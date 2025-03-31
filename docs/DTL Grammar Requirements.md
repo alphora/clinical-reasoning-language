@@ -1,188 +1,266 @@
-# DTL (Decision Tree Language) – Comprehensive Requirements
+# DTL (Decision Tree Language) – Final Grammar Requirements
 
-This document outlines the comprehensive requirements for the Decision Tree Language (DTL). These requirements are intended for use with an AI assistant to generate an ANTLR grammar. DTL’s core purpose is to represent a FHIR [PlanDefinition](http://hl7.org/fhir/plandefinition.html) as a Decision Tree or Decision Graph using the Clinical Practice Guideline Implementation Guide (CPG IG).
+This document provides a **final and comprehensive** set of requirements for creating a grammar for the Decision Tree Language (DTL). These requirements merge the original DTL specifications with additional clarifications and refinements aimed at:
+
+1. Producing a **useful, comprehensive, and accurate grammar** aligned with FHIR PlanDefinition and the CPG IG.
+2. **Optimizing for human readability**, especially for non-technical clinical users.
+
+The DTL grammar must therefore strike a balance between formal correctness, ease of parsing, and intuitive, indentation-based syntax.
 
 ---
 
-## 1. Introduction
-
-DTL is a domain-specific language designed to encode clinical decision logic in a tree or graph structure. DTL directly maps certain FHIR PlanDefinition elements (per the CPG IG) into a decision structure of **root nodes**, **leaf nodes**, **edges**, and **decision nodes**. DTL may also refer to a companion domain-specific language, the **Case Feature Language (CFL)**, to express the logical statements used in branching conditions.
+## 1. Purpose and Scope
 
 ### 1.1 Purpose
 
-1. Represent a FHIR PlanDefinition as a Decision Tree or Decision Graph.
-2. Encode clinical logic and flow (conditions, actions, references to subtrees) in a compact form.
-3. Interoperate with the subset of the CPG IG specification relevant to PlanDefinition structures.
-4. Provide a foundation for automatically generating or interpreting clinical decision pathways.
+- Represent a FHIR [PlanDefinition](http://hl7.org/fhir/plandefinition.html) as a Decision Tree or Decision Graph.
+- Encode clinical logic and flow (conditions, actions, references to subtrees) in a compact DSL.
+- Interoperate with the relevant portions of the Clinical Practice Guideline Implementation Guide (CPG IG).
+- Provide a foundation for generating or interpreting clinical decision pathways.
+
+### 1.2 Included FHIR Elements
+
+- **PlanDefinition.id** → unique identifier for the overall decision tree/graph.
+- **PlanDefinition.action** → backbone of the decision structure; the first top-level action is the root node.
+- **PlanDefinition.action.condition** → decision nodes in DTL.
+- **PlanDefinition.action.condition.expression** → references a CFL statement for the logical condition.
+- **PlanDefinition.action.input** → inputs or arguments for a decision node.
+- **PlanDefinition.action.definitionCanonical** → references a subtree (sub-PlanDefinition) or a leaf node.
+- **PlanDefinition.action.action** → edges connecting nodes in the tree/graph.
+
+### 1.3 Out of Scope
+
+The following will be addressed in future releases of the grammar:
+
+- **PlanDefinition.action.relatedAction** (including `actionId`, `relationship`, `offset`)
+- **PlanDefinition.action.timing**
+- **PlanDefinition.action.selectionBehavior**
+
+These elements **must not** appear in the current DTL grammar.
 
 ---
 
-## 2. Scope
+## 2. Structural Elements
 
-### 2.1 Included
+DTL models decision logic through:
 
-- **PlanDefinition.id**  
-  - Maps to the unique identifier of the decision tree/graph.
+1. **Root Node**  
+   - The top-level `PlanDefinition.action`.
 
-- **PlanDefinition.action**  
-  - Constitutes the backbone of the decision graph/tree, with the first top-level PlanDefinition action serving as the root.
+2. **Leaf Node**  
+   - A terminal node representing an outcome (mapped from `definitionCanonical` referencing a leaf).
 
-- **PlanDefinition.action.condition**  
-  - Represents the decision nodes in DTL.
+3. **Edges**  
+   - Each `action.action` forms a branch connecting nodes in the decision tree/graph.
 
-- **PlanDefinition.action.condition.expression**  
-  - References a CFL statement (logical expression describing the condition).
+4. **Decision Nodes**  
+   - Evaluate conditions and determine which branch to follow.
 
-- **PlanDefinition.action.input**  
-  - Represents arguments or inputs for a decision node.
-
-- **PlanDefinition.action.definitionCanonical**  
-  - Used in two ways:
-    1. Reference to another (sub) PlanDefinition, effectively embedding subtrees or subgraphs.
-    2. Reference to a leaf node (a terminal action or outcome).
-
-- **PlanDefinition.action.action**  
-  - Represents the edges connecting nodes within the Decision Tree/Decision Graph.
-
-### 2.2 Out of Scope
-
-The following PlanDefinition elements will be mapped in later versions of DTL, and **should not** be considered part of the current grammar:
-
-- `PlanDefinition.action.relatedAction`
-  - `actionId`
-  - `relationship`
-  - `offset`
-
-- `PlanDefinition.action.timing`
-- `PlanDefinition.action.selectionBehavior`
+5. **Subtrees**  
+   - Named subtrees that can be defined once and reused multiple times (including cyclical references). This feature supports decision graphs, not just acyclic trees.
 
 ---
 
-## 3. DTL Structural Elements
+## 3. Language Considerations
 
-DTL comprises four main elements:
-
-1. **Root Node**:  
-   - Corresponds to the first top-level `PlanDefinition.action`.  
-
-2. **Leaf Node**:  
-   - A terminal node where the decision path ends, typically mapped to `action.definitionCanonical` referencing a leaf.
-
-3. **Edges**:  
-   - Connections between nodes. In FHIR terms, each `action.action` in a PlanDefinition forms a branch (edge) in DTL.
-
-4. **Decision Nodes**:  
-   - Points in the tree where logic is evaluated to determine the next branch.
-
----
-
-## 4. Language Considerations
-
-1. **CFL References**  
-   - DTL references the Case Feature Language (CFL) for expressions inside concept blocks (`CONCEPT {}`) and action blocks (`ACTION {}`). However, at this stage, such references are **not** validated for correctness. They are simple placeholders within the grammar.
+1. **Reference to Case Feature Language (CFL)**  
+   - DTL references CFL statements in `CONCEPT { ... }` and `ACTION { ... }`.  
+   - At this stage, references to CFL are **not** validated; the grammar will simply accept their textual presence.
 
 2. **No Comments**  
-   - DTL does **not** allow comments (i.e., no syntactic structure for inline or block comments).
+   - DTL **disallows** any form of comments. The grammar must reject inline or block comment syntax.
 
 3. **Logical Operators**  
-   - `AND`, `OR`, and `NOT` must be supported for combining or negating expressions in both **concept blocks** and **action blocks**.
+   - Must support `AND`, `OR`, `NOT` in uppercase.  
+   - **Parentheses** are **mandatory** around expressions to ensure clarity for authors and unambiguous parsing.
 
 4. **SELECT Construct**  
-   - Allows specifying the number of items that must be true within a parenthetical expression of multiple items:
-     - **`SELECT[>=N](A OR B OR C)`**  
-       True if **at least** N of the listed items are true.
-     - **`SELECT[N](A OR B OR C)`**  
-       True if **exactly** N of the listed items are true.
-     - **`SELECT[<N](A OR B OR C)`**  
-       True if **fewer than** N of the listed items are true.
-     - **`SELECT[NONE](A OR B OR C)`**  
-       True if **none** of the listed items is true.
-     - **`SELECT[ALL](A AND B AND C)`**  
-       True if **all** of the listed items are true.
+   - `SELECT[...]` with cardinalities:  
+     - `[>=N]` → “at least N”  
+     - `[N]` → “exactly N”  
+     - `[<N]` → “fewer than N”  
+     - `[NONE]` → none is true  
+     - `[ALL]` → all are true  
+   - Additionally, the DSL must support the **shorthand** calls:  
+     - `ALL(...)` → equivalent to `SELECT[ALL](...)`  
+     - `ANY(...)` → equivalent to `SELECT[>=1](...)`
 
 ---
 
-## 5. DTL Grammar Statements
+## 4. Grammar Statements
 
-A DTL tree is structured using `IF`, `ELSE IF`, and `ELSE` blocks, with each condition referencing a **concept block**:
+### 4.1 Indentation-Based Control Flow
 
-IF <concept block> THEN <action block OR nested DTL tree> ELSE IF <concept block> THEN <action block OR nested DTL tree> ELSE <action block OR nested DTL tree>
+DTL uses **Python-like whitespace** to delineate blocks. There are **no** curly braces or semicolons around conditional blocks. Instead, each block’s body is indented relative to the preceding line. The grammar must handle indentation-based scoping.
 
-- There can be zero or more `ELSE IF` clauses.
-- The `ELSE` clause is optional.
-- A DTL tree may appear **nested** (recursively) within any THEN, ELSE IF, or ELSE section.
-- A DTL can also be a single **action block** if no branching (conditions) is required.
+**Example**:
 
-### 5.1 Concept Blocks
+``` dtl
+IF (<condition>) THEN <indented statements> ELSEIF (<condition>) THEN <indented statements> ELSE <indented statements>
+```
 
-A **concept block** describes a logical expression referencing CFL statements:
+Key points:
 
+- `ELSE IF` is replaced by **`ELSEIF`** as a single token.
+- Each new clause (`ELSEIF`, `ELSE`) starts at the **same indentation level** as the `IF`.
+- The body under `THEN`, `ELSEIF`, or `ELSE` is **further indented**.
+
+### 4.2 Concept and Action Blocks
+
+1. **Concept Block**
+
+``` dtl
 CONCEPT{ "description": "Example description", "expression": "Summary of concept" }
+```
 
-- May be combined with logical operators (`AND`, `OR`, `NOT`) or a `SELECT` statement.
+- Must be used within parenthesized logical expressions.  
+- May appear standalone or combined with other expressions (via `AND`, `OR`, `NOT`, `SELECT`, etc.).
 
-### 5.2 Action Blocks
+1. **Action Block**
 
-An **action block** describes an action or outcome:
-
+``` dtl
 ACTION{ "description": "Example description", "expression": "Summary of action" }
+```
 
-- May similarly be combined with logical operators or `SELECT` statements.
+- Same usage as `CONCEPT`, but denotes an actionable step or outcome rather than a condition.
 
-### 5.3 No Comments
+### 4.3 Logical Expressions
 
-DTL **disallows** comment syntax of any form (inline or block). Any comment-like material is considered invalid in the current version of the language.
+- **Always** enclosed in parentheses, e.g.:
 
----
+``` dtl
+(CONCEPT{...} AND (NOT ACTION{...}))
+```
 
-## 6. Requirements for the ANTLR Grammar
+or
 
-When generating an ANTLR grammar from these requirements, ensure the following:
+``` dtl
+( (CONCEPT{...} OR ACTION{...}) AND CONCEPT{...} )
+```
 
-1. **Terminals**  
-   - Keywords: `IF`, `ELSE`, `ELSE IF`, `THEN`, `CONCEPT`, `ACTION`, `SELECT`, `ALL`, `NONE`, `AND`, `OR`, `NOT`, plus symbols for operators `>=`, `<=`, `<`, `>`, `=`.
-   - Parentheses `(` `)` for grouping.
-   - Curly braces `{` `}` for concept and action blocks.
-   - Square brackets `[` `]` for the **SELECT** construct.
+- **SELECT** can wrap multiple expressions, e.g.:
 
-2. **Non-Terminals**  
-   - **dtlTree**: the root grammar rule for a DTL structure.
-   - **conditionalBranch**: captures `IF/ELSE IF/ELSE` blocks.
-   - **conceptBlock**: captures the syntax of the `CONCEPT { ... }` object.
-   - **actionBlock**: captures the syntax of the `ACTION { ... }` object.
-   - **selectStatement**: captures the `SELECT[...]` syntax.
-   - **logicalExpression**: captures the structure of combining concept/action blocks using `AND`, `OR`, `NOT`, or nesting.
+``` dtl
+SELECT[>=2]((CONCEPT{...}) OR (ACTION{...}) OR (CONCEPT{...}))
+```
 
-3. **Parsing Expressions**  
-   - The grammar must handle:
-     - Single condition branches, multiple `ELSE IF` branches, and optional `ELSE` branch.
-     - Nesting of `IF...THEN` statements within any resulting block.
-     - `CONCEPT` and `ACTION` objects, each containing at least:
-       - A `description` (string).
-       - An `expression` (string).
-     - The `SELECT` expression and bracketed integer/keyword (e.g., `[2]`, `[>=2]`, `[NONE]`, `[ALL]`).
+- Shorthand forms `ALL(...)` and `ANY(...)` are permitted as more user-friendly alternatives:
 
-4. **Validation**  
-   - Grammar rules must enforce that no comment syntax is present.
-   - The grammar must allow for references to possible nested DTL sub-trees in place of action blocks. 
-   - At this stage, the grammar need **not** validate the correctness of references to the CFL, though it must accept them as string literals in concept/action expressions.
-
-5. **Extensibility**  
-   - The grammar should be flexible enough to allow future additions for:
-     - `action.relatedAction` handling (e.g., `offset`, `relationship`).
-     - `PlanDefinition.action.timing`.
-     - Additional constraint checks or domain-specific expansions.
+``` dtl
+ALL((CONCEPT{...}) AND (CONCEPT{...})) ANY((CONCEPT{...}) OR (ACTION{...}))
+```
 
 ---
 
-## 7. Summary
+## 5. Subtrees and References
 
-The Decision Tree Language (DTL) is a specialized notation for modeling FHIR PlanDefinition artifacts as decision trees or graphs in alignment with the CPG IG. These requirements specify:
+### 5.1 Defining a Subtree
 
-- The high-level structure (IF / ELSE IF / ELSE blocks).
-- Concept and action blocks (referencing CFL expressions).
-- The `SELECT` construct for advanced logical counting.
-- Mappings to key PlanDefinition elements (e.g., `action`, `condition`, `input`, and `definitionCanonical`).
-- Limitations (no comments, partial references to external languages).
+The grammar must allow **named subtree definitions** for reuse. A subtree can include any valid DTL logic (including nested conditions, references to further subtrees, etc.). For example:
 
-This specification serves as the foundation for creating an ANTLR grammar. The grammar must accept valid DTL constructs as described here and reject any language constructs or syntax (particularly comments) not defined in these requirements.
+``` dtl
+DEFINE <SubtreeName>: IF (<condition>) THEN ... ELSEIF (<condition>) THEN ... ELSE ...
+```
+
+- `DEFINE <SubtreeName>:` appears at the top-level or in an appropriate scope.  
+- The block following this definition is **indented**.  
+- The grammar must handle subtree definitions in the **same** file only (no external references in the current version).
+
+### 5.2 Using a Subtree
+
+A defined subtree can be **called or referenced** from any logic branch to facilitate reuse. For instance:
+
+``` dtl
+USE <SubtreeName>
+```
+
+or
+
+``` dtl
+INCLUDE <SubtreeName>
+```
+
+(Choose the specific keyword to best fit your domain; the grammar must allow for a single, unambiguous reference keyword.)
+
+### 5.3 Cyclical References
+
+- The grammar **must** permit cyclical references, allowing directed cyclical graphs. Example:
+
+``` dtl
+DEFINE A: IF (<condition>) THEN USE B ELSE ACTION{...}
+DEFINE B: IF (<condition>) THEN USE A ELSE ACTION{...}
+```
+
+- The semantics or execution logic for such cycles is beyond the scope of the grammar but must not be disallowed at parse time.
+
+---
+
+## 6. Detailed Grammar Requirements
+
+### 6.1 Terminals
+
+1. **Keywords** (uppercase, indentation-sensitive):
+
+    - `IF`
+    - `ELSEIF`
+    - `ELSE`
+    - `THEN`
+    - `DEFINE`
+    - `USE` (or `INCLUDE`, whichever is chosen)
+    - `CONCEPT`
+    - `ACTION`
+    - `SELECT`
+    - `ALL`
+    - `NONE`
+    - `ANY`
+    - `AND`
+    - `OR`
+    - `NOT`
+2. **Operators**:
+     - `>=`, `<=`, `<`, `>`, `=`
+3. **Parentheses**:
+    - `(` and `)`
+4. **Square Brackets**:
+    - `[` and `]` (for `SELECT[...]`)
+5. **String Literals**:
+    - Must handle JSON-like blocks for `CONCEPT{ ... }` and `ACTION{ ... }`.
+6. **Indentation**:
+    - Whitespace or newline rules to handle block structure (similar to Python’s layout).
+
+### 6.2 Non-Terminals
+
+1. **dtlFile** (root rule)  
+    - A sequence of **DEFINE** statements and/or a top-level **IF** block.
+2. **defineStatement**  
+    - Matches `DEFINE <SubtreeName>:` plus indented block.
+3. **dtlTree**  
+    - Matches an `IF/ELSEIF/ELSE` chain with indented blocks, or a single `ACTION`/`CONCEPT` block, or a `USE` statement.
+4. **conditionalBranch**  
+    - Grammar for `IF (<expr>) THEN`, followed by an indented block, optional `ELSEIF` blocks, and optional `ELSE`.
+5. **conceptBlock**  
+    - Matches `CONCEPT { ... }`.
+6. **actionBlock**  
+    - Matches `ACTION { ... }`.
+7. **logicalExpression**  
+    - Captures `( expr )` forms with `AND`, `OR`, `NOT`, or `SELECT[...]`.
+8. **selectStatement**  
+    - Captures `SELECT[>=N](...)`, `ALL(...)`, `ANY(...)`, etc.
+9. **useStatement**  
+    - Captures `USE <SubtreeName>` referencing a previously defined subtree.
+
+### 6.3 Parsing Expressions
+
+- Must support nested parentheses, logical operators, and the combination of `CONCEPT{}` / `ACTION{}` blocks with `AND`, `OR`, `NOT`, `SELECT`, `ALL`, `ANY`.
+- Must **reject** any expressions that do not enclose conditions in parentheses (i.e., unparenthesized expressions are invalid).
+- Must accept string literal data inside `description` and `expression` fields of concept/action blocks, without additional validation.
+
+### 6.4 Validation Rules
+
+1. **No Comments**  
+    - Reject any input containing `#`, `//`, `/* ... */`, or any other comment-like sequence.
+2. **Indentation**  
+    - The grammar must correctly interpret indentation levels for block scope.  
+    - A typical approach is to use a lexical grammar that emits **INDENT** and **DEDENT** tokens, or an equivalent mechanism.
+3. **No External Subtrees**  
+    - In this version, all `DEFINE` statements must appear in the same file.  
+    - No syntax for external references is allowed.
