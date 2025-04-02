@@ -1,0 +1,65 @@
+<decision> ::= decision <id>: <description> <rule>
+<rule> ::= (all | any) when <condition> then? (<action> | <rule> | <decision>) // default is any
+<condition> ::= <id> // reference to a casefeature definition
+<action> ::= <id> // reference to ActivityDefinition
+<identifier> ::= <id> | <string> // string is a quoted string
+<description> ::= <string> // string is a quoted string
+<casefeature> ::= casefeature <id> // casefeature definition
+<id> ::= [a-zA-Z][a-zA-Z0-9_.]*[a-zA-Z0-9] // identifier starts with a letter, followed by letters, digits, dots, or underscores, and ends with a letter or digit
+
+// consider future considerations
+// double check for fit for parser
+  // rate complexity of the grammar
+  // is there a way to detect and quantify the ambiguity of the grammar
+// don't use antlr; use a context free grammar
+// 
+
+decision IMMZ.D2.D5.Measles: "Measles vaccination schedule for patients in low transmission settings"
+	when "Measles Routine Immunization Schedule Incomplete"
+		when "No Primary Series Doses Administered"
+			when "Client Age Less Than 12 Months" 
+				"Indicate"
+			when "Last Live Vaccine Administered Within 4 Weeks" 
+				"Indicate"
+			when "Client Is Due For MCV12" 
+				"Vaccinate"
+		when "One Primary Series Dose Administered"
+			when "Client Age Less Than 15 Months"
+				"Indicate"
+			when "Last Live Vaccine Administered Within 4 Weeks"
+				"Indicate"
+			when "Client Is Due For MCV2"
+				"Vaccinate"
+		when "Two Primary Series Doses Administered" 
+			"Indicate"
+
+decision something: "Something"
+	when "Something" 
+		"Do Something"
+
+casefeature obesity
+	Condition 
+	http://somevalueset-uri
+	(
+		casefeature bmi>25
+		OR
+		(
+			casefeature height
+			AND
+			casefeature weight
+		)
+	)
+
+
+casefeature height
+
+if "Measles Routine Immunization Schedule Incomplete" then
+	if "No Primary Series Doses Administered" then
+		if "Client Age Less Than 12 Months" then
+			Indicate
+		if not "Client Age Less Than 12 Months" then
+			if "Last Live Vaccine Administered Within 4 Weeks" then
+				Indicate
+			if not "Last Live Vaccine Administered Within 4 Weeks" then
+				if "Client Is Due For MCV12" then
+					Vaccinate
