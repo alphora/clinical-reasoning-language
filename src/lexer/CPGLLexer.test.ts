@@ -1,6 +1,6 @@
-import { CharStreams } from 'antlr4ts';
-import { CPGLLexer } from './CPGLLexer';
-import { CPGLTokenType } from './CPGLTokenType';
+/* eslint-disable no-console */
+import { CharStreams, Token } from 'antlr4ts';
+import { CPGLLexer, CPGLTokenType } from '../lexer';
 
 describe('CPGLLexer', () => {
     // Helper function to collect all tokens from input
@@ -70,4 +70,18 @@ describe('CPGLLexer', () => {
             getAllTokens('level1\n    level2\n   invalid');
         }).toThrow('Inconsistent indentation');
     });
+});
+
+// Example test case to ensure the lexer is functioning
+// This is a placeholder; replace with actual test logic
+
+test('Lexer should tokenize input correctly', () => {
+    const input = 'decision Test';
+    const lexer = new CPGLLexer(CharStreams.fromString(input));
+    let token = lexer.nextToken();
+    
+    while (token.type !== Token.EOF) {
+        console.log(`Token: type=${token.type}, text="${token.text}"`);
+        token = lexer.nextToken();
+    }
 }); 

@@ -7,34 +7,43 @@ import { CPGLTokenType } from './CPGLTokenType';
  * Custom token implementation for the Clinical Practice Guideline Language (CPGL)
  */
 export class CPGLToken implements Token {
-    private _type: number;
-    private _text: string;
-    private _line: number;
-    private _charPositionInLine: number;
-    private _channel: number;
-    private _tokenIndex: number;
-    private _startIndex: number;
-    private _stopIndex: number;
-    private _source: [CharStream, Lexer];
+    readonly _type: number;
+    readonly _text: string;
+    readonly _line: number;
+    readonly _charPositionInLine: number;
+    readonly _channel: number;
+    readonly _tokenIndex: number;
+    readonly _startIndex: number;
+    readonly _stopIndex: number;
+    readonly _source: [CharStream, Lexer];
 
-    constructor(
-        type: number,
-        text: string,
-        input: CharStream,
-        lexer: Lexer,
-        channel: number,
-        start: number,
-        stop: number,
-        tokenIndex: number,
-        line: number,
-        charPositionInLine: number
-    ) {
+    constructor({
+        type,
+        text,
+        line,
+        charPositionInLine,
+        channel,
+        tokenIndex,
+        startIndex,
+        stopIndex,
+        source
+    }: {
+        type: number;
+        text: string;
+        line: number;
+        charPositionInLine: number;
+        channel: number;
+        tokenIndex: number;
+        startIndex: number;
+        stopIndex: number;
+        source: [CharStream, Lexer];
+    }) {
         this._type = type;
         this._text = text;
-        this._source = [input, lexer];
+        this._source = source;
         this._channel = channel;
-        this._startIndex = start;
-        this._stopIndex = stop;
+        this._startIndex = startIndex;
+        this._stopIndex = stopIndex;
         this._tokenIndex = tokenIndex;
         this._line = line;
         this._charPositionInLine = charPositionInLine;

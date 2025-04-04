@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 import { CharStreams } from 'antlr4ts';
 import { CPGLLexer } from '../lexer';
 

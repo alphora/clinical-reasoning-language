@@ -10,8 +10,8 @@ import { Interval } from 'antlr4ts/misc/Interval';
  * Handles indentation-based syntax, comments, and token generation
  */
 export class CPGLLexer extends Lexer {
-    private indentationStack: number[] = [0];
-    private pendingTokens: CPGLToken[] = [];
+    readonly indentationStack: number[] = [0];
+    readonly pendingTokens: Token[] = [];
     private currentIndent = 0;
     private atStartOfLine = true;
     private _tokenIndex = -1;
@@ -23,7 +23,7 @@ export class CPGLLexer extends Lexer {
     public static readonly modeNames: string[] = ['DEFAULT_MODE'];
     public static readonly ruleNames: string[] = [];
     public static readonly vocabulary = {};
-    public static readonly grammarFileName = 'CPGL.g4';
+    public static readonly grammarFileName = 'CPGLCustomLexer';
 
     // Standard tokens for testing - these would normally be generated from an ANTLR grammar
     private readonly TOKEN_RULES: Map<string, number> = new Map([
@@ -72,25 +72,43 @@ export class CPGLLexer extends Lexer {
         // If we have pending tokens (INDENT/DEDENT), return those first
         if (this.pendingTokens.length > 0) {
             this._tokenIndex++;
-            return this.pendingTokens.shift()!;
+            const token = this.pendingTokens.shift();
+            if (token) {
+                return token;
+            }
         }
 
         // If at EOF and we have indentation levels to close
         if (this._input.LA(1) === -1 && this.indentationStack.length > 1) {
             this.indentationStack.pop();
             this._tokenIndex++;
-            return this.createToken(
-                CPGLTokenType.DEDENT,
-                '<DEDENT>',
-                this._input.index,
-                this._input.index
-            );
+            return this.createToken({
+                type: CPGLTokenType.DEDENT,
+                text: '<DEDENT>',
+                startIndex: this._input.index,
+                stopIndex: this._input.index,
+                line: this._currentLine,
+                charPositionInLine: this._currentColumn,
+                channel: Token.DEFAULT_CHANNEL,
+                tokenIndex: this._tokenIndex,
+                source: [this._input, this]
+            });
         }
 
         // Handle normal input
         if (this._input.LA(1) === -1) {
             // End of file
-            return this.createToken(CPGLTokenType.EOF, '<EOF>', this._input.index, this._input.index);
+            return this.createToken({
+                type: CPGLTokenType.EOF,
+                text: '<EOF>',
+                startIndex: this._input.index,
+                stopIndex: this._input.index,
+                line: this._currentLine,
+                charPositionInLine: this._currentColumn,
+                channel: Token.DEFAULT_CHANNEL,
+                tokenIndex: this._tokenIndex,
+                source: [this._input, this]
+            });
         }
 
         // Skip whitespace at the beginning of the line
@@ -112,12 +130,17 @@ export class CPGLLexer extends Lexer {
             if (this.currentIndent > lastIndent) {
                 // Increase in indentation
                 this.indentationStack.push(this.currentIndent);
-                return this.createToken(
-                    CPGLTokenType.INDENT,
-                    '<INDENT>',
-                    this._input.index - whitespaceCount,
-                    this._input.index
-                );
+                return this.createToken({
+                    type: CPGLTokenType.INDENT,
+                    text: '<INDENT>',
+                    startIndex: this._input.index - whitespaceCount,
+                    stopIndex: this._input.index,
+                    line: this._currentLine,
+                    charPositionInLine: this._currentColumn,
+                    channel: Token.DEFAULT_CHANNEL,
+                    tokenIndex: this._tokenIndex,
+                    source: [this._input, this]
+                });
             } else if (this.currentIndent < lastIndent) {
                 // Decrease in indentation
                 let found = false;
@@ -133,12 +156,17 @@ export class CPGLLexer extends Lexer {
                 }
 
                 this.indentationStack.pop();
-                return this.createToken(
-                    CPGLTokenType.DEDENT,
-                    '<DEDENT>',
-                    this._input.index - whitespaceCount,
-                    this._input.index
-                );
+                return this.createToken({
+                    type: CPGLTokenType.DEDENT,
+                    text: '<DEDENT>',
+                    startIndex: this._input.index - whitespaceCount,
+                    stopIndex: this._input.index,
+                    line: this._currentLine,
+                    charPositionInLine: this._currentColumn,
+                    channel: Token.DEFAULT_CHANNEL,
+                    tokenIndex: this._tokenIndex,
+                    source: [this._input, this]
+                });
             }
         }
 
@@ -166,7 +194,17 @@ export class CPGLLexer extends Lexer {
             this.atStartOfLine = true;
             this._currentLine++;
             this._currentColumn = 0;
-            return this.createToken(CPGLTokenType.NEWLINE, '<NEWLINE>', start, this._input.index);
+            return this.createToken({
+                type: CPGLTokenType.NEWLINE,
+                text: '<NEWLINE>',
+                startIndex: start,
+                stopIndex: this._input.index,
+                line: this._currentLine,
+                charPositionInLine: this._currentColumn,
+                channel: Token.DEFAULT_CHANNEL,
+                tokenIndex: this._tokenIndex,
+                source: [this._input, this]
+            });
         }
 
         // Handle string literals
@@ -202,7 +240,17 @@ export class CPGLLexer extends Lexer {
                 this._currentColumn++;
                 this._input.consume();
                 this._currentColumn++;
-                return this.createToken(operatorMap[possibleOp], possibleOp, start, this._input.index);
+                return this.createToken({
+                    type: operatorMap[possibleOp],
+                    text: possibleOp,
+                    startIndex: start,
+                    stopIndex: this._input.index,
+                    line: this._currentLine,
+                    charPositionInLine: this._currentColumn,
+                    channel: Token.DEFAULT_CHANNEL,
+                    tokenIndex: this._tokenIndex,
+                    source: [this._input, this]
+                });
             }
         }
 
@@ -213,7 +261,17 @@ export class CPGLLexer extends Lexer {
                 const start = this._input.index;
                 this._input.consume();
                 this._currentColumn++;
-                return this.createToken(operatorMap[possibleOp], possibleOp, start, this._input.index);
+                return this.createToken({
+                    type: operatorMap[possibleOp],
+                    text: possibleOp,
+                    startIndex: start,
+                    stopIndex: this._input.index,
+                    line: this._currentLine,
+                    charPositionInLine: this._currentColumn,
+                    channel: Token.DEFAULT_CHANNEL,
+                    tokenIndex: this._tokenIndex,
+                    source: [this._input, this]
+                });
             }
         }
 
@@ -229,7 +287,17 @@ export class CPGLLexer extends Lexer {
                 this._input.consume();
                 this._currentColumn++;
             }
-            return this.createToken(CPGLTokenType.WS, '<WS>', start, this._input.index);
+            return this.createToken({
+                type: CPGLTokenType.WS,
+                text: '<WS>',
+                startIndex: start,
+                stopIndex: this._input.index,
+                line: this._currentLine,
+                charPositionInLine: this._currentColumn,
+                channel: Token.DEFAULT_CHANNEL,
+                tokenIndex: this._tokenIndex,
+                source: [this._input, this]
+            });
         }
 
         // Handle unknown characters
@@ -237,7 +305,17 @@ export class CPGLLexer extends Lexer {
         const text = String.fromCharCode(this._input.LA(1));
         this._input.consume();
         this._currentColumn++;
-        return this.createToken(CPGLTokenType.UNKNOWN, text, start, this._input.index);
+        return this.createToken({
+            type: CPGLTokenType.UNKNOWN,
+            text: text,
+            startIndex: start,
+            stopIndex: this._input.index,
+            line: this._currentLine,
+            charPositionInLine: this._currentColumn,
+            channel: Token.DEFAULT_CHANNEL,
+            tokenIndex: this._tokenIndex,
+            source: [this._input, this]
+        });
     }
 
     private isAlpha(c: number): boolean {
@@ -274,12 +352,17 @@ export class CPGLLexer extends Lexer {
             this._currentColumn++;
         }
         
-        return this.createToken(
-            CPGLTokenType.SINGLE_LINE_COMMENT,
-            this._input.getText(new Interval(start, this._input.index - 1)), 
-            start, 
-            this._input.index
-        );
+        return this.createToken({
+            type: CPGLTokenType.SINGLE_LINE_COMMENT,
+            text: this._input.getText(new Interval(start, this._input.index - 1)), 
+            startIndex: start, 
+            stopIndex: this._input.index,
+            line: this._currentLine,
+            charPositionInLine: this._currentColumn,
+            channel: Token.DEFAULT_CHANNEL,
+            tokenIndex: this._tokenIndex,
+            source: [this._input, this]
+        });
     }
 
     /**
@@ -321,12 +404,17 @@ export class CPGLLexer extends Lexer {
             throw new Error('Unterminated block comment');
         }
         
-        return this.createToken(
-            CPGLTokenType.BLOCK_COMMENT,
-            this._input.getText(new Interval(start, this._input.index - 1)), 
-            start, 
-            this._input.index
-        );
+        return this.createToken({
+            type: CPGLTokenType.BLOCK_COMMENT,
+            text: this._input.getText(new Interval(start, this._input.index - 1)), 
+            startIndex: start, 
+            stopIndex: this._input.index,
+            line: this._currentLine,
+            charPositionInLine: this._currentColumn,
+            channel: Token.DEFAULT_CHANNEL,
+            tokenIndex: this._tokenIndex,
+            source: [this._input, this]
+        });
     }
 
     /**
@@ -363,12 +451,17 @@ export class CPGLLexer extends Lexer {
             throw new Error('Unterminated string literal');
         }
         
-        return this.createToken(
-            CPGLTokenType.STRING,
-            this._input.getText(new Interval(start, this._input.index - 1)), 
-            start, 
-            this._input.index
-        );
+        return this.createToken({
+            type: CPGLTokenType.STRING,
+            text: this._input.getText(new Interval(start, this._input.index - 1)), 
+            startIndex: start, 
+            stopIndex: this._input.index,
+            line: this._currentLine,
+            charPositionInLine: this._currentColumn,
+            channel: Token.DEFAULT_CHANNEL,
+            tokenIndex: this._tokenIndex,
+            source: [this._input, this]
+        });
     }
 
     /**
@@ -388,29 +481,48 @@ export class CPGLLexer extends Lexer {
         // Check if it's a keyword
         const keywordType = this.TOKEN_RULES.get(text);
         if (keywordType !== undefined) {
-            return this.createToken(keywordType, text, start, this._input.index);
+            return this.createToken({
+                type: keywordType,
+                text: text,
+                startIndex: start,
+                stopIndex: this._input.index,
+                line: this._currentLine,
+                charPositionInLine: this._currentColumn,
+                channel: Token.DEFAULT_CHANNEL,
+                tokenIndex: this._tokenIndex,
+                source: [this._input, this]
+            });
         }
         
         // Otherwise it's an identifier
-        return this.createToken(CPGLTokenType.IDENTIFIER, text, start, this._input.index);
+        return this.createToken({
+            type: CPGLTokenType.IDENTIFIER,
+            text: text,
+            startIndex: start,
+            stopIndex: this._input.index,
+            line: this._currentLine,
+            charPositionInLine: this._currentColumn,
+            channel: Token.DEFAULT_CHANNEL,
+            tokenIndex: this._tokenIndex,
+            source: [this._input, this]
+        });
     }
 
     /**
      * Create a token with the appropriate values
      */
-    private createToken(type: number, text: string, start: number, stop: number): Token {
+    private createToken(options: {
+        type: number;
+        text: string;
+        startIndex: number;
+        stopIndex: number;
+        line: number;
+        charPositionInLine: number;
+        channel: number;
+        tokenIndex: number;
+        source: [CharStream, CPGLLexer];
+    }): Token {
         this._tokenIndex++;
-        return new CPGLToken(
-            type,
-            text,
-            this._input,
-            this,
-            Token.DEFAULT_CHANNEL,
-            start,
-            stop - 1,
-            this._tokenIndex,
-            this._currentLine,
-            this._currentColumn
-        );
+        return new CPGLToken(options);
     }
 } 
