@@ -1,45 +1,58 @@
-<decision> ::= decision <id>: <description> <rule>
-<rule> ::= (all | any) when <condition> then? (<action> | <rule> | <decision>) // default is any
-<condition> ::= <id> // reference to a casefeature definition
-<action> ::= <id> // reference to ActivityDefinition
-<identifier> ::= <id> | <string> // string is a quoted string
-<description> ::= <string> // string is a quoted string
-<casefeature> ::= casefeature <id> // casefeature definition
-<id> ::= [a-zA-Z][a-zA-Z0-9_.]*[a-zA-Z0-9] // identifier starts with a letter, followed by letters, digits, dots, or underscores, and ends with a letter or digit
 
-// consider future considerations
-// double check for fit for parser
-  // rate complexity of the grammar
-  // is there a way to detect and quantify the ambiguity of the grammar
-// don't use antlr; use a context free grammar
-// 
+<newline> ::= "\n"
+<indent> ::= "   "
+<decision> ::= decision <identifier><newline><indent><rule>
+<rule> ::= (all | any) when <casefeaturereference> then<newline><indent> (do <actionreference> | <rule> | use <decisionreference>) // default is any, applicabilityBehavior
+<casefeaturcasefeaturereference> ::= <identifier> // reference to a casefeature definition
+<actionreference> ::= <identifier> // reference to action definition
+<identifier> ::= <string> // string is a quoted string
+<action> ::= action <identifier>
+<casefeature> ::= casefeature <identifier><newline><indent><fhirtype>
+<fhirtype> ::= (Observation | Condition)
 
-decision IMMZ.D2.D5.Measles: "Measles vaccination schedule for patients in low transmission settings"
-	when "Measles Routine Immunization Schedule Incomplete"
-		when "No Primary Series Doses Administered"
-			when "Client Age Less Than 12 Months" 
-				"Indicate"
-			when "Last Live Vaccine Administered Within 4 Weeks" 
-				"Indicate"
-			when "Client Is Due For MCV12" 
-				"Vaccinate"
-		when "One Primary Series Dose Administered"
-			when "Client Age Less Than 15 Months"
-				"Indicate"
-			when "Last Live Vaccine Administered Within 4 Weeks"
-				"Indicate"
-			when "Client Is Due For MCV2"
-				"Vaccinate"
-		when "Two Primary Series Doses Administered" 
-			"Indicate"
+decision "IMMZ.D2.D5.Measles"
+	when "Measles Routine Immunization Schedule Incomplete" then
+		when "No Primary Series Doses Administered" then
+			when "Client Age Less Than 12 Months" then 
+				do "Indicate"
+			when "Last Live Vaccine Administered Within 4 Weeks" then 
+				use "Elderly Based"
+			when "Client Is Due For MCV12" then 
+				do "Vaccinate"
+		when "One Primary Series Dose Administered" then
+			when "Client Age Less Than 15 Months" then 
+				do "Indicate"
+			when "Last Live Vaccine Administered Within 4 Weeks" then 
+				use "Elderly Based"
+			when "Client Is Due For MCV12" then 
+				do "Vaccinate"
+		when "Two Primary Series Doses Administered" then 
+			do "Indicate"
 
-decision something: "Something"
-	when "Something" 
-		"Do Something"
+decision "Elderly Based"
+	when "Client Age Greater Than 60" then
+		do "Indicate"
+	when "Client Age Less Than 60" then
+		do "Vaccinate"
 
-casefeature obesity
-	Condition 
-	http://somevalueset-uri
+action "Indicate"
+	fhirtype ServiceRequest
+
+action "Vaccinate"
+	fhirtype MedicationRequest
+
+casefeature "Measles Routine Immunization Schedule Incomplete"
+	code "measles-routine-immunization-schedule-incomplete"
+	fhirtype Condition 
+	url "http://someothervalueset-uri"
+	valuetype boolean
+
+casefeature "Last Live Vaccine Administered Within 4 Weeks"
+	code "last-live-vaccine-administered"
+	fhirtype Observation 
+	url "http://somevalueset-uri"
+	valuetype dateTime
+
 	(
 		casefeature bmi>25
 		OR
@@ -50,6 +63,7 @@ casefeature obesity
 		)
 	)
 
+// other case features
 
 casefeature height
 

@@ -1,11 +1,11 @@
-# DTL (Decision Tree Language) – Final Grammar Requirements
+# CPGL (Decision Tree Language) – Final Grammar Requirements
 
-This document provides a **final and comprehensive** set of requirements for creating a grammar for the Decision Tree Language (DTL). These requirements merge the original DTL specifications with additional clarifications and refinements aimed at:
+This document provides a **final and comprehensive** set of requirements for creating a grammar for the Decision Tree Language (CPGL). These requirements merge the original CPGL specifications with additional clarifications and refinements aimed at:
 
 1. Producing a **useful, comprehensive, and accurate grammar** aligned with FHIR PlanDefinition and the CPG IG.
 2. **Optimizing for human readability**, especially for non-technical clinical users.
 
-The DTL grammar must therefore strike a balance between formal correctness, ease of parsing, and intuitive, indentation-based syntax.
+The CPGL grammar must therefore strike a balance between formal correctness, ease of parsing, and intuitive, indentation-based syntax.
 
 ---
 
@@ -22,7 +22,7 @@ The DTL grammar must therefore strike a balance between formal correctness, ease
 
 - **PlanDefinition.id** → unique identifier for the overall decision tree/graph.
 - **PlanDefinition.action** → backbone of the decision structure; the first top-level action is the root node.
-- **PlanDefinition.action.condition** → decision nodes in DTL.
+- **PlanDefinition.action.condition** → decision nodes in CPGL.
 - **PlanDefinition.action.condition.expression** → references a CFL statement for the logical condition.
 - **PlanDefinition.action.input** → inputs or arguments for a decision node.
 - **PlanDefinition.action.definitionCanonical** → references a subtree (sub-PlanDefinition) or a leaf node.
@@ -36,13 +36,13 @@ The following will be addressed in future releases of the grammar:
 - **PlanDefinition.action.timing**
 - **PlanDefinition.action.selectionBehavior**
 
-These elements **must not** appear in the current DTL grammar.
+These elements **must not** appear in the current CPGL grammar.
 
 ---
 
 ## 2. Structural Elements
 
-DTL models decision logic through:
+CPGL models decision logic through:
 
 1. **Root Node**  
    - The top-level `PlanDefinition.action`.
@@ -64,11 +64,11 @@ DTL models decision logic through:
 ## 3. Language Considerations
 
 1. **Reference to Case Feature Language (CFL)**  
-   - DTL references CFL statements in `CONCEPT { ... }` and `ACTION { ... }`.  
+   - CPGL references CFL statements in `CONCEPT { ... }` and `ACTION { ... }`.  
    - At this stage, references to CFL are **not** validated; the grammar will simply accept their textual presence.
 
 2. **No Comments**  
-   - DTL **disallows** any form of comments. The grammar must reject inline or block comment syntax.
+   - CPGL **disallows** any form of comments. The grammar must reject inline or block comment syntax.
 
 3. **Logical Operators**  
    - Must support `AND`, `OR`, `NOT` in uppercase.  
@@ -91,11 +91,11 @@ DTL models decision logic through:
 
 ### 4.1 Indentation-Based Control Flow
 
-DTL uses **Python-like whitespace** to delineate blocks. There are **no** curly braces or semicolons around conditional blocks. Instead, each block’s body is indented relative to the preceding line. The grammar must handle indentation-based scoping.
+CPGL uses **Python-like whitespace** to delineate blocks. There are **no** curly braces or semicolons around conditional blocks. Instead, each block’s body is indented relative to the preceding line. The grammar must handle indentation-based scoping.
 
 **Example**:
 
-``` dtl
+``` cpgl
 IF (<condition>) THEN <indented statements> ELSEIF (<condition>) THEN <indented statements> ELSE <indented statements>
 ```
 
@@ -109,7 +109,7 @@ Key points:
 
 1. **Concept Block**
 
-``` dtl
+``` cpgl
 CONCEPT{ "description": "Example description", "expression": "Summary of concept" }
 ```
 
@@ -118,7 +118,7 @@ CONCEPT{ "description": "Example description", "expression": "Summary of concept
 
 1. **Action Block**
 
-``` dtl
+``` cpgl
 ACTION{ "description": "Example description", "expression": "Summary of action" }
 ```
 
@@ -128,25 +128,25 @@ ACTION{ "description": "Example description", "expression": "Summary of action" 
 
 - **Always** enclosed in parentheses, e.g.:
 
-``` dtl
+``` cpgl
 (CONCEPT{...} AND (NOT ACTION{...}))
 ```
 
 or
 
-``` dtl
+``` cpgl
 ( (CONCEPT{...} OR ACTION{...}) AND CONCEPT{...} )
 ```
 
 - **SELECT** can wrap multiple expressions, e.g.:
 
-``` dtl
+``` cpgl
 SELECT[>=2]((CONCEPT{...}) OR (ACTION{...}) OR (CONCEPT{...}))
 ```
 
 - Shorthand forms `ALL(...)` and `ANY(...)` are permitted as more user-friendly alternatives:
 
-``` dtl
+``` cpgl
 ALL((CONCEPT{...}) AND (CONCEPT{...})) ANY((CONCEPT{...}) OR (ACTION{...}))
 ```
 
@@ -156,9 +156,9 @@ ALL((CONCEPT{...}) AND (CONCEPT{...})) ANY((CONCEPT{...}) OR (ACTION{...}))
 
 ### 5.1 Defining a Subtree
 
-The grammar must allow **named subtree definitions** for reuse. A subtree can include any valid DTL logic (including nested conditions, references to further subtrees, etc.). For example:
+The grammar must allow **named subtree definitions** for reuse. A subtree can include any valid CPGL logic (including nested conditions, references to further subtrees, etc.). For example:
 
-``` dtl
+``` cpgl
 DEFINE <SubtreeName>: IF (<condition>) THEN ... ELSEIF (<condition>) THEN ... ELSE ...
 ```
 
@@ -170,13 +170,13 @@ DEFINE <SubtreeName>: IF (<condition>) THEN ... ELSEIF (<condition>) THEN ... EL
 
 A defined subtree can be **called or referenced** from any logic branch to facilitate reuse. For instance:
 
-``` dtl
+``` cpgl
 USE <SubtreeName>
 ```
 
 or
 
-``` dtl
+``` cpgl
 INCLUDE <SubtreeName>
 ```
 
@@ -186,7 +186,7 @@ INCLUDE <SubtreeName>
 
 - The grammar **must** permit cyclical references, allowing directed cyclical graphs. Example:
 
-``` dtl
+``` cpgl
 DEFINE A: IF (<condition>) THEN USE B ELSE ACTION{...}
 DEFINE B: IF (<condition>) THEN USE A ELSE ACTION{...}
 ```
@@ -229,11 +229,11 @@ DEFINE B: IF (<condition>) THEN USE A ELSE ACTION{...}
 
 ### 6.2 Non-Terminals
 
-1. **dtlFile** (root rule)  
+1. **cpglFile** (root rule)  
     - A sequence of **DEFINE** statements and/or a top-level **IF** block.
 2. **defineStatement**  
     - Matches `DEFINE <SubtreeName>:` plus indented block.
-3. **dtlTree**  
+3. **cpglTree**  
     - Matches an `IF/ELSEIF/ELSE` chain with indented blocks, or a single `ACTION`/`CONCEPT` block, or a `USE` statement.
 4. **conditionalBranch**  
     - Grammar for `IF (<expr>) THEN`, followed by an indented block, optional `ELSEIF` blocks, and optional `ELSE`.
