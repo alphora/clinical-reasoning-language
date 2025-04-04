@@ -1,5 +1,5 @@
 import { CharStreams } from 'antlr4ts';
-import { CPGLLexer, CPGLTokenType } from '../lexer';
+import { CPGLLexer } from '../lexer';
 
 // Simple test to make sure the lexer is working correctly
 const input = `decision Test`;
