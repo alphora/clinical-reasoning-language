@@ -1,10 +1,13 @@
 import { CPGLLexer } from '../lexer';
 import { CommonTokenStream, CharStreams } from 'antlr4ts';
 import { CPGLParser as GeneratedParser } from '../grammar/generated/CPGLParser';
+import { ASTVisitor } from '../ast/visitor';
+import { File } from '../ast/types';
 
 export class CPGLParser {
     private lexer: CPGLLexer;
     private parser: GeneratedParser;
+    private visitor: ASTVisitor;
 
     constructor(input: string) {
         // Trim leading and trailing whitespace and newlines
@@ -15,24 +18,21 @@ export class CPGLParser {
         this.lexer = new CPGLLexer(charStream);
         const tokens = new CommonTokenStream(this.lexer);
         this.parser = new GeneratedParser(tokens);
+        this.visitor = new ASTVisitor();
         
         // Remove the default error listener to prevent error messages
         this.parser.removeErrorListeners();
     }
 
-    private cleanTreeString(tree: any): string {
-        const treeStr = tree.toStringTree(this.parser);
-        // Remove redundant rule names that match their token values
-        return treeStr.replace(/\b(\w+)\s+\1\b/g, '$1');
-    }
-
-    public parse(): void {
+    public parse(): File {
         try {
             // Parse the input starting from the file rule
             const tree = this.parser.file();
-            console.log('Parse tree:', this.cleanTreeString(tree));
+            // Convert parse tree to AST
+            return this.visitor.visit(tree) as File;
         } catch (e) {
             console.error('Parsing error:', e);
+            throw e;
         }
     }
 } 

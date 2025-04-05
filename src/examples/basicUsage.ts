@@ -1,33 +1,8 @@
-import { CharStreams } from 'antlr4ts';
-import { CPGLLexer } from '../lexer/CPGLLexer';
-import { CPGLTokenType } from '../lexer/CPGLTokenType';
+import { CPGLLexer } from '../lexer';
 import { CPGLParser } from '../parser/CPGLParser';
+import { CharStreams } from 'antlr4ts';
 
-// Example 1: Basic lexer usage
-function tokenizeInput(input: string) {
-    const lexer = new CPGLLexer(CharStreams.fromString(input));
-    const tokens = [];
-    
-    let token = lexer.nextToken();
-    while (token.type !== CPGLTokenType.EOF) {
-        tokens.push({
-            type: CPGLTokenType[token.type],
-            text: token.text
-        });
-        token = lexer.nextToken();
-    }
-    
-    return tokens;
-}
-
-// Example 2: Basic parser usage
-function parseInput(input: string) {
-    const parser = new CPGLParser(input);
-    parser.parse();
-}
-
-// Example usage
-const exampleInput = `
+const input = `
 decision "Test Decision"
   when "condition" then
     do "action1"
@@ -36,8 +11,19 @@ decision "Test Decision"
 `;
 
 console.log('=== Tokenizing Example ===');
-const tokens = tokenizeInput(exampleInput);
+const lexer = new CPGLLexer(CharStreams.fromString(input));
+const tokens = [];
+let token = lexer.nextToken();
+while (token.type !== -1) { // -1 is EOF
+    tokens.push({
+        type: lexer.ruleNames[token.type - 1],
+        text: token.text
+    });
+    token = lexer.nextToken();
+}
 console.log('Tokens:', JSON.stringify(tokens, null, 2));
 
 console.log('\n=== Parsing Example ===');
-parseInput(exampleInput); 
+const parser = new CPGLParser(input);
+const ast = parser.parse();
+console.log('AST:', JSON.stringify(ast, null, 2)); 
