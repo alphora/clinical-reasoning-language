@@ -86,6 +86,10 @@ export class CPGLToken implements Token {
     }
 
     get text(): string {
+        // Special handling for EOF token
+        if (this._type === Token.EOF) {
+            return '<EOF>';
+        }
         return this._text;
     }
 
@@ -105,6 +109,9 @@ export class CPGLToken implements Token {
      * Get the name of the token type
      */
     public get typeName(): string {
+        if (this._type === Token.EOF) {
+            return 'EOF';
+        }
         return CPGLTokenType[this._type];
     }
 
@@ -121,7 +128,7 @@ export class CPGLToken implements Token {
             channelStr = `,channel=${this._channel}`;
         }
 
-        let txt = this._text;
+        let txt = this.text; // Use the getter to handle EOF specially
         if (txt) {
             txt = txt.replace(/\n/g, '\\n');
             txt = txt.replace(/\r/g, '\\r');
@@ -130,6 +137,6 @@ export class CPGLToken implements Token {
             txt = '<no text>';
         }
 
-        return `[@${this._tokenIndex},${this._startIndex}:${this._stopIndex}='${txt}',<${this._type}>${channelStr},${this._line}:${this._charPositionInLine}]`;
+        return `[@${this._tokenIndex},${this._startIndex}:${this._stopIndex}='${txt}',<${this.typeName}>${channelStr},${this._line}:${this._charPositionInLine}]`;
     }
 } 

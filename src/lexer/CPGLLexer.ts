@@ -89,6 +89,7 @@ export class CPGLLexer extends Lexer {
 
         // If at EOF and we have indentation levels to close
         if (this._input.LA(1) === -1) {
+            // Generate DEDENT tokens for any remaining indentation levels
             if (this.indentationStack.length > 1) {
                 this.indentationStack.pop();
                 return this.createToken({
@@ -104,17 +105,19 @@ export class CPGLLexer extends Lexer {
                 });
             }
             // Return EOF token when all indentation levels are closed
-            return this.createToken({
-                type: CPGLTokenType.EOF,
-                text: '<EOF>',
-                startIndex: this._input.index,
-                stopIndex: this._input.index,
-                line: this._currentLine,
-                charPositionInLine: this._currentColumn,
-                channel: Token.DEFAULT_CHANNEL,
-                tokenIndex: this._tokenIndex++,
-                source: [this._input, this]
-            });
+            if (this.indentationStack.length === 1) {
+                return this.createToken({
+                    type: Token.EOF,
+                    text: '<EOF>',
+                    startIndex: this._input.index,
+                    stopIndex: this._input.index,
+                    line: this._currentLine,
+                    charPositionInLine: this._currentColumn,
+                    channel: Token.DEFAULT_CHANNEL,
+                    tokenIndex: this._tokenIndex++,
+                    source: [this._input, this]
+                });
+            }
         }
 
         // Skip whitespace at the beginning of the line
@@ -127,6 +130,39 @@ export class CPGLLexer extends Lexer {
                 whitespaceCount++;
                 this._input.consume();
                 this._currentColumn++;
+            }
+
+            // If we hit EOF while counting whitespace
+            if (this._input.LA(1) === -1) {
+                // Generate DEDENT tokens for any remaining indentation levels
+                if (this.indentationStack.length > 1) {
+                    this.indentationStack.pop();
+                    return this.createToken({
+                        type: CPGLTokenType.DEDENT,
+                        text: '<DEDENT>',
+                        startIndex: this._input.index - whitespaceCount,
+                        stopIndex: this._input.index,
+                        line: this._currentLine,
+                        charPositionInLine: this._currentColumn,
+                        channel: Token.DEFAULT_CHANNEL,
+                        tokenIndex: this._tokenIndex++,
+                        source: [this._input, this]
+                    });
+                }
+                // Return EOF token when all indentation levels are closed
+                if (this.indentationStack.length === 1) {
+                    return this.createToken({
+                        type: Token.EOF,
+                        text: '<EOF>',
+                        startIndex: this._input.index,
+                        stopIndex: this._input.index,
+                        line: this._currentLine,
+                        charPositionInLine: this._currentColumn,
+                        channel: Token.DEFAULT_CHANNEL,
+                        tokenIndex: this._tokenIndex++,
+                        source: [this._input, this]
+                    });
+                }
             }
 
             // Handle indentation changes
@@ -180,6 +216,39 @@ export class CPGLLexer extends Lexer {
                 this._input.consume();
                 this._currentColumn++;
             }
+
+            // If we hit EOF while skipping whitespace
+            if (this._input.LA(1) === -1) {
+                // Generate DEDENT tokens for any remaining indentation levels
+                if (this.indentationStack.length > 1) {
+                    this.indentationStack.pop();
+                    return this.createToken({
+                        type: CPGLTokenType.DEDENT,
+                        text: '<DEDENT>',
+                        startIndex: this._input.index,
+                        stopIndex: this._input.index,
+                        line: this._currentLine,
+                        charPositionInLine: this._currentColumn,
+                        channel: Token.DEFAULT_CHANNEL,
+                        tokenIndex: this._tokenIndex++,
+                        source: [this._input, this]
+                    });
+                }
+                // Return EOF token when all indentation levels are closed
+                if (this.indentationStack.length === 1) {
+                    return this.createToken({
+                        type: Token.EOF,
+                        text: '<EOF>',
+                        startIndex: this._input.index,
+                        stopIndex: this._input.index,
+                        line: this._currentLine,
+                        charPositionInLine: this._currentColumn,
+                        channel: Token.DEFAULT_CHANNEL,
+                        tokenIndex: this._tokenIndex++,
+                        source: [this._input, this]
+                    });
+                }
+            }
         }
 
         // Handle comments
@@ -198,14 +267,15 @@ export class CPGLLexer extends Lexer {
             const start = this._input.index;
             this._input.consume();
             
-            // Handle Windows-style newlines (\r\n)
-            if (this._input.LA(1) === '\n'.charCodeAt(0) && this._input.LA(-1) === '\r'.charCodeAt(0)) {
+            // Skip the \n in \r\n
+            if (this._input.LA(1) === '\n'.charCodeAt(0)) {
                 this._input.consume();
             }
             
-            this.atStartOfLine = true;
             this._currentLine++;
             this._currentColumn = 0;
+            this.atStartOfLine = true;
+            
             return this.createToken({
                 type: CPGLTokenType.NEWLINE,
                 text: '<NEWLINE>',
@@ -225,24 +295,55 @@ export class CPGLLexer extends Lexer {
         }
 
         // Handle identifiers and keywords
-        if (this.isAlpha(this._input.LA(1)) || this._input.LA(1) === '_'.charCodeAt(0)) {
+        if (this.isAlpha(this._input.LA(1))) {
             return this.handleIdentifier();
         }
 
-        // Unknown character - treat as identifier
-        const startIndex = this._input.index;
-        const startColumn = this._currentColumn;
-        const c = String.fromCharCode(this._input.LA(1));
+        // If we reach here and find EOF, handle it
+        if (this._input.LA(1) === -1) {
+            // Generate DEDENT tokens for any remaining indentation levels
+            if (this.indentationStack.length > 1) {
+                this.indentationStack.pop();
+                return this.createToken({
+                    type: CPGLTokenType.DEDENT,
+                    text: '<DEDENT>',
+                    startIndex: this._input.index,
+                    stopIndex: this._input.index,
+                    line: this._currentLine,
+                    charPositionInLine: this._currentColumn,
+                    channel: Token.DEFAULT_CHANNEL,
+                    tokenIndex: this._tokenIndex++,
+                    source: [this._input, this]
+                });
+            }
+            // Return EOF token when all indentation levels are closed
+            if (this.indentationStack.length === 1) {
+                return this.createToken({
+                    type: Token.EOF,
+                    text: '<EOF>',
+                    startIndex: this._input.index,
+                    stopIndex: this._input.index,
+                    line: this._currentLine,
+                    charPositionInLine: this._currentColumn,
+                    channel: Token.DEFAULT_CHANNEL,
+                    tokenIndex: this._tokenIndex++,
+                    source: [this._input, this]
+                });
+            }
+        }
+
+        // Handle unrecognized characters
+        const c = this._input.LA(1);
         this._input.consume();
         this._currentColumn++;
-
+        
         return this.createToken({
-            type: CPGLTokenType.IDENTIFIER,
-            text: c,
-            startIndex: startIndex,
+            type: CPGLTokenType.ERROR,
+            text: String.fromCharCode(c),
+            startIndex: this._input.index - 1,
             stopIndex: this._input.index - 1,
             line: this._currentLine,
-            charPositionInLine: startColumn,
+            charPositionInLine: this._currentColumn - 1,
             channel: Token.DEFAULT_CHANNEL,
             tokenIndex: this._tokenIndex++,
             source: [this._input, this]

@@ -40,13 +40,15 @@ export class CPGLParser extends Parser {
 	public static readonly T__9 = 10;
 	public static readonly T__10 = 11;
 	public static readonly STRING = 12;
-	public static readonly IDENTIFIER = 13;
-	public static readonly NEWLINE = 14;
-	public static readonly WS = 15;
-	public static readonly COMMENT = 16;
-	public static readonly COMMENT_BLOCK = 17;
-	public static readonly INDENT = 18;
-	public static readonly DEDENT = 19;
+	public static readonly ACTION_FHIR_TYPE = 13;
+	public static readonly CASEFEATURE_FHIR_TYPE = 14;
+	public static readonly FHIR_VALUE_TYPE = 15;
+	public static readonly NEWLINE = 16;
+	public static readonly WS = 17;
+	public static readonly COMMENT = 18;
+	public static readonly COMMENT_BLOCK = 19;
+	public static readonly INDENT = 20;
+	public static readonly DEDENT = 21;
 	public static readonly RULE_file = 0;
 	public static readonly RULE_statement = 1;
 	public static readonly RULE_decision = 2;
@@ -77,12 +79,14 @@ export class CPGLParser extends Parser {
 	private static readonly _LITERAL_NAMES: Array<string | undefined> = [
 		undefined, "'decision'", "'when'", "'then'", "'do'", "'use'", "'action'", 
 		"'fhirtype'", "'casefeature'", "'code'", "'url'", "'valuetype'", undefined, 
-		undefined, undefined, undefined, undefined, undefined, "'<INDENT>'", "'<DEDENT>'",
+		undefined, undefined, undefined, undefined, undefined, undefined, undefined, 
+		"'<INDENT>'", "'<DEDENT>'",
 	];
 	private static readonly _SYMBOLIC_NAMES: Array<string | undefined> = [
 		undefined, undefined, undefined, undefined, undefined, undefined, undefined, 
-		undefined, undefined, undefined, undefined, undefined, "STRING", "IDENTIFIER", 
-		"NEWLINE", "WS", "COMMENT", "COMMENT_BLOCK", "INDENT", "DEDENT",
+		undefined, undefined, undefined, undefined, undefined, "STRING", "ACTION_FHIR_TYPE", 
+		"CASEFEATURE_FHIR_TYPE", "FHIR_VALUE_TYPE", "NEWLINE", "WS", "COMMENT", 
+		"COMMENT_BLOCK", "INDENT", "DEDENT",
 	];
 	public static readonly VOCABULARY: Vocabulary = new VocabularyImpl(CPGLParser._LITERAL_NAMES, CPGLParser._SYMBOLIC_NAMES, []);
 
@@ -558,7 +562,7 @@ export class CPGLParser extends Parser {
 			this.state = 101;
 			this.match(CPGLParser.T__6);
 			this.state = 102;
-			this.match(CPGLParser.IDENTIFIER);
+			this.match(CPGLParser.ACTION_FHIR_TYPE);
 			this.state = 103;
 			this.match(CPGLParser.NEWLINE);
 			}
@@ -740,7 +744,7 @@ export class CPGLParser extends Parser {
 			this.state = 126;
 			this.match(CPGLParser.T__6);
 			this.state = 127;
-			this.match(CPGLParser.IDENTIFIER);
+			this.match(CPGLParser.CASEFEATURE_FHIR_TYPE);
 			this.state = 128;
 			this.match(CPGLParser.NEWLINE);
 			}
@@ -798,7 +802,7 @@ export class CPGLParser extends Parser {
 			this.state = 134;
 			this.match(CPGLParser.T__10);
 			this.state = 135;
-			this.match(CPGLParser.IDENTIFIER);
+			this.match(CPGLParser.FHIR_VALUE_TYPE);
 			this.state = 136;
 			this.match(CPGLParser.NEWLINE);
 			}
@@ -819,7 +823,7 @@ export class CPGLParser extends Parser {
 	}
 
 	public static readonly _serializedATN: string =
-		"\x03\uC91D\uCABA\u058D\uAFBA\u4F53\u0607\uEA8B\uC241\x03\x15\x8D\x04\x02" +
+		"\x03\uC91D\uCABA\u058D\uAFBA\u4F53\u0607\uEA8B\uC241\x03\x17\x8D\x04\x02" +
 		"\t\x02\x04\x03\t\x03\x04\x04\t\x04\x04\x05\t\x05\x04\x06\t\x06\x04\x07" +
 		"\t\x07\x04\b\t\b\x04\t\t\t\x04\n\t\n\x04\v\t\v\x04\f\t\f\x04\r\t\r\x04" +
 		"\x0E\t\x0E\x04\x0F\t\x0F\x04\x10\t\x10\x04\x11\t\x11\x04\x12\t\x12\x04" +
@@ -836,7 +840,7 @@ export class CPGLParser extends Parser {
 		"\x13\x03\x13\x03\x13\x03\x14\x03\x14\x03\x14\x03\x14\x03\x14\x02\x02\x02" +
 		"\x15\x02\x02\x04\x02\x06\x02\b\x02\n\x02\f\x02\x0E\x02\x10\x02\x12\x02" +
 		"\x14\x02\x16\x02\x18\x02\x1A\x02\x1C\x02\x1E\x02 \x02\"\x02$\x02&\x02" +
-		"\x02\x04\x03\x02\x10\x11\x03\x03\x10\x10\x02\x85\x02+\x03\x02\x02\x02" +
+		"\x02\x04\x03\x02\x12\x13\x03\x03\x12\x12\x02\x85\x02+\x03\x02\x02\x02" +
 		"\x049\x03\x02\x02\x02\x06;\x03\x02\x02\x02\b@\x03\x02\x02\x02\nK\x03\x02" +
 		"\x02\x02\fM\x03\x02\x02\x02\x0ES\x03\x02\x02\x02\x10W\x03\x02\x02\x02" +
 		"\x12[\x03\x02\x02\x02\x14a\x03\x02\x02\x02\x16e\x03\x02\x02\x02\x18g\x03" +
@@ -848,30 +852,30 @@ export class CPGLParser extends Parser {
 		"12\x03\x02\x02\x0224\x03\x02\x02\x0231\x03\x02\x02\x0245\x07\x02\x02\x03" +
 		"5\x03\x03\x02\x02\x026:\x05\x06\x04\x027:\x05\x12\n\x028:\x05\x1A\x0E" +
 		"\x0296\x03\x02\x02\x0297\x03\x02\x02\x0298\x03\x02\x02\x02:\x05\x03\x02" +
-		"\x02\x02;<\x07\x03\x02\x02<=\x07\x0E\x02\x02=>\x07\x10\x02\x02>?\x05\b" +
-		"\x05\x02?\x07\x03\x02\x02\x02@B\x07\x14\x02\x02AC\x05\n\x06\x02BA\x03" +
+		"\x02\x02;<\x07\x03\x02\x02<=\x07\x0E\x02\x02=>\x07\x12\x02\x02>?\x05\b" +
+		"\x05\x02?\x07\x03\x02\x02\x02@B\x07\x16\x02\x02AC\x05\n\x06\x02BA\x03" +
 		"\x02\x02\x02CD\x03\x02\x02\x02DB\x03\x02\x02\x02DE\x03\x02\x02\x02EF\x03" +
-		"\x02\x02\x02FG\x07\x15\x02\x02G\t\x03\x02\x02\x02HL\x05\f\x07\x02IL\x05" +
+		"\x02\x02\x02FG\x07\x17\x02\x02G\t\x03\x02\x02\x02HL\x05\f\x07\x02IL\x05" +
 		"\x0E\b\x02JL\x05\x10\t\x02KH\x03\x02\x02\x02KI\x03\x02\x02\x02KJ\x03\x02" +
 		"\x02\x02L\v\x03\x02\x02\x02MN\x07\x04\x02\x02NO\x07\x0E\x02\x02OP\x07" +
-		"\x05\x02\x02PQ\x07\x10\x02\x02QR\x05\b\x05\x02R\r\x03\x02\x02\x02ST\x07" +
+		"\x05\x02\x02PQ\x07\x12\x02\x02QR\x05\b\x05\x02R\r\x03\x02\x02\x02ST\x07" +
 		"\x06\x02\x02TU\x07\x0E\x02\x02UV\t\x03\x02\x02V\x0F\x03\x02\x02\x02WX" +
 		"\x07\x07\x02\x02XY\x07\x0E\x02\x02YZ\t\x03\x02\x02Z\x11\x03\x02\x02\x02" +
-		"[\\\x07\b\x02\x02\\]\x07\x0E\x02\x02]_\x07\x10\x02\x02^`\x05\x14\v\x02" +
-		"_^\x03\x02\x02\x02_`\x03\x02\x02\x02`\x13\x03\x02\x02\x02ab\x07\x14\x02" +
-		"\x02bc\x05\x16\f\x02cd\x07\x15\x02\x02d\x15\x03\x02\x02\x02ef\x05\x18" +
-		"\r\x02f\x17\x03\x02\x02\x02gh\x07\t\x02\x02hi\x07\x0F\x02\x02ij\x07\x10" +
+		"[\\\x07\b\x02\x02\\]\x07\x0E\x02\x02]_\x07\x12\x02\x02^`\x05\x14\v\x02" +
+		"_^\x03\x02\x02\x02_`\x03\x02\x02\x02`\x13\x03\x02\x02\x02ab\x07\x16\x02" +
+		"\x02bc\x05\x16\f\x02cd\x07\x17\x02\x02d\x15\x03\x02\x02\x02ef\x05\x18" +
+		"\r\x02f\x17\x03\x02\x02\x02gh\x07\t\x02\x02hi\x07\x0F\x02\x02ij\x07\x12" +
 		"\x02\x02j\x19\x03\x02\x02\x02kl\x07\n\x02\x02lm\x07\x0E\x02\x02mn\x07" +
-		"\x10\x02\x02no\x05\x1C\x0F\x02o\x1B\x03\x02\x02\x02pq\x07\x14\x02\x02" +
-		"qr\x05\x1E\x10\x02rs\x07\x15\x02\x02s\x1D\x03\x02\x02\x02ty\x05 \x11\x02" +
+		"\x12\x02\x02no\x05\x1C\x0F\x02o\x1B\x03\x02\x02\x02pq\x07\x16\x02\x02" +
+		"qr\x05\x1E\x10\x02rs\x07\x17\x02\x02s\x1D\x03\x02\x02\x02ty\x05 \x11\x02" +
 		"uy\x05\"\x12\x02vy\x05$\x13\x02wy\x05&\x14\x02xt\x03\x02\x02\x02xu\x03" +
 		"\x02\x02\x02xv\x03\x02\x02\x02xw\x03\x02\x02\x02yz\x03\x02\x02\x02zx\x03" +
 		"\x02\x02\x02z{\x03\x02\x02\x02{\x1F\x03\x02\x02\x02|}\x07\v\x02\x02}~" +
-		"\x07\x0E\x02\x02~\x7F\x07\x10\x02\x02\x7F!\x03\x02\x02\x02\x80\x81\x07" +
-		"\t\x02\x02\x81\x82\x07\x0F\x02\x02\x82\x83\x07\x10\x02\x02\x83#\x03\x02" +
-		"\x02\x02\x84\x85\x07\f\x02\x02\x85\x86\x07\x0E\x02\x02\x86\x87\x07\x10" +
-		"\x02\x02\x87%\x03\x02\x02\x02\x88\x89\x07\r\x02\x02\x89\x8A\x07\x0F\x02" +
-		"\x02\x8A\x8B\x07\x10\x02\x02\x8B\'\x03\x02\x02\x02\n+19DK_xz";
+		"\x07\x0E\x02\x02~\x7F\x07\x12\x02\x02\x7F!\x03\x02\x02\x02\x80\x81\x07" +
+		"\t\x02\x02\x81\x82\x07\x10\x02\x02\x82\x83\x07\x12\x02\x02\x83#\x03\x02" +
+		"\x02\x02\x84\x85\x07\f\x02\x02\x85\x86\x07\x0E\x02\x02\x86\x87\x07\x12" +
+		"\x02\x02\x87%\x03\x02\x02\x02\x88\x89\x07\r\x02\x02\x89\x8A\x07\x11\x02" +
+		"\x02\x8A\x8B\x07\x12\x02\x02\x8B\'\x03\x02\x02\x02\n+19DK_xz";
 	public static __ATN: ATN;
 	public static get _ATN(): ATN {
 		if (!CPGLParser.__ATN) {
@@ -1289,7 +1293,7 @@ export class ActionBodyContext extends ParserRuleContext {
 
 
 export class FhirtypeClauseContext extends ParserRuleContext {
-	public IDENTIFIER(): TerminalNode { return this.getToken(CPGLParser.IDENTIFIER, 0); }
+	public ACTION_FHIR_TYPE(): TerminalNode { return this.getToken(CPGLParser.ACTION_FHIR_TYPE, 0); }
 	public NEWLINE(): TerminalNode { return this.getToken(CPGLParser.NEWLINE, 0); }
 	constructor(parent: ParserRuleContext | undefined, invokingState: number) {
 		super(parent, invokingState);
@@ -1484,7 +1488,7 @@ export class CodeClauseContext extends ParserRuleContext {
 
 
 export class CasefeatureFhirtypeClauseContext extends ParserRuleContext {
-	public IDENTIFIER(): TerminalNode { return this.getToken(CPGLParser.IDENTIFIER, 0); }
+	public CASEFEATURE_FHIR_TYPE(): TerminalNode { return this.getToken(CPGLParser.CASEFEATURE_FHIR_TYPE, 0); }
 	public NEWLINE(): TerminalNode { return this.getToken(CPGLParser.NEWLINE, 0); }
 	constructor(parent: ParserRuleContext | undefined, invokingState: number) {
 		super(parent, invokingState);
@@ -1546,7 +1550,7 @@ export class UrlClauseContext extends ParserRuleContext {
 
 
 export class ValuetypeClauseContext extends ParserRuleContext {
-	public IDENTIFIER(): TerminalNode { return this.getToken(CPGLParser.IDENTIFIER, 0); }
+	public FHIR_VALUE_TYPE(): TerminalNode { return this.getToken(CPGLParser.FHIR_VALUE_TYPE, 0); }
 	public NEWLINE(): TerminalNode { return this.getToken(CPGLParser.NEWLINE, 0); }
 	constructor(parent: ParserRuleContext | undefined, invokingState: number) {
 		super(parent, invokingState);

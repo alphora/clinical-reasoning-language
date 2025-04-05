@@ -1,6 +1,6 @@
 import { CharStreams, CommonTokenStream } from 'antlr4ts';
 import { CPGLLexer } from '../lexer/CPGLLexer';
-import { CPGLParser as GeneratedParser } from '../grammar/CPGLParser';
+import { CPGLParser as GeneratedParser } from '../grammar/generated/CPGLParser';
 
 describe('CPGLParser', () => {
     function createParser(input: string): GeneratedParser {

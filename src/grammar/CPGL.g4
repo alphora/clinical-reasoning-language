@@ -55,9 +55,9 @@ actionBody
     : fhirtypeClause
     ;
 
-// For actions, fhirtype specifies a FHIR resource type (e.g. ServiceRequest)
+// For actions, fhirtype specifies a FHIR resource type
 fhirtypeClause
-    : 'fhirtype' IDENTIFIER NEWLINE
+    : 'fhirtype' ACTION_FHIR_TYPE NEWLINE
     ;
 
 casefeature
@@ -80,9 +80,9 @@ codeClause
     : 'code' STRING NEWLINE
     ;
 
-// For casefeatures, fhirtype is given as an identifier (e.g. Condition, Observation)
+// For casefeatures, fhirtype is given as a FHIR resource type
 casefeatureFhirtypeClause
-    : 'fhirtype' IDENTIFIER NEWLINE
+    : 'fhirtype' CASEFEATURE_FHIR_TYPE NEWLINE
     ;
 
 urlClause
@@ -90,7 +90,7 @@ urlClause
     ;
 
 valuetypeClause
-    : 'valuetype' IDENTIFIER NEWLINE
+    : 'valuetype' FHIR_VALUE_TYPE NEWLINE
     ;
 
 /*
@@ -100,8 +100,60 @@ valuetypeClause
 // A STRING is a quoted sequence (without embedded line breaks)
 STRING: '"' (~["\r\n])* '"';
 
-// IDENTIFIER: sequence of letters, digits, underscores, starting with a letter or underscore.
-IDENTIFIER: [a-zA-Z_][a-zA-Z_0-9]* ;
+// FHIR resource types for actions (request/order resources)
+ACTION_FHIR_TYPE
+    : 'Appointment'
+    | 'AppointmentResponse'
+    | 'CarePlan'
+    | 'Claim'
+    | 'CommunicationRequest'
+    | 'Contract'
+    | 'DeviceRequest'
+    | 'EnrollmentRequest'
+    | 'ImmunizationRecommendation'
+    | 'MedicationRequest'
+    | 'NutritionOrder'
+    | 'ServiceRequest'
+    | 'SupplyRequest'
+    | 'Task'
+    | 'VisionPrescription'
+    ;
+
+// FHIR resource types for case features (clinical observation resources)
+CASEFEATURE_FHIR_TYPE
+    : 'AllergyIntolerance'
+    | 'Condition'
+    | 'Procedure'
+    | 'Observation'
+    | 'Immunization'
+    | 'MedicationDispense'
+    | 'MedicationAdministration'
+    | 'MedicationStatement'
+    ;
+
+// FHIR value types
+FHIR_VALUE_TYPE
+    : 'base64Binary'
+    | 'boolean'
+    | 'canonical'
+    | 'code'
+    | 'date'
+    | 'dateTime'
+    | 'decimal'
+    | 'id'
+    | 'instant'
+    | 'integer'
+    | 'markdown'
+    | 'oid'
+    | 'positiveInt'
+    | 'string'
+    | 'time'
+    | 'unsignedInt'
+    | 'uri'
+    | 'url'
+    | 'uuid'
+    | 'xhtml'
+    ;
 
 // NEWLINE: one or more newline characters.
 NEWLINE: ('\r'? '\n')+ ;
