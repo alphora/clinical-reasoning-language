@@ -9,7 +9,6 @@ import type { Decision, DoClause, File, WhenClause } from '../ast/types';
 describe('CPGLParser', () => {
   const INDENT = '    ';
   const NEWLINE = '\n';
-  const DEDENT = '    ';
   const createParser = (input: string) => {
     const charStream = CharStreams.fromString(input);
     const lexer = new CPGLLexer(charStream);
@@ -50,7 +49,6 @@ describe('CPGLParser', () => {
   describe('parse', () => {
     it('should parse a complete decision with any qualifier', () => {
       const input = `decision "test"${NEWLINE}${INDENT}any${NEWLINE}${INDENT}when "condition" then${NEWLINE}${INDENT}${INDENT}do "action"${NEWLINE}`;
-      console.log('Input for any qualifier:', input.replace(/\n/g, '\\n'));
       const parser = createParser(input);
       const file = parser.file();
       expect(file.statement().length).toBe(1);
@@ -59,7 +57,6 @@ describe('CPGLParser', () => {
       expect(decision?.STRING().text).toBe('"test"');
       const block = decision?.block();
       expect(block).toBeDefined();
-      console.log('Block qualifier:', block?.qualifier()?.text);
       expect(block?.qualifier()?.ANY()?.text).toBe('any');
       const whenClause = block?.whenClause();
       expect(whenClause).toBeDefined();
@@ -76,7 +73,6 @@ describe('CPGLParser', () => {
 
     it('should parse a complete decision with all qualifier', () => {
       const input = `decision "test"${NEWLINE}${INDENT}all${NEWLINE}${INDENT}when "condition" then${NEWLINE}${INDENT}${INDENT}do "action"${NEWLINE}`;
-      console.log('Input for all qualifier:', input.replace(/\n/g, '\\n'));
       const parser = createParser(input);
       const file = parser.file();
       expect(file.statement().length).toBe(1);
@@ -85,7 +81,6 @@ describe('CPGLParser', () => {
       expect(decision?.STRING().text).toBe('"test"');
       const block = decision?.block();
       expect(block).toBeDefined();
-      console.log('Block qualifier:', block?.qualifier()?.text);
       expect(block?.qualifier()?.ALL()?.text).toBe('all');
       const whenClause = block?.whenClause();
       expect(whenClause).toBeDefined();
