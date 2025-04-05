@@ -188,14 +188,8 @@ ACTION: 'action';
 FHIRTYPE: 'fhirtype';
 CASEFEATURE: 'casefeature';
 VALUETYPE: 'valuetype';
-
-// Special tokens
-NEWLINE: '\r'? '\n';
-WS: [ \t]+ -> skip;
-COMMENT: '//' ~[\r\n]* -> skip;
-COMMENT_BLOCK: '/*' .*? '*/' -> skip;
-INDENT: '    ' -> channel(HIDDEN);
-DEDENT: -> channel(HIDDEN);
+CODE: 'code';
+URL: 'url';
 
 // FHIR types
 ACTION_FHIR_TYPE: 'Appointment'
@@ -241,6 +235,14 @@ FHIR_VALUE_TYPE: 'base64Binary'
     | 'url'
     | 'uuid'
     | 'xhtml';
+
+// Special tokens
+NEWLINE: '\r'? '\n';
+WS: [ \t]+ -> skip;
+COMMENT: '//' ~[\r\n]* -> skip;
+COMMENT_BLOCK: '/*' .*? '*/' -> skip;
+INDENT: '    ' -> channel(HIDDEN);
+DEDENT: -> channel(HIDDEN);
 
 // String literals
 STRING: '"' (~["])* '"';
