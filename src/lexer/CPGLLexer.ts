@@ -61,6 +61,15 @@ export class CPGLLexer extends Lexer {
         return CPGLLexer.grammarFileName;
     }
 
+    // Line and column tracking
+    public get line(): number {
+        return this._currentLine;
+    }
+
+    public get charPositionInLine(): number {
+        return this._currentColumn;
+    }
+
     constructor(input: CharStream) {
         super(input);
     }
@@ -90,7 +99,7 @@ export class CPGLLexer extends Lexer {
                     line: this._currentLine,
                     charPositionInLine: this._currentColumn,
                     channel: Token.DEFAULT_CHANNEL,
-                    tokenIndex: this._tokenIndex,
+                    tokenIndex: this._tokenIndex++,
                     source: [this._input, this]
                 });
             }
@@ -103,7 +112,7 @@ export class CPGLLexer extends Lexer {
                 line: this._currentLine,
                 charPositionInLine: this._currentColumn,
                 channel: Token.DEFAULT_CHANNEL,
-                tokenIndex: this._tokenIndex,
+                tokenIndex: this._tokenIndex++,
                 source: [this._input, this]
             });
         }
@@ -135,7 +144,7 @@ export class CPGLLexer extends Lexer {
                     line: this._currentLine,
                     charPositionInLine: this._currentColumn,
                     channel: Token.DEFAULT_CHANNEL,
-                    tokenIndex: this._tokenIndex,
+                    tokenIndex: this._tokenIndex++,
                     source: [this._input, this]
                 });
             } else if (this.currentIndent < lastIndent) {
@@ -161,7 +170,7 @@ export class CPGLLexer extends Lexer {
                     line: this._currentLine,
                     charPositionInLine: this._currentColumn,
                     channel: Token.DEFAULT_CHANNEL,
-                    tokenIndex: this._tokenIndex,
+                    tokenIndex: this._tokenIndex++,
                     source: [this._input, this]
                 });
             }
@@ -205,7 +214,7 @@ export class CPGLLexer extends Lexer {
                 line: this._currentLine - 1,
                 charPositionInLine: this._currentColumn,
                 channel: Token.DEFAULT_CHANNEL,
-                tokenIndex: this._tokenIndex,
+                tokenIndex: this._tokenIndex++,
                 source: [this._input, this]
             });
         }
@@ -235,7 +244,7 @@ export class CPGLLexer extends Lexer {
             line: this._currentLine,
             charPositionInLine: startColumn,
             channel: Token.DEFAULT_CHANNEL,
-            tokenIndex: this._tokenIndex,
+            tokenIndex: this._tokenIndex++,
             source: [this._input, this]
         });
     }
@@ -281,8 +290,8 @@ export class CPGLLexer extends Lexer {
             stopIndex: this._input.index,
             line: this._currentLine,
             charPositionInLine: this._currentColumn,
-            channel: Token.DEFAULT_CHANNEL,
-            tokenIndex: this._tokenIndex,
+            channel: Token.HIDDEN_CHANNEL,
+            tokenIndex: this._tokenIndex++,
             source: [this._input, this]
         });
     }
@@ -292,7 +301,7 @@ export class CPGLLexer extends Lexer {
      */
     protected handleBlockComment(): Token {
         const start = this._input.index;
-        this._input.consume(); // Consume the '/'
+        this._input.consume(); // Consume the first '/'
         this._currentColumn++;
         this._input.consume(); // Consume the '*'
         this._currentColumn++;
@@ -333,8 +342,8 @@ export class CPGLLexer extends Lexer {
             stopIndex: this._input.index,
             line: this._currentLine,
             charPositionInLine: this._currentColumn,
-            channel: Token.DEFAULT_CHANNEL,
-            tokenIndex: this._tokenIndex,
+            channel: Token.HIDDEN_CHANNEL,
+            tokenIndex: this._tokenIndex++,
             source: [this._input, this]
         });
     }
@@ -381,7 +390,7 @@ export class CPGLLexer extends Lexer {
             line: this._currentLine,
             charPositionInLine: this._currentColumn,
             channel: Token.DEFAULT_CHANNEL,
-            tokenIndex: this._tokenIndex,
+            tokenIndex: this._tokenIndex++,
             source: [this._input, this]
         });
     }
@@ -411,7 +420,7 @@ export class CPGLLexer extends Lexer {
                 line: this._currentLine,
                 charPositionInLine: this._currentColumn,
                 channel: Token.DEFAULT_CHANNEL,
-                tokenIndex: this._tokenIndex,
+                tokenIndex: this._tokenIndex++,
                 source: [this._input, this]
             });
         }
@@ -425,7 +434,7 @@ export class CPGLLexer extends Lexer {
             line: this._currentLine,
             charPositionInLine: this._currentColumn,
             channel: Token.DEFAULT_CHANNEL,
-            tokenIndex: this._tokenIndex,
+            tokenIndex: this._tokenIndex++,
             source: [this._input, this]
         });
     }
@@ -444,7 +453,6 @@ export class CPGLLexer extends Lexer {
         tokenIndex: number;
         source: [CharStream, CPGLLexer];
     }): Token {
-        this._tokenIndex++;
         return new CPGLToken(options);
     }
 } 

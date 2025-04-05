@@ -1,4 +1,4 @@
-// Generated from docs/antlr.g4 by ANTLR 4.9.0-SNAPSHOT
+// Generated from src/grammar/CPGL.g4 by ANTLR 4.9.0-SNAPSHOT
 
 
 import { ATN } from "antlr4ts/atn/ATN";
@@ -78,7 +78,7 @@ export class CPGLLexer extends Lexer {
 	}
 
 	// @Override
-	public get grammarFileName(): string { return "antlr.g4"; }
+	public get grammarFileName(): string { return "CPGL.g4"; }
 
 	// @Override
 	public get ruleNames(): string[] { return CPGLLexer.ruleNames; }

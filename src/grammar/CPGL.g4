@@ -5,7 +5,7 @@ grammar CPGL;
  */
 
 file
-    : statement* EOF
+    : (NEWLINE | WS)* statement* EOF
     ;
 
 statement
@@ -35,12 +35,12 @@ whenClause
 
 // A "do" clause: a terminal action.
 doClause
-    : 'do' STRING NEWLINE
+    : 'do' STRING (NEWLINE | EOF)
     ;
 
 // A "use" clause: reference to another decision (subgraph).
 useClause
-    : 'use' STRING NEWLINE
+    : 'use' STRING (NEWLINE | EOF)
     ;
 
 action
