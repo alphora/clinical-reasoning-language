@@ -51,6 +51,30 @@ decision "Test_Decision"
     do "handle_inactive"
 `;
 
+// Example 6: Circular action dependencies
+const circularActionInput = `
+decision "Test_Decision"
+  when "condition" then
+    do "action1"
+    do "action2"
+    do "action1"
+`;
+
+// Example 7: Invalid FHIR resource type
+const invalidFHIRInput = `
+decision "Test_Decision"
+  when "condition" then
+    do "action1" fhir "InvalidResourceType"
+`;
+
+// Example 8: Valid FHIR resource type
+const validFHIRInput = `
+decision "Test_Decision"
+  when "condition" then
+    do "action1" fhir "Patient"
+    do "action2" fhir "Observation"
+`;
+
 function testInput(name: string, input: string) {
     console.log(`\n=== Testing ${name} ===`);
     try {
@@ -72,4 +96,7 @@ testInput('Valid Input', validInput);
 testInput('Invalid Input (Missing When Clause)', invalidInput);
 testInput('Cyclic Reference', cyclicInput);
 testInput('Duplicate Conditions/Actions', duplicateInput);
-testInput('Mutually Exclusive Conditions', mutuallyExclusiveInput); 
+testInput('Mutually Exclusive Conditions', mutuallyExclusiveInput);
+testInput('Circular Action Dependencies', circularActionInput);
+testInput('Invalid FHIR Resource Type', invalidFHIRInput);
+testInput('Valid FHIR Resource Type', validFHIRInput); 

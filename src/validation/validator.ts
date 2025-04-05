@@ -13,15 +13,45 @@ export class ValidationError extends Error {
     }
 }
 
+// Cache for FHIR resource types to avoid repeated lookups
+const FHIR_RESOURCE_TYPES = new Set([
+    'Patient',
+    'Observation',
+    'Condition',
+    'Procedure',
+    'MedicationRequest',
+    'ServiceRequest',
+    'CarePlan',
+    'Goal',
+    'Encounter',
+    'DiagnosticReport',
+    'Medication',
+    'Organization',
+    'Practitioner',
+    'Location',
+    'Device',
+    'AllergyIntolerance',
+    'Immunization',
+    'DocumentReference',
+    'Questionnaire',
+    'QuestionnaireResponse'
+]);
+
 export class ASTValidator {
     private decisionNames: Set<string> = new Set();
     private decisionGraph: Map<string, Set<string>> = new Map();
     private maxDecisionDepth = 10; // Maximum allowed depth for decision nesting
+    private actionDependencies: Map<string, Set<string>> = new Map();
+    private visitedDecisions: Set<string> = new Set();
+    private decisionCache: Map<string, Decision> = new Map();
 
     validate(ast: File): void {
         // Reset state
         this.decisionNames.clear();
         this.decisionGraph.clear();
+        this.actionDependencies.clear();
+        this.visitedDecisions.clear();
+        this.decisionCache.clear();
 
         // First pass: collect all decision names and build dependency graph
         this.collectDecisionInfo(ast);
@@ -34,15 +64,17 @@ export class ASTValidator {
         // Validate decision references and check for cycles
         this.validateDecisionReferences(ast);
         this.detectCycles(ast);
+
+        // Validate action dependencies
+        this.validateActionDependencies(ast);
     }
 
     private collectDecisionInfo(ast: File): void {
         for (const statement of ast.statements) {
             if (statement.type === 'Decision') {
-                // Add to decision names set
                 this.decisionNames.add(statement.name);
+                this.decisionCache.set(statement.name, statement);
                 
-                // Initialize dependency graph entry
                 const dependencies = new Set<string>();
                 for (const useClause of statement.useClauses) {
                     dependencies.add(useClause.decisionName);
@@ -242,7 +274,6 @@ export class ASTValidator {
     }
 
     private validateAction(action: Statement & { type: 'Action' }): void {
-        // Check action name format
         if (!this.isValidName(action.name)) {
             throw new ValidationError(
                 `Invalid action name: "${action.name}". Names must start with a letter and contain only letters, numbers, and underscores.`,
@@ -250,10 +281,9 @@ export class ASTValidator {
             );
         }
 
-        // If FHIR type is specified, validate it
         if (action.fhirType && !this.isValidFHIRType(action.fhirType)) {
             throw new ValidationError(
-                `Invalid FHIR type: "${action.fhirType}"`,
+                `Invalid FHIR type: "${action.fhirType}". Valid FHIR types are: ${Array.from(FHIR_RESOURCE_TYPES).join(', ')}`,
                 action.location.start
             );
         }
@@ -306,18 +336,7 @@ export class ASTValidator {
     }
 
     private isValidFHIRType(type: string): boolean {
-        // Add common FHIR resource types
-        const validTypes = new Set([
-            'Patient',
-            'Observation',
-            'Condition',
-            'Procedure',
-            'MedicationRequest',
-            'ServiceRequest',
-            'CarePlan',
-            'Goal'
-        ]);
-        return validTypes.has(type);
+        return FHIR_RESOURCE_TYPES.has(type);
     }
 
     private isValidUrl(url: string): boolean {
@@ -327,5 +346,77 @@ export class ASTValidator {
         } catch {
             return false;
         }
+    }
+
+    private validateActionDependencies(ast: File): void {
+        // Build action dependency graph
+        for (const statement of ast.statements) {
+            if (statement.type === 'Decision') {
+                this.buildActionDependencies(statement);
+            }
+        }
+
+        // Check for circular dependencies in actions
+        const visited = new Set<string>();
+        const recursionStack = new Set<string>();
+
+        const detectActionCycles = (actionName: string): void => {
+            if (recursionStack.has(actionName)) {
+                throw new ValidationError(
+                    `Circular dependency detected in actions involving "${actionName}"`,
+                    this.findActionLocation(ast, actionName)
+                );
+            }
+
+            if (visited.has(actionName)) {
+                return;
+            }
+
+            visited.add(actionName);
+            recursionStack.add(actionName);
+
+            const dependencies = this.actionDependencies.get(actionName) || new Set();
+            for (const dep of dependencies) {
+                detectActionCycles(dep);
+            }
+
+            recursionStack.delete(actionName);
+        };
+
+        for (const actionName of this.actionDependencies.keys()) {
+            if (!visited.has(actionName)) {
+                detectActionCycles(actionName);
+            }
+        }
+    }
+
+    private buildActionDependencies(decision: Decision): void {
+        for (const whenClause of decision.whenClauses) {
+            const actions = whenClause.actions;
+            for (let i = 0; i < actions.length - 1; i++) {
+                const currentAction = actions[i].action;
+                const nextAction = actions[i + 1].action;
+
+                if (!this.actionDependencies.has(currentAction)) {
+                    this.actionDependencies.set(currentAction, new Set());
+                }
+                this.actionDependencies.get(currentAction)!.add(nextAction);
+            }
+        }
+    }
+
+    private findActionLocation(ast: File, actionName: string) {
+        for (const statement of ast.statements) {
+            if (statement.type === 'Decision') {
+                for (const whenClause of statement.whenClauses) {
+                    for (const action of whenClause.actions) {
+                        if (action.action === actionName) {
+                            return action.location.start;
+                        }
+                    }
+                }
+            }
+        }
+        return { line: 0, column: 0 };
     }
 } 
