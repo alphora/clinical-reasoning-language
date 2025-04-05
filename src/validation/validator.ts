@@ -1,4 +1,4 @@
-import type { Decision, File, Statement, WhenClause } from '../ast/types';
+import { File, Statement, Decision, UseClause, WhenClause } from '../ast/types';
 import { ACTION_FHIR_TYPES, CASEFEATURE_FHIR_TYPES, FHIR_VALUE_TYPES } from '../grammar/fhirTypes';
 
 export class ValidationError extends Error {
@@ -17,7 +17,6 @@ export class ValidationError extends Error {
 export class ASTValidator {
   private readonly decisionNames: Set<string> = new Set();
   private readonly decisionGraph: Map<string, Set<string>> = new Map();
-  private readonly maxDecisionDepth = 10; // Maximum allowed depth for decision nesting
   private readonly actionDependencies: Map<string, Set<string>> = new Map();
   private readonly visitedDecisions: Set<string> = new Set();
   private readonly decisionCache: Map<string, Decision> = new Map();
@@ -38,9 +37,8 @@ export class ASTValidator {
       this.validateStatement(statement);
     }
 
-    // Validate decision references and check for cycles
+    // Validate decision references
     this.validateDecisionReferences(ast);
-    this.detectCycles(ast);
 
     // Validate action dependencies
     this.validateActionDependencies(ast);
@@ -186,68 +184,22 @@ export class ASTValidator {
     }
   }
 
-  private detectCycles(ast: File): void {
-    const visited = new Set<string>();
-    const recursionStack = new Set<string>();
-
-    const detectCyclesDFS = (decisionName: string, depth = 0): void => {
-      // Check for maximum depth
-      if (depth > this.maxDecisionDepth) {
-        throw new ValidationError(
-          `Decision tree exceeds maximum depth of ${this.maxDecisionDepth}`,
-          this.findDecisionLocation(ast, decisionName),
-        );
-      }
-
-      // Check for cycles
-      if (recursionStack.has(decisionName)) {
-        throw new ValidationError(
-          `Cyclic reference detected involving decision "${decisionName}"`,
-          this.findDecisionLocation(ast, decisionName),
-        );
-      }
-
-      if (visited.has(decisionName)) {
-        return;
-      }
-
-      visited.add(decisionName);
-      recursionStack.add(decisionName);
-
-      const dependencies = this.decisionGraph.get(decisionName) || new Set();
-      for (const dep of dependencies) {
-        detectCyclesDFS(dep, depth + 1);
-      }
-
-      recursionStack.delete(decisionName);
-    };
-
-    // Start DFS from each decision that hasn't been visited
-    for (const decisionName of this.decisionNames) {
-      if (!visited.has(decisionName)) {
-        detectCyclesDFS(decisionName);
-      }
-    }
-  }
-
   private findDecisionLocation(ast: File, decisionName: string): { line: number; column: number } {
     for (const statement of ast.statements) {
       if (statement.type === 'Decision' && statement.name === decisionName) {
         return statement.location.start;
       }
     }
-    return { line: 0, column: 0 }; // Fallback
+    return { line: 1, column: 1 };
   }
 
   private isValidCondition(condition: string): boolean {
-    // Add condition format validation rules
-    // For now, just check it's not too long and doesn't contain invalid characters
-    const maxConditionLength = 100;
-    const invalidChars = /[<>{}[\]\\]/;
-    return condition.length <= maxConditionLength && !invalidChars.test(condition);
+    // Basic validation - can be expanded based on requirements
+    return condition.trim().length > 0;
   }
 
   private validateAction(action: Statement & { type: 'Action' }): void {
+    // Check action name format
     if (!this.isValidName(action.name)) {
       throw new ValidationError(
         `Invalid action name: "${action.name}". Names must start with a letter and contain only letters, numbers, and underscores.`,
@@ -255,15 +207,17 @@ export class ASTValidator {
       );
     }
 
-    if (action.fhirType && !ACTION_FHIR_TYPES.has(action.fhirType)) {
+    // Check FHIR type if provided
+    if (action.fhirType && !this.isValidFHIRType(action.fhirType, true)) {
       throw new ValidationError(
-        `Invalid FHIR type for action: "${action.fhirType}". Valid FHIR types for actions are: ${Array.from(ACTION_FHIR_TYPES).join(', ')}`,
+        `Invalid FHIR type for action "${action.name}": "${action.fhirType}"`,
         action.location.start,
       );
     }
   }
 
   private validateCaseFeature(caseFeature: Statement & { type: 'CaseFeature' }): void {
+    // Check case feature name format
     if (!this.isValidName(caseFeature.name)) {
       throw new ValidationError(
         `Invalid case feature name: "${caseFeature.name}". Names must start with a letter and contain only letters, numbers, and underscores.`,
@@ -271,16 +225,26 @@ export class ASTValidator {
       );
     }
 
-    if (caseFeature.fhirType && !CASEFEATURE_FHIR_TYPES.has(caseFeature.fhirType)) {
+    // Check FHIR type if provided
+    if (caseFeature.fhirType && !this.isValidFHIRType(caseFeature.fhirType, false)) {
       throw new ValidationError(
-        `Invalid FHIR type for case feature: "${caseFeature.fhirType}". Valid FHIR types for case features are: ${Array.from(CASEFEATURE_FHIR_TYPES).join(', ')}`,
+        `Invalid FHIR type for case feature "${caseFeature.name}": "${caseFeature.fhirType}"`,
         caseFeature.location.start,
       );
     }
 
+    // Check URL if provided
+    if (caseFeature.url && !this.isValidUrl(caseFeature.url)) {
+      throw new ValidationError(
+        `Invalid URL for case feature "${caseFeature.name}": "${caseFeature.url}"`,
+        caseFeature.location.start,
+      );
+    }
+
+    // Check value type if provided
     if (caseFeature.valueType && !FHIR_VALUE_TYPES.has(caseFeature.valueType)) {
       throw new ValidationError(
-        `Invalid FHIR value type for case feature: "${caseFeature.valueType}". Valid FHIR value types are: ${Array.from(FHIR_VALUE_TYPES).join(', ')}`,
+        `Invalid value type for case feature "${caseFeature.name}": "${caseFeature.valueType}"`,
         caseFeature.location.start,
       );
     }
@@ -303,7 +267,7 @@ export class ASTValidator {
   }
 
   private isValidName(name: string): boolean {
-    return /^[a-zA-Z]\w*$/.test(name);
+    return /^[a-zA-Z][a-zA-Z0-9_]*$/.test(name);
   }
 
   private isValidFHIRType(type: string, isAction: boolean): boolean {
@@ -327,18 +291,11 @@ export class ASTValidator {
       }
     }
 
-    // Check for circular dependencies in actions
+    // Check for action cycles
     const visited = new Set<string>();
     const recursionStack = new Set<string>();
 
     const detectActionCycles = (actionName: string): void => {
-      if (recursionStack.has(actionName)) {
-        throw new ValidationError(
-          `Circular dependency detected in actions involving "${actionName}"`,
-          this.findActionLocation(ast, actionName),
-        );
-      }
-
       if (visited.has(actionName)) {
         return;
       }
@@ -346,48 +303,57 @@ export class ASTValidator {
       visited.add(actionName);
       recursionStack.add(actionName);
 
-      const dependencies = this.actionDependencies.get(actionName) || new Set();
-      for (const dep of dependencies) {
-        detectActionCycles(dep);
+      const dependencies = this.actionDependencies.get(actionName);
+      if (dependencies) {
+        for (const dep of dependencies) {
+          if (recursionStack.has(dep)) {
+            throw new ValidationError(
+              `Cyclic action dependency detected: ${actionName} -> ${dep}`,
+              this.findActionLocation(ast, actionName),
+            );
+          }
+          detectActionCycles(dep);
+        }
       }
 
       recursionStack.delete(actionName);
     };
 
+    // Check for cycles starting from each action
     for (const actionName of this.actionDependencies.keys()) {
-      if (!visited.has(actionName)) {
-        detectActionCycles(actionName);
-      }
+      detectActionCycles(actionName);
     }
   }
 
   private buildActionDependencies(decision: Decision): void {
     for (const whenClause of decision.whenClauses) {
-      const actions = whenClause.actions;
-      for (let i = 0; i < actions.length - 1; i++) {
-        const currentAction = actions[i].action;
-        const nextAction = actions[i + 1].action;
-
-        if (!this.actionDependencies.has(currentAction)) {
-          this.actionDependencies.set(currentAction, new Set());
+      for (const action of whenClause.actions) {
+        const actionName = action.action;
+        if (!this.actionDependencies.has(actionName)) {
+          this.actionDependencies.set(actionName, new Set<string>());
         }
-        this.actionDependencies.get(currentAction)!.add(nextAction);
+
+        // Add dependencies from use clauses
+        for (const useClause of decision.useClauses) {
+          const depDecision = this.decisionCache.get(useClause.decisionName);
+          if (depDecision) {
+            for (const depWhenClause of depDecision.whenClauses) {
+              for (const depAction of depWhenClause.actions) {
+                this.actionDependencies.get(actionName)?.add(depAction.action);
+              }
+            }
+          }
+        }
       }
     }
   }
 
   private findActionLocation(ast: File, actionName: string): { line: number; column: number } {
     for (const statement of ast.statements) {
-      if (statement.type === 'Decision') {
-        for (const whenClause of statement.whenClauses) {
-          for (const action of whenClause.actions) {
-            if (action.action === actionName) {
-              return action.location.start;
-            }
-          }
-        }
+      if (statement.type === 'Action' && statement.name === actionName) {
+        return statement.location.start;
       }
     }
-    return { line: 0, column: 0 };
+    return { line: 1, column: 1 };
   }
 }
