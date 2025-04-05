@@ -408,14 +408,31 @@ export class CPGLLexer extends Lexer {
         this._currentColumn++;
         
         let foundEnd = false;
+        let iterationCount = 0;
+        const MAX_ITERATIONS = 1000; // Safety limit
+        
         while (this._input.LA(1) !== -1 && !foundEnd) {
+            iterationCount++;
+            if (iterationCount > MAX_ITERATIONS) {
+                console.error('[DEBUGGING] Block comment loop exceeded max iterations');
+                console.error('[DEBUGGING] Current state:', {
+                    index: this._input.index,
+                    currentChar: String.fromCharCode(this._input.LA(1)),
+                    nextChar: String.fromCharCode(this._input.LA(2)),
+                    line: this._currentLine,
+                    column: this._currentColumn
+                });
+                throw new Error('Block comment processing exceeded maximum iterations');
+            }
+
             if (this._input.LA(1) === '\n'.charCodeAt(0)) {
+                this._input.consume(); // Consume the newline
                 this._currentLine++;
                 this._currentColumn = 0;
             } else if (this._input.LA(1) === '\r'.charCodeAt(0)) {
-                // Handle Windows-style newlines
-                if (this._input.LA(2) === '\n'.charCodeAt(0)) {
-                    this._input.consume(); // Consume \r
+                this._input.consume(); // Consume \r
+                if (this._input.LA(1) === '\n'.charCodeAt(0)) {
+                    this._input.consume(); // Consume \n
                 }
                 this._currentLine++;
                 this._currentColumn = 0;
@@ -434,6 +451,17 @@ export class CPGLLexer extends Lexer {
         
         if (!foundEnd) {
             throw new Error('Unterminated block comment');
+        }
+        
+        // After the block comment, we need to handle any newlines
+        if (this._input.LA(1) === '\n'.charCodeAt(0) || this._input.LA(1) === '\r'.charCodeAt(0)) {
+            this._input.consume(); // Consume the newline
+            if (this._input.LA(1) === '\n'.charCodeAt(0)) {
+                this._input.consume(); // Consume the \n in \r\n
+            }
+            this._currentLine++;
+            this._currentColumn = 0;
+            this.atStartOfLine = true;
         }
         
         return this.createToken({

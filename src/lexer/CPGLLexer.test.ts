@@ -10,16 +10,13 @@ describe('CPGLLexer', () => {
         const tokens: { type: number; text: string }[] = [];
         
         try {
-            while (true) {
-                const token = lexer.nextToken();
+            let token = lexer.nextToken();
+            while (token.type !== Token.EOF) {
                 tokens.push({
                     type: token.type,
                     text: token.text ?? ''
                 });
-                // Break after adding the EOF token
-                if (token.type === Token.EOF) {
-                    break;
-                }
+                token = lexer.nextToken();
             }
         } catch (e) {
             // Convert error to a more informative format for test failures
@@ -77,12 +74,12 @@ describe('CPGLLexer', () => {
         }).toThrow('Inconsistent indentation');
     });
 
-    // test('should handle block comments', () => {
-    //     const tokens = getAllTokens('/* This is a\nblock comment */\ndecision "Test"');
+    test('should handle block comments', () => {
+        const tokens = getAllTokens('/* This is a\nblock comment */\ndecision "Test"');
         
-    //     expect(tokens.find(t => t.type === CPGLTokenType.COMMENT_BLOCK)).toBeTruthy();
-    //     expect(tokens.find(t => t.type === CPGLTokenType.DECISION)).toBeTruthy();
-    // });
+        expect(tokens.find(t => t.type === CPGLTokenType.COMMENT_BLOCK)).toBeTruthy();
+        expect(tokens.find(t => t.type === CPGLTokenType.DECISION)).toBeTruthy();
+    });
 
     test('should tokenize a complete CPGL document', () => {
         const input = 'decision "Test"\n  when "condition" then\n    do "action"\n  use "other_decision"';
@@ -98,26 +95,26 @@ describe('CPGLLexer', () => {
         expect(tokens.find(t => t.type === CPGLTokenType.INDENT)).toBeTruthy();
         expect(tokens.find(t => t.type === CPGLTokenType.DEDENT)).toBeTruthy();
     });
-});
 
-test('Lexer should tokenize input correctly', () => {
-    const input = 'decision Test';
-    const lexer = new CPGLLexer(CharStreams.fromString(input));
-    const tokens: { type: number; text: string }[] = [];
-    let token = lexer.nextToken();
+    test('Lexer should tokenize input correctly', () => {
+        const input = 'decision Test';
+        const lexer = new CPGLLexer(CharStreams.fromString(input));
+        const tokens: { type: number; text: string }[] = [];
+        let token = lexer.nextToken();
+        
+        while (token.type !== Token.EOF) {
+            tokens.push({
+                type: token.type,
+                text: token.text ?? ''
+            });
+            token = lexer.nextToken();
+        }
     
-    while (token.type !== Token.EOF) {
-        tokens.push({
-            type: token.type,
-            text: token.text ?? ''
-        });
-        token = lexer.nextToken();
-    }
-
-    // Add assertions to verify the tokens
-    expect(tokens).toHaveLength(2); // decision keyword and Test identifier
-    expect(tokens[0].type).toBe(CPGLTokenType.DECISION);
-    expect(tokens[0].text).toBe('decision');
-    expect(tokens[1].type).toBe(CPGLTokenType.IDENTIFIER);
-    expect(tokens[1].text).toBe('Test');
-}); 
+        // Add assertions to verify the tokens
+        expect(tokens).toHaveLength(2); // decision keyword and Test identifier
+        expect(tokens[0].type).toBe(CPGLTokenType.DECISION);
+        expect(tokens[0].text).toBe('decision');
+        expect(tokens[1].type).toBe(CPGLTokenType.IDENTIFIER);
+        expect(tokens[1].text).toBe('Test');
+    });
+});
