@@ -1,8 +1,7 @@
 import { CharStreams } from 'antlr4ts';
 
-import { CPGLLexer as GeneratedLexer } from '../grammar/generated/CPGLLexer';
-
 import { CPGLLexer } from './CPGLLexer';
+import { CPGLLexer as GeneratedLexer } from '../grammar/generated/CPGLLexer';
 
 describe('CPGLLexer Simple Test', () => {
   test('should tokenize a simple string', () => {

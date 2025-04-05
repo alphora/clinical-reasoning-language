@@ -1,8 +1,8 @@
 /* eslint-disable no-console */
 import { CharStreams } from 'antlr4ts';
 
-import { CPGLLexer as GeneratedLexer } from '../grammar/generated/CPGLLexer';
 import { CPGLLexer } from '../lexer/CPGLLexer';
+import { CPGLLexer as GeneratedLexer } from '../grammar/generated/CPGLLexer';
 import type { CPGLToken } from '../lexer/CPGLToken';
 
 /**

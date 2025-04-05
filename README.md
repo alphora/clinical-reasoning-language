@@ -30,7 +30,7 @@ Here's a basic example of using the lexer:
 
 ```typescript
 import { CharStreams } from 'antlr4ts';
-import { CPGLLexer, GeneratedLexer } from 'clinical-practice-guideline-language';
+import { CPGLLexer } from 'clinical-practice-guideline-language';
 
 // Create a lexer instance
 const input = `decision "Test Decision"

@@ -1,9 +1,8 @@
 /* eslint-disable no-console */
 import { CharStreams } from 'antlr4ts';
 
-import { CPGLLexer as GeneratedLexer } from '../grammar/generated/CPGLLexer';
-
 import { CPGLLexer } from './CPGLLexer';
+import { CPGLLexer as GeneratedLexer } from '../grammar/generated/CPGLLexer';
 
 describe('CPGLLexer', () => {
   it('should handle basic tokens', () => {

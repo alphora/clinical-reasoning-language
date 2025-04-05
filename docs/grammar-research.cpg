@@ -13,6 +13,7 @@
 decision "IMMZ.D2.D5.Measles"
 	when "Measles Routine Immunization Schedule Incomplete" then
 		when "No Primary Series Doses Administered" then
+			any
 			when "Client Age Less Than 12 Months" then 
 				do "Indicate"
 			when "Last Live Vaccine Administered Within 4 Weeks" then 
@@ -20,6 +21,7 @@ decision "IMMZ.D2.D5.Measles"
 			when "Client Is Due For MCV12" then 
 				do "Vaccinate"
 		when "One Primary Series Dose Administered" then
+			all
 			when "Client Age Less Than 15 Months" then 
 				do "Indicate"
 			when "Last Live Vaccine Administered Within 4 Weeks" then 
@@ -44,13 +46,13 @@ action "Vaccinate"
 casefeature "Measles Routine Immunization Schedule Incomplete"
 	code "measles-routine-immunization-schedule-incomplete"
 	fhirtype Condition 
-	url "http://someothervalueset-uri"
+	url "http://someothercfprofile-uri"
 	valuetype boolean
 
 casefeature "Last Live Vaccine Administered Within 4 Weeks"
 	code "last-live-vaccine-administered"
 	fhirtype Observation 
-	url "http://somevalueset-uri"
+	url "http://somecfprofile-uri"
 	valuetype dateTime
 
 	(
