@@ -15,7 +15,7 @@ statement
     ;
 
 decision
-    : 'decision' STRING NEWLINE block
+    : 'decision' STRING NEWLINE block (NEWLINE | (NEWLINE | EOF))
     ;
 
 block
@@ -49,7 +49,7 @@ useClause
     ;
 
 action
-    : 'action' STRING NEWLINE actionBlock (NEWLINE | EOF)
+    : 'action' STRING NEWLINE actionBlock (NEWLINE | (NEWLINE | EOF))
     ;
 
 actionBlock
@@ -61,7 +61,7 @@ actionFhirTypeClause
     ;
 
 casefeature
-    : 'casefeature' STRING NEWLINE casefeatureBlock (NEWLINE | EOF)
+    : 'casefeature' STRING NEWLINE casefeatureBlock (NEWLINE | (NEWLINE | EOF))
     ;
 
 casefeatureBlock

@@ -248,20 +248,17 @@ export class CPGLLexer extends Lexer {
   private handleNewline(): Token {
     const start = this._input.index;
     this._input.consume();
-
-    if (this._input.LA(1) === '\n'.charCodeAt(0)) {
+    if (this._input.LA(1) === '\n'.charCodeAt(0) && this._input.LA(-1) === '\r'.charCodeAt(0)) {
       this._input.consume();
     }
-
     this._currentLine++;
     this._currentColumn = 0;
     this.atStartOfLine = true;
-
     return this.createToken({
       type: GeneratedLexer.NEWLINE,
       text: '<NEWLINE>',
       startIndex: start,
-      stopIndex: this._input.index - 1,
+      stopIndex: this._input.index,
       line: this._currentLine - 1,
       charPositionInLine: this._currentColumn,
       channel: Token.DEFAULT_CHANNEL,

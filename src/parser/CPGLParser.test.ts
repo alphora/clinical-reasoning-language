@@ -9,7 +9,6 @@ import type { Decision, DoClause, File, WhenClause } from '../ast/types';
 describe('CPGLParser', () => {
   const INDENT = '    ';
   const NEWLINE = '\n';
-  const DEDENT = '    ';
   const createParser = (input: string) => {
     const charStream = CharStreams.fromString(input);
     const lexer = new CPGLLexer(charStream);
@@ -154,7 +153,7 @@ describe('CPGLParser', () => {
     });
 
     it('should parse a decision with an indirect cycle', () => {
-      const input = `decision "cycle1"${NEWLINE}${INDENT}when "condition" then${NEWLINE}${INDENT}${INDENT}use "cycle2"${NEWLINE}${NEWLINE}decision "cycle2"${NEWLINE}${INDENT}when "condition" then${NEWLINE}${INDENT}${INDENT}use "cycle1"${NEWLINE}`;
+      const input = `decision "cycle1"${NEWLINE}${INDENT}when "condition" then${NEWLINE}${INDENT}${INDENT}use "cycle2"${NEWLINE}decision "cycle2"${NEWLINE}${INDENT}when "condition" then${NEWLINE}${INDENT}${INDENT}use "cycle1"${NEWLINE}`;
       console.log('Input for indirect cycle:', input);
       const parser = createParser(input);
       const file = parser.file();
