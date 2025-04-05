@@ -20,11 +20,17 @@ export class CPGLParser {
         this.parser.removeErrorListeners();
     }
 
+    private cleanTreeString(tree: any): string {
+        const treeStr = tree.toStringTree(this.parser);
+        // Remove redundant rule names that match their token values
+        return treeStr.replace(/\b(\w+)\s+\1\b/g, '$1');
+    }
+
     public parse(): void {
         try {
             // Parse the input starting from the file rule
             const tree = this.parser.file();
-            console.log('Parse tree:', tree.toStringTree(this.parser));
+            console.log('Parse tree:', this.cleanTreeString(tree));
         } catch (e) {
             console.error('Parsing error:', e);
         }
