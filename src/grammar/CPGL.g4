@@ -131,7 +131,14 @@ ACTION_FHIR_TYPE: 'Appointment'
     | 'SupplyRequest'
     | 'Task'
     | 'VisionPrescription';
-CASEFEATURE_FHIR_TYPE: 'Condition' | 'Observation' | 'Procedure' | 'Encounter';
+CASEFEATURE_FHIR_TYPE: 'AllergyIntolerance'
+    | 'Condition'
+    | 'Procedure'
+    | 'Observation'
+    | 'Immunization'
+    | 'MedicationDispense'
+    | 'MedicationAdministration'
+    | 'MedicationStatement';
 FHIR_VALUE_TYPE: 'boolean' | 'integer' | 'decimal' | 'string' | 'date' | 'dateTime' | 'time' | 'code' | 'uri';
 
 // String literals
