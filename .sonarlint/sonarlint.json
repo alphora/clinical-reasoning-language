@@ -1,0 +1,39 @@
+{
+    "sonarlint.connectedMode.project": {
+        "projectKey": "clinical-practice-guideline-language"
+    },
+    "rules": {
+        "typescript:S1128": {
+            "level": "off",
+            "parameters": {
+                "exclusions": [
+                    "src/grammar/generated/**/*.ts"
+                ]
+            }
+        },
+        "typescript:S3863": {
+            "level": "off",
+            "parameters": {
+                "exclusions": [
+                    "src/grammar/generated/**/*.ts"
+                ]
+            }
+        },
+        "typescript:S6535": {
+            "level": "off",
+            "parameters": {
+                "exclusions": [
+                    "src/grammar/generated/**/*.ts"
+                ]
+            }
+        },
+        "typescript:S1444": {
+            "level": "off",
+            "parameters": {
+                "exclusions": [
+                    "src/grammar/generated/**/*.ts"
+                ]
+            }
+        }
+    }
+} 

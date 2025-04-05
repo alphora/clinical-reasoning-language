@@ -12,7 +12,7 @@
     "format": "prettier --write \"src/**/*.ts\"",
     "prepare": "npm run build",
     "example": "ts-node src/examples/basicUsage.ts",
-    "generate": "antlr4ts -visitor src/grammar/CPGL.g4"
+    "generate": "antlr4ts -visitor -o src/grammar/generated src/grammar/CPGL.g4"
   },
   "keywords": [
     "clinical",
