@@ -19,7 +19,12 @@ decision
     ;
 
 block
-    : INDENT statementLine+ DEDENT
+    : INDENT (qualifier NEWLINE INDENT)? statementLine+ DEDENT
+    ;
+
+qualifier
+    : ANY
+    | ALL
     ;
 
 statementLine
@@ -35,12 +40,12 @@ whenClause
 
 // A "do" clause: a terminal action.
 doClause
-    : 'do' STRING (NEWLINE | EOF)
+    : 'do' STRING NEWLINE
     ;
 
 // A "use" clause: reference to another decision (subgraph).
 useClause
-    : 'use' STRING (NEWLINE | EOF)
+    : 'use' STRING NEWLINE
     ;
 
 action
@@ -190,6 +195,8 @@ CASEFEATURE: 'casefeature';
 VALUETYPE: 'valuetype';
 CODE: 'code';
 URL: 'url';
+ANY: 'any';
+ALL: 'all';
 
 // FHIR types
 ACTION_FHIR_TYPE: 'Appointment'

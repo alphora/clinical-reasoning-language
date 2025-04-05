@@ -7,6 +7,7 @@ import { FileContext } from "./CPGLParser";
 import { StatementContext } from "./CPGLParser";
 import { DecisionContext } from "./CPGLParser";
 import { BlockContext } from "./CPGLParser";
+import { QualifierContext } from "./CPGLParser";
 import { StatementLineContext } from "./CPGLParser";
 import { WhenClauseContext } from "./CPGLParser";
 import { DoClauseContext } from "./CPGLParser";
@@ -58,6 +59,13 @@ export interface CPGLVisitor<Result> extends ParseTreeVisitor<Result> {
 	 * @return the visitor result
 	 */
 	visitBlock?: (ctx: BlockContext) => Result;
+
+	/**
+	 * Visit a parse tree produced by `CPGLParser.qualifier`.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	visitQualifier?: (ctx: QualifierContext) => Result;
 
 	/**
 	 * Visit a parse tree produced by `CPGLParser.statementLine`.

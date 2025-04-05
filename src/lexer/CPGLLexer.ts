@@ -38,6 +38,8 @@ export class CPGLLexer extends Lexer {
     ['fhirtype', GeneratedLexer.FHIRTYPE],
     ['casefeature', GeneratedLexer.CASEFEATURE],
     ['valuetype', GeneratedLexer.VALUETYPE],
+    ['any', GeneratedLexer.ANY],
+    ['all', GeneratedLexer.ALL],
   ]);
 
   // Required by Lexer

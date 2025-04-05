@@ -7,6 +7,7 @@ import { FileContext } from "./CPGLParser";
 import { StatementContext } from "./CPGLParser";
 import { DecisionContext } from "./CPGLParser";
 import { BlockContext } from "./CPGLParser";
+import { QualifierContext } from "./CPGLParser";
 import { StatementLineContext } from "./CPGLParser";
 import { WhenClauseContext } from "./CPGLParser";
 import { DoClauseContext } from "./CPGLParser";
@@ -71,6 +72,17 @@ export interface CPGLListener extends ParseTreeListener {
 	 * @param ctx the parse tree
 	 */
 	exitBlock?: (ctx: BlockContext) => void;
+
+	/**
+	 * Enter a parse tree produced by `CPGLParser.qualifier`.
+	 * @param ctx the parse tree
+	 */
+	enterQualifier?: (ctx: QualifierContext) => void;
+	/**
+	 * Exit a parse tree produced by `CPGLParser.qualifier`.
+	 * @param ctx the parse tree
+	 */
+	exitQualifier?: (ctx: QualifierContext) => void;
 
 	/**
 	 * Enter a parse tree produced by `CPGLParser.statementLine`.
