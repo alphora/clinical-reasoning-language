@@ -71,8 +71,8 @@ decision "Test_Decision"
 const validFHIRInput = `
 decision "Test_Decision"
   when "condition" then
-    do "action1" fhir "Patient"
-    do "action2" fhir "Observation"
+    do "action1" fhir "MedicationRequest"
+    do "action2" fhir "ServiceRequest"
 `;
 
 function testInput(name: string, input: string): void {

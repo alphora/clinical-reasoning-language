@@ -1,4 +1,5 @@
 import type { Decision, File, Statement, WhenClause } from '../ast/types';
+import { ACTION_FHIR_TYPES, CASEFEATURE_FHIR_TYPES } from '../grammar/fhirTypes';
 
 export class ValidationError extends Error {
   constructor(
@@ -12,30 +13,6 @@ export class ValidationError extends Error {
     this.name = 'ValidationError';
   }
 }
-
-// Cache for FHIR resource types to avoid repeated lookups
-const FHIR_RESOURCE_TYPES = new Set([
-  'Patient',
-  'Observation',
-  'Condition',
-  'Procedure',
-  'MedicationRequest',
-  'ServiceRequest',
-  'CarePlan',
-  'Goal',
-  'Encounter',
-  'DiagnosticReport',
-  'Medication',
-  'Organization',
-  'Practitioner',
-  'Location',
-  'Device',
-  'AllergyIntolerance',
-  'Immunization',
-  'DocumentReference',
-  'Questionnaire',
-  'QuestionnaireResponse',
-]);
 
 export class ASTValidator {
   private readonly decisionNames: Set<string> = new Set();
@@ -278,16 +255,15 @@ export class ASTValidator {
       );
     }
 
-    if (action.fhirType && !this.isValidFHIRType(action.fhirType)) {
+    if (action.fhirType && !ACTION_FHIR_TYPES.has(action.fhirType)) {
       throw new ValidationError(
-        `Invalid FHIR type: "${action.fhirType}". Valid FHIR types are: ${Array.from(FHIR_RESOURCE_TYPES).join(', ')}`,
+        `Invalid FHIR type for action: "${action.fhirType}". Valid FHIR types for actions are: ${Array.from(ACTION_FHIR_TYPES).join(', ')}`,
         action.location.start,
       );
     }
   }
 
   private validateCaseFeature(caseFeature: Statement & { type: 'CaseFeature' }): void {
-    // Check case feature name format
     if (!this.isValidName(caseFeature.name)) {
       throw new ValidationError(
         `Invalid case feature name: "${caseFeature.name}". Names must start with a letter and contain only letters, numbers, and underscores.`,
@@ -295,17 +271,11 @@ export class ASTValidator {
       );
     }
 
-    // If FHIR type is specified, validate it
-    if (caseFeature.fhirType && !this.isValidFHIRType(caseFeature.fhirType)) {
+    if (caseFeature.fhirType && !CASEFEATURE_FHIR_TYPES.has(caseFeature.fhirType)) {
       throw new ValidationError(
-        `Invalid FHIR type: "${caseFeature.fhirType}"`,
+        `Invalid FHIR type for case feature: "${caseFeature.fhirType}". Valid FHIR types for case features are: ${Array.from(CASEFEATURE_FHIR_TYPES).join(', ')}`,
         caseFeature.location.start,
       );
-    }
-
-    // Validate URL if present
-    if (caseFeature.url && !this.isValidUrl(caseFeature.url)) {
-      throw new ValidationError(`Invalid URL: "${caseFeature.url}"`, caseFeature.location.start);
     }
   }
 
@@ -329,8 +299,8 @@ export class ASTValidator {
     return /^[a-zA-Z]\w*$/.test(name);
   }
 
-  private isValidFHIRType(type: string): boolean {
-    return FHIR_RESOURCE_TYPES.has(type);
+  private isValidFHIRType(type: string, isAction: boolean): boolean {
+    return isAction ? ACTION_FHIR_TYPES.has(type) : CASEFEATURE_FHIR_TYPES.has(type);
   }
 
   private isValidUrl(url: string): boolean {

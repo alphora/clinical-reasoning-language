@@ -116,7 +116,21 @@ INDENT: '    ' -> channel(HIDDEN);
 DEDENT: -> channel(HIDDEN);
 
 // FHIR types
-ACTION_FHIR_TYPE: 'ActivityDefinition' | 'PlanDefinition' | 'Task';
+ACTION_FHIR_TYPE: 'Appointment'
+    | 'AppointmentResponse'
+    | 'CarePlan'
+    | 'Claim'
+    | 'CommunicationRequest'
+    | 'Contract'
+    | 'DeviceRequest'
+    | 'EnrollmentRequest'
+    | 'ImmunizationRecommendation'
+    | 'MedicationRequest'
+    | 'NutritionOrder'
+    | 'ServiceRequest'
+    | 'SupplyRequest'
+    | 'Task'
+    | 'VisionPrescription';
 CASEFEATURE_FHIR_TYPE: 'Condition' | 'Observation' | 'Procedure' | 'Encounter';
 FHIR_VALUE_TYPE: 'boolean' | 'integer' | 'decimal' | 'string' | 'date' | 'dateTime' | 'time' | 'code' | 'uri';
 
