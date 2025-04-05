@@ -1,49 +1,36 @@
 /* eslint-disable no-console */
 import { CharStreams } from 'antlr4ts';
-import { CPGLLexer, CPGLTokenType } from '../lexer';
+import { CPGLLexer } from '../lexer/CPGLLexer';
+import { CPGLLexer as GeneratedLexer } from '../grammar/generated/CPGLLexer';
+import { CPGLToken } from '../lexer/CPGLToken';
 
-// A more complex example that tests indentation, comments, and string literals
-const input = `
-// Clinical practice guideline for hypertension
-decision HypertensionManagement
-    /* This decision tree helps manage 
-       patients with hypertension */
-    when
-        patient.condition == "hypertension"
-        patient.age > 18
-    then
-        // First-line recommendations
-        recommend "Lifestyle modifications"
-            with EVIDENCE_LEVEL "high"
-        
-        // Medication recommendations
-        recommend "Consider antihypertensive medication"
-            with EVIDENCE_LEVEL "moderate"
-`;
+// Example CPGL document
+const input = `decision "Test Decision"
+    when "Condition 1" then
+        do "Action 1"
+    when "Condition 2" then
+        do "Action 2"
+        use "Another Decision"`;
 
-console.log('Starting lexer on complex input...');
-const chars = CharStreams.fromString(input);
-const lexer = new CPGLLexer(chars);
+console.log('Input:');
+console.log(input);
+console.log('\nTokens:');
 
-// Process and print tokens
-console.log('Tokens:');
-console.log('--------------------------------------');
-console.log('| Type               | Text          |');
-console.log('--------------------------------------');
-
+// Create lexer and get tokens
+const lexer = new CPGLLexer(CharStreams.fromString(input));
 let token = lexer.nextToken();
 let count = 0;
 
-while (token.type !== CPGLTokenType.EOF && count < 50) {
-    const typeName = String(CPGLTokenType[token.type] || token.type);
-    const text = token.text ? 
-        (token.text.length > 15 ? token.text.substring(0, 12) + '...' : token.text) : 
-        '';
-    
-    console.log(`| ${typeName.padEnd(18)} | ${text.padEnd(13)} |`);
+// Print each token
+while (token.type !== GeneratedLexer.EOF && count < 50) {
+    const cpglToken = token as CPGLToken;
+    console.log(`Token #${count + 1}: type=${token.type} (${cpglToken.typeName}), text="${token.text}"`);
     token = lexer.nextToken();
     count++;
 }
 
-console.log('--------------------------------------');
-console.log('Processing complete.'); 
+if (token.type === GeneratedLexer.EOF) {
+    console.log('Reached EOF');
+} else {
+    console.log('Token limit reached');
+} 

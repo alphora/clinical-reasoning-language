@@ -1,120 +1,163 @@
 /* eslint-disable no-console */
-import { CharStreams, Token } from 'antlr4ts';
+import { CharStreams } from 'antlr4ts';
 import { CPGLLexer } from './CPGLLexer';
-import { CPGLTokenType } from './CPGLTokenType';
+import { CPGLLexer as GeneratedLexer } from '../grammar/generated/CPGLLexer';
 
 describe('CPGLLexer', () => {
-    // Helper function to collect all tokens from input
-    function getAllTokens(input: string): { type: number; text: string }[] {
+    it('should handle basic tokens', () => {
+        const input = 'decision "test"';
         const lexer = new CPGLLexer(CharStreams.fromString(input));
-        const tokens: { type: number; text: string }[] = [];
         
-        try {
-            let token = lexer.nextToken();
-            while (token.type !== Token.EOF) {
-                tokens.push({
-                    type: token.type,
-                    text: token.text ?? ''
-                });
-                token = lexer.nextToken();
-            }
-        } catch (e) {
-            // Convert error to a more informative format for test failures
-            throw new Error(`Tokenization error: ${e instanceof Error ? e.message : String(e)}`);
-        }
-        
-        return tokens;
-    }
-
-    test('should tokenize keywords correctly', () => {
-        const tokens = getAllTokens('decision when then do use action');
-        
-        expect(tokens.find(t => t.type === CPGLTokenType.DECISION)).toBeTruthy();
-        expect(tokens.find(t => t.type === CPGLTokenType.WHEN)).toBeTruthy();
-        expect(tokens.find(t => t.type === CPGLTokenType.THEN)).toBeTruthy();
-        expect(tokens.find(t => t.type === CPGLTokenType.DO)).toBeTruthy();
-        expect(tokens.find(t => t.type === CPGLTokenType.USE)).toBeTruthy();
-        expect(tokens.find(t => t.type === CPGLTokenType.ACTION)).toBeTruthy();
+        const tokens = getAllTokens(lexer);
+        expect(tokens.length).toBe(3);
+        expect(tokens[0].type).toBe(GeneratedLexer.DECISION);
+        expect(tokens[1].type).toBe(GeneratedLexer.STRING);
+        expect(tokens[2].type).toBe(GeneratedLexer.EOF);
     });
 
-    test('should handle strings correctly', () => {
-        const tokens = getAllTokens('"Simple string" "Test string"');
+    it('should handle indentation', () => {
+        const input = 'decision "test"\n    when "condition" then\n        do "action"';
+        const lexer = new CPGLLexer(CharStreams.fromString(input));
         
-        const stringTokens = tokens.filter(t => t.type === CPGLTokenType.STRING);
-        expect(stringTokens.length).toBeGreaterThanOrEqual(1);
-        
-        if (stringTokens.length > 0) {
-            expect(stringTokens[0].text).toContain('Simple string');
-        }
+        const tokens = getAllTokens(lexer);
+        expect(tokens.length).toBe(14);
+        expect(tokens[0].type).toBe(GeneratedLexer.DECISION);
+        expect(tokens[1].type).toBe(GeneratedLexer.STRING);
+        expect(tokens[2].type).toBe(GeneratedLexer.NEWLINE);
+        expect(tokens[3].type).toBe(GeneratedLexer.INDENT);
+        expect(tokens[4].type).toBe(GeneratedLexer.WHEN);
+        expect(tokens[5].type).toBe(GeneratedLexer.STRING);
+        expect(tokens[6].type).toBe(GeneratedLexer.THEN);
+        expect(tokens[7].type).toBe(GeneratedLexer.NEWLINE);
+        expect(tokens[8].type).toBe(GeneratedLexer.INDENT);
+        expect(tokens[9].type).toBe(GeneratedLexer.DO);
+        expect(tokens[10].type).toBe(GeneratedLexer.STRING);
+        expect(tokens[11].type).toBe(GeneratedLexer.DEDENT);
+        expect(tokens[12].type).toBe(GeneratedLexer.DEDENT);
+        expect(tokens[13].type).toBe(GeneratedLexer.EOF);
     });
 
-    test('should handle comments', () => {
-        const tokens = getAllTokens('// This is a comment\ndecision // Another comment');
+    it('should handle comments', () => {
+        const input = '// This is a comment\ndecision "test"';
+        const lexer = new CPGLLexer(CharStreams.fromString(input));
         
-        expect(tokens.filter(t => t.type === CPGLTokenType.COMMENT)).toHaveLength(2);
-        expect(tokens.find(t => t.type === CPGLTokenType.DECISION)).toBeTruthy();
+        const tokens = getAllTokens(lexer);
+        expect(tokens.length).toBe(4);
+        expect(tokens[0].type).toBe(GeneratedLexer.NEWLINE);
+        expect(tokens[1].type).toBe(GeneratedLexer.DECISION);
+        expect(tokens[2].type).toBe(GeneratedLexer.STRING);
+        expect(tokens[3].type).toBe(GeneratedLexer.EOF);
     });
 
-    test('should handle basic indentation', () => {
-        const tokens = getAllTokens('level1\n    level2\n        level3\n    back\nlevel1');
+    it('should handle block comments', () => {
+        const input = '/* This is a\nblock comment */\ndecision "test"';
+        const lexer = new CPGLLexer(CharStreams.fromString(input));
         
-        const indentTokens = tokens.filter(t => 
-            t.type === CPGLTokenType.INDENT || t.type === CPGLTokenType.DEDENT);
-            
-        expect(indentTokens.length).toBeGreaterThan(0);
-        // Check if we have the same number of INDENTs and DEDENTs
-        const indents = indentTokens.filter(t => t.type === CPGLTokenType.INDENT);
-        const dedents = indentTokens.filter(t => t.type === CPGLTokenType.DEDENT);
-        expect(indents.length).toBe(dedents.length);
+        const tokens = getAllTokens(lexer);
+        expect(tokens.length).toBe(4);
+        expect(tokens[0].type).toBe(GeneratedLexer.NEWLINE);
+        expect(tokens[1].type).toBe(GeneratedLexer.DECISION);
+        expect(tokens[2].type).toBe(GeneratedLexer.STRING);
+        expect(tokens[3].type).toBe(GeneratedLexer.EOF);
     });
 
-    test('should throw on inconsistent indentation', () => {
+    it('should handle errors', () => {
+        const input = '@';
+        const lexer = new CPGLLexer(CharStreams.fromString(input));
+        
+        const tokens = getAllTokens(lexer);
+        expect(tokens.length).toBe(2);
+        expect(tokens[0].type).toBe(GeneratedLexer.ERROR);
+        expect(tokens[1].type).toBe(GeneratedLexer.EOF);
+    });
+
+    it('should tokenize keywords correctly', () => {
+        const input = 'decision when then do use action fhirtype casefeature code url valuetype';
+        const lexer = new CPGLLexer(CharStreams.fromString(input));
+        
+        const tokens = getAllTokens(lexer);
+        expect(tokens.length).toBe(12);
+        expect(tokens[0].type).toBe(GeneratedLexer.DECISION);
+        expect(tokens[1].type).toBe(GeneratedLexer.WHEN);
+        expect(tokens[2].type).toBe(GeneratedLexer.THEN);
+        expect(tokens[3].type).toBe(GeneratedLexer.DO);
+        expect(tokens[4].type).toBe(GeneratedLexer.USE);
+        expect(tokens[5].type).toBe(GeneratedLexer.ACTION);
+        expect(tokens[6].type).toBe(GeneratedLexer.FHIRTYPE);
+        expect(tokens[7].type).toBe(GeneratedLexer.CASEFEATURE);
+        expect(tokens[8].type).toBe(GeneratedLexer.CODE);
+        expect(tokens[9].type).toBe(GeneratedLexer.URL);
+        expect(tokens[10].type).toBe(GeneratedLexer.VALUETYPE);
+        expect(tokens[11].type).toBe(GeneratedLexer.EOF);
+    });
+
+    it('should handle inconsistent indentation', () => {
+        const input = 'decision "test"\n    when "condition" then\n  do "action"';
+        const lexer = new CPGLLexer(CharStreams.fromString(input));
+        
         expect(() => {
-            getAllTokens('level1\n    level2\n   invalid');
+            getAllTokens(lexer);
         }).toThrow('Inconsistent indentation');
     });
 
-    test('should handle block comments', () => {
-        const tokens = getAllTokens('/* This is a\nblock comment */\ndecision "Test"');
-        
-        expect(tokens.find(t => t.type === CPGLTokenType.COMMENT_BLOCK)).toBeTruthy();
-        expect(tokens.find(t => t.type === CPGLTokenType.DECISION)).toBeTruthy();
-    });
-
-    test('should tokenize a complete CPGL document', () => {
-        const input = 'decision "Test"\n  when "condition" then\n    do "action"\n  use "other_decision"';
-        const tokens = getAllTokens(input);
-
-        // Verify the tokens
-        expect(tokens.find(t => t.type === CPGLTokenType.DECISION)).toBeTruthy();
-        expect(tokens.find(t => t.type === CPGLTokenType.STRING)).toBeTruthy();
-        expect(tokens.find(t => t.type === CPGLTokenType.WHEN)).toBeTruthy();
-        expect(tokens.find(t => t.type === CPGLTokenType.THEN)).toBeTruthy();
-        expect(tokens.find(t => t.type === CPGLTokenType.DO)).toBeTruthy();
-        expect(tokens.find(t => t.type === CPGLTokenType.USE)).toBeTruthy();
-        expect(tokens.find(t => t.type === CPGLTokenType.INDENT)).toBeTruthy();
-        expect(tokens.find(t => t.type === CPGLTokenType.DEDENT)).toBeTruthy();
-    });
-
-    test('Lexer should tokenize input correctly', () => {
-        const input = 'decision Test';
+    it('should tokenize a complete CPGL document', () => {
+        const input = `decision "Test Decision"
+    when "Condition 1" then
+        do "Action 1"
+    when "Condition 2" then
+        do "Action 2"
+        use "Another Decision"`;
         const lexer = new CPGLLexer(CharStreams.fromString(input));
-        const tokens: { type: number; text: string }[] = [];
-        let token = lexer.nextToken();
         
-        while (token.type !== Token.EOF) {
-            tokens.push({
-                type: token.type,
-                text: token.text ?? ''
-            });
-            token = lexer.nextToken();
-        }
-    
-        // Add assertions to verify the tokens
-        expect(tokens).toHaveLength(2); // decision keyword and Test identifier
-        expect(tokens[0].type).toBe(CPGLTokenType.DECISION);
-        expect(tokens[0].text).toBe('decision');
-        expect(tokens[1].type).toBe(CPGLTokenType.IDENTIFIER);
-        expect(tokens[1].text).toBe('Test');
+        const tokens = getAllTokens(lexer);
+        expect(tokens.length).toBe(26);
+        expect(tokens[0].type).toBe(GeneratedLexer.DECISION);
+        expect(tokens[1].type).toBe(GeneratedLexer.STRING);
+        expect(tokens[2].type).toBe(GeneratedLexer.NEWLINE);
+        expect(tokens[3].type).toBe(GeneratedLexer.INDENT);
+        expect(tokens[4].type).toBe(GeneratedLexer.WHEN);
+        expect(tokens[5].type).toBe(GeneratedLexer.STRING);
+        expect(tokens[6].type).toBe(GeneratedLexer.THEN);
+        expect(tokens[7].type).toBe(GeneratedLexer.NEWLINE);
+        expect(tokens[8].type).toBe(GeneratedLexer.INDENT);
+        expect(tokens[9].type).toBe(GeneratedLexer.DO);
+        expect(tokens[10].type).toBe(GeneratedLexer.STRING);
+        expect(tokens[11].type).toBe(GeneratedLexer.NEWLINE);
+        expect(tokens[12].type).toBe(GeneratedLexer.DEDENT);
+        expect(tokens[13].type).toBe(GeneratedLexer.WHEN);
+        expect(tokens[14].type).toBe(GeneratedLexer.STRING);
+        expect(tokens[15].type).toBe(GeneratedLexer.THEN);
+        expect(tokens[16].type).toBe(GeneratedLexer.NEWLINE);
+        expect(tokens[17].type).toBe(GeneratedLexer.INDENT);
+        expect(tokens[18].type).toBe(GeneratedLexer.DO);
+        expect(tokens[19].type).toBe(GeneratedLexer.STRING);
+        expect(tokens[20].type).toBe(GeneratedLexer.NEWLINE);
+        expect(tokens[21].type).toBe(GeneratedLexer.USE);
+        expect(tokens[22].type).toBe(GeneratedLexer.STRING);
+        expect(tokens[23].type).toBe(GeneratedLexer.DEDENT);
+        expect(tokens[24].type).toBe(GeneratedLexer.DEDENT);
+        expect(tokens[25].type).toBe(GeneratedLexer.EOF);
     });
 });
+
+function getAllTokens(lexer: CPGLLexer) {
+    const tokens = [];
+    let token = lexer.nextToken();
+    let iterationCount = 0;
+    const MAX_ITERATIONS = 1000; // Safety limit to prevent infinite loops
+    
+    while (token.type !== GeneratedLexer.EOF && iterationCount < MAX_ITERATIONS) {
+        console.log(`Token ${iterationCount}: type=${token.type} (${(token as any).typeName}), text="${token.text}"`);
+        tokens.push(token);
+        token = lexer.nextToken();
+        iterationCount++;
+    }
+    
+    if (iterationCount >= MAX_ITERATIONS) {
+        throw new Error('Token generation exceeded maximum iterations');
+    }
+    
+    tokens.push(token); // Add the EOF token
+    console.log(`Token ${iterationCount}: type=${token.type} (${(token as any).typeName}), text="${token.text}"`);
+    return tokens;
+}

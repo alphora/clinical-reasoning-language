@@ -1,3 +1,3 @@
 export * from './CPGLLexer';
 export * from './CPGLToken';
-export * from './CPGLTokenType'; 
+export { CPGLLexer as GeneratedLexer } from '../grammar/generated/CPGLLexer'; 

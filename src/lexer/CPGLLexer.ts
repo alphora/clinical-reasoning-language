@@ -2,7 +2,7 @@ import { Lexer } from 'antlr4ts/Lexer';
 import { CharStream } from 'antlr4ts/CharStream';
 import { Token } from 'antlr4ts/Token';
 import { CPGLToken } from './CPGLToken';
-import { CPGLTokenType } from './CPGLTokenType';
+import { CPGLLexer as GeneratedLexer } from '../grammar/generated/CPGLLexer';
 import { Interval } from 'antlr4ts/misc/Interval';
 
 /**
@@ -27,17 +27,17 @@ export class CPGLLexer extends Lexer {
 
     // Standard tokens for testing - these would normally be generated from an ANTLR grammar
     private readonly TOKEN_RULES: Map<string, number> = new Map([
-        ['decision', CPGLTokenType.DECISION],
-        ['when', CPGLTokenType.WHEN],
-        ['then', CPGLTokenType.THEN],
-        ['do', CPGLTokenType.DO],
-        ['use', CPGLTokenType.USE],
-        ['action', CPGLTokenType.ACTION],
-        ['fhirtype', CPGLTokenType.FHIRTYPE],
-        ['casefeature', CPGLTokenType.CASEFEATURE],
-        ['code', CPGLTokenType.CODE],
-        ['url', CPGLTokenType.URL],
-        ['valuetype', CPGLTokenType.VALUETYPE]
+        ['decision', GeneratedLexer.DECISION],
+        ['when', GeneratedLexer.WHEN],
+        ['then', GeneratedLexer.THEN],
+        ['do', GeneratedLexer.DO],
+        ['use', GeneratedLexer.USE],
+        ['action', GeneratedLexer.ACTION],
+        ['fhirtype', GeneratedLexer.FHIRTYPE],
+        ['casefeature', GeneratedLexer.CASEFEATURE],
+        ['code', GeneratedLexer.CODE],
+        ['url', GeneratedLexer.URL],
+        ['valuetype', GeneratedLexer.VALUETYPE]
     ]);
 
     // Required by Lexer
@@ -93,7 +93,7 @@ export class CPGLLexer extends Lexer {
             if (this.indentationStack.length > 1) {
                 this.indentationStack.pop();
                 return this.createToken({
-                    type: CPGLTokenType.DEDENT,
+                    type: GeneratedLexer.DEDENT,
                     text: '<DEDENT>',
                     startIndex: this._input.index,
                     stopIndex: this._input.index,
@@ -138,7 +138,7 @@ export class CPGLLexer extends Lexer {
                 if (this.indentationStack.length > 1) {
                     this.indentationStack.pop();
                     return this.createToken({
-                        type: CPGLTokenType.DEDENT,
+                        type: GeneratedLexer.DEDENT,
                         text: '<DEDENT>',
                         startIndex: this._input.index - whitespaceCount,
                         stopIndex: this._input.index,
@@ -173,7 +173,7 @@ export class CPGLLexer extends Lexer {
                 // Increase in indentation
                 this.indentationStack.push(this.currentIndent);
                 return this.createToken({
-                    type: CPGLTokenType.INDENT,
+                    type: GeneratedLexer.INDENT,
                     text: '<INDENT>',
                     startIndex: this._input.index - whitespaceCount,
                     stopIndex: this._input.index,
@@ -199,7 +199,7 @@ export class CPGLLexer extends Lexer {
 
                 this.indentationStack.pop();
                 return this.createToken({
-                    type: CPGLTokenType.DEDENT,
+                    type: GeneratedLexer.DEDENT,
                     text: '<DEDENT>',
                     startIndex: this._input.index - whitespaceCount,
                     stopIndex: this._input.index,
@@ -223,7 +223,7 @@ export class CPGLLexer extends Lexer {
                 if (this.indentationStack.length > 1) {
                     this.indentationStack.pop();
                     return this.createToken({
-                        type: CPGLTokenType.DEDENT,
+                        type: GeneratedLexer.DEDENT,
                         text: '<DEDENT>',
                         startIndex: this._input.index,
                         stopIndex: this._input.index,
@@ -277,7 +277,7 @@ export class CPGLLexer extends Lexer {
             this.atStartOfLine = true;
             
             return this.createToken({
-                type: CPGLTokenType.NEWLINE,
+                type: GeneratedLexer.NEWLINE,
                 text: '<NEWLINE>',
                 startIndex: start,
                 stopIndex: this._input.index - 1,
@@ -299,79 +299,14 @@ export class CPGLLexer extends Lexer {
             return this.handleIdentifier();
         }
 
-        // If we reach here and find EOF, handle it
-        if (this._input.LA(1) === -1) {
-            // Generate DEDENT tokens for any remaining indentation levels
-            if (this.indentationStack.length > 1) {
-                this.indentationStack.pop();
-                return this.createToken({
-                    type: CPGLTokenType.DEDENT,
-                    text: '<DEDENT>',
-                    startIndex: this._input.index,
-                    stopIndex: this._input.index,
-                    line: this._currentLine,
-                    charPositionInLine: this._currentColumn,
-                    channel: Token.DEFAULT_CHANNEL,
-                    tokenIndex: this._tokenIndex++,
-                    source: [this._input, this]
-                });
-            }
-            // Return EOF token when all indentation levels are closed
-            if (this.indentationStack.length === 1) {
-                return this.createToken({
-                    type: Token.EOF,
-                    text: '<EOF>',
-                    startIndex: this._input.index,
-                    stopIndex: this._input.index,
-                    line: this._currentLine,
-                    charPositionInLine: this._currentColumn,
-                    channel: Token.DEFAULT_CHANNEL,
-                    tokenIndex: this._tokenIndex++,
-                    source: [this._input, this]
-                });
-            }
-        }
-
-        // Handle unrecognized characters
-        const c = this._input.LA(1);
-        this._input.consume();
-        this._currentColumn++;
-        
-        return this.createToken({
-            type: CPGLTokenType.ERROR,
-            text: String.fromCharCode(c),
-            startIndex: this._input.index - 1,
-            stopIndex: this._input.index - 1,
-            line: this._currentLine,
-            charPositionInLine: this._currentColumn - 1,
-            channel: Token.DEFAULT_CHANNEL,
-            tokenIndex: this._tokenIndex++,
-            source: [this._input, this]
-        });
-    }
-
-    private isAlpha(c: number): boolean {
-        return (c >= 'a'.charCodeAt(0) && c <= 'z'.charCodeAt(0)) || 
-               (c >= 'A'.charCodeAt(0) && c <= 'Z'.charCodeAt(0));
-    }
-
-    private isDigit(c: number): boolean {
-        return c >= '0'.charCodeAt(0) && c <= '9'.charCodeAt(0);
-    }
-
-    private isAlphanumeric(c: number): boolean {
-        return this.isAlpha(c) || this.isDigit(c);
-    }
-
-    private isWhitespace(c: number): boolean {
-        return c === ' '.charCodeAt(0) || c === '\t'.charCodeAt(0);
+        // If we get here, we have an error
+        return this.handleError();
     }
 
     /**
      * Handle single-line comments
      */
     protected handleSingleLineComment(): Token {
-        const start = this._input.index;
         this._input.consume(); // Consume the first '/'
         this._currentColumn++;
         this._input.consume(); // Consume the second '/'
@@ -384,24 +319,14 @@ export class CPGLLexer extends Lexer {
             this._currentColumn++;
         }
         
-        return this.createToken({
-            type: CPGLTokenType.COMMENT,
-            text: this._input.getText(new Interval(start, this._input.index - 1)), 
-            startIndex: start, 
-            stopIndex: this._input.index,
-            line: this._currentLine,
-            charPositionInLine: this._currentColumn,
-            channel: Token.HIDDEN_CHANNEL,
-            tokenIndex: this._tokenIndex++,
-            source: [this._input, this]
-        });
+        // Skip the comment and return the next token
+        return this.nextToken();
     }
 
     /**
      * Handle block comments
      */
     protected handleBlockComment(): Token {
-        const start = this._input.index;
         this._input.consume(); // Consume the first '/'
         this._currentColumn++;
         this._input.consume(); // Consume the '*'
@@ -414,14 +339,6 @@ export class CPGLLexer extends Lexer {
         while (this._input.LA(1) !== -1 && !foundEnd) {
             iterationCount++;
             if (iterationCount > MAX_ITERATIONS) {
-                console.error('[DEBUGGING] Block comment loop exceeded max iterations');
-                console.error('[DEBUGGING] Current state:', {
-                    index: this._input.index,
-                    currentChar: String.fromCharCode(this._input.LA(1)),
-                    nextChar: String.fromCharCode(this._input.LA(2)),
-                    line: this._currentLine,
-                    column: this._currentColumn
-                });
                 throw new Error('Block comment processing exceeded maximum iterations');
             }
 
@@ -453,28 +370,8 @@ export class CPGLLexer extends Lexer {
             throw new Error('Unterminated block comment');
         }
         
-        // After the block comment, we need to handle any newlines
-        if (this._input.LA(1) === '\n'.charCodeAt(0) || this._input.LA(1) === '\r'.charCodeAt(0)) {
-            this._input.consume(); // Consume the newline
-            if (this._input.LA(1) === '\n'.charCodeAt(0)) {
-                this._input.consume(); // Consume the \n in \r\n
-            }
-            this._currentLine++;
-            this._currentColumn = 0;
-            this.atStartOfLine = true;
-        }
-        
-        return this.createToken({
-            type: CPGLTokenType.COMMENT_BLOCK,
-            text: this._input.getText(new Interval(start, this._input.index - 1)), 
-            startIndex: start, 
-            stopIndex: this._input.index,
-            line: this._currentLine,
-            charPositionInLine: this._currentColumn,
-            channel: Token.HIDDEN_CHANNEL,
-            tokenIndex: this._tokenIndex++,
-            source: [this._input, this]
-        });
+        // Skip the comment and return the next token
+        return this.nextToken();
     }
 
     /**
@@ -482,37 +379,28 @@ export class CPGLLexer extends Lexer {
      */
     protected handleStringLiteral(): Token {
         const start = this._input.index;
-        this._input.consume(); // Consume opening quote
+        this._input.consume(); // Consume the opening quote
         this._currentColumn++;
         
-        let escaping = false;
-        while (this._input.LA(1) !== -1) {
-            const c = this._input.LA(1);
-            
-            if (escaping) {
-                escaping = false;
-                this._input.consume();
-                this._currentColumn++;
-            } else if (c === '\\'.charCodeAt(0)) {
-                escaping = true;
-                this._input.consume();
-                this._currentColumn++;
-            } else if (c === '"'.charCodeAt(0)) {
-                this._input.consume(); // Consume closing quote
-                this._currentColumn++;
-                break;
-            } else {
-                this._input.consume();
-                this._currentColumn++;
-            }
+        while (this._input.LA(1) !== -1 && 
+               this._input.LA(1) !== '"'.charCodeAt(0) && 
+               this._input.LA(1) !== '\n'.charCodeAt(0) && 
+               this._input.LA(1) !== '\r'.charCodeAt(0)) {
+            this._input.consume();
+            this._currentColumn++;
         }
-
-        if (this._input.LA(-1) !== '"'.charCodeAt(0)) {
+        
+        if (this._input.LA(1) === -1 || 
+            this._input.LA(1) === '\n'.charCodeAt(0) || 
+            this._input.LA(1) === '\r'.charCodeAt(0)) {
             throw new Error('Unterminated string literal');
         }
         
+        this._input.consume(); // Consume the closing quote
+        this._currentColumn++;
+        
         return this.createToken({
-            type: CPGLTokenType.STRING,
+            type: GeneratedLexer.STRING,
             text: this._input.getText(new Interval(start, this._input.index - 1)), 
             startIndex: start, 
             stopIndex: this._input.index,
@@ -529,23 +417,25 @@ export class CPGLLexer extends Lexer {
      */
     protected handleIdentifier(): Token {
         const start = this._input.index;
+        let text = '';
         
-        // Consume all valid identifier characters
-        while (this.isAlphanumeric(this._input.LA(1)) || this._input.LA(1) === '_'.charCodeAt(0)) {
+        while (this._input.LA(1) !== -1 && 
+               (this.isAlpha(this._input.LA(1)) || 
+                this.isDigit(this._input.LA(1)) || 
+                this._input.LA(1) === '_'.charCodeAt(0))) {
+            text += String.fromCharCode(this._input.LA(1));
             this._input.consume();
             this._currentColumn++;
         }
         
-        const text = this._input.getText(new Interval(start, this._input.index - 1));
-        
-        // Check if it's a keyword
-        const keywordType = this.TOKEN_RULES.get(text);
-        if (keywordType !== undefined) {
+        // Check if this is a keyword
+        const type = this.TOKEN_RULES.get(text);
+        if (type !== undefined) {
             return this.createToken({
-                type: keywordType,
-                text: text,
+                type,
+                text,
                 startIndex: start,
-                stopIndex: this._input.index,
+                stopIndex: this._input.index - 1,
                 line: this._currentLine,
                 charPositionInLine: this._currentColumn,
                 channel: Token.DEFAULT_CHANNEL,
@@ -554,18 +444,33 @@ export class CPGLLexer extends Lexer {
             });
         }
         
-        // Otherwise it's an identifier
+        // If not a keyword, it's an error
         return this.createToken({
-            type: CPGLTokenType.IDENTIFIER,
-            text: text,
+            type: GeneratedLexer.ERROR,
+            text,
             startIndex: start,
-            stopIndex: this._input.index,
+            stopIndex: this._input.index - 1,
             line: this._currentLine,
             charPositionInLine: this._currentColumn,
             channel: Token.DEFAULT_CHANNEL,
             tokenIndex: this._tokenIndex++,
             source: [this._input, this]
         });
+    }
+
+    /**
+     * Check if a character is alphabetic
+     */
+    private isAlpha(c: number): boolean {
+        return (c >= 'a'.charCodeAt(0) && c <= 'z'.charCodeAt(0)) ||
+               (c >= 'A'.charCodeAt(0) && c <= 'Z'.charCodeAt(0));
+    }
+
+    /**
+     * Check if a character is a digit
+     */
+    private isDigit(c: number): boolean {
+        return c >= '0'.charCodeAt(0) && c <= '9'.charCodeAt(0);
     }
 
     /**
@@ -580,8 +485,30 @@ export class CPGLLexer extends Lexer {
         charPositionInLine: number;
         channel: number;
         tokenIndex: number;
-        source: [CharStream, CPGLLexer];
+        source: [CharStream, Lexer];
     }): Token {
         return new CPGLToken(options);
+    }
+
+    /**
+     * Handle invalid characters
+     */
+    private handleError(): Token {
+        const start = this._input.index;
+        const text = String.fromCharCode(this._input.LA(1));
+        this._input.consume();
+        this._currentColumn++;
+        
+        return this.createToken({
+            type: GeneratedLexer.ERROR,
+            text,
+            startIndex: start,
+            stopIndex: start,
+            line: this._currentLine,
+            charPositionInLine: this._currentColumn,
+            channel: Token.DEFAULT_CHANNEL,
+            tokenIndex: this._tokenIndex++,
+            source: [this._input, this]
+        });
     }
 } 

@@ -1,28 +1,28 @@
 /* eslint-disable no-console */
-import { CharStream, CharStreams } from 'antlr4ts';
-import { CPGLLexer, CPGLTokenType } from '../lexer';
+import { CharStreams } from 'antlr4ts';
+import { CPGLLexer } from '../lexer/CPGLLexer';
+import { CPGLLexer as GeneratedLexer } from '../grammar/generated/CPGLLexer';
+import { CPGLToken } from '../lexer/CPGLToken';
 
-// Example input string
-const input = `
-decision HypertensionTreatment
-    when
-        patient.condition == "hypertension"
-        patient.age > 18
-    then
-        recommend "Consider lifestyle modifications"
-        recommend "Start antihypertensive medication"
-            with EVIDENCE_LEVEL "high"
-`;
+// Example usage of the CPGL lexer
+const input = `decision "Test Decision"
+    when "Condition 1" then
+        do "Action 1"
+    when "Condition 2" then
+        do "Action 2"
+        use "Another Decision"`;
 
-// Create a character stream from the input
-const chars: CharStream = CharStreams.fromString(input);
+console.log('Input:');
+console.log(input);
+console.log('\nTokens:');
 
-// Create a lexer that feeds off of the character stream
-const lexer: CPGLLexer = new CPGLLexer(chars);
-
-// Print out all tokens
+// Create lexer and get tokens
+const lexer = new CPGLLexer(CharStreams.fromString(input));
 let token = lexer.nextToken();
-while (token.type !== CPGLTokenType.EOF) {
-    console.log(`Token: ${token.type} (${CPGLTokenType[token.type]}) - '${token.text}'`);
+
+// Print each token
+while (token.type !== GeneratedLexer.EOF) {
+    const cpglToken = token as CPGLToken;
+    console.log(`Token: type=${token.type} (${cpglToken.typeName}), text="${token.text}"`);
     token = lexer.nextToken();
 } 

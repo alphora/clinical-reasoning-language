@@ -1,7 +1,7 @@
 import { CharStream } from 'antlr4ts/CharStream';
 import { Lexer } from 'antlr4ts/Lexer';
 import { Token } from 'antlr4ts/Token';
-import { CPGLTokenType } from './CPGLTokenType';
+import { CPGLLexer as GeneratedLexer } from '../grammar/generated/CPGLLexer';
 
 /**
  * Custom token implementation for the Clinical Practice Guideline Language (CPGL)
@@ -112,7 +112,31 @@ export class CPGLToken implements Token {
         if (this._type === Token.EOF) {
             return 'EOF';
         }
-        return CPGLTokenType[this._type];
+        switch (this._type) {
+            case GeneratedLexer.DECISION: return 'DECISION';
+            case GeneratedLexer.WHEN: return 'WHEN';
+            case GeneratedLexer.THEN: return 'THEN';
+            case GeneratedLexer.DO: return 'DO';
+            case GeneratedLexer.USE: return 'USE';
+            case GeneratedLexer.ACTION: return 'ACTION';
+            case GeneratedLexer.FHIRTYPE: return 'FHIRTYPE';
+            case GeneratedLexer.CASEFEATURE: return 'CASEFEATURE';
+            case GeneratedLexer.CODE: return 'CODE';
+            case GeneratedLexer.URL: return 'URL';
+            case GeneratedLexer.VALUETYPE: return 'VALUETYPE';
+            case GeneratedLexer.NEWLINE: return 'NEWLINE';
+            case GeneratedLexer.WS: return 'WS';
+            case GeneratedLexer.COMMENT: return 'COMMENT';
+            case GeneratedLexer.COMMENT_BLOCK: return 'COMMENT_BLOCK';
+            case GeneratedLexer.INDENT: return 'INDENT';
+            case GeneratedLexer.DEDENT: return 'DEDENT';
+            case GeneratedLexer.ACTION_FHIR_TYPE: return 'ACTION_FHIR_TYPE';
+            case GeneratedLexer.CASEFEATURE_FHIR_TYPE: return 'CASEFEATURE_FHIR_TYPE';
+            case GeneratedLexer.FHIR_VALUE_TYPE: return 'FHIR_VALUE_TYPE';
+            case GeneratedLexer.STRING: return 'STRING';
+            case GeneratedLexer.ERROR: return 'ERROR';
+            default: return `UNKNOWN(${this._type})`;
+        }
     }
 
     /**

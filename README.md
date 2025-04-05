@@ -1,77 +1,72 @@
-# Clinical Practice Guideline Language (CPGL)
+# Clinical Practice Guideline Language
 
-A TypeScript implementation of a lexer for the Clinical Practice Guideline Language (CPGL), a domain-specific language for expressing clinical practice guidelines in a structured and executable format.
+A domain-specific language for expressing clinical practice guidelines.
+
+## Overview
+
+This project implements a lexer and parser for the Clinical Practice Guideline Language (CPGL), a domain-specific language designed for expressing clinical practice guidelines in a structured and machine-readable format.
 
 ## Features
 
-- Indentation-based syntax (similar to Python)
-- Support for decision trees and clinical recommendations
-- Semantic tokens for clinical concepts
-- Proper handling of comments, string literals, and indentation
-- Cross-platform compatibility
+- Lexical analysis of CPGL documents
+- Support for:
+  - Decision blocks
+  - Condition clauses
+  - Action statements
+  - FHIR resource types
+  - String literals
+  - Comments (single-line and block)
+  - Indentation-based structure
 
 ## Installation
 
 ```bash
-npm install
+npm install clinical-practice-guideline-language
 ```
 
 ## Usage
 
+Here's a basic example of using the lexer:
+
 ```typescript
 import { CharStreams } from 'antlr4ts';
-import { CPGLLexer, CPGLTokenType } from 'clinical-practice-guideline-language';
+import { CPGLLexer, GeneratedLexer } from 'clinical-practice-guideline-language';
 
-// Example input string
-const input = `
-decision HypertensionTreatment
-    when
-        patient.condition == "hypertension"
-        patient.age > 18
-    then
-        recommend "Consider lifestyle modifications"
-        recommend "Start antihypertensive medication"
-            with EVIDENCE_LEVEL "high"
-`;
+// Create a lexer instance
+const input = `decision "Test Decision"
+    when "Condition" then
+        do "Action"`;
+const lexer = new CPGLLexer(CharStreams.fromString(input));
 
-// Create a character stream from the input
-const chars = CharStreams.fromString(input);
-
-// Create a lexer that feeds off of the character stream
-const lexer = new CPGLLexer(chars);
-
-// Process the tokens
+// Get tokens
 let token = lexer.nextToken();
-while (token.type !== CPGLTokenType.EOF) {
-    console.log(`Token: ${token.type} (${CPGLTokenType[token.type]}) - '${token.text}'`);
+while (token.type !== GeneratedLexer.EOF) {
+    console.log(`Token: type=${token.type} (${token.typeName}), text="${token.text}"`);
     token = lexer.nextToken();
 }
 ```
 
 ## Development
 
-### Building the project
+### Building
 
 ```bash
 npm run build
 ```
 
-### Running tests
+### Testing
 
 ```bash
 npm test
 ```
 
-### Linting
+### Regenerating ANTLR Files
+
+If you modify the grammar in `src/grammar/CPGL.g4`, you'll need to regenerate the lexer and parser:
 
 ```bash
-npm run lint
-```
-
-### Running the example
-
-```bash
-npm run example
+cd src/grammar
+antlr4ts CPGL.g4 -o generated
 ```
 
 ## License

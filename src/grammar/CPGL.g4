@@ -48,48 +48,45 @@ action
     ;
 
 actionBlock
-    : INDENT actionBody DEDENT
+    : INDENT actionLine+ DEDENT
     ;
 
-actionBody
-    : fhirtypeClause
+actionLine
+    : fhirTypeClause
+    | codeClause
+    | urlClause
     ;
 
-// For actions, fhirtype specifies a FHIR resource type
-fhirtypeClause
+fhirTypeClause
     : 'fhirtype' ACTION_FHIR_TYPE NEWLINE
-    ;
-
-casefeature
-    : 'casefeature' STRING NEWLINE casefeatureBlock
-    ;
-
-casefeatureBlock
-    : INDENT casefeatureBody DEDENT
-    ;
-
-casefeatureBody
-    : ( codeClause
-      | casefeatureFhirtypeClause
-      | urlClause
-      | valuetypeClause
-      )+
     ;
 
 codeClause
     : 'code' STRING NEWLINE
     ;
 
-// For casefeatures, fhirtype is given as a FHIR resource type
-casefeatureFhirtypeClause
-    : 'fhirtype' CASEFEATURE_FHIR_TYPE NEWLINE
-    ;
-
 urlClause
     : 'url' STRING NEWLINE
     ;
 
-valuetypeClause
+casefeature
+    : 'casefeature' STRING NEWLINE casefeatureBlock?
+    ;
+
+casefeatureBlock
+    : INDENT casefeatureLine+ DEDENT
+    ;
+
+casefeatureLine
+    : casefeatureFhirTypeClause
+    | casefeatureValueTypeClause
+    ;
+
+casefeatureFhirTypeClause
+    : 'fhirtype' CASEFEATURE_FHIR_TYPE NEWLINE
+    ;
+
+casefeatureValueTypeClause
     : 'valuetype' FHIR_VALUE_TYPE NEWLINE
     ;
 
@@ -97,80 +94,34 @@ valuetypeClause
  * Lexer Rules
  */
 
-// A STRING is a quoted sequence (without embedded line breaks)
-STRING: '"' (~["\r\n])* '"';
+// Keywords
+DECISION: 'decision';
+WHEN: 'when';
+THEN: 'then';
+DO: 'do';
+USE: 'use';
+ACTION: 'action';
+FHIRTYPE: 'fhirtype';
+CASEFEATURE: 'casefeature';
+CODE: 'code';
+URL: 'url';
+VALUETYPE: 'valuetype';
 
-// FHIR resource types for actions (request/order resources)
-ACTION_FHIR_TYPE
-    : 'Appointment'
-    | 'AppointmentResponse'
-    | 'CarePlan'
-    | 'Claim'
-    | 'CommunicationRequest'
-    | 'Contract'
-    | 'DeviceRequest'
-    | 'EnrollmentRequest'
-    | 'ImmunizationRecommendation'
-    | 'MedicationRequest'
-    | 'NutritionOrder'
-    | 'ServiceRequest'
-    | 'SupplyRequest'
-    | 'Task'
-    | 'VisionPrescription'
-    ;
+// Special tokens
+NEWLINE: '\r'? '\n';
+WS: [ \t]+ -> skip;
+COMMENT: '//' ~[\r\n]* -> skip;
+COMMENT_BLOCK: '/*' .*? '*/' -> skip;
+INDENT: '    ' -> channel(HIDDEN);
+DEDENT: -> channel(HIDDEN);
 
-// FHIR resource types for case features (clinical observation resources)
-CASEFEATURE_FHIR_TYPE
-    : 'AllergyIntolerance'
-    | 'Condition'
-    | 'Procedure'
-    | 'Observation'
-    | 'Immunization'
-    | 'MedicationDispense'
-    | 'MedicationAdministration'
-    | 'MedicationStatement'
-    ;
+// FHIR types
+ACTION_FHIR_TYPE: 'ActivityDefinition' | 'PlanDefinition' | 'Task';
+CASEFEATURE_FHIR_TYPE: 'Condition' | 'Observation' | 'Procedure' | 'Encounter';
+FHIR_VALUE_TYPE: 'boolean' | 'integer' | 'decimal' | 'string' | 'date' | 'dateTime' | 'time' | 'code' | 'uri';
 
-// FHIR value types
-FHIR_VALUE_TYPE
-    : 'base64Binary'
-    | 'boolean'
-    | 'canonical'
-    | 'code'
-    | 'date'
-    | 'dateTime'
-    | 'decimal'
-    | 'id'
-    | 'instant'
-    | 'integer'
-    | 'markdown'
-    | 'oid'
-    | 'positiveInt'
-    | 'string'
-    | 'time'
-    | 'unsignedInt'
-    | 'uri'
-    | 'url'
-    | 'uuid'
-    | 'xhtml'
-    ;
+// String literals
+STRING: '"' (~["\\\r\n] | '\\' .)* '"';
 
-// NEWLINE: one or more newline characters.
-NEWLINE: ('\r'? '\n')+ ;
-
-// Whitespace (spaces and tabs) are skipped.
-WS: [ \t]+ -> skip ;
-
-// Single-line comments: start with '//' and extend to end-of-line.
-COMMENT: '//' ~[\r\n]* -> skip ;
-
-// Block comments: start with '/*' and end with '*/'. Non-greedy.
-COMMENT_BLOCK: '/*' .*? '*/' -> skip ;
-
-/*
- * The following INDENT and DEDENT rules are placeholders.
- * In a real implementation, you would implement indentation tracking in your lexer.
- * For example, you might use a custom Lexer in Java or TypeScript to emit INDENT/DEDENT tokens.
- */
-INDENT: '<INDENT>';
-DEDENT: '<DEDENT>';
+// Error token
+ERROR: .;

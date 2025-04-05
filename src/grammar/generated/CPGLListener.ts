@@ -1,4 +1,4 @@
-// Generated from src/grammar/CPGL.g4 by ANTLR 4.9.0-SNAPSHOT
+// Generated from CPGL.g4 by ANTLR 4.9.0-SNAPSHOT
 
 
 import { ParseTreeListener } from "antlr4ts/tree/ParseTreeListener";
@@ -13,15 +13,15 @@ import { DoClauseContext } from "./CPGLParser";
 import { UseClauseContext } from "./CPGLParser";
 import { ActionContext } from "./CPGLParser";
 import { ActionBlockContext } from "./CPGLParser";
-import { ActionBodyContext } from "./CPGLParser";
-import { FhirtypeClauseContext } from "./CPGLParser";
+import { ActionLineContext } from "./CPGLParser";
+import { FhirTypeClauseContext } from "./CPGLParser";
+import { CodeClauseContext } from "./CPGLParser";
+import { UrlClauseContext } from "./CPGLParser";
 import { CasefeatureContext } from "./CPGLParser";
 import { CasefeatureBlockContext } from "./CPGLParser";
-import { CasefeatureBodyContext } from "./CPGLParser";
-import { CodeClauseContext } from "./CPGLParser";
-import { CasefeatureFhirtypeClauseContext } from "./CPGLParser";
-import { UrlClauseContext } from "./CPGLParser";
-import { ValuetypeClauseContext } from "./CPGLParser";
+import { CasefeatureLineContext } from "./CPGLParser";
+import { CasefeatureFhirTypeClauseContext } from "./CPGLParser";
+import { CasefeatureValueTypeClauseContext } from "./CPGLParser";
 
 
 /**
@@ -140,26 +140,48 @@ export interface CPGLListener extends ParseTreeListener {
 	exitActionBlock?: (ctx: ActionBlockContext) => void;
 
 	/**
-	 * Enter a parse tree produced by `CPGLParser.actionBody`.
+	 * Enter a parse tree produced by `CPGLParser.actionLine`.
 	 * @param ctx the parse tree
 	 */
-	enterActionBody?: (ctx: ActionBodyContext) => void;
+	enterActionLine?: (ctx: ActionLineContext) => void;
 	/**
-	 * Exit a parse tree produced by `CPGLParser.actionBody`.
+	 * Exit a parse tree produced by `CPGLParser.actionLine`.
 	 * @param ctx the parse tree
 	 */
-	exitActionBody?: (ctx: ActionBodyContext) => void;
+	exitActionLine?: (ctx: ActionLineContext) => void;
 
 	/**
-	 * Enter a parse tree produced by `CPGLParser.fhirtypeClause`.
+	 * Enter a parse tree produced by `CPGLParser.fhirTypeClause`.
 	 * @param ctx the parse tree
 	 */
-	enterFhirtypeClause?: (ctx: FhirtypeClauseContext) => void;
+	enterFhirTypeClause?: (ctx: FhirTypeClauseContext) => void;
 	/**
-	 * Exit a parse tree produced by `CPGLParser.fhirtypeClause`.
+	 * Exit a parse tree produced by `CPGLParser.fhirTypeClause`.
 	 * @param ctx the parse tree
 	 */
-	exitFhirtypeClause?: (ctx: FhirtypeClauseContext) => void;
+	exitFhirTypeClause?: (ctx: FhirTypeClauseContext) => void;
+
+	/**
+	 * Enter a parse tree produced by `CPGLParser.codeClause`.
+	 * @param ctx the parse tree
+	 */
+	enterCodeClause?: (ctx: CodeClauseContext) => void;
+	/**
+	 * Exit a parse tree produced by `CPGLParser.codeClause`.
+	 * @param ctx the parse tree
+	 */
+	exitCodeClause?: (ctx: CodeClauseContext) => void;
+
+	/**
+	 * Enter a parse tree produced by `CPGLParser.urlClause`.
+	 * @param ctx the parse tree
+	 */
+	enterUrlClause?: (ctx: UrlClauseContext) => void;
+	/**
+	 * Exit a parse tree produced by `CPGLParser.urlClause`.
+	 * @param ctx the parse tree
+	 */
+	exitUrlClause?: (ctx: UrlClauseContext) => void;
 
 	/**
 	 * Enter a parse tree produced by `CPGLParser.casefeature`.
@@ -184,58 +206,36 @@ export interface CPGLListener extends ParseTreeListener {
 	exitCasefeatureBlock?: (ctx: CasefeatureBlockContext) => void;
 
 	/**
-	 * Enter a parse tree produced by `CPGLParser.casefeatureBody`.
+	 * Enter a parse tree produced by `CPGLParser.casefeatureLine`.
 	 * @param ctx the parse tree
 	 */
-	enterCasefeatureBody?: (ctx: CasefeatureBodyContext) => void;
+	enterCasefeatureLine?: (ctx: CasefeatureLineContext) => void;
 	/**
-	 * Exit a parse tree produced by `CPGLParser.casefeatureBody`.
+	 * Exit a parse tree produced by `CPGLParser.casefeatureLine`.
 	 * @param ctx the parse tree
 	 */
-	exitCasefeatureBody?: (ctx: CasefeatureBodyContext) => void;
+	exitCasefeatureLine?: (ctx: CasefeatureLineContext) => void;
 
 	/**
-	 * Enter a parse tree produced by `CPGLParser.codeClause`.
+	 * Enter a parse tree produced by `CPGLParser.casefeatureFhirTypeClause`.
 	 * @param ctx the parse tree
 	 */
-	enterCodeClause?: (ctx: CodeClauseContext) => void;
+	enterCasefeatureFhirTypeClause?: (ctx: CasefeatureFhirTypeClauseContext) => void;
 	/**
-	 * Exit a parse tree produced by `CPGLParser.codeClause`.
+	 * Exit a parse tree produced by `CPGLParser.casefeatureFhirTypeClause`.
 	 * @param ctx the parse tree
 	 */
-	exitCodeClause?: (ctx: CodeClauseContext) => void;
+	exitCasefeatureFhirTypeClause?: (ctx: CasefeatureFhirTypeClauseContext) => void;
 
 	/**
-	 * Enter a parse tree produced by `CPGLParser.casefeatureFhirtypeClause`.
+	 * Enter a parse tree produced by `CPGLParser.casefeatureValueTypeClause`.
 	 * @param ctx the parse tree
 	 */
-	enterCasefeatureFhirtypeClause?: (ctx: CasefeatureFhirtypeClauseContext) => void;
+	enterCasefeatureValueTypeClause?: (ctx: CasefeatureValueTypeClauseContext) => void;
 	/**
-	 * Exit a parse tree produced by `CPGLParser.casefeatureFhirtypeClause`.
+	 * Exit a parse tree produced by `CPGLParser.casefeatureValueTypeClause`.
 	 * @param ctx the parse tree
 	 */
-	exitCasefeatureFhirtypeClause?: (ctx: CasefeatureFhirtypeClauseContext) => void;
-
-	/**
-	 * Enter a parse tree produced by `CPGLParser.urlClause`.
-	 * @param ctx the parse tree
-	 */
-	enterUrlClause?: (ctx: UrlClauseContext) => void;
-	/**
-	 * Exit a parse tree produced by `CPGLParser.urlClause`.
-	 * @param ctx the parse tree
-	 */
-	exitUrlClause?: (ctx: UrlClauseContext) => void;
-
-	/**
-	 * Enter a parse tree produced by `CPGLParser.valuetypeClause`.
-	 * @param ctx the parse tree
-	 */
-	enterValuetypeClause?: (ctx: ValuetypeClauseContext) => void;
-	/**
-	 * Exit a parse tree produced by `CPGLParser.valuetypeClause`.
-	 * @param ctx the parse tree
-	 */
-	exitValuetypeClause?: (ctx: ValuetypeClauseContext) => void;
+	exitCasefeatureValueTypeClause?: (ctx: CasefeatureValueTypeClauseContext) => void;
 }
 
