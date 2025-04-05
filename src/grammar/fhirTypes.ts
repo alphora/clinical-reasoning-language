@@ -1,5 +1,6 @@
-import { CPGLLexer } from '../grammar/generated/CPGLLexer';
 import { CharStreams } from 'antlr4ts';
+
+import { CPGLLexer } from '../grammar/generated/CPGLLexer';
 
 // Create a dummy lexer to extract the types
 const dummyLexer = new CPGLLexer(CharStreams.fromString(''));
@@ -8,7 +9,7 @@ const dummyLexer = new CPGLLexer(CharStreams.fromString(''));
 const extractFhirTypes = (tokenType: number): Set<string> => {
   const types = new Set<string>();
   const vocabulary = dummyLexer.vocabulary;
-  
+
   // Get all tokens of the specified type
   for (let i = 0; i < vocabulary.maxTokenType; i++) {
     const symbolicName = vocabulary.getSymbolicName(i);
@@ -21,10 +22,11 @@ const extractFhirTypes = (tokenType: number): Set<string> => {
       }
     }
   }
-  
+
   return types;
 };
 
 // Export the FHIR type sets
 export const ACTION_FHIR_TYPES = extractFhirTypes(CPGLLexer.ACTION_FHIR_TYPE);
-export const CASEFEATURE_FHIR_TYPES = extractFhirTypes(CPGLLexer.CASEFEATURE_FHIR_TYPE); 
+export const CASEFEATURE_FHIR_TYPES = extractFhirTypes(CPGLLexer.CASEFEATURE_FHIR_TYPE);
+export const FHIR_VALUE_TYPES = extractFhirTypes(CPGLLexer.FHIR_VALUE_TYPE);

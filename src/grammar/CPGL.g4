@@ -44,46 +44,130 @@ useClause
     ;
 
 action
-    : 'action' STRING NEWLINE actionBlock?
+    : 'action' STRING NEWLINE actionBlock (NEWLINE | EOF)
     ;
 
 actionBlock
-    : INDENT actionLine+ DEDENT
+    : INDENT actionFhirTypeClause+ DEDENT
     ;
 
-actionLine
-    : fhirTypeClause
-    | codeClause
-    | urlClause
-    ;
-
-fhirTypeClause
+actionFhirTypeClause
     : 'fhirtype' ACTION_FHIR_TYPE NEWLINE
     ;
 
-codeClause
-    : 'code' STRING NEWLINE
-    ;
-
-urlClause
-    : 'url' STRING NEWLINE
-    ;
-
 casefeature
-    : 'casefeature' STRING NEWLINE casefeatureBlock?
+    : 'casefeature' STRING NEWLINE casefeatureBlock (NEWLINE | EOF)
     ;
 
 casefeatureBlock
-    : INDENT casefeatureLine+ DEDENT
+    : INDENT casefeatureLine DEDENT
     ;
 
 casefeatureLine
-    : casefeatureFhirTypeClause
+    : casefeatureCodeClause
+    casefeatureFhirTypeClause
+    casefeatureUrlClause
+    casefeatureValueTypeClause
+    | casefeatureCodeClause
+    casefeatureFhirTypeClause
+    casefeatureValueTypeClause
+    casefeatureUrlClause
+    | casefeatureCodeClause
+    casefeatureUrlClause
+    casefeatureFhirTypeClause
+    casefeatureValueTypeClause
+    | casefeatureCodeClause
+    casefeatureUrlClause
+    casefeatureValueTypeClause
+    casefeatureFhirTypeClause
+    | casefeatureCodeClause
+    casefeatureValueTypeClause
+    casefeatureFhirTypeClause
+    casefeatureUrlClause
+    | casefeatureCodeClause
+    casefeatureValueTypeClause
+    casefeatureUrlClause
+    casefeatureFhirTypeClause
+    | casefeatureFhirTypeClause
+    casefeatureCodeClause
+    casefeatureUrlClause
+    casefeatureValueTypeClause
+    | casefeatureFhirTypeClause
+    casefeatureCodeClause
+    casefeatureValueTypeClause
+    casefeatureUrlClause
+    | casefeatureFhirTypeClause
+    casefeatureUrlClause
+    casefeatureCodeClause
+    casefeatureValueTypeClause
+    | casefeatureFhirTypeClause
+    casefeatureUrlClause
+    casefeatureValueTypeClause
+    casefeatureCodeClause
+    | casefeatureFhirTypeClause
+    casefeatureValueTypeClause
+    casefeatureCodeClause
+    casefeatureUrlClause
+    | casefeatureFhirTypeClause
+    casefeatureValueTypeClause
+    casefeatureUrlClause
+    casefeatureCodeClause
+    | casefeatureUrlClause
+    casefeatureCodeClause
+    casefeatureFhirTypeClause
+    casefeatureValueTypeClause
+    | casefeatureUrlClause
+    casefeatureCodeClause
+    casefeatureValueTypeClause
+    casefeatureFhirTypeClause
+    | casefeatureUrlClause
+    casefeatureFhirTypeClause
+    casefeatureCodeClause
+    casefeatureValueTypeClause
+    | casefeatureUrlClause
+    casefeatureFhirTypeClause
+    casefeatureValueTypeClause
+    casefeatureCodeClause
+    | casefeatureUrlClause
+    casefeatureValueTypeClause
+    casefeatureFhirTypeClause
+    casefeatureCodeClause
     | casefeatureValueTypeClause
+    casefeatureCodeClause
+    casefeatureFhirTypeClause
+    casefeatureUrlClause
+    | casefeatureValueTypeClause
+    casefeatureCodeClause
+    casefeatureUrlClause
+    casefeatureFhirTypeClause
+    | casefeatureValueTypeClause
+    casefeatureFhirTypeClause
+    casefeatureCodeClause
+    casefeatureUrlClause
+    | casefeatureValueTypeClause
+    casefeatureFhirTypeClause
+    casefeatureUrlClause
+    casefeatureCodeClause
+    | casefeatureValueTypeClause
+    casefeatureUrlClause
+    casefeatureCodeClause
+    casefeatureFhirTypeClause
+    | casefeatureValueTypeClause
+    casefeatureUrlClause
+    casefeatureFhirTypeClause
+    casefeatureCodeClause
+    ;
+
+casefeatureCodeClause
+    : 'code' STRING NEWLINE
     ;
 
 casefeatureFhirTypeClause
     : 'fhirtype' CASEFEATURE_FHIR_TYPE NEWLINE
+    ;
+
+casefeatureUrlClause
+    : 'url' STRING NEWLINE
     ;
 
 casefeatureValueTypeClause
@@ -103,8 +187,6 @@ USE: 'use';
 ACTION: 'action';
 FHIRTYPE: 'fhirtype';
 CASEFEATURE: 'casefeature';
-CODE: 'code';
-URL: 'url';
 VALUETYPE: 'valuetype';
 
 // Special tokens
@@ -139,10 +221,29 @@ CASEFEATURE_FHIR_TYPE: 'AllergyIntolerance'
     | 'MedicationDispense'
     | 'MedicationAdministration'
     | 'MedicationStatement';
-FHIR_VALUE_TYPE: 'boolean' | 'integer' | 'decimal' | 'string' | 'date' | 'dateTime' | 'time' | 'code' | 'uri';
+FHIR_VALUE_TYPE: 'base64Binary'
+    | 'boolean'
+    | 'canonical'
+    | 'code'
+    | 'date'
+    | 'dateTime'
+    | 'decimal'
+    | 'id'
+    | 'instant'
+    | 'integer'
+    | 'markdown'
+    | 'oid'
+    | 'positiveInt'
+    | 'string'
+    | 'time'
+    | 'unsignedInt'
+    | 'uri'
+    | 'url'
+    | 'uuid'
+    | 'xhtml';
 
 // String literals
-STRING: '"' (~["\\\r\n] | '\\' .)* '"';
+STRING: '"' (~["])* '"';
 
 // Error token
 ERROR: .;

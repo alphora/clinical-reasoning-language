@@ -130,10 +130,6 @@ export class CPGLToken implements Token {
         return 'FHIRTYPE';
       case GeneratedLexer.CASEFEATURE:
         return 'CASEFEATURE';
-      case GeneratedLexer.CODE:
-        return 'CODE';
-      case GeneratedLexer.URL:
-        return 'URL';
       case GeneratedLexer.VALUETYPE:
         return 'VALUETYPE';
       case GeneratedLexer.NEWLINE:

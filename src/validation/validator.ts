@@ -1,5 +1,5 @@
 import type { Decision, File, Statement, WhenClause } from '../ast/types';
-import { ACTION_FHIR_TYPES, CASEFEATURE_FHIR_TYPES } from '../grammar/fhirTypes';
+import { ACTION_FHIR_TYPES, CASEFEATURE_FHIR_TYPES, FHIR_VALUE_TYPES } from '../grammar/fhirTypes';
 
 export class ValidationError extends Error {
   constructor(
@@ -274,6 +274,13 @@ export class ASTValidator {
     if (caseFeature.fhirType && !CASEFEATURE_FHIR_TYPES.has(caseFeature.fhirType)) {
       throw new ValidationError(
         `Invalid FHIR type for case feature: "${caseFeature.fhirType}". Valid FHIR types for case features are: ${Array.from(CASEFEATURE_FHIR_TYPES).join(', ')}`,
+        caseFeature.location.start,
+      );
+    }
+
+    if (caseFeature.valueType && !FHIR_VALUE_TYPES.has(caseFeature.valueType)) {
+      throw new ValidationError(
+        `Invalid FHIR value type for case feature: "${caseFeature.valueType}". Valid FHIR value types are: ${Array.from(FHIR_VALUE_TYPES).join(', ')}`,
         caseFeature.location.start,
       );
     }

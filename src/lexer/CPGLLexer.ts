@@ -37,8 +37,6 @@ export class CPGLLexer extends Lexer {
     ['action', GeneratedLexer.ACTION],
     ['fhirtype', GeneratedLexer.FHIRTYPE],
     ['casefeature', GeneratedLexer.CASEFEATURE],
-    ['code', GeneratedLexer.CODE],
-    ['url', GeneratedLexer.URL],
     ['valuetype', GeneratedLexer.VALUETYPE],
   ]);
 

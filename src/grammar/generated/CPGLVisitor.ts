@@ -15,8 +15,7 @@ import { ActionContext } from "./CPGLParser";
 import { ActionBlockContext } from "./CPGLParser";
 import { ActionLineContext } from "./CPGLParser";
 import { FhirTypeClauseContext } from "./CPGLParser";
-import { CodeClauseContext } from "./CPGLParser";
-import { UrlClauseContext } from "./CPGLParser";
+import { ValueTypeClauseContext } from "./CPGLParser";
 import { CasefeatureContext } from "./CPGLParser";
 import { CasefeatureBlockContext } from "./CPGLParser";
 import { CasefeatureLineContext } from "./CPGLParser";
@@ -117,18 +116,11 @@ export interface CPGLVisitor<Result> extends ParseTreeVisitor<Result> {
 	visitFhirTypeClause?: (ctx: FhirTypeClauseContext) => Result;
 
 	/**
-	 * Visit a parse tree produced by `CPGLParser.codeClause`.
+	 * Visit a parse tree produced by `CPGLParser.valueTypeClause`.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
-	visitCodeClause?: (ctx: CodeClauseContext) => Result;
-
-	/**
-	 * Visit a parse tree produced by `CPGLParser.urlClause`.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	visitUrlClause?: (ctx: UrlClauseContext) => Result;
+	visitValueTypeClause?: (ctx: ValueTypeClauseContext) => Result;
 
 	/**
 	 * Visit a parse tree produced by `CPGLParser.casefeature`.

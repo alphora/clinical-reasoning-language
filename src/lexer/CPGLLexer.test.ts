@@ -87,8 +87,8 @@ describe('CPGLLexer', () => {
     expect(tokens[5].type).toBe(GeneratedLexer.ACTION);
     expect(tokens[6].type).toBe(GeneratedLexer.FHIRTYPE);
     expect(tokens[7].type).toBe(GeneratedLexer.CASEFEATURE);
-    expect(tokens[8].type).toBe(GeneratedLexer.CODE);
-    expect(tokens[9].type).toBe(GeneratedLexer.URL);
+    expect(tokens[8].type).toBe(GeneratedLexer.FHIR_VALUE_TYPE);
+    expect(tokens[9].type).toBe(GeneratedLexer.FHIR_VALUE_TYPE);
     expect(tokens[10].type).toBe(GeneratedLexer.VALUETYPE);
     expect(tokens[11].type).toBe(GeneratedLexer.EOF);
   });
