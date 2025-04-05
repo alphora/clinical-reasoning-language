@@ -149,10 +149,10 @@ function getAllTokens(lexer: CPGLLexer, maxIterations = 1000): Token[] {
 
   while (iterations < maxIterations) {
     token = lexer.nextToken();
+    tokens.push(token);
     if (token.type === CPGLLexer.EOF) {
       break;
     }
-    tokens.push(token);
     iterations++;
   }
 
