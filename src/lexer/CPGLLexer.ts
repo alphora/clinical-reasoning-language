@@ -28,15 +28,16 @@ export class CPGLLexer extends Lexer {
     // Standard tokens for testing - these would normally be generated from an ANTLR grammar
     private readonly TOKEN_RULES: Map<string, number> = new Map([
         ['decision', CPGLTokenType.DECISION],
-        ['recommend', CPGLTokenType.RECOMMENDATION],
-        ['condition', CPGLTokenType.CONDITION],
-        ['action', CPGLTokenType.ACTION],
-        ['if', CPGLTokenType.IF],
-        ['else', CPGLTokenType.ELSE],
         ['when', CPGLTokenType.WHEN],
         ['then', CPGLTokenType.THEN],
-        ['with', CPGLTokenType.WITH],
-        ['EVIDENCE_LEVEL', CPGLTokenType.EVIDENCE_LEVEL]
+        ['do', CPGLTokenType.DO],
+        ['use', CPGLTokenType.USE],
+        ['action', CPGLTokenType.ACTION],
+        ['fhirtype', CPGLTokenType.FHIRTYPE],
+        ['casefeature', CPGLTokenType.CASEFEATURE],
+        ['code', CPGLTokenType.CODE],
+        ['url', CPGLTokenType.URL],
+        ['valuetype', CPGLTokenType.VALUETYPE]
     ]);
 
     // Required by Lexer
@@ -71,7 +72,6 @@ export class CPGLLexer extends Lexer {
     public nextToken(): Token {
         // If we have pending tokens (INDENT/DEDENT), return those first
         if (this.pendingTokens.length > 0) {
-            this._tokenIndex++;
             const token = this.pendingTokens.shift();
             if (token) {
                 return token;
@@ -79,25 +79,22 @@ export class CPGLLexer extends Lexer {
         }
 
         // If at EOF and we have indentation levels to close
-        if (this._input.LA(1) === -1 && this.indentationStack.length > 1) {
-            this.indentationStack.pop();
-            this._tokenIndex++;
-            return this.createToken({
-                type: CPGLTokenType.DEDENT,
-                text: '<DEDENT>',
-                startIndex: this._input.index,
-                stopIndex: this._input.index,
-                line: this._currentLine,
-                charPositionInLine: this._currentColumn,
-                channel: Token.DEFAULT_CHANNEL,
-                tokenIndex: this._tokenIndex,
-                source: [this._input, this]
-            });
-        }
-
-        // Handle normal input
         if (this._input.LA(1) === -1) {
-            // End of file
+            if (this.indentationStack.length > 1) {
+                this.indentationStack.pop();
+                return this.createToken({
+                    type: CPGLTokenType.DEDENT,
+                    text: '<DEDENT>',
+                    startIndex: this._input.index,
+                    stopIndex: this._input.index,
+                    line: this._currentLine,
+                    charPositionInLine: this._currentColumn,
+                    channel: Token.DEFAULT_CHANNEL,
+                    tokenIndex: this._tokenIndex,
+                    source: [this._input, this]
+                });
+            }
+            // Return EOF token when all indentation levels are closed
             return this.createToken({
                 type: CPGLTokenType.EOF,
                 text: '<EOF>',
@@ -168,6 +165,12 @@ export class CPGLLexer extends Lexer {
                     source: [this._input, this]
                 });
             }
+        } else {
+            // Skip whitespace between tokens
+            while (this._input.LA(1) === ' '.charCodeAt(0)) {
+                this._input.consume();
+                this._currentColumn++;
+            }
         }
 
         // Handle comments
@@ -198,8 +201,8 @@ export class CPGLLexer extends Lexer {
                 type: CPGLTokenType.NEWLINE,
                 text: '<NEWLINE>',
                 startIndex: start,
-                stopIndex: this._input.index,
-                line: this._currentLine,
+                stopIndex: this._input.index - 1,
+                line: this._currentLine - 1,
                 charPositionInLine: this._currentColumn,
                 channel: Token.DEFAULT_CHANNEL,
                 tokenIndex: this._tokenIndex,
@@ -212,106 +215,25 @@ export class CPGLLexer extends Lexer {
             return this.handleStringLiteral();
         }
 
-        // Handle operators and punctuation
-        const operatorMap: Record<string, number> = {
-            '==': CPGLTokenType.EQUALS,
-            '!=': CPGLTokenType.NOT_EQUALS,
-            '>': CPGLTokenType.GT,
-            '<': CPGLTokenType.LT,
-            '>=': CPGLTokenType.GTE,
-            '<=': CPGLTokenType.LTE,
-            '(': CPGLTokenType.LPAREN,
-            ')': CPGLTokenType.RPAREN,
-            '[': CPGLTokenType.LBRACKET,
-            ']': CPGLTokenType.RBRACKET,
-            '{': CPGLTokenType.LBRACE,
-            '}': CPGLTokenType.RBRACE,
-            ',': CPGLTokenType.COMMA,
-            ':': CPGLTokenType.COLON,
-            '.': CPGLTokenType.DOT
-        };
-
-        // Check for two-character operators
-        if (this._input.LA(1) !== -1 && this._input.LA(2) !== -1) {
-            const possibleOp = String.fromCharCode(this._input.LA(1), this._input.LA(2));
-            if (operatorMap[possibleOp]) {
-                const start = this._input.index;
-                this._input.consume();
-                this._currentColumn++;
-                this._input.consume();
-                this._currentColumn++;
-                return this.createToken({
-                    type: operatorMap[possibleOp],
-                    text: possibleOp,
-                    startIndex: start,
-                    stopIndex: this._input.index,
-                    line: this._currentLine,
-                    charPositionInLine: this._currentColumn,
-                    channel: Token.DEFAULT_CHANNEL,
-                    tokenIndex: this._tokenIndex,
-                    source: [this._input, this]
-                });
-            }
-        }
-
-        // Check for single-character operators
-        if (this._input.LA(1) !== -1) {
-            const possibleOp = String.fromCharCode(this._input.LA(1));
-            if (operatorMap[possibleOp]) {
-                const start = this._input.index;
-                this._input.consume();
-                this._currentColumn++;
-                return this.createToken({
-                    type: operatorMap[possibleOp],
-                    text: possibleOp,
-                    startIndex: start,
-                    stopIndex: this._input.index,
-                    line: this._currentLine,
-                    charPositionInLine: this._currentColumn,
-                    channel: Token.DEFAULT_CHANNEL,
-                    tokenIndex: this._tokenIndex,
-                    source: [this._input, this]
-                });
-            }
-        }
-
         // Handle identifiers and keywords
         if (this.isAlpha(this._input.LA(1)) || this._input.LA(1) === '_'.charCodeAt(0)) {
             return this.handleIdentifier();
         }
 
-        // Skip other whitespace
-        if (this.isWhitespace(this._input.LA(1))) {
-            const start = this._input.index;
-            while (this.isWhitespace(this._input.LA(1))) {
-                this._input.consume();
-                this._currentColumn++;
-            }
-            return this.createToken({
-                type: CPGLTokenType.WS,
-                text: '<WS>',
-                startIndex: start,
-                stopIndex: this._input.index,
-                line: this._currentLine,
-                charPositionInLine: this._currentColumn,
-                channel: Token.DEFAULT_CHANNEL,
-                tokenIndex: this._tokenIndex,
-                source: [this._input, this]
-            });
-        }
-
-        // Handle unknown characters
-        const start = this._input.index;
-        const text = String.fromCharCode(this._input.LA(1));
+        // Unknown character - treat as identifier
+        const startIndex = this._input.index;
+        const startColumn = this._currentColumn;
+        const c = String.fromCharCode(this._input.LA(1));
         this._input.consume();
         this._currentColumn++;
+
         return this.createToken({
-            type: CPGLTokenType.UNKNOWN,
-            text: text,
-            startIndex: start,
-            stopIndex: this._input.index,
+            type: CPGLTokenType.IDENTIFIER,
+            text: c,
+            startIndex: startIndex,
+            stopIndex: this._input.index - 1,
             line: this._currentLine,
-            charPositionInLine: this._currentColumn,
+            charPositionInLine: startColumn,
             channel: Token.DEFAULT_CHANNEL,
             tokenIndex: this._tokenIndex,
             source: [this._input, this]
@@ -353,7 +275,7 @@ export class CPGLLexer extends Lexer {
         }
         
         return this.createToken({
-            type: CPGLTokenType.SINGLE_LINE_COMMENT,
+            type: CPGLTokenType.COMMENT,
             text: this._input.getText(new Interval(start, this._input.index - 1)), 
             startIndex: start, 
             stopIndex: this._input.index,
@@ -405,7 +327,7 @@ export class CPGLLexer extends Lexer {
         }
         
         return this.createToken({
-            type: CPGLTokenType.BLOCK_COMMENT,
+            type: CPGLTokenType.COMMENT_BLOCK,
             text: this._input.getText(new Interval(start, this._input.index - 1)), 
             startIndex: start, 
             stopIndex: this._input.index,

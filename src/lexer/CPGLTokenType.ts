@@ -5,33 +5,29 @@ export enum CPGLTokenType {
     // Special tokens
     EOF = -1,
     ERROR = 0,
-    UNKNOWN = 1,
-    
-    // Whitespace and indentation
-    WS = 2,
-    NEWLINE = 3,
-    INDENT = 4,
-    DEDENT = 5,
-    
-    // Literals
-    IDENTIFIER = 6,
-    NUMBER = 7,
-    STRING = 8,
-    
-    // Comments
-    SINGLE_LINE_COMMENT = 9,
-    BLOCK_COMMENT = 10,
-    
-    // Keywords
-    DECISION = 11,
-    RECOMMENDATION = 12,
-    CONDITION = 13,
-    ACTION = 14,
-    IF = 15,
-    ELSE = 16,
-    WHEN = 17,
-    THEN = 18,
-    WITH = 19,
+
+    // Keywords (T__0 through T__10 in generated parser)
+    DECISION = 1,      // T__0: 'decision'
+    WHEN = 2,         // T__1: 'when'
+    THEN = 3,         // T__2: 'then'
+    DO = 4,           // T__3: 'do'
+    USE = 5,          // T__4: 'use'
+    ACTION = 6,       // T__5: 'action'
+    FHIRTYPE = 7,     // T__6: 'fhirtype'
+    CASEFEATURE = 8,  // T__7: 'casefeature'
+    CODE = 9,         // T__8: 'code'
+    URL = 10,         // T__9: 'url'
+    VALUETYPE = 11,   // T__10: 'valuetype'
+
+    // Literals and other tokens
+    STRING = 12,
+    IDENTIFIER = 13,
+    NEWLINE = 14,
+    WS = 15,
+    COMMENT = 16,
+    COMMENT_BLOCK = 17,
+    INDENT = 18,
+    DEDENT = 19,
     
     // Operators
     EQUALS = 20,

@@ -1,6 +1,7 @@
 /* eslint-disable no-console */
 import { CharStreams, Token } from 'antlr4ts';
-import { CPGLLexer, CPGLTokenType } from '../lexer';
+import { CPGLLexer } from './CPGLLexer';
+import { CPGLTokenType } from './CPGLTokenType';
 
 describe('CPGLLexer', () => {
     // Helper function to collect all tokens from input
@@ -17,6 +18,11 @@ describe('CPGLLexer', () => {
                 });
                 token = lexer.nextToken();
             }
+            // Add the EOF token
+            tokens.push({
+                type: token.type,
+                text: token.text ?? ''
+            });
         } catch (e) {
             // Convert error to a more informative format for test failures
             throw new Error(`Tokenization error: ${e instanceof Error ? e.message : String(e)}`);
@@ -26,12 +32,14 @@ describe('CPGLLexer', () => {
     }
 
     test('should tokenize keywords correctly', () => {
-        const tokens = getAllTokens('decision when then with');
+        const tokens = getAllTokens('decision when then do use action');
         
         expect(tokens.find(t => t.type === CPGLTokenType.DECISION)).toBeTruthy();
         expect(tokens.find(t => t.type === CPGLTokenType.WHEN)).toBeTruthy();
         expect(tokens.find(t => t.type === CPGLTokenType.THEN)).toBeTruthy();
-        expect(tokens.find(t => t.type === CPGLTokenType.WITH)).toBeTruthy();
+        expect(tokens.find(t => t.type === CPGLTokenType.DO)).toBeTruthy();
+        expect(tokens.find(t => t.type === CPGLTokenType.USE)).toBeTruthy();
+        expect(tokens.find(t => t.type === CPGLTokenType.ACTION)).toBeTruthy();
     });
 
     test('should handle strings correctly', () => {
@@ -45,10 +53,10 @@ describe('CPGLLexer', () => {
         }
     });
 
-    test('should handle single-line comments', () => {
+    test('should handle comments', () => {
         const tokens = getAllTokens('// This is a comment\ndecision // Another comment');
         
-        expect(tokens.filter(t => t.type === CPGLTokenType.SINGLE_LINE_COMMENT)).toHaveLength(2);
+        expect(tokens.filter(t => t.type === CPGLTokenType.COMMENT)).toHaveLength(2);
         expect(tokens.find(t => t.type === CPGLTokenType.DECISION)).toBeTruthy();
     });
 
@@ -69,6 +77,28 @@ describe('CPGLLexer', () => {
         expect(() => {
             getAllTokens('level1\n    level2\n   invalid');
         }).toThrow('Inconsistent indentation');
+    });
+
+    test('should handle block comments', () => {
+        const tokens = getAllTokens('/* This is a\nblock comment */\ndecision "Test"');
+        
+        expect(tokens.find(t => t.type === CPGLTokenType.COMMENT_BLOCK)).toBeTruthy();
+        expect(tokens.find(t => t.type === CPGLTokenType.DECISION)).toBeTruthy();
+    });
+
+    test('should tokenize a complete CPGL document', () => {
+        const input = 'decision "Test"\n  when "condition" then\n    do "action"\n  use "other_decision"';
+        const tokens = getAllTokens(input);
+
+        // Verify the tokens
+        expect(tokens.find(t => t.type === CPGLTokenType.DECISION)).toBeTruthy();
+        expect(tokens.find(t => t.type === CPGLTokenType.STRING)).toBeTruthy();
+        expect(tokens.find(t => t.type === CPGLTokenType.WHEN)).toBeTruthy();
+        expect(tokens.find(t => t.type === CPGLTokenType.THEN)).toBeTruthy();
+        expect(tokens.find(t => t.type === CPGLTokenType.DO)).toBeTruthy();
+        expect(tokens.find(t => t.type === CPGLTokenType.USE)).toBeTruthy();
+        expect(tokens.find(t => t.type === CPGLTokenType.INDENT)).toBeTruthy();
+        expect(tokens.find(t => t.type === CPGLTokenType.DEDENT)).toBeTruthy();
     });
 });
 
