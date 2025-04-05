@@ -1,29 +1,48 @@
-import { CPGLLexer } from '../lexer';
 import { CPGLParser } from '../parser/CPGLParser';
-import { CharStreams } from 'antlr4ts';
+import { ValidationError } from '../validation/validator';
 
-const input = `
-decision "Test Decision"
+// Example 1: Valid input
+const validInput = `
+decision "Test_Decision"
   when "condition" then
     do "action1"
     do "action2"
-  use "other_decision"
+  use "Other_Decision"
+
+decision "Other_Decision"
+  when "other_condition" then
+    do "other_action"
 `;
 
-console.log('=== Tokenizing Example ===');
-const lexer = new CPGLLexer(CharStreams.fromString(input));
-const tokens = [];
-let token = lexer.nextToken();
-while (token.type !== -1) { // -1 is EOF
-    tokens.push({
-        type: lexer.ruleNames[token.type - 1],
-        text: token.text
-    });
-    token = lexer.nextToken();
-}
-console.log('Tokens:', JSON.stringify(tokens, null, 2));
+// Example 2: Invalid input (missing when clause)
+const invalidInput = `
+decision "Test_Decision"
+  do "action1"
+`;
 
-console.log('\n=== Parsing Example ===');
-const parser = new CPGLParser(input);
-const ast = parser.parse();
-console.log('AST:', JSON.stringify(ast, null, 2)); 
+console.log('=== Testing Valid Input ===');
+try {
+    const parser = new CPGLParser(validInput);
+    const ast = parser.parse();
+    console.log('AST:', JSON.stringify(ast, null, 2));
+    console.log('Validation successful!');
+} catch (e) {
+    if (e instanceof ValidationError) {
+        console.error(`Validation error at line ${e.location.line}, column ${e.location.column}: ${e.message}`);
+    } else {
+        console.error('Error:', e instanceof Error ? e.message : String(e));
+    }
+}
+
+console.log('\n=== Testing Invalid Input ===');
+try {
+    const parser = new CPGLParser(invalidInput);
+    const ast = parser.parse();
+    console.log('AST:', JSON.stringify(ast, null, 2));
+} catch (e) {
+    if (e instanceof ValidationError) {
+        console.error(`Validation error at line ${e.location.line}, column ${e.location.column}: ${e.message}`);
+    } else {
+        console.error('Error:', e instanceof Error ? e.message : String(e));
+    }
+} 

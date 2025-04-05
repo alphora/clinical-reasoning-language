@@ -3,11 +3,13 @@ import { CommonTokenStream, CharStreams } from 'antlr4ts';
 import { CPGLParser as GeneratedParser } from '../grammar/generated/CPGLParser';
 import { ASTVisitor } from '../ast/visitor';
 import { File } from '../ast/types';
+import { ASTValidator, ValidationError } from '../validation/validator';
 
 export class CPGLParser {
     private lexer: CPGLLexer;
     private parser: GeneratedParser;
     private visitor: ASTVisitor;
+    private validator: ASTValidator;
 
     constructor(input: string) {
         // Trim leading and trailing whitespace and newlines
@@ -19,6 +21,7 @@ export class CPGLParser {
         const tokens = new CommonTokenStream(this.lexer);
         this.parser = new GeneratedParser(tokens);
         this.visitor = new ASTVisitor();
+        this.validator = new ASTValidator();
         
         // Remove the default error listener to prevent error messages
         this.parser.removeErrorListeners();
@@ -29,9 +32,16 @@ export class CPGLParser {
             // Parse the input starting from the file rule
             const tree = this.parser.file();
             // Convert parse tree to AST
-            return this.visitor.visit(tree) as File;
+            const ast = this.visitor.visit(tree) as File;
+            // Validate the AST
+            this.validator.validate(ast);
+            return ast;
         } catch (e) {
-            console.error('Parsing error:', e);
+            if (e instanceof ValidationError) {
+                console.error(`Validation error at line ${e.location.line}, column ${e.location.column}: ${e.message}`);
+            } else {
+                console.error('Parsing error:', e);
+            }
             throw e;
         }
     }
