@@ -75,20 +75,22 @@ decision "Test_Decision"
     do "action2" fhir "Observation"
 `;
 
-function testInput(name: string, input: string) {
-    console.log(`\n=== Testing ${name} ===`);
-    try {
-        const parser = new CPGLParser(input);
-        const ast = parser.parse();
-        console.log('AST:', JSON.stringify(ast, null, 2));
-        console.log('Validation successful!');
-    } catch (e) {
-        if (e instanceof ValidationError) {
-            console.error(`Validation error at line ${e.location.line}, column ${e.location.column}: ${e.message}`);
-        } else {
-            console.error('Error:', e instanceof Error ? e.message : String(e));
-        }
+function testInput(name: string, input: string): void {
+  console.log(`\n=== Testing ${name} ===`);
+  try {
+    const parser = new CPGLParser(input);
+    const ast = parser.parse();
+    console.log('AST:', JSON.stringify(ast, null, 2));
+    console.log('Validation successful!');
+  } catch (e) {
+    if (e instanceof ValidationError) {
+      console.error(
+        `Validation error at line ${e.location.line}, column ${e.location.column}: ${e.message}`,
+      );
+    } else {
+      console.error('Error:', e instanceof Error ? e.message : String(e));
     }
+  }
 }
 
 // Run all tests
@@ -99,4 +101,22 @@ testInput('Duplicate Conditions/Actions', duplicateInput);
 testInput('Mutually Exclusive Conditions', mutuallyExclusiveInput);
 testInput('Circular Action Dependencies', circularActionInput);
 testInput('Invalid FHIR Resource Type', invalidFHIRInput);
-testInput('Valid FHIR Resource Type', validFHIRInput); 
+testInput('Valid FHIR Resource Type', validFHIRInput);
+
+async function main(): Promise<void> {
+  const parser = new CPGLParser(validInput);
+  try {
+    const ast = parser.parse();
+    console.log('AST:', JSON.stringify(ast, null, 2));
+  } catch (error) {
+    if (error instanceof ValidationError) {
+      console.error('Validation Error:', error.message);
+      console.error('Location:', error.location);
+    } else {
+      console.error('Error:', error);
+    }
+  }
+}
+
+// Run the main function
+main().catch(console.error);

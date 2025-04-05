@@ -1,8 +1,9 @@
 /* eslint-disable no-console */
 import { CharStreams } from 'antlr4ts';
-import { CPGLLexer } from '../lexer/CPGLLexer';
+
 import { CPGLLexer as GeneratedLexer } from '../grammar/generated/CPGLLexer';
-import { CPGLToken } from '../lexer/CPGLToken';
+import { CPGLLexer } from '../lexer/CPGLLexer';
+import type { CPGLToken } from '../lexer/CPGLToken';
 
 // Example CPGL document
 const input = `decision "Test Decision"
@@ -23,14 +24,16 @@ let count = 0;
 
 // Print each token
 while (token.type !== GeneratedLexer.EOF && count < 50) {
-    const cpglToken = token as CPGLToken;
-    console.log(`Token #${count + 1}: type=${token.type} (${cpglToken.typeName}), text="${token.text}"`);
-    token = lexer.nextToken();
-    count++;
+  const cpglToken = token as CPGLToken;
+  console.log(
+    `Token #${count + 1}: type=${token.type} (${cpglToken.typeName}), text="${token.text}"`,
+  );
+  token = lexer.nextToken();
+  count++;
 }
 
 if (token.type === GeneratedLexer.EOF) {
-    console.log('Reached EOF');
+  console.log('Reached EOF');
 } else {
-    console.log('Token limit reached');
-} 
+  console.log('Token limit reached');
+}

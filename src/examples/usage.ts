@@ -1,8 +1,9 @@
 /* eslint-disable no-console */
 import { CharStreams } from 'antlr4ts';
-import { CPGLLexer } from '../lexer/CPGLLexer';
+
 import { CPGLLexer as GeneratedLexer } from '../grammar/generated/CPGLLexer';
-import { CPGLToken } from '../lexer/CPGLToken';
+import { CPGLLexer } from '../lexer/CPGLLexer';
+import type { CPGLToken } from '../lexer/CPGLToken';
 
 // Example usage of the CPGL lexer
 const input = `decision "Test Decision"
@@ -22,7 +23,7 @@ let token = lexer.nextToken();
 
 // Print each token
 while (token.type !== GeneratedLexer.EOF) {
-    const cpglToken = token as CPGLToken;
-    console.log(`Token: type=${token.type} (${cpglToken.typeName}), text="${token.text}"`);
-    token = lexer.nextToken();
-} 
+  const cpglToken = token as CPGLToken;
+  console.log(`Token: type=${token.type} (${cpglToken.typeName}), text="${token.text}"`);
+  token = lexer.nextToken();
+}

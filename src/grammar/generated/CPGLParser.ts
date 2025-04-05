@@ -1,4 +1,4 @@
-// Generated from CPGL.g4 by ANTLR 4.9.0-SNAPSHOT
+// Generated from src/grammar/CPGL.g4 by ANTLR 4.9.0-SNAPSHOT
 
 
 import { ATN } from "antlr4ts/atn/ATN";
@@ -24,6 +24,8 @@ import { VocabularyImpl } from "antlr4ts/VocabularyImpl";
 import * as Utils from "antlr4ts/misc/Utils";
 
 import { CPGLListener } from "./CPGLListener";
+import { CPGLVisitor } from "./CPGLVisitor";
+
 
 export class CPGLParser extends Parser {
 	public static readonly DECISION = 1;
@@ -47,8 +49,7 @@ export class CPGLParser extends Parser {
 	public static readonly CASEFEATURE_FHIR_TYPE = 19;
 	public static readonly FHIR_VALUE_TYPE = 20;
 	public static readonly STRING = 21;
-	public static readonly IDENTIFIER = 22;
-	public static readonly ERROR = 23;
+	public static readonly ERROR = 22;
 	public static readonly RULE_file = 0;
 	public static readonly RULE_statement = 1;
 	public static readonly RULE_decision = 2;
@@ -85,7 +86,7 @@ export class CPGLParser extends Parser {
 		undefined, "DECISION", "WHEN", "THEN", "DO", "USE", "ACTION", "FHIRTYPE", 
 		"CASEFEATURE", "CODE", "URL", "VALUETYPE", "NEWLINE", "WS", "COMMENT", 
 		"COMMENT_BLOCK", "INDENT", "DEDENT", "ACTION_FHIR_TYPE", "CASEFEATURE_FHIR_TYPE", 
-		"FHIR_VALUE_TYPE", "STRING", "IDENTIFIER", "ERROR",
+		"FHIR_VALUE_TYPE", "STRING", "ERROR",
 	];
 	public static readonly VOCABULARY: Vocabulary = new VocabularyImpl(CPGLParser._LITERAL_NAMES, CPGLParser._SYMBOLIC_NAMES, []);
 
@@ -855,7 +856,7 @@ export class CPGLParser extends Parser {
 	}
 
 	public static readonly _serializedATN: string =
-		"\x03\uC91D\uCABA\u058D\uAFBA\u4F53\u0607\uEA8B\uC241\x03\x19\x95\x04\x02" +
+		"\x03\uC91D\uCABA\u058D\uAFBA\u4F53\u0607\uEA8B\uC241\x03\x18\x95\x04\x02" +
 		"\t\x02\x04\x03\t\x03\x04\x04\t\x04\x04\x05\t\x05\x04\x06\t\x06\x04\x07" +
 		"\t\x07\x04\b\t\b\x04\t\t\t\x04\n\t\n\x04\v\t\v\x04\f\t\f\x04\r\t\r\x04" +
 		"\x0E\t\x0E\x04\x0F\t\x0F\x04\x10\t\x10\x04\x11\t\x11\x04\x12\t\x12\x04" +
@@ -970,6 +971,14 @@ export class FileContext extends ParserRuleContext {
 			listener.exitFile(this);
 		}
 	}
+	// @Override
+	public accept<Result>(visitor: CPGLVisitor<Result>): Result {
+		if (visitor.visitFile) {
+			return visitor.visitFile(this);
+		} else {
+			return visitor.visitChildren(this);
+		}
+	}
 }
 
 
@@ -1000,6 +1009,14 @@ export class StatementContext extends ParserRuleContext {
 			listener.exitStatement(this);
 		}
 	}
+	// @Override
+	public accept<Result>(visitor: CPGLVisitor<Result>): Result {
+		if (visitor.visitStatement) {
+			return visitor.visitStatement(this);
+		} else {
+			return visitor.visitChildren(this);
+		}
+	}
 }
 
 
@@ -1025,6 +1042,14 @@ export class DecisionContext extends ParserRuleContext {
 	public exitRule(listener: CPGLListener): void {
 		if (listener.exitDecision) {
 			listener.exitDecision(this);
+		}
+	}
+	// @Override
+	public accept<Result>(visitor: CPGLVisitor<Result>): Result {
+		if (visitor.visitDecision) {
+			return visitor.visitDecision(this);
+		} else {
+			return visitor.visitChildren(this);
 		}
 	}
 }
@@ -1059,6 +1084,14 @@ export class BlockContext extends ParserRuleContext {
 			listener.exitBlock(this);
 		}
 	}
+	// @Override
+	public accept<Result>(visitor: CPGLVisitor<Result>): Result {
+		if (visitor.visitBlock) {
+			return visitor.visitBlock(this);
+		} else {
+			return visitor.visitChildren(this);
+		}
+	}
 }
 
 
@@ -1089,6 +1122,14 @@ export class StatementLineContext extends ParserRuleContext {
 			listener.exitStatementLine(this);
 		}
 	}
+	// @Override
+	public accept<Result>(visitor: CPGLVisitor<Result>): Result {
+		if (visitor.visitStatementLine) {
+			return visitor.visitStatementLine(this);
+		} else {
+			return visitor.visitChildren(this);
+		}
+	}
 }
 
 
@@ -1117,6 +1158,14 @@ export class WhenClauseContext extends ParserRuleContext {
 			listener.exitWhenClause(this);
 		}
 	}
+	// @Override
+	public accept<Result>(visitor: CPGLVisitor<Result>): Result {
+		if (visitor.visitWhenClause) {
+			return visitor.visitWhenClause(this);
+		} else {
+			return visitor.visitChildren(this);
+		}
+	}
 }
 
 
@@ -1140,6 +1189,14 @@ export class DoClauseContext extends ParserRuleContext {
 	public exitRule(listener: CPGLListener): void {
 		if (listener.exitDoClause) {
 			listener.exitDoClause(this);
+		}
+	}
+	// @Override
+	public accept<Result>(visitor: CPGLVisitor<Result>): Result {
+		if (visitor.visitDoClause) {
+			return visitor.visitDoClause(this);
+		} else {
+			return visitor.visitChildren(this);
 		}
 	}
 }
@@ -1167,6 +1224,14 @@ export class UseClauseContext extends ParserRuleContext {
 			listener.exitUseClause(this);
 		}
 	}
+	// @Override
+	public accept<Result>(visitor: CPGLVisitor<Result>): Result {
+		if (visitor.visitUseClause) {
+			return visitor.visitUseClause(this);
+		} else {
+			return visitor.visitChildren(this);
+		}
+	}
 }
 
 
@@ -1192,6 +1257,14 @@ export class ActionContext extends ParserRuleContext {
 	public exitRule(listener: CPGLListener): void {
 		if (listener.exitAction) {
 			listener.exitAction(this);
+		}
+	}
+	// @Override
+	public accept<Result>(visitor: CPGLVisitor<Result>): Result {
+		if (visitor.visitAction) {
+			return visitor.visitAction(this);
+		} else {
+			return visitor.visitChildren(this);
 		}
 	}
 }
@@ -1226,6 +1299,14 @@ export class ActionBlockContext extends ParserRuleContext {
 			listener.exitActionBlock(this);
 		}
 	}
+	// @Override
+	public accept<Result>(visitor: CPGLVisitor<Result>): Result {
+		if (visitor.visitActionBlock) {
+			return visitor.visitActionBlock(this);
+		} else {
+			return visitor.visitChildren(this);
+		}
+	}
 }
 
 
@@ -1256,6 +1337,14 @@ export class ActionLineContext extends ParserRuleContext {
 			listener.exitActionLine(this);
 		}
 	}
+	// @Override
+	public accept<Result>(visitor: CPGLVisitor<Result>): Result {
+		if (visitor.visitActionLine) {
+			return visitor.visitActionLine(this);
+		} else {
+			return visitor.visitChildren(this);
+		}
+	}
 }
 
 
@@ -1278,6 +1367,14 @@ export class FhirTypeClauseContext extends ParserRuleContext {
 	public exitRule(listener: CPGLListener): void {
 		if (listener.exitFhirTypeClause) {
 			listener.exitFhirTypeClause(this);
+		}
+	}
+	// @Override
+	public accept<Result>(visitor: CPGLVisitor<Result>): Result {
+		if (visitor.visitFhirTypeClause) {
+			return visitor.visitFhirTypeClause(this);
+		} else {
+			return visitor.visitChildren(this);
 		}
 	}
 }
@@ -1304,6 +1401,14 @@ export class CodeClauseContext extends ParserRuleContext {
 			listener.exitCodeClause(this);
 		}
 	}
+	// @Override
+	public accept<Result>(visitor: CPGLVisitor<Result>): Result {
+		if (visitor.visitCodeClause) {
+			return visitor.visitCodeClause(this);
+		} else {
+			return visitor.visitChildren(this);
+		}
+	}
 }
 
 
@@ -1326,6 +1431,14 @@ export class UrlClauseContext extends ParserRuleContext {
 	public exitRule(listener: CPGLListener): void {
 		if (listener.exitUrlClause) {
 			listener.exitUrlClause(this);
+		}
+	}
+	// @Override
+	public accept<Result>(visitor: CPGLVisitor<Result>): Result {
+		if (visitor.visitUrlClause) {
+			return visitor.visitUrlClause(this);
+		} else {
+			return visitor.visitChildren(this);
 		}
 	}
 }
@@ -1353,6 +1466,14 @@ export class CasefeatureContext extends ParserRuleContext {
 	public exitRule(listener: CPGLListener): void {
 		if (listener.exitCasefeature) {
 			listener.exitCasefeature(this);
+		}
+	}
+	// @Override
+	public accept<Result>(visitor: CPGLVisitor<Result>): Result {
+		if (visitor.visitCasefeature) {
+			return visitor.visitCasefeature(this);
+		} else {
+			return visitor.visitChildren(this);
 		}
 	}
 }
@@ -1387,6 +1508,14 @@ export class CasefeatureBlockContext extends ParserRuleContext {
 			listener.exitCasefeatureBlock(this);
 		}
 	}
+	// @Override
+	public accept<Result>(visitor: CPGLVisitor<Result>): Result {
+		if (visitor.visitCasefeatureBlock) {
+			return visitor.visitCasefeatureBlock(this);
+		} else {
+			return visitor.visitChildren(this);
+		}
+	}
 }
 
 
@@ -1414,6 +1543,14 @@ export class CasefeatureLineContext extends ParserRuleContext {
 			listener.exitCasefeatureLine(this);
 		}
 	}
+	// @Override
+	public accept<Result>(visitor: CPGLVisitor<Result>): Result {
+		if (visitor.visitCasefeatureLine) {
+			return visitor.visitCasefeatureLine(this);
+		} else {
+			return visitor.visitChildren(this);
+		}
+	}
 }
 
 
@@ -1438,6 +1575,14 @@ export class CasefeatureFhirTypeClauseContext extends ParserRuleContext {
 			listener.exitCasefeatureFhirTypeClause(this);
 		}
 	}
+	// @Override
+	public accept<Result>(visitor: CPGLVisitor<Result>): Result {
+		if (visitor.visitCasefeatureFhirTypeClause) {
+			return visitor.visitCasefeatureFhirTypeClause(this);
+		} else {
+			return visitor.visitChildren(this);
+		}
+	}
 }
 
 
@@ -1460,6 +1605,14 @@ export class CasefeatureValueTypeClauseContext extends ParserRuleContext {
 	public exitRule(listener: CPGLListener): void {
 		if (listener.exitCasefeatureValueTypeClause) {
 			listener.exitCasefeatureValueTypeClause(this);
+		}
+	}
+	// @Override
+	public accept<Result>(visitor: CPGLVisitor<Result>): Result {
+		if (visitor.visitCasefeatureValueTypeClause) {
+			return visitor.visitCasefeatureValueTypeClause(this);
+		} else {
+			return visitor.visitChildren(this);
 		}
 	}
 }

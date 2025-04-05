@@ -60,6 +60,32 @@ npm run build
 npm test
 ```
 
+### Linting
+
+The project uses ESLint for code quality checks. To run the linter:
+
+```bash
+# Lint all TypeScript files
+npx eslint . --ext .ts
+
+# Lint and automatically fix issues where possible
+npx eslint . --ext .ts --fix
+```
+
+### Running Examples
+
+The project includes several example files that demonstrate different features and validation scenarios:
+
+```bash
+# Run the basic usage example
+npm run example
+
+# Run specific examples
+npm run example:basic
+npm run example:debug
+npm run example:full
+```
+
 ### Regenerating ANTLR Files
 
 If you modify the grammar in `src/grammar/CPGL.g4`, you'll need to regenerate the lexer and parser:
