@@ -13,11 +13,11 @@ statement
     ;
 
 decision
-    : 'decision' STRING NEWLINE block NEWLINE
+    : 'decision' STRING NEWLINE block
     ;
 
 block
-    : INDENT (qualifier NEWLINE whenClause | statementLine+) DEDENT
+    : INDENT statementLine+ DEDENT NEWLINE*
     ;
 
 qualifier
@@ -33,7 +33,7 @@ statementLine
 
 // A "when" clause: a condition that leads to a nested block.
 whenClause
-    : 'when' STRING 'then' NEWLINE block
+    : (qualifier NEWLINE)? 'when' STRING 'then' NEWLINE block
     ;
 
 // A "do" clause: a terminal action.
@@ -47,11 +47,11 @@ useClause
     ;
 
 action
-    : 'action' STRING NEWLINE actionBlock NEWLINE
+    : 'action' STRING NEWLINE actionBlock
     ;
 
 actionBlock
-    : INDENT actionFhirTypeClause+ DEDENT
+    : INDENT actionFhirTypeClause+ DEDENT NEWLINE*
     ;
 
 actionFhirTypeClause
