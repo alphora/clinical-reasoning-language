@@ -9,8 +9,9 @@
  */
 import { CharStreams } from 'antlr4ts';
 import { TokenTypes } from '../lexer/CPGLLexerConstants';
+import { CPGLLexer } from '../lexer/CPGLLexer';
 
-// Only using the generated lexer for its static constants
+// Create a dummy lexer to extract the types
 const dummyLexer = new CPGLLexer(CharStreams.fromString(''));
 
 // Get all possible FHIR types from the lexer's vocabulary

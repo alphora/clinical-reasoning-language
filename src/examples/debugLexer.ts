@@ -1,12 +1,14 @@
 /* eslint-disable no-console */
 import { CharStreams } from 'antlr4ts';
-
+import { TokenTypes } from '../lexer/CPGLLexerConstants';
 import { CPGLLexer } from '../lexer/CPGLLexer';
-import { CPGLLexer as GeneratedLexer } from '../grammar/generated/CPGLLexer';
-import type { CPGLToken } from '../lexer/CPGLToken';
+import { CPGLToken } from '../lexer/CPGLToken';
 
 /**
- * Debug utility to help visualize how the lexer tokenizes input
+ * Debug utility for the CPGL lexer
+ * 
+ * IMPORTANT: This example demonstrates the correct usage of our custom lexer.
+ * It should NOT use the generated lexer directly for token generation.
  */
 function debugLexer(input: string): void {
   console.log('Input:', input);
@@ -42,32 +44,28 @@ function debugLexer(input: string): void {
 
   // Create lexer and get tokens
   const lexer = new CPGLLexer(CharStreams.fromString(input));
-  let token = lexer.nextToken();
   let tokenCount = 0;
 
   // Print each token
-  while (token.type !== GeneratedLexer.EOF && tokenCount < 50) {
-    const cpglToken = token as CPGLToken;
-    console.log(
-      `Token #${tokenCount + 1}: type=${token.type} (${cpglToken.typeName}), text="${token.text}"`,
-    );
-    token = lexer.nextToken();
+  let token = lexer.nextToken() as CPGLToken;
+  while (token.type !== TokenTypes.EOF && tokenCount < 50) {
+    console.log(`Token: ${token.typeName} = "${token.text}"`);
+    token = lexer.nextToken() as CPGLToken;
     tokenCount++;
   }
 
-  if (token.type === GeneratedLexer.EOF) {
-    console.log('Reached EOF');
+  if (token.type === TokenTypes.EOF) {
+    console.log('Reached end of input');
   } else {
-    console.log('Token limit reached');
+    console.log('Stopped after 50 tokens');
   }
 }
 
 // Example usage
-const input = `decision "Test Decision"
-    when "Condition 1" then
-        do "Action 1"
-    when "Condition 2" then
-        do "Action 2"
-        use "Another Decision"`;
+const input = `
+decision "test"
+  when "condition"
+    then "action"
+`;
 
 debugLexer(input);

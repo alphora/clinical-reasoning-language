@@ -1,3 +1,10 @@
+/**
+ * Clinical Practice Guideline Language (CPGL)
+ * 
+ * IMPORTANT: Always use the custom CPGLLexer for token generation.
+ * The generated lexer should not be used directly.
+ */
+
 # Clinical Practice Guideline Language
 
 A domain-specific language for expressing clinical practice guidelines.
@@ -40,8 +47,8 @@ const lexer = new CPGLLexer(CharStreams.fromString(input));
 
 // Get tokens
 let token = lexer.nextToken();
-while (token.type !== GeneratedLexer.EOF) {
-    console.log(`Token: type=${token.type} (${token.typeName}), text="${token.text}"`);
+while (token.type !== TokenTypes.EOF) {
+    console.log(`Token: ${token.typeName} = "${token.text}"`);
     token = lexer.nextToken();
 }
 ```

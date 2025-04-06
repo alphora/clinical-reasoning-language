@@ -1,39 +1,36 @@
 /* eslint-disable no-console */
+/**
+ * Full example demonstrating CPGL lexer usage
+ * 
+ * IMPORTANT: This example demonstrates the correct usage of our custom lexer.
+ * It should NOT use the generated lexer directly for token generation.
+ */
 import { CharStreams } from 'antlr4ts';
-
+import { TokenTypes } from '../lexer/CPGLLexerConstants';
 import { CPGLLexer } from '../lexer/CPGLLexer';
-import { CPGLLexer as GeneratedLexer } from '../grammar/generated/CPGLLexer';
-import type { CPGLToken } from '../lexer/CPGLToken';
+import { CPGLToken } from '../lexer/CPGLToken';
 
-// Example CPGL document
-const input = `decision "Test Decision"
-    when "Condition 1" then
-        do "Action 1"
-    when "Condition 2" then
-        do "Action 2"
-        use "Another Decision"`;
+const input = `
+decision "test"
+  when "condition"
+    then "action"
+`;
 
-console.log('Input:');
-console.log(input);
-console.log('\nTokens:');
-
-// Create lexer and get tokens
 const lexer = new CPGLLexer(CharStreams.fromString(input));
-let token = lexer.nextToken();
 let count = 0;
 
-// Print each token
-while (token.type !== GeneratedLexer.EOF && count < 50) {
-  const cpglToken = token as CPGLToken;
-  console.log(
-    `Token #${count + 1}: type=${token.type} (${cpglToken.typeName}), text="${token.text}"`,
-  );
-  token = lexer.nextToken();
+console.log('Tokenizing input:');
+console.log(input);
+
+let token = lexer.nextToken() as CPGLToken;
+while (token.type !== TokenTypes.EOF && count < 50) {
+  console.log(`Token: ${token.typeName} = "${token.text}"`);
+  token = lexer.nextToken() as CPGLToken;
   count++;
 }
 
-if (token.type === GeneratedLexer.EOF) {
-  console.log('Reached EOF');
+if (token.type === TokenTypes.EOF) {
+  console.log('Reached end of input');
 } else {
-  console.log('Token limit reached');
+  console.log('Stopped after 50 tokens');
 }

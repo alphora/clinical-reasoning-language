@@ -1,13 +1,9 @@
 /**
- * Lexer exports for the Clinical Practice Guideline Language
+ * Lexer module exports
  * 
- * IMPORTANT: Always use the custom CPGLLexer for token generation.
- * The generated lexer is only exported for reference and should not be used directly.
+ * IMPORTANT: This module exports our custom lexer implementation.
+ * The generated lexer should not be used directly for token generation.
  */
-
-// Export our custom lexer implementation
-export * from './CPGLLexer';
-
-// WARNING: Only export the generated lexer for reference purposes
-// Do not use it directly for token generation
-export { CPGLLexer as GeneratedLexer } from '../grammar/generated/CPGLLexer';
+export { CPGLLexer } from './CPGLLexer';
+export { CPGLToken } from './CPGLToken';
+export { TokenTypes, Vocabulary, RuleNames, ChannelNames, ModeNames } from './CPGLLexerConstants';
