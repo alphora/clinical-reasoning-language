@@ -1,3 +1,10 @@
+/**
+ * Parser for the Clinical Practice Guideline Language
+ * 
+ * IMPORTANT: This parser uses our custom CPGLLexer implementation.
+ * The custom lexer is required for proper handling of indentation-based syntax
+ * and other language features.
+ */
 import { CharStreams, CommonTokenStream } from 'antlr4ts';
 import { Parser } from 'antlr4ts/Parser';
 import { TokenStream } from 'antlr4ts/TokenStream';

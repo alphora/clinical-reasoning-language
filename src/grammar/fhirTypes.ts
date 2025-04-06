@@ -1,8 +1,16 @@
+/**
+ * FHIR type definitions for the Clinical Practice Guideline Language
+ * 
+ * IMPORTANT: This file uses the generated lexer ONLY for its static constants
+ * and type definitions. It does not use the lexer for token generation.
+ * 
+ * The generated lexer is used here because it contains the canonical definitions
+ * of FHIR types that are part of the language specification.
+ */
 import { CharStreams } from 'antlr4ts';
+import { TokenTypes } from '../lexer/CPGLLexerConstants';
 
-import { CPGLLexer } from '../grammar/generated/CPGLLexer';
-
-// Create a dummy lexer to extract the types
+// Only using the generated lexer for its static constants
 const dummyLexer = new CPGLLexer(CharStreams.fromString(''));
 
 // Get all possible FHIR types from the lexer's vocabulary
@@ -27,6 +35,6 @@ const extractFhirTypes = (tokenType: number): Set<string> => {
 };
 
 // Export the FHIR type sets
-export const ACTION_FHIR_TYPES = extractFhirTypes(CPGLLexer.ACTION_FHIR_TYPE);
-export const CASEFEATURE_FHIR_TYPES = extractFhirTypes(CPGLLexer.CASEFEATURE_FHIR_TYPE);
-export const FHIR_VALUE_TYPES = extractFhirTypes(CPGLLexer.FHIR_VALUE_TYPE);
+export const ACTION_FHIR_TYPES = extractFhirTypes(TokenTypes.ACTION_FHIR_TYPE);
+export const CASEFEATURE_FHIR_TYPES = extractFhirTypes(TokenTypes.CASEFEATURE_FHIR_TYPE);
+export const FHIR_VALUE_TYPES = extractFhirTypes(TokenTypes.FHIR_VALUE_TYPE);

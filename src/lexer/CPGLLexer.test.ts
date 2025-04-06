@@ -1,8 +1,15 @@
-/* eslint-disable no-console */
+/**
+ * Tests for the custom CPGL lexer
+ * 
+ * IMPORTANT: These tests verify the functionality of our custom lexer implementation.
+ * They should NOT use the generated lexer directly for token generation.
+ * 
+ * The generated lexer is only used for reference and constant access.
+ */
 import { CharStreams } from 'antlr4ts';
-
+import { TokenTypes } from './CPGLLexerConstants';
 import { CPGLLexer } from './CPGLLexer';
-import { CPGLLexer as GeneratedLexer } from '../grammar/generated/CPGLLexer';
+import type { CPGLToken } from './CPGLToken';
 
 // Token type constants for readability
 const NEWLINE = '\n';
@@ -15,26 +22,26 @@ describe('CPGLLexer', () => {
     const lexer = new CPGLLexer(CharStreams.fromString(input));
     const tokens = getAllTokens(lexer);
     expect(tokens.length).toBe(3);
-    expect(tokens[0].type).toBe(GeneratedLexer.DECISION);
-    expect(tokens[1].type).toBe(GeneratedLexer.STRING);
-    expect(tokens[2].type).toBe(GeneratedLexer.EOF);
+    expect(tokens[0].type).toBe(TokenTypes.DECISION);
+    expect(tokens[1].type).toBe(TokenTypes.STRING);
+    expect(tokens[2].type).toBe(TokenTypes.EOF);
   });
 
   it('should handle indentation', () => {
     const lexer = new CPGLLexer(CharStreams.fromString('decision "test"\nwhen "condition" then\ndo "action"\n'));
     const tokens = getAllTokens(lexer);
     expect(tokens.length).toBe(11);
-    expect(tokens[0].type).toBe(GeneratedLexer.DECISION);
-    expect(tokens[1].type).toBe(GeneratedLexer.STRING);
-    expect(tokens[2].type).toBe(GeneratedLexer.NEWLINE);
-    expect(tokens[3].type).toBe(GeneratedLexer.WHEN);
-    expect(tokens[4].type).toBe(GeneratedLexer.STRING);
-    expect(tokens[5].type).toBe(GeneratedLexer.THEN);
-    expect(tokens[6].type).toBe(GeneratedLexer.NEWLINE);
-    expect(tokens[7].type).toBe(GeneratedLexer.DO);
-    expect(tokens[8].type).toBe(GeneratedLexer.STRING);
-    expect(tokens[9].type).toBe(GeneratedLexer.NEWLINE);
-    expect(tokens[10].type).toBe(GeneratedLexer.EOF);
+    expect(tokens[0].type).toBe(TokenTypes.DECISION);
+    expect(tokens[1].type).toBe(TokenTypes.STRING);
+    expect(tokens[2].type).toBe(TokenTypes.NEWLINE);
+    expect(tokens[3].type).toBe(TokenTypes.WHEN);
+    expect(tokens[4].type).toBe(TokenTypes.STRING);
+    expect(tokens[5].type).toBe(TokenTypes.THEN);
+    expect(tokens[6].type).toBe(TokenTypes.NEWLINE);
+    expect(tokens[7].type).toBe(TokenTypes.DO);
+    expect(tokens[8].type).toBe(TokenTypes.STRING);
+    expect(tokens[9].type).toBe(TokenTypes.NEWLINE);
+    expect(tokens[10].type).toBe(TokenTypes.EOF);
   });
 
   it('should handle comments', () => {
@@ -43,9 +50,9 @@ decision "test"`;
     const lexer = new CPGLLexer(CharStreams.fromString(input));
     const tokens = getAllTokens(lexer);
     expect(tokens.length).toBe(3);
-    expect(tokens[0].type).toBe(GeneratedLexer.DECISION);
-    expect(tokens[1].type).toBe(GeneratedLexer.STRING);
-    expect(tokens[2].type).toBe(GeneratedLexer.EOF);
+    expect(tokens[0].type).toBe(TokenTypes.DECISION);
+    expect(tokens[1].type).toBe(TokenTypes.STRING);
+    expect(tokens[2].type).toBe(TokenTypes.EOF);
   });
 
   it('should handle block comments', () => {
@@ -54,20 +61,20 @@ decision "test"`;
     const lexer = new CPGLLexer(CharStreams.fromString(input));
     const tokens = getAllTokens(lexer);
     expect(tokens.length).toBe(3);
-    expect(tokens[0].type).toBe(GeneratedLexer.DECISION);
-    expect(tokens[1].type).toBe(GeneratedLexer.STRING);
-    expect(tokens[2].type).toBe(GeneratedLexer.EOF);
+    expect(tokens[0].type).toBe(TokenTypes.DECISION);
+    expect(tokens[1].type).toBe(TokenTypes.STRING);
+    expect(tokens[2].type).toBe(TokenTypes.EOF);
   });
 
   it('should handle errors', () => {
     const lexer = new CPGLLexer(CharStreams.fromString('@invalid'));
     const tokens = getAllTokens(lexer);
     expect(tokens.length).toBe(3);
-    expect(tokens[0].type).toBe(GeneratedLexer.ERROR);
+    expect(tokens[0].type).toBe(TokenTypes.ERROR);
     expect(tokens[0].text).toBe('@');
-    expect(tokens[1].type).toBe(GeneratedLexer.ERROR);
+    expect(tokens[1].type).toBe(TokenTypes.ERROR);
     expect(tokens[1].text).toBe('invalid');
-    expect(tokens[2].type).toBe(GeneratedLexer.EOF);
+    expect(tokens[2].type).toBe(TokenTypes.EOF);
   });
 
   describe('tokenize', () => {
@@ -77,20 +84,20 @@ decision "test"`;
       const tokens = getAllTokens(lexer);
       expect(tokens.length).toBe(14);
       expect(tokens.map((t) => t.type)).toEqual([
-        GeneratedLexer.DECISION,
-        GeneratedLexer.WHEN,
-        GeneratedLexer.THEN,
-        GeneratedLexer.DO,
-        GeneratedLexer.USE,
-        GeneratedLexer.ACTION,
-        GeneratedLexer.FHIRTYPE,
-        GeneratedLexer.CASEFEATURE,
-        GeneratedLexer.VALUETYPE,
-        GeneratedLexer.CASEFEATURECODE,
-        GeneratedLexer.PROFILEURL,
-        GeneratedLexer.ANY,
-        GeneratedLexer.ALL,
-        GeneratedLexer.EOF,
+        TokenTypes.DECISION,
+        TokenTypes.WHEN,
+        TokenTypes.THEN,
+        TokenTypes.DO,
+        TokenTypes.USE,
+        TokenTypes.ACTION,
+        TokenTypes.FHIRTYPE,
+        TokenTypes.CASEFEATURE,
+        TokenTypes.VALUETYPE,
+        TokenTypes.CASEFEATURECODE,
+        TokenTypes.PROFILEURL,
+        TokenTypes.ANY,
+        TokenTypes.ALL,
+        TokenTypes.EOF,
       ]);
     });
 
@@ -99,19 +106,19 @@ decision "test"`;
       const tokens = getAllTokens(lexer);
       expect(tokens.length).toBe(13);
       expect(tokens.map((t) => t.type)).toEqual([
-        GeneratedLexer.DECISION,
-        GeneratedLexer.STRING,
-        GeneratedLexer.NEWLINE,
-        GeneratedLexer.ANY,
-        GeneratedLexer.NEWLINE,
-        GeneratedLexer.WHEN,
-        GeneratedLexer.STRING,
-        GeneratedLexer.THEN,
-        GeneratedLexer.NEWLINE,
-        GeneratedLexer.DO,
-        GeneratedLexer.STRING,
-        GeneratedLexer.NEWLINE,
-        GeneratedLexer.EOF
+        TokenTypes.DECISION,
+        TokenTypes.STRING,
+        TokenTypes.NEWLINE,
+        TokenTypes.ANY,
+        TokenTypes.NEWLINE,
+        TokenTypes.WHEN,
+        TokenTypes.STRING,
+        TokenTypes.THEN,
+        TokenTypes.NEWLINE,
+        TokenTypes.DO,
+        TokenTypes.STRING,
+        TokenTypes.NEWLINE,
+        TokenTypes.EOF
       ]);
     });
 
@@ -120,19 +127,19 @@ decision "test"`;
       const tokens = getAllTokens(lexer);
       expect(tokens.length).toBe(13);
       expect(tokens.map((t) => t.type)).toEqual([
-        GeneratedLexer.DECISION,
-        GeneratedLexer.STRING,
-        GeneratedLexer.NEWLINE,
-        GeneratedLexer.ALL,
-        GeneratedLexer.NEWLINE,
-        GeneratedLexer.WHEN,
-        GeneratedLexer.STRING,
-        GeneratedLexer.THEN,
-        GeneratedLexer.NEWLINE,
-        GeneratedLexer.DO,
-        GeneratedLexer.STRING,
-        GeneratedLexer.NEWLINE,
-        GeneratedLexer.EOF
+        TokenTypes.DECISION,
+        TokenTypes.STRING,
+        TokenTypes.NEWLINE,
+        TokenTypes.ALL,
+        TokenTypes.NEWLINE,
+        TokenTypes.WHEN,
+        TokenTypes.STRING,
+        TokenTypes.THEN,
+        TokenTypes.NEWLINE,
+        TokenTypes.DO,
+        TokenTypes.STRING,
+        TokenTypes.NEWLINE,
+        TokenTypes.EOF
       ]);
     });
 
@@ -141,17 +148,17 @@ decision "test"`;
       const tokens = getAllTokens(lexer);
       expect(tokens.length).toBe(11);
       expect(tokens.map((t) => t.type)).toEqual([
-        GeneratedLexer.DECISION,
-        GeneratedLexer.STRING,
-        GeneratedLexer.NEWLINE,
-        GeneratedLexer.WHEN,
-        GeneratedLexer.STRING,
-        GeneratedLexer.THEN,
-        GeneratedLexer.NEWLINE,
-        GeneratedLexer.DO,
-        GeneratedLexer.STRING,
-        GeneratedLexer.NEWLINE,
-        GeneratedLexer.EOF
+        TokenTypes.DECISION,
+        TokenTypes.STRING,
+        TokenTypes.NEWLINE,
+        TokenTypes.WHEN,
+        TokenTypes.STRING,
+        TokenTypes.THEN,
+        TokenTypes.NEWLINE,
+        TokenTypes.DO,
+        TokenTypes.STRING,
+        TokenTypes.NEWLINE,
+        TokenTypes.EOF
       ]);
     });
   });
@@ -166,23 +173,23 @@ decision "test"`;
     const tokens = getAllTokens(lexer);
 
     expect(tokens.length).toBe(17);
-    expect(tokens[0].type).toBe(GeneratedLexer.CASEFEATURE);
-    expect(tokens[1].type).toBe(GeneratedLexer.STRING);
-    expect(tokens[2].type).toBe(GeneratedLexer.NEWLINE);
-    expect(tokens[3].type).toBe(GeneratedLexer.INDENT);
-    expect(tokens[4].type).toBe(GeneratedLexer.CASEFEATURECODE);
-    expect(tokens[5].type).toBe(GeneratedLexer.STRING);
-    expect(tokens[6].type).toBe(GeneratedLexer.NEWLINE);
-    expect(tokens[7].type).toBe(GeneratedLexer.FHIRTYPE);
-    expect(tokens[8].type).toBe(GeneratedLexer.CASEFEATURE_FHIR_TYPE);
-    expect(tokens[9].type).toBe(GeneratedLexer.NEWLINE);
-    expect(tokens[10].type).toBe(GeneratedLexer.PROFILEURL);
-    expect(tokens[11].type).toBe(GeneratedLexer.STRING);
-    expect(tokens[12].type).toBe(GeneratedLexer.NEWLINE);
-    expect(tokens[13].type).toBe(GeneratedLexer.VALUETYPE);
-    expect(tokens[14].type).toBe(GeneratedLexer.FHIR_VALUE_TYPE);
-    expect(tokens[15].type).toBe(GeneratedLexer.DEDENT);
-    expect(tokens[16].type).toBe(GeneratedLexer.EOF);
+    expect(tokens[0].type).toBe(TokenTypes.CASEFEATURE);
+    expect(tokens[1].type).toBe(TokenTypes.STRING);
+    expect(tokens[2].type).toBe(TokenTypes.NEWLINE);
+    expect(tokens[3].type).toBe(TokenTypes.INDENT);
+    expect(tokens[4].type).toBe(TokenTypes.CASEFEATURECODE);
+    expect(tokens[5].type).toBe(TokenTypes.STRING);
+    expect(tokens[6].type).toBe(TokenTypes.NEWLINE);
+    expect(tokens[7].type).toBe(TokenTypes.FHIRTYPE);
+    expect(tokens[8].type).toBe(TokenTypes.CASEFEATURE_FHIR_TYPE);
+    expect(tokens[9].type).toBe(TokenTypes.NEWLINE);
+    expect(tokens[10].type).toBe(TokenTypes.PROFILEURL);
+    expect(tokens[11].type).toBe(TokenTypes.STRING);
+    expect(tokens[12].type).toBe(TokenTypes.NEWLINE);
+    expect(tokens[13].type).toBe(TokenTypes.VALUETYPE);
+    expect(tokens[14].type).toBe(TokenTypes.FHIR_VALUE_TYPE);
+    expect(tokens[15].type).toBe(TokenTypes.DEDENT);
+    expect(tokens[16].type).toBe(TokenTypes.EOF);
   });
 
   it('should tokenize action with fhirtype', () => {
@@ -192,14 +199,14 @@ decision "test"`;
     const tokens = getAllTokens(lexer);
 
     expect(tokens.length).toBe(8);
-    expect(tokens[0].type).toBe(GeneratedLexer.ACTION);
-    expect(tokens[1].type).toBe(GeneratedLexer.STRING);
-    expect(tokens[2].type).toBe(GeneratedLexer.NEWLINE);
-    expect(tokens[3].type).toBe(GeneratedLexer.INDENT);
-    expect(tokens[4].type).toBe(GeneratedLexer.FHIRTYPE);
-    expect(tokens[5].type).toBe(GeneratedLexer.ACTION_FHIR_TYPE);
-    expect(tokens[6].type).toBe(GeneratedLexer.DEDENT);
-    expect(tokens[7].type).toBe(GeneratedLexer.EOF);
+    expect(tokens[0].type).toBe(TokenTypes.ACTION);
+    expect(tokens[1].type).toBe(TokenTypes.STRING);
+    expect(tokens[2].type).toBe(TokenTypes.NEWLINE);
+    expect(tokens[3].type).toBe(TokenTypes.INDENT);
+    expect(tokens[4].type).toBe(TokenTypes.FHIRTYPE);
+    expect(tokens[5].type).toBe(TokenTypes.ACTION_FHIR_TYPE);
+    expect(tokens[6].type).toBe(TokenTypes.DEDENT);
+    expect(tokens[7].type).toBe(TokenTypes.EOF);
   });
 
   it('should handle inconsistent indentation', () => {
@@ -223,33 +230,33 @@ decision "test"`;
 
     const tokens = getAllTokens(lexer);
     expect(tokens.length).toBe(27);
-    expect(tokens[0].type).toBe(GeneratedLexer.DECISION);
-    expect(tokens[1].type).toBe(GeneratedLexer.STRING);
-    expect(tokens[2].type).toBe(GeneratedLexer.NEWLINE);
-    expect(tokens[3].type).toBe(GeneratedLexer.INDENT);
-    expect(tokens[4].type).toBe(GeneratedLexer.WHEN);
-    expect(tokens[5].type).toBe(GeneratedLexer.STRING);
-    expect(tokens[6].type).toBe(GeneratedLexer.THEN);
-    expect(tokens[7].type).toBe(GeneratedLexer.NEWLINE);
-    expect(tokens[8].type).toBe(GeneratedLexer.INDENT);
-    expect(tokens[9].type).toBe(GeneratedLexer.DO);
-    expect(tokens[10].type).toBe(GeneratedLexer.STRING);
-    expect(tokens[11].type).toBe(GeneratedLexer.NEWLINE);
-    expect(tokens[12].type).toBe(GeneratedLexer.DEDENT);
-    expect(tokens[13].type).toBe(GeneratedLexer.WHEN);
-    expect(tokens[14].type).toBe(GeneratedLexer.STRING);
-    expect(tokens[15].type).toBe(GeneratedLexer.THEN);
-    expect(tokens[16].type).toBe(GeneratedLexer.NEWLINE);
-    expect(tokens[17].type).toBe(GeneratedLexer.INDENT);
-    expect(tokens[18].type).toBe(GeneratedLexer.DO);
-    expect(tokens[19].type).toBe(GeneratedLexer.STRING);
-    expect(tokens[20].type).toBe(GeneratedLexer.NEWLINE);
-    expect(tokens[21].type).toBe(GeneratedLexer.USE);
-    expect(tokens[22].type).toBe(GeneratedLexer.STRING);
-    expect(tokens[23].type).toBe(GeneratedLexer.NEWLINE);
-    expect(tokens[24].type).toBe(GeneratedLexer.DEDENT);
-    expect(tokens[25].type).toBe(GeneratedLexer.DEDENT);
-    expect(tokens[26].type).toBe(GeneratedLexer.EOF);
+    expect(tokens[0].type).toBe(TokenTypes.DECISION);
+    expect(tokens[1].type).toBe(TokenTypes.STRING);
+    expect(tokens[2].type).toBe(TokenTypes.NEWLINE);
+    expect(tokens[3].type).toBe(TokenTypes.INDENT);
+    expect(tokens[4].type).toBe(TokenTypes.WHEN);
+    expect(tokens[5].type).toBe(TokenTypes.STRING);
+    expect(tokens[6].type).toBe(TokenTypes.THEN);
+    expect(tokens[7].type).toBe(TokenTypes.NEWLINE);
+    expect(tokens[8].type).toBe(TokenTypes.INDENT);
+    expect(tokens[9].type).toBe(TokenTypes.DO);
+    expect(tokens[10].type).toBe(TokenTypes.STRING);
+    expect(tokens[11].type).toBe(TokenTypes.NEWLINE);
+    expect(tokens[12].type).toBe(TokenTypes.DEDENT);
+    expect(tokens[13].type).toBe(TokenTypes.WHEN);
+    expect(tokens[14].type).toBe(TokenTypes.STRING);
+    expect(tokens[15].type).toBe(TokenTypes.THEN);
+    expect(tokens[16].type).toBe(TokenTypes.NEWLINE);
+    expect(tokens[17].type).toBe(TokenTypes.INDENT);
+    expect(tokens[18].type).toBe(TokenTypes.DO);
+    expect(tokens[19].type).toBe(TokenTypes.STRING);
+    expect(tokens[20].type).toBe(TokenTypes.NEWLINE);
+    expect(tokens[21].type).toBe(TokenTypes.USE);
+    expect(tokens[22].type).toBe(TokenTypes.STRING);
+    expect(tokens[23].type).toBe(TokenTypes.NEWLINE);
+    expect(tokens[24].type).toBe(TokenTypes.DEDENT);
+    expect(tokens[25].type).toBe(TokenTypes.DEDENT);
+    expect(tokens[26].type).toBe(TokenTypes.EOF);
   });
 
   it('should handle indentation with newline resets', () => {
@@ -265,36 +272,36 @@ decision "cycle2"
     const lexer = new CPGLLexer(CharStreams.fromString(input));
     const tokens = getAllTokens(lexer);
     expect(tokens.map(t => t.type)).toEqual([
-      GeneratedLexer.DECISION,
-      GeneratedLexer.STRING,
-      GeneratedLexer.NEWLINE,
-      GeneratedLexer.INDENT,
-      GeneratedLexer.WHEN,
-      GeneratedLexer.STRING,
-      GeneratedLexer.THEN,
-      GeneratedLexer.NEWLINE,
-      GeneratedLexer.INDENT,
-      GeneratedLexer.USE,
-      GeneratedLexer.STRING,
-      GeneratedLexer.NEWLINE,
-      GeneratedLexer.DEDENT,
-      GeneratedLexer.DEDENT,
-      GeneratedLexer.NEWLINE,
-      GeneratedLexer.DECISION,
-      GeneratedLexer.STRING,
-      GeneratedLexer.NEWLINE,
-      GeneratedLexer.INDENT,
-      GeneratedLexer.WHEN,
-      GeneratedLexer.STRING,
-      GeneratedLexer.THEN,
-      GeneratedLexer.NEWLINE,
-      GeneratedLexer.INDENT,
-      GeneratedLexer.USE,
-      GeneratedLexer.STRING,
-      GeneratedLexer.NEWLINE,
-      GeneratedLexer.DEDENT,
-      GeneratedLexer.DEDENT,
-      GeneratedLexer.EOF,
+      TokenTypes.DECISION,
+      TokenTypes.STRING,
+      TokenTypes.NEWLINE,
+      TokenTypes.INDENT,
+      TokenTypes.WHEN,
+      TokenTypes.STRING,
+      TokenTypes.THEN,
+      TokenTypes.NEWLINE,
+      TokenTypes.INDENT,
+      TokenTypes.USE,
+      TokenTypes.STRING,
+      TokenTypes.NEWLINE,
+      TokenTypes.DEDENT,
+      TokenTypes.DEDENT,
+      TokenTypes.NEWLINE,
+      TokenTypes.DECISION,
+      TokenTypes.STRING,
+      TokenTypes.NEWLINE,
+      TokenTypes.INDENT,
+      TokenTypes.WHEN,
+      TokenTypes.STRING,
+      TokenTypes.THEN,
+      TokenTypes.NEWLINE,
+      TokenTypes.INDENT,
+      TokenTypes.USE,
+      TokenTypes.STRING,
+      TokenTypes.NEWLINE,
+      TokenTypes.DEDENT,
+      TokenTypes.DEDENT,
+      TokenTypes.EOF,
     ]);
   });
 
@@ -316,48 +323,48 @@ casefeature "feature1"
     const lexer = new CPGLLexer(CharStreams.fromString(input));
     const tokens = getAllTokens(lexer);
     expect(tokens.map(t => t.type)).toEqual([
-      GeneratedLexer.DECISION,
-      GeneratedLexer.STRING,
-      GeneratedLexer.NEWLINE,
-      GeneratedLexer.INDENT,
-      GeneratedLexer.WHEN,
-      GeneratedLexer.STRING,
-      GeneratedLexer.THEN,
-      GeneratedLexer.NEWLINE,
-      GeneratedLexer.INDENT,
-      GeneratedLexer.USE,
-      GeneratedLexer.STRING,
-      GeneratedLexer.NEWLINE,
-      GeneratedLexer.DEDENT,
-      GeneratedLexer.DEDENT,
-      GeneratedLexer.NEWLINE,
-      GeneratedLexer.ACTION,
-      GeneratedLexer.STRING,
-      GeneratedLexer.NEWLINE,
-      GeneratedLexer.INDENT,
-      GeneratedLexer.FHIRTYPE,
-      GeneratedLexer.ACTION_FHIR_TYPE,
-      GeneratedLexer.NEWLINE,
-      GeneratedLexer.DEDENT,
-      GeneratedLexer.NEWLINE,
-      GeneratedLexer.CASEFEATURE,
-      GeneratedLexer.STRING,
-      GeneratedLexer.NEWLINE,
-      GeneratedLexer.INDENT,
-      GeneratedLexer.CASEFEATURECODE,
-      GeneratedLexer.STRING,
-      GeneratedLexer.NEWLINE,
-      GeneratedLexer.FHIRTYPE,
-      GeneratedLexer.CASEFEATURE_FHIR_TYPE,
-      GeneratedLexer.NEWLINE,
-      GeneratedLexer.VALUETYPE,
-      GeneratedLexer.FHIR_VALUE_TYPE,
-      GeneratedLexer.NEWLINE,
-      GeneratedLexer.PROFILEURL,
-      GeneratedLexer.STRING,
-      GeneratedLexer.NEWLINE,
-      GeneratedLexer.DEDENT,
-      GeneratedLexer.EOF,
+      TokenTypes.DECISION,
+      TokenTypes.STRING,
+      TokenTypes.NEWLINE,
+      TokenTypes.INDENT,
+      TokenTypes.WHEN,
+      TokenTypes.STRING,
+      TokenTypes.THEN,
+      TokenTypes.NEWLINE,
+      TokenTypes.INDENT,
+      TokenTypes.USE,
+      TokenTypes.STRING,
+      TokenTypes.NEWLINE,
+      TokenTypes.DEDENT,
+      TokenTypes.DEDENT,
+      TokenTypes.NEWLINE,
+      TokenTypes.ACTION,
+      TokenTypes.STRING,
+      TokenTypes.NEWLINE,
+      TokenTypes.INDENT,
+      TokenTypes.FHIRTYPE,
+      TokenTypes.ACTION_FHIR_TYPE,
+      TokenTypes.NEWLINE,
+      TokenTypes.DEDENT,
+      TokenTypes.NEWLINE,
+      TokenTypes.CASEFEATURE,
+      TokenTypes.STRING,
+      TokenTypes.NEWLINE,
+      TokenTypes.INDENT,
+      TokenTypes.CASEFEATURECODE,
+      TokenTypes.STRING,
+      TokenTypes.NEWLINE,
+      TokenTypes.FHIRTYPE,
+      TokenTypes.CASEFEATURE_FHIR_TYPE,
+      TokenTypes.NEWLINE,
+      TokenTypes.VALUETYPE,
+      TokenTypes.FHIR_VALUE_TYPE,
+      TokenTypes.NEWLINE,
+      TokenTypes.PROFILEURL,
+      TokenTypes.STRING,
+      TokenTypes.NEWLINE,
+      TokenTypes.DEDENT,
+      TokenTypes.EOF,
     ]);
   });
 
@@ -373,30 +380,30 @@ action "action1"
     const lexer = new CPGLLexer(CharStreams.fromString(input));
     const tokens = getAllTokens(lexer);
     expect(tokens.map(t => t.type)).toEqual([
-      GeneratedLexer.DECISION,
-      GeneratedLexer.STRING,
-      GeneratedLexer.NEWLINE,
-      GeneratedLexer.INDENT,
-      GeneratedLexer.WHEN,
-      GeneratedLexer.STRING,
-      GeneratedLexer.THEN,
-      GeneratedLexer.NEWLINE,
-      GeneratedLexer.INDENT,
-      GeneratedLexer.USE,
-      GeneratedLexer.STRING,
-      GeneratedLexer.NEWLINE,
-      GeneratedLexer.DEDENT,
-      GeneratedLexer.DEDENT,
-      GeneratedLexer.NEWLINE,
-      GeneratedLexer.ACTION,
-      GeneratedLexer.STRING,
-      GeneratedLexer.NEWLINE,
-      GeneratedLexer.INDENT,
-      GeneratedLexer.FHIRTYPE,
-      GeneratedLexer.ACTION_FHIR_TYPE,
-      GeneratedLexer.NEWLINE,
-      GeneratedLexer.DEDENT,
-      GeneratedLexer.EOF,
+      TokenTypes.DECISION,
+      TokenTypes.STRING,
+      TokenTypes.NEWLINE,
+      TokenTypes.INDENT,
+      TokenTypes.WHEN,
+      TokenTypes.STRING,
+      TokenTypes.THEN,
+      TokenTypes.NEWLINE,
+      TokenTypes.INDENT,
+      TokenTypes.USE,
+      TokenTypes.STRING,
+      TokenTypes.NEWLINE,
+      TokenTypes.DEDENT,
+      TokenTypes.DEDENT,
+      TokenTypes.NEWLINE,
+      TokenTypes.ACTION,
+      TokenTypes.STRING,
+      TokenTypes.NEWLINE,
+      TokenTypes.INDENT,
+      TokenTypes.FHIRTYPE,
+      TokenTypes.ACTION_FHIR_TYPE,
+      TokenTypes.NEWLINE,
+      TokenTypes.DEDENT,
+      TokenTypes.EOF,
     ]);
   });
 
@@ -415,39 +422,39 @@ casefeature "feature1"
     const lexer = new CPGLLexer(CharStreams.fromString(input));
     const tokens = getAllTokens(lexer);
     expect(tokens.map(t => t.type)).toEqual([
-      GeneratedLexer.DECISION,
-      GeneratedLexer.STRING,
-      GeneratedLexer.NEWLINE,
-      GeneratedLexer.INDENT,
-      GeneratedLexer.WHEN,
-      GeneratedLexer.STRING,
-      GeneratedLexer.THEN,
-      GeneratedLexer.NEWLINE,
-      GeneratedLexer.INDENT,
-      GeneratedLexer.USE,
-      GeneratedLexer.STRING,
-      GeneratedLexer.NEWLINE,
-      GeneratedLexer.DEDENT,
-      GeneratedLexer.DEDENT,
-      GeneratedLexer.NEWLINE,
-      GeneratedLexer.CASEFEATURE,
-      GeneratedLexer.STRING,
-      GeneratedLexer.NEWLINE,
-      GeneratedLexer.INDENT,
-      GeneratedLexer.CASEFEATURECODE,
-      GeneratedLexer.STRING,
-      GeneratedLexer.NEWLINE,
-      GeneratedLexer.FHIRTYPE,
-      GeneratedLexer.CASEFEATURE_FHIR_TYPE,
-      GeneratedLexer.NEWLINE,
-      GeneratedLexer.VALUETYPE,
-      GeneratedLexer.FHIR_VALUE_TYPE,
-      GeneratedLexer.NEWLINE,
-      GeneratedLexer.PROFILEURL,
-      GeneratedLexer.STRING,
-      GeneratedLexer.NEWLINE,
-      GeneratedLexer.DEDENT,
-      GeneratedLexer.EOF,
+      TokenTypes.DECISION,
+      TokenTypes.STRING,
+      TokenTypes.NEWLINE,
+      TokenTypes.INDENT,
+      TokenTypes.WHEN,
+      TokenTypes.STRING,
+      TokenTypes.THEN,
+      TokenTypes.NEWLINE,
+      TokenTypes.INDENT,
+      TokenTypes.USE,
+      TokenTypes.STRING,
+      TokenTypes.NEWLINE,
+      TokenTypes.DEDENT,
+      TokenTypes.DEDENT,
+      TokenTypes.NEWLINE,
+      TokenTypes.CASEFEATURE,
+      TokenTypes.STRING,
+      TokenTypes.NEWLINE,
+      TokenTypes.INDENT,
+      TokenTypes.CASEFEATURECODE,
+      TokenTypes.STRING,
+      TokenTypes.NEWLINE,
+      TokenTypes.FHIRTYPE,
+      TokenTypes.CASEFEATURE_FHIR_TYPE,
+      TokenTypes.NEWLINE,
+      TokenTypes.VALUETYPE,
+      TokenTypes.FHIR_VALUE_TYPE,
+      TokenTypes.NEWLINE,
+      TokenTypes.PROFILEURL,
+      TokenTypes.STRING,
+      TokenTypes.NEWLINE,
+      TokenTypes.DEDENT,
+      TokenTypes.EOF,
     ]);
   });
 
@@ -480,7 +487,7 @@ ${NEWLINE}${INDENT}   use "cycle3"`; // 3 spaces
 function getAllTokens(lexer: CPGLLexer): Array<{ type: number; text: string }> {
   const tokens: Array<{ type: number; text: string }> = [];
   let token = lexer.nextToken();
-  while (token.type !== GeneratedLexer.EOF) {
+  while (token.type !== TokenTypes.EOF) {
     tokens.push({ type: token.type, text: token.text ?? '' });
     token = lexer.nextToken();
   }
