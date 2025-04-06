@@ -211,12 +211,10 @@ describe('CPGLLexer', () => {
     it('should handle inconsistent indentation', () => {
       const input = '  \t';
       const lexer = new CPGLLexer(CharStreams.fromString(input));
-      const tokens = getAllTokens(lexer);
       
-      verifyTokenSequence(tokens, [
-        TokenTypes.INDENT,
-        TokenTypes.EOF
-      ]);
+      expect(() => {
+        getAllTokens(lexer);
+      }).toThrow('Mixed tabs and spaces are not allowed for indentation');
     });
 
     it('should handle multiple levels of indentation', () => {
