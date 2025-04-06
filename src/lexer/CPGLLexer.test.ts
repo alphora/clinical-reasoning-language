@@ -2295,6 +2295,238 @@ describe('CPGLLexer', () => {
       });
     });
   });
+
+  describe('Integration Tests', () => {
+    it('should handle complete example file token sequence', () => {
+      const input = `decision "Elderly Based"
+    when "Age" then
+        all
+        when "Age > 65" then
+            do "Elderly Care Plan"
+            do "Fall Risk Assessment"
+        when "Age > 80" then
+            use "Advanced Elderly Care Plan"
+    when "Condition" then
+        any
+        when "Dementia" then
+            do "Cognitive Assessment"
+            do "Memory Care Plan"
+        when "Mobility Issues" then
+            use "Physical Therapy Plan"
+    when "Medication" then
+        all
+        when "Multiple Medications" then
+            do "Medication Review"
+            do "Drug Interaction Check"
+        when "High Risk Medications" then
+            use "Specialized Medication Plan"`;
+
+      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const tokens = getAllTokens(lexer);
+      
+      expect(() => {
+        verifyTokenSequence(tokens, [
+          TokenTypes.DECISION, TokenTypes.STRING, TokenTypes.NEWLINE,
+          TokenTypes.INDENT,
+          TokenTypes.WHEN, TokenTypes.STRING, TokenTypes.THEN, TokenTypes.NEWLINE,
+          TokenTypes.INDENT,
+          TokenTypes.ALL, TokenTypes.NEWLINE,
+          TokenTypes.INDENT,
+          TokenTypes.WHEN, TokenTypes.STRING, TokenTypes.THEN, TokenTypes.NEWLINE,
+          TokenTypes.INDENT,
+          TokenTypes.DO, TokenTypes.STRING, TokenTypes.NEWLINE,
+          TokenTypes.DO, TokenTypes.STRING, TokenTypes.NEWLINE,
+          TokenTypes.DEDENT,
+          TokenTypes.WHEN, TokenTypes.STRING, TokenTypes.THEN, TokenTypes.NEWLINE,
+          TokenTypes.INDENT,
+          TokenTypes.USE, TokenTypes.STRING, TokenTypes.NEWLINE,
+          TokenTypes.DEDENT,
+          TokenTypes.DEDENT,
+          TokenTypes.WHEN, TokenTypes.STRING, TokenTypes.THEN, TokenTypes.NEWLINE,
+          TokenTypes.INDENT,
+          TokenTypes.ANY, TokenTypes.NEWLINE,
+          TokenTypes.INDENT,
+          TokenTypes.WHEN, TokenTypes.STRING, TokenTypes.THEN, TokenTypes.NEWLINE,
+          TokenTypes.INDENT,
+          TokenTypes.DO, TokenTypes.STRING, TokenTypes.NEWLINE,
+          TokenTypes.DO, TokenTypes.STRING, TokenTypes.NEWLINE,
+          TokenTypes.DEDENT,
+          TokenTypes.WHEN, TokenTypes.STRING, TokenTypes.THEN, TokenTypes.NEWLINE,
+          TokenTypes.INDENT,
+          TokenTypes.USE, TokenTypes.STRING, TokenTypes.NEWLINE,
+          TokenTypes.DEDENT,
+          TokenTypes.DEDENT,
+          TokenTypes.WHEN, TokenTypes.STRING, TokenTypes.THEN, TokenTypes.NEWLINE,
+          TokenTypes.INDENT,
+          TokenTypes.ALL, TokenTypes.NEWLINE,
+          TokenTypes.INDENT,
+          TokenTypes.WHEN, TokenTypes.STRING, TokenTypes.THEN, TokenTypes.NEWLINE,
+          TokenTypes.INDENT,
+          TokenTypes.DO, TokenTypes.STRING, TokenTypes.NEWLINE,
+          TokenTypes.DO, TokenTypes.STRING, TokenTypes.NEWLINE,
+          TokenTypes.DEDENT,
+          TokenTypes.WHEN, TokenTypes.STRING, TokenTypes.THEN, TokenTypes.NEWLINE,
+          TokenTypes.INDENT,
+          TokenTypes.USE, TokenTypes.STRING, TokenTypes.NEWLINE,
+          TokenTypes.DEDENT,
+          TokenTypes.DEDENT,
+          TokenTypes.DEDENT,
+          TokenTypes.DEDENT
+        ]);
+      }).not.toThrow();
+    });
+
+    it('should handle major sections independently', () => {
+      const sections = [
+        {
+          name: 'Age-based decisions',
+          input: `when "Age" then
+    all
+    when "Age > 65" then
+        do "Elderly Care Plan"
+        do "Fall Risk Assessment"
+    when "Age > 80" then
+        use "Advanced Elderly Care Plan"`,
+          expected: [
+            TokenTypes.WHEN, TokenTypes.STRING, TokenTypes.THEN, TokenTypes.NEWLINE,
+            TokenTypes.INDENT,
+            TokenTypes.ALL, TokenTypes.NEWLINE,
+            TokenTypes.INDENT,
+            TokenTypes.WHEN, TokenTypes.STRING, TokenTypes.THEN, TokenTypes.NEWLINE,
+            TokenTypes.INDENT,
+            TokenTypes.DO, TokenTypes.STRING, TokenTypes.NEWLINE,
+            TokenTypes.DO, TokenTypes.STRING, TokenTypes.NEWLINE,
+            TokenTypes.DEDENT,
+            TokenTypes.WHEN, TokenTypes.STRING, TokenTypes.THEN, TokenTypes.NEWLINE,
+            TokenTypes.INDENT,
+            TokenTypes.USE, TokenTypes.STRING, TokenTypes.NEWLINE,
+            TokenTypes.DEDENT,
+            TokenTypes.DEDENT,
+            TokenTypes.DEDENT
+          ]
+        },
+        {
+          name: 'Condition-based decisions',
+          input: `when "Condition" then
+    any
+    when "Dementia" then
+        do "Cognitive Assessment"
+        do "Memory Care Plan"
+    when "Mobility Issues" then
+        use "Physical Therapy Plan"`,
+          expected: [
+            TokenTypes.WHEN, TokenTypes.STRING, TokenTypes.THEN, TokenTypes.NEWLINE,
+            TokenTypes.INDENT,
+            TokenTypes.ANY, TokenTypes.NEWLINE,
+            TokenTypes.INDENT,
+            TokenTypes.WHEN, TokenTypes.STRING, TokenTypes.THEN, TokenTypes.NEWLINE,
+            TokenTypes.INDENT,
+            TokenTypes.DO, TokenTypes.STRING, TokenTypes.NEWLINE,
+            TokenTypes.DO, TokenTypes.STRING, TokenTypes.NEWLINE,
+            TokenTypes.DEDENT,
+            TokenTypes.WHEN, TokenTypes.STRING, TokenTypes.THEN, TokenTypes.NEWLINE,
+            TokenTypes.INDENT,
+            TokenTypes.USE, TokenTypes.STRING, TokenTypes.NEWLINE,
+            TokenTypes.DEDENT,
+            TokenTypes.DEDENT,
+            TokenTypes.DEDENT
+          ]
+        },
+        {
+          name: 'Medication-based decisions',
+          input: `when "Medication" then
+    all
+    when "Multiple Medications" then
+        do "Medication Review"
+        do "Drug Interaction Check"
+    when "High Risk Medications" then
+        use "Specialized Medication Plan"`,
+          expected: [
+            TokenTypes.WHEN, TokenTypes.STRING, TokenTypes.THEN, TokenTypes.NEWLINE,
+            TokenTypes.INDENT,
+            TokenTypes.ALL, TokenTypes.NEWLINE,
+            TokenTypes.INDENT,
+            TokenTypes.WHEN, TokenTypes.STRING, TokenTypes.THEN, TokenTypes.NEWLINE,
+            TokenTypes.INDENT,
+            TokenTypes.DO, TokenTypes.STRING, TokenTypes.NEWLINE,
+            TokenTypes.DO, TokenTypes.STRING, TokenTypes.NEWLINE,
+            TokenTypes.DEDENT,
+            TokenTypes.WHEN, TokenTypes.STRING, TokenTypes.THEN, TokenTypes.NEWLINE,
+            TokenTypes.INDENT,
+            TokenTypes.USE, TokenTypes.STRING, TokenTypes.NEWLINE,
+            TokenTypes.DEDENT,
+            TokenTypes.DEDENT,
+            TokenTypes.DEDENT
+          ]
+        }
+      ];
+
+      sections.forEach(section => {
+        const lexer = new CPGLLexer(CharStreams.fromString(section.input));
+        const tokens = getAllTokens(lexer);
+        expect(() => {
+          verifyTokenSequence(tokens, section.expected);
+        }).not.toThrow();
+      });
+    });
+
+    it('should verify relationships between different parts', () => {
+      const input = `decision "Elderly Based"
+    when "Age" then
+        all
+        when "Age > 65" then
+            do "Elderly Care Plan"
+            do "Fall Risk Assessment"
+        when "Age > 80" then
+            use "Advanced Elderly Care Plan"
+    when "Condition" then
+        any
+        when "Dementia" then
+            do "Cognitive Assessment"
+            do "Memory Care Plan"
+        when "Mobility Issues" then
+            use "Physical Therapy Plan"`;
+
+      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const tokens = getAllTokens(lexer);
+
+      // Verify decision structure
+      expect(tokens[0].type).toBe(TokenTypes.DECISION);
+      expect(tokens[1].type).toBe(TokenTypes.STRING);
+
+      // Verify when clauses
+      const whenIndices = tokens
+        .map((token, index) => token.type === TokenTypes.WHEN ? index : -1)
+        .filter(index => index !== -1);
+      expect(whenIndices.length).toBe(5);
+
+      // Verify action types
+      const actionIndices = tokens
+        .map((token, index) => 
+          (token.type === TokenTypes.DO || token.type === TokenTypes.USE) ? index : -1
+        )
+        .filter(index => index !== -1);
+      expect(actionIndices.length).toBe(6);
+
+      // Verify indentation levels
+      const indentCount = tokens.filter(token => token.type === TokenTypes.INDENT).length;
+      const dedentCount = tokens.filter(token => token.type === TokenTypes.DEDENT).length;
+      expect(indentCount).toBe(dedentCount);
+
+      // Verify nesting structure
+      let currentIndent = 0;
+      let maxIndent = 0;
+      tokens.forEach(token => {
+        if (token.type === TokenTypes.INDENT) {
+          currentIndent++;
+          maxIndent = Math.max(maxIndent, currentIndent);
+        } else if (token.type === TokenTypes.DEDENT) {
+          currentIndent--;
+        }
+      });
+      expect(maxIndent).toBe(4); // Maximum nesting level in the example
+    });
+  });
 });
 
 /**
