@@ -161,7 +161,7 @@ export class CPGLLexer extends Lexer {
       this.indentationStack.pop();
       const dedentToken = this.createToken({
         type: GeneratedLexer.DEDENT,
-        text: '',
+        text: '<DEDENT>',
         startIndex: this._input.index,
         stopIndex: this._input.index,
         line: this._currentLine,
@@ -326,7 +326,7 @@ export class CPGLLexer extends Lexer {
         this.indentationStack.pop();
         const dedentToken = this.createToken({
           type: GeneratedLexer.DEDENT,
-          text: '',
+          text: '<DEDENT>',
           startIndex: this._input.index,
           stopIndex: this._input.index,
           line: this._currentLine,

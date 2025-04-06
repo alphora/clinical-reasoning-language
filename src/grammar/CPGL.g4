@@ -19,7 +19,7 @@ decision
     ;
 
 block
-    : INDENT ((qualifier NEWLINE whenClause)? | statementLine+)
+    : INDENT (qualifier NEWLINE whenClause | statementLine+) DEDENT
     ;
 
 qualifier
