@@ -213,38 +213,106 @@ describe('CPGLLexer', () => {
     });
 
   describe('Whitespace and Indentation', () => {
-    it('should handle newlines', () => {
-      const input = '\n\n\n';
+    it('should handle newlines in decision blocks', () => {
+      const input = `decision "Test Decision"\n    when "Condition" then\n        do "Action"`;
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
       
       verifyTokenSequence(tokens, [
+        TokenTypes.DECISION,
+        TokenTypes.STRING,
         TokenTypes.NEWLINE,
-        TokenTypes.NEWLINE,
-        TokenTypes.NEWLINE,
-        TokenTypes.EOF
-      ]);
-    });
-
-    it('should handle 4-space indentation', () => {
-      const input = '    ';
-      const lexer = new CPGLLexer(CharStreams.fromString(input));
-      const tokens = getAllTokens(lexer);
-      
-      verifyTokenSequence(tokens, [
         TokenTypes.INDENT,
+        TokenTypes.WHEN,
+        TokenTypes.STRING,
+        TokenTypes.THEN,
+        TokenTypes.NEWLINE,
+        TokenTypes.INDENT,
+        TokenTypes.DO,
+        TokenTypes.STRING,
+        TokenTypes.DEDENT,
+        TokenTypes.DEDENT,
         TokenTypes.EOF
       ]);
     });
 
-    it('should handle inconsistent indentation', () => {
-      const input = '  \t';
+    it('should handle 4-space indentation in nested blocks', () => {
+      const input = `decision "Test Decision"
+    when "Condition" then
+        do "Action"`;
+
+      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const tokens = getAllTokens(lexer);
+      
+      verifyTokenSequence(tokens, [
+        TokenTypes.DECISION,
+        TokenTypes.STRING,
+        TokenTypes.NEWLINE,
+        TokenTypes.INDENT,
+        TokenTypes.WHEN,
+        TokenTypes.STRING,
+        TokenTypes.THEN,
+        TokenTypes.NEWLINE,
+        TokenTypes.INDENT,
+        TokenTypes.DO,
+        TokenTypes.STRING,
+        TokenTypes.DEDENT,
+        TokenTypes.DEDENT,
+        TokenTypes.EOF
+      ]);
+    });
+
+    it('should throw error for mixed tabs and spaces in indentation', () => {
+      const input = `decision "Test Decision"
+    when "Condition" then
+\t    do "Action"`;
+
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       
       expect(() => {
         getAllTokens(lexer);
       }).toThrow('Mixed tabs and spaces are not allowed for indentation');
     });
+
+    it('should handle multiple levels of indentation in nested blocks', () => {
+      const input = `decision "Test"
+    when "Level 1" then
+        when "Level 2" then
+            when "Level 3" then
+                do "Action"`;
+
+      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const tokens = getAllTokens(lexer);
+      
+      verifyTokenSequence(tokens, [
+        TokenTypes.DECISION,
+        TokenTypes.STRING,
+        TokenTypes.NEWLINE,
+        TokenTypes.INDENT,
+        TokenTypes.WHEN,
+        TokenTypes.STRING,
+        TokenTypes.THEN,
+        TokenTypes.NEWLINE,
+        TokenTypes.INDENT,
+        TokenTypes.WHEN,
+        TokenTypes.STRING,
+        TokenTypes.THEN,
+        TokenTypes.NEWLINE,
+        TokenTypes.INDENT,
+        TokenTypes.WHEN,
+        TokenTypes.STRING,
+        TokenTypes.THEN,
+        TokenTypes.NEWLINE,
+        TokenTypes.INDENT,
+        TokenTypes.DO,
+        TokenTypes.STRING,
+        TokenTypes.DEDENT,
+        TokenTypes.DEDENT,
+        TokenTypes.DEDENT,
+        TokenTypes.DEDENT,
+        TokenTypes.EOF
+      ]);
+    }); 
 
     it('should handle multiple levels of indentation', () => {
       const input = `decision "Test"
@@ -486,24 +554,76 @@ describe('CPGLLexer', () => {
   });
 
   describe('Comments', () => {
-    it('should skip single-line comments', () => {
-      const input = '// This is a comment\n';
+    it('should skip single-line comments in decision blocks', () => {
+      const input = `decision "Test Decision"
+    // This is a comment about the condition
+    when "Condition" then
+        // This is a comment about the action
+        do "Action"`;
+
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
       
       verifyTokenSequence(tokens, [
+        TokenTypes.DECISION,
+        TokenTypes.STRING,
         TokenTypes.NEWLINE,
+        TokenTypes.INDENT,
+        TokenTypes.WHEN,
+        TokenTypes.STRING,
+        TokenTypes.THEN,
+        TokenTypes.NEWLINE,
+        TokenTypes.INDENT,
+        TokenTypes.DO,
+        TokenTypes.STRING,
+        TokenTypes.DEDENT,
+        TokenTypes.DEDENT,
         TokenTypes.EOF
       ]);
     });
 
-    it('should skip block comments', () => {
-      const input = '/* This is a\nblock comment */\n';
+    it('should skip block comments in casefeature blocks', () => {
+      const input = `casefeature "Test Feature"
+    /* This is a block comment
+       explaining the feature */
+    expression "Condition 1" AND "Condition 2"`;
+
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
       
       verifyTokenSequence(tokens, [
+        TokenTypes.CASEFEATURE,
+        TokenTypes.STRING,
         TokenTypes.NEWLINE,
+        TokenTypes.INDENT,
+        TokenTypes.EXPRESSION,
+        TokenTypes.STRING,
+        TokenTypes.AND,
+        TokenTypes.STRING,
+        TokenTypes.DEDENT,
+        TokenTypes.EOF
+      ]);
+    });
+
+    it('should handle comments between tokens in expressions', () => {
+      const input = `casefeature "Test Feature"
+    expression (/* comment */ "Condition 1" /* another comment */ AND "Condition 2")`;
+
+      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const tokens = getAllTokens(lexer);
+      
+      verifyTokenSequence(tokens, [
+        TokenTypes.CASEFEATURE,
+        TokenTypes.STRING,
+        TokenTypes.NEWLINE,
+        TokenTypes.INDENT,
+        TokenTypes.EXPRESSION,
+        TokenTypes.LPAREN,
+        TokenTypes.STRING,
+        TokenTypes.AND,
+        TokenTypes.STRING,
+        TokenTypes.RPAREN,
+        TokenTypes.DEDENT,
         TokenTypes.EOF
       ]);
     });
@@ -808,7 +928,7 @@ describe('CPGLLexer', () => {
 
     describe('CaseFeature FHIR Types', () => {
       it('should recognize all casefeature FHIR types', () => {
-        const input = 'AllergyIntolerance Condition Procedure Observation Immunization MedicationDispense MedicationAdministration MedicationStatement';
+        const input = 'AllergyIntolerance Condition Procedure Observation Immunization MedicationDispense MedicationAdministration MedicationRequest MedicationStatement';
         const lexer = new CPGLLexer(CharStreams.fromString(input));
         const tokens = getAllTokens(lexer);
         
