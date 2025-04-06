@@ -17,7 +17,7 @@ decision
     ;
 
 block
-    : INDENT statementLine+ DEDENT NEWLINE*
+    : INDENT statementLine+ DEDENT
     ;
 
 qualifier
@@ -51,7 +51,7 @@ action
     ;
 
 actionBlock
-    : INDENT actionFhirTypeClause+ DEDENT NEWLINE*
+    : INDENT actionFhirTypeClause+ DEDENT
     ;
 
 actionFhirTypeClause
