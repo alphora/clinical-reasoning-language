@@ -1148,15 +1148,6 @@ describe('CPGLLexer', () => {
         TokenTypes.STRING,
         TokenTypes.DEDENT,
         TokenTypes.DEDENT,
-        TokenTypes.WHEN,
-        TokenTypes.STRING,
-        TokenTypes.THEN,
-        TokenTypes.NEWLINE,
-        TokenTypes.INDENT,
-        TokenTypes.DO,
-        TokenTypes.STRING,
-        TokenTypes.DEDENT,
-        TokenTypes.DEDENT,
         TokenTypes.DEDENT,
         TokenTypes.DEDENT,
         TokenTypes.EOF
@@ -1234,6 +1225,141 @@ describe('CPGLLexer', () => {
     expression NOT AND "Condition"`,  // Invalid operator sequence
         `casefeature "Test"
     expression "Condition" OR OR "Condition 2"`  // Duplicate operators
+      ];
+
+      inputs.forEach(input => {
+        const lexer = new CPGLLexer(CharStreams.fromString(input));
+        expect(() => {
+          getAllTokens(lexer);
+        }).toThrow();
+      });
+    });
+
+    it('should throw error for invalid composite expressions', () => {
+      const inputs = [
+        `casefeature "Invalid Expression"
+    expression (NOT "Condition 1" AND)`,  // Missing right operand
+        `casefeature "Invalid Expression"
+    expression (AND "Condition 1")`,  // Missing left operand
+        `casefeature "Invalid Expression"
+    expression ("Condition 1" OR OR "Condition 2")`,  // Duplicate operators
+        `casefeature "Invalid Expression"
+    expression (NOT NOT "Condition")`,  // Multiple NOTs without parentheses
+        `casefeature "Invalid Expression"
+    expression ("Condition 1" AND "Condition 2"`,  // Unmatched parentheses
+        `casefeature "Invalid Expression"
+    expression "Condition 1" AND "Condition 2")`  // Unmatched parentheses
+      ];
+
+      inputs.forEach(input => {
+        const lexer = new CPGLLexer(CharStreams.fromString(input));
+        expect(() => {
+          getAllTokens(lexer);
+        }).toThrow();
+      });
+    });
+
+    it('should throw error for invalid FHIR type combinations', () => {
+      const inputs = [
+        `casefeature "Invalid FHIR Type"
+    fhirtype Action`,  // Action type in casefeature
+        `action "Invalid FHIR Type"
+    fhirtype CaseFeature`,  // CaseFeature type in action
+        `casefeature "Invalid FHIR Type"
+    fhirtype Condition
+    valuetype string`,  // Both FHIR type and value type
+        `action "Invalid FHIR Type"
+    valuetype string`,  // Value type in action
+        `casefeature "Invalid FHIR Type"
+    fhirtype NotAType`  // Invalid FHIR type
+      ];
+
+      inputs.forEach(input => {
+        const lexer = new CPGLLexer(CharStreams.fromString(input));
+        expect(() => {
+          getAllTokens(lexer);
+        }).toThrow();
+      });
+    });
+
+    it('should throw error for invalid nesting patterns', () => {
+      const inputs = [
+        `decision "Invalid Nesting"
+    when "Condition" then
+        do "Action"
+    when "Another Condition" then
+            do "Action"`,  // Inconsistent indentation
+        `decision "Invalid Nesting"
+    when "Condition" then
+        all
+        when "Subcondition" then
+            do "Action"
+    when "Another Condition" then
+        do "Action"`,  // Missing DEDENT
+        `decision "Invalid Nesting"
+    when "Condition" then
+        all
+            when "Subcondition" then
+                do "Action"
+        when "Another Condition" then
+            do "Action"`,  // Incorrect nesting level
+        `decision "Invalid Nesting"
+    when "Condition" then
+        all
+        when "Subcondition" then
+            do "Action"
+        when "Another Condition" then
+            do "Action"
+    when "Another Condition" then
+        do "Action"`  // Multiple when clauses at different levels
+      ];
+
+      inputs.forEach(input => {
+        const lexer = new CPGLLexer(CharStreams.fromString(input));
+        expect(() => {
+          getAllTokens(lexer);
+        }).toThrow();
+      });
+    });
+
+    it('should throw error for invalid complex structures from example', () => {
+      const inputs = [
+        `decision "Elderly Based"
+    any
+    when "Client Age Greater Than 60" then
+        do "Indicate"
+    when "Client Age Less Than 60" then
+        do "Vaccinate"
+        do "another thing"
+        do "somthing else"
+    when "Client Age Greater Than 60" then
+        use "Elderly Based"
+        use "IMMZ.D2.D5.Measles"
+    when "Invalid" then`,  // Missing action
+        `decision "Elderly Based"
+    any
+    when "Client Age Greater Than 60" then
+        do "Indicate"
+    when "Client Age Less Than 60" then
+        do "Vaccinate"
+        do "another thing"
+        do "somthing else"
+    when "Client Age Greater Than 60" then
+        use "Elderly Based"
+        use "IMMZ.D2.D5.Measles"
+        when "Invalid" then`,  // Invalid nesting
+        `decision "Elderly Based"
+    any
+    when "Client Age Greater Than 60" then
+        do "Indicate"
+    when "Client Age Less Than 60" then
+        do "Vaccinate"
+        do "another thing"
+        do "somthing else"
+    when "Client Age Greater Than 60" then
+        use "Elderly Based"
+        use "IMMZ.D2.D5.Measles"
+    do "Invalid"`  // Action outside when clause
       ];
 
       inputs.forEach(input => {
