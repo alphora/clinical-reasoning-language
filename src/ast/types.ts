@@ -29,6 +29,7 @@ export interface WhenClause extends ASTNode {
   type: 'WhenClause';
   condition: string;
   actions: DoClause[];
+  nestedWhenClauses: WhenClause[];
 }
 
 // Do clause

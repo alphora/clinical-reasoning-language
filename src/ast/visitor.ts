@@ -58,14 +58,30 @@ export class ASTVisitor implements ParseTreeVisitor<ASTNode> {
     const useClauses: UseClause[] = [];
 
     if (block instanceof ParserRuleContext) {
-      for (let i = 0; i < block.childCount; i++) {
-        const child = block.getChild(i);
-        if (child instanceof ParserRuleContext) {
-          const statement = this.visitStatementLine(child);
-          if (statement.type === 'WhenClause') {
-            whenClauses.push(statement as WhenClause);
-          } else if (statement.type === 'UseClause') {
-            useClauses.push(statement as UseClause);
+      // Check if this is a qualifierBlock
+      const firstChild = block.getChild(1);
+      if (firstChild instanceof ParserRuleContext && firstChild.text === 'any' || firstChild.text === 'all') {
+        // This is a qualifierBlock, process the when clauses
+        for (let i = 3; i < block.childCount - 1; i++) {
+          const child = block.getChild(i);
+          if (child instanceof ParserRuleContext) {
+            const statement = this.visitWhenClause(child);
+            if (statement.type === 'WhenClause') {
+              whenClauses.push(statement as WhenClause);
+            }
+          }
+        }
+      } else {
+        // Process regular statementLines
+        for (let i = 1; i < block.childCount - 1; i++) {
+          const child = block.getChild(i);
+          if (child instanceof ParserRuleContext) {
+            const statement = this.visitStatementLine(child);
+            if (statement.type === 'WhenClause') {
+              whenClauses.push(statement as WhenClause);
+            } else if (statement.type === 'UseClause') {
+              useClauses.push(statement as UseClause);
+            }
           }
         }
       }
@@ -84,14 +100,17 @@ export class ASTVisitor implements ParseTreeVisitor<ASTNode> {
     const condition = this.getStringValue(ctx.getChild(1));
     const block = ctx.getChild(4);
     const actions: DoClause[] = [];
+    const nestedWhenClauses: WhenClause[] = [];
 
     if (block instanceof ParserRuleContext) {
-      for (let i = 0; i < block.childCount; i++) {
+      for (let i = 1; i < block.childCount - 1; i++) {
         const child = block.getChild(i);
         if (child instanceof ParserRuleContext) {
           const statement = this.visitStatementLine(child);
           if (statement.type === 'DoClause') {
             actions.push(statement as DoClause);
+          } else if (statement.type === 'WhenClause') {
+            nestedWhenClauses.push(statement as WhenClause);
           }
         }
       }
@@ -101,6 +120,7 @@ export class ASTVisitor implements ParseTreeVisitor<ASTNode> {
       type: 'WhenClause',
       condition,
       actions,
+      nestedWhenClauses,
       location: this.getLocation(ctx),
     };
   }

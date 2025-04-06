@@ -18,6 +18,7 @@ export class CPGLLexer extends Lexer {
   private _tokenIndex = -1;
   private _currentLine = 1;
   private _currentColumn = 0;
+  private lastTokenWasQualifier = false;
 
   // Required by ANTLR
   public static readonly channelNames: string[] = ['DEFAULT_TOKEN_CHANNEL', 'HIDDEN'];
@@ -275,72 +276,66 @@ export class CPGLLexer extends Lexer {
   }
 
   private handleLineStart(): Token | null {
-    if (!this.atStartOfLine) {
-      return null;
+    // Handle pending tokens
+    const pendingToken = this.handlePendingTokens();
+    if (pendingToken) {
+      return pendingToken;
     }
 
-    this.atStartOfLine = false;
-    this.currentIndent = 0;
-
-    // Count indentation
+    // Skip initial whitespace and track indentation
+    let indent = 0;
     while (this._input.LA(1) === ' '.charCodeAt(0) || this._input.LA(1) === '\t'.charCodeAt(0)) {
+      if (this._input.LA(1) === ' '.charCodeAt(0)) {
+        indent++;
+      } else if (this._input.LA(1) === '\t'.charCodeAt(0)) {
+        indent = (indent + 8) & ~7;  // Round up to next tab stop
+      }
       this._input.consume();
-      this.currentIndent++;
       this._currentColumn++;
     }
 
-    // Check for non-multiple-of-4 indentation
-    if (this.currentIndent % 4 !== 0) {
+    // Validate indentation
+    if (indent % 4 !== 0) {
       throw new Error('Inconsistent indentation');
     }
 
-    // Handle indentation
-    const lastIndent = this.indentationStack[this.indentationStack.length - 1];
-    if (this.currentIndent > lastIndent) {
-      // Check for inconsistent indentation
-      if (this.currentIndent - lastIndent !== 4) {
-        throw new Error('Inconsistent indentation');
-      }
-      this.indentationStack.push(this.currentIndent);
-      return this.createToken({
-        type: GeneratedLexer.INDENT,
-        text: '    ',
-        startIndex: this._input.index - this.currentIndent,
-        stopIndex: this._input.index - 1,
-        line: this._currentLine,
-        charPositionInLine: 0,
-        channel: Token.DEFAULT_CHANNEL,
-        tokenIndex: this._tokenIndex++,
-        source: [this._input, this],
-      });
-    } else if (this.currentIndent < lastIndent) {
-      // Find the matching indentation level
-      const matchingIndex = this.indentationStack.indexOf(this.currentIndent);
-      if (matchingIndex === -1) {
-        throw new Error('Inconsistent indentation');
-      }
+    // If we're at the start of a line
+    if (this.atStartOfLine) {
+      this.atStartOfLine = false;
 
-      // Generate DEDENT tokens for each level of indentation we're dedenting
-      const dedentCount = this.indentationStack.length - matchingIndex - 1;
-      for (let i = 0; i < dedentCount; i++) {
-        this.indentationStack.pop();
-        const dedentToken = this.createToken({
-          type: GeneratedLexer.DEDENT,
-          text: '<DEDENT>',
-          startIndex: this._input.index,
-          stopIndex: this._input.index,
+      // If this is a new indentation level
+      if (indent > this.indentationStack[this.indentationStack.length - 1]) {
+        this.indentationStack.push(indent);
+        return this.createToken({
+          type: GeneratedLexer.INDENT,
+          text: '    ',
+          startIndex: this._input.index - indent,
+          stopIndex: this._input.index - 1,
           line: this._currentLine,
-          charPositionInLine: this._currentColumn,
+          charPositionInLine: this._currentColumn - indent,
           channel: Token.DEFAULT_CHANNEL,
           tokenIndex: this._tokenIndex++,
           source: [this._input, this],
         });
-        this.pendingTokens.push(dedentToken);
       }
-
-      // Return the first DEDENT token if we generated any
-      if (this.pendingTokens.length > 0) {
-        return this.pendingTokens.shift()!;
+      // If this is a dedent
+      else if (indent < this.indentationStack[this.indentationStack.length - 1]) {
+        while (this.indentationStack.length > 1 && indent < this.indentationStack[this.indentationStack.length - 1]) {
+          this.indentationStack.pop();
+          const dedentToken = this.createToken({
+            type: GeneratedLexer.DEDENT,
+            text: '<DEDENT>',
+            startIndex: this._input.index,
+            stopIndex: this._input.index,
+            line: this._currentLine,
+            charPositionInLine: this._currentColumn,
+            channel: Token.DEFAULT_CHANNEL,
+            tokenIndex: this._tokenIndex++,
+            source: [this._input, this],
+          });
+          this.pendingTokens.push(dedentToken);
+        }
+        return this.handlePendingTokens();
       }
     }
 

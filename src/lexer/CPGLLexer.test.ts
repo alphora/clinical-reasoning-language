@@ -480,10 +480,10 @@ ${NEWLINE}${INDENT}   use "cycle3"`; // 3 spaces
 function getAllTokens(lexer: CPGLLexer): Array<{ type: number; text: string }> {
   const tokens: Array<{ type: number; text: string }> = [];
   let token = lexer.nextToken();
-  while (token.type !== -1) {
-    tokens.push({ type: token.type, text: token.text ?? '' });
+  while (token.type !== GeneratedLexer.EOF) {
+    tokens.push({ type: token.type, text: token.text || '' });
     token = lexer.nextToken();
   }
-  tokens.push({ type: -1, text: '<EOF>' });
+  tokens.push({ type: token.type, text: token.text || '' }); // Add EOF token
   return tokens;
 }
