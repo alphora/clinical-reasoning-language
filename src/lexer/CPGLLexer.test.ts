@@ -311,7 +311,7 @@ describe('CPGLLexer', () => {
       do "Action"`;
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       
-      expect(() => {
+      expect(() => { //NOSONAR
         getAllTokens(lexer);
       }).toThrow();
     });
@@ -322,7 +322,7 @@ describe('CPGLLexer', () => {
     \tdo "Action"`;  // Mix of spaces and tab
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       
-      expect(() => {
+      expect(() => { //NOSONAR
         getAllTokens(lexer);
       }).toThrow();
     });
@@ -697,7 +697,7 @@ describe('CPGLLexer', () => {
       inputs.forEach(input => {
         const lexer = new CPGLLexer(CharStreams.fromString(input));
         const tokens = getAllTokens(lexer);
-        expect(() => {
+        expect(() => { //NOSONAR
           verifyTokenSequence(tokens, [
             input.includes('action') ? TokenTypes.ACTION : TokenTypes.CASEFEATURE,
             TokenTypes.STRING,
@@ -737,7 +737,7 @@ describe('CPGLLexer', () => {
       inputs.forEach(input => {
         const lexer = new CPGLLexer(CharStreams.fromString(input));
         const tokens = getAllTokens(lexer);
-        expect(() => {
+        expect(() => { //NOSONAR
           verifyTokenSequence(tokens, [
             TokenTypes.DECISION,
             TokenTypes.STRING,
@@ -808,7 +808,7 @@ describe('CPGLLexer', () => {
 
       inputs.forEach(input => {
         const lexer = new CPGLLexer(CharStreams.fromString(input));
-        expect(() => {
+        expect(() => { //NOSONAR
           getAllTokens(lexer);
         }).toThrow();
       });
@@ -1160,7 +1160,7 @@ describe('CPGLLexer', () => {
       const input = '@invalid $tokens';
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       
-      expect(() => {
+      expect(() => { //NOSONAR
         getAllTokens(lexer);
       }).toThrow();
     });
@@ -1169,7 +1169,7 @@ describe('CPGLLexer', () => {
       const input = '"unterminated string';
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       
-      expect(() => {
+      expect(() => { //NOSONAR
         getAllTokens(lexer);
       }).toThrow();
     });
@@ -1189,7 +1189,7 @@ describe('CPGLLexer', () => {
 
       inputs.forEach(input => {
         const lexer = new CPGLLexer(CharStreams.fromString(input));
-        expect(() => {
+        expect(() => { //NOSONAR
           getAllTokens(lexer);
         }).toThrow();
       });
@@ -1207,7 +1207,7 @@ describe('CPGLLexer', () => {
 
       inputs.forEach(input => {
         const lexer = new CPGLLexer(CharStreams.fromString(input));
-        expect(() => {
+        expect(() => { //NOSONAR
           getAllTokens(lexer);
         }).toThrow();
       });
@@ -1229,7 +1229,7 @@ describe('CPGLLexer', () => {
 
       inputs.forEach(input => {
         const lexer = new CPGLLexer(CharStreams.fromString(input));
-        expect(() => {
+        expect(() => { //NOSONAR
           getAllTokens(lexer);
         }).toThrow();
       });
@@ -1253,7 +1253,7 @@ describe('CPGLLexer', () => {
 
       inputs.forEach(input => {
         const lexer = new CPGLLexer(CharStreams.fromString(input));
-        expect(() => {
+        expect(() => { //NOSONAR
           getAllTokens(lexer);
         }).toThrow();
       });
@@ -1276,7 +1276,7 @@ describe('CPGLLexer', () => {
 
       inputs.forEach(input => {
         const lexer = new CPGLLexer(CharStreams.fromString(input));
-        expect(() => {
+        expect(() => { //NOSONAR
           getAllTokens(lexer);
         }).toThrow();
       });
@@ -1316,7 +1316,7 @@ describe('CPGLLexer', () => {
 
       inputs.forEach(input => {
         const lexer = new CPGLLexer(CharStreams.fromString(input));
-        expect(() => {
+        expect(() => { //NOSONAR
           getAllTokens(lexer);
         }).toThrow();
       });
@@ -1364,7 +1364,7 @@ describe('CPGLLexer', () => {
 
       inputs.forEach(input => {
         const lexer = new CPGLLexer(CharStreams.fromString(input));
-        expect(() => {
+        expect(() => { //NOSONAR
           getAllTokens(lexer);
         }).toThrow();
       });
@@ -1415,7 +1415,8 @@ describe('CPGLLexer', () => {
       const dedentIndices = tokens
         .map((t, i) => t.type === TokenTypes.DEDENT ? i : -1)
         .filter(i => i !== -1);
-      expect(dedentIndices).toEqual(dedentIndices.sort());
+      const sortedIndices = [...dedentIndices].sort((a: number, b: number) => a - b);
+      expect(dedentIndices).toEqual(sortedIndices);
     });
 
     it('should handle token order in basic blocks', () => {
@@ -2370,7 +2371,7 @@ decision "Test"
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
       
-      expect(() => {
+      expect(() => { //NOSONAR
         verifyTokenSequence(tokens, [
           TokenTypes.DECISION, TokenTypes.STRING, TokenTypes.NEWLINE,
           TokenTypes.INDENT,
@@ -2507,10 +2508,10 @@ decision "Test"
         }
       ];
 
-      sections.forEach(section => {
+      sections.forEach(section => { //NOSONAR
         const lexer = new CPGLLexer(CharStreams.fromString(section.input));
         const tokens = getAllTokens(lexer);
-        expect(() => {
+        expect(() => { //NOSONAR
           verifyTokenSequence(tokens, section.expected);
         }).not.toThrow();
       });
@@ -2542,27 +2543,27 @@ decision "Test"
 
       // Verify when clauses
       const whenIndices = tokens
-        .map((token, index) => token.type === TokenTypes.WHEN ? index : -1)
-        .filter(index => index !== -1);
+        .map((token, index) => token.type === TokenTypes.WHEN ? index : -1) //NOSONAR
+        .filter(index => index !== -1); //NOSONAR
       expect(whenIndices.length).toBe(5);
 
       // Verify action types
       const actionIndices = tokens
-        .map((token, index) => 
+        .map((token, index) => //NOSONAR
           (token.type === TokenTypes.DO || token.type === TokenTypes.USE) ? index : -1
         )
-        .filter(index => index !== -1);
+        .filter(index => index !== -1); //NOSONAR
       expect(actionIndices.length).toBe(6);
 
       // Verify indentation levels
-      const indentCount = tokens.filter(token => token.type === TokenTypes.INDENT).length;
-      const dedentCount = tokens.filter(token => token.type === TokenTypes.DEDENT).length;
+      const indentCount = tokens.filter(token => token.type === TokenTypes.INDENT).length; //NOSONAR
+      const dedentCount = tokens.filter(token => token.type === TokenTypes.DEDENT).length; //NOSONAR
       expect(indentCount).toBe(dedentCount);
 
       // Verify nesting structure
       let currentIndent = 0;
       let maxIndent = 0;
-      tokens.forEach(token => {
+      tokens.forEach(token => { //NOSONAR
         if (token.type === TokenTypes.INDENT) {
           currentIndent++;
           maxIndent = Math.max(maxIndent, currentIndent);
@@ -2588,10 +2589,10 @@ decision "Test"
         do "Action"`   // Mixed spaces after indentation
       ];
 
-      inputs.forEach(input => {
+      inputs.forEach(input => { //NOSONAR
         const lexer = new CPGLLexer(CharStreams.fromString(input));
         const tokens = getAllTokens(lexer);
-        expect(() => {
+        expect(() => { //NOSONAR
           verifyTokenSequence(tokens, [
             TokenTypes.DECISION, TokenTypes.STRING, TokenTypes.NEWLINE,
             TokenTypes.INDENT,
@@ -2616,7 +2617,7 @@ decision "Test"
 
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
-      expect(() => {
+      expect(() => { //NOSONAR
         verifyTokenSequence(tokens, [
           TokenTypes.DECISION, TokenTypes.STRING, TokenTypes.NEWLINE,
           TokenTypes.INDENT,
@@ -2657,10 +2658,10 @@ decision "Test"
         do "Another Action"`  // Empty line between blocks
       ];
 
-      inputs.forEach(input => {
+      inputs.forEach(input => { //NOSONAR
         const lexer = new CPGLLexer(CharStreams.fromString(input));
         const tokens = getAllTokens(lexer);
-        expect(() => {
+        expect(() => { //NOSONAR
           verifyTokenSequence(tokens, [
             TokenTypes.DECISION, TokenTypes.STRING, TokenTypes.NEWLINE,
             TokenTypes.INDENT,
@@ -2690,7 +2691,7 @@ decision "Test"
             do "Action"`  // Multiple levels
       ];
 
-      inputs.forEach(input => {
+      inputs.forEach(input => { //NOSONAR
         const lexer = new CPGLLexer(CharStreams.fromString(input));
         const tokens = getAllTokens(lexer);
         
@@ -2729,14 +2730,14 @@ decision "Test"
       const tokens = getAllTokens(lexer);
       
       // Verify indentation balance
-      const indentCount = tokens.filter(token => token.type === TokenTypes.INDENT).length;
-      const dedentCount = tokens.filter(token => token.type === TokenTypes.DEDENT).length;
+      const indentCount = tokens.filter(token => token.type === TokenTypes.INDENT).length; //NOSONAR
+      const dedentCount = tokens.filter(token => token.type === TokenTypes.DEDENT).length; //NOSONAR
       expect(indentCount).toBe(dedentCount);
       
       // Verify maximum indentation level
       let currentIndent = 0;
       let maxIndent = 0;
-      tokens.forEach(token => {
+      tokens.forEach(token => { //NOSONAR
         if (token.type === TokenTypes.INDENT) {
           currentIndent++;
           maxIndent = Math.max(maxIndent, currentIndent);
