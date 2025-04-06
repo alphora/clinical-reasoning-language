@@ -12,8 +12,6 @@
  * error tokens. The lexer will throw an exception when it encounters invalid
  * input that cannot be tokenized.
  */
-import { CPGLLexer as GeneratedLexer } from '../grammar/generated/CPGLLexer';
-
 /**
  * Custom Token Types for CPGL Lexer
  * 
