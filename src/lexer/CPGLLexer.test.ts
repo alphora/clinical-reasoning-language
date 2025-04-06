@@ -1155,4 +1155,27 @@ describe('CPGLLexer', () => {
       verifyTokenSequence(tokens, expectedSequence);
     });
   });
-}); 
+});
+
+/**
+ * Future Work: Parser Integration Tests
+ * 
+ * Once the lexer implementation is complete and stable, the following parser integration tests
+ * should be added:
+ * 
+ * 1. Token Type Verification
+ *    - Verify that all token types emitted by the lexer match the parser's expectations
+ *    - Test token type compatibility with parser grammar rules
+ * 
+ * 2. Token Stream Structure
+ *    - Verify that the token stream structure aligns with grammar rules
+ *    - Test proper token ordering for different CPGL constructs
+ * 
+ * 3. End-to-End Parsing
+ *    - Test parsing of complete example files
+ *    - Verify successful parsing of complex CPGL structures
+ * 
+ * Note: These tests should be added after the parser has been updated to work with
+ * the new lexer implementation. Testing parser integration now would be premature
+ * as the parser will need significant updates to work with the new lexer.
+ */ 
