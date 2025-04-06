@@ -254,32 +254,31 @@ decision "test"`;
 
   it('should handle indentation with newline resets', () => {
     const input = `decision "cycle1"
-${NEWLINE}
-${INDENT}when "condition" then
-${NEWLINE}${INDENT}${INDENT}use "cycle2"${DEDENT}
-${NEWLINE}${NEWLINE}decision "cycle2"
-${NEWLINE}${INDENT}when "condition" then
-${NEWLINE}${INDENT}${INDENT}use "cycle1"${DEDENT}${NEWLINE}`;
+    when "condition" then
+        use "cycle2"
+
+decision "cycle2"
+    when "condition" then
+        use "cycle1"
+`;
+
     const lexer = new CPGLLexer(CharStreams.fromString(input));
     const tokens = getAllTokens(lexer);
-    
-    // Verify token sequence
     expect(tokens.map(t => t.type)).toEqual([
       GeneratedLexer.DECISION,
       GeneratedLexer.STRING,
       GeneratedLexer.NEWLINE,
-      GeneratedLexer.NEWLINE,
       GeneratedLexer.INDENT,
       GeneratedLexer.WHEN,
       GeneratedLexer.STRING,
       GeneratedLexer.THEN,
       GeneratedLexer.NEWLINE,
       GeneratedLexer.INDENT,
-      GeneratedLexer.INDENT,
       GeneratedLexer.USE,
       GeneratedLexer.STRING,
-      GeneratedLexer.DEDENT,
       GeneratedLexer.NEWLINE,
+      GeneratedLexer.DEDENT,
+      GeneratedLexer.DEDENT,
       GeneratedLexer.NEWLINE,
       GeneratedLexer.DECISION,
       GeneratedLexer.STRING,
@@ -290,70 +289,32 @@ ${NEWLINE}${INDENT}${INDENT}use "cycle1"${DEDENT}${NEWLINE}`;
       GeneratedLexer.THEN,
       GeneratedLexer.NEWLINE,
       GeneratedLexer.INDENT,
-      GeneratedLexer.INDENT,
       GeneratedLexer.USE,
       GeneratedLexer.STRING,
-      GeneratedLexer.DEDENT,
       GeneratedLexer.NEWLINE,
-      GeneratedLexer.EOF
+      GeneratedLexer.DEDENT,
+      GeneratedLexer.DEDENT,
+      GeneratedLexer.EOF,
     ]);
   });
 
   it('should handle indentation with newline resets and top-level keywords', () => {
     const input = `decision "cycle1"
-${INDENT}when "condition" then
-${NEWLINE}${INDENT}${INDENT}use "cycle2"${DEDENT}
-${NEWLINE}${NEWLINE}decision "cycle2"
-${INDENT}when "condition" then
-${NEWLINE}${INDENT}${INDENT}use "cycle1"${DEDENT}${NEWLINE}`;
-    const lexer = new CPGLLexer(CharStreams.fromString(input));
-    const tokens = getAllTokens(lexer);
-    
-    // Verify token sequence
-    expect(tokens.map(t => t.type)).toEqual([
-      GeneratedLexer.DECISION,
-      GeneratedLexer.STRING,
-      GeneratedLexer.NEWLINE,
-      GeneratedLexer.INDENT,
-      GeneratedLexer.WHEN,
-      GeneratedLexer.STRING,
-      GeneratedLexer.THEN,
-      GeneratedLexer.NEWLINE,
-      GeneratedLexer.INDENT,
-      GeneratedLexer.INDENT,
-      GeneratedLexer.USE,
-      GeneratedLexer.STRING,
-      GeneratedLexer.DEDENT,
-      GeneratedLexer.NEWLINE,
-      GeneratedLexer.NEWLINE,
-      GeneratedLexer.DECISION,
-      GeneratedLexer.STRING,
-      GeneratedLexer.NEWLINE,
-      GeneratedLexer.INDENT,
-      GeneratedLexer.WHEN,
-      GeneratedLexer.STRING,
-      GeneratedLexer.THEN,
-      GeneratedLexer.NEWLINE,
-      GeneratedLexer.INDENT,
-      GeneratedLexer.INDENT,
-      GeneratedLexer.USE,
-      GeneratedLexer.STRING,
-      GeneratedLexer.DEDENT,
-      GeneratedLexer.NEWLINE,
-      GeneratedLexer.EOF
-    ]);
-  });
+    when "condition" then
+        use "cycle2"
 
-  it('should handle indentation reset with action keyword', () => {
-    const input = `decision "cycle1"
-${INDENT}when "condition" then
-${NEWLINE}${INDENT}${INDENT}use "cycle2"${DEDENT}
-${NEWLINE}action "test"
-${INDENT}fhirtype ServiceRequest`;
+action "action1"
+    fhirtype Appointment
+
+casefeature "feature1"
+    casefeaturecode "code1"
+    fhirtype Condition
+    valuetype string
+    profileurl "http://example.com"
+`;
+
     const lexer = new CPGLLexer(CharStreams.fromString(input));
     const tokens = getAllTokens(lexer);
-    
-    // Verify token sequence
     expect(tokens.map(t => t.type)).toEqual([
       GeneratedLexer.DECISION,
       GeneratedLexer.STRING,
@@ -364,9 +325,10 @@ ${INDENT}fhirtype ServiceRequest`;
       GeneratedLexer.THEN,
       GeneratedLexer.NEWLINE,
       GeneratedLexer.INDENT,
-      GeneratedLexer.INDENT,
       GeneratedLexer.USE,
       GeneratedLexer.STRING,
+      GeneratedLexer.NEWLINE,
+      GeneratedLexer.DEDENT,
       GeneratedLexer.DEDENT,
       GeneratedLexer.NEWLINE,
       GeneratedLexer.ACTION,
@@ -375,20 +337,41 @@ ${INDENT}fhirtype ServiceRequest`;
       GeneratedLexer.INDENT,
       GeneratedLexer.FHIRTYPE,
       GeneratedLexer.ACTION_FHIR_TYPE,
-      GeneratedLexer.EOF
+      GeneratedLexer.NEWLINE,
+      GeneratedLexer.DEDENT,
+      GeneratedLexer.NEWLINE,
+      GeneratedLexer.CASEFEATURE,
+      GeneratedLexer.STRING,
+      GeneratedLexer.NEWLINE,
+      GeneratedLexer.INDENT,
+      GeneratedLexer.CASEFEATURECODE,
+      GeneratedLexer.STRING,
+      GeneratedLexer.NEWLINE,
+      GeneratedLexer.FHIRTYPE,
+      GeneratedLexer.CASEFEATURE_FHIR_TYPE,
+      GeneratedLexer.NEWLINE,
+      GeneratedLexer.VALUETYPE,
+      GeneratedLexer.FHIR_VALUE_TYPE,
+      GeneratedLexer.NEWLINE,
+      GeneratedLexer.PROFILEURL,
+      GeneratedLexer.STRING,
+      GeneratedLexer.NEWLINE,
+      GeneratedLexer.DEDENT,
+      GeneratedLexer.EOF,
     ]);
   });
 
-  it('should handle indentation reset with casefeature keyword', () => {
+  it('should handle indentation reset with action keyword', () => {
     const input = `decision "cycle1"
-${INDENT}when "condition" then
-${NEWLINE}${INDENT}${INDENT}use "cycle2"${DEDENT}
-${NEWLINE}casefeature "test"
-${INDENT}valuetype string`;
+    when "condition" then
+        use "cycle2"
+
+action "action1"
+    fhirtype Appointment
+`;
+
     const lexer = new CPGLLexer(CharStreams.fromString(input));
     const tokens = getAllTokens(lexer);
-    
-    // Verify token sequence
     expect(tokens.map(t => t.type)).toEqual([
       GeneratedLexer.DECISION,
       GeneratedLexer.STRING,
@@ -399,18 +382,72 @@ ${INDENT}valuetype string`;
       GeneratedLexer.THEN,
       GeneratedLexer.NEWLINE,
       GeneratedLexer.INDENT,
+      GeneratedLexer.USE,
+      GeneratedLexer.STRING,
+      GeneratedLexer.NEWLINE,
+      GeneratedLexer.DEDENT,
+      GeneratedLexer.DEDENT,
+      GeneratedLexer.NEWLINE,
+      GeneratedLexer.ACTION,
+      GeneratedLexer.STRING,
+      GeneratedLexer.NEWLINE,
+      GeneratedLexer.INDENT,
+      GeneratedLexer.FHIRTYPE,
+      GeneratedLexer.ACTION_FHIR_TYPE,
+      GeneratedLexer.NEWLINE,
+      GeneratedLexer.DEDENT,
+      GeneratedLexer.EOF,
+    ]);
+  });
+
+  it('should handle indentation reset with casefeature keyword', () => {
+    const input = `decision "cycle1"
+    when "condition" then
+        use "cycle2"
+
+casefeature "feature1"
+    casefeaturecode "code1"
+    fhirtype Condition
+    valuetype string
+    profileurl "http://example.com"
+`;
+
+    const lexer = new CPGLLexer(CharStreams.fromString(input));
+    const tokens = getAllTokens(lexer);
+    expect(tokens.map(t => t.type)).toEqual([
+      GeneratedLexer.DECISION,
+      GeneratedLexer.STRING,
+      GeneratedLexer.NEWLINE,
+      GeneratedLexer.INDENT,
+      GeneratedLexer.WHEN,
+      GeneratedLexer.STRING,
+      GeneratedLexer.THEN,
+      GeneratedLexer.NEWLINE,
       GeneratedLexer.INDENT,
       GeneratedLexer.USE,
       GeneratedLexer.STRING,
+      GeneratedLexer.NEWLINE,
+      GeneratedLexer.DEDENT,
       GeneratedLexer.DEDENT,
       GeneratedLexer.NEWLINE,
       GeneratedLexer.CASEFEATURE,
       GeneratedLexer.STRING,
       GeneratedLexer.NEWLINE,
       GeneratedLexer.INDENT,
+      GeneratedLexer.CASEFEATURECODE,
+      GeneratedLexer.STRING,
+      GeneratedLexer.NEWLINE,
+      GeneratedLexer.FHIRTYPE,
+      GeneratedLexer.CASEFEATURE_FHIR_TYPE,
+      GeneratedLexer.NEWLINE,
       GeneratedLexer.VALUETYPE,
       GeneratedLexer.FHIR_VALUE_TYPE,
-      GeneratedLexer.EOF
+      GeneratedLexer.NEWLINE,
+      GeneratedLexer.PROFILEURL,
+      GeneratedLexer.STRING,
+      GeneratedLexer.NEWLINE,
+      GeneratedLexer.DEDENT,
+      GeneratedLexer.EOF,
     ]);
   });
 

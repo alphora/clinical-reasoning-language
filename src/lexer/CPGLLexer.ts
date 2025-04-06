@@ -279,6 +279,10 @@ export class CPGLLexer extends Lexer {
     // Handle indentation
     const lastIndent = this.indentationStack[this.indentationStack.length - 1];
     if (this.currentIndent > lastIndent) {
+      // Check for inconsistent indentation
+      if (this.currentIndent - lastIndent !== 4) {
+        throw new Error('Inconsistent indentation');
+      }
       this.indentationStack.push(this.currentIndent);
       return this.createToken({
         type: GeneratedLexer.INDENT,
@@ -292,8 +296,15 @@ export class CPGLLexer extends Lexer {
         source: [this._input, this],
       });
     } else if (this.currentIndent < lastIndent) {
+      // Find the matching indentation level
+      const matchingIndex = this.indentationStack.indexOf(this.currentIndent);
+      if (matchingIndex === -1) {
+        throw new Error('Inconsistent indentation');
+      }
+
       // Generate DEDENT tokens for each level of indentation we're dedenting
-      while (this.currentIndent < this.indentationStack[this.indentationStack.length - 1]) {
+      const dedentCount = this.indentationStack.length - matchingIndex - 1;
+      for (let i = 0; i < dedentCount; i++) {
         this.indentationStack.pop();
         const dedentToken = this.createToken({
           type: GeneratedLexer.DEDENT,
@@ -309,11 +320,6 @@ export class CPGLLexer extends Lexer {
         this.pendingTokens.push(dedentToken);
       }
 
-      // If we dedented to a level that doesn't exist, that's an error
-      if (this.currentIndent !== this.indentationStack[this.indentationStack.length - 1]) {
-        throw new Error('Inconsistent indentation');
-      }
-
       // Return the first DEDENT token if we generated any
       if (this.pendingTokens.length > 0) {
         return this.pendingTokens.shift()!;
@@ -324,22 +330,10 @@ export class CPGLLexer extends Lexer {
   }
 
   private handleNewline(): Token {
-    // Reset indentation stack for certain keywords
-    const lastToken = this.pendingTokens[this.pendingTokens.length - 1] || null;
-    if (lastToken && (
-      lastToken.type === GeneratedLexer.ACTION ||
-      lastToken.type === GeneratedLexer.CASEFEATURE ||
-      lastToken.type === GeneratedLexer.DECISION
-    )) {
-      // Clear the stack except for the base indentation level
-      while (this.indentationStack.length > 1) {
-        this.indentationStack.pop();
-      }
-    }
-
-    // Consume the newline
+    // Consume the newline character(s)
     if (this._input.LA(1) === '\r'.charCodeAt(0)) {
       this._input.consume();
+      this._currentColumn = 0;
     }
     this._input.consume();
     this._currentLine++;
