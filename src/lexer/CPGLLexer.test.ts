@@ -2527,6 +2527,180 @@ describe('CPGLLexer', () => {
       expect(maxIndent).toBe(4); // Maximum nesting level in the example
     });
   });
+
+  describe('Indentation Handling', () => {
+    it('should handle basic 4-space indentation', () => {
+      const inputs = [
+        `decision "Test"
+    when "Condition" then
+        do "Action"`,  // Standard 4-space indentation
+        `decision "Test"
+    when "Condition" then
+        do "Action"`,  // Extra spaces after indentation
+        `decision "Test"
+    when "Condition" then
+        do "Action"`   // Mixed spaces after indentation
+      ];
+
+      inputs.forEach(input => {
+        const lexer = new CPGLLexer(CharStreams.fromString(input));
+        const tokens = getAllTokens(lexer);
+        expect(() => {
+          verifyTokenSequence(tokens, [
+            TokenTypes.DECISION, TokenTypes.STRING, TokenTypes.NEWLINE,
+            TokenTypes.INDENT,
+            TokenTypes.WHEN, TokenTypes.STRING, TokenTypes.THEN, TokenTypes.NEWLINE,
+            TokenTypes.INDENT,
+            TokenTypes.DO, TokenTypes.STRING, TokenTypes.NEWLINE,
+            TokenTypes.DEDENT,
+            TokenTypes.DEDENT
+          ]);
+        }).not.toThrow();
+      });
+    });
+
+    it('should handle multiple levels of indentation', () => {
+      const input = `decision "Test"
+    when "Condition" then
+        all
+        when "Subcondition" then
+            do "Action"
+        when "Another Subcondition" then
+            do "Another Action"`;
+
+      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const tokens = getAllTokens(lexer);
+      expect(() => {
+        verifyTokenSequence(tokens, [
+          TokenTypes.DECISION, TokenTypes.STRING, TokenTypes.NEWLINE,
+          TokenTypes.INDENT,
+          TokenTypes.WHEN, TokenTypes.STRING, TokenTypes.THEN, TokenTypes.NEWLINE,
+          TokenTypes.INDENT,
+          TokenTypes.ALL, TokenTypes.NEWLINE,
+          TokenTypes.INDENT,
+          TokenTypes.WHEN, TokenTypes.STRING, TokenTypes.THEN, TokenTypes.NEWLINE,
+          TokenTypes.INDENT,
+          TokenTypes.DO, TokenTypes.STRING, TokenTypes.NEWLINE,
+          TokenTypes.DEDENT,
+          TokenTypes.WHEN, TokenTypes.STRING, TokenTypes.THEN, TokenTypes.NEWLINE,
+          TokenTypes.INDENT,
+          TokenTypes.DO, TokenTypes.STRING, TokenTypes.NEWLINE,
+          TokenTypes.DEDENT,
+          TokenTypes.DEDENT,
+          TokenTypes.DEDENT,
+          TokenTypes.DEDENT
+        ]);
+      }).not.toThrow();
+    });
+
+    it('should handle empty lines with indentation', () => {
+      const inputs = [
+        `decision "Test"
+    
+    when "Condition" then
+        do "Action"`,  // Empty line at same indentation
+        `decision "Test"
+    when "Condition" then
+        
+        do "Action"`,  // Empty line at deeper indentation
+        `decision "Test"
+    when "Condition" then
+        do "Action"
+        
+    when "Another Condition" then
+        do "Another Action"`  // Empty line between blocks
+      ];
+
+      inputs.forEach(input => {
+        const lexer = new CPGLLexer(CharStreams.fromString(input));
+        const tokens = getAllTokens(lexer);
+        expect(() => {
+          verifyTokenSequence(tokens, [
+            TokenTypes.DECISION, TokenTypes.STRING, TokenTypes.NEWLINE,
+            TokenTypes.INDENT,
+            TokenTypes.WHEN, TokenTypes.STRING, TokenTypes.THEN, TokenTypes.NEWLINE,
+            TokenTypes.INDENT,
+            TokenTypes.DO, TokenTypes.STRING, TokenTypes.NEWLINE,
+            TokenTypes.DEDENT,
+            TokenTypes.DEDENT
+          ]);
+        }).not.toThrow();
+      });
+    });
+
+    it('should handle end-of-file DEDENT tokens', () => {
+      const inputs = [
+        `decision "Test"
+    when "Condition" then
+        do "Action"`,  // No trailing newline
+        `decision "Test"
+    when "Condition" then
+        do "Action"
+    `,  // With trailing newline
+        `decision "Test"
+    when "Condition" then
+        all
+        when "Subcondition" then
+            do "Action"`  // Multiple levels
+      ];
+
+      inputs.forEach(input => {
+        const lexer = new CPGLLexer(CharStreams.fromString(input));
+        const tokens = getAllTokens(lexer);
+        
+        // Verify all INDENTs are matched with DEDENTs
+        const indentCount = tokens.filter(token => token.type === TokenTypes.INDENT).length;
+        const dedentCount = tokens.filter(token => token.type === TokenTypes.DEDENT).length;
+        expect(indentCount).toBe(dedentCount);
+        
+        // Verify last token is DEDENT (except for EOF)
+        const lastNonEofToken = tokens[tokens.length - 2];
+        expect(lastNonEofToken.type).toBe(TokenTypes.DEDENT);
+      });
+    });
+
+    it('should handle complex indentation patterns from example', () => {
+      const input = `decision "IMMZ.D2.D5.Measles"
+    when "Measles Routine Immunization Schedule Incomplete" then
+        when "No Primary Series Doses Administered" then
+            any
+            when "Client Age Less Than 12 Months" then 
+                do "Indicate"
+            when "Last Live Vaccine Administered Within 4 Weeks" then 
+                use "Elderly Based"
+            when "Client Is Due For MCV12" then 
+                do "Vaccinate"
+    when "One Primary Series Dose Administered" then
+        all
+        when "Client Age Less Than 15 Months" then 
+            do "Indicate"
+        when "Last Live Vaccine Administered Within 4 Weeks" then 
+            use "Elderly Based"
+        when "Client Is Due For MCV12" then 
+            do "Vaccinate"`;
+
+      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const tokens = getAllTokens(lexer);
+      
+      // Verify indentation balance
+      const indentCount = tokens.filter(token => token.type === TokenTypes.INDENT).length;
+      const dedentCount = tokens.filter(token => token.type === TokenTypes.DEDENT).length;
+      expect(indentCount).toBe(dedentCount);
+      
+      // Verify maximum indentation level
+      let currentIndent = 0;
+      let maxIndent = 0;
+      tokens.forEach(token => {
+        if (token.type === TokenTypes.INDENT) {
+          currentIndent++;
+          maxIndent = Math.max(maxIndent, currentIndent);
+        } else if (token.type === TokenTypes.DEDENT) {
+          currentIndent--;
+        }
+      });
+      expect(maxIndent).toBe(4); // Maximum nesting level in example
+    });
+  });
 });
 
 /**
