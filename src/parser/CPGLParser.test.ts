@@ -3,6 +3,7 @@ import { CommonTokenStream } from 'antlr4ts/CommonTokenStream';
 
 import { CPGLLexer } from '../lexer/CPGLLexer';
 import { CPGLParser } from '../grammar/generated/CPGLParser';
+import { ProxyErrorListener } from '../ProxyErrorListener';
 
 describe('CPGLParser', () => {
   const INDENT = '    ';
@@ -22,45 +23,47 @@ describe('CPGLParser', () => {
       column: t.charPositionInLine
     })));
     
-    return new CPGLParser(tokenStream);
+    const parser = new CPGLParser(tokenStream);
+    const errorListener = new ProxyErrorListener();
+    parser.removeErrorListeners();
+    parser.addErrorListener(errorListener);
+    return { parser, errorListener };
   };
 
   test('should parse a simple decision', () => {
     const input = `decision "Test"${NEWLINE}${INDENT}when "condition" then${NEWLINE}${INDENT}${INDENT}do "action"${NEWLINE}${NEWLINE}`;
     console.log('Input:', input);
-    const parser = createParser(input);
+    const { parser, errorListener } = createParser(input);
 
-    expect(() => {
-      const tree = parser.file();
-      expect(tree).toBeTruthy();
-    }).not.toThrow();
+    const tree = parser.file();
+    expect(errorListener.hasErrors()).toBe(false);
+    expect(tree).toBeTruthy();
   });
 
   test('should parse a decision with multiple actions', () => {
     const input = `decision "Complex Test"${NEWLINE}${INDENT}when "first condition" then${NEWLINE}${INDENT}${INDENT}do "action1"${NEWLINE}${INDENT}${INDENT}do "action2"${NEWLINE}${INDENT}when "second condition" then${NEWLINE}${INDENT}${INDENT}do "action3"${NEWLINE}${NEWLINE}`;
-    const parser = createParser(input);
+    const { parser, errorListener } = createParser(input);
 
-    expect(() => {
-      const tree = parser.file();
-      expect(tree).toBeTruthy();
-    }).not.toThrow();
+    const tree = parser.file();
+    expect(errorListener.hasErrors()).toBe(false);
+    expect(tree).toBeTruthy();
   });
 
   test('should parse a decision with use statements', () => {
     const input = `decision "Test with Use"${NEWLINE}${INDENT}when "condition" then${NEWLINE}${INDENT}${INDENT}use "other_decision"${NEWLINE}${INDENT}when "another_condition" then${NEWLINE}${INDENT}${INDENT}do "another_action"${NEWLINE}${NEWLINE}`;
-    const parser = createParser(input);
+    const { parser, errorListener } = createParser(input);
 
-    expect(() => {
-      const tree = parser.file();
-      expect(tree).toBeTruthy();
-    }).not.toThrow();
+    const tree = parser.file();
+    expect(errorListener.hasErrors()).toBe(false);
+    expect(tree).toBeTruthy();
   });
 
   describe('parse', () => {
     it('should parse a complete decision with any qualifier', () => {
       const input = `decision "test"${NEWLINE}${INDENT}any${NEWLINE}${INDENT}when "condition" then${NEWLINE}${INDENT}${INDENT}do "action"${NEWLINE}${NEWLINE}`;
-      const parser = createParser(input);
+      const { parser, errorListener } = createParser(input);
       const file = parser.file();
+      expect(errorListener.hasErrors()).toBe(false);
       expect(file.statement().length).toBe(1);
       const decision = file.statement(0).decision();
       expect(decision).toBeDefined();
@@ -80,8 +83,9 @@ describe('CPGLParser', () => {
 
     it('should parse a complete decision with all qualifier', () => {
       const input = `decision "test"${NEWLINE}${INDENT}all${NEWLINE}${INDENT}when "condition" then${NEWLINE}${INDENT}${INDENT}do "action"${NEWLINE}${NEWLINE}`;
-      const parser = createParser(input);
+      const { parser, errorListener } = createParser(input);
       const file = parser.file();
+      expect(errorListener.hasErrors()).toBe(false);
       expect(file.statement().length).toBe(1);
       const decision = file.statement(0).decision();
       expect(decision).toBeDefined();
@@ -101,8 +105,9 @@ describe('CPGLParser', () => {
 
     it('should parse a complete decision without qualifier', () => {
       const input = `decision "test"${NEWLINE}${INDENT}when "condition" then${NEWLINE}${INDENT}${INDENT}do "action"${NEWLINE}${NEWLINE}`;
-      const parser = createParser(input);
+      const { parser, errorListener } = createParser(input);
       const file = parser.file();
+      expect(errorListener.hasErrors()).toBe(false);
       expect(file).toBeDefined();
       const statements = file?.statement();
       expect(statements).toBeDefined();
@@ -126,8 +131,9 @@ describe('CPGLParser', () => {
 
     it('should parse a decision with a direct cycle', () => {
       const input = `decision "cycle"${NEWLINE}${INDENT}when "condition" then${NEWLINE}${INDENT}${INDENT}use "cycle"${NEWLINE}${NEWLINE}`;
-      const parser = createParser(input);
+      const { parser, errorListener } = createParser(input);
       const file = parser.file();
+      expect(errorListener.hasErrors()).toBe(false);
       expect(file).toBeDefined();
       const statements = file?.statement();
       expect(statements).toBeDefined();
@@ -151,8 +157,9 @@ describe('CPGLParser', () => {
     it('should parse a decision with an indirect cycle', () => {
       const input = `decision "cycle1"${NEWLINE}${INDENT}when "condition" then${NEWLINE}${INDENT}${INDENT}use "cycle2"${NEWLINE}${NEWLINE}decision "cycle2"${NEWLINE}${INDENT}when "condition" then${NEWLINE}${INDENT}${INDENT}use "cycle1"${NEWLINE}${NEWLINE}`;
       console.log('Input for indirect cycle:', input);
-      const parser = createParser(input);
+      const { parser, errorListener } = createParser(input);
       const file = parser.file();
+      expect(errorListener.hasErrors()).toBe(false);
       expect(file).toBeDefined();
       const statements = file?.statement();
       expect(statements).toBeDefined();
