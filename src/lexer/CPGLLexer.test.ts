@@ -448,6 +448,166 @@ describe('CPGLLexer', () => {
         TokenTypes.EOF
       ]);
     });
+
+    it('should handle all valid FHIR types from the grammar', () => {
+      const inputs = [
+        `action "Test"
+    fhirtype Action`,
+        `casefeature "Test"
+    fhirtype CaseFeature`,
+        `casefeature "Test"
+    valuetype string`,
+        `casefeature "Test"
+    valuetype boolean`,
+        `casefeature "Test"
+    valuetype integer`,
+        `casefeature "Test"
+    valuetype decimal`,
+        `casefeature "Test"
+    valuetype date`,
+        `casefeature "Test"
+    valuetype dateTime`,
+        `casefeature "Test"
+    valuetype time`,
+        `casefeature "Test"
+    valuetype code`,
+        `casefeature "Test"
+    valuetype Coding`,
+        `casefeature "Test"
+    valuetype CodeableConcept`,
+        `casefeature "Test"
+    valuetype Quantity`,
+        `casefeature "Test"
+    valuetype Ratio`,
+        `casefeature "Test"
+    valuetype Period`,
+        `casefeature "Test"
+    valuetype Range`,
+        `casefeature "Test"
+    valuetype Reference`
+      ];
+
+      inputs.forEach(input => {
+        const lexer = new CPGLLexer(CharStreams.fromString(input));
+        const tokens = getAllTokens(lexer);
+        expect(() => {
+          verifyTokenSequence(tokens, [
+            input.includes('action') ? TokenTypes.ACTION : TokenTypes.CASEFEATURE,
+            TokenTypes.STRING,
+            TokenTypes.NEWLINE,
+            TokenTypes.INDENT,
+            input.includes('fhirtype') ? TokenTypes.FHIRTYPE : TokenTypes.VALUETYPE,
+            input.includes('Action') ? TokenTypes.ACTION_FHIR_TYPE :
+              input.includes('CaseFeature') ? TokenTypes.CASEFEATURE_FHIR_TYPE :
+              TokenTypes.FHIR_VALUE_TYPE,
+            TokenTypes.DEDENT,
+            TokenTypes.EOF
+          ]);
+        }).not.toThrow();
+      });
+    });
+
+    it('should handle FHIR types in different contexts', () => {
+      const inputs = [
+        `decision "Test"
+    when "Condition" then
+        action "Test Action"
+            fhirtype Action`,
+        `decision "Test"
+    when "Condition" then
+        casefeature "Test Feature"
+            fhirtype CaseFeature
+            valuetype string`,
+        `decision "Test"
+    when "Condition" then
+        casefeature "Test Feature"
+            fhirtype CaseFeature
+            valuetype boolean
+        when "Another Condition" then
+            casefeature "Another Feature"
+                fhirtype CaseFeature
+                valuetype integer`
+      ];
+
+      inputs.forEach(input => {
+        const lexer = new CPGLLexer(CharStreams.fromString(input));
+        const tokens = getAllTokens(lexer);
+        expect(() => {
+          verifyTokenSequence(tokens, [
+            TokenTypes.DECISION,
+            TokenTypes.STRING,
+            TokenTypes.NEWLINE,
+            TokenTypes.INDENT,
+            TokenTypes.WHEN,
+            TokenTypes.STRING,
+            TokenTypes.THEN,
+            TokenTypes.NEWLINE,
+            TokenTypes.INDENT,
+            input.includes('action') ? TokenTypes.ACTION : TokenTypes.CASEFEATURE,
+            TokenTypes.STRING,
+            TokenTypes.NEWLINE,
+            TokenTypes.INDENT,
+            TokenTypes.FHIRTYPE,
+            input.includes('Action') ? TokenTypes.ACTION_FHIR_TYPE : TokenTypes.CASEFEATURE_FHIR_TYPE,
+            ...(input.includes('valuetype') ? [
+              TokenTypes.NEWLINE,
+              TokenTypes.VALUETYPE,
+              TokenTypes.FHIR_VALUE_TYPE
+            ] : []),
+            TokenTypes.DEDENT,
+            ...(input.includes('Another Condition') ? [
+              TokenTypes.DEDENT,
+              TokenTypes.WHEN,
+              TokenTypes.STRING,
+              TokenTypes.THEN,
+              TokenTypes.NEWLINE,
+              TokenTypes.INDENT,
+              TokenTypes.CASEFEATURE,
+              TokenTypes.STRING,
+              TokenTypes.NEWLINE,
+              TokenTypes.INDENT,
+              TokenTypes.FHIRTYPE,
+              TokenTypes.CASEFEATURE_FHIR_TYPE,
+              TokenTypes.NEWLINE,
+              TokenTypes.VALUETYPE,
+              TokenTypes.FHIR_VALUE_TYPE,
+              TokenTypes.DEDENT
+            ] : []),
+            TokenTypes.DEDENT,
+            TokenTypes.DEDENT,
+            TokenTypes.EOF
+          ]);
+        }).not.toThrow();
+      });
+    });
+
+    it('should throw an exception for invalid FHIR types', () => {
+      const inputs = [
+        `action "Test"
+    fhirtype NotAType`,  // Invalid action type
+        `casefeature "Test"
+    fhirtype InvalidType`,  // Invalid casefeature type
+        `casefeature "Test"
+    valuetype not_a_type`,  // Invalid value type
+        `action "Test"
+    fhirtype Action fhirtype Action`,  // Duplicate type declaration
+        `casefeature "Test"
+    fhirtype CaseFeature valuetype string`,  // Multiple type declarations
+        `casefeature "Test"
+    valuetype string valuetype boolean`,  // Multiple value types
+        `action "Test"
+    valuetype string`,  // Value type in action
+        `casefeature "Test"
+    fhirtype Action`  // Action type in casefeature
+      ];
+
+      inputs.forEach(input => {
+        const lexer = new CPGLLexer(CharStreams.fromString(input));
+        expect(() => {
+          getAllTokens(lexer);
+        }).toThrow();
+      });
+    });
   });
 
   describe('Complex Structures', () => {
@@ -868,28 +1028,6 @@ describe('CPGLLexer', () => {
     expression NOT AND "Condition"`,  // Invalid operator sequence
         `casefeature "Test"
     expression "Condition" OR OR "Condition 2"`  // Duplicate operators
-      ];
-
-      inputs.forEach(input => {
-        const lexer = new CPGLLexer(CharStreams.fromString(input));
-        expect(() => {
-          getAllTokens(lexer);
-        }).toThrow();
-      });
-    });
-
-    it('should throw an exception for invalid FHIR types', () => {
-      const inputs = [
-        `action "Test"
-    fhirtype InvalidType`,  // Invalid FHIR type
-        `casefeature "Test"
-    fhirtype NotAFHIRType`,  // Invalid casefeature type
-        `casefeature "Test"
-    valuetype not_a_type`,  // Invalid value type
-        `action "Test"
-    fhirtype Action fhirtype Action`,  // Duplicate type declaration
-        `casefeature "Test"
-    fhirtype CaseFeature valuetype string`  // Multiple type declarations
       ];
 
       inputs.forEach(input => {
