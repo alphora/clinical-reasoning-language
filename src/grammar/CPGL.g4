@@ -15,11 +15,11 @@ statement
     ;
 
 decision
-    : 'decision' STRING NEWLINE block (NEWLINE | (NEWLINE | EOF))
+    : 'decision' STRING NEWLINE block NEWLINE
     ;
 
 block
-    : INDENT ((qualifier NEWLINE whenClause)? | statementLine+) DEDENT
+    : INDENT ((qualifier NEWLINE whenClause)? | statementLine+)
     ;
 
 qualifier
@@ -49,7 +49,7 @@ useClause
     ;
 
 action
-    : 'action' STRING NEWLINE actionBlock (NEWLINE | (NEWLINE | EOF))
+    : 'action' STRING NEWLINE actionBlock NEWLINE
     ;
 
 actionBlock
@@ -61,7 +61,7 @@ actionFhirTypeClause
     ;
 
 casefeature
-    : 'casefeature' STRING NEWLINE casefeatureBlock (NEWLINE | (NEWLINE | EOF))
+    : 'casefeature' STRING NEWLINE casefeatureBlock NEWLINE
     ;
 
 casefeatureBlock
@@ -164,7 +164,7 @@ casefeatureLine
     ;
 
 casefeatureCodeClause
-    : 'code' STRING NEWLINE
+    : 'casefeaturecode' STRING NEWLINE
     ;
 
 casefeatureFhirTypeClause
@@ -172,7 +172,7 @@ casefeatureFhirTypeClause
     ;
 
 casefeatureUrlClause
-    : 'url' STRING NEWLINE
+    : 'profileurl' STRING NEWLINE
     ;
 
 casefeatureValueTypeClause
@@ -193,8 +193,8 @@ ACTION: 'action';
 FHIRTYPE: 'fhirtype';
 CASEFEATURE: 'casefeature';
 VALUETYPE: 'valuetype';
-CODE: 'code';
-URL: 'url';
+CASEFEATURECODE: 'casefeaturecode';
+PROFILEURL: 'profileurl';
 ANY: 'any';
 ALL: 'all';
 
@@ -248,8 +248,8 @@ NEWLINE: '\r'? '\n';
 WS: [ \t]+ -> skip;
 COMMENT: '//' ~[\r\n]* -> skip;
 COMMENT_BLOCK: '/*' .*? '*/' -> skip;
-INDENT: '    ' -> channel(HIDDEN);
-DEDENT: -> channel(HIDDEN);
+INDENT: '    ';
+DEDENT: '<DEDENT>';
 
 // String literals
 STRING: '"' (~["])* '"';

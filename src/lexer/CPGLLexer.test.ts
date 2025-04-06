@@ -7,7 +7,7 @@ import { CPGLLexer as GeneratedLexer } from '../grammar/generated/CPGLLexer';
 describe('CPGLLexer', () => {
   it('should handle basic tokens', () => {
     const input = 'decision "test"';
-    const lexer = new GeneratedLexer(CharStreams.fromString(input));
+    const lexer = new CPGLLexer(CharStreams.fromString(input));
     const tokens = getAllTokens(lexer);
     expect(tokens.length).toBe(3);
     expect(tokens[0].type).toBe(GeneratedLexer.DECISION);
@@ -16,7 +16,7 @@ describe('CPGLLexer', () => {
   });
 
   it('should handle indentation', () => {
-    const lexer = new GeneratedLexer(CharStreams.fromString('decision "test"\nwhen "condition" then\ndo "action"\n'));
+    const lexer = new CPGLLexer(CharStreams.fromString('decision "test"\nwhen "condition" then\ndo "action"\n'));
     const tokens = getAllTokens(lexer);
     expect(tokens.length).toBe(11);
     expect(tokens[0].type).toBe(GeneratedLexer.DECISION);
@@ -35,7 +35,7 @@ describe('CPGLLexer', () => {
   it('should handle comments', () => {
     const input = `// comment
 decision "test"`;
-    const lexer = new GeneratedLexer(CharStreams.fromString(input));
+    const lexer = new CPGLLexer(CharStreams.fromString(input));
     const tokens = getAllTokens(lexer);
     expect(tokens.length).toBe(4);
     expect(tokens[0].type).toBe(GeneratedLexer.NEWLINE);
@@ -47,7 +47,7 @@ decision "test"`;
   it('should handle block comments', () => {
     const input = `/* comment */
 decision "test"`;
-    const lexer = new GeneratedLexer(CharStreams.fromString(input));
+    const lexer = new CPGLLexer(CharStreams.fromString(input));
     const tokens = getAllTokens(lexer);
     expect(tokens.length).toBe(4);
     expect(tokens[0].type).toBe(GeneratedLexer.NEWLINE);
@@ -57,23 +57,20 @@ decision "test"`;
   });
 
   it('should handle errors', () => {
-    const lexer = new GeneratedLexer(CharStreams.fromString('@invalid'));
+    const lexer = new CPGLLexer(CharStreams.fromString('@invalid'));
     const tokens = getAllTokens(lexer);
-    expect(tokens.length).toBe(8);
+    expect(tokens.length).toBe(3);
     expect(tokens[0].type).toBe(GeneratedLexer.ERROR);
+    expect(tokens[0].text).toBe('@');
     expect(tokens[1].type).toBe(GeneratedLexer.ERROR);
-    expect(tokens[2].type).toBe(GeneratedLexer.ERROR);
-    expect(tokens[3].type).toBe(GeneratedLexer.ERROR);
-    expect(tokens[4].type).toBe(GeneratedLexer.ERROR);
-    expect(tokens[5].type).toBe(GeneratedLexer.ERROR);
-    expect(tokens[6].type).toBe(GeneratedLexer.FHIR_VALUE_TYPE);
-    expect(tokens[7].type).toBe(GeneratedLexer.EOF);
+    expect(tokens[1].text).toBe('invalid');
+    expect(tokens[2].type).toBe(GeneratedLexer.EOF);
   });
 
   describe('tokenize', () => {
     it('should tokenize keywords correctly', () => {
-      const input = 'decision when then do use action fhirtype casefeature valuetype code url any all';
-      const lexer = new GeneratedLexer(CharStreams.fromString(input));
+      const input = 'decision when then do use action fhirtype casefeature valuetype casefeaturecode profileurl any all';
+      const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
       expect(tokens.length).toBe(14);
       expect(tokens.map((t) => t.type)).toEqual([
@@ -86,8 +83,8 @@ decision "test"`;
         GeneratedLexer.FHIRTYPE,
         GeneratedLexer.CASEFEATURE,
         GeneratedLexer.VALUETYPE,
-        GeneratedLexer.CODE,
-        GeneratedLexer.URL,
+        GeneratedLexer.CASEFEATURECODE,
+        GeneratedLexer.PROFILEURL,
         GeneratedLexer.ANY,
         GeneratedLexer.ALL,
         GeneratedLexer.EOF,
@@ -95,7 +92,7 @@ decision "test"`;
     });
 
     it('should tokenize when statement with any qualifier correctly', () => {
-      const lexer = new GeneratedLexer(CharStreams.fromString('decision "test"\nany\nwhen "condition" then\ndo "action"\n'));
+      const lexer = new CPGLLexer(CharStreams.fromString('decision "test"\nany\nwhen "condition" then\ndo "action"\n'));
       const tokens = getAllTokens(lexer);
       expect(tokens.length).toBe(13);
       expect(tokens.map((t) => t.type)).toEqual([
@@ -116,7 +113,7 @@ decision "test"`;
     });
 
     it('should tokenize when statement with all qualifier correctly', () => {
-      const lexer = new GeneratedLexer(CharStreams.fromString('decision "test"\nall\nwhen "condition" then\ndo "action"\n'));
+      const lexer = new CPGLLexer(CharStreams.fromString('decision "test"\nall\nwhen "condition" then\ndo "action"\n'));
       const tokens = getAllTokens(lexer);
       expect(tokens.length).toBe(13);
       expect(tokens.map((t) => t.type)).toEqual([
@@ -137,7 +134,7 @@ decision "test"`;
     });
 
     it('should tokenize when statement without qualifier correctly', () => {
-      const lexer = new GeneratedLexer(CharStreams.fromString('decision "test"\nwhen "condition" then\ndo "action"\n'));
+      const lexer = new CPGLLexer(CharStreams.fromString('decision "test"\nwhen "condition" then\ndo "action"\n'));
       const tokens = getAllTokens(lexer);
       expect(tokens.length).toBe(11);
       expect(tokens.map((t) => t.type)).toEqual([
@@ -158,49 +155,53 @@ decision "test"`;
 
   it('should tokenize casefeature with all required fields', () => {
     const input = `casefeature "Test Feature"
-    code "test-code"
+    casefeaturecode "test-code"
     fhirtype Condition
-    url "http://example.com"
+    profileurl "http://example.com"
     valuetype boolean`;
-    const lexer = new GeneratedLexer(CharStreams.fromString(input));
+    const lexer = new CPGLLexer(CharStreams.fromString(input));
     const tokens = getAllTokens(lexer);
 
-    expect(tokens.length).toBe(15);
+    expect(tokens.length).toBe(17);
     expect(tokens[0].type).toBe(GeneratedLexer.CASEFEATURE);
     expect(tokens[1].type).toBe(GeneratedLexer.STRING);
     expect(tokens[2].type).toBe(GeneratedLexer.NEWLINE);
-    expect(tokens[3].type).toBe(GeneratedLexer.CODE);
-    expect(tokens[4].type).toBe(GeneratedLexer.STRING);
-    expect(tokens[5].type).toBe(GeneratedLexer.NEWLINE);
-    expect(tokens[6].type).toBe(GeneratedLexer.FHIRTYPE);
-    expect(tokens[7].type).toBe(GeneratedLexer.CASEFEATURE_FHIR_TYPE);
-    expect(tokens[8].type).toBe(GeneratedLexer.NEWLINE);
-    expect(tokens[9].type).toBe(GeneratedLexer.URL);
-    expect(tokens[10].type).toBe(GeneratedLexer.STRING);
-    expect(tokens[11].type).toBe(GeneratedLexer.NEWLINE);
-    expect(tokens[12].type).toBe(GeneratedLexer.VALUETYPE);
-    expect(tokens[13].type).toBe(GeneratedLexer.FHIR_VALUE_TYPE);
-    expect(tokens[14].type).toBe(GeneratedLexer.EOF);
+    expect(tokens[3].type).toBe(GeneratedLexer.INDENT);
+    expect(tokens[4].type).toBe(GeneratedLexer.CASEFEATURECODE);
+    expect(tokens[5].type).toBe(GeneratedLexer.STRING);
+    expect(tokens[6].type).toBe(GeneratedLexer.NEWLINE);
+    expect(tokens[7].type).toBe(GeneratedLexer.FHIRTYPE);
+    expect(tokens[8].type).toBe(GeneratedLexer.CASEFEATURE_FHIR_TYPE);
+    expect(tokens[9].type).toBe(GeneratedLexer.NEWLINE);
+    expect(tokens[10].type).toBe(GeneratedLexer.PROFILEURL);
+    expect(tokens[11].type).toBe(GeneratedLexer.STRING);
+    expect(tokens[12].type).toBe(GeneratedLexer.NEWLINE);
+    expect(tokens[13].type).toBe(GeneratedLexer.VALUETYPE);
+    expect(tokens[14].type).toBe(GeneratedLexer.FHIR_VALUE_TYPE);
+    expect(tokens[15].type).toBe(GeneratedLexer.DEDENT);
+    expect(tokens[16].type).toBe(GeneratedLexer.EOF);
   });
 
   it('should tokenize action with fhirtype', () => {
     const input = `action "Test Action"
     fhirtype ServiceRequest`;
-    const lexer = new GeneratedLexer(CharStreams.fromString(input));
+    const lexer = new CPGLLexer(CharStreams.fromString(input));
     const tokens = getAllTokens(lexer);
 
-    expect(tokens.length).toBe(6);
+    expect(tokens.length).toBe(8);
     expect(tokens[0].type).toBe(GeneratedLexer.ACTION);
     expect(tokens[1].type).toBe(GeneratedLexer.STRING);
     expect(tokens[2].type).toBe(GeneratedLexer.NEWLINE);
-    expect(tokens[3].type).toBe(GeneratedLexer.FHIRTYPE);
-    expect(tokens[4].type).toBe(GeneratedLexer.ACTION_FHIR_TYPE);
-    expect(tokens[5].type).toBe(GeneratedLexer.EOF);
+    expect(tokens[3].type).toBe(GeneratedLexer.INDENT);
+    expect(tokens[4].type).toBe(GeneratedLexer.FHIRTYPE);
+    expect(tokens[5].type).toBe(GeneratedLexer.ACTION_FHIR_TYPE);
+    expect(tokens[6].type).toBe(GeneratedLexer.DEDENT);
+    expect(tokens[7].type).toBe(GeneratedLexer.EOF);
   });
 
   it('should handle inconsistent indentation', () => {
     const input = 'decision "test"\n    when "condition" then\n  do "action"';
-        const lexer = new CPGLLexer(CharStreams.fromString(input));
+    const lexer = new CPGLLexer(CharStreams.fromString(input));
 
     expect(() => {
       getAllTokens(lexer);
@@ -213,11 +214,12 @@ decision "test"`;
         do "Action 1"
     when "Condition 2" then
         do "Action 2"
-        use "Another Decision"`;
+        use "Another Decision"
+    `;
     const lexer = new CPGLLexer(CharStreams.fromString(input));
 
     const tokens = getAllTokens(lexer);
-    expect(tokens.length).toBe(26);
+    expect(tokens.length).toBe(27);
     expect(tokens[0].type).toBe(GeneratedLexer.DECISION);
     expect(tokens[1].type).toBe(GeneratedLexer.STRING);
     expect(tokens[2].type).toBe(GeneratedLexer.NEWLINE);
@@ -241,13 +243,14 @@ decision "test"`;
     expect(tokens[20].type).toBe(GeneratedLexer.NEWLINE);
     expect(tokens[21].type).toBe(GeneratedLexer.USE);
     expect(tokens[22].type).toBe(GeneratedLexer.STRING);
-    expect(tokens[23].type).toBe(GeneratedLexer.DEDENT);
+    expect(tokens[23].type).toBe(GeneratedLexer.NEWLINE);
     expect(tokens[24].type).toBe(GeneratedLexer.DEDENT);
-    expect(tokens[25].type).toBe(GeneratedLexer.EOF);
-    });
+    expect(tokens[25].type).toBe(GeneratedLexer.DEDENT);
+    expect(tokens[26].type).toBe(GeneratedLexer.EOF);
+  });
 });
 
-function getAllTokens(lexer: GeneratedLexer): Array<{ type: number; text: string }> {
+function getAllTokens(lexer: CPGLLexer): Array<{ type: number; text: string }> {
   const tokens: Array<{ type: number; text: string }> = [];
   let token = lexer.nextToken();
   while (token.type !== -1) {
