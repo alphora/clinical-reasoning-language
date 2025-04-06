@@ -1,203 +1,156 @@
 grammar CPGL;
 
-/*
- * Parser Rules
- */
+// ========================================================
+// Parser Rules
+// ========================================================
 
 file
-    : (NEWLINE | WS)* statement* EOF
+    : (statement NEWLINE?)* EOF
     ;
 
 statement
-    : (decision | action | casefeature) NEWLINE*
+    : decision
+    | action
+    | casefeature
     ;
+
+// ----------------------------------------------------------------
+// Decision Constructs
+// ----------------------------------------------------------------
 
 decision
-    : 'decision' STRING NEWLINE block
+    : 'decision' WS+ STRING NEWLINE decisionBlock
     ;
 
-block
-    : INDENT (qualifier NEWLINE)? statementLine+ DEDENT
+// A decisionBlock is one or more top-level when clauses
+decisionBlock
+    : INDENT whenClause+ DEDENT
     ;
 
-qualifier
-    : ANY
-    | ALL
+// A whenClause consists of a condition and a block that is either a
+// group of nested whenClauses (with an optional qualifier) or terminal actions.
+whenClause
+    : 'when' WS+ STRING WS+ 'then' NEWLINE whenBlock
     ;
 
-statementLine
-    : whenClause
-    | doClause
+// A whenBlock can be either a nested group of conditions or a list of terminal actions.
+whenBlock
+    : blockWhenList
+    | blockTerminal
+    ;
+
+// A blockWhenList is an indented block that may start with an optional qualifier
+// and then contains one or more nested whenClause entries.
+blockWhenList
+    : INDENT optionalQualifier? whenClause+ DEDENT
+    ;
+
+// A blockTerminal is an indented block containing one or more terminal actions.
+blockTerminal
+    : INDENT terminalAction+ DEDENT
+    ;
+
+// Terminal actions are either a doClause or a useClause.
+terminalAction
+    : doClause
     | useClause
     ;
 
-// A "when" clause: a condition that leads to a nested block.
-whenClause
-    : (qualifier NEWLINE)? 'when' STRING 'then' NEWLINE block
-    ;
-
-// A "do" clause: a terminal action.
+// doClause and useClause can only appear within a when's block as terminal actions.
 doClause
-    : 'do' STRING NEWLINE
+    : 'do' WS+ STRING NEWLINE
     ;
 
-// A "use" clause: reference to another decision (subgraph).
 useClause
-    : 'use' STRING NEWLINE
+    : 'use' WS+ STRING NEWLINE
     ;
+
+// A qualifier (either "any" or "all") to modify a group of nested whenClauses.
+optionalQualifier
+    : ('any' | 'all') NEWLINE
+    ;
+
+// ----------------------------------------------------------------
+// Action and Casefeature Constructs (Minimal)
+// ----------------------------------------------------------------
 
 action
-    : 'action' STRING NEWLINE actionBlock
+    : 'action' WS+ STRING NEWLINE actionBlock
     ;
 
 actionBlock
-    : INDENT actionFhirTypeClause+ DEDENT
+    : INDENT actionClause+ DEDENT
     ;
 
-actionFhirTypeClause
-    : 'fhirtype' ACTION_FHIR_TYPE NEWLINE
+actionClause
+    : 'fhirtype' WS+ ACTION_FHIR_TYPE NEWLINE
     ;
 
 casefeature
-    : 'casefeature' STRING NEWLINE casefeatureBlock NEWLINE
+    : 'casefeature' WS+ STRING NEWLINE casefeatureBlock (compositeExpression NEWLINE)?
     ;
 
 casefeatureBlock
-    : INDENT casefeatureLine DEDENT
+    : INDENT casefeatureClause+ DEDENT
     ;
 
-casefeatureLine
-    : casefeatureCodeClause
-    casefeatureFhirTypeClause
-    casefeatureUrlClause
-    casefeatureValueTypeClause
-    | casefeatureCodeClause
-    casefeatureFhirTypeClause
-    casefeatureValueTypeClause
-    casefeatureUrlClause
-    | casefeatureCodeClause
-    casefeatureUrlClause
-    casefeatureFhirTypeClause
-    casefeatureValueTypeClause
-    | casefeatureCodeClause
-    casefeatureUrlClause
-    casefeatureValueTypeClause
-    casefeatureFhirTypeClause
-    | casefeatureCodeClause
-    casefeatureValueTypeClause
-    casefeatureFhirTypeClause
-    casefeatureUrlClause
-    | casefeatureCodeClause
-    casefeatureValueTypeClause
-    casefeatureUrlClause
-    casefeatureFhirTypeClause
-    | casefeatureFhirTypeClause
-    casefeatureCodeClause
-    casefeatureUrlClause
-    casefeatureValueTypeClause
-    | casefeatureFhirTypeClause
-    casefeatureCodeClause
-    casefeatureValueTypeClause
-    casefeatureUrlClause
-    | casefeatureFhirTypeClause
-    casefeatureUrlClause
-    casefeatureCodeClause
-    casefeatureValueTypeClause
-    | casefeatureFhirTypeClause
-    casefeatureUrlClause
-    casefeatureValueTypeClause
-    casefeatureCodeClause
-    | casefeatureFhirTypeClause
-    casefeatureValueTypeClause
-    casefeatureCodeClause
-    casefeatureUrlClause
-    | casefeatureFhirTypeClause
-    casefeatureValueTypeClause
-    casefeatureUrlClause
-    casefeatureCodeClause
-    | casefeatureUrlClause
-    casefeatureCodeClause
-    casefeatureFhirTypeClause
-    casefeatureValueTypeClause
-    | casefeatureUrlClause
-    casefeatureCodeClause
-    casefeatureValueTypeClause
-    casefeatureFhirTypeClause
-    | casefeatureUrlClause
-    casefeatureFhirTypeClause
-    casefeatureCodeClause
-    casefeatureValueTypeClause
-    | casefeatureUrlClause
-    casefeatureFhirTypeClause
-    casefeatureValueTypeClause
-    casefeatureCodeClause
-    | casefeatureUrlClause
-    casefeatureValueTypeClause
-    casefeatureFhirTypeClause
-    casefeatureCodeClause
-    | casefeatureValueTypeClause
-    casefeatureCodeClause
-    casefeatureFhirTypeClause
-    casefeatureUrlClause
-    | casefeatureValueTypeClause
-    casefeatureCodeClause
-    casefeatureUrlClause
-    casefeatureFhirTypeClause
-    | casefeatureValueTypeClause
-    casefeatureFhirTypeClause
-    casefeatureCodeClause
-    casefeatureUrlClause
-    | casefeatureValueTypeClause
-    casefeatureFhirTypeClause
-    casefeatureUrlClause
-    casefeatureCodeClause
-    | casefeatureValueTypeClause
-    casefeatureUrlClause
-    casefeatureCodeClause
-    casefeatureFhirTypeClause
-    | casefeatureValueTypeClause
-    casefeatureUrlClause
-    casefeatureFhirTypeClause
-    casefeatureCodeClause
+casefeatureClause
+    : 'casefeaturecode' WS+ STRING NEWLINE
+    | 'fhirtype' WS+ CASEFEATURE_FHIR_TYPE NEWLINE
+    | 'profileurl' WS+ STRING NEWLINE
+    | 'valuetype' WS+ FHIR_VALUE_TYPE NEWLINE
     ;
 
-casefeatureCodeClause
-    : 'casefeaturecode' STRING NEWLINE
+// Composite boolean expression for advanced casefeature logic.
+compositeExpression
+    : '(' booleanExpr ')'
     ;
 
-casefeatureFhirTypeClause
-    : 'fhirtype' CASEFEATURE_FHIR_TYPE NEWLINE
+// Boolean expression rules (standard operator precedence).
+booleanExpr
+    : booleanTerm ( WS* OR WS* booleanTerm )*
     ;
 
-casefeatureUrlClause
-    : 'profileurl' STRING NEWLINE
+booleanTerm
+    : booleanFactor ( WS* AND WS* booleanFactor )*
     ;
 
-casefeatureValueTypeClause
-    : 'valuetype' FHIR_VALUE_TYPE NEWLINE
+booleanFactor
+    : NOT WS* booleanFactor
+    | '(' booleanExpr ')'
+    | STRING
     ;
 
-/*
- * Lexer Rules
- */
+// ========================================================
+// Lexer Rules
+// ========================================================
 
-// Keywords
-DECISION: 'decision';
-WHEN: 'when';
-THEN: 'then';
-DO: 'do';
-USE: 'use';
-ACTION: 'action';
-FHIRTYPE: 'fhirtype';
-CASEFEATURE: 'casefeature';
-VALUETYPE: 'valuetype';
-CASEFEATURECODE: 'casefeaturecode';
-PROFILEURL: 'profileurl';
-ANY: 'any';
-ALL: 'all';
+// INDENT and DEDENT tokens are placeholders.
+// A production-ready solution would use a custom lexer routine to track indentation levels.
+INDENT:  '    ';  // exactly 4 spaces for one indent level
+DEDENT:  '<DEDENT>';
 
-// FHIR types
-ACTION_FHIR_TYPE: 'Appointment'
+// NEWLINE matches one or more line breaks.
+NEWLINE: ('\r'? '\n')+;
+
+// WS matches whitespace (spaces and tabs) that are not part of indentation.
+WS: [ \t]+ -> skip;
+
+// Comments.
+COMMENT: '//' ~[\r\n]* -> skip;
+COMMENT_BLOCK: '/*' .*? '*/' -> skip;
+
+// STRING: double-quoted string without newlines.
+STRING: '"' (~["\r\n])* '"';
+
+// Boolean operators for composite expressions.
+OR: 'OR';
+AND: 'AND';
+NOT: 'NOT';
+
+// FHIR types for actions.
+ACTION_FHIR_TYPE:
+      'Appointment'
     | 'AppointmentResponse'
     | 'CarePlan'
     | 'Claim'
@@ -211,16 +164,24 @@ ACTION_FHIR_TYPE: 'Appointment'
     | 'ServiceRequest'
     | 'SupplyRequest'
     | 'Task'
-    | 'VisionPrescription';
-CASEFEATURE_FHIR_TYPE: 'AllergyIntolerance'
+    | 'VisionPrescription'
+    ;
+
+// FHIR types for casefeatures.
+CASEFEATURE_FHIR_TYPE:
+      'AllergyIntolerance'
     | 'Condition'
     | 'Procedure'
     | 'Observation'
     | 'Immunization'
     | 'MedicationDispense'
     | 'MedicationAdministration'
-    | 'MedicationStatement';
-FHIR_VALUE_TYPE: 'base64Binary'
+    | 'MedicationStatement'
+    ;
+
+// FHIR value types.
+FHIR_VALUE_TYPE:
+      'base64Binary'
     | 'boolean'
     | 'canonical'
     | 'code'
@@ -239,18 +200,5 @@ FHIR_VALUE_TYPE: 'base64Binary'
     | 'uri'
     | 'url'
     | 'uuid'
-    | 'xhtml';
-
-// Special tokens
-NEWLINE: '\r'? '\n';
-WS: [ \t]+ -> skip;
-COMMENT: '//' ~[\r\n]* -> skip;
-COMMENT_BLOCK: '/*' .*? '*/' -> skip;
-INDENT: '    ';
-DEDENT: '<DEDENT>';
-
-// String literals
-STRING: '"' (~["])* '"';
-
-// Error token
-ERROR: .;
+    | 'xhtml'
+    ;

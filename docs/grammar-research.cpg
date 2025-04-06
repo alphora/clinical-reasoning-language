@@ -1,81 +1,90 @@
-
-<newline> ::= "\n"
-<indent> ::= "   "
-<decision> ::= decision <identifier><newline><indent><rule>
-<rule> ::= (all | any) when <casefeaturereference> then<newline><indent> (do <actionreference> | <rule> | use <decisionreference>) // default is any, applicabilityBehavior
-<casefeaturcasefeaturereference> ::= <identifier> // reference to a casefeature definition
-<actionreference> ::= <identifier> // reference to action definition
-<identifier> ::= <string> // string is a quoted string
-<action> ::= action <identifier>
-<casefeature> ::= casefeature <identifier><newline><indent><fhirtype>
-<fhirtype> ::= (Observation | Condition)
-
 decision "IMMZ.D2.D5.Measles"
-	when "Measles Routine Immunization Schedule Incomplete" then
-		when "No Primary Series Doses Administered" then
-			any
-			when "Client Age Less Than 12 Months" then 
-				do "Indicate"
-			when "Last Live Vaccine Administered Within 4 Weeks" then 
-				use "Elderly Based"
-			when "Client Is Due For MCV12" then 
-				do "Vaccinate"
-		when "One Primary Series Dose Administered" then
-			all
-			when "Client Age Less Than 15 Months" then 
-				do "Indicate"
-			when "Last Live Vaccine Administered Within 4 Weeks" then 
-				use "Elderly Based"
-			when "Client Is Due For MCV12" then 
-				do "Vaccinate"
-		when "Two Primary Series Doses Administered" then 
-			do "Indicate"
+    when "Measles Routine Immunization Schedule Incomplete" then
+        when "No Primary Series Doses Administered" then
+            any
+            when "Client Age Less Than 12 Months" then 
+                do "Indicate"
+            when "Last Live Vaccine Administered Within 4 Weeks" then 
+                use "Elderly Based"
+            when "Client Is Due For MCV12" then 
+                do "Vaccinate"
+    when "One Primary Series Dose Administered" then
+        all
+        when "Client Age Less Than 15 Months" then 
+            do "Indicate"
+        when "Last Live Vaccine Administered Within 4 Weeks" then 
+            use "Elderly Based"
+        when "Client Is Due For MCV12" then 
+            do "Vaccinate"
+    when "Two Primary Series Doses Administered" then 
+        do "Indicate"
 
 decision "Elderly Based"
-	when "Client Age Greater Than 60" then
-		do "Indicate"
-	when "Client Age Less Than 60" then
-		do "Vaccinate"
+    any
+    when "Client Age Greater Than 60" then
+        do "Indicate"
+    when "Client Age Less Than 60" then
+        do "Vaccinate"
+        do "another thing"
+        do "somthing else"
+    when "Client Age Greater Than 60" then
+        use "Elderly Based"
+        use "IMMZ.D2.D5.Measles"
 
 action "Indicate"
-	fhirtype ServiceRequest
+    fhirtype ServiceRequest
 
 action "Vaccinate"
-	fhirtype MedicationRequest
+    fhirtype MedicationRequest
 
 casefeature "Measles Routine Immunization Schedule Incomplete"
-	code "measles-routine-immunization-schedule-incomplete"
-	fhirtype Condition 
-	url "http://someothercfprofile-uri"
-	valuetype boolean
+    casefeaturecode "measles-routine-immunization-schedule-incomplete"
+    fhirtype Condition 
+    profileurl "http://someothercfprofile-uri"
+    valuetype boolean
 
 casefeature "Last Live Vaccine Administered Within 4 Weeks"
-	code "last-live-vaccine-administered"
-	fhirtype Observation 
-	url "http://somecfprofile-uri"
-	valuetype dateTime
+    casefeaturecode "last-live-vaccine-administered"
+    fhirtype Observation 
+    profileurl "http://somecfprofile-uri"
+    valuetype dateTime
+    expression (
+        "casefeature bmi>25"
+        OR
+        (
+            NOT
+            (
+                "casefeature height"
+                AND
+                "casefeature weight"
+            )
+        )
+        AND 
+        (
+            NOT "some other case feature"
+        )
+    )
 
-	(
-		casefeature bmi>25
-		OR
-		(
-			casefeature height
-			AND
-			casefeature weight
-		)
-	)
+casefeature "casefeature bmi>25"
+    casefeaturecode "casefeature-bmi-gt-25"
+    fhirtype Observation 
+    profileurl "http://somecfprofile1-uri"
+    valuetype quantity
 
-// other case features
+casefeature "casefeature height"
+    casefeaturecode "casefeature-height"
+    fhirtype Observation 
+    profileurl "http://somecfprofile2-uri"
+    valuetype quantity
 
-casefeature height
+casefeature "casefeature height"
+    casefeaturecode "casefeature-height"
+    fhirtype Observation 
+    profileurl "http://somecfprofile2-uri"
+    valuetype quantity
 
-if "Measles Routine Immunization Schedule Incomplete" then
-	if "No Primary Series Doses Administered" then
-		if "Client Age Less Than 12 Months" then
-			Indicate
-		if not "Client Age Less Than 12 Months" then
-			if "Last Live Vaccine Administered Within 4 Weeks" then
-				Indicate
-			if not "Last Live Vaccine Administered Within 4 Weeks" then
-				if "Client Is Due For MCV12" then
-					Vaccinate
+casefeature "some other case feature"
+    casefeaturecode "some-other-case-feature"
+    fhirtype Observation 
+    profileurl "http://somecfprofile3-uri"
+    valuetype quantity
