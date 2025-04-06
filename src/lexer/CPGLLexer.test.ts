@@ -1269,6 +1269,9 @@ describe('CPGLLexer', () => {
 
     it('should handle casefeature with quantity value type', () => {
       const input = `casefeature "Quantity Feature"
+    casefeaturecode "code"
+    fhirtype Observation
+    profileurl "url"
     valuetype quantity
     expression ("Quantity > 100" AND "Quantity < 200")`;
 
@@ -1280,6 +1283,15 @@ describe('CPGLLexer', () => {
         TokenTypes.STRING,
         TokenTypes.NEWLINE,
         TokenTypes.INDENT,
+        TokenTypes.CASEFEATURECODE,
+        TokenTypes.STRING,
+        TokenTypes.NEWLINE,
+        TokenTypes.FHIRTYPE,
+        TokenTypes.CASEFEATURE_FHIR_TYPE,
+        TokenTypes.NEWLINE,
+        TokenTypes.PROFILEURL,
+        TokenTypes.STRING,
+        TokenTypes.NEWLINE,
         TokenTypes.VALUETYPE,
         TokenTypes.QUANTITY_VALUE_TYPE,
         TokenTypes.NEWLINE,
@@ -1289,7 +1301,6 @@ describe('CPGLLexer', () => {
         TokenTypes.AND,
         TokenTypes.STRING,
         TokenTypes.RPAREN,
-        TokenTypes.NEWLINE,
         TokenTypes.DEDENT,
         TokenTypes.EOF
       ]);
@@ -1766,128 +1777,71 @@ describe('CPGLLexer', () => {
   });
 
   describe('Action Structure', () => {
-    // eslint-disable-next-line typescript:S2004
-    // @ts-ignore: Deep nesting is intentional for test organization
-    describe('Multiple Actions in Sequence', () => {
-        it('should handle multiple do actions in sequence', () => {
-            const input = `action "Multiple Do Actions"
-    fhirtype Action
-    do "Action 1"
-    do "Action 2"
-    do "Action 3"`;
+    it('should handle basic action with valid FHIR type', () => {
+      const input = `action "Test Action"
+    fhirtype MedicationRequest`;
 
-            const lexer = new CPGLLexer(CharStreams.fromString(input));
-            const tokens = getAllTokens(lexer);
+      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const tokens = getAllTokens(lexer);
 
-            verifyTokenSequence(tokens, [
-                TokenTypes.ACTION, TokenTypes.STRING, TokenTypes.NEWLINE,
-                TokenTypes.INDENT,
-                TokenTypes.FHIRTYPE, TokenTypes.ACTION_FHIR_TYPE, TokenTypes.NEWLINE,
-                TokenTypes.DO, TokenTypes.STRING, TokenTypes.NEWLINE,
-                TokenTypes.DO, TokenTypes.STRING, TokenTypes.NEWLINE,
-                TokenTypes.DO, TokenTypes.STRING, TokenTypes.NEWLINE,
-                TokenTypes.DEDENT
-            ]);
-        });
-
-        it('should handle multiple use actions in sequence', () => {
-            const input = `action "Multiple Use Actions"
-    fhirtype Action
-    use "Decision 1"
-    use "Decision 2"
-    use "Decision 3"`;
-
-            const lexer = new CPGLLexer(CharStreams.fromString(input));
-            const tokens = getAllTokens(lexer);
-
-            verifyTokenSequence(tokens, [
-                TokenTypes.ACTION, TokenTypes.STRING, TokenTypes.NEWLINE,
-                TokenTypes.INDENT,
-                TokenTypes.FHIRTYPE, TokenTypes.ACTION_FHIR_TYPE, TokenTypes.NEWLINE,
-                TokenTypes.USE, TokenTypes.STRING, TokenTypes.NEWLINE,
-                TokenTypes.USE, TokenTypes.STRING, TokenTypes.NEWLINE,
-                TokenTypes.USE, TokenTypes.STRING, TokenTypes.NEWLINE,
-                TokenTypes.DEDENT
-            ]);
-        });
-
-        it('should handle mixed do and use actions in sequence', () => {
-            const input = `action "Mixed Actions"
-    fhirtype Action
-    do "Action 1"
-    use "Decision 1"
-    do "Action 2"
-    use "Decision 2"`;
-
-            const lexer = new CPGLLexer(CharStreams.fromString(input));
-            const tokens = getAllTokens(lexer);
-
-            verifyTokenSequence(tokens, [
-                TokenTypes.ACTION, TokenTypes.STRING, TokenTypes.NEWLINE,
-                TokenTypes.INDENT,
-                TokenTypes.FHIRTYPE, TokenTypes.ACTION_FHIR_TYPE, TokenTypes.NEWLINE,
-                TokenTypes.DO, TokenTypes.STRING, TokenTypes.NEWLINE,
-                TokenTypes.USE, TokenTypes.STRING, TokenTypes.NEWLINE,
-                TokenTypes.DO, TokenTypes.STRING, TokenTypes.NEWLINE,
-                TokenTypes.USE, TokenTypes.STRING, TokenTypes.NEWLINE,
-                TokenTypes.DEDENT
-            ]);
-        });
+      verifyTokenSequence(tokens, [
+        TokenTypes.ACTION, TokenTypes.STRING, TokenTypes.NEWLINE,
+        TokenTypes.INDENT,
+        TokenTypes.FHIRTYPE, TokenTypes.ACTION_FHIR_TYPE, TokenTypes.NEWLINE,
+        TokenTypes.DEDENT,
+        TokenTypes.EOF
+      ]);
     });
 
-    // eslint-disable-next-line typescript:S2004
-    // @ts-ignore: Deep nesting is intentional for test organization
-    describe('Actions with Different FHIR Types', () => {
-        it('should handle action with CaseFeature FHIR type', () => {
-            const input = `action "CaseFeature Action"
-    fhirtype CaseFeature
-    do "Action 1"`;
+    it('should handle action with different valid FHIR type', () => {
+      const input = `action "Another Action"
+    fhirtype Appointment`;
 
-            const lexer = new CPGLLexer(CharStreams.fromString(input));
-            const tokens = getAllTokens(lexer);
+      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const tokens = getAllTokens(lexer);
 
-            verifyTokenSequence(tokens, [
-                TokenTypes.ACTION, TokenTypes.STRING, TokenTypes.NEWLINE,
-                TokenTypes.INDENT,
-                TokenTypes.FHIRTYPE, TokenTypes.CASEFEATURE_FHIR_TYPE, TokenTypes.NEWLINE,
-                TokenTypes.DO, TokenTypes.STRING, TokenTypes.NEWLINE,
-                TokenTypes.DEDENT
-            ]);
-        });
+      verifyTokenSequence(tokens, [
+        TokenTypes.ACTION, TokenTypes.STRING, TokenTypes.NEWLINE,
+        TokenTypes.INDENT,
+        TokenTypes.FHIRTYPE, TokenTypes.ACTION_FHIR_TYPE, TokenTypes.NEWLINE,
+        TokenTypes.DEDENT,
+        TokenTypes.EOF
+      ]);
+    });
 
-        it('should handle action with Action FHIR type', () => {
-            const input = `action "Standard Action"
-    fhirtype Action
-    do "Action 1"`;
+    it('should throw an exception for action with invalid FHIR type', () => {
+      const input = `action "Invalid Action"
+    fhirtype Condition`;  // Condition is a casefeature type, not an action type
 
-            const lexer = new CPGLLexer(CharStreams.fromString(input));
-            const tokens = getAllTokens(lexer);
+      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      
+      expect(() => {
+        getAllTokens(lexer);
+      }).toThrow();
+    });
 
-            verifyTokenSequence(tokens, [
-                TokenTypes.ACTION, TokenTypes.STRING, TokenTypes.NEWLINE,
-                TokenTypes.INDENT,
-                TokenTypes.FHIRTYPE, TokenTypes.ACTION_FHIR_TYPE, TokenTypes.NEWLINE,
-                TokenTypes.DO, TokenTypes.STRING, TokenTypes.NEWLINE,
-                TokenTypes.DEDENT
-            ]);
-        });
+    it('should throw an exception for action with do clause', () => {
+      const input = `action "Invalid Action"
+    fhirtype MedicationRequest
+    do "Action"`;  // Actions cannot have do clauses
 
-        it('should handle action with value type', () => {
-            const input = `action "Value Type Action"
-    valuetype string
-    do "Action 1"`;
+      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      
+      expect(() => {
+        getAllTokens(lexer);
+      }).toThrow();
+    });
 
-            const lexer = new CPGLLexer(CharStreams.fromString(input));
-            const tokens = getAllTokens(lexer);
+    it('should throw an exception for action with use clause', () => {
+      const input = `action "Invalid Action"
+    fhirtype MedicationRequest
+    use "Another Decision"`;  // Actions cannot have use clauses
 
-            verifyTokenSequence(tokens, [
-                TokenTypes.ACTION, TokenTypes.STRING, TokenTypes.NEWLINE,
-                TokenTypes.INDENT,
-                TokenTypes.VALUETYPE, TokenTypes.FHIR_VALUE_TYPE, TokenTypes.NEWLINE,
-                TokenTypes.DO, TokenTypes.STRING, TokenTypes.NEWLINE,
-                TokenTypes.DEDENT
-            ]);
-        });
+      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      
+      expect(() => {
+        getAllTokens(lexer);
+      }).toThrow();
     });
   });
 
@@ -2093,6 +2047,9 @@ describe('CPGLLexer', () => {
 
         it('should handle CaseFeature with quantity value type', () => {
             const input = `casefeature "Quantity Feature"
+    casefeaturecode "code"
+    fhirtype Observation
+    profileurl "url"
     valuetype quantity
     expression ("Quantity > 100" AND "Quantity < 200")`;
 
@@ -2104,6 +2061,15 @@ describe('CPGLLexer', () => {
                 TokenTypes.STRING,
                 TokenTypes.NEWLINE,
                 TokenTypes.INDENT,
+                TokenTypes.CASEFEATURECODE,
+                TokenTypes.STRING,
+                TokenTypes.NEWLINE,
+                TokenTypes.FHIRTYPE,
+                TokenTypes.CASEFEATURE_FHIR_TYPE,
+                TokenTypes.NEWLINE,
+                TokenTypes.PROFILEURL,
+                TokenTypes.STRING,
+                TokenTypes.NEWLINE,
                 TokenTypes.VALUETYPE,
                 TokenTypes.QUANTITY_VALUE_TYPE,
                 TokenTypes.NEWLINE,
@@ -2113,7 +2079,6 @@ describe('CPGLLexer', () => {
                 TokenTypes.AND,
                 TokenTypes.STRING,
                 TokenTypes.RPAREN,
-                TokenTypes.NEWLINE,
                 TokenTypes.DEDENT,
                 TokenTypes.EOF
             ]);
