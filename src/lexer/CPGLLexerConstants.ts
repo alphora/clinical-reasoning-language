@@ -45,35 +45,27 @@ export enum TokenTypes {
     VALUETYPE = 25,
     EXPRESSION = 26,
 
+    // Operators
+    PLUS = 27,
+    MINUS = 28,
+    MULT = 29,
+    DIV = 30,
+    EQ = 31,
+    NEQ = 32,
+    GT = 33,
+    GTE = 34,
+    LT = 35,
+    LTE = 36,
+    ASSIGN = 37,
+
     // Parentheses
-    LPAREN = 30,
-    RPAREN = 31,
+    LPAREN = 40,
+    RPAREN = 41,
 
     // FHIR Types
-    ACTION_FHIR_TYPE = 40,
-    CASEFEATURE_FHIR_TYPE = 41,
-    CONDITION_FHIR_TYPE = 42,
-    OBSERVATION_FHIR_TYPE = 43,
-    SERVICE_REQUEST_FHIR_TYPE = 44,
-    MEDICATION_REQUEST_FHIR_TYPE = 45,
-
-    // Value Types
-    FHIR_VALUE_TYPE = 50,
-    BOOLEAN_VALUE_TYPE = 51,
-    DATETIME_VALUE_TYPE = 52,
-    QUANTITY_VALUE_TYPE = 53,
-    STRING_VALUE_TYPE = 54,
-    INTEGER_VALUE_TYPE = 55,
-    DECIMAL_VALUE_TYPE = 56,
-    DATE_VALUE_TYPE = 57,
-    TIME_VALUE_TYPE = 58,
-    CODE_VALUE_TYPE = 59,
-    CODING_VALUE_TYPE = 60,
-    CODEABLECONCEPT_VALUE_TYPE = 61,
-    RATIO_VALUE_TYPE = 62,
-    PERIOD_VALUE_TYPE = 63,
-    RANGE_VALUE_TYPE = 64,
-    REFERENCE_VALUE_TYPE = 65
+    ACTION_FHIR_TYPE = 50,
+    CASEFEATURE_FHIR_TYPE = 51,
+    FHIR_VALUE_TYPE = 60
 }
 
 /**
@@ -117,6 +109,17 @@ export const RuleNames = [
   'PROFILEURL',
   'VALUETYPE',
   'EXPRESSION',
+  'PLUS',
+  'MINUS',
+  'MULT',
+  'DIV',
+  'EQ',
+  'NEQ',
+  'GT',
+  'GTE',
+  'LT',
+  'LTE',
+  'ASSIGN',
   'LPAREN',
   'RPAREN',
   'OR',
@@ -124,10 +127,6 @@ export const RuleNames = [
   'NOT',
   'ACTION_FHIR_TYPE',
   'CASEFEATURE_FHIR_TYPE',
-  'CONDITION_FHIR_TYPE',
-  'OBSERVATION_FHIR_TYPE',
-  'SERVICE_REQUEST_FHIR_TYPE',
-  'MEDICATION_REQUEST_FHIR_TYPE',
   'FHIR_VALUE_TYPE'
 ];
 

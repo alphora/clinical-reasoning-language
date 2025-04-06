@@ -105,6 +105,8 @@ function getAllTokens(lexer: CPGLLexer): Token[] {
 
 // Helper function to verify token sequence
 function verifyTokenSequence(tokens: Token[], expectedTypes: number[], expectedTexts?: string[]) {
+  console.log('Got tokens:', tokens.map(t => ({ type: t.type, text: t.text })));
+  console.log('Expected types:', expectedTypes);
   expect(tokens.length).toBe(expectedTypes.length);
   tokens.forEach((token, index) => {
     expect(token.type).toBe(expectedTypes[index]);
@@ -882,7 +884,7 @@ describe('CPGLLexer', () => {
         TokenTypes.STRING,
         TokenTypes.NEWLINE,
         TokenTypes.VALUETYPE,
-        TokenTypes.STRING_VALUE_TYPE,
+        TokenTypes.FHIR_VALUE_TYPE,
         TokenTypes.NEWLINE,
         TokenTypes.EXPRESSION,
         TokenTypes.LPAREN,
@@ -1291,12 +1293,51 @@ describe('CPGLLexer', () => {
         TokenTypes.STRING,
         TokenTypes.NEWLINE,
         TokenTypes.VALUETYPE,
-        TokenTypes.QUANTITY_VALUE_TYPE,
+        TokenTypes.FHIR_VALUE_TYPE,
         TokenTypes.NEWLINE,
         TokenTypes.EXPRESSION,
         TokenTypes.LPAREN,
         TokenTypes.STRING,
         TokenTypes.AND,
+        TokenTypes.STRING,
+        TokenTypes.RPAREN,
+        TokenTypes.DEDENT,
+        TokenTypes.EOF
+      ]);
+    });
+
+    it('should handle CaseFeature with string value type', () => {
+      const input = `casefeature "String Feature"
+    casefeaturecode "code"
+    fhirtype Observation
+    profileurl "url"
+    valuetype string
+    expression ("Value = 'test'" OR "Value = 'example'")`;
+
+      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const tokens = getAllTokens(lexer);
+
+      verifyTokenSequence(tokens, [
+        TokenTypes.CASEFEATURE,
+        TokenTypes.STRING,
+        TokenTypes.NEWLINE,
+        TokenTypes.INDENT,
+        TokenTypes.CASEFEATURECODE,
+        TokenTypes.STRING,
+        TokenTypes.NEWLINE,
+        TokenTypes.FHIRTYPE,
+        TokenTypes.CASEFEATURE_FHIR_TYPE,
+        TokenTypes.NEWLINE,
+        TokenTypes.PROFILEURL,
+        TokenTypes.STRING,
+        TokenTypes.NEWLINE,
+        TokenTypes.VALUETYPE,
+        TokenTypes.FHIR_VALUE_TYPE,
+        TokenTypes.NEWLINE,
+        TokenTypes.EXPRESSION,
+        TokenTypes.LPAREN,
+        TokenTypes.STRING,
+        TokenTypes.OR,
         TokenTypes.STRING,
         TokenTypes.RPAREN,
         TokenTypes.DEDENT,
@@ -1948,7 +1989,7 @@ describe('CPGLLexer', () => {
             verifyTokenSequence(tokens, [
                 TokenTypes.CASEFEATURE, TokenTypes.STRING, TokenTypes.NEWLINE,
                 TokenTypes.INDENT,
-                TokenTypes.FHIRTYPE, TokenTypes.CONDITION_FHIR_TYPE, TokenTypes.NEWLINE,
+                TokenTypes.FHIRTYPE, TokenTypes.CASEFEATURE_FHIR_TYPE, TokenTypes.NEWLINE,
                 TokenTypes.EXPRESSION, TokenTypes.STRING,
                 TokenTypes.DEDENT
             ]);
@@ -1965,7 +2006,7 @@ describe('CPGLLexer', () => {
             verifyTokenSequence(tokens, [
                 TokenTypes.CASEFEATURE, TokenTypes.STRING, TokenTypes.NEWLINE,
                 TokenTypes.INDENT,
-                TokenTypes.FHIRTYPE, TokenTypes.OBSERVATION_FHIR_TYPE, TokenTypes.NEWLINE,
+                TokenTypes.FHIRTYPE, TokenTypes.CASEFEATURE_FHIR_TYPE, TokenTypes.NEWLINE,
                 TokenTypes.EXPRESSION, TokenTypes.STRING,
                 TokenTypes.DEDENT
             ]);
@@ -1982,7 +2023,7 @@ describe('CPGLLexer', () => {
             verifyTokenSequence(tokens, [
                 TokenTypes.CASEFEATURE, TokenTypes.STRING, TokenTypes.NEWLINE,
                 TokenTypes.INDENT,
-                TokenTypes.FHIRTYPE, TokenTypes.SERVICE_REQUEST_FHIR_TYPE, TokenTypes.NEWLINE,
+                TokenTypes.FHIRTYPE, TokenTypes.ACTION_FHIR_TYPE, TokenTypes.NEWLINE,
                 TokenTypes.EXPRESSION, TokenTypes.STRING,
                 TokenTypes.DEDENT
             ]);
@@ -1999,7 +2040,7 @@ describe('CPGLLexer', () => {
             verifyTokenSequence(tokens, [
                 TokenTypes.CASEFEATURE, TokenTypes.STRING, TokenTypes.NEWLINE,
                 TokenTypes.INDENT,
-                TokenTypes.FHIRTYPE, TokenTypes.MEDICATION_REQUEST_FHIR_TYPE, TokenTypes.NEWLINE,
+                TokenTypes.FHIRTYPE, TokenTypes.ACTION_FHIR_TYPE, TokenTypes.NEWLINE,
                 TokenTypes.EXPRESSION, TokenTypes.STRING,
                 TokenTypes.DEDENT
             ]);
@@ -2011,35 +2052,79 @@ describe('CPGLLexer', () => {
     describe('Different Value Types', () => {
         it('should handle CaseFeature with boolean value type', () => {
             const input = `casefeature "Boolean Feature"
+    casefeaturecode "code"
+    fhirtype Observation
+    profileurl "url"
     valuetype boolean
-    expression "Boolean Expression"`;
+    expression ("Value = true" OR "Value = false")`;
 
             const lexer = new CPGLLexer(CharStreams.fromString(input));
             const tokens = getAllTokens(lexer);
 
             verifyTokenSequence(tokens, [
-                TokenTypes.CASEFEATURE, TokenTypes.STRING, TokenTypes.NEWLINE,
+                TokenTypes.CASEFEATURE,
+                TokenTypes.STRING,
+                TokenTypes.NEWLINE,
                 TokenTypes.INDENT,
-                TokenTypes.VALUETYPE, TokenTypes.BOOLEAN_VALUE_TYPE, TokenTypes.NEWLINE,
-                TokenTypes.EXPRESSION, TokenTypes.STRING,
-                TokenTypes.DEDENT
+                TokenTypes.CASEFEATURECODE,
+                TokenTypes.STRING,
+                TokenTypes.NEWLINE,
+                TokenTypes.FHIRTYPE,
+                TokenTypes.CASEFEATURE_FHIR_TYPE,
+                TokenTypes.NEWLINE,
+                TokenTypes.PROFILEURL,
+                TokenTypes.STRING,
+                TokenTypes.NEWLINE,
+                TokenTypes.VALUETYPE,
+                TokenTypes.FHIR_VALUE_TYPE,
+                TokenTypes.NEWLINE,
+                TokenTypes.EXPRESSION,
+                TokenTypes.LPAREN,
+                TokenTypes.STRING,
+                TokenTypes.OR,
+                TokenTypes.STRING,
+                TokenTypes.RPAREN,
+                TokenTypes.DEDENT,
+                TokenTypes.EOF
             ]);
         });
 
-        it('should handle CaseFeature with dateTime value type', () => {
+        it('should handle CaseFeature with datetime value type', () => {
             const input = `casefeature "DateTime Feature"
+    casefeaturecode "code"
+    fhirtype Observation
+    profileurl "url"
     valuetype dateTime
-    expression "DateTime Expression"`;
+    expression ("Value > 2023-01-01T00:00:00Z" AND "Value < 2023-12-31T23:59:59Z")`;
 
             const lexer = new CPGLLexer(CharStreams.fromString(input));
             const tokens = getAllTokens(lexer);
 
             verifyTokenSequence(tokens, [
-                TokenTypes.CASEFEATURE, TokenTypes.STRING, TokenTypes.NEWLINE,
+                TokenTypes.CASEFEATURE,
+                TokenTypes.STRING,
+                TokenTypes.NEWLINE,
                 TokenTypes.INDENT,
-                TokenTypes.VALUETYPE, TokenTypes.DATETIME_VALUE_TYPE, TokenTypes.NEWLINE,
-                TokenTypes.EXPRESSION, TokenTypes.STRING,
-                TokenTypes.DEDENT
+                TokenTypes.CASEFEATURECODE,
+                TokenTypes.STRING,
+                TokenTypes.NEWLINE,
+                TokenTypes.FHIRTYPE,
+                TokenTypes.CASEFEATURE_FHIR_TYPE,
+                TokenTypes.NEWLINE,
+                TokenTypes.PROFILEURL,
+                TokenTypes.STRING,
+                TokenTypes.NEWLINE,
+                TokenTypes.VALUETYPE,
+                TokenTypes.FHIR_VALUE_TYPE,
+                TokenTypes.NEWLINE,
+                TokenTypes.EXPRESSION,
+                TokenTypes.LPAREN,
+                TokenTypes.STRING,
+                TokenTypes.AND,
+                TokenTypes.STRING,
+                TokenTypes.RPAREN,
+                TokenTypes.DEDENT,
+                TokenTypes.EOF
             ]);
         });
 
@@ -2048,7 +2133,7 @@ describe('CPGLLexer', () => {
     casefeaturecode "code"
     fhirtype Observation
     profileurl "url"
-    valuetype quantity
+    valuetype Quantity
     expression ("Quantity > 100" AND "Quantity < 200")`;
 
             const lexer = new CPGLLexer(CharStreams.fromString(input));
@@ -2069,12 +2154,51 @@ describe('CPGLLexer', () => {
                 TokenTypes.STRING,
                 TokenTypes.NEWLINE,
                 TokenTypes.VALUETYPE,
-                TokenTypes.QUANTITY_VALUE_TYPE,
+                TokenTypes.FHIR_VALUE_TYPE,
                 TokenTypes.NEWLINE,
                 TokenTypes.EXPRESSION,
                 TokenTypes.LPAREN,
                 TokenTypes.STRING,
                 TokenTypes.AND,
+                TokenTypes.STRING,
+                TokenTypes.RPAREN,
+                TokenTypes.DEDENT,
+                TokenTypes.EOF
+            ]);
+        });
+
+        it('should handle CaseFeature with string value type', () => {
+            const input = `casefeature "String Feature"
+    casefeaturecode "code"
+    fhirtype Observation
+    profileurl "url"
+    valuetype string
+    expression ("Value = 'test'" OR "Value = 'example'")`;
+
+            const lexer = new CPGLLexer(CharStreams.fromString(input));
+            const tokens = getAllTokens(lexer);
+
+            verifyTokenSequence(tokens, [
+                TokenTypes.CASEFEATURE,
+                TokenTypes.STRING,
+                TokenTypes.NEWLINE,
+                TokenTypes.INDENT,
+                TokenTypes.CASEFEATURECODE,
+                TokenTypes.STRING,
+                TokenTypes.NEWLINE,
+                TokenTypes.FHIRTYPE,
+                TokenTypes.CASEFEATURE_FHIR_TYPE,
+                TokenTypes.NEWLINE,
+                TokenTypes.PROFILEURL,
+                TokenTypes.STRING,
+                TokenTypes.NEWLINE,
+                TokenTypes.VALUETYPE,
+                TokenTypes.FHIR_VALUE_TYPE,
+                TokenTypes.NEWLINE,
+                TokenTypes.EXPRESSION,
+                TokenTypes.LPAREN,
+                TokenTypes.STRING,
+                TokenTypes.OR,
                 TokenTypes.STRING,
                 TokenTypes.RPAREN,
                 TokenTypes.DEDENT,
