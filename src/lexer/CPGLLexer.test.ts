@@ -4,6 +4,11 @@ import { CharStreams } from 'antlr4ts';
 import { CPGLLexer } from './CPGLLexer';
 import { CPGLLexer as GeneratedLexer } from '../grammar/generated/CPGLLexer';
 
+// Token type constants for readability
+const NEWLINE = '\n';
+const INDENT = '    ';
+const DEDENT = '<DEDENT>';
+
 describe('CPGLLexer', () => {
   it('should handle basic tokens', () => {
     const input = 'decision "test"';
@@ -37,11 +42,10 @@ describe('CPGLLexer', () => {
 decision "test"`;
     const lexer = new CPGLLexer(CharStreams.fromString(input));
     const tokens = getAllTokens(lexer);
-    expect(tokens.length).toBe(4);
-    expect(tokens[0].type).toBe(GeneratedLexer.NEWLINE);
-    expect(tokens[1].type).toBe(GeneratedLexer.DECISION);
-    expect(tokens[2].type).toBe(GeneratedLexer.STRING);
-    expect(tokens[3].type).toBe(GeneratedLexer.EOF);
+    expect(tokens.length).toBe(3);
+    expect(tokens[0].type).toBe(GeneratedLexer.DECISION);
+    expect(tokens[1].type).toBe(GeneratedLexer.STRING);
+    expect(tokens[2].type).toBe(GeneratedLexer.EOF);
   });
 
   it('should handle block comments', () => {
@@ -49,11 +53,10 @@ decision "test"`;
 decision "test"`;
     const lexer = new CPGLLexer(CharStreams.fromString(input));
     const tokens = getAllTokens(lexer);
-    expect(tokens.length).toBe(4);
-    expect(tokens[0].type).toBe(GeneratedLexer.NEWLINE);
-    expect(tokens[1].type).toBe(GeneratedLexer.DECISION);
-    expect(tokens[2].type).toBe(GeneratedLexer.STRING);
-    expect(tokens[3].type).toBe(GeneratedLexer.EOF);
+    expect(tokens.length).toBe(3);
+    expect(tokens[0].type).toBe(GeneratedLexer.DECISION);
+    expect(tokens[1].type).toBe(GeneratedLexer.STRING);
+    expect(tokens[2].type).toBe(GeneratedLexer.EOF);
   });
 
   it('should handle errors', () => {
@@ -247,6 +250,193 @@ decision "test"`;
     expect(tokens[24].type).toBe(GeneratedLexer.DEDENT);
     expect(tokens[25].type).toBe(GeneratedLexer.DEDENT);
     expect(tokens[26].type).toBe(GeneratedLexer.EOF);
+  });
+
+  it('should handle indentation with newline resets', () => {
+    const input = `decision "cycle1"
+${NEWLINE}
+${INDENT}when "condition" then
+${NEWLINE}${INDENT}${INDENT}use "cycle2"${DEDENT}
+${NEWLINE}${NEWLINE}decision "cycle2"
+${NEWLINE}${INDENT}when "condition" then
+${NEWLINE}${INDENT}${INDENT}use "cycle1"${DEDENT}${NEWLINE}`;
+    const lexer = new CPGLLexer(CharStreams.fromString(input));
+    const tokens = getAllTokens(lexer);
+    
+    // Verify token sequence
+    expect(tokens.map(t => t.type)).toEqual([
+      GeneratedLexer.DECISION,
+      GeneratedLexer.STRING,
+      GeneratedLexer.NEWLINE,
+      GeneratedLexer.NEWLINE,
+      GeneratedLexer.INDENT,
+      GeneratedLexer.WHEN,
+      GeneratedLexer.STRING,
+      GeneratedLexer.THEN,
+      GeneratedLexer.NEWLINE,
+      GeneratedLexer.INDENT,
+      GeneratedLexer.INDENT,
+      GeneratedLexer.USE,
+      GeneratedLexer.STRING,
+      GeneratedLexer.DEDENT,
+      GeneratedLexer.NEWLINE,
+      GeneratedLexer.NEWLINE,
+      GeneratedLexer.DECISION,
+      GeneratedLexer.STRING,
+      GeneratedLexer.NEWLINE,
+      GeneratedLexer.INDENT,
+      GeneratedLexer.WHEN,
+      GeneratedLexer.STRING,
+      GeneratedLexer.THEN,
+      GeneratedLexer.NEWLINE,
+      GeneratedLexer.INDENT,
+      GeneratedLexer.INDENT,
+      GeneratedLexer.USE,
+      GeneratedLexer.STRING,
+      GeneratedLexer.DEDENT,
+      GeneratedLexer.NEWLINE,
+      GeneratedLexer.EOF
+    ]);
+  });
+
+  it('should handle indentation with newline resets and top-level keywords', () => {
+    const input = `decision "cycle1"
+${INDENT}when "condition" then
+${NEWLINE}${INDENT}${INDENT}use "cycle2"${DEDENT}
+${NEWLINE}${NEWLINE}decision "cycle2"
+${INDENT}when "condition" then
+${NEWLINE}${INDENT}${INDENT}use "cycle1"${DEDENT}${NEWLINE}`;
+    const lexer = new CPGLLexer(CharStreams.fromString(input));
+    const tokens = getAllTokens(lexer);
+    
+    // Verify token sequence
+    expect(tokens.map(t => t.type)).toEqual([
+      GeneratedLexer.DECISION,
+      GeneratedLexer.STRING,
+      GeneratedLexer.NEWLINE,
+      GeneratedLexer.INDENT,
+      GeneratedLexer.WHEN,
+      GeneratedLexer.STRING,
+      GeneratedLexer.THEN,
+      GeneratedLexer.NEWLINE,
+      GeneratedLexer.INDENT,
+      GeneratedLexer.INDENT,
+      GeneratedLexer.USE,
+      GeneratedLexer.STRING,
+      GeneratedLexer.DEDENT,
+      GeneratedLexer.NEWLINE,
+      GeneratedLexer.NEWLINE,
+      GeneratedLexer.DECISION,
+      GeneratedLexer.STRING,
+      GeneratedLexer.NEWLINE,
+      GeneratedLexer.INDENT,
+      GeneratedLexer.WHEN,
+      GeneratedLexer.STRING,
+      GeneratedLexer.THEN,
+      GeneratedLexer.NEWLINE,
+      GeneratedLexer.INDENT,
+      GeneratedLexer.INDENT,
+      GeneratedLexer.USE,
+      GeneratedLexer.STRING,
+      GeneratedLexer.DEDENT,
+      GeneratedLexer.NEWLINE,
+      GeneratedLexer.EOF
+    ]);
+  });
+
+  it('should handle indentation reset with action keyword', () => {
+    const input = `decision "cycle1"
+${INDENT}when "condition" then
+${NEWLINE}${INDENT}${INDENT}use "cycle2"${DEDENT}
+${NEWLINE}action "test"
+${INDENT}fhirtype ServiceRequest`;
+    const lexer = new CPGLLexer(CharStreams.fromString(input));
+    const tokens = getAllTokens(lexer);
+    
+    // Verify token sequence
+    expect(tokens.map(t => t.type)).toEqual([
+      GeneratedLexer.DECISION,
+      GeneratedLexer.STRING,
+      GeneratedLexer.NEWLINE,
+      GeneratedLexer.INDENT,
+      GeneratedLexer.WHEN,
+      GeneratedLexer.STRING,
+      GeneratedLexer.THEN,
+      GeneratedLexer.NEWLINE,
+      GeneratedLexer.INDENT,
+      GeneratedLexer.INDENT,
+      GeneratedLexer.USE,
+      GeneratedLexer.STRING,
+      GeneratedLexer.DEDENT,
+      GeneratedLexer.NEWLINE,
+      GeneratedLexer.ACTION,
+      GeneratedLexer.STRING,
+      GeneratedLexer.NEWLINE,
+      GeneratedLexer.INDENT,
+      GeneratedLexer.FHIRTYPE,
+      GeneratedLexer.ACTION_FHIR_TYPE,
+      GeneratedLexer.EOF
+    ]);
+  });
+
+  it('should handle indentation reset with casefeature keyword', () => {
+    const input = `decision "cycle1"
+${INDENT}when "condition" then
+${NEWLINE}${INDENT}${INDENT}use "cycle2"${DEDENT}
+${NEWLINE}casefeature "test"
+${INDENT}valuetype string`;
+    const lexer = new CPGLLexer(CharStreams.fromString(input));
+    const tokens = getAllTokens(lexer);
+    
+    // Verify token sequence
+    expect(tokens.map(t => t.type)).toEqual([
+      GeneratedLexer.DECISION,
+      GeneratedLexer.STRING,
+      GeneratedLexer.NEWLINE,
+      GeneratedLexer.INDENT,
+      GeneratedLexer.WHEN,
+      GeneratedLexer.STRING,
+      GeneratedLexer.THEN,
+      GeneratedLexer.NEWLINE,
+      GeneratedLexer.INDENT,
+      GeneratedLexer.INDENT,
+      GeneratedLexer.USE,
+      GeneratedLexer.STRING,
+      GeneratedLexer.DEDENT,
+      GeneratedLexer.NEWLINE,
+      GeneratedLexer.CASEFEATURE,
+      GeneratedLexer.STRING,
+      GeneratedLexer.NEWLINE,
+      GeneratedLexer.INDENT,
+      GeneratedLexer.VALUETYPE,
+      GeneratedLexer.FHIR_VALUE_TYPE,
+      GeneratedLexer.EOF
+    ]);
+  });
+
+  it('should throw error for inconsistent indentation within block', () => {
+    const input = `decision "cycle1"
+${INDENT}when "condition" then
+${NEWLINE}${INDENT}${INDENT}use "cycle2"
+${NEWLINE}${INDENT}  use "cycle3"`; // 2 spaces instead of 4
+    const lexer = new CPGLLexer(CharStreams.fromString(input));
+    
+    expect(() => {
+      getAllTokens(lexer);
+    }).toThrow('Inconsistent indentation');
+  });
+
+  it('should throw error for non-multiple-of-4 indentation', () => {
+    const input = `decision "cycle1"
+${NEWLINE}
+${INDENT}when "condition" then
+${NEWLINE}${INDENT}${INDENT}use "cycle2"
+${NEWLINE}${INDENT}   use "cycle3"`; // 3 spaces
+    const lexer = new CPGLLexer(CharStreams.fromString(input));
+    
+    expect(() => {
+      getAllTokens(lexer);
+    }).toThrow('Inconsistent indentation');
   });
 });
 

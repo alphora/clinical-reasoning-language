@@ -135,82 +135,51 @@ export class CPGLLexer extends Lexer {
    * Handles indentation tracking and token generation
    */
   public nextToken(): Token {
-    // Handle pending tokens first
-    const pendingToken = this.handlePendingTokens();
-    if (pendingToken) return pendingToken;
-
-    // Handle EOF
-    const eofToken = this.handleEOF();
-    if (eofToken) return eofToken;
+    // Return any pending tokens first
+    if (this.pendingTokens.length > 0) {
+      const token = this.pendingTokens.shift()!;
+      return token;
+    }
 
     // Handle line start
     if (this.atStartOfLine) {
-      const indentationToken = this.handleLineStart();
-      if (indentationToken) return indentationToken;
-    } else {
-      this.skipWhitespace();
+      const lineStartToken = this.handleLineStart();
+      if (lineStartToken) {
+        return lineStartToken;
+      }
     }
 
-    // Handle EOF after whitespace
-    const eofAfterWhitespaceToken = this.handleEOF();
-    if (eofAfterWhitespaceToken) return eofAfterWhitespaceToken;
-
-    // Handle comments
-    if (this.isCommentStart()) {
-      return this.handleComment();
+    // Skip whitespace
+    while (this._input.LA(1) === ' '.charCodeAt(0) || this._input.LA(1) === '\t'.charCodeAt(0)) {
+      this._input.consume();
+      this._currentColumn++;
     }
 
-    // Handle newlines
-    if (this.isNewline()) {
-      return this.handleNewline();
-    }
-
-    // Handle string literals
-    if (this.isStringLiteral()) {
-      return this.handleStringLiteral();
-    }
-
-    // Handle identifiers and keywords
-    if (this.isAlpha(this._input.LA(1))) {
-      return this.handleIdentifier();
-    }
-
-    // Handle invalid characters
-    return this.handleError();
-  }
-
-  private handlePendingTokens(): Token | null {
-    if (this.pendingTokens.length > 0) {
-      const token = this.pendingTokens.shift();
-      return token || null;
-    }
-    return null;
-  }
-
-  private handleEOF(): Token | null {
+    // Check for EOF
     if (this._input.LA(1) === -1) {
-      // Emit DEDENT tokens for any remaining indentation levels
+      // Generate DEDENT tokens for any remaining indentation levels
       while (this.indentationStack.length > 1) {
         this.indentationStack.pop();
-        this.pendingTokens.push(
-          this.createToken({
-            type: GeneratedLexer.DEDENT,
-            text: '<DEDENT>',
-            startIndex: this._input.index,
-            stopIndex: this._input.index,
-            line: this._currentLine,
-            charPositionInLine: this._currentColumn,
-            channel: Token.DEFAULT_CHANNEL,
-            tokenIndex: this._tokenIndex++,
-            source: [this._input, this],
-          })
-        );
+        const dedentToken = this.createToken({
+          type: GeneratedLexer.DEDENT,
+          text: '',
+          startIndex: this._input.index,
+          stopIndex: this._input.index,
+          line: this._currentLine,
+          charPositionInLine: this._currentColumn,
+          channel: Token.DEFAULT_CHANNEL,
+          tokenIndex: this._tokenIndex++,
+          source: [this._input, this],
+        });
+        this.pendingTokens.push(dedentToken);
       }
-      // If we have pending tokens, return the first one
+
+      // Return pending DEDENT tokens if any
       if (this.pendingTokens.length > 0) {
-        return this.pendingTokens.shift() || null;
+        return this.pendingTokens.shift()!;
       }
-      // Otherwise, return EOF token
+
+      // Return EOF token
       return this.createToken({
         type: Token.EOF,
         text: '<EOF>',
@@ -223,56 +192,51 @@ export class CPGLLexer extends Lexer {
         source: [this._input, this],
       });
     }
-    return null;
-  }
 
-  private handleLineStart(): Token | null {
-    this.atStartOfLine = false;
-    let whitespaceCount = 0;
-
-    // Count spaces at start of line
-    while (this._input.LA(1) === ' '.charCodeAt(0)) {
-      whitespaceCount++;
-      this._input.consume();
-      this._currentColumn++;
+    // Handle newlines
+    if (this._input.LA(1) === '\n'.charCodeAt(0) || this._input.LA(1) === '\r'.charCodeAt(0)) {
+      return this.handleNewline();
     }
 
-    // Skip tabs
-    while (this._input.LA(1) === '\t'.charCodeAt(0)) {
-      this._input.consume();
-      this._currentColumn++;
+    // Handle single-line comments
+    if (this._input.LA(1) === '/'.charCodeAt(0) && this._input.LA(2) === '/'.charCodeAt(0)) {
+      const commentToken = this.handleSingleLineComment();
+      if (commentToken) {
+        return commentToken;
+      }
+      // If no token returned, continue to next token
+      return this.nextToken();
     }
 
-    // Only handle indentation if we're not at EOF or another newline
-    if (this._input.LA(1) !== -1 && !this.isNewline()) {
-      this.currentIndent = whitespaceCount;
-      const lastIndent = this.indentationStack[this.indentationStack.length - 1];
+    // Handle block comments
+    if (this._input.LA(1) === '/'.charCodeAt(0) && this._input.LA(2) === '*'.charCodeAt(0)) {
+      const commentToken = this.handleBlockComment();
+      if (commentToken) {
+        return commentToken;
+      }
+      // If no token returned, continue to next token
+      return this.nextToken();
+    }
 
-      if (this.currentIndent > lastIndent) {
-        // Only emit INDENT if it's a multiple of 4 spaces
-        if (this.currentIndent % 4 === 0) {
-          this.indentationStack.push(this.currentIndent);
-          return this.createToken({
-            type: GeneratedLexer.INDENT,
-            text: '    ',
-            startIndex: this._input.index - whitespaceCount,
-            stopIndex: this._input.index,
-            line: this._currentLine,
-            charPositionInLine: this._currentColumn,
-            channel: Token.DEFAULT_CHANNEL,
-            tokenIndex: this._tokenIndex++,
-            source: [this._input, this],
-          });
-        } else {
-          throw new Error('Inconsistent indentation');
-        }
-      } else if (this.currentIndent < lastIndent) {
-        // Only emit DEDENT if it's a multiple of 4 spaces
-        if (this.currentIndent % 4 === 0) {
+    // Handle string literals
+    if (this._input.LA(1) === '"'.charCodeAt(0)) {
+      return this.handleStringLiteral();
+    }
+
+    // Handle identifiers and keywords
+    if (this.isAlpha(this._input.LA(1))) {
+      const token = this.handleIdentifier();
+      
+      // Reset indentation for top-level keywords
+      if (token.type === GeneratedLexer.ACTION ||
+          token.type === GeneratedLexer.CASEFEATURE ||
+          token.type === GeneratedLexer.DECISION) {
+        // Generate DEDENT tokens for any remaining indentation levels
+        while (this.indentationStack.length > 1) {
           this.indentationStack.pop();
-          return this.createToken({
+          const dedentToken = this.createToken({
             type: GeneratedLexer.DEDENT,
-            text: '<DEDENT>',
+            text: '',
             startIndex: this._input.index,
             stopIndex: this._input.index,
             line: this._currentLine,
@@ -281,64 +245,111 @@ export class CPGLLexer extends Lexer {
             tokenIndex: this._tokenIndex++,
             source: [this._input, this],
           });
-        } else {
-          throw new Error('Inconsistent indentation');
+          this.pendingTokens.push(dedentToken);
         }
+      }
+
+      return token;
+    }
+
+    // Handle invalid characters
+    return this.handleError();
+  }
+
+  private handleLineStart(): Token | null {
+    if (!this.atStartOfLine) {
+      return null;
+    }
+
+    this.atStartOfLine = false;
+    this.currentIndent = 0;
+
+    // Count indentation
+    while (this._input.LA(1) === ' '.charCodeAt(0) || this._input.LA(1) === '\t'.charCodeAt(0)) {
+      this._input.consume();
+      this.currentIndent++;
+      this._currentColumn++;
+    }
+
+    // Check for non-multiple-of-4 indentation
+    if (this.currentIndent % 4 !== 0) {
+      throw new Error('Inconsistent indentation');
+    }
+
+    // Handle indentation
+    const lastIndent = this.indentationStack[this.indentationStack.length - 1];
+    if (this.currentIndent > lastIndent) {
+      this.indentationStack.push(this.currentIndent);
+      return this.createToken({
+        type: GeneratedLexer.INDENT,
+        text: '    ',
+        startIndex: this._input.index - this.currentIndent,
+        stopIndex: this._input.index - 1,
+        line: this._currentLine,
+        charPositionInLine: 0,
+        channel: Token.DEFAULT_CHANNEL,
+        tokenIndex: this._tokenIndex++,
+        source: [this._input, this],
+      });
+    } else if (this.currentIndent < lastIndent) {
+      // Generate DEDENT tokens for each level of indentation we're dedenting
+      while (this.currentIndent < this.indentationStack[this.indentationStack.length - 1]) {
+        this.indentationStack.pop();
+        const dedentToken = this.createToken({
+          type: GeneratedLexer.DEDENT,
+          text: '',
+          startIndex: this._input.index,
+          stopIndex: this._input.index,
+          line: this._currentLine,
+          charPositionInLine: this._currentColumn,
+          channel: Token.DEFAULT_CHANNEL,
+          tokenIndex: this._tokenIndex++,
+          source: [this._input, this],
+        });
+        this.pendingTokens.push(dedentToken);
+      }
+
+      // If we dedented to a level that doesn't exist, that's an error
+      if (this.currentIndent !== this.indentationStack[this.indentationStack.length - 1]) {
+        throw new Error('Inconsistent indentation');
+      }
+
+      // Return the first DEDENT token if we generated any
+      if (this.pendingTokens.length > 0) {
+        return this.pendingTokens.shift()!;
       }
     }
 
     return null;
   }
 
-  private skipWhitespace(): void {
-    while (this._input.LA(1) === ' '.charCodeAt(0)) {
-      this._input.consume();
-      this._currentColumn++;
-    }
-  }
-
-  private isCommentStart(): boolean {
-    return (
-      this._input.LA(1) === '/'.charCodeAt(0) &&
-      (this._input.LA(2) === '/'.charCodeAt(0) || this._input.LA(2) === '*'.charCodeAt(0))
-    );
-  }
-
-  private handleComment(): Token {
-    return this._input.LA(2) === '/'.charCodeAt(0)
-      ? this.handleSingleLineComment()
-      : this.handleBlockComment();
-  }
-
-  private isNewline(): boolean {
-    return this._input.LA(1) === '\n'.charCodeAt(0) || this._input.LA(1) === '\r'.charCodeAt(0);
-  }
-
   private handleNewline(): Token {
-    const start = this._input.index;
-    let text = '';
-
-    // Handle \r\n or \n
-    if (this._input.LA(1) === '\r'.charCodeAt(0)) {
-      text += '\r';
-      this._input.consume();
-      if (this._input.LA(1) === '\n'.charCodeAt(0)) {
-        text += '\n';
-        this._input.consume();
+    // Reset indentation stack for certain keywords
+    const lastToken = this.pendingTokens[this.pendingTokens.length - 1] || null;
+    if (lastToken && (
+      lastToken.type === GeneratedLexer.ACTION ||
+      lastToken.type === GeneratedLexer.CASEFEATURE ||
+      lastToken.type === GeneratedLexer.DECISION
+    )) {
+      // Clear the stack except for the base indentation level
+      while (this.indentationStack.length > 1) {
+        this.indentationStack.pop();
       }
-    } else if (this._input.LA(1) === '\n'.charCodeAt(0)) {
-      text += '\n';
-      this._input.consume();
     }
 
+    // Consume the newline
+    if (this._input.LA(1) === '\r'.charCodeAt(0)) {
+      this._input.consume();
+    }
+    this._input.consume();
     this._currentLine++;
     this._currentColumn = 0;
     this.atStartOfLine = true;
 
     return this.createToken({
       type: GeneratedLexer.NEWLINE,
-      text,
-      startIndex: start,
+      text: '\n',
+      startIndex: this._input.index - 1,
       stopIndex: this._input.index - 1,
       line: this._currentLine - 1,
       charPositionInLine: this._currentColumn,
@@ -348,239 +359,249 @@ export class CPGLLexer extends Lexer {
     });
   }
 
-  private isStringLiteral(): boolean {
-    return this._input.LA(1) === '"'.charCodeAt(0);
-  }
+  private handleSingleLineComment(): Token | null {
+    // Consume the // characters
+    this._input.consume();
+    this._input.consume();
+    this._currentColumn += 2;
 
-  /**
-   * Handle single-line comments
-   */
-  protected handleSingleLineComment(): Token {
-    this._input.consume(); // Consume the first '/'
-    this._currentColumn++;
-    this._input.consume(); // Consume the second '/'
-    this._currentColumn++;
-
-    while (
-      this._input.LA(1) !== -1 &&
-      this._input.LA(1) !== '\n'.charCodeAt(0) &&
-      this._input.LA(1) !== '\r'.charCodeAt(0)
-    ) {
+    // Consume the comment but stop before newline
+    while (this._input.LA(1) !== -1 && this._input.LA(1) !== '\n'.charCodeAt(0) && this._input.LA(1) !== '\r'.charCodeAt(0)) {
       this._input.consume();
       this._currentColumn++;
     }
 
-    // Skip the comment and return the next token
-    return this.nextToken();
+    // Consume the newline
+    if (this._input.LA(1) === '\r'.charCodeAt(0)) {
+      this._input.consume();
+      if (this._input.LA(1) === '\n'.charCodeAt(0)) {
+        this._input.consume();
+      }
+    } else if (this._input.LA(1) === '\n'.charCodeAt(0)) {
+      this._input.consume();
+    }
+    this._currentLine++;
+    this._currentColumn = 0;
+    this.atStartOfLine = true;
+
+    // Return null to skip the comment
+    return null;
   }
 
-  /**
-   * Handle block comments
-   */
-  protected handleBlockComment(): Token {
-    this._input.consume(); // Consume the first '/'
-    this._currentColumn++;
-    this._input.consume(); // Consume the '*'
-    this._currentColumn++;
+  private handleBlockComment(): Token | null {
+    // Consume the /* characters
+    this._input.consume();
+    this._input.consume();
+    this._currentColumn += 2;
 
-    let foundEnd = false;
-    let iterationCount = 0;
-    const MAX_ITERATIONS = 1000; // Safety limit
+    let nesting = 1;
 
-    while (this._input.LA(1) !== -1 && !foundEnd) {
-      iterationCount++;
-      if (iterationCount > MAX_ITERATIONS) {
-        throw new Error('Block comment processing exceeded maximum iterations');
-      }
-
-      if (this._input.LA(1) === '\n'.charCodeAt(0)) {
-        this._input.consume(); // Consume the newline
-        this._currentLine++;
-        this._currentColumn = 0;
-      } else if (this._input.LA(1) === '\r'.charCodeAt(0)) {
-        this._input.consume(); // Consume \r
-        if (this._input.LA(1) === '\n'.charCodeAt(0)) {
-          this._input.consume(); // Consume \n
-        }
-        this._currentLine++;
-        this._currentColumn = 0;
-      } else if (
-        this._input.LA(1) === '*'.charCodeAt(0) &&
-        this._input.LA(2) === '/'.charCodeAt(0)
-      ) {
-        this._input.consume(); // Consume the '*'
-        this._currentColumn++;
-        this._input.consume(); // Consume the '/'
-        this._currentColumn++;
-        foundEnd = true;
-        break;
+    // Consume the comment content
+    while (nesting > 0 && this._input.LA(1) !== -1) {
+      if (this._input.LA(1) === '/'.charCodeAt(0) && this._input.LA(2) === '*'.charCodeAt(0)) {
+        nesting++;
+        this._input.consume();
+        this._input.consume();
+        this._currentColumn += 2;
+      } else if (this._input.LA(1) === '*'.charCodeAt(0) && this._input.LA(2) === '/'.charCodeAt(0)) {
+        nesting--;
+        this._input.consume();
+        this._input.consume();
+        this._currentColumn += 2;
       } else {
+        if (this._input.LA(1) === '\n'.charCodeAt(0)) {
+          this._input.consume();
+          this._currentLine++;
+          this._currentColumn = 0;
+          this.atStartOfLine = true;
+        } else if (this._input.LA(1) === '\r'.charCodeAt(0)) {
+          this._input.consume();
+          if (this._input.LA(1) === '\n'.charCodeAt(0)) {
+            this._input.consume();
+          }
+          this._currentLine++;
+          this._currentColumn = 0;
+          this.atStartOfLine = true;
+        } else {
+          this._input.consume();
+          this._currentColumn++;
+        }
+      }
+    }
+
+    // Consume the newline after the block comment
+    if (this._input.LA(1) === '\r'.charCodeAt(0)) {
+      this._input.consume();
+      if (this._input.LA(1) === '\n'.charCodeAt(0)) {
+        this._input.consume();
+      }
+      this._currentLine++;
+      this._currentColumn = 0;
+      this.atStartOfLine = true;
+    } else if (this._input.LA(1) === '\n'.charCodeAt(0)) {
+      this._input.consume();
+      this._currentLine++;
+      this._currentColumn = 0;
+      this.atStartOfLine = true;
+    }
+
+    // Return null to skip the comment
+    return null;
+  }
+
+  private handleStringLiteral(): Token {
+    // Consume the opening quote
+    this._input.consume();
+    this._currentColumn++;
+
+    const startIndex = this._input.index;
+    let text = '"';
+
+    // Consume the string content
+    while (this._input.LA(1) !== -1 && this._input.LA(1) !== '"'.charCodeAt(0)) {
+      if (this._input.LA(1) === '\\'.charCodeAt(0)) {
         this._input.consume();
         this._currentColumn++;
+        text += '\\';
       }
-    }
-
-    if (!foundEnd) {
-      throw new Error('Unterminated block comment');
-    }
-
-    // Skip the comment and return the next token
-    return this.nextToken();
-  }
-
-  /**
-   * Handle string literals
-   */
-  protected handleStringLiteral(): Token {
-    const start = this._input.index;
-    this._input.consume(); // Consume the opening quote
-    this._currentColumn++;
-
-    while (
-      this._input.LA(1) !== -1 &&
-      this._input.LA(1) !== '"'.charCodeAt(0) &&
-      this._input.LA(1) !== '\n'.charCodeAt(0) &&
-      this._input.LA(1) !== '\r'.charCodeAt(0)
-    ) {
-      this._input.consume();
-      this._currentColumn++;
-    }
-
-    if (
-      this._input.LA(1) === -1 ||
-      this._input.LA(1) === '\n'.charCodeAt(0) ||
-      this._input.LA(1) === '\r'.charCodeAt(0)
-    ) {
-      throw new Error('Unterminated string literal');
-    }
-
-    this._input.consume(); // Consume the closing quote
-    this._currentColumn++;
-
-    return this.createToken({
-      type: GeneratedLexer.STRING,
-      text: this._input.getText(new Interval(start, this._input.index - 1)),
-      startIndex: start,
-      stopIndex: this._input.index,
-      line: this._currentLine,
-      charPositionInLine: this._currentColumn,
-      channel: Token.DEFAULT_CHANNEL,
-      tokenIndex: this._tokenIndex++,
-      source: [this._input, this],
-    });
-  }
-
-  /**
-   * Handle identifiers and keywords
-   */
-  protected handleIdentifier(): Token {
-    const start = this._input.index;
-    let text = '';
-
-    while (
-      this._input.LA(1) !== -1 &&
-      (this.isAlpha(this._input.LA(1)) ||
-        this.isDigit(this._input.LA(1)) ||
-        this._input.LA(1) === '_'.charCodeAt(0))
-    ) {
       text += String.fromCharCode(this._input.LA(1));
       this._input.consume();
       this._currentColumn++;
     }
 
-    // Check if this is a keyword
-    const type = this.TOKEN_RULES.get(text);
-    if (type !== undefined) {
-      return this.createToken({
-        type,
-        text,
-        startIndex: start,
-        stopIndex: this._input.index - 1,
-        line: this._currentLine,
-        charPositionInLine: this._currentColumn,
-        channel: Token.DEFAULT_CHANNEL,
-        tokenIndex: this._tokenIndex++,
-        source: [this._input, this],
-      });
+    // Consume the closing quote
+    if (this._input.LA(1) === '"'.charCodeAt(0)) {
+      this._input.consume();
+      this._currentColumn++;
+      text += '"';
     }
 
-    // Check if this is a FHIR type
-    if (this.ACTION_FHIR_TYPES.has(text)) {
-      return this.createToken({
-        type: GeneratedLexer.ACTION_FHIR_TYPE,
-        text,
-        startIndex: start,
-        stopIndex: this._input.index - 1,
-        line: this._currentLine,
-        charPositionInLine: this._currentColumn,
-        channel: Token.DEFAULT_CHANNEL,
-        tokenIndex: this._tokenIndex++,
-        source: [this._input, this],
-      });
-    }
-
-    if (this.CASEFEATURE_FHIR_TYPES.has(text)) {
-      return this.createToken({
-        type: GeneratedLexer.CASEFEATURE_FHIR_TYPE,
-        text,
-        startIndex: start,
-        stopIndex: this._input.index - 1,
-        line: this._currentLine,
-        charPositionInLine: this._currentColumn,
-        channel: Token.DEFAULT_CHANNEL,
-        tokenIndex: this._tokenIndex++,
-        source: [this._input, this],
-      });
-    }
-
-    if (this.FHIR_VALUE_TYPES.has(text)) {
-      return this.createToken({
-        type: GeneratedLexer.FHIR_VALUE_TYPE,
-        text,
-        startIndex: start,
-        stopIndex: this._input.index - 1,
-        line: this._currentLine,
-        charPositionInLine: this._currentColumn,
-        channel: Token.DEFAULT_CHANNEL,
-        tokenIndex: this._tokenIndex++,
-        source: [this._input, this],
-      });
-    }
-
-    // If not a keyword or FHIR type, it's an error
     return this.createToken({
-      type: GeneratedLexer.ERROR,
+      type: GeneratedLexer.STRING,
       text,
-      startIndex: start,
+      startIndex,
       stopIndex: this._input.index - 1,
       line: this._currentLine,
-      charPositionInLine: this._currentColumn,
+      charPositionInLine: this._currentColumn - text.length,
       channel: Token.DEFAULT_CHANNEL,
       tokenIndex: this._tokenIndex++,
       source: [this._input, this],
     });
   }
 
-  /**
-   * Check if a character is alphabetic
-   */
-  private isAlpha(c: number): boolean {
-    return (
-      (c >= 'a'.charCodeAt(0) && c <= 'z'.charCodeAt(0)) ||
-      (c >= 'A'.charCodeAt(0) && c <= 'Z'.charCodeAt(0))
-    );
+  private handleIdentifier(): Token {
+    const startIndex = this._input.index;
+    let text = '';
+
+    // Consume the identifier
+    while (this.isAlpha(this._input.LA(1)) || this.isDigit(this._input.LA(1))) {
+      text += String.fromCharCode(this._input.LA(1));
+      this._input.consume();
+      this._currentColumn++;
+    }
+
+    // Check if it's a keyword
+    if (this.TOKEN_RULES.has(text)) {
+      return this.createToken({
+        type: this.TOKEN_RULES.get(text)!,
+        text,
+        startIndex,
+        stopIndex: this._input.index - 1,
+        line: this._currentLine,
+        charPositionInLine: this._currentColumn - text.length,
+        channel: Token.DEFAULT_CHANNEL,
+        tokenIndex: this._tokenIndex++,
+        source: [this._input, this],
+      });
+    }
+
+    // Check if it's an ACTION_FHIR_TYPE
+    if (this.ACTION_FHIR_TYPES.has(text)) {
+      return this.createToken({
+        type: GeneratedLexer.ACTION_FHIR_TYPE,
+        text,
+        startIndex,
+        stopIndex: this._input.index - 1,
+        line: this._currentLine,
+        charPositionInLine: this._currentColumn - text.length,
+        channel: Token.DEFAULT_CHANNEL,
+        tokenIndex: this._tokenIndex++,
+        source: [this._input, this],
+      });
+    }
+
+    // Check if it's a CASEFEATURE_FHIR_TYPE
+    if (this.CASEFEATURE_FHIR_TYPES.has(text)) {
+      return this.createToken({
+        type: GeneratedLexer.CASEFEATURE_FHIR_TYPE,
+        text,
+        startIndex,
+        stopIndex: this._input.index - 1,
+        line: this._currentLine,
+        charPositionInLine: this._currentColumn - text.length,
+        channel: Token.DEFAULT_CHANNEL,
+        tokenIndex: this._tokenIndex++,
+        source: [this._input, this],
+      });
+    }
+
+    // Check if it's a FHIR_VALUE_TYPE
+    if (this.FHIR_VALUE_TYPES.has(text)) {
+      return this.createToken({
+        type: GeneratedLexer.FHIR_VALUE_TYPE,
+        text,
+        startIndex,
+        stopIndex: this._input.index - 1,
+        line: this._currentLine,
+        charPositionInLine: this._currentColumn - text.length,
+        channel: Token.DEFAULT_CHANNEL,
+        tokenIndex: this._tokenIndex++,
+        source: [this._input, this],
+      });
+    }
+
+    // If it's not any of the above, it's an error
+    return this.createToken({
+      type: GeneratedLexer.ERROR,
+      text,
+      startIndex,
+      stopIndex: this._input.index - 1,
+      line: this._currentLine,
+      charPositionInLine: this._currentColumn - text.length,
+      channel: Token.DEFAULT_CHANNEL,
+      tokenIndex: this._tokenIndex++,
+      source: [this._input, this],
+    });
   }
 
-  /**
-   * Check if a character is a digit
-   */
+  private handleError(): Token {
+    const startIndex = this._input.index;
+    const text = String.fromCharCode(this._input.LA(1));
+    this._input.consume();
+    this._currentColumn++;
+
+    return this.createToken({
+      type: GeneratedLexer.ERROR,
+      text,
+      startIndex,
+      stopIndex: this._input.index - 1,
+      line: this._currentLine,
+      charPositionInLine: this._currentColumn - 1,
+      channel: Token.DEFAULT_CHANNEL,
+      tokenIndex: this._tokenIndex++,
+      source: [this._input, this],
+    });
+  }
+
+  private isAlpha(c: number): boolean {
+    return (c >= 'a'.charCodeAt(0) && c <= 'z'.charCodeAt(0)) ||
+           (c >= 'A'.charCodeAt(0) && c <= 'Z'.charCodeAt(0));
+  }
+
   private isDigit(c: number): boolean {
     return c >= '0'.charCodeAt(0) && c <= '9'.charCodeAt(0);
   }
 
-  /**
-   * Create a token with the appropriate values
-   */
   private createToken(options: {
     type: number;
     text: string;
@@ -593,41 +614,5 @@ export class CPGLLexer extends Lexer {
     source: [CharStream, Lexer];
   }): Token {
     return new CPGLToken(options);
-  }
-
-  /**
-   * Handle invalid characters
-   */
-  private handleError(): Token {
-    const start = this._input.index;
-    let text = '';
-    
-    // Consume all invalid characters until we hit a valid one or EOF
-    while (
-      this._input.LA(1) !== -1 &&
-      !this.isAlpha(this._input.LA(1)) &&
-      !this.isDigit(this._input.LA(1)) &&
-      this._input.LA(1) !== '"'.charCodeAt(0) &&
-      this._input.LA(1) !== ' '.charCodeAt(0) &&
-      this._input.LA(1) !== '\t'.charCodeAt(0) &&
-      this._input.LA(1) !== '\r'.charCodeAt(0) &&
-      this._input.LA(1) !== '\n'.charCodeAt(0)
-    ) {
-      text += String.fromCharCode(this._input.LA(1));
-      this._input.consume();
-      this._currentColumn++;
-    }
-
-    return this.createToken({
-      type: GeneratedLexer.ERROR,
-      text,
-      startIndex: start,
-      stopIndex: this._input.index - 1,
-      line: this._currentLine,
-      charPositionInLine: this._currentColumn,
-      channel: Token.DEFAULT_CHANNEL,
-      tokenIndex: this._tokenIndex++,
-      source: [this._input, this],
-    });
   }
 }
