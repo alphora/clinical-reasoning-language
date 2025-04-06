@@ -1615,6 +1615,40 @@ describe('CPGLLexer', () => {
                 TokenTypes.DEDENT
             ]);
         });
+
+        it('should handle CaseFeature with ServiceRequest FHIR type', () => {
+            const input = `casefeature "ServiceRequest Feature"
+    fhirtype ServiceRequest
+    expression "ServiceRequest Expression"`;
+
+            const lexer = new CPGLLexer(CharStreams.fromString(input));
+            const tokens = getAllTokens(lexer);
+
+            verifyTokenSequence(tokens, [
+                TokenTypes.CASEFEATURE, TokenTypes.STRING, TokenTypes.NEWLINE,
+                TokenTypes.INDENT,
+                TokenTypes.FHIRTYPE, TokenTypes.SERVICE_REQUEST_FHIR_TYPE, TokenTypes.NEWLINE,
+                TokenTypes.EXPRESSION, TokenTypes.STRING,
+                TokenTypes.DEDENT
+            ]);
+        });
+
+        it('should handle CaseFeature with MedicationRequest FHIR type', () => {
+            const input = `casefeature "MedicationRequest Feature"
+    fhirtype MedicationRequest
+    expression "MedicationRequest Expression"`;
+
+            const lexer = new CPGLLexer(CharStreams.fromString(input));
+            const tokens = getAllTokens(lexer);
+
+            verifyTokenSequence(tokens, [
+                TokenTypes.CASEFEATURE, TokenTypes.STRING, TokenTypes.NEWLINE,
+                TokenTypes.INDENT,
+                TokenTypes.FHIRTYPE, TokenTypes.MEDICATION_REQUEST_FHIR_TYPE, TokenTypes.NEWLINE,
+                TokenTypes.EXPRESSION, TokenTypes.STRING,
+                TokenTypes.DEDENT
+            ]);
+        });
     });
 
     // eslint-disable-next-line typescript:S2004

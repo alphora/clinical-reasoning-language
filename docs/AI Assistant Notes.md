@@ -97,3 +97,4 @@ For some unexplainable reason, your AI Assistant will choose the most outdated/d
 - Tell it to use newer/better versions
 
 don't be afraid to repeat yourself
+unit tests!
