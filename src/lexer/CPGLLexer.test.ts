@@ -353,6 +353,120 @@ describe('CPGLLexer', () => {
         TokenTypes.EOF
       ]);
     });
+
+    it('should handle complex nesting indentation patterns from example', () => {
+      const input = `decision "Elderly Based"
+    any
+    when "Client Age Greater Than 60" then
+        do "Indicate"
+    when "Client Age Less Than 60" then
+        do "Vaccinate"
+        do "another thing"
+        do "somthing else"
+    when "Client Age Greater Than 60" then
+        use "Elderly Based"
+        use "IMMZ.D2.D5.Measles"`;
+
+      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const tokens = getAllTokens(lexer);
+
+      verifyTokenSequence(tokens, [
+        TokenTypes.DECISION, TokenTypes.STRING, TokenTypes.NEWLINE,
+        TokenTypes.INDENT,
+        TokenTypes.ANY, TokenTypes.NEWLINE,
+        TokenTypes.INDENT,
+        TokenTypes.WHEN, TokenTypes.STRING, TokenTypes.THEN, TokenTypes.NEWLINE,
+        TokenTypes.INDENT,
+        TokenTypes.DO, TokenTypes.STRING, TokenTypes.NEWLINE,
+        TokenTypes.DEDENT,
+        TokenTypes.WHEN, TokenTypes.STRING, TokenTypes.THEN, TokenTypes.NEWLINE,
+        TokenTypes.INDENT,
+        TokenTypes.DO, TokenTypes.STRING, TokenTypes.NEWLINE,
+        TokenTypes.DO, TokenTypes.STRING, TokenTypes.NEWLINE,
+        TokenTypes.DO, TokenTypes.STRING, TokenTypes.NEWLINE,
+        TokenTypes.DEDENT,
+        TokenTypes.WHEN, TokenTypes.STRING, TokenTypes.THEN, TokenTypes.NEWLINE,
+        TokenTypes.INDENT,
+        TokenTypes.USE, TokenTypes.STRING, TokenTypes.NEWLINE,
+        TokenTypes.USE, TokenTypes.STRING, TokenTypes.NEWLINE,
+        TokenTypes.DEDENT,
+        TokenTypes.DEDENT,
+        TokenTypes.DEDENT
+      ]);
+    });
+
+    it('should handle indentation in composite expressions', () => {
+      const input = `casefeature "Complex Expression"
+    expression (NOT "Condition 1" AND 
+               "Condition 2") OR 
+               (NOT "Condition 3" AND 
+                "Condition 4")`;
+
+      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const tokens = getAllTokens(lexer);
+
+      verifyTokenSequence(tokens, [
+        TokenTypes.CASEFEATURE, TokenTypes.STRING, TokenTypes.NEWLINE,
+        TokenTypes.INDENT,
+        TokenTypes.EXPRESSION, TokenTypes.LPAREN,
+        TokenTypes.NOT, TokenTypes.STRING,
+        TokenTypes.AND, TokenTypes.STRING,
+        TokenTypes.RPAREN,
+        TokenTypes.OR, TokenTypes.LPAREN,
+        TokenTypes.NOT, TokenTypes.STRING,
+        TokenTypes.AND, TokenTypes.STRING,
+        TokenTypes.RPAREN,
+        TokenTypes.DEDENT
+      ]);
+    });
+
+    it('should handle indentation in deeply nested when clauses', () => {
+      const input = `decision "Deeply Nested"
+    when "Level 1" then
+        all
+        when "Level 2" then
+            any
+            when "Level 3" then
+                do "Action 1"
+                do "Action 2"
+            when "Level 3b" then
+                use "Action 3"
+        when "Level 2b" then
+            do "Action 4"`;
+
+      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const tokens = getAllTokens(lexer);
+
+      verifyTokenSequence(tokens, [
+        TokenTypes.DECISION, TokenTypes.STRING, TokenTypes.NEWLINE,
+        TokenTypes.INDENT,
+        TokenTypes.WHEN, TokenTypes.STRING, TokenTypes.THEN, TokenTypes.NEWLINE,
+        TokenTypes.INDENT,
+        TokenTypes.ALL, TokenTypes.NEWLINE,
+        TokenTypes.INDENT,
+        TokenTypes.WHEN, TokenTypes.STRING, TokenTypes.THEN, TokenTypes.NEWLINE,
+        TokenTypes.INDENT,
+        TokenTypes.ANY, TokenTypes.NEWLINE,
+        TokenTypes.INDENT,
+        TokenTypes.WHEN, TokenTypes.STRING, TokenTypes.THEN, TokenTypes.NEWLINE,
+        TokenTypes.INDENT,
+        TokenTypes.DO, TokenTypes.STRING, TokenTypes.NEWLINE,
+        TokenTypes.DO, TokenTypes.STRING, TokenTypes.NEWLINE,
+        TokenTypes.DEDENT,
+        TokenTypes.WHEN, TokenTypes.STRING, TokenTypes.THEN, TokenTypes.NEWLINE,
+        TokenTypes.INDENT,
+        TokenTypes.USE, TokenTypes.STRING, TokenTypes.NEWLINE,
+        TokenTypes.DEDENT,
+        TokenTypes.DEDENT,
+        TokenTypes.WHEN, TokenTypes.STRING, TokenTypes.THEN, TokenTypes.NEWLINE,
+        TokenTypes.INDENT,
+        TokenTypes.DO, TokenTypes.STRING, TokenTypes.NEWLINE,
+        TokenTypes.DEDENT,
+        TokenTypes.DEDENT,
+        TokenTypes.DEDENT,
+        TokenTypes.DEDENT
+      ]);
+    });
   });
 
   describe('Comments', () => {
