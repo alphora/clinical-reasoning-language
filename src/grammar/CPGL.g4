@@ -22,7 +22,7 @@ decision
     : 'decision' WS+ STRING NEWLINE decisionBlock
     ;
 
-// A decisionBlock is one or more top-level when clauses
+// A decisionBlock is one or more top-level when clauses.
 decisionBlock
     : INDENT whenClause+ DEDENT
     ;
@@ -35,18 +35,18 @@ whenClause
 
 // A whenBlock can be either a nested group of conditions or a list of terminal actions.
 whenBlock
-    : blockWhenList
-    | blockTerminal
+    : nestedWhenBlock
+    | terminalBlock
     ;
 
-// A blockWhenList is an indented block that may start with an optional qualifier
+// A nestedWhenBlock is an indented block that may optionally begin with a qualifier
 // and then contains one or more nested whenClause entries.
-blockWhenList
+nestedWhenBlock
     : INDENT optionalQualifier? whenClause+ DEDENT
     ;
 
-// A blockTerminal is an indented block containing one or more terminal actions.
-blockTerminal
+// A terminalBlock is an indented block containing one or more terminal actions.
+terminalBlock
     : INDENT terminalAction+ DEDENT
     ;
 
@@ -56,7 +56,7 @@ terminalAction
     | useClause
     ;
 
-// doClause and useClause can only appear within a when's block as terminal actions.
+// doClause and useClause are only permitted within a terminal block.
 doClause
     : 'do' WS+ STRING NEWLINE
     ;
@@ -71,27 +71,31 @@ optionalQualifier
     ;
 
 // ----------------------------------------------------------------
-// Action and Casefeature Constructs (Minimal)
+// Action and Casefeature Constructs
 // ----------------------------------------------------------------
 
 action
     : 'action' WS+ STRING NEWLINE actionBlock
     ;
 
+// An actionBlock must have one and only one actionClause.
 actionBlock
-    : INDENT actionClause+ DEDENT
+    : INDENT actionClause DEDENT
     ;
 
 actionClause
     : 'fhirtype' WS+ ACTION_FHIR_TYPE NEWLINE
     ;
 
+// A casefeature is defined by a keyword, a name, a newline, and a block,
+// with an optional composite expression following.
 casefeature
     : 'casefeature' WS+ STRING NEWLINE casefeatureBlock (compositeExpression NEWLINE)?
     ;
 
+// A casefeatureBlock must have one and only one casefeatureClause.
 casefeatureBlock
-    : INDENT casefeatureClause+ DEDENT
+    : INDENT casefeatureClause DEDENT
     ;
 
 casefeatureClause
@@ -101,7 +105,7 @@ casefeatureClause
     | 'valuetype' WS+ FHIR_VALUE_TYPE NEWLINE
     ;
 
-// Composite boolean expression for advanced casefeature logic.
+// A composite boolean expression for advanced casefeature logic.
 compositeExpression
     : '(' booleanExpr ')'
     ;
@@ -126,7 +130,7 @@ booleanFactor
 // ========================================================
 
 // INDENT and DEDENT tokens are placeholders.
-// A production-ready solution would use a custom lexer routine to track indentation levels.
+// A production-ready solution would use a custom lexer routine to track indent levels.
 INDENT:  '    ';  // exactly 4 spaces for one indent level
 DEDENT:  '<DEDENT>';
 
@@ -140,7 +144,7 @@ WS: [ \t]+ -> skip;
 COMMENT: '//' ~[\r\n]* -> skip;
 COMMENT_BLOCK: '/*' .*? '*/' -> skip;
 
-// STRING: double-quoted string without newlines.
+// STRING: double-quoted string without embedded newlines.
 STRING: '"' (~["\r\n])* '"';
 
 // Boolean operators for composite expressions.
