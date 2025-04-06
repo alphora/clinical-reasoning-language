@@ -7,65 +7,116 @@
  * 
  * WARNING: Do not use the generated lexer directly for token generation.
  * Always use the custom CPGLLexer implementation for that purpose.
+ * 
+ * Note: Error handling in the lexer is done through exceptions rather than
+ * error tokens. The lexer will throw an exception when it encounters invalid
+ * input that cannot be tokenized.
  */
 import { CPGLLexer as GeneratedLexer } from '../grammar/generated/CPGLLexer';
 
 /**
- * Token type constants from the generated lexer
- * These are used for token type identification and should not be modified
+ * Token type constants for the CPGL lexer
+ * 
+ * These constants define all the token types needed to tokenize CPGL input
+ * according to the grammar and example requirements.
+ * 
+ * ⚠️ IMPORTANT: This is a custom lexer implementation. DO NOT use the generated lexer files
+ * from ANTLR (src/grammar/generated/*). The generated lexer is only used as a reference
+ * for the grammar structure. All lexing functionality should be implemented in our custom
+ * CPGLLexer class.
  */
 export const TokenTypes = {
   // Basic tokens
-  EOF: GeneratedLexer.EOF,
-  INDENT: GeneratedLexer.INDENT,
-  DEDENT: GeneratedLexer.DEDENT,
-  NEWLINE: GeneratedLexer.NEWLINE,
-  STRING: GeneratedLexer.STRING,
+  EOF: -1,
+  INDENT: 1,
+  DEDENT: 2,
+  NEWLINE: 3,
+  STRING: 4,
   
   // Keywords
-  DECISION: GeneratedLexer.DECISION,
-  WHEN: GeneratedLexer.WHEN,
-  THEN: GeneratedLexer.THEN,
-  DO: GeneratedLexer.DO,
-  USE: GeneratedLexer.USE,
-  ANY: GeneratedLexer.ANY,
-  ALL: GeneratedLexer.ALL,
+  DECISION: 10,
+  WHEN: 11,
+  THEN: 12,
+  DO: 13,
+  USE: 14,
+  ANY: 15,
+  ALL: 16,
+  ACTION: 17,
+  FHIRTYPE: 18,
+  CASEFEATURE: 19,
+  CASEFEATURECODE: 20,
+  PROFILEURL: 21,
+  VALUETYPE: 22,
+  EXPRESSION: 23,
+  
+  // Symbols
+  LPAREN: 30,
+  RPAREN: 31,
+  
+  // Boolean operators
+  OR: 40,
+  AND: 41,
+  NOT: 42,
   
   // FHIR types
-  ACTION: GeneratedLexer.ACTION,
-  ACTION_FHIR_TYPE: GeneratedLexer.ACTION_FHIR_TYPE,
-  CASEFEATURE: GeneratedLexer.CASEFEATURE,
-  CASEFEATURE_FHIR_TYPE: GeneratedLexer.CASEFEATURE_FHIR_TYPE,
-  FHIR_VALUE_TYPE: GeneratedLexer.FHIR_VALUE_TYPE,
-  FHIRTYPE: GeneratedLexer.FHIRTYPE,
-  CASEFEATURECODE: GeneratedLexer.CASEFEATURECODE,
-  PROFILEURL: GeneratedLexer.PROFILEURL,
-  VALUETYPE: GeneratedLexer.VALUETYPE,
-  
-  // Error token
-  ERROR: GeneratedLexer.ERROR
+  ACTION_FHIR_TYPE: 50,
+  CASEFEATURE_FHIR_TYPE: 51,
+  FHIR_VALUE_TYPE: 52
 } as const;
 
 /**
- * Vocabulary from the generated lexer
- * Used for token name resolution
+ * Vocabulary for token name resolution
  */
-export const Vocabulary = GeneratedLexer.VOCABULARY;
+export const Vocabulary = {
+  getDisplayName: (tokenType: number): string => {
+    const entry = Object.entries(TokenTypes).find(([_, value]) => value === tokenType);
+    return entry ? entry[0] : 'UNKNOWN';
+  }
+};
 
 /**
- * Rule names from the generated lexer
- * Used for debugging and error reporting
+ * Rule names for debugging and error reporting
  */
-export const RuleNames = GeneratedLexer.ruleNames;
+export const RuleNames = [
+  'INDENT',
+  'DEDENT',
+  'NEWLINE',
+  'STRING',
+  'DECISION',
+  'WHEN',
+  'THEN',
+  'DO',
+  'USE',
+  'ANY',
+  'ALL',
+  'ACTION',
+  'FHIRTYPE',
+  'CASEFEATURE',
+  'CASEFEATURECODE',
+  'PROFILEURL',
+  'VALUETYPE',
+  'EXPRESSION',
+  'LPAREN',
+  'RPAREN',
+  'OR',
+  'AND',
+  'NOT',
+  'ACTION_FHIR_TYPE',
+  'CASEFEATURE_FHIR_TYPE',
+  'FHIR_VALUE_TYPE'
+];
 
 /**
- * Channel names from the generated lexer
- * Used for token channel identification
+ * Channel names for token channel identification
  */
-export const ChannelNames = GeneratedLexer.channelNames;
+export const ChannelNames = [
+  'DEFAULT_TOKEN_CHANNEL',
+  'HIDDEN'
+];
 
 /**
- * Mode names from the generated lexer
- * Used for lexer mode identification
+ * Mode names for lexer mode identification
  */
-export const ModeNames = GeneratedLexer.modeNames; 
+export const ModeNames = [
+  'DEFAULT_MODE'
+]; 
