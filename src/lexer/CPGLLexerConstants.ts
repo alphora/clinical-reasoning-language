@@ -15,54 +15,66 @@
 import { CPGLLexer as GeneratedLexer } from '../grammar/generated/CPGLLexer';
 
 /**
- * Token type constants for the CPGL lexer
+ * Custom Token Types for CPGL Lexer
  * 
- * These constants define all the token types needed to tokenize CPGL input
- * according to the grammar and example requirements.
- * 
- * ⚠️ IMPORTANT: This is a custom lexer implementation. DO NOT use the generated lexer files
- * from ANTLR (src/grammar/generated/*). The generated lexer is only used as a reference
- * for the grammar structure. All lexing functionality should be implemented in our custom
- * CPGLLexer class.
+ * This enum defines all token types used by our custom lexer implementation.
+ * These values are independent of any generated lexer to avoid direct dependencies.
  */
-export const TokenTypes = {
-  // Basic tokens
-  EOF: -1,
-  INDENT: 1,
-  DEDENT: 2,
-  NEWLINE: 3,
-  STRING: 4,
-  
-  // Keywords
-  DECISION: 10,
-  WHEN: 11,
-  THEN: 12,
-  DO: 13,
-  USE: 14,
-  ANY: 15,
-  ALL: 16,
-  ACTION: 17,
-  FHIRTYPE: 18,
-  CASEFEATURE: 19,
-  CASEFEATURECODE: 20,
-  PROFILEURL: 21,
-  VALUETYPE: 22,
-  EXPRESSION: 23,
-  
-  // Symbols
-  LPAREN: 30,
-  RPAREN: 31,
-  
-  // Boolean operators
-  OR: 40,
-  AND: 41,
-  NOT: 42,
-  
-  // FHIR types
-  ACTION_FHIR_TYPE: 50,
-  CASEFEATURE_FHIR_TYPE: 51,
-  FHIR_VALUE_TYPE: 52
-} as const;
+export enum TokenTypes {
+    // Basic tokens
+    EOF = -1,
+    INDENT = 1,
+    DEDENT = 2,
+    NEWLINE = 3,
+    STRING = 4,
+
+    // Keywords
+    DECISION = 10,
+    WHEN = 11,
+    THEN = 12,
+    DO = 13,
+    USE = 14,
+    ANY = 15,
+    ALL = 16,
+    NOT = 17,
+    AND = 18,
+    OR = 19,
+    ACTION = 20,
+    CASEFEATURE = 21,
+    CASEFEATURECODE = 22,
+    PROFILEURL = 23,
+    FHIRTYPE = 24,
+    VALUETYPE = 25,
+    EXPRESSION = 26,
+
+    // Parentheses
+    LPAREN = 30,
+    RPAREN = 31,
+
+    // FHIR Types
+    ACTION_FHIR_TYPE = 40,
+    CASEFEATURE_FHIR_TYPE = 41,
+    CONDITION_FHIR_TYPE = 42,
+    OBSERVATION_FHIR_TYPE = 43,
+
+    // Value Types
+    FHIR_VALUE_TYPE = 50,
+    BOOLEAN_VALUE_TYPE = 51,
+    DATETIME_VALUE_TYPE = 52,
+    QUANTITY_VALUE_TYPE = 53,
+    STRING_VALUE_TYPE = 54,
+    INTEGER_VALUE_TYPE = 55,
+    DECIMAL_VALUE_TYPE = 56,
+    DATE_VALUE_TYPE = 57,
+    TIME_VALUE_TYPE = 58,
+    CODE_VALUE_TYPE = 59,
+    CODING_VALUE_TYPE = 60,
+    CODEABLECONCEPT_VALUE_TYPE = 61,
+    RATIO_VALUE_TYPE = 62,
+    PERIOD_VALUE_TYPE = 63,
+    RANGE_VALUE_TYPE = 64,
+    REFERENCE_VALUE_TYPE = 65
+}
 
 /**
  * Vocabulary for token name resolution

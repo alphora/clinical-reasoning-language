@@ -4,6 +4,13 @@
  * These tests verify the lexer's ability to correctly tokenize CPGL input according to the grammar.
  * The tests are organized by category and follow the structure of the CPGL grammar.
  * 
+ * Note: The deep nesting in this file is intentional and follows the grammar's hierarchical structure.
+ * We suppress the nesting depth linter warnings (typescript:S2004) because:
+ * 1. The nesting matches the logical organization of the grammar
+ * 2. It helps group related tests together
+ * 3. It makes test failures easier to diagnose
+ * 4. The nesting is necessary for proper test organization
+ * 
  * Test Categories:
  * 1. Basic Tokens
  *    - Keywords (decision, when, then, do, use, any, all)
@@ -105,6 +112,17 @@ function verifyTokenSequence(tokens: Token[], expectedTypes: number[], expectedT
       expect(token.text).toBe(expectedTexts[index]);
     }
   });
+}
+
+// Helper function to determine FHIR type token
+function getFhirTypeToken(input: string): number {
+  if (input.includes('Action')) {
+    return TokenTypes.ACTION_FHIR_TYPE;
+  }
+  if (input.includes('CaseFeature')) {
+    return TokenTypes.CASEFEATURE_FHIR_TYPE;
+  }
+  return TokenTypes.FHIR_VALUE_TYPE;
 }
 
 describe('CPGLLexer', () => {
@@ -572,9 +590,7 @@ describe('CPGLLexer', () => {
             TokenTypes.NEWLINE,
             TokenTypes.INDENT,
             input.includes('fhirtype') ? TokenTypes.FHIRTYPE : TokenTypes.VALUETYPE,
-            input.includes('Action') ? TokenTypes.ACTION_FHIR_TYPE :
-              input.includes('CaseFeature') ? TokenTypes.CASEFEATURE_FHIR_TYPE :
-              TokenTypes.FHIR_VALUE_TYPE,
+            getFhirTypeToken(input),
             TokenTypes.DEDENT,
             TokenTypes.EOF
           ]);
@@ -1232,6 +1248,7 @@ describe('CPGLLexer', () => {
   });
 
   describe('Decision Structure', () => {
+    // eslint-disable-next-line typescript:S2004
     describe('Multiple When Clauses at Same Level', () => {
       it('should handle decision with multiple when clauses at same level', () => {
         const input = `decision "Elderly Based"
@@ -1345,6 +1362,7 @@ describe('CPGLLexer', () => {
   });
 
   describe('Action Structure', () => {
+    // eslint-disable-next-line typescript:S2004
     describe('Multiple Actions in Sequence', () => {
         it('should handle multiple do actions in sequence', () => {
             const input = `action "Multiple Do Actions"
@@ -1412,6 +1430,7 @@ describe('CPGLLexer', () => {
         });
     });
 
+    // eslint-disable-next-line typescript:S2004
     describe('Actions with Different FHIR Types', () => {
         it('should handle action with CaseFeature FHIR type', () => {
             const input = `action "CaseFeature Action"
@@ -1460,6 +1479,182 @@ describe('CPGLLexer', () => {
                 TokenTypes.INDENT,
                 TokenTypes.VALUETYPE, TokenTypes.FHIR_VALUE_TYPE, TokenTypes.NEWLINE,
                 TokenTypes.DO, TokenTypes.STRING, TokenTypes.NEWLINE,
+                TokenTypes.DEDENT
+            ]);
+        });
+    });
+  });
+
+  describe('CaseFeature Structure', () => {
+    // eslint-disable-next-line typescript:S2004
+    describe('Complex Composite Expressions', () => {
+        it('should handle nested parentheses in expressions', () => {
+            const input = `casefeature "Complex Expression"
+    expression (("Condition 1" AND "Condition 2") OR (NOT ("Condition 3" AND ("Condition 4" OR "Condition 5"))))`;
+
+            const lexer = new CPGLLexer(CharStreams.fromString(input));
+            const tokens = getAllTokens(lexer);
+
+            verifyTokenSequence(tokens, [
+                TokenTypes.CASEFEATURE, TokenTypes.STRING, TokenTypes.NEWLINE,
+                TokenTypes.INDENT,
+                TokenTypes.EXPRESSION, TokenTypes.LPAREN,
+                TokenTypes.LPAREN, TokenTypes.STRING, TokenTypes.AND, TokenTypes.STRING, TokenTypes.RPAREN,
+                TokenTypes.OR,
+                TokenTypes.LPAREN, TokenTypes.NOT, TokenTypes.LPAREN,
+                TokenTypes.STRING, TokenTypes.AND,
+                TokenTypes.LPAREN, TokenTypes.STRING, TokenTypes.OR, TokenTypes.STRING, TokenTypes.RPAREN,
+                TokenTypes.RPAREN, TokenTypes.RPAREN,
+                TokenTypes.RPAREN,
+                TokenTypes.DEDENT
+            ]);
+        });
+
+        it('should handle multiple levels of NOT operations', () => {
+            const input = `casefeature "Multiple NOTs"
+    expression NOT (NOT (NOT "Condition 1" AND NOT "Condition 2"))`;
+
+            const lexer = new CPGLLexer(CharStreams.fromString(input));
+            const tokens = getAllTokens(lexer);
+
+            verifyTokenSequence(tokens, [
+                TokenTypes.CASEFEATURE, TokenTypes.STRING, TokenTypes.NEWLINE,
+                TokenTypes.INDENT,
+                TokenTypes.EXPRESSION, TokenTypes.NOT, TokenTypes.LPAREN,
+                TokenTypes.NOT, TokenTypes.LPAREN,
+                TokenTypes.NOT, TokenTypes.STRING,
+                TokenTypes.AND,
+                TokenTypes.NOT, TokenTypes.STRING,
+                TokenTypes.RPAREN, TokenTypes.RPAREN,
+                TokenTypes.DEDENT
+            ]);
+        });
+
+        it('should handle complex AND/OR combinations', () => {
+            const input = `casefeature "Complex Combinations"
+    expression ("Condition 1" AND "Condition 2" OR "Condition 3" AND NOT "Condition 4")`;
+
+            const lexer = new CPGLLexer(CharStreams.fromString(input));
+            const tokens = getAllTokens(lexer);
+
+            verifyTokenSequence(tokens, [
+                TokenTypes.CASEFEATURE, TokenTypes.STRING, TokenTypes.NEWLINE,
+                TokenTypes.INDENT,
+                TokenTypes.EXPRESSION, TokenTypes.LPAREN,
+                TokenTypes.STRING, TokenTypes.AND, TokenTypes.STRING,
+                TokenTypes.OR, TokenTypes.STRING,
+                TokenTypes.AND, TokenTypes.NOT, TokenTypes.STRING,
+                TokenTypes.RPAREN,
+                TokenTypes.DEDENT
+            ]);
+        });
+
+        it('should handle multiple casefeature references in expressions', () => {
+            const input = `casefeature "Multiple References"
+    expression ("Feature 1" AND "Feature 2" OR "Feature 3" AND "Feature 4")`;
+
+            const lexer = new CPGLLexer(CharStreams.fromString(input));
+            const tokens = getAllTokens(lexer);
+
+            verifyTokenSequence(tokens, [
+                TokenTypes.CASEFEATURE, TokenTypes.STRING, TokenTypes.NEWLINE,
+                TokenTypes.INDENT,
+                TokenTypes.EXPRESSION, TokenTypes.LPAREN,
+                TokenTypes.STRING, TokenTypes.AND, TokenTypes.STRING,
+                TokenTypes.OR, TokenTypes.STRING,
+                TokenTypes.AND, TokenTypes.STRING,
+                TokenTypes.RPAREN,
+                TokenTypes.DEDENT
+            ]);
+        });
+    });
+
+    // eslint-disable-next-line typescript:S2004
+    describe('Different FHIR Types', () => {
+        it('should handle CaseFeature with Condition FHIR type', () => {
+            const input = `casefeature "Condition Feature"
+    fhirtype Condition
+    expression "Condition Expression"`;
+
+            const lexer = new CPGLLexer(CharStreams.fromString(input));
+            const tokens = getAllTokens(lexer);
+
+            verifyTokenSequence(tokens, [
+                TokenTypes.CASEFEATURE, TokenTypes.STRING, TokenTypes.NEWLINE,
+                TokenTypes.INDENT,
+                TokenTypes.FHIRTYPE, TokenTypes.CONDITION_FHIR_TYPE, TokenTypes.NEWLINE,
+                TokenTypes.EXPRESSION, TokenTypes.STRING,
+                TokenTypes.DEDENT
+            ]);
+        });
+
+        it('should handle CaseFeature with Observation FHIR type', () => {
+            const input = `casefeature "Observation Feature"
+    fhirtype Observation
+    expression "Observation Expression"`;
+
+            const lexer = new CPGLLexer(CharStreams.fromString(input));
+            const tokens = getAllTokens(lexer);
+
+            verifyTokenSequence(tokens, [
+                TokenTypes.CASEFEATURE, TokenTypes.STRING, TokenTypes.NEWLINE,
+                TokenTypes.INDENT,
+                TokenTypes.FHIRTYPE, TokenTypes.OBSERVATION_FHIR_TYPE, TokenTypes.NEWLINE,
+                TokenTypes.EXPRESSION, TokenTypes.STRING,
+                TokenTypes.DEDENT
+            ]);
+        });
+    });
+
+    // eslint-disable-next-line typescript:S2004
+    describe('Different Value Types', () => {
+        it('should handle CaseFeature with boolean value type', () => {
+            const input = `casefeature "Boolean Feature"
+    valuetype boolean
+    expression "Boolean Expression"`;
+
+            const lexer = new CPGLLexer(CharStreams.fromString(input));
+            const tokens = getAllTokens(lexer);
+
+            verifyTokenSequence(tokens, [
+                TokenTypes.CASEFEATURE, TokenTypes.STRING, TokenTypes.NEWLINE,
+                TokenTypes.INDENT,
+                TokenTypes.VALUETYPE, TokenTypes.BOOLEAN_VALUE_TYPE, TokenTypes.NEWLINE,
+                TokenTypes.EXPRESSION, TokenTypes.STRING,
+                TokenTypes.DEDENT
+            ]);
+        });
+
+        it('should handle CaseFeature with dateTime value type', () => {
+            const input = `casefeature "DateTime Feature"
+    valuetype dateTime
+    expression "DateTime Expression"`;
+
+            const lexer = new CPGLLexer(CharStreams.fromString(input));
+            const tokens = getAllTokens(lexer);
+
+            verifyTokenSequence(tokens, [
+                TokenTypes.CASEFEATURE, TokenTypes.STRING, TokenTypes.NEWLINE,
+                TokenTypes.INDENT,
+                TokenTypes.VALUETYPE, TokenTypes.DATETIME_VALUE_TYPE, TokenTypes.NEWLINE,
+                TokenTypes.EXPRESSION, TokenTypes.STRING,
+                TokenTypes.DEDENT
+            ]);
+        });
+
+        it('should handle CaseFeature with quantity value type', () => {
+            const input = `casefeature "Quantity Feature"
+    valuetype quantity
+    expression "Quantity Expression"`;
+
+            const lexer = new CPGLLexer(CharStreams.fromString(input));
+            const tokens = getAllTokens(lexer);
+
+            verifyTokenSequence(tokens, [
+                TokenTypes.CASEFEATURE, TokenTypes.STRING, TokenTypes.NEWLINE,
+                TokenTypes.INDENT,
+                TokenTypes.VALUETYPE, TokenTypes.QUANTITY_VALUE_TYPE, TokenTypes.NEWLINE,
+                TokenTypes.EXPRESSION, TokenTypes.STRING,
                 TokenTypes.DEDENT
             ]);
         });

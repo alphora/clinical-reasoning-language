@@ -64,6 +64,10 @@ The AI Assistant is super smart but forgets things easily.  This is especially c
 
   - Keep resources available so you can provide them to the new session
 
+- Don't be afraid to repeat yourself
+
+  - Keep resources available so you can provide them to the new request (sometimes every request)
+
 - Use MCPs
 - Don't be afraid to HARD reset
 
@@ -75,3 +79,5 @@ For some unexplainable reason, your AI Assistant will choose the most outdated/d
 
 - Check tooling/libraries it adds
 - Tell it to use newer/better versions
+
+don't be afraid to repeat yourself
