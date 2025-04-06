@@ -2678,4 +2678,191 @@ describe('CPGLLexer', () => {
  * Note: These tests should be added after the parser has been updated to work with
  * the new lexer implementation. Testing parser integration now would be premature
  * as the parser will need significant updates to work with the new lexer.
- */ 
+ */
+
+describe('Basic Token Recognition', () => {
+  describe('Keywords', () => {
+    it('should recognize all CPGL keywords', () => {
+      const input = 'decision when then do use any all';
+      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const tokens = getAllTokens(lexer);
+      
+      verifyTokenSequence(tokens, [
+        TokenTypes.DECISION,
+        TokenTypes.WHEN,
+        TokenTypes.THEN,
+        TokenTypes.DO,
+        TokenTypes.USE,
+        TokenTypes.ANY,
+        TokenTypes.ALL,
+        TokenTypes.EOF
+      ]);
+    });
+
+    it('should recognize keywords in context', () => {
+      const input = `decision "Test"
+    when "Condition" then
+        do "Action"
+    when "Another Condition" then
+        use "Another Decision"`;
+      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const tokens = getAllTokens(lexer);
+      
+      verifyTokenSequence(tokens, [
+        TokenTypes.DECISION,
+        TokenTypes.STRING,
+        TokenTypes.NEWLINE,
+        TokenTypes.INDENT,
+        TokenTypes.WHEN,
+        TokenTypes.STRING,
+        TokenTypes.THEN,
+        TokenTypes.NEWLINE,
+        TokenTypes.INDENT,
+        TokenTypes.DO,
+        TokenTypes.STRING,
+        TokenTypes.NEWLINE,
+        TokenTypes.DEDENT,
+        TokenTypes.WHEN,
+        TokenTypes.STRING,
+        TokenTypes.THEN,
+        TokenTypes.NEWLINE,
+        TokenTypes.INDENT,
+        TokenTypes.USE,
+        TokenTypes.STRING,
+        TokenTypes.DEDENT,
+        TokenTypes.DEDENT,
+        TokenTypes.EOF
+      ]);
+    });
+  });
+
+  describe('String Literals', () => {
+    it('should recognize simple string literals', () => {
+      const input = '"simple string" "string with spaces"';
+      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const tokens = getAllTokens(lexer);
+      
+      verifyTokenSequence(tokens, [
+        TokenTypes.STRING,
+        TokenTypes.STRING,
+        TokenTypes.EOF
+      ], [
+        '"simple string"',
+        '"string with spaces"'
+      ]);
+    });
+
+    it('should handle escaped quotes in strings', () => {
+      const input = '"string with \\"quotes\\"" "another \\"quoted\\" string"';
+      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const tokens = getAllTokens(lexer);
+      
+      verifyTokenSequence(tokens, [
+        TokenTypes.STRING,
+        TokenTypes.STRING,
+        TokenTypes.EOF
+      ], [
+        '"string with \\"quotes\\""',
+        '"another \\"quoted\\" string"'
+      ]);
+    });
+
+    it('should handle empty strings', () => {
+      const input = '""';
+      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const tokens = getAllTokens(lexer);
+      
+      verifyTokenSequence(tokens, [
+        TokenTypes.STRING,
+        TokenTypes.EOF
+      ], [
+        '""'
+      ]);
+    });
+  });
+
+  describe('Boolean Operators', () => {
+    it('should recognize all boolean operators', () => {
+      const input = 'AND OR NOT';
+      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const tokens = getAllTokens(lexer);
+      
+      verifyTokenSequence(tokens, [
+        TokenTypes.AND,
+        TokenTypes.OR,
+        TokenTypes.NOT,
+        TokenTypes.EOF
+      ]);
+    });
+
+    it('should recognize boolean operators in expressions', () => {
+      const input = 'NOT "Condition 1" AND "Condition 2" OR NOT "Condition 3"';
+      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const tokens = getAllTokens(lexer);
+      
+      verifyTokenSequence(tokens, [
+        TokenTypes.NOT,
+        TokenTypes.STRING,
+        TokenTypes.AND,
+        TokenTypes.STRING,
+        TokenTypes.OR,
+        TokenTypes.NOT,
+        TokenTypes.STRING,
+        TokenTypes.EOF
+      ]);
+    });
+  });
+
+  describe('Parentheses', () => {
+    it('should recognize parentheses', () => {
+      const input = '( )';
+      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const tokens = getAllTokens(lexer);
+      
+      verifyTokenSequence(tokens, [
+        TokenTypes.LPAREN,
+        TokenTypes.RPAREN,
+        TokenTypes.EOF
+      ]);
+    });
+
+    it('should handle nested parentheses', () => {
+      const input = '((()))';
+      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const tokens = getAllTokens(lexer);
+      
+      verifyTokenSequence(tokens, [
+        TokenTypes.LPAREN,
+        TokenTypes.LPAREN,
+        TokenTypes.LPAREN,
+        TokenTypes.RPAREN,
+        TokenTypes.RPAREN,
+        TokenTypes.RPAREN,
+        TokenTypes.EOF
+      ]);
+    });
+
+    it('should handle parentheses in expressions', () => {
+      const input = '(NOT "Condition 1" AND "Condition 2") OR (NOT "Condition 3" AND "Condition 4")';
+      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const tokens = getAllTokens(lexer);
+      
+      verifyTokenSequence(tokens, [
+        TokenTypes.LPAREN,
+        TokenTypes.NOT,
+        TokenTypes.STRING,
+        TokenTypes.AND,
+        TokenTypes.STRING,
+        TokenTypes.RPAREN,
+        TokenTypes.OR,
+        TokenTypes.LPAREN,
+        TokenTypes.NOT,
+        TokenTypes.STRING,
+        TokenTypes.AND,
+        TokenTypes.STRING,
+        TokenTypes.RPAREN,
+        TokenTypes.EOF
+      ]);
+    });
+  });
+}); 
