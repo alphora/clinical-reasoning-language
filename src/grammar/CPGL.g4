@@ -196,6 +196,7 @@ CASEFEATURE_FHIR_TYPE:
     | 'Immunization'
     | 'MedicationDispense'
     | 'MedicationAdministration'
+    | 'MedicationRequest'
     | 'MedicationStatement'
     ;
 
