@@ -66,6 +66,7 @@ useClause
     ;
 
 // A qualifier (either "any" or "all") to modify a group of nested whenClauses.
+// The qualifier **only applies to where.** **It does not apply to do or use.**
 optionalQualifier
     : ('any' | 'all') NEWLINE
     ;
@@ -87,30 +88,43 @@ actionClause
     : 'fhirtype' WS+ ACTION_FHIR_TYPE NEWLINE
     ;
 
-// A casefeature is defined by a keyword, a name, a newline, and a block,
-// with an optional composite expression following.
 casefeature
-    : 'casefeature' WS+ STRING NEWLINE casefeatureBlock (compositeExpression NEWLINE)?
+    : 'casefeature' WS+ STRING NEWLINE 
+      casefeatureBlock 
+      (compositeExpression NEWLINE)?
     ;
 
-// A casefeatureBlock must have one and only one casefeatureClause.
 casefeatureBlock
-    : INDENT casefeatureClause DEDENT
+    : INDENT 
+        casefeatureCodeClause 
+        casefeatureFhirTypeClause 
+        casefeatureProfileUrlClause 
+        casefeatureValueTypeClause 
+      DEDENT
     ;
 
-casefeatureClause
+casefeatureCodeClause
     : 'casefeaturecode' WS+ STRING NEWLINE
-    | 'fhirtype' WS+ CASEFEATURE_FHIR_TYPE NEWLINE
-    | 'profileurl' WS+ STRING NEWLINE
-    | 'valuetype' WS+ FHIR_VALUE_TYPE NEWLINE
     ;
 
-// A composite boolean expression for advanced casefeature logic.
+casefeatureFhirTypeClause
+    : 'fhirtype' WS+ CASEFEATURE_FHIR_TYPE NEWLINE
+    ;
+
+casefeatureProfileUrlClause
+    : 'profileurl' WS+ STRING NEWLINE
+    ;
+
+casefeatureValueTypeClause
+    : 'valuetype' WS+ FHIR_VALUE_TYPE NEWLINE
+    ;
+
+// Composite boolean expression for advanced casefeature logic (optional).
 compositeExpression
     : '(' booleanExpr ')'
     ;
 
-// Boolean expression rules (standard operator precedence).
+// Boolean expression rules (for composite expressions).
 booleanExpr
     : booleanTerm ( WS* OR WS* booleanTerm )*
     ;
@@ -130,7 +144,9 @@ booleanFactor
 // ========================================================
 
 // INDENT and DEDENT tokens are placeholders.
-// A production-ready solution would use a custom lexer routine to track indent levels.
+// **A custom lexer routine to tracks indent levels.**
+// **Do not take these INDENT or DEDENT tokens into consideration when reasoning over the grammar relative to the lexer or parser.**
+// **The lexer and parser should govern the correct implementation of INDENT and DEDENT.**
 INDENT:  '    ';  // exactly 4 spaces for one indent level
 DEDENT:  '<DEDENT>';
 
