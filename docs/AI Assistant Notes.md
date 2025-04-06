@@ -23,6 +23,7 @@ The AI Assistant gets into a mindset.  This is great for some things and not so 
 - Check git diffs often
 - Start a new session if it gets into a bad mindset
 - Add comments to places where its repeating unwanted behavior
+- Ask another AI
 - Don't be afraid to HARD reset
 
 ### Stuck
@@ -32,6 +33,15 @@ The AI Assistant gets into a mindset.  This is great for some things and not so 
 #### Stuck Strategies
 
 - Start a new session if it gets into a bad mindset
+- Stop the Assistant and ask them what's going on. Tell them to not make any changs, just assess and report back.
+
+    Example:
+
+    ```chat
+    The linter warnings are still present because the // eslint-disable-next-line typescript:S2004 comments we added are for ESLint, but these warnings are coming from SonarLint (as indicated by the "owner": "sonarlint" in the error messages)
+    ```
+
+- Ask another AI
 - Go fix the issue yourself (get it over the hump)
 - Don't be afraid to HARD reset
 
@@ -67,6 +77,12 @@ The AI Assistant is super smart but forgets things easily.  This is especially c
 - Don't be afraid to repeat yourself
 
   - Keep resources available so you can provide them to the new request (sometimes every request)
+
+    Example
+
+    ```txt
+    Remember, we are only working on the lexer tests.  And we use the grammar and example (attached for reference), not the existing lexer implemeentation (custom or generated).
+    ```
 
 - Use MCPs
 - Don't be afraid to HARD reset

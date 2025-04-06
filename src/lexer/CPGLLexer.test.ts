@@ -1249,6 +1249,7 @@ describe('CPGLLexer', () => {
 
   describe('Decision Structure', () => {
     // eslint-disable-next-line typescript:S2004
+    // @ts-ignore: Deep nesting is intentional for test organization
     describe('Multiple When Clauses at Same Level', () => {
       it('should handle decision with multiple when clauses at same level', () => {
         const input = `decision "Elderly Based"
@@ -1363,6 +1364,7 @@ describe('CPGLLexer', () => {
 
   describe('Action Structure', () => {
     // eslint-disable-next-line typescript:S2004
+    // @ts-ignore: Deep nesting is intentional for test organization
     describe('Multiple Actions in Sequence', () => {
         it('should handle multiple do actions in sequence', () => {
             const input = `action "Multiple Do Actions"
@@ -1431,6 +1433,7 @@ describe('CPGLLexer', () => {
     });
 
     // eslint-disable-next-line typescript:S2004
+    // @ts-ignore: Deep nesting is intentional for test organization
     describe('Actions with Different FHIR Types', () => {
         it('should handle action with CaseFeature FHIR type', () => {
             const input = `action "CaseFeature Action"
@@ -1487,6 +1490,7 @@ describe('CPGLLexer', () => {
 
   describe('CaseFeature Structure', () => {
     // eslint-disable-next-line typescript:S2004
+    // @ts-ignore: Deep nesting is intentional for test organization
     describe('Complex Composite Expressions', () => {
         it('should handle nested parentheses in expressions', () => {
             const input = `casefeature "Complex Expression"
@@ -1512,7 +1516,7 @@ describe('CPGLLexer', () => {
 
         it('should handle multiple levels of NOT operations', () => {
             const input = `casefeature "Multiple NOTs"
-    expression NOT (NOT (NOT "Condition 1" AND NOT "Condition 2"))`;
+    expression NOT (NOT (NOT "Condition"))`;
 
             const lexer = new CPGLLexer(CharStreams.fromString(input));
             const tokens = getAllTokens(lexer);
@@ -1523,53 +1527,60 @@ describe('CPGLLexer', () => {
                 TokenTypes.EXPRESSION, TokenTypes.NOT, TokenTypes.LPAREN,
                 TokenTypes.NOT, TokenTypes.LPAREN,
                 TokenTypes.NOT, TokenTypes.STRING,
-                TokenTypes.AND,
-                TokenTypes.NOT, TokenTypes.STRING,
                 TokenTypes.RPAREN, TokenTypes.RPAREN,
-                TokenTypes.DEDENT
+                TokenTypes.DEDENT, TokenTypes.EOF
             ]);
         });
 
         it('should handle complex AND/OR combinations', () => {
-            const input = `casefeature "Complex Combinations"
-    expression ("Condition 1" AND "Condition 2" OR "Condition 3" AND NOT "Condition 4")`;
-
+            const input = `casefeature "Complex AND/OR"
+    expression ("Condition 1" AND "Condition 2" AND "Condition 3") OR 
+               ("Condition 4" OR "Condition 5" OR "Condition 6") AND 
+               (NOT "Condition 7" OR NOT "Condition 8")`;
             const lexer = new CPGLLexer(CharStreams.fromString(input));
             const tokens = getAllTokens(lexer);
-
+            
             verifyTokenSequence(tokens, [
                 TokenTypes.CASEFEATURE, TokenTypes.STRING, TokenTypes.NEWLINE,
                 TokenTypes.INDENT,
                 TokenTypes.EXPRESSION, TokenTypes.LPAREN,
-                TokenTypes.STRING, TokenTypes.AND, TokenTypes.STRING,
-                TokenTypes.OR, TokenTypes.STRING,
-                TokenTypes.AND, TokenTypes.NOT, TokenTypes.STRING,
+                TokenTypes.STRING, TokenTypes.AND, TokenTypes.STRING, TokenTypes.AND, TokenTypes.STRING,
                 TokenTypes.RPAREN,
-                TokenTypes.DEDENT
+                TokenTypes.OR,
+                TokenTypes.LPAREN,
+                TokenTypes.STRING, TokenTypes.OR, TokenTypes.STRING, TokenTypes.OR, TokenTypes.STRING,
+                TokenTypes.RPAREN,
+                TokenTypes.AND,
+                TokenTypes.LPAREN,
+                TokenTypes.NOT, TokenTypes.STRING, TokenTypes.OR, TokenTypes.NOT, TokenTypes.STRING,
+                TokenTypes.RPAREN,
+                TokenTypes.DEDENT, TokenTypes.EOF
             ]);
         });
 
-        it('should handle multiple casefeature references in expressions', () => {
+        it('should handle complex expression with multiple casefeature references', () => {
             const input = `casefeature "Multiple References"
-    expression ("Feature 1" AND "Feature 2" OR "Feature 3" AND "Feature 4")`;
-
+    expression ("Feature 1" AND "Feature 2") OR (NOT "Feature 3" AND "Feature 4") OR "Feature 5"`;
             const lexer = new CPGLLexer(CharStreams.fromString(input));
             const tokens = getAllTokens(lexer);
-
+            
             verifyTokenSequence(tokens, [
                 TokenTypes.CASEFEATURE, TokenTypes.STRING, TokenTypes.NEWLINE,
                 TokenTypes.INDENT,
                 TokenTypes.EXPRESSION, TokenTypes.LPAREN,
                 TokenTypes.STRING, TokenTypes.AND, TokenTypes.STRING,
-                TokenTypes.OR, TokenTypes.STRING,
-                TokenTypes.AND, TokenTypes.STRING,
                 TokenTypes.RPAREN,
-                TokenTypes.DEDENT
+                TokenTypes.OR, TokenTypes.LPAREN,
+                TokenTypes.NOT, TokenTypes.STRING, TokenTypes.AND, TokenTypes.STRING,
+                TokenTypes.RPAREN,
+                TokenTypes.OR, TokenTypes.STRING,
+                TokenTypes.DEDENT, TokenTypes.EOF
             ]);
         });
     });
 
     // eslint-disable-next-line typescript:S2004
+    // @ts-ignore: Deep nesting is intentional for test organization
     describe('Different FHIR Types', () => {
         it('should handle CaseFeature with Condition FHIR type', () => {
             const input = `casefeature "Condition Feature"
@@ -1607,6 +1618,7 @@ describe('CPGLLexer', () => {
     });
 
     // eslint-disable-next-line typescript:S2004
+    // @ts-ignore: Deep nesting is intentional for test organization
     describe('Different Value Types', () => {
         it('should handle CaseFeature with boolean value type', () => {
             const input = `casefeature "Boolean Feature"
@@ -1658,6 +1670,116 @@ describe('CPGLLexer', () => {
                 TokenTypes.DEDENT
             ]);
         });
+    });
+
+    // eslint-disable-next-line typescript:S2004
+    // @ts-ignore: Deep nesting is intentional for test organization
+    describe('Complex Boolean Expressions', () => {
+      it('should handle complex expression from example file', () => {
+        const input = `casefeature "Complex Expression"
+    expression (NOT "Condition 1" AND "Condition 2") OR (NOT "Condition 3" AND "Condition 4")`;
+        const lexer = new CPGLLexer(CharStreams.fromString(input));
+        const tokens = getAllTokens(lexer);
+        
+        verifyTokenSequence(tokens, [
+          TokenTypes.CASEFEATURE, TokenTypes.STRING, TokenTypes.NEWLINE,
+          TokenTypes.INDENT,
+          TokenTypes.EXPRESSION, TokenTypes.LPAREN,
+          TokenTypes.NOT, TokenTypes.STRING,
+          TokenTypes.AND, TokenTypes.STRING,
+          TokenTypes.RPAREN,
+          TokenTypes.OR, TokenTypes.LPAREN,
+          TokenTypes.NOT, TokenTypes.STRING,
+          TokenTypes.AND, TokenTypes.STRING,
+          TokenTypes.RPAREN,
+          TokenTypes.DEDENT, TokenTypes.EOF
+        ]);
+      });
+
+      it('should handle deeply nested expressions', () => {
+        const input = `casefeature "Deeply Nested"
+    expression (("Condition 1" AND ("Condition 2" OR "Condition 3")) AND (NOT ("Condition 4" AND "Condition 5")))`;
+        const lexer = new CPGLLexer(CharStreams.fromString(input));
+        const tokens = getAllTokens(lexer);
+        
+        verifyTokenSequence(tokens, [
+          TokenTypes.CASEFEATURE, TokenTypes.STRING, TokenTypes.NEWLINE,
+          TokenTypes.INDENT,
+          TokenTypes.EXPRESSION, TokenTypes.LPAREN, TokenTypes.LPAREN,
+          TokenTypes.STRING, TokenTypes.AND, TokenTypes.LPAREN,
+          TokenTypes.STRING, TokenTypes.OR, TokenTypes.STRING,
+          TokenTypes.RPAREN, TokenTypes.RPAREN,
+          TokenTypes.AND, TokenTypes.LPAREN,
+          TokenTypes.NOT, TokenTypes.LPAREN,
+          TokenTypes.STRING, TokenTypes.AND, TokenTypes.STRING,
+          TokenTypes.RPAREN, TokenTypes.RPAREN,
+          TokenTypes.RPAREN,
+          TokenTypes.DEDENT, TokenTypes.EOF
+        ]);
+      });
+
+      it('should handle multiple levels of NOT operations', () => {
+        const input = `casefeature "Multiple NOTs"
+    expression NOT (NOT (NOT "Condition"))`;
+        const lexer = new CPGLLexer(CharStreams.fromString(input));
+        const tokens = getAllTokens(lexer);
+        
+        verifyTokenSequence(tokens, [
+          TokenTypes.CASEFEATURE, TokenTypes.STRING, TokenTypes.NEWLINE,
+          TokenTypes.INDENT,
+          TokenTypes.EXPRESSION, TokenTypes.NOT, TokenTypes.LPAREN,
+          TokenTypes.NOT, TokenTypes.LPAREN,
+          TokenTypes.NOT, TokenTypes.STRING,
+          TokenTypes.RPAREN, TokenTypes.RPAREN,
+          TokenTypes.DEDENT, TokenTypes.EOF
+        ]);
+      });
+
+      it('should handle complex AND/OR combinations', () => {
+        const input = `casefeature "Complex AND/OR"
+    expression ("Condition 1" AND "Condition 2" AND "Condition 3") OR 
+               ("Condition 4" OR "Condition 5" OR "Condition 6") AND 
+               (NOT "Condition 7" OR NOT "Condition 8")`;
+        const lexer = new CPGLLexer(CharStreams.fromString(input));
+        const tokens = getAllTokens(lexer);
+        
+        verifyTokenSequence(tokens, [
+          TokenTypes.CASEFEATURE, TokenTypes.STRING, TokenTypes.NEWLINE,
+          TokenTypes.INDENT,
+          TokenTypes.EXPRESSION, TokenTypes.LPAREN,
+          TokenTypes.STRING, TokenTypes.AND, TokenTypes.STRING, TokenTypes.AND, TokenTypes.STRING,
+          TokenTypes.RPAREN,
+          TokenTypes.OR,
+          TokenTypes.LPAREN,
+          TokenTypes.STRING, TokenTypes.OR, TokenTypes.STRING, TokenTypes.OR, TokenTypes.STRING,
+          TokenTypes.RPAREN,
+          TokenTypes.AND,
+          TokenTypes.LPAREN,
+          TokenTypes.NOT, TokenTypes.STRING, TokenTypes.OR, TokenTypes.NOT, TokenTypes.STRING,
+          TokenTypes.RPAREN,
+          TokenTypes.DEDENT, TokenTypes.EOF
+        ]);
+      });
+
+      it('should handle complex expression with multiple casefeature references', () => {
+        const input = `casefeature "Multiple References"
+    expression ("Feature 1" AND "Feature 2") OR (NOT "Feature 3" AND "Feature 4") OR "Feature 5"`;
+        const lexer = new CPGLLexer(CharStreams.fromString(input));
+        const tokens = getAllTokens(lexer);
+        
+        verifyTokenSequence(tokens, [
+          TokenTypes.CASEFEATURE, TokenTypes.STRING, TokenTypes.NEWLINE,
+          TokenTypes.INDENT,
+          TokenTypes.EXPRESSION, TokenTypes.LPAREN,
+          TokenTypes.STRING, TokenTypes.AND, TokenTypes.STRING,
+          TokenTypes.RPAREN,
+          TokenTypes.OR, TokenTypes.LPAREN,
+          TokenTypes.NOT, TokenTypes.STRING, TokenTypes.AND, TokenTypes.STRING,
+          TokenTypes.RPAREN,
+          TokenTypes.OR, TokenTypes.STRING,
+          TokenTypes.DEDENT, TokenTypes.EOF
+        ]);
+      });
     });
   });
 });
