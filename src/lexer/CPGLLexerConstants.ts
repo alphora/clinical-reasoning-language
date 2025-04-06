@@ -80,9 +80,18 @@ export enum TokenTypes {
  * Vocabulary for token name resolution
  */
 export const Vocabulary = {
+  maxTokenType: Math.max(...Object.values(TokenTypes).filter(x => typeof x === 'number')),
   getDisplayName: (tokenType: number): string => {
     const entry = Object.entries(TokenTypes).find(([_, value]) => value === tokenType);
     return entry ? entry[0] : 'UNKNOWN';
+  },
+  getLiteralName: (tokenType: number): string | null => {
+    const name = Object.entries(TokenTypes).find(([_, value]) => value === tokenType)?.[0];
+    return name ? name : null;
+  },
+  getSymbolicName: (tokenType: number): string | null => {
+    const name = Object.entries(TokenTypes).find(([_, value]) => value === tokenType)?.[0];
+    return name ? name : null;
   }
 };
 

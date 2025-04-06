@@ -56,8 +56,6 @@ export class CPGLToken implements Token {
         return 'FHIR_VALUE_TYPE';
       case TokenTypes.STRING:
         return 'STRING';
-      case TokenTypes.ERROR:
-        return 'ERROR';
       default:
         return `UNKNOWN(${this.type})`;
     }
