@@ -585,6 +585,217 @@ describe('CPGLLexer', () => {
         TokenTypes.EOF
       ]);
     });
+
+    it('should handle nested blocks with qualifiers', () => {
+      const input = `decision "Test"
+    when "Condition" then
+        all
+        when "Subcondition 1" then
+            do "Action 1"
+        when "Subcondition 2" then
+            do "Action 2"
+    when "Another Condition" then
+        any
+        when "Subcondition 3" then
+            do "Action 3"`;
+      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const tokens = getAllTokens(lexer);
+      
+      verifyTokenSequence(tokens, [
+        TokenTypes.DECISION,
+        TokenTypes.STRING,
+        TokenTypes.NEWLINE,
+        TokenTypes.INDENT,
+        TokenTypes.WHEN,
+        TokenTypes.STRING,
+        TokenTypes.THEN,
+        TokenTypes.NEWLINE,
+        TokenTypes.INDENT,
+        TokenTypes.ALL,
+        TokenTypes.NEWLINE,
+        TokenTypes.INDENT,
+        TokenTypes.WHEN,
+        TokenTypes.STRING,
+        TokenTypes.THEN,
+        TokenTypes.NEWLINE,
+        TokenTypes.INDENT,
+        TokenTypes.DO,
+        TokenTypes.STRING,
+        TokenTypes.NEWLINE,
+        TokenTypes.DEDENT,
+        TokenTypes.WHEN,
+        TokenTypes.STRING,
+        TokenTypes.THEN,
+        TokenTypes.NEWLINE,
+        TokenTypes.INDENT,
+        TokenTypes.DO,
+        TokenTypes.STRING,
+        TokenTypes.NEWLINE,
+        TokenTypes.DEDENT,
+        TokenTypes.DEDENT,
+        TokenTypes.WHEN,
+        TokenTypes.STRING,
+        TokenTypes.THEN,
+        TokenTypes.NEWLINE,
+        TokenTypes.INDENT,
+        TokenTypes.ANY,
+        TokenTypes.NEWLINE,
+        TokenTypes.INDENT,
+        TokenTypes.WHEN,
+        TokenTypes.STRING,
+        TokenTypes.THEN,
+        TokenTypes.NEWLINE,
+        TokenTypes.INDENT,
+        TokenTypes.DO,
+        TokenTypes.STRING,
+        TokenTypes.DEDENT,
+        TokenTypes.DEDENT,
+        TokenTypes.DEDENT,
+        TokenTypes.DEDENT,
+        TokenTypes.EOF
+      ]);
+    });
+
+    it('should handle multiple terminal actions in a block', () => {
+      const input = `decision "Test"
+    when "Condition" then
+        do "Action 1"
+        do "Action 2"
+        use "Action 3"`;
+      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const tokens = getAllTokens(lexer);
+      
+      verifyTokenSequence(tokens, [
+        TokenTypes.DECISION,
+        TokenTypes.STRING,
+        TokenTypes.NEWLINE,
+        TokenTypes.INDENT,
+        TokenTypes.WHEN,
+        TokenTypes.STRING,
+        TokenTypes.THEN,
+        TokenTypes.NEWLINE,
+        TokenTypes.INDENT,
+        TokenTypes.DO,
+        TokenTypes.STRING,
+        TokenTypes.NEWLINE,
+        TokenTypes.DO,
+        TokenTypes.STRING,
+        TokenTypes.NEWLINE,
+        TokenTypes.USE,
+        TokenTypes.STRING,
+        TokenTypes.DEDENT,
+        TokenTypes.DEDENT,
+        TokenTypes.EOF
+      ]);
+    });
+
+    it('should handle complex boolean expressions with parentheses', () => {
+      const input = `casefeature "Test"
+    expression (("Condition 1" AND "Condition 2") OR (NOT "Condition 3" AND ("Condition 4" OR "Condition 5")))`;
+      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const tokens = getAllTokens(lexer);
+      
+      verifyTokenSequence(tokens, [
+        TokenTypes.CASEFEATURE,
+        TokenTypes.STRING,
+        TokenTypes.NEWLINE,
+        TokenTypes.INDENT,
+        TokenTypes.EXPRESSION,
+        TokenTypes.LPAREN,
+        TokenTypes.LPAREN,
+        TokenTypes.STRING,
+        TokenTypes.AND,
+        TokenTypes.STRING,
+        TokenTypes.RPAREN,
+        TokenTypes.OR,
+        TokenTypes.LPAREN,
+        TokenTypes.NOT,
+        TokenTypes.STRING,
+        TokenTypes.AND,
+        TokenTypes.LPAREN,
+        TokenTypes.STRING,
+        TokenTypes.OR,
+        TokenTypes.STRING,
+        TokenTypes.RPAREN,
+        TokenTypes.RPAREN,
+        TokenTypes.RPAREN,
+        TokenTypes.DEDENT,
+        TokenTypes.EOF
+      ]);
+    });
+
+    it('should handle multiple levels of nesting with mixed structures', () => {
+      const input = `decision "Test"
+    when "Level 1" then
+        all
+        when "Level 2" then
+            any
+            when "Level 3" then
+                do "Action 1"
+                do "Action 2"
+            when "Level 3b" then
+                use "Action 3"
+        when "Level 2b" then
+            do "Action 4"`;
+      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const tokens = getAllTokens(lexer);
+      
+      verifyTokenSequence(tokens, [
+        TokenTypes.DECISION,
+        TokenTypes.STRING,
+        TokenTypes.NEWLINE,
+        TokenTypes.INDENT,
+        TokenTypes.WHEN,
+        TokenTypes.STRING,
+        TokenTypes.THEN,
+        TokenTypes.NEWLINE,
+        TokenTypes.INDENT,
+        TokenTypes.ALL,
+        TokenTypes.NEWLINE,
+        TokenTypes.INDENT,
+        TokenTypes.WHEN,
+        TokenTypes.STRING,
+        TokenTypes.THEN,
+        TokenTypes.NEWLINE,
+        TokenTypes.INDENT,
+        TokenTypes.ANY,
+        TokenTypes.NEWLINE,
+        TokenTypes.INDENT,
+        TokenTypes.WHEN,
+        TokenTypes.STRING,
+        TokenTypes.THEN,
+        TokenTypes.NEWLINE,
+        TokenTypes.INDENT,
+        TokenTypes.DO,
+        TokenTypes.STRING,
+        TokenTypes.NEWLINE,
+        TokenTypes.DO,
+        TokenTypes.STRING,
+        TokenTypes.NEWLINE,
+        TokenTypes.DEDENT,
+        TokenTypes.WHEN,
+        TokenTypes.STRING,
+        TokenTypes.THEN,
+        TokenTypes.NEWLINE,
+        TokenTypes.INDENT,
+        TokenTypes.USE,
+        TokenTypes.STRING,
+        TokenTypes.DEDENT,
+        TokenTypes.DEDENT,
+        TokenTypes.WHEN,
+        TokenTypes.STRING,
+        TokenTypes.THEN,
+        TokenTypes.NEWLINE,
+        TokenTypes.INDENT,
+        TokenTypes.DO,
+        TokenTypes.STRING,
+        TokenTypes.DEDENT,
+        TokenTypes.DEDENT,
+        TokenTypes.DEDENT,
+        TokenTypes.DEDENT,
+        TokenTypes.EOF
+      ]);
+    });
   });
 
   describe('Error Handling', () => {
