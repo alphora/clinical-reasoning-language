@@ -480,4 +480,121 @@ describe('CPGLLexer', () => {
       }).toThrow();
     });
   });
+
+  describe('Token Emission Order', () => {
+    it('should emit INDENT before first token of indented block', () => {
+      const input = `decision "Test"
+    when "Condition" then
+        do "Action"`;
+      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const tokens = getAllTokens(lexer);
+      
+      // Verify INDENT appears before 'when' token
+      const whenIndex = tokens.findIndex(t => t.type === TokenTypes.WHEN);
+      const indentIndex = tokens.findIndex(t => t.type === TokenTypes.INDENT);
+      expect(indentIndex).toBeLessThan(whenIndex);
+    });
+
+    it('should emit DEDENT after last token of block', () => {
+      const input = `decision "Test"
+    when "Condition" then
+        do "Action"
+    when "Another Condition" then
+        do "Another Action"`;
+      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const tokens = getAllTokens(lexer);
+      
+      // Verify DEDENT appears after 'Action' string
+      const actionIndex = tokens.findIndex(t => t.type === TokenTypes.STRING && t.text === '"Action"');
+      const dedentIndex = tokens.findIndex(t => t.type === TokenTypes.DEDENT);
+      expect(dedentIndex).toBeGreaterThan(actionIndex);
+    });
+
+    it('should emit multiple INDENT/DEDENT tokens in sequence for nested blocks', () => {
+      const input = `decision "Test"
+    when "Level 1" then
+        when "Level 2" then
+            do "Action"`;
+      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const tokens = getAllTokens(lexer);
+      
+      // Get all INDENT and DEDENT tokens
+      const indentTokens = tokens.filter(t => t.type === TokenTypes.INDENT);
+      const dedentTokens = tokens.filter(t => t.type === TokenTypes.DEDENT);
+      
+      // Verify we have the correct number of each
+      expect(indentTokens.length).toBe(3); // One for each level
+      expect(dedentTokens.length).toBe(3); // One for each level
+      
+      // Verify they appear in the correct order
+      const lastIndentIndex = tokens.lastIndexOf(indentTokens[indentTokens.length - 1]);
+      const firstDedentIndex = tokens.indexOf(dedentTokens[0]);
+      expect(firstDedentIndex).toBeGreaterThan(lastIndentIndex);
+    });
+
+    it('should emit NEWLINE before INDENT/DEDENT at block boundaries', () => {
+      const input = `decision "Test"
+    when "Condition" then
+        do "Action"
+    when "Another Condition" then
+        do "Another Action"`;
+      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const tokens = getAllTokens(lexer);
+      
+      // For each INDENT/DEDENT, verify there's a NEWLINE before it
+      tokens.forEach((token, index) => {
+        if (token.type === TokenTypes.INDENT || token.type === TokenTypes.DEDENT) {
+          expect(tokens[index - 1].type).toBe(TokenTypes.NEWLINE);
+        }
+      });
+    });
+
+    it('should handle token emission at complex block boundaries', () => {
+      const input = `decision "Test"
+    when "Condition" then
+        all
+        when "Subcondition" then
+            do "Action"
+        when "Another Subcondition" then
+            do "Another Action"`;
+      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const tokens = getAllTokens(lexer);
+      
+      // Verify token sequence at block boundaries
+      const expectedSequence = [
+        TokenTypes.NEWLINE,
+        TokenTypes.INDENT,
+        TokenTypes.WHEN,
+        TokenTypes.STRING,
+        TokenTypes.THEN,
+        TokenTypes.NEWLINE,
+        TokenTypes.INDENT,
+        TokenTypes.ALL,
+        TokenTypes.NEWLINE,
+        TokenTypes.INDENT,
+        TokenTypes.WHEN,
+        TokenTypes.STRING,
+        TokenTypes.THEN,
+        TokenTypes.NEWLINE,
+        TokenTypes.INDENT,
+        TokenTypes.DO,
+        TokenTypes.STRING,
+        TokenTypes.NEWLINE,
+        TokenTypes.DEDENT,
+        TokenTypes.WHEN,
+        TokenTypes.STRING,
+        TokenTypes.THEN,
+        TokenTypes.NEWLINE,
+        TokenTypes.INDENT,
+        TokenTypes.DO,
+        TokenTypes.STRING,
+        TokenTypes.DEDENT,
+        TokenTypes.DEDENT,
+        TokenTypes.DEDENT,
+        TokenTypes.EOF
+      ];
+      
+      verifyTokenSequence(tokens, expectedSequence);
+    });
+  });
 }); 
