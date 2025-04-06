@@ -66,7 +66,7 @@ useClause
     ;
 
 // A qualifier (either "any" or "all") to modify a group of nested whenClauses.
-// The qualifier **only applies to where.** **It does not apply to do or use.**
+// The qualifier **only applies to when.** **It does not apply to do or use.**
 optionalQualifier
     : ('any' | 'all') NEWLINE
     ;
