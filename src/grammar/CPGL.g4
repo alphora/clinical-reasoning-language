@@ -9,9 +9,7 @@ file
     ;
 
 statement
-    : decision
-    | action
-    | casefeature
+    : (decision | action | casefeature) NEWLINE*
     ;
 
 decision
