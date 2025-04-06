@@ -58,7 +58,7 @@ describe('CPGLParser', () => {
 
   describe('parse', () => {
     it('should parse a complete decision with any qualifier', () => {
-      const input = `decision "test"${NEWLINE}${INDENT}any${NEWLINE}${INDENT}when "condition" then${NEWLINE}${INDENT}${INDENT}do "action"${NEWLINE}`;
+      const input = `decision "test"${NEWLINE}${INDENT}any${NEWLINE}${INDENT}when "condition" then${NEWLINE}${INDENT}${INDENT}do "action"${NEWLINE}${NEWLINE}`;
       const parser = createParser(input);
       const file = parser.file();
       expect(file.statement().length).toBe(1);
@@ -79,7 +79,7 @@ describe('CPGLParser', () => {
     });
 
     it('should parse a complete decision with all qualifier', () => {
-      const input = `decision "test"${NEWLINE}${INDENT}all${NEWLINE}${INDENT}when "condition" then${NEWLINE}${INDENT}${INDENT}do "action"${NEWLINE}`;
+      const input = `decision "test"${NEWLINE}${INDENT}all${NEWLINE}${INDENT}when "condition" then${NEWLINE}${INDENT}${INDENT}do "action"${NEWLINE}${NEWLINE}`;
       const parser = createParser(input);
       const file = parser.file();
       expect(file.statement().length).toBe(1);
