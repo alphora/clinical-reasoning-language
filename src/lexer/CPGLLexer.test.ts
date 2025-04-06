@@ -284,6 +284,132 @@ describe('CPGLLexer', () => {
         TokenTypes.EOF
       ]);
     });
+
+    it('should handle comments on indented lines', () => {
+      const input = `decision "Test"
+    // Comment on indented line
+    when "Condition" then
+        // Another indented comment
+        do "Action"`;
+      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const tokens = getAllTokens(lexer);
+      
+      verifyTokenSequence(tokens, [
+        TokenTypes.DECISION,
+        TokenTypes.STRING,
+        TokenTypes.NEWLINE,
+        TokenTypes.INDENT,
+        TokenTypes.WHEN,
+        TokenTypes.STRING,
+        TokenTypes.THEN,
+        TokenTypes.NEWLINE,
+        TokenTypes.INDENT,
+        TokenTypes.DO,
+        TokenTypes.STRING,
+        TokenTypes.DEDENT,
+        TokenTypes.DEDENT,
+        TokenTypes.EOF
+      ]);
+    });
+
+    it('should handle comments between tokens', () => {
+      const input = `decision /* block comment */ "Test" // line comment
+    when "Condition" /* another comment */ then
+        do "Action"`;
+      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const tokens = getAllTokens(lexer);
+      
+      verifyTokenSequence(tokens, [
+        TokenTypes.DECISION,
+        TokenTypes.STRING,
+        TokenTypes.NEWLINE,
+        TokenTypes.INDENT,
+        TokenTypes.WHEN,
+        TokenTypes.STRING,
+        TokenTypes.THEN,
+        TokenTypes.NEWLINE,
+        TokenTypes.INDENT,
+        TokenTypes.DO,
+        TokenTypes.STRING,
+        TokenTypes.DEDENT,
+        TokenTypes.DEDENT,
+        TokenTypes.EOF
+      ]);
+    });
+
+    it('should handle whitespace between tokens', () => {
+      const input = `decision    "Test"    \n    when    "Condition"    then\n        do    "Action"`;
+      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const tokens = getAllTokens(lexer);
+      
+      verifyTokenSequence(tokens, [
+        TokenTypes.DECISION,
+        TokenTypes.STRING,
+        TokenTypes.NEWLINE,
+        TokenTypes.INDENT,
+        TokenTypes.WHEN,
+        TokenTypes.STRING,
+        TokenTypes.THEN,
+        TokenTypes.NEWLINE,
+        TokenTypes.INDENT,
+        TokenTypes.DO,
+        TokenTypes.STRING,
+        TokenTypes.DEDENT,
+        TokenTypes.DEDENT,
+        TokenTypes.EOF
+      ]);
+    });
+
+    it('should handle trailing whitespace', () => {
+      const input = `decision "Test"    \n    when "Condition" then    \n        do "Action"    `;
+      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const tokens = getAllTokens(lexer);
+      
+      verifyTokenSequence(tokens, [
+        TokenTypes.DECISION,
+        TokenTypes.STRING,
+        TokenTypes.NEWLINE,
+        TokenTypes.INDENT,
+        TokenTypes.WHEN,
+        TokenTypes.STRING,
+        TokenTypes.THEN,
+        TokenTypes.NEWLINE,
+        TokenTypes.INDENT,
+        TokenTypes.DO,
+        TokenTypes.STRING,
+        TokenTypes.DEDENT,
+        TokenTypes.DEDENT,
+        TokenTypes.EOF
+      ]);
+    });
+
+    it('should handle block comments spanning multiple lines', () => {
+      const input = `decision "Test"
+    /* This is a
+       multi-line
+       comment */
+    when "Condition" then
+        do "Action"`;
+      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const tokens = getAllTokens(lexer);
+      
+      verifyTokenSequence(tokens, [
+        TokenTypes.DECISION,
+        TokenTypes.STRING,
+        TokenTypes.NEWLINE,
+        TokenTypes.INDENT,
+        TokenTypes.WHEN,
+        TokenTypes.STRING,
+        TokenTypes.THEN,
+        TokenTypes.NEWLINE,
+        TokenTypes.INDENT,
+        TokenTypes.DO,
+        TokenTypes.STRING,
+        TokenTypes.DEDENT,
+        TokenTypes.DEDENT,
+        TokenTypes.EOF
+      ]);
+    });
   });
 
   describe('FHIR Types', () => {
