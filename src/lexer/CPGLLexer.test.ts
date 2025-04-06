@@ -1230,6 +1230,119 @@ describe('CPGLLexer', () => {
       verifyTokenSequence(tokens, expectedSequence);
     });
   });
+
+  describe('Decision Structure', () => {
+    describe('Multiple When Clauses at Same Level', () => {
+      it('should handle decision with multiple when clauses at same level', () => {
+        const input = `decision "Elderly Based"
+    any
+    when "Client Age Greater Than 60" then
+        do "Indicate"
+    when "Client Age Less Than 60" then
+        do "Vaccinate"
+        do "another thing"
+        do "somthing else"
+    when "Client Age Greater Than 60" then
+        use "Elderly Based"
+        use "IMMZ.D2.D5.Measles"`;
+
+        const lexer = new CPGLLexer(CharStreams.fromString(input));
+        const tokens = getAllTokens(lexer);
+
+        verifyTokenSequence(tokens, [
+          TokenTypes.DECISION, TokenTypes.STRING, TokenTypes.NEWLINE,
+          TokenTypes.INDENT,
+          TokenTypes.ANY, TokenTypes.NEWLINE,
+          TokenTypes.INDENT,
+          TokenTypes.WHEN, TokenTypes.STRING, TokenTypes.THEN, TokenTypes.NEWLINE,
+          TokenTypes.INDENT,
+          TokenTypes.DO, TokenTypes.STRING, TokenTypes.NEWLINE,
+          TokenTypes.DEDENT,
+          TokenTypes.WHEN, TokenTypes.STRING, TokenTypes.THEN, TokenTypes.NEWLINE,
+          TokenTypes.INDENT,
+          TokenTypes.DO, TokenTypes.STRING, TokenTypes.NEWLINE,
+          TokenTypes.DO, TokenTypes.STRING, TokenTypes.NEWLINE,
+          TokenTypes.DO, TokenTypes.STRING, TokenTypes.NEWLINE,
+          TokenTypes.DEDENT,
+          TokenTypes.WHEN, TokenTypes.STRING, TokenTypes.THEN, TokenTypes.NEWLINE,
+          TokenTypes.INDENT,
+          TokenTypes.USE, TokenTypes.STRING, TokenTypes.NEWLINE,
+          TokenTypes.USE, TokenTypes.STRING, TokenTypes.NEWLINE,
+          TokenTypes.DEDENT,
+          TokenTypes.DEDENT,
+          TokenTypes.DEDENT
+        ]);
+      });
+
+      it('should handle decision with multiple when clauses and different terminal actions', () => {
+        const input = `decision "Test Decision"
+    when "Condition 1" then
+        do "Action 1"
+    when "Condition 2" then
+        use "Another Decision"
+    when "Condition 3" then
+        do "Action 2"
+        do "Action 3"`;
+
+        const lexer = new CPGLLexer(CharStreams.fromString(input));
+        const tokens = getAllTokens(lexer);
+
+        verifyTokenSequence(tokens, [
+          TokenTypes.DECISION, TokenTypes.STRING, TokenTypes.NEWLINE,
+          TokenTypes.INDENT,
+          TokenTypes.WHEN, TokenTypes.STRING, TokenTypes.THEN, TokenTypes.NEWLINE,
+          TokenTypes.INDENT,
+          TokenTypes.DO, TokenTypes.STRING, TokenTypes.NEWLINE,
+          TokenTypes.DEDENT,
+          TokenTypes.WHEN, TokenTypes.STRING, TokenTypes.THEN, TokenTypes.NEWLINE,
+          TokenTypes.INDENT,
+          TokenTypes.USE, TokenTypes.STRING, TokenTypes.NEWLINE,
+          TokenTypes.DEDENT,
+          TokenTypes.WHEN, TokenTypes.STRING, TokenTypes.THEN, TokenTypes.NEWLINE,
+          TokenTypes.INDENT,
+          TokenTypes.DO, TokenTypes.STRING, TokenTypes.NEWLINE,
+          TokenTypes.DO, TokenTypes.STRING, TokenTypes.NEWLINE,
+          TokenTypes.DEDENT,
+          TokenTypes.DEDENT
+        ]);
+      });
+
+      it('should handle decision with multiple when clauses and empty lines', () => {
+        const input = `decision "Test Decision"
+    when "Condition 1" then
+        do "Action 1"
+
+    when "Condition 2" then
+        use "Another Decision"
+
+    when "Condition 3" then
+        do "Action 2"`;
+
+        const lexer = new CPGLLexer(CharStreams.fromString(input));
+        const tokens = getAllTokens(lexer);
+
+        verifyTokenSequence(tokens, [
+          TokenTypes.DECISION, TokenTypes.STRING, TokenTypes.NEWLINE,
+          TokenTypes.INDENT,
+          TokenTypes.WHEN, TokenTypes.STRING, TokenTypes.THEN, TokenTypes.NEWLINE,
+          TokenTypes.INDENT,
+          TokenTypes.DO, TokenTypes.STRING, TokenTypes.NEWLINE,
+          TokenTypes.DEDENT,
+          TokenTypes.NEWLINE,
+          TokenTypes.WHEN, TokenTypes.STRING, TokenTypes.THEN, TokenTypes.NEWLINE,
+          TokenTypes.INDENT,
+          TokenTypes.USE, TokenTypes.STRING, TokenTypes.NEWLINE,
+          TokenTypes.DEDENT,
+          TokenTypes.NEWLINE,
+          TokenTypes.WHEN, TokenTypes.STRING, TokenTypes.THEN, TokenTypes.NEWLINE,
+          TokenTypes.INDENT,
+          TokenTypes.DO, TokenTypes.STRING, TokenTypes.NEWLINE,
+          TokenTypes.DEDENT,
+          TokenTypes.DEDENT
+        ]);
+      });
+    });
+  });
 });
 
 /**
