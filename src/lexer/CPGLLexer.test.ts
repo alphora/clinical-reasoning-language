@@ -1343,6 +1343,128 @@ describe('CPGLLexer', () => {
       });
     });
   });
+
+  describe('Action Structure', () => {
+    describe('Multiple Actions in Sequence', () => {
+        it('should handle multiple do actions in sequence', () => {
+            const input = `action "Multiple Do Actions"
+    fhirtype Action
+    do "Action 1"
+    do "Action 2"
+    do "Action 3"`;
+
+            const lexer = new CPGLLexer(CharStreams.fromString(input));
+            const tokens = getAllTokens(lexer);
+
+            verifyTokenSequence(tokens, [
+                TokenTypes.ACTION, TokenTypes.STRING, TokenTypes.NEWLINE,
+                TokenTypes.INDENT,
+                TokenTypes.FHIRTYPE, TokenTypes.ACTION_FHIR_TYPE, TokenTypes.NEWLINE,
+                TokenTypes.DO, TokenTypes.STRING, TokenTypes.NEWLINE,
+                TokenTypes.DO, TokenTypes.STRING, TokenTypes.NEWLINE,
+                TokenTypes.DO, TokenTypes.STRING, TokenTypes.NEWLINE,
+                TokenTypes.DEDENT
+            ]);
+        });
+
+        it('should handle multiple use actions in sequence', () => {
+            const input = `action "Multiple Use Actions"
+    fhirtype Action
+    use "Decision 1"
+    use "Decision 2"
+    use "Decision 3"`;
+
+            const lexer = new CPGLLexer(CharStreams.fromString(input));
+            const tokens = getAllTokens(lexer);
+
+            verifyTokenSequence(tokens, [
+                TokenTypes.ACTION, TokenTypes.STRING, TokenTypes.NEWLINE,
+                TokenTypes.INDENT,
+                TokenTypes.FHIRTYPE, TokenTypes.ACTION_FHIR_TYPE, TokenTypes.NEWLINE,
+                TokenTypes.USE, TokenTypes.STRING, TokenTypes.NEWLINE,
+                TokenTypes.USE, TokenTypes.STRING, TokenTypes.NEWLINE,
+                TokenTypes.USE, TokenTypes.STRING, TokenTypes.NEWLINE,
+                TokenTypes.DEDENT
+            ]);
+        });
+
+        it('should handle mixed do and use actions in sequence', () => {
+            const input = `action "Mixed Actions"
+    fhirtype Action
+    do "Action 1"
+    use "Decision 1"
+    do "Action 2"
+    use "Decision 2"`;
+
+            const lexer = new CPGLLexer(CharStreams.fromString(input));
+            const tokens = getAllTokens(lexer);
+
+            verifyTokenSequence(tokens, [
+                TokenTypes.ACTION, TokenTypes.STRING, TokenTypes.NEWLINE,
+                TokenTypes.INDENT,
+                TokenTypes.FHIRTYPE, TokenTypes.ACTION_FHIR_TYPE, TokenTypes.NEWLINE,
+                TokenTypes.DO, TokenTypes.STRING, TokenTypes.NEWLINE,
+                TokenTypes.USE, TokenTypes.STRING, TokenTypes.NEWLINE,
+                TokenTypes.DO, TokenTypes.STRING, TokenTypes.NEWLINE,
+                TokenTypes.USE, TokenTypes.STRING, TokenTypes.NEWLINE,
+                TokenTypes.DEDENT
+            ]);
+        });
+    });
+
+    describe('Actions with Different FHIR Types', () => {
+        it('should handle action with CaseFeature FHIR type', () => {
+            const input = `action "CaseFeature Action"
+    fhirtype CaseFeature
+    do "Action 1"`;
+
+            const lexer = new CPGLLexer(CharStreams.fromString(input));
+            const tokens = getAllTokens(lexer);
+
+            verifyTokenSequence(tokens, [
+                TokenTypes.ACTION, TokenTypes.STRING, TokenTypes.NEWLINE,
+                TokenTypes.INDENT,
+                TokenTypes.FHIRTYPE, TokenTypes.CASEFEATURE_FHIR_TYPE, TokenTypes.NEWLINE,
+                TokenTypes.DO, TokenTypes.STRING, TokenTypes.NEWLINE,
+                TokenTypes.DEDENT
+            ]);
+        });
+
+        it('should handle action with Action FHIR type', () => {
+            const input = `action "Standard Action"
+    fhirtype Action
+    do "Action 1"`;
+
+            const lexer = new CPGLLexer(CharStreams.fromString(input));
+            const tokens = getAllTokens(lexer);
+
+            verifyTokenSequence(tokens, [
+                TokenTypes.ACTION, TokenTypes.STRING, TokenTypes.NEWLINE,
+                TokenTypes.INDENT,
+                TokenTypes.FHIRTYPE, TokenTypes.ACTION_FHIR_TYPE, TokenTypes.NEWLINE,
+                TokenTypes.DO, TokenTypes.STRING, TokenTypes.NEWLINE,
+                TokenTypes.DEDENT
+            ]);
+        });
+
+        it('should handle action with value type', () => {
+            const input = `action "Value Type Action"
+    valuetype string
+    do "Action 1"`;
+
+            const lexer = new CPGLLexer(CharStreams.fromString(input));
+            const tokens = getAllTokens(lexer);
+
+            verifyTokenSequence(tokens, [
+                TokenTypes.ACTION, TokenTypes.STRING, TokenTypes.NEWLINE,
+                TokenTypes.INDENT,
+                TokenTypes.VALUETYPE, TokenTypes.FHIR_VALUE_TYPE, TokenTypes.NEWLINE,
+                TokenTypes.DO, TokenTypes.STRING, TokenTypes.NEWLINE,
+                TokenTypes.DEDENT
+            ]);
+        });
+    });
+  });
 });
 
 /**
