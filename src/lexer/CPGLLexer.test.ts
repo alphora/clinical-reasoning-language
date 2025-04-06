@@ -136,6 +136,130 @@ describe('CPGLLexer', () => {
         TokenTypes.EOF
       ]);
     });
+
+    it('should handle multiple levels of indentation', () => {
+      const input = `decision "Test"
+    when "Level 1" then
+        when "Level 2" then
+            when "Level 3" then
+                do "Action"`;
+      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const tokens = getAllTokens(lexer);
+      
+      verifyTokenSequence(tokens, [
+        TokenTypes.DECISION,
+        TokenTypes.STRING,
+        TokenTypes.NEWLINE,
+        TokenTypes.INDENT,
+        TokenTypes.WHEN,
+        TokenTypes.STRING,
+        TokenTypes.THEN,
+        TokenTypes.NEWLINE,
+        TokenTypes.INDENT,
+        TokenTypes.WHEN,
+        TokenTypes.STRING,
+        TokenTypes.THEN,
+        TokenTypes.NEWLINE,
+        TokenTypes.INDENT,
+        TokenTypes.WHEN,
+        TokenTypes.STRING,
+        TokenTypes.THEN,
+        TokenTypes.NEWLINE,
+        TokenTypes.INDENT,
+        TokenTypes.DO,
+        TokenTypes.STRING,
+        TokenTypes.DEDENT,
+        TokenTypes.DEDENT,
+        TokenTypes.DEDENT,
+        TokenTypes.DEDENT,
+        TokenTypes.EOF
+      ]);
+    });
+
+    it('should emit DEDENT tokens at EOF for open blocks', () => {
+      const input = `decision "Test"
+    when "Condition" then
+        do "Action"
+    when "Another Condition" then
+        do "Another Action"`;
+      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const tokens = getAllTokens(lexer);
+      
+      verifyTokenSequence(tokens, [
+        TokenTypes.DECISION,
+        TokenTypes.STRING,
+        TokenTypes.NEWLINE,
+        TokenTypes.INDENT,
+        TokenTypes.WHEN,
+        TokenTypes.STRING,
+        TokenTypes.THEN,
+        TokenTypes.NEWLINE,
+        TokenTypes.INDENT,
+        TokenTypes.DO,
+        TokenTypes.STRING,
+        TokenTypes.NEWLINE,
+        TokenTypes.DEDENT,
+        TokenTypes.WHEN,
+        TokenTypes.STRING,
+        TokenTypes.THEN,
+        TokenTypes.NEWLINE,
+        TokenTypes.INDENT,
+        TokenTypes.DO,
+        TokenTypes.STRING,
+        TokenTypes.DEDENT,
+        TokenTypes.DEDENT,
+        TokenTypes.EOF
+      ]);
+    });
+
+    it('should throw an exception for non-4-space indentation', () => {
+      const input = `decision "Test"
+  when "Invalid Indent" then  // 2 spaces instead of 4
+      do "Action"`;
+      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      
+      expect(() => {
+        getAllTokens(lexer);
+      }).toThrow();
+    });
+
+    it('should throw an exception for mixed tabs and spaces', () => {
+      const input = `decision "Test"
+    when "Mixed Indent" then
+    \tdo "Action"`;  // Mix of spaces and tab
+      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      
+      expect(() => {
+        getAllTokens(lexer);
+      }).toThrow();
+    });
+
+    it('should handle empty lines with indentation', () => {
+      const input = `decision "Test"
+    when "Condition" then
+    
+        do "Action"`;  // Empty line with indentation
+      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const tokens = getAllTokens(lexer);
+      
+      verifyTokenSequence(tokens, [
+        TokenTypes.DECISION,
+        TokenTypes.STRING,
+        TokenTypes.NEWLINE,
+        TokenTypes.INDENT,
+        TokenTypes.WHEN,
+        TokenTypes.STRING,
+        TokenTypes.THEN,
+        TokenTypes.NEWLINE,
+        TokenTypes.NEWLINE,  // Empty line
+        TokenTypes.INDENT,
+        TokenTypes.DO,
+        TokenTypes.STRING,
+        TokenTypes.DEDENT,
+        TokenTypes.DEDENT,
+        TokenTypes.EOF
+      ]);
+    });
   });
 
   describe('Comments', () => {
