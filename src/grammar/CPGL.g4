@@ -121,7 +121,7 @@ casefeatureValueTypeClause
 
 // Composite boolean expression for advanced casefeature logic (optional).
 compositeExpression
-    : '(' booleanExpr ')'
+    : 'expression' WS* '(' booleanExpr ')'
     ;
 
 // Boolean expression rules (for composite expressions).
