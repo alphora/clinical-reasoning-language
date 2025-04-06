@@ -7,7 +7,6 @@
 import { CharStreams } from 'antlr4ts';
 import { TokenTypes } from './CPGLLexerConstants';
 import { CPGLLexer } from './CPGLLexer';
-import type { CPGLToken } from './CPGLToken';
 import { Token } from 'antlr4ts/Token';
 
 // Helper function to get all tokens from a lexer
@@ -27,7 +26,7 @@ function verifyTokenSequence(tokens: Token[], expectedTypes: number[], expectedT
   expect(tokens.length).toBe(expectedTypes.length);
   tokens.forEach((token, index) => {
     expect(token.type).toBe(expectedTypes[index]);
-    if (expectedTexts && expectedTexts[index]) {
+    if (expectedTexts?.[index]) {
       expect(token.text).toBe(expectedTexts[index]);
     }
   });
@@ -36,7 +35,7 @@ function verifyTokenSequence(tokens: Token[], expectedTypes: number[], expectedT
 describe('CPGLLexer', () => {
   describe('Basic Tokens', () => {
     it('should tokenize keywords', () => {
-      const input = 'decision when then do use action fhirtype casefeature valuetype casefeaturecode profileurl any all';
+      const input = 'decision when then do use any all action fhirtype casefeature casefeaturecode profileurl valuetype expression';
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
       
@@ -46,14 +45,15 @@ describe('CPGLLexer', () => {
         TokenTypes.THEN,
         TokenTypes.DO,
         TokenTypes.USE,
+        TokenTypes.ANY,
+        TokenTypes.ALL,
         TokenTypes.ACTION,
         TokenTypes.FHIRTYPE,
         TokenTypes.CASEFEATURE,
-        TokenTypes.VALUETYPE,
         TokenTypes.CASEFEATURECODE,
         TokenTypes.PROFILEURL,
-        TokenTypes.ANY,
-        TokenTypes.ALL,
+        TokenTypes.VALUETYPE,
+        TokenTypes.EXPRESSION,
         TokenTypes.EOF
       ]);
     });
@@ -81,9 +81,21 @@ describe('CPGLLexer', () => {
       const tokens = getAllTokens(lexer);
       
       verifyTokenSequence(tokens, [
-        TokenTypes.ERROR, // OR is not a valid token type
-        TokenTypes.ERROR, // AND is not a valid token type
-        TokenTypes.ERROR, // NOT is not a valid token type
+        TokenTypes.OR,
+        TokenTypes.AND,
+        TokenTypes.NOT,
+        TokenTypes.EOF
+      ]);
+    });
+
+    it('should tokenize parentheses', () => {
+      const input = '( )';
+      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const tokens = getAllTokens(lexer);
+      
+      verifyTokenSequence(tokens, [
+        TokenTypes.LPAREN,
+        TokenTypes.RPAREN,
         TokenTypes.EOF
       ]);
     });
@@ -207,7 +219,7 @@ describe('CPGLLexer', () => {
   });
 
   describe('Complex Structures', () => {
-    it('should tokenize a complete decision block', () => {
+    it('should tokenize a complete decision block with qualifiers', () => {
       const input = `decision "Test Decision"
     when "Condition 1" then
         any
@@ -254,7 +266,7 @@ describe('CPGLLexer', () => {
       ]);
     });
 
-    it('should tokenize a complete casefeature with expression', () => {
+    it('should tokenize a complete casefeature with complex expression', () => {
       const input = `casefeature "Test Feature"
     casefeaturecode "test-code"
     fhirtype Observation
@@ -292,19 +304,88 @@ describe('CPGLLexer', () => {
         TokenTypes.VALUETYPE,
         TokenTypes.FHIR_VALUE_TYPE,
         TokenTypes.NEWLINE,
-        TokenTypes.ERROR, // expression
-        TokenTypes.ERROR, // (
+        TokenTypes.EXPRESSION,
+        TokenTypes.LPAREN,
         TokenTypes.STRING,
-        TokenTypes.ERROR, // OR
-        TokenTypes.ERROR, // (
-        TokenTypes.ERROR, // NOT
-        TokenTypes.ERROR, // (
+        TokenTypes.OR,
+        TokenTypes.LPAREN,
+        TokenTypes.NOT,
+        TokenTypes.LPAREN,
         TokenTypes.STRING,
-        TokenTypes.ERROR, // AND
+        TokenTypes.AND,
         TokenTypes.STRING,
-        TokenTypes.ERROR, // )
-        TokenTypes.ERROR, // )
-        TokenTypes.ERROR, // )
+        TokenTypes.RPAREN,
+        TokenTypes.RPAREN,
+        TokenTypes.RPAREN,
+        TokenTypes.DEDENT,
+        TokenTypes.EOF
+      ]);
+    });
+
+    it('should tokenize nested when clauses with different qualifiers', () => {
+      const input = `decision "Test Decision"
+    when "Condition 1" then
+        all
+        when "Subcondition 1" then
+            do "Action 1"
+        when "Subcondition 2" then
+            any
+            when "Subsubcondition 1" then
+                do "Action 2"
+            when "Subsubcondition 2" then
+                use "Another Decision"`;
+      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const tokens = getAllTokens(lexer);
+      
+      verifyTokenSequence(tokens, [
+        TokenTypes.DECISION,
+        TokenTypes.STRING,
+        TokenTypes.NEWLINE,
+        TokenTypes.INDENT,
+        TokenTypes.WHEN,
+        TokenTypes.STRING,
+        TokenTypes.THEN,
+        TokenTypes.NEWLINE,
+        TokenTypes.INDENT,
+        TokenTypes.ALL,
+        TokenTypes.NEWLINE,
+        TokenTypes.INDENT,
+        TokenTypes.WHEN,
+        TokenTypes.STRING,
+        TokenTypes.THEN,
+        TokenTypes.NEWLINE,
+        TokenTypes.INDENT,
+        TokenTypes.DO,
+        TokenTypes.STRING,
+        TokenTypes.NEWLINE,
+        TokenTypes.DEDENT,
+        TokenTypes.WHEN,
+        TokenTypes.STRING,
+        TokenTypes.THEN,
+        TokenTypes.NEWLINE,
+        TokenTypes.INDENT,
+        TokenTypes.ANY,
+        TokenTypes.NEWLINE,
+        TokenTypes.INDENT,
+        TokenTypes.WHEN,
+        TokenTypes.STRING,
+        TokenTypes.THEN,
+        TokenTypes.NEWLINE,
+        TokenTypes.INDENT,
+        TokenTypes.DO,
+        TokenTypes.STRING,
+        TokenTypes.NEWLINE,
+        TokenTypes.DEDENT,
+        TokenTypes.WHEN,
+        TokenTypes.STRING,
+        TokenTypes.THEN,
+        TokenTypes.NEWLINE,
+        TokenTypes.INDENT,
+        TokenTypes.USE,
+        TokenTypes.STRING,
+        TokenTypes.DEDENT,
+        TokenTypes.DEDENT,
+        TokenTypes.DEDENT,
         TokenTypes.DEDENT,
         TokenTypes.EOF
       ]);
