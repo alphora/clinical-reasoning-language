@@ -2,7 +2,7 @@ import { CharStreams } from 'antlr4ts';
 import { CommonTokenStream } from 'antlr4ts/CommonTokenStream';
 
 import { CPGLLexer } from '../lexer/CPGLLexer';
-import { CPGLParser, StatementLineContext, WhenClauseContext } from '../grammar/generated/CPGLParser';
+import { CPGLParser, StatementLineContext } from '../grammar/generated/CPGLParser';
 import { ProxyErrorListener } from '../ProxyErrorListener';
 
 describe('CPGLParser', () => {
@@ -135,7 +135,7 @@ describe('CPGLParser', () => {
       const block = decision?.block();
       expect(block).toBeDefined();
       expect(block?.qualifier()?.ANY()?.text).toBe('any');
-      const whenClause = block?.whenClause();
+      const whenClause = block?.statementLine(0)?.whenClause();
       expect(whenClause).toBeDefined();
       expect(whenClause?.STRING().text).toBe('"condition"');
       const nestedBlock = whenClause?.block();
@@ -157,7 +157,7 @@ describe('CPGLParser', () => {
       const block = decision?.block();
       expect(block).toBeDefined();
       expect(block?.qualifier()?.ALL()?.text).toBe('all');
-      const whenClause = block?.whenClause();
+      const whenClause = block?.statementLine(0)?.whenClause();
       expect(whenClause).toBeDefined();
       expect(whenClause?.STRING().text).toBe('"condition"');
       const nestedBlock = whenClause?.block();

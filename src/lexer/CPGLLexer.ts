@@ -13,12 +13,10 @@ import { CPGLToken } from './CPGLToken';
 export class CPGLLexer extends Lexer {
   readonly indentationStack: number[] = [0];
   readonly pendingTokens: Token[] = [];
-  private currentIndent = 0;
   private atStartOfLine = true;
   private _tokenIndex = -1;
   private _currentLine = 1;
   private _currentColumn = 0;
-  private lastTokenWasQualifier = false;
 
   // Required by ANTLR
   public static readonly channelNames: string[] = ['DEFAULT_TOKEN_CHANNEL', 'HIDDEN'];
@@ -138,12 +136,29 @@ export class CPGLLexer extends Lexer {
   }
 
   private handleEOF(): Token {
-    this.generateDedentTokens();
+    // Generate DEDENT tokens for all remaining indentation levels
+    while (this.indentationStack.length > 1) {
+      this.indentationStack.pop();
+      const dedentToken = this.createToken({
+        type: GeneratedLexer.DEDENT,
+        text: '<DEDENT>',
+        startIndex: this._input.index,
+        stopIndex: this._input.index,
+        line: this._currentLine,
+        charPositionInLine: this._currentColumn,
+        channel: Token.DEFAULT_CHANNEL,
+        tokenIndex: this._tokenIndex++,
+        source: [this._input, this],
+      });
+      this.pendingTokens.push(dedentToken);
+    }
     
+    // Handle any remaining pending tokens
     if (this.pendingTokens.length > 0) {
       return this.pendingTokens.shift()!;
     }
 
+    // Create and return EOF token
     return this.createToken({
       type: Token.EOF,
       text: '<EOF>',
@@ -215,12 +230,59 @@ export class CPGLLexer extends Lexer {
   private handleTokenContent(): Token | null {
     // Check for EOF
     if (this._input.LA(1) === -1) {
-      return this.handleEOF();
+      // Generate DEDENT tokens for all remaining indentation levels
+      while (this.indentationStack.length > 1) {
+        this.indentationStack.pop();
+        const dedentToken = this.createToken({
+          type: GeneratedLexer.DEDENT,
+          text: '<DEDENT>',
+          startIndex: this._input.index,
+          stopIndex: this._input.index,
+          line: this._currentLine,
+          charPositionInLine: this._currentColumn,
+          channel: Token.DEFAULT_CHANNEL,
+          tokenIndex: this._tokenIndex++,
+          source: [this._input, this],
+        });
+        this.pendingTokens.push(dedentToken);
+      }
+      
+      // Handle any remaining pending tokens
+      if (this.pendingTokens.length > 0) {
+        return this.pendingTokens.shift()!;
+      }
+
+      // Create and return EOF token
+      return this.createToken({
+        type: Token.EOF,
+        text: '<EOF>',
+        startIndex: this._input.index,
+        stopIndex: this._input.index,
+        line: this._currentLine,
+        charPositionInLine: this._currentColumn,
+        channel: Token.DEFAULT_CHANNEL,
+        tokenIndex: this._tokenIndex++,
+        source: [this._input, this],
+      });
     }
 
     // Handle newlines
-    if (this._input.LA(1) === '\n'.charCodeAt(0) || this._input.LA(1) === '\r'.charCodeAt(0)) {
-      return this.handleNewline();
+    if (this._input.LA(1) === '\n'.charCodeAt(0)) {
+      this._input.consume();
+      this._currentLine++;
+      this._currentColumn = 0;
+      this.atStartOfLine = true;
+      return this.createToken({
+        type: GeneratedLexer.NEWLINE,
+        text: '\n',
+        startIndex: this._input.index - 1,
+        stopIndex: this._input.index - 1,
+        line: this._currentLine - 1,
+        charPositionInLine: this._currentColumn,
+        channel: Token.DEFAULT_CHANNEL,
+        tokenIndex: this._tokenIndex++,
+        source: [this._input, this],
+      });
     }
 
     // Handle comments
@@ -320,7 +382,8 @@ export class CPGLLexer extends Lexer {
       }
       // If this is a dedent
       else if (indent < this.indentationStack[this.indentationStack.length - 1]) {
-        while (this.indentationStack.length > 1 && indent < this.indentationStack[this.indentationStack.length - 1]) {
+        // Generate DEDENT tokens until we match the current indent level
+        while (indent < this.indentationStack[this.indentationStack.length - 1]) {
           this.indentationStack.pop();
           const dedentToken = this.createToken({
             type: GeneratedLexer.DEDENT,
@@ -335,7 +398,20 @@ export class CPGLLexer extends Lexer {
           });
           this.pendingTokens.push(dedentToken);
         }
+
+        // If we couldn't find a matching indent level
+        if (indent !== this.indentationStack[this.indentationStack.length - 1]) {
+          throw new Error('Inconsistent indentation');
+        }
+
         return this.handlePendingTokens();
+      }
+      // Same indentation level
+      else if (indent === this.indentationStack[this.indentationStack.length - 1]) {
+        // Do nothing, continue with the next token
+      }
+      else {
+        throw new Error('Inconsistent indentation');
       }
     }
 

@@ -17,7 +17,7 @@ decision
     ;
 
 block
-    : INDENT statementLine+ DEDENT
+    : INDENT (qualifier NEWLINE)? statementLine+ DEDENT
     ;
 
 qualifier

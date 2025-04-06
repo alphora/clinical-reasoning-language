@@ -15,10 +15,10 @@
     "start": "npm run build && node dist/index.js",
     "compile": "tsc --noEmit",
     "prepare": "npm run build",
-    "example": "ts-node src/examples/basicUsage.ts",
-    "example:basic": "ts-node src/examples/basicUsage.ts",
-    "example:debug": "ts-node src/examples/debugLexer.ts",
-    "example:full": "ts-node src/examples/fullExample.ts",
+    "example": "npm run build && node dist/examples/basicUsage.js",
+    "example:basic": "npm run build && node dist/examples/basicUsage.js",
+    "example:debug": "npm run build && node dist/examples/debugLexer.js",
+    "example:full": "npm run build && node dist/examples/fullExample.js",
     "generate": "antlr4ts -visitor -o src/grammar/generated src/grammar/CPGL.g4"
   },
   "keywords": [

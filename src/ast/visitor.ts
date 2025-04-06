@@ -57,33 +57,28 @@ export class ASTVisitor implements ParseTreeVisitor<ASTNode> {
     const whenClauses: WhenClause[] = [];
     const useClauses: UseClause[] = [];
 
-    if (block instanceof ParserRuleContext) {
-      // Check if this is a qualifierBlock
-      const firstChild = block.getChild(1);
-      if (firstChild instanceof ParserRuleContext && firstChild.text === 'any' || firstChild.text === 'all') {
-        // This is a qualifierBlock, process the when clauses
-        for (let i = 3; i < block.childCount - 1; i++) {
-          const child = block.getChild(i);
-          if (child instanceof ParserRuleContext) {
-            const statement = this.visitWhenClause(child);
-            if (statement.type === 'WhenClause') {
-              whenClauses.push(statement as WhenClause);
-            }
-          }
-        }
-      } else {
-        // Process regular statementLines
-        for (let i = 1; i < block.childCount - 1; i++) {
-          const child = block.getChild(i);
-          if (child instanceof ParserRuleContext) {
-            const statement = this.visitStatementLine(child);
-            if (statement.type === 'WhenClause') {
-              whenClauses.push(statement as WhenClause);
-            } else if (statement.type === 'UseClause') {
-              useClauses.push(statement as UseClause);
-            }
-          }
-        }
+    if (!(block instanceof ParserRuleContext)) {
+      return {
+        type: 'Decision',
+        name,
+        whenClauses,
+        useClauses,
+        location: this.getLocation(ctx),
+      };
+    }
+
+    // Skip INDENT token
+    for (let i = 1; i < block.childCount - 1; i++) {
+      const child = block.getChild(i);
+      if (!(child instanceof ParserRuleContext)) {
+        continue;
+      }
+
+      const statement = this.visitStatementLine(child);
+      if (statement.type === 'WhenClause') {
+        whenClauses.push(statement as WhenClause);
+      } else if (statement.type === 'UseClause') {
+        useClauses.push(statement as UseClause);
       }
     }
 
@@ -97,21 +92,33 @@ export class ASTVisitor implements ParseTreeVisitor<ASTNode> {
   }
 
   visitWhenClause(ctx: ParserRuleContext): WhenClause {
-    const condition = this.getStringValue(ctx.getChild(1));
-    const block = ctx.getChild(4);
+    let startIndex = 0;
+    let qualifier: 'any' | 'all' | undefined;
+
+    // Check for qualifier
+    if (ctx.childCount > 4 && (ctx.getChild(0).text === 'any' || ctx.getChild(0).text === 'all')) {
+      qualifier = ctx.getChild(0).text as 'any' | 'all';
+      startIndex = 2; // Skip qualifier and NEWLINE
+    }
+
+    const condition = this.getStringValue(ctx.getChild(startIndex + 1));
+    const block = ctx.getChild(startIndex + 4);
     const actions: DoClause[] = [];
     const nestedWhenClauses: WhenClause[] = [];
 
     if (block instanceof ParserRuleContext) {
+      // Skip INDENT token
       for (let i = 1; i < block.childCount - 1; i++) {
         const child = block.getChild(i);
-        if (child instanceof ParserRuleContext) {
-          const statement = this.visitStatementLine(child);
-          if (statement.type === 'DoClause') {
-            actions.push(statement as DoClause);
-          } else if (statement.type === 'WhenClause') {
-            nestedWhenClauses.push(statement as WhenClause);
-          }
+        if (!(child instanceof ParserRuleContext)) {
+          continue;
+        }
+
+        const statement = this.visitStatementLine(child);
+        if (statement.type === 'DoClause') {
+          actions.push(statement as DoClause);
+        } else if (statement.type === 'WhenClause') {
+          nestedWhenClauses.push(statement as WhenClause);
         }
       }
     }
@@ -121,6 +128,7 @@ export class ASTVisitor implements ParseTreeVisitor<ASTNode> {
       condition,
       actions,
       nestedWhenClauses,
+      qualifier,
       location: this.getLocation(ctx),
     };
   }
