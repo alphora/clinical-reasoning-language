@@ -1,10 +1,8 @@
 import { CharStreams } from 'antlr4ts';
 import { CommonTokenStream } from 'antlr4ts/CommonTokenStream';
-import { ParseTreeWalker } from 'antlr4ts/tree/ParseTreeWalker';
 
 import { CPGLLexer } from '../lexer/CPGLLexer';
 import { CPGLParser } from '../grammar/generated/CPGLParser';
-import type { Decision, DoClause, File, WhenClause } from '../ast/types';
 
 describe('CPGLParser', () => {
   const INDENT = '    ';

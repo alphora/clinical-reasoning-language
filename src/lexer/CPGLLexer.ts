@@ -1,6 +1,5 @@
 import type { CharStream } from 'antlr4ts/CharStream';
 import { Lexer } from 'antlr4ts/Lexer';
-import { Interval } from 'antlr4ts/misc/Interval';
 import { Token } from 'antlr4ts/Token';
 
 import { CPGLLexer as GeneratedLexer } from '../grammar/generated/CPGLLexer';
@@ -130,15 +129,72 @@ export class CPGLLexer extends Lexer {
     super(input);
   }
 
-  /**
-   * Get the next token from the input stream
-   * Handles indentation tracking and token generation
-   */
-  public nextToken(): Token {
-    // Return any pending tokens first
+  private handlePendingTokens(): Token | null {
     if (this.pendingTokens.length > 0) {
-      const token = this.pendingTokens.shift()!;
-      return token;
+      return this.pendingTokens.shift()!;
+    }
+    return null;
+  }
+
+  private handleEOF(): Token {
+    this.generateDedentTokens();
+    
+    if (this.pendingTokens.length > 0) {
+      return this.pendingTokens.shift()!;
+    }
+
+    return this.createToken({
+      type: Token.EOF,
+      text: '<EOF>',
+      startIndex: this._input.index,
+      stopIndex: this._input.index,
+      line: this._currentLine,
+      charPositionInLine: this._currentColumn,
+      channel: Token.DEFAULT_CHANNEL,
+      tokenIndex: this._tokenIndex++,
+      source: [this._input, this],
+    });
+  }
+
+  private generateDedentTokens(): void {
+    while (this.indentationStack.length > 1) {
+      this.indentationStack.pop();
+      const dedentToken = this.createToken({
+        type: GeneratedLexer.DEDENT,
+        text: '',
+        startIndex: this._input.index,
+        stopIndex: this._input.index,
+        line: this._currentLine,
+        charPositionInLine: this._currentColumn,
+        channel: Token.DEFAULT_CHANNEL,
+        tokenIndex: this._tokenIndex++,
+        source: [this._input, this],
+      });
+      this.pendingTokens.push(dedentToken);
+    }
+  }
+
+  private skipWhitespace(): void {
+    while (this._input.LA(1) === ' '.charCodeAt(0) || this._input.LA(1) === '\t'.charCodeAt(0)) {
+      this._input.consume();
+      this._currentColumn++;
+    }
+  }
+
+  private handleTopLevelKeyword(token: Token): Token {
+    if (token.type === GeneratedLexer.ACTION ||
+        token.type === GeneratedLexer.CASEFEATURE ||
+        token.type === GeneratedLexer.DECISION) {
+      this.generateDedentTokens();
+    }
+    return token;
+  }
+
+  private handleTokenStart(): Token | null {
+    // Handle pending tokens
+    const pendingToken = this.handlePendingTokens();
+    if (pendingToken) {
+      return pendingToken;
     }
 
     // Handle line start
@@ -150,47 +206,15 @@ export class CPGLLexer extends Lexer {
     }
 
     // Skip whitespace
-    while (this._input.LA(1) === ' '.charCodeAt(0) || this._input.LA(1) === '\t'.charCodeAt(0)) {
-      this._input.consume();
-      this._currentColumn++;
-    }
+    this.skipWhitespace();
 
+    return null;
+  }
+
+  private handleTokenContent(): Token | null {
     // Check for EOF
     if (this._input.LA(1) === -1) {
-      // Generate DEDENT tokens for any remaining indentation levels
-      while (this.indentationStack.length > 1) {
-        this.indentationStack.pop();
-        const dedentToken = this.createToken({
-          type: GeneratedLexer.DEDENT,
-          text: '',
-          startIndex: this._input.index,
-          stopIndex: this._input.index,
-          line: this._currentLine,
-          charPositionInLine: this._currentColumn,
-          channel: Token.DEFAULT_CHANNEL,
-          tokenIndex: this._tokenIndex++,
-          source: [this._input, this],
-        });
-        this.pendingTokens.push(dedentToken);
-      }
-
-      // Return pending DEDENT tokens if any
-      if (this.pendingTokens.length > 0) {
-        return this.pendingTokens.shift()!;
-      }
-
-      // Return EOF token
-      return this.createToken({
-        type: Token.EOF,
-        text: '<EOF>',
-        startIndex: this._input.index,
-        stopIndex: this._input.index,
-        line: this._currentLine,
-        charPositionInLine: this._currentColumn,
-        channel: Token.DEFAULT_CHANNEL,
-        tokenIndex: this._tokenIndex++,
-        source: [this._input, this],
-      });
+      return this.handleEOF();
     }
 
     // Handle newlines
@@ -198,24 +222,21 @@ export class CPGLLexer extends Lexer {
       return this.handleNewline();
     }
 
-    // Handle single-line comments
-    if (this._input.LA(1) === '/'.charCodeAt(0) && this._input.LA(2) === '/'.charCodeAt(0)) {
-      const commentToken = this.handleSingleLineComment();
-      if (commentToken) {
-        return commentToken;
+    // Handle comments
+    if (this._input.LA(1) === '/'.charCodeAt(0)) {
+      if (this._input.LA(2) === '/'.charCodeAt(0)) {
+        const commentToken = this.handleSingleLineComment();
+        if (commentToken) {
+          return commentToken;
+        }
+        return this.nextToken();
+      } else if (this._input.LA(2) === '*'.charCodeAt(0)) {
+        const commentToken = this.handleBlockComment();
+        if (commentToken) {
+          return commentToken;
+        }
+        return this.nextToken();
       }
-      // If no token returned, continue to next token
-      return this.nextToken();
-    }
-
-    // Handle block comments
-    if (this._input.LA(1) === '/'.charCodeAt(0) && this._input.LA(2) === '*'.charCodeAt(0)) {
-      const commentToken = this.handleBlockComment();
-      if (commentToken) {
-        return commentToken;
-      }
-      // If no token returned, continue to next token
-      return this.nextToken();
     }
 
     // Handle string literals
@@ -226,30 +247,27 @@ export class CPGLLexer extends Lexer {
     // Handle identifiers and keywords
     if (this.isAlpha(this._input.LA(1))) {
       const token = this.handleIdentifier();
-      
-      // Reset indentation for top-level keywords
-      if (token.type === GeneratedLexer.ACTION ||
-          token.type === GeneratedLexer.CASEFEATURE ||
-          token.type === GeneratedLexer.DECISION) {
-        // Generate DEDENT tokens for any remaining indentation levels
-        while (this.indentationStack.length > 1) {
-          this.indentationStack.pop();
-          const dedentToken = this.createToken({
-            type: GeneratedLexer.DEDENT,
-            text: '',
-            startIndex: this._input.index,
-            stopIndex: this._input.index,
-            line: this._currentLine,
-            charPositionInLine: this._currentColumn,
-            channel: Token.DEFAULT_CHANNEL,
-            tokenIndex: this._tokenIndex++,
-            source: [this._input, this],
-          });
-          this.pendingTokens.push(dedentToken);
-        }
-      }
+      return this.handleTopLevelKeyword(token);
+    }
 
-      return token;
+    return null;
+  }
+
+  /**
+   * Get the next token from the input stream
+   * Handles indentation tracking and token generation
+   */
+  public nextToken(): Token {
+    // Handle token start (pending tokens, line start, whitespace)
+    const startToken = this.handleTokenStart();
+    if (startToken) {
+      return startToken;
+    }
+
+    // Handle token content
+    const contentToken = this.handleTokenContent();
+    if (contentToken) {
+      return contentToken;
     }
 
     // Handle invalid characters
@@ -382,6 +400,44 @@ export class CPGLLexer extends Lexer {
     return null;
   }
 
+  private handleNewlineInComment(): void {
+    if (this._input.LA(1) === '\n'.charCodeAt(0)) {
+      this._input.consume();
+      this._currentLine++;
+      this._currentColumn = 0;
+      this.atStartOfLine = true;
+    } else if (this._input.LA(1) === '\r'.charCodeAt(0)) {
+      this._input.consume();
+      if (this._input.LA(1) === '\n'.charCodeAt(0)) {
+        this._input.consume();
+      }
+      this._currentLine++;
+      this._currentColumn = 0;
+      this.atStartOfLine = true;
+    } else {
+      this._input.consume();
+      this._currentColumn++;
+    }
+  }
+
+  private handleBlockCommentNesting(): number {
+    let nesting = 1;
+    if (this._input.LA(1) === '/'.charCodeAt(0) && this._input.LA(2) === '*'.charCodeAt(0)) {
+      nesting++;
+      this._input.consume();
+      this._input.consume();
+      this._currentColumn += 2;
+    } else if (this._input.LA(1) === '*'.charCodeAt(0) && this._input.LA(2) === '/'.charCodeAt(0)) {
+      nesting--;
+      this._input.consume();
+      this._input.consume();
+      this._currentColumn += 2;
+    } else {
+      this.handleNewlineInComment();
+    }
+    return nesting;
+  }
+
   private handleBlockComment(): Token | null {
     // Consume the /* characters
     this._input.consume();
@@ -392,35 +448,7 @@ export class CPGLLexer extends Lexer {
 
     // Consume the comment content
     while (nesting > 0 && this._input.LA(1) !== -1) {
-      if (this._input.LA(1) === '/'.charCodeAt(0) && this._input.LA(2) === '*'.charCodeAt(0)) {
-        nesting++;
-        this._input.consume();
-        this._input.consume();
-        this._currentColumn += 2;
-      } else if (this._input.LA(1) === '*'.charCodeAt(0) && this._input.LA(2) === '/'.charCodeAt(0)) {
-        nesting--;
-        this._input.consume();
-        this._input.consume();
-        this._currentColumn += 2;
-      } else {
-        if (this._input.LA(1) === '\n'.charCodeAt(0)) {
-          this._input.consume();
-          this._currentLine++;
-          this._currentColumn = 0;
-          this.atStartOfLine = true;
-        } else if (this._input.LA(1) === '\r'.charCodeAt(0)) {
-          this._input.consume();
-          if (this._input.LA(1) === '\n'.charCodeAt(0)) {
-            this._input.consume();
-          }
-          this._currentLine++;
-          this._currentColumn = 0;
-          this.atStartOfLine = true;
-        } else {
-          this._input.consume();
-          this._currentColumn++;
-        }
-      }
+      nesting = this.handleBlockCommentNesting();
     }
 
     // Consume the newline after the block comment
