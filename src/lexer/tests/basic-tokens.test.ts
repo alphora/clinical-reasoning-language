@@ -18,13 +18,15 @@ describe('Basic Tokens', () => {
         when "Another Subcondition" then
             any
             when "Nested Condition" then
-                do "Nested Action"`;
+                do "Nested Action"
+`;
 
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
       
       // Verify all keywords are present in the correct order
-      const keywordTypes = tokens
+      // Filter out the tokens that are not keywords
+      const keywordTokens = tokens
         .filter(token => [
           TokenTypes.DECISION,
           TokenTypes.WHEN,
@@ -33,30 +35,30 @@ describe('Basic Tokens', () => {
           TokenTypes.USE,
           TokenTypes.ANY,
           TokenTypes.ALL
-        ].includes(token.type))
-        .map(token => token.type);
+        ].includes(token.type));
       
-      expect(keywordTypes).toEqual([
-        TokenTypes.DECISION,
-        TokenTypes.WHEN,
-        TokenTypes.THEN,
-        TokenTypes.DO,
-        TokenTypes.WHEN,
-        TokenTypes.THEN,
-        TokenTypes.USE,
-        TokenTypes.WHEN,
-        TokenTypes.THEN,
-        TokenTypes.ALL,
-        TokenTypes.WHEN,
-        TokenTypes.THEN,
-        TokenTypes.DO,
-        TokenTypes.WHEN,
-        TokenTypes.THEN,
-        TokenTypes.ANY,
-        TokenTypes.WHEN,
-        TokenTypes.THEN,
-        TokenTypes.DO
-      ]);
+        // Verify sequence of just keywords
+        verifyTokenSequence(keywordTokens, [
+            TokenTypes.DECISION,
+            TokenTypes.WHEN,
+            TokenTypes.THEN,
+            TokenTypes.DO,
+            TokenTypes.WHEN,
+            TokenTypes.THEN,
+            TokenTypes.USE,
+            TokenTypes.WHEN,
+            TokenTypes.THEN,
+            TokenTypes.ALL,
+            TokenTypes.WHEN,
+            TokenTypes.THEN,
+            TokenTypes.DO,
+            TokenTypes.WHEN,
+            TokenTypes.THEN,
+            TokenTypes.ANY,
+            TokenTypes.WHEN,
+            TokenTypes.THEN,
+            TokenTypes.DO
+        ]);
     });
 
     it('should recognize keywords in context with proper token sequence', () => {
@@ -64,7 +66,8 @@ describe('Basic Tokens', () => {
     when "Condition" then
         do "Action"
     when "Another Condition" then
-        use "Another Decision"`;
+        use "Another Decision"
+`;
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
       
@@ -89,6 +92,7 @@ describe('Basic Tokens', () => {
         TokenTypes.INDENT,
         TokenTypes.USE,
         TokenTypes.STRING,
+        TokenTypes.NEWLINE,
         TokenTypes.DEDENT,
         TokenTypes.DEDENT,
         TokenTypes.EOF
@@ -100,7 +104,8 @@ describe('Basic Tokens', () => {
     it('should tokenize strings in proper context', () => {
       const input = `decision "Test Decision"
     when "Condition" then
-        do "Action"`;
+        do "Action"
+`;
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
       
@@ -116,6 +121,7 @@ describe('Basic Tokens', () => {
         TokenTypes.INDENT,
         TokenTypes.DO,
         TokenTypes.STRING,
+        TokenTypes.NEWLINE,
         TokenTypes.DEDENT,
         TokenTypes.DEDENT,
         TokenTypes.EOF
@@ -131,6 +137,7 @@ describe('Basic Tokens', () => {
         '    ',
         'do',
         '"Action"',
+        '\n',
         '',
         '',
         ''

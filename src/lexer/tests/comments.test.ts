@@ -10,7 +10,8 @@ describe('Comments', () => {
     // This is a comment about the condition
     when "Condition" then
         // This is a comment about the action
-        do "Action"`;
+        do "Action"
+`;
 
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
@@ -27,6 +28,7 @@ describe('Comments', () => {
         TokenTypes.INDENT,
         TokenTypes.DO,
         TokenTypes.STRING,
+        TokenTypes.NEWLINE,
         TokenTypes.DEDENT,
         TokenTypes.DEDENT,
         TokenTypes.EOF
@@ -37,7 +39,8 @@ describe('Comments', () => {
       const input = `// This is a comment
 decision "Test"
     when "Condition" then
-        do "Action"`;
+        do "Action"
+`;
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
       
@@ -54,6 +57,7 @@ decision "Test"
         TokenTypes.INDENT,
         TokenTypes.DO,
         TokenTypes.STRING,
+        TokenTypes.NEWLINE,
         TokenTypes.DEDENT,
         TokenTypes.DEDENT,
         TokenTypes.EOF
@@ -70,7 +74,8 @@ decision "Test"
     valuetype string
     /* This is a block comment
        explaining the feature */
-    expression ("Condition 1" AND "Condition 2")`;
+    expression ("Condition 1" AND "Condition 2")
+`;
 
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
@@ -98,6 +103,7 @@ decision "Test"
         TokenTypes.AND,
         TokenTypes.STRING,
         TokenTypes.RPAREN,
+        TokenTypes.NEWLINE,
         TokenTypes.DEDENT,
         TokenTypes.EOF
       ]);
@@ -106,7 +112,8 @@ decision "Test"
     it('should handle block comments between tokens', () => {
       const input = `decision /* block comment */ "Test" // line comment
     when "Condition" /* another comment */ then
-        do "Action"`;
+        do "Action"
+`;
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
       
@@ -122,6 +129,7 @@ decision "Test"
         TokenTypes.INDENT,
         TokenTypes.DO,
         TokenTypes.STRING,
+        TokenTypes.NEWLINE,
         TokenTypes.DEDENT,
         TokenTypes.DEDENT,
         TokenTypes.EOF
@@ -136,7 +144,8 @@ decision "Test"
     fhirtype Condition
     profileurl "Test URL"
     valuetype string
-    expression (/* comment */ "Condition 1" /* another comment */ AND "Condition 2")`;
+    expression (/* comment */ "Condition 1" /* another comment */ AND "Condition 2")
+`;
 
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
@@ -164,6 +173,7 @@ decision "Test"
         TokenTypes.AND,
         TokenTypes.STRING,
         TokenTypes.RPAREN,
+        TokenTypes.NEWLINE,
         TokenTypes.DEDENT,
         TokenTypes.EOF
       ]);

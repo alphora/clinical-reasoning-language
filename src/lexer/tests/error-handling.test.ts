@@ -8,7 +8,7 @@ describe('Error Handling', () => {
     const input = '@invalid $tokens';
     const lexer = new CPGLLexer(CharStreams.fromString(input));
     
-    expect(() => { //NOSONAR
+    expect(() => {
       getAllTokens(lexer);
     }).toThrow();
   });
@@ -17,7 +17,7 @@ describe('Error Handling', () => {
     const input = '"unterminated string';
     const lexer = new CPGLLexer(CharStreams.fromString(input));
     
-    expect(() => { //NOSONAR
+    expect(() => {
       getAllTokens(lexer);
     }).toThrow();
   });
@@ -32,12 +32,13 @@ describe('Error Handling', () => {
     \tdo "Action"`,  // Mix of spaces and tab
       `decision "Test"
     when "Inconsistent Indent" then
-            do "Action"`  // 8 spaces instead of 4
+            do "Action"  // 8 spaces instead of 4
+`
     ];
 
     inputs.forEach(input => {
       const lexer = new CPGLLexer(CharStreams.fromString(input));
-      expect(() => { //NOSONAR
+      expect(() => {
         getAllTokens(lexer);
       }).toThrow();
     });
@@ -50,12 +51,13 @@ describe('Error Handling', () => {
     when "Missing Newline" then do "Action"`,  // Missing newline after then
       `decision "Test"
     when "Condition" then
-        do "Action" when "Another" then`  // Missing newline between blocks
+        do "Action" when "Another" then  // Missing newline between blocks
+`
     ];
 
     inputs.forEach(input => {
       const lexer = new CPGLLexer(CharStreams.fromString(input));
-      expect(() => { //NOSONAR
+      expect(() => {
         getAllTokens(lexer);
       }).toThrow();
     });
@@ -72,12 +74,13 @@ describe('Error Handling', () => {
       `casefeature "Test"
     expression NOT AND "Condition"`,  // Invalid operator sequence
       `casefeature "Test"
-    expression "Condition" OR OR "Condition 2"`  // Duplicate operators
+    expression "Condition" OR OR "Condition 2"  // Duplicate operators
+`
     ];
 
     inputs.forEach(input => {
       const lexer = new CPGLLexer(CharStreams.fromString(input));
-      expect(() => { //NOSONAR
+      expect(() => {
         getAllTokens(lexer);
       }).toThrow();
     });
@@ -96,12 +99,13 @@ describe('Error Handling', () => {
       `casefeature "Invalid Expression"
     expression ("Condition 1" AND "Condition 2"`,  // Unmatched parentheses
       `casefeature "Invalid Expression"
-    expression "Condition 1" AND "Condition 2")`  // Unmatched parentheses
+    expression "Condition 1" AND "Condition 2")  // Unmatched parentheses
+`
     ];
 
     inputs.forEach(input => {
       const lexer = new CPGLLexer(CharStreams.fromString(input));
-      expect(() => { //NOSONAR
+      expect(() => {
         getAllTokens(lexer);
       }).toThrow();
     });

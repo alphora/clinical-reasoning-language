@@ -8,7 +8,8 @@ describe('Structures', () => {
     it('should tokenize basic decision blocks', () => {
       const input = `decision "Test Decision"
     when "Condition" then
-        do "Action"`;
+        do "Action"
+`;
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
       
@@ -24,6 +25,7 @@ describe('Structures', () => {
         TokenTypes.INDENT,
         TokenTypes.DO,
         TokenTypes.STRING,
+        TokenTypes.NEWLINE,
         TokenTypes.DEDENT,
         TokenTypes.DEDENT,
         TokenTypes.EOF
@@ -41,7 +43,8 @@ describe('Structures', () => {
             when "Subsubcondition 1" then
                 do "Action 2"
             when "Subsubcondition 2" then
-                use "Another Decision"`;
+                use "Another Decision"
+`;
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
       
@@ -89,6 +92,7 @@ describe('Structures', () => {
         TokenTypes.INDENT,
         TokenTypes.USE,
         TokenTypes.STRING,
+        TokenTypes.NEWLINE,
         TokenTypes.DEDENT,
         TokenTypes.DEDENT,
         TokenTypes.DEDENT,
@@ -101,7 +105,8 @@ describe('Structures', () => {
   describe('Action Structure', () => {
     it('should handle basic action with valid FHIR type', () => {
       const input = `action "Test Action"
-    fhirtype MedicationRequest`;
+    fhirtype MedicationRequest
+`;
 
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
@@ -113,6 +118,7 @@ describe('Structures', () => {
         TokenTypes.INDENT,
         TokenTypes.FHIRTYPE,
         TokenTypes.ACTION_FHIR_TYPE,
+        TokenTypes.NEWLINE,
         TokenTypes.DEDENT,
         TokenTypes.EOF
       ]);
@@ -120,7 +126,8 @@ describe('Structures', () => {
 
     it('should handle action with different valid FHIR type', () => {
       const input = `action "Another Action"
-    fhirtype Appointment`;
+    fhirtype Appointment
+`;
 
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
@@ -132,6 +139,7 @@ describe('Structures', () => {
         TokenTypes.INDENT,
         TokenTypes.FHIRTYPE,
         TokenTypes.ACTION_FHIR_TYPE,
+        TokenTypes.NEWLINE,
         TokenTypes.DEDENT,
         TokenTypes.EOF
       ]);
@@ -139,7 +147,8 @@ describe('Structures', () => {
 
     it('should throw an exception for action with invalid FHIR type', () => {
       const input = `action "Invalid Action"
-    fhirtype Condition`;  // Condition is a casefeature type, not an action type
+    fhirtype Condition
+`;  // Condition is a casefeature type, not an action type
 
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       
@@ -151,7 +160,8 @@ describe('Structures', () => {
     it('should throw an exception for action with do clause', () => {
       const input = `action "Invalid Action"
     fhirtype MedicationRequest
-    do "Action"`;  // Actions cannot have do clauses
+    do "Action"
+`;  // Actions cannot have do clauses
 
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       
@@ -163,7 +173,8 @@ describe('Structures', () => {
     it('should throw an exception for action with use clause', () => {
       const input = `action "Invalid Action"
     fhirtype MedicationRequest
-    use "Another Decision"`;  // Actions cannot have use clauses
+    use "Another Decision"  // Actions cannot have use clauses
+`;
 
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       
@@ -179,7 +190,8 @@ describe('Structures', () => {
     casefeaturecode "Test Code"
     profileurl "Test URL"
     valuetype string
-    expression "Simple Expression"`;
+    expression "Simple Expression"
+`;
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
       
@@ -199,6 +211,7 @@ describe('Structures', () => {
         TokenTypes.NEWLINE,
         TokenTypes.EXPRESSION,
         TokenTypes.STRING,
+        TokenTypes.NEWLINE,
         TokenTypes.DEDENT,
         TokenTypes.EOF
       ]);
@@ -211,7 +224,8 @@ describe('Structures', () => {
     casefeaturecode "Test Code"
     profileurl "Test URL"
     valuetype string
-    expression ("Test Expression" OR (NOT ("Subexpression 1" AND "Subexpression 2")))`;
+    expression ("Test Expression" OR (NOT ("Subexpression 1" AND "Subexpression 2")))
+`;
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
       
@@ -242,6 +256,7 @@ describe('Structures', () => {
         TokenTypes.RPAREN,
         TokenTypes.RPAREN,
         TokenTypes.RPAREN,
+        TokenTypes.NEWLINE,
         TokenTypes.DEDENT,
         TokenTypes.EOF
       ]);
@@ -249,7 +264,8 @@ describe('Structures', () => {
 
     it('should handle nested parentheses in expressions', () => {
       const input = `casefeature "Complex Expression"
-    expression (("Condition 1" AND "Condition 2") OR (NOT ("Condition 3" AND ("Condition 4" OR "Condition 5"))))`;
+    expression (("Condition 1" AND "Condition 2") OR (NOT ("Condition 3" AND ("Condition 4" OR "Condition 5")))
+`;
 
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
@@ -280,6 +296,7 @@ describe('Structures', () => {
         TokenTypes.RPAREN,
         TokenTypes.RPAREN,
         TokenTypes.RPAREN,
+        TokenTypes.NEWLINE,
         TokenTypes.DEDENT,
         TokenTypes.EOF
       ]);
@@ -287,7 +304,8 @@ describe('Structures', () => {
 
     it('should handle multiple levels of NOT operations', () => {
       const input = `casefeature "Multiple NOTs"
-    expression NOT (NOT (NOT "Condition"))`;
+    expression NOT (NOT (NOT "Condition"))
+`;
 
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
@@ -306,6 +324,7 @@ describe('Structures', () => {
         TokenTypes.STRING,
         TokenTypes.RPAREN,
         TokenTypes.RPAREN,
+        TokenTypes.NEWLINE,
         TokenTypes.DEDENT,
         TokenTypes.EOF
       ]);
