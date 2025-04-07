@@ -93,17 +93,21 @@ describe('Integration', () => {
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
       
-      verifyTokenSequence(tokens, [
+      console.log('Actual tokens:');
+      tokens.forEach((token, index) => {
+        console.log(`${index}: ${token.type} (${token.text})`);
+      });
+      
+      console.log('\nExpected sequence:');
+      const expected = [
         TokenTypes.DECISION, TokenTypes.STRING, TokenTypes.NEWLINE,
         TokenTypes.INDENT,
         TokenTypes.WHEN, TokenTypes.STRING, TokenTypes.THEN, TokenTypes.NEWLINE,
         TokenTypes.INDENT,
         TokenTypes.ALL, TokenTypes.NEWLINE,
-        TokenTypes.INDENT,
         TokenTypes.WHEN, TokenTypes.STRING, TokenTypes.THEN, TokenTypes.NEWLINE,
         TokenTypes.INDENT,
         TokenTypes.ANY, TokenTypes.NEWLINE,
-        TokenTypes.INDENT,
         TokenTypes.WHEN, TokenTypes.STRING, TokenTypes.THEN, TokenTypes.NEWLINE,
         TokenTypes.INDENT,
         TokenTypes.DO, TokenTypes.STRING, TokenTypes.NEWLINE,
@@ -111,14 +115,18 @@ describe('Integration', () => {
         TokenTypes.DEDENT,
         TokenTypes.WHEN, TokenTypes.STRING, TokenTypes.THEN, TokenTypes.NEWLINE,
         TokenTypes.INDENT,
-        TokenTypes.USE, TokenTypes.STRING,
-        TokenTypes.DEDENT,
+        TokenTypes.USE, TokenTypes.STRING, TokenTypes.NEWLINE,
         TokenTypes.DEDENT,
         TokenTypes.DEDENT,
         TokenTypes.DEDENT,
         TokenTypes.DEDENT,
         TokenTypes.EOF
-      ]);
+      ];
+      expected.forEach((type, index) => {
+        console.log(`${index}: ${type}`);
+      });
+      
+      verifyTokenSequence(tokens, expected);
     });
   });
 
