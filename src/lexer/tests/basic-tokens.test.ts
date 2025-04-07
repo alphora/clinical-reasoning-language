@@ -100,7 +100,7 @@ describe('Basic Tokens', () => {
     it('should tokenize strings in proper context', () => {
       const input = `decision "Test Decision"
     when "Condition" then
-    do "Action"`;
+        do "Action"`;
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
       
@@ -113,8 +113,10 @@ describe('Basic Tokens', () => {
         TokenTypes.STRING,
         TokenTypes.THEN,
         TokenTypes.NEWLINE,
+        TokenTypes.INDENT,
         TokenTypes.DO,
         TokenTypes.STRING,
+        TokenTypes.DEDENT,
         TokenTypes.DEDENT,
         TokenTypes.EOF
       ], [
@@ -126,8 +128,10 @@ describe('Basic Tokens', () => {
         '"Condition"',
         'then',
         '\n',
+        '    ',
         'do',
         '"Action"',
+        '',
         '',
         ''
       ]);
