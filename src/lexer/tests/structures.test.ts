@@ -178,7 +178,39 @@ describe('Structures', () => {
     });
   });
 
-  describe('CaseFeature Structure', () => {
+  describe('Basic CaseFeature Structure', () => {
+    it('should tokenize casefeatures with basic expressions', () => {
+      const input = `casefeature "Test CaseFeature"
+    casefeaturecode "Test Code"
+    profileurl "Test URL"
+    valuetype string
+    expression "Simple Expression"`;
+      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const tokens = getAllTokens(lexer);
+      
+      verifyTokenSequence(tokens, [
+        TokenTypes.CASEFEATURE,
+        TokenTypes.STRING,
+        TokenTypes.NEWLINE,
+        TokenTypes.INDENT,
+        TokenTypes.CASEFEATURECODE,
+        TokenTypes.STRING,
+        TokenTypes.NEWLINE,
+        TokenTypes.PROFILEURL,
+        TokenTypes.STRING,
+        TokenTypes.NEWLINE,
+        TokenTypes.VALUETYPE,
+        TokenTypes.FHIR_VALUE_TYPE,
+        TokenTypes.NEWLINE,
+        TokenTypes.EXPRESSION,
+        TokenTypes.STRING,
+        TokenTypes.DEDENT,
+        TokenTypes.EOF
+      ]);
+    });
+  });
+
+  describe('Complex CaseFeature Expressions', () => {
     it('should tokenize casefeatures with complex expressions', () => {
       const input = `casefeature "Test CaseFeature"
     casefeaturecode "Test Code"
@@ -220,69 +252,68 @@ describe('Structures', () => {
       ]);
     });
 
-    describe('Complex Composite Expressions', () => {
-      it('should handle nested parentheses in expressions', () => {
-        const input = `casefeature "Complex Expression"
+    it('should handle nested parentheses in expressions', () => {
+      const input = `casefeature "Complex Expression"
     expression (("Condition 1" AND "Condition 2") OR (NOT ("Condition 3" AND ("Condition 4" OR "Condition 5"))))`;
 
-        const lexer = new CPGLLexer(CharStreams.fromString(input));
-        const tokens = getAllTokens(lexer);
+      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const tokens = getAllTokens(lexer);
 
-        verifyTokenSequence(tokens, [
-          TokenTypes.CASEFEATURE,
-          TokenTypes.STRING,
-          TokenTypes.NEWLINE,
-          TokenTypes.INDENT,
-          TokenTypes.EXPRESSION,
-          TokenTypes.LPAREN,
-          TokenTypes.LPAREN,
-          TokenTypes.STRING,
-          TokenTypes.AND,
-          TokenTypes.STRING,
-          TokenTypes.RPAREN,
-          TokenTypes.OR,
-          TokenTypes.LPAREN,
-          TokenTypes.NOT,
-          TokenTypes.LPAREN,
-          TokenTypes.STRING,
-          TokenTypes.AND,
-          TokenTypes.LPAREN,
-          TokenTypes.STRING,
-          TokenTypes.OR,
-          TokenTypes.STRING,
-          TokenTypes.RPAREN,
-          TokenTypes.RPAREN,
-          TokenTypes.RPAREN,
-          TokenTypes.RPAREN,
-          TokenTypes.DEDENT
-        ]);
-      });
+      verifyTokenSequence(tokens, [
+        TokenTypes.CASEFEATURE,
+        TokenTypes.STRING,
+        TokenTypes.NEWLINE,
+        TokenTypes.INDENT,
+        TokenTypes.EXPRESSION,
+        TokenTypes.LPAREN,
+        TokenTypes.LPAREN,
+        TokenTypes.STRING,
+        TokenTypes.AND,
+        TokenTypes.STRING,
+        TokenTypes.RPAREN,
+        TokenTypes.OR,
+        TokenTypes.LPAREN,
+        TokenTypes.NOT,
+        TokenTypes.LPAREN,
+        TokenTypes.STRING,
+        TokenTypes.AND,
+        TokenTypes.LPAREN,
+        TokenTypes.STRING,
+        TokenTypes.OR,
+        TokenTypes.STRING,
+        TokenTypes.RPAREN,
+        TokenTypes.RPAREN,
+        TokenTypes.RPAREN,
+        TokenTypes.RPAREN,
+        TokenTypes.DEDENT,
+        TokenTypes.EOF
+      ]);
+    });
 
-      it('should handle multiple levels of NOT operations', () => {
-        const input = `casefeature "Multiple NOTs"
+    it('should handle multiple levels of NOT operations', () => {
+      const input = `casefeature "Multiple NOTs"
     expression NOT (NOT (NOT "Condition"))`;
 
-        const lexer = new CPGLLexer(CharStreams.fromString(input));
-        const tokens = getAllTokens(lexer);
+      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const tokens = getAllTokens(lexer);
 
-        verifyTokenSequence(tokens, [
-          TokenTypes.CASEFEATURE,
-          TokenTypes.STRING,
-          TokenTypes.NEWLINE,
-          TokenTypes.INDENT,
-          TokenTypes.EXPRESSION,
-          TokenTypes.NOT,
-          TokenTypes.LPAREN,
-          TokenTypes.NOT,
-          TokenTypes.LPAREN,
-          TokenTypes.NOT,
-          TokenTypes.STRING,
-          TokenTypes.RPAREN,
-          TokenTypes.RPAREN,
-          TokenTypes.DEDENT,
-          TokenTypes.EOF
-        ]);
-      });
+      verifyTokenSequence(tokens, [
+        TokenTypes.CASEFEATURE,
+        TokenTypes.STRING,
+        TokenTypes.NEWLINE,
+        TokenTypes.INDENT,
+        TokenTypes.EXPRESSION,
+        TokenTypes.NOT,
+        TokenTypes.LPAREN,
+        TokenTypes.NOT,
+        TokenTypes.LPAREN,
+        TokenTypes.NOT,
+        TokenTypes.STRING,
+        TokenTypes.RPAREN,
+        TokenTypes.RPAREN,
+        TokenTypes.DEDENT,
+        TokenTypes.EOF
+      ]);
     });
   });
 }); 

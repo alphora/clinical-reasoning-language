@@ -53,7 +53,7 @@ describe('Whitespace', () => {
     ]);
   });
 
-  it('should throw error for mixed tabs and spaces in indentation', () => {
+  it('should throw error for tabs in indentation', () => {
     const input = `decision "Test Decision"
     when "Condition" then
 \t    do "Action"`;
@@ -62,7 +62,7 @@ describe('Whitespace', () => {
     
     expect(() => {
       getAllTokens(lexer);
-    }).toThrow('Mixed tabs and spaces are not allowed for indentation');
+    }).toThrow('Tabs are not allowed for indentation');
   });
 
   it('should handle multiple levels of indentation in nested blocks', () => {
