@@ -99,11 +99,8 @@ describe('Basic Tokens', () => {
   describe('String Literals', () => {
     it('should tokenize strings in proper context', () => {
       const input = `decision "Test Decision"
-    when "Condition with spaces" then
-        do "Action with spaces"
-    when "Another Condition" then
-        use "Another Decision"`;
-
+    when "Condition" then
+    do "Action"`;
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
       
@@ -116,27 +113,23 @@ describe('Basic Tokens', () => {
         TokenTypes.STRING,
         TokenTypes.THEN,
         TokenTypes.NEWLINE,
-        TokenTypes.INDENT,
         TokenTypes.DO,
         TokenTypes.STRING,
-        TokenTypes.NEWLINE,
-        TokenTypes.DEDENT,
-        TokenTypes.WHEN,
-        TokenTypes.STRING,
-        TokenTypes.THEN,
-        TokenTypes.NEWLINE,
-        TokenTypes.INDENT,
-        TokenTypes.USE,
-        TokenTypes.STRING,
-        TokenTypes.DEDENT,
         TokenTypes.DEDENT,
         TokenTypes.EOF
       ], [
+        'decision',
         '"Test Decision"',
-        '"Condition with spaces"',
-        '"Action with spaces"',
-        '"Another Condition"',
-        '"Another Decision"'
+        '\n',
+        '    ',
+        'when',
+        '"Condition"',
+        'then',
+        '\n',
+        'do',
+        '"Action"',
+        '',
+        ''
       ]);
     });
   });

@@ -108,24 +108,14 @@
  * the new lexer implementation. Testing parser integration now would be premature
  * as the parser will need significant updates to work with the new lexer.
  */
-// Import all test files
-import './basic-tokens.test';
-import './whitespace.test';
-import './comments.test';
-import './fhir-types.test';
-import './structures.test';
-import './error-handling.test';
-import './integration.test';
-
-// This file serves as the entry point for all lexer tests
-// Each imported file contains its own describe blocks and tests 
-
 import { CharStreams } from 'antlr4ts';
-import { TokenTypes } from '../CPGLLexerConstants';
-import { CPGLLexer } from '../CPGLLexer';
 import { Token } from 'antlr4ts/Token';
+import { CPGLLexer } from '../CPGLLexer';
+import { TokenTypes } from '../CPGLLexerConstants';
 
-// Helper function to get all tokens from a lexer
+/**
+ * Helper function to get all tokens from a lexer
+ */
 export function getAllTokens(lexer: CPGLLexer): Token[] {
   const tokens: Token[] = [];
   let token = lexer.nextToken();
@@ -133,19 +123,21 @@ export function getAllTokens(lexer: CPGLLexer): Token[] {
     tokens.push(token);
     token = lexer.nextToken();
   }
-  tokens.push(token); // Include EOF token
+  tokens.push(token); // Add EOF token
   return tokens;
 }
 
-// Helper function to verify token sequence
+/**
+ * Helper function to verify a sequence of tokens
+ */
 export function verifyTokenSequence(tokens: Token[], expectedTypes: number[], expectedTexts?: string[]) {
   expect(tokens.length).toBe(expectedTypes.length);
-  tokens.forEach((token, index) => {
-    expect(token.type).toBe(expectedTypes[index]);
-    if (expectedTexts?.[index]) {
-      expect(token.text).toBe(expectedTexts[index]);
+  for (let i = 0; i < tokens.length; i++) {
+    expect(tokens[i].type).toBe(expectedTypes[i]);
+    if (expectedTexts && expectedTexts[i]) {
+      expect(tokens[i].text).toBe(expectedTexts[i]);
     }
-  });
+  }
 }
 
 // Export common imports
