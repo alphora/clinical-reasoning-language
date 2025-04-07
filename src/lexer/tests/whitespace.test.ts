@@ -1,6 +1,8 @@
 import { CharStreams } from 'antlr4ts';
-import { TokenTypes } from '../CPGLLexerConstants';
+
 import { CPGLLexer } from '../CPGLLexer';
+import { TokenTypes } from '../CPGLLexerConstants';
+
 import { getAllTokens, verifyTokenSequence } from './index.test';
 
 describe('Whitespace', () => {
@@ -8,7 +10,7 @@ describe('Whitespace', () => {
     const input = `decision "Test Decision"\n    when "Condition" then\n        do "Action"\n`;
     const lexer = new CPGLLexer(CharStreams.fromString(input));
     const tokens = getAllTokens(lexer);
-    
+
     verifyTokenSequence(tokens, [
       TokenTypes.DECISION,
       TokenTypes.STRING,
@@ -24,7 +26,7 @@ describe('Whitespace', () => {
       TokenTypes.NEWLINE,
       TokenTypes.DEDENT,
       TokenTypes.DEDENT,
-      TokenTypes.EOF
+      TokenTypes.EOF,
     ]);
   });
 
@@ -36,7 +38,7 @@ describe('Whitespace', () => {
 
     const lexer = new CPGLLexer(CharStreams.fromString(input));
     const tokens = getAllTokens(lexer);
-    
+
     verifyTokenSequence(tokens, [
       TokenTypes.DECISION,
       TokenTypes.STRING,
@@ -52,7 +54,7 @@ describe('Whitespace', () => {
       TokenTypes.NEWLINE,
       TokenTypes.DEDENT,
       TokenTypes.DEDENT,
-      TokenTypes.EOF
+      TokenTypes.EOF,
     ]);
   });
 
@@ -63,7 +65,7 @@ describe('Whitespace', () => {
 `;
 
     const lexer = new CPGLLexer(CharStreams.fromString(input));
-    
+
     expect(() => {
       getAllTokens(lexer);
     }).toThrow('Tabs are not allowed for indentation');
@@ -79,7 +81,7 @@ describe('Whitespace', () => {
 
     const lexer = new CPGLLexer(CharStreams.fromString(input));
     const tokens = getAllTokens(lexer);
-    
+
     verifyTokenSequence(tokens, [
       TokenTypes.DECISION,
       TokenTypes.STRING,
@@ -107,7 +109,7 @@ describe('Whitespace', () => {
       TokenTypes.DEDENT,
       TokenTypes.DEDENT,
       TokenTypes.DEDENT,
-      TokenTypes.EOF
+      TokenTypes.EOF,
     ]);
   });
-}); 
+});

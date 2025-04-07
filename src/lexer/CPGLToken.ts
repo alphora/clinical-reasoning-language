@@ -1,11 +1,12 @@
-import { Token } from 'antlr4ts/Token';
-import { TokenTypes } from './CPGLLexerConstants';
 import { CharStream } from 'antlr4ts/CharStream';
 import { Lexer } from 'antlr4ts/Lexer';
+import { Token } from 'antlr4ts/Token';
+
+import { TokenTypes } from './CPGLLexerConstants';
 
 /**
  * Custom token implementation for the Clinical Practice Guideline Language
- * 
+ *
  * IMPORTANT: This file uses the generated lexer ONLY for its static constants
  * and type definitions. It does not use the lexer for token generation.
  */
@@ -19,7 +20,7 @@ export class CPGLToken implements Token {
     public tokenIndex: number,
     public startIndex: number,
     public stopIndex: number,
-    public source: [CharStream, Lexer]
+    public source: [CharStream, Lexer],
   ) {}
 
   public get typeName(): string {

@@ -1,6 +1,8 @@
 import { CharStreams } from 'antlr4ts';
-import { TokenTypes } from '../CPGLLexerConstants';
+
 import { CPGLLexer } from '../CPGLLexer';
+import { TokenTypes } from '../CPGLLexerConstants';
+
 import { getAllTokens, verifyTokenSequence } from './index.test';
 
 describe('Structures', () => {
@@ -12,7 +14,7 @@ describe('Structures', () => {
 `;
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
-      
+
       verifyTokenSequence(tokens, [
         TokenTypes.DECISION,
         TokenTypes.STRING,
@@ -28,7 +30,7 @@ describe('Structures', () => {
         TokenTypes.NEWLINE,
         TokenTypes.DEDENT,
         TokenTypes.DEDENT,
-        TokenTypes.EOF
+        TokenTypes.EOF,
       ]);
     });
 
@@ -47,7 +49,7 @@ describe('Structures', () => {
 `;
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
-      
+
       verifyTokenSequence(tokens, [
         TokenTypes.DECISION,
         TokenTypes.STRING,
@@ -97,7 +99,7 @@ describe('Structures', () => {
         TokenTypes.DEDENT,
         TokenTypes.DEDENT,
         TokenTypes.DEDENT,
-        TokenTypes.EOF
+        TokenTypes.EOF,
       ]);
     });
   });
@@ -120,7 +122,7 @@ describe('Structures', () => {
         TokenTypes.ACTION_FHIR_TYPE,
         TokenTypes.NEWLINE,
         TokenTypes.DEDENT,
-        TokenTypes.EOF
+        TokenTypes.EOF,
       ]);
     });
 
@@ -141,17 +143,17 @@ describe('Structures', () => {
         TokenTypes.ACTION_FHIR_TYPE,
         TokenTypes.NEWLINE,
         TokenTypes.DEDENT,
-        TokenTypes.EOF
+        TokenTypes.EOF,
       ]);
     });
 
     it('should throw an exception for action with invalid FHIR type', () => {
       const input = `action "Invalid Action"
     fhirtype Condition
-`;  // Condition is a casefeature type, not an action type
+`; // Condition is a casefeature type, not an action type
 
       const lexer = new CPGLLexer(CharStreams.fromString(input));
-      
+
       expect(() => {
         getAllTokens(lexer);
       }).toThrow();
@@ -161,10 +163,10 @@ describe('Structures', () => {
       const input = `action "Invalid Action"
     fhirtype MedicationRequest
     do "Action"
-`;  // Actions cannot have do clauses
+`; // Actions cannot have do clauses
 
       const lexer = new CPGLLexer(CharStreams.fromString(input));
-      
+
       expect(() => {
         getAllTokens(lexer);
       }).toThrow();
@@ -177,7 +179,7 @@ describe('Structures', () => {
 `;
 
       const lexer = new CPGLLexer(CharStreams.fromString(input));
-      
+
       expect(() => {
         getAllTokens(lexer);
       }).toThrow();
@@ -194,7 +196,7 @@ describe('Structures', () => {
 `;
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
-      
+
       verifyTokenSequence(tokens, [
         TokenTypes.CASEFEATURE,
         TokenTypes.STRING,
@@ -213,7 +215,7 @@ describe('Structures', () => {
         TokenTypes.STRING,
         TokenTypes.NEWLINE,
         TokenTypes.DEDENT,
-        TokenTypes.EOF
+        TokenTypes.EOF,
       ]);
     });
   });
@@ -228,7 +230,7 @@ describe('Structures', () => {
 `;
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
-      
+
       verifyTokenSequence(tokens, [
         TokenTypes.CASEFEATURE,
         TokenTypes.STRING,
@@ -258,7 +260,7 @@ describe('Structures', () => {
         TokenTypes.RPAREN,
         TokenTypes.NEWLINE,
         TokenTypes.DEDENT,
-        TokenTypes.EOF
+        TokenTypes.EOF,
       ]);
     });
 
@@ -298,7 +300,7 @@ describe('Structures', () => {
         TokenTypes.RPAREN,
         TokenTypes.NEWLINE,
         TokenTypes.DEDENT,
-        TokenTypes.EOF
+        TokenTypes.EOF,
       ]);
     });
 
@@ -326,8 +328,8 @@ describe('Structures', () => {
         TokenTypes.RPAREN,
         TokenTypes.NEWLINE,
         TokenTypes.DEDENT,
-        TokenTypes.EOF
+        TokenTypes.EOF,
       ]);
     });
   });
-}); 
+});

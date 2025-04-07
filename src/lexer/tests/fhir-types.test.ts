@@ -1,8 +1,10 @@
 import { CharStreams } from 'antlr4ts';
-import { TokenTypes } from '../CPGLLexerConstants';
+
 import { CPGLLexer } from '../CPGLLexer';
-import { getAllTokens, verifyTokenSequence } from './index.test';
+import { TokenTypes } from '../CPGLLexerConstants';
+
 import { getActionTokenSequence, getCaseFeatureTokenSequence } from './fhir-types.helpers';
+import { getAllTokens, verifyTokenSequence } from './index.test';
 
 describe('FHIR Types', () => {
   describe('Action FHIR Types', () => {
@@ -54,9 +56,12 @@ action "Test VisionPrescription"
 `;
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
-      
-      console.log('Action FHIR Types tokens:', tokens.map(t => ({ type: t.type, text: t.text })));
-      
+
+      console.log(
+        'Action FHIR Types tokens:',
+        tokens.map(t => ({ type: t.type, text: t.text })),
+      );
+
       // Generate expected sequence for all actions
       const expectedSequence = Array(15)
         .fill(null)
@@ -65,7 +70,7 @@ action "Test VisionPrescription"
             TokenTypes.ACTION,
             TokenTypes.STRING,
             TokenTypes.NEWLINE,
-            ...getActionTokenSequence()
+            ...getActionTokenSequence(),
           ];
           return sequence;
         })
@@ -74,7 +79,10 @@ action "Test VisionPrescription"
       console.log('Expected sequence length:', expectedSequence.length);
       console.log('Actual sequence length:', tokens.length);
       console.log('Expected sequence:', expectedSequence);
-      console.log('Actual sequence:', tokens.map(t => t.type));
+      console.log(
+        'Actual sequence:',
+        tokens.map(t => t.type),
+      );
 
       verifyTokenSequence(tokens, expectedSequence);
     });
@@ -85,25 +93,29 @@ action "Test VisionPrescription"
 `;
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
-      
-      console.log('Single action tokens:', tokens.map(t => ({ type: t.type, text: t.text })));
-      
+
+      console.log(
+        'Single action tokens:',
+        tokens.map(t => ({ type: t.type, text: t.text })),
+      );
+
       verifyTokenSequence(tokens, [
         TokenTypes.ACTION,
         TokenTypes.STRING,
         TokenTypes.NEWLINE,
         ...getActionTokenSequence(),
-        TokenTypes.EOF
+        TokenTypes.EOF,
       ]);
     });
 
     it('should throw an exception for invalid action FHIR type', () => {
       const input = `action "Test Action"
     fhirtype Condition
-`;  // Condition is a casefeature type, not an action type
+`; // Condition is a casefeature type, not an action type
       const lexer = new CPGLLexer(CharStreams.fromString(input));
-      
-      expect(() => { //NOSONAR
+
+      expect(() => {
+        //NOSONAR
         getAllTokens(lexer);
       }).toThrow();
     });
@@ -161,9 +173,12 @@ casefeature "Test MedicationStatement"
 `;
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
-      
-      console.log('CaseFeature FHIR Types tokens:', tokens.map(t => ({ type: t.type, text: t.text })));
-      
+
+      console.log(
+        'CaseFeature FHIR Types tokens:',
+        tokens.map(t => ({ type: t.type, text: t.text })),
+      );
+
       // Generate expected sequence for all casefeatures
       const expectedSequence = Array(8)
         .fill(null)
@@ -172,7 +187,7 @@ casefeature "Test MedicationStatement"
             TokenTypes.CASEFEATURE,
             TokenTypes.STRING,
             TokenTypes.NEWLINE,
-            ...getCaseFeatureTokenSequence()
+            ...getCaseFeatureTokenSequence(),
           ];
           return sequence;
         })
@@ -181,7 +196,10 @@ casefeature "Test MedicationStatement"
       console.log('Expected sequence length:', expectedSequence.length);
       console.log('Actual sequence length:', tokens.length);
       console.log('Expected sequence:', expectedSequence);
-      console.log('Actual sequence:', tokens.map(t => t.type));
+      console.log(
+        'Actual sequence:',
+        tokens.map(t => t.type),
+      );
 
       verifyTokenSequence(tokens, expectedSequence);
     });
@@ -195,15 +213,18 @@ casefeature "Test MedicationStatement"
 `;
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
-      
-      console.log('Single casefeature tokens:', tokens.map(t => ({ type: t.type, text: t.text })));
-      
+
+      console.log(
+        'Single casefeature tokens:',
+        tokens.map(t => ({ type: t.type, text: t.text })),
+      );
+
       verifyTokenSequence(tokens, [
         TokenTypes.CASEFEATURE,
         TokenTypes.STRING,
         TokenTypes.NEWLINE,
         ...getCaseFeatureTokenSequence(),
-        TokenTypes.EOF
+        TokenTypes.EOF,
       ]);
     });
 
@@ -213,10 +234,11 @@ casefeature "Test MedicationStatement"
     fhirtype Appointment
     profileurl "Test URL"
     valuetype string
-`;  // Appointment is an action type, not a casefeature type
+`; // Appointment is an action type, not a casefeature type
       const lexer = new CPGLLexer(CharStreams.fromString(input));
-      
-      expect(() => { //NOSONAR
+
+      expect(() => {
+        //NOSONAR
         getAllTokens(lexer);
       }).toThrow();
     });

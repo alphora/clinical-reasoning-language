@@ -1,6 +1,8 @@
 import { CharStreams } from 'antlr4ts';
-import { TokenTypes } from '../CPGLLexerConstants';
+
 import { CPGLLexer } from '../CPGLLexer';
+import { TokenTypes } from '../CPGLLexerConstants';
+
 import { getAllTokens, verifyTokenSequence } from './index.test';
 
 describe('Comments', () => {
@@ -15,7 +17,7 @@ describe('Comments', () => {
 
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
-      
+
       verifyTokenSequence(tokens, [
         TokenTypes.DECISION,
         TokenTypes.STRING,
@@ -31,7 +33,7 @@ describe('Comments', () => {
         TokenTypes.NEWLINE,
         TokenTypes.DEDENT,
         TokenTypes.DEDENT,
-        TokenTypes.EOF
+        TokenTypes.EOF,
       ]);
     });
 
@@ -43,7 +45,7 @@ decision "Test"
 `;
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
-      
+
       verifyTokenSequence(tokens, [
         TokenTypes.NEWLINE,
         TokenTypes.DECISION,
@@ -60,7 +62,7 @@ decision "Test"
         TokenTypes.NEWLINE,
         TokenTypes.DEDENT,
         TokenTypes.DEDENT,
-        TokenTypes.EOF
+        TokenTypes.EOF,
       ]);
     });
   });
@@ -79,7 +81,7 @@ decision "Test"
 
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
-      
+
       verifyTokenSequence(tokens, [
         TokenTypes.CASEFEATURE,
         TokenTypes.STRING,
@@ -105,7 +107,7 @@ decision "Test"
         TokenTypes.RPAREN,
         TokenTypes.NEWLINE,
         TokenTypes.DEDENT,
-        TokenTypes.EOF
+        TokenTypes.EOF,
       ]);
     });
 
@@ -116,7 +118,7 @@ decision "Test"
 `;
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
-      
+
       verifyTokenSequence(tokens, [
         TokenTypes.DECISION,
         TokenTypes.STRING,
@@ -132,7 +134,7 @@ decision "Test"
         TokenTypes.NEWLINE,
         TokenTypes.DEDENT,
         TokenTypes.DEDENT,
-        TokenTypes.EOF
+        TokenTypes.EOF,
       ]);
     });
   });
@@ -149,7 +151,7 @@ decision "Test"
 
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
-      
+
       verifyTokenSequence(tokens, [
         TokenTypes.CASEFEATURE,
         TokenTypes.STRING,
@@ -175,8 +177,8 @@ decision "Test"
         TokenTypes.RPAREN,
         TokenTypes.NEWLINE,
         TokenTypes.DEDENT,
-        TokenTypes.EOF
+        TokenTypes.EOF,
       ]);
     });
   });
-}); 
+});

@@ -14,7 +14,7 @@ export function getActionTokenSequence(): number[] {
     TokenTypes.FHIRTYPE,
     TokenTypes.ACTION_FHIR_TYPE,
     TokenTypes.NEWLINE,
-    TokenTypes.DEDENT
+    TokenTypes.DEDENT,
   ];
 }
 
@@ -44,6 +44,6 @@ export function getCaseFeatureTokenSequence(): number[] {
     TokenTypes.VALUETYPE,
     TokenTypes.FHIR_VALUE_TYPE,
     TokenTypes.NEWLINE,
-    TokenTypes.DEDENT
+    TokenTypes.DEDENT,
   ];
-} 
+}

@@ -1,6 +1,8 @@
 import { CharStreams } from 'antlr4ts';
-import { TokenTypes } from '../CPGLLexerConstants';
+
 import { CPGLLexer } from '../CPGLLexer';
+import { TokenTypes } from '../CPGLLexerConstants';
+
 import { getAllTokens, verifyTokenSequence } from './index.test';
 
 describe('Integration', () => {
@@ -12,7 +14,7 @@ describe('Integration', () => {
 `;
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
-      
+
       // Verify NEWLINE followed by INDENT pattern
       const newlineIndex = tokens.findIndex(t => t.type === TokenTypes.NEWLINE);
       const indentIndex = tokens.findIndex(t => t.type === TokenTypes.INDENT);
@@ -28,7 +30,7 @@ describe('Integration', () => {
 `;
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
-      
+
       // Find first DEDENT and verify next token is WHEN
       const firstDedentIndex = tokens.findIndex(t => t.type === TokenTypes.DEDENT);
       expect(tokens[firstDedentIndex + 1].type).toBe(TokenTypes.WHEN);
@@ -42,14 +44,14 @@ describe('Integration', () => {
 `;
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
-      
+
       // Get all DEDENT tokens
       const dedentTokens = tokens.filter(t => t.type === TokenTypes.DEDENT);
       expect(dedentTokens.length).toBe(3); // One for each level
-      
+
       // Verify they appear in sequence
       const dedentIndices = tokens
-        .map((t, i) => t.type === TokenTypes.DEDENT ? i : -1)
+        .map((t, i) => (t.type === TokenTypes.DEDENT ? i : -1))
         .filter(i => i !== -1);
       const sortedIndices = [...dedentIndices].sort((a: number, b: number) => a - b);
       expect(dedentIndices).toEqual(sortedIndices);
@@ -64,7 +66,7 @@ describe('Integration', () => {
 `;
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
-      
+
       verifyTokenSequence(tokens, [
         TokenTypes.DECISION,
         TokenTypes.STRING,
@@ -80,7 +82,7 @@ describe('Integration', () => {
         TokenTypes.NEWLINE,
         TokenTypes.DEDENT,
         TokenTypes.DEDENT,
-        TokenTypes.EOF
+        TokenTypes.EOF,
       ]);
     });
 
@@ -98,40 +100,62 @@ describe('Integration', () => {
 `;
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
-      
+
       console.log('Actual tokens:');
       tokens.forEach((token, index) => {
         console.log(`${index}: ${token.type} (${token.text})`);
       });
-      
+
       console.log('\nExpected sequence:');
       const expected = [
-        TokenTypes.DECISION, TokenTypes.STRING, TokenTypes.NEWLINE,
+        TokenTypes.DECISION,
+        TokenTypes.STRING,
+        TokenTypes.NEWLINE,
         TokenTypes.INDENT,
-        TokenTypes.WHEN, TokenTypes.STRING, TokenTypes.THEN, TokenTypes.NEWLINE,
+        TokenTypes.WHEN,
+        TokenTypes.STRING,
+        TokenTypes.THEN,
+        TokenTypes.NEWLINE,
         TokenTypes.INDENT,
-        TokenTypes.ALL, TokenTypes.NEWLINE,
-        TokenTypes.WHEN, TokenTypes.STRING, TokenTypes.THEN, TokenTypes.NEWLINE,
+        TokenTypes.ALL,
+        TokenTypes.NEWLINE,
+        TokenTypes.WHEN,
+        TokenTypes.STRING,
+        TokenTypes.THEN,
+        TokenTypes.NEWLINE,
         TokenTypes.INDENT,
-        TokenTypes.ANY, TokenTypes.NEWLINE,
-        TokenTypes.WHEN, TokenTypes.STRING, TokenTypes.THEN, TokenTypes.NEWLINE,
+        TokenTypes.ANY,
+        TokenTypes.NEWLINE,
+        TokenTypes.WHEN,
+        TokenTypes.STRING,
+        TokenTypes.THEN,
+        TokenTypes.NEWLINE,
         TokenTypes.INDENT,
-        TokenTypes.DO, TokenTypes.STRING, TokenTypes.NEWLINE,
-        TokenTypes.DO, TokenTypes.STRING, TokenTypes.NEWLINE,
+        TokenTypes.DO,
+        TokenTypes.STRING,
+        TokenTypes.NEWLINE,
+        TokenTypes.DO,
+        TokenTypes.STRING,
+        TokenTypes.NEWLINE,
         TokenTypes.DEDENT,
-        TokenTypes.WHEN, TokenTypes.STRING, TokenTypes.THEN, TokenTypes.NEWLINE,
+        TokenTypes.WHEN,
+        TokenTypes.STRING,
+        TokenTypes.THEN,
+        TokenTypes.NEWLINE,
         TokenTypes.INDENT,
-        TokenTypes.USE, TokenTypes.STRING, TokenTypes.NEWLINE,
+        TokenTypes.USE,
+        TokenTypes.STRING,
+        TokenTypes.NEWLINE,
         TokenTypes.DEDENT,
         TokenTypes.DEDENT,
         TokenTypes.DEDENT,
         TokenTypes.DEDENT,
-        TokenTypes.EOF
+        TokenTypes.EOF,
       ];
       expected.forEach((type, index) => {
         console.log(`${index}: ${type}`);
       });
-      
+
       verifyTokenSequence(tokens, expected);
     });
   });
@@ -156,27 +180,51 @@ describe('Integration', () => {
         const tokens = getAllTokens(lexer);
 
         verifyTokenSequence(tokens, [
-          TokenTypes.DECISION, TokenTypes.STRING, TokenTypes.NEWLINE,
+          TokenTypes.DECISION,
+          TokenTypes.STRING,
+          TokenTypes.NEWLINE,
           TokenTypes.INDENT,
-          TokenTypes.ANY, TokenTypes.NEWLINE,
+          TokenTypes.ANY,
+          TokenTypes.NEWLINE,
           TokenTypes.INDENT,
-          TokenTypes.WHEN, TokenTypes.STRING, TokenTypes.THEN, TokenTypes.NEWLINE,
+          TokenTypes.WHEN,
+          TokenTypes.STRING,
+          TokenTypes.THEN,
+          TokenTypes.NEWLINE,
           TokenTypes.INDENT,
-          TokenTypes.DO, TokenTypes.STRING, TokenTypes.NEWLINE,
+          TokenTypes.DO,
+          TokenTypes.STRING,
+          TokenTypes.NEWLINE,
           TokenTypes.DEDENT,
-          TokenTypes.WHEN, TokenTypes.STRING, TokenTypes.THEN, TokenTypes.NEWLINE,
+          TokenTypes.WHEN,
+          TokenTypes.STRING,
+          TokenTypes.THEN,
+          TokenTypes.NEWLINE,
           TokenTypes.INDENT,
-          TokenTypes.DO, TokenTypes.STRING, TokenTypes.NEWLINE,
-          TokenTypes.DO, TokenTypes.STRING, TokenTypes.NEWLINE,
-          TokenTypes.DO, TokenTypes.STRING, TokenTypes.NEWLINE,
+          TokenTypes.DO,
+          TokenTypes.STRING,
+          TokenTypes.NEWLINE,
+          TokenTypes.DO,
+          TokenTypes.STRING,
+          TokenTypes.NEWLINE,
+          TokenTypes.DO,
+          TokenTypes.STRING,
+          TokenTypes.NEWLINE,
           TokenTypes.DEDENT,
-          TokenTypes.WHEN, TokenTypes.STRING, TokenTypes.THEN, TokenTypes.NEWLINE,
+          TokenTypes.WHEN,
+          TokenTypes.STRING,
+          TokenTypes.THEN,
+          TokenTypes.NEWLINE,
           TokenTypes.INDENT,
-          TokenTypes.USE, TokenTypes.STRING, TokenTypes.NEWLINE,
-          TokenTypes.USE, TokenTypes.STRING, TokenTypes.NEWLINE,
+          TokenTypes.USE,
+          TokenTypes.STRING,
+          TokenTypes.NEWLINE,
+          TokenTypes.USE,
+          TokenTypes.STRING,
+          TokenTypes.NEWLINE,
           TokenTypes.DEDENT,
           TokenTypes.DEDENT,
-          TokenTypes.DEDENT
+          TokenTypes.DEDENT,
         ]);
       });
 
@@ -195,22 +243,41 @@ describe('Integration', () => {
         const tokens = getAllTokens(lexer);
 
         verifyTokenSequence(tokens, [
-          TokenTypes.DECISION, TokenTypes.STRING, TokenTypes.NEWLINE,
+          TokenTypes.DECISION,
+          TokenTypes.STRING,
+          TokenTypes.NEWLINE,
           TokenTypes.INDENT,
-          TokenTypes.WHEN, TokenTypes.STRING, TokenTypes.THEN, TokenTypes.NEWLINE,
+          TokenTypes.WHEN,
+          TokenTypes.STRING,
+          TokenTypes.THEN,
+          TokenTypes.NEWLINE,
           TokenTypes.INDENT,
-          TokenTypes.DO, TokenTypes.STRING, TokenTypes.NEWLINE,
+          TokenTypes.DO,
+          TokenTypes.STRING,
+          TokenTypes.NEWLINE,
           TokenTypes.DEDENT,
-          TokenTypes.WHEN, TokenTypes.STRING, TokenTypes.THEN, TokenTypes.NEWLINE,
+          TokenTypes.WHEN,
+          TokenTypes.STRING,
+          TokenTypes.THEN,
+          TokenTypes.NEWLINE,
           TokenTypes.INDENT,
-          TokenTypes.USE, TokenTypes.STRING, TokenTypes.NEWLINE,
+          TokenTypes.USE,
+          TokenTypes.STRING,
+          TokenTypes.NEWLINE,
           TokenTypes.DEDENT,
-          TokenTypes.WHEN, TokenTypes.STRING, TokenTypes.THEN, TokenTypes.NEWLINE,
+          TokenTypes.WHEN,
+          TokenTypes.STRING,
+          TokenTypes.THEN,
+          TokenTypes.NEWLINE,
           TokenTypes.INDENT,
-          TokenTypes.DO, TokenTypes.STRING, TokenTypes.NEWLINE,
-          TokenTypes.DO, TokenTypes.STRING, TokenTypes.NEWLINE,
+          TokenTypes.DO,
+          TokenTypes.STRING,
+          TokenTypes.NEWLINE,
+          TokenTypes.DO,
+          TokenTypes.STRING,
+          TokenTypes.NEWLINE,
           TokenTypes.DEDENT,
-          TokenTypes.DEDENT
+          TokenTypes.DEDENT,
         ]);
       });
 
@@ -230,23 +297,40 @@ describe('Integration', () => {
         const tokens = getAllTokens(lexer);
 
         verifyTokenSequence(tokens, [
-          TokenTypes.DECISION, TokenTypes.STRING, TokenTypes.NEWLINE,
+          TokenTypes.DECISION,
+          TokenTypes.STRING,
+          TokenTypes.NEWLINE,
           TokenTypes.INDENT,
-          TokenTypes.WHEN, TokenTypes.STRING, TokenTypes.THEN, TokenTypes.NEWLINE,
+          TokenTypes.WHEN,
+          TokenTypes.STRING,
+          TokenTypes.THEN,
+          TokenTypes.NEWLINE,
           TokenTypes.INDENT,
-          TokenTypes.DO, TokenTypes.STRING, TokenTypes.NEWLINE,
+          TokenTypes.DO,
+          TokenTypes.STRING,
+          TokenTypes.NEWLINE,
           TokenTypes.DEDENT,
-          TokenTypes.WHEN, TokenTypes.STRING, TokenTypes.THEN, TokenTypes.NEWLINE,
+          TokenTypes.WHEN,
+          TokenTypes.STRING,
+          TokenTypes.THEN,
+          TokenTypes.NEWLINE,
           TokenTypes.INDENT,
-          TokenTypes.USE, TokenTypes.STRING, TokenTypes.NEWLINE,
+          TokenTypes.USE,
+          TokenTypes.STRING,
+          TokenTypes.NEWLINE,
           TokenTypes.DEDENT,
-          TokenTypes.WHEN, TokenTypes.STRING, TokenTypes.THEN, TokenTypes.NEWLINE,
+          TokenTypes.WHEN,
+          TokenTypes.STRING,
+          TokenTypes.THEN,
+          TokenTypes.NEWLINE,
           TokenTypes.INDENT,
-          TokenTypes.DO, TokenTypes.STRING, TokenTypes.NEWLINE,
+          TokenTypes.DO,
+          TokenTypes.STRING,
+          TokenTypes.NEWLINE,
           TokenTypes.DEDENT,
-          TokenTypes.DEDENT
+          TokenTypes.DEDENT,
         ]);
       });
     });
   });
-}); 
+});
