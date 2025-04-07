@@ -64,9 +64,13 @@ decision "Test"
   describe('Block Comments', () => {
     it('should ignore block comments in casefeature blocks', () => {
       const input = `casefeature "Test Feature"
+    casefeaturecode "Test Code"
+    fhirtype Condition
+    profileurl "Test URL"
+    valuetype string
     /* This is a block comment
        explaining the feature */
-    expression "Condition 1" AND "Condition 2"`;
+    expression ("Condition 1" AND "Condition 2")`;
 
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
@@ -76,10 +80,24 @@ decision "Test"
         TokenTypes.STRING,
         TokenTypes.NEWLINE,
         TokenTypes.INDENT,
+        TokenTypes.CASEFEATURECODE,
+        TokenTypes.STRING,
+        TokenTypes.NEWLINE,
+        TokenTypes.FHIRTYPE,
+        TokenTypes.CASEFEATURE_FHIR_TYPE,
+        TokenTypes.NEWLINE,
+        TokenTypes.PROFILEURL,
+        TokenTypes.STRING,
+        TokenTypes.NEWLINE,
+        TokenTypes.VALUETYPE,
+        TokenTypes.FHIR_VALUE_TYPE,
+        TokenTypes.NEWLINE,
         TokenTypes.EXPRESSION,
+        TokenTypes.LPAREN,
         TokenTypes.STRING,
         TokenTypes.AND,
         TokenTypes.STRING,
+        TokenTypes.RPAREN,
         TokenTypes.DEDENT,
         TokenTypes.EOF
       ]);
@@ -114,6 +132,10 @@ decision "Test"
   describe('Comments in Expressions', () => {
     it('should handle comments between tokens in expressions', () => {
       const input = `casefeature "Test Feature"
+    casefeaturecode "Test Code"
+    fhirtype Condition
+    profileurl "Test URL"
+    valuetype string
     expression (/* comment */ "Condition 1" /* another comment */ AND "Condition 2")`;
 
       const lexer = new CPGLLexer(CharStreams.fromString(input));
@@ -124,6 +146,18 @@ decision "Test"
         TokenTypes.STRING,
         TokenTypes.NEWLINE,
         TokenTypes.INDENT,
+        TokenTypes.CASEFEATURECODE,
+        TokenTypes.STRING,
+        TokenTypes.NEWLINE,
+        TokenTypes.FHIRTYPE,
+        TokenTypes.CASEFEATURE_FHIR_TYPE,
+        TokenTypes.NEWLINE,
+        TokenTypes.PROFILEURL,
+        TokenTypes.STRING,
+        TokenTypes.NEWLINE,
+        TokenTypes.VALUETYPE,
+        TokenTypes.FHIR_VALUE_TYPE,
+        TokenTypes.NEWLINE,
         TokenTypes.EXPRESSION,
         TokenTypes.LPAREN,
         TokenTypes.STRING,

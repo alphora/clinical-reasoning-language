@@ -80,7 +80,10 @@ describe('FHIR Types', () => {
 
     it('should handle casefeature FHIR type in context', () => {
       const input = `casefeature "Test CaseFeature"
-    fhirtype Condition`;
+    casefeaturecode "Test Code"
+    fhirtype Condition
+    profileurl "Test URL"
+    valuetype string`;
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
       
@@ -89,8 +92,17 @@ describe('FHIR Types', () => {
         TokenTypes.STRING,
         TokenTypes.NEWLINE,
         TokenTypes.INDENT,
+        TokenTypes.CASEFEATURECODE,
+        TokenTypes.STRING,
+        TokenTypes.NEWLINE,
         TokenTypes.FHIRTYPE,
         TokenTypes.CASEFEATURE_FHIR_TYPE,
+        TokenTypes.NEWLINE,
+        TokenTypes.PROFILEURL,
+        TokenTypes.STRING,
+        TokenTypes.NEWLINE,
+        TokenTypes.VALUETYPE,
+        TokenTypes.FHIR_VALUE_TYPE,
         TokenTypes.DEDENT,
         TokenTypes.EOF
       ]);
@@ -98,7 +110,10 @@ describe('FHIR Types', () => {
 
     it('should throw an exception for invalid casefeature FHIR type', () => {
       const input = `casefeature "Test CaseFeature"
-    fhirtype Appointment`;  // Appointment is an action type, not a casefeature type
+    casefeaturecode "Test Code"
+    fhirtype Appointment
+    profileurl "Test URL"
+    valuetype string`;  // Appointment is an action type, not a casefeature type
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       
       expect(() => { //NOSONAR
