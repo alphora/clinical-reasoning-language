@@ -36,6 +36,7 @@ export class CPGLLexer extends Lexer {
     private _emptyLineIndent: number | null = null;
     private _currentIndentLevel = 0;
     private _isInCasefeatureBlock = false;
+    private _isInActionBlock = false;
 
     // Required by Lexer interface
     public static readonly channelNames: string[] = [
@@ -302,8 +303,13 @@ export class CPGLLexer extends Lexer {
             // Update context tracking
             if (tokenType === TokenTypes.CASEFEATURE) {
                 this._isInCasefeatureBlock = true;
+            } else if (tokenType === TokenTypes.ACTION) {
+                this._isInActionBlock = true;
             } else if (tokenType === TokenTypes.DEDENT && this._currentIndentLevel === 0) {
                 this._isInCasefeatureBlock = false;
+                this._isInActionBlock = false;
+            } else if (this._isInActionBlock && (tokenType === TokenTypes.DO || tokenType === TokenTypes.USE)) {
+                throw new Error('Actions cannot have do or use clauses');
             }
 
             if (tokenType === TokenTypes.FHIRTYPE || tokenType === TokenTypes.VALUETYPE) {
@@ -327,7 +333,7 @@ export class CPGLLexer extends Lexer {
                 if (fhirType) {
                     if (tokenType === TokenTypes.FHIRTYPE) {
                         // Check if we're in action or casefeature context
-                        if (this._lastNonWhitespaceToken === TokenTypes.ACTION) {
+                        if (this._isInActionBlock) {
                             if (!CPGLLexer.VALID_ACTION_FHIR_TYPES.has(fhirType)) {
                                 throw new Error(`Invalid action FHIR type: ${fhirType}`);
                             }

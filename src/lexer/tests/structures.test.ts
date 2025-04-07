@@ -57,7 +57,6 @@ describe('Structures', () => {
         TokenTypes.INDENT,
         TokenTypes.ALL,
         TokenTypes.NEWLINE,
-        TokenTypes.INDENT,
         TokenTypes.WHEN,
         TokenTypes.STRING,
         TokenTypes.THEN,
@@ -74,7 +73,6 @@ describe('Structures', () => {
         TokenTypes.INDENT,
         TokenTypes.ANY,
         TokenTypes.NEWLINE,
-        TokenTypes.INDENT,
         TokenTypes.WHEN,
         TokenTypes.STRING,
         TokenTypes.THEN,
@@ -91,7 +89,6 @@ describe('Structures', () => {
         TokenTypes.INDENT,
         TokenTypes.USE,
         TokenTypes.STRING,
-        TokenTypes.DEDENT,
         TokenTypes.DEDENT,
         TokenTypes.DEDENT,
         TokenTypes.DEDENT,
@@ -116,7 +113,6 @@ describe('Structures', () => {
         TokenTypes.INDENT,
         TokenTypes.FHIRTYPE,
         TokenTypes.ACTION_FHIR_TYPE,
-        TokenTypes.NEWLINE,
         TokenTypes.DEDENT,
         TokenTypes.EOF
       ]);
@@ -136,7 +132,6 @@ describe('Structures', () => {
         TokenTypes.INDENT,
         TokenTypes.FHIRTYPE,
         TokenTypes.ACTION_FHIR_TYPE,
-        TokenTypes.NEWLINE,
         TokenTypes.DEDENT,
         TokenTypes.EOF
       ]);
