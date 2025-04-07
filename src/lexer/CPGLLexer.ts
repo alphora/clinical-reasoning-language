@@ -31,6 +31,7 @@ export class CPGLLexer extends Lexer {
     private _blockCommentNestingLevel = 0;
     private _lastNonWhitespaceToken: number | null = null;
     private _lastTokenWasNewline: boolean = false;
+    private _lastTokenType: number = -1;
     private _currentIndent: number = 0;
     private _pendingNewline: boolean = false;
     private _emptyLineIndent: number | null = null;
@@ -116,7 +117,9 @@ export class CPGLLexer extends Lexer {
         while (true) {
             // Return any pending tokens first
             if (this._pendingTokens.length > 0) {
-                return this._pendingTokens.shift()!;
+                const token = this._pendingTokens.shift()!;
+                this._lastTokenType = token.type;  // Track last token type
+                return token;
             }
 
             const c = this._input.LA(1);

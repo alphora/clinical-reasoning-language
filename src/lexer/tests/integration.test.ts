@@ -8,7 +8,8 @@ describe('Integration', () => {
     it('should emit NEWLINE followed by INDENT at block boundaries', () => {
       const input = `decision "Test"
     when "Condition" then
-        do "Action"`;
+        do "Action"
+`;
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
       
@@ -23,7 +24,8 @@ describe('Integration', () => {
     when "Condition" then
         do "Action"
     when "Another Condition" then
-        do "Another Action"`;
+        do "Another Action"
+`;
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
       
@@ -36,7 +38,8 @@ describe('Integration', () => {
       const input = `decision "Test"
     when "Level 1" then
         when "Level 2" then
-            do "Action"`;
+            do "Action"
+`;
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
       
@@ -57,7 +60,8 @@ describe('Integration', () => {
     it('should handle token order in basic blocks', () => {
       const input = `decision "Test"
     when "Condition" then
-        do "Action"`;
+        do "Action"
+`;
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
       
@@ -73,6 +77,7 @@ describe('Integration', () => {
         TokenTypes.INDENT,
         TokenTypes.DO,
         TokenTypes.STRING,
+        TokenTypes.NEWLINE,
         TokenTypes.DEDENT,
         TokenTypes.DEDENT,
         TokenTypes.EOF
@@ -89,7 +94,8 @@ describe('Integration', () => {
                 do "Action 1"
                 do "Action 2"
             when "Level 3b" then
-                use "Action 3"`;
+                use "Action 3"
+`;
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
       
@@ -143,7 +149,8 @@ describe('Integration', () => {
         do "somthing else"
     when "Client Age Greater Than 60" then
         use "Elderly Based"
-        use "IMMZ.D2.D5.Measles"`;
+        use "IMMZ.D2.D5.Measles"
+`;
 
         const lexer = new CPGLLexer(CharStreams.fromString(input));
         const tokens = getAllTokens(lexer);
@@ -181,7 +188,8 @@ describe('Integration', () => {
         use "Another Decision"
     when "Condition 3" then
         do "Action 2"
-        do "Action 3"`;
+        do "Action 3"
+`;
 
         const lexer = new CPGLLexer(CharStreams.fromString(input));
         const tokens = getAllTokens(lexer);
@@ -215,7 +223,8 @@ describe('Integration', () => {
         use "Another Decision"
 
     when "Condition 3" then
-        do "Action 2"`;
+        do "Action 2"
+`;
 
         const lexer = new CPGLLexer(CharStreams.fromString(input));
         const tokens = getAllTokens(lexer);
