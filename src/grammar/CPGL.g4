@@ -1,208 +1,300 @@
 grammar CPGL;
 
-// ========================================================
-// Parser Rules
-// ========================================================
+// --------------------------------------------------------------------------
+// PARSER RULES
+// --------------------------------------------------------------------------
 
-file
-    : (statement NEWLINE?)* EOF
+cpgl
+    : statement* EOF
     ;
 
+// A statement can be one of the four types below
 statement
-    : decision
-    | action
-    | casefeature
+    : decisionStatement
+    | terminologyStatement
+    | activityStatement
+    | conceptStatement
     ;
 
-// ----------------------------------------------------------------
-// Decision Constructs
-// ----------------------------------------------------------------
-
-decision
-    : 'decision' WS+ STRING NEWLINE decisionBlock
+// --------------------------- DECISION STATEMENT ----------------------------
+//
+// Example:
+//   decision "IMMZ.D2.D5.Measles":
+//       when "Measles Routine Immunization Schedule Incomplete" then:
+//           when "No Primary Series Doses Administered" then:
+//               any:
+//               - when "Client Age Less Than 12 Months" then do "Indicate".
+//               - when "Last Live Vaccine Administered Within 4 Weeks" then use "Elderly Based".
+//               - when "Client Is Due For MCV12" then do "Vaccinate".
+//       when "One Primary Series Dose Administered" then:
+//           all:
+//           - when "Client Age Less Than 15 Months" then do "Indicate".
+//           - when "Last Live Vaccine Administered Within 4 Weeks" then use "Elderly Based".
+//           - when "Client Is Due For MCV12" then do "Vaccinate".
+//       when "Two Primary Series Doses Administered" then do "Indicate".
+//
+decisionStatement
+    : DECISION stringLiteral COLON decisionBody
     ;
 
-// A decisionBlock is one or more top-level when clauses.
-decisionBlock
-    : INDENT whenClause+ DEDENT
+// Top-level body of a decision: one or more `when` clauses
+decisionBody
+    : whenClause+
     ;
 
-// A whenClause consists of a condition and a block that is either a
-// group of nested whenClauses (with an optional qualifier) or terminal actions.
+// A `when` clause: 
+//   when "some concept" then do/use ...
+//   or
+//   when "some concept" then:
+//       [any|all]: (optional)
+//       - <listItem>
+//       - <listItem>
+//       ...
 whenClause
-    : 'when' WS+ STRING WS+ 'then' NEWLINE whenBlock
+    : WHEN stringLiteral THEN (whenThenBlock | singleActionStatement)
     ;
 
-// A whenBlock can be either a nested group of conditions or a list of terminal actions.
-whenBlock
-    : nestedWhenBlock
-    | terminalBlock
+// Block introduced by "then:"
+whenThenBlock
+    : COLON (anyOrAllClause? listItem+)
     ;
 
-// A nestedWhenBlock is an indented block that may optionally begin with a qualifier
-// and then contains one or more nested whenClause entries.
-nestedWhenBlock
-    : INDENT optionalQualifier? whenClause+ DEDENT
+anyOrAllClause
+    : (ANY | ALL) COLON
     ;
 
-// A terminalBlock is an indented block containing one or more terminal actions.
-terminalBlock
-    : INDENT terminalAction+ DEDENT
+// A single action line, e.g.  then do "Indicate".
+singleActionStatement
+    : (doStatement | useStatement) DOT
     ;
 
-// Terminal actions are either a doClause or a useClause.
-terminalAction
-    : doClause
-    | useClause
+// Items in the list after "any:" or "all:" or default
+listItem
+    : DASH listItemContent
     ;
 
-// doClause and useClause are only permitted within a terminal block.
-doClause
-    : 'do' WS+ STRING NEWLINE
+listItemContent
+    // Can be a nested `when` inside (with a possible block or single do/use),
+    // or a direct action statement
+    : whenClause
+    | actionStatement
     ;
 
-useClause
-    : 'use' WS+ STRING NEWLINE
+// An action statement is either `do "someActivity".` or `use "someDecision".`
+actionStatement
+    : (doStatement | useStatement) DOT
     ;
 
-// A qualifier (either "any" or "all") to modify a group of nested whenClauses.
-// The qualifier **only applies to when.** **It does not apply to do or use.**
-optionalQualifier
-    : ('any' | 'all') NEWLINE
+// For lines such as:  do "Indicate"
+doStatement
+    : DO stringLiteral
     ;
 
-// ----------------------------------------------------------------
-// Action and Casefeature Constructs
-// ----------------------------------------------------------------
-
-action
-    : 'action' WS+ STRING NEWLINE actionBlock
+// For lines such as:  use "Elderly Based"
+useStatement
+    : USE stringLiteral
     ;
 
-// An actionBlock must have one and only one actionClause.
-actionBlock
-    : INDENT actionClause DEDENT
+// ------------------------- TERMINOLOGY STATEMENT --------------------------
+//
+// Example:
+//   terminology "some terminology" unknown.
+//   terminology "Colonoscopy" system "http://snomed.info/sct" code "73761001".
+//
+terminologyStatement
+    : TERMINOLOGY stringLiteral (terminologyUnknown | terminologySystemCode) DOT
     ;
 
-actionClause
-    : 'fhirtype' WS+ ACTION_FHIR_TYPE NEWLINE
+terminologyUnknown
+    : UNKNOWN
     ;
 
-casefeature
-    : 'casefeature' WS+ STRING NEWLINE 
-      casefeatureBlock 
-      (compositeExpression NEWLINE)?
+terminologySystemCode
+    : SYSTEM stringLiteral CODE stringLiteral
     ;
 
-casefeatureBlock
-    : INDENT 
-        casefeatureCodeClause 
-        casefeatureFhirTypeClause 
-        casefeatureProfileUrlClause 
-        casefeatureValueTypeClause 
-      DEDENT
+// --------------------------- ACTIVITY STATEMENT ---------------------------
+//
+// Example:
+//   activity "Vaccinate" perform Immunization.
+//   activity "Indicate" perform ProposeDiagnosis of "Colonoscopy".
+//
+activityStatement
+    : ACTIVITY stringLiteral PERFORM ACTIVITY_TYPE (OF stringLiteral)? DOT
     ;
 
-casefeatureCodeClause
-    : 'casefeaturecode' WS+ STRING NEWLINE
+// ---------------------------- CONCEPT STATEMENT ---------------------------
+//
+// Example:
+//   concept "Most Recent BMI":
+//       type Observation.
+//       valuetype boolean.
+//       pattern "some pattern".
+//       provenance "some provenance".
+//       inferred:
+//           - ("Most Recent Height" and "Most Recent Weight").
+//           - ("BMI as a Condition" or "BMI as a Observation").
+//
+conceptStatement
+    : CONCEPT stringLiteral COLON conceptBody
     ;
 
-casefeatureFhirTypeClause
-    : 'fhirtype' WS+ CASEFEATURE_FHIR_TYPE NEWLINE
+// Enforce exactly one of each line in this order:
+//
+//  1. type ...
+//  2. valuetype ...
+//  3. pattern ...
+//  4. provenance ...
+//  5. inferred: ...
+//
+conceptBody
+    : typeLine 
+      valueTypeLine
+      patternLine
+      provenanceLine
+      inferredBlock
     ;
 
-casefeatureProfileUrlClause
-    : 'profileurl' WS+ STRING NEWLINE
+// type Observation.
+typeLine
+    : TYPE CONCEPT_TYPE DOT
     ;
 
-casefeatureValueTypeClause
-    : 'valuetype' WS+ FHIR_VALUE_TYPE NEWLINE
+// valuetype boolean.
+valueTypeLine
+    : VALUETYPE CONCEPT_VALUE_TYPE DOT
     ;
 
-// Composite boolean expression for advanced casefeature logic (optional).
-compositeExpression
-    : 'expression' WS* '(' booleanExpr ')'
+// pattern "some pattern".
+patternLine
+    : PATTERN stringLiteral DOT
     ;
 
-// Boolean expression rules (for composite expressions).
-booleanExpr
-    : booleanTerm ( WS* OR WS* booleanTerm )*
+// provenance "some provenance".
+provenanceLine
+    : PROVENANCE stringLiteral DOT
     ;
 
-booleanTerm
-    : booleanFactor ( WS* AND WS* booleanFactor )*
+// inferred: - (expr). - (expr).
+// The inferred block describes how this concept might be derived from other concepts, under the assumption that each referenced concept is true. 
+// The syntax uses logical keywords (and/or) to indicate how the referenced concepts collectively contribute to inferring the target. 
+// Though it resembles a Boolean expression, it should be understood more as guidance or a shorthand for indicating a logical combination of references, 
+// rather than a strict evaluatable expression.
+inferredBlock
+    : INFERRED COLON inferredList
     ;
 
-booleanFactor
-    : NOT WS* booleanFactor
-    | '(' booleanExpr ')'
-    | STRING
+inferredList
+    : inferredItem+
     ;
 
-// ========================================================
-// Lexer Rules
-// ========================================================
-
-// INDENT and DEDENT tokens are placeholders.
-// **A custom lexer routine to tracks indent levels.**
-// **Do not take these INDENT or DEDENT tokens into consideration when reasoning over the grammar relative to the lexer or parser.**
-// **The lexer and parser should govern the correct implementation of INDENT and DEDENT.**
-INDENT:  '    ';  // exactly 4 spaces for one indent level
-DEDENT:  '<DEDENT>';
-
-// NEWLINE matches one or more line breaks.
-NEWLINE: ('\r'? '\n')+;
-
-// WS matches whitespace (spaces and tabs) that are not part of indentation.
-WS: [ \t]+ -> skip;
-
-// Comments.
-COMMENT: '//' ~[\r\n]* -> skip;
-COMMENT_BLOCK: '/*' .*? '*/' -> skip;
-
-// STRING: double-quoted string without embedded newlines.
-STRING: '"' (~["\r\n])* '"';
-
-// Boolean operators for composite expressions.
-OR: 'OR';
-AND: 'AND';
-NOT: 'NOT';
-
-// FHIR types for actions.
-ACTION_FHIR_TYPE:
-      'Appointment'
-    | 'AppointmentResponse'
-    | 'CarePlan'
-    | 'Claim'
-    | 'CommunicationRequest'
-    | 'Contract'
-    | 'DeviceRequest'
-    | 'EnrollmentRequest'
-    | 'ImmunizationRecommendation'
-    | 'MedicationRequest'
-    | 'NutritionOrder'
-    | 'ServiceRequest'
-    | 'SupplyRequest'
-    | 'Task'
-    | 'VisionPrescription'
+inferredItem
+    : DASH LPAREN expr RPAREN DOT
     ;
 
-// FHIR types for casefeatures.
-CASEFEATURE_FHIR_TYPE:
-      'AllergyIntolerance'
-    | 'Condition'
-    | 'Procedure'
-    | 'Observation'
+// ----------------------------- EXPRESSIONS -------------------------------
+//
+// For the "inferred" block, we allow boolean expressions with "and"/"or"
+// referencing concept identifiers (quoted strings). Parentheses are allowed.
+// 
+expr
+    : orExpr
+    ;
+
+orExpr
+    : andExpr (OR andExpr)*
+    ;
+
+andExpr
+    : atom (AND atom)*
+    ;
+
+atom
+    : stringLiteral
+    | LPAREN orExpr RPAREN
+    ;
+
+// --------------------------------------------------------------------------
+// LEXER RULES
+// --------------------------------------------------------------------------
+
+// KEYWORDS (case sensitive, as stated)
+DECISION     : 'decision';
+WHEN         : 'when';
+THEN         : 'then';
+ANY          : 'any';
+DO           : 'do';
+USE          : 'use';
+ALL          : 'all';
+ACTIVITY     : 'activity';
+UNKNOWN      : 'unknown';
+SYSTEM       : 'system';
+CODE         : 'code';
+PERFORM      : 'perform';
+OF           : 'of';
+CONCEPT      : 'concept';
+TYPE         : 'type';
+VALUETYPE    : 'valuetype';
+TERMINOLOGY  : 'terminology';
+PATTERN      : 'pattern';
+PROVENANCE   : 'provenance';
+INFERRED     : 'inferred';
+AND          : 'and';
+OR           : 'or';
+
+// PUNCTUATION
+COLON        : ':';
+DASH         : '-';
+DOT          : '.';
+LPAREN       : '(';
+RPAREN       : ')';
+
+// ACTIVITY_TYPE possibilities
+// e.g. "activity "Vaccinate" perform Immunization."
+// Must exactly match one of these strings if used.
+ACTIVITY_TYPE
+    : 'AdministerMedication'
+    | 'CollectInformation'
+    | 'Communication'
+    | 'DispenseMedication'
+    | 'DocumentMedication'
+    | 'Enrollment'
+    | 'GenerateReport'
+    | 'Hold'
     | 'Immunization'
+    | 'MedicationRequest'
+    | 'ProposeDiagnosis'
+    | 'RecordDetectedIssue'
+    | 'RecordInference'
+    | 'ReportFlag'
+    | 'Resume'
+    | 'ServiceRequest'
+    | 'Stop'
+    ;
+
+// CONCEPT_TYPE possibilities
+// e.g. "concept "Most Recent BMI": type Observation."
+CONCEPT_TYPE
+    : 'Communication'
+    | 'CommunicationRequest'
+    | 'Condition'
+    | 'QuestionnaireTask'
+    | 'QuestionnaireResponse'
+    | 'MedicationRequest'
     | 'MedicationDispense'
     | 'MedicationAdministration'
-    | 'MedicationRequest'
     | 'MedicationStatement'
+    | 'ImmunizationRequest'
+    | 'Immunization'
+    | 'ServiceRequest'
+    | 'Procedure'
+    | 'Observation'
     ;
 
-// FHIR value types.
-FHIR_VALUE_TYPE:
-      'Quantity'
+// CONCEPT_VALUE_TYPE possibilities
+// e.g. "concept ... valuetype boolean."
+CONCEPT_VALUE_TYPE
+    : 'Quantity'
     | 'CodeableConcept'
     | 'string'
     | 'boolean'
@@ -214,5 +306,25 @@ FHIR_VALUE_TYPE:
     | 'dateTime'
     | 'Period'
     | 'Attachment'
-    | 'Reference(MolecularSequence)'
+    ;
+
+// STRING cannot contain escape characters or internal quotes.
+// This rule forbids backslashes and double-quotes inside the string contents.
+STRING
+    : '"' ( ~["\r\n] )* '"'
+    ;
+
+// Skip whitespace
+WS
+    : [ \t\r\n]+ -> skip
+    ;
+
+// Single line comment
+COMMENT
+    : '//' ~[\r\n]* -> skip
+    ;
+
+// Block comment
+COMMENT_BLOCK
+    : '/*' .*? '*/' -> skip
     ;

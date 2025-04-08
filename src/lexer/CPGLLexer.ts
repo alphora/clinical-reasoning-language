@@ -38,6 +38,10 @@ export class CPGLLexer extends Lexer {
   private _currentIndentLevel = 0;
   private _isInCasefeatureBlock = false;
   private _isInActionBlock = false;
+  private _isInExpression = false;
+  private _parenthesisLevel = 0;
+  private _lastTokenWasExpression = false;
+  private _expressionStartIndent = 0;
 
   // Required by Lexer interface
   public static readonly channelNames: string[] = ['DEFAULT_TOKEN_CHANNEL', 'HIDDEN'];
@@ -147,10 +151,21 @@ export class CPGLLexer extends Lexer {
       // Handle EOF
       if (c === Token.EOF) {
         // Handle any remaining indentation
+        if (this._isInExpression && this._parenthesisLevel > 0) {
+          throw new Error('Unterminated expression - missing closing parenthesis');
+        }
+        
+        // If we haven't emitted a NEWLINE for the last line, do it now
+        if (!this._lastTokenWasNewline) {
+          this._pendingTokens.push(this.createToken(TokenTypes.NEWLINE, '\n'));
+        }
+        
+        // Handle any remaining indentation
         while (this._indentStack.length > 1) {
           this._indentStack.pop();
           this._pendingTokens.push(this.createToken(TokenTypes.DEDENT, ''));
         }
+        
         if (this._pendingTokens.length > 0) {
           return this._pendingTokens.shift()!;
         }
@@ -263,6 +278,17 @@ export class CPGLLexer extends Lexer {
             this._pendingTokens.push(this.createToken(TokenTypes.NEWLINE, '\n'));
           }
 
+          // Special handling for expressions
+          if (this._isInExpression) {
+            // Allow indentation within expressions as long as it's not less than the expression start
+            if (this._currentIndent < this._expressionStartIndent) {
+              throw new Error('Invalid indentation in expression - cannot dedent below expression start');
+            }
+            // Don't emit INDENT/DEDENT tokens within expressions
+            this._lastTokenWasNewline = true;
+            return this._pendingTokens.shift()!;
+          }
+
           if (this._currentIndent > previousIndent) {
             this._indentStack.push(this._currentIndent);
             this._pendingTokens.push(this.createToken(TokenTypes.INDENT, '    '));
@@ -307,11 +333,60 @@ export class CPGLLexer extends Lexer {
       if (c === '('.charCodeAt(0)) {
         this._input.consume();
         this._currentColumn++;
+        if (this._isInExpression) {
+          this._parenthesisLevel++;
+          if (this._parenthesisLevel === 1) {
+            this._expressionStartIndent = this._currentIndent;
+          }
+        }
         return this.createToken(TokenTypes.LPAREN, '(');
       }
       if (c === ')'.charCodeAt(0)) {
         this._input.consume();
         this._currentColumn++;
+        if (this._isInExpression) {
+          this._parenthesisLevel--;
+          if (this._parenthesisLevel === 0) {
+            // Expression is complete, emit RPAREN and handle indentation
+            const rparenToken = this.createToken(TokenTypes.RPAREN, ')');
+            this._pendingTokens.push(rparenToken);
+            
+            // Check if we're at the end of the block
+            let nextChar = this._input.LA(1);
+            while (nextChar !== Token.EOF && this.isWhitespace(nextChar)) {
+              this._input.consume();
+              this._currentColumn++;
+              nextChar = this._input.LA(1);
+            }
+            
+            if (nextChar === '\n'.charCodeAt(0) || nextChar === Token.EOF) {
+              // We're at the end of the block, handle indentation
+              if (this._indentStack.length > 1) {
+                this._indentStack.pop();
+                this._pendingTokens.push(this.createToken(TokenTypes.DEDENT, ''));
+              }
+              // Always emit NEWLINE at the end of a block
+              this._pendingTokens.push(this.createToken(TokenTypes.NEWLINE, '\n'));
+              
+              // If we're at EOF, make sure we emit all necessary tokens
+              if (nextChar === Token.EOF) {
+                // Handle any remaining indentation
+                while (this._indentStack.length > 1) {
+                  this._indentStack.pop();
+                  this._pendingTokens.push(this.createToken(TokenTypes.DEDENT, ''));
+                }
+              }
+            } else {
+              // Not at end of block, emit NEWLINE
+              this._pendingTokens.push(this.createToken(TokenTypes.NEWLINE, '\n'));
+            }
+            
+            this._isInExpression = false;
+            return this._pendingTokens.shift()!;
+          } else if (this._parenthesisLevel < 0) {
+            throw new Error('Unmatched closing parenthesis in expression');
+          }
+        }
         return this.createToken(TokenTypes.RPAREN, ')');
       }
 
@@ -336,16 +411,76 @@ export class CPGLLexer extends Lexer {
       // Update context tracking
       if (tokenType === TokenTypes.CASEFEATURE) {
         this._isInCasefeatureBlock = true;
+        this._isInExpression = false;
+        this._parenthesisLevel = 0;
+        this._lastTokenWasExpression = false;
+        this._expressionStartIndent = 0;
       } else if (tokenType === TokenTypes.ACTION) {
         this._isInActionBlock = true;
+        this._isInExpression = false;
+        this._parenthesisLevel = 0;
+        this._lastTokenWasExpression = false;
+        this._expressionStartIndent = 0;
+      } else if (tokenType === TokenTypes.EXPRESSION) {
+        if (!this._isInCasefeatureBlock) {
+          throw new Error('Expression can only be used within a casefeature block');
+        }
+        // Check if we already have an expression in this casefeature block
+        if (this._isInExpression) {
+          throw new Error('Only one expression clause is allowed per casefeature block');
+        }
+        this._isInExpression = true;
+        this._lastTokenWasExpression = true;
+        this._expressionStartIndent = this._currentIndent;
+        // Skip whitespace after expression keyword
+        while (this._input.LA(1) !== -1 && this.isWhitespace(this._input.LA(1))) {
+          this._input.consume();
+          this._currentColumn++;
+        }
+        // Expect opening parenthesis
+        if (this._input.LA(1) !== '('.charCodeAt(0)) {
+          throw new Error('Expression must be followed by opening parenthesis');
+        }
       } else if (tokenType === TokenTypes.DEDENT && this._currentIndentLevel === 0) {
+        if (this._isInExpression && this._parenthesisLevel > 0) {
+          throw new Error('Unmatched parentheses in expression');
+        }
         this._isInCasefeatureBlock = false;
         this._isInActionBlock = false;
+        this._isInExpression = false;
+        this._parenthesisLevel = 0;
+        this._lastTokenWasExpression = false;
+        this._expressionStartIndent = 0;
       } else if (
         this._isInActionBlock &&
         (tokenType === TokenTypes.DO || tokenType === TokenTypes.USE)
       ) {
         throw new Error('Actions cannot have do or use clauses');
+      } else if (this._isInExpression) {
+        // Validate expression operators
+        if (tokenType === TokenTypes.AND || tokenType === TokenTypes.OR) {
+          // Skip whitespace after operator
+          while (this._input.LA(1) !== -1 && this.isWhitespace(this._input.LA(1))) {
+            this._input.consume();
+            this._currentColumn++;
+          }
+          // Check for valid next token after operator
+          const nextChar = this._input.LA(1);
+          if (nextChar !== '"'.charCodeAt(0) && nextChar !== '('.charCodeAt(0) && nextChar !== 'N'.charCodeAt(0)) {
+            throw new Error('Operator must be followed by a string, opening parenthesis, or NOT');
+          }
+        } else if (tokenType === TokenTypes.NOT) {
+          // NOT must be followed by a string or opening parenthesis
+          while (this._input.LA(1) !== -1 && this.isWhitespace(this._input.LA(1))) {
+            this._input.consume();
+            this._currentColumn++;
+          }
+          const nextChar = this._input.LA(1);
+          if (nextChar !== '"'.charCodeAt(0) && nextChar !== '('.charCodeAt(0)) {
+            throw new Error('NOT operator must be followed by a string or opening parenthesis');
+          }
+        }
+        this._lastTokenWasExpression = false;
       }
 
       if (tokenType === TokenTypes.FHIRTYPE || tokenType === TokenTypes.VALUETYPE) {

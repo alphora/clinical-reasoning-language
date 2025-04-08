@@ -67,15 +67,30 @@ describe('Error Handling', () => {
   it('should throw an exception for invalid boolean expressions', () => {
     const inputs = [
       `casefeature "Test"
-    expression "Condition" AND`, // Missing right operand
+    casefeaturecode "Test Code"
+    profileurl "Test URL"
+    valuetype string
+    expression ("Condition" AND)`, // Missing right operand
       `casefeature "Test"
-    expression AND "Condition"`, // Missing left operand
+    casefeaturecode "Test Code"
+    profileurl "Test URL"
+    valuetype string
+    expression (AND "Condition")`, // Missing left operand
       `casefeature "Test"
+    casefeaturecode "Test Code"
+    profileurl "Test URL"
+    valuetype string
     expression ("Condition" AND "Condition 2"`, // Unmatched parentheses
       `casefeature "Test"
-    expression NOT AND "Condition"`, // Invalid operator sequence
+    casefeaturecode "Test Code"
+    profileurl "Test URL"
+    valuetype string
+    expression (NOT AND "Condition")`, // Invalid operator sequence
       `casefeature "Test"
-    expression "Condition" OR OR "Condition 2"  // Duplicate operators
+    casefeaturecode "Test Code"
+    profileurl "Test URL"
+    valuetype string
+    expression ("Condition" OR OR "Condition 2")  // Duplicate operators
 `,
     ];
 
@@ -90,16 +105,34 @@ describe('Error Handling', () => {
   it('should throw error for invalid composite expressions', () => {
     const inputs = [
       `casefeature "Invalid Expression"
+    casefeaturecode "Test Code"
+    profileurl "Test URL"
+    valuetype string
     expression (NOT "Condition 1" AND)`, // Missing right operand
       `casefeature "Invalid Expression"
+    casefeaturecode "Test Code"
+    profileurl "Test URL"
+    valuetype string
     expression (AND "Condition 1")`, // Missing left operand
       `casefeature "Invalid Expression"
+    casefeaturecode "Test Code"
+    profileurl "Test URL"
+    valuetype string
     expression ("Condition 1" OR OR "Condition 2")`, // Duplicate operators
       `casefeature "Invalid Expression"
+    casefeaturecode "Test Code"
+    profileurl "Test URL"
+    valuetype string
     expression (NOT NOT "Condition")`, // Multiple NOTs without parentheses
       `casefeature "Invalid Expression"
+    casefeaturecode "Test Code"
+    profileurl "Test URL"
+    valuetype string
     expression ("Condition 1" AND "Condition 2"`, // Unmatched parentheses
       `casefeature "Invalid Expression"
+    casefeaturecode "Test Code"
+    profileurl "Test URL"
+    valuetype string
     expression "Condition 1" AND "Condition 2")  // Unmatched parentheses
 `,
     ];

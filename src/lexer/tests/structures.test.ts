@@ -192,10 +192,13 @@ describe('Structures', () => {
     casefeaturecode "Test Code"
     profileurl "Test URL"
     valuetype string
-    expression "Simple Expression"
+    expression ("Simple Expression")
 `;
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
+
+      // Debug logging
+      console.log('Actual tokens:', tokens.map(t => ({ type: t.type, text: t.text })));
 
       verifyTokenSequence(tokens, [
         TokenTypes.CASEFEATURE,
@@ -212,7 +215,9 @@ describe('Structures', () => {
         TokenTypes.FHIR_VALUE_TYPE,
         TokenTypes.NEWLINE,
         TokenTypes.EXPRESSION,
+        TokenTypes.LPAREN,
         TokenTypes.STRING,
+        TokenTypes.RPAREN,
         TokenTypes.NEWLINE,
         TokenTypes.DEDENT,
         TokenTypes.EOF,
@@ -266,6 +271,9 @@ describe('Structures', () => {
 
     it('should handle nested parentheses in expressions', () => {
       const input = `casefeature "Complex Expression"
+    casefeaturecode "Test Code"
+    profileurl "Test URL"
+    valuetype string
     expression (("Condition 1" AND "Condition 2") OR (NOT ("Condition 3" AND ("Condition 4" OR "Condition 5")))
 `;
 
@@ -277,6 +285,15 @@ describe('Structures', () => {
         TokenTypes.STRING,
         TokenTypes.NEWLINE,
         TokenTypes.INDENT,
+        TokenTypes.CASEFEATURECODE,
+        TokenTypes.STRING,
+        TokenTypes.NEWLINE,
+        TokenTypes.PROFILEURL,
+        TokenTypes.STRING,
+        TokenTypes.NEWLINE,
+        TokenTypes.VALUETYPE,
+        TokenTypes.FHIR_VALUE_TYPE,
+        TokenTypes.NEWLINE,
         TokenTypes.EXPRESSION,
         TokenTypes.LPAREN,
         TokenTypes.LPAREN,
@@ -306,7 +323,10 @@ describe('Structures', () => {
 
     it('should handle multiple levels of NOT operations', () => {
       const input = `casefeature "Multiple NOTs"
-    expression NOT (NOT (NOT "Condition"))
+    casefeaturecode "Test Code"
+    profileurl "Test URL"
+    valuetype string
+    expression (NOT (NOT (NOT "Condition")))
 `;
 
       const lexer = new CPGLLexer(CharStreams.fromString(input));
