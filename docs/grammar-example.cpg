@@ -18,7 +18,7 @@ Anything not identified as optional here is required.
 decision "IMMZ.D2.D5.Measles":
     when "Measles Routine Immunization Schedule Incomplete" then: //when references a concept
         when "No Primary Series Doses Administered" then:
-            any: //applies to list items ("-")
+            any: //applies to list items
             when "Client Age Less Than 12 Months" then do "Indicate". //do references an activity
             when "Last Live Vaccine Administered Within 4 Weeks" then use "Elderly Based". //use references a decision
         done 
