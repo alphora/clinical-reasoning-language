@@ -19,26 +19,33 @@ decision "IMMZ.D2.D5.Measles":
     when "Measles Routine Immunization Schedule Incomplete" then: //when references a concept
         when "No Primary Series Doses Administered" then:
             any: //applies to list items ("-")
-            - when "Client Age Less Than 12 Months" then do "Indicate". //do references an activity
-            - when "Last Live Vaccine Administered Within 4 Weeks" then use "Elderly Based". //use references a decision
-            - when "Client Is Due For MCV12" then do "Vaccinate".
+            when "Client Age Less Than 12 Months" then do "Indicate". //do references an activity
+            when "Last Live Vaccine Administered Within 4 Weeks" then use "Elderly Based". //use references a decision
+        done 
+        when "Client Is Due For MCV12" then do "Vaccinate".
+    done
     when "One Primary Series Dose Administered" then:
         all:
-        - when "Client Age Less Than 15 Months" then do "Indicate".
-        - when "Last Live Vaccine Administered Within 4 Weeks" then use "Elderly Based".
-        - when "Client Is Due For MCV12" then do "Vaccinate".
+        when "Client Age Less Than 15 Months" then do "Indicate".
+        when "Last Live Vaccine Administered Within 4 Weeks" then use "Elderly Based".
+        when "Client Is Due For MCV12" then do "Vaccinate".
+    done
     when "Two Primary Series Doses Administered" then do "Indicate".
+done
 
 decision "Elderly Based":
     //defaults to any
-    - when "Client Age Greater Than 60" then do "Indicate".
-    - when "Client Age Less Than 60" then:
-        - do "Vaccinate". 
-        - do "another thing".
-        - do "somthing else".
-    - when "Client Age Greater Than 60" then:
-        - use "Elderly Based".
-        - use "IMMZ.D2.D5.Measles".
+    when "Client Age Greater Than 60" then do "Indicate".
+    when "Client Age Less Than 60" then:
+        do "Vaccinate". 
+        do "another thing".
+        do "somthing else".
+    done
+    when "Client Age Greater Than 60" then:
+        use "Elderly Based".
+        use "IMMZ.D2.D5.Measles".
+    done
+done
 
 terminology "some terminology" unknown.
 
@@ -49,13 +56,14 @@ activity "Vaccinate" perform Immunization. //Immunization is an ACTIVITY_TYPE
 activity "Indicate" perform ProposeDiagnosis of "Colonoscopy". //of references a terminology
 
 concept "Most Recent BMI":
-    type Observation. //Observation is a CONCEPT_TYPE
-    valuetype boolean. //boolean is a CONCEPT_VALUE_TYPE
-    pattern "some pattern".
-    provenance "some provenance".
+    type Observation //Observation is a CONCEPT_TYPE
+    valuetype boolean //boolean is a CONCEPT_VALUE_TYPE
+    pattern "some pattern"
+    provenance "some provenance"
     inferred:
-        - ("Most Recent Height" and "Most Recent Weight"). //"Most Recent Height" (and others) is a reference to another concept
-        - ("BMI as a Condition" or "BMI as a Observation").
+        ("Most Recent Height" and "Most Recent Weight"). //"Most Recent Height" (and others) is a reference to another concept
+        ("BMI as a Condition" or "BMI as a Observation").
+done
 
 // additional concepts...
 
@@ -64,6 +72,7 @@ keywords:
 decision
 when
 then
+done
 any
 do
 use
@@ -86,7 +95,6 @@ or
 
 punctuation:
 :
--
 .
 (
 )
