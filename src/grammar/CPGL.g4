@@ -37,7 +37,7 @@ statement
 //   done
 //
 decisionStatement
-    : DECISION stringLiteral COLON decisionBody DONE
+    : DECISION identifier COLON decisionBody DONE
     ;
 
 decisionBody
@@ -46,7 +46,12 @@ decisionBody
 
 // A whenBlock covers a "when <concept> then ..." clause
 whenBlock
-    : WHEN stringLiteral THEN ( blockBody | singleActionStatement )
+    : WHEN identifier THEN ( blockBody | singleActionStatement )
+    ;
+
+// "any:" or "all:" clause for lists
+anyOrAllClause
+    : (ANY | ALL) COLON
     ;
 
 // Block body: after "then:" a list of statements terminated by "done"
@@ -57,11 +62,6 @@ blockBody
 // Single action statement: a one-line action ending with DOT.
 singleActionStatement
     : (doStatement | useStatement) DOT
-    ;
-
-// "any:" or "all:" clause for lists
-anyOrAllClause
-    : (ANY | ALL) COLON
     ;
 
 // A block statement is either a nested whenBlock or an action statement.
@@ -76,11 +76,11 @@ actionStatement
     ;
 
 doStatement
-    : DO stringLiteral
+    : DO identifier
     ;
 
 useStatement
-    : USE stringLiteral
+    : USE identifier
     ;
 
 // ------------------------- TERMINOLOGY STATEMENT --------------------------
@@ -91,11 +91,11 @@ useStatement
 //   terminology "Colonoscopy" system "http://snomed.info/sct" code "73761001".
 //
 terminologyStatement
-    : TERMINOLOGY stringLiteral ( terminologyValueset | terminologyUnknown | terminologySystemCode ) DOT
+    : TERMINOLOGY identifier ( terminologyValueset | terminologyUnknown | terminologySystemCode ) DOT
     ;
 
 terminologyValueset
-    : VALUESET stringLiteral
+    : VALUESET identifier
     ;
 
 terminologyUnknown
@@ -103,7 +103,7 @@ terminologyUnknown
     ;
 
 terminologySystemCode
-    : SYSTEM stringLiteral CODE stringLiteral
+    : SYSTEM identifier CODE identifier
     ;
 
 // --------------------------- ACTIVITY STATEMENT ---------------------------
@@ -113,7 +113,7 @@ terminologySystemCode
 //   activity "Indicate" perform ProposeDiagnosis of "Colonoscopy".
 //
 activityStatement
-    : ACTIVITY stringLiteral PERFORM ACTIVITY_TYPE (OF stringLiteral)? DOT
+    : ACTIVITY identifier PERFORM ACTIVITY_TYPE (OF identifier)? DOT
     ;
 
 // ---------------------------- CONCEPT STATEMENT ---------------------------
@@ -139,7 +139,7 @@ activityStatement
 //   done
 //
 conceptStatement
-    : CONCEPT stringLiteral COLON conceptBody DONE
+    : CONCEPT identifier COLON conceptBody DONE
     ;
 
 conceptBody
@@ -164,7 +164,7 @@ provenanceLine
 
 // "coded by" clause for concepts that reference a terminology.
 codedByLine
-    : CODED BY stringLiteral DOT
+    : CODED BY identifier DOT
     ;
 
 // "inferred by" clause for concepts with logic expressions.
@@ -180,7 +180,7 @@ inferredBody
     ;
 
 inferredByPattern
-    : stringLiteral? stringLiteral
+    : identifier? identifier
     ;
 
 inferredByExpr
@@ -203,7 +203,7 @@ andExpr
     ;
 
 atom
-    : stringLiteral
+    : identifier
     | LPAREN orExpr RPAREN
     ;
 
@@ -303,6 +303,16 @@ CONCEPT_VALUE_TYPE
 // STRING: quoted string without escapes or internal quotes.
 STRING
     : '"' ( ~["\\\r\n] )* '"'
+    ;
+
+// identifier: quoted string without escapes or internal quotes.
+stringLiteral
+    : STRING
+    ;
+
+// identifier: quoted string without escapes or internal quotes.
+identifier
+    : STRING
     ;
 
 // Skip whitespace.
