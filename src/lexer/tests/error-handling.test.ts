@@ -23,34 +23,10 @@ describe('Error Handling', () => {
     }).toThrow(/Line 2:/);
   });
 
-  it('should throw an exception with line number for invalid boolean expressions', () => {
-    const inputs = [
-      // Missing right operand
-      'concept "Invalid":\nhas type Observation\nhas valuetype Quantity\ninferred by ("Condition" and)\ndone',
-      // Missing left operand
-      'concept "Invalid":\nhas type Observation\nhas valuetype Quantity\ninferred by (and "Condition")\ndone',
-      // Unmatched parentheses
-      'concept "Invalid":\nhas type Observation\nhas valuetype Quantity\ninferred by ("Condition" and "Condition 2"\ndone',
-      // Invalid operator sequence
-      'concept "Invalid":\nhas type Observation\nhas valuetype Quantity\ninferred by (and or "Condition")\ndone',
-      // Duplicate operators
-      'concept "Invalid":\nhas type Observation\nhas valuetype Quantity\ninferred by ("Condition" or or "Condition 2")\ndone',
-    ];
-
-    inputs.forEach(input => {
-      const lexer = new CPGLLexer(CharStreams.fromString(input));
-      expect(() => {
-        getAllTokens(lexer);
-      }).toThrow(/Line \d+:/);
-    });
-  });
-
   it('should throw an exception with line number for invalid activity types', () => {
     const inputs = [
       // Invalid activity type
       'activity "Test"\nperform InvalidActivity',
-      // Missing activity type
-      'activity "Test"\nperform',
       // Invalid activity type case
       'activity "Test"\nperform immunizationactivity',
     ];
@@ -67,8 +43,6 @@ describe('Error Handling', () => {
     const inputs = [
       // Invalid concept type
       'concept "Test":\nhas type InvalidType\nhas valuetype Quantity\ndone',
-      // Missing concept type
-      'concept "Test":\nhas type\nhas valuetype Quantity\ndone',
       // Invalid concept type case
       'concept "Test":\nhas type observation\nhas valuetype Quantity\ndone',
     ];

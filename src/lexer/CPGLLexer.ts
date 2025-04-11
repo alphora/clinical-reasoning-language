@@ -55,6 +55,9 @@ export class CPGLLexer extends GeneratedLexer {
   }
 
   private isValidToken(type: number, text: string): boolean {
+    // Convert text to lowercase for case-insensitive comparison
+    const lowerText = text.toLowerCase();
+    
     switch (type) {
       case CPGLLexer.ACTIVITY_TYPE:
         return [
@@ -75,7 +78,7 @@ export class CPGLLexer extends GeneratedLexer {
           'ResumeActivity',
           'ServiceRequestActivity',
           'StopActivity',
-        ].includes(text);
+        ].some(validType => validType.toLowerCase() === lowerText);
 
       case CPGLLexer.CONCEPT_TYPE:
         return [
@@ -93,7 +96,7 @@ export class CPGLLexer extends GeneratedLexer {
           'ServiceRequest',
           'Procedure',
           'Observation',
-        ].includes(text);
+        ].some(validType => validType.toLowerCase() === lowerText);
 
       case CPGLLexer.CONCEPT_VALUE_TYPE:
         return [
@@ -109,7 +112,7 @@ export class CPGLLexer extends GeneratedLexer {
           'dateTime',
           'Period',
           'Attachment',
-        ].includes(text);
+        ].some(validType => validType.toLowerCase() === lowerText);
 
       default:
         return true;
