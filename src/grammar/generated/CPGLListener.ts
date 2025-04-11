@@ -34,8 +34,8 @@ import { ExprContext } from "./CPGLParser";
 import { OrExprContext } from "./CPGLParser";
 import { AndExprContext } from "./CPGLParser";
 import { AtomContext } from "./CPGLParser";
-import { StringLiteralContext } from "./CPGLParser";
 import { IdentifierContext } from "./CPGLParser";
+import { StringLiteralContext } from "./CPGLParser";
 
 
 /**
@@ -385,17 +385,6 @@ export interface CPGLListener extends ParseTreeListener {
 	exitAtom?: (ctx: AtomContext) => void;
 
 	/**
-	 * Enter a parse tree produced by `CPGLParser.stringLiteral`.
-	 * @param ctx the parse tree
-	 */
-	enterStringLiteral?: (ctx: StringLiteralContext) => void;
-	/**
-	 * Exit a parse tree produced by `CPGLParser.stringLiteral`.
-	 * @param ctx the parse tree
-	 */
-	exitStringLiteral?: (ctx: StringLiteralContext) => void;
-
-	/**
 	 * Enter a parse tree produced by `CPGLParser.identifier`.
 	 * @param ctx the parse tree
 	 */
@@ -405,5 +394,16 @@ export interface CPGLListener extends ParseTreeListener {
 	 * @param ctx the parse tree
 	 */
 	exitIdentifier?: (ctx: IdentifierContext) => void;
+
+	/**
+	 * Enter a parse tree produced by `CPGLParser.stringLiteral`.
+	 * @param ctx the parse tree
+	 */
+	enterStringLiteral?: (ctx: StringLiteralContext) => void;
+	/**
+	 * Exit a parse tree produced by `CPGLParser.stringLiteral`.
+	 * @param ctx the parse tree
+	 */
+	exitStringLiteral?: (ctx: StringLiteralContext) => void;
 }
 

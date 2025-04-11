@@ -1,6 +1,56 @@
 grammar CPGL;
 
 // --------------------------------------------------------------------------
+// PARSER ERROR HANDLING MEMBERS
+// --------------------------------------------------------------------------
+@parser::members {
+    /**
+     * Override to customize error reporting.
+     */
+    @Override
+    public void notifyErrorListeners(Token offendingToken, String msg, RecognitionException e) {
+        String formattedMessage = "Syntax error at line " + offendingToken.getLine() +
+            ":" + offendingToken.getCharPositionInLine() + " - " + msg;
+        super.notifyErrorListeners(offendingToken, formattedMessage, e);
+    }
+
+    /**
+     * Override inline recovery to throw an exception for unexpected tokens.
+     */
+    @Override
+    public Token recoverInline(Parser recognizer) throws RecognitionException {
+        InputMismatchException e = new InputMismatchException(this);
+        notifyErrorListeners(_input.LT(1), "Unexpected token: " + getCurrentToken().getText(), e);
+        throw e;
+    }
+
+    /**
+     * Override recovery to halt parsing immediately on error.
+     */
+    @Override
+    public void recover(RecognitionException e) {
+        throw new RuntimeException(e);
+    }
+}
+
+// --------------------------------------------------------------------------
+// LEXER ERROR HANDLING MEMBERS
+// --------------------------------------------------------------------------
+@lexer::members {
+    /**
+     * Override the default error notification for the lexer.
+     */
+    @Override
+    public void notifyListeners(LexerNoViableAltException e) {
+        String text = _input.getText(Interval.of(_tokenStartCharIndex, _input.index()));
+        String msg = "Lexical error at line " + getLine() + ":" + getCharPositionInLine() +
+            " at '" + text + "'";
+        ANTLRErrorListener listener = getErrorListenerDispatch();
+        listener.syntaxError(this, null, getLine(), getCharPositionInLine(), msg, e);
+    }
+}
+
+// --------------------------------------------------------------------------
 // PARSER RULES
 // --------------------------------------------------------------------------
 
@@ -16,26 +66,7 @@ statement
     ;
 
 // --------------------------- DECISION STATEMENT ----------------------------
-//
-// Example:
-//   decision "IMMZ.D2.D5.Measles":
-//       when "Measles Routine Immunization Schedule Incomplete" then:
-//           any:
-//               when "No Primary Series Doses Administered" then:
-//                   when "Client Age Less Than 12 Months" then do "Indicate".
-//                   when "Last Live Vaccine Administered has had in 4 Weeks" then use "Elderly Based".
-//               done 
-//               when "Client Is Due For MCV12" then do "Vaccinate".
-//       done
-//       when "One Primary Series Dose Administered" then:
-//           all:
-//               when "Client Age Less Than 15 Months" then do "Indicate".
-//               when "Last Live Vaccine Administered has had in 4 Weeks" then use "Elderly Based".
-//               when "Client Is Due For MCV12" then do "Vaccinate".
-//       done
-//       when "Two Primary Series Doses Administered" then do "Indicate".
-//   done
-//
+
 decisionStatement
     : DECISION identifier COLON decisionBody DONE
     ;
@@ -54,7 +85,7 @@ anyOrAllClause
     : (ANY | ALL) COLON
     ;
 
-// Block body: after "then:" a list of statements terminated by "done"
+// Block body: a list of statements terminated by "done"
 blockBody
     : COLON (anyOrAllClause? blockStatement+ ) DONE
     ;
@@ -207,6 +238,18 @@ atom
     | LPAREN orExpr RPAREN
     ;
 
+// ----------------------------- IDENTIFIER RULE ------------------------------
+
+// In CPGL, quoted strings are treated as identifiers.
+identifier
+    : STRING
+    ;
+
+// A helper rule to also refer to a string literal.
+stringLiteral
+    : STRING
+    ;
+
 // --------------------------------------------------------------------------
 // LEXER RULES
 // --------------------------------------------------------------------------
@@ -239,7 +282,7 @@ BY           : 'by';
 CODED        : 'coded';
 VALUESET     : 'valueset';
 
-// PUNCTUATION
+// Punctuation
 COLON        : ':';
 DOT          : '.';
 LPAREN       : '(';
@@ -300,19 +343,9 @@ CONCEPT_VALUE_TYPE
     | 'Attachment'
     ;
 
-// STRING: quoted string without escapes or internal quotes.
+// STRING: quoted string without escape sequences or internal quotes.
 STRING
     : '"' ( ~["\\\r\n] )* '"'
-    ;
-
-// identifier: quoted string without escapes or internal quotes.
-stringLiteral
-    : STRING
-    ;
-
-// identifier: quoted string without escapes or internal quotes.
-identifier
-    : STRING
     ;
 
 // Skip whitespace.
@@ -320,7 +353,7 @@ WS
     : [ \t\r\n]+ -> skip
     ;
 
-// Single line comment.
+// Single-line comment.
 COMMENT
     : '//' ~[\r\n]* -> skip
     ;

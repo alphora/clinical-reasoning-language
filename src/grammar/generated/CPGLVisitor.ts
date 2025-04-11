@@ -34,8 +34,8 @@ import { ExprContext } from "./CPGLParser";
 import { OrExprContext } from "./CPGLParser";
 import { AndExprContext } from "./CPGLParser";
 import { AtomContext } from "./CPGLParser";
-import { StringLiteralContext } from "./CPGLParser";
 import { IdentifierContext } from "./CPGLParser";
+import { StringLiteralContext } from "./CPGLParser";
 
 
 /**
@@ -264,17 +264,17 @@ export interface CPGLVisitor<Result> extends ParseTreeVisitor<Result> {
 	visitAtom?: (ctx: AtomContext) => Result;
 
 	/**
-	 * Visit a parse tree produced by `CPGLParser.stringLiteral`.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	visitStringLiteral?: (ctx: StringLiteralContext) => Result;
-
-	/**
 	 * Visit a parse tree produced by `CPGLParser.identifier`.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
 	visitIdentifier?: (ctx: IdentifierContext) => Result;
+
+	/**
+	 * Visit a parse tree produced by `CPGLParser.stringLiteral`.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	visitStringLiteral?: (ctx: StringLiteralContext) => Result;
 }
 
