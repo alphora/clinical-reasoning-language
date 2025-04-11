@@ -8,7 +8,6 @@ cpgl
     : statement* EOF
     ;
 
-// A statement can be one of the four types below
 statement
     : decisionStatement
     | terminologyStatement
@@ -18,15 +17,21 @@ statement
 
 // --------------------------- DECISION STATEMENT ----------------------------
 //
-// Example (simplified excerpt):
+// Example:
 //   decision "IMMZ.D2.D5.Measles":
 //       when "Measles Routine Immunization Schedule Incomplete" then:
-//           when "No Primary Series Doses Administered" then:
-//               any:
-//               when "Client Age Less Than 12 Months" then do "Indicate".
-//               when "Last Live Vaccine Administered Within 4 Weeks" then use "Elderly Based".
-//           done
-//           when "Client Is Due For MCV12" then do "Vaccinate".
+//           any:
+//               when "No Primary Series Doses Administered" then:
+//                   when "Client Age Less Than 12 Months" then do "Indicate".
+//                   when "Last Live Vaccine Administered has had in 4 Weeks" then use "Elderly Based".
+//               done 
+//               when "Client Is Due For MCV12" then do "Vaccinate".
+//       done
+//       when "One Primary Series Dose Administered" then:
+//           all:
+//               when "Client Age Less Than 15 Months" then do "Indicate".
+//               when "Last Live Vaccine Administered has had in 4 Weeks" then use "Elderly Based".
+//               when "Client Is Due For MCV12" then do "Vaccinate".
 //       done
 //       when "Two Primary Series Doses Administered" then do "Indicate".
 //   done
@@ -39,33 +44,33 @@ decisionBody
     : whenBlock+
     ;
 
-// A `whenBlock` is the grammar element for lines starting with "when ... then ..."
+// A whenBlock covers a "when <concept> then ..." clause
 whenBlock
     : WHEN stringLiteral THEN ( blockBody | singleActionStatement )
     ;
 
-// If the `when` has a colon after 'then', we parse multiple statements until 'done'
+// Block body: after "then:" a list of statements terminated by "done"
 blockBody
     : COLON (anyOrAllClause? blockStatement+ ) DONE
     ;
 
-// If the `when` has a single action on the same line, we parse it as do/use
+// Single action statement: a one-line action ending with DOT.
 singleActionStatement
     : (doStatement | useStatement) DOT
     ;
 
-// Optional "any:" or "all:"
+// "any:" or "all:" clause for lists
 anyOrAllClause
     : (ANY | ALL) COLON
     ;
 
-// A block can contain nested `when` or action statements
+// A block statement is either a nested whenBlock or an action statement.
 blockStatement
     : whenBlock
     | actionStatement
     ;
 
-// An action statement is either `do "something".` or `use "something".`
+// Action statements for do and use operations.
 actionStatement
     : (doStatement | useStatement) DOT
     ;
@@ -81,11 +86,12 @@ useStatement
 // ------------------------- TERMINOLOGY STATEMENT --------------------------
 //
 // Examples:
+//   terminology "BMI Valueset" valueset "bmi valueset".
 //   terminology "some terminology" unknown.
 //   terminology "Colonoscopy" system "http://snomed.info/sct" code "73761001".
 //
 terminologyStatement
-    : TERMINOLOGY stringLiteral (terminologyValueset | terminologyUnknown | terminologySystemCode) DOT
+    : TERMINOLOGY stringLiteral ( terminologyValueset | terminologyUnknown | terminologySystemCode ) DOT
     ;
 
 terminologyValueset
@@ -112,15 +118,24 @@ activityStatement
 
 // ---------------------------- CONCEPT STATEMENT ---------------------------
 //
-// Example:
+// Examples:
 //   concept "Most Recent BMI":
-//       type Observation
-//       valuetype boolean
-//       pattern "some pattern"
-//       provenance "some provenance"
-//       inferred:
-//           ("Most Recent Height" and "Most Recent Weight").
-//           ("BMI as a Condition" or "BMI as a Observation").
+//       has type Observation.
+//       has valuetype boolean.
+//       has provenance "some provenance".
+//       inferred by "Most Recent(this, lookbackMonths)" "BMI".
+//   done
+//
+//   concept "BMI":
+//       has type Observation.
+//       has valuetype Quantity.
+//       inferred by ("BMI Range as a Condition" or "BMI as an Observation" or "Calculated BMI").
+//   done
+//
+//   concept "BMI Range as a Condition":
+//       has type Condition.
+//       has valuetype CodeableConcept.
+//       coded by "BMI Valueset".
 //   done
 //
 conceptStatement
@@ -128,52 +143,53 @@ conceptStatement
     ;
 
 conceptBody
-    : typeLine
-      valueTypeLine
-      codingLine?
-      patternLine?
-      provenanceLine?
-      inferredBlock?
+    : hasTypeLine
+      hasValueTypeLine
+      (provenanceLine)?
+      (codedByLine | inferredByLine)
     ;
 
-typeLine
-    : TYPE CONCEPT_TYPE
+// "has" property lines for concept definitions.
+hasTypeLine
+    : HAS TYPE CONCEPT_TYPE DOT
     ;
 
-valueTypeLine
-    : VALUETYPE CONCEPT_VALUE_TYPE
-    ;
-
-patternLine
-    : PATTERN stringLiteral
+hasValueTypeLine
+    : HAS VALUETYPE CONCEPT_VALUE_TYPE DOT
     ;
 
 provenanceLine
-    : PROVENANCE stringLiteral
+    : HAS PROVENANCE stringLiteral DOT
     ;
 
-codedLine
-    : CODING (OF stringLiteral)
+// "coded by" clause for concepts that reference a terminology.
+codedByLine
+    : CODED BY stringLiteral DOT
     ;
 
-// inferred block like:
-//   inferred:
-//       ("Most Recent Height" and "Most Recent Weight").
-//       ("BMI as a Condition" or "BMI as a Observation").
-//
-inferredBlock
-    : INFERRED COLON inferredExpression+
+// "inferred by" clause for concepts with logic expressions.
+inferredByLine
+    : INFERRED BY inferredBody DOT
     ;
 
-inferredExpression
-    : LPAREN expr RPAREN DOT
+// The body of an "inferred by" statement can be either an optional pattern and concept
+// or a parenthesized logical expression.
+inferredBody
+    : inferredByExpr
+    | inferredByPattern
+    ;
+
+inferredByPattern
+    : stringLiteral? stringLiteral
+    ;
+
+inferredByExpr
+    : LPAREN expr RPAREN
     ;
 
 // ----------------------------- EXPRESSIONS -------------------------------
 //
-// For the "inferred" block, we allow expressions with "and"/"or" referencing
-// concept identifiers (quoted strings). Parentheses are allowed.
-//
+// Expressions used in inferred by lines allow logical operators AND, OR.
 expr
     : orExpr
     ;
@@ -213,13 +229,15 @@ CONCEPT      : 'concept';
 TYPE         : 'type';
 VALUETYPE    : 'valuetype';
 TERMINOLOGY  : 'terminology';
-PATTERN      : 'pattern';
 PROVENANCE   : 'provenance';
 INFERRED     : 'inferred';
 AND          : 'and';
 OR           : 'or';
 DONE         : 'done';
-CODING       : 'coding';
+HAS          : 'has';
+BY           : 'by';
+CODED        : 'coded';
+VALUESET     : 'valueset';
 
 // PUNCTUATION
 COLON        : ':';
@@ -282,26 +300,26 @@ CONCEPT_VALUE_TYPE
     | 'Attachment'
     ;
 
-// Quoted string with no internal quotes or backslashes
+// STRING: quoted string without escapes or internal quotes.
 STRING
     : '"' ( ~["\\\r\n] )* '"'
     ;
 
-// Treat whitespace as skip
+// Skip whitespace.
 WS
     : [ \t\r\n]+ -> skip
     ;
 
-// Single line comment
+// Single line comment.
 COMMENT
     : '//' ~[\r\n]* -> skip
     ;
 
-// Block comment
+// Block comment.
 COMMENT_BLOCK
     : '/*' .*? '*/' -> skip
     ;
 
-// For readability in code, capture these as parser tokens
+// Fragments for readability.
 fragment CHAR : ~["\\\r\n];
 fragment ANY_CHAR : . ;

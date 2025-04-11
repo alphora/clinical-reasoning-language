@@ -5,11 +5,13 @@ NOT whitespace sensitive.
 NOT indentation sensitive.
 Quoted strings cannot contain escape characters.
 Quoted strings (not in comments) are identifiers.
-The inferred value descibes concept derivation using logical operators and references, indicating how those referenced concepts collectively infer the target concept, not as a stricly evaluatable Boolean formula.
+The inferred value describes concept derivation using logical operators and references, indicating how those referenced concepts collectively infer the target concept, not as a strictly evaluatable Boolean formula.
 The inferred value can have any number of concept identifiers.
 The keywords "any/all" are optional (if not present, defaults to any).
 The keyword "of" for activity is optional.
-One of either the keywords "unknown" or "system/code" are required for terminology.
+The keyword "provenance" for concept is optional.
+One of either the keywords "inferred by" or "coded by" are required for concept.
+One of either the keywords "valueset", "unknown" or "system/code" are required for terminology.
 A file can have any number of decision, terminology, activity, concept.
 The example includes all options for valid statements.
 Anything not identified as optional here is required.
@@ -17,35 +19,46 @@ Anything not identified as optional here is required.
 
 decision "IMMZ.D2.D5.Measles":
     when "Measles Routine Immunization Schedule Incomplete" then: //when references a concept
+        any: //applies to list items
         when "No Primary Series Doses Administered" then:
-            any: //applies to list items
+            //defaults to any
             when "Client Age Less Than 12 Months" then do "Indicate". //do references an activity
-            when "Last Live Vaccine Administered Within 4 Weeks" then use "Elderly Based". //use references a decision
+            when "Last Live Vaccine Administered has had in 4 Weeks" then use "Elderly Based". //use references a decision
+            //defaults to "Not able to determine a recommendation"
         done 
         when "Client Is Due For MCV12" then do "Vaccinate".
     done
     when "One Primary Series Dose Administered" then:
         all:
         when "Client Age Less Than 15 Months" then do "Indicate".
-        when "Last Live Vaccine Administered Within 4 Weeks" then use "Elderly Based".
+        when "Last Live Vaccine Administered has had in 4 Weeks" then use "Elderly Based".
         when "Client Is Due For MCV12" then do "Vaccinate".
     done
     when "Two Primary Series Doses Administered" then do "Indicate".
 done
 
 decision "Elderly Based":
-    //defaults to any
     when "Client Age Greater Than 60" then do "Indicate".
     when "Client Age Less Than 60" then:
         do "Vaccinate". 
         do "another thing".
-        do "somthing else".
+        do "something else".
     done
     when "Client Age Greater Than 60" then:
-        use "Elderly Based".
-        use "IMMZ.D2.D5.Measles".
+        when "Most Recent BMI" then:
+            use "Some Other Decision". //Validator prevents cycles
+            use "Some Other Other Decision".
+        done
     done
 done
+
+//rationale
+
+terminology "BMI Valueset" valueset "bmi valueset".
+
+terminology "Height Valueset" valueset "height valueset". 
+
+terminology "Weight Valueset" valueset "weight valueset". 
 
 terminology "some terminology" unknown.
 
@@ -55,14 +68,70 @@ activity "Vaccinate" perform Immunization. //Immunization is an ACTIVITY_TYPE
 
 activity "Indicate" perform ProposeDiagnosis of "Colonoscopy". //of references a terminology
 
+// comments go into the auto generated README and, CQL when applicable
 concept "Most Recent BMI":
-    type Observation //Observation is a CONCEPT_TYPE
-    valuetype boolean //boolean is a CONCEPT_VALUE_TYPE
-    pattern "some pattern"
-    provenance "some provenance"
-    inferred:
-        ("Most Recent Height" and "Most Recent Weight"). //"Most Recent Height" (and others) is a reference to another concept
-        ("BMI as a Condition" or "BMI as a Observation").
+    has type Observation. //Observation is a CONCEPT_TYPE
+    has valuetype boolean. //boolean is a CONCEPT_VALUE_TYPE
+    has provenance "some provenance".
+    inferred by "Most Recent(this, lookbackMonths)" "BMI". //"Most Recent" is a reference to a CQL expression (that will be resolved by the parser) and is optional.  "BMI" is a reference to another concept.
+done
+
+concept "BMI":
+    has type Observation.
+    has valuetype Quantity.
+    inferred by ("BMI Range as a Condition" or "BMI as an Observation" or "Calculated BMI").
+done
+
+concept "BMI Range as a Condition":
+    has type Condition.
+    has valuetype CodeableConcept.
+    coded by "BMI Valueset". //"BMI Valueset" is a reference to a terminology
+done
+
+concept "BMI as an Observation":
+    has type Observation.
+    has valuetype Quantity.
+    coded by "BMI Valueset".
+done
+
+concept "Calculated BMI":
+    has type Observation.
+    has valuetype Quantity.
+    //calculate using (weight/height^2)
+    inferred by ("Patient Height" and "Patient Weight").
+done
+
+concept "Patient Height":
+    has type Observation.
+    has valuetype integer.
+    coded by "Height Valueset".
+done
+
+concept "Patient Weight":
+    has type Observation.
+    has valuetype integer.
+    coded by "Weight Valueset".
+done
+
+concept "Client Age Greater Than 60":
+    has type Observation.
+    has valuetype boolean.
+    inferred by 
+    (
+        (
+            ("a" and "b")
+            or (
+                ("c" and "d")
+                and ("e" or "f")
+            )
+        )
+        or (
+            ("x" or "y")
+            and "z"
+        )
+        or "k"
+        or "l"
+    ).
 done
 
 // additional concepts...
@@ -83,15 +152,18 @@ system
 code
 perform
 of
+coded
 concept
 type
 valuetype
 terminology
-pattern
 provenance
 inferred
+by
 and
 or
+valueset
+has
 
 punctuation:
 :
@@ -165,58 +237,3 @@ CONCEPT_VALUE_TYPE:
     | 'Attachment'
     ;
 */
-
-
-casefeature "Most Recent Height"
-    casefeaturecode "casefeature-height"
-    fhirtype Observation
-    profileurl "http://somecfprofile2-uri"
-    valuetype Quantity
-
-casefeature "Most Recent Weight"
-    casefeaturecode "casefeature-weight"
-    fhirtype Observation
-    profileurl "http://somecfprofile2-uri"
-    valuetype Quantity
-
-
-pattern "some pattern"
-    [ "GreatestInTheLast(), "MostRecent(arg1, arge)" ]
-
-// this is where I would put it?
-// text! for provenance
-// description?
-casefeature "has obesity"
-    casefeaturecode "casefeature-bmi-gt-25"
-    fhirtype Observation
-    profileurl "http://somecfprofile1-uri"
-    valuetype boolean
-    expression (
-        "casefeature bmi>25"
-        OR 
-        "calculated bmi > 25"
-    )
-
-casefeature "casefeature bmi>25"
-    casefeaturecode "casefeature-bmi-gt-25"
-    fhirtype Observation
-    profileurl "http://somecfprofile1-uri"
-    valuetype boolean
-
-casefeature "casefeature height"
-    casefeaturecode "casefeature-height"
-    fhirtype Observation
-    profileurl "http://somecfprofile2-uri"
-    valuetype Quantity
-
-casefeature "casefeature weight"
-    casefeaturecode "casefeature-weight"
-    fhirtype Observation
-    profileurl "http://somecfprofile2-uri"
-    valuetype Quantity
-
-casefeature "some other case feature"
-    casefeaturecode "some-other-case-feature"
-    fhirtype Observation
-    profileurl "http://somecfprofile3-uri"
-    valuetype Quantity
