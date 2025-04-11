@@ -96,6 +96,16 @@ export class CPGLLexer extends Lexer {
 	// tslint:enable:no-trailing-whitespace
 
 
+	    /**
+	     * Override to customize error reporting and throw exceptions for invalid tokens.
+	     */
+	    public override notifyErrorListeners(msg: string, offendingSymbol: Token | null, e: RecognitionException | null): void {
+	        const formattedMessage = `Lexer error - ${msg}`;
+	        super.notifyErrorListeners(formattedMessage, offendingSymbol, e);
+	        throw new Error(formattedMessage);
+	    }
+
+
 	constructor(input: CharStream) {
 		super(input);
 		this._interp = new LexerATNSimulator(CPGLLexer._ATN, this);
