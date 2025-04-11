@@ -1,4 +1,4 @@
-import { TokenTypes } from '../CPGLLexerConstants';
+import { CPGLLexer } from '../../grammar/generated/CPGLLexer';
 
 /**
  * Helper function to generate token sequence for a single action block
@@ -6,16 +6,10 @@ import { TokenTypes } from '../CPGLLexerConstants';
  * This only includes the repeating tokens.
  * example:
  * action "Indicate"
- *    fhirtype ServiceRequest
+ *    perform ServiceRequest
  */
 export function getActionTokenSequence(): number[] {
-  return [
-    TokenTypes.INDENT,
-    TokenTypes.FHIRTYPE,
-    TokenTypes.ACTION_FHIR_TYPE,
-    TokenTypes.NEWLINE,
-    TokenTypes.DEDENT,
-  ];
+  return [CPGLLexer.PERFORM, CPGLLexer.ACTIVITY_TYPE, CPGLLexer.DOT];
 }
 
 /**
@@ -23,27 +17,9 @@ export function getActionTokenSequence(): number[] {
  * @returns Array of token types for a casefeature block
  * This only includes the repeating tokens.
  * example:
- * casefeature "some other case feature"
- *    casefeaturecode "some-other-case-feature"
- *    fhirtype Observation
- *    profileurl "http://somecfprofile3-uri"
- *    valuetype Quantity
+ * concept "some other case feature"
+ *    has type Observation.
  */
 export function getCaseFeatureTokenSequence(): number[] {
-  return [
-    TokenTypes.INDENT,
-    TokenTypes.CASEFEATURECODE,
-    TokenTypes.STRING,
-    TokenTypes.NEWLINE,
-    TokenTypes.FHIRTYPE,
-    TokenTypes.CASEFEATURE_FHIR_TYPE,
-    TokenTypes.NEWLINE,
-    TokenTypes.PROFILEURL,
-    TokenTypes.STRING,
-    TokenTypes.NEWLINE,
-    TokenTypes.VALUETYPE,
-    TokenTypes.FHIR_VALUE_TYPE,
-    TokenTypes.NEWLINE,
-    TokenTypes.DEDENT,
-  ];
+  return [CPGLLexer.HAS, CPGLLexer.TYPE, CPGLLexer.CONCEPT_TYPE, CPGLLexer.DOT];
 }

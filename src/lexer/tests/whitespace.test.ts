@@ -147,7 +147,8 @@ describe('Whitespace Handling', () => {
     });
 
     it('should handle whitespace in concept inferred by expressions', () => {
-      const input = 'inferred\n  by\t(\n"Condition 1"\n  and\t"Condition 2"\n  or\t"Condition 3"\n)\t.';
+      const input =
+        'inferred\n  by\t(\n"Condition 1"\n  and\t"Condition 2"\n  or\t"Condition 3"\n)\t.';
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
       verifyTokenSequence(tokens, [
@@ -188,7 +189,8 @@ describe('Whitespace Handling', () => {
     });
 
     it('should handle whitespace in any/all clauses', () => {
-      const input = 'when\n  "Condition"\nthen\n  :\n    any\n      :\n        do\n          "Action 1"\n        .\n        do\n          "Action 2"\n        .\n    done\ndone';
+      const input =
+        'when\n  "Condition"\nthen\n  :\n    any\n      :\n        do\n          "Action 1"\n        .\n        do\n          "Action 2"\n        .\n    done\ndone';
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
       verifyTokenSequence(tokens, [
