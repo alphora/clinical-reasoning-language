@@ -1,9 +1,4 @@
-import {
-  ANTLRErrorListener,
-  RecognitionException,
-  Recognizer,
-  LexerNoViableAltException,
-} from 'antlr4ts';
+import { ANTLRErrorListener, RecognitionException, Recognizer } from 'antlr4ts';
 import { ATNSimulator } from 'antlr4ts/atn/ATNSimulator';
 
 export class CPGLLexerErrorListener implements ANTLRErrorListener<number> {
@@ -13,14 +8,8 @@ export class CPGLLexerErrorListener implements ANTLRErrorListener<number> {
     line: number,
     charPositionInLine: number,
     msg: string,
-    e: RecognitionException | undefined,
+    _e: RecognitionException | undefined,
   ): void {
-    if (e instanceof LexerNoViableAltException) {
-      const errorMsg = `Line ${line}:${charPositionInLine} - Invalid token: ${msg}`;
-      throw new Error(errorMsg);
-    } else {
-      const errorMsg = `Line ${line}:${charPositionInLine} - ${msg}`;
-      throw new Error(errorMsg);
-    }
+    throw new Error(`Line ${line}:${charPositionInLine} - ${msg}`);
   }
 }

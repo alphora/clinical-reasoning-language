@@ -1,6 +1,6 @@
 import { CharStreams } from 'antlr4ts';
 
-import { CPGLLexer } from '../CPGLLexer';
+import { CPGLLexer } from '../../grammar/generated/CPGLLexer';
 
 import { getAllTokens } from './index.test';
 
@@ -53,5 +53,54 @@ describe('Error Handling', () => {
         getAllTokens(lexer);
       }).toThrow(/Line \d+:/);
     });
+  });
+
+  it('should throw an exception with line number for invalid concept value types', () => {
+    const inputs = [
+      // Invalid value type
+      'concept "Test":\nhas type Observation\nhas valuetype InvalidType\ndone',
+      // Invalid value type case
+      'concept "Test":\nhas type Observation\nhas valuetype quantity\ndone',
+    ];
+
+    inputs.forEach(input => {
+      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      expect(() => {
+        getAllTokens(lexer);
+      }).toThrow(/Line \d+:/);
+    });
+  });
+
+  it('should include specific error messages for invalid types', () => {
+    const testCases = [
+      {
+        input: 'activity "Test"\nperform InvalidActivity',
+        expectedError: /Invalid activity type/i,
+      },
+      {
+        input: 'concept "Test":\nhas type InvalidType\nhas valuetype Quantity\ndone',
+        expectedError: /Invalid concept type/i,
+      },
+      {
+        input: 'concept "Test":\nhas type Observation\nhas valuetype InvalidType\ndone',
+        expectedError: /Invalid concept value type/i,
+      },
+    ];
+
+    testCases.forEach(({ input, expectedError }) => {
+      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      expect(() => {
+        getAllTokens(lexer);
+      }).toThrow(expectedError);
+    });
+  });
+
+  it('should include line and character position in error messages', () => {
+    const input = 'activity "Test"\nperform InvalidActivity';
+    const lexer = new CPGLLexer(CharStreams.fromString(input));
+
+    expect(() => {
+      getAllTokens(lexer);
+    }).toThrow(/Line 2:\d+/);
   });
 });

@@ -105,7 +105,7 @@
  */
 import { Token } from 'antlr4ts';
 
-import { CPGLLexer } from '../CPGLLexer';
+import { CPGLLexer } from '../../grammar/generated/CPGLLexer';
 
 /**
  * Gets all tokens from the lexer, filtering out whitespace and comments

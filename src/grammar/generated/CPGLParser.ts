@@ -65,7 +65,7 @@ export class CPGLParser extends Parser {
 	public static readonly WS = 35;
 	public static readonly COMMENT = 36;
 	public static readonly COMMENT_BLOCK = 37;
-	public static readonly ERROR_CHAR = 38;
+	public static readonly ErrorChar = 38;
 	public static readonly RULE_cpgl = 0;
 	public static readonly RULE_statement = 1;
 	public static readonly RULE_decisionStatement = 2;
@@ -124,7 +124,7 @@ export class CPGLParser extends Parser {
 		"TERMINOLOGY", "PROVENANCE", "INFERRED", "AND", "OR", "DONE", "HAS", "BY", 
 		"CODED", "VALUESET", "COLON", "DOT", "LPAREN", "RPAREN", "ACTIVITY_TYPE", 
 		"CONCEPT_TYPE", "CONCEPT_VALUE_TYPE", "STRING", "WS", "COMMENT", "COMMENT_BLOCK", 
-		"ERROR_CHAR",
+		"ErrorChar",
 	];
 	public static readonly VOCABULARY: Vocabulary = new VocabularyImpl(CPGLParser._LITERAL_NAMES, CPGLParser._SYMBOLIC_NAMES, []);
 

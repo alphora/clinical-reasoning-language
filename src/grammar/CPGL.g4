@@ -267,64 +267,87 @@ DOT          : '.';
 LPAREN       : '(';
 RPAREN       : ')';
 
-// ACTIVITY_TYPE possibilities
+// ACTIVITY_TYPE possibilities (case insensitive)
 ACTIVITY_TYPE
-    : 'AdministerMedicationActivity'
-    | 'CollectInformationActivity'
-    | 'CommunicationActivity'
-    | 'DispenseMedicationActivity'
-    | 'DocumentMedicationActivity'
-    | 'EnrollmentActivity'
-    | 'GenerateReportActivity'
-    | 'HoldActivity'
-    | 'ImmunizationActivity'
-    | 'MedicationRequestActivity'
-    | 'ProposeDiagnosisActivity'
-    | 'RecordDetectedIssueActivity'
-    | 'RecordInferenceActivity'
-    | 'ReportFlagv'
-    | 'ResumeActivity'
-    | 'ServiceRequestActivity'
-    | 'StopActivity'
+    : [a-zA-Z]+ {
+        const validTypes = [
+            'administerMedicationActivity',
+            'collectInformationActivity',
+            'communicationActivity',
+            'dispenseMedicationActivity',
+            'documentMedicationActivity',
+            'enrollmentActivity',
+            'generateReportActivity',
+            'holdActivity',
+            'immunizationActivity',
+            'medicationRequestActivity',
+            'proposeDiagnosisActivity',
+            'recordDetectedIssueActivity',
+            'recordInferenceActivity',
+            'reportFlagv',
+            'resumeActivity',
+            'serviceRequestActivity',
+            'stopActivity'
+        ];
+        if (!validTypes.includes(this.text.toLowerCase())) {
+            throw new Error(`Line ${this._tokenStartLine}:${this._tokenStartCharPositionInLine} - Invalid activity type: ${this.text}`);
+        }
+    }
     ;
 
-// CONCEPT_TYPE possibilities
+// CONCEPT_TYPE possibilities (case insensitive)
 CONCEPT_TYPE
-    : 'Communication'
-    | 'CommunicationRequest'
-    | 'Condition'
-    | 'QuestionnaireTask'
-    | 'QuestionnaireResponse'
-    | 'MedicationRequest'
-    | 'MedicationDispense'
-    | 'MedicationAdministration'
-    | 'MedicationStatement'
-    | 'ImmunizationRequest'
-    | 'Immunization'
-    | 'ServiceRequest'
-    | 'Procedure'
-    | 'Observation'
+    : [a-zA-Z]+ {
+        const validTypes = [
+            'communication',
+            'communicationrequest',
+            'condition',
+            'questionnairetask',
+            'questionnaireresponse',
+            'medicationrequest',
+            'medicationdispense',
+            'medicationadministration',
+            'medicationstatement',
+            'immunizationrequest',
+            'immunization',
+            'servicerequest',
+            'procedure',
+            'observation'
+        ];
+        if (!validTypes.includes(this.text.toLowerCase())) {
+            throw new Error(`Line ${this._tokenStartLine}:${this._tokenStartCharPositionInLine} - Invalid concept type: ${this.text}`);
+        }
+    }
     ;
 
-// CONCEPT_VALUE_TYPE possibilities
+// CONCEPT_VALUE_TYPE possibilities (case insensitive)
 CONCEPT_VALUE_TYPE
-    : 'Quantity'
-    | 'CodeableConcept'
-    | 'string'
-    | 'boolean'
-    | 'integer'
-    | 'Range'
-    | 'Ratio'
-    | 'SampledData'
-    | 'time'
-    | 'dateTime'
-    | 'Period'
-    | 'Attachment'
+    : [a-zA-Z]+ {
+        const validTypes = [
+            'quantity',
+            'codeableconcept',
+            'string',
+            'boolean',
+            'integer',
+            'range',
+            'ratio',
+            'sampleddata',
+            'time',
+            'datetime',
+            'period',
+            'attachment'
+        ];
+        if (!validTypes.includes(this.text.toLowerCase())) {
+            throw new Error(`Line ${this._tokenStartLine}:${this._tokenStartCharPositionInLine} - Invalid concept value type: ${this.text}`);
+        }
+    }
     ;
 
-// STRING: quoted string without escape sequences or internal quotes.
+// STRING: quoted string with error handling for unterminated strings
 STRING
-    : '"' ( ~["\\\r\n] )* '"'
+    : '"' ( ~["\\\r\n] )* ('"' | {
+        throw new Error(`Line ${this._tokenStartLine}:${this._tokenStartCharPositionInLine} - Unterminated string`);
+    })
     ;
 
 // Skip whitespace.
@@ -342,9 +365,9 @@ COMMENT_BLOCK
     : '/*' .*? '*/' -> skip
     ;
 
-// Fragments for readability.
-fragment CHAR : ~["\\\r\n] ;
-fragment ANY_CHAR : . ;
-
 // Error handling for unmatched characters
-ERROR_CHAR : . ;
+ErrorChar 
+    : . {
+        throw new Error(`Line ${this._tokenStartLine}:${this._tokenStartCharPositionInLine} - Invalid character: ${this.text}`);
+    }
+    ;

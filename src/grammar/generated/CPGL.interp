@@ -78,7 +78,7 @@ STRING
 WS
 COMMENT
 COMMENT_BLOCK
-ERROR_CHAR
+ErrorChar
 
 rule names:
 cpgl
