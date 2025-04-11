@@ -96,19 +96,6 @@ export class CPGLLexer extends Lexer {
 	// tslint:enable:no-trailing-whitespace
 
 
-	    /**
-	     * Override the default error notification for the lexer.
-	     */
-	    @Override
-	    public void notifyListeners(LexerNoViableAltException e) {
-	        String text = _input.getText(Interval.of(_tokenStartCharIndex, _input.index()));
-	        String msg = "Lexical error at line " + getLine() + ":" + getCharPositionInLine() +
-	            " at '" + text + "'";
-	        ANTLRErrorListener listener = getErrorListenerDispatch();
-	        listener.syntaxError(this, null, getLine(), getCharPositionInLine(), msg, e);
-	    }
-
-
 	constructor(input: CharStream) {
 		super(input);
 		this._interp = new LexerATNSimulator(CPGLLexer._ATN, this);

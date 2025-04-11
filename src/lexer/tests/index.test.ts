@@ -18,39 +18,34 @@
  *    - Boolean operators (AND, OR, NOT)
  *    - Parentheses
  *
- * 2. Whitespace and Indentation
- *    - 4-space indentation
- *    - Newlines
- *    - Multiple indentation levels
- *    - DEDENT at EOF
- *    - Invalid indentation patterns
- *
- * 3. Comments
+ * 2. Comments
  *    - Single-line comments
  *    - Block comments
- *    - Comments with indentation
  *    - Comments between tokens
  *
- * 4. FHIR Types
+ * 3. FHIR Types
  *    - Action FHIR types
  *    - CaseFeature FHIR types
  *    - Value types (string, boolean, integer, etc.)
  *    - Invalid FHIR types
  *
- * 5. Complex Structures
+ * 4. Complex Structures
  *    - Decision blocks
  *    - Casefeatures with expressions
  *    - Nested blocks with qualifiers
  *    - Multiple terminal actions
  *    - Complex boolean expressions
  *
- * 6. Error Handling
+ * 5. Error Handling
  *    - Invalid tokens
  *    - Unterminated strings
- *    - Invalid indentation
- *    - Missing newlines
- *    - Invalid boolean expressions
- *    - Invalid FHIR types
+ *
+ * 6. Whitespace and Indentation
+ *    - 4-space indentation
+ *    - Newlines
+ *    - Multiple indentation levels
+ *    - DEDENT at EOF
+ *    - Invalid indentation patterns
  *
  * 7. Token Emission Order
  *    - INDENT/DEDENT placement
@@ -108,42 +103,49 @@
  * the new lexer implementation. Testing parser integration now would be premature
  * as the parser will need significant updates to work with the new lexer.
  */
-import { CharStreams } from 'antlr4ts';
-import { Token } from 'antlr4ts/Token';
+import { Token } from 'antlr4ts';
 
-import { CPGLLexer } from '../CPGLLexer';
-import { TokenTypes } from '../CPGLLexerConstants';
+import { CPGLLexer } from '../../grammar/generated/CPGLLexer';
 
 /**
- * Helper function to get all tokens from a lexer
+ * Gets all tokens from the lexer, filtering out whitespace and comments
  */
 export function getAllTokens(lexer: CPGLLexer): Token[] {
   const tokens: Token[] = [];
   let token = lexer.nextToken();
-  while (token.type !== TokenTypes.EOF) {
-    tokens.push(token);
+  while (token.type !== Token.EOF) {
+    if (
+      token.type !== CPGLLexer.WS &&
+      token.type !== CPGLLexer.COMMENT &&
+      token.type !== CPGLLexer.COMMENT_BLOCK
+    ) {
+      tokens.push(token);
+    }
     token = lexer.nextToken();
   }
-  tokens.push(token); // Add EOF token
   return tokens;
 }
 
 /**
- * Helper function to verify a sequence of tokens
+ * Verifies that the sequence of tokens matches the expected types and optionally the expected text
  */
 export function verifyTokenSequence(
   tokens: Token[],
   expectedTypes: number[],
   expectedTexts?: string[],
-) {
+): void {
   expect(tokens.length).toBe(expectedTypes.length);
+  if (expectedTexts) {
+    expect(tokens.length).toBe(expectedTexts.length);
+  }
+
   for (let i = 0; i < tokens.length; i++) {
     expect(tokens[i].type).toBe(expectedTypes[i]);
-    if (expectedTexts && expectedTexts[i]) {
+    if (expectedTexts) {
       expect(tokens[i].text).toBe(expectedTexts[i]);
     }
   }
 }
 
 // Export common imports
-export { CharStreams, TokenTypes, CPGLLexer, Token };
+export { CPGLLexer };

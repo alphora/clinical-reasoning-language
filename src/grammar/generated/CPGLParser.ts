@@ -150,29 +150,25 @@ export class CPGLParser extends Parser {
 	    /**
 	     * Override to customize error reporting.
 	     */
-	    @Override
-	    public void notifyErrorListeners(Token offendingToken, String msg, RecognitionException e) {
-	        String formattedMessage = "Syntax error at line " + offendingToken.getLine() +
-	            ":" + offendingToken.getCharPositionInLine() + " - " + msg;
+	    public override notifyErrorListeners(offendingToken: Token, msg: string, e: RecognitionException): void {
+	        const formattedMessage = `Syntax error at line ${offendingToken.line}:${offendingToken.charPositionInLine} - ${msg}`;
 	        super.notifyErrorListeners(offendingToken, formattedMessage, e);
 	    }
 
 	    /**
 	     * Override inline recovery to throw an exception for unexpected tokens.
 	     */
-	    @Override
-	    public Token recoverInline(Parser recognizer) throws RecognitionException {
-	        InputMismatchException e = new InputMismatchException(this);
-	        notifyErrorListeners(_input.LT(1), "Unexpected token: " + getCurrentToken().getText(), e);
+	    public override recoverInline(recognizer: Parser): Token {
+	        const e = new InputMismatchException(this);
+	        this.notifyErrorListeners(this._input.LT(1), `Unexpected token: ${this.getCurrentToken().text}`, e);
 	        throw e;
 	    }
 
 	    /**
 	     * Override recovery to halt parsing immediately on error.
 	     */
-	    @Override
-	    public void recover(RecognitionException e) {
-	        throw new RuntimeException(e);
+	    public override recover(e: RecognitionException): void {
+	        throw new Error(e.message);
 	    }
 
 	constructor(input: TokenStream) {
@@ -183,25 +179,23 @@ export class CPGLParser extends Parser {
 	public cpgl(): CpglContext {
 		let _localctx: CpglContext = new CpglContext(this._ctx, this.state);
 		this.enterRule(_localctx, 0, CPGLParser.RULE_cpgl);
+		let _la: number;
 		try {
-			let _alt: number;
 			this.enterOuterAlt(_localctx, 1);
 			{
 			this.state = 69;
 			this._errHandler.sync(this);
-			_alt = this.interpreter.adaptivePredict(this._input, 0, this._ctx);
-			while (_alt !== 2 && _alt !== ATN.INVALID_ALT_NUMBER) {
-				if (_alt === 1) {
-					{
-					{
-					this.state = 66;
-					this.statement();
-					}
-					}
+			_la = this._input.LA(1);
+			while ((((_la) & ~0x1F) === 0 && ((1 << _la) & ((1 << CPGLParser.DECISION) | (1 << CPGLParser.ACTIVITY) | (1 << CPGLParser.CONCEPT) | (1 << CPGLParser.TERMINOLOGY))) !== 0)) {
+				{
+				{
+				this.state = 66;
+				this.statement();
+				}
 				}
 				this.state = 71;
 				this._errHandler.sync(this);
-				_alt = this.interpreter.adaptivePredict(this._input, 0, this._ctx);
+				_la = this._input.LA(1);
 			}
 			this.state = 72;
 			this.match(CPGLParser.EOF);
@@ -228,38 +222,37 @@ export class CPGLParser extends Parser {
 		try {
 			this.state = 78;
 			this._errHandler.sync(this);
-			switch ( this.interpreter.adaptivePredict(this._input, 1, this._ctx) ) {
-			case 1:
+			switch (this._input.LA(1)) {
+			case CPGLParser.DECISION:
 				this.enterOuterAlt(_localctx, 1);
 				{
 				this.state = 74;
 				this.decisionStatement();
 				}
 				break;
-
-			case 2:
+			case CPGLParser.TERMINOLOGY:
 				this.enterOuterAlt(_localctx, 2);
 				{
 				this.state = 75;
 				this.terminologyStatement();
 				}
 				break;
-
-			case 3:
+			case CPGLParser.ACTIVITY:
 				this.enterOuterAlt(_localctx, 3);
 				{
 				this.state = 76;
 				this.activityStatement();
 				}
 				break;
-
-			case 4:
+			case CPGLParser.CONCEPT:
 				this.enterOuterAlt(_localctx, 4);
 				{
 				this.state = 77;
 				this.conceptStatement();
 				}
 				break;
+			default:
+				throw new NoViableAltException(this);
 			}
 		}
 		catch (re) {
@@ -313,30 +306,24 @@ export class CPGLParser extends Parser {
 	public decisionBody(): DecisionBodyContext {
 		let _localctx: DecisionBodyContext = new DecisionBodyContext(this._ctx, this.state);
 		this.enterRule(_localctx, 6, CPGLParser.RULE_decisionBody);
+		let _la: number;
 		try {
-			let _alt: number;
 			this.enterOuterAlt(_localctx, 1);
 			{
 			this.state = 87;
 			this._errHandler.sync(this);
-			_alt = 1;
+			_la = this._input.LA(1);
 			do {
-				switch (_alt) {
-				case 1:
-					{
-					{
-					this.state = 86;
-					this.whenBlock();
-					}
-					}
-					break;
-				default:
-					throw new NoViableAltException(this);
+				{
+				{
+				this.state = 86;
+				this.whenBlock();
+				}
 				}
 				this.state = 89;
 				this._errHandler.sync(this);
-				_alt = this.interpreter.adaptivePredict(this._input, 2, this._ctx);
-			} while (_alt !== 2 && _alt !== ATN.INVALID_ALT_NUMBER);
+				_la = this._input.LA(1);
+			} while (_la === CPGLParser.WHEN);
 			}
 		}
 		catch (re) {
@@ -368,20 +355,22 @@ export class CPGLParser extends Parser {
 			this.match(CPGLParser.THEN);
 			this.state = 96;
 			this._errHandler.sync(this);
-			switch ( this.interpreter.adaptivePredict(this._input, 3, this._ctx) ) {
-			case 1:
+			switch (this._input.LA(1)) {
+			case CPGLParser.COLON:
 				{
 				this.state = 94;
 				this.blockBody();
 				}
 				break;
-
-			case 2:
+			case CPGLParser.DO:
+			case CPGLParser.USE:
 				{
 				this.state = 95;
 				this.singleActionStatement();
 				}
 				break;
+			default:
+				throw new NoViableAltException(this);
 			}
 			}
 		}
@@ -441,8 +430,8 @@ export class CPGLParser extends Parser {
 	public blockBody(): BlockBodyContext {
 		let _localctx: BlockBodyContext = new BlockBodyContext(this._ctx, this.state);
 		this.enterRule(_localctx, 12, CPGLParser.RULE_blockBody);
+		let _la: number;
 		try {
-			let _alt: number;
 			this.enterOuterAlt(_localctx, 1);
 			{
 			this.state = 101;
@@ -450,34 +439,28 @@ export class CPGLParser extends Parser {
 			{
 			this.state = 103;
 			this._errHandler.sync(this);
-			switch ( this.interpreter.adaptivePredict(this._input, 4, this._ctx) ) {
-			case 1:
+			_la = this._input.LA(1);
+			if (_la === CPGLParser.ANY || _la === CPGLParser.ALL) {
 				{
 				this.state = 102;
 				this.anyOrAllClause();
 				}
-				break;
 			}
+
 			this.state = 106;
 			this._errHandler.sync(this);
-			_alt = 1;
+			_la = this._input.LA(1);
 			do {
-				switch (_alt) {
-				case 1:
-					{
-					{
-					this.state = 105;
-					this.blockStatement();
-					}
-					}
-					break;
-				default:
-					throw new NoViableAltException(this);
+				{
+				{
+				this.state = 105;
+				this.blockStatement();
+				}
 				}
 				this.state = 108;
 				this._errHandler.sync(this);
-				_alt = this.interpreter.adaptivePredict(this._input, 5, this._ctx);
-			} while (_alt !== 2 && _alt !== ATN.INVALID_ALT_NUMBER);
+				_la = this._input.LA(1);
+			} while ((((_la) & ~0x1F) === 0 && ((1 << _la) & ((1 << CPGLParser.WHEN) | (1 << CPGLParser.DO) | (1 << CPGLParser.USE))) !== 0));
 			}
 			this.state = 110;
 			this.match(CPGLParser.DONE);
@@ -506,20 +489,21 @@ export class CPGLParser extends Parser {
 			{
 			this.state = 114;
 			this._errHandler.sync(this);
-			switch ( this.interpreter.adaptivePredict(this._input, 6, this._ctx) ) {
-			case 1:
+			switch (this._input.LA(1)) {
+			case CPGLParser.DO:
 				{
 				this.state = 112;
 				this.doStatement();
 				}
 				break;
-
-			case 2:
+			case CPGLParser.USE:
 				{
 				this.state = 113;
 				this.useStatement();
 				}
 				break;
+			default:
+				throw new NoViableAltException(this);
 			}
 			this.state = 116;
 			this.match(CPGLParser.DOT);
@@ -546,22 +530,24 @@ export class CPGLParser extends Parser {
 		try {
 			this.state = 120;
 			this._errHandler.sync(this);
-			switch ( this.interpreter.adaptivePredict(this._input, 7, this._ctx) ) {
-			case 1:
+			switch (this._input.LA(1)) {
+			case CPGLParser.WHEN:
 				this.enterOuterAlt(_localctx, 1);
 				{
 				this.state = 118;
 				this.whenBlock();
 				}
 				break;
-
-			case 2:
+			case CPGLParser.DO:
+			case CPGLParser.USE:
 				this.enterOuterAlt(_localctx, 2);
 				{
 				this.state = 119;
 				this.actionStatement();
 				}
 				break;
+			default:
+				throw new NoViableAltException(this);
 			}
 		}
 		catch (re) {
@@ -587,20 +573,21 @@ export class CPGLParser extends Parser {
 			{
 			this.state = 124;
 			this._errHandler.sync(this);
-			switch ( this.interpreter.adaptivePredict(this._input, 8, this._ctx) ) {
-			case 1:
+			switch (this._input.LA(1)) {
+			case CPGLParser.DO:
 				{
 				this.state = 122;
 				this.doStatement();
 				}
 				break;
-
-			case 2:
+			case CPGLParser.USE:
 				{
 				this.state = 123;
 				this.useStatement();
 				}
 				break;
+			default:
+				throw new NoViableAltException(this);
 			}
 			this.state = 126;
 			this.match(CPGLParser.DOT);
@@ -687,27 +674,27 @@ export class CPGLParser extends Parser {
 			this.identifier();
 			this.state = 139;
 			this._errHandler.sync(this);
-			switch ( this.interpreter.adaptivePredict(this._input, 9, this._ctx) ) {
-			case 1:
+			switch (this._input.LA(1)) {
+			case CPGLParser.VALUESET:
 				{
 				this.state = 136;
 				this.terminologyValueset();
 				}
 				break;
-
-			case 2:
+			case CPGLParser.UNKNOWN:
 				{
 				this.state = 137;
 				this.terminologyUnknown();
 				}
 				break;
-
-			case 3:
+			case CPGLParser.SYSTEM:
 				{
 				this.state = 138;
 				this.terminologySystemCode();
 				}
 				break;
+			default:
+				throw new NoViableAltException(this);
 			}
 			this.state = 141;
 			this.match(CPGLParser.DOT);
@@ -814,6 +801,7 @@ export class CPGLParser extends Parser {
 	public activityStatement(): ActivityStatementContext {
 		let _localctx: ActivityStatementContext = new ActivityStatementContext(this._ctx, this.state);
 		this.enterRule(_localctx, 32, CPGLParser.RULE_activityStatement);
+		let _la: number;
 		try {
 			this.enterOuterAlt(_localctx, 1);
 			{
@@ -827,16 +815,16 @@ export class CPGLParser extends Parser {
 			this.match(CPGLParser.ACTIVITY_TYPE);
 			this.state = 159;
 			this._errHandler.sync(this);
-			switch ( this.interpreter.adaptivePredict(this._input, 10, this._ctx) ) {
-			case 1:
+			_la = this._input.LA(1);
+			if (_la === CPGLParser.OF) {
 				{
 				this.state = 157;
 				this.match(CPGLParser.OF);
 				this.state = 158;
 				this.identifier();
 				}
-				break;
 			}
+
 			this.state = 161;
 			this.match(CPGLParser.DOT);
 			}
@@ -892,6 +880,7 @@ export class CPGLParser extends Parser {
 	public conceptBody(): ConceptBodyContext {
 		let _localctx: ConceptBodyContext = new ConceptBodyContext(this._ctx, this.state);
 		this.enterRule(_localctx, 36, CPGLParser.RULE_conceptBody);
+		let _la: number;
 		try {
 			this.enterOuterAlt(_localctx, 1);
 			{
@@ -901,30 +890,31 @@ export class CPGLParser extends Parser {
 			this.hasValueTypeLine();
 			this.state = 172;
 			this._errHandler.sync(this);
-			switch ( this.interpreter.adaptivePredict(this._input, 11, this._ctx) ) {
-			case 1:
+			_la = this._input.LA(1);
+			if (_la === CPGLParser.HAS) {
 				{
 				this.state = 171;
 				this.provenanceLine();
 				}
-				break;
 			}
+
 			this.state = 176;
 			this._errHandler.sync(this);
-			switch ( this.interpreter.adaptivePredict(this._input, 12, this._ctx) ) {
-			case 1:
+			switch (this._input.LA(1)) {
+			case CPGLParser.CODED:
 				{
 				this.state = 174;
 				this.codedByLine();
 				}
 				break;
-
-			case 2:
+			case CPGLParser.INFERRED:
 				{
 				this.state = 175;
 				this.inferredByLine();
 				}
 				break;
+			default:
+				throw new NoViableAltException(this);
 			}
 			}
 		}
@@ -1104,22 +1094,23 @@ export class CPGLParser extends Parser {
 		try {
 			this.state = 205;
 			this._errHandler.sync(this);
-			switch ( this.interpreter.adaptivePredict(this._input, 13, this._ctx) ) {
-			case 1:
+			switch (this._input.LA(1)) {
+			case CPGLParser.LPAREN:
 				this.enterOuterAlt(_localctx, 1);
 				{
 				this.state = 203;
 				this.inferredByExpr();
 				}
 				break;
-
-			case 2:
+			case CPGLParser.STRING:
 				this.enterOuterAlt(_localctx, 2);
 				{
 				this.state = 204;
 				this.inferredByPattern();
 				}
 				break;
+			default:
+				throw new NoViableAltException(this);
 			}
 		}
 		catch (re) {
@@ -1229,29 +1220,27 @@ export class CPGLParser extends Parser {
 	public orExpr(): OrExprContext {
 		let _localctx: OrExprContext = new OrExprContext(this._ctx, this.state);
 		this.enterRule(_localctx, 56, CPGLParser.RULE_orExpr);
+		let _la: number;
 		try {
-			let _alt: number;
 			this.enterOuterAlt(_localctx, 1);
 			{
 			this.state = 218;
 			this.andExpr();
 			this.state = 223;
 			this._errHandler.sync(this);
-			_alt = this.interpreter.adaptivePredict(this._input, 15, this._ctx);
-			while (_alt !== 2 && _alt !== ATN.INVALID_ALT_NUMBER) {
-				if (_alt === 1) {
-					{
-					{
-					this.state = 219;
-					this.match(CPGLParser.OR);
-					this.state = 220;
-					this.andExpr();
-					}
-					}
+			_la = this._input.LA(1);
+			while (_la === CPGLParser.OR) {
+				{
+				{
+				this.state = 219;
+				this.match(CPGLParser.OR);
+				this.state = 220;
+				this.andExpr();
+				}
 				}
 				this.state = 225;
 				this._errHandler.sync(this);
-				_alt = this.interpreter.adaptivePredict(this._input, 15, this._ctx);
+				_la = this._input.LA(1);
 			}
 			}
 		}
@@ -1273,29 +1262,27 @@ export class CPGLParser extends Parser {
 	public andExpr(): AndExprContext {
 		let _localctx: AndExprContext = new AndExprContext(this._ctx, this.state);
 		this.enterRule(_localctx, 58, CPGLParser.RULE_andExpr);
+		let _la: number;
 		try {
-			let _alt: number;
 			this.enterOuterAlt(_localctx, 1);
 			{
 			this.state = 226;
 			this.atom();
 			this.state = 231;
 			this._errHandler.sync(this);
-			_alt = this.interpreter.adaptivePredict(this._input, 16, this._ctx);
-			while (_alt !== 2 && _alt !== ATN.INVALID_ALT_NUMBER) {
-				if (_alt === 1) {
-					{
-					{
-					this.state = 227;
-					this.match(CPGLParser.AND);
-					this.state = 228;
-					this.atom();
-					}
-					}
+			_la = this._input.LA(1);
+			while (_la === CPGLParser.AND) {
+				{
+				{
+				this.state = 227;
+				this.match(CPGLParser.AND);
+				this.state = 228;
+				this.atom();
+				}
 				}
 				this.state = 233;
 				this._errHandler.sync(this);
-				_alt = this.interpreter.adaptivePredict(this._input, 16, this._ctx);
+				_la = this._input.LA(1);
 			}
 			}
 		}
@@ -1320,16 +1307,15 @@ export class CPGLParser extends Parser {
 		try {
 			this.state = 239;
 			this._errHandler.sync(this);
-			switch ( this.interpreter.adaptivePredict(this._input, 17, this._ctx) ) {
-			case 1:
+			switch (this._input.LA(1)) {
+			case CPGLParser.STRING:
 				this.enterOuterAlt(_localctx, 1);
 				{
 				this.state = 234;
 				this.identifier();
 				}
 				break;
-
-			case 2:
+			case CPGLParser.LPAREN:
 				this.enterOuterAlt(_localctx, 2);
 				{
 				this.state = 235;
@@ -1340,6 +1326,8 @@ export class CPGLParser extends Parser {
 				this.match(CPGLParser.RPAREN);
 				}
 				break;
+			default:
+				throw new NoViableAltException(this);
 			}
 		}
 		catch (re) {

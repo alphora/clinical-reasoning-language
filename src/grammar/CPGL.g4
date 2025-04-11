@@ -7,46 +7,25 @@ grammar CPGL;
     /**
      * Override to customize error reporting.
      */
-    @Override
-    public void notifyErrorListeners(Token offendingToken, String msg, RecognitionException e) {
-        String formattedMessage = "Syntax error at line " + offendingToken.getLine() +
-            ":" + offendingToken.getCharPositionInLine() + " - " + msg;
+    public override notifyErrorListeners(offendingToken: Token, msg: string, e: RecognitionException): void {
+        const formattedMessage = `Syntax error at line ${offendingToken.line}:${offendingToken.charPositionInLine} - ${msg}`;
         super.notifyErrorListeners(offendingToken, formattedMessage, e);
     }
 
     /**
      * Override inline recovery to throw an exception for unexpected tokens.
      */
-    @Override
-    public Token recoverInline(Parser recognizer) throws RecognitionException {
-        InputMismatchException e = new InputMismatchException(this);
-        notifyErrorListeners(_input.LT(1), "Unexpected token: " + getCurrentToken().getText(), e);
+    public override recoverInline(recognizer: Parser): Token {
+        const e = new InputMismatchException(this);
+        this.notifyErrorListeners(this._input.LT(1), `Unexpected token: ${this.getCurrentToken().text}`, e);
         throw e;
     }
 
     /**
      * Override recovery to halt parsing immediately on error.
      */
-    @Override
-    public void recover(RecognitionException e) {
-        throw new RuntimeException(e);
-    }
-}
-
-// --------------------------------------------------------------------------
-// LEXER ERROR HANDLING MEMBERS
-// --------------------------------------------------------------------------
-@lexer::members {
-    /**
-     * Override the default error notification for the lexer.
-     */
-    @Override
-    public void notifyListeners(LexerNoViableAltException e) {
-        String text = _input.getText(Interval.of(_tokenStartCharIndex, _input.index()));
-        String msg = "Lexical error at line " + getLine() + ":" + getCharPositionInLine() +
-            " at '" + text + "'";
-        ANTLRErrorListener listener = getErrorListenerDispatch();
-        listener.syntaxError(this, null, getLine(), getCharPositionInLine(), msg, e);
+    public override recover(e: RecognitionException): void {
+        throw new Error(e.message);
     }
 }
 
@@ -364,5 +343,5 @@ COMMENT_BLOCK
     ;
 
 // Fragments for readability.
-fragment CHAR : ~["\\\r\n];
+fragment CHAR : ~["\\\r\n] ;
 fragment ANY_CHAR : . ;
