@@ -18,91 +18,78 @@ statement
 
 // --------------------------- DECISION STATEMENT ----------------------------
 //
-// Example:
+// Example (simplified excerpt):
 //   decision "IMMZ.D2.D5.Measles":
 //       when "Measles Routine Immunization Schedule Incomplete" then:
 //           when "No Primary Series Doses Administered" then:
 //               any:
-//               - when "Client Age Less Than 12 Months" then do "Indicate".
-//               - when "Last Live Vaccine Administered Within 4 Weeks" then use "Elderly Based".
-//               - when "Client Is Due For MCV12" then do "Vaccinate".
-//       when "One Primary Series Dose Administered" then:
-//           all:
-//           - when "Client Age Less Than 15 Months" then do "Indicate".
-//           - when "Last Live Vaccine Administered Within 4 Weeks" then use "Elderly Based".
-//           - when "Client Is Due For MCV12" then do "Vaccinate".
+//               when "Client Age Less Than 12 Months" then do "Indicate".
+//               when "Last Live Vaccine Administered Within 4 Weeks" then use "Elderly Based".
+//           done
+//           when "Client Is Due For MCV12" then do "Vaccinate".
+//       done
 //       when "Two Primary Series Doses Administered" then do "Indicate".
+//   done
 //
 decisionStatement
-    : DECISION stringLiteral COLON decisionBody
+    : DECISION stringLiteral COLON decisionBody DONE
     ;
 
-// Top-level body of a decision: one or more `when` clauses
 decisionBody
-    : whenClause+
+    : whenBlock+
     ;
 
-// A `when` clause: 
-//   when "some concept" then do/use ...
-//   or
-//   when "some concept" then:
-//       [any|all]: (optional)
-//       - <listItem>
-//       - <listItem>
-//       ...
-whenClause
-    : WHEN stringLiteral THEN (whenThenBlock | singleActionStatement)
+// A `whenBlock` is the grammar element for lines starting with "when ... then ..."
+whenBlock
+    : WHEN stringLiteral THEN ( blockBody | singleActionStatement )
     ;
 
-// Block introduced by "then:"
-whenThenBlock
-    : COLON (anyOrAllClause? listItem+)
+// If the `when` has a colon after 'then', we parse multiple statements until 'done'
+blockBody
+    : COLON (anyOrAllClause? blockStatement+ ) DONE
     ;
 
-anyOrAllClause
-    : (ANY | ALL) COLON
-    ;
-
-// A single action line, e.g.  then do "Indicate".
+// If the `when` has a single action on the same line, we parse it as do/use
 singleActionStatement
     : (doStatement | useStatement) DOT
     ;
 
-// Items in the list after "any:" or "all:" or default
-listItem
-    : DASH listItemContent
+// Optional "any:" or "all:"
+anyOrAllClause
+    : (ANY | ALL) COLON
     ;
 
-listItemContent
-    // Can be a nested `when` inside (with a possible block or single do/use),
-    // or a direct action statement
-    : whenClause
+// A block can contain nested `when` or action statements
+blockStatement
+    : whenBlock
     | actionStatement
     ;
 
-// An action statement is either `do "someActivity".` or `use "someDecision".`
+// An action statement is either `do "something".` or `use "something".`
 actionStatement
     : (doStatement | useStatement) DOT
     ;
 
-// For lines such as:  do "Indicate"
 doStatement
     : DO stringLiteral
     ;
 
-// For lines such as:  use "Elderly Based"
 useStatement
     : USE stringLiteral
     ;
 
 // ------------------------- TERMINOLOGY STATEMENT --------------------------
 //
-// Example:
+// Examples:
 //   terminology "some terminology" unknown.
 //   terminology "Colonoscopy" system "http://snomed.info/sct" code "73761001".
 //
 terminologyStatement
-    : TERMINOLOGY stringLiteral (terminologyUnknown | terminologySystemCode) DOT
+    : TERMINOLOGY stringLiteral (terminologyValueset | terminologyUnknown | terminologySystemCode) DOT
+    ;
+
+terminologyValueset
+    : VALUESET stringLiteral
     ;
 
 terminologyUnknown
@@ -115,7 +102,7 @@ terminologySystemCode
 
 // --------------------------- ACTIVITY STATEMENT ---------------------------
 //
-// Example:
+// Examples:
 //   activity "Vaccinate" perform Immunization.
 //   activity "Indicate" perform ProposeDiagnosis of "Colonoscopy".
 //
@@ -127,76 +114,66 @@ activityStatement
 //
 // Example:
 //   concept "Most Recent BMI":
-//       type Observation.
-//       valuetype boolean.
-//       pattern "some pattern".
-//       provenance "some provenance".
+//       type Observation
+//       valuetype boolean
+//       pattern "some pattern"
+//       provenance "some provenance"
 //       inferred:
-//           - ("Most Recent Height" and "Most Recent Weight").
-//           - ("BMI as a Condition" or "BMI as a Observation").
+//           ("Most Recent Height" and "Most Recent Weight").
+//           ("BMI as a Condition" or "BMI as a Observation").
+//   done
 //
 conceptStatement
-    : CONCEPT stringLiteral COLON conceptBody
+    : CONCEPT stringLiteral COLON conceptBody DONE
     ;
 
-// Enforce exactly one of each line in this order:
-//
-//  1. type ...
-//  2. valuetype ...
-//  3. pattern ...
-//  4. provenance ...
-//  5. inferred: ...
-//
 conceptBody
-    : typeLine 
+    : typeLine
       valueTypeLine
-      patternLine
-      provenanceLine
-      inferredBlock
+      codingLine?
+      patternLine?
+      provenanceLine?
+      inferredBlock?
     ;
 
-// type Observation.
 typeLine
-    : TYPE CONCEPT_TYPE DOT
+    : TYPE CONCEPT_TYPE
     ;
 
-// valuetype boolean.
 valueTypeLine
-    : VALUETYPE CONCEPT_VALUE_TYPE DOT
+    : VALUETYPE CONCEPT_VALUE_TYPE
     ;
 
-// pattern "some pattern".
 patternLine
-    : PATTERN stringLiteral DOT
+    : PATTERN stringLiteral
     ;
 
-// provenance "some provenance".
 provenanceLine
-    : PROVENANCE stringLiteral DOT
+    : PROVENANCE stringLiteral
     ;
 
-// inferred: - (expr). - (expr).
-// The inferred block describes how this concept might be derived from other concepts, under the assumption that each referenced concept is true. 
-// The syntax uses logical keywords (and/or) to indicate how the referenced concepts collectively contribute to inferring the target. 
-// Though it resembles a Boolean expression, it should be understood more as guidance or a shorthand for indicating a logical combination of references, 
-// rather than a strict evaluatable expression.
+codedLine
+    : CODING (OF stringLiteral)
+    ;
+
+// inferred block like:
+//   inferred:
+//       ("Most Recent Height" and "Most Recent Weight").
+//       ("BMI as a Condition" or "BMI as a Observation").
+//
 inferredBlock
-    : INFERRED COLON inferredList
+    : INFERRED COLON inferredExpression+
     ;
 
-inferredList
-    : inferredItem+
-    ;
-
-inferredItem
-    : DASH LPAREN expr RPAREN DOT
+inferredExpression
+    : LPAREN expr RPAREN DOT
     ;
 
 // ----------------------------- EXPRESSIONS -------------------------------
 //
-// For the "inferred" block, we allow boolean expressions with "and"/"or"
-// referencing concept identifiers (quoted strings). Parentheses are allowed.
-// 
+// For the "inferred" block, we allow expressions with "and"/"or" referencing
+// concept identifiers (quoted strings). Parentheses are allowed.
+//
 expr
     : orExpr
     ;
@@ -218,14 +195,14 @@ atom
 // LEXER RULES
 // --------------------------------------------------------------------------
 
-// KEYWORDS (case sensitive, as stated)
+// KEYWORDS (case sensitive)
 DECISION     : 'decision';
 WHEN         : 'when';
 THEN         : 'then';
 ANY          : 'any';
+ALL          : 'all';
 DO           : 'do';
 USE          : 'use';
-ALL          : 'all';
 ACTIVITY     : 'activity';
 UNKNOWN      : 'unknown';
 SYSTEM       : 'system';
@@ -241,17 +218,16 @@ PROVENANCE   : 'provenance';
 INFERRED     : 'inferred';
 AND          : 'and';
 OR           : 'or';
+DONE         : 'done';
+CODING       : 'coding';
 
 // PUNCTUATION
 COLON        : ':';
-DASH         : '-';
 DOT          : '.';
 LPAREN       : '(';
 RPAREN       : ')';
 
 // ACTIVITY_TYPE possibilities
-// e.g. "activity "Vaccinate" perform Immunization."
-// Must exactly match one of these strings if used.
 ACTIVITY_TYPE
     : 'AdministerMedication'
     | 'CollectInformation'
@@ -273,7 +249,6 @@ ACTIVITY_TYPE
     ;
 
 // CONCEPT_TYPE possibilities
-// e.g. "concept "Most Recent BMI": type Observation."
 CONCEPT_TYPE
     : 'Communication'
     | 'CommunicationRequest'
@@ -292,7 +267,6 @@ CONCEPT_TYPE
     ;
 
 // CONCEPT_VALUE_TYPE possibilities
-// e.g. "concept ... valuetype boolean."
 CONCEPT_VALUE_TYPE
     : 'Quantity'
     | 'CodeableConcept'
@@ -308,13 +282,12 @@ CONCEPT_VALUE_TYPE
     | 'Attachment'
     ;
 
-// STRING cannot contain escape characters or internal quotes.
-// This rule forbids backslashes and double-quotes inside the string contents.
+// Quoted string with no internal quotes or backslashes
 STRING
-    : '"' ( ~["\r\n] )* '"'
+    : '"' ( ~["\\\r\n] )* '"'
     ;
 
-// Skip whitespace
+// Treat whitespace as skip
 WS
     : [ \t\r\n]+ -> skip
     ;
@@ -328,3 +301,7 @@ COMMENT
 COMMENT_BLOCK
     : '/*' .*? '*/' -> skip
     ;
+
+// For readability in code, capture these as parser tokens
+fragment CHAR : ~["\\\r\n];
+fragment ANY_CHAR : . ;
