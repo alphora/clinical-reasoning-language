@@ -74,6 +74,36 @@ describe('Integration', () => {
   });
 
   describe('Decision Structure', () => {
+    describe('Single Action Statements', () => {
+      it('should handle single action statements with dot terminator', () => {
+        const input = `decision "Test":
+    when "Condition" then do "Action".
+    when "Another Condition" then use "Another Decision".
+done`;
+        const lexer = new CPGLLexer(CharStreams.fromString(input));
+        const tokens = getAllTokens(lexer);
+
+        verifyTokenSequence(tokens, [
+          CPGLLexer.DECISION,
+          CPGLLexer.STRING,
+          CPGLLexer.COLON,
+          CPGLLexer.WHEN,
+          CPGLLexer.STRING,
+          CPGLLexer.THEN,
+          CPGLLexer.DO,
+          CPGLLexer.STRING,
+          CPGLLexer.DOT,
+          CPGLLexer.WHEN,
+          CPGLLexer.STRING,
+          CPGLLexer.THEN,
+          CPGLLexer.USE,
+          CPGLLexer.STRING,
+          CPGLLexer.DOT,
+          CPGLLexer.DONE,
+        ]);
+      });
+    });
+
     describe('Multiple When Clauses', () => {
       it('should handle decision with multiple when clauses at same level', () => {
         const input = `decision "Elderly Based":
@@ -372,6 +402,80 @@ done`;
         CPGLLexer.OR,
         CPGLLexer.STRING,
         CPGLLexer.OR,
+        CPGLLexer.STRING,
+        CPGLLexer.RPAREN,
+        CPGLLexer.DOT,
+        CPGLLexer.DONE,
+      ]);
+    });
+
+    it('should handle concept with inferred by expression using AND', () => {
+      const input = `concept "Complex BMI":
+    has type Observation.
+    has valuetype Quantity.
+    inferred by ("BMI Range" and "Height Record" and "Weight Record").
+done`;
+      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const tokens = getAllTokens(lexer);
+
+      verifyTokenSequence(tokens, [
+        CPGLLexer.CONCEPT,
+        CPGLLexer.STRING,
+        CPGLLexer.COLON,
+        CPGLLexer.HAS,
+        CPGLLexer.TYPE,
+        CPGLLexer.CONCEPT_TYPE,
+        CPGLLexer.DOT,
+        CPGLLexer.HAS,
+        CPGLLexer.VALUETYPE,
+        CPGLLexer.CONCEPT_VALUE_TYPE,
+        CPGLLexer.DOT,
+        CPGLLexer.INFERRED,
+        CPGLLexer.BY,
+        CPGLLexer.LPAREN,
+        CPGLLexer.STRING,
+        CPGLLexer.AND,
+        CPGLLexer.STRING,
+        CPGLLexer.AND,
+        CPGLLexer.STRING,
+        CPGLLexer.RPAREN,
+        CPGLLexer.DOT,
+        CPGLLexer.DONE,
+      ]);
+    });
+
+    it('should handle concept with inferred by expression using mixed AND/OR', () => {
+      const input = `concept "Complex BMI":
+    has type Observation.
+    has valuetype Quantity.
+    inferred by ("BMI Range" and ("Height Record" or "Estimated Height") and "Weight Record").
+done`;
+      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const tokens = getAllTokens(lexer);
+
+      verifyTokenSequence(tokens, [
+        CPGLLexer.CONCEPT,
+        CPGLLexer.STRING,
+        CPGLLexer.COLON,
+        CPGLLexer.HAS,
+        CPGLLexer.TYPE,
+        CPGLLexer.CONCEPT_TYPE,
+        CPGLLexer.DOT,
+        CPGLLexer.HAS,
+        CPGLLexer.VALUETYPE,
+        CPGLLexer.CONCEPT_VALUE_TYPE,
+        CPGLLexer.DOT,
+        CPGLLexer.INFERRED,
+        CPGLLexer.BY,
+        CPGLLexer.LPAREN,
+        CPGLLexer.STRING,
+        CPGLLexer.AND,
+        CPGLLexer.LPAREN,
+        CPGLLexer.STRING,
+        CPGLLexer.OR,
+        CPGLLexer.STRING,
+        CPGLLexer.RPAREN,
+        CPGLLexer.AND,
         CPGLLexer.STRING,
         CPGLLexer.RPAREN,
         CPGLLexer.DOT,
