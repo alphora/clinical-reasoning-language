@@ -494,7 +494,8 @@ describe('CPGL Lexer - Basic Tokens', () => {
     });
 
     it('should handle comments within statements', () => {
-      const input = 'decision "Test" // Comment after statement\nwhen "Condition" /* Block comment */ then';
+      const input =
+        'decision "Test" // Comment after statement\nwhen "Condition" /* Block comment */ then';
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
 
