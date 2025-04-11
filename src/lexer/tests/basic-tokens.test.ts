@@ -453,12 +453,58 @@ describe('CPGL Lexer - Basic Tokens', () => {
       verifyTokenSequence(tokens, [CPGLLexer.DECISION, CPGLLexer.STRING]);
     });
 
+    it('should skip empty single-line comments', () => {
+      const input = '//\ndecision "Test"';
+      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const tokens = getAllTokens(lexer);
+
+      verifyTokenSequence(tokens, [CPGLLexer.DECISION, CPGLLexer.STRING]);
+    });
+
+    it('should skip single-line comments with special characters', () => {
+      const input = '// This is a comment with special chars: /* */ " \' \n\ndecision "Test"';
+      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const tokens = getAllTokens(lexer);
+
+      verifyTokenSequence(tokens, [CPGLLexer.DECISION, CPGLLexer.STRING]);
+    });
+
     it('should skip block comments', () => {
       const input = '/* This is a\nblock comment */\ndecision "Test"';
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
 
       verifyTokenSequence(tokens, [CPGLLexer.DECISION, CPGLLexer.STRING]);
+    });
+
+    it('should skip empty block comments', () => {
+      const input = '/**/\ndecision "Test"';
+      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const tokens = getAllTokens(lexer);
+
+      verifyTokenSequence(tokens, [CPGLLexer.DECISION, CPGLLexer.STRING]);
+    });
+
+    it('should handle multiple comments in sequence', () => {
+      const input = '// First comment\n/* Second comment */\n// Third comment\ndecision "Test"';
+      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const tokens = getAllTokens(lexer);
+
+      verifyTokenSequence(tokens, [CPGLLexer.DECISION, CPGLLexer.STRING]);
+    });
+
+    it('should handle comments within statements', () => {
+      const input = 'decision "Test" // Comment after statement\nwhen "Condition" /* Block comment */ then';
+      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const tokens = getAllTokens(lexer);
+
+      verifyTokenSequence(tokens, [
+        CPGLLexer.DECISION,
+        CPGLLexer.STRING,
+        CPGLLexer.WHEN,
+        CPGLLexer.STRING,
+        CPGLLexer.THEN,
+      ]);
     });
   });
 });
