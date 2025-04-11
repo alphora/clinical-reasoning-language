@@ -68,6 +68,67 @@ decision "Test"
         CPGLLexer.STRING,
       ]);
     });
+
+    it('should ignore block comments in terminology statements', () => {
+      const input = `terminology /* name */ "BMI Valueset" /* type */ valueset /* value */ "bmi valueset" /* end */ .`;
+      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const tokens = getAllTokens(lexer);
+
+      verifyTokenSequence(tokens, [
+        CPGLLexer.TERMINOLOGY,
+        CPGLLexer.STRING,
+        CPGLLexer.VALUESET,
+        CPGLLexer.STRING,
+        CPGLLexer.DOT,
+      ]);
+    });
+
+    it('should ignore block comments in activity statements', () => {
+      const input = `activity /* name */ "Vaccinate" /* action */ perform /* type */ ImmunizationActivity /* end */ .`;
+      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const tokens = getAllTokens(lexer);
+
+      verifyTokenSequence(tokens, [
+        CPGLLexer.ACTIVITY,
+        CPGLLexer.STRING,
+        CPGLLexer.PERFORM,
+        CPGLLexer.ACTIVITY_TYPE,
+        CPGLLexer.DOT,
+      ]);
+    });
+
+    it('should ignore block comments in concept statements', () => {
+      const input = `concept /* name */ "BMI" /* start */ :
+    /* type */ has type /* value */ Observation /* end */ .
+    /* valuetype */ has valuetype /* value */ Quantity /* end */ .
+    /* inference */ inferred by /* expr */ ("BMI Range" /* or */ or /* value */ "BMI Value") /* end */ .
+done`;
+      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const tokens = getAllTokens(lexer);
+
+      verifyTokenSequence(tokens, [
+        CPGLLexer.CONCEPT,
+        CPGLLexer.STRING,
+        CPGLLexer.COLON,
+        CPGLLexer.HAS,
+        CPGLLexer.TYPE,
+        CPGLLexer.CONCEPT_TYPE,
+        CPGLLexer.DOT,
+        CPGLLexer.HAS,
+        CPGLLexer.VALUETYPE,
+        CPGLLexer.CONCEPT_VALUE_TYPE,
+        CPGLLexer.DOT,
+        CPGLLexer.INFERRED,
+        CPGLLexer.BY,
+        CPGLLexer.LPAREN,
+        CPGLLexer.STRING,
+        CPGLLexer.OR,
+        CPGLLexer.STRING,
+        CPGLLexer.RPAREN,
+        CPGLLexer.DOT,
+        CPGLLexer.DONE,
+      ]);
+    });
   });
 
   describe('Comments in Expressions', () => {
@@ -90,6 +151,24 @@ decision "Test"
         CPGLLexer.STRING,
         CPGLLexer.AND,
         CPGLLexer.STRING,
+      ]);
+    });
+
+    it('should handle comments in complex expressions', () => {
+      const input = `when /* start */ ("Condition 1" /* and */ and /* next */ "Condition 2" /* or */ or /* last */ "Condition 3") /* end */ then`;
+      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const tokens = getAllTokens(lexer);
+
+      verifyTokenSequence(tokens, [
+        CPGLLexer.WHEN,
+        CPGLLexer.LPAREN,
+        CPGLLexer.STRING,
+        CPGLLexer.AND,
+        CPGLLexer.STRING,
+        CPGLLexer.OR,
+        CPGLLexer.STRING,
+        CPGLLexer.RPAREN,
+        CPGLLexer.THEN,
       ]);
     });
   });
