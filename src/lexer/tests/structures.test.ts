@@ -1,4 +1,4 @@
-import { CharStreams, Token } from 'antlr4ts';
+import { CharStreams } from 'antlr4ts';
 
 import { CPGLLexer } from '../../grammar/generated/CPGLLexer';
 
@@ -21,7 +21,6 @@ describe('Structures', () => {
         CPGLLexer.THEN,
         CPGLLexer.DO,
         CPGLLexer.STRING,
-        Token.EOF,
       ]);
     });
 
@@ -66,7 +65,6 @@ describe('Structures', () => {
         CPGLLexer.THEN,
         CPGLLexer.USE,
         CPGLLexer.STRING,
-        Token.EOF,
       ]);
     });
 
@@ -81,7 +79,6 @@ describe('Structures', () => {
         CPGLLexer.PERFORM,
         CPGLLexer.ACTIVITY_TYPE,
         CPGLLexer.DOT,
-        Token.EOF,
       ]);
     });
 
@@ -98,7 +95,6 @@ describe('Structures', () => {
         CPGLLexer.OF,
         CPGLLexer.STRING,
         CPGLLexer.DOT,
-        Token.EOF,
       ]);
     });
   });
