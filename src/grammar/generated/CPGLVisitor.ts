@@ -3,31 +3,39 @@
 
 import { ParseTreeVisitor } from "antlr4ts/tree/ParseTreeVisitor";
 
-import { FileContext } from "./CPGLParser";
+import { CpglContext } from "./CPGLParser";
 import { StatementContext } from "./CPGLParser";
-import { DecisionContext } from "./CPGLParser";
-import { DecisionBlockContext } from "./CPGLParser";
-import { WhenClauseContext } from "./CPGLParser";
+import { DecisionStatementContext } from "./CPGLParser";
+import { DecisionBodyContext } from "./CPGLParser";
 import { WhenBlockContext } from "./CPGLParser";
-import { NestedWhenBlockContext } from "./CPGLParser";
-import { TerminalBlockContext } from "./CPGLParser";
-import { TerminalActionContext } from "./CPGLParser";
-import { DoClauseContext } from "./CPGLParser";
-import { UseClauseContext } from "./CPGLParser";
-import { OptionalQualifierContext } from "./CPGLParser";
-import { ActionContext } from "./CPGLParser";
-import { ActionBlockContext } from "./CPGLParser";
-import { ActionClauseContext } from "./CPGLParser";
-import { CasefeatureContext } from "./CPGLParser";
-import { CasefeatureBlockContext } from "./CPGLParser";
-import { CasefeatureCodeClauseContext } from "./CPGLParser";
-import { CasefeatureFhirTypeClauseContext } from "./CPGLParser";
-import { CasefeatureProfileUrlClauseContext } from "./CPGLParser";
-import { CasefeatureValueTypeClauseContext } from "./CPGLParser";
-import { CompositeExpressionContext } from "./CPGLParser";
-import { BooleanExprContext } from "./CPGLParser";
-import { BooleanTermContext } from "./CPGLParser";
-import { BooleanFactorContext } from "./CPGLParser";
+import { AnyOrAllClauseContext } from "./CPGLParser";
+import { BlockBodyContext } from "./CPGLParser";
+import { SingleActionStatementContext } from "./CPGLParser";
+import { BlockStatementContext } from "./CPGLParser";
+import { ActionStatementContext } from "./CPGLParser";
+import { DoStatementContext } from "./CPGLParser";
+import { UseStatementContext } from "./CPGLParser";
+import { TerminologyStatementContext } from "./CPGLParser";
+import { TerminologyValuesetContext } from "./CPGLParser";
+import { TerminologyUnknownContext } from "./CPGLParser";
+import { TerminologySystemCodeContext } from "./CPGLParser";
+import { ActivityStatementContext } from "./CPGLParser";
+import { ConceptStatementContext } from "./CPGLParser";
+import { ConceptBodyContext } from "./CPGLParser";
+import { HasTypeLineContext } from "./CPGLParser";
+import { HasValueTypeLineContext } from "./CPGLParser";
+import { ProvenanceLineContext } from "./CPGLParser";
+import { CodedByLineContext } from "./CPGLParser";
+import { InferredByLineContext } from "./CPGLParser";
+import { InferredBodyContext } from "./CPGLParser";
+import { InferredByPatternContext } from "./CPGLParser";
+import { InferredByExprContext } from "./CPGLParser";
+import { ExprContext } from "./CPGLParser";
+import { OrExprContext } from "./CPGLParser";
+import { AndExprContext } from "./CPGLParser";
+import { AtomContext } from "./CPGLParser";
+import { StringLiteralContext } from "./CPGLParser";
+import { IdentifierContext } from "./CPGLParser";
 
 
 /**
@@ -39,11 +47,11 @@ import { BooleanFactorContext } from "./CPGLParser";
  */
 export interface CPGLVisitor<Result> extends ParseTreeVisitor<Result> {
 	/**
-	 * Visit a parse tree produced by `CPGLParser.file`.
+	 * Visit a parse tree produced by `CPGLParser.cpgl`.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
-	visitFile?: (ctx: FileContext) => Result;
+	visitCpgl?: (ctx: CpglContext) => Result;
 
 	/**
 	 * Visit a parse tree produced by `CPGLParser.statement`.
@@ -53,25 +61,18 @@ export interface CPGLVisitor<Result> extends ParseTreeVisitor<Result> {
 	visitStatement?: (ctx: StatementContext) => Result;
 
 	/**
-	 * Visit a parse tree produced by `CPGLParser.decision`.
+	 * Visit a parse tree produced by `CPGLParser.decisionStatement`.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
-	visitDecision?: (ctx: DecisionContext) => Result;
+	visitDecisionStatement?: (ctx: DecisionStatementContext) => Result;
 
 	/**
-	 * Visit a parse tree produced by `CPGLParser.decisionBlock`.
+	 * Visit a parse tree produced by `CPGLParser.decisionBody`.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
-	visitDecisionBlock?: (ctx: DecisionBlockContext) => Result;
-
-	/**
-	 * Visit a parse tree produced by `CPGLParser.whenClause`.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	visitWhenClause?: (ctx: WhenClauseContext) => Result;
+	visitDecisionBody?: (ctx: DecisionBodyContext) => Result;
 
 	/**
 	 * Visit a parse tree produced by `CPGLParser.whenBlock`.
@@ -81,136 +82,199 @@ export interface CPGLVisitor<Result> extends ParseTreeVisitor<Result> {
 	visitWhenBlock?: (ctx: WhenBlockContext) => Result;
 
 	/**
-	 * Visit a parse tree produced by `CPGLParser.nestedWhenBlock`.
+	 * Visit a parse tree produced by `CPGLParser.anyOrAllClause`.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
-	visitNestedWhenBlock?: (ctx: NestedWhenBlockContext) => Result;
+	visitAnyOrAllClause?: (ctx: AnyOrAllClauseContext) => Result;
 
 	/**
-	 * Visit a parse tree produced by `CPGLParser.terminalBlock`.
+	 * Visit a parse tree produced by `CPGLParser.blockBody`.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
-	visitTerminalBlock?: (ctx: TerminalBlockContext) => Result;
+	visitBlockBody?: (ctx: BlockBodyContext) => Result;
 
 	/**
-	 * Visit a parse tree produced by `CPGLParser.terminalAction`.
+	 * Visit a parse tree produced by `CPGLParser.singleActionStatement`.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
-	visitTerminalAction?: (ctx: TerminalActionContext) => Result;
+	visitSingleActionStatement?: (ctx: SingleActionStatementContext) => Result;
 
 	/**
-	 * Visit a parse tree produced by `CPGLParser.doClause`.
+	 * Visit a parse tree produced by `CPGLParser.blockStatement`.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
-	visitDoClause?: (ctx: DoClauseContext) => Result;
+	visitBlockStatement?: (ctx: BlockStatementContext) => Result;
 
 	/**
-	 * Visit a parse tree produced by `CPGLParser.useClause`.
+	 * Visit a parse tree produced by `CPGLParser.actionStatement`.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
-	visitUseClause?: (ctx: UseClauseContext) => Result;
+	visitActionStatement?: (ctx: ActionStatementContext) => Result;
 
 	/**
-	 * Visit a parse tree produced by `CPGLParser.optionalQualifier`.
+	 * Visit a parse tree produced by `CPGLParser.doStatement`.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
-	visitOptionalQualifier?: (ctx: OptionalQualifierContext) => Result;
+	visitDoStatement?: (ctx: DoStatementContext) => Result;
 
 	/**
-	 * Visit a parse tree produced by `CPGLParser.action`.
+	 * Visit a parse tree produced by `CPGLParser.useStatement`.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
-	visitAction?: (ctx: ActionContext) => Result;
+	visitUseStatement?: (ctx: UseStatementContext) => Result;
 
 	/**
-	 * Visit a parse tree produced by `CPGLParser.actionBlock`.
+	 * Visit a parse tree produced by `CPGLParser.terminologyStatement`.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
-	visitActionBlock?: (ctx: ActionBlockContext) => Result;
+	visitTerminologyStatement?: (ctx: TerminologyStatementContext) => Result;
 
 	/**
-	 * Visit a parse tree produced by `CPGLParser.actionClause`.
+	 * Visit a parse tree produced by `CPGLParser.terminologyValueset`.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
-	visitActionClause?: (ctx: ActionClauseContext) => Result;
+	visitTerminologyValueset?: (ctx: TerminologyValuesetContext) => Result;
 
 	/**
-	 * Visit a parse tree produced by `CPGLParser.casefeature`.
+	 * Visit a parse tree produced by `CPGLParser.terminologyUnknown`.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
-	visitCasefeature?: (ctx: CasefeatureContext) => Result;
+	visitTerminologyUnknown?: (ctx: TerminologyUnknownContext) => Result;
 
 	/**
-	 * Visit a parse tree produced by `CPGLParser.casefeatureBlock`.
+	 * Visit a parse tree produced by `CPGLParser.terminologySystemCode`.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
-	visitCasefeatureBlock?: (ctx: CasefeatureBlockContext) => Result;
+	visitTerminologySystemCode?: (ctx: TerminologySystemCodeContext) => Result;
 
 	/**
-	 * Visit a parse tree produced by `CPGLParser.casefeatureCodeClause`.
+	 * Visit a parse tree produced by `CPGLParser.activityStatement`.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
-	visitCasefeatureCodeClause?: (ctx: CasefeatureCodeClauseContext) => Result;
+	visitActivityStatement?: (ctx: ActivityStatementContext) => Result;
 
 	/**
-	 * Visit a parse tree produced by `CPGLParser.casefeatureFhirTypeClause`.
+	 * Visit a parse tree produced by `CPGLParser.conceptStatement`.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
-	visitCasefeatureFhirTypeClause?: (ctx: CasefeatureFhirTypeClauseContext) => Result;
+	visitConceptStatement?: (ctx: ConceptStatementContext) => Result;
 
 	/**
-	 * Visit a parse tree produced by `CPGLParser.casefeatureProfileUrlClause`.
+	 * Visit a parse tree produced by `CPGLParser.conceptBody`.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
-	visitCasefeatureProfileUrlClause?: (ctx: CasefeatureProfileUrlClauseContext) => Result;
+	visitConceptBody?: (ctx: ConceptBodyContext) => Result;
 
 	/**
-	 * Visit a parse tree produced by `CPGLParser.casefeatureValueTypeClause`.
+	 * Visit a parse tree produced by `CPGLParser.hasTypeLine`.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
-	visitCasefeatureValueTypeClause?: (ctx: CasefeatureValueTypeClauseContext) => Result;
+	visitHasTypeLine?: (ctx: HasTypeLineContext) => Result;
 
 	/**
-	 * Visit a parse tree produced by `CPGLParser.compositeExpression`.
+	 * Visit a parse tree produced by `CPGLParser.hasValueTypeLine`.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
-	visitCompositeExpression?: (ctx: CompositeExpressionContext) => Result;
+	visitHasValueTypeLine?: (ctx: HasValueTypeLineContext) => Result;
 
 	/**
-	 * Visit a parse tree produced by `CPGLParser.booleanExpr`.
+	 * Visit a parse tree produced by `CPGLParser.provenanceLine`.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
-	visitBooleanExpr?: (ctx: BooleanExprContext) => Result;
+	visitProvenanceLine?: (ctx: ProvenanceLineContext) => Result;
 
 	/**
-	 * Visit a parse tree produced by `CPGLParser.booleanTerm`.
+	 * Visit a parse tree produced by `CPGLParser.codedByLine`.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
-	visitBooleanTerm?: (ctx: BooleanTermContext) => Result;
+	visitCodedByLine?: (ctx: CodedByLineContext) => Result;
 
 	/**
-	 * Visit a parse tree produced by `CPGLParser.booleanFactor`.
+	 * Visit a parse tree produced by `CPGLParser.inferredByLine`.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
-	visitBooleanFactor?: (ctx: BooleanFactorContext) => Result;
+	visitInferredByLine?: (ctx: InferredByLineContext) => Result;
+
+	/**
+	 * Visit a parse tree produced by `CPGLParser.inferredBody`.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	visitInferredBody?: (ctx: InferredBodyContext) => Result;
+
+	/**
+	 * Visit a parse tree produced by `CPGLParser.inferredByPattern`.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	visitInferredByPattern?: (ctx: InferredByPatternContext) => Result;
+
+	/**
+	 * Visit a parse tree produced by `CPGLParser.inferredByExpr`.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	visitInferredByExpr?: (ctx: InferredByExprContext) => Result;
+
+	/**
+	 * Visit a parse tree produced by `CPGLParser.expr`.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	visitExpr?: (ctx: ExprContext) => Result;
+
+	/**
+	 * Visit a parse tree produced by `CPGLParser.orExpr`.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	visitOrExpr?: (ctx: OrExprContext) => Result;
+
+	/**
+	 * Visit a parse tree produced by `CPGLParser.andExpr`.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	visitAndExpr?: (ctx: AndExprContext) => Result;
+
+	/**
+	 * Visit a parse tree produced by `CPGLParser.atom`.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	visitAtom?: (ctx: AtomContext) => Result;
+
+	/**
+	 * Visit a parse tree produced by `CPGLParser.stringLiteral`.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	visitStringLiteral?: (ctx: StringLiteralContext) => Result;
+
+	/**
+	 * Visit a parse tree produced by `CPGLParser.identifier`.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	visitIdentifier?: (ctx: IdentifierContext) => Result;
 }
 

@@ -3,31 +3,39 @@
 
 import { ParseTreeListener } from "antlr4ts/tree/ParseTreeListener";
 
-import { FileContext } from "./CPGLParser";
+import { CpglContext } from "./CPGLParser";
 import { StatementContext } from "./CPGLParser";
-import { DecisionContext } from "./CPGLParser";
-import { DecisionBlockContext } from "./CPGLParser";
-import { WhenClauseContext } from "./CPGLParser";
+import { DecisionStatementContext } from "./CPGLParser";
+import { DecisionBodyContext } from "./CPGLParser";
 import { WhenBlockContext } from "./CPGLParser";
-import { NestedWhenBlockContext } from "./CPGLParser";
-import { TerminalBlockContext } from "./CPGLParser";
-import { TerminalActionContext } from "./CPGLParser";
-import { DoClauseContext } from "./CPGLParser";
-import { UseClauseContext } from "./CPGLParser";
-import { OptionalQualifierContext } from "./CPGLParser";
-import { ActionContext } from "./CPGLParser";
-import { ActionBlockContext } from "./CPGLParser";
-import { ActionClauseContext } from "./CPGLParser";
-import { CasefeatureContext } from "./CPGLParser";
-import { CasefeatureBlockContext } from "./CPGLParser";
-import { CasefeatureCodeClauseContext } from "./CPGLParser";
-import { CasefeatureFhirTypeClauseContext } from "./CPGLParser";
-import { CasefeatureProfileUrlClauseContext } from "./CPGLParser";
-import { CasefeatureValueTypeClauseContext } from "./CPGLParser";
-import { CompositeExpressionContext } from "./CPGLParser";
-import { BooleanExprContext } from "./CPGLParser";
-import { BooleanTermContext } from "./CPGLParser";
-import { BooleanFactorContext } from "./CPGLParser";
+import { AnyOrAllClauseContext } from "./CPGLParser";
+import { BlockBodyContext } from "./CPGLParser";
+import { SingleActionStatementContext } from "./CPGLParser";
+import { BlockStatementContext } from "./CPGLParser";
+import { ActionStatementContext } from "./CPGLParser";
+import { DoStatementContext } from "./CPGLParser";
+import { UseStatementContext } from "./CPGLParser";
+import { TerminologyStatementContext } from "./CPGLParser";
+import { TerminologyValuesetContext } from "./CPGLParser";
+import { TerminologyUnknownContext } from "./CPGLParser";
+import { TerminologySystemCodeContext } from "./CPGLParser";
+import { ActivityStatementContext } from "./CPGLParser";
+import { ConceptStatementContext } from "./CPGLParser";
+import { ConceptBodyContext } from "./CPGLParser";
+import { HasTypeLineContext } from "./CPGLParser";
+import { HasValueTypeLineContext } from "./CPGLParser";
+import { ProvenanceLineContext } from "./CPGLParser";
+import { CodedByLineContext } from "./CPGLParser";
+import { InferredByLineContext } from "./CPGLParser";
+import { InferredBodyContext } from "./CPGLParser";
+import { InferredByPatternContext } from "./CPGLParser";
+import { InferredByExprContext } from "./CPGLParser";
+import { ExprContext } from "./CPGLParser";
+import { OrExprContext } from "./CPGLParser";
+import { AndExprContext } from "./CPGLParser";
+import { AtomContext } from "./CPGLParser";
+import { StringLiteralContext } from "./CPGLParser";
+import { IdentifierContext } from "./CPGLParser";
 
 
 /**
@@ -36,15 +44,15 @@ import { BooleanFactorContext } from "./CPGLParser";
  */
 export interface CPGLListener extends ParseTreeListener {
 	/**
-	 * Enter a parse tree produced by `CPGLParser.file`.
+	 * Enter a parse tree produced by `CPGLParser.cpgl`.
 	 * @param ctx the parse tree
 	 */
-	enterFile?: (ctx: FileContext) => void;
+	enterCpgl?: (ctx: CpglContext) => void;
 	/**
-	 * Exit a parse tree produced by `CPGLParser.file`.
+	 * Exit a parse tree produced by `CPGLParser.cpgl`.
 	 * @param ctx the parse tree
 	 */
-	exitFile?: (ctx: FileContext) => void;
+	exitCpgl?: (ctx: CpglContext) => void;
 
 	/**
 	 * Enter a parse tree produced by `CPGLParser.statement`.
@@ -58,37 +66,26 @@ export interface CPGLListener extends ParseTreeListener {
 	exitStatement?: (ctx: StatementContext) => void;
 
 	/**
-	 * Enter a parse tree produced by `CPGLParser.decision`.
+	 * Enter a parse tree produced by `CPGLParser.decisionStatement`.
 	 * @param ctx the parse tree
 	 */
-	enterDecision?: (ctx: DecisionContext) => void;
+	enterDecisionStatement?: (ctx: DecisionStatementContext) => void;
 	/**
-	 * Exit a parse tree produced by `CPGLParser.decision`.
+	 * Exit a parse tree produced by `CPGLParser.decisionStatement`.
 	 * @param ctx the parse tree
 	 */
-	exitDecision?: (ctx: DecisionContext) => void;
+	exitDecisionStatement?: (ctx: DecisionStatementContext) => void;
 
 	/**
-	 * Enter a parse tree produced by `CPGLParser.decisionBlock`.
+	 * Enter a parse tree produced by `CPGLParser.decisionBody`.
 	 * @param ctx the parse tree
 	 */
-	enterDecisionBlock?: (ctx: DecisionBlockContext) => void;
+	enterDecisionBody?: (ctx: DecisionBodyContext) => void;
 	/**
-	 * Exit a parse tree produced by `CPGLParser.decisionBlock`.
+	 * Exit a parse tree produced by `CPGLParser.decisionBody`.
 	 * @param ctx the parse tree
 	 */
-	exitDecisionBlock?: (ctx: DecisionBlockContext) => void;
-
-	/**
-	 * Enter a parse tree produced by `CPGLParser.whenClause`.
-	 * @param ctx the parse tree
-	 */
-	enterWhenClause?: (ctx: WhenClauseContext) => void;
-	/**
-	 * Exit a parse tree produced by `CPGLParser.whenClause`.
-	 * @param ctx the parse tree
-	 */
-	exitWhenClause?: (ctx: WhenClauseContext) => void;
+	exitDecisionBody?: (ctx: DecisionBodyContext) => void;
 
 	/**
 	 * Enter a parse tree produced by `CPGLParser.whenBlock`.
@@ -102,212 +99,311 @@ export interface CPGLListener extends ParseTreeListener {
 	exitWhenBlock?: (ctx: WhenBlockContext) => void;
 
 	/**
-	 * Enter a parse tree produced by `CPGLParser.nestedWhenBlock`.
+	 * Enter a parse tree produced by `CPGLParser.anyOrAllClause`.
 	 * @param ctx the parse tree
 	 */
-	enterNestedWhenBlock?: (ctx: NestedWhenBlockContext) => void;
+	enterAnyOrAllClause?: (ctx: AnyOrAllClauseContext) => void;
 	/**
-	 * Exit a parse tree produced by `CPGLParser.nestedWhenBlock`.
+	 * Exit a parse tree produced by `CPGLParser.anyOrAllClause`.
 	 * @param ctx the parse tree
 	 */
-	exitNestedWhenBlock?: (ctx: NestedWhenBlockContext) => void;
+	exitAnyOrAllClause?: (ctx: AnyOrAllClauseContext) => void;
 
 	/**
-	 * Enter a parse tree produced by `CPGLParser.terminalBlock`.
+	 * Enter a parse tree produced by `CPGLParser.blockBody`.
 	 * @param ctx the parse tree
 	 */
-	enterTerminalBlock?: (ctx: TerminalBlockContext) => void;
+	enterBlockBody?: (ctx: BlockBodyContext) => void;
 	/**
-	 * Exit a parse tree produced by `CPGLParser.terminalBlock`.
+	 * Exit a parse tree produced by `CPGLParser.blockBody`.
 	 * @param ctx the parse tree
 	 */
-	exitTerminalBlock?: (ctx: TerminalBlockContext) => void;
+	exitBlockBody?: (ctx: BlockBodyContext) => void;
 
 	/**
-	 * Enter a parse tree produced by `CPGLParser.terminalAction`.
+	 * Enter a parse tree produced by `CPGLParser.singleActionStatement`.
 	 * @param ctx the parse tree
 	 */
-	enterTerminalAction?: (ctx: TerminalActionContext) => void;
+	enterSingleActionStatement?: (ctx: SingleActionStatementContext) => void;
 	/**
-	 * Exit a parse tree produced by `CPGLParser.terminalAction`.
+	 * Exit a parse tree produced by `CPGLParser.singleActionStatement`.
 	 * @param ctx the parse tree
 	 */
-	exitTerminalAction?: (ctx: TerminalActionContext) => void;
+	exitSingleActionStatement?: (ctx: SingleActionStatementContext) => void;
 
 	/**
-	 * Enter a parse tree produced by `CPGLParser.doClause`.
+	 * Enter a parse tree produced by `CPGLParser.blockStatement`.
 	 * @param ctx the parse tree
 	 */
-	enterDoClause?: (ctx: DoClauseContext) => void;
+	enterBlockStatement?: (ctx: BlockStatementContext) => void;
 	/**
-	 * Exit a parse tree produced by `CPGLParser.doClause`.
+	 * Exit a parse tree produced by `CPGLParser.blockStatement`.
 	 * @param ctx the parse tree
 	 */
-	exitDoClause?: (ctx: DoClauseContext) => void;
+	exitBlockStatement?: (ctx: BlockStatementContext) => void;
 
 	/**
-	 * Enter a parse tree produced by `CPGLParser.useClause`.
+	 * Enter a parse tree produced by `CPGLParser.actionStatement`.
 	 * @param ctx the parse tree
 	 */
-	enterUseClause?: (ctx: UseClauseContext) => void;
+	enterActionStatement?: (ctx: ActionStatementContext) => void;
 	/**
-	 * Exit a parse tree produced by `CPGLParser.useClause`.
+	 * Exit a parse tree produced by `CPGLParser.actionStatement`.
 	 * @param ctx the parse tree
 	 */
-	exitUseClause?: (ctx: UseClauseContext) => void;
+	exitActionStatement?: (ctx: ActionStatementContext) => void;
 
 	/**
-	 * Enter a parse tree produced by `CPGLParser.optionalQualifier`.
+	 * Enter a parse tree produced by `CPGLParser.doStatement`.
 	 * @param ctx the parse tree
 	 */
-	enterOptionalQualifier?: (ctx: OptionalQualifierContext) => void;
+	enterDoStatement?: (ctx: DoStatementContext) => void;
 	/**
-	 * Exit a parse tree produced by `CPGLParser.optionalQualifier`.
+	 * Exit a parse tree produced by `CPGLParser.doStatement`.
 	 * @param ctx the parse tree
 	 */
-	exitOptionalQualifier?: (ctx: OptionalQualifierContext) => void;
+	exitDoStatement?: (ctx: DoStatementContext) => void;
 
 	/**
-	 * Enter a parse tree produced by `CPGLParser.action`.
+	 * Enter a parse tree produced by `CPGLParser.useStatement`.
 	 * @param ctx the parse tree
 	 */
-	enterAction?: (ctx: ActionContext) => void;
+	enterUseStatement?: (ctx: UseStatementContext) => void;
 	/**
-	 * Exit a parse tree produced by `CPGLParser.action`.
+	 * Exit a parse tree produced by `CPGLParser.useStatement`.
 	 * @param ctx the parse tree
 	 */
-	exitAction?: (ctx: ActionContext) => void;
+	exitUseStatement?: (ctx: UseStatementContext) => void;
 
 	/**
-	 * Enter a parse tree produced by `CPGLParser.actionBlock`.
+	 * Enter a parse tree produced by `CPGLParser.terminologyStatement`.
 	 * @param ctx the parse tree
 	 */
-	enterActionBlock?: (ctx: ActionBlockContext) => void;
+	enterTerminologyStatement?: (ctx: TerminologyStatementContext) => void;
 	/**
-	 * Exit a parse tree produced by `CPGLParser.actionBlock`.
+	 * Exit a parse tree produced by `CPGLParser.terminologyStatement`.
 	 * @param ctx the parse tree
 	 */
-	exitActionBlock?: (ctx: ActionBlockContext) => void;
+	exitTerminologyStatement?: (ctx: TerminologyStatementContext) => void;
 
 	/**
-	 * Enter a parse tree produced by `CPGLParser.actionClause`.
+	 * Enter a parse tree produced by `CPGLParser.terminologyValueset`.
 	 * @param ctx the parse tree
 	 */
-	enterActionClause?: (ctx: ActionClauseContext) => void;
+	enterTerminologyValueset?: (ctx: TerminologyValuesetContext) => void;
 	/**
-	 * Exit a parse tree produced by `CPGLParser.actionClause`.
+	 * Exit a parse tree produced by `CPGLParser.terminologyValueset`.
 	 * @param ctx the parse tree
 	 */
-	exitActionClause?: (ctx: ActionClauseContext) => void;
+	exitTerminologyValueset?: (ctx: TerminologyValuesetContext) => void;
 
 	/**
-	 * Enter a parse tree produced by `CPGLParser.casefeature`.
+	 * Enter a parse tree produced by `CPGLParser.terminologyUnknown`.
 	 * @param ctx the parse tree
 	 */
-	enterCasefeature?: (ctx: CasefeatureContext) => void;
+	enterTerminologyUnknown?: (ctx: TerminologyUnknownContext) => void;
 	/**
-	 * Exit a parse tree produced by `CPGLParser.casefeature`.
+	 * Exit a parse tree produced by `CPGLParser.terminologyUnknown`.
 	 * @param ctx the parse tree
 	 */
-	exitCasefeature?: (ctx: CasefeatureContext) => void;
+	exitTerminologyUnknown?: (ctx: TerminologyUnknownContext) => void;
 
 	/**
-	 * Enter a parse tree produced by `CPGLParser.casefeatureBlock`.
+	 * Enter a parse tree produced by `CPGLParser.terminologySystemCode`.
 	 * @param ctx the parse tree
 	 */
-	enterCasefeatureBlock?: (ctx: CasefeatureBlockContext) => void;
+	enterTerminologySystemCode?: (ctx: TerminologySystemCodeContext) => void;
 	/**
-	 * Exit a parse tree produced by `CPGLParser.casefeatureBlock`.
+	 * Exit a parse tree produced by `CPGLParser.terminologySystemCode`.
 	 * @param ctx the parse tree
 	 */
-	exitCasefeatureBlock?: (ctx: CasefeatureBlockContext) => void;
+	exitTerminologySystemCode?: (ctx: TerminologySystemCodeContext) => void;
 
 	/**
-	 * Enter a parse tree produced by `CPGLParser.casefeatureCodeClause`.
+	 * Enter a parse tree produced by `CPGLParser.activityStatement`.
 	 * @param ctx the parse tree
 	 */
-	enterCasefeatureCodeClause?: (ctx: CasefeatureCodeClauseContext) => void;
+	enterActivityStatement?: (ctx: ActivityStatementContext) => void;
 	/**
-	 * Exit a parse tree produced by `CPGLParser.casefeatureCodeClause`.
+	 * Exit a parse tree produced by `CPGLParser.activityStatement`.
 	 * @param ctx the parse tree
 	 */
-	exitCasefeatureCodeClause?: (ctx: CasefeatureCodeClauseContext) => void;
+	exitActivityStatement?: (ctx: ActivityStatementContext) => void;
 
 	/**
-	 * Enter a parse tree produced by `CPGLParser.casefeatureFhirTypeClause`.
+	 * Enter a parse tree produced by `CPGLParser.conceptStatement`.
 	 * @param ctx the parse tree
 	 */
-	enterCasefeatureFhirTypeClause?: (ctx: CasefeatureFhirTypeClauseContext) => void;
+	enterConceptStatement?: (ctx: ConceptStatementContext) => void;
 	/**
-	 * Exit a parse tree produced by `CPGLParser.casefeatureFhirTypeClause`.
+	 * Exit a parse tree produced by `CPGLParser.conceptStatement`.
 	 * @param ctx the parse tree
 	 */
-	exitCasefeatureFhirTypeClause?: (ctx: CasefeatureFhirTypeClauseContext) => void;
+	exitConceptStatement?: (ctx: ConceptStatementContext) => void;
 
 	/**
-	 * Enter a parse tree produced by `CPGLParser.casefeatureProfileUrlClause`.
+	 * Enter a parse tree produced by `CPGLParser.conceptBody`.
 	 * @param ctx the parse tree
 	 */
-	enterCasefeatureProfileUrlClause?: (ctx: CasefeatureProfileUrlClauseContext) => void;
+	enterConceptBody?: (ctx: ConceptBodyContext) => void;
 	/**
-	 * Exit a parse tree produced by `CPGLParser.casefeatureProfileUrlClause`.
+	 * Exit a parse tree produced by `CPGLParser.conceptBody`.
 	 * @param ctx the parse tree
 	 */
-	exitCasefeatureProfileUrlClause?: (ctx: CasefeatureProfileUrlClauseContext) => void;
+	exitConceptBody?: (ctx: ConceptBodyContext) => void;
 
 	/**
-	 * Enter a parse tree produced by `CPGLParser.casefeatureValueTypeClause`.
+	 * Enter a parse tree produced by `CPGLParser.hasTypeLine`.
 	 * @param ctx the parse tree
 	 */
-	enterCasefeatureValueTypeClause?: (ctx: CasefeatureValueTypeClauseContext) => void;
+	enterHasTypeLine?: (ctx: HasTypeLineContext) => void;
 	/**
-	 * Exit a parse tree produced by `CPGLParser.casefeatureValueTypeClause`.
+	 * Exit a parse tree produced by `CPGLParser.hasTypeLine`.
 	 * @param ctx the parse tree
 	 */
-	exitCasefeatureValueTypeClause?: (ctx: CasefeatureValueTypeClauseContext) => void;
+	exitHasTypeLine?: (ctx: HasTypeLineContext) => void;
 
 	/**
-	 * Enter a parse tree produced by `CPGLParser.compositeExpression`.
+	 * Enter a parse tree produced by `CPGLParser.hasValueTypeLine`.
 	 * @param ctx the parse tree
 	 */
-	enterCompositeExpression?: (ctx: CompositeExpressionContext) => void;
+	enterHasValueTypeLine?: (ctx: HasValueTypeLineContext) => void;
 	/**
-	 * Exit a parse tree produced by `CPGLParser.compositeExpression`.
+	 * Exit a parse tree produced by `CPGLParser.hasValueTypeLine`.
 	 * @param ctx the parse tree
 	 */
-	exitCompositeExpression?: (ctx: CompositeExpressionContext) => void;
+	exitHasValueTypeLine?: (ctx: HasValueTypeLineContext) => void;
 
 	/**
-	 * Enter a parse tree produced by `CPGLParser.booleanExpr`.
+	 * Enter a parse tree produced by `CPGLParser.provenanceLine`.
 	 * @param ctx the parse tree
 	 */
-	enterBooleanExpr?: (ctx: BooleanExprContext) => void;
+	enterProvenanceLine?: (ctx: ProvenanceLineContext) => void;
 	/**
-	 * Exit a parse tree produced by `CPGLParser.booleanExpr`.
+	 * Exit a parse tree produced by `CPGLParser.provenanceLine`.
 	 * @param ctx the parse tree
 	 */
-	exitBooleanExpr?: (ctx: BooleanExprContext) => void;
+	exitProvenanceLine?: (ctx: ProvenanceLineContext) => void;
 
 	/**
-	 * Enter a parse tree produced by `CPGLParser.booleanTerm`.
+	 * Enter a parse tree produced by `CPGLParser.codedByLine`.
 	 * @param ctx the parse tree
 	 */
-	enterBooleanTerm?: (ctx: BooleanTermContext) => void;
+	enterCodedByLine?: (ctx: CodedByLineContext) => void;
 	/**
-	 * Exit a parse tree produced by `CPGLParser.booleanTerm`.
+	 * Exit a parse tree produced by `CPGLParser.codedByLine`.
 	 * @param ctx the parse tree
 	 */
-	exitBooleanTerm?: (ctx: BooleanTermContext) => void;
+	exitCodedByLine?: (ctx: CodedByLineContext) => void;
 
 	/**
-	 * Enter a parse tree produced by `CPGLParser.booleanFactor`.
+	 * Enter a parse tree produced by `CPGLParser.inferredByLine`.
 	 * @param ctx the parse tree
 	 */
-	enterBooleanFactor?: (ctx: BooleanFactorContext) => void;
+	enterInferredByLine?: (ctx: InferredByLineContext) => void;
 	/**
-	 * Exit a parse tree produced by `CPGLParser.booleanFactor`.
+	 * Exit a parse tree produced by `CPGLParser.inferredByLine`.
 	 * @param ctx the parse tree
 	 */
-	exitBooleanFactor?: (ctx: BooleanFactorContext) => void;
+	exitInferredByLine?: (ctx: InferredByLineContext) => void;
+
+	/**
+	 * Enter a parse tree produced by `CPGLParser.inferredBody`.
+	 * @param ctx the parse tree
+	 */
+	enterInferredBody?: (ctx: InferredBodyContext) => void;
+	/**
+	 * Exit a parse tree produced by `CPGLParser.inferredBody`.
+	 * @param ctx the parse tree
+	 */
+	exitInferredBody?: (ctx: InferredBodyContext) => void;
+
+	/**
+	 * Enter a parse tree produced by `CPGLParser.inferredByPattern`.
+	 * @param ctx the parse tree
+	 */
+	enterInferredByPattern?: (ctx: InferredByPatternContext) => void;
+	/**
+	 * Exit a parse tree produced by `CPGLParser.inferredByPattern`.
+	 * @param ctx the parse tree
+	 */
+	exitInferredByPattern?: (ctx: InferredByPatternContext) => void;
+
+	/**
+	 * Enter a parse tree produced by `CPGLParser.inferredByExpr`.
+	 * @param ctx the parse tree
+	 */
+	enterInferredByExpr?: (ctx: InferredByExprContext) => void;
+	/**
+	 * Exit a parse tree produced by `CPGLParser.inferredByExpr`.
+	 * @param ctx the parse tree
+	 */
+	exitInferredByExpr?: (ctx: InferredByExprContext) => void;
+
+	/**
+	 * Enter a parse tree produced by `CPGLParser.expr`.
+	 * @param ctx the parse tree
+	 */
+	enterExpr?: (ctx: ExprContext) => void;
+	/**
+	 * Exit a parse tree produced by `CPGLParser.expr`.
+	 * @param ctx the parse tree
+	 */
+	exitExpr?: (ctx: ExprContext) => void;
+
+	/**
+	 * Enter a parse tree produced by `CPGLParser.orExpr`.
+	 * @param ctx the parse tree
+	 */
+	enterOrExpr?: (ctx: OrExprContext) => void;
+	/**
+	 * Exit a parse tree produced by `CPGLParser.orExpr`.
+	 * @param ctx the parse tree
+	 */
+	exitOrExpr?: (ctx: OrExprContext) => void;
+
+	/**
+	 * Enter a parse tree produced by `CPGLParser.andExpr`.
+	 * @param ctx the parse tree
+	 */
+	enterAndExpr?: (ctx: AndExprContext) => void;
+	/**
+	 * Exit a parse tree produced by `CPGLParser.andExpr`.
+	 * @param ctx the parse tree
+	 */
+	exitAndExpr?: (ctx: AndExprContext) => void;
+
+	/**
+	 * Enter a parse tree produced by `CPGLParser.atom`.
+	 * @param ctx the parse tree
+	 */
+	enterAtom?: (ctx: AtomContext) => void;
+	/**
+	 * Exit a parse tree produced by `CPGLParser.atom`.
+	 * @param ctx the parse tree
+	 */
+	exitAtom?: (ctx: AtomContext) => void;
+
+	/**
+	 * Enter a parse tree produced by `CPGLParser.stringLiteral`.
+	 * @param ctx the parse tree
+	 */
+	enterStringLiteral?: (ctx: StringLiteralContext) => void;
+	/**
+	 * Exit a parse tree produced by `CPGLParser.stringLiteral`.
+	 * @param ctx the parse tree
+	 */
+	exitStringLiteral?: (ctx: StringLiteralContext) => void;
+
+	/**
+	 * Enter a parse tree produced by `CPGLParser.identifier`.
+	 * @param ctx the parse tree
+	 */
+	enterIdentifier?: (ctx: IdentifierContext) => void;
+	/**
+	 * Exit a parse tree produced by `CPGLParser.identifier`.
+	 * @param ctx the parse tree
+	 */
+	exitIdentifier?: (ctx: IdentifierContext) => void;
 }
 
