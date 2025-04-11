@@ -201,4 +201,182 @@ describe('Integration', () => {
       });
     });
   });
+
+  describe('Terminology Structure', () => {
+    it('should handle terminology with valueset', () => {
+      const input = `terminology "BMI Valueset" valueset "bmi valueset".`;
+      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const tokens = getAllTokens(lexer);
+
+      verifyTokenSequence(tokens, [
+        CPGLLexer.TERMINOLOGY,
+        CPGLLexer.STRING,
+        CPGLLexer.VALUESET,
+        CPGLLexer.STRING,
+        CPGLLexer.DOT,
+      ]);
+    });
+
+    it('should handle terminology with unknown', () => {
+      const input = `terminology "some terminology" unknown.`;
+      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const tokens = getAllTokens(lexer);
+
+      verifyTokenSequence(tokens, [
+        CPGLLexer.TERMINOLOGY,
+        CPGLLexer.STRING,
+        CPGLLexer.UNKNOWN,
+        CPGLLexer.DOT,
+      ]);
+    });
+
+    it('should handle terminology with system and code', () => {
+      const input = `terminology "Colonoscopy" system "http://snomed.info/sct" code "73761001".`;
+      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const tokens = getAllTokens(lexer);
+
+      verifyTokenSequence(tokens, [
+        CPGLLexer.TERMINOLOGY,
+        CPGLLexer.STRING,
+        CPGLLexer.SYSTEM,
+        CPGLLexer.STRING,
+        CPGLLexer.CODE,
+        CPGLLexer.STRING,
+        CPGLLexer.DOT,
+      ]);
+    });
+  });
+
+  describe('Activity Structure', () => {
+    it('should handle basic activity statements', () => {
+      const input = `activity "Vaccinate" perform ImmunizationActivity.`;
+      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const tokens = getAllTokens(lexer);
+
+      verifyTokenSequence(tokens, [
+        CPGLLexer.ACTIVITY,
+        CPGLLexer.STRING,
+        CPGLLexer.PERFORM,
+        CPGLLexer.ACTIVITY_TYPE,
+        CPGLLexer.DOT,
+      ]);
+    });
+
+    it('should handle activity statements with of clause', () => {
+      const input = `activity "Indicate" perform ProposeDiagnosisActivity of "Colonoscopy".`;
+      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const tokens = getAllTokens(lexer);
+
+      verifyTokenSequence(tokens, [
+        CPGLLexer.ACTIVITY,
+        CPGLLexer.STRING,
+        CPGLLexer.PERFORM,
+        CPGLLexer.ACTIVITY_TYPE,
+        CPGLLexer.OF,
+        CPGLLexer.STRING,
+        CPGLLexer.DOT,
+      ]);
+    });
+  });
+
+  describe('Concept Structure', () => {
+    it('should handle basic concept with type and value type', () => {
+      const input = `concept "Most Recent BMI":
+    has type Observation.
+    has valuetype boolean.
+    coded by "BMI Valueset".
+done`;
+      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const tokens = getAllTokens(lexer);
+
+      verifyTokenSequence(tokens, [
+        CPGLLexer.CONCEPT,
+        CPGLLexer.STRING,
+        CPGLLexer.COLON,
+        CPGLLexer.HAS,
+        CPGLLexer.TYPE,
+        CPGLLexer.CONCEPT_TYPE,
+        CPGLLexer.DOT,
+        CPGLLexer.HAS,
+        CPGLLexer.VALUETYPE,
+        CPGLLexer.CONCEPT_VALUE_TYPE,
+        CPGLLexer.DOT,
+        CPGLLexer.CODED,
+        CPGLLexer.BY,
+        CPGLLexer.STRING,
+        CPGLLexer.DOT,
+        CPGLLexer.DONE,
+      ]);
+    });
+
+    it('should handle concept with provenance', () => {
+      const input = `concept "BMI":
+    has type Observation.
+    has valuetype Quantity.
+    has provenance "some provenance".
+    inferred by "Most Recent(this, lookbackMonths)" "BMI".
+done`;
+      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const tokens = getAllTokens(lexer);
+
+      verifyTokenSequence(tokens, [
+        CPGLLexer.CONCEPT,
+        CPGLLexer.STRING,
+        CPGLLexer.COLON,
+        CPGLLexer.HAS,
+        CPGLLexer.TYPE,
+        CPGLLexer.CONCEPT_TYPE,
+        CPGLLexer.DOT,
+        CPGLLexer.HAS,
+        CPGLLexer.VALUETYPE,
+        CPGLLexer.CONCEPT_VALUE_TYPE,
+        CPGLLexer.DOT,
+        CPGLLexer.HAS,
+        CPGLLexer.PROVENANCE,
+        CPGLLexer.STRING,
+        CPGLLexer.DOT,
+        CPGLLexer.INFERRED,
+        CPGLLexer.BY,
+        CPGLLexer.STRING,
+        CPGLLexer.STRING,
+        CPGLLexer.DOT,
+        CPGLLexer.DONE,
+      ]);
+    });
+
+    it('should handle concept with inferred by expression', () => {
+      const input = `concept "BMI":
+    has type Observation.
+    has valuetype Quantity.
+    inferred by ("BMI Range as a Condition" or "BMI as an Observation" or "Calculated BMI").
+done`;
+      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const tokens = getAllTokens(lexer);
+
+      verifyTokenSequence(tokens, [
+        CPGLLexer.CONCEPT,
+        CPGLLexer.STRING,
+        CPGLLexer.COLON,
+        CPGLLexer.HAS,
+        CPGLLexer.TYPE,
+        CPGLLexer.CONCEPT_TYPE,
+        CPGLLexer.DOT,
+        CPGLLexer.HAS,
+        CPGLLexer.VALUETYPE,
+        CPGLLexer.CONCEPT_VALUE_TYPE,
+        CPGLLexer.DOT,
+        CPGLLexer.INFERRED,
+        CPGLLexer.BY,
+        CPGLLexer.LPAREN,
+        CPGLLexer.STRING,
+        CPGLLexer.OR,
+        CPGLLexer.STRING,
+        CPGLLexer.OR,
+        CPGLLexer.STRING,
+        CPGLLexer.RPAREN,
+        CPGLLexer.DOT,
+        CPGLLexer.DONE,
+      ]);
+    });
+  });
 });
