@@ -1,6 +1,6 @@
 import { CharStreams } from 'antlr4ts';
 
-import { CPGLLexer } from '../../grammar/generated/CPGLLexer';
+import { CPGLLexer } from '../CPGLLexer';
 
 import { getAllTokens } from './index.test';
 

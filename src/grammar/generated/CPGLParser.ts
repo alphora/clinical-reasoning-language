@@ -65,6 +65,7 @@ export class CPGLParser extends Parser {
 	public static readonly WS = 35;
 	public static readonly COMMENT = 36;
 	public static readonly COMMENT_BLOCK = 37;
+	public static readonly ERROR_CHAR = 38;
 	public static readonly RULE_cpgl = 0;
 	public static readonly RULE_statement = 1;
 	public static readonly RULE_decisionStatement = 2;
@@ -122,7 +123,8 @@ export class CPGLParser extends Parser {
 		"UNKNOWN", "SYSTEM", "CODE", "PERFORM", "OF", "CONCEPT", "TYPE", "VALUETYPE", 
 		"TERMINOLOGY", "PROVENANCE", "INFERRED", "AND", "OR", "DONE", "HAS", "BY", 
 		"CODED", "VALUESET", "COLON", "DOT", "LPAREN", "RPAREN", "ACTIVITY_TYPE", 
-		"CONCEPT_TYPE", "CONCEPT_VALUE_TYPE", "STRING", "WS", "COMMENT", "COMMENT_BLOCK",
+		"CONCEPT_TYPE", "CONCEPT_VALUE_TYPE", "STRING", "WS", "COMMENT", "COMMENT_BLOCK", 
+		"ERROR_CHAR",
 	];
 	public static readonly VOCABULARY: Vocabulary = new VocabularyImpl(CPGLParser._LITERAL_NAMES, CPGLParser._SYMBOLIC_NAMES, []);
 
@@ -1396,7 +1398,7 @@ export class CPGLParser extends Parser {
 	}
 
 	public static readonly _serializedATN: string =
-		"\x03\uC91D\uCABA\u058D\uAFBA\u4F53\u0607\uEA8B\uC241\x03\'\xF8\x04\x02" +
+		"\x03\uC91D\uCABA\u058D\uAFBA\u4F53\u0607\uEA8B\uC241\x03(\xF8\x04\x02" +
 		"\t\x02\x04\x03\t\x03\x04\x04\t\x04\x04\x05\t\x05\x04\x06\t\x06\x04\x07" +
 		"\t\x07\x04\b\t\b\x04\t\t\t\x04\n\t\n\x04\v\t\v\x04\f\t\f\x04\r\t\r\x04" +
 		"\x0E\t\x0E\x04\x0F\t\x0F\x04\x10\t\x10\x04\x11\t\x11\x04\x12\t\x12\x04" +

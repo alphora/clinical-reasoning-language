@@ -29,22 +29,6 @@ grammar CPGL;
     }
 }
 
-@lexer::members {
-    /**
-     * Override to customize error reporting and throw exceptions for invalid tokens.
-     */
-    public override notifyErrorListeners(msg: string, offendingSymbol: Token | null, e: RecognitionException | null): void {
-        const formattedMessage = `Lexer error - ${msg}`;
-        super.notifyErrorListeners(formattedMessage, offendingSymbol, e);
-        throw new Error(formattedMessage);
-    }
-
-    public notifyListeners(e: antlr4ts.LexerNoViableAltException): void {
-        const formattedMessage = `Invalid token at line ${e.startIndex}: ${e.message}`;
-        throw new Error(formattedMessage);
-    }
-}
-
 // --------------------------------------------------------------------------
 // PARSER RULES
 // --------------------------------------------------------------------------
@@ -361,3 +345,6 @@ COMMENT_BLOCK
 // Fragments for readability.
 fragment CHAR : ~["\\\r\n] ;
 fragment ANY_CHAR : . ;
+
+// Error handling for unmatched characters
+ERROR_CHAR : . ;
