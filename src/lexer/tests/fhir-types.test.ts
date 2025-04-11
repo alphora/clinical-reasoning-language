@@ -2,7 +2,11 @@ import { CharStream, CharStreams } from 'antlr4ts';
 
 import { CPGLLexer } from '../../grammar/generated/CPGLLexer';
 
-import { getActionTokenSequence, getCaseFeatureTokenSequence } from './fhir-types.helpers';
+import {
+  getActionTokenSequence,
+  getCaseFeatureTokenSequence,
+  getValueTypeTokenSequence,
+} from './fhir-types.helpers';
 
 function verifyTokenSequence(
   input: CharStream,
@@ -25,10 +29,24 @@ function verifyTokenSequence(
 }
 
 describe('Action FHIR Types', () => {
-  test('should recognize action type in context', () => {
+  test('should recognize ServiceRequestActivity', () => {
     const input = 'perform ServiceRequestActivity.';
     const expectedTokens = getActionTokenSequence();
     const expectedText = ['perform', 'ServiceRequestActivity', '.'];
+    verifyTokenSequence(CharStreams.fromString(input), expectedTokens, expectedText);
+  });
+
+  test('should recognize ImmunizationActivity', () => {
+    const input = 'perform ImmunizationActivity.';
+    const expectedTokens = getActionTokenSequence();
+    const expectedText = ['perform', 'ImmunizationActivity', '.'];
+    verifyTokenSequence(CharStreams.fromString(input), expectedTokens, expectedText);
+  });
+
+  test('should recognize ProposeDiagnosisActivity', () => {
+    const input = 'perform ProposeDiagnosisActivity.';
+    const expectedTokens = getActionTokenSequence();
+    const expectedText = ['perform', 'ProposeDiagnosisActivity', '.'];
     verifyTokenSequence(CharStreams.fromString(input), expectedTokens, expectedText);
   });
 
@@ -43,10 +61,24 @@ describe('Action FHIR Types', () => {
 });
 
 describe('Case Feature FHIR Types', () => {
-  test('should recognize case feature type in context', () => {
+  test('should recognize Observation type', () => {
     const input = 'has type Observation.';
     const expectedTokens = getCaseFeatureTokenSequence();
     const expectedText = ['has', 'type', 'Observation', '.'];
+    verifyTokenSequence(CharStreams.fromString(input), expectedTokens, expectedText);
+  });
+
+  test('should recognize Condition type', () => {
+    const input = 'has type Condition.';
+    const expectedTokens = getCaseFeatureTokenSequence();
+    const expectedText = ['has', 'type', 'Condition', '.'];
+    verifyTokenSequence(CharStreams.fromString(input), expectedTokens, expectedText);
+  });
+
+  test('should recognize MedicationRequest type', () => {
+    const input = 'has type MedicationRequest.';
+    const expectedTokens = getCaseFeatureTokenSequence();
+    const expectedText = ['has', 'type', 'MedicationRequest', '.'];
     verifyTokenSequence(CharStreams.fromString(input), expectedTokens, expectedText);
   });
 
@@ -55,6 +87,38 @@ describe('Case Feature FHIR Types', () => {
     expect(() => {
       const expectedTokens = getCaseFeatureTokenSequence();
       const expectedText = ['has', 'type', 'InvalidType', '.'];
+      verifyTokenSequence(CharStreams.fromString(input), expectedTokens, expectedText);
+    }).toThrow();
+  });
+});
+
+describe('Concept Value Types', () => {
+  test('should recognize Quantity value type', () => {
+    const input = 'has valuetype Quantity.';
+    const expectedTokens = getValueTypeTokenSequence();
+    const expectedText = ['has', 'valuetype', 'Quantity', '.'];
+    verifyTokenSequence(CharStreams.fromString(input), expectedTokens, expectedText);
+  });
+
+  test('should recognize CodeableConcept value type', () => {
+    const input = 'has valuetype CodeableConcept.';
+    const expectedTokens = getValueTypeTokenSequence();
+    const expectedText = ['has', 'valuetype', 'CodeableConcept', '.'];
+    verifyTokenSequence(CharStreams.fromString(input), expectedTokens, expectedText);
+  });
+
+  test('should recognize boolean value type', () => {
+    const input = 'has valuetype boolean.';
+    const expectedTokens = getValueTypeTokenSequence();
+    const expectedText = ['has', 'valuetype', 'boolean', '.'];
+    verifyTokenSequence(CharStreams.fromString(input), expectedTokens, expectedText);
+  });
+
+  test('should throw error for invalid value type', () => {
+    const input = 'has valuetype InvalidValueType.';
+    expect(() => {
+      const expectedTokens = getValueTypeTokenSequence();
+      const expectedText = ['has', 'valuetype', 'InvalidValueType', '.'];
       verifyTokenSequence(CharStreams.fromString(input), expectedTokens, expectedText);
     }).toThrow();
   });

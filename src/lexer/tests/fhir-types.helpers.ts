@@ -23,3 +23,14 @@ export function getActionTokenSequence(): number[] {
 export function getCaseFeatureTokenSequence(): number[] {
   return [CPGLLexer.HAS, CPGLLexer.TYPE, CPGLLexer.CONCEPT_TYPE, CPGLLexer.DOT];
 }
+
+/**
+ * Helper function to generate token sequence for a value type declaration
+ * @returns Array of token types for a value type declaration
+ * This only includes the repeating tokens.
+ * example:
+ * has valuetype Quantity.
+ */
+export function getValueTypeTokenSequence(): number[] {
+  return [CPGLLexer.HAS, CPGLLexer.VALUETYPE, CPGLLexer.CONCEPT_VALUE_TYPE, CPGLLexer.DOT];
+}
