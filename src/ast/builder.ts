@@ -4,6 +4,7 @@ import { ParseTreeVisitor } from 'antlr4ts/tree/ParseTreeVisitor';
 import { RuleNode } from 'antlr4ts/tree/RuleNode';
 import { TerminalNode } from 'antlr4ts/tree/TerminalNode';
 
+import { CPGLLexer } from '../grammar/generated/CPGLLexer';
 import {
   CPGLParser,
   DecisionStatementContext,
@@ -200,7 +201,7 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode> {
     const actionType = ctx.getChild(0).text;
     const name = this.getStringValue(ctx.getChild(1));
 
-    if (actionType === 'do') {
+    if (actionType === CPGLLexer.DO.toString()) {
       return {
         type: DoActivityType.type,
         activityName: name,
@@ -263,21 +264,21 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode> {
 
   private visitTerminologyDefinition(ctx: ParserRuleContext): TerminologyDefinition {
     const firstChild = ctx.getChild(0);
-    if (firstChild.text === 'valueset') {
+    if (firstChild.text === CPGLLexer.VALUESET.toString()) {
       return {
-        type: 'TerminologyValueset',
+        type: TerminologyValuesetType.type,
         valuesetName: this.getStringValue(ctx.getChild(1)),
         location: this.getLocation(ctx),
       };
-    } else if (firstChild.text === 'unknown') {
+    } else if (firstChild.text === CPGLLexer.UNKNOWN.toString()) {
       return {
-        type: 'TerminologyUnknown',
+        type: TerminologyUnknownType.type,
         location: this.getLocation(ctx),
       };
     } else {
       // system code
       return {
-        type: 'TerminologySystemCode',
+        type: TerminologySystemCodeType.type,
         system: this.getStringValue(ctx.getChild(1)),
         code: this.getStringValue(ctx.getChild(3)),
         location: this.getLocation(ctx),
@@ -287,7 +288,7 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode> {
 
   private visitConceptDefinition(ctx: ParserRuleContext): CodedByDefinition | InferredByDefinition {
     const firstChild = ctx.getChild(0);
-    if (firstChild.text === 'coded') {
+    if (firstChild.text === CPGLLexer.CODED.toString()) {
       return this.visitCodedByDefinition(ctx);
     } else {
       return this.visitInferredByDefinition(ctx);
@@ -374,15 +375,15 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode> {
 
   private isStatement(node: ASTNode): node is Statement {
     return (
-      node.type === 'Decision' ||
-      node.type === 'Terminology' ||
-      node.type === 'Activity' ||
-      node.type === 'Concept'
+      node.type === DecisionType.type ||
+      node.type === TerminologyType.type ||
+      node.type === ActivityType.type ||
+      node.type === ConceptType.type
     );
   }
 
   private isBlockStatement(node: ASTNode): node is BlockStatement {
-    return node.type === 'WhenClause' || node.type === 'ActionStatement';
+    return node.type === WhenClauseType.type || node.type === ActionStatementType.type;
   }
 
   visitTerminologyValueset(ctx: ParserRuleContext): TerminologyValueset {
