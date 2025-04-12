@@ -206,7 +206,7 @@ atom
 
 // In CPGL, quoted strings are treated as identifiers.
 identifier
-    : STRING
+    : IDENTIFIER
     ;
 
 decisionIdentifier
