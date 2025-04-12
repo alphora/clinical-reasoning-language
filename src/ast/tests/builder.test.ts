@@ -1,7 +1,6 @@
 import { CharStreams, CommonTokenStream } from 'antlr4ts';
 import { ParseTree } from 'antlr4ts/tree/ParseTree';
 
-import { CPGLLexer } from '../../grammar/generated/CPGLLexer';
 import { CPGLParser } from '../../grammar/generated/CPGLParser';
 import { createLexer } from '../../lexer/createLexer';
 import { ASTBuilder } from '../builder';
@@ -115,8 +114,8 @@ describe('ASTBuilder', () => {
       const tempBlock = tempWhenBlock.body as BlockBody;
       const bpBlock = bpWhenBlock.body as BlockBody;
 
-      expect(tempBlock.qualifier).toBe(CPGLLexer.ANY.toString());
-      expect(bpBlock.qualifier).toBe(CPGLLexer.ALL.toString());
+      expect(tempBlock.qualifier).toBe('any');
+      expect(bpBlock.qualifier).toBe('all');
       expect(tempBlock.statements).toHaveLength(2);
       expect(bpBlock.statements).toHaveLength(2);
     });
