@@ -136,13 +136,7 @@ export function getAllTokens(lexer: CPGLLexer): Token[] {
     if (
       token.type !== CPGLLexer.WS &&
       token.type !== CPGLLexer.COMMENT &&
-      token.type !== CPGLLexer.COMMENT_BLOCK &&
-      token.type !== CPGLLexer.ACTIVITY_WS &&
-      token.type !== CPGLLexer.ACTIVITY_COMMENT_BLOCK &&
-      token.type !== CPGLLexer.CONCEPT_WS &&
-      token.type !== CPGLLexer.CONCEPT_COMMENT_BLOCK &&
-      token.type !== CPGLLexer.VALUE_TYPE_WS &&
-      token.type !== CPGLLexer.VALUE_TYPE_COMMENT_BLOCK
+      token.type !== CPGLLexer.COMMENT_BLOCK
     ) {
       tokens.push(token);
     }
