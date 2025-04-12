@@ -345,7 +345,11 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode> {
       }
 
       const firstChild = children[0];
-      if (firstChild instanceof ParserRuleContext && firstChild.childCount > 0 && firstChild.getChild(0).text === '(') {
+      if (
+        firstChild instanceof ParserRuleContext &&
+        firstChild.childCount > 0 &&
+        firstChild.getChild(0).text === '('
+      ) {
         // Expression case: inferred by (expr)
         definition = {
           type: 'InferredByDefinition',
@@ -402,12 +406,13 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode> {
   }
 
   visitExpression(ctx: ParserRuleContext): Expression {
-    const orExpr = ctx.getChild(0);
-    if (!(orExpr instanceof ParserRuleContext)) {
+    // Skip the parentheses and get the expression
+    const expr = ctx.getChild(1);
+    if (!(expr instanceof ParserRuleContext)) {
       throw new Error('Invalid expression');
     }
 
-    return this.visitOrExpr(orExpr);
+    return this.visitOrExpr(expr);
   }
 
   visitOrExpr(ctx: ParserRuleContext): Expression {
