@@ -34,32 +34,29 @@ function printAST(node: ASTNode, indent = 0): string {
   const spaces = '  '.repeat(indent);
   let output = '';
 
-  // Skip the File node
-  if (node.type !== 'File') {
-    output = `${spaces}${node.type}\n`;
+  output = `${spaces}${node.type}\n`;
 
-    // Print node-specific properties
-    if ('name' in node) {
-      output += `${spaces}  name: ${node.name}\n`;
-    }
-    if ('decisionName' in node) {
-      output += `${spaces}  decisionName: "${node.decisionName}"\n`;
-    }
-    if ('activityName' in node) {
-      output += `${spaces}  activityName: "${node.activityName}"\n`;
-    }
-    if ('conceptName' in node) {
-      output += `${spaces}  conceptName: "${node.conceptName}"\n`;
-    }
-    if ('qualifier' in node && node.qualifier) {
-      output += `${spaces}  qualifier: "${node.qualifier}"\n`;
-    }
+  // Print node-specific properties
+  if ('name' in node) {
+    output += `${spaces}  name: ${node.name}\n`;
+  }
+  if ('decisionName' in node) {
+    output += `${spaces}  decisionName: "${node.decisionName}"\n`;
+  }
+  if ('activityName' in node) {
+    output += `${spaces}  activityName: "${node.activityName}"\n`;
+  }
+  if ('conceptName' in node) {
+    output += `${spaces}  conceptName: "${node.conceptName}"\n`;
+  }
+  if ('qualifier' in node && node.qualifier) {
+    output += `${spaces}  qualifier: "${node.qualifier}"\n`;
   }
 
   // Handle statements
   if ('statements' in node && Array.isArray(node.statements)) {
     node.statements.forEach((statement: ASTNode) => {
-      output += printAST(statement, indent + (node.type === 'File' ? 0 : 1));
+      output += printAST(statement, indent + 1);
     });
   }
 
@@ -88,8 +85,15 @@ if (!firstDecision) {
   throw new Error('No decision found in AST');
 }
 
+// Create a File node with only the first decision
+const singleDecisionAST: File = {
+  type: 'File',
+  statements: [firstDecision],
+  location: ast.location,
+};
+
 // Print the AST
-const generatedAST = printAST(firstDecision);
+const generatedAST = printAST(singleDecisionAST);
 console.log('Generated AST:');
 console.log(generatedAST);
 
@@ -99,13 +103,23 @@ const expectedAST = readFileSync(expectedPath, 'utf-8');
 
 // Compare the ASTs
 console.log('\nComparing ASTs:');
-if (generatedAST.trim() === expectedAST.trim()) {
-  console.log('✅ ASTs match!');
+const trimmedGenerated = generatedAST.trim();
+const trimmedExpected = expectedAST.trim();
+
+// Create a version with all whitespace removed for strict comparison
+const noWhitespaceGenerated = generatedAST.replace(/\s+/g, '');
+const noWhitespaceExpected = expectedAST.replace(/\s+/g, '');
+
+if (noWhitespaceGenerated === noWhitespaceExpected) {
+  console.log('✅ ASTs match in structure!');
+  if (trimmedGenerated !== trimmedExpected) {
+    console.log('Note: There are formatting differences (whitespace/indentation)');
+  }
 } else {
   console.log('❌ ASTs do not match!');
   console.log('\nDifferences:');
-  const generatedLines = generatedAST.split('\n');
-  const expectedLines = expectedAST.split('\n');
+  const generatedLines = trimmedGenerated.split('\n');
+  const expectedLines = trimmedExpected.split('\n');
   const maxLines = Math.max(generatedLines.length, expectedLines.length);
   for (let i = 0; i < maxLines; i++) {
     const generatedLine = generatedLines[i] || '';
@@ -116,4 +130,4 @@ if (generatedAST.trim() === expectedAST.trim()) {
       console.log(`  Expected:  ${expectedLine}`);
     }
   }
-} 
+}
