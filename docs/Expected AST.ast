@@ -1,0 +1,49 @@
+Decision
+  name: IMMZ.D2.D5.Measles
+  DecisionBody
+    WhenBlock
+      conceptName: "Measles Routine Immunization Schedule Incomplete"
+      BlockBody
+        qualifier: "any"
+        WhenBlock
+          conceptName: "No Primary Series Doses Administered"
+          BlockBody
+            WhenBlock
+              conceptName: "Client Age Less Than 12 Months"
+              SingleAction
+                DoActivity
+                  activityName: "Indicate"
+            WhenBlock
+              conceptName: "Last Live Vaccine Administered has had in 4 Weeks"
+              SingleAction
+                UseDecision
+                  decisionName: "Elderly Based"
+        WhenBlock
+          conceptName: "Client Is Due For MCV12"
+          SingleAction
+            DoActivity
+              activityName: "Vaccinate"
+    WhenBlock
+      conceptName: "One Primary Series Dose Administered"
+      BlockBody
+        qualifier: "all"
+        WhenBlock
+          conceptName: "Client Age Less Than 15 Months"
+          SingleAction
+            DoActivity
+              activityName: "Indicate"
+        WhenBlock
+          conceptName: "Last Live Vaccine Administered has had in 4 Weeks"
+          SingleAction
+            UseDecision
+              decisionName: "Elderly Based"
+        WhenBlock
+          conceptName: "Client Is Due For MCV12"
+          SingleAction
+            DoActivity
+              activityName: "Vaccinate"
+    WhenBlock
+      conceptName: "Two Primary Series Doses Administered"
+      SingleAction
+        DoActivity
+          activityName: "Indicate"
