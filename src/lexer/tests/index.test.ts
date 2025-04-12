@@ -147,5 +147,6 @@ export function verifyTokenSequence(
   }
 }
 
-// Export common imports
+// Export common imports and types
 export { CPGLLexer };
+export { Token };

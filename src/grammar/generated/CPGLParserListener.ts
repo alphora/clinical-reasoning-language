@@ -1,4 +1,4 @@
-// Generated from src/grammar/CPGL.g4 by ANTLR 4.9.0-SNAPSHOT
+// Generated from src/grammar/CPGLParser.g4 by ANTLR 4.9.0-SNAPSHOT
 
 
 import { ParseTreeListener } from "antlr4ts/tree/ParseTreeListener";
@@ -42,7 +42,7 @@ import { StringLiteralContext } from "./CPGLParser";
  * This interface defines a complete listener for a parse tree produced by
  * `CPGLParser`.
  */
-export interface CPGLListener extends ParseTreeListener {
+export interface CPGLParserListener extends ParseTreeListener {
 	/**
 	 * Enter a parse tree produced by `CPGLParser.cpgl`.
 	 * @param ctx the parse tree

@@ -4,6 +4,4 @@
  * IMPORTANT: This module exports our custom lexer implementation.
  * The generated lexer should not be used directly for token generation.
  */
-export { CPGLLexer } from './CPGLLexer';
-export { CPGLToken } from './CPGLToken';
-export { TokenTypes, Vocabulary, RuleNames, ChannelNames, ModeNames } from './CPGLLexerConstants';
+export { CPGLLexer } from '../grammar/generated/CPGLLexer';

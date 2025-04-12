@@ -54,4 +54,28 @@ describe('Lexer Error Handling', () => {
       }).toThrow(expectedError);
     });
   });
+
+  it('should throw an exception for invalid activity types', () => {
+    const testCases = [
+      {
+        input: 'perform invalidActivity',
+        expectedError: /Line 1:\d+ - Invalid activity type: invalidActivity/,
+      },
+      {
+        input: 'perform someRandomActivity\nthen done',
+        expectedError: /Line 1:\d+ - Invalid activity type: someRandomActivity/,
+      },
+      {
+        input: 'decision "test"\nwhen true then perform unknownActivity\ndone',
+        expectedError: /Line 2:\d+ - Invalid activity type: unknownActivity/,
+      },
+    ];
+
+    testCases.forEach(({ input, expectedError }) => {
+      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      expect(() => {
+        getAllTokens(lexer);
+      }).toThrow(expectedError);
+    });
+  });
 });
