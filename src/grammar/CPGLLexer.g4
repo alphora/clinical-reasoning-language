@@ -36,14 +36,12 @@ DOT          : '.';
 LPAREN       : '(';
 RPAREN       : ')';
 
-// IDENTIFIER: quoted string with more restrictive character set
-IDENTIFIER
-    : '"' ( ~["\\\r\n] )* '"'
+QUOTED_STRING
+    : '"' ( ~["\r\n] )* '"'
     ;
 
-// STRING: quoted string with error handling for unterminated strings
 STRING
-    : '"' ( ~["\r\n] )* '"'
+    : '"' ( ~["\\\r\n] )* '"'
     ;
 
 // Block comment fragment

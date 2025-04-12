@@ -57,7 +57,7 @@ export class CPGLParser extends Parser {
 	public static readonly DOT = 29;
 	public static readonly LPAREN = 30;
 	public static readonly RPAREN = 31;
-	public static readonly IDENTIFIER = 32;
+	public static readonly QUOTED_STRING = 32;
 	public static readonly STRING = 33;
 	public static readonly WS = 34;
 	public static readonly COMMENT = 35;
@@ -144,7 +144,7 @@ export class CPGLParser extends Parser {
 		"INFERRED", "AND", "OR", "DONE", "HAS", "BY", "CODED", "VALUESET", "PERFORM", 
 		"ACTIVITY", "OF", "SYSTEM", "CODE", "UNKNOWN", "DO", "USE", "WHEN", "THEN", 
 		"ANY", "ALL", "DECISION", "ERROR", "COLON", "DOT", "LPAREN", "RPAREN", 
-		"IDENTIFIER", "STRING", "WS", "COMMENT", "COMMENT_BLOCK", "ACTIVITY_TYPE", 
+		"QUOTED_STRING", "STRING", "WS", "COMMENT", "COMMENT_BLOCK", "ACTIVITY_TYPE", 
 		"ACTIVITY_WS", "ACTIVITY_COMMENT_BLOCK", "ACTIVITY_ErrorChar", "CONCEPT_TYPE", 
 		"CONCEPT_WS", "CONCEPT_COMMENT_BLOCK", "CONCEPT_ErrorChar", "CONCEPT_VALUE_TYPE", 
 		"VALUE_TYPE_WS", "VALUE_TYPE_COMMENT_BLOCK", "VALUE_TYPE_ErrorChar",
@@ -1360,7 +1360,7 @@ export class CPGLParser extends Parser {
 			this.enterOuterAlt(_localctx, 1);
 			{
 			this.state = 261;
-			this.match(CPGLParser.IDENTIFIER);
+			this.match(CPGLParser.QUOTED_STRING);
 			}
 		}
 		catch (re) {
@@ -2683,7 +2683,7 @@ export class AtomContext extends ParserRuleContext {
 
 
 export class IdentifierContext extends ParserRuleContext {
-	public IDENTIFIER(): TerminalNode { return this.getToken(CPGLParser.IDENTIFIER, 0); }
+	public QUOTED_STRING(): TerminalNode { return this.getToken(CPGLParser.QUOTED_STRING, 0); }
 	constructor(parent: ParserRuleContext | undefined, invokingState: number) {
 		super(parent, invokingState);
 	}

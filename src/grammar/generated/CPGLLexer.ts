@@ -47,7 +47,7 @@ export class CPGLLexer extends Lexer {
 	public static readonly DOT = 29;
 	public static readonly LPAREN = 30;
 	public static readonly RPAREN = 31;
-	public static readonly IDENTIFIER = 32;
+	public static readonly QUOTED_STRING = 32;
 	public static readonly STRING = 33;
 	public static readonly WS = 34;
 	public static readonly COMMENT = 35;
@@ -82,7 +82,7 @@ export class CPGLLexer extends Lexer {
 		"CONCEPT", "TYPE", "VALUETYPE", "TERMINOLOGY", "PROVENANCE", "INFERRED", 
 		"AND", "OR", "DONE", "HAS", "BY", "CODED", "VALUESET", "PERFORM", "ACTIVITY", 
 		"OF", "SYSTEM", "CODE", "UNKNOWN", "DO", "USE", "WHEN", "THEN", "ANY", 
-		"ALL", "DECISION", "ERROR", "COLON", "DOT", "LPAREN", "RPAREN", "IDENTIFIER", 
+		"ALL", "DECISION", "ERROR", "COLON", "DOT", "LPAREN", "RPAREN", "QUOTED_STRING", 
 		"STRING", "BLOCK_COMMENT", "WS", "COMMENT", "COMMENT_BLOCK", "ACTIVITY_TYPE", 
 		"ACTIVITY_WS", "ACTIVITY_COMMENT_BLOCK", "ACTIVITY_ErrorChar", "CONCEPT_TYPE", 
 		"CONCEPT_WS", "CONCEPT_COMMENT_BLOCK", "CONCEPT_ErrorChar", "CONCEPT_VALUE_TYPE", 
@@ -101,7 +101,7 @@ export class CPGLLexer extends Lexer {
 		"INFERRED", "AND", "OR", "DONE", "HAS", "BY", "CODED", "VALUESET", "PERFORM", 
 		"ACTIVITY", "OF", "SYSTEM", "CODE", "UNKNOWN", "DO", "USE", "WHEN", "THEN", 
 		"ANY", "ALL", "DECISION", "ERROR", "COLON", "DOT", "LPAREN", "RPAREN", 
-		"IDENTIFIER", "STRING", "WS", "COMMENT", "COMMENT_BLOCK", "ACTIVITY_TYPE", 
+		"QUOTED_STRING", "STRING", "WS", "COMMENT", "COMMENT_BLOCK", "ACTIVITY_TYPE", 
 		"ACTIVITY_WS", "ACTIVITY_COMMENT_BLOCK", "ACTIVITY_ErrorChar", "CONCEPT_TYPE", 
 		"CONCEPT_WS", "CONCEPT_COMMENT_BLOCK", "CONCEPT_ErrorChar", "CONCEPT_VALUE_TYPE", 
 		"VALUE_TYPE_WS", "VALUE_TYPE_COMMENT_BLOCK", "VALUE_TYPE_ErrorChar",
@@ -320,7 +320,7 @@ export class CPGLLexer extends Lexer {
 		"\x170\x02\x182\x02\x194\x02\x1A6\x02\x1B8\x02\x1C:\x02\x1D<\x02\x1E>\x02" +
 		"\x1F@\x02 B\x02!D\x02\"F\x02#H\x02\x02J\x02$L\x02%N\x02&P\x02\'R\x02(" +
 		"T\x02)V\x02*X\x02+Z\x02,\\\x02-^\x02.`\x02/b\x020d\x021f\x022\x06\x02" +
-		"\x03\x04\x05\x07\x06\x02\f\f\x0F\x0F$$^^\x05\x02\f\f\x0F\x0F$$\x05\x02" +
+		"\x03\x04\x05\x07\x05\x02\f\f\x0F\x0F$$\x06\x02\f\f\x0F\x0F$$^^\x05\x02" +
 		"\v\f\x0F\x0F\"\"\x04\x02\f\f\x0F\x0F\x04\x02C\\c|\x02\u019E\x02\x06\x03" +
 		"\x02\x02\x02\x02\b\x03\x02\x02\x02\x02\n\x03\x02\x02\x02\x02\f\x03\x02" +
 		"\x02\x02\x02\x0E\x03\x02\x02\x02\x02\x10\x03\x02\x02\x02\x02\x12\x03\x02" +
