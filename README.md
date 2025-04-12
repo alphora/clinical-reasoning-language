@@ -194,5 +194,7 @@ If you modify the grammar in `src/grammar/CPGL.g4`, you'll need to regenerate th
 
 ```bash
 cd src/grammar
-antlr4ts -visitor -Xforce-atn -o src/grammar/generated src/grammar/CPGLLexer.g4 && antlr4ts -visitor -Xforce-atn -o src/grammar/generated src/grammar/CPGLParser.g4
+antlr4ts -Xforce-atn -o src/grammar/generated src/grammar/CPGLLexer.g4 && antlr4ts -Xforce-atn -o src/grammar/generated src/grammar/CPGLParser.g4
 ```
+
+Note: This project uses a custom AST implementation rather than ANTLR's visitor pattern. The generated files are used only for lexing and parsing, while semantic analysis and interpretation are handled by our custom AST implementation.

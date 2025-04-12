@@ -24,8 +24,6 @@ import { VocabularyImpl } from "antlr4ts/VocabularyImpl";
 import * as Utils from "antlr4ts/misc/Utils";
 
 import { CPGLParserListener } from "./CPGLParserListener";
-import { CPGLParserVisitor } from "./CPGLParserVisitor";
-
 
 export class CPGLParser extends Parser {
 	public static readonly CONCEPT = 1;
@@ -1531,14 +1529,6 @@ export class CpglContext extends ParserRuleContext {
 			listener.exitCpgl(this);
 		}
 	}
-	// @Override
-	public accept<Result>(visitor: CPGLParserVisitor<Result>): Result {
-		if (visitor.visitCpgl) {
-			return visitor.visitCpgl(this);
-		} else {
-			return visitor.visitChildren(this);
-		}
-	}
 }
 
 
@@ -1572,14 +1562,6 @@ export class StatementContext extends ParserRuleContext {
 			listener.exitStatement(this);
 		}
 	}
-	// @Override
-	public accept<Result>(visitor: CPGLParserVisitor<Result>): Result {
-		if (visitor.visitStatement) {
-			return visitor.visitStatement(this);
-		} else {
-			return visitor.visitChildren(this);
-		}
-	}
 }
 
 
@@ -1610,14 +1592,6 @@ export class DecisionStatementContext extends ParserRuleContext {
 			listener.exitDecisionStatement(this);
 		}
 	}
-	// @Override
-	public accept<Result>(visitor: CPGLParserVisitor<Result>): Result {
-		if (visitor.visitDecisionStatement) {
-			return visitor.visitDecisionStatement(this);
-		} else {
-			return visitor.visitChildren(this);
-		}
-	}
 }
 
 
@@ -1646,14 +1620,6 @@ export class DecisionBodyContext extends ParserRuleContext {
 	public exitRule(listener: CPGLParserListener): void {
 		if (listener.exitDecisionBody) {
 			listener.exitDecisionBody(this);
-		}
-	}
-	// @Override
-	public accept<Result>(visitor: CPGLParserVisitor<Result>): Result {
-		if (visitor.visitDecisionBody) {
-			return visitor.visitDecisionBody(this);
-		} else {
-			return visitor.visitChildren(this);
 		}
 	}
 }
@@ -1688,14 +1654,6 @@ export class WhenBlockContext extends ParserRuleContext {
 			listener.exitWhenBlock(this);
 		}
 	}
-	// @Override
-	public accept<Result>(visitor: CPGLParserVisitor<Result>): Result {
-		if (visitor.visitWhenBlock) {
-			return visitor.visitWhenBlock(this);
-		} else {
-			return visitor.visitChildren(this);
-		}
-	}
 }
 
 
@@ -1718,14 +1676,6 @@ export class AnyOrAllClauseContext extends ParserRuleContext {
 	public exitRule(listener: CPGLParserListener): void {
 		if (listener.exitAnyOrAllClause) {
 			listener.exitAnyOrAllClause(this);
-		}
-	}
-	// @Override
-	public accept<Result>(visitor: CPGLParserVisitor<Result>): Result {
-		if (visitor.visitAnyOrAllClause) {
-			return visitor.visitAnyOrAllClause(this);
-		} else {
-			return visitor.visitChildren(this);
 		}
 	}
 }
@@ -1763,14 +1713,6 @@ export class BlockBodyContext extends ParserRuleContext {
 			listener.exitBlockBody(this);
 		}
 	}
-	// @Override
-	public accept<Result>(visitor: CPGLParserVisitor<Result>): Result {
-		if (visitor.visitBlockBody) {
-			return visitor.visitBlockBody(this);
-		} else {
-			return visitor.visitChildren(this);
-		}
-	}
 }
 
 
@@ -1799,14 +1741,6 @@ export class SingleActionStatementContext extends ParserRuleContext {
 			listener.exitSingleActionStatement(this);
 		}
 	}
-	// @Override
-	public accept<Result>(visitor: CPGLParserVisitor<Result>): Result {
-		if (visitor.visitSingleActionStatement) {
-			return visitor.visitSingleActionStatement(this);
-		} else {
-			return visitor.visitChildren(this);
-		}
-	}
 }
 
 
@@ -1832,14 +1766,6 @@ export class BlockStatementContext extends ParserRuleContext {
 	public exitRule(listener: CPGLParserListener): void {
 		if (listener.exitBlockStatement) {
 			listener.exitBlockStatement(this);
-		}
-	}
-	// @Override
-	public accept<Result>(visitor: CPGLParserVisitor<Result>): Result {
-		if (visitor.visitBlockStatement) {
-			return visitor.visitBlockStatement(this);
-		} else {
-			return visitor.visitChildren(this);
 		}
 	}
 }
@@ -1870,14 +1796,6 @@ export class ActionStatementContext extends ParserRuleContext {
 			listener.exitActionStatement(this);
 		}
 	}
-	// @Override
-	public accept<Result>(visitor: CPGLParserVisitor<Result>): Result {
-		if (visitor.visitActionStatement) {
-			return visitor.visitActionStatement(this);
-		} else {
-			return visitor.visitChildren(this);
-		}
-	}
 }
 
 
@@ -1903,14 +1821,6 @@ export class DoStatementContext extends ParserRuleContext {
 			listener.exitDoStatement(this);
 		}
 	}
-	// @Override
-	public accept<Result>(visitor: CPGLParserVisitor<Result>): Result {
-		if (visitor.visitDoStatement) {
-			return visitor.visitDoStatement(this);
-		} else {
-			return visitor.visitChildren(this);
-		}
-	}
 }
 
 
@@ -1934,14 +1844,6 @@ export class UseStatementContext extends ParserRuleContext {
 	public exitRule(listener: CPGLParserListener): void {
 		if (listener.exitUseStatement) {
 			listener.exitUseStatement(this);
-		}
-	}
-	// @Override
-	public accept<Result>(visitor: CPGLParserVisitor<Result>): Result {
-		if (visitor.visitUseStatement) {
-			return visitor.visitUseStatement(this);
-		} else {
-			return visitor.visitChildren(this);
 		}
 	}
 }
@@ -1979,14 +1881,6 @@ export class TerminologyStatementContext extends ParserRuleContext {
 			listener.exitTerminologyStatement(this);
 		}
 	}
-	// @Override
-	public accept<Result>(visitor: CPGLParserVisitor<Result>): Result {
-		if (visitor.visitTerminologyStatement) {
-			return visitor.visitTerminologyStatement(this);
-		} else {
-			return visitor.visitChildren(this);
-		}
-	}
 }
 
 
@@ -2012,14 +1906,6 @@ export class TerminologyValuesetContext extends ParserRuleContext {
 			listener.exitTerminologyValueset(this);
 		}
 	}
-	// @Override
-	public accept<Result>(visitor: CPGLParserVisitor<Result>): Result {
-		if (visitor.visitTerminologyValueset) {
-			return visitor.visitTerminologyValueset(this);
-		} else {
-			return visitor.visitChildren(this);
-		}
-	}
 }
 
 
@@ -2040,14 +1926,6 @@ export class TerminologyUnknownContext extends ParserRuleContext {
 	public exitRule(listener: CPGLParserListener): void {
 		if (listener.exitTerminologyUnknown) {
 			listener.exitTerminologyUnknown(this);
-		}
-	}
-	// @Override
-	public accept<Result>(visitor: CPGLParserVisitor<Result>): Result {
-		if (visitor.visitTerminologyUnknown) {
-			return visitor.visitTerminologyUnknown(this);
-		} else {
-			return visitor.visitChildren(this);
 		}
 	}
 }
@@ -2080,14 +1958,6 @@ export class TerminologySystemCodeContext extends ParserRuleContext {
 	public exitRule(listener: CPGLParserListener): void {
 		if (listener.exitTerminologySystemCode) {
 			listener.exitTerminologySystemCode(this);
-		}
-	}
-	// @Override
-	public accept<Result>(visitor: CPGLParserVisitor<Result>): Result {
-		if (visitor.visitTerminologySystemCode) {
-			return visitor.visitTerminologySystemCode(this);
-		} else {
-			return visitor.visitChildren(this);
 		}
 	}
 }
@@ -2125,14 +1995,6 @@ export class ActivityStatementContext extends ParserRuleContext {
 			listener.exitActivityStatement(this);
 		}
 	}
-	// @Override
-	public accept<Result>(visitor: CPGLParserVisitor<Result>): Result {
-		if (visitor.visitActivityStatement) {
-			return visitor.visitActivityStatement(this);
-		} else {
-			return visitor.visitChildren(this);
-		}
-	}
 }
 
 
@@ -2161,14 +2023,6 @@ export class ConceptStatementContext extends ParserRuleContext {
 	public exitRule(listener: CPGLParserListener): void {
 		if (listener.exitConceptStatement) {
 			listener.exitConceptStatement(this);
-		}
-	}
-	// @Override
-	public accept<Result>(visitor: CPGLParserVisitor<Result>): Result {
-		if (visitor.visitConceptStatement) {
-			return visitor.visitConceptStatement(this);
-		} else {
-			return visitor.visitChildren(this);
 		}
 	}
 }
@@ -2207,14 +2061,6 @@ export class ConceptBodyContext extends ParserRuleContext {
 			listener.exitConceptBody(this);
 		}
 	}
-	// @Override
-	public accept<Result>(visitor: CPGLParserVisitor<Result>): Result {
-		if (visitor.visitConceptBody) {
-			return visitor.visitConceptBody(this);
-		} else {
-			return visitor.visitChildren(this);
-		}
-	}
 }
 
 
@@ -2240,14 +2086,6 @@ export class HasTypeLineContext extends ParserRuleContext {
 			listener.exitHasTypeLine(this);
 		}
 	}
-	// @Override
-	public accept<Result>(visitor: CPGLParserVisitor<Result>): Result {
-		if (visitor.visitHasTypeLine) {
-			return visitor.visitHasTypeLine(this);
-		} else {
-			return visitor.visitChildren(this);
-		}
-	}
 }
 
 
@@ -2271,14 +2109,6 @@ export class HasValueTypeLineContext extends ParserRuleContext {
 	public exitRule(listener: CPGLParserListener): void {
 		if (listener.exitHasValueTypeLine) {
 			listener.exitHasValueTypeLine(this);
-		}
-	}
-	// @Override
-	public accept<Result>(visitor: CPGLParserVisitor<Result>): Result {
-		if (visitor.visitHasValueTypeLine) {
-			return visitor.visitHasValueTypeLine(this);
-		} else {
-			return visitor.visitChildren(this);
 		}
 	}
 }
@@ -2308,14 +2138,6 @@ export class ProvenanceLineContext extends ParserRuleContext {
 			listener.exitProvenanceLine(this);
 		}
 	}
-	// @Override
-	public accept<Result>(visitor: CPGLParserVisitor<Result>): Result {
-		if (visitor.visitProvenanceLine) {
-			return visitor.visitProvenanceLine(this);
-		} else {
-			return visitor.visitChildren(this);
-		}
-	}
 }
 
 
@@ -2341,14 +2163,6 @@ export class CodedByLineContext extends ParserRuleContext {
 	public exitRule(listener: CPGLParserListener): void {
 		if (listener.exitCodedByLine) {
 			listener.exitCodedByLine(this);
-		}
-	}
-	// @Override
-	public accept<Result>(visitor: CPGLParserVisitor<Result>): Result {
-		if (visitor.visitCodedByLine) {
-			return visitor.visitCodedByLine(this);
-		} else {
-			return visitor.visitChildren(this);
 		}
 	}
 }
@@ -2378,14 +2192,6 @@ export class InferredByLineContext extends ParserRuleContext {
 			listener.exitInferredByLine(this);
 		}
 	}
-	// @Override
-	public accept<Result>(visitor: CPGLParserVisitor<Result>): Result {
-		if (visitor.visitInferredByLine) {
-			return visitor.visitInferredByLine(this);
-		} else {
-			return visitor.visitChildren(this);
-		}
-	}
 }
 
 
@@ -2411,14 +2217,6 @@ export class InferredBodyContext extends ParserRuleContext {
 	public exitRule(listener: CPGLParserListener): void {
 		if (listener.exitInferredBody) {
 			listener.exitInferredBody(this);
-		}
-	}
-	// @Override
-	public accept<Result>(visitor: CPGLParserVisitor<Result>): Result {
-		if (visitor.visitInferredBody) {
-			return visitor.visitInferredBody(this);
-		} else {
-			return visitor.visitChildren(this);
 		}
 	}
 }
@@ -2451,14 +2249,6 @@ export class InferredByPatternContext extends ParserRuleContext {
 			listener.exitInferredByPattern(this);
 		}
 	}
-	// @Override
-	public accept<Result>(visitor: CPGLParserVisitor<Result>): Result {
-		if (visitor.visitInferredByPattern) {
-			return visitor.visitInferredByPattern(this);
-		} else {
-			return visitor.visitChildren(this);
-		}
-	}
 }
 
 
@@ -2485,14 +2275,6 @@ export class InferredByExprContext extends ParserRuleContext {
 			listener.exitInferredByExpr(this);
 		}
 	}
-	// @Override
-	public accept<Result>(visitor: CPGLParserVisitor<Result>): Result {
-		if (visitor.visitInferredByExpr) {
-			return visitor.visitInferredByExpr(this);
-		} else {
-			return visitor.visitChildren(this);
-		}
-	}
 }
 
 
@@ -2515,14 +2297,6 @@ export class ExprContext extends ParserRuleContext {
 	public exitRule(listener: CPGLParserListener): void {
 		if (listener.exitExpr) {
 			listener.exitExpr(this);
-		}
-	}
-	// @Override
-	public accept<Result>(visitor: CPGLParserVisitor<Result>): Result {
-		if (visitor.visitExpr) {
-			return visitor.visitExpr(this);
-		} else {
-			return visitor.visitChildren(this);
 		}
 	}
 }
@@ -2564,14 +2338,6 @@ export class OrExprContext extends ParserRuleContext {
 			listener.exitOrExpr(this);
 		}
 	}
-	// @Override
-	public accept<Result>(visitor: CPGLParserVisitor<Result>): Result {
-		if (visitor.visitOrExpr) {
-			return visitor.visitOrExpr(this);
-		} else {
-			return visitor.visitChildren(this);
-		}
-	}
 }
 
 
@@ -2611,14 +2377,6 @@ export class AndExprContext extends ParserRuleContext {
 			listener.exitAndExpr(this);
 		}
 	}
-	// @Override
-	public accept<Result>(visitor: CPGLParserVisitor<Result>): Result {
-		if (visitor.visitAndExpr) {
-			return visitor.visitAndExpr(this);
-		} else {
-			return visitor.visitChildren(this);
-		}
-	}
 }
 
 
@@ -2648,14 +2406,6 @@ export class AtomContext extends ParserRuleContext {
 			listener.exitAtom(this);
 		}
 	}
-	// @Override
-	public accept<Result>(visitor: CPGLParserVisitor<Result>): Result {
-		if (visitor.visitAtom) {
-			return visitor.visitAtom(this);
-		} else {
-			return visitor.visitChildren(this);
-		}
-	}
 }
 
 
@@ -2678,14 +2428,6 @@ export class IdentifierContext extends ParserRuleContext {
 			listener.exitIdentifier(this);
 		}
 	}
-	// @Override
-	public accept<Result>(visitor: CPGLParserVisitor<Result>): Result {
-		if (visitor.visitIdentifier) {
-			return visitor.visitIdentifier(this);
-		} else {
-			return visitor.visitChildren(this);
-		}
-	}
 }
 
 
@@ -2706,14 +2448,6 @@ export class StringLiteralContext extends ParserRuleContext {
 	public exitRule(listener: CPGLParserListener): void {
 		if (listener.exitStringLiteral) {
 			listener.exitStringLiteral(this);
-		}
-	}
-	// @Override
-	public accept<Result>(visitor: CPGLParserVisitor<Result>): Result {
-		if (visitor.visitStringLiteral) {
-			return visitor.visitStringLiteral(this);
-		} else {
-			return visitor.visitChildren(this);
 		}
 	}
 }
