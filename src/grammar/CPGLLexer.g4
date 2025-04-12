@@ -37,9 +37,7 @@ RPAREN       : ')';
 
 // STRING: quoted string with error handling for unterminated strings
 STRING
-    : '"' ( ~["\\\r\n] )* ('"' | { 
-        throw new Error(`Line ${this._tokenStartLine}:${this._tokenStartCharPositionInLine} - Unterminated string`);
-    })
+    : '"' ( ~["\\\r\n] )* '"'
     ;
 
 // IDENTIFIER: any sequence of letters that isn't a keyword or special type
@@ -71,23 +69,30 @@ mode ACTIVITY_MODE;
 
 // ACTIVITY_TYPE possibilities (case sensitive)
 ACTIVITY_TYPE
-    : 'CPGAdministerMedication'
-    | 'CPGCollectInformation'
-    | 'CPGCommunication'
-    | 'CPGDispenseMedication'
-    | 'CPGDocumentMedication'
-    | 'CPGEnrollment'
-    | 'CPGGenerateReport'
-    | 'CPGHold'
-    | 'CPGImmunization'
-    | 'CPGMedicationRequest'
-    | 'CPGProposeDiagnosis'
-    | 'CPGRecordDetectedIssue'
-    | 'CPGRecordInference'
-    | 'CPGReportFlag'
-    | 'CPGResume'
-    | 'CPGServiceRequest'
-    | 'CPGStop'
+    : [a-zA-Z]+ { 
+        const validTypes = [
+            'CPGAdministerMedication',
+            'CPGCollectInformation',
+            'CPGCommunication',
+            'CPGDispenseMedication',
+            'CPGDocumentMedication',
+            'CPGEnrollment',
+            'CPGGenerateReport',
+            'CPGHold',
+            'CPGImmunization',
+            'CPGMedicationRequest',
+            'CPGProposeDiagnosis',
+            'CPGRecordDetectedIssue',
+            'CPGRecordInference',
+            'CPGReportFlag',
+            'CPGResume',
+            'CPGServiceRequest',
+            'CPGStop'
+        ];
+        if (!validTypes.includes(this.text)) {
+            throw new Error(`Line ${this._tokenStartLine}:${this._tokenStartCharPositionInLine} - Invalid activity type: ${this.text}. Valid types are: ${validTypes.join(', ')}`);
+        }
+    }
     -> mode(DEFAULT_MODE)
     ;
 
@@ -101,29 +106,38 @@ ACTIVITY_COMMENT_BLOCK
     : BLOCK_COMMENT -> skip
     ;
 
-// Any other character in activity mode becomes an IDENTIFIER
-ACTIVITY_IDENTIFIER
-    : [a-zA-Z][a-zA-Z0-9_]* -> mode(DEFAULT_MODE)
+// Error handling for unmatched characters in activity mode
+ACTIVITY_ErrorChar 
+    : . {
+        throw new Error(`Line ${this._tokenStartLine}:${this._tokenStartCharPositionInLine} - Invalid character in activity type: ${this.text}`);
+    }
     ;
 
 mode CONCEPT_MODE;
 
 // CONCEPT_TYPE possibilities (case sensitive)
 CONCEPT_TYPE
-    : 'Communication'
-    | 'CommunicationRequest'
-    | 'Condition'
-    | 'QuestionnaireTask'
-    | 'QuestionnaireResponse'
-    | 'MedicationRequest'
-    | 'MedicationDispense'
-    | 'MedicationAdministration'
-    | 'MedicationStatement'
-    | 'ImmunizationRequest'
-    | 'Immunization'
-    | 'ServiceRequest'
-    | 'Procedure'
-    | 'Observation'
+    : [a-zA-Z]+ {
+        const validTypes = [
+            'Communication',
+            'CommunicationRequest',
+            'Condition',
+            'QuestionnaireTask',
+            'QuestionnaireResponse',
+            'MedicationRequest',
+            'MedicationDispense',
+            'MedicationAdministration',
+            'MedicationStatement',
+            'ImmunizationRequest',
+            'Immunization',
+            'ServiceRequest',
+            'Procedure',
+            'Observation'
+        ];
+        if (!validTypes.includes(this.text)) {
+            throw new Error(`Line ${this._tokenStartLine}:${this._tokenStartCharPositionInLine} - Invalid concept type: ${this.text}. Valid types are: ${validTypes.join(', ')}`);
+        }
+    }
     -> mode(DEFAULT_MODE)
     ;
 
@@ -137,27 +151,36 @@ CONCEPT_COMMENT_BLOCK
     : BLOCK_COMMENT -> skip
     ;
 
-// Any other character in concept mode becomes an IDENTIFIER
-CONCEPT_IDENTIFIER
-    : [a-zA-Z][a-zA-Z0-9_]* -> mode(DEFAULT_MODE)
+// Error handling for unmatched characters in concept mode
+CONCEPT_ErrorChar 
+    : . {
+        throw new Error(`Line ${this._tokenStartLine}:${this._tokenStartCharPositionInLine} - Invalid character in concept type: ${this.text}`);
+    }
     ;
 
 mode VALUE_TYPE_MODE;
 
 // CONCEPT_VALUE_TYPE possibilities (case sensitive)
 CONCEPT_VALUE_TYPE
-    : 'Quantity'
-    | 'CodeableConcept'
-    | 'string'
-    | 'boolean'
-    | 'integer'
-    | 'Range'
-    | 'Ratio'
-    | 'SampledData'
-    | 'time'
-    | 'dateTime'
-    | 'Period'
-    | 'Attachment'
+    : [a-zA-Z]+ {
+        const validTypes = [
+            'Quantity',
+            'CodeableConcept',
+            'string',
+            'boolean',
+            'integer',
+            'Range',
+            'Ratio',
+            'SampledData',
+            'time',
+            'dateTime',
+            'Period',
+            'Attachment'
+        ];
+        if (!validTypes.includes(this.text)) {
+            throw new Error(`Line ${this._tokenStartLine}:${this._tokenStartCharPositionInLine} - Invalid concept value type: ${this.text}. Valid types are: ${validTypes.join(', ')}`);
+        }
+    }
     -> mode(DEFAULT_MODE)
     ;
 
@@ -171,7 +194,9 @@ VALUE_TYPE_COMMENT_BLOCK
     : BLOCK_COMMENT -> skip
     ;
 
-// Any other character in value type mode becomes an IDENTIFIER
-VALUE_TYPE_IDENTIFIER
-    : [a-zA-Z][a-zA-Z0-9_]* -> mode(DEFAULT_MODE)
+// Error handling for unmatched characters in value type mode
+VALUE_TYPE_ErrorChar 
+    : . {
+        throw new Error(`Line ${this._tokenStartLine}:${this._tokenStartCharPositionInLine} - Invalid character in value type: ${this.text}`);
+    }
     ; 
