@@ -64,9 +64,9 @@ terminology "some terminology" unknown.
 
 terminology "Colonoscopy" system "http://snomed.info/sct" code "73761001".
 
-activity "Vaccinate" perform Immunization. //Immunization is an ACTIVITY_TYPE
+activity "Vaccinate" perform ImmunizationActivity. //ImmunizationActivity is an ACTIVITY_TYPE
 
-activity "Indicate" perform ProposeDiagnosis of "Colonoscopy". //of references a terminology
+activity "Indicate" perform ProposeDiagnosisActivity of "Colonoscopy". //of references a terminology
 
 // comments go into the auto generated README and, CQL when applicable
 concept "Most Recent BMI":
