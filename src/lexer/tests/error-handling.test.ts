@@ -78,4 +78,104 @@ describe('Lexer Error Handling', () => {
       }).toThrow(expectedError);
     });
   });
+
+  it('should throw an exception for invalid concept types', () => {
+    const testCases = [
+      {
+        input: 'concept type InvalidConcept',
+        expectedError: /Line 1:\d+ - Invalid concept type: InvalidConcept/,
+      },
+      {
+        input: 'concept type SomeRandomType',
+        expectedError: /Line 1:\d+ - Invalid concept type: SomeRandomType/,
+      },
+    ];
+
+    testCases.forEach(({ input, expectedError }) => {
+      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      expect(() => {
+        getAllTokens(lexer);
+      }).toThrow(expectedError);
+    });
+  });
+
+  it('should throw an exception for invalid concept value types', () => {
+    const testCases = [
+      {
+        input: 'concept valuetype InvalidValueType',
+        expectedError: /Line 1:\d+ - Invalid concept value type: InvalidValueType/,
+      },
+      {
+        input: 'concept valuetype SomeRandomValueType',
+        expectedError: /Line 1:\d+ - Invalid concept value type: SomeRandomValueType/,
+      },
+    ];
+
+    testCases.forEach(({ input, expectedError }) => {
+      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      expect(() => {
+        getAllTokens(lexer);
+      }).toThrow(expectedError);
+    });
+  });
+
+  it('should throw an exception for invalid characters in concept mode', () => {
+    const testCases = [
+      {
+        input: 'concept type @invalid',
+        expectedError: /Line 1:\d+ - Invalid character in concept type: @/,
+      },
+      {
+        input: 'concept type $invalid',
+        expectedError: /Line 1:\d+ - Invalid character in concept type: \$/,
+      },
+    ];
+
+    testCases.forEach(({ input, expectedError }) => {
+      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      expect(() => {
+        getAllTokens(lexer);
+      }).toThrow(expectedError);
+    });
+  });
+
+  it('should throw an exception for invalid characters in value type mode', () => {
+    const testCases = [
+      {
+        input: 'concept valuetype @invalid',
+        expectedError: /Line 1:\d+ - Invalid character in value type: @/,
+      },
+      {
+        input: 'concept valuetype $invalid',
+        expectedError: /Line 1:\d+ - Invalid character in value type: \$/,
+      },
+    ];
+
+    testCases.forEach(({ input, expectedError }) => {
+      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      expect(() => {
+        getAllTokens(lexer);
+      }).toThrow(expectedError);
+    });
+  });
+
+  it('should throw an exception for invalid characters in activity mode', () => {
+    const testCases = [
+      {
+        input: 'perform @invalid',
+        expectedError: /Line 1:\d+ - Invalid character in activity type: @/,
+      },
+      {
+        input: 'perform $invalid',
+        expectedError: /Line 1:\d+ - Invalid character in activity type: \$/,
+      },
+    ];
+
+    testCases.forEach(({ input, expectedError }) => {
+      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      expect(() => {
+        getAllTokens(lexer);
+      }).toThrow(expectedError);
+    });
+  });
 });
