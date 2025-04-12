@@ -1,8 +1,5 @@
 /**
  * Clinical Practice Guideline Language (CPGL)
- * 
- * IMPORTANT: Always use the custom CPGLLexer for token generation.
- * The generated lexer should not be used directly.
  */
 
 # Clinical Practice Guideline Language
@@ -55,17 +52,99 @@ while (token.type !== TokenTypes.EOF) {
 
 ## Development
 
+### Updating grammar files
+
+```bash
+npm run generate
+```
+
 ### Building
 
 ```bash
 npm run build
 ```
 
-### Testing
+### Test Documentation
+
+The project includes a comprehensive test suite to ensure the correctness of the lexer and parser. Here's how to run and work with the tests:
+
+#### Running Tests
 
 ```bash
+# Run all tests
 npm test
+
+# Run tests with coverage
+npm run test:coverage
+
+# Run specific test files
+npm test src/lexer/tests/basic-tokens.test.ts
+npm test src/lexer/tests/fhir-types.test.ts
+npm test src/lexer/tests/grammar-example.test.ts
+
+# Run tests in watch mode (useful during development)
+npm run test:watch
 ```
+
+#### Test Categories
+
+The test suite is organized into several categories:
+
+1. **Basic Tokens** (`basic-tokens.test.ts`)
+   - Tests for fundamental language tokens
+   - Keywords, punctuation, and basic syntax
+
+2. **FHIR Types** (`fhir-types.test.ts`)
+   - Tests for FHIR-specific activity types
+   - Validation of CPG-prefixed activity types
+   - Error handling for invalid types
+
+3. **Grammar Example** (`grammar-example.test.ts`)
+   - Tests the lexer against the complete grammar example
+   - Validates real-world usage scenarios
+
+4. **Error Handling** (`error-handling.test.ts`)
+   - Tests for invalid input handling
+   - Error message validation
+   - Recovery from syntax errors
+
+5. **Comments** (`comments.test.ts`)
+   - Tests for comment handling
+   - Single-line and block comments
+   - Comment placement and nesting
+
+#### Writing Tests
+
+When adding new tests:
+
+1. Place test files in the appropriate directory under `src/lexer/tests/`
+2. Follow the existing test patterns
+3. Include both positive and negative test cases
+4. Use descriptive test names
+5. Add comments explaining complex test scenarios
+
+Example test structure:
+```typescript
+describe('Feature Name', () => {
+  it('should handle valid input', () => {
+    // Test valid cases
+  });
+
+  it('should handle invalid input', () => {
+    // Test error cases
+  });
+});
+```
+
+#### Test Utilities
+
+The test suite includes several utility functions:
+
+- `getAllTokens`: Retrieves all tokens from a lexer
+- `verifyTokenSequence`: Validates token sequences
+- `getActionTokenSequence`: Helper for activity type tests
+- `getCaseFeatureTokenSequence`: Helper for concept type tests
+- `getValueTypeTokenSequence`: Helper for value type tests
 
 ### Linting
 
@@ -99,9 +178,5 @@ If you modify the grammar in `src/grammar/CPGL.g4`, you'll need to regenerate th
 
 ```bash
 cd src/grammar
-antlr4ts CPGL.g4 -o generated
+antlr4ts -visitor -Xforce-atn -o src/grammar/generated src/grammar/CPGLLexer.g4 && antlr4ts -visitor -Xforce-atn -o src/grammar/generated src/grammar/CPGLParser.g4
 ```
-
-## License
-
-MIT
