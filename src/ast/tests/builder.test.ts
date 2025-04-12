@@ -5,7 +5,6 @@ import { CPGLLexer } from '../../grammar/generated/CPGLLexer';
 import { CPGLParser } from '../../grammar/generated/CPGLParser';
 import { ASTBuilder } from '../builder';
 import {
-  ActionStatement,
   Activity,
   ActivityType,
   BlockBody,
@@ -32,7 +31,7 @@ import {
   TerminologyUnknownType,
   UseDecision,
   UseDecisionType,
-  WhenClause,
+  WhenBlock,
 } from '../types';
 
 describe('ASTBuilder', () => {
@@ -65,8 +64,8 @@ describe('ASTBuilder', () => {
       expect(decision.name).toBe('BMI');
       expect(decision.body.statements).toHaveLength(1);
       expect(decision.body.statements[0].condition).toBe('BMI > 30');
-      const whenClause = decision.body.statements[0] as WhenClause;
-      const body = whenClause.body as SingleAction;
+      const whenBlock = decision.body.statements[0] as WhenBlock;
+      const body = whenBlock.body as SingleAction;
       expect(body.type).toBe(SingleActionType.type);
       const action = body.action as DoActivity;
       expect(action.type).toBe(DoActivityType.type);
@@ -110,10 +109,10 @@ describe('ASTBuilder', () => {
       const ast = builder.visit(tree) as File;
 
       const decision = ast.statements[0] as Decision;
-      const tempWhenClause = decision.body.statements[0] as WhenClause;
-      const bpWhenClause = decision.body.statements[1] as WhenClause;
-      const tempBlock = tempWhenClause.body as BlockBody;
-      const bpBlock = bpWhenClause.body as BlockBody;
+      const tempWhenBlock = decision.body.statements[0] as WhenBlock;
+      const bpWhenBlock = decision.body.statements[1] as WhenBlock;
+      const tempBlock = tempWhenBlock.body as BlockBody;
+      const bpBlock = bpWhenBlock.body as BlockBody;
 
       expect(tempBlock.qualifier).toBe(CPGLLexer.ANY.toString());
       expect(bpBlock.qualifier).toBe(CPGLLexer.ALL.toString());
@@ -171,9 +170,8 @@ describe('ASTBuilder', () => {
       const activity = ast.statements[0] as Activity;
       expect(activity.type).toBe(ActivityType.type);
       expect(activity.name).toBe('Vaccinate');
-      const actionStatement = activity.body.statements[0] as ActionStatement;
-      expect(actionStatement.action.type).toBe(DoActivityType.type);
-      expect((actionStatement.action as DoActivity).activityName).toBe('CPGImmunization');
+      expect(activity.activityType).toBe('CPGImmunization');
+      expect(activity.terminologyReference).toBeUndefined();
     });
 
     it('should parse an activity with of clause', () => {
@@ -183,11 +181,10 @@ describe('ASTBuilder', () => {
       const ast = builder.visit(tree) as File;
 
       const activity = ast.statements[0] as Activity;
-      const actionStatement = activity.body.statements[0] as ActionStatement;
-      expect(actionStatement.action.type).toBe(DoActivityType.type);
-      expect((actionStatement.action as DoActivity).activityName).toBe(
-        'CPGProposeDiagnosis of "Colonoscopy"',
-      );
+      expect(activity.type).toBe(ActivityType.type);
+      expect(activity.name).toBe('Indicate');
+      expect(activity.activityType).toBe('CPGProposeDiagnosis');
+      expect(activity.terminologyReference).toBe('Colonoscopy');
     });
   });
 
@@ -227,6 +224,11 @@ describe('ASTBuilder', () => {
       const ast = builder.visit(tree) as File;
 
       const concept = ast.statements[0] as Concept;
+      expect(concept.type).toBe(ConceptType.type);
+      expect(concept.name).toBe('Most Recent BMI');
+      expect(concept.conceptType).toBe('Observation');
+      expect(concept.valueType).toBe('boolean');
+      expect(concept.provenance).toBe('some provenance');
       expect(concept.definition.type).toBe(InferredByDefinitionType.type);
       const inferredBy = concept.definition as InferredByDefinition;
       expect(inferredBy.pattern).toBe('Most Recent(this, lookbackMonths)');
@@ -247,13 +249,17 @@ describe('ASTBuilder', () => {
       const ast = builder.visit(tree) as File;
 
       const concept = ast.statements[0] as Concept;
+      expect(concept.type).toBe(ConceptType.type);
+      expect(concept.name).toBe('BMI');
+      expect(concept.conceptType).toBe('Observation');
+      expect(concept.valueType).toBe('Quantity');
       expect(concept.definition.type).toBe(InferredByDefinitionType.type);
       const inferredBy = concept.definition as InferredByDefinition;
-      expect(inferredBy.pattern).toBeUndefined();
-      expect(inferredBy.concept).toBeUndefined();
       expect(inferredBy.descriptiveLogic).toBe(
         'BMI Range as a Condition or BMI as an Observation or Calculated BMI',
       );
+      expect(inferredBy.pattern).toBeUndefined();
+      expect(inferredBy.concept).toBeUndefined();
     });
 
     it('should parse a concept with inferred by descriptive logic using and/or combinations', () => {
@@ -315,8 +321,8 @@ done
       const tree = parseInput(input);
       const result = builder.visit(tree) as File;
       const decision = result.statements[0] as Decision;
-      const whenClause = decision.body.statements[0] as WhenClause;
-      const body = whenClause.body as SingleAction;
+      const whenBlock = decision.body.statements[0] as WhenBlock;
+      const body = whenBlock.body as SingleAction;
       expect(body.type).toBe(SingleActionType.type);
       const action = body.action as DoActivity;
       expect(action.type).toBe(DoActivityType.type);
@@ -332,8 +338,8 @@ done
       const tree = parseInput(input);
       const result = builder.visit(tree) as File;
       const decision = result.statements[0] as Decision;
-      const whenClause = decision.body.statements[0] as WhenClause;
-      const body = whenClause.body as SingleAction;
+      const whenBlock = decision.body.statements[0] as WhenBlock;
+      const body = whenBlock.body as SingleAction;
       expect(body.type).toBe(SingleActionType.type);
       const action = body.action as UseDecision;
       expect(action.type).toBe(UseDecisionType.type);
