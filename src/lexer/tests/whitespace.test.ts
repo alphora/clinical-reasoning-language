@@ -90,7 +90,7 @@ describe('Whitespace Handling', () => {
 
   describe('Whitespace in Activity Statements', () => {
     it('should handle whitespace in activity statements', () => {
-      const input = 'activity\n  "Vaccinate"\n\t\tperform\n  ImmunizationActivity\t.';
+      const input = 'activity\n  "Vaccinate"\n\t\tperform\n  CPGImmunization\t.';
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
       verifyTokenSequence(tokens, [
@@ -103,7 +103,7 @@ describe('Whitespace Handling', () => {
     });
 
     it('should handle whitespace in activity statements with of clause', () => {
-      const input = 'activity\n"Action"\n  perform\tProposeDiagnosisActivity\n  of\t"diagnosis"\t.';
+      const input = 'activity\n"Action"\n  perform\tCPGProposeDiagnosis\n  of\t"diagnosis"\t.';
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
       verifyTokenSequence(tokens, [

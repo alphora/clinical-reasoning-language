@@ -195,23 +195,23 @@ export class CPGLLexer extends Lexer {
 		case 2:
 			 
 			        const validTypes = [
-			            'AdministerMedicationActivity',
-			            'CollectInformationActivity',
-			            'CommunicationActivity',
-			            'DispenseMedicationActivity',
-			            'DocumentMedicationActivity',
-			            'EnrollmentActivity',
-			            'GenerateReportActivity',
-			            'HoldActivity',
-			            'ImmunizationActivity',
-			            'MedicationRequestActivity',
-			            'ProposeDiagnosisActivity',
-			            'RecordDetectedIssueActivity',
-			            'RecordInferenceActivity',
-			            'ReportFlag',
-			            'ResumeActivity',
-			            'ServiceRequestActivity',
-			            'StopActivity'
+			            'CPGAdministerMedication',
+			            'CPGCollectInformation',
+			            'CPGCommunication',
+			            'CPGDispenseMedication',
+			            'CPGDocumentMedication',
+			            'CPGEnrollment',
+			            'CPGGenerateReport',
+			            'CPGHold',
+			            'CPGImmunization',
+			            'CPGMedicationRequest',
+			            'CPGProposeDiagnosis',
+			            'CPGRecordDetectedIssue',
+			            'CPGRecordInference',
+			            'CPGReportFlag',
+			            'CPGResume',
+			            'CPGServiceRequest',
+			            'CPGStop'
 			        ];
 			        if (!validTypes.includes(this.text)) {
 			            throw new Error(`Line ${this._tokenStartLine}:${this._tokenStartCharPositionInLine} - Invalid activity type: ${this.text}. Valid types are: ${validTypes.join(', ')}`);

@@ -279,7 +279,7 @@ done`;
 
   describe('Activity Structure', () => {
     it('should handle basic activity statements', () => {
-      const input = `activity "Vaccinate" perform ImmunizationActivity.`;
+      const input = `activity "Vaccinate" perform CPGImmunization.`;
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
 
@@ -293,7 +293,7 @@ done`;
     });
 
     it('should handle activity statements with of clause', () => {
-      const input = `activity "Indicate" perform ProposeDiagnosisActivity of "Colonoscopy".`;
+      const input = `activity "Indicate" perform CPGProposeDiagnosis of "Colonoscopy".`;
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
 

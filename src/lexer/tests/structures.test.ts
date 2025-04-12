@@ -77,7 +77,7 @@ describe('Structures', () => {
     });
 
     it('should tokenize activity statements', () => {
-      const input = `activity "Vaccinate" perform ImmunizationActivity.`;
+      const input = `activity "Vaccinate" perform CPGImmunization.`;
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
 
@@ -91,7 +91,7 @@ describe('Structures', () => {
     });
 
     it('should tokenize activity statements with of clause', () => {
-      const input = `activity "Indicate" perform ProposeDiagnosisActivity of "Colonoscopy".`;
+      const input = `activity "Indicate" perform CPGProposeDiagnosis of "Colonoscopy".`;
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
 

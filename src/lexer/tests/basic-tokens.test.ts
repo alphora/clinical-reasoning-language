@@ -112,33 +112,32 @@ describe('CPGL Lexer - Basic Tokens', () => {
   });
 
   describe('Activity Types', () => {
-    it('should tokenize ImmunizationActivity', () => {
-      const input = 'perform ImmunizationActivity';
+    it('should tokenize CPGImmunization', () => {
+      const input = 'perform CPGImmunization';
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
 
       verifyTokenSequence(
         tokens,
         [CPGLLexer.PERFORM, CPGLLexer.ACTIVITY_TYPE],
-        ['perform', 'ImmunizationActivity'],
+        ['perform', 'CPGImmunization'],
       );
     });
 
-    it('should tokenize ProposeDiagnosisActivity', () => {
-      const input = 'perform ProposeDiagnosisActivity';
+    it('should tokenize CPGProposeDiagnosis', () => {
+      const input = 'perform CPGProposeDiagnosis';
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
 
       verifyTokenSequence(
         tokens,
         [CPGLLexer.PERFORM, CPGLLexer.ACTIVITY_TYPE],
-        ['perform', 'ProposeDiagnosisActivity'],
+        ['perform', 'CPGProposeDiagnosis'],
       );
     });
 
     it('should tokenize medication-related activities', () => {
-      const input =
-        'perform MedicationRequestActivity perform ServiceRequestActivity perform StopActivity';
+      const input = 'perform CPGMedicationRequest perform CPGServiceRequest perform CPGStop';
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
 
@@ -152,20 +151,13 @@ describe('CPGL Lexer - Basic Tokens', () => {
           CPGLLexer.PERFORM,
           CPGLLexer.ACTIVITY_TYPE,
         ],
-        [
-          'perform',
-          'MedicationRequestActivity',
-          'perform',
-          'ServiceRequestActivity',
-          'perform',
-          'StopActivity',
-        ],
+        ['perform', 'CPGMedicationRequest', 'perform', 'CPGServiceRequest', 'perform', 'CPGStop'],
       );
     });
 
     it('should tokenize information and communication activities', () => {
       const input =
-        'perform CollectInformationActivity perform CommunicationActivity perform GenerateReportActivity';
+        'perform CPGCollectInformation perform CPGCommunication perform CPGGenerateReport';
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
 
@@ -181,18 +173,18 @@ describe('CPGL Lexer - Basic Tokens', () => {
         ],
         [
           'perform',
-          'CollectInformationActivity',
+          'CPGCollectInformation',
           'perform',
-          'CommunicationActivity',
+          'CPGCommunication',
           'perform',
-          'GenerateReportActivity',
+          'CPGGenerateReport',
         ],
       );
     });
 
     it('should tokenize medication administration activities', () => {
       const input =
-        'perform AdministerMedicationActivity perform DispenseMedicationActivity perform DocumentMedicationActivity';
+        'perform CPGAdministerMedication perform CPGDispenseMedication perform CPGDocumentMedication';
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
 
@@ -208,18 +200,18 @@ describe('CPGL Lexer - Basic Tokens', () => {
         ],
         [
           'perform',
-          'AdministerMedicationActivity',
+          'CPGAdministerMedication',
           'perform',
-          'DispenseMedicationActivity',
+          'CPGDispenseMedication',
           'perform',
-          'DocumentMedicationActivity',
+          'CPGDocumentMedication',
         ],
       );
     });
 
     it('should tokenize enrollment and record activities', () => {
       const input =
-        'perform EnrollmentActivity perform HoldActivity perform RecordDetectedIssueActivity perform RecordInferenceActivity';
+        'perform CPGEnrollment perform CPGHold perform CPGRecordDetectedIssue perform CPGRecordInference';
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
 
@@ -237,26 +229,26 @@ describe('CPGL Lexer - Basic Tokens', () => {
         ],
         [
           'perform',
-          'EnrollmentActivity',
+          'CPGEnrollment',
           'perform',
-          'HoldActivity',
+          'CPGHold',
           'perform',
-          'RecordDetectedIssueActivity',
+          'CPGRecordDetectedIssue',
           'perform',
-          'RecordInferenceActivity',
+          'CPGRecordInference',
         ],
       );
     });
 
     it('should tokenize report and resume activities', () => {
-      const input = 'perform ReportFlag perform ResumeActivity';
+      const input = 'perform CPGReportFlag perform CPGResume';
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
 
       verifyTokenSequence(
         tokens,
         [CPGLLexer.PERFORM, CPGLLexer.ACTIVITY_TYPE, CPGLLexer.PERFORM, CPGLLexer.ACTIVITY_TYPE],
-        ['perform', 'ReportFlag', 'perform', 'ResumeActivity'],
+        ['perform', 'CPGReportFlag', 'perform', 'CPGResume'],
       );
     });
   });
@@ -534,7 +526,7 @@ describe('CPGL Lexer - Basic Tokens', () => {
 
   describe('Additional Keywords', () => {
     it('should tokenize activity statement', () => {
-      const input = 'activity "Test" perform ImmunizationActivity';
+      const input = 'activity "Test" perform CPGImmunization';
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
 

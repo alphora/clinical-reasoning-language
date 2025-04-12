@@ -29,24 +29,24 @@ function verifyTokenSequence(
 }
 
 describe('Action FHIR Types', () => {
-  test('should recognize ServiceRequestActivity', () => {
-    const input = 'perform ServiceRequestActivity.';
+  test('should recognize CPGServiceRequest', () => {
+    const input = 'perform CPGServiceRequest.';
     const expectedTokens = getActionTokenSequence();
-    const expectedText = ['perform', 'ServiceRequestActivity', '.'];
+    const expectedText = ['perform', 'CPGServiceRequest', '.'];
     verifyTokenSequence(CharStreams.fromString(input), expectedTokens, expectedText);
   });
 
-  test('should recognize ImmunizationActivity', () => {
-    const input = 'perform ImmunizationActivity.';
+  test('should recognize CPGImmunization', () => {
+    const input = 'perform CPGImmunization.';
     const expectedTokens = getActionTokenSequence();
-    const expectedText = ['perform', 'ImmunizationActivity', '.'];
+    const expectedText = ['perform', 'CPGImmunization', '.'];
     verifyTokenSequence(CharStreams.fromString(input), expectedTokens, expectedText);
   });
 
-  test('should recognize ProposeDiagnosisActivity', () => {
-    const input = 'perform ProposeDiagnosisActivity.';
+  test('should recognize CPGProposeDiagnosis', () => {
+    const input = 'perform CPGProposeDiagnosis.';
     const expectedTokens = getActionTokenSequence();
-    const expectedText = ['perform', 'ProposeDiagnosisActivity', '.'];
+    const expectedText = ['perform', 'CPGProposeDiagnosis', '.'];
     verifyTokenSequence(CharStreams.fromString(input), expectedTokens, expectedText);
   });
 

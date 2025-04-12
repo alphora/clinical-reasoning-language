@@ -64,9 +64,9 @@ terminology "some terminology" unknown.
 
 terminology "Colonoscopy" system "http://snomed.info/sct" code "73761001".
 
-activity "Vaccinate" perform ImmunizationActivity. //ImmunizationActivity is an ACTIVITY_TYPE
+activity "Vaccinate" perform CPGImmunization. //CPGImmunization is an ACTIVITY_TYPE
 
-activity "Indicate" perform ProposeDiagnosisActivity of "Colonoscopy". //of references a terminology
+activity "Indicate" perform CPGProposeDiagnosis of "Colonoscopy". //of references a terminology
 
 // comments go into the auto generated README and, CQL when applicable
 concept "Most Recent BMI":
@@ -182,23 +182,23 @@ CONCEPT_VALUE_TYPE
 
 /*
 ACTIVITY_TYPE:
-      'AdministerMedication'
-    | 'CollectInformation'
-    | 'Communication'
-    | 'DispenseMedication'
-    | 'DocumentMedication'
-    | 'Enrollment'
-    | 'GenerateReport'
-    | 'Hold'
-    | 'Immunization'
-    | 'MedicationRequest'
-    | 'ProposeDiagnosis'
-    | 'RecordDetectedIssue'
-    | 'RecordInference'
-    | 'ReportFlag'
-    | 'Resume'
-    | 'ServiceRequest'
-    | 'Stop'
+      'CPGAdministerMedication'
+    | 'CPGCollectInformation'
+    | 'CPGCommunication'
+    | 'CPGDispenseMedication'
+    | 'CPGDocumentMedication'
+    | 'CPGEnrollment'
+    | 'CPGGenerateReport'
+    | 'CPGHold'
+    | 'CPGImmunization'
+    | 'CPGMedicationRequest'
+    | 'CPGProposeDiagnosis'
+    | 'CPGRecordDetectedIssue'
+    | 'CPGRecordInference'
+    | 'CPGReportFlag'
+    | 'CPGResume'
+    | 'CPGServiceRequest'
+    | 'CPGStop'
     ;
 */
 
