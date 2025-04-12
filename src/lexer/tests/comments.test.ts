@@ -19,12 +19,12 @@ describe('Comments', () => {
 
       verifyTokenSequence(tokens, [
         CPGLLexer.DECISION,
-        CPGLLexer.STRING,
+        CPGLLexer.QUOTED_STRING,
         CPGLLexer.WHEN,
-        CPGLLexer.STRING,
+        CPGLLexer.QUOTED_STRING,
         CPGLLexer.THEN,
         CPGLLexer.DO,
-        CPGLLexer.STRING,
+        CPGLLexer.QUOTED_STRING,
       ]);
     });
 
@@ -39,12 +39,12 @@ decision "Test"
 
       verifyTokenSequence(tokens, [
         CPGLLexer.DECISION,
-        CPGLLexer.STRING,
+        CPGLLexer.QUOTED_STRING,
         CPGLLexer.WHEN,
-        CPGLLexer.STRING,
+        CPGLLexer.QUOTED_STRING,
         CPGLLexer.THEN,
         CPGLLexer.DO,
-        CPGLLexer.STRING,
+        CPGLLexer.QUOTED_STRING,
       ]);
     });
   });
@@ -60,12 +60,12 @@ decision "Test"
 
       verifyTokenSequence(tokens, [
         CPGLLexer.DECISION,
-        CPGLLexer.STRING,
+        CPGLLexer.QUOTED_STRING,
         CPGLLexer.WHEN,
-        CPGLLexer.STRING,
+        CPGLLexer.QUOTED_STRING,
         CPGLLexer.THEN,
         CPGLLexer.DO,
-        CPGLLexer.STRING,
+        CPGLLexer.QUOTED_STRING,
       ]);
     });
 
@@ -76,9 +76,9 @@ decision "Test"
 
       verifyTokenSequence(tokens, [
         CPGLLexer.TERMINOLOGY,
-        CPGLLexer.STRING,
+        CPGLLexer.QUOTED_STRING,
         CPGLLexer.VALUESET,
-        CPGLLexer.STRING,
+        CPGLLexer.QUOTED_STRING,
         CPGLLexer.DOT,
       ]);
     });
@@ -90,7 +90,7 @@ decision "Test"
 
       verifyTokenSequence(tokens, [
         CPGLLexer.ACTIVITY,
-        CPGLLexer.STRING,
+        CPGLLexer.QUOTED_STRING,
         CPGLLexer.PERFORM,
         CPGLLexer.ACTIVITY_TYPE,
         CPGLLexer.DOT,
@@ -108,7 +108,7 @@ done`;
 
       verifyTokenSequence(tokens, [
         CPGLLexer.CONCEPT,
-        CPGLLexer.STRING,
+        CPGLLexer.QUOTED_STRING,
         CPGLLexer.COLON,
         CPGLLexer.HAS,
         CPGLLexer.TYPE,
@@ -121,9 +121,9 @@ done`;
         CPGLLexer.INFERRED,
         CPGLLexer.BY,
         CPGLLexer.LPAREN,
-        CPGLLexer.STRING,
+        CPGLLexer.QUOTED_STRING,
         CPGLLexer.OR,
-        CPGLLexer.STRING,
+        CPGLLexer.QUOTED_STRING,
         CPGLLexer.RPAREN,
         CPGLLexer.DOT,
         CPGLLexer.DONE,
@@ -143,14 +143,14 @@ done`;
 
       verifyTokenSequence(tokens, [
         CPGLLexer.DECISION,
-        CPGLLexer.STRING,
+        CPGLLexer.QUOTED_STRING,
         CPGLLexer.WHEN,
-        CPGLLexer.STRING,
+        CPGLLexer.QUOTED_STRING,
         CPGLLexer.THEN,
         CPGLLexer.DO,
-        CPGLLexer.STRING,
+        CPGLLexer.QUOTED_STRING,
         CPGLLexer.AND,
-        CPGLLexer.STRING,
+        CPGLLexer.QUOTED_STRING,
       ]);
     });
 
@@ -162,11 +162,11 @@ done`;
       verifyTokenSequence(tokens, [
         CPGLLexer.WHEN,
         CPGLLexer.LPAREN,
-        CPGLLexer.STRING,
+        CPGLLexer.QUOTED_STRING,
         CPGLLexer.AND,
-        CPGLLexer.STRING,
+        CPGLLexer.QUOTED_STRING,
         CPGLLexer.OR,
-        CPGLLexer.STRING,
+        CPGLLexer.QUOTED_STRING,
         CPGLLexer.RPAREN,
         CPGLLexer.THEN,
       ]);

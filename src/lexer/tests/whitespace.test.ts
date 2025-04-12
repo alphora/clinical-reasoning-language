@@ -24,12 +24,12 @@ describe('Whitespace Handling', () => {
       const tokens = getAllTokens(lexer);
       verifyTokenSequence(tokens, [
         CPGLLexer.DECISION,
-        CPGLLexer.STRING,
+        CPGLLexer.QUOTED_STRING,
         CPGLLexer.WHEN,
-        CPGLLexer.STRING,
+        CPGLLexer.QUOTED_STRING,
         CPGLLexer.THEN,
         CPGLLexer.DO,
-        CPGLLexer.STRING,
+        CPGLLexer.QUOTED_STRING,
       ]);
     });
 
@@ -39,9 +39,9 @@ describe('Whitespace Handling', () => {
       const tokens = getAllTokens(lexer);
       verifyTokenSequence(tokens, [
         CPGLLexer.DECISION,
-        CPGLLexer.STRING,
+        CPGLLexer.QUOTED_STRING,
         CPGLLexer.WHEN,
-        CPGLLexer.STRING,
+        CPGLLexer.QUOTED_STRING,
       ]);
     });
 
@@ -51,9 +51,9 @@ describe('Whitespace Handling', () => {
       const tokens = getAllTokens(lexer);
       verifyTokenSequence(tokens, [
         CPGLLexer.DECISION,
-        CPGLLexer.STRING,
+        CPGLLexer.QUOTED_STRING,
         CPGLLexer.WHEN,
-        CPGLLexer.STRING,
+        CPGLLexer.QUOTED_STRING,
       ]);
     });
   });
@@ -65,9 +65,9 @@ describe('Whitespace Handling', () => {
       const tokens = getAllTokens(lexer);
       verifyTokenSequence(tokens, [
         CPGLLexer.TERMINOLOGY,
-        CPGLLexer.STRING,
+        CPGLLexer.QUOTED_STRING,
         CPGLLexer.VALUESET,
-        CPGLLexer.STRING,
+        CPGLLexer.QUOTED_STRING,
         CPGLLexer.DOT,
       ]);
     });
@@ -78,11 +78,11 @@ describe('Whitespace Handling', () => {
       const tokens = getAllTokens(lexer);
       verifyTokenSequence(tokens, [
         CPGLLexer.TERMINOLOGY,
-        CPGLLexer.STRING,
+        CPGLLexer.QUOTED_STRING,
         CPGLLexer.SYSTEM,
-        CPGLLexer.STRING,
+        CPGLLexer.QUOTED_STRING,
         CPGLLexer.CODE,
-        CPGLLexer.STRING,
+        CPGLLexer.QUOTED_STRING,
         CPGLLexer.DOT,
       ]);
     });
@@ -95,7 +95,7 @@ describe('Whitespace Handling', () => {
       const tokens = getAllTokens(lexer);
       verifyTokenSequence(tokens, [
         CPGLLexer.ACTIVITY,
-        CPGLLexer.STRING,
+        CPGLLexer.QUOTED_STRING,
         CPGLLexer.PERFORM,
         CPGLLexer.ACTIVITY_TYPE,
         CPGLLexer.DOT,
@@ -108,11 +108,11 @@ describe('Whitespace Handling', () => {
       const tokens = getAllTokens(lexer);
       verifyTokenSequence(tokens, [
         CPGLLexer.ACTIVITY,
-        CPGLLexer.STRING,
+        CPGLLexer.QUOTED_STRING,
         CPGLLexer.PERFORM,
         CPGLLexer.ACTIVITY_TYPE,
         CPGLLexer.OF,
-        CPGLLexer.STRING,
+        CPGLLexer.QUOTED_STRING,
         CPGLLexer.DOT,
       ]);
     });
@@ -125,7 +125,7 @@ describe('Whitespace Handling', () => {
       const tokens = getAllTokens(lexer);
       verifyTokenSequence(tokens, [
         CPGLLexer.CONCEPT,
-        CPGLLexer.STRING,
+        CPGLLexer.QUOTED_STRING,
         CPGLLexer.COLON,
         CPGLLexer.HAS,
         CPGLLexer.TYPE,
@@ -155,11 +155,11 @@ describe('Whitespace Handling', () => {
         CPGLLexer.INFERRED,
         CPGLLexer.BY,
         CPGLLexer.LPAREN,
-        CPGLLexer.STRING,
+        CPGLLexer.QUOTED_STRING,
         CPGLLexer.AND,
-        CPGLLexer.STRING,
+        CPGLLexer.QUOTED_STRING,
         CPGLLexer.OR,
-        CPGLLexer.STRING,
+        CPGLLexer.QUOTED_STRING,
         CPGLLexer.RPAREN,
         CPGLLexer.DOT,
       ]);
@@ -173,16 +173,16 @@ describe('Whitespace Handling', () => {
       const tokens = getAllTokens(lexer);
       verifyTokenSequence(tokens, [
         CPGLLexer.DECISION,
-        CPGLLexer.STRING,
+        CPGLLexer.QUOTED_STRING,
         CPGLLexer.COLON,
         CPGLLexer.WHEN,
-        CPGLLexer.STRING,
+        CPGLLexer.QUOTED_STRING,
         CPGLLexer.THEN,
         CPGLLexer.WHEN,
-        CPGLLexer.STRING,
+        CPGLLexer.QUOTED_STRING,
         CPGLLexer.THEN,
         CPGLLexer.DO,
-        CPGLLexer.STRING,
+        CPGLLexer.QUOTED_STRING,
         CPGLLexer.DOT,
         CPGLLexer.DONE,
       ]);
@@ -195,16 +195,16 @@ describe('Whitespace Handling', () => {
       const tokens = getAllTokens(lexer);
       verifyTokenSequence(tokens, [
         CPGLLexer.WHEN,
-        CPGLLexer.STRING,
+        CPGLLexer.QUOTED_STRING,
         CPGLLexer.THEN,
         CPGLLexer.COLON,
         CPGLLexer.ANY,
         CPGLLexer.COLON,
         CPGLLexer.DO,
-        CPGLLexer.STRING,
+        CPGLLexer.QUOTED_STRING,
         CPGLLexer.DOT,
         CPGLLexer.DO,
-        CPGLLexer.STRING,
+        CPGLLexer.QUOTED_STRING,
         CPGLLexer.DOT,
         CPGLLexer.DONE,
         CPGLLexer.DONE,
