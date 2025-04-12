@@ -57,8 +57,8 @@ export class CPGLParser extends Parser {
 	public static readonly DOT = 29;
 	public static readonly LPAREN = 30;
 	public static readonly RPAREN = 31;
-	public static readonly STRING = 32;
-	public static readonly IDENTIFIER = 33;
+	public static readonly IDENTIFIER = 32;
+	public static readonly STRING = 33;
 	public static readonly WS = 34;
 	public static readonly COMMENT = 35;
 	public static readonly COMMENT_BLOCK = 36;
@@ -144,7 +144,7 @@ export class CPGLParser extends Parser {
 		"INFERRED", "AND", "OR", "DONE", "HAS", "BY", "CODED", "VALUESET", "PERFORM", 
 		"ACTIVITY", "OF", "SYSTEM", "CODE", "UNKNOWN", "DO", "USE", "WHEN", "THEN", 
 		"ANY", "ALL", "DECISION", "ERROR", "COLON", "DOT", "LPAREN", "RPAREN", 
-		"STRING", "IDENTIFIER", "WS", "COMMENT", "COMMENT_BLOCK", "ACTIVITY_TYPE", 
+		"IDENTIFIER", "STRING", "WS", "COMMENT", "COMMENT_BLOCK", "ACTIVITY_TYPE", 
 		"ACTIVITY_WS", "ACTIVITY_COMMENT_BLOCK", "ACTIVITY_ErrorChar", "CONCEPT_TYPE", 
 		"CONCEPT_WS", "CONCEPT_COMMENT_BLOCK", "CONCEPT_ErrorChar", "CONCEPT_VALUE_TYPE", 
 		"VALUE_TYPE_WS", "VALUE_TYPE_COMMENT_BLOCK", "VALUE_TYPE_ErrorChar",
@@ -1760,14 +1760,14 @@ export class CPGLParser extends Parser {
 		"\x02\x02\u0100\u0106\x05P)\x02\u0101\u0102\x07 \x02\x02\u0102\u0103\x05" +
 		"8\x1D\x02\u0103\u0104\x07!\x02\x02\u0104\u0106\x03\x02\x02\x02\u0105\u0100" +
 		"\x03\x02\x02\x02\u0105\u0101\x03\x02\x02\x02\u0106?\x03\x02\x02\x02\u0107" +
-		"\u0108\x07#\x02\x02\u0108A\x03\x02\x02\x02\u0109\u010A\x05@!\x02\u010A" +
+		"\u0108\x07\"\x02\x02\u0108A\x03\x02\x02\x02\u0109\u010A\x05@!\x02\u010A" +
 		"C\x03\x02\x02\x02\u010B\u010C\x05B\"\x02\u010CE\x03\x02\x02\x02\u010D" +
 		"\u010E\x05@!\x02\u010EG\x03\x02\x02\x02\u010F\u0110\x05F$\x02\u0110I\x03" +
 		"\x02\x02\x02\u0111\u0112\x05@!\x02\u0112K\x03\x02\x02\x02\u0113\u0114" +
 		"\x05J&\x02\u0114M\x03\x02\x02\x02\u0115\u0116\x05@!\x02\u0116O\x03\x02" +
 		"\x02\x02\u0117\u0118\x05N(\x02\u0118Q\x03\x02\x02\x02\u0119\u011A\x05" +
 		"@!\x02\u011AS\x03\x02\x02\x02\u011B\u011C\x05R*\x02\u011CU\x03\x02\x02" +
-		"\x02\u011D\u011E\x07\"\x02\x02\u011EW\x03\x02\x02\x02\x14[dov}\x82\x88" +
+		"\x02\u011D\u011E\x07#\x02\x02\u011EW\x03\x02\x02\x02\x14[dov}\x82\x88" +
 		"\x8E\x92\xA1\xB5\xC2\xC6\xE3\xE6\xF5\xFD\u0105";
 	public static __ATN: ATN;
 	public static get _ATN(): ATN {

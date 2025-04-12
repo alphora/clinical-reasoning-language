@@ -15,11 +15,13 @@ describe('Lexer Error Handling', () => {
     });
   });
 
-  it('should handle unterminated strings', () => {
+  it('should handle unterminated identifiers and strings', () => {
     const inputs = [
-      '"unterminated string',
-      '"string with\nnewline',
-      'decision "unclosed string\nthen do "Action".',
+      '"unterminated identifier',
+      '"identifier with\nnewline',
+      'decision "unclosed identifier\nthen do "Action".',
+      '"unterminated string with backslash\\',
+      '"string with\\\nnewline',
     ];
 
     inputs.forEach(input => {
