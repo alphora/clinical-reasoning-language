@@ -8,7 +8,6 @@ import {
   ASTNode,
   File,
   Decision,
-  DecisionBody,
   WhenBlock,
   SingleAction,
   Terminology,
@@ -16,13 +15,16 @@ import {
 } from '../ast/types';
 import { CPGLLexer } from '../grammar/generated/CPGLLexer';
 import { CPGLParser } from '../grammar/generated/CPGLParser';
+import { CPGLLexerErrorListener } from '../lexer/CPGLLexerErrorListener';
 
 // Read the example file
 const examplePath = join(__dirname, '../../docs/grammar-example.cpg');
 const input = readFileSync(examplePath, 'utf-8');
 
-// Create the lexer
+// Create the lexer and add error listener
 const lexer = new CPGLLexer(CharStreams.fromString(input));
+lexer.removeErrorListeners();
+lexer.addErrorListener(new CPGLLexerErrorListener());
 const tokenStream = new CommonTokenStream(lexer);
 
 // Create the parser

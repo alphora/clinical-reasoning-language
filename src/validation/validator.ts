@@ -124,8 +124,11 @@ export class ASTValidator {
   }
 
   private validateWhenBlock(whenBlock: WhenBlock): void {
-    if (!whenBlock.condition || whenBlock.condition.length === 0) {
-      throw new ValidationError('When block must have a condition', whenBlock.location.start);
+    if (!whenBlock.conceptName || whenBlock.conceptName.length === 0) {
+      throw new ValidationError(
+        'When block must have a concept reference',
+        whenBlock.location.start,
+      );
     }
 
     if (this.isBlockBody(whenBlock.body)) {
