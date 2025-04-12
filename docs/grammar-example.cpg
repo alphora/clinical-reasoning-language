@@ -75,7 +75,7 @@ concept "Most Recent BMI":
     has provenance "some provenance".
     inferred by "Most Recent(this, lookbackMonths)" "BMI". //"Most Recent" is a reference to a CQL expression (that will be resolved by the parser) and is optional.  "BMI" is a reference to another concept.
 done
-
+@
 concept "BMI":
     has type Observation.
     has valuetype Quantity.

@@ -27,6 +27,7 @@ THEN         : 'then';
 ANY          : 'any';
 ALL          : 'all';
 DECISION     : 'decision';
+ERROR        : 'error';
 
 // Punctuation
 COLON        : ':';
@@ -64,13 +65,6 @@ COMMENT
 // Block comment.
 COMMENT_BLOCK
     : BLOCK_COMMENT -> skip
-    ;
-
-// Error handling for unmatched characters
-ErrorChar 
-    : . {
-        throw new Error(`Line ${this._tokenStartLine}:${this._tokenStartCharPositionInLine} - Invalid character: ${this.text}`);
-    }
     ;
 
 mode ACTIVITY_MODE;

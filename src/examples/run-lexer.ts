@@ -7,6 +7,7 @@ import { CharStreams } from 'antlr4ts';
 
 // Internal imports
 import { CPGLLexer } from '../grammar/generated/CPGLLexer';
+import { CPGLLexerErrorListener } from '../lexer/CPGLLexerErrorListener';
 
 // Get the path to the grammar example file
 const examplePath = path.join(__dirname, '../../docs/grammar-example.cpg');
@@ -16,6 +17,8 @@ const input = fs.readFileSync(examplePath, 'utf8');
 
 // Create lexer instance
 const lexer = new CPGLLexer(CharStreams.fromString(input));
+lexer.removeErrorListeners();
+lexer.addErrorListener(new CPGLLexerErrorListener());
 
 // Get all tokens
 console.log('\nTokenizing grammar-example.cpg:\n');
