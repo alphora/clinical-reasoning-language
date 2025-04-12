@@ -346,4 +346,39 @@ done
       expect(action.decisionName).toBe('SomeDecision');
     });
   });
+
+  describe('Decision Structure', () => {
+    it('should properly nest WhenBlocks under DecisionBody', () => {
+      const input = `
+        decision "IMMZ.D2.D5.Measles":
+          when "Measles Routine Immunization Schedule Incomplete" then:
+            any:
+            when "No Primary Series Doses Administered" then:
+              when "Client Age Less Than 12 Months" then do "Indicate".
+              when "Last Live Vaccine Administered has had in 4 Weeks" then use "Elderly Based".
+            done 
+            when "Client Is Due For MCV12" then do "Vaccinate".
+          done
+        done
+      `;
+
+      const tree = parseInput(input);
+      const result = builder.visit(tree) as File;
+      
+      const decision = result.statements[0] as Decision;
+      
+      // Verify Decision has a DecisionBody
+      expect(decision.body).toBeDefined();
+      expect(decision.body.type).toBe('DecisionBody');
+      
+      // Verify WhenBlocks are under DecisionBody, not directly under Decision
+      const decisionKeys = Object.keys(decision);
+      expect(decisionKeys).not.toContain('WhenBlock');
+      
+      // Verify WhenBlocks are properly nested under DecisionBody
+      expect(decision.body.statements).toBeDefined();
+      expect(decision.body.statements.length).toBeGreaterThan(0);
+      expect(decision.body.statements[0].type).toBe('WhenBlock');
+    });
+  });
 });
