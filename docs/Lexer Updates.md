@@ -7,7 +7,7 @@ Then address the indentation issues since they're also causing errors
 Finally, fix the token count mismatches and type mismatches
 
 "should tokenize keywords"
-focus on on only this.  Don't do anything else for now.
+focus on only this.  Don't do anything else for now.
 add just enough debugging to figure it out.
 laser focus on getting to the root of this.
 don't run all the damn tests only run this one
