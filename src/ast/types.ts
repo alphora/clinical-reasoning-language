@@ -33,7 +33,6 @@ export const DecisionType = {
 export interface WhenClause extends ASTNode {
   type: 'WhenClause';
   condition: string;
-  qualifier?: 'any' | 'all';
   body: WhenClauseBody;
 }
 export const WhenClauseType = {
@@ -55,19 +54,17 @@ export const SingleActionType = {
 // Block body containing multiple statements
 export interface BlockBody extends ASTNode {
   type: 'BlockBody';
-  qualifier?: 'any' | 'all';
-  statements: BlockStatement[];
+  qualifier?: string;
+  statements: (WhenClause | ActionStatement)[];
 }
 export const BlockBodyType = {
   type: 'BlockBody' as const,
 };
 
-// Block statement can be a when clause or an action
-export type BlockStatement = WhenClause | ActionStatement;
-
 // Action statement (do or use)
 export interface ActionStatement extends ASTNode {
   type: 'ActionStatement';
+  condition?: string;
   action: DoActivity | UseDecision;
 }
 export const ActionStatementType = {

@@ -5,19 +5,34 @@ import { CPGLLexer } from '../../grammar/generated/CPGLLexer';
 import { CPGLParser } from '../../grammar/generated/CPGLParser';
 import { ASTBuilder } from '../builder';
 import {
+  ActionStatement,
   Activity,
+  ActivityType,
   BlockBody,
   CodedByDefinition,
+  CodedByDefinitionType,
   Concept,
+  ConceptType,
   Decision,
+  DecisionType,
   DoActivity,
+  DoActivityType,
   File,
+  FileType,
   InferredByDefinition,
+  InferredByDefinitionType,
   SingleAction,
+  SingleActionType,
   Terminology,
+  TerminologyType,
   TerminologySystemCode,
+  TerminologySystemCodeType,
   TerminologyValueset,
+  TerminologyValuesetType,
+  TerminologyUnknownType,
   UseDecision,
+  UseDecisionType,
+  WhenClause,
 } from '../types';
 
 describe('ASTBuilder', () => {
@@ -43,17 +58,18 @@ describe('ASTBuilder', () => {
       `;
       const tree = parseInput(input);
       const result = builder.visit(tree) as File;
-      expect(result.type).toBe('File');
+      expect(result.type).toBe(FileType.type);
       expect(result.statements).toHaveLength(1);
       const decision = result.statements[0] as Decision;
-      expect(decision.type).toBe('Decision');
+      expect(decision.type).toBe(DecisionType.type);
       expect(decision.name).toBe('BMI');
-      expect(decision.whenClauses).toHaveLength(1);
-      expect(decision.whenClauses[0].condition).toBe('BMI > 30');
-      const body = decision.whenClauses[0].body as SingleAction;
-      expect(body.type).toBe('SingleAction');
+      expect(decision.body.statements).toHaveLength(1);
+      expect(decision.body.statements[0].condition).toBe('BMI > 30');
+      const whenClause = decision.body.statements[0] as WhenClause;
+      const body = whenClause.body as SingleAction;
+      expect(body.type).toBe(SingleActionType.type);
       const action = body.action as DoActivity;
-      expect(action.type).toBe('DoActivity');
+      expect(action.type).toBe(DoActivityType.type);
       expect(action.activityName).toBe('CPGProposeDiagnosis Obesity');
     });
 
@@ -69,9 +85,9 @@ describe('ASTBuilder', () => {
       const ast = builder.visit(tree) as File;
 
       const decision = ast.statements[0] as Decision;
-      expect(decision.whenClauses).toHaveLength(2);
-      expect(decision.whenClauses[0].condition).toBe('BMI');
-      expect(decision.whenClauses[1].condition).toBe('Weight');
+      expect(decision.body.statements).toHaveLength(2);
+      expect(decision.body.statements[0].condition).toBe('BMI');
+      expect(decision.body.statements[1].condition).toBe('Weight');
     });
 
     it('should parse a decision with any/all qualifiers', () => {
@@ -94,11 +110,13 @@ describe('ASTBuilder', () => {
       const ast = builder.visit(tree) as File;
 
       const decision = ast.statements[0] as Decision;
-      const tempBlock = decision.whenClauses[0].body as BlockBody;
-      const bpBlock = decision.whenClauses[1].body as BlockBody;
+      const tempWhenClause = decision.body.statements[0] as WhenClause;
+      const bpWhenClause = decision.body.statements[1] as WhenClause;
+      const tempBlock = tempWhenClause.body as BlockBody;
+      const bpBlock = bpWhenClause.body as BlockBody;
 
-      expect(tempBlock.qualifier).toBe('any');
-      expect(bpBlock.qualifier).toBe('all');
+      expect(tempBlock.qualifier).toBe(CPGLLexer.ANY.toString());
+      expect(bpBlock.qualifier).toBe(CPGLLexer.ALL.toString());
       expect(tempBlock.statements).toHaveLength(2);
       expect(bpBlock.statements).toHaveLength(2);
     });
@@ -112,9 +130,9 @@ describe('ASTBuilder', () => {
       const ast = builder.visit(tree) as File;
 
       const terminology = ast.statements[0] as Terminology;
-      expect(terminology.type).toBe('Terminology');
+      expect(terminology.type).toBe(TerminologyType.type);
       expect(terminology.name).toBe('BMI Valueset');
-      expect(terminology.definition.type).toBe('TerminologyValueset');
+      expect(terminology.definition.type).toBe(TerminologyValuesetType.type);
       expect((terminology.definition as TerminologyValueset).valuesetName).toBe('bmi valueset');
     });
 
@@ -125,7 +143,7 @@ describe('ASTBuilder', () => {
       const ast = builder.visit(tree) as File;
 
       const terminology = ast.statements[0] as Terminology;
-      expect(terminology.definition.type).toBe('TerminologySystemCode');
+      expect(terminology.definition.type).toBe(TerminologySystemCodeType.type);
       expect((terminology.definition as TerminologySystemCode).system).toBe(
         'http://snomed.info/sct',
       );
@@ -139,7 +157,7 @@ describe('ASTBuilder', () => {
       const ast = builder.visit(tree) as File;
 
       const terminology = ast.statements[0] as Terminology;
-      expect(terminology.definition.type).toBe('TerminologyUnknown');
+      expect(terminology.definition.type).toBe(TerminologyUnknownType.type);
     });
   });
 
@@ -151,9 +169,11 @@ describe('ASTBuilder', () => {
       const ast = builder.visit(tree) as File;
 
       const activity = ast.statements[0] as Activity;
-      expect(activity.type).toBe('Activity');
+      expect(activity.type).toBe(ActivityType.type);
       expect(activity.name).toBe('Vaccinate');
-      expect(activity.activityType).toBe('CPGImmunization');
+      const actionStatement = activity.body.statements[0] as ActionStatement;
+      expect(actionStatement.action.type).toBe(DoActivityType.type);
+      expect((actionStatement.action as DoActivity).activityName).toBe('CPGImmunization');
     });
 
     it('should parse an activity with of clause', () => {
@@ -163,7 +183,11 @@ describe('ASTBuilder', () => {
       const ast = builder.visit(tree) as File;
 
       const activity = ast.statements[0] as Activity;
-      expect(activity.of).toBe('Colonoscopy');
+      const actionStatement = activity.body.statements[0] as ActionStatement;
+      expect(actionStatement.action.type).toBe(DoActivityType.type);
+      expect((actionStatement.action as DoActivity).activityName).toBe(
+        'CPGProposeDiagnosis of Colonoscopy',
+      );
     });
   });
 
@@ -181,11 +205,11 @@ describe('ASTBuilder', () => {
       const ast = builder.visit(tree) as File;
 
       const concept = ast.statements[0] as Concept;
-      expect(concept.type).toBe('Concept');
+      expect(concept.type).toBe(ConceptType.type);
       expect(concept.name).toBe('BMI Range as a Condition');
       expect(concept.conceptType).toBe('Condition');
       expect(concept.valueType).toBe('CodeableConcept');
-      expect(concept.definition.type).toBe('CodedByDefinition');
+      expect(concept.definition.type).toBe(CodedByDefinitionType.type);
       expect((concept.definition as CodedByDefinition).terminologyName).toBe('BMI Valueset');
     });
 
@@ -203,7 +227,7 @@ describe('ASTBuilder', () => {
       const ast = builder.visit(tree) as File;
 
       const concept = ast.statements[0] as Concept;
-      expect(concept.definition.type).toBe('InferredByDefinition');
+      expect(concept.definition.type).toBe(InferredByDefinitionType.type);
       expect((concept.definition as InferredByDefinition).pattern).toBe(
         'Most Recent(this, lookbackMonths)',
       );
@@ -223,7 +247,7 @@ describe('ASTBuilder', () => {
       const ast = builder.visit(tree) as File;
 
       const concept = ast.statements[0] as Concept;
-      expect(concept.definition.type).toBe('InferredByDefinition');
+      expect(concept.definition.type).toBe(InferredByDefinitionType.type);
       expect((concept.definition as InferredByDefinition).expression).toBeDefined();
     });
   });
@@ -247,31 +271,45 @@ describe('ASTBuilder', () => {
       const ast = builder.visit(tree) as File;
 
       expect(ast.statements).toHaveLength(4);
-      expect(ast.statements[0].type).toBe('Terminology');
-      expect(ast.statements[1].type).toBe('Activity');
-      expect(ast.statements[2].type).toBe('Concept');
-      expect(ast.statements[3].type).toBe('Decision');
+      expect(ast.statements[0].type).toBe(TerminologyType.type);
+      expect(ast.statements[1].type).toBe(ActivityType.type);
+      expect(ast.statements[2].type).toBe(ConceptType.type);
+      expect(ast.statements[3].type).toBe(DecisionType.type);
     });
   });
 
   describe('Action Statements', () => {
     it('should parse a do activity', () => {
-      const input = 'do CPGProposeDiagnosis';
+      const input = `
+decision Test:
+  when BMI > 30 then do CPGProposeDiagnosis.
+done
+`;
       const tree = parseInput(input);
-      const result = builder.visit(tree) as SingleAction;
-      expect(result.type).toBe('SingleAction');
-      const action = result.action as DoActivity;
-      expect(action.type).toBe('DoActivity');
+      const result = builder.visit(tree) as File;
+      const decision = result.statements[0] as Decision;
+      const whenClause = decision.body.statements[0] as WhenClause;
+      const body = whenClause.body as SingleAction;
+      expect(body.type).toBe(SingleActionType.type);
+      const action = body.action as DoActivity;
+      expect(action.type).toBe(DoActivityType.type);
       expect(action.activityName).toBe('CPGProposeDiagnosis');
     });
 
     it('should parse a use decision', () => {
-      const input = 'use SomeDecision';
+      const input = `
+decision Test:
+  when BMI > 30 then use SomeDecision.
+done
+`;
       const tree = parseInput(input);
-      const result = builder.visit(tree) as SingleAction;
-      expect(result.type).toBe('SingleAction');
-      const action = result.action as UseDecision;
-      expect(action.type).toBe('UseDecision');
+      const result = builder.visit(tree) as File;
+      const decision = result.statements[0] as Decision;
+      const whenClause = decision.body.statements[0] as WhenClause;
+      const body = whenClause.body as SingleAction;
+      expect(body.type).toBe(SingleActionType.type);
+      const action = body.action as UseDecision;
+      expect(action.type).toBe(UseDecisionType.type);
       expect(action.decisionName).toBe('SomeDecision');
     });
   });

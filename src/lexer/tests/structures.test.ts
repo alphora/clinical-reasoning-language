@@ -16,13 +16,13 @@ describe('Structures', () => {
 
       verifyTokenSequence(tokens, [
         CPGLLexer.DECISION,
-        CPGLLexer.STRING,
+        CPGLLexer.IDENTIFIER,
         CPGLLexer.COLON,
         CPGLLexer.WHEN,
-        CPGLLexer.STRING,
+        CPGLLexer.IDENTIFIER,
         CPGLLexer.THEN,
         CPGLLexer.DO,
-        CPGLLexer.STRING,
+        CPGLLexer.IDENTIFIER,
         CPGLLexer.DONE,
       ]);
     });
@@ -45,33 +45,33 @@ describe('Structures', () => {
 
       verifyTokenSequence(tokens, [
         CPGLLexer.DECISION,
-        CPGLLexer.STRING,
+        CPGLLexer.IDENTIFIER,
         CPGLLexer.COLON,
         CPGLLexer.WHEN,
-        CPGLLexer.STRING,
+        CPGLLexer.IDENTIFIER,
         CPGLLexer.THEN,
         CPGLLexer.ALL,
         CPGLLexer.COLON,
         CPGLLexer.WHEN,
-        CPGLLexer.STRING,
+        CPGLLexer.IDENTIFIER,
         CPGLLexer.THEN,
         CPGLLexer.DO,
-        CPGLLexer.STRING,
+        CPGLLexer.IDENTIFIER,
         CPGLLexer.WHEN,
-        CPGLLexer.STRING,
+        CPGLLexer.IDENTIFIER,
         CPGLLexer.THEN,
         CPGLLexer.ANY,
         CPGLLexer.COLON,
         CPGLLexer.WHEN,
-        CPGLLexer.STRING,
+        CPGLLexer.IDENTIFIER,
         CPGLLexer.THEN,
         CPGLLexer.DO,
-        CPGLLexer.STRING,
+        CPGLLexer.IDENTIFIER,
         CPGLLexer.WHEN,
-        CPGLLexer.STRING,
+        CPGLLexer.IDENTIFIER,
         CPGLLexer.THEN,
         CPGLLexer.USE,
-        CPGLLexer.STRING,
+        CPGLLexer.IDENTIFIER,
         CPGLLexer.DONE,
       ]);
     });
@@ -83,7 +83,7 @@ describe('Structures', () => {
 
       verifyTokenSequence(tokens, [
         CPGLLexer.ACTIVITY,
-        CPGLLexer.STRING,
+        CPGLLexer.IDENTIFIER,
         CPGLLexer.PERFORM,
         CPGLLexer.ACTIVITY_TYPE,
         CPGLLexer.DOT,
@@ -97,11 +97,11 @@ describe('Structures', () => {
 
       verifyTokenSequence(tokens, [
         CPGLLexer.ACTIVITY,
-        CPGLLexer.STRING,
+        CPGLLexer.IDENTIFIER,
         CPGLLexer.PERFORM,
         CPGLLexer.ACTIVITY_TYPE,
         CPGLLexer.OF,
-        CPGLLexer.STRING,
+        CPGLLexer.IDENTIFIER,
         CPGLLexer.DOT,
       ]);
     });
@@ -115,9 +115,9 @@ describe('Structures', () => {
 
       verifyTokenSequence(tokens, [
         CPGLLexer.TERMINOLOGY,
-        CPGLLexer.STRING,
+        CPGLLexer.IDENTIFIER,
         CPGLLexer.VALUESET,
-        CPGLLexer.STRING,
+        CPGLLexer.IDENTIFIER,
         CPGLLexer.DOT,
       ]);
     });
@@ -129,7 +129,7 @@ describe('Structures', () => {
 
       verifyTokenSequence(tokens, [
         CPGLLexer.TERMINOLOGY,
-        CPGLLexer.STRING,
+        CPGLLexer.IDENTIFIER,
         CPGLLexer.UNKNOWN,
         CPGLLexer.DOT,
       ]);
@@ -142,11 +142,11 @@ describe('Structures', () => {
 
       verifyTokenSequence(tokens, [
         CPGLLexer.TERMINOLOGY,
-        CPGLLexer.STRING,
+        CPGLLexer.IDENTIFIER,
         CPGLLexer.SYSTEM,
-        CPGLLexer.STRING,
+        CPGLLexer.IDENTIFIER,
         CPGLLexer.CODE,
-        CPGLLexer.STRING,
+        CPGLLexer.IDENTIFIER,
         CPGLLexer.DOT,
       ]);
     });
@@ -163,7 +163,7 @@ done`;
 
       verifyTokenSequence(tokens, [
         CPGLLexer.CONCEPT,
-        CPGLLexer.STRING,
+        CPGLLexer.IDENTIFIER,
         CPGLLexer.COLON,
         CPGLLexer.HAS,
         CPGLLexer.TYPE,
@@ -189,7 +189,7 @@ done`;
 
       verifyTokenSequence(tokens, [
         CPGLLexer.CONCEPT,
-        CPGLLexer.STRING,
+        CPGLLexer.IDENTIFIER,
         CPGLLexer.COLON,
         CPGLLexer.HAS,
         CPGLLexer.TYPE,
@@ -205,7 +205,7 @@ done`;
         CPGLLexer.DOT,
         CPGLLexer.CODED,
         CPGLLexer.BY,
-        CPGLLexer.STRING,
+        CPGLLexer.IDENTIFIER,
         CPGLLexer.DOT,
         CPGLLexer.DONE,
       ]);
@@ -222,7 +222,7 @@ done`;
 
       verifyTokenSequence(tokens, [
         CPGLLexer.CONCEPT,
-        CPGLLexer.STRING,
+        CPGLLexer.IDENTIFIER,
         CPGLLexer.COLON,
         CPGLLexer.HAS,
         CPGLLexer.TYPE,
@@ -234,8 +234,8 @@ done`;
         CPGLLexer.DOT,
         CPGLLexer.INFERRED,
         CPGLLexer.BY,
-        CPGLLexer.STRING,
-        CPGLLexer.STRING,
+        CPGLLexer.IDENTIFIER,
+        CPGLLexer.IDENTIFIER,
         CPGLLexer.DOT,
         CPGLLexer.DONE,
       ]);
@@ -252,7 +252,7 @@ done`;
 
       verifyTokenSequence(tokens, [
         CPGLLexer.CONCEPT,
-        CPGLLexer.STRING,
+        CPGLLexer.IDENTIFIER,
         CPGLLexer.COLON,
         CPGLLexer.HAS,
         CPGLLexer.TYPE,
@@ -265,11 +265,11 @@ done`;
         CPGLLexer.INFERRED,
         CPGLLexer.BY,
         CPGLLexer.LPAREN,
-        CPGLLexer.STRING,
+        CPGLLexer.IDENTIFIER,
         CPGLLexer.OR,
-        CPGLLexer.STRING,
+        CPGLLexer.IDENTIFIER,
         CPGLLexer.OR,
-        CPGLLexer.STRING,
+        CPGLLexer.IDENTIFIER,
         CPGLLexer.RPAREN,
         CPGLLexer.DOT,
         CPGLLexer.DONE,
