@@ -20,7 +20,7 @@ function verifyTokenSequence(
   let token = lexer.nextToken();
   while (token.type !== CPGLLexer.EOF) {
     tokens.push(token.type);
-    text.push(token.text || '');
+    text.push(token.text ?? '');
     token = lexer.nextToken();
   }
 
