@@ -204,9 +204,8 @@ atom
 
 // ----------------------------- IDENTIFIER RULE ------------------------------
 
-// In CPGL, quoted strings are treated as identifiers.
 identifier
-    : IDENTIFIER
+    : QUOTED_STRING
     ;
 
 decisionIdentifier

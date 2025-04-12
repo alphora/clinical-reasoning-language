@@ -14,14 +14,14 @@ describe('CPGL Lexer - Basic Tokens', () => {
 
       verifyTokenSequence(tokens, [
         CPGLLexer.DECISION,
-        CPGLLexer.IDENTIFIER,
+        CPGLLexer.STRING,
         CPGLLexer.COLON,
         CPGLLexer.WHEN,
-        CPGLLexer.IDENTIFIER,
+        CPGLLexer.STRING,
         CPGLLexer.THEN,
         CPGLLexer.COLON,
         CPGLLexer.DO,
-        CPGLLexer.IDENTIFIER,
+        CPGLLexer.STRING,
         CPGLLexer.DONE,
       ]);
     });
@@ -34,36 +34,18 @@ describe('CPGL Lexer - Basic Tokens', () => {
 
       verifyTokenSequence(tokens, [
         CPGLLexer.DECISION,
-        CPGLLexer.IDENTIFIER,
+        CPGLLexer.STRING,
         CPGLLexer.COLON,
         CPGLLexer.WHEN,
-        CPGLLexer.IDENTIFIER,
+        CPGLLexer.STRING,
         CPGLLexer.THEN,
         CPGLLexer.COLON,
         CPGLLexer.DO,
-        CPGLLexer.IDENTIFIER,
+        CPGLLexer.STRING,
         CPGLLexer.DO,
-        CPGLLexer.IDENTIFIER,
+        CPGLLexer.STRING,
         CPGLLexer.DONE,
       ]);
-    });
-  });
-
-  describe('Identifiers', () => {
-    it('should tokenize simple identifier', () => {
-      const input = '"Test String"';
-      const lexer = new CPGLLexer(CharStreams.fromString(input));
-      const tokens = getAllTokens(lexer);
-
-      verifyTokenSequence(tokens, [CPGLLexer.IDENTIFIER], ['"Test String"']);
-    });
-
-    it('should tokenize identifier with spaces', () => {
-      const input = '"Test String With Spaces"';
-      const lexer = new CPGLLexer(CharStreams.fromString(input));
-      const tokens = getAllTokens(lexer);
-
-      verifyTokenSequence(tokens, [CPGLLexer.IDENTIFIER], ['"Test String With Spaces"']);
     });
   });
 
@@ -73,7 +55,7 @@ describe('CPGL Lexer - Basic Tokens', () => {
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
 
-      verifyTokenSequence(tokens, [CPGLLexer.IDENTIFIER], ['"Test String"']);
+      verifyTokenSequence(tokens, [CPGLLexer.STRING], ['"Test String"']);
     });
 
     it('should tokenize string with spaces', () => {
@@ -81,7 +63,7 @@ describe('CPGL Lexer - Basic Tokens', () => {
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
 
-      verifyTokenSequence(tokens, [CPGLLexer.IDENTIFIER], ['"Test String With Spaces"']);
+      verifyTokenSequence(tokens, [CPGLLexer.STRING], ['"Test String With Spaces"']);
     });
   });
 
@@ -125,7 +107,7 @@ describe('CPGL Lexer - Basic Tokens', () => {
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
 
-      verifyTokenSequence(tokens, [CPGLLexer.LPAREN, CPGLLexer.IDENTIFIER, CPGLLexer.RPAREN]);
+      verifyTokenSequence(tokens, [CPGLLexer.LPAREN, CPGLLexer.STRING, CPGLLexer.RPAREN]);
     });
   });
 
@@ -550,7 +532,7 @@ describe('CPGL Lexer - Basic Tokens', () => {
 
       verifyTokenSequence(tokens, [
         CPGLLexer.ACTIVITY,
-        CPGLLexer.IDENTIFIER,
+        CPGLLexer.STRING,
         CPGLLexer.PERFORM,
         CPGLLexer.ACTIVITY_TYPE,
       ]);
@@ -563,7 +545,7 @@ describe('CPGL Lexer - Basic Tokens', () => {
 
       verifyTokenSequence(tokens, [
         CPGLLexer.CONCEPT,
-        CPGLLexer.IDENTIFIER,
+        CPGLLexer.STRING,
         CPGLLexer.COLON,
         CPGLLexer.HAS,
         CPGLLexer.TYPE,
@@ -581,9 +563,9 @@ describe('CPGL Lexer - Basic Tokens', () => {
 
       verifyTokenSequence(tokens, [
         CPGLLexer.TERMINOLOGY,
-        CPGLLexer.IDENTIFIER,
+        CPGLLexer.STRING,
         CPGLLexer.VALUESET,
-        CPGLLexer.IDENTIFIER,
+        CPGLLexer.STRING,
       ]);
     });
 
@@ -598,7 +580,7 @@ describe('CPGL Lexer - Basic Tokens', () => {
         CPGLLexer.STRING,
         CPGLLexer.INFERRED,
         CPGLLexer.BY,
-        CPGLLexer.IDENTIFIER,
+        CPGLLexer.STRING,
       ]);
     });
 
@@ -607,7 +589,7 @@ describe('CPGL Lexer - Basic Tokens', () => {
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
 
-      verifyTokenSequence(tokens, [CPGLLexer.CODED, CPGLLexer.BY, CPGLLexer.IDENTIFIER]);
+      verifyTokenSequence(tokens, [CPGLLexer.CODED, CPGLLexer.BY, CPGLLexer.STRING]);
     });
 
     it('should tokenize system and code statement', () => {
@@ -617,9 +599,9 @@ describe('CPGL Lexer - Basic Tokens', () => {
 
       verifyTokenSequence(tokens, [
         CPGLLexer.SYSTEM,
-        CPGLLexer.IDENTIFIER,
+        CPGLLexer.STRING,
         CPGLLexer.CODE,
-        CPGLLexer.IDENTIFIER,
+        CPGLLexer.STRING,
       ]);
     });
 
@@ -646,7 +628,7 @@ describe('CPGL Lexer - Basic Tokens', () => {
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
 
-      verifyTokenSequence(tokens, [CPGLLexer.DECISION, CPGLLexer.IDENTIFIER]);
+      verifyTokenSequence(tokens, [CPGLLexer.DECISION, CPGLLexer.STRING]);
     });
 
     it('should skip empty single-line comments', () => {
@@ -654,7 +636,7 @@ describe('CPGL Lexer - Basic Tokens', () => {
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
 
-      verifyTokenSequence(tokens, [CPGLLexer.DECISION, CPGLLexer.IDENTIFIER]);
+      verifyTokenSequence(tokens, [CPGLLexer.DECISION, CPGLLexer.STRING]);
     });
 
     it('should skip single-line comments with special characters', () => {
@@ -662,7 +644,7 @@ describe('CPGL Lexer - Basic Tokens', () => {
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
 
-      verifyTokenSequence(tokens, [CPGLLexer.DECISION, CPGLLexer.IDENTIFIER]);
+      verifyTokenSequence(tokens, [CPGLLexer.DECISION, CPGLLexer.STRING]);
     });
 
     it('should skip block comments', () => {
@@ -670,7 +652,7 @@ describe('CPGL Lexer - Basic Tokens', () => {
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
 
-      verifyTokenSequence(tokens, [CPGLLexer.DECISION, CPGLLexer.IDENTIFIER]);
+      verifyTokenSequence(tokens, [CPGLLexer.DECISION, CPGLLexer.STRING]);
     });
 
     it('should skip empty block comments', () => {
@@ -678,7 +660,7 @@ describe('CPGL Lexer - Basic Tokens', () => {
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
 
-      verifyTokenSequence(tokens, [CPGLLexer.DECISION, CPGLLexer.IDENTIFIER]);
+      verifyTokenSequence(tokens, [CPGLLexer.DECISION, CPGLLexer.STRING]);
     });
 
     it('should handle multiple comments in sequence', () => {
@@ -686,7 +668,7 @@ describe('CPGL Lexer - Basic Tokens', () => {
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
 
-      verifyTokenSequence(tokens, [CPGLLexer.DECISION, CPGLLexer.IDENTIFIER]);
+      verifyTokenSequence(tokens, [CPGLLexer.DECISION, CPGLLexer.STRING]);
     });
 
     it('should handle comments within statements', () => {
@@ -697,9 +679,9 @@ describe('CPGL Lexer - Basic Tokens', () => {
 
       verifyTokenSequence(tokens, [
         CPGLLexer.DECISION,
-        CPGLLexer.IDENTIFIER,
+        CPGLLexer.STRING,
         CPGLLexer.WHEN,
-        CPGLLexer.IDENTIFIER,
+        CPGLLexer.STRING,
         CPGLLexer.THEN,
       ]);
     });
