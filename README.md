@@ -170,7 +170,23 @@ npm run example
 npm run example:basic
 npm run example:debug
 npm run example:full
+npm run example:lexer
+npm run example:parser
 ```
+
+#### Lexer Example
+The lexer example (`run-lexer.ts`) demonstrates how to tokenize a CPGL document:
+- Reads the grammar example file
+- Creates a lexer with a custom error listener
+- Prints all tokens found in the input
+
+#### Parser Example
+The parser example (`run-parser.ts`) demonstrates how to parse a CPGL document:
+- Reads the grammar example file
+- Creates a lexer with a custom error listener
+- Creates a token stream
+- Creates a parser with the same error listener
+- Parses the input and prints the resulting parse tree
 
 ### Regenerating ANTLR Files
 

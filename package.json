@@ -20,7 +20,8 @@
     "example:debug": "npm run build && node dist/examples/debugLexer.js",
     "example:full": "npm run build && node dist/examples/fullExample.js",
     "generate": "antlr4ts -visitor -Xforce-atn -o src/grammar/generated src/grammar/CPGLLexer.g4 && antlr4ts -visitor -Xforce-atn -o src/grammar/generated src/grammar/CPGLParser.g4",
-    "example:lexer": "ts-node src/examples/run-lexer.ts"
+    "example:lexer": "ts-node src/examples/run-lexer.ts",
+    "example:parser": "ts-node src/examples/run-parser.ts"
   },
   "keywords": [
     "clinical",
