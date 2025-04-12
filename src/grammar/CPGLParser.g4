@@ -22,7 +22,7 @@ statement
 // --------------------------- DECISION STATEMENT ----------------------------
 
 decisionStatement
-    : DECISION identifier COLON decisionBody DONE
+    : DECISION decisionIdentifier COLON decisionBody DONE
     ;
 
 decisionBody
@@ -31,7 +31,7 @@ decisionBody
 
 // A whenBlock covers a "when <concept> then ..." clause
 whenBlock
-    : WHEN identifier THEN ( blockBody | singleActionStatement )
+    : WHEN conceptReference THEN ( blockBody | singleActionStatement )
     ;
 
 // "any:" or "all:" clause for lists
@@ -61,11 +61,11 @@ actionStatement
     ;
 
 doStatement
-    : DO identifier
+    : DO activityReference
     ;
 
 useStatement
-    : USE identifier
+    : USE decisionReference
     ;
 
 // ------------------------- TERMINOLOGY STATEMENT --------------------------
@@ -76,7 +76,7 @@ useStatement
 //   terminology "Colonoscopy" system "http://snomed.info/sct" code "73761001".
 //
 terminologyStatement
-    : TERMINOLOGY identifier ( terminologyValueset | terminologyUnknown | terminologySystemCode ) DOT
+    : TERMINOLOGY terminologyIdentifier ( terminologyValueset | terminologyUnknown | terminologySystemCode ) DOT
     ;
 
 terminologyValueset
@@ -98,7 +98,7 @@ terminologySystemCode
 //   activity "Indicate" perform ProposeDiagnosis of "Colonoscopy".
 //
 activityStatement
-    : ACTIVITY identifier PERFORM ACTIVITY_TYPE (OF identifier)? DOT
+    : ACTIVITY activityIdentifier PERFORM ACTIVITY_TYPE (OF terminologyReference)? DOT
     ;
 
 // ---------------------------- CONCEPT STATEMENT ---------------------------
@@ -124,7 +124,7 @@ activityStatement
 //   done
 //
 conceptStatement
-    : CONCEPT identifier COLON conceptBody DONE
+    : CONCEPT conceptIdentifier COLON conceptBody DONE
     ;
 
 conceptBody
@@ -149,47 +149,57 @@ provenanceLine
 
 // "coded by" clause for concepts that reference a terminology.
 codedByLine
-    : CODED BY identifier DOT
+    : CODED BY teminologyReference DOT
     ;
 
-// "inferred by" clause for concepts with logic expressions.
+// "inferred by" clause for how a concept can be informally derived from other concepts.
 inferredByLine
     : INFERRED BY inferredBody DOT
     ;
 
-// The body of an "inferred by" statement can be either an optional pattern and concept
-// or a parenthesized logical expression.
+// The body of an "inferred by" statement describes how a concept can be informally derived
+// from other concepts. It can either reference a single concept (optionally paired with a 
+// pattern—a named expression applied later), or provide a descriptive narrative using 
+// informal logical operators (AND, OR). These narratives document logical relationships
+// among concepts without representing formal evaluatable logic.
 inferredBody
-    : inferredByExpr
-    | inferredByPattern
+    : inferredByDescriptiveLogic
+    | inferredByConceptReference
     ;
 
-inferredByPattern
-    : identifier? identifier
+// References a single concept identifier, optionally preceded by a pattern identifier.
+// The optional pattern identifier corresponds to the name (signature) of a referenced Clinical Quality 
+// Language expression to be applied to the referenced concept in subsequent processing.
+inferredByConceptReference
+    : patternReference? conceptReference
     ;
 
-inferredByExpr
-    : LPAREN expr RPAREN
+// A descriptive narrative (enclosed in parentheses) describing informal logical relationships 
+// among concepts using the operators AND and OR. These operators serve documentation and 
+// readability purposes only and are not computationally evaluated at this stage.
+inferredByDescriptiveLogic
+    : LPAREN logicalNarrative RPAREN
     ;
 
-// ----------------------------- EXPRESSIONS -------------------------------
+// ----------------------- DESCRIPTIVE LOGICAL NARRATIVES -----------------------
 //
-// Expressions used in inferred by lines allow logical operators AND, OR.
-expr
-    : orExpr
+// Logical narratives use informal Boolean operators AND, OR purely as descriptive 
+// connectors among concept references. No formal computational logic is implied.
+logicalNarrative
+    : informalOr
     ;
 
-orExpr
-    : andExpr (OR andExpr)*
+informalOr
+    : informalAnd (OR informalAnd)*
     ;
 
-andExpr
+informalAnd
     : atom (AND atom)*
     ;
 
 atom
-    : identifier
-    | LPAREN orExpr RPAREN
+    : conceptReference
+    | LPAREN logicalNarrative RPAREN
     ;
 
 // ----------------------------- IDENTIFIER RULE ------------------------------
@@ -197,6 +207,46 @@ atom
 // In CPGL, quoted strings are treated as identifiers.
 identifier
     : STRING
+    ;
+
+decisionIdentifier
+    : identifier
+    ;
+
+decisionReference
+    : decisionIdentifier
+    ;
+
+terminologyIdentifier
+    : identifier
+    ;
+
+terminologyReference
+    : terminologyIdentifier
+    ;
+
+activityIdentifier
+    : identifier
+    ;
+
+activityReference
+    : activityIdentifier
+    ;
+
+conceptIdentifier
+    : identifier
+    ;
+
+conceptReference
+    : conceptIdentifier
+    ;
+
+patternIdentifier
+    : identifier
+    ;
+
+patternReference
+    : patternIdentifier
     ;
 
 // A helper rule to also refer to a string literal.
