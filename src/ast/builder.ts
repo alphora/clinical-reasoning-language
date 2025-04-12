@@ -193,7 +193,10 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode> {
         const blockStatement = this.getContext(child.getChild(0));
         if (blockStatement.getChild(0)?.text === 'when') {
           statements.push(this.visitWhenBlock(blockStatement));
-        } else if (blockStatement.getChild(0)?.text === 'do' || blockStatement.getChild(0)?.text === 'use') {
+        } else if (
+          blockStatement.getChild(0)?.text === 'do' ||
+          blockStatement.getChild(0)?.text === 'use'
+        ) {
           statements.push(this.visitActionStatement(blockStatement));
         }
       }
@@ -370,16 +373,69 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode> {
   }
 
   visitInferredByDefinition(ctx: ParserRuleContext): InferredByDefinition {
-    const pattern = ctx.childCount > 2 ? this.getStringValue(ctx.getChild(2)) : undefined;
-    const concept = ctx.childCount > 4 ? this.getStringValue(ctx.getChild(4)) : undefined;
-    const descriptiveLogic = ctx.childCount > 6 ? this.getStringValue(ctx.getChild(6)) : undefined;
-    return {
-      type: InferredByDefinitionType.type,
-      pattern,
-      concept,
-      descriptiveLogic,
-      location: this.getLocation(ctx),
-    };
+    const inferredBody = this.getContext(ctx.getChild(2));
+    
+    // Check if it's a descriptive logic (enclosed in parentheses)
+    if (
+      inferredBody.getChild(0) instanceof ParserRuleContext &&
+      inferredBody.getChild(0).constructor.name === 'InferredByDescriptiveLogicContext'
+    ) {
+      const descriptiveLogic = inferredBody.text;
+      
+      // For simple descriptive logic (no nested parentheses), remove all parentheses
+      // For complex descriptive logic (with nested parentheses), keep them
+      const hasNestedParentheses = (descriptiveLogic.match(/\(/g) || []).length > 1;
+      
+      let cleanedLogic = descriptiveLogic;
+      if (!hasNestedParentheses) {
+        // Simple case - remove all parentheses
+        cleanedLogic = cleanedLogic
+          .slice(1, -1) // Remove outer parentheses
+          .replace(/[()]/g, '') // Remove all parentheses
+          .replace(/"/g, '') // Remove all quotes
+          .replace(/\s+/g, ' ') // Normalize whitespace
+          .replace(/\s*(and|or)\s*/g, ' $1 ') // Ensure spaces around operators
+          .trim(); // Remove leading/trailing whitespace
+      } else {
+        // Complex case - keep parentheses structure but clean up formatting
+        cleanedLogic = cleanedLogic
+          .slice(1, -1) // Remove outer parentheses
+          .replace(/"\s*([^"]+)\s*"/g, '$1') // Remove quotes but keep content
+          .replace(/\s+/g, ' ') // Normalize whitespace
+          .replace(/\s*\(\s*/g, '(') // Remove spaces after opening parentheses
+          .replace(/\s*\)\s*/g, ') ') // Keep one space after closing parentheses
+          .replace(/\s*(and|or)\s*/g, ' $1 ') // Ensure spaces around operators
+          .trim(); // Remove leading/trailing whitespace
+      }
+      
+      return {
+        type: InferredByDefinitionType.type,
+        descriptiveLogic: cleanedLogic,
+        location: this.getLocation(ctx),
+      };
+    }
+    
+    // Otherwise it's a concept reference with optional pattern
+    const text = inferredBody.text;
+    const matches = text.match(/"([^"]+)"\s*"([^"]+)"/);
+    
+    if (matches && matches.length === 3) {
+      // We have both pattern and concept
+      return {
+        type: InferredByDefinitionType.type,
+        pattern: matches[1],
+        concept: matches[2],
+        location: this.getLocation(ctx),
+      };
+    } else {
+      // Just a concept reference
+      const concept = this.getStringValue(inferredBody.getChild(0));
+      return {
+        type: InferredByDefinitionType.type,
+        concept,
+        location: this.getLocation(ctx),
+      };
+    }
   }
 
   visitExpression(ctx: ParserRuleContext): Expression {
