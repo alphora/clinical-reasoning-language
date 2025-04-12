@@ -145,11 +145,11 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode> {
   }
 
   visitWhenBlock(ctx: ParserRuleContext): WhenBlock {
-    const condition = this.getStringValue(ctx.getChild(1));
+    const conceptName = this.getStringValue(ctx.getChild(1));
     const body = this.visitWhenBlockBody(this.getContext(ctx.getChild(3)));
     return {
       type: WhenBlockType.type,
-      condition,
+      conceptName,
       body,
       location: this.getLocation(ctx),
     };
@@ -256,13 +256,13 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode> {
   visitConceptStatement(ctx: ConceptStatementContext): Concept {
     const conceptName = this.getStringValue(ctx.getChild(1));
     const conceptBody = this.getContext(ctx.getChild(3));
-    
+
     // Find the type, valueType, provenance, and definition
     let conceptType = '';
     let valueType = '';
     let provenance: string | undefined;
     let definition: ConceptDefinition | undefined;
-    
+
     for (let i = 0; i < conceptBody.childCount; i++) {
       const child = conceptBody.getChild(i);
       if (child instanceof ParserRuleContext) {

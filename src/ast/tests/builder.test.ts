@@ -63,7 +63,7 @@ describe('ASTBuilder', () => {
       expect(decision.type).toBe(DecisionType.type);
       expect(decision.name).toBe('BMI');
       expect(decision.body.statements).toHaveLength(1);
-      expect(decision.body.statements[0].condition).toBe('BMI > 30');
+      expect(decision.body.statements[0].conceptName).toBe('BMI > 30');
       const whenBlock = decision.body.statements[0] as WhenBlock;
       const body = whenBlock.body as SingleAction;
       expect(body.type).toBe(SingleActionType.type);
@@ -85,8 +85,8 @@ describe('ASTBuilder', () => {
 
       const decision = ast.statements[0] as Decision;
       expect(decision.body.statements).toHaveLength(2);
-      expect(decision.body.statements[0].condition).toBe('BMI');
-      expect(decision.body.statements[1].condition).toBe('Weight');
+      expect(decision.body.statements[0].conceptName).toBe('BMI');
+      expect(decision.body.statements[1].conceptName).toBe('Weight');
     });
 
     it('should parse a decision with any/all qualifiers', () => {

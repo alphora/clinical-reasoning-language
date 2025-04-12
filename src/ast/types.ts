@@ -43,7 +43,7 @@ export const DecisionBodyType = {
 // When block
 export interface WhenBlock extends ASTNode {
   type: 'WhenBlock';
-  condition: string;
+  conceptName: string;
   body: WhenBlockBody;
 }
 export const WhenBlockType = {
