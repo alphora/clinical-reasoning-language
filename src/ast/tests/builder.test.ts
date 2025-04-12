@@ -49,7 +49,7 @@ describe('ASTBuilder', () => {
   };
 
   describe('Decision Statements', () => {
-    it('should parse a simple decision with when clause', () => {
+    it('should parse a simple decision with when block', () => {
       const input = `
         decision "BMI":
           when "BMI > 30" then do "CPGProposeDiagnosis Obesity".
@@ -72,7 +72,7 @@ describe('ASTBuilder', () => {
       expect(action.activityName).toBe('CPGProposeDiagnosis Obesity');
     });
 
-    it('should parse a decision with multiple when clauses', () => {
+    it('should parse a decision with multiple when blocks', () => {
       const input = `
         decision "Check BMI":
           when "BMI" then do "Record BMI".

@@ -1,4 +1,16 @@
-import { File, Statement, Decision, WhenClause } from '../ast/types';
+import {
+  ASTNode,
+  Decision,
+  WhenBlock,
+  Activity,
+  Concept,
+  Terminology,
+  DoActivity,
+  UseDecision,
+  BlockBody,
+  SingleAction,
+  File,
+} from '../ast/types';
 import { ACTION_FHIR_TYPES, CASEFEATURE_FHIR_TYPES, FHIR_VALUE_TYPES } from '../grammar/fhirTypes';
 
 export class ValidationError extends Error {
@@ -34,7 +46,7 @@ export class ASTValidator {
 
     // Validate each statement
     for (const statement of ast.statements) {
-      this.validateStatement(statement);
+      this.validateNode(statement);
     }
 
     // Validate decision references
@@ -51,135 +63,96 @@ export class ASTValidator {
         this.decisionCache.set(statement.name, statement);
 
         const dependencies = new Set<string>();
-        for (const useClause of statement.useClauses) {
-          dependencies.add(useClause.decisionName);
+        // Collect dependencies from when blocks
+        for (const whenBlock of statement.body.statements) {
+          this.collectDependenciesFromWhenBlock(whenBlock, dependencies);
         }
         this.decisionGraph.set(statement.name, dependencies);
       }
     }
   }
 
-  private validateStatement(statement: Statement): void {
-    switch (statement.type) {
+  private collectDependenciesFromWhenBlock(whenBlock: WhenBlock, dependencies: Set<string>): void {
+    if (this.isBlockBody(whenBlock.body)) {
+      for (const action of whenBlock.body.statements) {
+        if (action.type === 'ActionStatement' && action.action.type === 'UseDecision') {
+          dependencies.add(action.action.decisionName);
+        }
+      }
+    } else if (
+      whenBlock.body.type === 'SingleAction' &&
+      whenBlock.body.action.type === 'UseDecision'
+    ) {
+      dependencies.add(whenBlock.body.action.decisionName);
+    }
+  }
+
+  private validateNode(node: ASTNode): void {
+    switch (node.type) {
       case 'Decision':
-        this.validateDecision(statement);
+        this.validateDecision(node as Decision);
         break;
-      case 'Action':
-        this.validateAction(statement);
+      case 'Activity':
+        this.validateActivity(node as Activity);
         break;
-      case 'CaseFeature':
-        this.validateCaseFeature(statement);
+      case 'Concept':
+        this.validateConcept(node as Concept);
         break;
+      case 'Terminology':
+        this.validateTerminology(node as Terminology);
+        break;
+      default:
+        throw new ValidationError(`Unknown node type: ${node.type}`, node.location.start);
     }
   }
 
   private validateDecision(decision: Decision): void {
-    // Check decision name format
-    if (!this.isValidName(decision.name)) {
+    if (!decision.name || !decision.name.trim()) {
+      throw new ValidationError('Decision name cannot be empty', decision.location.start);
+    }
+
+    if (!decision.body || !decision.body.statements || decision.body.statements.length === 0) {
       throw new ValidationError(
-        `Invalid decision name: "${decision.name}". Names must start with a letter and contain only letters, numbers, and underscores.`,
+        'Decision must have at least one when block',
         decision.location.start,
       );
     }
 
-    // Check for duplicate decision names
-    const duplicateCount = [...this.decisionGraph.keys()].filter(
-      name => name === decision.name,
-    ).length;
-    if (duplicateCount > 1) {
-      throw new ValidationError(
-        `Duplicate decision name: "${decision.name}"`,
-        decision.location.start,
-      );
-    }
-
-    // Check that decision has at least one when clause
-    if (decision.whenClauses.length === 0) {
-      throw new ValidationError(
-        `Decision "${decision.name}" must have at least one when clause`,
-        decision.location.start,
-      );
-    }
-
-    // Check for mutually exclusive conditions
-    this.validateConditions(decision);
-
-    // Validate each when clause
-    for (const whenClause of decision.whenClauses) {
-      this.validateWhenClause(whenClause);
-    }
-
-    // Check for duplicate actions within the same decision
-    this.validateUniqueActions(decision);
-  }
-
-  private validateConditions(decision: Decision): void {
-    const conditions = new Set<string>();
-    for (const whenClause of decision.whenClauses) {
-      const normalizedCondition = whenClause.condition.toLowerCase().trim();
-      if (conditions.has(normalizedCondition)) {
-        throw new ValidationError(
-          `Duplicate condition in decision "${decision.name}": "${whenClause.condition}"`,
-          whenClause.location.start,
-        );
-      }
-      conditions.add(normalizedCondition);
-
-      // Check for mutually exclusive conditions
-      if (
-        conditions.has(`not ${normalizedCondition}`) ||
-        (normalizedCondition.startsWith('not ') && conditions.has(normalizedCondition.substring(4)))
-      ) {
-        throw new ValidationError(
-          `Mutually exclusive conditions found in decision "${decision.name}": "${whenClause.condition}"`,
-          whenClause.location.start,
-        );
-      }
+    for (const whenBlock of decision.body.statements) {
+      this.validateWhenBlock(whenBlock);
     }
   }
 
-  private validateUniqueActions(decision: Decision): void {
-    const actions = new Set<string>();
-    for (const whenClause of decision.whenClauses) {
-      for (const action of whenClause.actions) {
-        const normalizedAction = action.action.toLowerCase().trim();
-        if (actions.has(normalizedAction)) {
-          throw new ValidationError(
-            `Duplicate action in decision "${decision.name}": "${action.action}"`,
-            action.location.start,
-          );
+  private validateWhenBlock(whenBlock: WhenBlock): void {
+    if (!whenBlock.condition || whenBlock.condition.length === 0) {
+      throw new ValidationError('When block must have a condition', whenBlock.location.start);
+    }
+
+    if (this.isBlockBody(whenBlock.body)) {
+      for (const action of whenBlock.body.statements) {
+        if (action.type === 'WhenBlock') {
+          this.validateWhenBlock(action);
+        } else if (action.type === 'ActionStatement') {
+          this.validateAction(action.action);
         }
-        actions.add(normalizedAction);
       }
+    } else {
+      this.validateAction(whenBlock.body.action);
     }
   }
 
-  private validateWhenClause(whenClause: WhenClause): void {
-    // Check that condition is not empty
-    if (!whenClause.condition.trim()) {
-      throw new ValidationError('When clause condition cannot be empty', whenClause.location.start);
-    }
+  private isBlockBody(body: BlockBody | SingleAction): body is BlockBody {
+    return 'statements' in body;
+  }
 
-    // Check condition format
-    if (!this.isValidCondition(whenClause.condition)) {
-      throw new ValidationError(
-        `Invalid condition format: "${whenClause.condition}". Conditions must be in a valid format.`,
-        whenClause.location.start,
-      );
-    }
-
-    // Check that when clause has at least one action
-    if (whenClause.actions.length === 0) {
-      throw new ValidationError(
-        'When clause must have at least one action',
-        whenClause.location.start,
-      );
-    }
-
-    // Validate each action
-    for (const action of whenClause.actions) {
-      if (!action.action.trim()) {
-        throw new ValidationError('Action cannot be empty', action.location.start);
+  private validateAction(action: DoActivity | UseDecision): void {
+    if (action.type === 'DoActivity') {
+      if (!action.activityName.trim()) {
+        throw new ValidationError('Activity name cannot be empty', action.location.start);
+      }
+    } else if (action.type === 'UseDecision') {
+      if (!action.decisionName.trim()) {
+        throw new ValidationError('Decision name cannot be empty', action.location.start);
       }
     }
   }
@@ -198,70 +171,38 @@ export class ASTValidator {
     return condition.trim().length > 0;
   }
 
-  private validateAction(action: Statement & { type: 'Action' }): void {
-    // Check action name format
-    if (!this.isValidName(action.name)) {
-      throw new ValidationError(
-        `Invalid action name: "${action.name}". Names must start with a letter and contain only letters, numbers, and underscores.`,
-        action.location.start,
-      );
-    }
-
-    // Check FHIR type if provided
-    if (action.fhirType && !this.isValidActionFHIRType(action.fhirType)) {
-      throw new ValidationError(
-        `Invalid FHIR type for action "${action.name}": "${action.fhirType}"`,
-        action.location.start,
-      );
-    }
-  }
-
-  private validateCaseFeature(caseFeature: Statement & { type: 'CaseFeature' }): void {
-    // Check case feature name format
-    if (!this.isValidName(caseFeature.name)) {
-      throw new ValidationError(
-        `Invalid case feature name: "${caseFeature.name}". Names must start with a letter and contain only letters, numbers, and underscores.`,
-        caseFeature.location.start,
-      );
-    }
-
-    // Check FHIR type if provided
-    if (caseFeature.fhirType && !this.isValidCaseFeatureFHIRType(caseFeature.fhirType)) {
-      throw new ValidationError(
-        `Invalid FHIR type for case feature "${caseFeature.name}": "${caseFeature.fhirType}"`,
-        caseFeature.location.start,
-      );
-    }
-
-    // Check URL if provided
-    if (caseFeature.url && !this.isValidUrl(caseFeature.url)) {
-      throw new ValidationError(
-        `Invalid URL for case feature "${caseFeature.name}": "${caseFeature.url}"`,
-        caseFeature.location.start,
-      );
-    }
-
-    // Check value type if provided
-    if (caseFeature.valueType && !FHIR_VALUE_TYPES.has(caseFeature.valueType)) {
-      throw new ValidationError(
-        `Invalid value type for case feature "${caseFeature.name}": "${caseFeature.valueType}"`,
-        caseFeature.location.start,
-      );
-    }
-  }
-
   private validateDecisionReferences(ast: File): void {
     // Check that all referenced decisions exist
     for (const statement of ast.statements) {
       if (statement.type === 'Decision') {
-        for (const useClause of statement.useClauses) {
-          if (!this.decisionNames.has(useClause.decisionName)) {
+        for (const whenBlock of statement.body.statements) {
+          this.validateDecisionReferencesInWhenBlock(whenBlock);
+        }
+      }
+    }
+  }
+
+  private validateDecisionReferencesInWhenBlock(whenBlock: WhenBlock): void {
+    if (this.isBlockBody(whenBlock.body)) {
+      for (const action of whenBlock.body.statements) {
+        if (action.type === 'ActionStatement' && action.action.type === 'UseDecision') {
+          if (!this.decisionNames.has(action.action.decisionName)) {
             throw new ValidationError(
-              `Referenced decision "${useClause.decisionName}" does not exist`,
-              useClause.location.start,
+              `Referenced decision "${action.action.decisionName}" does not exist`,
+              action.action.location.start,
             );
           }
         }
+      }
+    } else if (
+      whenBlock.body.type === 'SingleAction' &&
+      whenBlock.body.action.type === 'UseDecision'
+    ) {
+      if (!this.decisionNames.has(whenBlock.body.action.decisionName)) {
+        throw new ValidationError(
+          `Referenced decision "${whenBlock.body.action.decisionName}" does not exist`,
+          whenBlock.body.action.location.start,
+        );
       }
     }
   }
@@ -295,51 +236,53 @@ export class ASTValidator {
       }
     }
 
-    // Check for action cycles
-    const visited = new Set<string>();
-    const recursionStack = new Set<string>();
-
-    const detectActionCycles = (actionName: string): void => {
-      if (visited.has(actionName)) {
-        return;
-      }
-
-      visited.add(actionName);
-      recursionStack.add(actionName);
-
-      const dependencies = this.actionDependencies.get(actionName);
-      if (dependencies) {
-        for (const dep of dependencies) {
-          if (recursionStack.has(dep)) {
-            throw new ValidationError(
-              `Cyclic action dependency detected: ${actionName} -> ${dep}`,
-              this.findActionLocation(ast, actionName),
-            );
-          }
-          detectActionCycles(dep);
-        }
-      }
-
-      recursionStack.delete(actionName);
-    };
-
-    // Check for cycles starting from each action
-    for (const actionName of this.actionDependencies.keys()) {
-      detectActionCycles(actionName);
+    // Detect cycles in action dependencies
+    for (const [actionName] of this.actionDependencies) {
+      this.visitedDecisions.clear();
+      this.detectActionCycles(actionName, ast);
     }
+  }
+
+  private detectActionCycles(actionName: string, ast: File): void {
+    if (this.visitedDecisions.has(actionName)) {
+      throw new ValidationError(
+        `Circular dependency detected in action references: ${actionName}`,
+        this.findActionLocation(ast, actionName),
+      );
+    }
+
+    this.visitedDecisions.add(actionName);
+    const dependencies = this.actionDependencies.get(actionName);
+    if (dependencies) {
+      for (const dependency of dependencies) {
+        this.detectActionCycles(dependency, ast);
+      }
+    }
+    this.visitedDecisions.delete(actionName);
   }
 
   private buildActionDependencies(decision: Decision): void {
-    for (const whenClause of decision.whenClauses) {
-      this.processWhenClauseActions(whenClause, decision);
+    for (const whenBlock of decision.body.statements) {
+      this.processWhenBlockActions(whenBlock, decision);
     }
   }
 
-  private processWhenClauseActions(whenClause: WhenClause, decision: Decision): void {
-    for (const action of whenClause.actions) {
-      const actionName = action.action;
-      this.initializeActionDependencies(actionName);
-      this.addDependenciesFromUseClauses(actionName, decision);
+  private processWhenBlockActions(whenBlock: WhenBlock, decision: Decision): void {
+    if (this.isBlockBody(whenBlock.body)) {
+      for (const action of whenBlock.body.statements) {
+        if (action.type === 'ActionStatement') {
+          this.processAction(action.action, decision);
+        }
+      }
+    } else {
+      this.processAction(whenBlock.body.action, decision);
+    }
+  }
+
+  private processAction(action: DoActivity | UseDecision, decision: Decision): void {
+    if (action.type === 'DoActivity') {
+      this.initializeActionDependencies(action.activityName);
+      this.actionDependencies.get(decision.name)?.add(action.activityName);
     }
   }
 
@@ -349,29 +292,60 @@ export class ASTValidator {
     }
   }
 
-  private addDependenciesFromUseClauses(actionName: string, decision: Decision): void {
-    for (const useClause of decision.useClauses) {
-      const depDecision = this.decisionCache.get(useClause.decisionName);
-      if (depDecision) {
-        this.addDependenciesFromDecision(actionName, depDecision);
-      }
-    }
-  }
-
-  private addDependenciesFromDecision(actionName: string, depDecision: Decision): void {
-    for (const depWhenClause of depDecision.whenClauses) {
-      for (const depAction of depWhenClause.actions) {
-        this.actionDependencies.get(actionName)?.add(depAction.action);
-      }
-    }
-  }
-
   private findActionLocation(ast: File, actionName: string): { line: number; column: number } {
     for (const statement of ast.statements) {
-      if (statement.type === 'Action' && statement.name === actionName) {
+      if (statement.type === 'Activity' && statement.name === actionName) {
         return statement.location.start;
       }
     }
     return { line: 1, column: 1 };
+  }
+
+  private validateActivity(activity: Activity): void {
+    if (!activity.name || !activity.name.trim()) {
+      throw new ValidationError('Activity name cannot be empty', activity.location.start);
+    }
+    if (!activity.activityType || !activity.activityType.trim()) {
+      throw new ValidationError('Activity type cannot be empty', activity.location.start);
+    }
+    if (!ACTION_FHIR_TYPES.has(activity.activityType)) {
+      throw new ValidationError(
+        `Invalid FHIR type for activity: ${activity.activityType}`,
+        activity.location.start,
+      );
+    }
+  }
+
+  private validateConcept(concept: Concept): void {
+    if (!concept.name || !concept.name.trim()) {
+      throw new ValidationError('Concept name cannot be empty', concept.location.start);
+    }
+    if (!concept.conceptType || !concept.conceptType.trim()) {
+      throw new ValidationError('Concept type cannot be empty', concept.location.start);
+    }
+    if (!CASEFEATURE_FHIR_TYPES.has(concept.conceptType)) {
+      throw new ValidationError(
+        `Invalid FHIR type for concept: ${concept.conceptType}`,
+        concept.location.start,
+      );
+    }
+    if (!concept.valueType || !concept.valueType.trim()) {
+      throw new ValidationError('Value type cannot be empty', concept.location.start);
+    }
+    if (!FHIR_VALUE_TYPES.has(concept.valueType)) {
+      throw new ValidationError(
+        `Invalid FHIR value type for concept: ${concept.valueType}`,
+        concept.location.start,
+      );
+    }
+  }
+
+  private validateTerminology(terminology: Terminology): void {
+    if (!terminology.name || !terminology.name.trim()) {
+      throw new ValidationError('Terminology name cannot be empty', terminology.location.start);
+    }
+    if (!terminology.definition) {
+      throw new ValidationError('Terminology must have a definition', terminology.location.start);
+    }
   }
 }
