@@ -21,7 +21,8 @@
     "example:full": "npm run build && node dist/examples/fullExample.js",
     "generate": "antlr4ts -Xforce-atn -o src/grammar/generated src/grammar/CPGLLexer.g4 && antlr4ts -Xforce-atn -o src/grammar/generated src/grammar/CPGLParser.g4",
     "example:lexer": "ts-node src/examples/run-lexer.ts",
-    "example:parser": "ts-node src/examples/run-parser.ts"
+    "example:parser": "ts-node src/examples/run-parser.ts",
+    "example:ast": "ts-node src/examples/run-ast.ts"
   },
   "keywords": [
     "clinical",

@@ -294,6 +294,25 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode> {
       throw new Error('Invalid concept body');
     }
 
+    const { conceptType, valueType } = this.parseConceptTypeAndValue(conceptBody);
+    const { provenance, currentIndex } = this.parseProvenance(conceptBody);
+    const definition = this.parseConceptDefinition(conceptBody, currentIndex);
+
+    return {
+      type: 'Concept',
+      name,
+      conceptType,
+      valueType,
+      provenance,
+      definition,
+      location: this.getLocation(ctx),
+    };
+  }
+
+  private parseConceptTypeAndValue(conceptBody: ParserRuleContext): {
+    conceptType: string;
+    valueType: string;
+  } {
     // Get concept type from hasTypeLine
     const hasTypeLine = conceptBody.getChild(0);
     if (!(hasTypeLine instanceof ParserRuleContext)) {
@@ -308,101 +327,125 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode> {
     }
     const valueType = hasValueTypeLine.getChild(2).text;
 
-    let provenance: string | undefined;
-    let definition: CodedByDefinition | InferredByDefinition;
+    return { conceptType, valueType };
+  }
 
-    // Check for provenance line
+  private parseProvenance(conceptBody: ParserRuleContext): {
+    provenance: string | undefined;
+    currentIndex: number;
+  } {
+    let provenance: string | undefined;
     let currentIndex = 2;
+
     const provenanceLine = conceptBody.getChild(currentIndex);
     if (provenanceLine instanceof ParserRuleContext && provenanceLine.getChild(0).text === 'has') {
       provenance = this.getStringValue(provenanceLine.getChild(2));
       currentIndex++;
     }
 
-    // Get definition (coded by or inferred by)
+    return { provenance, currentIndex };
+  }
+
+  private parseConceptDefinition(
+    conceptBody: ParserRuleContext,
+    currentIndex: number,
+  ): CodedByDefinition | InferredByDefinition {
     const definitionLine = conceptBody.getChild(currentIndex);
     if (!(definitionLine instanceof ParserRuleContext)) {
       throw new Error('Invalid concept definition');
     }
 
     if (definitionLine.getChild(0).text === 'coded') {
-      definition = {
-        type: 'CodedByDefinition',
-        terminologyName: this.getStringValue(definitionLine.getChild(2)),
-        location: this.getLocation(definitionLine),
-      };
+      return this.parseCodedByDefinition(definitionLine);
     } else {
-      // inferred by
-      const inferredBody = definitionLine.getChild(2);
-      if (!(inferredBody instanceof ParserRuleContext)) {
-        throw new Error('Invalid inferred by definition');
-      }
+      return this.parseInferredByDefinition(definitionLine);
+    }
+  }
 
-      // Check if this is an expression or pattern
-      const children = inferredBody.children || [];
-      if (children.length === 0) {
-        throw new Error('Invalid inferred by: expected expression or pattern');
-      }
+  private parseCodedByDefinition(definitionLine: ParserRuleContext): CodedByDefinition {
+    return {
+      type: 'CodedByDefinition',
+      terminologyName: this.getStringValue(definitionLine.getChild(2)),
+      location: this.getLocation(definitionLine),
+    };
+  }
 
-      const firstChild = children[0];
-      if (
-        firstChild instanceof ParserRuleContext &&
-        firstChild.childCount > 0 &&
-        firstChild.getChild(0).text === '('
-      ) {
-        // Expression case: inferred by (expr)
-        definition = {
-          type: 'InferredByDefinition',
-          expression: this.visitExpression(firstChild),
-          location: this.getLocation(definitionLine),
-        };
-      } else {
-        // Pattern case: inferred by [pattern] concept
-        // Get the pattern context
-        const patternContext = firstChild as ParserRuleContext;
-        const patternChildren = patternContext.children || [];
-
-        // The first identifier is optional and represents the pattern
-        let pattern: string | undefined;
-        let concept: string;
-
-        if (patternChildren.length === 1) {
-          // Only concept
-          concept = patternChildren[0].text;
-        } else if (patternChildren.length === 2) {
-          // Pattern and concept
-          pattern = patternChildren[0].text;
-          concept = patternChildren[1].text;
-        } else {
-          throw new Error('Invalid inferred by pattern: expected one or two identifiers');
-        }
-
-        // Validate strings
-        if (pattern && (!pattern.startsWith('"') || !pattern.endsWith('"'))) {
-          throw new Error('Invalid inferred by pattern: pattern must be a quoted string');
-        }
-        if (!concept.startsWith('"') || !concept.endsWith('"')) {
-          throw new Error('Invalid inferred by pattern: concept must be a quoted string');
-        }
-
-        definition = {
-          type: 'InferredByDefinition',
-          pattern: pattern ? pattern.slice(1, -1) : undefined,
-          concept: concept.slice(1, -1),
-          location: this.getLocation(definitionLine),
-        };
-      }
+  private parseInferredByDefinition(definitionLine: ParserRuleContext): InferredByDefinition {
+    const inferredBody = definitionLine.getChild(2);
+    if (!(inferredBody instanceof ParserRuleContext)) {
+      throw new Error('Invalid inferred by definition');
     }
 
+    const children = inferredBody.children || [];
+    if (children.length === 0) {
+      throw new Error('Invalid inferred by: expected expression or pattern');
+    }
+
+    const firstChild = children[0];
+    if (this.isExpressionNode(firstChild)) {
+      return this.parseInferredByExpression(firstChild, definitionLine);
+    } else {
+      return this.parseInferredByPattern(firstChild as ParserRuleContext, definitionLine);
+    }
+  }
+
+  private isExpressionNode(node: ParseTree): boolean {
+    return (
+      node instanceof ParserRuleContext && node.childCount > 0 && node.getChild(0).text === '('
+    );
+  }
+
+  private parseInferredByExpression(
+    node: ParseTree,
+    definitionLine: ParserRuleContext,
+  ): InferredByDefinition {
     return {
-      type: 'Concept',
-      name,
-      conceptType,
-      valueType,
-      provenance,
-      definition,
-      location: this.getLocation(ctx),
+      type: 'InferredByDefinition',
+      expression: this.visitExpression(node as ParserRuleContext),
+      location: this.getLocation(definitionLine),
     };
+  }
+
+  private parseInferredByPattern(
+    patternContext: ParserRuleContext,
+    definitionLine: ParserRuleContext,
+  ): InferredByDefinition {
+    const patternChildren = patternContext.children || [];
+    const { pattern, concept } = this.extractPatternAndConcept(patternChildren);
+
+    return {
+      type: 'InferredByDefinition',
+      pattern: pattern ? pattern.slice(1, -1) : undefined,
+      concept: concept.slice(1, -1),
+      location: this.getLocation(definitionLine),
+    };
+  }
+
+  private extractPatternAndConcept(patternChildren: ParseTree[]): {
+    pattern?: string;
+    concept: string;
+  } {
+    if (patternChildren.length === 1) {
+      const concept = patternChildren[0].text;
+      this.validateQuotedString(concept, 'concept');
+      return { concept };
+    }
+
+    if (patternChildren.length === 2) {
+      const pattern = patternChildren[0].text;
+      const concept = patternChildren[1].text;
+      this.validateQuotedString(pattern, 'pattern');
+      this.validateQuotedString(concept, 'concept');
+      return { pattern, concept };
+    }
+
+    throw new Error('Invalid inferred by pattern: expected one or two identifiers');
+  }
+
+  private validateQuotedString(text: string, fieldName: string): void {
+    if (!text.startsWith('"') || !text.endsWith('"')) {
+      throw new Error(`Invalid inferred by pattern: ${fieldName} must be a quoted string`);
+    }
   }
 
   visitExpression(ctx: ParserRuleContext): Expression {
