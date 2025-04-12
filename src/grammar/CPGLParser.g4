@@ -251,4 +251,5 @@ patternReference
 // A helper rule to also refer to a string literal.
 stringLiteral
     : STRING
+    | QUOTED_STRING
     ; 
