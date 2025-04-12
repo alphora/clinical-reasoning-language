@@ -6,14 +6,17 @@ import { CPGLParser } from '../../grammar/generated/CPGLParser';
 import { ASTBuilder } from '../builder';
 import {
   Activity,
+  BlockBody,
+  CodedByDefinition,
   Concept,
   Decision,
+  DoAction,
   File,
-  Terminology,
-  TerminologyValueset,
-  TerminologySystemCode,
-  CodedByDefinition,
   InferredByDefinition,
+  SingleAction,
+  Terminology,
+  TerminologySystemCode,
+  TerminologyValueset,
 } from '../types';
 
 describe('ASTBuilder', () => {
@@ -33,30 +36,31 @@ describe('ASTBuilder', () => {
   describe('Decision Statements', () => {
     it('should parse a simple decision with when clause', () => {
       const input = `
-        decision "Check BMI":
-          when "BMI" then do "Record BMI". done
+        decision "BMI":
+          when "BMI > 30" then do "CPGProposeDiagnosis Obesity".
         done
       `;
-
       const tree = parseInput(input);
-      const ast = builder.visit(tree) as File;
-
-      expect(ast.type).toBe('File');
-      expect(ast.statements).toHaveLength(1);
-
-      const decision = ast.statements[0] as Decision;
+      const result = builder.visit(tree) as File;
+      expect(result.type).toBe('File');
+      expect(result.statements).toHaveLength(1);
+      const decision = result.statements[0] as Decision;
       expect(decision.type).toBe('Decision');
-      expect(decision.name).toBe('Check BMI');
+      expect(decision.name).toBe('BMI');
       expect(decision.whenClauses).toHaveLength(1);
-      expect(decision.whenClauses[0].condition).toBe('BMI');
-      expect(decision.whenClauses[0].body.type).toBe('SingleAction');
+      expect(decision.whenClauses[0].condition).toBe('BMI > 30');
+      const body = decision.whenClauses[0].body as SingleAction;
+      expect(body.type).toBe('SingleAction');
+      const action = body.action as DoAction;
+      expect(action.type).toBe('DoAction');
+      expect(action.name).toBe('CPGProposeDiagnosis Obesity');
     });
 
     it('should parse a decision with multiple when clauses', () => {
       const input = `
         decision "Check BMI":
-          when "BMI" then do "Record BMI". done
-          when "Weight" then do "Record Weight". done
+          when "BMI" then do "Record BMI".
+          when "Weight" then do "Record Weight".
         done
       `;
 
@@ -72,8 +76,16 @@ describe('ASTBuilder', () => {
     it('should parse a decision with any/all qualifiers', () => {
       const input = `
         decision "Check Vitals":
-          when any: "Temperature" then do "Record Temp". done
-          when all: "Blood Pressure" then do "Record BP". done
+          when "Temperature" then:
+            any:
+              when "High" then do "Record High Temp".
+              when "Low" then do "Record Low Temp".
+          done
+          when "Blood Pressure" then:
+            all:
+              when "Systolic High" then do "Record Systolic".
+              when "Diastolic High" then do "Record Diastolic".
+          done
         done
       `;
 
@@ -81,8 +93,13 @@ describe('ASTBuilder', () => {
       const ast = builder.visit(tree) as File;
 
       const decision = ast.statements[0] as Decision;
-      expect(decision.whenClauses[0].qualifier).toBe('any');
-      expect(decision.whenClauses[1].qualifier).toBe('all');
+      const tempBlock = decision.whenClauses[0].body as BlockBody;
+      const bpBlock = decision.whenClauses[1].body as BlockBody;
+
+      expect(tempBlock.qualifier).toBe('any');
+      expect(bpBlock.qualifier).toBe('all');
+      expect(tempBlock.statements).toHaveLength(2);
+      expect(bpBlock.statements).toHaveLength(2);
     });
   });
 
@@ -221,7 +238,7 @@ describe('ASTBuilder', () => {
           coded by "BMI Valueset".
         done
         decision "Check BMI":
-          when "BMI" then do "Record BMI". done
+          when "BMI" then do "Record BMI".
         done
       `;
 
