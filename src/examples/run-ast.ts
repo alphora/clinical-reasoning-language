@@ -43,6 +43,9 @@ function printAST(node: ASTNode, indent = 0): void {
   if ('name' in node) {
     console.log(`${spaces}  name: ${node.name}`);
   }
+  if ('decisionName' in node) {
+    console.log(`${spaces}  decisionName: ${node.decisionName}`);
+  }
   if ('statements' in node && Array.isArray((node as unknown as File).statements)) {
     (node as unknown as File).statements.forEach(statement => printAST(statement, indent + 1));
   }

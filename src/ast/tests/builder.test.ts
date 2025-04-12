@@ -10,13 +10,14 @@ import {
   CodedByDefinition,
   Concept,
   Decision,
-  DoAction,
+  DoActivity,
   File,
   InferredByDefinition,
   SingleAction,
   Terminology,
   TerminologySystemCode,
   TerminologyValueset,
+  UseDecision,
 } from '../types';
 
 describe('ASTBuilder', () => {
@@ -51,9 +52,9 @@ describe('ASTBuilder', () => {
       expect(decision.whenClauses[0].condition).toBe('BMI > 30');
       const body = decision.whenClauses[0].body as SingleAction;
       expect(body.type).toBe('SingleAction');
-      const action = body.action as DoAction;
-      expect(action.type).toBe('DoAction');
-      expect(action.name).toBe('CPGProposeDiagnosis Obesity');
+      const action = body.action as DoActivity;
+      expect(action.type).toBe('DoActivity');
+      expect(action.activityName).toBe('CPGProposeDiagnosis Obesity');
     });
 
     it('should parse a decision with multiple when clauses', () => {
@@ -250,6 +251,28 @@ describe('ASTBuilder', () => {
       expect(ast.statements[1].type).toBe('Activity');
       expect(ast.statements[2].type).toBe('Concept');
       expect(ast.statements[3].type).toBe('Decision');
+    });
+  });
+
+  describe('Action Statements', () => {
+    it('should parse a do activity', () => {
+      const input = 'do CPGProposeDiagnosis';
+      const tree = parseInput(input);
+      const result = builder.visit(tree) as SingleAction;
+      expect(result.type).toBe('SingleAction');
+      const action = result.action as DoActivity;
+      expect(action.type).toBe('DoActivity');
+      expect(action.activityName).toBe('CPGProposeDiagnosis');
+    });
+
+    it('should parse a use decision', () => {
+      const input = 'use SomeDecision';
+      const tree = parseInput(input);
+      const result = builder.visit(tree) as SingleAction;
+      expect(result.type).toBe('SingleAction');
+      const action = result.action as UseDecision;
+      expect(action.type).toBe('UseDecision');
+      expect(action.decisionName).toBe('SomeDecision');
     });
   });
 });
