@@ -8,7 +8,8 @@ import {
   ASTNode,
   File,
   Decision,
-  WhenClause,
+  DecisionBody,
+  WhenBlock,
   SingleAction,
   Terminology,
   Concept,
@@ -49,11 +50,14 @@ function printAST(node: ASTNode, indent = 0): void {
   if ('statements' in node && Array.isArray((node as unknown as File).statements)) {
     (node as unknown as File).statements.forEach(statement => printAST(statement, indent + 1));
   }
-  if ('whenClauses' in node && Array.isArray((node as unknown as Decision).whenClauses)) {
-    (node as unknown as Decision).whenClauses.forEach(clause => printAST(clause, indent + 1));
+  if ('body' in node && (node as unknown as Decision).body) {
+    const decisionBody = (node as unknown as Decision).body;
+    if ('statements' in decisionBody && Array.isArray(decisionBody.statements)) {
+      decisionBody.statements.forEach((block: WhenBlock) => printAST(block, indent + 1));
+    }
   }
-  if ('body' in node && (node as unknown as WhenClause).body) {
-    printAST((node as unknown as WhenClause).body, indent + 1);
+  if ('body' in node && (node as unknown as WhenBlock).body) {
+    printAST((node as unknown as WhenBlock).body, indent + 1);
   }
   if ('action' in node && (node as unknown as SingleAction).action) {
     printAST((node as unknown as SingleAction).action, indent + 1);

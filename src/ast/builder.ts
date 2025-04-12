@@ -230,7 +230,7 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode> {
 
   visitTerminologyStatement(ctx: TerminologyStatementContext): Terminology {
     const terminologyName = this.getStringValue(ctx.getChild(1));
-    const definition = this.visitTerminologyDefinition(this.getContext(ctx.getChild(3)));
+    const definition = this.visitTerminologyDefinition(this.getContext(ctx.getChild(2)));
     return {
       type: TerminologyType.type,
       name: terminologyName,
@@ -255,12 +255,36 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode> {
 
   visitConceptStatement(ctx: ConceptStatementContext): Concept {
     const conceptName = this.getStringValue(ctx.getChild(1));
-    const conceptType = this.getStringValue(ctx.getChild(3));
-    const valueType = this.getStringValue(ctx.getChild(5));
-    const provenance = ctx.childCount > 7 ? this.getStringValue(ctx.getChild(7)) : undefined;
-    const definition = this.visitConceptDefinition(
-      this.getContext(ctx.getChild(ctx.childCount - 2)),
-    );
+    const conceptBody = this.getContext(ctx.getChild(3));
+    
+    // Find the type, valueType, provenance, and definition
+    let conceptType = '';
+    let valueType = '';
+    let provenance: string | undefined;
+    let definition: ConceptDefinition | undefined;
+    
+    for (let i = 0; i < conceptBody.childCount; i++) {
+      const child = conceptBody.getChild(i);
+      if (child instanceof ParserRuleContext) {
+        const firstToken = child.getChild(0)?.text;
+        if (firstToken === 'has') {
+          const secondToken = child.getChild(1)?.text;
+          if (secondToken === 'type') {
+            conceptType = this.getStringValue(child.getChild(2));
+          } else if (secondToken === 'valuetype') {
+            valueType = this.getStringValue(child.getChild(2));
+          } else if (secondToken === 'provenance') {
+            provenance = this.getStringValue(child.getChild(2));
+          }
+        } else if (firstToken === 'coded' || firstToken === 'inferred') {
+          definition = this.visitConceptDefinition(child);
+        }
+      }
+    }
+
+    if (!definition) {
+      throw new Error('Concept definition is required');
+    }
 
     return {
       type: ConceptType.type,
