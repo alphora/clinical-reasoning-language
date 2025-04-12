@@ -21,11 +21,11 @@ import {
   ActivityType,
   BlockBody,
   BlockBodyType,
-  BlockStatement,
   CodedByDefinition,
   CodedByDefinitionType,
   Concept,
   ConceptType,
+  ConceptDefinition,
   Decision,
   DecisionType,
   DoActivity,
@@ -50,9 +50,9 @@ import {
   TerminologySystemCodeType,
   UseDecision,
   UseDecisionType,
-  WhenClause,
-  WhenClauseType,
-  WhenClauseBody,
+  WhenBlock,
+  WhenBlockType,
+  WhenBlockBody,
 } from './types';
 
 export class ASTBuilder implements ParseTreeVisitor<ASTNode> {
@@ -124,30 +124,41 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode> {
 
   visitDecisionStatement(ctx: DecisionStatementContext): Decision {
     const decisionName = this.getStringValue(ctx.getChild(1));
-    const blockBody = this.visitBlockBody(this.getContext(ctx.getChild(3)));
+    const whenBlocks: WhenBlock[] = [];
+    const blockBody = this.getContext(ctx.getChild(3));
+    for (let i = 0; i < blockBody.childCount; i++) {
+      const child = blockBody.getChild(i);
+      if (child instanceof ParserRuleContext && child.getChild(0)?.text === 'when') {
+        whenBlocks.push(this.visitWhenBlock(child));
+      }
+    }
     return {
       type: DecisionType.type,
       name: decisionName,
-      body: blockBody,
+      body: {
+        type: 'DecisionBody',
+        statements: whenBlocks,
+        location: this.getLocation(ctx),
+      },
       location: this.getLocation(ctx),
     };
   }
 
-  visitWhenBlock(ctx: ParserRuleContext): WhenClause {
+  visitWhenBlock(ctx: ParserRuleContext): WhenBlock {
     const condition = this.getStringValue(ctx.getChild(1));
-    const body = this.visitWhenClauseBody(this.getContext(ctx.getChild(3)));
+    const body = this.visitWhenBlockBody(this.getContext(ctx.getChild(3)));
     return {
-      type: WhenClauseType.type,
+      type: WhenBlockType.type,
       condition,
       body,
       location: this.getLocation(ctx),
     };
   }
 
-  visitWhenClauseBody(ctx: ParserRuleContext): WhenClauseBody {
+  visitWhenBlockBody(ctx: ParserRuleContext): WhenBlockBody {
     if (ctx.childCount === 2 && ctx.getChild(1).text === '.') {
       // Single action statement (ends with a dot)
-      return this.visitSingleAction(ctx);
+      return this.visitSingleAction(this.getContext(ctx.getChild(0)));
     } else {
       // Block body
       return this.visitBlockBody(ctx);
@@ -155,16 +166,20 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode> {
   }
 
   visitBlockBody(ctx: ParserRuleContext): BlockBody {
-    const statements: BlockStatement[] = [];
-    let qualifier: 'any' | 'all' | undefined;
-    for (let i = 1; i < ctx.childCount - 1; i++) {
+    const statements: (WhenBlock | ActionStatement)[] = [];
+    let qualifier: string | undefined;
+    for (let i = 0; i < ctx.childCount; i++) {
       const child = ctx.getChild(i);
       if (child instanceof ParserRuleContext) {
-        if (child.getChild(0).text === 'any' || child.getChild(0).text === 'all') {
-          qualifier = child.getChild(0).text as 'any' | 'all';
-        } else {
-          const statement = this.visitBlockStatement(child);
-          statements.push(statement);
+        const firstChild = child.getChild(0);
+        if (firstChild?.text === 'any') {
+          qualifier = CPGLLexer.ANY.toString();
+        } else if (firstChild?.text === 'all') {
+          qualifier = CPGLLexer.ALL.toString();
+        } else if (firstChild?.text === 'when') {
+          statements.push(this.visitWhenBlock(child));
+        } else if (firstChild?.text === 'do' || firstChild?.text === 'use') {
+          statements.push(this.visitActionStatement(child));
         }
       }
     }
@@ -176,22 +191,19 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode> {
     };
   }
 
-  visitBlockStatement(ctx: ParserRuleContext): BlockStatement {
-    const child = ctx.getChild(0);
-    if (child instanceof ParserRuleContext) {
-      if (child.getChild(0).text === 'when') {
-        return this.visitWhenBlock(child);
-      } else {
-        return this.visitActionStatement(child);
-      }
-    }
-    throw new Error('Invalid block statement');
-  }
-
   visitActionStatement(ctx: ParserRuleContext): ActionStatement {
-    const action = this.visitAction(this.getContext(ctx.getChild(0)));
+    const action = this.visitAction(ctx);
     return {
       type: ActionStatementType.type,
+      action,
+      location: this.getLocation(ctx),
+    };
+  }
+
+  visitSingleAction(ctx: ParserRuleContext): SingleAction {
+    const action = this.visitAction(ctx);
+    return {
+      type: SingleActionType.type,
       action,
       location: this.getLocation(ctx),
     };
@@ -201,7 +213,7 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode> {
     const actionType = ctx.getChild(0).text;
     const name = this.getStringValue(ctx.getChild(1));
 
-    if (actionType === CPGLLexer.DO.toString()) {
+    if (actionType === 'do') {
       return {
         type: DoActivityType.type,
         activityName: name,
@@ -214,15 +226,6 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode> {
         location: this.getLocation(ctx),
       };
     }
-  }
-
-  visitSingleAction(ctx: ParserRuleContext): SingleAction {
-    const action = this.visitAction(this.getContext(ctx.getChild(0)));
-    return {
-      type: SingleActionType.type,
-      action,
-      location: this.getLocation(ctx),
-    };
   }
 
   visitTerminologyStatement(ctx: TerminologyStatementContext): Terminology {
@@ -238,11 +241,14 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode> {
 
   visitActivityStatement(ctx: ActivityStatementContext): Activity {
     const activityName = this.getStringValue(ctx.getChild(1));
-    const blockBody = this.visitBlockBody(this.getContext(ctx.getChild(3)));
+    const activityType = this.getStringValue(ctx.getChild(3));
+    const terminologyReference =
+      ctx.childCount > 5 ? this.getStringValue(ctx.getChild(5)) : undefined;
     return {
       type: ActivityType.type,
       name: activityName,
-      body: blockBody,
+      activityType,
+      terminologyReference,
       location: this.getLocation(ctx),
     };
   }
@@ -251,52 +257,71 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode> {
     const conceptName = this.getStringValue(ctx.getChild(1));
     const conceptType = this.getStringValue(ctx.getChild(3));
     const valueType = this.getStringValue(ctx.getChild(5));
-    const definition = this.visitConceptDefinition(this.getContext(ctx.getChild(7)));
+    const provenance = ctx.childCount > 7 ? this.getStringValue(ctx.getChild(7)) : undefined;
+    const definition = this.visitConceptDefinition(
+      this.getContext(ctx.getChild(ctx.childCount - 2)),
+    );
+
     return {
       type: ConceptType.type,
       name: conceptName,
       conceptType,
       valueType,
+      provenance,
       definition,
       location: this.getLocation(ctx),
     };
   }
 
-  private visitTerminologyDefinition(ctx: ParserRuleContext): TerminologyDefinition {
-    const firstChild = ctx.getChild(0);
-    if (firstChild.text === CPGLLexer.VALUESET.toString()) {
-      return {
-        type: TerminologyValuesetType.type,
-        valuesetName: this.getStringValue(ctx.getChild(1)),
-        location: this.getLocation(ctx),
-      };
-    } else if (firstChild.text === CPGLLexer.UNKNOWN.toString()) {
-      return {
-        type: TerminologyUnknownType.type,
-        location: this.getLocation(ctx),
-      };
+  visitTerminologyDefinition(ctx: ParserRuleContext): TerminologyDefinition {
+    const firstToken = ctx.getChild(0).text;
+    if (firstToken === 'valueset') {
+      return this.visitTerminologyValueset(ctx);
+    } else if (firstToken === 'system') {
+      return this.visitTerminologySystemCode(ctx);
     } else {
-      // system code
-      return {
-        type: TerminologySystemCodeType.type,
-        system: this.getStringValue(ctx.getChild(1)),
-        code: this.getStringValue(ctx.getChild(3)),
-        location: this.getLocation(ctx),
-      };
+      return this.visitTerminologyUnknown(ctx);
     }
   }
 
-  private visitConceptDefinition(ctx: ParserRuleContext): CodedByDefinition | InferredByDefinition {
-    const firstChild = ctx.getChild(0);
-    if (firstChild.text === CPGLLexer.CODED.toString()) {
+  visitTerminologyValueset(ctx: ParserRuleContext): TerminologyValueset {
+    const valuesetName = this.getStringValue(ctx.getChild(1));
+    return {
+      type: TerminologyValuesetType.type,
+      valuesetName,
+      location: this.getLocation(ctx),
+    };
+  }
+
+  visitTerminologySystemCode(ctx: ParserRuleContext): TerminologySystemCode {
+    const system = this.getStringValue(ctx.getChild(1));
+    const code = this.getStringValue(ctx.getChild(3));
+    return {
+      type: TerminologySystemCodeType.type,
+      system,
+      code,
+      location: this.getLocation(ctx),
+    };
+  }
+
+  visitTerminologyUnknown(ctx: ParserRuleContext): TerminologyUnknown {
+    return {
+      type: TerminologyUnknownType.type,
+      location: this.getLocation(ctx),
+    };
+  }
+
+  visitConceptDefinition(ctx: ParserRuleContext): ConceptDefinition {
+    const firstToken = ctx.getChild(0).text;
+    if (firstToken === 'coded') {
       return this.visitCodedByDefinition(ctx);
     } else {
       return this.visitInferredByDefinition(ctx);
     }
   }
 
-  private visitCodedByDefinition(ctx: ParserRuleContext): CodedByDefinition {
-    const terminologyName = this.getStringValue(ctx.getChild(1));
+  visitCodedByDefinition(ctx: ParserRuleContext): CodedByDefinition {
+    const terminologyName = this.getStringValue(ctx.getChild(2));
     return {
       type: CodedByDefinitionType.type,
       terminologyName,
@@ -304,16 +329,15 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode> {
     };
   }
 
-  private visitInferredByDefinition(ctx: ParserRuleContext): InferredByDefinition {
-    const pattern = ctx.childCount > 1 ? this.getStringValue(ctx.getChild(1)) : undefined;
-    const concept = ctx.childCount > 2 ? this.getStringValue(ctx.getChild(2)) : undefined;
-    const expression =
-      ctx.childCount > 3 ? this.visitExpression(this.getContext(ctx.getChild(3))) : undefined;
+  visitInferredByDefinition(ctx: ParserRuleContext): InferredByDefinition {
+    const pattern = ctx.childCount > 2 ? this.getStringValue(ctx.getChild(2)) : undefined;
+    const concept = ctx.childCount > 4 ? this.getStringValue(ctx.getChild(4)) : undefined;
+    const descriptiveLogic = ctx.childCount > 6 ? this.getStringValue(ctx.getChild(6)) : undefined;
     return {
       type: InferredByDefinitionType.type,
       pattern,
       concept,
-      expression,
+      descriptiveLogic,
       location: this.getLocation(ctx),
     };
   }
@@ -332,36 +356,23 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode> {
   }
 
   private getStringValue(node: ParseTree): string {
-    if (!(node instanceof ParserRuleContext)) {
-      return node.text;
-    }
-    return node.text;
+    const text = node.text;
+    // Remove quotes if present
+    return text.startsWith('"') && text.endsWith('"') ? text.slice(1, -1) : text;
   }
 
   private getLocation(ctx: ParserRuleContext): {
     start: { line: number; column: number };
     end: { line: number; column: number };
   } {
-    if (!ctx.stop) {
-      return {
-        start: {
-          line: ctx.start.line,
-          column: ctx.start.charPositionInLine,
-        },
-        end: {
-          line: ctx.start.line,
-          column: ctx.start.charPositionInLine + (ctx.start.text?.length ?? 0),
-        },
-      };
-    }
     return {
       start: {
         line: ctx.start.line,
         column: ctx.start.charPositionInLine,
       },
       end: {
-        line: ctx.stop.line,
-        column: ctx.stop.charPositionInLine + (ctx.stop.text?.length ?? 0),
+        line: ctx.stop?.line ?? ctx.start.line,
+        column: ctx.stop?.charPositionInLine ?? ctx.start.charPositionInLine,
       },
     };
   }
@@ -382,31 +393,7 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode> {
     );
   }
 
-  private isBlockStatement(node: ASTNode): node is BlockStatement {
-    return node.type === WhenClauseType.type || node.type === ActionStatementType.type;
-  }
-
-  visitTerminologyValueset(ctx: ParserRuleContext): TerminologyValueset {
-    return {
-      type: TerminologyValuesetType.type,
-      valuesetName: this.getStringValue(ctx.getChild(1)),
-      location: this.getLocation(ctx),
-    };
-  }
-
-  visitTerminologyUnknown(ctx: ParserRuleContext): TerminologyUnknown {
-    return {
-      type: TerminologyUnknownType.type,
-      location: this.getLocation(ctx),
-    };
-  }
-
-  visitTerminologySystemCode(ctx: ParserRuleContext): TerminologySystemCode {
-    return {
-      type: TerminologySystemCodeType.type,
-      system: this.getStringValue(ctx.getChild(1)),
-      code: this.getStringValue(ctx.getChild(3)),
-      location: this.getLocation(ctx),
-    };
+  private isBlockStatement(node: ASTNode): node is WhenBlock | ActionStatement {
+    return node.type === WhenBlockType.type || node.type === ActionStatementType.type;
   }
 }
