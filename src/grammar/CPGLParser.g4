@@ -149,7 +149,7 @@ provenanceLine
 
 // "coded by" clause for concepts that reference a terminology.
 codedByLine
-    : CODED BY teminologyReference DOT
+    : CODED BY terminologyReference DOT
     ;
 
 // "inferred by" clause for how a concept can be informally derived from other concepts.
