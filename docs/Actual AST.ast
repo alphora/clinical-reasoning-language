@@ -1,0 +1,201 @@
+Decision
+  name: IMMZ.D2.D5.Measles
+  WhenBlock
+    WhenBlock
+      WhenBlock
+        SingleAction
+          DoActivity
+      WhenBlock
+        SingleAction
+          UseDecision
+            decisionName: Elderly Based
+      BlockBody
+        WhenBlock
+          SingleAction
+            DoActivity
+        WhenBlock
+          SingleAction
+            UseDecision
+              decisionName: Elderly Based
+    WhenBlock
+      SingleAction
+        DoActivity
+    BlockBody
+      WhenBlock
+        WhenBlock
+          SingleAction
+            DoActivity
+        WhenBlock
+          SingleAction
+            UseDecision
+              decisionName: Elderly Based
+        BlockBody
+          WhenBlock
+            SingleAction
+              DoActivity
+          WhenBlock
+            SingleAction
+              UseDecision
+                decisionName: Elderly Based
+      WhenBlock
+        SingleAction
+          DoActivity
+  WhenBlock
+    WhenBlock
+      SingleAction
+        DoActivity
+    WhenBlock
+      SingleAction
+        UseDecision
+          decisionName: Elderly Based
+    WhenBlock
+      SingleAction
+        DoActivity
+    BlockBody
+      WhenBlock
+        SingleAction
+          DoActivity
+      WhenBlock
+        SingleAction
+          UseDecision
+            decisionName: Elderly Based
+      WhenBlock
+        SingleAction
+          DoActivity
+  WhenBlock
+    SingleAction
+      DoActivity
+  DecisionBody
+    WhenBlock
+      WhenBlock
+        WhenBlock
+          SingleAction
+            DoActivity
+        WhenBlock
+          SingleAction
+            UseDecision
+              decisionName: Elderly Based
+        BlockBody
+          WhenBlock
+            SingleAction
+              DoActivity
+          WhenBlock
+            SingleAction
+              UseDecision
+                decisionName: Elderly Based
+      WhenBlock
+        SingleAction
+          DoActivity
+      BlockBody
+        WhenBlock
+          WhenBlock
+            SingleAction
+              DoActivity
+          WhenBlock
+            SingleAction
+              UseDecision
+                decisionName: Elderly Based
+          BlockBody
+            WhenBlock
+              SingleAction
+                DoActivity
+            WhenBlock
+              SingleAction
+                UseDecision
+                  decisionName: Elderly Based
+        WhenBlock
+          SingleAction
+            DoActivity
+    WhenBlock
+      WhenBlock
+        SingleAction
+          DoActivity
+      WhenBlock
+        SingleAction
+          UseDecision
+            decisionName: Elderly Based
+      WhenBlock
+        SingleAction
+          DoActivity
+      BlockBody
+        WhenBlock
+          SingleAction
+            DoActivity
+        WhenBlock
+          SingleAction
+            UseDecision
+              decisionName: Elderly Based
+        WhenBlock
+          SingleAction
+            DoActivity
+    WhenBlock
+      SingleAction
+        DoActivity
+Decision
+  name: Elderly Based
+  WhenBlock
+    SingleAction
+      DoActivity
+  WhenBlock
+    BlockBody
+  WhenBlock
+    WhenBlock
+      BlockBody
+    BlockBody
+      WhenBlock
+        BlockBody
+  DecisionBody
+    WhenBlock
+      SingleAction
+        DoActivity
+    WhenBlock
+      BlockBody
+    WhenBlock
+      WhenBlock
+        BlockBody
+      BlockBody
+        WhenBlock
+          BlockBody
+Terminology
+  name: BMI Valueset
+  TerminologyValueset
+Terminology
+  name: Height Valueset
+  TerminologyValueset
+Terminology
+  name: Weight Valueset
+  TerminologyValueset
+Terminology
+  name: some terminology
+  TerminologyUnknown
+Terminology
+  name: Colonoscopy
+  TerminologySystemCode
+Activity
+  name: Vaccinate
+Activity
+  name: Indicate
+Concept
+  name: Most Recent BMI
+  InferredByDefinition
+Concept
+  name: BMI
+  InferredByDefinition
+Concept
+  name: BMI Range as a Condition
+  CodedByDefinition
+Concept
+  name: BMI as an Observation
+  CodedByDefinition
+Concept
+  name: Calculated BMI
+  InferredByDefinition
+Concept
+  name: Patient Height
+  CodedByDefinition
+Concept
+  name: Patient Weight
+  CodedByDefinition
+Concept
+  name: Client Age Greater Than 60
+  InferredByDefinition

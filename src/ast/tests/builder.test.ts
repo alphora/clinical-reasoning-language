@@ -3,6 +3,7 @@ import { ParseTree } from 'antlr4ts/tree/ParseTree';
 
 import { CPGLLexer } from '../../grammar/generated/CPGLLexer';
 import { CPGLParser } from '../../grammar/generated/CPGLParser';
+import { createLexer } from '../../lexer/createLexer';
 import { ASTBuilder } from '../builder';
 import {
   Activity,
@@ -42,7 +43,7 @@ describe('ASTBuilder', () => {
   });
 
   const parseInput = (input: string): ParseTree => {
-    const lexer = new CPGLLexer(CharStreams.fromString(input));
+    const lexer = createLexer(CharStreams.fromString(input));
     const tokens = new CommonTokenStream(lexer);
     const parser = new CPGLParser(tokens);
     return parser.cpgl();
@@ -364,17 +365,17 @@ done
 
       const tree = parseInput(input);
       const result = builder.visit(tree) as File;
-      
+
       const decision = result.statements[0] as Decision;
-      
+
       // Verify Decision has a DecisionBody
       expect(decision.body).toBeDefined();
       expect(decision.body.type).toBe('DecisionBody');
-      
+
       // Verify WhenBlocks are under DecisionBody, not directly under Decision
       const decisionKeys = Object.keys(decision);
       expect(decisionKeys).not.toContain('WhenBlock');
-      
+
       // Verify WhenBlocks are properly nested under DecisionBody
       expect(decision.body.statements).toBeDefined();
       expect(decision.body.statements.length).toBeGreaterThan(0);

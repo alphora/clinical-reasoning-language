@@ -1,6 +1,7 @@
 import { CharStreams } from 'antlr4ts';
 
 import { CPGLLexer } from '../../grammar/generated/CPGLLexer';
+import { createLexer } from '../createLexer';
 
 import { getAllTokens, verifyTokenSequence } from './index.test';
 
@@ -11,7 +12,7 @@ describe('Structures', () => {
     when "Condition" then
         do "Action"
     done`;
-      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const lexer = createLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
 
       verifyTokenSequence(tokens, [

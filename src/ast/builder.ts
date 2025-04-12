@@ -4,7 +4,6 @@ import { ParseTreeVisitor } from 'antlr4ts/tree/ParseTreeVisitor';
 import { RuleNode } from 'antlr4ts/tree/RuleNode';
 import { TerminalNode } from 'antlr4ts/tree/TerminalNode';
 
-import { CPGLLexer } from '../grammar/generated/CPGLLexer';
 import {
   CPGLParser,
   DecisionStatementContext,
@@ -171,22 +170,23 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode> {
 
     // Skip the initial COLON
     let i = 1;
-    
+
     // Check for any/all qualifier
     const firstChild = ctx.getChild(i);
     if (firstChild instanceof ParserRuleContext) {
       const firstToken = firstChild.getChild(0)?.text;
       if (firstToken === 'any') {
-        qualifier = CPGLLexer.ANY.toString();
+        qualifier = 'any';
         i++; // Skip the qualifier
       } else if (firstToken === 'all') {
-        qualifier = CPGLLexer.ALL.toString();
+        qualifier = 'all';
         i++; // Skip the qualifier
       }
     }
 
     // Process block statements until DONE
-    for (let j = i; j < ctx.childCount - 1; j++) { // -1 to skip the final DONE
+    for (let j = i; j < ctx.childCount - 1; j++) {
+      // -1 to skip the final DONE
       const child = ctx.getChild(j);
       if (child instanceof ParserRuleContext) {
         // Each block statement is a complete statement (when/do/use)
@@ -374,18 +374,18 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode> {
 
   visitInferredByDefinition(ctx: ParserRuleContext): InferredByDefinition {
     const inferredBody = this.getContext(ctx.getChild(2));
-    
+
     // Check if it's a descriptive logic (enclosed in parentheses)
     if (
       inferredBody.getChild(0) instanceof ParserRuleContext &&
       inferredBody.getChild(0).constructor.name === 'InferredByDescriptiveLogicContext'
     ) {
       const descriptiveLogic = inferredBody.text;
-      
+
       // For simple descriptive logic (no nested parentheses), remove all parentheses
       // For complex descriptive logic (with nested parentheses), keep them
       const hasNestedParentheses = (descriptiveLogic.match(/\(/g) || []).length > 1;
-      
+
       let cleanedLogic = descriptiveLogic;
       if (!hasNestedParentheses) {
         // Simple case - remove all parentheses
@@ -407,18 +407,18 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode> {
           .replace(/\s*(and|or)\s*/g, ' $1 ') // Ensure spaces around operators
           .trim(); // Remove leading/trailing whitespace
       }
-      
+
       return {
         type: InferredByDefinitionType.type,
         descriptiveLogic: cleanedLogic,
         location: this.getLocation(ctx),
       };
     }
-    
+
     // Otherwise it's a concept reference with optional pattern
     const text = inferredBody.text;
     const matches = text.match(/"([^"]+)"\s*"([^"]+)"/);
-    
+
     if (matches && matches.length === 3) {
       // We have both pattern and concept
       return {
