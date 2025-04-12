@@ -37,11 +37,11 @@ LPAREN       : '(';
 RPAREN       : ')';
 
 QUOTED_STRING
-    : '"' ( ~["\r\n] )* '"'
+    : '"' ( ~["\\\r\n] )* '"'
     ;
 
 STRING
-    : '"' ( ~["\\\r\n] )* '"'
+    : '"' ( '\\' . | ~["] )* '"'
     ;
 
 // Block comment fragment

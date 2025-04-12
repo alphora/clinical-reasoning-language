@@ -65,6 +65,30 @@ describe('CPGL Lexer - Basic Tokens', () => {
 
       verifyTokenSequence(tokens, [CPGLLexer.QUOTED_STRING], ['"Test String With Spaces"']);
     });
+
+    it('should tokenize provenance value without backslashes as QUOTED_STRING', () => {
+      const input = 'has provenance "some provenance"';
+      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const tokens = getAllTokens(lexer);
+
+      verifyTokenSequence(
+        tokens,
+        [CPGLLexer.HAS, CPGLLexer.PROVENANCE, CPGLLexer.QUOTED_STRING],
+        ['has', 'provenance', '"some provenance"'],
+      );
+    });
+
+    it('should tokenize provenance value with backslashes as STRING', () => {
+      const input = 'has provenance "some\\provenance"';
+      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const tokens = getAllTokens(lexer);
+
+      verifyTokenSequence(
+        tokens,
+        [CPGLLexer.HAS, CPGLLexer.PROVENANCE, CPGLLexer.STRING],
+        ['has', 'provenance', '"some\\provenance"'],
+      );
+    });
   });
 
   describe('Boolean Operators', () => {
