@@ -4,27 +4,53 @@ import { ParseTreeVisitor } from 'antlr4ts/tree/ParseTreeVisitor';
 import { RuleNode } from 'antlr4ts/tree/RuleNode';
 import { TerminalNode } from 'antlr4ts/tree/TerminalNode';
 
-import { CPGLParser } from '../grammar/generated/CPGLParser';
+import {
+  CPGLParser,
+  DecisionStatementContext,
+  TerminologyStatementContext,
+  ActivityStatementContext,
+  ConceptStatementContext,
+} from '../grammar/generated/CPGLParser';
 
 import {
   ASTNode,
   ActionStatement,
-  Expression,
-  Statement,
+  ActionStatementType,
   Activity,
+  ActivityType,
   BlockBody,
+  BlockBodyType,
   BlockStatement,
   CodedByDefinition,
+  CodedByDefinitionType,
   Concept,
+  ConceptType,
   Decision,
-  DoAction,
+  DecisionType,
+  DoActivity,
+  DoActivityType,
+  Expression,
+  ExpressionType,
   File,
+  FileType,
   InferredByDefinition,
+  InferredByDefinitionType,
   SingleAction,
+  SingleActionType,
+  Statement,
   Terminology,
+  TerminologyType,
   TerminologyDefinition,
-  UseAction,
+  TerminologyValueset,
+  TerminologyValuesetType,
+  TerminologyUnknown,
+  TerminologyUnknownType,
+  TerminologySystemCode,
+  TerminologySystemCodeType,
+  UseDecision,
+  UseDecisionType,
   WhenClause,
+  WhenClauseType,
   WhenClauseBody,
 } from './types';
 
@@ -64,116 +90,85 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode> {
 
   visitCpgl(ctx: ParserRuleContext): File {
     const statements: Statement[] = [];
-
-    for (let i = 0; i < ctx.childCount - 1; i++) {
-      // -1 to skip EOF
+    for (let i = 0; i < ctx.childCount; i++) {
       const child = ctx.getChild(i);
       if (child instanceof ParserRuleContext) {
         const statement = this.visitStatement(child);
-        if (statement && this.isStatement(statement)) {
+        if (statement) {
           statements.push(statement);
         }
       }
     }
-
     return {
-      type: 'File',
+      type: FileType.type,
       statements,
       location: this.getLocation(ctx),
     };
   }
 
   visitStatement(ctx: ParserRuleContext): Statement | null {
-    const child = ctx.getChild(0);
-    if (child instanceof ParserRuleContext) {
-      const firstChild = child.getChild(0);
-      if (firstChild.text === 'decision') {
-        return this.visitDecisionStatement(child);
-      } else if (firstChild.text === 'terminology') {
-        return this.visitTerminologyStatement(child);
-      } else if (firstChild.text === 'activity') {
-        return this.visitActivityStatement(child);
-      } else if (firstChild.text === 'concept') {
-        return this.visitConceptStatement(child);
-      }
+    const child = this.getContext(ctx.getChild(0));
+    if (child instanceof DecisionStatementContext) {
+      return this.visitDecisionStatement(child);
+    } else if (child instanceof TerminologyStatementContext) {
+      return this.visitTerminologyStatement(child);
+    } else if (child instanceof ActivityStatementContext) {
+      return this.visitActivityStatement(child);
+    } else if (child instanceof ConceptStatementContext) {
+      return this.visitConceptStatement(child);
+    } else {
+      throw new Error(`Unknown statement type: ${child.constructor.name}`);
     }
-    return null;
   }
 
-  visitDecisionStatement(ctx: ParserRuleContext): Decision {
-    const name = this.getStringValue(ctx.getChild(1));
-    const whenClauses: WhenClause[] = [];
-
-    // Visit all when blocks
-    const decisionBody = ctx.getChild(3);
-    if (decisionBody instanceof ParserRuleContext) {
-      for (let i = 0; i < decisionBody.childCount; i++) {
-        const child = decisionBody.getChild(i);
-        if (child instanceof ParserRuleContext) {
-          const whenClause = this.visitWhenBlock(child);
-          if (whenClause.type === 'WhenClause') {
-            whenClauses.push(whenClause);
-          }
-        }
-      }
-    }
-
+  visitDecisionStatement(ctx: DecisionStatementContext): Decision {
+    const decisionName = this.getStringValue(ctx.getChild(1));
+    const blockBody = this.visitBlockBody(this.getContext(ctx.getChild(3)));
     return {
-      type: 'Decision',
-      name,
-      whenClauses,
+      type: DecisionType.type,
+      name: decisionName,
+      body: blockBody,
       location: this.getLocation(ctx),
     };
   }
 
   visitWhenBlock(ctx: ParserRuleContext): WhenClause {
     const condition = this.getStringValue(ctx.getChild(1));
-    const body = ctx.getChild(3);
-    let whenClauseBody: WhenClauseBody;
-    if (body instanceof ParserRuleContext) {
-      if (body.childCount === 2 && body.getChild(1).text === '.') {
-        // Single action statement (ends with a dot)
-        whenClauseBody = this.visitSingleAction(body);
-      } else {
-        // Block body
-        whenClauseBody = this.visitBlockBody(body);
-      }
-    } else {
-      throw new Error('Invalid when block body');
-    }
-
+    const body = this.visitWhenClauseBody(this.getContext(ctx.getChild(3)));
     return {
-      type: 'WhenClause',
+      type: WhenClauseType.type,
       condition,
-      body: whenClauseBody,
+      body,
       location: this.getLocation(ctx),
     };
+  }
+
+  visitWhenClauseBody(ctx: ParserRuleContext): WhenClauseBody {
+    if (ctx.childCount === 2 && ctx.getChild(1).text === '.') {
+      // Single action statement (ends with a dot)
+      return this.visitSingleAction(ctx);
+    } else {
+      // Block body
+      return this.visitBlockBody(ctx);
+    }
   }
 
   visitBlockBody(ctx: ParserRuleContext): BlockBody {
     const statements: BlockStatement[] = [];
     let qualifier: 'any' | 'all' | undefined;
-
-    // Check for any/all qualifier
-    const anyOrAllClause = ctx.getChild(1);
-    if (anyOrAllClause instanceof ParserRuleContext) {
-      qualifier = anyOrAllClause.getChild(0).text as 'any' | 'all';
-    }
-
-    // Process block statements
-    const startIndex = qualifier ? 2 : 1;
-    for (let i = startIndex; i < ctx.childCount - 1; i++) {
+    for (let i = 1; i < ctx.childCount - 1; i++) {
       const child = ctx.getChild(i);
       if (child instanceof ParserRuleContext) {
-        const statement = this.visitBlockStatement(child);
-        if (this.isBlockStatement(statement)) {
+        if (child.getChild(0).text === 'any' || child.getChild(0).text === 'all') {
+          qualifier = child.getChild(0).text as 'any' | 'all';
+        } else {
+          const statement = this.visitBlockStatement(child);
           statements.push(statement);
         }
       }
     }
-
     return {
-      type: 'BlockBody',
+      type: BlockBodyType.type,
       qualifier,
       statements,
       location: this.getLocation(ctx),
@@ -193,27 +188,27 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode> {
   }
 
   visitActionStatement(ctx: ParserRuleContext): ActionStatement {
-    const action = this.visitAction(ctx.getChild(0) as ParserRuleContext);
+    const action = this.visitAction(this.getContext(ctx.getChild(0)));
     return {
-      type: 'ActionStatement',
+      type: ActionStatementType.type,
       action,
       location: this.getLocation(ctx),
     };
   }
 
-  private visitAction(ctx: ParserRuleContext): DoAction | UseAction {
+  private visitAction(ctx: ParserRuleContext): DoActivity | UseDecision {
     const actionType = ctx.getChild(0).text;
     const name = this.getStringValue(ctx.getChild(1));
 
     if (actionType === 'do') {
       return {
-        type: 'DoAction',
-        name,
+        type: DoActivityType.type,
+        activityName: name,
         location: this.getLocation(ctx),
       };
     } else {
       return {
-        type: 'UseAction',
+        type: UseDecisionType.type,
         decisionName: name,
         location: this.getLocation(ctx),
       };
@@ -221,314 +216,160 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode> {
   }
 
   visitSingleAction(ctx: ParserRuleContext): SingleAction {
-    const action = this.visitAction(ctx.getChild(0) as ParserRuleContext);
+    const action = this.visitAction(this.getContext(ctx.getChild(0)));
     return {
-      type: 'SingleAction',
+      type: SingleActionType.type,
       action,
       location: this.getLocation(ctx),
     };
   }
 
-  visitTerminologyStatement(ctx: ParserRuleContext): Terminology {
-    const name = this.getStringValue(ctx.getChild(1));
-    let definition: TerminologyDefinition;
-
-    const definitionNode = ctx.getChild(2);
-    if (definitionNode instanceof ParserRuleContext) {
-      const firstChild = definitionNode.getChild(0);
-      if (firstChild.text === 'valueset') {
-        definition = {
-          type: 'TerminologyValueset',
-          valuesetName: this.getStringValue(definitionNode.getChild(1)),
-          location: this.getLocation(definitionNode),
-        };
-      } else if (firstChild.text === 'unknown') {
-        definition = {
-          type: 'TerminologyUnknown',
-          location: this.getLocation(definitionNode),
-        };
-      } else {
-        // system code
-        definition = {
-          type: 'TerminologySystemCode',
-          system: this.getStringValue(definitionNode.getChild(1)),
-          code: this.getStringValue(definitionNode.getChild(3)),
-          location: this.getLocation(definitionNode),
-        };
-      }
-    } else {
-      throw new Error('Invalid terminology definition');
-    }
-
+  visitTerminologyStatement(ctx: TerminologyStatementContext): Terminology {
+    const terminologyName = this.getStringValue(ctx.getChild(1));
+    const definition = this.visitTerminologyDefinition(this.getContext(ctx.getChild(3)));
     return {
-      type: 'Terminology',
-      name,
+      type: TerminologyType.type,
+      name: terminologyName,
       definition,
       location: this.getLocation(ctx),
     };
   }
 
-  visitActivityStatement(ctx: ParserRuleContext): Activity {
-    const name = this.getStringValue(ctx.getChild(1));
-    const activityType = ctx.getChild(3).text;
-    let of: string | undefined;
-
-    if (ctx.childCount > 5) {
-      of = this.getStringValue(ctx.getChild(5));
-    }
-
+  visitActivityStatement(ctx: ActivityStatementContext): Activity {
+    const activityName = this.getStringValue(ctx.getChild(1));
+    const blockBody = this.visitBlockBody(this.getContext(ctx.getChild(3)));
     return {
-      type: 'Activity',
-      name,
-      activityType,
-      of,
+      type: ActivityType.type,
+      name: activityName,
+      body: blockBody,
       location: this.getLocation(ctx),
     };
   }
 
-  visitConceptStatement(ctx: ParserRuleContext): Concept {
-    const name = this.getStringValue(ctx.getChild(1));
-    const conceptBody = ctx.getChild(3); // Skip the COLON token
-
-    if (!(conceptBody instanceof ParserRuleContext)) {
-      throw new Error('Invalid concept body');
-    }
-
-    const { conceptType, valueType } = this.parseConceptTypeAndValue(conceptBody);
-    const { provenance, currentIndex } = this.parseProvenance(conceptBody);
-    const definition = this.parseConceptDefinition(conceptBody, currentIndex);
-
+  visitConceptStatement(ctx: ConceptStatementContext): Concept {
+    const conceptName = this.getStringValue(ctx.getChild(1));
+    const conceptType = this.getStringValue(ctx.getChild(3));
+    const valueType = this.getStringValue(ctx.getChild(5));
+    const definition = this.visitConceptDefinition(this.getContext(ctx.getChild(7)));
     return {
-      type: 'Concept',
-      name,
+      type: ConceptType.type,
+      name: conceptName,
       conceptType,
       valueType,
-      provenance,
       definition,
       location: this.getLocation(ctx),
     };
   }
 
-  private parseConceptTypeAndValue(conceptBody: ParserRuleContext): {
-    conceptType: string;
-    valueType: string;
-  } {
-    // Get concept type from hasTypeLine
-    const hasTypeLine = conceptBody.getChild(0);
-    if (!(hasTypeLine instanceof ParserRuleContext)) {
-      throw new Error('Invalid concept type line');
-    }
-    const conceptType = hasTypeLine.getChild(2).text;
-
-    // Get value type from hasValueTypeLine
-    const hasValueTypeLine = conceptBody.getChild(1);
-    if (!(hasValueTypeLine instanceof ParserRuleContext)) {
-      throw new Error('Invalid value type line');
-    }
-    const valueType = hasValueTypeLine.getChild(2).text;
-
-    return { conceptType, valueType };
-  }
-
-  private parseProvenance(conceptBody: ParserRuleContext): {
-    provenance: string | undefined;
-    currentIndex: number;
-  } {
-    let provenance: string | undefined;
-    let currentIndex = 2;
-
-    const provenanceLine = conceptBody.getChild(currentIndex);
-    if (provenanceLine instanceof ParserRuleContext && provenanceLine.getChild(0).text === 'has') {
-      provenance = this.getStringValue(provenanceLine.getChild(2));
-      currentIndex++;
-    }
-
-    return { provenance, currentIndex };
-  }
-
-  private parseConceptDefinition(
-    conceptBody: ParserRuleContext,
-    currentIndex: number,
-  ): CodedByDefinition | InferredByDefinition {
-    const definitionLine = conceptBody.getChild(currentIndex);
-    if (!(definitionLine instanceof ParserRuleContext)) {
-      throw new Error('Invalid concept definition');
-    }
-
-    if (definitionLine.getChild(0).text === 'coded') {
-      return this.parseCodedByDefinition(definitionLine);
-    } else {
-      return this.parseInferredByDefinition(definitionLine);
-    }
-  }
-
-  private parseCodedByDefinition(definitionLine: ParserRuleContext): CodedByDefinition {
-    return {
-      type: 'CodedByDefinition',
-      terminologyName: this.getStringValue(definitionLine.getChild(2)),
-      location: this.getLocation(definitionLine),
-    };
-  }
-
-  private parseInferredByDefinition(definitionLine: ParserRuleContext): InferredByDefinition {
-    const inferredBody = definitionLine.getChild(2);
-    if (!(inferredBody instanceof ParserRuleContext)) {
-      throw new Error('Invalid inferred by definition');
-    }
-
-    const children = inferredBody.children || [];
-    if (children.length === 0) {
-      throw new Error('Invalid inferred by: expected expression or pattern');
-    }
-
-    const firstChild = children[0];
-    if (this.isExpressionNode(firstChild)) {
-      return this.parseInferredByExpression(firstChild, definitionLine);
-    } else {
-      return this.parseInferredByPattern(firstChild as ParserRuleContext, definitionLine);
-    }
-  }
-
-  private isExpressionNode(node: ParseTree): boolean {
-    return (
-      node instanceof ParserRuleContext && node.childCount > 0 && node.getChild(0).text === '('
-    );
-  }
-
-  private parseInferredByExpression(
-    node: ParseTree,
-    definitionLine: ParserRuleContext,
-  ): InferredByDefinition {
-    return {
-      type: 'InferredByDefinition',
-      expression: this.visitExpression(node as ParserRuleContext),
-      location: this.getLocation(definitionLine),
-    };
-  }
-
-  private parseInferredByPattern(
-    patternContext: ParserRuleContext,
-    definitionLine: ParserRuleContext,
-  ): InferredByDefinition {
-    const patternChildren = patternContext.children || [];
-    const { pattern, concept } = this.extractPatternAndConcept(patternChildren);
-
-    return {
-      type: 'InferredByDefinition',
-      pattern: pattern ? pattern.slice(1, -1) : undefined,
-      concept: concept.slice(1, -1),
-      location: this.getLocation(definitionLine),
-    };
-  }
-
-  private extractPatternAndConcept(patternChildren: ParseTree[]): {
-    pattern?: string;
-    concept: string;
-  } {
-    if (patternChildren.length === 1) {
-      const concept = patternChildren[0].text;
-      this.validateQuotedString(concept, 'concept');
-      return { concept };
-    }
-
-    if (patternChildren.length === 2) {
-      const pattern = patternChildren[0].text;
-      const concept = patternChildren[1].text;
-      this.validateQuotedString(pattern, 'pattern');
-      this.validateQuotedString(concept, 'concept');
-      return { pattern, concept };
-    }
-
-    throw new Error('Invalid inferred by pattern: expected one or two identifiers');
-  }
-
-  private validateQuotedString(text: string, fieldName: string): void {
-    if (!text.startsWith('"') || !text.endsWith('"')) {
-      throw new Error(`Invalid inferred by pattern: ${fieldName} must be a quoted string`);
-    }
-  }
-
-  visitExpression(ctx: ParserRuleContext): Expression {
-    // Skip the parentheses and get the expression
-    const expr = ctx.getChild(1);
-    if (!(expr instanceof ParserRuleContext)) {
-      throw new Error('Invalid expression');
-    }
-
-    return this.visitOrExpr(expr);
-  }
-
-  visitOrExpr(ctx: ParserRuleContext): Expression {
-    const left = this.visitAndExpr(ctx.getChild(0) as ParserRuleContext);
-    if (ctx.childCount === 1) {
-      return left;
-    }
-
-    const right = this.visitOrExpr(ctx.getChild(2) as ParserRuleContext);
-    return {
-      type: 'Expression',
-      operator: 'or',
-      left,
-      right,
-      location: this.getLocation(ctx),
-    };
-  }
-
-  visitAndExpr(ctx: ParserRuleContext): Expression {
-    const left = this.visitAtom(ctx.getChild(0) as ParserRuleContext);
-    if (ctx.childCount === 1) {
-      return left;
-    }
-
-    const right = this.visitAndExpr(ctx.getChild(2) as ParserRuleContext);
-    return {
-      type: 'Expression',
-      operator: 'and',
-      left,
-      right,
-      location: this.getLocation(ctx),
-    };
-  }
-
-  visitAtom(ctx: ParserRuleContext): Expression {
+  private visitTerminologyDefinition(ctx: ParserRuleContext): TerminologyDefinition {
     const firstChild = ctx.getChild(0);
-    if (firstChild.text === '(') {
-      return this.visitOrExpr(ctx.getChild(1) as ParserRuleContext);
-    } else {
-      const value = this.getStringValue(firstChild);
+    if (firstChild.text === 'valueset') {
       return {
-        type: 'Expression',
-        operator: 'atom',
-        left: value,
-        right: value,
+        type: 'TerminologyValueset',
+        valuesetName: this.getStringValue(ctx.getChild(1)),
+        location: this.getLocation(ctx),
+      };
+    } else if (firstChild.text === 'unknown') {
+      return {
+        type: 'TerminologyUnknown',
+        location: this.getLocation(ctx),
+      };
+    } else {
+      // system code
+      return {
+        type: 'TerminologySystemCode',
+        system: this.getStringValue(ctx.getChild(1)),
+        code: this.getStringValue(ctx.getChild(3)),
         location: this.getLocation(ctx),
       };
     }
   }
 
-  private getStringValue(node: ParseTree): string {
-    const text = node.text;
-    // If the text starts and ends with quotes, remove them
-    if (text.startsWith('"') && text.endsWith('"')) {
-      return text.slice(1, -1);
+  private visitConceptDefinition(ctx: ParserRuleContext): CodedByDefinition | InferredByDefinition {
+    const firstChild = ctx.getChild(0);
+    if (firstChild.text === 'coded') {
+      return this.visitCodedByDefinition(ctx);
+    } else {
+      return this.visitInferredByDefinition(ctx);
     }
-    return text;
   }
 
-  private getLocation(node: ParserRuleContext): {
+  private visitCodedByDefinition(ctx: ParserRuleContext): CodedByDefinition {
+    const terminologyName = this.getStringValue(ctx.getChild(1));
+    return {
+      type: CodedByDefinitionType.type,
+      terminologyName,
+      location: this.getLocation(ctx),
+    };
+  }
+
+  private visitInferredByDefinition(ctx: ParserRuleContext): InferredByDefinition {
+    const pattern = ctx.childCount > 1 ? this.getStringValue(ctx.getChild(1)) : undefined;
+    const concept = ctx.childCount > 2 ? this.getStringValue(ctx.getChild(2)) : undefined;
+    const expression =
+      ctx.childCount > 3 ? this.visitExpression(this.getContext(ctx.getChild(3))) : undefined;
+    return {
+      type: InferredByDefinitionType.type,
+      pattern,
+      concept,
+      expression,
+      location: this.getLocation(ctx),
+    };
+  }
+
+  visitExpression(ctx: ParserRuleContext): Expression {
+    const operator = ctx.getChild(1).text as 'or' | 'and' | 'atom';
+    const left = this.visitExpression(this.getContext(ctx.getChild(0)));
+    const right = this.visitExpression(this.getContext(ctx.getChild(2)));
+    return {
+      type: ExpressionType.type,
+      operator,
+      left,
+      right,
+      location: this.getLocation(ctx),
+    };
+  }
+
+  private getStringValue(node: ParseTree): string {
+    if (!(node instanceof ParserRuleContext)) {
+      return node.text;
+    }
+    return node.text;
+  }
+
+  private getLocation(ctx: ParserRuleContext): {
     start: { line: number; column: number };
     end: { line: number; column: number };
   } {
+    if (!ctx.stop) {
+      return {
+        start: {
+          line: ctx.start.line,
+          column: ctx.start.charPositionInLine,
+        },
+        end: {
+          line: ctx.start.line,
+          column: ctx.start.charPositionInLine + (ctx.start.text?.length ?? 0),
+        },
+      };
+    }
     return {
       start: {
-        line: node.start.line,
-        column: node.start.charPositionInLine,
+        line: ctx.start.line,
+        column: ctx.start.charPositionInLine,
       },
       end: {
-        line: node.stop?.line ?? node.start.line,
-        column: node.stop?.charPositionInLine ?? node.start.charPositionInLine,
+        line: ctx.stop.line,
+        column: ctx.stop.charPositionInLine + (ctx.stop.text?.length ?? 0),
       },
     };
+  }
+
+  private getContext(node: ParseTree): ParserRuleContext {
+    if (!(node instanceof ParserRuleContext)) {
+      throw new Error('Expected ParserRuleContext');
+    }
+    return node;
   }
 
   private isStatement(node: ASTNode): node is Statement {
@@ -542,5 +383,29 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode> {
 
   private isBlockStatement(node: ASTNode): node is BlockStatement {
     return node.type === 'WhenClause' || node.type === 'ActionStatement';
+  }
+
+  visitTerminologyValueset(ctx: ParserRuleContext): TerminologyValueset {
+    return {
+      type: TerminologyValuesetType.type,
+      valuesetName: this.getStringValue(ctx.getChild(1)),
+      location: this.getLocation(ctx),
+    };
+  }
+
+  visitTerminologyUnknown(ctx: ParserRuleContext): TerminologyUnknown {
+    return {
+      type: TerminologyUnknownType.type,
+      location: this.getLocation(ctx),
+    };
+  }
+
+  visitTerminologySystemCode(ctx: ParserRuleContext): TerminologySystemCode {
+    return {
+      type: TerminologySystemCodeType.type,
+      system: this.getStringValue(ctx.getChild(1)),
+      code: this.getStringValue(ctx.getChild(3)),
+      location: this.getLocation(ctx),
+    };
   }
 }
