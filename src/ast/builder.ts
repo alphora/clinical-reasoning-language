@@ -168,21 +168,37 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode> {
   visitBlockBody(ctx: ParserRuleContext): BlockBody {
     const statements: (WhenBlock | ActionStatement)[] = [];
     let qualifier: string | undefined;
-    for (let i = 0; i < ctx.childCount; i++) {
-      const child = ctx.getChild(i);
+
+    // Skip the initial COLON
+    let i = 1;
+    
+    // Check for any/all qualifier
+    const firstChild = ctx.getChild(i);
+    if (firstChild instanceof ParserRuleContext) {
+      const firstToken = firstChild.getChild(0)?.text;
+      if (firstToken === 'any') {
+        qualifier = CPGLLexer.ANY.toString();
+        i++; // Skip the qualifier
+      } else if (firstToken === 'all') {
+        qualifier = CPGLLexer.ALL.toString();
+        i++; // Skip the qualifier
+      }
+    }
+
+    // Process block statements until DONE
+    for (let j = i; j < ctx.childCount - 1; j++) { // -1 to skip the final DONE
+      const child = ctx.getChild(j);
       if (child instanceof ParserRuleContext) {
-        const firstChild = child.getChild(0);
-        if (firstChild?.text === 'any') {
-          qualifier = CPGLLexer.ANY.toString();
-        } else if (firstChild?.text === 'all') {
-          qualifier = CPGLLexer.ALL.toString();
-        } else if (firstChild?.text === 'when') {
-          statements.push(this.visitWhenBlock(child));
-        } else if (firstChild?.text === 'do' || firstChild?.text === 'use') {
-          statements.push(this.visitActionStatement(child));
+        // Each block statement is a complete statement (when/do/use)
+        const blockStatement = this.getContext(child.getChild(0));
+        if (blockStatement.getChild(0)?.text === 'when') {
+          statements.push(this.visitWhenBlock(blockStatement));
+        } else if (blockStatement.getChild(0)?.text === 'do' || blockStatement.getChild(0)?.text === 'use') {
+          statements.push(this.visitActionStatement(blockStatement));
         }
       }
     }
+
     return {
       type: BlockBodyType.type,
       qualifier,
