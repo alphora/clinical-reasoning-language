@@ -19,28 +19,49 @@ export const FileType = {
 // Union type for all possible statements
 export type Statement = Decision | Terminology | Activity | Concept;
 
+// --------------------------- DECISION STATEMENT ----------------------------
+
 // Decision node
 export interface Decision extends ASTNode {
   type: 'Decision';
   name: string;
-  body: BlockBody;
+  body: DecisionBody;
 }
 export const DecisionType = {
   type: 'Decision' as const,
 };
 
-// When clause
-export interface WhenClause extends ASTNode {
-  type: 'WhenClause';
-  condition: string;
-  body: WhenClauseBody;
+// Decision body containing when blocks
+export interface DecisionBody extends ASTNode {
+  type: 'DecisionBody';
+  statements: WhenBlock[];
 }
-export const WhenClauseType = {
-  type: 'WhenClause' as const,
+export const DecisionBodyType = {
+  type: 'DecisionBody' as const,
 };
 
-// When clause body can be a single action or a block
-export type WhenClauseBody = SingleAction | BlockBody;
+// When block
+export interface WhenBlock extends ASTNode {
+  type: 'WhenBlock';
+  condition: string;
+  body: WhenBlockBody;
+}
+export const WhenBlockType = {
+  type: 'WhenBlock' as const,
+};
+
+// When block body can be a block body or single action
+export type WhenBlockBody = BlockBody | SingleAction;
+
+// Block body containing multiple statements
+export interface BlockBody extends ASTNode {
+  type: 'BlockBody';
+  qualifier?: string; // 'any' or 'all'
+  statements: (WhenBlock | ActionStatement)[];
+}
+export const BlockBodyType = {
+  type: 'BlockBody' as const,
+};
 
 // Single action (do or use)
 export interface SingleAction extends ASTNode {
@@ -51,20 +72,9 @@ export const SingleActionType = {
   type: 'SingleAction' as const,
 };
 
-// Block body containing multiple statements
-export interface BlockBody extends ASTNode {
-  type: 'BlockBody';
-  qualifier?: string;
-  statements: (WhenClause | ActionStatement)[];
-}
-export const BlockBodyType = {
-  type: 'BlockBody' as const,
-};
-
 // Action statement (do or use)
 export interface ActionStatement extends ASTNode {
   type: 'ActionStatement';
-  condition?: string;
   action: DoActivity | UseDecision;
 }
 export const ActionStatementType = {
@@ -88,6 +98,8 @@ export interface UseDecision extends ASTNode {
 export const UseDecisionType = {
   type: 'UseDecision' as const,
 };
+
+// ------------------------- TERMINOLOGY STATEMENT --------------------------
 
 // Terminology node
 export interface Terminology extends ASTNode {
@@ -132,15 +144,20 @@ export const TerminologySystemCodeType = {
   type: 'TerminologySystemCode' as const,
 };
 
+// --------------------------- ACTIVITY STATEMENT ---------------------------
+
 // Activity node
 export interface Activity extends ASTNode {
   type: 'Activity';
   name: string;
-  body: BlockBody;
+  activityType: string;
+  terminologyReference?: string;
 }
 export const ActivityType = {
   type: 'Activity' as const,
 };
+
+// ---------------------------- CONCEPT STATEMENT ---------------------------
 
 // Concept node
 export interface Concept extends ASTNode {
@@ -172,7 +189,7 @@ export interface InferredByDefinition extends ASTNode {
   type: 'InferredByDefinition';
   pattern?: string;
   concept?: string;
-  expression?: Expression;
+  descriptiveLogic?: string;
 }
 export const InferredByDefinitionType = {
   type: 'InferredByDefinition' as const,

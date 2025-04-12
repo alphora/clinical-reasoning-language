@@ -186,7 +186,7 @@ describe('ASTBuilder', () => {
       const actionStatement = activity.body.statements[0] as ActionStatement;
       expect(actionStatement.action.type).toBe(DoActivityType.type);
       expect((actionStatement.action as DoActivity).activityName).toBe(
-        'CPGProposeDiagnosis of Colonoscopy',
+        'CPGProposeDiagnosis of "Colonoscopy"',
       );
     });
   });
@@ -213,7 +213,7 @@ describe('ASTBuilder', () => {
       expect((concept.definition as CodedByDefinition).terminologyName).toBe('BMI Valueset');
     });
 
-    it('should parse a concept with inferred by pattern', () => {
+    it('should parse a concept with inferred by pattern and concept reference', () => {
       const input = `
         concept "Most Recent BMI":
           has type Observation.
@@ -228,13 +228,13 @@ describe('ASTBuilder', () => {
 
       const concept = ast.statements[0] as Concept;
       expect(concept.definition.type).toBe(InferredByDefinitionType.type);
-      expect((concept.definition as InferredByDefinition).pattern).toBe(
-        'Most Recent(this, lookbackMonths)',
-      );
-      expect((concept.definition as InferredByDefinition).concept).toBe('BMI');
+      const inferredBy = concept.definition as InferredByDefinition;
+      expect(inferredBy.pattern).toBe('Most Recent(this, lookbackMonths)');
+      expect(inferredBy.concept).toBe('BMI');
+      expect(inferredBy.descriptiveLogic).toBeUndefined();
     });
 
-    it('should parse a concept with inferred by expression', () => {
+    it('should parse a concept with inferred by descriptive logic', () => {
       const input = `
         concept "BMI":
           has type Observation.
@@ -248,7 +248,34 @@ describe('ASTBuilder', () => {
 
       const concept = ast.statements[0] as Concept;
       expect(concept.definition.type).toBe(InferredByDefinitionType.type);
-      expect((concept.definition as InferredByDefinition).expression).toBeDefined();
+      const inferredBy = concept.definition as InferredByDefinition;
+      expect(inferredBy.pattern).toBeUndefined();
+      expect(inferredBy.concept).toBeUndefined();
+      expect(inferredBy.descriptiveLogic).toBe(
+        'BMI Range as a Condition or BMI as an Observation or Calculated BMI',
+      );
+    });
+
+    it('should parse a concept with inferred by descriptive logic using and/or combinations', () => {
+      const input = `
+        concept "Complex BMI":
+          has type Observation.
+          has valuetype Quantity.
+          inferred by (("BMI Range as a Condition" and "Recent") or ("BMI as an Observation" and "Valid") or "Calculated BMI").
+        done
+      `;
+
+      const tree = parseInput(input);
+      const ast = builder.visit(tree) as File;
+
+      const concept = ast.statements[0] as Concept;
+      expect(concept.definition.type).toBe(InferredByDefinitionType.type);
+      const inferredBy = concept.definition as InferredByDefinition;
+      expect(inferredBy.pattern).toBeUndefined();
+      expect(inferredBy.concept).toBeUndefined();
+      expect(inferredBy.descriptiveLogic).toBe(
+        '(BMI Range as a Condition and Recent) or (BMI as an Observation and Valid) or Calculated BMI',
+      );
     });
   });
 
@@ -281,8 +308,8 @@ describe('ASTBuilder', () => {
   describe('Action Statements', () => {
     it('should parse a do activity', () => {
       const input = `
-decision Test:
-  when BMI > 30 then do CPGProposeDiagnosis.
+decision "Test":
+  when "BMI > 30" then do "CPGProposeDiagnosis".
 done
 `;
       const tree = parseInput(input);
@@ -298,8 +325,8 @@ done
 
     it('should parse a use decision', () => {
       const input = `
-decision Test:
-  when BMI > 30 then use SomeDecision.
+decision "Test":
+  when "BMI > 30" then use "SomeDecision".
 done
 `;
       const tree = parseInput(input);
