@@ -15,24 +15,26 @@ export class CPGLLexerErrorListener implements ANTLRErrorListener<number> {
     msg: string,
     _e: RecognitionException | undefined,
   ): void {
-    const input = _recognizer.inputStream as CharStream;
-    const startIndex: number = (_recognizer as any)._tokenStartCharIndex ?? 0;
-    const currentIndex: number = input.index;
+    const input: CharStream = _recognizer.inputStream as CharStream;
+    const startIndex = input.index;
+    const currentIndex = input.index;
     const errorText = input.getText(Interval.of(startIndex, currentIndex));
     const errorMessage = `Lexical error at line ${line}:${charPositionInLine}: Invalid token '${errorText}'. (details: ${msg})`;
     console.error(errorMessage);
 
     if (_recognizer instanceof CPGLLexer) {
-      const errorToken: Token = _recognizer._factory.create(
-        _recognizer,
-        this.ERROR_TOKEN_TYPE,
-        errorMessage,
-        Token.DEFAULT_CHANNEL,
+      const errorToken: Token = {
+        type: this.ERROR_TOKEN_TYPE,
+        text: errorMessage,
+        channel: Token.DEFAULT_CHANNEL,
         startIndex,
-        currentIndex - 1,
+        stopIndex: currentIndex - 1,
         line,
         charPositionInLine,
-      );
+        tokenIndex: -1,
+        tokenSource: _recognizer,
+        inputStream: input,
+      };
 
       _recognizer.emit(errorToken);
 

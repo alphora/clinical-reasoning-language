@@ -71,13 +71,13 @@ activity "Indicate" perform CPGProposeDiagnosis of "Colonoscopy". //of reference
 // comments go into the auto generated README and, CQL when applicable
 concept "Most Recent BMI":
     has type Observation. //Observation is a CONCEPT_TYPE
-    has valuetype boolean. //boolean is a CONCEPT_VALUE_TYPE
+    having valuetype boolean. //boolean is a CONCEPT_VALUE_TYPE
     has provenance "some provenance".
     inferred by "Most Recent(this, lookbackMonths)" "BMI". //"Most Recent" is a reference to a CQL expression (that will be resolved by the parser) and is optional.  "BMI" is a reference to another concept.
 done
 @
 concept "BMI":
-    has type Observation.
+    has type Observatddsion.
     has valuetype Quantity.
     inferred by ("BMI Range as a Condition" or "BMI as an Observation" or "Calculated BMI").
 done
