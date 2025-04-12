@@ -77,7 +77,7 @@ concept "Most Recent BMI":
 done
 
 concept "BMI":
-    has type Observatddsion.
+    has type Observation.
     has valuetype Quantity.
     inferred by ("BMI Range as a Condition" or "BMI as an Observation" or "Calculated BMI").
 done
