@@ -46,6 +46,11 @@ IDENTIFIER
     : [a-zA-Z][a-zA-Z0-9_]*
     ;
 
+// Block comment fragment
+fragment BLOCK_COMMENT
+    : '/*' .*? '*/'
+    ;
+
 // Skip whitespace.
 WS
     : [ \t\r\n]+ -> skip
@@ -58,7 +63,7 @@ COMMENT
 
 // Block comment.
 COMMENT_BLOCK
-    : '/*' .*? '*/' -> skip
+    : BLOCK_COMMENT -> skip
     ;
 
 // Error handling for unmatched characters
@@ -104,6 +109,11 @@ ACTIVITY_WS
     : [ \t\r\n]+ -> skip
     ;
 
+// Block comment in activity mode
+ACTIVITY_COMMENT_BLOCK
+    : BLOCK_COMMENT -> skip
+    ;
+
 // Error handling for unmatched characters in activity mode
 ACTIVITY_ErrorChar 
     : . {
@@ -144,6 +154,11 @@ CONCEPT_WS
     : [ \t\r\n]+ -> skip
     ;
 
+// Block comment in concept mode
+CONCEPT_COMMENT_BLOCK
+    : BLOCK_COMMENT -> skip
+    ;
+
 // Error handling for unmatched characters in concept mode
 CONCEPT_ErrorChar 
     : . {
@@ -180,6 +195,11 @@ CONCEPT_VALUE_TYPE
 // Skip whitespace in value type mode
 VALUE_TYPE_WS
     : [ \t\r\n]+ -> skip
+    ;
+
+// Block comment in value type mode
+VALUE_TYPE_COMMENT_BLOCK
+    : BLOCK_COMMENT -> skip
     ;
 
 // Error handling for unmatched characters in value type mode

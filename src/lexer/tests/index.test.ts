@@ -103,9 +103,28 @@
  * the new lexer implementation. Testing parser integration now would be premature
  * as the parser will need significant updates to work with the new lexer.
  */
+
+// External imports
 import { Token } from 'antlr4ts';
 
+// Internal imports
 import { CPGLLexer } from '../../grammar/generated/CPGLLexer';
+
+// Test suite imports
+import './basic-tokens.test';
+import './comments.test';
+import './error-handling.test';
+import './fhir-types.test';
+import './integration.test';
+import './structures.test';
+import './whitespace.test';
+
+describe('CPGL Lexer Test Suite', () => {
+  it('should run all test suites', () => {
+    // This test exists to ensure the test runner executes all imported test files
+    expect(true).toBe(true);
+  });
+});
 
 /**
  * Gets all tokens from the lexer, filtering out whitespace and comments
@@ -117,7 +136,13 @@ export function getAllTokens(lexer: CPGLLexer): Token[] {
     if (
       token.type !== CPGLLexer.WS &&
       token.type !== CPGLLexer.COMMENT &&
-      token.type !== CPGLLexer.COMMENT_BLOCK
+      token.type !== CPGLLexer.COMMENT_BLOCK &&
+      token.type !== CPGLLexer.ACTIVITY_WS &&
+      token.type !== CPGLLexer.ACTIVITY_COMMENT_BLOCK &&
+      token.type !== CPGLLexer.CONCEPT_WS &&
+      token.type !== CPGLLexer.CONCEPT_COMMENT_BLOCK &&
+      token.type !== CPGLLexer.VALUE_TYPE_WS &&
+      token.type !== CPGLLexer.VALUE_TYPE_COMMENT_BLOCK
     ) {
       tokens.push(token);
     }

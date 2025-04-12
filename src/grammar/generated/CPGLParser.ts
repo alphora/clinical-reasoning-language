@@ -66,13 +66,16 @@ export class CPGLParser extends Parser {
 	public static readonly ErrorChar = 36;
 	public static readonly ACTIVITY_TYPE = 37;
 	public static readonly ACTIVITY_WS = 38;
-	public static readonly ACTIVITY_ErrorChar = 39;
-	public static readonly CONCEPT_TYPE = 40;
-	public static readonly CONCEPT_WS = 41;
-	public static readonly CONCEPT_ErrorChar = 42;
-	public static readonly CONCEPT_VALUE_TYPE = 43;
-	public static readonly VALUE_TYPE_WS = 44;
-	public static readonly VALUE_TYPE_ErrorChar = 45;
+	public static readonly ACTIVITY_COMMENT_BLOCK = 39;
+	public static readonly ACTIVITY_ErrorChar = 40;
+	public static readonly CONCEPT_TYPE = 41;
+	public static readonly CONCEPT_WS = 42;
+	public static readonly CONCEPT_COMMENT_BLOCK = 43;
+	public static readonly CONCEPT_ErrorChar = 44;
+	public static readonly CONCEPT_VALUE_TYPE = 45;
+	public static readonly VALUE_TYPE_WS = 46;
+	public static readonly VALUE_TYPE_COMMENT_BLOCK = 47;
+	public static readonly VALUE_TYPE_ErrorChar = 48;
 	public static readonly RULE_cpgl = 0;
 	public static readonly RULE_statement = 1;
 	public static readonly RULE_decisionStatement = 2;
@@ -131,8 +134,9 @@ export class CPGLParser extends Parser {
 		"ACTIVITY", "OF", "SYSTEM", "CODE", "UNKNOWN", "DO", "USE", "WHEN", "THEN", 
 		"ANY", "ALL", "DECISION", "COLON", "DOT", "LPAREN", "RPAREN", "STRING", 
 		"IDENTIFIER", "WS", "COMMENT", "COMMENT_BLOCK", "ErrorChar", "ACTIVITY_TYPE", 
-		"ACTIVITY_WS", "ACTIVITY_ErrorChar", "CONCEPT_TYPE", "CONCEPT_WS", "CONCEPT_ErrorChar", 
-		"CONCEPT_VALUE_TYPE", "VALUE_TYPE_WS", "VALUE_TYPE_ErrorChar",
+		"ACTIVITY_WS", "ACTIVITY_COMMENT_BLOCK", "ACTIVITY_ErrorChar", "CONCEPT_TYPE", 
+		"CONCEPT_WS", "CONCEPT_COMMENT_BLOCK", "CONCEPT_ErrorChar", "CONCEPT_VALUE_TYPE", 
+		"VALUE_TYPE_WS", "VALUE_TYPE_COMMENT_BLOCK", "VALUE_TYPE_ErrorChar",
 	];
 	public static readonly VOCABULARY: Vocabulary = new VocabularyImpl(CPGLParser._LITERAL_NAMES, CPGLParser._SYMBOLIC_NAMES, []);
 
@@ -1389,7 +1393,7 @@ export class CPGLParser extends Parser {
 	}
 
 	public static readonly _serializedATN: string =
-		"\x03\uC91D\uCABA\u058D\uAFBA\u4F53\u0607\uEA8B\uC241\x03/\xF8\x04\x02" +
+		"\x03\uC91D\uCABA\u058D\uAFBA\u4F53\u0607\uEA8B\uC241\x032\xF8\x04\x02" +
 		"\t\x02\x04\x03\t\x03\x04\x04\t\x04\x04\x05\t\x05\x04\x06\t\x06\x04\x07" +
 		"\t\x07\x04\b\t\b\x04\t\t\t\x04\n\t\n\x04\v\t\v\x04\f\t\f\x04\r\t\r\x04" +
 		"\x0E\t\x0E\x04\x0F\t\x0F\x04\x10\t\x10\x04\x11\t\x11\x04\x12\t\x12\x04" +
@@ -1465,8 +1469,8 @@ export class CPGLParser extends Parser {
 		"\xAD\x03\x02\x02\x02\xAE\xAF\x03\x02\x02\x02\xAF\xB2\x03\x02\x02\x02\xB0" +
 		"\xB3\x05.\x18\x02\xB1\xB3\x050\x19\x02\xB2\xB0\x03\x02\x02\x02\xB2\xB1" +
 		"\x03\x02\x02\x02\xB3\'\x03\x02\x02\x02\xB4\xB5\x07\f\x02\x02\xB5\xB6\x07" +
-		"\x04\x02\x02\xB6\xB7\x07*\x02\x02\xB7\xB8\x07\x1E\x02\x02\xB8)\x03\x02" +
-		"\x02\x02\xB9\xBA\x07\f\x02\x02\xBA\xBB\x07\x05\x02\x02\xBB\xBC\x07-\x02" +
+		"\x04\x02\x02\xB6\xB7\x07+\x02\x02\xB7\xB8\x07\x1E\x02\x02\xB8)\x03\x02" +
+		"\x02\x02\xB9\xBA\x07\f\x02\x02\xBA\xBB\x07\x05\x02\x02\xBB\xBC\x07/\x02" +
 		"\x02\xBC\xBD\x07\x1E\x02\x02\xBD+\x03\x02\x02\x02\xBE\xBF\x07\f\x02\x02" +
 		"\xBF\xC0\x07\x07\x02\x02\xC0\xC1\x05B\"\x02\xC1\xC2\x07\x1E\x02\x02\xC2" +
 		"-\x03\x02\x02\x02\xC3\xC4\x07\x0E\x02\x02\xC4\xC5\x07\r\x02\x02\xC5\xC6" +

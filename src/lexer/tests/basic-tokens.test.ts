@@ -113,57 +113,105 @@ describe('CPGL Lexer - Basic Tokens', () => {
 
   describe('Activity Types', () => {
     it('should tokenize ImmunizationActivity', () => {
-      const input = 'ImmunizationActivity';
-      const lexer = new CPGLLexer(CharStreams.fromString(input));
-      const tokens = getAllTokens(lexer);
-
-      verifyTokenSequence(tokens, [CPGLLexer.ACTIVITY_TYPE], ['ImmunizationActivity']);
-    });
-
-    it('should tokenize ProposeDiagnosisActivity', () => {
-      const input = 'ProposeDiagnosisActivity';
-      const lexer = new CPGLLexer(CharStreams.fromString(input));
-      const tokens = getAllTokens(lexer);
-
-      verifyTokenSequence(tokens, [CPGLLexer.ACTIVITY_TYPE], ['ProposeDiagnosisActivity']);
-    });
-
-    it('should tokenize medication-related activities', () => {
-      const input = 'MedicationRequestActivity ServiceRequestActivity StopActivity';
+      const input = 'perform ImmunizationActivity';
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
 
       verifyTokenSequence(
         tokens,
-        [CPGLLexer.ACTIVITY_TYPE, CPGLLexer.ACTIVITY_TYPE, CPGLLexer.ACTIVITY_TYPE],
-        ['MedicationRequestActivity', 'ServiceRequestActivity', 'StopActivity'],
+        [CPGLLexer.PERFORM, CPGLLexer.ACTIVITY_TYPE],
+        ['perform', 'ImmunizationActivity'],
+      );
+    });
+
+    it('should tokenize ProposeDiagnosisActivity', () => {
+      const input = 'perform ProposeDiagnosisActivity';
+      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const tokens = getAllTokens(lexer);
+
+      verifyTokenSequence(
+        tokens,
+        [CPGLLexer.PERFORM, CPGLLexer.ACTIVITY_TYPE],
+        ['perform', 'ProposeDiagnosisActivity'],
+      );
+    });
+
+    it('should tokenize medication-related activities', () => {
+      const input =
+        'perform MedicationRequestActivity perform ServiceRequestActivity perform StopActivity';
+      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const tokens = getAllTokens(lexer);
+
+      verifyTokenSequence(
+        tokens,
+        [
+          CPGLLexer.PERFORM,
+          CPGLLexer.ACTIVITY_TYPE,
+          CPGLLexer.PERFORM,
+          CPGLLexer.ACTIVITY_TYPE,
+          CPGLLexer.PERFORM,
+          CPGLLexer.ACTIVITY_TYPE,
+        ],
+        [
+          'perform',
+          'MedicationRequestActivity',
+          'perform',
+          'ServiceRequestActivity',
+          'perform',
+          'StopActivity',
+        ],
       );
     });
 
     it('should tokenize information and communication activities', () => {
-      const input = 'CollectInformationActivity CommunicationActivity GenerateReportActivity';
+      const input =
+        'perform CollectInformationActivity perform CommunicationActivity perform GenerateReportActivity';
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
 
       verifyTokenSequence(
         tokens,
-        [CPGLLexer.ACTIVITY_TYPE, CPGLLexer.ACTIVITY_TYPE, CPGLLexer.ACTIVITY_TYPE],
-        ['CollectInformationActivity', 'CommunicationActivity', 'GenerateReportActivity'],
+        [
+          CPGLLexer.PERFORM,
+          CPGLLexer.ACTIVITY_TYPE,
+          CPGLLexer.PERFORM,
+          CPGLLexer.ACTIVITY_TYPE,
+          CPGLLexer.PERFORM,
+          CPGLLexer.ACTIVITY_TYPE,
+        ],
+        [
+          'perform',
+          'CollectInformationActivity',
+          'perform',
+          'CommunicationActivity',
+          'perform',
+          'GenerateReportActivity',
+        ],
       );
     });
 
     it('should tokenize medication administration activities', () => {
       const input =
-        'AdministerMedicationActivity DispenseMedicationActivity DocumentMedicationActivity';
+        'perform AdministerMedicationActivity perform DispenseMedicationActivity perform DocumentMedicationActivity';
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
 
       verifyTokenSequence(
         tokens,
-        [CPGLLexer.ACTIVITY_TYPE, CPGLLexer.ACTIVITY_TYPE, CPGLLexer.ACTIVITY_TYPE],
         [
+          CPGLLexer.PERFORM,
+          CPGLLexer.ACTIVITY_TYPE,
+          CPGLLexer.PERFORM,
+          CPGLLexer.ACTIVITY_TYPE,
+          CPGLLexer.PERFORM,
+          CPGLLexer.ACTIVITY_TYPE,
+        ],
+        [
+          'perform',
           'AdministerMedicationActivity',
+          'perform',
           'DispenseMedicationActivity',
+          'perform',
           'DocumentMedicationActivity',
         ],
       );
@@ -171,36 +219,44 @@ describe('CPGL Lexer - Basic Tokens', () => {
 
     it('should tokenize enrollment and record activities', () => {
       const input =
-        'EnrollmentActivity HoldActivity RecordDetectedIssueActivity RecordInferenceActivity';
+        'perform EnrollmentActivity perform HoldActivity perform RecordDetectedIssueActivity perform RecordInferenceActivity';
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
 
       verifyTokenSequence(
         tokens,
         [
+          CPGLLexer.PERFORM,
           CPGLLexer.ACTIVITY_TYPE,
+          CPGLLexer.PERFORM,
           CPGLLexer.ACTIVITY_TYPE,
+          CPGLLexer.PERFORM,
           CPGLLexer.ACTIVITY_TYPE,
+          CPGLLexer.PERFORM,
           CPGLLexer.ACTIVITY_TYPE,
         ],
         [
+          'perform',
           'EnrollmentActivity',
+          'perform',
           'HoldActivity',
+          'perform',
           'RecordDetectedIssueActivity',
+          'perform',
           'RecordInferenceActivity',
         ],
       );
     });
 
     it('should tokenize report and resume activities', () => {
-      const input = 'ReportFlagv ResumeActivity';
+      const input = 'perform ReportFlag perform ResumeActivity';
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
 
       verifyTokenSequence(
         tokens,
-        [CPGLLexer.ACTIVITY_TYPE, CPGLLexer.ACTIVITY_TYPE],
-        ['ReportFlagv', 'ResumeActivity'],
+        [CPGLLexer.PERFORM, CPGLLexer.ACTIVITY_TYPE, CPGLLexer.PERFORM, CPGLLexer.ACTIVITY_TYPE],
+        ['perform', 'ReportFlag', 'perform', 'ResumeActivity'],
       );
     });
   });
@@ -231,7 +287,8 @@ describe('CPGL Lexer - Basic Tokens', () => {
     });
 
     it('should tokenize medication-related concepts', () => {
-      const input = 'has type MedicationRequest\nhas type MedicationDispense\nhas type MedicationAdministration\nhas type MedicationStatement';
+      const input =
+        'has type MedicationRequest\nhas type MedicationDispense\nhas type MedicationAdministration\nhas type MedicationStatement';
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
 
@@ -269,45 +326,79 @@ describe('CPGL Lexer - Basic Tokens', () => {
     });
 
     it('should tokenize communication and questionnaire concepts', () => {
-      const input = 'has type Communication\nhas type CommunicationRequest\nhas type QuestionnaireTask\nhas type QuestionnaireResponse';
+      const input =
+        'has type Communication\nhas type CommunicationRequest\nhas type QuestionnaireTask\nhas type QuestionnaireResponse';
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
 
       verifyTokenSequence(
         tokens,
         [
-          CPGLLexer.HAS, CPGLLexer.TYPE, CPGLLexer.CONCEPT_TYPE,
-          CPGLLexer.HAS, CPGLLexer.TYPE, CPGLLexer.CONCEPT_TYPE,
-          CPGLLexer.HAS, CPGLLexer.TYPE, CPGLLexer.CONCEPT_TYPE,
-          CPGLLexer.HAS, CPGLLexer.TYPE, CPGLLexer.CONCEPT_TYPE,
+          CPGLLexer.HAS,
+          CPGLLexer.TYPE,
+          CPGLLexer.CONCEPT_TYPE,
+          CPGLLexer.HAS,
+          CPGLLexer.TYPE,
+          CPGLLexer.CONCEPT_TYPE,
+          CPGLLexer.HAS,
+          CPGLLexer.TYPE,
+          CPGLLexer.CONCEPT_TYPE,
+          CPGLLexer.HAS,
+          CPGLLexer.TYPE,
+          CPGLLexer.CONCEPT_TYPE,
         ],
         [
-          'has', 'type', 'Communication',
-          'has', 'type', 'CommunicationRequest',
-          'has', 'type', 'QuestionnaireTask',
-          'has', 'type', 'QuestionnaireResponse',
+          'has',
+          'type',
+          'Communication',
+          'has',
+          'type',
+          'CommunicationRequest',
+          'has',
+          'type',
+          'QuestionnaireTask',
+          'has',
+          'type',
+          'QuestionnaireResponse',
         ],
       );
     });
 
     it('should tokenize immunization and service concepts', () => {
-      const input = 'has type ImmunizationRequest\nhas type Immunization\nhas type ServiceRequest\nhas type Procedure';
+      const input =
+        'has type ImmunizationRequest\nhas type Immunization\nhas type ServiceRequest\nhas type Procedure';
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
 
       verifyTokenSequence(
         tokens,
         [
-          CPGLLexer.HAS, CPGLLexer.TYPE, CPGLLexer.CONCEPT_TYPE,
-          CPGLLexer.HAS, CPGLLexer.TYPE, CPGLLexer.CONCEPT_TYPE,
-          CPGLLexer.HAS, CPGLLexer.TYPE, CPGLLexer.CONCEPT_TYPE,
-          CPGLLexer.HAS, CPGLLexer.TYPE, CPGLLexer.CONCEPT_TYPE,
+          CPGLLexer.HAS,
+          CPGLLexer.TYPE,
+          CPGLLexer.CONCEPT_TYPE,
+          CPGLLexer.HAS,
+          CPGLLexer.TYPE,
+          CPGLLexer.CONCEPT_TYPE,
+          CPGLLexer.HAS,
+          CPGLLexer.TYPE,
+          CPGLLexer.CONCEPT_TYPE,
+          CPGLLexer.HAS,
+          CPGLLexer.TYPE,
+          CPGLLexer.CONCEPT_TYPE,
         ],
         [
-          'has', 'type', 'ImmunizationRequest',
-          'has', 'type', 'Immunization',
-          'has', 'type', 'ServiceRequest',
-          'has', 'type', 'Procedure',
+          'has',
+          'type',
+          'ImmunizationRequest',
+          'has',
+          'type',
+          'Immunization',
+          'has',
+          'type',
+          'ServiceRequest',
+          'has',
+          'type',
+          'Procedure',
         ],
       );
     });
@@ -319,7 +410,11 @@ describe('CPGL Lexer - Basic Tokens', () => {
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
 
-      verifyTokenSequence(tokens, [CPGLLexer.HAS, CPGLLexer.VALUETYPE, CPGLLexer.CONCEPT_VALUE_TYPE], ['has', 'valuetype', 'Quantity']);
+      verifyTokenSequence(
+        tokens,
+        [CPGLLexer.HAS, CPGLLexer.VALUETYPE, CPGLLexer.CONCEPT_VALUE_TYPE],
+        ['has', 'valuetype', 'Quantity'],
+      );
     });
 
     it('should tokenize CodeableConcept', () => {
@@ -327,7 +422,11 @@ describe('CPGL Lexer - Basic Tokens', () => {
       const lexer = new CPGLLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
 
-      verifyTokenSequence(tokens, [CPGLLexer.HAS, CPGLLexer.VALUETYPE, CPGLLexer.CONCEPT_VALUE_TYPE], ['has', 'valuetype', 'CodeableConcept']);
+      verifyTokenSequence(
+        tokens,
+        [CPGLLexer.HAS, CPGLLexer.VALUETYPE, CPGLLexer.CONCEPT_VALUE_TYPE],
+        ['has', 'valuetype', 'CodeableConcept'],
+      );
     });
 
     it('should tokenize basic value types', () => {
@@ -338,14 +437,26 @@ describe('CPGL Lexer - Basic Tokens', () => {
       verifyTokenSequence(
         tokens,
         [
-          CPGLLexer.HAS, CPGLLexer.VALUETYPE, CPGLLexer.CONCEPT_VALUE_TYPE,
-          CPGLLexer.HAS, CPGLLexer.VALUETYPE, CPGLLexer.CONCEPT_VALUE_TYPE,
-          CPGLLexer.HAS, CPGLLexer.VALUETYPE, CPGLLexer.CONCEPT_VALUE_TYPE,
+          CPGLLexer.HAS,
+          CPGLLexer.VALUETYPE,
+          CPGLLexer.CONCEPT_VALUE_TYPE,
+          CPGLLexer.HAS,
+          CPGLLexer.VALUETYPE,
+          CPGLLexer.CONCEPT_VALUE_TYPE,
+          CPGLLexer.HAS,
+          CPGLLexer.VALUETYPE,
+          CPGLLexer.CONCEPT_VALUE_TYPE,
         ],
         [
-          'has', 'valuetype', 'string',
-          'has', 'valuetype', 'boolean',
-          'has', 'valuetype', 'integer',
+          'has',
+          'valuetype',
+          'string',
+          'has',
+          'valuetype',
+          'boolean',
+          'has',
+          'valuetype',
+          'integer',
         ],
       );
     });
@@ -358,13 +469,14 @@ describe('CPGL Lexer - Basic Tokens', () => {
       verifyTokenSequence(
         tokens,
         [
-          CPGLLexer.HAS, CPGLLexer.VALUETYPE, CPGLLexer.CONCEPT_VALUE_TYPE,
-          CPGLLexer.HAS, CPGLLexer.VALUETYPE, CPGLLexer.CONCEPT_VALUE_TYPE,
+          CPGLLexer.HAS,
+          CPGLLexer.VALUETYPE,
+          CPGLLexer.CONCEPT_VALUE_TYPE,
+          CPGLLexer.HAS,
+          CPGLLexer.VALUETYPE,
+          CPGLLexer.CONCEPT_VALUE_TYPE,
         ],
-        [
-          'has', 'valuetype', 'Range',
-          'has', 'valuetype', 'Ratio',
-        ],
+        ['has', 'valuetype', 'Range', 'has', 'valuetype', 'Ratio'],
       );
     });
 
@@ -376,14 +488,26 @@ describe('CPGL Lexer - Basic Tokens', () => {
       verifyTokenSequence(
         tokens,
         [
-          CPGLLexer.HAS, CPGLLexer.VALUETYPE, CPGLLexer.CONCEPT_VALUE_TYPE,
-          CPGLLexer.HAS, CPGLLexer.VALUETYPE, CPGLLexer.CONCEPT_VALUE_TYPE,
-          CPGLLexer.HAS, CPGLLexer.VALUETYPE, CPGLLexer.CONCEPT_VALUE_TYPE,
+          CPGLLexer.HAS,
+          CPGLLexer.VALUETYPE,
+          CPGLLexer.CONCEPT_VALUE_TYPE,
+          CPGLLexer.HAS,
+          CPGLLexer.VALUETYPE,
+          CPGLLexer.CONCEPT_VALUE_TYPE,
+          CPGLLexer.HAS,
+          CPGLLexer.VALUETYPE,
+          CPGLLexer.CONCEPT_VALUE_TYPE,
         ],
         [
-          'has', 'valuetype', 'SampledData',
-          'has', 'valuetype', 'time',
-          'has', 'valuetype', 'dateTime',
+          'has',
+          'valuetype',
+          'SampledData',
+          'has',
+          'valuetype',
+          'time',
+          'has',
+          'valuetype',
+          'dateTime',
         ],
       );
     });
@@ -396,13 +520,14 @@ describe('CPGL Lexer - Basic Tokens', () => {
       verifyTokenSequence(
         tokens,
         [
-          CPGLLexer.HAS, CPGLLexer.VALUETYPE, CPGLLexer.CONCEPT_VALUE_TYPE,
-          CPGLLexer.HAS, CPGLLexer.VALUETYPE, CPGLLexer.CONCEPT_VALUE_TYPE,
+          CPGLLexer.HAS,
+          CPGLLexer.VALUETYPE,
+          CPGLLexer.CONCEPT_VALUE_TYPE,
+          CPGLLexer.HAS,
+          CPGLLexer.VALUETYPE,
+          CPGLLexer.CONCEPT_VALUE_TYPE,
         ],
-        [
-          'has', 'valuetype', 'Period',
-          'has', 'valuetype', 'Attachment',
-        ],
+        ['has', 'valuetype', 'Period', 'has', 'valuetype', 'Attachment'],
       );
     });
   });
