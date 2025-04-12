@@ -1,0 +1,352 @@
+// import { CharStreams } from 'antlr4ts';
+// import { CommonTokenStream } from 'antlr4ts/CommonTokenStream';
+
+// import { CPGLLexer } from '../lexer/CPGLLexer';
+// import { CPGLParser, StatementLineContext } from '../grammar/generated/CPGLParser';
+// import { ProxyErrorListener } from '../ProxyErrorListener';
+
+// describe('CPGLParser', () => {
+//   const INDENT = '    ';
+//   const NEWLINE = '\n';
+//   const createParser = (input: string) => {
+//     const charStream = CharStreams.fromString(input);
+//     const lexer = new CPGLLexer(charStream);
+//     const tokenStream = new CommonTokenStream(lexer);
+    
+//     // Debug: Log all tokens
+//     tokenStream.fill();
+//     const tokens = tokenStream.getTokens();
+//     console.log('Tokens:', tokens.map(t => ({
+//       type: t.type,
+//       text: t.text,
+//       line: t.line,
+//       column: t.charPositionInLine
+//     })));
+    
+//     const parser = new CPGLParser(tokenStream);
+//     const errorListener = new ProxyErrorListener();
+//     parser.removeErrorListeners();
+//     parser.addErrorListener(errorListener);
+//     return { parser, errorListener };
+//   };
+
+//   test('should parse a simple decision', () => {
+//     const input = `decision "Test"${NEWLINE}${INDENT}when "condition" then${NEWLINE}${INDENT}${INDENT}do "action"${NEWLINE}${NEWLINE}`;
+//     console.log('Input:', input);
+//     const { parser, errorListener } = createParser(input);
+
+//     const file = parser.file();
+//     expect(errorListener.hasErrors()).toBe(false);
+//     expect(file).toBeDefined();
+//     const decision = file.statement(0).decision();
+//     expect(decision).toBeDefined();
+//     const block = decision?.block();
+//     expect(block).toBeDefined();
+//     const statementLine = block?.statementLine(0);
+//     expect(statementLine).toBeDefined();
+//     const whenClause = statementLine?.whenClause();
+//     expect(whenClause).toBeDefined();
+//     const nestedBlock = whenClause?.block();
+//     expect(nestedBlock).toBeDefined();
+//     const doClause = nestedBlock?.statementLine(0)?.doClause();
+//     expect(doClause).toBeDefined();
+//   });
+
+//   test('should parse a decision with multiple actions', () => {
+//     const input = `decision "Complex Test"${NEWLINE}${INDENT}when "first condition" then${NEWLINE}${INDENT}${INDENT}do "action1"${NEWLINE}${INDENT}${INDENT}do "action2"${NEWLINE}${INDENT}when "second condition" then${NEWLINE}${INDENT}${INDENT}do "action3"${NEWLINE}${NEWLINE}`;
+//     const { parser, errorListener } = createParser(input);
+
+//     const file = parser.file();
+//     expect(errorListener.hasErrors()).toBe(false);
+//     expect(file).toBeDefined();
+//     const decision = file.statement(0).decision();
+//     expect(decision).toBeDefined();
+//     const block = decision?.block();
+//     expect(block).toBeDefined();
+//     if (block) {
+//       const statementLines = block.getRuleContexts(StatementLineContext);
+//       expect(statementLines).toHaveLength(2);
+//       const firstWhenClause = statementLines[0]?.whenClause();
+//       expect(firstWhenClause).toBeDefined();
+//       const firstNestedBlock = firstWhenClause?.block();
+//       expect(firstNestedBlock).toBeDefined();
+//       if (firstNestedBlock) {
+//         const firstNestedStatementLines = firstNestedBlock.getRuleContexts(StatementLineContext);
+//         expect(firstNestedStatementLines).toHaveLength(2);
+//       }
+//       const secondWhenClause = statementLines[1]?.whenClause();
+//       expect(secondWhenClause).toBeDefined();
+//       const secondNestedBlock = secondWhenClause?.block();
+//       expect(secondNestedBlock).toBeDefined();
+//       if (secondNestedBlock) {
+//         const secondNestedStatementLines = secondNestedBlock.getRuleContexts(StatementLineContext);
+//         expect(secondNestedStatementLines).toHaveLength(1);
+//       }
+//     }
+//   });
+
+//   test('should parse a decision with use statements', () => {
+//     const input = `decision "Test with Use"${NEWLINE}${INDENT}when "condition" then${NEWLINE}${INDENT}${INDENT}use "other_decision"${NEWLINE}${INDENT}when "another_condition" then${NEWLINE}${INDENT}${INDENT}do "another_action"${NEWLINE}${NEWLINE}`;
+//     const { parser, errorListener } = createParser(input);
+
+//     const file = parser.file();
+//     expect(errorListener.hasErrors()).toBe(false);
+//     expect(file).toBeDefined();
+//     const decision = file.statement(0).decision();
+//     expect(decision).toBeDefined();
+//     const block = decision?.block();
+//     expect(block).toBeDefined();
+//     if (block) {
+//       const statementLines = block.getRuleContexts(StatementLineContext);
+//       expect(statementLines).toHaveLength(2);
+//       const firstWhenClause = statementLines[0]?.whenClause();
+//       expect(firstWhenClause).toBeDefined();
+//       const firstNestedBlock = firstWhenClause?.block();
+//       expect(firstNestedBlock).toBeDefined();
+//       if (firstNestedBlock) {
+//         const firstNestedStatementLines = firstNestedBlock.getRuleContexts(StatementLineContext);
+//         expect(firstNestedStatementLines).toHaveLength(1);
+//         const useClause = firstNestedStatementLines[0]?.useClause();
+//         expect(useClause).toBeDefined();
+//       }
+//       const secondWhenClause = statementLines[1]?.whenClause();
+//       expect(secondWhenClause).toBeDefined();
+//       const secondNestedBlock = secondWhenClause?.block();
+//       expect(secondNestedBlock).toBeDefined();
+//       if (secondNestedBlock) {
+//         const secondNestedStatementLines = secondNestedBlock.getRuleContexts(StatementLineContext);
+//         expect(secondNestedStatementLines).toHaveLength(1);
+//         const doClause = secondNestedStatementLines[0]?.doClause();
+//         expect(doClause).toBeDefined();
+//       }
+//     }
+//   });
+
+//   describe('parse', () => {
+//     it('should parse a complete decision with any qualifier', () => {
+//       const input = `decision "test"${NEWLINE}${INDENT}any${NEWLINE}${INDENT}when "condition" then${NEWLINE}${INDENT}${INDENT}do "action"${NEWLINE}${NEWLINE}`;
+//       const { parser, errorListener } = createParser(input);
+//       const file = parser.file();
+//       expect(errorListener.hasErrors()).toBe(false);
+//       expect(file.statement().length).toBe(1);
+//       const decision = file.statement(0).decision();
+//       expect(decision).toBeDefined();
+//       expect(decision?.STRING().text).toBe('"test"');
+//       const block = decision?.block();
+//       expect(block).toBeDefined();
+//       expect(block?.qualifier()?.ANY()?.text).toBe('any');
+//       const whenClause = block?.statementLine(0)?.whenClause();
+//       expect(whenClause).toBeDefined();
+//       expect(whenClause?.STRING().text).toBe('"condition"');
+//       const nestedBlock = whenClause?.block();
+//       expect(nestedBlock).toBeDefined();
+//       const doClause = nestedBlock?.statementLine(0)?.doClause();
+//       expect(doClause).toBeDefined();
+//       expect(doClause?.STRING().text).toBe('"action"');
+//     });
+
+//     it('should parse a complete decision with all qualifier', () => {
+//       const input = `decision "test"${NEWLINE}${INDENT}all${NEWLINE}${INDENT}when "condition" then${NEWLINE}${INDENT}${INDENT}do "action"${NEWLINE}${NEWLINE}`;
+//       const { parser, errorListener } = createParser(input);
+//       const file = parser.file();
+//       expect(errorListener.hasErrors()).toBe(false);
+//       expect(file.statement().length).toBe(1);
+//       const decision = file.statement(0).decision();
+//       expect(decision).toBeDefined();
+//       expect(decision?.STRING().text).toBe('"test"');
+//       const block = decision?.block();
+//       expect(block).toBeDefined();
+//       expect(block?.qualifier()?.ALL()?.text).toBe('all');
+//       const whenClause = block?.statementLine(0)?.whenClause();
+//       expect(whenClause).toBeDefined();
+//       expect(whenClause?.STRING().text).toBe('"condition"');
+//       const nestedBlock = whenClause?.block();
+//       expect(nestedBlock).toBeDefined();
+//       const doClause = nestedBlock?.statementLine(0)?.doClause();
+//       expect(doClause).toBeDefined();
+//       expect(doClause?.STRING().text).toBe('"action"');
+//     });
+
+//     it('should parse a complete decision without qualifier', () => {
+//       const input = `decision "test"${NEWLINE}${INDENT}when "condition" then${NEWLINE}${INDENT}${INDENT}do "action"${NEWLINE}${NEWLINE}`;
+//       const { parser, errorListener } = createParser(input);
+//       const file = parser.file();
+//       expect(errorListener.hasErrors()).toBe(false);
+//       expect(file).toBeDefined();
+//       const statements = file?.statement();
+//       expect(statements).toBeDefined();
+//       expect(statements?.length).toBe(1);
+//       const decision = statements?.[0].decision();
+//       expect(decision).toBeDefined();
+//       const block = decision?.block();
+//       expect(block).toBeDefined();
+//       expect(block?.qualifier()).toBeUndefined();
+//       const statementLine = block?.statementLine(0);
+//       expect(statementLine).toBeDefined();
+//       const whenClause = statementLine?.whenClause();
+//       expect(whenClause).toBeDefined();
+//       expect(whenClause?.STRING().text).toBe('"condition"');
+//       const nestedBlock = whenClause?.block();
+//       expect(nestedBlock).toBeDefined();
+//       const doClause = nestedBlock?.statementLine(0)?.doClause();
+//       expect(doClause).toBeDefined();
+//       expect(doClause?.STRING().text).toBe('"action"');
+//     });
+
+//     it('should parse a decision with a direct cycle', () => {
+//       const input = `decision "cycle"${NEWLINE}${INDENT}when "condition" then${NEWLINE}${INDENT}${INDENT}use "cycle"${NEWLINE}${NEWLINE}`;
+//       const { parser, errorListener } = createParser(input);
+//       const file = parser.file();
+//       expect(errorListener.hasErrors()).toBe(false);
+//       expect(file).toBeDefined();
+//       const statements = file?.statement();
+//       expect(statements).toBeDefined();
+//       expect(statements?.length).toBe(1);
+//       const decision = statements?.[0].decision();
+//       expect(decision).toBeDefined();
+//       const block = decision?.block();
+//       expect(block).toBeDefined();
+//       const statementLine = block?.statementLine(0);
+//       expect(statementLine).toBeDefined();
+//       const whenClause = statementLine?.whenClause();
+//       expect(whenClause).toBeDefined();
+//       expect(whenClause?.STRING().text).toBe('"condition"');
+//       const nestedBlock = whenClause?.block();
+//       expect(nestedBlock).toBeDefined();
+//       const useClause = nestedBlock?.statementLine(0)?.useClause();
+//       expect(useClause).toBeDefined();
+//       expect(useClause?.STRING().text).toBe('"cycle"');
+//     });
+
+//     it('should parse a decision with an indirect cycle', () => {
+//       const input = `decision "cycle1"${NEWLINE}${INDENT}when "condition" then${NEWLINE}${INDENT}${INDENT}use "cycle2"${NEWLINE}${NEWLINE}decision "cycle2"${NEWLINE}${INDENT}when "condition" then${NEWLINE}${INDENT}${INDENT}use "cycle1"${NEWLINE}${NEWLINE}`;
+//       console.log('Input for indirect cycle:', input);
+//       const { parser, errorListener } = createParser(input);
+//       const file = parser.file();
+//       expect(errorListener.hasErrors()).toBe(false);
+//       expect(file).toBeDefined();
+//       const statements = file?.statement();
+//       expect(statements).toBeDefined();
+//       expect(statements?.length).toBe(2);
+      
+//       // Check first decision
+//       const decision1 = statements?.[0].decision();
+//       expect(decision1).toBeDefined();
+//       const block1 = decision1?.block();
+//       expect(block1).toBeDefined();
+//       const statementLine1 = block1?.statementLine(0);
+//       expect(statementLine1).toBeDefined();
+//       const whenClause1 = statementLine1?.whenClause();
+//       expect(whenClause1).toBeDefined();
+//       expect(whenClause1?.STRING().text).toBe('"condition"');
+//       const nestedBlock1 = whenClause1?.block();
+//       expect(nestedBlock1).toBeDefined();
+//       const useClause1 = nestedBlock1?.statementLine(0)?.useClause();
+//       expect(useClause1).toBeDefined();
+//       expect(useClause1?.STRING().text).toBe('"cycle2"');
+      
+//       // Check second decision
+//       const decision2 = statements?.[1].decision();
+//       expect(decision2).toBeDefined();
+//       const block2 = decision2?.block();
+//       expect(block2).toBeDefined();
+//       const statementLine2 = block2?.statementLine(0);
+//       expect(statementLine2).toBeDefined();
+//       const whenClause2 = statementLine2?.whenClause();
+//       expect(whenClause2).toBeDefined();
+//       expect(whenClause2?.STRING().text).toBe('"condition"');
+//       const nestedBlock2 = whenClause2?.block();
+//       expect(nestedBlock2).toBeDefined();
+//       const useClause2 = nestedBlock2?.statementLine(0)?.useClause();
+//       expect(useClause2).toBeDefined();
+//       expect(useClause2?.STRING().text).toBe('"cycle1"');
+//     });
+
+//     it('should parse multiple when clauses at the same level', () => {
+//       const input = `decision "Test"${NEWLINE}${INDENT}when "condition1" then${NEWLINE}${INDENT}${INDENT}do "action1"${NEWLINE}${INDENT}when "condition2" then${NEWLINE}${INDENT}${INDENT}do "action2"${NEWLINE}${NEWLINE}`;
+//       const { parser, errorListener } = createParser(input);
+//       const file = parser.file();
+//       expect(errorListener.hasErrors()).toBe(false);
+//       expect(file).toBeDefined();
+//       const decision = file.statement(0).decision();
+//       expect(decision).toBeDefined();
+//       if (decision) {
+//         const statementLines = decision.block().getRuleContexts(StatementLineContext);
+//         expect(statementLines).toHaveLength(2);
+//         const firstWhenClause = statementLines[0]?.whenClause();
+//         expect(firstWhenClause).toBeDefined();
+//         const secondWhenClause = statementLines[1]?.whenClause();
+//         expect(secondWhenClause).toBeDefined();
+//       }
+//     });
+
+//     it('should parse multiple do actions at the same level', () => {
+//       const input = `decision "Test"${NEWLINE}${INDENT}when "condition" then${NEWLINE}${INDENT}${INDENT}do "action1"${NEWLINE}${INDENT}${INDENT}do "action2"${NEWLINE}${INDENT}${INDENT}do "action3"${NEWLINE}${NEWLINE}`;
+//       const { parser, errorListener } = createParser(input);
+//       const file = parser.file();
+//       expect(errorListener.hasErrors()).toBe(false);
+//       expect(file).toBeDefined();
+//       const decision = file.statement(0).decision();
+//       expect(decision).toBeDefined();
+//       if (decision) {
+//         const firstLine = decision.block().getRuleContext(0, StatementLineContext);
+//         const whenClause = firstLine?.whenClause();
+//         expect(whenClause).toBeDefined();
+//         if (whenClause) {
+//           const statementLines = whenClause.block().getRuleContexts(StatementLineContext);
+//           expect(statementLines).toHaveLength(3);
+//           for (let i = 0; i < 3; i++) {
+//             const doClause = statementLines[i]?.doClause();
+//             expect(doClause).toBeDefined();
+//           }
+//         }
+//       }
+//     });
+
+//     it('should handle nested when clauses with multiple actions', () => {
+//       const input = `decision "Test"${NEWLINE}${INDENT}when "condition1" then${NEWLINE}${INDENT}${INDENT}when "condition2" then${NEWLINE}${INDENT}${INDENT}${INDENT}do "action1"${NEWLINE}${INDENT}${INDENT}${INDENT}do "action2"${NEWLINE}${INDENT}when "condition3" then${NEWLINE}${INDENT}${INDENT}do "action3"${NEWLINE}${NEWLINE}`;
+//       const { parser, errorListener } = createParser(input);
+//       const file = parser.file();
+//       expect(errorListener.hasErrors()).toBe(false);
+//       expect(file).toBeDefined();
+//       const decision = file.statement(0).decision();
+//       expect(decision).toBeDefined();
+//       if (decision) {
+//         const statementLines = decision.block().getRuleContexts(StatementLineContext);
+//         expect(statementLines).toHaveLength(2);
+//         const firstWhen = statementLines[0]?.whenClause();
+//         expect(firstWhen).toBeDefined();
+//         if (firstWhen) {
+//           const firstWhenStatementLines = firstWhen.block().getRuleContexts(StatementLineContext);
+//           expect(firstWhenStatementLines).toHaveLength(1);
+//           const nestedWhen = firstWhenStatementLines[0]?.whenClause();
+//           expect(nestedWhen).toBeDefined();
+//           if (nestedWhen) {
+//             const nestedStatementLines = nestedWhen.block().getRuleContexts(StatementLineContext);
+//             expect(nestedStatementLines).toHaveLength(2);
+//             for (let i = 0; i < 2; i++) {
+//               const doClause = nestedStatementLines[i]?.doClause();
+//               expect(doClause).toBeDefined();
+//             }
+//           }
+//         }
+//       }
+//     });
+
+//     it('should reject when clause without then block', () => {
+//       const input = `decision "Test"${NEWLINE}${INDENT}when "condition"${NEWLINE}${NEWLINE}`;
+//       const { parser, errorListener } = createParser(input);
+//       parser.file();
+//       expect(errorListener.hasErrors()).toBe(true);
+//       expect(errorListener.getErrors()[0]).toContain("missing 'then'");
+//     });
+
+//     it('should reject then without block', () => {
+//       const input = `decision "Test"${NEWLINE}${INDENT}when "condition" then${NEWLINE}${NEWLINE}`;
+//       const { parser, errorListener } = createParser(input);
+//       parser.file();
+//       expect(errorListener.hasErrors()).toBe(true);
+//       expect(errorListener.getErrors()[0]).toContain("mismatched input '<DEDENT>' expecting '    '");
+//     });
+//   });
+// });

@@ -1,0 +1,239 @@
+// Clinical Practice Guideline Language (CPGL)
+/*
+IS case sensitive.
+NOT whitespace sensitive.
+NOT indentation sensitive.
+Quoted strings cannot contain escape characters.
+Quoted strings (not in comments) are identifiers.
+The inferred value describes concept derivation using logical operators and references, indicating how those referenced concepts collectively infer the target concept, not as a strictly evaluatable Boolean formula.
+The inferred value can have any number of concept identifiers.
+The keywords "any/all" are optional (if not present, defaults to any).
+The keyword "of" for activity is optional.
+The keyword "provenance" for concept is optional.
+One of either the keywords "inferred by" or "coded by" are required for concept.
+One of either the keywords "valueset", "unknown" or "system/code" are required for terminology.
+A file can have any number of decision, terminology, activity, concept.
+The example includes all options for valid statements.
+Anything not identified as optional here is required.
+*/
+
+decision "IMMZ.D2.D5.Measles":
+    when "Measles Routine Immunization Schedule Incomplete" then: //when references a concept
+        any: //applies to list items
+        when "No Primary Series Doses Administered" then:
+            //defaults to any
+            when "Client Age Less Than 12 Months" then do "Indicate". //do references an activity
+            when "Last Live Vaccine Administered has had in 4 Weeks" then use "Elderly Based". //use references a decision
+            //defaults to "Not able to determine a recommendation"
+        done 
+        when "Client Is Due For MCV12" then do "Vaccinate".
+    done
+    when "One Primary Series Dose Administered" then:
+        all:
+        when "Client Age Less Than 15 Months" then do "Indicate".
+        when "Last Live Vaccine Administered has had in 4 Weeks" then use "Elderly Based".
+        when "Client Is Due For MCV12" then do "Vaccinate".
+    done
+    when "Two Primary Series Doses Administered" then do "Indicate".
+done
+
+decision "Elderly Based":
+    when "Client Age Greater Than 60" then do "Indicate".
+    when "Client Age Less Than 60" then:
+        do "Vaccinate". 
+        do "another thing".
+        do "something else".
+    done
+    when "Client Age Greater Than 60" then:
+        when "Most Recent BMI" then:
+            use "Some Other Decision". //Validator prevents cycles
+            use "Some Other Other Decision".
+        done
+    done
+done
+
+//rationale
+
+terminology "BMI Valueset" valueset "bmi valueset".
+
+terminology "Height Valueset" valueset "height valueset". 
+
+terminology "Weight Valueset" valueset "weight valueset". 
+
+terminology "some terminology" unknown.
+
+terminology "Colonoscopy" system "http://snomed.info/sct" code "73761001".
+
+activity "Vaccinate" perform CPGImmunization. //CPGImmunization is an ACTIVITY_TYPE
+
+activity "Indicate" perform CPGProposeDiagnosis of "Colonoscopy". //of references a terminology
+
+// comments go into the auto generated README and, CQL when applicable
+concept "Most Recent BMI":
+    has type Observation. //Observation is a CONCEPT_TYPE
+    has valuetype boolean. //boolean is a CONCEPT_VALUE_TYPE
+    has provenance "some provenance".
+    inferred by "Most Recent(this, lookbackMonths)" "BMI". //"Most Recent" is a reference to a CQL expression (that will be resolved by the parser) and is optional.  "BMI" is a reference to another concept.
+done
+
+concept "BMI":
+    has type Observation.
+    has valuetype Quantity.
+    inferred by ("BMI Range as a Condition" or "BMI as an Observation" or "Calculated BMI").
+done
+
+concept "BMI Range as a Condition":
+    has type Condition.
+    has valuetype CodeableConcept.
+    coded by "BMI Valueset". //"BMI Valueset" is a reference to a terminology
+done
+
+concept "BMI as an Observation":
+    has type Observation.
+    has valuetype Quantity.
+    coded by "BMI Valueset".
+done
+
+concept "Calculated BMI":
+    has type Observation.
+    has valuetype Quantity.
+    //calculate using (weight/height^2)
+    inferred by ("Patient Height" and "Patient Weight").
+done
+
+concept "Patient Height":
+    has type Observation.
+    has valuetype integer.
+    coded by "Height Valueset".
+done
+
+concept "Patient Weight":
+    has type Observation.
+    has valuetype integer.
+    coded by "Weight Valueset".
+done
+
+concept "Client Age Greater Than 60":
+    has type Observation.
+    has valuetype boolean.
+    inferred by 
+    (
+        (
+            ("a" and "b")
+            or (
+                ("c" and "d")
+                and ("e" or "f")
+            )
+        )
+        or (
+            ("x" or "y")
+            and "z"
+        )
+        or "k"
+        or "l"
+    ).
+done
+
+// additional concepts...
+
+/*
+keywords:
+decision
+when
+then
+done
+any
+do
+use
+all
+activity
+unknown
+system
+code
+perform
+of
+coded
+concept
+type
+valuetype
+terminology
+provenance
+inferred
+by
+and
+or
+valueset
+has
+
+punctuation:
+:
+.
+(
+)
+
+tokens (non keyword/punctuation):
+STRING
+COMMENT
+COMMENT_BLOCK
+ACTIVITY_TYPE
+CONCEPT_TYPE
+CONCEPT_VALUE_TYPE
+*/
+
+/*
+ACTIVITY_TYPE:
+      'CPGAdministerMedication'
+    | 'CPGCollectInformation'
+    | 'CPGCommunication'
+    | 'CPGDispenseMedication'
+    | 'CPGDocumentMedication'
+    | 'CPGEnrollment'
+    | 'CPGGenerateReport'
+    | 'CPGHold'
+    | 'CPGImmunization'
+    | 'CPGMedicationRequest'
+    | 'CPGProposeDiagnosis'
+    | 'CPGRecordDetectedIssue'
+    | 'CPGRecordInference'
+    | 'CPGReportFlag'
+    | 'CPGResume'
+    | 'CPGServiceRequest'
+    | 'CPGStop'
+    ;
+*/
+
+/*
+CONCEPT_TYPE:
+      'Communication'
+    | 'CommunicationRequest'
+    | 'Condition'
+    | 'QuestionnaireTask'
+    | 'QuestionnaireResponse'
+    | 'MedicationRequest'
+    | 'MedicationDispense'
+    | 'MedicationAdministration'
+    | 'MedicationStatement'
+    | 'ImmunizationRequest'
+    | 'Immunization'
+    | 'ServiceRequest'
+    | 'Procedure'
+    | 'Observation'
+    ;
+*/
+
+/*
+CONCEPT_VALUE_TYPE:
+      'Quantity'
+    | 'CodeableConcept'
+    | 'string'
+    | 'boolean'
+    | 'integer'
+    | 'Range'
+    | 'Ratio'
+    | 'SampledData'
+    | 'time'
+    | 'dateTime'
+    | 'Period'
+    | 'Attachment'
+    ;
+*/
