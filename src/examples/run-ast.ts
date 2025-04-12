@@ -13,18 +13,15 @@ import {
   Terminology,
   Concept,
 } from '../ast/types';
-import { CPGLLexer } from '../grammar/generated/CPGLLexer';
 import { CPGLParser } from '../grammar/generated/CPGLParser';
-import { CPGLLexerErrorListener } from '../lexer/CPGLLexerErrorListener';
+import { createLexer } from '../lexer/createLexer';
 
 // Read the example file
 const examplePath = join(__dirname, '../../docs/grammar-example.cpg');
 const input = readFileSync(examplePath, 'utf-8');
 
-// Create the lexer and add error listener
-const lexer = new CPGLLexer(CharStreams.fromString(input));
-lexer.removeErrorListeners();
-lexer.addErrorListener(new CPGLLexerErrorListener());
+// Create the lexer and token stream
+const lexer = createLexer(CharStreams.fromString(input));
 const tokenStream = new CommonTokenStream(lexer);
 
 // Create the parser

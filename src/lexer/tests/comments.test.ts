@@ -1,6 +1,7 @@
 import { CharStreams } from 'antlr4ts';
 
 import { CPGLLexer } from '../../grammar/generated/CPGLLexer';
+import { createLexer } from '../createLexer';
 
 import { getAllTokens, verifyTokenSequence } from './index.test';
 
@@ -14,7 +15,7 @@ describe('Comments', () => {
         do "Action"
 `;
 
-      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const lexer = createLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
 
       verifyTokenSequence(tokens, [
@@ -34,7 +35,7 @@ decision "Test"
     when "Condition" then
         do "Action"
 `;
-      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const lexer = createLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
 
       verifyTokenSequence(tokens, [
@@ -55,7 +56,7 @@ decision "Test"
     when "Condition" /* another comment */ then
         do "Action"
 `;
-      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const lexer = createLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
 
       verifyTokenSequence(tokens, [
@@ -71,7 +72,7 @@ decision "Test"
 
     it('should ignore block comments in terminology statements', () => {
       const input = `terminology /* name */ "BMI Valueset" /* type */ valueset /* value */ "bmi valueset" /* end */ .`;
-      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const lexer = createLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
 
       verifyTokenSequence(tokens, [
@@ -85,7 +86,7 @@ decision "Test"
 
     it('should ignore block comments in activity statements', () => {
       const input = `activity /* name */ "Vaccinate" /* action */ perform /* type */ CPGImmunization /* end */ .`;
-      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const lexer = createLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
 
       verifyTokenSequence(tokens, [
@@ -103,7 +104,7 @@ decision "Test"
     /* valuetype */ has valuetype /* value */ Quantity /* end */ .
     /* inference */ inferred by /* expr */ ("BMI Range" /* or */ or /* value */ "BMI Value") /* end */ .
 done`;
-      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const lexer = createLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
 
       verifyTokenSequence(tokens, [
@@ -138,7 +139,7 @@ done`;
         do "Action" /* comment */ and /* another comment */ "Action 2"
 `;
 
-      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const lexer = createLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
 
       verifyTokenSequence(tokens, [
@@ -156,7 +157,7 @@ done`;
 
     it('should handle comments in complex expressions', () => {
       const input = `when /* start */ ("Condition 1" /* and */ and /* next */ "Condition 2" /* or */ or /* last */ "Condition 3") /* end */ then`;
-      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const lexer = createLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
 
       verifyTokenSequence(tokens, [

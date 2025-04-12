@@ -1,6 +1,7 @@
 import { CharStream, CharStreams } from 'antlr4ts';
 
 import { CPGLLexer } from '../../grammar/generated/CPGLLexer';
+import { createLexer } from '../createLexer';
 
 import {
   getActionTokenSequence,
@@ -13,7 +14,7 @@ function verifyTokenSequence(
   expectedTokens: number[],
   expectedText: string[],
 ): void {
-  const lexer = new CPGLLexer(input);
+  const lexer = createLexer(input);
   const tokens = [];
   const text = [];
 

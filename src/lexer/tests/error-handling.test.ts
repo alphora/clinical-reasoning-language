@@ -1,6 +1,6 @@
 import { CharStreams } from 'antlr4ts';
 
-import { CPGLLexer } from '../../grammar/generated/CPGLLexer';
+import { createLexer } from '../createLexer';
 
 import { getAllTokens } from './index.test';
 
@@ -9,7 +9,7 @@ describe('Lexer Error Handling', () => {
     const inputs = ['@invalid', '$tokens', '#notallowed', '~invalid', '`backtick'];
 
     inputs.forEach(input => {
-      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const lexer = createLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
       expect(tokens.length).toBeGreaterThanOrEqual(0);
     });
@@ -25,7 +25,7 @@ describe('Lexer Error Handling', () => {
     ];
 
     inputs.forEach(input => {
-      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const lexer = createLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
       expect(tokens.length).toBeGreaterThanOrEqual(0);
     });
@@ -48,7 +48,7 @@ describe('Lexer Error Handling', () => {
     ];
 
     testCases.forEach(({ input, minTokens }) => {
-      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const lexer = createLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
       expect(tokens.length).toBeGreaterThanOrEqual(minTokens);
     });
@@ -71,7 +71,7 @@ describe('Lexer Error Handling', () => {
     ];
 
     testCases.forEach(({ input, expectedError }) => {
-      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const lexer = createLexer(CharStreams.fromString(input));
       expect(() => {
         getAllTokens(lexer);
       }).toThrow(expectedError);
@@ -91,7 +91,7 @@ describe('Lexer Error Handling', () => {
     ];
 
     testCases.forEach(({ input, expectedError }) => {
-      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const lexer = createLexer(CharStreams.fromString(input));
       expect(() => {
         getAllTokens(lexer);
       }).toThrow(expectedError);
@@ -111,7 +111,7 @@ describe('Lexer Error Handling', () => {
     ];
 
     testCases.forEach(({ input, expectedError }) => {
-      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const lexer = createLexer(CharStreams.fromString(input));
       expect(() => {
         getAllTokens(lexer);
       }).toThrow(expectedError);
@@ -131,7 +131,7 @@ describe('Lexer Error Handling', () => {
     ];
 
     testCases.forEach(({ input, expectedError }) => {
-      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const lexer = createLexer(CharStreams.fromString(input));
       expect(() => {
         getAllTokens(lexer);
       }).toThrow(expectedError);
@@ -151,7 +151,7 @@ describe('Lexer Error Handling', () => {
     ];
 
     testCases.forEach(({ input, expectedError }) => {
-      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const lexer = createLexer(CharStreams.fromString(input));
       expect(() => {
         getAllTokens(lexer);
       }).toThrow(expectedError);
@@ -171,7 +171,7 @@ describe('Lexer Error Handling', () => {
     ];
 
     testCases.forEach(({ input, expectedError }) => {
-      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const lexer = createLexer(CharStreams.fromString(input));
       expect(() => {
         getAllTokens(lexer);
       }).toThrow(expectedError);

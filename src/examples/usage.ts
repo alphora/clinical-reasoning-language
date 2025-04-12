@@ -1,37 +1,26 @@
 /**
- * Example usage of the Clinical Practice Guideline Language
- * 
- * IMPORTANT: Always use the custom CPGLLexer for token generation.
- * The generated lexer is only imported for reference purposes.
- * 
- * This example demonstrates the proper usage of our custom lexer
- * for tokenizing CPGL input.
+ * Example demonstrating basic CPGL lexer usage
  */
-import { CharStreams, CommonTokenStream } from 'antlr4ts';
-import { TokenTypes } from '../lexer/CPGLLexerConstants';
-import { CPGLLexer } from '../lexer/CPGLLexer';
-import type { CPGLToken } from '../lexer/CPGLToken';
-import { CPGLParser } from '../parser/CPGLParser';
+import { CharStreams } from 'antlr4ts';
 
-// Example usage of the CPGL lexer
-const input = `decision "Test Decision"
-    when "Condition 1" then
-        do "Action 1"
-    when "Condition 2" then
-        do "Action 2"
-        use "Another Decision"`;
+import { CPGLLexer } from '../grammar/generated/CPGLLexer';
+import { createLexer } from '../lexer/createLexer';
 
-console.log('Input:');
+const input = `
+decision "test"
+  when "condition"
+    then "action"
+`;
+
+const lexer = createLexer(CharStreams.fromString(input));
+
+console.log('Tokenizing input:');
 console.log(input);
-console.log('\nTokens:');
 
-// Create lexer and get tokens
-const lexer = new CPGLLexer(CharStreams.fromString(input));
 let token = lexer.nextToken();
-
-// Print each token
-while (token.type !== TokenTypes.EOF) {
-  const cpglToken = token as CPGLToken;
-  console.log(`Token: type=${token.type} (${cpglToken.typeName}), text="${token.text}"`);
+while (token.type !== CPGLLexer.EOF) {
+  console.log(`Token: ${lexer.vocabulary.getSymbolicName(token.type)} = "${token.text}"`);
   token = lexer.nextToken();
 }
+
+console.log('Reached end of input');

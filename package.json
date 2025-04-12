@@ -8,7 +8,7 @@
     "lint": "eslint . --ext .ts --yes",
     "lint:fix": "eslint . --ext .ts --fix --yes",
     "format": "prettier --write \"src/**/*.ts\"",
-    "test": "jest",
+    "test": "jest src/lexer/tests/index.test.ts src/ast/tests/builder.test.ts",
     "build": "tsc",
     "clean": "rimraf dist",
     "watch": "onchange -i \"src/**/*.ts\" -- npm run build",

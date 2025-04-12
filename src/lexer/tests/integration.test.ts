@@ -1,6 +1,7 @@
 import { CharStreams } from 'antlr4ts';
 
 import { CPGLLexer } from '../../grammar/generated/CPGLLexer';
+import { createLexer } from '../createLexer';
 
 import { getAllTokens, verifyTokenSequence } from './index.test';
 
@@ -11,7 +12,7 @@ describe('Integration', () => {
     when "Condition" then
         do "Action"
     done`;
-      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const lexer = createLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
 
       verifyTokenSequence(tokens, [
@@ -39,7 +40,7 @@ describe('Integration', () => {
             when "Level 3b" then
                 use "Action 3"
     done`;
-      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const lexer = createLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
 
       verifyTokenSequence(tokens, [
@@ -80,7 +81,7 @@ describe('Integration', () => {
     when "Condition" then do "Action".
     when "Another Condition" then use "Another Decision".
 done`;
-        const lexer = new CPGLLexer(CharStreams.fromString(input));
+        const lexer = createLexer(CharStreams.fromString(input));
         const tokens = getAllTokens(lexer);
 
         verifyTokenSequence(tokens, [
@@ -119,7 +120,7 @@ done`;
         use "IMMZ.D2.D5.Measles"
     done`;
 
-        const lexer = new CPGLLexer(CharStreams.fromString(input));
+        const lexer = createLexer(CharStreams.fromString(input));
         const tokens = getAllTokens(lexer);
 
         verifyTokenSequence(tokens, [
@@ -164,7 +165,7 @@ done`;
         do "Action 3"
     done`;
 
-        const lexer = new CPGLLexer(CharStreams.fromString(input));
+        const lexer = createLexer(CharStreams.fromString(input));
         const tokens = getAllTokens(lexer);
 
         verifyTokenSequence(tokens, [
@@ -204,7 +205,7 @@ done`;
         do "Action 2"
     done`;
 
-        const lexer = new CPGLLexer(CharStreams.fromString(input));
+        const lexer = createLexer(CharStreams.fromString(input));
         const tokens = getAllTokens(lexer);
 
         verifyTokenSequence(tokens, [
@@ -235,7 +236,7 @@ done`;
   describe('Terminology Structure', () => {
     it('should handle terminology with valueset', () => {
       const input = `terminology "BMI Valueset" valueset "bmi valueset".`;
-      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const lexer = createLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
 
       verifyTokenSequence(tokens, [
@@ -249,7 +250,7 @@ done`;
 
     it('should handle terminology with unknown', () => {
       const input = `terminology "some terminology" unknown.`;
-      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const lexer = createLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
 
       verifyTokenSequence(tokens, [
@@ -262,7 +263,7 @@ done`;
 
     it('should handle terminology with system and code', () => {
       const input = `terminology "Colonoscopy" system "http://snomed.info/sct" code "73761001".`;
-      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const lexer = createLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
 
       verifyTokenSequence(tokens, [
@@ -280,7 +281,7 @@ done`;
   describe('Activity Structure', () => {
     it('should handle basic activity statements', () => {
       const input = `activity "Vaccinate" perform CPGImmunization.`;
-      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const lexer = createLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
 
       verifyTokenSequence(tokens, [
@@ -294,7 +295,7 @@ done`;
 
     it('should handle activity statements with of clause', () => {
       const input = `activity "Indicate" perform CPGProposeDiagnosis of "Colonoscopy".`;
-      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const lexer = createLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
 
       verifyTokenSequence(tokens, [
@@ -316,7 +317,7 @@ done`;
     has valuetype boolean.
     coded by "BMI Valueset".
 done`;
-      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const lexer = createLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
 
       verifyTokenSequence(tokens, [
@@ -346,7 +347,7 @@ done`;
     has provenance "some provenance".
     inferred by "Most Recent(this, lookbackMonths)" "BMI".
 done`;
-      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const lexer = createLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
 
       verifyTokenSequence(tokens, [
@@ -380,7 +381,7 @@ done`;
     has valuetype Quantity.
     inferred by ("BMI Range as a Condition" or "BMI as an Observation" or "Calculated BMI").
 done`;
-      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const lexer = createLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
 
       verifyTokenSequence(tokens, [
@@ -415,7 +416,7 @@ done`;
     has valuetype Quantity.
     inferred by ("BMI Range" and "Height Record" and "Weight Record").
 done`;
-      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const lexer = createLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
 
       verifyTokenSequence(tokens, [
@@ -450,7 +451,7 @@ done`;
     has valuetype Quantity.
     inferred by ("BMI Range" and ("Height Record" or "Estimated Height") and "Weight Record").
 done`;
-      const lexer = new CPGLLexer(CharStreams.fromString(input));
+      const lexer = createLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
 
       verifyTokenSequence(tokens, [
