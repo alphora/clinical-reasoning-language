@@ -4,15 +4,8 @@ import { join } from 'path';
 import { CharStreams, CommonTokenStream } from 'antlr4ts';
 
 import { ASTBuilder } from '../ast/builder';
-import {
-  ASTNode,
-  File,
-  Decision,
-  WhenBlock,
-  SingleAction,
-  Terminology,
-  Concept,
-} from '../ast/types';
+import { File } from '../ast/types';
+import { printAST } from '../ast/utils';
 import { CPGLParser } from '../grammar/generated/CPGLParser';
 import { createLexer } from '../lexer/createLexer';
 
@@ -32,41 +25,9 @@ const tree = parser.cpgl();
 
 // Create the AST builder and visit the parse tree
 const builder = new ASTBuilder();
-const ast = builder.visit(tree);
-
-// Helper function to print AST nodes with indentation
-function printAST(node: ASTNode, indent = 0): void {
-  const spaces = '  '.repeat(indent);
-  console.log(`${spaces}${node.type}`);
-
-  // Print node-specific properties
-  if ('name' in node) {
-    console.log(`${spaces}  name: ${node.name}`);
-  }
-  if ('decisionName' in node) {
-    console.log(`${spaces}  decisionName: ${node.decisionName}`);
-  }
-  if ('statements' in node && Array.isArray((node as unknown as File).statements)) {
-    (node as unknown as File).statements.forEach(statement => printAST(statement, indent + 1));
-  }
-  if ('body' in node && (node as unknown as Decision).body) {
-    const decisionBody = (node as unknown as Decision).body;
-    if ('statements' in decisionBody && Array.isArray(decisionBody.statements)) {
-      decisionBody.statements.forEach((block: WhenBlock) => printAST(block, indent + 1));
-    }
-  }
-  if ('body' in node && (node as unknown as WhenBlock).body) {
-    printAST((node as unknown as WhenBlock).body, indent + 1);
-  }
-  if ('action' in node && (node as unknown as SingleAction).action) {
-    printAST((node as unknown as SingleAction).action, indent + 1);
-  }
-  if ('definition' in node && (node as unknown as Terminology | Concept).definition) {
-    printAST((node as unknown as Terminology | Concept).definition, indent + 1);
-  }
-}
+const ast = builder.visit(tree) as File;
 
 // Print the AST
 console.log('AST Representation:');
 console.log('==================');
-printAST(ast);
+console.log(printAST(ast));
