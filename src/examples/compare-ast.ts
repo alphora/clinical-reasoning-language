@@ -99,35 +99,65 @@ console.log(generatedAST);
 
 // Read the expected AST
 const expectedPath = join(__dirname, '../../docs/Expected AST.ast');
+console.log('\nReading expected AST from:', expectedPath);
 const expectedAST = readFileSync(expectedPath, 'utf-8');
+
+// Normalize line endings to LF
+const normalizedGenerated = generatedAST.replace(/\r\n/g, '\n').trim();
+const normalizedExpected = expectedAST.replace(/\r\n/g, '\n').trim();
 
 // Compare the ASTs
 console.log('\nComparing ASTs:');
-const trimmedGenerated = generatedAST.trim();
-const trimmedExpected = expectedAST.trim();
 
 // Create a version with all whitespace removed for strict comparison
-const noWhitespaceGenerated = generatedAST.replace(/\s+/g, '');
-const noWhitespaceExpected = expectedAST.replace(/\s+/g, '');
+const noWhitespaceGenerated = normalizedGenerated.replace(/\s+/g, '');
+const noWhitespaceExpected = normalizedExpected.replace(/\s+/g, '');
 
 if (noWhitespaceGenerated === noWhitespaceExpected) {
   console.log('✅ ASTs match in structure!');
-  if (trimmedGenerated !== trimmedExpected) {
+  if (normalizedGenerated !== normalizedExpected) {
     console.log('Note: There are formatting differences (whitespace/indentation)');
+    console.log('\nDetailed whitespace comparison:');
+    const generatedLines = normalizedGenerated.split('\n');
+    const expectedLines = normalizedExpected.split('\n');
+    const maxLines = Math.max(generatedLines.length, expectedLines.length);
+    let differences = 0;
+    for (let i = 0; i < maxLines; i++) {
+      const generatedLine = generatedLines[i] || '';
+      const expectedLine = expectedLines[i] || '';
+      if (generatedLine !== expectedLine) {
+        differences++;
+        console.log(`\nLine ${i + 1}:`);
+        console.log(`  Generated: "${generatedLine}"`);
+        console.log(`  Expected:  "${expectedLine}"`);
+        console.log('  Character codes:');
+        console.log(
+          '    Generated:',
+          Array.from(generatedLine).map(c => c.charCodeAt(0)),
+        );
+        console.log(
+          '    Expected: ',
+          Array.from(expectedLine).map(c => c.charCodeAt(0)),
+        );
+      }
+    }
+    console.log(`\nTotal differences: ${differences} lines`);
+  } else {
+    console.log('✅ ASTs match exactly!');
   }
 } else {
   console.log('❌ ASTs do not match!');
   console.log('\nDifferences:');
-  const generatedLines = trimmedGenerated.split('\n');
-  const expectedLines = trimmedExpected.split('\n');
+  const generatedLines = normalizedGenerated.split('\n');
+  const expectedLines = normalizedExpected.split('\n');
   const maxLines = Math.max(generatedLines.length, expectedLines.length);
   for (let i = 0; i < maxLines; i++) {
     const generatedLine = generatedLines[i] || '';
     const expectedLine = expectedLines[i] || '';
     if (generatedLine.trim() !== expectedLine.trim()) {
       console.log(`Line ${i + 1}:`);
-      console.log(`  Generated: ${generatedLine}`);
-      console.log(`  Expected:  ${expectedLine}`);
+      console.log(`  Generated: "${generatedLine}"`);
+      console.log(`  Expected:  "${expectedLine}"`);
     }
   }
 }
