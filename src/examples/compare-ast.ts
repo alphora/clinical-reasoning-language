@@ -170,10 +170,10 @@ if (lineCountsMatch) {
 } else {
   // Different line counts
   const minLines = Math.min(generatedLineCount, expectedLineCount);
-  const commonLinesMatch = 
-    normalizedGenerated.split('\n').slice(0, minLines).join('\n') === 
+  const commonLinesMatch =
+    normalizedGenerated.split('\n').slice(0, minLines).join('\n') ===
     normalizedExpected.split('\n').slice(0, minLines).join('\n');
-  
+
   if (commonLinesMatch) {
     console.log('✅ Common lines match exactly!');
   } else if (structureMatch) {
