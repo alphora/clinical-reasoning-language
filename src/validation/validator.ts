@@ -107,11 +107,11 @@ export class ASTValidator {
   }
 
   private validateDecision(decision: Decision): void {
-    if (!decision.name || !decision.name.trim()) {
+    if (!decision.name?.trim()) {
       throw new ValidationError('Decision name cannot be empty', decision.location.start);
     }
 
-    if (!decision.body || !decision.body.statements || decision.body.statements.length === 0) {
+    if (!decision.body?.statements?.length) {
       throw new ValidationError(
         'Decision must have at least one when block',
         decision.location.start,
@@ -305,10 +305,10 @@ export class ASTValidator {
   }
 
   private validateActivity(activity: Activity): void {
-    if (!activity.name || !activity.name.trim()) {
+    if (!activity.name?.trim()) {
       throw new ValidationError('Activity name cannot be empty', activity.location.start);
     }
-    if (!activity.activityType || !activity.activityType.trim()) {
+    if (!activity.activityType?.trim()) {
       throw new ValidationError('Activity type cannot be empty', activity.location.start);
     }
     if (!ACTION_FHIR_TYPES.has(activity.activityType)) {
@@ -320,10 +320,10 @@ export class ASTValidator {
   }
 
   private validateConcept(concept: Concept): void {
-    if (!concept.name || !concept.name.trim()) {
+    if (!concept.name?.trim()) {
       throw new ValidationError('Concept name cannot be empty', concept.location.start);
     }
-    if (!concept.conceptType || !concept.conceptType.trim()) {
+    if (!concept.conceptType?.trim()) {
       throw new ValidationError('Concept type cannot be empty', concept.location.start);
     }
     if (!CASEFEATURE_FHIR_TYPES.has(concept.conceptType)) {
@@ -332,7 +332,7 @@ export class ASTValidator {
         concept.location.start,
       );
     }
-    if (!concept.valueType || !concept.valueType.trim()) {
+    if (!concept.valueType?.trim()) {
       throw new ValidationError('Value type cannot be empty', concept.location.start);
     }
     if (!FHIR_VALUE_TYPES.has(concept.valueType)) {
@@ -344,7 +344,7 @@ export class ASTValidator {
   }
 
   private validateTerminology(terminology: Terminology): void {
-    if (!terminology.name || !terminology.name.trim()) {
+    if (!terminology.name?.trim()) {
       throw new ValidationError('Terminology name cannot be empty', terminology.location.start);
     }
     if (!terminology.definition) {

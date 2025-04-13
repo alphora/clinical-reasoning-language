@@ -1,5 +1,16 @@
 import { ASTNode } from './types';
 
+interface ASTComparison {
+  lineCountsMatch: boolean;
+  whitespaceNormalizedMatch: boolean;
+  structureMatch: boolean;
+  generatedLineCount: number;
+  expectedLineCount: number;
+  maxLines: number;
+  generatedLines: string[];
+  expectedLines: string[];
+}
+
 /**
  * Prints an AST node with proper indentation
  * @param node The AST node to print
@@ -8,9 +19,7 @@ import { ASTNode } from './types';
  */
 export function printAST(node: ASTNode, indent = 0): string {
   const spaces = '  '.repeat(indent);
-  let output = '';
-
-  output = `${spaces}${node.type}\n`;
+  let output = `${spaces}${node.type}\n`;
 
   // Print node-specific properties
   if ('name' in node) {
@@ -39,11 +48,7 @@ export function printAST(node: ASTNode, indent = 0): string {
   // Handle body
   if ('body' in node && node.body) {
     const body = node.body as ASTNode;
-    if ('statements' in body && Array.isArray(body.statements)) {
-      output += printAST(body, indent + 1);
-    } else {
-      output += printAST(body, indent + 1);
-    }
+    output += printAST(body, indent + 1);
   }
 
   // Handle action
@@ -61,7 +66,7 @@ export function printAST(node: ASTNode, indent = 0): string {
  * @param expectedAST The expected AST string
  * @returns An object containing comparison results and details
  */
-export function compareASTs(generatedAST: string, expectedAST: string) {
+export function compareASTs(generatedAST: string, expectedAST: string): ASTComparison {
   // Normalize line endings to LF
   const normalizedGenerated = generatedAST.replace(/\r\n/g, '\n').trim();
   const normalizedExpected = expectedAST.replace(/\r\n/g, '\n').trim();
@@ -79,18 +84,14 @@ export function compareASTs(generatedAST: string, expectedAST: string) {
   const noWhitespaceGenerated = normalizedGenerated.replace(/\s+/g, '');
   const noWhitespaceExpected = normalizedExpected.replace(/\s+/g, '');
 
-  const lineCountsMatch = generatedLineCount === expectedLineCount;
-  const whitespaceNormalizedMatch = normalizedGenerated === normalizedExpected;
-  const structureMatch = noWhitespaceGenerated === noWhitespaceExpected;
-
   return {
-    lineCountsMatch,
-    whitespaceNormalizedMatch,
-    structureMatch,
+    lineCountsMatch: generatedLineCount === expectedLineCount,
+    whitespaceNormalizedMatch: normalizedGenerated === normalizedExpected,
+    structureMatch: noWhitespaceGenerated === noWhitespaceExpected,
     generatedLineCount,
     expectedLineCount,
     maxLines,
     generatedLines,
     expectedLines,
   };
-} 
+}

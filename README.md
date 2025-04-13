@@ -50,6 +50,26 @@ while (token.type !== TokenTypes.EOF) {
 }
 ```
 
+## Example AST Comparison
+
+To compare the generated AST with the expected AST, you can run:
+
+```bash
+npx ts-node --log-error src/examples/compare-ast.ts
+```
+
+This will:
+1. Parse the example CPGL file (`docs/Measles Immunization Decision.cpgl`)
+2. Generate an AST from the parsed input
+3. Compare it with the expected AST (`docs/Expected AST.ast`)
+4. Display any differences between the two ASTs
+
+The comparison includes:
+- Line count matching
+- Whitespace-normalized matching
+- Structure matching
+- Detailed line-by-line comparison of differences
+
 ## Development
 
 ### Updating grammar files

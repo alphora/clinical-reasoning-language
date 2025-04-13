@@ -32,25 +32,24 @@ const ast = builder.visit(tree) as File;
 // Helper function to print AST nodes with indentation
 function printAST(node: ASTNode, indent = 0): string {
   const spaces = '  '.repeat(indent);
-  let output = '';
-
-  output = `${spaces}${node.type}\n`;
+  let output = `${spaces}${node.type}\n`;
 
   // Print node-specific properties
-  if ('name' in node) {
-    output += `${spaces}  name: ${node.name}\n`;
-  }
-  if ('decisionName' in node) {
-    output += `${spaces}  decisionName: "${node.decisionName}"\n`;
-  }
-  if ('activityName' in node) {
-    output += `${spaces}  activityName: "${node.activityName}"\n`;
-  }
-  if ('conceptName' in node) {
-    output += `${spaces}  conceptName: "${node.conceptName}"\n`;
-  }
-  if ('qualifier' in node && node.qualifier) {
-    output += `${spaces}  qualifier: "${node.qualifier}"\n`;
+  const properties = [
+    { key: 'name', format: (value: string) => value },
+    { key: 'decisionName', format: (value: string) => `"${value}"` },
+    { key: 'activityName', format: (value: string) => `"${value}"` },
+    { key: 'conceptName', format: (value: string) => `"${value}"` },
+    { key: 'qualifier', format: (value: unknown) => `"${String(value)}"` },
+  ];
+
+  for (const { key, format } of properties) {
+    if (key in node) {
+      const value = (node as unknown as Record<string, unknown>)[key];
+      if (value) {
+        output += `${spaces}  ${key}: ${format(value as string)}\n`;
+      }
+    }
   }
 
   // Handle statements
@@ -62,18 +61,12 @@ function printAST(node: ASTNode, indent = 0): string {
 
   // Handle body
   if ('body' in node && node.body) {
-    const body = node.body as ASTNode;
-    if ('statements' in body && Array.isArray(body.statements)) {
-      output += printAST(body, indent + 1);
-    } else {
-      output += printAST(body, indent + 1);
-    }
+    output += printAST(node.body as ASTNode, indent + 1);
   }
 
   // Handle action
   if ('action' in node && node.action) {
-    const action = node.action as DoActivity | UseDecision;
-    output += printAST(action, indent + 1);
+    output += printAST(node.action as DoActivity | UseDecision, indent + 1);
   }
 
   return output;
