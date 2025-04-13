@@ -79,21 +79,8 @@ function printAST(node: ASTNode, indent = 0): string {
   return output;
 }
 
-// Get only the first decision
-const firstDecision = ast.statements.find(statement => statement.type === 'Decision');
-if (!firstDecision) {
-  throw new Error('No decision found in AST');
-}
-
-// Create a File node with only the first decision
-const singleDecisionAST: File = {
-  type: 'File',
-  statements: [firstDecision],
-  location: ast.location,
-};
-
 // Print the AST
-const generatedAST = printAST(singleDecisionAST);
+const generatedAST = printAST(ast);
 console.log('Generated AST:');
 console.log(generatedAST);
 
@@ -106,6 +93,28 @@ const expectedAST = readFileSync(expectedPath, 'utf-8');
 const normalizedGenerated = generatedAST.replace(/\r\n/g, '\n').trim();
 const normalizedExpected = expectedAST.replace(/\r\n/g, '\n').trim();
 
+// Split into lines
+const generatedLines = normalizedGenerated.split('\n');
+const expectedLines = normalizedExpected.split('\n');
+
+// Compare line counts
+const generatedLineCount = generatedLines.length;
+const expectedLineCount = expectedLines.length;
+const maxLines = Math.max(generatedLineCount, expectedLineCount);
+
+if (generatedLineCount !== expectedLineCount) {
+  console.log('\nWarning: Files have different line counts:');
+  console.log(`  Generated: ${generatedLineCount} lines`);
+  console.log(`  Expected:  ${expectedLineCount} lines`);
+  console.log(`  Difference: ${Math.abs(generatedLineCount - expectedLineCount)} lines`);
+  if (generatedLineCount > expectedLineCount) {
+    console.log('  Generated file is longer - will compare first', expectedLineCount, 'lines');
+  } else {
+    console.log('  Expected file is longer - will compare first', generatedLineCount, 'lines');
+  }
+  console.log('');
+}
+
 // Compare the ASTs
 console.log('\nComparing ASTs:');
 
@@ -113,14 +122,17 @@ console.log('\nComparing ASTs:');
 const noWhitespaceGenerated = normalizedGenerated.replace(/\s+/g, '');
 const noWhitespaceExpected = normalizedExpected.replace(/\s+/g, '');
 
-if (noWhitespaceGenerated === noWhitespaceExpected) {
-  console.log('✅ ASTs match in structure!');
-  if (normalizedGenerated !== normalizedExpected) {
+const lineCountsMatch = generatedLineCount === expectedLineCount;
+const whitespaceNormalizedMatch = normalizedGenerated === normalizedExpected;
+const structureMatch = noWhitespaceGenerated === noWhitespaceExpected;
+
+if (lineCountsMatch) {
+  if (whitespaceNormalizedMatch) {
+    console.log('✅ ASTs match exactly!');
+  } else if (structureMatch) {
+    console.log('✅ ASTs match in structure!');
     console.log('Note: There are formatting differences (whitespace/indentation)');
     console.log('\nDetailed whitespace comparison:');
-    const generatedLines = normalizedGenerated.split('\n');
-    const expectedLines = normalizedExpected.split('\n');
-    const maxLines = Math.max(generatedLines.length, expectedLines.length);
     let differences = 0;
     for (let i = 0; i < maxLines; i++) {
       const generatedLine = generatedLines[i] || '';
@@ -133,31 +145,49 @@ if (noWhitespaceGenerated === noWhitespaceExpected) {
         console.log('  Character codes:');
         console.log(
           '    Generated:',
-          Array.from(generatedLine).map(c => c.charCodeAt(0)),
+          Array.from(generatedLine).map((c: string) => c.charCodeAt(0)),
         );
         console.log(
           '    Expected: ',
-          Array.from(expectedLine).map(c => c.charCodeAt(0)),
+          Array.from(expectedLine).map((c: string) => c.charCodeAt(0)),
         );
       }
     }
     console.log(`\nTotal differences: ${differences} lines`);
   } else {
-    console.log('✅ ASTs match exactly!');
+    console.log('❌ ASTs do not match!');
+    console.log('\nDifferences:');
+    for (let i = 0; i < maxLines; i++) {
+      const generatedLine = generatedLines[i] || '';
+      const expectedLine = expectedLines[i] || '';
+      if (generatedLine.trim() !== expectedLine.trim()) {
+        console.log(`Line ${i + 1}:`);
+        console.log(`  Generated: "${generatedLine}"`);
+        console.log(`  Expected:  "${expectedLine}"`);
+      }
+    }
   }
 } else {
-  console.log('❌ ASTs do not match!');
-  console.log('\nDifferences:');
-  const generatedLines = normalizedGenerated.split('\n');
-  const expectedLines = normalizedExpected.split('\n');
-  const maxLines = Math.max(generatedLines.length, expectedLines.length);
-  for (let i = 0; i < maxLines; i++) {
+  // Different line counts
+  const minLines = Math.min(generatedLineCount, expectedLineCount);
+  const commonLinesMatch = 
+    normalizedGenerated.split('\n').slice(0, minLines).join('\n') === 
+    normalizedExpected.split('\n').slice(0, minLines).join('\n');
+  
+  if (commonLinesMatch) {
+    console.log('✅ Common lines match exactly!');
+  } else if (structureMatch) {
+    console.log('✅ Common lines match in structure!');
+  } else {
+    console.log('❌ Common lines do not match!');
+  }
+
+  console.log('\nRemaining lines:');
+  for (let i = minLines; i < maxLines; i++) {
     const generatedLine = generatedLines[i] || '';
     const expectedLine = expectedLines[i] || '';
-    if (generatedLine.trim() !== expectedLine.trim()) {
-      console.log(`Line ${i + 1}:`);
-      console.log(`  Generated: "${generatedLine}"`);
-      console.log(`  Expected:  "${expectedLine}"`);
-    }
+    console.log(`Line ${i + 1}:`);
+    console.log(`  Generated: "${generatedLine}"`);
+    console.log(`  Expected:  "${expectedLine}"`);
   }
 }
