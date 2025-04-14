@@ -54,8 +54,11 @@ import {
   WhenBlockBody,
 } from './types';
 
-export class ASTBuilder implements ParseTreeVisitor<ASTNode> {
-  visit(tree: ParseTree): ASTNode {
+export class ASTBuilder implements ParseTreeVisitor<ASTNode | File> {
+  private seenConcepts: Set<string> = new Set();
+  private seenActions: Set<string> = new Set();
+
+  visit(tree: ParseTree): ASTNode | File {
     if (tree instanceof ParserRuleContext) {
       const ruleName = tree.ruleContext.ruleIndex;
       // If it's the root cpgl rule
@@ -66,8 +69,8 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode> {
     return tree.accept(this);
   }
 
-  visitChildren(node: RuleNode): ASTNode {
-    const children: ASTNode[] = [];
+  visitChildren(node: RuleNode): ASTNode | File {
+    const children: (ASTNode | File)[] = [];
     for (let i = 0; i < node.childCount; i++) {
       const child = node.getChild(i);
       if (child instanceof ParserRuleContext) {
@@ -80,11 +83,11 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode> {
     return children[0];
   }
 
-  visitTerminal(_node: TerminalNode): ASTNode {
+  visitTerminal(_node: TerminalNode): ASTNode | File {
     throw new Error('Method not implemented.');
   }
 
-  visitErrorNode(_node: TerminalNode): ASTNode {
+  visitErrorNode(_node: TerminalNode): ASTNode | File {
     throw new Error('Method not implemented.');
   }
 
@@ -124,11 +127,17 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode> {
   visitDecisionStatement(ctx: DecisionStatementContext): Decision {
     const decisionName = this.getStringValue(ctx.getChild(1));
     const whenBlocks: WhenBlock[] = [];
+    const seenConcepts = new Set<string>();
     const blockBody = this.getContext(ctx.getChild(3));
     for (let i = 0; i < blockBody.childCount; i++) {
       const child = blockBody.getChild(i);
       if (child instanceof ParserRuleContext && child.getChild(0)?.text === 'when') {
-        whenBlocks.push(this.visitWhenBlock(child));
+        const whenBlock = this.visitWhenBlock(child);
+        // Only add if we haven't seen this concept before at the top level
+        if (!seenConcepts.has(whenBlock.conceptName)) {
+          seenConcepts.add(whenBlock.conceptName);
+          whenBlocks.push(whenBlock);
+        }
       }
     }
     return {
@@ -150,6 +159,35 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode> {
     });
     const conceptName = this.getStringValue(ctx.getChild(1));
     const body = this.visitWhenBlockBody(this.getContext(ctx.getChild(3)));
+
+    // If the body is a block body, we need to ensure we don't have duplicate statements
+    if (body.type === BlockBodyType.type) {
+      const uniqueStatements: (WhenBlock | ActionStatement)[] = [];
+
+      for (const statement of body.statements) {
+        if (statement.type === WhenBlockType.type) {
+          const whenBlock = statement as WhenBlock;
+          const conceptKey = `${conceptName}:${whenBlock.conceptName}`;
+          if (!this.seenConcepts.has(conceptKey)) {
+            this.seenConcepts.add(conceptKey);
+            uniqueStatements.push(statement);
+          }
+        } else if (statement.type === ActionStatementType.type) {
+          const actionStatement = statement as ActionStatement;
+          const actionKey =
+            actionStatement.action.type === DoActivityType.type
+              ? `${conceptName}:do:${(actionStatement.action as DoActivity).activityName}`
+              : `${conceptName}:use:${(actionStatement.action as UseDecision).decisionName}`;
+          if (!this.seenActions.has(actionKey)) {
+            this.seenActions.add(actionKey);
+            uniqueStatements.push(statement);
+          }
+        }
+      }
+
+      body.statements = uniqueStatements;
+    }
+
     console.log('[DEBUGGING] WhenBlock - Created when block:', {
       conceptName,
       bodyType: body.type,
@@ -245,11 +283,20 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode> {
 
               if (text === 'when') {
                 const whenBlock = this.visitWhenBlock(statementChild);
-                statements.push(whenBlock);
-                console.log('[DEBUGGING] BlockBody - Added when block:', {
-                  conceptName: whenBlock.conceptName,
-                  statementsLength: statements.length,
-                });
+                // Only add if we haven't seen this when block before
+                if (
+                  !statements.some(
+                    s =>
+                      s.type === WhenBlockType.type &&
+                      (s as WhenBlock).conceptName === whenBlock.conceptName,
+                  )
+                ) {
+                  statements.push(whenBlock);
+                  console.log('[DEBUGGING] BlockBody - Added when block:', {
+                    conceptName: whenBlock.conceptName,
+                    statementsLength: statements.length,
+                  });
+                }
               } else if (RegExp(/^(do|use)"[^"]+"/).exec(text)) {
                 // Process action statement
                 const action = this.visitAction(statementChild);
@@ -258,15 +305,35 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode> {
                   action,
                   location: this.getLocation(statementChild),
                 };
-                statements.push(actionStatement);
-                console.log('[DEBUGGING] BlockBody - Added action statement:', {
-                  type: action.type,
-                  name:
-                    action.type === DoActivityType.type
-                      ? (action as DoActivity).activityName
-                      : (action as UseDecision).decisionName,
-                  statementsLength: statements.length,
-                });
+                // Only add if we haven't seen this action before
+                if (
+                  !statements.some(s => {
+                    if (s.type !== ActionStatementType.type) return false;
+                    const existingAction = (s as ActionStatement).action;
+                    if (existingAction.type !== action.type) return false;
+                    if (action.type === DoActivityType.type) {
+                      return (
+                        (existingAction as DoActivity).activityName ===
+                        (action as DoActivity).activityName
+                      );
+                    } else {
+                      return (
+                        (existingAction as UseDecision).decisionName ===
+                        (action as UseDecision).decisionName
+                      );
+                    }
+                  })
+                ) {
+                  statements.push(actionStatement);
+                  console.log('[DEBUGGING] BlockBody - Added action statement:', {
+                    type: action.type,
+                    name:
+                      action.type === DoActivityType.type
+                        ? (action as DoActivity).activityName
+                        : (action as UseDecision).decisionName,
+                    statementsLength: statements.length,
+                  });
+                }
 
                 // Skip the dot if present
                 if (ctx.getChild(currentIndex + 1)?.text === '.') {
