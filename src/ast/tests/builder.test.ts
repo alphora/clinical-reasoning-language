@@ -1,55 +1,36 @@
-import { CharStreams, CommonTokenStream } from 'antlr4ts';
-import { ParseTree } from 'antlr4ts/tree/ParseTree';
-
-import { CPGLParser } from '../../grammar/generated/CPGLParser';
-import { createLexer } from '../../lexer/createLexer';
-import { ASTBuilder } from '../builder';
 import {
   Activity,
   ActivityType,
-  ActionStatement,
-  ActionStatementType,
   BlockBody,
-  CodedByDefinition,
-  CodedByDefinitionType,
+  SingleAction,
+  SingleActionType,
   Concept,
   ConceptType,
+  CodedByDefinition,
+  CodedByDefinitionType,
+  InferredByDefinition,
+  InferredByDefinitionType,
   Decision,
   DecisionType,
   DoActivity,
   DoActivityType,
-  File,
   FileType,
-  InferredByDefinition,
-  InferredByDefinitionType,
-  SingleAction,
-  SingleActionType,
   Terminology,
   TerminologyType,
   TerminologySystemCode,
   TerminologySystemCodeType,
+  TerminologyUnknownType,
   TerminologyValueset,
   TerminologyValuesetType,
-  TerminologyUnknownType,
+  WhenBlock,
   UseDecision,
   UseDecisionType,
-  WhenBlock,
+  ActionStatement,
 } from '../types';
 
+import { parseInput } from './index.test';
+
 describe('ASTBuilder', () => {
-  let builder: ASTBuilder;
-
-  beforeEach(() => {
-    builder = new ASTBuilder();
-  });
-
-  const parseInput = (input: string): ParseTree => {
-    const lexer = createLexer(CharStreams.fromString(input));
-    const tokens = new CommonTokenStream(lexer);
-    const parser = new CPGLParser(tokens);
-    return parser.cpgl();
-  };
-
   describe('Decision Statements', () => {
     it('should parse a simple decision with when block', () => {
       const input = `
@@ -57,8 +38,7 @@ describe('ASTBuilder', () => {
           when "BMI > 30" then do "CPGProposeDiagnosis Obesity".
         done
       `;
-      const tree = parseInput(input);
-      const result = builder.visit(tree) as File;
+      const result = parseInput(input);
       expect(result.type).toBe(FileType.type);
       expect(result.statements).toHaveLength(1);
       const decision = result.statements[0] as Decision;
@@ -82,10 +62,8 @@ describe('ASTBuilder', () => {
         done
       `;
 
-      const tree = parseInput(input);
-      const ast = builder.visit(tree) as File;
-
-      const decision = ast.statements[0] as Decision;
+      const result = parseInput(input);
+      const decision = result.statements[0] as Decision;
       expect(decision.body.statements).toHaveLength(2);
       expect(decision.body.statements[0].conceptName).toBe('BMI');
       expect(decision.body.statements[1].conceptName).toBe('Weight');
@@ -107,12 +85,10 @@ describe('ASTBuilder', () => {
         done
       `;
 
-      const tree = parseInput(input);
-      const ast = builder.visit(tree) as File;
-
-      const decision = ast.statements[0] as Decision;
-      const tempWhenBlock = decision.body.statements[0] as WhenBlock;
-      const bpWhenBlock = decision.body.statements[1] as WhenBlock;
+      const result = parseInput(input);
+      const ast = result.statements[0] as Decision;
+      const tempWhenBlock = ast.body.statements[0] as WhenBlock;
+      const bpWhenBlock = ast.body.statements[1] as WhenBlock;
       const tempBlock = tempWhenBlock.body as BlockBody;
       const bpBlock = bpWhenBlock.body as BlockBody;
 
@@ -132,9 +108,8 @@ describe('ASTBuilder', () => {
           done
         `;
 
-        const tree = parseInput(input);
-        const ast = builder.visit(tree) as File;
-        const decision = ast.statements[0] as Decision;
+        const result = parseInput(input);
+        const decision = result.statements[0] as Decision;
         const whenBlock = decision.body.statements[0] as WhenBlock;
         const blockBody = whenBlock.body as BlockBody;
 
@@ -154,9 +129,8 @@ describe('ASTBuilder', () => {
           done
         `;
 
-        const tree = parseInput(input);
-        const ast = builder.visit(tree) as File;
-        const decision = ast.statements[0] as Decision;
+        const result = parseInput(input);
+        const decision = result.statements[0] as Decision;
         const whenBlock = decision.body.statements[0] as WhenBlock;
         const blockBody = whenBlock.body as BlockBody;
 
@@ -178,9 +152,8 @@ describe('ASTBuilder', () => {
           done
         `;
 
-        const tree = parseInput(input);
-        const ast = builder.visit(tree) as File;
-        const decision = ast.statements[0] as Decision;
+        const result = parseInput(input);
+        const decision = result.statements[0] as Decision;
         const whenBlock = decision.body.statements[0] as WhenBlock;
         const blockBody = whenBlock.body as BlockBody;
 
@@ -196,9 +169,8 @@ describe('ASTBuilder', () => {
           done
         `;
 
-        const tree = parseInput(input);
-        const ast = builder.visit(tree) as File;
-        const decision = ast.statements[0] as Decision;
+        const result = parseInput(input);
+        const decision = result.statements[0] as Decision;
         const whenBlock = decision.body.statements[0] as WhenBlock;
         const blockBody = whenBlock.body as BlockBody;
 
@@ -218,9 +190,8 @@ describe('ASTBuilder', () => {
           done
         `;
 
-        const tree = parseInput(input);
-        const ast = builder.visit(tree) as File;
-        const decision = ast.statements[0] as Decision;
+        const result = parseInput(input);
+        const decision = result.statements[0] as Decision;
         const whenBlock = decision.body.statements[0] as WhenBlock;
         const blockBody = whenBlock.body as BlockBody;
 
@@ -242,9 +213,8 @@ describe('ASTBuilder', () => {
           done
         `;
 
-        const tree = parseInput(input);
-        const ast = builder.visit(tree) as File;
-        const decision = ast.statements[0] as Decision;
+        const result = parseInput(input);
+        const decision = result.statements[0] as Decision;
         const whenBlock = decision.body.statements[0] as WhenBlock;
         const blockBody = whenBlock.body as BlockBody;
 
@@ -263,9 +233,8 @@ describe('ASTBuilder', () => {
           done
         `;
 
-        const tree = parseInput(input);
-        const ast = builder.visit(tree) as File;
-        const decision = ast.statements[0] as Decision;
+        const result = parseInput(input);
+        const decision = result.statements[0] as Decision;
         const whenBlock = decision.body.statements[0] as WhenBlock;
         const blockBody = whenBlock.body as BlockBody;
 
@@ -294,38 +263,30 @@ describe('ASTBuilder', () => {
     it('should parse a terminology valueset', () => {
       const input = 'terminology "BMI Valueset" valueset "bmi valueset".';
 
-      const tree = parseInput(input);
-      const ast = builder.visit(tree) as File;
-
-      const terminology = ast.statements[0] as Terminology;
-      expect(terminology.type).toBe(TerminologyType.type);
-      expect(terminology.name).toBe('BMI Valueset');
-      expect(terminology.definition.type).toBe(TerminologyValuesetType.type);
-      expect((terminology.definition as TerminologyValueset).valuesetName).toBe('bmi valueset');
+      const result = parseInput(input);
+      const ast = result.statements[0] as Terminology;
+      expect(ast.type).toBe(TerminologyType.type);
+      expect(ast.name).toBe('BMI Valueset');
+      expect(ast.definition.type).toBe(TerminologyValuesetType.type);
+      expect((ast.definition as TerminologyValueset).valuesetName).toBe('bmi valueset');
     });
 
     it('should parse a terminology system code', () => {
       const input = 'terminology "Colonoscopy" system "http://snomed.info/sct" code "73761001".';
 
-      const tree = parseInput(input);
-      const ast = builder.visit(tree) as File;
-
-      const terminology = ast.statements[0] as Terminology;
-      expect(terminology.definition.type).toBe(TerminologySystemCodeType.type);
-      expect((terminology.definition as TerminologySystemCode).system).toBe(
-        'http://snomed.info/sct',
-      );
-      expect((terminology.definition as TerminologySystemCode).code).toBe('73761001');
+      const result = parseInput(input);
+      const ast = result.statements[0] as Terminology;
+      expect(ast.definition.type).toBe(TerminologySystemCodeType.type);
+      expect((ast.definition as TerminologySystemCode).system).toBe('http://snomed.info/sct');
+      expect((ast.definition as TerminologySystemCode).code).toBe('73761001');
     });
 
     it('should parse a terminology unknown', () => {
       const input = 'terminology "Some Terminology" unknown.';
 
-      const tree = parseInput(input);
-      const ast = builder.visit(tree) as File;
-
-      const terminology = ast.statements[0] as Terminology;
-      expect(terminology.definition.type).toBe(TerminologyUnknownType.type);
+      const result = parseInput(input);
+      const ast = result.statements[0] as Terminology;
+      expect(ast.definition.type).toBe(TerminologyUnknownType.type);
     });
   });
 
@@ -333,27 +294,23 @@ describe('ASTBuilder', () => {
     it('should parse a simple activity', () => {
       const input = 'activity "Vaccinate" perform CPGImmunization.';
 
-      const tree = parseInput(input);
-      const ast = builder.visit(tree) as File;
-
-      const activity = ast.statements[0] as Activity;
-      expect(activity.type).toBe(ActivityType.type);
-      expect(activity.name).toBe('Vaccinate');
-      expect(activity.activityType).toBe('CPGImmunization');
-      expect(activity.terminologyReference).toBeUndefined();
+      const result = parseInput(input);
+      const ast = result.statements[0] as Activity;
+      expect(ast.type).toBe(ActivityType.type);
+      expect(ast.name).toBe('Vaccinate');
+      expect(ast.activityType).toBe('CPGImmunization');
+      expect(ast.terminologyReference).toBeUndefined();
     });
 
     it('should parse an activity with of clause', () => {
       const input = 'activity "Indicate" perform CPGProposeDiagnosis of "Colonoscopy".';
 
-      const tree = parseInput(input);
-      const ast = builder.visit(tree) as File;
-
-      const activity = ast.statements[0] as Activity;
-      expect(activity.type).toBe(ActivityType.type);
-      expect(activity.name).toBe('Indicate');
-      expect(activity.activityType).toBe('CPGProposeDiagnosis');
-      expect(activity.terminologyReference).toBe('Colonoscopy');
+      const result = parseInput(input);
+      const ast = result.statements[0] as Activity;
+      expect(ast.type).toBe(ActivityType.type);
+      expect(ast.name).toBe('Indicate');
+      expect(ast.activityType).toBe('CPGProposeDiagnosis');
+      expect(ast.terminologyReference).toBe('Colonoscopy');
     });
   });
 
@@ -367,16 +324,14 @@ describe('ASTBuilder', () => {
         done
       `;
 
-      const tree = parseInput(input);
-      const ast = builder.visit(tree) as File;
-
-      const concept = ast.statements[0] as Concept;
-      expect(concept.type).toBe(ConceptType.type);
-      expect(concept.name).toBe('BMI Range as a Condition');
-      expect(concept.conceptType).toBe('Condition');
-      expect(concept.valueType).toBe('CodeableConcept');
-      expect(concept.definition.type).toBe(CodedByDefinitionType.type);
-      expect((concept.definition as CodedByDefinition).terminologyName).toBe('BMI Valueset');
+      const result = parseInput(input);
+      const ast = result.statements[0] as Concept;
+      expect(ast.type).toBe(ConceptType.type);
+      expect(ast.name).toBe('BMI Range as a Condition');
+      expect(ast.conceptType).toBe('Condition');
+      expect(ast.valueType).toBe('CodeableConcept');
+      expect(ast.definition.type).toBe(CodedByDefinitionType.type);
+      expect((ast.definition as CodedByDefinition).terminologyName).toBe('BMI Valueset');
     });
 
     it('should parse a concept with inferred by pattern and concept reference', () => {
@@ -389,17 +344,15 @@ describe('ASTBuilder', () => {
         done
       `;
 
-      const tree = parseInput(input);
-      const ast = builder.visit(tree) as File;
-
-      const concept = ast.statements[0] as Concept;
-      expect(concept.type).toBe(ConceptType.type);
-      expect(concept.name).toBe('Most Recent BMI');
-      expect(concept.conceptType).toBe('Observation');
-      expect(concept.valueType).toBe('boolean');
-      expect(concept.provenance).toBe('some provenance');
-      expect(concept.definition.type).toBe(InferredByDefinitionType.type);
-      const inferredBy = concept.definition as InferredByDefinition;
+      const result = parseInput(input);
+      const ast = result.statements[0] as Concept;
+      expect(ast.type).toBe(ConceptType.type);
+      expect(ast.name).toBe('Most Recent BMI');
+      expect(ast.conceptType).toBe('Observation');
+      expect(ast.valueType).toBe('boolean');
+      expect(ast.provenance).toBe('some provenance');
+      expect(ast.definition.type).toBe(InferredByDefinitionType.type);
+      const inferredBy = ast.definition as InferredByDefinition;
       expect(inferredBy.pattern).toBe('Most Recent(this, lookbackMonths)');
       expect(inferredBy.concept).toBe('BMI');
       expect(inferredBy.descriptiveLogic).toBeUndefined();
@@ -414,16 +367,14 @@ describe('ASTBuilder', () => {
         done
       `;
 
-      const tree = parseInput(input);
-      const ast = builder.visit(tree) as File;
-
-      const concept = ast.statements[0] as Concept;
-      expect(concept.type).toBe(ConceptType.type);
-      expect(concept.name).toBe('BMI');
-      expect(concept.conceptType).toBe('Observation');
-      expect(concept.valueType).toBe('Quantity');
-      expect(concept.definition.type).toBe(InferredByDefinitionType.type);
-      const inferredBy = concept.definition as InferredByDefinition;
+      const result = parseInput(input);
+      const ast = result.statements[0] as Concept;
+      expect(ast.type).toBe(ConceptType.type);
+      expect(ast.name).toBe('BMI');
+      expect(ast.conceptType).toBe('Observation');
+      expect(ast.valueType).toBe('Quantity');
+      expect(ast.definition.type).toBe(InferredByDefinitionType.type);
+      const inferredBy = ast.definition as InferredByDefinition;
       expect(inferredBy.descriptiveLogic).toBe(
         'BMI Range as a Condition or BMI as an Observation or Calculated BMI',
       );
@@ -440,12 +391,10 @@ describe('ASTBuilder', () => {
         done
       `;
 
-      const tree = parseInput(input);
-      const ast = builder.visit(tree) as File;
-
-      const concept = ast.statements[0] as Concept;
-      expect(concept.definition.type).toBe(InferredByDefinitionType.type);
-      const inferredBy = concept.definition as InferredByDefinition;
+      const result = parseInput(input);
+      const ast = result.statements[0] as Concept;
+      expect(ast.definition.type).toBe(InferredByDefinitionType.type);
+      const inferredBy = ast.definition as InferredByDefinition;
       expect(inferredBy.pattern).toBeUndefined();
       expect(inferredBy.concept).toBeUndefined();
       expect(inferredBy.descriptiveLogic).toBe(
@@ -462,21 +411,20 @@ describe('ASTBuilder', () => {
         concept "BMI":
           has type Observation.
           has valuetype Quantity.
-          coded by "BMI Valueset".
         done
         decision "Check BMI":
           when "BMI" then do "Record BMI".
         done
       `;
 
-      const tree = parseInput(input);
-      const ast = builder.visit(tree) as File;
+      const result = parseInput(input);
+      const ast = result.statements;
 
-      expect(ast.statements).toHaveLength(4);
-      expect(ast.statements[0].type).toBe(TerminologyType.type);
-      expect(ast.statements[1].type).toBe(ActivityType.type);
-      expect(ast.statements[2].type).toBe(ConceptType.type);
-      expect(ast.statements[3].type).toBe(DecisionType.type);
+      expect(ast.length).toBe(4);
+      expect(ast[0].type).toBe(TerminologyType.type);
+      expect(ast[1].type).toBe(ActivityType.type);
+      expect(ast[2].type).toBe(ConceptType.type);
+      expect(ast[3].type).toBe(DecisionType.type);
     });
   });
 
@@ -487,8 +435,7 @@ decision "Test":
   when "BMI > 30" then do "CPGProposeDiagnosis".
 done
 `;
-      const tree = parseInput(input);
-      const result = builder.visit(tree) as File;
+      const result = parseInput(input);
       const decision = result.statements[0] as Decision;
       const whenBlock = decision.body.statements[0] as WhenBlock;
       const body = whenBlock.body as SingleAction;
@@ -504,8 +451,7 @@ decision "Test":
   when "BMI > 30" then use "SomeDecision".
 done
 `;
-      const tree = parseInput(input);
-      const result = builder.visit(tree) as File;
+      const result = parseInput(input);
       const decision = result.statements[0] as Decision;
       const whenBlock = decision.body.statements[0] as WhenBlock;
       const body = whenBlock.body as SingleAction;
@@ -531,9 +477,7 @@ done
         done
       `;
 
-      const tree = parseInput(input);
-      const result = builder.visit(tree) as File;
-
+      const result = parseInput(input);
       const decision = result.statements[0] as Decision;
 
       // Verify Decision has a DecisionBody
