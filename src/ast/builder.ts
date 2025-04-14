@@ -188,7 +188,7 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode> {
   visitBlockBody(ctx: ParserRuleContext): BlockBody {
     const statements: (WhenBlock | ActionStatement)[] = [];
     let qualifier: string | undefined;
-    let i = 0;
+    let currentIndex = 0;
 
     console.log('[DEBUGGING] BlockBody - Starting to process block body');
     console.log('[DEBUGGING] BlockBody - Total children:', ctx.childCount);
@@ -196,7 +196,7 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode> {
     // Log the structure of the context
     for (let j = 0; j < ctx.childCount; j++) {
       const child = ctx.getChild(j);
-      console.log(`[DEBUGGING] BlockBody - Child ${j}:`, {
+      console.log('[DEBUGGING] BlockBody - Child ' + j + ':', {
         text: child.text,
         type: child instanceof ParserRuleContext ? child.constructor.name : 'Terminal',
       });
@@ -204,34 +204,79 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode> {
 
     // Skip the initial COLON
     if (ctx.childCount > 0 && ctx.getChild(0).text === ':') {
-      i = 1;
+      currentIndex = 1;
+      console.log(
+        '[DEBUGGING] BlockBody - Skipped initial COLON, currentIndex:',
+        currentIndex,
+      );
     }
 
     // Check for qualifier (any/all)
-    if (i < ctx.childCount) {
-      const child = ctx.getChild(i);
-      if (child instanceof ParserRuleContext && child.getChild(0)?.text === 'any') {
-        qualifier = 'any';
-        i++;
-      } else if (child instanceof ParserRuleContext && child.getChild(0)?.text === 'all') {
-        qualifier = 'all';
-        i++;
+    if (currentIndex < ctx.childCount) {
+      const child = ctx.getChild(currentIndex);
+      if (child instanceof ParserRuleContext) {
+        const firstToken = child.getChild(0)?.text;
+        if (firstToken === 'any' || firstToken === 'all') {
+          qualifier = firstToken;
+          currentIndex++;
+          console.log(
+            '[DEBUGGING] BlockBody - Found qualifier:',
+            qualifier,
+            'currentIndex:',
+            currentIndex,
+          );
+        }
       }
     }
 
     // Process block statements
-    while (i < ctx.childCount) {
-      const child = ctx.getChild(i);
+    while (currentIndex < ctx.childCount) {
+      const child = ctx.getChild(currentIndex);
       if (child instanceof ParserRuleContext) {
-        const firstChild = child.getChild(0);
-        if (firstChild?.text === 'when') {
-          statements.push(this.visitWhenBlock(child));
-        } else if (firstChild?.text === 'do' || firstChild?.text === 'use') {
-          statements.push(this.visitActionStatement(child));
+        // Check if this is a blockStatement by checking its type
+        if (child.constructor.name === 'BlockStatementContext') {
+          const statementChild = child.getChild(0);
+          if (statementChild instanceof ParserRuleContext) {
+            const firstChild = statementChild.getChild(0);
+            if (firstChild) {
+              const text = firstChild.text;
+              console.log('[DEBUGGING] BlockBody - Processing statement:', text);
+              if (text === 'when') {
+                const whenBlock = this.visitWhenBlock(statementChild);
+                statements.push(whenBlock);
+                console.log('[DEBUGGING] BlockBody - Added when block:', {
+                  conceptName: whenBlock.conceptName,
+                  statementsLength: statements.length,
+                });
+              } else if (text === 'do' || text === 'use') {
+                const actionStatement = this.visitActionStatement(statementChild);
+                statements.push(actionStatement);
+                console.log('[DEBUGGING] BlockBody - Added action statement:', {
+                  type: actionStatement.action.type,
+                  name: 'activityName' in actionStatement.action 
+                    ? actionStatement.action.activityName 
+                    : actionStatement.action.decisionName,
+                  statementsLength: statements.length,
+                });
+              }
+            }
+          }
         }
       }
-      i++;
+      currentIndex++;
     }
+
+    console.log(
+      '[DEBUGGING] BlockBody - Final statements array:',
+      statements.map(s => ({
+        type: s.type,
+        details: s.type === WhenBlockType.type
+          ? s.conceptName
+          : 'activityName' in s.action
+            ? s.action.activityName
+            : s.action.decisionName,
+      })),
+    );
 
     return {
       type: BlockBodyType.type,
