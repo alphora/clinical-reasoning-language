@@ -144,8 +144,16 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode> {
   }
 
   visitWhenBlock(ctx: ParserRuleContext): WhenBlock {
+    console.log('[DEBUGGING] WhenBlock - Processing when block:', {
+      text: ctx.text,
+      childCount: ctx.childCount,
+    });
     const conceptName = this.getStringValue(ctx.getChild(1));
     const body = this.visitWhenBlockBody(this.getContext(ctx.getChild(3)));
+    console.log('[DEBUGGING] WhenBlock - Created when block:', {
+      conceptName,
+      bodyType: body.type,
+    });
     return {
       type: WhenBlockType.type,
       conceptName,
@@ -155,63 +163,94 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode> {
   }
 
   visitWhenBlockBody(ctx: ParserRuleContext): WhenBlockBody {
-    if (ctx.childCount === 2 && ctx.getChild(1).text === '.') {
-      // Single action statement (ends with a dot)
-      return this.visitSingleAction(this.getContext(ctx.getChild(0)));
-    } else {
-      // Block body
-      return this.visitBlockBody(ctx);
+    console.log('[DEBUGGING] WhenBlockBody - Processing body:', {
+      text: ctx.text,
+      childCount: ctx.childCount,
+      lastChild: ctx.getChild(ctx.childCount - 1).text,
+    });
+
+    // If the first child is a 'do' or 'use' statement and it's followed by a dot,
+    // then it's a single action
+    const firstChild = ctx.getChild(0);
+    if (firstChild instanceof ParserRuleContext) {
+      const actionType = firstChild.getChild(0)?.text;
+      if ((actionType === 'do' || actionType === 'use') && ctx.getChild(1)?.text === '.') {
+        console.log('[DEBUGGING] WhenBlockBody - Found single action statement');
+        return this.visitSingleAction(firstChild);
+      }
     }
+
+    // Otherwise, it's a block body
+    console.log('[DEBUGGING] WhenBlockBody - Found block body');
+    return this.visitBlockBody(ctx);
   }
 
   visitBlockBody(ctx: ParserRuleContext): BlockBody {
     const statements: (WhenBlock | ActionStatement)[] = [];
     let qualifier: string | undefined;
+    let i = 0;
+
+    console.log('[DEBUGGING] BlockBody - Starting to process block body');
+    console.log('[DEBUGGING] BlockBody - Total children:', ctx.childCount);
+    
+    // Log the structure of the context
+    for (let j = 0; j < ctx.childCount; j++) {
+      const child = ctx.getChild(j);
+      console.log(`[DEBUGGING] BlockBody - Child ${j}:`, {
+        text: child.text,
+        type: child instanceof ParserRuleContext ? child.constructor.name : 'Terminal',
+      });
+    }
 
     // Skip the initial COLON
-    let i = 1;
+    if (ctx.childCount > 0 && ctx.getChild(0).text === ':') {
+      i = 1;
+    }
 
-    // Check for any/all qualifier
-    const firstChild = ctx.getChild(i);
-    if (firstChild instanceof ParserRuleContext) {
-      const firstToken = firstChild.getChild(0)?.text;
-      if (firstToken === 'any') {
+    // Check for qualifier (any/all)
+    if (i < ctx.childCount) {
+      const child = ctx.getChild(i);
+      if (child instanceof ParserRuleContext && child.getChild(0)?.text === 'any') {
         qualifier = 'any';
-        i++; // Skip the qualifier
-      } else if (firstToken === 'all') {
+        i++;
+      } else if (child instanceof ParserRuleContext && child.getChild(0)?.text === 'all') {
         qualifier = 'all';
-        i++; // Skip the qualifier
+        i++;
       }
     }
 
-    // Process block statements until DONE
-    for (let j = i; j < ctx.childCount - 1; j++) {
-      // -1 to skip the final DONE
-      const child = ctx.getChild(j);
+    // Process block statements
+    while (i < ctx.childCount) {
+      const child = ctx.getChild(i);
       if (child instanceof ParserRuleContext) {
-        // Each block statement is a complete statement (when/do/use)
-        const blockStatement = this.getContext(child.getChild(0));
-        if (blockStatement.getChild(0)?.text === 'when') {
-          statements.push(this.visitWhenBlock(blockStatement));
-        } else if (
-          blockStatement.getChild(0)?.text === 'do' ||
-          blockStatement.getChild(0)?.text === 'use'
-        ) {
-          statements.push(this.visitActionStatement(blockStatement));
+        const firstChild = child.getChild(0);
+        if (firstChild?.text === 'when') {
+          statements.push(this.visitWhenBlock(child));
+        } else if (firstChild?.text === 'do' || firstChild?.text === 'use') {
+          statements.push(this.visitActionStatement(child));
         }
       }
+      i++;
     }
 
     return {
       type: BlockBodyType.type,
-      qualifier,
       statements,
+      qualifier,
       location: this.getLocation(ctx),
     };
   }
 
   visitActionStatement(ctx: ParserRuleContext): ActionStatement {
+    console.log('[DEBUGGING] ActionStatement - Processing action statement:', {
+      text: ctx.text,
+      childCount: ctx.childCount,
+    });
     const action = this.visitAction(ctx);
+    console.log('[DEBUGGING] ActionStatement - Created action:', {
+      type: action.type,
+      name: 'activityName' in action ? action.activityName : action.decisionName,
+    });
     return {
       type: ActionStatementType.type,
       action,

@@ -7,6 +7,8 @@ import { ASTBuilder } from '../builder';
 import {
   Activity,
   ActivityType,
+  ActionStatement,
+  ActionStatementType,
   BlockBody,
   CodedByDefinition,
   CodedByDefinitionType,
@@ -118,6 +120,173 @@ describe('ASTBuilder', () => {
       expect(bpBlock.qualifier).toBe('all');
       expect(tempBlock.statements).toHaveLength(2);
       expect(bpBlock.statements).toHaveLength(2);
+    });
+
+    describe('Action Statements in Block Body', () => {
+      it('should parse a single do statement', () => {
+        const input = `
+          decision "Test":
+            when "Condition" then:
+              do "Activity".
+            done
+          done
+        `;
+
+        const tree = parseInput(input);
+        const ast = builder.visit(tree) as File;
+        const decision = ast.statements[0] as Decision;
+        const whenBlock = decision.body.statements[0] as WhenBlock;
+        const blockBody = whenBlock.body as BlockBody;
+
+        expect(blockBody.statements).toHaveLength(1);
+        const action = blockBody.statements[0] as ActionStatement;
+        expect(action.action.type).toBe(DoActivityType.type);
+        expect((action.action as DoActivity).activityName).toBe('Activity');
+      });
+
+      it('should parse two do statements', () => {
+        const input = `
+          decision "Test":
+            when "Condition" then:
+              do "First Activity".
+              do "Second Activity".
+            done
+          done
+        `;
+
+        const tree = parseInput(input);
+        const ast = builder.visit(tree) as File;
+        const decision = ast.statements[0] as Decision;
+        const whenBlock = decision.body.statements[0] as WhenBlock;
+        const blockBody = whenBlock.body as BlockBody;
+
+        expect(blockBody.statements).toHaveLength(2);
+        const firstAction = blockBody.statements[0] as ActionStatement;
+        expect(firstAction.action.type).toBe(DoActivityType.type);
+        expect((firstAction.action as DoActivity).activityName).toBe('First Activity');
+
+        const secondAction = blockBody.statements[1] as ActionStatement;
+        expect(secondAction.action.type).toBe(DoActivityType.type);
+        expect((secondAction.action as DoActivity).activityName).toBe('Second Activity');
+      });
+
+      it('should parse no do statements', () => {
+        const input = `
+          decision "Test":
+            when "Condition" then:
+            done
+          done
+        `;
+
+        const tree = parseInput(input);
+        const ast = builder.visit(tree) as File;
+        const decision = ast.statements[0] as Decision;
+        const whenBlock = decision.body.statements[0] as WhenBlock;
+        const blockBody = whenBlock.body as BlockBody;
+
+        expect(blockBody.statements).toHaveLength(0);
+      });
+
+      it('should parse a single use statement', () => {
+        const input = `
+          decision "Test":
+            when "Condition" then:
+              use "Other Decision".
+            done
+          done
+        `;
+
+        const tree = parseInput(input);
+        const ast = builder.visit(tree) as File;
+        const decision = ast.statements[0] as Decision;
+        const whenBlock = decision.body.statements[0] as WhenBlock;
+        const blockBody = whenBlock.body as BlockBody;
+
+        expect(blockBody.statements).toHaveLength(1);
+        const action = blockBody.statements[0] as ActionStatement;
+        expect(action.action.type).toBe(UseDecisionType.type);
+        expect((action.action as UseDecision).decisionName).toBe('Other Decision');
+      });
+
+      it('should parse two use statements', () => {
+        const input = `
+          decision "Test":
+            when "Condition" then:
+              use "First Decision".
+              use "Second Decision".
+            done
+          done
+        `;
+
+        const tree = parseInput(input);
+        const ast = builder.visit(tree) as File;
+        const decision = ast.statements[0] as Decision;
+        const whenBlock = decision.body.statements[0] as WhenBlock;
+        const blockBody = whenBlock.body as BlockBody;
+
+        expect(blockBody.statements).toHaveLength(2);
+        const firstAction = blockBody.statements[0] as ActionStatement;
+        expect(firstAction.action.type).toBe(UseDecisionType.type);
+        expect((firstAction.action as UseDecision).decisionName).toBe('First Decision');
+
+        const secondAction = blockBody.statements[1] as ActionStatement;
+        expect(secondAction.action.type).toBe(UseDecisionType.type);
+        expect((secondAction.action as UseDecision).decisionName).toBe('Second Decision');
+      });
+
+      it('should parse no use statements', () => {
+        const input = `
+          decision "Test":
+            when "Condition" then:
+            done
+          done
+        `;
+
+        const tree = parseInput(input);
+        const ast = builder.visit(tree) as File;
+        const decision = ast.statements[0] as Decision;
+        const whenBlock = decision.body.statements[0] as WhenBlock;
+        const blockBody = whenBlock.body as BlockBody;
+
+        expect(blockBody.statements).toHaveLength(0);
+      });
+
+      it('should parse a mixture of do and use statements', () => {
+        const input = `
+          decision "Test":
+            when "Condition" then:
+              do "First Activity".
+              use "First Decision".
+              do "Second Activity".
+              use "Second Decision".
+            done
+          done
+        `;
+
+        const tree = parseInput(input);
+        const ast = builder.visit(tree) as File;
+        const decision = ast.statements[0] as Decision;
+        const whenBlock = decision.body.statements[0] as WhenBlock;
+        const blockBody = whenBlock.body as BlockBody;
+
+        expect(blockBody.statements).toHaveLength(4);
+
+        const firstAction = blockBody.statements[0] as ActionStatement;
+        expect(firstAction.action.type).toBe(DoActivityType.type);
+        expect((firstAction.action as DoActivity).activityName).toBe('First Activity');
+
+        const secondAction = blockBody.statements[1] as ActionStatement;
+        expect(secondAction.action.type).toBe(UseDecisionType.type);
+        expect((secondAction.action as UseDecision).decisionName).toBe('First Decision');
+
+        const thirdAction = blockBody.statements[2] as ActionStatement;
+        expect(thirdAction.action.type).toBe(DoActivityType.type);
+        expect((thirdAction.action as DoActivity).activityName).toBe('Second Activity');
+
+        const fourthAction = blockBody.statements[3] as ActionStatement;
+        expect(fourthAction.action.type).toBe(UseDecisionType.type);
+        expect((fourthAction.action as UseDecision).decisionName).toBe('Second Decision');
+      });
     });
   });
 

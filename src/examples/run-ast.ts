@@ -27,7 +27,14 @@ const tree = parser.cpgl();
 const builder = new ASTBuilder();
 const ast = builder.visit(tree) as File;
 
-// Print the AST
-console.log('AST Representation:');
-console.log('==================');
-console.log(printAST(ast));
+// Check if pretty print is requested
+const prettyPrint = process.argv.includes('--pretty');
+
+if (prettyPrint) {
+  console.log('AST Representation:');
+  console.log('==================');
+  console.log(printAST(ast));
+} else {
+  // Raw AST output
+  console.log(JSON.stringify(ast, null, 2));
+}
