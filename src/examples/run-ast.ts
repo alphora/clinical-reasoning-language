@@ -30,6 +30,7 @@ const ast = builder.visit(tree) as File;
 // Check if pretty print is requested
 const prettyPrint = process.argv.includes('--pretty');
 
+// TODO: this is missing several fields
 if (prettyPrint) {
   console.log('AST Representation:');
   console.log('==================');

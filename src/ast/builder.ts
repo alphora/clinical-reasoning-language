@@ -55,8 +55,8 @@ import {
 } from './types';
 
 export class ASTBuilder implements ParseTreeVisitor<ASTNode | File> {
-  private seenConcepts: Set<string> = new Set();
-  private seenActions: Set<string> = new Set();
+  private readonly seenConcepts: Set<string> = new Set();
+  private readonly seenActions: Set<string> = new Set();
 
   visit(tree: ParseTree): ASTNode | File {
     if (tree instanceof ParserRuleContext) {
@@ -133,11 +133,12 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode | File> {
       const child = blockBody.getChild(i);
       if (child instanceof ParserRuleContext && child.getChild(0)?.text === 'when') {
         const whenBlock = this.visitWhenBlock(child);
-        // Only add if we haven't seen this concept before at the top level
         if (!seenConcepts.has(whenBlock.conceptName)) {
           seenConcepts.add(whenBlock.conceptName);
-          whenBlocks.push(whenBlock);
+        } else {
+          console.warn('[Builder] Duplicate whenBlock concept name: ', whenBlock.conceptName);
         }
+        whenBlocks.push(whenBlock);
       }
     }
     return {
@@ -162,7 +163,7 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode | File> {
 
     // If the body is a block body, we need to ensure we don't have duplicate statements
     if (body.type === BlockBodyType.type) {
-      const uniqueStatements: (WhenBlock | ActionStatement)[] = [];
+      const statements: (WhenBlock | ActionStatement)[] = [];
 
       for (const statement of body.statements) {
         if (statement.type === WhenBlockType.type) {
@@ -170,8 +171,10 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode | File> {
           const conceptKey = `${conceptName}:${whenBlock.conceptName}`;
           if (!this.seenConcepts.has(conceptKey)) {
             this.seenConcepts.add(conceptKey);
-            uniqueStatements.push(statement);
+          } else {
+            console.warn('[Builder]: duplicate concept key: ', conceptKey);
           }
+          statements.push(statement);
         } else if (statement.type === ActionStatementType.type) {
           const actionStatement = statement as ActionStatement;
           const actionKey =
@@ -180,12 +183,14 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode | File> {
               : `${conceptName}:use:${(actionStatement.action as UseDecision).decisionName}`;
           if (!this.seenActions.has(actionKey)) {
             this.seenActions.add(actionKey);
-            uniqueStatements.push(statement);
+          } else {
+            console.warn('[Builder]: duplicate action key: ', actionKey);
           }
+          statements.push(statement);
         }
       }
 
-      body.statements = uniqueStatements;
+      body.statements = statements;
     }
 
     console.log('[DEBUGGING] WhenBlock - Created when block:', {

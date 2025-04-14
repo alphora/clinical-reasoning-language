@@ -5,6 +5,11 @@ import { createLexer } from '../../lexer/createLexer';
 import { ASTBuilder } from '../builder';
 import { File } from '../types';
 
+// Test suite imports
+import './builder.test';
+import './duplication.test';
+import './decision-structure.test';
+
 export const parseInput = (input: string): File => {
   const lexer = createLexer(CharStreams.fromString(input));
   const tokenStream = new CommonTokenStream(lexer);
