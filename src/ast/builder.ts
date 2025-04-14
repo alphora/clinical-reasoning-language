@@ -192,7 +192,7 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode> {
 
     console.log('[DEBUGGING] BlockBody - Starting to process block body');
     console.log('[DEBUGGING] BlockBody - Total children:', ctx.childCount);
-    
+
     // Log the structure of the context
     for (let j = 0; j < ctx.childCount; j++) {
       const child = ctx.getChild(j);
@@ -205,10 +205,7 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode> {
     // Skip the initial COLON
     if (ctx.childCount > 0 && ctx.getChild(0).text === ':') {
       currentIndex = 1;
-      console.log(
-        '[DEBUGGING] BlockBody - Skipped initial COLON, currentIndex:',
-        currentIndex,
-      );
+      console.log('[DEBUGGING] BlockBody - Skipped initial COLON, currentIndex:', currentIndex);
     }
 
     // Check for qualifier (any/all)
@@ -233,7 +230,11 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode> {
     while (currentIndex < ctx.childCount) {
       const child = ctx.getChild(currentIndex);
       if (child instanceof ParserRuleContext) {
-        // Check if this is a blockStatement by checking its type
+        console.log('[DEBUGGING] BlockBody - Processing child:', {
+          text: child.text,
+          type: child.constructor.name,
+        });
+
         if (child.constructor.name === 'BlockStatementContext') {
           const statementChild = child.getChild(0);
           if (statementChild instanceof ParserRuleContext) {
@@ -241,6 +242,7 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode> {
             if (firstChild) {
               const text = firstChild.text;
               console.log('[DEBUGGING] BlockBody - Processing statement:', text);
+
               if (text === 'when') {
                 const whenBlock = this.visitWhenBlock(statementChild);
                 statements.push(whenBlock);
@@ -248,16 +250,28 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode> {
                   conceptName: whenBlock.conceptName,
                   statementsLength: statements.length,
                 });
-              } else if (text === 'do' || text === 'use') {
-                const actionStatement = this.visitActionStatement(statementChild);
+              } else if (RegExp(/^(do|use)"[^"]+"/).exec(text)) {
+                // Process action statement
+                const action = this.visitAction(statementChild);
+                const actionStatement: ActionStatement = {
+                  type: ActionStatementType.type,
+                  action,
+                  location: this.getLocation(statementChild),
+                };
                 statements.push(actionStatement);
                 console.log('[DEBUGGING] BlockBody - Added action statement:', {
-                  type: actionStatement.action.type,
-                  name: 'activityName' in actionStatement.action 
-                    ? actionStatement.action.activityName 
-                    : actionStatement.action.decisionName,
+                  type: action.type,
+                  name:
+                    action.type === DoActivityType.type
+                      ? (action as DoActivity).activityName
+                      : (action as UseDecision).decisionName,
                   statementsLength: statements.length,
                 });
+
+                // Skip the dot if present
+                if (ctx.getChild(currentIndex + 1)?.text === '.') {
+                  currentIndex++;
+                }
               }
             }
           }
@@ -270,11 +284,12 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode> {
       '[DEBUGGING] BlockBody - Final statements array:',
       statements.map(s => ({
         type: s.type,
-        details: s.type === WhenBlockType.type
-          ? s.conceptName
-          : 'activityName' in s.action
-            ? s.action.activityName
-            : s.action.decisionName,
+        details:
+          s.type === WhenBlockType.type
+            ? s.conceptName
+            : 'activityName' in s.action
+              ? s.action.activityName
+              : s.action.decisionName,
       })),
     );
 
@@ -313,21 +328,39 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode> {
   }
 
   private visitAction(ctx: ParserRuleContext): DoActivity | UseDecision {
-    const actionType = ctx.getChild(0).text;
-    const name = this.getStringValue(ctx.getChild(1));
+    console.log('[DEBUGGING] Action - Processing action:', {
+      text: ctx.text,
+      childCount: ctx.childCount,
+    });
+
+    // Get the full text and remove the dot at the end if present
+    const fullText = ctx.text.endsWith('.') ? ctx.text.slice(0, -1) : ctx.text;
+
+    // Extract the action type (do or use) and the name
+    const actionType = fullText.startsWith('do') ? 'do' : 'use';
+    const name = fullText.slice(actionType.length).trim().replace(/"/g, '');
+
+    console.log('[DEBUGGING] Action - Parsed action:', {
+      type: actionType,
+      name,
+    });
 
     if (actionType === 'do') {
-      return {
+      const activity = {
         type: DoActivityType.type,
         activityName: name,
         location: this.getLocation(ctx),
       };
+      console.log('[DEBUGGING] Action - Created do activity:', activity);
+      return activity;
     } else {
-      return {
+      const decision = {
         type: UseDecisionType.type,
         decisionName: name,
         location: this.getLocation(ctx),
       };
+      console.log('[DEBUGGING] Action - Created use decision:', decision);
+      return decision;
     }
   }
 
