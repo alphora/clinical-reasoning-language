@@ -1,4 +1,4 @@
-import { ASTNode, BlockBody } from './types';
+import { ASTNode } from './types';
 
 interface ASTComparison {
   lineCountsMatch: boolean;
@@ -55,14 +55,6 @@ export function printAST(node: ASTNode, indent = 0): string {
   if ('action' in node && node.action) {
     const action = node.action as ASTNode;
     output += printAST(action, indent + 1);
-  }
-
-  // Handle BlockBody statements
-  if (node.type === 'BlockBody' && 'statements' in node) {
-    const blockBody = node as BlockBody;
-    blockBody.statements.forEach((statement: ASTNode) => {
-      output += printAST(statement, indent + 1);
-    });
   }
 
   return output;
