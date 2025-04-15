@@ -21,7 +21,7 @@ export class ActionUniquenessValidator {
     const actionCycles = this.findCycles(actionGraph);
     for (const cycle of actionCycles) {
       errors.push({
-        message: `Cycle detected in action dependencies: ${cycle.join(' -> ')}`,
+        message: `Cycle detected in decision references: ${cycle.join(' -> ')}`,
         location: this.findActionLocation(ast, cycle[0]),
         severity: 'error',
       });
@@ -105,9 +105,9 @@ export class ActionUniquenessValidator {
       if (statement.type === 'Decision') {
         this.collectActions(statement.body).forEach(action => {
           if (action.type === 'DoActivity') {
-            graph.set(action.activityName, new Set<string>());
+            graph.set(`Activity:${action.activityName}`, new Set<string>());
           } else if (action.type === 'UseDecision') {
-            graph.set(action.decisionName, new Set<string>());
+            graph.set(`Decision:${action.decisionName}`, new Set<string>());
           }
         });
       }
@@ -152,9 +152,9 @@ export class ActionUniquenessValidator {
                 // Add an edge from the current decision to the referenced decision
                 const currentDecision = this.findContainingDecision(body);
                 if (currentDecision && currentDecision !== action.decisionName) {
-                  const dependencies = graph.get(currentDecision) || new Set<string>();
-                  dependencies.add(action.decisionName);
-                  graph.set(currentDecision, dependencies);
+                  const dependencies = graph.get(`Decision:${currentDecision}`) || new Set<string>();
+                  dependencies.add(`Decision:${action.decisionName}`);
+                  graph.set(`Decision:${currentDecision}`, dependencies);
                 }
               }
             }
@@ -165,9 +165,9 @@ export class ActionUniquenessValidator {
             // Add an edge from the current decision to the referenced decision
             const currentDecision = this.findContainingDecision(body);
             if (currentDecision && currentDecision !== action.decisionName) {
-              const dependencies = graph.get(currentDecision) || new Set<string>();
-              dependencies.add(action.decisionName);
-              graph.set(currentDecision, dependencies);
+              const dependencies = graph.get(`Decision:${currentDecision}`) || new Set<string>();
+              dependencies.add(`Decision:${action.decisionName}`);
+              graph.set(`Decision:${currentDecision}`, dependencies);
             }
           }
         }
@@ -227,15 +227,18 @@ export class ActionUniquenessValidator {
 
   private findActionLocation(
     ast: File,
-    actionName: string,
+    nodeId: string,
   ): { start: { line: number; column: number }; end: { line: number; column: number } } {
+    const [type, name] = nodeId.split(':');
     for (const statement of ast.statements) {
       if (statement.type === 'Decision') {
-        const location = this.findActionInBody(statement.body, actionName);
-        if (location) return location;
+        const location = this.findActionInBody(statement.body, name);
+        if (location) {
+          return location;
+        }
       }
     }
-    return { start: { line: 1, column: 1 }, end: { line: 1, column: 1 } };
+    return { start: { line: 0, column: 0 }, end: { line: 0, column: 0 } };
   }
 
   private findActionInBody(

@@ -86,8 +86,6 @@ export class UnusedDeclarationsValidator {
       Array.from(this.decisionDeclarations.entries()),
     );
     for (const statement of ast.statements) {
-      let activityInfo;
-      let terminologyInfo;
       switch (statement.type) {
         case DecisionType.type:
           // Process the decision body for all decisions
@@ -95,6 +93,7 @@ export class UnusedDeclarationsValidator {
           this.processDecisionBody(statement.body, statement.name);
           break;
         case 'Concept':
+          // Mark concepts as used when they are referenced in InferredByDefinition
           if (
             statement.definition.type === 'InferredByDefinition' &&
             statement.definition.concept
@@ -104,6 +103,7 @@ export class UnusedDeclarationsValidator {
               conceptInfo.used = true;
             }
           }
+          // Mark terminology as used when referenced in CodedByDefinition
           if (
             statement.definition.type === 'CodedByDefinition' &&
             statement.definition.terminologyName
@@ -114,20 +114,6 @@ export class UnusedDeclarationsValidator {
             if (terminologyInfo) {
               terminologyInfo.used = true;
             }
-          }
-          break;
-        case ActivityType.type:
-          // Mark activities as used if they are referenced in a DoActivity action
-          activityInfo = this.activityDeclarations.get(statement.name);
-          if (activityInfo) {
-            activityInfo.used = true;
-          }
-          break;
-        case 'Terminology':
-          // Mark terminologies as used if they are referenced in a CodedByDefinition
-          terminologyInfo = this.terminologyDeclarations.get(statement.name);
-          if (terminologyInfo) {
-            terminologyInfo.used = true;
           }
           break;
       }
@@ -197,8 +183,10 @@ export class UnusedDeclarationsValidator {
   private processAction(action: Action): void {
     console.log('[DEBUGGING] Processing action:', action);
     if (action.type === 'DoActivity') {
+      console.log('[DEBUGGING] Found DoActivity action for:', action.activityName);
       const activityInfo = this.activityDeclarations.get(action.activityName);
       if (activityInfo) {
+        console.log('[DEBUGGING] Marked activity as used:', action.activityName);
         activityInfo.used = true;
       }
     } else if (action.type === 'UseDecision') {
@@ -206,16 +194,14 @@ export class UnusedDeclarationsValidator {
       const decisionInfo = this.decisionDeclarations.get(action.decisionName);
       console.log('[DEBUGGING] Decision info for', action.decisionName, ':', decisionInfo);
       if (decisionInfo) {
-        decisionInfo.used = true;
         console.log('[DEBUGGING] Marked decision as used:', action.decisionName);
-        // Process the referenced decision's body
-        const referencedDecision = this.findDecision(action.decisionName);
-        console.log('[DEBUGGING] Found referenced decision:', referencedDecision?.name);
-        if (referencedDecision) {
-          this.processDecisionBody(referencedDecision.body);
-        }
+        decisionInfo.used = true;
       }
-      // Log the current state of all decisions
+      const referencedDecision = this.findDecision(action.decisionName);
+      console.log('[DEBUGGING] Found referenced decision:', referencedDecision);
+      if (referencedDecision) {
+        this.processDecisionBody(referencedDecision.body);
+      }
       console.log(
         '[DEBUGGING] Current decision declarations:',
         Array.from(this.decisionDeclarations.entries()),
