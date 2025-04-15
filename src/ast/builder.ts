@@ -304,6 +304,11 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode | File> {
                     conceptName: whenBlock.conceptName,
                     statementsLength: statements.length,
                   });
+                } else {
+                  console.warn(
+                    '[Builder - Duplication] Duplicate when block at same level: ',
+                    whenBlock.conceptName,
+                  );
                 }
               } else if (RegExp(/^(do|use)"[^"]+"/).exec(text)) {
                 // Process action statement
@@ -341,6 +346,13 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode | File> {
                         : (action as UseDecision).decisionName,
                     statementsLength: statements.length,
                   });
+                } else {
+                  console.warn(
+                    '[Builder - Duplication] Duplicate action at same level: ',
+                    action.type === DoActivityType.type
+                      ? (action as DoActivity).activityName
+                      : (action as UseDecision).decisionName,
+                  );
                 }
 
                 // Skip the dot if present
