@@ -1,164 +1,231 @@
-import { File, DecisionBody, WhenBlock, BlockBody, Action, Location } from '../ast/types';
+import {
+  File,
+  DecisionBody,
+  Action,
+  Location,
+  CodedByDefinition,
+  Concept,
+  Activity,
+  Decision,
+  Terminology,
+  BlockBody,
+  SingleAction,
+  WhenBlock,
+} from '../ast/types';
 
-import { ValidationWarning } from './validator';
+import { ValidationResult, ValidationWarning } from './validator';
 
 interface UsageInfo {
   used: boolean;
   location: Location;
 }
 
+interface ExtendedFile extends File {
+  decisions: Decision[];
+  concepts: ExtendedConcept[];
+  activities: ExtendedActivity[];
+  terminologies: Terminology[];
+  decisionBody: DecisionBody;
+}
+
+interface ExtendedConcept extends Concept {
+  inferredBy?: string;
+  codedBy?: CodedByDefinition[];
+}
+
+interface ExtendedActivity extends Activity {
+  perform?: string;
+}
+
+interface ExtendedWhenBlock extends WhenBlock {
+  type: 'WhenBlock';
+  conceptName: string;
+  body: BlockBody | SingleAction;
+  location: Location;
+  statements?: (ExtendedWhenBlock | { type: 'ActionStatement'; action: Action })[];
+}
+
 export class UnusedDeclarationsValidator {
-  validate(ast: File): ValidationWarning[] {
+  private decisionDeclarations: Map<string, UsageInfo> = new Map();
+  private conceptDeclarations: Map<string, UsageInfo> = new Map();
+  private activityDeclarations: Map<string, UsageInfo> = new Map();
+  private terminologyDeclarations: Map<string, UsageInfo> = new Map();
+
+  validate(file: File): ValidationResult {
+    const extendedFile = file as ExtendedFile;
+    this.collectDeclarations(extendedFile);
+    this.processDecisionBody(extendedFile.decisionBody);
+    this.processConcepts(extendedFile.concepts);
+    this.processActivities(extendedFile.activities);
+
     const warnings: ValidationWarning[] = [];
 
-    // Track all declarations
-    const decisions = new Map<string, UsageInfo>();
-    const concepts = new Map<string, UsageInfo>();
-    const activities = new Map<string, UsageInfo>();
-    const terminologies = new Map<string, UsageInfo>();
-
-    // First pass: collect all declarations
-    for (const statement of ast.statements) {
-      switch (statement.type) {
-        case 'Decision':
-          decisions.set(statement.name, { used: false, location: statement.location });
-          break;
-        case 'Concept':
-          concepts.set(statement.name, { used: false, location: statement.location });
-          break;
-        case 'Activity':
-          activities.set(statement.name, { used: false, location: statement.location });
-          break;
-        case 'Terminology':
-          terminologies.set(statement.name, { used: false, location: statement.location });
-          break;
+    // Check for unused decisions
+    this.decisionDeclarations.forEach((info, name) => {
+      if (!info.used) {
+        warnings.push({
+          message: `Unused decision declaration: ${name} at line ${info.location.start.line}`,
+          location: info.location,
+        });
       }
-    }
+    });
 
-    // Second pass: mark used declarations
-    for (const statement of ast.statements) {
-      if (statement.type === 'Decision') {
-        this.processDecisionBody(statement.body, decisions, concepts, activities);
-      } else if (statement.type === 'Concept') {
-        if (statement.definition.type === 'CodedByDefinition') {
-          const terminology = terminologies.get(statement.definition.terminologyName);
-          if (terminology) {
-            terminology.used = true;
-          }
-        } else if (
-          statement.definition.type === 'InferredByDefinition' &&
-          statement.definition.concept
-        ) {
-          const concept = concepts.get(statement.definition.concept);
-          if (concept) {
-            concept.used = true;
+    // Check for unused concepts
+    this.conceptDeclarations.forEach((info, name) => {
+      if (!info.used) {
+        warnings.push({
+          message: `Unused concept declaration: ${name} at line ${info.location.start.line}`,
+          location: info.location,
+        });
+      }
+    });
+
+    // Check for unused activities
+    this.activityDeclarations.forEach((info, name) => {
+      if (!info.used) {
+        warnings.push({
+          message: `Unused activity declaration: ${name} at line ${info.location.start.line}`,
+          location: info.location,
+        });
+      }
+    });
+
+    // Check for unused terminologies
+    this.terminologyDeclarations.forEach((info, name) => {
+      if (!info.used) {
+        warnings.push({
+          message: `Unused terminology declaration: ${name} at line ${info.location.start.line}`,
+          location: info.location,
+        });
+      }
+    });
+
+    return {
+      isValid: warnings.length === 0,
+      warnings,
+      errors: [],
+    };
+  }
+
+  private collectDeclarations(file: ExtendedFile): void {
+    // Collect decision declarations
+    file.decisions.forEach(decision => {
+      this.decisionDeclarations.set(decision.name, {
+        used: false,
+        location: decision.location,
+      });
+    });
+
+    // Collect concept declarations
+    file.concepts.forEach(concept => {
+      this.conceptDeclarations.set(concept.name, {
+        used: false,
+        location: concept.location,
+      });
+    });
+
+    // Collect activity declarations
+    file.activities.forEach(activity => {
+      this.activityDeclarations.set(activity.name, {
+        used: false,
+        location: activity.location,
+      });
+    });
+
+    // Collect terminology declarations
+    file.terminologies.forEach(terminology => {
+      this.terminologyDeclarations.set(terminology.name, {
+        used: false,
+        location: terminology.location,
+      });
+    });
+  }
+
+  private processDecisionBody(body: DecisionBody): void {
+    body.statements.forEach(statement => {
+      if (statement.type === 'WhenBlock') {
+        const whenBlock = statement as ExtendedWhenBlock;
+        // Mark concept as used when referenced in WhenBlock
+        if (whenBlock.conceptName) {
+          const conceptInfo = this.conceptDeclarations.get(whenBlock.conceptName);
+          if (conceptInfo) {
+            conceptInfo.used = true;
           }
         }
+        this.processBlockBody(whenBlock.body);
       }
-    }
-
-    // Generate warnings for unused declarations
-    for (const [name, info] of decisions) {
-      if (!info.used) {
-        warnings.push({
-          message: `Unused decision: ${name}`,
-          location: info.location,
-        });
-      }
-    }
-
-    for (const [name, info] of concepts) {
-      if (!info.used) {
-        warnings.push({
-          message: `Unused concept: ${name}`,
-          location: info.location,
-        });
-      }
-    }
-
-    for (const [name, info] of activities) {
-      if (!info.used) {
-        warnings.push({
-          message: `Unused activity: ${name}`,
-          location: info.location,
-        });
-      }
-    }
-
-    for (const [name, info] of terminologies) {
-      if (!info.used) {
-        warnings.push({
-          message: `Unused terminology: ${name}`,
-          location: info.location,
-        });
-      }
-    }
-
-    return warnings;
+    });
   }
 
-  private processDecisionBody(
-    body: DecisionBody,
-    decisions: Map<string, UsageInfo>,
-    concepts: Map<string, UsageInfo>,
-    activities: Map<string, UsageInfo>,
-  ): void {
-    for (const statement of body.statements) {
-      if (statement.type === 'WhenBlock') {
-        // Mark concept as used
-        const concept = concepts.get(statement.conceptName);
-        if (concept) {
-          concept.used = true;
+  private processBlockBody(body: BlockBody | SingleAction): void {
+    if (body.type === 'BlockBody') {
+      body.statements.forEach(statement => {
+        if (statement.type === 'WhenBlock') {
+          const whenBlock = statement as ExtendedWhenBlock;
+          // Mark concept as used when referenced in WhenBlock
+          if (whenBlock.conceptName) {
+            const conceptInfo = this.conceptDeclarations.get(whenBlock.conceptName);
+            if (conceptInfo) {
+              conceptInfo.used = true;
+            }
+          }
+          this.processBlockBody(whenBlock.body);
+        } else if (statement.type === 'ActionStatement') {
+          this.processAction(statement.action);
         }
-
-        this.processWhenBlock(statement, decisions, concepts, activities);
-      }
+      });
+    } else if (body.type === 'SingleAction') {
+      this.processAction(body.action);
     }
   }
 
-  private processWhenBlock(
-    whenBlock: WhenBlock,
-    decisions: Map<string, UsageInfo>,
-    concepts: Map<string, UsageInfo>,
-    activities: Map<string, UsageInfo>,
-  ): void {
-    if (whenBlock.body.type === 'BlockBody') {
-      this.processBlockBody(whenBlock.body, decisions, concepts, activities);
-    } else if (whenBlock.body.type === 'SingleAction') {
-      this.processAction(whenBlock.body.action, decisions, activities);
-    }
-  }
-
-  private processBlockBody(
-    blockBody: BlockBody,
-    decisions: Map<string, UsageInfo>,
-    concepts: Map<string, UsageInfo>,
-    activities: Map<string, UsageInfo>,
-  ): void {
-    for (const statement of blockBody.statements) {
-      if (statement.type === 'WhenBlock') {
-        this.processWhenBlock(statement, decisions, concepts, activities);
-      } else if (statement.type === 'ActionStatement') {
-        this.processAction(statement.action, decisions, activities);
-      }
-    }
-  }
-
-  private processAction(
-    action: Action,
-    decisions: Map<string, UsageInfo>,
-    activities: Map<string, UsageInfo>,
-  ): void {
+  private processAction(action: Action): void {
     if (action.type === 'UseDecision') {
-      const decision = decisions.get(action.decisionName);
-      if (decision) {
-        decision.used = true;
+      // Only mark decisions as used when referenced by UseDecision
+      const decisionInfo = this.decisionDeclarations.get(action.decisionName);
+      if (decisionInfo) {
+        decisionInfo.used = true;
       }
     } else if (action.type === 'DoActivity') {
-      const activity = activities.get(action.activityName);
-      if (activity) {
-        activity.used = true;
+      // Only mark activities as used when referenced by DoActivity
+      const activityInfo = this.activityDeclarations.get(action.activityName);
+      if (activityInfo) {
+        activityInfo.used = true;
       }
     }
+  }
+
+  private processConcepts(concepts: ExtendedConcept[]): void {
+    concepts.forEach(concept => {
+      // Mark concept as used when referenced in inferredBy
+      if (concept.inferredBy) {
+        const conceptInfo = this.conceptDeclarations.get(concept.inferredBy);
+        if (conceptInfo) {
+          conceptInfo.used = true;
+        }
+      }
+
+      // Mark terminology as used when referenced in CodedByDefinition
+      if (concept.codedBy) {
+        concept.codedBy.forEach((codedBy: CodedByDefinition) => {
+          const terminologyInfo = this.terminologyDeclarations.get(codedBy.terminologyName);
+          if (terminologyInfo) {
+            terminologyInfo.used = true;
+          }
+        });
+      }
+    });
+  }
+
+  private processActivities(activities: ExtendedActivity[]): void {
+    activities.forEach(activity => {
+      // Mark terminology as used when referenced in perform
+      if (activity.perform) {
+        const terminologyInfo = this.terminologyDeclarations.get(activity.perform);
+        if (terminologyInfo) {
+          terminologyInfo.used = true;
+        }
+      }
+    });
   }
 }
