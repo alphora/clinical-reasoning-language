@@ -3,7 +3,10 @@ import { File, DecisionBody, WhenBlock, BlockBody, ActionStatement, Action } fro
 import { ValidationError } from './validator';
 
 export class ActionUniquenessValidator {
+  private ast: File | null = null;
+
   validate(ast: File): ValidationError[] {
+    this.ast = ast;
     const errors: ValidationError[] = [];
 
     // Process each decision statement
@@ -32,6 +35,7 @@ export class ActionUniquenessValidator {
       }
     }
 
+    this.ast = null;
     return errors;
   }
 
@@ -145,20 +149,40 @@ export class ActionUniquenessValidator {
             if (s.type === 'ActionStatement') {
               const action = s.action;
               if (action.type === 'UseDecision') {
-                // Use decisions implicitly depend on the decision they reference
-                graph.get(action.decisionName)?.add(action.decisionName);
+                // Add an edge from the current decision to the referenced decision
+                const currentDecision = this.findContainingDecision(body);
+                if (currentDecision && currentDecision !== action.decisionName) {
+                  const dependencies = graph.get(currentDecision) || new Set<string>();
+                  dependencies.add(action.decisionName);
+                  graph.set(currentDecision, dependencies);
+                }
               }
             }
           });
         } else if (statement.body.type === 'SingleAction') {
           const action = statement.body.action;
           if (action.type === 'UseDecision') {
-            // Use decisions implicitly depend on the decision they reference
-            graph.get(action.decisionName)?.add(action.decisionName);
+            // Add an edge from the current decision to the referenced decision
+            const currentDecision = this.findContainingDecision(body);
+            if (currentDecision && currentDecision !== action.decisionName) {
+              const dependencies = graph.get(currentDecision) || new Set<string>();
+              dependencies.add(action.decisionName);
+              graph.set(currentDecision, dependencies);
+            }
           }
         }
       }
     }
+  }
+
+  private findContainingDecision(body: DecisionBody): string | null {
+    // Find the decision that contains this body by looking at the AST
+    for (const statement of this.ast?.statements || []) {
+      if (statement.type === 'Decision' && statement.body === body) {
+        return statement.name;
+      }
+    }
+    return null;
   }
 
   private findCycles(graph: Map<string, Set<string>>): string[][] {
