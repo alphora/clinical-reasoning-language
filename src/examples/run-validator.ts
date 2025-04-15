@@ -1,0 +1,51 @@
+import { readFileSync } from 'fs';
+import { join } from 'path';
+
+import { CharStreams, CommonTokenStream } from 'antlr4ts';
+
+import { ASTBuilder } from '../ast/builder';
+import { File } from '../ast/types';
+import { CPGLParser } from '../grammar/generated/CPGLParser';
+import { createLexer } from '../lexer/createLexer';
+import { Validator } from '../validator/validator';
+
+// Read the example file
+const examplePath = join(__dirname, '../../docs/grammar-example.cpg');
+const input = readFileSync(examplePath, 'utf-8');
+
+// Create the lexer and token stream
+const lexer = createLexer(CharStreams.fromString(input));
+const tokenStream = new CommonTokenStream(lexer);
+
+// Create the parser
+const parser = new CPGLParser(tokenStream);
+
+// Parse the input
+const tree = parser.cpgl();
+
+// Create the AST builder and visit the parse tree
+const builder = new ASTBuilder();
+const ast = builder.visit(tree) as File;
+
+// Create the validator and validate the AST
+const validator = new Validator();
+const result = validator.validate(ast);
+
+// Output the validation results
+console.log('Validation Results:');
+console.log('==================');
+console.log(`Valid: ${result.isValid}`);
+if (result.errors.length > 0) {
+  console.log('\nErrors:');
+  result.errors.forEach(error => {
+    console.log(`- ${error.message} (${error.location.start.line}:${error.location.start.column})`);
+  });
+}
+if (result.warnings.length > 0) {
+  console.log('\nWarnings:');
+  result.warnings.forEach(warning => {
+    console.log(
+      `- ${warning.message} (${warning.location.start.line}:${warning.location.start.column})`,
+    );
+  });
+}
