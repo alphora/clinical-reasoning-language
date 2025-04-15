@@ -82,8 +82,8 @@ export class UnusedDeclarationsValidator {
   private processDeclarations(ast: File): void {
     console.log('[DEBUGGING] Starting processDeclarations');
     console.log(
-      '[DEBUGGING] Initial decision declarations:',
-      Array.from(this.decisionDeclarations.entries()),
+      '[DEBUGGING] Initial concept declarations:',
+      Array.from(this.conceptDeclarations.entries()),
     );
     for (const statement of ast.statements) {
       switch (statement.type) {
@@ -93,16 +93,6 @@ export class UnusedDeclarationsValidator {
           this.processDecisionBody(statement.body, statement.name);
           break;
         case 'Concept':
-          // Mark concepts as used when they are referenced in InferredByDefinition
-          if (
-            statement.definition.type === 'InferredByDefinition' &&
-            statement.definition.concept
-          ) {
-            const conceptInfo = this.conceptDeclarations.get(statement.definition.concept);
-            if (conceptInfo) {
-              conceptInfo.used = true;
-            }
-          }
           // Mark terminology as used when referenced in CodedByDefinition
           if (
             statement.definition.type === 'CodedByDefinition' &&
@@ -118,6 +108,49 @@ export class UnusedDeclarationsValidator {
           break;
       }
     }
+
+    // Process concept references in InferredByDefinition after all declarations are collected
+    console.log('[DEBUGGING] Processing InferredByDefinition references');
+    for (const statement of ast.statements) {
+      if (
+        statement.type === 'Concept' &&
+        statement.definition.type === 'InferredByDefinition' &&
+        statement.definition.concept
+      ) {
+        console.log(
+          '[DEBUGGING] Found InferredByDefinition referencing concept:',
+          statement.definition.concept,
+        );
+        // Mark the referenced concept as used
+        const referencedConceptInfo = this.conceptDeclarations.get(statement.definition.concept);
+        if (referencedConceptInfo) {
+          console.log(
+            '[DEBUGGING] Marking referenced concept as used:',
+            statement.definition.concept,
+          );
+          referencedConceptInfo.used = true;
+        } else {
+          console.log(
+            '[DEBUGGING] Referenced concept not found in declarations:',
+            statement.definition.concept,
+          );
+        }
+        // Mark the concept containing the InferredByDefinition as used
+        const conceptInfo = this.conceptDeclarations.get(statement.name);
+        if (conceptInfo) {
+          console.log(
+            '[DEBUGGING] Marking concept with InferredByDefinition as used:',
+            statement.name,
+          );
+          conceptInfo.used = true;
+        }
+      }
+    }
+
+    console.log(
+      '[DEBUGGING] Final concept declarations:',
+      Array.from(this.conceptDeclarations.entries()),
+    );
     console.log(
       '[DEBUGGING] After processDeclarations, decision declarations:',
       Array.from(this.decisionDeclarations.entries()),
