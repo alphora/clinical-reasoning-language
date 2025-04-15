@@ -1,7 +1,7 @@
 import { File } from '../ast/types';
 
 import { ActionUniquenessValidator } from './actionUniquenessValidator';
-import { CycleDetector } from './cycleDetector';
+//import { CycleDetector } from './cycleDetector';
 import { NameUniquenessValidator } from './nameUniquenessValidator';
 import { UnusedDeclarationsValidator } from './unusedDeclarationsValidator';
 
@@ -24,13 +24,13 @@ export class Validator {
   private unusedDeclarationsValidator: UnusedDeclarationsValidator;
   private nameUniquenessValidator: NameUniquenessValidator;
   private actionUniquenessValidator: ActionUniquenessValidator;
-  private cycleDetector: CycleDetector;
+  //private cycleDetector: CycleDetector;
 
   constructor() {
     this.unusedDeclarationsValidator = new UnusedDeclarationsValidator();
     this.nameUniquenessValidator = new NameUniquenessValidator();
     this.actionUniquenessValidator = new ActionUniquenessValidator();
-    this.cycleDetector = new CycleDetector();
+    //this.cycleDetector = new CycleDetector();
   }
 
   public validate(ast: File): ValidationResult {
@@ -49,9 +49,9 @@ export class Validator {
     const actionResult = this.actionUniquenessValidator.validate(ast);
     errors.push(...actionResult);
 
-    // Check for cycles
-    const cycleResult = this.cycleDetector.validate(ast);
-    errors.push(...cycleResult);
+    // TODO: Check for cycles
+    // const cycleResult = this.cycleDetector.validate(ast);
+    // errors.push(...cycleResult);
 
     return {
       isValid: errors.length === 0,

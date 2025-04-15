@@ -174,4 +174,4 @@ describe('UnusedDeclarationsValidator - Concepts', () => {
     const result: ValidationError[] = validator.validate(ast);
     expect(result.length).toBe(0);
   });
-}); 
+});
