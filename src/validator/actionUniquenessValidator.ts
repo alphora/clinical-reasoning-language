@@ -1,4 +1,4 @@
-import { File, DecisionBody, WhenBlock, BlockBody, ActionStatement } from '../ast/types';
+import { File, DecisionBody, WhenBlock, BlockBody, ActionStatement, Action, DoActivity, UseDecision } from '../ast/types';
 
 import { ValidationError } from './validator';
 
@@ -10,6 +10,25 @@ export class ActionUniquenessValidator {
     for (const statement of ast.statements) {
       if (statement.type === 'Decision') {
         this.validateDecisionBody(statement.body, errors);
+      }
+    }
+
+    // Check for action dependencies
+    const actionGraph = this.buildActionGraph(ast);
+    const actionCycles = this.findCycles(actionGraph);
+    for (const cycle of actionCycles) {
+      errors.push({
+        message: `Cycle detected in action dependencies: ${cycle.join(' -> ')}`,
+        location: this.findActionLocation(ast, cycle[0]),
+        severity: 'error',
+      });
+    }
+
+    // Check for undefined actions
+    const definedActions = this.collectDefinedActions(ast);
+    for (const statement of ast.statements) {
+      if (statement.type === 'Decision') {
+        this.checkUndefinedActions(statement.body, definedActions, errors);
       }
     }
 
@@ -71,6 +90,203 @@ export class ActionUniquenessValidator {
         });
       }
       useStatements.add(action.decisionName);
+    }
+  }
+
+  private buildActionGraph(ast: File): Map<string, Set<string>> {
+    const graph = new Map<string, Set<string>>();
+
+    // Initialize graph with all actions
+    for (const statement of ast.statements) {
+      if (statement.type === 'Decision') {
+        this.collectActions(statement.body).forEach(action => {
+          if (action.type === 'DoActivity') {
+            graph.set(action.activityName, new Set<string>());
+          } else if (action.type === 'UseDecision') {
+            graph.set(action.decisionName, new Set<string>());
+          }
+        });
+      }
+    }
+
+    // Build edges from action dependencies
+    for (const statement of ast.statements) {
+      if (statement.type === 'Decision') {
+        this.processActionDependencies(statement.body, graph);
+      }
+    }
+
+    return graph;
+  }
+
+  private collectActions(body: DecisionBody): Action[] {
+    const actions: Action[] = [];
+    for (const statement of body.statements) {
+      if (statement.type === 'WhenBlock') {
+        if (statement.body.type === 'BlockBody') {
+          statement.body.statements.forEach(s => {
+            if (s.type === 'ActionStatement') {
+              actions.push(s.action);
+            }
+          });
+        } else if (statement.body.type === 'SingleAction') {
+          actions.push(statement.body.action);
+        }
+      }
+    }
+    return actions;
+  }
+
+  private processActionDependencies(body: DecisionBody, graph: Map<string, Set<string>>): void {
+    for (const statement of body.statements) {
+      if (statement.type === 'WhenBlock') {
+        if (statement.body.type === 'BlockBody') {
+          statement.body.statements.forEach(s => {
+            if (s.type === 'ActionStatement') {
+              const action = s.action;
+              if (action.type === 'UseDecision') {
+                // Use decisions implicitly depend on the decision they reference
+                graph.get(action.decisionName)?.add(action.decisionName);
+              }
+            }
+          });
+        } else if (statement.body.type === 'SingleAction') {
+          const action = statement.body.action;
+          if (action.type === 'UseDecision') {
+            // Use decisions implicitly depend on the decision they reference
+            graph.get(action.decisionName)?.add(action.decisionName);
+          }
+        }
+      }
+    }
+  }
+
+  private findCycles(graph: Map<string, Set<string>>): string[][] {
+    const visited = new Set<string>();
+    const recursionStack = new Set<string>();
+    const cycles: string[][] = [];
+
+    for (const node of graph.keys()) {
+      if (!visited.has(node)) {
+        this.dfs(node, graph, visited, recursionStack, [], cycles);
+      }
+    }
+
+    return cycles;
+  }
+
+  private dfs(
+    node: string,
+    graph: Map<string, Set<string>>,
+    visited: Set<string>,
+    recursionStack: Set<string>,
+    currentPath: string[],
+    cycles: string[][],
+  ): void {
+    visited.add(node);
+    recursionStack.add(node);
+    currentPath.push(node);
+
+    const neighbors = graph.get(node) || new Set<string>();
+    for (const neighbor of neighbors) {
+      if (!visited.has(neighbor)) {
+        this.dfs(neighbor, graph, visited, recursionStack, currentPath, cycles);
+      } else if (recursionStack.has(neighbor)) {
+        const cycleStart = currentPath.indexOf(neighbor);
+        cycles.push(currentPath.slice(cycleStart));
+      }
+    }
+
+    recursionStack.delete(node);
+    currentPath.pop();
+  }
+
+  private findActionLocation(
+    ast: File,
+    actionName: string,
+  ): { start: { line: number; column: number }; end: { line: number; column: number } } {
+    for (const statement of ast.statements) {
+      if (statement.type === 'Decision') {
+        const location = this.findActionInBody(statement.body, actionName);
+        if (location) return location;
+      }
+    }
+    return { start: { line: 1, column: 1 }, end: { line: 1, column: 1 } };
+  }
+
+  private findActionInBody(
+    body: DecisionBody,
+    actionName: string,
+  ): { start: { line: number; column: number }; end: { line: number; column: number } } | null {
+    for (const statement of body.statements) {
+      if (statement.type === 'WhenBlock') {
+        if (statement.body.type === 'BlockBody') {
+          for (const s of statement.body.statements) {
+            if (s.type === 'ActionStatement') {
+              const action = s.action;
+              if (action.type === 'DoActivity' && action.activityName === actionName) {
+                return s.location;
+              } else if (action.type === 'UseDecision' && action.decisionName === actionName) {
+                return s.location;
+              }
+            }
+          }
+        } else if (statement.body.type === 'SingleAction') {
+          const action = statement.body.action;
+          if (action.type === 'DoActivity' && action.activityName === actionName) {
+            return statement.body.location;
+          } else if (action.type === 'UseDecision' && action.decisionName === actionName) {
+            return statement.body.location;
+          }
+        }
+      }
+    }
+    return null;
+  }
+
+  private collectDefinedActions(ast: File): Set<string> {
+    const definedActions = new Set<string>();
+    for (const statement of ast.statements) {
+      if (statement.type === 'Decision') {
+        this.collectActions(statement.body).forEach(action => {
+          if (action.type === 'DoActivity') {
+            definedActions.add(action.activityName);
+          } else if (action.type === 'UseDecision') {
+            definedActions.add(action.decisionName);
+          }
+        });
+      }
+    }
+    return definedActions;
+  }
+
+  private checkUndefinedActions(body: DecisionBody, definedActions: Set<string>, errors: ValidationError[]): void {
+    for (const statement of body.statements) {
+      if (statement.type === 'WhenBlock') {
+        if (statement.body.type === 'BlockBody') {
+          statement.body.statements.forEach(s => {
+            if (s.type === 'ActionStatement') {
+              const action = s.action;
+              if (action.type === 'UseDecision' && !definedActions.has(action.decisionName)) {
+                errors.push({
+                  message: `Undefined decision: ${action.decisionName}`,
+                  location: s.location,
+                  severity: 'error',
+                });
+              }
+            }
+          });
+        } else if (statement.body.type === 'SingleAction') {
+          const action = statement.body.action;
+          if (action.type === 'UseDecision' && !definedActions.has(action.decisionName)) {
+            errors.push({
+              message: `Undefined decision: ${action.decisionName}`,
+              location: statement.body.location,
+              severity: 'error',
+            });
+          }
+        }
+      }
     }
   }
 }
