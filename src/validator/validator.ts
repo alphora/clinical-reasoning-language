@@ -5,68 +5,58 @@ import { CycleDetector } from './cycleDetector';
 import { NameUniquenessValidator } from './nameUniquenessValidator';
 import { UnusedDeclarationsValidator } from './unusedDeclarationsValidator';
 
-export interface ValidationResult {
-  isValid: boolean;
-  errors: ValidationError[];
-  warnings: ValidationWarning[];
-}
-
 export interface ValidationError {
   message: string;
   location: {
     start: { line: number; column: number };
     end: { line: number; column: number };
   };
-  severity: 'error';
+  severity: 'error' | 'warning';
 }
 
-export interface ValidationWarning {
-  message: string;
-  location: {
-    start: { line: number; column: number };
-    end: { line: number; column: number };
-  };
+export interface ValidationResult {
+  isValid: boolean;
+  errors: ValidationError[];
+  warnings: ValidationError[];
 }
 
 export class Validator {
+  private unusedDeclarationsValidator: UnusedDeclarationsValidator;
   private nameUniquenessValidator: NameUniquenessValidator;
   private actionUniquenessValidator: ActionUniquenessValidator;
   private cycleDetector: CycleDetector;
-  private unusedDeclarationsValidator: UnusedDeclarationsValidator;
 
   constructor() {
+    this.unusedDeclarationsValidator = new UnusedDeclarationsValidator();
     this.nameUniquenessValidator = new NameUniquenessValidator();
     this.actionUniquenessValidator = new ActionUniquenessValidator();
     this.cycleDetector = new CycleDetector();
-    this.unusedDeclarationsValidator = new UnusedDeclarationsValidator();
   }
 
   public validate(ast: File): ValidationResult {
     const errors: ValidationError[] = [];
-    const warnings: ValidationWarning[] = [];
+    const warnings: ValidationError[] = [];
 
     // Check for unused declarations
     const unusedResult = this.unusedDeclarationsValidator.validate(ast);
-    warnings.push(
-      ...unusedResult.warnings.map(message => ({
-        message,
-        location: { start: { line: 0, column: 0 }, end: { line: 0, column: 0 } },
-      })),
-    );
+    warnings.push(...unusedResult);
 
     // Check for duplicate names
-    warnings.push(...this.nameUniquenessValidator.validate(ast));
+    const nameResult = this.nameUniquenessValidator.validate(ast);
+    errors.push(...nameResult);
 
-    // Check for duplicate actions in blocks
-    errors.push(...this.actionUniquenessValidator.validate(ast));
+    // Check for duplicate actions
+    const actionResult = this.actionUniquenessValidator.validate(ast);
+    errors.push(...actionResult);
 
     // Check for cycles
-    errors.push(...this.cycleDetector.validate(ast));
+    const cycleResult = this.cycleDetector.validate(ast);
+    errors.push(...cycleResult);
 
     return {
-      isValid: warnings.length === 0 && errors.length === 0,
-      warnings,
+      isValid: errors.length === 0,
       errors,
+      warnings,
     };
   }
 }

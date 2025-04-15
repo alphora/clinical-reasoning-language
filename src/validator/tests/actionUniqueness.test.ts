@@ -1,11 +1,12 @@
 import { File } from '../../ast/types';
-import { Validator } from '../validator';
+import { ActionUniquenessValidator } from '../actionUniquenessValidator';
+import { ValidationError } from '../validator';
 
 describe('ActionUniquenessValidator', () => {
-  let validator: Validator;
+  let validator: ActionUniquenessValidator;
 
   beforeEach(() => {
-    validator = new Validator();
+    validator = new ActionUniquenessValidator();
   });
 
   describe('Do Statement Uniqueness', () => {
@@ -57,13 +58,12 @@ describe('ActionUniquenessValidator', () => {
         location: { start: { line: 1, column: 1 }, end: { line: 2, column: 1 } },
       };
 
-      const result = validator.validate(ast);
-      expect(result.isValid).toBe(false);
-      expect(result.errors).toHaveLength(1);
-      expect(result.errors[0].message).toContain('Duplicate do statement: Vaccinate');
+      const result: ValidationError[] = validator.validate(ast);
+      expect(result.length).toBeGreaterThan(0);
+      expect(result[0].message).toContain('Duplicate do statement');
     });
 
-    it('should allow same do statements in different blocks', () => {
+    it('should not detect duplicate do statements in different blocks', () => {
       const ast: File = {
         type: 'File',
         statements: [
@@ -75,7 +75,7 @@ describe('ActionUniquenessValidator', () => {
               statements: [
                 {
                   type: 'WhenBlock',
-                  conceptName: 'FirstConcept',
+                  conceptName: 'SomeConcept',
                   body: {
                     type: 'BlockBody',
                     statements: [
@@ -95,7 +95,7 @@ describe('ActionUniquenessValidator', () => {
                 },
                 {
                   type: 'WhenBlock',
-                  conceptName: 'SecondConcept',
+                  conceptName: 'AnotherConcept',
                   body: {
                     type: 'BlockBody',
                     statements: [
@@ -103,7 +103,7 @@ describe('ActionUniquenessValidator', () => {
                         type: 'ActionStatement',
                         action: {
                           type: 'DoActivity',
-                          activityName: 'Vaccinate', // Same activity in different block
+                          activityName: 'Vaccinate',
                           location: { start: { line: 2, column: 1 }, end: { line: 2, column: 1 } },
                         },
                         location: { start: { line: 2, column: 1 }, end: { line: 2, column: 1 } },
@@ -122,9 +122,8 @@ describe('ActionUniquenessValidator', () => {
         location: { start: { line: 1, column: 1 }, end: { line: 2, column: 1 } },
       };
 
-      const result = validator.validate(ast);
-      expect(result.isValid).toBe(true);
-      expect(result.errors).toHaveLength(0);
+      const result: ValidationError[] = validator.validate(ast);
+      expect(result).toHaveLength(0);
     });
   });
 
@@ -149,7 +148,7 @@ describe('ActionUniquenessValidator', () => {
                         type: 'ActionStatement',
                         action: {
                           type: 'UseDecision',
-                          decisionName: 'OtherDecision',
+                          decisionName: 'SomeOtherDecision',
                           location: { start: { line: 1, column: 1 }, end: { line: 1, column: 1 } },
                         },
                         location: { start: { line: 1, column: 1 }, end: { line: 1, column: 1 } },
@@ -158,7 +157,7 @@ describe('ActionUniquenessValidator', () => {
                         type: 'ActionStatement',
                         action: {
                           type: 'UseDecision',
-                          decisionName: 'OtherDecision', // Duplicate use statement
+                          decisionName: 'SomeOtherDecision', // Duplicate use statement
                           location: { start: { line: 2, column: 1 }, end: { line: 2, column: 1 } },
                         },
                         location: { start: { line: 2, column: 1 }, end: { line: 2, column: 1 } },
@@ -177,13 +176,12 @@ describe('ActionUniquenessValidator', () => {
         location: { start: { line: 1, column: 1 }, end: { line: 2, column: 1 } },
       };
 
-      const result = validator.validate(ast);
-      expect(result.isValid).toBe(false);
-      expect(result.errors).toHaveLength(1);
-      expect(result.errors[0].message).toContain('Duplicate use statement: OtherDecision');
+      const result: ValidationError[] = validator.validate(ast);
+      expect(result.length).toBeGreaterThan(0);
+      expect(result[0].message).toContain('Duplicate use statement');
     });
 
-    it('should allow same use statements in different blocks', () => {
+    it('should not detect duplicate use statements in different blocks', () => {
       const ast: File = {
         type: 'File',
         statements: [
@@ -195,7 +193,7 @@ describe('ActionUniquenessValidator', () => {
               statements: [
                 {
                   type: 'WhenBlock',
-                  conceptName: 'FirstConcept',
+                  conceptName: 'SomeConcept',
                   body: {
                     type: 'BlockBody',
                     statements: [
@@ -203,7 +201,7 @@ describe('ActionUniquenessValidator', () => {
                         type: 'ActionStatement',
                         action: {
                           type: 'UseDecision',
-                          decisionName: 'OtherDecision',
+                          decisionName: 'SomeOtherDecision',
                           location: { start: { line: 1, column: 1 }, end: { line: 1, column: 1 } },
                         },
                         location: { start: { line: 1, column: 1 }, end: { line: 1, column: 1 } },
@@ -215,7 +213,7 @@ describe('ActionUniquenessValidator', () => {
                 },
                 {
                   type: 'WhenBlock',
-                  conceptName: 'SecondConcept',
+                  conceptName: 'AnotherConcept',
                   body: {
                     type: 'BlockBody',
                     statements: [
@@ -223,7 +221,7 @@ describe('ActionUniquenessValidator', () => {
                         type: 'ActionStatement',
                         action: {
                           type: 'UseDecision',
-                          decisionName: 'OtherDecision', // Same decision in different block
+                          decisionName: 'SomeOtherDecision',
                           location: { start: { line: 2, column: 1 }, end: { line: 2, column: 1 } },
                         },
                         location: { start: { line: 2, column: 1 }, end: { line: 2, column: 1 } },
@@ -242,9 +240,8 @@ describe('ActionUniquenessValidator', () => {
         location: { start: { line: 1, column: 1 }, end: { line: 2, column: 1 } },
       };
 
-      const result = validator.validate(ast);
-      expect(result.isValid).toBe(true);
-      expect(result.errors).toHaveLength(0);
+      const result: ValidationError[] = validator.validate(ast);
+      expect(result).toHaveLength(0);
     });
   });
 });

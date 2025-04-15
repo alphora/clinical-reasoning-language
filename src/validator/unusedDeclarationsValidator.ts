@@ -1,5 +1,4 @@
 import {
-  ActivityType,
   Action,
   BlockBody,
   DecisionBody,
@@ -10,18 +9,20 @@ import {
   WhenBlockType,
 } from '../ast/types';
 
+import { ValidationError } from './validator';
+
 interface UsageInfo {
   used: boolean;
   location: Location;
 }
 
 export class UnusedDeclarationsValidator {
-  private decisionDeclarations: Map<string, UsageInfo> = new Map();
-  private conceptDeclarations: Map<string, UsageInfo> = new Map();
-  private activityDeclarations: Map<string, UsageInfo> = new Map();
-  private terminologyDeclarations: Map<string, UsageInfo> = new Map();
+  private readonly decisionDeclarations: Map<string, UsageInfo> = new Map();
+  private readonly conceptDeclarations: Map<string, UsageInfo> = new Map();
+  private readonly activityDeclarations: Map<string, UsageInfo> = new Map();
+  private readonly terminologyDeclarations: Map<string, UsageInfo> = new Map();
 
-  public validate(ast: File): { isValid: boolean; warnings: string[] } {
+  public validate(ast: File): ValidationError[] {
     this.collectDeclarations(ast);
     this.processDeclarations(ast);
     return this.generateResults();
@@ -29,31 +30,11 @@ export class UnusedDeclarationsValidator {
 
   private collectDeclarations(ast: File): void {
     for (const statement of ast.statements) {
-      switch (statement.type) {
-        case DecisionType.type:
-          this.decisionDeclarations.set(statement.name, {
-            used: false,
-            location: statement.location,
-          });
-          break;
-        case 'Concept':
-          this.conceptDeclarations.set(statement.name, {
-            used: false,
-            location: statement.location,
-          });
-          break;
-        case ActivityType.type:
-          this.activityDeclarations.set(statement.name, {
-            used: false,
-            location: statement.location,
-          });
-          break;
-        case 'Terminology':
-          this.terminologyDeclarations.set(statement.name, {
-            used: false,
-            location: statement.location,
-          });
-          break;
+      if (statement.type === DecisionType.type) {
+        this.decisionDeclarations.set(statement.name, {
+          used: false,
+          location: statement.location,
+        });
       }
     }
   }
@@ -75,73 +56,83 @@ export class UnusedDeclarationsValidator {
   }
 
   private processWhenBlock(whenBlock: WhenBlock): void {
-    // Mark the concept as used
-    const conceptInfo = this.conceptDeclarations.get(whenBlock.conceptName);
-    if (conceptInfo) {
-      conceptInfo.used = true;
-    }
+    this.conceptDeclarations.set(whenBlock.conceptName, {
+      used: true,
+      location: whenBlock.location,
+    });
 
-    // Process statements in the when block body
     if (whenBlock.body.type === 'BlockBody') {
       this.processBlockBody(whenBlock.body);
+    } else if (whenBlock.body.type === 'SingleAction') {
+      this.processAction(whenBlock.body.action);
     }
   }
 
   private processBlockBody(body: BlockBody): void {
     for (const statement of body.statements) {
-      if (statement.type === WhenBlockType.type) {
-        this.processWhenBlock(statement);
-      } else if (statement.type === 'ActionStatement') {
+      if (statement.type === 'ActionStatement') {
         this.processAction(statement.action);
       }
     }
   }
 
   private processAction(action: Action): void {
-    let info: UsageInfo | undefined;
-    switch (action.type) {
-      case 'UseDecision':
-        info = this.decisionDeclarations.get(action.decisionName);
-        break;
-      case 'DoActivity':
-        info = this.activityDeclarations.get(action.activityName);
-        break;
-    }
-    if (info) {
-      info.used = true;
+    if (action.type === 'DoActivity') {
+      this.activityDeclarations.set(action.activityName, {
+        used: true,
+        location: action.location,
+      });
+    } else if (action.type === 'UseDecision') {
+      this.decisionDeclarations.set(action.decisionName, {
+        used: true,
+        location: action.location,
+      });
     }
   }
 
-  private generateResults(): { isValid: boolean; warnings: string[] } {
-    const warnings: string[] = [];
+  private generateResults(): ValidationError[] {
+    const errors: ValidationError[] = [];
 
     for (const [name, info] of this.decisionDeclarations) {
       if (!info.used) {
-        warnings.push(`Unused decision: ${name} at line ${info.location.start.line}`);
+        errors.push({
+          message: `Unused decision: ${name}`,
+          location: info.location,
+          severity: 'error',
+        });
       }
     }
 
     for (const [name, info] of this.conceptDeclarations) {
       if (!info.used) {
-        warnings.push(`Unused concept: ${name} at line ${info.location.start.line}`);
+        errors.push({
+          message: `Unused concept: ${name}`,
+          location: info.location,
+          severity: 'error',
+        });
       }
     }
 
     for (const [name, info] of this.activityDeclarations) {
       if (!info.used) {
-        warnings.push(`Unused activity: ${name} at line ${info.location.start.line}`);
+        errors.push({
+          message: `Unused activity: ${name}`,
+          location: info.location,
+          severity: 'error',
+        });
       }
     }
 
     for (const [name, info] of this.terminologyDeclarations) {
       if (!info.used) {
-        warnings.push(`Unused terminology: ${name} at line ${info.location.start.line}`);
+        errors.push({
+          message: `Unused terminology: ${name}`,
+          location: info.location,
+          severity: 'error',
+        });
       }
     }
 
-    return {
-      isValid: warnings.length === 0,
-      warnings,
-    };
+    return errors;
   }
 }
