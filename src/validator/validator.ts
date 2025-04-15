@@ -41,12 +41,21 @@ export class Validator {
     this.unusedDeclarationsValidator = new UnusedDeclarationsValidator();
   }
 
-  validate(ast: File): ValidationResult {
+  public validate(ast: File): ValidationResult {
     const errors: ValidationError[] = [];
     const warnings: ValidationWarning[] = [];
 
+    // Check for unused declarations
+    const unusedResult = this.unusedDeclarationsValidator.validate(ast);
+    warnings.push(
+      ...unusedResult.warnings.map(message => ({
+        message,
+        location: { start: { line: 0, column: 0 }, end: { line: 0, column: 0 } },
+      })),
+    );
+
     // Check for duplicate names
-    errors.push(...this.nameUniquenessValidator.validate(ast));
+    warnings.push(...this.nameUniquenessValidator.validate(ast));
 
     // Check for duplicate actions in blocks
     errors.push(...this.actionUniquenessValidator.validate(ast));
@@ -54,13 +63,10 @@ export class Validator {
     // Check for cycles
     errors.push(...this.cycleDetector.validate(ast));
 
-    // Check for unused declarations
-    warnings.push(...this.unusedDeclarationsValidator.validate(ast));
-
     return {
-      isValid: errors.length === 0,
-      errors,
+      isValid: warnings.length === 0 && errors.length === 0,
       warnings,
+      errors,
     };
   }
 }
