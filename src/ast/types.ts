@@ -11,13 +11,14 @@ export interface ASTNode {
 export interface File extends ASTNode {
   type: 'File';
   statements: Statement[];
+  location: Location;
 }
 export const FileType = {
   type: 'File' as const,
 };
 
 // Union type for all possible statements
-export type Statement = Decision | Terminology | Activity | Concept;
+export type Statement = Decision | Concept | Activity | Terminology;
 
 // --------------------------- DECISION STATEMENT ----------------------------
 
@@ -26,6 +27,7 @@ export interface Decision extends ASTNode {
   type: 'Decision';
   name: string;
   body: DecisionBody;
+  location: Location;
 }
 export const DecisionType = {
   type: 'Decision' as const,
@@ -35,6 +37,7 @@ export const DecisionType = {
 export interface DecisionBody extends ASTNode {
   type: 'DecisionBody';
   statements: WhenBlock[];
+  location: Location;
 }
 export const DecisionBodyType = {
   type: 'DecisionBody' as const,
@@ -44,7 +47,8 @@ export const DecisionBodyType = {
 export interface WhenBlock extends ASTNode {
   type: 'WhenBlock';
   conceptName: string;
-  body: WhenBlockBody;
+  body: BlockBody | SingleAction;
+  location: Location;
 }
 export const WhenBlockType = {
   type: 'WhenBlock' as const,
@@ -58,6 +62,7 @@ export interface BlockBody extends ASTNode {
   type: 'BlockBody';
   qualifier?: string; // 'any' or 'all'
   statements: (WhenBlock | ActionStatement)[];
+  location: Location;
 }
 export const BlockBodyType = {
   type: 'BlockBody' as const,
@@ -66,7 +71,8 @@ export const BlockBodyType = {
 // Single action (do or use)
 export interface SingleAction extends ASTNode {
   type: 'SingleAction';
-  action: DoActivity | UseDecision;
+  action: Action;
+  location: Location;
 }
 export const SingleActionType = {
   type: 'SingleAction' as const,
@@ -75,7 +81,8 @@ export const SingleActionType = {
 // Action statement (do or use)
 export interface ActionStatement extends ASTNode {
   type: 'ActionStatement';
-  action: DoActivity | UseDecision;
+  action: Action;
+  location: Location;
 }
 export const ActionStatementType = {
   type: 'ActionStatement' as const,
@@ -85,6 +92,7 @@ export const ActionStatementType = {
 export interface DoActivity extends ASTNode {
   type: 'DoActivity';
   activityName: string;
+  location: Location;
 }
 export const DoActivityType = {
   type: 'DoActivity' as const,
@@ -94,6 +102,7 @@ export const DoActivityType = {
 export interface UseDecision extends ASTNode {
   type: 'UseDecision';
   decisionName: string;
+  location: Location;
 }
 export const UseDecisionType = {
   type: 'UseDecision' as const,
@@ -106,6 +115,7 @@ export interface Terminology extends ASTNode {
   type: 'Terminology';
   name: string;
   definition: TerminologyDefinition;
+  location: Location;
 }
 export const TerminologyType = {
   type: 'Terminology' as const,
@@ -121,6 +131,7 @@ export type TerminologyDefinition =
 export interface TerminologyValueset extends ASTNode {
   type: 'TerminologyValueset';
   valuesetName: string;
+  location: Location;
 }
 export const TerminologyValuesetType = {
   type: 'TerminologyValueset' as const,
@@ -129,6 +140,7 @@ export const TerminologyValuesetType = {
 // Terminology unknown
 export interface TerminologyUnknown extends ASTNode {
   type: 'TerminologyUnknown';
+  location: Location;
 }
 export const TerminologyUnknownType = {
   type: 'TerminologyUnknown' as const,
@@ -139,6 +151,7 @@ export interface TerminologySystemCode extends ASTNode {
   type: 'TerminologySystemCode';
   system: string;
   code: string;
+  location: Location;
 }
 export const TerminologySystemCodeType = {
   type: 'TerminologySystemCode' as const,
@@ -150,8 +163,8 @@ export const TerminologySystemCodeType = {
 export interface Activity extends ASTNode {
   type: 'Activity';
   name: string;
-  activityType: string;
-  terminologyReference?: string;
+  activityType: ActivityType;
+  location: Location;
 }
 export const ActivityType = {
   type: 'Activity' as const,
@@ -163,10 +176,10 @@ export const ActivityType = {
 export interface Concept extends ASTNode {
   type: 'Concept';
   name: string;
-  conceptType: string;
-  valueType: string;
-  provenance?: string;
+  conceptType: ConceptType;
+  valueType: ConceptValueType;
   definition: ConceptDefinition;
+  location: Location;
 }
 export const ConceptType = {
   type: 'Concept' as const,
@@ -179,6 +192,7 @@ export type ConceptDefinition = CodedByDefinition | InferredByDefinition;
 export interface CodedByDefinition extends ASTNode {
   type: 'CodedByDefinition';
   terminologyName: string;
+  location: Location;
 }
 export const CodedByDefinitionType = {
   type: 'CodedByDefinition' as const,
@@ -187,9 +201,10 @@ export const CodedByDefinitionType = {
 // Inferred by definition
 export interface InferredByDefinition extends ASTNode {
   type: 'InferredByDefinition';
-  pattern?: string;
   concept?: string;
   descriptiveLogic?: string;
+  pattern?: string;
+  location: Location;
 }
 export const InferredByDefinitionType = {
   type: 'InferredByDefinition' as const,
@@ -205,3 +220,59 @@ export interface Expression extends ASTNode {
 export const ExpressionType = {
   type: 'Expression' as const,
 };
+
+export interface Location {
+  start: { line: number; column: number };
+  end: { line: number; column: number };
+}
+
+export type Action = DoActivity | UseDecision;
+
+export type ConceptType =
+  | 'Communication'
+  | 'CommunicationRequest'
+  | 'Condition'
+  | 'QuestionnaireTask'
+  | 'QuestionnaireResponse'
+  | 'MedicationRequest'
+  | 'MedicationDispense'
+  | 'MedicationAdministration'
+  | 'MedicationStatement'
+  | 'ImmunizationRequest'
+  | 'Immunization'
+  | 'ServiceRequest'
+  | 'Procedure'
+  | 'Observation';
+
+export type ConceptValueType =
+  | 'Quantity'
+  | 'CodeableConcept'
+  | 'string'
+  | 'boolean'
+  | 'integer'
+  | 'Range'
+  | 'Ratio'
+  | 'SampledData'
+  | 'time'
+  | 'dateTime'
+  | 'Period'
+  | 'Attachment';
+
+export type ActivityType =
+  | 'CPGAdministerMedication'
+  | 'CPGCollectInformation'
+  | 'CPGCommunication'
+  | 'CPGDispenseMedication'
+  | 'CPGDocumentMedication'
+  | 'CPGEnrollment'
+  | 'CPGGenerateReport'
+  | 'CPGHold'
+  | 'CPGImmunization'
+  | 'CPGMedicationRequest'
+  | 'CPGProposeDiagnosis'
+  | 'CPGRecordDetectedIssue'
+  | 'CPGRecordInference'
+  | 'CPGReportFlag'
+  | 'CPGResume'
+  | 'CPGServiceRequest'
+  | 'CPGStop';

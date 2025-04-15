@@ -1,18 +1,9 @@
 import { File } from '../ast/types';
 
-export class Validator {
-  private errors: ValidationError[] = [];
-  private warnings: ValidationWarning[] = [];
-
-  validate(ast: File): ValidationResult {
-    // TODO: Implement validation logic
-    return {
-      isValid: this.errors.length === 0,
-      errors: this.errors,
-      warnings: this.warnings,
-    };
-  }
-}
+import { ActionUniquenessValidator } from './actionUniquenessValidator';
+import { CycleDetector } from './cycleDetector';
+import { NameUniquenessValidator } from './nameUniquenessValidator';
+import { UnusedDeclarationsValidator } from './unusedDeclarationsValidator';
 
 export interface ValidationResult {
   isValid: boolean;
@@ -22,23 +13,54 @@ export interface ValidationResult {
 
 export interface ValidationError {
   message: string;
-  location: SourceLocation;
-  severity: ErrorSeverity;
-  context?: any;
+  location: {
+    start: { line: number; column: number };
+    end: { line: number; column: number };
+  };
+  severity: 'error';
 }
 
 export interface ValidationWarning {
   message: string;
-  location: SourceLocation;
-  context?: any;
+  location: {
+    start: { line: number; column: number };
+    end: { line: number; column: number };
+  };
 }
 
-export interface SourceLocation {
-  start: { line: number; column: number };
-  end: { line: number; column: number };
-}
+export class Validator {
+  private nameUniquenessValidator: NameUniquenessValidator;
+  private actionUniquenessValidator: ActionUniquenessValidator;
+  private cycleDetector: CycleDetector;
+  private unusedDeclarationsValidator: UnusedDeclarationsValidator;
 
-export enum ErrorSeverity {
-  Error = 'error',
-  Warning = 'warning',
+  constructor() {
+    this.nameUniquenessValidator = new NameUniquenessValidator();
+    this.actionUniquenessValidator = new ActionUniquenessValidator();
+    this.cycleDetector = new CycleDetector();
+    this.unusedDeclarationsValidator = new UnusedDeclarationsValidator();
+  }
+
+  validate(ast: File): ValidationResult {
+    const errors: ValidationError[] = [];
+    const warnings: ValidationWarning[] = [];
+
+    // Check for duplicate names
+    errors.push(...this.nameUniquenessValidator.validate(ast));
+
+    // Check for duplicate actions in blocks
+    errors.push(...this.actionUniquenessValidator.validate(ast));
+
+    // Check for cycles
+    errors.push(...this.cycleDetector.validate(ast));
+
+    // Check for unused declarations
+    warnings.push(...this.unusedDeclarationsValidator.validate(ast));
+
+    return {
+      isValid: errors.length === 0,
+      errors,
+      warnings,
+    };
+  }
 }
