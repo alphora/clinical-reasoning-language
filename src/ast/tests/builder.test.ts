@@ -102,7 +102,7 @@ describe('ASTBuilder', () => {
       it('should parse a single do statement', () => {
         const input = `
           decision "Test":
-            when "Condition" then:
+            when "Concept" then:
               do "Activity".
             done
           done
@@ -122,7 +122,7 @@ describe('ASTBuilder', () => {
       it('should parse two do statements', () => {
         const input = `
           decision "Test":
-            when "Condition" then:
+            when "Concept" then:
               do "First Activity".
               do "Second Activity".
             done
@@ -147,7 +147,7 @@ describe('ASTBuilder', () => {
       it('should parse no do statements', () => {
         const input = `
           decision "Test":
-            when "Condition" then:
+            when "Concept" then:
             done
           done
         `;
@@ -163,7 +163,7 @@ describe('ASTBuilder', () => {
       it('should parse a single use statement', () => {
         const input = `
           decision "Test":
-            when "Condition" then:
+            when "Concept" then:
               use "Other Decision".
             done
           done
@@ -183,7 +183,7 @@ describe('ASTBuilder', () => {
       it('should parse two use statements', () => {
         const input = `
           decision "Test":
-            when "Condition" then:
+            when "Concept" then:
               use "First Decision".
               use "Second Decision".
             done
@@ -208,7 +208,7 @@ describe('ASTBuilder', () => {
       it('should parse no use statements', () => {
         const input = `
           decision "Test":
-            when "Condition" then:
+            when "Concept" then:
             done
           done
         `;
@@ -224,7 +224,7 @@ describe('ASTBuilder', () => {
       it('should parse a mixture of do and use statements', () => {
         const input = `
           decision "Test":
-            when "Condition" then:
+            when "Concept" then:
               do "First Activity".
               use "First Decision".
               do "Second Activity".
@@ -411,6 +411,7 @@ describe('ASTBuilder', () => {
         concept "BMI":
           has type Observation.
           has valuetype Quantity.
+          coded by "BMI Valueset".
         done
         decision "Check BMI":
           when "BMI" then do "Record BMI".

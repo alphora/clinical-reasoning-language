@@ -136,7 +136,10 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode | File> {
         if (!seenConcepts.has(whenBlock.conceptName)) {
           seenConcepts.add(whenBlock.conceptName);
         } else {
-          console.warn('[Builder] Duplicate whenBlock concept name: ', whenBlock.conceptName);
+          console.warn(
+            '[Builder - Duplication] Duplicate whenBlock concept name: ',
+            whenBlock.conceptName,
+          );
         }
         whenBlocks.push(whenBlock);
       }
@@ -172,7 +175,7 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode | File> {
           if (!this.seenConcepts.has(conceptKey)) {
             this.seenConcepts.add(conceptKey);
           } else {
-            console.warn('[Builder]: duplicate concept key: ', conceptKey);
+            console.warn('[Builder - Duplication]: duplicate concept key: ', conceptKey);
           }
           statements.push(statement);
         } else if (statement.type === ActionStatementType.type) {
@@ -184,7 +187,7 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode | File> {
           if (!this.seenActions.has(actionKey)) {
             this.seenActions.add(actionKey);
           } else {
-            console.warn('[Builder]: duplicate action key: ', actionKey);
+            console.warn('[Builder - Duplication]: duplicate action key: ', actionKey);
           }
           statements.push(statement);
         }
