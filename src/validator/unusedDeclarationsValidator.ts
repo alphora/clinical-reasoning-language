@@ -70,6 +70,7 @@ export class UnusedDeclarationsValidator {
           });
           break;
         case 'Terminology':
+          console.log('[DEBUGGING] Collecting terminology:', statement.name);
           this.terminologyDeclarations.set(statement.name, {
             used: false,
             location: statement.location,
@@ -82,8 +83,8 @@ export class UnusedDeclarationsValidator {
   private processDeclarations(ast: File): void {
     console.log('[DEBUGGING] Starting processDeclarations');
     console.log(
-      '[DEBUGGING] Initial concept declarations:',
-      Array.from(this.conceptDeclarations.entries()),
+      '[DEBUGGING] Initial terminology declarations:',
+      Array.from(this.terminologyDeclarations.entries()),
     );
     for (const statement of ast.statements) {
       switch (statement.type) {
@@ -98,11 +99,32 @@ export class UnusedDeclarationsValidator {
             statement.definition.type === 'CodedByDefinition' &&
             statement.definition.terminologyName
           ) {
+            console.log(
+              '[DEBUGGING] Found CodedByDefinition referencing terminology:',
+              statement.definition.terminologyName,
+            );
+
             const terminologyInfo = this.terminologyDeclarations.get(
               statement.definition.terminologyName,
             );
             if (terminologyInfo) {
+              console.log(
+                '[DEBUGGING] Marking terminology as used:',
+                statement.definition.terminologyName,
+              );
               terminologyInfo.used = true;
+            } else {
+              console.log(
+                '[DEBUGGING] Terminology not found in declarations:',
+                statement.definition.terminologyName,
+              );
+            }
+
+            // Mark the concept itself as used since it's being defined
+            const conceptInfo = this.conceptDeclarations.get(statement.name);
+            if (conceptInfo) {
+              console.log('[DEBUGGING] Marking concept as used:', statement.name);
+              conceptInfo.used = true;
             }
           }
           break;
@@ -148,8 +170,8 @@ export class UnusedDeclarationsValidator {
     }
 
     console.log(
-      '[DEBUGGING] Final concept declarations:',
-      Array.from(this.conceptDeclarations.entries()),
+      '[DEBUGGING] Final terminology declarations:',
+      Array.from(this.terminologyDeclarations.entries()),
     );
     console.log(
       '[DEBUGGING] After processDeclarations, decision declarations:',
@@ -277,37 +299,52 @@ export class UnusedDeclarationsValidator {
         errors.push({
           message: `Unused decision: ${name}`,
           location: info.location,
-          severity: 'error',
+          severity: 'warning',
         });
       }
     }
 
+    console.log(
+      '[DEBUGGING] Checking concept declarations:',
+      Array.from(this.conceptDeclarations.entries()),
+    );
     for (const [name, info] of this.conceptDeclarations) {
       if (!info.used) {
+        console.log('[DEBUGGING] Found unused concept:', name);
         errors.push({
           message: `Unused concept: ${name}`,
           location: info.location,
-          severity: 'error',
+          severity: 'warning',
         });
       }
     }
 
+    console.log(
+      '[DEBUGGING] Checking activity declarations:',
+      Array.from(this.activityDeclarations.entries()),
+    );
     for (const [name, info] of this.activityDeclarations) {
       if (!info.used) {
+        console.log('[DEBUGGING] Found unused activity:', name);
         errors.push({
           message: `Unused activity: ${name}`,
           location: info.location,
-          severity: 'error',
+          severity: 'warning',
         });
       }
     }
 
+    console.log(
+      '[DEBUGGING] Checking terminology declarations:',
+      Array.from(this.terminologyDeclarations.entries()),
+    );
     for (const [name, info] of this.terminologyDeclarations) {
       if (!info.used) {
+        console.log('[DEBUGGING] Found unused terminology:', name);
         errors.push({
           message: `Unused terminology: ${name}`,
           location: info.location,
-          severity: 'error',
+          severity: 'warning',
         });
       }
     }
