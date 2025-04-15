@@ -1,190 +1,102 @@
-import { File, DecisionBody, WhenBlock, BlockBody, Action } from '../ast/types';
-
 import { ValidationError } from './validator';
 
+type NodeId = string;
+type AdjacencyList = Map<NodeId, Set<NodeId>>;
+
+interface DecisionDeclaration {
+  id: string;
+  decisionReferences?: string[];
+  conceptInferences?: string[];
+}
+
 export class CycleDetector {
-  validate(ast: File): ValidationError[] {
+  private readonly decisionAdjacencyList: AdjacencyList = new Map();
+  private readonly conceptAdjacencyList: AdjacencyList = new Map();
+
+  public validate(declarations: DecisionDeclaration[]): ValidationError[] {
     const errors: ValidationError[] = [];
 
-    // Check for decision cycles
-    const decisionGraph = this.buildDecisionGraph(ast);
-    const decisionCycles = this.findCycles(decisionGraph);
-    for (const cycle of decisionCycles) {
-      errors.push({
-        message: `Cycle detected in decision references: ${cycle.join(' -> ')}`,
-        location: this.findDecisionLocation(ast, cycle[0]),
-        severity: 'error',
-      });
+    // Build adjacency lists
+    for (const declaration of declarations) {
+      // Add decision references
+      if (declaration.decisionReferences) {
+        const source = declaration.id;
+        if (!this.decisionAdjacencyList.has(source)) {
+          this.decisionAdjacencyList.set(source, new Set());
+        }
+        for (const ref of declaration.decisionReferences) {
+          this.decisionAdjacencyList.get(source)!.add(ref);
+        }
+      }
+
+      // Add concept inferences
+      if (declaration.conceptInferences) {
+        const source = declaration.id;
+        if (!this.conceptAdjacencyList.has(source)) {
+          this.conceptAdjacencyList.set(source, new Set());
+        }
+        for (const inf of declaration.conceptInferences) {
+          this.conceptAdjacencyList.get(source)!.add(inf);
+        }
+      }
     }
 
-    // Check for concept inference cycles
-    const conceptGraph = this.buildConceptGraph(ast);
-    const conceptCycles = this.findCycles(conceptGraph);
-    for (const cycle of conceptCycles) {
-      errors.push({
-        message: `Cycle detected in concept inferences: ${cycle.join(' -> ')}`,
-        location: this.findConceptLocation(ast, cycle[0]),
-        severity: 'error',
-      });
-    }
+    // Detect cycles in decisions
+    const decisionCycles = this.detectCycles(this.decisionAdjacencyList, 'Decision');
+    errors.push(...decisionCycles);
+
+    // Detect cycles in concepts
+    const conceptCycles = this.detectCycles(this.conceptAdjacencyList, 'Concept');
+    errors.push(...conceptCycles);
 
     return errors;
   }
 
-  private buildDecisionGraph(ast: File): Map<string, Set<string>> {
-    const graph = new Map<string, Set<string>>();
+  private detectCycles(adjacencyList: AdjacencyList, nodeType: string): ValidationError[] {
+    const errors: ValidationError[] = [];
+    const visited = new Set<NodeId>();
+    const recursionStack = new Set<NodeId>();
+    const cycles = new Set<string>();
 
-    // Initialize graph with all decisions
-    for (const statement of ast.statements) {
-      if (statement.type === 'Decision') {
-        graph.set(statement.name, new Set<string>());
-      }
-    }
+    const dfs = (node: NodeId, path: NodeId[]): void => {
+      visited.add(node);
+      recursionStack.add(node);
+      path.push(node);
 
-    // Build edges from use statements
-    for (const statement of ast.statements) {
-      if (statement.type === 'Decision') {
-        this.processDecisionBody(statement.body, statement.name, graph);
-      }
-    }
-
-    return graph;
-  }
-
-  private processDecisionBody(
-    body: DecisionBody,
-    sourceName: string,
-    graph: Map<string, Set<string>>,
-  ): void {
-    for (const statement of body.statements) {
-      if (statement.type === 'WhenBlock') {
-        this.processWhenBlock(statement, sourceName, graph);
-      }
-    }
-  }
-
-  private processWhenBlock(
-    whenBlock: WhenBlock,
-    sourceName: string,
-    graph: Map<string, Set<string>>,
-  ): void {
-    if (whenBlock.body.type === 'BlockBody') {
-      this.processBlockBody(whenBlock.body, sourceName, graph);
-    } else if (whenBlock.body.type === 'SingleAction') {
-      this.processAction(whenBlock.body.action, sourceName, graph);
-    }
-  }
-
-  private processBlockBody(
-    blockBody: BlockBody,
-    sourceName: string,
-    graph: Map<string, Set<string>>,
-  ): void {
-    for (const statement of blockBody.statements) {
-      if (statement.type === 'WhenBlock') {
-        this.processWhenBlock(statement, sourceName, graph);
-      } else if (statement.type === 'ActionStatement') {
-        this.processAction(statement.action, sourceName, graph);
-      }
-    }
-  }
-
-  private processAction(action: Action, sourceName: string, graph: Map<string, Set<string>>): void {
-    if (action.type === 'UseDecision') {
-      const edges = graph.get(sourceName);
-      if (edges) {
-        edges.add(action.decisionName);
-      }
-    }
-  }
-
-  private buildConceptGraph(ast: File): Map<string, Set<string>> {
-    const graph = new Map<string, Set<string>>();
-
-    // Initialize graph with all concepts
-    for (const statement of ast.statements) {
-      if (statement.type === 'Concept') {
-        graph.set(statement.name, new Set<string>());
-      }
-    }
-
-    // Build edges from inferred by statements
-    for (const statement of ast.statements) {
-      if (statement.type === 'Concept' && statement.definition.type === 'InferredByDefinition') {
-        const edges = graph.get(statement.name);
-        if (edges && statement.definition.concept) {
-          edges.add(statement.definition.concept);
-        }
-      }
-    }
-
-    return graph;
-  }
-
-  private findCycles(graph: Map<string, Set<string>>): string[][] {
-    const cycles: string[][] = [];
-    const visited = new Set<string>();
-    const recursionStack = new Set<string>();
-
-    for (const node of graph.keys()) {
-      if (!visited.has(node)) {
-        this.dfs(node, graph, visited, recursionStack, [], cycles);
-      }
-    }
-
-    return cycles;
-  }
-
-  private dfs(
-    node: string,
-    graph: Map<string, Set<string>>,
-    visited: Set<string>,
-    recursionStack: Set<string>,
-    currentPath: string[],
-    cycles: string[][],
-  ): void {
-    visited.add(node);
-    recursionStack.add(node);
-    currentPath.push(node);
-
-    const neighbors = graph.get(node);
-    if (neighbors) {
+      const neighbors = adjacencyList.get(node) || new Set<NodeId>();
       for (const neighbor of neighbors) {
         if (!visited.has(neighbor)) {
-          this.dfs(neighbor, graph, visited, recursionStack, currentPath, cycles);
+          dfs(neighbor, [...path]);
         } else if (recursionStack.has(neighbor)) {
-          // Found a cycle
-          const cycleStart = currentPath.indexOf(neighbor);
-          cycles.push(currentPath.slice(cycleStart));
+          // Found a cycle - check if it's a true cycle (returns to start)
+          const cycleStartIndex = path.indexOf(neighbor);
+          const cycle = path.slice(cycleStartIndex);
+          cycle.push(neighbor); // Complete the cycle
+
+          // Only report if it's a true cycle (returns to start)
+          if (cycle[0] === cycle[cycle.length - 1]) {
+            const cyclePath = cycle.map(node => `${nodeType}:${node}`).join(' -> ');
+            if (!cycles.has(cyclePath)) {
+              cycles.add(cyclePath);
+              errors.push({
+                message: `Cycle detected in ${nodeType.toLowerCase()} references: ${cyclePath}`,
+                severity: 'error',
+                location: { start: { line: 1, column: 1 }, end: { line: 1, column: 1 } },
+              });
+            }
+          }
         }
       }
-    }
 
-    recursionStack.delete(node);
-    currentPath.pop();
-  }
+      recursionStack.delete(node);
+    };
 
-  private findDecisionLocation(
-    ast: File,
-    decisionName: string,
-  ): { start: { line: number; column: number }; end: { line: number; column: number } } {
-    for (const statement of ast.statements) {
-      if (statement.type === 'Decision' && statement.name === decisionName) {
-        return statement.location;
+    for (const node of adjacencyList.keys()) {
+      if (!visited.has(node)) {
+        dfs(node, []);
       }
     }
-    return { start: { line: 0, column: 0 }, end: { line: 0, column: 0 } };
-  }
 
-  private findConceptLocation(
-    ast: File,
-    conceptName: string,
-  ): { start: { line: number; column: number }; end: { line: number; column: number } } {
-    for (const statement of ast.statements) {
-      if (statement.type === 'Concept' && statement.name === conceptName) {
-        return statement.location;
-      }
-    }
-    return { start: { line: 0, column: 0 }, end: { line: 0, column: 0 } };
+    return errors;
   }
 }
