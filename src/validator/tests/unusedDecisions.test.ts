@@ -14,7 +14,15 @@ describe('UnusedDeclarationsValidator - Decisions', () => {
   let validator: UnusedDeclarationsValidator;
 
   beforeEach(() => {
-    validator = new UnusedDeclarationsValidator();
+    const ast: File = {
+      type: FileType.type,
+      statements: [],
+      location: {
+        start: { line: 1, column: 1 },
+        end: { line: 1, column: 1 },
+      },
+    };
+    validator = new UnusedDeclarationsValidator(ast);
   });
 
   it('should detect unused decisions', () => {

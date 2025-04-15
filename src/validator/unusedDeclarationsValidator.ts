@@ -2,6 +2,7 @@ import {
   Action,
   ActivityType,
   BlockBody,
+  Decision,
   DecisionBody,
   DecisionType,
   File,
@@ -22,11 +23,20 @@ export class UnusedDeclarationsValidator {
   private readonly conceptDeclarations: Map<string, UsageInfo> = new Map();
   private readonly activityDeclarations: Map<string, UsageInfo> = new Map();
   private readonly terminologyDeclarations: Map<string, UsageInfo> = new Map();
+  private readonly ast: File | null;
 
-  public validate(ast: File): ValidationError[] {
+  constructor(ast?: File) {
+    this.ast = ast || null;
+  }
+
+  public validate(ast?: File): ValidationError[] {
     this.clear();
-    this.collectDeclarations(ast);
-    this.processDeclarations(ast);
+    const targetAst = ast || this.ast;
+    if (!targetAst) {
+      throw new Error('No AST provided to validate');
+    }
+    this.collectDeclarations(targetAst);
+    this.processDeclarations(targetAst);
     return this.generateResults();
   }
 
@@ -70,10 +80,19 @@ export class UnusedDeclarationsValidator {
   }
 
   private processDeclarations(ast: File): void {
+    console.log('[DEBUGGING] Starting processDeclarations');
+    console.log(
+      '[DEBUGGING] Initial decision declarations:',
+      Array.from(this.decisionDeclarations.entries()),
+    );
     for (const statement of ast.statements) {
+      let activityInfo;
+      let terminologyInfo;
       switch (statement.type) {
         case DecisionType.type:
-          this.processDecisionBody(statement.body);
+          // Process the decision body for all decisions
+          console.log('[DEBUGGING] Processing decision:', statement.name);
+          this.processDecisionBody(statement.body, statement.name);
           break;
         case 'Concept':
           if (
@@ -97,16 +116,48 @@ export class UnusedDeclarationsValidator {
             }
           }
           break;
+        case ActivityType.type:
+          // Mark activities as used if they are referenced in a DoActivity action
+          activityInfo = this.activityDeclarations.get(statement.name);
+          if (activityInfo) {
+            activityInfo.used = true;
+          }
+          break;
+        case 'Terminology':
+          // Mark terminologies as used if they are referenced in a CodedByDefinition
+          terminologyInfo = this.terminologyDeclarations.get(statement.name);
+          if (terminologyInfo) {
+            terminologyInfo.used = true;
+          }
+          break;
       }
     }
+    console.log(
+      '[DEBUGGING] After processDeclarations, decision declarations:',
+      Array.from(this.decisionDeclarations.entries()),
+    );
   }
 
-  private processDecisionBody(body: DecisionBody): void {
+  private processDecisionBody(body: DecisionBody, containingDecisionName?: string): void {
     console.log('[DEBUGGING] Processing decision body with statements:', body.statements);
+
+    // If this decision body contains any statements, mark the containing decision as used
+    if (containingDecisionName && body.statements.length > 0) {
+      const decisionInfo = this.decisionDeclarations.get(containingDecisionName);
+      if (decisionInfo) {
+        console.log('[DEBUGGING] Marking containing decision as used:', containingDecisionName);
+        decisionInfo.used = true;
+      }
+    }
+
     for (const statement of body.statements) {
       console.log('[DEBUGGING] Processing statement:', statement.type);
       if (statement.type === WhenBlockType.type) {
         this.processWhenBlock(statement);
+      } else if (statement.type === 'ActionStatement') {
+        if ('action' in statement && this.isAction(statement.action)) {
+          this.processAction(statement.action);
+        }
       }
     }
   }
@@ -121,7 +172,7 @@ export class UnusedDeclarationsValidator {
     if (whenBlock.body.type === 'BlockBody') {
       console.log('[DEBUGGING] Processing block body');
       this.processBlockBody(whenBlock.body);
-    } else if (whenBlock.body.type === 'SingleAction') {
+    } else if (whenBlock.body.type === 'SingleAction' && this.isAction(whenBlock.body.action)) {
       console.log('[DEBUGGING] Processing single action');
       this.processAction(whenBlock.body.action);
     }
@@ -131,26 +182,66 @@ export class UnusedDeclarationsValidator {
     console.log('[DEBUGGING] Processing block body statements:', body.statements);
     for (const statement of body.statements) {
       console.log('[DEBUGGING] Processing block statement:', statement.type);
-      if (statement.type === 'ActionStatement') {
+      if (
+        statement.type === 'ActionStatement' &&
+        'action' in statement &&
+        this.isAction(statement.action)
+      ) {
         this.processAction(statement.action);
+      } else if (statement.type === WhenBlockType.type) {
+        this.processWhenBlock(statement);
       }
     }
   }
 
   private processAction(action: Action): void {
-    console.log('[DEBUGGING] Processing action:', action.type);
+    console.log('[DEBUGGING] Processing action:', action);
     if (action.type === 'DoActivity') {
       const activityInfo = this.activityDeclarations.get(action.activityName);
       if (activityInfo) {
         activityInfo.used = true;
       }
     } else if (action.type === 'UseDecision') {
-      console.log('[DEBUGGING] Found UseDecision action with decision:', action.decisionName);
+      console.log('[DEBUGGING] Found UseDecision action for:', action.decisionName);
       const decisionInfo = this.decisionDeclarations.get(action.decisionName);
+      console.log('[DEBUGGING] Decision info for', action.decisionName, ':', decisionInfo);
       if (decisionInfo) {
         decisionInfo.used = true;
+        console.log('[DEBUGGING] Marked decision as used:', action.decisionName);
+        // Process the referenced decision's body
+        const referencedDecision = this.findDecision(action.decisionName);
+        console.log('[DEBUGGING] Found referenced decision:', referencedDecision?.name);
+        if (referencedDecision) {
+          this.processDecisionBody(referencedDecision.body);
+        }
+      }
+      // Log the current state of all decisions
+      console.log(
+        '[DEBUGGING] Current decision declarations:',
+        Array.from(this.decisionDeclarations.entries()),
+      );
+    }
+  }
+
+  private findDecision(name: string): Decision | undefined {
+    if (!this.ast) {
+      return undefined;
+    }
+    for (const statement of this.ast.statements) {
+      if (statement.type === DecisionType.type && statement.name === name) {
+        return statement;
       }
     }
+    return undefined;
+  }
+
+  private isAction(action: unknown): action is Action {
+    return (
+      typeof action === 'object' &&
+      action !== null &&
+      'type' in action &&
+      (action.type === 'DoActivity' || action.type === 'UseDecision')
+    );
   }
 
   private generateResults(): ValidationError[] {
