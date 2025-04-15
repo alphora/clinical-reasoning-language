@@ -1,4 +1,4 @@
-import { File, DecisionBody, WhenBlock, BlockBody, ActionStatement, Action, DoActivity, UseDecision } from '../ast/types';
+import { File, DecisionBody, WhenBlock, BlockBody, ActionStatement, Action } from '../ast/types';
 
 import { ValidationError } from './validator';
 
@@ -260,7 +260,11 @@ export class ActionUniquenessValidator {
     return definedActions;
   }
 
-  private checkUndefinedActions(body: DecisionBody, definedActions: Set<string>, errors: ValidationError[]): void {
+  private checkUndefinedActions(
+    body: DecisionBody,
+    definedActions: Set<string>,
+    errors: ValidationError[],
+  ): void {
     for (const statement of body.statements) {
       if (statement.type === 'WhenBlock') {
         if (statement.body.type === 'BlockBody') {
