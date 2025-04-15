@@ -245,3 +245,69 @@ done
     expect(warnings.some(warning => warning.includes('[Builder - Duplication]'))).toBe(true);
   });
 });
+
+describe('Top-Level Statement Names', () => {
+  it('should allow different statement types to have the same name', () => {
+    const input = `
+decision "blah":
+  when"test"thendo"something".
+done
+
+concept "blah":
+  has type Observation.
+  has valuetype Quantity.
+  inferred by "test".
+done
+`;
+
+    const warnings = captureWarnings(() => {
+      const result = parseInput(input);
+      expect(result.statements).toHaveLength(2);
+      expect(result.statements[0].type).toBe('Decision');
+      expect(result.statements[1].type).toBe('Concept');
+    });
+
+    // Should not have any duplication warnings
+    expect(warnings.some(warning => warning.includes('[Builder - Duplication]'))).toBe(false);
+  });
+
+  it('should error on duplicate decision names', () => {
+    const input = `
+      decision "blah" when "test" then do "something".
+      decision "blah" when "test" then do "something".
+    `;
+    expect(() => {
+      parseInput(input);
+    }).toThrow();
+  });
+
+  it('should error on duplicate concept names', () => {
+    const input = `
+      concept "blah" is a Observation has valuetype Quantity.
+      concept "blah" is a Observation has valuetype Quantity.
+    `;
+    expect(() => {
+      parseInput(input);
+    }).toThrow();
+  });
+
+  it('should error on duplicate terminology names', () => {
+    const input = `
+      terminology "blah" valueset "test".
+      terminology "blah" valueset "test".
+    `;
+    expect(() => {
+      parseInput(input);
+    }).toThrow();
+  });
+
+  it('should error on duplicate activity names', () => {
+    const input = `
+      activity "blah" is a "test".
+      activity "blah" is a "test".
+    `;
+    expect(() => {
+      parseInput(input);
+    }).toThrow();
+  });
+});
