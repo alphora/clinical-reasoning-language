@@ -6,3 +6,4 @@ import './unusedTerminology.test.ts';
 import './nameUniqueness.test.ts';
 import './actionUniqueness.test.ts';
 import './cycleDetector.test.ts';
+import './cycleDetectorExtended.test.ts';
