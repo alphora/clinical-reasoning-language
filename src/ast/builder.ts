@@ -57,6 +57,10 @@ import {
 export class ASTBuilder implements ParseTreeVisitor<ASTNode | File> {
   private readonly seenConcepts: Set<string> = new Set();
   private readonly seenActions: Set<string> = new Set();
+  private readonly seenDecisionNames: Set<string> = new Set();
+  private readonly seenConceptNames: Set<string> = new Set();
+  private readonly seenTerminologyNames: Set<string> = new Set();
+  private readonly seenActivityNames: Set<string> = new Set();
 
   visit(tree: ParseTree): ASTNode | File {
     if (tree instanceof ParserRuleContext) {
@@ -126,6 +130,10 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode | File> {
 
   visitDecisionStatement(ctx: DecisionStatementContext): Decision {
     const decisionName = this.getStringValue(ctx.getChild(1));
+    if (this.seenDecisionNames.has(decisionName)) {
+      throw new Error(`Duplicate decision name: ${decisionName}`);
+    }
+    this.seenDecisionNames.add(decisionName);
     const whenBlocks: WhenBlock[] = [];
     const seenConcepts = new Set<string>();
     const blockBody = this.getContext(ctx.getChild(3));
@@ -453,6 +461,10 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode | File> {
 
   visitTerminologyStatement(ctx: TerminologyStatementContext): Terminology {
     const terminologyName = this.getStringValue(ctx.getChild(1));
+    if (this.seenTerminologyNames.has(terminologyName)) {
+      throw new Error(`Duplicate terminologyName name: ${terminologyName}`);
+    }
+    this.seenTerminologyNames.add(terminologyName);
     const definition = this.visitTerminologyDefinition(this.getContext(ctx.getChild(2)));
     return {
       type: TerminologyType.type,
@@ -464,6 +476,10 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode | File> {
 
   visitActivityStatement(ctx: ActivityStatementContext): Activity {
     const activityName = this.getStringValue(ctx.getChild(1));
+    if (this.seenActivityNames.has(activityName)) {
+      throw new Error(`Duplicate activity name: ${activityName}`);
+    }
+    this.seenActivityNames.add(activityName);
     const activityType = this.getStringValue(ctx.getChild(3));
     const terminologyReference =
       ctx.childCount > 5 ? this.getStringValue(ctx.getChild(5)) : undefined;
@@ -478,6 +494,10 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode | File> {
 
   visitConceptStatement(ctx: ConceptStatementContext): Concept {
     const conceptName = this.getStringValue(ctx.getChild(1));
+    if (this.seenConceptNames.has(conceptName)) {
+      throw new Error(`Duplicate concept name: ${conceptName}`);
+    }
+    this.seenConceptNames.add(conceptName);
     const conceptBody = this.getContext(ctx.getChild(3));
 
     // Find the type, valueType, provenance, and definition
