@@ -164,6 +164,7 @@ export interface Activity extends ASTNode {
   type: 'Activity';
   name: string;
   activityType: ActivityType;
+  terminologyReference?: string;
   location: Location;
 }
 export const ActivityType = {
