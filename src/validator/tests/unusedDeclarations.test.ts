@@ -9,6 +9,8 @@ import {
   WhenBlockType,
 } from '../../ast/types';
 import { UnusedDeclarationsValidator } from '../unusedDeclarationsValidator';
+import { ValidationError } from '../validator';
+
 describe('UnusedDeclarationsValidator', () => {
   let validator: UnusedDeclarationsValidator;
 
@@ -44,9 +46,9 @@ describe('UnusedDeclarationsValidator', () => {
         },
       };
 
-      const result = validator.validate(ast);
-      expect(result.isValid).toBe(false);
-      expect(result.warnings).toContain('Unused decision: unusedDecision');
+      const result: ValidationError[] = validator.validate(ast);
+      expect(result.length).toBeGreaterThan(0);
+      expect(result[0].message).toContain('Unused decision: unusedDecision');
     });
 
     it('should mark decisions as used when referenced in UseDecision', () => {
@@ -86,11 +88,10 @@ describe('UnusedDeclarationsValidator', () => {
                     type: BlockBodyType.type,
                     statements: [
                       {
-                        type: WhenBlockType.type,
-                        conceptName: 'someConcept',
-                        body: {
-                          type: BlockBodyType.type,
-                          statements: [],
+                        type: ActionStatementType.type,
+                        action: {
+                          type: 'UseDecision',
+                          decisionName: 'usedDecision',
                           location: {
                             start: { line: 3, column: 1 },
                             end: { line: 3, column: 1 },
@@ -126,9 +127,8 @@ describe('UnusedDeclarationsValidator', () => {
         },
       };
 
-      const result = validator.validate(ast);
-      expect(result.isValid).toBe(true);
-      expect(result.warnings).not.toContain('Unused decision: usedDecision');
+      const result: ValidationError[] = validator.validate(ast);
+      expect(result.length).toBe(0);
     });
 
     it('should mark decisions as used when referenced in nested UseDecision', () => {
@@ -256,9 +256,8 @@ describe('UnusedDeclarationsValidator', () => {
         },
       };
 
-      const result = validator.validate(ast);
-      expect(result.isValid).toBe(true);
-      expect(result.warnings).not.toContain('Unused decision: nestedDecision');
+      const result: ValidationError[] = validator.validate(ast);
+      expect(result.length).toBe(0);
     });
   });
 
@@ -292,9 +291,9 @@ describe('UnusedDeclarationsValidator', () => {
         },
       };
 
-      const result = validator.validate(ast);
-      expect(result.isValid).toBe(false);
-      expect(result.warnings).toContain('Unused concept: unusedConcept');
+      const result: ValidationError[] = validator.validate(ast);
+      expect(result.length).toBeGreaterThan(0);
+      expect(result[0].message).toContain('Unused concept: unusedConcept');
     });
 
     it('should mark concepts as used when referenced in WhenBlock', () => {
@@ -359,9 +358,8 @@ describe('UnusedDeclarationsValidator', () => {
         },
       };
 
-      const result = validator.validate(ast);
-      expect(result.isValid).toBe(true);
-      expect(result.warnings).not.toContain('Unused concept: usedConcept');
+      const result: ValidationError[] = validator.validate(ast);
+      expect(result.length).toBe(0);
     });
 
     it('should mark concepts as used when referenced in inferredBy', () => {
@@ -393,9 +391,8 @@ describe('UnusedDeclarationsValidator', () => {
         },
       };
 
-      const result = validator.validate(ast);
-      expect(result.isValid).toBe(true);
-      expect(result.warnings).not.toContain('Unused concept: usedConcept');
+      const result: ValidationError[] = validator.validate(ast);
+      expect(result.length).toBe(0);
     });
 
     it('should mark concepts as used in nested WhenBlocks', () => {
@@ -495,10 +492,8 @@ describe('UnusedDeclarationsValidator', () => {
         },
       };
 
-      const result = validator.validate(ast);
-      expect(result.isValid).toBe(true);
-      expect(result.warnings).not.toContain('Unused concept: outerConcept');
-      expect(result.warnings).not.toContain('Unused concept: innerConcept');
+      const result: ValidationError[] = validator.validate(ast);
+      expect(result.length).toBe(0);
     });
   });
 
@@ -523,9 +518,9 @@ describe('UnusedDeclarationsValidator', () => {
         },
       };
 
-      const result = validator.validate(ast);
-      expect(result.isValid).toBe(false);
-      expect(result.warnings).toContain('Unused activity: unusedActivity');
+      const result: ValidationError[] = validator.validate(ast);
+      expect(result.length).toBeGreaterThan(0);
+      expect(result[0].message).toContain('Unused activity: unusedActivity');
     });
 
     it('should mark activities as used when referenced in DoActivity', () => {
@@ -597,9 +592,8 @@ describe('UnusedDeclarationsValidator', () => {
         },
       };
 
-      const result = validator.validate(ast);
-      expect(result.isValid).toBe(true);
-      expect(result.warnings).not.toContain('Unused activity: usedActivity');
+      const result: ValidationError[] = validator.validate(ast);
+      expect(result.length).toBe(0);
     });
   });
 
@@ -631,9 +625,9 @@ describe('UnusedDeclarationsValidator', () => {
         },
       };
 
-      const result = validator.validate(ast);
-      expect(result.isValid).toBe(false);
-      expect(result.warnings).toContain('Unused terminology: unusedTerminology');
+      const result: ValidationError[] = validator.validate(ast);
+      expect(result.length).toBeGreaterThan(0);
+      expect(result[0].message).toContain('Unused terminology: unusedTerminology');
     });
 
     it('should mark terminology as used when referenced in activity', () => {
@@ -673,9 +667,8 @@ describe('UnusedDeclarationsValidator', () => {
         },
       };
 
-      const result = validator.validate(ast);
-      expect(result.isValid).toBe(true);
-      expect(result.warnings).not.toContain('Unused terminology: usedTerminology');
+      const result: ValidationError[] = validator.validate(ast);
+      expect(result.length).toBe(0);
     });
   });
 
@@ -750,12 +743,13 @@ describe('UnusedDeclarationsValidator', () => {
         },
       };
 
-      const result = validator.validate(ast);
-      expect(result.isValid).toBe(false);
-      expect(result.warnings).toContain('Unused decision: unusedDecision');
-      expect(result.warnings).toContain('Unused concept: unusedConcept');
-      expect(result.warnings).toContain('Unused activity: unusedActivity');
-      expect(result.warnings).toContain('Unused terminology: unusedTerminology');
+      const result: ValidationError[] = validator.validate(ast);
+      expect(result.length).toBe(4);
+      const messages = result.map(error => error.message);
+      expect(messages).toContain('Unused decision: unusedDecision');
+      expect(messages).toContain('Unused concept: unusedConcept');
+      expect(messages).toContain('Unused activity: unusedActivity');
+      expect(messages).toContain('Unused terminology: unusedTerminology');
     });
   });
 });
