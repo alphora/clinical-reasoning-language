@@ -52,6 +52,7 @@ import {
   WhenBlock,
   WhenBlockType,
   WhenBlockBody,
+  ConceptValueType,
 } from './types';
 
 export class ASTBuilder implements ParseTreeVisitor<ASTNode | File> {
@@ -480,7 +481,7 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode | File> {
       throw new Error(`Duplicate activity name: ${activityName}`);
     }
     this.seenActivityNames.add(activityName);
-    const activityType = this.getStringValue(ctx.getChild(3));
+    const activityType = this.getStringValue(ctx.getChild(3)) as ActivityType;
     const terminologyReference =
       ctx.childCount > 5 ? this.getStringValue(ctx.getChild(5)) : undefined;
     return {
@@ -513,9 +514,9 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode | File> {
         if (firstToken === 'has') {
           const secondToken = child.getChild(1)?.text;
           if (secondToken === 'type') {
-            conceptType = this.getStringValue(child.getChild(2));
+            conceptType = this.getStringValue(child.getChild(2)) as ConceptType;
           } else if (secondToken === 'valuetype') {
-            valueType = this.getStringValue(child.getChild(2));
+            valueType = this.getStringValue(child.getChild(2)) as ConceptValueType;
           } else if (secondToken === 'provenance') {
             provenance = this.getStringValue(child.getChild(2));
           }
@@ -532,8 +533,8 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode | File> {
     return {
       type: ConceptType.type,
       name: conceptName,
-      conceptType,
-      valueType,
+      conceptType: conceptType as ConceptType,
+      valueType: valueType as ConceptValueType,
       provenance,
       definition,
       location: this.getLocation(ctx),

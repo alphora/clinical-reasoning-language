@@ -180,6 +180,7 @@ export interface Concept extends ASTNode {
   conceptType: ConceptType;
   valueType: ConceptValueType;
   definition: ConceptDefinition;
+  provenance?: string;
   location: Location;
 }
 export const ConceptType = {
