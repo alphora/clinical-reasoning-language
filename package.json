@@ -23,7 +23,8 @@
     "example:lexer": "ts-node src/examples/run-lexer.ts",
     "example:parser": "ts-node src/examples/run-parser.ts",
     "example:ast": "ts-node src/examples/run-ast.ts --pretty",
-    "example:ast:raw": "ts-node src/examples/run-ast.ts"
+    "example:ast:raw": "ts-node src/examples/run-ast.ts",
+    "run-validator": "ts-node src/examples/run-validator.ts"
   },
   "keywords": [
     "clinical",
