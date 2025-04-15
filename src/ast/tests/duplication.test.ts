@@ -1,3 +1,4 @@
+//Disable this test as duplications are currently considered to not be an error.
 import { Decision, WhenBlock, ActionStatement } from '../types';
 
 import { parseInput } from './index.test';
@@ -5,7 +6,7 @@ import { parseInput } from './index.test';
 describe('Duplication Detection', () => {
   it('should detect duplicate when blocks in nested decisions', () => {
     const input = `
-decision "IMMZ.D2.D5.Measles"
+decision "IMMZ.D2.D5.Measles":
   when"Measles Routine Immunization Schedule Incomplete"then:
     any:
       when"No Primary Series Doses Administered"then:
@@ -58,7 +59,7 @@ done
 
   it('should detect duplicate action statements in block bodies', () => {
     const input = `
-decision "Elderly Based"
+decision "Elderly Based":
   when"Client Age Less Than 60"then:
     do"Vaccinate".
     do"another thing".
@@ -91,7 +92,7 @@ done
 
   it('should detect duplicate when blocks with the same concept name in different contexts', () => {
     const input = `
-decision "IMMZ.D2.D5.Measles"
+decision "IMMZ.D2.D5.Measles":
   when"One Primary Series Dose Administered"then:
     all:
       when"Client Age Less Than 15 Months"thendo"Indicate".
@@ -122,7 +123,7 @@ done
 
   it('should detect duplicate when blocks and actions in complex nested decisions', () => {
     const input = `
-decision "Elderly Based"
+decision "Elderly Based":
   when"Client Age Greater Than 60"thendo"Indicate".
   when"Client Age Less Than 60"then:
     do"Vaccinate".
