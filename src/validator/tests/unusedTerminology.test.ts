@@ -1,0 +1,95 @@
+import {
+  File,
+  FileType,
+} from '../../ast/types';
+import { UnusedDeclarationsValidator } from '../unusedDeclarationsValidator';
+import { ValidationError } from '../validator';
+
+describe('UnusedDeclarationsValidator - Terminology', () => {
+  let validator: UnusedDeclarationsValidator;
+
+  beforeEach(() => {
+    validator = new UnusedDeclarationsValidator();
+  });
+
+  it('should detect unused terminology', () => {
+    const ast: File = {
+      type: FileType.type,
+      statements: [
+        {
+          type: 'Terminology',
+          name: 'unusedTerminology',
+          definition: {
+            type: 'TerminologyValueset',
+            valuesetName: 'some-valueset',
+            location: {
+              start: { line: 1, column: 1 },
+              end: { line: 1, column: 1 },
+            },
+          },
+          location: {
+            start: { line: 1, column: 1 },
+            end: { line: 1, column: 1 },
+          },
+        },
+      ],
+      location: {
+        start: { line: 1, column: 1 },
+        end: { line: 1, column: 1 },
+      },
+    };
+
+    const result: ValidationError[] = validator.validate(ast);
+    expect(result.length).toBeGreaterThan(0);
+    expect(result[0].message).toContain('Unused terminology: unusedTerminology');
+  });
+
+  it('should mark terminology as used when referenced in CodedByDefinition', () => {
+    const ast: File = {
+      type: FileType.type,
+      statements: [
+        {
+          type: 'Terminology',
+          name: 'usedTerminology',
+          definition: {
+            type: 'TerminologyValueset',
+            valuesetName: 'some-valueset',
+            location: {
+              start: { line: 1, column: 1 },
+              end: { line: 1, column: 1 },
+            },
+          },
+          location: {
+            start: { line: 1, column: 1 },
+            end: { line: 1, column: 1 },
+          },
+        },
+        {
+          type: 'Concept',
+          name: 'someConcept',
+          conceptType: 'Observation',
+          valueType: 'boolean',
+          definition: {
+            type: 'CodedByDefinition',
+            terminologyName: 'usedTerminology',
+            location: {
+              start: { line: 2, column: 1 },
+              end: { line: 2, column: 1 },
+            },
+          },
+          location: {
+            start: { line: 2, column: 1 },
+            end: { line: 2, column: 1 },
+          },
+        },
+      ],
+      location: {
+        start: { line: 1, column: 1 },
+        end: { line: 2, column: 1 },
+      },
+    };
+
+    const result: ValidationError[] = validator.validate(ast);
+    expect(result.length).toBe(0);
+  });
+}); 
