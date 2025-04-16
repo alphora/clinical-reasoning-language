@@ -230,7 +230,7 @@ export class ActionUniquenessValidator {
     ast: File,
     nodeId: string,
   ): { start: { line: number; column: number }; end: { line: number; column: number } } {
-    const [type, name] = nodeId.split(':');
+    const [, name] = nodeId.split(':');
     for (const statement of ast.statements) {
       if (statement.type === 'Decision') {
         const location = this.findActionInBody(statement.body, name);
