@@ -2,9 +2,183 @@
  * Clinical Practice Guideline Language (CPGL)
  */
 
-# Clinical Practice Guideline Language
+# @cqis/cpgl
 
-A domain-specific language for expressing clinical practice guidelines.
+Clinical Practice Guideline Language (CPGL) parser and validator
+
+## Installation
+
+### From GitHub Release
+
+```bash
+npm install github:cqis/cpgl#v0.1.0
+```
+
+## Usage
+
+The package provides four main functions for processing CPGL code:
+
+### 1. Tokenization
+
+```typescript
+import { tokenizeCPGL } from '@cqis/cpgl';
+
+const result = tokenizeCPGL(`
+  decision "Test":
+    when "Condition" then do "Action".
+  done
+`);
+
+if (result.success) {
+  // Access the tokens
+  console.log(result.result);
+} else {
+  // Handle errors
+  console.error(result.errors);
+}
+```
+
+### 2. Parsing
+
+```typescript
+import { parseCPGL } from '@cqis/cpgl';
+
+const result = parseCPGL(`
+  decision "Test":
+    when "Condition" then do "Action".
+  done
+`);
+
+if (result.success) {
+  // Access the parse tree
+  console.log(result.result);
+} else {
+  // Handle errors
+  console.error(result.errors);
+}
+```
+
+### 3. AST Building
+
+```typescript
+import { buildCPGL } from '@cqis/cpgl';
+
+const result = buildCPGL(`
+  decision "Test":
+    when "Condition" then do "Action".
+  done
+`);
+
+if (result.success) {
+  // Access the AST
+  console.log(result.result);
+} else {
+  // Handle errors
+  console.error(result.errors);
+}
+```
+
+### 4. Validation
+
+```typescript
+import { validateCPGL } from '@cqis/cpgl';
+
+const result = validateCPGL(`
+  decision "Test":
+    when "Condition" then do "Action".
+  done
+`);
+
+if (result.success) {
+  // Access the validated AST
+  console.log(result.result);
+} else {
+  // Handle validation errors
+  console.error(result.errors);
+}
+```
+
+## API Reference
+
+### `tokenizeCPGL(input: string): ParseResult<Token[]>`
+
+Tokenizes CPGL input into a sequence of tokens.
+
+### `parseCPGL(input: string): ParseResult<any>`
+
+Parses CPGL input into a parse tree.
+
+### `buildCPGL(input: string): ParseResult<File>`
+
+Builds an AST from CPGL input.
+
+### `validateCPGL(input: string): ParseResult<File>`
+
+Validates CPGL input and returns the AST if valid.
+
+### Types
+
+```typescript
+interface Token {
+  line: number;
+  column: number;
+  type: string;
+  text: string;
+}
+
+interface ParseResult<T> {
+  success: boolean;
+  result?: T;
+  errors?: string[];
+}
+```
+
+## Error Handling
+
+All functions return a `ParseResult` object with:
+- `success`: boolean indicating if the operation was successful
+- `result`: the parsed/tokenized/validated result (if successful)
+- `errors`: array of error messages (if unsuccessful)
+
+## Development
+
+### Building the Package
+
+1. Install dependencies:
+```bash
+npm install
+```
+
+2. Build the package:
+```bash
+npm run build
+```
+
+3. Create a distribution tarball:
+```bash
+npm pack
+```
+
+This will generate a `.tgz` file (e.g., `@cqis-cpgl-0.1.0.tgz`) that can be distributed.
+
+### Distribution
+
+The package is distributed via GitHub Releases. To create a new release:
+
+1. Create a new release on GitHub
+2. Attach the generated `.tgz` file
+3. Tag the release with a version number (e.g., `v0.1.0`)
+
+Users can then install the package using:
+```bash
+npm install github:cqis/cpgl#v0.1.0
+```
+
+Replace `v0.1.0` with the specific version they want to install.
+
+## License
+
+MIT
 
 ## Overview
 
@@ -21,34 +195,6 @@ This project implements a lexer and parser for the Clinical Practice Guideline L
   - String literals
   - Comments (single-line and block)
   - Indentation-based structure
-
-## Installation
-
-```bash
-npm install clinical-practice-guideline-language
-```
-
-## Usage
-
-Here's a basic example of using the lexer:
-
-```typescript
-import { CharStreams } from 'antlr4ts';
-import { CPGLLexer } from 'clinical-practice-guideline-language';
-
-// Create a lexer instance
-const input = `decision "Test Decision"
-    when "Condition" then
-        do "Action"`;
-const lexer = new CPGLLexer(CharStreams.fromString(input));
-
-// Get tokens
-let token = lexer.nextToken();
-while (token.type !== TokenTypes.EOF) {
-    console.log(`Token: ${token.typeName} = "${token.text}"`);
-    token = lexer.nextToken();
-}
-```
 
 ## Example AST Comparison
 
