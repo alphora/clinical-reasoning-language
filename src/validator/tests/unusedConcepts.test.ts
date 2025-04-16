@@ -2,7 +2,7 @@ import {
   BlockBodyType,
   DecisionType,
   DecisionBodyType,
-  File,
+  CPGL,
   FileType,
   WhenBlockType,
 } from '../../ast/types';
@@ -13,7 +13,7 @@ describe('UnusedDeclarationsValidator - Concepts', () => {
   let validator: UnusedDeclarationsValidator;
 
   beforeEach(() => {
-    const ast: File = {
+    const ast: CPGL = {
       type: FileType.type,
       statements: [],
       location: {
@@ -25,7 +25,7 @@ describe('UnusedDeclarationsValidator - Concepts', () => {
   });
 
   it('should detect unused concepts defined with CodedByDefinition', () => {
-    const ast: File = {
+    const ast: CPGL = {
       type: FileType.type,
       statements: [
         {
@@ -59,7 +59,7 @@ describe('UnusedDeclarationsValidator - Concepts', () => {
   });
 
   it('should mark concepts as used when referenced in WhenBlock', () => {
-    const ast: File = {
+    const ast: CPGL = {
       type: FileType.type,
       statements: [
         {
@@ -125,7 +125,7 @@ describe('UnusedDeclarationsValidator - Concepts', () => {
   });
 
   it('should mark concepts as used when referenced in inferredBy', () => {
-    const ast: File = {
+    const ast: CPGL = {
       type: FileType.type,
       statements: [
         {

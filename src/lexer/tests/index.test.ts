@@ -70,7 +70,7 @@
  * Relationship to Grammar:
  * These tests verify the lexer's ability to tokenize input according to the CPGL grammar.
  * The token types and sequences should match the grammar's requirements for:
- * - File structure
+ * - CPGL structure
  * - Statement blocks
  * - Decision blocks
  * - When clauses

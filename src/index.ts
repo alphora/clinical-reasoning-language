@@ -2,7 +2,7 @@ import { CharStreams, CommonTokenStream } from 'antlr4ts';
 import { ParseTree } from 'antlr4ts/tree/ParseTree';
 
 import { ASTBuilder } from './ast/builder';
-import { File } from './ast/types';
+import { CPGL } from './ast/types';
 import { CPGLLexer } from './grammar/generated/CPGLLexer';
 import { CPGLParser } from './grammar/generated/CPGLParser';
 import { createLexer } from './lexer/createLexer';
@@ -75,14 +75,14 @@ export function parseCPGL(input: string): ParseResult<ParseTree> {
  * @param input The CPGL code to build AST from
  * @returns ParseResult containing AST or errors
  */
-export function buildCPGL(input: string): ParseResult<File> {
+export function buildCPGL(input: string): ParseResult<CPGL> {
   try {
     const lexer = createLexer(CharStreams.fromString(input));
     const tokenStream = new CommonTokenStream(lexer);
     const parser = new CPGLParser(tokenStream);
     const tree = parser.cpgl();
     const builder = new ASTBuilder();
-    const ast = builder.visit(tree) as File;
+    const ast = builder.visit(tree) as CPGL;
 
     return { success: true, result: ast };
   } catch (error) {
@@ -95,14 +95,14 @@ export function buildCPGL(input: string): ParseResult<File> {
  * @param input The CPGL code to validate
  * @returns ParseResult containing validation result or errors
  */
-export function validateCPGL(input: string): ParseResult<File> {
+export function validateCPGL(input: string): ParseResult<CPGL> {
   try {
     const lexer = createLexer(CharStreams.fromString(input));
     const tokenStream = new CommonTokenStream(lexer);
     const parser = new CPGLParser(tokenStream);
     const tree = parser.cpgl();
     const builder = new ASTBuilder();
-    const ast = builder.visit(tree) as File;
+    const ast = builder.visit(tree) as CPGL;
 
     const validator = new Validator();
     const validationResult = validator.validate(ast);

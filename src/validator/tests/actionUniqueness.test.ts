@@ -1,4 +1,4 @@
-import { File } from '../../ast/types';
+import { CPGL } from '../../ast/types';
 import { ActionUniquenessValidator } from '../actionUniquenessValidator';
 import { ValidationError } from '../validator';
 
@@ -11,8 +11,8 @@ describe('ActionUniquenessValidator', () => {
 
   describe('Do Statement Uniqueness', () => {
     it('should detect duplicate do statements in the same block', () => {
-      const ast: File = {
-        type: 'File',
+      const ast: CPGL = {
+        type: 'CPGL',
         statements: [
           {
             type: 'Decision',
@@ -64,8 +64,8 @@ describe('ActionUniquenessValidator', () => {
     });
 
     it('should not detect duplicate do statements in different blocks', () => {
-      const ast: File = {
-        type: 'File',
+      const ast: CPGL = {
+        type: 'CPGL',
         statements: [
           {
             type: 'Decision',
@@ -129,8 +129,8 @@ describe('ActionUniquenessValidator', () => {
 
   describe('Use Statement Uniqueness', () => {
     it('should detect duplicate use statements in the same block', () => {
-      const ast: File = {
-        type: 'File',
+      const ast: CPGL = {
+        type: 'CPGL',
         statements: [
           {
             type: 'Decision',
@@ -182,8 +182,8 @@ describe('ActionUniquenessValidator', () => {
     });
 
     it('should not detect duplicate use statements in different blocks', () => {
-      const ast: File = {
-        type: 'File',
+      const ast: CPGL = {
+        type: 'CPGL',
         statements: [
           {
             type: 'Decision',

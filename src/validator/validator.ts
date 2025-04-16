@@ -1,4 +1,4 @@
-import { File } from '../ast/types';
+import { CPGL } from '../ast/types';
 
 import { ActionUniquenessValidator } from './actionUniquenessValidator';
 //import { CycleDetector } from './cycleDetector';
@@ -33,7 +33,7 @@ export class Validator {
     //this.cycleDetector = new CycleDetector();
   }
 
-  public validate(ast: File): ValidationResult {
+  public validate(ast: CPGL): ValidationResult {
     const errors: ValidationError[] = [];
     const warnings: ValidationError[] = [];
 

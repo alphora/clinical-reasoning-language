@@ -3,7 +3,16 @@ import { CharStreams, CommonTokenStream } from 'antlr4ts';
 import { CPGLParser } from '../../grammar/generated/CPGLParser';
 import { createLexer } from '../../lexer/createLexer';
 import { ASTBuilder } from '../builder';
-import { Decision, WhenBlock, BlockBody, SingleAction, File } from '../types';
+import { 
+  CPGL, 
+  Decision, 
+  WhenBlock, 
+  BlockBody, 
+  ActionStatement, 
+  ActionStatementType,
+  WhenBlockType,
+  BlockBodyType
+} from '../types';
 
 /**
  * This test suite verifies the correct structure of nested decisions in the AST.
@@ -21,12 +30,12 @@ describe('Decision Structure', () => {
     builder = new ASTBuilder();
   });
 
-  const parseInput = (input: string): File => {
+  const parseInput = (input: string): CPGL => {
     const lexer = createLexer(CharStreams.fromString(input));
     const tokens = new CommonTokenStream(lexer);
     const parser = new CPGLParser(tokens);
     const tree = parser.cpgl();
-    return builder.visit(tree) as File;
+    return builder.visit(tree) as CPGL;
   };
 
   it('should maintain correct structure for nested decisions', () => {
@@ -192,7 +201,125 @@ done`;
 
     // Third when block
     const thirdWhenBlock = decision.body.statements[2] as WhenBlock;
-    const thirdBlockBody = thirdWhenBlock.body as SingleAction;
-    expect(thirdBlockBody.action.type).toBe('DoActivity');
+    const thirdBlockBody = thirdWhenBlock.body as BlockBody;
+    expect(thirdBlockBody.statements).toHaveLength(1);
+    const action = thirdBlockBody.statements[0] as ActionStatement;
+    expect(action.action.type).toBe('DoActivity');
+  });
+});
+
+describe('Repeated Statements in Decision Blocks', () => {
+  let builder: ASTBuilder;
+
+  beforeEach(() => {
+    builder = new ASTBuilder();
+  });
+
+  const parseInput = (input: string): CPGL => {
+    const lexer = createLexer(CharStreams.fromString(input));
+    const tokens = new CommonTokenStream(lexer);
+    const parser = new CPGLParser(tokens);
+    const tree = parser.cpgl();
+    return builder.visit(tree) as CPGL;
+  };
+
+  it('should preserve repeated when statements', () => {
+    const input = `
+decision "Test Decision":
+    when "Age" "Greater Than" "18".
+    when "Age" "Less Than" "65".
+done`;
+
+    const result = parseInput(input);
+    const decision = result.statements[0] as Decision;
+    expect(decision.body.statements).toHaveLength(2);
+    const whenBlock1 = decision.body.statements[0] as WhenBlock;
+    const whenBlock2 = decision.body.statements[1] as WhenBlock;
+    expect(whenBlock1.conceptName).toBe('Age');
+    expect(whenBlock2.conceptName).toBe('Age');
+  });
+
+  it('should preserve repeated use statements', () => {
+    const input = `
+decision "Test Decision":
+    when "Age" "Greater Than" "18":
+        use "Adult Protocol".
+        use "Standard Care".
+    done
+done`;
+
+    const result = parseInput(input);
+    const decision = result.statements[0] as Decision;
+    const whenBlock = decision.body.statements[0] as WhenBlock;
+    const blockBody = whenBlock.body as BlockBody;
+    expect(blockBody.statements).toHaveLength(2);
+    const action1 = blockBody.statements[0] as ActionStatement;
+    const action2 = blockBody.statements[1] as ActionStatement;
+    expect(action1.action.type).toBe('UseDecision');
+    expect((action1.action as any).decisionName).toBe('Adult Protocol');
+    expect(action2.action.type).toBe('UseDecision');
+    expect((action2.action as any).decisionName).toBe('Standard Care');
+  });
+
+  it('should preserve repeated do statements', () => {
+    const input = `
+decision "Test Decision":
+    when "Age" "Greater Than" "18":
+        do "Administer Medication".
+        do "Monitor Vital Signs".
+    done
+done`;
+
+    const result = parseInput(input);
+    const decision = result.statements[0] as Decision;
+    const whenBlock = decision.body.statements[0] as WhenBlock;
+    const blockBody = whenBlock.body as BlockBody;
+    expect(blockBody.statements).toHaveLength(2);
+    const action1 = blockBody.statements[0] as ActionStatement;
+    const action2 = blockBody.statements[1] as ActionStatement;
+    expect(action1.action.type).toBe('DoActivity');
+    expect((action1.action as any).activityName).toBe('Administer Medication');
+    expect(action2.action.type).toBe('DoActivity');
+    expect((action2.action as any).activityName).toBe('Monitor Vital Signs');
+  });
+
+  it('should preserve mixed repeated statements', () => {
+    const input = `
+decision "Test Decision":
+    when "Age Greater Than 18":
+        use "Adult Protocol".
+        do "Administer Medication".
+        use "Adult Protocol".
+        do "Administer Medication".
+    done
+done`;
+
+    const result = parseInput(input);
+    const decision = result.statements[0] as Decision;
+    const whenBlock = decision.body.statements[0] as WhenBlock;
+    const blockBody = whenBlock.body as BlockBody;
+    
+    // Verify statements
+    expect(blockBody.statements).toHaveLength(4);
+    
+    // First use statement
+    const action1 = blockBody.statements[0] as ActionStatement;
+    expect(action1.action.type).toBe('UseDecision');
+    expect((action1.action as any).decisionName).toBe('Adult Protocol');
+    
+    // First do statement
+    const action2 = blockBody.statements[1] as ActionStatement;
+    expect(action2.action.type).toBe('DoActivity');
+    expect((action2.action as any).activityName).toBe('Administer Medication');
+    
+    // Second use statement
+    const action3 = blockBody.statements[2] as ActionStatement;
+    expect(action3.action.type).toBe('UseDecision');
+    expect((action3.action as any).decisionName).toBe('Adult Protocol');
+    
+    // Second do statement
+    const action4 = blockBody.statements[3] as ActionStatement;
+    expect(action4.action.type).toBe('DoActivity');
+    expect((action4.action as any).activityName).toBe('Administer Medication');
   });
 });
