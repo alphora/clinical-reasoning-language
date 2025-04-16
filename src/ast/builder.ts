@@ -340,14 +340,24 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode | File> {
   }
 
   visitTerminologyStatement(ctx: TerminologyStatementContext): Terminology {
-    const terminologyName = this.getStringValue(ctx.getChild(1));
-    const definition = this.visitTerminologyDefinition(this.getContext(ctx.getChild(2)));
-    return {
+    const name = this.getStringValue(ctx.getChild(1));
+    const terminology = {
       type: TerminologyType.type,
-      name: terminologyName,
-      definition,
+      name,
       location: this.getLocation(ctx),
-    };
+    } as Terminology;
+
+    // Check for valueset, system/code, or unknown
+    if (ctx.terminologyValueset()) {
+      terminology.valueset = this.getStringValue(ctx.terminologyValueset()!.getChild(1));
+    } else if (ctx.terminologySystemCode()) {
+      terminology.system = this.getStringValue(ctx.terminologySystemCode()!.getChild(1));
+      terminology.code = this.getStringValue(ctx.terminologySystemCode()!.getChild(3));
+    } else if (ctx.terminologyUnknown()) {
+      terminology.unknown = true;
+    }
+
+    return terminology;
   }
 
   visitActivityStatement(ctx: ActivityStatementContext): Activity {
