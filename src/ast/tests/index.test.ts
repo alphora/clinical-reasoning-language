@@ -7,8 +7,10 @@ import { File } from '../types';
 
 // Test suite imports
 import './builder.test';
-import './duplication.test';
 import './decision-structure.test';
+import './concept-structure.test';
+import './terminology-structure.test';
+import './activity-structure.test';
 
 export const parseInput = (input: string): File => {
   const lexer = createLexer(CharStreams.fromString(input));
