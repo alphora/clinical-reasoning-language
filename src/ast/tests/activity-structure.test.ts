@@ -31,7 +31,7 @@ activity "Vaccinate" perform CPGImmunization.
     // Verify basic activity structure
     expect(activity.type).toBe('Activity');
     expect(activity.name).toBe('Vaccinate');
-    expect(activity.activityType).toBe('CPGImmunization');
+    expect(activity.perform).toBe('CPGImmunization');
   });
 
   it('should correctly structure activity with type and terminology', () => {
@@ -45,7 +45,7 @@ activity "Indicate" perform CPGProposeDiagnosis of "Colonoscopy".
     // Verify basic activity structure
     expect(activity.type).toBe('Activity');
     expect(activity.name).toBe('Indicate');
-    expect(activity.activityType).toBe('CPGProposeDiagnosis');
+    expect(activity.perform).toBe('CPGProposeDiagnosis');
     expect(activity.terminologyReference).toBe('Colonoscopy');
   });
 }); 

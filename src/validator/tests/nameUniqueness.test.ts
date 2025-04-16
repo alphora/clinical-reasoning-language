@@ -161,13 +161,13 @@ describe('NameUniquenessValidator', () => {
           {
             type: 'Activity',
             name: 'MyActivity',
-            activityType: 'CPGImmunization',
+            perform: 'CPGImmunization',
             location: { start: { line: 1, column: 1 }, end: { line: 1, column: 1 } },
           },
           {
             type: 'Activity',
             name: 'MyActivity', // Duplicate name
-            activityType: 'CPGImmunization',
+            perform: 'CPGImmunization',
             location: { start: { line: 2, column: 1 }, end: { line: 2, column: 1 } },
           },
         ],
@@ -211,7 +211,7 @@ describe('NameUniquenessValidator', () => {
           {
             type: 'Activity',
             name: 'CommonName',
-            activityType: 'CPGImmunization',
+            perform: 'CPGImmunization',
             location: { start: { line: 3, column: 1 }, end: { line: 3, column: 1 } },
           },
           {
