@@ -4,7 +4,7 @@ import { join } from 'path';
 import { CharStreams, CommonTokenStream } from 'antlr4ts';
 
 import { ASTBuilder } from '../ast/builder';
-import { File } from '../ast/types';
+import { CPGL } from '../ast/types';
 import { CPGLParser } from '../grammar/generated/CPGLParser';
 import { createLexer } from '../lexer/createLexer';
 import { Validator } from '../validator/validator';
@@ -25,7 +25,7 @@ const tree = parser.cpgl();
 
 // Create the AST builder and visit the parse tree
 const builder = new ASTBuilder();
-const ast = builder.visit(tree) as File;
+const ast = builder.visit(tree) as CPGL;
 
 // Create the validator and validate the AST
 const validator = new Validator();

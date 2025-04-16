@@ -1,4 +1,4 @@
-import { File } from '../../ast/types';
+import { CPGL } from '../../ast/types';
 import { Validator } from '../validator';
 
 describe('CycleDetector', () => {
@@ -10,8 +10,8 @@ describe('CycleDetector', () => {
 
   describe('Decision Cycles', () => {
     it('should detect direct cycles in decision references', () => {
-      const ast: File = {
-        type: 'File',
+      const ast: CPGL = {
+        type: 'CPGL',
         statements: [
           {
             type: 'Decision',
@@ -86,8 +86,8 @@ describe('CycleDetector', () => {
     });
 
     it('should detect indirect cycles in decision references', () => {
-      const ast: File = {
-        type: 'File',
+      const ast: CPGL = {
+        type: 'CPGL',
         statements: [
           {
             type: 'Decision',
@@ -195,8 +195,8 @@ describe('CycleDetector', () => {
 
   describe('Concept Inference Cycles', () => {
     it('should detect direct cycles in concept inferences', () => {
-      const ast: File = {
-        type: 'File',
+      const ast: CPGL = {
+        type: 'CPGL',
         statements: [
           {
             type: 'Concept',
@@ -233,8 +233,8 @@ describe('CycleDetector', () => {
     });
 
     it('should detect indirect cycles in concept inferences', () => {
-      const ast: File = {
-        type: 'File',
+      const ast: CPGL = {
+        type: 'CPGL',
         statements: [
           {
             type: 'Concept',
@@ -283,8 +283,8 @@ describe('CycleDetector', () => {
     });
 
     it('should allow valid concept inference chains without cycles', () => {
-      const ast: File = {
-        type: 'File',
+      const ast: CPGL = {
+        type: 'CPGL',
         statements: [
           {
             type: 'Concept',

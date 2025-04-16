@@ -7,14 +7,14 @@ export interface ASTNode {
   };
 }
 
-// File represents the root of the AST
-export interface File extends ASTNode {
-  type: 'File';
+// CPGL represents the root of the AST
+export interface CPGL extends ASTNode {
+  type: 'CPGL';
   statements: Statement[];
   location: Location;
 }
 export const FileType = {
-  type: 'File' as const,
+  type: 'CPGL' as const,
 };
 
 // Union type for all possible statements
@@ -114,7 +114,7 @@ export const UseDecisionType = {
 export interface Terminology extends ASTNode {
   type: 'Terminology';
   name: string;
-  definition?: TerminologyDefinition;
+  definition: TerminologyDefinition;
   location: Location;
 }
 export const TerminologyType = {

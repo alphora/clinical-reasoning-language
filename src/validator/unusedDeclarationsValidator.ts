@@ -5,7 +5,7 @@ import {
   Decision,
   DecisionBody,
   DecisionType,
-  File,
+  CPGL,
   Location,
   WhenBlock,
   WhenBlockType,
@@ -23,13 +23,13 @@ export class UnusedDeclarationsValidator {
   private readonly conceptDeclarations: Map<string, UsageInfo> = new Map();
   private readonly activityDeclarations: Map<string, UsageInfo> = new Map();
   private readonly terminologyDeclarations: Map<string, UsageInfo> = new Map();
-  private readonly ast: File | null;
+  private readonly ast: CPGL | null;
 
-  constructor(ast?: File) {
+  constructor(ast?: CPGL) {
     this.ast = ast || null;
   }
 
-  public validate(ast?: File): ValidationError[] {
+  public validate(ast?: CPGL): ValidationError[] {
     this.clear();
     const targetAst = ast || this.ast;
     if (!targetAst) {
@@ -47,7 +47,7 @@ export class UnusedDeclarationsValidator {
     this.terminologyDeclarations.clear();
   }
 
-  private collectDeclarations(ast: File): void {
+  private collectDeclarations(ast: CPGL): void {
     for (const statement of ast.statements) {
       switch (statement.type) {
         case DecisionType.type:
@@ -78,7 +78,7 @@ export class UnusedDeclarationsValidator {
     }
   }
 
-  private processDeclarations(ast: File): void {
+  private processDeclarations(ast: CPGL): void {
     for (const statement of ast.statements) {
       switch (statement.type) {
         case DecisionType.type:

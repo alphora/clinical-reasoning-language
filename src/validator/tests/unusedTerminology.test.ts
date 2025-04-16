@@ -1,4 +1,4 @@
-import { File, FileType } from '../../ast/types';
+import { CPGL, FileType } from '../../ast/types';
 import { UnusedDeclarationsValidator } from '../unusedDeclarationsValidator';
 import { ValidationError } from '../validator';
 
@@ -10,7 +10,7 @@ describe('UnusedDeclarationsValidator - Terminology', () => {
   });
 
   it('should detect unused terminology', () => {
-    const ast: File = {
+    const ast: CPGL = {
       type: FileType.type,
       statements: [
         {
@@ -42,7 +42,7 @@ describe('UnusedDeclarationsValidator - Terminology', () => {
   });
 
   it('should mark terminology as used when referenced in CodedByDefinition', () => {
-    const ast: File = {
+    const ast: CPGL = {
       type: FileType.type,
       statements: [
         {

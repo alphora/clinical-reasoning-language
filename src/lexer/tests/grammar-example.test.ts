@@ -46,7 +46,7 @@ describe('Grammar Example Analysis', () => {
 
       expect(tokens.length).toBeGreaterThan(0);
     } catch (error) {
-      console.error('\nError tokenizing file:');
+      console.error('\nError tokenizing cpgl:');
       console.error(error);
       if (error instanceof Error) {
         const match = RegExp(/Line (\d+):(\d+)/).exec(error.message);

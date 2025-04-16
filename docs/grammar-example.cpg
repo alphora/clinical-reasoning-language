@@ -12,7 +12,7 @@ The keyword "of" for activity is optional.
 The keyword "provenance" for concept is optional.
 One of either the keywords "inferred by" or "coded by" are required for concept.
 One of either the keywords "valueset", "unknown" or "system/code" are required for terminology.
-A file can have any number of decision, terminology, activity, concept.
+A cpgl can have any number of decision, terminology, activity, concept.
 The example includes all options for valid statements.
 Anything not identified as optional here is required.
 */
@@ -24,7 +24,7 @@ decision "IMMZ.D2.D5.Measles":
             //defaults to any
             when "Client Age Less Than 12 Months" then do "Indicate". //do references an activity
             when "Last Live Vaccine Administered has had in 4 Weeks" then use "Elderly Based". //use references a decision
-            //defaults to "Not able to determine a recommendation"
+            //Note: defaults to "Not able to determine a recommendation"?
         done 
         when "Client Is Due For MCV12" then do "Vaccinate".
     done

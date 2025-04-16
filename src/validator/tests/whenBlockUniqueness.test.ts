@@ -1,4 +1,4 @@
-import { File } from '../../ast/types';
+import { CPGL } from '../../ast/types';
 import { Validator } from '../validator';
 
 describe('WhenBlockUniquenessValidator', () => {
@@ -10,8 +10,8 @@ describe('WhenBlockUniquenessValidator', () => {
 
   describe('When Block Uniqueness', () => {
     it('should detect duplicate when blocks in nested decisions', () => {
-      const ast: File = {
-        type: 'File',
+      const ast: CPGL = {
+        type: 'CPGL',
         statements: [
           {
             type: 'Decision',
@@ -66,8 +66,8 @@ describe('WhenBlockUniquenessValidator', () => {
     });
 
     it('should not detect duplicate when blocks in different contexts', () => {
-      const ast: File = {
-        type: 'File',
+      const ast: CPGL = {
+        type: 'CPGL',
         statements: [
           {
             type: 'Decision',

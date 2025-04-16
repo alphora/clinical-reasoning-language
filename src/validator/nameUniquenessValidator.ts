@@ -1,9 +1,9 @@
-import { File } from '../ast/types';
+import { CPGL } from '../ast/types';
 
 import { ValidationError } from './validator';
 
 export class NameUniquenessValidator {
-  validate(ast: File): ValidationError[] {
+  validate(ast: CPGL): ValidationError[] {
     const errors: ValidationError[] = [];
 
     // Track names by type

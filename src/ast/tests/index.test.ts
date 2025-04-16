@@ -3,7 +3,7 @@ import { CharStreams, CommonTokenStream } from 'antlr4ts';
 import { CPGLParser } from '../../grammar/generated/CPGLParser';
 import { createLexer } from '../../lexer/createLexer';
 import { ASTBuilder } from '../builder';
-import { File } from '../types';
+import { CPGL } from '../types';
 
 // Test suite imports
 import './builder.test';
@@ -12,7 +12,7 @@ import './concept-structure.test';
 import './terminology-structure.test';
 import './activity-structure.test';
 
-export const parseInput = (input: string): File => {
+export const parseInput = (input: string): CPGL => {
   const lexer = createLexer(CharStreams.fromString(input));
   const tokenStream = new CommonTokenStream(lexer);
   const parser = new CPGLParser(tokenStream);

@@ -29,7 +29,7 @@ describe('Comments', () => {
       ]);
     });
 
-    it('should handle single-line comments at the start of file', () => {
+    it('should handle single-line comments at the start of cpgl', () => {
       const input = `// This is a comment
 decision "Test"
     when "Condition" then

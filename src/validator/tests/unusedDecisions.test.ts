@@ -2,7 +2,7 @@ import {
   BlockBodyType,
   DecisionType,
   DecisionBodyType,
-  File,
+  CPGL,
   FileType,
   ActionStatementType,
   WhenBlockType,
@@ -14,7 +14,7 @@ describe('UnusedDeclarationsValidator - Decisions', () => {
   let validator: UnusedDeclarationsValidator;
 
   beforeEach(() => {
-    const ast: File = {
+    const ast: CPGL = {
       type: FileType.type,
       statements: [],
       location: {
@@ -26,7 +26,7 @@ describe('UnusedDeclarationsValidator - Decisions', () => {
   });
 
   it('should detect unused decisions', () => {
-    const ast: File = {
+    const ast: CPGL = {
       type: FileType.type,
       statements: [
         {
@@ -58,7 +58,7 @@ describe('UnusedDeclarationsValidator - Decisions', () => {
   });
 
   it('should mark decisions as used when referenced in UseDecision', () => {
-    const ast: File = {
+    const ast: CPGL = {
       type: FileType.type,
       statements: [
         {
@@ -138,7 +138,7 @@ describe('UnusedDeclarationsValidator - Decisions', () => {
   });
 
   it('should mark decisions as used when referenced in nested UseDecision', () => {
-    const ast: File = {
+    const ast: CPGL = {
       type: FileType.type,
       statements: [
         {

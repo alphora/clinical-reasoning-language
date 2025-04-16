@@ -31,7 +31,7 @@ import {
   DoActivityType,
   Expression,
   ExpressionType,
-  File,
+  CPGL,
   FileType,
   InferredByDefinition,
   InferredByDefinitionType,
@@ -55,8 +55,8 @@ import {
   ConceptValueType,
 } from './types';
 
-export class ASTBuilder implements ParseTreeVisitor<ASTNode | File> {
-  visit(tree: ParseTree): ASTNode | File {
+export class ASTBuilder implements ParseTreeVisitor<ASTNode | CPGL> {
+  visit(tree: ParseTree): ASTNode | CPGL {
     if (tree instanceof ParserRuleContext) {
       const ruleName = tree.ruleContext.ruleIndex;
       // If it's the root cpgl rule
@@ -67,8 +67,8 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode | File> {
     return tree.accept(this);
   }
 
-  visitChildren(node: RuleNode): ASTNode | File {
-    const children: (ASTNode | File)[] = [];
+  visitChildren(node: RuleNode): ASTNode | CPGL {
+    const children: (ASTNode | CPGL)[] = [];
     for (let i = 0; i < node.childCount; i++) {
       const child = node.getChild(i);
       if (child instanceof ParserRuleContext) {
@@ -81,15 +81,15 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode | File> {
     return children[0];
   }
 
-  visitTerminal(_node: TerminalNode): ASTNode | File {
+  visitTerminal(_node: TerminalNode): ASTNode | CPGL {
     throw new Error('Method not implemented.');
   }
 
-  visitErrorNode(_node: TerminalNode): ASTNode | File {
+  visitErrorNode(_node: TerminalNode): ASTNode | CPGL {
     throw new Error('Method not implemented.');
   }
 
-  visitCpgl(ctx: ParserRuleContext): File {
+  visitCpgl(ctx: ParserRuleContext): CPGL {
     const statements: Statement[] = [];
     for (let i = 0; i < ctx.childCount; i++) {
       const child = ctx.getChild(i);
@@ -224,21 +224,7 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode | File> {
 
               if (text === 'when') {
                 const whenBlock = this.visitWhenBlock(statementChild);
-                // Only add if we haven't seen this when block before
-                if (
-                  !statements.some(
-                    s =>
-                      s.type === WhenBlockType.type &&
-                      (s as WhenBlock).conceptName === whenBlock.conceptName,
-                  )
-                ) {
-                  statements.push(whenBlock);
-                } else {
-                  console.warn(
-                    '[Builder - Duplication] Duplicate when block at same level: ',
-                    whenBlock.conceptName,
-                  );
-                }
+                statements.push(whenBlock);
               } else if (RegExp(/^(do|use)"[^"]+"/).exec(text)) {
                 // Process action statement
                 const action = this.visitAction(statementChild);
@@ -248,32 +234,6 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode | File> {
                   location: this.getLocation(statementChild),
                 };
                 statements.push(actionStatement);
-                // Warn if we have seen this action before
-                if (
-                  statements.some(s => {
-                    if (s.type !== ActionStatementType.type) return false;
-                    const existingAction = (s as ActionStatement).action;
-                    if (existingAction.type !== action.type) return false;
-                    if (action.type === DoActivityType.type) {
-                      return (
-                        (existingAction as DoActivity).activityName ===
-                        (action as DoActivity).activityName
-                      );
-                    } else {
-                      return (
-                        (existingAction as UseDecision).decisionName ===
-                        (action as UseDecision).decisionName
-                      );
-                    }
-                  })
-                ) {
-                  console.warn(
-                    '[Builder - Duplication] Duplicate action at same level: ',
-                    action.type === DoActivityType.type
-                      ? (action as DoActivity).activityName
-                      : (action as UseDecision).decisionName,
-                  );
-                }
 
                 // Skip the dot if present
                 if (ctx.getChild(currentIndex + 1)?.text === '.') {

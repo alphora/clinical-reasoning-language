@@ -3,7 +3,7 @@ import { CharStreams, CommonTokenStream } from 'antlr4ts';
 import { CPGLParser } from '../../grammar/generated/CPGLParser';
 import { createLexer } from '../../lexer/createLexer';
 import { ASTBuilder } from '../builder';
-import { File, Terminology, TerminologyValueset, TerminologySystemCode, TerminologyUnknown } from '../types';
+import { CPGL, Terminology, TerminologyValueset, TerminologySystemCode, TerminologyUnknown } from '../types';
 
 describe('Terminology Structure', () => {
   let builder: ASTBuilder;
@@ -12,12 +12,12 @@ describe('Terminology Structure', () => {
     builder = new ASTBuilder();
   });
 
-  const parseInput = (input: string): File => {
+  const parseInput = (input: string): CPGL => {
     const lexer = createLexer(CharStreams.fromString(input));
     const tokens = new CommonTokenStream(lexer);
     const parser = new CPGLParser(tokens);
     const tree = parser.cpgl();
-    return builder.visit(tree) as File;
+    return builder.visit(tree) as CPGL;
   };
 
   it('should correctly structure terminology with valueset', () => {
