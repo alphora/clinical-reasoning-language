@@ -1,7 +1,4 @@
-import {
-  File,
-  FileType,
-} from '../../ast/types';
+import { File, FileType } from '../../ast/types';
 import { UnusedDeclarationsValidator } from '../unusedDeclarationsValidator';
 import { ValidationError } from '../validator';
 
@@ -90,6 +87,7 @@ describe('UnusedDeclarationsValidator - Terminology', () => {
     };
 
     const result: ValidationError[] = validator.validate(ast);
-    expect(result.length).toBe(0);
+    expect(result.length).toBe(1);
+    expect(result[0].message).toBe('Unused concept: someConcept');
   });
-}); 
+});
