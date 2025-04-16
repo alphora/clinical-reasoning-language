@@ -1,5 +1,5 @@
 import { ValidationError } from './validator';
-
+//TODO: not working
 type NodeId = string;
 type AdjacencyList = Map<NodeId, Set<NodeId>>;
 
