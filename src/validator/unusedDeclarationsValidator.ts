@@ -119,13 +119,6 @@ export class UnusedDeclarationsValidator {
                 statement.definition.terminologyName,
               );
             }
-
-            // Mark the concept itself as used since it's being defined
-            const conceptInfo = this.conceptDeclarations.get(statement.name);
-            if (conceptInfo) {
-              console.log('[DEBUGGING] Marking concept as used:', statement.name);
-              conceptInfo.used = true;
-            }
           }
           break;
       }

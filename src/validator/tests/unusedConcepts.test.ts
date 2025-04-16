@@ -24,7 +24,7 @@ describe('UnusedDeclarationsValidator - Concepts', () => {
     validator = new UnusedDeclarationsValidator(ast);
   });
 
-  it('should detect unused concepts', () => {
+  it('should detect unused concepts defined with CodedByDefinition', () => {
     const ast: File = {
       type: FileType.type,
       statements: [

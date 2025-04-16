@@ -21,9 +21,9 @@ export interface ValidationResult {
 }
 
 export class Validator {
-  private unusedDeclarationsValidator: UnusedDeclarationsValidator;
-  private nameUniquenessValidator: NameUniquenessValidator;
-  private actionUniquenessValidator: ActionUniquenessValidator;
+  private readonly unusedDeclarationsValidator: UnusedDeclarationsValidator;
+  private readonly nameUniquenessValidator: NameUniquenessValidator;
+  private readonly actionUniquenessValidator: ActionUniquenessValidator;
   //private cycleDetector: CycleDetector;
 
   constructor() {
