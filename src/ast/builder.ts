@@ -247,9 +247,10 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode | File> {
                   action,
                   location: this.getLocation(statementChild),
                 };
-                // Only add if we haven't seen this action before
+                statements.push(actionStatement);
+                // Warn if we have seen this action before
                 if (
-                  !statements.some(s => {
+                  statements.some(s => {
                     if (s.type !== ActionStatementType.type) return false;
                     const existingAction = (s as ActionStatement).action;
                     if (existingAction.type !== action.type) return false;
@@ -266,8 +267,6 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode | File> {
                     }
                   })
                 ) {
-                  statements.push(actionStatement);
-                } else {
                   console.warn(
                     '[Builder - Duplication] Duplicate action at same level: ',
                     action.type === DoActivityType.type
