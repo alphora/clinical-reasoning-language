@@ -298,7 +298,7 @@ describe('ASTBuilder', () => {
       const ast = result.statements[0] as Activity;
       expect(ast.type).toBe(ActivityType.type);
       expect(ast.name).toBe('Vaccinate');
-      expect(ast.activityType).toBe('CPGImmunization');
+      expect(ast.perform).toBe('CPGImmunization');
       expect(ast.terminologyReference).toBeUndefined();
     });
 
@@ -309,7 +309,7 @@ describe('ASTBuilder', () => {
       const ast = result.statements[0] as Activity;
       expect(ast.type).toBe(ActivityType.type);
       expect(ast.name).toBe('Indicate');
-      expect(ast.activityType).toBe('CPGProposeDiagnosis');
+      expect(ast.perform).toBe('CPGProposeDiagnosis');
       expect(ast.terminologyReference).toBe('Colonoscopy');
     });
   });

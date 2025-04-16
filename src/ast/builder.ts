@@ -335,13 +335,13 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode | CPGL> {
 
   visitActivityStatement(ctx: ActivityStatementContext): Activity {
     const activityName = this.getStringValue(ctx.getChild(1));
-    const activityType = this.getStringValue(ctx.getChild(3)) as ActivityType;
+    const perform = this.getStringValue(ctx.getChild(3)) as ActivityType;
     const terminologyReference =
       ctx.childCount > 5 ? this.getStringValue(ctx.getChild(5)) : undefined;
     return {
       type: ActivityType.type,
       name: activityName,
-      activityType,
+      perform,
       terminologyReference,
       location: this.getLocation(ctx),
     };
