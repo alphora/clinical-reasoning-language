@@ -15,8 +15,9 @@
     "isolatedModules": true,
     "sourceMap": true,
     "removeComments": true,
-    "noEmitOnError": false,
-    "incremental": true
+    "noEmitOnError": true,
+    "incremental": false,
+    "composite": false
   },
   "include": [
     "src/**/*.ts",
