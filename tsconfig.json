@@ -15,9 +15,22 @@
     "isolatedModules": true,
     "sourceMap": true,
     "removeComments": true,
-    "noEmitOnError": true,
+    "noEmitOnError": false,
     "incremental": true
   },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "**/*.test.ts"]
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.d.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "**/*.test.ts",
+    "**/*.spec.ts",
+    "src/examples/**/*",
+    "src/**/tests/**/*",
+    "tmp/**/*",
+    "*.log",
+    "docs/**/*"
+  ]
 } 

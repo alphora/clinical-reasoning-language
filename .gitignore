@@ -10,6 +10,7 @@ dist
 build
 lib
 coverage
+tsconfig.tsbuildinfo
 
 # IDE and editor files
 .idea
