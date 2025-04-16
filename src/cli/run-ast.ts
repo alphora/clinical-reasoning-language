@@ -27,15 +27,15 @@ const tree = parser.cpgl();
 const builder = new ASTBuilder();
 const ast = builder.visit(tree) as File;
 
-// Check if pretty print is requested
-const prettyPrint = process.argv.includes('--pretty');
+// Check if raw output is requested
+const rawOutput = process.argv.includes('--raw');
 
-// TODO: this is missing several fields
-if (prettyPrint) {
+if (rawOutput) {
+  // Raw AST output
+  console.log(JSON.stringify(ast, null, 2));
+} else {
+  // Pretty AST output
   console.log('AST Representation:');
   console.log('==================');
   console.log(printAST(ast));
-} else {
-  // Raw AST output
-  console.log(JSON.stringify(ast, null, 2));
 }

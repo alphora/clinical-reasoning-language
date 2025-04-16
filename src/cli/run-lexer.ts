@@ -1,19 +1,16 @@
-// Node.js built-in imports
-import * as fs from 'fs';
-import * as path from 'path';
+import { readFileSync } from 'fs';
+import { join } from 'path';
 
-// External imports
 import { CharStreams } from 'antlr4ts';
 
-// Internal imports
 import { CPGLLexer } from '../grammar/generated/CPGLLexer';
 import { createLexer } from '../lexer/createLexer';
 
 // Get the path to the grammar example file
-const examplePath = path.join(__dirname, '../../docs/grammar-example.cpg');
+const examplePath = join(__dirname, '../../docs/grammar-example.cpg');
 
 // Read the file content
-const input = fs.readFileSync(examplePath, 'utf8');
+const input = readFileSync(examplePath, 'utf8');
 
 // Create lexer instance
 const lexer = createLexer(CharStreams.fromString(input));
