@@ -11,6 +11,7 @@ build
 lib
 coverage
 tsconfig.tsbuildinfo
+*.tgz
 
 # IDE and editor files
 .idea
