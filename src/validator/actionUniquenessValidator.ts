@@ -152,7 +152,8 @@ export class ActionUniquenessValidator {
                 // Add an edge from the current decision to the referenced decision
                 const currentDecision = this.findContainingDecision(body);
                 if (currentDecision && currentDecision !== action.decisionName) {
-                  const dependencies = graph.get(`Decision:${currentDecision}`) || new Set<string>();
+                  const dependencies =
+                    graph.get(`Decision:${currentDecision}`) || new Set<string>();
                   dependencies.add(`Decision:${action.decisionName}`);
                   graph.set(`Decision:${currentDecision}`, dependencies);
                 }
@@ -229,7 +230,7 @@ export class ActionUniquenessValidator {
     ast: File,
     nodeId: string,
   ): { start: { line: number; column: number }; end: { line: number; column: number } } {
-    const [type, name] = nodeId.split(':');
+    const [, name] = nodeId.split(':');
     for (const statement of ast.statements) {
       if (statement.type === 'Decision') {
         const location = this.findActionInBody(statement.body, name);
