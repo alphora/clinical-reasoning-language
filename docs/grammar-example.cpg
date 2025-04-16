@@ -54,7 +54,9 @@ done
 
 //rationale
 
-terminology "BMI Valueset" valueset "bmi valueset".
+terminology "BMI Range as a Condition" unknown.
+
+terminology "BMI as an Observation" valueset "BMI as an Observation".
 
 terminology "Height Valueset" valueset "height valueset". 
 
@@ -85,13 +87,13 @@ done
 concept "BMI Range as a Condition":
     has type Condition.
     has valuetype CodeableConcept.
-    coded by "BMI Valueset". //"BMI Valueset" is a reference to a terminology
+    coded by "BMI Range as a Condition". //"BMI Range as a Condition" is a reference to a terminology
 done
 
 concept "BMI as an Observation":
     has type Observation.
     has valuetype Quantity.
-    coded by "BMI Valueset".
+    coded by "BMI as an Observation".
 done
 
 concept "Calculated BMI":
