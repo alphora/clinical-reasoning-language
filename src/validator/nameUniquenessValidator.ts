@@ -1,5 +1,4 @@
-import { File, Activity, Concept } from '../ast/types';
-import { ACTION_FHIR_TYPES, CASEFEATURE_FHIR_TYPES, FHIR_VALUE_TYPES } from '../grammar/fhirTypes';
+import { File } from '../ast/types';
 
 import { ValidationError } from './validator';
 
@@ -47,7 +46,6 @@ export class NameUniquenessValidator {
             });
           }
           conceptNames.add(statement.name);
-          this.validateConcept(statement, errors);
           break;
 
         case 'Activity':
@@ -65,7 +63,6 @@ export class NameUniquenessValidator {
             });
           }
           activityNames.add(statement.name);
-          this.validateActivity(statement, errors);
           break;
 
         case 'Terminology':
@@ -88,51 +85,5 @@ export class NameUniquenessValidator {
     }
 
     return errors;
-  }
-
-  private validateActivity(activity: Activity, errors: ValidationError[]): void {
-    if (!activity.activityType?.trim()) {
-      errors.push({
-        message: 'Activity type cannot be empty',
-        location: activity.location,
-        severity: 'error',
-      });
-    } else if (!ACTION_FHIR_TYPES.has(activity.activityType)) {
-      errors.push({
-        message: `Invalid FHIR type for activity: ${activity.activityType}`,
-        location: activity.location,
-        severity: 'error',
-      });
-    }
-  }
-
-  private validateConcept(concept: Concept, errors: ValidationError[]): void {
-    if (!concept.conceptType?.trim()) {
-      errors.push({
-        message: 'Concept type cannot be empty',
-        location: concept.location,
-        severity: 'error',
-      });
-    } else if (!CASEFEATURE_FHIR_TYPES.has(concept.conceptType)) {
-      errors.push({
-        message: `Invalid FHIR type for concept: ${concept.conceptType}`,
-        location: concept.location,
-        severity: 'error',
-      });
-    }
-
-    if (!concept.valueType?.trim()) {
-      errors.push({
-        message: 'Value type cannot be empty',
-        location: concept.location,
-        severity: 'error',
-      });
-    } else if (!FHIR_VALUE_TYPES.has(concept.valueType)) {
-      errors.push({
-        message: `Invalid FHIR value type for concept: ${concept.valueType}`,
-        location: concept.location,
-        severity: 'error',
-      });
-    }
   }
 }

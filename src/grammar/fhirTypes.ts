@@ -1,41 +1,52 @@
 /**
  * FHIR type definitions for the Clinical Practice Guideline Language
  *
- * IMPORTANT: This file uses the generated lexer ONLY for its static constants
- * and type definitions. It does not use the lexer for token generation.
- *
- * The generated lexer is used here because it contains the canonical definitions
- * of FHIR types that are part of the language specification.
+ * This module extracts FHIR type definitions directly from the generated lexer,
+ * ensuring that the types stay in sync with the grammar definition.
  */
-import { CharStreams } from 'antlr4ts';
 
-import { CPGLLexer } from './generated/CPGLLexer';
+import fs from 'fs';
+import path from 'path';
 
-// Create a dummy lexer to extract the types
-const dummyLexer = new CPGLLexer(CharStreams.fromString(''));
-
-// Get all possible FHIR types from the lexer's vocabulary
-const extractFhirTypes = (tokenType: number): Set<string> => {
-  const types = new Set<string>();
-  const vocabulary = dummyLexer.vocabulary;
-
-  // Get all tokens of the specified type
-  for (let i = 0; i < vocabulary.maxTokenType; i++) {
-    const symbolicName = vocabulary.getSymbolicName(i);
-    if (symbolicName && i === tokenType) {
-      // Get the literal name for this token
-      const literalName = vocabulary.getLiteralName(i);
-      if (literalName) {
-        // Remove quotes and add to set
-        types.add(literalName.replace(/['"]/g, ''));
-      }
-    }
+function extractTypesFromLexerAction(lexerSource: string, actionName: string): Set<string> {
+  // Match the array of valid types in the action block
+  const actionRegex = new RegExp(
+    `${actionName}[^{]*?{[^{]*?validTypes\\s*=\\s*\\[\\s*([^\\]]+?)\\s*\\]`,
+    's',
+  );
+  const match = actionRegex.exec(lexerSource);
+  if (!match?.[1]) {
+    console.warn(
+      `[DEBUGGING] Could not find ${actionName} types in lexer source - returning empty set`,
+    );
+    return new Set<string>();
   }
 
-  return types;
-};
+  // Extract and clean up the types
+  const types = match[1]
+    .split('\n') // Split by newlines first
+    .map(line => line.trim())
+    .filter(line => line.length > 0 && line !== ',') // Filter out empty lines and lone commas
+    .map(line => line.replace(/[',]/g, '').trim()); // Remove quotes and commas
 
-// Export the FHIR type sets
-export const ACTION_FHIR_TYPES = extractFhirTypes(CPGLLexer.ACTIVITY_TYPE);
-export const CASEFEATURE_FHIR_TYPES = extractFhirTypes(CPGLLexer.CONCEPT_TYPE);
-export const FHIR_VALUE_TYPES = extractFhirTypes(CPGLLexer.CONCEPT_VALUE_TYPE);
+  console.warn(`[DEBUGGING] Extracted ${actionName} types:`, types);
+  return new Set(types);
+}
+
+// Read the lexer grammar file directly
+const grammarPath = path.join(__dirname, 'CPGLLexer.g4');
+console.warn('[DEBUGGING] Looking for grammar file at:', grammarPath);
+const lexerSource = fs.readFileSync(grammarPath, 'utf8');
+console.warn('[DEBUGGING] Grammar file length:', lexerSource.length);
+
+// Action FHIR types from ACTIVITY_TYPE action
+export const ACTION_FHIR_TYPES = extractTypesFromLexerAction(lexerSource, 'ACTIVITY_TYPE');
+console.warn('[DEBUGGING] ACTION_FHIR_TYPES:', Array.from(ACTION_FHIR_TYPES));
+
+// Case feature types from CONCEPT_TYPE action
+export const CASEFEATURE_FHIR_TYPES = extractTypesFromLexerAction(lexerSource, 'CONCEPT_TYPE');
+console.warn('[DEBUGGING] CASEFEATURE_FHIR_TYPES:', Array.from(CASEFEATURE_FHIR_TYPES));
+
+// Value types from CONCEPT_VALUE_TYPE action
+export const FHIR_VALUE_TYPES = extractTypesFromLexerAction(lexerSource, 'CONCEPT_VALUE_TYPE');
+console.warn('[DEBUGGING] FHIR_VALUE_TYPES:', Array.from(FHIR_VALUE_TYPES));
