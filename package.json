@@ -26,8 +26,8 @@
     "example:parser:raw": "ts-node src/examples/run-parser.ts",
     "example:ast": "ts-node src/examples/run-ast.ts --pretty",
     "example:ast:raw": "ts-node src/examples/run-ast.ts",
-    "run-validator": "ts-node src/examples/run-validator.ts",
-    "run-validator:raw": "ts-node src/examples/run-validator.ts --raw"
+    "example:validator": "ts-node src/examples/run-validator.ts",
+    "example:validator:raw": "ts-node src/examples/run-validator.ts --raw"
   },
   "keywords": [
     "clinical",
