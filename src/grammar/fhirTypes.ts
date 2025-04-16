@@ -16,9 +16,7 @@ function extractTypesFromLexerAction(lexerSource: string, actionName: string): S
   );
   const match = actionRegex.exec(lexerSource);
   if (!match?.[1]) {
-    console.warn(
-      `[DEBUGGING] Could not find ${actionName} types in lexer source - returning empty set`,
-    );
+    console.warn(`Could not find ${actionName} types in lexer source - returning empty set`);
     return new Set<string>();
   }
 
@@ -29,24 +27,18 @@ function extractTypesFromLexerAction(lexerSource: string, actionName: string): S
     .filter(line => line.length > 0 && line !== ',') // Filter out empty lines and lone commas
     .map(line => line.replace(/[',]/g, '').trim()); // Remove quotes and commas
 
-  console.warn(`[DEBUGGING] Extracted ${actionName} types:`, types);
   return new Set(types);
 }
 
 // Read the lexer grammar file directly
 const grammarPath = path.join(__dirname, 'CPGLLexer.g4');
-console.warn('[DEBUGGING] Looking for grammar file at:', grammarPath);
 const lexerSource = fs.readFileSync(grammarPath, 'utf8');
-console.warn('[DEBUGGING] Grammar file length:', lexerSource.length);
 
 // Action FHIR types from ACTIVITY_TYPE action
 export const ACTION_FHIR_TYPES = extractTypesFromLexerAction(lexerSource, 'ACTIVITY_TYPE');
-console.warn('[DEBUGGING] ACTION_FHIR_TYPES:', Array.from(ACTION_FHIR_TYPES));
 
 // Case feature types from CONCEPT_TYPE action
 export const CASEFEATURE_FHIR_TYPES = extractTypesFromLexerAction(lexerSource, 'CONCEPT_TYPE');
-console.warn('[DEBUGGING] CASEFEATURE_FHIR_TYPES:', Array.from(CASEFEATURE_FHIR_TYPES));
 
 // Value types from CONCEPT_VALUE_TYPE action
 export const FHIR_VALUE_TYPES = extractTypesFromLexerAction(lexerSource, 'CONCEPT_VALUE_TYPE');
-console.warn('[DEBUGGING] FHIR_VALUE_TYPES:', Array.from(FHIR_VALUE_TYPES));

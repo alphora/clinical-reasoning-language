@@ -166,10 +166,6 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode | File> {
   }
 
   visitWhenBlock(ctx: ParserRuleContext): WhenBlock {
-    console.log('[DEBUGGING] WhenBlock - Processing when block:', {
-      text: ctx.text,
-      childCount: ctx.childCount,
-    });
     const conceptName = this.getStringValue(ctx.getChild(1));
     const body = this.visitWhenBlockBody(this.getContext(ctx.getChild(3)));
 
@@ -205,10 +201,6 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode | File> {
       body.statements = statements;
     }
 
-    console.log('[DEBUGGING] WhenBlock - Created when block:', {
-      conceptName,
-      bodyType: body.type,
-    });
     return {
       type: WhenBlockType.type,
       conceptName,
@@ -218,25 +210,17 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode | File> {
   }
 
   visitWhenBlockBody(ctx: ParserRuleContext): WhenBlockBody {
-    console.log('[DEBUGGING] WhenBlockBody - Processing body:', {
-      text: ctx.text,
-      childCount: ctx.childCount,
-      lastChild: ctx.getChild(ctx.childCount - 1).text,
-    });
-
     // If the first child is a 'do' or 'use' statement and it's followed by a dot,
     // then it's a single action
     const firstChild = ctx.getChild(0);
     if (firstChild instanceof ParserRuleContext) {
       const actionType = firstChild.getChild(0)?.text;
       if ((actionType === 'do' || actionType === 'use') && ctx.getChild(1)?.text === '.') {
-        console.log('[DEBUGGING] WhenBlockBody - Found single action statement');
         return this.visitSingleAction(firstChild);
       }
     }
 
     // Otherwise, it's a block body
-    console.log('[DEBUGGING] WhenBlockBody - Found block body');
     return this.visitBlockBody(ctx);
   }
 
@@ -245,22 +229,9 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode | File> {
     let qualifier: string | undefined;
     let currentIndex = 0;
 
-    console.log('[DEBUGGING] BlockBody - Starting to process block body');
-    console.log('[DEBUGGING] BlockBody - Total children:', ctx.childCount);
-
-    // Log the structure of the context
-    for (let j = 0; j < ctx.childCount; j++) {
-      const child = ctx.getChild(j);
-      console.log('[DEBUGGING] BlockBody - Child ' + j + ':', {
-        text: child.text,
-        type: child instanceof ParserRuleContext ? child.constructor.name : 'Terminal',
-      });
-    }
-
     // Skip the initial COLON
     if (ctx.childCount > 0 && ctx.getChild(0).text === ':') {
       currentIndex = 1;
-      console.log('[DEBUGGING] BlockBody - Skipped initial COLON, currentIndex:', currentIndex);
     }
 
     // Check for qualifier (any/all)
@@ -271,12 +242,6 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode | File> {
         if (firstToken === 'any' || firstToken === 'all') {
           qualifier = firstToken;
           currentIndex++;
-          console.log(
-            '[DEBUGGING] BlockBody - Found qualifier:',
-            qualifier,
-            'currentIndex:',
-            currentIndex,
-          );
         }
       }
     }
@@ -285,18 +250,12 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode | File> {
     while (currentIndex < ctx.childCount) {
       const child = ctx.getChild(currentIndex);
       if (child instanceof ParserRuleContext) {
-        console.log('[DEBUGGING] BlockBody - Processing child:', {
-          text: child.text,
-          type: child.constructor.name,
-        });
-
         if (child.constructor.name === 'BlockStatementContext') {
           const statementChild = child.getChild(0);
           if (statementChild instanceof ParserRuleContext) {
             const firstChild = statementChild.getChild(0);
             if (firstChild) {
               const text = firstChild.text;
-              console.log('[DEBUGGING] BlockBody - Processing statement:', text);
 
               if (text === 'when') {
                 const whenBlock = this.visitWhenBlock(statementChild);
@@ -309,10 +268,6 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode | File> {
                   )
                 ) {
                   statements.push(whenBlock);
-                  console.log('[DEBUGGING] BlockBody - Added when block:', {
-                    conceptName: whenBlock.conceptName,
-                    statementsLength: statements.length,
-                  });
                 } else {
                   console.warn(
                     '[Builder - Duplication] Duplicate when block at same level: ',
@@ -347,14 +302,6 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode | File> {
                   })
                 ) {
                   statements.push(actionStatement);
-                  console.log('[DEBUGGING] BlockBody - Added action statement:', {
-                    type: action.type,
-                    name:
-                      action.type === DoActivityType.type
-                        ? (action as DoActivity).activityName
-                        : (action as UseDecision).decisionName,
-                    statementsLength: statements.length,
-                  });
                 } else {
                   console.warn(
                     '[Builder - Duplication] Duplicate action at same level: ',
@@ -376,19 +323,6 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode | File> {
       currentIndex++;
     }
 
-    console.log(
-      '[DEBUGGING] BlockBody - Final statements array:',
-      statements.map(s => ({
-        type: s.type,
-        details:
-          s.type === WhenBlockType.type
-            ? s.conceptName
-            : 'activityName' in s.action
-              ? s.action.activityName
-              : s.action.decisionName,
-      })),
-    );
-
     return {
       type: BlockBodyType.type,
       statements,
@@ -398,15 +332,7 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode | File> {
   }
 
   visitActionStatement(ctx: ParserRuleContext): ActionStatement {
-    console.log('[DEBUGGING] ActionStatement - Processing action statement:', {
-      text: ctx.text,
-      childCount: ctx.childCount,
-    });
     const action = this.visitAction(ctx);
-    console.log('[DEBUGGING] ActionStatement - Created action:', {
-      type: action.type,
-      name: 'activityName' in action ? action.activityName : action.decisionName,
-    });
     return {
       type: ActionStatementType.type,
       action,
@@ -424,11 +350,6 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode | File> {
   }
 
   private visitAction(ctx: ParserRuleContext): DoActivity | UseDecision {
-    console.log('[DEBUGGING] Action - Processing action:', {
-      text: ctx.text,
-      childCount: ctx.childCount,
-    });
-
     // Get the full text and remove the dot at the end if present
     const fullText = ctx.text.endsWith('.') ? ctx.text.slice(0, -1) : ctx.text;
 
@@ -436,18 +357,12 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode | File> {
     const actionType = fullText.startsWith('do') ? 'do' : 'use';
     const name = fullText.slice(actionType.length).trim().replace(/"/g, '');
 
-    console.log('[DEBUGGING] Action - Parsed action:', {
-      type: actionType,
-      name,
-    });
-
     if (actionType === 'do') {
       const activity = {
         type: DoActivityType.type,
         activityName: name,
         location: this.getLocation(ctx),
       };
-      console.log('[DEBUGGING] Action - Created do activity:', activity);
       return activity;
     } else {
       const decision = {
@@ -455,7 +370,6 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode | File> {
         decisionName: name,
         location: this.getLocation(ctx),
       };
-      console.log('[DEBUGGING] Action - Created use decision:', decision);
       return decision;
     }
   }
