@@ -1,11 +1,8 @@
-// Node.js built-in imports
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
-// External imports
 import { CharStreams, CommonTokenStream } from 'antlr4ts';
 
-// Internal imports
 import { CPGLParser } from '../grammar/generated/CPGLParser';
 import { createLexer } from '../lexer/createLexer';
 
@@ -23,10 +20,13 @@ const parser = new CPGLParser(tokenStream);
 // Parse the input
 const tree = parser.cpgl();
 
-// Check if pretty output is requested
-const prettyOutput = process.argv.includes('--pretty');
+// Check if raw output is requested
+const rawOutput = process.argv.includes('--raw');
 
-if (prettyOutput) {
+if (rawOutput) {
+  // Raw parser output
+  console.log(tree.toStringTree(parser.ruleNames));
+} else {
   // Pretty parser output
   const serializableTree = {
     type: parser.ruleNames[tree.ruleIndex],
@@ -43,10 +43,8 @@ if (prettyOutput) {
       };
     }),
   };
-  console.log(JSON.stringify(serializableTree, null, 2));
-} else {
-  // Raw parser output
+
   console.log('Parse Tree:');
   console.log('===========');
-  console.log(tree.toStringTree(parser.ruleNames));
+  console.log(JSON.stringify(serializableTree, null, 2));
 }
