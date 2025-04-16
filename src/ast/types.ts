@@ -114,10 +114,7 @@ export const UseDecisionType = {
 export interface Terminology extends ASTNode {
   type: 'Terminology';
   name: string;
-  valueset?: string;
-  system?: string;
-  code?: string;
-  unknown?: boolean;
+  definition?: TerminologyDefinition;
   location: Location;
 }
 export const TerminologyType = {
