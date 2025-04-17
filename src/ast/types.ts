@@ -201,26 +201,60 @@ export const CodedByDefinitionType = {
 };
 
 // Inferred by definition
-export interface InferredByDefinition extends ASTNode {
-  type: 'InferredByDefinition';
-  concept?: string;
-  descriptiveLogic?: string;
+// concept reference
+interface ConceptReference extends ASTNode {
+  type: 'ConceptReference';
+  name: string;
+}
+export const ConceptReferenceType = {
+  type: 'ConceptReference' as const,
+};
+
+// instead of a binary-only LogicalExpression, split AND/OR into n‑ary:
+interface InformalAnd extends ASTNode {
+  type: 'AndExpression';
+  terms: InferredByExpression[];     // two or more
+}
+export const InformalAndType = {
+  type: 'AndExpression' as const,
+};
+
+interface InformalOr extends ASTNode {
+  type: 'OrExpression';
+  terms: InferredByExpression[];     // two or more
+}
+export const InformalOrType = {
+  type: 'OrExpression' as const,
+};
+
+// any node that can appear in a logical narrative
+type InferredByExpression = ConceptReference | InformalAnd | InformalOr | GroupExpression;
+
+// these are the parens
+interface GroupExpression extends ASTNode {
+  type: 'GroupExpression';
+  terms: InferredByExpression;
+}
+export const GroupExpressionType = {
+  type: 'GroupExpression' as const,
+};  
+
+// inferred-by nodes
+interface InferredByConcept extends ASTNode {
+  type: 'InferredByDefinitionConcept';
+  concept: string;
   pattern?: string;
-  location: Location;
+}
+export const InferredByConceptType = {
+  type: 'InferredByDefinitionConcept' as const,
+};
+
+interface InferredByDefinition extends ASTNode {
+  type: 'InferredByDefinition';
+  body: InferredByConcept | InferredByExpression;
 }
 export const InferredByDefinitionType = {
   type: 'InferredByDefinition' as const,
-};
-
-// Expression node for logical operations
-export interface Expression extends ASTNode {
-  type: 'Expression';
-  operator: 'or' | 'and' | 'atom';
-  left: Expression | string;
-  right: Expression | string;
-}
-export const ExpressionType = {
-  type: 'Expression' as const,
 };
 
 export interface Location {
