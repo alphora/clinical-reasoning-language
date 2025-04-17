@@ -165,12 +165,12 @@ done`;
 decision "IMMZ.D2.D5.Measles":
     when "Measles Routine Immunization Schedule Incomplete" then:
         any:
-            when "No Primary Series Doses Administered" then:
-                when "Client Age Less Than 12 Months" then do "Indicate".
-                when "Last Live Vaccine Administered has had in 4 Weeks" then use "Elderly Based".
-            done
-            when "Client Is Due For MCV12" then do "Vaccinate".
+        when "No Primary Series Doses Administered" then:
+            when "Client Age Less Than 12 Months" then do "Indicate".
+            when "Last Live Vaccine Administered has had in 4 Weeks" then use "Elderly Based".
         done
+        when "Client Is Due For MCV12" then do "Vaccinate".
+    done
 done`;
 
     const result = parseInput(input);
@@ -234,18 +234,18 @@ done`;
 decision "IMMZ.D2.D5.Measles":
     when "Measles Routine Immunization Schedule Incomplete" then:
         any:
-            when "No Primary Series Doses Administered" then:
-                when "Client Age Less Than 12 Months" then do "Indicate".
-                when "Last Live Vaccine Administered has had in 4 Weeks" then use "Elderly Based".
-            done
-            when "Client Is Due For MCV12" then do "Vaccinate".
+        when "No Primary Series Doses Administered" then:
+            when "Client Age Less Than 12 Months" then do "Indicate".
+            when "Last Live Vaccine Administered has had in 4 Weeks" then use "Elderly Based".
         done
+        when "Client Is Due For MCV12" then do "Vaccinate".
+    done
     when "One Primary Series Dose Administered" then:
         all:
-            when "Client Age Less Than 15 Months" then do "Indicate".
-            when "Last Live Vaccine Administered has had in 4 Weeks" then use "Elderly Based".
-            when "Client Is Due For MCV12" then do "Vaccinate".
-        done
+        when "Client Age Less Than 15 Months" then do "Indicate".
+        when "Last Live Vaccine Administered has had in 4 Weeks" then use "Elderly Based".
+        when "Client Is Due For MCV12" then do "Vaccinate".
+    done
     when "Two Primary Series Doses Administered" then do "Indicate".
 done`;
 

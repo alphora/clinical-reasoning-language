@@ -17,8 +17,40 @@ export class CPGLLexerErrorListener implements ANTLRErrorListener<number> {
   ): void {
     const input: CharStream = _recognizer.inputStream as CharStream;
     const startIndex = input.index;
-    const currentIndex = input.index;
-    const errorText = input.getText(Interval.of(startIndex, currentIndex));
+    let currentIndex = input.index;
+    let errorText = '';
+
+    // Track invalid sequence
+    while (currentIndex < input.size) {
+      const char = input.LA(1);
+      if (char === -1 || char === 10 || char === 13) { // EOF or newline
+        break;
+      }
+      if (char === 32 || char === 9) { // Space or tab
+        if (errorText.length > 0) {
+          break;
+        }
+      } else {
+        errorText += String.fromCharCode(char);
+      }
+      currentIndex++;
+      input.consume();
+    }
+
+    // Check if the error is part of a quoted string
+    const isQuotedString = errorText.startsWith('"') || errorText.startsWith("'");
+    if (isQuotedString) {
+      while (currentIndex < input.size && !errorText.endsWith('"') && !errorText.endsWith("'")) {
+        const char = input.LA(1);
+        if (char === -1 || char === 10 || char === 13) { // EOF or newline
+          break;
+        }
+        errorText += String.fromCharCode(char);
+        currentIndex++;
+        input.consume();
+      }
+    }
+
     const errorMessage = `Lexical error at line ${line}:${charPositionInLine}: Invalid token '${errorText}'. (details: ${msg})`;
     console.error(errorMessage);
 
