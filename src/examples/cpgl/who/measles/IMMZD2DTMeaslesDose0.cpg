@@ -1,0 +1,14 @@
+decision "IMMZD2DTMeaslesDose0":
+    when "Candidate For Dose 0" then do "Offer Measles Dose 0".
+done
+
+concept "Candidate For Dose 0":
+    has type Observation.
+    has valuetype boolean.
+    coded by "Candidate For Dose 0".
+done
+
+terminology "Candidate For Dose 0" system "IMMZD2DTMeaslesDose0" code "candidate-for-dose-0".
+
+// Consider measles dose 0 immunization
+activity "Offer Measles Dose 0" perform CommunicationRequest.

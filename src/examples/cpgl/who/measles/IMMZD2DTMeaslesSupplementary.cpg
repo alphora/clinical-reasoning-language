@@ -1,36 +1,22 @@
---- file: IMMZDTImmunizationStrategy.cpgl ---
-
-decision "IMMZDTImmunizationStrategy":
-    when "Measles Routine Immunization Schedule Incomplete" then:
-        when "No Primary Series Doses Administered" then do "Indicate".
-        when "One Primary Series Dose Administered" then do "Vaccinate".
+decision "IMMZD2DTMeaslesSupplementary":
+    when "Measles Routine Immunization Schedule Complete" then:
+        when "Candidate For Supplementary Dose" then do "Administer Supplementary Dose".
     done
 done
 
-concept "Measles Routine Immunization Schedule Incomplete":
+concept "Measles Routine Immunization Schedule Complete":
     has type Observation.
     has valuetype boolean.
-    inferred by ("child concept A" and "child concept B").
+    inferred by ("Candidate For Supplementary Dose").
 done
 
-concept "No Primary Series Doses Administered":
+concept "Candidate For Supplementary Dose":
     has type Observation.
     has valuetype boolean.
-    coded by "No Primary Series Doses Administered".
+    coded by "Candidate For Supplementary Dose".
 done
 
-terminology "No Primary Series Doses Administered" system "IMMZDTImmunizationStrategy" code "no-primary-series-doses-administered".
+terminology "Candidate For Supplementary Dose" system "IMMZD2DTMeaslesSupplementary" code "candidate-for-supplementary-dose".
 
-concept "One Primary Series Dose Administered":
-    has type Observation.
-    has valuetype boolean.
-    coded by "One Primary Series Dose Administered".
-done
-
-terminology "One Primary Series Dose Administered" system "IMMZDTImmunizationStrategy" code "one-primary-series-dose-administered".
-
-// Check immunization plan definitions to see what is required.
-activity "Indicate" perform CommunicationRequest.
-
-// Provide measles routine immunization
-activity "Vaccinate" perform CommunicationRequest.
+// Administer a supplementary dose of measles vaccine when routine schedule has been completed and based on context.
+activity "Administer Supplementary Dose" perform CommunicationRequest.

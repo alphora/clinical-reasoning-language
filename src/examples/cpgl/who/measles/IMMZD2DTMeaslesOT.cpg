@@ -1,0 +1,37 @@
+decision "IMMZD2DTMeaslesOT":
+    when "Measles Routine Immunization Schedule Incomplete" then:
+        when "No Primary Series Doses Administered" then use "IMMZD2DTMeaslesMR".
+        when "One Primary Series Dose Administered" then use "IMMZD2DTMeaslesMR".
+        when "Two Primary Series Doses Administered" then use "IMMZD2DTMeaslesSupplementary".
+    done
+done
+
+concept "Measles Routine Immunization Schedule Incomplete":
+    has type Observation.
+    has valuetype boolean.
+    inferred by ("No Primary Series Doses Administered" and "One Primary Series Dose Administered" and "Two Primary Series Doses Administered").
+done
+
+concept "No Primary Series Doses Administered":
+    has type Observation.
+    has valuetype boolean.
+    coded by "No Primary Series Doses Administered".
+done
+
+terminology "No Primary Series Doses Administered" system "IMMZD2DTMeaslesOT" code "no-primary-series-doses-administered".
+
+concept "One Primary Series Dose Administered":
+    has type Observation.
+    has valuetype boolean.
+    coded by "One Primary Series Dose Administered".
+done
+
+terminology "One Primary Series Dose Administered" system "IMMZD2DTMeaslesOT" code "one-primary-series-dose-administered".
+
+concept "Two Primary Series Doses Administered":
+    has type Observation.
+    has valuetype boolean.
+    coded by "Two Primary Series Doses Administered".
+done
+
+terminology "Two Primary Series Doses Administered" system "IMMZD2DTMeaslesOT" code "two-primary-series-doses-administered".

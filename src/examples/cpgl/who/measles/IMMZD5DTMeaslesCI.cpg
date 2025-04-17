@@ -1,0 +1,14 @@
+decision "IMMZD5DTMeaslesCI":
+    when "Measles Contraindications Present" then do "Do Not Vaccinate".
+done
+
+concept "Measles Contraindications Present":
+    has type Observation.
+    has valuetype boolean.
+    coded by "Measles Contraindications Present".
+done
+
+terminology "Measles Contraindications Present" system "IMMZD5DTMeaslesCI" code "measles-contraindications-present".
+
+// Contraindication identified. Do not administer measles vaccine.
+activity "Do Not Vaccinate" perform CommunicationRequest.

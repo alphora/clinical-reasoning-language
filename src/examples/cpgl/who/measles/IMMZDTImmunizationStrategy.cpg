@@ -8,7 +8,7 @@ done
 concept "Measles Routine Immunization Schedule Incomplete":
     has type Observation.
     has valuetype boolean.
-    inferred by ("child concept A" and "child concept B").
+    inferred by ("No Primary Series Doses Administered" and "One Primary Series Dose Administered").
 done
 
 concept "No Primary Series Doses Administered":

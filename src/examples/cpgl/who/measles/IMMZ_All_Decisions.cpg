@@ -1,0 +1,231 @@
+decision "IMMZDTImmunizationStrategy":
+    when "Measles Routine Immunization Schedule Incomplete" then:
+        when "No Primary Series Doses Administered" then do "Indicate".
+        when "One Primary Series Dose Administered" then do "Vaccinate".
+    done
+done
+
+concept "Measles Routine Immunization Schedule Incomplete":
+    has type Observation.
+    has valuetype boolean.
+    inferred by ("No Primary Series Doses Administered" and "One Primary Series Dose Administered").
+done
+concept "No Primary Series Doses Administered":
+    has type Observation.
+    has valuetype boolean.
+    coded by "No Primary Series Doses Administered".
+done
+
+terminology "No Primary Series Doses Administered" system "IMMZDTImmunizationStrategy" code "no-primary-series-doses-administered".
+concept "One Primary Series Dose Administered":
+    has type Observation.
+    has valuetype boolean.
+    coded by "One Primary Series Dose Administered".
+done
+
+terminology "One Primary Series Dose Administered" system "IMMZDTImmunizationStrategy" code "one-primary-series-dose-administered".
+
+// Check immunization plan definitions to see what is required.
+activity "Indicate" perform CPGCommunication.
+// Provide measles routine immunization
+activity "Vaccinate" perform CPGCommunication.
+
+decision "IMMZD2DTMeaslesDose0":
+    when "Candidate For Dose 0" then do "Offer Measles Dose 0".
+done
+
+concept "Candidate For Dose 0":
+    has type Observation.
+    has valuetype boolean.
+    coded by "Candidate For Dose 0".
+done
+
+terminology "Candidate For Dose 0" system "IMMZD2DTMeaslesDose0" code "candidate-for-dose-0".
+
+// Consider measles dose 0 immunization
+activity "Offer Measles Dose 0" perform CPGCommunication.
+
+decision "IMMZD2DTMeaslesLT":
+    when "Measles Routine Immunization Schedule Incomplete" then:
+        when "No Primary Series Doses Administered" then:
+            when "Client Age Less Than 12 Months" then do "Wait Until 12 Months".
+            when "Last Live Vaccine Administered Within 4 Weeks" then do "Wait Until After 4 Weeks".
+            when "Client Is Due For MCV1" then use "IMMZD2DTMeaslesMR".
+        done
+        when "One Primary Series Dose Administered" then:
+            when "Client Age Less Than 15 Months" then do "Wait Until 15 Months".
+            when "Last Live Vaccine Administered Within 4 Weeks" then do "Wait Until After 4 Weeks".
+            when "Client Is Due For MCV2" then use "IMMZD2DTMeaslesMR".
+        done
+        when "Two Primary Series Doses Administered" then do "Measles Primary Series Complete".
+    done
+done
+
+concept "Measles Routine Immunization Schedule Incomplete":
+    has type Observation.
+    has valuetype boolean.
+    inferred by ("No Primary Series Doses Administered" and "One Primary Series Dose Administered" and "Two Primary Series Doses Administered").
+done
+
+concept "No Primary Series Doses Administered":
+    has type Observation.
+    has valuetype boolean.
+    inferred by ("Client Age Less Than 12 Months" and "Last Live Vaccine Administered Within 4 Weeks" and "Client Is Due For MCV1").
+done
+
+concept "One Primary Series Dose Administered":
+    has type Observation.
+    has valuetype boolean.
+    inferred by ("Client Age Less Than 15 Months" and "Last Live Vaccine Administered Within 4 Weeks" and "Client Is Due For MCV2").
+done
+
+concept "Two Primary Series Doses Administered":
+    has type Observation.
+    has valuetype boolean.
+    coded by "Two Primary Series Doses Administered".
+done
+
+terminology "Two Primary Series Doses Administered" system "IMMZD2DTMeaslesLT" code "two-primary-series-doses-administered".
+
+concept "Client Age Less Than 12 Months":
+    has type Observation.
+    has valuetype boolean.
+    coded by "Client Age Less Than 12 Months".
+done
+
+terminology "Client Age Less Than 12 Months" system "IMMZD2DTMeaslesLT" code "client-age-less-than-12-months".
+
+concept "Last Live Vaccine Administered Within 4 Weeks":
+    has type Observation.
+    has valuetype boolean.
+    coded by "Last Live Vaccine Administered Within 4 Weeks".
+done
+
+terminology "Last Live Vaccine Administered Within 4 Weeks" system "IMMZD2DTMeaslesLT" code "last-live-vaccine-administered-within-4-weeks".
+
+concept "Client Is Due For MCV1":
+    has type Observation.
+    has valuetype boolean.
+    coded by "Client Is Due For MCV1".
+done
+
+terminology "Client Is Due For MCV1" system "IMMZD2DTMeaslesLT" code "client-is-due-for-mcv1".
+
+concept "Client Age Less Than 15 Months":
+    has type Observation.
+    has valuetype boolean.
+    coded by "Client Age Less Than 15 Months".
+done
+
+terminology "Client Age Less Than 15 Months" system "IMMZD2DTMeaslesLT" code "client-age-less-than-15-months".
+
+concept "Client Is Due For MCV2":
+    has type Observation.
+    has valuetype boolean.
+    coded by "Client Is Due For MCV2".
+done
+
+terminology "Client Is Due For MCV2" system "IMMZD2DTMeaslesLT" code "client-is-due-for-mcv2".
+
+// Should not vaccinate client as client's age is less than 12 months.
+activity "Wait Until 12 Months" perform CPGCommunication.
+
+// Should not vaccinate client as client's age is less than 15 months.
+activity "Wait Until 15 Months" perform CPGCommunication.
+
+// Should not vaccinate due to recent live vaccine.
+activity "Wait Until After 4 Weeks" perform CPGCommunication.
+
+// Measles primary series is complete.
+activity "Measles Primary Series Complete" perform CPGCommunication.
+
+decision "IMMZD2DTMeaslesOT":
+    when "Measles Routine Immunization Schedule Incomplete" then:
+        when "No Primary Series Doses Administered" then use "IMMZD2DTMeaslesMR".
+        when "One Primary Series Dose Administered" then use "IMMZD2DTMeaslesMR".
+        when "Two Primary Series Doses Administered" then use "IMMZD2DTMeaslesSupplementary".
+    done
+done
+
+concept "Measles Routine Immunization Schedule Incomplete":
+    has type Observation.
+    has valuetype boolean.
+    inferred by ("No Primary Series Doses Administered" and "One Primary Series Dose Administered" and "Two Primary Series Doses Administered").
+done
+
+concept "No Primary Series Doses Administered":
+    has type Observation.
+    has valuetype boolean.
+    coded by "No Primary Series Doses Administered".
+done
+
+terminology "No Primary Series Doses Administered" system "IMMZD2DTMeaslesOT" code "no-primary-series-doses-administered".
+
+concept "One Primary Series Dose Administered":
+    has type Observation.
+    has valuetype boolean.
+    coded by "One Primary Series Dose Administered".
+done
+
+terminology "One Primary Series Dose Administered" system "IMMZD2DTMeaslesOT" code "one-primary-series-dose-administered".
+
+concept "Two Primary Series Doses Administered":
+    has type Observation.
+    has valuetype boolean.
+    coded by "Two Primary Series Doses Administered".
+done
+
+terminology "Two Primary Series Doses Administered" system "IMMZD2DTMeaslesOT" code "two-primary-series-doses-administered".
+
+decision "IMMZD2DTMeaslesSupplementary":
+    when "Measles Routine Immunization Schedule Complete" then:
+        when "Candidate For Supplementary Dose" then do "Administer Supplementary Dose".
+    done
+done
+
+concept "Measles Routine Immunization Schedule Complete":
+    has type Observation.
+    has valuetype boolean.
+    inferred by ("Candidate For Supplementary Dose").
+done
+
+concept "Candidate For Supplementary Dose":
+    has type Observation.
+    has valuetype boolean.
+    coded by "Candidate For Supplementary Dose".
+done
+
+terminology "Candidate For Supplementary Dose" system "IMMZD2DTMeaslesSupplementary" code "candidate-for-supplementary-dose".
+
+// Administer a supplementary dose of measles vaccine when routine schedule has been completed and based on context.
+activity "Administer Supplementary Dose" perform CPGCommunication.
+
+decision "IMMZD5DTMeaslesCI":
+    when "Measles Contraindications Present" then do "Do Not Vaccinate".
+done
+
+concept "Measles Contraindications Present":
+    has type Observation.
+    has valuetype boolean.
+    coded by "Measles Contraindications Present".
+done
+
+terminology "Measles Contraindications Present" system "IMMZD5DTMeaslesCI" code "measles-contraindications-present".
+
+// Contraindication identified. Do not administer measles vaccine.
+activity "Do Not Vaccinate" perform CPGCommunication.
+
+decision "IMMZD2DTMeaslesMR":
+    when "Client Is Due For Measles Vaccine" then do "Provide Measles Vaccine".
+done
+
+concept "Client Is Due For Measles Vaccine":
+    has type Observation.
+    has valuetype boolean.
+    coded by "Client Is Due For Measles Vaccine".
+done
+
+terminology "Client Is Due For Measles Vaccine" system "IMMZD2DTMeaslesMR" code "client-is-due-for-measles-vaccine".
+
+// Vaccinate client if due and no contraindications.
+activity "Provide Measles Vaccine" perform CPGCommunication.

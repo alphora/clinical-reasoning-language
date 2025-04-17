@@ -7,7 +7,7 @@ import { CPGLLexer } from '../grammar/generated/CPGLLexer';
 import { createLexer } from '../lexer/createLexer';
 
 // Get the path to the grammar example file
-const examplePath = join(__dirname, '../../docs/grammar-example.cpg');
+const examplePath = join(__dirname, '../examples/cpgl/who/measles/IMMZ_All_Decisions.cpg');
 
 // Read the file content
 const input = readFileSync(examplePath, 'utf8');
@@ -41,10 +41,10 @@ while (token.type !== CPGLLexer.EOF) {
   token = lexer.nextToken();
 }
 
-// Check if raw output is requested
-const rawOutput = process.argv.includes('--raw');
+// Check if pretty output is requested
+const prettyOutput = process.argv.includes('--pretty');
 
-if (rawOutput) {
+if (!prettyOutput) {
   // Raw lexer output
   console.log(JSON.stringify(tokens, null, 2));
 } else {

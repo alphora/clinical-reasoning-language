@@ -7,7 +7,7 @@ import { createLexer } from '../lexer/createLexer';
 import { createParser } from '../parser/createParser';
 
 // Read the example file
-const examplePath = join(__dirname, '../../docs/grammar-example.cpg');
+const examplePath = join(__dirname, '../examples/cpgl/who/measles/IMMZ_All_Decisions.cpg');
 const input = readFileSync(examplePath, 'utf-8');
 
 // Create the lexer and token stream
@@ -20,10 +20,10 @@ const parser = createParser(tokenStream);
 // Parse the input
 const tree = parser.cpgl();
 
-// Check if raw output is requested
-const rawOutput = process.argv.includes('--raw');
+// Check if pretty output is requested
+const prettyOutput = process.argv.includes('--pretty');
 
-if (rawOutput) {
+if (!prettyOutput) {
   // Raw parser output
   console.log(tree.toStringTree(parser.ruleNames));
 } else {

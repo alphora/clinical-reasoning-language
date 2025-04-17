@@ -1,0 +1,14 @@
+decision "IMMZD2DTMeaslesMR":
+    when "Client Is Due For Measles Vaccine" then do "Provide Measles Vaccine".
+done
+
+concept "Client Is Due For Measles Vaccine":
+    has type Observation.
+    has valuetype boolean.
+    coded by "Client Is Due For Measles Vaccine".
+done
+
+terminology "Client Is Due For Measles Vaccine" system "IMMZD2DTMeaslesMR" code "client-is-due-for-measles-vaccine".
+
+// Vaccinate client if due and no contraindications.
+activity "Provide Measles Vaccine" perform CommunicationRequest.

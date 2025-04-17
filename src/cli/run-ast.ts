@@ -10,7 +10,7 @@ import { createLexer } from '../lexer/createLexer';
 import { createParser } from '../parser/createParser';
 
 // Read the example file
-const examplePath = join(__dirname, '../../docs/grammar-example.cpg');
+const examplePath = join(__dirname, '../examples/cpgl/who/measles/IMMZ_All_Decisions.cpg');
 const input = readFileSync(examplePath, 'utf-8');
 
 // Create the lexer and token stream
@@ -28,9 +28,9 @@ const builder = new CPGLAstBuilder();
 const ast = builder.visit(tree) as CPGL;
 
 // Check if raw output is requested
-const rawOutput = process.argv.includes('--raw');
+const prettyOutput = process.argv.includes('--pretty');
 
-if (rawOutput) {
+if (!prettyOutput) {
   // Raw AST output
   console.log(JSON.stringify(ast, null, 2));
 } else {
