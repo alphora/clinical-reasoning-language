@@ -1,6 +1,6 @@
 {
   "name": "@cqis/cpgl",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Clinical Practice Guideline Language (CPGL) parser and validator",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
