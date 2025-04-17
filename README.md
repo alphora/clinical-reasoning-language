@@ -279,6 +279,7 @@ The package is distributed via GitHub Releases. To create a new release:
 1. Build the package
 1. Commit all changes
 1. Rev the version: `npm version minor`
+1. Push changes: `git push`
 1. Create a new release on GitHub
 1. Attach the generated `.tgz` file
 1. Tag the release with a version number (e.g., `v0.1.0`)
