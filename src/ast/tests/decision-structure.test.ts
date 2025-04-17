@@ -1,6 +1,5 @@
 import { CharStreams, CommonTokenStream } from 'antlr4ts';
 
-import { CPGLParser } from '../../grammar/generated/CPGLParser';
 import { createLexer } from '../../lexer/createLexer';
 import { CPGLAstBuilder } from '../builder';
 import { 
@@ -9,15 +8,13 @@ import {
   WhenBlock, 
   BlockBody, 
   ActionStatement, 
-  ActionStatementType,
-  WhenBlockType,
-  BlockBodyType,
   SingleAction,
   SingleActionType,
   DoActivity,
   DoActivityType,
   UseDecision
 } from '../types';
+import { createParser } from '../../parser/createParser';
 
 /**
  * This test suite verifies the correct structure of nested decisions in the AST.
@@ -38,7 +35,7 @@ describe('Decision Structure', () => {
   const parseInput = (input: string): CPGL => {
     const lexer = createLexer(CharStreams.fromString(input));
     const tokens = new CommonTokenStream(lexer);
-    const parser = new CPGLParser(tokens);
+    const parser = createParser(tokens);
     const tree = parser.cpgl();
     return builder.visit(tree) as CPGL;
   };
@@ -278,7 +275,7 @@ describe('Repeated Statements in Decision Blocks', () => {
   const parseInput = (input: string): CPGL => {
     const lexer = createLexer(CharStreams.fromString(input));
     const tokens = new CommonTokenStream(lexer);
-    const parser = new CPGLParser(tokens);
+    const parser = createParser(tokens);
     const tree = parser.cpgl();
     return builder.visit(tree) as CPGL;
   };

@@ -1,6 +1,5 @@
 import { CharStreams, CommonTokenStream } from 'antlr4ts';
 
-import { CPGLParser } from '../../grammar/generated/CPGLParser';
 import { createLexer } from '../../lexer/createLexer';
 import { CPGLAstBuilder } from '../builder';
 import { 
@@ -11,6 +10,7 @@ import {
   InferredByExpression,
   CodedByDefinition 
 } from '../types';
+import { createParser } from '../../parser/createParser';
 
 describe('Concept Structure', () => {
   let builder: CPGLAstBuilder;
@@ -22,7 +22,7 @@ describe('Concept Structure', () => {
   const parseInput = (input: string): CPGL => {
     const lexer = createLexer(CharStreams.fromString(input));
     const tokens = new CommonTokenStream(lexer);
-    const parser = new CPGLParser(tokens);
+    const parser = createParser(tokens);
     const tree = parser.cpgl();
     return builder.visit(tree) as CPGL;
   };
