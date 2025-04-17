@@ -109,7 +109,7 @@ export class CPGLAstBuilder extends AbstractParseTreeVisitor<ASTNode> implements
         statements.push(this.visitBlockAction(stmtCtx));
       }
     }
-  
+
     return {
       type: BlockBodyType.type,
       qualifier,
