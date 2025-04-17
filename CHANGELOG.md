@@ -85,4 +85,38 @@ const result = validateCPGL(`
     when "Condition" then do "Action".
   done
 `);
-``` 
+```
+
+## [0.2.0] - 2024-04-17
+
+### Added
+- Enhanced concept structure support:
+  - Proper expression of concept.inferred-by
+  - Improved concept valueset handling
+  - Better type and value specifications
+- New validator implementation with comprehensive checks
+- Keyword-specific structure tests
+- Duplicate action detection with warning system
+
+### Changed
+- Refactored builder implementation for better maintainability
+- Renamed `activityType` to `perform` to match grammar
+- Renamed `File` to `CPGL` for consistency
+- Moved duplicate detection from builder to validator
+- Improved test organization and coverage
+
+### Fixed
+- Fixed build process to ensure files are properly included in dist
+- Resolved linter issues
+- Fixed cycle detection in validator
+- Corrected concept valueset handling
+- Addressed various test failures and edge cases
+
+### Technical Improvements
+- Enhanced test framework
+- Improved error handling and reporting
+- Better type safety in builder implementation
+- More robust validation system
+- Cleaner code organization
+
+[0.2.0]: https://github.com/cqis/cpgl/releases/tag/v0.2.0 

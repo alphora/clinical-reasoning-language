@@ -1,0 +1,13 @@
+```bash
+# Process a CPGL file
+npx cpgl process input.cpgl
+
+# Validate a CPGL file
+npx cpgl validate input.cpgl
+
+# Transform a CPGL file to AST
+npx cpgl transform input.cpgl --output ast.json
+
+# Get help
+npx cpgl --help
+```

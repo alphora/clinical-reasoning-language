@@ -6,6 +6,32 @@
 
 Clinical Practice Guideline Language (CPGL) parser and validator
 
+## Overview
+
+CPGL is a domain-specific language designed for expressing clinical practice guidelines in a structured and machine-readable format. The language is implemented in TypeScript and provides a comprehensive set of tools for processing CPGL documents.
+
+### Core Modules
+
+1. **Lexer Module**
+   - Tokenizes CPGL input into a sequence of tokens
+   - Handles lexical analysis of CPGL documents
+   - Supports various token types including keywords, identifiers, and literals
+
+2. **Parser Module**
+   - Parses CPGL input into a parse tree
+   - Implements grammar rules for CPGL syntax
+   - Handles complex nested structures and expressions
+
+3. **AST Module**
+   - Builds and validates Abstract Syntax Trees (AST)
+   - Provides type-safe AST structures
+   - Handles semantic analysis and validation
+
+4. **CLI Module**
+   - Command-line interface for CPGL processing
+   - Supports file-based and stdin/stdout operations
+   - Provides validation and transformation capabilities
+
 ## Installation
 
 ### From GitHub Release
@@ -14,7 +40,99 @@ Clinical Practice Guideline Language (CPGL) parser and validator
 npm install github:cqis/cpgl#v0.1.0
 ```
 
-## Usage
+## CLI Usage
+
+The CPGL package includes command-line tools for processing CPGL files. Each tool can be run with the `--raw` flag to output raw JSON data instead of formatted output.
+
+### Lexer Tool
+
+```bash
+# Run the lexer on the example file
+npx ts-node src/cli/run-lexer.ts
+
+# Run with raw JSON output
+npx ts-node src/cli/run-lexer.ts --raw
+```
+
+The lexer tool tokenizes the input file and displays:
+- Line and column numbers
+- Token types
+- Token text
+- Formatted output with separators for readability
+
+### Parser Tool
+
+```bash
+# Run the parser on the example file
+npx ts-node src/cli/run-parser.ts
+
+# Run with raw JSON output
+npx ts-node src/cli/run-parser.ts --raw
+```
+
+The parser tool creates a parse tree from the input and displays:
+- Tree structure
+- Node types
+- Text content
+- Rule indices for grammar nodes
+
+### AST Tool
+
+```bash
+# Run the AST builder on the example file
+npx ts-node src/cli/run-ast.ts
+
+# Run with raw JSON output
+npx ts-node src/cli/run-ast.ts --raw
+```
+
+The AST tool builds an abstract syntax tree and displays:
+- AST structure
+- Node types
+- Node properties
+- Formatted tree representation
+
+### Validator Tool
+
+```bash
+# Run the validator on the example file
+npx ts-node src/cli/run-validator.ts
+
+# Run with raw JSON output
+npx ts-node src/cli/run-validator.ts --raw
+```
+
+The validator tool checks the AST for errors and displays:
+- Validation status (valid/invalid)
+- Error messages with line and column numbers
+- Warning messages with line and column numbers
+
+## Features
+
+### Language Features
+- Decision blocks with nested conditions
+- Concept definitions with type and value specifications
+- Activity statements with perform types
+- Terminology statements with valueset, system/code, and unknown definitions
+- FHIR resource type support
+- String literals with proper escaping
+- Comments (single-line and block)
+
+### Processing Features
+- Lexical analysis with detailed token information
+- Syntax parsing with error recovery
+- AST generation with type safety
+- Semantic validation with comprehensive error reporting
+- Cross-platform compatibility (Windows, Mac, Linux)
+
+### Development Features
+- TypeScript implementation for type safety
+- Comprehensive test suite
+- Detailed documentation
+- Example implementations
+- Development tools and utilities
+
+## API Usage
 
 The package provides four main functions for processing CPGL code:
 
@@ -100,21 +218,12 @@ if (result.success) {
 
 ## API Reference
 
-### `tokenizeCPGL(input: string): ParseResult<Token[]>`
+### Core Functions
 
-Tokenizes CPGL input into a sequence of tokens.
-
-### `parseCPGL(input: string): ParseResult<any>`
-
-Parses CPGL input into a parse tree.
-
-### `buildCPGL(input: string): ParseResult<File>`
-
-Builds an AST from CPGL input.
-
-### `validateCPGL(input: string): ParseResult<File>`
-
-Validates CPGL input and returns the AST if valid.
+- `tokenizeCPGL(input: string): ParseResult<Token[]>`
+- `parseCPGL(input: string): ParseResult<any>`
+- `buildCPGL(input: string): ParseResult<File>`
+- `validateCPGL(input: string): ParseResult<File>`
 
 ### Types
 
@@ -165,9 +274,12 @@ This will generate a `.tgz` file (e.g., `@cqis-cpgl-0.1.0.tgz`) that can be dist
 
 The package is distributed via GitHub Releases. To create a new release:
 
+1. Create a new branch `v0.1.0`
+1. Generate a CHANGELOG: "I'm creating a new release, generate a CHANGELOG"
+1. Build the package
 1. Create a new release on GitHub
-2. Attach the generated `.tgz` file
-3. Tag the release with a version number (e.g., `v0.1.0`)
+1. Attach the generated `.tgz` file
+1. Tag the release with a version number (e.g., `v0.1.0`)
 
 Users can then install the package using:
 ```bash
@@ -175,26 +287,24 @@ npm install github:cqis/cpgl#v0.1.0
 ```
 
 Replace `v0.1.0` with the specific version they want to install.
+### Running Tests
 
-## License
+```bash
+# Run all tests
+npm test
 
-MIT
+# Run tests with coverage
+npm run test:coverage
 
-## Overview
+# Run specific test files
+npx jest src/ast/tests/decision-structure.test.ts --verbose --no-cache --colors --forceExit --detectOpenHandles --watchAll=false
+```
 
-This project implements a lexer and parser for the Clinical Practice Guideline Language (CPGL), a domain-specific language designed for expressing clinical practice guidelines in a structured and machine-readable format.
+### Updating Grammar
 
-## Features
-
-- Lexical analysis of CPGL documents
-- Support for:
-  - Decision blocks
-  - Condition clauses
-  - Action statements
-  - FHIR resource types
-  - String literals
-  - Comments (single-line and block)
-  - Indentation-based structure
+```bash
+npm run generate
+```
 
 ## Example AST Comparison
 
@@ -244,9 +354,7 @@ npm test
 npm run test:coverage
 
 # Run specific test files
-npm test src/lexer/tests/basic-tokens.test.ts
-npm test src/lexer/tests/fhir-types.test.ts
-npm test src/lexer/tests/grammar-example.test.ts
+npx jest src/ast/tests/decision-structure.test.ts --verbose --no-cache --colors --forceExit --detectOpenHandles --watchAll=false 
 
 # Run tests in watch mode (useful during development)
 npm run test:watch
@@ -283,7 +391,7 @@ The test suite is organized into several categories:
 
 When adding new tests:
 
-1. Place test files in the appropriate directory under `src/lexer/tests/`
+1. Place test files in the appropriate directory, for example `src/lexer/tests/`
 2. Follow the existing test patterns
 3. Include both positive and negative test cases
 4. Use descriptive test names
@@ -331,28 +439,7 @@ The project includes several example files that demonstrate different features a
 ```bash
 # Run the basic usage example
 npm run example
-
-# Run specific examples
-npm run example:basic
-npm run example:debug
-npm run example:full
-npm run example:lexer
-npm run example:parser
 ```
-
-#### Lexer Example
-The lexer example (`run-lexer.ts`) demonstrates how to tokenize a CPGL document:
-- Reads the grammar example file
-- Creates a lexer with a custom error listener
-- Prints all tokens found in the input
-
-#### Parser Example
-The parser example (`run-parser.ts`) demonstrates how to parse a CPGL document:
-- Reads the grammar example file
-- Creates a lexer with a custom error listener
-- Creates a token stream
-- Creates a parser with the same error listener
-- Parses the input and prints the resulting parse tree
 
 ### Regenerating ANTLR Files
 
@@ -363,4 +450,4 @@ cd src/grammar
 antlr4ts -Xforce-atn -o src/grammar/generated src/grammar/CPGLLexer.g4 && antlr4ts -Xforce-atn -o src/grammar/generated src/grammar/CPGLParser.g4
 ```
 
-Note: This project uses a custom AST implementation rather than ANTLR's visitor pattern. The generated files are used only for lexing and parsing, while semantic analysis and interpretation are handled by our custom AST implementation.
+Note: This project uses a custom AST implementation that uses ANTLR's visitor pattern. The generated files are used only for lexing and parsing directly, while semantic analysis and interpretation are handled by our custom AST implementation.
