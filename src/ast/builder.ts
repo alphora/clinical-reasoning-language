@@ -25,16 +25,18 @@ import {
   Concept,
   ConceptType,
   ConceptDefinition,
+  ConceptReferenceType,
   Decision,
   DecisionType,
   DoActivity,
   DoActivityType,
-  Expression,
-  ExpressionType,
   CPGL,
   FileType,
-  InferredByDefinition,
+  GroupExpressionType,
+  InferredByConceptType,
   InferredByDefinitionType,
+  InformalAndType,
+  InformalOrType,
   SingleAction,
   SingleActionType,
   Statement,
@@ -146,26 +148,20 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode | CPGL> {
   }
 
   visitWhenBlock(ctx: ParserRuleContext): WhenBlock {
-    const conceptName = this.getStringValue(ctx.getChild(1));
-    const body = this.visitWhenBlockBody(this.getContext(ctx.getChild(3)));
-
-    // If the body is a block body, we need to ensure we don't have duplicate statements
-    if (body.type === BlockBodyType.type) {
-      const statements: (WhenBlock | ActionStatement)[] = [];
-
-      for (const statement of body.statements) {
-        if (statement.type === WhenBlockType.type) {
-          const whenBlock = statement as WhenBlock;
-          statements.push(whenBlock);
-        } else if (statement.type === ActionStatementType.type) {
-          const actionStatement = statement as ActionStatement;
-          statements.push(actionStatement);
-        }
-      }
-
-      body.statements = statements;
+    // 1) Grab the concept name directly
+    const conceptName = this.getStringValue(ctx.conceptReference());
+  
+    // 2) Dispatch on which branch matched
+    let body: BlockBody | SingleAction;
+    if (ctx.blockBody()) {
+      // the grammar ensured this is a full BlockBody
+      body = this.visitBlockBody(ctx.blockBody()!);
+    } else {
+      // it must be the single‑action branch
+      body = this.visitSingleAction(ctx.singleActionStatement()!);
     }
-
+  
+    // 3) Return your AST node—no dedupe logic needed here
     return {
       type: WhenBlockType.type,
       conceptName,
@@ -173,84 +169,37 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode | CPGL> {
       location: this.getLocation(ctx),
     };
   }
-
-  visitWhenBlockBody(ctx: ParserRuleContext): WhenBlockBody {
-    // If the first child is a 'do' or 'use' statement and it's followed by a dot,
-    // then it's a single action
-    const firstChild = ctx.getChild(0);
-    if (firstChild instanceof ParserRuleContext) {
-      const actionType = firstChild.getChild(0)?.text;
-      if ((actionType === 'do' || actionType === 'use') && ctx.getChild(1)?.text === '.') {
-        return this.visitSingleAction(firstChild);
-      }
-    }
-
-    // Otherwise, it's a block body
-    return this.visitBlockBody(ctx);
+  
+  visitNestedWhenBlock(ctx: ParserRuleContext): WhenBlock {
+    // ctx.whenBlock() is guaranteed non-null
+    return this.visitWhenBlock(ctx.whenBlock()!);
+  }
+  
+  // Delegates to your ActionStatement logic:
+  visitBlockAction(ctx: ParserRuleContext): ActionStatement {
+    // ctx.actionStatement() is guaranteed non-null
+    return this.visitActionStatement(ctx.actionStatement()!);
   }
 
   visitBlockBody(ctx: ParserRuleContext): BlockBody {
-    const statements: (WhenBlock | ActionStatement)[] = [];
-    let qualifier: string | undefined;
-    let currentIndex = 0;
-
-    // Skip the initial COLON
-    if (ctx.childCount > 0 && ctx.getChild(0).text === ':') {
-      currentIndex = 1;
-    }
-
-    // Check for qualifier (any/all)
-    if (currentIndex < ctx.childCount) {
-      const child = ctx.getChild(currentIndex);
-      if (child instanceof ParserRuleContext) {
-        const firstToken = child.getChild(0)?.text;
-        if (firstToken === 'any' || firstToken === 'all') {
-          qualifier = firstToken;
-          currentIndex++;
-        }
-      }
-    }
-
-    // Process block statements
-    while (currentIndex < ctx.childCount) {
-      const child = ctx.getChild(currentIndex);
-      if (child instanceof ParserRuleContext) {
-        if (child.constructor.name === 'BlockStatementContext') {
-          const statementChild = child.getChild(0);
-          if (statementChild instanceof ParserRuleContext) {
-            const firstChild = statementChild.getChild(0);
-            if (firstChild) {
-              const text = firstChild.text;
-
-              if (text === 'when') {
-                const whenBlock = this.visitWhenBlock(statementChild);
-                statements.push(whenBlock);
-              } else if (RegExp(/^(do|use)"[^"]+"/).exec(text)) {
-                // Process action statement
-                const action = this.visitAction(statementChild);
-                const actionStatement: ActionStatement = {
-                  type: ActionStatementType.type,
-                  action,
-                  location: this.getLocation(statementChild),
-                };
-                statements.push(actionStatement);
-
-                // Skip the dot if present
-                if (ctx.getChild(currentIndex + 1)?.text === '.') {
-                  currentIndex++;
-                }
-              }
-            }
-          }
-        }
-      }
-      currentIndex++;
-    }
-
+    // 1) Qualifier (if present) comes from anyOrAllClause()
+    //    .text will be either "any:" or "all:", so slice off the trailing colon
+    const qualifierCtx = ctx.anyOrAllClause();
+    const qualifier = qualifierCtx
+      ? qualifierCtx.text.slice(0, -1)    // "any:" → "any", "all:" → "all"
+      : undefined;
+  
+    // 2) Collect the two kinds of block statements by their labeled contexts
+    const statements: (WhenBlock | ActionStatement)[] = [
+      ...ctx.nestedWhenBlock().map(nestedCtx => this.visitNestedWhenBlock(nestedCtx)),
+      ...ctx.blockAction().map(actionCtx  => this.visitBlockAction(actionCtx)),
+    ];
+  
+    // 3) Return the clean AST node
     return {
       type: BlockBodyType.type,
-      statements,
       qualifier,
+      statements,
       location: this.getLocation(ctx),
     };
   }
@@ -455,37 +404,9 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode | CPGL> {
       inferredBody.getChild(0) instanceof ParserRuleContext &&
       inferredBody.getChild(0).constructor.name === 'InferredByDescriptiveLogicContext'
     ) {
-      const descriptiveLogic = inferredBody.text;
-
-      // For simple descriptive logic (no nested parentheses), remove all parentheses
-      // For complex descriptive logic (with nested parentheses), keep them
-      const hasNestedParentheses = (descriptiveLogic.match(/\(/g) || []).length > 1;
-
-      let cleanedLogic = descriptiveLogic;
-      if (!hasNestedParentheses) {
-        // Simple case - remove all parentheses
-        cleanedLogic = cleanedLogic
-          .slice(1, -1) // Remove outer parentheses
-          .replace(/[()]/g, '') // Remove all parentheses
-          .replace(/"/g, '') // Remove all quotes
-          .replace(/\s+/g, ' ') // Normalize whitespace
-          .replace(/\s*(and|or)\s*/g, ' $1 ') // Ensure spaces around operators
-          .trim(); // Remove leading/trailing whitespace
-      } else {
-        // Complex case - keep parentheses structure but clean up formatting
-        cleanedLogic = cleanedLogic
-          .slice(1, -1) // Remove outer parentheses
-          .replace(/"\s*([^"]+)\s*"/g, '$1') // Remove quotes but keep content
-          .replace(/\s+/g, ' ') // Normalize whitespace
-          .replace(/\s*\(\s*/g, '(') // Remove spaces after opening parentheses
-          .replace(/\s*\)\s*/g, ') ') // Keep one space after closing parentheses
-          .replace(/\s*(and|or)\s*/g, ' $1 ') // Ensure spaces around operators
-          .trim(); // Remove leading/trailing whitespace
-      }
-
       return {
         type: InferredByDefinitionType.type,
-        descriptiveLogic: cleanedLogic,
+        descriptiveLogic: inferredBody.text,
         location: this.getLocation(ctx),
       };
     }
@@ -511,19 +432,6 @@ export class ASTBuilder implements ParseTreeVisitor<ASTNode | CPGL> {
         location: this.getLocation(ctx),
       };
     }
-  }
-
-  visitExpression(ctx: ParserRuleContext): Expression {
-    const operator = ctx.getChild(1).text as 'or' | 'and' | 'atom';
-    const left = this.visitExpression(this.getContext(ctx.getChild(0)));
-    const right = this.visitExpression(this.getContext(ctx.getChild(2)));
-    return {
-      type: ExpressionType.type,
-      operator,
-      left,
-      right,
-      location: this.getLocation(ctx),
-    };
   }
 
   private getStringValue(node: ParseTree): string {
