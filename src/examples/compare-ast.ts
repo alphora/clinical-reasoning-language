@@ -3,7 +3,7 @@ import { join } from 'path';
 
 import { CharStreams, CommonTokenStream } from 'antlr4ts';
 
-import { ASTBuilder } from '../ast/builder';
+import { CPGLAstBuilder } from '../ast/builder';
 import { ASTNode, DoActivity, UseDecision, CPGL } from '../ast/types';
 import { CPGLLexer } from '../grammar/generated/CPGLLexer';
 import { CPGLParser } from '../grammar/generated/CPGLParser';
@@ -26,7 +26,7 @@ const parser = new CPGLParser(tokenStream);
 const tree = parser.cpgl();
 
 // Create the AST builder and visit the parse tree
-const builder = new ASTBuilder();
+const builder = new CPGLAstBuilder();
 const ast = builder.visit(tree) as CPGL;
 
 // Helper function to print AST nodes with indentation

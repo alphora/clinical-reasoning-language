@@ -2,7 +2,7 @@ import { CharStreams, CommonTokenStream } from 'antlr4ts';
 
 import { CPGLParser } from '../../grammar/generated/CPGLParser';
 import { createLexer } from '../../lexer/createLexer';
-import { ASTBuilder } from '../builder';
+import { CPGLAstBuilder } from '../builder';
 import { 
   CPGL, 
   Decision, 
@@ -24,10 +24,10 @@ import {
  * - nameUniqueness.test.ts
  */
 describe('Decision Structure', () => {
-  let builder: ASTBuilder;
+  let builder: CPGLAstBuilder;
 
   beforeEach(() => {
-    builder = new ASTBuilder();
+    builder = new CPGLAstBuilder();
   });
 
   const parseInput = (input: string): CPGL => {
@@ -209,10 +209,10 @@ done`;
 });
 
 describe('Repeated Statements in Decision Blocks', () => {
-  let builder: ASTBuilder;
+  let builder: CPGLAstBuilder;
 
   beforeEach(() => {
-    builder = new ASTBuilder();
+    builder = new CPGLAstBuilder();
   });
 
   const parseInput = (input: string): CPGL => {

@@ -1,478 +1,241 @@
-import { ParserRuleContext } from 'antlr4ts';
-import { ParseTree } from 'antlr4ts/tree/ParseTree';
-import { ParseTreeVisitor } from 'antlr4ts/tree/ParseTreeVisitor';
-import { RuleNode } from 'antlr4ts/tree/RuleNode';
-import { TerminalNode } from 'antlr4ts/tree/TerminalNode';
+import { ParserRuleContext } from "antlr4ts/ParserRuleContext";
+
+import { AbstractParseTreeVisitor } from "antlr4ts/tree/AbstractParseTreeVisitor";
+import { CPGLParserVisitor } from "../grammar/generated/CPGLParserVisitor";
+import {
+  CpglContext, 
+  DecisionStatementContext, DecisionBodyContext,
+  WhenWithBodyContext, WhenSingleActionContext,
+  NestedWhenBlockContext, BlockActionContext,
+  BlockBodyContext, SingleActionStatementContext,
+  DoStatementContext, UseStatementContext,
+  TerminologyStatementContext, TerminologyValuesetContext,
+  TerminologyUnknownContext, TerminologySystemCodeContext,
+  ActivityStatementContext, ConceptStatementContext,
+  InferredByLineContext,
+  DefinitionConceptContext, DefinitionLogicContext,
+  InferredByExpressionContext, InformalOrContext,
+  InformalAndContext, InformalNotContext,
+  ConceptAtomContext, GroupExpressionContext} from "../grammar/generated/CPGLParser";
 
 import {
-  CPGLParser,
-  DecisionStatementContext,
-  TerminologyStatementContext,
-  ActivityStatementContext,
-  ConceptStatementContext,
-} from '../grammar/generated/CPGLParser';
-
-import {
-  ASTNode,
-  ActionStatement,
-  ActionStatementType,
-  Activity,
-  ActivityType,
-  BlockBody,
-  BlockBodyType,
-  CodedByDefinition,
+  ASTNode, CPGL, FileType, Statement,
+  Decision, DecisionType, DecisionBody, DecisionBodyType,
+  WhenBlock, WhenBlockType, BlockBody, BlockBodyType,
+  SingleAction, SingleActionType, ActionStatement, 
+  DoActivity, DoActivityType, UseDecision, UseDecisionType,
+  Terminology, TerminologyType,
+  TerminologyValueset, TerminologyValuesetType,
+  TerminologyUnknown, TerminologyUnknownType,
+  TerminologySystemCode, TerminologySystemCodeType,
+  Activity, ActivityType,
+  Concept, ConceptType, ConceptDefinition,
   CodedByDefinitionType,
-  Concept,
-  ConceptType,
-  ConceptDefinition,
-  ConceptReferenceType,
-  Decision,
-  DecisionType,
-  DoActivity,
-  DoActivityType,
-  CPGL,
-  FileType,
-  GroupExpressionType,
-  InferredByConceptType,
-  InferredByDefinitionType,
-  InformalAndType,
-  InformalOrType,
-  SingleAction,
-  SingleActionType,
-  Statement,
-  Terminology,
-  TerminologyType,
-  TerminologyDefinition,
-  TerminologyValueset,
-  TerminologyValuesetType,
-  TerminologyUnknown,
-  TerminologyUnknownType,
-  TerminologySystemCode,
-  TerminologySystemCodeType,
-  UseDecision,
-  UseDecisionType,
-  WhenBlock,
-  WhenBlockType,
-  WhenBlockBody,
-  ConceptValueType,
-} from './types';
+  InferredByDefinition, InferredByDefinitionType,
+  ConceptReference, ConceptReferenceType,
+  InformalAnd, InformalAndType,
+  InformalOr, InformalOrType,
+  NotExpression, NotExpressionType,
+  GroupExpression, GroupExpressionType,
+  InferredByConcept, InferredByConceptType,
+  InferredByExpression,
+  Location
+} from "./types";
 
-export class ASTBuilder implements ParseTreeVisitor<ASTNode | CPGL> {
-  visit(tree: ParseTree): ASTNode | CPGL {
-    if (tree instanceof ParserRuleContext) {
-      const ruleName = tree.ruleContext.ruleIndex;
-      // If it's the root cpgl rule
-      if (ruleName === CPGLParser.RULE_cpgl) {
-        return this.visitCpgl(tree);
-      }
+function getLocation(ctx: ParserRuleContext): Location {
+  const start = ctx.start;
+  const stop  = ctx.stop ?? start;
+
+  return {
+    start: {
+      line:   start.line,
+      column: start.charPositionInLine
+    },
+    end: {
+      line:   stop.line,
+      column: stop.charPositionInLine + (stop.text?.length ?? 0)
     }
-    return tree.accept(this);
-  }
+  };
+}
 
-  visitChildren(node: RuleNode): ASTNode | CPGL {
-    const children: (ASTNode | CPGL)[] = [];
-    for (let i = 0; i < node.childCount; i++) {
-      const child = node.getChild(i);
-      if (child instanceof ParserRuleContext) {
-        const result = child.accept(this);
-        if (result) {
-          children.push(result);
-        }
-      }
-    }
-    return children[0];
-  }
+export class CPGLAstBuilder extends AbstractParseTreeVisitor<ASTNode> implements CPGLParserVisitor<ASTNode> {
+  protected defaultResult() { return null as any; }
 
-  visitTerminal(_node: TerminalNode): ASTNode | CPGL {
-    throw new Error('Method not implemented.');
-  }
-
-  visitErrorNode(_node: TerminalNode): ASTNode | CPGL {
-    throw new Error('Method not implemented.');
-  }
-
-  visitCpgl(ctx: ParserRuleContext): CPGL {
-    const statements: Statement[] = [];
-    for (let i = 0; i < ctx.childCount; i++) {
-      const child = ctx.getChild(i);
-      if (child instanceof ParserRuleContext) {
-        const statement = this.visitStatement(child);
-        if (statement) {
-          statements.push(statement);
-        }
-      }
-    }
-    return {
-      type: FileType.type,
-      statements,
-      location: this.getLocation(ctx),
-    };
-  }
-
-  visitStatement(ctx: ParserRuleContext): Statement | null {
-    const child = this.getContext(ctx.getChild(0));
-    if (child instanceof DecisionStatementContext) {
-      return this.visitDecisionStatement(child);
-    } else if (child instanceof TerminologyStatementContext) {
-      return this.visitTerminologyStatement(child);
-    } else if (child instanceof ActivityStatementContext) {
-      return this.visitActivityStatement(child);
-    } else if (child instanceof ConceptStatementContext) {
-      return this.visitConceptStatement(child);
-    } else {
-      throw new Error(`Unknown statement type: ${child.constructor.name}`);
-    }
-  }
+  visitCpgl(ctx: CpglContext): CPGL {
+    const statements = ctx.statement().map(s => this.visit(s) as Statement);
+    return { type: FileType.type, statements, location: getLocation(ctx) };  }
 
   visitDecisionStatement(ctx: DecisionStatementContext): Decision {
-    const decisionName = this.getStringValue(ctx.getChild(1));
-    const whenBlocks: WhenBlock[] = [];
-    const blockBody = this.getContext(ctx.getChild(3));
-    for (let i = 0; i < blockBody.childCount; i++) {
-      const child = blockBody.getChild(i);
-      if (child instanceof ParserRuleContext && child.getChild(0)?.text === 'when') {
-        const whenBlock = this.visitWhenBlock(child);
-        whenBlocks.push(whenBlock);
-      }
-    }
-    return {
-      type: DecisionType.type,
-      name: decisionName,
-      body: {
-        type: 'DecisionBody',
-        statements: whenBlocks,
-        location: this.getLocation(ctx),
-      },
-      location: this.getLocation(ctx),
-    };
+    const name = (ctx.decisionIdentifier().text.slice(1, -1));
+    const body = this.visit(ctx.decisionBody()!) as DecisionBody;
+    return { type: DecisionType.type, name, body, location: getLocation(ctx) };
   }
 
-  visitWhenBlock(ctx: ParserRuleContext): WhenBlock {
-    // 1) Grab the concept name directly
-    const conceptName = this.getStringValue(ctx.conceptReference());
-  
-    // 2) Dispatch on which branch matched
-    let body: BlockBody | SingleAction;
-    if (ctx.blockBody()) {
-      // the grammar ensured this is a full BlockBody
-      body = this.visitBlockBody(ctx.blockBody()!);
-    } else {
-      // it must be the single‑action branch
-      body = this.visitSingleAction(ctx.singleActionStatement()!);
-    }
-  
-    // 3) Return your AST node—no dedupe logic needed here
-    return {
-      type: WhenBlockType.type,
-      conceptName,
-      body,
-      location: this.getLocation(ctx),
-    };
-  }
-  
-  visitNestedWhenBlock(ctx: ParserRuleContext): WhenBlock {
-    // ctx.whenBlock() is guaranteed non-null
-    return this.visitWhenBlock(ctx.whenBlock()!);
-  }
-  
-  // Delegates to your ActionStatement logic:
-  visitBlockAction(ctx: ParserRuleContext): ActionStatement {
-    // ctx.actionStatement() is guaranteed non-null
-    return this.visitActionStatement(ctx.actionStatement()!);
+  visitDecisionBody(ctx: DecisionBodyContext): DecisionBody {
+    const statements = ctx.whenBlock().map(w => this.visit(w) as WhenBlock);
+    return { type: DecisionBodyType.type, statements, location: getLocation(ctx) };
   }
 
-  visitBlockBody(ctx: ParserRuleContext): BlockBody {
-    // 1) Qualifier (if present) comes from anyOrAllClause()
-    //    .text will be either "any:" or "all:", so slice off the trailing colon
-    const qualifierCtx = ctx.anyOrAllClause();
-    const qualifier = qualifierCtx
-      ? qualifierCtx.text.slice(0, -1)    // "any:" → "any", "all:" → "all"
+  visitWhenWithBody(ctx: WhenWithBodyContext): WhenBlock {
+    const conceptName = ctx.conceptReference().text.slice(1, -1);
+    const body = this.visit(ctx.blockBody()!) as BlockBody;
+    return { type: WhenBlockType.type, conceptName, body, location: getLocation(ctx) };
+  }
+
+  visitWhenSingleAction(ctx: WhenSingleActionContext): WhenBlock {
+    const conceptName = ctx.conceptReference().text.slice(1, -1);
+    const action = this.visit(ctx.singleActionStatement()!) as SingleAction;
+    return { type: WhenBlockType.type, conceptName, body: action, location: getLocation(ctx) };
+  }
+
+  visitNestedWhenBlock(ctx: NestedWhenBlockContext): WhenBlock { return this.visit(ctx.whenBlock()) as WhenBlock; }
+  visitBlockAction(ctx: BlockActionContext): ActionStatement { return this.visit(ctx.actionStatement()) as ActionStatement; }
+
+  visitBlockBody(ctx: BlockBodyContext): BlockBody {
+    // qualifier as before
+    const qualifier = ctx.anyOrAllClause()
+      ? ctx.anyOrAllClause()!.text.slice(0, -1)
       : undefined;
   
-    // 2) Collect the two kinds of block statements by their labeled contexts
-    const statements: (WhenBlock | ActionStatement)[] = [
-      ...ctx.nestedWhenBlock().map(nestedCtx => this.visitNestedWhenBlock(nestedCtx)),
-      ...ctx.blockAction().map(actionCtx  => this.visitBlockAction(actionCtx)),
-    ];
+    const statements: (WhenBlock | ActionStatement)[] = [];
   
-    // 3) Return the clean AST node
+    // ctx.blockStatement() gives you every BlockStatementContext
+    for (const stmtCtx of ctx.blockStatement()) {
+      if (stmtCtx instanceof NestedWhenBlockContext) {
+        // the 'whenBlock' branch
+        statements.push(this.visitNestedWhenBlock(stmtCtx));
+      } else if (stmtCtx instanceof BlockActionContext) {
+        // the 'actionStatement' branch
+        statements.push(this.visitBlockAction(stmtCtx));
+      }
+    }
+  
     return {
       type: BlockBodyType.type,
       qualifier,
       statements,
-      location: this.getLocation(ctx),
+      location: getLocation(ctx),
     };
   }
 
-  visitActionStatement(ctx: ParserRuleContext): ActionStatement {
-    const action = this.visitAction(ctx);
-    return {
-      type: ActionStatementType.type,
-      action,
-      location: this.getLocation(ctx),
-    };
+  visitSingleActionStatement(ctx: SingleActionStatementContext): SingleAction {
+    const action = this.visit(ctx.doStatement() ?? ctx.useStatement()!) as DoActivity | UseDecision;
+    return { type: SingleActionType.type, action, location: getLocation(ctx) };
   }
 
-  visitSingleAction(ctx: ParserRuleContext): SingleAction {
-    const action = this.visitAction(ctx);
-    return {
-      type: SingleActionType.type,
-      action,
-      location: this.getLocation(ctx),
-    };
+  visitDoStatement(ctx: DoStatementContext): DoActivity {
+    const activityName = ctx.activityReference().text.slice(1, -1);
+    return { type: DoActivityType.type, activityName, location: getLocation(ctx) };
   }
 
-  private visitAction(ctx: ParserRuleContext): DoActivity | UseDecision {
-    // Get the full text and remove the dot at the end if present
-    const fullText = ctx.text.endsWith('.') ? ctx.text.slice(0, -1) : ctx.text;
-
-    // Extract the action type (do or use) and the name
-    const actionType = fullText.startsWith('do') ? 'do' : 'use';
-    const name = fullText.slice(actionType.length).trim().replace(/"/g, '');
-
-    if (actionType === 'do') {
-      const activity = {
-        type: DoActivityType.type,
-        activityName: name,
-        location: this.getLocation(ctx),
-      };
-      return activity;
-    } else {
-      const decision = {
-        type: UseDecisionType.type,
-        decisionName: name,
-        location: this.getLocation(ctx),
-      };
-      return decision;
-    }
+  visitUseStatement(ctx: UseStatementContext): UseDecision {
+    const decisionName = ctx.decisionReference().text.slice(1, -1);
+    return { type: UseDecisionType.type, decisionName, location: getLocation(ctx) };
   }
 
   visitTerminologyStatement(ctx: TerminologyStatementContext): Terminology {
-    const name = this.getStringValue(ctx.getChild(1));
-    const terminology = {
-      type: TerminologyType.type,
-      name,
-      location: this.getLocation(ctx),
-    } as Terminology;
+    const name = ctx.terminologyIdentifier().text.slice(1, -1);
+    const defCtx = ctx.terminologyValueset() ?? ctx.terminologyUnknown() ?? ctx.terminologySystemCode();
+    const definition = this.visit(defCtx!) as TerminologyValueset | TerminologyUnknown | TerminologySystemCode;
+    return { type: TerminologyType.type, name, definition, location: getLocation(ctx) };
+  }
 
-    // Check for valueset, system/code, or unknown
-    if (ctx.terminologyValueset()) {
-      const valuesetCtx = ctx.terminologyValueset()!;
-      terminology.definition = {
-        type: TerminologyValuesetType.type,
-        valuesetName: this.getStringValue(valuesetCtx.getChild(1)),
-        location: this.getLocation(valuesetCtx),
-      };
-    } else if (ctx.terminologySystemCode()) {
-      const systemCodeCtx = ctx.terminologySystemCode()!;
-      terminology.definition = {
-        type: TerminologySystemCodeType.type,
-        system: this.getStringValue(systemCodeCtx.getChild(1)),
-        code: this.getStringValue(systemCodeCtx.getChild(3)),
-        location: this.getLocation(systemCodeCtx),
-      };
-    } else if (ctx.terminologyUnknown()) {
-      const unknownCtx = ctx.terminologyUnknown()!;
-      terminology.definition = {
-        type: TerminologyUnknownType.type,
-        location: this.getLocation(unknownCtx),
-      };
-    }
-
-    return terminology;
+  visitTerminologyValueset(ctx: TerminologyValuesetContext): TerminologyValueset {
+    const valuesetName = ctx.identifier().text.slice(1, -1);
+    return { type: TerminologyValuesetType.type, valuesetName, location: getLocation(ctx) };
+  }
+  visitTerminologyUnknown(ctx: TerminologyUnknownContext): TerminologyUnknown { return { type: TerminologyUnknownType.type, location: getLocation(ctx) }; }
+  visitTerminologySystemCode(ctx: TerminologySystemCodeContext): TerminologySystemCode {
+    const system = ctx.identifier(0).text.slice(1,-1);
+    const code   = ctx.identifier(1).text.slice(1,-1);
+    return { type: TerminologySystemCodeType.type, system, code, location: getLocation(ctx) };
   }
 
   visitActivityStatement(ctx: ActivityStatementContext): Activity {
-    const activityName = this.getStringValue(ctx.getChild(1));
-    const perform = this.getStringValue(ctx.getChild(3)) as ActivityType;
-    const terminologyReference =
-      ctx.childCount > 5 ? this.getStringValue(ctx.getChild(5)) : undefined;
-    return {
-      type: ActivityType.type,
-      name: activityName,
-      perform,
-      terminologyReference,
-      location: this.getLocation(ctx),
-    };
+    const name = ctx.activityIdentifier().text.slice(1,-1);
+    const perform = ctx.ACTIVITY_TYPE().text as ActivityType;
+    const terminologyRef = ctx.terminologyReference()?.text.slice(1,-1);
+    return { type: ActivityType.type, name, perform, terminologyReference: terminologyRef, location: getLocation(ctx) };
   }
 
   visitConceptStatement(ctx: ConceptStatementContext): Concept {
-    const conceptName = this.getStringValue(ctx.getChild(1));
-    const conceptBody = this.getContext(ctx.getChild(3));
-
-    // Find the type, valueType, provenance, and definition
-    let conceptType = '';
-    let valueType = '';
-    let provenance: string | undefined;
-    let definition: ConceptDefinition | undefined;
-
-    for (let i = 0; i < conceptBody.childCount; i++) {
-      const child = conceptBody.getChild(i);
-      if (child instanceof ParserRuleContext) {
-        const firstToken = child.getChild(0)?.text;
-        if (firstToken === 'has') {
-          const secondToken = child.getChild(1)?.text;
-          if (secondToken === 'type') {
-            conceptType = this.getStringValue(child.getChild(2)) as ConceptType;
-          } else if (secondToken === 'valuetype') {
-            valueType = this.getStringValue(child.getChild(2)) as ConceptValueType;
-          } else if (secondToken === 'provenance') {
-            provenance = this.getStringValue(child.getChild(2));
-          }
-        } else if (firstToken === 'coded' || firstToken === 'inferred') {
-          definition = this.visitConceptDefinition(child);
-        }
-      }
-    }
-
-    if (!definition) {
-      throw new Error('Concept definition is required');
-    }
-
-    return {
-      type: ConceptType.type,
-      name: conceptName,
-      conceptType: conceptType as ConceptType,
-      valueType: valueType as ConceptValueType,
-      provenance,
-      definition,
-      location: this.getLocation(ctx),
-    };
-  }
-
-  visitTerminologyDefinition(ctx: ParserRuleContext): TerminologyDefinition {
-    const firstToken = ctx.getChild(0).text;
-    if (firstToken === 'valueset') {
-      return this.visitTerminologyValueset(ctx);
-    } else if (firstToken === 'system') {
-      return this.visitTerminologySystemCode(ctx);
+    const name = ctx.conceptIdentifier().text.slice(1,-1);
+    const bodyCtx = ctx.conceptBody();
+    const conceptType = (bodyCtx.hasTypeLine().CONCEPT_TYPE().text) as ConceptType;
+    const valueType   = (bodyCtx.hasValueTypeLine().CONCEPT_VALUE_TYPE().text) as any;
+    const provenance  = bodyCtx.provenanceLine()?.stringLiteral().text.slice(1,-1);
+    let definition: ConceptDefinition;
+    if (bodyCtx.codedByLine()) {
+      const termRef = bodyCtx.codedByLine()!.terminologyReference().text.slice(1,-1);
+      definition = { type: CodedByDefinitionType.type, terminologyName: termRef, location: getLocation(bodyCtx.codedByLine()!) };
     } else {
-      return this.visitTerminologyUnknown(ctx);
+      const infCtx = bodyCtx.inferredByLine()!;
+      definition = this.visit(infCtx) as InferredByDefinition;
     }
+    return { type: ConceptType.type, name, conceptType, valueType, provenance, definition, location: getLocation(ctx) };
   }
 
-  visitTerminologyValueset(ctx: ParserRuleContext): TerminologyValueset {
-    const valuesetName = this.getStringValue(ctx.getChild(1));
+  visitInferredByLine(ctx: InferredByLineContext): InferredByDefinition {
+    const defCtx = ctx.inferredBody();
+    const body = this.visit(defCtx) as InferredByConcept | InformalAnd | InformalOr | NotExpression | GroupExpression;
+    return { type: InferredByDefinitionType.type, body, location: getLocation(ctx) };
+  }
+
+  visitDefinitionConcept(ctx: DefinitionConceptContext): InferredByConcept {
+    const refCtx = ctx.inferredByConceptReference();
+    const pat     = refCtx.patternReference()?.text.slice(1, -1);
+    const concept = refCtx.conceptReference().text.slice(1, -1);
+  
     return {
-      type: TerminologyValuesetType.type,
-      valuesetName,
-      location: this.getLocation(ctx),
+      type: InferredByConceptType.type,
+      pattern: pat,
+      concept,
+      location: getLocation(ctx)
     };
   }
-
-  visitTerminologySystemCode(ctx: ParserRuleContext): TerminologySystemCode {
-    const system = this.getStringValue(ctx.getChild(1));
-    const code = this.getStringValue(ctx.getChild(3));
-    return {
-      type: TerminologySystemCodeType.type,
-      system,
-      code,
-      location: this.getLocation(ctx),
-    };
+  visitDefinitionLogic(ctx: DefinitionLogicContext): GroupExpression {
+    // first grab the InferredByDescriptiveLogicContext…
+    const descCtx = ctx.inferredByDescriptiveLogic();
+    // …then get its inner InferredByExpressionContext
+    const exprCtx = descCtx.inferredByExpression();
+    // now delegate to your existing visitor for that rule
+    return this.visit(exprCtx) as GroupExpression;
   }
 
-  visitTerminologyUnknown(ctx: ParserRuleContext): TerminologyUnknown {
-    return {
-      type: TerminologyUnknownType.type,
-      location: this.getLocation(ctx),
-    };
+  visitInferredByExpression(ctx: InferredByExpressionContext): InformalOr | InformalAnd | NotExpression | ConceptReference | GroupExpression {
+    return this.visit(ctx.informalOr()) as InferredByExpression;
   }
 
-  visitConceptDefinition(ctx: ParserRuleContext): ConceptDefinition {
-    const firstToken = ctx.getChild(0).text;
-    if (firstToken === 'coded') {
-      return this.visitCodedByDefinition(ctx);
-    } else {
-      return this.visitInferredByDefinition(ctx);
+  visitInformalOr(ctx: InformalOrContext): InformalOr {
+    const terms = ctx.informalAnd().map(a => this.visit(a) as any);
+    if (ctx.OR().length) {
+      // flatten
+      return { type: InformalOrType.type, terms, location: getLocation(ctx) };
     }
+    return terms[0] as InformalOr;
   }
 
-  visitCodedByDefinition(ctx: ParserRuleContext): CodedByDefinition {
-    const terminologyName = this.getStringValue(ctx.getChild(2));
-    return {
-      type: CodedByDefinitionType.type,
-      terminologyName,
-      location: this.getLocation(ctx),
-    };
-  }
-
-  visitInferredByDefinition(ctx: ParserRuleContext): InferredByDefinition {
-    const inferredBody = this.getContext(ctx.getChild(2));
-
-    // Check if it's a descriptive logic (enclosed in parentheses)
-    if (
-      inferredBody.getChild(0) instanceof ParserRuleContext &&
-      inferredBody.getChild(0).constructor.name === 'InferredByDescriptiveLogicContext'
-    ) {
-      return {
-        type: InferredByDefinitionType.type,
-        descriptiveLogic: inferredBody.text,
-        location: this.getLocation(ctx),
-      };
+  visitInformalAnd(ctx: InformalAndContext): InformalAnd | NotExpression | GroupExpression | ConceptReference {
+    const terms = ctx.informalNot().map(n => this.visit(n) as any);
+    if (ctx.AND().length) {
+      return { type: InformalAndType.type, terms, location: getLocation(ctx) };
     }
+    return terms[0] as any;
+  }
 
-    // Otherwise it's a concept reference with optional pattern
-    const text = inferredBody.text;
-    const matches = text.match(/"([^"]+)"\s*"([^"]+)"/);
-
-    if (matches && matches.length === 3) {
-      // We have both pattern and concept
-      return {
-        type: InferredByDefinitionType.type,
-        pattern: matches[1],
-        concept: matches[2],
-        location: this.getLocation(ctx),
-      };
-    } else {
-      // Just a concept reference
-      const concept = this.getStringValue(inferredBody.getChild(0));
-      return {
-        type: InferredByDefinitionType.type,
-        concept,
-        location: this.getLocation(ctx),
-      };
+  visitInformalNot(ctx: InformalNotContext): NotExpression | any {
+    if (ctx.NOT()) {
+      return { type: NotExpressionType.type, expression: this.visit(ctx.informalNot()!), location: getLocation(ctx) };
     }
+    return this.visit(ctx.atom()!);
   }
 
-  private getStringValue(node: ParseTree): string {
-    const text = node.text;
-    // Remove quotes if present
-    return text.startsWith('"') && text.endsWith('"') ? text.slice(1, -1) : text;
+  visitConceptAtom(ctx: ConceptAtomContext): ConceptReference {
+    const name = ctx.conceptReference().text.slice(1,-1);
+    return { type: ConceptReferenceType.type, name, location: getLocation(ctx) };
   }
-
-  private getLocation(ctx: ParserRuleContext): {
-    start: { line: number; column: number };
-    end: { line: number; column: number };
-  } {
-    return {
-      start: {
-        line: ctx.start.line,
-        column: ctx.start.charPositionInLine,
-      },
-      end: {
-        line: ctx.stop?.line ?? ctx.start.line,
-        column: ctx.stop?.charPositionInLine ?? ctx.start.charPositionInLine,
-      },
-    };
-  }
-
-  private getContext(node: ParseTree): ParserRuleContext {
-    if (!(node instanceof ParserRuleContext)) {
-      throw new Error('Expected ParserRuleContext');
-    }
-    return node;
-  }
-
-  private isStatement(node: ASTNode): node is Statement {
-    return (
-      node.type === DecisionType.type ||
-      node.type === TerminologyType.type ||
-      node.type === ActivityType.type ||
-      node.type === ConceptType.type
-    );
-  }
-
-  private isBlockStatement(node: ASTNode): node is WhenBlock | ActionStatement {
-    return node.type === WhenBlockType.type || node.type === ActionStatementType.type;
+  visitGroupExpression(ctx: GroupExpressionContext): GroupExpression {
+    const expr = this.visit(ctx.inferredByExpression()) as any;
+    return { type: GroupExpressionType.type, expression: expr, location: getLocation(ctx) };
   }
 }

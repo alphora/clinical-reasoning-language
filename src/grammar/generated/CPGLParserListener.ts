@@ -3,6 +3,8 @@
 
 import { ParseTreeListener } from "antlr4ts/tree/ParseTreeListener";
 
+import { WhenWithBodyContext } from "./CPGLParser";
+import { WhenSingleActionContext } from "./CPGLParser";
 import { NestedWhenBlockContext } from "./CPGLParser";
 import { BlockActionContext } from "./CPGLParser";
 import { DefinitionConceptContext } from "./CPGLParser";
@@ -60,6 +62,32 @@ import { StringLiteralContext } from "./CPGLParser";
  * `CPGLParser`.
  */
 export interface CPGLParserListener extends ParseTreeListener {
+	/**
+	 * Enter a parse tree produced by the `WhenWithBody`
+	 * labeled alternative in `CPGLParser.whenBlock`.
+	 * @param ctx the parse tree
+	 */
+	enterWhenWithBody?: (ctx: WhenWithBodyContext) => void;
+	/**
+	 * Exit a parse tree produced by the `WhenWithBody`
+	 * labeled alternative in `CPGLParser.whenBlock`.
+	 * @param ctx the parse tree
+	 */
+	exitWhenWithBody?: (ctx: WhenWithBodyContext) => void;
+
+	/**
+	 * Enter a parse tree produced by the `WhenSingleAction`
+	 * labeled alternative in `CPGLParser.whenBlock`.
+	 * @param ctx the parse tree
+	 */
+	enterWhenSingleAction?: (ctx: WhenSingleActionContext) => void;
+	/**
+	 * Exit a parse tree produced by the `WhenSingleAction`
+	 * labeled alternative in `CPGLParser.whenBlock`.
+	 * @param ctx the parse tree
+	 */
+	exitWhenSingleAction?: (ctx: WhenSingleActionContext) => void;
+
 	/**
 	 * Enter a parse tree produced by the `NestedWhenBlock`
 	 * labeled alternative in `CPGLParser.blockStatement`.

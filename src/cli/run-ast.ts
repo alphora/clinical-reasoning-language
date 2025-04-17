@@ -3,7 +3,7 @@ import { join } from 'path';
 
 import { CharStreams, CommonTokenStream } from 'antlr4ts';
 
-import { ASTBuilder } from '../ast/builder';
+import { CPGLAstBuilder } from '../ast/builder';
 import { CPGL } from '../ast/types';
 import { printAST } from '../ast/utils';
 import { CPGLParser } from '../grammar/generated/CPGLParser';
@@ -24,7 +24,7 @@ const parser = new CPGLParser(tokenStream);
 const tree = parser.cpgl();
 
 // Create the AST builder and visit the parse tree
-const builder = new ASTBuilder();
+const builder = new CPGLAstBuilder();
 const ast = builder.visit(tree) as CPGL;
 
 // Check if raw output is requested
