@@ -11,7 +11,11 @@ import {
   ActionStatement, 
   ActionStatementType,
   WhenBlockType,
-  BlockBodyType
+  BlockBodyType,
+  SingleAction,
+  SingleActionType,
+  DoActivity,
+  DoActivityType
 } from '../types';
 
 /**
@@ -59,39 +63,94 @@ done`;
 
     const firstWhenBlock = decision.body.statements[0] as WhenBlock;
     const firstBlockBody = firstWhenBlock.body as BlockBody;
-    expect(firstBlockBody.statements).toHaveLength(2); // Should have 2 when blocks
+    expect(firstBlockBody.statements).toHaveLength(2);
 
     const nestedWhenBlock = firstBlockBody.statements[0] as WhenBlock;
     const nestedBlockBody = nestedWhenBlock.body as BlockBody;
-    expect(nestedBlockBody.statements).toHaveLength(2); // Should have 2 statements
+    expect(nestedBlockBody.statements).toHaveLength(2);
   });
 
-  it('should correctly structure nested decisions', () => {
+  it('should handle single action statements', () => {
     const input = `
-decision "IMMZ.D2.D5.Measles":
-    when "Measles Routine Immunization Schedule Incomplete" then:
+decision "Test Decision":
+    when "Age" then do "Vaccinate".
+done`;
+
+    const result = parseInput(input);
+    const decision = result.statements[0] as Decision;
+    const whenBlock = decision.body.statements[0] as WhenBlock;
+    const singleAction = whenBlock.body as SingleAction;
+    const doActivity = singleAction.action as DoActivity;
+    
+    expect(singleAction.type).toBe(SingleActionType.type);
+    expect(doActivity.type).toBe(DoActivityType.type);
+    expect(doActivity.activityName).toBe('Vaccinate');
+  });
+
+  it('should handle block bodies with any qualifier', () => {
+    const input = `
+decision "Test Decision":
+    when "Age" then:
         any:
-        when "No Primary Series Doses Administered" then:
-            when "Client Age Less Than 12 Months" then do "Indicate".
-            when "Last Live Vaccine Administered has had in 4 Weeks" then use "Elderly Based".
-        done
-        when "Client Is Due For MCV12" then do "Vaccinate".
+        when "Greater Than 18" then do "Adult Protocol".
+        when "Less Than 65" then do "Standard Care".
     done
 done`;
 
     const result = parseInput(input);
     const decision = result.statements[0] as Decision;
+    const whenBlock = decision.body.statements[0] as WhenBlock;
+    const blockBody = whenBlock.body as BlockBody;
+    
+    expect(blockBody.qualifier).toBe('any');
+    expect(blockBody.statements).toHaveLength(2);
+  });
 
-    // Verify the structure
-    expect(decision.body.statements).toHaveLength(1);
+  it('should handle block bodies with all qualifier', () => {
+    const input = `
+decision "Test Decision":
+    when "Age" then:
+        all:
+        when "Greater Than 18" then do "Adult Protocol".
+        when "Less Than 65" then do "Standard Care".
+    done
+done`;
 
-    const firstWhenBlock = decision.body.statements[0] as WhenBlock;
-    const firstBlockBody = firstWhenBlock.body as BlockBody;
-    expect(firstBlockBody.statements).toHaveLength(2); // Should have 2 when blocks
+    const result = parseInput(input);
+    const decision = result.statements[0] as Decision;
+    const whenBlock = decision.body.statements[0] as WhenBlock;
+    const blockBody = whenBlock.body as BlockBody;
+    
+    expect(blockBody.qualifier).toBe('all');
+    expect(blockBody.statements).toHaveLength(2);
+  });
 
-    const nestedWhenBlock = firstBlockBody.statements[0] as WhenBlock;
-    const nestedBlockBody = nestedWhenBlock.body as BlockBody;
-    expect(nestedBlockBody.statements).toHaveLength(2); // Should have 2 statements
+  it('should handle mixed action types in block bodies', () => {
+    const input = `
+decision "Test Decision":
+    when "Age" then:
+        do "Vaccinate".
+        use "Protocol".
+        when "Condition" then do "Action".
+    done
+done`;
+
+    const result = parseInput(input);
+    const decision = result.statements[0] as Decision;
+    const whenBlock = decision.body.statements[0] as WhenBlock;
+    const blockBody = whenBlock.body as BlockBody;
+    
+    expect(blockBody.statements).toHaveLength(3);
+    
+    const action1 = blockBody.statements[0] as ActionStatement;
+    const doActivity1 = action1.action as DoActivity;
+    expect(doActivity1.type).toBe(DoActivityType.type);
+    
+    const action2 = blockBody.statements[1] as ActionStatement;
+    expect(action2.action.type).toBe('UseDecision');
+    
+    const whenBlock2 = blockBody.statements[2] as WhenBlock;
+    expect(whenBlock2.type).toBe(WhenBlockType.type);
   });
 
   it('should not duplicate when blocks in nested decisions', () => {
@@ -226,8 +285,8 @@ describe('Repeated Statements in Decision Blocks', () => {
   it('should preserve repeated when statements', () => {
     const input = `
 decision "Test Decision":
-    when "Age" "Greater Than" "18".
-    when "Age" "Less Than" "65".
+    when "Age Greater Than 18" then do "Standard Care".
+    when "Age Greater Than 18" then do "Monitor Vital Signs".
 done`;
 
     const result = parseInput(input);
@@ -235,15 +294,15 @@ done`;
     expect(decision.body.statements).toHaveLength(2);
     const whenBlock1 = decision.body.statements[0] as WhenBlock;
     const whenBlock2 = decision.body.statements[1] as WhenBlock;
-    expect(whenBlock1.conceptName).toBe('Age');
-    expect(whenBlock2.conceptName).toBe('Age');
+    expect(whenBlock1.conceptName).toBe('Age Greater Than 18');
+    expect(whenBlock2.conceptName).toBe('Age Greater Than 18');
   });
 
   it('should preserve repeated use statements', () => {
     const input = `
 decision "Test Decision":
-    when "Age" "Greater Than" "18":
-        use "Adult Protocol".
+    when "Age Greater Than 18":
+        use "Standard Care".
         use "Standard Care".
     done
 done`;
@@ -264,8 +323,8 @@ done`;
   it('should preserve repeated do statements', () => {
     const input = `
 decision "Test Decision":
-    when "Age" "Greater Than" "18":
-        do "Administer Medication".
+    when "Age Greater Than 18":
+        do "Monitor Vital Signs".
         do "Monitor Vital Signs".
     done
 done`;
