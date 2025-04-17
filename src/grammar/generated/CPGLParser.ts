@@ -25,6 +25,7 @@ import * as Utils from "antlr4ts/misc/Utils";
 
 import { CPGLParserListener } from "./CPGLParserListener";
 import { CPGLParserVisitor } from "./CPGLParserVisitor";
+import { CustomParserErrorListener } from '../../parser/CustomParserErrorListener';
 
 
 export class CPGLParser extends Parser {
@@ -178,6 +179,8 @@ export class CPGLParser extends Parser {
 	constructor(input: TokenStream) {
 		super(input);
 		this._interp = new ParserATNSimulator(CPGLParser._ATN, this);
+		this.removeErrorListeners();
+		this.addErrorListener(new CustomParserErrorListener());
 	}
 	// @RuleVersion(0)
 	public cpgl(): CpglContext {

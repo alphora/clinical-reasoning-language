@@ -6,8 +6,8 @@ import { CharStreams, CommonTokenStream } from 'antlr4ts';
 import { CPGLAstBuilder } from '../ast/builder';
 import { ASTNode, DoActivity, UseDecision, CPGL } from '../ast/types';
 import { CPGLLexer } from '../grammar/generated/CPGLLexer';
-import { CPGLParser } from '../grammar/generated/CPGLParser';
 import { CPGLLexerErrorListener } from '../lexer/CPGLLexerErrorListener';
+import { createParser } from '../parser/createParser';
 
 // Read the example file
 const examplePath = join(__dirname, '../../docs/grammar-example.cpg');
@@ -20,7 +20,7 @@ lexer.addErrorListener(new CPGLLexerErrorListener());
 const tokenStream = new CommonTokenStream(lexer);
 
 // Create the parser
-const parser = new CPGLParser(tokenStream);
+const parser = createParser(tokenStream);
 
 // Parse the input
 const tree = parser.cpgl();

@@ -4,9 +4,9 @@ import { ParseTree } from 'antlr4ts/tree/ParseTree';
 import { CPGLAstBuilder } from './ast/builder';
 import { CPGL } from './ast/types';
 import { CPGLLexer } from './grammar/generated/CPGLLexer';
-import { CPGLParser } from './grammar/generated/CPGLParser';
 import { createLexer } from './lexer/createLexer';
 import { Validator } from './validator/validator';
+import { createParser } from './parser/createParser';
 
 export interface Token {
   line: number;
@@ -61,7 +61,7 @@ export function parseCPGL(input: string): ParseResult<ParseTree> {
   try {
     const lexer = createLexer(CharStreams.fromString(input));
     const tokenStream = new CommonTokenStream(lexer);
-    const parser = new CPGLParser(tokenStream);
+    const parser = createParser(tokenStream);
     const tree = parser.cpgl();
 
     return { success: true, result: tree };
@@ -79,7 +79,7 @@ export function buildCPGL(input: string): ParseResult<CPGL> {
   try {
     const lexer = createLexer(CharStreams.fromString(input));
     const tokenStream = new CommonTokenStream(lexer);
-    const parser = new CPGLParser(tokenStream);
+    const parser = createParser(tokenStream);
     const tree = parser.cpgl();
     const builder = new CPGLAstBuilder();
     const ast = builder.visit(tree) as CPGL;
@@ -99,7 +99,7 @@ export function validateCPGL(input: string): ParseResult<CPGL> {
   try {
     const lexer = createLexer(CharStreams.fromString(input));
     const tokenStream = new CommonTokenStream(lexer);
-    const parser = new CPGLParser(tokenStream);
+    const parser = createParser(tokenStream);
     const tree = parser.cpgl();
     const builder = new CPGLAstBuilder();
     const ast = builder.visit(tree) as CPGL;
