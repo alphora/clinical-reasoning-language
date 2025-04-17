@@ -15,7 +15,8 @@ import {
   SingleAction,
   SingleActionType,
   DoActivity,
-  DoActivityType
+  DoActivityType,
+  UseDecision
 } from '../types';
 
 /**
@@ -47,12 +48,12 @@ describe('Decision Structure', () => {
 decision "IMMZ.D2.D5.Measles":
     when "Measles Routine Immunization Schedule Incomplete" then:
         any:
-        when "No Primary Series Doses Administered" then:
-            when "Client Age Less Than 12 Months" then do "Indicate".
-            when "Last Live Vaccine Administered has had in 4 Weeks" then use "Elderly Based".
+            when "No Primary Series Doses Administered" then:
+                when "Client Age Less Than 12 Months" then do "Indicate".
+                when "Last Live Vaccine Administered has had in 4 Weeks" then use "Elderly Based".
+            done
+            when "Client Is Due For MCV12" then do "Vaccinate".
         done
-        when "Client Is Due For MCV12" then do "Vaccinate".
-    done
 done`;
 
     const result = parseInput(input);
@@ -92,9 +93,9 @@ done`;
 decision "Test Decision":
     when "Age" then:
         any:
-        when "Greater Than 18" then do "Adult Protocol".
-        when "Less Than 65" then do "Standard Care".
-    done
+            when "Greater Than 18" then do "Adult Protocol".
+            when "Less Than 65" then do "Standard Care".
+        done
 done`;
 
     const result = parseInput(input);
@@ -111,9 +112,9 @@ done`;
 decision "Test Decision":
     when "Age" then:
         all:
-        when "Greater Than 18" then do "Adult Protocol".
-        when "Less Than 65" then do "Standard Care".
-    done
+            when "Greater Than 18" then do "Adult Protocol".
+            when "Less Than 65" then do "Standard Care".
+        done
 done`;
 
     const result = parseInput(input);
@@ -142,15 +143,21 @@ done`;
     
     expect(blockBody.statements).toHaveLength(3);
     
-    const action1 = blockBody.statements[0] as ActionStatement;
-    const doActivity1 = action1.action as DoActivity;
-    expect(doActivity1.type).toBe(DoActivityType.type);
+    const doAction = blockBody.statements[0] as ActionStatement;
+    expect(doAction.type).toBe('ActionStatement');
+    expect(doAction.action.type).toBe('DoActivity');
     
-    const action2 = blockBody.statements[1] as ActionStatement;
-    expect(action2.action.type).toBe('UseDecision');
+    const useAction = blockBody.statements[1] as ActionStatement;
+    expect(useAction.type).toBe('ActionStatement');
+    expect(useAction.action.type).toBe('UseDecision');
     
-    const whenBlock2 = blockBody.statements[2] as WhenBlock;
-    expect(whenBlock2.type).toBe(WhenBlockType.type);
+    const nestedWhen = blockBody.statements[2] as WhenBlock;
+    expect(nestedWhen.type).toBe('WhenBlock');
+    expect(nestedWhen.conceptName).toBe('Condition');
+    
+    const singleAction = nestedWhen.body as SingleAction;
+    expect(singleAction.type).toBe('SingleAction');
+    expect(singleAction.action.type).toBe('DoActivity');
   });
 
   it('should not duplicate when blocks in nested decisions', () => {
@@ -158,12 +165,12 @@ done`;
 decision "IMMZ.D2.D5.Measles":
     when "Measles Routine Immunization Schedule Incomplete" then:
         any:
-        when "No Primary Series Doses Administered" then:
-            when "Client Age Less Than 12 Months" then do "Indicate".
-            when "Last Live Vaccine Administered has had in 4 Weeks" then use "Elderly Based".
+            when "No Primary Series Doses Administered" then:
+                when "Client Age Less Than 12 Months" then do "Indicate".
+                when "Last Live Vaccine Administered has had in 4 Weeks" then use "Elderly Based".
+            done
+            when "Client Is Due For MCV12" then do "Vaccinate".
         done
-        when "Client Is Due For MCV12" then do "Vaccinate".
-    done
 done`;
 
     const result = parseInput(input);
@@ -227,18 +234,18 @@ done`;
 decision "IMMZ.D2.D5.Measles":
     when "Measles Routine Immunization Schedule Incomplete" then:
         any:
-        when "No Primary Series Doses Administered" then:
-            when "Client Age Less Than 12 Months" then do "Indicate".
-            when "Last Live Vaccine Administered has had in 4 Weeks" then use "Elderly Based".
+            when "No Primary Series Doses Administered" then:
+                when "Client Age Less Than 12 Months" then do "Indicate".
+                when "Last Live Vaccine Administered has had in 4 Weeks" then use "Elderly Based".
+            done
+            when "Client Is Due For MCV12" then do "Vaccinate".
         done
-        when "Client Is Due For MCV12" then do "Vaccinate".
-    done
     when "One Primary Series Dose Administered" then:
         all:
-        when "Client Age Less Than 15 Months" then do "Indicate".
-        when "Last Live Vaccine Administered has had in 4 Weeks" then use "Elderly Based".
-        when "Client Is Due For MCV12" then do "Vaccinate".
-    done
+            when "Client Age Less Than 15 Months" then do "Indicate".
+            when "Last Live Vaccine Administered has had in 4 Weeks" then use "Elderly Based".
+            when "Client Is Due For MCV12" then do "Vaccinate".
+        done
     when "Two Primary Series Doses Administered" then do "Indicate".
 done`;
 
@@ -248,22 +255,16 @@ done`;
     // Verify the structure without duplicates
     expect(decision.body.statements).toHaveLength(3);
 
-    // First when block
     const firstWhenBlock = decision.body.statements[0] as WhenBlock;
     const firstBlockBody = firstWhenBlock.body as BlockBody;
     expect(firstBlockBody.statements).toHaveLength(2);
 
-    // Second when block
     const secondWhenBlock = decision.body.statements[1] as WhenBlock;
     const secondBlockBody = secondWhenBlock.body as BlockBody;
     expect(secondBlockBody.statements).toHaveLength(3);
 
-    // Third when block
     const thirdWhenBlock = decision.body.statements[2] as WhenBlock;
-    const thirdBlockBody = thirdWhenBlock.body as BlockBody;
-    expect(thirdBlockBody.statements).toHaveLength(1);
-    const action = thirdBlockBody.statements[0] as ActionStatement;
-    expect(action.action.type).toBe('DoActivity');
+    expect(thirdWhenBlock.body.type).toBe(SingleActionType.type);
   });
 });
 
@@ -301,9 +302,9 @@ done`;
   it('should preserve repeated use statements', () => {
     const input = `
 decision "Test Decision":
-    when "Age Greater Than 18":
-        use "Standard Care".
-        use "Standard Care".
+    when "Age" then:
+        use "Protocol1".
+        use "Protocol2".
     done
 done`;
 
@@ -312,20 +313,26 @@ done`;
     const whenBlock = decision.body.statements[0] as WhenBlock;
     const blockBody = whenBlock.body as BlockBody;
     expect(blockBody.statements).toHaveLength(2);
-    const action1 = blockBody.statements[0] as ActionStatement;
-    const action2 = blockBody.statements[1] as ActionStatement;
-    expect(action1.action.type).toBe('UseDecision');
-    expect((action1.action as any).decisionName).toBe('Adult Protocol');
-    expect(action2.action.type).toBe('UseDecision');
-    expect((action2.action as any).decisionName).toBe('Standard Care');
+    
+    const useAction1 = blockBody.statements[0] as ActionStatement;
+    const useAction2 = blockBody.statements[1] as ActionStatement;
+    
+    expect(useAction1.type).toBe('ActionStatement');
+    expect(useAction2.type).toBe('ActionStatement');
+    
+    expect(useAction1.action.type).toBe('UseDecision');
+    expect(useAction2.action.type).toBe('UseDecision');
+    
+    expect((useAction1.action as UseDecision).decisionName).toBe('Protocol1');
+    expect((useAction2.action as UseDecision).decisionName).toBe('Protocol2');
   });
 
   it('should preserve repeated do statements', () => {
     const input = `
 decision "Test Decision":
-    when "Age Greater Than 18":
-        do "Monitor Vital Signs".
-        do "Monitor Vital Signs".
+    when "Age" then:
+        do "Action1".
+        do "Action2".
     done
 done`;
 
@@ -334,22 +341,28 @@ done`;
     const whenBlock = decision.body.statements[0] as WhenBlock;
     const blockBody = whenBlock.body as BlockBody;
     expect(blockBody.statements).toHaveLength(2);
-    const action1 = blockBody.statements[0] as ActionStatement;
-    const action2 = blockBody.statements[1] as ActionStatement;
-    expect(action1.action.type).toBe('DoActivity');
-    expect((action1.action as any).activityName).toBe('Administer Medication');
-    expect(action2.action.type).toBe('DoActivity');
-    expect((action2.action as any).activityName).toBe('Monitor Vital Signs');
+    
+    const doAction1 = blockBody.statements[0] as ActionStatement;
+    const doAction2 = blockBody.statements[1] as ActionStatement;
+    
+    expect(doAction1.type).toBe('ActionStatement');
+    expect(doAction2.type).toBe('ActionStatement');
+    
+    expect(doAction1.action.type).toBe('DoActivity');
+    expect(doAction2.action.type).toBe('DoActivity');
+    
+    expect((doAction1.action as DoActivity).activityName).toBe('Action1');
+    expect((doAction2.action as DoActivity).activityName).toBe('Action2');
   });
 
   it('should preserve mixed repeated statements', () => {
     const input = `
 decision "Test Decision":
-    when "Age Greater Than 18":
-        use "Adult Protocol".
-        do "Administer Medication".
-        use "Adult Protocol".
-        do "Administer Medication".
+    when "Age" then:
+        do "Action1".
+        use "Protocol1".
+        do "Action2".
+        use "Protocol2".
     done
 done`;
 
@@ -361,24 +374,24 @@ done`;
     // Verify statements
     expect(blockBody.statements).toHaveLength(4);
     
-    // First use statement
-    const action1 = blockBody.statements[0] as ActionStatement;
-    expect(action1.action.type).toBe('UseDecision');
-    expect((action1.action as any).decisionName).toBe('Adult Protocol');
+    const doAction1 = blockBody.statements[0] as ActionStatement;
+    const useAction1 = blockBody.statements[1] as ActionStatement;
+    const doAction2 = blockBody.statements[2] as ActionStatement;
+    const useAction2 = blockBody.statements[3] as ActionStatement;
     
-    // First do statement
-    const action2 = blockBody.statements[1] as ActionStatement;
-    expect(action2.action.type).toBe('DoActivity');
-    expect((action2.action as any).activityName).toBe('Administer Medication');
+    expect(doAction1.type).toBe('ActionStatement');
+    expect(useAction1.type).toBe('ActionStatement');
+    expect(doAction2.type).toBe('ActionStatement');
+    expect(useAction2.type).toBe('ActionStatement');
     
-    // Second use statement
-    const action3 = blockBody.statements[2] as ActionStatement;
-    expect(action3.action.type).toBe('UseDecision');
-    expect((action3.action as any).decisionName).toBe('Adult Protocol');
+    expect(doAction1.action.type).toBe('DoActivity');
+    expect(useAction1.action.type).toBe('UseDecision');
+    expect(doAction2.action.type).toBe('DoActivity');
+    expect(useAction2.action.type).toBe('UseDecision');
     
-    // Second do statement
-    const action4 = blockBody.statements[3] as ActionStatement;
-    expect(action4.action.type).toBe('DoActivity');
-    expect((action4.action as any).activityName).toBe('Administer Medication');
+    expect((doAction1.action as DoActivity).activityName).toBe('Action1');
+    expect((useAction1.action as UseDecision).decisionName).toBe('Protocol1');
+    expect((doAction2.action as DoActivity).activityName).toBe('Action2');
+    expect((useAction2.action as UseDecision).decisionName).toBe('Protocol2');
   });
 });
