@@ -119,4 +119,7 @@ const result = validateCPGL(`
 - More robust validation system
 - Cleaner code organization
 
+### Important Note
+- **Temporary Change**: The validator has been temporarily disabled to allow for refactoring to match the builder implementation. This functionality will be restored in the next release.
+
 [0.2.0]: https://github.com/cqis/cpgl/releases/tag/v0.2.0 
