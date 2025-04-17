@@ -1,6 +1,7 @@
 import { CharStreams, CommonTokenStream } from 'antlr4ts';
 import { CPGLLexer } from '../../grammar/generated/CPGLLexer';
 import { CPGLLexerErrorListener } from '../CPGLLexerErrorListener';
+import { getAllTokens } from './index.test';
 
 function createLexerWithErrors(input: string): { lexer: CPGLLexer, errorListener: CPGLLexerErrorListener } {
   const charStream = CharStreams.fromString(input);
@@ -18,7 +19,7 @@ describe('CPGLLexerErrorListener', () => {
     tokenStream.fill();
     const errors = errorListener.getErrors();
     expect(errors.length).toBe(1);
-    expect(errors[0]).toContain("Lexical error at line 1:0 - Invalid token 'valid'. (details: token recognition error at: 'inv')");
+    expect(errors[0]).toContain("Lexical error at line 1:0 - Invalid token 'invalid'. (details: token recognition error at: 'inv')");
   });
 
   it('should treat whitespace-separated invalid tokens as separate errors', () => {
@@ -27,8 +28,8 @@ describe('CPGLLexerErrorListener', () => {
     tokenStream.fill();
     const errors = errorListener.getErrors();
     expect(errors.length).toBe(2);
-    expect(errors[0]).toContain("Lexical error at line 1:0 - Invalid token 'valid1'. (details: token recognition error at: 'inv')");
-    expect(errors[1]).toContain("Lexical error at line 1:3 - Invalid token 'valid2'. (details: token recognition error at: 'inv')");
+    expect(errors[0]).toContain("Lexical error at line 1:0 - Invalid token 'invalid1'. (details: token recognition error at: 'inv')");
+    expect(errors[1]).toContain("Lexical error at line 1:9 - Invalid token 'invalid2'. (details: token recognition error at: 'inv')");
   });
 
   it('should combine invalid tokens within quoted strings into a single error', () => {
@@ -46,8 +47,8 @@ describe('CPGLLexerErrorListener', () => {
     tokenStream.fill();
     const errors = errorListener.getErrors();
     expect(errors.length).toBe(2);
-    expect(errors[0]).toContain("Lexical error at line 1:0 - Invalid token 'valid'. (details: token recognition error at: 'inv')");
-    expect(errors[1]).toContain("Lexical error at line 2:0 - Invalid token 'valid'. (details: token recognition error at: 'inv')");
+    expect(errors[0]).toContain("Lexical error at line 1:0 - Invalid token 'invalid'. (details: token recognition error at: 'inv')");
+    expect(errors[1]).toContain("Lexical error at line 2:0 - Invalid token 'invalid'. (details: token recognition error at: 'inv')");
   });
 });
 
@@ -66,7 +67,7 @@ describe('CPGLLexerErrorListener with CPGL-specific input', () => {
     tokenStream.fill();
     const errors = errorListener.getErrors();
     expect(errors.length).toBe(1);
-    expect(errors[0]).toContain("Line 1:36 - Invalid concept type - InvalidType. Valid types are: Communication, CommunicationRequest, Condition, QuestionnaireTask, QuestionnaireResponse, MedicationRequest, MedicationDispense, MedicationAdministration, MedicationStatement, ImmunizationRequest, Immunization, ServiceRequest, Procedure, Observation");
+    expect(errors[0]).toContain("Lexical error at line 1:36 - Invalid concept type 'InvalidType'. (details: Valid types are: Communication, CommunicationRequest, Condition, QuestionnaireTask, QuestionnaireResponse, MedicationRequest, MedicationDispense, MedicationAdministration, MedicationStatement, ImmunizationRequest, Immunization, ServiceRequest, Procedure, Observation)");
   });
 
   it('should detect invalid tokens in a terminology statement', () => {
@@ -84,5 +85,50 @@ describe('CPGLLexerErrorListener with CPGL-specific input', () => {
     tokenStream.fill();
     const errors = errorListener.getErrors();
     expect(errors.length).toBe(0);
+  });
+
+  it('should detect invalid activity type', () => {
+    const { lexer, errorListener } = createLexerWithErrors('invalidActivity');
+    const tokenStream = new CommonTokenStream(lexer);
+    tokenStream.fill();
+    const errors = errorListener.getErrors();
+    expect(errors.length).toBe(1);
+    expect(errors[0]).toContain("Lexical error at line 1:8 - Invalid activity type: invalidActivity. Valid types are: CPGAdministerMedication, CPGCollectInformation, CPGCommunication, CPGDispenseMedication, CPGDocumentMedication, CPGEnrollment, CPGGenerateReport, CPGHold, CPGImmunization, CPGMedicationRequest, CPGProposeDiagnosis, CPGRecordDetectedIssue, CPGRecordInference, CPGReportFlag, CPGResume, CPGServiceRequest, CPGStop");
+  });
+
+  it('should handle invalid concept type', () => {
+    const { lexer, errorListener } = createLexerWithErrors('concept "Invalid Concept": has type InvalidType. done');
+    const tokenStream = new CommonTokenStream(lexer);
+    tokenStream.fill();
+    const errors = errorListener.getErrors();
+    expect(errors.length).toBe(1);
+    expect(errors[0]).toContain("Lexical error at line 1:13 - Invalid concept type 'InvalidType'. (details: Valid types are: Communication, CommunicationRequest, Condition, QuestionnaireTask, QuestionnaireResponse, MedicationRequest, MedicationDispense, MedicationAdministration, MedicationStatement, ImmunizationRequest, Immunization, ServiceRequest, Procedure, Observation)");
+  });
+
+  it('should handle invalid concept value type', () => {
+    const { lexer, errorListener } = createLexerWithErrors('concept "Invalid Concept": has type InvalidValueType. done');
+    const tokenStream = new CommonTokenStream(lexer);
+    tokenStream.fill();
+    const errors = errorListener.getErrors();
+    expect(errors.length).toBe(1);
+    expect(errors[0]).toContain("Lexical error at line 1:18 - Invalid concept value type 'InvalidValueType'. (details: Valid types are: Quantity, CodeableConcept, string, boolean, integer, Range, Ratio, SampledData, time, dateTime, Period, Attachment)");
+  });
+
+  it('should handle invalid character in concept type', () => {
+    const { lexer, errorListener } = createLexerWithErrors('concept "Invalid Concept": has type @InvalidType. done');
+    const tokenStream = new CommonTokenStream(lexer);
+    tokenStream.fill();
+    const errors = errorListener.getErrors();
+    expect(errors.length).toBe(1);
+    expect(errors[0]).toContain("Lexical error at line 1:13 - Invalid character in concept type: '@'");
+  });
+
+  it('should handle invalid character in value type', () => {
+    const { lexer, errorListener } = createLexerWithErrors('concept "Invalid Concept": has type InvalidValueType. done');
+    const tokenStream = new CommonTokenStream(lexer);
+    tokenStream.fill();
+    const errors = errorListener.getErrors();
+    expect(errors.length).toBe(1);
+    expect(errors[0]).toContain("Lexical error at line 1:36 - Invalid concept type 'InvalidValueType'. (details: Valid types are: Communication, CommunicationRequest, Condition, QuestionnaireTask, QuestionnaireResponse, MedicationRequest, MedicationDispense, MedicationAdministration, MedicationStatement, ImmunizationRequest, Immunization, ServiceRequest, Procedure, Observation)");
   });
 }); 

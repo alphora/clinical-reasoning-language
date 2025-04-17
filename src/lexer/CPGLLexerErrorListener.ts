@@ -53,7 +53,15 @@ export class CPGLLexerErrorListener implements ANTLRErrorListener<number> {
       }
     }
 
-    const errorMessage = `Lexical error at line ${line}:${charPositionInLine} - Invalid token '${errorText}'. (details: ${msg})`;
+    const errorMessage = JSON.stringify({
+      type: "LexicalError",
+      line: line,
+      column: charPositionInLine,
+      message: `Invalid token: ${errorText}`,
+      details: {
+        message:`${msg}`
+      }
+    });
     console.error(errorMessage);
     this.errors.push(errorMessage);
 

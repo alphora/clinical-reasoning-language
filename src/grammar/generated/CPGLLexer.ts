@@ -189,7 +189,16 @@ export class CPGLLexer extends Lexer {
 			            'CPGStop'
 			        ];
 			        if (!validTypes.includes(this.text)) {
-			            throw new Error(`Lexical error at line ${this._tokenStartLine}:${this._tokenStartCharPositionInLine} - Invalid activity type: ${this.text}. Valid types are: ${validTypes.join(', ')}`);
+			            throw new Error(JSON.stringify({
+			                type: "LexicalError",
+			                line: this._tokenStartLine,
+			                column: this._tokenStartCharPositionInLine,
+			                message: `Invalid activity type: ${this.text}`,
+			                details: {
+			                    validTypes,
+			                    received: this.text
+			                }
+			                }));
 			        }
 			    
 			break;
@@ -199,7 +208,12 @@ export class CPGLLexer extends Lexer {
 		switch (actionIndex) {
 		case 1:
 
-			        throw new Error(`Line ${this._tokenStartLine}:${this._tokenStartCharPositionInLine} - Invalid character in activity type: ${this.text}`);
+			            throw new Error(JSON.stringify({
+			                type: "LexicalError",
+			                line: this._tokenStartLine,
+			                column: this._tokenStartCharPositionInLine,
+			                message: `Invalid character in activity type value: ${this.text}`
+			                }));
 			    
 			break;
 		}
@@ -225,7 +239,16 @@ export class CPGLLexer extends Lexer {
 			            'Observation'
 			        ];
 			        if (!validTypes.includes(this.text)) {
-			            throw new Error(`Lexical error at line ${this._tokenStartLine}:${this._tokenStartCharPositionInLine} - Invalid concept type '${this.text}'. (details: Valid types are: ${validTypes.join(', ')})`);
+			            throw new Error(JSON.stringify({
+			                type: "LexicalError",
+			                line: this._tokenStartLine,
+			                column: this._tokenStartCharPositionInLine,
+			                message: `Invalid concept type: ${this.text}`,
+			                details: {
+			                    validTypes,
+			                    received: this.text
+			                }
+			                }));
 			        }
 			    
 			break;
@@ -235,7 +258,12 @@ export class CPGLLexer extends Lexer {
 		switch (actionIndex) {
 		case 3:
 
-			        throw new Error(`Lexical error at line ${this._tokenStartLine}:${this._tokenStartCharPositionInLine} - Invalid character in concept type: '${this.text}'`);
+			            throw new Error(JSON.stringify({
+			                type: "LexicalError",
+			                line: this._tokenStartLine,
+			                column: this._tokenStartCharPositionInLine,
+			                message: `Invalid character in concept value: ${this.text}`
+			                }));
 			    
 			break;
 		}
@@ -259,7 +287,16 @@ export class CPGLLexer extends Lexer {
 			            'Attachment'
 			        ];
 			        if (!validTypes.includes(this.text)) {
-			            throw new Error(`Lexical error at line ${this._tokenStartLine}:${this._tokenStartCharPositionInLine} - Invalid concept value type '${this.text}'. (details: Valid types are: ${validTypes.join(', ')})`);
+			            throw new Error(JSON.stringify({
+			                type: "LexicalError",
+			                line: this._tokenStartLine,
+			                column: this._tokenStartCharPositionInLine,
+			                message: `Invalid concept value type: ${this.text}`,
+			                details: {
+			                    validTypes,
+			                    received: this.text
+			                }
+			                }));
 			        }
 			    
 			break;
@@ -269,7 +306,12 @@ export class CPGLLexer extends Lexer {
 		switch (actionIndex) {
 		case 5:
 
-			        throw new Error(`Lexical error at line ${this._tokenStartLine}:${this._tokenStartCharPositionInLine} - Invalid character in value type '${this.text}'`);
+			        throw new Error(JSON.stringify({
+			            type: "LexicalError",
+			            line: this._tokenStartLine,
+			            column: this._tokenStartCharPositionInLine,
+			            message: `Invalid character in concept type value: ${this.text}`
+			            }));
 			    
 			break;
 		}
