@@ -103,24 +103,24 @@ export class UnusedDeclarationsValidator {
     }
 
     // Process concept references in InferredByDefinition after all declarations are collected
-    for (const statement of ast.statements) {
-      if (
-        statement.type === 'Concept' &&
-        statement.definition.type === 'InferredByDefinition' &&
-        statement.definition.concept
-      ) {
-        // Mark the referenced concept as used
-        const referencedConceptInfo = this.conceptDeclarations.get(statement.definition.concept);
-        if (referencedConceptInfo) {
-          referencedConceptInfo.used = true;
-        }
-        // Mark the concept containing the InferredByDefinition as used
-        const conceptInfo = this.conceptDeclarations.get(statement.name);
-        if (conceptInfo) {
-          conceptInfo.used = true;
-        }
-      }
-    }
+    // for (const statement of ast.statements) {
+    //   if (
+    //     statement.type === 'Concept' &&
+    //     statement.definition.type === 'InferredByDefinition' &&
+    //     statement.definition.concept
+    //   ) {
+    //     // Mark the referenced concept as used
+    //     const referencedConceptInfo = this.conceptDeclarations.get(statement.definition.concept);
+    //     if (referencedConceptInfo) {
+    //       referencedConceptInfo.used = true;
+    //     }
+    //     // Mark the concept containing the InferredByDefinition as used
+    //     const conceptInfo = this.conceptDeclarations.get(statement.name);
+    //     if (conceptInfo) {
+    //       conceptInfo.used = true;
+    //     }
+    //   }
+    // }
   }
 
   private processDecisionBody(body: DecisionBody, containingDecisionName?: string): void {
