@@ -24,6 +24,8 @@ import { VocabularyImpl } from "antlr4ts/VocabularyImpl";
 import * as Utils from "antlr4ts/misc/Utils";
 
 import { CPGLParserListener } from "./CPGLParserListener";
+import { CPGLParserVisitor } from "./CPGLParserVisitor";
+
 
 export class CPGLParser extends Parser {
 	public static readonly CONCEPT = 1;
@@ -356,31 +358,38 @@ export class CPGLParser extends Parser {
 		let _localctx: WhenBlockContext = new WhenBlockContext(this._ctx, this.state);
 		this.enterRule(_localctx, 8, CPGLParser.RULE_whenBlock);
 		try {
-			this.enterOuterAlt(_localctx, 1);
-			{
-			this.state = 113;
-			this.match(CPGLParser.WHEN);
-			this.state = 114;
-			this.conceptReference();
-			this.state = 115;
-			this.match(CPGLParser.THEN);
-			this.state = 118;
+			this.state = 123;
 			this._errHandler.sync(this);
 			switch ( this.interpreter.adaptivePredict(this._input, 3, this._ctx) ) {
 			case 1:
+				_localctx = new WhenWithBodyContext(_localctx);
+				this.enterOuterAlt(_localctx, 1);
 				{
+				this.state = 113;
+				this.match(CPGLParser.WHEN);
+				this.state = 114;
+				this.conceptReference();
+				this.state = 115;
+				this.match(CPGLParser.THEN);
 				this.state = 116;
 				this.blockBody();
 				}
 				break;
 
 			case 2:
+				_localctx = new WhenSingleActionContext(_localctx);
+				this.enterOuterAlt(_localctx, 2);
 				{
-				this.state = 117;
+				this.state = 118;
+				this.match(CPGLParser.WHEN);
+				this.state = 119;
+				this.conceptReference();
+				this.state = 120;
+				this.match(CPGLParser.THEN);
+				this.state = 121;
 				this.singleActionStatement();
 				}
 				break;
-			}
 			}
 		}
 		catch (re) {
@@ -405,7 +414,7 @@ export class CPGLParser extends Parser {
 		try {
 			this.enterOuterAlt(_localctx, 1);
 			{
-			this.state = 120;
+			this.state = 125;
 			_la = this._input.LA(1);
 			if (!(_la === CPGLParser.ANY || _la === CPGLParser.ALL)) {
 			this._errHandler.recoverInline(this);
@@ -417,7 +426,7 @@ export class CPGLParser extends Parser {
 				this._errHandler.reportMatch(this);
 				this.consume();
 			}
-			this.state = 121;
+			this.state = 126;
 			this.match(CPGLParser.COLON);
 			}
 		}
@@ -443,20 +452,20 @@ export class CPGLParser extends Parser {
 			let _alt: number;
 			this.enterOuterAlt(_localctx, 1);
 			{
-			this.state = 123;
+			this.state = 128;
 			this.match(CPGLParser.COLON);
 			{
-			this.state = 125;
+			this.state = 130;
 			this._errHandler.sync(this);
 			switch ( this.interpreter.adaptivePredict(this._input, 4, this._ctx) ) {
 			case 1:
 				{
-				this.state = 124;
+				this.state = 129;
 				this.anyOrAllClause();
 				}
 				break;
 			}
-			this.state = 128;
+			this.state = 133;
 			this._errHandler.sync(this);
 			_alt = 1;
 			do {
@@ -464,7 +473,7 @@ export class CPGLParser extends Parser {
 				case 1:
 					{
 					{
-					this.state = 127;
+					this.state = 132;
 					this.blockStatement();
 					}
 					}
@@ -472,12 +481,12 @@ export class CPGLParser extends Parser {
 				default:
 					throw new NoViableAltException(this);
 				}
-				this.state = 130;
+				this.state = 135;
 				this._errHandler.sync(this);
 				_alt = this.interpreter.adaptivePredict(this._input, 5, this._ctx);
 			} while (_alt !== 2 && _alt !== ATN.INVALID_ALT_NUMBER);
 			}
-			this.state = 132;
+			this.state = 137;
 			this.match(CPGLParser.DONE);
 			}
 		}
@@ -502,24 +511,24 @@ export class CPGLParser extends Parser {
 		try {
 			this.enterOuterAlt(_localctx, 1);
 			{
-			this.state = 136;
+			this.state = 141;
 			this._errHandler.sync(this);
 			switch ( this.interpreter.adaptivePredict(this._input, 6, this._ctx) ) {
 			case 1:
 				{
-				this.state = 134;
+				this.state = 139;
 				this.doStatement();
 				}
 				break;
 
 			case 2:
 				{
-				this.state = 135;
+				this.state = 140;
 				this.useStatement();
 				}
 				break;
 			}
-			this.state = 138;
+			this.state = 143;
 			this.match(CPGLParser.DOT);
 			}
 		}
@@ -542,14 +551,14 @@ export class CPGLParser extends Parser {
 		let _localctx: BlockStatementContext = new BlockStatementContext(this._ctx, this.state);
 		this.enterRule(_localctx, 16, CPGLParser.RULE_blockStatement);
 		try {
-			this.state = 142;
+			this.state = 147;
 			this._errHandler.sync(this);
 			switch ( this.interpreter.adaptivePredict(this._input, 7, this._ctx) ) {
 			case 1:
 				_localctx = new NestedWhenBlockContext(_localctx);
 				this.enterOuterAlt(_localctx, 1);
 				{
-				this.state = 140;
+				this.state = 145;
 				this.whenBlock();
 				}
 				break;
@@ -558,7 +567,7 @@ export class CPGLParser extends Parser {
 				_localctx = new BlockActionContext(_localctx);
 				this.enterOuterAlt(_localctx, 2);
 				{
-				this.state = 141;
+				this.state = 146;
 				this.actionStatement();
 				}
 				break;
@@ -585,24 +594,24 @@ export class CPGLParser extends Parser {
 		try {
 			this.enterOuterAlt(_localctx, 1);
 			{
-			this.state = 146;
+			this.state = 151;
 			this._errHandler.sync(this);
 			switch ( this.interpreter.adaptivePredict(this._input, 8, this._ctx) ) {
 			case 1:
 				{
-				this.state = 144;
+				this.state = 149;
 				this.doStatement();
 				}
 				break;
 
 			case 2:
 				{
-				this.state = 145;
+				this.state = 150;
 				this.useStatement();
 				}
 				break;
 			}
-			this.state = 148;
+			this.state = 153;
 			this.match(CPGLParser.DOT);
 			}
 		}
@@ -627,9 +636,9 @@ export class CPGLParser extends Parser {
 		try {
 			this.enterOuterAlt(_localctx, 1);
 			{
-			this.state = 150;
+			this.state = 155;
 			this.match(CPGLParser.DO);
-			this.state = 151;
+			this.state = 156;
 			this.activityReference();
 			}
 		}
@@ -654,9 +663,9 @@ export class CPGLParser extends Parser {
 		try {
 			this.enterOuterAlt(_localctx, 1);
 			{
-			this.state = 153;
+			this.state = 158;
 			this.match(CPGLParser.USE);
-			this.state = 154;
+			this.state = 159;
 			this.decisionReference();
 			}
 		}
@@ -681,35 +690,35 @@ export class CPGLParser extends Parser {
 		try {
 			this.enterOuterAlt(_localctx, 1);
 			{
-			this.state = 156;
-			this.match(CPGLParser.TERMINOLOGY);
-			this.state = 157;
-			this.terminologyIdentifier();
 			this.state = 161;
+			this.match(CPGLParser.TERMINOLOGY);
+			this.state = 162;
+			this.terminologyIdentifier();
+			this.state = 166;
 			this._errHandler.sync(this);
 			switch ( this.interpreter.adaptivePredict(this._input, 9, this._ctx) ) {
 			case 1:
 				{
-				this.state = 158;
+				this.state = 163;
 				this.terminologyValueset();
 				}
 				break;
 
 			case 2:
 				{
-				this.state = 159;
+				this.state = 164;
 				this.terminologyUnknown();
 				}
 				break;
 
 			case 3:
 				{
-				this.state = 160;
+				this.state = 165;
 				this.terminologySystemCode();
 				}
 				break;
 			}
-			this.state = 163;
+			this.state = 168;
 			this.match(CPGLParser.DOT);
 			}
 		}
@@ -734,9 +743,9 @@ export class CPGLParser extends Parser {
 		try {
 			this.enterOuterAlt(_localctx, 1);
 			{
-			this.state = 165;
+			this.state = 170;
 			this.match(CPGLParser.VALUESET);
-			this.state = 166;
+			this.state = 171;
 			this.identifier();
 			}
 		}
@@ -761,7 +770,7 @@ export class CPGLParser extends Parser {
 		try {
 			this.enterOuterAlt(_localctx, 1);
 			{
-			this.state = 168;
+			this.state = 173;
 			this.match(CPGLParser.UNKNOWN);
 			}
 		}
@@ -786,13 +795,13 @@ export class CPGLParser extends Parser {
 		try {
 			this.enterOuterAlt(_localctx, 1);
 			{
-			this.state = 170;
+			this.state = 175;
 			this.match(CPGLParser.SYSTEM);
-			this.state = 171;
+			this.state = 176;
 			this.identifier();
-			this.state = 172;
+			this.state = 177;
 			this.match(CPGLParser.CODE);
-			this.state = 173;
+			this.state = 178;
 			this.identifier();
 			}
 		}
@@ -817,27 +826,27 @@ export class CPGLParser extends Parser {
 		try {
 			this.enterOuterAlt(_localctx, 1);
 			{
-			this.state = 175;
+			this.state = 180;
 			this.match(CPGLParser.ACTIVITY);
-			this.state = 176;
-			this.activityIdentifier();
-			this.state = 177;
-			this.match(CPGLParser.PERFORM);
-			this.state = 178;
-			this.match(CPGLParser.ACTIVITY_TYPE);
 			this.state = 181;
+			this.activityIdentifier();
+			this.state = 182;
+			this.match(CPGLParser.PERFORM);
+			this.state = 183;
+			this.match(CPGLParser.ACTIVITY_TYPE);
+			this.state = 186;
 			this._errHandler.sync(this);
 			switch ( this.interpreter.adaptivePredict(this._input, 10, this._ctx) ) {
 			case 1:
 				{
-				this.state = 179;
+				this.state = 184;
 				this.match(CPGLParser.OF);
-				this.state = 180;
+				this.state = 185;
 				this.terminologyReference();
 				}
 				break;
 			}
-			this.state = 183;
+			this.state = 188;
 			this.match(CPGLParser.DOT);
 			}
 		}
@@ -862,15 +871,15 @@ export class CPGLParser extends Parser {
 		try {
 			this.enterOuterAlt(_localctx, 1);
 			{
-			this.state = 185;
+			this.state = 190;
 			this.match(CPGLParser.CONCEPT);
-			this.state = 186;
+			this.state = 191;
 			this.conceptIdentifier();
-			this.state = 187;
+			this.state = 192;
 			this.match(CPGLParser.COLON);
-			this.state = 188;
+			this.state = 193;
 			this.conceptBody();
-			this.state = 189;
+			this.state = 194;
 			this.match(CPGLParser.DONE);
 			}
 		}
@@ -895,33 +904,33 @@ export class CPGLParser extends Parser {
 		try {
 			this.enterOuterAlt(_localctx, 1);
 			{
-			this.state = 191;
+			this.state = 196;
 			this.hasTypeLine();
-			this.state = 192;
+			this.state = 197;
 			this.hasValueTypeLine();
-			this.state = 194;
+			this.state = 199;
 			this._errHandler.sync(this);
 			switch ( this.interpreter.adaptivePredict(this._input, 11, this._ctx) ) {
 			case 1:
 				{
-				this.state = 193;
+				this.state = 198;
 				this.provenanceLine();
 				}
 				break;
 			}
-			this.state = 198;
+			this.state = 203;
 			this._errHandler.sync(this);
 			switch ( this.interpreter.adaptivePredict(this._input, 12, this._ctx) ) {
 			case 1:
 				{
-				this.state = 196;
+				this.state = 201;
 				this.codedByLine();
 				}
 				break;
 
 			case 2:
 				{
-				this.state = 197;
+				this.state = 202;
 				this.inferredByLine();
 				}
 				break;
@@ -949,13 +958,13 @@ export class CPGLParser extends Parser {
 		try {
 			this.enterOuterAlt(_localctx, 1);
 			{
-			this.state = 200;
+			this.state = 205;
 			this.match(CPGLParser.HAS);
-			this.state = 201;
+			this.state = 206;
 			this.match(CPGLParser.TYPE);
-			this.state = 202;
+			this.state = 207;
 			this.match(CPGLParser.CONCEPT_TYPE);
-			this.state = 203;
+			this.state = 208;
 			this.match(CPGLParser.DOT);
 			}
 		}
@@ -980,13 +989,13 @@ export class CPGLParser extends Parser {
 		try {
 			this.enterOuterAlt(_localctx, 1);
 			{
-			this.state = 205;
+			this.state = 210;
 			this.match(CPGLParser.HAS);
-			this.state = 206;
+			this.state = 211;
 			this.match(CPGLParser.VALUETYPE);
-			this.state = 207;
+			this.state = 212;
 			this.match(CPGLParser.CONCEPT_VALUE_TYPE);
-			this.state = 208;
+			this.state = 213;
 			this.match(CPGLParser.DOT);
 			}
 		}
@@ -1011,13 +1020,13 @@ export class CPGLParser extends Parser {
 		try {
 			this.enterOuterAlt(_localctx, 1);
 			{
-			this.state = 210;
+			this.state = 215;
 			this.match(CPGLParser.HAS);
-			this.state = 211;
+			this.state = 216;
 			this.match(CPGLParser.PROVENANCE);
-			this.state = 212;
+			this.state = 217;
 			this.stringLiteral();
-			this.state = 213;
+			this.state = 218;
 			this.match(CPGLParser.DOT);
 			}
 		}
@@ -1042,13 +1051,13 @@ export class CPGLParser extends Parser {
 		try {
 			this.enterOuterAlt(_localctx, 1);
 			{
-			this.state = 215;
+			this.state = 220;
 			this.match(CPGLParser.CODED);
-			this.state = 216;
+			this.state = 221;
 			this.match(CPGLParser.BY);
-			this.state = 217;
+			this.state = 222;
 			this.terminologyReference();
-			this.state = 218;
+			this.state = 223;
 			this.match(CPGLParser.DOT);
 			}
 		}
@@ -1073,13 +1082,13 @@ export class CPGLParser extends Parser {
 		try {
 			this.enterOuterAlt(_localctx, 1);
 			{
-			this.state = 220;
+			this.state = 225;
 			this.match(CPGLParser.INFERRED);
-			this.state = 221;
+			this.state = 226;
 			this.match(CPGLParser.BY);
-			this.state = 222;
+			this.state = 227;
 			this.inferredBody();
-			this.state = 223;
+			this.state = 228;
 			this.match(CPGLParser.DOT);
 			}
 		}
@@ -1102,14 +1111,14 @@ export class CPGLParser extends Parser {
 		let _localctx: InferredBodyContext = new InferredBodyContext(this._ctx, this.state);
 		this.enterRule(_localctx, 48, CPGLParser.RULE_inferredBody);
 		try {
-			this.state = 227;
+			this.state = 232;
 			this._errHandler.sync(this);
 			switch ( this.interpreter.adaptivePredict(this._input, 13, this._ctx) ) {
 			case 1:
 				_localctx = new DefinitionConceptContext(_localctx);
 				this.enterOuterAlt(_localctx, 1);
 				{
-				this.state = 225;
+				this.state = 230;
 				this.inferredByConceptReference();
 				}
 				break;
@@ -1118,7 +1127,7 @@ export class CPGLParser extends Parser {
 				_localctx = new DefinitionLogicContext(_localctx);
 				this.enterOuterAlt(_localctx, 2);
 				{
-				this.state = 226;
+				this.state = 231;
 				this.inferredByDescriptiveLogic();
 				}
 				break;
@@ -1145,17 +1154,17 @@ export class CPGLParser extends Parser {
 		try {
 			this.enterOuterAlt(_localctx, 1);
 			{
-			this.state = 230;
+			this.state = 235;
 			this._errHandler.sync(this);
 			switch ( this.interpreter.adaptivePredict(this._input, 14, this._ctx) ) {
 			case 1:
 				{
-				this.state = 229;
+				this.state = 234;
 				this.patternReference();
 				}
 				break;
 			}
-			this.state = 232;
+			this.state = 237;
 			this.conceptReference();
 			}
 		}
@@ -1180,11 +1189,11 @@ export class CPGLParser extends Parser {
 		try {
 			this.enterOuterAlt(_localctx, 1);
 			{
-			this.state = 234;
+			this.state = 239;
 			this.match(CPGLParser.LPAREN);
-			this.state = 235;
+			this.state = 240;
 			this.inferredByExpression();
-			this.state = 236;
+			this.state = 241;
 			this.match(CPGLParser.RPAREN);
 			}
 		}
@@ -1209,7 +1218,7 @@ export class CPGLParser extends Parser {
 		try {
 			this.enterOuterAlt(_localctx, 1);
 			{
-			this.state = 238;
+			this.state = 243;
 			this.informalOr();
 			}
 		}
@@ -1235,23 +1244,23 @@ export class CPGLParser extends Parser {
 			let _alt: number;
 			this.enterOuterAlt(_localctx, 1);
 			{
-			this.state = 240;
-			this.informalAnd();
 			this.state = 245;
+			this.informalAnd();
+			this.state = 250;
 			this._errHandler.sync(this);
 			_alt = this.interpreter.adaptivePredict(this._input, 15, this._ctx);
 			while (_alt !== 2 && _alt !== ATN.INVALID_ALT_NUMBER) {
 				if (_alt === 1) {
 					{
 					{
-					this.state = 241;
+					this.state = 246;
 					this.match(CPGLParser.OR);
-					this.state = 242;
+					this.state = 247;
 					this.informalAnd();
 					}
 					}
 				}
-				this.state = 247;
+				this.state = 252;
 				this._errHandler.sync(this);
 				_alt = this.interpreter.adaptivePredict(this._input, 15, this._ctx);
 			}
@@ -1279,23 +1288,23 @@ export class CPGLParser extends Parser {
 			let _alt: number;
 			this.enterOuterAlt(_localctx, 1);
 			{
-			this.state = 248;
-			this.informalNot();
 			this.state = 253;
+			this.informalNot();
+			this.state = 258;
 			this._errHandler.sync(this);
 			_alt = this.interpreter.adaptivePredict(this._input, 16, this._ctx);
 			while (_alt !== 2 && _alt !== ATN.INVALID_ALT_NUMBER) {
 				if (_alt === 1) {
 					{
 					{
-					this.state = 249;
+					this.state = 254;
 					this.match(CPGLParser.AND);
-					this.state = 250;
+					this.state = 255;
 					this.informalNot();
 					}
 					}
 				}
-				this.state = 255;
+				this.state = 260;
 				this._errHandler.sync(this);
 				_alt = this.interpreter.adaptivePredict(this._input, 16, this._ctx);
 			}
@@ -1320,15 +1329,15 @@ export class CPGLParser extends Parser {
 		let _localctx: InformalNotContext = new InformalNotContext(this._ctx, this.state);
 		this.enterRule(_localctx, 60, CPGLParser.RULE_informalNot);
 		try {
-			this.state = 259;
+			this.state = 264;
 			this._errHandler.sync(this);
 			switch ( this.interpreter.adaptivePredict(this._input, 17, this._ctx) ) {
 			case 1:
 				this.enterOuterAlt(_localctx, 1);
 				{
-				this.state = 256;
+				this.state = 261;
 				this.match(CPGLParser.NOT);
-				this.state = 257;
+				this.state = 262;
 				this.informalNot();
 				}
 				break;
@@ -1336,7 +1345,7 @@ export class CPGLParser extends Parser {
 			case 2:
 				this.enterOuterAlt(_localctx, 2);
 				{
-				this.state = 258;
+				this.state = 263;
 				this.atom();
 				}
 				break;
@@ -1361,14 +1370,14 @@ export class CPGLParser extends Parser {
 		let _localctx: AtomContext = new AtomContext(this._ctx, this.state);
 		this.enterRule(_localctx, 62, CPGLParser.RULE_atom);
 		try {
-			this.state = 266;
+			this.state = 271;
 			this._errHandler.sync(this);
 			switch ( this.interpreter.adaptivePredict(this._input, 18, this._ctx) ) {
 			case 1:
 				_localctx = new ConceptAtomContext(_localctx);
 				this.enterOuterAlt(_localctx, 1);
 				{
-				this.state = 261;
+				this.state = 266;
 				this.conceptReference();
 				}
 				break;
@@ -1377,11 +1386,11 @@ export class CPGLParser extends Parser {
 				_localctx = new GroupExpressionContext(_localctx);
 				this.enterOuterAlt(_localctx, 2);
 				{
-				this.state = 262;
+				this.state = 267;
 				this.match(CPGLParser.LPAREN);
-				this.state = 263;
+				this.state = 268;
 				this.inferredByExpression();
-				this.state = 264;
+				this.state = 269;
 				this.match(CPGLParser.RPAREN);
 				}
 				break;
@@ -1408,7 +1417,7 @@ export class CPGLParser extends Parser {
 		try {
 			this.enterOuterAlt(_localctx, 1);
 			{
-			this.state = 268;
+			this.state = 273;
 			this.match(CPGLParser.QUOTED_STRING);
 			}
 		}
@@ -1433,7 +1442,7 @@ export class CPGLParser extends Parser {
 		try {
 			this.enterOuterAlt(_localctx, 1);
 			{
-			this.state = 270;
+			this.state = 275;
 			this.identifier();
 			}
 		}
@@ -1458,7 +1467,7 @@ export class CPGLParser extends Parser {
 		try {
 			this.enterOuterAlt(_localctx, 1);
 			{
-			this.state = 272;
+			this.state = 277;
 			this.decisionIdentifier();
 			}
 		}
@@ -1483,7 +1492,7 @@ export class CPGLParser extends Parser {
 		try {
 			this.enterOuterAlt(_localctx, 1);
 			{
-			this.state = 274;
+			this.state = 279;
 			this.identifier();
 			}
 		}
@@ -1508,7 +1517,7 @@ export class CPGLParser extends Parser {
 		try {
 			this.enterOuterAlt(_localctx, 1);
 			{
-			this.state = 276;
+			this.state = 281;
 			this.terminologyIdentifier();
 			}
 		}
@@ -1533,7 +1542,7 @@ export class CPGLParser extends Parser {
 		try {
 			this.enterOuterAlt(_localctx, 1);
 			{
-			this.state = 278;
+			this.state = 283;
 			this.identifier();
 			}
 		}
@@ -1558,7 +1567,7 @@ export class CPGLParser extends Parser {
 		try {
 			this.enterOuterAlt(_localctx, 1);
 			{
-			this.state = 280;
+			this.state = 285;
 			this.activityIdentifier();
 			}
 		}
@@ -1583,7 +1592,7 @@ export class CPGLParser extends Parser {
 		try {
 			this.enterOuterAlt(_localctx, 1);
 			{
-			this.state = 282;
+			this.state = 287;
 			this.identifier();
 			}
 		}
@@ -1608,7 +1617,7 @@ export class CPGLParser extends Parser {
 		try {
 			this.enterOuterAlt(_localctx, 1);
 			{
-			this.state = 284;
+			this.state = 289;
 			this.conceptIdentifier();
 			}
 		}
@@ -1633,7 +1642,7 @@ export class CPGLParser extends Parser {
 		try {
 			this.enterOuterAlt(_localctx, 1);
 			{
-			this.state = 286;
+			this.state = 291;
 			this.identifier();
 			}
 		}
@@ -1658,7 +1667,7 @@ export class CPGLParser extends Parser {
 		try {
 			this.enterOuterAlt(_localctx, 1);
 			{
-			this.state = 288;
+			this.state = 293;
 			this.patternIdentifier();
 			}
 		}
@@ -1684,7 +1693,7 @@ export class CPGLParser extends Parser {
 		try {
 			this.enterOuterAlt(_localctx, 1);
 			{
-			this.state = 290;
+			this.state = 295;
 			_la = this._input.LA(1);
 			if (!(_la === CPGLParser.QUOTED_STRING || _la === CPGLParser.STRING)) {
 			this._errHandler.recoverInline(this);
@@ -1714,7 +1723,7 @@ export class CPGLParser extends Parser {
 	}
 
 	public static readonly _serializedATN: string =
-		"\x03\uC91D\uCABA\u058D\uAFBA\u4F53\u0607\uEA8B\uC241\x033\u0127\x04\x02" +
+		"\x03\uC91D\uCABA\u058D\uAFBA\u4F53\u0607\uEA8B\uC241\x033\u012C\x04\x02" +
 		"\t\x02\x04\x03\t\x03\x04\x04\t\x04\x04\x05\t\x05\x04\x06\t\x06\x04\x07" +
 		"\t\x07\x04\b\t\b\x04\t\t\t\x04\n\t\n\x04\v\t\v\x04\f\t\f\x04\r\t\r\x04" +
 		"\x0E\t\x0E\x04\x0F\t\x0F\x04\x10\t\x10\x04\x11\t\x11\x04\x12\t\x12\x04" +
@@ -1725,114 +1734,116 @@ export class CPGLParser extends Parser {
 		"\x04,\t,\x04-\t-\x03\x02\x07\x02\\\n\x02\f\x02\x0E\x02_\v\x02\x03\x02" +
 		"\x03\x02\x03\x03\x03\x03\x03\x03\x03\x03\x05\x03g\n\x03\x03\x04\x03\x04" +
 		"\x03\x04\x03\x04\x03\x04\x03\x04\x03\x05\x06\x05p\n\x05\r\x05\x0E\x05" +
-		"q\x03\x06\x03\x06\x03\x06\x03\x06\x03\x06\x05\x06y\n\x06\x03\x07\x03\x07" +
-		"\x03\x07\x03\b\x03\b\x05\b\x80\n\b\x03\b\x06\b\x83\n\b\r\b\x0E\b\x84\x03" +
-		"\b\x03\b\x03\t\x03\t\x05\t\x8B\n\t\x03\t\x03\t\x03\n\x03\n\x05\n\x91\n" +
-		"\n\x03\v\x03\v\x05\v\x95\n\v\x03\v\x03\v\x03\f\x03\f\x03\f\x03\r\x03\r" +
-		"\x03\r\x03\x0E\x03\x0E\x03\x0E\x03\x0E\x03\x0E\x05\x0E\xA4\n\x0E\x03\x0E" +
-		"\x03\x0E\x03\x0F\x03\x0F\x03\x0F\x03\x10\x03\x10\x03\x11\x03\x11\x03\x11" +
-		"\x03\x11\x03\x11\x03\x12\x03\x12\x03\x12\x03\x12\x03\x12\x03\x12\x05\x12" +
-		"\xB8\n\x12\x03\x12\x03\x12\x03\x13\x03\x13\x03\x13\x03\x13\x03\x13\x03" +
-		"\x13\x03\x14\x03\x14\x03\x14\x05\x14\xC5\n\x14\x03\x14\x03\x14\x05\x14" +
-		"\xC9\n\x14\x03\x15\x03\x15\x03\x15\x03\x15\x03\x15\x03\x16\x03\x16\x03" +
-		"\x16\x03\x16\x03\x16\x03\x17\x03\x17\x03\x17\x03\x17\x03\x17\x03\x18\x03" +
-		"\x18\x03\x18\x03\x18\x03\x18\x03\x19\x03\x19\x03\x19\x03\x19\x03\x19\x03" +
-		"\x1A\x03\x1A\x05\x1A\xE6\n\x1A\x03\x1B\x05\x1B\xE9\n\x1B\x03\x1B\x03\x1B" +
-		"\x03\x1C\x03\x1C\x03\x1C\x03\x1C\x03\x1D\x03\x1D\x03\x1E\x03\x1E\x03\x1E" +
-		"\x07\x1E\xF6\n\x1E\f\x1E\x0E\x1E\xF9\v\x1E\x03\x1F\x03\x1F\x03\x1F\x07" +
-		"\x1F\xFE\n\x1F\f\x1F\x0E\x1F\u0101\v\x1F\x03 \x03 \x03 \x05 \u0106\n " +
-		"\x03!\x03!\x03!\x03!\x03!\x05!\u010D\n!\x03\"\x03\"\x03#\x03#\x03$\x03" +
-		"$\x03%\x03%\x03&\x03&\x03\'\x03\'\x03(\x03(\x03)\x03)\x03*\x03*\x03+\x03" +
-		"+\x03,\x03,\x03-\x03-\x03-\x02\x02\x02.\x02\x02\x04\x02\x06\x02\b\x02" +
-		"\n\x02\f\x02\x0E\x02\x10\x02\x12\x02\x14\x02\x16\x02\x18\x02\x1A\x02\x1C" +
-		"\x02\x1E\x02 \x02\"\x02$\x02&\x02(\x02*\x02,\x02.\x020\x022\x024\x026" +
-		"\x028\x02:\x02<\x02>\x02@\x02B\x02D\x02F\x02H\x02J\x02L\x02N\x02P\x02" +
-		"R\x02T\x02V\x02X\x02\x02\x04\x03\x02\x1B\x1C\x03\x02#$\x02\u0110\x02]" +
-		"\x03\x02\x02\x02\x04f\x03\x02\x02\x02\x06h\x03\x02\x02\x02\bo\x03\x02" +
-		"\x02\x02\ns\x03\x02\x02\x02\fz\x03\x02\x02\x02\x0E}\x03\x02\x02\x02\x10" +
-		"\x8A\x03\x02\x02\x02\x12\x90\x03\x02\x02\x02\x14\x94\x03\x02\x02\x02\x16" +
-		"\x98\x03\x02\x02\x02\x18\x9B\x03\x02\x02\x02\x1A\x9E\x03\x02\x02\x02\x1C" +
-		"\xA7\x03\x02\x02\x02\x1E\xAA\x03\x02\x02\x02 \xAC\x03\x02\x02\x02\"\xB1" +
-		"\x03\x02\x02\x02$\xBB\x03\x02\x02\x02&\xC1\x03\x02\x02\x02(\xCA\x03\x02" +
-		"\x02\x02*\xCF\x03\x02\x02\x02,\xD4\x03\x02\x02\x02.\xD9\x03\x02\x02\x02" +
-		"0\xDE\x03\x02\x02\x022\xE5\x03\x02\x02\x024\xE8\x03\x02\x02\x026\xEC\x03" +
-		"\x02\x02\x028\xF0\x03\x02\x02\x02:\xF2\x03\x02\x02\x02<\xFA\x03\x02\x02" +
-		"\x02>\u0105\x03\x02\x02\x02@\u010C\x03\x02\x02\x02B\u010E\x03\x02\x02" +
-		"\x02D\u0110\x03\x02\x02\x02F\u0112\x03\x02\x02\x02H\u0114\x03\x02\x02" +
-		"\x02J\u0116\x03\x02\x02\x02L\u0118\x03\x02\x02\x02N\u011A\x03\x02\x02" +
-		"\x02P\u011C\x03\x02\x02\x02R\u011E\x03\x02\x02\x02T\u0120\x03\x02\x02" +
-		"\x02V\u0122\x03\x02\x02\x02X\u0124\x03\x02\x02\x02Z\\\x05\x04\x03\x02" +
-		"[Z\x03\x02\x02\x02\\_\x03\x02\x02\x02][\x03\x02\x02\x02]^\x03\x02\x02" +
-		"\x02^`\x03\x02\x02\x02_]\x03\x02\x02\x02`a\x07\x02\x02\x03a\x03\x03\x02" +
-		"\x02\x02bg\x05\x06\x04\x02cg\x05\x1A\x0E\x02dg\x05\"\x12\x02eg\x05$\x13" +
-		"\x02fb\x03\x02\x02\x02fc\x03\x02\x02\x02fd\x03\x02\x02\x02fe\x03\x02\x02" +
-		"\x02g\x05\x03\x02\x02\x02hi\x07\x1D\x02\x02ij\x05D#\x02jk\x07\x1F\x02" +
-		"\x02kl\x05\b\x05\x02lm\x07\f\x02\x02m\x07\x03\x02\x02\x02np\x05\n\x06" +
-		"\x02on\x03\x02\x02\x02pq\x03\x02\x02\x02qo\x03\x02\x02\x02qr\x03\x02\x02" +
-		"\x02r\t\x03\x02\x02\x02st\x07\x19\x02\x02tu\x05R*\x02ux\x07\x1A\x02\x02" +
-		"vy\x05\x0E\b\x02wy\x05\x10\t\x02xv\x03\x02\x02\x02xw\x03\x02\x02\x02y" +
-		"\v\x03\x02\x02\x02z{\t\x02\x02\x02{|\x07\x1F\x02\x02|\r\x03\x02\x02\x02" +
-		"}\x7F\x07\x1F\x02\x02~\x80\x05\f\x07\x02\x7F~\x03\x02\x02\x02\x7F\x80" +
-		"\x03\x02\x02\x02\x80\x82\x03\x02\x02\x02\x81\x83\x05\x12\n\x02\x82\x81" +
-		"\x03\x02\x02\x02\x83\x84\x03\x02\x02\x02\x84\x82\x03\x02\x02\x02\x84\x85" +
-		"\x03\x02\x02\x02\x85\x86\x03\x02\x02\x02\x86\x87\x07\f\x02\x02\x87\x0F" +
-		"\x03\x02\x02\x02\x88\x8B\x05\x16\f\x02\x89\x8B\x05\x18\r\x02\x8A\x88\x03" +
-		"\x02\x02\x02\x8A\x89\x03\x02\x02\x02\x8B\x8C\x03\x02\x02\x02\x8C\x8D\x07" +
-		" \x02\x02\x8D\x11\x03\x02\x02\x02\x8E\x91\x05\n\x06\x02\x8F\x91\x05\x14" +
-		"\v\x02\x90\x8E\x03\x02\x02\x02\x90\x8F\x03\x02\x02\x02\x91\x13\x03\x02" +
-		"\x02\x02\x92\x95\x05\x16\f\x02\x93\x95\x05\x18\r\x02\x94\x92\x03\x02\x02" +
-		"\x02\x94\x93\x03\x02\x02\x02\x95\x96\x03\x02\x02\x02\x96\x97\x07 \x02" +
-		"\x02\x97\x15\x03\x02\x02\x02\x98\x99\x07\x17\x02\x02\x99\x9A\x05N(\x02" +
-		"\x9A\x17\x03\x02\x02\x02\x9B\x9C\x07\x18\x02\x02\x9C\x9D\x05F$\x02\x9D" +
-		"\x19\x03\x02\x02\x02\x9E\x9F\x07\x06\x02\x02\x9F\xA3\x05H%\x02\xA0\xA4" +
-		"\x05\x1C\x0F\x02\xA1\xA4\x05\x1E\x10\x02\xA2\xA4\x05 \x11\x02\xA3\xA0" +
-		"\x03\x02\x02\x02\xA3\xA1\x03\x02\x02\x02\xA3\xA2\x03\x02\x02\x02\xA4\xA5" +
-		"\x03\x02\x02\x02\xA5\xA6\x07 \x02\x02\xA6\x1B\x03\x02\x02\x02\xA7\xA8" +
-		"\x07\x10\x02\x02\xA8\xA9\x05B\"\x02\xA9\x1D\x03\x02\x02\x02\xAA\xAB\x07" +
-		"\x16\x02\x02\xAB\x1F\x03\x02\x02\x02\xAC\xAD\x07\x14\x02\x02\xAD\xAE\x05" +
-		"B\"\x02\xAE\xAF\x07\x15\x02\x02\xAF\xB0\x05B\"\x02\xB0!\x03\x02\x02\x02" +
-		"\xB1\xB2\x07\x12\x02\x02\xB2\xB3\x05L\'\x02\xB3\xB4\x07\x11\x02\x02\xB4" +
-		"\xB7\x07(\x02\x02\xB5\xB6\x07\x13\x02\x02\xB6\xB8\x05J&\x02\xB7\xB5\x03" +
-		"\x02\x02\x02\xB7\xB8\x03\x02\x02\x02\xB8\xB9\x03\x02\x02\x02\xB9\xBA\x07" +
-		" \x02\x02\xBA#\x03\x02\x02\x02\xBB\xBC\x07\x03\x02\x02\xBC\xBD\x05P)\x02" +
-		"\xBD\xBE\x07\x1F\x02\x02\xBE\xBF\x05&\x14\x02\xBF\xC0\x07\f\x02\x02\xC0" +
-		"%\x03\x02\x02\x02\xC1\xC2\x05(\x15\x02\xC2\xC4\x05*\x16\x02\xC3\xC5\x05" +
-		",\x17\x02\xC4\xC3\x03\x02\x02\x02\xC4\xC5\x03\x02\x02\x02\xC5\xC8\x03" +
-		"\x02\x02\x02\xC6\xC9\x05.\x18\x02\xC7\xC9\x050\x19\x02\xC8\xC6\x03\x02" +
-		"\x02\x02\xC8\xC7\x03\x02\x02\x02\xC9\'\x03\x02\x02\x02\xCA\xCB\x07\r\x02" +
-		"\x02\xCB\xCC\x07\x04\x02\x02\xCC\xCD\x07,\x02\x02\xCD\xCE\x07 \x02\x02" +
-		"\xCE)\x03\x02\x02\x02\xCF\xD0\x07\r\x02\x02\xD0\xD1\x07\x05\x02\x02\xD1" +
-		"\xD2\x070\x02\x02\xD2\xD3\x07 \x02\x02\xD3+\x03\x02\x02\x02\xD4\xD5\x07" +
-		"\r\x02\x02\xD5\xD6\x07\x07\x02\x02\xD6\xD7\x05X-\x02\xD7\xD8\x07 \x02" +
-		"\x02\xD8-\x03\x02\x02\x02\xD9\xDA\x07\x0F\x02\x02\xDA\xDB\x07\x0E\x02" +
-		"\x02\xDB\xDC\x05J&\x02\xDC\xDD\x07 \x02\x02\xDD/\x03\x02\x02\x02\xDE\xDF" +
-		"\x07\b\x02\x02\xDF\xE0\x07\x0E\x02\x02\xE0\xE1\x052\x1A\x02\xE1\xE2\x07" +
-		" \x02\x02\xE21\x03\x02\x02\x02\xE3\xE6\x054\x1B\x02\xE4\xE6\x056\x1C\x02" +
-		"\xE5\xE3\x03\x02\x02\x02\xE5\xE4\x03\x02\x02\x02\xE63\x03\x02\x02\x02" +
-		"\xE7\xE9\x05V,\x02\xE8\xE7\x03\x02\x02\x02\xE8\xE9\x03\x02\x02\x02\xE9" +
-		"\xEA\x03\x02\x02\x02\xEA\xEB\x05R*\x02\xEB5\x03\x02\x02\x02\xEC\xED\x07" +
-		"!\x02\x02\xED\xEE\x058\x1D\x02\xEE\xEF\x07\"\x02\x02\xEF7\x03\x02\x02" +
-		"\x02\xF0\xF1\x05:\x1E\x02\xF19\x03\x02\x02\x02\xF2\xF7\x05<\x1F\x02\xF3" +
-		"\xF4\x07\n\x02\x02\xF4\xF6\x05<\x1F\x02\xF5\xF3\x03\x02\x02\x02\xF6\xF9" +
-		"\x03\x02\x02\x02\xF7\xF5\x03\x02\x02\x02\xF7\xF8\x03\x02\x02\x02\xF8;" +
-		"\x03\x02\x02\x02\xF9\xF7\x03\x02\x02\x02\xFA\xFF\x05> \x02\xFB\xFC\x07" +
-		"\t\x02\x02\xFC\xFE\x05> \x02\xFD\xFB\x03\x02\x02\x02\xFE\u0101\x03\x02" +
-		"\x02\x02\xFF\xFD\x03\x02\x02\x02\xFF\u0100\x03\x02\x02\x02\u0100=\x03" +
-		"\x02\x02\x02\u0101\xFF\x03\x02\x02\x02\u0102\u0103\x07\v\x02\x02\u0103" +
-		"\u0106\x05> \x02\u0104\u0106\x05@!\x02\u0105\u0102\x03\x02\x02\x02\u0105" +
-		"\u0104\x03\x02\x02\x02\u0106?\x03\x02\x02\x02\u0107\u010D\x05R*\x02\u0108" +
-		"\u0109\x07!\x02\x02\u0109\u010A\x058\x1D\x02\u010A\u010B\x07\"\x02\x02" +
-		"\u010B\u010D\x03\x02\x02\x02\u010C\u0107\x03\x02\x02\x02\u010C\u0108\x03" +
-		"\x02\x02\x02\u010DA\x03\x02\x02\x02\u010E\u010F\x07#\x02\x02\u010FC\x03" +
-		"\x02\x02\x02\u0110\u0111\x05B\"\x02\u0111E\x03\x02\x02\x02\u0112\u0113" +
-		"\x05D#\x02\u0113G\x03\x02\x02\x02\u0114\u0115\x05B\"\x02\u0115I\x03\x02" +
-		"\x02\x02\u0116\u0117\x05H%\x02\u0117K\x03\x02\x02\x02\u0118\u0119\x05" +
-		"B\"\x02\u0119M\x03\x02\x02\x02\u011A\u011B\x05L\'\x02\u011BO\x03\x02\x02" +
-		"\x02\u011C\u011D\x05B\"\x02\u011DQ\x03\x02\x02\x02\u011E\u011F\x05P)\x02" +
-		"\u011FS\x03\x02\x02\x02\u0120\u0121\x05B\"\x02\u0121U\x03\x02\x02\x02" +
-		"\u0122\u0123\x05T+\x02\u0123W\x03\x02\x02\x02\u0124\u0125\t\x03\x02\x02" +
-		"\u0125Y\x03\x02\x02\x02\x15]fqx\x7F\x84\x8A\x90\x94\xA3\xB7\xC4\xC8\xE5" +
-		"\xE8\xF7\xFF\u0105\u010C";
+		"q\x03\x06\x03\x06\x03\x06\x03\x06\x03\x06\x03\x06\x03\x06\x03\x06\x03" +
+		"\x06\x03\x06\x05\x06~\n\x06\x03\x07\x03\x07\x03\x07\x03\b\x03\b\x05\b" +
+		"\x85\n\b\x03\b\x06\b\x88\n\b\r\b\x0E\b\x89\x03\b\x03\b\x03\t\x03\t\x05" +
+		"\t\x90\n\t\x03\t\x03\t\x03\n\x03\n\x05\n\x96\n\n\x03\v\x03\v\x05\v\x9A" +
+		"\n\v\x03\v\x03\v\x03\f\x03\f\x03\f\x03\r\x03\r\x03\r\x03\x0E\x03\x0E\x03" +
+		"\x0E\x03\x0E\x03\x0E\x05\x0E\xA9\n\x0E\x03\x0E\x03\x0E\x03\x0F\x03\x0F" +
+		"\x03\x0F\x03\x10\x03\x10\x03\x11\x03\x11\x03\x11\x03\x11\x03\x11\x03\x12" +
+		"\x03\x12\x03\x12\x03\x12\x03\x12\x03\x12\x05\x12\xBD\n\x12\x03\x12\x03" +
+		"\x12\x03\x13\x03\x13\x03\x13\x03\x13\x03\x13\x03\x13\x03\x14\x03\x14\x03" +
+		"\x14\x05\x14\xCA\n\x14\x03\x14\x03\x14\x05\x14\xCE\n\x14\x03\x15\x03\x15" +
+		"\x03\x15\x03\x15\x03\x15\x03\x16\x03\x16\x03\x16\x03\x16\x03\x16\x03\x17" +
+		"\x03\x17\x03\x17\x03\x17\x03\x17\x03\x18\x03\x18\x03\x18\x03\x18\x03\x18" +
+		"\x03\x19\x03\x19\x03\x19\x03\x19\x03\x19\x03\x1A\x03\x1A\x05\x1A\xEB\n" +
+		"\x1A\x03\x1B\x05\x1B\xEE\n\x1B\x03\x1B\x03\x1B\x03\x1C\x03\x1C\x03\x1C" +
+		"\x03\x1C\x03\x1D\x03\x1D\x03\x1E\x03\x1E\x03\x1E\x07\x1E\xFB\n\x1E\f\x1E" +
+		"\x0E\x1E\xFE\v\x1E\x03\x1F\x03\x1F\x03\x1F\x07\x1F\u0103\n\x1F\f\x1F\x0E" +
+		"\x1F\u0106\v\x1F\x03 \x03 \x03 \x05 \u010B\n \x03!\x03!\x03!\x03!\x03" +
+		"!\x05!\u0112\n!\x03\"\x03\"\x03#\x03#\x03$\x03$\x03%\x03%\x03&\x03&\x03" +
+		"\'\x03\'\x03(\x03(\x03)\x03)\x03*\x03*\x03+\x03+\x03,\x03,\x03-\x03-\x03" +
+		"-\x02\x02\x02.\x02\x02\x04\x02\x06\x02\b\x02\n\x02\f\x02\x0E\x02\x10\x02" +
+		"\x12\x02\x14\x02\x16\x02\x18\x02\x1A\x02\x1C\x02\x1E\x02 \x02\"\x02$\x02" +
+		"&\x02(\x02*\x02,\x02.\x020\x022\x024\x026\x028\x02:\x02<\x02>\x02@\x02" +
+		"B\x02D\x02F\x02H\x02J\x02L\x02N\x02P\x02R\x02T\x02V\x02X\x02\x02\x04\x03" +
+		"\x02\x1B\x1C\x03\x02#$\x02\u0115\x02]\x03\x02\x02\x02\x04f\x03\x02\x02" +
+		"\x02\x06h\x03\x02\x02\x02\bo\x03\x02\x02\x02\n}\x03\x02\x02\x02\f\x7F" +
+		"\x03\x02\x02\x02\x0E\x82\x03\x02\x02\x02\x10\x8F\x03\x02\x02\x02\x12\x95" +
+		"\x03\x02\x02\x02\x14\x99\x03\x02\x02\x02\x16\x9D\x03\x02\x02\x02\x18\xA0" +
+		"\x03\x02\x02\x02\x1A\xA3\x03\x02\x02\x02\x1C\xAC\x03\x02\x02\x02\x1E\xAF" +
+		"\x03\x02\x02\x02 \xB1\x03\x02\x02\x02\"\xB6\x03\x02\x02\x02$\xC0\x03\x02" +
+		"\x02\x02&\xC6\x03\x02\x02\x02(\xCF\x03\x02\x02\x02*\xD4\x03\x02\x02\x02" +
+		",\xD9\x03\x02\x02\x02.\xDE\x03\x02\x02\x020\xE3\x03\x02\x02\x022\xEA\x03" +
+		"\x02\x02\x024\xED\x03\x02\x02\x026\xF1\x03\x02\x02\x028\xF5\x03\x02\x02" +
+		"\x02:\xF7\x03\x02\x02\x02<\xFF\x03\x02\x02\x02>\u010A\x03\x02\x02\x02" +
+		"@\u0111\x03\x02\x02\x02B\u0113\x03\x02\x02\x02D\u0115\x03\x02\x02\x02" +
+		"F\u0117\x03\x02\x02\x02H\u0119\x03\x02\x02\x02J\u011B\x03\x02\x02\x02" +
+		"L\u011D\x03\x02\x02\x02N\u011F\x03\x02\x02\x02P\u0121\x03\x02\x02\x02" +
+		"R\u0123\x03\x02\x02\x02T\u0125\x03\x02\x02\x02V\u0127\x03\x02\x02\x02" +
+		"X\u0129\x03\x02\x02\x02Z\\\x05\x04\x03\x02[Z\x03\x02\x02\x02\\_\x03\x02" +
+		"\x02\x02][\x03\x02\x02\x02]^\x03\x02\x02\x02^`\x03\x02\x02\x02_]\x03\x02" +
+		"\x02\x02`a\x07\x02\x02\x03a\x03\x03\x02\x02\x02bg\x05\x06\x04\x02cg\x05" +
+		"\x1A\x0E\x02dg\x05\"\x12\x02eg\x05$\x13\x02fb\x03\x02\x02\x02fc\x03\x02" +
+		"\x02\x02fd\x03\x02\x02\x02fe\x03\x02\x02\x02g\x05\x03\x02\x02\x02hi\x07" +
+		"\x1D\x02\x02ij\x05D#\x02jk\x07\x1F\x02\x02kl\x05\b\x05\x02lm\x07\f\x02" +
+		"\x02m\x07\x03\x02\x02\x02np\x05\n\x06\x02on\x03\x02\x02\x02pq\x03\x02" +
+		"\x02\x02qo\x03\x02\x02\x02qr\x03\x02\x02\x02r\t\x03\x02\x02\x02st\x07" +
+		"\x19\x02\x02tu\x05R*\x02uv\x07\x1A\x02\x02vw\x05\x0E\b\x02w~\x03\x02\x02" +
+		"\x02xy\x07\x19\x02\x02yz\x05R*\x02z{\x07\x1A\x02\x02{|\x05\x10\t\x02|" +
+		"~\x03\x02\x02\x02}s\x03\x02\x02\x02}x\x03\x02\x02\x02~\v\x03\x02\x02\x02" +
+		"\x7F\x80\t\x02\x02\x02\x80\x81\x07\x1F\x02\x02\x81\r\x03\x02\x02\x02\x82" +
+		"\x84\x07\x1F\x02\x02\x83\x85\x05\f\x07\x02\x84\x83\x03\x02\x02\x02\x84" +
+		"\x85\x03\x02\x02\x02\x85\x87\x03\x02\x02\x02\x86\x88\x05\x12\n\x02\x87" +
+		"\x86\x03\x02\x02\x02\x88\x89\x03\x02\x02\x02\x89\x87\x03\x02\x02\x02\x89" +
+		"\x8A\x03\x02\x02\x02\x8A\x8B\x03\x02\x02\x02\x8B\x8C\x07\f\x02\x02\x8C" +
+		"\x0F\x03\x02\x02\x02\x8D\x90\x05\x16\f\x02\x8E\x90\x05\x18\r\x02\x8F\x8D" +
+		"\x03\x02\x02\x02\x8F\x8E\x03\x02\x02\x02\x90\x91\x03\x02\x02\x02\x91\x92" +
+		"\x07 \x02\x02\x92\x11\x03\x02\x02\x02\x93\x96\x05\n\x06\x02\x94\x96\x05" +
+		"\x14\v\x02\x95\x93\x03\x02\x02\x02\x95\x94\x03\x02\x02\x02\x96\x13\x03" +
+		"\x02\x02\x02\x97\x9A\x05\x16\f\x02\x98\x9A\x05\x18\r\x02\x99\x97\x03\x02" +
+		"\x02\x02\x99\x98\x03\x02\x02\x02\x9A\x9B\x03\x02\x02\x02\x9B\x9C\x07 " +
+		"\x02\x02\x9C\x15\x03\x02\x02\x02\x9D\x9E\x07\x17\x02\x02\x9E\x9F\x05N" +
+		"(\x02\x9F\x17\x03\x02\x02\x02\xA0\xA1\x07\x18\x02\x02\xA1\xA2\x05F$\x02" +
+		"\xA2\x19\x03\x02\x02\x02\xA3\xA4\x07\x06\x02\x02\xA4\xA8\x05H%\x02\xA5" +
+		"\xA9\x05\x1C\x0F\x02\xA6\xA9\x05\x1E\x10\x02\xA7\xA9\x05 \x11\x02\xA8" +
+		"\xA5\x03\x02\x02\x02\xA8\xA6\x03\x02\x02\x02\xA8\xA7\x03\x02\x02\x02\xA9" +
+		"\xAA\x03\x02\x02\x02\xAA\xAB\x07 \x02\x02\xAB\x1B\x03\x02\x02\x02\xAC" +
+		"\xAD\x07\x10\x02\x02\xAD\xAE\x05B\"\x02\xAE\x1D\x03\x02\x02\x02\xAF\xB0" +
+		"\x07\x16\x02\x02\xB0\x1F\x03\x02\x02\x02\xB1\xB2\x07\x14\x02\x02\xB2\xB3" +
+		"\x05B\"\x02\xB3\xB4\x07\x15\x02\x02\xB4\xB5\x05B\"\x02\xB5!\x03\x02\x02" +
+		"\x02\xB6\xB7\x07\x12\x02\x02\xB7\xB8\x05L\'\x02\xB8\xB9\x07\x11\x02\x02" +
+		"\xB9\xBC\x07(\x02\x02\xBA\xBB\x07\x13\x02\x02\xBB\xBD\x05J&\x02\xBC\xBA" +
+		"\x03\x02\x02\x02\xBC\xBD\x03\x02\x02\x02\xBD\xBE\x03\x02\x02\x02\xBE\xBF" +
+		"\x07 \x02\x02\xBF#\x03\x02\x02\x02\xC0\xC1\x07\x03\x02\x02\xC1\xC2\x05" +
+		"P)\x02\xC2\xC3\x07\x1F\x02\x02\xC3\xC4\x05&\x14\x02\xC4\xC5\x07\f\x02" +
+		"\x02\xC5%\x03\x02\x02\x02\xC6\xC7\x05(\x15\x02\xC7\xC9\x05*\x16\x02\xC8" +
+		"\xCA\x05,\x17\x02\xC9\xC8\x03\x02\x02\x02\xC9\xCA\x03\x02\x02\x02\xCA" +
+		"\xCD\x03\x02\x02\x02\xCB\xCE\x05.\x18\x02\xCC\xCE\x050\x19\x02\xCD\xCB" +
+		"\x03\x02\x02\x02\xCD\xCC\x03\x02\x02\x02\xCE\'\x03\x02\x02\x02\xCF\xD0" +
+		"\x07\r\x02\x02\xD0\xD1\x07\x04\x02\x02\xD1\xD2\x07,\x02\x02\xD2\xD3\x07" +
+		" \x02\x02\xD3)\x03\x02\x02\x02\xD4\xD5\x07\r\x02\x02\xD5\xD6\x07\x05\x02" +
+		"\x02\xD6\xD7\x070\x02\x02\xD7\xD8\x07 \x02\x02\xD8+\x03\x02\x02\x02\xD9" +
+		"\xDA\x07\r\x02\x02\xDA\xDB\x07\x07\x02\x02\xDB\xDC\x05X-\x02\xDC\xDD\x07" +
+		" \x02\x02\xDD-\x03\x02\x02\x02\xDE\xDF\x07\x0F\x02\x02\xDF\xE0\x07\x0E" +
+		"\x02\x02\xE0\xE1\x05J&\x02\xE1\xE2\x07 \x02\x02\xE2/\x03\x02\x02\x02\xE3" +
+		"\xE4\x07\b\x02\x02\xE4\xE5\x07\x0E\x02\x02\xE5\xE6\x052\x1A\x02\xE6\xE7" +
+		"\x07 \x02\x02\xE71\x03\x02\x02\x02\xE8\xEB\x054\x1B\x02\xE9\xEB\x056\x1C" +
+		"\x02\xEA\xE8\x03\x02\x02\x02\xEA\xE9\x03\x02\x02\x02\xEB3\x03\x02\x02" +
+		"\x02\xEC\xEE\x05V,\x02\xED\xEC\x03\x02\x02\x02\xED\xEE\x03\x02\x02\x02" +
+		"\xEE\xEF\x03\x02\x02\x02\xEF\xF0\x05R*\x02\xF05\x03\x02\x02\x02\xF1\xF2" +
+		"\x07!\x02\x02\xF2\xF3\x058\x1D\x02\xF3\xF4\x07\"\x02\x02\xF47\x03\x02" +
+		"\x02\x02\xF5\xF6\x05:\x1E\x02\xF69\x03\x02\x02\x02\xF7\xFC\x05<\x1F\x02" +
+		"\xF8\xF9\x07\n\x02\x02\xF9\xFB\x05<\x1F\x02\xFA\xF8\x03\x02\x02\x02\xFB" +
+		"\xFE\x03\x02\x02\x02\xFC\xFA\x03\x02\x02\x02\xFC\xFD\x03\x02\x02\x02\xFD" +
+		";\x03\x02\x02\x02\xFE\xFC\x03\x02\x02\x02\xFF\u0104\x05> \x02\u0100\u0101" +
+		"\x07\t\x02\x02\u0101\u0103\x05> \x02\u0102\u0100\x03\x02\x02\x02\u0103" +
+		"\u0106\x03\x02\x02\x02\u0104\u0102\x03\x02\x02\x02\u0104\u0105\x03\x02" +
+		"\x02\x02\u0105=\x03\x02\x02\x02\u0106\u0104\x03\x02\x02\x02\u0107\u0108" +
+		"\x07\v\x02\x02\u0108\u010B\x05> \x02\u0109\u010B\x05@!\x02\u010A\u0107" +
+		"\x03\x02\x02\x02\u010A\u0109\x03\x02\x02\x02\u010B?\x03\x02\x02\x02\u010C" +
+		"\u0112\x05R*\x02\u010D\u010E\x07!\x02\x02\u010E\u010F\x058\x1D\x02\u010F" +
+		"\u0110\x07\"\x02\x02\u0110\u0112\x03\x02\x02\x02\u0111\u010C\x03\x02\x02" +
+		"\x02\u0111\u010D\x03\x02\x02\x02\u0112A\x03\x02\x02\x02\u0113\u0114\x07" +
+		"#\x02\x02\u0114C\x03\x02\x02\x02\u0115\u0116\x05B\"\x02\u0116E\x03\x02" +
+		"\x02\x02\u0117\u0118\x05D#\x02\u0118G\x03\x02\x02\x02\u0119\u011A\x05" +
+		"B\"\x02\u011AI\x03\x02\x02\x02\u011B\u011C\x05H%\x02\u011CK\x03\x02\x02" +
+		"\x02\u011D\u011E\x05B\"\x02\u011EM\x03\x02\x02\x02\u011F\u0120\x05L\'" +
+		"\x02\u0120O\x03\x02\x02\x02\u0121\u0122\x05B\"\x02\u0122Q\x03\x02\x02" +
+		"\x02\u0123\u0124\x05P)\x02\u0124S\x03\x02\x02\x02\u0125\u0126\x05B\"\x02" +
+		"\u0126U\x03\x02\x02\x02\u0127\u0128\x05T+\x02\u0128W\x03\x02\x02\x02\u0129" +
+		"\u012A\t\x03\x02\x02\u012AY\x03\x02\x02\x02\x15]fq}\x84\x89\x8F\x95\x99" +
+		"\xA8\xBC\xC9\xCD\xEA\xED\xFC\u0104\u010A\u0111";
 	public static __ATN: ATN;
 	public static get _ATN(): ATN {
 		if (!CPGLParser.__ATN) {
@@ -1872,6 +1883,14 @@ export class CpglContext extends ParserRuleContext {
 			listener.exitCpgl(this);
 		}
 	}
+	// @Override
+	public accept<Result>(visitor: CPGLParserVisitor<Result>): Result {
+		if (visitor.visitCpgl) {
+			return visitor.visitCpgl(this);
+		} else {
+			return visitor.visitChildren(this);
+		}
+	}
 }
 
 
@@ -1905,6 +1924,14 @@ export class StatementContext extends ParserRuleContext {
 			listener.exitStatement(this);
 		}
 	}
+	// @Override
+	public accept<Result>(visitor: CPGLParserVisitor<Result>): Result {
+		if (visitor.visitStatement) {
+			return visitor.visitStatement(this);
+		} else {
+			return visitor.visitChildren(this);
+		}
+	}
 }
 
 
@@ -1933,6 +1960,14 @@ export class DecisionStatementContext extends ParserRuleContext {
 	public exitRule(listener: CPGLParserListener): void {
 		if (listener.exitDecisionStatement) {
 			listener.exitDecisionStatement(this);
+		}
+	}
+	// @Override
+	public accept<Result>(visitor: CPGLParserVisitor<Result>): Result {
+		if (visitor.visitDecisionStatement) {
+			return visitor.visitDecisionStatement(this);
+		} else {
+			return visitor.visitChildren(this);
 		}
 	}
 }
@@ -1965,36 +2000,92 @@ export class DecisionBodyContext extends ParserRuleContext {
 			listener.exitDecisionBody(this);
 		}
 	}
+	// @Override
+	public accept<Result>(visitor: CPGLParserVisitor<Result>): Result {
+		if (visitor.visitDecisionBody) {
+			return visitor.visitDecisionBody(this);
+		} else {
+			return visitor.visitChildren(this);
+		}
+	}
 }
 
 
 export class WhenBlockContext extends ParserRuleContext {
-	public WHEN(): TerminalNode { return this.getToken(CPGLParser.WHEN, 0); }
-	public conceptReference(): ConceptReferenceContext {
-		return this.getRuleContext(0, ConceptReferenceContext);
-	}
-	public THEN(): TerminalNode { return this.getToken(CPGLParser.THEN, 0); }
-	public blockBody(): BlockBodyContext | undefined {
-		return this.tryGetRuleContext(0, BlockBodyContext);
-	}
-	public singleActionStatement(): SingleActionStatementContext | undefined {
-		return this.tryGetRuleContext(0, SingleActionStatementContext);
-	}
 	constructor(parent: ParserRuleContext | undefined, invokingState: number) {
 		super(parent, invokingState);
 	}
 	// @Override
 	public get ruleIndex(): number { return CPGLParser.RULE_whenBlock; }
+	public copyFrom(ctx: WhenBlockContext): void {
+		super.copyFrom(ctx);
+	}
+}
+export class WhenWithBodyContext extends WhenBlockContext {
+	public WHEN(): TerminalNode { return this.getToken(CPGLParser.WHEN, 0); }
+	public conceptReference(): ConceptReferenceContext {
+		return this.getRuleContext(0, ConceptReferenceContext);
+	}
+	public THEN(): TerminalNode { return this.getToken(CPGLParser.THEN, 0); }
+	public blockBody(): BlockBodyContext {
+		return this.getRuleContext(0, BlockBodyContext);
+	}
+	constructor(ctx: WhenBlockContext) {
+		super(ctx.parent, ctx.invokingState);
+		this.copyFrom(ctx);
+	}
 	// @Override
 	public enterRule(listener: CPGLParserListener): void {
-		if (listener.enterWhenBlock) {
-			listener.enterWhenBlock(this);
+		if (listener.enterWhenWithBody) {
+			listener.enterWhenWithBody(this);
 		}
 	}
 	// @Override
 	public exitRule(listener: CPGLParserListener): void {
-		if (listener.exitWhenBlock) {
-			listener.exitWhenBlock(this);
+		if (listener.exitWhenWithBody) {
+			listener.exitWhenWithBody(this);
+		}
+	}
+	// @Override
+	public accept<Result>(visitor: CPGLParserVisitor<Result>): Result {
+		if (visitor.visitWhenWithBody) {
+			return visitor.visitWhenWithBody(this);
+		} else {
+			return visitor.visitChildren(this);
+		}
+	}
+}
+export class WhenSingleActionContext extends WhenBlockContext {
+	public WHEN(): TerminalNode { return this.getToken(CPGLParser.WHEN, 0); }
+	public conceptReference(): ConceptReferenceContext {
+		return this.getRuleContext(0, ConceptReferenceContext);
+	}
+	public THEN(): TerminalNode { return this.getToken(CPGLParser.THEN, 0); }
+	public singleActionStatement(): SingleActionStatementContext {
+		return this.getRuleContext(0, SingleActionStatementContext);
+	}
+	constructor(ctx: WhenBlockContext) {
+		super(ctx.parent, ctx.invokingState);
+		this.copyFrom(ctx);
+	}
+	// @Override
+	public enterRule(listener: CPGLParserListener): void {
+		if (listener.enterWhenSingleAction) {
+			listener.enterWhenSingleAction(this);
+		}
+	}
+	// @Override
+	public exitRule(listener: CPGLParserListener): void {
+		if (listener.exitWhenSingleAction) {
+			listener.exitWhenSingleAction(this);
+		}
+	}
+	// @Override
+	public accept<Result>(visitor: CPGLParserVisitor<Result>): Result {
+		if (visitor.visitWhenSingleAction) {
+			return visitor.visitWhenSingleAction(this);
+		} else {
+			return visitor.visitChildren(this);
 		}
 	}
 }
@@ -2019,6 +2110,14 @@ export class AnyOrAllClauseContext extends ParserRuleContext {
 	public exitRule(listener: CPGLParserListener): void {
 		if (listener.exitAnyOrAllClause) {
 			listener.exitAnyOrAllClause(this);
+		}
+	}
+	// @Override
+	public accept<Result>(visitor: CPGLParserVisitor<Result>): Result {
+		if (visitor.visitAnyOrAllClause) {
+			return visitor.visitAnyOrAllClause(this);
+		} else {
+			return visitor.visitChildren(this);
 		}
 	}
 }
@@ -2056,6 +2155,14 @@ export class BlockBodyContext extends ParserRuleContext {
 			listener.exitBlockBody(this);
 		}
 	}
+	// @Override
+	public accept<Result>(visitor: CPGLParserVisitor<Result>): Result {
+		if (visitor.visitBlockBody) {
+			return visitor.visitBlockBody(this);
+		} else {
+			return visitor.visitChildren(this);
+		}
+	}
 }
 
 
@@ -2082,6 +2189,14 @@ export class SingleActionStatementContext extends ParserRuleContext {
 	public exitRule(listener: CPGLParserListener): void {
 		if (listener.exitSingleActionStatement) {
 			listener.exitSingleActionStatement(this);
+		}
+	}
+	// @Override
+	public accept<Result>(visitor: CPGLParserVisitor<Result>): Result {
+		if (visitor.visitSingleActionStatement) {
+			return visitor.visitSingleActionStatement(this);
+		} else {
+			return visitor.visitChildren(this);
 		}
 	}
 }
@@ -2117,6 +2232,14 @@ export class NestedWhenBlockContext extends BlockStatementContext {
 			listener.exitNestedWhenBlock(this);
 		}
 	}
+	// @Override
+	public accept<Result>(visitor: CPGLParserVisitor<Result>): Result {
+		if (visitor.visitNestedWhenBlock) {
+			return visitor.visitNestedWhenBlock(this);
+		} else {
+			return visitor.visitChildren(this);
+		}
+	}
 }
 export class BlockActionContext extends BlockStatementContext {
 	public actionStatement(): ActionStatementContext {
@@ -2136,6 +2259,14 @@ export class BlockActionContext extends BlockStatementContext {
 	public exitRule(listener: CPGLParserListener): void {
 		if (listener.exitBlockAction) {
 			listener.exitBlockAction(this);
+		}
+	}
+	// @Override
+	public accept<Result>(visitor: CPGLParserVisitor<Result>): Result {
+		if (visitor.visitBlockAction) {
+			return visitor.visitBlockAction(this);
+		} else {
+			return visitor.visitChildren(this);
 		}
 	}
 }
@@ -2166,6 +2297,14 @@ export class ActionStatementContext extends ParserRuleContext {
 			listener.exitActionStatement(this);
 		}
 	}
+	// @Override
+	public accept<Result>(visitor: CPGLParserVisitor<Result>): Result {
+		if (visitor.visitActionStatement) {
+			return visitor.visitActionStatement(this);
+		} else {
+			return visitor.visitChildren(this);
+		}
+	}
 }
 
 
@@ -2191,6 +2330,14 @@ export class DoStatementContext extends ParserRuleContext {
 			listener.exitDoStatement(this);
 		}
 	}
+	// @Override
+	public accept<Result>(visitor: CPGLParserVisitor<Result>): Result {
+		if (visitor.visitDoStatement) {
+			return visitor.visitDoStatement(this);
+		} else {
+			return visitor.visitChildren(this);
+		}
+	}
 }
 
 
@@ -2214,6 +2361,14 @@ export class UseStatementContext extends ParserRuleContext {
 	public exitRule(listener: CPGLParserListener): void {
 		if (listener.exitUseStatement) {
 			listener.exitUseStatement(this);
+		}
+	}
+	// @Override
+	public accept<Result>(visitor: CPGLParserVisitor<Result>): Result {
+		if (visitor.visitUseStatement) {
+			return visitor.visitUseStatement(this);
+		} else {
+			return visitor.visitChildren(this);
 		}
 	}
 }
@@ -2251,6 +2406,14 @@ export class TerminologyStatementContext extends ParserRuleContext {
 			listener.exitTerminologyStatement(this);
 		}
 	}
+	// @Override
+	public accept<Result>(visitor: CPGLParserVisitor<Result>): Result {
+		if (visitor.visitTerminologyStatement) {
+			return visitor.visitTerminologyStatement(this);
+		} else {
+			return visitor.visitChildren(this);
+		}
+	}
 }
 
 
@@ -2276,6 +2439,14 @@ export class TerminologyValuesetContext extends ParserRuleContext {
 			listener.exitTerminologyValueset(this);
 		}
 	}
+	// @Override
+	public accept<Result>(visitor: CPGLParserVisitor<Result>): Result {
+		if (visitor.visitTerminologyValueset) {
+			return visitor.visitTerminologyValueset(this);
+		} else {
+			return visitor.visitChildren(this);
+		}
+	}
 }
 
 
@@ -2296,6 +2467,14 @@ export class TerminologyUnknownContext extends ParserRuleContext {
 	public exitRule(listener: CPGLParserListener): void {
 		if (listener.exitTerminologyUnknown) {
 			listener.exitTerminologyUnknown(this);
+		}
+	}
+	// @Override
+	public accept<Result>(visitor: CPGLParserVisitor<Result>): Result {
+		if (visitor.visitTerminologyUnknown) {
+			return visitor.visitTerminologyUnknown(this);
+		} else {
+			return visitor.visitChildren(this);
 		}
 	}
 }
@@ -2330,6 +2509,14 @@ export class TerminologySystemCodeContext extends ParserRuleContext {
 			listener.exitTerminologySystemCode(this);
 		}
 	}
+	// @Override
+	public accept<Result>(visitor: CPGLParserVisitor<Result>): Result {
+		if (visitor.visitTerminologySystemCode) {
+			return visitor.visitTerminologySystemCode(this);
+		} else {
+			return visitor.visitChildren(this);
+		}
+	}
 }
 
 
@@ -2362,6 +2549,14 @@ export class ActivityStatementContext extends ParserRuleContext {
 			listener.exitActivityStatement(this);
 		}
 	}
+	// @Override
+	public accept<Result>(visitor: CPGLParserVisitor<Result>): Result {
+		if (visitor.visitActivityStatement) {
+			return visitor.visitActivityStatement(this);
+		} else {
+			return visitor.visitChildren(this);
+		}
+	}
 }
 
 
@@ -2390,6 +2585,14 @@ export class ConceptStatementContext extends ParserRuleContext {
 	public exitRule(listener: CPGLParserListener): void {
 		if (listener.exitConceptStatement) {
 			listener.exitConceptStatement(this);
+		}
+	}
+	// @Override
+	public accept<Result>(visitor: CPGLParserVisitor<Result>): Result {
+		if (visitor.visitConceptStatement) {
+			return visitor.visitConceptStatement(this);
+		} else {
+			return visitor.visitChildren(this);
 		}
 	}
 }
@@ -2428,6 +2631,14 @@ export class ConceptBodyContext extends ParserRuleContext {
 			listener.exitConceptBody(this);
 		}
 	}
+	// @Override
+	public accept<Result>(visitor: CPGLParserVisitor<Result>): Result {
+		if (visitor.visitConceptBody) {
+			return visitor.visitConceptBody(this);
+		} else {
+			return visitor.visitChildren(this);
+		}
+	}
 }
 
 
@@ -2453,6 +2664,14 @@ export class HasTypeLineContext extends ParserRuleContext {
 			listener.exitHasTypeLine(this);
 		}
 	}
+	// @Override
+	public accept<Result>(visitor: CPGLParserVisitor<Result>): Result {
+		if (visitor.visitHasTypeLine) {
+			return visitor.visitHasTypeLine(this);
+		} else {
+			return visitor.visitChildren(this);
+		}
+	}
 }
 
 
@@ -2476,6 +2695,14 @@ export class HasValueTypeLineContext extends ParserRuleContext {
 	public exitRule(listener: CPGLParserListener): void {
 		if (listener.exitHasValueTypeLine) {
 			listener.exitHasValueTypeLine(this);
+		}
+	}
+	// @Override
+	public accept<Result>(visitor: CPGLParserVisitor<Result>): Result {
+		if (visitor.visitHasValueTypeLine) {
+			return visitor.visitHasValueTypeLine(this);
+		} else {
+			return visitor.visitChildren(this);
 		}
 	}
 }
@@ -2505,6 +2732,14 @@ export class ProvenanceLineContext extends ParserRuleContext {
 			listener.exitProvenanceLine(this);
 		}
 	}
+	// @Override
+	public accept<Result>(visitor: CPGLParserVisitor<Result>): Result {
+		if (visitor.visitProvenanceLine) {
+			return visitor.visitProvenanceLine(this);
+		} else {
+			return visitor.visitChildren(this);
+		}
+	}
 }
 
 
@@ -2532,6 +2767,14 @@ export class CodedByLineContext extends ParserRuleContext {
 			listener.exitCodedByLine(this);
 		}
 	}
+	// @Override
+	public accept<Result>(visitor: CPGLParserVisitor<Result>): Result {
+		if (visitor.visitCodedByLine) {
+			return visitor.visitCodedByLine(this);
+		} else {
+			return visitor.visitChildren(this);
+		}
+	}
 }
 
 
@@ -2557,6 +2800,14 @@ export class InferredByLineContext extends ParserRuleContext {
 	public exitRule(listener: CPGLParserListener): void {
 		if (listener.exitInferredByLine) {
 			listener.exitInferredByLine(this);
+		}
+	}
+	// @Override
+	public accept<Result>(visitor: CPGLParserVisitor<Result>): Result {
+		if (visitor.visitInferredByLine) {
+			return visitor.visitInferredByLine(this);
+		} else {
+			return visitor.visitChildren(this);
 		}
 	}
 }
@@ -2592,6 +2843,14 @@ export class DefinitionConceptContext extends InferredBodyContext {
 			listener.exitDefinitionConcept(this);
 		}
 	}
+	// @Override
+	public accept<Result>(visitor: CPGLParserVisitor<Result>): Result {
+		if (visitor.visitDefinitionConcept) {
+			return visitor.visitDefinitionConcept(this);
+		} else {
+			return visitor.visitChildren(this);
+		}
+	}
 }
 export class DefinitionLogicContext extends InferredBodyContext {
 	public inferredByDescriptiveLogic(): InferredByDescriptiveLogicContext {
@@ -2611,6 +2870,14 @@ export class DefinitionLogicContext extends InferredBodyContext {
 	public exitRule(listener: CPGLParserListener): void {
 		if (listener.exitDefinitionLogic) {
 			listener.exitDefinitionLogic(this);
+		}
+	}
+	// @Override
+	public accept<Result>(visitor: CPGLParserVisitor<Result>): Result {
+		if (visitor.visitDefinitionLogic) {
+			return visitor.visitDefinitionLogic(this);
+		} else {
+			return visitor.visitChildren(this);
 		}
 	}
 }
@@ -2640,6 +2907,14 @@ export class InferredByConceptReferenceContext extends ParserRuleContext {
 			listener.exitInferredByConceptReference(this);
 		}
 	}
+	// @Override
+	public accept<Result>(visitor: CPGLParserVisitor<Result>): Result {
+		if (visitor.visitInferredByConceptReference) {
+			return visitor.visitInferredByConceptReference(this);
+		} else {
+			return visitor.visitChildren(this);
+		}
+	}
 }
 
 
@@ -2666,6 +2941,14 @@ export class InferredByDescriptiveLogicContext extends ParserRuleContext {
 			listener.exitInferredByDescriptiveLogic(this);
 		}
 	}
+	// @Override
+	public accept<Result>(visitor: CPGLParserVisitor<Result>): Result {
+		if (visitor.visitInferredByDescriptiveLogic) {
+			return visitor.visitInferredByDescriptiveLogic(this);
+		} else {
+			return visitor.visitChildren(this);
+		}
+	}
 }
 
 
@@ -2688,6 +2971,14 @@ export class InferredByExpressionContext extends ParserRuleContext {
 	public exitRule(listener: CPGLParserListener): void {
 		if (listener.exitInferredByExpression) {
 			listener.exitInferredByExpression(this);
+		}
+	}
+	// @Override
+	public accept<Result>(visitor: CPGLParserVisitor<Result>): Result {
+		if (visitor.visitInferredByExpression) {
+			return visitor.visitInferredByExpression(this);
+		} else {
+			return visitor.visitChildren(this);
 		}
 	}
 }
@@ -2729,6 +3020,14 @@ export class InformalOrContext extends ParserRuleContext {
 			listener.exitInformalOr(this);
 		}
 	}
+	// @Override
+	public accept<Result>(visitor: CPGLParserVisitor<Result>): Result {
+		if (visitor.visitInformalOr) {
+			return visitor.visitInformalOr(this);
+		} else {
+			return visitor.visitChildren(this);
+		}
+	}
 }
 
 
@@ -2768,6 +3067,14 @@ export class InformalAndContext extends ParserRuleContext {
 			listener.exitInformalAnd(this);
 		}
 	}
+	// @Override
+	public accept<Result>(visitor: CPGLParserVisitor<Result>): Result {
+		if (visitor.visitInformalAnd) {
+			return visitor.visitInformalAnd(this);
+		} else {
+			return visitor.visitChildren(this);
+		}
+	}
 }
 
 
@@ -2794,6 +3101,14 @@ export class InformalNotContext extends ParserRuleContext {
 	public exitRule(listener: CPGLParserListener): void {
 		if (listener.exitInformalNot) {
 			listener.exitInformalNot(this);
+		}
+	}
+	// @Override
+	public accept<Result>(visitor: CPGLParserVisitor<Result>): Result {
+		if (visitor.visitInformalNot) {
+			return visitor.visitInformalNot(this);
+		} else {
+			return visitor.visitChildren(this);
 		}
 	}
 }
@@ -2829,6 +3144,14 @@ export class ConceptAtomContext extends AtomContext {
 			listener.exitConceptAtom(this);
 		}
 	}
+	// @Override
+	public accept<Result>(visitor: CPGLParserVisitor<Result>): Result {
+		if (visitor.visitConceptAtom) {
+			return visitor.visitConceptAtom(this);
+		} else {
+			return visitor.visitChildren(this);
+		}
+	}
 }
 export class GroupExpressionContext extends AtomContext {
 	public LPAREN(): TerminalNode { return this.getToken(CPGLParser.LPAREN, 0); }
@@ -2852,6 +3175,14 @@ export class GroupExpressionContext extends AtomContext {
 			listener.exitGroupExpression(this);
 		}
 	}
+	// @Override
+	public accept<Result>(visitor: CPGLParserVisitor<Result>): Result {
+		if (visitor.visitGroupExpression) {
+			return visitor.visitGroupExpression(this);
+		} else {
+			return visitor.visitChildren(this);
+		}
+	}
 }
 
 
@@ -2872,6 +3203,14 @@ export class IdentifierContext extends ParserRuleContext {
 	public exitRule(listener: CPGLParserListener): void {
 		if (listener.exitIdentifier) {
 			listener.exitIdentifier(this);
+		}
+	}
+	// @Override
+	public accept<Result>(visitor: CPGLParserVisitor<Result>): Result {
+		if (visitor.visitIdentifier) {
+			return visitor.visitIdentifier(this);
+		} else {
+			return visitor.visitChildren(this);
 		}
 	}
 }
@@ -2898,6 +3237,14 @@ export class DecisionIdentifierContext extends ParserRuleContext {
 			listener.exitDecisionIdentifier(this);
 		}
 	}
+	// @Override
+	public accept<Result>(visitor: CPGLParserVisitor<Result>): Result {
+		if (visitor.visitDecisionIdentifier) {
+			return visitor.visitDecisionIdentifier(this);
+		} else {
+			return visitor.visitChildren(this);
+		}
+	}
 }
 
 
@@ -2920,6 +3267,14 @@ export class DecisionReferenceContext extends ParserRuleContext {
 	public exitRule(listener: CPGLParserListener): void {
 		if (listener.exitDecisionReference) {
 			listener.exitDecisionReference(this);
+		}
+	}
+	// @Override
+	public accept<Result>(visitor: CPGLParserVisitor<Result>): Result {
+		if (visitor.visitDecisionReference) {
+			return visitor.visitDecisionReference(this);
+		} else {
+			return visitor.visitChildren(this);
 		}
 	}
 }
@@ -2946,6 +3301,14 @@ export class TerminologyIdentifierContext extends ParserRuleContext {
 			listener.exitTerminologyIdentifier(this);
 		}
 	}
+	// @Override
+	public accept<Result>(visitor: CPGLParserVisitor<Result>): Result {
+		if (visitor.visitTerminologyIdentifier) {
+			return visitor.visitTerminologyIdentifier(this);
+		} else {
+			return visitor.visitChildren(this);
+		}
+	}
 }
 
 
@@ -2968,6 +3331,14 @@ export class TerminologyReferenceContext extends ParserRuleContext {
 	public exitRule(listener: CPGLParserListener): void {
 		if (listener.exitTerminologyReference) {
 			listener.exitTerminologyReference(this);
+		}
+	}
+	// @Override
+	public accept<Result>(visitor: CPGLParserVisitor<Result>): Result {
+		if (visitor.visitTerminologyReference) {
+			return visitor.visitTerminologyReference(this);
+		} else {
+			return visitor.visitChildren(this);
 		}
 	}
 }
@@ -2994,6 +3365,14 @@ export class ActivityIdentifierContext extends ParserRuleContext {
 			listener.exitActivityIdentifier(this);
 		}
 	}
+	// @Override
+	public accept<Result>(visitor: CPGLParserVisitor<Result>): Result {
+		if (visitor.visitActivityIdentifier) {
+			return visitor.visitActivityIdentifier(this);
+		} else {
+			return visitor.visitChildren(this);
+		}
+	}
 }
 
 
@@ -3016,6 +3395,14 @@ export class ActivityReferenceContext extends ParserRuleContext {
 	public exitRule(listener: CPGLParserListener): void {
 		if (listener.exitActivityReference) {
 			listener.exitActivityReference(this);
+		}
+	}
+	// @Override
+	public accept<Result>(visitor: CPGLParserVisitor<Result>): Result {
+		if (visitor.visitActivityReference) {
+			return visitor.visitActivityReference(this);
+		} else {
+			return visitor.visitChildren(this);
 		}
 	}
 }
@@ -3042,6 +3429,14 @@ export class ConceptIdentifierContext extends ParserRuleContext {
 			listener.exitConceptIdentifier(this);
 		}
 	}
+	// @Override
+	public accept<Result>(visitor: CPGLParserVisitor<Result>): Result {
+		if (visitor.visitConceptIdentifier) {
+			return visitor.visitConceptIdentifier(this);
+		} else {
+			return visitor.visitChildren(this);
+		}
+	}
 }
 
 
@@ -3064,6 +3459,14 @@ export class ConceptReferenceContext extends ParserRuleContext {
 	public exitRule(listener: CPGLParserListener): void {
 		if (listener.exitConceptReference) {
 			listener.exitConceptReference(this);
+		}
+	}
+	// @Override
+	public accept<Result>(visitor: CPGLParserVisitor<Result>): Result {
+		if (visitor.visitConceptReference) {
+			return visitor.visitConceptReference(this);
+		} else {
+			return visitor.visitChildren(this);
 		}
 	}
 }
@@ -3090,6 +3493,14 @@ export class PatternIdentifierContext extends ParserRuleContext {
 			listener.exitPatternIdentifier(this);
 		}
 	}
+	// @Override
+	public accept<Result>(visitor: CPGLParserVisitor<Result>): Result {
+		if (visitor.visitPatternIdentifier) {
+			return visitor.visitPatternIdentifier(this);
+		} else {
+			return visitor.visitChildren(this);
+		}
+	}
 }
 
 
@@ -3114,6 +3525,14 @@ export class PatternReferenceContext extends ParserRuleContext {
 			listener.exitPatternReference(this);
 		}
 	}
+	// @Override
+	public accept<Result>(visitor: CPGLParserVisitor<Result>): Result {
+		if (visitor.visitPatternReference) {
+			return visitor.visitPatternReference(this);
+		} else {
+			return visitor.visitChildren(this);
+		}
+	}
 }
 
 
@@ -3135,6 +3554,14 @@ export class StringLiteralContext extends ParserRuleContext {
 	public exitRule(listener: CPGLParserListener): void {
 		if (listener.exitStringLiteral) {
 			listener.exitStringLiteral(this);
+		}
+	}
+	// @Override
+	public accept<Result>(visitor: CPGLParserVisitor<Result>): Result {
+		if (visitor.visitStringLiteral) {
+			return visitor.visitStringLiteral(this);
+		} else {
+			return visitor.visitChildren(this);
 		}
 	}
 }

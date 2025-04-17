@@ -31,7 +31,8 @@ decisionBody
 
 // A whenBlock covers a "when <concept> then ..." clause
 whenBlock
-    : WHEN conceptReference THEN ( blockBody | singleActionStatement )
+    : WHEN conceptReference THEN blockBody              # WhenWithBody
+    | WHEN conceptReference THEN singleActionStatement  # WhenSingleAction
     ;
 
 // "any:" or "all:" clause for lists

@@ -2,7 +2,7 @@ import { CharStreams, CommonTokenStream } from 'antlr4ts';
 
 import { CPGLParser } from '../../grammar/generated/CPGLParser';
 import { createLexer } from '../../lexer/createLexer';
-import { ASTBuilder } from '../builder';
+import { CPGLAstBuilder } from '../builder';
 import { CPGL } from '../types';
 
 // Test suite imports
@@ -17,6 +17,6 @@ export const parseInput = (input: string): CPGL => {
   const tokenStream = new CommonTokenStream(lexer);
   const parser = new CPGLParser(tokenStream);
   const tree = parser.cpgl();
-  const builder = new ASTBuilder();
+  const builder = new CPGLAstBuilder();
   return builder.visitCpgl(tree);
 };

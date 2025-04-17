@@ -1,7 +1,7 @@
 import { CharStreams, CommonTokenStream } from 'antlr4ts';
 import { ParseTree } from 'antlr4ts/tree/ParseTree';
 
-import { ASTBuilder } from './ast/builder';
+import { CPGLAstBuilder } from './ast/builder';
 import { CPGL } from './ast/types';
 import { CPGLLexer } from './grammar/generated/CPGLLexer';
 import { CPGLParser } from './grammar/generated/CPGLParser';
@@ -81,7 +81,7 @@ export function buildCPGL(input: string): ParseResult<CPGL> {
     const tokenStream = new CommonTokenStream(lexer);
     const parser = new CPGLParser(tokenStream);
     const tree = parser.cpgl();
-    const builder = new ASTBuilder();
+    const builder = new CPGLAstBuilder();
     const ast = builder.visit(tree) as CPGL;
 
     return { success: true, result: ast };
@@ -101,7 +101,7 @@ export function validateCPGL(input: string): ParseResult<CPGL> {
     const tokenStream = new CommonTokenStream(lexer);
     const parser = new CPGLParser(tokenStream);
     const tree = parser.cpgl();
-    const builder = new ASTBuilder();
+    const builder = new CPGLAstBuilder();
     const ast = builder.visit(tree) as CPGL;
 
     const validator = new Validator();

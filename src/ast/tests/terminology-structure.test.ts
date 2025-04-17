@@ -2,14 +2,14 @@ import { CharStreams, CommonTokenStream } from 'antlr4ts';
 
 import { CPGLParser } from '../../grammar/generated/CPGLParser';
 import { createLexer } from '../../lexer/createLexer';
-import { ASTBuilder } from '../builder';
+import { CPGLAstBuilder } from '../builder';
 import { CPGL, Terminology, TerminologyValueset, TerminologySystemCode, TerminologyUnknown } from '../types';
 
 describe('Terminology Structure', () => {
-  let builder: ASTBuilder;
+  let builder: CPGLAstBuilder;
 
   beforeEach(() => {
-    builder = new ASTBuilder();
+    builder = new CPGLAstBuilder();
   });
 
   const parseInput = (input: string): CPGL => {

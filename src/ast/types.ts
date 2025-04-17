@@ -202,7 +202,7 @@ export const CodedByDefinitionType = {
 
 // Inferred by definition
 // concept reference
-interface ConceptReference extends ASTNode {
+export interface ConceptReference extends ASTNode {
   type: 'ConceptReference';
   name: string;
 }
@@ -211,7 +211,7 @@ export const ConceptReferenceType = {
 };
 
 // instead of a binary-only LogicalExpression, split AND/OR into n‑ary:
-interface InformalAnd extends ASTNode {
+export interface InformalAnd extends ASTNode {
   type: 'AndExpression';
   terms: InferredByExpression[];     // two or more
 }
@@ -219,28 +219,40 @@ export const InformalAndType = {
   type: 'AndExpression' as const,
 };
 
-interface InformalOr extends ASTNode {
+export interface InformalOr extends ASTNode {
   type: 'OrExpression';
   terms: InferredByExpression[];     // two or more
 }
 export const InformalOrType = {
   type: 'OrExpression' as const,
 };
+export interface NotExpression extends ASTNode {
+  type: 'NotExpression';
+  expression: InferredByExpression;
+}
+export const NotExpressionType = {
+  type: 'NotExpression' as const,
+};
 
 // any node that can appear in a logical narrative
-type InferredByExpression = ConceptReference | InformalAnd | InformalOr | GroupExpression;
+export type InferredByExpression
+  = ConceptReference
+  | InformalAnd
+  | InformalOr
+  | GroupExpression
+  | NotExpression;
 
 // these are the parens
-interface GroupExpression extends ASTNode {
+export interface GroupExpression extends ASTNode {
   type: 'GroupExpression';
-  terms: InferredByExpression;
+  expression: InferredByExpression;
 }
 export const GroupExpressionType = {
   type: 'GroupExpression' as const,
-};  
+};
 
 // inferred-by nodes
-interface InferredByConcept extends ASTNode {
+export interface InferredByConcept extends ASTNode {
   type: 'InferredByDefinitionConcept';
   concept: string;
   pattern?: string;
@@ -249,7 +261,7 @@ export const InferredByConceptType = {
   type: 'InferredByDefinitionConcept' as const,
 };
 
-interface InferredByDefinition extends ASTNode {
+export interface InferredByDefinition extends ASTNode {
   type: 'InferredByDefinition';
   body: InferredByConcept | InferredByExpression;
 }

@@ -30,7 +30,7 @@ import {
 
 import { parseInput } from './index.test';
 
-describe('ASTBuilder', () => {
+describe('CPGLAstBuilder', () => {
   describe('Decision Statements', () => {
     it('should parse a simple decision with when block', () => {
       const input = `
