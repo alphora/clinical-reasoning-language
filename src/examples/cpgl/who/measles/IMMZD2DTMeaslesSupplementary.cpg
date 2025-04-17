@@ -1,0 +1,36 @@
+--- file: IMMZDTImmunizationStrategy.cpgl ---
+
+decision "IMMZDTImmunizationStrategy":
+    when "Measles Routine Immunization Schedule Incomplete" then:
+        when "No Primary Series Doses Administered" then do "Indicate".
+        when "One Primary Series Dose Administered" then do "Vaccinate".
+    done
+done
+
+concept "Measles Routine Immunization Schedule Incomplete":
+    has type Observation.
+    has valuetype boolean.
+    inferred by ("child concept A" and "child concept B").
+done
+
+concept "No Primary Series Doses Administered":
+    has type Observation.
+    has valuetype boolean.
+    coded by "No Primary Series Doses Administered".
+done
+
+terminology "No Primary Series Doses Administered" system "IMMZDTImmunizationStrategy" code "no-primary-series-doses-administered".
+
+concept "One Primary Series Dose Administered":
+    has type Observation.
+    has valuetype boolean.
+    coded by "One Primary Series Dose Administered".
+done
+
+terminology "One Primary Series Dose Administered" system "IMMZDTImmunizationStrategy" code "one-primary-series-dose-administered".
+
+// Check immunization plan definitions to see what is required.
+activity "Indicate" perform CommunicationRequest.
+
+// Provide measles routine immunization
+activity "Vaccinate" perform CommunicationRequest.
