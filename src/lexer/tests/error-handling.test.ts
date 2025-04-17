@@ -58,15 +58,15 @@ describe('Lexer Error Handling', () => {
     const testCases = [
       {
         input: 'perform invalidActivity',
-        expectedError: /Line 1:\d+ - Invalid activity type: invalidActivity/,
+        expectedError: /Lexical error at line 1:\d+ - Invalid activity type: invalidActivity. Valid types are: CPGAdministerMedication, CPGCollectInformation, CPGCommunication, CPGDispenseMedication, CPGDocumentMedication, CPGEnrollment, CPGGenerateReport, CPGHold, CPGImmunization, CPGMedicationRequest, CPGProposeDiagnosis, CPGRecordDetectedIssue, CPGRecordInference, CPGReportFlag, CPGResume, CPGServiceRequest, CPGStop/,
       },
       {
         input: 'perform someRandomActivity\nthen done',
-        expectedError: /Line 1:\d+ - Invalid activity type: someRandomActivity/,
+        expectedError: /Lexical error at line 1:\d+ - Invalid activity type: someRandomActivity. Valid types are: CPGAdministerMedication, CPGCollectInformation, CPGCommunication, CPGDispenseMedication, CPGDocumentMedication, CPGEnrollment, CPGGenerateReport, CPGHold, CPGImmunization, CPGMedicationRequest, CPGProposeDiagnosis, CPGRecordDetectedIssue, CPGRecordInference, CPGReportFlag, CPGResume, CPGServiceRequest, CPGStop/,
       },
       {
         input: 'decision "test"\nwhen true then perform unknownActivity\ndone',
-        expectedError: /Line 2:\d+ - Invalid activity type: unknownActivity/,
+        expectedError: /Lexical error at line 2:\d+ - Invalid activity type: unknownActivity. Valid types are: CPGAdministerMedication, CPGCollectInformation, CPGCommunication, CPGDispenseMedication, CPGDocumentMedication, CPGEnrollment, CPGGenerateReport, CPGHold, CPGImmunization, CPGMedicationRequest, CPGProposeDiagnosis, CPGRecordDetectedIssue, CPGRecordInference, CPGReportFlag, CPGResume, CPGServiceRequest, CPGStop/,
       },
     ];
 
