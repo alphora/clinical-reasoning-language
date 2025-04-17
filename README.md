@@ -274,15 +274,19 @@ This will generate a `.tgz` file (e.g., `@cqis-cpgl-0.1.0.tgz`) that can be dist
 
 The package is distributed via GitHub Releases. To create a new release:
 
-1. Create a new branch `v0.1.0`
-1. Generate a CHANGELOG: "I'm creating a new release v0.1.0, generate and append to the CHANGELOG"
-1. Build the package
+1. Create a new branch (e.g., `v0.1.0`)
+1. Generate a CHANGELOG: "I'm creating a new release [version], generate and append to the CHANGELOG" (e.g., v0.1.0)
 1. Commit all changes
 1. Rev the version: `npm version minor`
+1. Build the package
 1. Push changes: `git push`
+1. Create a PR & merge the PR
 1. Create a new release on GitHub
-1. Attach the generated `.tgz` file
-1. Tag the release with a version number (e.g., `v0.1.0`)
+   1. Tag the release with a version number (e.g., `v0.1.0`)
+   1. Genereate relese notes
+   1. Attach the generated `.tgz` file
+
+1. Switch to main & pull
 
 Users can then install the package using:
 ```bash
