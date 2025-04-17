@@ -122,4 +122,14 @@ const result = validateCPGL(`
 ### Important Note
 - **Temporary Change**: The validator has been temporarily disabled to allow for refactoring to match the builder implementation. This functionality will be restored in the next release.
 
-[0.2.0]: https://github.com/cqis/cpgl/releases/tag/v0.2.0 
+[0.2.0]: https://github.com/cqis/cpgl/releases/tag/v0.2.0
+
+## [0.3.0] - 2025-04-17
+
+### Changed
+- Formatted parser error to match lexer error.
+
+### Known Issues
+- Error tests are currently broken and will be addressed in a future update.
+
+[0.3.0]: https://github.com/cqis/cpgl/releases/tag/v0.3.0 
