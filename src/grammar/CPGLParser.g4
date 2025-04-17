@@ -51,8 +51,8 @@ singleActionStatement
 
 // A block statement is either a nested whenBlock or an action statement.
 blockStatement
-    : whenBlock
-    | actionStatement
+    : whenBlock                # NestedWhenBlock
+    | actionStatement          # BlockAction
     ;
 
 // Action statements for do and use operations.
@@ -163,8 +163,8 @@ inferredByLine
 // informal logical operators (AND, OR). These narratives document logical relationships
 // among concepts without representing formal evaluatable logic.
 inferredBody
-    : inferredByDescriptiveLogic
-    | inferredByConceptReference
+    : inferredByConceptReference    # DefinitionConcept
+    | inferredByDescriptiveLogic    # DefinitionLogic
     ;
 
 // References a single concept identifier, optionally preceded by a pattern identifier.
@@ -178,14 +178,14 @@ inferredByConceptReference
 // among concepts using the operators AND and OR. These operators serve documentation and 
 // readability purposes only and are not computationally evaluated at this stage.
 inferredByDescriptiveLogic
-    : LPAREN logicalNarrative RPAREN
+    : LPAREN inferredByExpression RPAREN
     ;
 
 // ----------------------- DESCRIPTIVE LOGICAL NARRATIVES -----------------------
 //
-// Logical narratives use informal Boolean operators AND, OR purely as descriptive 
+// Inferred by expressions use informal Boolean operators AND, OR purely as descriptive 
 // connectors among concept references. No formal computational logic is implied.
-logicalNarrative
+inferredByExpression
     : informalOr
     ;
 
@@ -194,12 +194,17 @@ informalOr
     ;
 
 informalAnd
-    : atom (AND atom)*
+    : informalNot (AND informalNot)*
+    ;
+
+informalNot
+    : NOT informalNot
+    | atom
     ;
 
 atom
-    : conceptReference
-    | LPAREN logicalNarrative RPAREN
+    : conceptReference                             # ConceptAtom
+    | LPAREN inferredByExpression RPAREN           # GroupExpression
     ;
 
 // ----------------------------- IDENTIFIER RULE ------------------------------

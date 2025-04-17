@@ -9,6 +9,7 @@ PROVENANCE   : 'provenance';
 INFERRED     : 'inferred';
 AND          : 'and';
 OR           : 'or';
+NOT          : 'not';
 DONE         : 'done';
 HAS          : 'has';
 BY           : 'by';

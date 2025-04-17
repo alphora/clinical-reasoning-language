@@ -3,6 +3,12 @@
 
 import { ParseTreeListener } from "antlr4ts/tree/ParseTreeListener";
 
+import { NestedWhenBlockContext } from "./CPGLParser";
+import { BlockActionContext } from "./CPGLParser";
+import { DefinitionConceptContext } from "./CPGLParser";
+import { DefinitionLogicContext } from "./CPGLParser";
+import { ConceptAtomContext } from "./CPGLParser";
+import { GroupExpressionContext } from "./CPGLParser";
 import { CpglContext } from "./CPGLParser";
 import { StatementContext } from "./CPGLParser";
 import { DecisionStatementContext } from "./CPGLParser";
@@ -30,9 +36,10 @@ import { InferredByLineContext } from "./CPGLParser";
 import { InferredBodyContext } from "./CPGLParser";
 import { InferredByConceptReferenceContext } from "./CPGLParser";
 import { InferredByDescriptiveLogicContext } from "./CPGLParser";
-import { LogicalNarrativeContext } from "./CPGLParser";
+import { InferredByExpressionContext } from "./CPGLParser";
 import { InformalOrContext } from "./CPGLParser";
 import { InformalAndContext } from "./CPGLParser";
+import { InformalNotContext } from "./CPGLParser";
 import { AtomContext } from "./CPGLParser";
 import { IdentifierContext } from "./CPGLParser";
 import { DecisionIdentifierContext } from "./CPGLParser";
@@ -53,6 +60,84 @@ import { StringLiteralContext } from "./CPGLParser";
  * `CPGLParser`.
  */
 export interface CPGLParserListener extends ParseTreeListener {
+	/**
+	 * Enter a parse tree produced by the `NestedWhenBlock`
+	 * labeled alternative in `CPGLParser.blockStatement`.
+	 * @param ctx the parse tree
+	 */
+	enterNestedWhenBlock?: (ctx: NestedWhenBlockContext) => void;
+	/**
+	 * Exit a parse tree produced by the `NestedWhenBlock`
+	 * labeled alternative in `CPGLParser.blockStatement`.
+	 * @param ctx the parse tree
+	 */
+	exitNestedWhenBlock?: (ctx: NestedWhenBlockContext) => void;
+
+	/**
+	 * Enter a parse tree produced by the `BlockAction`
+	 * labeled alternative in `CPGLParser.blockStatement`.
+	 * @param ctx the parse tree
+	 */
+	enterBlockAction?: (ctx: BlockActionContext) => void;
+	/**
+	 * Exit a parse tree produced by the `BlockAction`
+	 * labeled alternative in `CPGLParser.blockStatement`.
+	 * @param ctx the parse tree
+	 */
+	exitBlockAction?: (ctx: BlockActionContext) => void;
+
+	/**
+	 * Enter a parse tree produced by the `DefinitionConcept`
+	 * labeled alternative in `CPGLParser.inferredBody`.
+	 * @param ctx the parse tree
+	 */
+	enterDefinitionConcept?: (ctx: DefinitionConceptContext) => void;
+	/**
+	 * Exit a parse tree produced by the `DefinitionConcept`
+	 * labeled alternative in `CPGLParser.inferredBody`.
+	 * @param ctx the parse tree
+	 */
+	exitDefinitionConcept?: (ctx: DefinitionConceptContext) => void;
+
+	/**
+	 * Enter a parse tree produced by the `DefinitionLogic`
+	 * labeled alternative in `CPGLParser.inferredBody`.
+	 * @param ctx the parse tree
+	 */
+	enterDefinitionLogic?: (ctx: DefinitionLogicContext) => void;
+	/**
+	 * Exit a parse tree produced by the `DefinitionLogic`
+	 * labeled alternative in `CPGLParser.inferredBody`.
+	 * @param ctx the parse tree
+	 */
+	exitDefinitionLogic?: (ctx: DefinitionLogicContext) => void;
+
+	/**
+	 * Enter a parse tree produced by the `ConceptAtom`
+	 * labeled alternative in `CPGLParser.atom`.
+	 * @param ctx the parse tree
+	 */
+	enterConceptAtom?: (ctx: ConceptAtomContext) => void;
+	/**
+	 * Exit a parse tree produced by the `ConceptAtom`
+	 * labeled alternative in `CPGLParser.atom`.
+	 * @param ctx the parse tree
+	 */
+	exitConceptAtom?: (ctx: ConceptAtomContext) => void;
+
+	/**
+	 * Enter a parse tree produced by the `GroupExpression`
+	 * labeled alternative in `CPGLParser.atom`.
+	 * @param ctx the parse tree
+	 */
+	enterGroupExpression?: (ctx: GroupExpressionContext) => void;
+	/**
+	 * Exit a parse tree produced by the `GroupExpression`
+	 * labeled alternative in `CPGLParser.atom`.
+	 * @param ctx the parse tree
+	 */
+	exitGroupExpression?: (ctx: GroupExpressionContext) => void;
+
 	/**
 	 * Enter a parse tree produced by `CPGLParser.cpgl`.
 	 * @param ctx the parse tree
@@ -351,15 +436,15 @@ export interface CPGLParserListener extends ParseTreeListener {
 	exitInferredByDescriptiveLogic?: (ctx: InferredByDescriptiveLogicContext) => void;
 
 	/**
-	 * Enter a parse tree produced by `CPGLParser.logicalNarrative`.
+	 * Enter a parse tree produced by `CPGLParser.inferredByExpression`.
 	 * @param ctx the parse tree
 	 */
-	enterLogicalNarrative?: (ctx: LogicalNarrativeContext) => void;
+	enterInferredByExpression?: (ctx: InferredByExpressionContext) => void;
 	/**
-	 * Exit a parse tree produced by `CPGLParser.logicalNarrative`.
+	 * Exit a parse tree produced by `CPGLParser.inferredByExpression`.
 	 * @param ctx the parse tree
 	 */
-	exitLogicalNarrative?: (ctx: LogicalNarrativeContext) => void;
+	exitInferredByExpression?: (ctx: InferredByExpressionContext) => void;
 
 	/**
 	 * Enter a parse tree produced by `CPGLParser.informalOr`.
@@ -382,6 +467,17 @@ export interface CPGLParserListener extends ParseTreeListener {
 	 * @param ctx the parse tree
 	 */
 	exitInformalAnd?: (ctx: InformalAndContext) => void;
+
+	/**
+	 * Enter a parse tree produced by `CPGLParser.informalNot`.
+	 * @param ctx the parse tree
+	 */
+	enterInformalNot?: (ctx: InformalNotContext) => void;
+	/**
+	 * Exit a parse tree produced by `CPGLParser.informalNot`.
+	 * @param ctx the parse tree
+	 */
+	exitInformalNot?: (ctx: InformalNotContext) => void;
 
 	/**
 	 * Enter a parse tree produced by `CPGLParser.atom`.
