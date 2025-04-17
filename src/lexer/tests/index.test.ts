@@ -118,6 +118,7 @@ import './fhir-types.test';
 import './integration.test';
 import './structures.test';
 import './whitespace.test';
+import './error-listener.test';
 
 describe('CPGL Lexer Test Suite', () => {
   it('should run all test suites', () => {
