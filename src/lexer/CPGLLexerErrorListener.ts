@@ -7,6 +7,8 @@ import { CPGLLexer } from '../grammar/generated/CPGLLexer';
 export class CPGLLexerErrorListener implements ANTLRErrorListener<number> {
   ERROR_TOKEN_TYPE = 27;
 
+  private errors: string[] = [];
+
   syntaxError<T extends number>(
     _recognizer: Recognizer<T, ATNSimulator>,
     _offendingSymbol: T | undefined,
@@ -51,8 +53,9 @@ export class CPGLLexerErrorListener implements ANTLRErrorListener<number> {
       }
     }
 
-    const errorMessage = `Lexical error at line ${line}:${charPositionInLine}: Invalid token '${errorText}'. (details: ${msg})`;
+    const errorMessage = `Lexical error at line ${line}:${charPositionInLine} - Invalid token '${errorText}'. (details: ${msg})`;
     console.error(errorMessage);
+    this.errors.push(errorMessage);
 
     if (_recognizer instanceof CPGLLexer) {
       const errorToken: Token = {
@@ -76,5 +79,9 @@ export class CPGLLexerErrorListener implements ANTLRErrorListener<number> {
     }
 
     throw new Error(errorMessage);
+  }
+
+  getErrors(): string[] {
+    return this.errors;
   }
 }
