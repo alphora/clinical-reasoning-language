@@ -1,4 +1,4 @@
-import { CharStreams, CommonTokenStream } from 'antlr4ts';
+import { CharStreams } from 'antlr4ts';
 import { CPGLLexer } from '../../grammar/generated/CPGLLexer';
 import { CPGLLexerErrorListener } from '../CPGLLexerErrorListener';
 
@@ -76,7 +76,7 @@ describe('Lexer Error Handling', () => {
         expectedMessage: 'Invalid activity type',
       },
       {
-        input: 'decision "test"\nwhen true then perform unknownActivity\ndone',
+        input: 'decision "test"\nwhen "true" then perform unknownActivity\ndone',
         expectedMessage: 'Invalid activity type',
       },
     ];
