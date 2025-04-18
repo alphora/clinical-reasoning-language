@@ -170,28 +170,25 @@ export class CPGLLexer extends Lexer {
 		case 0:
 
 			        const validTypes = [
-			            'CPGAdministerMedication',
+			            'CPGCommunicationRequest',
 			            'CPGCollectInformation',
-			            'CPGCommunication',
-			            'CPGDispenseMedication',
-			            'CPGDocumentMedication',
 			            'CPGEnrollment',
 			            'CPGGenerateReport',
-			            'CPGHold',
-			            'CPGImmunization',
 			            'CPGMedicationRequest',
-			            'CPGProposeDiagnosis',
+			            'CPGDispenseMedication',
+			            'CPGAdministerMedication',
+			            'CPGDocumentMedication',
+			            'CPGImmunizationRequest',
+			            'CPGServiceRequest',
+			            'CPGProposeDiagnosisTask',
 			            'CPGRecordDetectedIssue',
 			            'CPGRecordInference',
-			            'CPGReportFlag',
-			            'CPGResume',
-			            'CPGServiceRequest',
-			            'CPGStop'
+			            'CPGReportFlagTask'
 			        ];
 			        if (!validTypes.includes(this.text)) {
-			            for (const listener of this._listeners) {
-			                if (listener.reportCustomError) {
-			                    listener.reportCustomError(
+			            for (const listener of this.getErrorListeners()) {
+			                if (typeof (listener as any).reportCustomError === 'function') {
+			                    (listener as any).reportCustomError(
 			                        this._tokenStartLine,
 			                        this._tokenStartCharPositionInLine,
 			                        `Invalid activity type: ${this.text}`,
@@ -208,9 +205,9 @@ export class CPGLLexer extends Lexer {
 		switch (actionIndex) {
 		case 1:
 
-			        for (const listener of this._listeners) {
-			            if (listener.reportCustomError) {
-			                listener.reportCustomError(
+			        for (const listener of this.getErrorListeners()) {
+			            if (typeof (listener as any).reportCustomError === 'function') {
+			                (listener as any).reportCustomError(
 			                    this._tokenStartLine,
 			                    this._tokenStartCharPositionInLine,
 			                    `Invalid character in activity type: ${this.text}`,
@@ -243,9 +240,9 @@ export class CPGLLexer extends Lexer {
 			            'Observation'
 			        ];
 			        if (!validTypes.includes(this.text)) {
-			            for (const listener of this._listeners) {
-			                if (listener.reportCustomError) {
-			                    listener.reportCustomError(
+			            for (const listener of this.getErrorListeners()) {
+			                if (typeof (listener as any).reportCustomError === 'function') {
+			                    (listener as any).reportCustomError(
 			                        this._tokenStartLine,
 			                        this._tokenStartCharPositionInLine,
 			                        `Invalid concept type: ${this.text}`,
@@ -262,9 +259,9 @@ export class CPGLLexer extends Lexer {
 		switch (actionIndex) {
 		case 3:
 
-			        for (const listener of this._listeners) {
-			            if (listener.reportCustomError) {
-			                listener.reportCustomError(
+			        for (const listener of this.getErrorListeners()) {
+			            if (typeof (listener as any).reportCustomError === 'function') {
+			                (listener as any).reportCustomError(
 			                    this._tokenStartLine,
 			                    this._tokenStartCharPositionInLine,
 			                    `Invalid character in concept type: ${this.text}`,
@@ -295,9 +292,9 @@ export class CPGLLexer extends Lexer {
 			            'Attachment'
 			        ];
 			        if (!validTypes.includes(this.text)) {
-			            for (const listener of this._listeners) {
-			                if (listener.reportCustomError) {
-			                    listener.reportCustomError(
+			            for (const listener of this.getErrorListeners()) {
+			                if (typeof (listener as any).reportCustomError === 'function') {
+			                    (listener as any).reportCustomError(
 			                        this._tokenStartLine,
 			                        this._tokenStartCharPositionInLine,
 			                        `Invalid concept value type: ${this.text}`,
@@ -314,9 +311,9 @@ export class CPGLLexer extends Lexer {
 		switch (actionIndex) {
 		case 5:
 
-			        for (const listener of this._listeners) {
-			            if (listener.reportCustomError) {
-			                listener.reportCustomError(
+			        for (const listener of this.getErrorListeners()) {
+			            if (typeof (listener as any).reportCustomError === 'function') {
+			                (listener as any).reportCustomError(
 			                    this._tokenStartLine,
 			                    this._tokenStartCharPositionInLine,
 			                    `Invalid character in concept value type: ${this.text}`,

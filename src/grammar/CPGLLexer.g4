@@ -71,28 +71,25 @@ mode ACTIVITY_MODE;
 ACTIVITY_TYPE
     : [a-zA-Z]+ {
         const validTypes = [
-            'CPGAdministerMedication',
+            'CPGCommunicationRequest',
             'CPGCollectInformation',
-            'CPGCommunication',
-            'CPGDispenseMedication',
-            'CPGDocumentMedication',
             'CPGEnrollment',
             'CPGGenerateReport',
-            'CPGHold',
-            'CPGImmunization',
             'CPGMedicationRequest',
-            'CPGProposeDiagnosis',
+            'CPGDispenseMedication',
+            'CPGAdministerMedication',
+            'CPGDocumentMedication',
+            'CPGImmunizationRequest',
+            'CPGServiceRequest',
+            'CPGProposeDiagnosisTask',
             'CPGRecordDetectedIssue',
             'CPGRecordInference',
-            'CPGReportFlag',
-            'CPGResume',
-            'CPGServiceRequest',
-            'CPGStop'
+            'CPGReportFlagTask'
         ];
         if (!validTypes.includes(this.text)) {
-            for (const listener of this._listeners) {
-                if (listener.reportCustomError) {
-                    listener.reportCustomError(
+            for (const listener of this.getErrorListeners()) {
+                if (typeof (listener as any).reportCustomError === 'function') {
+                    (listener as any).reportCustomError(
                         this._tokenStartLine,
                         this._tokenStartCharPositionInLine,
                         `Invalid activity type: ${this.text}`,
@@ -118,9 +115,9 @@ ACTIVITY_COMMENT_BLOCK
 // Error handling for unmatched characters in activity mode
 ACTIVITY_ErrorChar
     : . {
-        for (const listener of this._listeners) {
-            if (listener.reportCustomError) {
-                listener.reportCustomError(
+        for (const listener of this.getErrorListeners()) {
+            if (typeof (listener as any).reportCustomError === 'function') {
+                (listener as any).reportCustomError(
                     this._tokenStartLine,
                     this._tokenStartCharPositionInLine,
                     `Invalid character in activity type: ${this.text}`,
@@ -153,9 +150,9 @@ CONCEPT_TYPE
             'Observation'
         ];
         if (!validTypes.includes(this.text)) {
-            for (const listener of this._listeners) {
-                if (listener.reportCustomError) {
-                    listener.reportCustomError(
+            for (const listener of this.getErrorListeners()) {
+                if (typeof (listener as any).reportCustomError === 'function') {
+                    (listener as any).reportCustomError(
                         this._tokenStartLine,
                         this._tokenStartCharPositionInLine,
                         `Invalid concept type: ${this.text}`,
@@ -181,9 +178,9 @@ CONCEPT_COMMENT_BLOCK
 // Error handling for unmatched characters in concept mode
 CONCEPT_ErrorChar
     : . {
-        for (const listener of this._listeners) {
-            if (listener.reportCustomError) {
-                listener.reportCustomError(
+        for (const listener of this.getErrorListeners()) {
+            if (typeof (listener as any).reportCustomError === 'function') {
+                (listener as any).reportCustomError(
                     this._tokenStartLine,
                     this._tokenStartCharPositionInLine,
                     `Invalid character in concept type: ${this.text}`,
@@ -214,9 +211,9 @@ CONCEPT_VALUE_TYPE
             'Attachment'
         ];
         if (!validTypes.includes(this.text)) {
-            for (const listener of this._listeners) {
-                if (listener.reportCustomError) {
-                    listener.reportCustomError(
+            for (const listener of this.getErrorListeners()) {
+                if (typeof (listener as any).reportCustomError === 'function') {
+                    (listener as any).reportCustomError(
                         this._tokenStartLine,
                         this._tokenStartCharPositionInLine,
                         `Invalid concept value type: ${this.text}`,
@@ -242,9 +239,9 @@ VALUE_TYPE_COMMENT_BLOCK
 // Error handling for unmatched characters in value type mode
 VALUE_TYPE_ErrorChar
     : . {
-        for (const listener of this._listeners) {
-            if (listener.reportCustomError) {
-                listener.reportCustomError(
+        for (const listener of this.getErrorListeners()) {
+            if (typeof (listener as any).reportCustomError === 'function') {
+                (listener as any).reportCustomError(
                     this._tokenStartLine,
                     this._tokenStartCharPositionInLine,
                     `Invalid character in concept value type: ${this.text}`,
