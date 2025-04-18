@@ -458,3 +458,43 @@ antlr4ts -Xforce-atn -o src/grammar/generated src/grammar/CPGLLexer.g4 && antlr4
 ```
 
 Note: This project uses a custom AST implementation that uses ANTLR's visitor pattern. The generated files are used only for lexing and parsing directly, while semantic analysis and interpretation are handled by our custom AST implementation.
+
+## Grammar-Driven Activity Types
+
+### How Activity Types Stay in Sync
+
+- The list of valid activity types is defined in the `validTypes` array in the `ACTIVITY_TYPE` rule of `src/grammar/CPGLLexer.g4`.
+- A script (`scripts/extractActivityTypes.js`) automatically extracts this list and writes it to `src/grammar/activityTypes.json`.
+- A TypeScript module (`src/grammar/activityTypes.ts`) imports this JSON and exports both the list and a type-safe union type.
+- **All code (lexer, AST, error listener, etc.) should import from this module to avoid drift.**
+
+### How to Update Activity Types
+
+1. **Edit the `validTypes` array** in `src/grammar/CPGLLexer.g4`.
+2. **Run**:
+   ```bash
+   npm run generate
+   ```
+   This will:
+   - Extract the updated activity types to `src/grammar/activityTypes.json`
+   - Regenerate the lexer and parser
+   - Keep all code in sync
+
+### Usage in TypeScript
+
+```typescript
+import { activityTypes, ActivityType } from './grammar/activityTypes';
+
+// Use activityTypes as an array
+console.log(activityTypes);
+
+// Use ActivityType as a type
+function isValidActivityType(type: string): type is ActivityType {
+  return activityTypes.includes(type as ActivityType);
+}
+```
+
+### Why?
+- This ensures a **single source of truth** for activity types.
+- No more manual updates or risk of drift between grammar and code.
+- All validation, error reporting, and type checking use the same list.

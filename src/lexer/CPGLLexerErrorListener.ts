@@ -4,17 +4,12 @@ import { CharStream } from 'antlr4ts/CharStream';
 import { Interval } from 'antlr4ts/misc/Interval';
 
 import { CPGLLexer } from '../grammar/generated/CPGLLexer';
+import { activityTypes } from '../grammar/activityTypes';
+
 export class CPGLLexerErrorListener implements ANTLRErrorListener<number> {
   ERROR_TOKEN_TYPE = 27;
 
   private errors: string[] = [];
-
-  private validActivityTypes = [
-    'CPGAdministerMedication', 'CPGCollectInformation', 'CPGCommunication', 'CPGDispenseMedication',
-    'CPGDocumentMedication', 'CPGEnrollment', 'CPGGenerateReport', 'CPGHold', 'CPGImmunization',
-    'CPGMedicationRequest', 'CPGProposeDiagnosis', 'CPGRecordDetectedIssue', 'CPGRecordInference',
-    'CPGReportFlag', 'CPGResume', 'CPGServiceRequest', 'CPGStop'
-  ];
 
   private validConceptTypes = [
     'Communication', 'CommunicationRequest', 'Condition', 'QuestionnaireTask', 'QuestionnaireResponse',
@@ -75,7 +70,7 @@ export class CPGLLexerErrorListener implements ANTLRErrorListener<number> {
     // does not allow us to trigger custom error actions for truly unrecognized characters. This workaround
     // ensures our tests and error reporting remain consistent with the grammar's intent.
     let specificMessage = `Invalid token: ${errorText}`;
-    if (this.validActivityTypes.some(type => errorText.startsWith(type))) {
+    if (activityTypes.some(type => errorText.startsWith(type))) {
       specificMessage = `Invalid character in activity type: ${errorText}`;
     } else if (this.validConceptTypes.some(type => errorText.startsWith(type))) {
       specificMessage = `Invalid character in concept type: ${errorText}`;

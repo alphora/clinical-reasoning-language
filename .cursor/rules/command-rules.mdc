@@ -6,7 +6,7 @@ alwaysApply: true
 
 # Your rule content
 
-- **Run tests** using npx jest.
+- Run tests using npx jest: **npx jest >test path< --verbose --no-cache --colors --forceExit --detectOpenHandles --watchAll=false**
 - **If I say "report back"**, perform the task and then pause.
 - **If I ask a question**, answer it and then pause.
 - **Run all commands** in a new terminal.  **Dispose the terminal when you're done.**

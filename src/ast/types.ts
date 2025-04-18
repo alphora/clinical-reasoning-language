@@ -1,3 +1,5 @@
+import type { ActivityType } from '../grammar/activityTypes';
+
 // Base AST Node interface
 export interface ASTNode {
   type: string;
@@ -167,9 +169,6 @@ export interface Activity extends ASTNode {
   terminologyReference?: string;
   location: Location;
 }
-export const ActivityType = {
-  type: 'Activity' as const,
-};
 
 // ---------------------------- CONCEPT STATEMENT ---------------------------
 
@@ -305,22 +304,3 @@ export type ConceptValueType =
   | 'dateTime'
   | 'Period'
   | 'Attachment';
-
-export type ActivityType =
-  | 'CPGAdministerMedication'
-  | 'CPGCollectInformation'
-  | 'CPGCommunication'
-  | 'CPGDispenseMedication'
-  | 'CPGDocumentMedication'
-  | 'CPGEnrollment'
-  | 'CPGGenerateReport'
-  | 'CPGHold'
-  | 'CPGImmunization'
-  | 'CPGMedicationRequest'
-  | 'CPGProposeDiagnosis'
-  | 'CPGRecordDetectedIssue'
-  | 'CPGRecordInference'
-  | 'CPGReportFlag'
-  | 'CPGResume'
-  | 'CPGServiceRequest'
-  | 'CPGStop';
