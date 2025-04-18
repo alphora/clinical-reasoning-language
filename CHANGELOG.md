@@ -140,6 +140,8 @@ const result = validateCPGL(`
 - WHO IMM Strategy example
 - Prepublish utility script for automated GitHub releases
 - Developer notes documentation
+- All grammar-driven types (activity, concept, value) are now auto-generated from the grammar for consistency and maintainability.
+- Hardened prepublish script with robust error handling, rollback, and working directory checks.
 
 ### Changed
 - Updated lexer to automatically extract activity types from grammar
@@ -148,8 +150,11 @@ const result = validateCPGL(`
 - Refactored lexer error handling for consistency
 - Improved and fixed tests in the lexer
 - Fixed activity types in grammar
+- Updated documentation to reflect new grammar-driven type extraction and release process.
+- Added prepublish:github script to package.json for easier releases.
 
 ### Fixed
 - Bug fixes in lexer grammar
+- Fixed builder tests to align with new type system and grammar-driven types.
 
 [0.4.0]: https://github.com/cqis/cpgl/releases/tag/v0.4.0 
