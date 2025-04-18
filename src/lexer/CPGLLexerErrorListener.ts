@@ -123,14 +123,18 @@ export class CPGLLexerErrorListener implements ANTLRErrorListener<number> {
     return this.errors;
   }
 
-  public reportCustomError(line: number, column: number, message: string, details?: any) {
+  // Custom error reporting method for grammar actions
+  public reportCustomError(line: number, column: number, message: string, details?: any): void {
     const errorMessage = JSON.stringify({
-      type: "LexicalError",
+      type: 'LexicalError',
       line,
       column,
       message,
       details,
     });
+    // [DEBUGGING] Custom error reported from grammar action
+    // eslint-disable-next-line no-console
+    console.error(errorMessage);
     this.errors.push(errorMessage);
   }
 }
