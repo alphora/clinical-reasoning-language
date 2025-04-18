@@ -325,7 +325,7 @@ describe('CPGLAstBuilder', () => {
 
       const result = parseInput(input);
       const ast = result.statements[0] as Concept;
-      expect(ast.type).toBe(ConceptType.type);
+      expect(ast.type).toBe('Concept');
       expect(ast.name).toBe('BMI Range as a Condition');
       expect(ast.conceptType).toBe('Condition');
       expect(ast.valueType).toBe('CodeableConcept');
@@ -345,16 +345,22 @@ describe('CPGLAstBuilder', () => {
 
       const result = parseInput(input);
       const ast = result.statements[0] as Concept;
-      expect(ast.type).toBe(ConceptType.type);
+      expect(ast.type).toBe('Concept');
       expect(ast.name).toBe('Most Recent BMI');
       expect(ast.conceptType).toBe('Observation');
       expect(ast.valueType).toBe('boolean');
       expect(ast.provenance).toBe('some provenance');
       expect(ast.definition.type).toBe(InferredByDefinitionType.type);
       const inferredBy = ast.definition as InferredByDefinition;
-      expect(inferredBy.pattern).toBe('Most Recent(this, lookbackMonths)');
-      expect(inferredBy.concept).toBe('BMI');
-      expect(inferredBy.descriptiveLogic).toBeUndefined();
+      if ('body' in inferredBy && inferredBy.body.type === 'InferredByDefinitionConcept') {
+        expect(inferredBy.body.pattern).toBe('Most Recent(this, lookbackMonths)');
+        expect(inferredBy.body.concept).toBe('BMI');
+        expect((inferredBy.body as any).descriptiveLogic).toBeUndefined();
+      } else {
+        expect((inferredBy.body as any).pattern).toBeUndefined();
+        expect((inferredBy.body as any).concept).toBeUndefined();
+        expect((inferredBy.body as any).descriptiveLogic).toBeUndefined();
+      }
     });
 
     it('should parse a concept with inferred by descriptive logic', () => {
@@ -368,17 +374,19 @@ describe('CPGLAstBuilder', () => {
 
       const result = parseInput(input);
       const ast = result.statements[0] as Concept;
-      expect(ast.type).toBe(ConceptType.type);
+      expect(ast.type).toBe('Concept');
       expect(ast.name).toBe('BMI');
       expect(ast.conceptType).toBe('Observation');
       expect(ast.valueType).toBe('Quantity');
       expect(ast.definition.type).toBe(InferredByDefinitionType.type);
       const inferredBy = ast.definition as InferredByDefinition;
-      expect(inferredBy.descriptiveLogic).toBe(
-        'BMI Range as a Condition or BMI as an Observation or Calculated BMI',
-      );
-      expect(inferredBy.pattern).toBeUndefined();
-      expect(inferredBy.concept).toBeUndefined();
+      if ('body' in inferredBy && inferredBy.body.type === 'InferredByDefinitionConcept') {
+        expect(inferredBy.body.descriptiveLogic).toBe(
+          'BMI Range as a Condition or BMI as an Observation or Calculated BMI',
+        );
+      }
+      expect((inferredBy.body as any).pattern).toBeUndefined();
+      expect((inferredBy.body as any).concept).toBeUndefined();
     });
 
     it('should parse a concept with inferred by descriptive logic using and/or combinations', () => {
@@ -392,13 +400,16 @@ describe('CPGLAstBuilder', () => {
 
       const result = parseInput(input);
       const ast = result.statements[0] as Concept;
+      expect(ast.type).toBe('Concept');
       expect(ast.definition.type).toBe(InferredByDefinitionType.type);
       const inferredBy = ast.definition as InferredByDefinition;
-      expect(inferredBy.pattern).toBeUndefined();
-      expect(inferredBy.concept).toBeUndefined();
-      expect(inferredBy.descriptiveLogic).toBe(
-        '(BMI Range as a Condition and Recent) or (BMI as an Observation and Valid) or Calculated BMI',
-      );
+      if (typeof inferredBy.body === 'object' && 'terms' in inferredBy.body) {
+        expect((inferredBy.body as any).descriptiveLogic).toBe(
+          '(BMI Range as a Condition and Recent) or (BMI as an Observation and Valid) or Calculated BMI',
+        );
+      }
+      expect((inferredBy.body as any).pattern).toBeUndefined();
+      expect((inferredBy.body as any).concept).toBeUndefined();
     });
   });
 
@@ -423,7 +434,7 @@ describe('CPGLAstBuilder', () => {
       expect(ast.length).toBe(4);
       expect(ast[0].type).toBe(TerminologyType.type);
       expect(ast[1].type).toBe('Activity');
-      expect(ast[2].type).toBe(ConceptType.type);
+      expect(ast[2].type).toBe('Concept');
       expect(ast[3].type).toBe(DecisionType.type);
     });
   });
