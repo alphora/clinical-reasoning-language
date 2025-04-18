@@ -155,7 +155,7 @@ export class CPGLAstBuilder extends AbstractParseTreeVisitor<ASTNode> implements
     const name = ctx.activityIdentifier().text.slice(1,-1);
     const perform = ctx.ACTIVITY_TYPE().text as ActivityType;
     const terminologyRef = ctx.terminologyReference()?.text.slice(1,-1);
-    return { type: ActivityType.type, name, perform, terminologyReference: terminologyRef, location: getLocation(ctx) };
+    return { type: 'Activity', name, perform, terminologyReference: terminologyRef, location: getLocation(ctx) };
   }
 
   visitConceptStatement(ctx: ConceptStatementContext): Concept {
@@ -172,7 +172,7 @@ export class CPGLAstBuilder extends AbstractParseTreeVisitor<ASTNode> implements
       const infCtx = bodyCtx.inferredByLine()!;
       definition = this.visit(infCtx) as InferredByDefinition;
     }
-    return { type: ConceptType.type, name, conceptType, valueType, provenance, definition, location: getLocation(ctx) };
+    return { type: 'Concept', name, conceptType, valueType, provenance, definition, location: getLocation(ctx) };
   }
 
   visitInferredByLine(ctx: InferredByLineContext): InferredByDefinition {

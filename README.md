@@ -275,9 +275,7 @@ This will generate a `.tgz` file (e.g., `@cqis-cpgl-0.1.0.tgz`) that can be dist
 The package is distributed via GitHub Releases. To create a new release:
 
 1. Create a new branch (e.g., `release/v0.1.0`)
-1. Generate a CHANGELOG: "I'm creating a new release release/>version<, generate and append to the CHANGELOG.  Use git to determin the changes from the last tag to now.
-
-" (e.g., v0.1.0)
+1. Generate a CHANGELOG: "I'm creating a new release release/>version<, generate and append to the CHANGELOG.  Use git to determin the changes from the last tag to now." (e.g., v0.1.0)
 1. Commit all changes
 1. Run the automated release script:
    ```bash
@@ -321,6 +319,8 @@ npx jest src/ast/tests/decision-structure.test.ts --verbose --no-cache --colors 
 ```bash
 npm run generate
 ```
+
+This will extract all grammar-driven types and regenerate the lexer and parser.
 
 ## Example AST Comparison
 
@@ -468,42 +468,46 @@ antlr4ts -Xforce-atn -o src/grammar/generated src/grammar/CPGLLexer.g4 && antlr4
 
 Note: This project uses a custom AST implementation that uses ANTLR's visitor pattern. The generated files are used only for lexing and parsing directly, while semantic analysis and interpretation are handled by our custom AST implementation.
 
-## Grammar-Driven Activity Types
+## Grammar-Driven Types
 
-### How Activity Types Stay in Sync
+### How Activity, Concept, and Value Types Stay in Sync
 
-- The list of valid activity types is defined in the `validTypes` array in the `ACTIVITY_TYPE` rule of `src/grammar/CPGLLexer.g4`.
-- A script (`scripts/extractActivityTypes.js`) automatically extracts this list and writes it to `src/grammar/activityTypes.json`.
-- A TypeScript module (`src/grammar/activityTypes.ts`) imports this JSON and exports both the list and a type-safe union type.
-- **All code (lexer, AST, error listener, etc.) should import from this module to avoid drift.**
+- The lists of valid activity types, concept types, and concept value types are defined in the `validTypes` arrays in the `ACTIVITY_TYPE`, `CONCEPT_TYPE`, and `CONCEPT_VALUE_TYPE` rules of `src/grammar/CPGLLexer.g4`.
+- Scripts (`scripts/extractActivityTypes.js`, `scripts/extractConceptTypes.js`, `scripts/extractConceptValueTypes.js`) automatically extract these lists and write them to `src/grammar/activityTypes.json`, `src/grammar/conceptTypes.json`, and `src/grammar/conceptValueTypes.json`.
+- TypeScript modules (`src/grammar/activityTypes.ts`, `src/grammar/conceptTypes.ts`, `src/grammar/conceptValueTypes.ts`) import these JSON files and export both the arrays and type-safe union types.
+- **All code (lexer, AST, error listener, etc.) should import from these modules to avoid drift.**
 
-### How to Update Activity Types
+### How to Update Types
 
-1. **Edit the `validTypes` array** in `src/grammar/CPGLLexer.g4`.
-2. **Run**:
+1. **Edit the relevant `validTypes` array** in `src/grammar/CPGLLexer.g4`.
+2. **Run:**
    ```bash
    npm run generate
    ```
    This will:
-   - Extract the updated activity types to `src/grammar/activityTypes.json`
+   - Extract the updated types to their respective JSON files
    - Regenerate the lexer and parser
    - Keep all code in sync
 
 ### Usage in TypeScript
 
 ```typescript
-import { activityTypes, ActivityType } from './grammar/activityTypes';
+import { activityTypes, ActivityType, conceptTypes, ConceptType, conceptValueTypes, ConceptValueType } from './grammar/activityTypes';
 
-// Use activityTypes as an array
-console.log(activityTypes);
+// Use as arrays
+console.log(activityTypes, conceptTypes, conceptValueTypes);
 
-// Use ActivityType as a type
+// Use as types
+type MyActivity = ActivityType;
+type MyConcept = ConceptType;
+type MyValueType = ConceptValueType;
+
 function isValidActivityType(type: string): type is ActivityType {
   return activityTypes.includes(type as ActivityType);
 }
 ```
 
 ### Why?
-- This ensures a **single source of truth** for activity types.
+- This ensures a **single source of truth** for all grammar-driven types.
 - No more manual updates or risk of drift between grammar and code.
-- All validation, error reporting, and type checking use the same list.
+- All validation, error reporting, and type checking use the same lists.

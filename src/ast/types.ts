@@ -1,4 +1,6 @@
 import type { ActivityType } from '../grammar/activityTypes';
+import type { ConceptType } from '../grammar/conceptTypes';
+import type { ConceptValueType } from '../grammar/conceptValueTypes';
 
 // Base AST Node interface
 export interface ASTNode {
@@ -182,9 +184,6 @@ export interface Concept extends ASTNode {
   provenance?: string;
   location: Location;
 }
-export const ConceptType = {
-  type: 'Concept' as const,
-};
 
 // Concept definition can be coded by or inferred by
 export type ConceptDefinition = CodedByDefinition | InferredByDefinition;
@@ -275,32 +274,9 @@ export interface Location {
 
 export type Action = DoActivity | UseDecision;
 
-export type ConceptType =
-  | 'Communication'
-  | 'CommunicationRequest'
-  | 'Condition'
-  | 'QuestionnaireTask'
-  | 'QuestionnaireResponse'
-  | 'MedicationRequest'
-  | 'MedicationDispense'
-  | 'MedicationAdministration'
-  | 'MedicationStatement'
-  | 'ImmunizationRequest'
-  | 'Immunization'
-  | 'ServiceRequest'
-  | 'Procedure'
-  | 'Observation';
-
-export type ConceptValueType =
-  | 'Quantity'
-  | 'CodeableConcept'
-  | 'string'
-  | 'boolean'
-  | 'integer'
-  | 'Range'
-  | 'Ratio'
-  | 'SampledData'
-  | 'time'
-  | 'dateTime'
-  | 'Period'
-  | 'Attachment';
+export type { ActivityType } from "../grammar/activityTypes";
+export type { ConceptType } from "../grammar/conceptTypes";
+export type { ConceptValueType } from "../grammar/conceptValueTypes";
+export { activityTypes } from "../grammar/activityTypes";
+export { conceptTypes } from "../grammar/conceptTypes";
+export { conceptValueTypes } from "../grammar/conceptValueTypes";
