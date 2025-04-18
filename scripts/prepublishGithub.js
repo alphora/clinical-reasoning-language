@@ -49,6 +49,35 @@ function isWorkingDirectoryClean() {
   return status === '';
 }
 
+function isBranchUpToDate() {
+  // Fetch latest remote info
+  execSync('git fetch');
+  // Check if local branch is behind remote
+  const status = execSync('git status -uno').toString();
+  return !status.includes('Your branch is behind');
+}
+
+function getCurrentBranch() {
+  return execSync('git rev-parse --abbrev-ref HEAD').toString().trim();
+}
+
+function getRemoteCommit(branch) {
+  return execSync(`git rev-parse origin/${branch}`).toString().trim();
+}
+
+function getRemoteTags() {
+  return execSync('git ls-remote --tags origin')
+    .toString()
+    .split('\n')
+    .map(line => line.split('\t')[1])
+    .filter(Boolean)
+    .map(ref => ref.replace('refs/tags/', ''));
+}
+
+function getLocalTags() {
+  return execSync('git tag').toString().split('\n').filter(Boolean);
+}
+
 function main() {
   const arg = process.argv[2];
   if (!arg) {
@@ -61,10 +90,24 @@ function main() {
     process.exit(1);
   }
 
+  if (!isBranchUpToDate()) {
+    console.error('[prepublish:github] Local branch is behind the remote. Please pull the latest changes before running this script.');
+    process.exit(1);
+  }
+
+  // --- Record initial state ---
+  const originalCommit = execSync('git rev-parse HEAD').toString().trim();
+  const branch = getCurrentBranch();
+  const originalRemoteCommit = getRemoteCommit(branch);
+  const originalGitignore = fs.readFileSync('.gitignore', 'utf8');
+  const originalRemoteTags = getRemoteTags();
+  const originalLocalTags = getLocalTags();
+
   const rollbackSteps = [];
   let taggedVersion = null;
   let versionBumpCommit = null;
   let tagsPushed = false;
+  let newTags = [];
 
   try {
     // 1. Remove dist/ from .gitignore
@@ -72,8 +115,14 @@ function main() {
     rollbackSteps.push(() => {
       console.warn('[prepublish:github] Rolling back: restoring .gitignore');
       updateGitignore(false);
-      run('git add .gitignore');
-      tryRun('git commit -m "Restore dist/ to .gitignore after failed release"');
+      tryRun('git add .gitignore');
+      // Only commit if there are staged changes
+      const status = require('child_process').execSync('git diff --cached --name-only').toString().trim();
+      if (status) {
+        tryRun('git commit -m "Restore dist/ to .gitignore after failed release"');
+      } else {
+        console.warn('[prepublish:github] No staged changes to commit for .gitignore rollback.');
+      }
     });
     console.log('[prepublish:github] Removed dist/ from .gitignore');
 
@@ -91,8 +140,9 @@ function main() {
     // 4. Tag (version increment or explicit version)
     run(`npm version ${arg}`);
     taggedVersion = require(path.join(process.cwd(), 'package.json')).version;
-    // Get the commit hash of the version bump
     versionBumpCommit = execSync('git rev-parse HEAD').toString().trim();
+    // Track new local tags
+    newTags = getLocalTags().filter(tag => !originalLocalTags.includes(tag));
     rollbackSteps.push(() => {
       if (taggedVersion) {
         console.warn(`[prepublish:github] Rolling back: deleting tag v${taggedVersion}`);
@@ -101,7 +151,14 @@ function main() {
       }
       if (versionBumpCommit) {
         console.warn('[prepublish:github] Rolling back: resetting version bump commit');
-        tryRun('git reset --hard HEAD~1');
+        tryRun(`git reset --hard ${originalCommit}`);
+      }
+      // Delete any new local tags
+      for (const tag of newTags) {
+        if (!originalLocalTags.includes(tag)) {
+          console.warn(`[prepublish:github] Rolling back: deleting new local tag ${tag}`);
+          tryRun(`git tag -d ${tag}`);
+        }
       }
     });
 
@@ -110,11 +167,21 @@ function main() {
     run('git push --tags');
     tagsPushed = true;
     rollbackSteps.push(() => {
-      if (tagsPushed && taggedVersion) {
-        console.warn('[prepublish:github] WARNING: Tags were pushed to remote. Attempting to delete remote tag. Manual intervention may be required.');
-        tryRun(`git push --delete origin v${taggedVersion}`);
-      } else {
-        console.warn('[prepublish:github] WARNING: Changes were pushed to remote. Manual intervention may be required to fully rollback.');
+      if (tagsPushed) {
+        if (process.env.FORCE_ROLLBACK === '1') {
+          console.warn('[prepublish:github] WARNING: Force-pushing original commit to remote branch to complete rollback. This will overwrite remote history!');
+          tryRun(`git push --force origin ${originalCommit}:${branch}`);
+          // Delete any new remote tags
+          const currentRemoteTags = getRemoteTags();
+          for (const tag of currentRemoteTags) {
+            if (!originalRemoteTags.includes(tag)) {
+              console.warn(`[prepublish:github] Rolling back: deleting new remote tag ${tag}`);
+              tryRun(`git push --delete origin ${tag}`);
+            }
+          }
+        } else {
+          console.warn('[prepublish:github] Skipping remote force-push rollback. Set FORCE_ROLLBACK=1 to enable full remote rollback.');
+        }
       }
     });
 
@@ -127,6 +194,9 @@ function main() {
     console.log('[prepublish:github] Release process complete!');
   } catch (err) {
     console.warn('[prepublish:github] Error occurred, starting rollback...');
+    // --- Full transactional rollback ---
+    // Restore .gitignore
+    fs.writeFileSync('.gitignore', originalGitignore);
     rollback(rollbackSteps);
     console.error('[prepublish:github] Release failed. All possible changes rolled back.');
     console.error(err);
