@@ -311,7 +311,7 @@ If you're installing this package directly from GitHub using `npm install`, note
 
 ---
 
-## ✅ Option 1: Install via HTTPS (Recommended)
+#### ✅ Option 1: Install via HTTPS (Recommended)
 
 This method works without needing to set up SSH keys.
 
@@ -329,17 +329,17 @@ Or add it to your `package.json`:
 
 ---
 
-## 🔐 Option 2: Use SSH (Advanced)
+#### 🔐 Option 2: Use SSH (Advanced)
 
 If you prefer SSH (or are using the shorthand syntax like `github:cqis/cpgl#v0.4.0`), make sure your system is set up for GitHub SSH access:
 
-### 1. Generate an SSH key (if you don’t already have one)
+##### 1. Generate an SSH key (if you don’t already have one)
 
 ~~~bash
 ssh-keygen -t ed25519 -C "you@example.com"
 ~~~
 
-### 2. Add your public key to GitHub
+##### 2. Add your public key to GitHub
 
 - Copy the contents of your public key file:
   - On macOS/Linux: `~/.ssh/id_ed25519.pub`
@@ -347,7 +347,7 @@ ssh-keygen -t ed25519 -C "you@example.com"
 - Go to: https://github.com/settings/keys
 - Click **New SSH key**, paste the key, and save
 
-### 3. Ensure the SSH agent is running and your key is loaded
+##### 3. Ensure the SSH agent is running and your key is loaded
 
 ~~~bash
 eval "$(ssh-agent -s)"
@@ -356,7 +356,7 @@ ssh-add ~/.ssh/id_ed25519
 
 > 💡 On Windows, you may need to run this in Git Bash or use the SSH Agent service
 
-### 4. Test your GitHub SSH access
+##### 4. Test your GitHub SSH access
 
 ~~~bash
 ssh -T git@github.com
@@ -364,7 +364,7 @@ ssh -T git@github.com
 
 If successful, GitHub will greet you by your username.
 
-### 5. Install via SSH
+##### 5. Install via SSH
 
 Now you can use the SSH shorthand syntax:
 
