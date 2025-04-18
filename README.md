@@ -277,23 +277,30 @@ The package is distributed via GitHub Releases. To create a new release:
 1. Create a new branch (e.g., `v0.1.0`)
 1. Generate a CHANGELOG: "I'm creating a new release [version], generate and append to the CHANGELOG" (e.g., v0.1.0)
 1. Commit all changes
-1. Rev the version: `npm version minor`
-1. Build the package
-1. Push changes: `git push`
-1. Create a PR & merge the PR
+1. Run the automated release script:
+   ```bash
+   npm run prepublish:github -- <patch|minor|major|version>
+   ```
+   - This will:
+     - Remove `dist/` from `.gitignore`
+     - Build the project
+     - Add and commit `dist/`
+     - Bump the version and create a git tag (using the argument you provide)
+     - Push the commit and tag to GitHub
+     - Restore `dist/` to `.gitignore` and commit that change
+     - Push the final commit
+1. Create a PR & merge the PR (if working on a feature branch)
 1. Create a new release on GitHub
-   1. Tag the release with a version number (e.g., `v0.1.0`)
-   1. Genereate relese notes
-   1. Attach the generated `.tgz` file
+   1. Tag the release with the version number (e.g., `v0.1.0`) if not already tagged
+   1. Generate release notes
 
-1. Switch to main & pull
+**Note:**
+- You do NOT need to attach a `.tgz` file for GitHub-based npm installs.
+- Users can install directly from GitHub using:
+  ```bash
+  npm install github:cqis/cpgl#v0.1.0
+  ```
 
-Users can then install the package using:
-```bash
-npm install github:cqis/cpgl#v0.1.0
-```
-
-Replace `v0.1.0` with the specific version they want to install.
 ### Running Tests
 
 ```bash
