@@ -124,7 +124,7 @@ ACTIVITY_ErrorChar
             column: this._tokenStartCharPositionInLine,
             message: `Invalid character in activity type: ${this.text}`
         }));
-    } -> type(ERROR_CHAR)
+    }
     ;
 
 mode CONCEPT_MODE;
@@ -183,7 +183,7 @@ CONCEPT_ErrorChar
             column: this._tokenStartCharPositionInLine,
             message: `Invalid character in concept type: ${this.text}`
         }));
-    } -> type(ERROR_CHAR)
+    }
     ;
 
 mode VALUE_TYPE_MODE;
@@ -240,5 +240,5 @@ VALUE_TYPE_ErrorChar
             column: this._tokenStartCharPositionInLine,
             message: `Invalid character in concept value type: ${this.text}`
         }));
-    } -> type(ERROR_CHAR)
+    }
     ; 
