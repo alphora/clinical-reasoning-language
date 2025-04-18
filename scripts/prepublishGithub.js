@@ -110,6 +110,20 @@ function verifyPostRollback(originalCommit, originalVersion, originalLocalTags) 
   }
 }
 
+function verifyRemotePostRollback(originalRemoteCommit, branch) {
+  const currentRemoteCommit = getRemoteCommit(branch);
+  let ok = true;
+  if (currentRemoteCommit !== originalRemoteCommit) {
+    console.error(`[prepublish:github] CRITICAL: Remote commit after rollback (${currentRemoteCommit}) does not match original remote commit (${originalRemoteCommit})! Manual intervention required.`);
+    ok = false;
+  }
+  if (ok) {
+    console.log('[prepublish:github] Post-rollback verification: remote state matches original.');
+  } else {
+    console.error('[prepublish:github] Post-rollback verification: remote state does NOT match original.');
+  }
+}
+
 function main() {
   const arg = process.argv[2];
   if (!arg) {
@@ -201,7 +215,9 @@ function main() {
     tagsPushed = true;
     rollbackSteps.push(() => {
       if (tagsPushed) {
-        if (process.env.FORCE_ROLLBACK === '1') {
+        if (process.env.NO_FORCE_ROLLBACK === '1') {
+          console.warn('[prepublish:github] Skipping remote force-push rollback due to NO_FORCE_ROLLBACK=1. Manual intervention required to restore remote state.');
+        } else {
           console.warn('[prepublish:github] WARNING: Force-pushing original remote commit to remote branch to complete rollback. This will overwrite remote history!');
           tryRun(`git push --force origin ${originalRemoteCommit}:${branch}`);
           // Delete any new remote tags
@@ -212,8 +228,6 @@ function main() {
               tryRun(`git push --delete origin ${tag}`);
             }
           }
-        } else {
-          console.warn('[prepublish:github] Skipping remote force-push rollback. Set FORCE_ROLLBACK=1 to enable full remote rollback.');
         }
       }
     });
@@ -232,6 +246,7 @@ function main() {
     fs.writeFileSync('.gitignore', originalGitignore);
     rollback(rollbackSteps);
     verifyPostRollback(originalCommit, originalVersion, originalLocalTags);
+    verifyRemotePostRollback(originalRemoteCommit, branch);
     console.error('[prepublish:github] Release failed. All possible changes rolled back.');
     console.error(err);
     process.exit(1);
