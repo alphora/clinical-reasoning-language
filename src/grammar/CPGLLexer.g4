@@ -69,7 +69,7 @@ mode ACTIVITY_MODE;
 
 // ACTIVITY_TYPE possibilities (case sensitive)
 ACTIVITY_TYPE
-    : [a-zA-Z]+ { 
+    : [a-zA-Z]+ {
         const validTypes = [
             'CPGAdministerMedication',
             'CPGCollectInformation',
@@ -116,15 +116,15 @@ ACTIVITY_COMMENT_BLOCK
     ;
 
 // Error handling for unmatched characters in activity mode
-ACTIVITY_ErrorChar 
+ACTIVITY_ErrorChar
     : . {
-            throw new Error(JSON.stringify({
-                type: "LexicalError",
-                line: this._tokenStartLine,
-                column: this._tokenStartCharPositionInLine,
-                message: `Invalid character in activity type value: ${this.text}`
-                }));
-    }
+        throw new Error(JSON.stringify({
+            type: "LexicalError",
+            line: this._tokenStartLine,
+            column: this._tokenStartCharPositionInLine,
+            message: `Invalid character in activity type: ${this.text}`
+        }));
+    } -> type(ERROR_CHAR)
     ;
 
 mode CONCEPT_MODE;
@@ -175,15 +175,15 @@ CONCEPT_COMMENT_BLOCK
     ;
 
 // Error handling for unmatched characters in concept mode
-CONCEPT_ErrorChar 
+CONCEPT_ErrorChar
     : . {
-            throw new Error(JSON.stringify({
-                type: "LexicalError",
-                line: this._tokenStartLine,
-                column: this._tokenStartCharPositionInLine,
-                message: `Invalid character in concept value: ${this.text}`
-                }));
-    }
+        throw new Error(JSON.stringify({
+            type: "LexicalError",
+            line: this._tokenStartLine,
+            column: this._tokenStartCharPositionInLine,
+            message: `Invalid character in concept type: ${this.text}`
+        }));
+    } -> type(ERROR_CHAR)
     ;
 
 mode VALUE_TYPE_MODE;
@@ -232,13 +232,13 @@ VALUE_TYPE_COMMENT_BLOCK
     ;
 
 // Error handling for unmatched characters in value type mode
-VALUE_TYPE_ErrorChar 
+VALUE_TYPE_ErrorChar
     : . {
         throw new Error(JSON.stringify({
             type: "LexicalError",
             line: this._tokenStartLine,
             column: this._tokenStartCharPositionInLine,
-            message: `Invalid character in concept type value: ${this.text}`
-            }));
-    }
+            message: `Invalid character in concept value type: ${this.text}`
+        }));
+    } -> type(ERROR_CHAR)
     ; 

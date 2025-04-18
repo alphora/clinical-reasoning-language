@@ -168,7 +168,7 @@ export class CPGLLexer extends Lexer {
 	private ACTIVITY_TYPE_action(_localctx: RuleContext, actionIndex: number): void {
 		switch (actionIndex) {
 		case 0:
-			 
+
 			        const validTypes = [
 			            'CPGAdministerMedication',
 			            'CPGCollectInformation',
@@ -208,12 +208,12 @@ export class CPGLLexer extends Lexer {
 		switch (actionIndex) {
 		case 1:
 
-			            throw new Error(JSON.stringify({
-			                type: "LexicalError",
-			                line: this._tokenStartLine,
-			                column: this._tokenStartCharPositionInLine,
-			                message: `Invalid character in activity type value: ${this.text}`
-			                }));
+			        throw new Error(JSON.stringify({
+			            type: "LexicalError",
+			            line: this._tokenStartLine,
+			            column: this._tokenStartCharPositionInLine,
+			            message: `Invalid character in activity type: ${this.text}`
+			        }));
 			    
 			break;
 		}
@@ -258,12 +258,12 @@ export class CPGLLexer extends Lexer {
 		switch (actionIndex) {
 		case 3:
 
-			            throw new Error(JSON.stringify({
-			                type: "LexicalError",
-			                line: this._tokenStartLine,
-			                column: this._tokenStartCharPositionInLine,
-			                message: `Invalid character in concept value: ${this.text}`
-			                }));
+			        throw new Error(JSON.stringify({
+			            type: "LexicalError",
+			            line: this._tokenStartLine,
+			            column: this._tokenStartCharPositionInLine,
+			            message: `Invalid character in concept type: ${this.text}`
+			        }));
 			    
 			break;
 		}
@@ -310,7 +310,7 @@ export class CPGLLexer extends Lexer {
 			            type: "LexicalError",
 			            line: this._tokenStartLine,
 			            column: this._tokenStartCharPositionInLine,
-			            message: `Invalid character in concept type value: ${this.text}`
+			            message: `Invalid character in concept value type: ${this.text}`
 			            }));
 			    
 			break;

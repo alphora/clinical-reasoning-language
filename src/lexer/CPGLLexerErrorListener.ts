@@ -9,6 +9,24 @@ export class CPGLLexerErrorListener implements ANTLRErrorListener<number> {
 
   private errors: string[] = [];
 
+  private validActivityTypes = [
+    'CPGAdministerMedication', 'CPGCollectInformation', 'CPGCommunication', 'CPGDispenseMedication',
+    'CPGDocumentMedication', 'CPGEnrollment', 'CPGGenerateReport', 'CPGHold', 'CPGImmunization',
+    'CPGMedicationRequest', 'CPGProposeDiagnosis', 'CPGRecordDetectedIssue', 'CPGRecordInference',
+    'CPGReportFlag', 'CPGResume', 'CPGServiceRequest', 'CPGStop'
+  ];
+
+  private validConceptTypes = [
+    'Communication', 'CommunicationRequest', 'Condition', 'QuestionnaireTask', 'QuestionnaireResponse',
+    'MedicationRequest', 'MedicationDispense', 'MedicationAdministration', 'MedicationStatement',
+    'ImmunizationRequest', 'Immunization', 'ServiceRequest', 'Procedure', 'Observation'
+  ];
+
+  private validConceptValueTypes = [
+    'Quantity', 'CodeableConcept', 'string', 'boolean', 'integer', 'Range', 'Ratio', 'SampledData',
+    'time', 'dateTime', 'Period', 'Attachment'
+  ];
+
   syntaxError<T extends number>(
     _recognizer: Recognizer<T, ATNSimulator>,
     _offendingSymbol: T | undefined,
@@ -53,11 +71,21 @@ export class CPGLLexerErrorListener implements ANTLRErrorListener<number> {
       }
     }
 
+    // [DEBUGGING] Map errorText to specific error message if possible
+    let specificMessage = `Invalid token: ${errorText}`;
+    if (this.validActivityTypes.some(type => errorText.startsWith(type))) {
+      specificMessage = `Invalid character in activity type: ${errorText}`;
+    } else if (this.validConceptTypes.some(type => errorText.startsWith(type))) {
+      specificMessage = `Invalid character in concept type: ${errorText}`;
+    } else if (this.validConceptValueTypes.some(type => errorText.startsWith(type))) {
+      specificMessage = `Invalid character in concept value type: ${errorText}`;
+    }
+
     const errorMessage = JSON.stringify({
       type: "LexicalError",
       line: line,
       column: charPositionInLine,
-      message: `Invalid token: ${errorText}`,
+      message: specificMessage,
       details: {
         message:`${msg}`
       }

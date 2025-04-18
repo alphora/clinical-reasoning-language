@@ -1,0 +1,12 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+
+# Your rule content
+
+- **Run tests** using npx jest.
+- **If I say "report back"**, perform the task and then pause.
+- **If I ask a question**, answer it and then pause.
+- **Run all commands** in a new terminal.  **Dispose the terminal when you're done.**
