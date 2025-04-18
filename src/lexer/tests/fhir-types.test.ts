@@ -2,6 +2,7 @@ import { CharStream, CharStreams } from 'antlr4ts';
 
 import { CPGLLexer } from '../../grammar/generated/CPGLLexer';
 import { createLexer } from '../createLexer';
+import { CPGLLexerErrorListener } from '../CPGLLexerErrorListener';
 
 import {
   getActionTokenSequence,
@@ -15,8 +16,8 @@ function verifyTokenSequence(
   expectedText: string[],
 ): void {
   const lexer = createLexer(input);
-  const tokens = [];
-  const text = [];
+  const tokens: number[] = [];
+  const text: string[] = [];
 
   let token = lexer.nextToken();
   while (token.type !== CPGLLexer.EOF) {
@@ -27,6 +28,14 @@ function verifyTokenSequence(
 
   expect(tokens).toEqual(expectedTokens);
   expect(text).toEqual(expectedText);
+}
+
+function createLexerWithErrors(input: CharStream): { lexer: CPGLLexer, errorListener: CPGLLexerErrorListener } {
+  const lexer = new CPGLLexer(input);
+  const errorListener = new CPGLLexerErrorListener();
+  lexer.removeErrorListeners();
+  lexer.addErrorListener(errorListener);
+  return { lexer, errorListener };
 }
 
 describe('Action FHIR Types', () => {
@@ -53,11 +62,13 @@ describe('Action FHIR Types', () => {
 
   test('should throw error for invalid action type', () => {
     const input = 'perform InvalidActivity.';
-    expect(() => {
-      const expectedTokens = getActionTokenSequence();
-      const expectedText = ['perform', 'InvalidActivity', '.'];
-      verifyTokenSequence(CharStreams.fromString(input), expectedTokens, expectedText);
-    }).toThrow();
+    const { lexer, errorListener } = createLexerWithErrors(CharStreams.fromString(input));
+    while (lexer.nextToken().type !== CPGLLexer.EOF) { /* empty */ }
+    const errors = errorListener.getErrors();
+    expect(errors.length).toBeGreaterThan(0);
+    const errorObj = JSON.parse(errors[0]);
+    expect(errorObj.type).toBe('LexicalError');
+    expect(errorObj.message).toContain('Invalid activity type');
   });
 });
 
@@ -85,11 +96,13 @@ describe('Case Feature FHIR Types', () => {
 
   test('should throw error for invalid case feature type', () => {
     const input = 'has type InvalidType.';
-    expect(() => {
-      const expectedTokens = getCaseFeatureTokenSequence();
-      const expectedText = ['has', 'type', 'InvalidType', '.'];
-      verifyTokenSequence(CharStreams.fromString(input), expectedTokens, expectedText);
-    }).toThrow();
+    const { lexer, errorListener } = createLexerWithErrors(CharStreams.fromString(input));
+    while (lexer.nextToken().type !== CPGLLexer.EOF) { /* empty */ }
+    const errors = errorListener.getErrors();
+    expect(errors.length).toBeGreaterThan(0);
+    const errorObj = JSON.parse(errors[0]);
+    expect(errorObj.type).toBe('LexicalError');
+    expect(errorObj.message).toContain('Invalid concept type');
   });
 });
 
@@ -117,10 +130,12 @@ describe('Concept Value Types', () => {
 
   test('should throw error for invalid value type', () => {
     const input = 'has valuetype InvalidValueType.';
-    expect(() => {
-      const expectedTokens = getValueTypeTokenSequence();
-      const expectedText = ['has', 'valuetype', 'InvalidValueType', '.'];
-      verifyTokenSequence(CharStreams.fromString(input), expectedTokens, expectedText);
-    }).toThrow();
+    const { lexer, errorListener } = createLexerWithErrors(CharStreams.fromString(input));
+    while (lexer.nextToken().type !== CPGLLexer.EOF) { /* empty */ }
+    const errors = errorListener.getErrors();
+    expect(errors.length).toBeGreaterThan(0);
+    const errorObj = JSON.parse(errors[0]);
+    expect(errorObj.type).toBe('LexicalError');
+    expect(errorObj.message).toContain('Invalid concept value type');
   });
 });
