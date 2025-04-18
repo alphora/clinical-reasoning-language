@@ -84,7 +84,7 @@ describe('CPGLLexerErrorListener with CPGL-specific input', () => {
     expect(errors.length).toBe(1);
     const errorObj = JSON.parse(errors[0]);
     expect(errorObj.type).toBe('LexicalError');
-    expect(errorObj.message).toContain('Invalid concept type:');
+    expect(errorObj.message).toContain('Invalid concept type: InvalidType');
   });
 
   it('should detect invalid tokens in a terminology statement', () => {
@@ -107,14 +107,14 @@ describe('CPGLLexerErrorListener with CPGL-specific input', () => {
   });
 
   it('should detect invalid activity type', () => {
-    const { lexer, errorListener } = createLexerWithErrors('invalidActivity');
+    const { lexer, errorListener } = createLexerWithErrors('perform invalidActivity');
     const tokenStream = new CommonTokenStream(lexer);
     tokenStream.fill();
     const errors = errorListener.getErrors();
     expect(errors.length).toBe(1);
     const errorObj = JSON.parse(errors[0]);
     expect(errorObj.type).toBe('LexicalError');
-    expect(errorObj.message).toContain('Invalid activity type:');
+    expect(errorObj.message).toContain('Invalid activity type: invalidActivity');
   });
 
   it('should handle invalid concept type', () => {
@@ -125,18 +125,18 @@ describe('CPGLLexerErrorListener with CPGL-specific input', () => {
     expect(errors.length).toBe(1);
     const errorObj = JSON.parse(errors[0]);
     expect(errorObj.type).toBe('LexicalError');
-    expect(errorObj.message).toContain('Invalid concept type:');
+    expect(errorObj.message).toContain('Invalid concept type: InvalidType');
   });
 
   it('should handle invalid concept value type', () => {
-    const { lexer, errorListener } = createLexerWithErrors('concept "Invalid Concept": has type InvalidValueType. done');
+    const { lexer, errorListener } = createLexerWithErrors('concept "Invalid Concept": has valuetype InvalidValueType. done');
     const tokenStream = new CommonTokenStream(lexer);
     tokenStream.fill();
     const errors = errorListener.getErrors();
     expect(errors.length).toBe(1);
     const errorObj = JSON.parse(errors[0]);
     expect(errorObj.type).toBe('LexicalError');
-    expect(errorObj.message).toContain('Invalid concept value type:');
+    expect(errorObj.message).toContain('Invalid concept value type: InvalidValueType');
   });
 
   it('should handle invalid character in activity type', () => {

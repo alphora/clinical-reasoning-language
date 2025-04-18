@@ -90,16 +90,16 @@ ACTIVITY_TYPE
             'CPGStop'
         ];
         if (!validTypes.includes(this.text)) {
-            throw new Error(JSON.stringify({
-                type: "LexicalError",
-                line: this._tokenStartLine,
-                column: this._tokenStartCharPositionInLine,
-                message: `Invalid activity type: ${this.text}`,
-                details: {
-                    validTypes,
-                    received: this.text
+            for (const listener of this._listeners) {
+                if (listener.reportCustomError) {
+                    listener.reportCustomError(
+                        this._tokenStartLine,
+                        this._tokenStartCharPositionInLine,
+                        `Invalid activity type: ${this.text}`,
+                        { validTypes, received: this.text }
+                    );
                 }
-                }));
+            }
         }
     }
     -> mode(DEFAULT_MODE)
@@ -149,16 +149,16 @@ CONCEPT_TYPE
             'Observation'
         ];
         if (!validTypes.includes(this.text)) {
-            throw new Error(JSON.stringify({
-                type: "LexicalError",
-                line: this._tokenStartLine,
-                column: this._tokenStartCharPositionInLine,
-                message: `Invalid concept type: ${this.text}`,
-                details: {
-                    validTypes,
-                    received: this.text
+            for (const listener of this._listeners) {
+                if (listener.reportCustomError) {
+                    listener.reportCustomError(
+                        this._tokenStartLine,
+                        this._tokenStartCharPositionInLine,
+                        `Invalid concept type: ${this.text}`,
+                        { validTypes, received: this.text }
+                    );
                 }
-                }));
+            }
         }
     }
     -> mode(DEFAULT_MODE)
@@ -206,16 +206,16 @@ CONCEPT_VALUE_TYPE
             'Attachment'
         ];
         if (!validTypes.includes(this.text)) {
-            throw new Error(JSON.stringify({
-                type: "LexicalError",
-                line: this._tokenStartLine,
-                column: this._tokenStartCharPositionInLine,
-                message: `Invalid concept value type: ${this.text}`,
-                details: {
-                    validTypes,
-                    received: this.text
+            for (const listener of this._listeners) {
+                if (listener.reportCustomError) {
+                    listener.reportCustomError(
+                        this._tokenStartLine,
+                        this._tokenStartCharPositionInLine,
+                        `Invalid concept value type: ${this.text}`,
+                        { validTypes, received: this.text }
+                    );
                 }
-                }));
+            }
         }
     }
     -> mode(DEFAULT_MODE)
