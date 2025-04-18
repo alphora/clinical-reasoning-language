@@ -1,6 +1,5 @@
 import {
   Action,
-  ActivityType,
   BlockBody,
   Decision,
   DecisionBody,
