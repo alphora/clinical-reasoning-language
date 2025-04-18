@@ -1,6 +1,5 @@
 import {
   Activity,
-  ActivityType,
   BlockBody,
   SingleAction,
   SingleActionType,
@@ -353,15 +352,9 @@ describe('CPGLAstBuilder', () => {
       expect(ast.provenance).toBe('some provenance');
       expect(ast.definition.type).toBe(InferredByDefinitionType.type);
       const inferredBy = ast.definition as InferredByDefinition;
-      if (inferredBy.body.type === 'InferredByDefinitionConcept') {
-        expect(inferredBy.body.pattern).toBe('Most Recent(this, lookbackMonths)');
-        expect(inferredBy.body.concept).toBe('BMI');
-        expect((inferredBy.body as any).descriptiveLogic).toBeUndefined();
-      } else {
-        expect((inferredBy.body as any).pattern).toBeUndefined();
-        expect((inferredBy.body as any).concept).toBeUndefined();
-        expect((inferredBy.body as any).descriptiveLogic).toBeUndefined();
-      }
+      expect(inferredBy.pattern).toBe('Most Recent(this, lookbackMonths)');
+      expect(inferredBy.concept).toBe('BMI');
+      expect(inferredBy.descriptiveLogic).toBeUndefined();
     });
 
     it('should parse a concept with inferred by descriptive logic', () => {
@@ -381,13 +374,11 @@ describe('CPGLAstBuilder', () => {
       expect(ast.valueType).toBe('Quantity');
       expect(ast.definition.type).toBe(InferredByDefinitionType.type);
       const inferredBy = ast.definition as InferredByDefinition;
-      if (typeof inferredBy.body === 'object' && 'terms' in inferredBy.body) {
-        expect((inferredBy.body as any).descriptiveLogic).toBe(
-          'BMI Range as a Condition or BMI as an Observation or Calculated BMI',
-        );
-      }
-      expect((inferredBy.body as any).pattern).toBeUndefined();
-      expect((inferredBy.body as any).concept).toBeUndefined();
+      expect(inferredBy.descriptiveLogic).toBe(
+        'BMI Range as a Condition or BMI as an Observation or Calculated BMI',
+      );
+      expect(inferredBy.pattern).toBeUndefined();
+      expect(inferredBy.concept).toBeUndefined();
     });
 
     it('should parse a concept with inferred by descriptive logic using and/or combinations', () => {
@@ -403,13 +394,11 @@ describe('CPGLAstBuilder', () => {
       const ast = result.statements[0] as Concept;
       expect(ast.definition.type).toBe(InferredByDefinitionType.type);
       const inferredBy = ast.definition as InferredByDefinition;
-      if (typeof inferredBy.body === 'object' && 'terms' in inferredBy.body) {
-        expect((inferredBy.body as any).descriptiveLogic).toBe(
-          '(BMI Range as a Condition and Recent) or (BMI as an Observation and Valid) or Calculated BMI',
-        );
-      }
-      expect((inferredBy.body as any).pattern).toBeUndefined();
-      expect((inferredBy.body as any).concept).toBeUndefined();
+      expect(inferredBy.pattern).toBeUndefined();
+      expect(inferredBy.concept).toBeUndefined();
+      expect(inferredBy.descriptiveLogic).toBe(
+        '(BMI Range as a Condition and Recent) or (BMI as an Observation and Valid) or Calculated BMI',
+      );
     });
   });
 

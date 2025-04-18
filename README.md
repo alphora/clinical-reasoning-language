@@ -294,6 +294,10 @@ The package is distributed via GitHub Releases. To create a new release:
    1. Tag the release with the version number (e.g., `v0.1.0`) if not already tagged
    1. Generate release notes
 
+**Important:**
+- The release script expects a **clean working directory** (no unstaged or uncommitted changes). If your working directory is not clean, the script will exit and prompt you to commit, stash, or discard your changes.
+- If a rollback warning is shown (e.g., after a failed release), manual intervention may be required to fully undo changes that were already pushed to the remote repository. Check your git log and tags, and clean up as needed.
+
 **Note:**
 - You do NOT need to attach a `.tgz` file for GitHub-based npm installs.
 - Users can install directly from GitHub using:
