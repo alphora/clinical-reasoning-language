@@ -132,4 +132,24 @@ const result = validateCPGL(`
 ### Known Issues
 - Error tests are currently broken and will be addressed in a future update.
 
-[0.3.0]: https://github.com/cqis/cpgl/releases/tag/v0.3.0 
+[0.3.0]: https://github.com/cqis/cpgl/releases/tag/v0.3.0
+
+## [0.4.0] - 2024-06-09
+
+### Added
+- WHO IMM Strategy example
+- Prepublish utility script for automated GitHub releases
+- Developer notes documentation
+
+### Changed
+- Updated lexer to automatically extract activity types from grammar
+- Improved example files
+- Consistent behavior across the lexer
+- Refactored lexer error handling for consistency
+- Improved and fixed tests in the lexer
+- Fixed activity types in grammar
+
+### Fixed
+- Bug fixes in lexer grammar
+
+[0.4.0]: https://github.com/cqis/cpgl/releases/tag/v0.4.0 
