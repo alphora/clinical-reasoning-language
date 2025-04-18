@@ -274,8 +274,10 @@ This will generate a `.tgz` file (e.g., `@cqis-cpgl-0.1.0.tgz`) that can be dist
 
 The package is distributed via GitHub Releases. To create a new release:
 
-1. Create a new branch (e.g., `v0.1.0`)
-1. Generate a CHANGELOG: "I'm creating a new release [version], generate and append to the CHANGELOG" (e.g., v0.1.0)
+1. Create a new branch (e.g., `release/v0.1.0`)
+1. Generate a CHANGELOG: "I'm creating a new release release/>version<, generate and append to the CHANGELOG.  Use git to determin the changes from the last tag to now.
+
+" (e.g., v0.1.0)
 1. Commit all changes
 1. Run the automated release script:
    ```bash
