@@ -300,10 +300,80 @@ The package is distributed via GitHub Releases. To create a new release:
 
 **Note:**
 - You do NOT need to attach a `.tgz` file for GitHub-based npm installs.
+
+### Installation
+
 - Users can install directly from GitHub using:
-  ```bash
-  npm install github:cqis/cpgl#v0.1.0
-  ```
+
+# 📦 Installing from GitHub
+
+If you're installing this package directly from GitHub using `npm install`, note that GitHub access via SSH is required by default. You have two options:
+
+---
+
+## ✅ Option 1: Install via HTTPS (Recommended)
+
+This method works without needing to set up SSH keys.
+
+~~~bash
+npm install https://github.com/cqis/cpgl.git#v0.4.0
+~~~
+
+Or add it to your `package.json`:
+
+~~~json
+"dependencies": {
+  "cpgl": "https://github.com/cqis/cpgl.git#v0.4.0"
+}
+~~~
+
+---
+
+## 🔐 Option 2: Use SSH (Advanced)
+
+If you prefer SSH (or are using the shorthand syntax like `github:cqis/cpgl#v0.4.0`), make sure your system is set up for GitHub SSH access:
+
+### 1. Generate an SSH key (if you don’t already have one)
+
+~~~bash
+ssh-keygen -t ed25519 -C "you@example.com"
+~~~
+
+### 2. Add your public key to GitHub
+
+- Copy the contents of your public key file:
+  - On macOS/Linux: `~/.ssh/id_ed25519.pub`
+  - On Windows: `C:\Users\<YourName>\.ssh\id_ed25519.pub`
+- Go to: https://github.com/settings/keys
+- Click **New SSH key**, paste the key, and save
+
+### 3. Ensure the SSH agent is running and your key is loaded
+
+~~~bash
+eval "$(ssh-agent -s)"
+ssh-add ~/.ssh/id_ed25519
+~~~
+
+> 💡 On Windows, you may need to run this in Git Bash or use the SSH Agent service
+
+### 4. Test your GitHub SSH access
+
+~~~bash
+ssh -T git@github.com
+~~~
+
+If successful, GitHub will greet you by your username.
+
+### 5. Install via SSH
+
+Now you can use the SSH shorthand syntax:
+
+~~~bash
+npm install github:cqis/cpgl#v0.4.0
+~~~
+
+If you still see `Permission denied (publickey)`, make sure you're using the correct SSH key and that it’s loaded into your agent.
+
 
 ### Running Tests
 
