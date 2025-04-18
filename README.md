@@ -289,7 +289,7 @@ The package is distributed via GitHub Releases. To create a new release:
      - Push the commit and tag to GitHub
      - Restore `dist/` to `.gitignore` and commit that change
      - Push the final commit
-1. Create a PR & merge the PR (if working on a feature branch)
+1. Create a PR & merge the PR
 1. Create a new release on GitHub
    1. Tag the release with the version number (e.g., `v0.1.0`) if not already tagged
    1. Generate release notes
