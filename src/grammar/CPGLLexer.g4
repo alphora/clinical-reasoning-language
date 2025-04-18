@@ -118,12 +118,16 @@ ACTIVITY_COMMENT_BLOCK
 // Error handling for unmatched characters in activity mode
 ACTIVITY_ErrorChar
     : . {
-        throw new Error(JSON.stringify({
-            type: "LexicalError",
-            line: this._tokenStartLine,
-            column: this._tokenStartCharPositionInLine,
-            message: `Invalid character in activity type: ${this.text}`
-        }));
+        for (const listener of this._listeners) {
+            if (listener.reportCustomError) {
+                listener.reportCustomError(
+                    this._tokenStartLine,
+                    this._tokenStartCharPositionInLine,
+                    `Invalid character in activity type: ${this.text}`,
+                    { received: this.text }
+                );
+            }
+        }
     }
     ;
 
@@ -177,12 +181,16 @@ CONCEPT_COMMENT_BLOCK
 // Error handling for unmatched characters in concept mode
 CONCEPT_ErrorChar
     : . {
-        throw new Error(JSON.stringify({
-            type: "LexicalError",
-            line: this._tokenStartLine,
-            column: this._tokenStartCharPositionInLine,
-            message: `Invalid character in concept type: ${this.text}`
-        }));
+        for (const listener of this._listeners) {
+            if (listener.reportCustomError) {
+                listener.reportCustomError(
+                    this._tokenStartLine,
+                    this._tokenStartCharPositionInLine,
+                    `Invalid character in concept type: ${this.text}`,
+                    { received: this.text }
+                );
+            }
+        }
     }
     ;
 
@@ -234,11 +242,15 @@ VALUE_TYPE_COMMENT_BLOCK
 // Error handling for unmatched characters in value type mode
 VALUE_TYPE_ErrorChar
     : . {
-        throw new Error(JSON.stringify({
-            type: "LexicalError",
-            line: this._tokenStartLine,
-            column: this._tokenStartCharPositionInLine,
-            message: `Invalid character in concept value type: ${this.text}`
-        }));
+        for (const listener of this._listeners) {
+            if (listener.reportCustomError) {
+                listener.reportCustomError(
+                    this._tokenStartLine,
+                    this._tokenStartCharPositionInLine,
+                    `Invalid character in concept value type: ${this.text}`,
+                    { received: this.text }
+                );
+            }
+        }
     }
     ; 

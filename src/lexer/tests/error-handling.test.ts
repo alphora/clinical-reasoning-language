@@ -1,8 +1,19 @@
-import { CharStreams } from 'antlr4ts';
+import { CharStreams, CommonTokenStream } from 'antlr4ts';
+import { CPGLLexer } from '../../grammar/generated/CPGLLexer';
+import { CPGLLexerErrorListener } from '../CPGLLexerErrorListener';
 
 import { createLexer } from '../createLexer';
 
 import { getAllTokens } from './index.test';
+
+function createLexerWithErrors(input: string): { lexer: CPGLLexer, errorListener: CPGLLexerErrorListener } {
+  const charStream = CharStreams.fromString(input);
+  const lexer = new CPGLLexer(charStream);
+  const errorListener = new CPGLLexerErrorListener();
+  lexer.removeErrorListeners();
+  lexer.addErrorListener(errorListener);
+  return { lexer, errorListener };
+}
 
 describe('Lexer Error Handling', () => {
   it('should handle invalid characters', () => {
@@ -71,20 +82,13 @@ describe('Lexer Error Handling', () => {
     ];
 
     testCases.forEach(({ input, expectedMessage }) => {
-      const lexer = createLexer(CharStreams.fromString(input));
-      try {
-        getAllTokens(lexer);
-        fail('Expected an error to be thrown');
-      } catch (err) {
-        let errorObj;
-        try {
-          errorObj = JSON.parse(err.message);
-        } catch {
-          fail('Error is not a valid JSON string');
-        }
-        expect(errorObj.type).toBe('LexicalError');
-        expect(errorObj.message).toContain(expectedMessage);
-      }
+      const { lexer, errorListener } = createLexerWithErrors(input);
+      getAllTokens(lexer);
+      const errors = errorListener.getErrors();
+      expect(errors.length).toBeGreaterThan(0);
+      const errorObj = JSON.parse(errors[0]);
+      expect(errorObj.type).toBe('LexicalError');
+      expect(errorObj.message).toContain(expectedMessage);
     });
   });
 
@@ -101,20 +105,13 @@ describe('Lexer Error Handling', () => {
     ];
 
     testCases.forEach(({ input, expectedMessage }) => {
-      const lexer = createLexer(CharStreams.fromString(input));
-      try {
-        getAllTokens(lexer);
-        fail('Expected an error to be thrown');
-      } catch (err) {
-        let errorObj;
-        try {
-          errorObj = JSON.parse(err.message);
-        } catch {
-          fail('Error is not a valid JSON string');
-        }
-        expect(errorObj.type).toBe('LexicalError');
-        expect(errorObj.message).toContain(expectedMessage);
-      }
+      const { lexer, errorListener } = createLexerWithErrors(input);
+      getAllTokens(lexer);
+      const errors = errorListener.getErrors();
+      expect(errors.length).toBeGreaterThan(0);
+      const errorObj = JSON.parse(errors[0]);
+      expect(errorObj.type).toBe('LexicalError');
+      expect(errorObj.message).toContain(expectedMessage);
     });
   });
 
@@ -131,20 +128,13 @@ describe('Lexer Error Handling', () => {
     ];
 
     testCases.forEach(({ input, expectedMessage }) => {
-      const lexer = createLexer(CharStreams.fromString(input));
-      try {
-        getAllTokens(lexer);
-        fail('Expected an error to be thrown');
-      } catch (err) {
-        let errorObj;
-        try {
-          errorObj = JSON.parse(err.message);
-        } catch {
-          fail('Error is not a valid JSON string');
-        }
-        expect(errorObj.type).toBe('LexicalError');
-        expect(errorObj.message).toContain(expectedMessage);
-      }
+      const { lexer, errorListener } = createLexerWithErrors(input);
+      getAllTokens(lexer);
+      const errors = errorListener.getErrors();
+      expect(errors.length).toBeGreaterThan(0);
+      const errorObj = JSON.parse(errors[0]);
+      expect(errorObj.type).toBe('LexicalError');
+      expect(errorObj.message).toContain(expectedMessage);
     });
   });
 
@@ -161,20 +151,13 @@ describe('Lexer Error Handling', () => {
     ];
 
     testCases.forEach(({ input, expectedMessage }) => {
-      const lexer = createLexer(CharStreams.fromString(input));
-      try {
-        getAllTokens(lexer);
-        fail('Expected an error to be thrown');
-      } catch (err) {
-        let errorObj;
-        try {
-          errorObj = JSON.parse(err.message);
-        } catch {
-          fail('Error is not a valid JSON string');
-        }
-        expect(errorObj.type).toBe('LexicalError');
-        expect(errorObj.message).toContain(expectedMessage);
-      }
+      const { lexer, errorListener } = createLexerWithErrors(input);
+      getAllTokens(lexer);
+      const errors = errorListener.getErrors();
+      expect(errors.length).toBeGreaterThan(0);
+      const errorObj = JSON.parse(errors[0]);
+      expect(errorObj.type).toBe('LexicalError');
+      expect(errorObj.message).toContain(expectedMessage);
     });
   });
 
@@ -191,20 +174,13 @@ describe('Lexer Error Handling', () => {
     ];
 
     testCases.forEach(({ input, expectedMessage }) => {
-      const lexer = createLexer(CharStreams.fromString(input));
-      try {
-        getAllTokens(lexer);
-        fail('Expected an error to be thrown');
-      } catch (err) {
-        let errorObj;
-        try {
-          errorObj = JSON.parse(err.message);
-        } catch {
-          fail('Error is not a valid JSON string');
-        }
-        expect(errorObj.type).toBe('LexicalError');
-        expect(errorObj.message).toContain(expectedMessage);
-      }
+      const { lexer, errorListener } = createLexerWithErrors(input);
+      getAllTokens(lexer);
+      const errors = errorListener.getErrors();
+      expect(errors.length).toBeGreaterThan(0);
+      const errorObj = JSON.parse(errors[0]);
+      expect(errorObj.type).toBe('LexicalError');
+      expect(errorObj.message).toContain(expectedMessage);
     });
   });
 
@@ -221,20 +197,13 @@ describe('Lexer Error Handling', () => {
     ];
 
     testCases.forEach(({ input, expectedMessage }) => {
-      const lexer = createLexer(CharStreams.fromString(input));
-      try {
-        getAllTokens(lexer);
-        fail('Expected an error to be thrown');
-      } catch (err) {
-        let errorObj;
-        try {
-          errorObj = JSON.parse(err.message);
-        } catch {
-          fail('Error is not a valid JSON string');
-        }
-        expect(errorObj.type).toBe('LexicalError');
-        expect(errorObj.message).toContain(expectedMessage);
-      }
+      const { lexer, errorListener } = createLexerWithErrors(input);
+      getAllTokens(lexer);
+      const errors = errorListener.getErrors();
+      expect(errors.length).toBeGreaterThan(0);
+      const errorObj = JSON.parse(errors[0]);
+      expect(errorObj.type).toBe('LexicalError');
+      expect(errorObj.message).toContain(expectedMessage);
     });
   });
 });

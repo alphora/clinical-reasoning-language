@@ -208,12 +208,16 @@ export class CPGLLexer extends Lexer {
 		switch (actionIndex) {
 		case 1:
 
-			        throw new Error(JSON.stringify({
-			            type: "LexicalError",
-			            line: this._tokenStartLine,
-			            column: this._tokenStartCharPositionInLine,
-			            message: `Invalid character in activity type: ${this.text}`
-			        }));
+			        for (const listener of this._listeners) {
+			            if (listener.reportCustomError) {
+			                listener.reportCustomError(
+			                    this._tokenStartLine,
+			                    this._tokenStartCharPositionInLine,
+			                    `Invalid character in activity type: ${this.text}`,
+			                    { received: this.text }
+			                );
+			            }
+			        }
 			    
 			break;
 		}
@@ -258,12 +262,16 @@ export class CPGLLexer extends Lexer {
 		switch (actionIndex) {
 		case 3:
 
-			        throw new Error(JSON.stringify({
-			            type: "LexicalError",
-			            line: this._tokenStartLine,
-			            column: this._tokenStartCharPositionInLine,
-			            message: `Invalid character in concept type: ${this.text}`
-			        }));
+			        for (const listener of this._listeners) {
+			            if (listener.reportCustomError) {
+			                listener.reportCustomError(
+			                    this._tokenStartLine,
+			                    this._tokenStartCharPositionInLine,
+			                    `Invalid character in concept type: ${this.text}`,
+			                    { received: this.text }
+			                );
+			            }
+			        }
 			    
 			break;
 		}
@@ -306,12 +314,16 @@ export class CPGLLexer extends Lexer {
 		switch (actionIndex) {
 		case 5:
 
-			        throw new Error(JSON.stringify({
-			            type: "LexicalError",
-			            line: this._tokenStartLine,
-			            column: this._tokenStartCharPositionInLine,
-			            message: `Invalid character in concept value type: ${this.text}`
-			        }));
+			        for (const listener of this._listeners) {
+			            if (listener.reportCustomError) {
+			                listener.reportCustomError(
+			                    this._tokenStartLine,
+			                    this._tokenStartCharPositionInLine,
+			                    `Invalid character in concept value type: ${this.text}`,
+			                    { received: this.text }
+			                );
+			            }
+			        }
 			    
 			break;
 		}
