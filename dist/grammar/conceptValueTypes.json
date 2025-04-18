@@ -1,0 +1,14 @@
+[
+    "Quantity",
+    "CodeableConcept",
+    "string",
+    "boolean",
+    "integer",
+    "Range",
+    "Ratio",
+    "SampledData",
+    "time",
+    "dateTime",
+    "Period",
+    "Attachment"
+]

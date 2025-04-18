@@ -1,0 +1,87 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.tokenizeCPGL = tokenizeCPGL;
+exports.parseCPGL = parseCPGL;
+exports.buildCPGL = buildCPGL;
+exports.validateCPGL = validateCPGL;
+const antlr4ts_1 = require("antlr4ts");
+const builder_1 = require("./ast/builder");
+const CPGLLexer_1 = require("./grammar/generated/CPGLLexer");
+const createLexer_1 = require("./lexer/createLexer");
+const validator_1 = require("./validator/validator");
+const createParser_1 = require("./parser/createParser");
+function tokenizeCPGL(input) {
+    try {
+        const lexer = (0, createLexer_1.createLexer)(antlr4ts_1.CharStreams.fromString(input));
+        const tokens = [];
+        let token = lexer.nextToken();
+        while (token.type !== CPGLLexer_1.CPGLLexer.EOF) {
+            if (token.channel === 0) {
+                const typeName = lexer.vocabulary.getSymbolicName(token.type) ?? `Unknown (${token.type})`;
+                tokens.push({
+                    line: token.line,
+                    column: token.charPositionInLine,
+                    type: typeName,
+                    text: token.text ?? '',
+                });
+            }
+            token = lexer.nextToken();
+        }
+        return { success: true, result: tokens };
+    }
+    catch (error) {
+        return { success: false, errors: [error instanceof Error ? error.message : String(error)] };
+    }
+}
+function parseCPGL(input) {
+    try {
+        const lexer = (0, createLexer_1.createLexer)(antlr4ts_1.CharStreams.fromString(input));
+        const tokenStream = new antlr4ts_1.CommonTokenStream(lexer);
+        const parser = (0, createParser_1.createParser)(tokenStream);
+        const tree = parser.cpgl();
+        return { success: true, result: tree };
+    }
+    catch (error) {
+        return { success: false, errors: [error instanceof Error ? error.message : String(error)] };
+    }
+}
+function buildCPGL(input) {
+    try {
+        const lexer = (0, createLexer_1.createLexer)(antlr4ts_1.CharStreams.fromString(input));
+        const tokenStream = new antlr4ts_1.CommonTokenStream(lexer);
+        const parser = (0, createParser_1.createParser)(tokenStream);
+        const tree = parser.cpgl();
+        const builder = new builder_1.CPGLAstBuilder();
+        const ast = builder.visit(tree);
+        return { success: true, result: ast };
+    }
+    catch (error) {
+        return { success: false, errors: [error instanceof Error ? error.message : String(error)] };
+    }
+}
+function validateCPGL(input) {
+    try {
+        const lexer = (0, createLexer_1.createLexer)(antlr4ts_1.CharStreams.fromString(input));
+        const tokenStream = new antlr4ts_1.CommonTokenStream(lexer);
+        const parser = (0, createParser_1.createParser)(tokenStream);
+        const tree = parser.cpgl();
+        const builder = new builder_1.CPGLAstBuilder();
+        const ast = builder.visit(tree);
+        const validator = new validator_1.Validator();
+        const validationResult = validator.validate(ast);
+        if (!validationResult.isValid) {
+            return {
+                success: false,
+                errors: [
+                    ...validationResult.errors.map(e => e.message),
+                    ...validationResult.warnings.map(w => w.message),
+                ],
+            };
+        }
+        return { success: true, result: ast };
+    }
+    catch (error) {
+        return { success: false, errors: [error instanceof Error ? error.message : String(error)] };
+    }
+}
+//# sourceMappingURL=index.js.map

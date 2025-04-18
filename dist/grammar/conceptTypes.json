@@ -1,0 +1,16 @@
+[
+    "Communication",
+    "CommunicationRequest",
+    "Condition",
+    "QuestionnaireTask",
+    "QuestionnaireResponse",
+    "MedicationRequest",
+    "MedicationDispense",
+    "MedicationAdministration",
+    "MedicationStatement",
+    "ImmunizationRequest",
+    "Immunization",
+    "ServiceRequest",
+    "Procedure",
+    "Observation"
+]
