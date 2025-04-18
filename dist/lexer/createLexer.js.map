@@ -1,0 +1,1 @@
+{"version":3,"file":"createLexer.js","sourceRoot":"","sources":["../../src/lexer/createLexer.ts"],"names":[],"mappings":";;AAMA,kCAKC;AATD,8DAA2D;AAE3D,qEAAkE;AAElE,SAAgB,WAAW,CAAC,KAAiB;IAC3C,MAAM,KAAK,GAAG,IAAI,qBAAS,CAAC,KAAK,CAAC,CAAC;IACnC,KAAK,CAAC,oBAAoB,EAAE,CAAC;IAC7B,KAAK,CAAC,gBAAgB,CAAC,IAAI,+CAAsB,EAAE,CAAC,CAAC;IACrD,OAAO,KAAK,CAAC;AACf,CAAC"}

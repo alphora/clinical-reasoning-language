@@ -6,7 +6,6 @@ package-lock.json
 yarn.lock
 
 # Build outputs
-dist
 build
 lib
 coverage
