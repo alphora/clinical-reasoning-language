@@ -166,7 +166,7 @@ function main() {
       // Only commit if there are staged changes
       const status = require('child_process').execSync('git diff --cached --name-only').toString().trim();
       if (status) {
-        tryRun('git commit -m "Restore dist/ to .gitignore after failed release"');
+        tryRun('git commit -m "Restore dist/ to .gitignore after failed prepublish:github"');
       } else {
         console.warn('[prepublish:github] No staged changes to commit for .gitignore rollback.');
       }
@@ -178,7 +178,7 @@ function main() {
 
     // 3. Add and commit dist/
     run('git add dist .gitignore');
-    run('git commit -m "Include dist for GitHub release"');
+    run('git commit -m "Include dist for GitHub Publish"');
     rollbackSteps.push(() => {
       console.warn('[prepublish:github] Rolling back: resetting commit that included dist/');
       tryRun('git reset --hard HEAD~1');
@@ -235,7 +235,7 @@ function main() {
     // 6. Re-add dist/ to .gitignore
     updateGitignore(false);
     run('git add .gitignore');
-    run('git commit -m "Restore dist/ to .gitignore after release"');
+    run('git commit -m "Restore dist/ to .gitignore after GitHub Publish"');
     run('git push');
 
     console.log('[prepublish:github] Release process complete!');
