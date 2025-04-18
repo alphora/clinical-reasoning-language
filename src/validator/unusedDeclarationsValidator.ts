@@ -62,7 +62,7 @@ export class UnusedDeclarationsValidator {
             location: statement.location,
           });
           break;
-        case ActivityType.type:
+        case 'Activity':
           this.activityDeclarations.set(statement.name, {
             used: false,
             location: statement.location,
