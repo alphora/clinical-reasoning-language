@@ -71,7 +71,9 @@ export class CPGLLexerErrorListener implements ANTLRErrorListener<number> {
       }
     }
 
-    // [DEBUGGING] Map errorText to specific error message if possible
+    // NOTE: We map errorText to specific error messages here because ANTLR's default error handling
+    // does not allow us to trigger custom error actions for truly unrecognized characters. This workaround
+    // ensures our tests and error reporting remain consistent with the grammar's intent.
     let specificMessage = `Invalid token: ${errorText}`;
     if (this.validActivityTypes.some(type => errorText.startsWith(type))) {
       specificMessage = `Invalid character in activity type: ${errorText}`;
@@ -119,5 +121,16 @@ export class CPGLLexerErrorListener implements ANTLRErrorListener<number> {
 
   getErrors(): string[] {
     return this.errors;
+  }
+
+  public reportCustomError(line: number, column: number, message: string, details?: any) {
+    const errorMessage = JSON.stringify({
+      type: "LexicalError",
+      line,
+      column,
+      message,
+      details,
+    });
+    this.errors.push(errorMessage);
   }
 }
