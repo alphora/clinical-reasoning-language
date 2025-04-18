@@ -78,6 +78,38 @@ function getLocalTags() {
   return execSync('git tag').toString().split('\n').filter(Boolean);
 }
 
+function getPackageJsonVersion() {
+  return require(path.join(process.cwd(), 'package.json')).version;
+}
+
+function verifyPostRollback(originalCommit, originalVersion, originalLocalTags) {
+  const currentCommit = execSync('git rev-parse HEAD').toString().trim();
+  const currentVersion = getPackageJsonVersion();
+  const currentTags = getLocalTags();
+  let ok = true;
+  if (currentCommit !== originalCommit) {
+    console.error(`[prepublish:github] WARNING: Commit hash after rollback (${currentCommit}) does not match original (${originalCommit})!`);
+    ok = false;
+  }
+  if (currentVersion !== originalVersion) {
+    console.error(`[prepublish:github] WARNING: package.json version after rollback (${currentVersion}) does not match original (${originalVersion})!`);
+    ok = false;
+  }
+  const missingTags = originalLocalTags.filter(tag => !currentTags.includes(tag));
+  const extraTags = currentTags.filter(tag => !originalLocalTags.includes(tag));
+  if (missingTags.length > 0 || extraTags.length > 0) {
+    console.error(`[prepublish:github] WARNING: Tag set after rollback does not match original.`);
+    if (missingTags.length > 0) console.error(`[prepublish:github] Missing tags: ${missingTags.join(', ')}`);
+    if (extraTags.length > 0) console.error(`[prepublish:github] Extra tags: ${extraTags.join(', ')}`);
+    ok = false;
+  }
+  if (ok) {
+    console.log('[prepublish:github] Post-rollback verification: local state matches original.');
+  } else {
+    console.error('[prepublish:github] Post-rollback verification: local state does NOT match original. Manual intervention may be required.');
+  }
+}
+
 function main() {
   const arg = process.argv[2];
   if (!arg) {
@@ -102,6 +134,7 @@ function main() {
   const originalGitignore = fs.readFileSync('.gitignore', 'utf8');
   const originalRemoteTags = getRemoteTags();
   const originalLocalTags = getLocalTags();
+  const originalVersion = getPackageJsonVersion();
 
   const rollbackSteps = [];
   let taggedVersion = null;
@@ -198,6 +231,7 @@ function main() {
     // Restore .gitignore
     fs.writeFileSync('.gitignore', originalGitignore);
     rollback(rollbackSteps);
+    verifyPostRollback(originalCommit, originalVersion, originalLocalTags);
     console.error('[prepublish:github] Release failed. All possible changes rolled back.');
     console.error(err);
     process.exit(1);
