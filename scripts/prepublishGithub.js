@@ -169,8 +169,8 @@ function main() {
     rollbackSteps.push(() => {
       if (tagsPushed) {
         if (process.env.FORCE_ROLLBACK === '1') {
-          console.warn('[prepublish:github] WARNING: Force-pushing original commit to remote branch to complete rollback. This will overwrite remote history!');
-          tryRun(`git push --force origin ${originalCommit}:${branch}`);
+          console.warn('[prepublish:github] WARNING: Force-pushing original remote commit to remote branch to complete rollback. This will overwrite remote history!');
+          tryRun(`git push --force origin ${originalRemoteCommit}:${branch}`);
           // Delete any new remote tags
           const currentRemoteTags = getRemoteTags();
           for (const tag of currentRemoteTags) {
