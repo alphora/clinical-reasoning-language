@@ -72,24 +72,20 @@ useStatement
 // ------------------------- TERMINOLOGY STATEMENT --------------------------
 //
 // Examples:
-//   terminology "BMI Valueset" valueset "bmi valueset".
-//   terminology "some terminology" unknown.
-//   terminology "Colonoscopy" system "http://snomed.info/sct" code "73761001".
+//   terminology "BMI Valueset" valueset 'bmi valueset'.
+//   terminology "some terminology" ''.
+//   terminology "Colonoscopy" system 'http://snomed.info/sct' code '73761001'.
 //
 terminologyStatement
-    : TERMINOLOGY terminologyIdentifier ( terminologyValueset | terminologyUnknown | terminologySystemCode ) DOT
+    : TERMINOLOGY terminologyIdentifier ( terminologyValueset | singleQuotedString | terminologySystemCode ) DOT
     ;
 
 terminologyValueset
     : VALUESET identifier
     ;
 
-terminologyUnknown
-    : UNKNOWN
-    ;
-
 terminologySystemCode
-    : SYSTEM identifier CODE identifier
+    : SYSTEM singleQuotedString CODE singleQuotedString
     ;
 
 // --------------------------- ACTIVITY STATEMENT ---------------------------
@@ -108,7 +104,7 @@ activityStatement
 //   concept "Most Recent BMI":
 //       has type Observation.
 //       has valuetype boolean.
-//       has provenance "some provenance".
+//       has provenance 'some provenance'.
 //       inferred by "Most Recent(this, lookbackMonths)" "BMI".
 //   done
 //
@@ -145,7 +141,7 @@ hasValueTypeLine
     ;
 
 provenanceLine
-    : HAS PROVENANCE stringLiteral DOT
+    : HAS PROVENANCE singleQuotedString DOT
     ;
 
 // "coded by" clause for concepts that reference a terminology.
@@ -227,7 +223,7 @@ terminologyIdentifier
     ;
 
 terminologyReference
-    : terminologyIdentifier
+    : identifier
     ;
 
 activityIdentifier
@@ -254,12 +250,9 @@ patternReference
     : patternIdentifier
     ;
 
-activityTypeValue
-    : STRING
-    | MARKDOWN_STRING
-    ; 
+singleQuotedString
+     SINGLE_QUOTED_STRING
 
-stringLiteral
-    : STRING
-    | QUOTED_STRING
-    ; 
+activityTypeValue
+    : singleQuotedString
+    ;

@@ -42,6 +42,8 @@ import {
   Location
 } from "./types";
 
+import { CPGLParser } from '../grammar/generated/CPGLParser';
+
 function getLocation(ctx: ParserRuleContext): Location {
   const start = ctx.start;
   const stop  = ctx.stop ?? start;
@@ -155,7 +157,7 @@ export class CPGLAstBuilder extends AbstractParseTreeVisitor<ASTNode> implements
     const name = ctx.activityIdentifier()!.text.slice(1,-1);
     const perform = ctx.ACTIVITY_TYPE()!.text as ActivityType;
     let terminologyReference: string | undefined;
-    let customText: string | undefined;
+    let activityTypeValue: string | undefined;
 
     // [DEBUGGING] Print children and their types
     if (ctx.children) {
@@ -171,11 +173,20 @@ export class CPGLAstBuilder extends AbstractParseTreeVisitor<ASTNode> implements
     if (ctx.terminologyReference()) {
       terminologyReference = ctx.terminologyReference()!.text.slice(1, -1);
     }
-    if (ctx.stringLiteral()) {
-      customText = ctx.stringLiteral()!.text.replace(/^['"]|['"]$/g, "");
+    if (ctx.activityTypeValue()) {
+      const atv = ctx.activityTypeValue()!;
+      const stringToken = atv.getToken(CPGLParser.STRING, 0);
+      const markdownToken = atv.getToken(CPGLParser.MARKDOWN_STRING, 0);
+      if (stringToken) {
+        const rawText = (stringToken as any).getText();
+        activityTypeValue = rawText.replace(/^['"]|['"]$/g, "");
+      } else if (markdownToken) {
+        console.log('[DEBUGGING] markdownToken:', markdownToken);
+        activityTypeValue = (markdownToken as any).getText();
+      }
     }
 
-    return { type: 'Activity', name, perform, terminologyReference, customText, location: getLocation(ctx) };
+    return { type: 'Activity', name, perform, terminologyReference, activityTypeValue, location: getLocation(ctx) };
   }
 
   visitConceptStatement(ctx: ConceptStatementContext): Concept {

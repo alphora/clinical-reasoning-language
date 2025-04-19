@@ -46,10 +46,10 @@ describe('Action FHIR Types', () => {
     verifyTokenSequence(CharStreams.fromString(input), expectedTokens, expectedText);
   });
 
-  test('should recognize CPGImmunization', () => {
-    const input = 'perform CPGImmunization.';
+  test('should recognize CPGImmunizationRequest', () => {
+    const input = 'perform CPGImmunizationRequest.';
     const expectedTokens = getActionTokenSequence();
-    const expectedText = ['perform', 'CPGImmunization', '.'];
+    const expectedText = ['perform', 'CPGImmunizationRequest', '.'];
     verifyTokenSequence(CharStreams.fromString(input), expectedTokens, expectedText);
   });
 
