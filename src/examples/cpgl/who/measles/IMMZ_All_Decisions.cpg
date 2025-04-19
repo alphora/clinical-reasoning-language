@@ -26,7 +26,7 @@ done
 /* 
    ValueMarkdown: "Ensure proper dosage based on patient weight." 
 */
-activity "IMMZD2DTMeaslesDose0_activity" perform CPGCommunicationRequest.
+activity "IMMZD2DTMeaslesDose0_activity" perform CPGCommunicationRequest of `Ensure proper dosage based on patient weight.`.
 
 
 /*
@@ -39,7 +39,7 @@ done
 /* 
    ValueMarkdown: "Follow up with serologic testing if needed." 
 */
-activity "IMMZD2DTMeaslesSupplementary_activity" perform CPGCommunicationRequest.
+activity "IMMZD2DTMeaslesSupplementary_activity" perform CPGCommunicationRequest of `Follow up with serologic testing if needed.`.
 
 
 /*
@@ -52,7 +52,7 @@ done
 /* 
    ValueMarkdown: "Consider known allergic reactions and medical history." 
 */
-activity "IMMZD5DTMeaslesCI_activity" perform CPGCommunicationRequest.
+activity "IMMZD5DTMeaslesCI_activity" perform CPGCommunicationRequest of `Consider known allergic reactions and medical history.`.
 
 
 // ========================================================
@@ -86,10 +86,10 @@ done
      is used as the parent rationale.
    - For the nested actions, we assume descriptive rationale as follows.
 */
-activity "OTIMMZD2DTMeasles_CheckHistory_activity" perform CPGCommunicationRequest. 
+activity "OTIMMZD2DTMeasles_CheckHistory_activity" perform CPGCommunicationRequest of `Check if the patient has no prior measles immunization.`. 
 // Check if the patient has no prior measles immunization.
 
-activity "OTIMMZD2DTMeasles_AssessEligibility_activity" perform CPGCommunicationRequest. 
+activity "OTIMMZD2DTMeasles_AssessEligibility_activity" perform CPGCommunicationRequest of `Assess if the patient is eligible for the routine measles vaccine.`. 
 // Assess if the patient is eligible for the routine measles vaccine.
 
 
@@ -141,8 +141,8 @@ done
    Using the description as a comment:
    "Perform measles vaccine administration as per protocol."
 */
-activity "IMMZD2DTMeaslesMR_activity" perform CPGMedicationRequest.
-
+activity "IMMZD2DTMeaslesMR_activity" perform CPGMedicationRequest of "Measles vaccines" because `Perform measles vaccine administration as per protocol.`.
+terminology "Measles vaccines" system `ICD11` code `XM28X5`.
 
 // ========================================================
 // Activities for Leaf Actions in IMMZD2DTMeaslesLT
@@ -151,32 +151,32 @@ activity "IMMZD2DTMeaslesMR_activity" perform CPGMedicationRequest.
    Activity for "Client Age Less Than 12 Months" (MCV1 branch).
    Description: "Should not vaccinate client as client's age is less than 12 months. Check for any vaccines due, and inform the caregiver of when to come back for MCV1."
 */
-activity "IMMZD2DTMeaslesLT_MCV1_ClientAgeLessThan12_activity" perform CPGCommunicationRequest.
+activity "IMMZD2DTMeaslesLT_MCV1_ClientAgeLessThan12_activity" perform CPGCommunicationRequest of `Should not vaccinate client as client's age is less than 12 months. Check for any vaccines due, and inform the caregiver of when to come back for MCV1.`.
 
 /* 
    Activity for "Last Live Vaccine Administered Within 4 Weeks" (MCV1 branch).
    Description: "Should not vaccinate client for MCV1 as live vaccine was administered in the last 4 weeks. Check for any vaccines due and inform the caregiver of when to come back for MCV1."
 */
-activity "IMMZD2DTMeaslesLT_MCV1_LastLiveWithin4Weeks_activity" perform CPGCommunicationRequest.
+activity "IMMZD2DTMeaslesLT_MCV1_LastLiveWithin4Weeks_activity" perform CPGCommunicationRequest of `Should not vaccinate client for MCV1 as live vaccine was administered in the last 4 weeks. Check for any vaccines due and inform the caregiver of when to come back for MCV1.`.
 
 /* 
    Activity for "Client Age Less Than 15 Months" (MCV2 branch).
    Description: "Should not vaccinate client for MCV2 as client's age is less than 15 months. Check for any vaccines due, and inform the caregiver of when to come back for MCV2."
 */
-activity "IMMZD2DTMeaslesLT_MCV2_ClientAgeLessThan15_activity" perform CPGCommunicationRequest.
+activity "IMMZD2DTMeaslesLT_MCV2_ClientAgeLessThan15_activity" perform CPGCommunicationRequest of `Should not vaccinate client for MCV2 as client's age is less than 15 months. Check for any vaccines due, and inform the caregiver of when to come back for MCV2`.
 
 /* 
    Activity for "Last Live Vaccine Administered Within 4 Weeks" (MCV2 branch).
    Description: "Should not vaccinate client for MCV2 as live vaccine was administered in the last 4 weeks. Check for any vaccines due, and inform the caregiver of when to come back for MCV2."
 */
-activity "IMMZD2DTMeaslesLT_MCV2_LastLiveWithin4Weeks_activity" perform CPGCommunicationRequest.
+activity "IMMZD2DTMeaslesLT_MCV2_LastLiveWithin4Weeks_activity" perform CPGCommunicationRequest of `Should not vaccinate client for MCV2 as live vaccine was administered in the last 4 weeks. Check for any vaccines due, and inform the caregiver of when to come back for MCV2.`.
 
 /* 
    Activity for "Measles primary series is complete." 
    ValueMarkdown (preferred): 
    "An additional dose of MCV should be administered to HIV-infected children receiving HAART following immune reconstitution. If CD4+ T lymphocyte counts are monitored, an additional dose of MCV should be administered when immune reconstitution has been achieved, e.g. when the CD4+ T lymphocyte count reaches 20–25%. Where CD4+ T lymphocyte monitoring is not available, children should receive an additional dose of MCV 6–12 months after initiation of HAART."
 */
-activity "IMMZD2DTMeaslesLT_PrimarySeriesComplete_activity" perform CPGCommunicationRequest.
+activity "IMMZD2DTMeaslesLT_PrimarySeriesComplete_activity" perform CPGCommunicationRequest of `Measles primary series is complete.` because `An additional dose of MCV should be administered to HIV-infected children receiving HAART following immune reconstitution. If CD4+ T lymphocyte counts are monitored, an additional dose of MCV should be administered when immune reconstitution has been achieved, e.g. when the CD4+ T lymphocyte count reaches 20–25%. Where CD4+ T lymphocyte monitoring is not available, children should receive an additional dose of MCV 6–12 months after initiation of HAART.`.
 
   
 // ========================================================
@@ -191,116 +191,116 @@ concept "Check Immunizations":
     has valuetype boolean.
     coded by "IMMZDTImmunizationStrategy_CheckImmunizations_Term".
 done
-terminology "IMMZDTImmunizationStrategy_CheckImmunizations_Term" system "IMMZDTImmunizationStrategy" code "CheckImmunizations".
+terminology "IMMZDTImmunizationStrategy_CheckImmunizations_Term" system `IMMZDTImmunizationStrategy` code `CheckImmunizations`.
 
 concept "Measles Dose 0":
     has type Observation.
     has valuetype boolean.
     coded by "IMMZDTImmunizationStrategy_MeaslesDose0_Term".
 done
-terminology "IMMZDTImmunizationStrategy_MeaslesDose0_Term" system "IMMZDTImmunizationStrategy" code "MeaslesDose0".
+terminology "IMMZDTImmunizationStrategy_MeaslesDose0_Term" system `IMMZDTImmunizationStrategy` code `MeaslesDose0`.
 
 concept "Measles Routine Immunization":
     has type Observation.
     has valuetype boolean.
     coded by "IMMZDTImmunizationStrategy_MeaslesRoutineImmunization_Term".
 done
-terminology "IMMZDTImmunizationStrategy_MeaslesRoutineImmunization_Term" system "IMMZDTImmunizationStrategy" code "MeaslesRoutineImmunization".
+terminology "IMMZDTImmunizationStrategy_MeaslesRoutineImmunization_Term" system `IMMZDTImmunizationStrategy` code `MeaslesRoutineImmunization`.
 
 concept "Measles Supplementary Dose":
     has type Observation.
     has valuetype boolean.
     coded by "IMMZDTImmunizationStrategy_MeaslesSupplementaryDose_Term".
 done
-terminology "IMMZDTImmunizationStrategy_MeaslesSupplementaryDose_Term" system "IMMZDTImmunizationStrategy" code "MeaslesSupplementaryDose".
+terminology "IMMZDTImmunizationStrategy_MeaslesSupplementaryDose_Term" system `IMMZDTImmunizationStrategy` code `MeaslesSupplementaryDose`.
 
 concept "Measles Contraindications":
     has type Observation.
     has valuetype boolean.
     coded by "IMMZDTImmunizationStrategy_MeaslesContraindications_Term".
 done
-terminology "IMMZDTImmunizationStrategy_MeaslesContraindications_Term" system "IMMZDTImmunizationStrategy" code "MeaslesContraindications".
+terminology "IMMZDTImmunizationStrategy_MeaslesContraindications_Term" system `IMMZDTImmunizationStrategy` code `MeaslesContraindications`.
 
 concept "Immunize patient for Measles":
     has type Observation.
     has valuetype boolean.
     coded by "IMMZDTImmunizationStrategy_ImmunizePatientForMeasles_Term".
 done
-terminology "IMMZDTImmunizationStrategy_ImmunizePatientForMeasles_Term" system "IMMZDTImmunizationStrategy" code "ImmunizePatientForMeasles".
+terminology "IMMZDTImmunizationStrategy_ImmunizePatientForMeasles_Term" system `IMMZDTImmunizationStrategy` code `ImmunizePatientForMeasles`.
 
 concept "Administer Routine Immunization":
     has type Observation.
     has valuetype boolean.
     coded by "IMMZDTImmunizationStrategy_AdministerRoutineImmunization_Term".
 done
-terminology "IMMZDTImmunizationStrategy_AdministerRoutineImmunization_Term" system "IMMZDTImmunizationStrategy" code "AdministerRoutineImmunization".
+terminology "IMMZDTImmunizationStrategy_AdministerRoutineImmunization_Term" system `IMMZDTImmunizationStrategy` code `AdministerRoutineImmunization`.
 
 concept "Check Prior Vaccination History":
     has type Observation.
     has valuetype boolean.
     coded by "IMMZDTImmunizationStrategy_CheckPriorVaccinationHistory_Term".
 done
-terminology "IMMZDTImmunizationStrategy_CheckPriorVaccinationHistory_Term" system "IMMZDTImmunizationStrategy" code "CheckPriorVaccinationHistory".
+terminology "IMMZDTImmunizationStrategy_CheckPriorVaccinationHistory_Term" system `IMMZDTImmunizationStrategy` code `CheckPriorVaccinationHistory`.
 
 concept "Assess Patient Eligibility":
     has type Observation.
     has valuetype boolean.
     coded by "IMMZDTImmunizationStrategy_AssessPatientEligibility_Term".
 done
-terminology "IMMZDTImmunizationStrategy_AssessPatientEligibility_Term" system "IMMZDTImmunizationStrategy" code "AssessPatientEligibility".
+terminology "IMMZDTImmunizationStrategy_AssessPatientEligibility_Term" system `IMMZDTImmunizationStrategy` code `AssessPatientEligibility`.
 
 concept "Provide primary series measles vaccination (MCV1)":
     has type Observation.
     has valuetype boolean.
     coded by "IMMZDTImmunizationStrategy_MCV1_Term".
 done
-terminology "IMMZDTImmunizationStrategy_MCV1_Term" system "IMMZDTImmunizationStrategy" code "ProvidePrimarySeriesMCV1".
+terminology "IMMZDTImmunizationStrategy_MCV1_Term" system `IMMZDTImmunizationStrategy` code `ProvidePrimarySeriesMCV1`.
 
 concept "Client Age Less Than 12 Months":
     has type Observation.
     has valuetype boolean.
     coded by "IMMZDTImmunizationStrategy_ClientAgeLessThan12_Term".
 done
-terminology "IMMZDTImmunizationStrategy_ClientAgeLessThan12_Term" system "IMMZDTImmunizationStrategy" code "ClientAgeLessThan12Months".
+terminology "IMMZDTImmunizationStrategy_ClientAgeLessThan12_Term" system `IMMZDTImmunizationStrategy` code `ClientAgeLessThan12Months`.
 
 concept "Last Live Vaccine Administered Within 4 Weeks":
     has type Observation.
     has valuetype boolean.
     coded by "IMMZDTImmunizationStrategy_LastLiveVaccine4Weeks_Term".
 done
-terminology "IMMZDTImmunizationStrategy_LastLiveVaccine4Weeks_Term" system "IMMZDTImmunizationStrategy" code "LastLiveVaccineWithin4Weeks".
+terminology "IMMZDTImmunizationStrategy_LastLiveVaccine4Weeks_Term" system `IMMZDTImmunizationStrategy` code `LastLiveVaccineWithin4Weeks`.
 
 concept "Provide Measles Vaccine":
     has type Observation.
     has valuetype boolean.
     coded by "IMMZDTImmunizationStrategy_ProvideMeaslesVaccine_Term".
 done
-terminology "IMMZDTImmunizationStrategy_ProvideMeaslesVaccine_Term" system "IMMZDTImmunizationStrategy" code "ProvideMeaslesVaccine".
+terminology "IMMZDTImmunizationStrategy_ProvideMeaslesVaccine_Term" system `IMMZDTImmunizationStrategy` code `ProvideMeaslesVaccine`.
 
 concept "Provide primary series measles vaccination (MCV2)":
     has type Observation.
     has valuetype boolean.
     coded by "IMMZDTImmunizationStrategy_MCV2_Term".
 done
-terminology "IMMZDTImmunizationStrategy_MCV2_Term" system "IMMZDTImmunizationStrategy" code "ProvidePrimarySeriesMCV2".
+terminology "IMMZDTImmunizationStrategy_MCV2_Term" system `IMMZDTImmunizationStrategy` code `ProvidePrimarySeriesMCV2`.
 
 concept "Client Age Less Than 15 Months":
     has type Observation.
     has valuetype boolean.
     coded by "IMMZDTImmunizationStrategy_ClientAgeLessThan15_Term".
 done
-terminology "IMMZDTImmunizationStrategy_ClientAgeLessThan15_Term" system "IMMZDTImmunizationStrategy" code "ClientAgeLessThan15Months".
+terminology "IMMZDTImmunizationStrategy_ClientAgeLessThan15_Term" system `IMMZDTImmunizationStrategy` code `ClientAgeLessThan15Months`.
 
 concept "Measles primary series is complete.":
     has type Observation.
     has valuetype boolean.
     coded by "IMMZDTImmunizationStrategy_PrimarySeriesComplete_Term".
 done
-terminology "IMMZDTImmunizationStrategy_PrimarySeriesComplete_Term" system "IMMZDTImmunizationStrategy" code "MeaslesPrimarySeriesComplete".
+terminology "IMMZDTImmunizationStrategy_PrimarySeriesComplete_Term" system `IMMZDTImmunizationStrategy` code `MeaslesPrimarySeriesComplete`.
 
 concept "Administer Measles Vaccine":
     has type Observation.
     has valuetype boolean.
     coded by "IMMZDTImmunizationStrategy_AdministerMeaslesVaccine_Term".
 done
-terminology "IMMZDTImmunizationStrategy_AdministerMeaslesVaccine_Term" system "IMMZDTImmunizationStrategy" code "AdministerMeaslesVaccine".
+terminology "IMMZDTImmunizationStrategy_AdministerMeaslesVaccine_Term" system `IMMZDTImmunizationStrategy` code `AdministerMeaslesVaccine`.

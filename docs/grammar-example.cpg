@@ -52,8 +52,6 @@ decision "Elderly Based":
     done
 done
 
-//rationale
-
 terminology "BMI Range as a Condition" ``.
 
 terminology "BMI as an Observation" valueset `BMI as an Observation`.
@@ -70,13 +68,13 @@ activity "Vaccinate" perform CPGImmunizationRequest. //CPGImmunizationRequest is
 
 activity "Indicate" perform CPGProposeDiagnosis of "Colonoscopy". //of references a terminology (or string)
 
-activity "another thing" perform CPGCommunicationRequest of `The message to send.` because `it's the right thing to do`. //of references a string (or terminology)
+activity "another thing" perform CPGCommunicationRequest of `cql:Some CQL` because `it's the right thing to do`. //of references a string (or terminology)
 
 // comments go into the auto generated README and, CQL when applicable
 concept "Most Recent BMI":
     has type Observation. //Observation is a CONCEPT_TYPE
     has valuetype boolean. //boolean is a CONCEPT_VALUE_TYPE
-    has provenance `some provenance`.
+    has provenance `It's some provenance`.
     inferred by "Most Recent(this, lookbackMonths)" "BMI". //"Most Recent" is a reference to a CQL expression (that will be resolved by the parser) and is optional.  "BMI" is a reference to another concept.
 done
 
