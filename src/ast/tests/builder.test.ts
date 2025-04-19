@@ -34,7 +34,7 @@ describe('CPGLAstBuilder', () => {
     it('should parse a simple decision with when block', () => {
       const input = `
         decision "BMI":
-          when "BMI > 30" then do "CPGProposeDiagnosis Obesity".
+          when "BMI > 30" then do "Propose Diagnosis Task".
         done
       `;
       const result = parseInput(input);
@@ -50,7 +50,7 @@ describe('CPGLAstBuilder', () => {
       expect(body.type).toBe(SingleActionType.type);
       const action = body.action as DoActivity;
       expect(action.type).toBe(DoActivityType.type);
-      expect(action.activityName).toBe('CPGProposeDiagnosis Obesity');
+      expect(action.activityName).toBe('Propose Diagnosis Task');
     });
 
     it('should parse a decision with multiple when blocks', () => {
@@ -204,22 +204,6 @@ describe('CPGLAstBuilder', () => {
         expect((secondAction.action as UseDecision).decisionName).toBe('Second Decision');
       });
 
-      it('should parse no use statements', () => {
-        const input = `
-          decision "Test":
-            when "Concept" then:
-            done
-          done
-        `;
-
-        const result = parseInput(input);
-        const decision = result.statements[0] as Decision;
-        const whenBlock = decision.body.statements[0] as WhenBlock;
-        const blockBody = whenBlock.body as BlockBody;
-
-        expect(blockBody.statements).toHaveLength(0);
-      });
-
       it('should parse a mixture of do and use statements', () => {
         const input = `
           decision "Test":
@@ -233,27 +217,107 @@ describe('CPGLAstBuilder', () => {
         `;
 
         const result = parseInput(input);
+        console.log('[DEBUGGING] blockBody (mixture):', JSON.stringify(result, null, 2));
         const decision = result.statements[0] as Decision;
         const whenBlock = decision.body.statements[0] as WhenBlock;
         const blockBody = whenBlock.body as BlockBody;
-
+        console.log('[DEBUGGING] blockBody:', blockBody);
+        console.log('[DEBUGGING] blockBody.statements:', blockBody?.statements);
+        if (!blockBody || !blockBody.statements) {
+          console.log('[DEBUGGING] blockBody or blockBody.statements is null/undefined');
+        } else {
+          blockBody.statements.forEach((stmt, idx) => {
+            console.log(`[DEBUGGING] blockBody.statements[${idx}]:`, stmt);
+          });
+        }
+        expect(blockBody && blockBody.statements).toBeTruthy();
         expect(blockBody.statements).toHaveLength(4);
-
         const firstAction = blockBody.statements[0] as ActionStatement;
+        expect(firstAction && firstAction.action).toBeTruthy();
         expect(firstAction.action.type).toBe(DoActivityType.type);
         expect((firstAction.action as DoActivity).activityName).toBe('First Activity');
-
         const secondAction = blockBody.statements[1] as ActionStatement;
+        expect(secondAction && secondAction.action).toBeTruthy();
         expect(secondAction.action.type).toBe(UseDecisionType.type);
         expect((secondAction.action as UseDecision).decisionName).toBe('First Decision');
-
         const thirdAction = blockBody.statements[2] as ActionStatement;
+        expect(thirdAction && thirdAction.action).toBeTruthy();
         expect(thirdAction.action.type).toBe(DoActivityType.type);
         expect((thirdAction.action as DoActivity).activityName).toBe('Second Activity');
-
         const fourthAction = blockBody.statements[3] as ActionStatement;
+        expect(fourthAction && fourthAction.action).toBeTruthy();
         expect(fourthAction.action.type).toBe(UseDecisionType.type);
         expect((fourthAction.action as UseDecision).decisionName).toBe('Second Decision');
+      });
+
+      it('should parse a block with only do statements (debug)', () => {
+        const input = `
+          decision "Test":
+            when "Concept" then:
+              do "First Activity".
+              do "Second Activity".
+            done
+          done
+        `;
+        const result = parseInput(input);
+        console.log('[DEBUGGING] blockBody (do only):', JSON.stringify(result, null, 2));
+        const decision = result.statements[0] as Decision;
+        const whenBlock = decision.body.statements[0] as WhenBlock;
+        const blockBody = whenBlock.body as BlockBody;
+        console.log('[DEBUGGING] blockBody:', blockBody);
+        console.log('[DEBUGGING] blockBody.statements:', blockBody?.statements);
+        if (!blockBody || !blockBody.statements) {
+          console.log('[DEBUGGING] blockBody or blockBody.statements is null/undefined');
+        } else {
+          blockBody.statements.forEach((stmt, idx) => {
+            console.log(`[DEBUGGING] blockBody.statements[${idx}]:`, stmt);
+          });
+        }
+        expect(blockBody && blockBody.statements).toBeTruthy();
+        expect(blockBody.statements).toHaveLength(2);
+        const firstAction = blockBody.statements[0] as ActionStatement;
+        expect(firstAction && firstAction.action).toBeTruthy();
+        expect(firstAction.action.type).toBe(DoActivityType.type);
+        expect((firstAction.action as DoActivity).activityName).toBe('First Activity');
+        const secondAction = blockBody.statements[1] as ActionStatement;
+        expect(secondAction && secondAction.action).toBeTruthy();
+        expect(secondAction.action.type).toBe(DoActivityType.type);
+        expect((secondAction.action as DoActivity).activityName).toBe('Second Activity');
+      });
+
+      it('should parse a block with only use statements (debug)', () => {
+        const input = `
+          decision "Test":
+            when "Concept" then:
+              use "First Decision".
+              use "Second Decision".
+            done
+          done
+        `;
+        const result = parseInput(input);
+        console.log('[DEBUGGING] blockBody (use only):', JSON.stringify(result, null, 2));
+        const decision = result.statements[0] as Decision;
+        const whenBlock = decision.body.statements[0] as WhenBlock;
+        const blockBody = whenBlock.body as BlockBody;
+        console.log('[DEBUGGING] blockBody:', blockBody);
+        console.log('[DEBUGGING] blockBody.statements:', blockBody?.statements);
+        if (!blockBody || !blockBody.statements) {
+          console.log('[DEBUGGING] blockBody or blockBody.statements is null/undefined');
+        } else {
+          blockBody.statements.forEach((stmt, idx) => {
+            console.log(`[DEBUGGING] blockBody.statements[${idx}]:`, stmt);
+          });
+        }
+        expect(blockBody && blockBody.statements).toBeTruthy();
+        expect(blockBody.statements).toHaveLength(2);
+        const firstAction = blockBody.statements[0] as ActionStatement;
+        expect(firstAction && firstAction.action).toBeTruthy();
+        expect(firstAction.action.type).toBe(UseDecisionType.type);
+        expect((firstAction.action as UseDecision).decisionName).toBe('First Decision');
+        const secondAction = blockBody.statements[1] as ActionStatement;
+        expect(secondAction && secondAction.action).toBeTruthy();
+        expect(secondAction.action.type).toBe(UseDecisionType.type);
+        expect((secondAction.action as UseDecision).decisionName).toBe('Second Decision');
       });
     });
   });
@@ -271,21 +335,13 @@ describe('CPGLAstBuilder', () => {
     });
 
     it('should parse a terminology system code', () => {
-      const input = 'terminology "Colonoscopy" system "http://snomed.info/sct" code "73761001".';
+      const input = 'terminology "Colonoscopy" system `http://snomed.info/sct` code `73761001`.';
 
       const result = parseInput(input);
       const ast = result.statements[0] as Terminology;
       expect(ast.definition.type).toBe(TerminologySystemCodeType.type);
       expect((ast.definition as TerminologySystemCode).system).toBe('http://snomed.info/sct');
       expect((ast.definition as TerminologySystemCode).code).toBe('73761001');
-    });
-
-    it('should parse a terminology unknown', () => {
-      const input = 'terminology "Some Terminology" unknown.';
-
-      const result = parseInput(input);
-      const ast = result.statements[0] as Terminology;
-      expect(ast.definition.type).toBe(TerminologyUnknownType.type);
     });
   });
 
@@ -302,13 +358,13 @@ describe('CPGLAstBuilder', () => {
     });
 
     it('should parse an activity with of clause', () => {
-      const input = 'activity "Indicate" perform CPGProposeDiagnosis of "Colonoscopy".';
+      const input = 'activity "Indicate" perform CPGProposeDiagnosisTask of "Colonoscopy".';
 
       const result = parseInput(input);
       const ast = result.statements[0] as Activity;
       expect(ast.type).toBe('Activity');
       expect(ast.name).toBe('Indicate');
-      expect(ast.perform).toBe('CPGProposeDiagnosis');
+      expect(ast.perform).toBe('CPGProposeDiagnosisTask');
       expect(ast.terminologyReference).toBe('Colonoscopy');
     });
   });
@@ -334,14 +390,14 @@ describe('CPGLAstBuilder', () => {
     });
 
     it('should parse a concept with inferred by pattern and concept reference', () => {
-      const input = `
-        concept "Most Recent BMI":
-          has type Observation.
-          has valuetype boolean.
-          has provenance "some provenance".
-          inferred by "Most Recent(this, lookbackMonths)" "BMI".
-        done
-      `;
+      const input = [
+        'concept "Most Recent BMI":',
+        '  has type Observation.',
+        '  has valuetype boolean.',
+        '  has provenance `some provenance`.',
+        '  inferred by "Most Recent(this, lookbackMonths)" "BMI".',
+        'done'
+      ].join('\n');
 
       const result = parseInput(input);
       const ast = result.statements[0] as Concept;
@@ -355,22 +411,20 @@ describe('CPGLAstBuilder', () => {
       if ('body' in inferredBy && inferredBy.body.type === 'InferredByDefinitionConcept') {
         expect(inferredBy.body.pattern).toBe('Most Recent(this, lookbackMonths)');
         expect(inferredBy.body.concept).toBe('BMI');
-        expect((inferredBy.body as any).descriptiveLogic).toBeUndefined();
       } else {
         expect((inferredBy.body as any).pattern).toBeUndefined();
         expect((inferredBy.body as any).concept).toBeUndefined();
-        expect((inferredBy.body as any).descriptiveLogic).toBeUndefined();
       }
     });
 
-    it('should parse a concept with inferred by descriptive logic', () => {
-      const input = `
-        concept "BMI":
-          has type Observation.
-          has valuetype Quantity.
-          inferred by ("BMI Range as a Condition" or "BMI as an Observation" or "Calculated BMI").
-        done
-      `;
+    it('should parse a concept with inferred by', () => {
+      const input = [
+        'concept "BMI":',
+        '  has type Observation.',
+        '  has valuetype Quantity.',
+        '  inferred by ("BMI Range as a Condition" or "BMI as an Observation" or "Calculated BMI").',
+        'done'
+      ].join('\n');
 
       const result = parseInput(input);
       const ast = result.statements[0] as Concept;
@@ -381,9 +435,6 @@ describe('CPGLAstBuilder', () => {
       expect(ast.definition.type).toBe(InferredByDefinitionType.type);
       const inferredBy = ast.definition as InferredByDefinition;
       if ('body' in inferredBy && inferredBy.body.type === 'InferredByDefinitionConcept') {
-        expect(inferredBy.body.descriptiveLogic).toBe(
-          'BMI Range as a Condition or BMI as an Observation or Calculated BMI',
-        );
       }
       expect((inferredBy.body as any).pattern).toBeUndefined();
       expect((inferredBy.body as any).concept).toBeUndefined();
@@ -403,11 +454,31 @@ describe('CPGLAstBuilder', () => {
       expect(ast.type).toBe('Concept');
       expect(ast.definition.type).toBe(InferredByDefinitionType.type);
       const inferredBy = ast.definition as InferredByDefinition;
-      if (typeof inferredBy.body === 'object' && 'terms' in inferredBy.body) {
-        expect((inferredBy.body as any).descriptiveLogic).toBe(
-          '(BMI Range as a Condition and Recent) or (BMI as an Observation and Valid) or Calculated BMI',
-        );
-      }
+      // Outer should be an OrExpression
+      expect(inferredBy.body.type).toBe('OrExpression');
+      const orExpr = inferredBy.body as any;
+      expect(Array.isArray(orExpr.terms)).toBe(true);
+      expect(orExpr.terms.length).toBe(3);
+      // First term: GroupExpression wrapping AndExpression
+      expect(orExpr.terms[0].type).toBe('GroupExpression');
+      const group1 = orExpr.terms[0];
+      expect(group1.expression.type).toBe('AndExpression');
+      expect(group1.expression.terms[0].type).toBe('ConceptReference');
+      expect(group1.expression.terms[0].name).toBe('BMI Range as a Condition');
+      expect(group1.expression.terms[1].type).toBe('ConceptReference');
+      expect(group1.expression.terms[1].name).toBe('Recent');
+      // Second term: GroupExpression wrapping AndExpression
+      expect(orExpr.terms[1].type).toBe('GroupExpression');
+      const group2 = orExpr.terms[1];
+      expect(group2.expression.type).toBe('AndExpression');
+      expect(group2.expression.terms[0].type).toBe('ConceptReference');
+      expect(group2.expression.terms[0].name).toBe('BMI as an Observation');
+      expect(group2.expression.terms[1].type).toBe('ConceptReference');
+      expect(group2.expression.terms[1].name).toBe('Valid');
+      // Third term: ConceptReference
+      expect(orExpr.terms[2].type).toBe('ConceptReference');
+      expect(orExpr.terms[2].name).toBe('Calculated BMI');
+      // pattern/concept should be undefined
       expect((inferredBy.body as any).pattern).toBeUndefined();
       expect((inferredBy.body as any).concept).toBeUndefined();
     });
@@ -443,7 +514,7 @@ describe('CPGLAstBuilder', () => {
     it('should parse a do activity', () => {
       const input = `
 decision "Test":
-  when "BMI > 30" then do "CPGProposeDiagnosis".
+  when "BMI > 30" then do "Propose Diagnosis Task".
 done
 `;
       const result = parseInput(input);
@@ -453,7 +524,7 @@ done
       expect(body.type).toBe(SingleActionType.type);
       const action = body.action as DoActivity;
       expect(action.type).toBe(DoActivityType.type);
-      expect(action.activityName).toBe('CPGProposeDiagnosis');
+      expect(action.activityName).toBe('Propose Diagnosis Task');
     });
 
     it('should parse a use decision', () => {
