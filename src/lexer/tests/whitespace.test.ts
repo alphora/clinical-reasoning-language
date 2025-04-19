@@ -91,7 +91,7 @@ describe('Whitespace Handling', () => {
 
   describe('Whitespace in Activity Statements', () => {
     it('should handle whitespace in activity statements', () => {
-      const input = 'activity\n  "Vaccinate"\n\t\tperform\n  CPGImmunization\t.';
+      const input = 'activity\n  "Vaccinate"\n\t\tperform\n  CPGImmunizationRequest\t.';
       const lexer = createLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
       verifyTokenSequence(tokens, [

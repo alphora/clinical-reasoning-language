@@ -280,7 +280,7 @@ done`;
 
   describe('Activity Structure', () => {
     it('should handle basic activity statements', () => {
-      const input = `activity "Vaccinate" perform CPGImmunization.`;
+      const input = `activity "Vaccinate" perform CPGImmunizationRequest.`;
       const lexer = createLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
 

@@ -291,13 +291,13 @@ describe('CPGLAstBuilder', () => {
 
   describe('Activity Statements', () => {
     it('should parse a simple activity', () => {
-      const input = 'activity "Vaccinate" perform CPGImmunization.';
+      const input = 'activity "Vaccinate" perform CPGImmunizationRequest.';
 
       const result = parseInput(input);
       const ast = result.statements[0] as Activity;
       expect(ast.type).toBe('Activity');
       expect(ast.name).toBe('Vaccinate');
-      expect(ast.perform).toBe('CPGImmunization');
+      expect(ast.perform).toBe('CPGImmunizationRequest');
       expect(ast.terminologyReference).toBeUndefined();
     });
 
@@ -417,7 +417,7 @@ describe('CPGLAstBuilder', () => {
     it('should parse multiple statements of different types', () => {
       const input = `
         terminology "BMI Valueset" valueset "bmi valueset".
-        activity "Vaccinate" perform CPGImmunization.
+        activity "Vaccinate" perform CPGImmunizationRequest.
         concept "BMI":
           has type Observation.
           has valuetype Quantity.

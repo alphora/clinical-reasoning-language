@@ -37,16 +37,14 @@ DOT          : '.';
 LPAREN       : '(';
 RPAREN       : ')';
 
+// Double-quoted identifier/reference
 QUOTED_STRING
     : '"' ( ~["\\\r\n] )* '"'
     ;
 
-MARKDOWN_STRING
-    : .+?
-    ;
-
-STRING
-    : '"' ( '\\' . | ~["] )* '"'
+// Single-quoted string literal (for markdown or free text)
+SINGLE_QUOTED_STRING
+    : '\'' ( ~['\\] | '\\' . )* '\''
     ;
 
 // Block comment fragment

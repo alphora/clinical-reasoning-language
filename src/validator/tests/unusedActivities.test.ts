@@ -25,7 +25,7 @@ describe('UnusedDeclarationsValidator - Activities', () => {
         {
           type: ActivityType.type,
           name: 'unusedActivity',
-          perform: 'CPGImmunization',
+          perform: 'CPGImmunizationRequest',
           location: {
             start: { line: 1, column: 1 },
             end: { line: 1, column: 1 },
@@ -50,7 +50,7 @@ describe('UnusedDeclarationsValidator - Activities', () => {
         {
           type: ActivityType.type,
           name: 'usedActivity',
-          perform: 'CPGImmunization',
+          perform: 'CPGImmunizationRequest',
           location: {
             start: { line: 1, column: 1 },
             end: { line: 1, column: 1 },

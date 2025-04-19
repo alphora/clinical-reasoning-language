@@ -85,7 +85,7 @@ decision "Test"
     });
 
     it('should ignore block comments in activity statements', () => {
-      const input = `activity /* name */ "Vaccinate" /* action */ perform /* type */ CPGImmunization /* end */ .`;
+      const input = `activity /* name */ "Vaccinate" /* action */ perform /* type */ CPGImmunizationRequest /* end */ .`;
       const lexer = createLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
 

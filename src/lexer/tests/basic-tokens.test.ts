@@ -137,15 +137,15 @@ describe('CPGL Lexer - Basic Tokens', () => {
   });
 
   describe('Activity Types', () => {
-    it('should tokenize CPGImmunization', () => {
-      const input = 'perform CPGImmunization';
+    it('should tokenize CPGImmunizationRequest', () => {
+      const input = 'perform CPGImmunizationRequest';
       const lexer = createLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
 
       verifyTokenSequence(
         tokens,
         [CPGLLexer.PERFORM, CPGLLexer.ACTIVITY_TYPE],
-        ['perform', 'CPGImmunization'],
+        ['perform', 'CPGImmunizationRequest'],
       );
     });
 
@@ -551,7 +551,7 @@ describe('CPGL Lexer - Basic Tokens', () => {
 
   describe('Additional Keywords', () => {
     it('should tokenize activity statement', () => {
-      const input = 'activity "Test" perform CPGImmunization';
+      const input = 'activity "Test" perform CPGImmunizationRequest';
       const lexer = createLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
 
