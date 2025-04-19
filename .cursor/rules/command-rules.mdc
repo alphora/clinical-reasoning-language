@@ -3,10 +3,33 @@ description:
 globs: 
 alwaysApply: true
 ---
+# 🛠️ Project Development Guidelines for AI Assistants
 
-# Your rule content
+## 👨‍💻 Development Practices
 
-- Run tests using npx jest: **npx jest >test path< --verbose --no-cache --colors --forceExit --detectOpenHandles --watchAll=false**
-- **If I say "report"**, perform the task and then pause.
-- **If I ask a question**, answer it and then pause.
-- **Run all commands** in a new terminal.  **Dispose the terminal when you're done.**
+- Always write code in **TypeScript** — no JavaScript implementations.
+- To run tests, use the following exact command:
+  ~~~bash
+  npx jest <test path> --verbose --no-cache --colors --forceExit --detectOpenHandles --watchAll=false
+  ~~~
+- If the user says **"report"**, complete the task and then **pause**.
+- If the user **asks a question**, answer it and then **pause**.
+- Execute all commands in a **new terminal**, and **dispose of the terminal** when finished.
+
+## 🌍 Cross-Platform Requirements
+
+- The project **must work on Windows, Mac, and Linux**.
+- Implement all changes to be **cross-platform compatible**.
+- Prefer **platform-independent commands**.
+- If platform-specific logic is required, provide an **equivalent implementation for each OS**.
+
+## ✅ Why These Rules Matter
+
+By following these practices, we achieve:
+
+- Fewer bugs in production
+- A maintainable, well-structured codebase
+- Consistent and predictable coding practices
+- Faster and easier code reviews
+- Minimized technical debt
+- Compatibility across all major operating systems
