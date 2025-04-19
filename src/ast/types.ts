@@ -170,6 +170,7 @@ export interface Activity extends ASTNode {
   perform: ActivityType;
   terminologyReference?: string;
   activityTypeValue?: string;
+  rationale?: string;
   location: Location;
 }
 
