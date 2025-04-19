@@ -28,6 +28,7 @@ THEN         : 'then';
 ANY          : 'any';
 ALL          : 'all';
 DECISION     : 'decision';
+BECAUSE      : 'because';
 // DO NOT remove as this is used by the lexer error listener.
 ERROR        : 'error';
 

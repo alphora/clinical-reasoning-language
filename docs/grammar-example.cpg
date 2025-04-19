@@ -70,7 +70,7 @@ activity "Vaccinate" perform CPGImmunizationRequest. //CPGImmunizationRequest is
 
 activity "Indicate" perform CPGProposeDiagnosis of "Colonoscopy". //of references a terminology (or string)
 
-activity "another thing" perform CPGCommunicationRequest of `Because it's the right thing to do`. //of references a string (or terminology)
+activity "another thing" perform CPGCommunicationRequest of `The message to send.` because `it's the right thing to do`. //of references a string (or terminology)
 
 // comments go into the auto generated README and, CQL when applicable
 concept "Most Recent BMI":
