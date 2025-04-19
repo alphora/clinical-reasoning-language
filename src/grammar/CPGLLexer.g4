@@ -20,7 +20,6 @@ ACTIVITY     : 'activity';
 OF           : 'of';
 SYSTEM       : 'system';
 CODE         : 'code';
-UNKNOWN      : 'unknown';
 DO           : 'do';
 USE          : 'use';
 WHEN         : 'when';
