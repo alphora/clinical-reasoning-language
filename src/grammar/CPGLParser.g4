@@ -251,7 +251,8 @@ patternReference
     ;
 
 singleQuotedString
-     SINGLE_QUOTED_STRING
+    : SINGLE_QUOTED_STRING
+    ;
 
 activityTypeValue
     : singleQuotedString
