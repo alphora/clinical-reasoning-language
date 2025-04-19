@@ -99,7 +99,7 @@ terminologySystemCode
 //   activity "Indicate" perform ProposeDiagnosis of "Colonoscopy".
 //
 activityStatement
-    : ACTIVITY activityIdentifier PERFORM ACTIVITY_TYPE (OF terminologyReference)? DOT
+    : ACTIVITY activityIdentifier PERFORM ACTIVITY_TYPE (OF (terminologyReference | activityTypeValue))? DOT
     ;
 
 // ---------------------------- CONCEPT STATEMENT ---------------------------
@@ -254,7 +254,11 @@ patternReference
     : patternIdentifier
     ;
 
-// A helper rule to also refer to a string literal.
+activityTypeValue
+    : STRING
+    | MARKDOWN_STRING
+    ; 
+
 stringLiteral
     : STRING
     | QUOTED_STRING

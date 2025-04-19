@@ -54,6 +54,7 @@ import { ConceptIdentifierContext } from "./CPGLParser";
 import { ConceptReferenceContext } from "./CPGLParser";
 import { PatternIdentifierContext } from "./CPGLParser";
 import { PatternReferenceContext } from "./CPGLParser";
+import { ActivityTypeValueContext } from "./CPGLParser";
 import { StringLiteralContext } from "./CPGLParser";
 
 
@@ -429,6 +430,13 @@ export interface CPGLParserVisitor<Result> extends ParseTreeVisitor<Result> {
 	 * @return the visitor result
 	 */
 	visitPatternReference?: (ctx: PatternReferenceContext) => Result;
+
+	/**
+	 * Visit a parse tree produced by `CPGLParser.activityTypeValue`.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	visitActivityTypeValue?: (ctx: ActivityTypeValueContext) => Result;
 
 	/**
 	 * Visit a parse tree produced by `CPGLParser.stringLiteral`.

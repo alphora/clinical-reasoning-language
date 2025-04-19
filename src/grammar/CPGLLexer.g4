@@ -41,6 +41,10 @@ QUOTED_STRING
     : '"' ( ~["\\\r\n] )* '"'
     ;
 
+MARKDOWN_STRING
+    : .+?
+    ;
+
 STRING
     : '"' ( '\\' . | ~["] )* '"'
     ;
