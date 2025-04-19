@@ -141,7 +141,7 @@ done
    Using the description as a comment:
    "Perform measles vaccine administration as per protocol."
 */
-activity "IMMZD2DTMeaslesMR_activity" perform MedicationRequest.
+activity "IMMZD2DTMeaslesMR_activity" perform CPGMedicationRequest.
 
 
 // ========================================================
