@@ -109,9 +109,10 @@ terminologySystemCode
 // Examples:
 //   activity "Vaccinate" perform Immunization.
 //   activity "Indicate" perform ProposeDiagnosis of "Colonoscopy".
+//   activity "Inform Clinician" perform CPGCommunicationRequest of `The message to send.` because `Clinician's should be messaged about these things.`.
 //
 activityStatement
-    : ACTIVITY activityIdentifier PERFORM ACTIVITY_TYPE (OF (terminologyReference | activityTypeValue))? DOT
+    : ACTIVITY activityIdentifier PERFORM ACTIVITY_TYPE (OF (terminologyReference | activityTypeValue))? (BECAUSE rationale)? DOT
     ;
 
 // ---------------------------- CONCEPT STATEMENT ---------------------------
@@ -271,5 +272,9 @@ backtickString
     ;
 
 activityTypeValue
+    : backtickString
+    ;
+
+rationale
     : backtickString
     ;

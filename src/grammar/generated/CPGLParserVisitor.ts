@@ -55,6 +55,7 @@ import { PatternIdentifierContext } from "./CPGLParser";
 import { PatternReferenceContext } from "./CPGLParser";
 import { BacktickStringContext } from "./CPGLParser";
 import { ActivityTypeValueContext } from "./CPGLParser";
+import { RationaleContext } from "./CPGLParser";
 
 
 /**
@@ -436,5 +437,12 @@ export interface CPGLParserVisitor<Result> extends ParseTreeVisitor<Result> {
 	 * @return the visitor result
 	 */
 	visitActivityTypeValue?: (ctx: ActivityTypeValueContext) => Result;
+
+	/**
+	 * Visit a parse tree produced by `CPGLParser.rationale`.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	visitRationale?: (ctx: RationaleContext) => Result;
 }
 
