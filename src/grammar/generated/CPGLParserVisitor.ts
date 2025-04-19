@@ -25,7 +25,6 @@ import { DoStatementContext } from "./CPGLParser";
 import { UseStatementContext } from "./CPGLParser";
 import { TerminologyStatementContext } from "./CPGLParser";
 import { TerminologyValuesetContext } from "./CPGLParser";
-import { TerminologyUnknownContext } from "./CPGLParser";
 import { TerminologySystemCodeContext } from "./CPGLParser";
 import { ActivityStatementContext } from "./CPGLParser";
 import { ConceptStatementContext } from "./CPGLParser";
@@ -54,8 +53,8 @@ import { ConceptIdentifierContext } from "./CPGLParser";
 import { ConceptReferenceContext } from "./CPGLParser";
 import { PatternIdentifierContext } from "./CPGLParser";
 import { PatternReferenceContext } from "./CPGLParser";
+import { SingleQuotedStringContext } from "./CPGLParser";
 import { ActivityTypeValueContext } from "./CPGLParser";
-import { StringLiteralContext } from "./CPGLParser";
 
 
 /**
@@ -227,13 +226,6 @@ export interface CPGLParserVisitor<Result> extends ParseTreeVisitor<Result> {
 	 * @return the visitor result
 	 */
 	visitTerminologyValueset?: (ctx: TerminologyValuesetContext) => Result;
-
-	/**
-	 * Visit a parse tree produced by `CPGLParser.terminologyUnknown`.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	visitTerminologyUnknown?: (ctx: TerminologyUnknownContext) => Result;
 
 	/**
 	 * Visit a parse tree produced by `CPGLParser.terminologySystemCode`.
@@ -432,17 +424,17 @@ export interface CPGLParserVisitor<Result> extends ParseTreeVisitor<Result> {
 	visitPatternReference?: (ctx: PatternReferenceContext) => Result;
 
 	/**
+	 * Visit a parse tree produced by `CPGLParser.singleQuotedString`.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	visitSingleQuotedString?: (ctx: SingleQuotedStringContext) => Result;
+
+	/**
 	 * Visit a parse tree produced by `CPGLParser.activityTypeValue`.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
 	visitActivityTypeValue?: (ctx: ActivityTypeValueContext) => Result;
-
-	/**
-	 * Visit a parse tree produced by `CPGLParser.stringLiteral`.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	visitStringLiteral?: (ctx: StringLiteralContext) => Result;
 }
 

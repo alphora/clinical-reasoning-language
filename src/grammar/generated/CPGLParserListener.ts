@@ -25,7 +25,6 @@ import { DoStatementContext } from "./CPGLParser";
 import { UseStatementContext } from "./CPGLParser";
 import { TerminologyStatementContext } from "./CPGLParser";
 import { TerminologyValuesetContext } from "./CPGLParser";
-import { TerminologyUnknownContext } from "./CPGLParser";
 import { TerminologySystemCodeContext } from "./CPGLParser";
 import { ActivityStatementContext } from "./CPGLParser";
 import { ConceptStatementContext } from "./CPGLParser";
@@ -54,8 +53,8 @@ import { ConceptIdentifierContext } from "./CPGLParser";
 import { ConceptReferenceContext } from "./CPGLParser";
 import { PatternIdentifierContext } from "./CPGLParser";
 import { PatternReferenceContext } from "./CPGLParser";
+import { SingleQuotedStringContext } from "./CPGLParser";
 import { ActivityTypeValueContext } from "./CPGLParser";
-import { StringLiteralContext } from "./CPGLParser";
 
 
 /**
@@ -320,17 +319,6 @@ export interface CPGLParserListener extends ParseTreeListener {
 	 * @param ctx the parse tree
 	 */
 	exitTerminologyValueset?: (ctx: TerminologyValuesetContext) => void;
-
-	/**
-	 * Enter a parse tree produced by `CPGLParser.terminologyUnknown`.
-	 * @param ctx the parse tree
-	 */
-	enterTerminologyUnknown?: (ctx: TerminologyUnknownContext) => void;
-	/**
-	 * Exit a parse tree produced by `CPGLParser.terminologyUnknown`.
-	 * @param ctx the parse tree
-	 */
-	exitTerminologyUnknown?: (ctx: TerminologyUnknownContext) => void;
 
 	/**
 	 * Enter a parse tree produced by `CPGLParser.terminologySystemCode`.
@@ -641,6 +629,17 @@ export interface CPGLParserListener extends ParseTreeListener {
 	exitPatternReference?: (ctx: PatternReferenceContext) => void;
 
 	/**
+	 * Enter a parse tree produced by `CPGLParser.singleQuotedString`.
+	 * @param ctx the parse tree
+	 */
+	enterSingleQuotedString?: (ctx: SingleQuotedStringContext) => void;
+	/**
+	 * Exit a parse tree produced by `CPGLParser.singleQuotedString`.
+	 * @param ctx the parse tree
+	 */
+	exitSingleQuotedString?: (ctx: SingleQuotedStringContext) => void;
+
+	/**
 	 * Enter a parse tree produced by `CPGLParser.activityTypeValue`.
 	 * @param ctx the parse tree
 	 */
@@ -650,16 +649,5 @@ export interface CPGLParserListener extends ParseTreeListener {
 	 * @param ctx the parse tree
 	 */
 	exitActivityTypeValue?: (ctx: ActivityTypeValueContext) => void;
-
-	/**
-	 * Enter a parse tree produced by `CPGLParser.stringLiteral`.
-	 * @param ctx the parse tree
-	 */
-	enterStringLiteral?: (ctx: StringLiteralContext) => void;
-	/**
-	 * Exit a parse tree produced by `CPGLParser.stringLiteral`.
-	 * @param ctx the parse tree
-	 */
-	exitStringLiteral?: (ctx: StringLiteralContext) => void;
 }
 
