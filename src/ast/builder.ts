@@ -90,7 +90,12 @@ export class CPGLAstBuilder extends AbstractParseTreeVisitor<ASTNode> implements
   }
 
   visitNestedWhenBlock(ctx: NestedWhenBlockContext): WhenBlock { return this.visit(ctx.whenBlock()) as WhenBlock; }
-  visitBlockAction(ctx: BlockActionContext): ActionStatement { return this.visit(ctx.actionStatement()) as ActionStatement; }
+  visitBlockAction(ctx: BlockActionContext): ActionStatement {
+    const result = this.visit(ctx.actionStatement()) as ActionStatement;
+    console.log('[DEBUGGING] visitBlockAction ctx:', ctx.text);
+    console.log('[DEBUGGING] visitBlockAction result:', result);
+    return result;
+  }
 
   visitBlockBody(ctx: BlockBodyContext): BlockBody {
     // qualifier as before
@@ -124,14 +129,34 @@ export class CPGLAstBuilder extends AbstractParseTreeVisitor<ASTNode> implements
     return { type: SingleActionType.type, action, location: getLocation(ctx) };
   }
 
+  visitActionStatement(ctx: any): ActionStatement {
+    const doStmt = ctx.doStatement && ctx.doStatement();
+    const useStmt = ctx.useStatement && ctx.useStatement();
+    let action: DoActivity | UseDecision;
+    if (doStmt) {
+      action = this.visitDoStatement(doStmt);
+    } else if (useStmt) {
+      action = this.visitUseStatement(useStmt);
+    } else {
+      throw new Error('ActionStatement must have doStatement or useStatement');
+    }
+    return { type: 'ActionStatement', action, location: getLocation(ctx) };
+  }
+
   visitDoStatement(ctx: DoStatementContext): DoActivity {
     const activityName = ctx.activityReference().text.slice(1, -1);
-    return { type: DoActivityType.type, activityName, location: getLocation(ctx) };
+    const result = { type: DoActivityType.type, activityName, location: getLocation(ctx) };
+    console.log('[DEBUGGING] visitDoStatement ctx:', ctx.text);
+    console.log('[DEBUGGING] visitDoStatement result:', result);
+    return result;
   }
 
   visitUseStatement(ctx: UseStatementContext): UseDecision {
     const decisionName = ctx.decisionReference().text.slice(1, -1);
-    return { type: UseDecisionType.type, decisionName, location: getLocation(ctx) };
+    const result = { type: UseDecisionType.type, decisionName, location: getLocation(ctx) };
+    console.log('[DEBUGGING] visitUseStatement ctx:', ctx.text);
+    console.log('[DEBUGGING] visitUseStatement result:', result);
+    return result;
   }
 
   visitTerminologyStatement(ctx: TerminologyStatementContext): Terminology {
