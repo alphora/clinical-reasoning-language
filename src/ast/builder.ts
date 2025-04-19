@@ -10,7 +10,7 @@ import {
   BlockBodyContext, SingleActionStatementContext,
   DoStatementContext, UseStatementContext,
   TerminologyStatementContext, TerminologyValuesetContext,
-  TerminologyUnknownContext, TerminologySystemCodeContext,
+  TerminologySystemCodeContext,
   ActivityStatementContext, ConceptStatementContext,
   InferredByLineContext,
   DefinitionConceptContext, DefinitionLogicContext,
@@ -26,7 +26,6 @@ import {
   DoActivity, DoActivityType, UseDecision, UseDecisionType,
   Terminology, TerminologyType,
   TerminologyValueset, TerminologyValuesetType,
-  TerminologyUnknown, TerminologyUnknownType,
   TerminologySystemCode, TerminologySystemCodeType,
   Activity, ActivityType,
   Concept, ConceptType, ConceptDefinition,
@@ -137,8 +136,8 @@ export class CPGLAstBuilder extends AbstractParseTreeVisitor<ASTNode> implements
 
   visitTerminologyStatement(ctx: TerminologyStatementContext): Terminology {
     const name = ctx.terminologyIdentifier().text.slice(1, -1);
-    const defCtx = ctx.terminologyValueset() ?? ctx.terminologyUnknown() ?? ctx.terminologySystemCode();
-    const definition = this.visit(defCtx!) as TerminologyValueset | TerminologyUnknown | TerminologySystemCode;
+    const defCtx = ctx.terminologyValueset() ?? ctx.terminologySystemCode();
+    const definition = this.visit(defCtx!) as TerminologyValueset | TerminologySystemCode;
     return { type: TerminologyType.type, name, definition, location: getLocation(ctx) };
   }
 
@@ -146,10 +145,16 @@ export class CPGLAstBuilder extends AbstractParseTreeVisitor<ASTNode> implements
     const valuesetName = ctx.identifier().text.slice(1, -1);
     return { type: TerminologyValuesetType.type, valuesetName, location: getLocation(ctx) };
   }
-  visitTerminologyUnknown(ctx: TerminologyUnknownContext): TerminologyUnknown { return { type: TerminologyUnknownType.type, location: getLocation(ctx) }; }
   visitTerminologySystemCode(ctx: TerminologySystemCodeContext): TerminologySystemCode {
-    const system = ctx.identifier(0).text.slice(1,-1);
-    const code   = ctx.identifier(1).text.slice(1,-1);
+    // SYSTEM backtickString CODE backtickString
+    let system = '';
+    let code = '';
+    if (ctx.backtickString && ctx.backtickString().length === 2) {
+      const systemNode = ctx.backtickString(0).BACKTICK_STRING();
+      const codeNode = ctx.backtickString(1).BACKTICK_STRING();
+      if (systemNode && systemNode.text) system = systemNode.text.slice(1, -1);
+      if (codeNode && codeNode.text) code = codeNode.text.slice(1, -1);
+    }
     return { type: TerminologySystemCodeType.type, system, code, location: getLocation(ctx) };
   }
 
@@ -158,6 +163,7 @@ export class CPGLAstBuilder extends AbstractParseTreeVisitor<ASTNode> implements
     const perform = ctx.ACTIVITY_TYPE()!.text as ActivityType;
     let terminologyReference: string | undefined;
     let activityTypeValue: string | undefined;
+    let rationale: string | undefined;
 
     // [DEBUGGING] Print children and their types
     if (ctx.children) {
@@ -174,19 +180,43 @@ export class CPGLAstBuilder extends AbstractParseTreeVisitor<ASTNode> implements
       terminologyReference = ctx.terminologyReference()!.text.slice(1, -1);
     }
     if (ctx.activityTypeValue()) {
+      // activityTypeValue is a backtickString
       const atv = ctx.activityTypeValue()!;
-      const stringToken = atv.getToken(CPGLParser.STRING, 0);
-      const markdownToken = atv.getToken(CPGLParser.MARKDOWN_STRING, 0);
-      if (stringToken) {
-        const rawText = (stringToken as any).getText();
-        activityTypeValue = rawText.replace(/^['"]|['"]$/g, "");
-      } else if (markdownToken) {
-        console.log('[DEBUGGING] markdownToken:', markdownToken);
-        activityTypeValue = (markdownToken as any).getText();
+      if (atv.backtickString) {
+        const backtickCtx = atv.backtickString();
+        if (backtickCtx && backtickCtx.BACKTICK_STRING) {
+          const token = backtickCtx.BACKTICK_STRING();
+          if (token && token.text) {
+            activityTypeValue = token.text.slice(1, -1);
+          } else if (backtickCtx.text) {
+            activityTypeValue = backtickCtx.text.slice(1, -1);
+          }
+        } else if (atv.text) {
+          activityTypeValue = atv.text.slice(1, -1);
+        }
+      } else if (atv.text) {
+        activityTypeValue = atv.text.slice(1, -1);
+      }
+    }
+    if (ctx.rationale) {
+      const rationaleCtx = ctx.rationale();
+      if (rationaleCtx && rationaleCtx.backtickString) {
+        const backtickCtx = rationaleCtx.backtickString();
+        if (backtickCtx && backtickCtx.BACKTICK_STRING) {
+          const token = backtickCtx.BACKTICK_STRING();
+          if (token && token.text) {
+            rationale = token.text.slice(1, -1);
+          } else if (backtickCtx.text) {
+            rationale = backtickCtx.text.slice(1, -1);
+          }
+        } else if (rationaleCtx.text) {
+          rationale = rationaleCtx.text.slice(1, -1);
+        }
+        console.log('[DEBUGGING] rationale:', rationale);
       }
     }
 
-    return { type: 'Activity', name, perform, terminologyReference, activityTypeValue, location: getLocation(ctx) };
+    return { type: 'Activity', name, perform, terminologyReference, activityTypeValue, rationale, location: getLocation(ctx) };
   }
 
   visitConceptStatement(ctx: ConceptStatementContext): Concept {
@@ -194,7 +224,23 @@ export class CPGLAstBuilder extends AbstractParseTreeVisitor<ASTNode> implements
     const bodyCtx = ctx.conceptBody();
     const conceptType = (bodyCtx.hasTypeLine().CONCEPT_TYPE().text) as ConceptType;
     const valueType   = (bodyCtx.hasValueTypeLine().CONCEPT_VALUE_TYPE().text) as any;
-    const provenance  = bodyCtx.provenanceLine()?.stringLiteral().text.slice(1,-1);
+    let provenance: string | undefined = undefined;
+    if (bodyCtx.provenanceLine) {
+      const provCtx = bodyCtx.provenanceLine();
+      if (provCtx && provCtx.backtickString) {
+        const backtickCtx = provCtx.backtickString();
+        if (backtickCtx && backtickCtx.BACKTICK_STRING) {
+          const token = backtickCtx.BACKTICK_STRING();
+          if (token && token.text) {
+            provenance = token.text.slice(1, -1);
+          } else if (backtickCtx.text) {
+            provenance = backtickCtx.text.slice(1, -1);
+          }
+        } else if (provCtx.text) {
+          provenance = provCtx.text.slice(1, -1);
+        }
+      }
+    }
     let definition: ConceptDefinition;
     if (bodyCtx.codedByLine()) {
       const termRef = bodyCtx.codedByLine()!.terminologyReference().text.slice(1,-1);

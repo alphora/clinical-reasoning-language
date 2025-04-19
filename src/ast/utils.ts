@@ -40,6 +40,9 @@ export function printAST(node: ASTNode, indent = 0): string {
   if ('activityTypeValue' in node && node.activityTypeValue) {
     output += `${spaces}  activityTypeValue: "${node.activityTypeValue}"\n`;
   }
+  if ('rationale' in node && node.rationale) {
+    output += `${spaces}  rationale: "${node.rationale}"\n`;
+  }
 
   // Handle statements
   if ('statements' in node && Array.isArray(node.statements)) {
