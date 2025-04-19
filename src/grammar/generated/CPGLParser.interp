@@ -85,7 +85,7 @@ DOT
 LPAREN
 RPAREN
 QUOTED_STRING
-SINGLE_QUOTED_STRING
+BACKTICK_STRING
 WS
 COMMENT
 COMMENT_BLOCK
@@ -145,7 +145,7 @@ conceptIdentifier
 conceptReference
 patternIdentifier
 patternReference
-singleQuotedString
+backtickString
 activityTypeValue
 
 

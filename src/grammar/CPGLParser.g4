@@ -5,6 +5,22 @@ options {
 }
 
 // --------------------------------------------------------------------------
+// QUOTING CONVENTIONS
+// --------------------------------------------------------------------------
+// Identifiers and references must be enclosed in double quotes (").
+//   Example: "Colonoscopy", "BMI Valueset"
+//   Used for: identifiers, references, concept names, etc.
+//
+// Free text, markdown, and provenance must be enclosed in backticks (`).
+//   Example: `it's the right thing to do`, `Some *markdown* text`
+//   Used for: provenance, markdown, system/code values, and any non-identifier string.
+//
+// Single quotes (') are NOT used as delimiters in this grammar.
+//
+// This convention ensures unambiguous parsing and user-friendly authoring.
+// --------------------------------------------------------------------------
+
+// --------------------------------------------------------------------------
 // PARSER RULES
 // --------------------------------------------------------------------------
 
@@ -77,7 +93,7 @@ useStatement
 //   terminology "Colonoscopy" system 'http://snomed.info/sct' code '73761001'.
 //
 terminologyStatement
-    : TERMINOLOGY terminologyIdentifier ( terminologyValueset | singleQuotedString | terminologySystemCode ) DOT
+    : TERMINOLOGY terminologyIdentifier ( terminologyValueset | backtickString | terminologySystemCode ) DOT
     ;
 
 terminologyValueset
@@ -85,7 +101,7 @@ terminologyValueset
     ;
 
 terminologySystemCode
-    : SYSTEM singleQuotedString CODE singleQuotedString
+    : SYSTEM backtickString CODE backtickString
     ;
 
 // --------------------------- ACTIVITY STATEMENT ---------------------------
@@ -141,7 +157,7 @@ hasValueTypeLine
     ;
 
 provenanceLine
-    : HAS PROVENANCE singleQuotedString DOT
+    : HAS PROVENANCE backtickString DOT
     ;
 
 // "coded by" clause for concepts that reference a terminology.
@@ -250,10 +266,10 @@ patternReference
     : patternIdentifier
     ;
 
-singleQuotedString
-    : SINGLE_QUOTED_STRING
+backtickString
+    : BACKTICK_STRING
     ;
 
 activityTypeValue
-    : singleQuotedString
+    : backtickString
     ;

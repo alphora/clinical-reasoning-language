@@ -61,7 +61,7 @@ export class CPGLParser extends Parser {
 	public static readonly LPAREN = 31;
 	public static readonly RPAREN = 32;
 	public static readonly QUOTED_STRING = 33;
-	public static readonly SINGLE_QUOTED_STRING = 34;
+	public static readonly BACKTICK_STRING = 34;
 	public static readonly WS = 35;
 	public static readonly COMMENT = 36;
 	public static readonly COMMENT_BLOCK = 37;
@@ -119,7 +119,7 @@ export class CPGLParser extends Parser {
 	public static readonly RULE_conceptReference = 39;
 	public static readonly RULE_patternIdentifier = 40;
 	public static readonly RULE_patternReference = 41;
-	public static readonly RULE_singleQuotedString = 42;
+	public static readonly RULE_backtickString = 42;
 	public static readonly RULE_activityTypeValue = 43;
 	// tslint:disable:no-trailing-whitespace
 	public static readonly ruleNames: string[] = [
@@ -132,7 +132,7 @@ export class CPGLParser extends Parser {
 		"inferredByExpression", "informalOr", "informalAnd", "informalNot", "atom", 
 		"identifier", "decisionIdentifier", "decisionReference", "terminologyIdentifier", 
 		"terminologyReference", "activityIdentifier", "activityReference", "conceptIdentifier", 
-		"conceptReference", "patternIdentifier", "patternReference", "singleQuotedString", 
+		"conceptReference", "patternIdentifier", "patternReference", "backtickString", 
 		"activityTypeValue",
 	];
 
@@ -148,7 +148,7 @@ export class CPGLParser extends Parser {
 		"INFERRED", "AND", "OR", "NOT", "DONE", "HAS", "BY", "CODED", "VALUESET", 
 		"PERFORM", "ACTIVITY", "OF", "SYSTEM", "CODE", "UNKNOWN", "DO", "USE", 
 		"WHEN", "THEN", "ANY", "ALL", "DECISION", "ERROR", "COLON", "DOT", "LPAREN", 
-		"RPAREN", "QUOTED_STRING", "SINGLE_QUOTED_STRING", "WS", "COMMENT", "COMMENT_BLOCK", 
+		"RPAREN", "QUOTED_STRING", "BACKTICK_STRING", "WS", "COMMENT", "COMMENT_BLOCK", 
 		"ACTIVITY_TYPE", "ACTIVITY_WS", "ACTIVITY_COMMENT_BLOCK", "ACTIVITY_ErrorChar", 
 		"CONCEPT_TYPE", "CONCEPT_WS", "CONCEPT_COMMENT_BLOCK", "CONCEPT_ErrorChar", 
 		"CONCEPT_VALUE_TYPE", "VALUE_TYPE_WS", "VALUE_TYPE_COMMENT_BLOCK", "VALUE_TYPE_ErrorChar",
@@ -707,7 +707,7 @@ export class CPGLParser extends Parser {
 			case 2:
 				{
 				this.state = 164;
-				this.singleQuotedString();
+				this.backtickString();
 				}
 				break;
 
@@ -773,11 +773,11 @@ export class CPGLParser extends Parser {
 			this.state = 173;
 			this.match(CPGLParser.SYSTEM);
 			this.state = 174;
-			this.singleQuotedString();
+			this.backtickString();
 			this.state = 175;
 			this.match(CPGLParser.CODE);
 			this.state = 176;
-			this.singleQuotedString();
+			this.backtickString();
 			}
 		}
 		catch (re) {
@@ -1015,7 +1015,7 @@ export class CPGLParser extends Parser {
 			this.state = 217;
 			this.match(CPGLParser.PROVENANCE);
 			this.state = 218;
-			this.singleQuotedString();
+			this.backtickString();
 			this.state = 219;
 			this.match(CPGLParser.DOT);
 			}
@@ -1676,14 +1676,14 @@ export class CPGLParser extends Parser {
 		return _localctx;
 	}
 	// @RuleVersion(0)
-	public singleQuotedString(): SingleQuotedStringContext {
-		let _localctx: SingleQuotedStringContext = new SingleQuotedStringContext(this._ctx, this.state);
-		this.enterRule(_localctx, 84, CPGLParser.RULE_singleQuotedString);
+	public backtickString(): BacktickStringContext {
+		let _localctx: BacktickStringContext = new BacktickStringContext(this._ctx, this.state);
+		this.enterRule(_localctx, 84, CPGLParser.RULE_backtickString);
 		try {
 			this.enterOuterAlt(_localctx, 1);
 			{
 			this.state = 296;
-			this.match(CPGLParser.SINGLE_QUOTED_STRING);
+			this.match(CPGLParser.BACKTICK_STRING);
 			}
 		}
 		catch (re) {
@@ -1708,7 +1708,7 @@ export class CPGLParser extends Parser {
 			this.enterOuterAlt(_localctx, 1);
 			{
 			this.state = 298;
-			this.singleQuotedString();
+			this.backtickString();
 			}
 		}
 		catch (re) {
@@ -2389,8 +2389,8 @@ export class TerminologyStatementContext extends ParserRuleContext {
 	public terminologyValueset(): TerminologyValuesetContext | undefined {
 		return this.tryGetRuleContext(0, TerminologyValuesetContext);
 	}
-	public singleQuotedString(): SingleQuotedStringContext | undefined {
-		return this.tryGetRuleContext(0, SingleQuotedStringContext);
+	public backtickString(): BacktickStringContext | undefined {
+		return this.tryGetRuleContext(0, BacktickStringContext);
 	}
 	public terminologySystemCode(): TerminologySystemCodeContext | undefined {
 		return this.tryGetRuleContext(0, TerminologySystemCodeContext);
@@ -2458,13 +2458,13 @@ export class TerminologyValuesetContext extends ParserRuleContext {
 
 export class TerminologySystemCodeContext extends ParserRuleContext {
 	public SYSTEM(): TerminalNode { return this.getToken(CPGLParser.SYSTEM, 0); }
-	public singleQuotedString(): SingleQuotedStringContext[];
-	public singleQuotedString(i: number): SingleQuotedStringContext;
-	public singleQuotedString(i?: number): SingleQuotedStringContext | SingleQuotedStringContext[] {
+	public backtickString(): BacktickStringContext[];
+	public backtickString(i: number): BacktickStringContext;
+	public backtickString(i?: number): BacktickStringContext | BacktickStringContext[] {
 		if (i === undefined) {
-			return this.getRuleContexts(SingleQuotedStringContext);
+			return this.getRuleContexts(BacktickStringContext);
 		} else {
-			return this.getRuleContext(i, SingleQuotedStringContext);
+			return this.getRuleContext(i, BacktickStringContext);
 		}
 	}
 	public CODE(): TerminalNode { return this.getToken(CPGLParser.CODE, 0); }
@@ -2690,8 +2690,8 @@ export class HasValueTypeLineContext extends ParserRuleContext {
 export class ProvenanceLineContext extends ParserRuleContext {
 	public HAS(): TerminalNode { return this.getToken(CPGLParser.HAS, 0); }
 	public PROVENANCE(): TerminalNode { return this.getToken(CPGLParser.PROVENANCE, 0); }
-	public singleQuotedString(): SingleQuotedStringContext {
-		return this.getRuleContext(0, SingleQuotedStringContext);
+	public backtickString(): BacktickStringContext {
+		return this.getRuleContext(0, BacktickStringContext);
 	}
 	public DOT(): TerminalNode { return this.getToken(CPGLParser.DOT, 0); }
 	constructor(parent: ParserRuleContext | undefined, invokingState: number) {
@@ -3515,29 +3515,29 @@ export class PatternReferenceContext extends ParserRuleContext {
 }
 
 
-export class SingleQuotedStringContext extends ParserRuleContext {
-	public SINGLE_QUOTED_STRING(): TerminalNode { return this.getToken(CPGLParser.SINGLE_QUOTED_STRING, 0); }
+export class BacktickStringContext extends ParserRuleContext {
+	public BACKTICK_STRING(): TerminalNode { return this.getToken(CPGLParser.BACKTICK_STRING, 0); }
 	constructor(parent: ParserRuleContext | undefined, invokingState: number) {
 		super(parent, invokingState);
 	}
 	// @Override
-	public get ruleIndex(): number { return CPGLParser.RULE_singleQuotedString; }
+	public get ruleIndex(): number { return CPGLParser.RULE_backtickString; }
 	// @Override
 	public enterRule(listener: CPGLParserListener): void {
-		if (listener.enterSingleQuotedString) {
-			listener.enterSingleQuotedString(this);
+		if (listener.enterBacktickString) {
+			listener.enterBacktickString(this);
 		}
 	}
 	// @Override
 	public exitRule(listener: CPGLParserListener): void {
-		if (listener.exitSingleQuotedString) {
-			listener.exitSingleQuotedString(this);
+		if (listener.exitBacktickString) {
+			listener.exitBacktickString(this);
 		}
 	}
 	// @Override
 	public accept<Result>(visitor: CPGLParserVisitor<Result>): Result {
-		if (visitor.visitSingleQuotedString) {
-			return visitor.visitSingleQuotedString(this);
+		if (visitor.visitBacktickString) {
+			return visitor.visitBacktickString(this);
 		} else {
 			return visitor.visitChildren(this);
 		}
@@ -3546,8 +3546,8 @@ export class SingleQuotedStringContext extends ParserRuleContext {
 
 
 export class ActivityTypeValueContext extends ParserRuleContext {
-	public singleQuotedString(): SingleQuotedStringContext {
-		return this.getRuleContext(0, SingleQuotedStringContext);
+	public backtickString(): BacktickStringContext {
+		return this.getRuleContext(0, BacktickStringContext);
 	}
 	constructor(parent: ParserRuleContext | undefined, invokingState: number) {
 		super(parent, invokingState);

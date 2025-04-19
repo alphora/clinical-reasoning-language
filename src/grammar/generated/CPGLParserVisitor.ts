@@ -53,7 +53,7 @@ import { ConceptIdentifierContext } from "./CPGLParser";
 import { ConceptReferenceContext } from "./CPGLParser";
 import { PatternIdentifierContext } from "./CPGLParser";
 import { PatternReferenceContext } from "./CPGLParser";
-import { SingleQuotedStringContext } from "./CPGLParser";
+import { BacktickStringContext } from "./CPGLParser";
 import { ActivityTypeValueContext } from "./CPGLParser";
 
 
@@ -424,11 +424,11 @@ export interface CPGLParserVisitor<Result> extends ParseTreeVisitor<Result> {
 	visitPatternReference?: (ctx: PatternReferenceContext) => Result;
 
 	/**
-	 * Visit a parse tree produced by `CPGLParser.singleQuotedString`.
+	 * Visit a parse tree produced by `CPGLParser.backtickString`.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
-	visitSingleQuotedString?: (ctx: SingleQuotedStringContext) => Result;
+	visitBacktickString?: (ctx: BacktickStringContext) => Result;
 
 	/**
 	 * Visit a parse tree produced by `CPGLParser.activityTypeValue`.
