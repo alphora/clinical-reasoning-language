@@ -36,7 +36,7 @@ activity "Vaccinate" perform CPGImmunization.
 
   it('should correctly structure activity with type and terminology', () => {
     const input = `
-activity "Indicate" perform CPGProposeDiagnosis of "Colonoscopy".
+activity "Indicate" perform CPGProposeDiagnosisTask of "Colonoscopy".
 `;
 
     const result = parseInput(input);
@@ -45,7 +45,40 @@ activity "Indicate" perform CPGProposeDiagnosis of "Colonoscopy".
     // Verify basic activity structure
     expect(activity.type).toBe('Activity');
     expect(activity.name).toBe('Indicate');
-    expect(activity.perform).toBe('CPGProposeDiagnosis');
+    expect(activity.perform).toBe('CPGProposeDiagnosisTask');
     expect(activity.terminologyReference).toBe('Colonoscopy');
+  });
+
+  it('should correctly structure activity with type and stringLiteral', () => {
+    const input = `
+activity "another thing" perform CPGCommunicationRequest of "The message".
+`;
+
+    const result = parseInput(input);
+    const activity = result.statements[0] as Activity;
+
+    // Verify structure for stringLiteral
+    expect(activity.type).toBe('Activity');
+    expect(activity.name).toBe('another thing');
+    expect(activity.perform).toBe('CPGCommunicationRequest');
+    expect(activity.customText).toBe('The message');
+    expect(activity.terminologyReference).toBeUndefined();
+  });
+
+  it('should correctly structure activity with type and terminology or stringLiteral', () => {
+    const input1 = `activity "Indicate" perform CPGProposeDiagnosisTask of "Colonoscopy".`;
+    const input2 = `activity "Notify" perform CPGCommunicationRequest of "A notification message".`;
+
+    const result1 = parseInput(input1);
+    const result2 = parseInput(input2);
+    const activity1 = result1.statements[0] as Activity;
+    const activity2 = result2.statements[0] as Activity;
+
+    // Terminology reference
+    expect(activity1.terminologyReference).toBe('Colonoscopy');
+    expect(activity1.customText).toBeUndefined();
+    // String literal
+    expect(activity2.customText).toBe('A notification message');
+    expect(activity2.terminologyReference).toBeUndefined();
   });
 }); 

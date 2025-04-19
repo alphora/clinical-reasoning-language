@@ -152,10 +152,30 @@ export class CPGLAstBuilder extends AbstractParseTreeVisitor<ASTNode> implements
   }
 
   visitActivityStatement(ctx: ActivityStatementContext): Activity {
-    const name = ctx.activityIdentifier().text.slice(1,-1);
-    const perform = ctx.ACTIVITY_TYPE().text as ActivityType;
-    const terminologyRef = ctx.terminologyReference()?.text.slice(1,-1);
-    return { type: 'Activity', name, perform, terminologyReference: terminologyRef, location: getLocation(ctx) };
+    const name = ctx.activityIdentifier()!.text.slice(1,-1);
+    const perform = ctx.ACTIVITY_TYPE()!.text as ActivityType;
+    let terminologyReference: string | undefined;
+    let customText: string | undefined;
+
+    // [DEBUGGING] Print children and their types
+    if (ctx.children) {
+      console.log('[DEBUGGING] activityStatement children:', ctx.children.map(c => {
+        const ruleCtx = c as any;
+        return {
+          text: ruleCtx.getText ? ruleCtx.getText() : String(c),
+          type: c.constructor.name
+        };
+      }));
+    }
+
+    if (ctx.terminologyReference()) {
+      terminologyReference = ctx.terminologyReference()!.text.slice(1, -1);
+    }
+    if (ctx.stringLiteral()) {
+      customText = ctx.stringLiteral()!.text.replace(/^['"]|['"]$/g, "");
+    }
+
+    return { type: 'Activity', name, perform, terminologyReference, customText, location: getLocation(ctx) };
   }
 
   visitConceptStatement(ctx: ConceptStatementContext): Concept {
@@ -225,7 +245,7 @@ export class CPGLAstBuilder extends AbstractParseTreeVisitor<ASTNode> implements
 
   visitInformalNot(ctx: InformalNotContext): NotExpression | any {
     if (ctx.NOT()) {
-      return { type: NotExpressionType.type, expression: this.visit(ctx.informalNot()!), location: getLocation(ctx) };
+      return { type: NotExpressionType.type, expression: this.visit(ctx.informalNot()!) as NotExpression, location: getLocation(ctx) };
     }
     return this.visit(ctx.atom()!);
   }

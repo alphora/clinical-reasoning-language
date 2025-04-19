@@ -364,8 +364,6 @@ The expression `[*].action` in these mapping rules means an arbitrary nesting of
 
 - `plandef-condition-expression` = `PlanDef.action.condition.expression.expression.toIdentifier()` or `[*].action.condition.expression.expression.toIdentifier()`
 
-- `plandef-markdown` = `PlanDef.action.valueMarkdown.toString()` or `[*].action.valueMarkdown.toString()`
-
 - `plandef-title` = `PlanDef.action.title.toIdentifier()` or `[*].action.title.toIdentifier()`
 
 - `plandef-description` = `PlanDef.action.description.toIdentifier()` or `[*].action.description.toIdentifier()` (note, `plandef-description` is different than `Description`)
@@ -520,7 +518,6 @@ Instance: IMMZD2DTMeaslesDose0
 - activitydef-description > decision.when.do
 - plandef-rationale > decision.rationale
 - plandef-description > decision.comment
-- plandef-markdown > decision.comment
 - activitydef > activity
 - activitydef-description > activity.identifier
 - activitydef-kind > activity.perform

@@ -37,6 +37,9 @@ export function printAST(node: ASTNode, indent = 0): string {
   if ('qualifier' in node && node.qualifier) {
     output += `${spaces}  qualifier: "${node.qualifier}"\n`;
   }
+  if ('customText' in node && node.customText) {
+    output += `${spaces}  customText: "${node.customText}"\n`;
+  }
 
   // Handle statements
   if ('statements' in node && Array.isArray(node.statements)) {
