@@ -54,29 +54,29 @@ done
 
 //rationale
 
-terminology "BMI Range as a Condition" ''.
+terminology "BMI Range as a Condition" ``.
 
-terminology "BMI as an Observation" valueset 'BMI as an Observation'.
+terminology "BMI as an Observation" valueset `BMI as an Observation`.
 
-terminology "Height Valueset" valueset 'height valueset'. 
+terminology "Height Valueset" valueset `height valueset`. 
 
-terminology "Weight Valueset" valueset 'weight valueset'. 
+terminology "Weight Valueset" valueset `weight valueset`. 
 
-terminology "some terminology" ''.
+terminology "some terminology" ``.
 
-terminology "Colonoscopy" system 'http://snomed.info/sct' code '73761001'.
+terminology "Colonoscopy" system `http://snomed.info/sct` code `73761001`.
 
 activity "Vaccinate" perform CPGImmunizationRequest. //CPGImmunizationRequest is an ACTIVITY_TYPE
 
 activity "Indicate" perform CPGProposeDiagnosis of "Colonoscopy". //of references a terminology (or string)
 
-activity "another thing" perform CPGCommunicationRequest of 'The message'. //of references a string (or terminology)
+activity "another thing" perform CPGCommunicationRequest of `Because it's the right thing to do`. //of references a string (or terminology)
 
 // comments go into the auto generated README and, CQL when applicable
 concept "Most Recent BMI":
     has type Observation. //Observation is a CONCEPT_TYPE
     has valuetype boolean. //boolean is a CONCEPT_VALUE_TYPE
-    has provenance 'some provenance'.
+    has provenance `some provenance`.
     inferred by "Most Recent(this, lookbackMonths)" "BMI". //"Most Recent" is a reference to a CQL expression (that will be resolved by the parser) and is optional.  "BMI" is a reference to another concept.
 done
 

@@ -49,7 +49,7 @@ export class CPGLLexer extends Lexer {
 	public static readonly LPAREN = 31;
 	public static readonly RPAREN = 32;
 	public static readonly QUOTED_STRING = 33;
-	public static readonly SINGLE_QUOTED_STRING = 34;
+	public static readonly BACKTICK_STRING = 34;
 	public static readonly WS = 35;
 	public static readonly COMMENT = 36;
 	public static readonly COMMENT_BLOCK = 37;
@@ -84,7 +84,7 @@ export class CPGLLexer extends Lexer {
 		"AND", "OR", "NOT", "DONE", "HAS", "BY", "CODED", "VALUESET", "PERFORM", 
 		"ACTIVITY", "OF", "SYSTEM", "CODE", "UNKNOWN", "DO", "USE", "WHEN", "THEN", 
 		"ANY", "ALL", "DECISION", "ERROR", "COLON", "DOT", "LPAREN", "RPAREN", 
-		"QUOTED_STRING", "SINGLE_QUOTED_STRING", "BLOCK_COMMENT", "WS", "COMMENT", 
+		"QUOTED_STRING", "BACKTICK_STRING", "BLOCK_COMMENT", "WS", "COMMENT", 
 		"COMMENT_BLOCK", "ACTIVITY_TYPE", "ACTIVITY_WS", "ACTIVITY_COMMENT_BLOCK", 
 		"ACTIVITY_ErrorChar", "CONCEPT_TYPE", "CONCEPT_WS", "CONCEPT_COMMENT_BLOCK", 
 		"CONCEPT_ErrorChar", "CONCEPT_VALUE_TYPE", "VALUE_TYPE_WS", "VALUE_TYPE_COMMENT_BLOCK", 
@@ -103,7 +103,7 @@ export class CPGLLexer extends Lexer {
 		"INFERRED", "AND", "OR", "NOT", "DONE", "HAS", "BY", "CODED", "VALUESET", 
 		"PERFORM", "ACTIVITY", "OF", "SYSTEM", "CODE", "UNKNOWN", "DO", "USE", 
 		"WHEN", "THEN", "ANY", "ALL", "DECISION", "ERROR", "COLON", "DOT", "LPAREN", 
-		"RPAREN", "QUOTED_STRING", "SINGLE_QUOTED_STRING", "WS", "COMMENT", "COMMENT_BLOCK", 
+		"RPAREN", "QUOTED_STRING", "BACKTICK_STRING", "WS", "COMMENT", "COMMENT_BLOCK", 
 		"ACTIVITY_TYPE", "ACTIVITY_WS", "ACTIVITY_COMMENT_BLOCK", "ACTIVITY_ErrorChar", 
 		"CONCEPT_TYPE", "CONCEPT_WS", "CONCEPT_COMMENT_BLOCK", "CONCEPT_ErrorChar", 
 		"CONCEPT_VALUE_TYPE", "VALUE_TYPE_WS", "VALUE_TYPE_COMMENT_BLOCK", "VALUE_TYPE_ErrorChar",
@@ -374,7 +374,7 @@ export class CPGLLexer extends Lexer {
 		"6\x02\x1B8\x02\x1C:\x02\x1D<\x02\x1E>\x02\x1F@\x02 B\x02!D\x02\"F\x02" +
 		"#H\x02$J\x02\x02L\x02%N\x02&P\x02\'R\x02(T\x02)V\x02*X\x02+Z\x02,\\\x02" +
 		"-^\x02.`\x02/b\x020d\x021f\x022h\x023\x06\x02\x03\x04\x05\x07\x06\x02" +
-		"\f\f\x0F\x0F$$^^\x04\x02))^^\x05\x02\v\f\x0F\x0F\"\"\x04\x02\f\f\x0F\x0F" +
+		"\f\f\x0F\x0F$$^^\x04\x02^^bb\x05\x02\v\f\x0F\x0F\"\"\x04\x02\f\f\x0F\x0F" +
 		"\x04\x02C\\c|\x02\u01A7\x02\x06\x03\x02\x02\x02\x02\b\x03\x02\x02\x02" +
 		"\x02\n\x03\x02\x02\x02\x02\f\x03\x02\x02\x02\x02\x0E\x03\x02\x02\x02\x02" +
 		"\x10\x03\x02\x02\x02\x02\x12\x03\x02\x02\x02\x02\x14\x03\x02\x02\x02\x02" +
@@ -466,11 +466,11 @@ export class CPGLLexer extends Lexer {
 		"\n\x02\x02\x02\u0127\u0126\x03\x02\x02\x02\u0128\u012B\x03\x02\x02\x02" +
 		"\u0129\u0127\x03\x02\x02\x02\u0129\u012A\x03\x02\x02\x02\u012A\u012C\x03" +
 		"\x02\x02\x02\u012B\u0129\x03\x02\x02\x02\u012C\u012D\x07$\x02\x02\u012D" +
-		"G\x03\x02\x02\x02\u012E\u0134\x07)\x02\x02\u012F\u0133\n\x03\x02\x02\u0130" +
+		"G\x03\x02\x02\x02\u012E\u0134\x07b\x02\x02\u012F\u0133\n\x03\x02\x02\u0130" +
 		"\u0131\x07^\x02\x02\u0131\u0133\v\x02\x02\x02\u0132\u012F\x03\x02\x02" +
 		"\x02\u0132\u0130\x03\x02\x02\x02\u0133\u0136\x03\x02\x02\x02\u0134\u0132" +
 		"\x03\x02\x02\x02\u0134\u0135\x03\x02\x02\x02\u0135\u0137\x03\x02\x02\x02" +
-		"\u0136\u0134\x03\x02\x02\x02\u0137\u0138\x07)\x02\x02\u0138I\x03\x02\x02" +
+		"\u0136\u0134\x03\x02\x02\x02\u0137\u0138\x07b\x02\x02\u0138I\x03\x02\x02" +
 		"\x02\u0139\u013A\x071\x02\x02\u013A\u013B\x07,\x02\x02\u013B\u013F\x03" +
 		"\x02\x02\x02\u013C\u013E\v\x02\x02\x02\u013D\u013C\x03\x02\x02\x02\u013E" +
 		"\u0141\x03\x02\x02\x02\u013F\u0140\x03\x02\x02\x02\u013F\u013D\x03\x02" +

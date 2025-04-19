@@ -42,9 +42,9 @@ QUOTED_STRING
     : '"' ( ~["\\\r\n] )* '"'
     ;
 
-// Single-quoted string literal (for markdown or free text)
-SINGLE_QUOTED_STRING
-    : '\'' ( ~['\\] | '\\' . )* '\''
+// Backtick-quoted string literal (for markdown or free text)
+BACKTICK_STRING
+    : '`' ( ~[`\\] | '\\' . )* '`'
     ;
 
 // Block comment fragment
