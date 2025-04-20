@@ -1,0 +1,7 @@
+canonical: http://example.org/fsh/measles
+fhirVersion: 4.0.1
+FSHOnly: true
+name: MeaslesFSH
+id: measles-fsh
+status: draft
+version: 1.0.0 

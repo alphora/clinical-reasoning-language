@@ -553,3 +553,18 @@ function isValidActivityType(type: string): type is ActivityType {
 - This ensures a **single source of truth** for all grammar-driven types.
 - No more manual updates or risk of drift between grammar and code.
 - All validation, error reporting, and type checking use the same lists.
+
+## FSH-to-CPGL Transformer
+
+This project includes a transformer that converts FHIR Shorthand (FSH) files into Clinical Practice Guideline Language (CPG-L) files. The transformer is located in `src/transformer/fsh-to-cpgl/`.
+
+### Example Data: WHO Measles Immunization
+
+The example FSH files and CPG-L outputs in `src/examples/fsh/who/measles/` and `src/examples/cpgl/who/measles/` are derived from the [WHO SMART Guidelines - Example IG for Measles Immunization](https://github.com/WorldHealthOrganization/smart-example-immz).
+
+- **Source repository:** [WorldHealthOrganization/smart-example-immz](https://github.com/WorldHealthOrganization/smart-example-immz)
+- **License:** [CC BY-IGO 3.0](https://github.com/WorldHealthOrganization/smart-example-immz/blob/main/LICENSE.md)
+
+These examples are used for development, testing, and demonstration of the transformer.
+
+---

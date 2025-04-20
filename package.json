@@ -41,6 +41,7 @@
     "cli:ast:pretty": "ts-node src/cli/run-ast.ts --pretty",
     "cli:validator": "ts-node src/cli/run-validator.ts",
     "cli:validator:pretty": "ts-node src/cli/run-validator.ts --pretty",
+    "cli:sushi-loader": "ts-node src/cli/run-sushi-loader.ts",
     "prebuild": "npm run clean",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
