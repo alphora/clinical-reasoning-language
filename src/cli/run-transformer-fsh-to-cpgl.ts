@@ -1,5 +1,6 @@
 import path from 'path';
 import { loadFSH } from '../transformer/fsh-to-cpgl/sushi-loader';
+import { transformFSHToCPGL } from '../transformer/fsh-to-cpgl/transformer';
 
 // Get the FSH directory path from command line args or use default
 const inputPath = process.argv[2]
@@ -9,13 +10,13 @@ const inputPath = process.argv[2]
 (async () => {
   try {
     console.log(`[DEBUGGING] Loading FSH files from: ${inputPath}`);
-    const result = await loadFSH({ path: inputPath });
-    console.log(`[DEBUGGING] Loaded ${result.instances.length} FSH instances.`);
-    result.instances.forEach(inst => {
-      console.log(`[DEBUGGING] Instance: ${inst.name} (InstanceOf: ${inst.instanceOf})`);
-    });
+    const fshResult = await loadFSH({ path: inputPath });
+    console.log(`[DEBUGGING] Loaded ${fshResult.instances.length} FSH instances.`);
+    const cpglOutput = transformFSHToCPGL(fshResult);
+    console.log('[DEBUGGING] Generated CPG-L output:\n');
+    console.log(cpglOutput);
   } catch (err) {
-    console.error('[DEBUGGING] Error loading FSH:', err);
+    console.error('[DEBUGGING] Error in transformer CLI:', err);
     process.exit(1);
   }
 })(); 

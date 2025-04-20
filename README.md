@@ -109,6 +109,20 @@ The validator tool checks the AST for errors and displays:
 - Error messages with line and column numbers
 - Warning messages with line and column numbers
 
+### FSH-to-CPGL Transformer Tool
+
+```bash
+# Run the FSH-to-CPGL transformer on the example FSH files
+yarn cli:transformer:fsh-to-cpgl
+# or
+npm run cli:transformer:fsh-to-cpgl
+
+# Optionally specify a different FSH directory
+npm run cli:transformer:fsh-to-cpgl -- path/to/your/fsh-folder
+```
+
+This tool loads FHIR Shorthand (FSH) files (using SUSHI), applies the FSH-to-CPGL transformation, and prints the generated CPG-L output. It is located at `src/cli/run-transformer-fsh-to-cpgl.ts` and is invoked via the `cli:transformer:fsh-to-cpgl` script.
+
 ## Features
 
 ### Language Features
