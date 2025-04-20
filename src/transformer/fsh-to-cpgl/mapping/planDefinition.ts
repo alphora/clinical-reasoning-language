@@ -3,10 +3,7 @@ const PLAN_DEFINITION_URLS = [
   'http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-recommendationdefinition'
 ];
 
-const ACTIVITY_DEFINITION_URLS = [
-  'http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-actiondefinition',
-  // Add more ActivityDefinition URLs here if needed
-];
+import { ACTIVITY_DEFINITION_URLS } from './activityDefinition';
 
 import { toIdentifier, toString } from '../utils/fshPathFunctions';
 
