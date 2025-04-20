@@ -368,7 +368,7 @@ The expression `[*].action` in these mapping rules means an arbitrary nesting of
 
 - `plandef-title` = `PlanDef.action.title.toIdentifier()` or `[*].action.title.toIdentifier()`
 
-- `plandef-description` = `PlanDef.action.description.toIdentifier()` or `[*].action.description.toIdentifier()` (note, `plandef-description` is different than `Description`)
+- `plandef-action-description` = `PlanDef.action.description.toIdentifier()` or `[*].action.description.toIdentifier()` (note, `plandef-action-description` is different than `Description`)
 
 - `plandef-rationale` = `PlanDef.extension.valueMarkdown.toString()` or `[*].action.extension.valueMarkdown.toString()`
 
