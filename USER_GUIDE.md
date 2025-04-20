@@ -211,7 +211,6 @@ The following are all reserved keywords in CPGL:
 - `coded`
 - `code`
 - `concept`
-- `condition`
 - `decision`
 - `do`
 - `done`
