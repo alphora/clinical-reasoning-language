@@ -4,7 +4,6 @@ import {
   SingleAction,
   SingleActionType,
   Concept,
-  ConceptType,
   CodedByDefinition,
   CodedByDefinitionType,
   InferredByDefinition,
@@ -18,7 +17,6 @@ import {
   TerminologyType,
   TerminologySystemCode,
   TerminologySystemCodeType,
-  TerminologyUnknownType,
   TerminologyValueset,
   TerminologyValuesetType,
   WhenBlock,
@@ -27,7 +25,7 @@ import {
   ActionStatement,
 } from '../types';
 
-import { parseInput } from './index.test';
+import { parseInput } from './parseInput';
 
 describe('CPGLAstBuilder', () => {
   describe('Decision Statements', () => {
