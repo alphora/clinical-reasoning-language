@@ -122,22 +122,48 @@ function parseActions(rules: any[], basePath = 'action'): ActionNode[] {
   return nodes;
 }
 
+import { toIdentifier } from '../utils/fshPathFunctions';
+
 export function mapPlanDefinitionToDecision(instance: any): { decision: string, activities: { name: string, original: string }[] } {
+  // Use instanceOf directly to check PlanDefinition type
   if (!PLAN_DEFINITION_URLS.includes(instance.instanceOf)) {
     return { decision: '', activities: [] };
   }
-  const decisionName = instance.name || '[UnnamedPlanDefinition]';
+  // Prefer direct property for description, fallback to rule if missing
+  let description = instance.description;
+  if (!description) {
+    const descriptionRule = (instance.rules || []).find((r: any) => r.path === 'Description');
+    description = descriptionRule ? descriptionRule.value : undefined;
+  }
+  description = description ? toIdentifier(description) : '[UnnamedPlanDefinition]';
+
+  // Citation: only extract from rules, not from instance property
+  const citationRule = (instance.rules || []).find((r: any) => r.path === 'relatedArtifact[=].citation');
+  const citation = citationRule ? toIdentifier(citationRule.value) : '';
+
   let output = '';
   // [DEBUGGING] Print all rules for this instance
-  console.log(`[DEBUGGING] All rules for instance ${decisionName}:`);
+  console.log(`[DEBUGGING] All rules for instance ${instance.name || '[UnnamedPlanDefinition]'}:`);
   for (const rule of (instance.rules || [])) {
     console.log(`[DEBUGGING]   path: ${rule.path}  value: ${rule.value}`);
   }
-  // Use the new parser
+  // [DEBUGGING] Print all top-level rule paths for this instance
+  console.log('[DEBUGGING] Top-level rule paths:');
+  for (const rule of (instance.rules || [])) {
+    if (!rule.path.includes('.')) {
+      console.log(`[DEBUGGING]   path: ${rule.path}  value: ${rule.value}`);
+    }
+  }
+  // Add citation as a comment if present
+  if (citation) {
+    output += `// ${citation}\n`;
+  }
+  // Use description as the decision identifier
+  output += `decision ${description}:\n`;
+
   const actionTree = parseActions(instance.rules || []);
   // [DEBUGGING] Print the entire constructed action tree
   console.log('[DEBUGGING] Constructed action tree:', JSON.stringify(actionTree, null, 2));
-  output += `decision "${decisionName}":\n`;
 
   const activities: { name: string, original: string }[] = [];
   const emittedActivities = new Set<string>();
