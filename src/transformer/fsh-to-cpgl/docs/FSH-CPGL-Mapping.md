@@ -512,10 +512,13 @@ Instance: IMMZD2DTMeaslesDose0
 - plandef-description > decision.identifier
 - plandef-citation > decision.comment
 - plandef-action > decision.when
+- plandef-condition-expression  > decision.when.identifier
 - plandef-canonical > decision.when.use
-- plandef-condition.expression > decision.when.identifier
-- plandef-title > decision.when.identifier
 - activitydef-description > decision.when.do
+
+- plandef-condition > concept
+- plandef-condition-expression > concept.identifier
+
 - plandef-rationale > decision.rationale
 - plandef-description > decision.comment
 - activitydef > activity
