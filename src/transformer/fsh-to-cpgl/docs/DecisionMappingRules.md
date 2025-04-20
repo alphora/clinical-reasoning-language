@@ -8,7 +8,7 @@
 - decision.comment < plandef-citation
 - decision.when < plandef-action
 - decision.when.identifier < plandef-condition-expression 
-- decision.when.use < - plandef-canonical 
+- decision.when.use < plandef-canonical 
 
 > 
 

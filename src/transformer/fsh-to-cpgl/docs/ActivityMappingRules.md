@@ -1,4 +1,16 @@
 
+We should finish off activity.
+
+Here are the rules:
+
+
+Some of that is done but not all.
+
+Investigate and report back.
+
+Note, I thin we're creating a do even when the definitionCanonical doesn't reference an ActivityDefinition.  In that case we should traverse and create new decisions, not create a 
+
+
 - decision.when.do:
 if action.definitionCanonical references a ActivityDefinition in any of the fsh files then
     // create a activity from the ActivityDefinition
@@ -19,4 +31,4 @@ else
     - activity.identifier < plandef-condition-expression
     - activity.perform < CPGCommunicationRequest
     // only add a message to CPGCommunicationRequest
-    - activity.perform.of < plandef-description
+    - activity.perform.of < plandef-action-description

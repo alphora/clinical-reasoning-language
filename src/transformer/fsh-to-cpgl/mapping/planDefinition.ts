@@ -3,52 +3,14 @@ const PLAN_DEFINITION_URLS = [
   'http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-recommendationdefinition'
 ];
 
+import { toIdentifier, toString } from '../utils/fshPathFunctions';
+
 interface ActionNode {
   title?: string;
+  description?: string;
   conditionExpression?: string;
   definitionCanonical?: string;
   children: ActionNode[];
-}
-
-function buildActionTreeFromRules(rules: any[], parentPath = 'action'): ActionNode[] {
-  // Find all unique action base paths at this level (e.g., 'action[=]', 'action[=].action[=]')
-  const actionBasePaths = new Set<string>();
-  for (const rule of rules) {
-    const match = rule.path.match(new RegExp(`^${parentPath}\[=\]`));
-    if (match) {
-      // The base path is up to the next property or nested action
-      const basePathMatch = rule.path.match(new RegExp(`^(${parentPath}\[=\])`));
-      if (basePathMatch) {
-        actionBasePaths.add(basePathMatch[1]);
-      }
-    }
-  }
-  const nodes: ActionNode[] = [];
-  for (const basePath of Array.from(actionBasePaths)) {
-    // All rules for this action node
-    const actionRules = rules.filter((r: any) => r.path.startsWith(basePath));
-    const titleRule = actionRules.find((r: any) => r.path === `${basePath}.title`);
-    // Find the first condition.expression.expression (if any)
-    const conditionRule = actionRules.find((r: any) => r.path.endsWith('.condition[=].expression.expression'));
-    const definitionCanonicalRule = actionRules.find((r: any) => r.path === `${basePath}.definitionCanonical`);
-    // Recursively build children
-    const children = buildActionTreeFromRules(rules, `${basePath}.action`);
-    const node: ActionNode = {
-      title: titleRule ? titleRule.value : undefined,
-      conditionExpression: conditionRule ? conditionRule.value : undefined,
-      definitionCanonical: definitionCanonicalRule ? definitionCanonicalRule.value : undefined,
-      children
-    };
-    // [DEBUGGING] Log the node
-    console.log(`[DEBUGGING] Built ActionNode:`, JSON.stringify(node, null, 2));
-    nodes.push(node);
-  }
-  return nodes;
-}
-
-function normalizeActivityName(title: string): string {
-  const base = title.replace(/[^a-zA-Z0-9]/g, '');
-  return base.charAt(0).toUpperCase() + base.slice(1);
 }
 
 function emitWhenBlocksRecursive(
@@ -56,76 +18,83 @@ function emitWhenBlocksRecursive(
   activities: { name: string, original: string }[],
   emittedActivities: Set<string>,
   allInstances: any[],
+  instance: any,
   indent = '    '
 ): string {
   let output = '';
   for (const node of nodes) {
-    if (node.conditionExpression) {
+    if (!node.conditionExpression) {
       if (node.children.length > 0) {
-        output += `${indent}when "${node.conditionExpression}" then:\n`;
-        output += emitWhenBlocksRecursive(node.children, activities, emittedActivities, allInstances, indent + '    ');
-        output += `${indent}done\n`;
-      } else {
-        const activityName = node.title ? normalizeActivityName(node.title) : 'UnnamedActivity';
-        let useEmitted = false;
-        let doEmitted = false;
-        // Handle definitionCanonical navigation
-        if (node.definitionCanonical) {
-          // Remove Canonical() wrapper if present
-          let canonicalValueStr: string | undefined = undefined;
-          if (typeof node.definitionCanonical === 'string') {
-            if (node.definitionCanonical.startsWith('Canonical(')) {
-              canonicalValueStr = node.definitionCanonical.replace(/^Canonical\((.*)\)$/, '$1');
-            } else {
-              canonicalValueStr = node.definitionCanonical;
-            }
-          } else if (typeof node.definitionCanonical === 'object' && 'entityName' in node.definitionCanonical) {
-            canonicalValueStr = (node.definitionCanonical as { entityName: string }).entityName;
-          }
-          if (canonicalValueStr) {
-            // Find referenced instance
-            const referenced = allInstances.find(inst => inst.name === canonicalValueStr);
-            if (referenced) {
-              // Check if it's a PlanDefinition
-              if (PLAN_DEFINITION_URLS.includes(referenced.instanceOf)) {
-                // Use its description as identifier
-                let refDescription = referenced.description;
-                if (!refDescription) {
-                  const descRule = (referenced.rules || []).find((r: any) => r.path === 'Description');
-                  refDescription = descRule ? descRule.value : '[UnnamedPlanDefinition]';
-                }
-                const useIdentifier = toIdentifier(refDescription);
-                output += `${indent}use ${useIdentifier}.\n`;
-                useEmitted = true;
-              } else {
-                // ActivityDefinition: emit do as before
-                output += `${indent}do "${activityName}".\n`;
-                if (!emittedActivities.has(activityName)) {
-                  activities.push({ name: activityName, original: `activity "${activityName}" perform ... // TODO: activity details\n` });
-                  emittedActivities.add(activityName);
-                }
-                doEmitted = true;
-              }
-            }
-          }
-        }
-        // If not already emitted do, emit do for leaf node
-        if (!doEmitted) {
-          output += `${indent}when "${node.conditionExpression}" then do "${activityName}".\n`;
-          if (!emittedActivities.has(activityName)) {
-            activities.push({ name: activityName, original: `activity "${activityName}" perform ... // TODO: activity details\n` });
-            emittedActivities.add(activityName);
-          }
-        }
+        output += emitWhenBlocksRecursive(node.children, activities, emittedActivities, allInstances, instance, indent);
       }
-    } else if (node.children.length > 0) {
-      output += emitWhenBlocksRecursive(node.children, activities, emittedActivities, allInstances, indent);
+      continue;
+    }
+    if (node.children.length > 0 && node.definitionCanonical) {
+      throw new Error('[emitWhenBlocksRecursive] Node has both children and definitionCanonical, which is ambiguous and violates the grammar.');
+    }
+    if (node.children.length > 0) {
+      output += `${indent}when "${node.conditionExpression}" then:\n`;
+      output += emitWhenBlocksRecursive(node.children, activities, emittedActivities, allInstances, instance, indent + '    ');
+      output += `${indent}done\n`;
+      continue;
+    }
+ 
+    let canonicalValueStr: string | undefined = undefined;
+    if (node.definitionCanonical) {
+      if (typeof node.definitionCanonical === 'string') {
+        if (node.definitionCanonical.startsWith('Canonical(')) {
+          canonicalValueStr = node.definitionCanonical.replace(/^Canonical\((.*)\)$/, '$1');
+        } else {
+          canonicalValueStr = node.definitionCanonical;
+        }
+      } else if (typeof node.definitionCanonical === 'object' && 'entityName' in node.definitionCanonical) {
+        canonicalValueStr = (node.definitionCanonical as { entityName: string }).entityName;
+      }
+    }
+    const activityName = node.title ? toIdentifier(node.title) : 'UnnamedActivity';
+    const activityDescription = node.description ? toString(node.description)  : 'TODO: fill in message.';
+    // Generate a unique identifier for this activity (name + hash of description)
+    let doIdentifier = activityName;
+    let hasPlanDef = false;
+    let hasActivityDef = false;
+    let useIdentifier = '';
+    if (canonicalValueStr) {
+      const referenced = allInstances.find(inst => inst.name === canonicalValueStr);
+      if (referenced && PLAN_DEFINITION_URLS.includes(referenced.instanceOf)) {
+        hasPlanDef = true;
+        let refDescription = referenced.description;
+        if (!refDescription) {
+          const descRule = (referenced.rules || []).find((r: any) => r.path === 'Description');
+          refDescription = descRule ? descRule.value : '[UnnamedPlanDefinition]';
+        }
+        useIdentifier = toIdentifier(refDescription);
+      } else if (referenced) {
+        hasActivityDef = true;
+      }
+    }
+    output += `${indent}when "${node.conditionExpression}" then`;
+    if (hasPlanDef && hasActivityDef) {
+      output += `:\n`;
+      output += `${indent}    use ${useIdentifier}.\n`;
+      output += `${indent}    do ${doIdentifier}.\n`;
+      output += `${indent}done\n`;
+      activities.push({ name: doIdentifier, original: `activity ${doIdentifier} perform ... // TODO: activity details.\n` });
+    } else if (hasPlanDef) {
+      output += ` use ${useIdentifier}.\n`;
+    } else if (hasActivityDef) {
+      output += ` do ${doIdentifier}.\n`;
+      activities.push({ name: doIdentifier, original: `activity ${doIdentifier} perform ... // TODO: activity details.\n` });
+    } else {
+      // Neither: emit a CPGCommunicationRequest activity (unique per name+description)
+      output += ` do ${doIdentifier}.\n`;
+      activities.push({ name: doIdentifier, original: `activity ${doIdentifier} perform CPGCommunicationRequest of ${activityDescription}.\n` });
+
     }
   }
   return output;
 }
 
-// New: Parse FSH rules into a hierarchical action tree using action[+]/action[=] semantics
+// Update parseActions to extract description
 function parseActions(rules: any[], basePath = 'action'): ActionNode[] {
   const nodes: ActionNode[] = [];
   let currentNode: ActionNode | null = null;
@@ -159,6 +128,7 @@ function parseActions(rules: any[], basePath = 'action'): ActionNode[] {
       } else {
         // Property of the current node
         if (subPath === '.title') currentNode.title = rule.value;
+        if (subPath === '.description') currentNode.description = rule.value;
         if (subPath.endsWith('.condition[=].expression.expression')) currentNode.conditionExpression = rule.value;
         if (subPath === '.definitionCanonical') currentNode.definitionCanonical = rule.value;
       }
@@ -168,61 +138,36 @@ function parseActions(rules: any[], basePath = 'action'): ActionNode[] {
   return nodes;
 }
 
-import { toIdentifier } from '../utils/fshPathFunctions';
-
 export function mapPlanDefinitionToDecision(instance: any, allInstances: any[]): { decision: string, activities: { name: string, original: string }[] } {
-  // Use instanceOf directly to check PlanDefinition type
   if (!PLAN_DEFINITION_URLS.includes(instance.instanceOf)) {
     return { decision: '', activities: [] };
   }
-  // Prefer direct property for description, fallback to rule if missing
   let description = instance.description;
   if (!description) {
     const descriptionRule = (instance.rules || []).find((r: any) => r.path === 'Description');
     description = descriptionRule ? descriptionRule.value : undefined;
   }
   description = description ? toIdentifier(description) : '[UnnamedPlanDefinition]';
-
-  // Citation: only extract from rules, not from instance property
   const citationRule = (instance.rules || []).find((r: any) => r.path === 'relatedArtifact[=].citation');
-  const citation = citationRule ? toIdentifier(citationRule.value) : '';
-
+  const citation = citationRule ? toString(citationRule.value) : '';
   let output = '';
-  // [DEBUGGING] Print all rules for this instance
-  console.log(`[DEBUGGING] All rules for instance ${instance.name || '[UnnamedPlanDefinition]'}:`);
-  for (const rule of (instance.rules || [])) {
-    console.log(`[DEBUGGING]   path: ${rule.path}  value: ${rule.value}`);
-  }
-  // [DEBUGGING] Print all top-level rule paths for this instance
-  console.log('[DEBUGGING] Top-level rule paths:');
-  for (const rule of (instance.rules || [])) {
-    if (!rule.path.includes('.')) {
-      console.log(`[DEBUGGING]   path: ${rule.path}  value: ${rule.value}`);
-    }
-  }
-  // Add instance name as a comment if present
   if (instance.name) {
     output += `// Instance: ${instance.name}\n`;
   }
-  // Add title as a comment if present
   if (instance.title) {
     output += `// Title: ${instance.title}\n`;
   }
-  // Add citation as a comment if present
   if (citation) {
     output += `// ${citation}\n`;
   }
-  // Use description as the decision identifier
   output += `decision ${description}:\n`;
-
   const actionTree = parseActions(instance.rules || []);
-  // [DEBUGGING] Print the entire constructed action tree
-  console.log('[DEBUGGING] Constructed action tree:', JSON.stringify(actionTree, null, 2));
 
+  // Collect activity stats for all PlanDefinitions
   const activities: { name: string, original: string }[] = [];
   const emittedActivities = new Set<string>();
-  output += emitWhenBlocksRecursive(actionTree, activities, emittedActivities, allInstances);
 
+  output += emitWhenBlocksRecursive(actionTree, activities, emittedActivities, allInstances, instance);
   output += 'done\n';
   return { decision: output, activities };
 } 
