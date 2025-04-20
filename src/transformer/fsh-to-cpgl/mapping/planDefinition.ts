@@ -55,6 +55,7 @@ function emitWhenBlocksRecursive(
   nodes: ActionNode[],
   activities: { name: string, original: string }[],
   emittedActivities: Set<string>,
+  allInstances: any[],
   indent = '    '
 ): string {
   let output = '';
@@ -62,18 +63,63 @@ function emitWhenBlocksRecursive(
     if (node.conditionExpression) {
       if (node.children.length > 0) {
         output += `${indent}when "${node.conditionExpression}" then:\n`;
-        output += emitWhenBlocksRecursive(node.children, activities, emittedActivities, indent + '    ');
+        output += emitWhenBlocksRecursive(node.children, activities, emittedActivities, allInstances, indent + '    ');
         output += `${indent}done\n`;
       } else {
         const activityName = node.title ? normalizeActivityName(node.title) : 'UnnamedActivity';
-        output += `${indent}when "${node.conditionExpression}" then do "${activityName}".\n`;
-        if (!emittedActivities.has(activityName)) {
-          activities.push({ name: activityName, original: `activity "${activityName}" perform ... // TODO: activity details\n` });
-          emittedActivities.add(activityName);
+        let useEmitted = false;
+        let doEmitted = false;
+        // Handle definitionCanonical navigation
+        if (node.definitionCanonical) {
+          // Remove Canonical() wrapper if present
+          let canonicalValueStr: string | undefined = undefined;
+          if (typeof node.definitionCanonical === 'string') {
+            if (node.definitionCanonical.startsWith('Canonical(')) {
+              canonicalValueStr = node.definitionCanonical.replace(/^Canonical\((.*)\)$/, '$1');
+            } else {
+              canonicalValueStr = node.definitionCanonical;
+            }
+          } else if (typeof node.definitionCanonical === 'object' && 'entityName' in node.definitionCanonical) {
+            canonicalValueStr = (node.definitionCanonical as { entityName: string }).entityName;
+          }
+          if (canonicalValueStr) {
+            // Find referenced instance
+            const referenced = allInstances.find(inst => inst.name === canonicalValueStr);
+            if (referenced) {
+              // Check if it's a PlanDefinition
+              if (PLAN_DEFINITION_URLS.includes(referenced.instanceOf)) {
+                // Use its description as identifier
+                let refDescription = referenced.description;
+                if (!refDescription) {
+                  const descRule = (referenced.rules || []).find((r: any) => r.path === 'Description');
+                  refDescription = descRule ? descRule.value : '[UnnamedPlanDefinition]';
+                }
+                const useIdentifier = toIdentifier(refDescription);
+                output += `${indent}use ${useIdentifier}.\n`;
+                useEmitted = true;
+              } else {
+                // ActivityDefinition: emit do as before
+                output += `${indent}do "${activityName}".\n`;
+                if (!emittedActivities.has(activityName)) {
+                  activities.push({ name: activityName, original: `activity "${activityName}" perform ... // TODO: activity details\n` });
+                  emittedActivities.add(activityName);
+                }
+                doEmitted = true;
+              }
+            }
+          }
+        }
+        // If not already emitted do, emit do for leaf node
+        if (!doEmitted) {
+          output += `${indent}when "${node.conditionExpression}" then do "${activityName}".\n`;
+          if (!emittedActivities.has(activityName)) {
+            activities.push({ name: activityName, original: `activity "${activityName}" perform ... // TODO: activity details\n` });
+            emittedActivities.add(activityName);
+          }
         }
       }
     } else if (node.children.length > 0) {
-      output += emitWhenBlocksRecursive(node.children, activities, emittedActivities, indent);
+      output += emitWhenBlocksRecursive(node.children, activities, emittedActivities, allInstances, indent);
     }
   }
   return output;
@@ -124,7 +170,7 @@ function parseActions(rules: any[], basePath = 'action'): ActionNode[] {
 
 import { toIdentifier } from '../utils/fshPathFunctions';
 
-export function mapPlanDefinitionToDecision(instance: any): { decision: string, activities: { name: string, original: string }[] } {
+export function mapPlanDefinitionToDecision(instance: any, allInstances: any[]): { decision: string, activities: { name: string, original: string }[] } {
   // Use instanceOf directly to check PlanDefinition type
   if (!PLAN_DEFINITION_URLS.includes(instance.instanceOf)) {
     return { decision: '', activities: [] };
@@ -175,7 +221,7 @@ export function mapPlanDefinitionToDecision(instance: any): { decision: string, 
 
   const activities: { name: string, original: string }[] = [];
   const emittedActivities = new Set<string>();
-  output += emitWhenBlocksRecursive(actionTree, activities, emittedActivities);
+  output += emitWhenBlocksRecursive(actionTree, activities, emittedActivities, allInstances);
 
   output += 'done\n';
   return { decision: output, activities };

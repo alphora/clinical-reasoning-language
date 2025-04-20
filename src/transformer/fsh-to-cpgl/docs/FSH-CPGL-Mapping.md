@@ -292,6 +292,10 @@ then:
 
 the CPG-L value would be: system "Measles vaccines"
 
+- `navigate()`: use the value of the reference to navigate to the target resource.
+
+- `ensure(type)`: require the resource to be of argument `type` type.
+
 - `extractCodeExpression()`: the CPG-L value is the result of executing the regex transform, where `input` is the FSH Path Value:
 
 ```regex
@@ -364,7 +368,7 @@ The expression `[*].action` in these mapping rules means an arbitrary nesting of
 
 - `plandef-action` = `PlanDef.action` or `[*].action`
 
-- `plandef-canonical` = `PlanDef.action.definitionCanonical` or `[*].action.definitionCanonical` Note, `plandef-canonical` is a navigation term as described in [Navigation](#navigation).  It does not get mapped to a CPG-L term.
+- `plandef-canonical` = `PlanDef.action.definitionCanonical.navigate().ensure(plandef-instance).plandef-description.toIdentifier()` or `[*].action.definitionCanonical.navigate().ensure(plandef-instance).plandef-description.toIdentifier()` Note, `plandef-canonical` is a navigation term as described in [Navigation](#navigation).  It does not get mapped to a CPG-L term.
 
 - `plandef-condition` = `PlanDef.action.condition` or `[*].action.condition`
 

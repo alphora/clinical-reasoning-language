@@ -22,7 +22,7 @@ export function transformFSHToCPGL(fshResult: FSHLoadResult): string {
 
   for (const inst of instances) {
     // For demonstration, call all mapping helpers for every instance
-    const planDefResult = mapPlanDefinitionToDecision(inst);
+    const planDefResult = mapPlanDefinitionToDecision(inst, instances);
     decisions.push(planDefResult.decision);
     for (const act of planDefResult.activities) {
       activityDeduplicator.add({ text: act.original });
