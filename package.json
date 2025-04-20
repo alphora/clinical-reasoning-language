@@ -57,7 +57,8 @@
   "author": "CQIS",
   "license": "MIT",
   "dependencies": {
-    "antlr4ts": "^0.5.0-alpha.4"
+    "antlr4ts": "^0.5.0-alpha.4",
+    "fsh-sushi": "^3.15.0"
   },
   "devDependencies": {
     "@types/jest": "^29.5.12",
