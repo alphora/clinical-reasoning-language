@@ -100,7 +100,7 @@ export interface Terminology extends ASTNode {
 export declare const TerminologyType: {
     type: "Terminology";
 };
-export type TerminologyDefinition = TerminologyValueset | TerminologyUnknown | TerminologySystemCode;
+export type TerminologyDefinition = TerminologyValueset | TerminologyFreeText | TerminologySystemCode;
 export interface TerminologyValueset extends ASTNode {
     type: 'TerminologyValueset';
     valuesetName: string;
@@ -109,12 +109,13 @@ export interface TerminologyValueset extends ASTNode {
 export declare const TerminologyValuesetType: {
     type: "TerminologyValueset";
 };
-export interface TerminologyUnknown extends ASTNode {
-    type: 'TerminologyUnknown';
+export interface TerminologyFreeText extends ASTNode {
+    type: 'TerminologyFreeText';
+    value: string;
     location: Location;
 }
-export declare const TerminologyUnknownType: {
-    type: "TerminologyUnknown";
+export declare const TerminologyFreeTextType: {
+    type: "TerminologyFreeText";
 };
 export interface TerminologySystemCode extends ASTNode {
     type: 'TerminologySystemCode';
@@ -130,6 +131,8 @@ export interface Activity extends ASTNode {
     name: string;
     perform: ActivityType;
     terminologyReference?: string;
+    activityTypeValue?: string;
+    rationale?: string;
     location: Location;
 }
 export interface Concept extends ASTNode {

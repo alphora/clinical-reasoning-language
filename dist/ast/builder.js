@@ -44,7 +44,10 @@ class CPGLAstBuilder extends AbstractParseTreeVisitor_1.AbstractParseTreeVisitor
         return { type: types_1.WhenBlockType.type, conceptName, body: action, location: getLocation(ctx) };
     }
     visitNestedWhenBlock(ctx) { return this.visit(ctx.whenBlock()); }
-    visitBlockAction(ctx) { return this.visit(ctx.actionStatement()); }
+    visitBlockAction(ctx) {
+        const result = this.visit(ctx.actionStatement());
+        return result;
+    }
     visitBlockBody(ctx) {
         const qualifier = ctx.anyOrAllClause()
             ? ctx.anyOrAllClause().text.slice(0, -1)
@@ -69,50 +72,132 @@ class CPGLAstBuilder extends AbstractParseTreeVisitor_1.AbstractParseTreeVisitor
         const action = this.visit(ctx.doStatement() ?? ctx.useStatement());
         return { type: types_1.SingleActionType.type, action, location: getLocation(ctx) };
     }
+    visitActionStatement(ctx) {
+        const doStmt = ctx.doStatement?.();
+        const useStmt = ctx.useStatement?.();
+        let action;
+        if (doStmt) {
+            action = this.visitDoStatement(doStmt);
+        }
+        else if (useStmt) {
+            action = this.visitUseStatement(useStmt);
+        }
+        else {
+            throw new Error('ActionStatement must have doStatement or useStatement');
+        }
+        return { type: 'ActionStatement', action, location: getLocation(ctx) };
+    }
     visitDoStatement(ctx) {
         const activityName = ctx.activityReference().text.slice(1, -1);
-        return { type: types_1.DoActivityType.type, activityName, location: getLocation(ctx) };
+        const result = { type: types_1.DoActivityType.type, activityName, location: getLocation(ctx) };
+        return result;
     }
     visitUseStatement(ctx) {
         const decisionName = ctx.decisionReference().text.slice(1, -1);
-        return { type: types_1.UseDecisionType.type, decisionName, location: getLocation(ctx) };
+        const result = { type: types_1.UseDecisionType.type, decisionName, location: getLocation(ctx) };
+        return result;
     }
     visitTerminologyStatement(ctx) {
         const name = ctx.terminologyIdentifier().text.slice(1, -1);
-        const defCtx = ctx.terminologyValueset() ?? ctx.terminologyUnknown() ?? ctx.terminologySystemCode();
-        const definition = this.visit(defCtx);
-        return { type: types_1.TerminologyType.type, name, definition, location: getLocation(ctx) };
+        let definition;
+        if (ctx.terminologyValueset()) {
+            definition = this.visit(ctx.terminologyValueset());
+        }
+        else if (ctx.terminologySystemCode()) {
+            definition = this.visit(ctx.terminologySystemCode());
+        }
+        else if (ctx.backtickString()) {
+            definition = {
+                type: 'TerminologyFreeText',
+                value: ctx.backtickString().text.slice(1, -1),
+                location: getLocation(ctx)
+            };
+        }
+        return { type: types_1.TerminologyType.type, name, definition: definition, location: getLocation(ctx) };
     }
     visitTerminologyValueset(ctx) {
         const valuesetName = ctx.identifier().text.slice(1, -1);
         return { type: types_1.TerminologyValuesetType.type, valuesetName, location: getLocation(ctx) };
     }
-    visitTerminologyUnknown(ctx) { return { type: types_1.TerminologyUnknownType.type, location: getLocation(ctx) }; }
     visitTerminologySystemCode(ctx) {
-        const system = ctx.identifier(0).text.slice(1, -1);
-        const code = ctx.identifier(1).text.slice(1, -1);
+        let system = '';
+        let code = '';
+        if (ctx.backtickString && ctx.backtickString().length === 2) {
+            const systemNode = ctx.backtickString(0);
+            const codeNode = ctx.backtickString(1);
+            if (systemNode?.text)
+                system = systemNode.text.slice(1, -1);
+            if (codeNode?.text)
+                code = codeNode.text.slice(1, -1);
+        }
         return { type: types_1.TerminologySystemCodeType.type, system, code, location: getLocation(ctx) };
     }
     visitActivityStatement(ctx) {
         const name = ctx.activityIdentifier().text.slice(1, -1);
         const perform = ctx.ACTIVITY_TYPE().text;
-        const terminologyRef = ctx.terminologyReference()?.text.slice(1, -1);
-        return { type: 'Activity', name, perform, terminologyReference: terminologyRef, location: getLocation(ctx) };
+        let terminologyReference;
+        let activityTypeValue;
+        let rationale;
+        if (ctx.OF()) {
+            if (ctx.terminologyReference()) {
+                terminologyReference = ctx.terminologyReference().text.slice(1, -1);
+            }
+            else if (ctx.activityTypeValue()) {
+                const atv = ctx.activityTypeValue();
+                if (atv?.backtickString) {
+                    const backtickCtx = atv.backtickString();
+                    if (backtickCtx?.text !== undefined) {
+                        activityTypeValue = backtickCtx.text.slice(1, -1);
+                    }
+                }
+            }
+        }
+        if (ctx.rationale) {
+            const rationaleCtx = ctx.rationale();
+            if (rationaleCtx?.backtickString) {
+                const backtickCtx = rationaleCtx.backtickString();
+                if (backtickCtx?.text !== undefined) {
+                    rationale = backtickCtx.text.slice(1, -1);
+                }
+            }
+        }
+        return { type: 'Activity', name, perform, terminologyReference, activityTypeValue, rationale, location: getLocation(ctx) };
     }
     visitConceptStatement(ctx) {
         const name = ctx.conceptIdentifier().text.slice(1, -1);
         const bodyCtx = ctx.conceptBody();
         const conceptType = (bodyCtx.hasTypeLine().CONCEPT_TYPE().text);
         const valueType = (bodyCtx.hasValueTypeLine().CONCEPT_VALUE_TYPE().text);
-        const provenance = bodyCtx.provenanceLine()?.stringLiteral().text.slice(1, -1);
+        let provenance = undefined;
+        if (bodyCtx.provenanceLine?.()) {
+            const provCtx = bodyCtx.provenanceLine?.();
+            if (provCtx?.backtickString) {
+                const backtickCtx = provCtx.backtickString();
+                if (backtickCtx?.text !== undefined) {
+                    provenance = backtickCtx.text.slice(1, -1);
+                }
+                else if (backtickCtx?.BACKTICK_STRING) {
+                    const token = backtickCtx.BACKTICK_STRING();
+                    if (token?.text !== undefined) {
+                        provenance = token.text.slice(1, -1);
+                    }
+                }
+            }
+        }
         let definition;
-        if (bodyCtx.codedByLine()) {
+        if (bodyCtx.codedByLine && bodyCtx.codedByLine()) {
             const termRef = bodyCtx.codedByLine().terminologyReference().text.slice(1, -1);
             definition = { type: types_1.CodedByDefinitionType.type, terminologyName: termRef, location: getLocation(bodyCtx.codedByLine()) };
         }
-        else {
+        else if (bodyCtx.inferredByLine && bodyCtx.inferredByLine()) {
             const infCtx = bodyCtx.inferredByLine();
+            if (!infCtx) {
+                throw new Error('ConceptStatement: inferredByLine() unexpectedly returned undefined');
+            }
             definition = this.visit(infCtx);
+        }
+        else {
+            throw new Error('ConceptStatement must have either codedByLine or inferredByLine');
         }
         return { type: 'Concept', name, conceptType, valueType, provenance, definition, location: getLocation(ctx) };
     }

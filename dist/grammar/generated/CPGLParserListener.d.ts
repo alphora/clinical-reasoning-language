@@ -21,7 +21,6 @@ import { DoStatementContext } from "./CPGLParser";
 import { UseStatementContext } from "./CPGLParser";
 import { TerminologyStatementContext } from "./CPGLParser";
 import { TerminologyValuesetContext } from "./CPGLParser";
-import { TerminologyUnknownContext } from "./CPGLParser";
 import { TerminologySystemCodeContext } from "./CPGLParser";
 import { ActivityStatementContext } from "./CPGLParser";
 import { ConceptStatementContext } from "./CPGLParser";
@@ -50,7 +49,9 @@ import { ConceptIdentifierContext } from "./CPGLParser";
 import { ConceptReferenceContext } from "./CPGLParser";
 import { PatternIdentifierContext } from "./CPGLParser";
 import { PatternReferenceContext } from "./CPGLParser";
-import { StringLiteralContext } from "./CPGLParser";
+import { BacktickStringContext } from "./CPGLParser";
+import { ActivityTypeValueContext } from "./CPGLParser";
+import { RationaleContext } from "./CPGLParser";
 export interface CPGLParserListener extends ParseTreeListener {
     enterWhenWithBody?: (ctx: WhenWithBodyContext) => void;
     exitWhenWithBody?: (ctx: WhenWithBodyContext) => void;
@@ -96,8 +97,6 @@ export interface CPGLParserListener extends ParseTreeListener {
     exitTerminologyStatement?: (ctx: TerminologyStatementContext) => void;
     enterTerminologyValueset?: (ctx: TerminologyValuesetContext) => void;
     exitTerminologyValueset?: (ctx: TerminologyValuesetContext) => void;
-    enterTerminologyUnknown?: (ctx: TerminologyUnknownContext) => void;
-    exitTerminologyUnknown?: (ctx: TerminologyUnknownContext) => void;
     enterTerminologySystemCode?: (ctx: TerminologySystemCodeContext) => void;
     exitTerminologySystemCode?: (ctx: TerminologySystemCodeContext) => void;
     enterActivityStatement?: (ctx: ActivityStatementContext) => void;
@@ -154,6 +153,10 @@ export interface CPGLParserListener extends ParseTreeListener {
     exitPatternIdentifier?: (ctx: PatternIdentifierContext) => void;
     enterPatternReference?: (ctx: PatternReferenceContext) => void;
     exitPatternReference?: (ctx: PatternReferenceContext) => void;
-    enterStringLiteral?: (ctx: StringLiteralContext) => void;
-    exitStringLiteral?: (ctx: StringLiteralContext) => void;
+    enterBacktickString?: (ctx: BacktickStringContext) => void;
+    exitBacktickString?: (ctx: BacktickStringContext) => void;
+    enterActivityTypeValue?: (ctx: ActivityTypeValueContext) => void;
+    exitActivityTypeValue?: (ctx: ActivityTypeValueContext) => void;
+    enterRationale?: (ctx: RationaleContext) => void;
+    exitRationale?: (ctx: RationaleContext) => void;
 }

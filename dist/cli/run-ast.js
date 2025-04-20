@@ -20,6 +20,7 @@ if (!prettyOutput) {
     console.log(JSON.stringify(ast, null, 2));
 }
 else {
+    console.warn('[WARNING] Pretty mode is currently broken and may not display the AST correctly.');
     console.log('AST Representation:');
     console.log('==================');
     console.log((0, utils_1.printAST)(ast));

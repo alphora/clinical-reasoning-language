@@ -18,7 +18,13 @@ function printAST(node, indent = 0) {
         output += `${spaces}  conceptName: "${node.conceptName}"\n`;
     }
     if ('qualifier' in node && node.qualifier) {
-        output += `${spaces}  qualifier: "${node.qualifier}"\n`;
+        output += `${spaces}  qualifier: "${String(node.qualifier)}"\n`;
+    }
+    if ('activityTypeValue' in node && node.activityTypeValue) {
+        output += `${spaces}  activityTypeValue: "${String(node.activityTypeValue)}"\n`;
+    }
+    if ('rationale' in node && node.rationale) {
+        output += `${spaces}  rationale: "${String(node.rationale)}"\n`;
     }
     if ('statements' in node && Array.isArray(node.statements)) {
         node.statements.forEach((statement) => {

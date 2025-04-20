@@ -27,21 +27,21 @@ export declare class CPGLParser extends Parser {
     static readonly OF = 17;
     static readonly SYSTEM = 18;
     static readonly CODE = 19;
-    static readonly UNKNOWN = 20;
-    static readonly DO = 21;
-    static readonly USE = 22;
-    static readonly WHEN = 23;
-    static readonly THEN = 24;
-    static readonly ANY = 25;
-    static readonly ALL = 26;
-    static readonly DECISION = 27;
+    static readonly DO = 20;
+    static readonly USE = 21;
+    static readonly WHEN = 22;
+    static readonly THEN = 23;
+    static readonly ANY = 24;
+    static readonly ALL = 25;
+    static readonly DECISION = 26;
+    static readonly BECAUSE = 27;
     static readonly ERROR = 28;
     static readonly COLON = 29;
     static readonly DOT = 30;
     static readonly LPAREN = 31;
     static readonly RPAREN = 32;
     static readonly QUOTED_STRING = 33;
-    static readonly STRING = 34;
+    static readonly BACKTICK_STRING = 34;
     static readonly WS = 35;
     static readonly COMMENT = 36;
     static readonly COMMENT_BLOCK = 37;
@@ -71,36 +71,37 @@ export declare class CPGLParser extends Parser {
     static readonly RULE_useStatement = 11;
     static readonly RULE_terminologyStatement = 12;
     static readonly RULE_terminologyValueset = 13;
-    static readonly RULE_terminologyUnknown = 14;
-    static readonly RULE_terminologySystemCode = 15;
-    static readonly RULE_activityStatement = 16;
-    static readonly RULE_conceptStatement = 17;
-    static readonly RULE_conceptBody = 18;
-    static readonly RULE_hasTypeLine = 19;
-    static readonly RULE_hasValueTypeLine = 20;
-    static readonly RULE_provenanceLine = 21;
-    static readonly RULE_codedByLine = 22;
-    static readonly RULE_inferredByLine = 23;
-    static readonly RULE_inferredBody = 24;
-    static readonly RULE_inferredByConceptReference = 25;
-    static readonly RULE_inferredByDescriptiveLogic = 26;
-    static readonly RULE_inferredByExpression = 27;
-    static readonly RULE_informalOr = 28;
-    static readonly RULE_informalAnd = 29;
-    static readonly RULE_informalNot = 30;
-    static readonly RULE_atom = 31;
-    static readonly RULE_identifier = 32;
-    static readonly RULE_decisionIdentifier = 33;
-    static readonly RULE_decisionReference = 34;
-    static readonly RULE_terminologyIdentifier = 35;
-    static readonly RULE_terminologyReference = 36;
-    static readonly RULE_activityIdentifier = 37;
-    static readonly RULE_activityReference = 38;
-    static readonly RULE_conceptIdentifier = 39;
-    static readonly RULE_conceptReference = 40;
-    static readonly RULE_patternIdentifier = 41;
-    static readonly RULE_patternReference = 42;
-    static readonly RULE_stringLiteral = 43;
+    static readonly RULE_terminologySystemCode = 14;
+    static readonly RULE_activityStatement = 15;
+    static readonly RULE_conceptStatement = 16;
+    static readonly RULE_conceptBody = 17;
+    static readonly RULE_hasTypeLine = 18;
+    static readonly RULE_hasValueTypeLine = 19;
+    static readonly RULE_provenanceLine = 20;
+    static readonly RULE_codedByLine = 21;
+    static readonly RULE_inferredByLine = 22;
+    static readonly RULE_inferredBody = 23;
+    static readonly RULE_inferredByConceptReference = 24;
+    static readonly RULE_inferredByDescriptiveLogic = 25;
+    static readonly RULE_inferredByExpression = 26;
+    static readonly RULE_informalOr = 27;
+    static readonly RULE_informalAnd = 28;
+    static readonly RULE_informalNot = 29;
+    static readonly RULE_atom = 30;
+    static readonly RULE_identifier = 31;
+    static readonly RULE_decisionIdentifier = 32;
+    static readonly RULE_decisionReference = 33;
+    static readonly RULE_terminologyIdentifier = 34;
+    static readonly RULE_terminologyReference = 35;
+    static readonly RULE_activityIdentifier = 36;
+    static readonly RULE_activityReference = 37;
+    static readonly RULE_conceptIdentifier = 38;
+    static readonly RULE_conceptReference = 39;
+    static readonly RULE_patternIdentifier = 40;
+    static readonly RULE_patternReference = 41;
+    static readonly RULE_backtickString = 42;
+    static readonly RULE_activityTypeValue = 43;
+    static readonly RULE_rationale = 44;
     static readonly ruleNames: string[];
     private static readonly _LITERAL_NAMES;
     private static readonly _SYMBOLIC_NAMES;
@@ -125,7 +126,6 @@ export declare class CPGLParser extends Parser {
     useStatement(): UseStatementContext;
     terminologyStatement(): TerminologyStatementContext;
     terminologyValueset(): TerminologyValuesetContext;
-    terminologyUnknown(): TerminologyUnknownContext;
     terminologySystemCode(): TerminologySystemCodeContext;
     activityStatement(): ActivityStatementContext;
     conceptStatement(): ConceptStatementContext;
@@ -154,7 +154,9 @@ export declare class CPGLParser extends Parser {
     conceptReference(): ConceptReferenceContext;
     patternIdentifier(): PatternIdentifierContext;
     patternReference(): PatternReferenceContext;
-    stringLiteral(): StringLiteralContext;
+    backtickString(): BacktickStringContext;
+    activityTypeValue(): ActivityTypeValueContext;
+    rationale(): RationaleContext;
     static readonly _serializedATN: string;
     static __ATN: ATN;
     static get _ATN(): ATN;
@@ -310,7 +312,7 @@ export declare class TerminologyStatementContext extends ParserRuleContext {
     terminologyIdentifier(): TerminologyIdentifierContext;
     DOT(): TerminalNode;
     terminologyValueset(): TerminologyValuesetContext | undefined;
-    terminologyUnknown(): TerminologyUnknownContext | undefined;
+    backtickString(): BacktickStringContext | undefined;
     terminologySystemCode(): TerminologySystemCodeContext | undefined;
     constructor(parent: ParserRuleContext | undefined, invokingState: number);
     get ruleIndex(): number;
@@ -327,18 +329,10 @@ export declare class TerminologyValuesetContext extends ParserRuleContext {
     exitRule(listener: CPGLParserListener): void;
     accept<Result>(visitor: CPGLParserVisitor<Result>): Result;
 }
-export declare class TerminologyUnknownContext extends ParserRuleContext {
-    UNKNOWN(): TerminalNode;
-    constructor(parent: ParserRuleContext | undefined, invokingState: number);
-    get ruleIndex(): number;
-    enterRule(listener: CPGLParserListener): void;
-    exitRule(listener: CPGLParserListener): void;
-    accept<Result>(visitor: CPGLParserVisitor<Result>): Result;
-}
 export declare class TerminologySystemCodeContext extends ParserRuleContext {
     SYSTEM(): TerminalNode;
-    identifier(): IdentifierContext[];
-    identifier(i: number): IdentifierContext;
+    backtickString(): BacktickStringContext[];
+    backtickString(i: number): BacktickStringContext;
     CODE(): TerminalNode;
     constructor(parent: ParserRuleContext | undefined, invokingState: number);
     get ruleIndex(): number;
@@ -353,7 +347,10 @@ export declare class ActivityStatementContext extends ParserRuleContext {
     ACTIVITY_TYPE(): TerminalNode;
     DOT(): TerminalNode;
     OF(): TerminalNode | undefined;
+    BECAUSE(): TerminalNode | undefined;
+    rationale(): RationaleContext | undefined;
     terminologyReference(): TerminologyReferenceContext | undefined;
+    activityTypeValue(): ActivityTypeValueContext | undefined;
     constructor(parent: ParserRuleContext | undefined, invokingState: number);
     get ruleIndex(): number;
     enterRule(listener: CPGLParserListener): void;
@@ -409,7 +406,7 @@ export declare class HasValueTypeLineContext extends ParserRuleContext {
 export declare class ProvenanceLineContext extends ParserRuleContext {
     HAS(): TerminalNode;
     PROVENANCE(): TerminalNode;
-    stringLiteral(): StringLiteralContext;
+    backtickString(): BacktickStringContext;
     DOT(): TerminalNode;
     constructor(parent: ParserRuleContext | undefined, invokingState: number);
     get ruleIndex(): number;
@@ -571,7 +568,7 @@ export declare class TerminologyIdentifierContext extends ParserRuleContext {
     accept<Result>(visitor: CPGLParserVisitor<Result>): Result;
 }
 export declare class TerminologyReferenceContext extends ParserRuleContext {
-    terminologyIdentifier(): TerminologyIdentifierContext;
+    identifier(): IdentifierContext;
     constructor(parent: ParserRuleContext | undefined, invokingState: number);
     get ruleIndex(): number;
     enterRule(listener: CPGLParserListener): void;
@@ -626,9 +623,24 @@ export declare class PatternReferenceContext extends ParserRuleContext {
     exitRule(listener: CPGLParserListener): void;
     accept<Result>(visitor: CPGLParserVisitor<Result>): Result;
 }
-export declare class StringLiteralContext extends ParserRuleContext {
-    STRING(): TerminalNode | undefined;
-    QUOTED_STRING(): TerminalNode | undefined;
+export declare class BacktickStringContext extends ParserRuleContext {
+    BACKTICK_STRING(): TerminalNode;
+    constructor(parent: ParserRuleContext | undefined, invokingState: number);
+    get ruleIndex(): number;
+    enterRule(listener: CPGLParserListener): void;
+    exitRule(listener: CPGLParserListener): void;
+    accept<Result>(visitor: CPGLParserVisitor<Result>): Result;
+}
+export declare class ActivityTypeValueContext extends ParserRuleContext {
+    backtickString(): BacktickStringContext;
+    constructor(parent: ParserRuleContext | undefined, invokingState: number);
+    get ruleIndex(): number;
+    enterRule(listener: CPGLParserListener): void;
+    exitRule(listener: CPGLParserListener): void;
+    accept<Result>(visitor: CPGLParserVisitor<Result>): Result;
+}
+export declare class RationaleContext extends ParserRuleContext {
+    backtickString(): BacktickStringContext;
     constructor(parent: ParserRuleContext | undefined, invokingState: number);
     get ruleIndex(): number;
     enterRule(listener: CPGLParserListener): void;
