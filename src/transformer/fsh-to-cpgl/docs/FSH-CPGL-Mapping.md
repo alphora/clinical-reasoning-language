@@ -141,6 +141,8 @@ the CPG-L value would be:
 
 "Provide vaccinations according to the recommended schedule"
 
+- `exists()`: check for the existence of the definition.
+
 - `toString()`: ensure the value meets the requirements of a CPG-L string:
 
 ```regex
@@ -352,7 +354,9 @@ The expression `[*].action` in these mapping rules means an arbitrary nesting of
 
 <!-- TODO: dynamicValue -->
 
-- `plandef` = Instance of PlanDef
+- `plandef-instance` = Instance of PlanDef
+
+- `plandef-title` = Title of PlanDef
 
 - `plandef-description` = Description of PlanDef
 

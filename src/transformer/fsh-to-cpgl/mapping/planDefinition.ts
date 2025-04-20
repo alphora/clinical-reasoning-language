@@ -154,6 +154,14 @@ export function mapPlanDefinitionToDecision(instance: any): { decision: string, 
       console.log(`[DEBUGGING]   path: ${rule.path}  value: ${rule.value}`);
     }
   }
+  // Add instance name as a comment if present
+  if (instance.name) {
+    output += `// Instance: ${instance.name}\n`;
+  }
+  // Add title as a comment if present
+  if (instance.title) {
+    output += `// Title: ${instance.title}\n`;
+  }
   // Add citation as a comment if present
   if (citation) {
     output += `// ${citation}\n`;
