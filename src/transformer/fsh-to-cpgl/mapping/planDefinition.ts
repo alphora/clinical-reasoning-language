@@ -3,7 +3,7 @@ const PLAN_DEFINITION_URLS = [
   'http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-recommendationdefinition'
 ];
 
-import { ACTIVITY_DEFINITION_URLS, getActivityPerformClause } from './activityDefinition';
+import { ACTIVITY_DEFINITION_URLS, getActivityPerformClause, emitActivityBlock } from './activityDefinition';
 
 import { toIdentifier, toString } from '../utils/fshPathFunctions';
 
@@ -40,83 +40,9 @@ function emitWhenBlocksRecursive(
       output += `${indent}done\n`;
       continue;
     }
- 
-    let canonicalValueStr: string | undefined = undefined;
-    if (node.definitionCanonical) {
-      if (typeof node.definitionCanonical === 'string') {
-        if (node.definitionCanonical.startsWith('Canonical(')) {
-          canonicalValueStr = node.definitionCanonical.replace(/^Canonical\((.*)\)$/, '$1');
-        } else {
-          canonicalValueStr = node.definitionCanonical;
-        }
-      } else if (typeof node.definitionCanonical === 'object' && 'entityName' in node.definitionCanonical) {
-        canonicalValueStr = (node.definitionCanonical as { entityName: string }).entityName;
-      }
-    }
-    const activityName = node.title ? toIdentifier(node.title) : 'UnnamedActivity';
-    const activityDescription = node.description ? toString(node.description)  : 'TODO: fill in message.';
-    // Generate a unique identifier for this activity (name + hash of description)
-    let doIdentifier = activityName;
-    let hasPlanDef = false;
-    let hasActivityDef = false;
-    let useIdentifier = '';
-    const referenced = allInstances.find(inst => inst.name === canonicalValueStr);
-    if (canonicalValueStr) {
-      if (referenced && PLAN_DEFINITION_URLS.includes(referenced.instanceOf)) {
-        hasPlanDef = true;
-        let refDescription = referenced.description;
-        if (!refDescription) {
-          const descRule = (referenced.rules || []).find((r: any) => r.path === 'Description');
-          refDescription = descRule ? descRule.value : '[UnnamedPlanDefinition]';
-        }
-        useIdentifier = toIdentifier(refDescription);
-      } else if (referenced && ACTIVITY_DEFINITION_URLS.includes(referenced.instanceOf)) {
-        hasActivityDef = true;
-      }
-    }
+    // Delegate activity emission to activityDefinition helper
     output += `${indent}when "${node.conditionExpression}" then`;
-    if (hasPlanDef && hasActivityDef) {
-      output += `:\n`;
-      output += `${indent}    use ${useIdentifier}.\n`;
-      output += `${indent}    do ${doIdentifier}.\n`;
-      output += `${indent}done\n`;
-      // Only call getActivityPerformClause with the resolved ActivityDefinition instance
-      let activityDefInstance = null;
-      if (canonicalValueStr) {
-        const referenced = allInstances.find(inst => inst.name === canonicalValueStr);
-        if (referenced && ACTIVITY_DEFINITION_URLS.includes(referenced.instanceOf)) {
-          activityDefInstance = referenced;
-        }
-      }
-      if (activityDefInstance) {
-        console.log('[DEBUGGING] getActivityPerformClause called with ActivityDefinition:', { name: activityDefInstance.name, instanceOf: activityDefInstance.instanceOf });
-        activities.push({ name: doIdentifier, original: `activity ${doIdentifier} ${getActivityPerformClause(activityDefInstance)}\n\n` });
-      } else {
-        activities.push({ name: doIdentifier, original: `activity ${doIdentifier} // TODO: activity details.\n\n` });
-      }
-    } else if (hasPlanDef) {
-      output += ` use ${useIdentifier}.\n`;
-    } else if (hasActivityDef) {
-      output += ` do ${doIdentifier}.\n`;
-      // Only call getActivityPerformClause with the resolved ActivityDefinition instance
-      let activityDefInstance = null;
-      if (canonicalValueStr) {
-        const referenced = allInstances.find(inst => inst.name === canonicalValueStr);
-        if (referenced && ACTIVITY_DEFINITION_URLS.includes(referenced.instanceOf)) {
-          activityDefInstance = referenced;
-        }
-      }
-      if (activityDefInstance) {
-        console.log('[DEBUGGING] getActivityPerformClause called with ActivityDefinition:', { name: activityDefInstance.name, instanceOf: activityDefInstance.instanceOf });
-        activities.push({ name: doIdentifier, original: `activity ${doIdentifier} ${getActivityPerformClause(activityDefInstance)}\n\n` });
-      } else {
-        activities.push({ name: doIdentifier, original: `activity ${doIdentifier} // TODO: activity details.\n\n` });
-      }
-    } else {
-      // Neither: emit a CPGCommunicationRequest activity (unique per name+description)
-      output += ` do ${doIdentifier}.\n`;
-      activities.push({ name: doIdentifier, original: `activity ${doIdentifier} perform CPGCommunicationRequest\n    of ${activityDescription}.\n\n` });
-    }
+    output += emitActivityBlock(node, allInstances, activities, indent);
   }
   return output;
 }
