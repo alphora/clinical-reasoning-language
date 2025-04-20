@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.conceptValueTypes = exports.conceptTypes = exports.activityTypes = exports.InferredByDefinitionType = exports.InferredByConceptType = exports.GroupExpressionType = exports.NotExpressionType = exports.InformalOrType = exports.InformalAndType = exports.ConceptReferenceType = exports.CodedByDefinitionType = exports.TerminologySystemCodeType = exports.TerminologyUnknownType = exports.TerminologyValuesetType = exports.TerminologyType = exports.UseDecisionType = exports.DoActivityType = exports.ActionStatementType = exports.SingleActionType = exports.BlockBodyType = exports.WhenBlockType = exports.DecisionBodyType = exports.DecisionType = exports.FileType = void 0;
+exports.conceptValueTypes = exports.conceptTypes = exports.activityTypes = exports.InferredByDefinitionType = exports.InferredByConceptType = exports.GroupExpressionType = exports.NotExpressionType = exports.InformalOrType = exports.InformalAndType = exports.ConceptReferenceType = exports.CodedByDefinitionType = exports.TerminologySystemCodeType = exports.TerminologyFreeTextType = exports.TerminologyValuesetType = exports.TerminologyType = exports.UseDecisionType = exports.DoActivityType = exports.ActionStatementType = exports.SingleActionType = exports.BlockBodyType = exports.WhenBlockType = exports.DecisionBodyType = exports.DecisionType = exports.FileType = void 0;
 exports.FileType = {
     type: 'CPGL',
 };
@@ -34,8 +34,8 @@ exports.TerminologyType = {
 exports.TerminologyValuesetType = {
     type: 'TerminologyValueset',
 };
-exports.TerminologyUnknownType = {
-    type: 'TerminologyUnknown',
+exports.TerminologyFreeTextType = {
+    type: 'TerminologyFreeText',
 };
 exports.TerminologySystemCodeType = {
     type: 'TerminologySystemCode',

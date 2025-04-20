@@ -21,7 +21,6 @@ import { DoStatementContext } from "./CPGLParser";
 import { UseStatementContext } from "./CPGLParser";
 import { TerminologyStatementContext } from "./CPGLParser";
 import { TerminologyValuesetContext } from "./CPGLParser";
-import { TerminologyUnknownContext } from "./CPGLParser";
 import { TerminologySystemCodeContext } from "./CPGLParser";
 import { ActivityStatementContext } from "./CPGLParser";
 import { ConceptStatementContext } from "./CPGLParser";
@@ -50,7 +49,9 @@ import { ConceptIdentifierContext } from "./CPGLParser";
 import { ConceptReferenceContext } from "./CPGLParser";
 import { PatternIdentifierContext } from "./CPGLParser";
 import { PatternReferenceContext } from "./CPGLParser";
-import { StringLiteralContext } from "./CPGLParser";
+import { BacktickStringContext } from "./CPGLParser";
+import { ActivityTypeValueContext } from "./CPGLParser";
+import { RationaleContext } from "./CPGLParser";
 export interface CPGLParserVisitor<Result> extends ParseTreeVisitor<Result> {
     visitWhenWithBody?: (ctx: WhenWithBodyContext) => Result;
     visitWhenSingleAction?: (ctx: WhenSingleActionContext) => Result;
@@ -74,7 +75,6 @@ export interface CPGLParserVisitor<Result> extends ParseTreeVisitor<Result> {
     visitUseStatement?: (ctx: UseStatementContext) => Result;
     visitTerminologyStatement?: (ctx: TerminologyStatementContext) => Result;
     visitTerminologyValueset?: (ctx: TerminologyValuesetContext) => Result;
-    visitTerminologyUnknown?: (ctx: TerminologyUnknownContext) => Result;
     visitTerminologySystemCode?: (ctx: TerminologySystemCodeContext) => Result;
     visitActivityStatement?: (ctx: ActivityStatementContext) => Result;
     visitConceptStatement?: (ctx: ConceptStatementContext) => Result;
@@ -103,5 +103,7 @@ export interface CPGLParserVisitor<Result> extends ParseTreeVisitor<Result> {
     visitConceptReference?: (ctx: ConceptReferenceContext) => Result;
     visitPatternIdentifier?: (ctx: PatternIdentifierContext) => Result;
     visitPatternReference?: (ctx: PatternReferenceContext) => Result;
-    visitStringLiteral?: (ctx: StringLiteralContext) => Result;
+    visitBacktickString?: (ctx: BacktickStringContext) => Result;
+    visitActivityTypeValue?: (ctx: ActivityTypeValueContext) => Result;
+    visitRationale?: (ctx: RationaleContext) => Result;
 }
