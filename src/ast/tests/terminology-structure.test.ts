@@ -1,9 +1,6 @@
-import { CharStreams, CommonTokenStream } from 'antlr4ts';
 
-import { createLexer } from '../../lexer/createLexer';
 import { CPGLAstBuilder } from '../builder';
-import { CPGL, Terminology, TerminologyValueset, TerminologySystemCode } from '../types';
-import { createParser } from '../../parser/createParser';
+import { Terminology, TerminologyValueset, TerminologySystemCode } from '../types';
 import { parseInput } from './parseInput';
 
 describe('Terminology Structure', () => {

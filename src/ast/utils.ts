@@ -35,13 +35,13 @@ export function printAST(node: ASTNode, indent = 0): string {
     output += `${spaces}  conceptName: "${node.conceptName}"\n`;
   }
   if ('qualifier' in node && node.qualifier) {
-    output += `${spaces}  qualifier: "${node.qualifier}"\n`;
+    output += `${spaces}  qualifier: "${String(node.qualifier)}"\n`;
   }
   if ('activityTypeValue' in node && node.activityTypeValue) {
-    output += `${spaces}  activityTypeValue: "${node.activityTypeValue}"\n`;
+    output += `${spaces}  activityTypeValue: "${String(node.activityTypeValue)}"\n`;
   }
   if ('rationale' in node && node.rationale) {
-    output += `${spaces}  rationale: "${node.rationale}"\n`;
+    output += `${spaces}  rationale: "${String(node.rationale)}"\n`;
   }
 
   // Handle statements

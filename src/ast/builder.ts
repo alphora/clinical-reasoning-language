@@ -41,7 +41,6 @@ import {
   Location
 } from "./types";
 
-import { CPGLParser } from '../grammar/generated/CPGLParser';
 
 function getLocation(ctx: ParserRuleContext): Location {
   const start = ctx.start;
@@ -130,8 +129,8 @@ export class CPGLAstBuilder extends AbstractParseTreeVisitor<ASTNode> implements
   }
 
   visitActionStatement(ctx: any): ActionStatement {
-    const doStmt = ctx.doStatement && ctx.doStatement();
-    const useStmt = ctx.useStatement && ctx.useStatement();
+    const doStmt = ctx.doStatement?.();
+    const useStmt = ctx.useStatement?.();
     let action: DoActivity | UseDecision;
     if (doStmt) {
       action = this.visitDoStatement(doStmt);
@@ -188,8 +187,8 @@ export class CPGLAstBuilder extends AbstractParseTreeVisitor<ASTNode> implements
     if (ctx.backtickString && ctx.backtickString().length === 2) {
       const systemNode = ctx.backtickString(0);
       const codeNode = ctx.backtickString(1);
-      if (systemNode && systemNode.text) system = systemNode.text.slice(1, -1);
-      if (codeNode && codeNode.text) code = codeNode.text.slice(1, -1);
+      if (systemNode?.text) system = systemNode.text.slice(1, -1);
+      if (codeNode?.text) code = codeNode.text.slice(1, -1);
     }
     return { type: TerminologySystemCodeType.type, system, code, location: getLocation(ctx) };
   }
@@ -207,10 +206,10 @@ export class CPGLAstBuilder extends AbstractParseTreeVisitor<ASTNode> implements
         terminologyReference = ctx.terminologyReference()!.text.slice(1, -1);
       } else if (ctx.activityTypeValue()) {
         // activityTypeValue is a backtickString
-        const atv = ctx.activityTypeValue()!;
-        if (atv.backtickString) {
+        const atv = ctx.activityTypeValue();
+        if (atv?.backtickString) {
           const backtickCtx = atv.backtickString();
-          if (backtickCtx && backtickCtx.text) {
+          if (backtickCtx?.text !== undefined) {
             activityTypeValue = backtickCtx.text.slice(1, -1);
           }
         }
@@ -219,9 +218,9 @@ export class CPGLAstBuilder extends AbstractParseTreeVisitor<ASTNode> implements
     // rationale (BECAUSE) is always a backtickString
     if (ctx.rationale) {
       const rationaleCtx = ctx.rationale();
-      if (rationaleCtx && rationaleCtx.backtickString) {
+      if (rationaleCtx?.backtickString) {
         const backtickCtx = rationaleCtx.backtickString();
-        if (backtickCtx && backtickCtx.text) {
+        if (backtickCtx?.text !== undefined) {
           rationale = backtickCtx.text.slice(1, -1);
         }
       }
@@ -235,19 +234,17 @@ export class CPGLAstBuilder extends AbstractParseTreeVisitor<ASTNode> implements
     const conceptType = (bodyCtx.hasTypeLine().CONCEPT_TYPE().text) as ConceptType;
     const valueType   = (bodyCtx.hasValueTypeLine().CONCEPT_VALUE_TYPE().text) as any;
     let provenance: string | undefined = undefined;
-    if (bodyCtx.provenanceLine) {
-      const provCtx = bodyCtx.provenanceLine();
-      if (provCtx && provCtx.backtickString) {
+    if (bodyCtx.provenanceLine?.()) {
+      const provCtx = bodyCtx.provenanceLine?.();
+      if (provCtx?.backtickString) {
         const backtickCtx = provCtx.backtickString();
-        if (backtickCtx && backtickCtx.BACKTICK_STRING) {
+        if (backtickCtx?.text !== undefined) {
+          provenance = backtickCtx.text.slice(1, -1);
+        } else if (backtickCtx?.BACKTICK_STRING) {
           const token = backtickCtx.BACKTICK_STRING();
-          if (token && token.text) {
+          if (token?.text !== undefined) {
             provenance = token.text.slice(1, -1);
-          } else if (backtickCtx.text) {
-            provenance = backtickCtx.text.slice(1, -1);
           }
-        } else if (provCtx.text) {
-          provenance = provCtx.text.slice(1, -1);
         }
       }
     }
@@ -303,18 +300,18 @@ export class CPGLAstBuilder extends AbstractParseTreeVisitor<ASTNode> implements
   }
 
   visitInformalAnd(ctx: InformalAndContext): InformalAnd | NotExpression | GroupExpression | ConceptReference {
-    const terms = ctx.informalNot().map(n => this.visit(n) as any);
+    const terms = ctx.informalNot().map(n => this.visit(n) as NotExpression | GroupExpression | ConceptReference);
     if (ctx.AND().length) {
       return { type: InformalAndType.type, terms, location: getLocation(ctx) };
     }
-    return terms[0] as any;
+    return terms[0];
   }
 
-  visitInformalNot(ctx: InformalNotContext): NotExpression | any {
+  visitInformalNot(ctx: InformalNotContext): InferredByExpression {
     if (ctx.NOT()) {
-      return { type: NotExpressionType.type, expression: this.visit(ctx.informalNot()!) as NotExpression, location: getLocation(ctx) };
+      return { type: NotExpressionType.type, expression: this.visit(ctx.informalNot()!) as InferredByExpression, location: getLocation(ctx) };
     }
-    return this.visit(ctx.atom()!);
+    return this.visit(ctx.atom()!) as InferredByExpression;
   }
 
   visitConceptAtom(ctx: ConceptAtomContext): ConceptReference {
@@ -322,7 +319,7 @@ export class CPGLAstBuilder extends AbstractParseTreeVisitor<ASTNode> implements
     return { type: ConceptReferenceType.type, name, location: getLocation(ctx) };
   }
   visitGroupExpression(ctx: GroupExpressionContext): GroupExpression {
-    const expr = this.visit(ctx.inferredByExpression()) as any;
+    const expr = this.visit(ctx.inferredByExpression()) as InformalAnd | InformalOr | NotExpression | ConceptReference | GroupExpression;
     return { type: GroupExpressionType.type, expression: expr, location: getLocation(ctx) };
   }
 }

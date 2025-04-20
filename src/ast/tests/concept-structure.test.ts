@@ -1,16 +1,12 @@
-import { CharStreams, CommonTokenStream } from 'antlr4ts';
 
-import { createLexer } from '../../lexer/createLexer';
 import { CPGLAstBuilder } from '../builder';
 import { 
-  CPGL, 
   Concept, 
   InferredByDefinition,
   InferredByConcept,
   InferredByExpression,
   CodedByDefinition 
 } from '../types';
-import { createParser } from '../../parser/createParser';
 import { parseInput } from './parseInput';
 
 describe('Concept Structure', () => {
