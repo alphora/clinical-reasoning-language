@@ -43,3 +43,5 @@ node_modules
 
 # ANTLR generated listener (not used in this project)
 src/grammar/generated/CPGLParserListener.ts
+
+dist/
