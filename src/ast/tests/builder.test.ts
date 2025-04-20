@@ -518,6 +518,7 @@ describe('CPGLAstBuilder', () => {
         concept "BMI":
           has type Observation.
           has valuetype Quantity.
+          coded by "BMI Valueset".
         done
         decision "Check BMI":
           when "BMI" then do "Record BMI".

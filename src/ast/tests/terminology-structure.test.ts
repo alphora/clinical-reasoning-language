@@ -29,7 +29,7 @@ terminology "MeaslesVaccineCodes" valueset "bmi valueset".
 
   it('should correctly structure terminology with system and code', () => {
     const input = `
-terminology "MeaslesVaccineCodes" system "http://snomed.info/sct" code "871807003".
+terminology "MeaslesVaccineCodes" system \`http://snomed.info/sct\` code \`871807003\`.
 `;
 
     const result = parseInput(input);
