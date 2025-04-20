@@ -157,4 +157,46 @@ const result = validateCPGL(`
 - Bug fixes in lexer grammar
 - Fixed builder tests to align with new type system and grammar-driven types.
 
-[0.4.0]: https://github.com/cqis/cpgl/releases/tag/v0.4.0 
+[0.4.0]: https://github.com/cqis/cpgl/releases/tag/v0.4.0
+
+## [0.5.0] - 2025-04-19
+
+### Added
+- **Rationale support:** Added rationale property to activities and grammar, with support in the AST and pretty-printer.
+- **Markdown/free text:** Activities and terminology can now use backtick-quoted markdown/free text values.
+- **Comprehensive builder and grammar tests:** Expanded and improved test coverage for builder, grammar, and edge cases.
+- **Warning for pretty mode:** The AST CLI now warns that pretty mode is currently broken.
+
+### Changed
+- **Grammar overhaul:** 
+  - Double quotes are now required for all identifiers and references.
+  - Backticks are required for all free text, markdown, and rationale values.
+  - Updated grammar and lexer to enforce these quoting rules.
+  - Improved handling of concept inferred-by and coded-by clauses.
+- **Refactored builder:** 
+  - Improved type safety and error handling.
+  - Refactored to use optional chaining and modern TypeScript idioms.
+  - Removed unnecessary type assertions and redundant checks.
+- **Test suite:** 
+  - Updated all builder and grammar tests to match new quoting and grammar rules.
+  - Added tests for empty and edge-case values (e.g., empty backtick strings).
+- **Documentation:** 
+  - Updated grammar examples and README to reflect new quoting and rationale rules.
+
+### Fixed
+- **Linter and SonarLint issues:** 
+  - Addressed all major linter warnings, including optional chaining, redundant conditions, and union types with `any`.
+  - Fixed bugs in builder logic that could cause undefined errors in certain edge cases.
+- **Grammar bugs:** 
+  - Fixed issues with concept and activity parsing.
+  - Fixed builder and grammar to handle new rationale and markdown rules.
+
+### Technical Improvements
+- Improved error messages and debugging output in the builder.
+- Hardened AST builder against malformed parse trees.
+- Improved maintainability and readability of the codebase.
+
+### Known Issues
+- **Pretty mode in AST CLI is currently broken** and will print a warning if used.
+
+[0.5.0]: https://github.com/cqis/cpgl/releases/tag/v0.5.0 

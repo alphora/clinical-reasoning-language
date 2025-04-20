@@ -263,13 +263,6 @@ npm install
 npm run build
 ```
 
-3. Create a distribution tarball:
-```bash
-npm pack
-```
-
-This will generate a `.tgz` file (e.g., `@cqis-cpgl-0.1.0.tgz`) that can be distributed.
-
 ### Distribution
 
 The package is distributed via GitHub Releases. To create a new release:
