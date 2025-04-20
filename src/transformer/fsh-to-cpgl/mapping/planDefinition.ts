@@ -3,6 +3,11 @@ const PLAN_DEFINITION_URLS = [
   'http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-recommendationdefinition'
 ];
 
+const ACTIVITY_DEFINITION_URLS = [
+  'http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-actiondefinition',
+  // Add more ActivityDefinition URLs here if needed
+];
+
 import { toIdentifier, toString } from '../utils/fshPathFunctions';
 
 interface ActionNode {
@@ -68,7 +73,7 @@ function emitWhenBlocksRecursive(
           refDescription = descRule ? descRule.value : '[UnnamedPlanDefinition]';
         }
         useIdentifier = toIdentifier(refDescription);
-      } else if (referenced) {
+      } else if (referenced && ACTIVITY_DEFINITION_URLS.includes(referenced.instanceOf)) {
         hasActivityDef = true;
       }
     }
@@ -82,15 +87,15 @@ function emitWhenBlocksRecursive(
       let activityDefInstance = null;
       if (canonicalValueStr) {
         const referenced = allInstances.find(inst => inst.name === canonicalValueStr);
-        if (referenced && !PLAN_DEFINITION_URLS.includes(referenced.instanceOf)) {
+        if (referenced && ACTIVITY_DEFINITION_URLS.includes(referenced.instanceOf)) {
           activityDefInstance = referenced;
         }
       }
       if (activityDefInstance) {
         console.log('[DEBUGGING] getActivityPerformClause called with ActivityDefinition:', { name: activityDefInstance.name, instanceOf: activityDefInstance.instanceOf });
-        activities.push({ name: doIdentifier, original: `activity ${doIdentifier} ${getActivityPerformClause(activityDefInstance)}\n` });
+        activities.push({ name: doIdentifier, original: `activity ${doIdentifier} ${getActivityPerformClause(activityDefInstance)}\n\n` });
       } else {
-        activities.push({ name: doIdentifier, original: `activity ${doIdentifier} // TODO: activity details.\n` });
+        activities.push({ name: doIdentifier, original: `activity ${doIdentifier} // TODO: activity details.\n\n` });
       }
     } else if (hasPlanDef) {
       output += ` use ${useIdentifier}.\n`;
@@ -100,20 +105,20 @@ function emitWhenBlocksRecursive(
       let activityDefInstance = null;
       if (canonicalValueStr) {
         const referenced = allInstances.find(inst => inst.name === canonicalValueStr);
-        if (referenced && !PLAN_DEFINITION_URLS.includes(referenced.instanceOf)) {
+        if (referenced && ACTIVITY_DEFINITION_URLS.includes(referenced.instanceOf)) {
           activityDefInstance = referenced;
         }
       }
       if (activityDefInstance) {
         console.log('[DEBUGGING] getActivityPerformClause called with ActivityDefinition:', { name: activityDefInstance.name, instanceOf: activityDefInstance.instanceOf });
-        activities.push({ name: doIdentifier, original: `activity ${doIdentifier} ${getActivityPerformClause(activityDefInstance)}\n` });
+        activities.push({ name: doIdentifier, original: `activity ${doIdentifier} ${getActivityPerformClause(activityDefInstance)}\n\n` });
       } else {
-        activities.push({ name: doIdentifier, original: `activity ${doIdentifier} // TODO: activity details.\n` });
+        activities.push({ name: doIdentifier, original: `activity ${doIdentifier} // TODO: activity details.\n\n` });
       }
     } else {
       // Neither: emit a CPGCommunicationRequest activity (unique per name+description)
       output += ` do ${doIdentifier}.\n`;
-      activities.push({ name: doIdentifier, original: `activity ${doIdentifier} perform CPGCommunicationRequest of ${activityDescription}.\n` });
+      activities.push({ name: doIdentifier, original: `activity ${doIdentifier} perform CPGCommunicationRequest\n    of ${activityDescription}.\n\n` });
     }
   }
   return output;
@@ -190,7 +195,6 @@ function getActivityPerformClause(activityDef: any): string {
     const pccRule = activityDef.rules.find((r: any) => r.path === 'productCodeableConcept');
     if (pccRule) {
       if (typeof pccRule.value === 'object' && pccRule.value !== null) {
-        // FshCode object
         if ('display' in pccRule.value && pccRule.value.display) {
           codeDisplay = `"${pccRule.value.display}"`;
         } else if ('code' in pccRule.value && pccRule.value.code) {
@@ -228,7 +232,7 @@ function getActivityPerformClause(activityDef: any): string {
   if (!codeDisplay) {
     codeDisplay = 'TODO';
   }
-  return `perform ${kind} of ${codeDisplay}.`;
+  return `perform ${kind}\n    of ${codeDisplay}.`;
 }
 
 export function mapPlanDefinitionToDecision(instance: any, allInstances: any[]): { decision: string, activities: { name: string, original: string }[] } {
@@ -261,6 +265,6 @@ export function mapPlanDefinitionToDecision(instance: any, allInstances: any[]):
   const emittedActivities = new Set<string>();
 
   output += emitWhenBlocksRecursive(actionTree, activities, emittedActivities, allInstances, instance);
-  output += 'done\n';
+  output += 'done\n\n';
   return { decision: output, activities };
-} 
+}
