@@ -1,9 +1,6 @@
-import { CharStreams, CommonTokenStream } from 'antlr4ts';
 
-import { createLexer } from '../../lexer/createLexer';
 import { CPGLAstBuilder } from '../builder';
 import { 
-  CPGL, 
   Decision, 
   WhenBlock, 
   BlockBody, 
@@ -14,7 +11,6 @@ import {
   DoActivityType,
   UseDecision
 } from '../types';
-import { createParser } from '../../parser/createParser';
 import { parseInput } from './parseInput';
 
 /**
