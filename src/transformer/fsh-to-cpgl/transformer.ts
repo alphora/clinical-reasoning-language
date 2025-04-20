@@ -3,6 +3,7 @@ import { mapPlanDefinitionToDecision } from './mapping/planDefinition';
 import { mapActivityDefinitionToActivity } from './mapping/activityDefinition';
 import { mapConcept } from './mapping/concept';
 import { mapTerminology } from './mapping/terminology';
+import { ActivityDeduplicator } from './utils/activityDeduplication';
 
 /**
  * Transform FSH (parsed with SUSHI) to CPG-L.
@@ -14,13 +15,32 @@ export function transformFSHToCPGL(fshResult: FSHLoadResult): string {
   let output = '';
 
   output += '// [DEBUGGING] CPG-L generated from FSH instances\n';
+
+  // Collect all activities for file-wide deduplication
+  const activityDeduplicator = new ActivityDeduplicator();
+  const decisions: string[] = [];
+
   for (const inst of instances) {
     // For demonstration, call all mapping helpers for every instance
-    output += mapPlanDefinitionToDecision(inst);
+    const planDefResult = mapPlanDefinitionToDecision(inst);
+    decisions.push(planDefResult.decision);
+    for (const act of planDefResult.activities) {
+      activityDeduplicator.add({ text: act.original });
+    }
     output += mapActivityDefinitionToActivity(inst);
     output += mapConcept(inst);
     output += mapTerminology(inst);
     output += '\n';
+  }
+
+  // Emit all decisions
+  for (const dec of decisions) {
+    output += dec;
+  }
+
+  // Emit unique activities at the end
+  for (const uniqueAct of activityDeduplicator.getUniqueActivities()) {
+    output += uniqueAct.text;
   }
 
   return output;

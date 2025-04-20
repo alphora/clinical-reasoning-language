@@ -65,7 +65,12 @@ function normalizeActivityName(title: string): string {
   return base.charAt(0).toUpperCase() + base.slice(1);
 }
 
-function emitWhenBlocks(nodes: ActionNode[], activities: string[], emittedActivities: Set<string>, indent = '    '): string {
+function emitWhenBlocks(
+  nodes: ActionNode[],
+  activities: { name: string, original: string }[],
+  emittedActivities: Set<string>,
+  indent = '    '
+): string {
   let output = '';
   for (const node of nodes) {
     if (node.children.length > 0) {
@@ -76,7 +81,7 @@ function emitWhenBlocks(nodes: ActionNode[], activities: string[], emittedActivi
       const activityName = normalizeActivityName(node.title);
       output += `${indent}when "${node.title}" then do "${activityName}".\n`;
       if (!emittedActivities.has(activityName)) {
-        activities.push(`activity "${activityName}" perform ... // TODO: activity details\n`);
+        activities.push({ name: activityName, original: `activity "${activityName}" perform ... // TODO: activity details\n` });
         emittedActivities.add(activityName);
       }
     }
@@ -84,22 +89,21 @@ function emitWhenBlocks(nodes: ActionNode[], activities: string[], emittedActivi
   return output;
 }
 
-export function mapPlanDefinitionToDecision(instance: any): string {
+export function mapPlanDefinitionToDecision(instance: any): { decision: string, activities: { name: string, original: string }[] } {
   if (!PLAN_DEFINITION_URLS.includes(instance.instanceOf)) {
-    return '';
+    return { decision: '', activities: [] };
   }
   const decisionName = instance.name || '[UnnamedPlanDefinition]';
   let output = '';
   output += `decision "${decisionName}":\n`;
 
-  const activities: string[] = [];
+  // Collect activities as { name, original } for deduplication later
+  const activities: { name: string, original: string }[] = [];
   const emittedActivities = new Set<string>();
   const actionTree = buildActionTree(instance.rules || []);
   output += emitWhenBlocks(actionTree, activities, emittedActivities);
 
   output += 'done\n';
-  for (const act of activities) {
-    output += act;
-  }
-  return output;
+  // Do not emit activities here; return them for file-wide deduplication
+  return { decision: output, activities };
 } 
