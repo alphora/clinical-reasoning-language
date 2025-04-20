@@ -341,6 +341,18 @@ describe('CPGLAstBuilder', () => {
       expect((ast.definition as TerminologySystemCode).system).toBe('http://snomed.info/sct');
       expect((ast.definition as TerminologySystemCode).code).toBe('73761001');
     });
+
+    it('should parse a terminology system code with empty system and code', () => {
+      const input = 'terminology "Empty System Code" system `` code ``.';
+
+      const result = parseInput(input);
+      const ast = result.statements[0] as Terminology;
+      expect(ast.type).toBe(TerminologyType.type);
+      expect(ast.name).toBe('Empty System Code');
+      expect(ast.definition.type).toBe(TerminologySystemCodeType.type);
+      expect((ast.definition as TerminologySystemCode).system).toBe('');
+      expect((ast.definition as TerminologySystemCode).code).toBe('');
+    });
   });
 
   describe('Activity Statements', () => {
@@ -432,8 +444,7 @@ describe('CPGLAstBuilder', () => {
       expect(ast.valueType).toBe('Quantity');
       expect(ast.definition.type).toBe(InferredByDefinitionType.type);
       const inferredBy = ast.definition as InferredByDefinition;
-      if ('body' in inferredBy && inferredBy.body.type === 'InferredByDefinitionConcept') {
-      }
+      if ('body' in inferredBy && inferredBy.body.type === 'InferredByDefinitionConcept') { /* empty */ }
       expect((inferredBy.body as any).pattern).toBeUndefined();
       expect((inferredBy.body as any).concept).toBeUndefined();
     });
@@ -480,6 +491,23 @@ describe('CPGLAstBuilder', () => {
       expect((inferredBy.body as any).pattern).toBeUndefined();
       expect((inferredBy.body as any).concept).toBeUndefined();
     });
+
+    it('should parse a concept with empty provenance', () => {
+      const input = [
+        'concept "Empty Provenance":',
+        '  has type Observation.',
+        '  has valuetype boolean.',
+        '  has provenance ``.',
+        '  inferred by "Some Pattern" "Some Concept".',
+        'done'
+      ].join('\n');
+
+      const result = parseInput(input);
+      const ast = result.statements[0] as Concept;
+      expect(ast.type).toBe('Concept');
+      expect(ast.name).toBe('Empty Provenance');
+      expect(ast.provenance).toBe('');
+    });
   });
 
   describe('Multiple Statements', () => {
@@ -490,7 +518,6 @@ describe('CPGLAstBuilder', () => {
         concept "BMI":
           has type Observation.
           has valuetype Quantity.
-          coded by "BMI Valueset".
         done
         decision "Check BMI":
           when "BMI" then do "Record BMI".
