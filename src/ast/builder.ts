@@ -249,12 +249,20 @@ export class CPGLAstBuilder extends AbstractParseTreeVisitor<ASTNode> implements
       }
     }
     let definition: ConceptDefinition;
-    if (bodyCtx.codedByLine()) {
+    console.log('[DEBUGGING] bodyCtx:', bodyCtx);
+    console.log('[DEBUGGING] bodyCtx.codedByLine():', bodyCtx.codedByLine?.());
+    console.log('[DEBUGGING] bodyCtx.inferredByLine():', bodyCtx.inferredByLine?.());
+    if (bodyCtx.codedByLine && bodyCtx.codedByLine()) {
       const termRef = bodyCtx.codedByLine()!.terminologyReference().text.slice(1,-1);
       definition = { type: CodedByDefinitionType.type, terminologyName: termRef, location: getLocation(bodyCtx.codedByLine()!) };
-    } else {
-      const infCtx = bodyCtx.inferredByLine()!;
+    } else if (bodyCtx.inferredByLine && bodyCtx.inferredByLine()) {
+      const infCtx = bodyCtx.inferredByLine();
+      if (!infCtx) {
+        throw new Error('[DEBUGGING] inferredByLine() is undefined in ConceptStatement');
+      }
       definition = this.visit(infCtx) as InferredByDefinition;
+    } else {
+      throw new Error('[DEBUGGING] ConceptStatement must have either codedByLine or inferredByLine');
     }
     return { type: 'Concept', name, conceptType, valueType, provenance, definition, location: getLocation(ctx) };
   }
