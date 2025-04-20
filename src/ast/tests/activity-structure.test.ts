@@ -1,9 +1,5 @@
-import { CharStreams, CommonTokenStream } from 'antlr4ts';
-
-import { createParser } from '../../parser/createParser';
-import { createLexer } from '../../lexer/createLexer';
 import { CPGLAstBuilder } from '../builder';
-import { CPGL, Activity } from '../types';
+import { Activity } from '../types';
 import { parseInput } from './parseInput';
 
 describe('Activity Structure', () => {
@@ -67,5 +63,18 @@ describe('Activity Structure', () => {
     // Free text
     expect(activity2.activityTypeValue).toBe('A notification message');
     expect(activity2.terminologyReference).toBeUndefined();
+  });
+
+  it('should correctly structure activity with empty free text', () => {
+    const input = 'activity "Empty Free Text" perform CPGCommunicationRequest of ``.';
+
+    const result = parseInput(input);
+    const activity = result.statements[0] as Activity;
+
+    expect(activity.type).toBe('Activity');
+    expect(activity.name).toBe('Empty Free Text');
+    expect(activity.perform).toBe('CPGCommunicationRequest');
+    expect(activity.activityTypeValue).toBe('');
+    expect(activity.terminologyReference).toBeUndefined();
   });
 }); 
