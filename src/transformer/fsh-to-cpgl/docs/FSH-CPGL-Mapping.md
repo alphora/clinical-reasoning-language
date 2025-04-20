@@ -184,6 +184,8 @@ then:
 
 the CPG-L value would be: MedicationRequest.
 
+- `prefix(string)`: add the `string` argument to the front of the CPG-L value.
+
 - `where(clause)`: only generate a CPG-L value if the clause arguments exists.
 
 The `clause` argument has two arguments, separated by a `=`: `leftArg=rightArg`.
@@ -374,7 +376,7 @@ The expression `[*].action` in these mapping rules means an arbitrary nesting of
 
 - `activitydef-description` = Description of ActivityDef
 
-- `activitydef-kind` = `ActivityDef.kind.remove('#')`
+- `activitydef-kind` = `ActivityDef.kind.remove('#').prefix('CPG')`
 
 - `activitydef-code` = one of either:
   - `ActivityDef.productCodeableConcept.extractCode()`
@@ -505,27 +507,3 @@ is a reference from the IMMZDTImmunizationStrategy FSR FHIR resource to the foll
 ```FSH
 Instance: IMMZD2DTMeaslesDose0
 ```
-
-## Rules
-
-- plandef > decision
-- plandef-description > decision.identifier
-- plandef-citation > decision.comment
-- plandef-action > decision.when
-- plandef-condition-expression  > decision.when.identifier
-- plandef-canonical > decision.when.use
-- activitydef-description > decision.when.do
-
-- plandef-condition > concept
-- plandef-condition-expression > concept.identifier
-
-- plandef-rationale > decision.rationale
-- plandef-description > decision.comment
-- activitydef > activity
-- activitydef-description > activity.identifier
-- activitydef-kind > activity.perform
-- activitydef-code-display > activity.perform.of
-- activitydef-code-display > terminology.identifier
-- activitydef-code > terminology.code
-- plandef-condition > concept
-- plandef-condition-expression > concept.identifier
