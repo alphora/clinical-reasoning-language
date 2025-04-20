@@ -15,6 +15,7 @@ import {
   UseDecision
 } from '../types';
 import { createParser } from '../../parser/createParser';
+import { parseInput } from './parseInput';
 
 /**
  * This test suite verifies the correct structure of nested decisions in the AST.
@@ -31,14 +32,6 @@ describe('Decision Structure', () => {
   beforeEach(() => {
     builder = new CPGLAstBuilder();
   });
-
-  const parseInput = (input: string): CPGL => {
-    const lexer = createLexer(CharStreams.fromString(input));
-    const tokens = new CommonTokenStream(lexer);
-    const parser = createParser(tokens);
-    const tree = parser.cpgl();
-    return builder.visit(tree) as CPGL;
-  };
 
   it('should maintain correct structure for nested decisions', () => {
     const input = `
@@ -271,14 +264,6 @@ describe('Repeated Statements in Decision Blocks', () => {
   beforeEach(() => {
     builder = new CPGLAstBuilder();
   });
-
-  const parseInput = (input: string): CPGL => {
-    const lexer = createLexer(CharStreams.fromString(input));
-    const tokens = new CommonTokenStream(lexer);
-    const parser = createParser(tokens);
-    const tree = parser.cpgl();
-    return builder.visit(tree) as CPGL;
-  };
 
   it('should preserve repeated when statements', () => {
     const input = `

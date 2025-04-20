@@ -11,6 +11,7 @@ import {
   CodedByDefinition 
 } from '../types';
 import { createParser } from '../../parser/createParser';
+import { parseInput } from './parseInput';
 
 describe('Concept Structure', () => {
   let builder: CPGLAstBuilder;
@@ -18,14 +19,6 @@ describe('Concept Structure', () => {
   beforeEach(() => {
     builder = new CPGLAstBuilder();
   });
-
-  const parseInput = (input: string): CPGL => {
-    const lexer = createLexer(CharStreams.fromString(input));
-    const tokens = new CommonTokenStream(lexer);
-    const parser = createParser(tokens);
-    const tree = parser.cpgl();
-    return builder.visit(tree) as CPGL;
-  };
 
   it('should correctly structure concept with inferred by concept reference', () => {
     const input = `

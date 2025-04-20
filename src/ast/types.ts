@@ -125,10 +125,10 @@ export const TerminologyType = {
   type: 'Terminology' as const,
 };
 
-// Terminology definition can be a valueset, unknown, or system code
+// Terminology definition can be a valueset, free text, or system code
 export type TerminologyDefinition =
   | TerminologyValueset
-  | TerminologyUnknown
+  | TerminologyFreeText
   | TerminologySystemCode;
 
 // Terminology valueset
@@ -141,13 +141,14 @@ export const TerminologyValuesetType = {
   type: 'TerminologyValueset' as const,
 };
 
-// Terminology unknown
-export interface TerminologyUnknown extends ASTNode {
-  type: 'TerminologyUnknown';
+// Terminology free text (markdown, etc.)
+export interface TerminologyFreeText extends ASTNode {
+  type: 'TerminologyFreeText';
+  value: string;
   location: Location;
 }
-export const TerminologyUnknownType = {
-  type: 'TerminologyUnknown' as const,
+export const TerminologyFreeTextType = {
+  type: 'TerminologyFreeText' as const,
 };
 
 // Terminology system code

@@ -4,6 +4,7 @@ import { createParser } from '../../parser/createParser';
 import { createLexer } from '../../lexer/createLexer';
 import { CPGLAstBuilder } from '../builder';
 import { CPGL, Activity } from '../types';
+import { parseInput } from './parseInput';
 
 describe('Activity Structure', () => {
   let builder: CPGLAstBuilder;
@@ -11,14 +12,6 @@ describe('Activity Structure', () => {
   beforeEach(() => {
     builder = new CPGLAstBuilder();
   });
-
-  const parseInput = (input: string): CPGL => {
-    const lexer = createLexer(CharStreams.fromString(input));
-    const tokens = new CommonTokenStream(lexer);
-    const parser = createParser(tokens);
-    const tree = parser.cpgl();
-    return builder.visit(tree) as CPGL;
-  };
 
   it('should correctly structure activity with type', () => {
     const input = 'activity "Vaccinate" perform CPGImmunizationRequest.';

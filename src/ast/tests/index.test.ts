@@ -12,11 +12,4 @@ import './terminology-structure.test';
 import './activity-structure.test';
 import { createParser } from '../../parser/createParser';
 
-export const parseInput = (input: string): CPGL => {
-  const lexer = createLexer(CharStreams.fromString(input));
-  const tokenStream = new CommonTokenStream(lexer);
-  const parser = createParser(tokenStream);
-  const tree = parser.cpgl();
-  const builder = new CPGLAstBuilder();
-  return builder.visitCpgl(tree);
-};
+// parseInput has been moved to parseInput.ts

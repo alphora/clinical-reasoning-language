@@ -161,9 +161,20 @@ export class CPGLAstBuilder extends AbstractParseTreeVisitor<ASTNode> implements
 
   visitTerminologyStatement(ctx: TerminologyStatementContext): Terminology {
     const name = ctx.terminologyIdentifier().text.slice(1, -1);
-    const defCtx = ctx.terminologyValueset() ?? ctx.terminologySystemCode();
-    const definition = this.visit(defCtx!) as TerminologyValueset | TerminologySystemCode;
-    return { type: TerminologyType.type, name, definition, location: getLocation(ctx) };
+    let definition: TerminologyValueset | TerminologySystemCode | { type: 'TerminologyFreeText'; value: string; location: Location };
+    if (ctx.terminologyValueset()) {
+      definition = this.visit(ctx.terminologyValueset()!) as TerminologyValueset;
+    } else if (ctx.terminologySystemCode()) {
+      definition = this.visit(ctx.terminologySystemCode()!) as TerminologySystemCode;
+    } else if (ctx.backtickString()) {
+      // free text/markdown case
+      definition = {
+        type: 'TerminologyFreeText',
+        value: ctx.backtickString()!.text.slice(1, -1),
+        location: getLocation(ctx)
+      };
+    }
+    return { type: TerminologyType.type, name, definition: definition!, location: getLocation(ctx) };
   }
 
   visitTerminologyValueset(ctx: TerminologyValuesetContext): TerminologyValueset {
@@ -175,8 +186,8 @@ export class CPGLAstBuilder extends AbstractParseTreeVisitor<ASTNode> implements
     let system = '';
     let code = '';
     if (ctx.backtickString && ctx.backtickString().length === 2) {
-      const systemNode = ctx.backtickString(0).BACKTICK_STRING();
-      const codeNode = ctx.backtickString(1).BACKTICK_STRING();
+      const systemNode = ctx.backtickString(0);
+      const codeNode = ctx.backtickString(1);
       if (systemNode && systemNode.text) system = systemNode.text.slice(1, -1);
       if (codeNode && codeNode.text) code = codeNode.text.slice(1, -1);
     }
@@ -190,57 +201,31 @@ export class CPGLAstBuilder extends AbstractParseTreeVisitor<ASTNode> implements
     let activityTypeValue: string | undefined;
     let rationale: string | undefined;
 
-    // [DEBUGGING] Print children and their types
-    if (ctx.children) {
-      console.log('[DEBUGGING] activityStatement children:', ctx.children.map(c => {
-        const ruleCtx = c as any;
-        return {
-          text: ruleCtx.getText ? ruleCtx.getText() : String(c),
-          type: c.constructor.name
-        };
-      }));
-    }
-
-    if (ctx.terminologyReference()) {
-      terminologyReference = ctx.terminologyReference()!.text.slice(1, -1);
-    }
-    if (ctx.activityTypeValue()) {
-      // activityTypeValue is a backtickString
-      const atv = ctx.activityTypeValue()!;
-      if (atv.backtickString) {
-        const backtickCtx = atv.backtickString();
-        if (backtickCtx && backtickCtx.BACKTICK_STRING) {
-          const token = backtickCtx.BACKTICK_STRING();
-          if (token && token.text) {
-            activityTypeValue = token.text.slice(1, -1);
-          } else if (backtickCtx.text) {
+    // OF clause: can be terminologyReference (identifier) or activityTypeValue (backtickString)
+    if (ctx.OF()) {
+      if (ctx.terminologyReference()) {
+        terminologyReference = ctx.terminologyReference()!.text.slice(1, -1);
+      } else if (ctx.activityTypeValue()) {
+        // activityTypeValue is a backtickString
+        const atv = ctx.activityTypeValue()!;
+        if (atv.backtickString) {
+          const backtickCtx = atv.backtickString();
+          if (backtickCtx && backtickCtx.text) {
             activityTypeValue = backtickCtx.text.slice(1, -1);
           }
-        } else if (atv.text) {
-          activityTypeValue = atv.text.slice(1, -1);
         }
-      } else if (atv.text) {
-        activityTypeValue = atv.text.slice(1, -1);
       }
     }
+    // rationale (BECAUSE) is always a backtickString
     if (ctx.rationale) {
       const rationaleCtx = ctx.rationale();
       if (rationaleCtx && rationaleCtx.backtickString) {
         const backtickCtx = rationaleCtx.backtickString();
-        if (backtickCtx && backtickCtx.BACKTICK_STRING) {
-          const token = backtickCtx.BACKTICK_STRING();
-          if (token && token.text) {
-            rationale = token.text.slice(1, -1);
-          } else if (backtickCtx.text) {
-            rationale = backtickCtx.text.slice(1, -1);
-          }
-        } else if (rationaleCtx.text) {
-          rationale = rationaleCtx.text.slice(1, -1);
+        if (backtickCtx && backtickCtx.text) {
+          rationale = backtickCtx.text.slice(1, -1);
         }
-        console.log('[DEBUGGING] rationale:', rationale);
       }
     }
-
     return { type: 'Activity', name, perform, terminologyReference, activityTypeValue, rationale, location: getLocation(ctx) };
   }
 
