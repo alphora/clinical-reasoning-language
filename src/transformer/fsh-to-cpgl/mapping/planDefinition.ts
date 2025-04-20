@@ -58,8 +58,8 @@ function emitWhenBlocksRecursive(
     let hasPlanDef = false;
     let hasActivityDef = false;
     let useIdentifier = '';
+    const referenced = allInstances.find(inst => inst.name === canonicalValueStr);
     if (canonicalValueStr) {
-      const referenced = allInstances.find(inst => inst.name === canonicalValueStr);
       if (referenced && PLAN_DEFINITION_URLS.includes(referenced.instanceOf)) {
         hasPlanDef = true;
         let refDescription = referenced.description;
@@ -78,17 +78,42 @@ function emitWhenBlocksRecursive(
       output += `${indent}    use ${useIdentifier}.\n`;
       output += `${indent}    do ${doIdentifier}.\n`;
       output += `${indent}done\n`;
-      activities.push({ name: doIdentifier, original: `activity ${doIdentifier} perform ... // TODO: activity details.\n` });
+      // Only call getActivityPerformClause with the resolved ActivityDefinition instance
+      let activityDefInstance = null;
+      if (canonicalValueStr) {
+        const referenced = allInstances.find(inst => inst.name === canonicalValueStr);
+        if (referenced && !PLAN_DEFINITION_URLS.includes(referenced.instanceOf)) {
+          activityDefInstance = referenced;
+        }
+      }
+      if (activityDefInstance) {
+        console.log('[DEBUGGING] getActivityPerformClause called with ActivityDefinition:', { name: activityDefInstance.name, instanceOf: activityDefInstance.instanceOf });
+        activities.push({ name: doIdentifier, original: `activity ${doIdentifier} ${getActivityPerformClause(activityDefInstance)}\n` });
+      } else {
+        activities.push({ name: doIdentifier, original: `activity ${doIdentifier} // TODO: activity details.\n` });
+      }
     } else if (hasPlanDef) {
       output += ` use ${useIdentifier}.\n`;
     } else if (hasActivityDef) {
       output += ` do ${doIdentifier}.\n`;
-      activities.push({ name: doIdentifier, original: `activity ${doIdentifier} perform ... // TODO: activity details.\n` });
+      // Only call getActivityPerformClause with the resolved ActivityDefinition instance
+      let activityDefInstance = null;
+      if (canonicalValueStr) {
+        const referenced = allInstances.find(inst => inst.name === canonicalValueStr);
+        if (referenced && !PLAN_DEFINITION_URLS.includes(referenced.instanceOf)) {
+          activityDefInstance = referenced;
+        }
+      }
+      if (activityDefInstance) {
+        console.log('[DEBUGGING] getActivityPerformClause called with ActivityDefinition:', { name: activityDefInstance.name, instanceOf: activityDefInstance.instanceOf });
+        activities.push({ name: doIdentifier, original: `activity ${doIdentifier} ${getActivityPerformClause(activityDefInstance)}\n` });
+      } else {
+        activities.push({ name: doIdentifier, original: `activity ${doIdentifier} // TODO: activity details.\n` });
+      }
     } else {
       // Neither: emit a CPGCommunicationRequest activity (unique per name+description)
       output += ` do ${doIdentifier}.\n`;
       activities.push({ name: doIdentifier, original: `activity ${doIdentifier} perform CPGCommunicationRequest of ${activityDescription}.\n` });
-
     }
   }
   return output;
@@ -136,6 +161,74 @@ function parseActions(rules: any[], basePath = 'action'): ActionNode[] {
   }
   if (currentNode) nodes.push(currentNode);
   return nodes;
+}
+
+// Helper to extract kind and code-display from an ActivityDefinition instance
+function getActivityPerformClause(activityDef: any): string {
+  // Extract kind from rules
+  let kind: string | undefined = undefined;
+  if (activityDef && Array.isArray(activityDef.rules)) {
+    const kindRule = activityDef.rules.find((r: any) => r.path === 'kind');
+    if (kindRule) {
+      if (typeof kindRule.value === 'string') {
+        kind = 'CPG' + kindRule.value.replace(/#/g, '');
+      } else if (kindRule.value && typeof kindRule.value === 'object' && 'code' in kindRule.value) {
+        kind = 'CPG' + String(kindRule.value.code).replace(/#/g, '');
+      }
+    }
+    if (!kindRule) {
+      console.log('[DEBUGGING] No kind rule found. All rule paths/values:', activityDef.rules.map((r: any) => ({ path: r.path, value: r.value })));
+    }
+  }
+  if (!kind) {
+    kind = 'TODO';
+  }
+  // Extract code-display from rules
+  let codeDisplay: string | undefined = undefined;
+  if (activityDef && Array.isArray(activityDef.rules)) {
+    // Prefer productCodeableConcept
+    const pccRule = activityDef.rules.find((r: any) => r.path === 'productCodeableConcept');
+    if (pccRule) {
+      if (typeof pccRule.value === 'object' && pccRule.value !== null) {
+        // FshCode object
+        if ('display' in pccRule.value && pccRule.value.display) {
+          codeDisplay = `"${pccRule.value.display}"`;
+        } else if ('code' in pccRule.value && pccRule.value.code) {
+          codeDisplay = `"${pccRule.value.code}"`;
+        }
+      } else if (typeof pccRule.value === 'string') {
+        // Fallback: extract quoted string
+        const match = /^.*?"(.*?)"$/.exec(pccRule.value);
+        if (match) {
+          codeDisplay = `"${match[1]}"`;
+        }
+      }
+    }
+    if (!pccRule) {
+      console.log('[DEBUGGING] No productCodeableConcept rule found. All rule paths/values:', activityDef.rules.map((r: any) => ({ path: r.path, value: r.value })));
+    }
+    // Fallback to dynamicValue logic (do not change)
+    if (!codeDisplay) {
+      // Find all dynamicValue rules
+      const dvRules = activityDef.rules.filter((r: any) => r.path.startsWith('dynamicValue'));
+      for (const rule of dvRules) {
+        // Look for a rule like 'dynamicValue[=].path' with value 'code.coding'
+        if (rule.path.endsWith('.path') && rule.value === 'code.coding') {
+          // Find the corresponding description
+          const prefix = rule.path.replace(/\.path$/, '');
+          const descRule = activityDef.rules.find((r: any) => r.path === `${prefix}.expression.description`);
+          if (descRule && typeof descRule.value === 'string') {
+            codeDisplay = `"${descRule.value}"`;
+            break;
+          }
+        }
+      }
+    }
+  }
+  if (!codeDisplay) {
+    codeDisplay = 'TODO';
+  }
+  return `perform ${kind} of ${codeDisplay}.`;
 }
 
 export function mapPlanDefinitionToDecision(instance: any, allInstances: any[]): { decision: string, activities: { name: string, original: string }[] } {
