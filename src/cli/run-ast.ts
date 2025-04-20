@@ -35,6 +35,7 @@ if (!prettyOutput) {
   console.log(JSON.stringify(ast, null, 2));
 } else {
   // Pretty AST output
+  console.warn('[WARNING] Pretty mode is currently broken and may not display the AST correctly.');
   console.log('AST Representation:');
   console.log('==================');
   console.log(printAST(ast));

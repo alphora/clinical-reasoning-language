@@ -91,8 +91,6 @@ export class CPGLAstBuilder extends AbstractParseTreeVisitor<ASTNode> implements
   visitNestedWhenBlock(ctx: NestedWhenBlockContext): WhenBlock { return this.visit(ctx.whenBlock()) as WhenBlock; }
   visitBlockAction(ctx: BlockActionContext): ActionStatement {
     const result = this.visit(ctx.actionStatement()) as ActionStatement;
-    console.log('[DEBUGGING] visitBlockAction ctx:', ctx.text);
-    console.log('[DEBUGGING] visitBlockAction result:', result);
     return result;
   }
 
@@ -145,16 +143,12 @@ export class CPGLAstBuilder extends AbstractParseTreeVisitor<ASTNode> implements
   visitDoStatement(ctx: DoStatementContext): DoActivity {
     const activityName = ctx.activityReference().text.slice(1, -1);
     const result = { type: DoActivityType.type, activityName, location: getLocation(ctx) };
-    console.log('[DEBUGGING] visitDoStatement ctx:', ctx.text);
-    console.log('[DEBUGGING] visitDoStatement result:', result);
     return result;
   }
 
   visitUseStatement(ctx: UseStatementContext): UseDecision {
     const decisionName = ctx.decisionReference().text.slice(1, -1);
     const result = { type: UseDecisionType.type, decisionName, location: getLocation(ctx) };
-    console.log('[DEBUGGING] visitUseStatement ctx:', ctx.text);
-    console.log('[DEBUGGING] visitUseStatement result:', result);
     return result;
   }
 
@@ -249,20 +243,17 @@ export class CPGLAstBuilder extends AbstractParseTreeVisitor<ASTNode> implements
       }
     }
     let definition: ConceptDefinition;
-    console.log('[DEBUGGING] bodyCtx:', bodyCtx);
-    console.log('[DEBUGGING] bodyCtx.codedByLine():', bodyCtx.codedByLine?.());
-    console.log('[DEBUGGING] bodyCtx.inferredByLine():', bodyCtx.inferredByLine?.());
     if (bodyCtx.codedByLine && bodyCtx.codedByLine()) {
       const termRef = bodyCtx.codedByLine()!.terminologyReference().text.slice(1,-1);
       definition = { type: CodedByDefinitionType.type, terminologyName: termRef, location: getLocation(bodyCtx.codedByLine()!) };
     } else if (bodyCtx.inferredByLine && bodyCtx.inferredByLine()) {
       const infCtx = bodyCtx.inferredByLine();
       if (!infCtx) {
-        throw new Error('[DEBUGGING] inferredByLine() is undefined in ConceptStatement');
+        throw new Error('ConceptStatement: inferredByLine() unexpectedly returned undefined');
       }
       definition = this.visit(infCtx) as InferredByDefinition;
     } else {
-      throw new Error('[DEBUGGING] ConceptStatement must have either codedByLine or inferredByLine');
+      throw new Error('ConceptStatement must have either codedByLine or inferredByLine');
     }
     return { type: 'Concept', name, conceptType, valueType, provenance, definition, location: getLocation(ctx) };
   }
