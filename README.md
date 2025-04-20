@@ -8,6 +8,8 @@ Clinical Practice Guideline Language (CPGL) parser and validator
 
 ## Overview
 
+See the [User Guide](./USER_GUIDE.md) for a comprehensive introduction to the CPGL language, syntax, and authoring best practices.
+
 CPGL is a domain-specific language designed for expressing clinical practice guidelines in a structured and machine-readable format. The language is implemented in TypeScript and provides a comprehensive set of tools for processing CPGL documents.
 
 ### Core Modules
@@ -268,7 +270,7 @@ npm run build
 The package is distributed via GitHub Releases. To create a new release:
 
 1. Create a new branch (e.g., `release/v0.1.0`)
-1. Generate a CHANGELOG: "I'm creating a new release release/>version<, generate and append to the CHANGELOG.  Use git to determin the changes from the last tag to now." (e.g., v0.1.0)
+1. Generate a CHANGELOG: "I'm creating a new release release/>version<, generate and append to the CHANGELOG.  Use git to determine the changes from the last tag to now. Use git to discover all the commits between the prior release and now." (e.g., v0.1.0)
 1. Commit all changes
 1. Run the automated release script:
    ```bash
