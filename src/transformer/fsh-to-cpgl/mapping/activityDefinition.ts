@@ -90,7 +90,8 @@ export function getActivityPerformClause(activityDef: any, doIdentifier: string)
   if (!kind && !activityValue) {
     return { clauseString: '', value };
   }
-  const clauseString = `\n    perform ${kind}${formatActivityValue(activityValue)}.`;
+  //TODO: Activity value needs to have backticks vs quotes based on the kind/source value.  Note: when doing so, it currently has double quotes so they need to be removed.
+  const clauseString = `\n    perform ${kind}${formatActivityValue(activityValue)}`;
   return { clauseString, value };
 }
 
@@ -129,6 +130,18 @@ export function emitActivityBlock(
       activityDefInstance = referenced;
     }
   }
+  let rationale: string | undefined = undefined;
+  if (Array.isArray(node.extension)) {
+    const rationaleExt = node.extension.find((ext: any) =>
+      ext.url === 'http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-rationale' &&
+      typeof ext.valueMarkdown === 'string' && ext.valueMarkdown.trim() !== ''
+    );
+    if (rationaleExt) {
+      // Format as CPGL backtick string (markdown/freetext)
+      rationale = `\n    because \`${rationaleExt.valueMarkdown.replace(/`/g, '`')}\``;
+    }
+  }
+
   let output = '';
   // If both planDef and activityDef are present, emit a use and do clause
   if (hasPlanDef && hasActivityDef) {
@@ -140,34 +153,10 @@ export function emitActivityBlock(
     output += `${indent}done\n`;
     if (activityDefInstance) {
       const { clauseString, value } = getActivityPerformClause(activityDefInstance, doIdentifier);
-      // Find rationale (plandef-rationale) for this action node
-      let rationale: string | undefined = undefined;
-      if (Array.isArray(node.extension)) {
-        const rationaleExt = node.extension.find((ext: any) =>
-          ext.url === 'http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-rationale' &&
-          typeof ext.valueMarkdown === 'string' && ext.valueMarkdown.trim() !== ''
-        );
-        if (rationaleExt) {
-          // Format as CPGL backtick string (markdown/freetext)
-          rationale = ` because \`${rationaleExt.valueMarkdown.replace(/`/g, '\`')}\``;
-        }
-      }
-      activities.push({ id: activityId, name: doIdentifier, value, original: `activity ${doIdentifier} ${clauseString}${rationale ?? ''}\n\n` });
+      activities.push({ id: activityId, name: doIdentifier, value, original: `activity ${doIdentifier} ${clauseString}${rationale ?? ''}.\n\n` });
       doReferences.push({ id: activityId, placeholder });
     } else {
-      // Find rationale (plandef-rationale) for this action node
-      let rationale: string | undefined = undefined;
-      if (Array.isArray(node.extension)) {
-        const rationaleExt = node.extension.find((ext: any) =>
-          ext.url === 'http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-rationale' &&
-          typeof ext.valueMarkdown === 'string' && ext.valueMarkdown.trim() !== ''
-        );
-        if (rationaleExt) {
-          // Format as CPGL backtick string (markdown/freetext)
-          rationale = ` because \`${rationaleExt.valueMarkdown.replace(/`/g, '\`')}\``;
-        }
-      }
-      activities.push({ id: activityId, name: doIdentifier, value: undefined, original: `activity ${doIdentifier} // TODO: activity details.${rationale ?? ''}\n\n` });
+      activities.push({ id: activityId, name: doIdentifier, value: undefined, original: `activity ${doIdentifier} // TODO: activity details${rationale ?? ''}.\n\n` });
       doReferences.push({ id: activityId, placeholder });
     }
   }
@@ -182,34 +171,10 @@ export function emitActivityBlock(
     output += ` do ${placeholder}.\n`;
     if (activityDefInstance) {
       const { clauseString, value } = getActivityPerformClause(activityDefInstance, doIdentifier);
-      // Find rationale (plandef-rationale) for this action node
-      let rationale: string | undefined = undefined;
-      if (Array.isArray(node.extension)) {
-        const rationaleExt = node.extension.find((ext: any) =>
-          ext.url === 'http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-rationale' &&
-          typeof ext.valueMarkdown === 'string' && ext.valueMarkdown.trim() !== ''
-        );
-        if (rationaleExt) {
-          // Format as CPGL backtick string (markdown/freetext)
-          rationale = ` because \`${rationaleExt.valueMarkdown.replace(/`/g, '\`')}\``;
-        }
-      }
-      activities.push({ id: activityId, name: doIdentifier, value, original: `activity ${doIdentifier} ${clauseString}${rationale ?? ''}\n\n` });
+      activities.push({ id: activityId, name: doIdentifier, value, original: `activity ${doIdentifier} ${clauseString}${rationale ?? ''}.\n\n` });
       doReferences.push({ id: activityId, placeholder });
     } else {
-      // Find rationale (plandef-rationale) for this action node
-      let rationale: string | undefined = undefined;
-      if (Array.isArray(node.extension)) {
-        const rationaleExt = node.extension.find((ext: any) =>
-          ext.url === 'http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-rationale' &&
-          typeof ext.valueMarkdown === 'string' && ext.valueMarkdown.trim() !== ''
-        );
-        if (rationaleExt) {
-          // Format as CPGL backtick string (markdown/freetext)
-          rationale = ` because \`${rationaleExt.valueMarkdown.replace(/`/g, '\`')}\``;
-        }
-      }
-      activities.push({ id: activityId, name: doIdentifier, value: undefined, original: `activity ${doIdentifier} // TODO: activity details.${rationale ?? ''}\n\n` });
+      activities.push({ id: activityId, name: doIdentifier, value: undefined, original: `activity ${doIdentifier} // TODO: activity details${rationale ?? ''}.\n\n` });
       doReferences.push({ id: activityId, placeholder });
     }
   } else {
@@ -217,28 +182,8 @@ export function emitActivityBlock(
     const activityId = getNextActivityId();
     const placeholder = `<<ACTIVITY_REF:${activityId}>>`;
     output += ` do ${placeholder}.\n`;
-    // Find rationale (plandef-rationale) for this action node
-    let rationale: string | undefined = undefined;
-    if (Array.isArray(node.extension)) {
-      const rationaleExt = node.extension.find((ext: any) =>
-        ext.url === 'http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-rationale' &&
-        typeof ext.valueMarkdown === 'string' && ext.valueMarkdown.trim() !== ''
-      );
-      if (rationaleExt) {
-        // Format as CPGL backtick string (markdown/freetext)
-        rationale = ` because \`${rationaleExt.valueMarkdown.replace(/`/g, '\`')}\``;
-      }
-    }
-    activities.push({ id: activityId, name: doIdentifier, value: activityDescription, original: `activity ${doIdentifier}\n    perform CPGCommunicationRequest${formatActivityValue('"' + (activityDescription || 'TODO: fill in message.') + '"')}.${rationale ?? ''}\n\n` });
+    activities.push({ id: activityId, name: doIdentifier, value: activityDescription, original: `activity ${doIdentifier}\n    perform CPGCommunicationRequest${formatActivityValue('`' + (activityDescription || 'TODO: fill in message.') + '`')}${rationale ?? ''}.\n\n` });
     doReferences.push({ id: activityId, placeholder });
-  }
-
-  // [DEBUGGING] Log the structure of node.extension and node for troubleshooting rationale extraction
-  if (typeof node === 'object') {
-    console.log('[DEBUGGING] node:', JSON.stringify(node, null, 2));
-    if ('extension' in node) {
-      console.log('[DEBUGGING] node.extension:', JSON.stringify(node.extension, null, 2));
-    }
   }
 
   return output;
