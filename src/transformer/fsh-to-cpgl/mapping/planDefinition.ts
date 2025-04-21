@@ -3,7 +3,7 @@ const PLAN_DEFINITION_URLS = [
   'http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-recommendationdefinition'
 ];
 
-import { ACTIVITY_DEFINITION_URLS, getActivityPerformClause, emitActivityBlock } from './activityDefinition';
+import { emitActivityBlock } from './activityDefinition';
 
 import { toIdentifier, toString } from '../utils/fshPathFunctions';
 
@@ -18,7 +18,6 @@ interface ActionNode {
 function emitWhenBlocksRecursive(
   nodes: ActionNode[],
   activities: { name: string, original: string }[],
-  emittedActivities: Set<string>,
   allInstances: any[],
   instance: any,
   indent = '    '
@@ -27,22 +26,46 @@ function emitWhenBlocksRecursive(
   for (const node of nodes) {
     if (!node.conditionExpression) {
       if (node.children.length > 0) {
-        output += emitWhenBlocksRecursive(node.children, activities, emittedActivities, allInstances, instance, indent);
-      }
-      continue;
+        output += emitWhenBlocksRecursive(node.children, activities, allInstances, instance, indent);
+      }     continue;
     }
     if (node.children.length > 0 && node.definitionCanonical) {
       throw new Error('[emitWhenBlocksRecursive] Node has both children and definitionCanonical, which is ambiguous and violates the grammar.');
     }
     if (node.children.length > 0) {
       output += `${indent}when "${node.conditionExpression}" then:\n`;
-      output += emitWhenBlocksRecursive(node.children, activities, emittedActivities, allInstances, instance, indent + '    ');
+      output += emitWhenBlocksRecursive(node.children, activities, allInstances, instance, indent + '    ');
       output += `${indent}done\n`;
       continue;
     }
+    // Calculate canonicalValueStr for this node
+    let canonicalValueStr: string | undefined = undefined;
+    if (node.definitionCanonical) {
+      if (typeof node.definitionCanonical === 'string') {
+        if (node.definitionCanonical.startsWith('Canonical(')) {
+          canonicalValueStr = node.definitionCanonical.replace(/^Canonical\((.*)\)$/, '$1');
+        } else {
+          canonicalValueStr = node.definitionCanonical;
+        }
+      } else if (typeof node.definitionCanonical === 'object' && 'entityName' in node.definitionCanonical) {
+        canonicalValueStr = (node.definitionCanonical as { entityName: string }).entityName;
+      }
+    }
+    // Calculate hasPlanDef for this node
+    let hasPlanDef = false;
+    if (canonicalValueStr) {
+      const referenced = allInstances.find(inst => inst.name === canonicalValueStr);
+      if (
+        referenced &&
+        referenced.instanceOf &&
+        PLAN_DEFINITION_URLS.includes(referenced.instanceOf)
+      ) {
+        hasPlanDef = true;
+      }
+    }
     // Delegate activity emission to activityDefinition helper
     output += `${indent}when "${node.conditionExpression}" then`;
-    output += emitActivityBlock(node, allInstances, activities, indent);
+    output += emitActivityBlock(node, canonicalValueStr, allInstances, activities, indent, hasPlanDef);
   }
   return output;
 }
@@ -118,9 +141,8 @@ export function mapPlanDefinitionToDecision(instance: any, allInstances: any[]):
 
   // Collect activity stats for all PlanDefinitions
   const activities: { name: string, original: string }[] = [];
-  const emittedActivities = new Set<string>();
 
-  output += emitWhenBlocksRecursive(actionTree, activities, emittedActivities, allInstances, instance);
+  output += emitWhenBlocksRecursive(actionTree, activities, allInstances, instance);
   output += 'done\n\n';
   return { decision: output, activities };
 }

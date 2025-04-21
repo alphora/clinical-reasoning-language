@@ -94,39 +94,22 @@ export function getActivityPerformClause(activityDef: any): string {
  */
 export function emitActivityBlock(
   node: any,
+  canonicalValueStr: string | undefined,
   allInstances: any[],
   activities: { name: string, original: string }[],
-  indent: string
+  indent: string,
+  hasPlanDef: boolean
 ): string {
-  let canonicalValueStr: string | undefined = undefined;
-  if (node.definitionCanonical) {
-    if (typeof node.definitionCanonical === 'string') {
-      if (node.definitionCanonical.startsWith('Canonical(')) {
-        canonicalValueStr = node.definitionCanonical.replace(/^Canonical\((.*)\)$/, '$1');
-      } else {
-        canonicalValueStr = node.definitionCanonical;
-      }
-    } else if (typeof node.definitionCanonical === 'object' && 'entityName' in node.definitionCanonical) {
-      canonicalValueStr = (node.definitionCanonical as { entityName: string }).entityName;
-    }
-  }
+  // hasPlanDef is now passed in
   const activityName = node.title ? toIdentifier(node.title) : 'UnnamedActivity';
   const activityDescription = node.description ? toString(node.description)  : 'TODO: fill in message.';
   let doIdentifier = activityName;
-  let hasPlanDef = false;
   let hasActivityDef = false;
   let useIdentifier = '';
   const referenced = allInstances.find(inst => inst.name === canonicalValueStr);
   if (canonicalValueStr) {
-    if (referenced && referenced.instanceOf && referenced.instanceOf.startsWith('http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-') && referenced.instanceOf.includes('plandefinition')) {
-      hasPlanDef = true;
-      let refDescription = referenced.description;
-      if (!refDescription) {
-        const descRule = (referenced.rules || []).find((r: any) => r.path === 'Description');
-        refDescription = descRule ? descRule.value : '[UnnamedPlanDefinition]';
-      }
-      useIdentifier = toIdentifier(refDescription);
-    } else if (referenced && ACTIVITY_DEFINITION_URLS.includes(referenced.instanceOf)) {
+    // Only check for ActivityDefinition URLs here
+    if (referenced && ACTIVITY_DEFINITION_URLS.includes(referenced.instanceOf)) {
       hasActivityDef = true;
     }
   }
