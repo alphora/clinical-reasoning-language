@@ -123,6 +123,14 @@ npm run cli:transformer:fsh-to-cpgl -- path/to/your/fsh-folder
 
 This tool loads FHIR Shorthand (FSH) files (using SUSHI), applies the FSH-to-CPGL transformation, and prints the generated CPG-L output. It is located at `src/cli/run-transformer-fsh-to-cpgl.ts` and is invoked via the `cli:transformer:fsh-to-cpgl` script.
 
+**Activity Deduplication and Reference Resolution:**
+- Each unique combination of activity name and value is defined only once in the output.
+- If multiple activities share the same name but have different values, suffixes (`_2`, `_3`, etc.) are added to the name (inside the quotes) to ensure uniqueness.
+- All references to activities in `do` statements are updated to use the final, unique name (with suffix if needed).
+- Quoting and escaping of activity names is handled automatically by the transformer.
+
+For more details, see the [User Guide](./USER_GUIDE.md#activity-deduplication-and-reference-resolution).
+
 ## Features
 
 ### Language Features
