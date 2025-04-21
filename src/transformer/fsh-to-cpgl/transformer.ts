@@ -69,11 +69,11 @@ export function transformFSHToCPGL(fshResult: FSHLoadResult): string {
   // 3. Emit unique activities at the end, using the assigned unique names
   for (const { uniqueName, activity } of dedupedMap.values()) {
     // Replace the name in the activity definition with the unique name (with suffix inside quotes)
-    // Assumes the activity definition starts with: activity <name>
+    // Assumes the activity definition starts with: activity "<name>"
     const original = activity.original;
     const replaced = original.replace(
-      new RegExp(`activity \\S+`),
-      `activity ${uniqueName}`
+      /activity\s+"[^"]+"/, // match activity "..."
+      `activity "${uniqueName}"`
     );
     finalOutput += replaced;
   }
