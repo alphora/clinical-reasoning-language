@@ -17,7 +17,14 @@ export const ACTIVITY_DEFINITION_URLS = [
   'http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-reportflagactivity',
 ];
 
-export function getActivityPerformClause(activityDef: any): string {
+function formatActivityValue(value: string | undefined): string {
+  if (!value) {
+    return '';
+  }
+  return value.length > 80 ? `\n    of ${value}` : ` of ${value}`;
+}
+
+export function getActivityPerformClause(activityDef: any, doIdentifier: string): { clauseString: string, value: string | undefined } {
   // Extract kind from rules
   let kind: string | undefined = undefined;
   if (activityDef && Array.isArray(activityDef.rules)) {
@@ -35,22 +42,26 @@ export function getActivityPerformClause(activityDef: any): string {
   }
 
   // Extract code-display from rules
-  let codeDisplay: string | undefined = undefined;
+  let activityValue: string | undefined = undefined;
+  let value: string | undefined = undefined;
   if (activityDef && Array.isArray(activityDef.rules)) {
     // Prefer productCodeableConcept
     const pccRule = activityDef.rules.find((r: any) => r.path === 'productCodeableConcept');
     if (pccRule) {
       if (typeof pccRule.value === 'object' && pccRule.value !== null) {
         if ('display' in pccRule.value && pccRule.value.display) {
-          codeDisplay = `"${pccRule.value.display}"`;
+          activityValue = `"${pccRule.value.display}"`;
+          value = pccRule.value.display;
         } else if ('code' in pccRule.value && pccRule.value.code) {
-          codeDisplay = `"${pccRule.value.code}"`;
+          activityValue = `"${pccRule.value.code}"`;
+          value = pccRule.value.code;
         }
       } else if (typeof pccRule.value === 'string') {
         // Fallback: extract quoted string
         const match = /^.*?"(.*?)"$/.exec(pccRule.value);
         if (match) {
-          codeDisplay = `"${match[1]}"`;
+          activityValue = `"${match[1]}"`;
+          value = match[1];
         }
       }
     }
@@ -58,7 +69,7 @@ export function getActivityPerformClause(activityDef: any): string {
       console.log('[DEBUGGING] No productCodeableConcept rule found. All rule paths/values:', activityDef.rules.map((r: any) => ({ path: r.path, value: r.value })));
     }
     // Fallback to dynamicValue logic (do not change)
-    if (!codeDisplay) {
+    if (!activityValue) {
       // Find all dynamicValue rules
       const dvRules = activityDef.rules.filter((r: any) => r.path.startsWith('dynamicValue'));
       for (const rule of dvRules) {
@@ -68,24 +79,26 @@ export function getActivityPerformClause(activityDef: any): string {
           const prefix = rule.path.replace(/\.path$/, '');
           const descRule = activityDef.rules.find((r: any) => r.path === `${prefix}.expression.description`);
           if (descRule && typeof descRule.value === 'string') {
-            codeDisplay = `"${descRule.value}"`;
+            activityValue = `"${descRule.value}"`;
+            value = descRule.value;
             break;
           }
         }
       }
     }
   }
-  if (!kind && !codeDisplay) {
-    return ``;
+  if (!kind && !activityValue) {
+    return { clauseString: '', value };
   }
-  return `\n    perform ${kind}\n    of ${codeDisplay}.`;
+  const clauseString = `\n    perform ${kind}${formatActivityValue(activityValue)}.`;
+  return { clauseString, value };
 }
 
 export function emitActivityBlock(
   node: any,
   canonicalValueStr: string | undefined,
   allInstances: any[],
-  activities: { name: string, original: string }[],
+  activities: { name: string, value: string | undefined, original: string }[],
   indent: string,
   hasPlanDef: boolean,
 ): string {
@@ -111,28 +124,36 @@ export function emitActivityBlock(
     }
   }
   let output = '';
+  // If both planDef and activityDef are present, emit a use and do clause
   if (hasPlanDef && hasActivityDef) {
     output += `:\n`;
     output += `${indent}    use ${useIdentifier}.\n`;
     output += `${indent}    do ${doIdentifier}.\n`;
     output += `${indent}done\n`;
     if (activityDefInstance) {
-      activities.push({ name: doIdentifier, original: `activity ${doIdentifier} ${getActivityPerformClause(activityDefInstance)}\n\n` });
+      const { clauseString, value } = getActivityPerformClause(activityDefInstance, doIdentifier);
+      activities.push({ name: doIdentifier, value, original: `activity ${doIdentifier} ${clauseString}\n\n` });
     } else {
-      activities.push({ name: doIdentifier, original: `activity ${doIdentifier} // TODO: activity details.\n\n` });
+      activities.push({ name: doIdentifier, value: undefined, original: `activity ${doIdentifier} // TODO: activity details.\n\n` });
     }
+  }
+  // If only planDef is present, emit a use clause
+  else if (hasPlanDef) {
     output += ` use ${useIdentifier}.\n`;
-  } else if (hasActivityDef) {
+  }
+  // If only activityDef is present, emit a do clause
+  else if (hasActivityDef) {
     output += ` do ${doIdentifier}.\n`;
     if (activityDefInstance) {
-      activities.push({ name: doIdentifier, original: `activity ${doIdentifier} ${getActivityPerformClause(activityDefInstance)}\n\n` });
+      const { clauseString, value } = getActivityPerformClause(activityDefInstance, doIdentifier);
+      activities.push({ name: doIdentifier, value, original: `activity ${doIdentifier} ${clauseString}\n\n` });
     } else {
-      activities.push({ name: doIdentifier, original: `activity ${doIdentifier} // TODO: activity details.\n\n` });
+      activities.push({ name: doIdentifier, value: undefined, original: `activity ${doIdentifier} // TODO: activity details.\n\n` });
     }
   } else {
-    // Neither: emit a CPGCommunicationRequest activity (unique per name+description)
+    // Neither: emit a CPGCommunicationRequest activity
     output += ` do ${doIdentifier}.\n`;
-    activities.push({ name: doIdentifier, original: `activity ${doIdentifier}\n    perform CPGCommunicationRequest\n    of "${activityDescription || 'TODO: fill in message.'}".\n\n` });
+    activities.push({ name: doIdentifier, value: activityDescription, original: `activity ${doIdentifier}\n    perform CPGCommunicationRequest${formatActivityValue('"' + (activityDescription || 'TODO: fill in message.') + '"')}.\n\n` });
   }
   return output;
 } 

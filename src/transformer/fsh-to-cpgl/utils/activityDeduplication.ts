@@ -3,7 +3,7 @@
 
 import { randomInt } from "crypto";
 
-export type Activity = { text: string } | Record<string, any>;
+export type Activity = { name: string, value: string | undefined, original: string };
 
 /**
  * Normalize an activity for deduplication purposes.
@@ -11,18 +11,8 @@ export type Activity = { text: string } | Record<string, any>;
  * ignoring irrelevant differences (e.g., whitespace, order of keys, etc.).
  */
 export function normalizeActivity(activity: Activity): string {
-  // If the activity is of the form { text: string }, normalize based on text
-  if ('text' in activity && typeof activity.text === 'string') {
-    return activity.text.trim();
-  }
-  // Otherwise, sort keys and stringify for a stable, comparable representation
-  const ordered = Object.keys(activity as Record<string, any>)
-    .sort()
-    .reduce((obj, key) => {
-      (obj as any)[key] = (activity as Record<string, any>)[key];
-      return obj;
-    }, {} as Record<string, any>);
-  return JSON.stringify(ordered);
+  // Use a composite key of name and value for deduplication
+  return `${activity.name}::${activity.value ?? ''}`;
 }
 
 /**
@@ -33,11 +23,10 @@ export class ActivityDeduplicator {
   private normalizedToOriginal: Map<string, Activity> = new Map();
 
   add(activity: Activity) {
-    // const norm = normalizeActivity(activity);
-    // if (!this.normalizedToOriginal.has(norm)) {
-    //   this.normalizedToOriginal.set(norm, activity);
-    // }
-    this.normalizedToOriginal.set(activity.text, activity);
+    const norm = normalizeActivity(activity);
+    if (!this.normalizedToOriginal.has(norm)) {
+      this.normalizedToOriginal.set(norm, activity);
+    }
   }
 
   /**

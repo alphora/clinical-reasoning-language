@@ -22,7 +22,7 @@ export function transformFSHToCPGL(fshResult: FSHLoadResult): string {
     const planDefResult = mapPlanDefinitionToDecision(inst, instances);
     decisions.push(planDefResult.decision);
     for (const act of planDefResult.activities) {
-      activityDeduplicator.add({ text: act.original });
+      activityDeduplicator.add({ name: act.name, value: act.value, original: act.original });
     }
     output += mapConcept(inst);
     output += mapTerminology(inst);
@@ -36,7 +36,7 @@ export function transformFSHToCPGL(fshResult: FSHLoadResult): string {
 
   // Emit unique activities at the end
   for (const uniqueAct of activityDeduplicator.getUniqueActivities()) {
-    output += uniqueAct.text;
+    output += uniqueAct.original;
   }
 
   return output;

@@ -17,7 +17,7 @@ interface ActionNode {
 
 function emitWhenBlocksRecursive(
   nodes: ActionNode[],
-  activities: { name: string, original: string }[],
+  activities: { name: string, value: string | undefined, original: string }[],
   allInstances: any[],
   instance: any,
   indent = '    ',
@@ -114,7 +114,7 @@ function parseActions(rules: any[], basePath = 'action'): ActionNode[] {
   return nodes;
 }
 
-export function mapPlanDefinitionToDecision(instance: any, allInstances: any[]): { decision: string, activities: { name: string, original: string }[] } {
+export function mapPlanDefinitionToDecision(instance: any, allInstances: any[]): { decision: string, activities: { name: string, value: string | undefined, original: string }[] } {
   if (!PLAN_DEFINITION_URLS.includes(instance.instanceOf)) {
     return { decision: '', activities: [] };
   }
@@ -140,7 +140,7 @@ export function mapPlanDefinitionToDecision(instance: any, allInstances: any[]):
   const actionTree = parseActions(instance.rules || []);
 
   // Collect activity stats for all PlanDefinitions
-  const activities: { name: string, original: string }[] = [];
+  const activities: { name: string, value: string | undefined, original: string }[] = [];
 
   output += emitWhenBlocksRecursive(actionTree, activities, allInstances, instance, '    ',);
   output += 'done\n\n';
