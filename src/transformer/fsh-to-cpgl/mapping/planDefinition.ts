@@ -3,7 +3,7 @@ const PLAN_DEFINITION_URLS = [
   'http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-recommendationdefinition'
 ];
 
-import { emitActivityBlock, ActivitySentinel } from './activityDefinition';
+import { emitActivityBlock } from './activityDefinition';
 
 import { toIdentifier, toString } from '../utils/fshPathFunctions';
 
@@ -21,13 +21,12 @@ function emitWhenBlocksRecursive(
   allInstances: any[],
   instance: any,
   indent = '    ',
-  activitySentinel: ActivitySentinel
 ): string {
   let output = '';
   for (const node of nodes) {
     if (!node.conditionExpression) {
       if (node.children.length > 0) {
-        output += emitWhenBlocksRecursive(node.children, activities, allInstances, instance, indent, activitySentinel);
+        output += emitWhenBlocksRecursive(node.children, activities, allInstances, instance, indent,);
       }     continue;
     }
     if (node.children.length > 0 && node.definitionCanonical) {
@@ -35,7 +34,7 @@ function emitWhenBlocksRecursive(
     }
     if (node.children.length > 0) {
       output += `${indent}when "${node.conditionExpression}" then:\n`;
-      output += emitWhenBlocksRecursive(node.children, activities, allInstances, instance, indent + '    ', activitySentinel);
+      output += emitWhenBlocksRecursive(node.children, activities, allInstances, instance, indent + '    ',);
       output += `${indent}done\n`;
       continue;
     }
@@ -66,7 +65,7 @@ function emitWhenBlocksRecursive(
     }
     // Delegate activity emission to activityDefinition helper
     output += `${indent}when "${node.conditionExpression}" then`;
-    output += emitActivityBlock(node, canonicalValueStr, allInstances, activities, indent, hasPlanDef, activitySentinel);
+    output += emitActivityBlock(node, canonicalValueStr, allInstances, activities, indent, hasPlanDef,);
   }
   return output;
 }
@@ -142,9 +141,8 @@ export function mapPlanDefinitionToDecision(instance: any, allInstances: any[]):
 
   // Collect activity stats for all PlanDefinitions
   const activities: { name: string, original: string }[] = [];
-  const activitySentinel: ActivitySentinel = {};
 
-  output += emitWhenBlocksRecursive(actionTree, activities, allInstances, instance, '    ', activitySentinel);
+  output += emitWhenBlocksRecursive(actionTree, activities, allInstances, instance, '    ',);
   output += 'done\n\n';
   return { decision: output, activities };
 }

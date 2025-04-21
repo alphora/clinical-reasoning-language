@@ -17,11 +17,6 @@ export const ACTIVITY_DEFINITION_URLS = [
   'http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-reportflagactivity',
 ];
 
-export function mapActivityDefinitionToActivity(instance: any): string {
-  // TODO: Implement mapping from ActivityDefinition FSH instance to CPG-L activity block
-  return `// [DEBUGGING] ActivityDefinition: ${instance.name}\n`;
-}
-
 export function getActivityPerformClause(activityDef: any): string {
   // Extract kind from rules
   let kind: string | undefined = undefined;
@@ -86,15 +81,6 @@ export function getActivityPerformClause(activityDef: any): string {
   return `\n    perform ${kind}\n    of ${codeDisplay}.`;
 }
 
-// Add type for the sentinel collection
-export interface ActivitySentinel {
-  // Map from doIdentifier to { count: number, descMap: Map<string, string> }
-  [doIdentifier: string]: {
-    count: number;
-    descMap: Map<string, string>;
-  };
-}
-
 export function emitActivityBlock(
   node: any,
   canonicalValueStr: string | undefined,
@@ -102,35 +88,16 @@ export function emitActivityBlock(
   activities: { name: string, original: string }[],
   indent: string,
   hasPlanDef: boolean,
-  activitySentinel: ActivitySentinel
 ): string {
   // Compute doIdentifier and activityDescription
   const referenced = allInstances.find(inst => inst.name === canonicalValueStr);
+
+  let doIdentifier = node.title ? toIdentifier(node.title) : 'UnnamedActivity';
+
   let activityDescription = node.description ? node.description : undefined;
-  if (referenced && referenced.rules && !activityDescription) {
+  if (referenced && referenced.rules) {
     const descRule = referenced.rules.find((r: any) => r.path === 'Description');
     activityDescription = descRule ? descRule.value : undefined;
-  }
-  // Fallback to node.title if no description
-  let doIdentifier = node.title ? toIdentifier(node.title) : 'UnnamedActivity';
-  let activityDescKey = activityDescription || '';
-  // Sentinel logic for unique naming
-  if (!activitySentinel[doIdentifier]) {
-    activitySentinel[doIdentifier] = { count: 0, descMap: new Map() };
-  }
-  let uniqueName = doIdentifier;
-  if (activitySentinel[doIdentifier].descMap.has(activityDescKey)) {
-    uniqueName = activitySentinel[doIdentifier].descMap.get(activityDescKey)!;
-  } else {
-    if (activitySentinel[doIdentifier].descMap.size === 0) {
-      // First occurrence, use base name
-      uniqueName = doIdentifier;
-    } else {
-      // Subsequent unique descriptions, use doIdentifier_<count>
-      activitySentinel[doIdentifier].count++;
-      uniqueName = `"${doIdentifier.replace(/"/g, '')}_${activitySentinel[doIdentifier].count}"`;
-    }
-    activitySentinel[doIdentifier].descMap.set(activityDescKey, uniqueName);
   }
 
   // Activity logic
@@ -147,25 +114,25 @@ export function emitActivityBlock(
   if (hasPlanDef && hasActivityDef) {
     output += `:\n`;
     output += `${indent}    use ${useIdentifier}.\n`;
-    output += `${indent}    do ${uniqueName}.\n`;
+    output += `${indent}    do ${doIdentifier}.\n`;
     output += `${indent}done\n`;
     if (activityDefInstance) {
-      activities.push({ name: uniqueName, original: `activity ${uniqueName} ${getActivityPerformClause(activityDefInstance)}\n\n` });
+      activities.push({ name: doIdentifier, original: `activity ${doIdentifier} ${getActivityPerformClause(activityDefInstance)}\n\n` });
     } else {
-      activities.push({ name: uniqueName, original: `activity ${uniqueName} // TODO: activity details.\n\n` });
+      activities.push({ name: doIdentifier, original: `activity ${doIdentifier} // TODO: activity details.\n\n` });
     }
     output += ` use ${useIdentifier}.\n`;
   } else if (hasActivityDef) {
-    output += ` do ${uniqueName}.\n`;
+    output += ` do ${doIdentifier}.\n`;
     if (activityDefInstance) {
-      activities.push({ name: uniqueName, original: `activity ${uniqueName} ${getActivityPerformClause(activityDefInstance)}\n\n` });
+      activities.push({ name: doIdentifier, original: `activity ${doIdentifier} ${getActivityPerformClause(activityDefInstance)}\n\n` });
     } else {
-      activities.push({ name: uniqueName, original: `activity ${uniqueName} // TODO: activity details.\n\n` });
+      activities.push({ name: doIdentifier, original: `activity ${doIdentifier} // TODO: activity details.\n\n` });
     }
   } else {
     // Neither: emit a CPGCommunicationRequest activity (unique per name+description)
-    output += ` do ${uniqueName}.\n`;
-    activities.push({ name: uniqueName, original: `activity ${uniqueName}\n    perform CPGCommunicationRequest\n    of "${activityDescription || 'TODO: fill in message.'}".\n\n` });
+    output += ` do ${doIdentifier}.\n`;
+    activities.push({ name: doIdentifier, original: `activity ${doIdentifier}\n    perform CPGCommunicationRequest\n    of "${activityDescription || 'TODO: fill in message.'}".\n\n` });
   }
   return output;
 } 

@@ -1,6 +1,5 @@
 import { FSHLoadResult } from './sushi-loader';
 import { mapPlanDefinitionToDecision } from './mapping/planDefinition';
-import { mapActivityDefinitionToActivity } from './mapping/activityDefinition';
 import { mapConcept } from './mapping/concept';
 import { mapTerminology } from './mapping/terminology';
 import { ActivityDeduplicator } from './utils/activityDeduplication';
@@ -14,8 +13,6 @@ export function transformFSHToCPGL(fshResult: FSHLoadResult): string {
   const { instances } = fshResult;
   let output = '';
 
-  output += '// [DEBUGGING] CPG-L generated from FSH instances\n';
-
   // Collect all activities for file-wide deduplication
   const activityDeduplicator = new ActivityDeduplicator();
   const decisions: string[] = [];
@@ -27,7 +24,6 @@ export function transformFSHToCPGL(fshResult: FSHLoadResult): string {
     for (const act of planDefResult.activities) {
       activityDeduplicator.add({ text: act.original });
     }
-    output += mapActivityDefinitionToActivity(inst);
     output += mapConcept(inst);
     output += mapTerminology(inst);
     output += '\n';
