@@ -6,8 +6,12 @@
  */
 export function toIdentifier(value: string): string {
   if (value == null) return '';
-  // Remove newlines and escapes, then wrap in double quotes
-  return '"' + value.replace(/[\r\n]+/g, ' ').replace(/"/g, '"') + '"';
+  // Remove newlines, tabs, and all escape sequences, then wrap in double quotes
+  let cleaned = value
+    .replace(/[\r\n\t]+/g, ' ')      // Replace newlines and tabs with space
+    .replace(/\\["'\\bfnrtv]/g, '')  // Remove common escaped characters
+    .replace(/"/g, '');              // Remove all double quotes
+  return `"${cleaned.trim()}"`;
 }
 
 /**

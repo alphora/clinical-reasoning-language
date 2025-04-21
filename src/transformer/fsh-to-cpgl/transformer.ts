@@ -3,6 +3,7 @@ import { mapPlanDefinitionToDecision } from './mapping/planDefinition';
 import { mapConcept } from './mapping/concept';
 import { mapTerminology } from './mapping/terminology';
 import { ActivityDeduplicator } from './utils/activityDeduplication';
+import { toIdentifier } from './utils/fshPathFunctions';
 
 /**
  * Transform FSH (parsed with SUSHI) to CPG-L.
@@ -64,17 +65,20 @@ export function transformFSHToCPGL(fshResult: FSHLoadResult): string {
   }
 
   // 2. Replace all <<ACTIVITY_REF:...>> placeholders in the output with the correct quoted unique name
-  finalOutput = finalOutput.replace(/<<ACTIVITY_REF:(activity_\d+)>>/g, (_, id) => `"${idToFinalName[id]}"`);
+  finalOutput = finalOutput.replace(/<<ACTIVITY_REF:(activity_\d+)>>/g, (_, id) => toIdentifier(idToFinalName[id]));
 
   // 3. Emit unique activities at the end, using the assigned unique names
   for (const { uniqueName, activity } of dedupedMap.values()) {
-    // Replace the name in the activity definition with the unique name (with suffix inside quotes)
-    // Assumes the activity definition starts with: activity "<name>"
-    const original = activity.original;
-    const replaced = original.replace(
-      /activity\s+"[^"]+"/, // match activity "..."
-      `activity "${uniqueName}"`
-    );
+    // Extract the base name from the original (without quotes)
+    const activityRegex = /activity\s+"([^"]+)"/;
+    const match = activity.original.match(activityRegex);
+    let replaced = activity.original;
+    if (match) {
+      // uniqueName is already baseName + suffix (no quotes)
+      replaced = activity.original.replace(activityRegex, `activity ${toIdentifier(uniqueName)}`);
+    } else {
+      console.warn(`Could not match activity identifier in: ${activity.original}`);
+    }
     finalOutput += replaced;
   }
 
