@@ -101,18 +101,22 @@ export function emitActivityBlock(
   hasPlanDef: boolean
 ): string {
   // hasPlanDef is now passed in
-  const activityName = node.title ? toIdentifier(node.title) : 'UnnamedActivity';
+  //const activityName = node.title ? toIdentifier(node.title) : 'UnnamedActivity';
   const activityDescription = node.description ? toString(node.description)  : 'TODO: fill in message.';
-  let doIdentifier = activityName;
+
   let hasActivityDef = false;
+  let activityDefInstance = null;
   let useIdentifier = '';
+  console.debug('[DEBUGGING] canonicalValueStr:', canonicalValueStr);
   const referenced = allInstances.find(inst => inst.name === canonicalValueStr);
   if (canonicalValueStr) {
     // Only check for ActivityDefinition URLs here
     if (referenced && ACTIVITY_DEFINITION_URLS.includes(referenced.instanceOf)) {
       hasActivityDef = true;
+      activityDefInstance = referenced;
     }
   }
+  let doIdentifier = referenced && referenced.description ? toIdentifier(referenced.description) : node.title ? toIdentifier(node.title) : 'UnnamedActivity';
   let output = '';
   if (hasPlanDef && hasActivityDef) {
     output += `:\n`;
@@ -120,13 +124,7 @@ export function emitActivityBlock(
     output += `${indent}    do ${doIdentifier}.\n`;
     output += `${indent}done\n`;
     // Only call getActivityPerformClause with the resolved ActivityDefinition instance
-    let activityDefInstance = null;
-    if (canonicalValueStr) {
-      const referenced = allInstances.find(inst => inst.name === canonicalValueStr);
-      if (referenced && ACTIVITY_DEFINITION_URLS.includes(referenced.instanceOf)) {
-        activityDefInstance = referenced;
-      }
-    }
+    
     if (activityDefInstance) {
       console.log('[DEBUGGING] getActivityPerformClause called with ActivityDefinition:', { name: activityDefInstance.name, instanceOf: activityDefInstance.instanceOf });
       activities.push({ name: doIdentifier, original: `activity ${doIdentifier} ${getActivityPerformClause(activityDefInstance)}\n\n` });
@@ -137,13 +135,6 @@ export function emitActivityBlock(
   } else if (hasActivityDef) {
     output += ` do ${doIdentifier}.\n`;
     // Only call getActivityPerformClause with the resolved ActivityDefinition instance
-    let activityDefInstance = null;
-    if (canonicalValueStr) {
-      const referenced = allInstances.find(inst => inst.name === canonicalValueStr);
-      if (referenced && ACTIVITY_DEFINITION_URLS.includes(referenced.instanceOf)) {
-        activityDefInstance = referenced;
-      }
-    }
     if (activityDefInstance) {
       console.log('[DEBUGGING] getActivityPerformClause called with ActivityDefinition:', { name: activityDefInstance.name, instanceOf: activityDefInstance.instanceOf });
       activities.push({ name: doIdentifier, original: `activity ${doIdentifier} ${getActivityPerformClause(activityDefInstance)}\n\n` });
