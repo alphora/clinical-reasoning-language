@@ -18,7 +18,10 @@
 - activitydef-description > activity.identifier
 - activitydef-kind > activity.perform
 - activitydef-code-display > activity.perform.of
-- plandef-rationale > activity.because
+
+
+
+
 - activitydef-code-display > terminology.identifier
 - activitydef-code > terminology.code
 

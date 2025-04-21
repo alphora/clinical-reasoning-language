@@ -13,6 +13,7 @@ interface ActionNode {
   conditionExpression?: string;
   definitionCanonical?: string;
   children: ActionNode[];
+  extension?: any[];
 }
 
 function emitWhenBlocksRecursive(
@@ -75,22 +76,27 @@ function emitWhenBlocksRecursive(
 function parseActions(rules: any[], basePath = 'action'): ActionNode[] {
   const nodes: ActionNode[] = [];
   let currentNode: ActionNode | null = null;
+  let currentExtensions: any[] = [];
+  let currentExtension: any = null;
   for (let i = 0; i < rules.length; i++) {
     const rule = rules[i];
     // Match action[+] at this level
     if (rule.path === `${basePath}[+]`) {
       // Start a new action node
-      if (currentNode) nodes.push(currentNode);
+      if (currentNode) {
+        if (currentExtensions.length > 0) currentNode.extension = currentExtensions;
+        nodes.push(currentNode);
+      }
       currentNode = { children: [] };
+      currentExtensions = [];
+      currentExtension = null;
     } else if (rule.path.startsWith(`${basePath}[=]`)) {
       // Property or nested action of the current node
       if (!currentNode) continue; // Defensive: skip if no current node
       const subPath = rule.path.slice(`${basePath}[=]`.length);
       if (subPath.startsWith('.action[+]')) {
         // Start a new child action
-        // Find all rules for this child action
         const childBase = `${basePath}[=].action`;
-        // Find the slice of rules for this child array
         const childRules: any[] = [];
         let j = i;
         while (j < rules.length && rules[j].path.startsWith(childBase)) {
@@ -100,10 +106,20 @@ function parseActions(rules: any[], basePath = 'action'): ActionNode[] {
         currentNode.children = parseActions(childRules, childBase);
         i = j - 1;
       } else if (subPath.startsWith('.action[=]')) {
-        // Property of a child action (should be handled in recursion)
         continue;
+      } else if (subPath === '.extension[+]') {
+        // Start a new extension object
+        currentExtension = {};
+        currentExtensions.push(currentExtension);
+      } else if (subPath.startsWith('.extension[=]')) {
+        // Set properties on the most recent extension object
+        if (!currentExtension) {
+          currentExtension = {};
+          currentExtensions.push(currentExtension);
+        }
+        if (subPath.endsWith('.url')) currentExtension.url = rule.value;
+        if (subPath.endsWith('.valueMarkdown')) currentExtension.valueMarkdown = rule.value;
       } else {
-        // Property of the current node
         if (subPath === '.title') currentNode.title = rule.value;
         if (subPath === '.description') currentNode.description = rule.value;
         if (subPath.endsWith('.condition[=].expression.expression')) currentNode.conditionExpression = rule.value;
@@ -111,7 +127,10 @@ function parseActions(rules: any[], basePath = 'action'): ActionNode[] {
       }
     }
   }
-  if (currentNode) nodes.push(currentNode);
+  if (currentNode) {
+    if (currentExtensions.length > 0) currentNode.extension = currentExtensions;
+    nodes.push(currentNode);
+  }
   return nodes;
 }
 

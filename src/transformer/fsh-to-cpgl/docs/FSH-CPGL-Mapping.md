@@ -378,7 +378,8 @@ The expression `[*].action` in these mapping rules means an arbitrary nesting of
 
 - `plandef-action-description` = `PlanDef.action.description.toIdentifier()` or `[*].action.description.toIdentifier()` (note, `plandef-action-description` is different than `Description`)
 
-- `plandef-rationale` = `PlanDef.extension.valueMarkdown.toString()` or `[*].action.extension.valueMarkdown.toString()`
+// add this: http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-rationale
+- `plandef-rationale` = `PlanDef.action.extension.valueMarkdown.toString()` or `[*].action.extension.valueMarkdown.toString()`
 
 - `activitydef` = Instance of ActivityDef
 
