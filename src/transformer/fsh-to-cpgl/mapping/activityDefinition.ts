@@ -94,13 +94,19 @@ export function getActivityPerformClause(activityDef: any, doIdentifier: string)
   return { clauseString, value };
 }
 
+let activityIdCounter = 0;
+export function getNextActivityId() {
+  return `activity_${++activityIdCounter}`;
+}
+
 export function emitActivityBlock(
   node: any,
   canonicalValueStr: string | undefined,
   allInstances: any[],
-  activities: { name: string, value: string | undefined, original: string }[],
+  activities: { id: string, name: string, value: string | undefined, original: string }[],
   indent: string,
   hasPlanDef: boolean,
+  doReferences: { id: string, placeholder: string }[],
 ): string {
   // Compute doIdentifier and activityDescription
   const referenced = allInstances.find(inst => inst.name === canonicalValueStr);
@@ -128,13 +134,17 @@ export function emitActivityBlock(
   if (hasPlanDef && hasActivityDef) {
     output += `:\n`;
     output += `${indent}    use ${useIdentifier}.\n`;
-    output += `${indent}    do ${doIdentifier}.\n`;
+    const activityId = getNextActivityId();
+    const placeholder = `<<ACTIVITY_REF:${activityId}>>`;
+    output += `${indent}    do ${placeholder}.\n`;
     output += `${indent}done\n`;
     if (activityDefInstance) {
       const { clauseString, value } = getActivityPerformClause(activityDefInstance, doIdentifier);
-      activities.push({ name: doIdentifier, value, original: `activity ${doIdentifier} ${clauseString}\n\n` });
+      activities.push({ id: activityId, name: doIdentifier, value, original: `activity ${doIdentifier} ${clauseString}\n\n` });
+      doReferences.push({ id: activityId, placeholder });
     } else {
-      activities.push({ name: doIdentifier, value: undefined, original: `activity ${doIdentifier} // TODO: activity details.\n\n` });
+      activities.push({ id: activityId, name: doIdentifier, value: undefined, original: `activity ${doIdentifier} // TODO: activity details.\n\n` });
+      doReferences.push({ id: activityId, placeholder });
     }
   }
   // If only planDef is present, emit a use clause
@@ -143,17 +153,26 @@ export function emitActivityBlock(
   }
   // If only activityDef is present, emit a do clause
   else if (hasActivityDef) {
-    output += ` do ${doIdentifier}.\n`;
+    const activityId = getNextActivityId();
+    const placeholder = `<<ACTIVITY_REF:${activityId}>>`;
+    output += ` do ${placeholder}.\n`;
     if (activityDefInstance) {
       const { clauseString, value } = getActivityPerformClause(activityDefInstance, doIdentifier);
-      activities.push({ name: doIdentifier, value, original: `activity ${doIdentifier} ${clauseString}\n\n` });
+      activities.push({ id: activityId, name: doIdentifier, value, original: `activity ${doIdentifier} ${clauseString}\n\n` });
+      doReferences.push({ id: activityId, placeholder });
     } else {
-      activities.push({ name: doIdentifier, value: undefined, original: `activity ${doIdentifier} // TODO: activity details.\n\n` });
+      activities.push({ id: activityId, name: doIdentifier, value: undefined, original: `activity ${doIdentifier} // TODO: activity details.\n\n` });
+      doReferences.push({ id: activityId, placeholder });
     }
   } else {
     // Neither: emit a CPGCommunicationRequest activity
-    output += ` do ${doIdentifier}.\n`;
-    activities.push({ name: doIdentifier, value: activityDescription, original: `activity ${doIdentifier}\n    perform CPGCommunicationRequest${formatActivityValue('"' + (activityDescription || 'TODO: fill in message.') + '"')}.\n\n` });
+    const activityId = getNextActivityId();
+    const placeholder = `<<ACTIVITY_REF:${activityId}>>`;
+    output += ` do ${placeholder}.\n`;
+    activities.push({ id: activityId, name: doIdentifier, value: activityDescription, original: `activity ${doIdentifier}\n    perform CPGCommunicationRequest${formatActivityValue('"' + (activityDescription || 'TODO: fill in message.') + '"')}.
+
+` });
+    doReferences.push({ id: activityId, placeholder });
   }
   return output;
 } 

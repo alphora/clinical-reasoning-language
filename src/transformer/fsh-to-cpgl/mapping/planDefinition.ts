@@ -17,16 +17,17 @@ interface ActionNode {
 
 function emitWhenBlocksRecursive(
   nodes: ActionNode[],
-  activities: { name: string, value: string | undefined, original: string }[],
+  activities: { id: string, name: string, value: string | undefined, original: string }[],
   allInstances: any[],
   instance: any,
   indent = '    ',
+  doReferences: { id: string, placeholder: string }[]
 ): string {
   let output = '';
   for (const node of nodes) {
     if (!node.conditionExpression) {
       if (node.children.length > 0) {
-        output += emitWhenBlocksRecursive(node.children, activities, allInstances, instance, indent,);
+        output += emitWhenBlocksRecursive(node.children, activities, allInstances, instance, indent, doReferences);
       }     continue;
     }
     if (node.children.length > 0 && node.definitionCanonical) {
@@ -34,7 +35,7 @@ function emitWhenBlocksRecursive(
     }
     if (node.children.length > 0) {
       output += `${indent}when "${node.conditionExpression}" then:\n`;
-      output += emitWhenBlocksRecursive(node.children, activities, allInstances, instance, indent + '    ',);
+      output += emitWhenBlocksRecursive(node.children, activities, allInstances, instance, indent + '    ', doReferences);
       output += `${indent}done\n`;
       continue;
     }
@@ -65,7 +66,7 @@ function emitWhenBlocksRecursive(
     }
     // Delegate activity emission to activityDefinition helper
     output += `${indent}when "${node.conditionExpression}" then`;
-    output += emitActivityBlock(node, canonicalValueStr, allInstances, activities, indent, hasPlanDef,);
+    output += emitActivityBlock(node, canonicalValueStr, allInstances, activities, indent, hasPlanDef, doReferences);
   }
   return output;
 }
@@ -114,9 +115,9 @@ function parseActions(rules: any[], basePath = 'action'): ActionNode[] {
   return nodes;
 }
 
-export function mapPlanDefinitionToDecision(instance: any, allInstances: any[]): { decision: string, activities: { name: string, value: string | undefined, original: string }[] } {
+export function mapPlanDefinitionToDecision(instance: any, allInstances: any[]): { decision: string, activities: { id: string, name: string, value: string | undefined, original: string }[], doReferences: { id: string, placeholder: string }[] } {
   if (!PLAN_DEFINITION_URLS.includes(instance.instanceOf)) {
-    return { decision: '', activities: [] };
+    return { decision: '', activities: [], doReferences: [] };
   }
   let description = instance.description;
   if (!description) {
@@ -140,9 +141,10 @@ export function mapPlanDefinitionToDecision(instance: any, allInstances: any[]):
   const actionTree = parseActions(instance.rules || []);
 
   // Collect activity stats for all PlanDefinitions
-  const activities: { name: string, value: string | undefined, original: string }[] = [];
+  const activities: { id: string, name: string, value: string | undefined, original: string }[] = [];
+  const doReferences: { id: string, placeholder: string }[] = [];
 
-  output += emitWhenBlocksRecursive(actionTree, activities, allInstances, instance, '    ',);
+  output += emitWhenBlocksRecursive(actionTree, activities, allInstances, instance, '    ', doReferences);
   output += 'done\n\n';
-  return { decision: output, activities };
+  return { decision: output, activities, doReferences };
 }
