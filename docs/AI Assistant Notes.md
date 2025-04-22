@@ -118,3 +118,6 @@ Suggest simpler solutions.  For example, the dedup... do at end.
 Key is to distinguish between when things are going well and when they are going poorly; and then to reset and suggest a different approach that gets it back to going well (CORRECT REQUIREMENTS and/or SIMPLER APPROACH!!!).
 
 Make it see the results, don't tell it about them.
+
+
+It messes up tests so give it expected results, not tests.  then have it build the code and the tests to match that.
