@@ -73,20 +73,20 @@ mode ACTIVITY_MODE;
 ACTIVITY_TYPE
     : [a-zA-Z]+ {
         const validTypes = [
-            'CPGCommunicationRequest',
+            'CPGAdministerMedication',
             'CPGCollectInformation',
+            'CPGCommunicationRequest',
+            'CPGDispenseMedication',
+            'CPGDocumentMedication',
             'CPGEnrollment',
             'CPGGenerateReport',
-            'CPGMedicationRequest',
-            'CPGDispenseMedication',
-            'CPGAdministerMedication',
-            'CPGDocumentMedication',
             'CPGImmunizationRequest',
-            'CPGServiceRequest',
+            'CPGMedicationRequest',
             'CPGProposeDiagnosisTask',
             'CPGRecordDetectedIssue',
             'CPGRecordInference',
-            'CPGReportFlagTask'
+            'CPGReportFlagTask',
+            'CPGServiceRequest'
         ];
         if (!validTypes.includes(this.text)) {
             for (const listener of this.getErrorListeners()) {
@@ -136,20 +136,28 @@ mode CONCEPT_MODE;
 CONCEPT_TYPE
     : [a-zA-Z]+ {
         const validTypes = [
+            'AdverseEvent',
+            'AllergyIntolerance',
+            'ClinicalImpression',
             'Communication',
             'CommunicationRequest',
             'Condition',
-            'QuestionnaireTask',
-            'QuestionnaireResponse',
-            'MedicationRequest',
-            'MedicationDispense',
-            'MedicationAdministration',
-            'MedicationStatement',
-            'ImmunizationRequest',
+            'DetectedIssue',
+            'Device',
+            'FamilyMemberHistory',
+            'Goal',
             'Immunization',
-            'ServiceRequest',
+            'MedicationAdministration',
+            'MedicationDispense',
+            'MedicationRequest',
+            'NutritionIntake',
+            'NutritionOrder',
+            'Observation',
             'Procedure',
-            'Observation'
+            'QuestionnaireResponse',
+            'RiskAssessment',
+            'ServiceRequest',
+            'Task'
         ];
         if (!validTypes.includes(this.text)) {
             for (const listener of this.getErrorListeners()) {
@@ -199,18 +207,18 @@ mode VALUE_TYPE_MODE;
 CONCEPT_VALUE_TYPE
     : [a-zA-Z]+ {
         const validTypes = [
-            'Quantity',
-            'CodeableConcept',
-            'string',
+            'Attachment',
             'boolean',
+            'CodeableConcept',
+            'dateTime',
             'integer',
+            'Period',
+            'Quantity',
             'Range',
             'Ratio',
             'SampledData',
-            'time',
-            'dateTime',
-            'Period',
-            'Attachment'
+            'string',
+            'time'
         ];
         if (!validTypes.includes(this.text)) {
             for (const listener of this.getErrorListeners()) {
