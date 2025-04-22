@@ -1,6 +1,6 @@
 Instance: IMMZD2DTMeaslesSupplementary
 InstanceOf: http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-recommendationdefinition
-Title: "IMMZ.D2.DT.Measles MCV Dose 0"
+Title: "IMMZ.D2.DT.Measles Supplementary"
 Description: "If the child or patient has not been given a supplementary dose"
 Usage: #definition
 * meta.profile[+] = "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareableplandefinition"

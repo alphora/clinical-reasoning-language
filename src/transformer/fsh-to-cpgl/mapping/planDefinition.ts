@@ -25,23 +25,79 @@ function emitWhenBlocksRecursive(
   doReferences: { id: string, placeholder: string }[]
 ): string {
   let output = '';
+  // Group nodes by conditionExpression (use '' for undefined/empty)
+  const groups: { [cond: string]: ActionNode[] } = {};
   for (const node of nodes) {
-    // If node has no conditionExpression but has a definitionCanonical (use/decision reference), emit a when ... then use ...
-    if (!node.conditionExpression && node.definitionCanonical) {
-      // Calculate canonicalValueStr for this node
-      let canonicalValueStr: string | undefined = undefined;
-      if (typeof node.definitionCanonical === 'string') {
-        if (node.definitionCanonical.startsWith('Canonical(')) {
-          canonicalValueStr = node.definitionCanonical.replace(/^Canonical\((.*)\)$/, '$1');
-        } else {
-          canonicalValueStr = node.definitionCanonical;
+    const cond = node.conditionExpression || '';
+    if (!groups[cond]) groups[cond] = [];
+    groups[cond].push(node);
+  }
+  for (const cond in groups) {
+    const group = groups[cond];
+    // Only stack comments for all action titles above when "" then: blocks
+    if (cond === '') {
+      for (const node of group) {
+        if (node.title) {
+          output += `${indent}// ${node.title}\n`;
         }
-      } else if (typeof node.definitionCanonical === 'object' && 'entityName' in node.definitionCanonical) {
-        canonicalValueStr = (node.definitionCanonical as { entityName: string }).entityName;
       }
-      // Calculate hasPlanDef for this node
+    }
+    // If only one node in group and it has children, recurse as before
+    if (group.length === 1 && group[0].children.length > 0) {
+      const node = group[0];
+      output += `${indent}when "${cond}" then:\n`;
+      output += emitWhenBlocksRecursive(node.children, activities, allInstances, instance, indent + '    ', doReferences);
+      output += `${indent}done\n`;
+      continue;
+    }
+    // Otherwise, emit a single when block for the group
+    if (group.length > 1) {
+      output += `${indent}when "${cond}" then:\n`;
+      for (const node of group) {
+        // Calculate canonicalValueStr for this node
+        let canonicalValueStr: string | undefined = undefined;
+        if (node.definitionCanonical) {
+          if (typeof node.definitionCanonical === 'string') {
+            if (node.definitionCanonical.startsWith('Canonical(')) {
+              canonicalValueStr = node.definitionCanonical.replace(/^Canonical\((.*)\)$/, '$1');
+            } else {
+              canonicalValueStr = node.definitionCanonical;
+            }
+          } else if (typeof node.definitionCanonical === 'object' && 'entityName' in node.definitionCanonical) {
+            canonicalValueStr = (node.definitionCanonical as { entityName: string }).entityName;
+          }
+        }
+        // Calculate hasPlanDef for this node
+        let hasPlanDef = false;
+        if (canonicalValueStr) {
+          const referenced = allInstances.find(inst => inst.name === canonicalValueStr);
+          if (
+            referenced &&
+            referenced.instanceOf &&
+            PLAN_DEFINITION_URLS.includes(referenced.instanceOf)
+          ) {
+            hasPlanDef = true;
+          }
+        }
+        output += emitActivityBlock(node, canonicalValueStr, allInstances, activities, indent + '    ', hasPlanDef, doReferences);
+      }
+      output += `${indent}done\n`;
+    } else if (group.length === 1 && group[0].children.length === 0) {
+      // Single leaf node
+      const node = group[0];
+      let canonicalValueStr: string | undefined = undefined;
+      if (node.definitionCanonical) {
+        if (typeof node.definitionCanonical === 'string') {
+          if (node.definitionCanonical.startsWith('Canonical(')) {
+            canonicalValueStr = node.definitionCanonical.replace(/^Canonical\((.*)\)$/, '$1');
+          } else {
+            canonicalValueStr = node.definitionCanonical;
+          }
+        } else if (typeof node.definitionCanonical === 'object' && 'entityName' in node.definitionCanonical) {
+          canonicalValueStr = (node.definitionCanonical as { entityName: string }).entityName;
+        }
+      }
       let hasPlanDef = false;
-      let referencedTitle = canonicalValueStr;
       if (canonicalValueStr) {
         const referenced = allInstances.find(inst => inst.name === canonicalValueStr);
         if (
@@ -50,57 +106,16 @@ function emitWhenBlocksRecursive(
           PLAN_DEFINITION_URLS.includes(referenced.instanceOf)
         ) {
           hasPlanDef = true;
-          // Use the referenced PlanDefinition's title as the identifier, and ensure it's a valid identifier (no quotes)
-          referencedTitle = referenced.title ? toIdentifier(referenced.title) : toIdentifier(canonicalValueStr);
         }
       }
-      // Use the title or a placeholder for the when condition
-      const whenLabel = node.title || node.description || referencedTitle || '[UnnamedDecisionReference]';
-      output += `${indent}when "${whenLabel}" then use ${referencedTitle}.\n`;
-      continue;
+      // Emit singleActionStatement style: when "cond" then do ... (no colon, no done)
+      output += `${indent}when "${cond}" then`;
+      // Remove leading/trailing whitespace from emitActivityBlock output
+      let actionLine = emitActivityBlock(node, canonicalValueStr, allInstances, activities, '', hasPlanDef, doReferences).trim();
+      // Remove leading indentation from actionLine if present
+      if (actionLine.startsWith(':')) actionLine = actionLine.slice(1).trim();
+      output += ` ${actionLine}\n`;
     }
-    if (!node.conditionExpression) {
-      if (node.children.length > 0) {
-        output += emitWhenBlocksRecursive(node.children, activities, allInstances, instance, indent, doReferences);
-      }     continue;
-    }
-    if (node.children.length > 0 && node.definitionCanonical) {
-      throw new Error('[emitWhenBlocksRecursive] Node has both children and definitionCanonical, which is ambiguous and violates the grammar.');
-    }
-    if (node.children.length > 0) {
-      output += `${indent}when "${node.conditionExpression}" then:\n`;
-      output += emitWhenBlocksRecursive(node.children, activities, allInstances, instance, indent + '    ', doReferences);
-      output += `${indent}done\n`;
-      continue;
-    }
-    // Calculate canonicalValueStr for this node
-    let canonicalValueStr: string | undefined = undefined;
-    if (node.definitionCanonical) {
-      if (typeof node.definitionCanonical === 'string') {
-        if (node.definitionCanonical.startsWith('Canonical(')) {
-          canonicalValueStr = node.definitionCanonical.replace(/^Canonical\((.*)\)$/, '$1');
-        } else {
-          canonicalValueStr = node.definitionCanonical;
-        }
-      } else if (typeof node.definitionCanonical === 'object' && 'entityName' in node.definitionCanonical) {
-        canonicalValueStr = (node.definitionCanonical as { entityName: string }).entityName;
-      }
-    }
-    // Calculate hasPlanDef for this node
-    let hasPlanDef = false;
-    if (canonicalValueStr) {
-      const referenced = allInstances.find(inst => inst.name === canonicalValueStr);
-      if (
-        referenced &&
-        referenced.instanceOf &&
-        PLAN_DEFINITION_URLS.includes(referenced.instanceOf)
-      ) {
-        hasPlanDef = true;
-      }
-    }
-    // Delegate activity emission to activityDefinition helper
-    output += `${indent}when "${node.conditionExpression}" then`;
-    output += emitActivityBlock(node, canonicalValueStr, allInstances, activities, indent, hasPlanDef, doReferences);
   }
   return output;
 }

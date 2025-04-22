@@ -163,6 +163,3 @@ done
 These rules ensure structural clarity and compactness in the generated CPGL.
 
 They improve output quality by removing unnecessary repetition and increasing semantic clarity.
-
-Behavior should be unit tested for various nesting depths, condition presence, and canonical types.
-
