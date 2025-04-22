@@ -26,6 +26,36 @@ function emitWhenBlocksRecursive(
 ): string {
   let output = '';
   for (const node of nodes) {
+    // If node has no conditionExpression but has a definitionCanonical (use/decision reference), emit a when ... then use ...
+    if (!node.conditionExpression && node.definitionCanonical) {
+      // Calculate canonicalValueStr for this node
+      let canonicalValueStr: string | undefined = undefined;
+      if (typeof node.definitionCanonical === 'string') {
+        if (node.definitionCanonical.startsWith('Canonical(')) {
+          canonicalValueStr = node.definitionCanonical.replace(/^Canonical\((.*)\)$/, '$1');
+        } else {
+          canonicalValueStr = node.definitionCanonical;
+        }
+      } else if (typeof node.definitionCanonical === 'object' && 'entityName' in node.definitionCanonical) {
+        canonicalValueStr = (node.definitionCanonical as { entityName: string }).entityName;
+      }
+      // Calculate hasPlanDef for this node
+      let hasPlanDef = false;
+      if (canonicalValueStr) {
+        const referenced = allInstances.find(inst => inst.name === canonicalValueStr);
+        if (
+          referenced &&
+          referenced.instanceOf &&
+          PLAN_DEFINITION_URLS.includes(referenced.instanceOf)
+        ) {
+          hasPlanDef = true;
+        }
+      }
+      // Use the title or a placeholder for the when condition
+      const whenLabel = node.title || node.description || canonicalValueStr || '[UnnamedDecisionReference]';
+      output += `${indent}when "${whenLabel}" then use "${canonicalValueStr}".\n`;
+      continue;
+    }
     if (!node.conditionExpression) {
       if (node.children.length > 0) {
         output += emitWhenBlocksRecursive(node.children, activities, allInstances, instance, indent, doReferences);
