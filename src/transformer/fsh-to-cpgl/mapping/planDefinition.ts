@@ -198,7 +198,7 @@ export function mapPlanDefinitionToDecision(instance: any, allInstances: any[]):
     output += `// Description: ${desc}\n`;
   }
   if (citation) {
-    output += `// ${citation}\n`;
+    output += `// Provenance: ${citation}\n`;
   }
   output += `decision ${plandefTitle}:\n`;
   const actionTree = parseActions(instance.rules || []);
