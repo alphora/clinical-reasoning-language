@@ -41,6 +41,7 @@ function emitWhenBlocksRecursive(
       }
       // Calculate hasPlanDef for this node
       let hasPlanDef = false;
+      let referencedTitle = canonicalValueStr;
       if (canonicalValueStr) {
         const referenced = allInstances.find(inst => inst.name === canonicalValueStr);
         if (
@@ -49,11 +50,13 @@ function emitWhenBlocksRecursive(
           PLAN_DEFINITION_URLS.includes(referenced.instanceOf)
         ) {
           hasPlanDef = true;
+          // Use the referenced PlanDefinition's title as the identifier, and ensure it's a valid identifier (no quotes)
+          referencedTitle = referenced.title ? toIdentifier(referenced.title) : toIdentifier(canonicalValueStr);
         }
       }
       // Use the title or a placeholder for the when condition
-      const whenLabel = node.title || node.description || canonicalValueStr || '[UnnamedDecisionReference]';
-      output += `${indent}when "${whenLabel}" then use "${canonicalValueStr}".\n`;
+      const whenLabel = node.title || node.description || referencedTitle || '[UnnamedDecisionReference]';
+      output += `${indent}when "${whenLabel}" then use ${referencedTitle}.\n`;
       continue;
     }
     if (!node.conditionExpression) {
@@ -173,20 +176,31 @@ export function mapPlanDefinitionToDecision(instance: any, allInstances: any[]):
     const descriptionRule = (instance.rules || []).find((r: any) => r.path === 'Description');
     description = descriptionRule ? descriptionRule.value : undefined;
   }
-  description = description ? toIdentifier(description) : '[UnnamedPlanDefinition]';
+  const title = instance.title || ((instance.rules || []).find((r: any) => r.path === 'Title')?.value);
+  const plandefTitle = title ? toIdentifier(title) : '[UnnamedPlanDefinition]';
+  const plandefDescription = description ? toString(description) : '';
   const citationRule = (instance.rules || []).find((r: any) => r.path === 'relatedArtifact[=].citation');
-  const citation = citationRule ? toString(citationRule.value) : '';
+  let citation = citationRule ? toString(citationRule.value) : '';
+  // Remove outer quotes from citation if present
+  if (citation.startsWith('"') && citation.endsWith('"')) {
+    citation = citation.slice(1, -1);
+  }
+
   let output = '';
   if (instance.name) {
     output += `// Instance: ${instance.name}\n`;
   }
-  if (instance.title) {
-    output += `// Title: ${instance.title}\n`;
+  if (plandefDescription) {
+    let desc = plandefDescription;
+    if (desc.startsWith('"') && desc.endsWith('"')) {
+      desc = desc.slice(1, -1);
+    }
+    output += `// Description: ${desc}\n`;
   }
   if (citation) {
     output += `// ${citation}\n`;
   }
-  output += `decision ${description}:\n`;
+  output += `decision ${plandefTitle}:\n`;
   const actionTree = parseActions(instance.rules || []);
 
   // Collect activity stats for all PlanDefinitions
