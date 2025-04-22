@@ -79,7 +79,12 @@ function emitWhenBlocksRecursive(
             hasPlanDef = true;
           }
         }
-        output += emitActivityBlock(node, canonicalValueStr, allInstances, activities, indent + '    ', hasPlanDef, doReferences);
+        // Indent each use/do line to the next level
+        let actionLine = emitActivityBlock(node, canonicalValueStr, allInstances, activities, indent + '    ', hasPlanDef, doReferences).trim();
+        // If the actionLine is not empty, add indentation
+        if (actionLine.length > 0) {
+          output += `${indent}    ${actionLine}\n`;
+        }
       }
       output += `${indent}done\n`;
     } else if (group.length === 1 && group[0].children.length === 0) {

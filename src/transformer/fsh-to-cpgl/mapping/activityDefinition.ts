@@ -158,7 +158,7 @@ export function emitActivityBlock(
     output += `${indent}done\n`;
     if (activityDefInstance) {
       const { clauseString, value } = getActivityPerformClause(activityDefInstance, doIdentifier);
-      activities.push({ id: activityId, name: doIdentifier, value, original: `activity ${doIdentifier} ${clauseString}${rationale ?? ''}.\n\n` });
+      activities.push({ id: activityId, name: doIdentifier, value, original: `activity ${doIdentifier}${clauseString}${rationale ?? ''}.\n\n` });
       doReferences.push({ id: activityId, placeholder });
     } else {
       activities.push({ id: activityId, name: doIdentifier, value: undefined, original: `activity ${doIdentifier} // TODO: activity details${rationale ?? ''}.\n\n` });
@@ -176,7 +176,7 @@ export function emitActivityBlock(
     output += ` do ${placeholder}.\n`;
     if (activityDefInstance) {
       const { clauseString, value } = getActivityPerformClause(activityDefInstance, doIdentifier);
-      activities.push({ id: activityId, name: doIdentifier, value, original: `activity ${doIdentifier} ${clauseString}${rationale ?? ''}.\n\n` });
+      activities.push({ id: activityId, name: doIdentifier, value, original: `activity ${doIdentifier}${clauseString}${rationale ?? ''}.\n\n` });
       doReferences.push({ id: activityId, placeholder });
     } else {
       activities.push({ id: activityId, name: doIdentifier, value: undefined, original: `activity ${doIdentifier} // TODO: activity details${rationale ?? ''}.\n\n` });
