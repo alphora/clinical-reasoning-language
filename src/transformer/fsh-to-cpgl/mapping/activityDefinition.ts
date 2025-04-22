@@ -129,6 +129,11 @@ export function emitActivityBlock(
       hasActivityDef = true;
       activityDefInstance = referenced;
     }
+    if (hasPlanDef && referenced && referenced.title) {
+      useIdentifier = toIdentifier(referenced.title);
+    } else if (hasPlanDef && canonicalValueStr) {
+      useIdentifier = toIdentifier(canonicalValueStr);
+    }
   }
   let rationale: string | undefined = undefined;
   if (Array.isArray(node.extension)) {
