@@ -133,6 +133,18 @@ ACTIVITY_ErrorChar
 mode CONCEPT_MODE;
 
 // CONCEPT_TYPE possibilities (case sensitive)
+// Consider adding:
+// ImagingStudy (maybe- though DiagnosticReport and Observation likely cover most use cases without it)
+// MolecularSequence (maybe- see ImagingStudy)
+// GenomicStudy (maybe- see ImagingStudy)
+
+// Consider adding for ERAS:
+// Location (certain things need to happen in certain "locations" eg for ERAS, but their is a distinction between a "physical location" and the "role" it plays as part of a "business unit"- to be discussed)
+// HealthcareService
+// EpisodeOfCare
+// EncounterHistory (need to understand better where to use vs EpisodeOfCare for surgical "patient flow")
+// Appointment
+// AppointmentResponse
 CONCEPT_TYPE
     : [a-zA-Z]+ {
         const validTypes = [
@@ -144,6 +156,8 @@ CONCEPT_TYPE
             'Condition',
             'DetectedIssue',
             'Device',
+            'DiagnosticReport',
+            'Encounter',
             'FamilyMemberHistory',
             'Goal',
             'Immunization',
