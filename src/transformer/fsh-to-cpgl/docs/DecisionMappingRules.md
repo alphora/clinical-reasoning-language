@@ -1,29 +1,11 @@
 
-## Rules
+# Rules
 
 - decision < plandef-instance.exists()
-- decision.identifier < plandef-description
+- decision.identifier < plandef-title
 - decision.comment < plandef-instance
-- decision.comment < plandef-title
+- decision.comment < plandef-description
 - decision.comment < plandef-citation
 - decision.when < plandef-action
-- decision.when.identifier < plandef-condition-expression 
-- decision.when.use < plandef-canonical 
-
-> 
-
-
-- activitydef > activity
-- activitydef-description > decision.when.do
-- activitydef-description > activity.identifier
-- activitydef-kind > activity.perform
-- activitydef-code-display > activity.perform.of
-
-
-
-
-- activitydef-code-display > terminology.identifier
-- activitydef-code > terminology.code
-
-- plandef-condition > concept
-- plandef-condition-expression > concept.identifier
+- decision.when.identifier < plandef-condition-expression
+- decision.when.use < plandef-canonical

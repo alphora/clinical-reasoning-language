@@ -244,10 +244,75 @@ then:
 
 the CPG-L value would not be generated (because the value would be "", an empty string).
 
+- `toCode()`: the CPG-L value is the result of executing the regex transform, where `input` is the FSH Path Value:
+
+```regex
+input
+  .replace(/^"([^"]+)"$/, (_, match) => '`' + match.toLowerCase().replace(/\s+/g, '-') + '`');
+
+```
+
+For example:
+
+given:
+
+```CPG-L
+concept "Measles Routine Immunization":
+    has type Observation.
+    has valuetype boolean.
+    coded by "IMMZDTImmunizationStrategy_CheckImmunizations_Term".
+done
+term
+```
+
+and:
+
+`concept.identifier.toCode()`
+
+then:
+
+the CPG-L value would be: code `XM28X5`
+
+- `create(type)`: creates a new CPG-L object of the argument type and retuns it as `new-<type>`.
+
+ForExample:
+
+given:
+
+```cpgl
+concept "Measles Routine Immunization":
+    has type Observation.
+    has valuetype boolean.
+    coded by "Measles Routine Immunization".
+done
+```
+
+and:
+
+```fsh-mapping
+
+- create(terminology)
+  - new-terminology.identifier < concept.identifier
+  - new-terminology.system < "http://sdh.com/cqis/kalm"
+  - new-terminology.code < concept.identifier.toCode()
+```
+
+then the resulting CPG-L is:
+
+```cpgl
+concept "Measles Routine Immunization":
+    has type Observation.
+    has valuetype boolean.
+    coded by "Measles Routine Immunization".
+done
+
+terminology "Measles Routine Immunization" system `http://sdh.com/cqis/kalm` code `measles-routine-immunization`
+```
+
 - `extractCode()`: the CPG-L value is the result of executing the regex transform, where `input` is the FSH Path Value:
 
 ```regex
-input.replace(/\$(\w+)#(\w+)\s+".*?"/, 'system "$1" code "$2"')
+input.replace(/\$(\w+)#(\w+)\s+".*?"/, 'system `$1` code `$2`')
 ```
 
 For example:
@@ -266,7 +331,7 @@ and:
 
 then:
 
-the CPG-L value would be: system "ICD11" code "XM28X5"
+the CPG-L value would be: system `ICD11` code `XM28X5`
 
 - `extractCodeDisplay()`: the CPG-L value is the result of executing the regex transform, where `input` is the FSH Path Value:
 
@@ -299,7 +364,7 @@ the CPG-L value would be: system "Measles vaccines"
 - `extractCodeExpression()`: the CPG-L value is the result of executing the regex transform, where `input` is the FSH Path Value:
 
 ```regex
-input.replace(/Code\s*{\s*system:\s*'([^']+)',\s*code:\s*'([^']+)'\s*}/, 'system "$1" code "$2"')
+input.replace(/Code\s*{\s*system:\s*'([^']+)',\s*code:\s*'([^']+)'\s*}/, 'system `$1` code `$2`')
 ```
 
 For example:
@@ -323,9 +388,9 @@ and:
 
 then:
 
-the CPG-L value would be: system "http://id.who.int/icd/release/11/mms" code "XM28X5"
+the CPG-L value would be: system `http://id.who.int/icd/release/11/mms` code `XM28X5`
 
-- "": the quoted string is inserted literally into the resulting CPG-L value.
+- "<string>": the quoted string is inserted literally into the resulting CPG-L value.  Note, `<string>` can be the empty string.
 
 For example:
 

@@ -10,8 +10,9 @@ if action.definitionCanonical references a ActivityDefinition in any of the fsh 
   - activity.perform < activitydef-kind
   - activity.perform.of < activitydef-code-display
     //create a terminology.  terminology can be duplicated in references, but must be unique in the cpgl file
-  - **terminology.identifier < activitydef-code-display**
-  - **terminology.code < activitydef-code**
+    - create(terminology)
+      - **new-terminology.identifier < activitydef-code-display**
+      - **terminology.code < activitydef.code**
 else
     // create a CPGCommunicationRequest Activity
     // set do reference to the current action's condition expression
@@ -22,4 +23,4 @@ else
     // only add a message to CPGCommunicationRequest
   - activity.perform.of < plandef-action-description
 // create an optional rationale
-- **activity.because < plandef-rationale**
+- activity.because < plandef-rationale
