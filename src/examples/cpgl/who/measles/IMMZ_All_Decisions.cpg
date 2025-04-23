@@ -1,306 +1,295 @@
-/*
-  This decision is generated from the IMMZDTImmunizationStrategy instance.
-  It contains one top-level action "Check Immunizations" whose nested actions 
-  reference further plan definitions via definitionCanonical.
-*/
-decision "IMMZDTImmunizationStrategy":
-    when "Check Immunizations" then:
-        when "Measles Dose 0" then use "IMMZD2DTMeaslesDose0".
-        when "Measles Routine Immunization" then use "OTIMMZD2DTMeasles".
-        when "Measles Supplementary Dose" then use "IMMZD2DTMeaslesSupplementary".
-        when "Measles Contraindications" then use "IMMZD5DTMeaslesCI".
-    done
-done
-
-// ========================================================
-// Decisions Derived via DefinitionCanonical References (Simple Plans)
-// ========================================================
-
-/*
-  Decision for IMMZD2DTMeaslesDose0.fsh.
-  Contains the leaf action "Perform Dose 0 Administration".
-*/
-decision "IMMZD2DTMeaslesDose0":
-    when "Perform Dose 0 Administration" then do "IMMZD2DTMeaslesDose0_activity".
-done
-/* 
-   ValueMarkdown: "Ensure proper dosage based on patient weight." 
-*/
-activity "IMMZD2DTMeaslesDose0_activity" perform CPGCommunicationRequest of `Ensure proper dosage based on patient weight.`.
-
-
-/*
-  Decision for IMMZD2DTMeaslesSupplementary.fsh.
-  Contains the leaf action "Administer Supplementary Dose".
-*/
-decision "IMMZD2DTMeaslesSupplementary":
-    when "Administer Supplementary Dose" then do "IMMZD2DTMeaslesSupplementary_activity".
-done
-/* 
-   ValueMarkdown: "Follow up with serologic testing if needed." 
-*/
-activity "IMMZD2DTMeaslesSupplementary_activity" perform CPGCommunicationRequest of `Follow up with serologic testing if needed.`.
-
-
-/*
-  Decision for IMMZD5DTMeaslesCI.fsh.
-  Contains the leaf action "Evaluate Contraindications".
-*/
-decision "IMMZD5DTMeaslesCI":
-    when "Evaluate Contraindications" then do "IMMZD5DTMeaslesCI_activity".
-done
-/* 
-   ValueMarkdown: "Consider known allergic reactions and medical history." 
-*/
-activity "IMMZD5DTMeaslesCI_activity" perform CPGCommunicationRequest of `Consider known allergic reactions and medical history.`.
-
-
-// ========================================================
-// Updated Decision for OTIMMZD2DTMeasles (Complex Routine Immunization)
-// Derived from the routine immunization plan definition (formerly IMMZD2DTMeaslesOT.fsh)
-// but now augmented with nested conditions and actions.
-// ========================================================
-/*
-  Decision "OTIMMZD2DTMeasles" now reflects a more complex nested structure.
-  The top-level action is "Administer Routine Immunization" with a valueMarkdown of 
-  "Standard dose as per immunization schedule." This action now branches into nested 
-  sub-actions for additional checks.
-*/
-decision "OTIMMZD2DTMeasles":
-    when "Administer Routine Immunization" then:
-         /*
-           Nested branch: Check if the patient has no prior measles immunization.
-           (Condition derived from the nested action's condition expression.)
-         */
-         when "Check Prior Vaccination History" then do "OTIMMZD2DTMeasles_CheckHistory_activity".
-         /*
-           Nested branch: Assess if the patient is eligible for routine measles vaccine.
-         */
-         when "Assess Patient Eligibility" then do "OTIMMZD2DTMeasles_AssessEligibility_activity".
-    done
-done
-
-/* 
-   Comments for the nested actions in OTIMMZD2DTMeasles:
-   - "Administer Routine Immunization": ValueMarkdown "Standard dose as per immunization schedule." 
-     is used as the parent rationale.
-   - For the nested actions, we assume descriptive rationale as follows.
-*/
-activity "OTIMMZD2DTMeasles_CheckHistory_activity" perform CPGCommunicationRequest of `Check if the patient has no prior measles immunization.`. 
-// Check if the patient has no prior measles immunization.
-
-activity "OTIMMZD2DTMeasles_AssessEligibility_activity" perform CPGCommunicationRequest of `Assess if the patient is eligible for the routine measles vaccine.`. 
-// Assess if the patient is eligible for the routine measles vaccine.
-
-
-// ========================================================
-// Decision for IMMZD2DTMeaslesLT.fsh (Complex Logic)
-// ========================================================
-/*
-  This decision is generated from the IMMZD2DTMeaslesLT instance.
-  It encodes multiple levels of nested actions and conditions.
-*/
-decision "IMMZD2DTMeaslesLT":
-    when "Immunize patient for Measles" then:
-        /*
-          Top-level condition: "Measles Routine Immunization Schedule Incomplete"
-          Under this branch, there are separate flows for primary series vaccination.
-        */
-        when "Provide primary series measles vaccination (MCV1)" then:
-            /*
-              Branch for MCV1:
-              Condition "No Primary Series Doses Administered" applies with three nested actions.
-            */
-            when "Client Age Less Than 12 Months" then do "IMMZD2DTMeaslesLT_MCV1_ClientAgeLessThan12_activity".
-            when "Last Live Vaccine Administered Within 4 Weeks" then do "IMMZD2DTMeaslesLT_MCV1_LastLiveWithin4Weeks_activity".
-            when "Provide Measles Vaccine" then use "IMMZD2DTMeaslesMR".
+// Instance: IMMZD2DTMeaslesDose0
+// Description: If the child or patient has not been given MCV0 between 6 and 9 months
+// Provenance: WHO recommendations for routine immunization - summary tables (March 2023)
+decision "IMMZ.D2.DT.Measles MCV Dose 0":
+    when "Measles Routine Immunization Schedule Incomplete" then:
+        when "No MCV0 Doses Administered" then:
+            when "Client Age Less Than 6 Months" then do "Client Age Less Than 6 Months".
+            when "Last Live Vaccine Administered Within 4 Weeks" then do "Last Live Vaccine Administered Within 4 Weeks".
+            when "Client Is Due For MCV0" then do "Provide Measles Vaccine".
         done
-        when "Provide primary series measles vaccination (MCV2)" then:
-            /*
-              Branch for MCV2:
-              Condition "One Primary Series Dose Administered" applies with three nested actions.
-            */
-            when "Client Age Less Than 15 Months" then do "IMMZD2DTMeaslesLT_MCV2_ClientAgeLessThan15_activity".
-            when "Last Live Vaccine Administered Within 4 Weeks" then do "IMMZD2DTMeaslesLT_MCV2_LastLiveWithin4Weeks_activity".
-            when "Provide Measles Vaccine" then use "IMMZD2DTMeaslesMR".
-        done
-        when "Measles primary series is complete." then do "IMMZD2DTMeaslesLT_PrimarySeriesComplete_activity".
+        when "MCV0 Dose Administered" then do "MCV0 Dose Administered".
     done
 done
 
-/*
-  Decision for IMMZD2DTMeaslesMR.
-  This plan definition is referenced by IMMZD2DTMeaslesLT for providing the measles vaccine.
-  (If detailed logic exists in its FSH file, it would be processed recursively;
-   here we provide a placeholder decision.)
-*/
-decision "IMMZD2DTMeaslesMR":
-    when "Administer Measles Vaccine" then do "IMMZD2DTMeaslesMR_activity".
+// Instance: IMMZD2DTMeaslesLT
+// Description: If the child or patient has not been given MCV1 (at 12 months) and MCV2 (between 15-18 months) vaccination
+// Provenance: WHO recommendations for routine immunization - summary tables (March 2023)
+decision "IMMZ.D2.DT.Measles Low Transmission":
+    when "Measles Routine Immunization Schedule Incomplete" then:
+        when "No Primary Series Doses Administered" then:
+            when "Client Age Less Than 12 Months" then do "Client Age Less Than 12 Months".
+            when "Last Live Vaccine Administered Within 4 Weeks" then do "Last Live Vaccine Administered Within 4 Weeks_2".
+            when "Client Is Due For MCV1" then do "Provide Measles Vaccine".
+        done
+        when "One Primary Series Dose Administered" then:
+            when "Client Age Less Than 15 Months" then do "Client Age Less Than 15 Months".
+            when "Last Live Vaccine Administered Within 4 Weeks" then do "Last Live Vaccine Administered Within 4 Weeks_3".
+            when "Client Is Due For MCV2" then do "Provide Measles Vaccine".
+        done
+        when "Two Primary Series Doses Administered" then do "Measles primary series is complete.".
+    done
 done
-/* 
-   Using the description as a comment:
-   "Perform measles vaccine administration as per protocol."
-*/
-activity "IMMZD2DTMeaslesMR_activity" perform CPGMedicationRequest of "Measles vaccines" because `Perform measles vaccine administration as per protocol.`.
-terminology "Measles vaccines" system `ICD11` code `XM28X5`.
 
-// ========================================================
-// Activities for Leaf Actions in IMMZD2DTMeaslesLT
-// ========================================================
-/* 
-   Activity for "Client Age Less Than 12 Months" (MCV1 branch).
-   Description: "Should not vaccinate client as client's age is less than 12 months. Check for any vaccines due, and inform the caregiver of when to come back for MCV1."
-*/
-activity "IMMZD2DTMeaslesLT_MCV1_ClientAgeLessThan12_activity" perform CPGCommunicationRequest of `Should not vaccinate client as client's age is less than 12 months. Check for any vaccines due, and inform the caregiver of when to come back for MCV1.`.
+// Instance: IMMZD2DTMeaslesOT
+// Description: If the child or patient has not been given MCV1 (at 9 months) and MCV2 (between 15-18 months) vaccination
+// Provenance: WHO recommendations for routine immunization - summary tables (March 2023)
+decision "IMMZ.D2.DT.Measles Ongoing Transmission":
+    when "Measles Routine Immunization Schedule Incomplete" then:
+        when "No Primary Series Doses Administered" then:
+            when "Client Age Less Than 9 Months" then do "Client Age Less Than 9 Months".
+            when "Last Live Vaccine Administered Within 4 Weeks" then do "Last Live Vaccine Administered Within 4 Weeks_2".
+            when "Client Is Due For MCV1" then do "Provide Measles Vaccine".
+        done
+        when "One Primary Series Dose Administered" then:
+            when "Client Age Less Than 15 Months" then do "Client Age Less Than 15 Months".
+            when "Last Live Vaccine Administered Within 4 Weeks" then do "Last Live Vaccine Administered Within 4 Weeks_3".
+            when "Client Is Due For MCV2" then do "Provide Measles Vaccine".
+        done
+        when "Two Primary Series Doses Administered" then do "Measles primary series is complete".
+    done
+done
 
-/* 
-   Activity for "Last Live Vaccine Administered Within 4 Weeks" (MCV1 branch).
-   Description: "Should not vaccinate client for MCV1 as live vaccine was administered in the last 4 weeks. Check for any vaccines due and inform the caregiver of when to come back for MCV1."
-*/
-activity "IMMZD2DTMeaslesLT_MCV1_LastLiveWithin4Weeks_activity" perform CPGCommunicationRequest of `Should not vaccinate client for MCV1 as live vaccine was administered in the last 4 weeks. Check for any vaccines due and inform the caregiver of when to come back for MCV1.`.
+// Instance: IMMZD2DTMeaslesSupplementary
+// Description: If the child or patient has not been given a supplementary dose
+// Provenance: WHO recommendations for routine immunization - summary tables (March 2023)
+decision "IMMZ.D2.DT.Measles Supplementary":
+    when "Measles Routine Immunization Schedule Complete" then:
+        when "No Supplementary Dose Administered" then:
+            when "Last Live Vaccine Administered Within 4 Weeks" then do "Last Live Vaccine Administered Within 4 Weeks_4".
+            when "Client Is Due For Supplementary Dose" then do "Provide Measles Vaccine".
+        done
+        when "Supplementary Dose Administered" then do "Supplementary Dose Administered".
+    done
+done
 
-/* 
-   Activity for "Client Age Less Than 15 Months" (MCV2 branch).
-   Description: "Should not vaccinate client for MCV2 as client's age is less than 15 months. Check for any vaccines due, and inform the caregiver of when to come back for MCV2."
-*/
-activity "IMMZD2DTMeaslesLT_MCV2_ClientAgeLessThan15_activity" perform CPGCommunicationRequest of `Should not vaccinate client for MCV2 as client's age is less than 15 months. Check for any vaccines due, and inform the caregiver of when to come back for MCV2`.
+// Instance: IMMZD5DTMeaslesCI
+// Description: Check contraindications for Measles vaccine
+// Provenance: WHO recommendations for routine immunization - summary tables (March 2023)
+decision "IMMZ.D5.DT.Measles.Contraindication":
+    when "MCV Dose Contraindicated" then do "Check Contraindication for Measles Immunization".
+    when "Contraindication Evaluation of the MCV dose" then do "Evaluate Contraindication for Measles".
+done
 
-/* 
-   Activity for "Last Live Vaccine Administered Within 4 Weeks" (MCV2 branch).
-   Description: "Should not vaccinate client for MCV2 as live vaccine was administered in the last 4 weeks. Check for any vaccines due, and inform the caregiver of when to come back for MCV2."
-*/
-activity "IMMZD2DTMeaslesLT_MCV2_LastLiveWithin4Weeks_activity" perform CPGCommunicationRequest of `Should not vaccinate client for MCV2 as live vaccine was administered in the last 4 weeks. Check for any vaccines due, and inform the caregiver of when to come back for MCV2.`.
+// Instance: IMMZDTImmunizationStrategy
+// Description: Provide vaccinations according to the recommended schedule
+// Provenance: WHO recommendations for routine immunization - summary tables (March 2023)
+decision "IMMZ.DT.Immunization Strategy":
+    // Check Immunizations
+    when "" then:
+        // Measles Dose 0
+        // Measles Routine Immunization
+        // Measles Supplementary Dose
+        // Measles Contraindications
+        when "" then:
+            use "IMMZ.D2.DT.Measles MCV Dose 0".
+            use "IMMZ.D2.DT.Measles Ongoing Transmission".
+            use "IMMZ.D2.DT.Measles Supplementary".
+            use "IMMZ.D5.DT.Measles.Contraindication".
+        done
+    done
+done
 
-/* 
-   Activity for "Measles primary series is complete." 
-   ValueMarkdown (preferred): 
-   "An additional dose of MCV should be administered to HIV-infected children receiving HAART following immune reconstitution. If CD4+ T lymphocyte counts are monitored, an additional dose of MCV should be administered when immune reconstitution has been achieved, e.g. when the CD4+ T lymphocyte count reaches 20–25%. Where CD4+ T lymphocyte monitoring is not available, children should receive an additional dose of MCV 6–12 months after initiation of HAART."
-*/
-activity "IMMZD2DTMeaslesLT_PrimarySeriesComplete_activity" perform CPGCommunicationRequest of `Measles primary series is complete.` because `An additional dose of MCV should be administered to HIV-infected children receiving HAART following immune reconstitution. If CD4+ T lymphocyte counts are monitored, an additional dose of MCV should be administered when immune reconstitution has been achieved, e.g. when the CD4+ T lymphocyte count reaches 20–25%. Where CD4+ T lymphocyte monitoring is not available, children should receive an additional dose of MCV 6–12 months after initiation of HAART.`.
+activity "Client Age Less Than 6 Months"
+    perform CPGCommunicationRequest
+    of `Should not vaccinate client for MCV0 as client is less than 6 months. Check for any vaccines due, and inform the caregiver of when to come back for MCV0.`.
 
-  
-// ========================================================
-// Concept Declarations & Terminology Statements
-// Terminal when-clause conditions are represented as concepts (type Observation, valuetype boolean)
-// and receive only a 'coded by' clause. The 'coded by' references a terminology statement whose system
-// is the top-level decision ("IMMZDTImmunizationStrategy") and whose code is the concept name with spaces removed.
-// ========================================================
+activity "Last Live Vaccine Administered Within 4 Weeks"
+    perform CPGCommunicationRequest
+    of `Should not vaccinate client for MCV0 as live vaccine was administered in the last 4 weeks. Check for any vaccines due, and inform the caregiver of when to come back for MCV0.`.
 
-concept "Check Immunizations":
+activity "Provide Measles Vaccine"
+    perform CPGMedicationRequest of "Measles vaccines".
+
+activity "MCV0 Dose Administered"
+    perform CPGCommunicationRequest of `MCV0 was administered. Check measles routine immunization schedule.`.
+
+activity "Client Age Less Than 12 Months"
+    perform CPGCommunicationRequest
+    of `Should not vaccinate client as client's age is less than 12 months. Check for any vaccines due, and inform the caregiver of when to come back for MCV1.`.
+
+activity "Last Live Vaccine Administered Within 4 Weeks_2"
+    perform CPGCommunicationRequest
+    of `Should not vaccinate client for MCV1 as live vaccine was administered in the last 4 weeks. Check for any vaccines due and inform the caregiver of when to come back for MCV1.`.
+
+activity "Client Age Less Than 15 Months"
+    perform CPGCommunicationRequest
+    of `Should not vaccinate client for MCV2 as client's age is less than 15 months. Check for any vaccines due, and inform the caregiver of when to come back for MCV2.`.
+
+activity "Last Live Vaccine Administered Within 4 Weeks_3"
+    perform CPGCommunicationRequest
+    of `Should not vaccinate client for MCV2 as live vaccine was administered in the last 4 weeks. Check for any vaccines due, and inform the caregiver of when to come back for MCV2.`.
+
+activity "Measles primary series is complete."
+    perform CPGCommunicationRequest
+    of `Measles primary series is complete. Two measles primary series doses were administered. Check if a measles supplementary dose is appropriate for the client.`
+    because `An additional dose of MCV should be administered to HIV-infected children receiving HAART following immune reconstitution. If CD4+ T lymphocyte counts are monitored, an additional dose of MCV should be administered when immune reconstitution has been achieved, e.g. when the CD4+ T lymphocyte count reaches 20–25%. Where CD4+ T lymphocyte monitoring is not available, children should receive an additional dose of MCV 6–12 months after initiation of HAART.`.
+
+activity "Client Age Less Than 9 Months"
+    perform CPGCommunicationRequest
+    of `Should not vaccinate client as client's age is less than 9 months. Check for any vaccines due, and inform the caregiver of when to come back for MCV1.`.
+
+activity "Measles primary series is complete"
+    perform CPGCommunicationRequest
+    of `Measles primary series is complete. Two measles primary series doses were administered. Check if a measles supplementary dose is appropriate for the client.`
+    because `An additional dose of MCV should be administered to HIV-infected children receiving HAART following immune reconstitution. If CD4+ T lymphocyte counts are monitored, an additional dose of MCV should be administered when immune reconstitution has been achieved, e.g. when the CD4+ T lymphocyte count reaches 20–25%. Where CD4+ T lymphocyte monitoring is not available, children should receive an additional dose of MCV 6–12 months after initiation of HAART.`.
+
+activity "Last Live Vaccine Administered Within 4 Weeks_4"
+    perform CPGCommunicationRequest
+    of `Should not vaccinate client for measles supplementary dose as live vaccine was administered in the last 4 weeks. Check for any vaccines due, and inform the caregiver of when to come back for supplementary dose.`.
+
+activity "Supplementary Dose Administered"
+    perform CPGCommunicationRequest
+    of `Measles immunization schedule is complete. Measles supplementary dose was administered.`.
+
+activity "Check Contraindication for Measles Immunization"
+    do not perform CPGMedicationRequest of "Measles vaccines"
+    because `While vaccines are universally recommended, some clients may have contraindications to particular vaccines.<br/>Additional contraindications may be included in WHO position papers for the vaccine - Measles vaccines: WHO position paper (April 2017).`.
+
+activity "Evaluate Contraindication for Measles"
+    perform CPGServiceRequest of "Measles Code"
+    because `While vaccines are universally recommended, some clients may have contraindications to particular vaccines.<br/>Additional contraindications may be included in WHO position papers for the vaccine - Measles vaccines: WHO position paper (April 2017).`.
+
+
+concept "Measles Routine Immunization Schedule Incomplete":
     has type Observation.
     has valuetype boolean.
-    coded by "IMMZDTImmunizationStrategy_CheckImmunizations_Term".
+    coded by "Measles Routine Immunization Schedule Incomplete".
 done
-terminology "IMMZDTImmunizationStrategy_CheckImmunizations_Term" system `IMMZDTImmunizationStrategy` code `CheckImmunizations`.
 
-concept "Measles Dose 0":
+concept "No MCV0 Doses Administered":
     has type Observation.
     has valuetype boolean.
-    coded by "IMMZDTImmunizationStrategy_MeaslesDose0_Term".
+    coded by "No MCV0 Doses Administered".
 done
-terminology "IMMZDTImmunizationStrategy_MeaslesDose0_Term" system `IMMZDTImmunizationStrategy` code `MeaslesDose0`.
 
-concept "Measles Routine Immunization":
+concept "Client Age Less Than 6 Months":
     has type Observation.
     has valuetype boolean.
-    coded by "IMMZDTImmunizationStrategy_MeaslesRoutineImmunization_Term".
+    coded by "Client Age Less Than 6 Months".
 done
-terminology "IMMZDTImmunizationStrategy_MeaslesRoutineImmunization_Term" system `IMMZDTImmunizationStrategy` code `MeaslesRoutineImmunization`.
-
-concept "Measles Supplementary Dose":
-    has type Observation.
-    has valuetype boolean.
-    coded by "IMMZDTImmunizationStrategy_MeaslesSupplementaryDose_Term".
-done
-terminology "IMMZDTImmunizationStrategy_MeaslesSupplementaryDose_Term" system `IMMZDTImmunizationStrategy` code `MeaslesSupplementaryDose`.
-
-concept "Measles Contraindications":
-    has type Observation.
-    has valuetype boolean.
-    coded by "IMMZDTImmunizationStrategy_MeaslesContraindications_Term".
-done
-terminology "IMMZDTImmunizationStrategy_MeaslesContraindications_Term" system `IMMZDTImmunizationStrategy` code `MeaslesContraindications`.
-
-concept "Immunize patient for Measles":
-    has type Observation.
-    has valuetype boolean.
-    coded by "IMMZDTImmunizationStrategy_ImmunizePatientForMeasles_Term".
-done
-terminology "IMMZDTImmunizationStrategy_ImmunizePatientForMeasles_Term" system `IMMZDTImmunizationStrategy` code `ImmunizePatientForMeasles`.
-
-concept "Administer Routine Immunization":
-    has type Observation.
-    has valuetype boolean.
-    coded by "IMMZDTImmunizationStrategy_AdministerRoutineImmunization_Term".
-done
-terminology "IMMZDTImmunizationStrategy_AdministerRoutineImmunization_Term" system `IMMZDTImmunizationStrategy` code `AdministerRoutineImmunization`.
-
-concept "Check Prior Vaccination History":
-    has type Observation.
-    has valuetype boolean.
-    coded by "IMMZDTImmunizationStrategy_CheckPriorVaccinationHistory_Term".
-done
-terminology "IMMZDTImmunizationStrategy_CheckPriorVaccinationHistory_Term" system `IMMZDTImmunizationStrategy` code `CheckPriorVaccinationHistory`.
-
-concept "Assess Patient Eligibility":
-    has type Observation.
-    has valuetype boolean.
-    coded by "IMMZDTImmunizationStrategy_AssessPatientEligibility_Term".
-done
-terminology "IMMZDTImmunizationStrategy_AssessPatientEligibility_Term" system `IMMZDTImmunizationStrategy` code `AssessPatientEligibility`.
-
-concept "Provide primary series measles vaccination (MCV1)":
-    has type Observation.
-    has valuetype boolean.
-    coded by "IMMZDTImmunizationStrategy_MCV1_Term".
-done
-terminology "IMMZDTImmunizationStrategy_MCV1_Term" system `IMMZDTImmunizationStrategy` code `ProvidePrimarySeriesMCV1`.
-
-concept "Client Age Less Than 12 Months":
-    has type Observation.
-    has valuetype boolean.
-    coded by "IMMZDTImmunizationStrategy_ClientAgeLessThan12_Term".
-done
-terminology "IMMZDTImmunizationStrategy_ClientAgeLessThan12_Term" system `IMMZDTImmunizationStrategy` code `ClientAgeLessThan12Months`.
 
 concept "Last Live Vaccine Administered Within 4 Weeks":
     has type Observation.
     has valuetype boolean.
-    coded by "IMMZDTImmunizationStrategy_LastLiveVaccine4Weeks_Term".
+    coded by "Last Live Vaccine Administered Within 4 Weeks".
 done
-terminology "IMMZDTImmunizationStrategy_LastLiveVaccine4Weeks_Term" system `IMMZDTImmunizationStrategy` code `LastLiveVaccineWithin4Weeks`.
 
-concept "Provide Measles Vaccine":
+concept "Client Is Due For MCV0":
     has type Observation.
     has valuetype boolean.
-    coded by "IMMZDTImmunizationStrategy_ProvideMeaslesVaccine_Term".
+    coded by "Client Is Due For MCV0".
 done
-terminology "IMMZDTImmunizationStrategy_ProvideMeaslesVaccine_Term" system `IMMZDTImmunizationStrategy` code `ProvideMeaslesVaccine`.
 
-concept "Provide primary series measles vaccination (MCV2)":
+concept "MCV0 Dose Administered":
     has type Observation.
     has valuetype boolean.
-    coded by "IMMZDTImmunizationStrategy_MCV2_Term".
+    coded by "MCV0 Dose Administered".
 done
-terminology "IMMZDTImmunizationStrategy_MCV2_Term" system `IMMZDTImmunizationStrategy` code `ProvidePrimarySeriesMCV2`.
+
+concept "No Primary Series Doses Administered":
+    has type Observation.
+    has valuetype boolean.
+    coded by "No Primary Series Doses Administered".
+done
+
+concept "Client Age Less Than 12 Months":
+    has type Observation.
+    has valuetype boolean.
+    coded by "Client Age Less Than 12 Months".
+done
+
+concept "Client Is Due For MCV1":
+    has type Observation.
+    has valuetype boolean.
+    coded by "Client Is Due For MCV1".
+done
+
+concept "One Primary Series Dose Administered":
+    has type Observation.
+    has valuetype boolean.
+    coded by "One Primary Series Dose Administered".
+done
 
 concept "Client Age Less Than 15 Months":
     has type Observation.
     has valuetype boolean.
-    coded by "IMMZDTImmunizationStrategy_ClientAgeLessThan15_Term".
+    coded by "Client Age Less Than 15 Months".
 done
-terminology "IMMZDTImmunizationStrategy_ClientAgeLessThan15_Term" system `IMMZDTImmunizationStrategy` code `ClientAgeLessThan15Months`.
 
-concept "Measles primary series is complete.":
+concept "Client Is Due For MCV2":
     has type Observation.
     has valuetype boolean.
-    coded by "IMMZDTImmunizationStrategy_PrimarySeriesComplete_Term".
+    coded by "Client Is Due For MCV2".
 done
-terminology "IMMZDTImmunizationStrategy_PrimarySeriesComplete_Term" system `IMMZDTImmunizationStrategy` code `MeaslesPrimarySeriesComplete`.
 
-concept "Administer Measles Vaccine":
+concept "Two Primary Series Doses Administered":
     has type Observation.
     has valuetype boolean.
-    coded by "IMMZDTImmunizationStrategy_AdministerMeaslesVaccine_Term".
+    coded by "Two Primary Series Doses Administered".
 done
-terminology "IMMZDTImmunizationStrategy_AdministerMeaslesVaccine_Term" system `IMMZDTImmunizationStrategy` code `AdministerMeaslesVaccine`.
+
+concept "Client Age Less Than 9 Months":
+    has type Observation.
+    has valuetype boolean.
+    coded by "Client Age Less Than 9 Months".
+done
+
+concept "Measles Routine Immunization Schedule Complete":
+    has type Observation.
+    has valuetype boolean.
+    coded by "Measles Routine Immunization Schedule Complete".
+done
+
+concept "No Supplementary Dose Administered":
+    has type Observation.
+    has valuetype boolean.
+    coded by "No Supplementary Dose Administered".
+done
+
+concept "Client Is Due For Supplementary Dose":
+    has type Observation.
+    has valuetype boolean.
+    coded by "Client Is Due For Supplementary Dose".
+done
+
+concept "Supplementary Dose Administered":
+    has type Observation.
+    has valuetype boolean.
+    coded by "Supplementary Dose Administered".
+done
+
+concept "MCV Dose Contraindicated":
+    has type Observation.
+    has valuetype boolean.
+    coded by "MCV Dose Contraindicated".
+done
+
+concept "Contraindication Evaluation of the MCV dose":
+    has type Observation.
+    has valuetype boolean.
+    coded by "Contraindication Evaluation of the MCV dose".
+done
+
+terminology "Measles Routine Immunization Schedule Incomplete" system `http://sdh.com/cqis/kalm` code `measles-routine-immunization-schedule-incomplete`.
+terminology "No MCV0 Doses Administered" system `http://sdh.com/cqis/kalm` code `no-mcv0-doses-administered`.
+terminology "Client Age Less Than 6 Months" system `http://sdh.com/cqis/kalm` code `client-age-less-than-6-months`.
+terminology "Last Live Vaccine Administered Within 4 Weeks" system `http://sdh.com/cqis/kalm` code `last-live-vaccine-administered-within-4-weeks`.
+terminology "Client Is Due For MCV0" system `http://sdh.com/cqis/kalm` code `client-is-due-for-mcv0`.
+terminology "MCV0 Dose Administered" system `http://sdh.com/cqis/kalm` code `mcv0-dose-administered`.
+terminology "No Primary Series Doses Administered" system `http://sdh.com/cqis/kalm` code `no-primary-series-doses-administered`.
+terminology "Client Age Less Than 12 Months" system `http://sdh.com/cqis/kalm` code `client-age-less-than-12-months`.
+terminology "Client Is Due For MCV1" system `http://sdh.com/cqis/kalm` code `client-is-due-for-mcv1`.
+terminology "One Primary Series Dose Administered" system `http://sdh.com/cqis/kalm` code `one-primary-series-dose-administered`.
+terminology "Client Age Less Than 15 Months" system `http://sdh.com/cqis/kalm` code `client-age-less-than-15-months`.
+terminology "Client Is Due For MCV2" system `http://sdh.com/cqis/kalm` code `client-is-due-for-mcv2`.
+terminology "Two Primary Series Doses Administered" system `http://sdh.com/cqis/kalm` code `two-primary-series-doses-administered`.
+terminology "Client Age Less Than 9 Months" system `http://sdh.com/cqis/kalm` code `client-age-less-than-9-months`.
+terminology "Measles Routine Immunization Schedule Complete" system `http://sdh.com/cqis/kalm` code `measles-routine-immunization-schedule-complete`.
+terminology "No Supplementary Dose Administered" system `http://sdh.com/cqis/kalm` code `no-supplementary-dose-administered`.
+terminology "Client Is Due For Supplementary Dose" system `http://sdh.com/cqis/kalm` code `client-is-due-for-supplementary-dose`.
+terminology "Supplementary Dose Administered" system `http://sdh.com/cqis/kalm` code `supplementary-dose-administered`.
+terminology "MCV Dose Contraindicated" system `http://sdh.com/cqis/kalm` code `mcv-dose-contraindicated`.
+terminology "Contraindication Evaluation of the MCV dose" system `http://sdh.com/cqis/kalm` code `contraindication-evaluation-of-the-mcv-dose`.
+terminology "Measles vaccines" system `http://id.who.int/icd/release/11/mms` code `XM28X5`.
+terminology "Measles Code" system `http://id.who.int/icd/release/11/mms` code `XM28X5`.
