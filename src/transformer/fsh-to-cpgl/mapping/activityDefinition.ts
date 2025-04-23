@@ -1,4 +1,4 @@
-import { toIdentifier, toString } from '../utils/fshPathFunctions';
+import { toIdentifier, toString, extractCode, extractCodeDisplay, extractCodeExpression } from '../utils/fshPathFunctions';
 
 export const ACTIVITY_DEFINITION_URLS = [
   'http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-communicationactivity',
@@ -24,9 +24,10 @@ function formatActivityValue(value: string | undefined): string {
   return value.length > 80 ? `\n    of ${value}` : ` of ${value}`;
 }
 
-export function getActivityPerformClause(activityDef: any, doIdentifier: string): { clauseString: string, value: string | undefined } {
+export function getActivityPerformClause(activityDef: any, doIdentifier: string): { clauseString: string, value: string | undefined, terminology?: { identifier: string, code: string, system: string } } {
   // Extract kind from rules
   let kind: string | undefined = undefined;
+  let doNotPerform = false;
   if (activityDef && Array.isArray(activityDef.rules)) {
     const kindRule = activityDef.rules.find((r: any) => r.path === 'kind');
     if (kindRule) {
@@ -36,14 +37,20 @@ export function getActivityPerformClause(activityDef: any, doIdentifier: string)
         kind = 'CPG' + String(kindRule.value.code).replace(/#/g, '');
       }
     }
+    // Check for doNotPerform
+    const doNotPerformRule = activityDef.rules.find((r: any) => r.path === 'doNotPerform');
+    if (doNotPerformRule && doNotPerformRule.value === true) {
+      doNotPerform = true;
+    }
     if (!kindRule) {
       console.log('[DEBUGGING] No kind rule found. All rule paths/values:', activityDef.rules.map((r: any) => ({ path: r.path, value: r.value })));
     }
   }
 
-  // Extract code-display from rules
+  // Extract code-display and code from rules
   let activityValue: string | undefined = undefined;
   let value: string | undefined = undefined;
+  let terminology: { identifier: string, code: string, system: string } | undefined = undefined;
   if (activityDef && Array.isArray(activityDef.rules)) {
     // Prefer medicationCodeableConcept
     const pccRule = activityDef.rules.find((r: any) => r.path === 'medicationCodeableConcept');
@@ -52,6 +59,18 @@ export function getActivityPerformClause(activityDef: any, doIdentifier: string)
         if ('display' in pccRule.value && pccRule.value.display) {
           activityValue = `"${pccRule.value.display}"`;
           value = pccRule.value.display;
+          // Terminology extraction
+          const codeStr = pccRule.value.code ? extractCode(`$${pccRule.value.system || 'UNKNOWN'}#${pccRule.value.code} "${pccRule.value.display}"`) : '';
+          const displayStr = extractCodeDisplay(`$${pccRule.value.system || 'UNKNOWN'}#${pccRule.value.code || ''} "${pccRule.value.display}"`);
+          // Parse system and code from codeStr
+          let system = '', code = '';
+          const sysMatch = /system "([^"]+)"/.exec(codeStr);
+          const codeMatch = /code "([^"]+)"/.exec(codeStr);
+          if (sysMatch) system = sysMatch[1];
+          if (codeMatch) code = codeMatch[1];
+          if (displayStr && code) {
+            terminology = { identifier: displayStr.replace(/"/g, ''), code, system };
+          }
         } else if ('code' in pccRule.value && pccRule.value.code) {
           activityValue = `"${pccRule.value.code}"`;
           value = pccRule.value.code;
@@ -65,10 +84,7 @@ export function getActivityPerformClause(activityDef: any, doIdentifier: string)
         }
       }
     }
-    if (!pccRule) {
-      console.log('[DEBUGGING] No medicationCodeableConcept rule found. All rule paths/values:', activityDef.rules.map((r: any) => ({ path: r.path, value: r.value })));
-    }
-    // Fallback to dynamicValue logic (do not change)
+    // Fallback to dynamicValue logic
     if (!activityValue) {
       // Find all dynamicValue rules
       const dvRules = activityDef.rules.filter((r: any) => r.path.startsWith('dynamicValue'));
@@ -78,10 +94,23 @@ export function getActivityPerformClause(activityDef: any, doIdentifier: string)
           // Find the corresponding description
           const prefix = rule.path.replace(/\.path$/, '');
           const descRule = activityDef.rules.find((r: any) => r.path === `${prefix}.expression.description`);
+          const exprRule = activityDef.rules.find((r: any) => r.path === `${prefix}.expression.expression`);
           if (descRule && typeof descRule.value === 'string') {
             activityValue = `"${descRule.value}"`;
             value = descRule.value;
-            break;
+          }
+          if (exprRule && typeof exprRule.value === 'string') {
+            // Terminology extraction from CQL code expression
+            const codeStr = extractCodeExpression(exprRule.value);
+            // Parse system and code from codeStr
+            let system = '', code = '';
+            const sysMatch = /system "([^"]+)"/.exec(codeStr);
+            const codeMatch = /code "([^"]+)"/.exec(codeStr);
+            if (sysMatch) system = sysMatch[1];
+            if (codeMatch) code = codeMatch[1];
+            if (descRule && code) {
+              terminology = { identifier: descRule.value, code, system };
+            }
           }
         }
       }
@@ -90,9 +119,9 @@ export function getActivityPerformClause(activityDef: any, doIdentifier: string)
   if (!kind && !activityValue) {
     return { clauseString: '', value };
   }
-  //TODO: Activity value needs to have backticks vs quotes based on the kind/source value.  Note: when doing so, it currently has double quotes so they need to be removed.
-  const clauseString = `\n    perform ${kind}${formatActivityValue(activityValue)}`;
-  return { clauseString, value };
+  // Compose the clause string
+  const clauseString = `\n    ${doNotPerform ? 'do not perform' : 'perform'} ${kind}${formatActivityValue(activityValue)}`;
+  return { clauseString, value, terminology };
 }
 
 let activityIdCounter = 0;
@@ -104,7 +133,7 @@ export function emitActivityBlock(
   node: any,
   canonicalValueStr: string | undefined,
   allInstances: any[],
-  activities: { id: string, name: string, value: string | undefined, original: string }[],
+  activities: { id: string, name: string, value: string | undefined, original: string, terminology?: { identifier: string, code: string, system: string } }[],
   indent: string,
   hasPlanDef: boolean,
   doReferences: { id: string, placeholder: string }[],
@@ -157,11 +186,15 @@ export function emitActivityBlock(
     output += `${indent}    do ${placeholder}.\n`;
     output += `${indent}done\n`;
     if (activityDefInstance) {
-      const { clauseString, value } = getActivityPerformClause(activityDefInstance, doIdentifier);
-      activities.push({ id: activityId, name: doIdentifier, value, original: `activity ${doIdentifier}${clauseString}${rationale ?? ''}.\n\n` });
+      const { clauseString, value, terminology } = getActivityPerformClause(activityDefInstance, doIdentifier);
+      activities.push({ id: activityId, name: doIdentifier, value, original: `activity ${doIdentifier}${clauseString}${rationale ?? ''}.
+
+`, ...(terminology ? { terminology } : {}) });
       doReferences.push({ id: activityId, placeholder });
     } else {
-      activities.push({ id: activityId, name: doIdentifier, value: undefined, original: `activity ${doIdentifier} // TODO: activity details${rationale ?? ''}.\n\n` });
+      activities.push({ id: activityId, name: doIdentifier, value: undefined, original: `activity ${doIdentifier} // TODO: activity details${rationale ?? ''}.
+
+` });
       doReferences.push({ id: activityId, placeholder });
     }
   }
@@ -175,11 +208,15 @@ export function emitActivityBlock(
     const placeholder = `<<ACTIVITY_REF:${activityId}>>`;
     output += ` do ${placeholder}.\n`;
     if (activityDefInstance) {
-      const { clauseString, value } = getActivityPerformClause(activityDefInstance, doIdentifier);
-      activities.push({ id: activityId, name: doIdentifier, value, original: `activity ${doIdentifier}${clauseString}${rationale ?? ''}.\n\n` });
+      const { clauseString, value, terminology } = getActivityPerformClause(activityDefInstance, doIdentifier);
+      activities.push({ id: activityId, name: doIdentifier, value, original: `activity ${doIdentifier}${clauseString}${rationale ?? ''}.
+
+`, ...(terminology ? { terminology } : {}) });
       doReferences.push({ id: activityId, placeholder });
     } else {
-      activities.push({ id: activityId, name: doIdentifier, value: undefined, original: `activity ${doIdentifier} // TODO: activity details${rationale ?? ''}.\n\n` });
+      activities.push({ id: activityId, name: doIdentifier, value: undefined, original: `activity ${doIdentifier} // TODO: activity details${rationale ?? ''}.
+
+` });
       doReferences.push({ id: activityId, placeholder });
     }
   } else {
@@ -187,7 +224,9 @@ export function emitActivityBlock(
     const activityId = getNextActivityId();
     const placeholder = `<<ACTIVITY_REF:${activityId}>>`;
     output += ` do ${placeholder}.\n`;
-    activities.push({ id: activityId, name: doIdentifier, value: activityDescription, original: `activity ${doIdentifier}\n    perform CPGCommunicationRequest${formatActivityValue('`' + (activityDescription || 'TODO: fill in message.') + '`')}${rationale ?? ''}.\n\n` });
+    activities.push({ id: activityId, name: doIdentifier, value: activityDescription, original: `activity ${doIdentifier}\n    perform CPGCommunicationRequest${formatActivityValue('`' + (activityDescription || 'TODO: fill in message.') + '`')}${rationale ?? ''}.
+
+` });
     doReferences.push({ id: activityId, placeholder });
   }
 

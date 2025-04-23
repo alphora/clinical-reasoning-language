@@ -43,6 +43,14 @@ export function transformFSHToCPGL(fshResult: FSHLoadResult): string {
     }
   }
 
+  // Collect all terminology blocks for activities
+  const activityTerminologies: { identifier: string, code: string, system: string }[] = [];
+  for (const act of allActivities) {
+    if ((act as any).terminology && (act as any).terminology.code) {
+      activityTerminologies.push((act as any).terminology);
+    }
+  }
+
   // Emit all decisions
   let finalOutput = '';
   for (const dec of decisions) {
@@ -93,6 +101,26 @@ export function transformFSHToCPGL(fshResult: FSHLoadResult): string {
   if (allConceptIdentifiers.size > 0) {
     finalOutput += '\n' + mapConcept(Array.from(allConceptIdentifiers));
     finalOutput += '\n' + mapTerminology(Array.from(allConceptIdentifiers));
+  }
+
+  // Emit unique activity terminology blocks
+  if (activityTerminologies.length > 0) {
+    // Deduplicate by identifier+body, suffix if needed
+    const termMap = new Map<string, { body: string, count: number }>();
+    for (const term of activityTerminologies) {
+      const baseId = term.identifier;
+      const body = `system \`${term.system}\` code \`${term.code}\``;
+      let id = baseId;
+      let count = 1;
+      while (termMap.has(id) && termMap.get(id)!.body !== body) {
+        count++;
+        id = `${baseId}_${count}`;
+      }
+      if (!termMap.has(id)) {
+        termMap.set(id, { body, count });
+        finalOutput += `\nterminology "${id}" ${body}.`;
+      }
+    }
   }
 
   return finalOutput;
