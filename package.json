@@ -45,7 +45,8 @@
     "prebuild": "npm run clean",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
-    "prepublish:github": "node scripts/prepublishGithub.js"
+    "prepublish:github": "node scripts/prepublishGithub.js",
+    "util:clonefsh": "npx ts-node scripts/clone-fsh-repo.ts"
   },
   "keywords": [
     "clinical",

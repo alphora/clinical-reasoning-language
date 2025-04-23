@@ -1,28 +1,40 @@
-import { FSHLoadResult } from './sushi-loader';
-import { mapPlanDefinitionToDecision } from './mapping/planDefinition';
-import { mapConcept } from './mapping/concept';
-import { mapTerminology } from './mapping/terminology';
-import { ActivityDeduplicator } from './utils/activityDeduplication';
-import { toIdentifier } from './utils/fshPathFunctions';
+// Canonical entry point for FSH-to-CPGL transformation.
+// Expects a path to a SUSHI-compatible FSH project directory (containing sushi-config.yaml and input/fsh/).
+import { FSHTank } from 'fsh-sushi/dist/import/FSHTank';
+import { importConfiguration } from 'fsh-sushi/dist/import/importConfiguration';
+import * as path from 'path';
+import * as fs from 'fs';
 
 /**
  * Transform FSH (parsed with SUSHI) to CPG-L.
- * @param fshResult The result from sushi-loader
+ * @param fshProjectDir The path to a SUSHI-compatible FSH project directory
  * @returns The CPG-L output as a string
  */
-export function transformFSHToCPGL(fshResult: FSHLoadResult): string {
-  const { instances } = fshResult;
-  let output = '';
+export function transformFSHToCPGL(fshProjectDir: string): string {
+  const configPath = path.join(fshProjectDir, 'sushi-config.yaml');
+  if (!fs.existsSync(configPath)) {
+    throw new Error(`sushi-config.yaml not found in ${fshProjectDir}`);
+  }
+  const configYaml = fs.readFileSync(configPath, 'utf8');
+  const config = importConfiguration(configYaml, configPath);
+
+  // This will recursively load all FSH files under input/fsh/
+  const tank = new FSHTank([], config);
+  const instances = tank.getAllInstances();
 
   // Collect all activities and do references for file-wide deduplication and postprocessing
-  const activityDeduplicator = new ActivityDeduplicator();
+  const activityDeduplicator = new (require('./utils/activityDeduplication').ActivityDeduplicator)();
   const decisions: string[] = [];
-  const allActivities: { id: string, name: string, value: string | undefined, original: string }[] = [];
+  const allActivities: { id: string, name: string, value: string | undefined, original: string, terminology?: { identifier: string, code: string, system: string } }[] = [];
   const allDoReferences: { id: string, placeholder: string }[] = [];
   const allConceptIdentifiers = new Set<string>();
 
+  const { mapPlanDefinitionToDecision } = require('./mapping/planDefinition');
+  const { mapConcept } = require('./mapping/concept');
+  const { mapTerminology } = require('./mapping/terminology');
+  const { toIdentifier } = require('./utils/fshPathFunctions');
+
   for (const inst of instances) {
-    // For demonstration, call all mapping helpers for every instance
     const planDefResult = mapPlanDefinitionToDecision(inst, instances);
     decisions.push(planDefResult.decision);
     for (const act of planDefResult.activities) {
@@ -34,10 +46,15 @@ export function transformFSHToCPGL(fshResult: FSHLoadResult): string {
     }
     // Collect concept identifiers from PlanDefinition action trees
     if (inst.instanceOf && (inst.instanceOf.includes('strategydefinition') || inst.instanceOf.includes('recommendationdefinition'))) {
-      // Traverse rules to find all condition.expression.expression values
       for (const rule of inst.rules || []) {
-        if (rule.path.endsWith('.condition[=].expression.expression') && rule.value) {
-          allConceptIdentifiers.add(rule.value);
+        if (
+          rule.path &&
+          rule.path.endsWith('.condition[=].expression.expression') &&
+          'value' in rule &&
+          typeof (rule as any).value === 'string' &&
+          (rule as any).value
+        ) {
+          allConceptIdentifiers.add((rule as any).value);
         }
       }
     }
@@ -58,7 +75,6 @@ export function transformFSHToCPGL(fshResult: FSHLoadResult): string {
   }
 
   // --- POSTPROCESSING: Deduplicate, assign unique names, and replace placeholders ---
-  // 1. Deduplicate activities by (name, value) and assign unique names with suffixes
   const dedupedMap = new Map<string, { uniqueName: string, activity: typeof allActivities[0] }>();
   const nameValueCount = new Map<string, number>();
   const idToFinalName: Record<string, string> = {};
@@ -73,23 +89,18 @@ export function transformFSHToCPGL(fshResult: FSHLoadResult): string {
       dedupedMap.set(key, { uniqueName, activity: act });
       idToFinalName[act.id] = uniqueName;
     } else {
-      // Already deduped, use the same unique name
       const { uniqueName } = dedupedMap.get(key)!;
       idToFinalName[act.id] = uniqueName;
     }
   }
 
-  // 2. Replace all <<ACTIVITY_REF:...>> placeholders in the output with the correct quoted unique name
   finalOutput = finalOutput.replace(/<<ACTIVITY_REF:(activity_\d+)>>/g, (_, id) => toIdentifier(idToFinalName[id]));
 
-  // 3. Emit unique activities at the end, using the assigned unique names
   for (const { uniqueName, activity } of dedupedMap.values()) {
-    // Extract the base name from the original (without quotes)
     const activityRegex = /activity\s+"([^"]+)"/;
     const match = activity.original.match(activityRegex);
     let replaced = activity.original;
     if (match) {
-      // uniqueName is already baseName + suffix (no quotes)
       replaced = activity.original.replace(activityRegex, `activity ${toIdentifier(uniqueName)}`);
     } else {
       console.warn(`Could not match activity identifier in: ${activity.original}`);
@@ -105,7 +116,6 @@ export function transformFSHToCPGL(fshResult: FSHLoadResult): string {
 
   // Emit unique activity terminology blocks
   if (activityTerminologies.length > 0) {
-    // Deduplicate by identifier+body, suffix if needed
     const termMap = new Map<string, { body: string, count: number }>();
     for (const term of activityTerminologies) {
       const baseId = term.identifier;
