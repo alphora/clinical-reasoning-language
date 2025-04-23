@@ -7,7 +7,7 @@ import { CPGLLexer } from '../grammar/generated/CPGLLexer';
 import { createLexer } from '../lexer/createLexer';
 
 // Get the path to the grammar example file
-const examplePath = join(__dirname, '../examples/cpgl/who/measles/IMMZ_All_Decisions.cpg');
+const examplePath = join(__dirname, '../examples/cpgl/who/smart-example-immz/IMMZ_All_Decisions.cpg');
 
 // Read the file content
 const input = readFileSync(examplePath, 'utf8');

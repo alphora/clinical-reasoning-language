@@ -149,7 +149,7 @@ done
 terminology "IMMZDTImmunizationStrategy_CheckImmunizations_Term" system `IMMZDTImmunizationStrategy` code `CheckImmunizations`.
 ```
 
-For a full example, see [`IMMZ_All_Decisions.cpg`](../../../../examples/cpgl/who/measles/IMMZ_All_Decisions.cpg).
+For a full example, see [`IMMZ_All_Decisions.cpg`](../../../../examples/cpgl/who/smart-example-immz/IMMZ_All_Decisions.cpg).
 
 ---
 
@@ -168,4 +168,4 @@ For a full example, see [`IMMZ_All_Decisions.cpg`](../../../../examples/cpgl/who
 - [SushiVisitor.md](./SushiVisitor.md)
 - [CPGLLexer.g4](../../../../grammar/CPGLLexer.g4)
 - [CPGLParser.g4](../../../../grammar/CPGLParser.g4)
-- [IMMZ_All_Decisions.cpg](../../../../examples/cpgl/who/measles/IMMZ_All_Decisions.cpg) 
+- [IMMZ_All_Decisions.cpg](../../../../examples/cpgl/who/smart-example-immz/IMMZ_All_Decisions.cpg) 

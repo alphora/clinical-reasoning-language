@@ -80,6 +80,6 @@ export async function loadFSH(options: {
 
 // [DEBUGGING] Example usage (uncomment for local testing):
 // (async () => {
-//   const result = await loadFSH({ path: '../../examples/fsh/who/measles' });
+//   const result = await loadFSH({ path: '../../examples/fsh/who/smart-example-immz' });
 //   console.log('[DEBUGGING] Loaded instances:', result.instances.map(i => i.name));
 // })(); 

@@ -10,7 +10,7 @@ import { createLexer } from '../lexer/createLexer';
 import { createParser } from '../parser/createParser';
 
 // Read the example file
-const examplePath = join(__dirname, '../examples/cpgl/who/measles/IMMZ_All_Decisions.cpg');
+const examplePath = join(__dirname, '../examples/cpgl/who/smart-example-immz/IMMZ_All_Decisions.cpg');
 const input = readFileSync(examplePath, 'utf-8');
 
 // Create the lexer and token stream

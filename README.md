@@ -614,7 +614,7 @@ This project includes a transformer that converts FHIR Shorthand (FSH) files int
 
 ### Example Data: WHO Measles Immunization
 
-The example FSH files and CPG-L outputs in `src/examples/fsh/who/measles/` and `src/examples/cpgl/who/measles/` are derived from the [WHO SMART Guidelines - Example IG for Measles Immunization](https://github.com/WorldHealthOrganization/smart-example-immz).
+The example FSH files and CPG-L outputs in `src/examples/fsh/who/smart-example-immz/` and `src/examples/cpgl/who/smart-example-immz/` are derived from the [WHO SMART Guidelines - Example IG for Measles Immunization](https://github.com/WorldHealthOrganization/smart-example-immz).
 
 - **Source repository:** [WorldHealthOrganization/smart-example-immz](https://github.com/WorldHealthOrganization/smart-example-immz)
 - **License:** [CC BY-IGO 3.0](https://github.com/WorldHealthOrganization/smart-example-immz/blob/main/LICENSE.md)
