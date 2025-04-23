@@ -54,6 +54,15 @@ for (const relPath of restorePaths) {
   }
 }
 
+// Append FSHOnly: true to sushi-config.yaml
+const sushiConfigPath = path.join(targetDir, 'sushi-config.yaml');
+try {
+  fs.appendFileSync(sushiConfigPath, '\nFSHOnly: true\n');
+  console.log('[INFO] Appended FSHOnly: true to sushi-config.yaml');
+} catch (e) {
+  console.warn('[WARN] Could not append FSHOnly: true to sushi-config.yaml');
+}
+
 // Add the root folder to .gitignore
 const igignorePath = path.join('.gitignore');
 const igLine = `src/examples/fsh/${repoName}/`;
