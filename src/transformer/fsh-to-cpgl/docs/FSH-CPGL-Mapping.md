@@ -322,12 +322,12 @@ given:
 ```FSH
 Instance: IMMZD2DTMeaslesCIMR
 InstanceOf: http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-immunizationactivity
-* productCodeableConcept = $ICD11#XM28X5 "Measles vaccines"
+* medicationCodeableConcept = $ICD11#XM28X5 "Measles vaccines"
 ```
 
 and:
 
-`ActivityDef.productCodeableConcept.extractCode()`
+`ActivityDef.medicationCodeableConcept.extractCode()`
 
 then:
 
@@ -346,12 +346,12 @@ given:
 ```FSH
 Instance: IMMZD2DTMeaslesCIMR
 InstanceOf: http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-immunizationactivity
-* productCodeableConcept = $ICD11#XM28X5 "Measles vaccines"
+* medicationCodeableConcept = $ICD11#XM28X5 "Measles vaccines"
 ```
 
 and:
 
-`ActivityDef.productCodeableConcept.extractCodeDisplay()`
+`ActivityDef.medicationCodeableConcept.extractCodeDisplay()`
 
 then:
 
@@ -416,7 +416,7 @@ The resulting CPG-L value would be:
 ```
 
 - `doNot()`: prefix the CPG-L value with "do not".
-
+ - `coded
 #### FSH Path Values
 
 FSH Path Values are the value of a given FSH Path, as defined in this section.  
@@ -455,11 +455,11 @@ The expression `[*].action` in these mapping rules means an arbitrary nesting of
 - `activitydef-kind` = `ActivityDef.kind.remove('#').prefix('CPG')`
 
 - `activitydef-code` = one of either:
-  - `ActivityDef.productCodeableConcept.extractCode()`
+  - `ActivityDef.medicationCodeableConcept.extractCode()`
   - `ActivityDef.dynamicValue.expression.expression.where(ActivityDef.dynamicValue.path="code.coding").extractCodeExpression()`
 
 - `activitydef-code-display` = one of either:
-  - `ActivityDef.productCodeableConcept.extractCodeDisplay()`
+  - `ActivityDef.medicationCodeableConcept.extractCodeDisplay()`
   - `ActivityDef.dynamicValue.expression.description.where(ActivityDef.dynamicValue.path="code.coding")`
 
 - `activity_def-donotperform` = `ActivityDef.doNotPerform`

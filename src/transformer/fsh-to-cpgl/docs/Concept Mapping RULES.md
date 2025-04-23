@@ -13,3 +13,7 @@
   - new-terminology.identifier < concept.identifier
   - new-terminology.system < "http://sdh.com/cqis/kalm"
   - new-terminology.code < concept.identifier.toCode()
+/*
+Note: `terminology` must be unique across the file, by `identifier`.
+Like `when` clauses, when a terminology is encountered that has the same `identifier` as a previous terminology, but the `body` of the terminology clauses differ, then the identifier of the new terminology should be suffixed with  `_<count>`.  If the `identifier` and the `body` are the same, then do skip.
+*/

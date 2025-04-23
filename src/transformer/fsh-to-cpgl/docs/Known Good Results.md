@@ -148,7 +148,7 @@ activity "Check Contraindication for Measles Immunization"
     do not perform CPGMedicationRequest of "Measles vaccines"
     because `While vaccines are universally recommended, some clients may have contraindications to particular vaccines.<br/>Additional contraindications may be included in WHO position papers for the vaccine - Measles vaccines: WHO position paper (April 2017).`.
 
-// productCodeableConcept
+// medicationCodeableConcept
 terminology "Measles vaccines" system `http://id.who.int/icd/release/11/mms` code `XM28X5`.
 
 // Code { system: 'http://id.who.int/icd/release/11/mms', code: 'XM28X5' }

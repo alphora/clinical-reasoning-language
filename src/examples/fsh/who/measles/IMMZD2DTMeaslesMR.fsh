@@ -20,7 +20,7 @@ Usage: #definition
 * kind = #MedicationRequest
 * intent = #proposal
 * doNotPerform = false
-* productCodeableConcept = $ICD11#XM28X5 "Measles vaccines"
+* medicationCodeableConcept = $ICD11#XM28X5 "Measles vaccines"
 * dynamicValue[+]
   * path = "status"
   * expression

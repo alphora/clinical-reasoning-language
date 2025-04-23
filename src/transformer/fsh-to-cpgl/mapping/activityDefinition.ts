@@ -45,8 +45,8 @@ export function getActivityPerformClause(activityDef: any, doIdentifier: string)
   let activityValue: string | undefined = undefined;
   let value: string | undefined = undefined;
   if (activityDef && Array.isArray(activityDef.rules)) {
-    // Prefer productCodeableConcept
-    const pccRule = activityDef.rules.find((r: any) => r.path === 'productCodeableConcept');
+    // Prefer medicationCodeableConcept
+    const pccRule = activityDef.rules.find((r: any) => r.path === 'medicationCodeableConcept');
     if (pccRule) {
       if (typeof pccRule.value === 'object' && pccRule.value !== null) {
         if ('display' in pccRule.value && pccRule.value.display) {
@@ -66,7 +66,7 @@ export function getActivityPerformClause(activityDef: any, doIdentifier: string)
       }
     }
     if (!pccRule) {
-      console.log('[DEBUGGING] No productCodeableConcept rule found. All rule paths/values:', activityDef.rules.map((r: any) => ({ path: r.path, value: r.value })));
+      console.log('[DEBUGGING] No medicationCodeableConcept rule found. All rule paths/values:', activityDef.rules.map((r: any) => ({ path: r.path, value: r.value })));
     }
     // Fallback to dynamicValue logic (do not change)
     if (!activityValue) {

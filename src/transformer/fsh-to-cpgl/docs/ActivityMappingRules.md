@@ -5,16 +5,21 @@ if action.definitionCanonical references a ActivityDefinition in any of the fsh 
   // create a activity from the ActivityDefinition
   // set do reference to the activity's identifier
   - decision.when.do < activitydef-description
-  //create a activity
+  // create a activity
   - activity.identifier < activitydef-description
   - activity.perform < activitydef-kind
   - activity.perform.of < activitydef-code-display
   if activity_def-donotperform = true
     - activity.perform.doNot()
-  //create a terminology.  terminology can be duplicated in references, but must be unique in the cpgl file
-  - create(terminology)
-    - new-terminology.identifier < activitydef-code-display
-    - terminology.code < activitydef.code
+  if activitydef-code.exists() then
+    // create a terminology.  terminology can be duplicated in references, but must be unique in the cpgl file
+    - create(terminology)
+      - new-terminology.identifier < activitydef-code-display
+      - new-terminology.code < activitydef-code
+/*
+Note: `terminology` must be unique across the file, by `identifier`.
+Like `when` clauses, when a terminology is encountered that has the same `identifier` as a previous terminology, but the `body` of the terminology clauses differ, then the identifier of the new terminology should be suffixed with  `_<count>`.  If the `identifier` and the `body` are the same, then do skip.
+*/
 else
   // create a CPGCommunicationRequest Activity
   // set do reference to the current action's condition expression
