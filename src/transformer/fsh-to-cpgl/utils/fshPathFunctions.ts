@@ -82,4 +82,15 @@ export function extractCodeExpression(value: string): string {
     return `system "${match[1]}" code "${match[2]}"`;
   }
   return value;
+}
+
+/**
+ * Converts a string to CPGL code format (kebab-case, wrapped in backticks).
+ * Example: 'Client Age Less Than 6 Months' -> `client-age-less-than-6-months`
+ */
+export function toCode(value: string): string {
+  if (value == null) return '``';
+  // Remove quotes, lower case, replace whitespace with dashes, wrap in backticks
+  let cleaned = value.replace(/"/g, '').toLowerCase().replace(/\s+/g, '-');
+  return `\`${cleaned}\``;
 } 

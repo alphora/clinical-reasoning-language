@@ -151,3 +151,171 @@ activity "Check Contraindication for Measles Immunization"
 activity "Evaluate Contraindication for Measles" 
     perform CPGServiceRequest of "Measles Code"
     because `While vaccines are universally recommended, some clients may have contraindications to particular vaccines.<br/>Additional contraindications may be included in WHO position papers for the vaccine - Measles vaccines: WHO position paper (April 2017).`.
+
+concept "Measles Routine Immunization Schedule Incomplete": 
+    has type Observation.
+    has valuetype boolean.
+    coded by "Measles Routine Immunization Schedule Incomplete". 
+done
+
+terminology "Measles Routine Immunization Schedule Incomplete" system `http://sdh.com/cqis/kalm` code `measles-routine-immunization-schedule-incomplete`.
+
+concept "No MCV0 Doses Administered": 
+    has type Observation.
+    has valuetype boolean.
+    coded by "No MCV0 Doses Administered". 
+done
+
+terminology "No MCV0 Doses Administered" system `http://sdh.com/cqis/kalm` code `no-mcv0-doses-administered`.
+
+concept "Client Age Less Than 6 Months": 
+    has type Observation.
+    has valuetype boolean.
+    coded by "Client Age Less Than 6 Months". 
+done
+
+terminology "Client Age Less Than 6 Months" system `http://sdh.com/cqis/kalm` code `client-age-less-than-6-months`.
+
+concept "Last Live Vaccine Administered Within 4 Weeks": 
+    has type Observation.
+    has valuetype boolean.
+    coded by "Last Live Vaccine Administered Within 4 Weeks". 
+done
+
+terminology "Last Live Vaccine Administered Within 4 Weeks" system `http://sdh.com/cqis/kalm` code `last-live-vaccine-administered-within-4-weeks`.
+
+concept "Client Is Due For MCV0": 
+    has type Observation.
+    has valuetype boolean.
+    coded by "Client Is Due For MCV0". 
+done
+
+terminology "Client Is Due For MCV0" system `http://sdh.com/cqis/kalm` code `client-is-due-for-mcv0`.
+
+concept "MCV0 Dose Administered": 
+    has type Observation.
+    has valuetype boolean.
+    coded by "MCV0 Dose Administered". 
+done
+
+terminology "MCV0 Dose Administered" system `http://sdh.com/cqis/kalm` code `mcv0-dose-administered`.
+
+concept "No Primary Series Doses Administered": 
+    has type Observation.
+    has valuetype boolean.
+    coded by "No Primary Series Doses Administered". 
+done
+
+terminology "No Primary Series Doses Administered" system `http://sdh.com/cqis/kalm` code `no-primary-series-doses-administered`.
+
+concept "Client Age Less Than 12 Months": 
+    has type Observation.
+    has valuetype boolean.
+    coded by "Client Age Less Than 12 Months". 
+done
+
+terminology "Client Age Less Than 12 Months" system `http://sdh.com/cqis/kalm` code `client-age-less-than-12-months`.
+
+concept "Client Is Due For MCV1": 
+    has type Observation.
+    has valuetype boolean.
+    coded by "Client Is Due For MCV1". 
+done
+
+terminology "Client Is Due For MCV1" system `http://sdh.com/cqis/kalm` code `client-is-due-for-mcv1`.
+
+concept "One Primary Series Dose Administered": 
+    has type Observation.
+    has valuetype boolean.
+    coded by "One Primary Series Dose Administered". 
+done
+
+terminology "One Primary Series Dose Administered" system `http://sdh.com/cqis/kalm` code `one-primary-series-dose-administered`.
+
+concept "Client Age Less Than 15 Months": 
+    has type Observation.
+    has valuetype boolean.
+    coded by "Client Age Less Than 15 Months". 
+done
+
+terminology "Client Age Less Than 15 Months" system `http://sdh.com/cqis/kalm` code `client-age-less-than-15-months`.
+
+concept "Client Is Due For MCV2": 
+    has type Observation.
+    has valuetype boolean.
+    coded by "Client Is Due For MCV2". 
+done
+
+terminology "Client Is Due For MCV2" system `http://sdh.com/cqis/kalm` code `client-is-due-for-mcv2`.
+
+concept "Two Primary Series Doses Administered": 
+    has type Observation.
+    has valuetype boolean.
+    coded by "Two Primary Series Doses Administered". 
+done
+
+terminology "Two Primary Series Doses Administered" system `http://sdh.com/cqis/kalm` code `two-primary-series-doses-administered`.
+
+concept "Client Age Less Than 9 Months": 
+    has type Observation.
+    has valuetype boolean.
+    coded by "Client Age Less Than 9 Months". 
+done
+
+terminology "Client Age Less Than 9 Months" system `http://sdh.com/cqis/kalm` code `client-age-less-than-9-months`.
+
+concept "Measles primary series is complete": 
+    has type Observation.
+    has valuetype boolean.
+    coded by "Measles primary series is complete". 
+done
+
+terminology "Measles primary series is complete" system `http://sdh.com/cqis/kalm` code `measles-primary-series-is-complete`.
+
+concept "Measles Routine Immunization Schedule Complete": 
+    has type Observation.
+    has valuetype boolean.
+    coded by "Measles Routine Immunization Schedule Complete". 
+done
+
+terminology "Measles Routine Immunization Schedule Complete" system `http://sdh.com/cqis/kalm` code `measles-routine-immunization-schedule-complete`.
+
+concept "No Supplementary Dose Administered": 
+    has type Observation.
+    has valuetype boolean.
+    coded by "No Supplementary Dose Administered". 
+done
+
+terminology "No Supplementary Dose Administered" system `http://sdh.com/cqis/kalm` code `no-supplementary-dose-administered`.
+
+concept "Client Is Due For Supplementary Dose": 
+    has type Observation.
+    has valuetype boolean.
+    coded by "Client Is Due For Supplementary Dose". 
+done
+
+terminology "Client Is Due For Supplementary Dose" system `http://sdh.com/cqis/kalm` code `client-is-due-for-supplementary-dose`.
+
+concept "Supplementary Dose Administered": 
+    has type Observation.
+    has valuetype boolean.
+    coded by "Supplementary Dose Administered". 
+done
+
+terminology "Supplementary Dose Administered" system `http://sdh.com/cqis/kalm` code `supplementary-dose-administered`.
+
+concept "MCV Dose Contraindicated": 
+    has type Observation.
+    has valuetype boolean.
+    coded by "MCV Dose Contraindicated". 
+done
+
+terminology "MCV Dose Contraindicated" system `http://sdh.com/cqis/kalm` code `mcv-dose-contraindicated`.
+
+concept "Contraindication Evaluation of the MCV dose": 
+    has type Observation.
+    has valuetype boolean.
+    coded by "Contraindication Evaluation of the MCV dose". 
+done
+
+terminology "Contraindication Evaluation of the MCV dose" system `http://sdh.com/cqis/kalm` code `contraindication-evaluation-of-the-mcv-dose`.

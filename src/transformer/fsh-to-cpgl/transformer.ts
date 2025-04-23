@@ -19,6 +19,7 @@ export function transformFSHToCPGL(fshResult: FSHLoadResult): string {
   const decisions: string[] = [];
   const allActivities: { id: string, name: string, value: string | undefined, original: string }[] = [];
   const allDoReferences: { id: string, placeholder: string }[] = [];
+  const allConceptIdentifiers = new Set<string>();
 
   for (const inst of instances) {
     // For demonstration, call all mapping helpers for every instance
@@ -31,9 +32,15 @@ export function transformFSHToCPGL(fshResult: FSHLoadResult): string {
     for (const ref of planDefResult.doReferences) {
       allDoReferences.push(ref);
     }
-    output += mapConcept(inst);
-    output += mapTerminology(inst);
-    output += '\n';
+    // Collect concept identifiers from PlanDefinition action trees
+    if (inst.instanceOf && (inst.instanceOf.includes('strategydefinition') || inst.instanceOf.includes('recommendationdefinition'))) {
+      // Traverse rules to find all condition.expression.expression values
+      for (const rule of inst.rules || []) {
+        if (rule.path.endsWith('.condition[=].expression.expression') && rule.value) {
+          allConceptIdentifiers.add(rule.value);
+        }
+      }
+    }
   }
 
   // Emit all decisions
@@ -80,6 +87,12 @@ export function transformFSHToCPGL(fshResult: FSHLoadResult): string {
       console.warn(`Could not match activity identifier in: ${activity.original}`);
     }
     finalOutput += replaced;
+  }
+
+  // Emit concept and terminology blocks for all unique concept identifiers
+  if (allConceptIdentifiers.size > 0) {
+    finalOutput += '\n' + mapConcept(Array.from(allConceptIdentifiers));
+    finalOutput += '\n' + mapTerminology(Array.from(allConceptIdentifiers));
   }
 
   return finalOutput;
