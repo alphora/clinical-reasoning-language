@@ -111,25 +111,57 @@ The validator tool checks the AST for errors and displays:
 
 ### FSH-to-CPGL Transformer Tool
 
-```bash
-# Run the FSH-to-CPGL transformer on the example FSH files
-yarn cli:transformer:fsh-to-cpgl
-# or
-npm run cli:transformer:fsh-to-cpgl
+The FSH-to-CPGL transformer converts FHIR Shorthand (FSH) files into Clinical Practice Guideline Language (CPGL) files. It supports advanced mapping and deduplication logic for activities, concepts, and terminology blocks.
 
-# Optionally specify a different FSH directory
-npm run cli:transformer:fsh-to-cpgl -- path/to/your/fsh-folder
-```
+### Activity Mapping Enhancements
 
-This tool loads FHIR Shorthand (FSH) files (using SUSHI), applies the FSH-to-CPGL transformation, and prints the generated CPG-L output. It is located at `src/cli/run-transformer-fsh-to-cpgl.ts` and is invoked via the `cli:transformer:fsh-to-cpgl` script.
+- **Conditional `do not perform`**: If an activity in FSH has `doNotPerform = true`, the generated CPGL will emit `do not perform` instead of `perform` for that activity.
+  
+  Example:
+  ```cpgl
+  activity "Check Contraindication for Measles Immunization"
+      do not perform CPGMedicationRequest of "Measles vaccines"
+  ```
 
-**Activity Deduplication and Reference Resolution:**
-- Each unique combination of activity name and value is defined only once in the output.
-- If multiple activities share the same name but have different values, suffixes (`_2`, `_3`, etc.) are added to the name (inside the quotes) to ensure uniqueness.
-- All references to activities in `do` statements are updated to use the final, unique name (with suffix if needed).
-- Quoting and escaping of activity names is handled automatically by the transformer.
+- **Activity Terminology Block Emission**:
+  - For activities with a `medicationCodeableConcept`, the terminology block uses the `system` and `code` properties directly from the FSH object (not parsed from a string).
+  - For activities using `dynamicValue.expression.expression` with `path = "code.coding"`, the code and system are extracted from the CQL code expression.
+  - Example:
+    ```cpgl
+    terminology "Measles vaccines" system `http://id.who.int/icd/release/11/mms` code `XM28X5`.
+    ```
 
-For more details, see the [User Guide](./USER_GUIDE.md#activity-deduplication-and-reference-resolution).
+- **Deduplication and Suffixing**:
+  - Terminology blocks are unique by identifier and body. If a duplicate identifier is encountered with a different body, a numeric suffix (e.g., `_2`) is added to the identifier.
+  - If both identifier and body are the same, the block is not duplicated.
+
+- **Extraction Logic**:
+  - For `medicationCodeableConcept`, the transformer uses:
+    - `system`: from `pccRule.value.system`
+    - `code`: from `pccRule.value.code`
+    - `identifier`: from `pccRule.value.display`
+  - For `dynamicValue.expression.expression` (where `path = "code.coding"`), the transformer uses:
+    - `system` and `code`: extracted from the CQL code expression string
+    - `identifier`: from the corresponding description
+
+- **Example Usage**:
+  ```fsh
+  * medicationCodeableConcept = $ICD11#XM28X5 "Measles vaccines"
+  // ...
+  * dynamicValue[+]
+    * path = "code.coding"
+    * expression
+      * description = "Measles Code"
+      * language = #text/cql
+      * expression = "Code { system: 'http://id.who.int/icd/release/11/mms', code: 'XM28X5' }"
+  ```
+  Generates:
+  ```cpgl
+  terminology "Measles vaccines" system `http://id.who.int/icd/release/11/mms` code `XM28X5`.
+  terminology "Measles Code" system `http://id.who.int/icd/release/11/mms` code `XM28X5`.
+  ```
+
+For more details, see the [User Guide](./USER_GUIDE.md) and the technical mapping documentation.
 
 ## Features
 
