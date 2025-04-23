@@ -59,17 +59,12 @@ export function getActivityPerformClause(activityDef: any, doIdentifier: string)
         if ('display' in pccRule.value && pccRule.value.display) {
           activityValue = `"${pccRule.value.display}"`;
           value = pccRule.value.display;
-          // Terminology extraction
-          const codeStr = pccRule.value.code ? extractCode(`$${pccRule.value.system || 'UNKNOWN'}#${pccRule.value.code} "${pccRule.value.display}"`) : '';
-          const displayStr = extractCodeDisplay(`$${pccRule.value.system || 'UNKNOWN'}#${pccRule.value.code || ''} "${pccRule.value.display}"`);
-          // Parse system and code from codeStr
-          let system = '', code = '';
-          const sysMatch = /system "([^"]+)"/.exec(codeStr);
-          const codeMatch = /code "([^"]+)"/.exec(codeStr);
-          if (sysMatch) system = sysMatch[1];
-          if (codeMatch) code = codeMatch[1];
-          if (displayStr && code) {
-            terminology = { identifier: displayStr.replace(/"/g, ''), code, system };
+          // Terminology extraction (use system and code directly)
+          const system = pccRule.value.system || '';
+          const code = pccRule.value.code || '';
+          const displayStr = pccRule.value.display;
+          if (displayStr && code && system) {
+            terminology = { identifier: displayStr, code, system };
           }
         } else if ('code' in pccRule.value && pccRule.value.code) {
           activityValue = `"${pccRule.value.code}"`;
