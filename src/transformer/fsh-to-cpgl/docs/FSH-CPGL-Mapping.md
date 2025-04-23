@@ -415,6 +415,8 @@ The resulting CPG-L value would be:
 
 ```
 
+- `doNot()`: prefix the CPG-L value with "do not".
+
 #### FSH Path Values
 
 FSH Path Values are the value of a given FSH Path, as defined in this section.  
@@ -459,6 +461,8 @@ The expression `[*].action` in these mapping rules means an arbitrary nesting of
 - `activitydef-code-display` = one of either:
   - `ActivityDef.productCodeableConcept.extractCodeDisplay()`
   - `ActivityDef.dynamicValue.expression.description.where(ActivityDef.dynamicValue.path="code.coding")`
+
+- `activity_def-donotperform` = `ActivityDef.doNotPerform`
 
 ## CPG-L Defined Terms
 

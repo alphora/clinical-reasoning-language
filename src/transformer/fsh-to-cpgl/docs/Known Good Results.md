@@ -145,12 +145,18 @@ activity "Supplementary Dose Administered"
     of `Measles immunization schedule is complete. Measles supplementary dose was administered.`.
 
 activity "Check Contraindication for Measles Immunization" 
-    perform CPGMedicationRequest of "Measles vaccines"
+    do not perform CPGMedicationRequest of "Measles vaccines"
     because `While vaccines are universally recommended, some clients may have contraindications to particular vaccines.<br/>Additional contraindications may be included in WHO position papers for the vaccine - Measles vaccines: WHO position paper (April 2017).`.
 
+// productCodeableConcept
+terminology "Measles vaccines" system `http://id.who.int/icd/release/11/mms` code `XM28X5`.
+
+// Code { system: 'http://id.who.int/icd/release/11/mms', code: 'XM28X5' }
 activity "Evaluate Contraindication for Measles" 
     perform CPGServiceRequest of "Measles Code"
     because `While vaccines are universally recommended, some clients may have contraindications to particular vaccines.<br/>Additional contraindications may be included in WHO position papers for the vaccine - Measles vaccines: WHO position paper (April 2017).`.
+
+terminology "Measles Code" system `http://id.who.int/icd/release/11/mms` code `XM28X5`.
 
 concept "Measles Routine Immunization Schedule Incomplete": 
     has type Observation.
