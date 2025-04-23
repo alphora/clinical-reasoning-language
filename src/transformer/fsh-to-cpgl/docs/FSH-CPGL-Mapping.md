@@ -309,17 +309,25 @@ done
 terminology "Measles Routine Immunization" system `http://sdh.com/cqis/kalm` code `measles-routine-immunization`
 ```
 
-- `extractCode()`: the CPG-L value is the result of executing the regex transform, where `input` is the FSH Path Value:
+- `extractCode()`: the CPG-L value is the result of:
+
+1. executing the regex transform, where `input` is the FSH Path Value:
 
 ```regex
-input.replace(/\$(\w+)#(\w+)\s+".*?"/, 'system `$1` code `$2`')
+result[] = input.exec(/(\$\w+)#(\w+)\s+".*?"/)
 ```
+
+2. and then setting a temporary variable `systemResult` to the lookup of the `result[0]` value up in the `aliases`.
+
+3. and then the CPG-L value is "system `<systemResult>` code `<result[1]>`"
 
 For example:
 
 given:
 
 ```FSH
+Alias: $ICD11 = http://id.who.int/icd/release/11/mms
+
 Instance: IMMZD2DTMeaslesCIMR
 InstanceOf: http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-immunizationactivity
 * medicationCodeableConcept = $ICD11#XM28X5 "Measles vaccines"
@@ -331,7 +339,7 @@ and:
 
 then:
 
-the CPG-L value would be: system `ICD11` code `XM28X5`
+the CPG-L value would be: "system `http://id.who.int/icd/release/11/mms` code `XM28X5`"
 
 - `extractCodeDisplay()`: the CPG-L value is the result of executing the regex transform, where `input` is the FSH Path Value:
 

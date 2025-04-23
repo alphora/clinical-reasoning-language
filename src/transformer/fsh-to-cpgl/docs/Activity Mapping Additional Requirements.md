@@ -22,7 +22,7 @@ Boolean property in the FSH `ActivityDefinition`.
 
 ### B. `activitydef-code`
 **Term:** One of:
-- `ActivityDef.productCodeableConcept.extractCode()`
+- `ActivityDef.medicationCodeableConcept.extractCode()`
 - `ActivityDef.dynamicValue.expression.expression.where(ActivityDef.dynamicValue.path="code.coding").extractCodeExpression()`
 
 **Function:**
@@ -34,7 +34,7 @@ Boolean property in the FSH `ActivityDefinition`.
 
 ### C. `activitydef-code-display`
 **Term:** One of:
-- `ActivityDef.productCodeableConcept.extractCodeDisplay()`
+- `ActivityDef.medicationCodeableConcept.extractCodeDisplay()`
 - `ActivityDef.dynamicValue.expression.description.where(ActivityDef.dynamicValue.path="code.coding")`
 
 **Function:**
@@ -69,7 +69,7 @@ Boolean property in the FSH `ActivityDefinition`.
 |---------------------------|------------------------|----------------------------------------|
 | doNotPerform = true       | do not perform         | Boolean check                          |
 | doNotPerform = false      | perform                | Default                                 |
-| productCodeableConcept    | terminology block      | extractCode, extractCodeDisplay         |
+| medicationCodeableConcept    | terminology block      | extractCode, extractCodeDisplay         |
 | dynamicValue (code.coding)| terminology block      | extractCodeExpression, extractCodeDisplay |
 | code exists               | emit terminology       | Only if code is present                 |
 | code/display deduplication| unique identifier+body | Suffix if needed                        |
