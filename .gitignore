@@ -45,3 +45,5 @@ node_modules
 src/grammar/generated/CPGLParserListener.ts
 
 src/examples/fsh/smart-example-immz
+src/examples/fsh/smart-immunizations/
+src/examples/fsh/smart-hiv/

@@ -39,11 +39,13 @@ for (const file of files) {
 const restorePaths = [
   'input/fsh/Aliases.fsh',
   'input/fsh/activitydefinitions',
+  'input/fsh/activitydefinition',
   'input/fsh/plandefinitions',
+  'input/fsh/plandefinition',
   'input/cql',
   'input/datadictionary',
   'sushi-config.yaml',
-  'readme.md',
+  'README.md',
 ];
 for (const relPath of restorePaths) {
   try {
@@ -54,13 +56,27 @@ for (const relPath of restorePaths) {
   }
 }
 
-// Append FSHOnly: true to sushi-config.yaml
+// Append or update FSHOnly: true in sushi-config.yaml
 const sushiConfigPath = path.join(targetDir, 'sushi-config.yaml');
 try {
-  fs.appendFileSync(sushiConfigPath, '\nFSHOnly: true\n');
-  console.log('[INFO] Appended FSHOnly: true to sushi-config.yaml');
+  let sushiConfigContent = fs.readFileSync(sushiConfigPath, 'utf8');
+  const fshOnlyRegex = /^\s*FSHOnly\s*:\s*(.*)$/m;
+  const match = sushiConfigContent.match(fshOnlyRegex);
+  if (match) {
+    if (match[1].trim() === 'true') {
+      console.log('[INFO] FSHOnly: true already set in sushi-config.yaml');
+    } else {
+      // Replace the value with true
+      sushiConfigContent = sushiConfigContent.replace(fshOnlyRegex, 'FSHOnly: true');
+      fs.writeFileSync(sushiConfigPath, sushiConfigContent, 'utf8');
+      console.log('[INFO] Updated FSHOnly to true in sushi-config.yaml');
+    }
+  } else {
+    fs.appendFileSync(sushiConfigPath, '\nFSHOnly: true\n');
+    console.log('[INFO] Appended FSHOnly: true to sushi-config.yaml');
+  }
 } catch (e) {
-  console.warn('[WARN] Could not append FSHOnly: true to sushi-config.yaml');
+  console.warn('[WARN] Could not update or append FSHOnly: true to sushi-config.yaml');
 }
 
 // Add the root folder to .gitignore

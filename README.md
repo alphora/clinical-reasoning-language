@@ -621,4 +621,35 @@ The example FSH files and CPG-L outputs in `src/examples/fsh/who/smart-example-i
 
 These examples are used for development, testing, and demonstration of the transformer.
 
+## Loading a New FSH IG and Running the Transformer
+
+To load a new FSH Implementation Guide (IG) and run the FSH-to-CPGL transformer, follow these steps:
+
+### 1. Clone the FSH IG Repository
+
+Use the provided script to clone a FSH IG repository into the project:
+
+```sh
+npx ts-node scripts/clone-fsh-repo.ts <github-repo-url>
+```
+- This will clone the repo into `src/examples/fsh/<repo-name>`.
+- The script will clean up unnecessary files, restore only the required FSH/CQL/data files, append `FSHOnly: true` to `sushi-config.yaml`, and add the folder to `.gitignore`.
+
+### 2. Run the Transformer
+
+Transform the FSH IG to CPGL using the CLI:
+
+```sh
+npm run cli:transformer:fsh-to-cpgl -- src/examples/fsh/<repo-name>
+```
+- This will process the FSH files in the specified directory and output the generated CPGL to the console.
+
+### Example
+```sh
+npx ts-node scripts/clone-fsh-repo.ts https://github.com/example/fsh-ig-repo.git
+npm run cli:transformer:fsh-to-cpgl -- src/examples/fsh/fsh-ig-repo
+```
+
+See the User Guide for more details on authoring and transformation logic.
+
 ---
