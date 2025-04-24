@@ -199,4 +199,21 @@ const result = validateCPGL(`
 ### Known Issues
 - **Pretty mode in AST CLI is currently broken** and will print a warning if used.
 
-[0.5.0]: https://github.com/cqis/cpgl/releases/tag/v0.5.0 
+[0.5.0]: https://github.com/cqis/cpgl/releases/tag/v0.5.0
+
+## [0.5.1] - 2024-06-10
+
+### Fixed
+- **Error message handling:** Improved error reporting and error message clarity throughout the lexer, especially in `CPGLLexerErrorListener`.
+- Fixed bug in how the error listener accesses dynamically generated type files.
+- Fixed build and test issues related to the new location of auto-generated files and dynamic type imports.
+- Ensured all grammar-driven type files (activity, concept, value) are correctly included and referenced in builds and tests.
+- Improved robustness of error handling for missing or misconfigured type files.
+- Fixed test paths and removed unused files.
+
+### Technical Improvements
+- Refactored error listener to use dynamically generated JSON type files for activity, concept, and value types.
+- Hardened error handling for missing or invalid type files, with more actionable error messages.
+- Improved maintainability by moving auto-generated files to a more standard location.
+
+[0.5.1]: https://github.com/cqis/cpgl/releases/tag/v0.5.1 
