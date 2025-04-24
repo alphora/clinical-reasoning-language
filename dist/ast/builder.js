@@ -2,7 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CPGLAstBuilder = void 0;
 const AbstractParseTreeVisitor_1 = require("antlr4ts/tree/AbstractParseTreeVisitor");
-const CPGLParser_1 = require("../grammar/generated/CPGLParser");
+const CPGLParser_1 = require("../grammar/generated/antlr/CPGLParser");
 const types_1 = require("./types");
 function getLocation(ctx) {
     const start = ctx.start;

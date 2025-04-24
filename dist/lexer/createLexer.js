@@ -1,7 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.createLexer = createLexer;
-const CPGLLexer_1 = require("../grammar/generated/CPGLLexer");
+const CPGLLexer_1 = require("../grammar/generated/antlr/CPGLLexer");
 const CPGLLexerErrorListener_1 = require("./CPGLLexerErrorListener");
 function createLexer(input) {
     const lexer = new CPGLLexer_1.CPGLLexer(input);

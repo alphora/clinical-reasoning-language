@@ -3,7 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const fs_1 = require("fs");
 const path_1 = require("path");
 const antlr4ts_1 = require("antlr4ts");
-const CPGLLexer_1 = require("../grammar/generated/CPGLLexer");
+const CPGLLexer_1 = require("../grammar/generated/antlr/CPGLLexer");
 const createLexer_1 = require("../lexer/createLexer");
 const examplePath = (0, path_1.join)(__dirname, '../examples/cpgl/who/measles/IMMZ_All_Decisions.cpg');
 const input = (0, fs_1.readFileSync)(examplePath, 'utf8');

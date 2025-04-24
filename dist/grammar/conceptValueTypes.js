@@ -4,6 +4,6 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.conceptValueTypes = void 0;
-const conceptValueTypes_json_1 = __importDefault(require("./conceptValueTypes.json"));
+const conceptValueTypes_json_1 = __importDefault(require("./generated/types/conceptValueTypes.json"));
 exports.conceptValueTypes = conceptValueTypes_json_1.default;
 //# sourceMappingURL=conceptValueTypes.js.map
