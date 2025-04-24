@@ -1,5 +1,5 @@
 import { TokenStream } from 'antlr4ts';
-import { CPGLParser } from '../grammar/generated/CPGLParser';
+import { CPGLParser } from '../grammar/generated/antlr/CPGLParser';
 import { CustomParserErrorListener } from './CustomParserErrorListener';
 
 export function createParser(input: TokenStream): CPGLParser {

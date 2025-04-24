@@ -2,7 +2,7 @@ import { ANTLRErrorListener, RecognitionException, Recognizer, Token } from 'ant
 import { ATNSimulator } from 'antlr4ts/atn/ATNSimulator';
 import { CharStream } from 'antlr4ts/CharStream';
 
-import { CPGLLexer } from '../grammar/generated/CPGLLexer';
+import { CPGLLexer } from '../grammar/generated/antlr/CPGLLexer';
 import activityTypesJson from '../grammar/generated/types/activityTypes.json';
 import conceptTypesJson from '../grammar/generated/types/conceptTypes.json';
 import conceptValueTypesJson from '../grammar/generated/types/conceptValueTypes.json';
