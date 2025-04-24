@@ -1,71 +1,56 @@
 import { ANTLRErrorListener, RecognitionException, Recognizer, Token } from 'antlr4ts';
 import { ATNSimulator } from 'antlr4ts/atn/ATNSimulator';
 import { CharStream } from 'antlr4ts/CharStream';
-import { Interval } from 'antlr4ts/misc/Interval';
 
 import { CPGLLexer } from '../grammar/generated/CPGLLexer';
-import { activityTypes } from '../grammar/activityTypes';
+import activityTypesJson from '../grammar/activityTypes.json';
 import conceptTypesJson from '../grammar/conceptTypes.json';
 import conceptValueTypesJson from '../grammar/conceptValueTypes.json';
 
 export class CPGLLexerErrorListener implements ANTLRErrorListener<number> {
   ERROR_TOKEN_TYPE = 27;
 
-  private errors: string[] = [];
+  private readonly errors: string[] = [];
 
+  private readonly validActivityTypes = activityTypesJson as string[];
   private readonly validConceptTypes = conceptTypesJson as string[];
   private readonly validConceptValueTypes = conceptValueTypesJson as string[];
 
-  syntaxError<T extends number>(
-    _recognizer: Recognizer<T, ATNSimulator>,
-    _offendingSymbol: T | undefined,
-    line: number,
-    charPositionInLine: number,
-    msg: string,
-    _e: RecognitionException | undefined,
-  ): void {
-    const input: CharStream = _recognizer.inputStream as CharStream;
-    const startIndex = input.index;
-    let currentIndex = input.index;
+  private parseErrorText(input: CharStream): string {
     let errorText = '';
-
-    // Track invalid sequence
+    let currentIndex = input.index;
     while (currentIndex < input.size) {
       const char = input.LA(1);
-      if (char === -1 || char === 10 || char === 13) { // EOF or newline
-        break;
-      }
-      if (char === 32 || char === 9) { // Space or tab
-        if (errorText.length > 0) {
-          break;
-        }
+      if (char === -1 || char === 10 || char === 13) break;
+      if (char === 32 || char === 9) {
+        if (errorText.length > 0) break;
       } else {
         errorText += String.fromCharCode(char);
       }
       currentIndex++;
       input.consume();
     }
+    return errorText;
+  }
 
-    // Check if the error is part of a quoted string
+  private parseQuotedString(input: CharStream, errorText: string): string {
+    let currentIndex = input.index;
+    let result = errorText;
     const isQuotedString = errorText.startsWith('"') || errorText.startsWith("'");
     if (isQuotedString) {
-      while (currentIndex < input.size && !errorText.endsWith('"') && !errorText.endsWith("'")) {
+      while (currentIndex < input.size && !result.endsWith('"') && !result.endsWith("'")) {
         const char = input.LA(1);
-        if (char === -1 || char === 10 || char === 13) { // EOF or newline
-          break;
-        }
-        errorText += String.fromCharCode(char);
+        if (char === -1 || char === 10 || char === 13) break;
+        result += String.fromCharCode(char);
         currentIndex++;
         input.consume();
       }
     }
+    return result;
+  }
 
-    // NOTE: We map errorText to specific error messages here because ANTLR's default error handling
-    // does not allow us to trigger custom error actions for truly unrecognized characters. This workaround
-    // ensures our tests and error reporting remain consistent with the grammar's intent.
-    let specificMessage = `Invalid token: ${errorText}`;
-    // Defensive checks for required type arrays
-    if (!activityTypes) {
+  private getSpecificMessage(errorText: string, msg: string): string {
+    if (!this.validActivityTypes) {
       const errorMsg = [
         'activityTypes is undefined. This usually means the JSON file was not found or not imported correctly.',
         'Check: src/grammar/activityTypes.json exists and is valid.',
@@ -73,7 +58,7 @@ export class CPGLLexerErrorListener implements ANTLRErrorListener<number> {
         'If using ts-node or a bundler, ensure resolveJsonModule is enabled and your runtime supports JSON imports.',
         'If the file is missing, re-run the code generation step (e.g., npm run generate) or check your build scripts.'
       ].join('\n');
-      // eslint-disable-next-line no-console
+
       console.error(errorMsg);
       throw new Error(errorMsg);
     }
@@ -85,7 +70,7 @@ export class CPGLLexerErrorListener implements ANTLRErrorListener<number> {
         'If using ts-node or a bundler, ensure resolveJsonModule is enabled and your runtime supports JSON imports.',
         'If the file is missing, re-run the code generation step (e.g., npm run generate) or check your build scripts.'
       ].join('\n');
-      // eslint-disable-next-line no-console
+
       console.error(errorMsg);
       throw new Error(errorMsg);
     }
@@ -97,17 +82,35 @@ export class CPGLLexerErrorListener implements ANTLRErrorListener<number> {
         'If using ts-node or a bundler, ensure resolveJsonModule is enabled and your runtime supports JSON imports.',
         'If the file is missing, re-run the code generation step (e.g., npm run generate) or check your build scripts.'
       ].join('\n');
-      // eslint-disable-next-line no-console
+
       console.error(errorMsg);
       throw new Error(errorMsg);
     }
-    if (activityTypes.some(type => errorText.startsWith(type))) {
-      specificMessage = `Invalid character in activity type: ${errorText}`;
-    } else if (this.validConceptTypes.some(type => errorText.startsWith(type))) {
-      specificMessage = `Invalid character in concept type: ${errorText}`;
-    } else if (this.validConceptValueTypes.some(type => errorText.startsWith(type))) {
-      specificMessage = `Invalid character in concept value type: ${errorText}`;
+    if (this.validActivityTypes.some(type => errorText.startsWith(type))) {
+      return `Invalid character in activity type: ${errorText}`;
     }
+    if (this.validConceptTypes.some(type => errorText.startsWith(type))) {
+      return `Invalid character in concept type: ${errorText}`;
+    }
+    if (this.validConceptValueTypes.some(type => errorText.startsWith(type))) {
+      return `Invalid character in concept value type: ${errorText}`;
+    }
+    return `Invalid token: ${errorText}`;
+  }
+
+  syntaxError<T extends number>(
+    _recognizer: Recognizer<T, ATNSimulator>,
+    _offendingSymbol: T | undefined,
+    line: number,
+    charPositionInLine: number,
+    msg: string,
+    _e: RecognitionException | undefined,
+  ): void {
+    const input: CharStream = _recognizer.inputStream as CharStream;
+    const startIndex = input.index;
+    let errorText = this.parseErrorText(input);
+    errorText = this.parseQuotedString(input, errorText);
+    const specificMessage = this.getSpecificMessage(errorText, msg);
 
     const errorMessage = JSON.stringify({
       type: "LexicalError",
@@ -127,7 +130,7 @@ export class CPGLLexerErrorListener implements ANTLRErrorListener<number> {
         text: errorMessage,
         channel: Token.DEFAULT_CHANNEL,
         startIndex,
-        stopIndex: currentIndex - 1,
+        stopIndex: input.index - 1,
         line,
         charPositionInLine,
         tokenIndex: -1,
@@ -136,9 +139,6 @@ export class CPGLLexerErrorListener implements ANTLRErrorListener<number> {
       };
 
       _recognizer.emit(errorToken);
-
-      // Do not throw an error here; by emitting a token, we let the lexer continue
-      // so that all lexical errors in the input can be collected.
       return;
     }
 
@@ -149,7 +149,6 @@ export class CPGLLexerErrorListener implements ANTLRErrorListener<number> {
     return this.errors;
   }
 
-  // Custom error reporting method for grammar actions
   public reportCustomError(line: number, column: number, message: string, details?: any): void {
     const errorMessage = JSON.stringify({
       type: 'LexicalError',
@@ -158,8 +157,6 @@ export class CPGLLexerErrorListener implements ANTLRErrorListener<number> {
       message,
       details,
     });
-    // [DEBUGGING] Custom error reported from grammar action
-    // eslint-disable-next-line no-console
     console.error(errorMessage);
     this.errors.push(errorMessage);
   }
