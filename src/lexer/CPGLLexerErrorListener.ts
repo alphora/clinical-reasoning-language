@@ -5,22 +5,16 @@ import { Interval } from 'antlr4ts/misc/Interval';
 
 import { CPGLLexer } from '../grammar/generated/CPGLLexer';
 import { activityTypes } from '../grammar/activityTypes';
+import conceptTypesJson from '../grammar/conceptTypes.json';
+import conceptValueTypesJson from '../grammar/conceptValueTypes.json';
 
 export class CPGLLexerErrorListener implements ANTLRErrorListener<number> {
   ERROR_TOKEN_TYPE = 27;
 
   private errors: string[] = [];
 
-  private validConceptTypes = [
-    'Communication', 'CommunicationRequest', 'Condition', 'QuestionnaireTask', 'QuestionnaireResponse',
-    'MedicationRequest', 'MedicationDispense', 'MedicationAdministration', 'MedicationStatement',
-    'ImmunizationRequest', 'Immunization', 'ServiceRequest', 'Procedure', 'Observation'
-  ];
-
-  private validConceptValueTypes = [
-    'Quantity', 'CodeableConcept', 'string', 'boolean', 'integer', 'Range', 'Ratio', 'SampledData',
-    'time', 'dateTime', 'Period', 'Attachment'
-  ];
+  private readonly validConceptTypes = conceptTypesJson as string[];
+  private readonly validConceptValueTypes = conceptValueTypesJson as string[];
 
   syntaxError<T extends number>(
     _recognizer: Recognizer<T, ATNSimulator>,
