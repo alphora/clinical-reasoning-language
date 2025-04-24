@@ -3,7 +3,7 @@ import { ParseTree } from 'antlr4ts/tree/ParseTree';
 
 import { CPGLAstBuilder } from './ast/builder';
 import { CPGL } from './ast/types';
-import { CPGLLexer } from './grammar/generated/CPGLLexer';
+import { CPGLLexer } from './grammar/generated/antlr/CPGLLexer';
 import { createLexer } from './lexer/createLexer';
 import { Validator } from './validator/validator';
 import { createParser } from './parser/createParser';

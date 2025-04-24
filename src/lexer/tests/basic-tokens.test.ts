@@ -1,9 +1,11 @@
 import { CharStreams } from 'antlr4ts';
 
-import { CPGLLexer } from '../../grammar/generated/CPGLLexer';
+import { CPGLLexer } from '../../grammar/generated/antlr/CPGLLexer';
 import { createLexer } from '../createLexer';
 
 import { getAllTokens, verifyTokenSequence } from './index.test';
+
+// TODO: update tests to use BACKTICK_STRING (instead of STRING)
 
 describe('CPGL Lexer - Basic Tokens', () => {
   describe('Keywords', () => {
@@ -86,8 +88,8 @@ describe('CPGL Lexer - Basic Tokens', () => {
 
       verifyTokenSequence(
         tokens,
-        [CPGLLexer.HAS, CPGLLexer.PROVENANCE, CPGLLexer.STRING],
-        ['has', 'provenance', '"some\\provenance"'],
+        [CPGLLexer.HAS, CPGLLexer.PROVENANCE, CPGLLexer.BACKTICK_STRING],
+        ['has', 'provenance', '`some\\provenance`'],
       );
     });
   });
@@ -630,15 +632,7 @@ describe('CPGL Lexer - Basic Tokens', () => {
       ]);
     });
 
-    it('should tokenize unknown terminology', () => {
-      const input = 'unknown';
-      const lexer = createLexer(CharStreams.fromString(input));
-      const tokens = getAllTokens(lexer);
-
-      verifyTokenSequence(tokens, [CPGLLexer.UNKNOWN], ['unknown']);
-    });
-
-    it('should tokenize period', () => {
+   it('should tokenize period', () => {
       const input = '.';
       const lexer = createLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);

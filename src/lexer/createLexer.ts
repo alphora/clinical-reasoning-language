@@ -1,6 +1,6 @@
 import { CharStream } from 'antlr4ts';
 
-import { CPGLLexer } from '../grammar/generated/CPGLLexer';
+import { CPGLLexer } from '../grammar/generated/antlr/CPGLLexer';
 
 import { CPGLLexerErrorListener } from './CPGLLexerErrorListener';
 

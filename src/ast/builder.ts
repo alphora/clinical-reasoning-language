@@ -1,7 +1,7 @@
 import { ParserRuleContext } from "antlr4ts/ParserRuleContext";
 
 import { AbstractParseTreeVisitor } from "antlr4ts/tree/AbstractParseTreeVisitor";
-import { CPGLParserVisitor } from "../grammar/generated/CPGLParserVisitor";
+import { CPGLParserVisitor } from "../grammar/generated/antlr/CPGLParserVisitor";
 import {
   CpglContext, 
   DecisionStatementContext, DecisionBodyContext,
@@ -16,7 +16,7 @@ import {
   DefinitionConceptContext, DefinitionLogicContext,
   InferredByExpressionContext, InformalOrContext,
   InformalAndContext, InformalNotContext,
-  ConceptAtomContext, GroupExpressionContext} from "../grammar/generated/CPGLParser";
+  ConceptAtomContext, GroupExpressionContext} from "../grammar/generated/antlr/CPGLParser";
 
 import {
   ASTNode, CPGL, FileType, Statement,

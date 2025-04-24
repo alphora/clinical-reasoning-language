@@ -1,0 +1,16 @@
+[
+  "CPGCommunicationRequest",
+  "CPGCollectInformation",
+  "CPGEnrollment",
+  "CPGGenerateReport",
+  "CPGMedicationRequest",
+  "CPGDispenseMedication",
+  "CPGAdministerMedication",
+  "CPGDocumentMedication",
+  "CPGImmunizationRequest",
+  "CPGServiceRequest",
+  "CPGProposeDiagnosisTask",
+  "CPGRecordDetectedIssue",
+  "CPGRecordInference",
+  "CPGReportFlagTask"
+]

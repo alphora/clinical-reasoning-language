@@ -5,7 +5,7 @@ import { CharStreams, CommonTokenStream } from 'antlr4ts';
 
 import { CPGLAstBuilder } from '../ast/builder';
 import { ASTNode, DoActivity, UseDecision, CPGL } from '../ast/types';
-import { CPGLLexer } from '../grammar/generated/CPGLLexer';
+import { CPGLLexer } from '../grammar/generated/antlr/CPGLLexer';
 import { CPGLLexerErrorListener } from '../lexer/CPGLLexerErrorListener';
 import { createParser } from '../parser/createParser';
 
