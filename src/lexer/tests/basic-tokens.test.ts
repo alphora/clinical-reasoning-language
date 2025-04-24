@@ -82,7 +82,7 @@ describe('CPGL Lexer - Basic Tokens', () => {
     });
 
     it('should tokenize provenance value with backslashes as STRING', () => {
-      const input = 'has provenance "some\\provenance"';
+      const input = 'has provenance `some\\provenance`';
       const lexer = createLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
 

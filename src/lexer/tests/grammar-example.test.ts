@@ -6,7 +6,7 @@ import * as path from 'path';
 import { CharStreams } from 'antlr4ts';
 
 // Internal imports
-import { CPGLLexer } from '../../grammar/generated/CPGLLexer';
+import { CPGLLexer } from '../../grammar/generated/antlr/CPGLLexer';
 
 import { getAllTokens } from './index.test';
 
