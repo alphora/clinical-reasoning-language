@@ -553,3 +553,19 @@ function isValidActivityType(type: string): type is ActivityType {
 - This ensures a **single source of truth** for all grammar-driven types.
 - No more manual updates or risk of drift between grammar and code.
 - All validation, error reporting, and type checking use the same lists.
+
+## Generated Type Lists
+
+The following files are auto-generated and should not be edited manually or tracked in git:
+
+- `src/grammar/generated/types/activityTypes.json`
+- `src/grammar/generated/types/conceptTypes.json`
+- `src/grammar/generated/types/conceptValueTypes.json`
+
+To regenerate these files, run:
+
+```
+npm run generate
+```
+
+These files are ignored by git via `.gitignore` and will be recreated as needed.
