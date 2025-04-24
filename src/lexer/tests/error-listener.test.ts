@@ -1,5 +1,5 @@
 import { CharStreams, CommonTokenStream } from 'antlr4ts';
-import { CPGLLexer } from '../../grammar/generated/CPGLLexer';
+import { CPGLLexer } from '../../grammar/generated/antlr/CPGLLexer';
 import { CPGLLexerErrorListener } from '../CPGLLexerErrorListener';
 import { getAllTokens } from './index.test';
 
@@ -88,7 +88,7 @@ describe('CPGLLexerErrorListener with CPGL-specific input', () => {
   });
 
   it('should detect invalid tokens in a terminology statement', () => {
-    const { lexer, errorListener } = createLexerWithErrors('terminology "Invalid Terminology" unknown invalid.');
+    const { lexer, errorListener } = createLexerWithErrors('terminology "Invalid Terminology" `` invalid.');
     const tokenStream = new CommonTokenStream(lexer);
     tokenStream.fill();
     const errors = errorListener.getErrors();

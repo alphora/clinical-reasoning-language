@@ -1,6 +1,6 @@
 import { CharStreams } from 'antlr4ts';
 
-import { CPGLLexer } from '../../grammar/generated/CPGLLexer';
+import { CPGLLexer } from '../../grammar/generated/antlr/CPGLLexer';
 import { createLexer } from '../createLexer';
 
 import { getAllTokens, verifyTokenSequence } from './index.test';
@@ -248,15 +248,15 @@ done`;
       ]);
     });
 
-    it('should handle terminology with unknown', () => {
-      const input = `terminology "some terminology" unknown.`;
+    it('should handle terminology with unknown terminology', () => {
+      const input = `terminology "some terminology" \`\`.`;
       const lexer = createLexer(CharStreams.fromString(input));
       const tokens = getAllTokens(lexer);
 
       verifyTokenSequence(tokens, [
         CPGLLexer.TERMINOLOGY,
         CPGLLexer.QUOTED_STRING,
-        CPGLLexer.UNKNOWN,
+        CPGLLexer.BACKTICK_STRING,
         CPGLLexer.DOT,
       ]);
     });
