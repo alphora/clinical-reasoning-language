@@ -9,8 +9,8 @@ const requiredFiles = [
 ];
 
 const locations = [
-  path.join(__dirname, '../src/grammar'),
-  path.join(__dirname, '../dist/grammar'),
+  path.join(__dirname, '../src/grammar/generated/types'),
+  path.join(__dirname, '../dist/grammar/generated/types'),
 ];
 
 let missing = [];

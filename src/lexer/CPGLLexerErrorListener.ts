@@ -3,9 +3,9 @@ import { ATNSimulator } from 'antlr4ts/atn/ATNSimulator';
 import { CharStream } from 'antlr4ts/CharStream';
 
 import { CPGLLexer } from '../grammar/generated/CPGLLexer';
-import activityTypesJson from '../grammar/activityTypes.json';
-import conceptTypesJson from '../grammar/conceptTypes.json';
-import conceptValueTypesJson from '../grammar/conceptValueTypes.json';
+import activityTypesJson from '../grammar/generated/types/activityTypes.json';
+import conceptTypesJson from '../grammar/generated/types/conceptTypes.json';
+import conceptValueTypesJson from '../grammar/generated/types/conceptValueTypes.json';
 
 export class CPGLLexerErrorListener implements ANTLRErrorListener<number> {
   ERROR_TOKEN_TYPE = 27;
