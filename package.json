@@ -25,6 +25,7 @@
     "format": "prettier --write \"src/**/*.ts\"",
     "test": "jest src/lexer/tests/index.test.ts src/ast/tests/index.test.ts src/validator/tests/index.test.ts",
     "build": "rimraf dist && mkdir dist && tsc",
+    "postbuild": "node scripts/checkGrammarJsonFiles.js",
     "clean": "rimraf dist",
     "watch": "onchange -i \"src/**/*.ts\" -- npm run build",
     "start": "npm run build && node dist/index.js",
