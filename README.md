@@ -277,36 +277,10 @@ npm install
 npm run build
 ```
 
-### Distribution
+### Publish Package
 
-The package is distributed via GitHub Releases. To create a new release:
-
-1. Create a new branch (e.g., `release/v0.1.0`)
-1. Generate a CHANGELOG: "I'm creating a new release release/>version<, generate and append to the CHANGELOG.  Use git to discover all the commits between right after the prior release and now. Do not include the following information: - Restored `dist/` to `.gitignore` after publish to keep the main branch clean." (e.g., v0.1.0)
-1. Commit all changes
-1. Run the automated release script:
-   ```bash
-   npm run prepublish:github -- <patch|minor|major|version>
-   ```
-   - This will:
-     - Remove `dist/` from `.gitignore`
-     - Build the project
-     - Add and commit `dist/`
-     - Bump the version and create a git tag (using the argument you provide)
-     - Push the commit and tag to GitHub
-     - Restore `dist/` to `.gitignore` and commit that change
-     - Push the final commit
-1. Create a PR & merge the PR
-1. Create a new release on GitHub
-   1. Tag the release with the version number (e.g., `v0.1.0`) if not already tagged
-   1. Generate release notes
-
-**Important:**
-- The release script expects a **clean working directory** (no unstaged or uncommitted changes). If your working directory is not clean, the script will exit and prompt you to commit, stash, or discard your changes.
-- If a rollback warning is shown (e.g., after a failed release), manual intervention may be required to fully undo changes that were already pushed to the remote repository. Check your git log and tags, and clean up as needed.
-
-**Note:**
-- You do NOT need to attach a `.tgz` file for GitHub-based npm installs.
+> **Note:**
+> The release script (`npm run prepublish:github ...`) will temporarily remove `.gitignore` rules for `src/grammar/generated/types/` and `src/grammar/generated/antlr/`, add and commit all generated files for the release, and then restore the ignore rules. This ensures that users installing from GitHub tags will have all necessary files for both runtime and TypeScript builds.
 
 ### Installation
 
