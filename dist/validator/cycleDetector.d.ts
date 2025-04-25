@@ -1,4 +1,4 @@
-import { ValidationError } from './validator';
+import { ValidationError } from "./validator";
 interface DecisionDeclaration {
     id: string;
     decisionReferences?: string[];

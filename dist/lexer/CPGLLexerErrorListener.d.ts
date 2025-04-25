@@ -1,5 +1,5 @@
-import { ANTLRErrorListener, RecognitionException, Recognizer } from 'antlr4ts';
-import { ATNSimulator } from 'antlr4ts/atn/ATNSimulator';
+import { ANTLRErrorListener, RecognitionException, Recognizer } from "antlr4ts";
+import { ATNSimulator } from "antlr4ts/atn/ATNSimulator";
 export declare class CPGLLexerErrorListener implements ANTLRErrorListener<number> {
     ERROR_TOKEN_TYPE: number;
     private readonly errors;

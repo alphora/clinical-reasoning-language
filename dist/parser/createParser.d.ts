@@ -1,3 +1,7 @@
-import { TokenStream } from 'antlr4ts';
-import { CPGLParser } from '../grammar/generated/antlr/CPGLParser';
-export declare function createParser(input: TokenStream): CPGLParser;
+import { CPGLParser } from "../grammar/generated/antlr/CPGLParser";
+import { CustomParserErrorListener } from "./CustomParserErrorListener";
+export declare function createParser(input: string): {
+    parser: CPGLParser;
+    lexerErrorListener: import("../lexer/CPGLLexerErrorListener").CPGLLexerErrorListener;
+    parserErrorListener: CustomParserErrorListener;
+};

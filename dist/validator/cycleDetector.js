@@ -28,9 +28,9 @@ class CycleDetector {
                 }
             }
         }
-        const decisionCycles = this.detectCycles(this.decisionAdjacencyList, 'Decision');
+        const decisionCycles = this.detectCycles(this.decisionAdjacencyList, "Decision");
         errors.push(...decisionCycles);
-        const conceptCycles = this.detectCycles(this.conceptAdjacencyList, 'Concept');
+        const conceptCycles = this.detectCycles(this.conceptAdjacencyList, "Concept");
         errors.push(...conceptCycles);
         return errors;
     }
@@ -53,12 +53,12 @@ class CycleDetector {
                     const cycle = path.slice(cycleStartIndex);
                     cycle.push(neighbor);
                     if (cycle[0] === cycle[cycle.length - 1]) {
-                        const cyclePath = cycle.map(node => `${nodeType}:${node}`).join(' -> ');
+                        const cyclePath = cycle.map((node) => `${nodeType}:${node}`).join(" -> ");
                         if (!cycles.has(cyclePath)) {
                             cycles.add(cyclePath);
                             errors.push({
                                 message: `Cycle detected in ${nodeType.toLowerCase()} references: ${cyclePath}`,
-                                severity: 'error',
+                                severity: "error",
                                 location: { start: { line: 1, column: 1 }, end: { line: 1, column: 1 } },
                             });
                         }

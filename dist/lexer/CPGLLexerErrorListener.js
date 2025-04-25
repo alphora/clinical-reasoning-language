@@ -18,7 +18,7 @@ class CPGLLexerErrorListener {
         this.validConceptValueTypes = conceptValueTypes_json_1.default;
     }
     parseErrorText(input) {
-        let errorText = '';
+        let errorText = "";
         let currentIndex = input.index;
         while (currentIndex < input.size) {
             const char = input.LA(1);
@@ -55,44 +55,44 @@ class CPGLLexerErrorListener {
     getSpecificMessage(errorText, msg) {
         if (!this.validActivityTypes) {
             const errorMsg = [
-                'activityTypes is undefined. This usually means the JSON file was not found or not imported correctly.',
-                'Check: src/grammar/activityTypes.json exists and is valid.',
-                'If using a build output, ensure activityTypes.json is copied to the output directory (e.g., dist/grammar/activityTypes.json).',
-                'If using ts-node or a bundler, ensure resolveJsonModule is enabled and your runtime supports JSON imports.',
-                'If the file is missing, re-run the code generation step (e.g., npm run generate) or check your build scripts.'
-            ].join('\n');
+                "activityTypes is undefined. This usually means the JSON file was not found or not imported correctly.",
+                "Check: src/grammar/activityTypes.json exists and is valid.",
+                "If using a build output, ensure activityTypes.json is copied to the output directory (e.g., dist/grammar/activityTypes.json).",
+                "If using ts-node or a bundler, ensure resolveJsonModule is enabled and your runtime supports JSON imports.",
+                "If the file is missing, re-run the code generation step (e.g., npm run generate) or check your build scripts.",
+            ].join("\n");
             console.error(errorMsg);
             throw new Error(errorMsg);
         }
         if (!this.validConceptTypes) {
             const errorMsg = [
-                'validConceptTypes is undefined. This usually means the conceptTypes array was not initialized.',
-                'Check: src/grammar/conceptTypes.json exists and is valid.',
-                'If using a build output, ensure conceptTypes.json is copied to the output directory (e.g., dist/grammar/conceptTypes.json).',
-                'If using ts-node or a bundler, ensure resolveJsonModule is enabled and your runtime supports JSON imports.',
-                'If the file is missing, re-run the code generation step (e.g., npm run generate) or check your build scripts.'
-            ].join('\n');
+                "validConceptTypes is undefined. This usually means the conceptTypes array was not initialized.",
+                "Check: src/grammar/conceptTypes.json exists and is valid.",
+                "If using a build output, ensure conceptTypes.json is copied to the output directory (e.g., dist/grammar/conceptTypes.json).",
+                "If using ts-node or a bundler, ensure resolveJsonModule is enabled and your runtime supports JSON imports.",
+                "If the file is missing, re-run the code generation step (e.g., npm run generate) or check your build scripts.",
+            ].join("\n");
             console.error(errorMsg);
             throw new Error(errorMsg);
         }
         if (!this.validConceptValueTypes) {
             const errorMsg = [
-                'validConceptValueTypes is undefined. This usually means the conceptValueTypes array was not initialized.',
-                'Check: src/grammar/conceptValueTypes.json exists and is valid.',
-                'If using a build output, ensure conceptValueTypes.json is copied to the output directory (e.g., dist/grammar/conceptValueTypes.json).',
-                'If using ts-node or a bundler, ensure resolveJsonModule is enabled and your runtime supports JSON imports.',
-                'If the file is missing, re-run the code generation step (e.g., npm run generate) or check your build scripts.'
-            ].join('\n');
+                "validConceptValueTypes is undefined. This usually means the conceptValueTypes array was not initialized.",
+                "Check: src/grammar/conceptValueTypes.json exists and is valid.",
+                "If using a build output, ensure conceptValueTypes.json is copied to the output directory (e.g., dist/grammar/conceptValueTypes.json).",
+                "If using ts-node or a bundler, ensure resolveJsonModule is enabled and your runtime supports JSON imports.",
+                "If the file is missing, re-run the code generation step (e.g., npm run generate) or check your build scripts.",
+            ].join("\n");
             console.error(errorMsg);
             throw new Error(errorMsg);
         }
-        if (this.validActivityTypes.some(type => errorText.startsWith(type))) {
+        if (this.validActivityTypes.some((type) => errorText.startsWith(type))) {
             return `Invalid character in activity type: ${errorText}`;
         }
-        if (this.validConceptTypes.some(type => errorText.startsWith(type))) {
+        if (this.validConceptTypes.some((type) => errorText.startsWith(type))) {
             return `Invalid character in concept type: ${errorText}`;
         }
-        if (this.validConceptValueTypes.some(type => errorText.startsWith(type))) {
+        if (this.validConceptValueTypes.some((type) => errorText.startsWith(type))) {
             return `Invalid character in concept value type: ${errorText}`;
         }
         return `Invalid token: ${errorText}`;
@@ -109,8 +109,8 @@ class CPGLLexerErrorListener {
             column: charPositionInLine,
             message: specificMessage,
             details: {
-                message: `${msg}`
-            }
+                message: `${msg}`,
+            },
         });
         console.error(errorMessage);
         this.errors.push(errorMessage);
@@ -137,7 +137,7 @@ class CPGLLexerErrorListener {
     }
     reportCustomError(line, column, message, details) {
         const errorMessage = JSON.stringify({
-            type: 'LexicalError',
+            type: "LexicalError",
             line,
             column,
             message,
