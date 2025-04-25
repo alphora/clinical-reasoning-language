@@ -4,6 +4,7 @@ import { CPGLLexer } from '../../grammar/generated/antlr/CPGLLexer';
 import { createLexer } from '../createLexer';
 
 import { getAllTokens, verifyTokenSequence } from './index.test';
+import { getTokensFromString } from './helpers';
 
 describe('Structures', () => {
   describe('Decision Structure', () => {
@@ -12,8 +13,7 @@ describe('Structures', () => {
     when "Condition" then
         do "Action"
     done`;
-      const lexer = createLexer(CharStreams.fromString(input));
-      const tokens = getAllTokens(lexer);
+      const tokens = getTokensFromString(input);
 
       verifyTokenSequence(tokens, [
         CPGLLexer.DECISION,
@@ -41,8 +41,7 @@ describe('Structures', () => {
             when "Subsubcondition 2" then
                 use "Another Decision"
     done`;
-      const lexer = new CPGLLexer(CharStreams.fromString(input));
-      const tokens = getAllTokens(lexer);
+      const tokens = getTokensFromString(input);
 
       verifyTokenSequence(tokens, [
         CPGLLexer.DECISION,
@@ -79,8 +78,7 @@ describe('Structures', () => {
 
     it('should tokenize activity statements', () => {
       const input = `activity "Vaccinate" perform CPGImmunizationRequest.`;
-      const lexer = new CPGLLexer(CharStreams.fromString(input));
-      const tokens = getAllTokens(lexer);
+      const tokens = getTokensFromString(input);
 
       verifyTokenSequence(tokens, [
         CPGLLexer.ACTIVITY,
@@ -93,8 +91,7 @@ describe('Structures', () => {
 
     it('should tokenize activity statements with of clause', () => {
       const input = `activity "Indicate" perform CPGProposeDiagnosis of "Colonoscopy".`;
-      const lexer = new CPGLLexer(CharStreams.fromString(input));
-      const tokens = getAllTokens(lexer);
+      const tokens = getTokensFromString(input);
 
       verifyTokenSequence(tokens, [
         CPGLLexer.ACTIVITY,
@@ -111,8 +108,7 @@ describe('Structures', () => {
   describe('Terminology Structure', () => {
     it('should tokenize terminology with valueset', () => {
       const input = `terminology "BMI Valueset" valueset "bmi valueset".`;
-      const lexer = new CPGLLexer(CharStreams.fromString(input));
-      const tokens = getAllTokens(lexer);
+      const tokens = getTokensFromString(input);
 
       verifyTokenSequence(tokens, [
         CPGLLexer.TERMINOLOGY,
@@ -125,8 +121,7 @@ describe('Structures', () => {
 
     it('should tokenize terminology with unknown', () => {
       const input = `terminology "some terminology" \`\`.`;
-      const lexer = new CPGLLexer(CharStreams.fromString(input));
-      const tokens = getAllTokens(lexer);
+      const tokens = getTokensFromString(input);
 
       verifyTokenSequence(tokens, [
         CPGLLexer.TERMINOLOGY,
@@ -138,8 +133,7 @@ describe('Structures', () => {
 
     it('should tokenize terminology with system and code', () => {
       const input = `terminology "Colonoscopy" system "http://snomed.info/sct" code "73761001".`;
-      const lexer = new CPGLLexer(CharStreams.fromString(input));
-      const tokens = getAllTokens(lexer);
+      const tokens = getTokensFromString(input);
 
       verifyTokenSequence(tokens, [
         CPGLLexer.TERMINOLOGY,
@@ -159,8 +153,7 @@ describe('Structures', () => {
     has type Observation.
     has valuetype boolean.
 done`;
-      const lexer = new CPGLLexer(CharStreams.fromString(input));
-      const tokens = getAllTokens(lexer);
+      const tokens = getTokensFromString(input);
 
       verifyTokenSequence(tokens, [
         CPGLLexer.CONCEPT,
@@ -185,8 +178,7 @@ done`;
     has provenance "some provenance".
     coded by "BMI Valueset".
 done`;
-      const lexer = new CPGLLexer(CharStreams.fromString(input));
-      const tokens = getAllTokens(lexer);
+      const tokens = getTokensFromString(input);
 
       verifyTokenSequence(tokens, [
         CPGLLexer.CONCEPT,
@@ -218,8 +210,7 @@ done`;
     has valuetype Quantity.
     inferred by "Most Recent(this, lookbackMonths)" "BMI".
 done`;
-      const lexer = new CPGLLexer(CharStreams.fromString(input));
-      const tokens = getAllTokens(lexer);
+      const tokens = getTokensFromString(input);
 
       verifyTokenSequence(tokens, [
         CPGLLexer.CONCEPT,
@@ -248,8 +239,7 @@ done`;
     has valuetype Quantity.
     inferred by ("BMI Range as a Condition" or "BMI as an Observation" or "Calculated BMI").
 done`;
-      const lexer = new CPGLLexer(CharStreams.fromString(input));
-      const tokens = getAllTokens(lexer);
+      const tokens = getTokensFromString(input);
 
       verifyTokenSequence(tokens, [
         CPGLLexer.CONCEPT,

@@ -4,13 +4,13 @@ import { CPGLLexer } from '../../grammar/generated/antlr/CPGLLexer';
 import { createLexer } from '../createLexer';
 
 import { getAllTokens, verifyTokenSequence } from './index.test';
+import { getTokensFromString } from './helpers';
 
 describe('Whitespace Handling', () => {
   describe('Basic Whitespace', () => {
     it('should skip newlines between tokens', () => {
       const input = 'decision\nwhen\nthen\ndo';
-      const lexer = createLexer(CharStreams.fromString(input));
-      const tokens = getAllTokens(lexer);
+      const tokens = getTokensFromString(input);
       verifyTokenSequence(tokens, [
         CPGLLexer.DECISION,
         CPGLLexer.WHEN,
@@ -21,8 +21,7 @@ describe('Whitespace Handling', () => {
 
     it('should skip spaces between tokens', () => {
       const input = 'decision "Test Decision"    when "Condition"  then    do "Action"';
-      const lexer = createLexer(CharStreams.fromString(input));
-      const tokens = getAllTokens(lexer);
+      const tokens = getTokensFromString(input);
       verifyTokenSequence(tokens, [
         CPGLLexer.DECISION,
         CPGLLexer.QUOTED_STRING,
@@ -36,8 +35,7 @@ describe('Whitespace Handling', () => {
 
     it('should handle consecutive whitespace', () => {
       const input = 'decision    "Test"  \t  when  \n\n  "Condition"';
-      const lexer = createLexer(CharStreams.fromString(input));
-      const tokens = getAllTokens(lexer);
+      const tokens = getTokensFromString(input);
       verifyTokenSequence(tokens, [
         CPGLLexer.DECISION,
         CPGLLexer.QUOTED_STRING,
@@ -48,8 +46,7 @@ describe('Whitespace Handling', () => {
 
     it('should handle leading and trailing whitespace', () => {
       const input = '\n  \t decision "Test" when "Condition" \n  ';
-      const lexer = createLexer(CharStreams.fromString(input));
-      const tokens = getAllTokens(lexer);
+      const tokens = getTokensFromString(input);
       verifyTokenSequence(tokens, [
         CPGLLexer.DECISION,
         CPGLLexer.QUOTED_STRING,
@@ -62,8 +59,7 @@ describe('Whitespace Handling', () => {
   describe('Whitespace in Terminology Statements', () => {
     it('should handle whitespace in terminology valueset statements', () => {
       const input = 'terminology\n  "BMI Valueset"\n\t\tvalueset\n  "bmi valueset"\t.';
-      const lexer = createLexer(CharStreams.fromString(input));
-      const tokens = getAllTokens(lexer);
+      const tokens = getTokensFromString(input);
       verifyTokenSequence(tokens, [
         CPGLLexer.TERMINOLOGY,
         CPGLLexer.QUOTED_STRING,
@@ -75,8 +71,7 @@ describe('Whitespace Handling', () => {
 
     it('should handle whitespace in terminology system code statements', () => {
       const input = 'terminology\n"term"\n  system\t"sys"\n  code\t"123"\t.';
-      const lexer = createLexer(CharStreams.fromString(input));
-      const tokens = getAllTokens(lexer);
+      const tokens = getTokensFromString(input);
       verifyTokenSequence(tokens, [
         CPGLLexer.TERMINOLOGY,
         CPGLLexer.QUOTED_STRING,
@@ -92,8 +87,7 @@ describe('Whitespace Handling', () => {
   describe('Whitespace in Activity Statements', () => {
     it('should handle whitespace in activity statements', () => {
       const input = 'activity\n  "Vaccinate"\n\t\tperform\n  CPGImmunizationRequest\t.';
-      const lexer = createLexer(CharStreams.fromString(input));
-      const tokens = getAllTokens(lexer);
+      const tokens = getTokensFromString(input);
       verifyTokenSequence(tokens, [
         CPGLLexer.ACTIVITY,
         CPGLLexer.QUOTED_STRING,
@@ -105,8 +99,7 @@ describe('Whitespace Handling', () => {
 
     it('should handle whitespace in activity statements with of clause', () => {
       const input = 'activity\n"Action"\n  perform\tCPGProposeDiagnosis\n  of\t"diagnosis"\t.';
-      const lexer = createLexer(CharStreams.fromString(input));
-      const tokens = getAllTokens(lexer);
+      const tokens = getTokensFromString(input);
       verifyTokenSequence(tokens, [
         CPGLLexer.ACTIVITY,
         CPGLLexer.QUOTED_STRING,
@@ -122,8 +115,7 @@ describe('Whitespace Handling', () => {
   describe('Whitespace in Concept Statements', () => {
     it('should handle whitespace in concept type declarations', () => {
       const input = 'concept\n"BMI"\n  :\n    has\ttype\n  Observation\t.';
-      const lexer = createLexer(CharStreams.fromString(input));
-      const tokens = getAllTokens(lexer);
+      const tokens = getTokensFromString(input);
       verifyTokenSequence(tokens, [
         CPGLLexer.CONCEPT,
         CPGLLexer.QUOTED_STRING,
@@ -137,8 +129,7 @@ describe('Whitespace Handling', () => {
 
     it('should handle whitespace in concept value type declarations', () => {
       const input = 'has\n  valuetype\t\tQuantity\n.';
-      const lexer = createLexer(CharStreams.fromString(input));
-      const tokens = getAllTokens(lexer);
+      const tokens = getTokensFromString(input);
       verifyTokenSequence(tokens, [
         CPGLLexer.HAS,
         CPGLLexer.VALUETYPE,
@@ -150,8 +141,7 @@ describe('Whitespace Handling', () => {
     it('should handle whitespace in concept inferred by expressions', () => {
       const input =
         'inferred\n  by\t(\n"Condition 1"\n  and\t"Condition 2"\n  or\t"Condition 3"\n)\t.';
-      const lexer = createLexer(CharStreams.fromString(input));
-      const tokens = getAllTokens(lexer);
+      const tokens = getTokensFromString(input);
       verifyTokenSequence(tokens, [
         CPGLLexer.INFERRED,
         CPGLLexer.BY,
@@ -170,8 +160,7 @@ describe('Whitespace Handling', () => {
   describe('Whitespace in Decision Blocks', () => {
     it('should handle whitespace in nested decision blocks', () => {
       const input = `decision\n  "Test"\n:\n  when\n    "Level 1"\n  then\n    when\n      "Level 2"\n    then\n      do\n        "Action"\n    .\ndone`;
-      const lexer = createLexer(CharStreams.fromString(input));
-      const tokens = getAllTokens(lexer);
+      const tokens = getTokensFromString(input);
       verifyTokenSequence(tokens, [
         CPGLLexer.DECISION,
         CPGLLexer.QUOTED_STRING,
@@ -192,8 +181,7 @@ describe('Whitespace Handling', () => {
     it('should handle whitespace in any/all clauses', () => {
       const input =
         'when\n  "Condition"\nthen\n  :\n    any\n      :\n        do\n          "Action 1"\n        .\n        do\n          "Action 2"\n        .\n    done\ndone';
-      const lexer = createLexer(CharStreams.fromString(input));
-      const tokens = getAllTokens(lexer);
+      const tokens = getTokensFromString(input);
       verifyTokenSequence(tokens, [
         CPGLLexer.WHEN,
         CPGLLexer.QUOTED_STRING,

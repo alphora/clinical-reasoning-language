@@ -1,6 +1,6 @@
-import { CPGL, DecisionBody, WhenBlock, BlockBody, ActionStatement, Action } from '../ast/types';
+import { CPGL, DecisionBody, WhenBlock, BlockBody, ActionStatement, Action } from "../ast/types";
 
-import { ValidationError } from './validator';
+import { ValidationError } from "./validator";
 
 export class ActionUniquenessValidator {
   private ast: CPGL | null = null;
@@ -11,7 +11,7 @@ export class ActionUniquenessValidator {
 
     // Process each decision statement
     for (const statement of ast.statements) {
-      if (statement.type === 'Decision') {
+      if (statement.type === "Decision") {
         this.validateDecisionBody(statement.body, errors);
       }
     }
@@ -21,16 +21,16 @@ export class ActionUniquenessValidator {
     const actionCycles = this.findCycles(actionGraph);
     for (const cycle of actionCycles) {
       errors.push({
-        message: `Cycle detected in decision references: ${cycle.join(' -> ')}`,
+        message: `Cycle detected in decision references: ${cycle.join(" -> ")}`,
         location: this.findActionLocation(ast, cycle[0]),
-        severity: 'error',
+        severity: "error",
       });
     }
 
     // Check for undefined actions
     const definedActions = this.collectDefinedActions(ast);
     for (const statement of ast.statements) {
-      if (statement.type === 'Decision') {
+      if (statement.type === "Decision") {
         this.checkUndefinedActions(statement.body, definedActions, errors);
       }
     }
@@ -41,16 +41,16 @@ export class ActionUniquenessValidator {
 
   private validateDecisionBody(body: DecisionBody, errors: ValidationError[]): void {
     for (const statement of body.statements) {
-      if (statement.type === 'WhenBlock') {
+      if (statement.type === "WhenBlock") {
         this.validateWhenBlock(statement, errors);
       }
     }
   }
 
   private validateWhenBlock(whenBlock: WhenBlock, errors: ValidationError[]): void {
-    if (whenBlock.body.type === 'BlockBody') {
+    if (whenBlock.body.type === "BlockBody") {
       this.validateBlockBody(whenBlock.body, errors);
-    } else if (whenBlock.body.type === 'SingleAction') {
+    } else if (whenBlock.body.type === "SingleAction") {
       // Single actions are unique by definition
       return;
     }
@@ -61,9 +61,9 @@ export class ActionUniquenessValidator {
     const useStatements = new Set<string>();
 
     for (const statement of blockBody.statements) {
-      if (statement.type === 'WhenBlock') {
+      if (statement.type === "WhenBlock") {
         this.validateWhenBlock(statement, errors);
-      } else if (statement.type === 'ActionStatement') {
+      } else if (statement.type === "ActionStatement") {
         this.validateActionStatement(statement, doStatements, useStatements, errors);
       }
     }
@@ -76,21 +76,21 @@ export class ActionUniquenessValidator {
     errors: ValidationError[],
   ): void {
     const action = statement.action;
-    if (action.type === 'DoActivity') {
+    if (action.type === "DoActivity") {
       if (doStatements.has(action.activityName)) {
         errors.push({
           message: `Duplicate do statement: ${action.activityName}`,
           location: action.location,
-          severity: 'error',
+          severity: "error",
         });
       }
       doStatements.add(action.activityName);
-    } else if (action.type === 'UseDecision') {
+    } else if (action.type === "UseDecision") {
       if (useStatements.has(action.decisionName)) {
         errors.push({
           message: `Duplicate use statement: ${action.decisionName}`,
           location: action.location,
-          severity: 'error',
+          severity: "error",
         });
       }
       useStatements.add(action.decisionName);
@@ -102,11 +102,11 @@ export class ActionUniquenessValidator {
 
     // Initialize graph with all actions
     for (const statement of ast.statements) {
-      if (statement.type === 'Decision') {
-        this.collectActions(statement.body).forEach(action => {
-          if (action.type === 'DoActivity') {
+      if (statement.type === "Decision") {
+        this.collectActions(statement.body).forEach((action) => {
+          if (action.type === "DoActivity") {
             graph.set(`Activity:${action.activityName}`, new Set<string>());
-          } else if (action.type === 'UseDecision') {
+          } else if (action.type === "UseDecision") {
             graph.set(`Decision:${action.decisionName}`, new Set<string>());
           }
         });
@@ -115,7 +115,7 @@ export class ActionUniquenessValidator {
 
     // Build edges from action dependencies
     for (const statement of ast.statements) {
-      if (statement.type === 'Decision') {
+      if (statement.type === "Decision") {
         this.processActionDependencies(statement.body, graph);
       }
     }
@@ -126,14 +126,14 @@ export class ActionUniquenessValidator {
   private collectActions(body: DecisionBody): Action[] {
     const actions: Action[] = [];
     for (const statement of body.statements) {
-      if (statement.type === 'WhenBlock') {
-        if (statement.body.type === 'BlockBody') {
-          statement.body.statements.forEach(s => {
-            if (s.type === 'ActionStatement') {
+      if (statement.type === "WhenBlock") {
+        if (statement.body.type === "BlockBody") {
+          statement.body.statements.forEach((s) => {
+            if (s.type === "ActionStatement") {
               actions.push(s.action);
             }
           });
-        } else if (statement.body.type === 'SingleAction') {
+        } else if (statement.body.type === "SingleAction") {
           actions.push(statement.body.action);
         }
       }
@@ -143,12 +143,12 @@ export class ActionUniquenessValidator {
 
   private processActionDependencies(body: DecisionBody, graph: Map<string, Set<string>>): void {
     for (const statement of body.statements) {
-      if (statement.type === 'WhenBlock') {
-        if (statement.body.type === 'BlockBody') {
-          statement.body.statements.forEach(s => {
-            if (s.type === 'ActionStatement') {
+      if (statement.type === "WhenBlock") {
+        if (statement.body.type === "BlockBody") {
+          statement.body.statements.forEach((s) => {
+            if (s.type === "ActionStatement") {
               const action = s.action;
-              if (action.type === 'UseDecision') {
+              if (action.type === "UseDecision") {
                 // Add an edge from the current decision to the referenced decision
                 const currentDecision = this.findContainingDecision(body);
                 if (currentDecision && currentDecision !== action.decisionName) {
@@ -160,9 +160,9 @@ export class ActionUniquenessValidator {
               }
             }
           });
-        } else if (statement.body.type === 'SingleAction') {
+        } else if (statement.body.type === "SingleAction") {
           const action = statement.body.action;
-          if (action.type === 'UseDecision') {
+          if (action.type === "UseDecision") {
             // Add an edge from the current decision to the referenced decision
             const currentDecision = this.findContainingDecision(body);
             if (currentDecision && currentDecision !== action.decisionName) {
@@ -179,7 +179,7 @@ export class ActionUniquenessValidator {
   private findContainingDecision(body: DecisionBody): string | null {
     // Find the decision that contains this body by looking at the AST
     for (const statement of this.ast?.statements || []) {
-      if (statement.type === 'Decision' && statement.body === body) {
+      if (statement.type === "Decision" && statement.body === body) {
         return statement.name;
       }
     }
@@ -230,9 +230,9 @@ export class ActionUniquenessValidator {
     ast: CPGL,
     nodeId: string,
   ): { start: { line: number; column: number }; end: { line: number; column: number } } {
-    const [, name] = nodeId.split(':');
+    const [, name] = nodeId.split(":");
     for (const statement of ast.statements) {
-      if (statement.type === 'Decision') {
+      if (statement.type === "Decision") {
         const location = this.findActionInBody(statement.body, name);
         if (location) {
           return location;
@@ -247,23 +247,23 @@ export class ActionUniquenessValidator {
     actionName: string,
   ): { start: { line: number; column: number }; end: { line: number; column: number } } | null {
     for (const statement of body.statements) {
-      if (statement.type === 'WhenBlock') {
-        if (statement.body.type === 'BlockBody') {
+      if (statement.type === "WhenBlock") {
+        if (statement.body.type === "BlockBody") {
           for (const s of statement.body.statements) {
-            if (s.type === 'ActionStatement') {
+            if (s.type === "ActionStatement") {
               const action = s.action;
-              if (action.type === 'DoActivity' && action.activityName === actionName) {
+              if (action.type === "DoActivity" && action.activityName === actionName) {
                 return s.location;
-              } else if (action.type === 'UseDecision' && action.decisionName === actionName) {
+              } else if (action.type === "UseDecision" && action.decisionName === actionName) {
                 return s.location;
               }
             }
           }
-        } else if (statement.body.type === 'SingleAction') {
+        } else if (statement.body.type === "SingleAction") {
           const action = statement.body.action;
-          if (action.type === 'DoActivity' && action.activityName === actionName) {
+          if (action.type === "DoActivity" && action.activityName === actionName) {
             return statement.body.location;
-          } else if (action.type === 'UseDecision' && action.decisionName === actionName) {
+          } else if (action.type === "UseDecision" && action.decisionName === actionName) {
             return statement.body.location;
           }
         }
@@ -275,11 +275,11 @@ export class ActionUniquenessValidator {
   private collectDefinedActions(ast: CPGL): Set<string> {
     const definedActions = new Set<string>();
     for (const statement of ast.statements) {
-      if (statement.type === 'Decision') {
-        this.collectActions(statement.body).forEach(action => {
-          if (action.type === 'DoActivity') {
+      if (statement.type === "Decision") {
+        this.collectActions(statement.body).forEach((action) => {
+          if (action.type === "DoActivity") {
             definedActions.add(action.activityName);
-          } else if (action.type === 'UseDecision') {
+          } else if (action.type === "UseDecision") {
             definedActions.add(action.decisionName);
           }
         });
@@ -294,27 +294,27 @@ export class ActionUniquenessValidator {
     errors: ValidationError[],
   ): void {
     for (const statement of body.statements) {
-      if (statement.type === 'WhenBlock') {
-        if (statement.body.type === 'BlockBody') {
-          statement.body.statements.forEach(s => {
-            if (s.type === 'ActionStatement') {
+      if (statement.type === "WhenBlock") {
+        if (statement.body.type === "BlockBody") {
+          statement.body.statements.forEach((s) => {
+            if (s.type === "ActionStatement") {
               const action = s.action;
-              if (action.type === 'UseDecision' && !definedActions.has(action.decisionName)) {
+              if (action.type === "UseDecision" && !definedActions.has(action.decisionName)) {
                 errors.push({
                   message: `Undefined decision: ${action.decisionName}`,
                   location: s.location,
-                  severity: 'error',
+                  severity: "error",
                 });
               }
             }
           });
-        } else if (statement.body.type === 'SingleAction') {
+        } else if (statement.body.type === "SingleAction") {
           const action = statement.body.action;
-          if (action.type === 'UseDecision' && !definedActions.has(action.decisionName)) {
+          if (action.type === "UseDecision" && !definedActions.has(action.decisionName)) {
             errors.push({
               message: `Undefined decision: ${action.decisionName}`,
               location: statement.body.location,
-              severity: 'error',
+              severity: "error",
             });
           }
         }

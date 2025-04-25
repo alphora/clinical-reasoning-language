@@ -136,6 +136,8 @@ The validator tool checks the AST for errors and displays:
 
 ## API Usage
 
+**All API functions return a `ParseResult` object. If there are any lexical or syntax errors, these are collected and returned in the `errors` array (not just printed to the console). You should always check `result.success` and handle errors accordingly.**
+
 The package provides four main functions for processing CPGL code:
 
 ### 1. Tokenization
@@ -250,6 +252,16 @@ All functions return a `ParseResult` object with:
 - `success`: boolean indicating if the operation was successful
 - `result`: the parsed/tokenized/validated result (if successful)
 - `errors`: array of error messages (if unsuccessful)
+
+**Note:**
+- All lexer and parser errors are collected and returned in the `errors` array. They are not just printed to the console.
+- You should always check `success` before using the result.
+- If you want to throw on error, you can do so in your own code:
+
+```typescript
+const result = parseCPGL('...');
+if (!result.success) throw new Error(result.errors?.join('\n'));
+```
 
 ## Development
 
