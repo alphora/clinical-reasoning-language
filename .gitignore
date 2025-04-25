@@ -45,9 +45,5 @@ node_modules
 src/grammar/generated/CPGLParserListener.ts
 
 # Ignore generated type lists
-src/grammar/generated/types/
 
 # Ignore ANTLR generated files
-src/grammar/generated/antlr/
-
-dist/
