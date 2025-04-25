@@ -33,6 +33,20 @@ function updateGitignore(removeDist) {
   fs.writeFileSync(gitignorePath, gitignore.join('\n'));
 }
 
+function updateGitignoreGenerated(removeIgnore) {
+  const gitignorePath = path.join(process.cwd(), '.gitignore');
+  let gitignore = fs.readFileSync(gitignorePath, 'utf8').split('\n');
+  const typesLine = 'src/grammar/generated/types/';
+  const antlrLine = 'src/grammar/generated/antlr/';
+  if (removeIgnore) {
+    gitignore = gitignore.filter(line => line.trim() !== typesLine && line.trim() !== antlrLine);
+  } else {
+    if (!gitignore.includes(typesLine)) gitignore.push(typesLine);
+    if (!gitignore.includes(antlrLine)) gitignore.push(antlrLine);
+  }
+  fs.writeFileSync(gitignorePath, gitignore.join('\n'));
+}
+
 function rollback(steps) {
   for (const step of steps.reverse()) {
     try {
@@ -159,19 +173,22 @@ function main() {
   try {
     // 1. Remove dist/ from .gitignore
     updateGitignore(true);
+    // Remove ignore for generated folders
+    updateGitignoreGenerated(true);
     rollbackSteps.push(() => {
       console.warn('[prepublish:github] Rolling back: restoring .gitignore');
       updateGitignore(false);
+      updateGitignoreGenerated(false);
       tryRun('git add .gitignore');
       // Only commit if there are staged changes
       const status = require('child_process').execSync('git diff --cached --name-only').toString().trim();
       if (status) {
-        tryRun('git commit -m "Restore dist/ to .gitignore after failed prepublish:github"');
+        tryRun('git commit -m "Restore .gitignore after failed prepublish:github"');
       } else {
         console.warn('[prepublish:github] No staged changes to commit for .gitignore rollback.');
       }
     });
-    console.log('[prepublish:github] Removed dist/ from .gitignore');
+    console.log('[prepublish:github] Removed dist/ and generated ignores from .gitignore');
 
     // 2. Build the project
     run('npm run build');
@@ -234,8 +251,10 @@ function main() {
 
     // 6. Re-add dist/ to .gitignore
     updateGitignore(false);
+    // Restore ignore for generated folders
+    updateGitignoreGenerated(false);
     run('git add .gitignore');
-    run('git commit -m "Restore dist/ to .gitignore after GitHub Publish"');
+    run('git commit -m "Restore dist/ and generated ignores to .gitignore after GitHub Publish"');
     run('git push');
 
     console.log('[prepublish:github] Release process complete!');
