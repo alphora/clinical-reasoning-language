@@ -47,3 +47,7 @@ src/grammar/generated/CPGLParserListener.ts
 # Ignore generated type lists
 
 # Ignore ANTLR generated files
+
+dist/
+src/grammar/generated/types/
+src/grammar/generated/antlr/
