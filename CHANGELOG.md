@@ -216,4 +216,21 @@ const result = validateCPGL(`
 - Hardened error handling for missing or invalid type files, with more actionable error messages.
 - Improved maintainability by moving auto-generated files to a more standard location.
 
-[0.5.1]: https://github.com/cqis/cpgl/releases/tag/v0.5.1 
+[0.5.1]: https://github.com/cqis/cpgl/releases/tag/v0.5.1
+
+## [0.5.2] - 2025-04-25
+
+### Fixed
+- **Parser & Error Emission:**  Fixed a bug in the test helper `parseInput` that caused parser errors not to be emitted or captured correctly. The helper now uses the correct parser API, ensuring that error listeners and error reporting work as intended in all AST and parser tests.
+- All parser and lexer tests now pass, confirming correct error emission and reporting.
+
+### Internal
+- Refactored test helpers to use the new `createParser(input: string)` API.
+- Removed legacy lexer and token stream instantiation from test code.
+
+Commits included since v0.5.1:
+- db66606 Passing parser tests
+- b4524a1 All lexer tests passing
+- 5b0d850 Restore dist/ to .gitignore after GitHub Publish
+- a93a445 Include dist for GitHub Publish
+- 1c6eb97 Release documentation 
