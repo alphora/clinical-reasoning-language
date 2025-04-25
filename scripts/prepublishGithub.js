@@ -176,9 +176,9 @@ function main() {
     // 2. Build the project
     run('npm run build');
 
-    // 3. Add and commit dist/
-    run('git add dist .gitignore');
-    run('git commit -m "Include dist for GitHub Publish"');
+    // 3. Add and commit dist/ and all generated files
+    run('git add dist src/grammar/generated/antlr src/grammar/generated/types .gitignore');
+    run('git commit -m "Include dist and generated files for GitHub Publish"');
     rollbackSteps.push(() => {
       console.warn('[prepublish:github] Rolling back: resetting commit that included dist/');
       tryRun('git reset --hard HEAD~1');
