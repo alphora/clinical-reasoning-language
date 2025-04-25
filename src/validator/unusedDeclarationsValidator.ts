@@ -8,9 +8,9 @@ import {
   Location,
   WhenBlock,
   WhenBlockType,
-} from '../ast/types';
+} from "../ast/types";
 
-import { ValidationError } from './validator';
+import { ValidationError } from "./validator";
 
 interface UsageInfo {
   used: boolean;
@@ -32,7 +32,7 @@ export class UnusedDeclarationsValidator {
     this.clear();
     const targetAst = ast || this.ast;
     if (!targetAst) {
-      throw new Error('No AST provided to validate');
+      throw new Error("No AST provided to validate");
     }
     this.collectDeclarations(targetAst);
     this.processDeclarations(targetAst);
@@ -55,19 +55,19 @@ export class UnusedDeclarationsValidator {
             location: statement.location,
           });
           break;
-        case 'Concept':
+        case "Concept":
           this.conceptDeclarations.set(statement.name, {
             used: false,
             location: statement.location,
           });
           break;
-        case 'Activity':
+        case "Activity":
           this.activityDeclarations.set(statement.name, {
             used: false,
             location: statement.location,
           });
           break;
-        case 'Terminology':
+        case "Terminology":
           this.terminologyDeclarations.set(statement.name, {
             used: false,
             location: statement.location,
@@ -84,10 +84,10 @@ export class UnusedDeclarationsValidator {
           // Process the decision body for all decisions
           this.processDecisionBody(statement.body, statement.name);
           break;
-        case 'Concept':
+        case "Concept":
           // Mark terminology as used when referenced in CodedByDefinition
           if (
-            statement.definition.type === 'CodedByDefinition' &&
+            statement.definition.type === "CodedByDefinition" &&
             statement.definition.terminologyName
           ) {
             const terminologyInfo = this.terminologyDeclarations.get(
@@ -134,8 +134,8 @@ export class UnusedDeclarationsValidator {
     for (const statement of body.statements) {
       if (statement.type === WhenBlockType.type) {
         this.processWhenBlock(statement);
-      } else if (statement.type === 'ActionStatement') {
-        if ('action' in statement && this.isAction(statement.action)) {
+      } else if (statement.type === "ActionStatement") {
+        if ("action" in statement && this.isAction(statement.action)) {
           this.processAction(statement.action);
         }
       }
@@ -148,9 +148,9 @@ export class UnusedDeclarationsValidator {
       conceptInfo.used = true;
     }
 
-    if (whenBlock.body.type === 'BlockBody') {
+    if (whenBlock.body.type === "BlockBody") {
       this.processBlockBody(whenBlock.body);
-    } else if (whenBlock.body.type === 'SingleAction' && this.isAction(whenBlock.body.action)) {
+    } else if (whenBlock.body.type === "SingleAction" && this.isAction(whenBlock.body.action)) {
       this.processAction(whenBlock.body.action);
     }
   }
@@ -158,8 +158,8 @@ export class UnusedDeclarationsValidator {
   private processBlockBody(body: BlockBody): void {
     for (const statement of body.statements) {
       if (
-        statement.type === 'ActionStatement' &&
-        'action' in statement &&
+        statement.type === "ActionStatement" &&
+        "action" in statement &&
         this.isAction(statement.action)
       ) {
         this.processAction(statement.action);
@@ -170,12 +170,12 @@ export class UnusedDeclarationsValidator {
   }
 
   private processAction(action: Action): void {
-    if (action.type === 'DoActivity') {
+    if (action.type === "DoActivity") {
       const activityInfo = this.activityDeclarations.get(action.activityName);
       if (activityInfo) {
         activityInfo.used = true;
       }
-    } else if (action.type === 'UseDecision') {
+    } else if (action.type === "UseDecision") {
       const decisionInfo = this.decisionDeclarations.get(action.decisionName);
       if (decisionInfo) {
         decisionInfo.used = true;
@@ -201,10 +201,10 @@ export class UnusedDeclarationsValidator {
 
   private isAction(action: unknown): action is Action {
     return (
-      typeof action === 'object' &&
+      typeof action === "object" &&
       action !== null &&
-      'type' in action &&
-      (action.type === 'DoActivity' || action.type === 'UseDecision')
+      "type" in action &&
+      (action.type === "DoActivity" || action.type === "UseDecision")
     );
   }
 
@@ -213,11 +213,11 @@ export class UnusedDeclarationsValidator {
 
     for (const [name, info] of this.decisionDeclarations) {
       if (!info.used) {
-        console.log('] Found unused decision:', name);
+        console.log("] Found unused decision:", name);
         errors.push({
           message: `Unused decision: ${name}`,
           location: info.location,
-          severity: 'warning',
+          severity: "warning",
         });
       }
     }
@@ -227,7 +227,7 @@ export class UnusedDeclarationsValidator {
         errors.push({
           message: `Unused concept: ${name}`,
           location: info.location,
-          severity: 'warning',
+          severity: "warning",
         });
       }
     }
@@ -237,7 +237,7 @@ export class UnusedDeclarationsValidator {
         errors.push({
           message: `Unused activity: ${name}`,
           location: info.location,
-          severity: 'warning',
+          severity: "warning",
         });
       }
     }
@@ -247,7 +247,7 @@ export class UnusedDeclarationsValidator {
         errors.push({
           message: `Unused terminology: ${name}`,
           location: info.location,
-          severity: 'warning',
+          severity: "warning",
         });
       }
     }

@@ -1,9 +1,9 @@
-import { CPGL } from '../ast/types';
+import { CPGL } from "../ast/types";
 
-import { ActionUniquenessValidator } from './actionUniquenessValidator';
+import { ActionUniquenessValidator } from "./actionUniquenessValidator";
 //import { CycleDetector } from './cycleDetector';
-import { NameUniquenessValidator } from './nameUniquenessValidator';
-import { UnusedDeclarationsValidator } from './unusedDeclarationsValidator';
+import { NameUniquenessValidator } from "./nameUniquenessValidator";
+import { UnusedDeclarationsValidator } from "./unusedDeclarationsValidator";
 
 export interface ValidationError {
   message: string;
@@ -11,7 +11,7 @@ export interface ValidationError {
     start: { line: number; column: number };
     end: { line: number; column: number };
   };
-  severity: 'error' | 'warning';
+  severity: "error" | "warning";
 }
 
 export interface ValidationResult {

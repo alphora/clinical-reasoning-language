@@ -8,7 +8,7 @@ import { CharStreams } from 'antlr4ts';
 // Internal imports
 import { CPGLLexer } from '../../grammar/generated/antlr/CPGLLexer';
 
-import { getAllTokens } from './index.test';
+import { getTokensFromString } from './helpers';
 
 describe('Grammar Example Analysis', () => {
   it('should successfully tokenize the grammar example file', () => {
@@ -17,7 +17,7 @@ describe('Grammar Example Analysis', () => {
     const lexer = new CPGLLexer(CharStreams.fromString(input));
 
     try {
-      const tokens = getAllTokens(lexer);
+      const tokens = getTokensFromString(input);
 
       // Create output string
       let output = 'Token sequence from grammar example:\n\n';

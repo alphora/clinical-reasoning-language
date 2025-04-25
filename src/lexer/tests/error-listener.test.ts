@@ -2,19 +2,11 @@ import { CharStreams, CommonTokenStream } from 'antlr4ts';
 import { CPGLLexer } from '../../grammar/generated/antlr/CPGLLexer';
 import { CPGLLexerErrorListener } from '../CPGLLexerErrorListener';
 import { getAllTokens } from './index.test';
-
-function createLexerWithErrors(input: string): { lexer: CPGLLexer, errorListener: CPGLLexerErrorListener } {
-  const charStream = CharStreams.fromString(input);
-  const lexer = new CPGLLexer(charStream);
-  const errorListener = new CPGLLexerErrorListener();
-  lexer.removeErrorListeners();
-  lexer.addErrorListener(errorListener);
-  return { lexer, errorListener };
-}
+import { createLexer } from '../createLexer';
 
 describe('CPGLLexerErrorListener', () => {
   it('should detect individual invalid tokens', () => {
-    const { lexer, errorListener } = createLexerWithErrors('invalid');
+    const { lexer, errorListener } = createLexer('invalid');
     const tokenStream = new CommonTokenStream(lexer);
     tokenStream.fill();
     const errors = errorListener.getErrors();
@@ -26,7 +18,7 @@ describe('CPGLLexerErrorListener', () => {
   });
 
   it('should treat whitespace-separated invalid tokens as separate errors', () => {
-    const { lexer, errorListener } = createLexerWithErrors('invalid1 invalid2');
+    const { lexer, errorListener } = createLexer('invalid1 invalid2');
     const tokenStream = new CommonTokenStream(lexer);
     tokenStream.fill();
     const errors = errorListener.getErrors();
@@ -42,7 +34,7 @@ describe('CPGLLexerErrorListener', () => {
   });
 
   it('should combine invalid tokens within quoted strings into a single error', () => {
-    const { lexer, errorListener } = createLexerWithErrors('"invalid string');
+    const { lexer, errorListener } = createLexer('"invalid string');
     const tokenStream = new CommonTokenStream(lexer);
     tokenStream.fill();
     const errors = errorListener.getErrors();
@@ -53,7 +45,7 @@ describe('CPGLLexerErrorListener', () => {
   });
 
   it('should not span error tokens across multiple lines', () => {
-    const { lexer, errorListener } = createLexerWithErrors('invalid\ninvalid');
+    const { lexer, errorListener } = createLexer('invalid\ninvalid');
     const tokenStream = new CommonTokenStream(lexer);
     tokenStream.fill();
     const errors = errorListener.getErrors();
@@ -69,7 +61,7 @@ describe('CPGLLexerErrorListener', () => {
 
 describe('CPGLLexerErrorListener with CPGL-specific input', () => {
   it('should detect invalid tokens in a decision statement', () => {
-    const { lexer, errorListener } = createLexerWithErrors('decision "Invalid Decision": when "Invalid Concept" then do "Invalid Action". done');
+    const { lexer, errorListener } = createLexer('decision "Invalid Decision": when "Invalid Concept" then do "Invalid Action". done');
     const tokenStream = new CommonTokenStream(lexer);
     tokenStream.fill();
     const errors = errorListener.getErrors();
@@ -77,7 +69,7 @@ describe('CPGLLexerErrorListener with CPGL-specific input', () => {
   });
 
   it('should handle invalid tokens within a concept definition', () => {
-    const { lexer, errorListener } = createLexerWithErrors('concept "Invalid Concept": has type InvalidType. done');
+    const { lexer, errorListener } = createLexer('concept "Invalid Concept": has type InvalidType. done');
     const tokenStream = new CommonTokenStream(lexer);
     tokenStream.fill();
     const errors = errorListener.getErrors();
@@ -88,7 +80,7 @@ describe('CPGLLexerErrorListener with CPGL-specific input', () => {
   });
 
   it('should detect invalid tokens in a terminology statement', () => {
-    const { lexer, errorListener } = createLexerWithErrors('terminology "Invalid Terminology" `` invalid.');
+    const { lexer, errorListener } = createLexer('terminology "Invalid Terminology" `` invalid.');
     const tokenStream = new CommonTokenStream(lexer);
     tokenStream.fill();
     const errors = errorListener.getErrors();
@@ -99,7 +91,7 @@ describe('CPGLLexerErrorListener with CPGL-specific input', () => {
   });
 
   it('should not span error tokens across multiple lines in a complex statement', () => {
-    const { lexer, errorListener } = createLexerWithErrors('concept "Complex Concept": has type Observation.\ninferred by ("Invalid" and "Another Invalid"). done');
+    const { lexer, errorListener } = createLexer('concept "Complex Concept": has type Observation.\ninferred by ("Invalid" and "Another Invalid"). done');
     const tokenStream = new CommonTokenStream(lexer);
     tokenStream.fill();
     const errors = errorListener.getErrors();
@@ -107,7 +99,7 @@ describe('CPGLLexerErrorListener with CPGL-specific input', () => {
   });
 
   it('should detect invalid activity type', () => {
-    const { lexer, errorListener } = createLexerWithErrors('perform invalidActivity');
+    const { lexer, errorListener } = createLexer('perform invalidActivity');
     const tokenStream = new CommonTokenStream(lexer);
     tokenStream.fill();
     const errors = errorListener.getErrors();
@@ -118,7 +110,7 @@ describe('CPGLLexerErrorListener with CPGL-specific input', () => {
   });
 
   it('should handle invalid concept type', () => {
-    const { lexer, errorListener } = createLexerWithErrors('concept "Invalid Concept": has type InvalidType. done');
+    const { lexer, errorListener } = createLexer('concept "Invalid Concept": has type InvalidType. done');
     const tokenStream = new CommonTokenStream(lexer);
     tokenStream.fill();
     const errors = errorListener.getErrors();
@@ -129,7 +121,7 @@ describe('CPGLLexerErrorListener with CPGL-specific input', () => {
   });
 
   it('should handle invalid concept value type', () => {
-    const { lexer, errorListener } = createLexerWithErrors('concept "Invalid Concept": has valuetype InvalidValueType. done');
+    const { lexer, errorListener } = createLexer('concept "Invalid Concept": has valuetype InvalidValueType. done');
     const tokenStream = new CommonTokenStream(lexer);
     tokenStream.fill();
     const errors = errorListener.getErrors();
@@ -140,7 +132,7 @@ describe('CPGLLexerErrorListener with CPGL-specific input', () => {
   });
 
   it('should handle invalid character in activity type', () => {
-    const { lexer, errorListener } = createLexerWithErrors('CPGAdministerMedication@');
+    const { lexer, errorListener } = createLexer('CPGAdministerMedication@');
     const tokenStream = new CommonTokenStream(lexer);
     tokenStream.fill();
     const errors = errorListener.getErrors();
@@ -151,7 +143,7 @@ describe('CPGLLexerErrorListener with CPGL-specific input', () => {
   });
 
   it('should handle invalid character in concept type', () => {
-    const { lexer, errorListener } = createLexerWithErrors('Communication@');
+    const { lexer, errorListener } = createLexer('Communication@');
     const tokenStream = new CommonTokenStream(lexer);
     tokenStream.fill();
     const errors = errorListener.getErrors();
@@ -162,7 +154,7 @@ describe('CPGLLexerErrorListener with CPGL-specific input', () => {
   });
 
   it('should handle invalid character in concept value type', () => {
-    const { lexer, errorListener } = createLexerWithErrors('Quantity@');
+    const { lexer, errorListener } = createLexer('Quantity@');
     const tokenStream = new CommonTokenStream(lexer);
     tokenStream.fill();
     const errors = errorListener.getErrors();
@@ -173,7 +165,7 @@ describe('CPGLLexerErrorListener with CPGL-specific input', () => {
   });
 
   it('[DEBUGGING] should print tokens for perform CPGAdministerMedication@', () => {
-    const { lexer } = createLexerWithErrors('perform CPGAdministerMedication@');
+    const { lexer, errorListener } = createLexer('perform CPGAdministerMedication@');
     const tokenStream = new CommonTokenStream(lexer);
     tokenStream.fill();
     const tokens = tokenStream.getTokens();

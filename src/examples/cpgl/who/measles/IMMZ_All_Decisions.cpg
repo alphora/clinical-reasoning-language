@@ -4,7 +4,7 @@
   reference further plan definitions via definitionCanonical.
 */
 decision "IMMZDTImmunizationStrategy":
-    when "Check Immunizations" then:
+    whefdsn "Check Immunizations" then:
         when "Measles Dose 0" then use "IMMZD2DTMeaslesDose0".
         when "Measles Routine Immunization" then use "OTIMMZD2DTMeasles".
         when "Measles Supplementary Dose" then use "IMMZD2DTMeaslesSupplementary".

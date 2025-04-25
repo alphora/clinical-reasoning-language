@@ -1,78 +1,122 @@
 import { ParserRuleContext } from "antlr4ts/ParserRuleContext";
-
 import { AbstractParseTreeVisitor } from "antlr4ts/tree/AbstractParseTreeVisitor";
-import { CPGLParserVisitor } from "../grammar/generated/antlr/CPGLParserVisitor";
+
 import {
-  CpglContext, 
-  DecisionStatementContext, DecisionBodyContext,
-  WhenWithBodyContext, WhenSingleActionContext,
-  NestedWhenBlockContext, BlockActionContext,
-  BlockBodyContext, SingleActionStatementContext,
-  DoStatementContext, UseStatementContext,
-  TerminologyStatementContext, TerminologyValuesetContext,
+  CpglContext,
+  DecisionStatementContext,
+  DecisionBodyContext,
+  WhenWithBodyContext,
+  WhenSingleActionContext,
+  NestedWhenBlockContext,
+  BlockActionContext,
+  BlockBodyContext,
+  SingleActionStatementContext,
+  DoStatementContext,
+  UseStatementContext,
+  TerminologyStatementContext,
+  TerminologyValuesetContext,
   TerminologySystemCodeContext,
-  ActivityStatementContext, ConceptStatementContext,
+  ActivityStatementContext,
+  ConceptStatementContext,
   InferredByLineContext,
-  DefinitionConceptContext, DefinitionLogicContext,
-  InferredByExpressionContext, InformalOrContext,
-  InformalAndContext, InformalNotContext,
-  ConceptAtomContext, GroupExpressionContext} from "../grammar/generated/antlr/CPGLParser";
+  DefinitionConceptContext,
+  DefinitionLogicContext,
+  InferredByExpressionContext,
+  InformalOrContext,
+  InformalAndContext,
+  InformalNotContext,
+  ConceptAtomContext,
+  GroupExpressionContext,
+} from "../grammar/generated/antlr/CPGLParser";
+import { CPGLParserVisitor } from "../grammar/generated/antlr/CPGLParserVisitor";
 
 import {
-  ASTNode, CPGL, FileType, Statement,
-  Decision, DecisionType, DecisionBody, DecisionBodyType,
-  WhenBlock, WhenBlockType, BlockBody, BlockBodyType,
-  SingleAction, SingleActionType, ActionStatement, 
-  DoActivity, DoActivityType, UseDecision, UseDecisionType,
-  Terminology, TerminologyType,
-  TerminologyValueset, TerminologyValuesetType,
-  TerminologySystemCode, TerminologySystemCodeType,
-  Activity, ActivityType,
-  Concept, ConceptType, ConceptDefinition,
+  ASTNode,
+  CPGL,
+  FileType,
+  Statement,
+  Decision,
+  DecisionType,
+  DecisionBody,
+  DecisionBodyType,
+  WhenBlock,
+  WhenBlockType,
+  BlockBody,
+  BlockBodyType,
+  SingleAction,
+  SingleActionType,
+  ActionStatement,
+  DoActivity,
+  DoActivityType,
+  UseDecision,
+  UseDecisionType,
+  Terminology,
+  TerminologyType,
+  TerminologyValueset,
+  TerminologyValuesetType,
+  TerminologySystemCode,
+  TerminologySystemCodeType,
+  Activity,
+  ActivityType,
+  Concept,
+  ConceptType,
+  ConceptDefinition,
   CodedByDefinitionType,
-  InferredByDefinition, InferredByDefinitionType,
-  ConceptReference, ConceptReferenceType,
-  InformalAnd, InformalAndType,
-  InformalOr, InformalOrType,
-  NotExpression, NotExpressionType,
-  GroupExpression, GroupExpressionType,
-  InferredByConcept, InferredByConceptType,
+  InferredByDefinition,
+  InferredByDefinitionType,
+  ConceptReference,
+  ConceptReferenceType,
+  InformalAnd,
+  InformalAndType,
+  InformalOr,
+  InformalOrType,
+  NotExpression,
+  NotExpressionType,
+  GroupExpression,
+  GroupExpressionType,
+  InferredByConcept,
+  InferredByConceptType,
   InferredByExpression,
-  Location
+  Location,
 } from "./types";
-
 
 function getLocation(ctx: ParserRuleContext): Location {
   const start = ctx.start;
-  const stop  = ctx.stop ?? start;
+  const stop = ctx.stop ?? start;
 
   return {
     start: {
-      line:   start.line,
-      column: start.charPositionInLine
+      line: start.line,
+      column: start.charPositionInLine,
     },
     end: {
-      line:   stop.line,
-      column: stop.charPositionInLine + (stop.text?.length ?? 0)
-    }
+      line: stop.line,
+      column: stop.charPositionInLine + (stop.text?.length ?? 0),
+    },
   };
 }
 
-export class CPGLAstBuilder extends AbstractParseTreeVisitor<ASTNode> implements CPGLParserVisitor<ASTNode> {
-  protected defaultResult() { return null as any; }
+export class CPGLAstBuilder
+  extends AbstractParseTreeVisitor<ASTNode>
+  implements CPGLParserVisitor<ASTNode>
+{
+  protected defaultResult() {
+    return null as any;
+  }
 
   visitCpgl(ctx: CpglContext): CPGL {
-    const statements = ctx.statement().map(s => this.visit(s) as Statement);
-    return { type: FileType.type, statements, location: getLocation(ctx) };  }
+    const statements = ctx.statement().map((s) => this.visit(s) as Statement);
+    return { type: FileType.type, statements, location: getLocation(ctx) };
+  }
 
   visitDecisionStatement(ctx: DecisionStatementContext): Decision {
-    const name = (ctx.decisionIdentifier().text.slice(1, -1));
+    const name = ctx.decisionIdentifier().text.slice(1, -1);
     const body = this.visit(ctx.decisionBody()!) as DecisionBody;
     return { type: DecisionType.type, name, body, location: getLocation(ctx) };
   }
 
   visitDecisionBody(ctx: DecisionBodyContext): DecisionBody {
-    const statements = ctx.whenBlock().map(w => this.visit(w) as WhenBlock);
+    const statements = ctx.whenBlock().map((w) => this.visit(w) as WhenBlock);
     return { type: DecisionBodyType.type, statements, location: getLocation(ctx) };
   }
 
@@ -88,7 +132,9 @@ export class CPGLAstBuilder extends AbstractParseTreeVisitor<ASTNode> implements
     return { type: WhenBlockType.type, conceptName, body: action, location: getLocation(ctx) };
   }
 
-  visitNestedWhenBlock(ctx: NestedWhenBlockContext): WhenBlock { return this.visit(ctx.whenBlock()) as WhenBlock; }
+  visitNestedWhenBlock(ctx: NestedWhenBlockContext): WhenBlock {
+    return this.visit(ctx.whenBlock()) as WhenBlock;
+  }
   visitBlockAction(ctx: BlockActionContext): ActionStatement {
     const result = this.visit(ctx.actionStatement()) as ActionStatement;
     return result;
@@ -96,12 +142,10 @@ export class CPGLAstBuilder extends AbstractParseTreeVisitor<ASTNode> implements
 
   visitBlockBody(ctx: BlockBodyContext): BlockBody {
     // qualifier as before
-    const qualifier = ctx.anyOrAllClause()
-      ? ctx.anyOrAllClause()!.text.slice(0, -1)
-      : undefined;
-  
+    const qualifier = ctx.anyOrAllClause() ? ctx.anyOrAllClause()!.text.slice(0, -1) : undefined;
+
     const statements: (WhenBlock | ActionStatement)[] = [];
-  
+
     // ctx.blockStatement() gives you every BlockStatementContext
     for (const stmtCtx of ctx.blockStatement()) {
       if (stmtCtx instanceof NestedWhenBlockContext) {
@@ -135,9 +179,9 @@ export class CPGLAstBuilder extends AbstractParseTreeVisitor<ASTNode> implements
     } else if (useStmt) {
       action = this.visitUseStatement(useStmt);
     } else {
-      throw new Error('ActionStatement must have doStatement or useStatement');
+      throw new Error("ActionStatement must have doStatement or useStatement");
     }
-    return { type: 'ActionStatement', action, location: getLocation(ctx) };
+    return { type: "ActionStatement", action, location: getLocation(ctx) };
   }
 
   visitDoStatement(ctx: DoStatementContext): DoActivity {
@@ -154,7 +198,10 @@ export class CPGLAstBuilder extends AbstractParseTreeVisitor<ASTNode> implements
 
   visitTerminologyStatement(ctx: TerminologyStatementContext): Terminology {
     const name = ctx.terminologyIdentifier().text.slice(1, -1);
-    let definition: TerminologyValueset | TerminologySystemCode | { type: 'TerminologyFreeText'; value: string; location: Location };
+    let definition:
+      | TerminologyValueset
+      | TerminologySystemCode
+      | { type: "TerminologyFreeText"; value: string; location: Location };
     if (ctx.terminologyValueset()) {
       definition = this.visit(ctx.terminologyValueset()!) as TerminologyValueset;
     } else if (ctx.terminologySystemCode()) {
@@ -162,12 +209,17 @@ export class CPGLAstBuilder extends AbstractParseTreeVisitor<ASTNode> implements
     } else if (ctx.backtickString()) {
       // free text/markdown case
       definition = {
-        type: 'TerminologyFreeText',
+        type: "TerminologyFreeText",
         value: ctx.backtickString()!.text.slice(1, -1),
-        location: getLocation(ctx)
+        location: getLocation(ctx),
       };
     }
-    return { type: TerminologyType.type, name, definition: definition!, location: getLocation(ctx) };
+    return {
+      type: TerminologyType.type,
+      name,
+      definition: definition!,
+      location: getLocation(ctx),
+    };
   }
 
   visitTerminologyValueset(ctx: TerminologyValuesetContext): TerminologyValueset {
@@ -176,8 +228,8 @@ export class CPGLAstBuilder extends AbstractParseTreeVisitor<ASTNode> implements
   }
   visitTerminologySystemCode(ctx: TerminologySystemCodeContext): TerminologySystemCode {
     // SYSTEM backtickString CODE backtickString
-    let system = '';
-    let code = '';
+    let system = "";
+    let code = "";
     if (ctx.backtickString && ctx.backtickString().length === 2) {
       const systemNode = ctx.backtickString(0);
       const codeNode = ctx.backtickString(1);
@@ -188,7 +240,7 @@ export class CPGLAstBuilder extends AbstractParseTreeVisitor<ASTNode> implements
   }
 
   visitActivityStatement(ctx: ActivityStatementContext): Activity {
-    const name = ctx.activityIdentifier()!.text.slice(1,-1);
+    const name = ctx.activityIdentifier()!.text.slice(1, -1);
     const perform = ctx.ACTIVITY_TYPE()!.text as ActivityType;
     let terminologyReference: string | undefined;
     let activityTypeValue: string | undefined;
@@ -219,14 +271,22 @@ export class CPGLAstBuilder extends AbstractParseTreeVisitor<ASTNode> implements
         }
       }
     }
-    return { type: 'Activity', name, perform, terminologyReference, activityTypeValue, rationale, location: getLocation(ctx) };
+    return {
+      type: "Activity",
+      name,
+      perform,
+      terminologyReference,
+      activityTypeValue,
+      rationale,
+      location: getLocation(ctx),
+    };
   }
 
   visitConceptStatement(ctx: ConceptStatementContext): Concept {
-    const name = ctx.conceptIdentifier().text.slice(1,-1);
+    const name = ctx.conceptIdentifier().text.slice(1, -1);
     const bodyCtx = ctx.conceptBody();
-    const conceptType = (bodyCtx.hasTypeLine().CONCEPT_TYPE().text) as ConceptType;
-    const valueType   = (bodyCtx.hasValueTypeLine().CONCEPT_VALUE_TYPE().text) as any;
+    const conceptType = bodyCtx.hasTypeLine().CONCEPT_TYPE().text as ConceptType;
+    const valueType = bodyCtx.hasValueTypeLine().CONCEPT_VALUE_TYPE().text as any;
     let provenance: string | undefined = undefined;
     if (bodyCtx.provenanceLine?.()) {
       const provCtx = bodyCtx.provenanceLine?.();
@@ -244,36 +304,53 @@ export class CPGLAstBuilder extends AbstractParseTreeVisitor<ASTNode> implements
     }
     let definition: ConceptDefinition;
     if (bodyCtx.codedByLine && bodyCtx.codedByLine()) {
-      const termRef = bodyCtx.codedByLine()!.terminologyReference().text.slice(1,-1);
-      definition = { type: CodedByDefinitionType.type, terminologyName: termRef, location: getLocation(bodyCtx.codedByLine()!) };
+      const termRef = bodyCtx.codedByLine()!.terminologyReference().text.slice(1, -1);
+      definition = {
+        type: CodedByDefinitionType.type,
+        terminologyName: termRef,
+        location: getLocation(bodyCtx.codedByLine()!),
+      };
     } else if (bodyCtx.inferredByLine && bodyCtx.inferredByLine()) {
       const infCtx = bodyCtx.inferredByLine();
       if (!infCtx) {
-        throw new Error('ConceptStatement: inferredByLine() unexpectedly returned undefined');
+        throw new Error("ConceptStatement: inferredByLine() unexpectedly returned undefined");
       }
       definition = this.visit(infCtx) as InferredByDefinition;
     } else {
-      throw new Error('ConceptStatement must have either codedByLine or inferredByLine');
+      throw new Error("ConceptStatement must have either codedByLine or inferredByLine");
     }
-    return { type: 'Concept', name, conceptType, valueType, provenance, definition, location: getLocation(ctx) };
+    return {
+      type: "Concept",
+      name,
+      conceptType,
+      valueType,
+      provenance,
+      definition,
+      location: getLocation(ctx),
+    };
   }
 
   visitInferredByLine(ctx: InferredByLineContext): InferredByDefinition {
     const defCtx = ctx.inferredBody();
-    const body = this.visit(defCtx) as InferredByConcept | InformalAnd | InformalOr | NotExpression | GroupExpression;
+    const body = this.visit(defCtx) as
+      | InferredByConcept
+      | InformalAnd
+      | InformalOr
+      | NotExpression
+      | GroupExpression;
     return { type: InferredByDefinitionType.type, body, location: getLocation(ctx) };
   }
 
   visitDefinitionConcept(ctx: DefinitionConceptContext): InferredByConcept {
     const refCtx = ctx.inferredByConceptReference();
-    const pat     = refCtx.patternReference()?.text.slice(1, -1);
+    const pat = refCtx.patternReference()?.text.slice(1, -1);
     const concept = refCtx.conceptReference().text.slice(1, -1);
-  
+
     return {
       type: InferredByConceptType.type,
       pattern: pat,
       concept,
-      location: getLocation(ctx)
+      location: getLocation(ctx),
     };
   }
   visitDefinitionLogic(ctx: DefinitionLogicContext): GroupExpression {
@@ -285,12 +362,14 @@ export class CPGLAstBuilder extends AbstractParseTreeVisitor<ASTNode> implements
     return this.visit(exprCtx) as GroupExpression;
   }
 
-  visitInferredByExpression(ctx: InferredByExpressionContext): InformalOr | InformalAnd | NotExpression | ConceptReference | GroupExpression {
+  visitInferredByExpression(
+    ctx: InferredByExpressionContext,
+  ): InformalOr | InformalAnd | NotExpression | ConceptReference | GroupExpression {
     return this.visit(ctx.informalOr()) as InferredByExpression;
   }
 
   visitInformalOr(ctx: InformalOrContext): InformalOr {
-    const terms = ctx.informalAnd().map(a => this.visit(a) as any);
+    const terms = ctx.informalAnd().map((a) => this.visit(a) as any);
     if (ctx.OR().length) {
       // flatten
       return { type: InformalOrType.type, terms, location: getLocation(ctx) };
@@ -298,8 +377,12 @@ export class CPGLAstBuilder extends AbstractParseTreeVisitor<ASTNode> implements
     return terms[0] as InformalOr;
   }
 
-  visitInformalAnd(ctx: InformalAndContext): InformalAnd | NotExpression | GroupExpression | ConceptReference {
-    const terms = ctx.informalNot().map(n => this.visit(n) as NotExpression | GroupExpression | ConceptReference);
+  visitInformalAnd(
+    ctx: InformalAndContext,
+  ): InformalAnd | NotExpression | GroupExpression | ConceptReference {
+    const terms = ctx
+      .informalNot()
+      .map((n) => this.visit(n) as NotExpression | GroupExpression | ConceptReference);
     if (ctx.AND().length) {
       return { type: InformalAndType.type, terms, location: getLocation(ctx) };
     }
@@ -308,17 +391,26 @@ export class CPGLAstBuilder extends AbstractParseTreeVisitor<ASTNode> implements
 
   visitInformalNot(ctx: InformalNotContext): InferredByExpression {
     if (ctx.NOT()) {
-      return { type: NotExpressionType.type, expression: this.visit(ctx.informalNot()!) as InferredByExpression, location: getLocation(ctx) };
+      return {
+        type: NotExpressionType.type,
+        expression: this.visit(ctx.informalNot()!) as InferredByExpression,
+        location: getLocation(ctx),
+      };
     }
     return this.visit(ctx.atom()!) as InferredByExpression;
   }
 
   visitConceptAtom(ctx: ConceptAtomContext): ConceptReference {
-    const name = ctx.conceptReference().text.slice(1,-1);
+    const name = ctx.conceptReference().text.slice(1, -1);
     return { type: ConceptReferenceType.type, name, location: getLocation(ctx) };
   }
   visitGroupExpression(ctx: GroupExpressionContext): GroupExpression {
-    const expr = this.visit(ctx.inferredByExpression()) as InformalAnd | InformalOr | NotExpression | ConceptReference | GroupExpression;
+    const expr = this.visit(ctx.inferredByExpression()) as
+      | InformalAnd
+      | InformalOr
+      | NotExpression
+      | ConceptReference
+      | GroupExpression;
     return { type: GroupExpressionType.type, expression: expr, location: getLocation(ctx) };
   }
 }

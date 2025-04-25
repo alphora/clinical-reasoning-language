@@ -1,4 +1,4 @@
-import { ASTNode } from './types';
+import { ASTNode } from "./types";
 
 interface ASTComparison {
   lineCountsMatch: boolean;
@@ -18,47 +18,47 @@ interface ASTComparison {
  * @returns The string representation of the AST
  */
 export function printAST(node: ASTNode, indent = 0): string {
-  const spaces = '  '.repeat(indent);
+  const spaces = "  ".repeat(indent);
   let output = `${spaces}${node.type}\n`;
 
   // Print node-specific properties
-  if ('name' in node) {
+  if ("name" in node) {
     output += `${spaces}  name: ${node.name}\n`;
   }
-  if ('decisionName' in node) {
+  if ("decisionName" in node) {
     output += `${spaces}  decisionName: "${node.decisionName}"\n`;
   }
-  if ('activityName' in node) {
+  if ("activityName" in node) {
     output += `${spaces}  activityName: "${node.activityName}"\n`;
   }
-  if ('conceptName' in node) {
+  if ("conceptName" in node) {
     output += `${spaces}  conceptName: "${node.conceptName}"\n`;
   }
-  if ('qualifier' in node && node.qualifier) {
+  if ("qualifier" in node && node.qualifier) {
     output += `${spaces}  qualifier: "${String(node.qualifier)}"\n`;
   }
-  if ('activityTypeValue' in node && node.activityTypeValue) {
+  if ("activityTypeValue" in node && node.activityTypeValue) {
     output += `${spaces}  activityTypeValue: "${String(node.activityTypeValue)}"\n`;
   }
-  if ('rationale' in node && node.rationale) {
+  if ("rationale" in node && node.rationale) {
     output += `${spaces}  rationale: "${String(node.rationale)}"\n`;
   }
 
   // Handle statements
-  if ('statements' in node && Array.isArray(node.statements)) {
+  if ("statements" in node && Array.isArray(node.statements)) {
     node.statements.forEach((statement: ASTNode) => {
       output += printAST(statement, indent + 1);
     });
   }
 
   // Handle body
-  if ('body' in node && node.body) {
+  if ("body" in node && node.body) {
     const body = node.body as ASTNode;
     output += printAST(body, indent + 1);
   }
 
   // Handle action
-  if ('action' in node && node.action) {
+  if ("action" in node && node.action) {
     const action = node.action as ASTNode;
     output += printAST(action, indent + 1);
   }
@@ -74,12 +74,12 @@ export function printAST(node: ASTNode, indent = 0): string {
  */
 export function compareASTs(generatedAST: string, expectedAST: string): ASTComparison {
   // Normalize line endings to LF
-  const normalizedGenerated = generatedAST.replace(/\r\n/g, '\n').trim();
-  const normalizedExpected = expectedAST.replace(/\r\n/g, '\n').trim();
+  const normalizedGenerated = generatedAST.replace(/\r\n/g, "\n").trim();
+  const normalizedExpected = expectedAST.replace(/\r\n/g, "\n").trim();
 
   // Split into lines
-  const generatedLines = normalizedGenerated.split('\n');
-  const expectedLines = normalizedExpected.split('\n');
+  const generatedLines = normalizedGenerated.split("\n");
+  const expectedLines = normalizedExpected.split("\n");
 
   // Compare line counts
   const generatedLineCount = generatedLines.length;
@@ -87,8 +87,8 @@ export function compareASTs(generatedAST: string, expectedAST: string): ASTCompa
   const maxLines = Math.max(generatedLineCount, expectedLineCount);
 
   // Create a version with all whitespace removed for strict comparison
-  const noWhitespaceGenerated = normalizedGenerated.replace(/\s+/g, '');
-  const noWhitespaceExpected = normalizedExpected.replace(/\s+/g, '');
+  const noWhitespaceGenerated = normalizedGenerated.replace(/\s+/g, "");
+  const noWhitespaceExpected = normalizedExpected.replace(/\s+/g, "");
 
   return {
     lineCountsMatch: generatedLineCount === expectedLineCount,
