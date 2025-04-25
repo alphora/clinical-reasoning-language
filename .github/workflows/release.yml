@@ -1,4 +1,5 @@
-name: Release
+# This workflow validates releases by running tests. If tests fail, the workflow fails and no further automation is run.
+name: Validate Release
 
 on:
   release:
@@ -6,7 +7,8 @@ on:
   workflow_dispatch:
 
 jobs:
-  test-and-release:
+  test-release:
+    name: Run Tests Before Release
     runs-on: ubuntu-latest
 
     steps:
@@ -21,9 +23,4 @@ jobs:
         run: npm install
 
       - name: Run tests
-        run: npm test
-
-      # Only runs if tests pass
-      - name: Publish (placeholder)
-        if: success()
-        run: echo "Publishing release... (replace with your publish command)" 
+        run: npm test 
