@@ -1,4 +1,4 @@
-import { CPGL } from '../ast/types';
+import { CPGL } from "../ast/types";
 export interface ValidationError {
     message: string;
     location: {
@@ -11,7 +11,7 @@ export interface ValidationError {
             column: number;
         };
     };
-    severity: 'error' | 'warning';
+    severity: "error" | "warning";
 }
 export interface ValidationResult {
     isValid: boolean;

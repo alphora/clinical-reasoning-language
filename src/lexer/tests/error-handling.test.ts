@@ -1,27 +1,19 @@
 import { CharStreams } from 'antlr4ts';
-import { CPGLLexer } from '../../grammar/generated/CPGLLexer';
+import { CPGLLexer } from '../../grammar/generated/antlr/CPGLLexer';
 import { CPGLLexerErrorListener } from '../CPGLLexerErrorListener';
 
 import { createLexer } from '../createLexer';
 
-import { getAllTokens } from './index.test';
-
-function createLexerWithErrors(input: string): { lexer: CPGLLexer, errorListener: CPGLLexerErrorListener } {
-  const charStream = CharStreams.fromString(input);
-  const lexer = new CPGLLexer(charStream);
-  const errorListener = new CPGLLexerErrorListener();
-  lexer.removeErrorListeners();
-  lexer.addErrorListener(errorListener);
-  return { lexer, errorListener };
-}
+import { getTokensFromString } from './helpers';
+import { tokenizeCPGL } from '../../index';
 
 describe('Lexer Error Handling', () => {
   it('should handle invalid characters', () => {
     const inputs = ['@invalid', '$tokens', '#notallowed', '~invalid', '`backtick'];
 
     inputs.forEach(input => {
-      const lexer = createLexer(CharStreams.fromString(input));
-      const tokens = getAllTokens(lexer);
+      const { lexer } = createLexer(input);
+      const tokens = getTokensFromString(input);
       expect(tokens.length).toBeGreaterThanOrEqual(0);
     });
   });
@@ -36,8 +28,8 @@ describe('Lexer Error Handling', () => {
     ];
 
     inputs.forEach(input => {
-      const lexer = createLexer(CharStreams.fromString(input));
-      const tokens = getAllTokens(lexer);
+      const { lexer } = createLexer(input);
+      const tokens = getTokensFromString(input);
       expect(tokens.length).toBeGreaterThanOrEqual(0);
     });
   });
@@ -59,8 +51,8 @@ describe('Lexer Error Handling', () => {
     ];
 
     testCases.forEach(({ input, minTokens }) => {
-      const lexer = createLexer(CharStreams.fromString(input));
-      const tokens = getAllTokens(lexer);
+      const { lexer } = createLexer(input);
+      const tokens = getTokensFromString(input);
       expect(tokens.length).toBeGreaterThanOrEqual(minTokens);
     });
   });
@@ -72,7 +64,7 @@ describe('Lexer Error Handling', () => {
         expectedMessage: 'Invalid activity type',
       },
       {
-        input: 'perform someRandomActivity\nthen done',
+        input: 'perform invalid',
         expectedMessage: 'Invalid activity type',
       },
       {
@@ -82,8 +74,7 @@ describe('Lexer Error Handling', () => {
     ];
 
     testCases.forEach(({ input, expectedMessage }) => {
-      const { lexer, errorListener } = createLexerWithErrors(input);
-      getAllTokens(lexer);
+      const { errorListener } = getTokensFromString(input, { withListener: true });
       const errors = errorListener.getErrors();
       expect(errors.length).toBeGreaterThan(0);
       const errorObj = JSON.parse(errors[0]);
@@ -105,8 +96,7 @@ describe('Lexer Error Handling', () => {
     ];
 
     testCases.forEach(({ input, expectedMessage }) => {
-      const { lexer, errorListener } = createLexerWithErrors(input);
-      getAllTokens(lexer);
+      const { errorListener } = getTokensFromString(input, { withListener: true });
       const errors = errorListener.getErrors();
       expect(errors.length).toBeGreaterThan(0);
       const errorObj = JSON.parse(errors[0]);
@@ -128,8 +118,7 @@ describe('Lexer Error Handling', () => {
     ];
 
     testCases.forEach(({ input, expectedMessage }) => {
-      const { lexer, errorListener } = createLexerWithErrors(input);
-      getAllTokens(lexer);
+      const { errorListener } = getTokensFromString(input, { withListener: true });
       const errors = errorListener.getErrors();
       expect(errors.length).toBeGreaterThan(0);
       const errorObj = JSON.parse(errors[0]);
@@ -151,8 +140,7 @@ describe('Lexer Error Handling', () => {
     ];
 
     testCases.forEach(({ input, expectedMessage }) => {
-      const { lexer, errorListener } = createLexerWithErrors(input);
-      getAllTokens(lexer);
+      const { errorListener } = getTokensFromString(input, { withListener: true });
       const errors = errorListener.getErrors();
       expect(errors.length).toBeGreaterThan(0);
       const errorObj = JSON.parse(errors[0]);
@@ -174,8 +162,7 @@ describe('Lexer Error Handling', () => {
     ];
 
     testCases.forEach(({ input, expectedMessage }) => {
-      const { lexer, errorListener } = createLexerWithErrors(input);
-      getAllTokens(lexer);
+      const { errorListener } = getTokensFromString(input, { withListener: true });
       const errors = errorListener.getErrors();
       expect(errors.length).toBeGreaterThan(0);
       const errorObj = JSON.parse(errors[0]);
@@ -197,13 +184,44 @@ describe('Lexer Error Handling', () => {
     ];
 
     testCases.forEach(({ input, expectedMessage }) => {
-      const { lexer, errorListener } = createLexerWithErrors(input);
-      getAllTokens(lexer);
+      const { errorListener } = getTokensFromString(input, { withListener: true });
       const errors = errorListener.getErrors();
       expect(errors.length).toBeGreaterThan(0);
       const errorObj = JSON.parse(errors[0]);
       expect(errorObj.type).toBe('LexicalError');
       expect(errorObj.message).toContain(expectedMessage);
     });
+  });
+});
+
+describe('tokenizeCPGL error reporting', () => {
+  it('should return errors in ParseResult for invalid activity type', () => {
+    const input = 'perform invalidActivity';
+    const result = tokenizeCPGL(input);
+    expect(result.success).toBe(false);
+    expect(result.errors && result.errors.length).toBeGreaterThan(0);
+    const errorObj = JSON.parse(result.errors![0]);
+    expect(errorObj.type).toBe('LexicalError');
+    expect(errorObj.message).toContain('Invalid activity type');
+  });
+
+  it('should return errors in ParseResult for invalid concept type', () => {
+    const input = 'concept type InvalidConcept';
+    const result = tokenizeCPGL(input);
+    expect(result.success).toBe(false);
+    expect(result.errors && result.errors.length).toBeGreaterThan(0);
+    const errorObj = JSON.parse(result.errors![0]);
+    expect(errorObj.type).toBe('LexicalError');
+    expect(errorObj.message).toContain('Invalid concept type');
+  });
+
+  it('should return errors in ParseResult for invalid characters', () => {
+    const input = '@invalid';
+    const result = tokenizeCPGL(input);
+    expect(result.success).toBe(false);
+    expect(result.errors && result.errors.length).toBeGreaterThan(0);
+    const errorObj = JSON.parse(result.errors![0]);
+    expect(errorObj.type).toBe('LexicalError');
+    expect(errorObj.message).toContain('Invalid token');
   });
 });

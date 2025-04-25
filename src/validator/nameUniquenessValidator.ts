@@ -1,6 +1,6 @@
-import { CPGL } from '../ast/types';
+import { CPGL } from "../ast/types";
 
-import { ValidationError } from './validator';
+import { ValidationError } from "./validator";
 
 export class NameUniquenessValidator {
   validate(ast: CPGL): ValidationError[] {
@@ -14,69 +14,69 @@ export class NameUniquenessValidator {
 
     for (const statement of ast.statements) {
       switch (statement.type) {
-        case 'Decision':
+        case "Decision":
           if (!statement.name?.trim()) {
             errors.push({
-              message: 'Decision name cannot be empty',
+              message: "Decision name cannot be empty",
               location: statement.location,
-              severity: 'error',
+              severity: "error",
             });
           } else if (decisionNames.has(statement.name)) {
             errors.push({
               message: `Duplicate decision name: ${statement.name}`,
               location: statement.location,
-              severity: 'error',
+              severity: "error",
             });
           }
           decisionNames.add(statement.name);
           break;
 
-        case 'Concept':
+        case "Concept":
           if (!statement.name?.trim()) {
             errors.push({
-              message: 'Concept name cannot be empty',
+              message: "Concept name cannot be empty",
               location: statement.location,
-              severity: 'error',
+              severity: "error",
             });
           } else if (conceptNames.has(statement.name)) {
             errors.push({
               message: `Duplicate concept name: ${statement.name}`,
               location: statement.location,
-              severity: 'error',
+              severity: "error",
             });
           }
           conceptNames.add(statement.name);
           break;
 
-        case 'Activity':
+        case "Activity":
           if (!statement.name?.trim()) {
             errors.push({
-              message: 'Activity name cannot be empty',
+              message: "Activity name cannot be empty",
               location: statement.location,
-              severity: 'error',
+              severity: "error",
             });
           } else if (activityNames.has(statement.name)) {
             errors.push({
               message: `Duplicate activity name: ${statement.name}`,
               location: statement.location,
-              severity: 'error',
+              severity: "error",
             });
           }
           activityNames.add(statement.name);
           break;
 
-        case 'Terminology':
+        case "Terminology":
           if (!statement.name?.trim()) {
             errors.push({
-              message: 'Terminology name cannot be empty',
+              message: "Terminology name cannot be empty",
               location: statement.location,
-              severity: 'error',
+              severity: "error",
             });
           } else if (terminologyNames.has(statement.name)) {
             errors.push({
               message: `Duplicate terminology name: ${statement.name}`,
               location: statement.location,
-              severity: 'error',
+              severity: "error",
             });
           }
           terminologyNames.add(statement.name);

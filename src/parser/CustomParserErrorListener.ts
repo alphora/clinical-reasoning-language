@@ -1,5 +1,5 @@
-import { ANTLRErrorListener, RecognitionException, Recognizer, Token } from 'antlr4ts';
-import { ATNSimulator } from 'antlr4ts/atn/ATNSimulator';
+import { ANTLRErrorListener, RecognitionException, Recognizer, Token } from "antlr4ts";
+import { ATNSimulator } from "antlr4ts/atn/ATNSimulator";
 
 export class CustomParserErrorListener implements ANTLRErrorListener<Token> {
   private readonly errors: string[] = [];
@@ -10,7 +10,7 @@ export class CustomParserErrorListener implements ANTLRErrorListener<Token> {
     line: number,
     charPositionInLine: number,
     msg: string,
-    e: RecognitionException | undefined
+    e: RecognitionException | undefined,
   ): void {
     const errorMessage = JSON.stringify({
       type: "ParserError",
@@ -28,4 +28,4 @@ export class CustomParserErrorListener implements ANTLRErrorListener<Token> {
   getErrors(): string[] {
     return this.errors;
   }
-} 
+}

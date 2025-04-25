@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 
 const grammarPath = path.join(__dirname, '../src/grammar/CPGLLexer.g4');
-const outputPath = path.join(__dirname, '../src/grammar/activityTypes.json');
+const outputPath = path.join(__dirname, '../src/grammar/generated/types/activityTypes.json');
 
 const grammar = fs.readFileSync(grammarPath, 'utf8');
 const match = grammar.match(/const validTypes = \[((?:.|\n)*?)\];/);

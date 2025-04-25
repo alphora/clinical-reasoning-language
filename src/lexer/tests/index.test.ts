@@ -108,7 +108,7 @@
 import { Token } from 'antlr4ts';
 
 // Internal imports
-import { CPGLLexer } from '../../grammar/generated/CPGLLexer';
+import { CPGLLexer } from '../../grammar/generated/antlr/CPGLLexer';
 
 // Test suite imports
 import './basic-tokens.test';

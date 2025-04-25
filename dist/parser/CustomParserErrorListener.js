@@ -12,8 +12,8 @@ class CustomParserErrorListener {
             column: charPositionInLine,
             message: `Syntax error: ${msg}`,
             details: {
-                offendingSymbol: offendingSymbol?.text || "unknown"
-            }
+                offendingSymbol: offendingSymbol?.text || "unknown",
+            },
         });
         console.error(errorMessage);
         this.errors.push(errorMessage);

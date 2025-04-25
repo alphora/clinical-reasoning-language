@@ -1,4 +1,4 @@
-import { ASTNode } from './types';
+import { ASTNode } from "./types";
 interface ASTComparison {
     lineCountsMatch: boolean;
     whitespaceNormalizedMatch: boolean;

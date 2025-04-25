@@ -1,12 +1,11 @@
-import { CharStreams, CommonTokenStream } from 'antlr4ts';
-import { ParseTree } from 'antlr4ts/tree/ParseTree';
+import { ParseTree } from "antlr4ts/tree/ParseTree";
 
-import { CPGLAstBuilder } from './ast/builder';
-import { CPGL } from './ast/types';
-import { CPGLLexer } from './grammar/generated/CPGLLexer';
-import { createLexer } from './lexer/createLexer';
-import { Validator } from './validator/validator';
-import { createParser } from './parser/createParser';
+import { CPGLAstBuilder } from "./ast/builder";
+import { CPGL } from "./ast/types";
+import { CPGLLexer } from "./grammar/generated/antlr/CPGLLexer";
+import { createLexer } from "./lexer/createLexer";
+import { createParser } from "./parser/createParser";
+import { Validator } from "./validator/validator";
 
 export interface Token {
   line: number;
@@ -28,7 +27,7 @@ export interface ParseResult<T> {
  */
 export function tokenizeCPGL(input: string): ParseResult<Token[]> {
   try {
-    const lexer = createLexer(CharStreams.fromString(input));
+    const { lexer, errorListener } = createLexer(input);
     const tokens: Token[] = [];
     let token = lexer.nextToken();
 
@@ -40,12 +39,16 @@ export function tokenizeCPGL(input: string): ParseResult<Token[]> {
           line: token.line,
           column: token.charPositionInLine,
           type: typeName,
-          text: token.text ?? '',
+          text: token.text ?? "",
         });
       }
       token = lexer.nextToken();
     }
 
+    const errors = errorListener.getErrors();
+    if (errors.length > 0) {
+      return { success: false, errors };
+    }
     return { success: true, result: tokens };
   } catch (error) {
     return { success: false, errors: [error instanceof Error ? error.message : String(error)] };
@@ -59,11 +62,12 @@ export function tokenizeCPGL(input: string): ParseResult<Token[]> {
  */
 export function parseCPGL(input: string): ParseResult<ParseTree> {
   try {
-    const lexer = createLexer(CharStreams.fromString(input));
-    const tokenStream = new CommonTokenStream(lexer);
-    const parser = createParser(tokenStream);
+    const { parser, lexerErrorListener, parserErrorListener } = createParser(input);
     const tree = parser.cpgl();
-
+    const errors = [...lexerErrorListener.getErrors(), ...parserErrorListener.getErrors()];
+    if (errors.length > 0) {
+      return { success: false, errors };
+    }
     return { success: true, result: tree };
   } catch (error) {
     return { success: false, errors: [error instanceof Error ? error.message : String(error)] };
@@ -77,13 +81,14 @@ export function parseCPGL(input: string): ParseResult<ParseTree> {
  */
 export function buildCPGL(input: string): ParseResult<CPGL> {
   try {
-    const lexer = createLexer(CharStreams.fromString(input));
-    const tokenStream = new CommonTokenStream(lexer);
-    const parser = createParser(tokenStream);
+    const { parser, lexerErrorListener, parserErrorListener } = createParser(input);
     const tree = parser.cpgl();
     const builder = new CPGLAstBuilder();
     const ast = builder.visit(tree) as CPGL;
-
+    const errors = [...lexerErrorListener.getErrors(), ...parserErrorListener.getErrors()];
+    if (errors.length > 0) {
+      return { success: false, errors };
+    }
     return { success: true, result: ast };
   } catch (error) {
     return { success: false, errors: [error instanceof Error ? error.message : String(error)] };
@@ -97,26 +102,25 @@ export function buildCPGL(input: string): ParseResult<CPGL> {
  */
 export function validateCPGL(input: string): ParseResult<CPGL> {
   try {
-    const lexer = createLexer(CharStreams.fromString(input));
-    const tokenStream = new CommonTokenStream(lexer);
-    const parser = createParser(tokenStream);
+    const { parser, lexerErrorListener, parserErrorListener } = createParser(input);
     const tree = parser.cpgl();
     const builder = new CPGLAstBuilder();
     const ast = builder.visit(tree) as CPGL;
-
+    const errors = [...lexerErrorListener.getErrors(), ...parserErrorListener.getErrors()];
+    if (errors.length > 0) {
+      return { success: false, errors };
+    }
     const validator = new Validator();
     const validationResult = validator.validate(ast);
-
     if (!validationResult.isValid) {
       return {
         success: false,
         errors: [
-          ...validationResult.errors.map(e => e.message),
-          ...validationResult.warnings.map(w => w.message),
+          ...validationResult.errors.map((e) => e.message),
+          ...validationResult.warnings.map((w) => w.message),
         ],
       };
     }
-
     return { success: true, result: ast };
   } catch (error) {
     return { success: false, errors: [error instanceof Error ? error.message : String(error)] };

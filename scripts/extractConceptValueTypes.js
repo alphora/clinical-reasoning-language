@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 
 const grammarPath = path.join(__dirname, '../src/grammar/CPGLLexer.g4');
-const outputPath = path.join(__dirname, '../src/grammar/conceptValueTypes.json');
+const outputPath = path.join(__dirname, '../src/grammar/generated/types/conceptValueTypes.json');
 
 const grammar = fs.readFileSync(grammarPath, 'utf8');
 const match = grammar.match(/CONCEPT_VALUE_TYPE[\s\S]*?const validTypes = \[((?:.|\n)*?)\];/);

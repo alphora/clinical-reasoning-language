@@ -199,4 +199,38 @@ const result = validateCPGL(`
 ### Known Issues
 - **Pretty mode in AST CLI is currently broken** and will print a warning if used.
 
-[0.5.0]: https://github.com/cqis/cpgl/releases/tag/v0.5.0 
+[0.5.0]: https://github.com/cqis/cpgl/releases/tag/v0.5.0
+
+## [0.5.1] - 2024-06-10
+
+### Fixed
+- **Error message handling:** Improved error reporting and error message clarity throughout the lexer, especially in `CPGLLexerErrorListener`.
+- Fixed bug in how the error listener accesses dynamically generated type files.
+- Fixed build and test issues related to the new location of auto-generated files and dynamic type imports.
+- Ensured all grammar-driven type files (activity, concept, value) are correctly included and referenced in builds and tests.
+- Improved robustness of error handling for missing or misconfigured type files.
+- Fixed test paths and removed unused files.
+
+### Technical Improvements
+- Refactored error listener to use dynamically generated JSON type files for activity, concept, and value types.
+- Hardened error handling for missing or invalid type files, with more actionable error messages.
+- Improved maintainability by moving auto-generated files to a more standard location.
+
+[0.5.1]: https://github.com/cqis/cpgl/releases/tag/v0.5.1
+
+## [0.5.2] - 2025-04-25
+
+### Fixed
+- **Parser & Error Emission:**  Fixed a bug in the test helper `parseInput` that caused parser errors not to be emitted or captured correctly. The helper now uses the correct parser API, ensuring that error listeners and error reporting work as intended in all AST and parser tests.
+- All parser and lexer tests now pass, confirming correct error emission and reporting.
+
+### Internal
+- Refactored test helpers to use the new `createParser(input: string)` API.
+- Removed legacy lexer and token stream instantiation from test code.
+
+Commits included since v0.5.1:
+- db66606 Passing parser tests
+- b4524a1 All lexer tests passing
+- 5b0d850 Restore dist/ to .gitignore after GitHub Publish
+- a93a445 Include dist for GitHub Publish
+- 1c6eb97 Release documentation 

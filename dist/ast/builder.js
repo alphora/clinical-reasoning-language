@@ -2,7 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CPGLAstBuilder = void 0;
 const AbstractParseTreeVisitor_1 = require("antlr4ts/tree/AbstractParseTreeVisitor");
-const CPGLParser_1 = require("../grammar/generated/CPGLParser");
+const CPGLParser_1 = require("../grammar/generated/antlr/CPGLParser");
 const types_1 = require("./types");
 function getLocation(ctx) {
     const start = ctx.start;
@@ -10,27 +10,29 @@ function getLocation(ctx) {
     return {
         start: {
             line: start.line,
-            column: start.charPositionInLine
+            column: start.charPositionInLine,
         },
         end: {
             line: stop.line,
-            column: stop.charPositionInLine + (stop.text?.length ?? 0)
-        }
+            column: stop.charPositionInLine + (stop.text?.length ?? 0),
+        },
     };
 }
 class CPGLAstBuilder extends AbstractParseTreeVisitor_1.AbstractParseTreeVisitor {
-    defaultResult() { return null; }
+    defaultResult() {
+        return null;
+    }
     visitCpgl(ctx) {
-        const statements = ctx.statement().map(s => this.visit(s));
+        const statements = ctx.statement().map((s) => this.visit(s));
         return { type: types_1.FileType.type, statements, location: getLocation(ctx) };
     }
     visitDecisionStatement(ctx) {
-        const name = (ctx.decisionIdentifier().text.slice(1, -1));
+        const name = ctx.decisionIdentifier().text.slice(1, -1);
         const body = this.visit(ctx.decisionBody());
         return { type: types_1.DecisionType.type, name, body, location: getLocation(ctx) };
     }
     visitDecisionBody(ctx) {
-        const statements = ctx.whenBlock().map(w => this.visit(w));
+        const statements = ctx.whenBlock().map((w) => this.visit(w));
         return { type: types_1.DecisionBodyType.type, statements, location: getLocation(ctx) };
     }
     visitWhenWithBody(ctx) {
@@ -43,15 +45,15 @@ class CPGLAstBuilder extends AbstractParseTreeVisitor_1.AbstractParseTreeVisitor
         const action = this.visit(ctx.singleActionStatement());
         return { type: types_1.WhenBlockType.type, conceptName, body: action, location: getLocation(ctx) };
     }
-    visitNestedWhenBlock(ctx) { return this.visit(ctx.whenBlock()); }
+    visitNestedWhenBlock(ctx) {
+        return this.visit(ctx.whenBlock());
+    }
     visitBlockAction(ctx) {
         const result = this.visit(ctx.actionStatement());
         return result;
     }
     visitBlockBody(ctx) {
-        const qualifier = ctx.anyOrAllClause()
-            ? ctx.anyOrAllClause().text.slice(0, -1)
-            : undefined;
+        const qualifier = ctx.anyOrAllClause() ? ctx.anyOrAllClause().text.slice(0, -1) : undefined;
         const statements = [];
         for (const stmtCtx of ctx.blockStatement()) {
             if (stmtCtx instanceof CPGLParser_1.NestedWhenBlockContext) {
@@ -83,9 +85,9 @@ class CPGLAstBuilder extends AbstractParseTreeVisitor_1.AbstractParseTreeVisitor
             action = this.visitUseStatement(useStmt);
         }
         else {
-            throw new Error('ActionStatement must have doStatement or useStatement');
+            throw new Error("ActionStatement must have doStatement or useStatement");
         }
-        return { type: 'ActionStatement', action, location: getLocation(ctx) };
+        return { type: "ActionStatement", action, location: getLocation(ctx) };
     }
     visitDoStatement(ctx) {
         const activityName = ctx.activityReference().text.slice(1, -1);
@@ -108,20 +110,25 @@ class CPGLAstBuilder extends AbstractParseTreeVisitor_1.AbstractParseTreeVisitor
         }
         else if (ctx.backtickString()) {
             definition = {
-                type: 'TerminologyFreeText',
+                type: "TerminologyFreeText",
                 value: ctx.backtickString().text.slice(1, -1),
-                location: getLocation(ctx)
+                location: getLocation(ctx),
             };
         }
-        return { type: types_1.TerminologyType.type, name, definition: definition, location: getLocation(ctx) };
+        return {
+            type: types_1.TerminologyType.type,
+            name,
+            definition: definition,
+            location: getLocation(ctx),
+        };
     }
     visitTerminologyValueset(ctx) {
         const valuesetName = ctx.identifier().text.slice(1, -1);
         return { type: types_1.TerminologyValuesetType.type, valuesetName, location: getLocation(ctx) };
     }
     visitTerminologySystemCode(ctx) {
-        let system = '';
-        let code = '';
+        let system = "";
+        let code = "";
         if (ctx.backtickString && ctx.backtickString().length === 2) {
             const systemNode = ctx.backtickString(0);
             const codeNode = ctx.backtickString(1);
@@ -161,13 +168,21 @@ class CPGLAstBuilder extends AbstractParseTreeVisitor_1.AbstractParseTreeVisitor
                 }
             }
         }
-        return { type: 'Activity', name, perform, terminologyReference, activityTypeValue, rationale, location: getLocation(ctx) };
+        return {
+            type: "Activity",
+            name,
+            perform,
+            terminologyReference,
+            activityTypeValue,
+            rationale,
+            location: getLocation(ctx),
+        };
     }
     visitConceptStatement(ctx) {
         const name = ctx.conceptIdentifier().text.slice(1, -1);
         const bodyCtx = ctx.conceptBody();
-        const conceptType = (bodyCtx.hasTypeLine().CONCEPT_TYPE().text);
-        const valueType = (bodyCtx.hasValueTypeLine().CONCEPT_VALUE_TYPE().text);
+        const conceptType = bodyCtx.hasTypeLine().CONCEPT_TYPE().text;
+        const valueType = bodyCtx.hasValueTypeLine().CONCEPT_VALUE_TYPE().text;
         let provenance = undefined;
         if (bodyCtx.provenanceLine?.()) {
             const provCtx = bodyCtx.provenanceLine?.();
@@ -187,19 +202,31 @@ class CPGLAstBuilder extends AbstractParseTreeVisitor_1.AbstractParseTreeVisitor
         let definition;
         if (bodyCtx.codedByLine && bodyCtx.codedByLine()) {
             const termRef = bodyCtx.codedByLine().terminologyReference().text.slice(1, -1);
-            definition = { type: types_1.CodedByDefinitionType.type, terminologyName: termRef, location: getLocation(bodyCtx.codedByLine()) };
+            definition = {
+                type: types_1.CodedByDefinitionType.type,
+                terminologyName: termRef,
+                location: getLocation(bodyCtx.codedByLine()),
+            };
         }
         else if (bodyCtx.inferredByLine && bodyCtx.inferredByLine()) {
             const infCtx = bodyCtx.inferredByLine();
             if (!infCtx) {
-                throw new Error('ConceptStatement: inferredByLine() unexpectedly returned undefined');
+                throw new Error("ConceptStatement: inferredByLine() unexpectedly returned undefined");
             }
             definition = this.visit(infCtx);
         }
         else {
-            throw new Error('ConceptStatement must have either codedByLine or inferredByLine');
+            throw new Error("ConceptStatement must have either codedByLine or inferredByLine");
         }
-        return { type: 'Concept', name, conceptType, valueType, provenance, definition, location: getLocation(ctx) };
+        return {
+            type: "Concept",
+            name,
+            conceptType,
+            valueType,
+            provenance,
+            definition,
+            location: getLocation(ctx),
+        };
     }
     visitInferredByLine(ctx) {
         const defCtx = ctx.inferredBody();
@@ -214,7 +241,7 @@ class CPGLAstBuilder extends AbstractParseTreeVisitor_1.AbstractParseTreeVisitor
             type: types_1.InferredByConceptType.type,
             pattern: pat,
             concept,
-            location: getLocation(ctx)
+            location: getLocation(ctx),
         };
     }
     visitDefinitionLogic(ctx) {
@@ -226,14 +253,16 @@ class CPGLAstBuilder extends AbstractParseTreeVisitor_1.AbstractParseTreeVisitor
         return this.visit(ctx.informalOr());
     }
     visitInformalOr(ctx) {
-        const terms = ctx.informalAnd().map(a => this.visit(a));
+        const terms = ctx.informalAnd().map((a) => this.visit(a));
         if (ctx.OR().length) {
             return { type: types_1.InformalOrType.type, terms, location: getLocation(ctx) };
         }
         return terms[0];
     }
     visitInformalAnd(ctx) {
-        const terms = ctx.informalNot().map(n => this.visit(n));
+        const terms = ctx
+            .informalNot()
+            .map((n) => this.visit(n));
         if (ctx.AND().length) {
             return { type: types_1.InformalAndType.type, terms, location: getLocation(ctx) };
         }
@@ -241,7 +270,11 @@ class CPGLAstBuilder extends AbstractParseTreeVisitor_1.AbstractParseTreeVisitor
     }
     visitInformalNot(ctx) {
         if (ctx.NOT()) {
-            return { type: types_1.NotExpressionType.type, expression: this.visit(ctx.informalNot()), location: getLocation(ctx) };
+            return {
+                type: types_1.NotExpressionType.type,
+                expression: this.visit(ctx.informalNot()),
+                location: getLocation(ctx),
+            };
         }
         return this.visit(ctx.atom());
     }

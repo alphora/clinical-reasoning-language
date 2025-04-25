@@ -1,4 +1,4 @@
-import { ValidationError } from './validator';
+import { ValidationError } from "./validator";
 //TODO: not working
 type NodeId = string;
 type AdjacencyList = Map<NodeId, Set<NodeId>>;
@@ -42,11 +42,11 @@ export class CycleDetector {
     }
 
     // Detect cycles in decisions
-    const decisionCycles = this.detectCycles(this.decisionAdjacencyList, 'Decision');
+    const decisionCycles = this.detectCycles(this.decisionAdjacencyList, "Decision");
     errors.push(...decisionCycles);
 
     // Detect cycles in concepts
-    const conceptCycles = this.detectCycles(this.conceptAdjacencyList, 'Concept');
+    const conceptCycles = this.detectCycles(this.conceptAdjacencyList, "Concept");
     errors.push(...conceptCycles);
 
     return errors;
@@ -75,12 +75,12 @@ export class CycleDetector {
 
           // Only report if it's a true cycle (returns to start)
           if (cycle[0] === cycle[cycle.length - 1]) {
-            const cyclePath = cycle.map(node => `${nodeType}:${node}`).join(' -> ');
+            const cyclePath = cycle.map((node) => `${nodeType}:${node}`).join(" -> ");
             if (!cycles.has(cyclePath)) {
               cycles.add(cyclePath);
               errors.push({
                 message: `Cycle detected in ${nodeType.toLowerCase()} references: ${cyclePath}`,
-                severity: 'error',
+                severity: "error",
                 location: { start: { line: 1, column: 1 }, end: { line: 1, column: 1 } },
               });
             }

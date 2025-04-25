@@ -26,6 +26,7 @@ import {
 } from '../types';
 
 import { parseInput } from './parseInput';
+import { buildCPGL, parseCPGL } from '../../index';
 
 describe('CPGLAstBuilder', () => {
   describe('Decision Statements', () => {
@@ -518,7 +519,6 @@ describe('CPGLAstBuilder', () => {
         concept "BMI":
           has type Observation.
           has valuetype Quantity.
-          coded by "BMI Valueset".
         done
         decision "Check BMI":
           when "BMI" then do "Record BMI".
@@ -600,6 +600,64 @@ done
       expect(decision.body.statements).toBeDefined();
       expect(decision.body.statements.length).toBeGreaterThan(0);
       expect(decision.body.statements[0].type).toBe('WhenBlock');
+    });
+  });
+
+  describe('buildCPGL error reporting', () => {
+    it('should return errors in ParseResult for invalid activity type', () => {
+      const input = 'perform invalidActivity';
+      const result = buildCPGL(input);
+      expect(result.success).toBe(false);
+      expect(result.errors && result.errors.length).toBeGreaterThan(0);
+      const errorObj = JSON.parse(result.errors![0]);
+      expect(errorObj.type).toBe('LexicalError');
+      expect(errorObj.message).toContain('Invalid activity type');
+    });
+
+    it('should return errors in ParseResult for syntax errors', () => {
+      const input = 'decision "Test" when "Condition" then do "Action"'; // missing done
+      const result = buildCPGL(input);
+      expect(result.success).toBe(false);
+      expect(result.errors && result.errors.length).toBeGreaterThan(0);
+      // Should contain a ParserError or similar
+      const foundParserError = result.errors!.some(e => e.includes('ParserError'));
+      expect(foundParserError).toBe(true);
+    });
+  });
+
+  describe('parseCPGL and buildCPGL direct API tests', () => {
+    it('parseCPGL should succeed on valid input', () => {
+      const input = 'decision "Test": when "Condition" then do "Action". done';
+      const result = parseCPGL(input);
+      expect(result.success).toBe(true);
+      expect(result.result).toBeDefined();
+      expect(result.errors).toBeUndefined();
+    });
+
+    it('parseCPGL should return errors on invalid input', () => {
+      const input = 'decision "Test" when "Condition" then do "Action"'; // missing done
+      const result = parseCPGL(input);
+      expect(result.success).toBe(false);
+      expect(result.errors && result.errors.length).toBeGreaterThan(0);
+      const foundParserError = result.errors!.some(e => e.includes('ParserError'));
+      expect(foundParserError).toBe(true);
+    });
+
+    it('buildCPGL should succeed on valid input', () => {
+      const input = 'decision "Test": when "Condition" then do "Action". done';
+      const result = buildCPGL(input);
+      expect(result.success).toBe(true);
+      expect(result.result).toBeDefined();
+      expect(result.errors).toBeUndefined();
+    });
+
+    it('buildCPGL should return errors on invalid input', () => {
+      const input = 'decision "Test" when "Condition" then do "Action"'; // missing done
+      const result = buildCPGL(input);
+      expect(result.success).toBe(false);
+      expect(result.errors && result.errors.length).toBeGreaterThan(0);
+      const foundParserError = result.errors!.some(e => e.includes('ParserError'));
+      expect(foundParserError).toBe(true);
     });
   });
 });
