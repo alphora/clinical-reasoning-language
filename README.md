@@ -282,7 +282,7 @@ npm run build
 The package is distributed via GitHub Releases. To create a new release:
 
 1. Create a new branch (e.g., `release/v0.1.0`)
-1. Generate a CHANGELOG: "I'm creating a new release release/>version<, generate and append to the CHANGELOG.  Use git to determine the changes from directly after the last tag to now. Use git to discover all the commits between the prior release and now." (e.g., v0.1.0)
+1. Generate a CHANGELOG: "I'm creating a new release release/>version<, generate and append to the CHANGELOG.  Use git to discover all the commits between right after the prior release and now. Do not include the following information: - Restored `dist/` to `.gitignore` after publish to keep the main branch clean." (e.g., v0.1.0)
 1. Commit all changes
 1. Run the automated release script:
    ```bash
