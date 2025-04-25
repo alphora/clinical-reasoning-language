@@ -1,5 +1,5 @@
-import { ParseTree } from 'antlr4ts/tree/ParseTree';
-import { CPGL } from './ast/types';
+import { ParseTree } from "antlr4ts/tree/ParseTree";
+import { CPGL } from "./ast/types";
 export interface Token {
     line: number;
     column: number;

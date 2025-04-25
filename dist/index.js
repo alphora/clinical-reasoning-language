@@ -4,15 +4,14 @@ exports.tokenizeCPGL = tokenizeCPGL;
 exports.parseCPGL = parseCPGL;
 exports.buildCPGL = buildCPGL;
 exports.validateCPGL = validateCPGL;
-const antlr4ts_1 = require("antlr4ts");
 const builder_1 = require("./ast/builder");
 const CPGLLexer_1 = require("./grammar/generated/antlr/CPGLLexer");
 const createLexer_1 = require("./lexer/createLexer");
-const validator_1 = require("./validator/validator");
 const createParser_1 = require("./parser/createParser");
+const validator_1 = require("./validator/validator");
 function tokenizeCPGL(input) {
     try {
-        const lexer = (0, createLexer_1.createLexer)(antlr4ts_1.CharStreams.fromString(input));
+        const { lexer, errorListener } = (0, createLexer_1.createLexer)(input);
         const tokens = [];
         let token = lexer.nextToken();
         while (token.type !== CPGLLexer_1.CPGLLexer.EOF) {
@@ -22,10 +21,14 @@ function tokenizeCPGL(input) {
                     line: token.line,
                     column: token.charPositionInLine,
                     type: typeName,
-                    text: token.text ?? '',
+                    text: token.text ?? "",
                 });
             }
             token = lexer.nextToken();
+        }
+        const errors = errorListener.getErrors();
+        if (errors.length > 0) {
+            return { success: false, errors };
         }
         return { success: true, result: tokens };
     }
@@ -35,10 +38,12 @@ function tokenizeCPGL(input) {
 }
 function parseCPGL(input) {
     try {
-        const lexer = (0, createLexer_1.createLexer)(antlr4ts_1.CharStreams.fromString(input));
-        const tokenStream = new antlr4ts_1.CommonTokenStream(lexer);
-        const parser = (0, createParser_1.createParser)(tokenStream);
+        const { parser, lexerErrorListener, parserErrorListener } = (0, createParser_1.createParser)(input);
         const tree = parser.cpgl();
+        const errors = [...lexerErrorListener.getErrors(), ...parserErrorListener.getErrors()];
+        if (errors.length > 0) {
+            return { success: false, errors };
+        }
         return { success: true, result: tree };
     }
     catch (error) {
@@ -47,12 +52,14 @@ function parseCPGL(input) {
 }
 function buildCPGL(input) {
     try {
-        const lexer = (0, createLexer_1.createLexer)(antlr4ts_1.CharStreams.fromString(input));
-        const tokenStream = new antlr4ts_1.CommonTokenStream(lexer);
-        const parser = (0, createParser_1.createParser)(tokenStream);
+        const { parser, lexerErrorListener, parserErrorListener } = (0, createParser_1.createParser)(input);
         const tree = parser.cpgl();
         const builder = new builder_1.CPGLAstBuilder();
         const ast = builder.visit(tree);
+        const errors = [...lexerErrorListener.getErrors(), ...parserErrorListener.getErrors()];
+        if (errors.length > 0) {
+            return { success: false, errors };
+        }
         return { success: true, result: ast };
     }
     catch (error) {
@@ -61,20 +68,22 @@ function buildCPGL(input) {
 }
 function validateCPGL(input) {
     try {
-        const lexer = (0, createLexer_1.createLexer)(antlr4ts_1.CharStreams.fromString(input));
-        const tokenStream = new antlr4ts_1.CommonTokenStream(lexer);
-        const parser = (0, createParser_1.createParser)(tokenStream);
+        const { parser, lexerErrorListener, parserErrorListener } = (0, createParser_1.createParser)(input);
         const tree = parser.cpgl();
         const builder = new builder_1.CPGLAstBuilder();
         const ast = builder.visit(tree);
+        const errors = [...lexerErrorListener.getErrors(), ...parserErrorListener.getErrors()];
+        if (errors.length > 0) {
+            return { success: false, errors };
+        }
         const validator = new validator_1.Validator();
         const validationResult = validator.validate(ast);
         if (!validationResult.isValid) {
             return {
                 success: false,
                 errors: [
-                    ...validationResult.errors.map(e => e.message),
-                    ...validationResult.warnings.map(w => w.message),
+                    ...validationResult.errors.map((e) => e.message),
+                    ...validationResult.warnings.map((w) => w.message),
                 ],
             };
         }
