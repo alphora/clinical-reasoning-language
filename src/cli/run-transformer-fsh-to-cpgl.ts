@@ -8,13 +8,9 @@ const inputPath = process.argv[2]
 
 (async () => {
   try {
-    console.log(`[DEBUGGING] Loading FSH project from: ${inputPath}`);
     const cpglOutput = transformFSHToCPGL(inputPath);
-    console.log('[DEBUGGING] Generated CPG-L output:\n');
-    // Trim trailing newlines and ensure only a single newline at the end
     process.stdout.write(cpglOutput.replace(/\n+$/, '') + '\n');
   } catch (err) {
-    console.error('[DEBUGGING] Error in transformer CLI:', err);
     process.exit(1);
   }
 })(); 

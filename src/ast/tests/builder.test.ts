@@ -216,19 +216,9 @@ describe('CPGLAstBuilder', () => {
         `;
 
         const result = parseInput(input);
-        console.log('[DEBUGGING] blockBody (mixture):', JSON.stringify(result, null, 2));
         const decision = result.statements[0] as Decision;
         const whenBlock = decision.body.statements[0] as WhenBlock;
         const blockBody = whenBlock.body as BlockBody;
-        console.log('[DEBUGGING] blockBody:', blockBody);
-        console.log('[DEBUGGING] blockBody.statements:', blockBody?.statements);
-        if (!blockBody || !blockBody.statements) {
-          console.log('[DEBUGGING] blockBody or blockBody.statements is null/undefined');
-        } else {
-          blockBody.statements.forEach((stmt, idx) => {
-            console.log(`[DEBUGGING] blockBody.statements[${idx}]:`, stmt);
-          });
-        }
         expect(blockBody && blockBody.statements).toBeTruthy();
         expect(blockBody.statements).toHaveLength(4);
         const firstAction = blockBody.statements[0] as ActionStatement;
@@ -259,19 +249,9 @@ describe('CPGLAstBuilder', () => {
           done
         `;
         const result = parseInput(input);
-        console.log('[DEBUGGING] blockBody (do only):', JSON.stringify(result, null, 2));
         const decision = result.statements[0] as Decision;
         const whenBlock = decision.body.statements[0] as WhenBlock;
         const blockBody = whenBlock.body as BlockBody;
-        console.log('[DEBUGGING] blockBody:', blockBody);
-        console.log('[DEBUGGING] blockBody.statements:', blockBody?.statements);
-        if (!blockBody || !blockBody.statements) {
-          console.log('[DEBUGGING] blockBody or blockBody.statements is null/undefined');
-        } else {
-          blockBody.statements.forEach((stmt, idx) => {
-            console.log(`[DEBUGGING] blockBody.statements[${idx}]:`, stmt);
-          });
-        }
         expect(blockBody && blockBody.statements).toBeTruthy();
         expect(blockBody.statements).toHaveLength(2);
         const firstAction = blockBody.statements[0] as ActionStatement;
@@ -294,19 +274,9 @@ describe('CPGLAstBuilder', () => {
           done
         `;
         const result = parseInput(input);
-        console.log('[DEBUGGING] blockBody (use only):', JSON.stringify(result, null, 2));
         const decision = result.statements[0] as Decision;
         const whenBlock = decision.body.statements[0] as WhenBlock;
         const blockBody = whenBlock.body as BlockBody;
-        console.log('[DEBUGGING] blockBody:', blockBody);
-        console.log('[DEBUGGING] blockBody.statements:', blockBody?.statements);
-        if (!blockBody || !blockBody.statements) {
-          console.log('[DEBUGGING] blockBody or blockBody.statements is null/undefined');
-        } else {
-          blockBody.statements.forEach((stmt, idx) => {
-            console.log(`[DEBUGGING] blockBody.statements[${idx}]:`, stmt);
-          });
-        }
         expect(blockBody && blockBody.statements).toBeTruthy();
         expect(blockBody.statements).toHaveLength(2);
         const firstAction = blockBody.statements[0] as ActionStatement;
