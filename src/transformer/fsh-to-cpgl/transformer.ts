@@ -8,6 +8,12 @@ import { importConfiguration } from "fsh-sushi/dist/import/importConfiguration";
 import { importText } from "fsh-sushi/dist/import/importText";
 import { RawFSH } from "fsh-sushi/dist/import/RawFSH";
 
+import { mapConcept } from "./mapping/concept";
+import { mapPlanDefinitionToDecision } from "./mapping/planDefinition";
+import { mapTerminology } from "./mapping/terminology";
+import { ActivityDeduplicator } from "./utils/activityDeduplication";
+import { toIdentifier } from "./utils/fshPathFunctions";
+
 /**
  * Transform FSH (parsed with SUSHI) to CPG-L.
  * @param fshProjectDir The path to a SUSHI-compatible FSH project directory
@@ -46,8 +52,7 @@ export function transformFSHToCPGL(fshProjectDir: string): string {
   const instances = tank.getAllInstances();
 
   // Collect all activities and do references for file-wide deduplication and postprocessing
-  const activityDeduplicator =
-    new (require("./utils/activityDeduplication").ActivityDeduplicator)();
+  const activityDeduplicator = new ActivityDeduplicator();
   const decisions: string[] = [];
   const allActivities: {
     id: string;
@@ -59,16 +64,7 @@ export function transformFSHToCPGL(fshProjectDir: string): string {
   const allDoReferences: { id: string; placeholder: string }[] = [];
   const allConceptIdentifiers = new Set<string>();
 
-  const { mapPlanDefinitionToDecision } = require("./mapping/planDefinition");
-  const { mapConcept } = require("./mapping/concept");
-  const { mapTerminology } = require("./mapping/terminology");
-  const { toIdentifier } = require("./utils/fshPathFunctions");
-
-  let planDefCount = 0;
   for (const inst of instances) {
-    if (inst.instanceOf && inst.instanceOf.toLowerCase().includes("plandefinition")) {
-      planDefCount++;
-    }
     const planDefResult = mapPlanDefinitionToDecision(inst, instances);
     decisions.push(planDefResult.decision);
     for (const act of planDefResult.activities) {
@@ -89,10 +85,10 @@ export function transformFSHToCPGL(fshProjectDir: string): string {
           rule.path &&
           rule.path.endsWith(".condition[=].expression.expression") &&
           "value" in rule &&
-          typeof (rule as any).value === "string" &&
-          (rule as any).value
+          typeof (rule as { value: unknown }).value === "string" &&
+          (rule as { value: unknown }).value
         ) {
-          allConceptIdentifiers.add((rule as any).value);
+          allConceptIdentifiers.add((rule as { value: string }).value);
         }
       }
     }
@@ -101,8 +97,11 @@ export function transformFSHToCPGL(fshProjectDir: string): string {
   // Collect all terminology blocks for activities
   const activityTerminologies: { identifier: string; code: string; system: string }[] = [];
   for (const act of allActivities) {
-    if ((act as any).terminology && (act as any).terminology.code) {
-      activityTerminologies.push((act as any).terminology);
+    const terminology = (
+      act as { terminology?: { identifier: string; code: string; system: string } }
+    ).terminology;
+    if (terminology && typeof terminology.code === "string") {
+      activityTerminologies.push(terminology);
     }
   }
 

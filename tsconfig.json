@@ -16,7 +16,11 @@
     "removeComments": true,
     "noEmitOnError": true,
     "incremental": false,
-    "composite": false
+    "composite": false,
+    "typeRoots": [
+      "./types",
+      "./node_modules/@types"
+    ]
   },
   "include": [
     "src/**/*.ts",
