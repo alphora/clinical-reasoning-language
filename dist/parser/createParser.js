@@ -12,6 +12,6 @@ function createParser(input) {
     const parser = new CPGLParser_1.CPGLParser(tokenStream);
     parser.removeErrorListeners();
     parser.addErrorListener(parserErrorListener);
-    return { parser, lexerErrorListener, parserErrorListener };
+    return { parser, parserErrorListener, lexerErrorListener };
 }
 //# sourceMappingURL=createParser.js.map

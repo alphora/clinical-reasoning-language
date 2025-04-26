@@ -19,6 +19,22 @@ function getLocation(ctx) {
     };
 }
 class CPGLAstBuilder extends AbstractParseTreeVisitor_1.AbstractParseTreeVisitor {
+    constructor() {
+        super(...arguments);
+        this.errors = [];
+    }
+    reportError(type, message, location, details) {
+        const errorObj = {
+            type,
+            message,
+            location,
+            details,
+        };
+        this.errors.push(JSON.stringify(errorObj));
+    }
+    getErrors() {
+        return this.errors;
+    }
     defaultResult() {
         return null;
     }
@@ -179,10 +195,37 @@ class CPGLAstBuilder extends AbstractParseTreeVisitor_1.AbstractParseTreeVisitor
         };
     }
     visitConceptStatement(ctx) {
-        const name = ctx.conceptIdentifier().text.slice(1, -1);
-        const bodyCtx = ctx.conceptBody();
-        const conceptType = bodyCtx.hasTypeLine().CONCEPT_TYPE().text;
-        const valueType = bodyCtx.hasValueTypeLine().CONCEPT_VALUE_TYPE().text;
+        const name = ctx.conceptIdentifier?.()?.text?.slice(1, -1);
+        const bodyCtx = ctx.conceptBody?.();
+        if (!name || !bodyCtx) {
+            this.reportError("AstError", "ConceptStatement: missing conceptIdentifier or conceptBody", getLocation(ctx));
+            return null;
+        }
+        const typeLine = bodyCtx.hasTypeLine?.();
+        const valueTypeLine = bodyCtx.hasValueTypeLine?.();
+        if (!typeLine || !valueTypeLine) {
+            this.reportError("AstError", "ConceptStatement: missing type or valueType line", getLocation(ctx));
+            return null;
+        }
+        let conceptTypeToken, valueTypeToken;
+        try {
+            conceptTypeToken = typeLine.CONCEPT_TYPE();
+        }
+        catch {
+            conceptTypeToken = undefined;
+        }
+        try {
+            valueTypeToken = valueTypeLine.CONCEPT_VALUE_TYPE();
+        }
+        catch {
+            valueTypeToken = undefined;
+        }
+        if (!conceptTypeToken || !valueTypeToken) {
+            this.reportError("AstError", "ConceptStatement: missing CONCEPT_TYPE or CONCEPT_VALUE_TYPE token", getLocation(ctx));
+            return null;
+        }
+        const conceptType = conceptTypeToken.text;
+        const valueType = valueTypeToken.text;
         let provenance = undefined;
         if (bodyCtx.provenanceLine?.()) {
             const provCtx = bodyCtx.provenanceLine?.();
@@ -201,7 +244,12 @@ class CPGLAstBuilder extends AbstractParseTreeVisitor_1.AbstractParseTreeVisitor
         }
         let definition;
         if (bodyCtx.codedByLine && bodyCtx.codedByLine()) {
-            const termRef = bodyCtx.codedByLine().terminologyReference().text.slice(1, -1);
+            const codedBy = bodyCtx.codedByLine();
+            const termRef = codedBy?.terminologyReference?.()?.text?.slice(1, -1);
+            if (!termRef) {
+                this.reportError("AstError", "ConceptStatement: missing terminologyReference in codedByLine", getLocation(ctx));
+                return null;
+            }
             definition = {
                 type: types_1.CodedByDefinitionType.type,
                 terminologyName: termRef,
@@ -211,12 +259,14 @@ class CPGLAstBuilder extends AbstractParseTreeVisitor_1.AbstractParseTreeVisitor
         else if (bodyCtx.inferredByLine && bodyCtx.inferredByLine()) {
             const infCtx = bodyCtx.inferredByLine();
             if (!infCtx) {
-                throw new Error("ConceptStatement: inferredByLine() unexpectedly returned undefined");
+                this.reportError("AstError", "ConceptStatement: inferredByLine() unexpectedly returned undefined", getLocation(ctx));
+                return null;
             }
             definition = this.visit(infCtx);
         }
         else {
-            throw new Error("ConceptStatement must have either codedByLine or inferredByLine");
+            this.reportError("AstError", "ConceptStatement must have either codedByLine or inferredByLine", getLocation(ctx));
+            return null;
         }
         return {
             type: "Concept",

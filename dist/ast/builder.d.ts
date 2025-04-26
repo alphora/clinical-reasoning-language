@@ -1,8 +1,11 @@
 import { AbstractParseTreeVisitor } from "antlr4ts/tree/AbstractParseTreeVisitor";
 import { CpglContext, DecisionStatementContext, DecisionBodyContext, WhenWithBodyContext, WhenSingleActionContext, NestedWhenBlockContext, BlockActionContext, BlockBodyContext, SingleActionStatementContext, DoStatementContext, UseStatementContext, TerminologyStatementContext, TerminologyValuesetContext, TerminologySystemCodeContext, ActivityStatementContext, ConceptStatementContext, InferredByLineContext, DefinitionConceptContext, DefinitionLogicContext, InferredByExpressionContext, InformalOrContext, InformalAndContext, InformalNotContext, ConceptAtomContext, GroupExpressionContext } from "../grammar/generated/antlr/CPGLParser";
 import { CPGLParserVisitor } from "../grammar/generated/antlr/CPGLParserVisitor";
-import { ASTNode, CPGL, Decision, DecisionBody, WhenBlock, BlockBody, SingleAction, ActionStatement, DoActivity, UseDecision, Terminology, TerminologyValueset, TerminologySystemCode, Activity, Concept, InferredByDefinition, ConceptReference, InformalAnd, InformalOr, NotExpression, GroupExpression, InferredByConcept, InferredByExpression } from "./types";
+import { ASTNode, CPGL, Decision, DecisionBody, WhenBlock, BlockBody, SingleAction, ActionStatement, DoActivity, UseDecision, Terminology, TerminologyValueset, TerminologySystemCode, Activity, Concept, InferredByDefinition, ConceptReference, InformalAnd, InformalOr, NotExpression, GroupExpression, InferredByConcept, InferredByExpression, Location } from "./types";
 export declare class CPGLAstBuilder extends AbstractParseTreeVisitor<ASTNode> implements CPGLParserVisitor<ASTNode> {
+    private readonly errors;
+    protected reportError(type: string, message: string, location?: Location, details?: any): void;
+    getErrors(): string[];
     protected defaultResult(): any;
     visitCpgl(ctx: CpglContext): CPGL;
     visitDecisionStatement(ctx: DecisionStatementContext): Decision;
