@@ -70,7 +70,15 @@ export function parseCPGL(input: string): ParseResult<ParseTree> {
     }
     return { success: true, result: tree };
   } catch (error) {
-    return { success: false, errors: [error instanceof Error ? error.message : String(error)] };
+    return {
+      success: false,
+      errors: [
+        JSON.stringify({
+          type: "Exception",
+          message: error instanceof Error ? error.message : String(error),
+        }),
+      ],
+    };
   }
 }
 
@@ -91,7 +99,15 @@ export function buildCPGL(input: string): ParseResult<CPGL> {
     }
     return { success: true, result: ast };
   } catch (error) {
-    return { success: false, errors: [error instanceof Error ? error.message : String(error)] };
+    return {
+      success: false,
+      errors: [
+        JSON.stringify({
+          type: "Exception",
+          message: error instanceof Error ? error.message : String(error),
+        }),
+      ],
+    };
   }
 }
 
@@ -123,6 +139,14 @@ export function validateCPGL(input: string): ParseResult<CPGL> {
     }
     return { success: true, result: ast };
   } catch (error) {
-    return { success: false, errors: [error instanceof Error ? error.message : String(error)] };
+    return {
+      success: false,
+      errors: [
+        JSON.stringify({
+          type: "Exception",
+          message: error instanceof Error ? error.message : String(error),
+        }),
+      ],
+    };
   }
 }
