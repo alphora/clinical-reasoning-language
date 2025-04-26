@@ -16,19 +16,6 @@ interface ActionNode {
   extension?: any[];
 }
 
-interface FshRule {
-  path: string;
-  value?: unknown;
-}
-
-interface Instance {
-  instanceOf?: string;
-  name?: string;
-  title?: string;
-  description?: string;
-  rules?: FshRule[];
-}
-
 function emitWhenBlocksRecursive(
   nodes: ActionNode[],
   activities: { id: string; name: string; value: string | undefined; original: string }[],
@@ -168,7 +155,7 @@ function emitWhenBlocksRecursive(
 }
 
 // Update parseActions to extract description
-function parseActions(rules: FshRule[], basePath = "action"): ActionNode[] {
+function parseActions(rules: any[], basePath = "action"): ActionNode[] {
   const nodes: ActionNode[] = [];
   let currentNode: ActionNode | null = null;
   let currentExtensions: any[] = [];
@@ -215,12 +202,11 @@ function parseActions(rules: FshRule[], basePath = "action"): ActionNode[] {
         if (subPath.endsWith(".url")) currentExtension.url = rule.value;
         if (subPath.endsWith(".valueMarkdown")) currentExtension.valueMarkdown = rule.value;
       } else {
-        if (subPath === ".title" && typeof rule.value === "string") currentNode.title = rule.value;
-        if (subPath === ".description" && typeof rule.value === "string") currentNode.description = rule.value;
-        if (subPath.endsWith(".condition[=].expression.expression") && typeof rule.value === "string")
+        if (subPath === ".title") currentNode.title = rule.value;
+        if (subPath === ".description") currentNode.description = rule.value;
+        if (subPath.endsWith(".condition[=].expression.expression"))
           currentNode.conditionExpression = rule.value;
-        if (subPath === ".definitionCanonical" && typeof rule.value === "string")
-          currentNode.definitionCanonical = rule.value;
+        if (subPath === ".definitionCanonical") currentNode.definitionCanonical = rule.value;
       }
     }
   }
@@ -232,30 +218,29 @@ function parseActions(rules: FshRule[], basePath = "action"): ActionNode[] {
 }
 
 export function mapPlanDefinitionToDecision(
-  instance: Instance,
-  allInstances: Instance[],
+  instance: any,
+  allInstances: any[],
 ): {
   decision: string;
   activities: { id: string; name: string; value: string | undefined; original: string }[];
   doReferences: { id: string; placeholder: string }[];
 } {
-  if (!instance.instanceOf || !PLAN_DEFINITION_URLS.includes(instance.instanceOf)) {
+  if (!PLAN_DEFINITION_URLS.includes(instance.instanceOf)) {
     return { decision: "", activities: [], doReferences: [] };
   }
   let description = instance.description;
   if (!description) {
-    const descriptionRule = (instance.rules || []).find((r) => r.path === "Description");
-    description =
-      descriptionRule && typeof descriptionRule.value === "string"
-        ? descriptionRule.value
-        : undefined;
+    const descriptionRule = (instance.rules || []).find((r: any) => r.path === "Description");
+    description = descriptionRule ? descriptionRule.value : undefined;
   }
-  const title = instance.title || (instance.rules || []).find((r) => r.path === "Title")?.value;
-  const plandefTitle = title ? toIdentifier(String(title)) : "[UnnamedPlanDefinition]";
-  const plandefDescription = description ? toString(String(description)) : "";
-  const citationRule = (instance.rules || []).find((r) => r.path === "relatedArtifact[=].citation");
-  let citation =
-    citationRule && typeof citationRule.value === "string" ? toString(citationRule.value) : "";
+  const title =
+    instance.title || (instance.rules || []).find((r: any) => r.path === "Title")?.value;
+  const plandefTitle = title ? toIdentifier(title) : "[UnnamedPlanDefinition]";
+  const plandefDescription = description ? toString(description) : "";
+  const citationRule = (instance.rules || []).find(
+    (r: any) => r.path === "relatedArtifact[=].citation",
+  );
+  let citation = citationRule ? toString(citationRule.value) : "";
   // Remove outer quotes from citation if present
   if (citation.startsWith('"') && citation.endsWith('"')) {
     citation = citation.slice(1, -1);
