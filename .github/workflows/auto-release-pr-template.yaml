@@ -2,7 +2,7 @@ name: Auto-select PR Template
 
 on:
   pull_request:
-    types: [opened, edited, synchronize]
+    types: [opened]
 
 jobs:
   set-pr-template:
