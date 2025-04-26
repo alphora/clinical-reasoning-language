@@ -2,67 +2,67 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.conceptValueTypes = exports.conceptTypes = exports.activityTypes = exports.InferredByDefinitionType = exports.InferredByConceptType = exports.GroupExpressionType = exports.NotExpressionType = exports.InformalOrType = exports.InformalAndType = exports.ConceptReferenceType = exports.CodedByDefinitionType = exports.TerminologySystemCodeType = exports.TerminologyFreeTextType = exports.TerminologyValuesetType = exports.TerminologyType = exports.UseDecisionType = exports.DoActivityType = exports.ActionStatementType = exports.SingleActionType = exports.BlockBodyType = exports.WhenBlockType = exports.DecisionBodyType = exports.DecisionType = exports.FileType = void 0;
 exports.FileType = {
-    type: 'CPGL',
+    type: "CPGL",
 };
 exports.DecisionType = {
-    type: 'Decision',
+    type: "Decision",
 };
 exports.DecisionBodyType = {
-    type: 'DecisionBody',
+    type: "DecisionBody",
 };
 exports.WhenBlockType = {
-    type: 'WhenBlock',
+    type: "WhenBlock",
 };
 exports.BlockBodyType = {
-    type: 'BlockBody',
+    type: "BlockBody",
 };
 exports.SingleActionType = {
-    type: 'SingleAction',
+    type: "SingleAction",
 };
 exports.ActionStatementType = {
-    type: 'ActionStatement',
+    type: "ActionStatement",
 };
 exports.DoActivityType = {
-    type: 'DoActivity',
+    type: "DoActivity",
 };
 exports.UseDecisionType = {
-    type: 'UseDecision',
+    type: "UseDecision",
 };
 exports.TerminologyType = {
-    type: 'Terminology',
+    type: "Terminology",
 };
 exports.TerminologyValuesetType = {
-    type: 'TerminologyValueset',
+    type: "TerminologyValueset",
 };
 exports.TerminologyFreeTextType = {
-    type: 'TerminologyFreeText',
+    type: "TerminologyFreeText",
 };
 exports.TerminologySystemCodeType = {
-    type: 'TerminologySystemCode',
+    type: "TerminologySystemCode",
 };
 exports.CodedByDefinitionType = {
-    type: 'CodedByDefinition',
+    type: "CodedByDefinition",
 };
 exports.ConceptReferenceType = {
-    type: 'ConceptReference',
+    type: "ConceptReference",
 };
 exports.InformalAndType = {
-    type: 'AndExpression',
+    type: "AndExpression",
 };
 exports.InformalOrType = {
-    type: 'OrExpression',
+    type: "OrExpression",
 };
 exports.NotExpressionType = {
-    type: 'NotExpression',
+    type: "NotExpression",
 };
 exports.GroupExpressionType = {
-    type: 'GroupExpression',
+    type: "GroupExpression",
 };
 exports.InferredByConceptType = {
-    type: 'InferredByDefinitionConcept',
+    type: "InferredByDefinitionConcept",
 };
 exports.InferredByDefinitionType = {
-    type: 'InferredByDefinition',
+    type: "InferredByDefinition",
 };
 var activityTypes_1 = require("../grammar/activityTypes");
 Object.defineProperty(exports, "activityTypes", { enumerable: true, get: function () { return activityTypes_1.activityTypes; } });

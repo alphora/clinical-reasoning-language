@@ -1,4 +1,4 @@
-import { CPGLLexer } from '../../grammar/generated/CPGLLexer';
+import { CPGLLexer } from "../../grammar/generated/antlr/CPGLLexer";
 
 /**
  * Helper function to generate token sequence for a single action block

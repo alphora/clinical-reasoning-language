@@ -1,54 +1,55 @@
-import { CPGLAstBuilder } from '../builder';
-import { Activity } from '../types';
-import { parseInput } from './parseInput';
+import { CPGLAstBuilder } from "../builder";
+import { Activity } from "../types";
 
-describe('Activity Structure', () => {
+import { parseInput } from "./parseInput";
+
+describe("Activity Structure", () => {
   let builder: CPGLAstBuilder;
 
   beforeEach(() => {
     builder = new CPGLAstBuilder();
   });
 
-  it('should correctly structure activity with type', () => {
+  it("should correctly structure activity with type", () => {
     const input = 'activity "Vaccinate" perform CPGImmunizationRequest.';
 
     const result = parseInput(input);
     const activity = result.statements[0] as Activity;
 
     // Verify basic activity structure
-    expect(activity.type).toBe('Activity');
-    expect(activity.name).toBe('Vaccinate');
-    expect(activity.perform).toBe('CPGImmunizationRequest');
+    expect(activity.type).toBe("Activity");
+    expect(activity.name).toBe("Vaccinate");
+    expect(activity.perform).toBe("CPGImmunizationRequest");
   });
 
-  it('should correctly structure activity with type and terminology', () => {
+  it("should correctly structure activity with type and terminology", () => {
     const input = 'activity "Indicate" perform CPGProposeDiagnosisTask of "Colonoscopy".';
 
     const result = parseInput(input);
     const activity = result.statements[0] as Activity;
 
     // Verify basic activity structure
-    expect(activity.type).toBe('Activity');
-    expect(activity.name).toBe('Indicate');
-    expect(activity.perform).toBe('CPGProposeDiagnosisTask');
-    expect(activity.terminologyReference).toBe('Colonoscopy');
+    expect(activity.type).toBe("Activity");
+    expect(activity.name).toBe("Indicate");
+    expect(activity.perform).toBe("CPGProposeDiagnosisTask");
+    expect(activity.terminologyReference).toBe("Colonoscopy");
   });
 
-  it('should correctly structure activity with type and free text', () => {
+  it("should correctly structure activity with type and free text", () => {
     const input = 'activity "another thing" perform CPGCommunicationRequest of `The message`.';
 
     const result = parseInput(input);
     const activity = result.statements[0] as Activity;
 
     // Verify structure for free text
-    expect(activity.type).toBe('Activity');
-    expect(activity.name).toBe('another thing');
-    expect(activity.perform).toBe('CPGCommunicationRequest');
-    expect(activity.activityTypeValue).toBe('The message');
+    expect(activity.type).toBe("Activity");
+    expect(activity.name).toBe("another thing");
+    expect(activity.perform).toBe("CPGCommunicationRequest");
+    expect(activity.activityTypeValue).toBe("The message");
     expect(activity.terminologyReference).toBeUndefined();
   });
 
-  it('should correctly structure activity with type and terminology or free text', () => {
+  it("should correctly structure activity with type and terminology or free text", () => {
     const input1 = 'activity "Indicate" perform CPGProposeDiagnosisTask of "Colonoscopy".';
     const input2 = 'activity "Notify" perform CPGCommunicationRequest of `A notification message`.';
 
@@ -58,23 +59,23 @@ describe('Activity Structure', () => {
     const activity2 = result2.statements[0] as Activity;
 
     // Terminology reference
-    expect(activity1.terminologyReference).toBe('Colonoscopy');
+    expect(activity1.terminologyReference).toBe("Colonoscopy");
     expect(activity1.activityTypeValue).toBeUndefined();
     // Free text
-    expect(activity2.activityTypeValue).toBe('A notification message');
+    expect(activity2.activityTypeValue).toBe("A notification message");
     expect(activity2.terminologyReference).toBeUndefined();
   });
 
-  it('should correctly structure activity with empty free text', () => {
+  it("should correctly structure activity with empty free text", () => {
     const input = 'activity "Empty Free Text" perform CPGCommunicationRequest of ``.';
 
     const result = parseInput(input);
     const activity = result.statements[0] as Activity;
 
-    expect(activity.type).toBe('Activity');
-    expect(activity.name).toBe('Empty Free Text');
-    expect(activity.perform).toBe('CPGCommunicationRequest');
-    expect(activity.activityTypeValue).toBe('');
+    expect(activity.type).toBe("Activity");
+    expect(activity.name).toBe("Empty Free Text");
+    expect(activity.perform).toBe("CPGCommunicationRequest");
+    expect(activity.activityTypeValue).toBe("");
     expect(activity.terminologyReference).toBeUndefined();
   });
-}); 
+});

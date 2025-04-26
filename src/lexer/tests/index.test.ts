@@ -105,23 +105,23 @@
  */
 
 // External imports
-import { Token } from 'antlr4ts';
+import { Token } from "antlr4ts";
 
 // Internal imports
-import { CPGLLexer } from '../../grammar/generated/CPGLLexer';
+import { CPGLLexer } from "../../grammar/generated/antlr/CPGLLexer";
 
 // Test suite imports
-import './basic-tokens.test';
-import './comments.test';
-import './error-handling.test';
-import './fhir-types.test';
-import './integration.test';
-import './structures.test';
-import './whitespace.test';
-import './error-listener.test';
+import "./basic-tokens.test";
+import "./comments.test";
+import "./error-handling.test";
+import "./fhir-types.test";
+import "./integration.test";
+import "./structures.test";
+import "./whitespace.test";
+import "./error-listener.test";
 
-describe('CPGL Lexer Test Suite', () => {
-  it('should run all test suites', () => {
+describe("CPGL Lexer Test Suite", () => {
+  it("should run all test suites", () => {
     // This test exists to ensure the test runner executes all imported test files
     expect(true).toBe(true);
   });

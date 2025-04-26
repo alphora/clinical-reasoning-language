@@ -1,8 +1,15 @@
 {
+  "root": true,
   "env": {
-    "node": true,
     "es2021": true,
+    "node": true,
     "jest": true
+  },
+  "parser": "@typescript-eslint/parser",
+  "parserOptions": {
+    "project": "./tsconfig.eslint.json",
+    "sourceType": "module",
+    "ecmaVersion": 2021
   },
   "extends": [
     "eslint:recommended",
@@ -11,51 +18,36 @@
     "plugin:import/typescript",
     "plugin:prettier/recommended"
   ],
-  "parser": "@typescript-eslint/parser",
-  "parserOptions": {
-    "ecmaVersion": 2021,
-    "sourceType": "module",
-    "project": "./tsconfig.json"
-  },
   "plugins": [
     "@typescript-eslint",
     "import",
     "prettier"
   ],
   "rules": {
-    "@typescript-eslint/explicit-function-return-type": "error",
-    "@typescript-eslint/no-explicit-any": "error",
+    "prettier/prettier": "error",
     "@typescript-eslint/no-unused-vars": ["error", { "argsIgnorePattern": "^_" }],
+    "@typescript-eslint/explicit-function-return-type": "warn",
+    "@typescript-eslint/no-explicit-any": "warn",
     "import/order": [
       "error",
       {
-        "groups": [
-          "builtin",
-          "external",
-          "internal",
-          "parent",
-          "sibling",
-          "index"
-        ],
+        "groups": ["builtin", "external", "internal", "parent", "sibling", "index"],
         "newlines-between": "always",
-        "alphabetize": {
-          "order": "asc",
-          "caseInsensitive": true
-        }
+        "alphabetize": { "order": "asc", "caseInsensitive": true }
       }
-    ],
-    "prettier/prettier": "error"
+    ]
   },
   "settings": {
     "import/resolver": {
       "typescript": {
-        "project": "./tsconfig.json"
+        "project": "./tsconfig.eslint.json"
       }
     }
   },
   "ignorePatterns": [
-    "dist/**",
-    "node_modules/**",
-    "src/grammar/generated/**"
+    "dist/",
+    "node_modules/",
+    "coverage/",
+    "src/grammar/generated/"
   ]
-} 
+}

@@ -1,19 +1,20 @@
-import { readFileSync } from 'fs';
-import { join } from 'path';
+import { readFileSync } from "fs";
+import { join } from "path";
 
-import { CharStreams } from 'antlr4ts';
-
-import { CPGLLexer } from '../grammar/generated/CPGLLexer';
-import { createLexer } from '../lexer/createLexer';
+import { CPGLLexer } from "../grammar/generated/antlr/CPGLLexer";
+import { createLexer } from "../lexer/createLexer";
 
 // Get the path to the grammar example file
-const examplePath = join(__dirname, '../examples/cpgl/who/measles/IMMZ_All_Decisions.cpg');
+const examplePath = join(
+  __dirname,
+  "../examples/cpgl/who/smart-example-immz/IMMZ_All_Decisions.cpg",
+);
 
 // Read the file content
-const input = readFileSync(examplePath, 'utf8');
+const input = readFileSync(examplePath, "utf8");
 
-// Create lexer instance
-const lexer = createLexer(CharStreams.fromString(input));
+// Create lexer instance (new API)
+const { lexer } = createLexer(input);
 
 // Get all tokens
 const tokens: Array<{
@@ -34,7 +35,7 @@ while (token.type !== CPGLLexer.EOF) {
       line: token.line,
       column: token.charPositionInLine,
       type: typeName,
-      text: token.text ?? '',
+      text: token.text ?? "",
     });
   }
 
@@ -42,19 +43,19 @@ while (token.type !== CPGLLexer.EOF) {
 }
 
 // Check if pretty output is requested
-const prettyOutput = process.argv.includes('--pretty');
+const prettyOutput = process.argv.includes("--pretty");
 
 if (!prettyOutput) {
   // Raw lexer output
   console.log(JSON.stringify(tokens, null, 2));
 } else {
   // Pretty lexer output
-  console.log('\nTokenizing grammar-example.cpg:\n');
-  console.log('Line | Column | Type | Text');
-  console.log('-----|--------|------|------');
+  console.log("\nTokenizing grammar-example.cpg:\n");
+  console.log("Line | Column | Type | Text");
+  console.log("-----|--------|------|------");
 
   let lastLine = 0;
-  tokens.forEach(token => {
+  tokens.forEach((token) => {
     // Add a blank line when we move to a new line
     if (token.line !== lastLine) {
       console.log();

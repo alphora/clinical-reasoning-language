@@ -105,3 +105,19 @@ Apply to CPGLLexer.g4
 But in the test input, we're using inferred-by with a hyphen. The lexer is correctly identifying this as an error because there's no rule to handle the hyphen character between these keywords.
 This suggests that my initial assessment about lexer mode transitions was incorrect. The actual issue is with the grammar not properly handling compound keywords with hyphens. The lexer modes are working as expected for handling concept types, value types, and activity types.
 Would you like me to propose a fix for handling the hyphenated keywords in the grammar?
+
+
+make it think, don't tell. for example instead of saying: Yes, but it needs to be applied across the board, not just with identifiers that have the suffix so we address these too. 
+
+ask: Yes, but it needs to be applied across the board, not just with identifiers that have the suffix so we address these too, right? 
+
+What not how: example the rules definition!!!
+
+Suggest simpler solutions.  For example, the dedup... do at end.
+
+Key is to distinguish between when things are going well and when they are going poorly; and then to reset and suggest a different approach that gets it back to going well (CORRECT REQUIREMENTS and/or SIMPLER APPROACH!!!).
+
+Make it see the results, don't tell it about them.
+
+
+It messes up tests so give it expected results, not tests.  then have it build the code and the tests to match that.

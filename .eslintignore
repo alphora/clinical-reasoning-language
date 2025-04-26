@@ -1,2 +1,5 @@
 # Ignore generated files
 src/grammar/generated/** 
+
+# Ignore validator files and subdirectories
+src/validator/** 

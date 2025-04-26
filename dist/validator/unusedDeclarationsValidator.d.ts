@@ -1,5 +1,5 @@
-import { CPGL } from '../ast/types';
-import { ValidationError } from './validator';
+import { CPGL } from "../ast/types";
+import { ValidationError } from "./validator";
 export declare class UnusedDeclarationsValidator {
     private readonly decisionDeclarations;
     private readonly conceptDeclarations;

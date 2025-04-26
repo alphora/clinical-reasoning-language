@@ -1,12 +1,16 @@
-import { CharStream } from 'antlr4ts';
+import { CharStreams } from "antlr4ts";
 
-import { CPGLLexer } from '../grammar/generated/CPGLLexer';
+import { CPGLLexer } from "../grammar/generated/antlr/CPGLLexer";
 
-import { CPGLLexerErrorListener } from './CPGLLexerErrorListener';
+import { CPGLLexerErrorListener } from "./CPGLLexerErrorListener";
 
-export function createLexer(input: CharStream): CPGLLexer {
-  const lexer = new CPGLLexer(input);
+export function createLexer(input: string): {
+  lexer: CPGLLexer;
+  errorListener: CPGLLexerErrorListener;
+} {
+  const lexerErrorListener = new CPGLLexerErrorListener();
+  const lexer = new CPGLLexer(CharStreams.fromString(input));
   lexer.removeErrorListeners();
-  lexer.addErrorListener(new CPGLLexerErrorListener());
-  return lexer;
+  lexer.addErrorListener(lexerErrorListener);
+  return { lexer, errorListener: lexerErrorListener };
 }

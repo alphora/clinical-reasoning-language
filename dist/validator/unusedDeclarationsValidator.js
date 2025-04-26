@@ -14,7 +14,7 @@ class UnusedDeclarationsValidator {
         this.clear();
         const targetAst = ast || this.ast;
         if (!targetAst) {
-            throw new Error('No AST provided to validate');
+            throw new Error("No AST provided to validate");
         }
         this.collectDeclarations(targetAst);
         this.processDeclarations(targetAst);
@@ -35,19 +35,19 @@ class UnusedDeclarationsValidator {
                         location: statement.location,
                     });
                     break;
-                case 'Concept':
+                case "Concept":
                     this.conceptDeclarations.set(statement.name, {
                         used: false,
                         location: statement.location,
                     });
                     break;
-                case 'Activity':
+                case "Activity":
                     this.activityDeclarations.set(statement.name, {
                         used: false,
                         location: statement.location,
                     });
                     break;
-                case 'Terminology':
+                case "Terminology":
                     this.terminologyDeclarations.set(statement.name, {
                         used: false,
                         location: statement.location,
@@ -62,8 +62,8 @@ class UnusedDeclarationsValidator {
                 case types_1.DecisionType.type:
                     this.processDecisionBody(statement.body, statement.name);
                     break;
-                case 'Concept':
-                    if (statement.definition.type === 'CodedByDefinition' &&
+                case "Concept":
+                    if (statement.definition.type === "CodedByDefinition" &&
                         statement.definition.terminologyName) {
                         const terminologyInfo = this.terminologyDeclarations.get(statement.definition.terminologyName);
                         if (terminologyInfo) {
@@ -85,8 +85,8 @@ class UnusedDeclarationsValidator {
             if (statement.type === types_1.WhenBlockType.type) {
                 this.processWhenBlock(statement);
             }
-            else if (statement.type === 'ActionStatement') {
-                if ('action' in statement && this.isAction(statement.action)) {
+            else if (statement.type === "ActionStatement") {
+                if ("action" in statement && this.isAction(statement.action)) {
                     this.processAction(statement.action);
                 }
             }
@@ -97,17 +97,17 @@ class UnusedDeclarationsValidator {
         if (conceptInfo) {
             conceptInfo.used = true;
         }
-        if (whenBlock.body.type === 'BlockBody') {
+        if (whenBlock.body.type === "BlockBody") {
             this.processBlockBody(whenBlock.body);
         }
-        else if (whenBlock.body.type === 'SingleAction' && this.isAction(whenBlock.body.action)) {
+        else if (whenBlock.body.type === "SingleAction" && this.isAction(whenBlock.body.action)) {
             this.processAction(whenBlock.body.action);
         }
     }
     processBlockBody(body) {
         for (const statement of body.statements) {
-            if (statement.type === 'ActionStatement' &&
-                'action' in statement &&
+            if (statement.type === "ActionStatement" &&
+                "action" in statement &&
                 this.isAction(statement.action)) {
                 this.processAction(statement.action);
             }
@@ -117,13 +117,13 @@ class UnusedDeclarationsValidator {
         }
     }
     processAction(action) {
-        if (action.type === 'DoActivity') {
+        if (action.type === "DoActivity") {
             const activityInfo = this.activityDeclarations.get(action.activityName);
             if (activityInfo) {
                 activityInfo.used = true;
             }
         }
-        else if (action.type === 'UseDecision') {
+        else if (action.type === "UseDecision") {
             const decisionInfo = this.decisionDeclarations.get(action.decisionName);
             if (decisionInfo) {
                 decisionInfo.used = true;
@@ -146,20 +146,20 @@ class UnusedDeclarationsValidator {
         return undefined;
     }
     isAction(action) {
-        return (typeof action === 'object' &&
+        return (typeof action === "object" &&
             action !== null &&
-            'type' in action &&
-            (action.type === 'DoActivity' || action.type === 'UseDecision'));
+            "type" in action &&
+            (action.type === "DoActivity" || action.type === "UseDecision"));
     }
     generateResults() {
         const errors = [];
         for (const [name, info] of this.decisionDeclarations) {
             if (!info.used) {
-                console.log('] Found unused decision:', name);
+                console.log("] Found unused decision:", name);
                 errors.push({
                     message: `Unused decision: ${name}`,
                     location: info.location,
-                    severity: 'warning',
+                    severity: "warning",
                 });
             }
         }
@@ -168,7 +168,7 @@ class UnusedDeclarationsValidator {
                 errors.push({
                     message: `Unused concept: ${name}`,
                     location: info.location,
-                    severity: 'warning',
+                    severity: "warning",
                 });
             }
         }
@@ -177,7 +177,7 @@ class UnusedDeclarationsValidator {
                 errors.push({
                     message: `Unused activity: ${name}`,
                     location: info.location,
-                    severity: 'warning',
+                    severity: "warning",
                 });
             }
         }
@@ -186,7 +186,7 @@ class UnusedDeclarationsValidator {
                 errors.push({
                     message: `Unused terminology: ${name}`,
                     location: info.location,
-                    severity: 'warning',
+                    severity: "warning",
                 });
             }
         }
