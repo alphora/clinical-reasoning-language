@@ -27,7 +27,7 @@
     "lint:fix": "eslint . --ext .ts --fix",
     "format": "prettier --write \"src/**/*.ts\"",
     "test": "jest src/lexer/tests/index.test.ts src/ast/tests/index.test.ts src/validator/tests/index.test.ts",
-    "build": "rimraf dist && mkdir dist && tsc",
+    "build": "rimraf dist && shx mkdir -p dist && tsc",
     "postbuild": "node scripts/checkGrammarJsonFiles.js && npm run postbuild:types",
     "postbuild:types": "cpx \"src/grammar/generated/types/*.json\" dist/grammar/generated/types/",
     "clean": "rimraf dist",
@@ -83,6 +83,7 @@
     "onchange": "^7.1.0",
     "prettier": "^3.2.5",
     "rimraf": "^5.0.5",
+    "shx": "^0.4.0",
     "ts-jest": "^29.1.2",
     "ts-node": "^10.9.2",
     "typescript": "^5.3.3"
