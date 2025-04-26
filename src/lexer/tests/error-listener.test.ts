@@ -163,16 +163,4 @@ describe('CPGLLexerErrorListener with CPGL-specific input', () => {
     expect(errorObj.type).toBe('LexicalError');
     expect(errorObj.message).toContain('Invalid character in concept value type:');
   });
-
-  it('[DEBUGGING] should print tokens for perform CPGAdministerMedication@', () => {
-    const { lexer, errorListener } = createLexer('perform CPGAdministerMedication@');
-    const tokenStream = new CommonTokenStream(lexer);
-    tokenStream.fill();
-    const tokens = tokenStream.getTokens();
-    for (const token of tokens) {
-      // Print token type and text for debugging
-      // eslint-disable-next-line no-console
-      console.log(`[DEBUGGING] Token type: ${token.type}, text: '${token.text}'`);
-    }
-  });
 }); 

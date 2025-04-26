@@ -38,15 +38,11 @@ export function transformFSHToCPGL(fshProjectDir: string): string {
     return results;
   }
   const fshFiles = getAllFSHFiles(fshDir);
-  console.log('[DEBUGGING] FSH files found:', fshFiles);
   const rawFSHes = fshFiles.map(f => new RawFSH(fs.readFileSync(f, 'utf8'), f));
-  console.log('[DEBUGGING] Number of RawFSH loaded:', rawFSHes.length);
   const fshDocs = importText(rawFSHes);
-  console.log('[DEBUGGING] Number of FSHDocuments created:', fshDocs.length);
 
   const tank = new FSHTank(fshDocs, config);
   const instances = tank.getAllInstances();
-  console.log('[DEBUGGING] Number of FSH instances loaded:', instances.length);
 
   // Collect all activities and do references for file-wide deduplication and postprocessing
   const activityDeduplicator = new (require('./utils/activityDeduplication').ActivityDeduplicator)();
@@ -89,10 +85,6 @@ export function transformFSHToCPGL(fshProjectDir: string): string {
       }
     }
   }
-  console.log('[DEBUGGING] PlanDefinitions found:', planDefCount);
-  console.log('[DEBUGGING] Decisions collected:', decisions.length);
-  console.log('[DEBUGGING] Activities collected:', allActivities.length);
-  console.log('[DEBUGGING] Do references collected:', allDoReferences.length);
 
   // Collect all terminology blocks for activities
   const activityTerminologies: { identifier: string, code: string, system: string }[] = [];
@@ -167,6 +159,5 @@ export function transformFSHToCPGL(fshProjectDir: string): string {
     }
   }
 
-  console.log('[DEBUGGING] Final CPG-L output before return:', finalOutput.length > 500 ? finalOutput.slice(0, 500) + '... [truncated]' : finalOutput);
   return finalOutput;
 } 

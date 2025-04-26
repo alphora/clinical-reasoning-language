@@ -10,6 +10,7 @@ _This checklist is for release branches (e.g., `release/v0.1.0`)._
 - [ ] Run the linter with auto-fix
 - [ ] Update the CHANGELOG
 - [ ] Commit all changes
+- [ ] Run tests to ensure there's no regression
 - [ ] Run the release script
 - [ ] Push commits and tags
 - [ ] Merge the PR
@@ -40,7 +41,7 @@ To create a new release:
 
 3. **Remove all debugging logs**  
    Prompt:
-   > "Search for and remove all console.log statements with messages prefixed with [DEBUGGING]."
+   > Search for and remove all console.log statements with messages prefixed with [DEBUGGING].  Don't remove from instructions or documentation, only functional code.
 
 4. **Run the linter with auto-fix:**
 
@@ -52,14 +53,20 @@ To create a new release:
    Prompt:
    > "Generate and append to the CHANGELOG based on git commits since the last tag."
 
-6. **Commit all changes**
+6. **Run tests to ensure no regression**
+
+   ```bash
+   npm test
+   ```
+
+7. **Commit all changes**
 
    ```bash
    git add .
    git commit -m "Prepare release v0.1.0"
    ```
 
-7. **Run the automated release script**
+8. **Run the automated release script**
 
    ```bash
    npm run prepublish:github -- <patch|minor|major|version>
@@ -79,15 +86,15 @@ To create a new release:
    - Push commits and tags
    - Restore `dist/` to `.gitignore` and push final cleanup
 
-8. **Push commits and tags** (if not already pushed by the script)
+9. **Push commits and tags** (if not already pushed by the script)
 
-9. **Create and merge the Pull Request (PR)**
+10. **Create and merge the Pull Request (PR)**
 
-10. **Create and publish the GitHub Release**
+11. **Create and publish the GitHub Release**
     - Use the version tag (e.g., `v0.1.0`)
     - Generate release notes automatically if needed
 
-11. **Switch back to main and delete the release branch:**
+12. **Switch back to main and delete the release branch:**
 
     ```bash
     git checkout main

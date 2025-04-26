@@ -24,7 +24,7 @@ describe('createParser', () => {
     if (errors.length > 0) {
       // Debug log for error output
       // eslint-disable-next-line no-console
-      console.log('[DEBUGGING] Parser errors:', errors);
+      // console.log('[DEBUGGING] Parser errors:', errors);
     }
     expect(errors.length).toBeGreaterThan(0);
     expect(

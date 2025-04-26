@@ -43,7 +43,7 @@ export function getActivityPerformClause(activityDef: any, doIdentifier: string)
       doNotPerform = true;
     }
     if (!kindRule) {
-      console.log('[DEBUGGING] No kind rule found. All rule paths/values:', activityDef.rules.map((r: any) => ({ path: r.path, value: r.value })));
+      // Remove all console.log statements with messages prefixed with [DEBUGGING]
     }
   }
 
