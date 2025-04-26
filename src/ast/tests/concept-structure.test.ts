@@ -1,22 +1,22 @@
-
-import { CPGLAstBuilder } from '../builder';
-import { 
-  Concept, 
+import { CPGLAstBuilder } from "../builder";
+import {
+  Concept,
   InferredByDefinition,
   InferredByConcept,
   InferredByExpression,
-  CodedByDefinition 
-} from '../types';
-import { parseInput } from './parseInput';
+  CodedByDefinition,
+} from "../types";
 
-describe('Concept Structure', () => {
+import { parseInput } from "./parseInput";
+
+describe("Concept Structure", () => {
   let builder: CPGLAstBuilder;
 
   beforeEach(() => {
     builder = new CPGLAstBuilder();
   });
 
-  it('should correctly structure concept with inferred by concept reference', () => {
+  it("should correctly structure concept with inferred by concept reference", () => {
     const input = `
 concept "Client Age Less Than 12 Months":
     has type Condition.
@@ -28,22 +28,22 @@ done`;
     const concept = result.statements[0] as Concept;
 
     // Verify basic concept structure
-    expect(concept.type).toBe('Concept');
-    expect(concept.name).toBe('Client Age Less Than 12 Months');
-    expect(concept.conceptType).toBe('Condition');
-    expect(concept.valueType).toBe('boolean');
+    expect(concept.type).toBe("Concept");
+    expect(concept.name).toBe("Client Age Less Than 12 Months");
+    expect(concept.conceptType).toBe("Condition");
+    expect(concept.valueType).toBe("boolean");
 
     // Verify inferred-by structure
     const definition = concept.definition as InferredByDefinition;
-    expect(definition.type).toBe('InferredByDefinition');
-    
+    expect(definition.type).toBe("InferredByDefinition");
+
     const body = definition.body as InferredByConcept;
-    expect(body.type).toBe('InferredByDefinitionConcept');
-    expect(body.concept).toBe('Age 12 Months');
-    expect(body.pattern).toBe('Less Than');
+    expect(body.type).toBe("InferredByDefinitionConcept");
+    expect(body.concept).toBe("Age 12 Months");
+    expect(body.pattern).toBe("Less Than");
   });
 
-  it('should correctly structure concept with inferred by descriptive logic', () => {
+  it("should correctly structure concept with inferred by descriptive logic", () => {
     const input = `
 concept "Client Is Due For MCV12":
     has type Condition.
@@ -55,20 +55,20 @@ done`;
     const concept = result.statements[0] as Concept;
 
     // Verify basic concept structure
-    expect(concept.type).toBe('Concept');
-    expect(concept.name).toBe('Client Is Due For MCV12');
-    expect(concept.conceptType).toBe('Condition');
-    expect(concept.valueType).toBe('boolean');
+    expect(concept.type).toBe("Concept");
+    expect(concept.name).toBe("Client Is Due For MCV12");
+    expect(concept.conceptType).toBe("Condition");
+    expect(concept.valueType).toBe("boolean");
 
     // Verify inferred-by structure
     const definition = concept.definition as InferredByDefinition;
-    expect(definition.type).toBe('InferredByDefinition');
-    
+    expect(definition.type).toBe("InferredByDefinition");
+
     const body = definition.body as InferredByExpression;
-    expect(body.type).toBe('AndExpression');
+    expect(body.type).toBe("AndExpression");
   });
 
-  it('should correctly structure concept with coded by definition', () => {
+  it("should correctly structure concept with coded by definition", () => {
     const input = `
 concept "Measles Vaccine":
     has type Immunization.
@@ -80,18 +80,18 @@ done`;
     const concept = result.statements[0] as Concept;
 
     // Verify basic concept structure
-    expect(concept.type).toBe('Concept');
-    expect(concept.name).toBe('Measles Vaccine');
-    expect(concept.conceptType).toBe('Immunization');
-    expect(concept.valueType).toBe('CodeableConcept');
+    expect(concept.type).toBe("Concept");
+    expect(concept.name).toBe("Measles Vaccine");
+    expect(concept.conceptType).toBe("Immunization");
+    expect(concept.valueType).toBe("CodeableConcept");
 
     // Verify coded-by structure
     const definition = concept.definition as CodedByDefinition;
-    expect(definition.type).toBe('CodedByDefinition');
-    expect(definition.terminologyName).toBe('MeaslesVaccineCodes');
+    expect(definition.type).toBe("CodedByDefinition");
+    expect(definition.terminologyName).toBe("MeaslesVaccineCodes");
   });
 
-  it('should handle complex inferred by expressions', () => {
+  it("should handle complex inferred by expressions", () => {
     const input = `
 concept "Complex Condition":
     has type Condition.
@@ -102,15 +102,15 @@ done`;
     const result = parseInput(input);
     const concept = result.statements[0] as Concept;
     const definition = concept.definition as InferredByDefinition;
-    
-    expect(definition.type).toBe('InferredByDefinition');
+
+    expect(definition.type).toBe("InferredByDefinition");
     const body = definition.body as InferredByExpression;
-    expect(body.type).toBe('NotExpression');
-    
+    expect(body.type).toBe("NotExpression");
+
     const groupExpr = (body as any).expression as InferredByExpression;
-    expect(groupExpr.type).toBe('GroupExpression');
-    
+    expect(groupExpr.type).toBe("GroupExpression");
+
     const andExpr = (groupExpr as any).expression as InferredByExpression;
-    expect(andExpr.type).toBe('AndExpression');
+    expect(andExpr.type).toBe("AndExpression");
   });
-}); 
+});

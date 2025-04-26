@@ -1,35 +1,35 @@
-
-import { CPGLAstBuilder } from '../builder';
-import { 
-  Decision, 
-  WhenBlock, 
-  BlockBody, 
-  ActionStatement, 
+import { CPGLAstBuilder } from "../builder";
+import {
+  Decision,
+  WhenBlock,
+  BlockBody,
+  ActionStatement,
   SingleAction,
   SingleActionType,
   DoActivity,
   DoActivityType,
-  UseDecision
-} from '../types';
-import { parseInput } from './parseInput';
+  UseDecision,
+} from "../types";
+
+import { parseInput } from "./parseInput";
 
 /**
  * This test suite verifies the correct structure of nested decisions in the AST.
  * It ensures that the AST builder correctly parses and structures nested decision blocks.
- * 
+ *
  * Note: For actual duplication checks, see the validator tests in:
  * - whenBlockUniqueness.test.ts
  * - actionUniqueness.test.ts
  * - nameUniqueness.test.ts
  */
-describe('Decision Structure', () => {
+describe("Decision Structure", () => {
   let builder: CPGLAstBuilder;
 
   beforeEach(() => {
     builder = new CPGLAstBuilder();
   });
 
-  it('should maintain correct structure for nested decisions', () => {
+  it("should maintain correct structure for nested decisions", () => {
     const input = `
 decision "IMMZ.D2.D5.Measles":
     when "Measles Routine Immunization Schedule Incomplete" then:
@@ -57,7 +57,7 @@ done`;
     expect(nestedBlockBody.statements).toHaveLength(2);
   });
 
-  it('should handle single action statements', () => {
+  it("should handle single action statements", () => {
     const input = `
 decision "Test Decision":
     when "Age" then do "Vaccinate".
@@ -68,13 +68,13 @@ done`;
     const whenBlock = decision.body.statements[0] as WhenBlock;
     const singleAction = whenBlock.body as SingleAction;
     const doActivity = singleAction.action as DoActivity;
-    
+
     expect(singleAction.type).toBe(SingleActionType.type);
     expect(doActivity.type).toBe(DoActivityType.type);
-    expect(doActivity.activityName).toBe('Vaccinate');
+    expect(doActivity.activityName).toBe("Vaccinate");
   });
 
-  it('should handle block bodies with any qualifier', () => {
+  it("should handle block bodies with any qualifier", () => {
     const input = `
 decision "Test Decision":
     when "Age" then:
@@ -88,12 +88,12 @@ done`;
     const decision = result.statements[0] as Decision;
     const whenBlock = decision.body.statements[0] as WhenBlock;
     const blockBody = whenBlock.body as BlockBody;
-    
-    expect(blockBody.qualifier).toBe('any');
+
+    expect(blockBody.qualifier).toBe("any");
     expect(blockBody.statements).toHaveLength(2);
   });
 
-  it('should handle block bodies with all qualifier', () => {
+  it("should handle block bodies with all qualifier", () => {
     const input = `
 decision "Test Decision":
     when "Age" then:
@@ -107,12 +107,12 @@ done`;
     const decision = result.statements[0] as Decision;
     const whenBlock = decision.body.statements[0] as WhenBlock;
     const blockBody = whenBlock.body as BlockBody;
-    
-    expect(blockBody.qualifier).toBe('all');
+
+    expect(blockBody.qualifier).toBe("all");
     expect(blockBody.statements).toHaveLength(2);
   });
 
-  it('should handle mixed action types in block bodies', () => {
+  it("should handle mixed action types in block bodies", () => {
     const input = `
 decision "Test Decision":
     when "Age" then:
@@ -126,27 +126,27 @@ done`;
     const decision = result.statements[0] as Decision;
     const whenBlock = decision.body.statements[0] as WhenBlock;
     const blockBody = whenBlock.body as BlockBody;
-    
+
     expect(blockBody.statements).toHaveLength(3);
-    
+
     const doAction = blockBody.statements[0] as ActionStatement;
-    expect(doAction.type).toBe('ActionStatement');
-    expect(doAction.action.type).toBe('DoActivity');
-    
+    expect(doAction.type).toBe("ActionStatement");
+    expect(doAction.action.type).toBe("DoActivity");
+
     const useAction = blockBody.statements[1] as ActionStatement;
-    expect(useAction.type).toBe('ActionStatement');
-    expect(useAction.action.type).toBe('UseDecision');
-    
+    expect(useAction.type).toBe("ActionStatement");
+    expect(useAction.action.type).toBe("UseDecision");
+
     const nestedWhen = blockBody.statements[2] as WhenBlock;
-    expect(nestedWhen.type).toBe('WhenBlock');
-    expect(nestedWhen.conceptName).toBe('Condition');
-    
+    expect(nestedWhen.type).toBe("WhenBlock");
+    expect(nestedWhen.conceptName).toBe("Condition");
+
     const singleAction = nestedWhen.body as SingleAction;
-    expect(singleAction.type).toBe('SingleAction');
-    expect(singleAction.action.type).toBe('DoActivity');
+    expect(singleAction.type).toBe("SingleAction");
+    expect(singleAction.action.type).toBe("DoActivity");
   });
 
-  it('should not duplicate when blocks in nested decisions', () => {
+  it("should not duplicate when blocks in nested decisions", () => {
     const input = `
 decision "IMMZ.D2.D5.Measles":
     when "Measles Routine Immunization Schedule Incomplete" then:
@@ -174,7 +174,7 @@ done`;
     expect(nestedBlockBody.statements).toHaveLength(2); // Should only have 2 when blocks
   });
 
-  it('should not duplicate action statements in block bodies', () => {
+  it("should not duplicate action statements in block bodies", () => {
     const input = `
 decision "Elderly Based":
     when "Client Age Less Than 60" then:
@@ -192,7 +192,7 @@ done`;
     expect(blockBody.statements).toHaveLength(3); // Should only have 3 unique actions
   });
 
-  it('should not duplicate nested when blocks with the same concept name', () => {
+  it("should not duplicate nested when blocks with the same concept name", () => {
     const input = `
 decision "Elderly Based":
     when "Client Age Greater Than 60" then:
@@ -215,7 +215,7 @@ done`;
     expect(nestedBlockBody.statements).toHaveLength(2); // Should only have 2 unique actions
   });
 
-  it('should handle complex nested decisions without duplication', () => {
+  it("should handle complex nested decisions without duplication", () => {
     const input = `
 decision "IMMZ.D2.D5.Measles":
     when "Measles Routine Immunization Schedule Incomplete" then:
@@ -254,14 +254,14 @@ done`;
   });
 });
 
-describe('Repeated Statements in Decision Blocks', () => {
+describe("Repeated Statements in Decision Blocks", () => {
   let builder: CPGLAstBuilder;
 
   beforeEach(() => {
     builder = new CPGLAstBuilder();
   });
 
-  it('should preserve repeated when statements', () => {
+  it("should preserve repeated when statements", () => {
     const input = `
 decision "Test Decision":
     when "Age Greater Than 18" then do "Standard Care".
@@ -273,11 +273,11 @@ done`;
     expect(decision.body.statements).toHaveLength(2);
     const whenBlock1 = decision.body.statements[0] as WhenBlock;
     const whenBlock2 = decision.body.statements[1] as WhenBlock;
-    expect(whenBlock1.conceptName).toBe('Age Greater Than 18');
-    expect(whenBlock2.conceptName).toBe('Age Greater Than 18');
+    expect(whenBlock1.conceptName).toBe("Age Greater Than 18");
+    expect(whenBlock2.conceptName).toBe("Age Greater Than 18");
   });
 
-  it('should preserve repeated use statements', () => {
+  it("should preserve repeated use statements", () => {
     const input = `
 decision "Test Decision":
     when "Age" then:
@@ -291,21 +291,21 @@ done`;
     const whenBlock = decision.body.statements[0] as WhenBlock;
     const blockBody = whenBlock.body as BlockBody;
     expect(blockBody.statements).toHaveLength(2);
-    
+
     const useAction1 = blockBody.statements[0] as ActionStatement;
     const useAction2 = blockBody.statements[1] as ActionStatement;
-    
-    expect(useAction1.type).toBe('ActionStatement');
-    expect(useAction2.type).toBe('ActionStatement');
-    
-    expect(useAction1.action.type).toBe('UseDecision');
-    expect(useAction2.action.type).toBe('UseDecision');
-    
-    expect((useAction1.action as UseDecision).decisionName).toBe('Protocol1');
-    expect((useAction2.action as UseDecision).decisionName).toBe('Protocol2');
+
+    expect(useAction1.type).toBe("ActionStatement");
+    expect(useAction2.type).toBe("ActionStatement");
+
+    expect(useAction1.action.type).toBe("UseDecision");
+    expect(useAction2.action.type).toBe("UseDecision");
+
+    expect((useAction1.action as UseDecision).decisionName).toBe("Protocol1");
+    expect((useAction2.action as UseDecision).decisionName).toBe("Protocol2");
   });
 
-  it('should preserve repeated do statements', () => {
+  it("should preserve repeated do statements", () => {
     const input = `
 decision "Test Decision":
     when "Age" then:
@@ -319,21 +319,21 @@ done`;
     const whenBlock = decision.body.statements[0] as WhenBlock;
     const blockBody = whenBlock.body as BlockBody;
     expect(blockBody.statements).toHaveLength(2);
-    
+
     const doAction1 = blockBody.statements[0] as ActionStatement;
     const doAction2 = blockBody.statements[1] as ActionStatement;
-    
-    expect(doAction1.type).toBe('ActionStatement');
-    expect(doAction2.type).toBe('ActionStatement');
-    
-    expect(doAction1.action.type).toBe('DoActivity');
-    expect(doAction2.action.type).toBe('DoActivity');
-    
-    expect((doAction1.action as DoActivity).activityName).toBe('Action1');
-    expect((doAction2.action as DoActivity).activityName).toBe('Action2');
+
+    expect(doAction1.type).toBe("ActionStatement");
+    expect(doAction2.type).toBe("ActionStatement");
+
+    expect(doAction1.action.type).toBe("DoActivity");
+    expect(doAction2.action.type).toBe("DoActivity");
+
+    expect((doAction1.action as DoActivity).activityName).toBe("Action1");
+    expect((doAction2.action as DoActivity).activityName).toBe("Action2");
   });
 
-  it('should preserve mixed repeated statements', () => {
+  it("should preserve mixed repeated statements", () => {
     const input = `
 decision "Test Decision":
     when "Age" then:
@@ -348,28 +348,28 @@ done`;
     const decision = result.statements[0] as Decision;
     const whenBlock = decision.body.statements[0] as WhenBlock;
     const blockBody = whenBlock.body as BlockBody;
-    
+
     // Verify statements
     expect(blockBody.statements).toHaveLength(4);
-    
+
     const doAction1 = blockBody.statements[0] as ActionStatement;
     const useAction1 = blockBody.statements[1] as ActionStatement;
     const doAction2 = blockBody.statements[2] as ActionStatement;
     const useAction2 = blockBody.statements[3] as ActionStatement;
-    
-    expect(doAction1.type).toBe('ActionStatement');
-    expect(useAction1.type).toBe('ActionStatement');
-    expect(doAction2.type).toBe('ActionStatement');
-    expect(useAction2.type).toBe('ActionStatement');
-    
-    expect(doAction1.action.type).toBe('DoActivity');
-    expect(useAction1.action.type).toBe('UseDecision');
-    expect(doAction2.action.type).toBe('DoActivity');
-    expect(useAction2.action.type).toBe('UseDecision');
-    
-    expect((doAction1.action as DoActivity).activityName).toBe('Action1');
-    expect((useAction1.action as UseDecision).decisionName).toBe('Protocol1');
-    expect((doAction2.action as DoActivity).activityName).toBe('Action2');
-    expect((useAction2.action as UseDecision).decisionName).toBe('Protocol2');
+
+    expect(doAction1.type).toBe("ActionStatement");
+    expect(useAction1.type).toBe("ActionStatement");
+    expect(doAction2.type).toBe("ActionStatement");
+    expect(useAction2.type).toBe("ActionStatement");
+
+    expect(doAction1.action.type).toBe("DoActivity");
+    expect(useAction1.action.type).toBe("UseDecision");
+    expect(doAction2.action.type).toBe("DoActivity");
+    expect(useAction2.action.type).toBe("UseDecision");
+
+    expect((doAction1.action as DoActivity).activityName).toBe("Action1");
+    expect((useAction1.action as UseDecision).decisionName).toBe("Protocol1");
+    expect((doAction2.action as DoActivity).activityName).toBe("Action2");
+    expect((useAction2.action as UseDecision).decisionName).toBe("Protocol2");
   });
 });
