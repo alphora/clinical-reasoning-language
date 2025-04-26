@@ -12,6 +12,7 @@ Welcome to the CPGL User Guide! This guide introduces the syntax, structure, and
 - [Top-Level Statements](#top-level-statements)
 - [Syntax and Grammar Overview](#syntax-and-grammar-overview)
 - [Authoring Guidelines](#authoring-guidelines)
+- [Activity Deduplication and Reference Resolution](#activity-deduplication-and-reference-resolution)
 - [Example: A Complete CPGL Library](#example-a-complete-cpgl-library)
 - [References](#references)
 - [Keywords](#keywords)
@@ -153,6 +154,36 @@ terminology "Colonoscopy" system `http://snomed.info/sct` code `73761001`.
 
 ---
 
+## Activity Deduplication and Reference Resolution
+
+When using the FSH-to-CPGL transformer, the tool automatically deduplicates activities and manages references as follows:
+
+- **Deduplication:**  
+  Each unique combination of activity name and value is defined only once in the output.  
+  If multiple activities share the same name but have different values, suffixes (`_2`, `_3`, etc.) are added to the name (inside the quotes) to ensure uniqueness.
+
+- **Reference Replacement:**  
+  All references to activities in `do` statements are updated to use the final, unique name (with suffix if needed).
+
+- **Quoting and Escaping:**  
+  Quoting and escaping of activity names is handled automatically by the transformer.
+
+**Example:**
+```cpgl
+// If two activities have the same name but different values:
+activity "Last Live Vaccine Administered Within 4 Weeks"
+    perform CPGCommunicationRequest
+    of "Should not vaccinate client for MCV0 ...".
+
+activity "Last Live Vaccine Administered Within 4 Weeks_2"
+    perform CPGCommunicationRequest
+    of "Should not vaccinate client for MCV1 ...".
+```
+
+For more technical details, see the [Activity Deduplication and Reference Requirements](./src/transformer/fsh-to-cpgl/docs/Activity%20Deduplication%20and%20Reference%20Requirements.md).
+
+---
+
 ## Example: A Complete CPGL Library
 
 ```cpgl
@@ -211,7 +242,6 @@ The following are all reserved keywords in CPGL:
 - `coded`
 - `code`
 - `concept`
-- `condition`
 - `decision`
 - `do`
 - `done`

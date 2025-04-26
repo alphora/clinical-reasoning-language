@@ -141,6 +141,8 @@ the CPG-L value would be:
 
 "Provide vaccinations according to the recommended schedule"
 
+- `exists()`: check for the existence of the definition.
+
 - `toString()`: ensure the value meets the requirements of a CPG-L string:
 
 ```regex
@@ -183,6 +185,8 @@ and:
 then:
 
 the CPG-L value would be: MedicationRequest.
+
+- `prefix(string)`: add the `string` argument to the front of the CPG-L value.
 
 - `where(clause)`: only generate a CPG-L value if the clause arguments exists.
 
@@ -240,29 +244,102 @@ then:
 
 the CPG-L value would not be generated (because the value would be "", an empty string).
 
-- `extractCode()`: the CPG-L value is the result of executing the regex transform, where `input` is the FSH Path Value:
+- `toCode()`: the CPG-L value is the result of executing the regex transform, where `input` is the FSH Path Value:
 
 ```regex
-input.replace(/\$(\w+)#(\w+)\s+".*?"/, 'system "$1" code "$2"')
+input
+  .replace(/^"([^"]+)"$/, (_, match) => '`' + match.toLowerCase().replace(/\s+/g, '-') + '`');
+
 ```
 
 For example:
 
 given:
 
-```FSH
-Instance: IMMZD2DTMeaslesCIMR
-InstanceOf: http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-immunizationactivity
-* productCodeableConcept = $ICD11#XM28X5 "Measles vaccines"
+```CPG-L
+concept "Measles Routine Immunization":
+    has type Observation.
+    has valuetype boolean.
+    coded by "IMMZDTImmunizationStrategy_CheckImmunizations_Term".
+done
+term
 ```
 
 and:
 
-`ActivityDef.productCodeableConcept.extractCode()`
+`concept.identifier.toCode()`
 
 then:
 
-the CPG-L value would be: system "ICD11" code "XM28X5"
+the CPG-L value would be: code `XM28X5`
+
+- `create(type)`: creates a new CPG-L object of the argument type and retuns it as `new-<type>`.
+
+ForExample:
+
+given:
+
+```cpgl
+concept "Measles Routine Immunization":
+    has type Observation.
+    has valuetype boolean.
+    coded by "Measles Routine Immunization".
+done
+```
+
+and:
+
+```fsh-mapping
+
+- create(terminology)
+  - new-terminology.identifier < concept.identifier
+  - new-terminology.system < "http://sdh.com/cqis/kalm"
+  - new-terminology.code < concept.identifier.toCode()
+```
+
+then the resulting CPG-L is:
+
+```cpgl
+concept "Measles Routine Immunization":
+    has type Observation.
+    has valuetype boolean.
+    coded by "Measles Routine Immunization".
+done
+
+terminology "Measles Routine Immunization" system `http://sdh.com/cqis/kalm` code `measles-routine-immunization`
+```
+
+- `extractCode()`: the CPG-L value is the result of:
+
+1. executing the regex transform, where `input` is the FSH Path Value:
+
+```regex
+result[] = input.exec(/(\$\w+)#(\w+)\s+".*?"/)
+```
+
+2. and then setting a temporary variable `systemResult` to the lookup of the `result[0]` value up in the `aliases`.
+
+3. and then the CPG-L value is "system `<systemResult>` code `<result[1]>`"
+
+For example:
+
+given:
+
+```FSH
+Alias: $ICD11 = http://id.who.int/icd/release/11/mms
+
+Instance: IMMZD2DTMeaslesCIMR
+InstanceOf: http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-immunizationactivity
+* medicationCodeableConcept = $ICD11#XM28X5 "Measles vaccines"
+```
+
+and:
+
+`ActivityDef.medicationCodeableConcept.extractCode()`
+
+then:
+
+the CPG-L value would be: "system `http://id.who.int/icd/release/11/mms` code `XM28X5`"
 
 - `extractCodeDisplay()`: the CPG-L value is the result of executing the regex transform, where `input` is the FSH Path Value:
 
@@ -277,21 +354,25 @@ given:
 ```FSH
 Instance: IMMZD2DTMeaslesCIMR
 InstanceOf: http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-immunizationactivity
-* productCodeableConcept = $ICD11#XM28X5 "Measles vaccines"
+* medicationCodeableConcept = $ICD11#XM28X5 "Measles vaccines"
 ```
 
 and:
 
-`ActivityDef.productCodeableConcept.extractCodeDisplay()`
+`ActivityDef.medicationCodeableConcept.extractCodeDisplay()`
 
 then:
 
 the CPG-L value would be: system "Measles vaccines"
 
+- `navigate()`: use the value of the reference to navigate to the target resource.
+
+- `ensure(type)`: require the resource to be of argument `type` type.
+
 - `extractCodeExpression()`: the CPG-L value is the result of executing the regex transform, where `input` is the FSH Path Value:
 
 ```regex
-input.replace(/Code\s*{\s*system:\s*'([^']+)',\s*code:\s*'([^']+)'\s*}/, 'system "$1" code "$2"')
+input.replace(/Code\s*{\s*system:\s*'([^']+)',\s*code:\s*'([^']+)'\s*}/, 'system `$1` code `$2`')
 ```
 
 For example:
@@ -315,9 +396,9 @@ and:
 
 then:
 
-the CPG-L value would be: system "http://id.who.int/icd/release/11/mms" code "XM28X5"
+the CPG-L value would be: system `http://id.who.int/icd/release/11/mms` code `XM28X5`
 
-- "": the quoted string is inserted literally into the resulting CPG-L value.
+- "<string>": the quoted string is inserted literally into the resulting CPG-L value.  Note, `<string>` can be the empty string.
 
 For example:
 
@@ -342,6 +423,8 @@ The resulting CPG-L value would be:
 
 ```
 
+- `doNot()`: prefix the CPG-L value with "do not".
+ - `coded
 #### FSH Path Values
 
 FSH Path Values are the value of a given FSH Path, as defined in this section.  
@@ -350,7 +433,9 @@ The expression `[*].action` in these mapping rules means an arbitrary nesting of
 
 <!-- TODO: dynamicValue -->
 
-- `plandef` = Instance of PlanDef
+- `plandef-instance` = Instance of PlanDef
+
+- `plandef-title` = Title of PlanDef
 
 - `plandef-description` = Description of PlanDef
 
@@ -358,7 +443,7 @@ The expression `[*].action` in these mapping rules means an arbitrary nesting of
 
 - `plandef-action` = `PlanDef.action` or `[*].action`
 
-- `plandef-canonical` = `PlanDef.action.definitionCanonical` or `[*].action.definitionCanonical` Note, `plandef-canonical` is a navigation term as described in [Navigation](#navigation).  It does not get mapped to a CPG-L term.
+- `plandef-canonical` = `PlanDef.action.definitionCanonical.navigate().ensure(plandef-instance).plandef-description.toIdentifier()` or `[*].action.definitionCanonical.navigate().ensure(plandef-instance).plandef-description.toIdentifier()` Note, `plandef-canonical` is a navigation term as described in [Navigation](#navigation).  It does not get mapped to a CPG-L term.
 
 - `plandef-condition` = `PlanDef.action.condition` or `[*].action.condition`
 
@@ -366,23 +451,26 @@ The expression `[*].action` in these mapping rules means an arbitrary nesting of
 
 - `plandef-title` = `PlanDef.action.title.toIdentifier()` or `[*].action.title.toIdentifier()`
 
-- `plandef-description` = `PlanDef.action.description.toIdentifier()` or `[*].action.description.toIdentifier()` (note, `plandef-description` is different than `Description`)
+- `plandef-action-description` = `PlanDef.action.description.toIdentifier()` or `[*].action.description.toIdentifier()` (note, `plandef-action-description` is different than `Description`)
 
-- `plandef-rationale` = `PlanDef.extension.valueMarkdown.toString()` or `[*].action.extension.valueMarkdown.toString()`
+// add this: http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-rationale
+- `plandef-rationale` = `PlanDef.action.extension.valueMarkdown.toString()` or `[*].action.extension.valueMarkdown.toString()`
 
 - `activitydef` = Instance of ActivityDef
 
 - `activitydef-description` = Description of ActivityDef
 
-- `activitydef-kind` = `ActivityDef.kind.remove('#')`
+- `activitydef-kind` = `ActivityDef.kind.remove('#').prefix('CPG')`
 
 - `activitydef-code` = one of either:
-  - `ActivityDef.productCodeableConcept.extractCode()`
+  - `ActivityDef.medicationCodeableConcept.extractCode()`
   - `ActivityDef.dynamicValue.expression.expression.where(ActivityDef.dynamicValue.path="code.coding").extractCodeExpression()`
 
 - `activitydef-code-display` = one of either:
-  - `ActivityDef.productCodeableConcept.extractCodeDisplay()`
+  - `ActivityDef.medicationCodeableConcept.extractCodeDisplay()`
   - `ActivityDef.dynamicValue.expression.description.where(ActivityDef.dynamicValue.path="code.coding")`
+
+- `activity_def-donotperform` = `ActivityDef.doNotPerform`
 
 ## CPG-L Defined Terms
 
@@ -505,24 +593,3 @@ is a reference from the IMMZDTImmunizationStrategy FSR FHIR resource to the foll
 ```FSH
 Instance: IMMZD2DTMeaslesDose0
 ```
-
-## Rules
-
-- plandef > decision
-- plandef-description > decision.identifier
-- plandef-citation > decision.comment
-- plandef-action > decision.when
-- plandef-canonical > decision.when.use
-- plandef-condition.expression > decision.when.identifier
-- plandef-title > decision.when.identifier
-- activitydef-description > decision.when.do
-- plandef-rationale > decision.rationale
-- plandef-description > decision.comment
-- activitydef > activity
-- activitydef-description > activity.identifier
-- activitydef-kind > activity.perform
-- activitydef-code-display > activity.perform.of
-- activitydef-code-display > terminology.identifier
-- activitydef-code > terminology.code
-- plandef-condition > concept
-- plandef-condition-expression > concept.identifier

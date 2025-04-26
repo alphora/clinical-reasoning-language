@@ -47,10 +47,12 @@
     "cli:ast:pretty": "ts-node src/cli/run-ast.ts --pretty",
     "cli:validator": "ts-node src/cli/run-validator.ts",
     "cli:validator:pretty": "ts-node src/cli/run-validator.ts --pretty",
+    "cli:transformer:fsh-to-cpgl": "ts-node src/cli/run-transformer-fsh-to-cpgl.ts",
     "prebuild": "npm run clean",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "prepublish:github": "node scripts/prepublishGithub.js",
+    "util:clonefsh": "npx ts-node scripts/clone-fsh-repo.ts",
     "git:unmerged": "ts-node scripts/unmerged-branches.ts"
   },
   "keywords": [
@@ -65,6 +67,7 @@
   "license": "MIT",
   "dependencies": {
     "antlr4ts": "^0.5.0-alpha.4",
+    "fsh-sushi": "^3.15.0",
     "prompts": "^2.4.2"
   },
   "devDependencies": {

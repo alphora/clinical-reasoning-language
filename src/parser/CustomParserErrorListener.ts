@@ -2,7 +2,7 @@ import { ANTLRErrorListener, RecognitionException, Recognizer, Token } from "ant
 import { ATNSimulator } from "antlr4ts/atn/ATNSimulator";
 
 export class CustomParserErrorListener implements ANTLRErrorListener<Token> {
-  private errors: string[] = [];
+  private readonly errors: string[] = [];
 
   syntaxError(
     recognizer: Recognizer<Token, ATNSimulator>,
@@ -18,8 +18,8 @@ export class CustomParserErrorListener implements ANTLRErrorListener<Token> {
       column: charPositionInLine,
       message: `Syntax error: ${msg}`,
       details: {
-        offendingSymbol: offendingSymbol?.text || "unknown",
-      },
+        offendingSymbol: offendingSymbol?.text ?? "unknown"
+      }
     });
     console.error(errorMessage);
     this.errors.push(errorMessage);

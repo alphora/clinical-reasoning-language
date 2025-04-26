@@ -101,6 +101,60 @@ The validator tool checks the AST for errors and displays:
 * Error messages with line and column numbers
 * Warning messages with line and column numbers
 
+### FSH-to-CPGL Transformer Tool
+
+The FSH-to-CPGL transformer converts FHIR Shorthand (FSH) files into Clinical Practice Guideline Language (CPGL) files. It supports advanced mapping and deduplication logic for activities, concepts, and terminology blocks.
+
+### Activity Mapping Enhancements
+
+- **Conditional `do not perform`**: If an activity in FSH has `doNotPerform = true`, the generated CPGL will emit `do not perform` instead of `perform` for that activity.
+  
+  Example:
+  ```cpgl
+  activity "Check Contraindication for Measles Immunization"
+      do not perform CPGMedicationRequest of "Measles vaccines"
+  ```
+
+- **Activity Terminology Block Emission**:
+  - For activities with a `medicationCodeableConcept`, the terminology block uses the `system` and `code` properties directly from the FSH object (not parsed from a string).
+  - For activities using `dynamicValue.expression.expression` with `path = "code.coding"`, the code and system are extracted from the CQL code expression.
+  - Example:
+    ```cpgl
+    terminology "Measles vaccines" system `http://id.who.int/icd/release/11/mms` code `XM28X5`.
+    ```
+
+- **Deduplication and Suffixing**:
+  - Terminology blocks are unique by identifier and body. If a duplicate identifier is encountered with a different body, a numeric suffix (e.g., `_2`) is added to the identifier.
+  - If both identifier and body are the same, the block is not duplicated.
+
+- **Extraction Logic**:
+  - For `medicationCodeableConcept`, the transformer uses:
+    - `system`: from `pccRule.value.system`
+    - `code`: from `pccRule.value.code`
+    - `identifier`: from `pccRule.value.display`
+  - For `dynamicValue.expression.expression` (where `path = "code.coding"`), the transformer uses:
+    - `system` and `code`: extracted from the CQL code expression string
+    - `identifier`: from the corresponding description
+
+- **Example Usage**:
+  ```fsh
+  * medicationCodeableConcept = $ICD11#XM28X5 "Measles vaccines"
+  // ...
+  * dynamicValue[+]
+    * path = "code.coding"
+    * expression
+      * description = "Measles Code"
+      * language = #text/cql
+      * expression = "Code { system: 'http://id.who.int/icd/release/11/mms', code: 'XM28X5' }"
+  ```
+  Generates:
+  ```cpgl
+  terminology "Measles vaccines" system `http://id.who.int/icd/release/11/mms` code `XM28X5`.
+  terminology "Measles Code" system `http://id.who.int/icd/release/11/mms` code `XM28X5`.
+  ```
+
+For more details, see the [User Guide](./USER_GUIDE.md) and the technical mapping documentation.
+
 ## Features
 
 ### Language Features
@@ -575,6 +629,52 @@ function isValidActivityType(type: string): type is ActivityType {
 
 * No more manual updates or risk of drift between grammar and code.
 * All validation, error reporting, and type checking use the same lists.
+
+## FSH-to-CPGL Transformer
+
+This project includes a transformer that converts FHIR Shorthand (FSH) files into Clinical Practice Guideline Language (CPG-L) files. The transformer is located in `src/transformer/fsh-to-cpgl/`.
+
+### Example Data: WHO Measles Immunization
+
+The example FSH files and CPG-L outputs in `src/examples/fsh/who/smart-example-immz/` and `src/examples/cpgl/who/smart-example-immz/` are derived from the [WHO SMART Guidelines - Example IG for Measles Immunization](https://github.com/WorldHealthOrganization/smart-example-immz).
+
+- **Source repository:** [WorldHealthOrganization/smart-example-immz](https://github.com/WorldHealthOrganization/smart-example-immz)
+- **License:** [CC BY-IGO 3.0](https://github.com/WorldHealthOrganization/smart-example-immz/blob/main/LICENSE.md)
+
+These examples are used for development, testing, and demonstration of the transformer.
+
+## Loading a New FSH IG and Running the Transformer
+
+To load a new FSH Implementation Guide (IG) and run the FSH-to-CPGL transformer, follow these steps:
+
+### 1. Clone the FSH IG Repository
+
+Use the provided script to clone a FSH IG repository into the project:
+
+```sh
+npx ts-node scripts/clone-fsh-repo.ts <github-repo-url>
+```
+- This will clone the repo into `src/examples/fsh/<repo-name>`.
+- The script will clean up unnecessary files, restore only the required FSH/CQL/data files, append `FSHOnly: true` to `sushi-config.yaml`, and add the folder to `.gitignore`.
+
+### 2. Run the Transformer
+
+Transform the FSH IG to CPGL using the CLI:
+
+```sh
+npm run cli:transformer:fsh-to-cpgl -- src/examples/fsh/<repo-name>
+```
+- This will process the FSH files in the specified directory and output the generated CPGL to the console.
+
+### Example
+```sh
+npx ts-node scripts/clone-fsh-repo.ts https://github.com/example/fsh-ig-repo.git
+npm run cli:transformer:fsh-to-cpgl -- src/examples/fsh/fsh-ig-repo
+```
+
+See the User Guide for more details on authoring and transformation logic.
+
+---
 
 ## Generated Type Lists
 
