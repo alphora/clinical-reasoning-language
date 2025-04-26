@@ -1,4 +1,4 @@
-# @cqis/cpgl
+# @smiledigitalhealth/cpgl
 
 Clinical Practice Guideline Language (CPGL) parser and validator
 
@@ -141,7 +141,7 @@ The package provides four main functions for processing CPGL code:
 ### 1. Tokenization
 
 ```typescript
-import { tokenizeCPGL } from '@cqis/cpgl';
+import { tokenizeCPGL } from '@smiledigitalhealth/cpgl';
 
 const result = tokenizeCPGL(`
   decision "Test":
@@ -161,7 +161,7 @@ if (result.success) {
 ### 2. Parsing
 
 ```typescript
-import { parseCPGL } from '@cqis/cpgl';
+import { parseCPGL } from '@smiledigitalhealth/cpgl';
 
 const result = parseCPGL(`
   decision "Test":
@@ -181,7 +181,7 @@ if (result.success) {
 ### 3. AST Building
 
 ```typescript
-import { buildCPGL } from '@cqis/cpgl';
+import { buildCPGL } from '@smiledigitalhealth/cpgl';
 
 const result = buildCPGL(`
   decision "Test":
@@ -201,7 +201,7 @@ if (result.success) {
 ### 4. Validation
 
 ```typescript
-import { validateCPGL } from '@cqis/cpgl';
+import { validateCPGL } from '@smiledigitalhealth/cpgl';
 
 const result = validateCPGL(`
   decision "Test":
