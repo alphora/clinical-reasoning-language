@@ -1,4 +1,3 @@
-
 // Test suite imports
 import "./regression-ast.test";
 import "./regression-lexer.test";

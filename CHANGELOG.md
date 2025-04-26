@@ -242,3 +242,15 @@ Commits included since v0.5.1:
 
 ### Added
 - **Release Workflow:** Added a GitHub Actions workflow to require all tests to pass before a release is published.
+
+## [v0.5.4]
+
+### Fixed
+- Regression not running in GitHub CI.
+- Included dist and generated files for GitHub Publish to ensure all necessary files are present for deployment and installation.
+- Included files needed for GitHub deploy to improve release reliability.
+
+Commits included since v0.5.3:
+- 7643835 Regression not running in github ci
+- 249cdb6 Include dist and generated files for GitHub Publish
+- f56580a Include files needed for github deploy
