@@ -50,7 +50,8 @@
     "prebuild": "npm run clean",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
-    "prepublish:github": "node scripts/prepublishGithub.js"
+    "prepublish:github": "node scripts/prepublishGithub.js",
+    "git:unmerged": "ts-node scripts/unmerged-branches.ts"
   },
   "keywords": [
     "clinical",
@@ -63,7 +64,8 @@
   "author": "CQIS",
   "license": "MIT",
   "dependencies": {
-    "antlr4ts": "^0.5.0-alpha.4"
+    "antlr4ts": "^0.5.0-alpha.4",
+    "prompts": "^2.4.2"
   },
   "devDependencies": {
     "@types/jest": "^29.5.12",
