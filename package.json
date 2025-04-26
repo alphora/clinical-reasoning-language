@@ -51,6 +51,7 @@
     "prebuild": "npm run clean",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
+    "test:regression": "jest src/tests/index.test.ts --verbose --no-cache --colors --forceExit --detectOpenHandles --watchAll=false",
     "prepublish:github": "node scripts/prepublishGithub.js",
     "util:clonefsh": "npx ts-node scripts/clone-fsh-repo.ts",
     "git:unmerged": "ts-node scripts/unmerged-branches.ts"
