@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.json",
+  "include": [
+    "src/**/*.test.ts",
+    "src/**/*.spec.ts",
+    "src/**/tests/**/*.ts",
+    "src/ast/tests/**/*.ts",
+    "src/lexer/tests/**/*.ts",
+    "src/parser/tests/**/*.ts",
+    "src/transformer/fsh-to-cpgl/mapping/**/*.test.ts",
+    "tests/**/*.ts"
+  ]
+} 

@@ -1,5 +1,6 @@
 import { execSync } from "child_process";
 import fs from "fs";
+
 const prompts = require("prompts");
 
 function run(cmd: string, options: { silent?: boolean } = {}): string {
