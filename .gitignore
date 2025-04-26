@@ -53,3 +53,5 @@ src/grammar/generated/antlr/
 # Ignore FSH examples
 
 src/examples/fsh/smart-example-immz/
+
+dist/
