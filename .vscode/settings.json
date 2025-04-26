@@ -1,0 +1,64 @@
+{
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.fixAll": true,
+      "source.fixAll.eslint": true
+    },
+    "eslint.validate": [
+      "typescript"
+    ],
+    "prettier.requireConfig": true,
+  
+    "sonarlint.connectedMode.project": {
+      "projectKey": "clinical-practice-guideline-language"
+    },
+    "sonarlint.rules": {
+      "typescript:S1128": {
+        "level": "off",
+        "parameters": {
+          "exclusions": [
+            "src/grammar/generated/**/*.ts"
+          ]
+        }
+      },
+      "typescript:S3863": {
+        "level": "off",
+        "parameters": {
+          "exclusions": [
+            "src/grammar/generated/**/*.ts"
+          ]
+        }
+      },
+      "typescript:S6535": {
+        "level": "off",
+        "parameters": {
+          "exclusions": [
+            "src/grammar/generated/**/*.ts"
+          ]
+        }
+      },
+      "typescript:S1444": {
+        "level": "off",
+        "parameters": {
+          "exclusions": [
+            "src/grammar/generated/**/*.ts"
+          ]
+        }
+      }
+    },
+    "cSpell.words": [
+        "activitydef",
+        "alphora",
+        "CIMR",
+        "CPGL",
+        "cqis",
+        "IMMZ",
+        "IMMZD",
+        "IMMZDT",
+        "LPAREN",
+        "RPAREN",
+        "smiledigitalhealth",
+        "valuetype"
+    ]
+  }
+  

@@ -2,6 +2,7 @@
 const fs = require('fs');
 const { execSync } = require('child_process');
 const path = require('path');
+const crypto = require('crypto');
 
 function run(cmd) {
   console.log(`[prepublish:github] $ ${cmd}`);
@@ -13,48 +14,64 @@ function tryRun(cmd) {
     run(cmd);
     return true;
   } catch (e) {
-    // Log the error for debugging purposes
     console.warn(`[prepublish:github] Command failed: ${cmd}\n${e}`);
     return false;
   }
 }
 
+function hashContent(content) {
+  return crypto.createHash('sha256').update(content, 'utf8').digest('hex');
+}
+
 function updateGitignore(removeDist) {
   const gitignorePath = path.join(process.cwd(), '.gitignore');
-  let gitignore = fs.readFileSync(gitignorePath, 'utf8').split('\n');
+  const originalContent = fs.readFileSync(gitignorePath, 'utf8');
+  const originalHash = hashContent(originalContent);
+
+  let gitignoreLines = originalContent.split('\n');
+  const normalizedLines = gitignoreLines.map(line => line.trim());
+  const distIndex = normalizedLines.findIndex(line => line === 'dist/' || line === 'dist');
+
   if (removeDist) {
-    gitignore = gitignore.filter(line => !/^dist\/?$/.test(line.trim()));
-  } 
-  if (!removeDist) {
-    if (!gitignore.some(line => /^dist\/?$/.test(line.trim()))) {
-      gitignore.push('dist/');
+    if (distIndex !== -1) {
+      gitignoreLines = gitignoreLines.filter((_, idx) => idx !== distIndex);
+      fs.writeFileSync(gitignorePath, gitignoreLines.join('\n'));
+      console.log('[prepublish:github] Removed dist/ from .gitignore');
+    } else {
+      console.log('[prepublish:github] dist/ was not in .gitignore, no changes needed.');
     }
-  }
-  fs.writeFileSync(gitignorePath, gitignore.join('\n'));
-}
-
-function updateGitignoreGenerated(removeIgnore) {
-  const gitignorePath = path.join(process.cwd(), '.gitignore');
-  let gitignore = fs.readFileSync(gitignorePath, 'utf8').split('\n');
-  const typesLine = 'src/grammar/generated/types/';
-  const antlrLine = 'src/grammar/generated/antlr/';
-  if (removeIgnore) {
-    gitignore = gitignore.filter(line => line.trim() !== typesLine && line.trim() !== antlrLine);
   } else {
-    if (!gitignore.includes(typesLine)) gitignore.push(typesLine);
-    if (!gitignore.includes(antlrLine)) gitignore.push(antlrLine);
+    if (distIndex === -1) {
+      gitignoreLines.push('dist/');
+      fs.writeFileSync(gitignorePath, gitignoreLines.join('\n'));
+      console.log('[prepublish:github] Added dist/ back to .gitignore');
+    } else {
+      console.log('[prepublish:github] dist/ already present in .gitignore, no changes needed.');
+    }
   }
-  fs.writeFileSync(gitignorePath, gitignore.join('\n'));
+
+  const updatedContent = fs.readFileSync(gitignorePath, 'utf8');
+  const updatedHash = hashContent(updatedContent);
+
+  const modified = originalHash !== updatedHash;
+  if (modified) {
+    console.log('[prepublish:github] .gitignore was modified.');
+  } else {
+    console.log('[prepublish:github] .gitignore remained unchanged.');
+  }
+
+  return modified;
 }
 
-function rollback(steps) {
-  for (const step of steps.reverse()) {
-    try {
-      step();
-    } catch (e) {
-      // Log rollback errors for visibility
-      console.warn('[prepublish:github] Rollback step failed:', e);
-    }
+function rollbackGitignore(originalContent) {
+  const gitignorePath = path.join(process.cwd(), '.gitignore');
+  const currentContent = fs.readFileSync(gitignorePath, 'utf8');
+
+  if (currentContent !== originalContent) {
+    fs.writeFileSync(gitignorePath, originalContent);
+    console.warn('[prepublish:github] Rolled back .gitignore to original state.');
+  } else {
+    console.log('[prepublish:github] No rollback needed for .gitignore (unchanged).');
   }
 }
 
@@ -64,9 +81,7 @@ function isWorkingDirectoryClean() {
 }
 
 function isBranchUpToDate() {
-  // Fetch latest remote info
   execSync('git fetch');
-  // Check if local branch is behind remote
   const status = execSync('git status -uno').toString();
   return !status.includes('Your branch is behind');
 }
@@ -101,6 +116,7 @@ function verifyPostRollback(originalCommit, originalVersion, originalLocalTags) 
   const currentVersion = getPackageJsonVersion();
   const currentTags = getLocalTags();
   let ok = true;
+
   if (currentCommit !== originalCommit) {
     console.error(`[prepublish:github] WARNING: Commit hash after rollback (${currentCommit}) does not match original (${originalCommit})!`);
     ok = false;
@@ -112,9 +128,9 @@ function verifyPostRollback(originalCommit, originalVersion, originalLocalTags) 
   const missingTags = originalLocalTags.filter(tag => !currentTags.includes(tag));
   const extraTags = currentTags.filter(tag => !originalLocalTags.includes(tag));
   if (missingTags.length > 0 || extraTags.length > 0) {
-    console.error(`[prepublish:github] WARNING: Tag set after rollback does not match original.`);
-    if (missingTags.length > 0) console.error(`[prepublish:github] Missing tags: ${missingTags.join(', ')}`);
-    if (extraTags.length > 0) console.error(`[prepublish:github] Extra tags: ${extraTags.join(', ')}`);
+    console.error('[prepublish:github] WARNING: Tag set after rollback does not match original.');
+    if (missingTags.length > 0) console.error(`Missing tags: ${missingTags.join(', ')}`);
+    if (extraTags.length > 0) console.error(`Extra tags: ${extraTags.join(', ')}`);
     ok = false;
   }
   if (ok) {
@@ -126,15 +142,10 @@ function verifyPostRollback(originalCommit, originalVersion, originalLocalTags) 
 
 function verifyRemotePostRollback(originalRemoteCommit, branch) {
   const currentRemoteCommit = getRemoteCommit(branch);
-  let ok = true;
   if (currentRemoteCommit !== originalRemoteCommit) {
     console.error(`[prepublish:github] CRITICAL: Remote commit after rollback (${currentRemoteCommit}) does not match original remote commit (${originalRemoteCommit})! Manual intervention required.`);
-    ok = false;
-  }
-  if (ok) {
-    console.log('[prepublish:github] Post-rollback verification: remote state matches original.');
   } else {
-    console.error('[prepublish:github] Post-rollback verification: remote state does NOT match original.');
+    console.log('[prepublish:github] Post-rollback verification: remote state matches original.');
   }
 }
 
@@ -155,115 +166,70 @@ function main() {
     process.exit(1);
   }
 
-  // --- Record initial state ---
   const originalCommit = execSync('git rev-parse HEAD').toString().trim();
   const branch = getCurrentBranch();
   const originalRemoteCommit = getRemoteCommit(branch);
   const originalGitignore = fs.readFileSync('.gitignore', 'utf8');
-  const originalRemoteTags = getRemoteTags();
   const originalLocalTags = getLocalTags();
   const originalVersion = getPackageJsonVersion();
 
-  const rollbackSteps = [];
-  let taggedVersion = null;
+  // Rollback flags
+  let gitignoreModified = false;
+  let distCommitted = false;
+  let versionTagged = false;
   let versionBumpCommit = null;
   let tagsPushed = false;
-  let newTags = [];
+  let taggedVersion = null;
 
   try {
-    // 1. Remove dist/ from .gitignore
-    updateGitignore(true);
-    // Remove ignore for generated folders
-    updateGitignoreGenerated(true);
-    rollbackSteps.push(() => {
-      console.warn('[prepublish:github] Rolling back: restoring .gitignore');
-      updateGitignore(false);
-      updateGitignoreGenerated(false);
-      tryRun('git add .gitignore');
-      // Only commit if there are staged changes
-      const status = require('child_process').execSync('git diff --cached --name-only').toString().trim();
-      if (status) {
-        tryRun('git commit -m "Restore .gitignore after failed prepublish:github"');
-      } else {
-        console.warn('[prepublish:github] No staged changes to commit for .gitignore rollback.');
-      }
-    });
-    console.log('[prepublish:github] Removed dist/ and generated ignores from .gitignore');
+    // 1. Update .gitignore if needed
+    gitignoreModified = updateGitignore(true);
 
-    // 2. Build the project
+    // 2. Build
     run('npm run build');
 
-    // 3. Add and commit dist/ and all generated files
-    run('git add dist src/grammar/generated/antlr src/grammar/generated/types .gitignore');
-    run('git commit -m "Include dist and generated files for GitHub Publish"');
-    rollbackSteps.push(() => {
-      console.warn('[prepublish:github] Rolling back: resetting commit that included dist/');
-      tryRun('git reset --hard HEAD~1');
-    });
+    // 3. Add and commit dist/ + .gitignore
+    run('git add dist .gitignore');
+    run('git commit -m "Include dist for GitHub Publish"');
+    distCommitted = true;
 
-    // 4. Tag (version increment or explicit version)
+    // 4. Bump version and tag
     run(`npm version ${arg}`);
     taggedVersion = require(path.join(process.cwd(), 'package.json')).version;
     versionBumpCommit = execSync('git rev-parse HEAD').toString().trim();
-    // Track new local tags
-    newTags = getLocalTags().filter(tag => !originalLocalTags.includes(tag));
-    rollbackSteps.push(() => {
-      if (taggedVersion) {
-        console.warn(`[prepublish:github] Rolling back: deleting tag v${taggedVersion}`);
-        tryRun(`git tag -d v${taggedVersion}`);
-        tryRun(`git push --delete origin v${taggedVersion}`);
-      }
-      if (versionBumpCommit) {
-        console.warn('[prepublish:github] Rolling back: resetting version bump commit');
-        tryRun(`git reset --hard ${originalCommit}`);
-      }
-      // Delete any new local tags
-      for (const tag of newTags) {
-        if (!originalLocalTags.includes(tag)) {
-          console.warn(`[prepublish:github] Rolling back: deleting new local tag ${tag}`);
-          tryRun(`git tag -d ${tag}`);
-        }
-      }
-    });
+    versionTagged = true;
 
-    // 5. Push
+    // 5. Push commits and tags
     run('git push');
     run('git push --tags');
     tagsPushed = true;
-    rollbackSteps.push(() => {
-      if (tagsPushed) {
-        if (process.env.NO_FORCE_ROLLBACK === '1') {
-          console.warn('[prepublish:github] Skipping remote force-push rollback due to NO_FORCE_ROLLBACK=1. Manual intervention required to restore remote state.');
-        } else {
-          console.warn('[prepublish:github] WARNING: Force-pushing original remote commit to remote branch to complete rollback. This will overwrite remote history!');
-          tryRun(`git push --force origin ${originalRemoteCommit}:${branch}`);
-          // Delete any new remote tags
-          const currentRemoteTags = getRemoteTags();
-          for (const tag of currentRemoteTags) {
-            if (!originalRemoteTags.includes(tag)) {
-              console.warn(`[prepublish:github] Rolling back: deleting new remote tag ${tag}`);
-              tryRun(`git push --delete origin ${tag}`);
-            }
-          }
-        }
-      }
-    });
 
-    // 6. Re-add dist/ to .gitignore
-    updateGitignore(false);
-    // Restore ignore for generated folders
-    updateGitignoreGenerated(false);
-    run('git add .gitignore');
-    run('git commit -m "Restore dist/ and generated ignores to .gitignore after GitHub Publish"');
-    run('git push');
+    // 6. Restore .gitignore
+    if (gitignoreModified) {
+      updateGitignore(false);
+      run('git add .gitignore');
+      run('git commit -m "Restore dist/ to .gitignore after GitHub Publish"');
+      run('git push');
+    }
 
     console.log('[prepublish:github] Release process complete!');
   } catch (err) {
     console.warn('[prepublish:github] Error occurred, starting rollback...');
-    // --- Full transactional rollback ---
-    // Restore .gitignore
-    fs.writeFileSync('.gitignore', originalGitignore);
-    rollback(rollbackSteps);
+    if (tagsPushed && taggedVersion) {
+      tryRun(`git push --delete origin v${taggedVersion}`);
+    }
+    if (versionTagged && versionBumpCommit) {
+      tryRun(`git reset --hard ${originalCommit}`);
+    }
+    if (distCommitted) {
+      tryRun('git reset --hard HEAD~1');
+    }
+    if (gitignoreModified) {
+      rollbackGitignore(originalGitignore);
+      tryRun('git add .gitignore');
+      tryRun('git commit -m "Restore .gitignore after failed prepublish:github"');
+      tryRun('git push');
+    }
     verifyPostRollback(originalCommit, originalVersion, originalLocalTags);
     verifyRemotePostRollback(originalRemoteCommit, branch);
     console.error('[prepublish:github] Release failed. All possible changes rolled back.');
@@ -272,4 +238,4 @@ function main() {
   }
 }
 
-main(); 
+main();
