@@ -99,18 +99,35 @@ export class CPGLLexerErrorListener implements ANTLRErrorListener<number> {
   }
 
   syntaxError<T extends number>(
-    _recognizer: Recognizer<T, ATNSimulator>,
-    _offendingSymbol: T | undefined,
+    recognizer: Recognizer<T, ATNSimulator>,
+    offendingSymbol: T | undefined,
     line: number,
     charPositionInLine: number,
     msg: string,
     _e: RecognitionException | undefined,
   ): void {
-    const input: CharStream = _recognizer.inputStream as CharStream;
+    const input: CharStream = recognizer.inputStream as CharStream;
     const startIndex = input.index;
     let errorText = this.parseErrorText(input);
     errorText = this.parseQuotedString(input, errorText);
     const specificMessage = this.getSpecificMessage(errorText, msg);
+
+    let offendingDetails: any = { text: "unknown" };
+    // If offendingSymbol is a Token, extract details
+    if (offendingSymbol && typeof (offendingSymbol as any).text === "string") {
+      const token = offendingSymbol as unknown as Token;
+      offendingDetails = {
+        text: token.text,
+        type: token.type,
+        line: token.line,
+        charPositionInLine: token.charPositionInLine,
+        startIndex: token.startIndex,
+        stopIndex: token.stopIndex,
+        tokenIndex: token.tokenIndex,
+      };
+    } else if (offendingSymbol !== undefined) {
+      offendingDetails = { text: String(offendingSymbol) };
+    }
 
     const errorMessage = JSON.stringify({
       type: "LexicalError",
@@ -119,26 +136,27 @@ export class CPGLLexerErrorListener implements ANTLRErrorListener<number> {
       message: specificMessage,
       details: {
         message: `${msg}`,
+        offendingSymbol: offendingDetails,
       },
     });
     console.error(errorMessage);
     this.errors.push(errorMessage);
 
-    if (_recognizer instanceof CPGLLexer) {
+    if (recognizer instanceof CPGLLexer) {
       const errorToken: Token = {
         type: this.ERROR_TOKEN_TYPE,
         text: errorMessage,
         channel: Token.DEFAULT_CHANNEL,
         startIndex,
         stopIndex: input.index - 1,
-        line,
-        charPositionInLine,
+        line: line,
+        charPositionInLine: charPositionInLine,
         tokenIndex: -1,
-        tokenSource: _recognizer,
+        tokenSource: recognizer,
         inputStream: input,
       };
 
-      _recognizer.emit(errorToken);
+      recognizer.emit(errorToken);
       return;
     }
 
