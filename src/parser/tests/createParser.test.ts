@@ -17,7 +17,7 @@ describe("createParser", () => {
     // Try to parse
     try {
       parser.cpgl();
-    } catch (e) {
+    } catch (_e) {
       // ANTLR may throw, but we want to check the error listener
     }
     const errors = parserErrorListener.getErrors();

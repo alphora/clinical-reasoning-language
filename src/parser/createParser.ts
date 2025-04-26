@@ -5,8 +5,11 @@ import { createLexer } from "../lexer/createLexer";
 
 import { CustomParserErrorListener } from "./CustomParserErrorListener";
 
-export function createParser(input: string) {
-  const { lexer, errorListener: lexerErrorListener } = createLexer(input);
+export function createParser(input: string): {
+  parser: CPGLParser;
+  parserErrorListener: CustomParserErrorListener;
+} {
+  const { lexer } = createLexer(input);
   const tokenStream = new CommonTokenStream(lexer);
 
   const parserErrorListener = new CustomParserErrorListener();
@@ -14,5 +17,5 @@ export function createParser(input: string) {
   parser.removeErrorListeners();
   parser.addErrorListener(parserErrorListener);
 
-  return { parser, lexerErrorListener, parserErrorListener };
+  return { parser, parserErrorListener };
 }

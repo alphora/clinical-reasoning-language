@@ -43,8 +43,8 @@ export function prefix(value: string, prefixStr: string): string {
  * Only returns the value if the clause is satisfied (leftArg exists and equals rightArg).
  * rules: array of FSH rules, leftArg: FSH path, rightArg: value to match
  */
-export function where(rules: any[], leftArg: string, rightArg: string, value: string): string {
-  const found = rules.find((r: any) => r.path === leftArg && r.value === rightArg);
+export function where(rules: { path: string; value: unknown }[], leftArg: string, rightArg: string, value: string): string {
+  const found = rules.find((r) => r.path === leftArg && r.value === rightArg);
   return found ? value : "";
 }
 

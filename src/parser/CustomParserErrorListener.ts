@@ -5,12 +5,12 @@ export class CustomParserErrorListener implements ANTLRErrorListener<Token> {
   private readonly errors: string[] = [];
 
   syntaxError(
-    recognizer: Recognizer<Token, ATNSimulator>,
+    _recognizer: Recognizer<Token, ATNSimulator>,
     offendingSymbol: Token | undefined,
     line: number,
     charPositionInLine: number,
     msg: string,
-    e: RecognitionException | undefined,
+    _e: RecognitionException | undefined
   ): void {
     const errorMessage = JSON.stringify({
       type: "ParserError",
