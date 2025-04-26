@@ -3,8 +3,8 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 describe('Transformer regression test: IMMZ example', () => {
-  const TMP_FILE = path.join(__dirname, 'testdata', 'smart-example-immz-regression-actual.cpg');
-  const EXPECTED_FILE = path.join(__dirname, 'testdata', 'smart-example-immz-regression-expected.cpg');
+  const TMP_FILE = path.join(__dirname, 'testdata', 'regression-transformer-actual.cpg');
+  const EXPECTED_FILE = path.join(__dirname, 'testdata', 'regression-transformer-expected.cpg');
   const MARKER = '// Instance: IMMZD2DTMeaslesDose0';
 
   it('should match the expected CPG-L output (ignoring header)', () => {

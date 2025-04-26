@@ -26,7 +26,7 @@
     "lint": "eslint 'src/**/*.ts' --quiet",
     "lint:fix": "eslint 'src/**/*.ts' --fix",
     "format": "prettier --write 'src/**/*.ts'",
-    "test": "jest src/lexer/tests/index.test.ts src/ast/tests/index.test.ts src/validator/tests/index.test.ts",
+    "test": "jest src/lexer/tests/index.test.ts src/parser/tests/index.test.ts src/ast/tests/index.test.ts src/validator/tests/index.test.ts src/tests/index.test.ts",
     "build": "rimraf dist && shx mkdir -p dist && tsc",
     "postbuild": "node scripts/checkGrammarJsonFiles.js && npm run postbuild:types",
     "postbuild:types": "cpx \"src/grammar/generated/types/*.json\" dist/grammar/generated/types/",
