@@ -1,6 +1,6 @@
 {
-  "name": "@cqis/cpgl",
-  "version": "0.5.2",
+  "name": "@smiledigitalhealth/cpgl",
+  "version": "0.5.3",
   "description": "Clinical Practice Guideline Language (CPGL) parser and validator",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -19,6 +19,9 @@
     "dist/**/*.js.map",
     "README.md"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "lint": "eslint . --ext .ts",
     "lint:fix": "eslint . --ext .ts --fix",
@@ -49,7 +52,8 @@
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "prepublish:github": "node scripts/prepublishGithub.js",
-    "util:clonefsh": "npx ts-node scripts/clone-fsh-repo.ts"
+    "util:clonefsh": "npx ts-node scripts/clone-fsh-repo.ts",
+    "git:unmerged": "ts-node scripts/unmerged-branches.ts"
   },
   "keywords": [
     "clinical",
@@ -63,7 +67,8 @@
   "license": "MIT",
   "dependencies": {
     "antlr4ts": "^0.5.0-alpha.4",
-    "fsh-sushi": "^3.15.0"
+    "fsh-sushi": "^3.15.0",
+    "prompts": "^2.4.2"
   },
   "devDependencies": {
     "@types/jest": "^29.5.12",

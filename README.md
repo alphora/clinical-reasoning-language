@@ -1,8 +1,4 @@
-/**
- * Clinical Practice Guideline Language (CPGL)
- */
-
-# @cqis/cpgl
+# @smiledigitalhealth/cpgl
 
 Clinical Practice Guideline Language (CPGL) parser and validator
 
@@ -15,32 +11,24 @@ CPGL is a domain-specific language designed for expressing clinical practice gui
 ### Core Modules
 
 1. **Lexer Module**
-   - Tokenizes CPGL input into a sequence of tokens
-   - Handles lexical analysis of CPGL documents
-   - Supports various token types including keywords, identifiers, and literals
+   * Tokenizes CPGL input into a sequence of tokens
+   * Handles lexical analysis of CPGL documents
+   * Supports various token types including keywords, identifiers, and literals
 
 2. **Parser Module**
-   - Parses CPGL input into a parse tree
-   - Implements grammar rules for CPGL syntax
-   - Handles complex nested structures and expressions
+   * Parses CPGL input into a parse tree
+   * Implements grammar rules for CPGL syntax
+   * Handles complex nested structures and expressions
 
 3. **AST Module**
-   - Builds and validates Abstract Syntax Trees (AST)
-   - Provides type-safe AST structures
-   - Handles semantic analysis and validation
+   * Builds and validates Abstract Syntax Trees (AST)
+   * Provides type-safe AST structures
+   * Handles semantic analysis and validation
 
 4. **CLI Module**
-   - Command-line interface for CPGL processing
-   - Supports file-based and stdin/stdout operations
-   - Provides validation and transformation capabilities
-
-## Installation
-
-### From GitHub Release
-
-```bash
-npm install github:cqis/cpgl#v0.1.0
-```
+   * Command-line interface for CPGL processing
+   * Supports file-based and stdin/stdout operations
+   * Provides validation and transformation capabilities
 
 ## CLI Usage
 
@@ -57,10 +45,11 @@ npx ts-node src/cli/run-lexer.ts --raw
 ```
 
 The lexer tool tokenizes the input file and displays:
-- Line and column numbers
-- Token types
-- Token text
-- Formatted output with separators for readability
+
+* Line and column numbers
+* Token types
+* Token text
+* Formatted output with separators for readability
 
 ### Parser Tool
 
@@ -73,10 +62,11 @@ npx ts-node src/cli/run-parser.ts --raw
 ```
 
 The parser tool creates a parse tree from the input and displays:
-- Tree structure
-- Node types
-- Text content
-- Rule indices for grammar nodes
+
+* Tree structure
+* Node types
+* Text content
+* Rule indices for grammar nodes
 
 ### AST Tool
 
@@ -89,10 +79,11 @@ npx ts-node src/cli/run-ast.ts --raw
 ```
 
 The AST tool builds an abstract syntax tree and displays:
-- AST structure
-- Node types
-- Node properties
-- Formatted tree representation
+
+* AST structure
+* Node types
+* Node properties
+* Formatted tree representation
 
 ### Validator Tool
 
@@ -105,9 +96,10 @@ npx ts-node src/cli/run-validator.ts --raw
 ```
 
 The validator tool checks the AST for errors and displays:
-- Validation status (valid/invalid)
-- Error messages with line and column numbers
-- Warning messages with line and column numbers
+
+* Validation status (valid/invalid)
+* Error messages with line and column numbers
+* Warning messages with line and column numbers
 
 ### FSH-to-CPGL Transformer Tool
 
@@ -166,27 +158,33 @@ For more details, see the [User Guide](./USER_GUIDE.md) and the technical mappin
 ## Features
 
 ### Language Features
-- Decision blocks with nested conditions
-- Concept definitions with type and value specifications
-- Activity statements with perform types
-- Terminology statements with valueset, system/code, and unknown definitions
-- FHIR resource type support
-- String literals with proper escaping
-- Comments (single-line and block)
+
+* Decision blocks with nested conditions
+
+* Concept definitions with type and value specifications
+* Activity statements with perform types
+* Terminology statements with valueset, system/code, and unknown definitions
+* FHIR resource type support
+* String literals with proper escaping
+* Comments (single-line and block)
 
 ### Processing Features
-- Lexical analysis with detailed token information
-- Syntax parsing with error recovery
-- AST generation with type safety
-- Semantic validation with comprehensive error reporting
-- Cross-platform compatibility (Windows, Mac, Linux)
+
+* Lexical analysis with detailed token information
+
+* Syntax parsing with error recovery
+* AST generation with type safety
+* Semantic validation with comprehensive error reporting
+* Cross-platform compatibility (Windows, Mac, Linux)
 
 ### Development Features
-- TypeScript implementation for type safety
-- Comprehensive test suite
-- Detailed documentation
-- Example implementations
-- Development tools and utilities
+
+* TypeScript implementation for type safety
+
+* Comprehensive test suite
+* Detailed documentation
+* Example implementations
+* Development tools and utilities
 
 ## API Usage
 
@@ -197,7 +195,7 @@ The package provides four main functions for processing CPGL code:
 ### 1. Tokenization
 
 ```typescript
-import { tokenizeCPGL } from '@cqis/cpgl';
+import { tokenizeCPGL } from '@smiledigitalhealth/cpgl';
 
 const result = tokenizeCPGL(`
   decision "Test":
@@ -217,7 +215,7 @@ if (result.success) {
 ### 2. Parsing
 
 ```typescript
-import { parseCPGL } from '@cqis/cpgl';
+import { parseCPGL } from '@smiledigitalhealth/cpgl';
 
 const result = parseCPGL(`
   decision "Test":
@@ -237,7 +235,7 @@ if (result.success) {
 ### 3. AST Building
 
 ```typescript
-import { buildCPGL } from '@cqis/cpgl';
+import { buildCPGL } from '@smiledigitalhealth/cpgl';
 
 const result = buildCPGL(`
   decision "Test":
@@ -257,7 +255,7 @@ if (result.success) {
 ### 4. Validation
 
 ```typescript
-import { validateCPGL } from '@cqis/cpgl';
+import { validateCPGL } from '@smiledigitalhealth/cpgl';
 
 const result = validateCPGL(`
   decision "Test":
@@ -278,10 +276,10 @@ if (result.success) {
 
 ### Core Functions
 
-- `tokenizeCPGL(input: string): ParseResult<Token[]>`
-- `parseCPGL(input: string): ParseResult<any>`
-- `buildCPGL(input: string): ParseResult<File>`
-- `validateCPGL(input: string): ParseResult<File>`
+* `tokenizeCPGL(input: string): ParseResult<Token[]>`
+* `parseCPGL(input: string): ParseResult<any>`
+* `buildCPGL(input: string): ParseResult<File>`
+* `validateCPGL(input: string): ParseResult<File>`
 
 ### Types
 
@@ -303,124 +301,129 @@ interface ParseResult<T> {
 ## Error Handling
 
 All functions return a `ParseResult` object with:
-- `success`: boolean indicating if the operation was successful
-- `result`: the parsed/tokenized/validated result (if successful)
-- `errors`: array of error messages (if unsuccessful)
+
+* `success`: boolean indicating if the operation was successful
+* `result`: the parsed/tokenized/validated result (if successful)
+* `errors`: array of error messages (if unsuccessful)
 
 **Note:**
-- All lexer and parser errors are collected and returned in the `errors` array. They are not just printed to the console.
-- You should always check `success` before using the result.
-- If you want to throw on error, you can do so in your own code:
+
+* All lexer and parser errors are collected and returned in the `errors` array. They are not just printed to the console.
+* You should always check `success` before using the result.
+* If you want to throw on error, you can do so in your own code:
 
 ```typescript
 const result = parseCPGL('...');
 if (!result.success) throw new Error(result.errors?.join('\n'));
 ```
 
-## Development
+### 📦 Distribution: GitHub Releases
 
-### Building the Package
+This package is distributed via GitHub Releases.
 
-1. Install dependencies:
-```bash
-npm install
-```
+To create a new release:
 
-2. Build the package:
-```bash
-npm run build
-```
+1. **Create a release branch**  
+   Example:
 
-### Distribution
+   ```bash
+   git checkout -b release/v0.1.0
+   ```
 
-The package is distributed via GitHub Releases. To create a new release:
+2. **Generate and update the CHANGELOG**  
+   Prompt:
+   > "I'm creating a new release v0.1.0. Generate and append to the CHANGELOG based on git commits since the last tag."
 
-1. Create a new branch (e.g., `release/v0.1.0`)
-1. Generate a CHANGELOG: "I'm creating a new release release/>version<, generate and append to the CHANGELOG.  Use git to determine the changes from the last tag to now. Use git to discover all the commits between the prior release and now." (e.g., v0.1.0)
-1. Commit all changes
-1. Run the automated release script:
+3. **Commit all changes**  
+
+   ```bash
+   git add .
+   git commit -m "Prepare release v0.1.0"
+   ```
+
+4. **Run the automated release script**  
+
    ```bash
    npm run prepublish:github -- <patch|minor|major|version>
    ```
-   - This will:
-     - Remove `dist/` from `.gitignore`
-     - Build the project
-     - Add and commit `dist/`
-     - Bump the version and create a git tag (using the argument you provide)
-     - Push the commit and tag to GitHub
-     - Restore `dist/` to `.gitignore` and commit that change
-     - Push the final commit
-1. Create a PR & merge the PR
-1. Create a new release on GitHub
-   1. Tag the release with the version number (e.g., `v0.1.0`) if not already tagged
-   1. Generate release notes
+
+   Example:
+
+   ```bash
+   npm run prepublish:github -- minor
+   ```
+
+   This script will:
+
+   * Remove `dist/` from `.gitignore`
+   * Build the project
+   * Add and commit `dist/`
+   * Bump the version and create a Git tag
+   * Push commits and tags
+   * Restore `dist/` to `.gitignore` and push final cleanup
+
+5. **Create and merge the Pull Request (PR)**
+
+6. **Publish the GitHub Release**
+
+   * Use the version tag (e.g., `v0.1.0`)  
+   * Generate release notes automatically if needed
 
 **Important:**
-- The release script expects a **clean working directory** (no unstaged or uncommitted changes). If your working directory is not clean, the script will exit and prompt you to commit, stash, or discard your changes.
-- If a rollback warning is shown (e.g., after a failed release), manual intervention may be required to fully undo changes that were already pushed to the remote repository. Check your git log and tags, and clean up as needed.
+
+* The release script expects a **clean working directory** (no unstaged or uncommitted changes). If your working directory is not clean, the script will exit and prompt you to commit, stash, or discard your changes.
+* If a rollback warning is shown (e.g., after a failed release), manual intervention may be required to fully undo changes that were already pushed to the remote repository. Check your git log and tags, and clean up as needed.
 
 **Note:**
-- You do NOT need to attach a `.tgz` file for GitHub-based npm installs.
+
+* You do NOT need to attach a `.tgz` file for GitHub-based npm installs.
 
 ### Installation
 
-- Users can install directly from GitHub using:
+* Users can install directly from GitHub using:
 
-# 📦 Installing from GitHub
+#### 📦 Installing from GitHub
 
 If you're installing this package directly from GitHub using `npm install`, note that GitHub access via SSH is required by default. You have two options:
 
 ---
 
-#### ✅ Option 1: Install via HTTPS (Recommended)
+##### ✅ Option 1: Install via HTTPS (Recommended)
 
 This method works without needing to set up SSH keys.
 
 ```bash
-npm install https://github.com/cqis/cpgl.git#v0.4.0
+npm install git+https://github.com/alphora/clinical-practice-guideline-language.git#v0.4.0
 ```
 
 Or add it to your `package.json`:
 
 ```json
 "dependencies": {
-  "cpgl": "https://github.com/cqis/cpgl.git#v0.4.0"
+  "@smiledigitalhealth/cpgl": "git+https://github.com/alphora/clinical-practice-guideline-language.git#v0.4.0"
 }
 ```
 
 ---
 
-#### 🔐 Option 2: Use SSH (Advanced)
+##### 🔐 Option 2: Use SSH (Advanced)
 
 If you prefer SSH (or are using the shorthand syntax like `github:cqis/cpgl#v0.4.0`), make sure your system is set up for GitHub SSH access.
 
 ```bash
-npm install github:cqis/cpgl#v0.4.0
+npm install github:alphora/clinical-practice-guideline-language#v0.4.0
+
 ```
 
 Or add it to your `package.json`:
 
 ```json
 "dependencies": {
-  "cpgl": "github:cqis/cpgl#v0.4.0"
+  "@smiledigitalhealth/cpgl": "github:alphora/clinical-practice-guideline-language#v0.4.0"
 }
 ```
 
 See the internets for detailed instructions on setting up SSH for GitHub.
-
-
-### Running Tests
-
-```bash
-# Run all tests
-npm test
-
-# Run tests with coverage
-npm run test:coverage
-
-# Run specific test files
-npx jest src/ast/tests/decision-structure.test.ts --verbose --no-cache --colors --forceExit --detectOpenHandles --watchAll=false
-```
 
 ### Updating Grammar
 
@@ -439,16 +442,18 @@ npx ts-node --log-error src/examples/compare-ast.ts
 ```
 
 This will:
+
 1. Parse the example CPGL file (`docs/Measles Immunization Decision.cpgl`)
 2. Generate an AST from the parsed input
 3. Compare it with the expected AST (`docs/Expected AST.ast`)
 4. Display any differences between the two ASTs
 
 The comparison includes:
-- Line count matching
-- Whitespace-normalized matching
-- Structure matching
-- Detailed line-by-line comparison of differences
+
+* Line count matching
+* Whitespace-normalized matching
+* Structure matching
+* Detailed line-by-line comparison of differences
 
 ## Development
 
@@ -489,27 +494,27 @@ npm run test:watch
 The test suite is organized into several categories:
 
 1. **Basic Tokens** (`basic-tokens.test.ts`)
-   - Tests for fundamental language tokens
-   - Keywords, punctuation, and basic syntax
+   * Tests for fundamental language tokens
+   * Keywords, punctuation, and basic syntax
 
 2. **FHIR Types** (`fhir-types.test.ts`)
-   - Tests for FHIR-specific activity types
-   - Validation of CPG-prefixed activity types
-   - Error handling for invalid types
+   * Tests for FHIR-specific activity types
+   * Validation of CPG-prefixed activity types
+   * Error handling for invalid types
 
 3. **Grammar Example** (`grammar-example.test.ts`)
-   - Tests the lexer against the complete grammar example
-   - Validates real-world usage scenarios
+   * Tests the lexer against the complete grammar example
+   * Validates real-world usage scenarios
 
 4. **Error Handling** (`error-handling.test.ts`)
-   - Tests for invalid input handling
-   - Error message validation
-   - Recovery from syntax errors
+   * Tests for invalid input handling
+   * Error message validation
+   * Recovery from syntax errors
 
 5. **Comments** (`comments.test.ts`)
-   - Tests for comment handling
-   - Single-line and block comments
-   - Comment placement and nesting
+   * Tests for comment handling
+   * Single-line and block comments
+   * Comment placement and nesting
 
 #### Writing Tests
 
@@ -522,6 +527,7 @@ When adding new tests:
 5. Add comments explaining complex test scenarios
 
 Example test structure:
+
 ```typescript
 describe('Feature Name', () => {
   it('should handle valid input', () => {
@@ -538,11 +544,11 @@ describe('Feature Name', () => {
 
 The test suite includes several utility functions:
 
-- `getAllTokens`: Retrieves all tokens from a lexer
-- `verifyTokenSequence`: Validates token sequences
-- `getActionTokenSequence`: Helper for activity type tests
-- `getCaseFeatureTokenSequence`: Helper for concept type tests
-- `getValueTypeTokenSequence`: Helper for value type tests
+* `getAllTokens`: Retrieves all tokens from a lexer
+* `verifyTokenSequence`: Validates token sequences
+* `getActionTokenSequence`: Helper for activity type tests
+* `getCaseFeatureTokenSequence`: Helper for concept type tests
+* `getValueTypeTokenSequence`: Helper for value type tests
 
 ### Linting
 
@@ -580,22 +586,24 @@ Note: This project uses a custom AST implementation that uses ANTLR's visitor pa
 
 ### How Activity, Concept, and Value Types Stay in Sync
 
-- The lists of valid activity types, concept types, and concept value types are defined in the `validTypes` arrays in the `ACTIVITY_TYPE`, `CONCEPT_TYPE`, and `CONCEPT_VALUE_TYPE` rules of `src/grammar/CPGLLexer.g4`.
-- Scripts (`scripts/extractActivityTypes.js`, `scripts/extractConceptTypes.js`, `scripts/extractConceptValueTypes.js`) automatically extract these lists and write them to `src/grammar/activityTypes.json`, `src/grammar/conceptTypes.json`, and `src/grammar/conceptValueTypes.json`.
-- TypeScript modules (`src/grammar/activityTypes.ts`, `src/grammar/conceptTypes.ts`, `src/grammar/conceptValueTypes.ts`) import these JSON files and export both the arrays and type-safe union types.
-- **All code (lexer, AST, error listener, etc.) should import from these modules to avoid drift.**
+* The lists of valid activity types, concept types, and concept value types are defined in the `validTypes` arrays in the `ACTIVITY_TYPE`, `CONCEPT_TYPE`, and `CONCEPT_VALUE_TYPE` rules of `src/grammar/CPGLLexer.g4`.
+* Scripts (`scripts/extractActivityTypes.js`, `scripts/extractConceptTypes.js`, `scripts/extractConceptValueTypes.js`) automatically extract these lists and write them to `src/grammar/activityTypes.json`, `src/grammar/conceptTypes.json`, and `src/grammar/conceptValueTypes.json`.
+* TypeScript modules (`src/grammar/activityTypes.ts`, `src/grammar/conceptTypes.ts`, `src/grammar/conceptValueTypes.ts`) import these JSON files and export both the arrays and type-safe union types.
+* **All code (lexer, AST, error listener, etc.) should import from these modules to avoid drift.**
 
 ### How to Update Types
 
 1. **Edit the relevant `validTypes` array** in `src/grammar/CPGLLexer.g4`.
 2. **Run:**
+
    ```bash
    npm run generate
    ```
+
    This will:
-   - Extract the updated types to their respective JSON files
-   - Regenerate the lexer and parser
-   - Keep all code in sync
+   * Extract the updated types to their respective JSON files
+   * Regenerate the lexer and parser
+   * Keep all code in sync
 
 ### Usage in TypeScript
 
@@ -616,9 +624,11 @@ function isValidActivityType(type: string): type is ActivityType {
 ```
 
 ### Why?
-- This ensures a **single source of truth** for all grammar-driven types.
-- No more manual updates or risk of drift between grammar and code.
-- All validation, error reporting, and type checking use the same lists.
+
+* This ensures a **single source of truth** for all grammar-driven types.
+
+* No more manual updates or risk of drift between grammar and code.
+* All validation, error reporting, and type checking use the same lists.
 
 ## FSH-to-CPGL Transformer
 
@@ -670,13 +680,13 @@ See the User Guide for more details on authoring and transformation logic.
 
 The following files are auto-generated and should not be edited manually or tracked in git:
 
-- `src/grammar/generated/types/activityTypes.json`
-- `src/grammar/generated/types/conceptTypes.json`
-- `src/grammar/generated/types/conceptValueTypes.json`
+* `src/grammar/generated/types/activityTypes.json`
+* `src/grammar/generated/types/conceptTypes.json`
+* `src/grammar/generated/types/conceptValueTypes.json`
 
 To regenerate these files, run:
 
-```
+```bash
 npm run generate
 ```
 
@@ -686,18 +696,18 @@ These files are ignored by git via `.gitignore` and will be recreated as needed.
 
 The following files are generated by ANTLR and should not be edited manually or tracked in git:
 
-- `src/grammar/generated/antlr/CPGLLexer.ts`
-- `src/grammar/generated/antlr/CPGLParser.ts`
-- `src/grammar/generated/antlr/CPGLParserVisitor.ts`
-- `src/grammar/generated/antlr/CPGLParserListener.ts`
-- `src/grammar/generated/antlr/CPGLLexer.tokens`
-- `src/grammar/generated/antlr/CPGLLexer.interp`
-- `src/grammar/generated/antlr/CPGLParser.tokens`
-- `src/grammar/generated/antlr/CPGLParser.interp`
+* `src/grammar/generated/antlr/CPGLLexer.ts`
+* `src/grammar/generated/antlr/CPGLParser.ts`
+* `src/grammar/generated/antlr/CPGLParserVisitor.ts`
+* `src/grammar/generated/antlr/CPGLParserListener.ts`
+* `src/grammar/generated/antlr/CPGLLexer.tokens`
+* `src/grammar/generated/antlr/CPGLLexer.interp`
+* `src/grammar/generated/antlr/CPGLParser.tokens`
+* `src/grammar/generated/antlr/CPGLParser.interp`
 
 To regenerate these files, run:
 
-```
+```bash
 npm run generate
 ```
 

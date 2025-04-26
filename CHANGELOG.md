@@ -234,3 +234,11 @@ Commits included since v0.5.1:
 - 5b0d850 Restore dist/ to .gitignore after GitHub Publish
 - a93a445 Include dist for GitHub Publish
 - 1c6eb97 Release documentation 
+
+## [0.5.3] - 2025-04-25
+
+### Fixed
+- **GitHub Publish Hotfix:** Ensured all required build and generated files are included in the release commit/tag for GitHub installs. This fixes issues where users could not install from GitHub due to missing files.
+
+### Added
+- **Release Workflow:** Added a GitHub Actions workflow to require all tests to pass before a release is published.
