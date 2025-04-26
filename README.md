@@ -326,7 +326,7 @@ To create a new release:
 1. **Create a release branch**  
    Example:
 
-   ```bash
+```bash
    git checkout -b release/v0.1.0
    ```
 

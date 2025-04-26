@@ -51,7 +51,7 @@ To create a new release:
 
 5. **Update the CHANGELOG**  
    Prompt:
-   > "Generate and append to the CHANGELOG based on git commits since the last tag."
+   > Generate and append to the CHANGELOG based on git commits since the last tag.
 
 6. **Run tests to ensure no regression**
 

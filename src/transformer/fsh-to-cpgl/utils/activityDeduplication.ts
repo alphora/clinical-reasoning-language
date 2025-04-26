@@ -3,7 +3,7 @@
 
 import { randomInt } from "crypto";
 
-export type Activity = { name: string, value: string | undefined, original: string };
+export type Activity = { name: string; value: string | undefined; original: string };
 
 /**
  * Normalize an activity for deduplication purposes.
@@ -12,7 +12,7 @@ export type Activity = { name: string, value: string | undefined, original: stri
  */
 export function normalizeActivity(activity: Activity): string {
   // Use a composite key of name and value for deduplication
-  return `${activity.name}::${activity.value ?? ''}`;
+  return `${activity.name}::${activity.value ?? ""}`;
 }
 
 /**
@@ -35,4 +35,4 @@ export class ActivityDeduplicator {
   getUniqueActivities(): Activity[] {
     return Array.from(this.normalizedToOriginal.values());
   }
-} 
+}
