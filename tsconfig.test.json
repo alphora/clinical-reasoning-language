@@ -1,6 +1,21 @@
 {
   "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "src"
+  },
   "include": [
-    "src/lexer/tests/error-listener.test.ts"
+    "src/**/*.test.ts",
+    "src/**/*.spec.ts",
+    "src/**/tests/**/*.ts",
+    "src/ast/tests/**/*.ts",
+    "src/lexer/tests/**/*.ts",
+    "src/lexer/tests/*.ts",
+    "src/parser/tests/**/*.ts",
+    "src/parser/tests/*.ts",
+    "src/parser/tests/*.ts",
+    "src/parser/tests/*.d.ts",
+    "src/parser/tests/*.js",
+    "src/transformer/fsh-to-cpgl/mapping/**/*.test.ts",
+    "tests/**/*.ts"
   ]
 } 
