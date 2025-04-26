@@ -9,7 +9,7 @@ describe('AST builder regression test: IMMZ example', () => {
 
   it('should match the expected AST output (ignoring header)', () => {
     // Run the AST builder CLI and capture output
-    const output = execSync('npm run cli:ast', { encoding: 'utf8' });
+    const output = execSync('npm run cli:ast -- ' + path.join(__dirname, 'testdata', 'smart-example-immz'), { encoding: 'utf8' });
     fs.writeFileSync(TMP_FILE, output, 'utf8');
 
     // Read both files

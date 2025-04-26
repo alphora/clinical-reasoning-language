@@ -9,7 +9,7 @@ describe('Lexer regression test: IMMZ example', () => {
 
   it('should match the expected lexer output (ignoring header)', () => {
     // Run the lexer CLI and capture output
-    const output = execSync('npm run cli:lexer', { encoding: 'utf8' });
+    const output = execSync('npm run cli:lexer -- ' + path.join(__dirname, 'testdata', 'smart-example-immz'), { encoding: 'utf8' });
     fs.writeFileSync(TMP_FILE, output, 'utf8');
 
     // Read both files
