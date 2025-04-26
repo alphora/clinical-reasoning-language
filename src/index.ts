@@ -93,7 +93,11 @@ export function buildCPGL(input: string): ParseResult<CPGL> {
     const tree = parser.cpgl();
     const builder = new CPGLAstBuilder();
     const ast = builder.visit(tree) as CPGL;
-    const errors = [...lexerErrorListener.getErrors(), ...parserErrorListener.getErrors()];
+    const errors = [
+      ...lexerErrorListener.getErrors(),
+      ...parserErrorListener.getErrors(),
+      ...builder.getErrors(),
+    ];
     if (errors.length > 0) {
       return { success: false, errors };
     }
