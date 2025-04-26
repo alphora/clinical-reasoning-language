@@ -747,3 +747,50 @@ All references to the release process (including the automated release script, d
 - **Documentation:** Keep all documentation referencing the release checklist up-to-date by linking to the PR template.
 
 For more details, see the [release PR template](.github/PULL_REQUEST_TEMPLATE/release.md) and the automation scripts in `.github/scripts/`.
+
+## Error Handling Strategy
+
+This project implements robust, layered error handling across all stages of the CPGL pipeline:
+
+| Layer     | Responsibility                                  | Error Type         | How Errors Are Reported                |
+|-----------|-------------------------------------------------|--------------------|----------------------------------------|
+| Lexer     | Tokenization, valid characters/tokens            | LexicalError       | Collected by error listener, JSON      |
+| Parser    | Syntax, structure, required/optional elements    | ParserError        | Collected by error listener, JSON      |
+| AST       | Parse tree → AST, structural integrity           | AstError           | Collected by AST builder, JSON         |
+| Validator | Domain/semantic rules, cross-references, logic   | ValidationError    | Collected by validator, plain text     |
+
+- **Lexical and parser errors** are collected by their respective error listeners and reported as JSON strings with a `type` property (e.g., `"LexicalError"`, `"ParserError"`).
+- **AST errors** are reported as `"AstError"` if the AST builder encounters a structural problem not caught by the parser.
+- **Validation errors** are reported by the validator after AST construction.
+
+### Example Error Object
+
+```json
+{
+  "type": "ParserError",
+  "line": 1,
+  "column": 51,
+  "message": "Syntax error: missing 'done' at '<EOF>'",
+  "details": {
+    "offendingSymbol": { "text": "<EOF>", ... }
+  }
+}
+```
+
+### Clean Test Output: Suppressing Console Errors in Jest
+
+To keep test output clean and focused on actual test failures, all `console.error` output is globally suppressed during tests. This is achieved by adding the following to `jest.setup.js`:
+
+```js
+beforeAll(() => {
+  jest.spyOn(console, 'error').mockImplementation(() => {});
+});
+```
+
+And registering it in `jest.config.js`:
+
+```js
+setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
+```
+
+This ensures that error logs are visible during development and CLI runs, but do not clutter test output.
