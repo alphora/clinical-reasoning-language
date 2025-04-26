@@ -29,7 +29,7 @@
     "test": "jest src/lexer/tests/index.test.ts src/ast/tests/index.test.ts src/validator/tests/index.test.ts",
     "build": "rimraf dist && mkdir dist && tsc",
     "postbuild": "node scripts/checkGrammarJsonFiles.js && npm run postbuild:types",
-    "postbuild:types": "copy src\\grammar\\generated\\types\\*.json dist\\grammar\\generated\\types\\",
+    "postbuild:types": "cpx \"src/grammar/generated/types/*.json\" dist/grammar/generated/types/",
     "clean": "rimraf dist",
     "watch": "onchange -i \"src/**/*.ts\" -- npm run build",
     "start": "npm run build && node dist/index.js",
