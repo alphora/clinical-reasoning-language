@@ -1,16 +1,16 @@
+import { CPGLAstBuilder } from "../builder";
+import { Terminology, TerminologyValueset, TerminologySystemCode } from "../types";
 
-import { CPGLAstBuilder } from '../builder';
-import { Terminology, TerminologyValueset, TerminologySystemCode } from '../types';
-import { parseInput } from './parseInput';
+import { parseInput } from "./parseInput";
 
-describe('Terminology Structure', () => {
+describe("Terminology Structure", () => {
   let builder: CPGLAstBuilder;
 
   beforeEach(() => {
     builder = new CPGLAstBuilder();
   });
 
-  it('should correctly structure terminology with valueset', () => {
+  it("should correctly structure terminology with valueset", () => {
     const input = `
 terminology "MeaslesVaccineCodes" valueset "bmi valueset".
 `;
@@ -19,15 +19,15 @@ terminology "MeaslesVaccineCodes" valueset "bmi valueset".
     const terminology = result.statements[0] as Terminology;
 
     // Verify basic terminology structure
-    expect(terminology.type).toBe('Terminology');
-    expect(terminology.name).toBe('MeaslesVaccineCodes');
+    expect(terminology.type).toBe("Terminology");
+    expect(terminology.name).toBe("MeaslesVaccineCodes");
     expect(terminology.definition).toBeDefined();
-    expect(terminology.definition?.type).toBe('TerminologyValueset');
+    expect(terminology.definition?.type).toBe("TerminologyValueset");
     const valuesetDef = terminology.definition as TerminologyValueset;
-    expect(valuesetDef.valuesetName).toBe('bmi valueset');
+    expect(valuesetDef.valuesetName).toBe("bmi valueset");
   });
 
-  it('should correctly structure terminology with system and code', () => {
+  it("should correctly structure terminology with system and code", () => {
     const input = `
 terminology "MeaslesVaccineCodes" system \`http://snomed.info/sct\` code \`871807003\`.
 `;
@@ -36,12 +36,12 @@ terminology "MeaslesVaccineCodes" system \`http://snomed.info/sct\` code \`87180
     const terminology = result.statements[0] as Terminology;
 
     // Verify basic terminology structure
-    expect(terminology.type).toBe('Terminology');
-    expect(terminology.name).toBe('MeaslesVaccineCodes');
+    expect(terminology.type).toBe("Terminology");
+    expect(terminology.name).toBe("MeaslesVaccineCodes");
     expect(terminology.definition).toBeDefined();
-    expect(terminology.definition?.type).toBe('TerminologySystemCode');
+    expect(terminology.definition?.type).toBe("TerminologySystemCode");
     const systemCodeDef = terminology.definition as TerminologySystemCode;
-    expect(systemCodeDef.system).toBe('http://snomed.info/sct');
-    expect(systemCodeDef.code).toBe('871807003');
+    expect(systemCodeDef.system).toBe("http://snomed.info/sct");
+    expect(systemCodeDef.code).toBe("871807003");
   });
-}); 
+});

@@ -1,3 +1,4 @@
+import { buildCPGL, parseCPGL } from "../../index";
 import {
   Activity,
   BlockBody,
@@ -23,14 +24,13 @@ import {
   UseDecision,
   UseDecisionType,
   ActionStatement,
-} from '../types';
+} from "../types";
 
-import { parseInput } from './parseInput';
-import { buildCPGL, parseCPGL } from '../../index';
+import { parseInput } from "./parseInput";
 
-describe('CPGLAstBuilder', () => {
-  describe('Decision Statements', () => {
-    it('should parse a simple decision with when block', () => {
+describe("CPGLAstBuilder", () => {
+  describe("Decision Statements", () => {
+    it("should parse a simple decision with when block", () => {
       const input = `
         decision "BMI":
           when "BMI > 30" then do "Propose Diagnosis Task".
@@ -41,18 +41,18 @@ describe('CPGLAstBuilder', () => {
       expect(result.statements).toHaveLength(1);
       const decision = result.statements[0] as Decision;
       expect(decision.type).toBe(DecisionType.type);
-      expect(decision.name).toBe('BMI');
+      expect(decision.name).toBe("BMI");
       expect(decision.body.statements).toHaveLength(1);
-      expect(decision.body.statements[0].conceptName).toBe('BMI > 30');
+      expect(decision.body.statements[0].conceptName).toBe("BMI > 30");
       const whenBlock = decision.body.statements[0] as WhenBlock;
       const body = whenBlock.body as SingleAction;
       expect(body.type).toBe(SingleActionType.type);
       const action = body.action as DoActivity;
       expect(action.type).toBe(DoActivityType.type);
-      expect(action.activityName).toBe('Propose Diagnosis Task');
+      expect(action.activityName).toBe("Propose Diagnosis Task");
     });
 
-    it('should parse a decision with multiple when blocks', () => {
+    it("should parse a decision with multiple when blocks", () => {
       const input = `
         decision "Check BMI":
           when "BMI" then do "Record BMI".
@@ -63,11 +63,11 @@ describe('CPGLAstBuilder', () => {
       const result = parseInput(input);
       const decision = result.statements[0] as Decision;
       expect(decision.body.statements).toHaveLength(2);
-      expect(decision.body.statements[0].conceptName).toBe('BMI');
-      expect(decision.body.statements[1].conceptName).toBe('Weight');
+      expect(decision.body.statements[0].conceptName).toBe("BMI");
+      expect(decision.body.statements[1].conceptName).toBe("Weight");
     });
 
-    it('should parse a decision with any/all qualifiers', () => {
+    it("should parse a decision with any/all qualifiers", () => {
       const input = `
         decision "Check Vitals":
           when "Temperature" then:
@@ -90,14 +90,14 @@ describe('CPGLAstBuilder', () => {
       const tempBlock = tempWhenBlock.body as BlockBody;
       const bpBlock = bpWhenBlock.body as BlockBody;
 
-      expect(tempBlock.qualifier).toBe('any');
-      expect(bpBlock.qualifier).toBe('all');
+      expect(tempBlock.qualifier).toBe("any");
+      expect(bpBlock.qualifier).toBe("all");
       expect(tempBlock.statements).toHaveLength(2);
       expect(bpBlock.statements).toHaveLength(2);
     });
 
-    describe('Action Statements in Block Body', () => {
-      it('should parse a single do statement', () => {
+    describe("Action Statements in Block Body", () => {
+      it("should parse a single do statement", () => {
         const input = `
           decision "Test":
             when "Concept" then:
@@ -114,10 +114,10 @@ describe('CPGLAstBuilder', () => {
         expect(blockBody.statements).toHaveLength(1);
         const action = blockBody.statements[0] as ActionStatement;
         expect(action.action.type).toBe(DoActivityType.type);
-        expect((action.action as DoActivity).activityName).toBe('Activity');
+        expect((action.action as DoActivity).activityName).toBe("Activity");
       });
 
-      it('should parse two do statements', () => {
+      it("should parse two do statements", () => {
         const input = `
           decision "Test":
             when "Concept" then:
@@ -135,14 +135,14 @@ describe('CPGLAstBuilder', () => {
         expect(blockBody.statements).toHaveLength(2);
         const firstAction = blockBody.statements[0] as ActionStatement;
         expect(firstAction.action.type).toBe(DoActivityType.type);
-        expect((firstAction.action as DoActivity).activityName).toBe('First Activity');
+        expect((firstAction.action as DoActivity).activityName).toBe("First Activity");
 
         const secondAction = blockBody.statements[1] as ActionStatement;
         expect(secondAction.action.type).toBe(DoActivityType.type);
-        expect((secondAction.action as DoActivity).activityName).toBe('Second Activity');
+        expect((secondAction.action as DoActivity).activityName).toBe("Second Activity");
       });
 
-      it('should parse no do statements', () => {
+      it("should parse no do statements", () => {
         const input = `
           decision "Test":
             when "Concept" then:
@@ -158,7 +158,7 @@ describe('CPGLAstBuilder', () => {
         expect(blockBody.statements).toHaveLength(0);
       });
 
-      it('should parse a single use statement', () => {
+      it("should parse a single use statement", () => {
         const input = `
           decision "Test":
             when "Concept" then:
@@ -175,10 +175,10 @@ describe('CPGLAstBuilder', () => {
         expect(blockBody.statements).toHaveLength(1);
         const action = blockBody.statements[0] as ActionStatement;
         expect(action.action.type).toBe(UseDecisionType.type);
-        expect((action.action as UseDecision).decisionName).toBe('Other Decision');
+        expect((action.action as UseDecision).decisionName).toBe("Other Decision");
       });
 
-      it('should parse two use statements', () => {
+      it("should parse two use statements", () => {
         const input = `
           decision "Test":
             when "Concept" then:
@@ -196,14 +196,14 @@ describe('CPGLAstBuilder', () => {
         expect(blockBody.statements).toHaveLength(2);
         const firstAction = blockBody.statements[0] as ActionStatement;
         expect(firstAction.action.type).toBe(UseDecisionType.type);
-        expect((firstAction.action as UseDecision).decisionName).toBe('First Decision');
+        expect((firstAction.action as UseDecision).decisionName).toBe("First Decision");
 
         const secondAction = blockBody.statements[1] as ActionStatement;
         expect(secondAction.action.type).toBe(UseDecisionType.type);
-        expect((secondAction.action as UseDecision).decisionName).toBe('Second Decision');
+        expect((secondAction.action as UseDecision).decisionName).toBe("Second Decision");
       });
 
-      it('should parse a mixture of do and use statements', () => {
+      it("should parse a mixture of do and use statements", () => {
         const input = `
           decision "Test":
             when "Concept" then:
@@ -224,22 +224,22 @@ describe('CPGLAstBuilder', () => {
         const firstAction = blockBody.statements[0] as ActionStatement;
         expect(firstAction && firstAction.action).toBeTruthy();
         expect(firstAction.action.type).toBe(DoActivityType.type);
-        expect((firstAction.action as DoActivity).activityName).toBe('First Activity');
+        expect((firstAction.action as DoActivity).activityName).toBe("First Activity");
         const secondAction = blockBody.statements[1] as ActionStatement;
         expect(secondAction && secondAction.action).toBeTruthy();
         expect(secondAction.action.type).toBe(UseDecisionType.type);
-        expect((secondAction.action as UseDecision).decisionName).toBe('First Decision');
+        expect((secondAction.action as UseDecision).decisionName).toBe("First Decision");
         const thirdAction = blockBody.statements[2] as ActionStatement;
         expect(thirdAction && thirdAction.action).toBeTruthy();
         expect(thirdAction.action.type).toBe(DoActivityType.type);
-        expect((thirdAction.action as DoActivity).activityName).toBe('Second Activity');
+        expect((thirdAction.action as DoActivity).activityName).toBe("Second Activity");
         const fourthAction = blockBody.statements[3] as ActionStatement;
         expect(fourthAction && fourthAction.action).toBeTruthy();
         expect(fourthAction.action.type).toBe(UseDecisionType.type);
-        expect((fourthAction.action as UseDecision).decisionName).toBe('Second Decision');
+        expect((fourthAction.action as UseDecision).decisionName).toBe("Second Decision");
       });
 
-      it('should parse a block with only do statements (debug)', () => {
+      it("should parse a block with only do statements (debug)", () => {
         const input = `
           decision "Test":
             when "Concept" then:
@@ -257,14 +257,14 @@ describe('CPGLAstBuilder', () => {
         const firstAction = blockBody.statements[0] as ActionStatement;
         expect(firstAction && firstAction.action).toBeTruthy();
         expect(firstAction.action.type).toBe(DoActivityType.type);
-        expect((firstAction.action as DoActivity).activityName).toBe('First Activity');
+        expect((firstAction.action as DoActivity).activityName).toBe("First Activity");
         const secondAction = blockBody.statements[1] as ActionStatement;
         expect(secondAction && secondAction.action).toBeTruthy();
         expect(secondAction.action.type).toBe(DoActivityType.type);
-        expect((secondAction.action as DoActivity).activityName).toBe('Second Activity');
+        expect((secondAction.action as DoActivity).activityName).toBe("Second Activity");
       });
 
-      it('should parse a block with only use statements (debug)', () => {
+      it("should parse a block with only use statements (debug)", () => {
         const input = `
           decision "Test":
             when "Concept" then:
@@ -282,76 +282,76 @@ describe('CPGLAstBuilder', () => {
         const firstAction = blockBody.statements[0] as ActionStatement;
         expect(firstAction && firstAction.action).toBeTruthy();
         expect(firstAction.action.type).toBe(UseDecisionType.type);
-        expect((firstAction.action as UseDecision).decisionName).toBe('First Decision');
+        expect((firstAction.action as UseDecision).decisionName).toBe("First Decision");
         const secondAction = blockBody.statements[1] as ActionStatement;
         expect(secondAction && secondAction.action).toBeTruthy();
         expect(secondAction.action.type).toBe(UseDecisionType.type);
-        expect((secondAction.action as UseDecision).decisionName).toBe('Second Decision');
+        expect((secondAction.action as UseDecision).decisionName).toBe("Second Decision");
       });
     });
   });
 
-  describe('Terminology Statements', () => {
-    it('should parse a terminology valueset', () => {
+  describe("Terminology Statements", () => {
+    it("should parse a terminology valueset", () => {
       const input = 'terminology "BMI Valueset" valueset "bmi valueset".';
 
       const result = parseInput(input);
       const ast = result.statements[0] as Terminology;
       expect(ast.type).toBe(TerminologyType.type);
-      expect(ast.name).toBe('BMI Valueset');
+      expect(ast.name).toBe("BMI Valueset");
       expect(ast.definition.type).toBe(TerminologyValuesetType.type);
-      expect((ast.definition as TerminologyValueset).valuesetName).toBe('bmi valueset');
+      expect((ast.definition as TerminologyValueset).valuesetName).toBe("bmi valueset");
     });
 
-    it('should parse a terminology system code', () => {
+    it("should parse a terminology system code", () => {
       const input = 'terminology "Colonoscopy" system `http://snomed.info/sct` code `73761001`.';
 
       const result = parseInput(input);
       const ast = result.statements[0] as Terminology;
       expect(ast.definition.type).toBe(TerminologySystemCodeType.type);
-      expect((ast.definition as TerminologySystemCode).system).toBe('http://snomed.info/sct');
-      expect((ast.definition as TerminologySystemCode).code).toBe('73761001');
+      expect((ast.definition as TerminologySystemCode).system).toBe("http://snomed.info/sct");
+      expect((ast.definition as TerminologySystemCode).code).toBe("73761001");
     });
 
-    it('should parse a terminology system code with empty system and code', () => {
+    it("should parse a terminology system code with empty system and code", () => {
       const input = 'terminology "Empty System Code" system `` code ``.';
 
       const result = parseInput(input);
       const ast = result.statements[0] as Terminology;
       expect(ast.type).toBe(TerminologyType.type);
-      expect(ast.name).toBe('Empty System Code');
+      expect(ast.name).toBe("Empty System Code");
       expect(ast.definition.type).toBe(TerminologySystemCodeType.type);
-      expect((ast.definition as TerminologySystemCode).system).toBe('');
-      expect((ast.definition as TerminologySystemCode).code).toBe('');
+      expect((ast.definition as TerminologySystemCode).system).toBe("");
+      expect((ast.definition as TerminologySystemCode).code).toBe("");
     });
   });
 
-  describe('Activity Statements', () => {
-    it('should parse a simple activity', () => {
+  describe("Activity Statements", () => {
+    it("should parse a simple activity", () => {
       const input = 'activity "Vaccinate" perform CPGImmunizationRequest.';
 
       const result = parseInput(input);
       const ast = result.statements[0] as Activity;
-      expect(ast.type).toBe('Activity');
-      expect(ast.name).toBe('Vaccinate');
-      expect(ast.perform).toBe('CPGImmunizationRequest');
+      expect(ast.type).toBe("Activity");
+      expect(ast.name).toBe("Vaccinate");
+      expect(ast.perform).toBe("CPGImmunizationRequest");
       expect(ast.terminologyReference).toBeUndefined();
     });
 
-    it('should parse an activity with of clause', () => {
+    it("should parse an activity with of clause", () => {
       const input = 'activity "Indicate" perform CPGProposeDiagnosisTask of "Colonoscopy".';
 
       const result = parseInput(input);
       const ast = result.statements[0] as Activity;
-      expect(ast.type).toBe('Activity');
-      expect(ast.name).toBe('Indicate');
-      expect(ast.perform).toBe('CPGProposeDiagnosisTask');
-      expect(ast.terminologyReference).toBe('Colonoscopy');
+      expect(ast.type).toBe("Activity");
+      expect(ast.name).toBe("Indicate");
+      expect(ast.perform).toBe("CPGProposeDiagnosisTask");
+      expect(ast.terminologyReference).toBe("Colonoscopy");
     });
   });
 
-  describe('Concept Statements', () => {
-    it('should parse a simple concept with coded by', () => {
+  describe("Concept Statements", () => {
+    it("should parse a simple concept with coded by", () => {
       const input = `
         concept "BMI Range as a Condition":
           has type Condition.
@@ -362,65 +362,67 @@ describe('CPGLAstBuilder', () => {
 
       const result = parseInput(input);
       const ast = result.statements[0] as Concept;
-      expect(ast.type).toBe('Concept');
-      expect(ast.name).toBe('BMI Range as a Condition');
-      expect(ast.conceptType).toBe('Condition');
-      expect(ast.valueType).toBe('CodeableConcept');
+      expect(ast.type).toBe("Concept");
+      expect(ast.name).toBe("BMI Range as a Condition");
+      expect(ast.conceptType).toBe("Condition");
+      expect(ast.valueType).toBe("CodeableConcept");
       expect(ast.definition.type).toBe(CodedByDefinitionType.type);
-      expect((ast.definition as CodedByDefinition).terminologyName).toBe('BMI Valueset');
+      expect((ast.definition as CodedByDefinition).terminologyName).toBe("BMI Valueset");
     });
 
-    it('should parse a concept with inferred by pattern and concept reference', () => {
+    it("should parse a concept with inferred by pattern and concept reference", () => {
       const input = [
         'concept "Most Recent BMI":',
-        '  has type Observation.',
-        '  has valuetype boolean.',
-        '  has provenance `some provenance`.',
+        "  has type Observation.",
+        "  has valuetype boolean.",
+        "  has provenance `some provenance`.",
         '  inferred by "Most Recent(this, lookbackMonths)" "BMI".',
-        'done'
-      ].join('\n');
+        "done",
+      ].join("\n");
 
       const result = parseInput(input);
       const ast = result.statements[0] as Concept;
-      expect(ast.type).toBe('Concept');
-      expect(ast.name).toBe('Most Recent BMI');
-      expect(ast.conceptType).toBe('Observation');
-      expect(ast.valueType).toBe('boolean');
-      expect(ast.provenance).toBe('some provenance');
+      expect(ast.type).toBe("Concept");
+      expect(ast.name).toBe("Most Recent BMI");
+      expect(ast.conceptType).toBe("Observation");
+      expect(ast.valueType).toBe("boolean");
+      expect(ast.provenance).toBe("some provenance");
       expect(ast.definition.type).toBe(InferredByDefinitionType.type);
       const inferredBy = ast.definition as InferredByDefinition;
-      if ('body' in inferredBy && inferredBy.body.type === 'InferredByDefinitionConcept') {
-        expect(inferredBy.body.pattern).toBe('Most Recent(this, lookbackMonths)');
-        expect(inferredBy.body.concept).toBe('BMI');
+      if ("body" in inferredBy && inferredBy.body.type === "InferredByDefinitionConcept") {
+        expect(inferredBy.body.pattern).toBe("Most Recent(this, lookbackMonths)");
+        expect(inferredBy.body.concept).toBe("BMI");
       } else {
         expect((inferredBy.body as any).pattern).toBeUndefined();
         expect((inferredBy.body as any).concept).toBeUndefined();
       }
     });
 
-    it('should parse a concept with inferred by', () => {
+    it("should parse a concept with inferred by", () => {
       const input = [
         'concept "BMI":',
-        '  has type Observation.',
-        '  has valuetype Quantity.',
+        "  has type Observation.",
+        "  has valuetype Quantity.",
         '  inferred by ("BMI Range as a Condition" or "BMI as an Observation" or "Calculated BMI").',
-        'done'
-      ].join('\n');
+        "done",
+      ].join("\n");
 
       const result = parseInput(input);
       const ast = result.statements[0] as Concept;
-      expect(ast.type).toBe('Concept');
-      expect(ast.name).toBe('BMI');
-      expect(ast.conceptType).toBe('Observation');
-      expect(ast.valueType).toBe('Quantity');
+      expect(ast.type).toBe("Concept");
+      expect(ast.name).toBe("BMI");
+      expect(ast.conceptType).toBe("Observation");
+      expect(ast.valueType).toBe("Quantity");
       expect(ast.definition.type).toBe(InferredByDefinitionType.type);
       const inferredBy = ast.definition as InferredByDefinition;
-      if ('body' in inferredBy && inferredBy.body.type === 'InferredByDefinitionConcept') { /* empty */ }
+      if ("body" in inferredBy && inferredBy.body.type === "InferredByDefinitionConcept") {
+        /* empty */
+      }
       expect((inferredBy.body as any).pattern).toBeUndefined();
       expect((inferredBy.body as any).concept).toBeUndefined();
     });
 
-    it('should parse a concept with inferred by descriptive logic using and/or combinations', () => {
+    it("should parse a concept with inferred by descriptive logic using and/or combinations", () => {
       const input = `
         concept "Complex BMI":
           has type Observation.
@@ -431,53 +433,53 @@ describe('CPGLAstBuilder', () => {
 
       const result = parseInput(input);
       const ast = result.statements[0] as Concept;
-      expect(ast.type).toBe('Concept');
+      expect(ast.type).toBe("Concept");
       expect(ast.definition.type).toBe(InferredByDefinitionType.type);
       const inferredBy = ast.definition as InferredByDefinition;
       // Outer should be an OrExpression
-      expect(inferredBy.body.type).toBe('OrExpression');
+      expect(inferredBy.body.type).toBe("OrExpression");
       const orExpr = inferredBy.body as any;
       expect(Array.isArray(orExpr.terms)).toBe(true);
       expect(orExpr.terms.length).toBe(3);
       // First term: GroupExpression wrapping AndExpression
-      expect(orExpr.terms[0].type).toBe('GroupExpression');
+      expect(orExpr.terms[0].type).toBe("GroupExpression");
       const group1 = orExpr.terms[0];
-      expect(group1.expression.type).toBe('AndExpression');
-      expect(group1.expression.terms[0].type).toBe('ConceptReference');
-      expect(group1.expression.terms[0].name).toBe('BMI Range as a Condition');
-      expect(group1.expression.terms[1].type).toBe('ConceptReference');
-      expect(group1.expression.terms[1].name).toBe('Recent');
+      expect(group1.expression.type).toBe("AndExpression");
+      expect(group1.expression.terms[0].type).toBe("ConceptReference");
+      expect(group1.expression.terms[0].name).toBe("BMI Range as a Condition");
+      expect(group1.expression.terms[1].type).toBe("ConceptReference");
+      expect(group1.expression.terms[1].name).toBe("Recent");
       // Second term: GroupExpression wrapping AndExpression
-      expect(orExpr.terms[1].type).toBe('GroupExpression');
+      expect(orExpr.terms[1].type).toBe("GroupExpression");
       const group2 = orExpr.terms[1];
-      expect(group2.expression.type).toBe('AndExpression');
-      expect(group2.expression.terms[0].type).toBe('ConceptReference');
-      expect(group2.expression.terms[0].name).toBe('BMI as an Observation');
-      expect(group2.expression.terms[1].type).toBe('ConceptReference');
-      expect(group2.expression.terms[1].name).toBe('Valid');
+      expect(group2.expression.type).toBe("AndExpression");
+      expect(group2.expression.terms[0].type).toBe("ConceptReference");
+      expect(group2.expression.terms[0].name).toBe("BMI as an Observation");
+      expect(group2.expression.terms[1].type).toBe("ConceptReference");
+      expect(group2.expression.terms[1].name).toBe("Valid");
       // Third term: ConceptReference
-      expect(orExpr.terms[2].type).toBe('ConceptReference');
-      expect(orExpr.terms[2].name).toBe('Calculated BMI');
+      expect(orExpr.terms[2].type).toBe("ConceptReference");
+      expect(orExpr.terms[2].name).toBe("Calculated BMI");
       // pattern/concept should be undefined
       expect((inferredBy.body as any).pattern).toBeUndefined();
       expect((inferredBy.body as any).concept).toBeUndefined();
     });
 
-    it('should parse a concept with empty provenance', () => {
+    it("should parse a concept with empty provenance", () => {
       const input = [
         'concept "Empty Provenance":',
-        '  has type Observation.',
-        '  has valuetype boolean.',
-        '  has provenance ``.',
+        "  has type Observation.",
+        "  has valuetype boolean.",
+        "  has provenance ``.",
         '  inferred by "Some Pattern" "Some Concept".',
-        'done'
-      ].join('\n');
+        "done",
+      ].join("\n");
 
       const result = parseInput(input);
       const ast = result.statements[0] as Concept;
-      expect(ast.type).toBe('Concept');
-      expect(ast.name).toBe('Empty Provenance');
-      expect(ast.provenance).toBe('');
+      expect(ast.type).toBe("Concept");
+      expect(ast.name).toBe("Empty Provenance");
+      expect(ast.provenance).toBe("");
     });
   });
 
@@ -507,8 +509,8 @@ describe('CPGLAstBuilder', () => {
   //   });
   // });
 
-  describe('Action Statements', () => {
-    it('should parse a do activity', () => {
+  describe("Action Statements", () => {
+    it("should parse a do activity", () => {
       const input = `
 decision "Test":
   when "BMI > 30" then do "Propose Diagnosis Task".
@@ -521,10 +523,10 @@ done
       expect(body.type).toBe(SingleActionType.type);
       const action = body.action as DoActivity;
       expect(action.type).toBe(DoActivityType.type);
-      expect(action.activityName).toBe('Propose Diagnosis Task');
+      expect(action.activityName).toBe("Propose Diagnosis Task");
     });
 
-    it('should parse a use decision', () => {
+    it("should parse a use decision", () => {
       const input = `
 decision "Test":
   when "BMI > 30" then use "SomeDecision".
@@ -537,12 +539,12 @@ done
       expect(body.type).toBe(SingleActionType.type);
       const action = body.action as UseDecision;
       expect(action.type).toBe(UseDecisionType.type);
-      expect(action.decisionName).toBe('SomeDecision');
+      expect(action.decisionName).toBe("SomeDecision");
     });
   });
 
-  describe('Decision Structure', () => {
-    it('should properly nest WhenBlocks under DecisionBody', () => {
+  describe("Decision Structure", () => {
+    it("should properly nest WhenBlocks under DecisionBody", () => {
       const input = `
         decision "IMMZ.D2.D5.Measles":
           when "Measles Routine Immunization Schedule Incomplete" then:
@@ -561,43 +563,43 @@ done
 
       // Verify Decision has a DecisionBody
       expect(decision.body).toBeDefined();
-      expect(decision.body.type).toBe('DecisionBody');
+      expect(decision.body.type).toBe("DecisionBody");
 
       // Verify WhenBlocks are under DecisionBody, not directly under Decision
       const decisionKeys = Object.keys(decision);
-      expect(decisionKeys).not.toContain('WhenBlock');
+      expect(decisionKeys).not.toContain("WhenBlock");
 
       // Verify WhenBlocks are properly nested under DecisionBody
       expect(decision.body.statements).toBeDefined();
       expect(decision.body.statements.length).toBeGreaterThan(0);
-      expect(decision.body.statements[0].type).toBe('WhenBlock');
+      expect(decision.body.statements[0].type).toBe("WhenBlock");
     });
   });
 
-  describe('buildCPGL error reporting', () => {
-    it('should return errors in ParseResult for invalid activity type', () => {
-      const input = 'perform invalidActivity';
+  describe("buildCPGL error reporting", () => {
+    it("should return errors in ParseResult for invalid activity type", () => {
+      const input = "perform invalidActivity";
       const result = buildCPGL(input);
       expect(result.success).toBe(false);
       expect(result.errors && result.errors.length).toBeGreaterThan(0);
       const errorObj = JSON.parse(result.errors![0]);
-      expect(errorObj.type).toBe('LexicalError');
-      expect(errorObj.message).toContain('Invalid activity type');
+      expect(errorObj.type).toBe("LexicalError");
+      expect(errorObj.message).toContain("Invalid activity type");
     });
 
-    it('should return errors in ParseResult for syntax errors', () => {
+    it("should return errors in ParseResult for syntax errors", () => {
       const input = 'decision "Test" when "Condition" then do "Action"'; // missing done
       const result = buildCPGL(input);
       expect(result.success).toBe(false);
       expect(result.errors && result.errors.length).toBeGreaterThan(0);
       // Should contain a ParserError or similar
-      const foundParserError = result.errors!.some(e => e.includes('ParserError'));
+      const foundParserError = result.errors!.some((e) => e.includes("ParserError"));
       expect(foundParserError).toBe(true);
     });
   });
 
-  describe('parseCPGL and buildCPGL direct API tests', () => {
-    it('parseCPGL should succeed on valid input', () => {
+  describe("parseCPGL and buildCPGL direct API tests", () => {
+    it("parseCPGL should succeed on valid input", () => {
       const input = 'decision "Test": when "Condition" then do "Action". done';
       const result = parseCPGL(input);
       expect(result.success).toBe(true);
@@ -605,16 +607,16 @@ done
       expect(result.errors).toBeUndefined();
     });
 
-    it('parseCPGL should return errors on invalid input', () => {
+    it("parseCPGL should return errors on invalid input", () => {
       const input = 'decision "Test" when "Condition" then do "Action"'; // missing done
       const result = parseCPGL(input);
       expect(result.success).toBe(false);
       expect(result.errors && result.errors.length).toBeGreaterThan(0);
-      const foundParserError = result.errors!.some(e => e.includes('ParserError'));
+      const foundParserError = result.errors!.some((e) => e.includes("ParserError"));
       expect(foundParserError).toBe(true);
     });
 
-    it('buildCPGL should succeed on valid input', () => {
+    it("buildCPGL should succeed on valid input", () => {
       const input = 'decision "Test": when "Condition" then do "Action". done';
       const result = buildCPGL(input);
       expect(result.success).toBe(true);
@@ -622,12 +624,12 @@ done
       expect(result.errors).toBeUndefined();
     });
 
-    it('buildCPGL should return errors on invalid input', () => {
+    it("buildCPGL should return errors on invalid input", () => {
       const input = 'decision "Test" when "Condition" then do "Action"'; // missing done
       const result = buildCPGL(input);
       expect(result.success).toBe(false);
       expect(result.errors && result.errors.length).toBeGreaterThan(0);
-      const foundParserError = result.errors!.some(e => e.includes('ParserError'));
+      const foundParserError = result.errors!.some((e) => e.includes("ParserError"));
       expect(foundParserError).toBe(true);
     });
   });

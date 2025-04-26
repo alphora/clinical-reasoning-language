@@ -1,15 +1,15 @@
-import { CharStreams } from 'antlr4ts';
+import { CharStreams } from "antlr4ts";
 
-import { CPGLLexer } from '../../grammar/generated/antlr/CPGLLexer';
-import { createLexer } from '../createLexer';
+import { CPGLLexer } from "../../grammar/generated/antlr/CPGLLexer";
+import { createLexer } from "../createLexer";
 
-import { getAllTokens, verifyTokenSequence } from './index.test';
-import { getTokensFromString } from './helpers';
+import { getTokensFromString } from "./helpers";
+import { getAllTokens, verifyTokenSequence } from "./index.test";
 
-describe('Whitespace Handling', () => {
-  describe('Basic Whitespace', () => {
-    it('should skip newlines between tokens', () => {
-      const input = 'decision\nwhen\nthen\ndo';
+describe("Whitespace Handling", () => {
+  describe("Basic Whitespace", () => {
+    it("should skip newlines between tokens", () => {
+      const input = "decision\nwhen\nthen\ndo";
       const tokens = getTokensFromString(input);
       verifyTokenSequence(tokens, [
         CPGLLexer.DECISION,
@@ -19,7 +19,7 @@ describe('Whitespace Handling', () => {
       ]);
     });
 
-    it('should skip spaces between tokens', () => {
+    it("should skip spaces between tokens", () => {
       const input = 'decision "Test Decision"    when "Condition"  then    do "Action"';
       const tokens = getTokensFromString(input);
       verifyTokenSequence(tokens, [
@@ -33,7 +33,7 @@ describe('Whitespace Handling', () => {
       ]);
     });
 
-    it('should handle consecutive whitespace', () => {
+    it("should handle consecutive whitespace", () => {
       const input = 'decision    "Test"  \t  when  \n\n  "Condition"';
       const tokens = getTokensFromString(input);
       verifyTokenSequence(tokens, [
@@ -44,7 +44,7 @@ describe('Whitespace Handling', () => {
       ]);
     });
 
-    it('should handle leading and trailing whitespace', () => {
+    it("should handle leading and trailing whitespace", () => {
       const input = '\n  \t decision "Test" when "Condition" \n  ';
       const tokens = getTokensFromString(input);
       verifyTokenSequence(tokens, [
@@ -56,8 +56,8 @@ describe('Whitespace Handling', () => {
     });
   });
 
-  describe('Whitespace in Terminology Statements', () => {
-    it('should handle whitespace in terminology valueset statements', () => {
+  describe("Whitespace in Terminology Statements", () => {
+    it("should handle whitespace in terminology valueset statements", () => {
       const input = 'terminology\n  "BMI Valueset"\n\t\tvalueset\n  "bmi valueset"\t.';
       const tokens = getTokensFromString(input);
       verifyTokenSequence(tokens, [
@@ -69,7 +69,7 @@ describe('Whitespace Handling', () => {
       ]);
     });
 
-    it('should handle whitespace in terminology system code statements', () => {
+    it("should handle whitespace in terminology system code statements", () => {
       const input = 'terminology\n"term"\n  system\t"sys"\n  code\t"123"\t.';
       const tokens = getTokensFromString(input);
       verifyTokenSequence(tokens, [
@@ -84,8 +84,8 @@ describe('Whitespace Handling', () => {
     });
   });
 
-  describe('Whitespace in Activity Statements', () => {
-    it('should handle whitespace in activity statements', () => {
+  describe("Whitespace in Activity Statements", () => {
+    it("should handle whitespace in activity statements", () => {
       const input = 'activity\n  "Vaccinate"\n\t\tperform\n  CPGImmunizationRequest\t.';
       const tokens = getTokensFromString(input);
       verifyTokenSequence(tokens, [
@@ -97,7 +97,7 @@ describe('Whitespace Handling', () => {
       ]);
     });
 
-    it('should handle whitespace in activity statements with of clause', () => {
+    it("should handle whitespace in activity statements with of clause", () => {
       const input = 'activity\n"Action"\n  perform\tCPGProposeDiagnosis\n  of\t"diagnosis"\t.';
       const tokens = getTokensFromString(input);
       verifyTokenSequence(tokens, [
@@ -112,8 +112,8 @@ describe('Whitespace Handling', () => {
     });
   });
 
-  describe('Whitespace in Concept Statements', () => {
-    it('should handle whitespace in concept type declarations', () => {
+  describe("Whitespace in Concept Statements", () => {
+    it("should handle whitespace in concept type declarations", () => {
       const input = 'concept\n"BMI"\n  :\n    has\ttype\n  Observation\t.';
       const tokens = getTokensFromString(input);
       verifyTokenSequence(tokens, [
@@ -127,8 +127,8 @@ describe('Whitespace Handling', () => {
       ]);
     });
 
-    it('should handle whitespace in concept value type declarations', () => {
-      const input = 'has\n  valuetype\t\tQuantity\n.';
+    it("should handle whitespace in concept value type declarations", () => {
+      const input = "has\n  valuetype\t\tQuantity\n.";
       const tokens = getTokensFromString(input);
       verifyTokenSequence(tokens, [
         CPGLLexer.HAS,
@@ -138,7 +138,7 @@ describe('Whitespace Handling', () => {
       ]);
     });
 
-    it('should handle whitespace in concept inferred by expressions', () => {
+    it("should handle whitespace in concept inferred by expressions", () => {
       const input =
         'inferred\n  by\t(\n"Condition 1"\n  and\t"Condition 2"\n  or\t"Condition 3"\n)\t.';
       const tokens = getTokensFromString(input);
@@ -157,8 +157,8 @@ describe('Whitespace Handling', () => {
     });
   });
 
-  describe('Whitespace in Decision Blocks', () => {
-    it('should handle whitespace in nested decision blocks', () => {
+  describe("Whitespace in Decision Blocks", () => {
+    it("should handle whitespace in nested decision blocks", () => {
       const input = `decision\n  "Test"\n:\n  when\n    "Level 1"\n  then\n    when\n      "Level 2"\n    then\n      do\n        "Action"\n    .\ndone`;
       const tokens = getTokensFromString(input);
       verifyTokenSequence(tokens, [
@@ -178,7 +178,7 @@ describe('Whitespace Handling', () => {
       ]);
     });
 
-    it('should handle whitespace in any/all clauses', () => {
+    it("should handle whitespace in any/all clauses", () => {
       const input =
         'when\n  "Condition"\nthen\n  :\n    any\n      :\n        do\n          "Action 1"\n        .\n        do\n          "Action 2"\n        .\n    done\ndone';
       const tokens = getTokensFromString(input);

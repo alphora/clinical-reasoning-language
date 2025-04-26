@@ -1,14 +1,14 @@
-import { CharStreams } from 'antlr4ts';
+import { CharStreams } from "antlr4ts";
 
-import { CPGLLexer } from '../../grammar/generated/antlr/CPGLLexer';
-import { createLexer } from '../createLexer';
+import { CPGLLexer } from "../../grammar/generated/antlr/CPGLLexer";
+import { createLexer } from "../createLexer";
 
-import { getAllTokens, verifyTokenSequence } from './index.test';
-import { getTokensFromString } from './helpers';
+import { getTokensFromString } from "./helpers";
+import { getAllTokens, verifyTokenSequence } from "./index.test";
 
-describe('Integration', () => {
-  describe('Token Order and Sequence', () => {
-    it('should handle token order in basic blocks', () => {
+describe("Integration", () => {
+  describe("Token Order and Sequence", () => {
+    it("should handle token order in basic blocks", () => {
       const input = `decision "Test":
     when "Condition" then
         do "Action"
@@ -28,7 +28,7 @@ describe('Integration', () => {
       ]);
     });
 
-    it('should handle token order in complex nested blocks', () => {
+    it("should handle token order in complex nested blocks", () => {
       const input = `decision "Test":
     when "Level 1" then
         all:
@@ -73,9 +73,9 @@ describe('Integration', () => {
     });
   });
 
-  describe('Decision Structure', () => {
-    describe('Single Action Statements', () => {
-      it('should handle single action statements with dot terminator', () => {
+  describe("Decision Structure", () => {
+    describe("Single Action Statements", () => {
+      it("should handle single action statements with dot terminator", () => {
         const input = `decision "Test":
     when "Condition" then do "Action".
     when "Another Condition" then use "Another Decision".
@@ -103,8 +103,8 @@ done`;
       });
     });
 
-    describe('Multiple When Clauses', () => {
-      it('should handle decision with multiple when clauses at same level', () => {
+    describe("Multiple When Clauses", () => {
+      it("should handle decision with multiple when clauses at same level", () => {
         const input = `decision "Elderly Based":
     any:
     when "Client Age Greater Than 60" then
@@ -151,7 +151,7 @@ done`;
         ]);
       });
 
-      it('should handle decision with multiple when clauses and different terminal actions', () => {
+      it("should handle decision with multiple when clauses and different terminal actions", () => {
         const input = `decision "Test Decision":
     when "Condition 1" then
         do "Action 1"
@@ -189,7 +189,7 @@ done`;
         ]);
       });
 
-      it('should handle decision with multiple when clauses and empty lines', () => {
+      it("should handle decision with multiple when clauses and empty lines", () => {
         const input = `decision "Test Decision":
     when "Condition 1" then
         do "Action 1"
@@ -228,8 +228,8 @@ done`;
     });
   });
 
-  describe('Terminology Structure', () => {
-    it('should handle terminology with valueset', () => {
+  describe("Terminology Structure", () => {
+    it("should handle terminology with valueset", () => {
       const input = `terminology "BMI Valueset" valueset "bmi valueset".`;
       const tokens = getTokensFromString(input);
 
@@ -242,7 +242,7 @@ done`;
       ]);
     });
 
-    it('should handle terminology with unknown terminology', () => {
+    it("should handle terminology with unknown terminology", () => {
       const input = `terminology "some terminology" \`\`.`;
       const tokens = getTokensFromString(input);
 
@@ -254,7 +254,7 @@ done`;
       ]);
     });
 
-    it('should handle terminology with system and code', () => {
+    it("should handle terminology with system and code", () => {
       const input = `terminology "Colonoscopy" system "http://snomed.info/sct" code "73761001".`;
       const tokens = getTokensFromString(input);
 
@@ -270,8 +270,8 @@ done`;
     });
   });
 
-  describe('Activity Structure', () => {
-    it('should handle basic activity statements', () => {
+  describe("Activity Structure", () => {
+    it("should handle basic activity statements", () => {
       const input = `activity "Vaccinate" perform CPGImmunizationRequest.`;
       const tokens = getTokensFromString(input);
 
@@ -284,7 +284,7 @@ done`;
       ]);
     });
 
-    it('should handle activity statements with of clause', () => {
+    it("should handle activity statements with of clause", () => {
       const input = `activity "Indicate" perform CPGProposeDiagnosis of "Colonoscopy".`;
       const tokens = getTokensFromString(input);
 
@@ -300,8 +300,8 @@ done`;
     });
   });
 
-  describe('Concept Structure', () => {
-    it('should handle basic concept with type and value type', () => {
+  describe("Concept Structure", () => {
+    it("should handle basic concept with type and value type", () => {
       const input = `concept "Most Recent BMI":
     has type Observation.
     has valuetype boolean.
@@ -329,7 +329,7 @@ done`;
       ]);
     });
 
-    it('should handle concept with provenance', () => {
+    it("should handle concept with provenance", () => {
       const input = `concept "BMI":
     has type Observation.
     has valuetype Quantity.
@@ -363,7 +363,7 @@ done`;
       ]);
     });
 
-    it('should handle concept with inferred by expression', () => {
+    it("should handle concept with inferred by expression", () => {
       const input = `concept "BMI":
     has type Observation.
     has valuetype Quantity.
@@ -397,7 +397,7 @@ done`;
       ]);
     });
 
-    it('should handle concept with inferred by expression using AND', () => {
+    it("should handle concept with inferred by expression using AND", () => {
       const input = `concept "Complex BMI":
     has type Observation.
     has valuetype Quantity.
@@ -431,7 +431,7 @@ done`;
       ]);
     });
 
-    it('should handle concept with inferred by expression using mixed AND/OR', () => {
+    it("should handle concept with inferred by expression using mixed AND/OR", () => {
       const input = `concept "Complex BMI":
     has type Observation.
     has valuetype Quantity.

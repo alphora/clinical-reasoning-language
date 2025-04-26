@@ -1,14 +1,14 @@
-import { CharStreams } from 'antlr4ts';
+import { CharStreams } from "antlr4ts";
 
-import { CPGLLexer } from '../../grammar/generated/antlr/CPGLLexer';
-import { createLexer } from '../createLexer';
+import { CPGLLexer } from "../../grammar/generated/antlr/CPGLLexer";
+import { createLexer } from "../createLexer";
 
-import { getAllTokens, verifyTokenSequence } from './index.test';
-import { getTokensFromString } from './helpers';
+import { getTokensFromString } from "./helpers";
+import { getAllTokens, verifyTokenSequence } from "./index.test";
 
-describe('Structures', () => {
-  describe('Decision Structure', () => {
-    it('should tokenize basic decision blocks', () => {
+describe("Structures", () => {
+  describe("Decision Structure", () => {
+    it("should tokenize basic decision blocks", () => {
       const input = `decision "Test Decision":
     when "Condition" then
         do "Action"
@@ -28,7 +28,7 @@ describe('Structures', () => {
       ]);
     });
 
-    it('should tokenize nested when clauses with different qualifiers', () => {
+    it("should tokenize nested when clauses with different qualifiers", () => {
       const input = `decision "Test Decision":
     when "Condition 1" then
         all:
@@ -76,7 +76,7 @@ describe('Structures', () => {
       ]);
     });
 
-    it('should tokenize activity statements', () => {
+    it("should tokenize activity statements", () => {
       const input = `activity "Vaccinate" perform CPGImmunizationRequest.`;
       const tokens = getTokensFromString(input);
 
@@ -89,7 +89,7 @@ describe('Structures', () => {
       ]);
     });
 
-    it('should tokenize activity statements with of clause', () => {
+    it("should tokenize activity statements with of clause", () => {
       const input = `activity "Indicate" perform CPGProposeDiagnosis of "Colonoscopy".`;
       const tokens = getTokensFromString(input);
 
@@ -105,8 +105,8 @@ describe('Structures', () => {
     });
   });
 
-  describe('Terminology Structure', () => {
-    it('should tokenize terminology with valueset', () => {
+  describe("Terminology Structure", () => {
+    it("should tokenize terminology with valueset", () => {
       const input = `terminology "BMI Valueset" valueset "bmi valueset".`;
       const tokens = getTokensFromString(input);
 
@@ -119,7 +119,7 @@ describe('Structures', () => {
       ]);
     });
 
-    it('should tokenize terminology with unknown', () => {
+    it("should tokenize terminology with unknown", () => {
       const input = `terminology "some terminology" \`\`.`;
       const tokens = getTokensFromString(input);
 
@@ -131,7 +131,7 @@ describe('Structures', () => {
       ]);
     });
 
-    it('should tokenize terminology with system and code', () => {
+    it("should tokenize terminology with system and code", () => {
       const input = `terminology "Colonoscopy" system "http://snomed.info/sct" code "73761001".`;
       const tokens = getTokensFromString(input);
 
@@ -147,8 +147,8 @@ describe('Structures', () => {
     });
   });
 
-  describe('Concept Structure', () => {
-    it('should tokenize basic concept with type and value type', () => {
+  describe("Concept Structure", () => {
+    it("should tokenize basic concept with type and value type", () => {
       const input = `concept "Most Recent BMI":
     has type Observation.
     has valuetype boolean.
@@ -171,7 +171,7 @@ done`;
       ]);
     });
 
-    it('should tokenize concept with provenance and coded by', () => {
+    it("should tokenize concept with provenance and coded by", () => {
       const input = `concept "BMI Range as a Condition":
     has type Condition.
     has valuetype CodeableConcept.
@@ -204,7 +204,7 @@ done`;
       ]);
     });
 
-    it('should tokenize concept with inferred by pattern', () => {
+    it("should tokenize concept with inferred by pattern", () => {
       const input = `concept "BMI":
     has type Observation.
     has valuetype Quantity.
@@ -233,7 +233,7 @@ done`;
       ]);
     });
 
-    it('should tokenize concept with inferred by expression', () => {
+    it("should tokenize concept with inferred by expression", () => {
       const input = `concept "BMI":
     has type Observation.
     has valuetype Quantity.
