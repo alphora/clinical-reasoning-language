@@ -97,12 +97,28 @@ class CPGLLexerErrorListener {
         }
         return `Invalid token: ${errorText}`;
     }
-    syntaxError(_recognizer, _offendingSymbol, line, charPositionInLine, msg, _e) {
-        const input = _recognizer.inputStream;
+    syntaxError(recognizer, offendingSymbol, line, charPositionInLine, msg, _e) {
+        const input = recognizer.inputStream;
         const startIndex = input.index;
         let errorText = this.parseErrorText(input);
         errorText = this.parseQuotedString(input, errorText);
         const specificMessage = this.getSpecificMessage(errorText, msg);
+        let offendingDetails = { text: "unknown" };
+        if (offendingSymbol && typeof offendingSymbol.text === "string") {
+            const token = offendingSymbol;
+            offendingDetails = {
+                text: token.text,
+                type: token.type,
+                line: token.line,
+                charPositionInLine: token.charPositionInLine,
+                startIndex: token.startIndex,
+                stopIndex: token.stopIndex,
+                tokenIndex: token.tokenIndex,
+            };
+        }
+        else if (offendingSymbol !== undefined) {
+            offendingDetails = { text: String(offendingSymbol) };
+        }
         const errorMessage = JSON.stringify({
             type: "LexicalError",
             line: line,
@@ -110,24 +126,25 @@ class CPGLLexerErrorListener {
             message: specificMessage,
             details: {
                 message: `${msg}`,
+                offendingSymbol: offendingDetails,
             },
         });
         console.error(errorMessage);
         this.errors.push(errorMessage);
-        if (_recognizer instanceof CPGLLexer_1.CPGLLexer) {
+        if (recognizer instanceof CPGLLexer_1.CPGLLexer) {
             const errorToken = {
                 type: this.ERROR_TOKEN_TYPE,
                 text: errorMessage,
                 channel: antlr4ts_1.Token.DEFAULT_CHANNEL,
                 startIndex,
                 stopIndex: input.index - 1,
-                line,
-                charPositionInLine,
+                line: line,
+                charPositionInLine: charPositionInLine,
                 tokenIndex: -1,
-                tokenSource: _recognizer,
+                tokenSource: recognizer,
                 inputStream: input,
             };
-            _recognizer.emit(errorToken);
+            recognizer.emit(errorToken);
             return;
         }
         throw new Error(errorMessage);

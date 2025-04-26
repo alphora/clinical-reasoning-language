@@ -5,14 +5,25 @@ class CustomParserErrorListener {
     constructor() {
         this.errors = [];
     }
-    syntaxError(recognizer, offendingSymbol, line, charPositionInLine, msg, e) {
+    syntaxError(_recognizer, offendingSymbol, line, charPositionInLine, msg, _e) {
+        const offendingDetails = offendingSymbol
+            ? {
+                text: offendingSymbol.text,
+                type: offendingSymbol.type,
+                line: offendingSymbol.line,
+                charPositionInLine: offendingSymbol.charPositionInLine,
+                startIndex: offendingSymbol.startIndex,
+                stopIndex: offendingSymbol.stopIndex,
+                tokenIndex: offendingSymbol.tokenIndex,
+            }
+            : { text: "unknown" };
         const errorMessage = JSON.stringify({
             type: "ParserError",
             line: line,
             column: charPositionInLine,
             message: `Syntax error: ${msg}`,
             details: {
-                offendingSymbol: offendingSymbol?.text || "unknown",
+                offendingSymbol: offendingDetails,
             },
         });
         console.error(errorMessage);

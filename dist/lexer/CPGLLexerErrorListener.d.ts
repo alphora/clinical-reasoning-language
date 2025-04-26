@@ -9,7 +9,7 @@ export declare class CPGLLexerErrorListener implements ANTLRErrorListener<number
     private parseErrorText;
     private parseQuotedString;
     private getSpecificMessage;
-    syntaxError<T extends number>(_recognizer: Recognizer<T, ATNSimulator>, _offendingSymbol: T | undefined, line: number, charPositionInLine: number, msg: string, _e: RecognitionException | undefined): void;
+    syntaxError<T extends number>(recognizer: Recognizer<T, ATNSimulator>, offendingSymbol: T | undefined, line: number, charPositionInLine: number, msg: string, _e: RecognitionException | undefined): void;
     getErrors(): string[];
     reportCustomError(line: number, column: number, message: string, details?: any): void;
 }
