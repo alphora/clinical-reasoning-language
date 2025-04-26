@@ -100,6 +100,22 @@ export class CPGLAstBuilder
   extends AbstractParseTreeVisitor<ASTNode>
   implements CPGLParserVisitor<ASTNode>
 {
+  private readonly errors: string[] = [];
+
+  protected reportError(type: string, message: string, location?: Location, details?: any) {
+    const errorObj = {
+      type,
+      message,
+      location,
+      details,
+    };
+    this.errors.push(JSON.stringify(errorObj));
+  }
+
+  public getErrors(): string[] {
+    return this.errors;
+  }
+
   protected defaultResult() {
     return null as any;
   }
@@ -283,10 +299,50 @@ export class CPGLAstBuilder
   }
 
   visitConceptStatement(ctx: ConceptStatementContext): Concept {
-    const name = ctx.conceptIdentifier().text.slice(1, -1);
-    const bodyCtx = ctx.conceptBody();
-    const conceptType = bodyCtx.hasTypeLine().CONCEPT_TYPE().text as ConceptType;
-    const valueType = bodyCtx.hasValueTypeLine().CONCEPT_VALUE_TYPE().text as any;
+    const name = ctx.conceptIdentifier?.()?.text?.slice(1, -1);
+    const bodyCtx = ctx.conceptBody?.();
+    if (!name || !bodyCtx) {
+      this.reportError(
+        "AstError",
+        "ConceptStatement: missing conceptIdentifier or conceptBody",
+        getLocation(ctx)
+      );
+      return null as any;
+    }
+
+    const typeLine = bodyCtx.hasTypeLine?.();
+    const valueTypeLine = bodyCtx.hasValueTypeLine?.();
+    if (!typeLine || !valueTypeLine) {
+      this.reportError(
+        "AstError",
+        "ConceptStatement: missing type or valueType line",
+        getLocation(ctx)
+      );
+      return null as any;
+    }
+
+    let conceptTypeToken, valueTypeToken;
+    try {
+      conceptTypeToken = typeLine.CONCEPT_TYPE();
+    } catch {
+      conceptTypeToken = undefined;
+    }
+    try {
+      valueTypeToken = valueTypeLine.CONCEPT_VALUE_TYPE();
+    } catch {
+      valueTypeToken = undefined;
+    }
+    if (!conceptTypeToken || !valueTypeToken) {
+      this.reportError(
+        "AstError",
+        "ConceptStatement: missing CONCEPT_TYPE or CONCEPT_VALUE_TYPE token",
+        getLocation(ctx)
+      );
+      return null as any;
+    }
+
+    const conceptType = conceptTypeToken.text as ConceptType;
+    const valueType = valueTypeToken.text as any;
     let provenance: string | undefined = undefined;
     if (bodyCtx.provenanceLine?.()) {
       const provCtx = bodyCtx.provenanceLine?.();
@@ -304,7 +360,16 @@ export class CPGLAstBuilder
     }
     let definition: ConceptDefinition;
     if (bodyCtx.codedByLine && bodyCtx.codedByLine()) {
-      const termRef = bodyCtx.codedByLine()!.terminologyReference().text.slice(1, -1);
+      const codedBy = bodyCtx.codedByLine();
+      const termRef = codedBy?.terminologyReference?.()?.text?.slice(1, -1);
+      if (!termRef) {
+        this.reportError(
+          "AstError",
+          "ConceptStatement: missing terminologyReference in codedByLine",
+          getLocation(ctx)
+        );
+        return null as any;
+      }
       definition = {
         type: CodedByDefinitionType.type,
         terminologyName: termRef,
@@ -313,11 +378,21 @@ export class CPGLAstBuilder
     } else if (bodyCtx.inferredByLine && bodyCtx.inferredByLine()) {
       const infCtx = bodyCtx.inferredByLine();
       if (!infCtx) {
-        throw new Error("ConceptStatement: inferredByLine() unexpectedly returned undefined");
+        this.reportError(
+          "AstError",
+          "ConceptStatement: inferredByLine() unexpectedly returned undefined",
+          getLocation(ctx)
+        );
+        return null as any;
       }
       definition = this.visit(infCtx) as InferredByDefinition;
     } else {
-      throw new Error("ConceptStatement must have either codedByLine or inferredByLine");
+      this.reportError(
+        "AstError",
+        "ConceptStatement must have either codedByLine or inferredByLine",
+        getLocation(ctx)
+      );
+      return null as any;
     }
     return {
       type: "Concept",
