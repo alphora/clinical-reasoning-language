@@ -1,6 +1,6 @@
 
 > @smiledigitalhealth/cpgl@0.5.3 cli:lexer
-> ts-node src/cli/run-lexer.ts
+> ts-node src/cli/run-lexer.ts D:\src\clinical-practice-guideline-language\src\tests\testdata\smart-example-immz
 
 [
   {

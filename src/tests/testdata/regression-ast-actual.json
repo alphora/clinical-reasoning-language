@@ -1,6 +1,6 @@
 
 > @smiledigitalhealth/cpgl@0.5.3 cli:ast
-> ts-node src/cli/run-ast.ts
+> ts-node src/cli/run-ast.ts D:\src\clinical-practice-guideline-language\src\tests\testdata\smart-example-immz
 
 {
   "type": "CPGL",

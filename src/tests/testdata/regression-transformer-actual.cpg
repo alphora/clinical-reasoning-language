@@ -2,10 +2,10 @@
 > @smiledigitalhealth/cpgl@0.5.3 cli:transformer:fsh-to-cpgl
 > ts-node src/cli/run-transformer-fsh-to-cpgl.ts
 
-warn  The FSHOnly property is set to true, so no output specific to IG creation will be generated. The following properties are unused and only relevant for IG creation: id, name, title, description, experimental, copyrightYear, releaseLabel, license, publisher, pages, menu, meta, parameters. Consider removing these properties from sushi-config.yaml.
+[97m[48;2;179;98;0mwarn [49m[39m The FSHOnly property is set to true, so no output specific to IG creation will be generated. The following properties are unused and only relevant for IG creation: id, name, title, description, experimental, copyrightYear, releaseLabel, license, publisher, pages, menu, meta, parameters. Consider removing these properties from sushi-config.yaml.
   File: D:\src\clinical-practice-guideline-language\src\examples\fsh\smart-example-immz\sushi-config.yaml
-info  Preprocessed 10 documents with 10 aliases.
-info  Imported 0 definitions and 9 instances.
+[97m[42minfo [49m[39m Preprocessed 10 documents with 10 aliases.
+[97m[42minfo [49m[39m Imported 0 definitions and 9 instances.
 // Instance: IMMZD2DTMeaslesDose0
 // Description: If the child or patient has not been given MCV0 between 6 and 9 months
 // Provenance: WHO recommendations for routine immunization - summary tables (March 2023)

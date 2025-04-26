@@ -9,7 +9,7 @@ describe('Parser regression test: IMMZ example', () => {
 
   it('should match the expected parser output (ignoring header)', () => {
     // Run the parser CLI and capture output
-    const output = execSync('npm run cli:parser', { encoding: 'utf8' });
+    const output = execSync('npm run cli:parser -- ' + path.join(__dirname, 'testdata', 'smart-example-immz'), { encoding: 'utf8' });
     fs.writeFileSync(TMP_FILE, output, 'utf8');
 
     // Read both files
