@@ -4,13 +4,17 @@ _This checklist is for release branches (e.g., `release/v0.1.0`)._
 
 ## ✅ Checklist
 
+- [ ] Update your local main branch to the latest
 - [ ] Create a release branch (`release/v<version>`)
+- [ ] Remove all debugging logs
+- [ ] Run the linter with auto-fix
 - [ ] Update the CHANGELOG
 - [ ] Commit all changes
 - [ ] Run the release script
 - [ ] Push commits and tags
 - [ ] Merge the PR
 - [ ] Create and publish GitHub Release
+- [ ] Switch back to main and delete the release branch
 
 ---
 
@@ -20,25 +24,42 @@ This package is distributed via GitHub Releases.
 
 To create a new release:
 
-1. **Create a release branch**  
+1. **Update your local main branch to the latest:**
+
+   ```bash
+   git checkout main
+   git pull
+   ```
+
+2. **Create a release branch**  
    Example:
 
    ```bash
    git checkout -b release/v0.1.0
    ```
 
-2. **Generate and update the CHANGELOG**  
+3. **Remove all debugging logs**  
    Prompt:
-   > "I'm creating a new release v0.1.0. Generate and append to the CHANGELOG based on git commits since the last tag."
+   > "Search for and remove all console.log statements with messages prefixed with [DEBUGGING]."
 
-3. **Commit all changes**  
+4. **Run the linter with auto-fix:**
+
+   ```bash
+   npx eslint . --ext .ts --fix
+   ```
+
+5. **Update the CHANGELOG**  
+   Prompt:
+   > "Generate and append to the CHANGELOG based on git commits since the last tag."
+
+6. **Commit all changes**
 
    ```bash
    git add .
    git commit -m "Prepare release v0.1.0"
    ```
 
-4. **Run the automated release script**  
+7. **Run the automated release script**
 
    ```bash
    npm run prepublish:github -- <patch|minor|major|version>
@@ -58,11 +79,21 @@ To create a new release:
    - Push commits and tags
    - Restore `dist/` to `.gitignore` and push final cleanup
 
-5. **Create and merge the Pull Request (PR)**
+8. **Push commits and tags** (if not already pushed by the script)
 
-6. **Publish the GitHub Release**
-   - Use the version tag (e.g., `v0.1.0`)
-   - Generate release notes automatically if needed
+9. **Create and merge the Pull Request (PR)**
+
+10. **Create and publish the GitHub Release**
+    - Use the version tag (e.g., `v0.1.0`)
+    - Generate release notes automatically if needed
+
+11. **Switch back to main and delete the release branch:**
+
+    ```bash
+    git checkout main
+    git branch -d release/v0.1.0
+    git push origin --delete release/v0.1.0
+    ```
 
 ---
 

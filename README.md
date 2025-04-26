@@ -712,3 +712,38 @@ npm run generate
 ```
 
 These files are ignored by git via `.gitignore` and will be recreated as needed.
+
+### 📦 Release Process & Checklist
+
+> **Release Checklist:**
+> The release checklist is now maintained in a single source of truth: 
+> [`.github/PULL_REQUEST_TEMPLATE/release.md`](.github/PULL_REQUEST_TEMPLATE/release.md)
+>
+> Please refer to that file for the most up-to-date release steps and requirements.
+
+---
+
+The rest of the release process, including changelog generation, tagging, and publishing, is described in the [release PR template](.github/PULL_REQUEST_TEMPLATE/release.md). Always follow the steps in that file to ensure a consistent and error-free release.
+
+## Developer Notes: Release Checklist & GitHub Automation
+
+### Single Source of Truth for Release Checklist
+
+To avoid duplication and checklist drift, the release checklist is maintained in a single location:
+
+- **[.github/PULL_REQUEST_TEMPLATE/release.md](.github/PULL_REQUEST_TEMPLATE/release.md)**
+
+All references to the release process (including the automated release script, documentation, and PRs) should point to this file. If you need to update the release process, update the PR template only. This ensures consistency and reduces maintenance overhead.
+
+- The release PR body is automatically populated from this file by the release automation script (`.github/scripts/set-release-pr-body.js`).
+- The README and other documentation reference this file instead of duplicating the checklist.
+
+### GitHub Workflow & Automation Considerations
+
+- **Pull Request Templates:** The project uses GitHub's PR template system to standardize release PRs and ensure all required steps are followed.
+- **Release Automation:** The release process is automated via scripts and GitHub Actions. Always ensure your working directory is clean and up-to-date before running release scripts.
+- **CI/CD:** All tests and builds are run in GitHub Actions before a release is published. If any step fails, the release will be blocked.
+- **Generated Files:** Auto-generated files (e.g., ANTLR outputs, grammar-driven types) are ignored by git and should never be edited manually. Always use the provided scripts to regenerate them.
+- **Documentation:** Keep all documentation referencing the release checklist up-to-date by linking to the PR template.
+
+For more details, see the [release PR template](.github/PULL_REQUEST_TEMPLATE/release.md) and the automation scripts in `.github/scripts/`.
