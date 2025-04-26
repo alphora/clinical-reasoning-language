@@ -1,8 +1,6 @@
 // Utility for activity normalization and deduplication
 // [DEBUGGING] All debug logs are prefixed as per guidelines
 
-import { randomInt } from "crypto";
-
 export type Activity = { name: string; value: string | undefined; original: string };
 
 /**
@@ -22,7 +20,7 @@ export function normalizeActivity(activity: Activity): string {
 export class ActivityDeduplicator {
   private normalizedToOriginal: Map<string, Activity> = new Map();
 
-  add(activity: Activity) {
+  add(activity: Activity): void {
     const norm = normalizeActivity(activity);
     if (!this.normalizedToOriginal.has(norm)) {
       this.normalizedToOriginal.set(norm, activity);
