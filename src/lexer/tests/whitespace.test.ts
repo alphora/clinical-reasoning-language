@@ -1,10 +1,7 @@
-import { CharStreams } from "antlr4ts";
-
 import { CPGLLexer } from "../../grammar/generated/antlr/CPGLLexer";
-import { createLexer } from "../createLexer";
 
 import { getTokensFromString } from "./helpers";
-import { getAllTokens, verifyTokenSequence } from "./index.test";
+import { verifyTokenSequence } from "./index.test";
 
 describe("Whitespace Handling", () => {
   describe("Basic Whitespace", () => {
