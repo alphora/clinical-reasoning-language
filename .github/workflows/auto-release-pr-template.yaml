@@ -19,4 +19,5 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            require('./.github/scripts/set-release-pr-body.js')
+            const setReleasePrBody = require('./.github/scripts/set-release-pr-body.js');
+            await setReleasePrBody({github, context});
