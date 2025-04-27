@@ -13,24 +13,21 @@ export function getActionTokenSequence(): number[] {
 }
 
 /**
- * Helper function to generate token sequence for a single casefeature block
- * @returns Array of token types for a casefeature block
- * This only includes the repeating tokens.
+ * Helper function to generate token sequence for a concept type declaration
+ * @returns Array of token types for a concept type declaration
  * example:
- * concept "some other case feature"
- *    has type Observation.
+ * type is Observation.
  */
 export function getCaseFeatureTokenSequence(): number[] {
-  return [CPGLLexer.HAS, CPGLLexer.TYPE, CPGLLexer.CONCEPT_TYPE, CPGLLexer.DOT];
+  return [CPGLLexer.TYPE, CPGLLexer.IS, CPGLLexer.CONCEPT_TYPE, CPGLLexer.DOT];
 }
 
 /**
  * Helper function to generate token sequence for a value type declaration
  * @returns Array of token types for a value type declaration
- * This only includes the repeating tokens.
  * example:
- * has valuetype Quantity.
+ * valuetype is Quantity.
  */
 export function getValueTypeTokenSequence(): number[] {
-  return [CPGLLexer.HAS, CPGLLexer.VALUETYPE, CPGLLexer.CONCEPT_VALUE_TYPE, CPGLLexer.DOT];
+  return [CPGLLexer.VALUETYPE, CPGLLexer.IS, CPGLLexer.CONCEPT_VALUE_TYPE, CPGLLexer.DOT];
 }

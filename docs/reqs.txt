@@ -1,0 +1,42 @@
+
+ Here's the breakdown:
+Duplicate Top-Level Names
+Currently in ASTBuilder:
+seenDecisionNames set for duplicate decision names
+seenConceptNames set for duplicate concept names
+seenTerminologyNames set for duplicate terminology names
+seenActivityNames set for duplicate activity names
+
+Duplicate When Block Concepts
+Currently in visitDecisionStatement:
+Apply to actionUnique...
+This validation should be moved to the validator.
+
+Duplicate Actions in When Blocks
+Currently in visitWhenBlock:
+Apply to actionUnique...
+This validation should be moved to the validator.
+
+Duplicate Nested When Blocks
+Currently in visitWhenBlock:
+Apply to actionUnique...
+This validation should be moved to the validator.
+
+The builder should focus on:
+Constructing the AST
+
+Basic syntax validation
+Ensuring the AST structure is valid
+
+The validator should handle:
+All business rule validations
+Duplicate name checks
+Action uniqueness checks
+When block uniqueness checks
+Cycle detection
+
+duplicate when blocks -> warn
+duplicate actions -> warn
+Rob: 
+- lock the sushi version in
+- run some more IGs

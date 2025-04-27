@@ -64,24 +64,24 @@ describe("CPGL Lexer - Basic Tokens", () => {
     });
 
     it("should tokenize provenance value without backslashes as QUOTED_STRING", () => {
-      const input = 'has provenance "some provenance"';
+      const input = 'evidence is "some provenance"';
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(
         tokens,
-        [CPGLLexer.HAS, CPGLLexer.PROVENANCE, CPGLLexer.QUOTED_STRING],
-        ["has", "provenance", '"some provenance"'],
+        [CPGLLexer.EVIDENCE, CPGLLexer.IS, CPGLLexer.QUOTED_STRING],
+        ["evidence", "is", '"some provenance"'],
       );
     });
 
-    it("should tokenize provenance value with backslashes as STRING", () => {
-      const input = "has provenance `some\\provenance`";
+    it("should tokenize evidence value with backslashes as BACKTICK_STRING", () => {
+      const input = "evidence is `some\\provenance`";
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(
         tokens,
-        [CPGLLexer.HAS, CPGLLexer.PROVENANCE, CPGLLexer.BACKTICK_STRING],
-        ["has", "provenance", "`some\\provenance`"],
+        [CPGLLexer.EVIDENCE, CPGLLexer.IS, CPGLLexer.BACKTICK_STRING],
+        ["evidence", "is", "`some\\provenance`"],
       );
     });
   });
@@ -262,60 +262,60 @@ describe("CPGL Lexer - Basic Tokens", () => {
 
   describe("Concept Types", () => {
     it("should tokenize Observation", () => {
-      const input = "has type Observation";
+      const input = "type is Observation";
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(
         tokens,
-        [CPGLLexer.HAS, CPGLLexer.TYPE, CPGLLexer.CONCEPT_TYPE],
-        ["has", "type", "Observation"],
+        [CPGLLexer.TYPE, CPGLLexer.IS, CPGLLexer.CONCEPT_TYPE],
+        ["type", "is", "Observation"],
       );
     });
 
     it("should tokenize Condition", () => {
-      const input = "has type Condition";
+      const input = "type is Condition";
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(
         tokens,
-        [CPGLLexer.HAS, CPGLLexer.TYPE, CPGLLexer.CONCEPT_TYPE],
-        ["has", "type", "Condition"],
+        [CPGLLexer.TYPE, CPGLLexer.IS, CPGLLexer.CONCEPT_TYPE],
+        ["type", "is", "Condition"],
       );
     });
 
     it("should tokenize medication-related concepts", () => {
       const input =
-        "has type MedicationRequest\nhas type MedicationDispense\nhas type MedicationAdministration\nhas type MedicationStatement";
+        "type is MedicationRequest\ntype is MedicationDispense\ntype is MedicationAdministration\ntype is MedicationStatement";
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(
         tokens,
         [
-          CPGLLexer.HAS,
           CPGLLexer.TYPE,
+          CPGLLexer.IS,
           CPGLLexer.CONCEPT_TYPE,
-          CPGLLexer.HAS,
           CPGLLexer.TYPE,
+          CPGLLexer.IS,
           CPGLLexer.CONCEPT_TYPE,
-          CPGLLexer.HAS,
           CPGLLexer.TYPE,
+          CPGLLexer.IS,
           CPGLLexer.CONCEPT_TYPE,
-          CPGLLexer.HAS,
           CPGLLexer.TYPE,
+          CPGLLexer.IS,
           CPGLLexer.CONCEPT_TYPE,
         ],
         [
-          "has",
           "type",
+          "is",
           "MedicationRequest",
-          "has",
           "type",
+          "is",
           "MedicationDispense",
-          "has",
           "type",
+          "is",
           "MedicationAdministration",
-          "has",
           "type",
+          "is",
           "MedicationStatement",
         ],
       );
@@ -323,37 +323,37 @@ describe("CPGL Lexer - Basic Tokens", () => {
 
     it("should tokenize communication and questionnaire concepts", () => {
       const input =
-        "has type Communication\nhas type CommunicationRequest\nhas type QuestionnaireTask\nhas type QuestionnaireResponse";
+        "type is Communication\ntype is CommunicationRequest\ntype is QuestionnaireTask\ntype is QuestionnaireResponse";
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(
         tokens,
         [
-          CPGLLexer.HAS,
           CPGLLexer.TYPE,
+          CPGLLexer.IS,
           CPGLLexer.CONCEPT_TYPE,
-          CPGLLexer.HAS,
           CPGLLexer.TYPE,
+          CPGLLexer.IS,
           CPGLLexer.CONCEPT_TYPE,
-          CPGLLexer.HAS,
           CPGLLexer.TYPE,
+          CPGLLexer.IS,
           CPGLLexer.CONCEPT_TYPE,
-          CPGLLexer.HAS,
           CPGLLexer.TYPE,
+          CPGLLexer.IS,
           CPGLLexer.CONCEPT_TYPE,
         ],
         [
-          "has",
           "type",
+          "is",
           "Communication",
-          "has",
           "type",
+          "is",
           "CommunicationRequest",
-          "has",
           "type",
+          "is",
           "QuestionnaireTask",
-          "has",
           "type",
+          "is",
           "QuestionnaireResponse",
         ],
       );
@@ -361,37 +361,37 @@ describe("CPGL Lexer - Basic Tokens", () => {
 
     it("should tokenize immunization and service concepts", () => {
       const input =
-        "has type ImmunizationRequest\nhas type Immunization\nhas type ServiceRequest\nhas type Procedure";
+        "type is ImmunizationRequest\ntype is Immunization\ntype is ServiceRequest\ntype is Procedure";
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(
         tokens,
         [
-          CPGLLexer.HAS,
           CPGLLexer.TYPE,
+          CPGLLexer.IS,
           CPGLLexer.CONCEPT_TYPE,
-          CPGLLexer.HAS,
           CPGLLexer.TYPE,
+          CPGLLexer.IS,
           CPGLLexer.CONCEPT_TYPE,
-          CPGLLexer.HAS,
           CPGLLexer.TYPE,
+          CPGLLexer.IS,
           CPGLLexer.CONCEPT_TYPE,
-          CPGLLexer.HAS,
           CPGLLexer.TYPE,
+          CPGLLexer.IS,
           CPGLLexer.CONCEPT_TYPE,
         ],
         [
-          "has",
           "type",
+          "is",
           "ImmunizationRequest",
-          "has",
           "type",
+          "is",
           "Immunization",
-          "has",
           "type",
+          "is",
           "ServiceRequest",
-          "has",
           "type",
+          "is",
           "Procedure",
         ],
       );
@@ -400,122 +400,112 @@ describe("CPGL Lexer - Basic Tokens", () => {
 
   describe("Concept Value Types", () => {
     it("should tokenize Quantity", () => {
-      const input = "has valuetype Quantity";
+      const input = "valuetype is Quantity";
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(
         tokens,
-        [CPGLLexer.HAS, CPGLLexer.VALUETYPE, CPGLLexer.CONCEPT_VALUE_TYPE],
-        ["has", "valuetype", "Quantity"],
+        [CPGLLexer.VALUETYPE, CPGLLexer.IS, CPGLLexer.CONCEPT_VALUE_TYPE],
+        ["valuetype", "is", "Quantity"],
       );
     });
 
     it("should tokenize CodeableConcept", () => {
-      const input = "has valuetype CodeableConcept";
+      const input = "valuetype is CodeableConcept";
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(
         tokens,
-        [CPGLLexer.HAS, CPGLLexer.VALUETYPE, CPGLLexer.CONCEPT_VALUE_TYPE],
-        ["has", "valuetype", "CodeableConcept"],
+        [CPGLLexer.VALUETYPE, CPGLLexer.IS, CPGLLexer.CONCEPT_VALUE_TYPE],
+        ["valuetype", "is", "CodeableConcept"],
       );
     });
 
     it("should tokenize basic value types", () => {
-      const input = "has valuetype string\nhas valuetype boolean\nhas valuetype integer";
+      const input = "valuetype is string\nvaluetype is boolean\nvaluetype is integer";
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(
         tokens,
         [
-          CPGLLexer.HAS,
           CPGLLexer.VALUETYPE,
+          CPGLLexer.IS,
           CPGLLexer.CONCEPT_VALUE_TYPE,
-          CPGLLexer.HAS,
           CPGLLexer.VALUETYPE,
+          CPGLLexer.IS,
           CPGLLexer.CONCEPT_VALUE_TYPE,
-          CPGLLexer.HAS,
           CPGLLexer.VALUETYPE,
+          CPGLLexer.IS,
           CPGLLexer.CONCEPT_VALUE_TYPE,
         ],
-        [
-          "has",
-          "valuetype",
-          "string",
-          "has",
-          "valuetype",
-          "boolean",
-          "has",
-          "valuetype",
-          "integer",
-        ],
+        ["valuetype", "is", "string", "valuetype", "is", "boolean", "valuetype", "is", "integer"],
       );
     });
 
     it("should tokenize range and ratio types", () => {
-      const input = "has valuetype Range\nhas valuetype Ratio";
+      const input = "valuetype is Range\nvaluetype is Ratio";
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(
         tokens,
         [
-          CPGLLexer.HAS,
           CPGLLexer.VALUETYPE,
+          CPGLLexer.IS,
           CPGLLexer.CONCEPT_VALUE_TYPE,
-          CPGLLexer.HAS,
           CPGLLexer.VALUETYPE,
+          CPGLLexer.IS,
           CPGLLexer.CONCEPT_VALUE_TYPE,
         ],
-        ["has", "valuetype", "Range", "has", "valuetype", "Ratio"],
+        ["valuetype", "is", "Range", "valuetype", "is", "Ratio"],
       );
     });
 
     it("should tokenize sampled data and time types", () => {
-      const input = "has valuetype SampledData\nhas valuetype time\nhas valuetype dateTime";
+      const input = "valuetype is SampledData\nvaluetype is time\nvaluetype is dateTime";
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(
         tokens,
         [
-          CPGLLexer.HAS,
           CPGLLexer.VALUETYPE,
+          CPGLLexer.IS,
           CPGLLexer.CONCEPT_VALUE_TYPE,
-          CPGLLexer.HAS,
           CPGLLexer.VALUETYPE,
+          CPGLLexer.IS,
           CPGLLexer.CONCEPT_VALUE_TYPE,
-          CPGLLexer.HAS,
           CPGLLexer.VALUETYPE,
+          CPGLLexer.IS,
           CPGLLexer.CONCEPT_VALUE_TYPE,
         ],
         [
-          "has",
           "valuetype",
+          "is",
           "SampledData",
-          "has",
           "valuetype",
+          "is",
           "time",
-          "has",
           "valuetype",
+          "is",
           "dateTime",
         ],
       );
     });
 
     it("should tokenize period and attachment types", () => {
-      const input = "has valuetype Period\nhas valuetype Attachment";
+      const input = "valuetype is Period\nvaluetype is Attachment";
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(
         tokens,
         [
-          CPGLLexer.HAS,
           CPGLLexer.VALUETYPE,
+          CPGLLexer.IS,
           CPGLLexer.CONCEPT_VALUE_TYPE,
-          CPGLLexer.HAS,
           CPGLLexer.VALUETYPE,
+          CPGLLexer.IS,
           CPGLLexer.CONCEPT_VALUE_TYPE,
         ],
-        ["has", "valuetype", "Period", "has", "valuetype", "Attachment"],
+        ["valuetype", "is", "Period", "valuetype", "is", "Attachment"],
       );
     });
   });
@@ -534,18 +524,18 @@ describe("CPGL Lexer - Basic Tokens", () => {
     });
 
     it("should tokenize concept statement", () => {
-      const input = 'concept "Test":\n    has type Observation\n    has valuetype Quantity';
+      const input = 'concept "Test":\n    type is Observation\n    valuetype is Quantity';
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(tokens, [
         CPGLLexer.CONCEPT,
         CPGLLexer.QUOTED_STRING,
         CPGLLexer.COLON,
-        CPGLLexer.HAS,
         CPGLLexer.TYPE,
+        CPGLLexer.IS,
         CPGLLexer.CONCEPT_TYPE,
-        CPGLLexer.HAS,
         CPGLLexer.VALUETYPE,
+        CPGLLexer.IS,
         CPGLLexer.CONCEPT_VALUE_TYPE,
       ]);
     });
@@ -563,24 +553,24 @@ describe("CPGL Lexer - Basic Tokens", () => {
     });
 
     it("should tokenize provenance and inferred statements", () => {
-      const input = 'has provenance "source" inferred by "logic"';
+      const input = 'evidence is "source" inferred from "logic"';
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(tokens, [
-        CPGLLexer.HAS,
-        CPGLLexer.PROVENANCE,
+        CPGLLexer.EVIDENCE,
+        CPGLLexer.IS,
         CPGLLexer.QUOTED_STRING,
         CPGLLexer.INFERRED,
-        CPGLLexer.BY,
+        CPGLLexer.FROM,
         CPGLLexer.QUOTED_STRING,
       ]);
     });
 
-    it("should tokenize coded by statement", () => {
-      const input = 'coded by "Test"';
+    it("should tokenize coded from statement", () => {
+      const input = 'coded from "Test"';
       const tokens = getTokensFromString(input);
 
-      verifyTokenSequence(tokens, [CPGLLexer.CODED, CPGLLexer.BY, CPGLLexer.QUOTED_STRING]);
+      verifyTokenSequence(tokens, [CPGLLexer.CODED, CPGLLexer.FROM, CPGLLexer.QUOTED_STRING]);
     });
 
     it("should tokenize system and code statement", () => {

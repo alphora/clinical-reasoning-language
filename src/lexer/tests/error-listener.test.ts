@@ -1,10 +1,6 @@
-import { CharStreams, CommonTokenStream } from "antlr4ts";
+import { CommonTokenStream } from "antlr4ts";
 
-import { CPGLLexer } from "../../grammar/generated/antlr/CPGLLexer";
-import { CPGLLexerErrorListener } from "../CPGLLexerErrorListener";
 import { createLexer } from "../createLexer";
-
-import { getAllTokens } from "./index.test";
 
 describe("CPGLLexerErrorListener", () => {
   it("should detect individual invalid tokens", () => {
@@ -74,7 +70,7 @@ describe("CPGLLexerErrorListener with CPGL-specific input", () => {
 
   it("should handle invalid tokens within a concept definition", () => {
     const { lexer, errorListener } = createLexer(
-      'concept "Invalid Concept": has type InvalidType. done',
+      'concept "Invalid Concept": type is InvalidType. done',
     );
     const tokenStream = new CommonTokenStream(lexer);
     tokenStream.fill();
@@ -98,7 +94,7 @@ describe("CPGLLexerErrorListener with CPGL-specific input", () => {
 
   it("should not span error tokens across multiple lines in a complex statement", () => {
     const { lexer, errorListener } = createLexer(
-      'concept "Complex Concept": has type Observation.\ninferred by ("Invalid" and "Another Invalid"). done',
+      'concept "Complex Concept": type is Observation.\ninferred from ("Invalid" and "Another Invalid"). done',
     );
     const tokenStream = new CommonTokenStream(lexer);
     tokenStream.fill();
@@ -119,7 +115,7 @@ describe("CPGLLexerErrorListener with CPGL-specific input", () => {
 
   it("should handle invalid concept type", () => {
     const { lexer, errorListener } = createLexer(
-      'concept "Invalid Concept": has type InvalidType. done',
+      'concept "Invalid Concept": type is InvalidType. done',
     );
     const tokenStream = new CommonTokenStream(lexer);
     tokenStream.fill();
@@ -132,7 +128,7 @@ describe("CPGLLexerErrorListener with CPGL-specific input", () => {
 
   it("should handle invalid concept value type", () => {
     const { lexer, errorListener } = createLexer(
-      'concept "Invalid Concept": has valuetype InvalidValueType. done',
+      'concept "Invalid Concept": valuetype is InvalidValueType. done',
     );
     const tokenStream = new CommonTokenStream(lexer);
     tokenStream.fill();

@@ -55,27 +55,27 @@ describe("Whitespace Handling", () => {
 
   describe("Whitespace in Terminology Statements", () => {
     it("should handle whitespace in terminology valueset statements", () => {
-      const input = 'terminology\n  "BMI Valueset"\n\t\tvalueset\n  "bmi valueset"\t.';
+      const input = 'terminology\n  "BMI Valueset"\n\t\tvalueset\n  `bmi valueset`\t.';
       const tokens = getTokensFromString(input);
       verifyTokenSequence(tokens, [
         CPGLLexer.TERMINOLOGY,
         CPGLLexer.QUOTED_STRING,
         CPGLLexer.VALUESET,
-        CPGLLexer.QUOTED_STRING,
+        CPGLLexer.BACKTICK_STRING,
         CPGLLexer.DOT,
       ]);
     });
 
     it("should handle whitespace in terminology system code statements", () => {
-      const input = 'terminology\n"term"\n  system\t"sys"\n  code\t"123"\t.';
+      const input = 'terminology\n"term"\n  system\t`sys`\n  code\t`123`\t.';
       const tokens = getTokensFromString(input);
       verifyTokenSequence(tokens, [
         CPGLLexer.TERMINOLOGY,
         CPGLLexer.QUOTED_STRING,
         CPGLLexer.SYSTEM,
-        CPGLLexer.QUOTED_STRING,
+        CPGLLexer.BACKTICK_STRING,
         CPGLLexer.CODE,
-        CPGLLexer.QUOTED_STRING,
+        CPGLLexer.BACKTICK_STRING,
         CPGLLexer.DOT,
       ]);
     });
@@ -95,14 +95,14 @@ describe("Whitespace Handling", () => {
     });
 
     it("should handle whitespace in activity statements with of clause", () => {
-      const input = 'activity\n"Action"\n  perform\tCPGProposeDiagnosis\n  of\t"diagnosis"\t.';
+      const input = 'activity\n"Action"\n  perform\tCPGProposeDiagnosis\n  with\t"diagnosis"\t.';
       const tokens = getTokensFromString(input);
       verifyTokenSequence(tokens, [
         CPGLLexer.ACTIVITY,
         CPGLLexer.QUOTED_STRING,
         CPGLLexer.PERFORM,
         CPGLLexer.ACTIVITY_TYPE,
-        CPGLLexer.OF,
+        CPGLLexer.WITH,
         CPGLLexer.QUOTED_STRING,
         CPGLLexer.DOT,
       ]);
@@ -111,25 +111,25 @@ describe("Whitespace Handling", () => {
 
   describe("Whitespace in Concept Statements", () => {
     it("should handle whitespace in concept type declarations", () => {
-      const input = 'concept\n"BMI"\n  :\n    has\ttype\n  Observation\t.';
+      const input = 'concept\n"BMI"\n  :\n    type\tis\n  Observation\t.';
       const tokens = getTokensFromString(input);
       verifyTokenSequence(tokens, [
         CPGLLexer.CONCEPT,
         CPGLLexer.QUOTED_STRING,
         CPGLLexer.COLON,
-        CPGLLexer.HAS,
         CPGLLexer.TYPE,
+        CPGLLexer.IS,
         CPGLLexer.CONCEPT_TYPE,
         CPGLLexer.DOT,
       ]);
     });
 
     it("should handle whitespace in concept value type declarations", () => {
-      const input = "has\n  valuetype\t\tQuantity\n.";
+      const input = "valuetype\n  is\t\tQuantity\n.";
       const tokens = getTokensFromString(input);
       verifyTokenSequence(tokens, [
-        CPGLLexer.HAS,
         CPGLLexer.VALUETYPE,
+        CPGLLexer.IS,
         CPGLLexer.CONCEPT_VALUE_TYPE,
         CPGLLexer.DOT,
       ]);
@@ -137,11 +137,11 @@ describe("Whitespace Handling", () => {
 
     it("should handle whitespace in concept inferred by expressions", () => {
       const input =
-        'inferred\n  by\t(\n"Condition 1"\n  and\t"Condition 2"\n  or\t"Condition 3"\n)\t.';
+        'inferred\n  from\t(\n"Condition 1"\n  and\t"Condition 2"\n  or\t"Condition 3"\n)\t.';
       const tokens = getTokensFromString(input);
       verifyTokenSequence(tokens, [
         CPGLLexer.INFERRED,
-        CPGLLexer.BY,
+        CPGLLexer.FROM,
         CPGLLexer.LPAREN,
         CPGLLexer.QUOTED_STRING,
         CPGLLexer.AND,

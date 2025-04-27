@@ -1,5 +1,4 @@
 import { CPGLLexer } from "../../grammar/generated/antlr/CPGLLexer";
-import { CPGLLexerErrorListener } from "../CPGLLexerErrorListener";
 import { createLexer } from "../createLexer";
 
 import {
@@ -66,28 +65,28 @@ describe("Action FHIR Types", () => {
 
 describe("Case Feature FHIR Types", () => {
   test("should recognize Observation type", () => {
-    const input = "has type Observation.";
+    const input = "type is Observation.";
     const expectedTokens = getCaseFeatureTokenSequence();
-    const expectedText = ["has", "type", "Observation", "."];
+    const expectedText = ["type", "is", "Observation", "."];
     verifyTokenSequence(input, expectedTokens, expectedText);
   });
 
   test("should recognize Condition type", () => {
-    const input = "has type Condition.";
+    const input = "type is Condition.";
     const expectedTokens = getCaseFeatureTokenSequence();
-    const expectedText = ["has", "type", "Condition", "."];
+    const expectedText = ["type", "is", "Condition", "."];
     verifyTokenSequence(input, expectedTokens, expectedText);
   });
 
   test("should recognize MedicationRequest type", () => {
-    const input = "has type MedicationRequest.";
+    const input = "type is MedicationRequest.";
     const expectedTokens = getCaseFeatureTokenSequence();
-    const expectedText = ["has", "type", "MedicationRequest", "."];
+    const expectedText = ["type", "is", "MedicationRequest", "."];
     verifyTokenSequence(input, expectedTokens, expectedText);
   });
 
   test("should throw error for invalid case feature type", () => {
-    const input = "has type InvalidType.";
+    const input = "type is InvalidType.";
     const { lexer, errorListener } = createLexer(input);
     while (lexer.nextToken().type !== CPGLLexer.EOF) {
       /* empty */
@@ -102,28 +101,28 @@ describe("Case Feature FHIR Types", () => {
 
 describe("Concept Value Types", () => {
   test("should recognize Quantity value type", () => {
-    const input = "has valuetype Quantity.";
+    const input = "valuetype is Quantity.";
     const expectedTokens = getValueTypeTokenSequence();
-    const expectedText = ["has", "valuetype", "Quantity", "."];
+    const expectedText = ["valuetype", "is", "Quantity", "."];
     verifyTokenSequence(input, expectedTokens, expectedText);
   });
 
   test("should recognize CodeableConcept value type", () => {
-    const input = "has valuetype CodeableConcept.";
+    const input = "valuetype is CodeableConcept.";
     const expectedTokens = getValueTypeTokenSequence();
-    const expectedText = ["has", "valuetype", "CodeableConcept", "."];
+    const expectedText = ["valuetype", "is", "CodeableConcept", "."];
     verifyTokenSequence(input, expectedTokens, expectedText);
   });
 
   test("should recognize boolean value type", () => {
-    const input = "has valuetype boolean.";
+    const input = "valuetype is boolean.";
     const expectedTokens = getValueTypeTokenSequence();
-    const expectedText = ["has", "valuetype", "boolean", "."];
+    const expectedText = ["valuetype", "is", "boolean", "."];
     verifyTokenSequence(input, expectedTokens, expectedText);
   });
 
   test("should throw error for invalid value type", () => {
-    const input = "has valuetype InvalidValueType.";
+    const input = "valuetype is InvalidValueType.";
     const { lexer, errorListener } = createLexer(input);
     while (lexer.nextToken().type !== CPGLLexer.EOF) {
       /* empty */
