@@ -4,25 +4,25 @@ options {
     tokenVocab=CPGLLexer;
 }
 
-// --------------------------------------------------------------------------
-// QUOTING CONVENTIONS
-// --------------------------------------------------------------------------
+// ============================
+// Quoting Conventions
+// ============================
+//
 // Identifiers and references must be enclosed in double quotes (").
 //   Example: "Colonoscopy", "BMI Valueset"
 //   Used for: identifiers, references, concept names, etc.
 //
 // Free text, markdown, and evidence must be enclosed in backticks (`).
 //   Example: `it's the right thing to do`, `Some *markdown* text`
-//   Used for: evidence, markdown, system/code values, and any non-identifier string.
+//   Used for: evidence, markdown, system/code values, and non-identifier strings.
 //
-// Single quotes (') are NOT used as delimiters in this grammar.
+// Single quotes (') are NOT used.
 //
-// This convention ensures unambiguous parsing and user-friendly authoring.
-// --------------------------------------------------------------------------
+// This ensures unambiguous parsing and user-friendly authoring.
 
-// --------------------------------------------------------------------------
-// PARSER RULES
-// --------------------------------------------------------------------------
+// ============================
+// Parser Rules
+// ============================
 
 cpgl
     : statement* EOF
@@ -35,8 +35,18 @@ statement
     | conceptStatement
     ;
 
-// --------------------------- DECISION STATEMENT ----------------------------
-
+// ============================
+// Decision Statement
+// ============================
+//
+// A reusable decision logic block.
+// Consists of "when" conditions leading to "do" or "use" actions.
+//
+// Examples:
+//   decision "Example Decision":
+//     when "Concept" then do "Action".
+//   done
+//
 decisionStatement
     : DECISION decisionIdentifier COLON decisionBody DONE
     ;
@@ -45,34 +55,34 @@ decisionBody
     : whenBlock+
     ;
 
-// A whenBlock covers a "when <concept> then ..." clause
+// ============================
+// When Blocks and Actions
+// ============================
+//
+// A whenBlock covers a "when <concept> then ..." clause.
+
 whenBlock
     : WHEN conceptReference THEN blockBody              # WhenWithBody
     | WHEN conceptReference THEN singleActionStatement  # WhenSingleAction
     ;
 
-// "any:" or "all:" clause for lists
 anyOrAllClause
     : (ANY | ALL) COLON
     ;
 
-// Block body: a list of statements terminated by "done"
 blockBody
     : COLON (anyOrAllClause? blockStatement+ ) DONE
     ;
 
-// Single action statement: a one-line action ending with DOT.
 singleActionStatement
     : (doStatement | useStatement) DOT
     ;
 
-// A block statement is either a nested whenBlock or an action statement.
 blockStatement
     : whenBlock                # NestedWhenBlock
     | actionStatement          # BlockAction
     ;
 
-// Action statements for do and use operations.
 actionStatement
     : (doStatement | useStatement) DOT
     ;
@@ -85,17 +95,19 @@ useStatement
     : USE decisionReference
     ;
 
-// ------------------------- TERMINOLOGY STATEMENT --------------------------
+// ============================
+// Terminology Statement
+// ============================
 //
-// A terminology may:
-// - reference a valueset (mutually exclusive with system/code)
-// - reference a system/code pair
-// - provide an explicit empty placeholder (``) if unknown
-// Terminology statements are terminated by DOT (no 'done').
+// Defines a terminology reference.
+// Terminologies can:
+//   - Reference a valueset (exclusive with system/code)
+//   - Reference a system/code pair
+//   - Provide an explicit empty placeholder (``)
 //
 // Examples:
-//   terminology "BMI Valueset" valueset `bmi valueset`.
-//   terminology "some terminology" ``.
+//   terminology "BMI Valueset" valueset `BMI`.
+//   terminology "Some Terminology" ``.
 //   terminology "Colonoscopy" system `http://snomed.info/sct` code `73761001`.
 //
 terminologyStatement
@@ -110,7 +122,12 @@ terminologySystemCode
     : SYSTEM backtickString CODE backtickString
     ;
 
-// --------------------------- ACTIVITY STATEMENT ---------------------------
+// ============================
+// Activity Statement
+// ============================
+//
+// Defines an executable clinical activity.
+// Can reference a terminology or a custom CQL string for dynamic configuration.
 //
 // Examples:
 //   activity "Vaccinate" perform Immunization.
@@ -121,7 +138,13 @@ activityStatement
     : ACTIVITY activityIdentifier PERFORM ACTIVITY_TYPE (WITH (terminologyReference | activityTypeValue))? (BECAUSE rationale)? DOT
     ;
 
-// ---------------------------- CONCEPT STATEMENT ---------------------------
+// ============================
+// Concept Statement
+// ============================
+//
+// Defines a reusable clinical concept.
+// Must either be coded from a terminology or inferred from other concepts.
+// Evidence (metadata/provenance) is optional.
 //
 // Examples:
 //   concept "Most Recent BMI":
@@ -132,15 +155,15 @@ activityStatement
 //   done
 //
 //   concept "BMI":
-//       type is Observation.
-//       valuetype is Quantity.
-//       inferred from ("BMI Range as a Condition" or "BMI as an Observation" or "Calculated BMI").
+//     type is Observation.
+//     valuetype is Quantity.
+//     inferred from ("BMI Range" or "BMI Observation").
 //   done
 //
-//   concept "BMI Range as a Condition":
-//       type is Condition.
-//       valuetype is CodeableConcept.
-//       coded from "BMI Valueset".
+//   concept "BMI Range":
+//     type is Condition.
+//     valuetype is CodeableConcept.
+//     coded from "BMI Valueset".
 //   done
 //
 conceptStatement
@@ -148,70 +171,67 @@ conceptStatement
     ;
 
 conceptBody
-    : TypeLine
-      ValueTypeLine
+    : typeLine
+      valueTypeLine
       (evidenceLine)?
       (codedFromLine | inferredFromLine)
     ;
 
-// "type" clause to specify how the concept is modeled.
+// ============================
+// Concept Property Lines
+// ============================
+
 typeLine
     : TYPE IS CONCEPT_TYPE DOT
     ;
 
-// "valueType" clause to specify the concept's low-level data type.
 valueTypeLine
     : VALUETYPE IS CONCEPT_VALUE_TYPE DOT
     ;
 
-// "evidence" clause to capture who, what, where, when, and how a concept is produced.
 evidenceLine
     : EVIDENCE IS backtickString DOT
     ;
 
-// "coded from" clause for concepts that reference a terminology.
 codedFromLine
     : CODED FROM terminologyReference DOT
     ;
 
-// "inferred from" clause for how a concept can be informally derived from other concepts.
 inferredFromLine
     : INFERRED FROM inferredBody DOT
     ;
 
-// The body of an "inferred from" statement describes how a concept can be informally derived
-// from other concepts. It can either reference a single concept (optionally paired with a 
-// pattern—a named expression applied later), or provide a descriptive narrative using 
-// informal logical operators (AND, OR). These narratives document logical relationships
-// among concepts without implying formal evaluatable logic.
+// ============================
+// Inference Body
+// ============================
+//
+// A concept can be inferred from:
+//   - a single concept (optionally applying a pattern)
+//   - or a logical expression combining multiple concepts.
+//
 inferredBody
     : inferredFromConceptReference    # DefinitionConcept
     | inferredFromDescriptiveLogic    # DefinitionLogic
     ;
 
-// References a single concept identifier, optionally followed by a pattern.
-// The optional pattern corresponds to the name (signature) of a referenced Clinical Quality 
-// Language expression to be applied to the referenced concept in subsequent processing.
 inferredFromConceptReference
     : conceptReference patternStatement?
     ;
 
-// Optional apply pattern clause to specify a transformation applied during inference.
 patternStatement
     : APPLY PATTERN patternName
     ;
 
-// A descriptive narrative (enclosed in parentheses) describing informal logical relationships 
-// among concepts using the operators AND and OR. These operators serve documentation and 
-// readability purposes only and are not computationally evaluated at this stage.
 inferredFromDescriptiveLogic
     : LPAREN inferredFromExpression RPAREN
     ;
 
-// ----------------------- DESCRIPTIVE LOGICAL NARRATIVES -----------------------
+// ============================
+// Descriptive Logical Narratives
+// ============================
 //
-// Inferred from expressions use informal Boolean operators AND, OR purely as descriptive 
-// connectors among concept references. No formal computational logic is implied.
+// Informal logical expressions using AND, OR, and NOT for clarity.
+
 inferredFromExpression
     : informalOr
     ;
@@ -230,11 +250,13 @@ informalNot
     ;
 
 atom
-    : conceptReference                             # ConceptAtom
-    | LPAREN inferredFromExpression RPAREN           # GroupExpression
+    : conceptReference                      # ConceptAtom
+    | LPAREN inferredFromExpression RPAREN  # GroupExpression
     ;
 
-// ----------------------------- IDENTIFIER RULE ------------------------------
+// ============================
+// Identifier and Token Mappings
+// ============================
 
 identifier
     : QUOTED_STRING
