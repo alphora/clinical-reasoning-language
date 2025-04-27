@@ -184,24 +184,24 @@ export interface Concept extends ASTNode {
   conceptType: ConceptType;
   valueType: ConceptValueType;
   definition: ConceptDefinition;
-  provenance?: string;
+  evidence?: string;
   location: Location;
 }
 
-// Concept definition can be coded by or inferred by
-export type ConceptDefinition = CodedByDefinition | InferredByDefinition;
+// Concept definition can be coded from or inferred from
+export type ConceptDefinition = CodedFromDefinition | InferredFromDefinition;
 
-// Coded by definition
-export interface CodedByDefinition extends ASTNode {
-  type: "CodedByDefinition";
+// Coded from definition
+export interface CodedFromDefinition extends ASTNode {
+  type: "CodedFromDefinition";
   terminologyName: string;
   location: Location;
 }
-export const CodedByDefinitionType = {
-  type: "CodedByDefinition" as const,
+export const CodedFromDefinitionType = {
+  type: "CodedFromDefinition" as const,
 };
 
-// Inferred by definition
+// Inferred from definition
 // concept reference
 export interface ConceptReference extends ASTNode {
   type: "ConceptReference";
@@ -214,7 +214,7 @@ export const ConceptReferenceType = {
 // instead of a binary-only LogicalExpression, split AND/OR into n‑ary:
 export interface InformalAnd extends ASTNode {
   type: "AndExpression";
-  terms: InferredByExpression[]; // two or more
+  terms: InferredFromExpression[]; // two or more
 }
 export const InformalAndType = {
   type: "AndExpression" as const,
@@ -222,21 +222,21 @@ export const InformalAndType = {
 
 export interface InformalOr extends ASTNode {
   type: "OrExpression";
-  terms: InferredByExpression[]; // two or more
+  terms: InferredFromExpression[]; // two or more
 }
 export const InformalOrType = {
   type: "OrExpression" as const,
 };
 export interface NotExpression extends ASTNode {
   type: "NotExpression";
-  expression: InferredByExpression;
+  expression: InferredFromExpression;
 }
 export const NotExpressionType = {
   type: "NotExpression" as const,
 };
 
 // any node that can appear in a logical narrative
-export type InferredByExpression =
+export type InferredFromExpression =
   | ConceptReference
   | InformalAnd
   | InformalOr
@@ -246,28 +246,28 @@ export type InferredByExpression =
 // these are the parens
 export interface GroupExpression extends ASTNode {
   type: "GroupExpression";
-  expression: InferredByExpression;
+  expression: InferredFromExpression;
 }
 export const GroupExpressionType = {
   type: "GroupExpression" as const,
 };
 
-// inferred-by nodes
-export interface InferredByConcept extends ASTNode {
-  type: "InferredByDefinitionConcept";
+// inferred-from nodes
+export interface InferredFromConcept extends ASTNode {
+  type: "InferredFromDefinitionConcept";
   concept: string;
   pattern?: string;
 }
-export const InferredByConceptType = {
-  type: "InferredByDefinitionConcept" as const,
+export const InferredFromConceptType = {
+  type: "InferredFromDefinitionConcept" as const,
 };
 
-export interface InferredByDefinition extends ASTNode {
-  type: "InferredByDefinition";
-  body: InferredByConcept | InferredByExpression;
+export interface InferredFromDefinition extends ASTNode {
+  type: "InferredFromDefinition";
+  body: InferredFromConcept | InferredFromExpression;
 }
-export const InferredByDefinitionType = {
-  type: "InferredByDefinition" as const,
+export const InferredFromDefinitionType = {
+  type: "InferredFromDefinition" as const,
 };
 
 export interface Location {
