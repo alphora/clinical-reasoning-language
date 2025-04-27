@@ -18,10 +18,10 @@ import {
   TerminologySystemCodeContext,
   ActivityStatementContext,
   ConceptStatementContext,
-  InferredByLineContext,
+  InferredFromLineContext,
   DefinitionConceptContext,
   DefinitionLogicContext,
-  InferredByExpressionContext,
+  InferredFromExpressionContext,
   InformalOrContext,
   InformalAndContext,
   InformalNotContext,
@@ -61,9 +61,9 @@ import {
   Concept,
   ConceptType,
   ConceptDefinition,
-  CodedByDefinitionType,
-  InferredByDefinition,
-  InferredByDefinitionType,
+  CodedFromDefinitionType,
+  InferredFromDefinition,
+  InferredFromDefinitionType,
   ConceptReference,
   ConceptReferenceType,
   InformalAnd,
@@ -74,9 +74,9 @@ import {
   NotExpressionType,
   GroupExpression,
   GroupExpressionType,
-  InferredByConcept,
-  InferredByConceptType,
-  InferredByExpression,
+  InferredFromConcept,
+  InferredFromConceptType,
+  InferredFromExpression,
   Location,
 } from "./types";
 
@@ -262,8 +262,8 @@ export class CPGLAstBuilder
     let activityTypeValue: string | undefined;
     let rationale: string | undefined;
 
-    // OF clause: can be terminologyReference (identifier) or activityTypeValue (backtickString)
-    if (ctx.OF()) {
+    // WITH clause: can be terminologyReference (identifier) or activityTypeValue (backtickString)
+    if (ctx.WITH()) {
       if (ctx.terminologyReference()) {
         terminologyReference = ctx.terminologyReference()!.text.slice(1, -1);
       } else if (ctx.activityTypeValue()) {
@@ -305,18 +305,18 @@ export class CPGLAstBuilder
       this.reportError(
         "AstError",
         "ConceptStatement: missing conceptIdentifier or conceptBody",
-        getLocation(ctx)
+        getLocation(ctx),
       );
       return null as any;
     }
 
-    const typeLine = bodyCtx.hasTypeLine?.();
-    const valueTypeLine = bodyCtx.hasValueTypeLine?.();
+    const typeLine = bodyCtx.typeLine?.();
+    const valueTypeLine = bodyCtx.valueTypeLine?.();
     if (!typeLine || !valueTypeLine) {
       this.reportError(
         "AstError",
         "ConceptStatement: missing type or valueType line",
-        getLocation(ctx)
+        getLocation(ctx),
       );
       return null as any;
     }
@@ -336,61 +336,61 @@ export class CPGLAstBuilder
       this.reportError(
         "AstError",
         "ConceptStatement: missing CONCEPT_TYPE or CONCEPT_VALUE_TYPE token",
-        getLocation(ctx)
+        getLocation(ctx),
       );
       return null as any;
     }
 
     const conceptType = conceptTypeToken.text as ConceptType;
     const valueType = valueTypeToken.text as any;
-    let provenance: string | undefined = undefined;
-    if (bodyCtx.provenanceLine?.()) {
-      const provCtx = bodyCtx.provenanceLine?.();
-      if (provCtx?.backtickString) {
-        const backtickCtx = provCtx.backtickString();
+    let evidence: string | undefined = undefined;
+    if (bodyCtx.evidenceLine?.()) {
+      const evidenceCtx = bodyCtx.evidenceLine?.();
+      if (evidenceCtx?.backtickString) {
+        const backtickCtx = evidenceCtx.backtickString();
         if (backtickCtx?.text !== undefined) {
-          provenance = backtickCtx.text.slice(1, -1);
+          evidence = backtickCtx.text.slice(1, -1);
         } else if (backtickCtx?.BACKTICK_STRING) {
           const token = backtickCtx.BACKTICK_STRING();
           if (token?.text !== undefined) {
-            provenance = token.text.slice(1, -1);
+            evidence = token.text.slice(1, -1);
           }
         }
       }
     }
     let definition: ConceptDefinition;
-    if (bodyCtx.codedByLine && bodyCtx.codedByLine()) {
-      const codedBy = bodyCtx.codedByLine();
-      const termRef = codedBy?.terminologyReference?.()?.text?.slice(1, -1);
+    if (bodyCtx.codedFromLine && bodyCtx.codedFromLine()) {
+      const codedFrom = bodyCtx.codedFromLine();
+      const termRef = codedFrom?.terminologyReference?.()?.text?.slice(1, -1);
       if (!termRef) {
         this.reportError(
           "AstError",
-          "ConceptStatement: missing terminologyReference in codedByLine",
-          getLocation(ctx)
+          "ConceptStatement: missing terminologyReference in codedFromLine",
+          getLocation(ctx),
         );
         return null as any;
       }
       definition = {
-        type: CodedByDefinitionType.type,
+        type: CodedFromDefinitionType.type,
         terminologyName: termRef,
-        location: getLocation(bodyCtx.codedByLine()!),
+        location: getLocation(bodyCtx.codedFromLine()!),
       };
-    } else if (bodyCtx.inferredByLine && bodyCtx.inferredByLine()) {
-      const infCtx = bodyCtx.inferredByLine();
+    } else if (bodyCtx.inferredFromLine && bodyCtx.inferredFromLine()) {
+      const infCtx = bodyCtx.inferredFromLine();
       if (!infCtx) {
         this.reportError(
           "AstError",
-          "ConceptStatement: inferredByLine() unexpectedly returned undefined",
-          getLocation(ctx)
+          "ConceptStatement: inferredFromLine() unexpectedly returned undefined",
+          getLocation(ctx),
         );
         return null as any;
       }
-      definition = this.visit(infCtx) as InferredByDefinition;
+      definition = this.visit(infCtx) as InferredFromDefinition;
     } else {
       this.reportError(
         "AstError",
-        "ConceptStatement must have either codedByLine or inferredByLine",
-        getLocation(ctx)
+        "ConceptStatement must have either codedFromLine or inferredFromLine",
+        getLocation(ctx),
       );
       return null as any;
     }
@@ -399,52 +399,61 @@ export class CPGLAstBuilder
       name,
       conceptType,
       valueType,
-      provenance,
+      evidence,
       definition,
       location: getLocation(ctx),
     };
   }
 
-  visitInferredByLine(ctx: InferredByLineContext): InferredByDefinition {
+  visitInferredFromLine(ctx: InferredFromLineContext): InferredFromDefinition {
     const defCtx = ctx.inferredBody();
     const body = this.visit(defCtx) as
-      | InferredByConcept
+      | InferredFromConcept
       | InformalAnd
       | InformalOr
       | NotExpression
       | GroupExpression;
-    return { type: InferredByDefinitionType.type, body, location: getLocation(ctx) };
+    return { type: InferredFromDefinitionType.type, body, location: getLocation(ctx) };
   }
 
-  visitDefinitionConcept(ctx: DefinitionConceptContext): InferredByConcept {
-    const refCtx = ctx.inferredByConceptReference();
-    const pat = refCtx.patternReference()?.text.slice(1, -1);
+  visitDefinitionConcept(ctx: DefinitionConceptContext): InferredFromConcept {
+    const refCtx = ctx.inferredFromConceptReference();
+    let pat: string | undefined = undefined;
+    if (refCtx.patternStatement) {
+      const patternCtx = refCtx.patternStatement();
+      if (patternCtx && patternCtx.patternName && patternCtx.patternName().backtickString) {
+        const backtickCtx = patternCtx.patternName().backtickString();
+        if (backtickCtx?.text !== undefined) {
+          pat = backtickCtx.text.slice(1, -1);
+        }
+      }
+    }
     const concept = refCtx.conceptReference().text.slice(1, -1);
-
     return {
-      type: InferredByConceptType.type,
+      type: InferredFromConceptType.type,
       pattern: pat,
       concept,
       location: getLocation(ctx),
     };
   }
+
   visitDefinitionLogic(ctx: DefinitionLogicContext): GroupExpression {
-    // first grab the InferredByDescriptiveLogicContext…
-    const descCtx = ctx.inferredByDescriptiveLogic();
-    // …then get its inner InferredByExpressionContext
-    const exprCtx = descCtx.inferredByExpression();
+    // first grab the InferredFromDescriptiveLogicContext…
+    const descCtx = ctx.inferredFromDescriptiveLogic();
+    // …then get its inner inferredFromExpression
+    const exprCtx = descCtx.inferredFromExpression();
     // now delegate to your existing visitor for that rule
     return this.visit(exprCtx) as GroupExpression;
   }
 
-  visitInferredByExpression(
-    ctx: InferredByExpressionContext,
+  visitInferredFromExpression(
+    ctx: InferredFromExpressionContext,
   ): InformalOr | InformalAnd | NotExpression | ConceptReference | GroupExpression {
-    return this.visit(ctx.informalOr()) as InferredByExpression;
+    return this.visit(ctx.informalOr()) as InferredFromExpression;
   }
 
   visitInformalOr(ctx: InformalOrContext): InformalOr {
-    const terms = ctx.informalAnd().map((a) => this.visit(a) as any);
+    const terms = ctx.informalAnd().map((a: any) => this.visit(a) as any);
     if (ctx.OR().length) {
       // flatten
       return { type: InformalOrType.type, terms, location: getLocation(ctx) };
@@ -457,22 +466,22 @@ export class CPGLAstBuilder
   ): InformalAnd | NotExpression | GroupExpression | ConceptReference {
     const terms = ctx
       .informalNot()
-      .map((n) => this.visit(n) as NotExpression | GroupExpression | ConceptReference);
+      .map((n: any) => this.visit(n) as NotExpression | GroupExpression | ConceptReference);
     if (ctx.AND().length) {
       return { type: InformalAndType.type, terms, location: getLocation(ctx) };
     }
     return terms[0];
   }
 
-  visitInformalNot(ctx: InformalNotContext): InferredByExpression {
+  visitInformalNot(ctx: InformalNotContext): InferredFromExpression {
     if (ctx.NOT()) {
       return {
         type: NotExpressionType.type,
-        expression: this.visit(ctx.informalNot()!) as InferredByExpression,
+        expression: this.visit(ctx.informalNot()!) as InferredFromExpression,
         location: getLocation(ctx),
       };
     }
-    return this.visit(ctx.atom()!) as InferredByExpression;
+    return this.visit(ctx.atom()!) as InferredFromExpression;
   }
 
   visitConceptAtom(ctx: ConceptAtomContext): ConceptReference {
@@ -480,7 +489,7 @@ export class CPGLAstBuilder
     return { type: ConceptReferenceType.type, name, location: getLocation(ctx) };
   }
   visitGroupExpression(ctx: GroupExpressionContext): GroupExpression {
-    const expr = this.visit(ctx.inferredByExpression()) as
+    const expr = this.visit(ctx.inferredFromExpression()) as
       | InformalAnd
       | InformalOr
       | NotExpression
