@@ -4,7 +4,7 @@ import { CPGLLexer } from "../../grammar/generated/antlr/CPGLLexer";
 import { CPGLLexerErrorListener } from "../CPGLLexerErrorListener";
 import { createLexer } from "../createLexer";
 
-import { getAllTokens } from "./index.test";
+import { getAllTokens } from "./lexer-test-utils";
 
 // Overload signatures
 export function getTokensFromString(input: string): Token[];

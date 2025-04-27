@@ -1,9 +1,4 @@
-import { CharStreams } from "antlr4ts";
-
-import { CPGLLexer } from "../../grammar/generated/antlr/CPGLLexer";
 import { tokenizeCPGL } from "../../index";
-import { CPGLLexerErrorListener } from "../CPGLLexerErrorListener";
-import { createLexer } from "../createLexer";
 
 import { getTokensFromString } from "./helpers";
 
@@ -12,7 +7,6 @@ describe("Lexer Error Handling", () => {
     const inputs = ["@invalid", "$tokens", "#notallowed", "~invalid", "`backtick"];
 
     inputs.forEach((input) => {
-      const { lexer } = createLexer(input);
       const tokens = getTokensFromString(input);
       expect(tokens.length).toBeGreaterThanOrEqual(0);
     });
@@ -28,7 +22,6 @@ describe("Lexer Error Handling", () => {
     ];
 
     inputs.forEach((input) => {
-      const { lexer } = createLexer(input);
       const tokens = getTokensFromString(input);
       expect(tokens.length).toBeGreaterThanOrEqual(0);
     });
@@ -51,7 +44,6 @@ describe("Lexer Error Handling", () => {
     ];
 
     testCases.forEach(({ input, minTokens }) => {
-      const { lexer } = createLexer(input);
       const tokens = getTokensFromString(input);
       expect(tokens.length).toBeGreaterThanOrEqual(minTokens);
     });
