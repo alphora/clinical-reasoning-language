@@ -1219,29 +1219,29 @@
     "line": 71,
     "column": 9,
     "type": "QUOTED_STRING",
-    "text": "\"Contraindication Evaluation with the MCV dose\""
+    "text": "\"Contraindication Evaluation of the MCV dose\""
   },
   {
     "line": 71,
-    "column": 57,
+    "column": 55,
     "type": "THEN",
     "text": "then"
   },
   {
     "line": 71,
-    "column": 62,
+    "column": 60,
     "type": "DO",
     "text": "do"
   },
   {
     "line": 71,
-    "column": 65,
+    "column": 63,
     "type": "QUOTED_STRING",
     "text": "\"Evaluate Contraindication for Measles\""
   },
   {
     "line": 71,
-    "column": 104,
+    "column": 102,
     "type": "DOT",
     "text": "."
   },
@@ -1441,11 +1441,11 @@
     "line": 95,
     "column": 9,
     "type": "BACKTICK_STRING",
-    "text": "`Should not vaccinate client for MCV0 as client is less than 6 months. Check for any vaccines due, and inform the caregiver with when to come back for MCV0.`"
+    "text": "`Should not vaccinate client for MCV0 as client is less than 6 months. Check for any vaccines due, and inform the caregiver of when to come back for MCV0.`"
   },
   {
     "line": 95,
-    "column": 166,
+    "column": 164,
     "type": "DOT",
     "text": "."
   },
@@ -1483,11 +1483,11 @@
     "line": 99,
     "column": 9,
     "type": "BACKTICK_STRING",
-    "text": "`Should not vaccinate client for MCV0 as live vaccine was administered in the last 4 weeks. Check for any vaccines due, and inform the caregiver with when to come back for MCV0.`"
+    "text": "`Should not vaccinate client for MCV0 as live vaccine was administered in the last 4 weeks. Check for any vaccines due, and inform the caregiver of when to come back for MCV0.`"
   },
   {
     "line": 99,
-    "column": 187,
+    "column": 185,
     "type": "DOT",
     "text": "."
   },
@@ -1609,11 +1609,11 @@
     "line": 109,
     "column": 9,
     "type": "BACKTICK_STRING",
-    "text": "`Should not vaccinate client as client's age is less than 12 months. Check for any vaccines due, and inform the caregiver with when to come back for MCV1.`"
+    "text": "`Should not vaccinate client as client's age is less than 12 months. Check for any vaccines due, and inform the caregiver of when to come back for MCV1.`"
   },
   {
     "line": 109,
-    "column": 164,
+    "column": 162,
     "type": "DOT",
     "text": "."
   },
@@ -1651,11 +1651,11 @@
     "line": 113,
     "column": 9,
     "type": "BACKTICK_STRING",
-    "text": "`Should not vaccinate client for MCV1 as live vaccine was administered in the last 4 weeks. Check for any vaccines due and inform the caregiver with when to come back for MCV1.`"
+    "text": "`Should not vaccinate client for MCV1 as live vaccine was administered in the last 4 weeks. Check for any vaccines due and inform the caregiver of when to come back for MCV1.`"
   },
   {
     "line": 113,
-    "column": 186,
+    "column": 184,
     "type": "DOT",
     "text": "."
   },
@@ -1693,11 +1693,11 @@
     "line": 117,
     "column": 9,
     "type": "BACKTICK_STRING",
-    "text": "`Should not vaccinate client for MCV2 as client's age is less than 15 months. Check for any vaccines due, and inform the caregiver with when to come back for MCV2.`"
+    "text": "`Should not vaccinate client for MCV2 as client's age is less than 15 months. Check for any vaccines due, and inform the caregiver of when to come back for MCV2.`"
   },
   {
     "line": 117,
-    "column": 173,
+    "column": 171,
     "type": "DOT",
     "text": "."
   },
@@ -1735,11 +1735,11 @@
     "line": 121,
     "column": 9,
     "type": "BACKTICK_STRING",
-    "text": "`Should not vaccinate client for MCV2 as live vaccine was administered in the last 4 weeks. Check for any vaccines due, and inform the caregiver with when to come back for MCV2.`"
+    "text": "`Should not vaccinate client for MCV2 as live vaccine was administered in the last 4 weeks. Check for any vaccines due, and inform the caregiver of when to come back for MCV2.`"
   },
   {
     "line": 121,
-    "column": 187,
+    "column": 185,
     "type": "DOT",
     "text": "."
   },
@@ -1789,11 +1789,11 @@
     "line": 126,
     "column": 12,
     "type": "BACKTICK_STRING",
-    "text": "`An additional dose with MCV should be administered to HIV-infected children receiving HAART following immune reconstitution. If CD4+ T lymphocyte counts are monitored, an additional dose with MCV should be administered when immune reconstitution has been achieved, e.g. when the CD4+ T lymphocyte count reaches 20–25%. Where CD4+ T lymphocyte monitoring is not available, children should receive an additional dose with MCV 6–12 months after initiation with HAART.`"
+    "text": "`An additional dose of MCV should be administered to HIV-infected children receiving HAART following immune reconstitution. If CD4+ T lymphocyte counts are monitored, an additional dose of MCV should be administered when immune reconstitution has been achieved, e.g. when the CD4+ T lymphocyte count reaches 20–25%. Where CD4+ T lymphocyte monitoring is not available, children should receive an additional dose of MCV 6–12 months after initiation of HAART.`"
   },
   {
     "line": 126,
-    "column": 478,
+    "column": 470,
     "type": "DOT",
     "text": "."
   },
@@ -1831,11 +1831,11 @@
     "line": 130,
     "column": 9,
     "type": "BACKTICK_STRING",
-    "text": "`Should not vaccinate client as client's age is less than 9 months. Check for any vaccines due, and inform the caregiver with when to come back for MCV1.`"
+    "text": "`Should not vaccinate client as client's age is less than 9 months. Check for any vaccines due, and inform the caregiver of when to come back for MCV1.`"
   },
   {
     "line": 130,
-    "column": 163,
+    "column": 161,
     "type": "DOT",
     "text": "."
   },
@@ -1885,11 +1885,11 @@
     "line": 135,
     "column": 12,
     "type": "BACKTICK_STRING",
-    "text": "`An additional dose with MCV should be administered to HIV-infected children receiving HAART following immune reconstitution. If CD4+ T lymphocyte counts are monitored, an additional dose with MCV should be administered when immune reconstitution has been achieved, e.g. when the CD4+ T lymphocyte count reaches 20–25%. Where CD4+ T lymphocyte monitoring is not available, children should receive an additional dose with MCV 6–12 months after initiation with HAART.`"
+    "text": "`An additional dose of MCV should be administered to HIV-infected children receiving HAART following immune reconstitution. If CD4+ T lymphocyte counts are monitored, an additional dose of MCV should be administered when immune reconstitution has been achieved, e.g. when the CD4+ T lymphocyte count reaches 20–25%. Where CD4+ T lymphocyte monitoring is not available, children should receive an additional dose of MCV 6–12 months after initiation of HAART.`"
   },
   {
     "line": 135,
-    "column": 478,
+    "column": 470,
     "type": "DOT",
     "text": "."
   },
@@ -1927,11 +1927,11 @@
     "line": 139,
     "column": 9,
     "type": "BACKTICK_STRING",
-    "text": "`Should not vaccinate client for measles supplementary dose as live vaccine was administered in the last 4 weeks. Check for any vaccines due, and inform the caregiver with when to come back for supplementary dose.`"
+    "text": "`Should not vaccinate client for measles supplementary dose as live vaccine was administered in the last 4 weeks. Check for any vaccines due, and inform the caregiver of when to come back for supplementary dose.`"
   },
   {
     "line": 139,
-    "column": 223,
+    "column": 221,
     "type": "DOT",
     "text": "."
   },
@@ -3919,11 +3919,11 @@
     "line": 268,
     "column": 8,
     "type": "QUOTED_STRING",
-    "text": "\"Contraindication Evaluation with the MCV dose\""
+    "text": "\"Contraindication Evaluation of the MCV dose\""
   },
   {
     "line": 268,
-    "column": 55,
+    "column": 53,
     "type": "COLON",
     "text": ":"
   },
@@ -3991,11 +3991,11 @@
     "line": 271,
     "column": 15,
     "type": "QUOTED_STRING",
-    "text": "\"Contraindication Evaluation with the MCV dose\""
+    "text": "\"Contraindication Evaluation of the MCV dose\""
   },
   {
     "line": 271,
-    "column": 62,
+    "column": 60,
     "type": "DOT",
     "text": "."
   },
@@ -4813,35 +4813,35 @@
     "line": 293,
     "column": 12,
     "type": "QUOTED_STRING",
-    "text": "\"Contraindication Evaluation with the MCV dose\""
+    "text": "\"Contraindication Evaluation of the MCV dose\""
   },
   {
     "line": 293,
-    "column": 60,
+    "column": 58,
     "type": "SYSTEM",
     "text": "system"
   },
   {
     "line": 293,
-    "column": 67,
+    "column": 65,
     "type": "BACKTICK_STRING",
     "text": "`http://sdh.com/cqis/kalm`"
   },
   {
     "line": 293,
-    "column": 94,
+    "column": 92,
     "type": "CODE",
     "text": "code"
   },
   {
     "line": 293,
-    "column": 99,
+    "column": 97,
     "type": "BACKTICK_STRING",
     "text": "`contraindication-evaluation-of-the-mcv-dose`"
   },
   {
     "line": 293,
-    "column": 144,
+    "column": 142,
     "type": "DOT",
     "text": "."
   },
