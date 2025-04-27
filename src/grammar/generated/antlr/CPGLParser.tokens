@@ -64,7 +64,6 @@ VALUE_TYPE_ErrorChar=51
 'evidence'=13
 'from'=14
 'inferred'=15
-'is'=16
 'not'=17
 'or'=18
 'pattern'=19

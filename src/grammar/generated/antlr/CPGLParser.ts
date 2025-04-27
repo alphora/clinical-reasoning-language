@@ -142,7 +142,7 @@ export class CPGLParser extends Parser {
 	private static readonly _LITERAL_NAMES: Array<string | undefined> = [
 		undefined, "'activity'", "'all'", "'and'", "'any'", "'apply'", "'because'", 
 		"'code'", "'coded'", "'concept'", "'decision'", "'done'", "'do'", "'evidence'", 
-		"'from'", "'inferred'", "'is'", "'not'", "'or'", "'pattern'", "'perform'", 
+		"'from'", "'inferred'", undefined, "'not'", "'or'", "'pattern'", "'perform'", 
 		"'system'", "'terminology'", "'then'", "'type'", "'use'", "'valuetype'", 
 		"'valueset'", "'when'", "'with'", "'error'", "':'", "'.'", "'('", "')'",
 	];
