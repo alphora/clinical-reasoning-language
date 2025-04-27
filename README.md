@@ -2,6 +2,8 @@
 
 Clinical Practice Guideline Language (CPGL) parser and validator
 
+Clinical Reasoning Language (CRL) provides a structured way to model clinical decision logic, concept derivations, clinical activities, measurements, and summaries — while remaining simple, readable, and guideline-compatible.
+
 ## Overview
 
 See the [User Guide](./USER_GUIDE.md) for a comprehensive introduction to the CPGL language, syntax, and authoring best practices.
