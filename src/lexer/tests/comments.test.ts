@@ -96,9 +96,9 @@ decision "Test"
 
     it("should ignore block comments in concept statements", () => {
       const input = `concept /* name */ "BMI" /* start */ :
-    /* type */ has type /* value */ Observation /* end */ .
-    /* valuetype */ has valuetype /* value */ Quantity /* end */ .
-    /* inference */ inferred by /* expr */ ("BMI Range" /* or */ or /* value */ "BMI Value") /* end */ .
+    /* type */ type is /* value */ Observation /* end */ .
+    /* valuetype */ valuetype /* value */ is Quantity /* end */ .
+    /* inference */ inferred from /* expr */ ("BMI Range" /* or */ or /* value */ "BMI Value") /* end */ .
 done`;
       const tokens = getTokensFromString(input);
 
@@ -106,16 +106,16 @@ done`;
         CPGLLexer.CONCEPT,
         CPGLLexer.QUOTED_STRING,
         CPGLLexer.COLON,
-        CPGLLexer.HAS,
         CPGLLexer.TYPE,
+        CPGLLexer.IS,
         CPGLLexer.CONCEPT_TYPE,
         CPGLLexer.DOT,
-        CPGLLexer.HAS,
         CPGLLexer.VALUETYPE,
+        CPGLLexer.IS,
         CPGLLexer.CONCEPT_VALUE_TYPE,
         CPGLLexer.DOT,
         CPGLLexer.INFERRED,
-        CPGLLexer.BY,
+        CPGLLexer.FROM,
         CPGLLexer.LPAREN,
         CPGLLexer.QUOTED_STRING,
         CPGLLexer.OR,
