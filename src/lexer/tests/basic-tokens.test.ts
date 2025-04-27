@@ -63,14 +63,14 @@ describe("CPGL Lexer - Basic Tokens", () => {
       verifyTokenSequence(tokens, [CPGLLexer.QUOTED_STRING], ['"Test String With Spaces"']);
     });
 
-    it("should tokenize provenance value without backslashes as QUOTED_STRING", () => {
-      const input = 'evidence is "some provenance"';
+    it("should tokenize evidence value as BACKTICK_STRING", () => {
+      const input = "evidence is `some provenance`";
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(
         tokens,
-        [CPGLLexer.EVIDENCE, CPGLLexer.IS, CPGLLexer.QUOTED_STRING],
-        ["evidence", "is", '"some provenance"'],
+        [CPGLLexer.EVIDENCE, CPGLLexer.IS, CPGLLexer.BACKTICK_STRING],
+        ["evidence", "is", "`some provenance`"],
       );
     });
 
@@ -560,24 +560,32 @@ describe("CPGL Lexer - Basic Tokens", () => {
     });
 
     it("should tokenize provenance and inferred statements", () => {
-      const input = 'evidence is "source" inferred from "logic"';
+      const input = "evidence is `source` inferred from `logic`";
       const tokens = getTokensFromString(input);
 
-      verifyTokenSequence(tokens, [
-        CPGLLexer.EVIDENCE,
-        CPGLLexer.IS,
-        CPGLLexer.QUOTED_STRING,
-        CPGLLexer.INFERRED,
-        CPGLLexer.FROM,
-        CPGLLexer.QUOTED_STRING,
-      ]);
+      verifyTokenSequence(
+        tokens,
+        [
+          CPGLLexer.EVIDENCE,
+          CPGLLexer.IS,
+          CPGLLexer.BACKTICK_STRING,
+          CPGLLexer.INFERRED,
+          CPGLLexer.FROM,
+          CPGLLexer.BACKTICK_STRING,
+        ],
+        ["evidence", "is", "`source`", "inferred", "from", "`logic`"],
+      );
     });
 
     it("should tokenize coded from statement", () => {
-      const input = 'coded from "Test"';
+      const input = "coded from `Test`";
       const tokens = getTokensFromString(input);
 
-      verifyTokenSequence(tokens, [CPGLLexer.CODED, CPGLLexer.FROM, CPGLLexer.QUOTED_STRING]);
+      verifyTokenSequence(
+        tokens,
+        [CPGLLexer.CODED, CPGLLexer.FROM, CPGLLexer.BACKTICK_STRING],
+        ["coded", "from", "`Test`"],
+      );
     });
 
     it("should tokenize system and code statement", () => {
