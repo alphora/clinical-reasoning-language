@@ -282,7 +282,7 @@ done`;
     });
 
     it("should handle activity statements with of clause", () => {
-      const input = `activity "Indicate" perform CPGProposeDiagnosis of "Colonoscopy".`;
+      const input = 'activity "Indicate" perform CPGProposeDiagnosis with "Colonoscopy".';
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(tokens, [
@@ -290,7 +290,7 @@ done`;
         CPGLLexer.QUOTED_STRING,
         CPGLLexer.PERFORM,
         CPGLLexer.ACTIVITY_TYPE,
-        CPGLLexer.OF,
+        CPGLLexer.WITH,
         CPGLLexer.QUOTED_STRING,
         CPGLLexer.DOT,
       ]);
@@ -299,27 +299,25 @@ done`;
 
   describe("Concept Structure", () => {
     it("should handle basic concept with type and value type", () => {
-      const input = `concept "Most Recent BMI":
-    has type Observation.
-    has valuetype boolean.
-    coded by "BMI Valueset".
-done`;
+      const input =
+        'concept "Most Recent BMI":\n    type is Observation.\n    valuetype is boolean.\n    coded from "BMI Valueset".\ndone';
+
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(tokens, [
         CPGLLexer.CONCEPT,
         CPGLLexer.QUOTED_STRING,
         CPGLLexer.COLON,
-        CPGLLexer.HAS,
         CPGLLexer.TYPE,
+        CPGLLexer.IS,
         CPGLLexer.CONCEPT_TYPE,
         CPGLLexer.DOT,
-        CPGLLexer.HAS,
         CPGLLexer.VALUETYPE,
+        CPGLLexer.IS,
         CPGLLexer.CONCEPT_VALUE_TYPE,
         CPGLLexer.DOT,
         CPGLLexer.CODED,
-        CPGLLexer.BY,
+        CPGLLexer.FROM,
         CPGLLexer.QUOTED_STRING,
         CPGLLexer.DOT,
         CPGLLexer.DONE,
@@ -327,61 +325,58 @@ done`;
     });
 
     it("should handle concept with provenance", () => {
-      const input = `concept "BMI":
-    has type Observation.
-    has valuetype Quantity.
-    has provenance "some provenance".
-    inferred by "Most Recent(this, lookbackMonths)" "BMI".
-done`;
+      const input =
+        'concept "BMI":\n    type is Observation.\n    valuetype is Quantity.\n    evidence is `some provenance`.\n    inferred from "BMI" apply pattern `Most Recent(this, lookbackMonths)`.\ndone';
+
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(tokens, [
         CPGLLexer.CONCEPT,
         CPGLLexer.QUOTED_STRING,
         CPGLLexer.COLON,
-        CPGLLexer.HAS,
         CPGLLexer.TYPE,
+        CPGLLexer.IS,
         CPGLLexer.CONCEPT_TYPE,
         CPGLLexer.DOT,
-        CPGLLexer.HAS,
         CPGLLexer.VALUETYPE,
+        CPGLLexer.IS,
         CPGLLexer.CONCEPT_VALUE_TYPE,
         CPGLLexer.DOT,
-        CPGLLexer.HAS,
-        CPGLLexer.PROVENANCE,
-        CPGLLexer.QUOTED_STRING,
+        CPGLLexer.EVIDENCE,
+        CPGLLexer.IS,
+        CPGLLexer.BACKTICK_STRING,
         CPGLLexer.DOT,
         CPGLLexer.INFERRED,
-        CPGLLexer.BY,
+        CPGLLexer.FROM,
         CPGLLexer.QUOTED_STRING,
-        CPGLLexer.QUOTED_STRING,
+        CPGLLexer.APPLY,
+        CPGLLexer.PATTERN,
+        CPGLLexer.BACKTICK_STRING,
         CPGLLexer.DOT,
         CPGLLexer.DONE,
       ]);
     });
 
     it("should handle concept with inferred by expression", () => {
-      const input = `concept "BMI":
-    has type Observation.
-    has valuetype Quantity.
-    inferred by ("BMI Range as a Condition" or "BMI as an Observation" or "Calculated BMI").
-done`;
+      const input =
+        'concept "BMI":\n    type is Observation.\n    valuetype is Quantity.\n    inferred from ("BMI Range as a Condition" or "BMI as an Observation" or "Calculated BMI").\ndone';
+
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(tokens, [
         CPGLLexer.CONCEPT,
         CPGLLexer.QUOTED_STRING,
         CPGLLexer.COLON,
-        CPGLLexer.HAS,
         CPGLLexer.TYPE,
+        CPGLLexer.IS,
         CPGLLexer.CONCEPT_TYPE,
         CPGLLexer.DOT,
-        CPGLLexer.HAS,
         CPGLLexer.VALUETYPE,
+        CPGLLexer.IS,
         CPGLLexer.CONCEPT_VALUE_TYPE,
         CPGLLexer.DOT,
         CPGLLexer.INFERRED,
-        CPGLLexer.BY,
+        CPGLLexer.FROM,
         CPGLLexer.LPAREN,
         CPGLLexer.QUOTED_STRING,
         CPGLLexer.OR,
@@ -395,27 +390,25 @@ done`;
     });
 
     it("should handle concept with inferred by expression using AND", () => {
-      const input = `concept "Complex BMI":
-    has type Observation.
-    has valuetype Quantity.
-    inferred by ("BMI Range" and "Height Record" and "Weight Record").
-done`;
+      const input =
+        'concept "Complex BMI":\n    type is Observation.\n    valuetype is Quantity.\n    inferred from ("BMI Range" and "Height Record" and "Weight Record").\ndone';
+
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(tokens, [
         CPGLLexer.CONCEPT,
         CPGLLexer.QUOTED_STRING,
         CPGLLexer.COLON,
-        CPGLLexer.HAS,
         CPGLLexer.TYPE,
+        CPGLLexer.IS,
         CPGLLexer.CONCEPT_TYPE,
         CPGLLexer.DOT,
-        CPGLLexer.HAS,
         CPGLLexer.VALUETYPE,
+        CPGLLexer.IS,
         CPGLLexer.CONCEPT_VALUE_TYPE,
         CPGLLexer.DOT,
         CPGLLexer.INFERRED,
-        CPGLLexer.BY,
+        CPGLLexer.FROM,
         CPGLLexer.LPAREN,
         CPGLLexer.QUOTED_STRING,
         CPGLLexer.AND,
@@ -429,27 +422,25 @@ done`;
     });
 
     it("should handle concept with inferred by expression using mixed AND/OR", () => {
-      const input = `concept "Complex BMI":
-    has type Observation.
-    has valuetype Quantity.
-    inferred by ("BMI Range" and ("Height Record" or "Estimated Height") and "Weight Record").
-done`;
+      const input =
+        'concept "Complex BMI":\n    type is Observation.\n    valuetype is Quantity.\n    inferred from ("BMI Range" and ("Height Record" or "Estimated Height") and "Weight Record").\ndone';
+
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(tokens, [
         CPGLLexer.CONCEPT,
         CPGLLexer.QUOTED_STRING,
         CPGLLexer.COLON,
-        CPGLLexer.HAS,
         CPGLLexer.TYPE,
+        CPGLLexer.IS,
         CPGLLexer.CONCEPT_TYPE,
         CPGLLexer.DOT,
-        CPGLLexer.HAS,
         CPGLLexer.VALUETYPE,
+        CPGLLexer.IS,
         CPGLLexer.CONCEPT_VALUE_TYPE,
         CPGLLexer.DOT,
         CPGLLexer.INFERRED,
-        CPGLLexer.BY,
+        CPGLLexer.FROM,
         CPGLLexer.LPAREN,
         CPGLLexer.QUOTED_STRING,
         CPGLLexer.AND,
