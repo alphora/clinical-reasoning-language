@@ -46,18 +46,22 @@
       }
     },
     "cSpell.words": [
-        "activitydef",
-        "alphora",
-        "CIMR",
-        "CPGL",
-        "cqis",
-        "IMMZ",
-        "IMMZD",
-        "IMMZDT",
-        "LPAREN",
-        "RPAREN",
-        "smiledigitalhealth",
-        "valuetype"
+      "activitydef",
+      "alphora",
+      "Casefeatures",
+      "CIMR",
+      "CPGL",
+      "cqis",
+      "IMMZ",
+      "IMMZD",
+      "IMMZDT",
+      "LPAREN",
+      "notallowed",
+      "RPAREN",
+      "smiledigitalhealth",
+      "Subcondition",
+      "Subsubcondition",
+      "valuetype"
     ]
   }
   

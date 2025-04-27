@@ -109,7 +109,7 @@ done`;
     when "Client Age Less Than 60" then
         do "Vaccinate"
         do "another thing"
-        do "somthing else"
+        do "something else"
     when "Client Age Greater Than 60" then
         use "Elderly Based"
         use "IMMZ.D2.D5.Measles"
