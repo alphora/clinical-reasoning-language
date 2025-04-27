@@ -5,10 +5,6 @@ import {
   SingleAction,
   SingleActionType,
   Concept,
-  CodedByDefinition,
-  CodedByDefinitionType,
-  InferredByDefinition,
-  InferredByDefinitionType,
   Decision,
   DecisionType,
   DoActivity,
@@ -24,6 +20,10 @@ import {
   UseDecision,
   UseDecisionType,
   ActionStatement,
+  CodedFromDefinition,
+  CodedFromDefinitionType,
+  InferredFromDefinition,
+  InferredFromDefinitionType,
 } from "../types";
 
 import { parseInput } from "./parseInput";
@@ -339,7 +339,7 @@ describe("CPGLAstBuilder", () => {
     });
 
     it("should parse an activity with of clause", () => {
-      const input = 'activity "Indicate" perform CPGProposeDiagnosisTask of "Colonoscopy".';
+      const input = 'activity "Indicate" perform CPGProposeDiagnosisTask with "Colonoscopy".';
 
       const result = parseInput(input);
       const ast = result.statements[0] as Activity;
@@ -354,9 +354,9 @@ describe("CPGLAstBuilder", () => {
     it("should parse a simple concept with coded by", () => {
       const input = `
         concept "BMI Range as a Condition":
-          has type Condition.
-          has valuetype CodeableConcept.
-          coded by "BMI Valueset".
+          type is Condition.
+          valuetype is CodeableConcept.
+          coded from "BMI Valueset".
         done
       `;
 
@@ -366,17 +366,17 @@ describe("CPGLAstBuilder", () => {
       expect(ast.name).toBe("BMI Range as a Condition");
       expect(ast.conceptType).toBe("Condition");
       expect(ast.valueType).toBe("CodeableConcept");
-      expect(ast.definition.type).toBe(CodedByDefinitionType.type);
-      expect((ast.definition as CodedByDefinition).terminologyName).toBe("BMI Valueset");
+      expect(ast.definition.type).toBe(CodedFromDefinitionType.type);
+      expect((ast.definition as CodedFromDefinition).terminologyName).toBe("BMI Valueset");
     });
 
     it("should parse a concept with inferred by pattern and concept reference", () => {
       const input = [
         'concept "Most Recent BMI":',
-        "  has type Observation.",
-        "  has valuetype boolean.",
-        "  has provenance `some provenance`.",
-        '  inferred by "Most Recent(this, lookbackMonths)" "BMI".',
+        "  type is Observation.",
+        "  valuetype is boolean.",
+        "  evidence is `some provenance`.",
+        '  inferred from "Most Recent(this, lookbackMonths)" "BMI".',
         "done",
       ].join("\n");
 
@@ -386,12 +386,12 @@ describe("CPGLAstBuilder", () => {
       expect(ast.name).toBe("Most Recent BMI");
       expect(ast.conceptType).toBe("Observation");
       expect(ast.valueType).toBe("boolean");
-      expect(ast.provenance).toBe("some provenance");
-      expect(ast.definition.type).toBe(InferredByDefinitionType.type);
-      const inferredBy = ast.definition as InferredByDefinition;
-      if ("body" in inferredBy && inferredBy.body.type === "InferredByDefinitionConcept") {
-        expect(inferredBy.body.pattern).toBe("Most Recent(this, lookbackMonths)");
-        expect(inferredBy.body.concept).toBe("BMI");
+      expect(ast.evidence).toBe("some provenance");
+      expect(ast.definition.type).toBe(InferredFromDefinitionType.type);
+      const inferredBy = ast.definition as InferredFromDefinition;
+      if ("body" in inferredBy && inferredBy.body.type === "InferredFromDefinitionConcept") {
+        expect(inferredBy.body.pattern).toBeUndefined();
+        expect(inferredBy.body.concept).toBe("Most Recent(this, lookbackMonths)");
       } else {
         expect((inferredBy.body as any).pattern).toBeUndefined();
         expect((inferredBy.body as any).concept).toBeUndefined();
@@ -401,9 +401,9 @@ describe("CPGLAstBuilder", () => {
     it("should parse a concept with inferred by", () => {
       const input = [
         'concept "BMI":',
-        "  has type Observation.",
-        "  has valuetype Quantity.",
-        '  inferred by ("BMI Range as a Condition" or "BMI as an Observation" or "Calculated BMI").',
+        "  type is Observation.",
+        "  valuetype is Quantity.",
+        '  inferred from ("BMI Range as a Condition" or "BMI as an Observation" or "Calculated BMI").',
         "done",
       ].join("\n");
 
@@ -413,9 +413,9 @@ describe("CPGLAstBuilder", () => {
       expect(ast.name).toBe("BMI");
       expect(ast.conceptType).toBe("Observation");
       expect(ast.valueType).toBe("Quantity");
-      expect(ast.definition.type).toBe(InferredByDefinitionType.type);
-      const inferredBy = ast.definition as InferredByDefinition;
-      if ("body" in inferredBy && inferredBy.body.type === "InferredByDefinitionConcept") {
+      expect(ast.definition.type).toBe(InferredFromDefinitionType.type);
+      const inferredBy = ast.definition as InferredFromDefinition;
+      if ("body" in inferredBy && inferredBy.body.type === "InferredFromDefinitionConcept") {
         /* empty */
       }
       expect((inferredBy.body as any).pattern).toBeUndefined();
@@ -425,17 +425,17 @@ describe("CPGLAstBuilder", () => {
     it("should parse a concept with inferred by descriptive logic using and/or combinations", () => {
       const input = `
         concept "Complex BMI":
-          has type Observation.
-          has valuetype Quantity.
-          inferred by (("BMI Range as a Condition" and "Recent") or ("BMI as an Observation" and "Valid") or "Calculated BMI").
+          type is Observation.
+          valuetype is Quantity.
+          inferred from (("BMI Range as a Condition" and "Recent") or ("BMI as an Observation" and "Valid") or "Calculated BMI").
         done
       `;
 
       const result = parseInput(input);
       const ast = result.statements[0] as Concept;
       expect(ast.type).toBe("Concept");
-      expect(ast.definition.type).toBe(InferredByDefinitionType.type);
-      const inferredBy = ast.definition as InferredByDefinition;
+      expect(ast.definition.type).toBe(InferredFromDefinitionType.type);
+      const inferredBy = ast.definition as InferredFromDefinition;
       // Outer should be an OrExpression
       expect(inferredBy.body.type).toBe("OrExpression");
       const orExpr = inferredBy.body as any;
@@ -468,10 +468,10 @@ describe("CPGLAstBuilder", () => {
     it("should parse a concept with empty provenance", () => {
       const input = [
         'concept "Empty Provenance":',
-        "  has type Observation.",
-        "  has valuetype boolean.",
-        "  has provenance ``.",
-        '  inferred by "Some Pattern" "Some Concept".',
+        "  type is Observation.",
+        "  valuetype is boolean.",
+        "  evidence is ``.",
+        '  inferred from "Some Pattern" "Some Concept".',
         "done",
       ].join("\n");
 
@@ -479,7 +479,7 @@ describe("CPGLAstBuilder", () => {
       const ast = result.statements[0] as Concept;
       expect(ast.type).toBe("Concept");
       expect(ast.name).toBe("Empty Provenance");
-      expect(ast.provenance).toBe("");
+      expect(ast.evidence).toBe("");
     });
   });
 

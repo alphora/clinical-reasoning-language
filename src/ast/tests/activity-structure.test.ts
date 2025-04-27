@@ -1,14 +1,11 @@
-import { CPGLAstBuilder } from "../builder";
+// Removed unused CPGLAstBuilder import
+
 import { Activity } from "../types";
 
 import { parseInput } from "./parseInput";
 
 describe("Activity Structure", () => {
-  let builder: CPGLAstBuilder;
-
-  beforeEach(() => {
-    builder = new CPGLAstBuilder();
-  });
+  // Removed unused builder variable
 
   it("should correctly structure activity with type", () => {
     const input = 'activity "Vaccinate" perform CPGImmunizationRequest.';
@@ -23,7 +20,7 @@ describe("Activity Structure", () => {
   });
 
   it("should correctly structure activity with type and terminology", () => {
-    const input = 'activity "Indicate" perform CPGProposeDiagnosisTask of "Colonoscopy".';
+    const input = 'activity "Indicate" perform CPGProposeDiagnosisTask with "Colonoscopy".';
 
     const result = parseInput(input);
     const activity = result.statements[0] as Activity;
@@ -36,7 +33,7 @@ describe("Activity Structure", () => {
   });
 
   it("should correctly structure activity with type and free text", () => {
-    const input = 'activity "another thing" perform CPGCommunicationRequest of `The message`.';
+    const input = 'activity "another thing" perform CPGCommunicationRequest with `The message`.';
 
     const result = parseInput(input);
     const activity = result.statements[0] as Activity;
@@ -50,8 +47,8 @@ describe("Activity Structure", () => {
   });
 
   it("should correctly structure activity with type and terminology or free text", () => {
-    const input1 = 'activity "Indicate" perform CPGProposeDiagnosisTask of "Colonoscopy".';
-    const input2 = 'activity "Notify" perform CPGCommunicationRequest of `A notification message`.';
+    const input1 = 'activity "Indicate" perform CPGProposeDiagnosisTask with "Colonoscopy".';
+    const input2 = 'activity "Notify" perform CPGCommunicationRequest with `A notification message`.';
 
     const result1 = parseInput(input1);
     const result2 = parseInput(input2);
@@ -67,7 +64,7 @@ describe("Activity Structure", () => {
   });
 
   it("should correctly structure activity with empty free text", () => {
-    const input = 'activity "Empty Free Text" perform CPGCommunicationRequest of ``.';
+    const input = 'activity "Empty Free Text" perform CPGCommunicationRequest with ``.';
 
     const result = parseInput(input);
     const activity = result.statements[0] as Activity;
