@@ -134,6 +134,10 @@ ACTIVITY_ErrorChar
 
 mode CONCEPT_MODE;
 
+CONCEPT_IS
+    : 'is' -> type(IS)
+    ;
+
 // CONCEPT_TYPE possibilities (case sensitive)
 // Consider adding:
 // ImagingStudy (maybe- though DiagnosticReport and Observation likely cover most use cases without it)
@@ -218,6 +222,10 @@ CONCEPT_ErrorChar
     ;
 
 mode VALUE_TYPE_MODE;
+
+VALUE_TYPE_IS
+    : 'is' -> type(IS)
+    ;
 
 // CONCEPT_VALUE_TYPE possibilities (case sensitive)
 CONCEPT_VALUE_TYPE
