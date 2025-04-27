@@ -102,7 +102,12 @@ export class CPGLAstBuilder
 {
   private readonly errors: string[] = [];
 
-  protected reportError(type: string, message: string, location?: Location, details?: any) {
+  protected reportError(
+    type: string,
+    message: string,
+    location?: Location,
+    details?: unknown,
+  ): void {
     const errorObj = {
       type,
       message,
@@ -116,7 +121,7 @@ export class CPGLAstBuilder
     return this.errors;
   }
 
-  protected defaultResult() {
+  protected defaultResult(): ASTNode {
     return null as any;
   }
 
@@ -186,7 +191,9 @@ export class CPGLAstBuilder
     return { type: SingleActionType.type, action, location: getLocation(ctx) };
   }
 
-  visitActionStatement(ctx: any): ActionStatement {
+  visitActionStatement(
+    ctx: import("../grammar/generated/antlr/CPGLParser").ActionStatementContext,
+  ): ActionStatement {
     const doStmt = ctx.doStatement?.();
     const useStmt = ctx.useStatement?.();
     let action: DoActivity | UseDecision;
@@ -466,7 +473,10 @@ export class CPGLAstBuilder
   ): InformalAnd | NotExpression | GroupExpression | ConceptReference {
     const terms = ctx
       .informalNot()
-      .map((n: any) => this.visit(n) as NotExpression | GroupExpression | ConceptReference);
+      .map(
+        (n: InformalNotContext) =>
+          this.visit(n) as NotExpression | GroupExpression | ConceptReference,
+      );
     if (ctx.AND().length) {
       return { type: InformalAndType.type, terms, location: getLocation(ctx) };
     }
