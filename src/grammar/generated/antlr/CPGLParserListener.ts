@@ -29,15 +29,16 @@ import { TerminologySystemCodeContext } from "./CPGLParser";
 import { ActivityStatementContext } from "./CPGLParser";
 import { ConceptStatementContext } from "./CPGLParser";
 import { ConceptBodyContext } from "./CPGLParser";
-import { HasTypeLineContext } from "./CPGLParser";
-import { HasValueTypeLineContext } from "./CPGLParser";
-import { ProvenanceLineContext } from "./CPGLParser";
-import { CodedByLineContext } from "./CPGLParser";
-import { InferredByLineContext } from "./CPGLParser";
+import { TypeLineContext } from "./CPGLParser";
+import { ValueTypeLineContext } from "./CPGLParser";
+import { EvidenceLineContext } from "./CPGLParser";
+import { CodedFromLineContext } from "./CPGLParser";
+import { InferredFromLineContext } from "./CPGLParser";
 import { InferredBodyContext } from "./CPGLParser";
-import { InferredByConceptReferenceContext } from "./CPGLParser";
-import { InferredByDescriptiveLogicContext } from "./CPGLParser";
-import { InferredByExpressionContext } from "./CPGLParser";
+import { InferredFromConceptReferenceContext } from "./CPGLParser";
+import { PatternStatementContext } from "./CPGLParser";
+import { InferredFromDescriptiveLogicContext } from "./CPGLParser";
+import { InferredFromExpressionContext } from "./CPGLParser";
 import { InformalOrContext } from "./CPGLParser";
 import { InformalAndContext } from "./CPGLParser";
 import { InformalNotContext } from "./CPGLParser";
@@ -51,9 +52,8 @@ import { ActivityIdentifierContext } from "./CPGLParser";
 import { ActivityReferenceContext } from "./CPGLParser";
 import { ConceptIdentifierContext } from "./CPGLParser";
 import { ConceptReferenceContext } from "./CPGLParser";
-import { PatternIdentifierContext } from "./CPGLParser";
-import { PatternReferenceContext } from "./CPGLParser";
 import { BacktickStringContext } from "./CPGLParser";
+import { PatternNameContext } from "./CPGLParser";
 import { ActivityTypeValueContext } from "./CPGLParser";
 import { RationaleContext } from "./CPGLParser";
 
@@ -366,59 +366,59 @@ export interface CPGLParserListener extends ParseTreeListener {
 	exitConceptBody?: (ctx: ConceptBodyContext) => void;
 
 	/**
-	 * Enter a parse tree produced by `CPGLParser.hasTypeLine`.
+	 * Enter a parse tree produced by `CPGLParser.typeLine`.
 	 * @param ctx the parse tree
 	 */
-	enterHasTypeLine?: (ctx: HasTypeLineContext) => void;
+	enterTypeLine?: (ctx: TypeLineContext) => void;
 	/**
-	 * Exit a parse tree produced by `CPGLParser.hasTypeLine`.
+	 * Exit a parse tree produced by `CPGLParser.typeLine`.
 	 * @param ctx the parse tree
 	 */
-	exitHasTypeLine?: (ctx: HasTypeLineContext) => void;
+	exitTypeLine?: (ctx: TypeLineContext) => void;
 
 	/**
-	 * Enter a parse tree produced by `CPGLParser.hasValueTypeLine`.
+	 * Enter a parse tree produced by `CPGLParser.valueTypeLine`.
 	 * @param ctx the parse tree
 	 */
-	enterHasValueTypeLine?: (ctx: HasValueTypeLineContext) => void;
+	enterValueTypeLine?: (ctx: ValueTypeLineContext) => void;
 	/**
-	 * Exit a parse tree produced by `CPGLParser.hasValueTypeLine`.
+	 * Exit a parse tree produced by `CPGLParser.valueTypeLine`.
 	 * @param ctx the parse tree
 	 */
-	exitHasValueTypeLine?: (ctx: HasValueTypeLineContext) => void;
+	exitValueTypeLine?: (ctx: ValueTypeLineContext) => void;
 
 	/**
-	 * Enter a parse tree produced by `CPGLParser.provenanceLine`.
+	 * Enter a parse tree produced by `CPGLParser.evidenceLine`.
 	 * @param ctx the parse tree
 	 */
-	enterProvenanceLine?: (ctx: ProvenanceLineContext) => void;
+	enterEvidenceLine?: (ctx: EvidenceLineContext) => void;
 	/**
-	 * Exit a parse tree produced by `CPGLParser.provenanceLine`.
+	 * Exit a parse tree produced by `CPGLParser.evidenceLine`.
 	 * @param ctx the parse tree
 	 */
-	exitProvenanceLine?: (ctx: ProvenanceLineContext) => void;
+	exitEvidenceLine?: (ctx: EvidenceLineContext) => void;
 
 	/**
-	 * Enter a parse tree produced by `CPGLParser.codedByLine`.
+	 * Enter a parse tree produced by `CPGLParser.codedFromLine`.
 	 * @param ctx the parse tree
 	 */
-	enterCodedByLine?: (ctx: CodedByLineContext) => void;
+	enterCodedFromLine?: (ctx: CodedFromLineContext) => void;
 	/**
-	 * Exit a parse tree produced by `CPGLParser.codedByLine`.
+	 * Exit a parse tree produced by `CPGLParser.codedFromLine`.
 	 * @param ctx the parse tree
 	 */
-	exitCodedByLine?: (ctx: CodedByLineContext) => void;
+	exitCodedFromLine?: (ctx: CodedFromLineContext) => void;
 
 	/**
-	 * Enter a parse tree produced by `CPGLParser.inferredByLine`.
+	 * Enter a parse tree produced by `CPGLParser.inferredFromLine`.
 	 * @param ctx the parse tree
 	 */
-	enterInferredByLine?: (ctx: InferredByLineContext) => void;
+	enterInferredFromLine?: (ctx: InferredFromLineContext) => void;
 	/**
-	 * Exit a parse tree produced by `CPGLParser.inferredByLine`.
+	 * Exit a parse tree produced by `CPGLParser.inferredFromLine`.
 	 * @param ctx the parse tree
 	 */
-	exitInferredByLine?: (ctx: InferredByLineContext) => void;
+	exitInferredFromLine?: (ctx: InferredFromLineContext) => void;
 
 	/**
 	 * Enter a parse tree produced by `CPGLParser.inferredBody`.
@@ -432,37 +432,48 @@ export interface CPGLParserListener extends ParseTreeListener {
 	exitInferredBody?: (ctx: InferredBodyContext) => void;
 
 	/**
-	 * Enter a parse tree produced by `CPGLParser.inferredByConceptReference`.
+	 * Enter a parse tree produced by `CPGLParser.inferredFromConceptReference`.
 	 * @param ctx the parse tree
 	 */
-	enterInferredByConceptReference?: (ctx: InferredByConceptReferenceContext) => void;
+	enterInferredFromConceptReference?: (ctx: InferredFromConceptReferenceContext) => void;
 	/**
-	 * Exit a parse tree produced by `CPGLParser.inferredByConceptReference`.
+	 * Exit a parse tree produced by `CPGLParser.inferredFromConceptReference`.
 	 * @param ctx the parse tree
 	 */
-	exitInferredByConceptReference?: (ctx: InferredByConceptReferenceContext) => void;
+	exitInferredFromConceptReference?: (ctx: InferredFromConceptReferenceContext) => void;
 
 	/**
-	 * Enter a parse tree produced by `CPGLParser.inferredByDescriptiveLogic`.
+	 * Enter a parse tree produced by `CPGLParser.patternStatement`.
 	 * @param ctx the parse tree
 	 */
-	enterInferredByDescriptiveLogic?: (ctx: InferredByDescriptiveLogicContext) => void;
+	enterPatternStatement?: (ctx: PatternStatementContext) => void;
 	/**
-	 * Exit a parse tree produced by `CPGLParser.inferredByDescriptiveLogic`.
+	 * Exit a parse tree produced by `CPGLParser.patternStatement`.
 	 * @param ctx the parse tree
 	 */
-	exitInferredByDescriptiveLogic?: (ctx: InferredByDescriptiveLogicContext) => void;
+	exitPatternStatement?: (ctx: PatternStatementContext) => void;
 
 	/**
-	 * Enter a parse tree produced by `CPGLParser.inferredByExpression`.
+	 * Enter a parse tree produced by `CPGLParser.inferredFromDescriptiveLogic`.
 	 * @param ctx the parse tree
 	 */
-	enterInferredByExpression?: (ctx: InferredByExpressionContext) => void;
+	enterInferredFromDescriptiveLogic?: (ctx: InferredFromDescriptiveLogicContext) => void;
 	/**
-	 * Exit a parse tree produced by `CPGLParser.inferredByExpression`.
+	 * Exit a parse tree produced by `CPGLParser.inferredFromDescriptiveLogic`.
 	 * @param ctx the parse tree
 	 */
-	exitInferredByExpression?: (ctx: InferredByExpressionContext) => void;
+	exitInferredFromDescriptiveLogic?: (ctx: InferredFromDescriptiveLogicContext) => void;
+
+	/**
+	 * Enter a parse tree produced by `CPGLParser.inferredFromExpression`.
+	 * @param ctx the parse tree
+	 */
+	enterInferredFromExpression?: (ctx: InferredFromExpressionContext) => void;
+	/**
+	 * Exit a parse tree produced by `CPGLParser.inferredFromExpression`.
+	 * @param ctx the parse tree
+	 */
+	exitInferredFromExpression?: (ctx: InferredFromExpressionContext) => void;
 
 	/**
 	 * Enter a parse tree produced by `CPGLParser.informalOr`.
@@ -608,28 +619,6 @@ export interface CPGLParserListener extends ParseTreeListener {
 	exitConceptReference?: (ctx: ConceptReferenceContext) => void;
 
 	/**
-	 * Enter a parse tree produced by `CPGLParser.patternIdentifier`.
-	 * @param ctx the parse tree
-	 */
-	enterPatternIdentifier?: (ctx: PatternIdentifierContext) => void;
-	/**
-	 * Exit a parse tree produced by `CPGLParser.patternIdentifier`.
-	 * @param ctx the parse tree
-	 */
-	exitPatternIdentifier?: (ctx: PatternIdentifierContext) => void;
-
-	/**
-	 * Enter a parse tree produced by `CPGLParser.patternReference`.
-	 * @param ctx the parse tree
-	 */
-	enterPatternReference?: (ctx: PatternReferenceContext) => void;
-	/**
-	 * Exit a parse tree produced by `CPGLParser.patternReference`.
-	 * @param ctx the parse tree
-	 */
-	exitPatternReference?: (ctx: PatternReferenceContext) => void;
-
-	/**
 	 * Enter a parse tree produced by `CPGLParser.backtickString`.
 	 * @param ctx the parse tree
 	 */
@@ -639,6 +628,17 @@ export interface CPGLParserListener extends ParseTreeListener {
 	 * @param ctx the parse tree
 	 */
 	exitBacktickString?: (ctx: BacktickStringContext) => void;
+
+	/**
+	 * Enter a parse tree produced by `CPGLParser.patternName`.
+	 * @param ctx the parse tree
+	 */
+	enterPatternName?: (ctx: PatternNameContext) => void;
+	/**
+	 * Exit a parse tree produced by `CPGLParser.patternName`.
+	 * @param ctx the parse tree
+	 */
+	exitPatternName?: (ctx: PatternNameContext) => void;
 
 	/**
 	 * Enter a parse tree produced by `CPGLParser.activityTypeValue`.

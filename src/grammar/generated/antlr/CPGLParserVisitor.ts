@@ -29,15 +29,16 @@ import { TerminologySystemCodeContext } from "./CPGLParser";
 import { ActivityStatementContext } from "./CPGLParser";
 import { ConceptStatementContext } from "./CPGLParser";
 import { ConceptBodyContext } from "./CPGLParser";
-import { HasTypeLineContext } from "./CPGLParser";
-import { HasValueTypeLineContext } from "./CPGLParser";
-import { ProvenanceLineContext } from "./CPGLParser";
-import { CodedByLineContext } from "./CPGLParser";
-import { InferredByLineContext } from "./CPGLParser";
+import { TypeLineContext } from "./CPGLParser";
+import { ValueTypeLineContext } from "./CPGLParser";
+import { EvidenceLineContext } from "./CPGLParser";
+import { CodedFromLineContext } from "./CPGLParser";
+import { InferredFromLineContext } from "./CPGLParser";
 import { InferredBodyContext } from "./CPGLParser";
-import { InferredByConceptReferenceContext } from "./CPGLParser";
-import { InferredByDescriptiveLogicContext } from "./CPGLParser";
-import { InferredByExpressionContext } from "./CPGLParser";
+import { InferredFromConceptReferenceContext } from "./CPGLParser";
+import { PatternStatementContext } from "./CPGLParser";
+import { InferredFromDescriptiveLogicContext } from "./CPGLParser";
+import { InferredFromExpressionContext } from "./CPGLParser";
 import { InformalOrContext } from "./CPGLParser";
 import { InformalAndContext } from "./CPGLParser";
 import { InformalNotContext } from "./CPGLParser";
@@ -51,9 +52,8 @@ import { ActivityIdentifierContext } from "./CPGLParser";
 import { ActivityReferenceContext } from "./CPGLParser";
 import { ConceptIdentifierContext } from "./CPGLParser";
 import { ConceptReferenceContext } from "./CPGLParser";
-import { PatternIdentifierContext } from "./CPGLParser";
-import { PatternReferenceContext } from "./CPGLParser";
 import { BacktickStringContext } from "./CPGLParser";
+import { PatternNameContext } from "./CPGLParser";
 import { ActivityTypeValueContext } from "./CPGLParser";
 import { RationaleContext } from "./CPGLParser";
 
@@ -257,39 +257,39 @@ export interface CPGLParserVisitor<Result> extends ParseTreeVisitor<Result> {
 	visitConceptBody?: (ctx: ConceptBodyContext) => Result;
 
 	/**
-	 * Visit a parse tree produced by `CPGLParser.hasTypeLine`.
+	 * Visit a parse tree produced by `CPGLParser.typeLine`.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
-	visitHasTypeLine?: (ctx: HasTypeLineContext) => Result;
+	visitTypeLine?: (ctx: TypeLineContext) => Result;
 
 	/**
-	 * Visit a parse tree produced by `CPGLParser.hasValueTypeLine`.
+	 * Visit a parse tree produced by `CPGLParser.valueTypeLine`.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
-	visitHasValueTypeLine?: (ctx: HasValueTypeLineContext) => Result;
+	visitValueTypeLine?: (ctx: ValueTypeLineContext) => Result;
 
 	/**
-	 * Visit a parse tree produced by `CPGLParser.provenanceLine`.
+	 * Visit a parse tree produced by `CPGLParser.evidenceLine`.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
-	visitProvenanceLine?: (ctx: ProvenanceLineContext) => Result;
+	visitEvidenceLine?: (ctx: EvidenceLineContext) => Result;
 
 	/**
-	 * Visit a parse tree produced by `CPGLParser.codedByLine`.
+	 * Visit a parse tree produced by `CPGLParser.codedFromLine`.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
-	visitCodedByLine?: (ctx: CodedByLineContext) => Result;
+	visitCodedFromLine?: (ctx: CodedFromLineContext) => Result;
 
 	/**
-	 * Visit a parse tree produced by `CPGLParser.inferredByLine`.
+	 * Visit a parse tree produced by `CPGLParser.inferredFromLine`.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
-	visitInferredByLine?: (ctx: InferredByLineContext) => Result;
+	visitInferredFromLine?: (ctx: InferredFromLineContext) => Result;
 
 	/**
 	 * Visit a parse tree produced by `CPGLParser.inferredBody`.
@@ -299,25 +299,32 @@ export interface CPGLParserVisitor<Result> extends ParseTreeVisitor<Result> {
 	visitInferredBody?: (ctx: InferredBodyContext) => Result;
 
 	/**
-	 * Visit a parse tree produced by `CPGLParser.inferredByConceptReference`.
+	 * Visit a parse tree produced by `CPGLParser.inferredFromConceptReference`.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
-	visitInferredByConceptReference?: (ctx: InferredByConceptReferenceContext) => Result;
+	visitInferredFromConceptReference?: (ctx: InferredFromConceptReferenceContext) => Result;
 
 	/**
-	 * Visit a parse tree produced by `CPGLParser.inferredByDescriptiveLogic`.
+	 * Visit a parse tree produced by `CPGLParser.patternStatement`.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
-	visitInferredByDescriptiveLogic?: (ctx: InferredByDescriptiveLogicContext) => Result;
+	visitPatternStatement?: (ctx: PatternStatementContext) => Result;
 
 	/**
-	 * Visit a parse tree produced by `CPGLParser.inferredByExpression`.
+	 * Visit a parse tree produced by `CPGLParser.inferredFromDescriptiveLogic`.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
-	visitInferredByExpression?: (ctx: InferredByExpressionContext) => Result;
+	visitInferredFromDescriptiveLogic?: (ctx: InferredFromDescriptiveLogicContext) => Result;
+
+	/**
+	 * Visit a parse tree produced by `CPGLParser.inferredFromExpression`.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	visitInferredFromExpression?: (ctx: InferredFromExpressionContext) => Result;
 
 	/**
 	 * Visit a parse tree produced by `CPGLParser.informalOr`.
@@ -411,25 +418,18 @@ export interface CPGLParserVisitor<Result> extends ParseTreeVisitor<Result> {
 	visitConceptReference?: (ctx: ConceptReferenceContext) => Result;
 
 	/**
-	 * Visit a parse tree produced by `CPGLParser.patternIdentifier`.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	visitPatternIdentifier?: (ctx: PatternIdentifierContext) => Result;
-
-	/**
-	 * Visit a parse tree produced by `CPGLParser.patternReference`.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	visitPatternReference?: (ctx: PatternReferenceContext) => Result;
-
-	/**
 	 * Visit a parse tree produced by `CPGLParser.backtickString`.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
 	visitBacktickString?: (ctx: BacktickStringContext) => Result;
+
+	/**
+	 * Visit a parse tree produced by `CPGLParser.patternName`.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	visitPatternName?: (ctx: PatternNameContext) => Result;
 
 	/**
 	 * Visit a parse tree produced by `CPGLParser.activityTypeValue`.

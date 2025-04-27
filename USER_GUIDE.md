@@ -36,7 +36,7 @@ CPGL is designed to:
 
 CPGL is built from a small set of basic elements, called **tokens**:
 - **Symbols**: e.g., `:`, `.`, `(`, `)`
-- **Keywords**: e.g., `decision`, `concept`, `activity`, `terminology`, `when`, `then`, `do`, `use`, `has`, `type`, `valuetype`, `coded`, `by`, `inferred`, `done`, `because`, `of`, `system`, `code`, `valueset`, `and`, `or`, `not`, `any`, `all`
+- **Keywords**: e.g., `decision`, `concept`, `activity`, `terminology`, `when`, `then`, `do`, `use`, `type`, `valuetype`, `coded`, `from`, `inferred`, `done`, `because`, `system`, `code`, `valueset`, `and`, `or`, `not`, `any`, `all`, `with`, `pattern`, `apply`, `evidence`
 - **Literals**: e.g., numbers, backtick-quoted free text (`` `markdown or free text` ``)
 - **Identifiers**: always double-quoted (e.g., `"Colonoscopy"`, `"BMI Valueset"`)
 
@@ -50,8 +50,8 @@ CPGL enforces strict quoting rules for clarity and unambiguous parsing:
 
 - **Identifiers and references**: Always use double quotes (`"Identifier"`).
   - Examples: `"Colonoscopy"`, `"BMI Valueset"`, `"Propose Diagnosis Task"`
-- **Free text, markdown, and provenance**: Always use backticks (`` `free text or markdown` ``).
-  - Examples: `` `This is *markdown*` ``, `` `A rationale for the action` ``
+- **Free text, markdown, and evidence**: Always use backticks (`` `free text or markdown` ``).
+  - Examples: `` `This is *markdown*` ``, `` `A rationale for the action` ``, `` `http://snomed.info/sct` ``
 - **Single quotes are not used** as delimiters in CPGL.
 
 ## Comments
@@ -75,9 +75,9 @@ CPGL supports two types of comments:
       It can span multiple lines.
     */
     concept "BMI":
-      has type Observation.
-      has valuetype Quantity.
-      inferred by ("BMI Range as a Condition" or "BMI as an Observation" or "Calculated BMI").
+      type is Observation.
+      valuetype is Quantity.
+      inferred from ("BMI Range as a Condition" or "BMI as an Observation" or "Calculated BMI").
     done
     ```
 
@@ -90,7 +90,7 @@ Comments can be placed anywhere whitespace is allowed. They are ignored by the l
 A CPGL document consists of a sequence of **statements**. The main statement types are:
 
 - **Decision**: Defines a clinical decision with conditions and actions.
-- **Concept**: Defines a clinical concept, its type, value type, provenance, and logic.
+- **Concept**: Defines a clinical concept, its type, value type, evidence, and logic.
 - **Activity**: Defines an activity to be performed, with type, value, and rationale.
 - **Terminology**: Defines a terminology set, system/code, or free text.
 
@@ -120,24 +120,24 @@ done
 
 ```cpgl
 concept "Concept Name":
-  has type Condition.
-  has valuetype boolean.
-  has provenance `Provenance or markdown info`.
-  inferred by ("Other Concept" and "Another Concept").
+  type is Condition.
+  valuetype is boolean.
+  evidence is `Provenance or markdown info`.
+  inferred from ("Other Concept" and "Another Concept").
 done
 ```
 
 ### 3. Activity Statement
 
 ```cpgl
-activity "Activity Name" perform CPGImmunizationRequest of "Colonoscopy".
-activity "Notify" perform CPGCommunicationRequest of `A notification message` because `Rationale for notification`.
+activity "Activity Name" perform CPGImmunizationRequest with "Colonoscopy".
+activity "Notify" perform CPGCommunicationRequest with `A notification message` because `Rationale for notification`.
 ```
 
 ### 4. Terminology Statement
 
 ```cpgl
-terminology "BMI Valueset" valueset "bmi valueset".
+terminology "BMI Valueset" valueset `bmi valueset`.
 terminology "Colonoscopy" system `http://snomed.info/sct` code `73761001`.
 ```
 
@@ -146,7 +146,7 @@ terminology "Colonoscopy" system `http://snomed.info/sct` code `73761001`.
 ## Authoring Guidelines
 
 - **Always use double quotes for identifiers and references.**
-- **Always use backticks for free text, markdown, and provenance.**
+- **Always use backticks for free text, markdown, and evidence.**
 - **End statements with a period (`.`) or `done` as required by the grammar.**
 - **Indent nested blocks for readability.**
 - **Use keywords and symbols exactly as defined in the grammar.**
@@ -173,11 +173,11 @@ When using the FSH-to-CPGL transformer, the tool automatically deduplicates acti
 // If two activities have the same name but different values:
 activity "Last Live Vaccine Administered Within 4 Weeks"
     perform CPGCommunicationRequest
-    of "Should not vaccinate client for MCV0 ...".
+    with `Should not vaccinate client for MCV0 ...`.
 
 activity "Last Live Vaccine Administered Within 4 Weeks_2"
     perform CPGCommunicationRequest
-    of "Should not vaccinate client for MCV1 ...".
+    with `Should not vaccinate client for MCV1 ...`.
 ```
 
 For more technical details, see the [Activity Deduplication and Reference Requirements](./src/transformer/fsh-to-cpgl/docs/Activity%20Deduplication%20and%20Reference%20Requirements.md).
@@ -208,14 +208,14 @@ decision "IMMZ.D2.D5.Measles":
 done
 
 concept "BMI Range as a Condition":
-  has type Condition.
-  has valuetype CodeableConcept.
-  coded by "BMI Valueset".
+  type is Condition.
+  valuetype is CodeableConcept.
+  coded from "BMI Valueset".
 done
 
-activity "Notify" perform CPGCommunicationRequest of `A notification message` because `Notify the clinician of the result`.
+activity "Notify" perform CPGCommunicationRequest with `A notification message` because `Notify the clinician of the result`.
 
-terminology "BMI Valueset" valueset "bmi valueset".
+terminology "BMI Valueset" valueset `bmi valueset`.
 terminology "Colonoscopy" system `http://snomed.info/sct` code `73761001`.
 ```
 
@@ -237,21 +237,21 @@ The following are all reserved keywords in CPGL:
 - `all`
 - `and`
 - `any`
+- `apply`
 - `because`
-- `by`
 - `coded`
 - `code`
 - `concept`
 - `decision`
 - `do`
 - `done`
-- `has`
+- `evidence`
+- `from`
 - `inferred`
 - `not`
-- `of`
 - `or`
+- `pattern`
 - `perform`
-- `provenance`
 - `system`
 - `terminology`
 - `then`
@@ -260,6 +260,7 @@ The following are all reserved keywords in CPGL:
 - `valuetype`
 - `valueset`
 - `when`
+- `with`
 
 ## Keyword Glossary
 
@@ -271,20 +272,20 @@ Below is a glossary of all keywords, with descriptions and usage examples:
 - **all**: Used in block bodies to require all conditions/actions.
   - Example: `all: when "A" then do "B". done`
 
-- **and**: Logical operator for combining concepts in inferred-by logic.
-  - Example: `inferred by ("A" and "B").`
+- **and**: Logical operator for combining concepts in inferred-from logic.
+  - Example: `inferred from ("A" and "B").`
 
 - **any**: Used in block bodies to require any of the conditions/actions.
   - Example: `any: when "A" then do "B". done`
 
+- **apply**: Used to apply a pattern in concept inference.
+  - Example: `inferred from "BMI" apply pattern `Most Recent(this, lookbackMonths)`.`
+
 - **because**: Introduces a rationale (free text) for an activity.
   - Example: ``activity "Notify" perform CPGCommunicationRequest because `A rationale here`.``
 
-- **by**: Used in `coded by` and `inferred by` clauses in concepts.
-  - Example: `coded by "BMI Valueset".`
-
-- **coded**: Used in `coded by` clause for concepts.
-  - Example: `coded by "BMI Valueset".`
+- **coded**: Used in `coded from` clause for concepts.
+  - Example: `coded from "BMI Valueset".`
 
 - **code**: Used in terminology statements to specify a code.
   - Example: ``terminology "Colonoscopy" system `http://snomed.info/sct` code `73761001`.``
@@ -301,69 +302,65 @@ Below is a glossary of all keywords, with descriptions and usage examples:
 - **done**: Marks the end of a block or statement.
   - Example: `done`
 
-- **has**: Used to specify properties of a concept.
-  - Example: `has type Condition.`
+- **evidence**: Used to specify evidence (free text) for a concept.
+  - Example: ``evidence is `Some evidence info`.``
 
-- **inferred**: Used in `inferred by` clause for concepts.
-  - Example: `inferred by ("A" or "B").`
+- **from**: Used in `coded from` and `inferred from` clauses in concepts.
+  - Example: `coded from "BMI Valueset".`
 
-- **not**: Logical negation in inferred-by logic.
-  - Example: `inferred by (not "A").`
+- **inferred**: Used in `inferred from` clause for concepts.
+  - Example: `inferred from ("A" or "B").`
 
-- **of**: Used in activity statements to specify a value or reference.
-  - Example: `activity "Indicate" perform CPGProposeDiagnosis of "Colonoscopy".`
+- **not**: Logical negation in inferred-from logic.
+  - Example: `inferred from (not "A").`
 
-- **or**: Logical operator for alternatives in inferred-by logic.
-  - Example: `inferred by ("A" or "B").`
+- **or**: Logical operator for alternatives in inferred-from logic.
+  - Example: `inferred from ("A" or "B").`
+
+- **pattern**: Used in pattern application in concept inference.
+  - Example: `apply pattern `Most Recent(this, lookbackMonths)`.`
 
 - **perform**: Specifies the activity type in an activity statement.
   - Example: `activity "Vaccinate" perform CPGImmunizationRequest.`
-
-- **provenance**: Used to specify provenance (free text) for a concept.
-  - Example: ``has provenance `Some provenance info`.``
 
 - **system**: Used in terminology statements to specify a code system.
   - Example: ``terminology "Colonoscopy" system `http://snomed.info/sct` code `73761001`.``
 
 - **terminology**: Declares a terminology statement.
-  - Example: `terminology "BMI Valueset" valueset "bmi valueset".`
+  - Example: `terminology "BMI Valueset" valueset `bmi valueset`.`
 
 - **then**: Used in decision statements to introduce the action block.
   - Example: `when "BMI > 30" then do "Propose Diagnosis Task".`
 
 - **type**: Used to specify the type of a concept.
-  - Example: `has type Condition.`
+  - Example: `type is Condition.`
 
 - **use**: Used in actions to reference another decision.
   - Example: `use "Other Decision".`
 
 - **valuetype**: Used to specify the value type of a concept.
-  - Example: `has valuetype boolean.`
+  - Example: `valuetype is boolean.`
 
 - **valueset**: Used in terminology statements to specify a valueset.
-  - Example: `terminology "BMI Valueset" valueset "bmi valueset".`
+  - Example: `terminology "BMI Valueset" valueset `bmi valueset`.`
 
 - **when**: Used in decision statements to introduce a condition.
   - Example: `when "BMI > 30" then do "Propose Diagnosis Task".`
+
+- **with**: Used in activity statements to specify a value or reference.
+  - Example: `activity "Indicate" perform CPGProposeDiagnosis with "Colonoscopy".`
 
 ## Valid Types
 
 ### Activity Types
 The following are valid activity types (case sensitive):
-- CPGCommunicationRequest
-- CPGCollectInformation
-- CPGEnrollment
-- CPGGenerateReport
-- CPGMedicationRequest
-- CPGDispenseMedication
 - CPGAdministerMedication
-- CPGDocumentMedication
-- CPGImmunizationRequest
-- CPGServiceRequest
-- CPGProposeDiagnosisTask
-- CPGRecordDetectedIssue
+- CPGCollectInformation
+- CPGCommunicationRequest
+- CPGDispenseMedication
 - CPGRecordInference
 - CPGReportFlagTask
+- CPGServiceRequest
 
 Example:
 ```cpgl
@@ -372,50 +369,60 @@ activity "Vaccinate" perform CPGImmunizationRequest.
 
 ### Concept Types
 The following are valid concept types (case sensitive):
+- AdverseEvent
+- AllergyIntolerance
+- ClinicalImpression
 - Communication
 - CommunicationRequest
 - Condition
-- QuestionnaireTask
-- QuestionnaireResponse
-- MedicationRequest
-- MedicationDispense
-- MedicationAdministration
-- MedicationStatement
-- ImmunizationRequest
+- DetectedIssue
+- Device
+- DiagnosticReport
+- Encounter
+- FamilyMemberHistory
+- Goal
 - Immunization
-- ServiceRequest
-- Procedure
+- MedicationAdministration
+- MedicationDispense
+- MedicationRequest
+- NutritionIntake
+- NutritionOrder
 - Observation
+- Procedure
+- QuestionnaireResponse
+- RiskAssessment
+- ServiceRequest
+- Task
 
 Example:
 ```cpgl
 concept "BMI Range as a Condition":
-  has type Condition.
-  has valuetype CodeableConcept.
-  coded by "BMI Valueset".
+  type is Condition.
+  valuetype is CodeableConcept.
+  coded from "BMI Valueset".
 done
 ```
 
 ### Concept Value Types
 The following are valid concept value types (case sensitive):
-- Quantity
-- CodeableConcept
-- string
+- Attachment
 - boolean
+- CodeableConcept
+- dateTime
 - integer
+- Period
+- Quantity
 - Range
 - Ratio
 - SampledData
+- string
 - time
-- dateTime
-- Period
-- Attachment
 
 Example:
 ```cpgl
 concept "BMI":
-  has type Observation.
-  has valuetype Quantity.
-  inferred by ("BMI Range as a Condition" or "BMI as an Observation" or "Calculated BMI").
+  type is Observation.
+  valuetype is Quantity.
+  inferred from ("BMI Range as a Condition" or "BMI as an Observation" or "Calculated BMI").
 done
 ``` 
