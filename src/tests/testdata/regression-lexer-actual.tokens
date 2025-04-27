@@ -1,5 +1,5 @@
 
-> @smiledigitalhealth/cpgl@0.5.3 cli:lexer
+> @smiledigitalhealth/cpgl@0.5.4 cli:lexer
 > ts-node src/cli/run-lexer.ts D:\src\clinical-practice-guideline-language\src\tests\testdata\smart-example-immz
 
 [
@@ -1219,29 +1219,29 @@
     "line": 71,
     "column": 9,
     "type": "QUOTED_STRING",
-    "text": "\"Contraindication Evaluation of the MCV dose\""
+    "text": "\"Contraindication Evaluation with the MCV dose\""
   },
   {
     "line": 71,
-    "column": 55,
+    "column": 57,
     "type": "THEN",
     "text": "then"
   },
   {
     "line": 71,
-    "column": 60,
+    "column": 62,
     "type": "DO",
     "text": "do"
   },
   {
     "line": 71,
-    "column": 63,
+    "column": 65,
     "type": "QUOTED_STRING",
     "text": "\"Evaluate Contraindication for Measles\""
   },
   {
     "line": 71,
-    "column": 102,
+    "column": 104,
     "type": "DOT",
     "text": "."
   },
@@ -1434,18 +1434,18 @@
   {
     "line": 95,
     "column": 4,
-    "type": "OF",
-    "text": "of"
+    "type": "WITH",
+    "text": "with"
   },
   {
     "line": 95,
-    "column": 7,
+    "column": 9,
     "type": "BACKTICK_STRING",
-    "text": "`Should not vaccinate client for MCV0 as client is less than 6 months. Check for any vaccines due, and inform the caregiver of when to come back for MCV0.`"
+    "text": "`Should not vaccinate client for MCV0 as client is less than 6 months. Check for any vaccines due, and inform the caregiver with when to come back for MCV0.`"
   },
   {
     "line": 95,
-    "column": 162,
+    "column": 166,
     "type": "DOT",
     "text": "."
   },
@@ -1476,18 +1476,18 @@
   {
     "line": 99,
     "column": 4,
-    "type": "OF",
-    "text": "of"
+    "type": "WITH",
+    "text": "with"
   },
   {
     "line": 99,
-    "column": 7,
+    "column": 9,
     "type": "BACKTICK_STRING",
-    "text": "`Should not vaccinate client for MCV0 as live vaccine was administered in the last 4 weeks. Check for any vaccines due, and inform the caregiver of when to come back for MCV0.`"
+    "text": "`Should not vaccinate client for MCV0 as live vaccine was administered in the last 4 weeks. Check for any vaccines due, and inform the caregiver with when to come back for MCV0.`"
   },
   {
     "line": 99,
-    "column": 183,
+    "column": 187,
     "type": "DOT",
     "text": "."
   },
@@ -1518,18 +1518,18 @@
   {
     "line": 102,
     "column": 33,
-    "type": "OF",
-    "text": "of"
+    "type": "WITH",
+    "text": "with"
   },
   {
     "line": 102,
-    "column": 36,
+    "column": 38,
     "type": "QUOTED_STRING",
     "text": "\"Measles vaccines\""
   },
   {
     "line": 102,
-    "column": 54,
+    "column": 56,
     "type": "DOT",
     "text": "."
   },
@@ -1560,18 +1560,18 @@
   {
     "line": 105,
     "column": 36,
-    "type": "OF",
-    "text": "of"
+    "type": "WITH",
+    "text": "with"
   },
   {
     "line": 105,
-    "column": 39,
+    "column": 41,
     "type": "BACKTICK_STRING",
     "text": "`MCV0 was administered. Check measles routine immunization schedule.`"
   },
   {
     "line": 105,
-    "column": 108,
+    "column": 110,
     "type": "DOT",
     "text": "."
   },
@@ -1602,18 +1602,18 @@
   {
     "line": 109,
     "column": 4,
-    "type": "OF",
-    "text": "of"
+    "type": "WITH",
+    "text": "with"
   },
   {
     "line": 109,
-    "column": 7,
+    "column": 9,
     "type": "BACKTICK_STRING",
-    "text": "`Should not vaccinate client as client's age is less than 12 months. Check for any vaccines due, and inform the caregiver of when to come back for MCV1.`"
+    "text": "`Should not vaccinate client as client's age is less than 12 months. Check for any vaccines due, and inform the caregiver with when to come back for MCV1.`"
   },
   {
     "line": 109,
-    "column": 160,
+    "column": 164,
     "type": "DOT",
     "text": "."
   },
@@ -1644,18 +1644,18 @@
   {
     "line": 113,
     "column": 4,
-    "type": "OF",
-    "text": "of"
+    "type": "WITH",
+    "text": "with"
   },
   {
     "line": 113,
-    "column": 7,
+    "column": 9,
     "type": "BACKTICK_STRING",
-    "text": "`Should not vaccinate client for MCV1 as live vaccine was administered in the last 4 weeks. Check for any vaccines due and inform the caregiver of when to come back for MCV1.`"
+    "text": "`Should not vaccinate client for MCV1 as live vaccine was administered in the last 4 weeks. Check for any vaccines due and inform the caregiver with when to come back for MCV1.`"
   },
   {
     "line": 113,
-    "column": 182,
+    "column": 186,
     "type": "DOT",
     "text": "."
   },
@@ -1686,18 +1686,18 @@
   {
     "line": 117,
     "column": 4,
-    "type": "OF",
-    "text": "of"
+    "type": "WITH",
+    "text": "with"
   },
   {
     "line": 117,
-    "column": 7,
+    "column": 9,
     "type": "BACKTICK_STRING",
-    "text": "`Should not vaccinate client for MCV2 as client's age is less than 15 months. Check for any vaccines due, and inform the caregiver of when to come back for MCV2.`"
+    "text": "`Should not vaccinate client for MCV2 as client's age is less than 15 months. Check for any vaccines due, and inform the caregiver with when to come back for MCV2.`"
   },
   {
     "line": 117,
-    "column": 169,
+    "column": 173,
     "type": "DOT",
     "text": "."
   },
@@ -1728,18 +1728,18 @@
   {
     "line": 121,
     "column": 4,
-    "type": "OF",
-    "text": "of"
+    "type": "WITH",
+    "text": "with"
   },
   {
     "line": 121,
-    "column": 7,
+    "column": 9,
     "type": "BACKTICK_STRING",
-    "text": "`Should not vaccinate client for MCV2 as live vaccine was administered in the last 4 weeks. Check for any vaccines due, and inform the caregiver of when to come back for MCV2.`"
+    "text": "`Should not vaccinate client for MCV2 as live vaccine was administered in the last 4 weeks. Check for any vaccines due, and inform the caregiver with when to come back for MCV2.`"
   },
   {
     "line": 121,
-    "column": 183,
+    "column": 187,
     "type": "DOT",
     "text": "."
   },
@@ -1770,12 +1770,12 @@
   {
     "line": 125,
     "column": 4,
-    "type": "OF",
-    "text": "of"
+    "type": "WITH",
+    "text": "with"
   },
   {
     "line": 125,
-    "column": 7,
+    "column": 9,
     "type": "BACKTICK_STRING",
     "text": "`Measles primary series is complete. Two measles primary series doses were administered. Check if a measles supplementary dose is appropriate for the client.`"
   },
@@ -1789,11 +1789,11 @@
     "line": 126,
     "column": 12,
     "type": "BACKTICK_STRING",
-    "text": "`An additional dose of MCV should be administered to HIV-infected children receiving HAART following immune reconstitution. If CD4+ T lymphocyte counts are monitored, an additional dose of MCV should be administered when immune reconstitution has been achieved, e.g. when the CD4+ T lymphocyte count reaches 20–25%. Where CD4+ T lymphocyte monitoring is not available, children should receive an additional dose of MCV 6–12 months after initiation of HAART.`"
+    "text": "`An additional dose with MCV should be administered to HIV-infected children receiving HAART following immune reconstitution. If CD4+ T lymphocyte counts are monitored, an additional dose with MCV should be administered when immune reconstitution has been achieved, e.g. when the CD4+ T lymphocyte count reaches 20–25%. Where CD4+ T lymphocyte monitoring is not available, children should receive an additional dose with MCV 6–12 months after initiation with HAART.`"
   },
   {
     "line": 126,
-    "column": 470,
+    "column": 478,
     "type": "DOT",
     "text": "."
   },
@@ -1824,18 +1824,18 @@
   {
     "line": 130,
     "column": 4,
-    "type": "OF",
-    "text": "of"
+    "type": "WITH",
+    "text": "with"
   },
   {
     "line": 130,
-    "column": 7,
+    "column": 9,
     "type": "BACKTICK_STRING",
-    "text": "`Should not vaccinate client as client's age is less than 9 months. Check for any vaccines due, and inform the caregiver of when to come back for MCV1.`"
+    "text": "`Should not vaccinate client as client's age is less than 9 months. Check for any vaccines due, and inform the caregiver with when to come back for MCV1.`"
   },
   {
     "line": 130,
-    "column": 159,
+    "column": 163,
     "type": "DOT",
     "text": "."
   },
@@ -1866,12 +1866,12 @@
   {
     "line": 134,
     "column": 4,
-    "type": "OF",
-    "text": "of"
+    "type": "WITH",
+    "text": "with"
   },
   {
     "line": 134,
-    "column": 7,
+    "column": 9,
     "type": "BACKTICK_STRING",
     "text": "`Measles primary series is complete. Two measles primary series doses were administered. Check if a measles supplementary dose is appropriate for the client.`"
   },
@@ -1885,11 +1885,11 @@
     "line": 135,
     "column": 12,
     "type": "BACKTICK_STRING",
-    "text": "`An additional dose of MCV should be administered to HIV-infected children receiving HAART following immune reconstitution. If CD4+ T lymphocyte counts are monitored, an additional dose of MCV should be administered when immune reconstitution has been achieved, e.g. when the CD4+ T lymphocyte count reaches 20–25%. Where CD4+ T lymphocyte monitoring is not available, children should receive an additional dose of MCV 6–12 months after initiation of HAART.`"
+    "text": "`An additional dose with MCV should be administered to HIV-infected children receiving HAART following immune reconstitution. If CD4+ T lymphocyte counts are monitored, an additional dose with MCV should be administered when immune reconstitution has been achieved, e.g. when the CD4+ T lymphocyte count reaches 20–25%. Where CD4+ T lymphocyte monitoring is not available, children should receive an additional dose with MCV 6–12 months after initiation with HAART.`"
   },
   {
     "line": 135,
-    "column": 470,
+    "column": 478,
     "type": "DOT",
     "text": "."
   },
@@ -1920,18 +1920,18 @@
   {
     "line": 139,
     "column": 4,
-    "type": "OF",
-    "text": "of"
+    "type": "WITH",
+    "text": "with"
   },
   {
     "line": 139,
-    "column": 7,
+    "column": 9,
     "type": "BACKTICK_STRING",
-    "text": "`Should not vaccinate client for measles supplementary dose as live vaccine was administered in the last 4 weeks. Check for any vaccines due, and inform the caregiver of when to come back for supplementary dose.`"
+    "text": "`Should not vaccinate client for measles supplementary dose as live vaccine was administered in the last 4 weeks. Check for any vaccines due, and inform the caregiver with when to come back for supplementary dose.`"
   },
   {
     "line": 139,
-    "column": 219,
+    "column": 223,
     "type": "DOT",
     "text": "."
   },
@@ -1962,18 +1962,18 @@
   {
     "line": 143,
     "column": 4,
-    "type": "OF",
-    "text": "of"
+    "type": "WITH",
+    "text": "with"
   },
   {
     "line": 143,
-    "column": 7,
+    "column": 9,
     "type": "BACKTICK_STRING",
     "text": "`Measles immunization schedule is complete. Measles supplementary dose was administered.`"
   },
   {
     "line": 143,
-    "column": 96,
+    "column": 98,
     "type": "DOT",
     "text": "."
   },
@@ -2004,12 +2004,12 @@
   {
     "line": 146,
     "column": 33,
-    "type": "OF",
-    "text": "of"
+    "type": "WITH",
+    "text": "with"
   },
   {
     "line": 146,
-    "column": 36,
+    "column": 38,
     "type": "QUOTED_STRING",
     "text": "\"Measles vaccines\""
   },
@@ -2058,12 +2058,12 @@
   {
     "line": 150,
     "column": 30,
-    "type": "OF",
-    "text": "of"
+    "type": "WITH",
+    "text": "with"
   },
   {
     "line": 150,
-    "column": 33,
+    "column": 35,
     "type": "QUOTED_STRING",
     "text": "\"Measles Code\""
   },
@@ -2106,48 +2106,48 @@
   {
     "line": 155,
     "column": 4,
-    "type": "HAS",
-    "text": "has"
-  },
-  {
-    "line": 155,
-    "column": 8,
     "type": "TYPE",
     "text": "type"
   },
   {
     "line": 155,
-    "column": 13,
+    "column": 9,
+    "type": "IS",
+    "text": "is"
+  },
+  {
+    "line": 155,
+    "column": 12,
     "type": "CONCEPT_TYPE",
     "text": "Observation"
   },
   {
     "line": 155,
-    "column": 24,
+    "column": 23,
     "type": "DOT",
     "text": "."
   },
   {
     "line": 156,
     "column": 4,
-    "type": "HAS",
-    "text": "has"
-  },
-  {
-    "line": 156,
-    "column": 8,
     "type": "VALUETYPE",
     "text": "valuetype"
   },
   {
     "line": 156,
-    "column": 18,
+    "column": 14,
+    "type": "IS",
+    "text": "is"
+  },
+  {
+    "line": 156,
+    "column": 17,
     "type": "CONCEPT_VALUE_TYPE",
     "text": "boolean"
   },
   {
     "line": 156,
-    "column": 25,
+    "column": 24,
     "type": "DOT",
     "text": "."
   },
@@ -2160,18 +2160,18 @@
   {
     "line": 157,
     "column": 10,
-    "type": "BY",
-    "text": "by"
+    "type": "FROM",
+    "text": "from"
   },
   {
     "line": 157,
-    "column": 13,
+    "column": 15,
     "type": "QUOTED_STRING",
     "text": "\"Measles Routine Immunization Schedule Incomplete\""
   },
   {
     "line": 157,
-    "column": 63,
+    "column": 65,
     "type": "DOT",
     "text": "."
   },
@@ -2202,48 +2202,48 @@
   {
     "line": 161,
     "column": 4,
-    "type": "HAS",
-    "text": "has"
-  },
-  {
-    "line": 161,
-    "column": 8,
     "type": "TYPE",
     "text": "type"
   },
   {
     "line": 161,
-    "column": 13,
+    "column": 9,
+    "type": "IS",
+    "text": "is"
+  },
+  {
+    "line": 161,
+    "column": 12,
     "type": "CONCEPT_TYPE",
     "text": "Observation"
   },
   {
     "line": 161,
-    "column": 24,
+    "column": 23,
     "type": "DOT",
     "text": "."
   },
   {
     "line": 162,
     "column": 4,
-    "type": "HAS",
-    "text": "has"
-  },
-  {
-    "line": 162,
-    "column": 8,
     "type": "VALUETYPE",
     "text": "valuetype"
   },
   {
     "line": 162,
-    "column": 18,
+    "column": 14,
+    "type": "IS",
+    "text": "is"
+  },
+  {
+    "line": 162,
+    "column": 17,
     "type": "CONCEPT_VALUE_TYPE",
     "text": "boolean"
   },
   {
     "line": 162,
-    "column": 25,
+    "column": 24,
     "type": "DOT",
     "text": "."
   },
@@ -2256,18 +2256,18 @@
   {
     "line": 163,
     "column": 10,
-    "type": "BY",
-    "text": "by"
+    "type": "FROM",
+    "text": "from"
   },
   {
     "line": 163,
-    "column": 13,
+    "column": 15,
     "type": "QUOTED_STRING",
     "text": "\"No MCV0 Doses Administered\""
   },
   {
     "line": 163,
-    "column": 41,
+    "column": 43,
     "type": "DOT",
     "text": "."
   },
@@ -2298,48 +2298,48 @@
   {
     "line": 167,
     "column": 4,
-    "type": "HAS",
-    "text": "has"
-  },
-  {
-    "line": 167,
-    "column": 8,
     "type": "TYPE",
     "text": "type"
   },
   {
     "line": 167,
-    "column": 13,
+    "column": 9,
+    "type": "IS",
+    "text": "is"
+  },
+  {
+    "line": 167,
+    "column": 12,
     "type": "CONCEPT_TYPE",
     "text": "Observation"
   },
   {
     "line": 167,
-    "column": 24,
+    "column": 23,
     "type": "DOT",
     "text": "."
   },
   {
     "line": 168,
     "column": 4,
-    "type": "HAS",
-    "text": "has"
-  },
-  {
-    "line": 168,
-    "column": 8,
     "type": "VALUETYPE",
     "text": "valuetype"
   },
   {
     "line": 168,
-    "column": 18,
+    "column": 14,
+    "type": "IS",
+    "text": "is"
+  },
+  {
+    "line": 168,
+    "column": 17,
     "type": "CONCEPT_VALUE_TYPE",
     "text": "boolean"
   },
   {
     "line": 168,
-    "column": 25,
+    "column": 24,
     "type": "DOT",
     "text": "."
   },
@@ -2352,18 +2352,18 @@
   {
     "line": 169,
     "column": 10,
-    "type": "BY",
-    "text": "by"
+    "type": "FROM",
+    "text": "from"
   },
   {
     "line": 169,
-    "column": 13,
+    "column": 15,
     "type": "QUOTED_STRING",
     "text": "\"Client Age Less Than 6 Months\""
   },
   {
     "line": 169,
-    "column": 44,
+    "column": 46,
     "type": "DOT",
     "text": "."
   },
@@ -2394,48 +2394,48 @@
   {
     "line": 173,
     "column": 4,
-    "type": "HAS",
-    "text": "has"
-  },
-  {
-    "line": 173,
-    "column": 8,
     "type": "TYPE",
     "text": "type"
   },
   {
     "line": 173,
-    "column": 13,
+    "column": 9,
+    "type": "IS",
+    "text": "is"
+  },
+  {
+    "line": 173,
+    "column": 12,
     "type": "CONCEPT_TYPE",
     "text": "Observation"
   },
   {
     "line": 173,
-    "column": 24,
+    "column": 23,
     "type": "DOT",
     "text": "."
   },
   {
     "line": 174,
     "column": 4,
-    "type": "HAS",
-    "text": "has"
-  },
-  {
-    "line": 174,
-    "column": 8,
     "type": "VALUETYPE",
     "text": "valuetype"
   },
   {
     "line": 174,
-    "column": 18,
+    "column": 14,
+    "type": "IS",
+    "text": "is"
+  },
+  {
+    "line": 174,
+    "column": 17,
     "type": "CONCEPT_VALUE_TYPE",
     "text": "boolean"
   },
   {
     "line": 174,
-    "column": 25,
+    "column": 24,
     "type": "DOT",
     "text": "."
   },
@@ -2448,18 +2448,18 @@
   {
     "line": 175,
     "column": 10,
-    "type": "BY",
-    "text": "by"
+    "type": "FROM",
+    "text": "from"
   },
   {
     "line": 175,
-    "column": 13,
+    "column": 15,
     "type": "QUOTED_STRING",
     "text": "\"Last Live Vaccine Administered Within 4 Weeks\""
   },
   {
     "line": 175,
-    "column": 60,
+    "column": 62,
     "type": "DOT",
     "text": "."
   },
@@ -2490,48 +2490,48 @@
   {
     "line": 179,
     "column": 4,
-    "type": "HAS",
-    "text": "has"
-  },
-  {
-    "line": 179,
-    "column": 8,
     "type": "TYPE",
     "text": "type"
   },
   {
     "line": 179,
-    "column": 13,
+    "column": 9,
+    "type": "IS",
+    "text": "is"
+  },
+  {
+    "line": 179,
+    "column": 12,
     "type": "CONCEPT_TYPE",
     "text": "Observation"
   },
   {
     "line": 179,
-    "column": 24,
+    "column": 23,
     "type": "DOT",
     "text": "."
   },
   {
     "line": 180,
     "column": 4,
-    "type": "HAS",
-    "text": "has"
-  },
-  {
-    "line": 180,
-    "column": 8,
     "type": "VALUETYPE",
     "text": "valuetype"
   },
   {
     "line": 180,
-    "column": 18,
+    "column": 14,
+    "type": "IS",
+    "text": "is"
+  },
+  {
+    "line": 180,
+    "column": 17,
     "type": "CONCEPT_VALUE_TYPE",
     "text": "boolean"
   },
   {
     "line": 180,
-    "column": 25,
+    "column": 24,
     "type": "DOT",
     "text": "."
   },
@@ -2544,18 +2544,18 @@
   {
     "line": 181,
     "column": 10,
-    "type": "BY",
-    "text": "by"
+    "type": "FROM",
+    "text": "from"
   },
   {
     "line": 181,
-    "column": 13,
+    "column": 15,
     "type": "QUOTED_STRING",
     "text": "\"Client Is Due For MCV0\""
   },
   {
     "line": 181,
-    "column": 37,
+    "column": 39,
     "type": "DOT",
     "text": "."
   },
@@ -2586,48 +2586,48 @@
   {
     "line": 185,
     "column": 4,
-    "type": "HAS",
-    "text": "has"
-  },
-  {
-    "line": 185,
-    "column": 8,
     "type": "TYPE",
     "text": "type"
   },
   {
     "line": 185,
-    "column": 13,
+    "column": 9,
+    "type": "IS",
+    "text": "is"
+  },
+  {
+    "line": 185,
+    "column": 12,
     "type": "CONCEPT_TYPE",
     "text": "Observation"
   },
   {
     "line": 185,
-    "column": 24,
+    "column": 23,
     "type": "DOT",
     "text": "."
   },
   {
     "line": 186,
     "column": 4,
-    "type": "HAS",
-    "text": "has"
-  },
-  {
-    "line": 186,
-    "column": 8,
     "type": "VALUETYPE",
     "text": "valuetype"
   },
   {
     "line": 186,
-    "column": 18,
+    "column": 14,
+    "type": "IS",
+    "text": "is"
+  },
+  {
+    "line": 186,
+    "column": 17,
     "type": "CONCEPT_VALUE_TYPE",
     "text": "boolean"
   },
   {
     "line": 186,
-    "column": 25,
+    "column": 24,
     "type": "DOT",
     "text": "."
   },
@@ -2640,18 +2640,18 @@
   {
     "line": 187,
     "column": 10,
-    "type": "BY",
-    "text": "by"
+    "type": "FROM",
+    "text": "from"
   },
   {
     "line": 187,
-    "column": 13,
+    "column": 15,
     "type": "QUOTED_STRING",
     "text": "\"MCV0 Dose Administered\""
   },
   {
     "line": 187,
-    "column": 37,
+    "column": 39,
     "type": "DOT",
     "text": "."
   },
@@ -2682,48 +2682,48 @@
   {
     "line": 191,
     "column": 4,
-    "type": "HAS",
-    "text": "has"
-  },
-  {
-    "line": 191,
-    "column": 8,
     "type": "TYPE",
     "text": "type"
   },
   {
     "line": 191,
-    "column": 13,
+    "column": 9,
+    "type": "IS",
+    "text": "is"
+  },
+  {
+    "line": 191,
+    "column": 12,
     "type": "CONCEPT_TYPE",
     "text": "Observation"
   },
   {
     "line": 191,
-    "column": 24,
+    "column": 23,
     "type": "DOT",
     "text": "."
   },
   {
     "line": 192,
     "column": 4,
-    "type": "HAS",
-    "text": "has"
-  },
-  {
-    "line": 192,
-    "column": 8,
     "type": "VALUETYPE",
     "text": "valuetype"
   },
   {
     "line": 192,
-    "column": 18,
+    "column": 14,
+    "type": "IS",
+    "text": "is"
+  },
+  {
+    "line": 192,
+    "column": 17,
     "type": "CONCEPT_VALUE_TYPE",
     "text": "boolean"
   },
   {
     "line": 192,
-    "column": 25,
+    "column": 24,
     "type": "DOT",
     "text": "."
   },
@@ -2736,18 +2736,18 @@
   {
     "line": 193,
     "column": 10,
-    "type": "BY",
-    "text": "by"
+    "type": "FROM",
+    "text": "from"
   },
   {
     "line": 193,
-    "column": 13,
+    "column": 15,
     "type": "QUOTED_STRING",
     "text": "\"No Primary Series Doses Administered\""
   },
   {
     "line": 193,
-    "column": 51,
+    "column": 53,
     "type": "DOT",
     "text": "."
   },
@@ -2778,48 +2778,48 @@
   {
     "line": 197,
     "column": 4,
-    "type": "HAS",
-    "text": "has"
-  },
-  {
-    "line": 197,
-    "column": 8,
     "type": "TYPE",
     "text": "type"
   },
   {
     "line": 197,
-    "column": 13,
+    "column": 9,
+    "type": "IS",
+    "text": "is"
+  },
+  {
+    "line": 197,
+    "column": 12,
     "type": "CONCEPT_TYPE",
     "text": "Observation"
   },
   {
     "line": 197,
-    "column": 24,
+    "column": 23,
     "type": "DOT",
     "text": "."
   },
   {
     "line": 198,
     "column": 4,
-    "type": "HAS",
-    "text": "has"
-  },
-  {
-    "line": 198,
-    "column": 8,
     "type": "VALUETYPE",
     "text": "valuetype"
   },
   {
     "line": 198,
-    "column": 18,
+    "column": 14,
+    "type": "IS",
+    "text": "is"
+  },
+  {
+    "line": 198,
+    "column": 17,
     "type": "CONCEPT_VALUE_TYPE",
     "text": "boolean"
   },
   {
     "line": 198,
-    "column": 25,
+    "column": 24,
     "type": "DOT",
     "text": "."
   },
@@ -2832,18 +2832,18 @@
   {
     "line": 199,
     "column": 10,
-    "type": "BY",
-    "text": "by"
+    "type": "FROM",
+    "text": "from"
   },
   {
     "line": 199,
-    "column": 13,
+    "column": 15,
     "type": "QUOTED_STRING",
     "text": "\"Client Age Less Than 12 Months\""
   },
   {
     "line": 199,
-    "column": 45,
+    "column": 47,
     "type": "DOT",
     "text": "."
   },
@@ -2874,48 +2874,48 @@
   {
     "line": 203,
     "column": 4,
-    "type": "HAS",
-    "text": "has"
-  },
-  {
-    "line": 203,
-    "column": 8,
     "type": "TYPE",
     "text": "type"
   },
   {
     "line": 203,
-    "column": 13,
+    "column": 9,
+    "type": "IS",
+    "text": "is"
+  },
+  {
+    "line": 203,
+    "column": 12,
     "type": "CONCEPT_TYPE",
     "text": "Observation"
   },
   {
     "line": 203,
-    "column": 24,
+    "column": 23,
     "type": "DOT",
     "text": "."
   },
   {
     "line": 204,
     "column": 4,
-    "type": "HAS",
-    "text": "has"
-  },
-  {
-    "line": 204,
-    "column": 8,
     "type": "VALUETYPE",
     "text": "valuetype"
   },
   {
     "line": 204,
-    "column": 18,
+    "column": 14,
+    "type": "IS",
+    "text": "is"
+  },
+  {
+    "line": 204,
+    "column": 17,
     "type": "CONCEPT_VALUE_TYPE",
     "text": "boolean"
   },
   {
     "line": 204,
-    "column": 25,
+    "column": 24,
     "type": "DOT",
     "text": "."
   },
@@ -2928,18 +2928,18 @@
   {
     "line": 205,
     "column": 10,
-    "type": "BY",
-    "text": "by"
+    "type": "FROM",
+    "text": "from"
   },
   {
     "line": 205,
-    "column": 13,
+    "column": 15,
     "type": "QUOTED_STRING",
     "text": "\"Client Is Due For MCV1\""
   },
   {
     "line": 205,
-    "column": 37,
+    "column": 39,
     "type": "DOT",
     "text": "."
   },
@@ -2970,48 +2970,48 @@
   {
     "line": 209,
     "column": 4,
-    "type": "HAS",
-    "text": "has"
-  },
-  {
-    "line": 209,
-    "column": 8,
     "type": "TYPE",
     "text": "type"
   },
   {
     "line": 209,
-    "column": 13,
+    "column": 9,
+    "type": "IS",
+    "text": "is"
+  },
+  {
+    "line": 209,
+    "column": 12,
     "type": "CONCEPT_TYPE",
     "text": "Observation"
   },
   {
     "line": 209,
-    "column": 24,
+    "column": 23,
     "type": "DOT",
     "text": "."
   },
   {
     "line": 210,
     "column": 4,
-    "type": "HAS",
-    "text": "has"
-  },
-  {
-    "line": 210,
-    "column": 8,
     "type": "VALUETYPE",
     "text": "valuetype"
   },
   {
     "line": 210,
-    "column": 18,
+    "column": 14,
+    "type": "IS",
+    "text": "is"
+  },
+  {
+    "line": 210,
+    "column": 17,
     "type": "CONCEPT_VALUE_TYPE",
     "text": "boolean"
   },
   {
     "line": 210,
-    "column": 25,
+    "column": 24,
     "type": "DOT",
     "text": "."
   },
@@ -3024,18 +3024,18 @@
   {
     "line": 211,
     "column": 10,
-    "type": "BY",
-    "text": "by"
+    "type": "FROM",
+    "text": "from"
   },
   {
     "line": 211,
-    "column": 13,
+    "column": 15,
     "type": "QUOTED_STRING",
     "text": "\"One Primary Series Dose Administered\""
   },
   {
     "line": 211,
-    "column": 51,
+    "column": 53,
     "type": "DOT",
     "text": "."
   },
@@ -3066,48 +3066,48 @@
   {
     "line": 215,
     "column": 4,
-    "type": "HAS",
-    "text": "has"
-  },
-  {
-    "line": 215,
-    "column": 8,
     "type": "TYPE",
     "text": "type"
   },
   {
     "line": 215,
-    "column": 13,
+    "column": 9,
+    "type": "IS",
+    "text": "is"
+  },
+  {
+    "line": 215,
+    "column": 12,
     "type": "CONCEPT_TYPE",
     "text": "Observation"
   },
   {
     "line": 215,
-    "column": 24,
+    "column": 23,
     "type": "DOT",
     "text": "."
   },
   {
     "line": 216,
     "column": 4,
-    "type": "HAS",
-    "text": "has"
-  },
-  {
-    "line": 216,
-    "column": 8,
     "type": "VALUETYPE",
     "text": "valuetype"
   },
   {
     "line": 216,
-    "column": 18,
+    "column": 14,
+    "type": "IS",
+    "text": "is"
+  },
+  {
+    "line": 216,
+    "column": 17,
     "type": "CONCEPT_VALUE_TYPE",
     "text": "boolean"
   },
   {
     "line": 216,
-    "column": 25,
+    "column": 24,
     "type": "DOT",
     "text": "."
   },
@@ -3120,18 +3120,18 @@
   {
     "line": 217,
     "column": 10,
-    "type": "BY",
-    "text": "by"
+    "type": "FROM",
+    "text": "from"
   },
   {
     "line": 217,
-    "column": 13,
+    "column": 15,
     "type": "QUOTED_STRING",
     "text": "\"Client Age Less Than 15 Months\""
   },
   {
     "line": 217,
-    "column": 45,
+    "column": 47,
     "type": "DOT",
     "text": "."
   },
@@ -3162,48 +3162,48 @@
   {
     "line": 221,
     "column": 4,
-    "type": "HAS",
-    "text": "has"
-  },
-  {
-    "line": 221,
-    "column": 8,
     "type": "TYPE",
     "text": "type"
   },
   {
     "line": 221,
-    "column": 13,
+    "column": 9,
+    "type": "IS",
+    "text": "is"
+  },
+  {
+    "line": 221,
+    "column": 12,
     "type": "CONCEPT_TYPE",
     "text": "Observation"
   },
   {
     "line": 221,
-    "column": 24,
+    "column": 23,
     "type": "DOT",
     "text": "."
   },
   {
     "line": 222,
     "column": 4,
-    "type": "HAS",
-    "text": "has"
-  },
-  {
-    "line": 222,
-    "column": 8,
     "type": "VALUETYPE",
     "text": "valuetype"
   },
   {
     "line": 222,
-    "column": 18,
+    "column": 14,
+    "type": "IS",
+    "text": "is"
+  },
+  {
+    "line": 222,
+    "column": 17,
     "type": "CONCEPT_VALUE_TYPE",
     "text": "boolean"
   },
   {
     "line": 222,
-    "column": 25,
+    "column": 24,
     "type": "DOT",
     "text": "."
   },
@@ -3216,18 +3216,18 @@
   {
     "line": 223,
     "column": 10,
-    "type": "BY",
-    "text": "by"
+    "type": "FROM",
+    "text": "from"
   },
   {
     "line": 223,
-    "column": 13,
+    "column": 15,
     "type": "QUOTED_STRING",
     "text": "\"Client Is Due For MCV2\""
   },
   {
     "line": 223,
-    "column": 37,
+    "column": 39,
     "type": "DOT",
     "text": "."
   },
@@ -3258,48 +3258,48 @@
   {
     "line": 227,
     "column": 4,
-    "type": "HAS",
-    "text": "has"
-  },
-  {
-    "line": 227,
-    "column": 8,
     "type": "TYPE",
     "text": "type"
   },
   {
     "line": 227,
-    "column": 13,
+    "column": 9,
+    "type": "IS",
+    "text": "is"
+  },
+  {
+    "line": 227,
+    "column": 12,
     "type": "CONCEPT_TYPE",
     "text": "Observation"
   },
   {
     "line": 227,
-    "column": 24,
+    "column": 23,
     "type": "DOT",
     "text": "."
   },
   {
     "line": 228,
     "column": 4,
-    "type": "HAS",
-    "text": "has"
-  },
-  {
-    "line": 228,
-    "column": 8,
     "type": "VALUETYPE",
     "text": "valuetype"
   },
   {
     "line": 228,
-    "column": 18,
+    "column": 14,
+    "type": "IS",
+    "text": "is"
+  },
+  {
+    "line": 228,
+    "column": 17,
     "type": "CONCEPT_VALUE_TYPE",
     "text": "boolean"
   },
   {
     "line": 228,
-    "column": 25,
+    "column": 24,
     "type": "DOT",
     "text": "."
   },
@@ -3312,18 +3312,18 @@
   {
     "line": 229,
     "column": 10,
-    "type": "BY",
-    "text": "by"
+    "type": "FROM",
+    "text": "from"
   },
   {
     "line": 229,
-    "column": 13,
+    "column": 15,
     "type": "QUOTED_STRING",
     "text": "\"Two Primary Series Doses Administered\""
   },
   {
     "line": 229,
-    "column": 52,
+    "column": 54,
     "type": "DOT",
     "text": "."
   },
@@ -3354,48 +3354,48 @@
   {
     "line": 233,
     "column": 4,
-    "type": "HAS",
-    "text": "has"
-  },
-  {
-    "line": 233,
-    "column": 8,
     "type": "TYPE",
     "text": "type"
   },
   {
     "line": 233,
-    "column": 13,
+    "column": 9,
+    "type": "IS",
+    "text": "is"
+  },
+  {
+    "line": 233,
+    "column": 12,
     "type": "CONCEPT_TYPE",
     "text": "Observation"
   },
   {
     "line": 233,
-    "column": 24,
+    "column": 23,
     "type": "DOT",
     "text": "."
   },
   {
     "line": 234,
     "column": 4,
-    "type": "HAS",
-    "text": "has"
-  },
-  {
-    "line": 234,
-    "column": 8,
     "type": "VALUETYPE",
     "text": "valuetype"
   },
   {
     "line": 234,
-    "column": 18,
+    "column": 14,
+    "type": "IS",
+    "text": "is"
+  },
+  {
+    "line": 234,
+    "column": 17,
     "type": "CONCEPT_VALUE_TYPE",
     "text": "boolean"
   },
   {
     "line": 234,
-    "column": 25,
+    "column": 24,
     "type": "DOT",
     "text": "."
   },
@@ -3408,18 +3408,18 @@
   {
     "line": 235,
     "column": 10,
-    "type": "BY",
-    "text": "by"
+    "type": "FROM",
+    "text": "from"
   },
   {
     "line": 235,
-    "column": 13,
+    "column": 15,
     "type": "QUOTED_STRING",
     "text": "\"Client Age Less Than 9 Months\""
   },
   {
     "line": 235,
-    "column": 44,
+    "column": 46,
     "type": "DOT",
     "text": "."
   },
@@ -3450,48 +3450,48 @@
   {
     "line": 239,
     "column": 4,
-    "type": "HAS",
-    "text": "has"
-  },
-  {
-    "line": 239,
-    "column": 8,
     "type": "TYPE",
     "text": "type"
   },
   {
     "line": 239,
-    "column": 13,
+    "column": 9,
+    "type": "IS",
+    "text": "is"
+  },
+  {
+    "line": 239,
+    "column": 12,
     "type": "CONCEPT_TYPE",
     "text": "Observation"
   },
   {
     "line": 239,
-    "column": 24,
+    "column": 23,
     "type": "DOT",
     "text": "."
   },
   {
     "line": 240,
     "column": 4,
-    "type": "HAS",
-    "text": "has"
-  },
-  {
-    "line": 240,
-    "column": 8,
     "type": "VALUETYPE",
     "text": "valuetype"
   },
   {
     "line": 240,
-    "column": 18,
+    "column": 14,
+    "type": "IS",
+    "text": "is"
+  },
+  {
+    "line": 240,
+    "column": 17,
     "type": "CONCEPT_VALUE_TYPE",
     "text": "boolean"
   },
   {
     "line": 240,
-    "column": 25,
+    "column": 24,
     "type": "DOT",
     "text": "."
   },
@@ -3504,18 +3504,18 @@
   {
     "line": 241,
     "column": 10,
-    "type": "BY",
-    "text": "by"
+    "type": "FROM",
+    "text": "from"
   },
   {
     "line": 241,
-    "column": 13,
+    "column": 15,
     "type": "QUOTED_STRING",
     "text": "\"Measles Routine Immunization Schedule Complete\""
   },
   {
     "line": 241,
-    "column": 61,
+    "column": 63,
     "type": "DOT",
     "text": "."
   },
@@ -3546,48 +3546,48 @@
   {
     "line": 245,
     "column": 4,
-    "type": "HAS",
-    "text": "has"
-  },
-  {
-    "line": 245,
-    "column": 8,
     "type": "TYPE",
     "text": "type"
   },
   {
     "line": 245,
-    "column": 13,
+    "column": 9,
+    "type": "IS",
+    "text": "is"
+  },
+  {
+    "line": 245,
+    "column": 12,
     "type": "CONCEPT_TYPE",
     "text": "Observation"
   },
   {
     "line": 245,
-    "column": 24,
+    "column": 23,
     "type": "DOT",
     "text": "."
   },
   {
     "line": 246,
     "column": 4,
-    "type": "HAS",
-    "text": "has"
-  },
-  {
-    "line": 246,
-    "column": 8,
     "type": "VALUETYPE",
     "text": "valuetype"
   },
   {
     "line": 246,
-    "column": 18,
+    "column": 14,
+    "type": "IS",
+    "text": "is"
+  },
+  {
+    "line": 246,
+    "column": 17,
     "type": "CONCEPT_VALUE_TYPE",
     "text": "boolean"
   },
   {
     "line": 246,
-    "column": 25,
+    "column": 24,
     "type": "DOT",
     "text": "."
   },
@@ -3600,18 +3600,18 @@
   {
     "line": 247,
     "column": 10,
-    "type": "BY",
-    "text": "by"
+    "type": "FROM",
+    "text": "from"
   },
   {
     "line": 247,
-    "column": 13,
+    "column": 15,
     "type": "QUOTED_STRING",
     "text": "\"No Supplementary Dose Administered\""
   },
   {
     "line": 247,
-    "column": 49,
+    "column": 51,
     "type": "DOT",
     "text": "."
   },
@@ -3642,48 +3642,48 @@
   {
     "line": 251,
     "column": 4,
-    "type": "HAS",
-    "text": "has"
-  },
-  {
-    "line": 251,
-    "column": 8,
     "type": "TYPE",
     "text": "type"
   },
   {
     "line": 251,
-    "column": 13,
+    "column": 9,
+    "type": "IS",
+    "text": "is"
+  },
+  {
+    "line": 251,
+    "column": 12,
     "type": "CONCEPT_TYPE",
     "text": "Observation"
   },
   {
     "line": 251,
-    "column": 24,
+    "column": 23,
     "type": "DOT",
     "text": "."
   },
   {
     "line": 252,
     "column": 4,
-    "type": "HAS",
-    "text": "has"
-  },
-  {
-    "line": 252,
-    "column": 8,
     "type": "VALUETYPE",
     "text": "valuetype"
   },
   {
     "line": 252,
-    "column": 18,
+    "column": 14,
+    "type": "IS",
+    "text": "is"
+  },
+  {
+    "line": 252,
+    "column": 17,
     "type": "CONCEPT_VALUE_TYPE",
     "text": "boolean"
   },
   {
     "line": 252,
-    "column": 25,
+    "column": 24,
     "type": "DOT",
     "text": "."
   },
@@ -3696,18 +3696,18 @@
   {
     "line": 253,
     "column": 10,
-    "type": "BY",
-    "text": "by"
+    "type": "FROM",
+    "text": "from"
   },
   {
     "line": 253,
-    "column": 13,
+    "column": 15,
     "type": "QUOTED_STRING",
     "text": "\"Client Is Due For Supplementary Dose\""
   },
   {
     "line": 253,
-    "column": 51,
+    "column": 53,
     "type": "DOT",
     "text": "."
   },
@@ -3738,48 +3738,48 @@
   {
     "line": 257,
     "column": 4,
-    "type": "HAS",
-    "text": "has"
-  },
-  {
-    "line": 257,
-    "column": 8,
     "type": "TYPE",
     "text": "type"
   },
   {
     "line": 257,
-    "column": 13,
+    "column": 9,
+    "type": "IS",
+    "text": "is"
+  },
+  {
+    "line": 257,
+    "column": 12,
     "type": "CONCEPT_TYPE",
     "text": "Observation"
   },
   {
     "line": 257,
-    "column": 24,
+    "column": 23,
     "type": "DOT",
     "text": "."
   },
   {
     "line": 258,
     "column": 4,
-    "type": "HAS",
-    "text": "has"
-  },
-  {
-    "line": 258,
-    "column": 8,
     "type": "VALUETYPE",
     "text": "valuetype"
   },
   {
     "line": 258,
-    "column": 18,
+    "column": 14,
+    "type": "IS",
+    "text": "is"
+  },
+  {
+    "line": 258,
+    "column": 17,
     "type": "CONCEPT_VALUE_TYPE",
     "text": "boolean"
   },
   {
     "line": 258,
-    "column": 25,
+    "column": 24,
     "type": "DOT",
     "text": "."
   },
@@ -3792,18 +3792,18 @@
   {
     "line": 259,
     "column": 10,
-    "type": "BY",
-    "text": "by"
+    "type": "FROM",
+    "text": "from"
   },
   {
     "line": 259,
-    "column": 13,
+    "column": 15,
     "type": "QUOTED_STRING",
     "text": "\"Supplementary Dose Administered\""
   },
   {
     "line": 259,
-    "column": 46,
+    "column": 48,
     "type": "DOT",
     "text": "."
   },
@@ -3834,48 +3834,48 @@
   {
     "line": 263,
     "column": 4,
-    "type": "HAS",
-    "text": "has"
-  },
-  {
-    "line": 263,
-    "column": 8,
     "type": "TYPE",
     "text": "type"
   },
   {
     "line": 263,
-    "column": 13,
+    "column": 9,
+    "type": "IS",
+    "text": "is"
+  },
+  {
+    "line": 263,
+    "column": 12,
     "type": "CONCEPT_TYPE",
     "text": "Observation"
   },
   {
     "line": 263,
-    "column": 24,
+    "column": 23,
     "type": "DOT",
     "text": "."
   },
   {
     "line": 264,
     "column": 4,
-    "type": "HAS",
-    "text": "has"
-  },
-  {
-    "line": 264,
-    "column": 8,
     "type": "VALUETYPE",
     "text": "valuetype"
   },
   {
     "line": 264,
-    "column": 18,
+    "column": 14,
+    "type": "IS",
+    "text": "is"
+  },
+  {
+    "line": 264,
+    "column": 17,
     "type": "CONCEPT_VALUE_TYPE",
     "text": "boolean"
   },
   {
     "line": 264,
-    "column": 25,
+    "column": 24,
     "type": "DOT",
     "text": "."
   },
@@ -3888,18 +3888,18 @@
   {
     "line": 265,
     "column": 10,
-    "type": "BY",
-    "text": "by"
+    "type": "FROM",
+    "text": "from"
   },
   {
     "line": 265,
-    "column": 13,
+    "column": 15,
     "type": "QUOTED_STRING",
     "text": "\"MCV Dose Contraindicated\""
   },
   {
     "line": 265,
-    "column": 39,
+    "column": 41,
     "type": "DOT",
     "text": "."
   },
@@ -3919,59 +3919,59 @@
     "line": 268,
     "column": 8,
     "type": "QUOTED_STRING",
-    "text": "\"Contraindication Evaluation of the MCV dose\""
+    "text": "\"Contraindication Evaluation with the MCV dose\""
   },
   {
     "line": 268,
-    "column": 53,
+    "column": 55,
     "type": "COLON",
     "text": ":"
   },
   {
     "line": 269,
     "column": 4,
-    "type": "HAS",
-    "text": "has"
-  },
-  {
-    "line": 269,
-    "column": 8,
     "type": "TYPE",
     "text": "type"
   },
   {
     "line": 269,
-    "column": 13,
+    "column": 9,
+    "type": "IS",
+    "text": "is"
+  },
+  {
+    "line": 269,
+    "column": 12,
     "type": "CONCEPT_TYPE",
     "text": "Observation"
   },
   {
     "line": 269,
-    "column": 24,
+    "column": 23,
     "type": "DOT",
     "text": "."
   },
   {
     "line": 270,
     "column": 4,
-    "type": "HAS",
-    "text": "has"
-  },
-  {
-    "line": 270,
-    "column": 8,
     "type": "VALUETYPE",
     "text": "valuetype"
   },
   {
     "line": 270,
-    "column": 18,
+    "column": 14,
+    "type": "IS",
+    "text": "is"
+  },
+  {
+    "line": 270,
+    "column": 17,
     "type": "CONCEPT_VALUE_TYPE",
     "text": "boolean"
   },
   {
     "line": 270,
-    "column": 25,
+    "column": 24,
     "type": "DOT",
     "text": "."
   },
@@ -3984,18 +3984,18 @@
   {
     "line": 271,
     "column": 10,
-    "type": "BY",
-    "text": "by"
+    "type": "FROM",
+    "text": "from"
   },
   {
     "line": 271,
-    "column": 13,
+    "column": 15,
     "type": "QUOTED_STRING",
-    "text": "\"Contraindication Evaluation of the MCV dose\""
+    "text": "\"Contraindication Evaluation with the MCV dose\""
   },
   {
     "line": 271,
-    "column": 58,
+    "column": 62,
     "type": "DOT",
     "text": "."
   },
@@ -4813,35 +4813,35 @@
     "line": 293,
     "column": 12,
     "type": "QUOTED_STRING",
-    "text": "\"Contraindication Evaluation of the MCV dose\""
+    "text": "\"Contraindication Evaluation with the MCV dose\""
   },
   {
     "line": 293,
-    "column": 58,
+    "column": 60,
     "type": "SYSTEM",
     "text": "system"
   },
   {
     "line": 293,
-    "column": 65,
+    "column": 67,
     "type": "BACKTICK_STRING",
     "text": "`http://sdh.com/cqis/kalm`"
   },
   {
     "line": 293,
-    "column": 92,
+    "column": 94,
     "type": "CODE",
     "text": "code"
   },
   {
     "line": 293,
-    "column": 97,
+    "column": 99,
     "type": "BACKTICK_STRING",
     "text": "`contraindication-evaluation-of-the-mcv-dose`"
   },
   {
     "line": 293,
-    "column": 142,
+    "column": 144,
     "type": "DOT",
     "text": "."
   },
