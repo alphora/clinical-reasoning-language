@@ -1,35 +1,37 @@
 lexer grammar CPGLLexer;
 
 // Keywords
-CONCEPT      : 'concept';
-TYPE         : 'type' -> mode(CONCEPT_MODE);
-VALUETYPE    : 'valuetype' -> mode(VALUE_TYPE_MODE);
-TERMINOLOGY  : 'terminology';
-PROVENANCE   : 'provenance';
-INFERRED     : 'inferred';
-AND          : 'and';
-OR           : 'or';
-NOT          : 'not';
-DONE         : 'done';
-HAS          : 'has';
-BY           : 'by';
-CODED        : 'coded';
-VALUESET     : 'valueset';
-PERFORM      : 'perform' -> mode(ACTIVITY_MODE);
 ACTIVITY     : 'activity';
-OF           : 'of';
-SYSTEM       : 'system';
-CODE         : 'code';
-DO           : 'do';
-USE          : 'use';
-WHEN         : 'when';
-THEN         : 'then';
-ANY          : 'any';
 ALL          : 'all';
-DECISION     : 'decision';
+AND          : 'and';
+ANY          : 'any';
+APPLY        : 'apply';
 BECAUSE      : 'because';
-// DO NOT remove as this is used by the lexer error listener.
-ERROR        : 'error';
+CODE         : 'code';
+CODED        : 'coded';
+CONCEPT      : 'concept';
+DECISION     : 'decision';
+DONE         : 'done';
+DO           : 'do';
+EVIDENCE     : 'evidence';
+FROM         : 'from';
+INFERRED     : 'inferred';
+IS           : 'is';
+NOT          : 'not';
+OR           : 'or';
+PATTERN      : 'pattern';
+PERFORM      : 'perform' -> mode(ACTIVITY_MODE);
+SYSTEM       : 'system';
+TERMINOLOGY  : 'terminology';
+THEN         : 'then';
+TYPE         : 'type' -> mode(CONCEPT_MODE);
+USE          : 'use';
+VALUETYPE    : 'valuetype' -> mode(VALUE_TYPE_MODE);
+VALUESET     : 'valueset';
+WHEN         : 'when';
+WITH         : 'with';
+
+ERROR        : 'error'; // DO NOT remove as this is used by the lexer error listener.
 
 // Punctuation
 COLON        : ':';

@@ -8,10 +8,10 @@ Quoted strings (not in comments) are identifiers.
 The inferred value describes concept derivation using logical operators and references, indicating how those referenced concepts collectively infer the target concept, not as a strictly evaluatable Boolean formula.
 The inferred value can have any number of concept identifiers.
 The keywords "any/all" are optional (if not present, defaults to any).
-The keyword "of" for activity is optional.
-The keyword "provenance" for concept is optional.
-One of either the keywords "inferred by" or "coded by" are required for concept.
-One of either the keywords "valueset", "unknown" or "system/code" are required for terminology.
+The keyword "with" for activity is optional.
+The keyword "evidence" for concept is optional.
+One of either the keywords "inferred from" or "coded from" are required for concept.
+One of either the keywords "valueset", `` (unknown) or "system/code" are required for terminology.
 A cpgl can have any number of decision, terminology, activity, concept.
 The example includes all options for valid statements.
 Anything not identified as optional here is required.
@@ -64,61 +64,93 @@ terminology "some terminology" ``.
 
 terminology "Colonoscopy" system `http://snomed.info/sct` code `73761001`.
 
-activity "Vaccinate" perform CPGImmunizationRequest. //CPGImmunizationRequest is an ACTIVITY_TYPE
+activity "Vaccinate" perform CPGImmunizationRequest. // CPGImmunizationRequest is an ACTIVITY_TYPE
 
-activity "Indicate" perform CPGProposeDiagnosis of "Colonoscopy". //of references a terminology (or string)
+activity "Indicate" perform CPGProposeDiagnosis with "Colonoscopy". // with references a terminology (or string)
 
-activity "another thing" perform CPGCommunicationRequest of `cql:Some CQL` because `it's the right thing to do`. //of references a string (or terminology)
+activity "another thing" perform CPGCommunicationRequest with `cql:Some CQL` because `it's the right thing to do`. //with references a string (or terminology)
 
 // comments go into the auto generated README and, CQL when applicable
 concept "Most Recent BMI":
-    has type Observation. //Observation is a CONCEPT_TYPE
-    has valuetype boolean. //boolean is a CONCEPT_VALUE_TYPE
-    has provenance `It's some provenance`.
-    inferred by "Most Recent(this, lookbackMonths)" "BMI". //"Most Recent" is a reference to a CQL expression (that will be resolved by the parser) and is optional.  "BMI" is a reference to another concept.
+    type is Observation. //Observation is a CONCEPT_TYPE
+    valuetype is boolean. //boolean is a CONCEPT_VALUE_TYPE
+    evidence is `It's some evidence`.
+    // gets a default local domain `coded from`
+    inferred from "BMI" apply pattern `Most Recent(this, lookbackMonths)`. //"Most Recent" is a reference to a CQL expression (that will be resolved by the parser) and is optional.  "BMI" is a reference to another concept.
 done
 
 concept "BMI":
-    has type Observation.
-    has valuetype Quantity.
-    inferred by ("BMI Range as a Condition" or "BMI as an Observation" or "Calculated BMI").
+    type is Observation.
+    valuetype is Quantity.
+    inferred from ("BMI Range as a Condition" or "BMI as an Observation" or "Calculated BMI").
 done
 
 concept "BMI Range as a Condition":
-    has type Condition.
-    has valuetype CodeableConcept.
-    coded by "BMI Range as a Condition". //"BMI Range as a Condition" is a reference to a terminology
+    type is Condition.
+    valuetype is CodeableConcept.
+    coded from "BMI Range as a Condition". //"BMI Range as a Condition" is a reference to a terminology
 done
 
 concept "BMI as an Observation":
-    has type Observation.
-    has valuetype Quantity.
-    coded by "BMI as an Observation".
+    type is Observation.
+    valuetype is Quantity.
+    coded from "BMI as an Observation".
 done
 
 concept "Calculated BMI":
-    has type Observation.
-    has valuetype Quantity.
+    type is Observation.
+    valuetype is Quantity.
     //calculate using (weight/height^2)
-    inferred by ("Patient Height" and "Patient Weight").
+    inferred from ("Patient Height" and "Patient Weight").
 done
 
 concept "Patient Height":
-    has type Observation.
-    has valuetype integer.
-    coded by "Height Valueset".
+    type is Observation.
+    valuetype is integer.
+    coded from "Height Valueset".
 done
 
 concept "Patient Weight":
-    has type Observation.
-    has valuetype integer.
-    coded by "Weight Valueset".
+    type is Observation.
+    valuetype is integer.
+    coded from "Weight Valueset".
 done
 
 concept "Client Age Greater Than 60":
-    has type Observation.
-    has valuetype boolean.
-    inferred by 
+    type is Observation.
+    valuetype is boolean.
+    inferred from 
+    (
+        (
+            ("a" and "b")
+            or (
+                ("c" and "d")
+                and not ("e" or "f")
+            )
+        )
+        or (
+            ("x" or "y")
+            and "z"
+        )
+        or "k"
+        or "l"
+    ).
+done
+
+/**
+This section (summary and metric) is under development.
+**/
+summary "some thing":
+    collects 
+    ("Weight Change" or "Urine Out")
+        or (
+            ("Net IO's" or "JVP")
+            or ("O2 Sat" or "Potassium")
+        ).
+done
+
+summary "some other thing":
+    collects 
     (
         (
             ("a" and "b")
@@ -136,36 +168,58 @@ concept "Client Age Greater Than 60":
     ).
 done
 
-// additional concepts...
+// measure
+metric "Colorectal Screening":
+    scoring is continuous-variable.  //optional
+    improvement is increase. // optional
+    evidence `because this fixes things` //optional
+    based on ("Initial Population" and "Numerator" and "Denominator").
+done
+
+metric "Initial Population"
+    based on ("Qualifying Encounter" and "Minimum Age").
+done
+
+metric "Denominator"
+    based on ("Initial Population").
+done
+
+metric "Numerator"
+    based on ("Colorectal Exam Within 10 Years").
+done
 
 /*
 keywords:
-decision
-when
-then
-done
-any
-do
-use
-all
 activity
-unknown
-system
+all
+and
+any
+apply
+because
 code
-perform
-of
 coded
 concept
-type
-valuetype
-terminology
-provenance
-inferred
-by
-and
-or
-valueset
+decision
+done
+do
+error
+evidence
+from
 has
+inferred
+not
+or
+pattern
+perform
+system
+terminology
+then
+type
+use
+valuetype
+valueset
+when
+with
 
 punctuation:
 :
@@ -174,7 +228,8 @@ punctuation:
 )
 
 tokens (non keyword/punctuation):
-STRING
+QUOTED_STRING
+BACKTICK_STRING
 COMMENT
 COMMENT_BLOCK
 ACTIVITY_TYPE
@@ -184,58 +239,65 @@ CONCEPT_VALUE_TYPE
 
 /*
 ACTIVITY_TYPE:
-      'CPGAdministerMedication'
-    | 'CPGCollectInformation'
-    | 'CPGCommunication'
-    | 'CPGDispenseMedication'
-    | 'CPGDocumentMedication'
-    | 'CPGEnrollment'
-    | 'CPGGenerateReport'
-    | 'CPGHold'
-    | 'CPGImmunizationRequest'
-    | 'CPGMedicationRequest'
-    | 'CPGProposeDiagnosis'
-    | 'CPGRecordDetectedIssue'
-    | 'CPGRecordInference'
-    | 'CPGReportFlag'
-    | 'CPGResume'
+      'CPGAdministerMedication',
+    | 'CPGCollectInformation',
+    | 'CPGCommunicationRequest',
+    | 'CPGDispenseMedication',
+    | 'CPGDocumentMedication',
+    | 'CPGEnrollment',
+    | 'CPGGenerateReport',
+    | 'CPGImmunizationRequest',
+    | 'CPGMedicationRequest',
+    | 'CPGProposeDiagnosisTask',
+    | 'CPGRecordDetectedIssue',
+    | 'CPGRecordInference',
+    | 'CPGReportFlagTask',
     | 'CPGServiceRequest'
-    | 'CPGStop'
     ;
 */
 
 /*
 CONCEPT_TYPE:
-      'Communication'
-    | 'CommunicationRequest'
-    | 'Condition'
-    | 'QuestionnaireTask'
-    | 'QuestionnaireResponse'
-    | 'MedicationRequest'
-    | 'MedicationDispense'
-    | 'MedicationAdministration'
-    | 'MedicationStatement'
-    | 'ImmunizationRequest'
-    | 'Immunization'
-    | 'ServiceRequest'
-    | 'Procedure'
-    | 'Observation'
+      'AdverseEvent',
+    | 'AllergyIntolerance',
+    | 'ClinicalImpression',
+    | 'Communication',
+    | 'CommunicationRequest',
+    | 'Condition',
+    | 'DetectedIssue',
+    | 'Device',
+    | 'DiagnosticReport',
+    | 'Encounter',
+    | 'FamilyMemberHistory',
+    | 'Goal',
+    | 'Immunization',
+    | 'MedicationAdministration',
+    | 'MedicationDispense',
+    | 'MedicationRequest',
+    | 'NutritionIntake',
+    | 'NutritionOrder',
+    | 'Observation',
+    | 'Procedure',
+    | 'QuestionnaireResponse',
+    | 'RiskAssessment',
+    | 'ServiceRequest',
+    | 'Task'
     ;
 */
 
 /*
 CONCEPT_VALUE_TYPE:
-      'Quantity'
-    | 'CodeableConcept'
-    | 'string'
-    | 'boolean'
-    | 'integer'
-    | 'Range'
-    | 'Ratio'
-    | 'SampledData'
+      'Attachment',
+    | 'boolean',
+    | 'CodeableConcept',
+    | 'dateTime',
+    | 'integer',
+    | 'Period',
+    | 'Quantity',
+    | 'Range',
+    | 'Ratio',
+    | 'SampledData',
+    | 'string',
     | 'time'
-    | 'dateTime'
-    | 'Period'
-    | 'Attachment'
     ;
 */
