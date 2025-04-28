@@ -268,3 +268,14 @@ Commits included since v0.5.3:
 - Addressed issues in lexer and related tests to ensure correct tokenization and test coverage. (rob-reynolds)
 
 ---
+ 
+## Unreleased 
+- Fixed bug where error handling wasn't adding detailed errors when they were thrown by the build or parse modules. (rob-reynolds, 2025-04-28)
+- Remove the validator test that was failing (rob-reynolds, 2025-04-27)
+- Update readme (rob-reynolds, 2025-04-27)
+- Restore dist/ to .gitignore after GitHub Publish (rob-reynolds, 2025-04-27)
+- 0.6.0 (rob-reynolds, 2025-04-27)
+- Include dist for GitHub Publish (rob-reynolds, 2025-04-27)
+- Comment build in unimplemented validator (rob-reynolds, 2025-04-27)
+- Updated documentation (rob-reynolds, 2025-04-27)
+- Update documentation (rob-reynolds, 2025-04-27)
