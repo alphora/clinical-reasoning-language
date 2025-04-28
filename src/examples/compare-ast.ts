@@ -1,7 +1,7 @@
 import { readFileSync } from "fs";
 import { join } from "path";
 
-import { CharStreams, CommonTokenStream } from "antlr4ts";
+import { CharStreams } from "antlr4ts";
 
 import { CPGLAstBuilder } from "../ast/builder";
 import { ASTNode, DoActivity, UseDecision, CPGL } from "../ast/types";
@@ -17,10 +17,9 @@ const input = readFileSync(examplePath, "utf-8");
 const lexer = new CPGLLexer(CharStreams.fromString(input));
 lexer.removeErrorListeners();
 lexer.addErrorListener(new CPGLLexerErrorListener());
-const tokenStream = new CommonTokenStream(lexer);
 
 // Create the parser
-const parser = createParser(tokenStream);
+const { parser } = createParser(input);
 
 // Parse the input
 const tree = parser.cpgl();
@@ -36,11 +35,11 @@ function printAST(node: ASTNode, indent = 0): string {
 
   // Print node-specific properties
   const properties = [
-    { key: "name", format: (value: string) => value },
-    { key: "decisionName", format: (value: string) => `"${value}"` },
-    { key: "activityName", format: (value: string) => `"${value}"` },
-    { key: "conceptName", format: (value: string) => `"${value}"` },
-    { key: "qualifier", format: (value: unknown) => `"${String(value)}"` },
+    { key: "name", format: (value: string): string => value },
+    { key: "decisionName", format: (value: string): string => `"${value}"` },
+    { key: "activityName", format: (value: string): string => `"${value}"` },
+    { key: "conceptName", format: (value: string): string => `"${value}"` },
+    { key: "qualifier", format: (value: unknown): string => `"${String(value)}"` },
   ];
 
   for (const { key, format } of properties) {

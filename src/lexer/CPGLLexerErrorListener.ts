@@ -49,7 +49,7 @@ export class CPGLLexerErrorListener implements ANTLRErrorListener<number> {
     return result;
   }
 
-  private getSpecificMessage(errorText: string, msg: string): string {
+  private getSpecificMessage(errorText: string, _msg: string): string {
     if (!this.validActivityTypes) {
       const errorMsg = [
         "activityTypes is undefined. This usually means the JSON file was not found or not imported correctly.",
@@ -112,9 +112,9 @@ export class CPGLLexerErrorListener implements ANTLRErrorListener<number> {
     errorText = this.parseQuotedString(input, errorText);
     const specificMessage = this.getSpecificMessage(errorText, msg);
 
-    let offendingDetails: any = { text: "unknown" };
+    let offendingDetails: unknown = { text: "unknown" };
     // If offendingSymbol is a Token, extract details
-    if (offendingSymbol && typeof (offendingSymbol as any).text === "string") {
+    if (offendingSymbol && typeof (offendingSymbol as unknown as Token).text === "string") {
       const token = offendingSymbol as unknown as Token;
       offendingDetails = {
         text: token.text,
@@ -167,7 +167,7 @@ export class CPGLLexerErrorListener implements ANTLRErrorListener<number> {
     return this.errors;
   }
 
-  public reportCustomError(line: number, column: number, message: string, details?: any): void {
+  public reportCustomError(line: number, column: number, message: string, details?: unknown): void {
     const errorMessage = JSON.stringify({
       type: "LexicalError",
       line,
