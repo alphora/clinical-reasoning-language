@@ -86,12 +86,15 @@ function emitWhenBlocksRecursive(
         // Calculate hasPlanDef for this node
         let hasPlanDef = false;
         if (canonicalValueStr) {
-          const referenced = (allInstances as { name: unknown; instanceOf?: string }[]).find(
-            (inst) =>
+          const referenced = (allInstances as unknown[]).find(
+            (inst): inst is { name: string; instanceOf?: string } =>
               typeof inst === "object" &&
               inst !== null &&
               "name" in inst &&
-              (inst as { name: unknown }).name === canonicalValueStr,
+              typeof (inst as { name: unknown }).name === "string" &&
+              (inst as { name: string }).name === canonicalValueStr &&
+              "instanceOf" in inst &&
+              typeof (inst as { instanceOf?: unknown }).instanceOf === "string",
           );
           if (
             referenced &&
@@ -139,12 +142,15 @@ function emitWhenBlocksRecursive(
       }
       let hasPlanDef = false;
       if (canonicalValueStr) {
-        const referenced = (allInstances as { name: unknown; instanceOf?: string }[]).find(
-          (inst) =>
+        const referenced = (allInstances as unknown[]).find(
+          (inst): inst is { name: string; instanceOf?: string } =>
             typeof inst === "object" &&
             inst !== null &&
             "name" in inst &&
-            (inst as { name: unknown }).name === canonicalValueStr,
+            typeof (inst as { name: unknown }).name === "string" &&
+            (inst as { name: string }).name === canonicalValueStr &&
+            "instanceOf" in inst &&
+            typeof (inst as { instanceOf?: unknown }).instanceOf === "string",
         );
         if (
           referenced &&
@@ -177,13 +183,13 @@ function emitWhenBlocksRecursive(
 }
 
 // Update parseActions to extract description
-function parseActions(rules: any[], basePath = "action"): ActionNode[] {
+function parseActions(rules: unknown[], basePath = "action"): ActionNode[] {
   const nodes: ActionNode[] = [];
   let currentNode: ActionNode | null = null;
-  let currentExtensions: any[] = [];
-  let currentExtension: any = null;
+  let currentExtensions: ExtensionObj[] = [];
+  let currentExtension: ExtensionObj | null = null;
   for (let i = 0; i < rules.length; i++) {
-    const rule = rules[i];
+    const rule = rules[i] as Record<string, unknown>;
     // Match action[+] at this level
     if (rule.path === `${basePath}[+]`) {
       // Start a new action node
@@ -194,16 +200,20 @@ function parseActions(rules: any[], basePath = "action"): ActionNode[] {
       currentNode = { children: [] };
       currentExtensions = [];
       currentExtension = null;
-    } else if (rule.path.startsWith(`${basePath}[=]`)) {
+    } else if (typeof rule.path === "string" && rule.path.startsWith(`${basePath}[=]`)) {
       // Property or nested action of the current node
       if (!currentNode) continue; // Defensive: skip if no current node
-      const subPath = rule.path.slice(`${basePath}[=]`.length);
+      const subPath = (rule.path as string).slice(`${basePath}[=]`.length);
       if (subPath.startsWith(".action[+]")) {
         // Start a new child action
         const childBase = `${basePath}[=].action`;
-        const childRules: any[] = [];
+        const childRules: unknown[] = [];
         let j = i;
-        while (j < rules.length && rules[j].path.startsWith(childBase)) {
+        while (
+          j < rules.length &&
+          typeof (rules[j] as Record<string, unknown>).path === "string" &&
+          ((rules[j] as Record<string, unknown>).path as string).startsWith(childBase)
+        ) {
           childRules.push(rules[j]);
           j++;
         }
@@ -212,65 +222,81 @@ function parseActions(rules: any[], basePath = "action"): ActionNode[] {
       } else if (subPath.startsWith(".action[=]")) {
         continue;
       } else if (subPath === ".extension[+]") {
-        // Start a new extension object
-        currentExtension = {};
+        // Start a new extension object with required 'url' property
+        currentExtension = { url: "" };
         currentExtensions.push(currentExtension);
       } else if (subPath.startsWith(".extension[=]")) {
         // Set properties on the most recent extension object
         if (!currentExtension) {
-          currentExtension = {};
+          currentExtension = { url: "" };
           currentExtensions.push(currentExtension);
         }
-        if (subPath.endsWith(".url")) currentExtension.url = rule.value;
-        if (subPath.endsWith(".valueMarkdown")) currentExtension.valueMarkdown = rule.value;
+        if (subPath.endsWith(".url")) currentExtension.url = rule.value as string;
+        if (subPath.endsWith(".valueMarkdown"))
+          currentExtension.valueMarkdown = rule.value as string;
       } else {
-        if (subPath === ".title") currentNode.title = rule.value;
-        if (subPath === ".description") currentNode.description = rule.value;
+        if (subPath === ".title") currentNode.title = rule.value as string;
+        if (subPath === ".description") currentNode.description = rule.value as string;
         if (subPath.endsWith(".condition[=].expression.expression"))
-          currentNode.conditionExpression = rule.value;
-        if (subPath === ".definitionCanonical") currentNode.definitionCanonical = rule.value;
+          currentNode.conditionExpression = rule.value as string;
+        if (subPath === ".definitionCanonical")
+          currentNode.definitionCanonical = rule.value as string;
       }
     }
   }
   if (currentNode) {
-    if (currentExtensions.length > 0) currentNode.extension = currentExtensions;
+    if (currentExtensions.length > 0) {
+      // Only push extensions that have a non-empty url
+      currentNode.extension = currentExtensions.filter(
+        (ext) => ext.url !== undefined && ext.url !== null,
+      );
+    }
     nodes.push(currentNode);
   }
   return nodes;
 }
 
 export function mapPlanDefinitionToDecision(
-  instance: any,
-  allInstances: any[],
+  instance: unknown,
+  allInstances: unknown[],
 ): {
   decision: string;
   activities: { id: string; name: string; value: string | undefined; original: string }[];
   doReferences: { id: string; placeholder: string }[];
 } {
-  if (!PLAN_DEFINITION_URLS.includes(instance.instanceOf)) {
+  if (
+    typeof instance !== "object" ||
+    instance === null ||
+    !("instanceOf" in instance) ||
+    !PLAN_DEFINITION_URLS.includes((instance as { instanceOf: string }).instanceOf)
+  ) {
     return { decision: "", activities: [], doReferences: [] };
   }
-  let description = instance.description;
+  let description = (instance as { description?: string }).description;
+  const rules = (instance as { rules?: unknown[] }).rules || [];
   if (!description) {
-    const descriptionRule = (instance.rules || []).find((r: any) => r.path === "Description");
-    description = descriptionRule ? descriptionRule.value : undefined;
+    const descriptionRule = (rules as Record<string, unknown>[]).find(
+      (r) => r.path === "Description",
+    );
+    description = descriptionRule ? (descriptionRule.value as string) : undefined;
   }
   const title =
-    instance.title || (instance.rules || []).find((r: any) => r.path === "Title")?.value;
-  const plandefTitle = title ? toIdentifier(title) : "[UnnamedPlanDefinition]";
+    (instance as { title?: string }).title ||
+    (rules as Record<string, unknown>[]).find((r) => r.path === "Title")?.value;
+  const plandefTitle = title ? toIdentifier(title as string) : "[UnnamedPlanDefinition]";
   const plandefDescription = description ? toString(description) : "";
-  const citationRule = (instance.rules || []).find(
-    (r: any) => r.path === "relatedArtifact[=].citation",
+  const citationRule = (rules as Record<string, unknown>[]).find(
+    (r) => r.path === "relatedArtifact[=].citation",
   );
-  let citation = citationRule ? toString(citationRule.value) : "";
+  let citation = citationRule ? toString(citationRule.value as string) : "";
   // Remove outer quotes from citation if present
   if (citation.startsWith('"') && citation.endsWith('"')) {
     citation = citation.slice(1, -1);
   }
 
   let output = "";
-  if (instance.name) {
-    output += `// Instance: ${instance.name}\n`;
+  if ((instance as { name?: string }).name) {
+    output += `// Instance: ${(instance as unknown as { name: string }).name}\n`;
   }
   if (plandefDescription) {
     let desc = plandefDescription;
@@ -283,7 +309,7 @@ export function mapPlanDefinitionToDecision(
     output += `// Provenance: ${citation}\n`;
   }
   output += `decision ${plandefTitle}:\n`;
-  const actionTree = parseActions(instance.rules || []);
+  const actionTree = parseActions(rules);
 
   // Collect activity stats for all PlanDefinitions
   const activities: { id: string; name: string; value: string | undefined; original: string }[] =
