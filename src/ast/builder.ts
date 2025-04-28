@@ -81,6 +81,9 @@ import {
   ConceptValueType,
 } from "./types";
 
+// Alias for all possible informal expression node types
+type InformalNode = GroupExpression | ConceptReference | InformalAnd | NotExpression | InformalOr;
+
 function getLocation(ctx: ParserRuleContext): Location {
   const start = ctx.start;
   const stop = ctx.stop ?? start;
@@ -429,7 +432,7 @@ export class CPGLAstBuilder
     let pat: string | undefined = undefined;
     if (refCtx.patternStatement) {
       const patternCtx = refCtx.patternStatement();
-      if (patternCtx && patternCtx.patternName && patternCtx.patternName().backtickString) {
+      if (patternCtx?.patternName?.().backtickString) {
         const backtickCtx = patternCtx.patternName().backtickString();
         if (backtickCtx?.text !== undefined) {
           pat = backtickCtx.text.slice(1, -1);
@@ -454,14 +457,12 @@ export class CPGLAstBuilder
     return this.visit(exprCtx) as GroupExpression;
   }
 
-  visitInferredFromExpression(
-    ctx: InferredFromExpressionContext,
-  ): InformalOr | InformalAnd | NotExpression | ConceptReference | GroupExpression {
-    return this.visit(ctx.informalOr()) as InferredFromExpression;
+  visitInferredFromExpression(ctx: InferredFromExpressionContext): InformalNode {
+    return this.visit(ctx.informalOr()) as InformalNode;
   }
 
   visitInformalOr(ctx: InformalOrContext): InformalOr {
-    const terms = ctx.informalAnd().map((a: any) => this.visit(a) as any);
+    const terms = ctx.informalAnd().map((a: InformalAndContext) => this.visit(a) as InformalNode);
     if (ctx.OR().length) {
       // flatten
       return { type: InformalOrType.type, terms, location: getLocation(ctx) };
