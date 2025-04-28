@@ -419,6 +419,37 @@ describe("CPGLAstBuilder", () => {
       expect((body as InferredFromConcept).concept).toBeUndefined();
     });
 
+    // Helper functions for expression checks
+    function expectConceptReference(
+      term: import("../types").ConceptReference,
+      expectedName: string,
+    ): void {
+      expect(term.type).toBe("ConceptReference");
+      if (term.type === "ConceptReference") {
+        expect(term.name).toBe(expectedName);
+      }
+    }
+    function expectAndExpression(
+      group: import("../types").GroupExpression,
+      expectedNames: [string, string],
+    ): void {
+      expect(group.type).toBe("GroupExpression");
+      if (group.type === "GroupExpression") {
+        expect(group.expression.type).toBe("AndExpression");
+        const andExpr = group.expression as import("../types").InformalAnd;
+        if (andExpr.type === "AndExpression") {
+          expectConceptReference(
+            andExpr.terms[0] as import("../types").ConceptReference,
+            expectedNames[0],
+          );
+          expectConceptReference(
+            andExpr.terms[1] as import("../types").ConceptReference,
+            expectedNames[1],
+          );
+        }
+      }
+    }
+
     it("should parse a concept with inferred by descriptive logic using and/or combinations", () => {
       const input = `
         concept "Complex BMI":
@@ -439,44 +470,20 @@ describe("CPGLAstBuilder", () => {
       expect(Array.isArray(orExpr.terms)).toBe(true);
       expect(orExpr.terms.length).toBe(3);
       // First term: GroupExpression wrapping AndExpression
-      expect(orExpr.terms[0].type).toBe("GroupExpression");
-      const group1 = orExpr.terms[0];
-      if (group1.type === "GroupExpression") {
-        expect(group1.expression.type).toBe("AndExpression");
-        const andExpr1 = group1.expression;
-        if (andExpr1.type === "AndExpression") {
-          expect(andExpr1.terms[0].type).toBe("ConceptReference");
-          if (andExpr1.terms[0].type === "ConceptReference") {
-            expect(andExpr1.terms[0].name).toBe("BMI Range as a Condition");
-          }
-          expect(andExpr1.terms[1].type).toBe("ConceptReference");
-          if (andExpr1.terms[1].type === "ConceptReference") {
-            expect(andExpr1.terms[1].name).toBe("Recent");
-          }
-        }
-      }
+      expectAndExpression(orExpr.terms[0] as import("../types").GroupExpression, [
+        "BMI Range as a Condition",
+        "Recent",
+      ]);
       // Second term: GroupExpression wrapping AndExpression
-      expect(orExpr.terms[1].type).toBe("GroupExpression");
-      const group2 = orExpr.terms[1];
-      if (group2.type === "GroupExpression") {
-        expect(group2.expression.type).toBe("AndExpression");
-        const andExpr2 = group2.expression;
-        if (andExpr2.type === "AndExpression") {
-          expect(andExpr2.terms[0].type).toBe("ConceptReference");
-          if (andExpr2.terms[0].type === "ConceptReference") {
-            expect(andExpr2.terms[0].name).toBe("BMI as an Observation");
-          }
-          expect(andExpr2.terms[1].type).toBe("ConceptReference");
-          if (andExpr2.terms[1].type === "ConceptReference") {
-            expect(andExpr2.terms[1].name).toBe("Valid");
-          }
-        }
-      }
+      expectAndExpression(orExpr.terms[1] as import("../types").GroupExpression, [
+        "BMI as an Observation",
+        "Valid",
+      ]);
       // Third term: ConceptReference
-      expect(orExpr.terms[2].type).toBe("ConceptReference");
-      if (orExpr.terms[2].type === "ConceptReference") {
-        expect(orExpr.terms[2].name).toBe("Calculated BMI");
-      }
+      expectConceptReference(
+        orExpr.terms[2] as import("../types").ConceptReference,
+        "Calculated BMI",
+      );
       // pattern/concept should be undefined
       const body = inferredBy.body as InferredFromConcept | InferredFromExpression;
       expect((body as InferredFromConcept).pattern).toBeUndefined();
