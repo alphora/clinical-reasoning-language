@@ -545,4 +545,3 @@ export class CPGLAstBuilder
     return { type: GroupExpressionType.type, expression: expr, location: getLocation(ctx) };
   }
 }
-

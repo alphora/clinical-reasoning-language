@@ -48,7 +48,8 @@ describe("Activity Structure", () => {
 
   it("should correctly structure activity with type and terminology or free text", () => {
     const input1 = 'activity "Indicate" perform CPGProposeDiagnosisTask with "Colonoscopy".';
-    const input2 = 'activity "Notify" perform CPGCommunicationRequest with `A notification message`.';
+    const input2 =
+      'activity "Notify" perform CPGCommunicationRequest with `A notification message`.';
 
     const result1 = parseInput(input1);
     const result2 = parseInput(input2);
