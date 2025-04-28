@@ -7,20 +7,26 @@ import { toIdentifier, toString } from "../utils/fshPathFunctions";
 
 import { emitActivityBlock } from "./activityDefinition";
 
+interface ExtensionObj {
+  url: string;
+  valueMarkdown?: string;
+  [key: string]: unknown;
+}
+
 interface ActionNode {
   title?: string;
   description?: string;
   conditionExpression?: string;
   definitionCanonical?: string;
   children: ActionNode[];
-  extension?: any[];
+  extension?: ExtensionObj[];
 }
 
 function emitWhenBlocksRecursive(
   nodes: ActionNode[],
   activities: { id: string; name: string; value: string | undefined; original: string }[],
-  allInstances: any[],
-  instance: any,
+  allInstances: unknown[],
+  instance: unknown,
   indent = "    ",
   doReferences: { id: string; placeholder: string }[],
 ): string {
@@ -80,11 +86,19 @@ function emitWhenBlocksRecursive(
         // Calculate hasPlanDef for this node
         let hasPlanDef = false;
         if (canonicalValueStr) {
-          const referenced = allInstances.find((inst) => inst.name === canonicalValueStr);
+          const referenced = (allInstances as { name: unknown; instanceOf?: string }[]).find(
+            (inst) =>
+              typeof inst === "object" &&
+              inst !== null &&
+              "name" in inst &&
+              (inst as { name: unknown }).name === canonicalValueStr,
+          );
           if (
             referenced &&
-            referenced.instanceOf &&
-            PLAN_DEFINITION_URLS.includes(referenced.instanceOf)
+            typeof referenced === "object" &&
+            referenced !== null &&
+            "instanceOf" in referenced &&
+            PLAN_DEFINITION_URLS.includes((referenced as { instanceOf: string }).instanceOf)
           ) {
             hasPlanDef = true;
           }
@@ -93,7 +107,7 @@ function emitWhenBlocksRecursive(
         const actionLine = emitActivityBlock(
           node,
           canonicalValueStr,
-          allInstances,
+          allInstances as any[],
           activities,
           indent + "    ",
           hasPlanDef,
@@ -125,11 +139,19 @@ function emitWhenBlocksRecursive(
       }
       let hasPlanDef = false;
       if (canonicalValueStr) {
-        const referenced = allInstances.find((inst) => inst.name === canonicalValueStr);
+        const referenced = (allInstances as { name: unknown; instanceOf?: string }[]).find(
+          (inst) =>
+            typeof inst === "object" &&
+            inst !== null &&
+            "name" in inst &&
+            (inst as { name: unknown }).name === canonicalValueStr,
+        );
         if (
           referenced &&
-          referenced.instanceOf &&
-          PLAN_DEFINITION_URLS.includes(referenced.instanceOf)
+          typeof referenced === "object" &&
+          referenced !== null &&
+          "instanceOf" in referenced &&
+          PLAN_DEFINITION_URLS.includes((referenced as { instanceOf: string }).instanceOf)
         ) {
           hasPlanDef = true;
         }
@@ -140,7 +162,7 @@ function emitWhenBlocksRecursive(
       let actionLine = emitActivityBlock(
         node,
         canonicalValueStr,
-        allInstances,
+        allInstances as any[],
         activities,
         "",
         hasPlanDef,
