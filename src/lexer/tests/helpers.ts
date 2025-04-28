@@ -12,7 +12,10 @@ export function getTokensFromString(
   input: string,
   opts: { withListener: true },
 ): { tokens: Token[]; errorListener: CPGLLexerErrorListener; lexer: CPGLLexer };
-export function getTokensFromString(input: string, opts?: { withListener?: boolean }) {
+export function getTokensFromString(
+  input: string,
+  opts?: { withListener?: boolean },
+): Token[] | { tokens: Token[]; errorListener: CPGLLexerErrorListener; lexer: CPGLLexer } {
   const { lexer, errorListener } = createLexer(input);
   const tokens = getAllTokens(lexer);
   if (opts?.withListener) {
