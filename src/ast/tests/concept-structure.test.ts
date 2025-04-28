@@ -4,6 +4,8 @@ import {
   InferredFromConcept,
   InferredFromExpression,
   CodedFromDefinition,
+  GroupExpression,
+  InformalAnd,
 } from "../types";
 
 import { parseInput } from "./parseInput";
@@ -100,10 +102,10 @@ done`;
     const body = definition.body as InferredFromExpression;
     expect(body.type).toBe("NotExpression");
 
-    const groupExpr = (body as any).expression as InferredFromExpression;
+    const groupExpr = (body as GroupExpression).expression as InferredFromExpression;
     expect(groupExpr.type).toBe("GroupExpression");
 
-    const andExpr = (groupExpr as any).expression as InferredFromExpression;
+    const andExpr = (groupExpr as GroupExpression).expression as InformalAnd;
     expect(andExpr.type).toBe("AndExpression");
   });
 });
