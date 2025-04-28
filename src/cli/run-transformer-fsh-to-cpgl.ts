@@ -7,11 +7,11 @@ const inputPath = process.argv[2]
   ? path.resolve(process.cwd(), process.argv[2])
   : path.resolve(__dirname, "../examples/fsh/smart-example-immz");
 
-(async () => {
+(async (): Promise<void> => {
   try {
     const cpglOutput = transformFSHToCPGL(inputPath);
     process.stdout.write(cpglOutput.replace(/\n+$/, "") + "\n");
-  } catch (err) {
+  } catch {
     process.exit(1);
   }
 })();

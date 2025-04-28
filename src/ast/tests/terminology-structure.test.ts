@@ -1,15 +1,8 @@
-import { CPGLAstBuilder } from "../builder";
 import { Terminology, TerminologyValueset, TerminologySystemCode } from "../types";
 
 import { parseInput } from "./parseInput";
 
 describe("Terminology Structure", () => {
-  let builder: CPGLAstBuilder;
-
-  beforeEach(() => {
-    builder = new CPGLAstBuilder();
-  });
-
   it("should correctly structure terminology with valueset", () => {
     const input = `
 terminology "MeaslesVaccineCodes" valueset "bmi valueset".
