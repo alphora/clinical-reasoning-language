@@ -36,7 +36,7 @@ export function transformFSHToCPGL(fshProjectDir: string): string {
     for (const file of list) {
       const filePath = path.join(dir, file);
       const stat = fs.statSync(filePath);
-      if (stat && stat.isDirectory()) {
+      if (stat?.isDirectory()) {
         results = results.concat(getAllFSHFiles(filePath));
       } else if (filePath.endsWith(".fsh")) {
         results.push(filePath);
@@ -118,7 +118,7 @@ export function transformFSHToCPGL(fshProjectDir: string): string {
 
   for (const act of allActivities) {
     const key = `${act.name}::${act.value ?? ""}`;
-    let count = nameValueCount.get(act.name) || 0;
+    let count = nameValueCount.get(act.name) ?? 0;
     if (!dedupedMap.has(key)) {
       count += 1;
       nameValueCount.set(act.name, count);
@@ -137,7 +137,7 @@ export function transformFSHToCPGL(fshProjectDir: string): string {
 
   for (const { uniqueName, activity } of dedupedMap.values()) {
     const activityRegex = /activity\s+"([^"]+)"/;
-    const match = activity.original.match(activityRegex);
+    const match = RegExp(activityRegex).exec(activity.original);
     let replaced = activity.original;
     if (match) {
       replaced = activity.original.replace(activityRegex, `activity ${toIdentifier(uniqueName)}`);

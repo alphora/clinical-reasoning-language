@@ -29,7 +29,7 @@ interface ActivityDefRule {
   value?: unknown;
 }
 
-interface ActivityDef {
+export interface ActivityDef {
   rules?: ActivityDefRule[];
   instanceOf?: string;
   title?: string;
@@ -188,7 +188,7 @@ export function emitActivityBlock(
   const doIdentifier = node.title ? toIdentifier(node.title as string) : "UnnamedActivity";
 
   let activityDescription = node.description ? (node.description as string) : undefined;
-  if (referenced && referenced.rules) {
+  if (referenced?.rules) {
     const descRule = referenced.rules.find((r: ActivityDefRule) => r.path === "Description");
     activityDescription = descRule ? (descRule.value as string) : undefined;
   }
@@ -198,11 +198,11 @@ export function emitActivityBlock(
   let activityDefInstance = null;
   let useIdentifier = "";
   if (canonicalValueStr) {
-    if (referenced && ACTIVITY_DEFINITION_URLS.includes(referenced.instanceOf || "")) {
+    if (referenced && ACTIVITY_DEFINITION_URLS.includes(referenced.instanceOf ?? "")) {
       hasActivityDef = true;
       activityDefInstance = referenced;
     }
-    if (hasPlanDef && referenced && referenced.title) {
+    if (hasPlanDef && referenced?.title) {
       useIdentifier = toIdentifier(referenced.title as string);
     } else if (hasPlanDef && canonicalValueStr) {
       useIdentifier = toIdentifier(canonicalValueStr);
@@ -288,7 +288,7 @@ export function emitActivityBlock(
       id: activityId,
       name: doIdentifier,
       value: activityDescription,
-      original: `activity ${doIdentifier}\n    perform CPGCommunicationRequest${formatActivityValue("`" + (activityDescription || "TODO: fill in message.") + "`")}${rationale ?? ""}.\n\n`,
+      original: `activity ${doIdentifier}\n    perform CPGCommunicationRequest${formatActivityValue("`" + (activityDescription ?? "TODO: fill in message.") + "`")}${rationale ?? ""}.\n\n`,
     });
     doReferences.push({ id: activityId, placeholder });
   }
