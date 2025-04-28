@@ -266,19 +266,15 @@ export class CPGLAstBuilder
     return { type: TerminologySystemCodeType.type, system, code, location: getLocation(ctx) };
   }
 
-  visitActivityStatement(ctx: ActivityStatementContext): Activity {
-    const name = ctx.activityIdentifier()!.text.slice(1, -1);
-    const perform = ctx.ACTIVITY_TYPE()!.text as ActivityType;
+  private parseWithClause(
+    ctx: import("../grammar/generated/antlr/CPGLParser").ActivityStatementContext,
+  ): { terminologyReference?: string; activityTypeValue?: string } {
     let terminologyReference: string | undefined;
     let activityTypeValue: string | undefined;
-    let rationale: string | undefined;
-
-    // WITH clause: can be terminologyReference (identifier) or activityTypeValue (backtickString)
     if (ctx.WITH()) {
       if (ctx.terminologyReference()) {
         terminologyReference = ctx.terminologyReference()!.text.slice(1, -1);
       } else if (ctx.activityTypeValue()) {
-        // activityTypeValue is a backtickString
         const atv = ctx.activityTypeValue();
         if (atv?.backtickString) {
           const backtickCtx = atv.backtickString();
@@ -288,16 +284,29 @@ export class CPGLAstBuilder
         }
       }
     }
-    // rationale (BECAUSE) is always a backtickString
+    return { terminologyReference, activityTypeValue };
+  }
+
+  private parseRationaleClause(
+    ctx: import("../grammar/generated/antlr/CPGLParser").ActivityStatementContext,
+  ): string | undefined {
     if (ctx.rationale) {
       const rationaleCtx = ctx.rationale();
       if (rationaleCtx?.backtickString) {
         const backtickCtx = rationaleCtx.backtickString();
         if (backtickCtx?.text !== undefined) {
-          rationale = backtickCtx.text.slice(1, -1);
+          return backtickCtx.text.slice(1, -1);
         }
       }
     }
+    return undefined;
+  }
+
+  visitActivityStatement(ctx: ActivityStatementContext): Activity {
+    const name = ctx.activityIdentifier()!.text.slice(1, -1);
+    const perform = ctx.ACTIVITY_TYPE()!.text as ActivityType;
+    const { terminologyReference, activityTypeValue } = this.parseWithClause(ctx);
+    const rationale = this.parseRationaleClause(ctx);
     return {
       type: "Activity",
       name,
@@ -309,18 +318,10 @@ export class CPGLAstBuilder
     };
   }
 
-  visitConceptStatement(ctx: ConceptStatementContext): Concept {
-    const name = ctx.conceptIdentifier?.()?.text?.slice(1, -1);
-    const bodyCtx = ctx.conceptBody?.();
-    if (!name || !bodyCtx) {
-      this.reportError(
-        "AstError",
-        "ConceptStatement: missing conceptIdentifier or conceptBody",
-        getLocation(ctx),
-      );
-      return null as unknown as Concept;
-    }
-
+  private parseConceptTypes(
+    bodyCtx: import("../grammar/generated/antlr/CPGLParser").ConceptBodyContext,
+    ctx: import("../grammar/generated/antlr/CPGLParser").ConceptStatementContext,
+  ): { conceptType: ConceptType; valueType: ConceptValueType } | null {
     const typeLine = bodyCtx.typeLine?.();
     const valueTypeLine = bodyCtx.valueTypeLine?.();
     if (!typeLine || !valueTypeLine) {
@@ -329,9 +330,8 @@ export class CPGLAstBuilder
         "ConceptStatement: missing type or valueType line",
         getLocation(ctx),
       );
-      return null as unknown as Concept;
+      return null;
     }
-
     let conceptTypeToken, valueTypeToken;
     try {
       conceptTypeToken = typeLine.CONCEPT_TYPE();
@@ -349,27 +349,38 @@ export class CPGLAstBuilder
         "ConceptStatement: missing CONCEPT_TYPE or CONCEPT_VALUE_TYPE token",
         getLocation(ctx),
       );
-      return null as unknown as Concept;
+      return null;
     }
+    return {
+      conceptType: conceptTypeToken.text as ConceptType,
+      valueType: valueTypeToken.text as ConceptValueType,
+    };
+  }
 
-    const conceptType = conceptTypeToken.text as ConceptType;
-    const valueType = valueTypeToken.text as ConceptValueType;
-    let evidence: string | undefined = undefined;
+  private parseEvidence(
+    bodyCtx: import("../grammar/generated/antlr/CPGLParser").ConceptBodyContext,
+  ): string | undefined {
     if (bodyCtx.evidenceLine?.()) {
       const evidenceCtx = bodyCtx.evidenceLine?.();
       if (evidenceCtx?.backtickString) {
         const backtickCtx = evidenceCtx.backtickString();
         if (backtickCtx?.text !== undefined) {
-          evidence = backtickCtx.text.slice(1, -1);
+          return backtickCtx.text.slice(1, -1);
         } else if (backtickCtx?.BACKTICK_STRING) {
           const token = backtickCtx.BACKTICK_STRING();
           if (token?.text !== undefined) {
-            evidence = token.text.slice(1, -1);
+            return token.text.slice(1, -1);
           }
         }
       }
     }
-    let definition: ConceptDefinition;
+    return undefined;
+  }
+
+  private parseConceptDefinition(
+    bodyCtx: import("../grammar/generated/antlr/CPGLParser").ConceptBodyContext,
+    ctx: import("../grammar/generated/antlr/CPGLParser").ConceptStatementContext,
+  ): ConceptDefinition | null {
     if (bodyCtx.codedFromLine?.()) {
       const codedFrom = bodyCtx.codedFromLine();
       const termRef = codedFrom?.terminologyReference?.()?.text?.slice(1, -1);
@@ -379,9 +390,9 @@ export class CPGLAstBuilder
           "ConceptStatement: missing terminologyReference in codedFromLine",
           getLocation(ctx),
         );
-        return null as unknown as Concept;
+        return null;
       }
-      definition = {
+      return {
         type: CodedFromDefinitionType.type,
         terminologyName: termRef,
         location: getLocation(bodyCtx.codedFromLine()!),
@@ -394,15 +405,39 @@ export class CPGLAstBuilder
           "ConceptStatement: inferredFromLine() unexpectedly returned undefined",
           getLocation(ctx),
         );
-        return null as unknown as Concept;
+        return null;
       }
-      definition = this.visit(infCtx) as InferredFromDefinition;
+      return this.visit(infCtx) as InferredFromDefinition;
     } else {
       this.reportError(
         "AstError",
         "ConceptStatement must have either codedFromLine or inferredFromLine",
         getLocation(ctx),
       );
+      return null;
+    }
+  }
+
+  visitConceptStatement(ctx: ConceptStatementContext): Concept {
+    const name = ctx.conceptIdentifier?.()?.text?.slice(1, -1);
+    const bodyCtx = ctx.conceptBody?.();
+    if (!name || !bodyCtx) {
+      this.reportError(
+        "AstError",
+        "ConceptStatement: missing conceptIdentifier or conceptBody",
+        getLocation(ctx),
+      );
+      return null as unknown as Concept;
+    }
+
+    const types = this.parseConceptTypes(bodyCtx, ctx);
+    if (!types) {
+      return null as unknown as Concept;
+    }
+    const { conceptType, valueType } = types;
+    const evidence = this.parseEvidence(bodyCtx);
+    const definition = this.parseConceptDefinition(bodyCtx, ctx);
+    if (!definition) {
       return null as unknown as Concept;
     }
     return {
@@ -510,3 +545,4 @@ export class CPGLAstBuilder
     return { type: GroupExpressionType.type, expression: expr, location: getLocation(ctx) };
   }
 }
+
