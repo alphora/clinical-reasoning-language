@@ -33,8 +33,8 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.PatternIdentifierContext = exports.ConceptReferenceContext = exports.ConceptIdentifierContext = exports.ActivityReferenceContext = exports.ActivityIdentifierContext = exports.TerminologyReferenceContext = exports.TerminologyIdentifierContext = exports.DecisionReferenceContext = exports.DecisionIdentifierContext = exports.IdentifierContext = exports.GroupExpressionContext = exports.ConceptAtomContext = exports.AtomContext = exports.InformalNotContext = exports.InformalAndContext = exports.InformalOrContext = exports.InferredByExpressionContext = exports.InferredByDescriptiveLogicContext = exports.InferredByConceptReferenceContext = exports.DefinitionLogicContext = exports.DefinitionConceptContext = exports.InferredBodyContext = exports.InferredByLineContext = exports.CodedByLineContext = exports.ProvenanceLineContext = exports.HasValueTypeLineContext = exports.HasTypeLineContext = exports.ConceptBodyContext = exports.ConceptStatementContext = exports.ActivityStatementContext = exports.TerminologySystemCodeContext = exports.TerminologyValuesetContext = exports.TerminologyStatementContext = exports.UseStatementContext = exports.DoStatementContext = exports.ActionStatementContext = exports.BlockActionContext = exports.NestedWhenBlockContext = exports.BlockStatementContext = exports.SingleActionStatementContext = exports.BlockBodyContext = exports.AnyOrAllClauseContext = exports.WhenSingleActionContext = exports.WhenWithBodyContext = exports.WhenBlockContext = exports.DecisionBodyContext = exports.DecisionStatementContext = exports.StatementContext = exports.CpglContext = exports.CPGLParser = void 0;
-exports.RationaleContext = exports.ActivityTypeValueContext = exports.BacktickStringContext = exports.PatternReferenceContext = void 0;
+exports.ConceptReferenceContext = exports.ConceptIdentifierContext = exports.ActivityReferenceContext = exports.ActivityIdentifierContext = exports.TerminologyReferenceContext = exports.TerminologyIdentifierContext = exports.DecisionReferenceContext = exports.DecisionIdentifierContext = exports.IdentifierContext = exports.GroupExpressionContext = exports.ConceptAtomContext = exports.AtomContext = exports.InformalNotContext = exports.InformalAndContext = exports.InformalOrContext = exports.InferredFromExpressionContext = exports.InferredFromDescriptiveLogicContext = exports.PatternStatementContext = exports.InferredFromConceptReferenceContext = exports.DefinitionLogicContext = exports.DefinitionConceptContext = exports.InferredBodyContext = exports.InferredFromLineContext = exports.CodedFromLineContext = exports.EvidenceLineContext = exports.ValueTypeLineContext = exports.TypeLineContext = exports.ConceptBodyContext = exports.ConceptStatementContext = exports.ActivityStatementContext = exports.TerminologySystemCodeContext = exports.TerminologyValuesetContext = exports.TerminologyStatementContext = exports.UseStatementContext = exports.DoStatementContext = exports.ActionStatementContext = exports.BlockActionContext = exports.NestedWhenBlockContext = exports.BlockStatementContext = exports.SingleActionStatementContext = exports.BlockBodyContext = exports.AnyOrAllClauseContext = exports.WhenSingleActionContext = exports.WhenWithBodyContext = exports.WhenBlockContext = exports.DecisionBodyContext = exports.DecisionStatementContext = exports.StatementContext = exports.CpglContext = exports.CPGLParser = void 0;
+exports.RationaleContext = exports.ActivityTypeValueContext = exports.PatternNameContext = exports.BacktickStringContext = void 0;
 const ATN_1 = require("antlr4ts/atn/ATN");
 const ATNDeserializer_1 = require("antlr4ts/atn/ATNDeserializer");
 const FailedPredicateException_1 = require("antlr4ts/FailedPredicateException");
@@ -292,7 +292,7 @@ class CPGLParser extends Parser_1.Parser {
             {
                 this.state = 127;
                 _la = this._input.LA(1);
-                if (!(_la === CPGLParser.ANY || _la === CPGLParser.ALL)) {
+                if (!(_la === CPGLParser.ALL || _la === CPGLParser.ANY)) {
                     this._errHandler.recoverInline(this);
                 }
                 else {
@@ -686,7 +686,7 @@ class CPGLParser extends Parser_1.Parser {
                     case 1:
                         {
                             this.state = 184;
-                            this.match(CPGLParser.OF);
+                            this.match(CPGLParser.WITH);
                             this.state = 187;
                             this._errHandler.sync(this);
                             switch (this.interpreter.adaptivePredict(this._input, 10, this._ctx)) {
@@ -777,16 +777,16 @@ class CPGLParser extends Parser_1.Parser {
             this.enterOuterAlt(_localctx, 1);
             {
                 this.state = 203;
-                this.hasTypeLine();
+                this.typeLine();
                 this.state = 204;
-                this.hasValueTypeLine();
+                this.valueTypeLine();
                 this.state = 206;
                 this._errHandler.sync(this);
                 switch (this.interpreter.adaptivePredict(this._input, 13, this._ctx)) {
                     case 1:
                         {
                             this.state = 205;
-                            this.provenanceLine();
+                            this.evidenceLine();
                         }
                         break;
                 }
@@ -796,13 +796,13 @@ class CPGLParser extends Parser_1.Parser {
                     case 1:
                         {
                             this.state = 208;
-                            this.codedByLine();
+                            this.codedFromLine();
                         }
                         break;
                     case 2:
                         {
                             this.state = 209;
-                            this.inferredByLine();
+                            this.inferredFromLine();
                         }
                         break;
                 }
@@ -823,16 +823,16 @@ class CPGLParser extends Parser_1.Parser {
         }
         return _localctx;
     }
-    hasTypeLine() {
-        let _localctx = new HasTypeLineContext(this._ctx, this.state);
-        this.enterRule(_localctx, 36, CPGLParser.RULE_hasTypeLine);
+    typeLine() {
+        let _localctx = new TypeLineContext(this._ctx, this.state);
+        this.enterRule(_localctx, 36, CPGLParser.RULE_typeLine);
         try {
             this.enterOuterAlt(_localctx, 1);
             {
                 this.state = 212;
-                this.match(CPGLParser.HAS);
-                this.state = 213;
                 this.match(CPGLParser.TYPE);
+                this.state = 213;
+                this.match(CPGLParser.IS);
                 this.state = 214;
                 this.match(CPGLParser.CONCEPT_TYPE);
                 this.state = 215;
@@ -854,16 +854,16 @@ class CPGLParser extends Parser_1.Parser {
         }
         return _localctx;
     }
-    hasValueTypeLine() {
-        let _localctx = new HasValueTypeLineContext(this._ctx, this.state);
-        this.enterRule(_localctx, 38, CPGLParser.RULE_hasValueTypeLine);
+    valueTypeLine() {
+        let _localctx = new ValueTypeLineContext(this._ctx, this.state);
+        this.enterRule(_localctx, 38, CPGLParser.RULE_valueTypeLine);
         try {
             this.enterOuterAlt(_localctx, 1);
             {
                 this.state = 217;
-                this.match(CPGLParser.HAS);
-                this.state = 218;
                 this.match(CPGLParser.VALUETYPE);
+                this.state = 218;
+                this.match(CPGLParser.IS);
                 this.state = 219;
                 this.match(CPGLParser.CONCEPT_VALUE_TYPE);
                 this.state = 220;
@@ -885,16 +885,16 @@ class CPGLParser extends Parser_1.Parser {
         }
         return _localctx;
     }
-    provenanceLine() {
-        let _localctx = new ProvenanceLineContext(this._ctx, this.state);
-        this.enterRule(_localctx, 40, CPGLParser.RULE_provenanceLine);
+    evidenceLine() {
+        let _localctx = new EvidenceLineContext(this._ctx, this.state);
+        this.enterRule(_localctx, 40, CPGLParser.RULE_evidenceLine);
         try {
             this.enterOuterAlt(_localctx, 1);
             {
                 this.state = 222;
-                this.match(CPGLParser.HAS);
+                this.match(CPGLParser.EVIDENCE);
                 this.state = 223;
-                this.match(CPGLParser.PROVENANCE);
+                this.match(CPGLParser.IS);
                 this.state = 224;
                 this.backtickString();
                 this.state = 225;
@@ -916,16 +916,16 @@ class CPGLParser extends Parser_1.Parser {
         }
         return _localctx;
     }
-    codedByLine() {
-        let _localctx = new CodedByLineContext(this._ctx, this.state);
-        this.enterRule(_localctx, 42, CPGLParser.RULE_codedByLine);
+    codedFromLine() {
+        let _localctx = new CodedFromLineContext(this._ctx, this.state);
+        this.enterRule(_localctx, 42, CPGLParser.RULE_codedFromLine);
         try {
             this.enterOuterAlt(_localctx, 1);
             {
                 this.state = 227;
                 this.match(CPGLParser.CODED);
                 this.state = 228;
-                this.match(CPGLParser.BY);
+                this.match(CPGLParser.FROM);
                 this.state = 229;
                 this.terminologyReference();
                 this.state = 230;
@@ -947,16 +947,16 @@ class CPGLParser extends Parser_1.Parser {
         }
         return _localctx;
     }
-    inferredByLine() {
-        let _localctx = new InferredByLineContext(this._ctx, this.state);
-        this.enterRule(_localctx, 44, CPGLParser.RULE_inferredByLine);
+    inferredFromLine() {
+        let _localctx = new InferredFromLineContext(this._ctx, this.state);
+        this.enterRule(_localctx, 44, CPGLParser.RULE_inferredFromLine);
         try {
             this.enterOuterAlt(_localctx, 1);
             {
                 this.state = 232;
                 this.match(CPGLParser.INFERRED);
                 this.state = 233;
-                this.match(CPGLParser.BY);
+                this.match(CPGLParser.FROM);
                 this.state = 234;
                 this.inferredBody();
                 this.state = 235;
@@ -990,7 +990,7 @@ class CPGLParser extends Parser_1.Parser {
                     this.enterOuterAlt(_localctx, 1);
                     {
                         this.state = 237;
-                        this.inferredByConceptReference();
+                        this.inferredFromConceptReference();
                     }
                     break;
                 case 2:
@@ -998,7 +998,7 @@ class CPGLParser extends Parser_1.Parser {
                     this.enterOuterAlt(_localctx, 2);
                     {
                         this.state = 238;
-                        this.inferredByDescriptiveLogic();
+                        this.inferredFromDescriptiveLogic();
                     }
                     break;
             }
@@ -1018,24 +1018,24 @@ class CPGLParser extends Parser_1.Parser {
         }
         return _localctx;
     }
-    inferredByConceptReference() {
-        let _localctx = new InferredByConceptReferenceContext(this._ctx, this.state);
-        this.enterRule(_localctx, 48, CPGLParser.RULE_inferredByConceptReference);
+    inferredFromConceptReference() {
+        let _localctx = new InferredFromConceptReferenceContext(this._ctx, this.state);
+        this.enterRule(_localctx, 48, CPGLParser.RULE_inferredFromConceptReference);
         try {
             this.enterOuterAlt(_localctx, 1);
             {
-                this.state = 242;
+                this.state = 241;
+                this.conceptReference();
+                this.state = 243;
                 this._errHandler.sync(this);
                 switch (this.interpreter.adaptivePredict(this._input, 16, this._ctx)) {
                     case 1:
                         {
-                            this.state = 241;
-                            this.patternReference();
+                            this.state = 242;
+                            this.patternStatement();
                         }
                         break;
                 }
-                this.state = 244;
-                this.conceptReference();
             }
         }
         catch (re) {
@@ -1053,17 +1053,46 @@ class CPGLParser extends Parser_1.Parser {
         }
         return _localctx;
     }
-    inferredByDescriptiveLogic() {
-        let _localctx = new InferredByDescriptiveLogicContext(this._ctx, this.state);
-        this.enterRule(_localctx, 50, CPGLParser.RULE_inferredByDescriptiveLogic);
+    patternStatement() {
+        let _localctx = new PatternStatementContext(this._ctx, this.state);
+        this.enterRule(_localctx, 50, CPGLParser.RULE_patternStatement);
         try {
             this.enterOuterAlt(_localctx, 1);
             {
+                this.state = 245;
+                this.match(CPGLParser.APPLY);
                 this.state = 246;
-                this.match(CPGLParser.LPAREN);
+                this.match(CPGLParser.PATTERN);
                 this.state = 247;
-                this.inferredByExpression();
-                this.state = 248;
+                this.patternName();
+            }
+        }
+        catch (re) {
+            if (re instanceof RecognitionException_1.RecognitionException) {
+                _localctx.exception = re;
+                this._errHandler.reportError(this, re);
+                this._errHandler.recover(this, re);
+            }
+            else {
+                throw re;
+            }
+        }
+        finally {
+            this.exitRule();
+        }
+        return _localctx;
+    }
+    inferredFromDescriptiveLogic() {
+        let _localctx = new InferredFromDescriptiveLogicContext(this._ctx, this.state);
+        this.enterRule(_localctx, 52, CPGLParser.RULE_inferredFromDescriptiveLogic);
+        try {
+            this.enterOuterAlt(_localctx, 1);
+            {
+                this.state = 249;
+                this.match(CPGLParser.LPAREN);
+                this.state = 250;
+                this.inferredFromExpression();
+                this.state = 251;
                 this.match(CPGLParser.RPAREN);
             }
         }
@@ -1082,13 +1111,13 @@ class CPGLParser extends Parser_1.Parser {
         }
         return _localctx;
     }
-    inferredByExpression() {
-        let _localctx = new InferredByExpressionContext(this._ctx, this.state);
-        this.enterRule(_localctx, 52, CPGLParser.RULE_inferredByExpression);
+    inferredFromExpression() {
+        let _localctx = new InferredFromExpressionContext(this._ctx, this.state);
+        this.enterRule(_localctx, 54, CPGLParser.RULE_inferredFromExpression);
         try {
             this.enterOuterAlt(_localctx, 1);
             {
-                this.state = 250;
+                this.state = 253;
                 this.informalOr();
             }
         }
@@ -1109,28 +1138,28 @@ class CPGLParser extends Parser_1.Parser {
     }
     informalOr() {
         let _localctx = new InformalOrContext(this._ctx, this.state);
-        this.enterRule(_localctx, 54, CPGLParser.RULE_informalOr);
+        this.enterRule(_localctx, 56, CPGLParser.RULE_informalOr);
         try {
             let _alt;
             this.enterOuterAlt(_localctx, 1);
             {
-                this.state = 252;
+                this.state = 255;
                 this.informalAnd();
-                this.state = 257;
+                this.state = 260;
                 this._errHandler.sync(this);
                 _alt = this.interpreter.adaptivePredict(this._input, 17, this._ctx);
                 while (_alt !== 2 && _alt !== ATN_1.ATN.INVALID_ALT_NUMBER) {
                     if (_alt === 1) {
                         {
                             {
-                                this.state = 253;
+                                this.state = 256;
                                 this.match(CPGLParser.OR);
-                                this.state = 254;
+                                this.state = 257;
                                 this.informalAnd();
                             }
                         }
                     }
-                    this.state = 259;
+                    this.state = 262;
                     this._errHandler.sync(this);
                     _alt = this.interpreter.adaptivePredict(this._input, 17, this._ctx);
                 }
@@ -1153,28 +1182,28 @@ class CPGLParser extends Parser_1.Parser {
     }
     informalAnd() {
         let _localctx = new InformalAndContext(this._ctx, this.state);
-        this.enterRule(_localctx, 56, CPGLParser.RULE_informalAnd);
+        this.enterRule(_localctx, 58, CPGLParser.RULE_informalAnd);
         try {
             let _alt;
             this.enterOuterAlt(_localctx, 1);
             {
-                this.state = 260;
+                this.state = 263;
                 this.informalNot();
-                this.state = 265;
+                this.state = 268;
                 this._errHandler.sync(this);
                 _alt = this.interpreter.adaptivePredict(this._input, 18, this._ctx);
                 while (_alt !== 2 && _alt !== ATN_1.ATN.INVALID_ALT_NUMBER) {
                     if (_alt === 1) {
                         {
                             {
-                                this.state = 261;
+                                this.state = 264;
                                 this.match(CPGLParser.AND);
-                                this.state = 262;
+                                this.state = 265;
                                 this.informalNot();
                             }
                         }
                     }
-                    this.state = 267;
+                    this.state = 270;
                     this._errHandler.sync(this);
                     _alt = this.interpreter.adaptivePredict(this._input, 18, this._ctx);
                 }
@@ -1197,24 +1226,24 @@ class CPGLParser extends Parser_1.Parser {
     }
     informalNot() {
         let _localctx = new InformalNotContext(this._ctx, this.state);
-        this.enterRule(_localctx, 58, CPGLParser.RULE_informalNot);
+        this.enterRule(_localctx, 60, CPGLParser.RULE_informalNot);
         try {
-            this.state = 271;
+            this.state = 274;
             this._errHandler.sync(this);
             switch (this.interpreter.adaptivePredict(this._input, 19, this._ctx)) {
                 case 1:
                     this.enterOuterAlt(_localctx, 1);
                     {
-                        this.state = 268;
+                        this.state = 271;
                         this.match(CPGLParser.NOT);
-                        this.state = 269;
+                        this.state = 272;
                         this.informalNot();
                     }
                     break;
                 case 2:
                     this.enterOuterAlt(_localctx, 2);
                     {
-                        this.state = 270;
+                        this.state = 273;
                         this.atom();
                     }
                     break;
@@ -1237,16 +1266,16 @@ class CPGLParser extends Parser_1.Parser {
     }
     atom() {
         let _localctx = new AtomContext(this._ctx, this.state);
-        this.enterRule(_localctx, 60, CPGLParser.RULE_atom);
+        this.enterRule(_localctx, 62, CPGLParser.RULE_atom);
         try {
-            this.state = 278;
+            this.state = 281;
             this._errHandler.sync(this);
             switch (this.interpreter.adaptivePredict(this._input, 20, this._ctx)) {
                 case 1:
                     _localctx = new ConceptAtomContext(_localctx);
                     this.enterOuterAlt(_localctx, 1);
                     {
-                        this.state = 273;
+                        this.state = 276;
                         this.conceptReference();
                     }
                     break;
@@ -1254,11 +1283,11 @@ class CPGLParser extends Parser_1.Parser {
                     _localctx = new GroupExpressionContext(_localctx);
                     this.enterOuterAlt(_localctx, 2);
                     {
-                        this.state = 274;
+                        this.state = 277;
                         this.match(CPGLParser.LPAREN);
-                        this.state = 275;
-                        this.inferredByExpression();
-                        this.state = 276;
+                        this.state = 278;
+                        this.inferredFromExpression();
+                        this.state = 279;
                         this.match(CPGLParser.RPAREN);
                     }
                     break;
@@ -1281,11 +1310,11 @@ class CPGLParser extends Parser_1.Parser {
     }
     identifier() {
         let _localctx = new IdentifierContext(this._ctx, this.state);
-        this.enterRule(_localctx, 62, CPGLParser.RULE_identifier);
+        this.enterRule(_localctx, 64, CPGLParser.RULE_identifier);
         try {
             this.enterOuterAlt(_localctx, 1);
             {
-                this.state = 280;
+                this.state = 283;
                 this.match(CPGLParser.QUOTED_STRING);
             }
         }
@@ -1306,11 +1335,11 @@ class CPGLParser extends Parser_1.Parser {
     }
     decisionIdentifier() {
         let _localctx = new DecisionIdentifierContext(this._ctx, this.state);
-        this.enterRule(_localctx, 64, CPGLParser.RULE_decisionIdentifier);
+        this.enterRule(_localctx, 66, CPGLParser.RULE_decisionIdentifier);
         try {
             this.enterOuterAlt(_localctx, 1);
             {
-                this.state = 282;
+                this.state = 285;
                 this.identifier();
             }
         }
@@ -1331,11 +1360,11 @@ class CPGLParser extends Parser_1.Parser {
     }
     decisionReference() {
         let _localctx = new DecisionReferenceContext(this._ctx, this.state);
-        this.enterRule(_localctx, 66, CPGLParser.RULE_decisionReference);
+        this.enterRule(_localctx, 68, CPGLParser.RULE_decisionReference);
         try {
             this.enterOuterAlt(_localctx, 1);
             {
-                this.state = 284;
+                this.state = 287;
                 this.decisionIdentifier();
             }
         }
@@ -1356,11 +1385,11 @@ class CPGLParser extends Parser_1.Parser {
     }
     terminologyIdentifier() {
         let _localctx = new TerminologyIdentifierContext(this._ctx, this.state);
-        this.enterRule(_localctx, 68, CPGLParser.RULE_terminologyIdentifier);
+        this.enterRule(_localctx, 70, CPGLParser.RULE_terminologyIdentifier);
         try {
             this.enterOuterAlt(_localctx, 1);
             {
-                this.state = 286;
+                this.state = 289;
                 this.identifier();
             }
         }
@@ -1381,11 +1410,11 @@ class CPGLParser extends Parser_1.Parser {
     }
     terminologyReference() {
         let _localctx = new TerminologyReferenceContext(this._ctx, this.state);
-        this.enterRule(_localctx, 70, CPGLParser.RULE_terminologyReference);
+        this.enterRule(_localctx, 72, CPGLParser.RULE_terminologyReference);
         try {
             this.enterOuterAlt(_localctx, 1);
             {
-                this.state = 288;
+                this.state = 291;
                 this.identifier();
             }
         }
@@ -1406,11 +1435,11 @@ class CPGLParser extends Parser_1.Parser {
     }
     activityIdentifier() {
         let _localctx = new ActivityIdentifierContext(this._ctx, this.state);
-        this.enterRule(_localctx, 72, CPGLParser.RULE_activityIdentifier);
+        this.enterRule(_localctx, 74, CPGLParser.RULE_activityIdentifier);
         try {
             this.enterOuterAlt(_localctx, 1);
             {
-                this.state = 290;
+                this.state = 293;
                 this.identifier();
             }
         }
@@ -1431,11 +1460,11 @@ class CPGLParser extends Parser_1.Parser {
     }
     activityReference() {
         let _localctx = new ActivityReferenceContext(this._ctx, this.state);
-        this.enterRule(_localctx, 74, CPGLParser.RULE_activityReference);
+        this.enterRule(_localctx, 76, CPGLParser.RULE_activityReference);
         try {
             this.enterOuterAlt(_localctx, 1);
             {
-                this.state = 292;
+                this.state = 295;
                 this.activityIdentifier();
             }
         }
@@ -1456,11 +1485,11 @@ class CPGLParser extends Parser_1.Parser {
     }
     conceptIdentifier() {
         let _localctx = new ConceptIdentifierContext(this._ctx, this.state);
-        this.enterRule(_localctx, 76, CPGLParser.RULE_conceptIdentifier);
+        this.enterRule(_localctx, 78, CPGLParser.RULE_conceptIdentifier);
         try {
             this.enterOuterAlt(_localctx, 1);
             {
-                this.state = 294;
+                this.state = 297;
                 this.identifier();
             }
         }
@@ -1481,62 +1510,12 @@ class CPGLParser extends Parser_1.Parser {
     }
     conceptReference() {
         let _localctx = new ConceptReferenceContext(this._ctx, this.state);
-        this.enterRule(_localctx, 78, CPGLParser.RULE_conceptReference);
+        this.enterRule(_localctx, 80, CPGLParser.RULE_conceptReference);
         try {
             this.enterOuterAlt(_localctx, 1);
             {
-                this.state = 296;
+                this.state = 299;
                 this.conceptIdentifier();
-            }
-        }
-        catch (re) {
-            if (re instanceof RecognitionException_1.RecognitionException) {
-                _localctx.exception = re;
-                this._errHandler.reportError(this, re);
-                this._errHandler.recover(this, re);
-            }
-            else {
-                throw re;
-            }
-        }
-        finally {
-            this.exitRule();
-        }
-        return _localctx;
-    }
-    patternIdentifier() {
-        let _localctx = new PatternIdentifierContext(this._ctx, this.state);
-        this.enterRule(_localctx, 80, CPGLParser.RULE_patternIdentifier);
-        try {
-            this.enterOuterAlt(_localctx, 1);
-            {
-                this.state = 298;
-                this.identifier();
-            }
-        }
-        catch (re) {
-            if (re instanceof RecognitionException_1.RecognitionException) {
-                _localctx.exception = re;
-                this._errHandler.reportError(this, re);
-                this._errHandler.recover(this, re);
-            }
-            else {
-                throw re;
-            }
-        }
-        finally {
-            this.exitRule();
-        }
-        return _localctx;
-    }
-    patternReference() {
-        let _localctx = new PatternReferenceContext(this._ctx, this.state);
-        this.enterRule(_localctx, 82, CPGLParser.RULE_patternReference);
-        try {
-            this.enterOuterAlt(_localctx, 1);
-            {
-                this.state = 300;
-                this.patternIdentifier();
             }
         }
         catch (re) {
@@ -1556,12 +1535,37 @@ class CPGLParser extends Parser_1.Parser {
     }
     backtickString() {
         let _localctx = new BacktickStringContext(this._ctx, this.state);
-        this.enterRule(_localctx, 84, CPGLParser.RULE_backtickString);
+        this.enterRule(_localctx, 82, CPGLParser.RULE_backtickString);
         try {
             this.enterOuterAlt(_localctx, 1);
             {
-                this.state = 302;
+                this.state = 301;
                 this.match(CPGLParser.BACKTICK_STRING);
+            }
+        }
+        catch (re) {
+            if (re instanceof RecognitionException_1.RecognitionException) {
+                _localctx.exception = re;
+                this._errHandler.reportError(this, re);
+                this._errHandler.recover(this, re);
+            }
+            else {
+                throw re;
+            }
+        }
+        finally {
+            this.exitRule();
+        }
+        return _localctx;
+    }
+    patternName() {
+        let _localctx = new PatternNameContext(this._ctx, this.state);
+        this.enterRule(_localctx, 84, CPGLParser.RULE_patternName);
+        try {
+            this.enterOuterAlt(_localctx, 1);
+            {
+                this.state = 303;
+                this.backtickString();
             }
         }
         catch (re) {
@@ -1585,7 +1589,7 @@ class CPGLParser extends Parser_1.Parser {
         try {
             this.enterOuterAlt(_localctx, 1);
             {
-                this.state = 304;
+                this.state = 305;
                 this.backtickString();
             }
         }
@@ -1610,7 +1614,7 @@ class CPGLParser extends Parser_1.Parser {
         try {
             this.enterOuterAlt(_localctx, 1);
             {
-                this.state = 306;
+                this.state = 307;
                 this.backtickString();
             }
         }
@@ -1637,55 +1641,57 @@ class CPGLParser extends Parser_1.Parser {
     }
 }
 exports.CPGLParser = CPGLParser;
-CPGLParser.CONCEPT = 1;
-CPGLParser.TYPE = 2;
-CPGLParser.VALUETYPE = 3;
-CPGLParser.TERMINOLOGY = 4;
-CPGLParser.PROVENANCE = 5;
-CPGLParser.INFERRED = 6;
-CPGLParser.AND = 7;
-CPGLParser.OR = 8;
-CPGLParser.NOT = 9;
-CPGLParser.DONE = 10;
-CPGLParser.HAS = 11;
-CPGLParser.BY = 12;
-CPGLParser.CODED = 13;
-CPGLParser.VALUESET = 14;
-CPGLParser.PERFORM = 15;
-CPGLParser.ACTIVITY = 16;
-CPGLParser.OF = 17;
-CPGLParser.SYSTEM = 18;
-CPGLParser.CODE = 19;
-CPGLParser.DO = 20;
-CPGLParser.USE = 21;
-CPGLParser.WHEN = 22;
+CPGLParser.ACTIVITY = 1;
+CPGLParser.ALL = 2;
+CPGLParser.AND = 3;
+CPGLParser.ANY = 4;
+CPGLParser.APPLY = 5;
+CPGLParser.BECAUSE = 6;
+CPGLParser.CODE = 7;
+CPGLParser.CODED = 8;
+CPGLParser.CONCEPT = 9;
+CPGLParser.DECISION = 10;
+CPGLParser.DONE = 11;
+CPGLParser.DO = 12;
+CPGLParser.EVIDENCE = 13;
+CPGLParser.FROM = 14;
+CPGLParser.INFERRED = 15;
+CPGLParser.IS = 16;
+CPGLParser.NOT = 17;
+CPGLParser.OR = 18;
+CPGLParser.PATTERN = 19;
+CPGLParser.PERFORM = 20;
+CPGLParser.SYSTEM = 21;
+CPGLParser.TERMINOLOGY = 22;
 CPGLParser.THEN = 23;
-CPGLParser.ANY = 24;
-CPGLParser.ALL = 25;
-CPGLParser.DECISION = 26;
-CPGLParser.BECAUSE = 27;
-CPGLParser.ERROR = 28;
-CPGLParser.COLON = 29;
-CPGLParser.DOT = 30;
-CPGLParser.LPAREN = 31;
-CPGLParser.RPAREN = 32;
-CPGLParser.QUOTED_STRING = 33;
-CPGLParser.BACKTICK_STRING = 34;
-CPGLParser.WS = 35;
-CPGLParser.COMMENT = 36;
-CPGLParser.COMMENT_BLOCK = 37;
-CPGLParser.ACTIVITY_TYPE = 38;
-CPGLParser.ACTIVITY_WS = 39;
-CPGLParser.ACTIVITY_COMMENT_BLOCK = 40;
-CPGLParser.ACTIVITY_ErrorChar = 41;
-CPGLParser.CONCEPT_TYPE = 42;
-CPGLParser.CONCEPT_WS = 43;
-CPGLParser.CONCEPT_COMMENT_BLOCK = 44;
-CPGLParser.CONCEPT_ErrorChar = 45;
-CPGLParser.CONCEPT_VALUE_TYPE = 46;
-CPGLParser.VALUE_TYPE_WS = 47;
-CPGLParser.VALUE_TYPE_COMMENT_BLOCK = 48;
-CPGLParser.VALUE_TYPE_ErrorChar = 49;
+CPGLParser.TYPE = 24;
+CPGLParser.USE = 25;
+CPGLParser.VALUETYPE = 26;
+CPGLParser.VALUESET = 27;
+CPGLParser.WHEN = 28;
+CPGLParser.WITH = 29;
+CPGLParser.ERROR = 30;
+CPGLParser.COLON = 31;
+CPGLParser.DOT = 32;
+CPGLParser.LPAREN = 33;
+CPGLParser.RPAREN = 34;
+CPGLParser.QUOTED_STRING = 35;
+CPGLParser.BACKTICK_STRING = 36;
+CPGLParser.WS = 37;
+CPGLParser.COMMENT = 38;
+CPGLParser.COMMENT_BLOCK = 39;
+CPGLParser.ACTIVITY_TYPE = 40;
+CPGLParser.ACTIVITY_WS = 41;
+CPGLParser.ACTIVITY_COMMENT_BLOCK = 42;
+CPGLParser.ACTIVITY_ErrorChar = 43;
+CPGLParser.CONCEPT_TYPE = 44;
+CPGLParser.CONCEPT_WS = 45;
+CPGLParser.CONCEPT_COMMENT_BLOCK = 46;
+CPGLParser.CONCEPT_ErrorChar = 47;
+CPGLParser.CONCEPT_VALUE_TYPE = 48;
+CPGLParser.VALUE_TYPE_WS = 49;
+CPGLParser.VALUE_TYPE_COMMENT_BLOCK = 50;
+CPGLParser.VALUE_TYPE_ErrorChar = 51;
 CPGLParser.RULE_cpgl = 0;
 CPGLParser.RULE_statement = 1;
 CPGLParser.RULE_decisionStatement = 2;
@@ -1704,31 +1710,31 @@ CPGLParser.RULE_terminologySystemCode = 14;
 CPGLParser.RULE_activityStatement = 15;
 CPGLParser.RULE_conceptStatement = 16;
 CPGLParser.RULE_conceptBody = 17;
-CPGLParser.RULE_hasTypeLine = 18;
-CPGLParser.RULE_hasValueTypeLine = 19;
-CPGLParser.RULE_provenanceLine = 20;
-CPGLParser.RULE_codedByLine = 21;
-CPGLParser.RULE_inferredByLine = 22;
+CPGLParser.RULE_typeLine = 18;
+CPGLParser.RULE_valueTypeLine = 19;
+CPGLParser.RULE_evidenceLine = 20;
+CPGLParser.RULE_codedFromLine = 21;
+CPGLParser.RULE_inferredFromLine = 22;
 CPGLParser.RULE_inferredBody = 23;
-CPGLParser.RULE_inferredByConceptReference = 24;
-CPGLParser.RULE_inferredByDescriptiveLogic = 25;
-CPGLParser.RULE_inferredByExpression = 26;
-CPGLParser.RULE_informalOr = 27;
-CPGLParser.RULE_informalAnd = 28;
-CPGLParser.RULE_informalNot = 29;
-CPGLParser.RULE_atom = 30;
-CPGLParser.RULE_identifier = 31;
-CPGLParser.RULE_decisionIdentifier = 32;
-CPGLParser.RULE_decisionReference = 33;
-CPGLParser.RULE_terminologyIdentifier = 34;
-CPGLParser.RULE_terminologyReference = 35;
-CPGLParser.RULE_activityIdentifier = 36;
-CPGLParser.RULE_activityReference = 37;
-CPGLParser.RULE_conceptIdentifier = 38;
-CPGLParser.RULE_conceptReference = 39;
-CPGLParser.RULE_patternIdentifier = 40;
-CPGLParser.RULE_patternReference = 41;
-CPGLParser.RULE_backtickString = 42;
+CPGLParser.RULE_inferredFromConceptReference = 24;
+CPGLParser.RULE_patternStatement = 25;
+CPGLParser.RULE_inferredFromDescriptiveLogic = 26;
+CPGLParser.RULE_inferredFromExpression = 27;
+CPGLParser.RULE_informalOr = 28;
+CPGLParser.RULE_informalAnd = 29;
+CPGLParser.RULE_informalNot = 30;
+CPGLParser.RULE_atom = 31;
+CPGLParser.RULE_identifier = 32;
+CPGLParser.RULE_decisionIdentifier = 33;
+CPGLParser.RULE_decisionReference = 34;
+CPGLParser.RULE_terminologyIdentifier = 35;
+CPGLParser.RULE_terminologyReference = 36;
+CPGLParser.RULE_activityIdentifier = 37;
+CPGLParser.RULE_activityReference = 38;
+CPGLParser.RULE_conceptIdentifier = 39;
+CPGLParser.RULE_conceptReference = 40;
+CPGLParser.RULE_backtickString = 41;
+CPGLParser.RULE_patternName = 42;
 CPGLParser.RULE_activityTypeValue = 43;
 CPGLParser.RULE_rationale = 44;
 CPGLParser.ruleNames = [
@@ -1736,33 +1742,34 @@ CPGLParser.ruleNames = [
     "anyOrAllClause", "blockBody", "singleActionStatement", "blockStatement",
     "actionStatement", "doStatement", "useStatement", "terminologyStatement",
     "terminologyValueset", "terminologySystemCode", "activityStatement", "conceptStatement",
-    "conceptBody", "hasTypeLine", "hasValueTypeLine", "provenanceLine", "codedByLine",
-    "inferredByLine", "inferredBody", "inferredByConceptReference", "inferredByDescriptiveLogic",
-    "inferredByExpression", "informalOr", "informalAnd", "informalNot", "atom",
-    "identifier", "decisionIdentifier", "decisionReference", "terminologyIdentifier",
-    "terminologyReference", "activityIdentifier", "activityReference", "conceptIdentifier",
-    "conceptReference", "patternIdentifier", "patternReference", "backtickString",
-    "activityTypeValue", "rationale",
+    "conceptBody", "typeLine", "valueTypeLine", "evidenceLine", "codedFromLine",
+    "inferredFromLine", "inferredBody", "inferredFromConceptReference", "patternStatement",
+    "inferredFromDescriptiveLogic", "inferredFromExpression", "informalOr",
+    "informalAnd", "informalNot", "atom", "identifier", "decisionIdentifier",
+    "decisionReference", "terminologyIdentifier", "terminologyReference",
+    "activityIdentifier", "activityReference", "conceptIdentifier", "conceptReference",
+    "backtickString", "patternName", "activityTypeValue", "rationale",
 ];
 CPGLParser._LITERAL_NAMES = [
-    undefined, "'concept'", "'type'", "'valuetype'", "'terminology'", "'provenance'",
-    "'inferred'", "'and'", "'or'", "'not'", "'done'", "'has'", "'by'", "'coded'",
-    "'valueset'", "'perform'", "'activity'", "'of'", "'system'", "'code'",
-    "'do'", "'use'", "'when'", "'then'", "'any'", "'all'", "'decision'", "'because'",
-    "'error'", "':'", "'.'", "'('", "')'",
+    undefined, "'activity'", "'all'", "'and'", "'any'", "'apply'", "'because'",
+    "'code'", "'coded'", "'concept'", "'decision'", "'done'", "'do'", "'evidence'",
+    "'from'", "'inferred'", undefined, "'not'", "'or'", "'pattern'", "'perform'",
+    "'system'", "'terminology'", "'then'", "'type'", "'use'", "'valuetype'",
+    "'valueset'", "'when'", "'with'", "'error'", "':'", "'.'", "'('", "')'",
 ];
 CPGLParser._SYMBOLIC_NAMES = [
-    undefined, "CONCEPT", "TYPE", "VALUETYPE", "TERMINOLOGY", "PROVENANCE",
-    "INFERRED", "AND", "OR", "NOT", "DONE", "HAS", "BY", "CODED", "VALUESET",
-    "PERFORM", "ACTIVITY", "OF", "SYSTEM", "CODE", "DO", "USE", "WHEN", "THEN",
-    "ANY", "ALL", "DECISION", "BECAUSE", "ERROR", "COLON", "DOT", "LPAREN",
-    "RPAREN", "QUOTED_STRING", "BACKTICK_STRING", "WS", "COMMENT", "COMMENT_BLOCK",
-    "ACTIVITY_TYPE", "ACTIVITY_WS", "ACTIVITY_COMMENT_BLOCK", "ACTIVITY_ErrorChar",
-    "CONCEPT_TYPE", "CONCEPT_WS", "CONCEPT_COMMENT_BLOCK", "CONCEPT_ErrorChar",
-    "CONCEPT_VALUE_TYPE", "VALUE_TYPE_WS", "VALUE_TYPE_COMMENT_BLOCK", "VALUE_TYPE_ErrorChar",
+    undefined, "ACTIVITY", "ALL", "AND", "ANY", "APPLY", "BECAUSE", "CODE",
+    "CODED", "CONCEPT", "DECISION", "DONE", "DO", "EVIDENCE", "FROM", "INFERRED",
+    "IS", "NOT", "OR", "PATTERN", "PERFORM", "SYSTEM", "TERMINOLOGY", "THEN",
+    "TYPE", "USE", "VALUETYPE", "VALUESET", "WHEN", "WITH", "ERROR", "COLON",
+    "DOT", "LPAREN", "RPAREN", "QUOTED_STRING", "BACKTICK_STRING", "WS", "COMMENT",
+    "COMMENT_BLOCK", "ACTIVITY_TYPE", "ACTIVITY_WS", "ACTIVITY_COMMENT_BLOCK",
+    "ACTIVITY_ErrorChar", "CONCEPT_TYPE", "CONCEPT_WS", "CONCEPT_COMMENT_BLOCK",
+    "CONCEPT_ErrorChar", "CONCEPT_VALUE_TYPE", "VALUE_TYPE_WS", "VALUE_TYPE_COMMENT_BLOCK",
+    "VALUE_TYPE_ErrorChar",
 ];
 CPGLParser.VOCABULARY = new VocabularyImpl_1.VocabularyImpl(CPGLParser._LITERAL_NAMES, CPGLParser._SYMBOLIC_NAMES, []);
-CPGLParser._serializedATN = "\x03\uC91D\uCABA\u058D\uAFBA\u4F53\u0607\uEA8B\uC241\x033\u0137\x04\x02" +
+CPGLParser._serializedATN = "\x03\uC91D\uCABA\u058D\uAFBA\u4F53\u0607\uEA8B\uC241\x035\u0138\x04\x02" +
     "\t\x02\x04\x03\t\x03\x04\x04\t\x04\x04\x05\t\x05\x04\x06\t\x06\x04\x07" +
     "\t\x07\x04\b\t\b\x04\t\t\t\x04\n\t\n\x04\v\t\v\x04\f\t\f\x04\r\t\r\x04" +
     "\x0E\t\x0E\x04\x0F\t\x0F\x04\x10\t\x10\x04\x11\t\x11\x04\x12\t\x12\x04" +
@@ -1786,109 +1793,110 @@ CPGLParser._serializedATN = "\x03\uC91D\uCABA\u058D\uAFBA\u4F53\u0607\uEA8B\uC24
     "\x13\x03\x13\x03\x13\x05\x13\xD5\n\x13\x03\x14\x03\x14\x03\x14\x03\x14" +
     "\x03\x14\x03\x15\x03\x15\x03\x15\x03\x15\x03\x15\x03\x16\x03\x16\x03\x16" +
     "\x03\x16\x03\x16\x03\x17\x03\x17\x03\x17\x03\x17\x03\x17\x03\x18\x03\x18" +
-    "\x03\x18\x03\x18\x03\x18\x03\x19\x03\x19\x05\x19\xF2\n\x19\x03\x1A\x05" +
-    "\x1A\xF5\n\x1A\x03\x1A\x03\x1A\x03\x1B\x03\x1B\x03\x1B\x03\x1B\x03\x1C" +
-    "\x03\x1C\x03\x1D\x03\x1D\x03\x1D\x07\x1D\u0102\n\x1D\f\x1D\x0E\x1D\u0105" +
-    "\v\x1D\x03\x1E\x03\x1E\x03\x1E\x07\x1E\u010A\n\x1E\f\x1E\x0E\x1E\u010D" +
-    "\v\x1E\x03\x1F\x03\x1F\x03\x1F\x05\x1F\u0112\n\x1F\x03 \x03 \x03 \x03" +
-    " \x03 \x05 \u0119\n \x03!\x03!\x03\"\x03\"\x03#\x03#\x03$\x03$\x03%\x03" +
+    "\x03\x18\x03\x18\x03\x18\x03\x19\x03\x19\x05\x19\xF2\n\x19\x03\x1A\x03" +
+    "\x1A\x05\x1A\xF6\n\x1A\x03\x1B\x03\x1B\x03\x1B\x03\x1B\x03\x1C\x03\x1C" +
+    "\x03\x1C\x03\x1C\x03\x1D\x03\x1D\x03\x1E\x03\x1E\x03\x1E\x07\x1E\u0105" +
+    "\n\x1E\f\x1E\x0E\x1E\u0108\v\x1E\x03\x1F\x03\x1F\x03\x1F\x07\x1F\u010D" +
+    "\n\x1F\f\x1F\x0E\x1F\u0110\v\x1F\x03 \x03 \x03 \x05 \u0115\n \x03!\x03" +
+    "!\x03!\x03!\x03!\x05!\u011C\n!\x03\"\x03\"\x03#\x03#\x03$\x03$\x03%\x03" +
     "%\x03&\x03&\x03\'\x03\'\x03(\x03(\x03)\x03)\x03*\x03*\x03+\x03+\x03,\x03" +
     ",\x03-\x03-\x03.\x03.\x03.\x02\x02\x02/\x02\x02\x04\x02\x06\x02\b\x02" +
     "\n\x02\f\x02\x0E\x02\x10\x02\x12\x02\x14\x02\x16\x02\x18\x02\x1A\x02\x1C" +
     "\x02\x1E\x02 \x02\"\x02$\x02&\x02(\x02*\x02,\x02.\x020\x022\x024\x026" +
     "\x028\x02:\x02<\x02>\x02@\x02B\x02D\x02F\x02H\x02J\x02L\x02N\x02P\x02" +
-    "R\x02T\x02V\x02X\x02Z\x02\x02\x03\x03\x02\x1A\x1B\x02\u0121\x02_\x03\x02" +
-    "\x02\x02\x04h\x03\x02\x02\x02\x06j\x03\x02\x02\x02\bq\x03\x02\x02\x02" +
-    "\n\x7F\x03\x02\x02\x02\f\x81\x03\x02\x02\x02\x0E\x84\x03\x02\x02\x02\x10" +
-    "\x91\x03\x02\x02\x02\x12\x97\x03\x02\x02\x02\x14\x9B\x03\x02\x02\x02\x16" +
-    "\x9F\x03\x02\x02\x02\x18\xA2\x03\x02\x02\x02\x1A\xA5\x03\x02\x02\x02\x1C" +
-    "\xAE\x03\x02\x02\x02\x1E\xB1\x03\x02\x02\x02 \xB6\x03\x02\x02\x02\"\xC7" +
-    "\x03\x02\x02\x02$\xCD\x03\x02\x02\x02&\xD6\x03\x02\x02\x02(\xDB\x03\x02" +
-    "\x02\x02*\xE0\x03\x02\x02\x02,\xE5\x03\x02\x02\x02.\xEA\x03\x02\x02\x02" +
-    "0\xF1\x03\x02\x02\x022\xF4\x03\x02\x02\x024\xF8\x03\x02\x02\x026\xFC\x03" +
-    "\x02\x02\x028\xFE\x03\x02\x02\x02:\u0106\x03\x02\x02\x02<\u0111\x03\x02" +
-    "\x02\x02>\u0118\x03\x02\x02\x02@\u011A\x03\x02\x02\x02B\u011C\x03\x02" +
-    "\x02\x02D\u011E\x03\x02\x02\x02F\u0120\x03\x02\x02\x02H\u0122\x03\x02" +
-    "\x02\x02J\u0124\x03\x02\x02\x02L\u0126\x03\x02\x02\x02N\u0128\x03\x02" +
-    "\x02\x02P\u012A\x03\x02\x02\x02R\u012C\x03\x02\x02\x02T\u012E\x03\x02" +
-    "\x02\x02V\u0130\x03\x02\x02\x02X\u0132\x03\x02\x02\x02Z\u0134\x03\x02" +
-    "\x02\x02\\^\x05\x04\x03\x02]\\\x03\x02\x02\x02^a\x03\x02\x02\x02_]\x03" +
-    "\x02\x02\x02_`\x03\x02\x02\x02`b\x03\x02\x02\x02a_\x03\x02\x02\x02bc\x07" +
-    "\x02\x02\x03c\x03\x03\x02\x02\x02di\x05\x06\x04\x02ei\x05\x1A\x0E\x02" +
-    "fi\x05 \x11\x02gi\x05\"\x12\x02hd\x03\x02\x02\x02he\x03\x02\x02\x02hf" +
-    "\x03\x02\x02\x02hg\x03\x02\x02\x02i\x05\x03\x02\x02\x02jk\x07\x1C\x02" +
-    "\x02kl\x05B\"\x02lm\x07\x1F\x02\x02mn\x05\b\x05\x02no\x07\f\x02\x02o\x07" +
-    "\x03\x02\x02\x02pr\x05\n\x06\x02qp\x03\x02\x02\x02rs\x03\x02\x02\x02s" +
-    "q\x03\x02\x02\x02st\x03\x02\x02\x02t\t\x03\x02\x02\x02uv\x07\x18\x02\x02" +
-    "vw\x05P)\x02wx\x07\x19\x02\x02xy\x05\x0E\b\x02y\x80\x03\x02\x02\x02z{" +
-    "\x07\x18\x02\x02{|\x05P)\x02|}\x07\x19\x02\x02}~\x05\x10\t\x02~\x80\x03" +
-    "\x02\x02\x02\x7Fu\x03\x02\x02\x02\x7Fz\x03\x02\x02\x02\x80\v\x03\x02\x02" +
-    "\x02\x81\x82\t\x02\x02\x02\x82\x83\x07\x1F\x02\x02\x83\r\x03\x02\x02\x02" +
-    "\x84\x86\x07\x1F\x02\x02\x85\x87\x05\f\x07\x02\x86\x85\x03\x02\x02\x02" +
-    "\x86\x87\x03\x02\x02\x02\x87\x89\x03\x02\x02\x02\x88\x8A\x05\x12\n\x02" +
-    "\x89\x88\x03\x02\x02\x02\x8A\x8B\x03\x02\x02\x02\x8B\x89\x03\x02\x02\x02" +
-    "\x8B\x8C\x03\x02\x02\x02\x8C\x8D\x03\x02\x02\x02\x8D\x8E\x07\f\x02\x02" +
-    "\x8E\x0F\x03\x02\x02\x02\x8F\x92\x05\x16\f\x02\x90\x92\x05\x18\r\x02\x91" +
-    "\x8F\x03\x02\x02\x02\x91\x90\x03\x02\x02\x02\x92\x93\x03\x02\x02\x02\x93" +
-    "\x94\x07 \x02\x02\x94\x11\x03\x02\x02\x02\x95\x98\x05\n\x06\x02\x96\x98" +
-    "\x05\x14\v\x02\x97\x95\x03\x02\x02\x02\x97\x96\x03\x02\x02\x02\x98\x13" +
-    "\x03\x02\x02\x02\x99\x9C\x05\x16\f\x02\x9A\x9C\x05\x18\r\x02\x9B\x99\x03" +
-    "\x02\x02\x02\x9B\x9A\x03\x02\x02\x02\x9C\x9D\x03\x02\x02\x02\x9D\x9E\x07" +
-    " \x02\x02\x9E\x15\x03\x02\x02\x02\x9F\xA0\x07\x16\x02\x02\xA0\xA1\x05" +
-    "L\'\x02\xA1\x17\x03\x02\x02\x02\xA2\xA3\x07\x17\x02\x02\xA3\xA4\x05D#" +
-    "\x02\xA4\x19\x03\x02\x02\x02\xA5\xA6\x07\x06\x02\x02\xA6\xAA\x05F$\x02" +
-    "\xA7\xAB\x05\x1C\x0F\x02\xA8\xAB\x05V,\x02\xA9\xAB\x05\x1E\x10\x02\xAA" +
+    "R\x02T\x02V\x02X\x02Z\x02\x02\x03\x04\x02\x04\x04\x06\x06\x02\u0122\x02" +
+    "_\x03\x02\x02\x02\x04h\x03\x02\x02\x02\x06j\x03\x02\x02\x02\bq\x03\x02" +
+    "\x02\x02\n\x7F\x03\x02\x02\x02\f\x81\x03\x02\x02\x02\x0E\x84\x03\x02\x02" +
+    "\x02\x10\x91\x03\x02\x02\x02\x12\x97\x03\x02\x02\x02\x14\x9B\x03\x02\x02" +
+    "\x02\x16\x9F\x03\x02\x02\x02\x18\xA2\x03\x02\x02\x02\x1A\xA5\x03\x02\x02" +
+    "\x02\x1C\xAE\x03\x02\x02\x02\x1E\xB1\x03\x02\x02\x02 \xB6\x03\x02\x02" +
+    "\x02\"\xC7\x03\x02\x02\x02$\xCD\x03\x02\x02\x02&\xD6\x03\x02\x02\x02(" +
+    "\xDB\x03\x02\x02\x02*\xE0\x03\x02\x02\x02,\xE5\x03\x02\x02\x02.\xEA\x03" +
+    "\x02\x02\x020\xF1\x03\x02\x02\x022\xF3\x03\x02\x02\x024\xF7\x03\x02\x02" +
+    "\x026\xFB\x03\x02\x02\x028\xFF\x03\x02\x02\x02:\u0101\x03\x02\x02\x02" +
+    "<\u0109\x03\x02\x02\x02>\u0114\x03\x02\x02\x02@\u011B\x03\x02\x02\x02" +
+    "B\u011D\x03\x02\x02\x02D\u011F\x03\x02\x02\x02F\u0121\x03\x02\x02\x02" +
+    "H\u0123\x03\x02\x02\x02J\u0125\x03\x02\x02\x02L\u0127\x03\x02\x02\x02" +
+    "N\u0129\x03\x02\x02\x02P\u012B\x03\x02\x02\x02R\u012D\x03\x02\x02\x02" +
+    "T\u012F\x03\x02\x02\x02V\u0131\x03\x02\x02\x02X\u0133\x03\x02\x02\x02" +
+    "Z\u0135\x03\x02\x02\x02\\^\x05\x04\x03\x02]\\\x03\x02\x02\x02^a\x03\x02" +
+    "\x02\x02_]\x03\x02\x02\x02_`\x03\x02\x02\x02`b\x03\x02\x02\x02a_\x03\x02" +
+    "\x02\x02bc\x07\x02\x02\x03c\x03\x03\x02\x02\x02di\x05\x06\x04\x02ei\x05" +
+    "\x1A\x0E\x02fi\x05 \x11\x02gi\x05\"\x12\x02hd\x03\x02\x02\x02he\x03\x02" +
+    "\x02\x02hf\x03\x02\x02\x02hg\x03\x02\x02\x02i\x05\x03\x02\x02\x02jk\x07" +
+    "\f\x02\x02kl\x05D#\x02lm\x07!\x02\x02mn\x05\b\x05\x02no\x07\r\x02\x02" +
+    "o\x07\x03\x02\x02\x02pr\x05\n\x06\x02qp\x03\x02\x02\x02rs\x03\x02\x02" +
+    "\x02sq\x03\x02\x02\x02st\x03\x02\x02\x02t\t\x03\x02\x02\x02uv\x07\x1E" +
+    "\x02\x02vw\x05R*\x02wx\x07\x19\x02\x02xy\x05\x0E\b\x02y\x80\x03\x02\x02" +
+    "\x02z{\x07\x1E\x02\x02{|\x05R*\x02|}\x07\x19\x02\x02}~\x05\x10\t\x02~" +
+    "\x80\x03\x02\x02\x02\x7Fu\x03\x02\x02\x02\x7Fz\x03\x02\x02\x02\x80\v\x03" +
+    "\x02\x02\x02\x81\x82\t\x02\x02\x02\x82\x83\x07!\x02\x02\x83\r\x03\x02" +
+    "\x02\x02\x84\x86\x07!\x02\x02\x85\x87\x05\f\x07\x02\x86\x85\x03\x02\x02" +
+    "\x02\x86\x87\x03\x02\x02\x02\x87\x89\x03\x02\x02\x02\x88\x8A\x05\x12\n" +
+    "\x02\x89\x88\x03\x02\x02\x02\x8A\x8B\x03\x02\x02\x02\x8B\x89\x03\x02\x02" +
+    "\x02\x8B\x8C\x03\x02\x02\x02\x8C\x8D\x03\x02\x02\x02\x8D\x8E\x07\r\x02" +
+    "\x02\x8E\x0F\x03\x02\x02\x02\x8F\x92\x05\x16\f\x02\x90\x92\x05\x18\r\x02" +
+    "\x91\x8F\x03\x02\x02\x02\x91\x90\x03\x02\x02\x02\x92\x93\x03\x02\x02\x02" +
+    "\x93\x94\x07\"\x02\x02\x94\x11\x03\x02\x02\x02\x95\x98\x05\n\x06\x02\x96" +
+    "\x98\x05\x14\v\x02\x97\x95\x03\x02\x02\x02\x97\x96\x03\x02\x02\x02\x98" +
+    "\x13\x03\x02\x02\x02\x99\x9C\x05\x16\f\x02\x9A\x9C\x05\x18\r\x02\x9B\x99" +
+    "\x03\x02\x02\x02\x9B\x9A\x03\x02\x02\x02\x9C\x9D\x03\x02\x02\x02\x9D\x9E" +
+    "\x07\"\x02\x02\x9E\x15\x03\x02\x02\x02\x9F\xA0\x07\x0E\x02\x02\xA0\xA1" +
+    "\x05N(\x02\xA1\x17\x03\x02\x02\x02\xA2\xA3\x07\x1B\x02\x02\xA3\xA4\x05" +
+    "F$\x02\xA4\x19\x03\x02\x02\x02\xA5\xA6\x07\x18\x02\x02\xA6\xAA\x05H%\x02" +
+    "\xA7\xAB\x05\x1C\x0F\x02\xA8\xAB\x05T+\x02\xA9\xAB\x05\x1E\x10\x02\xAA" +
     "\xA7\x03\x02\x02\x02\xAA\xA8\x03\x02\x02\x02\xAA\xA9\x03\x02\x02\x02\xAB" +
-    "\xAC\x03\x02\x02\x02\xAC\xAD\x07 \x02\x02\xAD\x1B\x03\x02\x02\x02\xAE" +
-    "\xAF\x07\x10\x02\x02\xAF\xB0\x05@!\x02\xB0\x1D\x03\x02\x02\x02\xB1\xB2" +
-    "\x07\x14\x02\x02\xB2\xB3\x05V,\x02\xB3\xB4\x07\x15\x02\x02\xB4\xB5\x05" +
-    "V,\x02\xB5\x1F\x03\x02\x02\x02\xB6\xB7\x07\x12\x02\x02\xB7\xB8\x05J&\x02" +
-    "\xB8\xB9\x07\x11\x02\x02\xB9\xBF\x07(\x02\x02\xBA\xBD\x07\x13\x02\x02" +
-    "\xBB\xBE\x05H%\x02\xBC\xBE\x05X-\x02\xBD\xBB\x03\x02\x02\x02\xBD\xBC\x03" +
+    "\xAC\x03\x02\x02\x02\xAC\xAD\x07\"\x02\x02\xAD\x1B\x03\x02\x02\x02\xAE" +
+    "\xAF\x07\x1D\x02\x02\xAF\xB0\x05B\"\x02\xB0\x1D\x03\x02\x02\x02\xB1\xB2" +
+    "\x07\x17\x02\x02\xB2\xB3\x05T+\x02\xB3\xB4\x07\t\x02\x02\xB4\xB5\x05T" +
+    "+\x02\xB5\x1F\x03\x02\x02\x02\xB6\xB7\x07\x03\x02\x02\xB7\xB8\x05L\'\x02" +
+    "\xB8\xB9\x07\x16\x02\x02\xB9\xBF\x07*\x02\x02\xBA\xBD\x07\x1F\x02\x02" +
+    "\xBB\xBE\x05J&\x02\xBC\xBE\x05X-\x02\xBD\xBB\x03\x02\x02\x02\xBD\xBC\x03" +
     "\x02\x02\x02\xBE\xC0\x03\x02\x02\x02\xBF\xBA\x03\x02\x02\x02\xBF\xC0\x03" +
-    "\x02\x02\x02\xC0\xC3\x03\x02\x02\x02\xC1\xC2\x07\x1D\x02\x02\xC2\xC4\x05" +
+    "\x02\x02\x02\xC0\xC3\x03\x02\x02\x02\xC1\xC2\x07\b\x02\x02\xC2\xC4\x05" +
     "Z.\x02\xC3\xC1\x03\x02\x02\x02\xC3\xC4\x03\x02\x02\x02\xC4\xC5\x03\x02" +
-    "\x02\x02\xC5\xC6\x07 \x02\x02\xC6!\x03\x02\x02\x02\xC7\xC8\x07\x03\x02" +
-    "\x02\xC8\xC9\x05N(\x02\xC9\xCA\x07\x1F\x02\x02\xCA\xCB\x05$\x13\x02\xCB" +
-    "\xCC\x07\f\x02\x02\xCC#\x03\x02\x02\x02\xCD\xCE\x05&\x14\x02\xCE\xD0\x05" +
-    "(\x15\x02\xCF\xD1\x05*\x16\x02\xD0\xCF\x03\x02\x02\x02\xD0\xD1\x03\x02" +
+    "\x02\x02\xC5\xC6\x07\"\x02\x02\xC6!\x03\x02\x02\x02\xC7\xC8\x07\v\x02" +
+    "\x02\xC8\xC9\x05P)\x02\xC9\xCA\x07!\x02\x02\xCA\xCB\x05$\x13\x02\xCB\xCC" +
+    "\x07\r\x02\x02\xCC#\x03\x02\x02\x02\xCD\xCE\x05&\x14\x02\xCE\xD0\x05(" +
+    "\x15\x02\xCF\xD1\x05*\x16\x02\xD0\xCF\x03\x02\x02\x02\xD0\xD1\x03\x02" +
     "\x02\x02\xD1\xD4\x03\x02\x02\x02\xD2\xD5\x05,\x17\x02\xD3\xD5\x05.\x18" +
     "\x02\xD4\xD2\x03\x02\x02\x02\xD4\xD3\x03\x02\x02\x02\xD5%\x03\x02\x02" +
-    "\x02\xD6\xD7\x07\r\x02\x02\xD7\xD8\x07\x04\x02\x02\xD8\xD9\x07,\x02\x02" +
-    "\xD9\xDA\x07 \x02\x02\xDA\'\x03\x02\x02\x02\xDB\xDC\x07\r\x02\x02\xDC" +
-    "\xDD\x07\x05\x02\x02\xDD\xDE\x070\x02\x02\xDE\xDF\x07 \x02\x02\xDF)\x03" +
-    "\x02\x02\x02\xE0\xE1\x07\r\x02\x02\xE1\xE2\x07\x07\x02\x02\xE2\xE3\x05" +
-    "V,\x02\xE3\xE4\x07 \x02\x02\xE4+\x03\x02\x02\x02\xE5\xE6\x07\x0F\x02\x02" +
-    "\xE6\xE7\x07\x0E\x02\x02\xE7\xE8\x05H%\x02\xE8\xE9\x07 \x02\x02\xE9-\x03" +
-    "\x02\x02\x02\xEA\xEB\x07\b\x02\x02\xEB\xEC\x07\x0E\x02\x02\xEC\xED\x05" +
-    "0\x19\x02\xED\xEE\x07 \x02\x02\xEE/\x03\x02\x02\x02\xEF\xF2\x052\x1A\x02" +
-    "\xF0\xF2\x054\x1B\x02\xF1\xEF\x03\x02\x02\x02\xF1\xF0\x03\x02\x02\x02" +
-    "\xF21\x03\x02\x02\x02\xF3\xF5\x05T+\x02\xF4\xF3\x03\x02\x02\x02\xF4\xF5" +
-    "\x03\x02\x02\x02\xF5\xF6\x03\x02\x02\x02\xF6\xF7\x05P)\x02\xF73\x03\x02" +
-    "\x02\x02\xF8\xF9\x07!\x02\x02\xF9\xFA\x056\x1C\x02\xFA\xFB\x07\"\x02\x02" +
-    "\xFB5\x03\x02\x02\x02\xFC\xFD\x058\x1D\x02\xFD7\x03\x02\x02\x02\xFE\u0103" +
-    "\x05:\x1E\x02\xFF\u0100\x07\n\x02\x02\u0100\u0102\x05:\x1E\x02\u0101\xFF" +
-    "\x03\x02\x02\x02\u0102\u0105\x03\x02\x02\x02\u0103\u0101\x03\x02\x02\x02" +
-    "\u0103\u0104\x03\x02\x02\x02\u01049\x03\x02\x02\x02\u0105\u0103\x03\x02" +
-    "\x02\x02\u0106\u010B\x05<\x1F\x02\u0107\u0108\x07\t\x02\x02\u0108\u010A" +
-    "\x05<\x1F\x02\u0109\u0107\x03\x02\x02\x02\u010A\u010D\x03\x02\x02\x02" +
-    "\u010B\u0109\x03\x02\x02\x02\u010B\u010C\x03\x02\x02\x02\u010C;\x03\x02" +
-    "\x02\x02\u010D\u010B\x03\x02\x02\x02\u010E\u010F\x07\v\x02\x02\u010F\u0112" +
-    "\x05<\x1F\x02\u0110\u0112\x05> \x02\u0111\u010E\x03\x02\x02\x02\u0111" +
-    "\u0110\x03\x02\x02\x02\u0112=\x03\x02\x02\x02\u0113\u0119\x05P)\x02\u0114" +
-    "\u0115\x07!\x02\x02\u0115\u0116\x056\x1C\x02\u0116\u0117\x07\"\x02\x02" +
-    "\u0117\u0119\x03\x02\x02\x02\u0118\u0113\x03\x02\x02\x02\u0118\u0114\x03" +
-    "\x02\x02\x02\u0119?\x03\x02\x02\x02\u011A\u011B\x07#\x02\x02\u011BA\x03" +
-    "\x02\x02\x02\u011C\u011D\x05@!\x02\u011DC\x03\x02\x02\x02\u011E\u011F" +
-    "\x05B\"\x02\u011FE\x03\x02\x02\x02\u0120\u0121\x05@!\x02\u0121G\x03\x02" +
-    "\x02\x02\u0122\u0123\x05@!\x02\u0123I\x03\x02\x02\x02\u0124\u0125\x05" +
-    "@!\x02\u0125K\x03\x02\x02\x02\u0126\u0127\x05J&\x02\u0127M\x03\x02\x02" +
-    "\x02\u0128\u0129\x05@!\x02\u0129O\x03\x02\x02\x02\u012A\u012B\x05N(\x02" +
-    "\u012BQ\x03\x02\x02\x02\u012C\u012D\x05@!\x02\u012DS\x03\x02\x02\x02\u012E" +
-    "\u012F\x05R*\x02\u012FU\x03\x02\x02\x02\u0130\u0131\x07$\x02\x02\u0131" +
-    "W\x03\x02\x02\x02\u0132\u0133\x05V,\x02\u0133Y\x03\x02\x02\x02\u0134\u0135" +
-    "\x05V,\x02\u0135[\x03\x02\x02\x02\x17_hs\x7F\x86\x8B\x91\x97\x9B\xAA\xBD" +
-    "\xBF\xC3\xD0\xD4\xF1\xF4\u0103\u010B\u0111\u0118";
+    "\x02\xD6\xD7\x07\x1A\x02\x02\xD7\xD8\x07\x12\x02\x02\xD8\xD9\x07.\x02" +
+    "\x02\xD9\xDA\x07\"\x02\x02\xDA\'\x03\x02\x02\x02\xDB\xDC\x07\x1C\x02\x02" +
+    "\xDC\xDD\x07\x12\x02\x02\xDD\xDE\x072\x02\x02\xDE\xDF\x07\"\x02\x02\xDF" +
+    ")\x03\x02\x02\x02\xE0\xE1\x07\x0F\x02\x02\xE1\xE2\x07\x12\x02\x02\xE2" +
+    "\xE3\x05T+\x02\xE3\xE4\x07\"\x02\x02\xE4+\x03\x02\x02\x02\xE5\xE6\x07" +
+    "\n\x02\x02\xE6\xE7\x07\x10\x02\x02\xE7\xE8\x05J&\x02\xE8\xE9\x07\"\x02" +
+    "\x02\xE9-\x03\x02\x02\x02\xEA\xEB\x07\x11\x02\x02\xEB\xEC\x07\x10\x02" +
+    "\x02\xEC\xED\x050\x19\x02\xED\xEE\x07\"\x02\x02\xEE/\x03\x02\x02\x02\xEF" +
+    "\xF2\x052\x1A\x02\xF0\xF2\x056\x1C\x02\xF1\xEF\x03\x02\x02\x02\xF1\xF0" +
+    "\x03\x02\x02\x02\xF21\x03\x02\x02\x02\xF3\xF5\x05R*\x02\xF4\xF6\x054\x1B" +
+    "\x02\xF5\xF4\x03\x02\x02\x02\xF5\xF6\x03\x02\x02\x02\xF63\x03\x02\x02" +
+    "\x02\xF7\xF8\x07\x07\x02\x02\xF8\xF9\x07\x15\x02\x02\xF9\xFA\x05V,\x02" +
+    "\xFA5\x03\x02\x02\x02\xFB\xFC\x07#\x02\x02\xFC\xFD\x058\x1D\x02\xFD\xFE" +
+    "\x07$\x02\x02\xFE7\x03\x02\x02\x02\xFF\u0100\x05:\x1E\x02\u01009\x03\x02" +
+    "\x02\x02\u0101\u0106\x05<\x1F\x02\u0102\u0103\x07\x14\x02\x02\u0103\u0105" +
+    "\x05<\x1F\x02\u0104\u0102\x03\x02\x02\x02\u0105\u0108\x03\x02\x02\x02" +
+    "\u0106\u0104\x03\x02\x02\x02\u0106\u0107\x03\x02\x02\x02\u0107;\x03\x02" +
+    "\x02\x02\u0108\u0106\x03\x02\x02\x02\u0109\u010E\x05> \x02\u010A\u010B" +
+    "\x07\x05\x02\x02\u010B\u010D\x05> \x02\u010C\u010A\x03\x02\x02\x02\u010D" +
+    "\u0110\x03\x02\x02\x02\u010E\u010C\x03\x02\x02\x02\u010E\u010F\x03\x02" +
+    "\x02\x02\u010F=\x03\x02\x02\x02\u0110\u010E\x03\x02\x02\x02\u0111\u0112" +
+    "\x07\x13\x02\x02\u0112\u0115\x05> \x02\u0113\u0115\x05@!\x02\u0114\u0111" +
+    "\x03\x02\x02\x02\u0114\u0113\x03\x02\x02\x02\u0115?\x03\x02\x02\x02\u0116" +
+    "\u011C\x05R*\x02\u0117\u0118\x07#\x02\x02\u0118\u0119\x058\x1D\x02\u0119" +
+    "\u011A\x07$\x02\x02\u011A\u011C\x03\x02\x02\x02\u011B\u0116\x03\x02\x02" +
+    "\x02\u011B\u0117\x03\x02\x02\x02\u011CA\x03\x02\x02\x02\u011D\u011E\x07" +
+    "%\x02\x02\u011EC\x03\x02\x02\x02\u011F\u0120\x05B\"\x02\u0120E\x03\x02" +
+    "\x02\x02\u0121\u0122\x05D#\x02\u0122G\x03\x02\x02\x02\u0123\u0124\x05" +
+    "B\"\x02\u0124I\x03\x02\x02\x02\u0125\u0126\x05B\"\x02\u0126K\x03\x02\x02" +
+    "\x02\u0127\u0128\x05B\"\x02\u0128M\x03\x02\x02\x02\u0129\u012A\x05L\'" +
+    "\x02\u012AO\x03\x02\x02\x02\u012B\u012C\x05B\"\x02\u012CQ\x03\x02\x02" +
+    "\x02\u012D\u012E\x05P)\x02\u012ES\x03\x02\x02\x02\u012F\u0130\x07&\x02" +
+    "\x02\u0130U\x03\x02\x02\x02\u0131\u0132\x05T+\x02\u0132W\x03\x02\x02\x02" +
+    "\u0133\u0134\x05T+\x02\u0134Y\x03\x02\x02\x02\u0135\u0136\x05T+\x02\u0136" +
+    "[\x03\x02\x02\x02\x17_hs\x7F\x86\x8B\x91\x97\x9B\xAA\xBD\xBF\xC3\xD0\xD4" +
+    "\xF1\xF5\u0106\u010E\u0114\u011B";
 class CpglContext extends ParserRuleContext_1.ParserRuleContext {
     EOF() { return this.getToken(CPGLParser.EOF, 0); }
     statement(i) {
@@ -2468,7 +2476,7 @@ class ActivityStatementContext extends ParserRuleContext_1.ParserRuleContext {
     PERFORM() { return this.getToken(CPGLParser.PERFORM, 0); }
     ACTIVITY_TYPE() { return this.getToken(CPGLParser.ACTIVITY_TYPE, 0); }
     DOT() { return this.getToken(CPGLParser.DOT, 0); }
-    OF() { return this.tryGetToken(CPGLParser.OF, 0); }
+    WITH() { return this.tryGetToken(CPGLParser.WITH, 0); }
     BECAUSE() { return this.tryGetToken(CPGLParser.BECAUSE, 0); }
     rationale() {
         return this.tryGetRuleContext(0, RationaleContext);
@@ -2538,20 +2546,20 @@ class ConceptStatementContext extends ParserRuleContext_1.ParserRuleContext {
 }
 exports.ConceptStatementContext = ConceptStatementContext;
 class ConceptBodyContext extends ParserRuleContext_1.ParserRuleContext {
-    hasTypeLine() {
-        return this.getRuleContext(0, HasTypeLineContext);
+    typeLine() {
+        return this.getRuleContext(0, TypeLineContext);
     }
-    hasValueTypeLine() {
-        return this.getRuleContext(0, HasValueTypeLineContext);
+    valueTypeLine() {
+        return this.getRuleContext(0, ValueTypeLineContext);
     }
-    codedByLine() {
-        return this.tryGetRuleContext(0, CodedByLineContext);
+    codedFromLine() {
+        return this.tryGetRuleContext(0, CodedFromLineContext);
     }
-    inferredByLine() {
-        return this.tryGetRuleContext(0, InferredByLineContext);
+    inferredFromLine() {
+        return this.tryGetRuleContext(0, InferredFromLineContext);
     }
-    provenanceLine() {
-        return this.tryGetRuleContext(0, ProvenanceLineContext);
+    evidenceLine() {
+        return this.tryGetRuleContext(0, EvidenceLineContext);
     }
     constructor(parent, invokingState) {
         super(parent, invokingState);
@@ -2577,67 +2585,67 @@ class ConceptBodyContext extends ParserRuleContext_1.ParserRuleContext {
     }
 }
 exports.ConceptBodyContext = ConceptBodyContext;
-class HasTypeLineContext extends ParserRuleContext_1.ParserRuleContext {
-    HAS() { return this.getToken(CPGLParser.HAS, 0); }
+class TypeLineContext extends ParserRuleContext_1.ParserRuleContext {
     TYPE() { return this.getToken(CPGLParser.TYPE, 0); }
+    IS() { return this.getToken(CPGLParser.IS, 0); }
     CONCEPT_TYPE() { return this.getToken(CPGLParser.CONCEPT_TYPE, 0); }
     DOT() { return this.getToken(CPGLParser.DOT, 0); }
     constructor(parent, invokingState) {
         super(parent, invokingState);
     }
-    get ruleIndex() { return CPGLParser.RULE_hasTypeLine; }
+    get ruleIndex() { return CPGLParser.RULE_typeLine; }
     enterRule(listener) {
-        if (listener.enterHasTypeLine) {
-            listener.enterHasTypeLine(this);
+        if (listener.enterTypeLine) {
+            listener.enterTypeLine(this);
         }
     }
     exitRule(listener) {
-        if (listener.exitHasTypeLine) {
-            listener.exitHasTypeLine(this);
+        if (listener.exitTypeLine) {
+            listener.exitTypeLine(this);
         }
     }
     accept(visitor) {
-        if (visitor.visitHasTypeLine) {
-            return visitor.visitHasTypeLine(this);
+        if (visitor.visitTypeLine) {
+            return visitor.visitTypeLine(this);
         }
         else {
             return visitor.visitChildren(this);
         }
     }
 }
-exports.HasTypeLineContext = HasTypeLineContext;
-class HasValueTypeLineContext extends ParserRuleContext_1.ParserRuleContext {
-    HAS() { return this.getToken(CPGLParser.HAS, 0); }
+exports.TypeLineContext = TypeLineContext;
+class ValueTypeLineContext extends ParserRuleContext_1.ParserRuleContext {
     VALUETYPE() { return this.getToken(CPGLParser.VALUETYPE, 0); }
+    IS() { return this.getToken(CPGLParser.IS, 0); }
     CONCEPT_VALUE_TYPE() { return this.getToken(CPGLParser.CONCEPT_VALUE_TYPE, 0); }
     DOT() { return this.getToken(CPGLParser.DOT, 0); }
     constructor(parent, invokingState) {
         super(parent, invokingState);
     }
-    get ruleIndex() { return CPGLParser.RULE_hasValueTypeLine; }
+    get ruleIndex() { return CPGLParser.RULE_valueTypeLine; }
     enterRule(listener) {
-        if (listener.enterHasValueTypeLine) {
-            listener.enterHasValueTypeLine(this);
+        if (listener.enterValueTypeLine) {
+            listener.enterValueTypeLine(this);
         }
     }
     exitRule(listener) {
-        if (listener.exitHasValueTypeLine) {
-            listener.exitHasValueTypeLine(this);
+        if (listener.exitValueTypeLine) {
+            listener.exitValueTypeLine(this);
         }
     }
     accept(visitor) {
-        if (visitor.visitHasValueTypeLine) {
-            return visitor.visitHasValueTypeLine(this);
+        if (visitor.visitValueTypeLine) {
+            return visitor.visitValueTypeLine(this);
         }
         else {
             return visitor.visitChildren(this);
         }
     }
 }
-exports.HasValueTypeLineContext = HasValueTypeLineContext;
-class ProvenanceLineContext extends ParserRuleContext_1.ParserRuleContext {
-    HAS() { return this.getToken(CPGLParser.HAS, 0); }
-    PROVENANCE() { return this.getToken(CPGLParser.PROVENANCE, 0); }
+exports.ValueTypeLineContext = ValueTypeLineContext;
+class EvidenceLineContext extends ParserRuleContext_1.ParserRuleContext {
+    EVIDENCE() { return this.getToken(CPGLParser.EVIDENCE, 0); }
+    IS() { return this.getToken(CPGLParser.IS, 0); }
     backtickString() {
         return this.getRuleContext(0, BacktickStringContext);
     }
@@ -2645,30 +2653,30 @@ class ProvenanceLineContext extends ParserRuleContext_1.ParserRuleContext {
     constructor(parent, invokingState) {
         super(parent, invokingState);
     }
-    get ruleIndex() { return CPGLParser.RULE_provenanceLine; }
+    get ruleIndex() { return CPGLParser.RULE_evidenceLine; }
     enterRule(listener) {
-        if (listener.enterProvenanceLine) {
-            listener.enterProvenanceLine(this);
+        if (listener.enterEvidenceLine) {
+            listener.enterEvidenceLine(this);
         }
     }
     exitRule(listener) {
-        if (listener.exitProvenanceLine) {
-            listener.exitProvenanceLine(this);
+        if (listener.exitEvidenceLine) {
+            listener.exitEvidenceLine(this);
         }
     }
     accept(visitor) {
-        if (visitor.visitProvenanceLine) {
-            return visitor.visitProvenanceLine(this);
+        if (visitor.visitEvidenceLine) {
+            return visitor.visitEvidenceLine(this);
         }
         else {
             return visitor.visitChildren(this);
         }
     }
 }
-exports.ProvenanceLineContext = ProvenanceLineContext;
-class CodedByLineContext extends ParserRuleContext_1.ParserRuleContext {
+exports.EvidenceLineContext = EvidenceLineContext;
+class CodedFromLineContext extends ParserRuleContext_1.ParserRuleContext {
     CODED() { return this.getToken(CPGLParser.CODED, 0); }
-    BY() { return this.getToken(CPGLParser.BY, 0); }
+    FROM() { return this.getToken(CPGLParser.FROM, 0); }
     terminologyReference() {
         return this.getRuleContext(0, TerminologyReferenceContext);
     }
@@ -2676,30 +2684,30 @@ class CodedByLineContext extends ParserRuleContext_1.ParserRuleContext {
     constructor(parent, invokingState) {
         super(parent, invokingState);
     }
-    get ruleIndex() { return CPGLParser.RULE_codedByLine; }
+    get ruleIndex() { return CPGLParser.RULE_codedFromLine; }
     enterRule(listener) {
-        if (listener.enterCodedByLine) {
-            listener.enterCodedByLine(this);
+        if (listener.enterCodedFromLine) {
+            listener.enterCodedFromLine(this);
         }
     }
     exitRule(listener) {
-        if (listener.exitCodedByLine) {
-            listener.exitCodedByLine(this);
+        if (listener.exitCodedFromLine) {
+            listener.exitCodedFromLine(this);
         }
     }
     accept(visitor) {
-        if (visitor.visitCodedByLine) {
-            return visitor.visitCodedByLine(this);
+        if (visitor.visitCodedFromLine) {
+            return visitor.visitCodedFromLine(this);
         }
         else {
             return visitor.visitChildren(this);
         }
     }
 }
-exports.CodedByLineContext = CodedByLineContext;
-class InferredByLineContext extends ParserRuleContext_1.ParserRuleContext {
+exports.CodedFromLineContext = CodedFromLineContext;
+class InferredFromLineContext extends ParserRuleContext_1.ParserRuleContext {
     INFERRED() { return this.getToken(CPGLParser.INFERRED, 0); }
-    BY() { return this.getToken(CPGLParser.BY, 0); }
+    FROM() { return this.getToken(CPGLParser.FROM, 0); }
     inferredBody() {
         return this.getRuleContext(0, InferredBodyContext);
     }
@@ -2707,27 +2715,27 @@ class InferredByLineContext extends ParserRuleContext_1.ParserRuleContext {
     constructor(parent, invokingState) {
         super(parent, invokingState);
     }
-    get ruleIndex() { return CPGLParser.RULE_inferredByLine; }
+    get ruleIndex() { return CPGLParser.RULE_inferredFromLine; }
     enterRule(listener) {
-        if (listener.enterInferredByLine) {
-            listener.enterInferredByLine(this);
+        if (listener.enterInferredFromLine) {
+            listener.enterInferredFromLine(this);
         }
     }
     exitRule(listener) {
-        if (listener.exitInferredByLine) {
-            listener.exitInferredByLine(this);
+        if (listener.exitInferredFromLine) {
+            listener.exitInferredFromLine(this);
         }
     }
     accept(visitor) {
-        if (visitor.visitInferredByLine) {
-            return visitor.visitInferredByLine(this);
+        if (visitor.visitInferredFromLine) {
+            return visitor.visitInferredFromLine(this);
         }
         else {
             return visitor.visitChildren(this);
         }
     }
 }
-exports.InferredByLineContext = InferredByLineContext;
+exports.InferredFromLineContext = InferredFromLineContext;
 class InferredBodyContext extends ParserRuleContext_1.ParserRuleContext {
     constructor(parent, invokingState) {
         super(parent, invokingState);
@@ -2739,8 +2747,8 @@ class InferredBodyContext extends ParserRuleContext_1.ParserRuleContext {
 }
 exports.InferredBodyContext = InferredBodyContext;
 class DefinitionConceptContext extends InferredBodyContext {
-    inferredByConceptReference() {
-        return this.getRuleContext(0, InferredByConceptReferenceContext);
+    inferredFromConceptReference() {
+        return this.getRuleContext(0, InferredFromConceptReferenceContext);
     }
     constructor(ctx) {
         super(ctx.parent, ctx.invokingState);
@@ -2767,8 +2775,8 @@ class DefinitionConceptContext extends InferredBodyContext {
 }
 exports.DefinitionConceptContext = DefinitionConceptContext;
 class DefinitionLogicContext extends InferredBodyContext {
-    inferredByDescriptiveLogic() {
-        return this.getRuleContext(0, InferredByDescriptiveLogicContext);
+    inferredFromDescriptiveLogic() {
+        return this.getRuleContext(0, InferredFromDescriptiveLogicContext);
     }
     constructor(ctx) {
         super(ctx.parent, ctx.invokingState);
@@ -2794,95 +2802,125 @@ class DefinitionLogicContext extends InferredBodyContext {
     }
 }
 exports.DefinitionLogicContext = DefinitionLogicContext;
-class InferredByConceptReferenceContext extends ParserRuleContext_1.ParserRuleContext {
+class InferredFromConceptReferenceContext extends ParserRuleContext_1.ParserRuleContext {
     conceptReference() {
         return this.getRuleContext(0, ConceptReferenceContext);
     }
-    patternReference() {
-        return this.tryGetRuleContext(0, PatternReferenceContext);
+    patternStatement() {
+        return this.tryGetRuleContext(0, PatternStatementContext);
     }
     constructor(parent, invokingState) {
         super(parent, invokingState);
     }
-    get ruleIndex() { return CPGLParser.RULE_inferredByConceptReference; }
+    get ruleIndex() { return CPGLParser.RULE_inferredFromConceptReference; }
     enterRule(listener) {
-        if (listener.enterInferredByConceptReference) {
-            listener.enterInferredByConceptReference(this);
+        if (listener.enterInferredFromConceptReference) {
+            listener.enterInferredFromConceptReference(this);
         }
     }
     exitRule(listener) {
-        if (listener.exitInferredByConceptReference) {
-            listener.exitInferredByConceptReference(this);
+        if (listener.exitInferredFromConceptReference) {
+            listener.exitInferredFromConceptReference(this);
         }
     }
     accept(visitor) {
-        if (visitor.visitInferredByConceptReference) {
-            return visitor.visitInferredByConceptReference(this);
+        if (visitor.visitInferredFromConceptReference) {
+            return visitor.visitInferredFromConceptReference(this);
         }
         else {
             return visitor.visitChildren(this);
         }
     }
 }
-exports.InferredByConceptReferenceContext = InferredByConceptReferenceContext;
-class InferredByDescriptiveLogicContext extends ParserRuleContext_1.ParserRuleContext {
+exports.InferredFromConceptReferenceContext = InferredFromConceptReferenceContext;
+class PatternStatementContext extends ParserRuleContext_1.ParserRuleContext {
+    APPLY() { return this.getToken(CPGLParser.APPLY, 0); }
+    PATTERN() { return this.getToken(CPGLParser.PATTERN, 0); }
+    patternName() {
+        return this.getRuleContext(0, PatternNameContext);
+    }
+    constructor(parent, invokingState) {
+        super(parent, invokingState);
+    }
+    get ruleIndex() { return CPGLParser.RULE_patternStatement; }
+    enterRule(listener) {
+        if (listener.enterPatternStatement) {
+            listener.enterPatternStatement(this);
+        }
+    }
+    exitRule(listener) {
+        if (listener.exitPatternStatement) {
+            listener.exitPatternStatement(this);
+        }
+    }
+    accept(visitor) {
+        if (visitor.visitPatternStatement) {
+            return visitor.visitPatternStatement(this);
+        }
+        else {
+            return visitor.visitChildren(this);
+        }
+    }
+}
+exports.PatternStatementContext = PatternStatementContext;
+class InferredFromDescriptiveLogicContext extends ParserRuleContext_1.ParserRuleContext {
     LPAREN() { return this.getToken(CPGLParser.LPAREN, 0); }
-    inferredByExpression() {
-        return this.getRuleContext(0, InferredByExpressionContext);
+    inferredFromExpression() {
+        return this.getRuleContext(0, InferredFromExpressionContext);
     }
     RPAREN() { return this.getToken(CPGLParser.RPAREN, 0); }
     constructor(parent, invokingState) {
         super(parent, invokingState);
     }
-    get ruleIndex() { return CPGLParser.RULE_inferredByDescriptiveLogic; }
+    get ruleIndex() { return CPGLParser.RULE_inferredFromDescriptiveLogic; }
     enterRule(listener) {
-        if (listener.enterInferredByDescriptiveLogic) {
-            listener.enterInferredByDescriptiveLogic(this);
+        if (listener.enterInferredFromDescriptiveLogic) {
+            listener.enterInferredFromDescriptiveLogic(this);
         }
     }
     exitRule(listener) {
-        if (listener.exitInferredByDescriptiveLogic) {
-            listener.exitInferredByDescriptiveLogic(this);
+        if (listener.exitInferredFromDescriptiveLogic) {
+            listener.exitInferredFromDescriptiveLogic(this);
         }
     }
     accept(visitor) {
-        if (visitor.visitInferredByDescriptiveLogic) {
-            return visitor.visitInferredByDescriptiveLogic(this);
+        if (visitor.visitInferredFromDescriptiveLogic) {
+            return visitor.visitInferredFromDescriptiveLogic(this);
         }
         else {
             return visitor.visitChildren(this);
         }
     }
 }
-exports.InferredByDescriptiveLogicContext = InferredByDescriptiveLogicContext;
-class InferredByExpressionContext extends ParserRuleContext_1.ParserRuleContext {
+exports.InferredFromDescriptiveLogicContext = InferredFromDescriptiveLogicContext;
+class InferredFromExpressionContext extends ParserRuleContext_1.ParserRuleContext {
     informalOr() {
         return this.getRuleContext(0, InformalOrContext);
     }
     constructor(parent, invokingState) {
         super(parent, invokingState);
     }
-    get ruleIndex() { return CPGLParser.RULE_inferredByExpression; }
+    get ruleIndex() { return CPGLParser.RULE_inferredFromExpression; }
     enterRule(listener) {
-        if (listener.enterInferredByExpression) {
-            listener.enterInferredByExpression(this);
+        if (listener.enterInferredFromExpression) {
+            listener.enterInferredFromExpression(this);
         }
     }
     exitRule(listener) {
-        if (listener.exitInferredByExpression) {
-            listener.exitInferredByExpression(this);
+        if (listener.exitInferredFromExpression) {
+            listener.exitInferredFromExpression(this);
         }
     }
     accept(visitor) {
-        if (visitor.visitInferredByExpression) {
-            return visitor.visitInferredByExpression(this);
+        if (visitor.visitInferredFromExpression) {
+            return visitor.visitInferredFromExpression(this);
         }
         else {
             return visitor.visitChildren(this);
         }
     }
 }
-exports.InferredByExpressionContext = InferredByExpressionContext;
+exports.InferredFromExpressionContext = InferredFromExpressionContext;
 class InformalOrContext extends ParserRuleContext_1.ParserRuleContext {
     informalAnd(i) {
         if (i === undefined) {
@@ -3037,8 +3075,8 @@ class ConceptAtomContext extends AtomContext {
 exports.ConceptAtomContext = ConceptAtomContext;
 class GroupExpressionContext extends AtomContext {
     LPAREN() { return this.getToken(CPGLParser.LPAREN, 0); }
-    inferredByExpression() {
-        return this.getRuleContext(0, InferredByExpressionContext);
+    inferredFromExpression() {
+        return this.getRuleContext(0, InferredFromExpressionContext);
     }
     RPAREN() { return this.getToken(CPGLParser.RPAREN, 0); }
     constructor(ctx) {
@@ -3315,62 +3353,6 @@ class ConceptReferenceContext extends ParserRuleContext_1.ParserRuleContext {
     }
 }
 exports.ConceptReferenceContext = ConceptReferenceContext;
-class PatternIdentifierContext extends ParserRuleContext_1.ParserRuleContext {
-    identifier() {
-        return this.getRuleContext(0, IdentifierContext);
-    }
-    constructor(parent, invokingState) {
-        super(parent, invokingState);
-    }
-    get ruleIndex() { return CPGLParser.RULE_patternIdentifier; }
-    enterRule(listener) {
-        if (listener.enterPatternIdentifier) {
-            listener.enterPatternIdentifier(this);
-        }
-    }
-    exitRule(listener) {
-        if (listener.exitPatternIdentifier) {
-            listener.exitPatternIdentifier(this);
-        }
-    }
-    accept(visitor) {
-        if (visitor.visitPatternIdentifier) {
-            return visitor.visitPatternIdentifier(this);
-        }
-        else {
-            return visitor.visitChildren(this);
-        }
-    }
-}
-exports.PatternIdentifierContext = PatternIdentifierContext;
-class PatternReferenceContext extends ParserRuleContext_1.ParserRuleContext {
-    patternIdentifier() {
-        return this.getRuleContext(0, PatternIdentifierContext);
-    }
-    constructor(parent, invokingState) {
-        super(parent, invokingState);
-    }
-    get ruleIndex() { return CPGLParser.RULE_patternReference; }
-    enterRule(listener) {
-        if (listener.enterPatternReference) {
-            listener.enterPatternReference(this);
-        }
-    }
-    exitRule(listener) {
-        if (listener.exitPatternReference) {
-            listener.exitPatternReference(this);
-        }
-    }
-    accept(visitor) {
-        if (visitor.visitPatternReference) {
-            return visitor.visitPatternReference(this);
-        }
-        else {
-            return visitor.visitChildren(this);
-        }
-    }
-}
-exports.PatternReferenceContext = PatternReferenceContext;
 class BacktickStringContext extends ParserRuleContext_1.ParserRuleContext {
     BACKTICK_STRING() { return this.getToken(CPGLParser.BACKTICK_STRING, 0); }
     constructor(parent, invokingState) {
@@ -3397,6 +3379,34 @@ class BacktickStringContext extends ParserRuleContext_1.ParserRuleContext {
     }
 }
 exports.BacktickStringContext = BacktickStringContext;
+class PatternNameContext extends ParserRuleContext_1.ParserRuleContext {
+    backtickString() {
+        return this.getRuleContext(0, BacktickStringContext);
+    }
+    constructor(parent, invokingState) {
+        super(parent, invokingState);
+    }
+    get ruleIndex() { return CPGLParser.RULE_patternName; }
+    enterRule(listener) {
+        if (listener.enterPatternName) {
+            listener.enterPatternName(this);
+        }
+    }
+    exitRule(listener) {
+        if (listener.exitPatternName) {
+            listener.exitPatternName(this);
+        }
+    }
+    accept(visitor) {
+        if (visitor.visitPatternName) {
+            return visitor.visitPatternName(this);
+        }
+        else {
+            return visitor.visitChildren(this);
+        }
+    }
+}
+exports.PatternNameContext = PatternNameContext;
 class ActivityTypeValueContext extends ParserRuleContext_1.ParserRuleContext {
     backtickString() {
         return this.getRuleContext(0, BacktickStringContext);

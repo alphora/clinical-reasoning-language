@@ -1,4 +1,5 @@
-export declare function mapPlanDefinitionToDecision(instance: any, allInstances: any[]): {
+import { ActivityDef } from "./activityDefinition";
+export declare function mapPlanDefinitionToDecision(instance: unknown, allInstances: ActivityDef[]): {
     decision: string;
     activities: {
         id: string;

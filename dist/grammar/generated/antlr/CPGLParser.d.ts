@@ -8,55 +8,57 @@ import { Vocabulary } from "antlr4ts/Vocabulary";
 import { CPGLParserListener } from "./CPGLParserListener";
 import { CPGLParserVisitor } from "./CPGLParserVisitor";
 export declare class CPGLParser extends Parser {
-    static readonly CONCEPT = 1;
-    static readonly TYPE = 2;
-    static readonly VALUETYPE = 3;
-    static readonly TERMINOLOGY = 4;
-    static readonly PROVENANCE = 5;
-    static readonly INFERRED = 6;
-    static readonly AND = 7;
-    static readonly OR = 8;
-    static readonly NOT = 9;
-    static readonly DONE = 10;
-    static readonly HAS = 11;
-    static readonly BY = 12;
-    static readonly CODED = 13;
-    static readonly VALUESET = 14;
-    static readonly PERFORM = 15;
-    static readonly ACTIVITY = 16;
-    static readonly OF = 17;
-    static readonly SYSTEM = 18;
-    static readonly CODE = 19;
-    static readonly DO = 20;
-    static readonly USE = 21;
-    static readonly WHEN = 22;
+    static readonly ACTIVITY = 1;
+    static readonly ALL = 2;
+    static readonly AND = 3;
+    static readonly ANY = 4;
+    static readonly APPLY = 5;
+    static readonly BECAUSE = 6;
+    static readonly CODE = 7;
+    static readonly CODED = 8;
+    static readonly CONCEPT = 9;
+    static readonly DECISION = 10;
+    static readonly DONE = 11;
+    static readonly DO = 12;
+    static readonly EVIDENCE = 13;
+    static readonly FROM = 14;
+    static readonly INFERRED = 15;
+    static readonly IS = 16;
+    static readonly NOT = 17;
+    static readonly OR = 18;
+    static readonly PATTERN = 19;
+    static readonly PERFORM = 20;
+    static readonly SYSTEM = 21;
+    static readonly TERMINOLOGY = 22;
     static readonly THEN = 23;
-    static readonly ANY = 24;
-    static readonly ALL = 25;
-    static readonly DECISION = 26;
-    static readonly BECAUSE = 27;
-    static readonly ERROR = 28;
-    static readonly COLON = 29;
-    static readonly DOT = 30;
-    static readonly LPAREN = 31;
-    static readonly RPAREN = 32;
-    static readonly QUOTED_STRING = 33;
-    static readonly BACKTICK_STRING = 34;
-    static readonly WS = 35;
-    static readonly COMMENT = 36;
-    static readonly COMMENT_BLOCK = 37;
-    static readonly ACTIVITY_TYPE = 38;
-    static readonly ACTIVITY_WS = 39;
-    static readonly ACTIVITY_COMMENT_BLOCK = 40;
-    static readonly ACTIVITY_ErrorChar = 41;
-    static readonly CONCEPT_TYPE = 42;
-    static readonly CONCEPT_WS = 43;
-    static readonly CONCEPT_COMMENT_BLOCK = 44;
-    static readonly CONCEPT_ErrorChar = 45;
-    static readonly CONCEPT_VALUE_TYPE = 46;
-    static readonly VALUE_TYPE_WS = 47;
-    static readonly VALUE_TYPE_COMMENT_BLOCK = 48;
-    static readonly VALUE_TYPE_ErrorChar = 49;
+    static readonly TYPE = 24;
+    static readonly USE = 25;
+    static readonly VALUETYPE = 26;
+    static readonly VALUESET = 27;
+    static readonly WHEN = 28;
+    static readonly WITH = 29;
+    static readonly ERROR = 30;
+    static readonly COLON = 31;
+    static readonly DOT = 32;
+    static readonly LPAREN = 33;
+    static readonly RPAREN = 34;
+    static readonly QUOTED_STRING = 35;
+    static readonly BACKTICK_STRING = 36;
+    static readonly WS = 37;
+    static readonly COMMENT = 38;
+    static readonly COMMENT_BLOCK = 39;
+    static readonly ACTIVITY_TYPE = 40;
+    static readonly ACTIVITY_WS = 41;
+    static readonly ACTIVITY_COMMENT_BLOCK = 42;
+    static readonly ACTIVITY_ErrorChar = 43;
+    static readonly CONCEPT_TYPE = 44;
+    static readonly CONCEPT_WS = 45;
+    static readonly CONCEPT_COMMENT_BLOCK = 46;
+    static readonly CONCEPT_ErrorChar = 47;
+    static readonly CONCEPT_VALUE_TYPE = 48;
+    static readonly VALUE_TYPE_WS = 49;
+    static readonly VALUE_TYPE_COMMENT_BLOCK = 50;
+    static readonly VALUE_TYPE_ErrorChar = 51;
     static readonly RULE_cpgl = 0;
     static readonly RULE_statement = 1;
     static readonly RULE_decisionStatement = 2;
@@ -75,31 +77,31 @@ export declare class CPGLParser extends Parser {
     static readonly RULE_activityStatement = 15;
     static readonly RULE_conceptStatement = 16;
     static readonly RULE_conceptBody = 17;
-    static readonly RULE_hasTypeLine = 18;
-    static readonly RULE_hasValueTypeLine = 19;
-    static readonly RULE_provenanceLine = 20;
-    static readonly RULE_codedByLine = 21;
-    static readonly RULE_inferredByLine = 22;
+    static readonly RULE_typeLine = 18;
+    static readonly RULE_valueTypeLine = 19;
+    static readonly RULE_evidenceLine = 20;
+    static readonly RULE_codedFromLine = 21;
+    static readonly RULE_inferredFromLine = 22;
     static readonly RULE_inferredBody = 23;
-    static readonly RULE_inferredByConceptReference = 24;
-    static readonly RULE_inferredByDescriptiveLogic = 25;
-    static readonly RULE_inferredByExpression = 26;
-    static readonly RULE_informalOr = 27;
-    static readonly RULE_informalAnd = 28;
-    static readonly RULE_informalNot = 29;
-    static readonly RULE_atom = 30;
-    static readonly RULE_identifier = 31;
-    static readonly RULE_decisionIdentifier = 32;
-    static readonly RULE_decisionReference = 33;
-    static readonly RULE_terminologyIdentifier = 34;
-    static readonly RULE_terminologyReference = 35;
-    static readonly RULE_activityIdentifier = 36;
-    static readonly RULE_activityReference = 37;
-    static readonly RULE_conceptIdentifier = 38;
-    static readonly RULE_conceptReference = 39;
-    static readonly RULE_patternIdentifier = 40;
-    static readonly RULE_patternReference = 41;
-    static readonly RULE_backtickString = 42;
+    static readonly RULE_inferredFromConceptReference = 24;
+    static readonly RULE_patternStatement = 25;
+    static readonly RULE_inferredFromDescriptiveLogic = 26;
+    static readonly RULE_inferredFromExpression = 27;
+    static readonly RULE_informalOr = 28;
+    static readonly RULE_informalAnd = 29;
+    static readonly RULE_informalNot = 30;
+    static readonly RULE_atom = 31;
+    static readonly RULE_identifier = 32;
+    static readonly RULE_decisionIdentifier = 33;
+    static readonly RULE_decisionReference = 34;
+    static readonly RULE_terminologyIdentifier = 35;
+    static readonly RULE_terminologyReference = 36;
+    static readonly RULE_activityIdentifier = 37;
+    static readonly RULE_activityReference = 38;
+    static readonly RULE_conceptIdentifier = 39;
+    static readonly RULE_conceptReference = 40;
+    static readonly RULE_backtickString = 41;
+    static readonly RULE_patternName = 42;
     static readonly RULE_activityTypeValue = 43;
     static readonly RULE_rationale = 44;
     static readonly ruleNames: string[];
@@ -130,15 +132,16 @@ export declare class CPGLParser extends Parser {
     activityStatement(): ActivityStatementContext;
     conceptStatement(): ConceptStatementContext;
     conceptBody(): ConceptBodyContext;
-    hasTypeLine(): HasTypeLineContext;
-    hasValueTypeLine(): HasValueTypeLineContext;
-    provenanceLine(): ProvenanceLineContext;
-    codedByLine(): CodedByLineContext;
-    inferredByLine(): InferredByLineContext;
+    typeLine(): TypeLineContext;
+    valueTypeLine(): ValueTypeLineContext;
+    evidenceLine(): EvidenceLineContext;
+    codedFromLine(): CodedFromLineContext;
+    inferredFromLine(): InferredFromLineContext;
     inferredBody(): InferredBodyContext;
-    inferredByConceptReference(): InferredByConceptReferenceContext;
-    inferredByDescriptiveLogic(): InferredByDescriptiveLogicContext;
-    inferredByExpression(): InferredByExpressionContext;
+    inferredFromConceptReference(): InferredFromConceptReferenceContext;
+    patternStatement(): PatternStatementContext;
+    inferredFromDescriptiveLogic(): InferredFromDescriptiveLogicContext;
+    inferredFromExpression(): InferredFromExpressionContext;
     informalOr(): InformalOrContext;
     informalAnd(): InformalAndContext;
     informalNot(): InformalNotContext;
@@ -152,9 +155,8 @@ export declare class CPGLParser extends Parser {
     activityReference(): ActivityReferenceContext;
     conceptIdentifier(): ConceptIdentifierContext;
     conceptReference(): ConceptReferenceContext;
-    patternIdentifier(): PatternIdentifierContext;
-    patternReference(): PatternReferenceContext;
     backtickString(): BacktickStringContext;
+    patternName(): PatternNameContext;
     activityTypeValue(): ActivityTypeValueContext;
     rationale(): RationaleContext;
     static readonly _serializedATN: string;
@@ -346,7 +348,7 @@ export declare class ActivityStatementContext extends ParserRuleContext {
     PERFORM(): TerminalNode;
     ACTIVITY_TYPE(): TerminalNode;
     DOT(): TerminalNode;
-    OF(): TerminalNode | undefined;
+    WITH(): TerminalNode | undefined;
     BECAUSE(): TerminalNode | undefined;
     rationale(): RationaleContext | undefined;
     terminologyReference(): TerminologyReferenceContext | undefined;
@@ -370,20 +372,20 @@ export declare class ConceptStatementContext extends ParserRuleContext {
     accept<Result>(visitor: CPGLParserVisitor<Result>): Result;
 }
 export declare class ConceptBodyContext extends ParserRuleContext {
-    hasTypeLine(): HasTypeLineContext;
-    hasValueTypeLine(): HasValueTypeLineContext;
-    codedByLine(): CodedByLineContext | undefined;
-    inferredByLine(): InferredByLineContext | undefined;
-    provenanceLine(): ProvenanceLineContext | undefined;
+    typeLine(): TypeLineContext;
+    valueTypeLine(): ValueTypeLineContext;
+    codedFromLine(): CodedFromLineContext | undefined;
+    inferredFromLine(): InferredFromLineContext | undefined;
+    evidenceLine(): EvidenceLineContext | undefined;
     constructor(parent: ParserRuleContext | undefined, invokingState: number);
     get ruleIndex(): number;
     enterRule(listener: CPGLParserListener): void;
     exitRule(listener: CPGLParserListener): void;
     accept<Result>(visitor: CPGLParserVisitor<Result>): Result;
 }
-export declare class HasTypeLineContext extends ParserRuleContext {
-    HAS(): TerminalNode;
+export declare class TypeLineContext extends ParserRuleContext {
     TYPE(): TerminalNode;
+    IS(): TerminalNode;
     CONCEPT_TYPE(): TerminalNode;
     DOT(): TerminalNode;
     constructor(parent: ParserRuleContext | undefined, invokingState: number);
@@ -392,9 +394,9 @@ export declare class HasTypeLineContext extends ParserRuleContext {
     exitRule(listener: CPGLParserListener): void;
     accept<Result>(visitor: CPGLParserVisitor<Result>): Result;
 }
-export declare class HasValueTypeLineContext extends ParserRuleContext {
-    HAS(): TerminalNode;
+export declare class ValueTypeLineContext extends ParserRuleContext {
     VALUETYPE(): TerminalNode;
+    IS(): TerminalNode;
     CONCEPT_VALUE_TYPE(): TerminalNode;
     DOT(): TerminalNode;
     constructor(parent: ParserRuleContext | undefined, invokingState: number);
@@ -403,9 +405,9 @@ export declare class HasValueTypeLineContext extends ParserRuleContext {
     exitRule(listener: CPGLParserListener): void;
     accept<Result>(visitor: CPGLParserVisitor<Result>): Result;
 }
-export declare class ProvenanceLineContext extends ParserRuleContext {
-    HAS(): TerminalNode;
-    PROVENANCE(): TerminalNode;
+export declare class EvidenceLineContext extends ParserRuleContext {
+    EVIDENCE(): TerminalNode;
+    IS(): TerminalNode;
     backtickString(): BacktickStringContext;
     DOT(): TerminalNode;
     constructor(parent: ParserRuleContext | undefined, invokingState: number);
@@ -414,9 +416,9 @@ export declare class ProvenanceLineContext extends ParserRuleContext {
     exitRule(listener: CPGLParserListener): void;
     accept<Result>(visitor: CPGLParserVisitor<Result>): Result;
 }
-export declare class CodedByLineContext extends ParserRuleContext {
+export declare class CodedFromLineContext extends ParserRuleContext {
     CODED(): TerminalNode;
-    BY(): TerminalNode;
+    FROM(): TerminalNode;
     terminologyReference(): TerminologyReferenceContext;
     DOT(): TerminalNode;
     constructor(parent: ParserRuleContext | undefined, invokingState: number);
@@ -425,9 +427,9 @@ export declare class CodedByLineContext extends ParserRuleContext {
     exitRule(listener: CPGLParserListener): void;
     accept<Result>(visitor: CPGLParserVisitor<Result>): Result;
 }
-export declare class InferredByLineContext extends ParserRuleContext {
+export declare class InferredFromLineContext extends ParserRuleContext {
     INFERRED(): TerminalNode;
-    BY(): TerminalNode;
+    FROM(): TerminalNode;
     inferredBody(): InferredBodyContext;
     DOT(): TerminalNode;
     constructor(parent: ParserRuleContext | undefined, invokingState: number);
@@ -442,31 +444,41 @@ export declare class InferredBodyContext extends ParserRuleContext {
     copyFrom(ctx: InferredBodyContext): void;
 }
 export declare class DefinitionConceptContext extends InferredBodyContext {
-    inferredByConceptReference(): InferredByConceptReferenceContext;
+    inferredFromConceptReference(): InferredFromConceptReferenceContext;
     constructor(ctx: InferredBodyContext);
     enterRule(listener: CPGLParserListener): void;
     exitRule(listener: CPGLParserListener): void;
     accept<Result>(visitor: CPGLParserVisitor<Result>): Result;
 }
 export declare class DefinitionLogicContext extends InferredBodyContext {
-    inferredByDescriptiveLogic(): InferredByDescriptiveLogicContext;
+    inferredFromDescriptiveLogic(): InferredFromDescriptiveLogicContext;
     constructor(ctx: InferredBodyContext);
     enterRule(listener: CPGLParserListener): void;
     exitRule(listener: CPGLParserListener): void;
     accept<Result>(visitor: CPGLParserVisitor<Result>): Result;
 }
-export declare class InferredByConceptReferenceContext extends ParserRuleContext {
+export declare class InferredFromConceptReferenceContext extends ParserRuleContext {
     conceptReference(): ConceptReferenceContext;
-    patternReference(): PatternReferenceContext | undefined;
+    patternStatement(): PatternStatementContext | undefined;
     constructor(parent: ParserRuleContext | undefined, invokingState: number);
     get ruleIndex(): number;
     enterRule(listener: CPGLParserListener): void;
     exitRule(listener: CPGLParserListener): void;
     accept<Result>(visitor: CPGLParserVisitor<Result>): Result;
 }
-export declare class InferredByDescriptiveLogicContext extends ParserRuleContext {
+export declare class PatternStatementContext extends ParserRuleContext {
+    APPLY(): TerminalNode;
+    PATTERN(): TerminalNode;
+    patternName(): PatternNameContext;
+    constructor(parent: ParserRuleContext | undefined, invokingState: number);
+    get ruleIndex(): number;
+    enterRule(listener: CPGLParserListener): void;
+    exitRule(listener: CPGLParserListener): void;
+    accept<Result>(visitor: CPGLParserVisitor<Result>): Result;
+}
+export declare class InferredFromDescriptiveLogicContext extends ParserRuleContext {
     LPAREN(): TerminalNode;
-    inferredByExpression(): InferredByExpressionContext;
+    inferredFromExpression(): InferredFromExpressionContext;
     RPAREN(): TerminalNode;
     constructor(parent: ParserRuleContext | undefined, invokingState: number);
     get ruleIndex(): number;
@@ -474,7 +486,7 @@ export declare class InferredByDescriptiveLogicContext extends ParserRuleContext
     exitRule(listener: CPGLParserListener): void;
     accept<Result>(visitor: CPGLParserVisitor<Result>): Result;
 }
-export declare class InferredByExpressionContext extends ParserRuleContext {
+export declare class InferredFromExpressionContext extends ParserRuleContext {
     informalOr(): InformalOrContext;
     constructor(parent: ParserRuleContext | undefined, invokingState: number);
     get ruleIndex(): number;
@@ -528,7 +540,7 @@ export declare class ConceptAtomContext extends AtomContext {
 }
 export declare class GroupExpressionContext extends AtomContext {
     LPAREN(): TerminalNode;
-    inferredByExpression(): InferredByExpressionContext;
+    inferredFromExpression(): InferredFromExpressionContext;
     RPAREN(): TerminalNode;
     constructor(ctx: AtomContext);
     enterRule(listener: CPGLParserListener): void;
@@ -607,24 +619,16 @@ export declare class ConceptReferenceContext extends ParserRuleContext {
     exitRule(listener: CPGLParserListener): void;
     accept<Result>(visitor: CPGLParserVisitor<Result>): Result;
 }
-export declare class PatternIdentifierContext extends ParserRuleContext {
-    identifier(): IdentifierContext;
-    constructor(parent: ParserRuleContext | undefined, invokingState: number);
-    get ruleIndex(): number;
-    enterRule(listener: CPGLParserListener): void;
-    exitRule(listener: CPGLParserListener): void;
-    accept<Result>(visitor: CPGLParserVisitor<Result>): Result;
-}
-export declare class PatternReferenceContext extends ParserRuleContext {
-    patternIdentifier(): PatternIdentifierContext;
-    constructor(parent: ParserRuleContext | undefined, invokingState: number);
-    get ruleIndex(): number;
-    enterRule(listener: CPGLParserListener): void;
-    exitRule(listener: CPGLParserListener): void;
-    accept<Result>(visitor: CPGLParserVisitor<Result>): Result;
-}
 export declare class BacktickStringContext extends ParserRuleContext {
     BACKTICK_STRING(): TerminalNode;
+    constructor(parent: ParserRuleContext | undefined, invokingState: number);
+    get ruleIndex(): number;
+    enterRule(listener: CPGLParserListener): void;
+    exitRule(listener: CPGLParserListener): void;
+    accept<Result>(visitor: CPGLParserVisitor<Result>): Result;
+}
+export declare class PatternNameContext extends ParserRuleContext {
+    backtickString(): BacktickStringContext;
     constructor(parent: ParserRuleContext | undefined, invokingState: number);
     get ruleIndex(): number;
     enterRule(listener: CPGLParserListener): void;

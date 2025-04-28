@@ -3,7 +3,7 @@ interface ActivityDefRule {
     path: string;
     value?: unknown;
 }
-interface ActivityDef {
+export interface ActivityDef {
     rules?: ActivityDefRule[];
     instanceOf?: string;
     title?: string;

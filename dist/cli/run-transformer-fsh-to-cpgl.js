@@ -13,7 +13,7 @@ const inputPath = process.argv[2]
         const cpglOutput = (0, transformer_1.transformFSHToCPGL)(inputPath);
         process.stdout.write(cpglOutput.replace(/\n+$/, "") + "\n");
     }
-    catch (err) {
+    catch {
         process.exit(1);
     }
 })();

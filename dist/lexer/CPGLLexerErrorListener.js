@@ -52,7 +52,7 @@ class CPGLLexerErrorListener {
         }
         return result;
     }
-    getSpecificMessage(errorText, msg) {
+    getSpecificMessage(errorText, _msg) {
         if (!this.validActivityTypes) {
             const errorMsg = [
                 "activityTypes is undefined. This usually means the JSON file was not found or not imported correctly.",

@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.conceptValueTypes = exports.conceptTypes = exports.activityTypes = exports.InferredByDefinitionType = exports.InferredByConceptType = exports.GroupExpressionType = exports.NotExpressionType = exports.InformalOrType = exports.InformalAndType = exports.ConceptReferenceType = exports.CodedByDefinitionType = exports.TerminologySystemCodeType = exports.TerminologyFreeTextType = exports.TerminologyValuesetType = exports.TerminologyType = exports.UseDecisionType = exports.DoActivityType = exports.ActionStatementType = exports.SingleActionType = exports.BlockBodyType = exports.WhenBlockType = exports.DecisionBodyType = exports.DecisionType = exports.FileType = void 0;
+exports.conceptValueTypes = exports.conceptTypes = exports.activityTypes = exports.InferredFromDefinitionType = exports.InferredFromConceptType = exports.GroupExpressionType = exports.NotExpressionType = exports.InformalOrType = exports.InformalAndType = exports.ConceptReferenceType = exports.CodedFromDefinitionType = exports.TerminologySystemCodeType = exports.TerminologyFreeTextType = exports.TerminologyValuesetType = exports.TerminologyType = exports.UseDecisionType = exports.DoActivityType = exports.ActionStatementType = exports.SingleActionType = exports.BlockBodyType = exports.WhenBlockType = exports.DecisionBodyType = exports.DecisionType = exports.FileType = void 0;
 exports.FileType = {
     type: "CPGL",
 };
@@ -40,8 +40,8 @@ exports.TerminologyFreeTextType = {
 exports.TerminologySystemCodeType = {
     type: "TerminologySystemCode",
 };
-exports.CodedByDefinitionType = {
-    type: "CodedByDefinition",
+exports.CodedFromDefinitionType = {
+    type: "CodedFromDefinition",
 };
 exports.ConceptReferenceType = {
     type: "ConceptReference",
@@ -58,11 +58,11 @@ exports.NotExpressionType = {
 exports.GroupExpressionType = {
     type: "GroupExpression",
 };
-exports.InferredByConceptType = {
-    type: "InferredByDefinitionConcept",
+exports.InferredFromConceptType = {
+    type: "InferredFromDefinitionConcept",
 };
-exports.InferredByDefinitionType = {
-    type: "InferredByDefinition",
+exports.InferredFromDefinitionType = {
+    type: "InferredFromDefinition",
 };
 var activityTypes_1 = require("../grammar/activityTypes");
 Object.defineProperty(exports, "activityTypes", { enumerable: true, get: function () { return activityTypes_1.activityTypes; } });
