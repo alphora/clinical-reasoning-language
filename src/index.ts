@@ -61,23 +61,30 @@ export function tokenizeCPGL(input: string): ParseResult<Token[]> {
  * @returns ParseResult containing parse tree or errors
  */
 export function parseCPGL(input: string): ParseResult<ParseTree> {
+  let lexerErrorListener, parserErrorListener;
   try {
-    const { parser, lexerErrorListener, parserErrorListener } = createParser(input);
-    const tree = parser.cpgl();
+    const parserSetup = createParser(input);
+    lexerErrorListener = parserSetup.lexerErrorListener;
+    parserErrorListener = parserSetup.parserErrorListener;
+    const tree = parserSetup.parser.cpgl();
     const errors = [...lexerErrorListener.getErrors(), ...parserErrorListener.getErrors()];
     if (errors.length > 0) {
       return { success: false, errors };
     }
     return { success: true, result: tree };
   } catch (error) {
+    // Collect all errors if available, plus the exception
+    const errors = [
+      ...(lexerErrorListener?.getErrors?.() ?? []),
+      ...(parserErrorListener?.getErrors?.() ?? []),
+      JSON.stringify({
+        type: "Exception",
+        message: error instanceof Error ? error.message : String(error),
+      }),
+    ];
     return {
       success: false,
-      errors: [
-        JSON.stringify({
-          type: "Exception",
-          message: error instanceof Error ? error.message : String(error),
-        }),
-      ],
+      errors,
     };
   }
 }
@@ -88,10 +95,13 @@ export function parseCPGL(input: string): ParseResult<ParseTree> {
  * @returns ParseResult containing AST or errors
  */
 export function buildCPGL(input: string): ParseResult<CPGL> {
+  let lexerErrorListener, parserErrorListener, builder;
   try {
-    const { parser, lexerErrorListener, parserErrorListener } = createParser(input);
-    const tree = parser.cpgl();
-    const builder = new CPGLAstBuilder();
+    const parserSetup = createParser(input);
+    lexerErrorListener = parserSetup.lexerErrorListener;
+    parserErrorListener = parserSetup.parserErrorListener;
+    const tree = parserSetup.parser.cpgl();
+    builder = new CPGLAstBuilder();
     const ast = builder.visit(tree) as CPGL;
     const errors = [
       ...lexerErrorListener.getErrors(),
@@ -103,14 +113,19 @@ export function buildCPGL(input: string): ParseResult<CPGL> {
     }
     return { success: true, result: ast };
   } catch (error) {
+    // Collect all errors if available, plus the exception
+    const errors = [
+      ...(lexerErrorListener?.getErrors?.() ?? []),
+      ...(parserErrorListener?.getErrors?.() ?? []),
+      ...(builder?.getErrors?.() ?? []),
+      JSON.stringify({
+        type: "Exception",
+        message: error instanceof Error ? error.message : String(error),
+      }),
+    ];
     return {
       success: false,
-      errors: [
-        JSON.stringify({
-          type: "Exception",
-          message: error instanceof Error ? error.message : String(error),
-        }),
-      ],
+      errors,
     };
   }
 }

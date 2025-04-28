@@ -621,6 +621,20 @@ done
       const foundParserError = result.errors!.some((e) => e.includes("ParserError"));
       expect(foundParserError).toBe(true);
     });
+
+    it("should return all error details for input with both lexical and parser errors", () => {
+      // User's problematic input (missing closing quote and colon)
+      const input = 'decision "Test: when "Condition" then do "Action". done';
+      const result = buildCPGL(input);
+      expect(result.success).toBe(false);
+      expect(result.errors && result.errors.length).toBeGreaterThan(0);
+      // Should contain a LexicalError
+      const foundLexicalError = result.errors!.some((e) => e.includes("LexicalError"));
+      expect(foundLexicalError).toBe(true);
+      // Should contain a ParserError
+      const foundParserError = result.errors!.some((e) => e.includes("ParserError"));
+      expect(foundParserError).toBe(true);
+    });
   });
 
   describe("parseCPGL and buildCPGL direct API tests", () => {
