@@ -86,17 +86,18 @@ export class UnusedDeclarationsValidator {
           break;
         case "Concept":
           // Mark terminology as used when referenced in CodedByDefinition
-          if (
-            statement.definition.type === "CodedByDefinition" &&
-            statement.definition.terminologyName
-          ) {
-            const terminologyInfo = this.terminologyDeclarations.get(
-              statement.definition.terminologyName,
-            );
-            if (terminologyInfo) {
-              terminologyInfo.used = true;
-            }
-          }
+          // TODO: Uncomment this when implementing validation again 
+          // if (
+          //   statement.definition.type === "CodedByDefinition" &&
+          //   statement.definition.terminologyName
+          // ) {
+          //   const terminologyInfo = this.terminologyDeclarations.get(
+          //     statement.definition.terminologyName,
+          //   );
+          //   if (terminologyInfo) {
+          //     terminologyInfo.used = true;
+          //   }
+          // }
           break;
       }
     }
