@@ -1,4 +1,3 @@
-import { CPGLAstBuilder } from "../builder";
 import {
   Decision,
   WhenBlock,
@@ -23,12 +22,6 @@ import { parseInput } from "./parseInput";
  * - nameUniqueness.test.ts
  */
 describe("Decision Structure", () => {
-  let builder: CPGLAstBuilder;
-
-  beforeEach(() => {
-    builder = new CPGLAstBuilder();
-  });
-
   it("should maintain correct structure for nested decisions", () => {
     const input = `
 decision "IMMZ.D2.D5.Measles":
@@ -255,12 +248,6 @@ done`;
 });
 
 describe("Repeated Statements in Decision Blocks", () => {
-  let builder: CPGLAstBuilder;
-
-  beforeEach(() => {
-    builder = new CPGLAstBuilder();
-  });
-
   it("should preserve repeated when statements", () => {
     const input = `
 decision "Test Decision":
