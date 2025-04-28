@@ -98,8 +98,7 @@ To create a new release:
 
     ```bash
     git checkout main
-    git branch -d release/v0.1.0
-    git push origin --delete release/v0.1.0
+    git branch -D release/v0.1.0
     ```
 
 ---
