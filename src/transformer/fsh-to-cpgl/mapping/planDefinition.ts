@@ -5,7 +5,7 @@ const PLAN_DEFINITION_URLS = [
 
 import { toIdentifier, toString } from "../utils/fshPathFunctions";
 
-import { emitActivityBlock } from "./activityDefinition";
+import { emitActivityBlock, ActivityDef } from "./activityDefinition";
 
 interface ExtensionObj {
   url: string;
@@ -25,7 +25,7 @@ interface ActionNode {
 function emitWhenBlocksRecursive(
   nodes: ActionNode[],
   activities: { id: string; name: string; value: string | undefined; original: string }[],
-  allInstances: unknown[],
+  allInstances: ActivityDef[],
   instance: unknown,
   indent = "    ",
   doReferences: { id: string; placeholder: string }[],
@@ -34,7 +34,7 @@ function emitWhenBlocksRecursive(
   // Group nodes by conditionExpression (use '' for undefined/empty)
   const groups: { [cond: string]: ActionNode[] } = {};
   for (const node of nodes) {
-    const cond = node.conditionExpression || "";
+    const cond = node.conditionExpression ?? "";
     if (!groups[cond]) groups[cond] = [];
     groups[cond].push(node);
   }
@@ -86,7 +86,7 @@ function emitWhenBlocksRecursive(
         // Calculate hasPlanDef for this node
         let hasPlanDef = false;
         if (canonicalValueStr) {
-          const referenced = (allInstances as unknown[]).find(
+          const referenced = (allInstances as ActivityDef[]).find(
             (inst): inst is { name: string; instanceOf?: string } =>
               typeof inst === "object" &&
               inst !== null &&
@@ -110,7 +110,7 @@ function emitWhenBlocksRecursive(
         const actionLine = emitActivityBlock(
           node,
           canonicalValueStr,
-          allInstances as any[],
+          allInstances,
           activities,
           indent + "    ",
           hasPlanDef,
@@ -142,7 +142,7 @@ function emitWhenBlocksRecursive(
       }
       let hasPlanDef = false;
       if (canonicalValueStr) {
-        const referenced = (allInstances as unknown[]).find(
+        const referenced = (allInstances as ActivityDef[]).find(
           (inst): inst is { name: string; instanceOf?: string } =>
             typeof inst === "object" &&
             inst !== null &&
@@ -168,7 +168,7 @@ function emitWhenBlocksRecursive(
       let actionLine = emitActivityBlock(
         node,
         canonicalValueStr,
-        allInstances as any[],
+        allInstances,
         activities,
         "",
         hasPlanDef,
@@ -194,7 +194,10 @@ function parseActions(rules: unknown[], basePath = "action"): ActionNode[] {
     if (rule.path === `${basePath}[+]`) {
       // Start a new action node
       if (currentNode) {
-        if (currentExtensions.length > 0) currentNode.extension = currentExtensions;
+        if (currentExtensions.length > 0)
+          currentNode.extension = currentExtensions.filter(
+            (ext) => ext.url !== undefined && ext.url !== null && ext.url !== "",
+          );
         nodes.push(currentNode);
       }
       currentNode = { children: [] };
@@ -248,7 +251,7 @@ function parseActions(rules: unknown[], basePath = "action"): ActionNode[] {
     if (currentExtensions.length > 0) {
       // Only push extensions that have a non-empty url
       currentNode.extension = currentExtensions.filter(
-        (ext) => ext.url !== undefined && ext.url !== null,
+        (ext) => ext.url !== undefined && ext.url !== null && ext.url !== "",
       );
     }
     nodes.push(currentNode);
@@ -258,7 +261,7 @@ function parseActions(rules: unknown[], basePath = "action"): ActionNode[] {
 
 export function mapPlanDefinitionToDecision(
   instance: unknown,
-  allInstances: unknown[],
+  allInstances: ActivityDef[],
 ): {
   decision: string;
   activities: { id: string; name: string; value: string | undefined; original: string }[];
@@ -281,7 +284,7 @@ export function mapPlanDefinitionToDecision(
     description = descriptionRule ? (descriptionRule.value as string) : undefined;
   }
   const title =
-    (instance as { title?: string }).title ||
+    (instance as { title?: string }).title ??
     (rules as Record<string, unknown>[]).find((r) => r.path === "Title")?.value;
   const plandefTitle = title ? toIdentifier(title as string) : "[UnnamedPlanDefinition]";
   const plandefDescription = description ? toString(description) : "";
