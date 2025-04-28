@@ -254,3 +254,17 @@ Commits included since v0.5.3:
 - 7643835 Regression not running in github ci
 - 249cdb6 Include dist and generated files for GitHub Publish
 - f56580a Include files needed for github deploy
+
+## [v0.6.0] - YYYY-MM-DD
+### Added
+- No major new features in this release.
+
+### Changed
+- Numerous linter fixes and code style improvements for better code quality and maintainability. (rob-reynolds)
+- Improved lexer and test reliability, addressing issues in lexer tests and token handling. (rob-reynolds)
+
+### Fixed
+- Fixed various linter errors and warnings across the codebase. (rob-reynolds)
+- Addressed issues in lexer and related tests to ensure correct tokenization and test coverage. (rob-reynolds)
+
+---
