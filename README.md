@@ -319,66 +319,6 @@ const result = parseCPGL('...');
 if (!result.success) throw new Error(result.errors?.join('\n'));
 ```
 
-### 📦 Distribution: GitHub Releases
-
-This package is distributed via GitHub Releases.
-
-To create a new release:
-
-1. **Create a release branch**  
-   Example:
-
-```bash
-   git checkout -b release/v0.1.0
-   ```
-
-2. **Generate and update the CHANGELOG**  
-   Prompt:
-   > "I'm creating a new release v0.1.0. Generate and append to the CHANGELOG based on git commits since the last tag."
-
-3. **Commit all changes**  
-
-   ```bash
-   git add .
-   git commit -m "Prepare release v0.1.0"
-   ```
-
-4. **Run the automated release script**  
-
-   ```bash
-   npm run prepublish:github -- <patch|minor|major|version>
-   ```
-
-   Example:
-
-   ```bash
-   npm run prepublish:github -- minor
-   ```
-
-   This script will:
-
-   * Remove `dist/` from `.gitignore`
-   * Build the project
-   * Add and commit `dist/`
-   * Bump the version and create a Git tag
-   * Push commits and tags
-   * Restore `dist/` to `.gitignore` and push final cleanup
-
-5. **Create and merge the Pull Request (PR)**
-
-6. **Publish the GitHub Release**
-
-   * Use the version tag (e.g., `v0.1.0`)  
-   * Generate release notes automatically if needed
-
-**Important:**
-
-* The release script expects a **clean working directory** (no unstaged or uncommitted changes). If your working directory is not clean, the script will exit and prompt you to commit, stash, or discard your changes.
-* If a rollback warning is shown (e.g., after a failed release), manual intervention may be required to fully undo changes that were already pushed to the remote repository. Check your git log and tags, and clean up as needed.
-
-**Note:**
-
-* You do NOT need to attach a `.tgz` file for GitHub-based npm installs.
 
 ### Installation
 
@@ -717,16 +657,13 @@ These files are ignored by git via `.gitignore` and will be recreated as needed.
 
 ### 📦 Release Process & Checklist
 
-### Single Source of Truth for Release Checklist
-
-To avoid duplication and checklist drift, the release checklist is maintained in a single location:
-
-- **[.github/PULL_REQUEST_TEMPLATE/release.md](.github/PULL_REQUEST_TEMPLATE/release.md)**
-
-All references to the release process (including the automated release script, documentation, and PRs) should point to this file. If you need to update the release process, update the PR template only. This ensures consistency and reduces maintenance overhead.
-
-- The release PR body is automatically populated from this file by the release automation script (`.github/scripts/set-release-pr-body.js`).
-- The README and other documentation reference this file instead of duplicating the checklist.
+> **Release Process:**
+>
+> The authoritative release checklist and instructions are maintained in a single location:
+> 
+> **[.github/PULL_REQUEST_TEMPLATE/release.md](.github/PULL_REQUEST_TEMPLATE/release.md)**
+>
+> Always follow the steps in this file when preparing a new release. This ensures consistency and reduces maintenance overhead. If you need to update the release process, update the PR template only.
 
 ## Developer Notes: Release Checklist & GitHub Automation
 
