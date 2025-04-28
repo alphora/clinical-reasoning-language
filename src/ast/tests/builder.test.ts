@@ -24,6 +24,8 @@ import {
   CodedFromDefinitionType,
   InferredFromDefinition,
   InferredFromDefinitionType,
+  InferredFromConcept,
+  InferredFromExpression,
 } from "../types";
 
 import { parseInput } from "./parseInput";
@@ -389,13 +391,9 @@ describe("CPGLAstBuilder", () => {
       expect(ast.evidence).toBe("some provenance");
       expect(ast.definition.type).toBe(InferredFromDefinitionType.type);
       const inferredBy = ast.definition as InferredFromDefinition;
-      if ("body" in inferredBy && inferredBy.body.type === "InferredFromDefinitionConcept") {
-        expect(inferredBy.body.pattern).toBeUndefined();
-        expect(inferredBy.body.concept).toBe("Most Recent(this, lookbackMonths)");
-      } else {
-        expect((inferredBy.body as any).pattern).toBeUndefined();
-        expect((inferredBy.body as any).concept).toBeUndefined();
-      }
+      const body = inferredBy.body as InferredFromConcept | InferredFromExpression;
+      expect((body as InferredFromConcept).pattern).toBeUndefined();
+      expect((body as InferredFromConcept).concept).toBe("Most Recent(this, lookbackMonths)");
     });
 
     it("should parse a concept with inferred by", () => {
@@ -415,11 +413,9 @@ describe("CPGLAstBuilder", () => {
       expect(ast.valueType).toBe("Quantity");
       expect(ast.definition.type).toBe(InferredFromDefinitionType.type);
       const inferredBy = ast.definition as InferredFromDefinition;
-      if ("body" in inferredBy && inferredBy.body.type === "InferredFromDefinitionConcept") {
-        /* empty */
-      }
-      expect((inferredBy.body as any).pattern).toBeUndefined();
-      expect((inferredBy.body as any).concept).toBeUndefined();
+      const body = inferredBy.body as InferredFromConcept | InferredFromExpression;
+      expect((body as InferredFromConcept).pattern).toBeUndefined();
+      expect((body as InferredFromConcept).concept).toBeUndefined();
     });
 
     it("should parse a concept with inferred by descriptive logic using and/or combinations", () => {
@@ -461,8 +457,9 @@ describe("CPGLAstBuilder", () => {
       expect(orExpr.terms[2].type).toBe("ConceptReference");
       expect(orExpr.terms[2].name).toBe("Calculated BMI");
       // pattern/concept should be undefined
-      expect((inferredBy.body as any).pattern).toBeUndefined();
-      expect((inferredBy.body as any).concept).toBeUndefined();
+      const body = inferredBy.body as InferredFromConcept | InferredFromExpression;
+      expect((body as InferredFromConcept).pattern).toBeUndefined();
+      expect((body as InferredFromConcept).concept).toBeUndefined();
     });
 
     it("should parse a concept with empty provenance", () => {
