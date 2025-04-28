@@ -1,16 +1,16 @@
 [
-  "CPGCommunicationRequest",
+  "CPGAdministerMedication",
   "CPGCollectInformation",
+  "CPGCommunicationRequest",
+  "CPGDispenseMedication",
+  "CPGDocumentMedication",
   "CPGEnrollment",
   "CPGGenerateReport",
-  "CPGMedicationRequest",
-  "CPGDispenseMedication",
-  "CPGAdministerMedication",
-  "CPGDocumentMedication",
   "CPGImmunizationRequest",
-  "CPGServiceRequest",
+  "CPGMedicationRequest",
   "CPGProposeDiagnosisTask",
   "CPGRecordDetectedIssue",
   "CPGRecordInference",
-  "CPGReportFlagTask"
+  "CPGReportFlagTask",
+  "CPGServiceRequest"
 ]

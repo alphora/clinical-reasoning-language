@@ -127,7 +127,7 @@ function emitActivityBlock(node, canonicalValueStr, allInstances, activities, in
     const referenced = allInstances.find((inst) => inst.name === canonicalValueStr);
     const doIdentifier = node.title ? (0, fshPathFunctions_1.toIdentifier)(node.title) : "UnnamedActivity";
     let activityDescription = node.description ? node.description : undefined;
-    if (referenced && referenced.rules) {
+    if (referenced?.rules) {
         const descRule = referenced.rules.find((r) => r.path === "Description");
         activityDescription = descRule ? descRule.value : undefined;
     }
@@ -135,11 +135,11 @@ function emitActivityBlock(node, canonicalValueStr, allInstances, activities, in
     let activityDefInstance = null;
     let useIdentifier = "";
     if (canonicalValueStr) {
-        if (referenced && exports.ACTIVITY_DEFINITION_URLS.includes(referenced.instanceOf || "")) {
+        if (referenced && exports.ACTIVITY_DEFINITION_URLS.includes(referenced.instanceOf ?? "")) {
             hasActivityDef = true;
             activityDefInstance = referenced;
         }
-        if (hasPlanDef && referenced && referenced.title) {
+        if (hasPlanDef && referenced?.title) {
             useIdentifier = (0, fshPathFunctions_1.toIdentifier)(referenced.title);
         }
         else if (hasPlanDef && canonicalValueStr) {
@@ -220,7 +220,7 @@ function emitActivityBlock(node, canonicalValueStr, allInstances, activities, in
             id: activityId,
             name: doIdentifier,
             value: activityDescription,
-            original: `activity ${doIdentifier}\n    perform CPGCommunicationRequest${formatActivityValue("`" + (activityDescription || "TODO: fill in message.") + "`")}${rationale ?? ""}.\n\n`,
+            original: `activity ${doIdentifier}\n    perform CPGCommunicationRequest${formatActivityValue("`" + (activityDescription ?? "TODO: fill in message.") + "`")}${rationale ?? ""}.\n\n`,
         });
         doReferences.push({ id: activityId, placeholder });
     }

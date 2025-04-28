@@ -11,5 +11,5 @@ export declare class CPGLLexerErrorListener implements ANTLRErrorListener<number
     private getSpecificMessage;
     syntaxError<T extends number>(recognizer: Recognizer<T, ATNSimulator>, offendingSymbol: T | undefined, line: number, charPositionInLine: number, msg: string, _e: RecognitionException | undefined): void;
     getErrors(): string[];
-    reportCustomError(line: number, column: number, message: string, details?: any): void;
+    reportCustomError(line: number, column: number, message: string, details?: unknown): void;
 }

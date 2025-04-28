@@ -63,13 +63,6 @@ class UnusedDeclarationsValidator {
                     this.processDecisionBody(statement.body, statement.name);
                     break;
                 case "Concept":
-                    if (statement.definition.type === "CodedByDefinition" &&
-                        statement.definition.terminologyName) {
-                        const terminologyInfo = this.terminologyDeclarations.get(statement.definition.terminologyName);
-                        if (terminologyInfo) {
-                            terminologyInfo.used = true;
-                        }
-                    }
                     break;
             }
         }

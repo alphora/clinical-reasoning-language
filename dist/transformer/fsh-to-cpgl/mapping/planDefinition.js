@@ -11,7 +11,7 @@ function emitWhenBlocksRecursive(nodes, activities, allInstances, instance, inde
     let output = "";
     const groups = {};
     for (const node of nodes) {
-        const cond = node.conditionExpression || "";
+        const cond = node.conditionExpression ?? "";
         if (!groups[cond])
             groups[cond] = [];
         groups[cond].push(node);
@@ -52,9 +52,17 @@ function emitWhenBlocksRecursive(nodes, activities, allInstances, instance, inde
                 }
                 let hasPlanDef = false;
                 if (canonicalValueStr) {
-                    const referenced = allInstances.find((inst) => inst.name === canonicalValueStr);
+                    const referenced = allInstances.find((inst) => typeof inst === "object" &&
+                        inst !== null &&
+                        "name" in inst &&
+                        typeof inst.name === "string" &&
+                        inst.name === canonicalValueStr &&
+                        "instanceOf" in inst &&
+                        typeof inst.instanceOf === "string");
                     if (referenced &&
-                        referenced.instanceOf &&
+                        typeof referenced === "object" &&
+                        referenced !== null &&
+                        "instanceOf" in referenced &&
                         PLAN_DEFINITION_URLS.includes(referenced.instanceOf)) {
                         hasPlanDef = true;
                     }
@@ -85,9 +93,17 @@ function emitWhenBlocksRecursive(nodes, activities, allInstances, instance, inde
             }
             let hasPlanDef = false;
             if (canonicalValueStr) {
-                const referenced = allInstances.find((inst) => inst.name === canonicalValueStr);
+                const referenced = allInstances.find((inst) => typeof inst === "object" &&
+                    inst !== null &&
+                    "name" in inst &&
+                    typeof inst.name === "string" &&
+                    inst.name === canonicalValueStr &&
+                    "instanceOf" in inst &&
+                    typeof inst.instanceOf === "string");
                 if (referenced &&
-                    referenced.instanceOf &&
+                    typeof referenced === "object" &&
+                    referenced !== null &&
+                    "instanceOf" in referenced &&
                     PLAN_DEFINITION_URLS.includes(referenced.instanceOf)) {
                     hasPlanDef = true;
                 }
@@ -111,14 +127,14 @@ function parseActions(rules, basePath = "action") {
         if (rule.path === `${basePath}[+]`) {
             if (currentNode) {
                 if (currentExtensions.length > 0)
-                    currentNode.extension = currentExtensions;
+                    currentNode.extension = currentExtensions.filter((ext) => ext.url !== undefined && ext.url !== null && ext.url !== "");
                 nodes.push(currentNode);
             }
             currentNode = { children: [] };
             currentExtensions = [];
             currentExtension = null;
         }
-        else if (rule.path.startsWith(`${basePath}[=]`)) {
+        else if (typeof rule.path === "string" && rule.path.startsWith(`${basePath}[=]`)) {
             if (!currentNode)
                 continue;
             const subPath = rule.path.slice(`${basePath}[=]`.length);
@@ -126,7 +142,9 @@ function parseActions(rules, basePath = "action") {
                 const childBase = `${basePath}[=].action`;
                 const childRules = [];
                 let j = i;
-                while (j < rules.length && rules[j].path.startsWith(childBase)) {
+                while (j < rules.length &&
+                    typeof rules[j].path === "string" &&
+                    rules[j].path.startsWith(childBase)) {
                     childRules.push(rules[j]);
                     j++;
                 }
@@ -137,12 +155,12 @@ function parseActions(rules, basePath = "action") {
                 continue;
             }
             else if (subPath === ".extension[+]") {
-                currentExtension = {};
+                currentExtension = { url: "" };
                 currentExtensions.push(currentExtension);
             }
             else if (subPath.startsWith(".extension[=]")) {
                 if (!currentExtension) {
-                    currentExtension = {};
+                    currentExtension = { url: "" };
                     currentExtensions.push(currentExtension);
                 }
                 if (subPath.endsWith(".url"))
@@ -163,25 +181,31 @@ function parseActions(rules, basePath = "action") {
         }
     }
     if (currentNode) {
-        if (currentExtensions.length > 0)
-            currentNode.extension = currentExtensions;
+        if (currentExtensions.length > 0) {
+            currentNode.extension = currentExtensions.filter((ext) => ext.url !== undefined && ext.url !== null && ext.url !== "");
+        }
         nodes.push(currentNode);
     }
     return nodes;
 }
 function mapPlanDefinitionToDecision(instance, allInstances) {
-    if (!PLAN_DEFINITION_URLS.includes(instance.instanceOf)) {
+    if (typeof instance !== "object" ||
+        instance === null ||
+        !("instanceOf" in instance) ||
+        !PLAN_DEFINITION_URLS.includes(instance.instanceOf)) {
         return { decision: "", activities: [], doReferences: [] };
     }
     let description = instance.description;
+    const rules = instance.rules || [];
     if (!description) {
-        const descriptionRule = (instance.rules || []).find((r) => r.path === "Description");
+        const descriptionRule = rules.find((r) => r.path === "Description");
         description = descriptionRule ? descriptionRule.value : undefined;
     }
-    const title = instance.title || (instance.rules || []).find((r) => r.path === "Title")?.value;
+    const title = instance.title ??
+        rules.find((r) => r.path === "Title")?.value;
     const plandefTitle = title ? (0, fshPathFunctions_1.toIdentifier)(title) : "[UnnamedPlanDefinition]";
     const plandefDescription = description ? (0, fshPathFunctions_1.toString)(description) : "";
-    const citationRule = (instance.rules || []).find((r) => r.path === "relatedArtifact[=].citation");
+    const citationRule = rules.find((r) => r.path === "relatedArtifact[=].citation");
     let citation = citationRule ? (0, fshPathFunctions_1.toString)(citationRule.value) : "";
     if (citation.startsWith('"') && citation.endsWith('"')) {
         citation = citation.slice(1, -1);
@@ -201,7 +225,7 @@ function mapPlanDefinitionToDecision(instance, allInstances) {
         output += `// Provenance: ${citation}\n`;
     }
     output += `decision ${plandefTitle}:\n`;
-    const actionTree = parseActions(instance.rules || []);
+    const actionTree = parseActions(rules);
     const activities = [];
     const doReferences = [];
     output += emitWhenBlocksRecursive(actionTree, activities, allInstances, instance, "    ", doReferences);

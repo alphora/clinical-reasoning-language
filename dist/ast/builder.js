@@ -155,13 +155,10 @@ class CPGLAstBuilder extends AbstractParseTreeVisitor_1.AbstractParseTreeVisitor
         }
         return { type: types_1.TerminologySystemCodeType.type, system, code, location: getLocation(ctx) };
     }
-    visitActivityStatement(ctx) {
-        const name = ctx.activityIdentifier().text.slice(1, -1);
-        const perform = ctx.ACTIVITY_TYPE().text;
+    parseWithClause(ctx) {
         let terminologyReference;
         let activityTypeValue;
-        let rationale;
-        if (ctx.OF()) {
+        if (ctx.WITH()) {
             if (ctx.terminologyReference()) {
                 terminologyReference = ctx.terminologyReference().text.slice(1, -1);
             }
@@ -175,15 +172,25 @@ class CPGLAstBuilder extends AbstractParseTreeVisitor_1.AbstractParseTreeVisitor
                 }
             }
         }
+        return { terminologyReference, activityTypeValue };
+    }
+    parseRationaleClause(ctx) {
         if (ctx.rationale) {
             const rationaleCtx = ctx.rationale();
             if (rationaleCtx?.backtickString) {
                 const backtickCtx = rationaleCtx.backtickString();
                 if (backtickCtx?.text !== undefined) {
-                    rationale = backtickCtx.text.slice(1, -1);
+                    return backtickCtx.text.slice(1, -1);
                 }
             }
         }
+        return undefined;
+    }
+    visitActivityStatement(ctx) {
+        const name = ctx.activityIdentifier().text.slice(1, -1);
+        const perform = ctx.ACTIVITY_TYPE().text;
+        const { terminologyReference, activityTypeValue } = this.parseWithClause(ctx);
+        const rationale = this.parseRationaleClause(ctx);
         return {
             type: "Activity",
             name,
@@ -194,15 +201,9 @@ class CPGLAstBuilder extends AbstractParseTreeVisitor_1.AbstractParseTreeVisitor
             location: getLocation(ctx),
         };
     }
-    visitConceptStatement(ctx) {
-        const name = ctx.conceptIdentifier?.()?.text?.slice(1, -1);
-        const bodyCtx = ctx.conceptBody?.();
-        if (!name || !bodyCtx) {
-            this.reportError("AstError", "ConceptStatement: missing conceptIdentifier or conceptBody", getLocation(ctx));
-            return null;
-        }
-        const typeLine = bodyCtx.hasTypeLine?.();
-        const valueTypeLine = bodyCtx.hasValueTypeLine?.();
+    parseConceptTypes(bodyCtx, ctx) {
+        const typeLine = bodyCtx.typeLine?.();
+        const valueTypeLine = bodyCtx.valueTypeLine?.();
         if (!typeLine || !valueTypeLine) {
             this.reportError("AstError", "ConceptStatement: missing type or valueType line", getLocation(ctx));
             return null;
@@ -224,48 +225,71 @@ class CPGLAstBuilder extends AbstractParseTreeVisitor_1.AbstractParseTreeVisitor
             this.reportError("AstError", "ConceptStatement: missing CONCEPT_TYPE or CONCEPT_VALUE_TYPE token", getLocation(ctx));
             return null;
         }
-        const conceptType = conceptTypeToken.text;
-        const valueType = valueTypeToken.text;
-        let provenance = undefined;
-        if (bodyCtx.provenanceLine?.()) {
-            const provCtx = bodyCtx.provenanceLine?.();
-            if (provCtx?.backtickString) {
-                const backtickCtx = provCtx.backtickString();
+        return {
+            conceptType: conceptTypeToken.text,
+            valueType: valueTypeToken.text,
+        };
+    }
+    parseEvidence(bodyCtx) {
+        if (bodyCtx.evidenceLine?.()) {
+            const evidenceCtx = bodyCtx.evidenceLine?.();
+            if (evidenceCtx?.backtickString) {
+                const backtickCtx = evidenceCtx.backtickString();
                 if (backtickCtx?.text !== undefined) {
-                    provenance = backtickCtx.text.slice(1, -1);
+                    return backtickCtx.text.slice(1, -1);
                 }
                 else if (backtickCtx?.BACKTICK_STRING) {
                     const token = backtickCtx.BACKTICK_STRING();
                     if (token?.text !== undefined) {
-                        provenance = token.text.slice(1, -1);
+                        return token.text.slice(1, -1);
                     }
                 }
             }
         }
-        let definition;
-        if (bodyCtx.codedByLine && bodyCtx.codedByLine()) {
-            const codedBy = bodyCtx.codedByLine();
-            const termRef = codedBy?.terminologyReference?.()?.text?.slice(1, -1);
+        return undefined;
+    }
+    parseConceptDefinition(bodyCtx, ctx) {
+        if (bodyCtx.codedFromLine?.()) {
+            const codedFrom = bodyCtx.codedFromLine();
+            const termRef = codedFrom?.terminologyReference?.()?.text?.slice(1, -1);
             if (!termRef) {
-                this.reportError("AstError", "ConceptStatement: missing terminologyReference in codedByLine", getLocation(ctx));
+                this.reportError("AstError", "ConceptStatement: missing terminologyReference in codedFromLine", getLocation(ctx));
                 return null;
             }
-            definition = {
-                type: types_1.CodedByDefinitionType.type,
+            return {
+                type: types_1.CodedFromDefinitionType.type,
                 terminologyName: termRef,
-                location: getLocation(bodyCtx.codedByLine()),
+                location: getLocation(bodyCtx.codedFromLine()),
             };
         }
-        else if (bodyCtx.inferredByLine && bodyCtx.inferredByLine()) {
-            const infCtx = bodyCtx.inferredByLine();
+        else if (bodyCtx.inferredFromLine?.()) {
+            const infCtx = bodyCtx.inferredFromLine();
             if (!infCtx) {
-                this.reportError("AstError", "ConceptStatement: inferredByLine() unexpectedly returned undefined", getLocation(ctx));
+                this.reportError("AstError", "ConceptStatement: inferredFromLine() unexpectedly returned undefined", getLocation(ctx));
                 return null;
             }
-            definition = this.visit(infCtx);
+            return this.visit(infCtx);
         }
         else {
-            this.reportError("AstError", "ConceptStatement must have either codedByLine or inferredByLine", getLocation(ctx));
+            this.reportError("AstError", "ConceptStatement must have either codedFromLine or inferredFromLine", getLocation(ctx));
+            return null;
+        }
+    }
+    visitConceptStatement(ctx) {
+        const name = ctx.conceptIdentifier?.()?.text?.slice(1, -1);
+        const bodyCtx = ctx.conceptBody?.();
+        if (!name || !bodyCtx) {
+            this.reportError("AstError", "ConceptStatement: missing conceptIdentifier or conceptBody", getLocation(ctx));
+            return null;
+        }
+        const types = this.parseConceptTypes(bodyCtx, ctx);
+        if (!types) {
+            return null;
+        }
+        const { conceptType, valueType } = types;
+        const evidence = this.parseEvidence(bodyCtx);
+        const definition = this.parseConceptDefinition(bodyCtx, ctx);
+        if (!definition) {
             return null;
         }
         return {
@@ -273,33 +297,42 @@ class CPGLAstBuilder extends AbstractParseTreeVisitor_1.AbstractParseTreeVisitor
             name,
             conceptType,
             valueType,
-            provenance,
+            evidence,
             definition,
             location: getLocation(ctx),
         };
     }
-    visitInferredByLine(ctx) {
+    visitInferredFromLine(ctx) {
         const defCtx = ctx.inferredBody();
         const body = this.visit(defCtx);
-        return { type: types_1.InferredByDefinitionType.type, body, location: getLocation(ctx) };
+        return { type: types_1.InferredFromDefinitionType.type, body, location: getLocation(ctx) };
     }
     visitDefinitionConcept(ctx) {
-        const refCtx = ctx.inferredByConceptReference();
-        const pat = refCtx.patternReference()?.text.slice(1, -1);
+        const refCtx = ctx.inferredFromConceptReference();
+        let pat = undefined;
+        if (refCtx.patternStatement) {
+            const patternCtx = refCtx.patternStatement();
+            if (patternCtx?.patternName?.().backtickString) {
+                const backtickCtx = patternCtx.patternName().backtickString();
+                if (backtickCtx?.text !== undefined) {
+                    pat = backtickCtx.text.slice(1, -1);
+                }
+            }
+        }
         const concept = refCtx.conceptReference().text.slice(1, -1);
         return {
-            type: types_1.InferredByConceptType.type,
+            type: types_1.InferredFromConceptType.type,
             pattern: pat,
             concept,
             location: getLocation(ctx),
         };
     }
     visitDefinitionLogic(ctx) {
-        const descCtx = ctx.inferredByDescriptiveLogic();
-        const exprCtx = descCtx.inferredByExpression();
+        const descCtx = ctx.inferredFromDescriptiveLogic();
+        const exprCtx = descCtx.inferredFromExpression();
         return this.visit(exprCtx);
     }
-    visitInferredByExpression(ctx) {
+    visitInferredFromExpression(ctx) {
         return this.visit(ctx.informalOr());
     }
     visitInformalOr(ctx) {
@@ -333,7 +366,7 @@ class CPGLAstBuilder extends AbstractParseTreeVisitor_1.AbstractParseTreeVisitor
         return { type: types_1.ConceptReferenceType.type, name, location: getLocation(ctx) };
     }
     visitGroupExpression(ctx) {
-        const expr = this.visit(ctx.inferredByExpression());
+        const expr = this.visit(ctx.inferredFromExpression());
         return { type: types_1.GroupExpressionType.type, expression: expr, location: getLocation(ctx) };
     }
 }

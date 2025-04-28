@@ -141,17 +141,17 @@ export interface Concept extends ASTNode {
     conceptType: ConceptType;
     valueType: ConceptValueType;
     definition: ConceptDefinition;
-    provenance?: string;
+    evidence?: string;
     location: Location;
 }
-export type ConceptDefinition = CodedByDefinition | InferredByDefinition;
-export interface CodedByDefinition extends ASTNode {
-    type: "CodedByDefinition";
+export type ConceptDefinition = CodedFromDefinition | InferredFromDefinition;
+export interface CodedFromDefinition extends ASTNode {
+    type: "CodedFromDefinition";
     terminologyName: string;
     location: Location;
 }
-export declare const CodedByDefinitionType: {
-    type: "CodedByDefinition";
+export declare const CodedFromDefinitionType: {
+    type: "CodedFromDefinition";
 };
 export interface ConceptReference extends ASTNode {
     type: "ConceptReference";
@@ -162,47 +162,47 @@ export declare const ConceptReferenceType: {
 };
 export interface InformalAnd extends ASTNode {
     type: "AndExpression";
-    terms: InferredByExpression[];
+    terms: InferredFromExpression[];
 }
 export declare const InformalAndType: {
     type: "AndExpression";
 };
 export interface InformalOr extends ASTNode {
     type: "OrExpression";
-    terms: InferredByExpression[];
+    terms: InferredFromExpression[];
 }
 export declare const InformalOrType: {
     type: "OrExpression";
 };
 export interface NotExpression extends ASTNode {
     type: "NotExpression";
-    expression: InferredByExpression;
+    expression: InferredFromExpression;
 }
 export declare const NotExpressionType: {
     type: "NotExpression";
 };
-export type InferredByExpression = ConceptReference | InformalAnd | InformalOr | GroupExpression | NotExpression;
+export type InferredFromExpression = ConceptReference | InformalAnd | InformalOr | GroupExpression | NotExpression;
 export interface GroupExpression extends ASTNode {
     type: "GroupExpression";
-    expression: InferredByExpression;
+    expression: InferredFromExpression;
 }
 export declare const GroupExpressionType: {
     type: "GroupExpression";
 };
-export interface InferredByConcept extends ASTNode {
-    type: "InferredByDefinitionConcept";
+export interface InferredFromConcept extends ASTNode {
+    type: "InferredFromDefinitionConcept";
     concept: string;
     pattern?: string;
 }
-export declare const InferredByConceptType: {
-    type: "InferredByDefinitionConcept";
+export declare const InferredFromConceptType: {
+    type: "InferredFromDefinitionConcept";
 };
-export interface InferredByDefinition extends ASTNode {
-    type: "InferredByDefinition";
-    body: InferredByConcept | InferredByExpression;
+export interface InferredFromDefinition extends ASTNode {
+    type: "InferredFromDefinition";
+    body: InferredFromConcept | InferredFromExpression;
 }
-export declare const InferredByDefinitionType: {
-    type: "InferredByDefinition";
+export declare const InferredFromDefinitionType: {
+    type: "InferredFromDefinition";
 };
 export interface Location {
     start: {
