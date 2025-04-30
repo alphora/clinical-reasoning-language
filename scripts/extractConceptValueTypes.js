@@ -1,6 +1,9 @@
 const fs = require('fs');
 const path = require('path');
 
+const dir = path.join(__dirname, '../src/grammar/generated/types');
+fs.mkdirSync(dir, { recursive: true });
+
 const grammarPath = path.join(__dirname, '../src/grammar/CRLLexer.g4');
 const outputPath = path.join(__dirname, '../src/grammar/generated/types/conceptValueTypes.json');
 
