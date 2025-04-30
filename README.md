@@ -12,7 +12,25 @@ CRL is a domain-specific language designed for expressing clinical practice guid
 
 ## Installation
 
-Install the package from npm:
+This is a private package. To install it, you need:
+
+1. An npm account with access to `@smiledigitalhealth` packages
+   - Contact your team lead to request access
+   - You will receive an invitation to join the organization
+   - Each developer should use their own npm account
+
+2. Set up authentication:
+   ```bash
+   # Log in to npm - recommended for individual developers
+   npm login
+
+   # Or create/edit ~/.npmrc with your personal access token
+   //registry.npmjs.org/:_authToken=YOUR_NPM_TOKEN
+   ```
+
+   > **Security Note:** Always use your personal npm token. Do not share tokens between team members.
+
+Once authenticated, install the package:
 
 ```bash
 npm install @smiledigitalhealth/crl
