@@ -1,5 +1,5 @@
 {
-  "name": "@smiledigitalhealth/crl",
+  "name": "@smile-digital-health/crl",
   "version": "0.6.1",
   "description": "Clinical Practice Guideline Language (CRL) parser and validator",
   "main": "dist/index.js",
@@ -20,7 +20,7 @@
     "README.md"
   ],
   "publishConfig": {
-    "access": "public"
+    "access": "restricted"
   },
   "scripts": {
     "lint": "eslint 'src/**/*.ts' --quiet",
@@ -49,7 +49,7 @@
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "test:regression": "jest src/tests/index.test.ts --verbose --no-cache --colors --forceExit --detectOpenHandles --watchAll=false",
-    "prepublish:github": "node scripts/prepublishGithub.js",
+    "prerelease:github": "node scripts/prereleaseGithub.js",
     "util:clonefsh": "npx ts-node scripts/clone-fsh-repo.ts",
     "git:unmerged": "ts-node scripts/unmerged-branches.ts"
   },

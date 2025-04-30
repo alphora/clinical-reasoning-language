@@ -1,4 +1,4 @@
-# @smiledigitalhealth/crl
+# @smile-digital-health/crl
 
 Clinical Practice Guideline Language (CRL) parser and validator
 
@@ -12,49 +12,54 @@ CRL is a domain-specific language designed for expressing clinical practice guid
 
 ## Installation
 
-* Users can install directly from GitHub using:
+This is a private package. To install it, you need:
 
-#### 📦 Installing from GitHub
+1. An npm account with access to `@smile-digital-health` packages
+   - Contact your team lead to request access
+   - You will receive an invitation to join the organization
+   - Each developer should use their own npm account
 
-If you're installing this package directly from GitHub using `npm install`, note that GitHub access via SSH is required by default. You have two options:
+2. Set up authentication:
+   ```bash
+   # Log in to npm - recommended for individual developers
+   npm login
 
----
+   # Or create/edit ~/.npmrc with your personal access token
+   //registry.npmjs.org/:_authToken=YOUR_NPM_TOKEN
+   ```
 
-##### ✅ Option 1: Install via HTTPS (Recommended)
+   > **Security Note:** Always use your personal npm token. Do not share tokens between team members.
 
-This method works without needing to set up SSH keys.
+Once authenticated, install the package:
 
 ```bash
-npm install git+https://github.com/alphora/clinical-practice-guideline-language.git#v0.4.0
+npm install @smile-digital-health/crl
 ```
 
 Or add it to your `package.json`:
 
 ```json
 "dependencies": {
-  "@smiledigitalhealth/crl": "git+https://github.com/alphora/clinical-practice-guideline-language.git#v0.4.0"
+  "@smile-digital-health/crl": "^0.6.1"
 }
 ```
 
----
+### For Package Maintainers
 
-##### 🔐 Option 2: Use SSH (Advanced)
+#### Publishing to npm
 
-If you prefer SSH (or are using the shorthand syntax like `github:cqis/crl#v0.4.0`), make sure your system is set up for GitHub SSH access.
+The package is automatically published to npm when a new GitHub release is created (non-draft, non-prerelease). To verify what will be published:
 
 ```bash
-npm install github:alphora/clinical-practice-guideline-language#v0.4.0
+# See what files would be included in the package
+npm publish --dry-run
+
+# Create the package locally without publishing
+npm pack
+
+# Examine contents of the generated .tgz file
+tar -ztvf <package-name>.tgz
 ```
-
-Or add it to your `package.json`:
-
-```json
-"dependencies": {
-  "@smiledigitalhealth/crl": "github:alphora/clinical-practice-guideline-language#v0.4.0"
-}
-```
-
-See the internets for detailed instructions on setting up SSH for GitHub.
 
 ## Features
 
@@ -138,7 +143,8 @@ The package provides four main functions for processing CRL code:
 ### 1. Tokenization
 
 ```typescript
-import { tokenizeCRL } from '@smiledigitalhealth/crl';
+import { tokenizeCRL } from '@smile-digital-health/crl';
+
 
 const result = tokenizeCRL(`
   decision "Test":
@@ -158,7 +164,7 @@ if (result.success) {
 ### 2. Parsing
 
 ```typescript
-import { parseCRL } from '@smiledigitalhealth/crl';
+import { parseCRL } from '@smile-digital-health/crl';
 
 const result = parseCRL(`
   decision "Test":
@@ -178,7 +184,7 @@ if (result.success) {
 ### 3. AST Building
 
 ```typescript
-import { buildCRL } from '@smiledigitalhealth/crl';
+import { buildCRL } from '@smile-digital-health/crl';
 
 const result = buildCRL(`
   decision "Test":
@@ -197,8 +203,10 @@ if (result.success) {
 
 ### 4. Validation
 
+> ⚠️ **Note:** Validation functionality is not yet implemented. The `validateCRL` function is a placeholder and will likely throw or return an error if used.
+
 ```typescript
-import { validateCRL } from '@smiledigitalhealth/crl';
+import { validateCRL } from '@smile-digital-health/crl';
 
 const result = validateCRL(`
   decision "Test":
