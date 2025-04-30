@@ -15,30 +15,21 @@ function ensureDir(dir) {
  */
 function moveFiles(srcDir, pattern, destDir) {
   ensureDir(destDir);
-  console.log(`[DEBUGGING] Scanning directory: ${srcDir}`);
-  console.log(`[DEBUGGING] Using pattern: ${pattern instanceof RegExp ? pattern.toString() : pattern}`);
   const files = fs.readdirSync(srcDir).filter(f =>
     pattern instanceof RegExp ? pattern.test(f) : f.endsWith(pattern)
   );
-  if (files.length === 0) {
-    console.log(`[DEBUGGING] No files matched pattern in ${srcDir}`);
-  } else {
-    console.log(`[DEBUGGING] Files to move: ${files.join(', ')}`);
-  }
   files.forEach(file => {
     const src = path.join(srcDir, file);
     const dest = path.join(destDir, file);
     fs.renameSync(src, dest);
-    console.log(`[DEBUGGING] Moved ${src} -> ${dest}`);
+    console.log(`Moved ${src} -> ${dest}`);
   });
-  console.log(`[DEBUGGING] Moved ${files.length} file(s) from ${srcDir} to ${destDir} for pattern ${pattern instanceof RegExp ? pattern.toString() : pattern}`);
 }
 
 // TODO: There must be a way to have local and github workflows use the same files
 // The problem is that if you try to set the output directory for the github workflow,
-// it will not be able to find the files because it adds to the path.
-// The only way to get it to work is to build in the root directory locally 
-// so when it adds to the path it is correct.
+// it will not be able to find the files because the files because it adds to the path
+// The only way to get it to work is to build in the root directory locally.
 const rootDir = path.join(__dirname, '..');
 const antlrDir = path.join(__dirname, '../src/grammar/generated/antlr');
 const grammarDir = path.join(__dirname, '../src/grammar');
