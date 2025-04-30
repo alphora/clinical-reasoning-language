@@ -37,7 +37,7 @@
     "extract-activity-types": "node scripts/extractActivityTypes.js",
     "extract-concept-types": "node scripts/extractConceptTypes.js",
     "extract-concept-value-types": "node scripts/extractConceptValueTypes.js",
-    "generate": "npm run extract-activity-types && npm run extract-concept-types && npm run extract-concept-value-types && antlr4ts -Xforce-atn -o src/grammar/generated/antlr src/grammar/CRLLexer.g4 && antlr4ts -Xforce-atn -visitor -o src/grammar/generated/antlr src/grammar/CRLParser.g4",
+    "generate": "npm run extract-activity-types && npm run extract-concept-types && npm run extract-concept-value-types && antlr4ts -Xforce-atn -o src/grammar/generated/antlr src/grammar/CRLLexer.g4 && antlr4ts -Xforce-atn -visitor -lib src/grammar/generated/antlr -o src/grammar/generated/antlr src/grammar/CRLParser.g4",
     "cli:lexer": "ts-node src/cli/run-lexer.ts",
     "cli:lexer:pretty": "ts-node src/cli/run-lexer.ts --pretty",
     "cli:parser": "ts-node src/cli/run-parser.ts",
