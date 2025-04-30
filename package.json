@@ -48,13 +48,14 @@
     "cli:validator": "ts-node src/cli/run-validator.ts",
     "cli:validator:pretty": "ts-node src/cli/run-validator.ts --pretty",
     "cli:transformer:fsh-to-crl": "ts-node src/cli/run-transformer-fsh-to-crl.ts",
-    "prebuild": "npm run clean",
+    "prebuild": "npm run clean && npm run generate",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "test:regression": "jest src/tests/index.test.ts --verbose --no-cache --colors --forceExit --detectOpenHandles --watchAll=false",
     "prepublish:github": "node scripts/prepublishGithub.js",
     "util:clonefsh": "npx ts-node scripts/clone-fsh-repo.ts",
-    "git:unmerged": "ts-node scripts/unmerged-branches.ts"
+    "git:unmerged": "ts-node scripts/unmerged-branches.ts",
+    "postinstall": "npm run generate"
   },
   "keywords": [
     "clinical",
