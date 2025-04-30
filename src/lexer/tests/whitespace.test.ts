@@ -8,12 +8,7 @@ describe("Whitespace Handling", () => {
     it("should skip newlines between tokens", () => {
       const input = "decision\nwhen\nthen\ndo";
       const tokens = getTokensFromString(input);
-      verifyTokenSequence(tokens, [
-        CRLLexer.DECISION,
-        CRLLexer.WHEN,
-        CRLLexer.THEN,
-        CRLLexer.DO,
-      ]);
+      verifyTokenSequence(tokens, [CRLLexer.DECISION, CRLLexer.WHEN, CRLLexer.THEN, CRLLexer.DO]);
     });
 
     it("should skip spaces between tokens", () => {

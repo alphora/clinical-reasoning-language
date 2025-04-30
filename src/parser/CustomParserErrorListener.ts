@@ -1,5 +1,6 @@
 import { ANTLRErrorListener, RecognitionException, Recognizer, Token } from "antlr4ts";
 import { ATNSimulator } from "antlr4ts/atn/ATNSimulator";
+
 import { CRLError } from "../types/errors";
 
 export class CustomParserErrorListener implements ANTLRErrorListener<Token> {
