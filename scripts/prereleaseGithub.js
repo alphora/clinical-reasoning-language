@@ -5,7 +5,7 @@ const path = require('path');
 const crypto = require('crypto');
 
 function run(cmd) {
-  console.log(`[prerelease:github] $ ${cmd}`);
+  console.log(`[prerelease] $ ${cmd}`);
   execSync(cmd, { stdio: 'inherit' });
 }
 
@@ -14,7 +14,7 @@ function tryRun(cmd) {
     run(cmd);
     return true;
   } catch (e) {
-    console.warn(`[prerelease:github] Command failed: ${cmd}\n${e}`);
+    console.warn(`[prerelease] Command failed: ${cmd}\n${e}`);
     return false;
   }
 }
@@ -62,51 +62,51 @@ function verifyPostRollback(originalCommit, originalVersion, originalLocalTags) 
   let ok = true;
 
   if (currentCommit !== originalCommit) {
-    console.error(`[prerelease:github] WARNING: Commit hash after rollback (${currentCommit}) does not match original (${originalCommit})!`);
+    console.error(`[prerelease] WARNING: Commit hash after rollback (${currentCommit}) does not match original (${originalCommit})!`);
     ok = false;
   }
   if (currentVersion !== originalVersion) {
-    console.error(`[prerelease:github] WARNING: package.json version after rollback (${currentVersion}) does not match original (${originalVersion})!`);
+    console.error(`[prerelease] WARNING: package.json version after rollback (${currentVersion}) does not match original (${originalVersion})!`);
     ok = false;
   }
   const missingTags = originalLocalTags.filter(tag => !currentTags.includes(tag));
   const extraTags = currentTags.filter(tag => !originalLocalTags.includes(tag));
   if (missingTags.length > 0 || extraTags.length > 0) {
-    console.error('[prerelease:github] WARNING: Tag set after rollback does not match original.');
+    console.error('[prerelease] WARNING: Tag set after rollback does not match original.');
     if (missingTags.length > 0) console.error(`Missing tags: ${missingTags.join(', ')}`);
     if (extraTags.length > 0) console.error(`Extra tags: ${extraTags.join(', ')}`);
     ok = false;
   }
   if (ok) {
-    console.log('[prerelease:github] Post-rollback verification: local state matches original.');
+    console.log('[prerelease] Post-rollback verification: local state matches original.');
   } else {
-    console.error('[prerelease:github] Post-rollback verification: local state does NOT match original. Manual intervention may be required.');
+    console.error('[prerelease] Post-rollback verification: local state does NOT match original. Manual intervention may be required.');
   }
 }
 
 function verifyRemotePostRollback(originalRemoteCommit, branch) {
   const currentRemoteCommit = getRemoteCommit(branch);
   if (currentRemoteCommit !== originalRemoteCommit) {
-    console.error(`[prerelease:github] CRITICAL: Remote commit after rollback (${currentRemoteCommit}) does not match original remote commit (${originalRemoteCommit})! Manual intervention required.`);
+    console.error(`[prerelease] CRITICAL: Remote commit after rollback (${currentRemoteCommit}) does not match original remote commit (${originalRemoteCommit})! Manual intervention required.`);
   } else {
-    console.log('[prerelease:github] Post-rollback verification: remote state matches original.');
+    console.log('[prerelease] Post-rollback verification: remote state matches original.');
   }
 }
 
 function main() {
   const arg = process.argv[2];
   if (!arg) {
-    console.error('Usage: npm run prerelease:github -- <patch|minor|major|version>');
+    console.error('Usage: npm run prerelease -- <patch|minor|major|version>');
     process.exit(1);
   }
 
   if (!isWorkingDirectoryClean()) {
-    console.error('[prerelease:github] Working directory is not clean. Please commit, stash, or discard your changes before running this script.');
+    console.error('[prerelease] Working directory is not clean. Please commit, stash, or discard your changes before running this script.');
     process.exit(1);
   }
 
   if (!isBranchUpToDate()) {
-    console.error('[prerelease:github] Local branch is behind the remote. Please pull the latest changes before running this script.');
+    console.error('[prerelease] Local branch is behind the remote. Please pull the latest changes before running this script.');
     process.exit(1);
   }
 
@@ -137,9 +137,9 @@ function main() {
     run('git push --tags');
     tagsPushed = true;
 
-    console.log('[prerelease:github] Release process complete!');
+    console.log('[prerelease] Release process complete!');
   } catch (err) {
-    console.warn('[prerelease:github] Error occurred, starting rollback...');
+    console.warn('[prerelease] Error occurred, starting rollback...');
     if (tagsPushed && taggedVersion) {
       tryRun(`git push --delete origin v${taggedVersion}`);
     }
@@ -148,7 +148,7 @@ function main() {
     }
     verifyPostRollback(originalCommit, originalVersion, originalLocalTags);
     verifyRemotePostRollback(originalRemoteCommit, branch);
-    console.error('[prerelease:github] Release failed. All possible changes rolled back.');
+    console.error('[prerelease] Release failed. All possible changes rolled back.');
     console.error(err);
     process.exit(1);
   }
