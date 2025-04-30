@@ -12,7 +12,7 @@ import { getTokensFromString } from "./helpers";
 
 describe("Grammar Example Analysis", () => {
   it("should successfully tokenize the grammar example file", () => {
-    const examplePath = path.join(__dirname, "../../../docs/grammar-example.cpg");
+    const examplePath = path.join(__dirname, "../../../docs/grammar-example.crl");
     const input = fs.readFileSync(examplePath, "utf8");
     const lexer = new CRLLexer(CharStreams.fromString(input));
 

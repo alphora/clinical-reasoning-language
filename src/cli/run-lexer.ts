@@ -7,7 +7,7 @@ import { createLexer } from "../lexer/createLexer";
 // Get the path to the grammar example file
 const examplePath = join(
   __dirname,
-  "../examples/crl/who/smart-example-immz/IMMZ_All_Decisions.cpg",
+  "../examples/crl/who/smart-example-immz/IMMZ_All_Decisions.crl",
 );
 
 // Read the file content
@@ -50,7 +50,7 @@ if (!prettyOutput) {
   console.log(JSON.stringify(tokens, null, 2));
 } else {
   // Pretty lexer output
-  console.log("\nTokenizing grammar-example.cpg:\n");
+  console.log("\nTokenizing grammar-example.crl:\n");
   console.log("Line | Column | Type | Text");
   console.log("-----|--------|------|------");
 

@@ -10,7 +10,7 @@ import { CRLLexerErrorListener } from "../lexer/CRLLexerErrorListener";
 import { createParser } from "../parser/createParser";
 
 // Read the example file
-const examplePath = join(__dirname, "../../docs/grammar-example.cpg");
+const examplePath = join(__dirname, "../../docs/grammar-example.crl");
 const input = readFileSync(examplePath, "utf-8");
 
 // Create the lexer and add error listener

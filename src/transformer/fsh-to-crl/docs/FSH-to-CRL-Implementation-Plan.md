@@ -41,7 +41,7 @@ src/transformer/fsh-to-crl/
   - Build up the CRL output as a string or AST.
 
 ### D. Output Generation
-- Format and write the CRL output to `.cpg` files.
+- Format and write the CRL output to `.crl` files.
 - Ensure output is valid per the CRL grammar (optionally, add a validation step).
 
 ### E. Entry Point

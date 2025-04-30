@@ -5,8 +5,8 @@ import * as path from "path";
 import stripAnsi from "strip-ansi";
 
 describe("Transformer regression test: IMMZ example", () => {
-  const TMP_FILE = path.join(__dirname, "testdata", "regression-transformer-actual.cpg");
-  const EXPECTED_FILE = path.join(__dirname, "testdata", "regression-transformer-expected.cpg");
+  const TMP_FILE = path.join(__dirname, "testdata", "regression-transformer-actual.crl");
+  const EXPECTED_FILE = path.join(__dirname, "testdata", "regression-transformer-expected.crl");
   const MARKER = "// Instance: IMMZD2DTMeaslesDose0";
 
   const isCI = process.env.CI === "true";
