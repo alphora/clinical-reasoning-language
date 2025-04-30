@@ -1,5 +1,5 @@
 
-> @smiledigitalhealth/crl@0.5.3 cli:ast
+> @smile-digital-health/crl@0.5.3 cli:ast
 > ts-node src/cli/run-ast.ts
 
 {
