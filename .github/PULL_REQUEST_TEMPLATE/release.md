@@ -53,20 +53,26 @@ To create a new release:
    Prompt:
    > Generate and append to the CHANGELOG based on git commits since the last tag.
 
-6. **Run tests to ensure no regression**
+6. **Build the project**
+
+   ```bash
+   npm run build
+   ```
+
+7. **Run tests to ensure no regression**
 
    ```bash
    npm test
    ```
 
-7. **Commit all changes**
+8. **Commit all changes**
 
    ```bash
    git add .
    git commit -m "Prepare release v0.1.0"
    ```
 
-8. **Run the automated release script**
+9. **Run the automated release script**
 
    ```bash
    npm run prerelease:github -- <patch|minor|major|version>
@@ -83,15 +89,15 @@ To create a new release:
    - Bump the version and create a Git tag
    - Push commits and tags
 
-9. **Push commits and tags** (if not already pushed by the script)
+10. **Push commits and tags** (if not already pushed by the script)
 
-10. **Create and merge the Pull Request (PR)**
+11. **Create and merge the Pull Request (PR)**
 
-11. **Create and publish the GitHub Release**
+12. **Create and publish the GitHub Release**
     - Use the version tag (e.g., `v0.1.0`)
     - Generate release notes automatically if needed
 
-12. **Switch back to main and delete the release branch:**
+13. **Switch back to main and delete the release branch:**
 
     ```bash
     git checkout main
