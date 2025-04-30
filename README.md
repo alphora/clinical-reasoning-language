@@ -26,7 +26,7 @@ This is a private package. To install it, you need:
    npm login
    ```
 
-  Or create/edit ~/.npmrc with your personal access token (note the second line is **NOT a comment**):
+  Or create/edit `~/.npmrc` with your personal access token (note the second line is **NOT a comment**):
 
   ```npmc
 @smile-digital-health:registry=https://registry.npmjs.org/
