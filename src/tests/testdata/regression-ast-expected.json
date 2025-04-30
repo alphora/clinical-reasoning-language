@@ -1,9 +1,9 @@
 
-> @smiledigitalhealth/cpgl@0.5.4 cli:ast
+> @smiledigitalhealth/crl@0.5.4 cli:ast
 > ts-node src/cli/run-ast.ts
 
 {
-  "type": "CPGL",
+  "type": "CRL",
   "statements": [
     {
       "type": "Decision",

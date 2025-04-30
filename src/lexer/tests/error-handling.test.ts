@@ -1,4 +1,4 @@
-import { tokenizeCPGL } from "../../index";
+import { tokenizeCRL } from "../../index";
 
 import { getTokensFromString } from "./helpers";
 
@@ -186,10 +186,10 @@ describe("Lexer Error Handling", () => {
   });
 });
 
-describe("tokenizeCPGL error reporting", () => {
+describe("tokenizeCRL error reporting", () => {
   it("should return errors in ParseResult for invalid activity type", () => {
     const input = "perform invalidActivity";
-    const result = tokenizeCPGL(input);
+    const result = tokenizeCRL(input);
     expect(result.success).toBe(false);
     expect(result.errors && result.errors.length).toBeGreaterThan(0);
     const errorObj = JSON.parse(result.errors![0]);
@@ -199,7 +199,7 @@ describe("tokenizeCPGL error reporting", () => {
 
   it("should return errors in ParseResult for invalid concept type", () => {
     const input = "concept type InvalidConcept";
-    const result = tokenizeCPGL(input);
+    const result = tokenizeCRL(input);
     expect(result.success).toBe(false);
     expect(result.errors && result.errors.length).toBeGreaterThan(0);
     const errorObj = JSON.parse(result.errors![0]);
@@ -209,7 +209,7 @@ describe("tokenizeCPGL error reporting", () => {
 
   it("should return errors in ParseResult for invalid characters", () => {
     const input = "@invalid";
-    const result = tokenizeCPGL(input);
+    const result = tokenizeCRL(input);
     expect(result.success).toBe(false);
     expect(result.errors && result.errors.length).toBeGreaterThan(0);
     const errorObj = JSON.parse(result.errors![0]);

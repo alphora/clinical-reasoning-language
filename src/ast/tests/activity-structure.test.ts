@@ -1,4 +1,4 @@
-// Removed unused CPGLAstBuilder import
+// Removed unused CRLAstBuilder import
 
 import { Activity } from "../types";
 

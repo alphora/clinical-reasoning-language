@@ -1,8 +1,8 @@
-# 🛠️ CPGL Transformation Requirements from FSH Action Trees
+# 🛠️ CRL Transformation Requirements from FSH Action Trees
 
 ## ✅ General Logic
 
-When transforming a PlanDefinition's `action[]` tree into CPGL `when` and `use/do` statements, follow the rules below.
+When transforming a PlanDefinition's `action[]` tree into CRL `when` and `use/do` statements, follow the rules below.
 
 ---
 
@@ -20,8 +20,8 @@ FSH:
   * definitionCanonical = Canonical(IMMZD2DTMeaslesSupplementary)
 ~~~
 
-CPGL:
-~~~cpgl
+CRL:
+~~~crl
 //"Measles Supplementary Dose"
 when "" then use "IMMZD2DTMeaslesSupplementary".
 ~~~
@@ -43,8 +43,8 @@ FSH:
   * definitionCanonical = Canonical(B1)
 ~~~
 
-CPGL:
-~~~cpgl
+CRL:
+~~~crl
 //"A"
 //"B"
 when "" then:
@@ -70,13 +70,13 @@ FSH:
 * definitionCanonical = Canonical(IMMZD5DTMeaslesCI)
 ~~~
 
-CPGL:
-~~~cpgl
+CRL:
+~~~crl
 //"Evaluate Contraindications"
 when "" then use "IMMZD5DTMeaslesCI".
 ~~~
 
-## 4. 🧱 CPGL Structural Example
+## 4. 🧱 CRL Structural Example
 
 Given this FSH fragment:
 
@@ -91,9 +91,9 @@ Given this FSH fragment:
     * definitionCanonical = Canonical(IMMZD2DTMeaslesSupplementary)
 ~~~
 
-Generate the following CPGL:
+Generate the following CRL:
 
-~~~cpgl
+~~~crl
 decision "IMMZ.DT.Immunization Strategy":
     when "Check Immunizations":
         //"Measles Dose 0"
@@ -131,7 +131,7 @@ Description: "Provide vaccinations according to the recommended schedule"
 
 Should result in:
 
-~~~cpgl
+~~~crl
 decision "IMMZ.DT.Immunization Strategy":
     when "Check Immunizations":
         //"Measles Dose 0"
@@ -160,6 +160,6 @@ done
 
 ## 📌 Final Notes
 
-These rules ensure structural clarity and compactness in the generated CPGL.
+These rules ensure structural clarity and compactness in the generated CRL.
 
 They improve output quality by removing unnecessary repetition and increasing semantic clarity.

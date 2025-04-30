@@ -1,4 +1,4 @@
-import { CPGLLexer } from "../../grammar/generated/antlr/CPGLLexer";
+import { CRLLexer } from "../../grammar/generated/antlr/CRLLexer";
 
 /**
  * Helper function to generate token sequence for a single action block
@@ -9,7 +9,7 @@ import { CPGLLexer } from "../../grammar/generated/antlr/CPGLLexer";
  *    perform ServiceRequest
  */
 export function getActionTokenSequence(): number[] {
-  return [CPGLLexer.PERFORM, CPGLLexer.ACTIVITY_TYPE, CPGLLexer.DOT];
+  return [CRLLexer.PERFORM, CRLLexer.ACTIVITY_TYPE, CRLLexer.DOT];
 }
 
 /**
@@ -19,7 +19,7 @@ export function getActionTokenSequence(): number[] {
  * type is Observation.
  */
 export function getCaseFeatureTokenSequence(): number[] {
-  return [CPGLLexer.TYPE, CPGLLexer.IS, CPGLLexer.CONCEPT_TYPE, CPGLLexer.DOT];
+  return [CRLLexer.TYPE, CRLLexer.IS, CRLLexer.CONCEPT_TYPE, CRLLexer.DOT];
 }
 
 /**
@@ -29,5 +29,5 @@ export function getCaseFeatureTokenSequence(): number[] {
  * valuetype is Quantity.
  */
 export function getValueTypeTokenSequence(): number[] {
-  return [CPGLLexer.VALUETYPE, CPGLLexer.IS, CPGLLexer.CONCEPT_VALUE_TYPE, CPGLLexer.DOT];
+  return [CRLLexer.VALUETYPE, CRLLexer.IS, CRLLexer.CONCEPT_VALUE_TYPE, CRLLexer.DOT];
 }

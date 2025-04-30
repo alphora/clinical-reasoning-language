@@ -1,4 +1,4 @@
-import { CPGL } from "../ast/types";
+import { CRL } from "../ast/types";
 import { ValidationError } from "./validator";
 export declare class UnusedDeclarationsValidator {
     private readonly decisionDeclarations;
@@ -6,8 +6,8 @@ export declare class UnusedDeclarationsValidator {
     private readonly activityDeclarations;
     private readonly terminologyDeclarations;
     private readonly ast;
-    constructor(ast?: CPGL);
-    validate(ast?: CPGL): ValidationError[];
+    constructor(ast?: CRL);
+    validate(ast?: CRL): ValidationError[];
     private clear;
     private collectDeclarations;
     private processDeclarations;

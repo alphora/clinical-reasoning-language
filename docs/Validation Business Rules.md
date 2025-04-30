@@ -70,7 +70,7 @@ should not be an error.
 
 for example:
 
-```cpgl
+```crl
 decision "Elderly Based":
   when"Client Age Less Than 60"then:
     do"Vaccinate".
@@ -90,7 +90,7 @@ should be errors.
 
 But
 
-```cpgl
+```crl
 decision "Elderly Based":
   when"Client Age Less Than 60"then:
     do"Vaccinate".

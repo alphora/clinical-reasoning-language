@@ -1,7 +1,7 @@
-parser grammar CPGLParser;
+parser grammar CRLParser;
 
 options {
-    tokenVocab=CPGLLexer;
+    tokenVocab=CRLLexer;
 }
 
 // ============================
@@ -24,7 +24,7 @@ options {
 // Parser Rules
 // ============================
 
-cpgl
+crl
     : statement* EOF
     ;
 

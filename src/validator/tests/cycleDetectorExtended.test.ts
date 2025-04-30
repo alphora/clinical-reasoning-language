@@ -1,4 +1,4 @@
-import { CPGL } from '../../ast/types';
+import { CRL } from '../../ast/types';
 import { Validator } from '../validator';
 
 describe('CycleDetector Extended Tests', () => {
@@ -8,11 +8,11 @@ describe('CycleDetector Extended Tests', () => {
     validator = new Validator();
   });
 
-  // 1. Multiple independent cycles in one cpgl:
+  // 1. Multiple independent cycles in one crl:
   describe('Multiple Independent Decision Cycles', () => {
     it('should detect two separate decision cycles', () => {
-      const ast: CPGL = {
-        type: 'CPGL',
+      const ast: CRL = {
+        type: 'CRL',
         statements: [
           // Cycle 1: DecisionX <-> DecisionY
           {
@@ -155,8 +155,8 @@ describe('CycleDetector Extended Tests', () => {
   // 2. Self-loop cycle: A decision referencing itself
   describe('Self-loop Decision Cycle', () => {
     it('should detect a self-loop decision cycle', () => {
-      const ast: CPGL = {
-        type: 'CPGL',
+      const ast: CRL = {
+        type: 'CRL',
         statements: [
           {
             type: 'Decision',
@@ -202,8 +202,8 @@ describe('CycleDetector Extended Tests', () => {
   // 3. Complex indirect cycle: A -> B -> C -> D -> A
   describe('Complex Indirect Decision Cycle', () => {
     it('should detect a decision cycle with four nodes (A -> B -> C -> D -> A)', () => {
-      const ast: CPGL = {
-        type: 'CPGL',
+      const ast: CRL = {
+        type: 'CRL',
         statements: [
           {
             type: 'Decision',
@@ -345,8 +345,8 @@ describe('CycleDetector Extended Tests', () => {
       // Two cycles:
       // Cycle 1: DecisionA -> DecisionB -> DecisionA
       // Cycle 2: DecisionB -> DecisionC -> DecisionD -> DecisionB
-      const ast: CPGL = {
-        type: 'CPGL',
+      const ast: CRL = {
+        type: 'CRL',
         statements: [
           // Cycle 1
           {
@@ -499,8 +499,8 @@ describe('CycleDetector Extended Tests', () => {
   // 5. Mixed usage: cycle + repeated action in the same block.
   describe('Mixed Errors: Cycle and Repeated Action', () => {
     it('should detect both a cycle in decision references and a repeated do action', () => {
-      const ast: CPGL = {
-        type: 'CPGL',
+      const ast: CRL = {
+        type: 'CRL',
         statements: [
           {
             type: 'Decision',

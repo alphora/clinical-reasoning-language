@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.CPGLLexer = void 0;
-var CPGLLexer_1 = require("../grammar/generated/antlr/CPGLLexer");
-Object.defineProperty(exports, "CPGLLexer", { enumerable: true, get: function () { return CPGLLexer_1.CPGLLexer; } });
+exports.CRLLexer = void 0;
+var CRLLexer_1 = require("../grammar/generated/antlr/CRLLexer");
+Object.defineProperty(exports, "CRLLexer", { enumerable: true, get: function () { return CRLLexer_1.CRLLexer; } });
 //# sourceMappingURL=index.js.map

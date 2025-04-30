@@ -101,7 +101,7 @@ unit tests!
 explosion of universe
 
  see the issue now. In the lexer grammar, we have separate tokens for INFERRED and BY:
-Apply to CPGLLexer.g4
+Apply to CRLLexer.g4
 But in the test input, we're using inferred-by with a hyphen. The lexer is correctly identifying this as an error because there's no rule to handle the hyphen character between these keywords.
 This suggests that my initial assessment about lexer mode transitions was incorrect. The actual issue is with the grammar not properly handling compound keywords with hyphens. The lexer modes are working as expected for handling concept types, value types, and activity types.
 Would you like me to propose a fix for handling the hyphenated keywords in the grammar?

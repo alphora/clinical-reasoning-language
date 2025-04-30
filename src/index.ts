@@ -1,8 +1,8 @@
 import { ParseTree } from "antlr4ts/tree/ParseTree";
 
-import { CPGLAstBuilder } from "./ast/builder";
-import { CPGL } from "./ast/types";
-import { CPGLLexer } from "./grammar/generated/antlr/CPGLLexer";
+import { CRLAstBuilder } from "./ast/builder";
+import { CRL } from "./ast/types";
+import { CRLLexer } from "./grammar/generated/antlr/CRLLexer";
 import { createLexer } from "./lexer/createLexer";
 import { createParser } from "./parser/createParser";
 import { Validator } from "./validator/validator";
@@ -21,17 +21,17 @@ export interface ParseResult<T> {
 }
 
 /**
- * Tokenizes CPGL input into a sequence of tokens
- * @param input The CPGL code to tokenize
+ * Tokenizes CRL input into a sequence of tokens
+ * @param input The CRL code to tokenize
  * @returns ParseResult containing tokens or errors
  */
-export function tokenizeCPGL(input: string): ParseResult<Token[]> {
+export function tokenizeCRL(input: string): ParseResult<Token[]> {
   try {
     const { lexer, errorListener } = createLexer(input);
     const tokens: Token[] = [];
     let token = lexer.nextToken();
 
-    while (token.type !== CPGLLexer.EOF) {
+    while (token.type !== CRLLexer.EOF) {
       if (token.channel === 0) {
         // Only show tokens on the default channel
         const typeName = lexer.vocabulary.getSymbolicName(token.type) ?? `Unknown (${token.type})`;
@@ -56,17 +56,17 @@ export function tokenizeCPGL(input: string): ParseResult<Token[]> {
 }
 
 /**
- * Parses CPGL input into a parse tree
- * @param input The CPGL code to parse
+ * Parses CRL input into a parse tree
+ * @param input The CRL code to parse
  * @returns ParseResult containing parse tree or errors
  */
-export function parseCPGL(input: string): ParseResult<ParseTree> {
+export function parseCRL(input: string): ParseResult<ParseTree> {
   let lexerErrorListener, parserErrorListener;
   try {
     const parserSetup = createParser(input);
     lexerErrorListener = parserSetup.lexerErrorListener;
     parserErrorListener = parserSetup.parserErrorListener;
-    const tree = parserSetup.parser.cpgl();
+    const tree = parserSetup.parser.crl();
     const errors = [...lexerErrorListener.getErrors(), ...parserErrorListener.getErrors()];
     if (errors.length > 0) {
       return { success: false, errors };
@@ -90,19 +90,19 @@ export function parseCPGL(input: string): ParseResult<ParseTree> {
 }
 
 /**
- * Builds an AST from CPGL input
- * @param input The CPGL code to build AST from
+ * Builds an AST from CRL input
+ * @param input The CRL code to build AST from
  * @returns ParseResult containing AST or errors
  */
-export function buildCPGL(input: string): ParseResult<CPGL> {
+export function buildCRL(input: string): ParseResult<CRL> {
   let lexerErrorListener, parserErrorListener, builder;
   try {
     const parserSetup = createParser(input);
     lexerErrorListener = parserSetup.lexerErrorListener;
     parserErrorListener = parserSetup.parserErrorListener;
-    const tree = parserSetup.parser.cpgl();
-    builder = new CPGLAstBuilder();
-    const ast = builder.visit(tree) as CPGL;
+    const tree = parserSetup.parser.crl();
+    builder = new CRLAstBuilder();
+    const ast = builder.visit(tree) as CRL;
     const errors = [
       ...lexerErrorListener.getErrors(),
       ...parserErrorListener.getErrors(),
@@ -131,16 +131,16 @@ export function buildCPGL(input: string): ParseResult<CPGL> {
 }
 
 /**
- * Validates CPGL input
- * @param input The CPGL code to validate
+ * Validates CRL input
+ * @param input The CRL code to validate
  * @returns ParseResult containing validation result or errors
  */
-export function validateCPGL(input: string): ParseResult<CPGL> {
+export function validateCRL(input: string): ParseResult<CRL> {
   try {
     const { parser, lexerErrorListener, parserErrorListener } = createParser(input);
-    const tree = parser.cpgl();
-    const builder = new CPGLAstBuilder();
-    const ast = builder.visit(tree) as CPGL;
+    const tree = parser.crl();
+    const builder = new CRLAstBuilder();
+    const ast = builder.visit(tree) as CRL;
     const errors = [...lexerErrorListener.getErrors(), ...parserErrorListener.getErrors()];
     if (errors.length > 0) {
       return { success: false, errors };

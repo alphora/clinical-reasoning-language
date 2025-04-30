@@ -40,7 +40,7 @@ temp/
 *.tmp
 
 # Ignore ANTLR generated listener (not used)
-src/grammar/generated/CPGLParserListener.ts
+src/grammar/generated/CRLParserListener.ts
 
 # Don't put anything below this line as these are auto-generated
 

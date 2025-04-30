@@ -1,11 +1,11 @@
-import { CPGL, DecisionBody, WhenBlock, BlockBody, ActionStatement, Action } from "../ast/types";
+import { CRL, DecisionBody, WhenBlock, BlockBody, ActionStatement, Action } from "../ast/types";
 
 import { ValidationError } from "./validator";
 
 export class ActionUniquenessValidator {
-  private ast: CPGL | null = null;
+  private ast: CRL | null = null;
 
-  validate(ast: CPGL): ValidationError[] {
+  validate(ast: CRL): ValidationError[] {
     this.ast = ast;
     const errors: ValidationError[] = [];
 
@@ -97,7 +97,7 @@ export class ActionUniquenessValidator {
     }
   }
 
-  private buildActionGraph(ast: CPGL): Map<string, Set<string>> {
+  private buildActionGraph(ast: CRL): Map<string, Set<string>> {
     const graph = new Map<string, Set<string>>();
 
     // Initialize graph with all actions
@@ -227,7 +227,7 @@ export class ActionUniquenessValidator {
   }
 
   private findActionLocation(
-    ast: CPGL,
+    ast: CRL,
     nodeId: string,
   ): { start: { line: number; column: number }; end: { line: number; column: number } } {
     const [, name] = nodeId.split(":");
@@ -272,7 +272,7 @@ export class ActionUniquenessValidator {
     return null;
   }
 
-  private collectDefinedActions(ast: CPGL): Set<string> {
+  private collectDefinedActions(ast: CRL): Set<string> {
     const definedActions = new Set<string>();
     for (const statement of ast.statements) {
       if (statement.type === "Decision") {

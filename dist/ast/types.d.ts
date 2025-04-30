@@ -14,13 +14,13 @@ export interface ASTNode {
         };
     };
 }
-export interface CPGL extends ASTNode {
-    type: "CPGL";
+export interface CRL extends ASTNode {
+    type: "CRL";
     statements: Statement[];
     location: Location;
 }
 export declare const FileType: {
-    type: "CPGL";
+    type: "CRL";
 };
 export type Statement = Decision | Concept | Activity | Terminology;
 export interface Decision extends ASTNode {

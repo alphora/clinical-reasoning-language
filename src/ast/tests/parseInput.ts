@@ -1,10 +1,10 @@
 import { createParser } from "../../parser/createParser";
-import { CPGLAstBuilder } from "../builder";
-import { CPGL } from "../types";
+import { CRLAstBuilder } from "../builder";
+import { CRL } from "../types";
 
-export const parseInput = (input: string): CPGL => {
+export const parseInput = (input: string): CRL => {
   const { parser } = createParser(input);
-  const tree = parser.cpgl();
-  const builder = new CPGLAstBuilder();
-  return builder.visitCpgl(tree);
+  const tree = parser.crl();
+  const builder = new CRLAstBuilder();
+  return builder.visitCrl(tree);
 };

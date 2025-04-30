@@ -2,7 +2,7 @@ import { CommonTokenStream } from "antlr4ts";
 
 import { createLexer } from "../createLexer";
 
-describe("CPGLLexerErrorListener", () => {
+describe("CRLLexerErrorListener", () => {
   it("should detect individual invalid tokens", () => {
     const { lexer, errorListener } = createLexer("invalid");
     const tokenStream = new CommonTokenStream(lexer);
@@ -57,7 +57,7 @@ describe("CPGLLexerErrorListener", () => {
   });
 });
 
-describe("CPGLLexerErrorListener with CPGL-specific input", () => {
+describe("CRLLexerErrorListener with CRL-specific input", () => {
   it("should detect invalid tokens in a decision statement", () => {
     const { lexer, errorListener } = createLexer(
       'decision "Invalid Decision": when "Invalid Concept" then do "Invalid Action". done',

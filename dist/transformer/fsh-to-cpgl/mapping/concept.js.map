@@ -1,1 +1,0 @@
-{"version":3,"file":"concept.js","sourceRoot":"","sources":["../../../../src/transformer/fsh-to-cpgl/mapping/concept.ts"],"names":[],"mappings":";;AAMA,gCAWC;AAjBD,gEAAyD;AAMzD,SAAgB,UAAU,CAAC,WAAqB;IAC9C,OAAO,WAAW;SACf,GAAG,CACF,CAAC,EAAE,EAAE,EAAE,CACL,WAAW,IAAA,+BAAY,EAAC,EAAE,CAAC;;;eAGpB,IAAA,+BAAY,EAAC,EAAE,CAAC;OACxB,CACF;SACA,IAAI,CAAC,IAAI,CAAC,CAAC;AAChB,CAAC"}

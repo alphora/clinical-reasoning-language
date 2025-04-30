@@ -15,7 +15,7 @@ describe("Transformer regression test: IMMZ example", () => {
   (isCI ? it.skip : it)("should match the expected CPG-L output (ignoring header)", () => {
     // Run the transformer CLI and capture output
     let output = execSync(
-      "npm run cli:transformer:fsh-to-cpgl -- " +
+      "npm run cli:transformer:fsh-to-crl -- " +
         path.join(__dirname, "testdata", "smart-example-immz"),
       { encoding: "utf8" },
     );

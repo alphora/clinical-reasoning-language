@@ -1,4 +1,4 @@
-import { CPGLLexer } from "../../grammar/generated/antlr/CPGLLexer";
+import { CRLLexer } from "../../grammar/generated/antlr/CRLLexer";
 
 import { getTokensFromString } from "./helpers";
 import { verifyTokenSequence } from "./index.test";
@@ -16,17 +16,17 @@ describe("Comments", () => {
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(tokens, [
-        CPGLLexer.DECISION,
-        CPGLLexer.QUOTED_STRING,
-        CPGLLexer.WHEN,
-        CPGLLexer.QUOTED_STRING,
-        CPGLLexer.THEN,
-        CPGLLexer.DO,
-        CPGLLexer.QUOTED_STRING,
+        CRLLexer.DECISION,
+        CRLLexer.QUOTED_STRING,
+        CRLLexer.WHEN,
+        CRLLexer.QUOTED_STRING,
+        CRLLexer.THEN,
+        CRLLexer.DO,
+        CRLLexer.QUOTED_STRING,
       ]);
     });
 
-    it("should handle single-line comments at the start of cpgl", () => {
+    it("should handle single-line comments at the start of crl", () => {
       const input = `// This is a comment
 decision "Test"
     when "Condition" then
@@ -35,13 +35,13 @@ decision "Test"
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(tokens, [
-        CPGLLexer.DECISION,
-        CPGLLexer.QUOTED_STRING,
-        CPGLLexer.WHEN,
-        CPGLLexer.QUOTED_STRING,
-        CPGLLexer.THEN,
-        CPGLLexer.DO,
-        CPGLLexer.QUOTED_STRING,
+        CRLLexer.DECISION,
+        CRLLexer.QUOTED_STRING,
+        CRLLexer.WHEN,
+        CRLLexer.QUOTED_STRING,
+        CRLLexer.THEN,
+        CRLLexer.DO,
+        CRLLexer.QUOTED_STRING,
       ]);
     });
   });
@@ -55,13 +55,13 @@ decision "Test"
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(tokens, [
-        CPGLLexer.DECISION,
-        CPGLLexer.QUOTED_STRING,
-        CPGLLexer.WHEN,
-        CPGLLexer.QUOTED_STRING,
-        CPGLLexer.THEN,
-        CPGLLexer.DO,
-        CPGLLexer.QUOTED_STRING,
+        CRLLexer.DECISION,
+        CRLLexer.QUOTED_STRING,
+        CRLLexer.WHEN,
+        CRLLexer.QUOTED_STRING,
+        CRLLexer.THEN,
+        CRLLexer.DO,
+        CRLLexer.QUOTED_STRING,
       ]);
     });
 
@@ -70,11 +70,11 @@ decision "Test"
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(tokens, [
-        CPGLLexer.TERMINOLOGY,
-        CPGLLexer.QUOTED_STRING,
-        CPGLLexer.VALUESET,
-        CPGLLexer.QUOTED_STRING,
-        CPGLLexer.DOT,
+        CRLLexer.TERMINOLOGY,
+        CRLLexer.QUOTED_STRING,
+        CRLLexer.VALUESET,
+        CRLLexer.QUOTED_STRING,
+        CRLLexer.DOT,
       ]);
     });
 
@@ -83,11 +83,11 @@ decision "Test"
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(tokens, [
-        CPGLLexer.ACTIVITY,
-        CPGLLexer.QUOTED_STRING,
-        CPGLLexer.PERFORM,
-        CPGLLexer.ACTIVITY_TYPE,
-        CPGLLexer.DOT,
+        CRLLexer.ACTIVITY,
+        CRLLexer.QUOTED_STRING,
+        CRLLexer.PERFORM,
+        CRLLexer.ACTIVITY_TYPE,
+        CRLLexer.DOT,
       ]);
     });
 
@@ -100,26 +100,26 @@ done`;
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(tokens, [
-        CPGLLexer.CONCEPT,
-        CPGLLexer.QUOTED_STRING,
-        CPGLLexer.COLON,
-        CPGLLexer.TYPE,
-        CPGLLexer.IS,
-        CPGLLexer.CONCEPT_TYPE,
-        CPGLLexer.DOT,
-        CPGLLexer.VALUETYPE,
-        CPGLLexer.IS,
-        CPGLLexer.CONCEPT_VALUE_TYPE,
-        CPGLLexer.DOT,
-        CPGLLexer.INFERRED,
-        CPGLLexer.FROM,
-        CPGLLexer.LPAREN,
-        CPGLLexer.QUOTED_STRING,
-        CPGLLexer.OR,
-        CPGLLexer.QUOTED_STRING,
-        CPGLLexer.RPAREN,
-        CPGLLexer.DOT,
-        CPGLLexer.DONE,
+        CRLLexer.CONCEPT,
+        CRLLexer.QUOTED_STRING,
+        CRLLexer.COLON,
+        CRLLexer.TYPE,
+        CRLLexer.IS,
+        CRLLexer.CONCEPT_TYPE,
+        CRLLexer.DOT,
+        CRLLexer.VALUETYPE,
+        CRLLexer.IS,
+        CRLLexer.CONCEPT_VALUE_TYPE,
+        CRLLexer.DOT,
+        CRLLexer.INFERRED,
+        CRLLexer.FROM,
+        CRLLexer.LPAREN,
+        CRLLexer.QUOTED_STRING,
+        CRLLexer.OR,
+        CRLLexer.QUOTED_STRING,
+        CRLLexer.RPAREN,
+        CRLLexer.DOT,
+        CRLLexer.DONE,
       ]);
     });
   });
@@ -134,15 +134,15 @@ done`;
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(tokens, [
-        CPGLLexer.DECISION,
-        CPGLLexer.QUOTED_STRING,
-        CPGLLexer.WHEN,
-        CPGLLexer.QUOTED_STRING,
-        CPGLLexer.THEN,
-        CPGLLexer.DO,
-        CPGLLexer.QUOTED_STRING,
-        CPGLLexer.AND,
-        CPGLLexer.QUOTED_STRING,
+        CRLLexer.DECISION,
+        CRLLexer.QUOTED_STRING,
+        CRLLexer.WHEN,
+        CRLLexer.QUOTED_STRING,
+        CRLLexer.THEN,
+        CRLLexer.DO,
+        CRLLexer.QUOTED_STRING,
+        CRLLexer.AND,
+        CRLLexer.QUOTED_STRING,
       ]);
     });
 
@@ -151,15 +151,15 @@ done`;
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(tokens, [
-        CPGLLexer.WHEN,
-        CPGLLexer.LPAREN,
-        CPGLLexer.QUOTED_STRING,
-        CPGLLexer.AND,
-        CPGLLexer.QUOTED_STRING,
-        CPGLLexer.OR,
-        CPGLLexer.QUOTED_STRING,
-        CPGLLexer.RPAREN,
-        CPGLLexer.THEN,
+        CRLLexer.WHEN,
+        CRLLexer.LPAREN,
+        CRLLexer.QUOTED_STRING,
+        CRLLexer.AND,
+        CRLLexer.QUOTED_STRING,
+        CRLLexer.OR,
+        CRLLexer.QUOTED_STRING,
+        CRLLexer.RPAREN,
+        CRLLexer.THEN,
       ]);
     });
   });

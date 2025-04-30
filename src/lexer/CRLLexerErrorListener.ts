@@ -2,12 +2,12 @@ import { ANTLRErrorListener, RecognitionException, Recognizer, Token } from "ant
 import { ATNSimulator } from "antlr4ts/atn/ATNSimulator";
 import { CharStream } from "antlr4ts/CharStream";
 
-import { CPGLLexer } from "../grammar/generated/antlr/CPGLLexer";
+import { CRLLexer } from "../grammar/generated/antlr/CRLLexer";
 import activityTypesJson from "../grammar/generated/types/activityTypes.json";
 import conceptTypesJson from "../grammar/generated/types/conceptTypes.json";
 import conceptValueTypesJson from "../grammar/generated/types/conceptValueTypes.json";
 
-export class CPGLLexerErrorListener implements ANTLRErrorListener<number> {
+export class CRLLexerErrorListener implements ANTLRErrorListener<number> {
   ERROR_TOKEN_TYPE = 27;
 
   private readonly errors: string[] = [];
@@ -142,7 +142,7 @@ export class CPGLLexerErrorListener implements ANTLRErrorListener<number> {
     console.error(errorMessage);
     this.errors.push(errorMessage);
 
-    if (recognizer instanceof CPGLLexer) {
+    if (recognizer instanceof CRLLexer) {
       const errorToken: Token = {
         type: this.ERROR_TOKEN_TYPE,
         text: errorMessage,

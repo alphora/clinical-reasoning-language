@@ -1,4 +1,4 @@
-import { CPGL } from "../ast/types";
+import { CRL } from "../ast/types";
 export interface ValidationError {
     message: string;
     location: {
@@ -23,5 +23,5 @@ export declare class Validator {
     private readonly nameUniquenessValidator;
     private readonly actionUniquenessValidator;
     constructor();
-    validate(ast: CPGL): ValidationResult;
+    validate(ast: CRL): ValidationResult;
 }

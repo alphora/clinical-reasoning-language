@@ -5,7 +5,7 @@ describe("createParser", () => {
     const input = 'decision "Test": when "Condition" then do "Action". done';
     const { parser, parserErrorListener } = createParser(input);
     expect(parser).toBeDefined();
-    expect(typeof parser.cpgl).toBe("function");
+    expect(typeof parser.crl).toBe("function");
     // Should not emit errors for valid input
     expect(parserErrorListener.getErrors().length).toBe(0);
   });
@@ -16,7 +16,7 @@ describe("createParser", () => {
     const { parser, parserErrorListener } = createParser(input);
     // Try to parse
     try {
-      parser.cpgl();
+      parser.crl();
     } catch {
       // ANTLR may throw, but we want to check the error listener
     }

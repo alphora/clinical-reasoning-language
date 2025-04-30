@@ -1,4 +1,4 @@
-import { buildCPGL, parseCPGL } from "../../index";
+import { buildCRL, parseCRL } from "../../index";
 import {
   Activity,
   BlockBody,
@@ -31,7 +31,7 @@ import {
 
 import { parseInput } from "./parseInput";
 
-describe("CPGLAstBuilder", () => {
+describe("CRLAstBuilder", () => {
   describe("Decision Statements", () => {
     it("should parse a simple decision with when block", () => {
       const input = `
@@ -601,10 +601,10 @@ done
     });
   });
 
-  describe("buildCPGL error reporting", () => {
+  describe("buildCRL error reporting", () => {
     it("should return errors in ParseResult for invalid activity type", () => {
       const input = "perform invalidActivity";
-      const result = buildCPGL(input);
+      const result = buildCRL(input);
       expect(result.success).toBe(false);
       expect(result.errors && result.errors.length).toBeGreaterThan(0);
       const errorObj = JSON.parse(result.errors![0]);
@@ -614,7 +614,7 @@ done
 
     it("should return errors in ParseResult for syntax errors", () => {
       const input = 'decision "Test" when "Condition" then do "Action"'; // missing done
-      const result = buildCPGL(input);
+      const result = buildCRL(input);
       expect(result.success).toBe(false);
       expect(result.errors && result.errors.length).toBeGreaterThan(0);
       // Should contain a ParserError or similar
@@ -625,7 +625,7 @@ done
     it("should return all error details for input with both lexical and parser errors", () => {
       // User's problematic input (missing closing quote and colon)
       const input = 'decision "Test: when "Condition" then do "Action". done';
-      const result = buildCPGL(input);
+      const result = buildCRL(input);
       expect(result.success).toBe(false);
       expect(result.errors && result.errors.length).toBeGreaterThan(0);
       // Should contain a LexicalError
@@ -637,35 +637,35 @@ done
     });
   });
 
-  describe("parseCPGL and buildCPGL direct API tests", () => {
-    it("parseCPGL should succeed on valid input", () => {
+  describe("parseCRL and buildCRL direct API tests", () => {
+    it("parseCRL should succeed on valid input", () => {
       const input = 'decision "Test": when "Condition" then do "Action". done';
-      const result = parseCPGL(input);
+      const result = parseCRL(input);
       expect(result.success).toBe(true);
       expect(result.result).toBeDefined();
       expect(result.errors).toBeUndefined();
     });
 
-    it("parseCPGL should return errors on invalid input", () => {
+    it("parseCRL should return errors on invalid input", () => {
       const input = 'decision "Test" when "Condition" then do "Action"'; // missing done
-      const result = parseCPGL(input);
+      const result = parseCRL(input);
       expect(result.success).toBe(false);
       expect(result.errors && result.errors.length).toBeGreaterThan(0);
       const foundParserError = result.errors!.some((e) => e.includes("ParserError"));
       expect(foundParserError).toBe(true);
     });
 
-    it("buildCPGL should succeed on valid input", () => {
+    it("buildCRL should succeed on valid input", () => {
       const input = 'decision "Test": when "Condition" then do "Action". done';
-      const result = buildCPGL(input);
+      const result = buildCRL(input);
       expect(result.success).toBe(true);
       expect(result.result).toBeDefined();
       expect(result.errors).toBeUndefined();
     });
 
-    it("buildCPGL should return errors on invalid input", () => {
+    it("buildCRL should return errors on invalid input", () => {
       const input = 'decision "Test" when "Condition" then do "Action"'; // missing done
-      const result = buildCPGL(input);
+      const result = buildCRL(input);
       expect(result.success).toBe(false);
       expect(result.errors && result.errors.length).toBeGreaterThan(0);
       const foundParserError = result.errors!.some((e) => e.includes("ParserError"));

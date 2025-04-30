@@ -1,9 +1,9 @@
 /**
- * Example demonstrating basic CPGL lexer usage
+ * Example demonstrating basic CRL lexer usage
  */
 import { CharStreams } from "antlr4ts";
 
-import { CPGLLexer } from "../grammar/generated/antlr/CPGLLexer";
+import { CRLLexer } from "../grammar/generated/antlr/CRLLexer";
 import { createLexer } from "../lexer/createLexer";
 
 const input = `
@@ -18,7 +18,7 @@ console.log("Tokenizing input:");
 console.log(input);
 
 let token = lexer.nextToken();
-while (token.type !== CPGLLexer.EOF) {
+while (token.type !== CRLLexer.EOF) {
   console.log(`Token: ${lexer.vocabulary.getSymbolicName(token.type)} = "${token.text}"`);
   token = lexer.nextToken();
 }

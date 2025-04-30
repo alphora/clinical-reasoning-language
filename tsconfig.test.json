@@ -15,7 +15,7 @@
     "src/parser/tests/*.ts",
     "src/parser/tests/*.d.ts",
     "src/parser/tests/*.js",
-    "src/transformer/fsh-to-cpgl/mapping/**/*.test.ts",
+    "src/transformer/fsh-to-crl/mapping/**/*.test.ts",
     "tests/**/*.ts"
   ]
 } 

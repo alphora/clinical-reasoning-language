@@ -1,20 +1,20 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.tokenizeCPGL = tokenizeCPGL;
-exports.parseCPGL = parseCPGL;
-exports.buildCPGL = buildCPGL;
-exports.validateCPGL = validateCPGL;
+exports.tokenizeCRL = tokenizeCRL;
+exports.parseCRL = parseCRL;
+exports.buildCRL = buildCRL;
+exports.validateCRL = validateCRL;
 const builder_1 = require("./ast/builder");
-const CPGLLexer_1 = require("./grammar/generated/antlr/CPGLLexer");
+const CRLLexer_1 = require("./grammar/generated/antlr/CRLLexer");
 const createLexer_1 = require("./lexer/createLexer");
 const createParser_1 = require("./parser/createParser");
 const validator_1 = require("./validator/validator");
-function tokenizeCPGL(input) {
+function tokenizeCRL(input) {
     try {
         const { lexer, errorListener } = (0, createLexer_1.createLexer)(input);
         const tokens = [];
         let token = lexer.nextToken();
-        while (token.type !== CPGLLexer_1.CPGLLexer.EOF) {
+        while (token.type !== CRLLexer_1.CRLLexer.EOF) {
             if (token.channel === 0) {
                 const typeName = lexer.vocabulary.getSymbolicName(token.type) ?? `Unknown (${token.type})`;
                 tokens.push({
@@ -36,13 +36,13 @@ function tokenizeCPGL(input) {
         return { success: false, errors: [error instanceof Error ? error.message : String(error)] };
     }
 }
-function parseCPGL(input) {
+function parseCRL(input) {
     let lexerErrorListener, parserErrorListener;
     try {
         const parserSetup = (0, createParser_1.createParser)(input);
         lexerErrorListener = parserSetup.lexerErrorListener;
         parserErrorListener = parserSetup.parserErrorListener;
-        const tree = parserSetup.parser.cpgl();
+        const tree = parserSetup.parser.crl();
         const errors = [...lexerErrorListener.getErrors(), ...parserErrorListener.getErrors()];
         if (errors.length > 0) {
             return { success: false, errors };
@@ -64,14 +64,14 @@ function parseCPGL(input) {
         };
     }
 }
-function buildCPGL(input) {
+function buildCRL(input) {
     let lexerErrorListener, parserErrorListener, builder;
     try {
         const parserSetup = (0, createParser_1.createParser)(input);
         lexerErrorListener = parserSetup.lexerErrorListener;
         parserErrorListener = parserSetup.parserErrorListener;
-        const tree = parserSetup.parser.cpgl();
-        builder = new builder_1.CPGLAstBuilder();
+        const tree = parserSetup.parser.crl();
+        builder = new builder_1.CRLAstBuilder();
         const ast = builder.visit(tree);
         const errors = [
             ...lexerErrorListener.getErrors(),
@@ -99,11 +99,11 @@ function buildCPGL(input) {
         };
     }
 }
-function validateCPGL(input) {
+function validateCRL(input) {
     try {
         const { parser, lexerErrorListener, parserErrorListener } = (0, createParser_1.createParser)(input);
-        const tree = parser.cpgl();
-        const builder = new builder_1.CPGLAstBuilder();
+        const tree = parser.crl();
+        const builder = new builder_1.CRLAstBuilder();
         const ast = builder.visit(tree);
         const errors = [...lexerErrorListener.getErrors(), ...parserErrorListener.getErrors()];
         if (errors.length > 0) {

@@ -6,7 +6,7 @@ import * as path from "path";
 import { CharStreams } from "antlr4ts";
 
 // Internal imports
-import { CPGLLexer } from "../../grammar/generated/antlr/CPGLLexer";
+import { CRLLexer } from "../../grammar/generated/antlr/CRLLexer";
 
 import { getTokensFromString } from "./helpers";
 
@@ -14,7 +14,7 @@ describe("Grammar Example Analysis", () => {
   it("should successfully tokenize the grammar example file", () => {
     const examplePath = path.join(__dirname, "../../../docs/grammar-example.cpg");
     const input = fs.readFileSync(examplePath, "utf8");
-    const lexer = new CPGLLexer(CharStreams.fromString(input));
+    const lexer = new CRLLexer(CharStreams.fromString(input));
 
     try {
       const tokens = getTokensFromString(input);
@@ -46,7 +46,7 @@ describe("Grammar Example Analysis", () => {
 
       expect(tokens.length).toBeGreaterThan(0);
     } catch (error) {
-      console.error("\nError tokenizing cpgl:");
+      console.error("\nError tokenizing crl:");
       console.error(error);
       if (error instanceof Error) {
         const match = RegExp(/Line (\d+):(\d+)/).exec(error.message);

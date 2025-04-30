@@ -90,7 +90,7 @@ export function extractCodeExpression(value: string): string {
 }
 
 /**
- * Converts a string to CPGL code format (kebab-case, wrapped in backticks).
+ * Converts a string to CRL code format (kebab-case, wrapped in backticks).
  * Example: 'Client Age Less Than 6 Months' -> `client-age-less-than-6-months`
  */
 export function toCode(value: string): string {

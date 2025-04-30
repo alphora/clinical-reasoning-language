@@ -12,7 +12,7 @@ if action.definitionCanonical references a ActivityDefinition in any of the fsh 
   if activity_def-donotperform = true
     - activity.perform.doNot()
   if activitydef-code.exists() then
-    // create a terminology.  terminology can be duplicated in references, but must be unique in the cpgl file
+    // create a terminology.  terminology can be duplicated in references, but must be unique in the crl file
     - create(terminology)
       - new-terminology.identifier < activitydef-code-display
       - new-terminology.code < activitydef-code

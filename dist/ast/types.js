@@ -2,7 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.conceptValueTypes = exports.conceptTypes = exports.activityTypes = exports.InferredFromDefinitionType = exports.InferredFromConceptType = exports.GroupExpressionType = exports.NotExpressionType = exports.InformalOrType = exports.InformalAndType = exports.ConceptReferenceType = exports.CodedFromDefinitionType = exports.TerminologySystemCodeType = exports.TerminologyFreeTextType = exports.TerminologyValuesetType = exports.TerminologyType = exports.UseDecisionType = exports.DoActivityType = exports.ActionStatementType = exports.SingleActionType = exports.BlockBodyType = exports.WhenBlockType = exports.DecisionBodyType = exports.DecisionType = exports.FileType = void 0;
 exports.FileType = {
-    type: "CPGL",
+    type: "CRL",
 };
 exports.DecisionType = {
     type: "Decision",

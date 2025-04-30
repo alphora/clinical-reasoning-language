@@ -1,14 +1,14 @@
-# @smiledigitalhealth/cpgl
+# @smiledigitalhealth/crl
 
-Clinical Practice Guideline Language (CPGL) parser and validator
+Clinical Practice Guideline Language (CRL) parser and validator
 
 Clinical Reasoning Language (CRL) provides a structured way to model clinical decision logic, concept derivations, clinical activities, measurements, and summaries — while remaining simple, readable, and guideline-compatible.
 
 ## Overview
 
-See the [User Guide](./USER_GUIDE.md) for a comprehensive introduction to the CPGL language, syntax, and authoring best practices.
+See the [User Guide](./USER_GUIDE.md) for a comprehensive introduction to the CRL language, syntax, and authoring best practices.
 
-CPGL is a domain-specific language designed for expressing clinical practice guidelines in a structured and machine-readable format. The language is implemented in TypeScript and provides a comprehensive set of tools for processing CPGL documents.
+CRL is a domain-specific language designed for expressing clinical practice guidelines in a structured and machine-readable format. The language is implemented in TypeScript and provides a comprehensive set of tools for processing CRL documents.
 
 ## Installation
 
@@ -32,7 +32,7 @@ Or add it to your `package.json`:
 
 ```json
 "dependencies": {
-  "@smiledigitalhealth/cpgl": "git+https://github.com/alphora/clinical-practice-guideline-language.git#v0.4.0"
+  "@smiledigitalhealth/crl": "git+https://github.com/alphora/clinical-practice-guideline-language.git#v0.4.0"
 }
 ```
 
@@ -40,7 +40,7 @@ Or add it to your `package.json`:
 
 ##### 🔐 Option 2: Use SSH (Advanced)
 
-If you prefer SSH (or are using the shorthand syntax like `github:cqis/cpgl#v0.4.0`), make sure your system is set up for GitHub SSH access.
+If you prefer SSH (or are using the shorthand syntax like `github:cqis/crl#v0.4.0`), make sure your system is set up for GitHub SSH access.
 
 ```bash
 npm install github:alphora/clinical-practice-guideline-language#v0.4.0
@@ -50,7 +50,7 @@ Or add it to your `package.json`:
 
 ```json
 "dependencies": {
-  "@smiledigitalhealth/cpgl": "github:alphora/clinical-practice-guideline-language#v0.4.0"
+  "@smiledigitalhealth/crl": "github:alphora/clinical-practice-guideline-language#v0.4.0"
 }
 ```
 
@@ -86,7 +86,7 @@ See the internets for detailed instructions on setting up SSH for GitHub.
 
 ## CLI Usage
 
-The CPGL package includes command-line tools for processing CPGL files. Each tool can be run with the `--raw` flag to output raw JSON data instead of formatted output.
+The CRL package includes command-line tools for processing CRL files. Each tool can be run with the `--raw` flag to output raw JSON data instead of formatted output.
 
 ### Lexer Tool
 
@@ -116,13 +116,13 @@ npx ts-node src/cli/run-validator.ts
 npx ts-node src/cli/run-validator.ts --raw
 ```
 
-### FSH-to-CPGL Transformer Tool
+### FSH-to-CRL Transformer Tool
 
-The FSH-to-CPGL transformer converts FHIR Shorthand (FSH) files into Clinical Practice Guideline Language (CPGL) files. It supports advanced mapping and deduplication logic for activities, concepts, and terminology blocks.
+The FSH-to-CRL transformer converts FHIR Shorthand (FSH) files into Clinical Practice Guideline Language (CRL) files. It supports advanced mapping and deduplication logic for activities, concepts, and terminology blocks.
 
 #### Activity Mapping Enhancements
 
-- **Conditional `do not perform`**: If an activity in FSH has `doNotPerform = true`, the generated CPGL will emit `do not perform` instead of `perform` for that activity.
+- **Conditional `do not perform`**: If an activity in FSH has `doNotPerform = true`, the generated CRL will emit `do not perform` instead of `perform` for that activity.
 - **Activity Terminology Block Emission**: For activities with a `medicationCodeableConcept`, the terminology block uses the `system` and `code` properties directly from the FSH object. For activities using `dynamicValue.expression.expression` with `path = "code.coding"`, the code and system are extracted from the CQL code expression.
 - **Deduplication and Suffixing**: Terminology blocks are unique by identifier and body. If a duplicate identifier is encountered with a different body, a numeric suffix (e.g., `_2`) is added to the identifier. If both identifier and body are the same, the block is not duplicated.
 - **Extraction Logic**: For `medicationCodeableConcept`, the transformer uses `system`, `code`, and `identifier` from the FSH object. For `dynamicValue.expression.expression` (where `path = "code.coding"`), the transformer uses `system` and `code` from the CQL code expression string and `identifier` from the corresponding description.
@@ -133,14 +133,14 @@ For more details, see the [User Guide](./USER_GUIDE.md) and the technical mappin
 
 **All API functions return a `ParseResult` object. If there are any lexical or syntax errors, these are collected and returned in the `errors` array (not just printed to the console). You should always check `result.success` and handle errors accordingly.**
 
-The package provides four main functions for processing CPGL code:
+The package provides four main functions for processing CRL code:
 
 ### 1. Tokenization
 
 ```typescript
-import { tokenizeCPGL } from '@smiledigitalhealth/cpgl';
+import { tokenizeCRL } from '@smiledigitalhealth/crl';
 
-const result = tokenizeCPGL(`
+const result = tokenizeCRL(`
   decision "Test":
     when "Condition" then do "Action".
   done
@@ -158,9 +158,9 @@ if (result.success) {
 ### 2. Parsing
 
 ```typescript
-import { parseCPGL } from '@smiledigitalhealth/cpgl';
+import { parseCRL } from '@smiledigitalhealth/crl';
 
-const result = parseCPGL(`
+const result = parseCRL(`
   decision "Test":
     when "Condition" then do "Action".
   done
@@ -178,9 +178,9 @@ if (result.success) {
 ### 3. AST Building
 
 ```typescript
-import { buildCPGL } from '@smiledigitalhealth/cpgl';
+import { buildCRL } from '@smiledigitalhealth/crl';
 
-const result = buildCPGL(`
+const result = buildCRL(`
   decision "Test":
     when "Condition" then do "Action".
   done
@@ -198,9 +198,9 @@ if (result.success) {
 ### 4. Validation
 
 ```typescript
-import { validateCPGL } from '@smiledigitalhealth/cpgl';
+import { validateCRL } from '@smiledigitalhealth/crl';
 
-const result = validateCPGL(`
+const result = validateCRL(`
   decision "Test":
     when "Condition" then do "Action".
   done
@@ -244,7 +244,7 @@ npx ts-node --log-error src/examples/compare-ast.ts
 
 This will:
 
-1. Parse the example CPGL file (`docs/Measles Immunization Decision.cpgl`)
+1. Parse the example CRL file (`docs/Measles Immunization Decision.crl`)
 2. Generate an AST from the parsed input
 3. Compare it with the expected AST (`docs/Expected AST.ast`)
 4. Display any differences between the two ASTs
@@ -256,9 +256,9 @@ The comparison includes:
 * Structure matching
 * Detailed line-by-line comparison of differences
 
-### FSH-to-CPGL Example Data
+### FSH-to-CRL Example Data
 
-The example FSH files and CPG-L outputs in `src/examples/fsh/who/smart-example-immz/` and `src/examples/cpgl/who/smart-example-immz/` are derived from the [WHO SMART Guidelines - Example IG for Measles Immunization](https://github.com/WorldHealthOrganization/smart-example-immz).
+The example FSH files and CPG-L outputs in `src/examples/fsh/who/smart-example-immz/` and `src/examples/crl/who/smart-example-immz/` are derived from the [WHO SMART Guidelines - Example IG for Measles Immunization](https://github.com/WorldHealthOrganization/smart-example-immz).
 
 - **Source repository:** [WorldHealthOrganization/smart-example-immz](https://github.com/WorldHealthOrganization/smart-example-immz)
 - **License:** [CC BY-IGO 3.0](https://github.com/WorldHealthOrganization/smart-example-immz/blob/main/LICENSE.md)
@@ -277,7 +277,7 @@ This will extract all grammar-driven types and regenerate the lexer and parser.
 
 ### Grammar-Driven Types
 
-* The lists of valid activity types, concept types, and concept value types are defined in the `validTypes` arrays in the `ACTIVITY_TYPE`, `CONCEPT_TYPE`, and `CONCEPT_VALUE_TYPE` rules of `src/grammar/CPGLLexer.g4`.
+* The lists of valid activity types, concept types, and concept value types are defined in the `validTypes` arrays in the `ACTIVITY_TYPE`, `CONCEPT_TYPE`, and `CONCEPT_VALUE_TYPE` rules of `src/grammar/CRLLexer.g4`.
 * Scripts (`scripts/extractActivityTypes.js`, `scripts/extractConceptTypes.js`, `scripts/extractConceptValueTypes.js`) automatically extract these lists and write them to `src/grammar/activityTypes.json`, `src/grammar/conceptTypes.json`, and `src/grammar/conceptValueTypes.json`.
 * TypeScript modules (`src/grammar/activityTypes.ts`, `src/grammar/conceptTypes.ts`, `src/grammar/conceptValueTypes.ts`) import these JSON files and export both the arrays and type-safe union types.
 * **All code (lexer, AST, error listener, etc.) should import from these modules to avoid drift.**
@@ -286,14 +286,14 @@ This will extract all grammar-driven types and regenerate the lexer and parser.
 
 The following files are generated by ANTLR and should not be edited manually or tracked in git:
 
-* `src/grammar/generated/antlr/CPGLLexer.ts`
-* `src/grammar/generated/antlr/CPGLParser.ts`
-* `src/grammar/generated/antlr/CPGLParserVisitor.ts`
-* `src/grammar/generated/antlr/CPGLParserListener.ts`
-* `src/grammar/generated/antlr/CPGLLexer.tokens`
-* `src/grammar/generated/antlr/CPGLLexer.interp`
-* `src/grammar/generated/antlr/CPGLParser.tokens`
-* `src/grammar/generated/antlr/CPGLParser.interp`
+* `src/grammar/generated/antlr/CRLLexer.ts`
+* `src/grammar/generated/antlr/CRLParser.ts`
+* `src/grammar/generated/antlr/CRLParserVisitor.ts`
+* `src/grammar/generated/antlr/CRLParserListener.ts`
+* `src/grammar/generated/antlr/CRLLexer.tokens`
+* `src/grammar/generated/antlr/CRLLexer.interp`
+* `src/grammar/generated/antlr/CRLParser.tokens`
+* `src/grammar/generated/antlr/CRLParser.interp`
 
 To regenerate these files, run:
 
@@ -415,11 +415,11 @@ npm run example
 
 ### Regenerating ANTLR Files
 
-If you modify the grammar in `src/grammar/CPGL.g4`, you'll need to regenerate the lexer and parser:
+If you modify the grammar in `src/grammar/CRL.g4`, you'll need to regenerate the lexer and parser:
 
 ```bash
 cd src/grammar
-antlr4ts -Xforce-atn -o src/grammar/generated src/grammar/CPGLLexer.g4 && antlr4ts -Xforce-atn -o src/grammar/generated src/grammar/CPGLParser.g4
+antlr4ts -Xforce-atn -o src/grammar/generated src/grammar/CRLLexer.g4 && antlr4ts -Xforce-atn -o src/grammar/generated src/grammar/CRLParser.g4
 ```
 
 Note: This project uses a custom AST implementation that uses ANTLR's visitor pattern. The generated files are used only for lexing and parsing directly, while semantic analysis and interpretation are handled by our custom AST implementation.
@@ -448,7 +448,7 @@ For more details, see the [release PR template](.github/PULL_REQUEST_TEMPLATE/re
 
 ### Error Handling Strategy
 
-This project implements robust, layered error handling across all stages of the CPGL pipeline:
+This project implements robust, layered error handling across all stages of the CRL pipeline:
 
 | Layer     | Responsibility                                  | Error Type         | How Errors Are Reported                |
 |-----------|-------------------------------------------------|--------------------|----------------------------------------|

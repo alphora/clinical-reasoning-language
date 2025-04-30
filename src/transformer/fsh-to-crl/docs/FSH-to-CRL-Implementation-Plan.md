@@ -1,11 +1,11 @@
-# FSH-to-CPGL Transformer: Implementation Plan
+# FSH-to-CRL Transformer: Implementation Plan
 
 ## 1. Project Structure
 
-Within `src/transformer/fsh-to-cpgl/`, use the following structure:
+Within `src/transformer/fsh-to-crl/`, use the following structure:
 
 ```
-src/transformer/fsh-to-cpgl/
+src/transformer/fsh-to-crl/
   ├─ index.ts                # Entry point for the transformer
   ├─ transformer.ts          # Main transformation logic (FSH → CPG-L)
   ├─ sushi-loader.ts         # SUSHI integration and FSH parsing helpers
@@ -14,7 +14,7 @@ src/transformer/fsh-to-cpgl/
   │    ├─ activityDefinition.ts
   │    └─ concept.ts
   ├─ utils/                  # Utility functions (string, path, etc.)
-  ├─ types/                  # TypeScript types/interfaces for FSH/CPGL
+  ├─ types/                  # TypeScript types/interfaces for FSH/CRL
   └─ __tests__/              # Unit/integration tests
 ```
 
