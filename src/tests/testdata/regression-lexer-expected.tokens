@@ -1,5 +1,5 @@
 
-> @smiledigitalhealth/crl@0.5.4 cli:lexer
+> @smile-digital-health/crl@0.5.4 cli:lexer
 > ts-node src/cli/run-lexer.ts
 
 [

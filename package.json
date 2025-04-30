@@ -1,5 +1,5 @@
 {
-  "name": "@smiledigitalhealth/crl",
+  "name": "@smile-digital-health/crl",
   "version": "0.6.1",
   "description": "Clinical Practice Guideline Language (CRL) parser and validator",
   "main": "dist/index.js",

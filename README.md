@@ -1,4 +1,4 @@
-# @smiledigitalhealth/crl
+# @smile-digital-health/crl
 
 Clinical Practice Guideline Language (CRL) parser and validator
 
@@ -14,7 +14,7 @@ CRL is a domain-specific language designed for expressing clinical practice guid
 
 This is a private package. To install it, you need:
 
-1. An npm account with access to `@smiledigitalhealth` packages
+1. An npm account with access to `@smile-digital-health` packages
    - Contact your team lead to request access
    - You will receive an invitation to join the organization
    - Each developer should use their own npm account
@@ -33,14 +33,14 @@ This is a private package. To install it, you need:
 Once authenticated, install the package:
 
 ```bash
-npm install @smiledigitalhealth/crl
+npm install @smile-digital-health/crl
 ```
 
 Or add it to your `package.json`:
 
 ```json
 "dependencies": {
-  "@smiledigitalhealth/crl": "^0.6.1"
+  "@smile-digital-health/crl": "^0.6.1"
 }
 ```
 
@@ -143,7 +143,7 @@ The package provides four main functions for processing CRL code:
 ### 1. Tokenization
 
 ```typescript
-import { tokenizeCRL } from '@smiledigitalhealth/crl';
+import { tokenizeCRL } from '@smile-digital-health/crl';
 
 const result = tokenizeCRL(`
   decision "Test":
@@ -163,7 +163,7 @@ if (result.success) {
 ### 2. Parsing
 
 ```typescript
-import { parseCRL } from '@smiledigitalhealth/crl';
+import { parseCRL } from '@smile-digital-health/crl';
 
 const result = parseCRL(`
   decision "Test":
@@ -183,7 +183,7 @@ if (result.success) {
 ### 3. AST Building
 
 ```typescript
-import { buildCRL } from '@smiledigitalhealth/crl';
+import { buildCRL } from '@smile-digital-health/crl';
 
 const result = buildCRL(`
   decision "Test":
@@ -203,7 +203,7 @@ if (result.success) {
 ### 4. Validation
 
 ```typescript
-import { validateCRL } from '@smiledigitalhealth/crl';
+import { validateCRL } from '@smile-digital-health/crl';
 
 const result = validateCRL(`
   decision "Test":
