@@ -1,6 +1,6 @@
 # Requirements for CRL Validator (Single-File Scope)
 
-These requirements specify the design and implementation details for a **Typescript-based** validator of a domain-specific language (DSL) called *CRL (Clinical Practice Guideline Language)*. The validator is intended to operate on an Abstract Syntax Tree (AST) produced by an ANTLR-based lexer and parser. The **lexer**, **parser**, and **AST** generation phases are already implemented.
+These requirements specify the design and implementation details for a **Typescript-based** validator of a domain-specific language (DSL) called *CRL (Clinical Reasoning Language)*. The validator is intended to operate on an Abstract Syntax Tree (AST) produced by an ANTLR-based lexer and parser. The **lexer**, **parser**, and **AST** generation phases are already implemented.
 
 ---
 

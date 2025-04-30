@@ -1,4 +1,4 @@
-# FHIRShorthand (FSH) to Clinical Practice Guideline Language (CPG-L) Mappings
+# FHIRShorthand (FSH) to Clinical Reasoning Language (CPG-L) Mappings
 
 ## Mapping Rules
 

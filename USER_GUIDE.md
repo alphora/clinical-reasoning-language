@@ -1,6 +1,6 @@
-# Clinical Practice Guideline Language (CRL) User Guide
+# Clinical Reasoning Language (CRL) User Guide
 
-Welcome to the CRL User Guide! This guide introduces the syntax, structure, and authoring best practices for the Clinical Practice Guideline Language (CRL).
+Welcome to the CRL User Guide! This guide introduces the syntax, structure, and authoring best practices for the Clinical Reasoning Language (CRL).
 
 ---
 
@@ -23,7 +23,7 @@ Welcome to the CRL User Guide! This guide introduces the syntax, structure, and 
 
 ## Introduction
 
-CRL (Clinical Practice Guideline Language) is a domain-specific language for expressing clinical practice guidelines in a structured, machine-readable, and human-friendly format. It is inspired by HL7's Clinical Quality Language (CQL) but is tailored for guideline authoring, decision support, and computable care pathways.
+CRL (Clinical Reasoning Language) is a domain-specific language for expressing clinical practice guidelines in a structured, machine-readable, and human-friendly format. It is inspired by HL7's Clinical Quality Language (CQL) but is tailored for guideline authoring, decision support, and computable care pathways.
 
 CRL is designed to:
 - Enable clear, unambiguous representation of clinical logic

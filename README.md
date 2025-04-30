@@ -1,6 +1,6 @@
 # @smile-digital-health/crl
 
-Clinical Practice Guideline Language (CRL) parser and validator
+Clinical Reasoning Language (CRL) parser and validator
 
 Clinical Reasoning Language (CRL) provides a structured way to model clinical decision logic, concept derivations, clinical activities, measurements, and summaries — while remaining simple, readable, and guideline-compatible.
 
@@ -123,7 +123,7 @@ npx ts-node src/cli/run-validator.ts --raw
 
 ### FSH-to-CRL Transformer Tool
 
-The FSH-to-CRL transformer converts FHIR Shorthand (FSH) files into Clinical Practice Guideline Language (CRL) files. It supports advanced mapping and deduplication logic for activities, concepts, and terminology blocks.
+The FSH-to-CRL transformer converts FHIR Shorthand (FSH) files into Clinical Reasoning Language (CRL) files. It supports advanced mapping and deduplication logic for activities, concepts, and terminology blocks.
 
 #### Activity Mapping Enhancements
 

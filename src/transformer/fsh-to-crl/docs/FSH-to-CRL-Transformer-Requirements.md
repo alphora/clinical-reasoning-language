@@ -2,7 +2,7 @@
 
 ## 1. Introduction
 
-This document specifies the requirements for implementing a transformer that converts FHIR Shorthand (FSH) files into Clinical Practice Guideline Language (CPG-L) files. It merges and deduplicates the content from the project's mapping rules, implementation requirements, and SUSHI usage notes. It also includes a summary of the CPG-L grammar and a canonical example for reference.
+This document specifies the requirements for implementing a transformer that converts FHIR Shorthand (FSH) files into Clinical Reasoning Language (CPG-L) files. It merges and deduplicates the content from the project's mapping rules, implementation requirements, and SUSHI usage notes. It also includes a summary of the CPG-L grammar and a canonical example for reference.
 
 ---
 
