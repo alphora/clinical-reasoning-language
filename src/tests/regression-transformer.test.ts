@@ -12,7 +12,7 @@ describe("Transformer regression test: IMMZ example", () => {
   const isCI = process.env.CI === "true";
 
   //TODO: figure out how to get this to work in CI
-  (isCI ? it.skip : it)("should match the expected CPG-L output (ignoring header)", () => {
+  (isCI ? it.skip : it)("should match the expected CRL output (ignoring header)", () => {
     // Run the transformer CLI and capture output
     let output = execSync(
       "npm run cli:transformer:fsh-to-crl -- " +

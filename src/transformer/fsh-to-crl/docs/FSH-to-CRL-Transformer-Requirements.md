@@ -2,7 +2,7 @@
 
 ## 1. Introduction
 
-This document specifies the requirements for implementing a transformer that converts FHIR Shorthand (FSH) files into Clinical Reasoning Language (CPG-L) files. It merges and deduplicates the content from the project's mapping rules, implementation requirements, and SUSHI usage notes. It also includes a summary of the CPG-L grammar and a canonical example for reference.
+This document specifies the requirements for implementing a transformer that converts FHIR Shorthand (FSH) files into Clinical Reasoning Language (CRL) files. It merges and deduplicates the content from the project's mapping rules, implementation requirements, and SUSHI usage notes. It also includes a summary of the CRL grammar and a canonical example for reference.
 
 ---
 
@@ -36,12 +36,12 @@ async function parseFSHFiles(pathToFSH: string) {
 
 ---
 
-## 3. Mapping Rules: FSH to CPG-L
+## 3. Mapping Rules: FSH to CRL
 
 ### 3.1. Definitions
 - **PlanDefinition** (strategydefinition or recommendationdefinition) maps to `decision`.
 - **ActivityDefinition** (immunizationactivity or servicerequestactivity) maps to `activity`.
-- CPG-L expects that each `decision`, `when`, `do`, `use`, `activity`, `concept`, and `terminology` can be inferred from FHIR fields via these rules.
+- CRL expects that each `decision`, `when`, `do`, `use`, `activity`, `concept`, and `terminology` can be inferred from FHIR fields via these rules.
 
 ### 3.2. Top-Level Mappings
 - `plandef > decision`: `PlanDefinition.name` → `decision "<PlanDefinition.name>"`
@@ -92,10 +92,10 @@ async function parseFSHFiles(pathToFSH: string) {
   - ConceptCode = identifier with spaces removed or kebab-cased
 
 ### 3.10. FSH Path Functions
-- `toIdentifier()`: Ensures the value meets CPG-L identifier requirements (double-quoted string)
-- `toString()`: Ensures the value meets CPG-L string requirements (double-quoted string, with escapes)
+- `toIdentifier()`: Ensures the value meets CRL identifier requirements (double-quoted string)
+- `toString()`: Ensures the value meets CRL string requirements (double-quoted string, with escapes)
 - `remove(string)`: Removes all instances of the argument string
-- `where(clause)`: Only generate a CPG-L value if the clause is satisfied
+- `where(clause)`: Only generate a CRL value if the clause is satisfied
 - `extractCode()`, `extractCodeDisplay()`, `extractCodeExpression()`: Regex-based transforms for code extraction (see mapping doc for details)
 
 ### 3.11. Navigation
@@ -103,9 +103,9 @@ async function parseFSHFiles(pathToFSH: string) {
 
 ---
 
-## 4. CPG-L Grammar (Summary)
+## 4. CRL Grammar (Summary)
 
-The CPG-L language is defined by the following ANTLR grammars:
+The CRL language is defined by the following ANTLR grammars:
 - [CRLLexer.g4](../../../../grammar/CRLLexer.g4)
 - [CRLParser.g4](../../../../grammar/CRLParser.g4)
 
@@ -122,9 +122,9 @@ For full details, see the referenced grammar files.
 
 ---
 
-## 5. Canonical Example: CPG-L Output
+## 5. Canonical Example: CRL Output
 
-Below is a canonical CPG-L example, excerpted from a real transformation output. This demonstrates the mapping of FSH PlanDefinitions and ActivityDefinitions to CPG-L decisions, activities, concepts, and terminology.
+Below is a canonical CRL example, excerpted from a real transformation output. This demonstrates the mapping of FSH PlanDefinitions and ActivityDefinitions to CRL decisions, activities, concepts, and terminology.
 
 ```crl
 // Decision for IMMZDTImmunizationStrategy instance

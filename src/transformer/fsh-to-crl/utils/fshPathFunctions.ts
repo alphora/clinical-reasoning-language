@@ -2,7 +2,7 @@
 // [DEBUGGING] All debug logs are prefixed as per guidelines
 
 /**
- * Ensures the value meets CPG-L identifier requirements (double-quoted string, no newlines, no escapes).
+ * Ensures the value meets CRL identifier requirements (double-quoted string, no newlines, no escapes).
  */
 export function toIdentifier(value: string): string {
   if (value == null) return "";
@@ -15,7 +15,7 @@ export function toIdentifier(value: string): string {
 }
 
 /**
- * Ensures the value meets CPG-L string requirements (double-quoted string, with escapes).
+ * Ensures the value meets CRL string requirements (double-quoted string, with escapes).
  */
 export function toString(value: string): string {
   if (value == null) return "";

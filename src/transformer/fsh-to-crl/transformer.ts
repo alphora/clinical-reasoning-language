@@ -15,9 +15,9 @@ import { ActivityDeduplicator } from "./utils/activityDeduplication";
 import { toIdentifier } from "./utils/fshPathFunctions";
 
 /**
- * Transform FSH (parsed with SUSHI) to CPG-L.
+ * Transform FSH (parsed with SUSHI) to CRL.
  * @param fshProjectDir The path to a SUSHI-compatible FSH project directory
- * @returns The CPG-L output as a string
+ * @returns The CRL output as a string
  */
 export function transformFSHToCRL(fshProjectDir: string): string {
   const configPath = path.join(fshProjectDir, "sushi-config.yaml");

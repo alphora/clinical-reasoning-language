@@ -1,8 +1,8 @@
-# FHIRShorthand (FSH) to Clinical Reasoning Language (CPG-L) Mappings
+# FHIRShorthand (FSH) to Clinical Reasoning Language (CRL) Mappings
 
 ## Mapping Rules
 
-Mapping rules are expressed as `source > target`, where `source` is a [FSH Defined Term](#fsh-defined-terms) to be transformed and `target` is a [CPG-L Defined Term](#cpg-l-defined-terms) that is the result of the transformation.
+Mapping rules are expressed as `source > target`, where `source` is a [FSH Defined Term](#fsh-defined-terms) to be transformed and `target` is a [CRL Defined Term](#CRL-defined-terms) that is the result of the transformation.
 
 If a `source` is null or an empty string ("") then a mapping will not be performed.  That is to say a `target` will not be generated from that application of the mapping rule.
 
@@ -114,9 +114,9 @@ then:
 
 #### FSH Path Functions
 
-FSH Path Functions are code-like hints that describe how to format the FSH Path Value when translating to CPG-L.
+FSH Path Functions are code-like hints that describe how to format the FSH Path Value when translating to CRL.
 
-- `toIdentifier()`: ensure the CPG-L value meets the requirements of a CPG-L identifier:
+- `toIdentifier()`: ensure the CRL value meets the requirements of a CRL identifier:
 
 ```regex
 '"' ( ~["\\\r\n] )* '"'
@@ -137,13 +137,13 @@ and:
 
 `Description.toIdentifier()`
 
-the CPG-L value would be:
+the CRL value would be:
 
 "Provide vaccinations according to the recommended schedule"
 
 - `exists()`: check for the existence of the definition.
 
-- `toString()`: ensure the value meets the requirements of a CPG-L string:
+- `toString()`: ensure the value meets the requirements of a CRL string:
 
 ```regex
 '"' ( '\\' . | ~["] )* '"'
@@ -164,11 +164,11 @@ and:
 
 `Description.toString()`
 
-the CPG-L value would be:
+the CRL value would be:
 
 "Provide vaccinations according to the\n recommended schedule"
 
-- `remove(string)`: remove all instances of the `string` argument from the CPG-l value.
+- `remove(string)`: remove all instances of the `string` argument from the CRL value.
 
 For example:
 
@@ -184,11 +184,11 @@ and:
 
 then:
 
-the CPG-L value would be: MedicationRequest.
+the CRL value would be: MedicationRequest.
 
-- `prefix(string)`: add the `string` argument to the front of the CPG-L value.
+- `prefix(string)`: add the `string` argument to the front of the CRL value.
 
-- `where(clause)`: only generate a CPG-L value if the clause arguments exists.
+- `where(clause)`: only generate a CRL value if the clause arguments exists.
 
 The `clause` argument has two arguments, separated by a `=`: `leftArg=rightArg`.
 
@@ -196,7 +196,7 @@ The `leftArg` is a FSH Path.
 
 The `rightArg` is the value of the FSH Path.
 
-The `where` FSH Path Function only generates a CPG-L value if both the `leftArg` exists (relative to the FSH Term the `where` is being invoked on) and it has a value of `rightArg`.
+The `where` FSH Path Function only generates a CRL value if both the `leftArg` exists (relative to the FSH Term the `where` is being invoked on) and it has a value of `rightArg`.
 
 For example:
 
@@ -219,7 +219,7 @@ and:
 
 then:
 
-the CPG-L value would be: "XM28X5".
+the CRL value would be: "XM28X5".
 
 However:
 
@@ -242,9 +242,9 @@ and:
 
 then:
 
-the CPG-L value would not be generated (because the value would be "", an empty string).
+the CRL value would not be generated (because the value would be "", an empty string).
 
-- `toCode()`: the CPG-L value is the result of executing the regex transform, where `input` is the FSH Path Value:
+- `toCode()`: the CRL value is the result of executing the regex transform, where `input` is the FSH Path Value:
 
 ```regex
 input
@@ -256,7 +256,7 @@ For example:
 
 given:
 
-```CPG-L
+```CRL
 concept "Measles Routine Immunization":
     has type Observation.
     has valuetype boolean.
@@ -271,9 +271,9 @@ and:
 
 then:
 
-the CPG-L value would be: code `XM28X5`
+the CRL value would be: code `XM28X5`
 
-- `create(type)`: creates a new CPG-L object of the argument type and retuns it as `new-<type>`.
+- `create(type)`: creates a new CRL object of the argument type and retuns it as `new-<type>`.
 
 ForExample:
 
@@ -297,7 +297,7 @@ and:
   - new-terminology.code < concept.identifier.toCode()
 ```
 
-then the resulting CPG-L is:
+then the resulting CRL is:
 
 ```crl
 concept "Measles Routine Immunization":
@@ -309,7 +309,7 @@ done
 terminology "Measles Routine Immunization" system `http://sdh.com/cqis/kalm` code `measles-routine-immunization`
 ```
 
-- `extractCode()`: the CPG-L value is the result of:
+- `extractCode()`: the CRL value is the result of:
 
 1. executing the regex transform, where `input` is the FSH Path Value:
 
@@ -319,7 +319,7 @@ result[] = input.exec(/(\$\w+)#(\w+)\s+".*?"/)
 
 2. and then setting a temporary variable `systemResult` to the lookup of the `result[0]` value up in the `aliases`.
 
-3. and then the CPG-L value is "system `<systemResult>` code `<result[1]>`"
+3. and then the CRL value is "system `<systemResult>` code `<result[1]>`"
 
 For example:
 
@@ -339,9 +339,9 @@ and:
 
 then:
 
-the CPG-L value would be: "system `http://id.who.int/icd/release/11/mms` code `XM28X5`"
+the CRL value would be: "system `http://id.who.int/icd/release/11/mms` code `XM28X5`"
 
-- `extractCodeDisplay()`: the CPG-L value is the result of executing the regex transform, where `input` is the FSH Path Value:
+- `extractCodeDisplay()`: the CRL value is the result of executing the regex transform, where `input` is the FSH Path Value:
 
 ```regex
 input.replace(/^.*?"(.*?)"$/, '"$1"')
@@ -363,13 +363,13 @@ and:
 
 then:
 
-the CPG-L value would be: system "Measles vaccines"
+the CRL value would be: system "Measles vaccines"
 
 - `navigate()`: use the value of the reference to navigate to the target resource.
 
 - `ensure(type)`: require the resource to be of argument `type` type.
 
-- `extractCodeExpression()`: the CPG-L value is the result of executing the regex transform, where `input` is the FSH Path Value:
+- `extractCodeExpression()`: the CRL value is the result of executing the regex transform, where `input` is the FSH Path Value:
 
 ```regex
 input.replace(/Code\s*{\s*system:\s*'([^']+)',\s*code:\s*'([^']+)'\s*}/, 'system `$1` code `$2`')
@@ -396,9 +396,9 @@ and:
 
 then:
 
-the CPG-L value would be: system `http://id.who.int/icd/release/11/mms` code `XM28X5`
+the CRL value would be: system `http://id.who.int/icd/release/11/mms` code `XM28X5`
 
-- "<string>": the quoted string is inserted literally into the resulting CPG-L value.  Note, `<string>` can be the empty string.
+- "<string>": the quoted string is inserted literally into the resulting CRL value.  Note, `<string>` can be the empty string.
 
 For example:
 
@@ -416,14 +416,14 @@ And the transformation rule:
 
 description > decision.identifier":\n"
 
-The resulting CPG-L value would be:
+The resulting CRL value would be:
 
-```CPG-L
+```CRL
 "Provide measles immunization":
 
 ```
 
-- `doNot()`: prefix the CPG-L value with "do not".
+- `doNot()`: prefix the CRL value with "do not".
  - `coded
 #### FSH Path Values
 
@@ -443,7 +443,7 @@ The expression `[*].action` in these mapping rules means an arbitrary nesting of
 
 - `plandef-action` = `PlanDef.action` or `[*].action`
 
-- `plandef-canonical` = `PlanDef.action.definitionCanonical.navigate().ensure(plandef-instance).plandef-description.toIdentifier()` or `[*].action.definitionCanonical.navigate().ensure(plandef-instance).plandef-description.toIdentifier()` Note, `plandef-canonical` is a navigation term as described in [Navigation](#navigation).  It does not get mapped to a CPG-L term.
+- `plandef-canonical` = `PlanDef.action.definitionCanonical.navigate().ensure(plandef-instance).plandef-description.toIdentifier()` or `[*].action.definitionCanonical.navigate().ensure(plandef-instance).plandef-description.toIdentifier()` Note, `plandef-canonical` is a navigation term as described in [Navigation](#navigation).  It does not get mapped to a CRL term.
 
 - `plandef-condition` = `PlanDef.action.condition` or `[*].action.condition`
 
@@ -472,9 +472,9 @@ The expression `[*].action` in these mapping rules means an arbitrary nesting of
 
 - `activity_def-donotperform` = `ActivityDef.doNotPerform`
 
-## CPG-L Defined Terms
+## CRL Defined Terms
 
-- `decision`: the CPG-L `decision` keyword.
+- `decision`: the CRL `decision` keyword.
 
 For example:
 
@@ -494,13 +494,13 @@ instance > decision
 
 then:
 
-CPG-L would be generated:
+CRL would be generated:
 
-```CPG-L
+```CRL
 decision
 ```
 
-- `decision.identifier`: the CPG-L `decision` keyword's identifier value.
+- `decision.identifier`: the CRL `decision` keyword's identifier value.
 
 For example:
 
@@ -520,13 +520,13 @@ description > decision.identifier
 
 then:
 
-CPG-L would be generated:
+CRL would be generated:
 
-```CPG-L
+```CRL
 decision "Provide measles immunization"
 ```
 
-- `decision.comment`: a comment on the CPG-L `decision` keyword.
+- `decision.comment`: a comment on the CRL `decision` keyword.
 
 For example:
 
@@ -551,9 +551,9 @@ and:
 
 then:
 
-CPG-L would be generated:
+CRL would be generated:
 
-```CPG-L
+```CRL
 // WHO recommendations for routine immunization - summary tables (March 2023)
 decision "Provide measles immunization"
 ```

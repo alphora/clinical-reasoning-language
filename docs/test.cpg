@@ -1,8 +1,0 @@
-decision "cycle1"
-${INDENT}when "condition" then
-${INDENT}${INDENT}use "cycle2"
-
-decision "cycle2"
-${INDENT}when "condition" then
-${INDENT}${INDENT}use "cycle1"
-

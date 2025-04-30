@@ -1,7 +1,7 @@
 import { toIdentifier, toCode } from "../utils/fshPathFunctions";
 
 /**
- * Emits CPG-L terminology blocks for each unique identifier.
+ * Emits CRL terminology blocks for each unique identifier.
  * @param identifiers Array of unique concept identifiers (strings)
  */
 export function mapTerminology(identifiers: string[]): string {

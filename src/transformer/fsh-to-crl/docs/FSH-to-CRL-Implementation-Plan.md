@@ -7,7 +7,7 @@ Within `src/transformer/fsh-to-crl/`, use the following structure:
 ```
 src/transformer/fsh-to-crl/
   ├─ index.ts                # Entry point for the transformer
-  ├─ transformer.ts          # Main transformation logic (FSH → CPG-L)
+  ├─ transformer.ts          # Main transformation logic (FSH → CRL)
   ├─ sushi-loader.ts         # SUSHI integration and FSH parsing helpers
   ├─ mapping/                # Mapping helpers and rule implementations
   │    ├─ planDefinition.ts
@@ -29,8 +29,8 @@ src/transformer/fsh-to-crl/
 
 ### B. Mapping Layer
 - In `mapping/`, implement functions to:
-  - Map PlanDefinition FSH objects to CPG-L `decision` blocks.
-  - Map ActivityDefinition FSH objects to CPG-L `activity` blocks.
+  - Map PlanDefinition FSH objects to CRL `decision` blocks.
+  - Map ActivityDefinition FSH objects to CRL `activity` blocks.
   - Map conditions, concepts, and terminology as per the requirements.
   - Handle FSH path functions (e.g., `toIdentifier()`, `extractCode()`, etc.).
 
@@ -38,31 +38,31 @@ src/transformer/fsh-to-crl/
 - In `transformer.ts`:
   - Accept parsed FSH resources.
   - Walk through each resource, applying the mapping rules.
-  - Build up the CPG-L output as a string or AST.
+  - Build up the CRL output as a string or AST.
 
 ### D. Output Generation
-- Format and write the CPG-L output to `.cpg` files.
-- Ensure output is valid per the CPG-L grammar (optionally, add a validation step).
+- Format and write the CRL output to `.cpg` files.
+- Ensure output is valid per the CRL grammar (optionally, add a validation step).
 
 ### E. Entry Point
 - In `index.ts`:
-  - Parse CLI args or config (input FSH folder, output CPG-L file/folder).
+  - Parse CLI args or config (input FSH folder, output CRL file/folder).
   - Call the transformer and write results.
 
 ### F. Utilities & Types
 - Add helpers for string formatting, kebab-case, identifier quoting, etc.
-- Define TypeScript types for FSH and CPG-L constructs.
+- Define TypeScript types for FSH and CRL constructs.
 
 ### G. Testing
 - Add unit tests for each mapping function.
-- Add integration tests: FSH input → CPG-L output (compare to canonical examples).
+- Add integration tests: FSH input → CRL output (compare to canonical examples).
 
 ---
 
 ## 3. Milestones
 
 1. **SUSHI Loader**: Parse FSH and print resource summaries.
-2. **Basic PlanDefinition → decision mapping**: Output simple CPG-L for a PlanDefinition.
+2. **Basic PlanDefinition → decision mapping**: Output simple CRL for a PlanDefinition.
 3. **ActivityDefinition, Concepts, and Terminology**: Add mapping for activities, concepts, and terminology.
 4. **Recursive/Nested Actions**: Support nested actions and canonical references.
 5. **FSH Path Functions**: Implement all required path functions and edge cases.

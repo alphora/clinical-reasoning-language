@@ -1,7 +1,7 @@
 import { toIdentifier } from "../utils/fshPathFunctions";
 
 /**
- * Emits CPG-L concept blocks for each unique identifier.
+ * Emits CRL concept blocks for each unique identifier.
  * @param identifiers Array of unique concept identifiers (strings)
  */
 export function mapConcept(identifiers: string[]): string {
