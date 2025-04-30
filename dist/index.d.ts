@@ -1,5 +1,6 @@
 import { ParseTree } from "antlr4ts/tree/ParseTree";
 import { CRL } from "./ast/types";
+import { CRLError } from "./types/errors";
 export interface Token {
     line: number;
     column: number;
@@ -9,7 +10,7 @@ export interface Token {
 export interface ParseResult<T> {
     success: boolean;
     result?: T;
-    errors?: string[];
+    errors?: CRLError[];
 }
 export declare function tokenizeCRL(input: string): ParseResult<Token[]>;
 export declare function parseCRL(input: string): ParseResult<ParseTree>;

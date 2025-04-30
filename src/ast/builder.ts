@@ -29,6 +29,7 @@ import {
   GroupExpressionContext,
 } from "../grammar/generated/antlr/CRLParser";
 import { CRLParserVisitor } from "../grammar/generated/antlr/CRLParserVisitor";
+import { CRLError } from "../types/errors";
 
 import {
   ASTNode,
@@ -104,29 +105,31 @@ export class CRLAstBuilder
   extends AbstractParseTreeVisitor<ASTNode>
   implements CRLParserVisitor<ASTNode>
 {
-  private readonly errors: string[] = [];
-
-  protected reportError(
-    type: string,
-    message: string,
-    location?: Location,
-    details?: unknown,
-  ): void {
-    const errorObj = {
-      type,
-      message,
-      location,
-      details,
-    };
-    this.errors.push(JSON.stringify(errorObj));
-  }
-
-  public getErrors(): string[] {
-    return this.errors;
-  }
+  private readonly errors: CRLError[] = [];
 
   protected defaultResult(): ASTNode {
     return null as unknown as ASTNode;
+  }
+
+  getErrors(): CRLError[] {
+    return this.errors;
+  }
+
+  protected reportError(
+    message: string,
+    ctx: ParserRuleContext,
+    details?: Record<string, unknown>,
+  ): void {
+    this.errors.push({
+      type: "Exception",
+      message,
+      line: ctx.start.line,
+      column: ctx.start.charPositionInLine,
+      details: {
+        location: getLocation(ctx),
+        ...details,
+      },
+    });
   }
 
   visitCrl(ctx: CrlContext): CRL {
@@ -325,11 +328,9 @@ export class CRLAstBuilder
     const typeLine = bodyCtx.typeLine?.();
     const valueTypeLine = bodyCtx.valueTypeLine?.();
     if (!typeLine || !valueTypeLine) {
-      this.reportError(
-        "AstError",
-        "ConceptStatement: missing type or valueType line",
-        getLocation(ctx),
-      );
+      this.reportError("AstError", ctx, {
+        message: "ConceptStatement: missing type or valueType line",
+      });
       return null;
     }
     let conceptTypeToken, valueTypeToken;
@@ -344,11 +345,9 @@ export class CRLAstBuilder
       valueTypeToken = undefined;
     }
     if (!conceptTypeToken || !valueTypeToken) {
-      this.reportError(
-        "AstError",
-        "ConceptStatement: missing CONCEPT_TYPE or CONCEPT_VALUE_TYPE token",
-        getLocation(ctx),
-      );
+      this.reportError("AstError", ctx, {
+        message: "ConceptStatement: missing CONCEPT_TYPE or CONCEPT_VALUE_TYPE token",
+      });
       return null;
     }
     return {
@@ -385,11 +384,9 @@ export class CRLAstBuilder
       const codedFrom = bodyCtx.codedFromLine();
       const termRef = codedFrom?.terminologyReference?.()?.text?.slice(1, -1);
       if (!termRef) {
-        this.reportError(
-          "AstError",
-          "ConceptStatement: missing terminologyReference in codedFromLine",
-          getLocation(ctx),
-        );
+        this.reportError("AstError", ctx, {
+          message: "ConceptStatement: missing terminologyReference in codedFromLine",
+        });
         return null;
       }
       return {
@@ -400,20 +397,16 @@ export class CRLAstBuilder
     } else if (bodyCtx.inferredFromLine?.()) {
       const infCtx = bodyCtx.inferredFromLine();
       if (!infCtx) {
-        this.reportError(
-          "AstError",
-          "ConceptStatement: inferredFromLine() unexpectedly returned undefined",
-          getLocation(ctx),
-        );
+        this.reportError("AstError", ctx, {
+          message: "ConceptStatement: inferredFromLine() unexpectedly returned undefined",
+        });
         return null;
       }
       return this.visit(infCtx) as InferredFromDefinition;
     } else {
-      this.reportError(
-        "AstError",
-        "ConceptStatement must have either codedFromLine or inferredFromLine",
-        getLocation(ctx),
-      );
+      this.reportError("AstError", ctx, {
+        message: "ConceptStatement must have either codedFromLine or inferredFromLine",
+      });
       return null;
     }
   }
@@ -422,11 +415,9 @@ export class CRLAstBuilder
     const name = ctx.conceptIdentifier?.()?.text?.slice(1, -1);
     const bodyCtx = ctx.conceptBody?.();
     if (!name || !bodyCtx) {
-      this.reportError(
-        "AstError",
-        "ConceptStatement: missing conceptIdentifier or conceptBody",
-        getLocation(ctx),
-      );
+      this.reportError("AstError", ctx, {
+        message: "ConceptStatement: missing conceptIdentifier or conceptBody",
+      });
       return null as unknown as Concept;
     }
 

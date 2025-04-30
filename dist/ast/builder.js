@@ -23,20 +23,23 @@ class CRLAstBuilder extends AbstractParseTreeVisitor_1.AbstractParseTreeVisitor 
         super(...arguments);
         this.errors = [];
     }
-    reportError(type, message, location, details) {
-        const errorObj = {
-            type,
-            message,
-            location,
-            details,
-        };
-        this.errors.push(JSON.stringify(errorObj));
+    defaultResult() {
+        return null;
     }
     getErrors() {
         return this.errors;
     }
-    defaultResult() {
-        return null;
+    reportError(message, ctx, details) {
+        this.errors.push({
+            type: "Exception",
+            message,
+            line: ctx.start.line,
+            column: ctx.start.charPositionInLine,
+            details: {
+                location: getLocation(ctx),
+                ...details,
+            },
+        });
     }
     visitCrl(ctx) {
         const statements = ctx.statement().map((s) => this.visit(s));
@@ -205,7 +208,9 @@ class CRLAstBuilder extends AbstractParseTreeVisitor_1.AbstractParseTreeVisitor 
         const typeLine = bodyCtx.typeLine?.();
         const valueTypeLine = bodyCtx.valueTypeLine?.();
         if (!typeLine || !valueTypeLine) {
-            this.reportError("AstError", "ConceptStatement: missing type or valueType line", getLocation(ctx));
+            this.reportError("AstError", ctx, {
+                message: "ConceptStatement: missing type or valueType line",
+            });
             return null;
         }
         let conceptTypeToken, valueTypeToken;
@@ -222,7 +227,9 @@ class CRLAstBuilder extends AbstractParseTreeVisitor_1.AbstractParseTreeVisitor 
             valueTypeToken = undefined;
         }
         if (!conceptTypeToken || !valueTypeToken) {
-            this.reportError("AstError", "ConceptStatement: missing CONCEPT_TYPE or CONCEPT_VALUE_TYPE token", getLocation(ctx));
+            this.reportError("AstError", ctx, {
+                message: "ConceptStatement: missing CONCEPT_TYPE or CONCEPT_VALUE_TYPE token",
+            });
             return null;
         }
         return {
@@ -253,7 +260,9 @@ class CRLAstBuilder extends AbstractParseTreeVisitor_1.AbstractParseTreeVisitor 
             const codedFrom = bodyCtx.codedFromLine();
             const termRef = codedFrom?.terminologyReference?.()?.text?.slice(1, -1);
             if (!termRef) {
-                this.reportError("AstError", "ConceptStatement: missing terminologyReference in codedFromLine", getLocation(ctx));
+                this.reportError("AstError", ctx, {
+                    message: "ConceptStatement: missing terminologyReference in codedFromLine",
+                });
                 return null;
             }
             return {
@@ -265,13 +274,17 @@ class CRLAstBuilder extends AbstractParseTreeVisitor_1.AbstractParseTreeVisitor 
         else if (bodyCtx.inferredFromLine?.()) {
             const infCtx = bodyCtx.inferredFromLine();
             if (!infCtx) {
-                this.reportError("AstError", "ConceptStatement: inferredFromLine() unexpectedly returned undefined", getLocation(ctx));
+                this.reportError("AstError", ctx, {
+                    message: "ConceptStatement: inferredFromLine() unexpectedly returned undefined",
+                });
                 return null;
             }
             return this.visit(infCtx);
         }
         else {
-            this.reportError("AstError", "ConceptStatement must have either codedFromLine or inferredFromLine", getLocation(ctx));
+            this.reportError("AstError", ctx, {
+                message: "ConceptStatement must have either codedFromLine or inferredFromLine",
+            });
             return null;
         }
     }
@@ -279,7 +292,9 @@ class CRLAstBuilder extends AbstractParseTreeVisitor_1.AbstractParseTreeVisitor 
         const name = ctx.conceptIdentifier?.()?.text?.slice(1, -1);
         const bodyCtx = ctx.conceptBody?.();
         if (!name || !bodyCtx) {
-            this.reportError("AstError", "ConceptStatement: missing conceptIdentifier or conceptBody", getLocation(ctx));
+            this.reportError("AstError", ctx, {
+                message: "ConceptStatement: missing conceptIdentifier or conceptBody",
+            });
             return null;
         }
         const types = this.parseConceptTypes(bodyCtx, ctx);

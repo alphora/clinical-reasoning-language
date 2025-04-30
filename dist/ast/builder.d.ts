@@ -1,13 +1,15 @@
+import { ParserRuleContext } from "antlr4ts/ParserRuleContext";
 import { AbstractParseTreeVisitor } from "antlr4ts/tree/AbstractParseTreeVisitor";
 import { CrlContext, DecisionStatementContext, DecisionBodyContext, WhenWithBodyContext, WhenSingleActionContext, NestedWhenBlockContext, BlockActionContext, BlockBodyContext, SingleActionStatementContext, DoStatementContext, UseStatementContext, TerminologyStatementContext, TerminologyValuesetContext, TerminologySystemCodeContext, ActivityStatementContext, ConceptStatementContext, InferredFromLineContext, DefinitionConceptContext, DefinitionLogicContext, InferredFromExpressionContext, InformalOrContext, InformalAndContext, InformalNotContext, ConceptAtomContext, GroupExpressionContext } from "../grammar/generated/antlr/CRLParser";
 import { CRLParserVisitor } from "../grammar/generated/antlr/CRLParserVisitor";
-import { ASTNode, CRL, Decision, DecisionBody, WhenBlock, BlockBody, SingleAction, ActionStatement, DoActivity, UseDecision, Terminology, TerminologyValueset, TerminologySystemCode, Activity, Concept, InferredFromDefinition, ConceptReference, InformalAnd, InformalOr, NotExpression, GroupExpression, InferredFromConcept, InferredFromExpression, Location } from "./types";
+import { CRLError } from "../types/errors";
+import { ASTNode, CRL, Decision, DecisionBody, WhenBlock, BlockBody, SingleAction, ActionStatement, DoActivity, UseDecision, Terminology, TerminologyValueset, TerminologySystemCode, Activity, Concept, InferredFromDefinition, ConceptReference, InformalAnd, InformalOr, NotExpression, GroupExpression, InferredFromConcept, InferredFromExpression } from "./types";
 type InformalNode = GroupExpression | ConceptReference | InformalAnd | NotExpression | InformalOr;
 export declare class CRLAstBuilder extends AbstractParseTreeVisitor<ASTNode> implements CRLParserVisitor<ASTNode> {
     private readonly errors;
-    protected reportError(type: string, message: string, location?: Location, details?: unknown): void;
-    getErrors(): string[];
     protected defaultResult(): ASTNode;
+    getErrors(): CRLError[];
+    protected reportError(message: string, ctx: ParserRuleContext, details?: Record<string, unknown>): void;
     visitCrl(ctx: CrlContext): CRL;
     visitDecisionStatement(ctx: DecisionStatementContext): Decision;
     visitDecisionBody(ctx: DecisionBodyContext): DecisionBody;

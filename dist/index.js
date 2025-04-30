@@ -33,7 +33,11 @@ function tokenizeCRL(input) {
         return { success: true, result: tokens };
     }
     catch (error) {
-        return { success: false, errors: [error instanceof Error ? error.message : String(error)] };
+        const errorObj = {
+            type: "Exception",
+            message: error instanceof Error ? error.message : String(error),
+        };
+        return { success: false, errors: [errorObj] };
     }
 }
 function parseCRL(input) {
@@ -51,12 +55,12 @@ function parseCRL(input) {
     }
     catch (error) {
         const errors = [
-            ...(lexerErrorListener?.getErrors?.() ?? []),
-            ...(parserErrorListener?.getErrors?.() ?? []),
-            JSON.stringify({
+            ...(lexerErrorListener?.getErrors() ?? []),
+            ...(parserErrorListener?.getErrors() ?? []),
+            {
                 type: "Exception",
                 message: error instanceof Error ? error.message : String(error),
-            }),
+            },
         ];
         return {
             success: false,
@@ -85,13 +89,13 @@ function buildCRL(input) {
     }
     catch (error) {
         const errors = [
-            ...(lexerErrorListener?.getErrors?.() ?? []),
-            ...(parserErrorListener?.getErrors?.() ?? []),
-            ...(builder?.getErrors?.() ?? []),
-            JSON.stringify({
+            ...(lexerErrorListener?.getErrors() ?? []),
+            ...(parserErrorListener?.getErrors() ?? []),
+            ...(builder?.getErrors() ?? []),
+            {
                 type: "Exception",
                 message: error instanceof Error ? error.message : String(error),
-            }),
+            },
         ];
         return {
             success: false,
@@ -115,8 +119,14 @@ function validateCRL(input) {
             return {
                 success: false,
                 errors: [
-                    ...validationResult.errors.map((e) => e.message),
-                    ...validationResult.warnings.map((w) => w.message),
+                    ...validationResult.errors.map((e) => ({
+                        type: "Exception",
+                        message: e.message,
+                    })),
+                    ...validationResult.warnings.map((w) => ({
+                        type: "Exception",
+                        message: w.message,
+                    })),
                 ],
             };
         }
@@ -126,10 +136,10 @@ function validateCRL(input) {
         return {
             success: false,
             errors: [
-                JSON.stringify({
+                {
                     type: "Exception",
                     message: error instanceof Error ? error.message : String(error),
-                }),
+                },
             ],
         };
     }

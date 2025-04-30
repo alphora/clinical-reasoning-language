@@ -6,11 +6,12 @@ import { CRLLexer } from "../grammar/generated/antlr/CRLLexer";
 import activityTypesJson from "../grammar/generated/types/activityTypes.json";
 import conceptTypesJson from "../grammar/generated/types/conceptTypes.json";
 import conceptValueTypesJson from "../grammar/generated/types/conceptValueTypes.json";
+import { CRLError } from "../types/errors";
 
 export class CRLLexerErrorListener implements ANTLRErrorListener<number> {
   ERROR_TOKEN_TYPE = 27;
 
-  private readonly errors: string[] = [];
+  private readonly errors: CRLError[] = [];
 
   private readonly validActivityTypes = activityTypesJson as string[];
   private readonly validConceptTypes = conceptTypesJson as string[];
@@ -129,28 +130,28 @@ export class CRLLexerErrorListener implements ANTLRErrorListener<number> {
       offendingDetails = { text: String(offendingSymbol) };
     }
 
-    const errorMessage = JSON.stringify({
+    const error: CRLError = {
       type: "LexicalError",
-      line: line,
+      line,
       column: charPositionInLine,
       message: specificMessage,
       details: {
-        message: `${msg}`,
+        message: msg,
         offendingSymbol: offendingDetails,
       },
-    });
-    console.error(errorMessage);
-    this.errors.push(errorMessage);
+    };
+    console.error(JSON.stringify(error, null, 2));
+    this.errors.push(error);
 
     if (recognizer instanceof CRLLexer) {
       const errorToken: Token = {
         type: this.ERROR_TOKEN_TYPE,
-        text: errorMessage,
+        text: JSON.stringify(error),
         channel: Token.DEFAULT_CHANNEL,
         startIndex,
         stopIndex: input.index - 1,
-        line: line,
-        charPositionInLine: charPositionInLine,
+        line,
+        charPositionInLine,
         tokenIndex: -1,
         tokenSource: recognizer,
         inputStream: input,
@@ -160,22 +161,22 @@ export class CRLLexerErrorListener implements ANTLRErrorListener<number> {
       return;
     }
 
-    throw new Error(errorMessage);
+    throw new Error(JSON.stringify(error));
   }
 
-  getErrors(): string[] {
+  getErrors(): CRLError[] {
     return this.errors;
   }
 
   public reportCustomError(line: number, column: number, message: string, details?: unknown): void {
-    const errorMessage = JSON.stringify({
+    const error: CRLError = {
       type: "LexicalError",
       line,
       column,
       message,
       details,
-    });
-    console.error(errorMessage);
-    this.errors.push(errorMessage);
+    };
+    console.error(JSON.stringify(error, null, 2));
+    this.errors.push(error);
   }
 }

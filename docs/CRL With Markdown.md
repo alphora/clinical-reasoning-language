@@ -2,7 +2,7 @@
 
 decision "Elderly Based":
 
-- when "Client Age Greater Than 60" then recommend activity "Indicate".
+- **when** "Client Age Greater Than 60" then recommend activity "Indicate".
 - **when** "Client Age Less Than 60" then:
   - recommend activity ["Vaccinate"](#vaccinate).
   - recommend activity ["another thing"](#indicate).
