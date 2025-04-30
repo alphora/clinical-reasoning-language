@@ -20,12 +20,17 @@ This is a private package. To install it, you need:
    - Each developer should use their own npm account
 
 2. Set up authentication:
+
    ```bash
    # Log in to npm - recommended for individual developers
    npm login
+   ```
 
-   # Or create/edit ~/.npmrc with your personal access token
-   //registry.npmjs.org/:_authToken=YOUR_NPM_TOKEN
+  Or create/edit ~/.npmrc with your personal access token (note the second line is **NOT a comment**):
+
+  ```npmc
+@smile-digital-health:registry=https://registry.npmjs.org/
+//registry.npmjs.org/:_authToken=YOUR_NPM_TOKEN
    ```
 
    > **Security Note:** Always use your personal npm token. Do not share tokens between team members.
