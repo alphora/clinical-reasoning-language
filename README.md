@@ -145,6 +145,7 @@ The package provides four main functions for processing CRL code:
 ```typescript
 import { tokenizeCRL } from '@smile-digital-health/crl';
 
+
 const result = tokenizeCRL(`
   decision "Test":
     when "Condition" then do "Action".

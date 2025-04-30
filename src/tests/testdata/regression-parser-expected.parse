@@ -1,4 +1,3 @@
-
 > @smile-digital-health/crl@0.5.4 cli:parser
 > ts-node src/cli/run-parser.ts
 
