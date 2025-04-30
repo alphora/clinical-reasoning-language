@@ -1,6 +1,15 @@
 import { CommonTokenStream } from "antlr4ts";
 
+import { CRLError } from "../../types/errors";
 import { createLexer } from "../createLexer";
+
+interface ErrorDetails {
+  message: string;
+  offendingSymbol: {
+    text: string;
+    [key: string]: unknown;
+  };
+}
 
 describe("CRLLexerErrorListener", () => {
   it("should detect individual invalid tokens", () => {
@@ -9,10 +18,10 @@ describe("CRLLexerErrorListener", () => {
     tokenStream.fill();
     const errors = errorListener.getErrors();
     expect(errors.length).toBe(1);
-    const errorObj = JSON.parse(errors[0]);
+    const errorObj: CRLError = errors[0];
     expect(errorObj.type).toBe("LexicalError");
     expect(errorObj.message).toContain("Invalid token:");
-    expect(errorObj.details.message).toContain("token recognition error");
+    expect((errorObj.details as ErrorDetails).message).toContain("token recognition error");
   });
 
   it("should treat whitespace-separated invalid tokens as separate errors", () => {
@@ -21,14 +30,14 @@ describe("CRLLexerErrorListener", () => {
     tokenStream.fill();
     const errors = errorListener.getErrors();
     expect(errors.length).toBe(2);
-    const errorObj1 = JSON.parse(errors[0]);
-    const errorObj2 = JSON.parse(errors[1]);
+    const errorObj1: CRLError = errors[0];
+    const errorObj2: CRLError = errors[1];
     expect(errorObj1.type).toBe("LexicalError");
     expect(errorObj2.type).toBe("LexicalError");
     expect(errorObj1.message).toContain("Invalid token:");
     expect(errorObj2.message).toContain("Invalid token:");
-    expect(errorObj1.details.message).toContain("token recognition error");
-    expect(errorObj2.details.message).toContain("token recognition error");
+    expect((errorObj1.details as ErrorDetails).message).toContain("token recognition error");
+    expect((errorObj2.details as ErrorDetails).message).toContain("token recognition error");
   });
 
   it("should combine invalid tokens within quoted strings into a single error", () => {
@@ -37,9 +46,9 @@ describe("CRLLexerErrorListener", () => {
     tokenStream.fill();
     const errors = errorListener.getErrors();
     expect(errors.length).toBe(1);
-    const errorObj = JSON.parse(errors[0]);
+    const errorObj: CRLError = errors[0];
     expect(errorObj.type).toBe("LexicalError");
-    expect(errorObj.details.message).toContain("token recognition error");
+    expect((errorObj.details as ErrorDetails).message).toContain("token recognition error");
   });
 
   it("should not span error tokens across multiple lines", () => {
@@ -48,8 +57,8 @@ describe("CRLLexerErrorListener", () => {
     tokenStream.fill();
     const errors = errorListener.getErrors();
     expect(errors.length).toBe(2);
-    const errorObj1 = JSON.parse(errors[0]);
-    const errorObj2 = JSON.parse(errors[1]);
+    const errorObj1: CRLError = errors[0];
+    const errorObj2: CRLError = errors[1];
     expect(errorObj1.type).toBe("LexicalError");
     expect(errorObj2.type).toBe("LexicalError");
     expect(errorObj1.message).toContain("Invalid token:");
@@ -76,7 +85,7 @@ describe("CRLLexerErrorListener with CRL-specific input", () => {
     tokenStream.fill();
     const errors = errorListener.getErrors();
     expect(errors.length).toBe(1);
-    const errorObj = JSON.parse(errors[0]);
+    const errorObj = errors[0];
     expect(errorObj.type).toBe("LexicalError");
     expect(errorObj.message).toContain("Invalid concept type: InvalidType");
   });
@@ -87,7 +96,7 @@ describe("CRLLexerErrorListener with CRL-specific input", () => {
     tokenStream.fill();
     const errors = errorListener.getErrors();
     expect(errors.length).toBe(1);
-    const errorObj = JSON.parse(errors[0]);
+    const errorObj = errors[0];
     expect(errorObj.type).toBe("LexicalError");
     expect(errorObj.message).toContain("Invalid token:");
   });
@@ -108,7 +117,7 @@ describe("CRLLexerErrorListener with CRL-specific input", () => {
     tokenStream.fill();
     const errors = errorListener.getErrors();
     expect(errors.length).toBe(1);
-    const errorObj = JSON.parse(errors[0]);
+    const errorObj = errors[0];
     expect(errorObj.type).toBe("LexicalError");
     expect(errorObj.message).toContain("Invalid activity type: invalidActivity");
   });
@@ -121,7 +130,7 @@ describe("CRLLexerErrorListener with CRL-specific input", () => {
     tokenStream.fill();
     const errors = errorListener.getErrors();
     expect(errors.length).toBe(1);
-    const errorObj = JSON.parse(errors[0]);
+    const errorObj = errors[0];
     expect(errorObj.type).toBe("LexicalError");
     expect(errorObj.message).toContain("Invalid concept type: InvalidType");
   });
@@ -134,7 +143,7 @@ describe("CRLLexerErrorListener with CRL-specific input", () => {
     tokenStream.fill();
     const errors = errorListener.getErrors();
     expect(errors.length).toBe(1);
-    const errorObj = JSON.parse(errors[0]);
+    const errorObj = errors[0];
     expect(errorObj.type).toBe("LexicalError");
     expect(errorObj.message).toContain("Invalid concept value type: InvalidValueType");
   });
@@ -145,7 +154,7 @@ describe("CRLLexerErrorListener with CRL-specific input", () => {
     tokenStream.fill();
     const errors = errorListener.getErrors();
     expect(errors.length).toBe(1);
-    const errorObj = JSON.parse(errors[0]);
+    const errorObj = errors[0];
     expect(errorObj.type).toBe("LexicalError");
     expect(errorObj.message).toContain("Invalid character in activity type:");
   });
@@ -156,7 +165,7 @@ describe("CRLLexerErrorListener with CRL-specific input", () => {
     tokenStream.fill();
     const errors = errorListener.getErrors();
     expect(errors.length).toBe(1);
-    const errorObj = JSON.parse(errors[0]);
+    const errorObj = errors[0];
     expect(errorObj.type).toBe("LexicalError");
     expect(errorObj.message).toContain("Invalid character in concept type:");
   });
@@ -167,7 +176,7 @@ describe("CRLLexerErrorListener with CRL-specific input", () => {
     tokenStream.fill();
     const errors = errorListener.getErrors();
     expect(errors.length).toBe(1);
-    const errorObj = JSON.parse(errors[0]);
+    const errorObj = errors[0];
     expect(errorObj.type).toBe("LexicalError");
     expect(errorObj.message).toContain("Invalid character in concept value type:");
   });

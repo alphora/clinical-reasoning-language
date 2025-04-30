@@ -1,4 +1,5 @@
 import { tokenizeCRL } from "../../index";
+import { CRLError } from "../../types/errors";
 
 import { getTokensFromString } from "./helpers";
 
@@ -69,9 +70,9 @@ describe("Lexer Error Handling", () => {
       const { errorListener } = getTokensFromString(input, { withListener: true });
       const errors = errorListener.getErrors();
       expect(errors.length).toBeGreaterThan(0);
-      const errorObj = JSON.parse(errors[0]);
-      expect(errorObj.type).toBe("LexicalError");
-      expect(errorObj.message).toContain(expectedMessage);
+      const error = errors[0] as CRLError;
+      expect(error.type).toBe("LexicalError");
+      expect(error.message).toContain(expectedMessage);
     });
   });
 
@@ -91,9 +92,9 @@ describe("Lexer Error Handling", () => {
       const { errorListener } = getTokensFromString(input, { withListener: true });
       const errors = errorListener.getErrors();
       expect(errors.length).toBeGreaterThan(0);
-      const errorObj = JSON.parse(errors[0]);
-      expect(errorObj.type).toBe("LexicalError");
-      expect(errorObj.message).toContain(expectedMessage);
+      const error = errors[0] as CRLError;
+      expect(error.type).toBe("LexicalError");
+      expect(error.message).toContain(expectedMessage);
     });
   });
 
@@ -113,9 +114,9 @@ describe("Lexer Error Handling", () => {
       const { errorListener } = getTokensFromString(input, { withListener: true });
       const errors = errorListener.getErrors();
       expect(errors.length).toBeGreaterThan(0);
-      const errorObj = JSON.parse(errors[0]);
-      expect(errorObj.type).toBe("LexicalError");
-      expect(errorObj.message).toContain(expectedMessage);
+      const error = errors[0] as CRLError;
+      expect(error.type).toBe("LexicalError");
+      expect(error.message).toContain(expectedMessage);
     });
   });
 
@@ -135,9 +136,9 @@ describe("Lexer Error Handling", () => {
       const { errorListener } = getTokensFromString(input, { withListener: true });
       const errors = errorListener.getErrors();
       expect(errors.length).toBeGreaterThan(0);
-      const errorObj = JSON.parse(errors[0]);
-      expect(errorObj.type).toBe("LexicalError");
-      expect(errorObj.message).toContain(expectedMessage);
+      const error = errors[0] as CRLError;
+      expect(error.type).toBe("LexicalError");
+      expect(error.message).toContain(expectedMessage);
     });
   });
 
@@ -157,9 +158,9 @@ describe("Lexer Error Handling", () => {
       const { errorListener } = getTokensFromString(input, { withListener: true });
       const errors = errorListener.getErrors();
       expect(errors.length).toBeGreaterThan(0);
-      const errorObj = JSON.parse(errors[0]);
-      expect(errorObj.type).toBe("LexicalError");
-      expect(errorObj.message).toContain(expectedMessage);
+      const error = errors[0] as CRLError;
+      expect(error.type).toBe("LexicalError");
+      expect(error.message).toContain(expectedMessage);
     });
   });
 
@@ -179,9 +180,9 @@ describe("Lexer Error Handling", () => {
       const { errorListener } = getTokensFromString(input, { withListener: true });
       const errors = errorListener.getErrors();
       expect(errors.length).toBeGreaterThan(0);
-      const errorObj = JSON.parse(errors[0]);
-      expect(errorObj.type).toBe("LexicalError");
-      expect(errorObj.message).toContain(expectedMessage);
+      const error = errors[0] as CRLError;
+      expect(error.type).toBe("LexicalError");
+      expect(error.message).toContain(expectedMessage);
     });
   });
 });
@@ -192,9 +193,9 @@ describe("tokenizeCRL error reporting", () => {
     const result = tokenizeCRL(input);
     expect(result.success).toBe(false);
     expect(result.errors && result.errors.length).toBeGreaterThan(0);
-    const errorObj = JSON.parse(result.errors![0]);
-    expect(errorObj.type).toBe("LexicalError");
-    expect(errorObj.message).toContain("Invalid activity type");
+    const error = result.errors![0] as CRLError;
+    expect(error.type).toBe("LexicalError");
+    expect(error.message).toContain("Invalid activity type");
   });
 
   it("should return errors in ParseResult for invalid concept type", () => {
@@ -202,9 +203,9 @@ describe("tokenizeCRL error reporting", () => {
     const result = tokenizeCRL(input);
     expect(result.success).toBe(false);
     expect(result.errors && result.errors.length).toBeGreaterThan(0);
-    const errorObj = JSON.parse(result.errors![0]);
-    expect(errorObj.type).toBe("LexicalError");
-    expect(errorObj.message).toContain("Invalid concept type");
+    const error = result.errors![0] as CRLError;
+    expect(error.type).toBe("LexicalError");
+    expect(error.message).toContain("Invalid concept type");
   });
 
   it("should return errors in ParseResult for invalid characters", () => {
@@ -212,8 +213,8 @@ describe("tokenizeCRL error reporting", () => {
     const result = tokenizeCRL(input);
     expect(result.success).toBe(false);
     expect(result.errors && result.errors.length).toBeGreaterThan(0);
-    const errorObj = JSON.parse(result.errors![0]);
-    expect(errorObj.type).toBe("LexicalError");
-    expect(errorObj.message).toContain("Invalid token");
+    const error = result.errors![0] as CRLError;
+    expect(error.type).toBe("LexicalError");
+    expect(error.message).toContain("Invalid token");
   });
 });

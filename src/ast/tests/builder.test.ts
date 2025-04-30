@@ -1,4 +1,5 @@
 import { buildCRL, parseCRL } from "../../index";
+import { CRLError } from "../../types/errors";
 import {
   Activity,
   BlockBody,
@@ -607,7 +608,7 @@ done
       const result = buildCRL(input);
       expect(result.success).toBe(false);
       expect(result.errors && result.errors.length).toBeGreaterThan(0);
-      const errorObj = JSON.parse(result.errors![0]);
+      const errorObj: CRLError = result.errors![0];
       expect(errorObj.type).toBe("LexicalError");
       expect(errorObj.message).toContain("Invalid activity type");
     });
@@ -618,7 +619,7 @@ done
       expect(result.success).toBe(false);
       expect(result.errors && result.errors.length).toBeGreaterThan(0);
       // Should contain a ParserError or similar
-      const foundParserError = result.errors!.some((e) => e.includes("ParserError"));
+      const foundParserError = result.errors!.some((e) => e.type === "ParserError");
       expect(foundParserError).toBe(true);
     });
 
@@ -629,10 +630,10 @@ done
       expect(result.success).toBe(false);
       expect(result.errors && result.errors.length).toBeGreaterThan(0);
       // Should contain a LexicalError
-      const foundLexicalError = result.errors!.some((e) => e.includes("LexicalError"));
+      const foundLexicalError = result.errors!.some((e) => e.type === "LexicalError");
       expect(foundLexicalError).toBe(true);
       // Should contain a ParserError
-      const foundParserError = result.errors!.some((e) => e.includes("ParserError"));
+      const foundParserError = result.errors!.some((e) => e.type === "ParserError");
       expect(foundParserError).toBe(true);
     });
   });
@@ -651,7 +652,7 @@ done
       const result = parseCRL(input);
       expect(result.success).toBe(false);
       expect(result.errors && result.errors.length).toBeGreaterThan(0);
-      const foundParserError = result.errors!.some((e) => e.includes("ParserError"));
+      const foundParserError = result.errors!.some((e) => e.type === "ParserError");
       expect(foundParserError).toBe(true);
     });
 
@@ -668,7 +669,7 @@ done
       const result = buildCRL(input);
       expect(result.success).toBe(false);
       expect(result.errors && result.errors.length).toBeGreaterThan(0);
-      const foundParserError = result.errors!.some((e) => e.includes("ParserError"));
+      const foundParserError = result.errors!.some((e) => e.type === "ParserError");
       expect(foundParserError).toBe(true);
     });
   });

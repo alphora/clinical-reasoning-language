@@ -57,7 +57,7 @@ describe("Action FHIR Types", () => {
     }
     const errors = errorListener.getErrors();
     expect(errors.length).toBeGreaterThan(0);
-    const errorObj = JSON.parse(errors[0]);
+    const errorObj = errors[0];
     expect(errorObj.type).toBe("LexicalError");
     expect(errorObj.message).toContain("Invalid activity type");
   });
@@ -93,7 +93,7 @@ describe("Case Feature FHIR Types", () => {
     }
     const errors = errorListener.getErrors();
     expect(errors.length).toBeGreaterThan(0);
-    const errorObj = JSON.parse(errors[0]);
+    const errorObj = errors[0];
     expect(errorObj.type).toBe("LexicalError");
     expect(errorObj.message).toContain("Invalid concept type");
   });
@@ -129,7 +129,7 @@ describe("Concept Value Types", () => {
     }
     const errors = errorListener.getErrors();
     expect(errors.length).toBeGreaterThan(0);
-    const errorObj = JSON.parse(errors[0]);
+    const errorObj = errors[0];
     expect(errorObj.type).toBe("LexicalError");
     expect(errorObj.message).toContain("Invalid concept value type");
   });

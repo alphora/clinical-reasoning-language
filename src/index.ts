@@ -5,6 +5,7 @@ import { CRL } from "./ast/types";
 import { CRLLexer } from "./grammar/generated/antlr/CRLLexer";
 import { createLexer } from "./lexer/createLexer";
 import { createParser } from "./parser/createParser";
+import { CRLError } from "./types/errors";
 import { Validator } from "./validator/validator";
 
 export interface Token {
@@ -17,7 +18,7 @@ export interface Token {
 export interface ParseResult<T> {
   success: boolean;
   result?: T;
-  errors?: string[];
+  errors?: CRLError[];
 }
 
 /**
@@ -51,7 +52,11 @@ export function tokenizeCRL(input: string): ParseResult<Token[]> {
     }
     return { success: true, result: tokens };
   } catch (error) {
-    return { success: false, errors: [error instanceof Error ? error.message : String(error)] };
+    const errorObj: CRLError = {
+      type: "Exception",
+      message: error instanceof Error ? error.message : String(error),
+    };
+    return { success: false, errors: [errorObj] };
   }
 }
 
@@ -75,12 +80,12 @@ export function parseCRL(input: string): ParseResult<ParseTree> {
   } catch (error) {
     // Collect all errors if available, plus the exception
     const errors = [
-      ...(lexerErrorListener?.getErrors?.() ?? []),
-      ...(parserErrorListener?.getErrors?.() ?? []),
-      JSON.stringify({
-        type: "Exception",
+      ...(lexerErrorListener?.getErrors() ?? []),
+      ...(parserErrorListener?.getErrors() ?? []),
+      {
+        type: "Exception" as const,
         message: error instanceof Error ? error.message : String(error),
-      }),
+      },
     ];
     return {
       success: false,
@@ -115,13 +120,13 @@ export function buildCRL(input: string): ParseResult<CRL> {
   } catch (error) {
     // Collect all errors if available, plus the exception
     const errors = [
-      ...(lexerErrorListener?.getErrors?.() ?? []),
-      ...(parserErrorListener?.getErrors?.() ?? []),
-      ...(builder?.getErrors?.() ?? []),
-      JSON.stringify({
-        type: "Exception",
+      ...(lexerErrorListener?.getErrors() ?? []),
+      ...(parserErrorListener?.getErrors() ?? []),
+      ...(builder?.getErrors() ?? []),
+      {
+        type: "Exception" as const,
         message: error instanceof Error ? error.message : String(error),
-      }),
+      },
     ];
     return {
       success: false,
@@ -151,8 +156,14 @@ export function validateCRL(input: string): ParseResult<CRL> {
       return {
         success: false,
         errors: [
-          ...validationResult.errors.map((e) => e.message),
-          ...validationResult.warnings.map((w) => w.message),
+          ...validationResult.errors.map((e) => ({
+            type: "Exception" as const,
+            message: e.message,
+          })),
+          ...validationResult.warnings.map((w) => ({
+            type: "Exception" as const,
+            message: w.message,
+          })),
         ],
       };
     }
@@ -161,10 +172,10 @@ export function validateCRL(input: string): ParseResult<CRL> {
     return {
       success: false,
       errors: [
-        JSON.stringify({
+        {
           type: "Exception",
           message: error instanceof Error ? error.message : String(error),
-        }),
+        },
       ],
     };
   }

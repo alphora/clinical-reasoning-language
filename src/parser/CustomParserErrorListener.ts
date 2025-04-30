@@ -1,8 +1,9 @@
 import { ANTLRErrorListener, RecognitionException, Recognizer, Token } from "antlr4ts";
 import { ATNSimulator } from "antlr4ts/atn/ATNSimulator";
+import { CRLError } from "../types/errors";
 
 export class CustomParserErrorListener implements ANTLRErrorListener<Token> {
-  private readonly errors: string[] = [];
+  private readonly errors: CRLError[] = [];
 
   syntaxError(
     _recognizer: Recognizer<Token, ATNSimulator>,
@@ -24,20 +25,20 @@ export class CustomParserErrorListener implements ANTLRErrorListener<Token> {
         }
       : { text: "unknown" };
 
-    const errorMessage = JSON.stringify({
+    const error: CRLError = {
       type: "ParserError",
-      line: line,
+      line,
       column: charPositionInLine,
       message: `Syntax error: ${msg}`,
       details: {
         offendingSymbol: offendingDetails,
       },
-    });
-    console.error(errorMessage);
-    this.errors.push(errorMessage);
+    };
+    console.error(JSON.stringify(error, null, 2));
+    this.errors.push(error);
   }
 
-  getErrors(): string[] {
+  getErrors(): CRLError[] {
     return this.errors;
   }
 }

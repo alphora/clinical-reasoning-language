@@ -27,6 +27,6 @@ describe("createParser", () => {
       // console.log('[DEBUGGING] Parser errors:', errors);
     }
     expect(errors.length).toBeGreaterThan(0);
-    expect(errors.some((e) => e.toLowerCase().includes("syntax error"))).toBe(true);
+    expect(errors.some((e) => e.message.toLowerCase().includes("syntax error"))).toBe(true);
   });
 });

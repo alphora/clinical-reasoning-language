@@ -17,17 +17,17 @@ class CustomParserErrorListener {
                 tokenIndex: offendingSymbol.tokenIndex,
             }
             : { text: "unknown" };
-        const errorMessage = JSON.stringify({
+        const error = {
             type: "ParserError",
-            line: line,
+            line,
             column: charPositionInLine,
             message: `Syntax error: ${msg}`,
             details: {
                 offendingSymbol: offendingDetails,
             },
-        });
-        console.error(errorMessage);
-        this.errors.push(errorMessage);
+        };
+        console.error(JSON.stringify(error, null, 2));
+        this.errors.push(error);
     }
     getErrors() {
         return this.errors;
