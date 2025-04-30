@@ -1,13 +1,13 @@
 import { readFileSync } from "fs";
 import { join } from "path";
 
-import { CPGLLexer } from "../grammar/generated/antlr/CPGLLexer";
+import { CRLLexer } from "../grammar/generated/antlr/CRLLexer";
 import { createLexer } from "../lexer/createLexer";
 
 // Get the path to the grammar example file
 const examplePath = join(
   __dirname,
-  "../examples/cpgl/who/smart-example-immz/IMMZ_All_Decisions.cpg",
+  "../examples/crl/who/smart-example-immz/IMMZ_All_Decisions.cpg",
 );
 
 // Read the file content
@@ -25,7 +25,7 @@ const tokens: Array<{
 }> = [];
 
 let token = lexer.nextToken();
-while (token.type !== CPGLLexer.EOF) {
+while (token.type !== CRLLexer.EOF) {
   // Only show tokens on the default channel (skip comments and whitespace)
   if (token.channel === 0) {
     // Get token type name

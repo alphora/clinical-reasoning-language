@@ -2,7 +2,7 @@ import { ParserRuleContext } from "antlr4ts/ParserRuleContext";
 import { AbstractParseTreeVisitor } from "antlr4ts/tree/AbstractParseTreeVisitor";
 
 import {
-  CpglContext,
+  CrlContext,
   DecisionStatementContext,
   DecisionBodyContext,
   WhenWithBodyContext,
@@ -27,12 +27,12 @@ import {
   InformalNotContext,
   ConceptAtomContext,
   GroupExpressionContext,
-} from "../grammar/generated/antlr/CPGLParser";
-import { CPGLParserVisitor } from "../grammar/generated/antlr/CPGLParserVisitor";
+} from "../grammar/generated/antlr/CRLParser";
+import { CRLParserVisitor } from "../grammar/generated/antlr/CRLParserVisitor";
 
 import {
   ASTNode,
-  CPGL,
+  CRL,
   FileType,
   Statement,
   Decision,
@@ -100,9 +100,9 @@ function getLocation(ctx: ParserRuleContext): Location {
   };
 }
 
-export class CPGLAstBuilder
+export class CRLAstBuilder
   extends AbstractParseTreeVisitor<ASTNode>
-  implements CPGLParserVisitor<ASTNode>
+  implements CRLParserVisitor<ASTNode>
 {
   private readonly errors: string[] = [];
 
@@ -129,7 +129,7 @@ export class CPGLAstBuilder
     return null as unknown as ASTNode;
   }
 
-  visitCpgl(ctx: CpglContext): CPGL {
+  visitCrl(ctx: CrlContext): CRL {
     const statements = ctx.statement().map((s) => this.visit(s) as Statement);
     return { type: FileType.type, statements, location: getLocation(ctx) };
   }
@@ -196,7 +196,7 @@ export class CPGLAstBuilder
   }
 
   visitActionStatement(
-    ctx: import("../grammar/generated/antlr/CPGLParser").ActionStatementContext,
+    ctx: import("../grammar/generated/antlr/CRLParser").ActionStatementContext,
   ): ActionStatement {
     const doStmt = ctx.doStatement?.();
     const useStmt = ctx.useStatement?.();
@@ -267,7 +267,7 @@ export class CPGLAstBuilder
   }
 
   private parseWithClause(
-    ctx: import("../grammar/generated/antlr/CPGLParser").ActivityStatementContext,
+    ctx: import("../grammar/generated/antlr/CRLParser").ActivityStatementContext,
   ): { terminologyReference?: string; activityTypeValue?: string } {
     let terminologyReference: string | undefined;
     let activityTypeValue: string | undefined;
@@ -288,7 +288,7 @@ export class CPGLAstBuilder
   }
 
   private parseRationaleClause(
-    ctx: import("../grammar/generated/antlr/CPGLParser").ActivityStatementContext,
+    ctx: import("../grammar/generated/antlr/CRLParser").ActivityStatementContext,
   ): string | undefined {
     if (ctx.rationale) {
       const rationaleCtx = ctx.rationale();
@@ -319,8 +319,8 @@ export class CPGLAstBuilder
   }
 
   private parseConceptTypes(
-    bodyCtx: import("../grammar/generated/antlr/CPGLParser").ConceptBodyContext,
-    ctx: import("../grammar/generated/antlr/CPGLParser").ConceptStatementContext,
+    bodyCtx: import("../grammar/generated/antlr/CRLParser").ConceptBodyContext,
+    ctx: import("../grammar/generated/antlr/CRLParser").ConceptStatementContext,
   ): { conceptType: ConceptType; valueType: ConceptValueType } | null {
     const typeLine = bodyCtx.typeLine?.();
     const valueTypeLine = bodyCtx.valueTypeLine?.();
@@ -358,7 +358,7 @@ export class CPGLAstBuilder
   }
 
   private parseEvidence(
-    bodyCtx: import("../grammar/generated/antlr/CPGLParser").ConceptBodyContext,
+    bodyCtx: import("../grammar/generated/antlr/CRLParser").ConceptBodyContext,
   ): string | undefined {
     if (bodyCtx.evidenceLine?.()) {
       const evidenceCtx = bodyCtx.evidenceLine?.();
@@ -378,8 +378,8 @@ export class CPGLAstBuilder
   }
 
   private parseConceptDefinition(
-    bodyCtx: import("../grammar/generated/antlr/CPGLParser").ConceptBodyContext,
-    ctx: import("../grammar/generated/antlr/CPGLParser").ConceptStatementContext,
+    bodyCtx: import("../grammar/generated/antlr/CRLParser").ConceptBodyContext,
+    ctx: import("../grammar/generated/antlr/CRLParser").ConceptStatementContext,
   ): ConceptDefinition | null {
     if (bodyCtx.codedFromLine?.()) {
       const codedFrom = bodyCtx.codedFromLine();

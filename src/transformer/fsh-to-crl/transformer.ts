@@ -1,4 +1,4 @@
-// Canonical entry point for FSH-to-CPGL transformation.
+// Canonical entry point for FSH-to-CRL transformation.
 // Expects a path to a SUSHI-compatible FSH project directory (containing sushi-config.yaml and input/fsh/).
 import * as fs from "fs";
 import * as path from "path";
@@ -19,7 +19,7 @@ import { toIdentifier } from "./utils/fshPathFunctions";
  * @param fshProjectDir The path to a SUSHI-compatible FSH project directory
  * @returns The CPG-L output as a string
  */
-export function transformFSHToCPGL(fshProjectDir: string): string {
+export function transformFSHToCRL(fshProjectDir: string): string {
   const configPath = path.join(fshProjectDir, "sushi-config.yaml");
   if (!fs.existsSync(configPath)) {
     throw new Error(`sushi-config.yaml not found in ${fshProjectDir}`);

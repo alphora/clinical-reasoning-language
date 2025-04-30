@@ -1,11 +1,11 @@
-import { CPGLLexer } from "../../grammar/generated/antlr/CPGLLexer";
+import { CRLLexer } from "../../grammar/generated/antlr/CRLLexer";
 
 import { getTokensFromString } from "./helpers";
 import { verifyTokenSequence } from "./index.test";
 
 // TODO: update tests to use BACKTICK_STRING (instead of STRING)
 
-describe("CPGL Lexer - Basic Tokens", () => {
+describe("CRL Lexer - Basic Tokens", () => {
   describe("Keywords", () => {
     it("should tokenize decision statement", () => {
       const input =
@@ -13,16 +13,16 @@ describe("CPGL Lexer - Basic Tokens", () => {
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(tokens, [
-        CPGLLexer.DECISION,
-        CPGLLexer.QUOTED_STRING,
-        CPGLLexer.COLON,
-        CPGLLexer.WHEN,
-        CPGLLexer.QUOTED_STRING,
-        CPGLLexer.THEN,
-        CPGLLexer.COLON,
-        CPGLLexer.DO,
-        CPGLLexer.QUOTED_STRING,
-        CPGLLexer.DONE,
+        CRLLexer.DECISION,
+        CRLLexer.QUOTED_STRING,
+        CRLLexer.COLON,
+        CRLLexer.WHEN,
+        CRLLexer.QUOTED_STRING,
+        CRLLexer.THEN,
+        CRLLexer.COLON,
+        CRLLexer.DO,
+        CRLLexer.QUOTED_STRING,
+        CRLLexer.DONE,
       ]);
     });
 
@@ -32,18 +32,18 @@ describe("CPGL Lexer - Basic Tokens", () => {
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(tokens, [
-        CPGLLexer.DECISION,
-        CPGLLexer.QUOTED_STRING,
-        CPGLLexer.COLON,
-        CPGLLexer.WHEN,
-        CPGLLexer.QUOTED_STRING,
-        CPGLLexer.THEN,
-        CPGLLexer.COLON,
-        CPGLLexer.DO,
-        CPGLLexer.QUOTED_STRING,
-        CPGLLexer.DO,
-        CPGLLexer.QUOTED_STRING,
-        CPGLLexer.DONE,
+        CRLLexer.DECISION,
+        CRLLexer.QUOTED_STRING,
+        CRLLexer.COLON,
+        CRLLexer.WHEN,
+        CRLLexer.QUOTED_STRING,
+        CRLLexer.THEN,
+        CRLLexer.COLON,
+        CRLLexer.DO,
+        CRLLexer.QUOTED_STRING,
+        CRLLexer.DO,
+        CRLLexer.QUOTED_STRING,
+        CRLLexer.DONE,
       ]);
     });
   });
@@ -53,14 +53,14 @@ describe("CPGL Lexer - Basic Tokens", () => {
       const input = '"Test String"';
       const tokens = getTokensFromString(input);
 
-      verifyTokenSequence(tokens, [CPGLLexer.QUOTED_STRING], ['"Test String"']);
+      verifyTokenSequence(tokens, [CRLLexer.QUOTED_STRING], ['"Test String"']);
     });
 
     it("should tokenize string with spaces", () => {
       const input = '"Test String With Spaces"';
       const tokens = getTokensFromString(input);
 
-      verifyTokenSequence(tokens, [CPGLLexer.QUOTED_STRING], ['"Test String With Spaces"']);
+      verifyTokenSequence(tokens, [CRLLexer.QUOTED_STRING], ['"Test String With Spaces"']);
     });
 
     it("should tokenize evidence value as BACKTICK_STRING", () => {
@@ -69,7 +69,7 @@ describe("CPGL Lexer - Basic Tokens", () => {
 
       verifyTokenSequence(
         tokens,
-        [CPGLLexer.EVIDENCE, CPGLLexer.IS, CPGLLexer.BACKTICK_STRING],
+        [CRLLexer.EVIDENCE, CRLLexer.IS, CRLLexer.BACKTICK_STRING],
         ["evidence", "is", "`some provenance`"],
       );
     });
@@ -80,7 +80,7 @@ describe("CPGL Lexer - Basic Tokens", () => {
 
       verifyTokenSequence(
         tokens,
-        [CPGLLexer.EVIDENCE, CPGLLexer.IS, CPGLLexer.BACKTICK_STRING],
+        [CRLLexer.EVIDENCE, CRLLexer.IS, CRLLexer.BACKTICK_STRING],
         ["evidence", "is", "`some\\provenance`"],
       );
     });
@@ -91,14 +91,14 @@ describe("CPGL Lexer - Basic Tokens", () => {
       const input = "and";
       const tokens = getTokensFromString(input);
 
-      verifyTokenSequence(tokens, [CPGLLexer.AND], ["and"]);
+      verifyTokenSequence(tokens, [CRLLexer.AND], ["and"]);
     });
 
     it("should tokenize OR operator", () => {
       const input = "or";
       const tokens = getTokensFromString(input);
 
-      verifyTokenSequence(tokens, [CPGLLexer.OR], ["or"]);
+      verifyTokenSequence(tokens, [CRLLexer.OR], ["or"]);
     });
   });
 
@@ -107,21 +107,21 @@ describe("CPGL Lexer - Basic Tokens", () => {
       const input = "(";
       const tokens = getTokensFromString(input);
 
-      verifyTokenSequence(tokens, [CPGLLexer.LPAREN], ["("]);
+      verifyTokenSequence(tokens, [CRLLexer.LPAREN], ["("]);
     });
 
     it("should tokenize closing parenthesis", () => {
       const input = ")";
       const tokens = getTokensFromString(input);
 
-      verifyTokenSequence(tokens, [CPGLLexer.RPAREN], [")"]);
+      verifyTokenSequence(tokens, [CRLLexer.RPAREN], [")"]);
     });
 
     it("should tokenize parenthesized expression", () => {
       const input = '("Test")';
       const tokens = getTokensFromString(input);
 
-      verifyTokenSequence(tokens, [CPGLLexer.LPAREN, CPGLLexer.QUOTED_STRING, CPGLLexer.RPAREN]);
+      verifyTokenSequence(tokens, [CRLLexer.LPAREN, CRLLexer.QUOTED_STRING, CRLLexer.RPAREN]);
     });
   });
 
@@ -132,7 +132,7 @@ describe("CPGL Lexer - Basic Tokens", () => {
 
       verifyTokenSequence(
         tokens,
-        [CPGLLexer.PERFORM, CPGLLexer.ACTIVITY_TYPE],
+        [CRLLexer.PERFORM, CRLLexer.ACTIVITY_TYPE],
         ["perform", "CPGImmunizationRequest"],
       );
     });
@@ -143,7 +143,7 @@ describe("CPGL Lexer - Basic Tokens", () => {
 
       verifyTokenSequence(
         tokens,
-        [CPGLLexer.PERFORM, CPGLLexer.ACTIVITY_TYPE],
+        [CRLLexer.PERFORM, CRLLexer.ACTIVITY_TYPE],
         ["perform", "CPGProposeDiagnosis"],
       );
     });
@@ -155,12 +155,12 @@ describe("CPGL Lexer - Basic Tokens", () => {
       verifyTokenSequence(
         tokens,
         [
-          CPGLLexer.PERFORM,
-          CPGLLexer.ACTIVITY_TYPE,
-          CPGLLexer.PERFORM,
-          CPGLLexer.ACTIVITY_TYPE,
-          CPGLLexer.PERFORM,
-          CPGLLexer.ACTIVITY_TYPE,
+          CRLLexer.PERFORM,
+          CRLLexer.ACTIVITY_TYPE,
+          CRLLexer.PERFORM,
+          CRLLexer.ACTIVITY_TYPE,
+          CRLLexer.PERFORM,
+          CRLLexer.ACTIVITY_TYPE,
         ],
         ["perform", "CPGMedicationRequest", "perform", "CPGServiceRequest", "perform", "CPGStop"],
       );
@@ -174,12 +174,12 @@ describe("CPGL Lexer - Basic Tokens", () => {
       verifyTokenSequence(
         tokens,
         [
-          CPGLLexer.PERFORM,
-          CPGLLexer.ACTIVITY_TYPE,
-          CPGLLexer.PERFORM,
-          CPGLLexer.ACTIVITY_TYPE,
-          CPGLLexer.PERFORM,
-          CPGLLexer.ACTIVITY_TYPE,
+          CRLLexer.PERFORM,
+          CRLLexer.ACTIVITY_TYPE,
+          CRLLexer.PERFORM,
+          CRLLexer.ACTIVITY_TYPE,
+          CRLLexer.PERFORM,
+          CRLLexer.ACTIVITY_TYPE,
         ],
         [
           "perform",
@@ -200,12 +200,12 @@ describe("CPGL Lexer - Basic Tokens", () => {
       verifyTokenSequence(
         tokens,
         [
-          CPGLLexer.PERFORM,
-          CPGLLexer.ACTIVITY_TYPE,
-          CPGLLexer.PERFORM,
-          CPGLLexer.ACTIVITY_TYPE,
-          CPGLLexer.PERFORM,
-          CPGLLexer.ACTIVITY_TYPE,
+          CRLLexer.PERFORM,
+          CRLLexer.ACTIVITY_TYPE,
+          CRLLexer.PERFORM,
+          CRLLexer.ACTIVITY_TYPE,
+          CRLLexer.PERFORM,
+          CRLLexer.ACTIVITY_TYPE,
         ],
         [
           "perform",
@@ -226,14 +226,14 @@ describe("CPGL Lexer - Basic Tokens", () => {
       verifyTokenSequence(
         tokens,
         [
-          CPGLLexer.PERFORM,
-          CPGLLexer.ACTIVITY_TYPE,
-          CPGLLexer.PERFORM,
-          CPGLLexer.ACTIVITY_TYPE,
-          CPGLLexer.PERFORM,
-          CPGLLexer.ACTIVITY_TYPE,
-          CPGLLexer.PERFORM,
-          CPGLLexer.ACTIVITY_TYPE,
+          CRLLexer.PERFORM,
+          CRLLexer.ACTIVITY_TYPE,
+          CRLLexer.PERFORM,
+          CRLLexer.ACTIVITY_TYPE,
+          CRLLexer.PERFORM,
+          CRLLexer.ACTIVITY_TYPE,
+          CRLLexer.PERFORM,
+          CRLLexer.ACTIVITY_TYPE,
         ],
         [
           "perform",
@@ -254,7 +254,7 @@ describe("CPGL Lexer - Basic Tokens", () => {
 
       verifyTokenSequence(
         tokens,
-        [CPGLLexer.PERFORM, CPGLLexer.ACTIVITY_TYPE, CPGLLexer.PERFORM, CPGLLexer.ACTIVITY_TYPE],
+        [CRLLexer.PERFORM, CRLLexer.ACTIVITY_TYPE, CRLLexer.PERFORM, CRLLexer.ACTIVITY_TYPE],
         ["perform", "CPGReportFlag", "perform", "CPGResume"],
       );
     });
@@ -274,7 +274,7 @@ describe("CPGL Lexer - Basic Tokens", () => {
 
       verifyTokenSequence(
         tokens,
-        [CPGLLexer.TYPE, CPGLLexer.IS, CPGLLexer.CONCEPT_TYPE],
+        [CRLLexer.TYPE, CRLLexer.IS, CRLLexer.CONCEPT_TYPE],
         ["type", "is", "Observation"],
       );
     });
@@ -285,7 +285,7 @@ describe("CPGL Lexer - Basic Tokens", () => {
 
       verifyTokenSequence(
         tokens,
-        [CPGLLexer.TYPE, CPGLLexer.IS, CPGLLexer.CONCEPT_TYPE],
+        [CRLLexer.TYPE, CRLLexer.IS, CRLLexer.CONCEPT_TYPE],
         ["type", "is", "Condition"],
       );
     });
@@ -298,18 +298,18 @@ describe("CPGL Lexer - Basic Tokens", () => {
       verifyTokenSequence(
         tokens,
         [
-          CPGLLexer.TYPE,
-          CPGLLexer.IS,
-          CPGLLexer.CONCEPT_TYPE,
-          CPGLLexer.TYPE,
-          CPGLLexer.IS,
-          CPGLLexer.CONCEPT_TYPE,
-          CPGLLexer.TYPE,
-          CPGLLexer.IS,
-          CPGLLexer.CONCEPT_TYPE,
-          CPGLLexer.TYPE,
-          CPGLLexer.IS,
-          CPGLLexer.CONCEPT_TYPE,
+          CRLLexer.TYPE,
+          CRLLexer.IS,
+          CRLLexer.CONCEPT_TYPE,
+          CRLLexer.TYPE,
+          CRLLexer.IS,
+          CRLLexer.CONCEPT_TYPE,
+          CRLLexer.TYPE,
+          CRLLexer.IS,
+          CRLLexer.CONCEPT_TYPE,
+          CRLLexer.TYPE,
+          CRLLexer.IS,
+          CRLLexer.CONCEPT_TYPE,
         ],
         [
           "type",
@@ -336,18 +336,18 @@ describe("CPGL Lexer - Basic Tokens", () => {
       verifyTokenSequence(
         tokens,
         [
-          CPGLLexer.TYPE,
-          CPGLLexer.IS,
-          CPGLLexer.CONCEPT_TYPE,
-          CPGLLexer.TYPE,
-          CPGLLexer.IS,
-          CPGLLexer.CONCEPT_TYPE,
-          CPGLLexer.TYPE,
-          CPGLLexer.IS,
-          CPGLLexer.CONCEPT_TYPE,
-          CPGLLexer.TYPE,
-          CPGLLexer.IS,
-          CPGLLexer.CONCEPT_TYPE,
+          CRLLexer.TYPE,
+          CRLLexer.IS,
+          CRLLexer.CONCEPT_TYPE,
+          CRLLexer.TYPE,
+          CRLLexer.IS,
+          CRLLexer.CONCEPT_TYPE,
+          CRLLexer.TYPE,
+          CRLLexer.IS,
+          CRLLexer.CONCEPT_TYPE,
+          CRLLexer.TYPE,
+          CRLLexer.IS,
+          CRLLexer.CONCEPT_TYPE,
         ],
         [
           "type",
@@ -374,18 +374,18 @@ describe("CPGL Lexer - Basic Tokens", () => {
       verifyTokenSequence(
         tokens,
         [
-          CPGLLexer.TYPE,
-          CPGLLexer.IS,
-          CPGLLexer.CONCEPT_TYPE,
-          CPGLLexer.TYPE,
-          CPGLLexer.IS,
-          CPGLLexer.CONCEPT_TYPE,
-          CPGLLexer.TYPE,
-          CPGLLexer.IS,
-          CPGLLexer.CONCEPT_TYPE,
-          CPGLLexer.TYPE,
-          CPGLLexer.IS,
-          CPGLLexer.CONCEPT_TYPE,
+          CRLLexer.TYPE,
+          CRLLexer.IS,
+          CRLLexer.CONCEPT_TYPE,
+          CRLLexer.TYPE,
+          CRLLexer.IS,
+          CRLLexer.CONCEPT_TYPE,
+          CRLLexer.TYPE,
+          CRLLexer.IS,
+          CRLLexer.CONCEPT_TYPE,
+          CRLLexer.TYPE,
+          CRLLexer.IS,
+          CRLLexer.CONCEPT_TYPE,
         ],
         [
           "type",
@@ -412,7 +412,7 @@ describe("CPGL Lexer - Basic Tokens", () => {
 
       verifyTokenSequence(
         tokens,
-        [CPGLLexer.VALUETYPE, CPGLLexer.IS, CPGLLexer.CONCEPT_VALUE_TYPE],
+        [CRLLexer.VALUETYPE, CRLLexer.IS, CRLLexer.CONCEPT_VALUE_TYPE],
         ["valuetype", "is", "Quantity"],
       );
     });
@@ -423,7 +423,7 @@ describe("CPGL Lexer - Basic Tokens", () => {
 
       verifyTokenSequence(
         tokens,
-        [CPGLLexer.VALUETYPE, CPGLLexer.IS, CPGLLexer.CONCEPT_VALUE_TYPE],
+        [CRLLexer.VALUETYPE, CRLLexer.IS, CRLLexer.CONCEPT_VALUE_TYPE],
         ["valuetype", "is", "CodeableConcept"],
       );
     });
@@ -435,15 +435,15 @@ describe("CPGL Lexer - Basic Tokens", () => {
       verifyTokenSequence(
         tokens,
         [
-          CPGLLexer.VALUETYPE,
-          CPGLLexer.IS,
-          CPGLLexer.CONCEPT_VALUE_TYPE,
-          CPGLLexer.VALUETYPE,
-          CPGLLexer.IS,
-          CPGLLexer.CONCEPT_VALUE_TYPE,
-          CPGLLexer.VALUETYPE,
-          CPGLLexer.IS,
-          CPGLLexer.CONCEPT_VALUE_TYPE,
+          CRLLexer.VALUETYPE,
+          CRLLexer.IS,
+          CRLLexer.CONCEPT_VALUE_TYPE,
+          CRLLexer.VALUETYPE,
+          CRLLexer.IS,
+          CRLLexer.CONCEPT_VALUE_TYPE,
+          CRLLexer.VALUETYPE,
+          CRLLexer.IS,
+          CRLLexer.CONCEPT_VALUE_TYPE,
         ],
         ["valuetype", "is", "string", "valuetype", "is", "boolean", "valuetype", "is", "integer"],
       );
@@ -456,12 +456,12 @@ describe("CPGL Lexer - Basic Tokens", () => {
       verifyTokenSequence(
         tokens,
         [
-          CPGLLexer.VALUETYPE,
-          CPGLLexer.IS,
-          CPGLLexer.CONCEPT_VALUE_TYPE,
-          CPGLLexer.VALUETYPE,
-          CPGLLexer.IS,
-          CPGLLexer.CONCEPT_VALUE_TYPE,
+          CRLLexer.VALUETYPE,
+          CRLLexer.IS,
+          CRLLexer.CONCEPT_VALUE_TYPE,
+          CRLLexer.VALUETYPE,
+          CRLLexer.IS,
+          CRLLexer.CONCEPT_VALUE_TYPE,
         ],
         ["valuetype", "is", "Range", "valuetype", "is", "Ratio"],
       );
@@ -474,15 +474,15 @@ describe("CPGL Lexer - Basic Tokens", () => {
       verifyTokenSequence(
         tokens,
         [
-          CPGLLexer.VALUETYPE,
-          CPGLLexer.IS,
-          CPGLLexer.CONCEPT_VALUE_TYPE,
-          CPGLLexer.VALUETYPE,
-          CPGLLexer.IS,
-          CPGLLexer.CONCEPT_VALUE_TYPE,
-          CPGLLexer.VALUETYPE,
-          CPGLLexer.IS,
-          CPGLLexer.CONCEPT_VALUE_TYPE,
+          CRLLexer.VALUETYPE,
+          CRLLexer.IS,
+          CRLLexer.CONCEPT_VALUE_TYPE,
+          CRLLexer.VALUETYPE,
+          CRLLexer.IS,
+          CRLLexer.CONCEPT_VALUE_TYPE,
+          CRLLexer.VALUETYPE,
+          CRLLexer.IS,
+          CRLLexer.CONCEPT_VALUE_TYPE,
         ],
         [
           "valuetype",
@@ -505,12 +505,12 @@ describe("CPGL Lexer - Basic Tokens", () => {
       verifyTokenSequence(
         tokens,
         [
-          CPGLLexer.VALUETYPE,
-          CPGLLexer.IS,
-          CPGLLexer.CONCEPT_VALUE_TYPE,
-          CPGLLexer.VALUETYPE,
-          CPGLLexer.IS,
-          CPGLLexer.CONCEPT_VALUE_TYPE,
+          CRLLexer.VALUETYPE,
+          CRLLexer.IS,
+          CRLLexer.CONCEPT_VALUE_TYPE,
+          CRLLexer.VALUETYPE,
+          CRLLexer.IS,
+          CRLLexer.CONCEPT_VALUE_TYPE,
         ],
         ["valuetype", "is", "Period", "valuetype", "is", "Attachment"],
       );
@@ -523,10 +523,10 @@ describe("CPGL Lexer - Basic Tokens", () => {
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(tokens, [
-        CPGLLexer.ACTIVITY,
-        CPGLLexer.QUOTED_STRING,
-        CPGLLexer.PERFORM,
-        CPGLLexer.ACTIVITY_TYPE,
+        CRLLexer.ACTIVITY,
+        CRLLexer.QUOTED_STRING,
+        CRLLexer.PERFORM,
+        CRLLexer.ACTIVITY_TYPE,
       ]);
     });
 
@@ -535,15 +535,15 @@ describe("CPGL Lexer - Basic Tokens", () => {
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(tokens, [
-        CPGLLexer.CONCEPT,
-        CPGLLexer.QUOTED_STRING,
-        CPGLLexer.COLON,
-        CPGLLexer.TYPE,
-        CPGLLexer.IS,
-        CPGLLexer.CONCEPT_TYPE,
-        CPGLLexer.VALUETYPE,
-        CPGLLexer.IS,
-        CPGLLexer.CONCEPT_VALUE_TYPE,
+        CRLLexer.CONCEPT,
+        CRLLexer.QUOTED_STRING,
+        CRLLexer.COLON,
+        CRLLexer.TYPE,
+        CRLLexer.IS,
+        CRLLexer.CONCEPT_TYPE,
+        CRLLexer.VALUETYPE,
+        CRLLexer.IS,
+        CRLLexer.CONCEPT_VALUE_TYPE,
       ]);
     });
 
@@ -552,10 +552,10 @@ describe("CPGL Lexer - Basic Tokens", () => {
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(tokens, [
-        CPGLLexer.TERMINOLOGY,
-        CPGLLexer.QUOTED_STRING,
-        CPGLLexer.VALUESET,
-        CPGLLexer.QUOTED_STRING,
+        CRLLexer.TERMINOLOGY,
+        CRLLexer.QUOTED_STRING,
+        CRLLexer.VALUESET,
+        CRLLexer.QUOTED_STRING,
       ]);
     });
 
@@ -566,12 +566,12 @@ describe("CPGL Lexer - Basic Tokens", () => {
       verifyTokenSequence(
         tokens,
         [
-          CPGLLexer.EVIDENCE,
-          CPGLLexer.IS,
-          CPGLLexer.BACKTICK_STRING,
-          CPGLLexer.INFERRED,
-          CPGLLexer.FROM,
-          CPGLLexer.BACKTICK_STRING,
+          CRLLexer.EVIDENCE,
+          CRLLexer.IS,
+          CRLLexer.BACKTICK_STRING,
+          CRLLexer.INFERRED,
+          CRLLexer.FROM,
+          CRLLexer.BACKTICK_STRING,
         ],
         ["evidence", "is", "`source`", "inferred", "from", "`logic`"],
       );
@@ -583,7 +583,7 @@ describe("CPGL Lexer - Basic Tokens", () => {
 
       verifyTokenSequence(
         tokens,
-        [CPGLLexer.CODED, CPGLLexer.FROM, CPGLLexer.BACKTICK_STRING],
+        [CRLLexer.CODED, CRLLexer.FROM, CRLLexer.BACKTICK_STRING],
         ["coded", "from", "`Test`"],
       );
     });
@@ -593,10 +593,10 @@ describe("CPGL Lexer - Basic Tokens", () => {
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(tokens, [
-        CPGLLexer.SYSTEM,
-        CPGLLexer.QUOTED_STRING,
-        CPGLLexer.CODE,
-        CPGLLexer.QUOTED_STRING,
+        CRLLexer.SYSTEM,
+        CRLLexer.QUOTED_STRING,
+        CRLLexer.CODE,
+        CRLLexer.QUOTED_STRING,
       ]);
     });
 
@@ -604,7 +604,7 @@ describe("CPGL Lexer - Basic Tokens", () => {
       const input = ".";
       const tokens = getTokensFromString(input);
 
-      verifyTokenSequence(tokens, [CPGLLexer.DOT], ["."]);
+      verifyTokenSequence(tokens, [CRLLexer.DOT], ["."]);
     });
   });
 
@@ -613,42 +613,42 @@ describe("CPGL Lexer - Basic Tokens", () => {
       const input = '// This is a comment\ndecision "Test"';
       const tokens = getTokensFromString(input);
 
-      verifyTokenSequence(tokens, [CPGLLexer.DECISION, CPGLLexer.QUOTED_STRING]);
+      verifyTokenSequence(tokens, [CRLLexer.DECISION, CRLLexer.QUOTED_STRING]);
     });
 
     it("should skip empty single-line comments", () => {
       const input = '//\ndecision "Test"';
       const tokens = getTokensFromString(input);
 
-      verifyTokenSequence(tokens, [CPGLLexer.DECISION, CPGLLexer.QUOTED_STRING]);
+      verifyTokenSequence(tokens, [CRLLexer.DECISION, CRLLexer.QUOTED_STRING]);
     });
 
     it("should skip single-line comments with special characters", () => {
       const input = '// This is a comment with special chars: /* */ " \' \n\ndecision "Test"';
       const tokens = getTokensFromString(input);
 
-      verifyTokenSequence(tokens, [CPGLLexer.DECISION, CPGLLexer.QUOTED_STRING]);
+      verifyTokenSequence(tokens, [CRLLexer.DECISION, CRLLexer.QUOTED_STRING]);
     });
 
     it("should skip block comments", () => {
       const input = '/* This is a\nblock comment */\ndecision "Test"';
       const tokens = getTokensFromString(input);
 
-      verifyTokenSequence(tokens, [CPGLLexer.DECISION, CPGLLexer.QUOTED_STRING]);
+      verifyTokenSequence(tokens, [CRLLexer.DECISION, CRLLexer.QUOTED_STRING]);
     });
 
     it("should skip empty block comments", () => {
       const input = '/**/\ndecision "Test"';
       const tokens = getTokensFromString(input);
 
-      verifyTokenSequence(tokens, [CPGLLexer.DECISION, CPGLLexer.QUOTED_STRING]);
+      verifyTokenSequence(tokens, [CRLLexer.DECISION, CRLLexer.QUOTED_STRING]);
     });
 
     it("should handle multiple comments in sequence", () => {
       const input = '// First comment\n/* Second comment */\n// Third comment\ndecision "Test"';
       const tokens = getTokensFromString(input);
 
-      verifyTokenSequence(tokens, [CPGLLexer.DECISION, CPGLLexer.QUOTED_STRING]);
+      verifyTokenSequence(tokens, [CRLLexer.DECISION, CRLLexer.QUOTED_STRING]);
     });
 
     it("should handle comments within statements", () => {
@@ -657,11 +657,11 @@ describe("CPGL Lexer - Basic Tokens", () => {
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(tokens, [
-        CPGLLexer.DECISION,
-        CPGLLexer.QUOTED_STRING,
-        CPGLLexer.WHEN,
-        CPGLLexer.QUOTED_STRING,
-        CPGLLexer.THEN,
+        CRLLexer.DECISION,
+        CRLLexer.QUOTED_STRING,
+        CRLLexer.WHEN,
+        CRLLexer.QUOTED_STRING,
+        CRLLexer.THEN,
       ]);
     });
   });

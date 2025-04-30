@@ -4,7 +4,7 @@ import {
   Decision,
   DecisionBody,
   DecisionType,
-  CPGL,
+  CRL,
   Location,
   WhenBlock,
   WhenBlockType,
@@ -22,13 +22,13 @@ export class UnusedDeclarationsValidator {
   private readonly conceptDeclarations: Map<string, UsageInfo> = new Map();
   private readonly activityDeclarations: Map<string, UsageInfo> = new Map();
   private readonly terminologyDeclarations: Map<string, UsageInfo> = new Map();
-  private readonly ast: CPGL | null;
+  private readonly ast: CRL | null;
 
-  constructor(ast?: CPGL) {
+  constructor(ast?: CRL) {
     this.ast = ast || null;
   }
 
-  public validate(ast?: CPGL): ValidationError[] {
+  public validate(ast?: CRL): ValidationError[] {
     this.clear();
     const targetAst = ast || this.ast;
     if (!targetAst) {
@@ -46,7 +46,7 @@ export class UnusedDeclarationsValidator {
     this.terminologyDeclarations.clear();
   }
 
-  private collectDeclarations(ast: CPGL): void {
+  private collectDeclarations(ast: CRL): void {
     for (const statement of ast.statements) {
       switch (statement.type) {
         case DecisionType.type:
@@ -77,7 +77,7 @@ export class UnusedDeclarationsValidator {
     }
   }
 
-  private processDeclarations(ast: CPGL): void {
+  private processDeclarations(ast: CRL): void {
     for (const statement of ast.statements) {
       switch (statement.type) {
         case DecisionType.type:

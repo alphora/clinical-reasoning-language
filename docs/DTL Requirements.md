@@ -1,28 +1,28 @@
 # Domain Specific Language Requirements
 
-We have a domain specific language called Decision Tree Language (CPGL).
+We have a domain specific language called Decision Tree Language (CRL).
 
 The primary purpose of the language is to represent a FHIR PlanDefinition as a Decision Tree or Decision Graph using the Clinical Practice Guideline Implementation Guide (CPG IG).
 
 ## Goal
 
-- assess whether there are gaps in the current CPGL
-- assess whether there are improvements that could be made in the current CPGL
-- create a Antlr grammar for the finalized CPGL
+- assess whether there are gaps in the current CRL
+- assess whether there are improvements that could be made in the current CRL
+- create a Antlr grammar for the finalized CRL
 
 ## Description
 
-The current language implementation includes a set of statements that describe the language to a AI assistant.  These need to be included in achieving the goal. To that end, the statements are included delimited between the "CPGL Grammar Statements" tags.
+The current language implementation includes a set of statements that describe the language to a AI assistant.  These need to be included in achieving the goal. To that end, the statements are included delimited between the "CRL Grammar Statements" tags.
 
-There is a subset of the CPG IG definitions that we are targeting with the language.  These need to be included in achieving the goal.  To that end, the applicable CPG IG specs are found at  [Applicable CPG IG Specs](#cpgl-grammar-statements).
+There is a subset of the CPG IG definitions that we are targeting with the language.  These need to be included in achieving the goal.  To that end, the applicable CPG IG specs are found at  [Applicable CPG IG Specs](#crl-grammar-statements).
 
 ## Considerations
 
-There is an associated language, Case Feature Language (CFL), that is referenced by keywords in CPGL, but at this maturity of the language those references are not validated.
+There is an associated language, Case Feature Language (CFL), that is referenced by keywords in CRL, but at this maturity of the language those references are not validated.
 
 ## Elements
 
-The elements of CPGL are:
+The elements of CRL are:
 
 - root node
 
@@ -34,7 +34,7 @@ The elements of CPGL are:
 
 ## PlanDefinition Mappings
 
-The following elements of FHIR PlanDefinition map to the described (Description) conceptual features of the CPGL language:
+The following elements of FHIR PlanDefinition map to the described (Description) conceptual features of the CRL language:
 
 - id
     Description: unique id
@@ -79,24 +79,24 @@ action.timing
 
 action.selectionBehavior
 
-## CPGL Grammar Statements
+## CRL Grammar Statements
 
-The following is a description of a Decision Tree Language (CPGL) tree. A CPGL tree will take the following form:
+The following is a description of a Decision Tree Language (CRL) tree. A CRL tree will take the following form:
 
-``` cpgl
+``` crl
 IF <concept block> THEN
-    <action block OR CPGL tree>
+    <action block OR CRL tree>
 ELSE IF <concept block> THEN
-    <action block OR CPGL tree>
+    <action block OR CRL tree>
 ELSE
-    <action block OR CPGL tree>
+    <action block OR CRL tree>
 ```
 
 There can be one or more ELSE IF sections, and the ELSE section is optional.
 
 A concept block is a logical expression using logical operators AND, OR, and NOT involving concept objects of the following form:
 
-``` cpgl
+``` crl
 CONCEPT{
     "description": "Example description",
     "expression": "Summary of concept"
@@ -105,7 +105,7 @@ CONCEPT{
 
 An action block is a logical expression using logical operators AND, OR, and NOT involving action objects of the following form:
 
-``` cpgl
+``` crl
 ACTION{
     "description": "Example description",
     "expression": "Summary of action"
@@ -114,7 +114,7 @@ ACTION{
 
 Additionally, logical expressions can specify that a multiplicity of a sequence of OR-separated inputs be true. This can be specified via the following syntax:
 
-``` cpgl
+``` crl
 SELECT[>=2](A OR B OR C)
 ```
 
@@ -122,13 +122,13 @@ The above example returns true if and only if at least 2 of A, B, or C are true.
 
 To specify that exactly 2 should be true:
 
-``` cpgl
+``` crl
 SELECT[2](A OR B OR C)
 ```
 
 Strict inequality is also allowed. For example,
 
-``` cpgl
+``` crl
 SELECT[<2](A OR B OR C)
 ```
 
@@ -136,7 +136,7 @@ returns true if and only if less than 2 of A, B, or C are true.
 
 The SELECT keyword can also be used to specify that none of a sequence of OR-separated inputs be true. This can be specified via the following syntax:
 
-``` cpgl
+``` crl
 SELECT[NONE](A OR B OR C)
 ```
 
@@ -144,12 +144,12 @@ The above example returns true if and only if none of A, B, or C are true.
 
 The SELECT keyword can also be used to specify that all of a sequence of AND-separated inputs be true. This can be specified via the following syntax:
 
-``` cpgl
+``` crl
 SELECT[ALL](A AND B AND C)
 ```
 
 The above example returns true if and only if all of A, B, and C are true.
 
-A CPGL tree can also just be an action block if there are no concepts.
+A CRL tree can also just be an action block if there are no concepts.
 
-A CPGL is not allowed to have any comments.
+A CRL is not allowed to have any comments.

@@ -1,11 +1,11 @@
-# CPGL Activity Mapping: Additional Requirements
+# CRL Activity Mapping: Additional Requirements
 
 ## 1. Requirements
 
 ### A. Conditional "do not" for Activity
 **Rule:**  
 Apply to `ActivityMapping`.
-- If the FSH `ActivityDefinition` has `doNotPerform = true`, the CPGL `activity` block should use the `do not perform` syntax instead of `perform`.
+- If the FSH `ActivityDefinition` has `doNotPerform = true`, the CRL `activity` block should use the `do not perform` syntax instead of `perform`.
 
 ### B. Conditional Terminology Block for Activity
 **Rule:**  
@@ -13,7 +13,7 @@ Apply to `ActivityMapping`.
 - Only emit a `terminology` block **if** the activity has a code (i.e., `activitydef-code.exists()`).
 - The `terminology` block must be **unique by identifier** (with suffixing if needed, as previously described).
 
-## 2. FSH Terms and Functions (from FSH-CPGL-Mapping.md)
+## 2. FSH Terms and Functions (from FSH-CRL-Mapping.md)
 
 ### A. `activity_def-donotperform`
 **Term:**  
@@ -42,15 +42,15 @@ Boolean property in the FSH `ActivityDefinition`.
   Extracts the display string from a FSH code string  
   _(e.g., `$ICD11#XM28X5 "Measles vaccines"` → `"Measles vaccines"`)_
 
-## 3. CPGL Output Requirements
+## 3. CRL Output Requirements
 
 ### A. Activity Block
 - If `doNotPerform = true`, emit:
-  ```cpgl
+  ```crl
   activity "..." do not perform ...
   ```
 - Otherwise, emit:
-  ```cpgl
+  ```crl
   activity "..." perform ...
   ```
 
@@ -65,7 +65,7 @@ Boolean property in the FSH `ActivityDefinition`.
 
 ## 5. Summary Table
 
-| FSH Property/Rule          | CPGL Output           | Function/Transformation                        |
+| FSH Property/Rule          | CRL Output           | Function/Transformation                        |
 |---------------------------|------------------------|----------------------------------------|
 | doNotPerform = true       | do not perform         | Boolean check                          |
 | doNotPerform = false      | perform                | Default                                 |

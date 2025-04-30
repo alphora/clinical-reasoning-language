@@ -1,5 +1,5 @@
 import { ParseTree } from "antlr4ts/tree/ParseTree";
-import { CPGL } from "./ast/types";
+import { CRL } from "./ast/types";
 export interface Token {
     line: number;
     column: number;
@@ -11,7 +11,7 @@ export interface ParseResult<T> {
     result?: T;
     errors?: string[];
 }
-export declare function tokenizeCPGL(input: string): ParseResult<Token[]>;
-export declare function parseCPGL(input: string): ParseResult<ParseTree>;
-export declare function buildCPGL(input: string): ParseResult<CPGL>;
-export declare function validateCPGL(input: string): ParseResult<CPGL>;
+export declare function tokenizeCRL(input: string): ParseResult<Token[]>;
+export declare function parseCRL(input: string): ParseResult<ParseTree>;
+export declare function buildCRL(input: string): ParseResult<CRL>;
+export declare function validateCRL(input: string): ParseResult<CRL>;

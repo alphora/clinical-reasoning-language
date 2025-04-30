@@ -1,1 +1,1 @@
-export { CPGLLexer } from "../grammar/generated/antlr/CPGLLexer";
+export { CRLLexer } from "../grammar/generated/antlr/CRLLexer";

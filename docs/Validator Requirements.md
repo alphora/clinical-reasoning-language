@@ -1,13 +1,13 @@
-# Requirements for CPGL Validator (Single-File Scope)
+# Requirements for CRL Validator (Single-File Scope)
 
-These requirements specify the design and implementation details for a **Typescript-based** validator of a domain-specific language (DSL) called *CPGL (Clinical Practice Guideline Language)*. The validator is intended to operate on an Abstract Syntax Tree (AST) produced by an ANTLR-based lexer and parser. The **lexer**, **parser**, and **AST** generation phases are already implemented.
+These requirements specify the design and implementation details for a **Typescript-based** validator of a domain-specific language (DSL) called *CRL (Clinical Practice Guideline Language)*. The validator is intended to operate on an Abstract Syntax Tree (AST) produced by an ANTLR-based lexer and parser. The **lexer**, **parser**, and **AST** generation phases are already implemented.
 
 ---
 
 ## 1. Background & Objectives
 
 1. **DSL Context**  
-   - The DSL grammar is defined in ANTLR files (`CPGLLexer.g4` and `CPGLParser.g4`) and produces a parse tree.  
+   - The DSL grammar is defined in ANTLR files (`CRLLexer.g4` and `CRLParser.g4`) and produces a parse tree.  
    - An AST is created from that parse tree, representing statements like `decision`, `concept`, `activity`, or `terminology`.
    - The validator processes the AST to enforce **semantic** and **business** rules that the grammar cannot fully address.
 
@@ -131,7 +131,7 @@ While the validator is a single component, conceptually we can separate checks i
 ## 6. Performance & Incremental Validation
 
 1. **Efficient AST Traversal**  
-   - The AST is relatively small (a single CPGL file), but should still be traversed in a single or minimal number of passes.  
+   - The AST is relatively small (a single CRL file), but should still be traversed in a single or minimal number of passes.  
    - Re-using partial computations (e.g., a single pass to build reference graphs for cycle detection) is preferred.
 
 2. **Caching & Incremental** (Optional/Future Enhancement)  
@@ -198,7 +198,7 @@ Each validator component would implement logic specific to its domain, e.g.:
 
 ### 8. Example Validation Flow
 
-Given a CPGL file with duplicated `decision "blah"` and repeated `do "Vaccinate"` in the same block, the validator would:
+Given a CRL file with duplicated `decision "blah"` and repeated `do "Vaccinate"` in the same block, the validator would:
 
 1. **Parse**  
    - The existing ANTLR grammar produces a parse tree, then the AST is built.
@@ -222,7 +222,7 @@ Given a CPGL file with duplicated `decision "blah"` and repeated `do "Vaccinate"
 
 ### 9. Conclusion
 
-These requirements provide a clear outline of what the single-file CPGL validator should check, how it should report errors, and how it should integrate into a larger DSL workflow. Key points include:
+These requirements provide a clear outline of what the single-file CRL validator should check, how it should report errors, and how it should integrate into a larger DSL workflow. Key points include:
 
 - **Leverage** existing lexer/parser to handle grammar-level rules.  
 - **Focus** on semantic and business rules at the AST level (name uniqueness, repeated actions, cycle detection, warnings for unused declarations).  

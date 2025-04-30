@@ -1,6 +1,6 @@
-import { CPGLLexer } from "../grammar/generated/antlr/CPGLLexer";
-import { CPGLLexerErrorListener } from "./CPGLLexerErrorListener";
+import { CRLLexer } from "../grammar/generated/antlr/CRLLexer";
+import { CRLLexerErrorListener } from "./CRLLexerErrorListener";
 export declare function createLexer(input: string): {
-    lexer: CPGLLexer;
-    errorListener: CPGLLexerErrorListener;
+    lexer: CRLLexer;
+    errorListener: CRLLexerErrorListener;
 };

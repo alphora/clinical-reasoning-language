@@ -1,8 +1,8 @@
 /**
- * CPGL Lexer Tests
+ * CRL Lexer Tests
  *
- * These tests verify the lexer's ability to correctly tokenize CPGL input according to the grammar.
- * The tests are organized by category and follow the structure of the CPGL grammar.
+ * These tests verify the lexer's ability to correctly tokenize CRL input according to the grammar.
+ * The tests are organized by category and follow the structure of the CRL grammar.
  *
  * Note: The deep nesting in this file is intentional and follows the grammar's hierarchical structure.
  * We suppress the nesting depth linter warnings (typescript:S2004) because:
@@ -68,9 +68,9 @@
  * 4. Verify token sequence or error handling
  *
  * Relationship to Grammar:
- * These tests verify the lexer's ability to tokenize input according to the CPGL grammar.
+ * These tests verify the lexer's ability to tokenize input according to the CRL grammar.
  * The token types and sequences should match the grammar's requirements for:
- * - CPGL structure
+ * - CRL structure
  * - Statement blocks
  * - Decision blocks
  * - When clauses
@@ -93,11 +93,11 @@
  *
  * 2. Token Stream Structure
  *    - Verify that the token stream structure aligns with grammar rules
- *    - Test proper token ordering for different CPGL constructs
+ *    - Test proper token ordering for different CRL constructs
  *
  * 3. End-to-End Parsing
  *    - Test parsing of complete example files
- *    - Verify successful parsing of complex CPGL structures
+ *    - Verify successful parsing of complex CRL structures
  *
  * Note: These tests should be added after the parser has been updated to work with
  * the new lexer implementation. Testing parser integration now would be premature
@@ -108,7 +108,7 @@
 import { Token } from "antlr4ts";
 
 // Internal imports
-import { CPGLLexer } from "../../grammar/generated/antlr/CPGLLexer";
+import { CRLLexer } from "../../grammar/generated/antlr/CRLLexer";
 
 // Test suite imports
 import "./basic-tokens.test";
@@ -120,7 +120,7 @@ import "./structures.test";
 import "./whitespace.test";
 import "./error-listener.test";
 
-describe("CPGL Lexer Test Suite", () => {
+describe("CRL Lexer Test Suite", () => {
   it("should run all test suites", () => {
     // This test exists to ensure the test runner executes all imported test files
     expect(true).toBe(true);
@@ -130,14 +130,14 @@ describe("CPGL Lexer Test Suite", () => {
 /**
  * Gets all tokens from the lexer, filtering out whitespace and comments
  */
-export function getAllTokens(lexer: CPGLLexer): Token[] {
+export function getAllTokens(lexer: CRLLexer): Token[] {
   const tokens: Token[] = [];
   let token = lexer.nextToken();
   while (token.type !== Token.EOF) {
     if (
-      token.type !== CPGLLexer.WS &&
-      token.type !== CPGLLexer.COMMENT &&
-      token.type !== CPGLLexer.COMMENT_BLOCK
+      token.type !== CRLLexer.WS &&
+      token.type !== CRLLexer.COMMENT &&
+      token.type !== CRLLexer.COMMENT_BLOCK
     ) {
       tokens.push(token);
     }
@@ -168,5 +168,5 @@ export function verifyTokenSequence(
 }
 
 // Export common imports and types
-export { CPGLLexer };
+export { CRLLexer };
 export { Token };

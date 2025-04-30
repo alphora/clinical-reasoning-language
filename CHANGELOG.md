@@ -8,12 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.1.0] - 2024-03-19
 
 ### Added
-- Initial release of the Clinical Practice Guideline Language (CPGL) parser and validator package
+- Initial release of the Clinical Practice Guideline Language (CRL) parser and validator package
 - Core functionality:
-  - Tokenization of CPGL input
-  - Parsing of CPGL input into parse trees
-  - AST building from CPGL input
-  - Validation of CPGL input
+  - Tokenization of CRL input
+  - Parsing of CRL input into parse trees
+  - AST building from CRL input
+  - Validation of CRL input
 - Language support for:
   - Decision blocks
   - Condition clauses
@@ -38,16 +38,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Installation
 ```bash
-npm install github:cqis/cpgl#v0.1.0
+npm install github:cqis/crl#v0.1.0
 ```
 
 ### Usage Examples
 
 #### Tokenization
 ```typescript
-import { tokenizeCPGL } from '@cqis/cpgl';
+import { tokenizeCRL } from '@cqis/crl';
 
-const result = tokenizeCPGL(`
+const result = tokenizeCRL(`
   decision "Test":
     when "Condition" then do "Action".
   done
@@ -56,9 +56,9 @@ const result = tokenizeCPGL(`
 
 #### Parsing
 ```typescript
-import { parseCPGL } from '@cqis/cpgl';
+import { parseCRL } from '@cqis/crl';
 
-const result = parseCPGL(`
+const result = parseCRL(`
   decision "Test":
     when "Condition" then do "Action".
   done
@@ -67,9 +67,9 @@ const result = parseCPGL(`
 
 #### AST Building
 ```typescript
-import { buildCPGL } from '@cqis/cpgl';
+import { buildCRL } from '@cqis/crl';
 
-const result = buildCPGL(`
+const result = buildCRL(`
   decision "Test":
     when "Condition" then do "Action".
   done
@@ -78,9 +78,9 @@ const result = buildCPGL(`
 
 #### Validation
 ```typescript
-import { validateCPGL } from '@cqis/cpgl';
+import { validateCRL } from '@cqis/crl';
 
-const result = validateCPGL(`
+const result = validateCRL(`
   decision "Test":
     when "Condition" then do "Action".
   done
@@ -101,7 +101,7 @@ const result = validateCPGL(`
 ### Changed
 - Refactored builder implementation for better maintainability
 - Renamed `activityType` to `perform` to match grammar
-- Renamed `File` to `CPGL` for consistency
+- Renamed `File` to `CRL` for consistency
 - Moved duplicate detection from builder to validator
 - Improved test organization and coverage
 
@@ -122,7 +122,7 @@ const result = validateCPGL(`
 ### Important Note
 - **Temporary Change**: The validator has been temporarily disabled to allow for refactoring to match the builder implementation. This functionality will be restored in the next release.
 
-[0.2.0]: https://github.com/cqis/cpgl/releases/tag/v0.2.0
+[0.2.0]: https://github.com/cqis/crl/releases/tag/v0.2.0
 
 ## [0.3.0] - 2025-04-17
 
@@ -132,7 +132,7 @@ const result = validateCPGL(`
 ### Known Issues
 - Error tests are currently broken and will be addressed in a future update.
 
-[0.3.0]: https://github.com/cqis/cpgl/releases/tag/v0.3.0
+[0.3.0]: https://github.com/cqis/crl/releases/tag/v0.3.0
 
 ## [0.4.0] - 2024-06-09
 
@@ -157,7 +157,7 @@ const result = validateCPGL(`
 - Bug fixes in lexer grammar
 - Fixed builder tests to align with new type system and grammar-driven types.
 
-[0.4.0]: https://github.com/cqis/cpgl/releases/tag/v0.4.0
+[0.4.0]: https://github.com/cqis/crl/releases/tag/v0.4.0
 
 ## [0.5.0] - 2025-04-19
 
@@ -199,12 +199,12 @@ const result = validateCPGL(`
 ### Known Issues
 - **Pretty mode in AST CLI is currently broken** and will print a warning if used.
 
-[0.5.0]: https://github.com/cqis/cpgl/releases/tag/v0.5.0
+[0.5.0]: https://github.com/cqis/crl/releases/tag/v0.5.0
 
 ## [0.5.1] - 2024-06-10
 
 ### Fixed
-- **Error message handling:** Improved error reporting and error message clarity throughout the lexer, especially in `CPGLLexerErrorListener`.
+- **Error message handling:** Improved error reporting and error message clarity throughout the lexer, especially in `CRLLexerErrorListener`.
 - Fixed bug in how the error listener accesses dynamically generated type files.
 - Fixed build and test issues related to the new location of auto-generated files and dynamic type imports.
 - Ensured all grammar-driven type files (activity, concept, value) are correctly included and referenced in builds and tests.
@@ -216,7 +216,7 @@ const result = validateCPGL(`
 - Hardened error handling for missing or invalid type files, with more actionable error messages.
 - Improved maintainability by moving auto-generated files to a more standard location.
 
-[0.5.1]: https://github.com/cqis/cpgl/releases/tag/v0.5.1
+[0.5.1]: https://github.com/cqis/crl/releases/tag/v0.5.1
 
 ## [0.5.2] - 2025-04-25
 

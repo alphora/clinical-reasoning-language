@@ -1,4 +1,4 @@
-import { CPGLLexer } from "../../grammar/generated/antlr/CPGLLexer";
+import { CRLLexer } from "../../grammar/generated/antlr/CRLLexer";
 
 import { getTokensFromString } from "./helpers";
 import { verifyTokenSequence } from "./index.test";
@@ -9,10 +9,10 @@ describe("Whitespace Handling", () => {
       const input = "decision\nwhen\nthen\ndo";
       const tokens = getTokensFromString(input);
       verifyTokenSequence(tokens, [
-        CPGLLexer.DECISION,
-        CPGLLexer.WHEN,
-        CPGLLexer.THEN,
-        CPGLLexer.DO,
+        CRLLexer.DECISION,
+        CRLLexer.WHEN,
+        CRLLexer.THEN,
+        CRLLexer.DO,
       ]);
     });
 
@@ -20,13 +20,13 @@ describe("Whitespace Handling", () => {
       const input = 'decision "Test Decision"    when "Condition"  then    do "Action"';
       const tokens = getTokensFromString(input);
       verifyTokenSequence(tokens, [
-        CPGLLexer.DECISION,
-        CPGLLexer.QUOTED_STRING,
-        CPGLLexer.WHEN,
-        CPGLLexer.QUOTED_STRING,
-        CPGLLexer.THEN,
-        CPGLLexer.DO,
-        CPGLLexer.QUOTED_STRING,
+        CRLLexer.DECISION,
+        CRLLexer.QUOTED_STRING,
+        CRLLexer.WHEN,
+        CRLLexer.QUOTED_STRING,
+        CRLLexer.THEN,
+        CRLLexer.DO,
+        CRLLexer.QUOTED_STRING,
       ]);
     });
 
@@ -34,10 +34,10 @@ describe("Whitespace Handling", () => {
       const input = 'decision    "Test"  \t  when  \n\n  "Condition"';
       const tokens = getTokensFromString(input);
       verifyTokenSequence(tokens, [
-        CPGLLexer.DECISION,
-        CPGLLexer.QUOTED_STRING,
-        CPGLLexer.WHEN,
-        CPGLLexer.QUOTED_STRING,
+        CRLLexer.DECISION,
+        CRLLexer.QUOTED_STRING,
+        CRLLexer.WHEN,
+        CRLLexer.QUOTED_STRING,
       ]);
     });
 
@@ -45,10 +45,10 @@ describe("Whitespace Handling", () => {
       const input = '\n  \t decision "Test" when "Condition" \n  ';
       const tokens = getTokensFromString(input);
       verifyTokenSequence(tokens, [
-        CPGLLexer.DECISION,
-        CPGLLexer.QUOTED_STRING,
-        CPGLLexer.WHEN,
-        CPGLLexer.QUOTED_STRING,
+        CRLLexer.DECISION,
+        CRLLexer.QUOTED_STRING,
+        CRLLexer.WHEN,
+        CRLLexer.QUOTED_STRING,
       ]);
     });
   });
@@ -58,11 +58,11 @@ describe("Whitespace Handling", () => {
       const input = 'terminology\n  "BMI Valueset"\n\t\tvalueset\n  `bmi valueset`\t.';
       const tokens = getTokensFromString(input);
       verifyTokenSequence(tokens, [
-        CPGLLexer.TERMINOLOGY,
-        CPGLLexer.QUOTED_STRING,
-        CPGLLexer.VALUESET,
-        CPGLLexer.BACKTICK_STRING,
-        CPGLLexer.DOT,
+        CRLLexer.TERMINOLOGY,
+        CRLLexer.QUOTED_STRING,
+        CRLLexer.VALUESET,
+        CRLLexer.BACKTICK_STRING,
+        CRLLexer.DOT,
       ]);
     });
 
@@ -70,13 +70,13 @@ describe("Whitespace Handling", () => {
       const input = 'terminology\n"term"\n  system\t`sys`\n  code\t`123`\t.';
       const tokens = getTokensFromString(input);
       verifyTokenSequence(tokens, [
-        CPGLLexer.TERMINOLOGY,
-        CPGLLexer.QUOTED_STRING,
-        CPGLLexer.SYSTEM,
-        CPGLLexer.BACKTICK_STRING,
-        CPGLLexer.CODE,
-        CPGLLexer.BACKTICK_STRING,
-        CPGLLexer.DOT,
+        CRLLexer.TERMINOLOGY,
+        CRLLexer.QUOTED_STRING,
+        CRLLexer.SYSTEM,
+        CRLLexer.BACKTICK_STRING,
+        CRLLexer.CODE,
+        CRLLexer.BACKTICK_STRING,
+        CRLLexer.DOT,
       ]);
     });
   });
@@ -86,11 +86,11 @@ describe("Whitespace Handling", () => {
       const input = 'activity\n  "Vaccinate"\n\t\tperform\n  CPGImmunizationRequest\t.';
       const tokens = getTokensFromString(input);
       verifyTokenSequence(tokens, [
-        CPGLLexer.ACTIVITY,
-        CPGLLexer.QUOTED_STRING,
-        CPGLLexer.PERFORM,
-        CPGLLexer.ACTIVITY_TYPE,
-        CPGLLexer.DOT,
+        CRLLexer.ACTIVITY,
+        CRLLexer.QUOTED_STRING,
+        CRLLexer.PERFORM,
+        CRLLexer.ACTIVITY_TYPE,
+        CRLLexer.DOT,
       ]);
     });
 
@@ -98,13 +98,13 @@ describe("Whitespace Handling", () => {
       const input = 'activity\n"Action"\n  perform\tCPGProposeDiagnosis\n  with\t"diagnosis"\t.';
       const tokens = getTokensFromString(input);
       verifyTokenSequence(tokens, [
-        CPGLLexer.ACTIVITY,
-        CPGLLexer.QUOTED_STRING,
-        CPGLLexer.PERFORM,
-        CPGLLexer.ACTIVITY_TYPE,
-        CPGLLexer.WITH,
-        CPGLLexer.QUOTED_STRING,
-        CPGLLexer.DOT,
+        CRLLexer.ACTIVITY,
+        CRLLexer.QUOTED_STRING,
+        CRLLexer.PERFORM,
+        CRLLexer.ACTIVITY_TYPE,
+        CRLLexer.WITH,
+        CRLLexer.QUOTED_STRING,
+        CRLLexer.DOT,
       ]);
     });
   });
@@ -114,13 +114,13 @@ describe("Whitespace Handling", () => {
       const input = 'concept\n"BMI"\n  :\n    type\tis\n  Observation\t.';
       const tokens = getTokensFromString(input);
       verifyTokenSequence(tokens, [
-        CPGLLexer.CONCEPT,
-        CPGLLexer.QUOTED_STRING,
-        CPGLLexer.COLON,
-        CPGLLexer.TYPE,
-        CPGLLexer.IS,
-        CPGLLexer.CONCEPT_TYPE,
-        CPGLLexer.DOT,
+        CRLLexer.CONCEPT,
+        CRLLexer.QUOTED_STRING,
+        CRLLexer.COLON,
+        CRLLexer.TYPE,
+        CRLLexer.IS,
+        CRLLexer.CONCEPT_TYPE,
+        CRLLexer.DOT,
       ]);
     });
 
@@ -128,10 +128,10 @@ describe("Whitespace Handling", () => {
       const input = "valuetype\n  is\t\tQuantity\n.";
       const tokens = getTokensFromString(input);
       verifyTokenSequence(tokens, [
-        CPGLLexer.VALUETYPE,
-        CPGLLexer.IS,
-        CPGLLexer.CONCEPT_VALUE_TYPE,
-        CPGLLexer.DOT,
+        CRLLexer.VALUETYPE,
+        CRLLexer.IS,
+        CRLLexer.CONCEPT_VALUE_TYPE,
+        CRLLexer.DOT,
       ]);
     });
 
@@ -140,16 +140,16 @@ describe("Whitespace Handling", () => {
         'inferred\n  from\t(\n"Condition 1"\n  and\t"Condition 2"\n  or\t"Condition 3"\n)\t.';
       const tokens = getTokensFromString(input);
       verifyTokenSequence(tokens, [
-        CPGLLexer.INFERRED,
-        CPGLLexer.FROM,
-        CPGLLexer.LPAREN,
-        CPGLLexer.QUOTED_STRING,
-        CPGLLexer.AND,
-        CPGLLexer.QUOTED_STRING,
-        CPGLLexer.OR,
-        CPGLLexer.QUOTED_STRING,
-        CPGLLexer.RPAREN,
-        CPGLLexer.DOT,
+        CRLLexer.INFERRED,
+        CRLLexer.FROM,
+        CRLLexer.LPAREN,
+        CRLLexer.QUOTED_STRING,
+        CRLLexer.AND,
+        CRLLexer.QUOTED_STRING,
+        CRLLexer.OR,
+        CRLLexer.QUOTED_STRING,
+        CRLLexer.RPAREN,
+        CRLLexer.DOT,
       ]);
     });
   });
@@ -159,19 +159,19 @@ describe("Whitespace Handling", () => {
       const input = `decision\n  "Test"\n:\n  when\n    "Level 1"\n  then\n    when\n      "Level 2"\n    then\n      do\n        "Action"\n    .\ndone`;
       const tokens = getTokensFromString(input);
       verifyTokenSequence(tokens, [
-        CPGLLexer.DECISION,
-        CPGLLexer.QUOTED_STRING,
-        CPGLLexer.COLON,
-        CPGLLexer.WHEN,
-        CPGLLexer.QUOTED_STRING,
-        CPGLLexer.THEN,
-        CPGLLexer.WHEN,
-        CPGLLexer.QUOTED_STRING,
-        CPGLLexer.THEN,
-        CPGLLexer.DO,
-        CPGLLexer.QUOTED_STRING,
-        CPGLLexer.DOT,
-        CPGLLexer.DONE,
+        CRLLexer.DECISION,
+        CRLLexer.QUOTED_STRING,
+        CRLLexer.COLON,
+        CRLLexer.WHEN,
+        CRLLexer.QUOTED_STRING,
+        CRLLexer.THEN,
+        CRLLexer.WHEN,
+        CRLLexer.QUOTED_STRING,
+        CRLLexer.THEN,
+        CRLLexer.DO,
+        CRLLexer.QUOTED_STRING,
+        CRLLexer.DOT,
+        CRLLexer.DONE,
       ]);
     });
 
@@ -180,20 +180,20 @@ describe("Whitespace Handling", () => {
         'when\n  "Condition"\nthen\n  :\n    any\n      :\n        do\n          "Action 1"\n        .\n        do\n          "Action 2"\n        .\n    done\ndone';
       const tokens = getTokensFromString(input);
       verifyTokenSequence(tokens, [
-        CPGLLexer.WHEN,
-        CPGLLexer.QUOTED_STRING,
-        CPGLLexer.THEN,
-        CPGLLexer.COLON,
-        CPGLLexer.ANY,
-        CPGLLexer.COLON,
-        CPGLLexer.DO,
-        CPGLLexer.QUOTED_STRING,
-        CPGLLexer.DOT,
-        CPGLLexer.DO,
-        CPGLLexer.QUOTED_STRING,
-        CPGLLexer.DOT,
-        CPGLLexer.DONE,
-        CPGLLexer.DONE,
+        CRLLexer.WHEN,
+        CRLLexer.QUOTED_STRING,
+        CRLLexer.THEN,
+        CRLLexer.COLON,
+        CRLLexer.ANY,
+        CRLLexer.COLON,
+        CRLLexer.DO,
+        CRLLexer.QUOTED_STRING,
+        CRLLexer.DOT,
+        CRLLexer.DO,
+        CRLLexer.QUOTED_STRING,
+        CRLLexer.DOT,
+        CRLLexer.DONE,
+        CRLLexer.DONE,
       ]);
     });
   });

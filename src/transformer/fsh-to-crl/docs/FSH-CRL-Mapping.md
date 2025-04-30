@@ -279,7 +279,7 @@ ForExample:
 
 given:
 
-```cpgl
+```crl
 concept "Measles Routine Immunization":
     has type Observation.
     has valuetype boolean.
@@ -299,7 +299,7 @@ and:
 
 then the resulting CPG-L is:
 
-```cpgl
+```crl
 concept "Measles Routine Immunization":
     has type Observation.
     has valuetype boolean.

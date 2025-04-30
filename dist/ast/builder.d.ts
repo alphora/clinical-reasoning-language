@@ -1,14 +1,14 @@
 import { AbstractParseTreeVisitor } from "antlr4ts/tree/AbstractParseTreeVisitor";
-import { CpglContext, DecisionStatementContext, DecisionBodyContext, WhenWithBodyContext, WhenSingleActionContext, NestedWhenBlockContext, BlockActionContext, BlockBodyContext, SingleActionStatementContext, DoStatementContext, UseStatementContext, TerminologyStatementContext, TerminologyValuesetContext, TerminologySystemCodeContext, ActivityStatementContext, ConceptStatementContext, InferredFromLineContext, DefinitionConceptContext, DefinitionLogicContext, InferredFromExpressionContext, InformalOrContext, InformalAndContext, InformalNotContext, ConceptAtomContext, GroupExpressionContext } from "../grammar/generated/antlr/CPGLParser";
-import { CPGLParserVisitor } from "../grammar/generated/antlr/CPGLParserVisitor";
-import { ASTNode, CPGL, Decision, DecisionBody, WhenBlock, BlockBody, SingleAction, ActionStatement, DoActivity, UseDecision, Terminology, TerminologyValueset, TerminologySystemCode, Activity, Concept, InferredFromDefinition, ConceptReference, InformalAnd, InformalOr, NotExpression, GroupExpression, InferredFromConcept, InferredFromExpression, Location } from "./types";
+import { CrlContext, DecisionStatementContext, DecisionBodyContext, WhenWithBodyContext, WhenSingleActionContext, NestedWhenBlockContext, BlockActionContext, BlockBodyContext, SingleActionStatementContext, DoStatementContext, UseStatementContext, TerminologyStatementContext, TerminologyValuesetContext, TerminologySystemCodeContext, ActivityStatementContext, ConceptStatementContext, InferredFromLineContext, DefinitionConceptContext, DefinitionLogicContext, InferredFromExpressionContext, InformalOrContext, InformalAndContext, InformalNotContext, ConceptAtomContext, GroupExpressionContext } from "../grammar/generated/antlr/CRLParser";
+import { CRLParserVisitor } from "../grammar/generated/antlr/CRLParserVisitor";
+import { ASTNode, CRL, Decision, DecisionBody, WhenBlock, BlockBody, SingleAction, ActionStatement, DoActivity, UseDecision, Terminology, TerminologyValueset, TerminologySystemCode, Activity, Concept, InferredFromDefinition, ConceptReference, InformalAnd, InformalOr, NotExpression, GroupExpression, InferredFromConcept, InferredFromExpression, Location } from "./types";
 type InformalNode = GroupExpression | ConceptReference | InformalAnd | NotExpression | InformalOr;
-export declare class CPGLAstBuilder extends AbstractParseTreeVisitor<ASTNode> implements CPGLParserVisitor<ASTNode> {
+export declare class CRLAstBuilder extends AbstractParseTreeVisitor<ASTNode> implements CRLParserVisitor<ASTNode> {
     private readonly errors;
     protected reportError(type: string, message: string, location?: Location, details?: unknown): void;
     getErrors(): string[];
     protected defaultResult(): ASTNode;
-    visitCpgl(ctx: CpglContext): CPGL;
+    visitCrl(ctx: CrlContext): CRL;
     visitDecisionStatement(ctx: DecisionStatementContext): Decision;
     visitDecisionBody(ctx: DecisionBodyContext): DecisionBody;
     visitWhenWithBody(ctx: WhenWithBodyContext): WhenBlock;
@@ -17,7 +17,7 @@ export declare class CPGLAstBuilder extends AbstractParseTreeVisitor<ASTNode> im
     visitBlockAction(ctx: BlockActionContext): ActionStatement;
     visitBlockBody(ctx: BlockBodyContext): BlockBody;
     visitSingleActionStatement(ctx: SingleActionStatementContext): SingleAction;
-    visitActionStatement(ctx: import("../grammar/generated/antlr/CPGLParser").ActionStatementContext): ActionStatement;
+    visitActionStatement(ctx: import("../grammar/generated/antlr/CRLParser").ActionStatementContext): ActionStatement;
     visitDoStatement(ctx: DoStatementContext): DoActivity;
     visitUseStatement(ctx: UseStatementContext): UseDecision;
     visitTerminologyStatement(ctx: TerminologyStatementContext): Terminology;

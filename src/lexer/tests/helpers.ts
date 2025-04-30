@@ -1,7 +1,7 @@
 import { Token } from "antlr4ts";
 
-import { CPGLLexer } from "../../grammar/generated/antlr/CPGLLexer";
-import { CPGLLexerErrorListener } from "../CPGLLexerErrorListener";
+import { CRLLexer } from "../../grammar/generated/antlr/CRLLexer";
+import { CRLLexerErrorListener } from "../CRLLexerErrorListener";
 import { createLexer } from "../createLexer";
 
 import { getAllTokens } from "./lexer-test-utils";
@@ -11,11 +11,11 @@ export function getTokensFromString(input: string): Token[];
 export function getTokensFromString(
   input: string,
   opts: { withListener: true },
-): { tokens: Token[]; errorListener: CPGLLexerErrorListener; lexer: CPGLLexer };
+): { tokens: Token[]; errorListener: CRLLexerErrorListener; lexer: CRLLexer };
 export function getTokensFromString(
   input: string,
   opts?: { withListener?: boolean },
-): Token[] | { tokens: Token[]; errorListener: CPGLLexerErrorListener; lexer: CPGLLexer } {
+): Token[] | { tokens: Token[]; errorListener: CRLLexerErrorListener; lexer: CRLLexer } {
   const { lexer, errorListener } = createLexer(input);
   const tokens = getAllTokens(lexer);
   if (opts?.withListener) {

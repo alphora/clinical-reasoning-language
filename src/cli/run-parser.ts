@@ -6,7 +6,7 @@ import { createParser } from "../parser/createParser";
 // Read the example file
 const examplePath = join(
   __dirname,
-  "../examples/cpgl/who/smart-example-immz/IMMZ_All_Decisions.cpg",
+  "../examples/crl/who/smart-example-immz/IMMZ_All_Decisions.cpg",
 );
 const input = readFileSync(examplePath, "utf-8");
 
@@ -14,7 +14,7 @@ const input = readFileSync(examplePath, "utf-8");
 const { parser } = createParser(input);
 
 // Parse the input
-const tree = parser.cpgl();
+const tree = parser.crl();
 
 // Check if pretty output is requested
 const prettyOutput = process.argv.includes("--pretty");

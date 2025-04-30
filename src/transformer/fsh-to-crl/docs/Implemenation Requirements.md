@@ -1,13 +1,13 @@
-To ensure the mapping rules fully describe the requirements necessary to implement a FSH-to-CPGL transformer, we must analyze whether each CPGL construct can be derived unambiguously from available FSH fields. Below is a rewritten and *complete* description of the transformation rules, grounded in the CPGL syntax and semantics.
+To ensure the mapping rules fully describe the requirements necessary to implement a FSH-to-CRL transformer, we must analyze whether each CRL construct can be derived unambiguously from available FSH fields. Below is a rewritten and *complete* description of the transformation rules, grounded in the CRL syntax and semantics.
 
 ---
 
-# FSH-to-CPGL Transformation Mapping Rules (Complete Specification)
+# FSH-to-CRL Transformation Mapping Rules (Complete Specification)
 
 ## Definitions
 - **PlanDefinition (strategydefinition or recommendationdefinition)** maps to `decision`
 - **ActivityDefinition (immunizationactivity or servicerequestactivity)** maps to `activity`
-- CPGL expects that each `decision`, `when`, `do`, `use`, `activity`, `concept`, and `terminology` can be inferred from FHIR fields via these rules.
+- CRL expects that each `decision`, `when`, `do`, `use`, `activity`, `concept`, and `terminology` can be inferred from FHIR fields via these rules.
 
 ---
 

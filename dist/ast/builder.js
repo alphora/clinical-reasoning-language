@@ -1,8 +1,8 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.CPGLAstBuilder = void 0;
+exports.CRLAstBuilder = void 0;
 const AbstractParseTreeVisitor_1 = require("antlr4ts/tree/AbstractParseTreeVisitor");
-const CPGLParser_1 = require("../grammar/generated/antlr/CPGLParser");
+const CRLParser_1 = require("../grammar/generated/antlr/CRLParser");
 const types_1 = require("./types");
 function getLocation(ctx) {
     const start = ctx.start;
@@ -18,7 +18,7 @@ function getLocation(ctx) {
         },
     };
 }
-class CPGLAstBuilder extends AbstractParseTreeVisitor_1.AbstractParseTreeVisitor {
+class CRLAstBuilder extends AbstractParseTreeVisitor_1.AbstractParseTreeVisitor {
     constructor() {
         super(...arguments);
         this.errors = [];
@@ -38,7 +38,7 @@ class CPGLAstBuilder extends AbstractParseTreeVisitor_1.AbstractParseTreeVisitor
     defaultResult() {
         return null;
     }
-    visitCpgl(ctx) {
+    visitCrl(ctx) {
         const statements = ctx.statement().map((s) => this.visit(s));
         return { type: types_1.FileType.type, statements, location: getLocation(ctx) };
     }
@@ -72,10 +72,10 @@ class CPGLAstBuilder extends AbstractParseTreeVisitor_1.AbstractParseTreeVisitor
         const qualifier = ctx.anyOrAllClause() ? ctx.anyOrAllClause().text.slice(0, -1) : undefined;
         const statements = [];
         for (const stmtCtx of ctx.blockStatement()) {
-            if (stmtCtx instanceof CPGLParser_1.NestedWhenBlockContext) {
+            if (stmtCtx instanceof CRLParser_1.NestedWhenBlockContext) {
                 statements.push(this.visitNestedWhenBlock(stmtCtx));
             }
-            else if (stmtCtx instanceof CPGLParser_1.BlockActionContext) {
+            else if (stmtCtx instanceof CRLParser_1.BlockActionContext) {
                 statements.push(this.visitBlockAction(stmtCtx));
             }
         }
@@ -370,5 +370,5 @@ class CPGLAstBuilder extends AbstractParseTreeVisitor_1.AbstractParseTreeVisitor
         return { type: types_1.GroupExpressionType.type, expression: expr, location: getLocation(ctx) };
     }
 }
-exports.CPGLAstBuilder = CPGLAstBuilder;
+exports.CRLAstBuilder = CRLAstBuilder;
 //# sourceMappingURL=builder.js.map

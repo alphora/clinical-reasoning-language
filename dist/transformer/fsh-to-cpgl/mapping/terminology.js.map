@@ -1,1 +1,0 @@
-{"version":3,"file":"terminology.js","sourceRoot":"","sources":["../../../../src/transformer/fsh-to-cpgl/mapping/terminology.ts"],"names":[],"mappings":";;AAMA,wCAOC;AAbD,gEAAiE;AAMjE,SAAgB,cAAc,CAAC,WAAqB;IAClD,OAAO,WAAW;SACf,GAAG,CACF,CAAC,EAAE,EAAE,EAAE,CACL,eAAe,IAAA,+BAAY,EAAC,EAAE,CAAC,6CAA6C,IAAA,yBAAM,EAAC,EAAE,CAAC,GAAG,CAC5F;SACA,IAAI,CAAC,IAAI,CAAC,CAAC;AAChB,CAAC"}

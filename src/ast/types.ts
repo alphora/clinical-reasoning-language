@@ -11,14 +11,14 @@ export interface ASTNode {
   };
 }
 
-// CPGL represents the root of the AST
-export interface CPGL extends ASTNode {
-  type: "CPGL";
+// CRL represents the root of the AST
+export interface CRL extends ASTNode {
+  type: "CRL";
   statements: Statement[];
   location: Location;
 }
 export const FileType = {
-  type: "CPGL" as const,
+  type: "CRL" as const,
 };
 
 // Union type for all possible statements

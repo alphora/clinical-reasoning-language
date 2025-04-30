@@ -1,4 +1,4 @@
-import { CPGLLexer } from "../../grammar/generated/antlr/CPGLLexer";
+import { CRLLexer } from "../../grammar/generated/antlr/CRLLexer";
 
 import { getTokensFromString } from "./helpers";
 import { verifyTokenSequence } from "./index.test";
@@ -13,15 +13,15 @@ describe("Structures", () => {
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(tokens, [
-        CPGLLexer.DECISION,
-        CPGLLexer.QUOTED_STRING,
-        CPGLLexer.COLON,
-        CPGLLexer.WHEN,
-        CPGLLexer.QUOTED_STRING,
-        CPGLLexer.THEN,
-        CPGLLexer.DO,
-        CPGLLexer.QUOTED_STRING,
-        CPGLLexer.DONE,
+        CRLLexer.DECISION,
+        CRLLexer.QUOTED_STRING,
+        CRLLexer.COLON,
+        CRLLexer.WHEN,
+        CRLLexer.QUOTED_STRING,
+        CRLLexer.THEN,
+        CRLLexer.DO,
+        CRLLexer.QUOTED_STRING,
+        CRLLexer.DONE,
       ]);
     });
 
@@ -41,35 +41,35 @@ describe("Structures", () => {
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(tokens, [
-        CPGLLexer.DECISION,
-        CPGLLexer.QUOTED_STRING,
-        CPGLLexer.COLON,
-        CPGLLexer.WHEN,
-        CPGLLexer.QUOTED_STRING,
-        CPGLLexer.THEN,
-        CPGLLexer.ALL,
-        CPGLLexer.COLON,
-        CPGLLexer.WHEN,
-        CPGLLexer.QUOTED_STRING,
-        CPGLLexer.THEN,
-        CPGLLexer.DO,
-        CPGLLexer.QUOTED_STRING,
-        CPGLLexer.WHEN,
-        CPGLLexer.QUOTED_STRING,
-        CPGLLexer.THEN,
-        CPGLLexer.ANY,
-        CPGLLexer.COLON,
-        CPGLLexer.WHEN,
-        CPGLLexer.QUOTED_STRING,
-        CPGLLexer.THEN,
-        CPGLLexer.DO,
-        CPGLLexer.QUOTED_STRING,
-        CPGLLexer.WHEN,
-        CPGLLexer.QUOTED_STRING,
-        CPGLLexer.THEN,
-        CPGLLexer.USE,
-        CPGLLexer.QUOTED_STRING,
-        CPGLLexer.DONE,
+        CRLLexer.DECISION,
+        CRLLexer.QUOTED_STRING,
+        CRLLexer.COLON,
+        CRLLexer.WHEN,
+        CRLLexer.QUOTED_STRING,
+        CRLLexer.THEN,
+        CRLLexer.ALL,
+        CRLLexer.COLON,
+        CRLLexer.WHEN,
+        CRLLexer.QUOTED_STRING,
+        CRLLexer.THEN,
+        CRLLexer.DO,
+        CRLLexer.QUOTED_STRING,
+        CRLLexer.WHEN,
+        CRLLexer.QUOTED_STRING,
+        CRLLexer.THEN,
+        CRLLexer.ANY,
+        CRLLexer.COLON,
+        CRLLexer.WHEN,
+        CRLLexer.QUOTED_STRING,
+        CRLLexer.THEN,
+        CRLLexer.DO,
+        CRLLexer.QUOTED_STRING,
+        CRLLexer.WHEN,
+        CRLLexer.QUOTED_STRING,
+        CRLLexer.THEN,
+        CRLLexer.USE,
+        CRLLexer.QUOTED_STRING,
+        CRLLexer.DONE,
       ]);
     });
 
@@ -78,11 +78,11 @@ describe("Structures", () => {
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(tokens, [
-        CPGLLexer.ACTIVITY,
-        CPGLLexer.QUOTED_STRING,
-        CPGLLexer.PERFORM,
-        CPGLLexer.ACTIVITY_TYPE,
-        CPGLLexer.DOT,
+        CRLLexer.ACTIVITY,
+        CRLLexer.QUOTED_STRING,
+        CRLLexer.PERFORM,
+        CRLLexer.ACTIVITY_TYPE,
+        CRLLexer.DOT,
       ]);
     });
 
@@ -91,13 +91,13 @@ describe("Structures", () => {
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(tokens, [
-        CPGLLexer.ACTIVITY,
-        CPGLLexer.QUOTED_STRING,
-        CPGLLexer.PERFORM,
-        CPGLLexer.ACTIVITY_TYPE,
-        CPGLLexer.WITH,
-        CPGLLexer.QUOTED_STRING,
-        CPGLLexer.DOT,
+        CRLLexer.ACTIVITY,
+        CRLLexer.QUOTED_STRING,
+        CRLLexer.PERFORM,
+        CRLLexer.ACTIVITY_TYPE,
+        CRLLexer.WITH,
+        CRLLexer.QUOTED_STRING,
+        CRLLexer.DOT,
       ]);
     });
   });
@@ -108,11 +108,11 @@ describe("Structures", () => {
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(tokens, [
-        CPGLLexer.TERMINOLOGY,
-        CPGLLexer.QUOTED_STRING,
-        CPGLLexer.VALUESET,
-        CPGLLexer.BACKTICK_STRING,
-        CPGLLexer.DOT,
+        CRLLexer.TERMINOLOGY,
+        CRLLexer.QUOTED_STRING,
+        CRLLexer.VALUESET,
+        CRLLexer.BACKTICK_STRING,
+        CRLLexer.DOT,
       ]);
     });
 
@@ -121,10 +121,10 @@ describe("Structures", () => {
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(tokens, [
-        CPGLLexer.TERMINOLOGY,
-        CPGLLexer.QUOTED_STRING,
-        CPGLLexer.BACKTICK_STRING,
-        CPGLLexer.DOT,
+        CRLLexer.TERMINOLOGY,
+        CRLLexer.QUOTED_STRING,
+        CRLLexer.BACKTICK_STRING,
+        CRLLexer.DOT,
       ]);
     });
 
@@ -133,13 +133,13 @@ describe("Structures", () => {
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(tokens, [
-        CPGLLexer.TERMINOLOGY,
-        CPGLLexer.QUOTED_STRING,
-        CPGLLexer.SYSTEM,
-        CPGLLexer.BACKTICK_STRING,
-        CPGLLexer.CODE,
-        CPGLLexer.BACKTICK_STRING,
-        CPGLLexer.DOT,
+        CRLLexer.TERMINOLOGY,
+        CRLLexer.QUOTED_STRING,
+        CRLLexer.SYSTEM,
+        CRLLexer.BACKTICK_STRING,
+        CRLLexer.CODE,
+        CRLLexer.BACKTICK_STRING,
+        CRLLexer.DOT,
       ]);
     });
   });
@@ -152,18 +152,18 @@ describe("Structures", () => {
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(tokens, [
-        CPGLLexer.CONCEPT,
-        CPGLLexer.QUOTED_STRING,
-        CPGLLexer.COLON,
-        CPGLLexer.TYPE,
-        CPGLLexer.IS,
-        CPGLLexer.CONCEPT_TYPE,
-        CPGLLexer.DOT,
-        CPGLLexer.VALUETYPE,
-        CPGLLexer.IS,
-        CPGLLexer.CONCEPT_VALUE_TYPE,
-        CPGLLexer.DOT,
-        CPGLLexer.DONE,
+        CRLLexer.CONCEPT,
+        CRLLexer.QUOTED_STRING,
+        CRLLexer.COLON,
+        CRLLexer.TYPE,
+        CRLLexer.IS,
+        CRLLexer.CONCEPT_TYPE,
+        CRLLexer.DOT,
+        CRLLexer.VALUETYPE,
+        CRLLexer.IS,
+        CRLLexer.CONCEPT_VALUE_TYPE,
+        CRLLexer.DOT,
+        CRLLexer.DONE,
       ]);
     });
 
@@ -174,26 +174,26 @@ describe("Structures", () => {
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(tokens, [
-        CPGLLexer.CONCEPT,
-        CPGLLexer.QUOTED_STRING,
-        CPGLLexer.COLON,
-        CPGLLexer.TYPE,
-        CPGLLexer.IS,
-        CPGLLexer.CONCEPT_TYPE,
-        CPGLLexer.DOT,
-        CPGLLexer.VALUETYPE,
-        CPGLLexer.IS,
-        CPGLLexer.CONCEPT_VALUE_TYPE,
-        CPGLLexer.DOT,
-        CPGLLexer.EVIDENCE,
-        CPGLLexer.IS,
-        CPGLLexer.BACKTICK_STRING,
-        CPGLLexer.DOT,
-        CPGLLexer.CODED,
-        CPGLLexer.FROM,
-        CPGLLexer.QUOTED_STRING,
-        CPGLLexer.DOT,
-        CPGLLexer.DONE,
+        CRLLexer.CONCEPT,
+        CRLLexer.QUOTED_STRING,
+        CRLLexer.COLON,
+        CRLLexer.TYPE,
+        CRLLexer.IS,
+        CRLLexer.CONCEPT_TYPE,
+        CRLLexer.DOT,
+        CRLLexer.VALUETYPE,
+        CRLLexer.IS,
+        CRLLexer.CONCEPT_VALUE_TYPE,
+        CRLLexer.DOT,
+        CRLLexer.EVIDENCE,
+        CRLLexer.IS,
+        CRLLexer.BACKTICK_STRING,
+        CRLLexer.DOT,
+        CRLLexer.CODED,
+        CRLLexer.FROM,
+        CRLLexer.QUOTED_STRING,
+        CRLLexer.DOT,
+        CRLLexer.DONE,
       ]);
     });
 
@@ -204,25 +204,25 @@ describe("Structures", () => {
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(tokens, [
-        CPGLLexer.CONCEPT,
-        CPGLLexer.QUOTED_STRING,
-        CPGLLexer.COLON,
-        CPGLLexer.TYPE,
-        CPGLLexer.IS,
-        CPGLLexer.CONCEPT_TYPE,
-        CPGLLexer.DOT,
-        CPGLLexer.VALUETYPE,
-        CPGLLexer.IS,
-        CPGLLexer.CONCEPT_VALUE_TYPE,
-        CPGLLexer.DOT,
-        CPGLLexer.INFERRED,
-        CPGLLexer.FROM,
-        CPGLLexer.QUOTED_STRING,
-        CPGLLexer.APPLY,
-        CPGLLexer.PATTERN,
-        CPGLLexer.BACKTICK_STRING,
-        CPGLLexer.DOT,
-        CPGLLexer.DONE,
+        CRLLexer.CONCEPT,
+        CRLLexer.QUOTED_STRING,
+        CRLLexer.COLON,
+        CRLLexer.TYPE,
+        CRLLexer.IS,
+        CRLLexer.CONCEPT_TYPE,
+        CRLLexer.DOT,
+        CRLLexer.VALUETYPE,
+        CRLLexer.IS,
+        CRLLexer.CONCEPT_VALUE_TYPE,
+        CRLLexer.DOT,
+        CRLLexer.INFERRED,
+        CRLLexer.FROM,
+        CRLLexer.QUOTED_STRING,
+        CRLLexer.APPLY,
+        CRLLexer.PATTERN,
+        CRLLexer.BACKTICK_STRING,
+        CRLLexer.DOT,
+        CRLLexer.DONE,
       ]);
     });
 
@@ -233,28 +233,28 @@ describe("Structures", () => {
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(tokens, [
-        CPGLLexer.CONCEPT,
-        CPGLLexer.QUOTED_STRING,
-        CPGLLexer.COLON,
-        CPGLLexer.TYPE,
-        CPGLLexer.IS,
-        CPGLLexer.CONCEPT_TYPE,
-        CPGLLexer.DOT,
-        CPGLLexer.VALUETYPE,
-        CPGLLexer.IS,
-        CPGLLexer.CONCEPT_VALUE_TYPE,
-        CPGLLexer.DOT,
-        CPGLLexer.INFERRED,
-        CPGLLexer.FROM,
-        CPGLLexer.LPAREN,
-        CPGLLexer.QUOTED_STRING,
-        CPGLLexer.OR,
-        CPGLLexer.QUOTED_STRING,
-        CPGLLexer.OR,
-        CPGLLexer.QUOTED_STRING,
-        CPGLLexer.RPAREN,
-        CPGLLexer.DOT,
-        CPGLLexer.DONE,
+        CRLLexer.CONCEPT,
+        CRLLexer.QUOTED_STRING,
+        CRLLexer.COLON,
+        CRLLexer.TYPE,
+        CRLLexer.IS,
+        CRLLexer.CONCEPT_TYPE,
+        CRLLexer.DOT,
+        CRLLexer.VALUETYPE,
+        CRLLexer.IS,
+        CRLLexer.CONCEPT_VALUE_TYPE,
+        CRLLexer.DOT,
+        CRLLexer.INFERRED,
+        CRLLexer.FROM,
+        CRLLexer.LPAREN,
+        CRLLexer.QUOTED_STRING,
+        CRLLexer.OR,
+        CRLLexer.QUOTED_STRING,
+        CRLLexer.OR,
+        CRLLexer.QUOTED_STRING,
+        CRLLexer.RPAREN,
+        CRLLexer.DOT,
+        CRLLexer.DONE,
       ]);
     });
   });

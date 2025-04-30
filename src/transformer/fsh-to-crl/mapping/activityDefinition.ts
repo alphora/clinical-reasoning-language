@@ -217,7 +217,7 @@ export function emitActivityBlock(
         ext.valueMarkdown.trim() !== "",
     );
     if (rationaleExt) {
-      // Format as CPGL backtick string (markdown/freetext)
+      // Format as CRL backtick string (markdown/freetext)
       rationale = `\n    because \`${rationaleExt.valueMarkdown!.replace(/`/g, "`")}\``;
     }
   }

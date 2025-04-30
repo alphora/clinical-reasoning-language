@@ -3,7 +3,7 @@ import {
   BlockBodyType,
   DecisionType,
   DecisionBodyType,
-  CPGL,
+  CRL,
   FileType,
   ActionStatementType,
   WhenBlockType,
@@ -19,7 +19,7 @@ describe('UnusedDeclarationsValidator - Activities', () => {
   });
 
   it('should detect unused activities', () => {
-    const ast: CPGL = {
+    const ast: CRL = {
       type: FileType.type,
       statements: [
         {
@@ -44,7 +44,7 @@ describe('UnusedDeclarationsValidator - Activities', () => {
   });
 
   it('should mark activities as used when referenced in DoActivity', () => {
-    const ast: CPGL = {
+    const ast: CRL = {
       type: FileType.type,
       statements: [
         {

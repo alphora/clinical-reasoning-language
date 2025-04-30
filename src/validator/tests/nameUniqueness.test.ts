@@ -1,4 +1,4 @@
-import { CPGL } from '../../ast/types';
+import { CRL } from '../../ast/types';
 import { Validator } from '../validator';
 
 describe('NameUniquenessValidator', () => {
@@ -10,8 +10,8 @@ describe('NameUniquenessValidator', () => {
 
   describe('Decision Name Uniqueness', () => {
     it('should detect duplicate decision names', () => {
-      const ast: CPGL = {
-        type: 'CPGL',
+      const ast: CRL = {
+        type: 'CRL',
         statements: [
           {
             type: 'Decision',
@@ -44,8 +44,8 @@ describe('NameUniquenessValidator', () => {
     });
 
     it('should allow different decision names', () => {
-      const ast: CPGL = {
-        type: 'CPGL',
+      const ast: CRL = {
+        type: 'CRL',
         statements: [
           {
             type: 'Decision',
@@ -79,8 +79,8 @@ describe('NameUniquenessValidator', () => {
 
   describe('Concept Name Uniqueness', () => {
     it('should detect duplicate concept names', () => {
-      const ast: CPGL = {
-        type: 'CPGL',
+      const ast: CRL = {
+        type: 'CRL',
         statements: [
           {
             type: 'Concept',
@@ -119,8 +119,8 @@ describe('NameUniquenessValidator', () => {
 
   describe('Terminology Name Uniqueness', () => {
     it('should detect duplicate terminology names', () => {
-      const ast: CPGL = {
-        type: 'CPGL',
+      const ast: CRL = {
+        type: 'CRL',
         statements: [
           {
             type: 'Terminology',
@@ -155,8 +155,8 @@ describe('NameUniquenessValidator', () => {
 
   describe('Activity Name Uniqueness', () => {
     it('should detect duplicate activity names', () => {
-      const ast: CPGL = {
-        type: 'CPGL',
+      const ast: CRL = {
+        type: 'CRL',
         statements: [
           {
             type: 'Activity',
@@ -183,8 +183,8 @@ describe('NameUniquenessValidator', () => {
 
   describe('Cross-Category Name Uniqueness', () => {
     it('should allow same name across different categories', () => {
-      const ast: CPGL = {
-        type: 'CPGL',
+      const ast: CRL = {
+        type: 'CRL',
         statements: [
           {
             type: 'Decision',

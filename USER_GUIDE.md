@@ -1,6 +1,6 @@
-# Clinical Practice Guideline Language (CPGL) User Guide
+# Clinical Practice Guideline Language (CRL) User Guide
 
-Welcome to the CPGL User Guide! This guide introduces the syntax, structure, and authoring best practices for the Clinical Practice Guideline Language (CPGL).
+Welcome to the CRL User Guide! This guide introduces the syntax, structure, and authoring best practices for the Clinical Practice Guideline Language (CRL).
 
 ---
 
@@ -13,7 +13,7 @@ Welcome to the CPGL User Guide! This guide introduces the syntax, structure, and
 - [Syntax and Grammar Overview](#syntax-and-grammar-overview)
 - [Authoring Guidelines](#authoring-guidelines)
 - [Activity Deduplication and Reference Resolution](#activity-deduplication-and-reference-resolution)
-- [Example: A Complete CPGL Library](#example-a-complete-cpgl-library)
+- [Example: A Complete CRL Library](#example-a-complete-crl-library)
 - [References](#references)
 - [Keywords](#keywords)
 - [Keyword Glossary](#keyword-glossary)
@@ -23,9 +23,9 @@ Welcome to the CPGL User Guide! This guide introduces the syntax, structure, and
 
 ## Introduction
 
-CPGL (Clinical Practice Guideline Language) is a domain-specific language for expressing clinical practice guidelines in a structured, machine-readable, and human-friendly format. It is inspired by HL7's Clinical Quality Language (CQL) but is tailored for guideline authoring, decision support, and computable care pathways.
+CRL (Clinical Practice Guideline Language) is a domain-specific language for expressing clinical practice guidelines in a structured, machine-readable, and human-friendly format. It is inspired by HL7's Clinical Quality Language (CQL) but is tailored for guideline authoring, decision support, and computable care pathways.
 
-CPGL is designed to:
+CRL is designed to:
 - Enable clear, unambiguous representation of clinical logic
 - Support decision, concept, activity, and terminology definitions
 - Be easy to read, write, and validate
@@ -34,7 +34,7 @@ CPGL is designed to:
 
 ## Language Structure
 
-CPGL is built from a small set of basic elements, called **tokens**:
+CRL is built from a small set of basic elements, called **tokens**:
 - **Symbols**: e.g., `:`, `.`, `(`, `)`
 - **Keywords**: e.g., `decision`, `concept`, `activity`, `terminology`, `when`, `then`, `do`, `use`, `type`, `valuetype`, `coded`, `from`, `inferred`, `done`, `because`, `system`, `code`, `valueset`, `and`, `or`, `not`, `any`, `all`, `with`, `pattern`, `apply`, `evidence`
 - **Literals**: e.g., numbers, backtick-quoted free text (`` `markdown or free text` ``)
@@ -46,21 +46,21 @@ Whitespace (spaces, tabs, newlines) separates tokens and is ignored except where
 
 ## Quoting Conventions
 
-CPGL enforces strict quoting rules for clarity and unambiguous parsing:
+CRL enforces strict quoting rules for clarity and unambiguous parsing:
 
 - **Identifiers and references**: Always use double quotes (`"Identifier"`).
   - Examples: `"Colonoscopy"`, `"BMI Valueset"`, `"Propose Diagnosis Task"`
 - **Free text, markdown, and evidence**: Always use backticks (`` `free text or markdown` ``).
   - Examples: `` `This is *markdown*` ``, `` `A rationale for the action` ``, `` `http://snomed.info/sct` ``
-- **Single quotes are not used** as delimiters in CPGL.
+- **Single quotes are not used** as delimiters in CRL.
 
 ## Comments
 
-CPGL supports two types of comments:
+CRL supports two types of comments:
 
 - **Single-line comments** start with `//` and continue to the end of the line.
   - Example:
-    ```cpgl
+    ```crl
     // This is a single-line comment
     decision "BMI":
       when "BMI > 30" then do "Propose Diagnosis Task".
@@ -69,7 +69,7 @@ CPGL supports two types of comments:
 
 - **Block comments** are enclosed in `/* ... */` and can span multiple lines.
   - Example:
-    ```cpgl
+    ```crl
     /*
       This is a block comment.
       It can span multiple lines.
@@ -81,13 +81,13 @@ CPGL supports two types of comments:
     done
     ```
 
-Comments can be placed anywhere whitespace is allowed. They are ignored by the lexer and parser and do not affect the meaning of the CPGL document.
+Comments can be placed anywhere whitespace is allowed. They are ignored by the lexer and parser and do not affect the meaning of the CRL document.
 
 ---
 
 ## Top-Level Statements
 
-A CPGL document consists of a sequence of **statements**. The main statement types are:
+A CRL document consists of a sequence of **statements**. The main statement types are:
 
 - **Decision**: Defines a clinical decision with conditions and actions.
 - **Concept**: Defines a clinical concept, its type, value type, evidence, and logic.
@@ -100,11 +100,11 @@ Each statement has a specific structure, as defined by the grammar.
 
 ## Syntax and Grammar Overview
 
-Below are the main constructs, with simplified syntax and examples. For full details, see the [CPGL grammar](./src/grammar/CPGLParser.g4) and [lexer](./src/grammar/CPGLLexer.g4).
+Below are the main constructs, with simplified syntax and examples. For full details, see the [CRL grammar](./src/grammar/CRLParser.g4) and [lexer](./src/grammar/CRLLexer.g4).
 
 ### 1. Decision Statement
 
-```cpgl
+```crl
 decision "Decision Name":
   when "Concept Name" then do "Activity Name".
   when "Other Concept" then:
@@ -118,7 +118,7 @@ done
 
 ### 2. Concept Statement
 
-```cpgl
+```crl
 concept "Concept Name":
   type is Condition.
   valuetype is boolean.
@@ -129,14 +129,14 @@ done
 
 ### 3. Activity Statement
 
-```cpgl
+```crl
 activity "Activity Name" perform CPGImmunizationRequest with "Colonoscopy".
 activity "Notify" perform CPGCommunicationRequest with `A notification message` because `Rationale for notification`.
 ```
 
 ### 4. Terminology Statement
 
-```cpgl
+```crl
 terminology "BMI Valueset" valueset `bmi valueset`.
 terminology "Colonoscopy" system `http://snomed.info/sct` code `73761001`.
 ```
@@ -150,13 +150,13 @@ terminology "Colonoscopy" system `http://snomed.info/sct` code `73761001`.
 - **End statements with a period (`.`) or `done` as required by the grammar.**
 - **Indent nested blocks for readability.**
 - **Use keywords and symbols exactly as defined in the grammar.**
-- **Validate your CPGL files using the CLI tools before publishing.**
+- **Validate your CRL files using the CLI tools before publishing.**
 
 ---
 
 ## Activity Deduplication and Reference Resolution
 
-When using the FSH-to-CPGL transformer, the tool automatically deduplicates activities and manages references as follows:
+When using the FSH-to-CRL transformer, the tool automatically deduplicates activities and manages references as follows:
 
 - **Deduplication:**  
   Each unique combination of activity name and value is defined only once in the output.  
@@ -169,7 +169,7 @@ When using the FSH-to-CPGL transformer, the tool automatically deduplicates acti
   Quoting and escaping of activity names is handled automatically by the transformer.
 
 **Example:**
-```cpgl
+```crl
 // If two activities have the same name but different values:
 activity "Last Live Vaccine Administered Within 4 Weeks"
     perform CPGCommunicationRequest
@@ -180,13 +180,13 @@ activity "Last Live Vaccine Administered Within 4 Weeks_2"
     with `Should not vaccinate client for MCV1 ...`.
 ```
 
-For more technical details, see the [Activity Deduplication and Reference Requirements](./src/transformer/fsh-to-cpgl/docs/Activity%20Deduplication%20and%20Reference%20Requirements.md).
+For more technical details, see the [Activity Deduplication and Reference Requirements](./src/transformer/fsh-to-crl/docs/Activity%20Deduplication%20and%20Reference%20Requirements.md).
 
 ---
 
-## Example: A Complete CPGL Library
+## Example: A Complete CRL Library
 
-```cpgl
+```crl
 decision "IMMZ.D2.D5.Measles":
   when "Measles Routine Immunization Schedule Incomplete" then:
     any:
@@ -222,8 +222,8 @@ terminology "Colonoscopy" system `http://snomed.info/sct` code `73761001`.
 ---
 
 ## References
-- [CPGL Grammar (CPGLParser.g4)](./src/grammar/CPGLParser.g4)
-- [CPGL Lexer (CPGLLexer.g4)](./src/grammar/CPGLLexer.g4)
+- [CRL Grammar (CRLParser.g4)](./src/grammar/CRLParser.g4)
+- [CRL Lexer (CRLLexer.g4)](./src/grammar/CRLLexer.g4)
 
 ---
 
@@ -231,7 +231,7 @@ For more details, see the [README](./README.md) and the CLI tools for validation
 
 ## Keywords
 
-The following are all reserved keywords in CPGL:
+The following are all reserved keywords in CRL:
 
 - `activity`
 - `all`
@@ -363,7 +363,7 @@ The following are valid activity types (case sensitive):
 - CPGServiceRequest
 
 Example:
-```cpgl
+```crl
 activity "Vaccinate" perform CPGImmunizationRequest.
 ```
 
@@ -395,7 +395,7 @@ The following are valid concept types (case sensitive):
 - Task
 
 Example:
-```cpgl
+```crl
 concept "BMI Range as a Condition":
   type is Condition.
   valuetype is CodeableConcept.
@@ -419,7 +419,7 @@ The following are valid concept value types (case sensitive):
 - time
 
 Example:
-```cpgl
+```crl
 concept "BMI":
   type is Observation.
   valuetype is Quantity.

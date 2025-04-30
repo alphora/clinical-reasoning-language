@@ -1,4 +1,4 @@
-# FSH-to-CPGL Transformer: Comprehensive Requirements
+# FSH-to-CRL Transformer: Comprehensive Requirements
 
 ## 1. Introduction
 
@@ -106,8 +106,8 @@ async function parseFSHFiles(pathToFSH: string) {
 ## 4. CPG-L Grammar (Summary)
 
 The CPG-L language is defined by the following ANTLR grammars:
-- [CPGLLexer.g4](../../../../grammar/CPGLLexer.g4)
-- [CPGLParser.g4](../../../../grammar/CPGLParser.g4)
+- [CRLLexer.g4](../../../../grammar/CRLLexer.g4)
+- [CRLParser.g4](../../../../grammar/CRLParser.g4)
 
 ### Key Syntax Elements
 - **Identifiers and references**: Double-quoted strings (e.g., `"Colonoscopy"`)
@@ -126,7 +126,7 @@ For full details, see the referenced grammar files.
 
 Below is a canonical CPG-L example, excerpted from a real transformation output. This demonstrates the mapping of FSH PlanDefinitions and ActivityDefinitions to CPG-L decisions, activities, concepts, and terminology.
 
-```cpgl
+```crl
 // Decision for IMMZDTImmunizationStrategy instance
 decision "IMMZDTImmunizationStrategy":
     when "Check Immunizations" then:
@@ -149,7 +149,7 @@ done
 terminology "IMMZDTImmunizationStrategy_CheckImmunizations_Term" system `IMMZDTImmunizationStrategy` code `CheckImmunizations`.
 ```
 
-For a full example, see [`IMMZ_All_Decisions.cpg`](../../../../examples/cpgl/who/smart-example-immz/IMMZ_All_Decisions.cpg).
+For a full example, see [`IMMZ_All_Decisions.cpg`](../../../../examples/crl/who/smart-example-immz/IMMZ_All_Decisions.cpg).
 
 ---
 
@@ -163,9 +163,9 @@ For a full example, see [`IMMZ_All_Decisions.cpg`](../../../../examples/cpgl/who
 ---
 
 ## 7. References
-- [FSH-CPGL-Mapping.md](./FSH-CPGL-Mapping.md)
+- [FSH-CRL-Mapping.md](./FSH-CRL-Mapping.md)
 - [Implemenation Requirements.md](./Implemenation%20Requirements.md)
 - [SushiVisitor.md](./SushiVisitor.md)
-- [CPGLLexer.g4](../../../../grammar/CPGLLexer.g4)
-- [CPGLParser.g4](../../../../grammar/CPGLParser.g4)
-- [IMMZ_All_Decisions.cpg](../../../../examples/cpgl/who/smart-example-immz/IMMZ_All_Decisions.cpg) 
+- [CRLLexer.g4](../../../../grammar/CRLLexer.g4)
+- [CRLParser.g4](../../../../grammar/CRLParser.g4)
+- [IMMZ_All_Decisions.cpg](../../../../examples/crl/who/smart-example-immz/IMMZ_All_Decisions.cpg) 

@@ -1,20 +1,20 @@
 import { CommonTokenStream } from "antlr4ts";
 
-import { CPGLParser } from "../grammar/generated/antlr/CPGLParser";
+import { CRLParser } from "../grammar/generated/antlr/CRLParser";
 import { createLexer } from "../lexer/createLexer";
 
 import { CustomParserErrorListener } from "./CustomParserErrorListener";
 
 export function createParser(input: string): {
-  parser: CPGLParser;
+  parser: CRLParser;
   parserErrorListener: CustomParserErrorListener;
-  lexerErrorListener: import("../lexer/CPGLLexerErrorListener").CPGLLexerErrorListener;
+  lexerErrorListener: import("../lexer/CRLLexerErrorListener").CRLLexerErrorListener;
 } {
   const { lexer, errorListener: lexerErrorListener } = createLexer(input);
   const tokenStream = new CommonTokenStream(lexer);
 
   const parserErrorListener = new CustomParserErrorListener();
-  const parser = new CPGLParser(tokenStream);
+  const parser = new CRLParser(tokenStream);
   parser.removeErrorListeners();
   parser.addErrorListener(parserErrorListener);
 

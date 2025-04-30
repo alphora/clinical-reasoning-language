@@ -1,8 +1,8 @@
-import { CPGL } from "../ast/types";
+import { CRL } from "../ast/types";
 import { ValidationError } from "./validator";
 export declare class ActionUniquenessValidator {
     private ast;
-    validate(ast: CPGL): ValidationError[];
+    validate(ast: CRL): ValidationError[];
     private validateDecisionBody;
     private validateWhenBlock;
     private validateBlockBody;

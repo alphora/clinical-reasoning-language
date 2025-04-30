@@ -3,10 +3,10 @@ import { join } from "path";
 
 import { CharStreams } from "antlr4ts";
 
-import { CPGLAstBuilder } from "../ast/builder";
-import { ASTNode, DoActivity, UseDecision, CPGL } from "../ast/types";
-import { CPGLLexer } from "../grammar/generated/antlr/CPGLLexer";
-import { CPGLLexerErrorListener } from "../lexer/CPGLLexerErrorListener";
+import { CRLAstBuilder } from "../ast/builder";
+import { ASTNode, DoActivity, UseDecision, CRL } from "../ast/types";
+import { CRLLexer } from "../grammar/generated/antlr/CRLLexer";
+import { CRLLexerErrorListener } from "../lexer/CRLLexerErrorListener";
 import { createParser } from "../parser/createParser";
 
 // Read the example file
@@ -14,19 +14,19 @@ const examplePath = join(__dirname, "../../docs/grammar-example.cpg");
 const input = readFileSync(examplePath, "utf-8");
 
 // Create the lexer and add error listener
-const lexer = new CPGLLexer(CharStreams.fromString(input));
+const lexer = new CRLLexer(CharStreams.fromString(input));
 lexer.removeErrorListeners();
-lexer.addErrorListener(new CPGLLexerErrorListener());
+lexer.addErrorListener(new CRLLexerErrorListener());
 
 // Create the parser
 const { parser } = createParser(input);
 
 // Parse the input
-const tree = parser.cpgl();
+const tree = parser.crl();
 
 // Create the AST builder and visit the parse tree
-const builder = new CPGLAstBuilder();
-const ast = builder.visit(tree) as CPGL;
+const builder = new CRLAstBuilder();
+const ast = builder.visit(tree) as CRL;
 
 // Helper function to print AST nodes with indentation
 function printAST(node: ASTNode, indent = 0): string {

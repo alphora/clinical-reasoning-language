@@ -1,4 +1,4 @@
-// Clinical Practice Guideline Language (CPGL)
+// Clinical Practice Guideline Language (CRL)
 /*
 IS case sensitive.
 NOT whitespace sensitive.
@@ -12,7 +12,7 @@ The keyword "with" for activity is optional.
 The keyword "evidence" for concept is optional.
 One of either the keywords "inferred from" or "coded from" are required for concept.
 One of either the keywords "valueset", `` (unknown) or "system/code" are required for terminology.
-A cpgl can have any number of decision, terminology, activity, concept.
+A crl can have any number of decision, terminology, activity, concept.
 The example includes all options for valid statements.
 Anything not identified as optional here is required.
 */

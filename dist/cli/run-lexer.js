@@ -2,14 +2,14 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const fs_1 = require("fs");
 const path_1 = require("path");
-const CPGLLexer_1 = require("../grammar/generated/antlr/CPGLLexer");
+const CRLLexer_1 = require("../grammar/generated/antlr/CRLLexer");
 const createLexer_1 = require("../lexer/createLexer");
-const examplePath = (0, path_1.join)(__dirname, "../examples/cpgl/who/smart-example-immz/IMMZ_All_Decisions.cpg");
+const examplePath = (0, path_1.join)(__dirname, "../examples/crl/who/smart-example-immz/IMMZ_All_Decisions.cpg");
 const input = (0, fs_1.readFileSync)(examplePath, "utf8");
 const { lexer } = (0, createLexer_1.createLexer)(input);
 const tokens = [];
 let token = lexer.nextToken();
-while (token.type !== CPGLLexer_1.CPGLLexer.EOF) {
+while (token.type !== CRLLexer_1.CRLLexer.EOF) {
     if (token.channel === 0) {
         const typeName = lexer.vocabulary.getSymbolicName(token.type) ?? `Unknown (${token.type})`;
         tokens.push({

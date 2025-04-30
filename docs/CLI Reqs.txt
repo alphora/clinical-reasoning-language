@@ -1,13 +1,13 @@
 ```bash
-# Process a CPGL file
-npx cpgl process input.cpgl
+# Process a CRL file
+npx crl process input.crl
 
-# Validate a CPGL file
-npx cpgl validate input.cpgl
+# Validate a CRL file
+npx crl validate input.crl
 
-# Transform a CPGL file to AST
-npx cpgl transform input.cpgl --output ast.json
+# Transform a CRL file to AST
+npx crl transform input.crl --output ast.json
 
 # Get help
-npx cpgl --help
+npx crl --help
 ```

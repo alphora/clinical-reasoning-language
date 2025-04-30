@@ -3,10 +3,10 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const fs_1 = require("fs");
 const path_1 = require("path");
 const createParser_1 = require("../parser/createParser");
-const examplePath = (0, path_1.join)(__dirname, "../examples/cpgl/who/smart-example-immz/IMMZ_All_Decisions.cpg");
+const examplePath = (0, path_1.join)(__dirname, "../examples/crl/who/smart-example-immz/IMMZ_All_Decisions.cpg");
 const input = (0, fs_1.readFileSync)(examplePath, "utf-8");
 const { parser } = (0, createParser_1.createParser)(input);
-const tree = parser.cpgl();
+const tree = parser.crl();
 const prettyOutput = process.argv.includes("--pretty");
 if (!prettyOutput) {
     console.log(tree.toStringTree(parser.ruleNames));

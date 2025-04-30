@@ -1,7 +1,7 @@
 
 
 warn  The FSHOnly property is set to true, so no output specific to IG creation will be generated. The following properties are unused and only relevant for IG creation: id, name, title, description, experimental, copyrightYear, releaseLabel, license, publisher, pages, menu, meta, parameters. Consider removing these properties from sushi-config.yaml.
-  File: D:\src\clinical-practice-guideline-language\src\tests\testdata\smart-example-immz\sushi-config.yaml
+  File: D:\src\clinical-reasoning-language\src\tests\testdata\smart-example-immz\sushi-config.yaml
 info  Preprocessed 10 documents with 10 aliases.
 info  Imported 0 definitions and 9 instances.
 // Instance: IMMZD2DTMeaslesDose0

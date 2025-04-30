@@ -1,4 +1,4 @@
-lexer grammar CPGLLexer;
+lexer grammar CRLLexer;
 
 // Keywords
 ACTIVITY     : 'activity';

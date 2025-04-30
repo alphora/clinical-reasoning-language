@@ -1,7 +1,7 @@
-import { CPGLParser } from "../grammar/generated/antlr/CPGLParser";
+import { CRLParser } from "../grammar/generated/antlr/CRLParser";
 import { CustomParserErrorListener } from "./CustomParserErrorListener";
 export declare function createParser(input: string): {
-    parser: CPGLParser;
+    parser: CRLParser;
     parserErrorListener: CustomParserErrorListener;
-    lexerErrorListener: import("../lexer/CPGLLexerErrorListener").CPGLLexerErrorListener;
+    lexerErrorListener: import("../lexer/CRLLexerErrorListener").CRLLexerErrorListener;
 };

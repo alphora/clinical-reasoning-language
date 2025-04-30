@@ -1,15 +1,15 @@
 import { readFileSync } from "fs";
 import { join } from "path";
 
-import { CPGLAstBuilder } from "../ast/builder";
-import { CPGL } from "../ast/types";
+import { CRLAstBuilder } from "../ast/builder";
+import { CRL } from "../ast/types";
 import { createParser } from "../parser/createParser";
 import { Validator } from "../validator/validator";
 
 // Read the example file
 const examplePath = join(
   __dirname,
-  "../examples/cpgl/who/smart-example-immz/IMMZ_All_Decisions.cpg",
+  "../examples/crl/who/smart-example-immz/IMMZ_All_Decisions.cpg",
 );
 const input = readFileSync(examplePath, "utf-8");
 
@@ -17,11 +17,11 @@ const input = readFileSync(examplePath, "utf-8");
 const { parser } = createParser(input);
 
 // Parse the input
-const tree = parser.cpgl();
+const tree = parser.crl();
 
 // Create the AST builder and visit the parse tree
-const builder = new CPGLAstBuilder();
-const ast = builder.visit(tree) as CPGL;
+const builder = new CRLAstBuilder();
+const ast = builder.visit(tree) as CRL;
 
 // Create the validator and validate the AST
 const validator = new Validator();

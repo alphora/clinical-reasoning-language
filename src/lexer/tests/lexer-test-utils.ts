@@ -1,18 +1,18 @@
 import { Token } from "antlr4ts";
 
-import { CPGLLexer } from "../../grammar/generated/antlr/CPGLLexer";
+import { CRLLexer } from "../../grammar/generated/antlr/CRLLexer";
 
 /**
  * Gets all tokens from the lexer, filtering out whitespace and comments
  */
-export function getAllTokens(lexer: CPGLLexer): Token[] {
+export function getAllTokens(lexer: CRLLexer): Token[] {
   const tokens: Token[] = [];
   let token = lexer.nextToken();
   while (token.type !== Token.EOF) {
     if (
-      token.type !== CPGLLexer.WS &&
-      token.type !== CPGLLexer.COMMENT &&
-      token.type !== CPGLLexer.COMMENT_BLOCK
+      token.type !== CRLLexer.WS &&
+      token.type !== CRLLexer.COMMENT &&
+      token.type !== CRLLexer.COMMENT_BLOCK
     ) {
       tokens.push(token);
     }
