@@ -202,6 +202,8 @@ if (result.success) {
 
 ### 4. Validation
 
+> ⚠️ **Note:** Validation functionality is not yet implemented. The `validateCRL` function is a placeholder and will likely throw or return an error if used.
+
 ```typescript
 import { validateCRL } from '@smile-digital-health/crl';
 
