@@ -265,13 +265,6 @@ describe("CRL Lexer - Basic Tokens", () => {
       const input = "type is Observation";
       const tokens = getTokensFromString(input);
 
-      // [DEBUGGING] Print token types and text for investigation
-      // eslint-disable-next-line no-console
-      console.log(
-        '[DEBUGGING] Tokens for "type is Observation":',
-        tokens.map((t) => ({ type: t.type, text: t.text })),
-      );
-
       verifyTokenSequence(
         tokens,
         [CRLLexer.TYPE, CRLLexer.IS, CRLLexer.CONCEPT_TYPE],

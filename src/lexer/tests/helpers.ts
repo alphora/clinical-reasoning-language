@@ -1,8 +1,8 @@
 import { Token } from "antlr4ts";
 
 import { CRLLexer } from "../../grammar/generated/antlr/CRLLexer";
-import { CRLLexerErrorListener } from "../CRLLexerErrorListener";
 import { createLexer } from "../createLexer";
+import { CRLLexerErrorListener } from "../CRLLexerErrorListener";
 
 import { getAllTokens } from "./lexer-test-utils";
 
