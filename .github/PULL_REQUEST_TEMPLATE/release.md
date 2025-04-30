@@ -75,13 +75,13 @@ To create a new release:
 9. **Run the automated release script**
 
    ```bash
-   npm run prerelease:github -- <patch|minor|major|version>
+   npm run prerelease -- <patch|minor|major|version>
    ```
 
    Example:
 
    ```bash
-   npm run prerelease:github -- minor
+   npm run prerelease -- minor
    ```
 
    This script will:
