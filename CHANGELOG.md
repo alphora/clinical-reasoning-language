@@ -269,7 +269,7 @@ Commits included since v0.5.3:
 
 ---
  
-## Unreleased 
+## [v0.6.6] - YYYY-MM-DD
 - Fixed bug where error handling wasn't adding detailed errors when they were thrown by the build or parse modules. (rob-reynolds, 2025-04-28)
 - Remove the validator test that was failing (rob-reynolds, 2025-04-27)
 - Update readme (rob-reynolds, 2025-04-27)
@@ -279,3 +279,25 @@ Commits included since v0.5.3:
 - Comment build in unimplemented validator (rob-reynolds, 2025-04-27)
 - Updated documentation (rob-reynolds, 2025-04-27)
 - Update documentation (rob-reynolds, 2025-04-27)
+
+## [0.7.0] - 2024-04-30
+
+### Changed
+- **Package Distribution:** Moved from GitHub Packages to npm registry for easier installation and better dependency management
+- **Package Name:** Updated to `@smile-digital-health/crl` to match organization name
+- **Documentation:** 
+  - Renamed "Clinical Practice Guideline Language" to "Clinical Reasoning Language" throughout the codebase
+  - Updated installation instructions to use npm registry
+  - Added note about validation functionality not being implemented yet
+  - Removed GitHub-specific installation instructions
+- **Build Process:** Improved GitHub Actions workflow for automated npm publishing on releases
+
+### Added
+- **CI/CD:** New automated npm package publishing on GitHub releases (non-draft, non-prerelease)
+- **Quality:** Added package verification steps (npm pack, dry-run) to release process
+
+### Technical Improvements
+- Enhanced build process reliability in CI/CD environment
+- Improved file generation and movement in build pipeline
+
+[0.7.0]: https://github.com/smile-digital-health/clinical-reasoning-language/releases/tag/v0.6.0
