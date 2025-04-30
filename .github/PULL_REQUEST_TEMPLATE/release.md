@@ -69,22 +69,19 @@ To create a new release:
 8. **Run the automated release script**
 
    ```bash
-   npm run prepublish:github -- <patch|minor|major|version>
+   npm run prerelease:github -- <patch|minor|major|version>
    ```
 
    Example:
 
    ```bash
-   npm run prepublish:github -- minor
+   npm run prerelease:github -- minor
    ```
 
    This script will:
-   - Remove `dist/` from `.gitignore`
    - Build the project
-   - Add and commit `dist/`
    - Bump the version and create a Git tag
    - Push commits and tags
-   - Restore `dist/` to `.gitignore` and push final cleanup
 
 9. **Push commits and tags** (if not already pushed by the script)
 
