@@ -12,49 +12,36 @@ CRL is a domain-specific language designed for expressing clinical practice guid
 
 ## Installation
 
-* Users can install directly from GitHub using:
-
-#### 📦 Installing from GitHub
-
-If you're installing this package directly from GitHub using `npm install`, note that GitHub access via SSH is required by default. You have two options:
-
----
-
-##### ✅ Option 1: Install via HTTPS (Recommended)
-
-This method works without needing to set up SSH keys.
+Install the package from npm:
 
 ```bash
-npm install git+https://github.com/alphora/clinical-practice-guideline-language.git#v0.4.0
+npm install @smiledigitalhealth/crl
 ```
 
 Or add it to your `package.json`:
 
 ```json
 "dependencies": {
-  "@smiledigitalhealth/crl": "git+https://github.com/alphora/clinical-practice-guideline-language.git#v0.4.0"
+  "@smiledigitalhealth/crl": "^0.6.1"
 }
 ```
 
----
+### For Package Maintainers
 
-##### 🔐 Option 2: Use SSH (Advanced)
+#### Publishing to npm
 
-If you prefer SSH (or are using the shorthand syntax like `github:cqis/crl#v0.4.0`), make sure your system is set up for GitHub SSH access.
+The package is automatically published to npm when a new GitHub release is created (non-draft, non-prerelease). To verify what will be published:
 
 ```bash
-npm install github:alphora/clinical-practice-guideline-language#v0.4.0
+# See what files would be included in the package
+npm publish --dry-run
+
+# Create the package locally without publishing
+npm pack
+
+# Examine contents of the generated .tgz file
+tar -ztvf <package-name>.tgz
 ```
-
-Or add it to your `package.json`:
-
-```json
-"dependencies": {
-  "@smiledigitalhealth/crl": "github:alphora/clinical-practice-guideline-language#v0.4.0"
-}
-```
-
-See the internets for detailed instructions on setting up SSH for GitHub.
 
 ## Features
 
