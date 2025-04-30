@@ -1,14 +1,14 @@
 [
-  "Attachment",
-  "boolean",
-  "CodeableConcept",
-  "dateTime",
-  "integer",
-  "Period",
-  "Quantity",
-  "Range",
-  "Ratio",
-  "SampledData",
-  "string",
-  "time"
+    "Attachment",
+    "boolean",
+    "CodeableConcept",
+    "dateTime",
+    "integer",
+    "Period",
+    "Quantity",
+    "Range",
+    "Ratio",
+    "SampledData",
+    "string",
+    "time"
 ]
