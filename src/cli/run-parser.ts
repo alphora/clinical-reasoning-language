@@ -6,7 +6,7 @@ import { createParser } from "../parser/createParser";
 // Read the example file
 const examplePath = join(
   __dirname,
-  "../examples/crl/who/smart-example-immz/IMMZ_All_Decisions.cpg",
+  "../examples/crl/who/smart-example-immz/IMMZ_All_Decisions.crl",
 );
 const input = readFileSync(examplePath, "utf-8");
 
