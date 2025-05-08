@@ -23,6 +23,7 @@
     "access": "restricted"
   },
   "scripts": {
+    "package:extension": "cd extension && vsce package",
     "lint": "eslint 'src/**/*.ts' --quiet",
     "lint:fix": "eslint src/**/*.ts --fix",
     "format": "prettier --write 'src/**/*.ts'",
