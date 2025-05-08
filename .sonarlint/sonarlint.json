@@ -1,6 +1,6 @@
 {
     "sonarlint.connectedMode.project": {
-        "projectKey": "clinical-practice-guideline-language"
+        "projectKey": "clinical-reasoning-language"
     },
     "rules": {
         "typescript:S1128": {

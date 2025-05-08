@@ -9,7 +9,7 @@
     "prettier.requireConfig": true,
   
     "sonarlint.connectedMode.project": {
-      "projectKey": "clinical-practice-guideline-language"
+      "projectKey": "clinical-reasoning-language"
     },
     "sonarlint.rules": {
       "typescript:S1128": {
@@ -44,6 +44,9 @@
           ]
         }
       }
+    },
+    "files.associations": {
+      "*.crl": "markdown"
     },
     "cSpell.words": [
       "activitydef",
