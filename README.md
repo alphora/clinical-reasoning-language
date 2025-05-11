@@ -96,35 +96,56 @@ tar -ztvf <package-name>.tgz
 
 ## CLI Usage
 
-The CRL package includes command-line tools for processing CRL files. Each tool can be run with the `--raw` flag to output raw JSON data instead of formatted output.
+> **⚠️ WARNING:**
+> When using npm scripts and passing arguments to the underlying CLI, always use `--` before your arguments. Otherwise, npm will not pass them to your script.
+> 
+> **Example:**
+> ```bash
+> npm run cli:lexer -- --path path/to/your/file.crl --pretty
+> ```
+
+The CRL package includes command-line tools for processing CRL files. Each tool supports the following options:
+
+- `--path <file>`: Specify the path to a CRL file to process. If omitted, the main example file is used by default.
+- `--pretty`: Output formatted (pretty-printed) results instead of raw JSON.
 
 ### Lexer Tool
 
 ```bash
 npx ts-node src/cli/run-lexer.ts
-npx ts-node src/cli/run-lexer.ts --raw
+npx ts-node src/cli/run-lexer.ts --pretty
+npx ts-node src/cli/run-lexer.ts --path path/to/your/file.crl
+npx ts-node src/cli/run-lexer.ts --path path/to/your/file.crl --pretty
 ```
 
 ### Parser Tool
 
 ```bash
 npx ts-node src/cli/run-parser.ts
-npx ts-node src/cli/run-parser.ts --raw
+npx ts-node src/cli/run-parser.ts --pretty
+npx ts-node src/cli/run-parser.ts --path path/to/your/file.crl
+npx ts-node src/cli/run-parser.ts --path path/to/your/file.crl --pretty
 ```
 
 ### AST Tool
 
 ```bash
 npx ts-node src/cli/run-ast.ts
-npx ts-node src/cli/run-ast.ts --raw
+npx ts-node src/cli/run-ast.ts --pretty
+npx ts-node src/cli/run-ast.ts --path path/to/your/file.crl
+npx ts-node src/cli/run-ast.ts --path path/to/your/file.crl --pretty
 ```
 
 ### Validator Tool
 
 ```bash
 npx ts-node src/cli/run-validator.ts
-npx ts-node src/cli/run-validator.ts --raw
+npx ts-node src/cli/run-validator.ts --pretty
+npx ts-node src/cli/run-validator.ts --path path/to/your/file.crl
+npx ts-node src/cli/run-validator.ts --path path/to/your/file.crl --pretty
 ```
+
+By default, each command processes the main example CRL file. To process a different file, provide the file path using `--path`. Use `--pretty` for formatted output.
 
 ### FSH-to-CRL Transformer Tool
 
@@ -138,6 +159,22 @@ The FSH-to-CRL transformer converts FHIR Shorthand (FSH) files into Clinical Rea
 - **Extraction Logic**: For `medicationCodeableConcept`, the transformer uses `system`, `code`, and `identifier` from the FSH object. For `dynamicValue.expression.expression` (where `path = "code.coding"`), the transformer uses `system` and `code` from the CQL code expression string and `identifier` from the corresponding description.
 
 For more details, see the [User Guide](./USER_GUIDE.md) and the technical mapping documentation.
+
+## CLI Tool Usage
+
+You can run specific CLI modules using the following command:
+
+```
+npm run cli:<module>
+```
+
+For example, to run the lexer CLI on a CRL file:
+
+```
+npm run cli:lexer
+```
+
+Replace `<module>` with the desired CLI module name (e.g., `lexer`, `parser`, etc.).
 
 ## API Usage & Reference
 
