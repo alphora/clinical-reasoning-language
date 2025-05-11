@@ -35,7 +35,7 @@
     },
     {
       "name": "keyword.operator.logical.crl",
-      "match": "(?<![\\w`\"])\\b(or|and|not)\\b(?![\\w`\"])"
+      "match": "(?<![\\w`\"])\\b(or|and|not|any|all)\\b(?![\\w`\"])"
     },
     {
       "name": "variable.language.meta.crl",
