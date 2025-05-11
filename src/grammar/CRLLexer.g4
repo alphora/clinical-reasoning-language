@@ -39,6 +39,30 @@ DOT          : '.';
 LPAREN       : '(';
 RPAREN       : ')';
 
+// Markdown header
+HEADER: '#' ~[\r\n]* ;
+
+// Empty string literal (two backticks with nothing in between)
+EMPTY_STRING: '``' ;
+
+// Dash for list items
+DASH: '-' ;
+
+// Block starters for 'all:' and 'any:'
+ALL_BLOCK: 'all:' ;
+ANY_BLOCK: 'any:' ;
+
+// Multi-word phrase tokens for easier parsing
+END_WHEN: 'end when' ;
+RECOMMEND_ACTIVITY: 'recommend activity' ;
+USE_DECISION: 'use decision' ;
+TYPE_IS: 'type is' ;
+VALUETYPE_IS: 'valuetype is' ;
+EVIDENCE_IS: 'evidence is' ;
+INFERRED_FROM: 'inferred from' ;
+CODED_FROM: 'coded from' ;
+APPLY_PATTERN: 'apply pattern' ;
+
 // Double-quoted identifier/reference
 QUOTED_STRING
     : '"' ( ~["\\\r\n] )* '"'
