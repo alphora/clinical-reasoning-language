@@ -1,6 +1,6 @@
 lexer grammar CRLLexer;
 
-// Keywords
+// === Keywords ===
 ACTIVITY     : 'activity';
 AND          : 'and';
 BECAUSE      : 'because';
@@ -16,68 +16,59 @@ THEN         : 'then';
 VALUESET     : 'valueset';
 WHEN         : 'when';
 WITH         : 'with';
-ERROR        : 'error'; // DO NOT remove as this is used by the lexer error listener.
 
-// Punctuation
+// === Multi-word phrase tokens ===
+END_WHEN           : 'end when';
+RECOMMEND_ACTIVITY : 'recommend activity';
+USE_DECISION       : 'use decision';
+TYPE_IS            : 'type is' -> mode(CONCEPT_MODE);
+VALUETYPE_IS       : 'valuetype is' -> mode(VALUE_TYPE_MODE);
+EVIDENCE_IS        : 'evidence is';
+INFERRED_FROM      : 'inferred from';
+CODED_FROM         : 'coded from';
+APPLY_PATTERN      : 'apply pattern';
+ALL_BLOCK          : 'all:';
+ANY_BLOCK          : 'any:';
+
+// === Punctuation ===
 COLON        : ':';
 DOT          : '.';
+DASH         : '-';
 LPAREN       : '(';
 RPAREN       : ')';
+HEADER       : '#' ~[\r\n]* ;
+EMPTY_STRING : '``' ;
 
-// Markdown header
-HEADER: '#' ~[\r\n]* ;
-
-// Empty string literal (two backticks with nothing in between)
-EMPTY_STRING: '``' ;
-
-// Dash for list items
-DASH: '-' ;
-
-// Block starters for 'all:' and 'any:'
-ALL_BLOCK: 'all:' ;
-ANY_BLOCK: 'any:' ;
-
-// Multi-word phrase tokens for easier parsing
-END_WHEN: 'end when' ;
-RECOMMEND_ACTIVITY: 'recommend activity' ;
-USE_DECISION: 'use decision' ;
-TYPE_IS: 'type is' -> mode(CONCEPT_MODE);
-VALUETYPE_IS: 'valuetype is' -> mode(VALUE_TYPE_MODE);
-EVIDENCE_IS: 'evidence is' ;
-INFERRED_FROM: 'inferred from' ;
-CODED_FROM: 'coded from' ;
-APPLY_PATTERN: 'apply pattern' ;
-
-// Double-quoted identifier/reference
+// === String Types ===
 QUOTED_STRING
     : '"' ( ~["\\\r\n] )* '"'
     ;
 
-// Backtick-quoted string literal (for markdown or free text)
 BACKTICK_STRING
     : '`' ( ~[`\\] | '\\' . )* '`'
     ;
 
-// Block comment fragment
+// === Comments and Whitespace ===
 fragment BLOCK_COMMENT
     : '/*' .*? '*/'
     ;
 
-// Skip whitespace.
 WS
     : [ \t\r\n]+ -> skip
     ;
 
-// Single-line comment.
 COMMENT
     : '//' ~[\r\n]* -> skip
     ;
 
-// Block comment.
 COMMENT_BLOCK
     : BLOCK_COMMENT -> skip
     ;
 
+// === Error Handling ===
+ERROR        : 'error'; // DO NOT remove as this is used by the lexer error listener.
+
+// === Modes ===
 mode ACTIVITY_MODE;
 
 // ACTIVITY_TYPE possibilities (case sensitive)
@@ -114,13 +105,9 @@ ACTIVITY_TYPE
     }
     -> mode(DEFAULT_MODE)
     ;
-
-// Skip whitespace in activity mode
 ACTIVITY_WS
     : [ \t\r\n]+ -> skip
     ;
-
-// Block comment in activity mode
 ACTIVITY_COMMENT_BLOCK
     : BLOCK_COMMENT -> skip
     ;
@@ -142,10 +129,6 @@ ACTIVITY_ErrorChar
     ;
 
 mode CONCEPT_MODE;
-
-CONCEPT_IS
-    : 'is' -> type(IS)
-    ;
 
 // CONCEPT_TYPE possibilities (case sensitive)
 // Consider adding:
@@ -203,13 +186,9 @@ CONCEPT_TYPE
     }
     -> mode(DEFAULT_MODE)
     ;
-
-// Skip whitespace in concept mode
 CONCEPT_WS
     : [ \t\r\n]+ -> skip
     ;
-
-// Block comment in concept mode
 CONCEPT_COMMENT_BLOCK
     : BLOCK_COMMENT -> skip
     ;
@@ -231,11 +210,6 @@ CONCEPT_ErrorChar
     ;
 
 mode VALUE_TYPE_MODE;
-
-VALUE_TYPE_IS
-    : 'is' -> type(IS)
-    ;
-
 // CONCEPT_VALUE_TYPE possibilities (case sensitive)
 CONCEPT_VALUE_TYPE
     : [a-zA-Z]+ {
@@ -268,13 +242,9 @@ CONCEPT_VALUE_TYPE
     }
     -> mode(DEFAULT_MODE)
     ;
-
-// Skip whitespace in value type mode
 VALUE_TYPE_WS
     : [ \t\r\n]+ -> skip
     ;
-
-// Block comment in value type mode
 VALUE_TYPE_COMMENT_BLOCK
     : BLOCK_COMMENT -> skip
     ;
