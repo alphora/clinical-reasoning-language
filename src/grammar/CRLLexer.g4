@@ -2,33 +2,22 @@ lexer grammar CRLLexer;
 
 // Keywords
 ACTIVITY     : 'activity';
-ALL          : 'all';
 AND          : 'and';
-ANY          : 'any';
-APPLY        : 'apply';
 BECAUSE      : 'because';
 CODE         : 'code';
-CODED        : 'coded';
 CONCEPT      : 'concept';
 DECISION     : 'decision';
 DONE         : 'done';
 DO           : 'do';
-EVIDENCE     : 'evidence';
-FROM         : 'from';
-INFERRED     : 'inferred';
-IS           : 'is';
 NOT          : 'not';
 OR           : 'or';
-PATTERN      : 'pattern';
 PERFORM      : 'perform' -> mode(ACTIVITY_MODE);
 SYSTEM       : 'system';
 TERMINOLOGY  : 'terminology';
 THEN         : 'then';
-USE          : 'use';
 VALUESET     : 'valueset';
 WHEN         : 'when';
 WITH         : 'with';
-
 ERROR        : 'error'; // DO NOT remove as this is used by the lexer error listener.
 
 // Punctuation
