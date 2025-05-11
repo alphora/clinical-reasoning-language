@@ -93,10 +93,10 @@ decision "IMMZ.DT.Immunization Strategy":
   // Measles Supplementary Dose
   // Measles Contraindications
   - when "" then:
-    - use "IMMZ.D2.DT.Measles MCV Dose 0".
-    - use "IMMZ.D2.DT.Measles Ongoing Transmission".
-    - use "IMMZ.D2.DT.Measles Supplementary".
-    - use "IMMZ.D5.DT.Measles.Contraindication".
+    - use decision "IMMZ.D2.DT.Measles MCV Dose 0".
+    - use decision "IMMZ.D2.DT.Measles Ongoing Transmission".
+    - use decision "IMMZ.D2.DT.Measles Supplementary".
+    - use decision "IMMZ.D5.DT.Measles.Contraindication".
   - end when
 - end when
 
