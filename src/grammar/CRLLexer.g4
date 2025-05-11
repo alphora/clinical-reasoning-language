@@ -37,7 +37,6 @@ DASH         : '-';
 LPAREN       : '(';
 RPAREN       : ')';
 HEADER       : '#' ~[\r\n]* ;
-EMPTY_STRING : '``' ;
 
 // === String Types ===
 QUOTED_STRING
