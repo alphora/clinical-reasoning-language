@@ -1,4 +1,25 @@
-# Immunization for Measles
+# Clinical Reasoning Language Example
+
+/*
+Clinical Reasoning Language (CRL):
+IS case sensitive.
+NOT whitespace sensitive.
+NOT indentation sensitive.
+The file must start with `#` and a markdown valid has string.
+Quoted strings cannot contain escape characters.
+Quoted strings (not in comments) are identifiers.
+The `inferred from` value describes concept derivation using logical operators and references, indicating how those referenced concepts collectively infer the target concept, not as a strictly evaluatable Boolean formula.
+The `inferred from` value can include any number of concept identifiers.
+The keywords `any/all` are optional (if not present, defaults to any).
+The keyword `with` and `because` for `activity` are optional.
+The keyword phrase `evidence is` for concept is optional.
+One of either the keyword phrases `inferred from` or `coded from` are required for concept.
+One of either the keywords `valueset`, `` (unknown) or `system/code` are required for terminology.
+The keyword phrase `apply pattern` for concept is optional and can only be used in conjunction with `inferred from`.
+A crl can have any number of decision, terminology, activity, concept.
+The example includes all options for valid statements.
+Anything not identified as optional here is required.
+*/
 
 decision "IMMZ.D2.D5.Measles":
 
@@ -10,6 +31,7 @@ decision "IMMZ.D2.D5.Measles":
 - end when
 - when "Client Is Due For MCV12" then recommend activity "Vaccinate".
 - when "One Primary Series Dose Administered" then:
+  any:
   - when "Client Age Less Than 15 Months" then recommend activity "Indicate".
   - when "Last Live Vaccine Administered has had in 4 Weeks" then use decision "Elderly Based".
   - when "Client Is Due For MCV12" then recommend activity "Vaccinate".
@@ -20,6 +42,7 @@ decision "Elderly Based":
 
 - when "Client Age Greater Than 60" then recommend activity "Indicate".
 - when "Client Age Less Than 60" then:
+  all:
   - recommend activity "Vaccinate".
   - recommend activity "another thing".
   - recommend activity "something else".
