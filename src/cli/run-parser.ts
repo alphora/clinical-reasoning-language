@@ -3,12 +3,12 @@ import { join } from "path";
 
 import { createParser } from "../parser/createParser";
 
-// Read the example file
-const examplePath = join(
-  __dirname,
-  "../examples/crl/who/smart-example-immz/IMMZ_All_Decisions.crl",
-);
-const input = readFileSync(examplePath, "utf-8");
+// Parse --path argument
+const pathArgIndex = process.argv.indexOf("--path");
+const filePath =
+  (pathArgIndex !== -1 && process.argv[pathArgIndex + 1]) ||
+  join(__dirname, "../examples/crl/who/smart-example-immz/IMMZ_All_Decisions.crl");
+const input = readFileSync(filePath, "utf-8");
 
 // Create the parser (new API)
 const { parser } = createParser(input);
@@ -40,7 +40,7 @@ if (!prettyOutput) {
     }),
   };
 
-  console.log("Parse Tree:");
+  console.log(`Parse Tree for: ${filePath}`);
   console.log("===========");
   console.log(JSON.stringify(serializableTree, null, 2));
 }

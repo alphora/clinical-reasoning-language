@@ -4,14 +4,14 @@ import { join } from "path";
 import { CRLLexer } from "../grammar/generated/antlr/CRLLexer";
 import { createLexer } from "../lexer/createLexer";
 
-// Get the path to the grammar example file
-const examplePath = join(
-  __dirname,
-  "../examples/crl/who/smart-example-immz/IMMZ_All_Decisions.crl",
-);
+// Parse --path argument
+const pathArgIndex = process.argv.indexOf("--path");
+const filePath =
+  (pathArgIndex !== -1 && process.argv[pathArgIndex + 1]) ||
+  join(__dirname, "../examples/crl/who/smart-example-immz/IMMZ_All_Decisions.crl");
 
 // Read the file content
-const input = readFileSync(examplePath, "utf8");
+const input = readFileSync(filePath, "utf8");
 
 // Create lexer instance (new API)
 const { lexer } = createLexer(input);
@@ -50,7 +50,7 @@ if (!prettyOutput) {
   console.log(JSON.stringify(tokens, null, 2));
 } else {
   // Pretty lexer output
-  console.log("\nTokenizing grammar-example.crl:\n");
+  console.log(`\nTokenizing: ${filePath}\n`);
   console.log("Line | Column | Type | Text");
   console.log("-----|--------|------|------");
 

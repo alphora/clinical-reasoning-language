@@ -54,11 +54,11 @@ decision "Elderly Based":
   - end when
 - end when
 
-activity "Vaccinate" request CPGImmunization.
+activity "Vaccinate" request CPGImmunizationRequest.
 
-activity "Indicate" request CPGProposeDiagnosis with "Colonoscopy".
+activity "Indicate" request CPGProposeDiagnosisTask with "Colonoscopy".
 
-activity "another thing" request CPGCommunication with `Do the thing` because `it's the right thing to do`.
+activity "another thing" request CPGCommunicationRequest with `Do the thing` because `it's the right thing to do`.
 
 terminology "BMI Range as a Condition" ``.
 
