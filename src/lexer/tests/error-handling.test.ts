@@ -35,11 +35,11 @@ describe("Lexer Error Handling", () => {
         minTokens: 0,
       },
       {
-        input: "done\n@invalid",
+        input: "end when\n@invalid",
         minTokens: 1,
       },
       {
-        input: "done\n  @invalid",
+        input: "end when\n  @invalid",
         minTokens: 1,
       },
     ];
@@ -65,16 +65,16 @@ describe("Lexer Error Handling", () => {
         expectedMessage: "Invalid token: ~invalid",
       },
       {
-        input: "request @invalid",
+        input: "recommend activity @invalid",
         expectedMessage: "Invalid token: @invalid",
       },
       {
-        input: "type is @invalid",
-        expectedMessage: "Invalid token: @invalid",
+        input: "- type is @invalid",
+        expectedMessage: "Invalid concept type: @invalid",
       },
       {
-        input: "valuetype is @invalid",
-        expectedMessage: "Invalid token: @invalid",
+        input: "- valuetype is @invalid",
+        expectedMessage: "Invalid concept value type: @invalid",
       },
     ];
     testCases.forEach(({ input, expectedMessage }) => {
@@ -90,16 +90,16 @@ describe("Lexer Error Handling", () => {
   it("should throw an exception for invalid activity types", () => {
     const testCases = [
       {
-        input: "perform invalidActivity",
+        input: 'activity "blah" request invalidActivity',
         expectedMessage: "Invalid activity type",
       },
       {
-        input: "perform invalid",
+        input: 'activity "blah" request invalid',
         expectedMessage: "Invalid activity type",
       },
       {
-        input: 'decision "test"\nwhen "true" then perform unknownActivity\ndone',
-        expectedMessage: "Invalid activity type",
+        input: 'decision "test":\nwhen "true" then recommend activity unknownActivity\n.',
+        expectedMessage: "Invalid token: unknownActivity",
       },
     ];
 
@@ -116,11 +116,11 @@ describe("Lexer Error Handling", () => {
   it("should throw an exception for invalid concept types", () => {
     const testCases = [
       {
-        input: "concept type InvalidConcept",
+        input: 'concept "blah": - type is InvalidConcept.',
         expectedMessage: "Invalid concept type",
       },
       {
-        input: "concept type SomeRandomType",
+        input: 'concept "blah": - type is SomeRandomType.',
         expectedMessage: "Invalid concept type",
       },
     ];
@@ -138,11 +138,11 @@ describe("Lexer Error Handling", () => {
   it("should throw an exception for invalid concept value types", () => {
     const testCases = [
       {
-        input: "concept valuetype InvalidValueType",
+        input: 'concept "blah": - valuetype is InvalidValueType.',
         expectedMessage: "Invalid concept value type",
       },
       {
-        input: "concept valuetype SomeRandomValueType",
+        input: 'concept "blah": - valuetype is SomeRandomValueType.',
         expectedMessage: "Invalid concept value type",
       },
     ];
@@ -160,12 +160,12 @@ describe("Lexer Error Handling", () => {
   it("should throw an exception for invalid characters in concept mode", () => {
     const testCases = [
       {
-        input: "concept type @invalid",
-        expectedMessage: "Invalid character in concept type",
+        input: 'concept "blah": - type is @invalid.',
+        expectedMessage: "Invalid concept type: @invalid",
       },
       {
-        input: "concept type $invalid",
-        expectedMessage: "Invalid character in concept type",
+        input: 'concept "blah": - type is $invalid',
+        expectedMessage: "Invalid concept type: $invalid",
       },
     ];
 
@@ -182,12 +182,12 @@ describe("Lexer Error Handling", () => {
   it("should throw an exception for invalid characters in value type mode", () => {
     const testCases = [
       {
-        input: "concept valuetype @invalid",
-        expectedMessage: "Invalid character in concept value type",
+        input: 'concept "blah": - valuetype is @invalid.',
+        expectedMessage: "Invalid concept value type: @invalid",
       },
       {
-        input: "concept valuetype $invalid",
-        expectedMessage: "Invalid character in concept value type",
+        input: 'concept "blah": - valuetype is $invalid',
+        expectedMessage: "Invalid concept value type: $invalid",
       },
     ];
 
@@ -204,12 +204,12 @@ describe("Lexer Error Handling", () => {
   it("should throw an exception for invalid characters in activity mode", () => {
     const testCases = [
       {
-        input: "perform @invalid",
-        expectedMessage: "Invalid character in activity type",
+        input: "request @invalid",
+        expectedMessage: "Invalid activity type: @invalid",
       },
       {
-        input: "perform $invalid",
-        expectedMessage: "Invalid character in activity type",
+        input: "request $invalid",
+        expectedMessage: "Invalid activity type: $invalid",
       },
     ];
 
@@ -232,6 +232,6 @@ describe("tokenizeCRL error reporting", () => {
     expect(result.errors && result.errors.length).toBeGreaterThan(0);
     const error = result.errors![0] as CRLError;
     expect(error.type).toBe("LexicalError");
-    expect(error.message).toContain("Invalid token: @invalid");
+    expect(error.message).toContain("Invalid activity type: @invalid");
   });
 });
