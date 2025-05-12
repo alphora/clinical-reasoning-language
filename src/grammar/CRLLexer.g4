@@ -40,11 +40,25 @@ HEADER       : '#' ~[\r\n]* ;
 
 // === String Types ===
 QUOTED_STRING
-    : '"' ( ~["\\\r\n] )* '"'
+    : '"' ( ~["\\\r\n] )* '"' // valid quoted string
+    | '"' ( ~["\\\r\n] )* { // unterminated quoted string
+        this.text = JSON.stringify({
+            errorType: 'InvalidToken',
+            value: this.text
+        });
+        this.type = CRLLexer.ERROR;
+    }
     ;
 
 BACKTICK_STRING
-    : '`' ( ~[`\\] | '\\' . )* '`'
+    : '`' ( ~[`\\] | '\\' . )* '`' // valid backtick string
+    | '`' ( ~[`\\] | '\\' . )* { // unterminated backtick string
+        this.text = JSON.stringify({
+            errorType: 'InvalidToken',
+            value: this.text
+        });
+        this.type = CRLLexer.ERROR;
+    }
     ;
 
 // === Comments and Whitespace ===
@@ -204,7 +218,6 @@ VALUE_TYPE_COMMENT_BLOCK
     : BLOCK_COMMENT -> skip
     ;
 
-// === Modes ===
 mode DEFAULT_MODE;
 
 // Catch-all error handling for unmatched characters in DEFAULT_MODE
