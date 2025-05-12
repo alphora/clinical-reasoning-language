@@ -63,7 +63,7 @@ export function getActivityPerformClause(activityDef: ActivityDef): {
       doNotPerform = true;
     }
     if (!kindRule) {
-      // Remove all console.log statements with messages prefixed with [DEBUGGING]
+      /* empty */
     }
   }
 

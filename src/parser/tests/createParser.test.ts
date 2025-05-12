@@ -22,9 +22,7 @@ describe("createParser", () => {
     }
     const errors = parserErrorListener.getErrors();
     if (errors.length > 0) {
-      // Debug log for error output
-      // eslint-disable-next-line no-console
-      // console.log('[DEBUGGING] Parser errors:', errors);
+      /* empty */
     }
     expect(errors.length).toBeGreaterThan(0);
     expect(errors.some((e) => e.message.toLowerCase().includes("syntax error"))).toBe(true);

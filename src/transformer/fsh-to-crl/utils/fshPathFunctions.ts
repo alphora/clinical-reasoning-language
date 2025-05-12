@@ -1,5 +1,4 @@
 // FSH Path Functions utility
-// [DEBUGGING] All debug logs are prefixed as per guidelines
 
 /**
  * Ensures the value meets CRL identifier requirements (double-quoted string, no newlines, no escapes).
