@@ -114,11 +114,11 @@ import { CRLLexer } from "../../grammar/generated/antlr/CRLLexer";
 import "./basic-tokens.test";
 import "./comments.test";
 import "./error-handling.test";
+import "./error-listener.test";
 import "./fhir-types.test";
 import "./integration.test";
 import "./structures.test";
 import "./whitespace.test";
-import "./error-listener.test";
 
 describe("CRL Lexer Test Suite", () => {
   it("should run all test suites", () => {
