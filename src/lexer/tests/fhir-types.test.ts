@@ -29,28 +29,28 @@ function verifyTokenSequence(
 
 describe("Action FHIR Types", () => {
   test("should recognize CPGServiceRequest", () => {
-    const input = "perform CPGServiceRequest.";
+    const input = "request CPGServiceRequest.";
     const expectedTokens = getActionTokenSequence();
-    const expectedText = ["perform", "CPGServiceRequest", "."];
+    const expectedText = ["request", "CPGServiceRequest", "."];
     verifyTokenSequence(input, expectedTokens, expectedText);
   });
 
   test("should recognize CPGImmunizationRequest", () => {
-    const input = "perform CPGImmunizationRequest.";
+    const input = "request CPGImmunizationRequest.";
     const expectedTokens = getActionTokenSequence();
-    const expectedText = ["perform", "CPGImmunizationRequest", "."];
+    const expectedText = ["request", "CPGImmunizationRequest", "."];
     verifyTokenSequence(input, expectedTokens, expectedText);
   });
 
-  test("should recognize CPGProposeDiagnosis", () => {
-    const input = "perform CPGProposeDiagnosis.";
+  test("should recognize CPGProposeDiagnosisTask", () => {
+    const input = "request CPGProposeDiagnosisTask.";
     const expectedTokens = getActionTokenSequence();
-    const expectedText = ["perform", "CPGProposeDiagnosis", "."];
+    const expectedText = ["request", "CPGProposeDiagnosisTask", "."];
     verifyTokenSequence(input, expectedTokens, expectedText);
   });
 
   test("should throw error for invalid action type", () => {
-    const input = "perform InvalidActivity.";
+    const input = "request InvalidActivity.";
     const { lexer, errorListener } = createLexer(input);
     while (lexer.nextToken().type !== CRLLexer.EOF) {
       /* empty */
@@ -67,21 +67,21 @@ describe("Case Feature FHIR Types", () => {
   test("should recognize Observation type", () => {
     const input = "type is Observation.";
     const expectedTokens = getCaseFeatureTokenSequence();
-    const expectedText = ["type", "is", "Observation", "."];
+    const expectedText = ["type is", "Observation", "."];
     verifyTokenSequence(input, expectedTokens, expectedText);
   });
 
   test("should recognize Condition type", () => {
     const input = "type is Condition.";
     const expectedTokens = getCaseFeatureTokenSequence();
-    const expectedText = ["type", "is", "Condition", "."];
+    const expectedText = ["type is", "Condition", "."];
     verifyTokenSequence(input, expectedTokens, expectedText);
   });
 
   test("should recognize MedicationRequest type", () => {
     const input = "type is MedicationRequest.";
     const expectedTokens = getCaseFeatureTokenSequence();
-    const expectedText = ["type", "is", "MedicationRequest", "."];
+    const expectedText = ["type is", "MedicationRequest", "."];
     verifyTokenSequence(input, expectedTokens, expectedText);
   });
 
@@ -103,21 +103,21 @@ describe("Concept Value Types", () => {
   test("should recognize Quantity value type", () => {
     const input = "valuetype is Quantity.";
     const expectedTokens = getValueTypeTokenSequence();
-    const expectedText = ["valuetype", "is", "Quantity", "."];
+    const expectedText = ["valuetype is", "Quantity", "."];
     verifyTokenSequence(input, expectedTokens, expectedText);
   });
 
   test("should recognize CodeableConcept value type", () => {
     const input = "valuetype is CodeableConcept.";
     const expectedTokens = getValueTypeTokenSequence();
-    const expectedText = ["valuetype", "is", "CodeableConcept", "."];
+    const expectedText = ["valuetype is", "CodeableConcept", "."];
     verifyTokenSequence(input, expectedTokens, expectedText);
   });
 
   test("should recognize boolean value type", () => {
     const input = "valuetype is boolean.";
     const expectedTokens = getValueTypeTokenSequence();
-    const expectedText = ["valuetype", "is", "boolean", "."];
+    const expectedText = ["valuetype is", "boolean", "."];
     verifyTokenSequence(input, expectedTokens, expectedText);
   });
 
