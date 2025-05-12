@@ -163,7 +163,7 @@ export class CRLLexerErrorListener implements ANTLRErrorListener<number> {
   handleToken(token: Token): void {
     if (token.type === this.ERROR_TOKEN_TYPE) {
       let details: Record<string, unknown> = { text: token.text };
-      let message = "Invalid token";
+      let message: string;
       try {
         const parsed = JSON.parse(token.text ?? "{}") as Record<string, unknown>;
         details = parsed;
@@ -187,7 +187,7 @@ export class CRLLexerErrorListener implements ANTLRErrorListener<number> {
             message = `Invalid character in concept value type: ${parsed.value}`;
             break;
           default:
-            message = `Invalid token: ${parsed.value ?? token.text}`;
+            message = `Invalid token: ${typeof parsed.value === "string" ? parsed.value : token.text}`;
         }
       } catch {
         // fallback to generic message

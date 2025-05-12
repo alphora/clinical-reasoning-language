@@ -72,7 +72,7 @@ mode ACTIVITY_MODE;
 
 // ACTIVITY_TYPE possibilities (case sensitive)
 ACTIVITY_TYPE
-    : [a-zA-Z]+ {
+    : ~[ \t\r\n.:()]+ {
         const validTypes = [
             'CPGAdministerMedication',
             'CPGCollectInformation',
@@ -107,17 +107,6 @@ ACTIVITY_COMMENT_BLOCK
     : BLOCK_COMMENT -> skip
     ;
 
-// Error handling for unmatched characters in activity mode
-ACTIVITY_ErrorChar
-    : . {
-        this.text = JSON.stringify({
-            errorType: 'InvalidCharacterInActivityType',
-            value: this.text
-        });
-        this.type = CRLLexer.ERROR;
-    }
-    ;
-
 mode CONCEPT_MODE;
 
 // CONCEPT_TYPE possibilities (case sensitive)
@@ -134,7 +123,7 @@ mode CONCEPT_MODE;
 // Appointment
 // AppointmentResponse
 CONCEPT_TYPE
-    : [a-zA-Z]+ {
+    : ~[ \t\r\n.:()]+ {
         const validTypes = [
             'AdverseEvent',
             'AllergyIntolerance',
@@ -179,21 +168,10 @@ CONCEPT_COMMENT_BLOCK
     : BLOCK_COMMENT -> skip
     ;
 
-// Error handling for unmatched characters in concept mode
-CONCEPT_ErrorChar
-    : . {
-        this.text = JSON.stringify({
-            errorType: 'InvalidCharacterInConceptType',
-            value: this.text
-        });
-        this.type = CRLLexer.ERROR;
-    }
-    ;
-
 mode VALUE_TYPE_MODE;
 // CONCEPT_VALUE_TYPE possibilities (case sensitive)
 CONCEPT_VALUE_TYPE
-    : [a-zA-Z]+ {
+    : ~[ \t\r\n.:()]+ {
         const validTypes = [
             'Attachment',
             'boolean',
@@ -226,23 +204,12 @@ VALUE_TYPE_COMMENT_BLOCK
     : BLOCK_COMMENT -> skip
     ;
 
-// Error handling for unmatched characters in value type mode
-VALUE_TYPE_ErrorChar
-    : . {
-        this.text = JSON.stringify({
-            errorType: 'InvalidCharacterInConceptValueType',
-            value: this.text
-        });
-        this.type = CRLLexer.ERROR;
-    }
-    ;
-
 // === Modes ===
 mode DEFAULT_MODE;
 
 // Catch-all error handling for unmatched characters in DEFAULT_MODE
 DEFAULT_ErrorChar
-    : [a-zA-Z]+ {
+    : ~[ \t\r\n.:()]+ {
         this.text = JSON.stringify({
             errorType: 'InvalidToken',
             value: this.text
