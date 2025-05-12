@@ -193,14 +193,32 @@ export class CRLLexerErrorListener implements ANTLRErrorListener<number> {
         // fallback to generic message
         message = `Invalid token: ${token.text}`;
       }
-      const error: CRLError = {
-        type: "LexicalError",
-        line: (details.line as number) ?? token.line,
-        column: (details.charPosition as number) ?? token.charPositionInLine,
-        message,
-        details,
-      };
-      this.errors.push(error);
+
+      const lastError = this.errors[this.errors.length - 1];
+      const line = (details.line as number) ?? token.line;
+      const column = (details.charPosition as number) ?? token.charPositionInLine;
+      const value = (details.value as string) ?? token.text;
+      const lastValue =
+        typeof lastError?.details === "object" &&
+        lastError.details !== null &&
+        "value" in lastError.details
+          ? (lastError.details as { value?: unknown }).value
+          : undefined;
+      if (
+        !lastError ||
+        lastError.line !== line ||
+        lastError.column !== column ||
+        lastValue !== value
+      ) {
+        const error: CRLError = {
+          type: "LexicalError",
+          line,
+          column,
+          message,
+          details,
+        };
+        this.errors.push(error);
+      }
     }
   }
 

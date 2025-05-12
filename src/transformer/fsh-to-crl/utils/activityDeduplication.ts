@@ -1,5 +1,4 @@
 // Utility for activity normalization and deduplication
-// [DEBUGGING] All debug logs are prefixed as per guidelines
 
 export type Activity = { name: string; value: string | undefined; original: string };
 
