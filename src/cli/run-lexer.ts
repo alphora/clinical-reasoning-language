@@ -14,7 +14,7 @@ const filePath =
 const input = readFileSync(filePath, "utf8");
 
 // Create lexer instance (new API)
-const { lexer } = createLexer(input);
+const { lexer, errorListener } = createLexer(input);
 
 // Get all tokens
 const tokens: Array<{
@@ -40,6 +40,13 @@ while (token.type !== CRLLexer.EOF) {
   }
 
   token = lexer.nextToken();
+}
+
+// Print errors after tokenization
+const errors = errorListener.getErrors();
+if (errors.length > 0) {
+  console.error("Lexer errors:");
+  errors.forEach((e) => console.error(JSON.stringify(e, null, 2)));
 }
 
 // Check if pretty output is requested
