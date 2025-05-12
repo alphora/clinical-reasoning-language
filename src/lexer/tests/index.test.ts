@@ -146,27 +146,6 @@ export function getAllTokens(lexer: CRLLexer): Token[] {
   return tokens;
 }
 
-/**
- * Verifies that the sequence of tokens matches the expected types and optionally the expected text
- */
-export function verifyTokenSequence(
-  tokens: Token[],
-  expectedTypes: number[],
-  expectedTexts?: string[],
-): void {
-  expect(tokens.length).toBe(expectedTypes.length);
-  if (expectedTexts) {
-    expect(tokens.length).toBe(expectedTexts.length);
-  }
-
-  for (let i = 0; i < tokens.length; i++) {
-    expect(tokens[i].type).toBe(expectedTypes[i]);
-    if (expectedTexts) {
-      expect(tokens[i].text).toBe(expectedTexts[i]);
-    }
-  }
-}
-
 // Export common imports and types
 export { CRLLexer };
 export { Token };

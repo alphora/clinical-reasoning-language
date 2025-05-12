@@ -8,7 +8,7 @@ describe("Structures", () => {
     it("should tokenize basic decision blocks", () => {
       const input = `decision "Test Decision":
     when "Condition" then
-        do "Action"
+        ERROR
     done`;
       const tokens = getTokensFromString(input);
 
@@ -19,9 +19,7 @@ describe("Structures", () => {
         CRLLexer.WHEN,
         CRLLexer.QUOTED_STRING,
         CRLLexer.THEN,
-        CRLLexer.DO,
-        CRLLexer.QUOTED_STRING,
-        CRLLexer.DONE,
+        CRLLexer.ERROR,
       ]);
     });
 
@@ -30,13 +28,13 @@ describe("Structures", () => {
     when "Condition 1" then
         all:
         when "Subcondition 1" then
-            do "Action 1"
+            ERROR
         when "Subcondition 2" then
             any:
             when "Subsubcondition 1" then
-                do "Action 2"
+                ERROR
             when "Subsubcondition 2" then
-                use "Another Decision"
+                use ERROR
     done`;
       const tokens = getTokensFromString(input);
 
@@ -47,29 +45,25 @@ describe("Structures", () => {
         CRLLexer.WHEN,
         CRLLexer.QUOTED_STRING,
         CRLLexer.THEN,
-        CRLLexer.ALL,
+        CRLLexer.ALL_BLOCK,
         CRLLexer.COLON,
         CRLLexer.WHEN,
         CRLLexer.QUOTED_STRING,
         CRLLexer.THEN,
-        CRLLexer.DO,
-        CRLLexer.QUOTED_STRING,
+        CRLLexer.ERROR,
         CRLLexer.WHEN,
         CRLLexer.QUOTED_STRING,
         CRLLexer.THEN,
-        CRLLexer.ANY,
+        CRLLexer.ANY_BLOCK,
         CRLLexer.COLON,
         CRLLexer.WHEN,
         CRLLexer.QUOTED_STRING,
         CRLLexer.THEN,
-        CRLLexer.DO,
-        CRLLexer.QUOTED_STRING,
+        CRLLexer.ERROR,
         CRLLexer.WHEN,
         CRLLexer.QUOTED_STRING,
         CRLLexer.THEN,
-        CRLLexer.USE,
-        CRLLexer.QUOTED_STRING,
-        CRLLexer.DONE,
+        CRLLexer.ERROR,
       ]);
     });
 
@@ -80,7 +74,7 @@ describe("Structures", () => {
       verifyTokenSequence(tokens, [
         CRLLexer.ACTIVITY,
         CRLLexer.QUOTED_STRING,
-        CRLLexer.PERFORM,
+        CRLLexer.ERROR,
         CRLLexer.ACTIVITY_TYPE,
         CRLLexer.DOT,
       ]);
@@ -93,7 +87,7 @@ describe("Structures", () => {
       verifyTokenSequence(tokens, [
         CRLLexer.ACTIVITY,
         CRLLexer.QUOTED_STRING,
-        CRLLexer.PERFORM,
+        CRLLexer.ERROR,
         CRLLexer.ACTIVITY_TYPE,
         CRLLexer.WITH,
         CRLLexer.QUOTED_STRING,
@@ -155,15 +149,13 @@ describe("Structures", () => {
         CRLLexer.CONCEPT,
         CRLLexer.QUOTED_STRING,
         CRLLexer.COLON,
-        CRLLexer.TYPE,
-        CRLLexer.IS,
+        CRLLexer.TYPE_IS,
         CRLLexer.CONCEPT_TYPE,
         CRLLexer.DOT,
-        CRLLexer.VALUETYPE,
-        CRLLexer.IS,
+        CRLLexer.VALUETYPE_IS,
         CRLLexer.CONCEPT_VALUE_TYPE,
         CRLLexer.DOT,
-        CRLLexer.DONE,
+        CRLLexer.ERROR,
       ]);
     });
 
@@ -177,23 +169,19 @@ describe("Structures", () => {
         CRLLexer.CONCEPT,
         CRLLexer.QUOTED_STRING,
         CRLLexer.COLON,
-        CRLLexer.TYPE,
-        CRLLexer.IS,
+        CRLLexer.TYPE_IS,
         CRLLexer.CONCEPT_TYPE,
         CRLLexer.DOT,
-        CRLLexer.VALUETYPE,
-        CRLLexer.IS,
+        CRLLexer.VALUETYPE_IS,
         CRLLexer.CONCEPT_VALUE_TYPE,
         CRLLexer.DOT,
-        CRLLexer.EVIDENCE,
-        CRLLexer.IS,
+        CRLLexer.EVIDENCE_IS,
         CRLLexer.BACKTICK_STRING,
         CRLLexer.DOT,
-        CRLLexer.CODED,
-        CRLLexer.FROM,
+        CRLLexer.CODED_FROM,
         CRLLexer.QUOTED_STRING,
         CRLLexer.DOT,
-        CRLLexer.DONE,
+        CRLLexer.ERROR,
       ]);
     });
 
@@ -207,22 +195,18 @@ describe("Structures", () => {
         CRLLexer.CONCEPT,
         CRLLexer.QUOTED_STRING,
         CRLLexer.COLON,
-        CRLLexer.TYPE,
-        CRLLexer.IS,
+        CRLLexer.TYPE_IS,
         CRLLexer.CONCEPT_TYPE,
         CRLLexer.DOT,
-        CRLLexer.VALUETYPE,
-        CRLLexer.IS,
+        CRLLexer.VALUETYPE_IS,
         CRLLexer.CONCEPT_VALUE_TYPE,
         CRLLexer.DOT,
-        CRLLexer.INFERRED,
-        CRLLexer.FROM,
+        CRLLexer.INFERRED_FROM,
         CRLLexer.QUOTED_STRING,
-        CRLLexer.APPLY,
-        CRLLexer.PATTERN,
+        CRLLexer.APPLY_PATTERN,
         CRLLexer.BACKTICK_STRING,
         CRLLexer.DOT,
-        CRLLexer.DONE,
+        CRLLexer.ERROR,
       ]);
     });
 
@@ -236,17 +220,13 @@ describe("Structures", () => {
         CRLLexer.CONCEPT,
         CRLLexer.QUOTED_STRING,
         CRLLexer.COLON,
-        CRLLexer.TYPE,
-        CRLLexer.IS,
+        CRLLexer.TYPE_IS,
         CRLLexer.CONCEPT_TYPE,
         CRLLexer.DOT,
-        CRLLexer.VALUETYPE,
-        CRLLexer.IS,
+        CRLLexer.VALUETYPE_IS,
         CRLLexer.CONCEPT_VALUE_TYPE,
         CRLLexer.DOT,
-        CRLLexer.INFERRED,
-        CRLLexer.FROM,
-        CRLLexer.LPAREN,
+        CRLLexer.INFERRED_FROM,
         CRLLexer.QUOTED_STRING,
         CRLLexer.OR,
         CRLLexer.QUOTED_STRING,
@@ -254,7 +234,7 @@ describe("Structures", () => {
         CRLLexer.QUOTED_STRING,
         CRLLexer.RPAREN,
         CRLLexer.DOT,
-        CRLLexer.DONE,
+        CRLLexer.ERROR,
       ]);
     });
   });

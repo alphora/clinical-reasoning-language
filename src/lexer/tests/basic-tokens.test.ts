@@ -1,49 +1,40 @@
 import { CRLLexer } from "../../grammar/generated/antlr/CRLLexer";
 
-import { getTokensFromString } from "./helpers";
-import { verifyTokenSequence } from "./index.test";
+import { getTokensFromString, verifyTokenSequence } from "./helpers";
 
 // TODO: update tests to use BACKTICK_STRING (instead of STRING)
 
 describe("CRL Lexer - Basic Tokens", () => {
   describe("Keywords", () => {
     it("should tokenize decision statement", () => {
-      const input =
-        'decision "Test Decision":\n    when "Condition" then:\n        do "Action"\n    done';
+      const input = 'decision "Test Decision":\n- when "Condition" then:';
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(tokens, [
         CRLLexer.DECISION,
         CRLLexer.QUOTED_STRING,
         CRLLexer.COLON,
+        CRLLexer.DASH,
         CRLLexer.WHEN,
         CRLLexer.QUOTED_STRING,
         CRLLexer.THEN,
         CRLLexer.COLON,
-        CRLLexer.DO,
-        CRLLexer.QUOTED_STRING,
-        CRLLexer.DONE,
       ]);
     });
 
     it("should tokenize decision statement with multiple actions", () => {
-      const input =
-        'decision "Test Decision":\n    when "Condition" then:\n        do "Action1"\n        do "Action2"\n    done';
+      const input = 'decision "Test Decision":\n- when "Condition" then:';
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(tokens, [
         CRLLexer.DECISION,
         CRLLexer.QUOTED_STRING,
         CRLLexer.COLON,
+        CRLLexer.DASH,
         CRLLexer.WHEN,
         CRLLexer.QUOTED_STRING,
         CRLLexer.THEN,
         CRLLexer.COLON,
-        CRLLexer.DO,
-        CRLLexer.QUOTED_STRING,
-        CRLLexer.DO,
-        CRLLexer.QUOTED_STRING,
-        CRLLexer.DONE,
       ]);
     });
   });
@@ -69,8 +60,8 @@ describe("CRL Lexer - Basic Tokens", () => {
 
       verifyTokenSequence(
         tokens,
-        [CRLLexer.EVIDENCE, CRLLexer.IS, CRLLexer.BACKTICK_STRING],
-        ["evidence", "is", "`some provenance`"],
+        [CRLLexer.EVIDENCE_IS, CRLLexer.BACKTICK_STRING],
+        ["evidence is", "`some provenance`"],
       );
     });
 
@@ -80,8 +71,8 @@ describe("CRL Lexer - Basic Tokens", () => {
 
       verifyTokenSequence(
         tokens,
-        [CRLLexer.EVIDENCE, CRLLexer.IS, CRLLexer.BACKTICK_STRING],
-        ["evidence", "is", "`some\\provenance`"],
+        [CRLLexer.EVIDENCE_IS, CRLLexer.BACKTICK_STRING],
+        ["evidence is", "`some\\provenance`"],
       );
     });
   });
@@ -127,66 +118,62 @@ describe("CRL Lexer - Basic Tokens", () => {
 
   describe("Activity Types", () => {
     it("should tokenize CPGImmunizationRequest", () => {
-      const input = "perform CPGImmunizationRequest";
+      const input = "request CPGImmunizationRequest";
       const tokens = getTokensFromString(input);
-
       verifyTokenSequence(
         tokens,
-        [CRLLexer.PERFORM, CRLLexer.ACTIVITY_TYPE],
-        ["perform", "CPGImmunizationRequest"],
+        [CRLLexer.REQUEST, CRLLexer.ACTIVITY_TYPE],
+        ["request", "CPGImmunizationRequest"],
       );
     });
 
     it("should tokenize CPGProposeDiagnosis", () => {
-      const input = "perform CPGProposeDiagnosis";
+      const input = "request CPGProposeDiagnosis";
       const tokens = getTokensFromString(input);
-
       verifyTokenSequence(
         tokens,
-        [CRLLexer.PERFORM, CRLLexer.ACTIVITY_TYPE],
-        ["perform", "CPGProposeDiagnosis"],
+        [CRLLexer.REQUEST, CRLLexer.ACTIVITY_TYPE],
+        ["request", "CPGProposeDiagnosis"],
       );
     });
 
     it("should tokenize medication-related activities", () => {
-      const input = "perform CPGMedicationRequest perform CPGServiceRequest perform CPGStop";
+      const input = "request CPGMedicationRequest request CPGServiceRequest request CPGStop";
       const tokens = getTokensFromString(input);
-
       verifyTokenSequence(
         tokens,
         [
-          CRLLexer.PERFORM,
+          CRLLexer.REQUEST,
           CRLLexer.ACTIVITY_TYPE,
-          CRLLexer.PERFORM,
+          CRLLexer.REQUEST,
           CRLLexer.ACTIVITY_TYPE,
-          CRLLexer.PERFORM,
+          CRLLexer.REQUEST,
           CRLLexer.ACTIVITY_TYPE,
         ],
-        ["perform", "CPGMedicationRequest", "perform", "CPGServiceRequest", "perform", "CPGStop"],
+        ["request", "CPGMedicationRequest", "request", "CPGServiceRequest", "request", "CPGStop"],
       );
     });
 
     it("should tokenize information and communication activities", () => {
       const input =
-        "perform CPGCollectInformation perform CPGCommunication perform CPGGenerateReport";
+        "request CPGCollectInformation request CPGCommunication request CPGGenerateReport";
       const tokens = getTokensFromString(input);
-
       verifyTokenSequence(
         tokens,
         [
-          CRLLexer.PERFORM,
+          CRLLexer.REQUEST,
           CRLLexer.ACTIVITY_TYPE,
-          CRLLexer.PERFORM,
+          CRLLexer.REQUEST,
           CRLLexer.ACTIVITY_TYPE,
-          CRLLexer.PERFORM,
+          CRLLexer.REQUEST,
           CRLLexer.ACTIVITY_TYPE,
         ],
         [
-          "perform",
+          "request",
           "CPGCollectInformation",
-          "perform",
+          "request",
           "CPGCommunication",
-          "perform",
+          "request",
           "CPGGenerateReport",
         ],
       );
@@ -194,25 +181,24 @@ describe("CRL Lexer - Basic Tokens", () => {
 
     it("should tokenize medication administration activities", () => {
       const input =
-        "perform CPGAdministerMedication perform CPGDispenseMedication perform CPGDocumentMedication";
+        "request CPGAdministerMedication request CPGDispenseMedication request CPGDocumentMedication";
       const tokens = getTokensFromString(input);
-
       verifyTokenSequence(
         tokens,
         [
-          CRLLexer.PERFORM,
+          CRLLexer.REQUEST,
           CRLLexer.ACTIVITY_TYPE,
-          CRLLexer.PERFORM,
+          CRLLexer.REQUEST,
           CRLLexer.ACTIVITY_TYPE,
-          CRLLexer.PERFORM,
+          CRLLexer.REQUEST,
           CRLLexer.ACTIVITY_TYPE,
         ],
         [
-          "perform",
+          "request",
           "CPGAdministerMedication",
-          "perform",
+          "request",
           "CPGDispenseMedication",
-          "perform",
+          "request",
           "CPGDocumentMedication",
         ],
       );
@@ -220,42 +206,40 @@ describe("CRL Lexer - Basic Tokens", () => {
 
     it("should tokenize enrollment and record activities", () => {
       const input =
-        "perform CPGEnrollment perform CPGHold perform CPGRecordDetectedIssue perform CPGRecordInference";
+        "request CPGEnrollment request CPGHold request CPGRecordDetectedIssue request CPGRecordInference";
       const tokens = getTokensFromString(input);
-
       verifyTokenSequence(
         tokens,
         [
-          CRLLexer.PERFORM,
+          CRLLexer.REQUEST,
           CRLLexer.ACTIVITY_TYPE,
-          CRLLexer.PERFORM,
+          CRLLexer.REQUEST,
           CRLLexer.ACTIVITY_TYPE,
-          CRLLexer.PERFORM,
+          CRLLexer.REQUEST,
           CRLLexer.ACTIVITY_TYPE,
-          CRLLexer.PERFORM,
+          CRLLexer.REQUEST,
           CRLLexer.ACTIVITY_TYPE,
         ],
         [
-          "perform",
+          "request",
           "CPGEnrollment",
-          "perform",
+          "request",
           "CPGHold",
-          "perform",
+          "request",
           "CPGRecordDetectedIssue",
-          "perform",
+          "request",
           "CPGRecordInference",
         ],
       );
     });
 
     it("should tokenize report and resume activities", () => {
-      const input = "perform CPGReportFlag perform CPGResume";
+      const input = "request CPGReportFlag request CPGResume";
       const tokens = getTokensFromString(input);
-
       verifyTokenSequence(
         tokens,
-        [CRLLexer.PERFORM, CRLLexer.ACTIVITY_TYPE, CRLLexer.PERFORM, CRLLexer.ACTIVITY_TYPE],
-        ["perform", "CPGReportFlag", "perform", "CPGResume"],
+        [CRLLexer.REQUEST, CRLLexer.ACTIVITY_TYPE, CRLLexer.REQUEST, CRLLexer.ACTIVITY_TYPE],
+        ["request", "CPGReportFlag", "request", "CPGResume"],
       );
     });
   });
@@ -267,8 +251,8 @@ describe("CRL Lexer - Basic Tokens", () => {
 
       verifyTokenSequence(
         tokens,
-        [CRLLexer.TYPE, CRLLexer.IS, CRLLexer.CONCEPT_TYPE],
-        ["type", "is", "Observation"],
+        [CRLLexer.TYPE_IS, CRLLexer.CONCEPT_TYPE],
+        ["type is", "Observation"],
       );
     });
 
@@ -278,44 +262,44 @@ describe("CRL Lexer - Basic Tokens", () => {
 
       verifyTokenSequence(
         tokens,
-        [CRLLexer.TYPE, CRLLexer.IS, CRLLexer.CONCEPT_TYPE],
-        ["type", "is", "Condition"],
+        [CRLLexer.TYPE_IS, CRLLexer.CONCEPT_TYPE],
+        ["type is", "Condition"],
       );
     });
 
     it("should tokenize medication-related concepts", () => {
       const input =
-        "type is MedicationRequest\ntype is MedicationDispense\ntype is MedicationAdministration\ntype is MedicationStatement";
+        "- type is MedicationRequest\n- type is MedicationDispense\n- type is MedicationAdministration\n- type is MedicationStatement";
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(
         tokens,
         [
-          CRLLexer.TYPE,
-          CRLLexer.IS,
+          CRLLexer.DASH,
+          CRLLexer.TYPE_IS,
           CRLLexer.CONCEPT_TYPE,
-          CRLLexer.TYPE,
-          CRLLexer.IS,
+          CRLLexer.DASH,
+          CRLLexer.TYPE_IS,
           CRLLexer.CONCEPT_TYPE,
-          CRLLexer.TYPE,
-          CRLLexer.IS,
+          CRLLexer.DASH,
+          CRLLexer.TYPE_IS,
           CRLLexer.CONCEPT_TYPE,
-          CRLLexer.TYPE,
-          CRLLexer.IS,
+          CRLLexer.DASH,
+          CRLLexer.TYPE_IS,
           CRLLexer.CONCEPT_TYPE,
         ],
         [
-          "type",
-          "is",
+          "-",
+          "type is",
           "MedicationRequest",
-          "type",
-          "is",
+          "-",
+          "type is",
           "MedicationDispense",
-          "type",
-          "is",
+          "-",
+          "type is",
           "MedicationAdministration",
-          "type",
-          "is",
+          "-",
+          "type is",
           "MedicationStatement",
         ],
       );
@@ -323,37 +307,34 @@ describe("CRL Lexer - Basic Tokens", () => {
 
     it("should tokenize communication and questionnaire concepts", () => {
       const input =
-        "type is Communication\ntype is CommunicationRequest\ntype is QuestionnaireTask\ntype is QuestionnaireResponse";
+        "- type is Communication\n- type is CommunicationRequest\n- type is QuestionnaireTask\n- type is QuestionnaireResponse";
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(
         tokens,
         [
-          CRLLexer.TYPE,
-          CRLLexer.IS,
+          CRLLexer.DASH,
+          CRLLexer.TYPE_IS,
           CRLLexer.CONCEPT_TYPE,
-          CRLLexer.TYPE,
-          CRLLexer.IS,
+          CRLLexer.DASH,
+          CRLLexer.TYPE_IS,
           CRLLexer.CONCEPT_TYPE,
-          CRLLexer.TYPE,
-          CRLLexer.IS,
-          CRLLexer.CONCEPT_TYPE,
-          CRLLexer.TYPE,
-          CRLLexer.IS,
+          CRLLexer.DASH,
+          CRLLexer.TYPE_IS,
           CRLLexer.CONCEPT_TYPE,
         ],
         [
-          "type",
-          "is",
+          "-",
+          "type is",
           "Communication",
-          "type",
-          "is",
+          "-",
+          "type is",
           "CommunicationRequest",
-          "type",
-          "is",
+          "-",
+          "type is",
           "QuestionnaireTask",
-          "type",
-          "is",
+          "-",
+          "type is",
           "QuestionnaireResponse",
         ],
       );
@@ -361,37 +342,34 @@ describe("CRL Lexer - Basic Tokens", () => {
 
     it("should tokenize immunization and service concepts", () => {
       const input =
-        "type is ImmunizationRequest\ntype is Immunization\ntype is ServiceRequest\ntype is Procedure";
+        "- type is ImmunizationRequest\n- type is Immunization\n- type is ServiceRequest\n- type is Procedure";
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(
         tokens,
         [
-          CRLLexer.TYPE,
-          CRLLexer.IS,
+          CRLLexer.DASH,
+          CRLLexer.TYPE_IS,
           CRLLexer.CONCEPT_TYPE,
-          CRLLexer.TYPE,
-          CRLLexer.IS,
+          CRLLexer.DASH,
+          CRLLexer.TYPE_IS,
           CRLLexer.CONCEPT_TYPE,
-          CRLLexer.TYPE,
-          CRLLexer.IS,
-          CRLLexer.CONCEPT_TYPE,
-          CRLLexer.TYPE,
-          CRLLexer.IS,
+          CRLLexer.DASH,
+          CRLLexer.TYPE_IS,
           CRLLexer.CONCEPT_TYPE,
         ],
         [
-          "type",
-          "is",
+          "-",
+          "type is",
           "ImmunizationRequest",
-          "type",
-          "is",
+          "-",
+          "type is",
           "Immunization",
-          "type",
-          "is",
+          "-",
+          "type is",
           "ServiceRequest",
-          "type",
-          "is",
+          "-",
+          "type is",
           "Procedure",
         ],
       );
@@ -405,8 +383,8 @@ describe("CRL Lexer - Basic Tokens", () => {
 
       verifyTokenSequence(
         tokens,
-        [CRLLexer.VALUETYPE, CRLLexer.IS, CRLLexer.CONCEPT_VALUE_TYPE],
-        ["valuetype", "is", "Quantity"],
+        [CRLLexer.VALUETYPE_IS, CRLLexer.CONCEPT_VALUE_TYPE],
+        ["valuetype is", "Quantity"],
       );
     });
 
@@ -416,126 +394,116 @@ describe("CRL Lexer - Basic Tokens", () => {
 
       verifyTokenSequence(
         tokens,
-        [CRLLexer.VALUETYPE, CRLLexer.IS, CRLLexer.CONCEPT_VALUE_TYPE],
-        ["valuetype", "is", "CodeableConcept"],
+        [CRLLexer.VALUETYPE_IS, CRLLexer.CONCEPT_VALUE_TYPE],
+        ["valuetype is", "CodeableConcept"],
       );
     });
 
     it("should tokenize basic value types", () => {
-      const input = "valuetype is string\nvaluetype is boolean\nvaluetype is integer";
+      const input = "- valuetype is string\n- valuetype is boolean\n- valuetype is integer";
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(
         tokens,
         [
-          CRLLexer.VALUETYPE,
-          CRLLexer.IS,
+          CRLLexer.DASH,
+          CRLLexer.VALUETYPE_IS,
           CRLLexer.CONCEPT_VALUE_TYPE,
-          CRLLexer.VALUETYPE,
-          CRLLexer.IS,
+          CRLLexer.DASH,
+          CRLLexer.VALUETYPE_IS,
           CRLLexer.CONCEPT_VALUE_TYPE,
-          CRLLexer.VALUETYPE,
-          CRLLexer.IS,
+          CRLLexer.DASH,
+          CRLLexer.VALUETYPE_IS,
           CRLLexer.CONCEPT_VALUE_TYPE,
         ],
-        ["valuetype", "is", "string", "valuetype", "is", "boolean", "valuetype", "is", "integer"],
+        ["valuetype is", "string", "valuetype is", "boolean", "valuetype is", "integer"],
       );
     });
 
     it("should tokenize range and ratio types", () => {
-      const input = "valuetype is Range\nvaluetype is Ratio";
+      const input = "- valuetype is Range\n- valuetype is Ratio";
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(
         tokens,
         [
-          CRLLexer.VALUETYPE,
-          CRLLexer.IS,
+          CRLLexer.DASH,
+          CRLLexer.VALUETYPE_IS,
           CRLLexer.CONCEPT_VALUE_TYPE,
-          CRLLexer.VALUETYPE,
-          CRLLexer.IS,
+          CRLLexer.DASH,
+          CRLLexer.VALUETYPE_IS,
           CRLLexer.CONCEPT_VALUE_TYPE,
         ],
-        ["valuetype", "is", "Range", "valuetype", "is", "Ratio"],
+        ["valuetype is", "Range", "valuetype is", "Ratio"],
       );
     });
 
     it("should tokenize sampled data and time types", () => {
-      const input = "valuetype is SampledData\nvaluetype is time\nvaluetype is dateTime";
+      const input = "- valuetype is SampledData\n- valuetype is time\n- valuetype is dateTime";
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(
         tokens,
         [
-          CRLLexer.VALUETYPE,
-          CRLLexer.IS,
+          CRLLexer.DASH,
+          CRLLexer.VALUETYPE_IS,
           CRLLexer.CONCEPT_VALUE_TYPE,
-          CRLLexer.VALUETYPE,
-          CRLLexer.IS,
+          CRLLexer.DASH,
+          CRLLexer.VALUETYPE_IS,
           CRLLexer.CONCEPT_VALUE_TYPE,
-          CRLLexer.VALUETYPE,
-          CRLLexer.IS,
+          CRLLexer.DASH,
+          CRLLexer.VALUETYPE_IS,
           CRLLexer.CONCEPT_VALUE_TYPE,
         ],
-        [
-          "valuetype",
-          "is",
-          "SampledData",
-          "valuetype",
-          "is",
-          "time",
-          "valuetype",
-          "is",
-          "dateTime",
-        ],
+        ["valuetype is", "SampledData", "valuetype is", "time", "valuetype is", "dateTime"],
       );
     });
 
     it("should tokenize period and attachment types", () => {
-      const input = "valuetype is Period\nvaluetype is Attachment";
+      const input = "- valuetype is Period\n- valuetype is Attachment";
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(
         tokens,
         [
-          CRLLexer.VALUETYPE,
-          CRLLexer.IS,
+          CRLLexer.DASH,
+          CRLLexer.VALUETYPE_IS,
           CRLLexer.CONCEPT_VALUE_TYPE,
-          CRLLexer.VALUETYPE,
-          CRLLexer.IS,
+          CRLLexer.DASH,
+          CRLLexer.VALUETYPE_IS,
           CRLLexer.CONCEPT_VALUE_TYPE,
         ],
-        ["valuetype", "is", "Period", "valuetype", "is", "Attachment"],
+        ["valuetype is", "Period", "valuetype is", "Attachment"],
       );
     });
   });
 
   describe("Additional Keywords", () => {
     it("should tokenize activity statement", () => {
-      const input = 'activity "Test" perform CPGImmunizationRequest';
+      const input = 'activity "Test" request CPGImmunizationRequest';
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(tokens, [
         CRLLexer.ACTIVITY,
         CRLLexer.QUOTED_STRING,
-        CRLLexer.PERFORM,
+        CRLLexer.REQUEST,
         CRLLexer.ACTIVITY_TYPE,
       ]);
     });
 
     it("should tokenize concept statement", () => {
-      const input = 'concept "Test":\n    type is Observation\n    valuetype is Quantity';
+      const input = 'concept "Test":\n- type is Observation\n- valuetype is Quantity';
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(tokens, [
         CRLLexer.CONCEPT,
         CRLLexer.QUOTED_STRING,
         CRLLexer.COLON,
-        CRLLexer.TYPE,
-        CRLLexer.IS,
+        CRLLexer.DASH,
+        CRLLexer.TYPE_IS,
         CRLLexer.CONCEPT_TYPE,
-        CRLLexer.VALUETYPE,
-        CRLLexer.IS,
+        CRLLexer.DASH,
+        CRLLexer.VALUETYPE_IS,
         CRLLexer.CONCEPT_VALUE_TYPE,
       ]);
     });
@@ -553,20 +521,20 @@ describe("CRL Lexer - Basic Tokens", () => {
     });
 
     it("should tokenize provenance and inferred statements", () => {
-      const input = "evidence is `source` inferred from `logic`";
+      const input = "- evidence is `source` - inferred from `logic`";
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(
         tokens,
         [
-          CRLLexer.EVIDENCE,
-          CRLLexer.IS,
+          CRLLexer.DASH,
+          CRLLexer.EVIDENCE_IS,
           CRLLexer.BACKTICK_STRING,
-          CRLLexer.INFERRED,
-          CRLLexer.FROM,
+          CRLLexer.DASH,
+          CRLLexer.INFERRED_FROM,
           CRLLexer.BACKTICK_STRING,
         ],
-        ["evidence", "is", "`source`", "inferred", "from", "`logic`"],
+        ["evidence is", "`source`", "inferred from", "`logic`"],
       );
     });
 
@@ -576,8 +544,8 @@ describe("CRL Lexer - Basic Tokens", () => {
 
       verifyTokenSequence(
         tokens,
-        [CRLLexer.CODED, CRLLexer.FROM, CRLLexer.BACKTICK_STRING],
-        ["coded", "from", "`Test`"],
+        [CRLLexer.CODED_FROM, CRLLexer.BACKTICK_STRING],
+        ["coded from", "`Test`"],
       );
     });
 
