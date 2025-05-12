@@ -9,7 +9,7 @@ import { CRLLexer } from "../../grammar/generated/antlr/CRLLexer";
  *    perform ServiceRequest
  */
 export function getActionTokenSequence(): number[] {
-  return [CRLLexer.ERROR, CRLLexer.ACTIVITY_TYPE, CRLLexer.DOT];
+  return [CRLLexer.REQUEST, CRLLexer.ACTIVITY_TYPE, CRLLexer.DOT];
 }
 
 /**
