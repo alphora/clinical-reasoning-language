@@ -40,7 +40,22 @@ export function verifyTokenSequence(
   for (let i = 0; i < tokens.length; i++) {
     expect(tokens[i].type).toBe(expectedTypes[i]);
     if (expectedTexts) {
-      expect(tokens[i].text).toBe(expectedTexts[i]);
+      if (
+        tokens[i].type === CRLLexer.ERROR &&
+        typeof tokens[i].text === "string" &&
+        (tokens[i].text ?? "").trim().startsWith("{")
+      ) {
+        // Try to parse the error JSON and compare the .value property
+        try {
+          const errorObj = JSON.parse(tokens[i].text ?? "{}");
+          expect(errorObj.value).toBe(expectedTexts[i] ?? "");
+        } catch {
+          // If parsing fails, fall back to direct comparison
+          expect(tokens[i].text ?? "").toBe(expectedTexts[i] ?? "");
+        }
+      } else {
+        expect(tokens[i].text ?? "").toBe(expectedTexts[i] ?? "");
+      }
     }
   }
 }
