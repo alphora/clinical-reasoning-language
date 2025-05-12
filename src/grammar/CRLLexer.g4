@@ -90,16 +90,12 @@ ACTIVITY_TYPE
             'CPGServiceRequest'
         ];
         if (!validTypes.includes(this.text)) {
-            for (const listener of this.getErrorListeners()) {
-                if (typeof (listener as any).reportCustomError === 'function') {
-                    (listener as any).reportCustomError(
-                        this._tokenStartLine,
-                        this._tokenStartCharPositionInLine,
-                        `Invalid activity type: ${this.text}`,
-                        { validTypes, received: this.text }
-                    );
-                }
-            }
+            this.text = JSON.stringify({
+                errorType: 'InvalidActivityType',
+                value: this.text,
+                validTypes
+            });
+            this.type = CRLLexer.ERROR;
         }
     }
     -> mode(DEFAULT_MODE)
@@ -114,16 +110,11 @@ ACTIVITY_COMMENT_BLOCK
 // Error handling for unmatched characters in activity mode
 ACTIVITY_ErrorChar
     : . {
-        for (const listener of this.getErrorListeners()) {
-            if (typeof (listener as any).reportCustomError === 'function') {
-                (listener as any).reportCustomError(
-                    this._tokenStartLine,
-                    this._tokenStartCharPositionInLine,
-                    `Invalid character in activity type: ${this.text}`,
-                    { received: this.text }
-                );
-            }
-        }
+        this.text = JSON.stringify({
+            errorType: 'InvalidCharacterInActivityType',
+            value: this.text
+        });
+        this.type = CRLLexer.ERROR;
     }
     ;
 
@@ -171,16 +162,12 @@ CONCEPT_TYPE
             'Task'
         ];
         if (!validTypes.includes(this.text)) {
-            for (const listener of this.getErrorListeners()) {
-                if (typeof (listener as any).reportCustomError === 'function') {
-                    (listener as any).reportCustomError(
-                        this._tokenStartLine,
-                        this._tokenStartCharPositionInLine,
-                        `Invalid concept type: ${this.text}`,
-                        { validTypes, received: this.text }
-                    );
-                }
-            }
+            this.text = JSON.stringify({
+                errorType: 'InvalidConceptType',
+                value: this.text,
+                validTypes
+            });
+            this.type = CRLLexer.ERROR;
         }
     }
     -> mode(DEFAULT_MODE)
@@ -195,16 +182,11 @@ CONCEPT_COMMENT_BLOCK
 // Error handling for unmatched characters in concept mode
 CONCEPT_ErrorChar
     : . {
-        for (const listener of this.getErrorListeners()) {
-            if (typeof (listener as any).reportCustomError === 'function') {
-                (listener as any).reportCustomError(
-                    this._tokenStartLine,
-                    this._tokenStartCharPositionInLine,
-                    `Invalid character in concept type: ${this.text}`,
-                    { received: this.text }
-                );
-            }
-        }
+        this.text = JSON.stringify({
+            errorType: 'InvalidCharacterInConceptType',
+            value: this.text
+        });
+        this.type = CRLLexer.ERROR;
     }
     ;
 
@@ -227,16 +209,12 @@ CONCEPT_VALUE_TYPE
             'time'
         ];
         if (!validTypes.includes(this.text)) {
-            for (const listener of this.getErrorListeners()) {
-                if (typeof (listener as any).reportCustomError === 'function') {
-                    (listener as any).reportCustomError(
-                        this._tokenStartLine,
-                        this._tokenStartCharPositionInLine,
-                        `Invalid concept value type: ${this.text}`,
-                        { validTypes, received: this.text }
-                    );
-                }
-            }
+            this.text = JSON.stringify({
+                errorType: 'InvalidConceptValueType',
+                value: this.text,
+                validTypes
+            });
+            this.type = CRLLexer.ERROR;
         }
     }
     -> mode(DEFAULT_MODE)
@@ -251,15 +229,24 @@ VALUE_TYPE_COMMENT_BLOCK
 // Error handling for unmatched characters in value type mode
 VALUE_TYPE_ErrorChar
     : . {
-        for (const listener of this.getErrorListeners()) {
-            if (typeof (listener as any).reportCustomError === 'function') {
-                (listener as any).reportCustomError(
-                    this._tokenStartLine,
-                    this._tokenStartCharPositionInLine,
-                    `Invalid character in concept value type: ${this.text}`,
-                    { received: this.text }
-                );
-            }
-        }
+        this.text = JSON.stringify({
+            errorType: 'InvalidCharacterInConceptValueType',
+            value: this.text
+        });
+        this.type = CRLLexer.ERROR;
     }
-    ; 
+    ;
+
+// === Modes ===
+mode DEFAULT_MODE;
+
+// Catch-all error handling for unmatched characters in DEFAULT_MODE
+DEFAULT_ErrorChar
+    : [a-zA-Z]+ {
+        this.text = JSON.stringify({
+            errorType: 'InvalidToken',
+            value: this.text
+        });
+        this.type = CRLLexer.ERROR;
+    }
+    ;

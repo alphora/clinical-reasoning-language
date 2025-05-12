@@ -9,7 +9,7 @@ import conceptValueTypesJson from "../grammar/generated/types/conceptValueTypes.
 import { CRLError } from "../types/errors";
 
 export class CRLLexerErrorListener implements ANTLRErrorListener<number> {
-  ERROR_TOKEN_TYPE = 27;
+  ERROR_TOKEN_TYPE = CRLLexer.ERROR;
 
   private readonly errors: CRLError[] = [];
 
@@ -114,7 +114,6 @@ export class CRLLexerErrorListener implements ANTLRErrorListener<number> {
     const specificMessage = this.getSpecificMessage(errorText, msg);
 
     let offendingDetails: unknown = { text: "unknown" };
-    // If offendingSymbol is a Token, extract details
     if (offendingSymbol && typeof (offendingSymbol as unknown as Token).text === "string") {
       const token = offendingSymbol as unknown as Token;
       offendingDetails = {
@@ -140,7 +139,6 @@ export class CRLLexerErrorListener implements ANTLRErrorListener<number> {
         offendingSymbol: offendingDetails,
       },
     };
-    console.error(JSON.stringify(error, null, 2));
     this.errors.push(error);
 
     if (recognizer instanceof CRLLexer) {
@@ -156,27 +154,57 @@ export class CRLLexerErrorListener implements ANTLRErrorListener<number> {
         tokenSource: recognizer,
         inputStream: input,
       };
-
       recognizer.emit(errorToken);
       return;
     }
-
     throw new Error(JSON.stringify(error));
+  }
+
+  handleToken(token: Token): void {
+    if (token.type === this.ERROR_TOKEN_TYPE) {
+      let details: Record<string, unknown> = { text: token.text };
+      let message = "Invalid token";
+      try {
+        const parsed = JSON.parse(token.text ?? "{}") as Record<string, unknown>;
+        details = parsed;
+        switch (parsed.errorType) {
+          case "InvalidActivityType":
+            message = `Invalid activity type: ${parsed.value}`;
+            break;
+          case "InvalidConceptType":
+            message = `Invalid concept type: ${parsed.value}`;
+            break;
+          case "InvalidConceptValueType":
+            message = `Invalid concept value type: ${parsed.value}`;
+            break;
+          case "InvalidCharacterInActivityType":
+            message = `Invalid character in activity type: ${parsed.value}`;
+            break;
+          case "InvalidCharacterInConceptType":
+            message = `Invalid character in concept type: ${parsed.value}`;
+            break;
+          case "InvalidCharacterInConceptValueType":
+            message = `Invalid character in concept value type: ${parsed.value}`;
+            break;
+          default:
+            message = `Invalid token: ${parsed.value ?? token.text}`;
+        }
+      } catch {
+        // fallback to generic message
+        message = `Invalid token: ${token.text}`;
+      }
+      const error: CRLError = {
+        type: "LexicalError",
+        line: (details.line as number) ?? token.line,
+        column: (details.charPosition as number) ?? token.charPositionInLine,
+        message,
+        details,
+      };
+      this.errors.push(error);
+    }
   }
 
   getErrors(): CRLError[] {
     return this.errors;
-  }
-
-  public reportCustomError(line: number, column: number, message: string, details?: unknown): void {
-    const error: CRLError = {
-      type: "LexicalError",
-      line,
-      column,
-      message,
-      details,
-    };
-    console.error(JSON.stringify(error, null, 2));
-    this.errors.push(error);
   }
 }
