@@ -9,7 +9,7 @@ import { CRLLexer } from "../../grammar/generated/antlr/CRLLexer";
  *    perform ServiceRequest
  */
 export function getActionTokenSequence(): number[] {
-  return [CRLLexer.PERFORM, CRLLexer.ACTIVITY_TYPE, CRLLexer.DOT];
+  return [CRLLexer.ERROR, CRLLexer.ACTIVITY_TYPE, CRLLexer.DOT];
 }
 
 /**
@@ -19,7 +19,7 @@ export function getActionTokenSequence(): number[] {
  * type is Observation.
  */
 export function getCaseFeatureTokenSequence(): number[] {
-  return [CRLLexer.TYPE, CRLLexer.IS, CRLLexer.CONCEPT_TYPE, CRLLexer.DOT];
+  return [CRLLexer.TYPE_IS, CRLLexer.CONCEPT_TYPE, CRLLexer.DOT];
 }
 
 /**
@@ -29,5 +29,5 @@ export function getCaseFeatureTokenSequence(): number[] {
  * valuetype is Quantity.
  */
 export function getValueTypeTokenSequence(): number[] {
-  return [CRLLexer.VALUETYPE, CRLLexer.IS, CRLLexer.CONCEPT_VALUE_TYPE, CRLLexer.DOT];
+  return [CRLLexer.VALUETYPE_IS, CRLLexer.CONCEPT_VALUE_TYPE, CRLLexer.DOT];
 }

@@ -17,7 +17,7 @@ describe("Lexer Error Handling", () => {
     const inputs = [
       '"unterminated identifier',
       '"identifier with\nnewline',
-      'decision "unclosed identifier\nthen do "Action".',
+      'decision "unclosed identifier\nthen recommend activity "Action".',
       '"unterminated string with backslash\\',
       '"string with\\\nnewline',
     ];
@@ -47,6 +47,43 @@ describe("Lexer Error Handling", () => {
     testCases.forEach(({ input, minTokens }) => {
       const tokens = getTokensFromString(input);
       expect(tokens.length).toBeGreaterThanOrEqual(minTokens);
+    });
+  });
+
+  it("should throw an exception for invalid tokens", () => {
+    const testCases = [
+      {
+        input: "@invalid",
+        expectedMessage: "Invalid token: @invalid",
+      },
+      {
+        input: "$invalid",
+        expectedMessage: "Invalid token: $invalid",
+      },
+      {
+        input: "~invalid",
+        expectedMessage: "Invalid token: ~invalid",
+      },
+      {
+        input: "request @invalid",
+        expectedMessage: "Invalid token: @invalid",
+      },
+      {
+        input: "type is @invalid",
+        expectedMessage: "Invalid token: @invalid",
+      },
+      {
+        input: "valuetype is @invalid",
+        expectedMessage: "Invalid token: @invalid",
+      },
+    ];
+    testCases.forEach(({ input, expectedMessage }) => {
+      const { errorListener } = getTokensFromString(input, { withListener: true });
+      const errors = errorListener.getErrors();
+      expect(errors.length).toBeGreaterThan(0);
+      const error = errors[0] as CRLError;
+      expect(error.type).toBe("LexicalError");
+      expect(error.message).toContain(expectedMessage);
     });
   });
 
@@ -188,33 +225,13 @@ describe("Lexer Error Handling", () => {
 });
 
 describe("tokenizeCRL error reporting", () => {
-  it("should return errors in ParseResult for invalid activity type", () => {
-    const input = "perform invalidActivity";
+  it("should return errors in ParseResult for invalid tokens", () => {
+    const input = "request @invalid";
     const result = tokenizeCRL(input);
     expect(result.success).toBe(false);
     expect(result.errors && result.errors.length).toBeGreaterThan(0);
     const error = result.errors![0] as CRLError;
     expect(error.type).toBe("LexicalError");
-    expect(error.message).toContain("Invalid activity type");
-  });
-
-  it("should return errors in ParseResult for invalid concept type", () => {
-    const input = "concept type InvalidConcept";
-    const result = tokenizeCRL(input);
-    expect(result.success).toBe(false);
-    expect(result.errors && result.errors.length).toBeGreaterThan(0);
-    const error = result.errors![0] as CRLError;
-    expect(error.type).toBe("LexicalError");
-    expect(error.message).toContain("Invalid concept type");
-  });
-
-  it("should return errors in ParseResult for invalid characters", () => {
-    const input = "@invalid";
-    const result = tokenizeCRL(input);
-    expect(result.success).toBe(false);
-    expect(result.errors && result.errors.length).toBeGreaterThan(0);
-    const error = result.errors![0] as CRLError;
-    expect(error.type).toBe("LexicalError");
-    expect(error.message).toContain("Invalid token");
+    expect(error.message).toContain("Invalid token: @invalid");
   });
 });
