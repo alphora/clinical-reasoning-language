@@ -132,18 +132,6 @@ describe("Integration", () => {
 
         const tokens = getTokensFromString(input);
 
-        // [DEBUGGING] Print actual token types and texts for diagnosis
-        // eslint-disable-next-line no-console
-        console.log(
-          "[DEBUGGING] Actual token types:",
-          tokens.map((t) => t.type),
-        );
-        // eslint-disable-next-line no-console
-        console.log(
-          "[DEBUGGING] Actual token texts:",
-          tokens.map((t) => t.text),
-        );
-
         verifyTokenSequence(tokens, [
           CRLLexer.DECISION,
           CRLLexer.QUOTED_STRING,
