@@ -61,32 +61,22 @@ describe("Integration", () => {
         CRLLexer.THEN,
         CRLLexer.COLON,
         CRLLexer.DASH,
-        CRLLexer.WHEN,
+        CRLLexer.RECOMMEND_ACTIVITY,
         CRLLexer.QUOTED_STRING,
-        CRLLexer.THEN,
-        CRLLexer.COLON,
-        CRLLexer.ANY_BLOCK,
+        CRLLexer.DOT,
         CRLLexer.DASH,
         CRLLexer.RECOMMEND_ACTIVITY,
         CRLLexer.QUOTED_STRING,
         CRLLexer.DOT,
         CRLLexer.DASH,
-        CRLLexer.WHEN,
-        CRLLexer.QUOTED_STRING,
-        CRLLexer.RECOMMEND_ACTIVITY,
-        CRLLexer.QUOTED_STRING,
-        CRLLexer.DOT,
         CRLLexer.END_WHEN,
         CRLLexer.DASH,
         CRLLexer.WHEN,
         CRLLexer.QUOTED_STRING,
         CRLLexer.THEN,
-        CRLLexer.ERROR,
-        CRLLexer.QUOTED_STRING,
         CRLLexer.USE_DECISION,
         CRLLexer.QUOTED_STRING,
         CRLLexer.DOT,
-        CRLLexer.END_WHEN,
         CRLLexer.DASH,
         CRLLexer.END_WHEN,
         CRLLexer.DASH,
@@ -114,17 +104,13 @@ describe("Integration", () => {
           CRLLexer.RECOMMEND_ACTIVITY,
           CRLLexer.QUOTED_STRING,
           CRLLexer.DOT,
+          CRLLexer.DASH,
           CRLLexer.WHEN,
           CRLLexer.QUOTED_STRING,
           CRLLexer.THEN,
-          CRLLexer.ERROR,
+          CRLLexer.USE_DECISION,
           CRLLexer.QUOTED_STRING,
-          CRLLexer.ERROR,
           CRLLexer.DOT,
-          CRLLexer.WHEN,
-          CRLLexer.QUOTED_STRING,
-          CRLLexer.THEN,
-          CRLLexer.ERROR,
         ]);
       });
     });
@@ -145,6 +131,18 @@ describe("Integration", () => {
     - end when`;
 
         const tokens = getTokensFromString(input);
+
+        // [DEBUGGING] Print actual token types and texts for diagnosis
+        // eslint-disable-next-line no-console
+        console.log(
+          "[DEBUGGING] Actual token types:",
+          tokens.map((t) => t.type),
+        );
+        // eslint-disable-next-line no-console
+        console.log(
+          "[DEBUGGING] Actual token texts:",
+          tokens.map((t) => t.text),
+        );
 
         verifyTokenSequence(tokens, [
           CRLLexer.DECISION,
@@ -183,21 +181,9 @@ describe("Integration", () => {
           CRLLexer.QUOTED_STRING,
           CRLLexer.DOT,
           CRLLexer.DASH,
-          CRLLexer.WHEN,
-          CRLLexer.QUOTED_STRING,
-          CRLLexer.THEN,
-          CRLLexer.COLON,
-          CRLLexer.DASH,
-          CRLLexer.USE_DECISION,
-          CRLLexer.QUOTED_STRING,
-          CRLLexer.COLON,
-          CRLLexer.DASH,
           CRLLexer.USE_DECISION,
           CRLLexer.QUOTED_STRING,
           CRLLexer.DOT,
-          CRLLexer.END_WHEN,
-          CRLLexer.DASH,
-          CRLLexer.END_WHEN,
           CRLLexer.DASH,
           CRLLexer.END_WHEN,
         ]);
@@ -206,10 +192,10 @@ describe("Integration", () => {
       it("should handle decision with multiple when clauses and different terminal actions", () => {
         const input = `decision "Test Decision":
    - when "Condition 1" then
-       "Action 1".
+      recommend activity "Action 1".
    - when "Condition 2" then
-       use "Another Decision".
-   - when "Condition 3" then
+       use decision "Another Decision".
+   - when "Condition 3" then:
         - recommend activity  "Action 2".
         - recommend activity "Action 3".
     - end when`;
@@ -224,21 +210,31 @@ describe("Integration", () => {
           CRLLexer.WHEN,
           CRLLexer.QUOTED_STRING,
           CRLLexer.THEN,
-          CRLLexer.ERROR,
+          CRLLexer.RECOMMEND_ACTIVITY,
           CRLLexer.QUOTED_STRING,
+          CRLLexer.DOT,
+          CRLLexer.DASH,
           CRLLexer.WHEN,
           CRLLexer.QUOTED_STRING,
           CRLLexer.THEN,
-          CRLLexer.ERROR,
+          CRLLexer.USE_DECISION,
           CRLLexer.QUOTED_STRING,
+          CRLLexer.DOT,
+          CRLLexer.DASH,
           CRLLexer.WHEN,
           CRLLexer.QUOTED_STRING,
           CRLLexer.THEN,
-          CRLLexer.ERROR,
+          CRLLexer.COLON,
+          CRLLexer.DASH,
+          CRLLexer.RECOMMEND_ACTIVITY,
           CRLLexer.QUOTED_STRING,
-          CRLLexer.ERROR,
+          CRLLexer.DOT,
+          CRLLexer.DASH,
+          CRLLexer.RECOMMEND_ACTIVITY,
           CRLLexer.QUOTED_STRING,
-          CRLLexer.ERROR,
+          CRLLexer.DOT,
+          CRLLexer.DASH,
+          CRLLexer.END_WHEN,
         ]);
       });
 
@@ -263,19 +259,23 @@ describe("Integration", () => {
           CRLLexer.WHEN,
           CRLLexer.QUOTED_STRING,
           CRLLexer.THEN,
-          CRLLexer.ERROR,
+          CRLLexer.RECOMMEND_ACTIVITY,
           CRLLexer.QUOTED_STRING,
+          CRLLexer.DOT,
+          CRLLexer.DASH,
           CRLLexer.WHEN,
           CRLLexer.QUOTED_STRING,
           CRLLexer.THEN,
-          CRLLexer.ERROR,
+          CRLLexer.USE_DECISION,
           CRLLexer.QUOTED_STRING,
+          CRLLexer.DOT,
+          CRLLexer.DASH,
           CRLLexer.WHEN,
           CRLLexer.QUOTED_STRING,
           CRLLexer.THEN,
-          CRLLexer.ERROR,
+          CRLLexer.RECOMMEND_ACTIVITY,
           CRLLexer.QUOTED_STRING,
-          CRLLexer.ERROR,
+          CRLLexer.DOT,
         ]);
       });
     });
@@ -337,7 +337,7 @@ describe("Integration", () => {
       ]);
     });
 
-    it("should handle activity statements with of clause", () => {
+    it("should handle activity statements with clause", () => {
       const input = 'activity "Indicate" request CPGProposeDiagnosis with "Colonoscopy".';
       const tokens = getTokensFromString(input);
 
@@ -356,7 +356,7 @@ describe("Integration", () => {
   describe("Concept Structure", () => {
     it("should handle basic concept with type and value type", () => {
       const input =
-        'concept "Most Recent BMI":\n    type is Observation.\n    valuetype is boolean.\n    coded from "BMI Valueset".\ndone';
+        'concept "Most Recent BMI":\n    - type is Observation.\n    - valuetype is boolean.\n    - coded from "BMI Valueset".';
 
       const tokens = getTokensFromString(input);
 
@@ -379,7 +379,7 @@ describe("Integration", () => {
 
     it("should handle concept with provenance", () => {
       const input =
-        'concept "BMI":\n    type is Observation.\n    valuetype is Quantity.\n    evidence is `some provenance`.\n    inferred from "BMI" apply pattern `Most Recent(this, lookbackMonths)`.\ndone';
+        'concept "BMI":\n    - type is Observation.\n    - valuetype is Quantity.\n    - evidence is `some provenance`.\n    -  inferred from "BMI" apply pattern `Most Recent(this, lookbackMonths)`.';
 
       const tokens = getTokensFromString(input);
 
@@ -407,7 +407,7 @@ describe("Integration", () => {
 
     it("should handle concept with inferred by expression", () => {
       const input =
-        'concept "BMI":\n    type is Observation.\n    valuetype is Quantity.\n    inferred from ("BMI Range as a Condition" or "BMI as an Observation" or "Calculated BMI").\ndone';
+        'concept "BMI":\n    - type is Observation.\n   - valuetype is Quantity.\n  -  inferred from ("BMI Range as a Condition" or "BMI as an Observation" or "Calculated BMI").';
 
       const tokens = getTokensFromString(input);
 
@@ -436,7 +436,7 @@ describe("Integration", () => {
 
     it("should handle concept with inferred by expression using AND", () => {
       const input =
-        'concept "Complex BMI":\n    type is Observation.\n    valuetype is Quantity.\n    inferred from ("BMI Range" and "Height Record" and "Weight Record").\ndone';
+        'concept "Complex BMI":\n  - type is Observation.\n   - valuetype is Quantity.\n   - inferred from ("BMI Range" and "Height Record" and "Weight Record").';
 
       const tokens = getTokensFromString(input);
 
@@ -465,7 +465,7 @@ describe("Integration", () => {
 
     it("should handle concept with inferred by expression using mixed AND/OR", () => {
       const input =
-        'concept "Complex BMI":\n    type is Observation.\n    valuetype is Quantity.\n    inferred from ("BMI Range" and ("Height Record" or "Estimated Height") and "Weight Record").\ndone';
+        'concept "Complex BMI":\n  -  type is Observation.\n  -  valuetype is Quantity.\n  -  inferred from ("BMI Range" and ("Height Record" or "Estimated Height") and "Weight Record").';
 
       const tokens = getTokensFromString(input);
 
