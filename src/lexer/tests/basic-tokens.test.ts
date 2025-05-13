@@ -2,8 +2,6 @@ import { CRLLexer } from "../../grammar/generated/antlr/CRLLexer";
 
 import { getTokensFromString, verifyTokenSequence } from "./helpers";
 
-// TODO: update tests to use BACKTICK_STRING (instead of STRING)
-
 describe("CRL Lexer - Basic Tokens", () => {
   describe("Keywords", () => {
     it("should tokenize decision statement", () => {
