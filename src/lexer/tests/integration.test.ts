@@ -338,7 +338,7 @@ describe("Integration", () => {
     });
 
     it("should handle activity statements with clause", () => {
-      const input = 'activity "Indicate" request CPGProposeDiagnosis with "Colonoscopy".';
+      const input = 'activity "Indicate" request CPGProposeDiagnosisTask with "Colonoscopy".';
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(tokens, [
@@ -364,16 +364,18 @@ describe("Integration", () => {
         CRLLexer.CONCEPT,
         CRLLexer.QUOTED_STRING,
         CRLLexer.COLON,
+        CRLLexer.DASH,
         CRLLexer.TYPE_IS,
         CRLLexer.CONCEPT_TYPE,
         CRLLexer.DOT,
+        CRLLexer.DASH,
         CRLLexer.VALUETYPE_IS,
         CRLLexer.CONCEPT_VALUE_TYPE,
         CRLLexer.DOT,
+        CRLLexer.DASH,
         CRLLexer.CODED_FROM,
         CRLLexer.QUOTED_STRING,
         CRLLexer.DOT,
-        CRLLexer.ERROR,
       ]);
     });
 
@@ -387,21 +389,24 @@ describe("Integration", () => {
         CRLLexer.CONCEPT,
         CRLLexer.QUOTED_STRING,
         CRLLexer.COLON,
+        CRLLexer.DASH,
         CRLLexer.TYPE_IS,
         CRLLexer.CONCEPT_TYPE,
         CRLLexer.DOT,
+        CRLLexer.DASH,
         CRLLexer.VALUETYPE_IS,
         CRLLexer.CONCEPT_VALUE_TYPE,
         CRLLexer.DOT,
+        CRLLexer.DASH,
         CRLLexer.EVIDENCE_IS,
         CRLLexer.BACKTICK_STRING,
         CRLLexer.DOT,
+        CRLLexer.DASH,
         CRLLexer.INFERRED_FROM,
         CRLLexer.QUOTED_STRING,
         CRLLexer.APPLY_PATTERN,
         CRLLexer.BACKTICK_STRING,
         CRLLexer.DOT,
-        CRLLexer.ERROR,
       ]);
     });
 
@@ -415,12 +420,15 @@ describe("Integration", () => {
         CRLLexer.CONCEPT,
         CRLLexer.QUOTED_STRING,
         CRLLexer.COLON,
+        CRLLexer.DASH,
         CRLLexer.TYPE_IS,
         CRLLexer.CONCEPT_TYPE,
         CRLLexer.DOT,
+        CRLLexer.DASH,
         CRLLexer.VALUETYPE_IS,
         CRLLexer.CONCEPT_VALUE_TYPE,
         CRLLexer.DOT,
+        CRLLexer.DASH,
         CRLLexer.INFERRED_FROM,
         CRLLexer.LPAREN,
         CRLLexer.QUOTED_STRING,
@@ -430,7 +438,6 @@ describe("Integration", () => {
         CRLLexer.QUOTED_STRING,
         CRLLexer.RPAREN,
         CRLLexer.DOT,
-        CRLLexer.ERROR,
       ]);
     });
 
@@ -444,12 +451,15 @@ describe("Integration", () => {
         CRLLexer.CONCEPT,
         CRLLexer.QUOTED_STRING,
         CRLLexer.COLON,
+        CRLLexer.DASH,
         CRLLexer.TYPE_IS,
         CRLLexer.CONCEPT_TYPE,
         CRLLexer.DOT,
+        CRLLexer.DASH,
         CRLLexer.VALUETYPE_IS,
         CRLLexer.CONCEPT_VALUE_TYPE,
         CRLLexer.DOT,
+        CRLLexer.DASH,
         CRLLexer.INFERRED_FROM,
         CRLLexer.LPAREN,
         CRLLexer.QUOTED_STRING,
@@ -459,7 +469,6 @@ describe("Integration", () => {
         CRLLexer.QUOTED_STRING,
         CRLLexer.RPAREN,
         CRLLexer.DOT,
-        CRLLexer.ERROR,
       ]);
     });
 
@@ -473,12 +482,15 @@ describe("Integration", () => {
         CRLLexer.CONCEPT,
         CRLLexer.QUOTED_STRING,
         CRLLexer.COLON,
+        CRLLexer.DASH,
         CRLLexer.TYPE_IS,
         CRLLexer.CONCEPT_TYPE,
         CRLLexer.DOT,
+        CRLLexer.DASH,
         CRLLexer.VALUETYPE_IS,
         CRLLexer.CONCEPT_VALUE_TYPE,
         CRLLexer.DOT,
+        CRLLexer.DASH,
         CRLLexer.INFERRED_FROM,
         CRLLexer.LPAREN,
         CRLLexer.QUOTED_STRING,
@@ -492,7 +504,6 @@ describe("Integration", () => {
         CRLLexer.QUOTED_STRING,
         CRLLexer.RPAREN,
         CRLLexer.DOT,
-        CRLLexer.ERROR,
       ]);
     });
   });
