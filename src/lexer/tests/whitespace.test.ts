@@ -1,47 +1,59 @@
 import { CRLLexer } from "../../grammar/generated/antlr/CRLLexer";
 
-import { getTokensFromString } from "./helpers";
-import { verifyTokenSequence } from "./index.test";
+import { getTokensFromString, verifyTokenSequence } from "./helpers";
 
 describe("Whitespace Handling", () => {
   describe("Basic Whitespace", () => {
     it("should skip newlines between tokens", () => {
-      const input = "decision\nwhen\nthen\ndo";
+      const input = "decision\nwhen\nthen\rrecommend activity";
       const tokens = getTokensFromString(input);
-      verifyTokenSequence(tokens, [CRLLexer.DECISION, CRLLexer.WHEN, CRLLexer.THEN, CRLLexer.DO]);
+      verifyTokenSequence(tokens, [
+        CRLLexer.DECISION,
+        CRLLexer.WHEN,
+        CRLLexer.THEN,
+        CRLLexer.RECOMMEND_ACTIVITY,
+      ]);
     });
 
     it("should skip spaces between tokens", () => {
-      const input = 'decision "Test Decision"    when "Condition"  then    do "Action"';
+      const input =
+        'decision "Test Decision":   - when "Condition"  then    recommend activity "Action".';
       const tokens = getTokensFromString(input);
       verifyTokenSequence(tokens, [
         CRLLexer.DECISION,
         CRLLexer.QUOTED_STRING,
+        CRLLexer.COLON,
+        CRLLexer.DASH,
         CRLLexer.WHEN,
         CRLLexer.QUOTED_STRING,
         CRLLexer.THEN,
-        CRLLexer.DO,
+        CRLLexer.RECOMMEND_ACTIVITY,
         CRLLexer.QUOTED_STRING,
+        CRLLexer.DOT,
       ]);
     });
 
     it("should handle consecutive whitespace", () => {
-      const input = 'decision    "Test"  \t  when  \n\n  "Condition"';
+      const input = 'decision    "Test":  \t - when  \n\n  "Condition"';
       const tokens = getTokensFromString(input);
       verifyTokenSequence(tokens, [
         CRLLexer.DECISION,
         CRLLexer.QUOTED_STRING,
+        CRLLexer.COLON,
+        CRLLexer.DASH,
         CRLLexer.WHEN,
         CRLLexer.QUOTED_STRING,
       ]);
     });
 
     it("should handle leading and trailing whitespace", () => {
-      const input = '\n  \t decision "Test" when "Condition" \n  ';
+      const input = '\n  \t decision "Test": - when "Condition" \n  ';
       const tokens = getTokensFromString(input);
       verifyTokenSequence(tokens, [
         CRLLexer.DECISION,
         CRLLexer.QUOTED_STRING,
+        CRLLexer.COLON,
+        CRLLexer.DASH,
         CRLLexer.WHEN,
         CRLLexer.QUOTED_STRING,
       ]);
@@ -78,24 +90,25 @@ describe("Whitespace Handling", () => {
 
   describe("Whitespace in Activity Statements", () => {
     it("should handle whitespace in activity statements", () => {
-      const input = 'activity\n  "Vaccinate"\n\t\tperform\n  CPGImmunizationRequest\t.';
+      const input = 'activity\n  "Vaccinate"\n\t\trequest\n  CPGImmunizationRequest\t.';
       const tokens = getTokensFromString(input);
       verifyTokenSequence(tokens, [
         CRLLexer.ACTIVITY,
         CRLLexer.QUOTED_STRING,
-        CRLLexer.PERFORM,
+        CRLLexer.REQUEST,
         CRLLexer.ACTIVITY_TYPE,
         CRLLexer.DOT,
       ]);
     });
 
     it("should handle whitespace in activity statements with of clause", () => {
-      const input = 'activity\n"Action"\n  perform\tCPGProposeDiagnosis\n  with\t"diagnosis"\t.';
+      const input =
+        'activity\n"Action"\n  request\tCPGProposeDiagnosisTask\n  with\t"diagnosis"\t.';
       const tokens = getTokensFromString(input);
       verifyTokenSequence(tokens, [
         CRLLexer.ACTIVITY,
         CRLLexer.QUOTED_STRING,
-        CRLLexer.PERFORM,
+        CRLLexer.REQUEST,
         CRLLexer.ACTIVITY_TYPE,
         CRLLexer.WITH,
         CRLLexer.QUOTED_STRING,
@@ -106,25 +119,51 @@ describe("Whitespace Handling", () => {
 
   describe("Whitespace in Concept Statements", () => {
     it("should handle whitespace in concept type declarations", () => {
-      const input = 'concept\n"BMI"\n  :\n    type\tis\n  Observation\t.';
+      const input = 'concept\n"BMI"\n  :\n   - type is\n  Observation\t.';
       const tokens = getTokensFromString(input);
+
+      // [DEBUGGING] Print actual token types and texts for diagnosis
+      // eslint-disable-next-line no-console
+      console.log(
+        "[DEBUGGING] Actual token types:",
+        tokens.map((t) => t.type),
+      );
+      // eslint-disable-next-line no-console
+      console.log(
+        "[DEBUGGING] Actual token texts:",
+        tokens.map((t) => t.text),
+      );
+
       verifyTokenSequence(tokens, [
         CRLLexer.CONCEPT,
         CRLLexer.QUOTED_STRING,
         CRLLexer.COLON,
-        CRLLexer.TYPE,
-        CRLLexer.IS,
+        CRLLexer.DASH,
+        CRLLexer.TYPE_IS,
         CRLLexer.CONCEPT_TYPE,
         CRLLexer.DOT,
       ]);
     });
 
     it("should handle whitespace in concept value type declarations", () => {
-      const input = "valuetype\n  is\t\tQuantity\n.";
+      const input = "- valuetype is\t\tQuantity\n.";
       const tokens = getTokensFromString(input);
+
+      // [DEBUGGING] Print actual token types and texts for diagnosis
+      // eslint-disable-next-line no-console
+      console.log(
+        "[DEBUGGING] Actual token types:",
+        tokens.map((t) => t.type),
+      );
+      // eslint-disable-next-line no-console
+      console.log(
+        "[DEBUGGING] Actual token texts:",
+        tokens.map((t) => t.text),
+      );
+
       verifyTokenSequence(tokens, [
-        CRLLexer.VALUETYPE,
-        CRLLexer.IS,
+        CRLLexer.DASH,
+        CRLLexer.VALUETYPE_IS,
         CRLLexer.CONCEPT_VALUE_TYPE,
         CRLLexer.DOT,
       ]);
@@ -132,11 +171,23 @@ describe("Whitespace Handling", () => {
 
     it("should handle whitespace in concept inferred by expressions", () => {
       const input =
-        'inferred\n  from\t(\n"Condition 1"\n  and\t"Condition 2"\n  or\t"Condition 3"\n)\t.';
+        'inferred from\t(\n"Condition 1"\n  and\t"Condition 2"\n  or\t"Condition 3"\n)\t.';
       const tokens = getTokensFromString(input);
+
+      // [DEBUGGING] Print actual token types and texts for diagnosis
+      // eslint-disable-next-line no-console
+      console.log(
+        "[DEBUGGING] Actual token types:",
+        tokens.map((t) => t.type),
+      );
+      // eslint-disable-next-line no-console
+      console.log(
+        "[DEBUGGING] Actual token texts:",
+        tokens.map((t) => t.text),
+      );
+
       verifyTokenSequence(tokens, [
-        CRLLexer.INFERRED,
-        CRLLexer.FROM,
+        CRLLexer.INFERRED_FROM,
         CRLLexer.LPAREN,
         CRLLexer.QUOTED_STRING,
         CRLLexer.AND,
@@ -151,44 +202,44 @@ describe("Whitespace Handling", () => {
 
   describe("Whitespace in Decision Blocks", () => {
     it("should handle whitespace in nested decision blocks", () => {
-      const input = `decision\n  "Test"\n:\n  when\n    "Level 1"\n  then\n    when\n      "Level 2"\n    then\n      do\n        "Action"\n    .\ndone`;
+      const input = `decision\n  "Test"\n:\n  - when\n    "Level 1"\n  then\n    - when\n      "Level 2"\n    then\n      recommend activity\n        "Action"\n    .`;
       const tokens = getTokensFromString(input);
       verifyTokenSequence(tokens, [
         CRLLexer.DECISION,
         CRLLexer.QUOTED_STRING,
         CRLLexer.COLON,
+        CRLLexer.DASH,
         CRLLexer.WHEN,
         CRLLexer.QUOTED_STRING,
         CRLLexer.THEN,
+        CRLLexer.DASH,
         CRLLexer.WHEN,
         CRLLexer.QUOTED_STRING,
         CRLLexer.THEN,
-        CRLLexer.DO,
+        CRLLexer.RECOMMEND_ACTIVITY,
         CRLLexer.QUOTED_STRING,
         CRLLexer.DOT,
-        CRLLexer.DONE,
       ]);
     });
 
     it("should handle whitespace in any/all clauses", () => {
       const input =
-        'when\n  "Condition"\nthen\n  :\n    any\n      :\n        do\n          "Action 1"\n        .\n        do\n          "Action 2"\n        .\n    done\ndone';
+        'when\n  "Condition"\nthen:\n    any:\n       -  recommend activity\n          "Action 1"\n        .\n        - recommend activity\n          "Action 2"\n        .';
       const tokens = getTokensFromString(input);
       verifyTokenSequence(tokens, [
         CRLLexer.WHEN,
         CRLLexer.QUOTED_STRING,
         CRLLexer.THEN,
         CRLLexer.COLON,
-        CRLLexer.ANY,
-        CRLLexer.COLON,
-        CRLLexer.DO,
+        CRLLexer.ANY_BLOCK,
+        CRLLexer.DASH,
+        CRLLexer.RECOMMEND_ACTIVITY,
         CRLLexer.QUOTED_STRING,
         CRLLexer.DOT,
-        CRLLexer.DO,
+        CRLLexer.DASH,
+        CRLLexer.RECOMMEND_ACTIVITY,
         CRLLexer.QUOTED_STRING,
         CRLLexer.DOT,
-        CRLLexer.DONE,
-        CRLLexer.DONE,
       ]);
     });
   });
