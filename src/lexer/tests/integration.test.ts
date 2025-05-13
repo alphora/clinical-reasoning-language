@@ -1,71 +1,96 @@
 import { CRLLexer } from "../../grammar/generated/antlr/CRLLexer";
 
-import { getTokensFromString } from "./helpers";
-import { verifyTokenSequence } from "./index.test";
+import { getTokensFromString, verifyTokenSequence } from "./helpers";
 
 describe("Integration", () => {
   describe("Token Order and Sequence", () => {
     it("should handle token order in basic blocks", () => {
       const input = `decision "Test":
-    when "Condition" then
-        do "Action"
-    done`;
+    - when "Condition" then
+        recommend activity "Action".`;
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(tokens, [
         CRLLexer.DECISION,
         CRLLexer.QUOTED_STRING,
         CRLLexer.COLON,
+        CRLLexer.DASH,
         CRLLexer.WHEN,
         CRLLexer.QUOTED_STRING,
         CRLLexer.THEN,
-        CRLLexer.ERROR,
+        CRLLexer.RECOMMEND_ACTIVITY,
         CRLLexer.QUOTED_STRING,
-        CRLLexer.ERROR,
+        CRLLexer.DOT,
       ]);
     });
 
     it("should handle token order in complex nested blocks", () => {
       const input = `decision "Test":
-    when "Level 1" then
+    - when "Level 1" then:
         all:
-        when "Level 2" then
+        - when "Level 2" then:
             any:
-            when "Level 3" then
-                do "Action 1"
-                do "Action 2"
-            when "Level 3b" then
-                use "Action 3"
-    done`;
+            - when "Level 3" then:
+                - recommend activity "Action 1".
+                - recommend activity "Action 2".
+            - end when
+            - when "Level 3b" then use decision "Action 3".
+        - end when
+    - end when`;
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(tokens, [
         CRLLexer.DECISION,
         CRLLexer.QUOTED_STRING,
         CRLLexer.COLON,
+        CRLLexer.DASH,
         CRLLexer.WHEN,
         CRLLexer.QUOTED_STRING,
         CRLLexer.THEN,
+        CRLLexer.COLON,
         CRLLexer.ALL_BLOCK,
+        CRLLexer.DASH,
         CRLLexer.WHEN,
         CRLLexer.QUOTED_STRING,
         CRLLexer.THEN,
+        CRLLexer.COLON,
         CRLLexer.ANY_BLOCK,
+        CRLLexer.DASH,
+        CRLLexer.WHEN,
+        CRLLexer.QUOTED_STRING,
+        CRLLexer.THEN,
+        CRLLexer.COLON,
+        CRLLexer.DASH,
+        CRLLexer.WHEN,
+        CRLLexer.QUOTED_STRING,
+        CRLLexer.THEN,
+        CRLLexer.COLON,
+        CRLLexer.ANY_BLOCK,
+        CRLLexer.DASH,
+        CRLLexer.RECOMMEND_ACTIVITY,
+        CRLLexer.QUOTED_STRING,
+        CRLLexer.DOT,
+        CRLLexer.DASH,
+        CRLLexer.WHEN,
+        CRLLexer.QUOTED_STRING,
+        CRLLexer.RECOMMEND_ACTIVITY,
+        CRLLexer.QUOTED_STRING,
+        CRLLexer.DOT,
+        CRLLexer.END_WHEN,
+        CRLLexer.DASH,
         CRLLexer.WHEN,
         CRLLexer.QUOTED_STRING,
         CRLLexer.THEN,
         CRLLexer.ERROR,
         CRLLexer.QUOTED_STRING,
-        CRLLexer.ERROR,
+        CRLLexer.USE_DECISION,
         CRLLexer.QUOTED_STRING,
-        CRLLexer.ERROR,
-        CRLLexer.QUOTED_STRING,
-        CRLLexer.WHEN,
-        CRLLexer.QUOTED_STRING,
-        CRLLexer.THEN,
-        CRLLexer.ERROR,
-        CRLLexer.QUOTED_STRING,
-        CRLLexer.ERROR,
+        CRLLexer.DOT,
+        CRLLexer.END_WHEN,
+        CRLLexer.DASH,
+        CRLLexer.END_WHEN,
+        CRLLexer.DASH,
+        CRLLexer.END_WHEN,
       ]);
     });
   });
@@ -74,15 +99,21 @@ describe("Integration", () => {
     describe("Single Action Statements", () => {
       it("should handle single action statements with dot terminator", () => {
         const input = `decision "Test":
-    when "Condition" then do "Action".
-    when "Another Condition" then use "Another Decision".
-done`;
+    - when "Condition" then recommend activity "Action".
+    - when "Another Condition" then use decision "Another Decision".`;
         const tokens = getTokensFromString(input);
 
         verifyTokenSequence(tokens, [
           CRLLexer.DECISION,
           CRLLexer.QUOTED_STRING,
           CRLLexer.COLON,
+          CRLLexer.DASH,
+          CRLLexer.WHEN,
+          CRLLexer.QUOTED_STRING,
+          CRLLexer.THEN,
+          CRLLexer.RECOMMEND_ACTIVITY,
+          CRLLexer.QUOTED_STRING,
+          CRLLexer.DOT,
           CRLLexer.WHEN,
           CRLLexer.QUOTED_STRING,
           CRLLexer.THEN,
@@ -93,9 +124,6 @@ done`;
           CRLLexer.WHEN,
           CRLLexer.QUOTED_STRING,
           CRLLexer.THEN,
-          CRLLexer.ERROR,
-          CRLLexer.QUOTED_STRING,
-          CRLLexer.DOT,
           CRLLexer.ERROR,
         ]);
       });
@@ -105,16 +133,16 @@ done`;
       it("should handle decision with multiple when clauses at same level", () => {
         const input = `decision "Elderly Based":
     any:
-    when "Client Age Greater Than 60" then
-        do "Indicate"
-    when "Client Age Less Than 60" then
-        do "Vaccinate"
-        do "another thing"
-        do "something else"
-    when "Client Age Greater Than 60" then
-        use "Elderly Based"
-        use "IMMZ.D2.D5.Measles"
-    done`;
+   - when "Client Age Greater Than 60" then
+        recommend activity "Indicate".
+    - when "Client Age Less Than 60" then:
+        - recommend activity "Vaccinate".
+        - recommend activity "another thing".
+    - end when
+    - when "Client Age Greater Than 60" then:
+        - use decision "Elderly Based".
+        - use decision "IMMZ.D2.D5.Measles".
+    - end when`;
 
         const tokens = getTokensFromString(input);
 
@@ -123,41 +151,68 @@ done`;
           CRLLexer.QUOTED_STRING,
           CRLLexer.COLON,
           CRLLexer.ANY_BLOCK,
+          CRLLexer.DASH,
           CRLLexer.WHEN,
           CRLLexer.QUOTED_STRING,
           CRLLexer.THEN,
-          CRLLexer.ERROR,
+          CRLLexer.RECOMMEND_ACTIVITY,
           CRLLexer.QUOTED_STRING,
+          CRLLexer.DOT,
+          CRLLexer.DASH,
           CRLLexer.WHEN,
           CRLLexer.QUOTED_STRING,
           CRLLexer.THEN,
-          CRLLexer.ERROR,
+          CRLLexer.COLON,
+          CRLLexer.DASH,
+          CRLLexer.RECOMMEND_ACTIVITY,
           CRLLexer.QUOTED_STRING,
-          CRLLexer.ERROR,
+          CRLLexer.DOT,
+          CRLLexer.DASH,
+          CRLLexer.RECOMMEND_ACTIVITY,
           CRLLexer.QUOTED_STRING,
-          CRLLexer.ERROR,
-          CRLLexer.QUOTED_STRING,
+          CRLLexer.DOT,
+          CRLLexer.DASH,
+          CRLLexer.END_WHEN,
+          CRLLexer.DASH,
           CRLLexer.WHEN,
           CRLLexer.QUOTED_STRING,
           CRLLexer.THEN,
-          CRLLexer.ERROR,
+          CRLLexer.COLON,
+          CRLLexer.DASH,
+          CRLLexer.USE_DECISION,
           CRLLexer.QUOTED_STRING,
-          CRLLexer.ERROR,
-          CRLLexer.ERROR,
-          CRLLexer.ERROR,
+          CRLLexer.DOT,
+          CRLLexer.DASH,
+          CRLLexer.WHEN,
+          CRLLexer.QUOTED_STRING,
+          CRLLexer.THEN,
+          CRLLexer.COLON,
+          CRLLexer.DASH,
+          CRLLexer.USE_DECISION,
+          CRLLexer.QUOTED_STRING,
+          CRLLexer.COLON,
+          CRLLexer.DASH,
+          CRLLexer.USE_DECISION,
+          CRLLexer.QUOTED_STRING,
+          CRLLexer.DOT,
+          CRLLexer.END_WHEN,
+          CRLLexer.DASH,
+          CRLLexer.END_WHEN,
+          CRLLexer.DASH,
+          CRLLexer.END_WHEN,
         ]);
       });
 
       it("should handle decision with multiple when clauses and different terminal actions", () => {
         const input = `decision "Test Decision":
-    when "Condition 1" then
-        do "Action 1"
-    when "Condition 2" then
-        use "Another Decision"
-    when "Condition 3" then
-        do "Action 2"
-        do "Action 3"
-    done`;
+   - when "Condition 1" then
+       "Action 1".
+   - when "Condition 2" then
+       use "Another Decision".
+   - when "Condition 3" then
+        - recommend activity  "Action 2".
+        - recommend activity "Action 3".
+    - end when`;
 
         const tokens = getTokensFromString(input);
 
@@ -165,6 +220,7 @@ done`;
           CRLLexer.DECISION,
           CRLLexer.QUOTED_STRING,
           CRLLexer.COLON,
+          CRLLexer.DASH,
           CRLLexer.WHEN,
           CRLLexer.QUOTED_STRING,
           CRLLexer.THEN,
@@ -188,15 +244,14 @@ done`;
 
       it("should handle decision with multiple when clauses and empty lines", () => {
         const input = `decision "Test Decision":
-    when "Condition 1" then
-        do "Action 1"
+    - when "Condition 1" then
+        recommend activity "Action 1".
 
-    when "Condition 2" then
-        use "Another Decision"
+    - when "Condition 2" then
+        use decision "Another Decision".
 
-    when "Condition 3" then
-        do "Action 2"
-    done`;
+    - when "Condition 3" then
+      recommend activity "Action 2".`;
 
         const tokens = getTokensFromString(input);
 
@@ -204,6 +259,7 @@ done`;
           CRLLexer.DECISION,
           CRLLexer.QUOTED_STRING,
           CRLLexer.COLON,
+          CRLLexer.DASH,
           CRLLexer.WHEN,
           CRLLexer.QUOTED_STRING,
           CRLLexer.THEN,
@@ -269,26 +325,26 @@ done`;
 
   describe("Activity Structure", () => {
     it("should handle basic activity statements", () => {
-      const input = `activity "Vaccinate" perform CPGImmunizationRequest.`;
+      const input = `activity "Vaccinate" request CPGImmunizationRequest.`;
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(tokens, [
         CRLLexer.ACTIVITY,
         CRLLexer.QUOTED_STRING,
-        CRLLexer.ERROR,
+        CRLLexer.REQUEST,
         CRLLexer.ACTIVITY_TYPE,
         CRLLexer.DOT,
       ]);
     });
 
     it("should handle activity statements with of clause", () => {
-      const input = 'activity "Indicate" perform CPGProposeDiagnosis with "Colonoscopy".';
+      const input = 'activity "Indicate" request CPGProposeDiagnosis with "Colonoscopy".';
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(tokens, [
         CRLLexer.ACTIVITY,
         CRLLexer.QUOTED_STRING,
-        CRLLexer.ERROR,
+        CRLLexer.REQUEST,
         CRLLexer.ACTIVITY_TYPE,
         CRLLexer.WITH,
         CRLLexer.QUOTED_STRING,
