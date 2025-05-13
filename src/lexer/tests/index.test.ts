@@ -116,6 +116,7 @@ import "./comments.test";
 import "./error-handling.test";
 import "./error-listener.test";
 import "./fhir-types.test";
+import "./grammar-example.test";
 import "./integration.test";
 import "./structures.test";
 import "./whitespace.test";
