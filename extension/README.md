@@ -63,53 +63,64 @@ Add the following to your `settings.json` (via Ctrl+Shift+P → Preferences: Ope
 
 ```json
 "editor.tokenColorCustomizations": {
-  "textMateRules": [
-    {
-      "scope": "entity.name.type.crl",
-      "settings": {
-        "foreground": "#C586C0",
-        "fontStyle": "bold"
+    "textMateRules": [
+      {
+        "scope": "entity.name.type.crl",
+        "settings": {
+          "foreground": "#9CDCFE",
+          "fontStyle": "bold"
+        }
+      },
+      {
+        "scope": "keyword.control.flow.crl",
+        "settings": {
+          "foreground": "#569CD6"
+        }
+      },
+      {
+        "scope": "keyword.control.structure.crl",
+        "settings": {
+          "foreground": "#C586C0"
+        }
+      },
+      {
+        "scope": "keyword.operator.logical.crl",
+        "settings": {
+          "foreground": "#D16969",
+          "fontStyle": "bold"
+        }
+      },
+      {
+        "scope": "variable.language.element.crl",
+        "settings": {
+          "foreground": "#569CD6"
+        }
+      },
+      {
+        "scope": "comment.line.double-slash.crl",
+        "settings": {
+          "foreground": "#6A9955",
+          "fontStyle": "italic"
+        }
+      },
+      {
+        "scope": "string.quoted.double.crl",
+        "settings": {
+          "foreground": "#CE9178"
+        }
+      },
+      {
+        "scope": "comment.block.crl",
+        "settings": {
+          "foreground": "#6A9955"
+        }
+      },
+      {
+        "scope": "string.quoted.backtick.crl",
+        "settings": {
+          "foreground": "#DCDCAA"
+        }
       }
-    },
-    {
-      "scope": "keyword.control.flow.crl",
-      "settings": {
-        "foreground": "#569CD6",
-        "fontStyle": "bold"
-      }
-    },
-    {
-      "scope": "keyword.control.structure.crl",
-      "settings": {
-        "foreground": "#4EC9B0",
-        "fontStyle": "bold"
-      }
-    },
-    {
-      "scope": "variable.language.element.crl",
-      "settings": {
-        "foreground": "#9CDCFE"
-      }
-    },
-    {
-      "scope": "comment.line.double-slash.crl",
-      "settings": {
-        "foreground": "#6A9955",
-        "fontStyle": "italic"
-      }
-    },
-    {
-      "scope": "string.quoted.double.crl",
-      "settings": {
-        "foreground": "#CE9178"
-      }
-    },
-    {
-      "scope": "string.quoted.backtick.crl",
-      "settings": {
-        "foreground": "#DCDCAA"
-      }
-    }
-  ]
-}
+    ]
+  }
 ```

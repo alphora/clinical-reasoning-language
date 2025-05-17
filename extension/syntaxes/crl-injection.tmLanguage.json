@@ -92,6 +92,12 @@
           }
         },
         {
+          "scope": "comment.block.crl",
+          "settings": {
+            "foreground": "#6A9955"
+          }
+        },
+        {
           "scope": "string.quoted.backtick.crl",
           "settings": {
             "foreground": "#DCDCAA"
