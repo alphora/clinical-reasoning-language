@@ -7,6 +7,7 @@ BECAUSE      : 'because';
 CODE         : 'code';
 CONCEPT      : 'concept';
 DECISION     : 'decision';
+META         : 'meta';
 NOT          : 'not';
 OR           : 'or';
 REQUEST      : 'request' -> mode(ACTIVITY_MODE);
@@ -148,6 +149,7 @@ CONCEPT_TYPE
             'DetectedIssue',
             'Device',
             'DiagnosticReport',
+            'DocumentReference',
             'Encounter',
             'FamilyMemberHistory',
             'Goal',

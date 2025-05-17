@@ -39,7 +39,7 @@
     },
     {
       "name": "variable.language.meta.crl",
-      "match": "(?<![\\w`\"])\\b(type is|valuetype is|evidence is|inferred from|apply pattern|request|with|because|valueset|system|code|coded from)\\b(?![\\w`\"])"
+      "match": "(?<![\\w`\"])\\b(meta is|type is|valuetype is|evidence is|inferred from|apply pattern|request|with|because|valueset|system|code|coded from)\\b(?![\\w`\"])"
     }
   ],
   "uuid": "cc3b5b42-2f43-4fa4-94cc-b2fae909c22a",
