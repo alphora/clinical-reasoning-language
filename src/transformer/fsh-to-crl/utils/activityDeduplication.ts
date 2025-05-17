@@ -17,7 +17,7 @@ export function normalizeActivity(activity: Activity): string {
  * Stores the first original activity for each normalized key.
  */
 export class ActivityDeduplicator {
-  private normalizedToOriginal: Map<string, Activity> = new Map();
+  private readonly normalizedToOriginal: Map<string, Activity> = new Map();
 
   add(activity: Activity): void {
     const norm = normalizeActivity(activity);
