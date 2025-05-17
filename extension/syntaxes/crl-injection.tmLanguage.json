@@ -30,14 +30,18 @@
       "match": "(?<![\\w`\"])\\b(recommend activity|use decision)\\b(?![\\w`\"])"
     },
     {
+      "name": "keyword.control.applicability.crl",
+      "match": "(?<![\\w`\"])\\b(any|all)\\b(?![\\w`\"])"
+    },
+    {
       "name": "keyword.control.structure.crl",
       "match": "(?<![\\w`\"])\\b(when|end when|then)\\b(?![\\w`\"])"
     },
     {
       "name": "keyword.operator.logical.crl",
-      "match": "(?<![\\w`\"])\\b(or|and|any|all|\\)|\\()\\b(?![\\w`\"])"
+      "match": "(?<![\\w`\"])\\b(or|and)\\b(?![\\w`\"])"
     },
-        {
+    {
       "name": "keyword.operator.parens.crl",
       "match": "\\(|\\)"
     },
@@ -68,6 +72,12 @@
           }
         },
         {
+          "scope": "keyword.control.applicability.crl",
+          "settings": {
+            "foreground": "#ffd700"
+          }
+        },
+        {
           "scope": "keyword.control.structure.crl",
           "settings": {
             "foreground": "#C586C0"
@@ -76,10 +86,10 @@
         {
           "scope": "keyword.operator.logical.crl",
           "settings": {
-            "foreground": "#ffd700"
+            "foreground": "#C586C0"
           }
         },
-                {
+        {
           "scope": "keyword.operator.parens.crl",
           "settings": {
             "foreground": "#ffd700"
