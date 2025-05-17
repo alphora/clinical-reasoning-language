@@ -60,17 +60,17 @@ activity "Indicate" request CPGProposeDiagnosisTask with "Colonoscopy".
 
 activity "Message Care Plan" request CPGCommunicationRequest with `Create a care plan` because `A new plan needs to be implemented.`.
 
-terminology "BMI Range as a Condition" ``.
+activity "Contraindicated" request CPGImmunizationRequest with "Immunization" do not perform because `Immunization is contraindicated`.
 
-terminology "BMI as an Observation" valueset `BMI as an Observation`.
+terminology "BMI Range as a Condition" is ``.
 
-terminology "Height Valueset" valueset `height valueset`.
+terminology "BMI as an Observation" is valueset `BMI as an Observation`.
 
-terminology "Weight Valueset" valueset `weight valueset`.
+terminology "Height Valueset" is valueset `height valueset`.
 
-terminology "some terminology" ``.
+terminology "Weight Valueset" is valueset `weight valueset`.
 
-terminology "Colonoscopy" system `http://snomed.info/sct` code `73761001`.
+terminology "Colonoscopy" is system `http://snomed.info/sct` and code `73761001`.
 
 // comments go into the auto generated README and, CQL when applicable
 

@@ -3,11 +3,12 @@
   "editor.guides.bracketPairs": "active",
   "editor.formatOnSave": false,
   "eslint.format.enable": false,
-  "eslint.validate": ["typescript"],
+  "eslint.validate": [
+    "typescript"
+  ],
   "eslint.alwaysShowStatus": true,
   "prettier.enable": true,
   "prettier.requireConfig": true,
-
   "sonarlint.connectedMode.project": {
     "projectKey": "clinical-reasoning-language"
   },
@@ -15,29 +16,42 @@
     "typescript:S1128": {
       "level": "off",
       "parameters": {
-        "exclusions": ["src/grammar/generated/**/*.ts"]
+        "exclusions": [
+          "src/grammar/generated/**/*.ts"
+        ]
       }
     },
     "typescript:S3863": {
       "level": "off",
       "parameters": {
-        "exclusions": ["src/grammar/generated/**/*.ts"]
+        "exclusions": [
+          "src/grammar/generated/**/*.ts"
+        ]
       }
     },
     "typescript:S6535": {
       "level": "off",
       "parameters": {
-        "exclusions": ["src/grammar/generated/**/*.ts"]
+        "exclusions": [
+          "src/grammar/generated/**/*.ts"
+        ]
       }
     },
     "typescript:S1444": {
       "level": "off",
       "parameters": {
-        "exclusions": ["src/grammar/generated/**/*.ts"]
+        "exclusions": [
+          "src/grammar/generated/**/*.ts"
+        ]
       }
     }
   },
-  "editor.language.brackets": [["(", ")"]],
+  "editor.language.brackets": [
+    [
+      "(",
+      ")"
+    ]
+  ],
   "files.associations": {
     "*.crl": "markdown"
   },
@@ -65,8 +79,19 @@
       {
         "scope": "keyword.operator.logical.crl",
         "settings": {
-          "foreground": "#D16969",
-          "fontStyle": "bold"
+          "foreground": "#ffd700"
+        }
+      },
+      {
+        "scope": "keyword.operator.parens.crl",
+        "settings": {
+          "foreground": "#ffd700"
+        }
+      },
+      {
+        "scope": "keyword.operator.negate.crl",
+        "settings": {
+          "foreground": "#D16969"
         }
       },
       {
