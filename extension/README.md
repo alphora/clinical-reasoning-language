@@ -86,7 +86,7 @@ Add the following to your `settings.json` (via Ctrl+Shift+P → Preferences: Ope
       }
     },
     {
-      "scope": "variable.language.meta.crl",
+      "scope": "variable.language.element.crl",
       "settings": {
         "foreground": "#9CDCFE"
       }

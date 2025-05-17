@@ -1,120 +1,115 @@
 {
-    "editor.formatOnSave": false,
-    "eslint.format.enable": false,
-    "eslint.validate": [
-      "typescript"
-    ],
-    "eslint.alwaysShowStatus": true,
-    "prettier.enable": true,
-    "prettier.requireConfig": true,
-  
-    "sonarlint.connectedMode.project": {
-      "projectKey": "clinical-reasoning-language"
-    },
-    "sonarlint.rules": {
-      "typescript:S1128": {
-        "level": "off",
-        "parameters": {
-          "exclusions": [
-            "src/grammar/generated/**/*.ts"
-          ]
-        }
-      },
-      "typescript:S3863": {
-        "level": "off",
-        "parameters": {
-          "exclusions": [
-            "src/grammar/generated/**/*.ts"
-          ]
-        }
-      },
-      "typescript:S6535": {
-        "level": "off",
-        "parameters": {
-          "exclusions": [
-            "src/grammar/generated/**/*.ts"
-          ]
-        }
-      },
-      "typescript:S1444": {
-        "level": "off",
-        "parameters": {
-          "exclusions": [
-            "src/grammar/generated/**/*.ts"
-          ]
-        }
+  "editor.formatOnSave": false,
+  "eslint.format.enable": false,
+  "eslint.validate": ["typescript"],
+  "eslint.alwaysShowStatus": true,
+  "prettier.enable": true,
+  "prettier.requireConfig": true,
+
+  "sonarlint.connectedMode.project": {
+    "projectKey": "clinical-reasoning-language"
+  },
+  "sonarlint.rules": {
+    "typescript:S1128": {
+      "level": "off",
+      "parameters": {
+        "exclusions": ["src/grammar/generated/**/*.ts"]
       }
     },
-    "files.associations": {
-      "*.crl": "markdown"
-    },
-    "editor.tokenColorCustomizations": {
-  "textMateRules": [
-    {
-      "scope": "entity.name.type.crl",
-      "settings": {
-        "foreground": "#C586C0",
-        "fontStyle": "bold"
+    "typescript:S3863": {
+      "level": "off",
+      "parameters": {
+        "exclusions": ["src/grammar/generated/**/*.ts"]
       }
     },
-    {
-      "scope": "keyword.control.flow.crl",
-      "settings": {
-        "foreground": "#569CD6",
-        "fontStyle": "bold"
+    "typescript:S6535": {
+      "level": "off",
+      "parameters": {
+        "exclusions": ["src/grammar/generated/**/*.ts"]
       }
     },
-    {
-      "scope": "keyword.control.structure.crl",
-      "settings": {
-        "foreground": "#4EC9B0",
-        "fontStyle": "bold"
-      }
-    },
-    {
-      "scope": "variable.language.meta.crl",
-      "settings": {
-        "foreground": "#9CDCFE"
-      }
-    },
-    {
-      "scope": "comment.line.double-slash.crl",
-      "settings": {
-        "foreground": "#6A9955",
-        "fontStyle": "italic"
-      }
-    },
-    {
-      "scope": "string.quoted.double.crl",
-      "settings": {
-        "foreground": "#CE9178"
-      }
-    },
-    {
-      "scope": "string.quoted.backtick.crl",
-      "settings": {
-        "foreground": "#DCDCAA"
+    "typescript:S1444": {
+      "level": "off",
+      "parameters": {
+        "exclusions": ["src/grammar/generated/**/*.ts"]
       }
     }
-  ]
-},
-    "cSpell.words": [
-      "activitydef",
-      "alphora",
-      "Casefeatures",
-      "CIMR",
-      "CRL",
-      "cqis",
-      "IMMZ",
-      "IMMZD",
-      "IMMZDT",
-      "LPAREN",
-      "notallowed",
-      "RPAREN",
-      "smiledigitalhealth",
-      "Subcondition",
-      "Subsubcondition",
-      "valuetype"
+  },
+  "editor.language.brackets": [["(", ")"]],
+  "files.associations": {
+    "*.crl": "markdown"
+  },
+  "editor.tokenColorCustomizations": {
+    "textMateRules": [
+      {
+        "scope": "entity.name.type.crl",
+        "settings": {
+          "foreground": "#9CDCFE",
+          "fontStyle": "bold"
+        }
+      },
+      {
+        "scope": "keyword.control.flow.crl",
+        "settings": {
+          "foreground": "#569CD6"
+        }
+      },
+      {
+        "scope": "keyword.control.structure.crl",
+        "settings": {
+          "foreground": "#C586C0"
+        }
+      },
+      {
+        "scope": "keyword.operator.logical.crl",
+        "settings": {
+          "foreground": "#D16969",
+          "fontStyle": "bold"
+        }
+      },
+      {
+        "scope": "variable.language.element.crl",
+        "settings": {
+          "foreground": "#569CD6"
+        }
+      },
+      {
+        "scope": "comment.line.double-slash.crl",
+        "settings": {
+          "foreground": "#6A9955",
+          "fontStyle": "italic"
+        }
+      },
+      {
+        "scope": "comment.block.crl",
+        "settings": {
+          "foreground": "#6A9955"
+        }
+      },
+      {
+        "scope": "string.quoted.backtick.crl",
+        "settings": {
+          "foreground": "#DCDCAA"
+        }
+      }
     ]
-  }
-  
+  },
+  "cSpell.words": [
+    "activitydef",
+    "alphora",
+    "Casefeatures",
+    "CIMR",
+    "CRL",
+    "cqis",
+    "IMMZ",
+    "IMMZD",
+    "IMMZDT",
+    "LPAREN",
+    "notallowed",
+    "RPAREN",
+    "smiledigitalhealth",
+    "Subcondition",
+    "Subsubcondition",
+    "valuetype"
+  ]
+}

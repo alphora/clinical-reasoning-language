@@ -38,7 +38,7 @@
       "match": "(?<![\\w`\"])\\b(or|and|not|any|all)\\b(?![\\w`\"])"
     },
     {
-      "name": "variable.language.meta.crl",
+      "name": "variable.language.element.crl",
       "match": "(?<![\\w`\"])\\b(meta is|type is|valuetype is|evidence is|inferred from|apply pattern|request|with|because|valueset|system|code|coded from)\\b(?![\\w`\"])"
     }
   ],
@@ -73,7 +73,7 @@
           }
         },
         {
-          "scope": "variable.language.meta.crl",
+          "scope": "variable.language.element.crl",
           "settings": {
             "foreground": "#569CD6"
           }
