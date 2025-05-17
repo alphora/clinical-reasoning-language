@@ -1,23 +1,5 @@
 lexer grammar CRLLexer;
 
-// === Keywords ===
-ACTIVITY     : 'activity';
-AND          : 'and';
-BECAUSE      : 'because';
-CODE         : 'code';
-CONCEPT      : 'concept';
-DECISION     : 'decision';
-META         : 'meta';
-NOT          : 'not';
-OR           : 'or';
-REQUEST      : 'request' -> mode(ACTIVITY_MODE);
-SYSTEM       : 'system';
-TERMINOLOGY  : 'terminology';
-THEN         : 'then';
-VALUESET     : 'valueset';
-WHEN         : 'when';
-WITH         : 'with';
-
 // === Multi-word phrase tokens ===
 END_WHEN           : 'end when';
 RECOMMEND_ACTIVITY : 'recommend activity';
@@ -28,8 +10,30 @@ EVIDENCE_IS        : 'evidence is';
 INFERRED_FROM      : 'inferred from';
 CODED_FROM         : 'coded from';
 APPLY_PATTERN      : 'apply pattern';
+IS_SYSTEM          : 'is system';
+IS_VALUESET        : 'is valueset';
+DO_NOT_PERFORM     : 'do not perform';
 ALL_BLOCK          : 'all:';
 ANY_BLOCK          : 'any:';
+
+// === Keywords ===
+ACTIVITY     : 'activity';
+AND          : 'and';
+BECAUSE      : 'because';
+CODE         : 'code';
+CONCEPT      : 'concept';
+DECISION     : 'decision';
+IS           : 'is';
+META         : 'meta';
+NOT          : 'not';
+OR           : 'or';
+REQUEST      : 'request' -> mode(ACTIVITY_MODE);
+SYSTEM       : 'system';
+TERMINOLOGY  : 'terminology';
+THEN         : 'then';
+VALUESET     : 'valueset';
+WHEN         : 'when';
+WITH         : 'with';
 
 // === Punctuation ===
 COLON        : ':';

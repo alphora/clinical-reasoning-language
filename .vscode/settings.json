@@ -71,6 +71,12 @@
         }
       },
       {
+        "scope": "keyword.control.applicability.crl",
+        "settings": {
+          "foreground": "#ffd700"
+        }
+      },
+      {
         "scope": "keyword.control.structure.crl",
         "settings": {
           "foreground": "#C586C0"
@@ -79,7 +85,7 @@
       {
         "scope": "keyword.operator.logical.crl",
         "settings": {
-          "foreground": "#ffd700"
+          "foreground": "#C586C0"
         }
       },
       {
