@@ -1,4 +1,6 @@
 {
+  "editor.bracketPairColorization.enabled": true,
+  "editor.guides.bracketPairs": "active",
   "editor.formatOnSave": false,
   "eslint.format.enable": false,
   "eslint.validate": ["typescript"],
@@ -78,6 +80,12 @@
         "settings": {
           "foreground": "#6A9955",
           "fontStyle": "italic"
+        }
+      },
+      {
+        "scope": "string.quoted.double.crl",
+        "settings": {
+          "foreground": "#CE9178"
         }
       },
       {
