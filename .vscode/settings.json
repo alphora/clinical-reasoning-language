@@ -48,6 +48,56 @@
     "files.associations": {
       "*.crl": "markdown"
     },
+    "editor.tokenColorCustomizations": {
+  "textMateRules": [
+    {
+      "scope": "entity.name.type.crl",
+      "settings": {
+        "foreground": "#C586C0",
+        "fontStyle": "bold"
+      }
+    },
+    {
+      "scope": "keyword.control.flow.crl",
+      "settings": {
+        "foreground": "#569CD6",
+        "fontStyle": "bold"
+      }
+    },
+    {
+      "scope": "keyword.control.structure.crl",
+      "settings": {
+        "foreground": "#4EC9B0",
+        "fontStyle": "bold"
+      }
+    },
+    {
+      "scope": "variable.language.meta.crl",
+      "settings": {
+        "foreground": "#9CDCFE"
+      }
+    },
+    {
+      "scope": "comment.line.double-slash.crl",
+      "settings": {
+        "foreground": "#6A9955",
+        "fontStyle": "italic"
+      }
+    },
+    {
+      "scope": "string.quoted.double.crl",
+      "settings": {
+        "foreground": "#CE9178"
+      }
+    },
+    {
+      "scope": "string.quoted.backtick.crl",
+      "settings": {
+        "foreground": "#DCDCAA"
+      }
+    }
+  ]
+},
     "cSpell.words": [
       "activitydef",
       "alphora",

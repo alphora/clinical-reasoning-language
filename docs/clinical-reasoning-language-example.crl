@@ -58,7 +58,7 @@ activity "Vaccinate" request CPGImmunizationRequest.
 
 activity "Indicate" request CPGProposeDiagnosisTask with "Colonoscopy".
 
-activity "another thing" request CPGCommunicationRequest with `Do the thing` because `it's the right thing to do`.
+activity "Message Care Plan" request CPGCommunicationRequest with `Create a care plan` because `A new plan needs to be implemented.`.
 
 terminology "BMI Range as a Condition" ``.
 
@@ -78,7 +78,7 @@ concept "Most Recent BMI":
 
 - type is Observation.
 - valuetype is boolean.
-- evidence is `It's some evidence`.
+- evidence is `Calculated by Smile`.
 - inferred from "BMI" apply pattern `Most Recent(this, lookbackMonths)`.
 
 concept "BMI":

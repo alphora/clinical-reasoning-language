@@ -41,6 +41,11 @@ code --install-extension extension/crl-language-support-0.0.1.vsix
 ```
 Then open any `.crl` file — it will highlight automatically.
 
+## Install locally in Cursor
+
+- Ctrl+Shift+P → `Developer: Install Extension From Location`
+- browse to `/extension`
+
 ## 🚀 Publish to VS Code Marketplace
 
 1. [Create a publisher account](https://code.visualstudio.com/api/working-with-extensions/publishing-extension)
