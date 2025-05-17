@@ -280,46 +280,46 @@ concept "Contraindication Evaluation of the MCV dose":
 - valuetype is boolean.
 - coded from "Contraindication Evaluation of the MCV dose".
 
-terminology "Measles Routine Immunization Schedule Incomplete" system `http://sdh.com/cqis/kalm` code `measles-routine-immunization-schedule-incomplete`.
+terminology "Measles Routine Immunization Schedule Incomplete" is system `http://sdh.com/cqis/kalm` and code `measles-routine-immunization-schedule-incomplete`.
 
-terminology "No MCV0 Doses Administered" system `http://sdh.com/cqis/kalm` code `no-mcv0-doses-administered`.
+terminology "No MCV0 Doses Administered" is system `http://sdh.com/cqis/kalm` and code `no-mcv0-doses-administered`.
 
-terminology "Client Age Less Than 6 Months" system `http://sdh.com/cqis/kalm` code `client-age-less-than-6-months`.
+terminology "Client Age Less Than 6 Months" is system `http://sdh.com/cqis/kalm` and code `client-age-less-than-6-months`.
 
-terminology "Last Live Vaccine Administered Within 4 Weeks" system `http://sdh.com/cqis/kalm` code `last-live-vaccine-administered-within-4-weeks`.
+terminology "Last Live Vaccine Administered Within 4 Weeks" is system `http://sdh.com/cqis/kalm` and code `last-live-vaccine-administered-within-4-weeks`.
 
-terminology "Client Is Due For MCV0" system `http://sdh.com/cqis/kalm` code `client-is-due-for-mcv0`.
+terminology "Client Is Due For MCV0" is system `http://sdh.com/cqis/kalm` and code `client-is-due-for-mcv0`.
 
-terminology "MCV0 Dose Administered" system `http://sdh.com/cqis/kalm` code `mcv0-dose-administered`.
+terminology "MCV0 Dose Administered" is system `http://sdh.com/cqis/kalm` and code `mcv0-dose-administered`.
 
-terminology "No Primary Series Doses Administered" system `http://sdh.com/cqis/kalm` code `no-primary-series-doses-administered`.
+terminology "No Primary Series Doses Administered" is system `http://sdh.com/cqis/kalm` and code `no-primary-series-doses-administered`.
 
-terminology "Client Age Less Than 12 Months" system `http://sdh.com/cqis/kalm` code `client-age-less-than-12-months`.
+terminology "Client Age Less Than 12 Months" is system `http://sdh.com/cqis/kalm` and code `client-age-less-than-12-months`.
 
-terminology "Client Is Due For MCV1" system `http://sdh.com/cqis/kalm` code `client-is-due-for-mcv1`.
+terminology "Client Is Due For MCV1" is system `http://sdh.com/cqis/kalm` and code `client-is-due-for-mcv1`.
 
-terminology "One Primary Series Dose Administered" system `http://sdh.com/cqis/kalm` code `one-primary-series-dose-administered`.
+terminology "One Primary Series Dose Administered" is system `http://sdh.com/cqis/kalm` and code `one-primary-series-dose-administered`.
 
-terminology "Client Age Less Than 15 Months" system `http://sdh.com/cqis/kalm` code `client-age-less-than-15-months`.
+terminology "Client Age Less Than 15 Months" is system `http://sdh.com/cqis/kalm` and code `client-age-less-than-15-months`.
 
-terminology "Client Is Due For MCV2" system `http://sdh.com/cqis/kalm` code `client-is-due-for-mcv2`.
+terminology "Client Is Due For MCV2" is system `http://sdh.com/cqis/kalm` and code `client-is-due-for-mcv2`.
 
-terminology "Two Primary Series Doses Administered" system `http://sdh.com/cqis/kalm` code `two-primary-series-doses-administered`.
+terminology "Two Primary Series Doses Administered" is system `http://sdh.com/cqis/kalm` and code `two-primary-series-doses-administered`.
 
-terminology "Client Age Less Than 9 Months" system `http://sdh.com/cqis/kalm` code `client-age-less-than-9-months`.
+terminology "Client Age Less Than 9 Months" is system `http://sdh.com/cqis/kalm` and code `client-age-less-than-9-months`.
 
-terminology "Measles Routine Immunization Schedule Complete" system `http://sdh.com/cqis/kalm` code `measles-routine-immunization-schedule-complete`.
+terminology "Measles Routine Immunization Schedule Complete" is system `http://sdh.com/cqis/kalm` and code `measles-routine-immunization-schedule-complete`.
 
-terminology "No Supplementary Dose Administered" system `http://sdh.com/cqis/kalm` code `no-supplementary-dose-administered`.
+terminology "No Supplementary Dose Administered" is system `http://sdh.com/cqis/kalm` and code `no-supplementary-dose-administered`.
 
-terminology "Client Is Due For Supplementary Dose" system `http://sdh.com/cqis/kalm` code `client-is-due-for-supplementary-dose`.
+terminology "Client Is Due For Supplementary Dose" is system `http://sdh.com/cqis/kalm` and code `client-is-due-for-supplementary-dose`.
 
-terminology "Supplementary Dose Administered" system `http://sdh.com/cqis/kalm` code `supplementary-dose-administered`.
+terminology "Supplementary Dose Administered" is system `http://sdh.com/cqis/kalm` and code `supplementary-dose-administered`.
 
-terminology "MCV Dose Contraindicated" system `http://sdh.com/cqis/kalm` code `mcv-dose-contraindicated`.
+terminology "MCV Dose Contraindicated" is system `http://sdh.com/cqis/kalm` and code `mcv-dose-contraindicated`.
 
-terminology "Contraindication Evaluation of the MCV dose" system `http://sdh.com/cqis/kalm` code `contraindication-evaluation-of-the-mcv-dose`.
+terminology "Contraindication Evaluation of the MCV dose" is system `http://sdh.com/cqis/kalm` and code `contraindication-evaluation-of-the-mcv-dose`.
 
-terminology "Measles vaccines" system `http://id.who.int/icd/release/11/mms` code `XM28X5`.
+terminology "Measles vaccines" is system `http://id.who.int/icd/release/11/mms` and code `XM28X5`.
 
-terminology "Measles Code" system `http://id.who.int/icd/release/11/mms` code `XM28X5`.
+terminology "Measles Code" is system `http://id.who.int/icd/release/11/mms` and code `XM28X5`.
