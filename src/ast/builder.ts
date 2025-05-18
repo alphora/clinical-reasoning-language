@@ -126,6 +126,16 @@ export class CRLAstBuilder
     return { type: "DecisionBody", statements, location: getLocation(ctx) };
   }
 
+  visitWhenBlock(ctx: WhenBlockContext): WhenBlock {
+    if (ctx.blockBody() && ctx.END_WHEN()) {
+      return this.visitWhenWithBody(ctx);
+    } else if (ctx.actionStatement()) {
+      return this.visitWhenSingleAction(ctx);
+    }
+    this.reportError("Unknown whenBlock alternative", ctx);
+    return null as unknown as WhenBlock;
+  }
+
   visitWhenWithBody(ctx: WhenBlockContext): WhenBlock {
     const conceptName = ctx.conceptReference().text.slice(1, -1);
     const body = this.visit(ctx.blockBody()!) as BlockBody;
@@ -142,15 +152,23 @@ export class CRLAstBuilder
     return this.visit(ctx) as WhenBlock;
   }
 
+  visitBlockStatement(
+    ctx: import("../grammar/generated/antlr/CRLParser").BlockStatementContext,
+  ): WhenBlock | ActionStatement {
+    if (ctx.whenBlock()) {
+      return this.visitNestedWhenBlock(ctx.whenBlock()!);
+    } else if (ctx.actionStatement()) {
+      return this.visitBlockAction(ctx.actionStatement()!);
+    }
+    this.reportError("Unknown blockStatement alternative", ctx);
+    return null as unknown as WhenBlock;
+  }
+
   visitBlockBody(ctx: BlockBodyContext): BlockBody {
     const qualifier = ctx.anyOrAllClause() ? ctx.anyOrAllClause()!.text.slice(0, -1) : undefined;
     const statements: (WhenBlock | ActionStatement)[] = [];
     for (const stmtCtx of ctx.blockStatement()) {
-      if (stmtCtx instanceof WhenBlockContext) {
-        statements.push(this.visitNestedWhenBlock(stmtCtx));
-      } else if (stmtCtx instanceof ActionStatementContext) {
-        statements.push(this.visitBlockAction(stmtCtx));
-      }
+      statements.push(this.visitBlockStatement(stmtCtx));
     }
     return {
       type: "BlockBody",
