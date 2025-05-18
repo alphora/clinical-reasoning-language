@@ -35,7 +35,6 @@ export class CustomParserErrorListener implements ANTLRErrorListener<Token> {
         offendingSymbol: offendingDetails,
       },
     };
-    console.error(JSON.stringify(error, null, 2));
     this.errors.push(error);
   }
 
