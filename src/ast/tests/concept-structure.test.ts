@@ -12,12 +12,12 @@ import { parseInput } from "./parseInput";
 
 describe("Concept Structure", () => {
   it("should correctly structure concept with inferred by concept reference", () => {
-    const input = `
+    const input = `# Test
 concept "Client Age Less Than 12 Months":
-    type is Condition.
-    valuetype is boolean.
-    inferred from "Less Than" "Age 12 Months".
-done`;
+    - type is Condition.
+    - valuetype is boolean.
+    - inferred from ("Less Than").
+.`;
 
     const result = parseInput(input);
     const concept = result.statements[0] as Concept;
@@ -33,18 +33,18 @@ done`;
     expect(definition.type).toBe("InferredFromDefinition");
 
     const body = definition.body as InferredFromConcept;
-    expect(body.type).toBe("InferredFromDefinitionConcept");
+    expect(body.type).toBe("ConceptReference");
     expect(body.pattern).toBeUndefined();
-    expect(body.concept).toBe("Less Than");
+    expect(body.name).toBe("Less Than");
   });
 
   it("should correctly structure concept with inferred by descriptive logic", () => {
-    const input = `
+    const input = `# Test
 concept "Client Is Due For MCV12":
-    type is Condition.
-    valuetype is boolean.
-    inferred from ("Last MCV Dose Administered" and "More Than 4 Weeks Ago").
-done`;
+    - type is Condition.
+    - valuetype is boolean.
+    - inferred from ("Last MCV Dose Administered" and "More Than 4 Weeks Ago").
+.`;
 
     const result = parseInput(input);
     const concept = result.statements[0] as Concept;
@@ -64,12 +64,12 @@ done`;
   });
 
   it("should correctly structure concept with coded by definition", () => {
-    const input = `
+    const input = `# Test
 concept "Measles Vaccine":
-    type is Immunization.
-    valuetype is CodeableConcept.
-    coded from "MeaslesVaccineCodes".
-done`;
+    - type is Immunization.
+    - valuetype is CodeableConcept.
+    - coded from "MeaslesVaccineCodes".
+.`;
 
     const result = parseInput(input);
     const concept = result.statements[0] as Concept;
@@ -87,12 +87,12 @@ done`;
   });
 
   it("should handle complex inferred by expressions", () => {
-    const input = `
+    const input = `# Test
 concept "Complex Condition":
-    type is Condition.
-    valuetype is boolean.
-    inferred from (not ("Age Greater Than 18" and "Age Less Than 65")).
-done`;
+    - type is Condition.
+    - valuetype is boolean.
+    - inferred from (not ("Age Greater Than 18" and "Age Less Than 65")).
+.`;
 
     const result = parseInput(input);
     const concept = result.statements[0] as Concept;
