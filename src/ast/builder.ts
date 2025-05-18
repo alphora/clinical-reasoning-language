@@ -111,8 +111,19 @@ export class CRLAstBuilder
   }
 
   visitCrl(ctx: CrlContext): CRL {
+    let header: string | undefined;
+    const headerNode = ctx.HEADER();
+    if (headerNode) {
+      // Remove leading '#' and trim whitespace
+      header = headerNode.text.replace(/^#\s*/, "");
+    }
     const statements = ctx.statement().map((s) => this.visit(s) as Statement);
-    return { type: "CRL", statements, location: getLocation(ctx) };
+    return {
+      type: "CRL",
+      ...(header ? { identifier: header } : {}),
+      statements,
+      location: getLocation(ctx),
+    };
   }
 
   visitDecisionStatement(ctx: DecisionStatementContext): Decision {
