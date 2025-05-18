@@ -11,10 +11,18 @@ const filePath =
 const input = readFileSync(filePath, "utf-8");
 
 // Create the parser (new API)
-const { parser } = createParser(input);
+const { parser, parserErrorListener } = createParser(input);
 
 // Parse the input
 const tree = parser.crl();
+
+// Print errors and exit if any are present
+const errors = parserErrorListener.getErrors();
+if (errors.length > 0) {
+  console.error("Parser errors:");
+  errors.forEach((e) => console.error(JSON.stringify(e, null, 2)));
+  process.exit(1);
+}
 
 // Check if pretty output is requested
 const prettyOutput = process.argv.includes("--pretty");

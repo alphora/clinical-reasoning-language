@@ -1,8 +1,7 @@
 import { readFileSync } from "fs";
 import { join } from "path";
 
-import { CRLAstBuilder } from "../ast/builder";
-import { CRL } from "../ast/types";
+import { createBuilder } from "../ast/builder";
 import { printAST } from "../ast/utils";
 import { createParser } from "../parser/createParser";
 
@@ -20,8 +19,12 @@ const { parser } = createParser(input);
 const tree = parser.crl();
 
 // Create the AST builder and visit the parse tree
-const builder = new CRLAstBuilder();
-const ast = builder.visit(tree) as CRL;
+const { ast, errors } = createBuilder(tree);
+if (errors.length > 0) {
+  console.error("AST builder errors:");
+  errors.forEach((e) => console.error(JSON.stringify(e, null, 2)));
+  process.exit(1);
+}
 
 // Check if raw output is requested
 const prettyOutput = process.argv.includes("--pretty");
