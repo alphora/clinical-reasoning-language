@@ -1,5 +1,5 @@
-// Test suite imports
-import "./regression-ast.test";
-import "./regression-lexer.test";
-import "./regression-parser.test";
-import "./regression-transformer.test";
+import "../lexer/tests/index.test";
+import "../parser/tests/index.test";
+import "../ast/tests/index.test";
+// import "../validator/tests/index.test";
+import "./regression/index.test";

@@ -3,7 +3,6 @@ import {
   WhenBlock,
   BlockBody,
   ActionStatement,
-  SingleAction,
   RecommendActivity,
   UseDecision,
 } from "../types";
@@ -55,10 +54,10 @@ decision "Test Decision":
     const result = parseInput(input);
     const decision = result.statements[0] as Decision;
     const whenBlock = decision.body.statements[0] as WhenBlock;
-    const singleAction = whenBlock.body as SingleAction;
-    const doActivity = singleAction.action as RecommendActivity;
+    const actionStatement = whenBlock.body as ActionStatement;
+    const doActivity = actionStatement.action as RecommendActivity;
 
-    expect(singleAction.type).toBe("ActionStatement");
+    expect(actionStatement.type).toBe("ActionStatement");
     expect(doActivity.type).toBe("RecommendActivity");
     expect(doActivity.activityName).toBe("Vaccinate");
   });
@@ -110,8 +109,8 @@ decision "Test Decision":
 
     const result = parseInput(input);
     const decision = result.statements[0] as Decision;
-    const whenBlock = decision.body.statements[0] as WhenBlock;
-    const blockBody = whenBlock.body as BlockBody;
+    const whenBlock1 = decision.body.statements[0] as WhenBlock;
+    const blockBody = whenBlock1.body as BlockBody;
 
     expect(blockBody.statements).toHaveLength(2);
 
@@ -123,13 +122,13 @@ decision "Test Decision":
     expect(useAction.type).toBe("ActionStatement");
     expect(useAction.action.type).toBe("UseDecision");
 
-    const nestedWhen = blockBody.statements[2] as WhenBlock;
-    expect(nestedWhen.type).toBe("WhenBlock");
-    expect(nestedWhen.conceptName).toBe("Condition");
-
-    const singleAction = nestedWhen.body as SingleAction;
-    expect(singleAction.type).toBe("ActionStatement");
-    expect(singleAction.action.type).toBe("RecommendActivity");
+    // The second top-level when block
+    const whenBlock2 = decision.body.statements[1] as WhenBlock;
+    expect(whenBlock2.type).toBe("WhenBlock");
+    expect(whenBlock2.conceptName).toBe("Condition");
+    const actionStatement = whenBlock2.body as ActionStatement;
+    expect(actionStatement.type).toBe("ActionStatement");
+    expect(actionStatement.action.type).toBe("RecommendActivity");
   });
 
   it("should not duplicate when blocks in nested decisions", () => {

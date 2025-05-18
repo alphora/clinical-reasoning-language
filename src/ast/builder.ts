@@ -36,7 +36,6 @@ import {
   DecisionBody,
   WhenBlock,
   BlockBody,
-  SingleAction,
   ActionStatement,
   RecommendActivity,
   UseDecision,
@@ -155,7 +154,7 @@ export class CRLAstBuilder
 
   visitWhenSingleAction(ctx: WhenBlockContext): WhenBlock {
     const conceptName = ctx.conceptReference().text.slice(1, -1);
-    const action = this.visit(ctx.actionStatement()!) as SingleAction;
+    const action = this.visit(ctx.actionStatement()!) as ActionStatement;
     return { type: "WhenBlock", conceptName, body: action, location: getLocation(ctx) };
   }
 
@@ -467,10 +466,21 @@ export class CRLAstBuilder
     };
   }
 
-  visitDefinitionLogic(ctx: InferredBodyContext): GroupExpression {
+  visitDefinitionLogic(ctx: InferredBodyContext): GroupExpression | InferredFromConcept {
     const descCtx = ctx.getRuleContext(0, InferredFromDescriptiveLogicContext);
     const exprCtx = descCtx?.inferredFromExpression();
-    return this.visit(exprCtx) as GroupExpression;
+    const expr = this.visit(exprCtx);
+
+    // If the result is a single ConceptReference, wrap as InferredFromConcept
+    if (expr && expr.type === "ConceptReference") {
+      const conceptRef = expr as ConceptReference;
+      return {
+        type: "InferredFromDefinitionConcept",
+        concept: conceptRef.name,
+        location: getLocation(ctx),
+      };
+    }
+    return expr as GroupExpression;
   }
 
   visitInferredFromExpression(ctx: InferredFromExpressionContext): InformalNode {
