@@ -1,5 +1,6 @@
 import { ParserRuleContext } from "antlr4ts/ParserRuleContext";
 import { AbstractParseTreeVisitor } from "antlr4ts/tree/AbstractParseTreeVisitor";
+import type { ParseTree } from "antlr4ts/tree/ParseTree";
 
 import {
   CrlContext,
@@ -27,56 +28,38 @@ import {
   ConceptReferenceContext,
 } from "../grammar/generated/antlr/CRLParser";
 import { CRLParserVisitor } from "../grammar/generated/antlr/CRLParserVisitor";
-import { CRLError } from "../types/errors";
+import type { CRLError } from "../types/errors";
 
 import {
   ASTNode,
-  CRL,
-  FileType,
   Statement,
   Decision,
-  DecisionType,
   DecisionBody,
-  DecisionBodyType,
   WhenBlock,
   BlockBody,
-  BlockBodyType,
   SingleAction,
   ActionStatement,
   RecommendActivity,
-  RecommendActivityType,
   UseDecision,
-  UseDecisionType,
   Terminology,
-  TerminologyType,
   TerminologyValueset,
-  TerminologyValuesetType,
   TerminologySystemCode,
-  TerminologySystemCodeType,
   Activity,
   ActivityType,
   Concept,
   ConceptType,
   ConceptDefinition,
-  CodedFromDefinitionType,
   InferredFromDefinition,
-  InferredFromDefinitionType,
   ConceptReference,
-  ConceptReferenceType,
   InformalAnd,
-  InformalAndType,
   InformalOr,
-  InformalOrType,
   NotExpression,
-  NotExpressionType,
   GroupExpression,
-  GroupExpressionType,
   InferredFromConcept,
-  InferredFromConceptType,
-  InferredFromExpression,
   Location,
   ConceptValueType,
 } from "./types";
+import type { CRL } from "./types";
 
 // Alias for all possible informal expression node types
 type InformalNode = GroupExpression | ConceptReference | InformalAnd | NotExpression | InformalOr;
@@ -130,18 +113,18 @@ export class CRLAstBuilder
 
   visitCrl(ctx: CrlContext): CRL {
     const statements = ctx.statement().map((s) => this.visit(s) as Statement);
-    return { type: FileType.type, statements, location: getLocation(ctx) };
+    return { type: "CRL", statements, location: getLocation(ctx) };
   }
 
   visitDecisionStatement(ctx: DecisionStatementContext): Decision {
     const name = ctx.decisionIdentifier().text.slice(1, -1);
     const body = this.visit(ctx.decisionBody()!) as DecisionBody;
-    return { type: DecisionType.type, name, body, location: getLocation(ctx) };
+    return { type: "Decision", name, body, location: getLocation(ctx) };
   }
 
   visitDecisionBody(ctx: DecisionBodyContext): DecisionBody {
     const statements = ctx.whenBlock().map((w) => this.visit(w) as WhenBlock);
-    return { type: DecisionBodyType.type, statements, location: getLocation(ctx) };
+    return { type: "DecisionBody", statements, location: getLocation(ctx) };
   }
 
   visitWhenWithBody(ctx: WhenBlockContext): WhenBlock {
@@ -161,24 +144,17 @@ export class CRLAstBuilder
   }
 
   visitBlockBody(ctx: BlockBodyContext): BlockBody {
-    // qualifier as before
     const qualifier = ctx.anyOrAllClause() ? ctx.anyOrAllClause()!.text.slice(0, -1) : undefined;
-
     const statements: (WhenBlock | ActionStatement)[] = [];
-
-    // ctx.blockStatement() gives you every BlockStatementContext
     for (const stmtCtx of ctx.blockStatement()) {
       if (stmtCtx instanceof WhenBlockContext) {
-        // the 'whenBlock' branch
         statements.push(this.visitNestedWhenBlock(stmtCtx));
       } else if (stmtCtx instanceof ActionStatementContext) {
-        // the 'actionStatement' branch
         statements.push(this.visitBlockAction(stmtCtx));
       }
     }
-
     return {
-      type: BlockBodyType.type,
+      type: "BlockBody",
       qualifier,
       statements,
       location: getLocation(ctx),
@@ -206,13 +182,13 @@ export class CRLAstBuilder
 
   visitrecommendStatement(ctx: RecommendStatementContext): RecommendActivity {
     const activityName = ctx.activityReference().text.slice(1, -1);
-    const result = { type: RecommendActivityType.type, activityName, location: getLocation(ctx) };
+    const result = { type: "RecommendActivity" as const, activityName, location: getLocation(ctx) };
     return result;
   }
 
   visitUseStatement(ctx: UseStatementContext): UseDecision {
     const decisionName = ctx.decisionReference().text.slice(1, -1);
-    const result = { type: UseDecisionType.type, decisionName, location: getLocation(ctx) };
+    const result = { type: "UseDecision" as const, decisionName, location: getLocation(ctx) };
     return result;
   }
 
@@ -227,7 +203,6 @@ export class CRLAstBuilder
     } else if (ctx.terminologySystemCode()) {
       definition = this.visit(ctx.terminologySystemCode()!) as TerminologySystemCode;
     } else if (ctx.terminologyUnknown()) {
-      // free text/markdown case
       definition = {
         type: "TerminologyUnknown",
         value: "",
@@ -235,7 +210,7 @@ export class CRLAstBuilder
       };
     }
     return {
-      type: TerminologyType.type,
+      type: "Terminology",
       name,
       definition: definition!,
       location: getLocation(ctx),
@@ -244,11 +219,10 @@ export class CRLAstBuilder
 
   visitTerminologyValueset(ctx: TerminologyValuesetContext): TerminologyValueset {
     const valuesetName = ctx.backtickString().text.slice(1, -1);
-    return { type: TerminologyValuesetType.type, valuesetName, location: getLocation(ctx) };
+    return { type: "TerminologyValueset", valuesetName, location: getLocation(ctx) };
   }
 
   visitTerminologySystemCode(ctx: TerminologySystemCodeContext): TerminologySystemCode {
-    // SYSTEM backtickString CODE backtickString
     let system = "";
     let code = "";
     if (ctx.backtickString && ctx.backtickString().length === 2) {
@@ -257,7 +231,7 @@ export class CRLAstBuilder
       if (systemNode?.text) system = systemNode.text.slice(1, -1);
       if (codeNode?.text) code = codeNode.text.slice(1, -1);
     }
-    return { type: TerminologySystemCodeType.type, system, code, location: getLocation(ctx) };
+    return { type: "TerminologySystemCode", system, code, location: getLocation(ctx) };
   }
 
   private parseWithClause(
@@ -383,7 +357,7 @@ export class CRLAstBuilder
         return null;
       }
       return {
-        type: CodedFromDefinitionType.type,
+        type: "CodedFromDefinition" as const,
         terminologyName: termRef,
         location: getLocation(bodyCtx.codedFromLine()!),
       };
@@ -443,7 +417,7 @@ export class CRLAstBuilder
       | InformalOr
       | NotExpression
       | GroupExpression;
-    return { type: InferredFromDefinitionType.type, body, location: getLocation(ctx) };
+    return { type: "InferredFromDefinition", body, location: getLocation(ctx) };
   }
 
   visitDefinitionConcept(ctx: InferredBodyContext): InferredFromConcept {
@@ -460,7 +434,7 @@ export class CRLAstBuilder
     }
     const concept = refCtx?.conceptReference().text.slice(1, -1) ?? "";
     return {
-      type: InferredFromConceptType.type,
+      type: "InferredFromDefinitionConcept",
       pattern: pat,
       concept,
       location: getLocation(ctx),
@@ -480,8 +454,7 @@ export class CRLAstBuilder
   visitInformalOr(ctx: InformalOrContext): InformalOr {
     const terms = ctx.informalAnd().map((a: InformalAndContext) => this.visit(a) as InformalNode);
     if (ctx.OR().length) {
-      // flatten
-      return { type: InformalOrType.type, terms, location: getLocation(ctx) };
+      return { type: "OrExpression", terms, location: getLocation(ctx) };
     }
     return terms[0] as InformalOr;
   }
@@ -496,26 +469,26 @@ export class CRLAstBuilder
           this.visit(n) as GroupExpression | ConceptReference | InformalAnd | NotExpression,
       );
     if (ctx.AND().length) {
-      return { type: InformalAndType.type, terms, location: getLocation(ctx) };
+      return { type: "AndExpression", terms, location: getLocation(ctx) };
     }
     return terms[0];
   }
 
-  visitInformalNot(ctx: InformalNotContext): InferredFromExpression {
+  visitInformalNot(ctx: InformalNotContext): import("./types").InferredFromExpression {
     if (ctx.NOT()) {
       return {
-        type: NotExpressionType.type,
-        expression: this.visit(ctx.informalNot()!) as InferredFromExpression,
+        type: "NotExpression" as const,
+        expression: this.visit(ctx.informalNot()!) as import("./types").InferredFromExpression,
         location: getLocation(ctx),
       };
     }
-    return this.visit(ctx.atom()!) as InferredFromExpression;
+    return this.visit(ctx.atom()!) as import("./types").InferredFromExpression;
   }
 
   visitConceptAtom(ctx: AtomContext): ConceptReference {
     const conceptRefCtx = ctx.getRuleContext(0, ConceptReferenceContext);
     const name = conceptRefCtx?.text?.slice(1, -1) ?? "";
-    return { type: ConceptReferenceType.type, name, location: getLocation(ctx) };
+    return { type: "ConceptReference", name, location: getLocation(ctx) };
   }
   visitGroupExpression(ctx: AtomContext): GroupExpression {
     const exprCtx = ctx.getRuleContext(0, InferredFromExpressionContext);
@@ -525,6 +498,18 @@ export class CRLAstBuilder
       | NotExpression
       | ConceptReference
       | GroupExpression;
-    return { type: GroupExpressionType.type, expression: expr, location: getLocation(ctx) };
+    return { type: "GroupExpression", expression: expr, location: getLocation(ctx) };
   }
+}
+
+// Factory function to create a builder, build the AST, and collect errors
+export function createBuilder(tree: ParseTree): {
+  builder: CRLAstBuilder;
+  ast: CRL;
+  errors: CRLError[];
+} {
+  const builder = new CRLAstBuilder();
+  const ast = builder.visit(tree) as CRL;
+  const errors = builder.getErrors();
+  return { builder, ast, errors };
 }
