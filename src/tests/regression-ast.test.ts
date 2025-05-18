@@ -35,3 +35,18 @@ describe("AST builder regression test: IMMZ example", () => {
     expect(actualBody).toBe(expectedBody);
   });
 });
+
+describe("AST builder regression test: Example files run without error", () => {
+  const EXAMPLES = [
+    path.join(__dirname, "testdata", "clinical-reasoning-language-example.crl"),
+    path.join(__dirname, "testdata", "IMMZ_All_Decisions.crl"),
+  ];
+
+  EXAMPLES.forEach((examplePath) => {
+    it(`should build AST for ${path.basename(examplePath)} without error`, () => {
+      expect(() => {
+        execSync(`npm run cli:ast -- ${examplePath}`, { encoding: "utf8" });
+      }).not.toThrow();
+    });
+  });
+});

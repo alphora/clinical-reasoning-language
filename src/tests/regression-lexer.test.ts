@@ -35,3 +35,18 @@ describe("Lexer regression test: IMMZ example", () => {
     expect(actualBody).toBe(expectedBody);
   });
 });
+
+describe("Lexer regression test: Example files run without error", () => {
+  const EXAMPLES = [
+    path.join(__dirname, "testdata", "clinical-reasoning-language-example.crl"),
+    path.join(__dirname, "testdata", "IMMZ_All_Decisions.crl"),
+  ];
+
+  EXAMPLES.forEach((examplePath) => {
+    it(`should lex ${path.basename(examplePath)} without error`, () => {
+      expect(() => {
+        execSync(`npm run cli:lexer -- ${examplePath}`, { encoding: "utf8" });
+      }).not.toThrow();
+    });
+  });
+});
