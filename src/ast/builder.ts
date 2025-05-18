@@ -25,6 +25,11 @@ import {
   InformalNotContext,
   AtomContext,
   ConceptReferenceContext,
+  WhenWithBodyContext,
+  WhenSingleActionContext,
+  NestedWhenBlockContext,
+  BlockActionContext,
+  BlockStatementContext,
 } from "../grammar/generated/antlr/CRLParser";
 import { CRLParserVisitor } from "../grammar/generated/antlr/CRLParserVisitor";
 import type { CRLError } from "../types/errors";
@@ -137,38 +142,36 @@ export class CRLAstBuilder
   }
 
   visitWhenBlock(ctx: WhenBlockContext): WhenBlock {
-    if (ctx.blockBody() && ctx.END_WHEN()) {
+    if (ctx instanceof WhenWithBodyContext) {
       return this.visitWhenWithBody(ctx);
-    } else if (ctx.actionStatement()) {
+    } else if (ctx instanceof WhenSingleActionContext) {
       return this.visitWhenSingleAction(ctx);
     }
     this.reportError("Unknown whenBlock alternative", ctx);
     return null as unknown as WhenBlock;
   }
 
-  visitWhenWithBody(ctx: WhenBlockContext): WhenBlock {
+  visitWhenWithBody(ctx: WhenWithBodyContext): WhenBlock {
     const conceptName = ctx.conceptReference().text.slice(1, -1);
-    const body = this.visit(ctx.blockBody()!) as BlockBody;
+    const body = this.visit(ctx.blockBody()) as BlockBody;
     return { type: "WhenBlock", conceptName, body, location: getLocation(ctx) };
   }
 
-  visitWhenSingleAction(ctx: WhenBlockContext): WhenBlock {
+  visitWhenSingleAction(ctx: WhenSingleActionContext): WhenBlock {
     const conceptName = ctx.conceptReference().text.slice(1, -1);
-    const action = this.visit(ctx.actionStatement()!) as ActionStatement;
+    const action = this.visit(ctx.actionStatement()) as ActionStatement;
     return { type: "WhenBlock", conceptName, body: action, location: getLocation(ctx) };
   }
 
-  visitNestedWhenBlock(ctx: WhenBlockContext): WhenBlock {
-    return this.visit(ctx) as WhenBlock;
+  visitNestedWhenBlock(ctx: NestedWhenBlockContext): WhenBlock {
+    return this.visit(ctx.whenBlock()) as WhenBlock;
   }
 
-  visitBlockStatement(
-    ctx: import("../grammar/generated/antlr/CRLParser").BlockStatementContext,
-  ): WhenBlock | ActionStatement {
-    if (ctx.whenBlock()) {
-      return this.visitNestedWhenBlock(ctx.whenBlock()!);
-    } else if (ctx.actionStatement()) {
-      return this.visitBlockAction(ctx.actionStatement()!);
+  visitBlockStatement(ctx: BlockStatementContext): WhenBlock | ActionStatement {
+    if (ctx instanceof NestedWhenBlockContext) {
+      return this.visitNestedWhenBlock(ctx);
+    } else if (ctx instanceof BlockActionContext) {
+      return this.visitBlockAction(ctx);
     }
     this.reportError("Unknown blockStatement alternative", ctx);
     return null as unknown as WhenBlock;
@@ -188,9 +191,8 @@ export class CRLAstBuilder
     };
   }
 
-  visitBlockAction(ctx: ActionStatementContext): ActionStatement {
-    const result = this.visit(ctx) as ActionStatement;
-    return result;
+  visitBlockAction(ctx: BlockActionContext): ActionStatement {
+    return this.visit(ctx.actionStatement()) as ActionStatement;
   }
 
   visitActionStatement(ctx: ActionStatementContext): ActionStatement {
