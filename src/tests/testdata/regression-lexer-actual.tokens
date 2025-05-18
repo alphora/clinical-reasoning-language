@@ -1,4557 +1,4251 @@
 
-> @smile-digital-health/crl@0.6.1 cli:lexer
+> @smile-digital-health/crl@0.7.0 cli:lexer
 > ts-node src/cli/run-lexer.ts D:\src\clinical-reasoning-language\src\tests\testdata\smart-example-immz
 
 [
   {
-    "line": 4,
+    "line": 1,
+    "column": 0,
+    "type": "HEADER",
+    "text": "# IMMZ_All_Decisions"
+  },
+  {
+    "line": 7,
     "column": 0,
     "type": "DECISION",
     "text": "decision"
   },
   {
-    "line": 4,
+    "line": 7,
     "column": 9,
     "type": "QUOTED_STRING",
     "text": "\"IMMZ.D2.DT.Measles MCV Dose 0\""
   },
   {
-    "line": 4,
+    "line": 7,
     "column": 40,
     "type": "COLON",
     "text": ":"
   },
   {
-    "line": 5,
+    "line": 9,
+    "column": 0,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 9,
+    "column": 2,
+    "type": "WHEN",
+    "text": "when"
+  },
+  {
+    "line": 9,
+    "column": 7,
+    "type": "QUOTED_STRING",
+    "text": "\"Measles Routine Immunization Schedule Incomplete\""
+  },
+  {
+    "line": 9,
+    "column": 58,
+    "type": "THEN",
+    "text": "then"
+  },
+  {
+    "line": 9,
+    "column": 62,
+    "type": "COLON",
+    "text": ":"
+  },
+  {
+    "line": 10,
+    "column": 2,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 10,
     "column": 4,
     "type": "WHEN",
     "text": "when"
   },
   {
-    "line": 5,
+    "line": 10,
     "column": 9,
-    "type": "QUOTED_STRING",
-    "text": "\"Measles Routine Immunization Schedule Incomplete\""
-  },
-  {
-    "line": 5,
-    "column": 60,
-    "type": "THEN",
-    "text": "then"
-  },
-  {
-    "line": 5,
-    "column": 64,
-    "type": "COLON",
-    "text": ":"
-  },
-  {
-    "line": 6,
-    "column": 8,
-    "type": "WHEN",
-    "text": "when"
-  },
-  {
-    "line": 6,
-    "column": 13,
     "type": "QUOTED_STRING",
     "text": "\"No MCV0 Doses Administered\""
   },
   {
-    "line": 6,
-    "column": 42,
-    "type": "THEN",
-    "text": "then"
-  },
-  {
-    "line": 6,
-    "column": 46,
-    "type": "COLON",
-    "text": ":"
-  },
-  {
-    "line": 7,
-    "column": 12,
-    "type": "WHEN",
-    "text": "when"
-  },
-  {
-    "line": 7,
-    "column": 17,
-    "type": "QUOTED_STRING",
-    "text": "\"Client Age Less Than 6 Months\""
-  },
-  {
-    "line": 7,
-    "column": 49,
-    "type": "THEN",
-    "text": "then"
-  },
-  {
-    "line": 7,
-    "column": 54,
-    "type": "DO",
-    "text": "do"
-  },
-  {
-    "line": 7,
-    "column": 57,
-    "type": "QUOTED_STRING",
-    "text": "\"Client Age Less Than 6 Months\""
-  },
-  {
-    "line": 7,
-    "column": 88,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 8,
-    "column": 12,
-    "type": "WHEN",
-    "text": "when"
-  },
-  {
-    "line": 8,
-    "column": 17,
-    "type": "QUOTED_STRING",
-    "text": "\"Last Live Vaccine Administered Within 4 Weeks\""
-  },
-  {
-    "line": 8,
-    "column": 65,
-    "type": "THEN",
-    "text": "then"
-  },
-  {
-    "line": 8,
-    "column": 70,
-    "type": "DO",
-    "text": "do"
-  },
-  {
-    "line": 8,
-    "column": 73,
-    "type": "QUOTED_STRING",
-    "text": "\"Last Live Vaccine Administered Within 4 Weeks\""
-  },
-  {
-    "line": 8,
-    "column": 120,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 9,
-    "column": 12,
-    "type": "WHEN",
-    "text": "when"
-  },
-  {
-    "line": 9,
-    "column": 17,
-    "type": "QUOTED_STRING",
-    "text": "\"Client Is Due For MCV0\""
-  },
-  {
-    "line": 9,
-    "column": 42,
-    "type": "THEN",
-    "text": "then"
-  },
-  {
-    "line": 9,
-    "column": 47,
-    "type": "DO",
-    "text": "do"
-  },
-  {
-    "line": 9,
-    "column": 50,
-    "type": "QUOTED_STRING",
-    "text": "\"Provide Measles Vaccine\""
-  },
-  {
-    "line": 9,
-    "column": 75,
-    "type": "DOT",
-    "text": "."
-  },
-  {
     "line": 10,
-    "column": 8,
-    "type": "DONE",
-    "text": "done"
-  },
-  {
-    "line": 11,
-    "column": 8,
-    "type": "WHEN",
-    "text": "when"
-  },
-  {
-    "line": 11,
-    "column": 13,
-    "type": "QUOTED_STRING",
-    "text": "\"MCV0 Dose Administered\""
-  },
-  {
-    "line": 11,
     "column": 38,
     "type": "THEN",
     "text": "then"
   },
   {
+    "line": 10,
+    "column": 42,
+    "type": "COLON",
+    "text": ":"
+  },
+  {
+    "line": 11,
+    "column": 4,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 11,
+    "column": 6,
+    "type": "WHEN",
+    "text": "when"
+  },
+  {
+    "line": 11,
+    "column": 11,
+    "type": "QUOTED_STRING",
+    "text": "\"Client Age Less Than 6 Months\""
+  },
+  {
     "line": 11,
     "column": 43,
-    "type": "DO",
-    "text": "do"
+    "type": "THEN",
+    "text": "then"
   },
   {
     "line": 11,
-    "column": 46,
+    "column": 48,
+    "type": "RECOMMEND_ACTIVITY",
+    "text": "recommend activity"
+  },
+  {
+    "line": 11,
+    "column": 67,
     "type": "QUOTED_STRING",
-    "text": "\"MCV0 Dose Administered\""
+    "text": "\"Client Age Less Than 6 Months\""
   },
   {
     "line": 11,
-    "column": 70,
+    "column": 98,
     "type": "DOT",
     "text": "."
   },
   {
     "line": 12,
     "column": 4,
-    "type": "DONE",
-    "text": "done"
+    "type": "DASH",
+    "text": "-"
   },
   {
-    "line": 13,
-    "column": 0,
-    "type": "DONE",
-    "text": "done"
-  },
-  {
-    "line": 18,
-    "column": 0,
-    "type": "DECISION",
-    "text": "decision"
-  },
-  {
-    "line": 18,
-    "column": 9,
-    "type": "QUOTED_STRING",
-    "text": "\"IMMZ.D2.DT.Measles Low Transmission\""
-  },
-  {
-    "line": 18,
-    "column": 46,
-    "type": "COLON",
-    "text": ":"
-  },
-  {
-    "line": 19,
-    "column": 4,
+    "line": 12,
+    "column": 6,
     "type": "WHEN",
     "text": "when"
   },
   {
-    "line": 19,
-    "column": 9,
-    "type": "QUOTED_STRING",
-    "text": "\"Measles Routine Immunization Schedule Incomplete\""
-  },
-  {
-    "line": 19,
-    "column": 60,
-    "type": "THEN",
-    "text": "then"
-  },
-  {
-    "line": 19,
-    "column": 64,
-    "type": "COLON",
-    "text": ":"
-  },
-  {
-    "line": 20,
-    "column": 8,
-    "type": "WHEN",
-    "text": "when"
-  },
-  {
-    "line": 20,
-    "column": 13,
-    "type": "QUOTED_STRING",
-    "text": "\"No Primary Series Doses Administered\""
-  },
-  {
-    "line": 20,
-    "column": 52,
-    "type": "THEN",
-    "text": "then"
-  },
-  {
-    "line": 20,
-    "column": 56,
-    "type": "COLON",
-    "text": ":"
-  },
-  {
-    "line": 21,
-    "column": 12,
-    "type": "WHEN",
-    "text": "when"
-  },
-  {
-    "line": 21,
-    "column": 17,
-    "type": "QUOTED_STRING",
-    "text": "\"Client Age Less Than 12 Months\""
-  },
-  {
-    "line": 21,
-    "column": 50,
-    "type": "THEN",
-    "text": "then"
-  },
-  {
-    "line": 21,
-    "column": 55,
-    "type": "DO",
-    "text": "do"
-  },
-  {
-    "line": 21,
-    "column": 58,
-    "type": "QUOTED_STRING",
-    "text": "\"Client Age Less Than 12 Months\""
-  },
-  {
-    "line": 21,
-    "column": 90,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 22,
-    "column": 12,
-    "type": "WHEN",
-    "text": "when"
-  },
-  {
-    "line": 22,
-    "column": 17,
+    "line": 12,
+    "column": 11,
     "type": "QUOTED_STRING",
     "text": "\"Last Live Vaccine Administered Within 4 Weeks\""
   },
   {
-    "line": 22,
-    "column": 65,
-    "type": "THEN",
-    "text": "then"
-  },
-  {
-    "line": 22,
-    "column": 70,
-    "type": "DO",
-    "text": "do"
-  },
-  {
-    "line": 22,
-    "column": 73,
-    "type": "QUOTED_STRING",
-    "text": "\"Last Live Vaccine Administered Within 4 Weeks_2\""
-  },
-  {
-    "line": 22,
-    "column": 122,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 23,
-    "column": 12,
-    "type": "WHEN",
-    "text": "when"
-  },
-  {
-    "line": 23,
-    "column": 17,
-    "type": "QUOTED_STRING",
-    "text": "\"Client Is Due For MCV1\""
-  },
-  {
-    "line": 23,
-    "column": 42,
-    "type": "THEN",
-    "text": "then"
-  },
-  {
-    "line": 23,
-    "column": 47,
-    "type": "DO",
-    "text": "do"
-  },
-  {
-    "line": 23,
-    "column": 50,
-    "type": "QUOTED_STRING",
-    "text": "\"Provide Measles Vaccine\""
-  },
-  {
-    "line": 23,
-    "column": 75,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 24,
-    "column": 8,
-    "type": "DONE",
-    "text": "done"
-  },
-  {
-    "line": 25,
-    "column": 8,
-    "type": "WHEN",
-    "text": "when"
-  },
-  {
-    "line": 25,
-    "column": 13,
-    "type": "QUOTED_STRING",
-    "text": "\"One Primary Series Dose Administered\""
-  },
-  {
-    "line": 25,
-    "column": 52,
-    "type": "THEN",
-    "text": "then"
-  },
-  {
-    "line": 25,
-    "column": 56,
-    "type": "COLON",
-    "text": ":"
-  },
-  {
-    "line": 26,
-    "column": 12,
-    "type": "WHEN",
-    "text": "when"
-  },
-  {
-    "line": 26,
-    "column": 17,
-    "type": "QUOTED_STRING",
-    "text": "\"Client Age Less Than 15 Months\""
-  },
-  {
-    "line": 26,
-    "column": 50,
-    "type": "THEN",
-    "text": "then"
-  },
-  {
-    "line": 26,
-    "column": 55,
-    "type": "DO",
-    "text": "do"
-  },
-  {
-    "line": 26,
-    "column": 58,
-    "type": "QUOTED_STRING",
-    "text": "\"Client Age Less Than 15 Months\""
-  },
-  {
-    "line": 26,
-    "column": 90,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 27,
-    "column": 12,
-    "type": "WHEN",
-    "text": "when"
-  },
-  {
-    "line": 27,
-    "column": 17,
-    "type": "QUOTED_STRING",
-    "text": "\"Last Live Vaccine Administered Within 4 Weeks\""
-  },
-  {
-    "line": 27,
-    "column": 65,
-    "type": "THEN",
-    "text": "then"
-  },
-  {
-    "line": 27,
-    "column": 70,
-    "type": "DO",
-    "text": "do"
-  },
-  {
-    "line": 27,
-    "column": 73,
-    "type": "QUOTED_STRING",
-    "text": "\"Last Live Vaccine Administered Within 4 Weeks_3\""
-  },
-  {
-    "line": 27,
-    "column": 122,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 28,
-    "column": 12,
-    "type": "WHEN",
-    "text": "when"
-  },
-  {
-    "line": 28,
-    "column": 17,
-    "type": "QUOTED_STRING",
-    "text": "\"Client Is Due For MCV2\""
-  },
-  {
-    "line": 28,
-    "column": 42,
-    "type": "THEN",
-    "text": "then"
-  },
-  {
-    "line": 28,
-    "column": 47,
-    "type": "DO",
-    "text": "do"
-  },
-  {
-    "line": 28,
-    "column": 50,
-    "type": "QUOTED_STRING",
-    "text": "\"Provide Measles Vaccine\""
-  },
-  {
-    "line": 28,
-    "column": 75,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 29,
-    "column": 8,
-    "type": "DONE",
-    "text": "done"
-  },
-  {
-    "line": 30,
-    "column": 8,
-    "type": "WHEN",
-    "text": "when"
-  },
-  {
-    "line": 30,
-    "column": 13,
-    "type": "QUOTED_STRING",
-    "text": "\"Two Primary Series Doses Administered\""
-  },
-  {
-    "line": 30,
-    "column": 53,
-    "type": "THEN",
-    "text": "then"
-  },
-  {
-    "line": 30,
-    "column": 58,
-    "type": "DO",
-    "text": "do"
-  },
-  {
-    "line": 30,
-    "column": 61,
-    "type": "QUOTED_STRING",
-    "text": "\"Measles primary series is complete.\""
-  },
-  {
-    "line": 30,
-    "column": 98,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 31,
-    "column": 4,
-    "type": "DONE",
-    "text": "done"
-  },
-  {
-    "line": 32,
-    "column": 0,
-    "type": "DONE",
-    "text": "done"
-  },
-  {
-    "line": 37,
-    "column": 0,
-    "type": "DECISION",
-    "text": "decision"
-  },
-  {
-    "line": 37,
-    "column": 9,
-    "type": "QUOTED_STRING",
-    "text": "\"IMMZ.D2.DT.Measles Ongoing Transmission\""
-  },
-  {
-    "line": 37,
-    "column": 50,
-    "type": "COLON",
-    "text": ":"
-  },
-  {
-    "line": 38,
-    "column": 4,
-    "type": "WHEN",
-    "text": "when"
-  },
-  {
-    "line": 38,
-    "column": 9,
-    "type": "QUOTED_STRING",
-    "text": "\"Measles Routine Immunization Schedule Incomplete\""
-  },
-  {
-    "line": 38,
-    "column": 60,
-    "type": "THEN",
-    "text": "then"
-  },
-  {
-    "line": 38,
-    "column": 64,
-    "type": "COLON",
-    "text": ":"
-  },
-  {
-    "line": 39,
-    "column": 8,
-    "type": "WHEN",
-    "text": "when"
-  },
-  {
-    "line": 39,
-    "column": 13,
-    "type": "QUOTED_STRING",
-    "text": "\"No Primary Series Doses Administered\""
-  },
-  {
-    "line": 39,
-    "column": 52,
-    "type": "THEN",
-    "text": "then"
-  },
-  {
-    "line": 39,
-    "column": 56,
-    "type": "COLON",
-    "text": ":"
-  },
-  {
-    "line": 40,
-    "column": 12,
-    "type": "WHEN",
-    "text": "when"
-  },
-  {
-    "line": 40,
-    "column": 17,
-    "type": "QUOTED_STRING",
-    "text": "\"Client Age Less Than 9 Months\""
-  },
-  {
-    "line": 40,
-    "column": 49,
-    "type": "THEN",
-    "text": "then"
-  },
-  {
-    "line": 40,
-    "column": 54,
-    "type": "DO",
-    "text": "do"
-  },
-  {
-    "line": 40,
-    "column": 57,
-    "type": "QUOTED_STRING",
-    "text": "\"Client Age Less Than 9 Months\""
-  },
-  {
-    "line": 40,
-    "column": 88,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 41,
-    "column": 12,
-    "type": "WHEN",
-    "text": "when"
-  },
-  {
-    "line": 41,
-    "column": 17,
-    "type": "QUOTED_STRING",
-    "text": "\"Last Live Vaccine Administered Within 4 Weeks\""
-  },
-  {
-    "line": 41,
-    "column": 65,
-    "type": "THEN",
-    "text": "then"
-  },
-  {
-    "line": 41,
-    "column": 70,
-    "type": "DO",
-    "text": "do"
-  },
-  {
-    "line": 41,
-    "column": 73,
-    "type": "QUOTED_STRING",
-    "text": "\"Last Live Vaccine Administered Within 4 Weeks_2\""
-  },
-  {
-    "line": 41,
-    "column": 122,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 42,
-    "column": 12,
-    "type": "WHEN",
-    "text": "when"
-  },
-  {
-    "line": 42,
-    "column": 17,
-    "type": "QUOTED_STRING",
-    "text": "\"Client Is Due For MCV1\""
-  },
-  {
-    "line": 42,
-    "column": 42,
-    "type": "THEN",
-    "text": "then"
-  },
-  {
-    "line": 42,
-    "column": 47,
-    "type": "DO",
-    "text": "do"
-  },
-  {
-    "line": 42,
-    "column": 50,
-    "type": "QUOTED_STRING",
-    "text": "\"Provide Measles Vaccine\""
-  },
-  {
-    "line": 42,
-    "column": 75,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 43,
-    "column": 8,
-    "type": "DONE",
-    "text": "done"
-  },
-  {
-    "line": 44,
-    "column": 8,
-    "type": "WHEN",
-    "text": "when"
-  },
-  {
-    "line": 44,
-    "column": 13,
-    "type": "QUOTED_STRING",
-    "text": "\"One Primary Series Dose Administered\""
-  },
-  {
-    "line": 44,
-    "column": 52,
-    "type": "THEN",
-    "text": "then"
-  },
-  {
-    "line": 44,
-    "column": 56,
-    "type": "COLON",
-    "text": ":"
-  },
-  {
-    "line": 45,
-    "column": 12,
-    "type": "WHEN",
-    "text": "when"
-  },
-  {
-    "line": 45,
-    "column": 17,
-    "type": "QUOTED_STRING",
-    "text": "\"Client Age Less Than 15 Months\""
-  },
-  {
-    "line": 45,
-    "column": 50,
-    "type": "THEN",
-    "text": "then"
-  },
-  {
-    "line": 45,
-    "column": 55,
-    "type": "DO",
-    "text": "do"
-  },
-  {
-    "line": 45,
-    "column": 58,
-    "type": "QUOTED_STRING",
-    "text": "\"Client Age Less Than 15 Months\""
-  },
-  {
-    "line": 45,
-    "column": 90,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 46,
-    "column": 12,
-    "type": "WHEN",
-    "text": "when"
-  },
-  {
-    "line": 46,
-    "column": 17,
-    "type": "QUOTED_STRING",
-    "text": "\"Last Live Vaccine Administered Within 4 Weeks\""
-  },
-  {
-    "line": 46,
-    "column": 65,
-    "type": "THEN",
-    "text": "then"
-  },
-  {
-    "line": 46,
-    "column": 70,
-    "type": "DO",
-    "text": "do"
-  },
-  {
-    "line": 46,
-    "column": 73,
-    "type": "QUOTED_STRING",
-    "text": "\"Last Live Vaccine Administered Within 4 Weeks_3\""
-  },
-  {
-    "line": 46,
-    "column": 122,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 47,
-    "column": 12,
-    "type": "WHEN",
-    "text": "when"
-  },
-  {
-    "line": 47,
-    "column": 17,
-    "type": "QUOTED_STRING",
-    "text": "\"Client Is Due For MCV2\""
-  },
-  {
-    "line": 47,
-    "column": 42,
-    "type": "THEN",
-    "text": "then"
-  },
-  {
-    "line": 47,
-    "column": 47,
-    "type": "DO",
-    "text": "do"
-  },
-  {
-    "line": 47,
-    "column": 50,
-    "type": "QUOTED_STRING",
-    "text": "\"Provide Measles Vaccine\""
-  },
-  {
-    "line": 47,
-    "column": 75,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 48,
-    "column": 8,
-    "type": "DONE",
-    "text": "done"
-  },
-  {
-    "line": 49,
-    "column": 8,
-    "type": "WHEN",
-    "text": "when"
-  },
-  {
-    "line": 49,
-    "column": 13,
-    "type": "QUOTED_STRING",
-    "text": "\"Two Primary Series Doses Administered\""
-  },
-  {
-    "line": 49,
-    "column": 53,
-    "type": "THEN",
-    "text": "then"
-  },
-  {
-    "line": 49,
-    "column": 58,
-    "type": "DO",
-    "text": "do"
-  },
-  {
-    "line": 49,
-    "column": 61,
-    "type": "QUOTED_STRING",
-    "text": "\"Measles primary series is complete\""
-  },
-  {
-    "line": 49,
-    "column": 97,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 50,
-    "column": 4,
-    "type": "DONE",
-    "text": "done"
-  },
-  {
-    "line": 51,
-    "column": 0,
-    "type": "DONE",
-    "text": "done"
-  },
-  {
-    "line": 56,
-    "column": 0,
-    "type": "DECISION",
-    "text": "decision"
-  },
-  {
-    "line": 56,
-    "column": 9,
-    "type": "QUOTED_STRING",
-    "text": "\"IMMZ.D2.DT.Measles Supplementary\""
-  },
-  {
-    "line": 56,
-    "column": 43,
-    "type": "COLON",
-    "text": ":"
-  },
-  {
-    "line": 57,
-    "column": 4,
-    "type": "WHEN",
-    "text": "when"
-  },
-  {
-    "line": 57,
-    "column": 9,
-    "type": "QUOTED_STRING",
-    "text": "\"Measles Routine Immunization Schedule Complete\""
-  },
-  {
-    "line": 57,
-    "column": 58,
-    "type": "THEN",
-    "text": "then"
-  },
-  {
-    "line": 57,
-    "column": 62,
-    "type": "COLON",
-    "text": ":"
-  },
-  {
-    "line": 58,
-    "column": 8,
-    "type": "WHEN",
-    "text": "when"
-  },
-  {
-    "line": 58,
-    "column": 13,
-    "type": "QUOTED_STRING",
-    "text": "\"No Supplementary Dose Administered\""
-  },
-  {
-    "line": 58,
-    "column": 50,
-    "type": "THEN",
-    "text": "then"
-  },
-  {
-    "line": 58,
-    "column": 54,
-    "type": "COLON",
-    "text": ":"
-  },
-  {
-    "line": 59,
-    "column": 12,
-    "type": "WHEN",
-    "text": "when"
-  },
-  {
-    "line": 59,
-    "column": 17,
-    "type": "QUOTED_STRING",
-    "text": "\"Last Live Vaccine Administered Within 4 Weeks\""
-  },
-  {
-    "line": 59,
-    "column": 65,
-    "type": "THEN",
-    "text": "then"
-  },
-  {
-    "line": 59,
-    "column": 70,
-    "type": "DO",
-    "text": "do"
-  },
-  {
-    "line": 59,
-    "column": 73,
-    "type": "QUOTED_STRING",
-    "text": "\"Last Live Vaccine Administered Within 4 Weeks_4\""
-  },
-  {
-    "line": 59,
-    "column": 122,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 60,
-    "column": 12,
-    "type": "WHEN",
-    "text": "when"
-  },
-  {
-    "line": 60,
-    "column": 17,
-    "type": "QUOTED_STRING",
-    "text": "\"Client Is Due For Supplementary Dose\""
-  },
-  {
-    "line": 60,
-    "column": 56,
-    "type": "THEN",
-    "text": "then"
-  },
-  {
-    "line": 60,
-    "column": 61,
-    "type": "DO",
-    "text": "do"
-  },
-  {
-    "line": 60,
-    "column": 64,
-    "type": "QUOTED_STRING",
-    "text": "\"Provide Measles Vaccine\""
-  },
-  {
-    "line": 60,
-    "column": 89,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 61,
-    "column": 8,
-    "type": "DONE",
-    "text": "done"
-  },
-  {
-    "line": 62,
-    "column": 8,
-    "type": "WHEN",
-    "text": "when"
-  },
-  {
-    "line": 62,
-    "column": 13,
-    "type": "QUOTED_STRING",
-    "text": "\"Supplementary Dose Administered\""
-  },
-  {
-    "line": 62,
-    "column": 47,
-    "type": "THEN",
-    "text": "then"
-  },
-  {
-    "line": 62,
-    "column": 52,
-    "type": "DO",
-    "text": "do"
-  },
-  {
-    "line": 62,
-    "column": 55,
-    "type": "QUOTED_STRING",
-    "text": "\"Supplementary Dose Administered\""
-  },
-  {
-    "line": 62,
-    "column": 88,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 63,
-    "column": 4,
-    "type": "DONE",
-    "text": "done"
-  },
-  {
-    "line": 64,
-    "column": 0,
-    "type": "DONE",
-    "text": "done"
-  },
-  {
-    "line": 69,
-    "column": 0,
-    "type": "DECISION",
-    "text": "decision"
-  },
-  {
-    "line": 69,
-    "column": 9,
-    "type": "QUOTED_STRING",
-    "text": "\"IMMZ.D5.DT.Measles.Contraindication\""
-  },
-  {
-    "line": 69,
-    "column": 46,
-    "type": "COLON",
-    "text": ":"
-  },
-  {
-    "line": 70,
-    "column": 4,
-    "type": "WHEN",
-    "text": "when"
-  },
-  {
-    "line": 70,
-    "column": 9,
-    "type": "QUOTED_STRING",
-    "text": "\"MCV Dose Contraindicated\""
-  },
-  {
-    "line": 70,
-    "column": 36,
-    "type": "THEN",
-    "text": "then"
-  },
-  {
-    "line": 70,
-    "column": 41,
-    "type": "DO",
-    "text": "do"
-  },
-  {
-    "line": 70,
-    "column": 44,
-    "type": "QUOTED_STRING",
-    "text": "\"Check Contraindication for Measles Immunization\""
-  },
-  {
-    "line": 70,
-    "column": 93,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 71,
-    "column": 4,
-    "type": "WHEN",
-    "text": "when"
-  },
-  {
-    "line": 71,
-    "column": 9,
-    "type": "QUOTED_STRING",
-    "text": "\"Contraindication Evaluation of the MCV dose\""
-  },
-  {
-    "line": 71,
-    "column": 55,
-    "type": "THEN",
-    "text": "then"
-  },
-  {
-    "line": 71,
-    "column": 60,
-    "type": "DO",
-    "text": "do"
-  },
-  {
-    "line": 71,
-    "column": 63,
-    "type": "QUOTED_STRING",
-    "text": "\"Evaluate Contraindication for Measles\""
-  },
-  {
-    "line": 71,
-    "column": 102,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 72,
-    "column": 0,
-    "type": "DONE",
-    "text": "done"
-  },
-  {
-    "line": 77,
-    "column": 0,
-    "type": "DECISION",
-    "text": "decision"
-  },
-  {
-    "line": 77,
-    "column": 9,
-    "type": "QUOTED_STRING",
-    "text": "\"IMMZ.DT.Immunization Strategy\""
-  },
-  {
-    "line": 77,
-    "column": 40,
-    "type": "COLON",
-    "text": ":"
-  },
-  {
-    "line": 79,
-    "column": 4,
-    "type": "WHEN",
-    "text": "when"
-  },
-  {
-    "line": 79,
-    "column": 9,
-    "type": "QUOTED_STRING",
-    "text": "\"\""
-  },
-  {
-    "line": 79,
-    "column": 12,
-    "type": "THEN",
-    "text": "then"
-  },
-  {
-    "line": 79,
-    "column": 16,
-    "type": "COLON",
-    "text": ":"
-  },
-  {
-    "line": 84,
-    "column": 8,
-    "type": "WHEN",
-    "text": "when"
-  },
-  {
-    "line": 84,
-    "column": 13,
-    "type": "QUOTED_STRING",
-    "text": "\"\""
-  },
-  {
-    "line": 84,
-    "column": 16,
-    "type": "THEN",
-    "text": "then"
-  },
-  {
-    "line": 84,
-    "column": 20,
-    "type": "COLON",
-    "text": ":"
-  },
-  {
-    "line": 85,
-    "column": 12,
-    "type": "USE",
-    "text": "use"
-  },
-  {
-    "line": 85,
-    "column": 16,
-    "type": "QUOTED_STRING",
-    "text": "\"IMMZ.D2.DT.Measles MCV Dose 0\""
-  },
-  {
-    "line": 85,
-    "column": 47,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 86,
-    "column": 12,
-    "type": "USE",
-    "text": "use"
-  },
-  {
-    "line": 86,
-    "column": 16,
-    "type": "QUOTED_STRING",
-    "text": "\"IMMZ.D2.DT.Measles Ongoing Transmission\""
-  },
-  {
-    "line": 86,
-    "column": 57,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 87,
-    "column": 12,
-    "type": "USE",
-    "text": "use"
-  },
-  {
-    "line": 87,
-    "column": 16,
-    "type": "QUOTED_STRING",
-    "text": "\"IMMZ.D2.DT.Measles Supplementary\""
-  },
-  {
-    "line": 87,
-    "column": 50,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 88,
-    "column": 12,
-    "type": "USE",
-    "text": "use"
-  },
-  {
-    "line": 88,
-    "column": 16,
-    "type": "QUOTED_STRING",
-    "text": "\"IMMZ.D5.DT.Measles.Contraindication\""
-  },
-  {
-    "line": 88,
-    "column": 53,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 89,
-    "column": 8,
-    "type": "DONE",
-    "text": "done"
-  },
-  {
-    "line": 90,
-    "column": 4,
-    "type": "DONE",
-    "text": "done"
-  },
-  {
-    "line": 91,
-    "column": 0,
-    "type": "DONE",
-    "text": "done"
-  },
-  {
-    "line": 93,
-    "column": 0,
-    "type": "ACTIVITY",
-    "text": "activity"
-  },
-  {
-    "line": 93,
-    "column": 9,
-    "type": "QUOTED_STRING",
-    "text": "\"Client Age Less Than 6 Months\""
-  },
-  {
-    "line": 94,
-    "column": 4,
-    "type": "PERFORM",
-    "text": "request"
-  },
-  {
-    "line": 94,
-    "column": 12,
-    "type": "ACTIVITY_TYPE",
-    "text": "CPGCommunicationRequest"
-  },
-  {
-    "line": 95,
-    "column": 4,
-    "type": "WITH",
-    "text": "with"
-  },
-  {
-    "line": 95,
-    "column": 9,
-    "type": "BACKTICK_STRING",
-    "text": "`Should not vaccinate client for MCV0 as client is less than 6 months. Check for any vaccines due, and inform the caregiver of when to come back for MCV0.`"
-  },
-  {
-    "line": 95,
-    "column": 164,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 97,
-    "column": 0,
-    "type": "ACTIVITY",
-    "text": "activity"
-  },
-  {
-    "line": 97,
-    "column": 9,
-    "type": "QUOTED_STRING",
-    "text": "\"Last Live Vaccine Administered Within 4 Weeks\""
-  },
-  {
-    "line": 98,
-    "column": 4,
-    "type": "PERFORM",
-    "text": "request"
-  },
-  {
-    "line": 98,
-    "column": 12,
-    "type": "ACTIVITY_TYPE",
-    "text": "CPGCommunicationRequest"
-  },
-  {
-    "line": 99,
-    "column": 4,
-    "type": "WITH",
-    "text": "with"
-  },
-  {
-    "line": 99,
-    "column": 9,
-    "type": "BACKTICK_STRING",
-    "text": "`Should not vaccinate client for MCV0 as live vaccine was administered in the last 4 weeks. Check for any vaccines due, and inform the caregiver of when to come back for MCV0.`"
-  },
-  {
-    "line": 99,
-    "column": 185,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 101,
-    "column": 0,
-    "type": "ACTIVITY",
-    "text": "activity"
-  },
-  {
-    "line": 101,
-    "column": 9,
-    "type": "QUOTED_STRING",
-    "text": "\"Provide Measles Vaccine\""
-  },
-  {
-    "line": 102,
-    "column": 4,
-    "type": "PERFORM",
-    "text": "request"
-  },
-  {
-    "line": 102,
-    "column": 12,
-    "type": "ACTIVITY_TYPE",
-    "text": "CPGMedicationRequest"
-  },
-  {
-    "line": 102,
-    "column": 33,
-    "type": "WITH",
-    "text": "with"
-  },
-  {
-    "line": 102,
-    "column": 38,
-    "type": "QUOTED_STRING",
-    "text": "\"Measles vaccines\""
-  },
-  {
-    "line": 102,
-    "column": 56,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 104,
-    "column": 0,
-    "type": "ACTIVITY",
-    "text": "activity"
-  },
-  {
-    "line": 104,
-    "column": 9,
-    "type": "QUOTED_STRING",
-    "text": "\"MCV0 Dose Administered\""
-  },
-  {
-    "line": 105,
-    "column": 4,
-    "type": "PERFORM",
-    "text": "request"
-  },
-  {
-    "line": 105,
-    "column": 12,
-    "type": "ACTIVITY_TYPE",
-    "text": "CPGCommunicationRequest"
-  },
-  {
-    "line": 105,
-    "column": 36,
-    "type": "WITH",
-    "text": "with"
-  },
-  {
-    "line": 105,
-    "column": 41,
-    "type": "BACKTICK_STRING",
-    "text": "`MCV0 was administered. Check measles routine immunization schedule.`"
-  },
-  {
-    "line": 105,
-    "column": 110,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 107,
-    "column": 0,
-    "type": "ACTIVITY",
-    "text": "activity"
-  },
-  {
-    "line": 107,
-    "column": 9,
-    "type": "QUOTED_STRING",
-    "text": "\"Client Age Less Than 12 Months\""
-  },
-  {
-    "line": 108,
-    "column": 4,
-    "type": "PERFORM",
-    "text": "request"
-  },
-  {
-    "line": 108,
-    "column": 12,
-    "type": "ACTIVITY_TYPE",
-    "text": "CPGCommunicationRequest"
-  },
-  {
-    "line": 109,
-    "column": 4,
-    "type": "WITH",
-    "text": "with"
-  },
-  {
-    "line": 109,
-    "column": 9,
-    "type": "BACKTICK_STRING",
-    "text": "`Should not vaccinate client as client's age is less than 12 months. Check for any vaccines due, and inform the caregiver of when to come back for MCV1.`"
-  },
-  {
-    "line": 109,
-    "column": 162,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 111,
-    "column": 0,
-    "type": "ACTIVITY",
-    "text": "activity"
-  },
-  {
-    "line": 111,
-    "column": 9,
-    "type": "QUOTED_STRING",
-    "text": "\"Last Live Vaccine Administered Within 4 Weeks_2\""
-  },
-  {
-    "line": 112,
-    "column": 4,
-    "type": "PERFORM",
-    "text": "request"
-  },
-  {
-    "line": 112,
-    "column": 12,
-    "type": "ACTIVITY_TYPE",
-    "text": "CPGCommunicationRequest"
-  },
-  {
-    "line": 113,
-    "column": 4,
-    "type": "WITH",
-    "text": "with"
-  },
-  {
-    "line": 113,
-    "column": 9,
-    "type": "BACKTICK_STRING",
-    "text": "`Should not vaccinate client for MCV1 as live vaccine was administered in the last 4 weeks. Check for any vaccines due and inform the caregiver of when to come back for MCV1.`"
-  },
-  {
-    "line": 113,
-    "column": 184,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 115,
-    "column": 0,
-    "type": "ACTIVITY",
-    "text": "activity"
-  },
-  {
-    "line": 115,
-    "column": 9,
-    "type": "QUOTED_STRING",
-    "text": "\"Client Age Less Than 15 Months\""
-  },
-  {
-    "line": 116,
-    "column": 4,
-    "type": "PERFORM",
-    "text": "request"
-  },
-  {
-    "line": 116,
-    "column": 12,
-    "type": "ACTIVITY_TYPE",
-    "text": "CPGCommunicationRequest"
-  },
-  {
-    "line": 117,
-    "column": 4,
-    "type": "WITH",
-    "text": "with"
-  },
-  {
-    "line": 117,
-    "column": 9,
-    "type": "BACKTICK_STRING",
-    "text": "`Should not vaccinate client for MCV2 as client's age is less than 15 months. Check for any vaccines due, and inform the caregiver of when to come back for MCV2.`"
-  },
-  {
-    "line": 117,
-    "column": 171,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 119,
-    "column": 0,
-    "type": "ACTIVITY",
-    "text": "activity"
-  },
-  {
-    "line": 119,
-    "column": 9,
-    "type": "QUOTED_STRING",
-    "text": "\"Last Live Vaccine Administered Within 4 Weeks_3\""
-  },
-  {
-    "line": 120,
-    "column": 4,
-    "type": "PERFORM",
-    "text": "request"
-  },
-  {
-    "line": 120,
-    "column": 12,
-    "type": "ACTIVITY_TYPE",
-    "text": "CPGCommunicationRequest"
-  },
-  {
-    "line": 121,
-    "column": 4,
-    "type": "WITH",
-    "text": "with"
-  },
-  {
-    "line": 121,
-    "column": 9,
-    "type": "BACKTICK_STRING",
-    "text": "`Should not vaccinate client for MCV2 as live vaccine was administered in the last 4 weeks. Check for any vaccines due, and inform the caregiver of when to come back for MCV2.`"
-  },
-  {
-    "line": 121,
-    "column": 185,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 123,
-    "column": 0,
-    "type": "ACTIVITY",
-    "text": "activity"
-  },
-  {
-    "line": 123,
-    "column": 9,
-    "type": "QUOTED_STRING",
-    "text": "\"Measles primary series is complete.\""
-  },
-  {
-    "line": 124,
-    "column": 4,
-    "type": "PERFORM",
-    "text": "request"
-  },
-  {
-    "line": 124,
-    "column": 12,
-    "type": "ACTIVITY_TYPE",
-    "text": "CPGCommunicationRequest"
-  },
-  {
-    "line": 125,
-    "column": 4,
-    "type": "WITH",
-    "text": "with"
-  },
-  {
-    "line": 125,
-    "column": 9,
-    "type": "BACKTICK_STRING",
-    "text": "`Measles primary series is complete. Two measles primary series doses were administered. Check if a measles supplementary dose is appropriate for the client.`"
-  },
-  {
-    "line": 126,
-    "column": 4,
-    "type": "BECAUSE",
-    "text": "because"
-  },
-  {
-    "line": 126,
-    "column": 12,
-    "type": "BACKTICK_STRING",
-    "text": "`An additional dose of MCV should be administered to HIV-infected children receiving HAART following immune reconstitution. If CD4+ T lymphocyte counts are monitored, an additional dose of MCV should be administered when immune reconstitution has been achieved, e.g. when the CD4+ T lymphocyte count reaches 20–25%. Where CD4+ T lymphocyte monitoring is not available, children should receive an additional dose of MCV 6–12 months after initiation of HAART.`"
-  },
-  {
-    "line": 126,
-    "column": 470,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 128,
-    "column": 0,
-    "type": "ACTIVITY",
-    "text": "activity"
-  },
-  {
-    "line": 128,
-    "column": 9,
-    "type": "QUOTED_STRING",
-    "text": "\"Client Age Less Than 9 Months\""
-  },
-  {
-    "line": 129,
-    "column": 4,
-    "type": "PERFORM",
-    "text": "request"
-  },
-  {
-    "line": 129,
-    "column": 12,
-    "type": "ACTIVITY_TYPE",
-    "text": "CPGCommunicationRequest"
-  },
-  {
-    "line": 130,
-    "column": 4,
-    "type": "WITH",
-    "text": "with"
-  },
-  {
-    "line": 130,
-    "column": 9,
-    "type": "BACKTICK_STRING",
-    "text": "`Should not vaccinate client as client's age is less than 9 months. Check for any vaccines due, and inform the caregiver of when to come back for MCV1.`"
-  },
-  {
-    "line": 130,
-    "column": 161,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 132,
-    "column": 0,
-    "type": "ACTIVITY",
-    "text": "activity"
-  },
-  {
-    "line": 132,
-    "column": 9,
-    "type": "QUOTED_STRING",
-    "text": "\"Measles primary series is complete\""
-  },
-  {
-    "line": 133,
-    "column": 4,
-    "type": "PERFORM",
-    "text": "request"
-  },
-  {
-    "line": 133,
-    "column": 12,
-    "type": "ACTIVITY_TYPE",
-    "text": "CPGCommunicationRequest"
-  },
-  {
-    "line": 134,
-    "column": 4,
-    "type": "WITH",
-    "text": "with"
-  },
-  {
-    "line": 134,
-    "column": 9,
-    "type": "BACKTICK_STRING",
-    "text": "`Measles primary series is complete. Two measles primary series doses were administered. Check if a measles supplementary dose is appropriate for the client.`"
-  },
-  {
-    "line": 135,
-    "column": 4,
-    "type": "BECAUSE",
-    "text": "because"
-  },
-  {
-    "line": 135,
-    "column": 12,
-    "type": "BACKTICK_STRING",
-    "text": "`An additional dose of MCV should be administered to HIV-infected children receiving HAART following immune reconstitution. If CD4+ T lymphocyte counts are monitored, an additional dose of MCV should be administered when immune reconstitution has been achieved, e.g. when the CD4+ T lymphocyte count reaches 20–25%. Where CD4+ T lymphocyte monitoring is not available, children should receive an additional dose of MCV 6–12 months after initiation of HAART.`"
-  },
-  {
-    "line": 135,
-    "column": 470,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 137,
-    "column": 0,
-    "type": "ACTIVITY",
-    "text": "activity"
-  },
-  {
-    "line": 137,
-    "column": 9,
-    "type": "QUOTED_STRING",
-    "text": "\"Last Live Vaccine Administered Within 4 Weeks_4\""
-  },
-  {
-    "line": 138,
-    "column": 4,
-    "type": "PERFORM",
-    "text": "request"
-  },
-  {
-    "line": 138,
-    "column": 12,
-    "type": "ACTIVITY_TYPE",
-    "text": "CPGCommunicationRequest"
-  },
-  {
-    "line": 139,
-    "column": 4,
-    "type": "WITH",
-    "text": "with"
-  },
-  {
-    "line": 139,
-    "column": 9,
-    "type": "BACKTICK_STRING",
-    "text": "`Should not vaccinate client for measles supplementary dose as live vaccine was administered in the last 4 weeks. Check for any vaccines due, and inform the caregiver of when to come back for supplementary dose.`"
-  },
-  {
-    "line": 139,
-    "column": 221,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 141,
-    "column": 0,
-    "type": "ACTIVITY",
-    "text": "activity"
-  },
-  {
-    "line": 141,
-    "column": 9,
-    "type": "QUOTED_STRING",
-    "text": "\"Supplementary Dose Administered\""
-  },
-  {
-    "line": 142,
-    "column": 4,
-    "type": "PERFORM",
-    "text": "request"
-  },
-  {
-    "line": 142,
-    "column": 12,
-    "type": "ACTIVITY_TYPE",
-    "text": "CPGCommunicationRequest"
-  },
-  {
-    "line": 143,
-    "column": 4,
-    "type": "WITH",
-    "text": "with"
-  },
-  {
-    "line": 143,
-    "column": 9,
-    "type": "BACKTICK_STRING",
-    "text": "`Measles immunization schedule is complete. Measles supplementary dose was administered.`"
-  },
-  {
-    "line": 143,
-    "column": 98,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 145,
-    "column": 0,
-    "type": "ACTIVITY",
-    "text": "activity"
-  },
-  {
-    "line": 145,
-    "column": 9,
-    "type": "QUOTED_STRING",
-    "text": "\"Check Contraindication for Measles Immunization\""
-  },
-  {
-    "line": 146,
-    "column": 4,
-    "type": "PERFORM",
-    "text": "request"
-  },
-  {
-    "line": 146,
-    "column": 12,
-    "type": "ACTIVITY_TYPE",
-    "text": "CPGMedicationRequest"
-  },
-  {
-    "line": 146,
-    "column": 33,
-    "type": "WITH",
-    "text": "with"
-  },
-  {
-    "line": 146,
-    "column": 38,
-    "type": "QUOTED_STRING",
-    "text": "\"Measles vaccines\""
-  },
-  {
-    "line": 147,
-    "column": 4,
-    "type": "BECAUSE",
-    "text": "because"
-  },
-  {
-    "line": 147,
-    "column": 12,
-    "type": "BACKTICK_STRING",
-    "text": "`While vaccines are universally recommended, some clients may have contraindications to particular vaccines.<br/>Additional contraindications may be included in WHO position papers for the vaccine - Measles vaccines: WHO position paper (April 2017).`"
-  },
-  {
-    "line": 147,
-    "column": 262,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 149,
-    "column": 0,
-    "type": "ACTIVITY",
-    "text": "activity"
-  },
-  {
-    "line": 149,
-    "column": 9,
-    "type": "QUOTED_STRING",
-    "text": "\"Evaluate Contraindication for Measles\""
-  },
-  {
-    "line": 150,
-    "column": 4,
-    "type": "PERFORM",
-    "text": "request"
-  },
-  {
-    "line": 150,
-    "column": 12,
-    "type": "ACTIVITY_TYPE",
-    "text": "CPGServiceRequest"
-  },
-  {
-    "line": 150,
-    "column": 30,
-    "type": "WITH",
-    "text": "with"
-  },
-  {
-    "line": 150,
-    "column": 35,
-    "type": "QUOTED_STRING",
-    "text": "\"Measles Code\""
-  },
-  {
-    "line": 151,
-    "column": 4,
-    "type": "BECAUSE",
-    "text": "because"
-  },
-  {
-    "line": 151,
-    "column": 12,
-    "type": "BACKTICK_STRING",
-    "text": "`While vaccines are universally recommended, some clients may have contraindications to particular vaccines.<br/>Additional contraindications may be included in WHO position papers for the vaccine - Measles vaccines: WHO position paper (April 2017).`"
-  },
-  {
-    "line": 151,
-    "column": 262,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 154,
-    "column": 0,
-    "type": "CONCEPT",
-    "text": "concept"
-  },
-  {
-    "line": 154,
-    "column": 8,
-    "type": "QUOTED_STRING",
-    "text": "\"Measles Routine Immunization Schedule Incomplete\""
-  },
-  {
-    "line": 154,
-    "column": 58,
-    "type": "COLON",
-    "text": ":"
-  },
-  {
-    "line": 155,
-    "column": 4,
-    "type": "TYPE",
-    "text": "type"
-  },
-  {
-    "line": 155,
-    "column": 9,
-    "type": "IS",
-    "text": "is"
-  },
-  {
-    "line": 155,
-    "column": 12,
-    "type": "CONCEPT_TYPE",
-    "text": "Observation"
-  },
-  {
-    "line": 155,
-    "column": 23,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 156,
-    "column": 4,
-    "type": "VALUETYPE",
-    "text": "valuetype"
-  },
-  {
-    "line": 156,
-    "column": 14,
-    "type": "IS",
-    "text": "is"
-  },
-  {
-    "line": 156,
-    "column": 17,
-    "type": "CONCEPT_VALUE_TYPE",
-    "text": "boolean"
-  },
-  {
-    "line": 156,
-    "column": 24,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 157,
-    "column": 4,
-    "type": "CODED",
-    "text": "coded"
-  },
-  {
-    "line": 157,
-    "column": 10,
-    "type": "FROM",
-    "text": "from"
-  },
-  {
-    "line": 157,
-    "column": 15,
-    "type": "QUOTED_STRING",
-    "text": "\"Measles Routine Immunization Schedule Incomplete\""
-  },
-  {
-    "line": 157,
-    "column": 65,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 158,
-    "column": 0,
-    "type": "DONE",
-    "text": "done"
-  },
-  {
-    "line": 160,
-    "column": 0,
-    "type": "CONCEPT",
-    "text": "concept"
-  },
-  {
-    "line": 160,
-    "column": 8,
-    "type": "QUOTED_STRING",
-    "text": "\"No MCV0 Doses Administered\""
-  },
-  {
-    "line": 160,
-    "column": 36,
-    "type": "COLON",
-    "text": ":"
-  },
-  {
-    "line": 161,
-    "column": 4,
-    "type": "TYPE",
-    "text": "type"
-  },
-  {
-    "line": 161,
-    "column": 9,
-    "type": "IS",
-    "text": "is"
-  },
-  {
-    "line": 161,
-    "column": 12,
-    "type": "CONCEPT_TYPE",
-    "text": "Observation"
-  },
-  {
-    "line": 161,
-    "column": 23,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 162,
-    "column": 4,
-    "type": "VALUETYPE",
-    "text": "valuetype"
-  },
-  {
-    "line": 162,
-    "column": 14,
-    "type": "IS",
-    "text": "is"
-  },
-  {
-    "line": 162,
-    "column": 17,
-    "type": "CONCEPT_VALUE_TYPE",
-    "text": "boolean"
-  },
-  {
-    "line": 162,
-    "column": 24,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 163,
-    "column": 4,
-    "type": "CODED",
-    "text": "coded"
-  },
-  {
-    "line": 163,
-    "column": 10,
-    "type": "FROM",
-    "text": "from"
-  },
-  {
-    "line": 163,
-    "column": 15,
-    "type": "QUOTED_STRING",
-    "text": "\"No MCV0 Doses Administered\""
-  },
-  {
-    "line": 163,
-    "column": 43,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 164,
-    "column": 0,
-    "type": "DONE",
-    "text": "done"
-  },
-  {
-    "line": 166,
-    "column": 0,
-    "type": "CONCEPT",
-    "text": "concept"
-  },
-  {
-    "line": 166,
-    "column": 8,
-    "type": "QUOTED_STRING",
-    "text": "\"Client Age Less Than 6 Months\""
-  },
-  {
-    "line": 166,
-    "column": 39,
-    "type": "COLON",
-    "text": ":"
-  },
-  {
-    "line": 167,
-    "column": 4,
-    "type": "TYPE",
-    "text": "type"
-  },
-  {
-    "line": 167,
-    "column": 9,
-    "type": "IS",
-    "text": "is"
-  },
-  {
-    "line": 167,
-    "column": 12,
-    "type": "CONCEPT_TYPE",
-    "text": "Observation"
-  },
-  {
-    "line": 167,
-    "column": 23,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 168,
-    "column": 4,
-    "type": "VALUETYPE",
-    "text": "valuetype"
-  },
-  {
-    "line": 168,
-    "column": 14,
-    "type": "IS",
-    "text": "is"
-  },
-  {
-    "line": 168,
-    "column": 17,
-    "type": "CONCEPT_VALUE_TYPE",
-    "text": "boolean"
-  },
-  {
-    "line": 168,
-    "column": 24,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 169,
-    "column": 4,
-    "type": "CODED",
-    "text": "coded"
-  },
-  {
-    "line": 169,
-    "column": 10,
-    "type": "FROM",
-    "text": "from"
-  },
-  {
-    "line": 169,
-    "column": 15,
-    "type": "QUOTED_STRING",
-    "text": "\"Client Age Less Than 6 Months\""
-  },
-  {
-    "line": 169,
-    "column": 46,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 170,
-    "column": 0,
-    "type": "DONE",
-    "text": "done"
-  },
-  {
-    "line": 172,
-    "column": 0,
-    "type": "CONCEPT",
-    "text": "concept"
-  },
-  {
-    "line": 172,
-    "column": 8,
-    "type": "QUOTED_STRING",
-    "text": "\"Last Live Vaccine Administered Within 4 Weeks\""
-  },
-  {
-    "line": 172,
-    "column": 55,
-    "type": "COLON",
-    "text": ":"
-  },
-  {
-    "line": 173,
-    "column": 4,
-    "type": "TYPE",
-    "text": "type"
-  },
-  {
-    "line": 173,
-    "column": 9,
-    "type": "IS",
-    "text": "is"
-  },
-  {
-    "line": 173,
-    "column": 12,
-    "type": "CONCEPT_TYPE",
-    "text": "Observation"
-  },
-  {
-    "line": 173,
-    "column": 23,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 174,
-    "column": 4,
-    "type": "VALUETYPE",
-    "text": "valuetype"
-  },
-  {
-    "line": 174,
-    "column": 14,
-    "type": "IS",
-    "text": "is"
-  },
-  {
-    "line": 174,
-    "column": 17,
-    "type": "CONCEPT_VALUE_TYPE",
-    "text": "boolean"
-  },
-  {
-    "line": 174,
-    "column": 24,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 175,
-    "column": 4,
-    "type": "CODED",
-    "text": "coded"
-  },
-  {
-    "line": 175,
-    "column": 10,
-    "type": "FROM",
-    "text": "from"
-  },
-  {
-    "line": 175,
-    "column": 15,
-    "type": "QUOTED_STRING",
-    "text": "\"Last Live Vaccine Administered Within 4 Weeks\""
-  },
-  {
-    "line": 175,
-    "column": 62,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 176,
-    "column": 0,
-    "type": "DONE",
-    "text": "done"
-  },
-  {
-    "line": 178,
-    "column": 0,
-    "type": "CONCEPT",
-    "text": "concept"
-  },
-  {
-    "line": 178,
-    "column": 8,
-    "type": "QUOTED_STRING",
-    "text": "\"Client Is Due For MCV0\""
-  },
-  {
-    "line": 178,
-    "column": 32,
-    "type": "COLON",
-    "text": ":"
-  },
-  {
-    "line": 179,
-    "column": 4,
-    "type": "TYPE",
-    "text": "type"
-  },
-  {
-    "line": 179,
-    "column": 9,
-    "type": "IS",
-    "text": "is"
-  },
-  {
-    "line": 179,
-    "column": 12,
-    "type": "CONCEPT_TYPE",
-    "text": "Observation"
-  },
-  {
-    "line": 179,
-    "column": 23,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 180,
-    "column": 4,
-    "type": "VALUETYPE",
-    "text": "valuetype"
-  },
-  {
-    "line": 180,
-    "column": 14,
-    "type": "IS",
-    "text": "is"
-  },
-  {
-    "line": 180,
-    "column": 17,
-    "type": "CONCEPT_VALUE_TYPE",
-    "text": "boolean"
-  },
-  {
-    "line": 180,
-    "column": 24,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 181,
-    "column": 4,
-    "type": "CODED",
-    "text": "coded"
-  },
-  {
-    "line": 181,
-    "column": 10,
-    "type": "FROM",
-    "text": "from"
-  },
-  {
-    "line": 181,
-    "column": 15,
-    "type": "QUOTED_STRING",
-    "text": "\"Client Is Due For MCV0\""
-  },
-  {
-    "line": 181,
-    "column": 39,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 182,
-    "column": 0,
-    "type": "DONE",
-    "text": "done"
-  },
-  {
-    "line": 184,
-    "column": 0,
-    "type": "CONCEPT",
-    "text": "concept"
-  },
-  {
-    "line": 184,
-    "column": 8,
-    "type": "QUOTED_STRING",
-    "text": "\"MCV0 Dose Administered\""
-  },
-  {
-    "line": 184,
-    "column": 32,
-    "type": "COLON",
-    "text": ":"
-  },
-  {
-    "line": 185,
-    "column": 4,
-    "type": "TYPE",
-    "text": "type"
-  },
-  {
-    "line": 185,
-    "column": 9,
-    "type": "IS",
-    "text": "is"
-  },
-  {
-    "line": 185,
-    "column": 12,
-    "type": "CONCEPT_TYPE",
-    "text": "Observation"
-  },
-  {
-    "line": 185,
-    "column": 23,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 186,
-    "column": 4,
-    "type": "VALUETYPE",
-    "text": "valuetype"
-  },
-  {
-    "line": 186,
-    "column": 14,
-    "type": "IS",
-    "text": "is"
-  },
-  {
-    "line": 186,
-    "column": 17,
-    "type": "CONCEPT_VALUE_TYPE",
-    "text": "boolean"
-  },
-  {
-    "line": 186,
-    "column": 24,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 187,
-    "column": 4,
-    "type": "CODED",
-    "text": "coded"
-  },
-  {
-    "line": 187,
-    "column": 10,
-    "type": "FROM",
-    "text": "from"
-  },
-  {
-    "line": 187,
-    "column": 15,
-    "type": "QUOTED_STRING",
-    "text": "\"MCV0 Dose Administered\""
-  },
-  {
-    "line": 187,
-    "column": 39,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 188,
-    "column": 0,
-    "type": "DONE",
-    "text": "done"
-  },
-  {
-    "line": 190,
-    "column": 0,
-    "type": "CONCEPT",
-    "text": "concept"
-  },
-  {
-    "line": 190,
-    "column": 8,
-    "type": "QUOTED_STRING",
-    "text": "\"No Primary Series Doses Administered\""
-  },
-  {
-    "line": 190,
-    "column": 46,
-    "type": "COLON",
-    "text": ":"
-  },
-  {
-    "line": 191,
-    "column": 4,
-    "type": "TYPE",
-    "text": "type"
-  },
-  {
-    "line": 191,
-    "column": 9,
-    "type": "IS",
-    "text": "is"
-  },
-  {
-    "line": 191,
-    "column": 12,
-    "type": "CONCEPT_TYPE",
-    "text": "Observation"
-  },
-  {
-    "line": 191,
-    "column": 23,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 192,
-    "column": 4,
-    "type": "VALUETYPE",
-    "text": "valuetype"
-  },
-  {
-    "line": 192,
-    "column": 14,
-    "type": "IS",
-    "text": "is"
-  },
-  {
-    "line": 192,
-    "column": 17,
-    "type": "CONCEPT_VALUE_TYPE",
-    "text": "boolean"
-  },
-  {
-    "line": 192,
-    "column": 24,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 193,
-    "column": 4,
-    "type": "CODED",
-    "text": "coded"
-  },
-  {
-    "line": 193,
-    "column": 10,
-    "type": "FROM",
-    "text": "from"
-  },
-  {
-    "line": 193,
-    "column": 15,
-    "type": "QUOTED_STRING",
-    "text": "\"No Primary Series Doses Administered\""
-  },
-  {
-    "line": 193,
-    "column": 53,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 194,
-    "column": 0,
-    "type": "DONE",
-    "text": "done"
-  },
-  {
-    "line": 196,
-    "column": 0,
-    "type": "CONCEPT",
-    "text": "concept"
-  },
-  {
-    "line": 196,
-    "column": 8,
-    "type": "QUOTED_STRING",
-    "text": "\"Client Age Less Than 12 Months\""
-  },
-  {
-    "line": 196,
-    "column": 40,
-    "type": "COLON",
-    "text": ":"
-  },
-  {
-    "line": 197,
-    "column": 4,
-    "type": "TYPE",
-    "text": "type"
-  },
-  {
-    "line": 197,
-    "column": 9,
-    "type": "IS",
-    "text": "is"
-  },
-  {
-    "line": 197,
-    "column": 12,
-    "type": "CONCEPT_TYPE",
-    "text": "Observation"
-  },
-  {
-    "line": 197,
-    "column": 23,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 198,
-    "column": 4,
-    "type": "VALUETYPE",
-    "text": "valuetype"
-  },
-  {
-    "line": 198,
-    "column": 14,
-    "type": "IS",
-    "text": "is"
-  },
-  {
-    "line": 198,
-    "column": 17,
-    "type": "CONCEPT_VALUE_TYPE",
-    "text": "boolean"
-  },
-  {
-    "line": 198,
-    "column": 24,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 199,
-    "column": 4,
-    "type": "CODED",
-    "text": "coded"
-  },
-  {
-    "line": 199,
-    "column": 10,
-    "type": "FROM",
-    "text": "from"
-  },
-  {
-    "line": 199,
-    "column": 15,
-    "type": "QUOTED_STRING",
-    "text": "\"Client Age Less Than 12 Months\""
-  },
-  {
-    "line": 199,
-    "column": 47,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 200,
-    "column": 0,
-    "type": "DONE",
-    "text": "done"
-  },
-  {
-    "line": 202,
-    "column": 0,
-    "type": "CONCEPT",
-    "text": "concept"
-  },
-  {
-    "line": 202,
-    "column": 8,
-    "type": "QUOTED_STRING",
-    "text": "\"Client Is Due For MCV1\""
-  },
-  {
-    "line": 202,
-    "column": 32,
-    "type": "COLON",
-    "text": ":"
-  },
-  {
-    "line": 203,
-    "column": 4,
-    "type": "TYPE",
-    "text": "type"
-  },
-  {
-    "line": 203,
-    "column": 9,
-    "type": "IS",
-    "text": "is"
-  },
-  {
-    "line": 203,
-    "column": 12,
-    "type": "CONCEPT_TYPE",
-    "text": "Observation"
-  },
-  {
-    "line": 203,
-    "column": 23,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 204,
-    "column": 4,
-    "type": "VALUETYPE",
-    "text": "valuetype"
-  },
-  {
-    "line": 204,
-    "column": 14,
-    "type": "IS",
-    "text": "is"
-  },
-  {
-    "line": 204,
-    "column": 17,
-    "type": "CONCEPT_VALUE_TYPE",
-    "text": "boolean"
-  },
-  {
-    "line": 204,
-    "column": 24,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 205,
-    "column": 4,
-    "type": "CODED",
-    "text": "coded"
-  },
-  {
-    "line": 205,
-    "column": 10,
-    "type": "FROM",
-    "text": "from"
-  },
-  {
-    "line": 205,
-    "column": 15,
-    "type": "QUOTED_STRING",
-    "text": "\"Client Is Due For MCV1\""
-  },
-  {
-    "line": 205,
-    "column": 39,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 206,
-    "column": 0,
-    "type": "DONE",
-    "text": "done"
-  },
-  {
-    "line": 208,
-    "column": 0,
-    "type": "CONCEPT",
-    "text": "concept"
-  },
-  {
-    "line": 208,
-    "column": 8,
-    "type": "QUOTED_STRING",
-    "text": "\"One Primary Series Dose Administered\""
-  },
-  {
-    "line": 208,
-    "column": 46,
-    "type": "COLON",
-    "text": ":"
-  },
-  {
-    "line": 209,
-    "column": 4,
-    "type": "TYPE",
-    "text": "type"
-  },
-  {
-    "line": 209,
-    "column": 9,
-    "type": "IS",
-    "text": "is"
-  },
-  {
-    "line": 209,
-    "column": 12,
-    "type": "CONCEPT_TYPE",
-    "text": "Observation"
-  },
-  {
-    "line": 209,
-    "column": 23,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 210,
-    "column": 4,
-    "type": "VALUETYPE",
-    "text": "valuetype"
-  },
-  {
-    "line": 210,
-    "column": 14,
-    "type": "IS",
-    "text": "is"
-  },
-  {
-    "line": 210,
-    "column": 17,
-    "type": "CONCEPT_VALUE_TYPE",
-    "text": "boolean"
-  },
-  {
-    "line": 210,
-    "column": 24,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 211,
-    "column": 4,
-    "type": "CODED",
-    "text": "coded"
-  },
-  {
-    "line": 211,
-    "column": 10,
-    "type": "FROM",
-    "text": "from"
-  },
-  {
-    "line": 211,
-    "column": 15,
-    "type": "QUOTED_STRING",
-    "text": "\"One Primary Series Dose Administered\""
-  },
-  {
-    "line": 211,
-    "column": 53,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 212,
-    "column": 0,
-    "type": "DONE",
-    "text": "done"
-  },
-  {
-    "line": 214,
-    "column": 0,
-    "type": "CONCEPT",
-    "text": "concept"
-  },
-  {
-    "line": 214,
-    "column": 8,
-    "type": "QUOTED_STRING",
-    "text": "\"Client Age Less Than 15 Months\""
-  },
-  {
-    "line": 214,
-    "column": 40,
-    "type": "COLON",
-    "text": ":"
-  },
-  {
-    "line": 215,
-    "column": 4,
-    "type": "TYPE",
-    "text": "type"
-  },
-  {
-    "line": 215,
-    "column": 9,
-    "type": "IS",
-    "text": "is"
-  },
-  {
-    "line": 215,
-    "column": 12,
-    "type": "CONCEPT_TYPE",
-    "text": "Observation"
-  },
-  {
-    "line": 215,
-    "column": 23,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 216,
-    "column": 4,
-    "type": "VALUETYPE",
-    "text": "valuetype"
-  },
-  {
-    "line": 216,
-    "column": 14,
-    "type": "IS",
-    "text": "is"
-  },
-  {
-    "line": 216,
-    "column": 17,
-    "type": "CONCEPT_VALUE_TYPE",
-    "text": "boolean"
-  },
-  {
-    "line": 216,
-    "column": 24,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 217,
-    "column": 4,
-    "type": "CODED",
-    "text": "coded"
-  },
-  {
-    "line": 217,
-    "column": 10,
-    "type": "FROM",
-    "text": "from"
-  },
-  {
-    "line": 217,
-    "column": 15,
-    "type": "QUOTED_STRING",
-    "text": "\"Client Age Less Than 15 Months\""
-  },
-  {
-    "line": 217,
-    "column": 47,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 218,
-    "column": 0,
-    "type": "DONE",
-    "text": "done"
-  },
-  {
-    "line": 220,
-    "column": 0,
-    "type": "CONCEPT",
-    "text": "concept"
-  },
-  {
-    "line": 220,
-    "column": 8,
-    "type": "QUOTED_STRING",
-    "text": "\"Client Is Due For MCV2\""
-  },
-  {
-    "line": 220,
-    "column": 32,
-    "type": "COLON",
-    "text": ":"
-  },
-  {
-    "line": 221,
-    "column": 4,
-    "type": "TYPE",
-    "text": "type"
-  },
-  {
-    "line": 221,
-    "column": 9,
-    "type": "IS",
-    "text": "is"
-  },
-  {
-    "line": 221,
-    "column": 12,
-    "type": "CONCEPT_TYPE",
-    "text": "Observation"
-  },
-  {
-    "line": 221,
-    "column": 23,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 222,
-    "column": 4,
-    "type": "VALUETYPE",
-    "text": "valuetype"
-  },
-  {
-    "line": 222,
-    "column": 14,
-    "type": "IS",
-    "text": "is"
-  },
-  {
-    "line": 222,
-    "column": 17,
-    "type": "CONCEPT_VALUE_TYPE",
-    "text": "boolean"
-  },
-  {
-    "line": 222,
-    "column": 24,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 223,
-    "column": 4,
-    "type": "CODED",
-    "text": "coded"
-  },
-  {
-    "line": 223,
-    "column": 10,
-    "type": "FROM",
-    "text": "from"
-  },
-  {
-    "line": 223,
-    "column": 15,
-    "type": "QUOTED_STRING",
-    "text": "\"Client Is Due For MCV2\""
-  },
-  {
-    "line": 223,
-    "column": 39,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 224,
-    "column": 0,
-    "type": "DONE",
-    "text": "done"
-  },
-  {
-    "line": 226,
-    "column": 0,
-    "type": "CONCEPT",
-    "text": "concept"
-  },
-  {
-    "line": 226,
-    "column": 8,
-    "type": "QUOTED_STRING",
-    "text": "\"Two Primary Series Doses Administered\""
-  },
-  {
-    "line": 226,
-    "column": 47,
-    "type": "COLON",
-    "text": ":"
-  },
-  {
-    "line": 227,
-    "column": 4,
-    "type": "TYPE",
-    "text": "type"
-  },
-  {
-    "line": 227,
-    "column": 9,
-    "type": "IS",
-    "text": "is"
-  },
-  {
-    "line": 227,
-    "column": 12,
-    "type": "CONCEPT_TYPE",
-    "text": "Observation"
-  },
-  {
-    "line": 227,
-    "column": 23,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 228,
-    "column": 4,
-    "type": "VALUETYPE",
-    "text": "valuetype"
-  },
-  {
-    "line": 228,
-    "column": 14,
-    "type": "IS",
-    "text": "is"
-  },
-  {
-    "line": 228,
-    "column": 17,
-    "type": "CONCEPT_VALUE_TYPE",
-    "text": "boolean"
-  },
-  {
-    "line": 228,
-    "column": 24,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 229,
-    "column": 4,
-    "type": "CODED",
-    "text": "coded"
-  },
-  {
-    "line": 229,
-    "column": 10,
-    "type": "FROM",
-    "text": "from"
-  },
-  {
-    "line": 229,
-    "column": 15,
-    "type": "QUOTED_STRING",
-    "text": "\"Two Primary Series Doses Administered\""
-  },
-  {
-    "line": 229,
-    "column": 54,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 230,
-    "column": 0,
-    "type": "DONE",
-    "text": "done"
-  },
-  {
-    "line": 232,
-    "column": 0,
-    "type": "CONCEPT",
-    "text": "concept"
-  },
-  {
-    "line": 232,
-    "column": 8,
-    "type": "QUOTED_STRING",
-    "text": "\"Client Age Less Than 9 Months\""
-  },
-  {
-    "line": 232,
-    "column": 39,
-    "type": "COLON",
-    "text": ":"
-  },
-  {
-    "line": 233,
-    "column": 4,
-    "type": "TYPE",
-    "text": "type"
-  },
-  {
-    "line": 233,
-    "column": 9,
-    "type": "IS",
-    "text": "is"
-  },
-  {
-    "line": 233,
-    "column": 12,
-    "type": "CONCEPT_TYPE",
-    "text": "Observation"
-  },
-  {
-    "line": 233,
-    "column": 23,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 234,
-    "column": 4,
-    "type": "VALUETYPE",
-    "text": "valuetype"
-  },
-  {
-    "line": 234,
-    "column": 14,
-    "type": "IS",
-    "text": "is"
-  },
-  {
-    "line": 234,
-    "column": 17,
-    "type": "CONCEPT_VALUE_TYPE",
-    "text": "boolean"
-  },
-  {
-    "line": 234,
-    "column": 24,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 235,
-    "column": 4,
-    "type": "CODED",
-    "text": "coded"
-  },
-  {
-    "line": 235,
-    "column": 10,
-    "type": "FROM",
-    "text": "from"
-  },
-  {
-    "line": 235,
-    "column": 15,
-    "type": "QUOTED_STRING",
-    "text": "\"Client Age Less Than 9 Months\""
-  },
-  {
-    "line": 235,
-    "column": 46,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 236,
-    "column": 0,
-    "type": "DONE",
-    "text": "done"
-  },
-  {
-    "line": 238,
-    "column": 0,
-    "type": "CONCEPT",
-    "text": "concept"
-  },
-  {
-    "line": 238,
-    "column": 8,
-    "type": "QUOTED_STRING",
-    "text": "\"Measles Routine Immunization Schedule Complete\""
-  },
-  {
-    "line": 238,
-    "column": 56,
-    "type": "COLON",
-    "text": ":"
-  },
-  {
-    "line": 239,
-    "column": 4,
-    "type": "TYPE",
-    "text": "type"
-  },
-  {
-    "line": 239,
-    "column": 9,
-    "type": "IS",
-    "text": "is"
-  },
-  {
-    "line": 239,
-    "column": 12,
-    "type": "CONCEPT_TYPE",
-    "text": "Observation"
-  },
-  {
-    "line": 239,
-    "column": 23,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 240,
-    "column": 4,
-    "type": "VALUETYPE",
-    "text": "valuetype"
-  },
-  {
-    "line": 240,
-    "column": 14,
-    "type": "IS",
-    "text": "is"
-  },
-  {
-    "line": 240,
-    "column": 17,
-    "type": "CONCEPT_VALUE_TYPE",
-    "text": "boolean"
-  },
-  {
-    "line": 240,
-    "column": 24,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 241,
-    "column": 4,
-    "type": "CODED",
-    "text": "coded"
-  },
-  {
-    "line": 241,
-    "column": 10,
-    "type": "FROM",
-    "text": "from"
-  },
-  {
-    "line": 241,
-    "column": 15,
-    "type": "QUOTED_STRING",
-    "text": "\"Measles Routine Immunization Schedule Complete\""
-  },
-  {
-    "line": 241,
-    "column": 63,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 242,
-    "column": 0,
-    "type": "DONE",
-    "text": "done"
-  },
-  {
-    "line": 244,
-    "column": 0,
-    "type": "CONCEPT",
-    "text": "concept"
-  },
-  {
-    "line": 244,
-    "column": 8,
-    "type": "QUOTED_STRING",
-    "text": "\"No Supplementary Dose Administered\""
-  },
-  {
-    "line": 244,
-    "column": 44,
-    "type": "COLON",
-    "text": ":"
-  },
-  {
-    "line": 245,
-    "column": 4,
-    "type": "TYPE",
-    "text": "type"
-  },
-  {
-    "line": 245,
-    "column": 9,
-    "type": "IS",
-    "text": "is"
-  },
-  {
-    "line": 245,
-    "column": 12,
-    "type": "CONCEPT_TYPE",
-    "text": "Observation"
-  },
-  {
-    "line": 245,
-    "column": 23,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 246,
-    "column": 4,
-    "type": "VALUETYPE",
-    "text": "valuetype"
-  },
-  {
-    "line": 246,
-    "column": 14,
-    "type": "IS",
-    "text": "is"
-  },
-  {
-    "line": 246,
-    "column": 17,
-    "type": "CONCEPT_VALUE_TYPE",
-    "text": "boolean"
-  },
-  {
-    "line": 246,
-    "column": 24,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 247,
-    "column": 4,
-    "type": "CODED",
-    "text": "coded"
-  },
-  {
-    "line": 247,
-    "column": 10,
-    "type": "FROM",
-    "text": "from"
-  },
-  {
-    "line": 247,
-    "column": 15,
-    "type": "QUOTED_STRING",
-    "text": "\"No Supplementary Dose Administered\""
-  },
-  {
-    "line": 247,
-    "column": 51,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 248,
-    "column": 0,
-    "type": "DONE",
-    "text": "done"
-  },
-  {
-    "line": 250,
-    "column": 0,
-    "type": "CONCEPT",
-    "text": "concept"
-  },
-  {
-    "line": 250,
-    "column": 8,
-    "type": "QUOTED_STRING",
-    "text": "\"Client Is Due For Supplementary Dose\""
-  },
-  {
-    "line": 250,
-    "column": 46,
-    "type": "COLON",
-    "text": ":"
-  },
-  {
-    "line": 251,
-    "column": 4,
-    "type": "TYPE",
-    "text": "type"
-  },
-  {
-    "line": 251,
-    "column": 9,
-    "type": "IS",
-    "text": "is"
-  },
-  {
-    "line": 251,
-    "column": 12,
-    "type": "CONCEPT_TYPE",
-    "text": "Observation"
-  },
-  {
-    "line": 251,
-    "column": 23,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 252,
-    "column": 4,
-    "type": "VALUETYPE",
-    "text": "valuetype"
-  },
-  {
-    "line": 252,
-    "column": 14,
-    "type": "IS",
-    "text": "is"
-  },
-  {
-    "line": 252,
-    "column": 17,
-    "type": "CONCEPT_VALUE_TYPE",
-    "text": "boolean"
-  },
-  {
-    "line": 252,
-    "column": 24,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 253,
-    "column": 4,
-    "type": "CODED",
-    "text": "coded"
-  },
-  {
-    "line": 253,
-    "column": 10,
-    "type": "FROM",
-    "text": "from"
-  },
-  {
-    "line": 253,
-    "column": 15,
-    "type": "QUOTED_STRING",
-    "text": "\"Client Is Due For Supplementary Dose\""
-  },
-  {
-    "line": 253,
-    "column": 53,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 254,
-    "column": 0,
-    "type": "DONE",
-    "text": "done"
-  },
-  {
-    "line": 256,
-    "column": 0,
-    "type": "CONCEPT",
-    "text": "concept"
-  },
-  {
-    "line": 256,
-    "column": 8,
-    "type": "QUOTED_STRING",
-    "text": "\"Supplementary Dose Administered\""
-  },
-  {
-    "line": 256,
-    "column": 41,
-    "type": "COLON",
-    "text": ":"
-  },
-  {
-    "line": 257,
-    "column": 4,
-    "type": "TYPE",
-    "text": "type"
-  },
-  {
-    "line": 257,
-    "column": 9,
-    "type": "IS",
-    "text": "is"
-  },
-  {
-    "line": 257,
-    "column": 12,
-    "type": "CONCEPT_TYPE",
-    "text": "Observation"
-  },
-  {
-    "line": 257,
-    "column": 23,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 258,
-    "column": 4,
-    "type": "VALUETYPE",
-    "text": "valuetype"
-  },
-  {
-    "line": 258,
-    "column": 14,
-    "type": "IS",
-    "text": "is"
-  },
-  {
-    "line": 258,
-    "column": 17,
-    "type": "CONCEPT_VALUE_TYPE",
-    "text": "boolean"
-  },
-  {
-    "line": 258,
-    "column": 24,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 259,
-    "column": 4,
-    "type": "CODED",
-    "text": "coded"
-  },
-  {
-    "line": 259,
-    "column": 10,
-    "type": "FROM",
-    "text": "from"
-  },
-  {
-    "line": 259,
-    "column": 15,
-    "type": "QUOTED_STRING",
-    "text": "\"Supplementary Dose Administered\""
-  },
-  {
-    "line": 259,
-    "column": 48,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 260,
-    "column": 0,
-    "type": "DONE",
-    "text": "done"
-  },
-  {
-    "line": 262,
-    "column": 0,
-    "type": "CONCEPT",
-    "text": "concept"
-  },
-  {
-    "line": 262,
-    "column": 8,
-    "type": "QUOTED_STRING",
-    "text": "\"MCV Dose Contraindicated\""
-  },
-  {
-    "line": 262,
-    "column": 34,
-    "type": "COLON",
-    "text": ":"
-  },
-  {
-    "line": 263,
-    "column": 4,
-    "type": "TYPE",
-    "text": "type"
-  },
-  {
-    "line": 263,
-    "column": 9,
-    "type": "IS",
-    "text": "is"
-  },
-  {
-    "line": 263,
-    "column": 12,
-    "type": "CONCEPT_TYPE",
-    "text": "Observation"
-  },
-  {
-    "line": 263,
-    "column": 23,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 264,
-    "column": 4,
-    "type": "VALUETYPE",
-    "text": "valuetype"
-  },
-  {
-    "line": 264,
-    "column": 14,
-    "type": "IS",
-    "text": "is"
-  },
-  {
-    "line": 264,
-    "column": 17,
-    "type": "CONCEPT_VALUE_TYPE",
-    "text": "boolean"
-  },
-  {
-    "line": 264,
-    "column": 24,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 265,
-    "column": 4,
-    "type": "CODED",
-    "text": "coded"
-  },
-  {
-    "line": 265,
-    "column": 10,
-    "type": "FROM",
-    "text": "from"
-  },
-  {
-    "line": 265,
-    "column": 15,
-    "type": "QUOTED_STRING",
-    "text": "\"MCV Dose Contraindicated\""
-  },
-  {
-    "line": 265,
-    "column": 41,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 266,
-    "column": 0,
-    "type": "DONE",
-    "text": "done"
-  },
-  {
-    "line": 268,
-    "column": 0,
-    "type": "CONCEPT",
-    "text": "concept"
-  },
-  {
-    "line": 268,
-    "column": 8,
-    "type": "QUOTED_STRING",
-    "text": "\"Contraindication Evaluation of the MCV dose\""
-  },
-  {
-    "line": 268,
-    "column": 53,
-    "type": "COLON",
-    "text": ":"
-  },
-  {
-    "line": 269,
-    "column": 4,
-    "type": "TYPE",
-    "text": "type"
-  },
-  {
-    "line": 269,
-    "column": 9,
-    "type": "IS",
-    "text": "is"
-  },
-  {
-    "line": 269,
-    "column": 12,
-    "type": "CONCEPT_TYPE",
-    "text": "Observation"
-  },
-  {
-    "line": 269,
-    "column": 23,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 270,
-    "column": 4,
-    "type": "VALUETYPE",
-    "text": "valuetype"
-  },
-  {
-    "line": 270,
-    "column": 14,
-    "type": "IS",
-    "text": "is"
-  },
-  {
-    "line": 270,
-    "column": 17,
-    "type": "CONCEPT_VALUE_TYPE",
-    "text": "boolean"
-  },
-  {
-    "line": 270,
-    "column": 24,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 271,
-    "column": 4,
-    "type": "CODED",
-    "text": "coded"
-  },
-  {
-    "line": 271,
-    "column": 10,
-    "type": "FROM",
-    "text": "from"
-  },
-  {
-    "line": 271,
-    "column": 15,
-    "type": "QUOTED_STRING",
-    "text": "\"Contraindication Evaluation of the MCV dose\""
-  },
-  {
-    "line": 271,
-    "column": 60,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 272,
-    "column": 0,
-    "type": "DONE",
-    "text": "done"
-  },
-  {
-    "line": 274,
-    "column": 0,
-    "type": "TERMINOLOGY",
-    "text": "terminology"
-  },
-  {
-    "line": 274,
-    "column": 12,
-    "type": "QUOTED_STRING",
-    "text": "\"Measles Routine Immunization Schedule Incomplete\""
-  },
-  {
-    "line": 274,
-    "column": 63,
-    "type": "SYSTEM",
-    "text": "system"
-  },
-  {
-    "line": 274,
-    "column": 70,
-    "type": "BACKTICK_STRING",
-    "text": "`http://sdh.com/cqis/kalm`"
-  },
-  {
-    "line": 274,
-    "column": 97,
-    "type": "CODE",
-    "text": "code"
-  },
-  {
-    "line": 274,
-    "column": 102,
-    "type": "BACKTICK_STRING",
-    "text": "`measles-routine-immunization-schedule-incomplete`"
-  },
-  {
-    "line": 274,
-    "column": 152,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 275,
-    "column": 0,
-    "type": "TERMINOLOGY",
-    "text": "terminology"
-  },
-  {
-    "line": 275,
-    "column": 12,
-    "type": "QUOTED_STRING",
-    "text": "\"No MCV0 Doses Administered\""
-  },
-  {
-    "line": 275,
-    "column": 41,
-    "type": "SYSTEM",
-    "text": "system"
-  },
-  {
-    "line": 275,
-    "column": 48,
-    "type": "BACKTICK_STRING",
-    "text": "`http://sdh.com/cqis/kalm`"
-  },
-  {
-    "line": 275,
-    "column": 75,
-    "type": "CODE",
-    "text": "code"
-  },
-  {
-    "line": 275,
-    "column": 80,
-    "type": "BACKTICK_STRING",
-    "text": "`no-mcv0-doses-administered`"
-  },
-  {
-    "line": 275,
-    "column": 108,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 276,
-    "column": 0,
-    "type": "TERMINOLOGY",
-    "text": "terminology"
-  },
-  {
-    "line": 276,
-    "column": 12,
-    "type": "QUOTED_STRING",
-    "text": "\"Client Age Less Than 6 Months\""
-  },
-  {
-    "line": 276,
-    "column": 44,
-    "type": "SYSTEM",
-    "text": "system"
-  },
-  {
-    "line": 276,
-    "column": 51,
-    "type": "BACKTICK_STRING",
-    "text": "`http://sdh.com/cqis/kalm`"
-  },
-  {
-    "line": 276,
-    "column": 78,
-    "type": "CODE",
-    "text": "code"
-  },
-  {
-    "line": 276,
-    "column": 83,
-    "type": "BACKTICK_STRING",
-    "text": "`client-age-less-than-6-months`"
-  },
-  {
-    "line": 276,
-    "column": 114,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 277,
-    "column": 0,
-    "type": "TERMINOLOGY",
-    "text": "terminology"
-  },
-  {
-    "line": 277,
-    "column": 12,
-    "type": "QUOTED_STRING",
-    "text": "\"Last Live Vaccine Administered Within 4 Weeks\""
-  },
-  {
-    "line": 277,
-    "column": 60,
-    "type": "SYSTEM",
-    "text": "system"
-  },
-  {
-    "line": 277,
-    "column": 67,
-    "type": "BACKTICK_STRING",
-    "text": "`http://sdh.com/cqis/kalm`"
-  },
-  {
-    "line": 277,
-    "column": 94,
-    "type": "CODE",
-    "text": "code"
-  },
-  {
-    "line": 277,
-    "column": 99,
-    "type": "BACKTICK_STRING",
-    "text": "`last-live-vaccine-administered-within-4-weeks`"
-  },
-  {
-    "line": 277,
-    "column": 146,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 278,
-    "column": 0,
-    "type": "TERMINOLOGY",
-    "text": "terminology"
-  },
-  {
-    "line": 278,
-    "column": 12,
-    "type": "QUOTED_STRING",
-    "text": "\"Client Is Due For MCV0\""
-  },
-  {
-    "line": 278,
-    "column": 37,
-    "type": "SYSTEM",
-    "text": "system"
-  },
-  {
-    "line": 278,
-    "column": 44,
-    "type": "BACKTICK_STRING",
-    "text": "`http://sdh.com/cqis/kalm`"
-  },
-  {
-    "line": 278,
-    "column": 71,
-    "type": "CODE",
-    "text": "code"
-  },
-  {
-    "line": 278,
-    "column": 76,
-    "type": "BACKTICK_STRING",
-    "text": "`client-is-due-for-mcv0`"
-  },
-  {
-    "line": 278,
-    "column": 100,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 279,
-    "column": 0,
-    "type": "TERMINOLOGY",
-    "text": "terminology"
-  },
-  {
-    "line": 279,
-    "column": 12,
-    "type": "QUOTED_STRING",
-    "text": "\"MCV0 Dose Administered\""
-  },
-  {
-    "line": 279,
-    "column": 37,
-    "type": "SYSTEM",
-    "text": "system"
-  },
-  {
-    "line": 279,
-    "column": 44,
-    "type": "BACKTICK_STRING",
-    "text": "`http://sdh.com/cqis/kalm`"
-  },
-  {
-    "line": 279,
-    "column": 71,
-    "type": "CODE",
-    "text": "code"
-  },
-  {
-    "line": 279,
-    "column": 76,
-    "type": "BACKTICK_STRING",
-    "text": "`mcv0-dose-administered`"
-  },
-  {
-    "line": 279,
-    "column": 100,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 280,
-    "column": 0,
-    "type": "TERMINOLOGY",
-    "text": "terminology"
-  },
-  {
-    "line": 280,
-    "column": 12,
-    "type": "QUOTED_STRING",
-    "text": "\"No Primary Series Doses Administered\""
-  },
-  {
-    "line": 280,
-    "column": 51,
-    "type": "SYSTEM",
-    "text": "system"
-  },
-  {
-    "line": 280,
-    "column": 58,
-    "type": "BACKTICK_STRING",
-    "text": "`http://sdh.com/cqis/kalm`"
-  },
-  {
-    "line": 280,
-    "column": 85,
-    "type": "CODE",
-    "text": "code"
-  },
-  {
-    "line": 280,
-    "column": 90,
-    "type": "BACKTICK_STRING",
-    "text": "`no-primary-series-doses-administered`"
-  },
-  {
-    "line": 280,
-    "column": 128,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 281,
-    "column": 0,
-    "type": "TERMINOLOGY",
-    "text": "terminology"
-  },
-  {
-    "line": 281,
-    "column": 12,
-    "type": "QUOTED_STRING",
-    "text": "\"Client Age Less Than 12 Months\""
-  },
-  {
-    "line": 281,
-    "column": 45,
-    "type": "SYSTEM",
-    "text": "system"
-  },
-  {
-    "line": 281,
-    "column": 52,
-    "type": "BACKTICK_STRING",
-    "text": "`http://sdh.com/cqis/kalm`"
-  },
-  {
-    "line": 281,
-    "column": 79,
-    "type": "CODE",
-    "text": "code"
-  },
-  {
-    "line": 281,
-    "column": 84,
-    "type": "BACKTICK_STRING",
-    "text": "`client-age-less-than-12-months`"
-  },
-  {
-    "line": 281,
-    "column": 116,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 282,
-    "column": 0,
-    "type": "TERMINOLOGY",
-    "text": "terminology"
-  },
-  {
-    "line": 282,
-    "column": 12,
-    "type": "QUOTED_STRING",
-    "text": "\"Client Is Due For MCV1\""
-  },
-  {
-    "line": 282,
-    "column": 37,
-    "type": "SYSTEM",
-    "text": "system"
-  },
-  {
-    "line": 282,
-    "column": 44,
-    "type": "BACKTICK_STRING",
-    "text": "`http://sdh.com/cqis/kalm`"
-  },
-  {
-    "line": 282,
-    "column": 71,
-    "type": "CODE",
-    "text": "code"
-  },
-  {
-    "line": 282,
-    "column": 76,
-    "type": "BACKTICK_STRING",
-    "text": "`client-is-due-for-mcv1`"
-  },
-  {
-    "line": 282,
-    "column": 100,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 283,
-    "column": 0,
-    "type": "TERMINOLOGY",
-    "text": "terminology"
-  },
-  {
-    "line": 283,
-    "column": 12,
-    "type": "QUOTED_STRING",
-    "text": "\"One Primary Series Dose Administered\""
-  },
-  {
-    "line": 283,
-    "column": 51,
-    "type": "SYSTEM",
-    "text": "system"
-  },
-  {
-    "line": 283,
-    "column": 58,
-    "type": "BACKTICK_STRING",
-    "text": "`http://sdh.com/cqis/kalm`"
-  },
-  {
-    "line": 283,
-    "column": 85,
-    "type": "CODE",
-    "text": "code"
-  },
-  {
-    "line": 283,
-    "column": 90,
-    "type": "BACKTICK_STRING",
-    "text": "`one-primary-series-dose-administered`"
-  },
-  {
-    "line": 283,
-    "column": 128,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 284,
-    "column": 0,
-    "type": "TERMINOLOGY",
-    "text": "terminology"
-  },
-  {
-    "line": 284,
-    "column": 12,
-    "type": "QUOTED_STRING",
-    "text": "\"Client Age Less Than 15 Months\""
-  },
-  {
-    "line": 284,
-    "column": 45,
-    "type": "SYSTEM",
-    "text": "system"
-  },
-  {
-    "line": 284,
-    "column": 52,
-    "type": "BACKTICK_STRING",
-    "text": "`http://sdh.com/cqis/kalm`"
-  },
-  {
-    "line": 284,
-    "column": 79,
-    "type": "CODE",
-    "text": "code"
-  },
-  {
-    "line": 284,
-    "column": 84,
-    "type": "BACKTICK_STRING",
-    "text": "`client-age-less-than-15-months`"
-  },
-  {
-    "line": 284,
-    "column": 116,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 285,
-    "column": 0,
-    "type": "TERMINOLOGY",
-    "text": "terminology"
-  },
-  {
-    "line": 285,
-    "column": 12,
-    "type": "QUOTED_STRING",
-    "text": "\"Client Is Due For MCV2\""
-  },
-  {
-    "line": 285,
-    "column": 37,
-    "type": "SYSTEM",
-    "text": "system"
-  },
-  {
-    "line": 285,
-    "column": 44,
-    "type": "BACKTICK_STRING",
-    "text": "`http://sdh.com/cqis/kalm`"
-  },
-  {
-    "line": 285,
-    "column": 71,
-    "type": "CODE",
-    "text": "code"
-  },
-  {
-    "line": 285,
-    "column": 76,
-    "type": "BACKTICK_STRING",
-    "text": "`client-is-due-for-mcv2`"
-  },
-  {
-    "line": 285,
-    "column": 100,
-    "type": "DOT",
-    "text": "."
-  },
-  {
-    "line": 286,
-    "column": 0,
-    "type": "TERMINOLOGY",
-    "text": "terminology"
-  },
-  {
-    "line": 286,
-    "column": 12,
-    "type": "QUOTED_STRING",
-    "text": "\"Two Primary Series Doses Administered\""
-  },
-  {
-    "line": 286,
-    "column": 52,
-    "type": "SYSTEM",
-    "text": "system"
-  },
-  {
-    "line": 286,
+    "line": 12,
     "column": 59,
-    "type": "BACKTICK_STRING",
-    "text": "`http://sdh.com/cqis/kalm`"
+    "type": "THEN",
+    "text": "then"
   },
   {
-    "line": 286,
-    "column": 86,
-    "type": "CODE",
-    "text": "code"
+    "line": 12,
+    "column": 64,
+    "type": "RECOMMEND_ACTIVITY",
+    "text": "recommend activity"
   },
   {
-    "line": 286,
-    "column": 91,
-    "type": "BACKTICK_STRING",
-    "text": "`two-primary-series-doses-administered`"
+    "line": 12,
+    "column": 83,
+    "type": "QUOTED_STRING",
+    "text": "\"Last Live Vaccine Administered Within 4 Weeks\""
   },
   {
-    "line": 286,
+    "line": 12,
     "column": 130,
     "type": "DOT",
     "text": "."
   },
   {
+    "line": 13,
+    "column": 4,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 13,
+    "column": 6,
+    "type": "WHEN",
+    "text": "when"
+  },
+  {
+    "line": 13,
+    "column": 11,
+    "type": "QUOTED_STRING",
+    "text": "\"Client Is Due For MCV0\""
+  },
+  {
+    "line": 13,
+    "column": 36,
+    "type": "THEN",
+    "text": "then"
+  },
+  {
+    "line": 13,
+    "column": 41,
+    "type": "RECOMMEND_ACTIVITY",
+    "text": "recommend activity"
+  },
+  {
+    "line": 13,
+    "column": 60,
+    "type": "QUOTED_STRING",
+    "text": "\"Provide Measles Vaccine\""
+  },
+  {
+    "line": 13,
+    "column": 85,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 14,
+    "column": 2,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 14,
+    "column": 4,
+    "type": "END_WHEN",
+    "text": "end when"
+  },
+  {
+    "line": 15,
+    "column": 2,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 15,
+    "column": 4,
+    "type": "WHEN",
+    "text": "when"
+  },
+  {
+    "line": 15,
+    "column": 9,
+    "type": "QUOTED_STRING",
+    "text": "\"MCV0 Dose Administered\""
+  },
+  {
+    "line": 15,
+    "column": 34,
+    "type": "THEN",
+    "text": "then"
+  },
+  {
+    "line": 15,
+    "column": 39,
+    "type": "RECOMMEND_ACTIVITY",
+    "text": "recommend activity"
+  },
+  {
+    "line": 15,
+    "column": 58,
+    "type": "QUOTED_STRING",
+    "text": "\"MCV0 Dose Administered\""
+  },
+  {
+    "line": 15,
+    "column": 82,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 16,
+    "column": 0,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 16,
+    "column": 2,
+    "type": "END_WHEN",
+    "text": "end when"
+  },
+  {
+    "line": 22,
+    "column": 0,
+    "type": "DECISION",
+    "text": "decision"
+  },
+  {
+    "line": 22,
+    "column": 9,
+    "type": "QUOTED_STRING",
+    "text": "\"IMMZ.D2.DT.Measles Low Transmission\""
+  },
+  {
+    "line": 22,
+    "column": 46,
+    "type": "COLON",
+    "text": ":"
+  },
+  {
+    "line": 24,
+    "column": 0,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 24,
+    "column": 2,
+    "type": "WHEN",
+    "text": "when"
+  },
+  {
+    "line": 24,
+    "column": 7,
+    "type": "QUOTED_STRING",
+    "text": "\"Measles Routine Immunization Schedule Incomplete\""
+  },
+  {
+    "line": 24,
+    "column": 58,
+    "type": "THEN",
+    "text": "then"
+  },
+  {
+    "line": 24,
+    "column": 62,
+    "type": "COLON",
+    "text": ":"
+  },
+  {
+    "line": 25,
+    "column": 2,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 25,
+    "column": 4,
+    "type": "WHEN",
+    "text": "when"
+  },
+  {
+    "line": 25,
+    "column": 9,
+    "type": "QUOTED_STRING",
+    "text": "\"No Primary Series Doses Administered\""
+  },
+  {
+    "line": 25,
+    "column": 48,
+    "type": "THEN",
+    "text": "then"
+  },
+  {
+    "line": 25,
+    "column": 52,
+    "type": "COLON",
+    "text": ":"
+  },
+  {
+    "line": 26,
+    "column": 4,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 26,
+    "column": 6,
+    "type": "WHEN",
+    "text": "when"
+  },
+  {
+    "line": 26,
+    "column": 11,
+    "type": "QUOTED_STRING",
+    "text": "\"Client Age Less Than 12 Months\""
+  },
+  {
+    "line": 26,
+    "column": 44,
+    "type": "THEN",
+    "text": "then"
+  },
+  {
+    "line": 26,
+    "column": 49,
+    "type": "RECOMMEND_ACTIVITY",
+    "text": "recommend activity"
+  },
+  {
+    "line": 26,
+    "column": 68,
+    "type": "QUOTED_STRING",
+    "text": "\"Client Age Less Than 12 Months\""
+  },
+  {
+    "line": 26,
+    "column": 100,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 27,
+    "column": 4,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 27,
+    "column": 6,
+    "type": "WHEN",
+    "text": "when"
+  },
+  {
+    "line": 27,
+    "column": 11,
+    "type": "QUOTED_STRING",
+    "text": "\"Last Live Vaccine Administered Within 4 Weeks\""
+  },
+  {
+    "line": 27,
+    "column": 59,
+    "type": "THEN",
+    "text": "then"
+  },
+  {
+    "line": 27,
+    "column": 64,
+    "type": "RECOMMEND_ACTIVITY",
+    "text": "recommend activity"
+  },
+  {
+    "line": 27,
+    "column": 83,
+    "type": "QUOTED_STRING",
+    "text": "\"Last Live Vaccine Administered Within 4 Weeks_2\""
+  },
+  {
+    "line": 27,
+    "column": 132,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 28,
+    "column": 4,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 28,
+    "column": 6,
+    "type": "WHEN",
+    "text": "when"
+  },
+  {
+    "line": 28,
+    "column": 11,
+    "type": "QUOTED_STRING",
+    "text": "\"Client Is Due For MCV1\""
+  },
+  {
+    "line": 28,
+    "column": 36,
+    "type": "THEN",
+    "text": "then"
+  },
+  {
+    "line": 28,
+    "column": 41,
+    "type": "RECOMMEND_ACTIVITY",
+    "text": "recommend activity"
+  },
+  {
+    "line": 28,
+    "column": 60,
+    "type": "QUOTED_STRING",
+    "text": "\"Provide Measles Vaccine\""
+  },
+  {
+    "line": 28,
+    "column": 85,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 29,
+    "column": 2,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 29,
+    "column": 4,
+    "type": "END_WHEN",
+    "text": "end when"
+  },
+  {
+    "line": 30,
+    "column": 2,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 30,
+    "column": 4,
+    "type": "WHEN",
+    "text": "when"
+  },
+  {
+    "line": 30,
+    "column": 9,
+    "type": "QUOTED_STRING",
+    "text": "\"One Primary Series Dose Administered\""
+  },
+  {
+    "line": 30,
+    "column": 48,
+    "type": "THEN",
+    "text": "then"
+  },
+  {
+    "line": 30,
+    "column": 52,
+    "type": "COLON",
+    "text": ":"
+  },
+  {
+    "line": 31,
+    "column": 4,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 31,
+    "column": 6,
+    "type": "WHEN",
+    "text": "when"
+  },
+  {
+    "line": 31,
+    "column": 11,
+    "type": "QUOTED_STRING",
+    "text": "\"Client Age Less Than 15 Months\""
+  },
+  {
+    "line": 31,
+    "column": 44,
+    "type": "THEN",
+    "text": "then"
+  },
+  {
+    "line": 31,
+    "column": 49,
+    "type": "RECOMMEND_ACTIVITY",
+    "text": "recommend activity"
+  },
+  {
+    "line": 31,
+    "column": 68,
+    "type": "QUOTED_STRING",
+    "text": "\"Client Age Less Than 15 Months\""
+  },
+  {
+    "line": 31,
+    "column": 100,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 32,
+    "column": 4,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 32,
+    "column": 6,
+    "type": "WHEN",
+    "text": "when"
+  },
+  {
+    "line": 32,
+    "column": 11,
+    "type": "QUOTED_STRING",
+    "text": "\"Last Live Vaccine Administered Within 4 Weeks\""
+  },
+  {
+    "line": 32,
+    "column": 59,
+    "type": "THEN",
+    "text": "then"
+  },
+  {
+    "line": 32,
+    "column": 64,
+    "type": "RECOMMEND_ACTIVITY",
+    "text": "recommend activity"
+  },
+  {
+    "line": 32,
+    "column": 83,
+    "type": "QUOTED_STRING",
+    "text": "\"Last Live Vaccine Administered Within 4 Weeks_3\""
+  },
+  {
+    "line": 32,
+    "column": 132,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 33,
+    "column": 4,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 33,
+    "column": 6,
+    "type": "WHEN",
+    "text": "when"
+  },
+  {
+    "line": 33,
+    "column": 11,
+    "type": "QUOTED_STRING",
+    "text": "\"Client Is Due For MCV2\""
+  },
+  {
+    "line": 33,
+    "column": 36,
+    "type": "THEN",
+    "text": "then"
+  },
+  {
+    "line": 33,
+    "column": 41,
+    "type": "RECOMMEND_ACTIVITY",
+    "text": "recommend activity"
+  },
+  {
+    "line": 33,
+    "column": 60,
+    "type": "QUOTED_STRING",
+    "text": "\"Provide Measles Vaccine\""
+  },
+  {
+    "line": 33,
+    "column": 85,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 34,
+    "column": 2,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 34,
+    "column": 4,
+    "type": "END_WHEN",
+    "text": "end when"
+  },
+  {
+    "line": 35,
+    "column": 2,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 35,
+    "column": 4,
+    "type": "WHEN",
+    "text": "when"
+  },
+  {
+    "line": 35,
+    "column": 9,
+    "type": "QUOTED_STRING",
+    "text": "\"Two Primary Series Doses Administered\""
+  },
+  {
+    "line": 35,
+    "column": 49,
+    "type": "THEN",
+    "text": "then"
+  },
+  {
+    "line": 35,
+    "column": 54,
+    "type": "RECOMMEND_ACTIVITY",
+    "text": "recommend activity"
+  },
+  {
+    "line": 35,
+    "column": 73,
+    "type": "QUOTED_STRING",
+    "text": "\"Measles primary series is complete.\""
+  },
+  {
+    "line": 35,
+    "column": 110,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 36,
+    "column": 0,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 36,
+    "column": 2,
+    "type": "END_WHEN",
+    "text": "end when"
+  },
+  {
+    "line": 42,
+    "column": 0,
+    "type": "DECISION",
+    "text": "decision"
+  },
+  {
+    "line": 42,
+    "column": 9,
+    "type": "QUOTED_STRING",
+    "text": "\"IMMZ.D2.DT.Measles Ongoing Transmission\""
+  },
+  {
+    "line": 42,
+    "column": 50,
+    "type": "COLON",
+    "text": ":"
+  },
+  {
+    "line": 44,
+    "column": 0,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 44,
+    "column": 2,
+    "type": "WHEN",
+    "text": "when"
+  },
+  {
+    "line": 44,
+    "column": 7,
+    "type": "QUOTED_STRING",
+    "text": "\"Measles Routine Immunization Schedule Incomplete\""
+  },
+  {
+    "line": 44,
+    "column": 58,
+    "type": "THEN",
+    "text": "then"
+  },
+  {
+    "line": 44,
+    "column": 62,
+    "type": "COLON",
+    "text": ":"
+  },
+  {
+    "line": 45,
+    "column": 2,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 45,
+    "column": 4,
+    "type": "WHEN",
+    "text": "when"
+  },
+  {
+    "line": 45,
+    "column": 9,
+    "type": "QUOTED_STRING",
+    "text": "\"No Primary Series Doses Administered\""
+  },
+  {
+    "line": 45,
+    "column": 48,
+    "type": "THEN",
+    "text": "then"
+  },
+  {
+    "line": 45,
+    "column": 52,
+    "type": "COLON",
+    "text": ":"
+  },
+  {
+    "line": 46,
+    "column": 4,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 46,
+    "column": 6,
+    "type": "WHEN",
+    "text": "when"
+  },
+  {
+    "line": 46,
+    "column": 11,
+    "type": "QUOTED_STRING",
+    "text": "\"Client Age Less Than 9 Months\""
+  },
+  {
+    "line": 46,
+    "column": 43,
+    "type": "THEN",
+    "text": "then"
+  },
+  {
+    "line": 46,
+    "column": 48,
+    "type": "RECOMMEND_ACTIVITY",
+    "text": "recommend activity"
+  },
+  {
+    "line": 46,
+    "column": 68,
+    "type": "QUOTED_STRING",
+    "text": "\"Client Age Less Than 9 Months\""
+  },
+  {
+    "line": 46,
+    "column": 99,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 47,
+    "column": 4,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 47,
+    "column": 6,
+    "type": "WHEN",
+    "text": "when"
+  },
+  {
+    "line": 47,
+    "column": 11,
+    "type": "QUOTED_STRING",
+    "text": "\"Last Live Vaccine Administered Within 4 Weeks\""
+  },
+  {
+    "line": 47,
+    "column": 59,
+    "type": "THEN",
+    "text": "then"
+  },
+  {
+    "line": 47,
+    "column": 64,
+    "type": "RECOMMEND_ACTIVITY",
+    "text": "recommend activity"
+  },
+  {
+    "line": 47,
+    "column": 84,
+    "type": "QUOTED_STRING",
+    "text": "\"Last Live Vaccine Administered Within 4 Weeks_2\""
+  },
+  {
+    "line": 47,
+    "column": 133,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 48,
+    "column": 4,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 48,
+    "column": 6,
+    "type": "WHEN",
+    "text": "when"
+  },
+  {
+    "line": 48,
+    "column": 11,
+    "type": "QUOTED_STRING",
+    "text": "\"Client Is Due For MCV1\""
+  },
+  {
+    "line": 48,
+    "column": 36,
+    "type": "THEN",
+    "text": "then"
+  },
+  {
+    "line": 48,
+    "column": 41,
+    "type": "RECOMMEND_ACTIVITY",
+    "text": "recommend activity"
+  },
+  {
+    "line": 48,
+    "column": 61,
+    "type": "QUOTED_STRING",
+    "text": "\"Provide Measles Vaccine\""
+  },
+  {
+    "line": 48,
+    "column": 86,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 49,
+    "column": 2,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 49,
+    "column": 4,
+    "type": "END_WHEN",
+    "text": "end when"
+  },
+  {
+    "line": 50,
+    "column": 2,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 50,
+    "column": 4,
+    "type": "WHEN",
+    "text": "when"
+  },
+  {
+    "line": 50,
+    "column": 9,
+    "type": "QUOTED_STRING",
+    "text": "\"One Primary Series Dose Administered\""
+  },
+  {
+    "line": 50,
+    "column": 48,
+    "type": "THEN",
+    "text": "then"
+  },
+  {
+    "line": 50,
+    "column": 52,
+    "type": "COLON",
+    "text": ":"
+  },
+  {
+    "line": 51,
+    "column": 4,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 51,
+    "column": 6,
+    "type": "WHEN",
+    "text": "when"
+  },
+  {
+    "line": 51,
+    "column": 11,
+    "type": "QUOTED_STRING",
+    "text": "\"Client Age Less Than 15 Months\""
+  },
+  {
+    "line": 51,
+    "column": 44,
+    "type": "THEN",
+    "text": "then"
+  },
+  {
+    "line": 51,
+    "column": 49,
+    "type": "RECOMMEND_ACTIVITY",
+    "text": "recommend activity"
+  },
+  {
+    "line": 51,
+    "column": 68,
+    "type": "QUOTED_STRING",
+    "text": "\"Client Age Less Than 15 Months\""
+  },
+  {
+    "line": 51,
+    "column": 100,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 52,
+    "column": 4,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 52,
+    "column": 6,
+    "type": "WHEN",
+    "text": "when"
+  },
+  {
+    "line": 52,
+    "column": 11,
+    "type": "QUOTED_STRING",
+    "text": "\"Last Live Vaccine Administered Within 4 Weeks\""
+  },
+  {
+    "line": 52,
+    "column": 59,
+    "type": "THEN",
+    "text": "then"
+  },
+  {
+    "line": 52,
+    "column": 64,
+    "type": "RECOMMEND_ACTIVITY",
+    "text": "recommend activity"
+  },
+  {
+    "line": 52,
+    "column": 83,
+    "type": "QUOTED_STRING",
+    "text": "\"Last Live Vaccine Administered Within 4 Weeks_3\""
+  },
+  {
+    "line": 52,
+    "column": 132,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 53,
+    "column": 4,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 53,
+    "column": 6,
+    "type": "WHEN",
+    "text": "when"
+  },
+  {
+    "line": 53,
+    "column": 11,
+    "type": "QUOTED_STRING",
+    "text": "\"Client Is Due For MCV2\""
+  },
+  {
+    "line": 53,
+    "column": 36,
+    "type": "THEN",
+    "text": "then"
+  },
+  {
+    "line": 53,
+    "column": 41,
+    "type": "RECOMMEND_ACTIVITY",
+    "text": "recommend activity"
+  },
+  {
+    "line": 53,
+    "column": 60,
+    "type": "QUOTED_STRING",
+    "text": "\"Provide Measles Vaccine\""
+  },
+  {
+    "line": 53,
+    "column": 85,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 54,
+    "column": 2,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 54,
+    "column": 4,
+    "type": "END_WHEN",
+    "text": "end when"
+  },
+  {
+    "line": 55,
+    "column": 2,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 55,
+    "column": 4,
+    "type": "WHEN",
+    "text": "when"
+  },
+  {
+    "line": 55,
+    "column": 9,
+    "type": "QUOTED_STRING",
+    "text": "\"Two Primary Series Doses Administered\""
+  },
+  {
+    "line": 55,
+    "column": 49,
+    "type": "THEN",
+    "text": "then"
+  },
+  {
+    "line": 55,
+    "column": 54,
+    "type": "RECOMMEND_ACTIVITY",
+    "text": "recommend activity"
+  },
+  {
+    "line": 55,
+    "column": 73,
+    "type": "QUOTED_STRING",
+    "text": "\"Measles primary series is complete\""
+  },
+  {
+    "line": 55,
+    "column": 109,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 56,
+    "column": 0,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 56,
+    "column": 2,
+    "type": "END_WHEN",
+    "text": "end when"
+  },
+  {
+    "line": 62,
+    "column": 0,
+    "type": "DECISION",
+    "text": "decision"
+  },
+  {
+    "line": 62,
+    "column": 9,
+    "type": "QUOTED_STRING",
+    "text": "\"IMMZ.D2.DT.Measles Supplementary\""
+  },
+  {
+    "line": 62,
+    "column": 43,
+    "type": "COLON",
+    "text": ":"
+  },
+  {
+    "line": 64,
+    "column": 0,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 64,
+    "column": 2,
+    "type": "WHEN",
+    "text": "when"
+  },
+  {
+    "line": 64,
+    "column": 7,
+    "type": "QUOTED_STRING",
+    "text": "\"Measles Routine Immunization Schedule Complete\""
+  },
+  {
+    "line": 64,
+    "column": 56,
+    "type": "THEN",
+    "text": "then"
+  },
+  {
+    "line": 64,
+    "column": 60,
+    "type": "COLON",
+    "text": ":"
+  },
+  {
+    "line": 65,
+    "column": 2,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 65,
+    "column": 4,
+    "type": "WHEN",
+    "text": "when"
+  },
+  {
+    "line": 65,
+    "column": 9,
+    "type": "QUOTED_STRING",
+    "text": "\"No Supplementary Dose Administered\""
+  },
+  {
+    "line": 65,
+    "column": 46,
+    "type": "THEN",
+    "text": "then"
+  },
+  {
+    "line": 65,
+    "column": 50,
+    "type": "COLON",
+    "text": ":"
+  },
+  {
+    "line": 66,
+    "column": 4,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 66,
+    "column": 6,
+    "type": "WHEN",
+    "text": "when"
+  },
+  {
+    "line": 66,
+    "column": 11,
+    "type": "QUOTED_STRING",
+    "text": "\"Last Live Vaccine Administered Within 4 Weeks\""
+  },
+  {
+    "line": 66,
+    "column": 59,
+    "type": "THEN",
+    "text": "then"
+  },
+  {
+    "line": 66,
+    "column": 64,
+    "type": "RECOMMEND_ACTIVITY",
+    "text": "recommend activity"
+  },
+  {
+    "line": 66,
+    "column": 83,
+    "type": "QUOTED_STRING",
+    "text": "\"Last Live Vaccine Administered Within 4 Weeks_4\""
+  },
+  {
+    "line": 66,
+    "column": 132,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 67,
+    "column": 4,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 67,
+    "column": 6,
+    "type": "WHEN",
+    "text": "when"
+  },
+  {
+    "line": 67,
+    "column": 11,
+    "type": "QUOTED_STRING",
+    "text": "\"Client Is Due For Supplementary Dose\""
+  },
+  {
+    "line": 67,
+    "column": 50,
+    "type": "THEN",
+    "text": "then"
+  },
+  {
+    "line": 67,
+    "column": 55,
+    "type": "RECOMMEND_ACTIVITY",
+    "text": "recommend activity"
+  },
+  {
+    "line": 67,
+    "column": 74,
+    "type": "QUOTED_STRING",
+    "text": "\"Provide Measles Vaccine\""
+  },
+  {
+    "line": 67,
+    "column": 99,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 68,
+    "column": 2,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 68,
+    "column": 4,
+    "type": "END_WHEN",
+    "text": "end when"
+  },
+  {
+    "line": 69,
+    "column": 2,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 69,
+    "column": 4,
+    "type": "WHEN",
+    "text": "when"
+  },
+  {
+    "line": 69,
+    "column": 9,
+    "type": "QUOTED_STRING",
+    "text": "\"Supplementary Dose Administered\""
+  },
+  {
+    "line": 69,
+    "column": 43,
+    "type": "THEN",
+    "text": "then"
+  },
+  {
+    "line": 69,
+    "column": 48,
+    "type": "RECOMMEND_ACTIVITY",
+    "text": "recommend activity"
+  },
+  {
+    "line": 69,
+    "column": 67,
+    "type": "QUOTED_STRING",
+    "text": "\"Supplementary Dose Administered\""
+  },
+  {
+    "line": 69,
+    "column": 100,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 70,
+    "column": 0,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 70,
+    "column": 2,
+    "type": "END_WHEN",
+    "text": "end when"
+  },
+  {
+    "line": 76,
+    "column": 0,
+    "type": "DECISION",
+    "text": "decision"
+  },
+  {
+    "line": 76,
+    "column": 9,
+    "type": "QUOTED_STRING",
+    "text": "\"IMMZ.D5.DT.Measles.Contraindication\""
+  },
+  {
+    "line": 76,
+    "column": 46,
+    "type": "COLON",
+    "text": ":"
+  },
+  {
+    "line": 78,
+    "column": 0,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 78,
+    "column": 2,
+    "type": "WHEN",
+    "text": "when"
+  },
+  {
+    "line": 78,
+    "column": 7,
+    "type": "QUOTED_STRING",
+    "text": "\"MCV Dose Contraindicated\""
+  },
+  {
+    "line": 78,
+    "column": 34,
+    "type": "THEN",
+    "text": "then"
+  },
+  {
+    "line": 78,
+    "column": 39,
+    "type": "RECOMMEND_ACTIVITY",
+    "text": "recommend activity"
+  },
+  {
+    "line": 78,
+    "column": 58,
+    "type": "QUOTED_STRING",
+    "text": "\"Check Contraindication for Measles Immunization\""
+  },
+  {
+    "line": 78,
+    "column": 107,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 79,
+    "column": 0,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 79,
+    "column": 2,
+    "type": "WHEN",
+    "text": "when"
+  },
+  {
+    "line": 79,
+    "column": 7,
+    "type": "QUOTED_STRING",
+    "text": "\"Contraindication Evaluation of the MCV dose\""
+  },
+  {
+    "line": 79,
+    "column": 53,
+    "type": "THEN",
+    "text": "then"
+  },
+  {
+    "line": 79,
+    "column": 58,
+    "type": "RECOMMEND_ACTIVITY",
+    "text": "recommend activity"
+  },
+  {
+    "line": 79,
+    "column": 77,
+    "type": "QUOTED_STRING",
+    "text": "\"Evaluate Contraindication for Measles\""
+  },
+  {
+    "line": 79,
+    "column": 116,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 85,
+    "column": 0,
+    "type": "DECISION",
+    "text": "decision"
+  },
+  {
+    "line": 85,
+    "column": 9,
+    "type": "QUOTED_STRING",
+    "text": "\"IMMZ.DT.Immunization Strategy\""
+  },
+  {
+    "line": 85,
+    "column": 40,
+    "type": "COLON",
+    "text": ":"
+  },
+  {
+    "line": 89,
+    "column": 0,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 89,
+    "column": 2,
+    "type": "WHEN",
+    "text": "when"
+  },
+  {
+    "line": 89,
+    "column": 7,
+    "type": "QUOTED_STRING",
+    "text": "\"\""
+  },
+  {
+    "line": 89,
+    "column": 10,
+    "type": "THEN",
+    "text": "then"
+  },
+  {
+    "line": 89,
+    "column": 14,
+    "type": "COLON",
+    "text": ":"
+  },
+  {
+    "line": 95,
+    "column": 2,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 95,
+    "column": 4,
+    "type": "WHEN",
+    "text": "when"
+  },
+  {
+    "line": 95,
+    "column": 9,
+    "type": "QUOTED_STRING",
+    "text": "\"\""
+  },
+  {
+    "line": 95,
+    "column": 12,
+    "type": "THEN",
+    "text": "then"
+  },
+  {
+    "line": 95,
+    "column": 16,
+    "type": "COLON",
+    "text": ":"
+  },
+  {
+    "line": 96,
+    "column": 4,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 96,
+    "column": 6,
+    "type": "USE_DECISION",
+    "text": "use decision"
+  },
+  {
+    "line": 96,
+    "column": 19,
+    "type": "QUOTED_STRING",
+    "text": "\"IMMZ.D2.DT.Measles MCV Dose 0\""
+  },
+  {
+    "line": 96,
+    "column": 50,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 97,
+    "column": 4,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 97,
+    "column": 6,
+    "type": "USE_DECISION",
+    "text": "use decision"
+  },
+  {
+    "line": 97,
+    "column": 19,
+    "type": "QUOTED_STRING",
+    "text": "\"IMMZ.D2.DT.Measles Ongoing Transmission\""
+  },
+  {
+    "line": 97,
+    "column": 60,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 98,
+    "column": 4,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 98,
+    "column": 6,
+    "type": "USE_DECISION",
+    "text": "use decision"
+  },
+  {
+    "line": 98,
+    "column": 19,
+    "type": "QUOTED_STRING",
+    "text": "\"IMMZ.D2.DT.Measles Supplementary\""
+  },
+  {
+    "line": 98,
+    "column": 53,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 99,
+    "column": 4,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 99,
+    "column": 6,
+    "type": "USE_DECISION",
+    "text": "use decision"
+  },
+  {
+    "line": 99,
+    "column": 19,
+    "type": "QUOTED_STRING",
+    "text": "\"IMMZ.D5.DT.Measles.Contraindication\""
+  },
+  {
+    "line": 99,
+    "column": 56,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 100,
+    "column": 2,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 100,
+    "column": 4,
+    "type": "END_WHEN",
+    "text": "end when"
+  },
+  {
+    "line": 101,
+    "column": 0,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 101,
+    "column": 2,
+    "type": "END_WHEN",
+    "text": "end when"
+  },
+  {
+    "line": 103,
+    "column": 0,
+    "type": "ACTIVITY",
+    "text": "activity"
+  },
+  {
+    "line": 103,
+    "column": 9,
+    "type": "QUOTED_STRING",
+    "text": "\"Client Age Less Than 6 Months\""
+  },
+  {
+    "line": 104,
+    "column": 4,
+    "type": "REQUEST",
+    "text": "request"
+  },
+  {
+    "line": 104,
+    "column": 12,
+    "type": "ACTIVITY_TYPE",
+    "text": "CPGCommunicationRequest"
+  },
+  {
+    "line": 105,
+    "column": 4,
+    "type": "WITH",
+    "text": "with"
+  },
+  {
+    "line": 105,
+    "column": 9,
+    "type": "BACKTICK_STRING",
+    "text": "`Should not vaccinate client for MCV0 as client is less than 6 months. Check for any vaccines due, and inform the caregiver of when to come back for MCV0.`"
+  },
+  {
+    "line": 105,
+    "column": 164,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 107,
+    "column": 0,
+    "type": "ACTIVITY",
+    "text": "activity"
+  },
+  {
+    "line": 107,
+    "column": 9,
+    "type": "QUOTED_STRING",
+    "text": "\"Last Live Vaccine Administered Within 4 Weeks\""
+  },
+  {
+    "line": 108,
+    "column": 4,
+    "type": "REQUEST",
+    "text": "request"
+  },
+  {
+    "line": 108,
+    "column": 12,
+    "type": "ACTIVITY_TYPE",
+    "text": "CPGCommunicationRequest"
+  },
+  {
+    "line": 109,
+    "column": 4,
+    "type": "WITH",
+    "text": "with"
+  },
+  {
+    "line": 109,
+    "column": 9,
+    "type": "BACKTICK_STRING",
+    "text": "`Should not vaccinate client for MCV0 as live vaccine was administered in the last 4 weeks. Check for any vaccines due, and inform the caregiver of when to come back for MCV0.`"
+  },
+  {
+    "line": 109,
+    "column": 185,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 111,
+    "column": 0,
+    "type": "ACTIVITY",
+    "text": "activity"
+  },
+  {
+    "line": 111,
+    "column": 9,
+    "type": "QUOTED_STRING",
+    "text": "\"Provide Measles Vaccine\""
+  },
+  {
+    "line": 111,
+    "column": 35,
+    "type": "REQUEST",
+    "text": "request"
+  },
+  {
+    "line": 111,
+    "column": 43,
+    "type": "ACTIVITY_TYPE",
+    "text": "CPGMedicationRequest"
+  },
+  {
+    "line": 111,
+    "column": 64,
+    "type": "WITH",
+    "text": "with"
+  },
+  {
+    "line": 111,
+    "column": 69,
+    "type": "QUOTED_STRING",
+    "text": "\"Measles vaccines\""
+  },
+  {
+    "line": 111,
+    "column": 87,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 113,
+    "column": 0,
+    "type": "ACTIVITY",
+    "text": "activity"
+  },
+  {
+    "line": 113,
+    "column": 9,
+    "type": "QUOTED_STRING",
+    "text": "\"MCV0 Dose Administered\""
+  },
+  {
+    "line": 114,
+    "column": 4,
+    "type": "REQUEST",
+    "text": "request"
+  },
+  {
+    "line": 114,
+    "column": 12,
+    "type": "ACTIVITY_TYPE",
+    "text": "CPGCommunicationRequest"
+  },
+  {
+    "line": 115,
+    "column": 4,
+    "type": "WITH",
+    "text": "with"
+  },
+  {
+    "line": 115,
+    "column": 9,
+    "type": "BACKTICK_STRING",
+    "text": "`MCV0 was administered. Check measles routine immunization schedule.`"
+  },
+  {
+    "line": 115,
+    "column": 78,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 117,
+    "column": 0,
+    "type": "ACTIVITY",
+    "text": "activity"
+  },
+  {
+    "line": 117,
+    "column": 9,
+    "type": "QUOTED_STRING",
+    "text": "\"Client Age Less Than 12 Months\""
+  },
+  {
+    "line": 118,
+    "column": 4,
+    "type": "REQUEST",
+    "text": "request"
+  },
+  {
+    "line": 118,
+    "column": 12,
+    "type": "ACTIVITY_TYPE",
+    "text": "CPGCommunicationRequest"
+  },
+  {
+    "line": 119,
+    "column": 4,
+    "type": "WITH",
+    "text": "with"
+  },
+  {
+    "line": 119,
+    "column": 9,
+    "type": "BACKTICK_STRING",
+    "text": "`Should not vaccinate client as client's age is less than 12 months. Check for any vaccines due, and inform the caregiver of when to come back for MCV1.`"
+  },
+  {
+    "line": 119,
+    "column": 162,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 121,
+    "column": 0,
+    "type": "ACTIVITY",
+    "text": "activity"
+  },
+  {
+    "line": 121,
+    "column": 9,
+    "type": "QUOTED_STRING",
+    "text": "\"Last Live Vaccine Administered Within 4 Weeks_2\""
+  },
+  {
+    "line": 122,
+    "column": 4,
+    "type": "REQUEST",
+    "text": "request"
+  },
+  {
+    "line": 122,
+    "column": 12,
+    "type": "ACTIVITY_TYPE",
+    "text": "CPGCommunicationRequest"
+  },
+  {
+    "line": 123,
+    "column": 4,
+    "type": "WITH",
+    "text": "with"
+  },
+  {
+    "line": 123,
+    "column": 9,
+    "type": "BACKTICK_STRING",
+    "text": "`Should not vaccinate client for MCV1 as live vaccine was administered in the last 4 weeks. Check for any vaccines due and inform the caregiver of when to come back for MCV1.`"
+  },
+  {
+    "line": 123,
+    "column": 184,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 125,
+    "column": 0,
+    "type": "ACTIVITY",
+    "text": "activity"
+  },
+  {
+    "line": 125,
+    "column": 9,
+    "type": "QUOTED_STRING",
+    "text": "\"Client Age Less Than 15 Months\""
+  },
+  {
+    "line": 126,
+    "column": 4,
+    "type": "REQUEST",
+    "text": "request"
+  },
+  {
+    "line": 126,
+    "column": 12,
+    "type": "ACTIVITY_TYPE",
+    "text": "CPGCommunicationRequest"
+  },
+  {
+    "line": 127,
+    "column": 4,
+    "type": "WITH",
+    "text": "with"
+  },
+  {
+    "line": 127,
+    "column": 9,
+    "type": "BACKTICK_STRING",
+    "text": "`Should not vaccinate client for MCV2 as client's age is less than 15 months. Check for any vaccines due, and inform the caregiver of when to come back for MCV2.`"
+  },
+  {
+    "line": 127,
+    "column": 171,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 129,
+    "column": 0,
+    "type": "ACTIVITY",
+    "text": "activity"
+  },
+  {
+    "line": 129,
+    "column": 9,
+    "type": "QUOTED_STRING",
+    "text": "\"Last Live Vaccine Administered Within 4 Weeks_3\""
+  },
+  {
+    "line": 130,
+    "column": 4,
+    "type": "REQUEST",
+    "text": "request"
+  },
+  {
+    "line": 130,
+    "column": 12,
+    "type": "ACTIVITY_TYPE",
+    "text": "CPGCommunicationRequest"
+  },
+  {
+    "line": 131,
+    "column": 4,
+    "type": "WITH",
+    "text": "with"
+  },
+  {
+    "line": 131,
+    "column": 9,
+    "type": "BACKTICK_STRING",
+    "text": "`Should not vaccinate client for MCV2 as live vaccine was administered in the last 4 weeks. Check for any vaccines due, and inform the caregiver of when to come back for MCV2.`"
+  },
+  {
+    "line": 131,
+    "column": 185,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 133,
+    "column": 0,
+    "type": "ACTIVITY",
+    "text": "activity"
+  },
+  {
+    "line": 133,
+    "column": 9,
+    "type": "QUOTED_STRING",
+    "text": "\"Measles primary series is complete.\""
+  },
+  {
+    "line": 134,
+    "column": 4,
+    "type": "REQUEST",
+    "text": "request"
+  },
+  {
+    "line": 134,
+    "column": 12,
+    "type": "ACTIVITY_TYPE",
+    "text": "CPGCommunicationRequest"
+  },
+  {
+    "line": 135,
+    "column": 4,
+    "type": "WITH",
+    "text": "with"
+  },
+  {
+    "line": 135,
+    "column": 9,
+    "type": "BACKTICK_STRING",
+    "text": "`Measles primary series is complete. Two measles primary series doses were administered. Check if a measles supplementary dose is appropriate for the client.`"
+  },
+  {
+    "line": 136,
+    "column": 4,
+    "type": "BECAUSE",
+    "text": "because"
+  },
+  {
+    "line": 136,
+    "column": 12,
+    "type": "BACKTICK_STRING",
+    "text": "`An additional dose of MCV should be administered to HIV-infected children receiving HAART following immune reconstitution. If CD4+ T lymphocyte counts are monitored, an additional dose of MCV should be administered when immune reconstitution has been achieved, e.g. when the CD4+ T lymphocyte count reaches 20–25%. Where CD4+ T lymphocyte monitoring is not available, children should receive an additional dose of MCV 6–12 months after initiation of HAART.`"
+  },
+  {
+    "line": 136,
+    "column": 470,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 138,
+    "column": 0,
+    "type": "ACTIVITY",
+    "text": "activity"
+  },
+  {
+    "line": 138,
+    "column": 9,
+    "type": "QUOTED_STRING",
+    "text": "\"Client Age Less Than 9 Months\""
+  },
+  {
+    "line": 139,
+    "column": 4,
+    "type": "REQUEST",
+    "text": "request"
+  },
+  {
+    "line": 139,
+    "column": 12,
+    "type": "ACTIVITY_TYPE",
+    "text": "CPGCommunicationRequest"
+  },
+  {
+    "line": 140,
+    "column": 4,
+    "type": "WITH",
+    "text": "with"
+  },
+  {
+    "line": 140,
+    "column": 9,
+    "type": "BACKTICK_STRING",
+    "text": "`Should not vaccinate client as client's age is less than 9 months. Check for any vaccines due, and inform the caregiver of when to come back for MCV1.`"
+  },
+  {
+    "line": 140,
+    "column": 161,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 142,
+    "column": 0,
+    "type": "ACTIVITY",
+    "text": "activity"
+  },
+  {
+    "line": 142,
+    "column": 9,
+    "type": "QUOTED_STRING",
+    "text": "\"Measles primary series is complete\""
+  },
+  {
+    "line": 143,
+    "column": 4,
+    "type": "REQUEST",
+    "text": "request"
+  },
+  {
+    "line": 143,
+    "column": 12,
+    "type": "ACTIVITY_TYPE",
+    "text": "CPGCommunicationRequest"
+  },
+  {
+    "line": 144,
+    "column": 4,
+    "type": "WITH",
+    "text": "with"
+  },
+  {
+    "line": 144,
+    "column": 9,
+    "type": "BACKTICK_STRING",
+    "text": "`Measles primary series is complete. Two measles primary series doses were administered. Check if a measles supplementary dose is appropriate for the client.`"
+  },
+  {
+    "line": 145,
+    "column": 4,
+    "type": "BECAUSE",
+    "text": "because"
+  },
+  {
+    "line": 145,
+    "column": 12,
+    "type": "BACKTICK_STRING",
+    "text": "`An additional dose of MCV should be administered to HIV-infected children receiving HAART following immune reconstitution. If CD4+ T lymphocyte counts are monitored, an additional dose of MCV should be administered when immune reconstitution has been achieved, e.g. when the CD4+ T lymphocyte count reaches 20–25%. Where CD4+ T lymphocyte monitoring is not available, children should receive an additional dose of MCV 6–12 months after initiation of HAART.`"
+  },
+  {
+    "line": 145,
+    "column": 470,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 147,
+    "column": 0,
+    "type": "ACTIVITY",
+    "text": "activity"
+  },
+  {
+    "line": 147,
+    "column": 9,
+    "type": "QUOTED_STRING",
+    "text": "\"Last Live Vaccine Administered Within 4 Weeks_4\""
+  },
+  {
+    "line": 148,
+    "column": 4,
+    "type": "REQUEST",
+    "text": "request"
+  },
+  {
+    "line": 148,
+    "column": 12,
+    "type": "ACTIVITY_TYPE",
+    "text": "CPGCommunicationRequest"
+  },
+  {
+    "line": 149,
+    "column": 4,
+    "type": "WITH",
+    "text": "with"
+  },
+  {
+    "line": 149,
+    "column": 9,
+    "type": "BACKTICK_STRING",
+    "text": "`Should not vaccinate client for measles supplementary dose as live vaccine was administered in the last 4 weeks. Check for any vaccines due, and inform the caregiver of when to come back for supplementary dose.`"
+  },
+  {
+    "line": 149,
+    "column": 221,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 151,
+    "column": 0,
+    "type": "ACTIVITY",
+    "text": "activity"
+  },
+  {
+    "line": 151,
+    "column": 9,
+    "type": "QUOTED_STRING",
+    "text": "\"Supplementary Dose Administered\""
+  },
+  {
+    "line": 152,
+    "column": 4,
+    "type": "REQUEST",
+    "text": "request"
+  },
+  {
+    "line": 152,
+    "column": 12,
+    "type": "ACTIVITY_TYPE",
+    "text": "CPGCommunicationRequest"
+  },
+  {
+    "line": 153,
+    "column": 4,
+    "type": "WITH",
+    "text": "with"
+  },
+  {
+    "line": 153,
+    "column": 9,
+    "type": "BACKTICK_STRING",
+    "text": "`Measles immunization schedule is complete. Measles supplementary dose was administered.`"
+  },
+  {
+    "line": 153,
+    "column": 98,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 155,
+    "column": 0,
+    "type": "ACTIVITY",
+    "text": "activity"
+  },
+  {
+    "line": 155,
+    "column": 9,
+    "type": "QUOTED_STRING",
+    "text": "\"Check Contraindication for Measles Immunization\""
+  },
+  {
+    "line": 156,
+    "column": 4,
+    "type": "REQUEST",
+    "text": "request"
+  },
+  {
+    "line": 156,
+    "column": 12,
+    "type": "ACTIVITY_TYPE",
+    "text": "CPGMedicationRequest"
+  },
+  {
+    "line": 156,
+    "column": 33,
+    "type": "WITH",
+    "text": "with"
+  },
+  {
+    "line": 156,
+    "column": 38,
+    "type": "QUOTED_STRING",
+    "text": "\"Measles vaccines\""
+  },
+  {
+    "line": 157,
+    "column": 4,
+    "type": "BECAUSE",
+    "text": "because"
+  },
+  {
+    "line": 157,
+    "column": 12,
+    "type": "BACKTICK_STRING",
+    "text": "`While vaccines are universally recommended, some clients may have contraindications to particular vaccines.<br/>Additional contraindications may be included in WHO position papers for the vaccine - Measles vaccines: WHO position paper (April 2017).`"
+  },
+  {
+    "line": 157,
+    "column": 262,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 159,
+    "column": 0,
+    "type": "ACTIVITY",
+    "text": "activity"
+  },
+  {
+    "line": 159,
+    "column": 9,
+    "type": "QUOTED_STRING",
+    "text": "\"Evaluate Contraindication for Measles\""
+  },
+  {
+    "line": 160,
+    "column": 4,
+    "type": "REQUEST",
+    "text": "request"
+  },
+  {
+    "line": 160,
+    "column": 12,
+    "type": "ACTIVITY_TYPE",
+    "text": "CPGServiceRequest"
+  },
+  {
+    "line": 160,
+    "column": 30,
+    "type": "WITH",
+    "text": "with"
+  },
+  {
+    "line": 160,
+    "column": 35,
+    "type": "QUOTED_STRING",
+    "text": "\"Measles Code\""
+  },
+  {
+    "line": 161,
+    "column": 4,
+    "type": "BECAUSE",
+    "text": "because"
+  },
+  {
+    "line": 161,
+    "column": 12,
+    "type": "BACKTICK_STRING",
+    "text": "`While vaccines are universally recommended, some clients may have contraindications to particular vaccines.<br/>Additional contraindications may be included in WHO position papers for the vaccine - Measles vaccines: WHO position paper (April 2017).`"
+  },
+  {
+    "line": 161,
+    "column": 262,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 163,
+    "column": 0,
+    "type": "CONCEPT",
+    "text": "concept"
+  },
+  {
+    "line": 163,
+    "column": 8,
+    "type": "QUOTED_STRING",
+    "text": "\"Measles Routine Immunization Schedule Incomplete\""
+  },
+  {
+    "line": 163,
+    "column": 58,
+    "type": "COLON",
+    "text": ":"
+  },
+  {
+    "line": 165,
+    "column": 0,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 165,
+    "column": 2,
+    "type": "TYPE_IS",
+    "text": "type is"
+  },
+  {
+    "line": 165,
+    "column": 10,
+    "type": "CONCEPT_TYPE",
+    "text": "Observation"
+  },
+  {
+    "line": 165,
+    "column": 21,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 166,
+    "column": 0,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 166,
+    "column": 2,
+    "type": "VALUETYPE_IS",
+    "text": "valuetype is"
+  },
+  {
+    "line": 166,
+    "column": 15,
+    "type": "CONCEPT_VALUE_TYPE",
+    "text": "boolean"
+  },
+  {
+    "line": 166,
+    "column": 22,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 167,
+    "column": 0,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 167,
+    "column": 2,
+    "type": "CODED_FROM",
+    "text": "coded from"
+  },
+  {
+    "line": 167,
+    "column": 13,
+    "type": "QUOTED_STRING",
+    "text": "\"Measles Routine Immunization Schedule Incomplete\""
+  },
+  {
+    "line": 167,
+    "column": 63,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 169,
+    "column": 0,
+    "type": "CONCEPT",
+    "text": "concept"
+  },
+  {
+    "line": 169,
+    "column": 8,
+    "type": "QUOTED_STRING",
+    "text": "\"No MCV0 Doses Administered\""
+  },
+  {
+    "line": 169,
+    "column": 36,
+    "type": "COLON",
+    "text": ":"
+  },
+  {
+    "line": 171,
+    "column": 0,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 171,
+    "column": 2,
+    "type": "TYPE_IS",
+    "text": "type is"
+  },
+  {
+    "line": 171,
+    "column": 10,
+    "type": "CONCEPT_TYPE",
+    "text": "Observation"
+  },
+  {
+    "line": 171,
+    "column": 21,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 172,
+    "column": 0,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 172,
+    "column": 2,
+    "type": "VALUETYPE_IS",
+    "text": "valuetype is"
+  },
+  {
+    "line": 172,
+    "column": 15,
+    "type": "CONCEPT_VALUE_TYPE",
+    "text": "boolean"
+  },
+  {
+    "line": 172,
+    "column": 22,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 173,
+    "column": 0,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 173,
+    "column": 2,
+    "type": "CODED_FROM",
+    "text": "coded from"
+  },
+  {
+    "line": 173,
+    "column": 13,
+    "type": "QUOTED_STRING",
+    "text": "\"No MCV0 Doses Administered\""
+  },
+  {
+    "line": 173,
+    "column": 41,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 175,
+    "column": 0,
+    "type": "CONCEPT",
+    "text": "concept"
+  },
+  {
+    "line": 175,
+    "column": 8,
+    "type": "QUOTED_STRING",
+    "text": "\"Client Age Less Than 6 Months\""
+  },
+  {
+    "line": 175,
+    "column": 39,
+    "type": "COLON",
+    "text": ":"
+  },
+  {
+    "line": 177,
+    "column": 0,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 177,
+    "column": 2,
+    "type": "TYPE_IS",
+    "text": "type is"
+  },
+  {
+    "line": 177,
+    "column": 10,
+    "type": "CONCEPT_TYPE",
+    "text": "Observation"
+  },
+  {
+    "line": 177,
+    "column": 21,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 178,
+    "column": 0,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 178,
+    "column": 2,
+    "type": "VALUETYPE_IS",
+    "text": "valuetype is"
+  },
+  {
+    "line": 178,
+    "column": 15,
+    "type": "CONCEPT_VALUE_TYPE",
+    "text": "boolean"
+  },
+  {
+    "line": 178,
+    "column": 22,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 179,
+    "column": 0,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 179,
+    "column": 2,
+    "type": "CODED_FROM",
+    "text": "coded from"
+  },
+  {
+    "line": 179,
+    "column": 13,
+    "type": "QUOTED_STRING",
+    "text": "\"Client Age Less Than 6 Months\""
+  },
+  {
+    "line": 179,
+    "column": 44,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 181,
+    "column": 0,
+    "type": "CONCEPT",
+    "text": "concept"
+  },
+  {
+    "line": 181,
+    "column": 8,
+    "type": "QUOTED_STRING",
+    "text": "\"Last Live Vaccine Administered Within 4 Weeks\""
+  },
+  {
+    "line": 181,
+    "column": 55,
+    "type": "COLON",
+    "text": ":"
+  },
+  {
+    "line": 183,
+    "column": 0,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 183,
+    "column": 2,
+    "type": "TYPE_IS",
+    "text": "type is"
+  },
+  {
+    "line": 183,
+    "column": 10,
+    "type": "CONCEPT_TYPE",
+    "text": "Observation"
+  },
+  {
+    "line": 183,
+    "column": 21,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 184,
+    "column": 0,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 184,
+    "column": 2,
+    "type": "VALUETYPE_IS",
+    "text": "valuetype is"
+  },
+  {
+    "line": 184,
+    "column": 15,
+    "type": "CONCEPT_VALUE_TYPE",
+    "text": "boolean"
+  },
+  {
+    "line": 184,
+    "column": 22,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 185,
+    "column": 0,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 185,
+    "column": 2,
+    "type": "CODED_FROM",
+    "text": "coded from"
+  },
+  {
+    "line": 185,
+    "column": 13,
+    "type": "QUOTED_STRING",
+    "text": "\"Last Live Vaccine Administered Within 4 Weeks\""
+  },
+  {
+    "line": 185,
+    "column": 60,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 187,
+    "column": 0,
+    "type": "CONCEPT",
+    "text": "concept"
+  },
+  {
+    "line": 187,
+    "column": 8,
+    "type": "QUOTED_STRING",
+    "text": "\"Client Is Due For MCV0\""
+  },
+  {
+    "line": 187,
+    "column": 32,
+    "type": "COLON",
+    "text": ":"
+  },
+  {
+    "line": 189,
+    "column": 0,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 189,
+    "column": 2,
+    "type": "TYPE_IS",
+    "text": "type is"
+  },
+  {
+    "line": 189,
+    "column": 10,
+    "type": "CONCEPT_TYPE",
+    "text": "Observation"
+  },
+  {
+    "line": 189,
+    "column": 21,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 190,
+    "column": 0,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 190,
+    "column": 2,
+    "type": "VALUETYPE_IS",
+    "text": "valuetype is"
+  },
+  {
+    "line": 190,
+    "column": 15,
+    "type": "CONCEPT_VALUE_TYPE",
+    "text": "boolean"
+  },
+  {
+    "line": 190,
+    "column": 22,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 191,
+    "column": 0,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 191,
+    "column": 2,
+    "type": "CODED_FROM",
+    "text": "coded from"
+  },
+  {
+    "line": 191,
+    "column": 13,
+    "type": "QUOTED_STRING",
+    "text": "\"Client Is Due For MCV0\""
+  },
+  {
+    "line": 191,
+    "column": 37,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 193,
+    "column": 0,
+    "type": "CONCEPT",
+    "text": "concept"
+  },
+  {
+    "line": 193,
+    "column": 8,
+    "type": "QUOTED_STRING",
+    "text": "\"MCV0 Dose Administered\""
+  },
+  {
+    "line": 193,
+    "column": 32,
+    "type": "COLON",
+    "text": ":"
+  },
+  {
+    "line": 195,
+    "column": 0,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 195,
+    "column": 2,
+    "type": "TYPE_IS",
+    "text": "type is"
+  },
+  {
+    "line": 195,
+    "column": 10,
+    "type": "CONCEPT_TYPE",
+    "text": "Observation"
+  },
+  {
+    "line": 195,
+    "column": 21,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 196,
+    "column": 0,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 196,
+    "column": 2,
+    "type": "VALUETYPE_IS",
+    "text": "valuetype is"
+  },
+  {
+    "line": 196,
+    "column": 15,
+    "type": "CONCEPT_VALUE_TYPE",
+    "text": "boolean"
+  },
+  {
+    "line": 196,
+    "column": 22,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 197,
+    "column": 0,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 197,
+    "column": 2,
+    "type": "CODED_FROM",
+    "text": "coded from"
+  },
+  {
+    "line": 197,
+    "column": 13,
+    "type": "QUOTED_STRING",
+    "text": "\"MCV0 Dose Administered\""
+  },
+  {
+    "line": 197,
+    "column": 37,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 199,
+    "column": 0,
+    "type": "CONCEPT",
+    "text": "concept"
+  },
+  {
+    "line": 199,
+    "column": 8,
+    "type": "QUOTED_STRING",
+    "text": "\"No Primary Series Doses Administered\""
+  },
+  {
+    "line": 199,
+    "column": 46,
+    "type": "COLON",
+    "text": ":"
+  },
+  {
+    "line": 201,
+    "column": 0,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 201,
+    "column": 2,
+    "type": "TYPE_IS",
+    "text": "type is"
+  },
+  {
+    "line": 201,
+    "column": 10,
+    "type": "CONCEPT_TYPE",
+    "text": "Observation"
+  },
+  {
+    "line": 201,
+    "column": 21,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 202,
+    "column": 0,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 202,
+    "column": 2,
+    "type": "VALUETYPE_IS",
+    "text": "valuetype is"
+  },
+  {
+    "line": 202,
+    "column": 15,
+    "type": "CONCEPT_VALUE_TYPE",
+    "text": "boolean"
+  },
+  {
+    "line": 202,
+    "column": 22,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 203,
+    "column": 0,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 203,
+    "column": 2,
+    "type": "CODED_FROM",
+    "text": "coded from"
+  },
+  {
+    "line": 203,
+    "column": 13,
+    "type": "QUOTED_STRING",
+    "text": "\"No Primary Series Doses Administered\""
+  },
+  {
+    "line": 203,
+    "column": 51,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 205,
+    "column": 0,
+    "type": "CONCEPT",
+    "text": "concept"
+  },
+  {
+    "line": 205,
+    "column": 8,
+    "type": "QUOTED_STRING",
+    "text": "\"Client Age Less Than 12 Months\""
+  },
+  {
+    "line": 205,
+    "column": 40,
+    "type": "COLON",
+    "text": ":"
+  },
+  {
+    "line": 207,
+    "column": 0,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 207,
+    "column": 2,
+    "type": "TYPE_IS",
+    "text": "type is"
+  },
+  {
+    "line": 207,
+    "column": 10,
+    "type": "CONCEPT_TYPE",
+    "text": "Observation"
+  },
+  {
+    "line": 207,
+    "column": 21,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 208,
+    "column": 0,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 208,
+    "column": 2,
+    "type": "VALUETYPE_IS",
+    "text": "valuetype is"
+  },
+  {
+    "line": 208,
+    "column": 15,
+    "type": "CONCEPT_VALUE_TYPE",
+    "text": "boolean"
+  },
+  {
+    "line": 208,
+    "column": 22,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 209,
+    "column": 0,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 209,
+    "column": 2,
+    "type": "CODED_FROM",
+    "text": "coded from"
+  },
+  {
+    "line": 209,
+    "column": 13,
+    "type": "QUOTED_STRING",
+    "text": "\"Client Age Less Than 12 Months\""
+  },
+  {
+    "line": 209,
+    "column": 45,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 211,
+    "column": 0,
+    "type": "CONCEPT",
+    "text": "concept"
+  },
+  {
+    "line": 211,
+    "column": 8,
+    "type": "QUOTED_STRING",
+    "text": "\"Client Is Due For MCV1\""
+  },
+  {
+    "line": 211,
+    "column": 32,
+    "type": "COLON",
+    "text": ":"
+  },
+  {
+    "line": 213,
+    "column": 0,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 213,
+    "column": 2,
+    "type": "TYPE_IS",
+    "text": "type is"
+  },
+  {
+    "line": 213,
+    "column": 10,
+    "type": "CONCEPT_TYPE",
+    "text": "Observation"
+  },
+  {
+    "line": 213,
+    "column": 21,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 214,
+    "column": 0,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 214,
+    "column": 2,
+    "type": "VALUETYPE_IS",
+    "text": "valuetype is"
+  },
+  {
+    "line": 214,
+    "column": 15,
+    "type": "CONCEPT_VALUE_TYPE",
+    "text": "boolean"
+  },
+  {
+    "line": 214,
+    "column": 22,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 215,
+    "column": 0,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 215,
+    "column": 2,
+    "type": "CODED_FROM",
+    "text": "coded from"
+  },
+  {
+    "line": 215,
+    "column": 13,
+    "type": "QUOTED_STRING",
+    "text": "\"Client Is Due For MCV1\""
+  },
+  {
+    "line": 215,
+    "column": 37,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 217,
+    "column": 0,
+    "type": "CONCEPT",
+    "text": "concept"
+  },
+  {
+    "line": 217,
+    "column": 8,
+    "type": "QUOTED_STRING",
+    "text": "\"One Primary Series Dose Administered\""
+  },
+  {
+    "line": 217,
+    "column": 46,
+    "type": "COLON",
+    "text": ":"
+  },
+  {
+    "line": 219,
+    "column": 0,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 219,
+    "column": 2,
+    "type": "TYPE_IS",
+    "text": "type is"
+  },
+  {
+    "line": 219,
+    "column": 10,
+    "type": "CONCEPT_TYPE",
+    "text": "Observation"
+  },
+  {
+    "line": 219,
+    "column": 21,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 220,
+    "column": 0,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 220,
+    "column": 2,
+    "type": "VALUETYPE_IS",
+    "text": "valuetype is"
+  },
+  {
+    "line": 220,
+    "column": 15,
+    "type": "CONCEPT_VALUE_TYPE",
+    "text": "boolean"
+  },
+  {
+    "line": 220,
+    "column": 22,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 221,
+    "column": 0,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 221,
+    "column": 2,
+    "type": "CODED_FROM",
+    "text": "coded from"
+  },
+  {
+    "line": 221,
+    "column": 13,
+    "type": "QUOTED_STRING",
+    "text": "\"One Primary Series Dose Administered\""
+  },
+  {
+    "line": 221,
+    "column": 51,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 223,
+    "column": 0,
+    "type": "CONCEPT",
+    "text": "concept"
+  },
+  {
+    "line": 223,
+    "column": 8,
+    "type": "QUOTED_STRING",
+    "text": "\"Client Age Less Than 15 Months\""
+  },
+  {
+    "line": 223,
+    "column": 40,
+    "type": "COLON",
+    "text": ":"
+  },
+  {
+    "line": 225,
+    "column": 0,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 225,
+    "column": 2,
+    "type": "TYPE_IS",
+    "text": "type is"
+  },
+  {
+    "line": 225,
+    "column": 10,
+    "type": "CONCEPT_TYPE",
+    "text": "Observation"
+  },
+  {
+    "line": 225,
+    "column": 21,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 226,
+    "column": 0,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 226,
+    "column": 2,
+    "type": "VALUETYPE_IS",
+    "text": "valuetype is"
+  },
+  {
+    "line": 226,
+    "column": 15,
+    "type": "CONCEPT_VALUE_TYPE",
+    "text": "boolean"
+  },
+  {
+    "line": 226,
+    "column": 22,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 227,
+    "column": 0,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 227,
+    "column": 2,
+    "type": "CODED_FROM",
+    "text": "coded from"
+  },
+  {
+    "line": 227,
+    "column": 13,
+    "type": "QUOTED_STRING",
+    "text": "\"Client Age Less Than 15 Months\""
+  },
+  {
+    "line": 227,
+    "column": 45,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 229,
+    "column": 0,
+    "type": "CONCEPT",
+    "text": "concept"
+  },
+  {
+    "line": 229,
+    "column": 8,
+    "type": "QUOTED_STRING",
+    "text": "\"Client Is Due For MCV2\""
+  },
+  {
+    "line": 229,
+    "column": 32,
+    "type": "COLON",
+    "text": ":"
+  },
+  {
+    "line": 231,
+    "column": 0,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 231,
+    "column": 2,
+    "type": "TYPE_IS",
+    "text": "type is"
+  },
+  {
+    "line": 231,
+    "column": 10,
+    "type": "CONCEPT_TYPE",
+    "text": "Observation"
+  },
+  {
+    "line": 231,
+    "column": 21,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 232,
+    "column": 0,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 232,
+    "column": 2,
+    "type": "VALUETYPE_IS",
+    "text": "valuetype is"
+  },
+  {
+    "line": 232,
+    "column": 15,
+    "type": "CONCEPT_VALUE_TYPE",
+    "text": "boolean"
+  },
+  {
+    "line": 232,
+    "column": 22,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 233,
+    "column": 0,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 233,
+    "column": 2,
+    "type": "CODED_FROM",
+    "text": "coded from"
+  },
+  {
+    "line": 233,
+    "column": 13,
+    "type": "QUOTED_STRING",
+    "text": "\"Client Is Due For MCV2\""
+  },
+  {
+    "line": 233,
+    "column": 37,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 235,
+    "column": 0,
+    "type": "CONCEPT",
+    "text": "concept"
+  },
+  {
+    "line": 235,
+    "column": 8,
+    "type": "QUOTED_STRING",
+    "text": "\"Two Primary Series Doses Administered\""
+  },
+  {
+    "line": 235,
+    "column": 47,
+    "type": "COLON",
+    "text": ":"
+  },
+  {
+    "line": 237,
+    "column": 0,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 237,
+    "column": 2,
+    "type": "TYPE_IS",
+    "text": "type is"
+  },
+  {
+    "line": 237,
+    "column": 10,
+    "type": "CONCEPT_TYPE",
+    "text": "Observation"
+  },
+  {
+    "line": 237,
+    "column": 21,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 238,
+    "column": 0,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 238,
+    "column": 2,
+    "type": "VALUETYPE_IS",
+    "text": "valuetype is"
+  },
+  {
+    "line": 238,
+    "column": 15,
+    "type": "CONCEPT_VALUE_TYPE",
+    "text": "boolean"
+  },
+  {
+    "line": 238,
+    "column": 22,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 239,
+    "column": 0,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 239,
+    "column": 2,
+    "type": "CODED_FROM",
+    "text": "coded from"
+  },
+  {
+    "line": 239,
+    "column": 13,
+    "type": "QUOTED_STRING",
+    "text": "\"Two Primary Series Doses Administered\""
+  },
+  {
+    "line": 239,
+    "column": 52,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 241,
+    "column": 0,
+    "type": "CONCEPT",
+    "text": "concept"
+  },
+  {
+    "line": 241,
+    "column": 8,
+    "type": "QUOTED_STRING",
+    "text": "\"Client Age Less Than 9 Months\""
+  },
+  {
+    "line": 241,
+    "column": 39,
+    "type": "COLON",
+    "text": ":"
+  },
+  {
+    "line": 243,
+    "column": 0,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 243,
+    "column": 2,
+    "type": "TYPE_IS",
+    "text": "type is"
+  },
+  {
+    "line": 243,
+    "column": 10,
+    "type": "CONCEPT_TYPE",
+    "text": "Observation"
+  },
+  {
+    "line": 243,
+    "column": 21,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 244,
+    "column": 0,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 244,
+    "column": 2,
+    "type": "VALUETYPE_IS",
+    "text": "valuetype is"
+  },
+  {
+    "line": 244,
+    "column": 15,
+    "type": "CONCEPT_VALUE_TYPE",
+    "text": "boolean"
+  },
+  {
+    "line": 244,
+    "column": 22,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 245,
+    "column": 0,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 245,
+    "column": 2,
+    "type": "CODED_FROM",
+    "text": "coded from"
+  },
+  {
+    "line": 245,
+    "column": 13,
+    "type": "QUOTED_STRING",
+    "text": "\"Client Age Less Than 9 Months\""
+  },
+  {
+    "line": 245,
+    "column": 44,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 247,
+    "column": 0,
+    "type": "CONCEPT",
+    "text": "concept"
+  },
+  {
+    "line": 247,
+    "column": 8,
+    "type": "QUOTED_STRING",
+    "text": "\"Measles Routine Immunization Schedule Complete\""
+  },
+  {
+    "line": 247,
+    "column": 56,
+    "type": "COLON",
+    "text": ":"
+  },
+  {
+    "line": 249,
+    "column": 0,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 249,
+    "column": 2,
+    "type": "TYPE_IS",
+    "text": "type is"
+  },
+  {
+    "line": 249,
+    "column": 10,
+    "type": "CONCEPT_TYPE",
+    "text": "Observation"
+  },
+  {
+    "line": 249,
+    "column": 21,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 250,
+    "column": 0,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 250,
+    "column": 2,
+    "type": "VALUETYPE_IS",
+    "text": "valuetype is"
+  },
+  {
+    "line": 250,
+    "column": 15,
+    "type": "CONCEPT_VALUE_TYPE",
+    "text": "boolean"
+  },
+  {
+    "line": 250,
+    "column": 22,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 251,
+    "column": 0,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 251,
+    "column": 2,
+    "type": "CODED_FROM",
+    "text": "coded from"
+  },
+  {
+    "line": 251,
+    "column": 13,
+    "type": "QUOTED_STRING",
+    "text": "\"Measles Routine Immunization Schedule Complete\""
+  },
+  {
+    "line": 251,
+    "column": 61,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 253,
+    "column": 0,
+    "type": "CONCEPT",
+    "text": "concept"
+  },
+  {
+    "line": 253,
+    "column": 8,
+    "type": "QUOTED_STRING",
+    "text": "\"No Supplementary Dose Administered\""
+  },
+  {
+    "line": 253,
+    "column": 44,
+    "type": "COLON",
+    "text": ":"
+  },
+  {
+    "line": 255,
+    "column": 0,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 255,
+    "column": 2,
+    "type": "TYPE_IS",
+    "text": "type is"
+  },
+  {
+    "line": 255,
+    "column": 10,
+    "type": "CONCEPT_TYPE",
+    "text": "Observation"
+  },
+  {
+    "line": 255,
+    "column": 21,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 256,
+    "column": 0,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 256,
+    "column": 2,
+    "type": "VALUETYPE_IS",
+    "text": "valuetype is"
+  },
+  {
+    "line": 256,
+    "column": 15,
+    "type": "CONCEPT_VALUE_TYPE",
+    "text": "boolean"
+  },
+  {
+    "line": 256,
+    "column": 22,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 257,
+    "column": 0,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 257,
+    "column": 2,
+    "type": "CODED_FROM",
+    "text": "coded from"
+  },
+  {
+    "line": 257,
+    "column": 13,
+    "type": "QUOTED_STRING",
+    "text": "\"No Supplementary Dose Administered\""
+  },
+  {
+    "line": 257,
+    "column": 49,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 259,
+    "column": 0,
+    "type": "CONCEPT",
+    "text": "concept"
+  },
+  {
+    "line": 259,
+    "column": 8,
+    "type": "QUOTED_STRING",
+    "text": "\"Client Is Due For Supplementary Dose\""
+  },
+  {
+    "line": 259,
+    "column": 46,
+    "type": "COLON",
+    "text": ":"
+  },
+  {
+    "line": 261,
+    "column": 0,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 261,
+    "column": 2,
+    "type": "TYPE_IS",
+    "text": "type is"
+  },
+  {
+    "line": 261,
+    "column": 10,
+    "type": "CONCEPT_TYPE",
+    "text": "Observation"
+  },
+  {
+    "line": 261,
+    "column": 21,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 262,
+    "column": 0,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 262,
+    "column": 2,
+    "type": "VALUETYPE_IS",
+    "text": "valuetype is"
+  },
+  {
+    "line": 262,
+    "column": 15,
+    "type": "CONCEPT_VALUE_TYPE",
+    "text": "boolean"
+  },
+  {
+    "line": 262,
+    "column": 22,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 263,
+    "column": 0,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 263,
+    "column": 2,
+    "type": "CODED_FROM",
+    "text": "coded from"
+  },
+  {
+    "line": 263,
+    "column": 13,
+    "type": "QUOTED_STRING",
+    "text": "\"Client Is Due For Supplementary Dose\""
+  },
+  {
+    "line": 263,
+    "column": 51,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 265,
+    "column": 0,
+    "type": "CONCEPT",
+    "text": "concept"
+  },
+  {
+    "line": 265,
+    "column": 8,
+    "type": "QUOTED_STRING",
+    "text": "\"Supplementary Dose Administered\""
+  },
+  {
+    "line": 265,
+    "column": 41,
+    "type": "COLON",
+    "text": ":"
+  },
+  {
+    "line": 267,
+    "column": 0,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 267,
+    "column": 2,
+    "type": "TYPE_IS",
+    "text": "type is"
+  },
+  {
+    "line": 267,
+    "column": 10,
+    "type": "CONCEPT_TYPE",
+    "text": "Observation"
+  },
+  {
+    "line": 267,
+    "column": 21,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 268,
+    "column": 0,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 268,
+    "column": 2,
+    "type": "VALUETYPE_IS",
+    "text": "valuetype is"
+  },
+  {
+    "line": 268,
+    "column": 15,
+    "type": "CONCEPT_VALUE_TYPE",
+    "text": "boolean"
+  },
+  {
+    "line": 268,
+    "column": 22,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 269,
+    "column": 0,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 269,
+    "column": 2,
+    "type": "CODED_FROM",
+    "text": "coded from"
+  },
+  {
+    "line": 269,
+    "column": 13,
+    "type": "QUOTED_STRING",
+    "text": "\"Supplementary Dose Administered\""
+  },
+  {
+    "line": 269,
+    "column": 46,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 271,
+    "column": 0,
+    "type": "CONCEPT",
+    "text": "concept"
+  },
+  {
+    "line": 271,
+    "column": 8,
+    "type": "QUOTED_STRING",
+    "text": "\"MCV Dose Contraindicated\""
+  },
+  {
+    "line": 271,
+    "column": 34,
+    "type": "COLON",
+    "text": ":"
+  },
+  {
+    "line": 273,
+    "column": 0,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 273,
+    "column": 2,
+    "type": "TYPE_IS",
+    "text": "type is"
+  },
+  {
+    "line": 273,
+    "column": 10,
+    "type": "CONCEPT_TYPE",
+    "text": "Observation"
+  },
+  {
+    "line": 273,
+    "column": 21,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 274,
+    "column": 0,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 274,
+    "column": 2,
+    "type": "VALUETYPE_IS",
+    "text": "valuetype is"
+  },
+  {
+    "line": 274,
+    "column": 15,
+    "type": "CONCEPT_VALUE_TYPE",
+    "text": "boolean"
+  },
+  {
+    "line": 274,
+    "column": 22,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 275,
+    "column": 0,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 275,
+    "column": 2,
+    "type": "CODED_FROM",
+    "text": "coded from"
+  },
+  {
+    "line": 275,
+    "column": 13,
+    "type": "QUOTED_STRING",
+    "text": "\"MCV Dose Contraindicated\""
+  },
+  {
+    "line": 275,
+    "column": 39,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 277,
+    "column": 0,
+    "type": "CONCEPT",
+    "text": "concept"
+  },
+  {
+    "line": 277,
+    "column": 8,
+    "type": "QUOTED_STRING",
+    "text": "\"Contraindication Evaluation of the MCV dose\""
+  },
+  {
+    "line": 277,
+    "column": 53,
+    "type": "COLON",
+    "text": ":"
+  },
+  {
+    "line": 279,
+    "column": 0,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 279,
+    "column": 2,
+    "type": "TYPE_IS",
+    "text": "type is"
+  },
+  {
+    "line": 279,
+    "column": 10,
+    "type": "CONCEPT_TYPE",
+    "text": "Observation"
+  },
+  {
+    "line": 279,
+    "column": 21,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 280,
+    "column": 0,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 280,
+    "column": 2,
+    "type": "VALUETYPE_IS",
+    "text": "valuetype is"
+  },
+  {
+    "line": 280,
+    "column": 15,
+    "type": "CONCEPT_VALUE_TYPE",
+    "text": "boolean"
+  },
+  {
+    "line": 280,
+    "column": 22,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 281,
+    "column": 0,
+    "type": "DASH",
+    "text": "-"
+  },
+  {
+    "line": 281,
+    "column": 2,
+    "type": "CODED_FROM",
+    "text": "coded from"
+  },
+  {
+    "line": 281,
+    "column": 13,
+    "type": "QUOTED_STRING",
+    "text": "\"Contraindication Evaluation of the MCV dose\""
+  },
+  {
+    "line": 281,
+    "column": 58,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 283,
+    "column": 0,
+    "type": "TERMINOLOGY",
+    "text": "terminology"
+  },
+  {
+    "line": 283,
+    "column": 12,
+    "type": "QUOTED_STRING",
+    "text": "\"Measles Routine Immunization Schedule Incomplete\""
+  },
+  {
+    "line": 283,
+    "column": 63,
+    "type": "IS_SYSTEM",
+    "text": "is system"
+  },
+  {
+    "line": 283,
+    "column": 73,
+    "type": "BACKTICK_STRING",
+    "text": "`http://sdh.com/cqis/kalm`"
+  },
+  {
+    "line": 283,
+    "column": 100,
+    "type": "AND_CODE",
+    "text": "and code"
+  },
+  {
+    "line": 283,
+    "column": 109,
+    "type": "BACKTICK_STRING",
+    "text": "`measles-routine-immunization-schedule-incomplete`"
+  },
+  {
+    "line": 283,
+    "column": 159,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 285,
+    "column": 0,
+    "type": "TERMINOLOGY",
+    "text": "terminology"
+  },
+  {
+    "line": 285,
+    "column": 12,
+    "type": "QUOTED_STRING",
+    "text": "\"No MCV0 Doses Administered\""
+  },
+  {
+    "line": 285,
+    "column": 41,
+    "type": "IS_SYSTEM",
+    "text": "is system"
+  },
+  {
+    "line": 285,
+    "column": 51,
+    "type": "BACKTICK_STRING",
+    "text": "`http://sdh.com/cqis/kalm`"
+  },
+  {
+    "line": 285,
+    "column": 78,
+    "type": "AND_CODE",
+    "text": "and code"
+  },
+  {
+    "line": 285,
+    "column": 87,
+    "type": "BACKTICK_STRING",
+    "text": "`no-mcv0-doses-administered`"
+  },
+  {
+    "line": 285,
+    "column": 115,
+    "type": "DOT",
+    "text": "."
+  },
+  {
     "line": 287,
     "column": 0,
     "type": "TERMINOLOGY",
@@ -4559,373 +4253,835 @@
   },
   {
     "line": 287,
+    "column": 12,
+    "type": "QUOTED_STRING",
+    "text": "\"Client Age Less Than 6 Months\""
+  },
+  {
+    "line": 287,
+    "column": 44,
+    "type": "IS_SYSTEM",
+    "text": "is system"
+  },
+  {
+    "line": 287,
+    "column": 54,
+    "type": "BACKTICK_STRING",
+    "text": "`http://sdh.com/cqis/kalm`"
+  },
+  {
+    "line": 287,
+    "column": 81,
+    "type": "AND_CODE",
+    "text": "and code"
+  },
+  {
+    "line": 287,
+    "column": 90,
+    "type": "BACKTICK_STRING",
+    "text": "`client-age-less-than-6-months`"
+  },
+  {
+    "line": 287,
+    "column": 121,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 289,
+    "column": 0,
+    "type": "TERMINOLOGY",
+    "text": "terminology"
+  },
+  {
+    "line": 289,
+    "column": 12,
+    "type": "QUOTED_STRING",
+    "text": "\"Last Live Vaccine Administered Within 4 Weeks\""
+  },
+  {
+    "line": 289,
+    "column": 60,
+    "type": "IS_SYSTEM",
+    "text": "is system"
+  },
+  {
+    "line": 289,
+    "column": 70,
+    "type": "BACKTICK_STRING",
+    "text": "`http://sdh.com/cqis/kalm`"
+  },
+  {
+    "line": 289,
+    "column": 97,
+    "type": "AND_CODE",
+    "text": "and code"
+  },
+  {
+    "line": 289,
+    "column": 106,
+    "type": "BACKTICK_STRING",
+    "text": "`last-live-vaccine-administered-within-4-weeks`"
+  },
+  {
+    "line": 289,
+    "column": 153,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 291,
+    "column": 0,
+    "type": "TERMINOLOGY",
+    "text": "terminology"
+  },
+  {
+    "line": 291,
+    "column": 12,
+    "type": "QUOTED_STRING",
+    "text": "\"Client Is Due For MCV0\""
+  },
+  {
+    "line": 291,
+    "column": 37,
+    "type": "IS_SYSTEM",
+    "text": "is system"
+  },
+  {
+    "line": 291,
+    "column": 47,
+    "type": "BACKTICK_STRING",
+    "text": "`http://sdh.com/cqis/kalm`"
+  },
+  {
+    "line": 291,
+    "column": 74,
+    "type": "AND_CODE",
+    "text": "and code"
+  },
+  {
+    "line": 291,
+    "column": 83,
+    "type": "BACKTICK_STRING",
+    "text": "`client-is-due-for-mcv0`"
+  },
+  {
+    "line": 291,
+    "column": 107,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 293,
+    "column": 0,
+    "type": "TERMINOLOGY",
+    "text": "terminology"
+  },
+  {
+    "line": 293,
+    "column": 12,
+    "type": "QUOTED_STRING",
+    "text": "\"MCV0 Dose Administered\""
+  },
+  {
+    "line": 293,
+    "column": 37,
+    "type": "IS_SYSTEM",
+    "text": "is system"
+  },
+  {
+    "line": 293,
+    "column": 47,
+    "type": "BACKTICK_STRING",
+    "text": "`http://sdh.com/cqis/kalm`"
+  },
+  {
+    "line": 293,
+    "column": 74,
+    "type": "AND_CODE",
+    "text": "and code"
+  },
+  {
+    "line": 293,
+    "column": 83,
+    "type": "BACKTICK_STRING",
+    "text": "`mcv0-dose-administered`"
+  },
+  {
+    "line": 293,
+    "column": 107,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 295,
+    "column": 0,
+    "type": "TERMINOLOGY",
+    "text": "terminology"
+  },
+  {
+    "line": 295,
+    "column": 12,
+    "type": "QUOTED_STRING",
+    "text": "\"No Primary Series Doses Administered\""
+  },
+  {
+    "line": 295,
+    "column": 51,
+    "type": "IS_SYSTEM",
+    "text": "is system"
+  },
+  {
+    "line": 295,
+    "column": 61,
+    "type": "BACKTICK_STRING",
+    "text": "`http://sdh.com/cqis/kalm`"
+  },
+  {
+    "line": 295,
+    "column": 88,
+    "type": "AND_CODE",
+    "text": "and code"
+  },
+  {
+    "line": 295,
+    "column": 97,
+    "type": "BACKTICK_STRING",
+    "text": "`no-primary-series-doses-administered`"
+  },
+  {
+    "line": 295,
+    "column": 135,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 297,
+    "column": 0,
+    "type": "TERMINOLOGY",
+    "text": "terminology"
+  },
+  {
+    "line": 297,
+    "column": 12,
+    "type": "QUOTED_STRING",
+    "text": "\"Client Age Less Than 12 Months\""
+  },
+  {
+    "line": 297,
+    "column": 45,
+    "type": "IS_SYSTEM",
+    "text": "is system"
+  },
+  {
+    "line": 297,
+    "column": 55,
+    "type": "BACKTICK_STRING",
+    "text": "`http://sdh.com/cqis/kalm`"
+  },
+  {
+    "line": 297,
+    "column": 82,
+    "type": "AND_CODE",
+    "text": "and code"
+  },
+  {
+    "line": 297,
+    "column": 91,
+    "type": "BACKTICK_STRING",
+    "text": "`client-age-less-than-12-months`"
+  },
+  {
+    "line": 297,
+    "column": 123,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 299,
+    "column": 0,
+    "type": "TERMINOLOGY",
+    "text": "terminology"
+  },
+  {
+    "line": 299,
+    "column": 12,
+    "type": "QUOTED_STRING",
+    "text": "\"Client Is Due For MCV1\""
+  },
+  {
+    "line": 299,
+    "column": 37,
+    "type": "IS_SYSTEM",
+    "text": "is system"
+  },
+  {
+    "line": 299,
+    "column": 47,
+    "type": "BACKTICK_STRING",
+    "text": "`http://sdh.com/cqis/kalm`"
+  },
+  {
+    "line": 299,
+    "column": 74,
+    "type": "AND_CODE",
+    "text": "and code"
+  },
+  {
+    "line": 299,
+    "column": 83,
+    "type": "BACKTICK_STRING",
+    "text": "`client-is-due-for-mcv1`"
+  },
+  {
+    "line": 299,
+    "column": 107,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 301,
+    "column": 0,
+    "type": "TERMINOLOGY",
+    "text": "terminology"
+  },
+  {
+    "line": 301,
+    "column": 12,
+    "type": "QUOTED_STRING",
+    "text": "\"One Primary Series Dose Administered\""
+  },
+  {
+    "line": 301,
+    "column": 51,
+    "type": "IS_SYSTEM",
+    "text": "is system"
+  },
+  {
+    "line": 301,
+    "column": 61,
+    "type": "BACKTICK_STRING",
+    "text": "`http://sdh.com/cqis/kalm`"
+  },
+  {
+    "line": 301,
+    "column": 88,
+    "type": "AND_CODE",
+    "text": "and code"
+  },
+  {
+    "line": 301,
+    "column": 97,
+    "type": "BACKTICK_STRING",
+    "text": "`one-primary-series-dose-administered`"
+  },
+  {
+    "line": 301,
+    "column": 135,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 303,
+    "column": 0,
+    "type": "TERMINOLOGY",
+    "text": "terminology"
+  },
+  {
+    "line": 303,
+    "column": 12,
+    "type": "QUOTED_STRING",
+    "text": "\"Client Age Less Than 15 Months\""
+  },
+  {
+    "line": 303,
+    "column": 45,
+    "type": "IS_SYSTEM",
+    "text": "is system"
+  },
+  {
+    "line": 303,
+    "column": 55,
+    "type": "BACKTICK_STRING",
+    "text": "`http://sdh.com/cqis/kalm`"
+  },
+  {
+    "line": 303,
+    "column": 82,
+    "type": "AND_CODE",
+    "text": "and code"
+  },
+  {
+    "line": 303,
+    "column": 91,
+    "type": "BACKTICK_STRING",
+    "text": "`client-age-less-than-15-months`"
+  },
+  {
+    "line": 303,
+    "column": 123,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 305,
+    "column": 0,
+    "type": "TERMINOLOGY",
+    "text": "terminology"
+  },
+  {
+    "line": 305,
+    "column": 12,
+    "type": "QUOTED_STRING",
+    "text": "\"Client Is Due For MCV2\""
+  },
+  {
+    "line": 305,
+    "column": 37,
+    "type": "IS_SYSTEM",
+    "text": "is system"
+  },
+  {
+    "line": 305,
+    "column": 47,
+    "type": "BACKTICK_STRING",
+    "text": "`http://sdh.com/cqis/kalm`"
+  },
+  {
+    "line": 305,
+    "column": 74,
+    "type": "AND_CODE",
+    "text": "and code"
+  },
+  {
+    "line": 305,
+    "column": 83,
+    "type": "BACKTICK_STRING",
+    "text": "`client-is-due-for-mcv2`"
+  },
+  {
+    "line": 305,
+    "column": 107,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 307,
+    "column": 0,
+    "type": "TERMINOLOGY",
+    "text": "terminology"
+  },
+  {
+    "line": 307,
+    "column": 12,
+    "type": "QUOTED_STRING",
+    "text": "\"Two Primary Series Doses Administered\""
+  },
+  {
+    "line": 307,
+    "column": 52,
+    "type": "IS_SYSTEM",
+    "text": "is system"
+  },
+  {
+    "line": 307,
+    "column": 62,
+    "type": "BACKTICK_STRING",
+    "text": "`http://sdh.com/cqis/kalm`"
+  },
+  {
+    "line": 307,
+    "column": 89,
+    "type": "AND_CODE",
+    "text": "and code"
+  },
+  {
+    "line": 307,
+    "column": 98,
+    "type": "BACKTICK_STRING",
+    "text": "`two-primary-series-doses-administered`"
+  },
+  {
+    "line": 307,
+    "column": 137,
+    "type": "DOT",
+    "text": "."
+  },
+  {
+    "line": 309,
+    "column": 0,
+    "type": "TERMINOLOGY",
+    "text": "terminology"
+  },
+  {
+    "line": 309,
     "column": 12,
     "type": "QUOTED_STRING",
     "text": "\"Client Age Less Than 9 Months\""
   },
   {
-    "line": 287,
+    "line": 309,
     "column": 44,
-    "type": "SYSTEM",
-    "text": "system"
+    "type": "IS_SYSTEM",
+    "text": "is system"
   },
   {
-    "line": 287,
-    "column": 51,
+    "line": 309,
+    "column": 54,
     "type": "BACKTICK_STRING",
     "text": "`http://sdh.com/cqis/kalm`"
   },
   {
-    "line": 287,
-    "column": 78,
-    "type": "CODE",
-    "text": "code"
+    "line": 309,
+    "column": 81,
+    "type": "AND_CODE",
+    "text": "and code"
   },
   {
-    "line": 287,
-    "column": 83,
+    "line": 309,
+    "column": 90,
     "type": "BACKTICK_STRING",
     "text": "`client-age-less-than-9-months`"
   },
   {
-    "line": 287,
-    "column": 114,
+    "line": 309,
+    "column": 121,
     "type": "DOT",
     "text": "."
   },
   {
-    "line": 288,
+    "line": 311,
     "column": 0,
     "type": "TERMINOLOGY",
     "text": "terminology"
   },
   {
-    "line": 288,
+    "line": 311,
     "column": 12,
     "type": "QUOTED_STRING",
     "text": "\"Measles Routine Immunization Schedule Complete\""
   },
   {
-    "line": 288,
+    "line": 311,
     "column": 61,
-    "type": "SYSTEM",
-    "text": "system"
+    "type": "IS_SYSTEM",
+    "text": "is system"
   },
   {
-    "line": 288,
-    "column": 68,
+    "line": 311,
+    "column": 71,
     "type": "BACKTICK_STRING",
     "text": "`http://sdh.com/cqis/kalm`"
   },
   {
-    "line": 288,
-    "column": 95,
-    "type": "CODE",
-    "text": "code"
+    "line": 311,
+    "column": 98,
+    "type": "AND_CODE",
+    "text": "and code"
   },
   {
-    "line": 288,
-    "column": 100,
+    "line": 311,
+    "column": 107,
     "type": "BACKTICK_STRING",
     "text": "`measles-routine-immunization-schedule-complete`"
   },
   {
-    "line": 288,
-    "column": 148,
+    "line": 311,
+    "column": 155,
     "type": "DOT",
     "text": "."
   },
   {
-    "line": 289,
+    "line": 313,
     "column": 0,
     "type": "TERMINOLOGY",
     "text": "terminology"
   },
   {
-    "line": 289,
+    "line": 313,
     "column": 12,
     "type": "QUOTED_STRING",
     "text": "\"No Supplementary Dose Administered\""
   },
   {
-    "line": 289,
+    "line": 313,
     "column": 49,
-    "type": "SYSTEM",
-    "text": "system"
+    "type": "IS_SYSTEM",
+    "text": "is system"
   },
   {
-    "line": 289,
-    "column": 56,
+    "line": 313,
+    "column": 59,
     "type": "BACKTICK_STRING",
     "text": "`http://sdh.com/cqis/kalm`"
   },
   {
-    "line": 289,
-    "column": 83,
-    "type": "CODE",
-    "text": "code"
+    "line": 313,
+    "column": 86,
+    "type": "AND_CODE",
+    "text": "and code"
   },
   {
-    "line": 289,
-    "column": 88,
+    "line": 313,
+    "column": 95,
     "type": "BACKTICK_STRING",
     "text": "`no-supplementary-dose-administered`"
   },
   {
-    "line": 289,
-    "column": 124,
+    "line": 313,
+    "column": 131,
     "type": "DOT",
     "text": "."
   },
   {
-    "line": 290,
+    "line": 315,
     "column": 0,
     "type": "TERMINOLOGY",
     "text": "terminology"
   },
   {
-    "line": 290,
+    "line": 315,
     "column": 12,
     "type": "QUOTED_STRING",
     "text": "\"Client Is Due For Supplementary Dose\""
   },
   {
-    "line": 290,
+    "line": 315,
     "column": 51,
-    "type": "SYSTEM",
-    "text": "system"
+    "type": "IS_SYSTEM",
+    "text": "is system"
   },
   {
-    "line": 290,
-    "column": 58,
+    "line": 315,
+    "column": 61,
     "type": "BACKTICK_STRING",
     "text": "`http://sdh.com/cqis/kalm`"
   },
   {
-    "line": 290,
-    "column": 85,
-    "type": "CODE",
-    "text": "code"
+    "line": 315,
+    "column": 88,
+    "type": "AND_CODE",
+    "text": "and code"
   },
   {
-    "line": 290,
-    "column": 90,
+    "line": 315,
+    "column": 97,
     "type": "BACKTICK_STRING",
     "text": "`client-is-due-for-supplementary-dose`"
   },
   {
-    "line": 290,
-    "column": 128,
+    "line": 315,
+    "column": 135,
     "type": "DOT",
     "text": "."
   },
   {
-    "line": 291,
+    "line": 317,
     "column": 0,
     "type": "TERMINOLOGY",
     "text": "terminology"
   },
   {
-    "line": 291,
+    "line": 317,
     "column": 12,
     "type": "QUOTED_STRING",
     "text": "\"Supplementary Dose Administered\""
   },
   {
-    "line": 291,
+    "line": 317,
     "column": 46,
-    "type": "SYSTEM",
-    "text": "system"
+    "type": "IS_SYSTEM",
+    "text": "is system"
   },
   {
-    "line": 291,
-    "column": 53,
+    "line": 317,
+    "column": 56,
     "type": "BACKTICK_STRING",
     "text": "`http://sdh.com/cqis/kalm`"
   },
   {
-    "line": 291,
-    "column": 80,
-    "type": "CODE",
-    "text": "code"
+    "line": 317,
+    "column": 83,
+    "type": "AND_CODE",
+    "text": "and code"
   },
   {
-    "line": 291,
-    "column": 85,
+    "line": 317,
+    "column": 92,
     "type": "BACKTICK_STRING",
     "text": "`supplementary-dose-administered`"
   },
   {
-    "line": 291,
-    "column": 118,
+    "line": 317,
+    "column": 125,
     "type": "DOT",
     "text": "."
   },
   {
-    "line": 292,
+    "line": 319,
     "column": 0,
     "type": "TERMINOLOGY",
     "text": "terminology"
   },
   {
-    "line": 292,
+    "line": 319,
     "column": 12,
     "type": "QUOTED_STRING",
     "text": "\"MCV Dose Contraindicated\""
   },
   {
-    "line": 292,
+    "line": 319,
     "column": 39,
-    "type": "SYSTEM",
-    "text": "system"
+    "type": "IS_SYSTEM",
+    "text": "is system"
   },
   {
-    "line": 292,
-    "column": 46,
+    "line": 319,
+    "column": 49,
     "type": "BACKTICK_STRING",
     "text": "`http://sdh.com/cqis/kalm`"
   },
   {
-    "line": 292,
-    "column": 73,
-    "type": "CODE",
-    "text": "code"
+    "line": 319,
+    "column": 76,
+    "type": "AND_CODE",
+    "text": "and code"
   },
   {
-    "line": 292,
-    "column": 78,
+    "line": 319,
+    "column": 85,
     "type": "BACKTICK_STRING",
     "text": "`mcv-dose-contraindicated`"
   },
   {
-    "line": 292,
-    "column": 104,
+    "line": 319,
+    "column": 111,
     "type": "DOT",
     "text": "."
   },
   {
-    "line": 293,
+    "line": 321,
     "column": 0,
     "type": "TERMINOLOGY",
     "text": "terminology"
   },
   {
-    "line": 293,
+    "line": 321,
     "column": 12,
     "type": "QUOTED_STRING",
     "text": "\"Contraindication Evaluation of the MCV dose\""
   },
   {
-    "line": 293,
+    "line": 321,
     "column": 58,
-    "type": "SYSTEM",
-    "text": "system"
+    "type": "IS_SYSTEM",
+    "text": "is system"
   },
   {
-    "line": 293,
-    "column": 65,
+    "line": 321,
+    "column": 68,
     "type": "BACKTICK_STRING",
     "text": "`http://sdh.com/cqis/kalm`"
   },
   {
-    "line": 293,
-    "column": 92,
-    "type": "CODE",
-    "text": "code"
+    "line": 321,
+    "column": 95,
+    "type": "AND_CODE",
+    "text": "and code"
   },
   {
-    "line": 293,
-    "column": 97,
+    "line": 321,
+    "column": 104,
     "type": "BACKTICK_STRING",
     "text": "`contraindication-evaluation-of-the-mcv-dose`"
   },
   {
-    "line": 293,
-    "column": 142,
+    "line": 321,
+    "column": 149,
     "type": "DOT",
     "text": "."
   },
   {
-    "line": 294,
+    "line": 323,
     "column": 0,
     "type": "TERMINOLOGY",
     "text": "terminology"
   },
   {
-    "line": 294,
+    "line": 323,
     "column": 12,
     "type": "QUOTED_STRING",
     "text": "\"Measles vaccines\""
   },
   {
-    "line": 294,
+    "line": 323,
     "column": 31,
-    "type": "SYSTEM",
-    "text": "system"
+    "type": "IS_SYSTEM",
+    "text": "is system"
   },
   {
-    "line": 294,
-    "column": 38,
+    "line": 323,
+    "column": 41,
     "type": "BACKTICK_STRING",
     "text": "`http://id.who.int/icd/release/11/mms`"
   },
   {
-    "line": 294,
-    "column": 77,
-    "type": "CODE",
-    "text": "code"
+    "line": 323,
+    "column": 80,
+    "type": "AND_CODE",
+    "text": "and code"
   },
   {
-    "line": 294,
-    "column": 82,
+    "line": 323,
+    "column": 89,
     "type": "BACKTICK_STRING",
     "text": "`XM28X5`"
   },
   {
-    "line": 294,
-    "column": 90,
+    "line": 323,
+    "column": 97,
     "type": "DOT",
     "text": "."
   },
   {
-    "line": 295,
+    "line": 325,
     "column": 0,
     "type": "TERMINOLOGY",
     "text": "terminology"
   },
   {
-    "line": 295,
+    "line": 325,
     "column": 12,
     "type": "QUOTED_STRING",
     "text": "\"Measles Code\""
   },
   {
-    "line": 295,
+    "line": 325,
     "column": 27,
-    "type": "SYSTEM",
-    "text": "system"
+    "type": "IS_SYSTEM",
+    "text": "is system"
   },
   {
-    "line": 295,
-    "column": 34,
+    "line": 325,
+    "column": 37,
     "type": "BACKTICK_STRING",
     "text": "`http://id.who.int/icd/release/11/mms`"
   },
   {
-    "line": 295,
-    "column": 73,
-    "type": "CODE",
-    "text": "code"
+    "line": 325,
+    "column": 76,
+    "type": "AND_CODE",
+    "text": "and code"
   },
   {
-    "line": 295,
-    "column": 78,
+    "line": 325,
+    "column": 85,
     "type": "BACKTICK_STRING",
     "text": "`XM28X5`"
   },
   {
-    "line": 295,
-    "column": 86,
+    "line": 325,
+    "column": 93,
     "type": "DOT",
     "text": "."
   }
