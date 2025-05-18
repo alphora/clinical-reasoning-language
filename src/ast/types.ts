@@ -47,21 +47,14 @@ export interface WhenBlock extends ASTNode {
   location: Location;
 }
 
-// When block body can be a block body or single action
-export type WhenBlockBody = BlockBody | SingleAction;
+// When block body can be a block body or action statement
+export type WhenBlockBody = BlockBody | ActionStatement;
 
 // Block body containing multiple statements
 export interface BlockBody extends ASTNode {
   type: "BlockBody";
   qualifier?: string; // 'any' or 'all'
   statements: (WhenBlock | ActionStatement)[];
-  location: Location;
-}
-
-// Single action (do or use)
-export interface SingleAction extends ASTNode {
-  type: "SingleAction";
-  action: Action;
   location: Location;
 }
 
@@ -201,6 +194,7 @@ export interface GroupExpression extends ASTNode {
 
 // inferred-from nodes
 export interface InferredFromConcept extends ASTNode {
+  [x: string]: any;
   type: "InferredFromDefinitionConcept";
   concept: string;
   pattern?: string;

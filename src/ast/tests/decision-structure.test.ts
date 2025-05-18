@@ -4,9 +4,7 @@ import {
   BlockBody,
   ActionStatement,
   SingleAction,
-  SingleActionType,
   RecommendActivity,
-  RecommendActivityType,
   UseDecision,
 } from "../types";
 
@@ -23,17 +21,16 @@ import { parseInput } from "./parseInput";
  */
 describe("Decision Structure", () => {
   it("should maintain correct structure for nested decisions", () => {
-    const input = `
+    const input = `# Test
 decision "IMMZ.D2.D5.Measles":
-    when "Measles Routine Immunization Schedule Incomplete" then:
+    - when "Measles Routine Immunization Schedule Incomplete" then:
         any:
-            when "No Primary Series Doses Administered" then:
-                when "Client Age Less Than 12 Months" then do "Indicate".
-                when "Last Live Vaccine Administered has had in 4 Weeks" then use "Elderly Based".
-            done
-            when "Client Is Due For MCV12" then do "Vaccinate".
-        done
-done`;
+            - when "No Primary Series Doses Administered" then:
+                - when "Client Age Less Than 12 Months" then recommend activity "Indicate".
+                - when "Last Live Vaccine Administered has had in 4 Weeks" then use decision "Elderly Based".
+            - end when
+            - when "Client Is Due For MCV12" then recommend activity "Vaccinate".
+        - end when`;
 
     const result = parseInput(input);
     const decision = result.statements[0] as Decision;
@@ -51,10 +48,9 @@ done`;
   });
 
   it("should handle single action statements", () => {
-    const input = `
+    const input = `# Test
 decision "Test Decision":
-    when "Age" then do "Vaccinate".
-done`;
+    - when "Age" then recommend activity "Vaccinate".`;
 
     const result = parseInput(input);
     const decision = result.statements[0] as Decision;
@@ -62,20 +58,19 @@ done`;
     const singleAction = whenBlock.body as SingleAction;
     const doActivity = singleAction.action as RecommendActivity;
 
-    expect(singleAction.type).toBe(SingleActionType.type);
-    expect(doActivity.type).toBe(RecommendActivityType.type);
+    expect(singleAction.type).toBe("ActionStatement");
+    expect(doActivity.type).toBe("RecommendActivity");
     expect(doActivity.activityName).toBe("Vaccinate");
   });
 
   it("should handle block bodies with any qualifier", () => {
-    const input = `
+    const input = `# Test
 decision "Test Decision":
-    when "Age" then:
+    - when "Age" then:
         any:
-            when "Greater Than 18" then do "Adult Protocol".
-            when "Less Than 65" then do "Standard Care".
-        done
-done`;
+            - when "Greater Than 18" then recommend activity "Adult Protocol".
+            - when "Less Than 65" then recommend activity "Standard Care".
+        - end when`;
 
     const result = parseInput(input);
     const decision = result.statements[0] as Decision;
@@ -87,14 +82,13 @@ done`;
   });
 
   it("should handle block bodies with all qualifier", () => {
-    const input = `
+    const input = `# Test
 decision "Test Decision":
-    when "Age" then:
+    - when "Age" then:
         all:
-            when "Greater Than 18" then do "Adult Protocol".
-            when "Less Than 65" then do "Standard Care".
-        done
-done`;
+            - when "Greater Than 18" then recommend activity "Adult Protocol".
+            - when "Less Than 65" then recommend activity "Standard Care".
+        - end when`;
 
     const result = parseInput(input);
     const decision = result.statements[0] as Decision;
@@ -106,21 +100,20 @@ done`;
   });
 
   it("should handle mixed action types in block bodies", () => {
-    const input = `
+    const input = `# Test
 decision "Test Decision":
-    when "Age" then:
-        do "Vaccinate".
-        use "Protocol".
-        when "Condition" then do "Action".
-    done
-done`;
+    - when "Age" then:
+        - recommend activity "Vaccinate".
+        - use decision "Protocol".
+    - end when
+    - when "Condition" then recommend activity "Action".`;
 
     const result = parseInput(input);
     const decision = result.statements[0] as Decision;
     const whenBlock = decision.body.statements[0] as WhenBlock;
     const blockBody = whenBlock.body as BlockBody;
 
-    expect(blockBody.statements).toHaveLength(3);
+    expect(blockBody.statements).toHaveLength(2);
 
     const doAction = blockBody.statements[0] as ActionStatement;
     expect(doAction.type).toBe("ActionStatement");
@@ -135,22 +128,21 @@ done`;
     expect(nestedWhen.conceptName).toBe("Condition");
 
     const singleAction = nestedWhen.body as SingleAction;
-    expect(singleAction.type).toBe("SingleAction");
+    expect(singleAction.type).toBe("ActionStatement");
     expect(singleAction.action.type).toBe("RecommendActivity");
   });
 
   it("should not duplicate when blocks in nested decisions", () => {
-    const input = `
+    const input = `# Test
 decision "IMMZ.D2.D5.Measles":
-    when "Measles Routine Immunization Schedule Incomplete" then:
+    - when "Measles Routine Immunization Schedule Incomplete" then:
         any:
-        when "No Primary Series Doses Administered" then:
-            when "Client Age Less Than 12 Months" then do "Indicate".
-            when "Last Live Vaccine Administered has had in 4 Weeks" then use "Elderly Based".
-        done
-        when "Client Is Due For MCV12" then do "Vaccinate".
-    done
-done`;
+        - when "No Primary Series Doses Administered" then:
+            - when "Client Age Less Than 12 Months" then recommend activity "Indicate".
+            - when "Last Live Vaccine Administered has had in 4 Weeks" then use decision "Elderly Based".
+        - end when
+        - when "Client Is Due For MCV12" then recommend activity "Vaccinate".
+    - end when`;
 
     const result = parseInput(input);
     const decision = result.statements[0] as Decision;
@@ -168,14 +160,13 @@ done`;
   });
 
   it("should not duplicate action statements in block bodies", () => {
-    const input = `
+    const input = `# Test
 decision "Elderly Based":
-    when "Client Age Less Than 60" then:
-        do "Vaccinate".
-        do "another thing".
-        do "something else".
-    done
-done`;
+    - when "Client Age Less Than 60" then:
+        - recommend activity "Vaccinate".
+        - recommend activity "another thing".
+        - recommend activity "something else".
+    - end when`;
 
     const result = parseInput(input);
     const decision = result.statements[0] as Decision;
@@ -186,15 +177,14 @@ done`;
   });
 
   it("should not duplicate nested when blocks with the same concept name", () => {
-    const input = `
+    const input = `# Test
 decision "Elderly Based":
-    when "Client Age Greater Than 60" then:
-        when "Most Recent BMI" then:
-            use "Some Other Decision".
-            use "Some Other Other Decision".
-        done
-    done
-done`;
+    - when "Client Age Greater Than 60" then:
+        - when "Most Recent BMI" then:
+            - use decision "Some Other Decision".
+            - use decision "Some Other Other Decision".
+        - end when
+    - end when`;
 
     const result = parseInput(input);
     const decision = result.statements[0] as Decision;
@@ -209,24 +199,23 @@ done`;
   });
 
   it("should handle complex nested decisions without duplication", () => {
-    const input = `
+    const input = `# Test
 decision "IMMZ.D2.D5.Measles":
-    when "Measles Routine Immunization Schedule Incomplete" then:
+    - when "Measles Routine Immunization Schedule Incomplete" then:
         any:
-        when "No Primary Series Doses Administered" then:
-            when "Client Age Less Than 12 Months" then do "Indicate".
-            when "Last Live Vaccine Administered has had in 4 Weeks" then use "Elderly Based".
-        done
-        when "Client Is Due For MCV12" then do "Vaccinate".
-    done
-    when "One Primary Series Dose Administered" then:
+        - when "No Primary Series Doses Administered" then:
+            - when "Client Age Less Than 12 Months" then recommend activity "Indicate".
+            - when "Last Live Vaccine Administered has had in 4 Weeks" then use decision "Elderly Based".
+        - end when
+        - when "Client Is Due For MCV12" then recommend activity "Vaccinate".
+    - end when
+    - when "One Primary Series Dose Administered" then:
         all:
-        when "Client Age Less Than 15 Months" then do "Indicate".
-        when "Last Live Vaccine Administered has had in 4 Weeks" then use "Elderly Based".
-        when "Client Is Due For MCV12" then do "Vaccinate".
-    done
-    when "Two Primary Series Doses Administered" then do "Indicate".
-done`;
+        - when "Client Age Less Than 15 Months" then recommend activity "Indicate".
+        - when "Last Live Vaccine Administered has had in 4 Weeks" then use decision "Elderly Based".
+        - when "Client Is Due For MCV12" then recommend activity "Vaccinate".
+    - end when
+    - when "Two Primary Series Doses Administered" then recommend activity "Indicate".`;
 
     const result = parseInput(input);
     const decision = result.statements[0] as Decision;
@@ -243,17 +232,16 @@ done`;
     expect(secondBlockBody.statements).toHaveLength(3);
 
     const thirdWhenBlock = decision.body.statements[2] as WhenBlock;
-    expect(thirdWhenBlock.body.type).toBe(SingleActionType.type);
+    expect(thirdWhenBlock.body.type).toBe("ActionStatement");
   });
 });
 
 describe("Repeated Statements in Decision Blocks", () => {
   it("should preserve repeated when statements", () => {
-    const input = `
+    const input = `# Test
 decision "Test Decision":
-    when "Age Greater Than 18" then do "Standard Care".
-    when "Age Greater Than 18" then do "Monitor Vital Signs".
-done`;
+    - when "Age Greater Than 18" then recommend activity "Standard Care".
+    - when "Age Greater Than 18" then recommend activity "Monitor Vital Signs".`;
 
     const result = parseInput(input);
     const decision = result.statements[0] as Decision;
@@ -265,13 +253,12 @@ done`;
   });
 
   it("should preserve repeated use statements", () => {
-    const input = `
+    const input = `# Test
 decision "Test Decision":
-    when "Age" then:
-        use "Protocol1".
-        use "Protocol2".
-    done
-done`;
+    - when "Age" then:
+        - use decision "Protocol1".
+        - use decision "Protocol2".
+    - end when`;
 
     const result = parseInput(input);
     const decision = result.statements[0] as Decision;
@@ -293,13 +280,12 @@ done`;
   });
 
   it("should preserve repeated do statements", () => {
-    const input = `
+    const input = `# Test
 decision "Test Decision":
-    when "Age" then:
-        do "Action1".
-        do "Action2".
-    done
-done`;
+    - when "Age" then:
+        - recommend activity "Action1".
+        - recommend activity "Action2".
+    - end when`;
 
     const result = parseInput(input);
     const decision = result.statements[0] as Decision;
@@ -321,15 +307,14 @@ done`;
   });
 
   it("should preserve mixed repeated statements", () => {
-    const input = `
+    const input = `# Test
 decision "Test Decision":
-    when "Age" then:
-        do "Action1".
-        use "Protocol1".
-        do "Action2".
-        use "Protocol2".
-    done
-done`;
+    - when "Age" then:
+        - recommend activity "Action1".
+        - use decision "Protocol1".
+        - recommend activity "Action2".
+        - use decision "Protocol2".
+    - end when`;
 
     const result = parseInput(input);
     const decision = result.statements[0] as Decision;
