@@ -76,4 +76,16 @@ describe("Activity Structure", () => {
     expect(activity.activityTypeValue).toBe("");
     expect(activity.terminologyReference).toBeUndefined();
   });
+
+  it("should correctly structure activity with do not perform", () => {
+    const input = 'activity "Contraindicated" request do not perform CPGImmunizationRequest.';
+
+    const result = parseInput(input);
+    const activity = result.statements[0] as Activity;
+
+    expect(activity.type).toBe("Activity");
+    expect(activity.name).toBe("Contraindicated");
+    expect(activity.request).toBe("CPGImmunizationRequest");
+    expect(activity.doNotPerform).toBe(true);
+  });
 });
