@@ -528,7 +528,7 @@ describe('CycleDetector Extended Tests', () => {
                       {
                         type: 'ActionStatement',
                         action: {
-                          type: 'DoActivity',
+                          type: 'RecommendActivity',
                           activityName: 'Vaccinate',
                           location: { start: { line: 1, column: 2 }, end: { line: 1, column: 2 } },
                         },
@@ -538,7 +538,7 @@ describe('CycleDetector Extended Tests', () => {
                       {
                         type: 'ActionStatement',
                         action: {
-                          type: 'DoActivity',
+                          type: 'RecommendActivity',
                           activityName: 'Vaccinate',
                           location: { start: { line: 1, column: 3 }, end: { line: 1, column: 3 } },
                         },

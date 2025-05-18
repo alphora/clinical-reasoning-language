@@ -43,7 +43,7 @@ describe('UnusedDeclarationsValidator - Activities', () => {
     expect(result[0].message).toContain('Unused activity: unusedActivity');
   });
 
-  it('should mark activities as used when referenced in DoActivity', () => {
+  it('should mark activities as used when referenced in RecommendActivity', () => {
     const ast: CRL = {
       type: FileType.type,
       statements: [
@@ -75,7 +75,7 @@ describe('UnusedDeclarationsValidator - Activities', () => {
                     {
                       type: ActionStatementType.type,
                       action: {
-                        type: 'DoActivity',
+                        type: 'RecommendActivity',
                         activityName: 'usedActivity',
                         location: {
                           start: { line: 3, column: 1 },

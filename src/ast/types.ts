@@ -16,6 +16,7 @@ export interface CRL extends ASTNode {
   type: "CRL";
   statements: Statement[];
   location: Location;
+  header?: string;
 }
 export const FileType = {
   type: "CRL" as const,
@@ -92,14 +93,14 @@ export const ActionStatementType = {
   type: "ActionStatement" as const,
 };
 
-// Do activity
-export interface DoActivity extends ASTNode {
-  type: "DoActivity";
+// Recommend activity
+export interface RecommendActivity extends ASTNode {
+  type: "RecommendActivity";
   activityName: string;
   location: Location;
 }
-export const DoActivityType = {
-  type: "DoActivity" as const,
+export const RecommendActivityType = {
+  type: "RecommendActivity" as const,
 };
 
 // Use decision
@@ -125,10 +126,10 @@ export const TerminologyType = {
   type: "Terminology" as const,
 };
 
-// Terminology definition can be a valueset, free text, or system code
+// Terminology definition can be a valueset, unknown, or system code
 export type TerminologyDefinition =
   | TerminologyValueset
-  | TerminologyFreeText
+  | TerminologyUnknown
   | TerminologySystemCode;
 
 // Terminology valueset
@@ -141,14 +142,14 @@ export const TerminologyValuesetType = {
   type: "TerminologyValueset" as const,
 };
 
-// Terminology free text (markdown, etc.)
-export interface TerminologyFreeText extends ASTNode {
-  type: "TerminologyFreeText";
+// Terminology unknown (is ``)
+export interface TerminologyUnknown extends ASTNode {
+  type: "TerminologyUnknown";
   value: string;
   location: Location;
 }
-export const TerminologyFreeTextType = {
-  type: "TerminologyFreeText" as const,
+export const TerminologyUnknownType = {
+  type: "TerminologyUnknown" as const,
 };
 
 // Terminology system code
@@ -172,6 +173,7 @@ export interface Activity extends ASTNode {
   terminologyReference?: string;
   activityTypeValue?: string;
   rationale?: string;
+  doNotPerform?: boolean;
   location: Location;
 }
 
@@ -184,6 +186,7 @@ export interface Concept extends ASTNode {
   conceptType: ConceptType;
   valueType: ConceptValueType;
   definition: ConceptDefinition;
+  meta?: string;
   evidence?: string;
   location: Location;
 }
@@ -275,7 +278,7 @@ export interface Location {
   end: { line: number; column: number };
 }
 
-export type Action = DoActivity | UseDecision;
+export type Action = RecommendActivity | UseDecision;
 
 export type { ActivityType } from "../grammar/activityTypes";
 export type { ConceptType } from "../grammar/conceptTypes";

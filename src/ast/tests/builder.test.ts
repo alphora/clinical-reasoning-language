@@ -8,8 +8,8 @@ import {
   Concept,
   Decision,
   DecisionType,
-  DoActivity,
-  DoActivityType,
+  RecommendActivity,
+  RecommendActivityType,
   FileType,
   Terminology,
   TerminologyType,
@@ -51,8 +51,8 @@ describe("CRLAstBuilder", () => {
       const whenBlock = decision.body.statements[0] as WhenBlock;
       const body = whenBlock.body as SingleAction;
       expect(body.type).toBe(SingleActionType.type);
-      const action = body.action as DoActivity;
-      expect(action.type).toBe(DoActivityType.type);
+      const action = body.action as RecommendActivity;
+      expect(action.type).toBe(RecommendActivityType.type);
       expect(action.activityName).toBe("Propose Diagnosis Task");
     });
 
@@ -117,8 +117,8 @@ describe("CRLAstBuilder", () => {
 
         expect(blockBody.statements).toHaveLength(1);
         const action = blockBody.statements[0] as ActionStatement;
-        expect(action.action.type).toBe(DoActivityType.type);
-        expect((action.action as DoActivity).activityName).toBe("Activity");
+        expect(action.action.type).toBe(RecommendActivityType.type);
+        expect((action.action as RecommendActivity).activityName).toBe("Activity");
       });
 
       it("should parse two do statements", () => {
@@ -138,12 +138,12 @@ describe("CRLAstBuilder", () => {
 
         expect(blockBody.statements).toHaveLength(2);
         const firstAction = blockBody.statements[0] as ActionStatement;
-        expect(firstAction.action.type).toBe(DoActivityType.type);
-        expect((firstAction.action as DoActivity).activityName).toBe("First Activity");
+        expect(firstAction.action.type).toBe(RecommendActivityType.type);
+        expect((firstAction.action as RecommendActivity).activityName).toBe("First Activity");
 
         const secondAction = blockBody.statements[1] as ActionStatement;
-        expect(secondAction.action.type).toBe(DoActivityType.type);
-        expect((secondAction.action as DoActivity).activityName).toBe("Second Activity");
+        expect(secondAction.action.type).toBe(RecommendActivityType.type);
+        expect((secondAction.action as RecommendActivity).activityName).toBe("Second Activity");
       });
 
       it("should parse no do statements", () => {
@@ -227,16 +227,16 @@ describe("CRLAstBuilder", () => {
         expect(blockBody.statements).toHaveLength(4);
         const firstAction = blockBody.statements[0] as ActionStatement;
         expect(firstAction && firstAction.action).toBeTruthy();
-        expect(firstAction.action.type).toBe(DoActivityType.type);
-        expect((firstAction.action as DoActivity).activityName).toBe("First Activity");
+        expect(firstAction.action.type).toBe(RecommendActivityType.type);
+        expect((firstAction.action as RecommendActivity).activityName).toBe("First Activity");
         const secondAction = blockBody.statements[1] as ActionStatement;
         expect(secondAction && secondAction.action).toBeTruthy();
         expect(secondAction.action.type).toBe(UseDecisionType.type);
         expect((secondAction.action as UseDecision).decisionName).toBe("First Decision");
         const thirdAction = blockBody.statements[2] as ActionStatement;
         expect(thirdAction && thirdAction.action).toBeTruthy();
-        expect(thirdAction.action.type).toBe(DoActivityType.type);
-        expect((thirdAction.action as DoActivity).activityName).toBe("Second Activity");
+        expect(thirdAction.action.type).toBe(RecommendActivityType.type);
+        expect((thirdAction.action as RecommendActivity).activityName).toBe("Second Activity");
         const fourthAction = blockBody.statements[3] as ActionStatement;
         expect(fourthAction && fourthAction.action).toBeTruthy();
         expect(fourthAction.action.type).toBe(UseDecisionType.type);
@@ -260,12 +260,12 @@ describe("CRLAstBuilder", () => {
         expect(blockBody.statements).toHaveLength(2);
         const firstAction = blockBody.statements[0] as ActionStatement;
         expect(firstAction && firstAction.action).toBeTruthy();
-        expect(firstAction.action.type).toBe(DoActivityType.type);
-        expect((firstAction.action as DoActivity).activityName).toBe("First Activity");
+        expect(firstAction.action.type).toBe(RecommendActivityType.type);
+        expect((firstAction.action as RecommendActivity).activityName).toBe("First Activity");
         const secondAction = blockBody.statements[1] as ActionStatement;
         expect(secondAction && secondAction.action).toBeTruthy();
-        expect(secondAction.action.type).toBe(DoActivityType.type);
-        expect((secondAction.action as DoActivity).activityName).toBe("Second Activity");
+        expect(secondAction.action.type).toBe(RecommendActivityType.type);
+        expect((secondAction.action as RecommendActivity).activityName).toBe("Second Activity");
       });
 
       it("should parse a block with only use statements (debug)", () => {
@@ -547,8 +547,8 @@ done
       const whenBlock = decision.body.statements[0] as WhenBlock;
       const body = whenBlock.body as SingleAction;
       expect(body.type).toBe(SingleActionType.type);
-      const action = body.action as DoActivity;
-      expect(action.type).toBe(DoActivityType.type);
+      const action = body.action as RecommendActivity;
+      expect(action.type).toBe(RecommendActivityType.type);
       expect(action.activityName).toBe("Propose Diagnosis Task");
     });
 

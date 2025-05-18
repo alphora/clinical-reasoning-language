@@ -4,7 +4,7 @@ import { join } from "path";
 import { CharStreams } from "antlr4ts";
 
 import { CRLAstBuilder } from "../ast/builder";
-import { ASTNode, DoActivity, UseDecision, CRL } from "../ast/types";
+import { ASTNode, RecommendActivity, UseDecision, CRL } from "../ast/types";
 import { CRLLexer } from "../grammar/generated/antlr/CRLLexer";
 import { CRLLexerErrorListener } from "../lexer/CRLLexerErrorListener";
 import { createParser } from "../parser/createParser";
@@ -65,7 +65,7 @@ function printAST(node: ASTNode, indent = 0): string {
 
   // Handle action
   if ("action" in node && node.action) {
-    output += printAST(node.action as DoActivity | UseDecision, indent + 1);
+    output += printAST(node.action as RecommendActivity | UseDecision, indent + 1);
   }
 
   return output;

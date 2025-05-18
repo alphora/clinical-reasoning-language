@@ -5,8 +5,8 @@ import {
   ActionStatement,
   SingleAction,
   SingleActionType,
-  DoActivity,
-  DoActivityType,
+  RecommendActivity,
+  RecommendActivityType,
   UseDecision,
 } from "../types";
 
@@ -60,10 +60,10 @@ done`;
     const decision = result.statements[0] as Decision;
     const whenBlock = decision.body.statements[0] as WhenBlock;
     const singleAction = whenBlock.body as SingleAction;
-    const doActivity = singleAction.action as DoActivity;
+    const doActivity = singleAction.action as RecommendActivity;
 
     expect(singleAction.type).toBe(SingleActionType.type);
-    expect(doActivity.type).toBe(DoActivityType.type);
+    expect(doActivity.type).toBe(RecommendActivityType.type);
     expect(doActivity.activityName).toBe("Vaccinate");
   });
 
@@ -124,7 +124,7 @@ done`;
 
     const doAction = blockBody.statements[0] as ActionStatement;
     expect(doAction.type).toBe("ActionStatement");
-    expect(doAction.action.type).toBe("DoActivity");
+    expect(doAction.action.type).toBe("RecommendActivity");
 
     const useAction = blockBody.statements[1] as ActionStatement;
     expect(useAction.type).toBe("ActionStatement");
@@ -136,7 +136,7 @@ done`;
 
     const singleAction = nestedWhen.body as SingleAction;
     expect(singleAction.type).toBe("SingleAction");
-    expect(singleAction.action.type).toBe("DoActivity");
+    expect(singleAction.action.type).toBe("RecommendActivity");
   });
 
   it("should not duplicate when blocks in nested decisions", () => {
@@ -313,11 +313,11 @@ done`;
     expect(doAction1.type).toBe("ActionStatement");
     expect(doAction2.type).toBe("ActionStatement");
 
-    expect(doAction1.action.type).toBe("DoActivity");
-    expect(doAction2.action.type).toBe("DoActivity");
+    expect(doAction1.action.type).toBe("RecommendActivity");
+    expect(doAction2.action.type).toBe("RecommendActivity");
 
-    expect((doAction1.action as DoActivity).activityName).toBe("Action1");
-    expect((doAction2.action as DoActivity).activityName).toBe("Action2");
+    expect((doAction1.action as RecommendActivity).activityName).toBe("Action1");
+    expect((doAction2.action as RecommendActivity).activityName).toBe("Action2");
   });
 
   it("should preserve mixed repeated statements", () => {
@@ -349,14 +349,14 @@ done`;
     expect(doAction2.type).toBe("ActionStatement");
     expect(useAction2.type).toBe("ActionStatement");
 
-    expect(doAction1.action.type).toBe("DoActivity");
+    expect(doAction1.action.type).toBe("RecommendActivity");
     expect(useAction1.action.type).toBe("UseDecision");
-    expect(doAction2.action.type).toBe("DoActivity");
+    expect(doAction2.action.type).toBe("RecommendActivity");
     expect(useAction2.action.type).toBe("UseDecision");
 
-    expect((doAction1.action as DoActivity).activityName).toBe("Action1");
+    expect((doAction1.action as RecommendActivity).activityName).toBe("Action1");
     expect((useAction1.action as UseDecision).decisionName).toBe("Protocol1");
-    expect((doAction2.action as DoActivity).activityName).toBe("Action2");
+    expect((doAction2.action as RecommendActivity).activityName).toBe("Action2");
     expect((useAction2.action as UseDecision).decisionName).toBe("Protocol2");
   });
 });
