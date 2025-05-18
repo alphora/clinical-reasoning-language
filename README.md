@@ -188,10 +188,9 @@ The package provides four main functions for processing CRL code:
 import { tokenizeCRL } from '@smile-digital-health/crl';
 
 
-const result = tokenizeCRL(`
+const result = tokenizeCRL(`# Example
   decision "Test":
-    when "Condition" then do "Action".
-  done
+    - when "Condition" then recommend activity "Action".
 `);
 
 if (result.success) {
@@ -208,10 +207,9 @@ if (result.success) {
 ```typescript
 import { parseCRL } from '@smile-digital-health/crl';
 
-const result = parseCRL(`
+const result = parseCRL(`# Example
   decision "Test":
-    when "Condition" then do "Action".
-  done
+    - when "Condition" then recommend activity "Action".
 `);
 
 if (result.success) {
@@ -228,10 +226,9 @@ if (result.success) {
 ```typescript
 import { buildCRL } from '@smile-digital-health/crl';
 
-const result = buildCRL(`
+const result = buildCRL(`# Example
   decision "Test":
-    when "Condition" then do "Action".
-  done
+    - when "Condition" then recommend activity "Action".
 `);
 
 if (result.success) {
@@ -250,10 +247,9 @@ if (result.success) {
 ```typescript
 import { validateCRL } from '@smile-digital-health/crl';
 
-const result = validateCRL(`
+const result = validateCRL(`# Example
   decision "Test":
-    when "Condition" then do "Action".
-  done
+    - when "Condition" then recommend activity "Action".
 `);
 
 if (result.success) {
@@ -542,3 +538,13 @@ setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
 ```
 
 This ensures that error logs are visible during development and CLI runs, but do not clutter test output.
+
+## Editor Support: VS Code Extension
+
+We provide a Visual Studio Code extension for CRL files:
+
+- Syntax highlighting for `.crl` files
+- Comment support
+- Language basics for a better editing experience
+
+For installation instructions and full details, see [extension/README.md](./extension/README.md)

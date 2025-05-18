@@ -301,3 +301,40 @@ Commits included since v0.5.3:
 - Improved file generation and movement in build pipeline
 
 [0.7.0]: https://github.com/smile-digital-health/clinical-reasoning-language/releases/tag/v0.6.0
+
+## [0.8.0] - 2024-06-10
+
+### Added
+- CLI and API now check for parser errors first, then lexer errors, then AST/validation errors, providing more helpful and user-friendly error messages.
+- Added clear error message to `validateCRL` API indicating it is not yet implemented.
+- Added test for activity do not perform.
+- Added header as the identifier in the AST and parser.
+- Added error reporting and non-zero exit codes to CLI tools for better automation and scripting support.
+
+### Changed
+- Refactored builder and CLI to use best practices for error handling and type values.
+- Updated CLI tools to allow path argument and improved example files.
+- Updated npm test to run all tests.
+- Moved createBuilder to its own class for consistency.
+- Updated examples and regression tests to match grammar and AST changes.
+- Updated parser and lexer to support new grammar features (e.g., do not perform, recommend/request, is system/valueset).
+- Updated syntax highlighting extension for new tokens and multi-word support.
+- Updated documentation to reflect new error handling and CLI usage.
+
+### Fixed
+- Fixed bug in AST that was missing when statements due to not using named identifiers in the grammar.
+- Fixed build issue with AST builder and temporarily removed validator tests.
+- Fixed duplicate error messages issue in error handling.
+- Fixed linter issues and removed unused variables in mapping/planDefinition.
+- Fixed bug where parser error logging was happening in the wrong place (now only the consumer logs errors).
+- Fixed structure and concept tests for new AST and grammar.
+- Fixed regression and builder tests for new grammar and AST structure.
+
+### Technical Improvements
+- Removed legacy abstractions (SingleAction, DoActivity) from AST and builder.
+- Refactored AST builder to use string literals for type properties and modern TypeScript idioms.
+- Improved error handling and debug logging in builder and CLI.
+- Hardened CLI and API error handling for cross-platform compatibility.
+- Improved code organization and modularity in CLI and builder.
+
+[0.8.0]: https://github.com/cqis/crl/compare/v0.7.0...0.8.0
