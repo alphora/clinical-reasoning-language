@@ -13,12 +13,8 @@ class Validator {
     validate(ast) {
         const errors = [];
         const warnings = [];
-        const unusedResult = this.unusedDeclarationsValidator.validate(ast);
-        warnings.push(...unusedResult);
         const nameResult = this.nameUniquenessValidator.validate(ast);
         errors.push(...nameResult);
-        const actionResult = this.actionUniquenessValidator.validate(ast);
-        errors.push(...actionResult);
         return {
             isValid: errors.length === 0,
             errors,

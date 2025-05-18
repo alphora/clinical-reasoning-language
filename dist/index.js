@@ -8,7 +8,6 @@ const builder_1 = require("./ast/builder");
 const CRLLexer_1 = require("./grammar/generated/antlr/CRLLexer");
 const createLexer_1 = require("./lexer/createLexer");
 const createParser_1 = require("./parser/createParser");
-const validator_1 = require("./validator/validator");
 function tokenizeCRL(input) {
     try {
         const { lexer, errorListener } = (0, createLexer_1.createLexer)(input);
@@ -47,9 +46,13 @@ function parseCRL(input) {
         lexerErrorListener = parserSetup.lexerErrorListener;
         parserErrorListener = parserSetup.parserErrorListener;
         const tree = parserSetup.parser.crl();
-        const errors = [...lexerErrorListener.getErrors(), ...parserErrorListener.getErrors()];
-        if (errors.length > 0) {
-            return { success: false, errors };
+        const parserErrors = parserErrorListener.getErrors();
+        if (parserErrors.length > 0) {
+            return { success: false, errors: parserErrors };
+        }
+        const lexerErrors = lexerErrorListener.getErrors();
+        if (lexerErrors.length > 0) {
+            return { success: false, errors: lexerErrors };
         }
         return { success: true, result: tree };
     }
@@ -77,13 +80,17 @@ function buildCRL(input) {
         const tree = parserSetup.parser.crl();
         builder = new builder_1.CRLAstBuilder();
         const ast = builder.visit(tree);
-        const errors = [
-            ...lexerErrorListener.getErrors(),
-            ...parserErrorListener.getErrors(),
-            ...builder.getErrors(),
-        ];
-        if (errors.length > 0) {
-            return { success: false, errors };
+        const parserErrors = parserErrorListener.getErrors();
+        if (parserErrors.length > 0) {
+            return { success: false, errors: parserErrors };
+        }
+        const lexerErrors = lexerErrorListener.getErrors();
+        if (lexerErrors.length > 0) {
+            return { success: false, errors: lexerErrors };
+        }
+        const builderErrors = builder.getErrors();
+        if (builderErrors.length > 0) {
+            return { success: false, errors: builderErrors };
         }
         return { success: true, result: ast };
     }
@@ -104,44 +111,10 @@ function buildCRL(input) {
     }
 }
 function validateCRL(input) {
-    try {
-        const { parser, lexerErrorListener, parserErrorListener } = (0, createParser_1.createParser)(input);
-        const tree = parser.crl();
-        const builder = new builder_1.CRLAstBuilder();
-        const ast = builder.visit(tree);
-        const errors = [...lexerErrorListener.getErrors(), ...parserErrorListener.getErrors()];
-        if (errors.length > 0) {
-            return { success: false, errors };
-        }
-        const validator = new validator_1.Validator();
-        const validationResult = validator.validate(ast);
-        if (!validationResult.isValid) {
-            return {
-                success: false,
-                errors: [
-                    ...validationResult.errors.map((e) => ({
-                        type: "Exception",
-                        message: e.message,
-                    })),
-                    ...validationResult.warnings.map((w) => ({
-                        type: "Exception",
-                        message: w.message,
-                    })),
-                ],
-            };
-        }
-        return { success: true, result: ast };
+    const result = buildCRL(input);
+    if (!result.success) {
+        throw new Error(`validateCRL is not currently implemented. Use buildCRL instead. Look for updates in the future. Build errors: ${JSON.stringify(result.errors, null, 2)}`);
     }
-    catch (error) {
-        return {
-            success: false,
-            errors: [
-                {
-                    type: "Exception",
-                    message: error instanceof Error ? error.message : String(error),
-                },
-            ],
-        };
-    }
+    throw new Error("validateCRL is not currently implemented. Use buildCRL instead. Look for updates in the future.");
 }
 //# sourceMappingURL=index.js.map

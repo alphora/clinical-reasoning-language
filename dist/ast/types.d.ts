@@ -18,10 +18,8 @@ export interface CRL extends ASTNode {
     type: "CRL";
     statements: Statement[];
     location: Location;
+    header?: string;
 }
-export declare const FileType: {
-    type: "CRL";
-};
 export type Statement = Decision | Concept | Activity | Terminology;
 export interface Decision extends ASTNode {
     type: "Decision";
@@ -29,110 +27,70 @@ export interface Decision extends ASTNode {
     body: DecisionBody;
     location: Location;
 }
-export declare const DecisionType: {
-    type: "Decision";
-};
 export interface DecisionBody extends ASTNode {
     type: "DecisionBody";
     statements: WhenBlock[];
     location: Location;
 }
-export declare const DecisionBodyType: {
-    type: "DecisionBody";
-};
 export interface WhenBlock extends ASTNode {
     type: "WhenBlock";
     conceptName: string;
-    body: BlockBody | SingleAction;
+    body: WhenBlockBody;
     location: Location;
 }
-export declare const WhenBlockType: {
-    type: "WhenBlock";
-};
-export type WhenBlockBody = BlockBody | SingleAction;
+export type WhenBlockBody = BlockBody | ActionStatement;
 export interface BlockBody extends ASTNode {
     type: "BlockBody";
     qualifier?: string;
     statements: (WhenBlock | ActionStatement)[];
     location: Location;
 }
-export declare const BlockBodyType: {
-    type: "BlockBody";
-};
-export interface SingleAction extends ASTNode {
-    type: "SingleAction";
-    action: Action;
-    location: Location;
-}
-export declare const SingleActionType: {
-    type: "SingleAction";
-};
 export interface ActionStatement extends ASTNode {
     type: "ActionStatement";
     action: Action;
     location: Location;
 }
-export declare const ActionStatementType: {
-    type: "ActionStatement";
-};
-export interface DoActivity extends ASTNode {
-    type: "DoActivity";
+export interface RecommendActivity extends ASTNode {
+    type: "RecommendActivity";
     activityName: string;
     location: Location;
 }
-export declare const DoActivityType: {
-    type: "DoActivity";
-};
 export interface UseDecision extends ASTNode {
     type: "UseDecision";
     decisionName: string;
     location: Location;
 }
-export declare const UseDecisionType: {
-    type: "UseDecision";
-};
 export interface Terminology extends ASTNode {
     type: "Terminology";
     name: string;
     definition: TerminologyDefinition;
     location: Location;
 }
-export declare const TerminologyType: {
-    type: "Terminology";
-};
-export type TerminologyDefinition = TerminologyValueset | TerminologyFreeText | TerminologySystemCode;
+export type TerminologyDefinition = TerminologyValueset | TerminologyUnknown | TerminologySystemCode;
 export interface TerminologyValueset extends ASTNode {
     type: "TerminologyValueset";
     valuesetName: string;
     location: Location;
 }
-export declare const TerminologyValuesetType: {
-    type: "TerminologyValueset";
-};
-export interface TerminologyFreeText extends ASTNode {
-    type: "TerminologyFreeText";
+export interface TerminologyUnknown extends ASTNode {
+    type: "TerminologyUnknown";
     value: string;
     location: Location;
 }
-export declare const TerminologyFreeTextType: {
-    type: "TerminologyFreeText";
-};
 export interface TerminologySystemCode extends ASTNode {
     type: "TerminologySystemCode";
     system: string;
     code: string;
     location: Location;
 }
-export declare const TerminologySystemCodeType: {
-    type: "TerminologySystemCode";
-};
 export interface Activity extends ASTNode {
     type: "Activity";
     name: string;
-    perform: ActivityType;
+    request: ActivityType;
     terminologyReference?: string;
     activityTypeValue?: string;
     rationale?: string;
+    doNotPerform?: boolean;
     location: Location;
 }
 export interface Concept extends ASTNode {
@@ -141,6 +99,7 @@ export interface Concept extends ASTNode {
     conceptType: ConceptType;
     valueType: ConceptValueType;
     definition: ConceptDefinition;
+    meta?: string;
     evidence?: string;
     location: Location;
 }
@@ -150,60 +109,36 @@ export interface CodedFromDefinition extends ASTNode {
     terminologyName: string;
     location: Location;
 }
-export declare const CodedFromDefinitionType: {
-    type: "CodedFromDefinition";
-};
 export interface ConceptReference extends ASTNode {
     type: "ConceptReference";
     name: string;
 }
-export declare const ConceptReferenceType: {
-    type: "ConceptReference";
-};
 export interface InformalAnd extends ASTNode {
     type: "AndExpression";
     terms: InferredFromExpression[];
 }
-export declare const InformalAndType: {
-    type: "AndExpression";
-};
 export interface InformalOr extends ASTNode {
     type: "OrExpression";
     terms: InferredFromExpression[];
 }
-export declare const InformalOrType: {
-    type: "OrExpression";
-};
 export interface NotExpression extends ASTNode {
     type: "NotExpression";
     expression: InferredFromExpression;
 }
-export declare const NotExpressionType: {
-    type: "NotExpression";
-};
 export type InferredFromExpression = ConceptReference | InformalAnd | InformalOr | GroupExpression | NotExpression;
 export interface GroupExpression extends ASTNode {
     type: "GroupExpression";
     expression: InferredFromExpression;
 }
-export declare const GroupExpressionType: {
-    type: "GroupExpression";
-};
 export interface InferredFromConcept extends ASTNode {
     type: "InferredFromDefinitionConcept";
     concept: string;
     pattern?: string;
 }
-export declare const InferredFromConceptType: {
-    type: "InferredFromDefinitionConcept";
-};
 export interface InferredFromDefinition extends ASTNode {
     type: "InferredFromDefinition";
     body: InferredFromConcept | InferredFromExpression;
 }
-export declare const InferredFromDefinitionType: {
-    type: "InferredFromDefinition";
-};
 export interface Location {
     start: {
         line: number;
@@ -214,7 +149,7 @@ export interface Location {
         column: number;
     };
 }
-export type Action = DoActivity | UseDecision;
+export type Action = RecommendActivity | UseDecision;
 export type { ActivityType } from "../grammar/activityTypes";
 export type { ConceptType } from "../grammar/conceptTypes";
 export type { ConceptValueType } from "../grammar/conceptValueTypes";

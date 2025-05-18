@@ -26,7 +26,6 @@ class CustomParserErrorListener {
                 offendingSymbol: offendingDetails,
             },
         };
-        console.error(JSON.stringify(error, null, 2));
         this.errors.push(error);
     }
     getErrors() {

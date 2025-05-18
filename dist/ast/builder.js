@@ -3,7 +3,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.CRLAstBuilder = void 0;
 const AbstractParseTreeVisitor_1 = require("antlr4ts/tree/AbstractParseTreeVisitor");
 const CRLParser_1 = require("../grammar/generated/antlr/CRLParser");
-const types_1 = require("./types");
 function getLocation(ctx) {
     const start = ctx.start;
     const stop = ctx.stop ?? start;
@@ -42,80 +41,100 @@ class CRLAstBuilder extends AbstractParseTreeVisitor_1.AbstractParseTreeVisitor 
         });
     }
     visitCrl(ctx) {
+        let header;
+        const headerNode = ctx.HEADER();
+        if (headerNode) {
+            header = headerNode.text.replace(/^#\s*/, "");
+        }
         const statements = ctx.statement().map((s) => this.visit(s));
-        return { type: types_1.FileType.type, statements, location: getLocation(ctx) };
+        return {
+            type: "CRL",
+            ...(header ? { identifier: header } : {}),
+            statements,
+            location: getLocation(ctx),
+        };
     }
     visitDecisionStatement(ctx) {
         const name = ctx.decisionIdentifier().text.slice(1, -1);
         const body = this.visit(ctx.decisionBody());
-        return { type: types_1.DecisionType.type, name, body, location: getLocation(ctx) };
+        return { type: "Decision", name, body, location: getLocation(ctx) };
     }
     visitDecisionBody(ctx) {
         const statements = ctx.whenBlock().map((w) => this.visit(w));
-        return { type: types_1.DecisionBodyType.type, statements, location: getLocation(ctx) };
+        return { type: "DecisionBody", statements, location: getLocation(ctx) };
+    }
+    visitWhenBlock(ctx) {
+        if (ctx instanceof CRLParser_1.WhenWithBodyContext) {
+            return this.visitWhenWithBody(ctx);
+        }
+        else if (ctx instanceof CRLParser_1.WhenSingleActionContext) {
+            return this.visitWhenSingleAction(ctx);
+        }
+        this.reportError("Unknown whenBlock alternative", ctx);
+        return null;
     }
     visitWhenWithBody(ctx) {
         const conceptName = ctx.conceptReference().text.slice(1, -1);
         const body = this.visit(ctx.blockBody());
-        return { type: types_1.WhenBlockType.type, conceptName, body, location: getLocation(ctx) };
+        return { type: "WhenBlock", conceptName, body, location: getLocation(ctx) };
     }
     visitWhenSingleAction(ctx) {
         const conceptName = ctx.conceptReference().text.slice(1, -1);
-        const action = this.visit(ctx.singleActionStatement());
-        return { type: types_1.WhenBlockType.type, conceptName, body: action, location: getLocation(ctx) };
+        const action = this.visit(ctx.actionStatement());
+        return { type: "WhenBlock", conceptName, body: action, location: getLocation(ctx) };
     }
     visitNestedWhenBlock(ctx) {
         return this.visit(ctx.whenBlock());
     }
-    visitBlockAction(ctx) {
-        const result = this.visit(ctx.actionStatement());
-        return result;
+    visitBlockStatement(ctx) {
+        if (ctx instanceof CRLParser_1.NestedWhenBlockContext) {
+            return this.visitNestedWhenBlock(ctx);
+        }
+        else if (ctx instanceof CRLParser_1.BlockActionContext) {
+            return this.visitBlockAction(ctx);
+        }
+        this.reportError("Unknown blockStatement alternative", ctx);
+        return null;
     }
     visitBlockBody(ctx) {
         const qualifier = ctx.anyOrAllClause() ? ctx.anyOrAllClause().text.slice(0, -1) : undefined;
         const statements = [];
         for (const stmtCtx of ctx.blockStatement()) {
-            if (stmtCtx instanceof CRLParser_1.NestedWhenBlockContext) {
-                statements.push(this.visitNestedWhenBlock(stmtCtx));
-            }
-            else if (stmtCtx instanceof CRLParser_1.BlockActionContext) {
-                statements.push(this.visitBlockAction(stmtCtx));
-            }
+            statements.push(this.visitBlockStatement(stmtCtx));
         }
         return {
-            type: types_1.BlockBodyType.type,
+            type: "BlockBody",
             qualifier,
             statements,
             location: getLocation(ctx),
         };
     }
-    visitSingleActionStatement(ctx) {
-        const action = this.visit(ctx.doStatement() ?? ctx.useStatement());
-        return { type: types_1.SingleActionType.type, action, location: getLocation(ctx) };
+    visitBlockAction(ctx) {
+        return this.visit(ctx.actionStatement());
     }
     visitActionStatement(ctx) {
-        const doStmt = ctx.doStatement?.();
+        const recStmt = ctx.recommendStatement?.();
         const useStmt = ctx.useStatement?.();
         let action;
-        if (doStmt) {
-            action = this.visitDoStatement(doStmt);
+        if (recStmt) {
+            action = this.visitRecommendStatement(recStmt);
         }
         else if (useStmt) {
             action = this.visitUseStatement(useStmt);
         }
         else {
-            throw new Error("ActionStatement must have doStatement or useStatement");
+            throw new Error("ActionStatement must have recommendStatement or useStatement");
         }
         return { type: "ActionStatement", action, location: getLocation(ctx) };
     }
-    visitDoStatement(ctx) {
+    visitRecommendStatement(ctx) {
         const activityName = ctx.activityReference().text.slice(1, -1);
-        const result = { type: types_1.DoActivityType.type, activityName, location: getLocation(ctx) };
+        const result = { type: "RecommendActivity", activityName, location: getLocation(ctx) };
         return result;
     }
     visitUseStatement(ctx) {
         const decisionName = ctx.decisionReference().text.slice(1, -1);
-        const result = { type: types_1.UseDecisionType.type, decisionName, location: getLocation(ctx) };
+        const result = { type: "UseDecision", decisionName, location: getLocation(ctx) };
         return result;
     }
     visitTerminologyStatement(ctx) {
@@ -127,23 +146,23 @@ class CRLAstBuilder extends AbstractParseTreeVisitor_1.AbstractParseTreeVisitor 
         else if (ctx.terminologySystemCode()) {
             definition = this.visit(ctx.terminologySystemCode());
         }
-        else if (ctx.backtickString()) {
+        else if (ctx.terminologyUnknown()) {
             definition = {
-                type: "TerminologyFreeText",
-                value: ctx.backtickString().text.slice(1, -1),
+                type: "TerminologyUnknown",
+                value: "",
                 location: getLocation(ctx),
             };
         }
         return {
-            type: types_1.TerminologyType.type,
+            type: "Terminology",
             name,
             definition: definition,
             location: getLocation(ctx),
         };
     }
     visitTerminologyValueset(ctx) {
-        const valuesetName = ctx.identifier().text.slice(1, -1);
-        return { type: types_1.TerminologyValuesetType.type, valuesetName, location: getLocation(ctx) };
+        const valuesetName = ctx.backtickString().text.slice(1, -1);
+        return { type: "TerminologyValueset", valuesetName, location: getLocation(ctx) };
     }
     visitTerminologySystemCode(ctx) {
         let system = "";
@@ -156,7 +175,7 @@ class CRLAstBuilder extends AbstractParseTreeVisitor_1.AbstractParseTreeVisitor 
             if (codeNode?.text)
                 code = codeNode.text.slice(1, -1);
         }
-        return { type: types_1.TerminologySystemCodeType.type, system, code, location: getLocation(ctx) };
+        return { type: "TerminologySystemCode", system, code, location: getLocation(ctx) };
     }
     parseWithClause(ctx) {
         let terminologyReference;
@@ -191,16 +210,18 @@ class CRLAstBuilder extends AbstractParseTreeVisitor_1.AbstractParseTreeVisitor 
     }
     visitActivityStatement(ctx) {
         const name = ctx.activityIdentifier().text.slice(1, -1);
-        const perform = ctx.ACTIVITY_TYPE().text;
+        const request = ctx.ACTIVITY_TYPE().text;
         const { terminologyReference, activityTypeValue } = this.parseWithClause(ctx);
         const rationale = this.parseRationaleClause(ctx);
+        const doNotPerform = ctx.doNotPerform?.() != null;
         return {
             type: "Activity",
             name,
-            perform,
+            request,
             terminologyReference,
             activityTypeValue,
             rationale,
+            doNotPerform,
             location: getLocation(ctx),
         };
     }
@@ -266,7 +287,7 @@ class CRLAstBuilder extends AbstractParseTreeVisitor_1.AbstractParseTreeVisitor 
                 return null;
             }
             return {
-                type: types_1.CodedFromDefinitionType.type,
+                type: "CodedFromDefinition",
                 terminologyName: termRef,
                 location: getLocation(bodyCtx.codedFromLine()),
             };
@@ -320,32 +341,39 @@ class CRLAstBuilder extends AbstractParseTreeVisitor_1.AbstractParseTreeVisitor 
     visitInferredFromLine(ctx) {
         const defCtx = ctx.inferredBody();
         const body = this.visit(defCtx);
-        return { type: types_1.InferredFromDefinitionType.type, body, location: getLocation(ctx) };
+        return { type: "InferredFromDefinition", body, location: getLocation(ctx) };
     }
     visitDefinitionConcept(ctx) {
-        const refCtx = ctx.inferredFromConceptReference();
+        const refCtx = ctx.getRuleContext(0, CRLParser_1.InferredFromConceptReferenceContext);
         let pat = undefined;
-        if (refCtx.patternStatement) {
-            const patternCtx = refCtx.patternStatement();
-            if (patternCtx?.patternName?.().backtickString) {
-                const backtickCtx = patternCtx.patternName().backtickString();
-                if (backtickCtx?.text !== undefined) {
-                    pat = backtickCtx.text.slice(1, -1);
-                }
+        const patternCtx = refCtx?.patternStatement?.();
+        if (patternCtx?.patternName?.().backtickString) {
+            const backtickCtx = patternCtx.patternName().backtickString();
+            if (backtickCtx?.text !== undefined) {
+                pat = backtickCtx.text.slice(1, -1);
             }
         }
-        const concept = refCtx.conceptReference().text.slice(1, -1);
+        const concept = refCtx?.conceptReference().text.slice(1, -1) ?? "";
         return {
-            type: types_1.InferredFromConceptType.type,
+            type: "InferredFromDefinitionConcept",
             pattern: pat,
             concept,
             location: getLocation(ctx),
         };
     }
     visitDefinitionLogic(ctx) {
-        const descCtx = ctx.inferredFromDescriptiveLogic();
-        const exprCtx = descCtx.inferredFromExpression();
-        return this.visit(exprCtx);
+        const descCtx = ctx.getRuleContext(0, CRLParser_1.InferredFromDescriptiveLogicContext);
+        const exprCtx = descCtx?.inferredFromExpression();
+        const expr = this.visit(exprCtx);
+        if (expr && expr.type === "ConceptReference") {
+            const conceptRef = expr;
+            return {
+                type: "InferredFromDefinitionConcept",
+                concept: conceptRef.name,
+                location: getLocation(ctx),
+            };
+        }
+        return expr;
     }
     visitInferredFromExpression(ctx) {
         return this.visit(ctx.informalOr());
@@ -353,7 +381,7 @@ class CRLAstBuilder extends AbstractParseTreeVisitor_1.AbstractParseTreeVisitor 
     visitInformalOr(ctx) {
         const terms = ctx.informalAnd().map((a) => this.visit(a));
         if (ctx.OR().length) {
-            return { type: types_1.InformalOrType.type, terms, location: getLocation(ctx) };
+            return { type: "OrExpression", terms, location: getLocation(ctx) };
         }
         return terms[0];
     }
@@ -362,14 +390,14 @@ class CRLAstBuilder extends AbstractParseTreeVisitor_1.AbstractParseTreeVisitor 
             .informalNot()
             .map((n) => this.visit(n));
         if (ctx.AND().length) {
-            return { type: types_1.InformalAndType.type, terms, location: getLocation(ctx) };
+            return { type: "AndExpression", terms, location: getLocation(ctx) };
         }
         return terms[0];
     }
     visitInformalNot(ctx) {
         if (ctx.NOT()) {
             return {
-                type: types_1.NotExpressionType.type,
+                type: "NotExpression",
                 expression: this.visit(ctx.informalNot()),
                 location: getLocation(ctx),
             };
@@ -377,12 +405,14 @@ class CRLAstBuilder extends AbstractParseTreeVisitor_1.AbstractParseTreeVisitor 
         return this.visit(ctx.atom());
     }
     visitConceptAtom(ctx) {
-        const name = ctx.conceptReference().text.slice(1, -1);
-        return { type: types_1.ConceptReferenceType.type, name, location: getLocation(ctx) };
+        const conceptRefCtx = ctx.getRuleContext(0, CRLParser_1.ConceptReferenceContext);
+        const name = conceptRefCtx?.text?.slice(1, -1) ?? "";
+        return { type: "ConceptReference", name, location: getLocation(ctx) };
     }
     visitGroupExpression(ctx) {
-        const expr = this.visit(ctx.inferredFromExpression());
-        return { type: types_1.GroupExpressionType.type, expression: expr, location: getLocation(ctx) };
+        const exprCtx = ctx.getRuleContext(0, CRLParser_1.InferredFromExpressionContext);
+        const expr = this.visit(exprCtx);
+        return { type: "GroupExpression", expression: expr, location: getLocation(ctx) };
     }
 }
 exports.CRLAstBuilder = CRLAstBuilder;
