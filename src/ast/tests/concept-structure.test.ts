@@ -33,9 +33,9 @@ concept "Client Age Less Than 12 Months":
     expect(definition.type).toBe("InferredFromDefinition");
 
     const body = definition.body as InferredFromConcept;
-    expect(body.type).toBe("ConceptReference");
+    expect(body.type).toBe("InferredFromDefinitionConcept");
     expect(body.pattern).toBeUndefined();
-    expect(body.name).toBe("Less Than");
+    expect(body.concept).toBe("Less Than");
   });
 
   it("should correctly structure concept with inferred by descriptive logic", () => {

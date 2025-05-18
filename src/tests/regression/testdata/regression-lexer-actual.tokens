@@ -1,6 +1,6 @@
 
 > @smile-digital-health/crl@0.7.0 cli:lexer
-> ts-node src/cli/run-lexer.ts D:\src\clinical-reasoning-language\src\tests\testdata\smart-example-immz
+> ts-node src/cli/run-lexer.ts D:\src\clinical-reasoning-language\src\tests\regression\testdata\smart-example-immz
 
 [
   {

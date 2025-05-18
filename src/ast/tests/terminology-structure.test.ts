@@ -4,8 +4,8 @@ import { parseInput } from "./parseInput";
 
 describe("Terminology Structure", () => {
   it("should correctly structure terminology with valueset", () => {
-    const input = `
-terminology "MeaslesVaccineCodes" valueset "bmi valueset".
+    const input = `# Test
+terminology "MeaslesVaccineCodes" is valueset "bmi valueset".
 `;
 
     const result = parseInput(input);
@@ -21,8 +21,8 @@ terminology "MeaslesVaccineCodes" valueset "bmi valueset".
   });
 
   it("should correctly structure terminology with system and code", () => {
-    const input = `
-terminology "MeaslesVaccineCodes" system \`http://snomed.info/sct\` code \`871807003\`.
+    const input = `# Test
+terminology "MeaslesVaccineCodes" is system \`http://snomed.info/sct\` and code \`871807003\`.
 `;
 
     const result = parseInput(input);

@@ -1,9 +1,6 @@
-
-> @smile-digital-health/crl@0.6.1 cli:ast
-> ts-node src/cli/run-ast.ts D:\src\clinical-reasoning-language\src\tests\testdata\smart-example-immz
-
 {
   "type": "CRL",
+  "identifier": "IMMZ_All_Decisions",
   "statements": [
     {
       "type": "Decision",
@@ -27,40 +24,40 @@
                         "type": "WhenBlock",
                         "conceptName": "Client Age Less Than 6 Months",
                         "body": {
-                          "type": "SingleAction",
+                          "type": "ActionStatement",
                           "action": {
                             "type": "RecommendActivity",
                             "activityName": "Client Age Less Than 6 Months",
                             "location": {
                               "start": {
-                                "line": 7,
-                                "column": 54
+                                "line": 11,
+                                "column": 48
                               },
                               "end": {
-                                "line": 7,
-                                "column": 88
+                                "line": 11,
+                                "column": 99
                               }
                             }
                           },
                           "location": {
                             "start": {
-                              "line": 7,
-                              "column": 54
+                              "line": 11,
+                              "column": 48
                             },
                             "end": {
-                              "line": 7,
-                              "column": 89
+                              "line": 11,
+                              "column": 99
                             }
                           }
                         },
                         "location": {
                           "start": {
-                            "line": 7,
-                            "column": 12
+                            "line": 11,
+                            "column": 4
                           },
                           "end": {
-                            "line": 7,
-                            "column": 89
+                            "line": 11,
+                            "column": 99
                           }
                         }
                       },
@@ -68,40 +65,40 @@
                         "type": "WhenBlock",
                         "conceptName": "Last Live Vaccine Administered Within 4 Weeks",
                         "body": {
-                          "type": "SingleAction",
+                          "type": "ActionStatement",
                           "action": {
                             "type": "RecommendActivity",
                             "activityName": "Last Live Vaccine Administered Within 4 Weeks",
                             "location": {
                               "start": {
-                                "line": 8,
-                                "column": 70
+                                "line": 12,
+                                "column": 64
                               },
                               "end": {
-                                "line": 8,
-                                "column": 120
+                                "line": 12,
+                                "column": 131
                               }
                             }
                           },
                           "location": {
                             "start": {
-                              "line": 8,
-                              "column": 70
+                              "line": 12,
+                              "column": 64
                             },
                             "end": {
-                              "line": 8,
-                              "column": 121
+                              "line": 12,
+                              "column": 131
                             }
                           }
                         },
                         "location": {
                           "start": {
-                            "line": 8,
-                            "column": 12
+                            "line": 12,
+                            "column": 4
                           },
                           "end": {
-                            "line": 8,
-                            "column": 121
+                            "line": 12,
+                            "column": 131
                           }
                         }
                       },
@@ -109,62 +106,62 @@
                         "type": "WhenBlock",
                         "conceptName": "Client Is Due For MCV0",
                         "body": {
-                          "type": "SingleAction",
+                          "type": "ActionStatement",
                           "action": {
                             "type": "RecommendActivity",
                             "activityName": "Provide Measles Vaccine",
                             "location": {
                               "start": {
-                                "line": 9,
-                                "column": 47
+                                "line": 13,
+                                "column": 41
                               },
                               "end": {
-                                "line": 9,
-                                "column": 75
+                                "line": 13,
+                                "column": 86
                               }
                             }
                           },
                           "location": {
                             "start": {
-                              "line": 9,
-                              "column": 47
+                              "line": 13,
+                              "column": 41
                             },
                             "end": {
-                              "line": 9,
-                              "column": 76
+                              "line": 13,
+                              "column": 86
                             }
                           }
                         },
                         "location": {
                           "start": {
-                            "line": 9,
-                            "column": 12
+                            "line": 13,
+                            "column": 4
                           },
                           "end": {
-                            "line": 9,
-                            "column": 76
+                            "line": 13,
+                            "column": 86
                           }
                         }
                       }
                     ],
                     "location": {
                       "start": {
-                        "line": 6,
-                        "column": 46
+                        "line": 10,
+                        "column": 42
                       },
                       "end": {
-                        "line": 10,
-                        "column": 12
+                        "line": 13,
+                        "column": 86
                       }
                     }
                   },
                   "location": {
                     "start": {
-                      "line": 6,
-                      "column": 8
+                      "line": 10,
+                      "column": 2
                     },
                     "end": {
-                      "line": 10,
+                      "line": 14,
                       "column": 12
                     }
                   }
@@ -173,86 +170,86 @@
                   "type": "WhenBlock",
                   "conceptName": "MCV0 Dose Administered",
                   "body": {
-                    "type": "SingleAction",
+                    "type": "ActionStatement",
                     "action": {
                       "type": "RecommendActivity",
                       "activityName": "MCV0 Dose Administered",
                       "location": {
                         "start": {
-                          "line": 11,
-                          "column": 43
+                          "line": 15,
+                          "column": 39
                         },
                         "end": {
-                          "line": 11,
-                          "column": 70
+                          "line": 15,
+                          "column": 83
                         }
                       }
                     },
                     "location": {
                       "start": {
-                        "line": 11,
-                        "column": 43
+                        "line": 15,
+                        "column": 39
                       },
                       "end": {
-                        "line": 11,
-                        "column": 71
+                        "line": 15,
+                        "column": 83
                       }
                     }
                   },
                   "location": {
                     "start": {
-                      "line": 11,
-                      "column": 8
+                      "line": 15,
+                      "column": 2
                     },
                     "end": {
-                      "line": 11,
-                      "column": 71
+                      "line": 15,
+                      "column": 83
                     }
                   }
                 }
               ],
               "location": {
                 "start": {
-                  "line": 5,
-                  "column": 64
+                  "line": 9,
+                  "column": 62
                 },
                 "end": {
-                  "line": 12,
-                  "column": 8
+                  "line": 15,
+                  "column": 83
                 }
               }
             },
             "location": {
               "start": {
-                "line": 5,
-                "column": 4
+                "line": 9,
+                "column": 0
               },
               "end": {
-                "line": 12,
-                "column": 8
+                "line": 16,
+                "column": 10
               }
             }
           }
         ],
         "location": {
           "start": {
-            "line": 5,
-            "column": 4
+            "line": 9,
+            "column": 0
           },
           "end": {
-            "line": 12,
-            "column": 8
+            "line": 16,
+            "column": 10
           }
         }
       },
       "location": {
         "start": {
-          "line": 4,
+          "line": 7,
           "column": 0
         },
         "end": {
-          "line": 13,
-          "column": 4
+          "line": 16,
+          "column": 10
         }
       }
     },
@@ -278,40 +275,40 @@
                         "type": "WhenBlock",
                         "conceptName": "Client Age Less Than 12 Months",
                         "body": {
-                          "type": "SingleAction",
+                          "type": "ActionStatement",
                           "action": {
                             "type": "RecommendActivity",
                             "activityName": "Client Age Less Than 12 Months",
                             "location": {
                               "start": {
-                                "line": 21,
-                                "column": 55
+                                "line": 26,
+                                "column": 49
                               },
                               "end": {
-                                "line": 21,
-                                "column": 90
+                                "line": 26,
+                                "column": 101
                               }
                             }
                           },
                           "location": {
                             "start": {
-                              "line": 21,
-                              "column": 55
+                              "line": 26,
+                              "column": 49
                             },
                             "end": {
-                              "line": 21,
-                              "column": 91
+                              "line": 26,
+                              "column": 101
                             }
                           }
                         },
                         "location": {
                           "start": {
-                            "line": 21,
-                            "column": 12
+                            "line": 26,
+                            "column": 4
                           },
                           "end": {
-                            "line": 21,
-                            "column": 91
+                            "line": 26,
+                            "column": 101
                           }
                         }
                       },
@@ -319,40 +316,40 @@
                         "type": "WhenBlock",
                         "conceptName": "Last Live Vaccine Administered Within 4 Weeks",
                         "body": {
-                          "type": "SingleAction",
+                          "type": "ActionStatement",
                           "action": {
                             "type": "RecommendActivity",
                             "activityName": "Last Live Vaccine Administered Within 4 Weeks_2",
                             "location": {
                               "start": {
-                                "line": 22,
-                                "column": 70
+                                "line": 27,
+                                "column": 64
                               },
                               "end": {
-                                "line": 22,
-                                "column": 122
+                                "line": 27,
+                                "column": 133
                               }
                             }
                           },
                           "location": {
                             "start": {
-                              "line": 22,
-                              "column": 70
+                              "line": 27,
+                              "column": 64
                             },
                             "end": {
-                              "line": 22,
-                              "column": 123
+                              "line": 27,
+                              "column": 133
                             }
                           }
                         },
                         "location": {
                           "start": {
-                            "line": 22,
-                            "column": 12
+                            "line": 27,
+                            "column": 4
                           },
                           "end": {
-                            "line": 22,
-                            "column": 123
+                            "line": 27,
+                            "column": 133
                           }
                         }
                       },
@@ -360,62 +357,62 @@
                         "type": "WhenBlock",
                         "conceptName": "Client Is Due For MCV1",
                         "body": {
-                          "type": "SingleAction",
+                          "type": "ActionStatement",
                           "action": {
                             "type": "RecommendActivity",
                             "activityName": "Provide Measles Vaccine",
                             "location": {
                               "start": {
-                                "line": 23,
-                                "column": 47
+                                "line": 28,
+                                "column": 41
                               },
                               "end": {
-                                "line": 23,
-                                "column": 75
+                                "line": 28,
+                                "column": 86
                               }
                             }
                           },
                           "location": {
                             "start": {
-                              "line": 23,
-                              "column": 47
+                              "line": 28,
+                              "column": 41
                             },
                             "end": {
-                              "line": 23,
-                              "column": 76
+                              "line": 28,
+                              "column": 86
                             }
                           }
                         },
                         "location": {
                           "start": {
-                            "line": 23,
-                            "column": 12
+                            "line": 28,
+                            "column": 4
                           },
                           "end": {
-                            "line": 23,
-                            "column": 76
+                            "line": 28,
+                            "column": 86
                           }
                         }
                       }
                     ],
                     "location": {
                       "start": {
-                        "line": 20,
-                        "column": 56
+                        "line": 25,
+                        "column": 52
                       },
                       "end": {
-                        "line": 24,
-                        "column": 12
+                        "line": 28,
+                        "column": 86
                       }
                     }
                   },
                   "location": {
                     "start": {
-                      "line": 20,
-                      "column": 8
+                      "line": 25,
+                      "column": 2
                     },
                     "end": {
-                      "line": 24,
+                      "line": 29,
                       "column": 12
                     }
                   }
@@ -430,40 +427,40 @@
                         "type": "WhenBlock",
                         "conceptName": "Client Age Less Than 15 Months",
                         "body": {
-                          "type": "SingleAction",
+                          "type": "ActionStatement",
                           "action": {
                             "type": "RecommendActivity",
                             "activityName": "Client Age Less Than 15 Months",
                             "location": {
                               "start": {
-                                "line": 26,
-                                "column": 55
+                                "line": 31,
+                                "column": 49
                               },
                               "end": {
-                                "line": 26,
-                                "column": 90
+                                "line": 31,
+                                "column": 101
                               }
                             }
                           },
                           "location": {
                             "start": {
-                              "line": 26,
-                              "column": 55
+                              "line": 31,
+                              "column": 49
                             },
                             "end": {
-                              "line": 26,
-                              "column": 91
+                              "line": 31,
+                              "column": 101
                             }
                           }
                         },
                         "location": {
                           "start": {
-                            "line": 26,
-                            "column": 12
+                            "line": 31,
+                            "column": 4
                           },
                           "end": {
-                            "line": 26,
-                            "column": 91
+                            "line": 31,
+                            "column": 101
                           }
                         }
                       },
@@ -471,40 +468,40 @@
                         "type": "WhenBlock",
                         "conceptName": "Last Live Vaccine Administered Within 4 Weeks",
                         "body": {
-                          "type": "SingleAction",
+                          "type": "ActionStatement",
                           "action": {
                             "type": "RecommendActivity",
                             "activityName": "Last Live Vaccine Administered Within 4 Weeks_3",
                             "location": {
                               "start": {
-                                "line": 27,
-                                "column": 70
+                                "line": 32,
+                                "column": 64
                               },
                               "end": {
-                                "line": 27,
-                                "column": 122
+                                "line": 32,
+                                "column": 133
                               }
                             }
                           },
                           "location": {
                             "start": {
-                              "line": 27,
-                              "column": 70
+                              "line": 32,
+                              "column": 64
                             },
                             "end": {
-                              "line": 27,
-                              "column": 123
+                              "line": 32,
+                              "column": 133
                             }
                           }
                         },
                         "location": {
                           "start": {
-                            "line": 27,
-                            "column": 12
+                            "line": 32,
+                            "column": 4
                           },
                           "end": {
-                            "line": 27,
-                            "column": 123
+                            "line": 32,
+                            "column": 133
                           }
                         }
                       },
@@ -512,62 +509,62 @@
                         "type": "WhenBlock",
                         "conceptName": "Client Is Due For MCV2",
                         "body": {
-                          "type": "SingleAction",
+                          "type": "ActionStatement",
                           "action": {
                             "type": "RecommendActivity",
                             "activityName": "Provide Measles Vaccine",
                             "location": {
                               "start": {
-                                "line": 28,
-                                "column": 47
+                                "line": 33,
+                                "column": 41
                               },
                               "end": {
-                                "line": 28,
-                                "column": 75
+                                "line": 33,
+                                "column": 86
                               }
                             }
                           },
                           "location": {
                             "start": {
-                              "line": 28,
-                              "column": 47
+                              "line": 33,
+                              "column": 41
                             },
                             "end": {
-                              "line": 28,
-                              "column": 76
+                              "line": 33,
+                              "column": 86
                             }
                           }
                         },
                         "location": {
                           "start": {
-                            "line": 28,
-                            "column": 12
+                            "line": 33,
+                            "column": 4
                           },
                           "end": {
-                            "line": 28,
-                            "column": 76
+                            "line": 33,
+                            "column": 86
                           }
                         }
                       }
                     ],
                     "location": {
                       "start": {
-                        "line": 25,
-                        "column": 56
+                        "line": 30,
+                        "column": 52
                       },
                       "end": {
-                        "line": 29,
-                        "column": 12
+                        "line": 33,
+                        "column": 86
                       }
                     }
                   },
                   "location": {
                     "start": {
-                      "line": 25,
-                      "column": 8
+                      "line": 30,
+                      "column": 2
                     },
                     "end": {
-                      "line": 29,
+                      "line": 34,
                       "column": 12
                     }
                   }
@@ -576,86 +573,86 @@
                   "type": "WhenBlock",
                   "conceptName": "Two Primary Series Doses Administered",
                   "body": {
-                    "type": "SingleAction",
+                    "type": "ActionStatement",
                     "action": {
                       "type": "RecommendActivity",
                       "activityName": "Measles primary series is complete.",
                       "location": {
                         "start": {
-                          "line": 30,
-                          "column": 58
+                          "line": 35,
+                          "column": 54
                         },
                         "end": {
-                          "line": 30,
-                          "column": 98
+                          "line": 35,
+                          "column": 111
                         }
                       }
                     },
                     "location": {
                       "start": {
-                        "line": 30,
-                        "column": 58
+                        "line": 35,
+                        "column": 54
                       },
                       "end": {
-                        "line": 30,
-                        "column": 99
+                        "line": 35,
+                        "column": 111
                       }
                     }
                   },
                   "location": {
                     "start": {
-                      "line": 30,
-                      "column": 8
+                      "line": 35,
+                      "column": 2
                     },
                     "end": {
-                      "line": 30,
-                      "column": 99
+                      "line": 35,
+                      "column": 111
                     }
                   }
                 }
               ],
               "location": {
                 "start": {
-                  "line": 19,
-                  "column": 64
+                  "line": 24,
+                  "column": 62
                 },
                 "end": {
-                  "line": 31,
-                  "column": 8
+                  "line": 35,
+                  "column": 111
                 }
               }
             },
             "location": {
               "start": {
-                "line": 19,
-                "column": 4
+                "line": 24,
+                "column": 0
               },
               "end": {
-                "line": 31,
-                "column": 8
+                "line": 36,
+                "column": 10
               }
             }
           }
         ],
         "location": {
           "start": {
-            "line": 19,
-            "column": 4
+            "line": 24,
+            "column": 0
           },
           "end": {
-            "line": 31,
-            "column": 8
+            "line": 36,
+            "column": 10
           }
         }
       },
       "location": {
         "start": {
-          "line": 18,
+          "line": 22,
           "column": 0
         },
         "end": {
-          "line": 32,
-          "column": 4
+          "line": 36,
+          "column": 10
         }
       }
     },
@@ -681,40 +678,40 @@
                         "type": "WhenBlock",
                         "conceptName": "Client Age Less Than 9 Months",
                         "body": {
-                          "type": "SingleAction",
+                          "type": "ActionStatement",
                           "action": {
                             "type": "RecommendActivity",
                             "activityName": "Client Age Less Than 9 Months",
                             "location": {
                               "start": {
-                                "line": 40,
-                                "column": 54
+                                "line": 46,
+                                "column": 48
                               },
                               "end": {
-                                "line": 40,
-                                "column": 88
+                                "line": 46,
+                                "column": 100
                               }
                             }
                           },
                           "location": {
                             "start": {
-                              "line": 40,
-                              "column": 54
+                              "line": 46,
+                              "column": 48
                             },
                             "end": {
-                              "line": 40,
-                              "column": 89
+                              "line": 46,
+                              "column": 100
                             }
                           }
                         },
                         "location": {
                           "start": {
-                            "line": 40,
-                            "column": 12
+                            "line": 46,
+                            "column": 4
                           },
                           "end": {
-                            "line": 40,
-                            "column": 89
+                            "line": 46,
+                            "column": 100
                           }
                         }
                       },
@@ -722,40 +719,40 @@
                         "type": "WhenBlock",
                         "conceptName": "Last Live Vaccine Administered Within 4 Weeks",
                         "body": {
-                          "type": "SingleAction",
+                          "type": "ActionStatement",
                           "action": {
                             "type": "RecommendActivity",
                             "activityName": "Last Live Vaccine Administered Within 4 Weeks_2",
                             "location": {
                               "start": {
-                                "line": 41,
-                                "column": 70
+                                "line": 47,
+                                "column": 64
                               },
                               "end": {
-                                "line": 41,
-                                "column": 122
+                                "line": 47,
+                                "column": 134
                               }
                             }
                           },
                           "location": {
                             "start": {
-                              "line": 41,
-                              "column": 70
+                              "line": 47,
+                              "column": 64
                             },
                             "end": {
-                              "line": 41,
-                              "column": 123
+                              "line": 47,
+                              "column": 134
                             }
                           }
                         },
                         "location": {
                           "start": {
-                            "line": 41,
-                            "column": 12
+                            "line": 47,
+                            "column": 4
                           },
                           "end": {
-                            "line": 41,
-                            "column": 123
+                            "line": 47,
+                            "column": 134
                           }
                         }
                       },
@@ -763,62 +760,62 @@
                         "type": "WhenBlock",
                         "conceptName": "Client Is Due For MCV1",
                         "body": {
-                          "type": "SingleAction",
+                          "type": "ActionStatement",
                           "action": {
                             "type": "RecommendActivity",
                             "activityName": "Provide Measles Vaccine",
                             "location": {
                               "start": {
-                                "line": 42,
-                                "column": 47
+                                "line": 48,
+                                "column": 41
                               },
                               "end": {
-                                "line": 42,
-                                "column": 75
+                                "line": 48,
+                                "column": 87
                               }
                             }
                           },
                           "location": {
                             "start": {
-                              "line": 42,
-                              "column": 47
+                              "line": 48,
+                              "column": 41
                             },
                             "end": {
-                              "line": 42,
-                              "column": 76
+                              "line": 48,
+                              "column": 87
                             }
                           }
                         },
                         "location": {
                           "start": {
-                            "line": 42,
-                            "column": 12
+                            "line": 48,
+                            "column": 4
                           },
                           "end": {
-                            "line": 42,
-                            "column": 76
+                            "line": 48,
+                            "column": 87
                           }
                         }
                       }
                     ],
                     "location": {
                       "start": {
-                        "line": 39,
-                        "column": 56
+                        "line": 45,
+                        "column": 52
                       },
                       "end": {
-                        "line": 43,
-                        "column": 12
+                        "line": 48,
+                        "column": 87
                       }
                     }
                   },
                   "location": {
                     "start": {
-                      "line": 39,
-                      "column": 8
+                      "line": 45,
+                      "column": 2
                     },
                     "end": {
-                      "line": 43,
+                      "line": 49,
                       "column": 12
                     }
                   }
@@ -833,40 +830,40 @@
                         "type": "WhenBlock",
                         "conceptName": "Client Age Less Than 15 Months",
                         "body": {
-                          "type": "SingleAction",
+                          "type": "ActionStatement",
                           "action": {
                             "type": "RecommendActivity",
                             "activityName": "Client Age Less Than 15 Months",
                             "location": {
                               "start": {
-                                "line": 45,
-                                "column": 55
+                                "line": 51,
+                                "column": 49
                               },
                               "end": {
-                                "line": 45,
-                                "column": 90
+                                "line": 51,
+                                "column": 101
                               }
                             }
                           },
                           "location": {
                             "start": {
-                              "line": 45,
-                              "column": 55
+                              "line": 51,
+                              "column": 49
                             },
                             "end": {
-                              "line": 45,
-                              "column": 91
+                              "line": 51,
+                              "column": 101
                             }
                           }
                         },
                         "location": {
                           "start": {
-                            "line": 45,
-                            "column": 12
+                            "line": 51,
+                            "column": 4
                           },
                           "end": {
-                            "line": 45,
-                            "column": 91
+                            "line": 51,
+                            "column": 101
                           }
                         }
                       },
@@ -874,40 +871,40 @@
                         "type": "WhenBlock",
                         "conceptName": "Last Live Vaccine Administered Within 4 Weeks",
                         "body": {
-                          "type": "SingleAction",
+                          "type": "ActionStatement",
                           "action": {
                             "type": "RecommendActivity",
                             "activityName": "Last Live Vaccine Administered Within 4 Weeks_3",
                             "location": {
                               "start": {
-                                "line": 46,
-                                "column": 70
+                                "line": 52,
+                                "column": 64
                               },
                               "end": {
-                                "line": 46,
-                                "column": 122
+                                "line": 52,
+                                "column": 133
                               }
                             }
                           },
                           "location": {
                             "start": {
-                              "line": 46,
-                              "column": 70
+                              "line": 52,
+                              "column": 64
                             },
                             "end": {
-                              "line": 46,
-                              "column": 123
+                              "line": 52,
+                              "column": 133
                             }
                           }
                         },
                         "location": {
                           "start": {
-                            "line": 46,
-                            "column": 12
+                            "line": 52,
+                            "column": 4
                           },
                           "end": {
-                            "line": 46,
-                            "column": 123
+                            "line": 52,
+                            "column": 133
                           }
                         }
                       },
@@ -915,62 +912,62 @@
                         "type": "WhenBlock",
                         "conceptName": "Client Is Due For MCV2",
                         "body": {
-                          "type": "SingleAction",
+                          "type": "ActionStatement",
                           "action": {
                             "type": "RecommendActivity",
                             "activityName": "Provide Measles Vaccine",
                             "location": {
                               "start": {
-                                "line": 47,
-                                "column": 47
+                                "line": 53,
+                                "column": 41
                               },
                               "end": {
-                                "line": 47,
-                                "column": 75
+                                "line": 53,
+                                "column": 86
                               }
                             }
                           },
                           "location": {
                             "start": {
-                              "line": 47,
-                              "column": 47
+                              "line": 53,
+                              "column": 41
                             },
                             "end": {
-                              "line": 47,
-                              "column": 76
+                              "line": 53,
+                              "column": 86
                             }
                           }
                         },
                         "location": {
                           "start": {
-                            "line": 47,
-                            "column": 12
+                            "line": 53,
+                            "column": 4
                           },
                           "end": {
-                            "line": 47,
-                            "column": 76
+                            "line": 53,
+                            "column": 86
                           }
                         }
                       }
                     ],
                     "location": {
                       "start": {
-                        "line": 44,
-                        "column": 56
+                        "line": 50,
+                        "column": 52
                       },
                       "end": {
-                        "line": 48,
-                        "column": 12
+                        "line": 53,
+                        "column": 86
                       }
                     }
                   },
                   "location": {
                     "start": {
-                      "line": 44,
-                      "column": 8
+                      "line": 50,
+                      "column": 2
                     },
                     "end": {
-                      "line": 48,
+                      "line": 54,
                       "column": 12
                     }
                   }
@@ -979,86 +976,86 @@
                   "type": "WhenBlock",
                   "conceptName": "Two Primary Series Doses Administered",
                   "body": {
-                    "type": "SingleAction",
+                    "type": "ActionStatement",
                     "action": {
                       "type": "RecommendActivity",
                       "activityName": "Measles primary series is complete",
                       "location": {
                         "start": {
-                          "line": 49,
-                          "column": 58
+                          "line": 55,
+                          "column": 54
                         },
                         "end": {
-                          "line": 49,
-                          "column": 97
+                          "line": 55,
+                          "column": 110
                         }
                       }
                     },
                     "location": {
                       "start": {
-                        "line": 49,
-                        "column": 58
+                        "line": 55,
+                        "column": 54
                       },
                       "end": {
-                        "line": 49,
-                        "column": 98
+                        "line": 55,
+                        "column": 110
                       }
                     }
                   },
                   "location": {
                     "start": {
-                      "line": 49,
-                      "column": 8
+                      "line": 55,
+                      "column": 2
                     },
                     "end": {
-                      "line": 49,
-                      "column": 98
+                      "line": 55,
+                      "column": 110
                     }
                   }
                 }
               ],
               "location": {
                 "start": {
-                  "line": 38,
-                  "column": 64
+                  "line": 44,
+                  "column": 62
                 },
                 "end": {
-                  "line": 50,
-                  "column": 8
+                  "line": 55,
+                  "column": 110
                 }
               }
             },
             "location": {
               "start": {
-                "line": 38,
-                "column": 4
+                "line": 44,
+                "column": 0
               },
               "end": {
-                "line": 50,
-                "column": 8
+                "line": 56,
+                "column": 10
               }
             }
           }
         ],
         "location": {
           "start": {
-            "line": 38,
-            "column": 4
+            "line": 44,
+            "column": 0
           },
           "end": {
-            "line": 50,
-            "column": 8
+            "line": 56,
+            "column": 10
           }
         }
       },
       "location": {
         "start": {
-          "line": 37,
+          "line": 42,
           "column": 0
         },
         "end": {
-          "line": 51,
-          "column": 4
+          "line": 56,
+          "column": 10
         }
       }
     },
@@ -1084,40 +1081,40 @@
                         "type": "WhenBlock",
                         "conceptName": "Last Live Vaccine Administered Within 4 Weeks",
                         "body": {
-                          "type": "SingleAction",
+                          "type": "ActionStatement",
                           "action": {
                             "type": "RecommendActivity",
                             "activityName": "Last Live Vaccine Administered Within 4 Weeks_4",
                             "location": {
                               "start": {
-                                "line": 59,
-                                "column": 70
+                                "line": 66,
+                                "column": 64
                               },
                               "end": {
-                                "line": 59,
-                                "column": 122
+                                "line": 66,
+                                "column": 133
                               }
                             }
                           },
                           "location": {
                             "start": {
-                              "line": 59,
-                              "column": 70
+                              "line": 66,
+                              "column": 64
                             },
                             "end": {
-                              "line": 59,
-                              "column": 123
+                              "line": 66,
+                              "column": 133
                             }
                           }
                         },
                         "location": {
                           "start": {
-                            "line": 59,
-                            "column": 12
+                            "line": 66,
+                            "column": 4
                           },
                           "end": {
-                            "line": 59,
-                            "column": 123
+                            "line": 66,
+                            "column": 133
                           }
                         }
                       },
@@ -1125,62 +1122,62 @@
                         "type": "WhenBlock",
                         "conceptName": "Client Is Due For Supplementary Dose",
                         "body": {
-                          "type": "SingleAction",
+                          "type": "ActionStatement",
                           "action": {
                             "type": "RecommendActivity",
                             "activityName": "Provide Measles Vaccine",
                             "location": {
                               "start": {
-                                "line": 60,
-                                "column": 61
+                                "line": 67,
+                                "column": 55
                               },
                               "end": {
-                                "line": 60,
-                                "column": 89
+                                "line": 67,
+                                "column": 100
                               }
                             }
                           },
                           "location": {
                             "start": {
-                              "line": 60,
-                              "column": 61
+                              "line": 67,
+                              "column": 55
                             },
                             "end": {
-                              "line": 60,
-                              "column": 90
+                              "line": 67,
+                              "column": 100
                             }
                           }
                         },
                         "location": {
                           "start": {
-                            "line": 60,
-                            "column": 12
+                            "line": 67,
+                            "column": 4
                           },
                           "end": {
-                            "line": 60,
-                            "column": 90
+                            "line": 67,
+                            "column": 100
                           }
                         }
                       }
                     ],
                     "location": {
                       "start": {
-                        "line": 58,
-                        "column": 54
+                        "line": 65,
+                        "column": 50
                       },
                       "end": {
-                        "line": 61,
-                        "column": 12
+                        "line": 67,
+                        "column": 100
                       }
                     }
                   },
                   "location": {
                     "start": {
-                      "line": 58,
-                      "column": 8
+                      "line": 65,
+                      "column": 2
                     },
                     "end": {
-                      "line": 61,
+                      "line": 68,
                       "column": 12
                     }
                   }
@@ -1189,86 +1186,86 @@
                   "type": "WhenBlock",
                   "conceptName": "Supplementary Dose Administered",
                   "body": {
-                    "type": "SingleAction",
+                    "type": "ActionStatement",
                     "action": {
                       "type": "RecommendActivity",
                       "activityName": "Supplementary Dose Administered",
                       "location": {
                         "start": {
-                          "line": 62,
-                          "column": 52
+                          "line": 69,
+                          "column": 48
                         },
                         "end": {
-                          "line": 62,
-                          "column": 88
+                          "line": 69,
+                          "column": 101
                         }
                       }
                     },
                     "location": {
                       "start": {
-                        "line": 62,
-                        "column": 52
+                        "line": 69,
+                        "column": 48
                       },
                       "end": {
-                        "line": 62,
-                        "column": 89
+                        "line": 69,
+                        "column": 101
                       }
                     }
                   },
                   "location": {
                     "start": {
-                      "line": 62,
-                      "column": 8
+                      "line": 69,
+                      "column": 2
                     },
                     "end": {
-                      "line": 62,
-                      "column": 89
+                      "line": 69,
+                      "column": 101
                     }
                   }
                 }
               ],
               "location": {
                 "start": {
-                  "line": 57,
-                  "column": 62
+                  "line": 64,
+                  "column": 60
                 },
                 "end": {
-                  "line": 63,
-                  "column": 8
+                  "line": 69,
+                  "column": 101
                 }
               }
             },
             "location": {
               "start": {
-                "line": 57,
-                "column": 4
+                "line": 64,
+                "column": 0
               },
               "end": {
-                "line": 63,
-                "column": 8
+                "line": 70,
+                "column": 10
               }
             }
           }
         ],
         "location": {
           "start": {
-            "line": 57,
-            "column": 4
+            "line": 64,
+            "column": 0
           },
           "end": {
-            "line": 63,
-            "column": 8
+            "line": 70,
+            "column": 10
           }
         }
       },
       "location": {
         "start": {
-          "line": 56,
+          "line": 62,
           "column": 0
         },
         "end": {
-          "line": 64,
-          "column": 4
+          "line": 70,
+          "column": 10
         }
       }
     },
@@ -1282,40 +1279,40 @@
             "type": "WhenBlock",
             "conceptName": "MCV Dose Contraindicated",
             "body": {
-              "type": "SingleAction",
+              "type": "ActionStatement",
               "action": {
                 "type": "RecommendActivity",
                 "activityName": "Check Contraindication for Measles Immunization",
                 "location": {
                   "start": {
-                    "line": 70,
-                    "column": 41
+                    "line": 78,
+                    "column": 39
                   },
                   "end": {
-                    "line": 70,
-                    "column": 93
+                    "line": 78,
+                    "column": 108
                   }
                 }
               },
               "location": {
                 "start": {
-                  "line": 70,
-                  "column": 41
+                  "line": 78,
+                  "column": 39
                 },
                 "end": {
-                  "line": 70,
-                  "column": 94
+                  "line": 78,
+                  "column": 108
                 }
               }
             },
             "location": {
               "start": {
-                "line": 70,
-                "column": 4
+                "line": 78,
+                "column": 0
               },
               "end": {
-                "line": 70,
-                "column": 94
+                "line": 78,
+                "column": 108
               }
             }
           },
@@ -1323,63 +1320,63 @@
             "type": "WhenBlock",
             "conceptName": "Contraindication Evaluation of the MCV dose",
             "body": {
-              "type": "SingleAction",
+              "type": "ActionStatement",
               "action": {
                 "type": "RecommendActivity",
                 "activityName": "Evaluate Contraindication for Measles",
                 "location": {
                   "start": {
-                    "line": 71,
-                    "column": 60
+                    "line": 79,
+                    "column": 58
                   },
                   "end": {
-                    "line": 71,
-                    "column": 102
+                    "line": 79,
+                    "column": 117
                   }
                 }
               },
               "location": {
                 "start": {
-                  "line": 71,
-                  "column": 60
+                  "line": 79,
+                  "column": 58
                 },
                 "end": {
-                  "line": 71,
-                  "column": 103
+                  "line": 79,
+                  "column": 117
                 }
               }
             },
             "location": {
               "start": {
-                "line": 71,
-                "column": 4
+                "line": 79,
+                "column": 0
               },
               "end": {
-                "line": 71,
-                "column": 103
+                "line": 79,
+                "column": 117
               }
             }
           }
         ],
         "location": {
           "start": {
-            "line": 70,
-            "column": 4
+            "line": 78,
+            "column": 0
           },
           "end": {
-            "line": 71,
-            "column": 103
+            "line": 79,
+            "column": 117
           }
         }
       },
       "location": {
         "start": {
-          "line": 69,
+          "line": 76,
           "column": 0
         },
         "end": {
-          "line": 72,
-          "column": 4
+          "line": 79,
+          "column": 117
         }
       }
     },
@@ -1408,23 +1405,23 @@
                           "decisionName": "IMMZ.D2.DT.Measles MCV Dose 0",
                           "location": {
                             "start": {
-                              "line": 85,
-                              "column": 12
+                              "line": 96,
+                              "column": 6
                             },
                             "end": {
-                              "line": 85,
-                              "column": 47
+                              "line": 96,
+                              "column": 51
                             }
                           }
                         },
                         "location": {
                           "start": {
-                            "line": 85,
-                            "column": 12
+                            "line": 96,
+                            "column": 6
                           },
                           "end": {
-                            "line": 85,
-                            "column": 48
+                            "line": 96,
+                            "column": 51
                           }
                         }
                       },
@@ -1435,23 +1432,23 @@
                           "decisionName": "IMMZ.D2.DT.Measles Ongoing Transmission",
                           "location": {
                             "start": {
-                              "line": 86,
-                              "column": 12
+                              "line": 97,
+                              "column": 6
                             },
                             "end": {
-                              "line": 86,
-                              "column": 57
+                              "line": 97,
+                              "column": 61
                             }
                           }
                         },
                         "location": {
                           "start": {
-                            "line": 86,
-                            "column": 12
+                            "line": 97,
+                            "column": 6
                           },
                           "end": {
-                            "line": 86,
-                            "column": 58
+                            "line": 97,
+                            "column": 61
                           }
                         }
                       },
@@ -1462,23 +1459,23 @@
                           "decisionName": "IMMZ.D2.DT.Measles Supplementary",
                           "location": {
                             "start": {
-                              "line": 87,
-                              "column": 12
+                              "line": 98,
+                              "column": 6
                             },
                             "end": {
-                              "line": 87,
-                              "column": 50
+                              "line": 98,
+                              "column": 54
                             }
                           }
                         },
                         "location": {
                           "start": {
-                            "line": 87,
-                            "column": 12
+                            "line": 98,
+                            "column": 6
                           },
                           "end": {
-                            "line": 87,
-                            "column": 51
+                            "line": 98,
+                            "column": 54
                           }
                         }
                       },
@@ -1489,45 +1486,45 @@
                           "decisionName": "IMMZ.D5.DT.Measles.Contraindication",
                           "location": {
                             "start": {
-                              "line": 88,
-                              "column": 12
+                              "line": 99,
+                              "column": 6
                             },
                             "end": {
-                              "line": 88,
-                              "column": 53
+                              "line": 99,
+                              "column": 57
                             }
                           }
                         },
                         "location": {
                           "start": {
-                            "line": 88,
-                            "column": 12
+                            "line": 99,
+                            "column": 6
                           },
                           "end": {
-                            "line": 88,
-                            "column": 54
+                            "line": 99,
+                            "column": 57
                           }
                         }
                       }
                     ],
                     "location": {
                       "start": {
-                        "line": 84,
-                        "column": 20
+                        "line": 95,
+                        "column": 16
                       },
                       "end": {
-                        "line": 89,
-                        "column": 12
+                        "line": 99,
+                        "column": 57
                       }
                     }
                   },
                   "location": {
                     "start": {
-                      "line": 84,
-                      "column": 8
+                      "line": 95,
+                      "column": 2
                     },
                     "end": {
-                      "line": 89,
+                      "line": 100,
                       "column": 12
                     }
                   }
@@ -1535,46 +1532,46 @@
               ],
               "location": {
                 "start": {
-                  "line": 79,
-                  "column": 16
+                  "line": 89,
+                  "column": 14
                 },
                 "end": {
-                  "line": 90,
-                  "column": 8
+                  "line": 100,
+                  "column": 12
                 }
               }
             },
             "location": {
               "start": {
-                "line": 79,
-                "column": 4
+                "line": 89,
+                "column": 0
               },
               "end": {
-                "line": 90,
-                "column": 8
+                "line": 101,
+                "column": 10
               }
             }
           }
         ],
         "location": {
           "start": {
-            "line": 79,
-            "column": 4
+            "line": 89,
+            "column": 0
           },
           "end": {
-            "line": 90,
-            "column": 8
+            "line": 101,
+            "column": 10
           }
         }
       },
       "location": {
         "start": {
-          "line": 77,
+          "line": 85,
           "column": 0
         },
         "end": {
-          "line": 91,
-          "column": 4
+          "line": 101,
+          "column": 10
         }
       }
     },
@@ -1583,13 +1580,14 @@
       "name": "Client Age Less Than 6 Months",
       "request": "CPGCommunicationRequest",
       "activityTypeValue": "Should not vaccinate client for MCV0 as client is less than 6 months. Check for any vaccines due, and inform the caregiver of when to come back for MCV0.",
+      "doNotPerform": false,
       "location": {
         "start": {
-          "line": 93,
+          "line": 103,
           "column": 0
         },
         "end": {
-          "line": 95,
+          "line": 105,
           "column": 165
         }
       }
@@ -1599,13 +1597,14 @@
       "name": "Last Live Vaccine Administered Within 4 Weeks",
       "request": "CPGCommunicationRequest",
       "activityTypeValue": "Should not vaccinate client for MCV0 as live vaccine was administered in the last 4 weeks. Check for any vaccines due, and inform the caregiver of when to come back for MCV0.",
+      "doNotPerform": false,
       "location": {
         "start": {
-          "line": 97,
+          "line": 107,
           "column": 0
         },
         "end": {
-          "line": 99,
+          "line": 109,
           "column": 186
         }
       }
@@ -1615,14 +1614,15 @@
       "name": "Provide Measles Vaccine",
       "request": "CPGMedicationRequest",
       "terminologyReference": "Measles vaccines",
+      "doNotPerform": false,
       "location": {
         "start": {
-          "line": 101,
+          "line": 111,
           "column": 0
         },
         "end": {
-          "line": 102,
-          "column": 57
+          "line": 111,
+          "column": 88
         }
       }
     },
@@ -1631,14 +1631,15 @@
       "name": "MCV0 Dose Administered",
       "request": "CPGCommunicationRequest",
       "activityTypeValue": "MCV0 was administered. Check measles routine immunization schedule.",
+      "doNotPerform": false,
       "location": {
         "start": {
-          "line": 104,
+          "line": 113,
           "column": 0
         },
         "end": {
-          "line": 105,
-          "column": 111
+          "line": 115,
+          "column": 79
         }
       }
     },
@@ -1647,13 +1648,14 @@
       "name": "Client Age Less Than 12 Months",
       "request": "CPGCommunicationRequest",
       "activityTypeValue": "Should not vaccinate client as client's age is less than 12 months. Check for any vaccines due, and inform the caregiver of when to come back for MCV1.",
+      "doNotPerform": false,
       "location": {
         "start": {
-          "line": 107,
+          "line": 117,
           "column": 0
         },
         "end": {
-          "line": 109,
+          "line": 119,
           "column": 163
         }
       }
@@ -1663,13 +1665,14 @@
       "name": "Last Live Vaccine Administered Within 4 Weeks_2",
       "request": "CPGCommunicationRequest",
       "activityTypeValue": "Should not vaccinate client for MCV1 as live vaccine was administered in the last 4 weeks. Check for any vaccines due and inform the caregiver of when to come back for MCV1.",
+      "doNotPerform": false,
       "location": {
         "start": {
-          "line": 111,
+          "line": 121,
           "column": 0
         },
         "end": {
-          "line": 113,
+          "line": 123,
           "column": 185
         }
       }
@@ -1679,13 +1682,14 @@
       "name": "Client Age Less Than 15 Months",
       "request": "CPGCommunicationRequest",
       "activityTypeValue": "Should not vaccinate client for MCV2 as client's age is less than 15 months. Check for any vaccines due, and inform the caregiver of when to come back for MCV2.",
+      "doNotPerform": false,
       "location": {
         "start": {
-          "line": 115,
+          "line": 125,
           "column": 0
         },
         "end": {
-          "line": 117,
+          "line": 127,
           "column": 172
         }
       }
@@ -1695,13 +1699,14 @@
       "name": "Last Live Vaccine Administered Within 4 Weeks_3",
       "request": "CPGCommunicationRequest",
       "activityTypeValue": "Should not vaccinate client for MCV2 as live vaccine was administered in the last 4 weeks. Check for any vaccines due, and inform the caregiver of when to come back for MCV2.",
+      "doNotPerform": false,
       "location": {
         "start": {
-          "line": 119,
+          "line": 129,
           "column": 0
         },
         "end": {
-          "line": 121,
+          "line": 131,
           "column": 186
         }
       }
@@ -1712,13 +1717,14 @@
       "request": "CPGCommunicationRequest",
       "activityTypeValue": "Measles primary series is complete. Two measles primary series doses were administered. Check if a measles supplementary dose is appropriate for the client.",
       "rationale": "An additional dose of MCV should be administered to HIV-infected children receiving HAART following immune reconstitution. If CD4+ T lymphocyte counts are monitored, an additional dose of MCV should be administered when immune reconstitution has been achieved, e.g. when the CD4+ T lymphocyte count reaches 20–25%. Where CD4+ T lymphocyte monitoring is not available, children should receive an additional dose of MCV 6–12 months after initiation of HAART.",
+      "doNotPerform": false,
       "location": {
         "start": {
-          "line": 123,
+          "line": 133,
           "column": 0
         },
         "end": {
-          "line": 126,
+          "line": 136,
           "column": 471
         }
       }
@@ -1728,13 +1734,14 @@
       "name": "Client Age Less Than 9 Months",
       "request": "CPGCommunicationRequest",
       "activityTypeValue": "Should not vaccinate client as client's age is less than 9 months. Check for any vaccines due, and inform the caregiver of when to come back for MCV1.",
+      "doNotPerform": false,
       "location": {
         "start": {
-          "line": 128,
+          "line": 138,
           "column": 0
         },
         "end": {
-          "line": 130,
+          "line": 140,
           "column": 162
         }
       }
@@ -1745,13 +1752,14 @@
       "request": "CPGCommunicationRequest",
       "activityTypeValue": "Measles primary series is complete. Two measles primary series doses were administered. Check if a measles supplementary dose is appropriate for the client.",
       "rationale": "An additional dose of MCV should be administered to HIV-infected children receiving HAART following immune reconstitution. If CD4+ T lymphocyte counts are monitored, an additional dose of MCV should be administered when immune reconstitution has been achieved, e.g. when the CD4+ T lymphocyte count reaches 20–25%. Where CD4+ T lymphocyte monitoring is not available, children should receive an additional dose of MCV 6–12 months after initiation of HAART.",
+      "doNotPerform": false,
       "location": {
         "start": {
-          "line": 132,
+          "line": 142,
           "column": 0
         },
         "end": {
-          "line": 135,
+          "line": 145,
           "column": 471
         }
       }
@@ -1761,13 +1769,14 @@
       "name": "Last Live Vaccine Administered Within 4 Weeks_4",
       "request": "CPGCommunicationRequest",
       "activityTypeValue": "Should not vaccinate client for measles supplementary dose as live vaccine was administered in the last 4 weeks. Check for any vaccines due, and inform the caregiver of when to come back for supplementary dose.",
+      "doNotPerform": false,
       "location": {
         "start": {
-          "line": 137,
+          "line": 147,
           "column": 0
         },
         "end": {
-          "line": 139,
+          "line": 149,
           "column": 222
         }
       }
@@ -1777,13 +1786,14 @@
       "name": "Supplementary Dose Administered",
       "request": "CPGCommunicationRequest",
       "activityTypeValue": "Measles immunization schedule is complete. Measles supplementary dose was administered.",
+      "doNotPerform": false,
       "location": {
         "start": {
-          "line": 141,
+          "line": 151,
           "column": 0
         },
         "end": {
-          "line": 143,
+          "line": 153,
           "column": 99
         }
       }
@@ -1794,13 +1804,14 @@
       "request": "CPGMedicationRequest",
       "terminologyReference": "Measles vaccines",
       "rationale": "While vaccines are universally recommended, some clients may have contraindications to particular vaccines.<br/>Additional contraindications may be included in WHO position papers for the vaccine - Measles vaccines: WHO position paper (April 2017).",
+      "doNotPerform": false,
       "location": {
         "start": {
-          "line": 145,
+          "line": 155,
           "column": 0
         },
         "end": {
-          "line": 147,
+          "line": 157,
           "column": 263
         }
       }
@@ -1811,13 +1822,14 @@
       "request": "CPGServiceRequest",
       "terminologyReference": "Measles Code",
       "rationale": "While vaccines are universally recommended, some clients may have contraindications to particular vaccines.<br/>Additional contraindications may be included in WHO position papers for the vaccine - Measles vaccines: WHO position paper (April 2017).",
+      "doNotPerform": false,
       "location": {
         "start": {
-          "line": 149,
+          "line": 159,
           "column": 0
         },
         "end": {
-          "line": 151,
+          "line": 161,
           "column": 263
         }
       }
@@ -1832,23 +1844,23 @@
         "terminologyName": "Measles Routine Immunization Schedule Incomplete",
         "location": {
           "start": {
-            "line": 157,
-            "column": 4
+            "line": 167,
+            "column": 0
           },
           "end": {
-            "line": 157,
-            "column": 66
+            "line": 167,
+            "column": 64
           }
         }
       },
       "location": {
         "start": {
-          "line": 154,
+          "line": 163,
           "column": 0
         },
         "end": {
-          "line": 158,
-          "column": 4
+          "line": 167,
+          "column": 64
         }
       }
     },
@@ -1862,23 +1874,23 @@
         "terminologyName": "No MCV0 Doses Administered",
         "location": {
           "start": {
-            "line": 163,
-            "column": 4
+            "line": 173,
+            "column": 0
           },
           "end": {
-            "line": 163,
-            "column": 44
+            "line": 173,
+            "column": 42
           }
         }
       },
       "location": {
         "start": {
-          "line": 160,
+          "line": 169,
           "column": 0
         },
         "end": {
-          "line": 164,
-          "column": 4
+          "line": 173,
+          "column": 42
         }
       }
     },
@@ -1892,23 +1904,23 @@
         "terminologyName": "Client Age Less Than 6 Months",
         "location": {
           "start": {
-            "line": 169,
-            "column": 4
+            "line": 179,
+            "column": 0
           },
           "end": {
-            "line": 169,
-            "column": 47
+            "line": 179,
+            "column": 45
           }
         }
       },
       "location": {
         "start": {
-          "line": 166,
+          "line": 175,
           "column": 0
         },
         "end": {
-          "line": 170,
-          "column": 4
+          "line": 179,
+          "column": 45
         }
       }
     },
@@ -1922,23 +1934,23 @@
         "terminologyName": "Last Live Vaccine Administered Within 4 Weeks",
         "location": {
           "start": {
-            "line": 175,
-            "column": 4
+            "line": 185,
+            "column": 0
           },
           "end": {
-            "line": 175,
-            "column": 63
+            "line": 185,
+            "column": 61
           }
         }
       },
       "location": {
         "start": {
-          "line": 172,
+          "line": 181,
           "column": 0
         },
         "end": {
-          "line": 176,
-          "column": 4
+          "line": 185,
+          "column": 61
         }
       }
     },
@@ -1952,23 +1964,23 @@
         "terminologyName": "Client Is Due For MCV0",
         "location": {
           "start": {
-            "line": 181,
-            "column": 4
+            "line": 191,
+            "column": 0
           },
           "end": {
-            "line": 181,
-            "column": 40
+            "line": 191,
+            "column": 38
           }
         }
       },
       "location": {
         "start": {
-          "line": 178,
+          "line": 187,
           "column": 0
         },
         "end": {
-          "line": 182,
-          "column": 4
+          "line": 191,
+          "column": 38
         }
       }
     },
@@ -1982,23 +1994,23 @@
         "terminologyName": "MCV0 Dose Administered",
         "location": {
           "start": {
-            "line": 187,
-            "column": 4
+            "line": 197,
+            "column": 0
           },
           "end": {
-            "line": 187,
-            "column": 40
+            "line": 197,
+            "column": 38
           }
         }
       },
       "location": {
         "start": {
-          "line": 184,
+          "line": 193,
           "column": 0
         },
         "end": {
-          "line": 188,
-          "column": 4
+          "line": 197,
+          "column": 38
         }
       }
     },
@@ -2012,23 +2024,23 @@
         "terminologyName": "No Primary Series Doses Administered",
         "location": {
           "start": {
-            "line": 193,
-            "column": 4
+            "line": 203,
+            "column": 0
           },
           "end": {
-            "line": 193,
-            "column": 54
+            "line": 203,
+            "column": 52
           }
         }
       },
       "location": {
         "start": {
-          "line": 190,
+          "line": 199,
           "column": 0
         },
         "end": {
-          "line": 194,
-          "column": 4
+          "line": 203,
+          "column": 52
         }
       }
     },
@@ -2042,23 +2054,23 @@
         "terminologyName": "Client Age Less Than 12 Months",
         "location": {
           "start": {
-            "line": 199,
-            "column": 4
+            "line": 209,
+            "column": 0
           },
           "end": {
-            "line": 199,
-            "column": 48
+            "line": 209,
+            "column": 46
           }
         }
       },
       "location": {
         "start": {
-          "line": 196,
+          "line": 205,
           "column": 0
         },
         "end": {
-          "line": 200,
-          "column": 4
+          "line": 209,
+          "column": 46
         }
       }
     },
@@ -2072,23 +2084,23 @@
         "terminologyName": "Client Is Due For MCV1",
         "location": {
           "start": {
-            "line": 205,
-            "column": 4
+            "line": 215,
+            "column": 0
           },
           "end": {
-            "line": 205,
-            "column": 40
+            "line": 215,
+            "column": 38
           }
         }
       },
       "location": {
         "start": {
-          "line": 202,
+          "line": 211,
           "column": 0
         },
         "end": {
-          "line": 206,
-          "column": 4
+          "line": 215,
+          "column": 38
         }
       }
     },
@@ -2102,23 +2114,23 @@
         "terminologyName": "One Primary Series Dose Administered",
         "location": {
           "start": {
-            "line": 211,
-            "column": 4
+            "line": 221,
+            "column": 0
           },
           "end": {
-            "line": 211,
-            "column": 54
+            "line": 221,
+            "column": 52
           }
         }
       },
       "location": {
         "start": {
-          "line": 208,
+          "line": 217,
           "column": 0
         },
         "end": {
-          "line": 212,
-          "column": 4
+          "line": 221,
+          "column": 52
         }
       }
     },
@@ -2132,23 +2144,23 @@
         "terminologyName": "Client Age Less Than 15 Months",
         "location": {
           "start": {
-            "line": 217,
-            "column": 4
+            "line": 227,
+            "column": 0
           },
           "end": {
-            "line": 217,
-            "column": 48
+            "line": 227,
+            "column": 46
           }
         }
       },
       "location": {
         "start": {
-          "line": 214,
+          "line": 223,
           "column": 0
         },
         "end": {
-          "line": 218,
-          "column": 4
+          "line": 227,
+          "column": 46
         }
       }
     },
@@ -2162,23 +2174,23 @@
         "terminologyName": "Client Is Due For MCV2",
         "location": {
           "start": {
-            "line": 223,
-            "column": 4
+            "line": 233,
+            "column": 0
           },
           "end": {
-            "line": 223,
-            "column": 40
+            "line": 233,
+            "column": 38
           }
         }
       },
       "location": {
         "start": {
-          "line": 220,
+          "line": 229,
           "column": 0
         },
         "end": {
-          "line": 224,
-          "column": 4
+          "line": 233,
+          "column": 38
         }
       }
     },
@@ -2192,23 +2204,23 @@
         "terminologyName": "Two Primary Series Doses Administered",
         "location": {
           "start": {
-            "line": 229,
-            "column": 4
+            "line": 239,
+            "column": 0
           },
           "end": {
-            "line": 229,
-            "column": 55
+            "line": 239,
+            "column": 53
           }
         }
       },
       "location": {
         "start": {
-          "line": 226,
+          "line": 235,
           "column": 0
         },
         "end": {
-          "line": 230,
-          "column": 4
+          "line": 239,
+          "column": 53
         }
       }
     },
@@ -2222,23 +2234,23 @@
         "terminologyName": "Client Age Less Than 9 Months",
         "location": {
           "start": {
-            "line": 235,
-            "column": 4
+            "line": 245,
+            "column": 0
           },
           "end": {
-            "line": 235,
-            "column": 47
+            "line": 245,
+            "column": 45
           }
         }
       },
       "location": {
         "start": {
-          "line": 232,
+          "line": 241,
           "column": 0
         },
         "end": {
-          "line": 236,
-          "column": 4
+          "line": 245,
+          "column": 45
         }
       }
     },
@@ -2252,23 +2264,23 @@
         "terminologyName": "Measles Routine Immunization Schedule Complete",
         "location": {
           "start": {
-            "line": 241,
-            "column": 4
+            "line": 251,
+            "column": 0
           },
           "end": {
-            "line": 241,
-            "column": 64
+            "line": 251,
+            "column": 62
           }
         }
       },
       "location": {
         "start": {
-          "line": 238,
+          "line": 247,
           "column": 0
         },
         "end": {
-          "line": 242,
-          "column": 4
+          "line": 251,
+          "column": 62
         }
       }
     },
@@ -2282,23 +2294,23 @@
         "terminologyName": "No Supplementary Dose Administered",
         "location": {
           "start": {
-            "line": 247,
-            "column": 4
+            "line": 257,
+            "column": 0
           },
           "end": {
-            "line": 247,
-            "column": 52
+            "line": 257,
+            "column": 50
           }
         }
       },
       "location": {
         "start": {
-          "line": 244,
+          "line": 253,
           "column": 0
         },
         "end": {
-          "line": 248,
-          "column": 4
+          "line": 257,
+          "column": 50
         }
       }
     },
@@ -2312,23 +2324,23 @@
         "terminologyName": "Client Is Due For Supplementary Dose",
         "location": {
           "start": {
-            "line": 253,
-            "column": 4
+            "line": 263,
+            "column": 0
           },
           "end": {
-            "line": 253,
-            "column": 54
+            "line": 263,
+            "column": 52
           }
         }
       },
       "location": {
         "start": {
-          "line": 250,
+          "line": 259,
           "column": 0
         },
         "end": {
-          "line": 254,
-          "column": 4
+          "line": 263,
+          "column": 52
         }
       }
     },
@@ -2342,23 +2354,23 @@
         "terminologyName": "Supplementary Dose Administered",
         "location": {
           "start": {
-            "line": 259,
-            "column": 4
+            "line": 269,
+            "column": 0
           },
           "end": {
-            "line": 259,
-            "column": 49
+            "line": 269,
+            "column": 47
           }
         }
       },
       "location": {
         "start": {
-          "line": 256,
+          "line": 265,
           "column": 0
         },
         "end": {
-          "line": 260,
-          "column": 4
+          "line": 269,
+          "column": 47
         }
       }
     },
@@ -2372,23 +2384,23 @@
         "terminologyName": "MCV Dose Contraindicated",
         "location": {
           "start": {
-            "line": 265,
-            "column": 4
+            "line": 275,
+            "column": 0
           },
           "end": {
-            "line": 265,
-            "column": 42
+            "line": 275,
+            "column": 40
           }
         }
       },
       "location": {
         "start": {
-          "line": 262,
+          "line": 271,
           "column": 0
         },
         "end": {
-          "line": 266,
-          "column": 4
+          "line": 275,
+          "column": 40
         }
       }
     },
@@ -2402,23 +2414,23 @@
         "terminologyName": "Contraindication Evaluation of the MCV dose",
         "location": {
           "start": {
-            "line": 271,
-            "column": 4
+            "line": 281,
+            "column": 0
           },
           "end": {
-            "line": 271,
-            "column": 61
+            "line": 281,
+            "column": 59
           }
         }
       },
       "location": {
         "start": {
-          "line": 268,
+          "line": 277,
           "column": 0
         },
         "end": {
-          "line": 272,
-          "column": 4
+          "line": 281,
+          "column": 59
         }
       }
     },
@@ -2431,23 +2443,23 @@
         "code": "measles-routine-immunization-schedule-incomplete",
         "location": {
           "start": {
-            "line": 274,
+            "line": 283,
             "column": 63
           },
           "end": {
-            "line": 274,
-            "column": 152
+            "line": 283,
+            "column": 159
           }
         }
       },
       "location": {
         "start": {
-          "line": 274,
+          "line": 283,
           "column": 0
         },
         "end": {
-          "line": 274,
-          "column": 153
+          "line": 283,
+          "column": 160
         }
       }
     },
@@ -2460,23 +2472,23 @@
         "code": "no-mcv0-doses-administered",
         "location": {
           "start": {
-            "line": 275,
+            "line": 285,
             "column": 41
           },
           "end": {
-            "line": 275,
-            "column": 108
+            "line": 285,
+            "column": 115
           }
         }
       },
       "location": {
         "start": {
-          "line": 275,
+          "line": 285,
           "column": 0
         },
         "end": {
-          "line": 275,
-          "column": 109
+          "line": 285,
+          "column": 116
         }
       }
     },
@@ -2489,23 +2501,23 @@
         "code": "client-age-less-than-6-months",
         "location": {
           "start": {
-            "line": 276,
+            "line": 287,
             "column": 44
           },
           "end": {
-            "line": 276,
-            "column": 114
+            "line": 287,
+            "column": 121
           }
         }
       },
       "location": {
         "start": {
-          "line": 276,
+          "line": 287,
           "column": 0
         },
         "end": {
-          "line": 276,
-          "column": 115
+          "line": 287,
+          "column": 122
         }
       }
     },
@@ -2518,23 +2530,23 @@
         "code": "last-live-vaccine-administered-within-4-weeks",
         "location": {
           "start": {
-            "line": 277,
+            "line": 289,
             "column": 60
           },
           "end": {
-            "line": 277,
-            "column": 146
+            "line": 289,
+            "column": 153
           }
         }
       },
       "location": {
         "start": {
-          "line": 277,
+          "line": 289,
           "column": 0
         },
         "end": {
-          "line": 277,
-          "column": 147
+          "line": 289,
+          "column": 154
         }
       }
     },
@@ -2547,23 +2559,23 @@
         "code": "client-is-due-for-mcv0",
         "location": {
           "start": {
-            "line": 278,
+            "line": 291,
             "column": 37
           },
           "end": {
-            "line": 278,
-            "column": 100
+            "line": 291,
+            "column": 107
           }
         }
       },
       "location": {
         "start": {
-          "line": 278,
+          "line": 291,
           "column": 0
         },
         "end": {
-          "line": 278,
-          "column": 101
+          "line": 291,
+          "column": 108
         }
       }
     },
@@ -2576,23 +2588,23 @@
         "code": "mcv0-dose-administered",
         "location": {
           "start": {
-            "line": 279,
+            "line": 293,
             "column": 37
           },
           "end": {
-            "line": 279,
-            "column": 100
+            "line": 293,
+            "column": 107
           }
         }
       },
       "location": {
         "start": {
-          "line": 279,
+          "line": 293,
           "column": 0
         },
         "end": {
-          "line": 279,
-          "column": 101
+          "line": 293,
+          "column": 108
         }
       }
     },
@@ -2605,23 +2617,23 @@
         "code": "no-primary-series-doses-administered",
         "location": {
           "start": {
-            "line": 280,
+            "line": 295,
             "column": 51
           },
           "end": {
-            "line": 280,
-            "column": 128
+            "line": 295,
+            "column": 135
           }
         }
       },
       "location": {
         "start": {
-          "line": 280,
+          "line": 295,
           "column": 0
         },
         "end": {
-          "line": 280,
-          "column": 129
+          "line": 295,
+          "column": 136
         }
       }
     },
@@ -2634,23 +2646,23 @@
         "code": "client-age-less-than-12-months",
         "location": {
           "start": {
-            "line": 281,
+            "line": 297,
             "column": 45
           },
           "end": {
-            "line": 281,
-            "column": 116
+            "line": 297,
+            "column": 123
           }
         }
       },
       "location": {
         "start": {
-          "line": 281,
+          "line": 297,
           "column": 0
         },
         "end": {
-          "line": 281,
-          "column": 117
+          "line": 297,
+          "column": 124
         }
       }
     },
@@ -2663,23 +2675,23 @@
         "code": "client-is-due-for-mcv1",
         "location": {
           "start": {
-            "line": 282,
+            "line": 299,
             "column": 37
           },
           "end": {
-            "line": 282,
-            "column": 100
+            "line": 299,
+            "column": 107
           }
         }
       },
       "location": {
         "start": {
-          "line": 282,
+          "line": 299,
           "column": 0
         },
         "end": {
-          "line": 282,
-          "column": 101
+          "line": 299,
+          "column": 108
         }
       }
     },
@@ -2692,23 +2704,23 @@
         "code": "one-primary-series-dose-administered",
         "location": {
           "start": {
-            "line": 283,
+            "line": 301,
             "column": 51
           },
           "end": {
-            "line": 283,
-            "column": 128
+            "line": 301,
+            "column": 135
           }
         }
       },
       "location": {
         "start": {
-          "line": 283,
+          "line": 301,
           "column": 0
         },
         "end": {
-          "line": 283,
-          "column": 129
+          "line": 301,
+          "column": 136
         }
       }
     },
@@ -2721,23 +2733,23 @@
         "code": "client-age-less-than-15-months",
         "location": {
           "start": {
-            "line": 284,
+            "line": 303,
             "column": 45
           },
           "end": {
-            "line": 284,
-            "column": 116
+            "line": 303,
+            "column": 123
           }
         }
       },
       "location": {
         "start": {
-          "line": 284,
+          "line": 303,
           "column": 0
         },
         "end": {
-          "line": 284,
-          "column": 117
+          "line": 303,
+          "column": 124
         }
       }
     },
@@ -2750,23 +2762,23 @@
         "code": "client-is-due-for-mcv2",
         "location": {
           "start": {
-            "line": 285,
+            "line": 305,
             "column": 37
           },
           "end": {
-            "line": 285,
-            "column": 100
+            "line": 305,
+            "column": 107
           }
         }
       },
       "location": {
         "start": {
-          "line": 285,
+          "line": 305,
           "column": 0
         },
         "end": {
-          "line": 285,
-          "column": 101
+          "line": 305,
+          "column": 108
         }
       }
     },
@@ -2779,23 +2791,23 @@
         "code": "two-primary-series-doses-administered",
         "location": {
           "start": {
-            "line": 286,
+            "line": 307,
             "column": 52
           },
           "end": {
-            "line": 286,
-            "column": 130
+            "line": 307,
+            "column": 137
           }
         }
       },
       "location": {
         "start": {
-          "line": 286,
+          "line": 307,
           "column": 0
         },
         "end": {
-          "line": 286,
-          "column": 131
+          "line": 307,
+          "column": 138
         }
       }
     },
@@ -2808,23 +2820,23 @@
         "code": "client-age-less-than-9-months",
         "location": {
           "start": {
-            "line": 287,
+            "line": 309,
             "column": 44
           },
           "end": {
-            "line": 287,
-            "column": 114
+            "line": 309,
+            "column": 121
           }
         }
       },
       "location": {
         "start": {
-          "line": 287,
+          "line": 309,
           "column": 0
         },
         "end": {
-          "line": 287,
-          "column": 115
+          "line": 309,
+          "column": 122
         }
       }
     },
@@ -2837,23 +2849,23 @@
         "code": "measles-routine-immunization-schedule-complete",
         "location": {
           "start": {
-            "line": 288,
+            "line": 311,
             "column": 61
           },
           "end": {
-            "line": 288,
-            "column": 148
+            "line": 311,
+            "column": 155
           }
         }
       },
       "location": {
         "start": {
-          "line": 288,
+          "line": 311,
           "column": 0
         },
         "end": {
-          "line": 288,
-          "column": 149
+          "line": 311,
+          "column": 156
         }
       }
     },
@@ -2866,23 +2878,23 @@
         "code": "no-supplementary-dose-administered",
         "location": {
           "start": {
-            "line": 289,
+            "line": 313,
             "column": 49
           },
           "end": {
-            "line": 289,
-            "column": 124
+            "line": 313,
+            "column": 131
           }
         }
       },
       "location": {
         "start": {
-          "line": 289,
+          "line": 313,
           "column": 0
         },
         "end": {
-          "line": 289,
-          "column": 125
+          "line": 313,
+          "column": 132
         }
       }
     },
@@ -2895,23 +2907,23 @@
         "code": "client-is-due-for-supplementary-dose",
         "location": {
           "start": {
-            "line": 290,
+            "line": 315,
             "column": 51
           },
           "end": {
-            "line": 290,
-            "column": 128
+            "line": 315,
+            "column": 135
           }
         }
       },
       "location": {
         "start": {
-          "line": 290,
+          "line": 315,
           "column": 0
         },
         "end": {
-          "line": 290,
-          "column": 129
+          "line": 315,
+          "column": 136
         }
       }
     },
@@ -2924,23 +2936,23 @@
         "code": "supplementary-dose-administered",
         "location": {
           "start": {
-            "line": 291,
+            "line": 317,
             "column": 46
           },
           "end": {
-            "line": 291,
-            "column": 118
+            "line": 317,
+            "column": 125
           }
         }
       },
       "location": {
         "start": {
-          "line": 291,
+          "line": 317,
           "column": 0
         },
         "end": {
-          "line": 291,
-          "column": 119
+          "line": 317,
+          "column": 126
         }
       }
     },
@@ -2953,23 +2965,23 @@
         "code": "mcv-dose-contraindicated",
         "location": {
           "start": {
-            "line": 292,
+            "line": 319,
             "column": 39
           },
           "end": {
-            "line": 292,
-            "column": 104
+            "line": 319,
+            "column": 111
           }
         }
       },
       "location": {
         "start": {
-          "line": 292,
+          "line": 319,
           "column": 0
         },
         "end": {
-          "line": 292,
-          "column": 105
+          "line": 319,
+          "column": 112
         }
       }
     },
@@ -2982,23 +2994,23 @@
         "code": "contraindication-evaluation-of-the-mcv-dose",
         "location": {
           "start": {
-            "line": 293,
+            "line": 321,
             "column": 58
           },
           "end": {
-            "line": 293,
-            "column": 142
+            "line": 321,
+            "column": 149
           }
         }
       },
       "location": {
         "start": {
-          "line": 293,
+          "line": 321,
           "column": 0
         },
         "end": {
-          "line": 293,
-          "column": 143
+          "line": 321,
+          "column": 150
         }
       }
     },
@@ -3011,23 +3023,23 @@
         "code": "XM28X5",
         "location": {
           "start": {
-            "line": 294,
+            "line": 323,
             "column": 31
           },
           "end": {
-            "line": 294,
-            "column": 90
+            "line": 323,
+            "column": 97
           }
         }
       },
       "location": {
         "start": {
-          "line": 294,
+          "line": 323,
           "column": 0
         },
         "end": {
-          "line": 294,
-          "column": 91
+          "line": 323,
+          "column": 98
         }
       }
     },
@@ -3040,34 +3052,34 @@
         "code": "XM28X5",
         "location": {
           "start": {
-            "line": 295,
+            "line": 325,
             "column": 27
           },
           "end": {
-            "line": 295,
-            "column": 86
+            "line": 325,
+            "column": 93
           }
         }
       },
       "location": {
         "start": {
-          "line": 295,
+          "line": 325,
           "column": 0
         },
         "end": {
-          "line": 295,
-          "column": 87
+          "line": 325,
+          "column": 94
         }
       }
     }
   ],
   "location": {
     "start": {
-      "line": 4,
+      "line": 1,
       "column": 0
     },
     "end": {
-      "line": 296,
+      "line": 326,
       "column": 5
     }
   }

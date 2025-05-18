@@ -3,7 +3,6 @@ import { CRLError } from "../../types/errors";
 import {
   Activity,
   BlockBody,
-  SingleAction,
   Concept,
   Decision,
   RecommendActivity,
@@ -545,7 +544,7 @@ decision "Test":
       const result = parseInput(input);
       const decision = result.statements[0] as Decision;
       const whenBlock = decision.body.statements[0] as WhenBlock;
-      const body = whenBlock.body as SingleAction;
+      const body = whenBlock.body as ActionStatement;
       expect(body.type).toBe("ActionStatement");
       const action = body.action as UseDecision;
       expect(action.type).toBe("UseDecision");

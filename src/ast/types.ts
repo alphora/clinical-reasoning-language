@@ -194,7 +194,6 @@ export interface GroupExpression extends ASTNode {
 
 // inferred-from nodes
 export interface InferredFromConcept extends ASTNode {
-  [x: string]: any;
   type: "InferredFromDefinitionConcept";
   concept: string;
   pattern?: string;
