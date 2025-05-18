@@ -162,21 +162,6 @@ function emitWhenBlocksRecursive(
           hasPlanDef = true;
         }
       }
-      // Emit singleActionStatement style: when "cond" then do ... (no colon, no done)
-      output += `${indent}when "${cond}" then`;
-      // Remove leading/trailing whitespace from emitActivityBlock output
-      let actionLine = emitActivityBlock(
-        node,
-        canonicalValueStr,
-        allInstances,
-        activities,
-        "",
-        hasPlanDef,
-        doReferences,
-      ).trim();
-      // Remove leading indentation from actionLine if present
-      if (actionLine.startsWith(":")) actionLine = actionLine.slice(1).trim();
-      output += ` ${actionLine}\n`;
     }
   }
   return output;

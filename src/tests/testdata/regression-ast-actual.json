@@ -29,7 +29,7 @@
                         "body": {
                           "type": "SingleAction",
                           "action": {
-                            "type": "DoActivity",
+                            "type": "RecommendActivity",
                             "activityName": "Client Age Less Than 6 Months",
                             "location": {
                               "start": {
@@ -70,7 +70,7 @@
                         "body": {
                           "type": "SingleAction",
                           "action": {
-                            "type": "DoActivity",
+                            "type": "RecommendActivity",
                             "activityName": "Last Live Vaccine Administered Within 4 Weeks",
                             "location": {
                               "start": {
@@ -111,7 +111,7 @@
                         "body": {
                           "type": "SingleAction",
                           "action": {
-                            "type": "DoActivity",
+                            "type": "RecommendActivity",
                             "activityName": "Provide Measles Vaccine",
                             "location": {
                               "start": {
@@ -175,7 +175,7 @@
                   "body": {
                     "type": "SingleAction",
                     "action": {
-                      "type": "DoActivity",
+                      "type": "RecommendActivity",
                       "activityName": "MCV0 Dose Administered",
                       "location": {
                         "start": {
@@ -280,7 +280,7 @@
                         "body": {
                           "type": "SingleAction",
                           "action": {
-                            "type": "DoActivity",
+                            "type": "RecommendActivity",
                             "activityName": "Client Age Less Than 12 Months",
                             "location": {
                               "start": {
@@ -321,7 +321,7 @@
                         "body": {
                           "type": "SingleAction",
                           "action": {
-                            "type": "DoActivity",
+                            "type": "RecommendActivity",
                             "activityName": "Last Live Vaccine Administered Within 4 Weeks_2",
                             "location": {
                               "start": {
@@ -362,7 +362,7 @@
                         "body": {
                           "type": "SingleAction",
                           "action": {
-                            "type": "DoActivity",
+                            "type": "RecommendActivity",
                             "activityName": "Provide Measles Vaccine",
                             "location": {
                               "start": {
@@ -432,7 +432,7 @@
                         "body": {
                           "type": "SingleAction",
                           "action": {
-                            "type": "DoActivity",
+                            "type": "RecommendActivity",
                             "activityName": "Client Age Less Than 15 Months",
                             "location": {
                               "start": {
@@ -473,7 +473,7 @@
                         "body": {
                           "type": "SingleAction",
                           "action": {
-                            "type": "DoActivity",
+                            "type": "RecommendActivity",
                             "activityName": "Last Live Vaccine Administered Within 4 Weeks_3",
                             "location": {
                               "start": {
@@ -514,7 +514,7 @@
                         "body": {
                           "type": "SingleAction",
                           "action": {
-                            "type": "DoActivity",
+                            "type": "RecommendActivity",
                             "activityName": "Provide Measles Vaccine",
                             "location": {
                               "start": {
@@ -578,7 +578,7 @@
                   "body": {
                     "type": "SingleAction",
                     "action": {
-                      "type": "DoActivity",
+                      "type": "RecommendActivity",
                       "activityName": "Measles primary series is complete.",
                       "location": {
                         "start": {
@@ -683,7 +683,7 @@
                         "body": {
                           "type": "SingleAction",
                           "action": {
-                            "type": "DoActivity",
+                            "type": "RecommendActivity",
                             "activityName": "Client Age Less Than 9 Months",
                             "location": {
                               "start": {
@@ -724,7 +724,7 @@
                         "body": {
                           "type": "SingleAction",
                           "action": {
-                            "type": "DoActivity",
+                            "type": "RecommendActivity",
                             "activityName": "Last Live Vaccine Administered Within 4 Weeks_2",
                             "location": {
                               "start": {
@@ -765,7 +765,7 @@
                         "body": {
                           "type": "SingleAction",
                           "action": {
-                            "type": "DoActivity",
+                            "type": "RecommendActivity",
                             "activityName": "Provide Measles Vaccine",
                             "location": {
                               "start": {
@@ -835,7 +835,7 @@
                         "body": {
                           "type": "SingleAction",
                           "action": {
-                            "type": "DoActivity",
+                            "type": "RecommendActivity",
                             "activityName": "Client Age Less Than 15 Months",
                             "location": {
                               "start": {
@@ -876,7 +876,7 @@
                         "body": {
                           "type": "SingleAction",
                           "action": {
-                            "type": "DoActivity",
+                            "type": "RecommendActivity",
                             "activityName": "Last Live Vaccine Administered Within 4 Weeks_3",
                             "location": {
                               "start": {
@@ -917,7 +917,7 @@
                         "body": {
                           "type": "SingleAction",
                           "action": {
-                            "type": "DoActivity",
+                            "type": "RecommendActivity",
                             "activityName": "Provide Measles Vaccine",
                             "location": {
                               "start": {
@@ -981,7 +981,7 @@
                   "body": {
                     "type": "SingleAction",
                     "action": {
-                      "type": "DoActivity",
+                      "type": "RecommendActivity",
                       "activityName": "Measles primary series is complete",
                       "location": {
                         "start": {
@@ -1086,7 +1086,7 @@
                         "body": {
                           "type": "SingleAction",
                           "action": {
-                            "type": "DoActivity",
+                            "type": "RecommendActivity",
                             "activityName": "Last Live Vaccine Administered Within 4 Weeks_4",
                             "location": {
                               "start": {
@@ -1127,7 +1127,7 @@
                         "body": {
                           "type": "SingleAction",
                           "action": {
-                            "type": "DoActivity",
+                            "type": "RecommendActivity",
                             "activityName": "Provide Measles Vaccine",
                             "location": {
                               "start": {
@@ -1191,7 +1191,7 @@
                   "body": {
                     "type": "SingleAction",
                     "action": {
-                      "type": "DoActivity",
+                      "type": "RecommendActivity",
                       "activityName": "Supplementary Dose Administered",
                       "location": {
                         "start": {
@@ -1284,7 +1284,7 @@
             "body": {
               "type": "SingleAction",
               "action": {
-                "type": "DoActivity",
+                "type": "RecommendActivity",
                 "activityName": "Check Contraindication for Measles Immunization",
                 "location": {
                   "start": {
@@ -1325,7 +1325,7 @@
             "body": {
               "type": "SingleAction",
               "action": {
-                "type": "DoActivity",
+                "type": "RecommendActivity",
                 "activityName": "Evaluate Contraindication for Measles",
                 "location": {
                   "start": {

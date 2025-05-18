@@ -76,7 +76,7 @@ export class ActionUniquenessValidator {
     errors: ValidationError[],
   ): void {
     const action = statement.action;
-    if (action.type === "DoActivity") {
+    if (action.type === "RecommendActivity") {
       if (recommendStatements.has(action.activityName)) {
         errors.push({
           message: `Duplicate do statement: ${action.activityName}`,
@@ -104,7 +104,7 @@ export class ActionUniquenessValidator {
     for (const statement of ast.statements) {
       if (statement.type === "Decision") {
         this.collectActions(statement.body).forEach((action) => {
-          if (action.type === "DoActivity") {
+          if (action.type === "RecommendActivity") {
             graph.set(`Activity:${action.activityName}`, new Set<string>());
           } else if (action.type === "UseDecision") {
             graph.set(`Decision:${action.decisionName}`, new Set<string>());
@@ -252,7 +252,7 @@ export class ActionUniquenessValidator {
           for (const s of statement.body.statements) {
             if (s.type === "ActionStatement") {
               const action = s.action;
-              if (action.type === "DoActivity" && action.activityName === actionName) {
+              if (action.type === "RecommendActivity" && action.activityName === actionName) {
                 return s.location;
               } else if (action.type === "UseDecision" && action.decisionName === actionName) {
                 return s.location;
@@ -261,7 +261,7 @@ export class ActionUniquenessValidator {
           }
         } else if (statement.body.type === "SingleAction") {
           const action = statement.body.action;
-          if (action.type === "DoActivity" && action.activityName === actionName) {
+          if (action.type === "RecommendActivity" && action.activityName === actionName) {
             return statement.body.location;
           } else if (action.type === "UseDecision" && action.decisionName === actionName) {
             return statement.body.location;
@@ -277,7 +277,7 @@ export class ActionUniquenessValidator {
     for (const statement of ast.statements) {
       if (statement.type === "Decision") {
         this.collectActions(statement.body).forEach((action) => {
-          if (action.type === "DoActivity") {
+          if (action.type === "RecommendActivity") {
             definedActions.add(action.activityName);
           } else if (action.type === "UseDecision") {
             definedActions.add(action.decisionName);

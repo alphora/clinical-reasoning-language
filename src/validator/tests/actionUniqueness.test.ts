@@ -29,7 +29,7 @@ describe('ActionUniquenessValidator', () => {
                       {
                         type: 'ActionStatement',
                         action: {
-                          type: 'DoActivity',
+                          type: 'RecommendActivity',
                           activityName: 'Vaccinate',
                           location: { start: { line: 1, column: 1 }, end: { line: 1, column: 1 } },
                         },
@@ -38,7 +38,7 @@ describe('ActionUniquenessValidator', () => {
                       {
                         type: 'ActionStatement',
                         action: {
-                          type: 'DoActivity',
+                          type: 'RecommendActivity',
                           activityName: 'Vaccinate', // Duplicate do statement
                           location: { start: { line: 2, column: 1 }, end: { line: 2, column: 1 } },
                         },
@@ -82,7 +82,7 @@ describe('ActionUniquenessValidator', () => {
                       {
                         type: 'ActionStatement',
                         action: {
-                          type: 'DoActivity',
+                          type: 'RecommendActivity',
                           activityName: 'Vaccinate',
                           location: { start: { line: 1, column: 1 }, end: { line: 1, column: 1 } },
                         },
@@ -102,7 +102,7 @@ describe('ActionUniquenessValidator', () => {
                       {
                         type: 'ActionStatement',
                         action: {
-                          type: 'DoActivity',
+                          type: 'RecommendActivity',
                           activityName: 'Vaccinate',
                           location: { start: { line: 2, column: 1 }, end: { line: 2, column: 1 } },
                         },

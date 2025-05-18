@@ -171,7 +171,7 @@ export class UnusedDeclarationsValidator {
   }
 
   private processAction(action: Action): void {
-    if (action.type === "DoActivity") {
+    if (action.type === "RecommendActivity") {
       const activityInfo = this.activityDeclarations.get(action.activityName);
       if (activityInfo) {
         activityInfo.used = true;
@@ -205,7 +205,7 @@ export class UnusedDeclarationsValidator {
       typeof action === "object" &&
       action !== null &&
       "type" in action &&
-      (action.type === "DoActivity" || action.type === "UseDecision")
+      (action.type === "RecommendActivity" || action.type === "UseDecision")
     );
   }
 
