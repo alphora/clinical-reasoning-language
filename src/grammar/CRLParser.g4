@@ -25,7 +25,7 @@ options {
 // ============================
 
 crl
-    : statement* EOF
+    : HEADER statement* EOF
     ;
 
 statement
