@@ -271,40 +271,40 @@ describe("Integration", () => {
 
   describe("Terminology Structure", () => {
     it("should handle terminology with valueset", () => {
-      const input = `terminology "BMI Valueset" valueset "bmi valueset".`;
+      const input = `terminology "BMI Valueset" is valueset "bmi valueset".`;
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(tokens, [
         CRLLexer.TERMINOLOGY,
         CRLLexer.QUOTED_STRING,
-        CRLLexer.VALUESET,
+        CRLLexer.IS_VALUESET,
         CRLLexer.QUOTED_STRING,
         CRLLexer.DOT,
       ]);
     });
 
     it("should handle terminology with unknown terminology", () => {
-      const input = `terminology "some terminology" \`\`.`;
+      const input = `terminology "some terminology" is \`\`.`;
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(tokens, [
         CRLLexer.TERMINOLOGY,
         CRLLexer.QUOTED_STRING,
-        CRLLexer.BACKTICK_STRING,
+        CRLLexer.IS_UNKNOWN_BACKTICK,
         CRLLexer.DOT,
       ]);
     });
 
     it("should handle terminology with system and code", () => {
-      const input = `terminology "Colonoscopy" system "http://snomed.info/sct" code "73761001".`;
+      const input = `terminology "Colonoscopy" is system "http://snomed.info/sct" and code "73761001".`;
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(tokens, [
         CRLLexer.TERMINOLOGY,
         CRLLexer.QUOTED_STRING,
-        CRLLexer.SYSTEM,
+        CRLLexer.IS_SYSTEM,
         CRLLexer.QUOTED_STRING,
-        CRLLexer.CODE,
+        CRLLexer.AND_CODE,
         CRLLexer.QUOTED_STRING,
         CRLLexer.DOT,
       ]);

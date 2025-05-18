@@ -11,7 +11,7 @@ import {
   BlockActionContext,
   BlockBodyContext,
   SingleActionStatementContext,
-  DoStatementContext,
+  recommendStatementContext,
   UseStatementContext,
   TerminologyStatementContext,
   TerminologyValuesetContext,
@@ -194,27 +194,27 @@ export class CRLAstBuilder
   }
 
   visitSingleActionStatement(ctx: SingleActionStatementContext): SingleAction {
-    const action = this.visit(ctx.doStatement() ?? ctx.useStatement()!) as DoActivity | UseDecision;
+    const action = this.visit(ctx.recommendStatement() ?? ctx.useStatement()!) as DoActivity | UseDecision;
     return { type: SingleActionType.type, action, location: getLocation(ctx) };
   }
 
   visitActionStatement(
     ctx: import("../grammar/generated/antlr/CRLParser").ActionStatementContext,
   ): ActionStatement {
-    const doStmt = ctx.doStatement?.();
+    const doStmt = ctx.recommendStatement?.();
     const useStmt = ctx.useStatement?.();
     let action: DoActivity | UseDecision;
     if (doStmt) {
-      action = this.visitDoStatement(doStmt);
+      action = this.visitrecommendStatement(doStmt);
     } else if (useStmt) {
       action = this.visitUseStatement(useStmt);
     } else {
-      throw new Error("ActionStatement must have doStatement or useStatement");
+      throw new Error("ActionStatement must have recommendStatement or useStatement");
     }
     return { type: "ActionStatement", action, location: getLocation(ctx) };
   }
 
-  visitDoStatement(ctx: DoStatementContext): DoActivity {
+  visitrecommendStatement(ctx: recommendStatementContext): DoActivity {
     const activityName = ctx.activityReference().text.slice(1, -1);
     const result = { type: DoActivityType.type, activityName, location: getLocation(ctx) };
     return result;
@@ -307,13 +307,13 @@ export class CRLAstBuilder
 
   visitActivityStatement(ctx: ActivityStatementContext): Activity {
     const name = ctx.activityIdentifier()!.text.slice(1, -1);
-    const perform = ctx.ACTIVITY_TYPE()!.text as ActivityType;
+    const request = ctx.ACTIVITY_TYPE()!.text as ActivityType;
     const { terminologyReference, activityTypeValue } = this.parseWithClause(ctx);
     const rationale = this.parseRationaleClause(ctx);
     return {
       type: "Activity",
       name,
-      perform,
+      request,
       terminologyReference,
       activityTypeValue,
       rationale,

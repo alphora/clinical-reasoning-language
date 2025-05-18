@@ -44,7 +44,7 @@ const idToFinalName = {
 
 ### b. Update Activity Definitions
 - Emit a single `activity` block for each unique `(baseName, value)` using the final name
-- Reuse the exact formatting (including `perform` and `of` clauses)
+- Reuse the exact formatting (including `request` and `of` clauses)
 
 ---
 
@@ -123,95 +123,95 @@ Ensure tests cover:
 ### Example Source
 
 activity "Client Age Less Than 6 Months"
-    perform CPGCommunicationRequest
+    request CPGCommunicationRequest
     of "Should not vaccinate client for MCV0 as client is less than 6 months. Check for any vaccines due, and inform the caregiver of when to come back for MCV0.".
 
 activity "Last Live Vaccine Administered Within 4 Weeks"
-    perform CPGCommunicationRequest
+    request CPGCommunicationRequest
     of "Should not vaccinate client for MCV0 as live vaccine was administered in the last 4 weeks. Check for any vaccines due, and inform the caregiver of when to come back for MCV0.".
 
 activity "Provide Measles Vaccine" 
-    perform CPGMedicationRequest
+    request CPGMedicationRequest
     of "Measles vaccines".
 
 activity "MCV0 Dose Administered"
-    perform CPGCommunicationRequest
+    request CPGCommunicationRequest
     of "MCV0 was administered. Check measles routine immunization schedule.".
 
 activity "Client Age Less Than 12 Months"
-    perform CPGCommunicationRequest
+    request CPGCommunicationRequest
     of "Should not vaccinate client as client's age is less than 12 months. Check for any vaccines due, and inform the caregiver of when to come back for MCV1.".
 
 activity "Last Live Vaccine Administered Within 4 Weeks"
-    perform CPGCommunicationRequest
+    request CPGCommunicationRequest
     of "Should not vaccinate client for MCV1 as live vaccine was administered in the last 4 weeks. Check for any vaccines due and inform the caregiver of when to come back for MCV1.".
 
 activity "Provide Measles Vaccine" 
-    perform CPGMedicationRequest
+    request CPGMedicationRequest
     of "Measles vaccines".
 
 activity "Client Age Less Than 15 Months"
-    perform CPGCommunicationRequest
+    request CPGCommunicationRequest
     of "Should not vaccinate client for MCV2 as client's age is less than 15 months. Check for any vaccines due, and inform the caregiver of when to come back for MCV2.".
 
 activity "Last Live Vaccine Administered Within 4 Weeks"
-    perform CPGCommunicationRequest
+    request CPGCommunicationRequest
     of "Should not vaccinate client for MCV2 as live vaccine was administered in the last 4 weeks. Check for any vaccines due, and inform the caregiver of when to come back for MCV2.".
 
 activity "Provide Measles Vaccine" 
-    perform CPGMedicationRequest
+    request CPGMedicationRequest
     of "Measles vaccines".
 
 activity "Measles primary series is complete."
-    perform CPGCommunicationRequest
+    request CPGCommunicationRequest
     of "Measles primary series is complete. Two measles primary series doses were administered. Check if a measles supplementary dose is appropriate for the client.".
 
 activity "Client Age Less Than 9 Months"
-    perform CPGCommunicationRequest
+    request CPGCommunicationRequest
     of "Should not vaccinate client as client's age is less than 9 months. Check for any vaccines due, and inform the caregiver of when to come back for MCV1.".
 
 activity "Last Live Vaccine Administered Within 4 Weeks"
-    perform CPGCommunicationRequest
+    request CPGCommunicationRequest
     of "Should not vaccinate client for MCV1 as live vaccine was administered in the last 4 weeks. Check for any vaccines due and inform the caregiver of when to come back for MCV1.".
 
 activity "Provide Measles Vaccine" 
-    perform CPGMedicationRequest
+    request CPGMedicationRequest
     of "Measles vaccines".
 
 activity "Client Age Less Than 15 Months"
-    perform CPGCommunicationRequest
+    request CPGCommunicationRequest
     of "Should not vaccinate client for MCV2 as client's age is less than 15 months. Check for any vaccines due, and inform the caregiver of when to come back for MCV2.".
 
 activity "Last Live Vaccine Administered Within 4 Weeks"
-    perform CPGCommunicationRequest
+    request CPGCommunicationRequest
     of "Should not vaccinate client for MCV2 as live vaccine was administered in the last 4 weeks. Check for any vaccines due, and inform the caregiver of when to come back for MCV2.".
 
 activity "Provide Measles Vaccine" 
-    perform CPGMedicationRequest
+    request CPGMedicationRequest
     of "Measles vaccines".
 
 activity "Measles primary series is complete"
-    perform CPGCommunicationRequest
+    request CPGCommunicationRequest
     of "Measles primary series is complete. Two measles primary series doses were administered. Check if a measles supplementary dose is appropriate for the client.".
 
 activity "Last Live Vaccine Administered Within 4 Weeks"
-    perform CPGCommunicationRequest
+    request CPGCommunicationRequest
     of "Should not vaccinate client for measles supplementary dose as live vaccine was administered in the last 4 weeks. Check for any vaccines due, and inform the caregiver of when to come back for supplementary dose.".
 
 activity "Provide Measles Vaccine" 
-    perform CPGMedicationRequest
+    request CPGMedicationRequest
     of "Measles vaccines".
 
 activity "Supplementary Dose Administered"
-    perform CPGCommunicationRequest
+    request CPGCommunicationRequest
     of "Measles immunization schedule is complete. Measles supplementary dose was administered.".
 
 activity "Check Contraindication for Measles Immunization" 
-    perform CPGMedicationRequest
+    request CPGMedicationRequest
     of "Measles vaccines".
 
 activity "Evaluate Contraindication for Measles" 
-    perform CPGServiceRequest
+    request CPGServiceRequest
     of "Measles Code".
 
 ---

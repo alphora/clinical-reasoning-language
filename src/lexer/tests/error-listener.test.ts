@@ -101,15 +101,13 @@ describe("CRLLexerErrorListener with CRL-specific input", () => {
   });
 
   it("should detect invalid activity type", () => {
-    const { lexer, errorListener } = createLexer("perform invalidActivity");
+    const { lexer, errorListener } = createLexer("request invalidActivity");
     const tokenStream = new CommonTokenStream(lexer);
     tokenStream.fill();
     const errors = errorListener.getErrors();
-    expect(errors.length).toBe(2);
+    expect(errors.length).toBe(1);
     expect(errors[0].type).toBe("LexicalError");
-    expect(errors[0].message).toMatch(/Invalid token: perform/);
-    expect(errors[1].type).toBe("LexicalError");
-    expect(errors[1].message).toMatch(/Invalid token: invalidActivity/);
+    expect(errors[0].message).toMatch(/Invalid activity type: invalidActivity/);
   });
 
   it("should handle invalid concept type", () => {

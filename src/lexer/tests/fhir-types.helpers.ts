@@ -6,7 +6,7 @@ import { CRLLexer } from "../../grammar/generated/antlr/CRLLexer";
  * This only includes the repeating tokens.
  * example:
  * action "Indicate"
- *    perform ServiceRequest
+ *    request ServiceRequest
  */
 export function getActionTokenSequence(): number[] {
   return [CRLLexer.REQUEST, CRLLexer.ACTIVITY_TYPE, CRLLexer.DOT];

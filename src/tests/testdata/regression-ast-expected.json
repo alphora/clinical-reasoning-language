@@ -1580,7 +1580,7 @@
     {
       "type": "Activity",
       "name": "Client Age Less Than 6 Months",
-      "perform": "CPGCommunicationRequest",
+      "request": "CPGCommunicationRequest",
       "activityTypeValue": "Should not vaccinate client for MCV0 as client is less than 6 months. Check for any vaccines due, and inform the caregiver of when to come back for MCV0.",
       "location": {
         "start": {
@@ -1596,7 +1596,7 @@
     {
       "type": "Activity",
       "name": "Last Live Vaccine Administered Within 4 Weeks",
-      "perform": "CPGCommunicationRequest",
+      "request": "CPGCommunicationRequest",
       "activityTypeValue": "Should not vaccinate client for MCV0 as live vaccine was administered in the last 4 weeks. Check for any vaccines due, and inform the caregiver of when to come back for MCV0.",
       "location": {
         "start": {
@@ -1612,7 +1612,7 @@
     {
       "type": "Activity",
       "name": "Provide Measles Vaccine",
-      "perform": "CPGMedicationRequest",
+      "request": "CPGMedicationRequest",
       "terminologyReference": "Measles vaccines",
       "location": {
         "start": {
@@ -1628,7 +1628,7 @@
     {
       "type": "Activity",
       "name": "MCV0 Dose Administered",
-      "perform": "CPGCommunicationRequest",
+      "request": "CPGCommunicationRequest",
       "activityTypeValue": "MCV0 was administered. Check measles routine immunization schedule.",
       "location": {
         "start": {
@@ -1644,7 +1644,7 @@
     {
       "type": "Activity",
       "name": "Client Age Less Than 12 Months",
-      "perform": "CPGCommunicationRequest",
+      "request": "CPGCommunicationRequest",
       "activityTypeValue": "Should not vaccinate client as client's age is less than 12 months. Check for any vaccines due, and inform the caregiver of when to come back for MCV1.",
       "location": {
         "start": {
@@ -1660,7 +1660,7 @@
     {
       "type": "Activity",
       "name": "Last Live Vaccine Administered Within 4 Weeks_2",
-      "perform": "CPGCommunicationRequest",
+      "request": "CPGCommunicationRequest",
       "activityTypeValue": "Should not vaccinate client for MCV1 as live vaccine was administered in the last 4 weeks. Check for any vaccines due and inform the caregiver of when to come back for MCV1.",
       "location": {
         "start": {
@@ -1676,7 +1676,7 @@
     {
       "type": "Activity",
       "name": "Client Age Less Than 15 Months",
-      "perform": "CPGCommunicationRequest",
+      "request": "CPGCommunicationRequest",
       "activityTypeValue": "Should not vaccinate client for MCV2 as client's age is less than 15 months. Check for any vaccines due, and inform the caregiver of when to come back for MCV2.",
       "location": {
         "start": {
@@ -1692,7 +1692,7 @@
     {
       "type": "Activity",
       "name": "Last Live Vaccine Administered Within 4 Weeks_3",
-      "perform": "CPGCommunicationRequest",
+      "request": "CPGCommunicationRequest",
       "activityTypeValue": "Should not vaccinate client for MCV2 as live vaccine was administered in the last 4 weeks. Check for any vaccines due, and inform the caregiver of when to come back for MCV2.",
       "location": {
         "start": {
@@ -1708,7 +1708,7 @@
     {
       "type": "Activity",
       "name": "Measles primary series is complete.",
-      "perform": "CPGCommunicationRequest",
+      "request": "CPGCommunicationRequest",
       "activityTypeValue": "Measles primary series is complete. Two measles primary series doses were administered. Check if a measles supplementary dose is appropriate for the client.",
       "rationale": "An additional dose of MCV should be administered to HIV-infected children receiving HAART following immune reconstitution. If CD4+ T lymphocyte counts are monitored, an additional dose of MCV should be administered when immune reconstitution has been achieved, e.g. when the CD4+ T lymphocyte count reaches 20–25%. Where CD4+ T lymphocyte monitoring is not available, children should receive an additional dose of MCV 6–12 months after initiation of HAART.",
       "location": {
@@ -1725,7 +1725,7 @@
     {
       "type": "Activity",
       "name": "Client Age Less Than 9 Months",
-      "perform": "CPGCommunicationRequest",
+      "request": "CPGCommunicationRequest",
       "activityTypeValue": "Should not vaccinate client as client's age is less than 9 months. Check for any vaccines due, and inform the caregiver of when to come back for MCV1.",
       "location": {
         "start": {
@@ -1741,7 +1741,7 @@
     {
       "type": "Activity",
       "name": "Measles primary series is complete",
-      "perform": "CPGCommunicationRequest",
+      "request": "CPGCommunicationRequest",
       "activityTypeValue": "Measles primary series is complete. Two measles primary series doses were administered. Check if a measles supplementary dose is appropriate for the client.",
       "rationale": "An additional dose of MCV should be administered to HIV-infected children receiving HAART following immune reconstitution. If CD4+ T lymphocyte counts are monitored, an additional dose of MCV should be administered when immune reconstitution has been achieved, e.g. when the CD4+ T lymphocyte count reaches 20–25%. Where CD4+ T lymphocyte monitoring is not available, children should receive an additional dose of MCV 6–12 months after initiation of HAART.",
       "location": {
@@ -1758,7 +1758,7 @@
     {
       "type": "Activity",
       "name": "Last Live Vaccine Administered Within 4 Weeks_4",
-      "perform": "CPGCommunicationRequest",
+      "request": "CPGCommunicationRequest",
       "activityTypeValue": "Should not vaccinate client for measles supplementary dose as live vaccine was administered in the last 4 weeks. Check for any vaccines due, and inform the caregiver of when to come back for supplementary dose.",
       "location": {
         "start": {
@@ -1774,7 +1774,7 @@
     {
       "type": "Activity",
       "name": "Supplementary Dose Administered",
-      "perform": "CPGCommunicationRequest",
+      "request": "CPGCommunicationRequest",
       "activityTypeValue": "Measles immunization schedule is complete. Measles supplementary dose was administered.",
       "location": {
         "start": {
@@ -1790,7 +1790,7 @@
     {
       "type": "Activity",
       "name": "Check Contraindication for Measles Immunization",
-      "perform": "CPGMedicationRequest",
+      "request": "CPGMedicationRequest",
       "terminologyReference": "Measles vaccines",
       "rationale": "While vaccines are universally recommended, some clients may have contraindications to particular vaccines.<br/>Additional contraindications may be included in WHO position papers for the vaccine - Measles vaccines: WHO position paper (April 2017).",
       "location": {
@@ -1807,7 +1807,7 @@
     {
       "type": "Activity",
       "name": "Evaluate Contraindication for Measles",
-      "perform": "CPGServiceRequest",
+      "request": "CPGServiceRequest",
       "terminologyReference": "Measles Code",
       "rationale": "While vaccines are universally recommended, some clients may have contraindications to particular vaccines.<br/>Additional contraindications may be included in WHO position papers for the vaccine - Measles vaccines: WHO position paper (April 2017).",
       "location": {

@@ -62,26 +62,26 @@ describe("Whitespace Handling", () => {
 
   describe("Whitespace in Terminology Statements", () => {
     it("should handle whitespace in terminology valueset statements", () => {
-      const input = 'terminology\n  "BMI Valueset"\n\t\tvalueset\n  `bmi valueset`\t.';
+      const input = 'terminology\n  "BMI Valueset"\n\t\tis valueset\n  `bmi valueset`\t.';
       const tokens = getTokensFromString(input);
       verifyTokenSequence(tokens, [
         CRLLexer.TERMINOLOGY,
         CRLLexer.QUOTED_STRING,
-        CRLLexer.VALUESET,
+        CRLLexer.IS_VALUESET,
         CRLLexer.BACKTICK_STRING,
         CRLLexer.DOT,
       ]);
     });
 
     it("should handle whitespace in terminology system code statements", () => {
-      const input = 'terminology\n"term"\n  system\t`sys`\n  code\t`123`\t.';
+      const input = 'terminology\n"term"\n is system\t`sys`\n and code\t`123`\t.';
       const tokens = getTokensFromString(input);
       verifyTokenSequence(tokens, [
         CRLLexer.TERMINOLOGY,
         CRLLexer.QUOTED_STRING,
-        CRLLexer.SYSTEM,
+        CRLLexer.IS_SYSTEM,
         CRLLexer.BACKTICK_STRING,
-        CRLLexer.CODE,
+        CRLLexer.AND_CODE,
         CRLLexer.BACKTICK_STRING,
         CRLLexer.DOT,
       ]);

@@ -47,9 +47,9 @@ To ensure the mapping rules fully describe the requirements necessary to impleme
   - `ActivityDefinition.name` → `activity "<name>"`
 - `activitydef-description > activity.identifier`
   - `ActivityDefinition.description` or `title` → `of "<description>"`
-- `activitydef-kind > activity.perform`
-  - `ActivityDefinition.kind` (e.g., #MedicationRequest) → `perform <ActivityType>`
-- `activitydef-code-display > activity.perform.of`
+- `activitydef-kind > activity.request`
+  - `ActivityDefinition.kind` (e.g., #MedicationRequest) → `request <ActivityType>`
+- `activitydef-code-display > activity.request.of`
   - If `ActivityDefinition.code.display` exists, append `of "<display>"`
 - `activitydef-code-display > terminology.identifier`
   - `code.display` used for `terminology "<display>"`

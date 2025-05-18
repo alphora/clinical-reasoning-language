@@ -67,8 +67,8 @@ async function parseFSHFiles(pathToFSH: string) {
 ### 3.7. Activity Mapping
 - `activitydef > activity`: `ActivityDefinition.name` → `activity "<name>"`
 - `activitydef-description > activity.identifier`: `ActivityDefinition.description` or `title` → `of "<description>"`
-- `activitydef-kind > activity.perform`: `ActivityDefinition.kind` (e.g., #MedicationRequest) → `perform <ActivityType>`
-- `activitydef-code-display > activity.perform.of`: If `ActivityDefinition.code.display` exists, append `of "<display>"`
+- `activitydef-kind > activity.request`: `ActivityDefinition.kind` (e.g., #MedicationRequest) → `request <ActivityType>`
+- `activitydef-code-display > activity.request.of`: If `ActivityDefinition.code.display` exists, append `of "<display>"`
 - `activitydef-code-display > terminology.identifier`: `code.display` used for `terminology "<display>"`
 - `activitydef-code > terminology.code`: `code.code` used for `terminology.code`
 
@@ -114,7 +114,7 @@ The CRL language is defined by the following ANTLR grammars:
 - **Free text/markdown**: Backtick-quoted strings (e.g., `` `Some *markdown* text` ``)
 - **Statements**: `decision`, `activity`, `concept`, `terminology`
 - **Blocks**: Indented or colon-delimited, terminated by `done`
-- **Action statements**: `do`, `use`, `perform`, `of`, `because`
+- **Action statements**: `do`, `use`, `request`, `of`, `because`
 - **Concepts**: Have `type`, `valuetype`, and may be `coded by` or `inferred by`
 - **Terminology**: May specify `system` and `code`
 
@@ -138,7 +138,7 @@ decision "IMMZDTImmunizationStrategy":
 done
 
 // Activity for "IMMZD2DTMeaslesDose0"
-activity "IMMZD2DTMeaslesDose0_activity" perform CPGCommunicationRequest of `Ensure proper dosage based on patient weight.`.
+activity "IMMZD2DTMeaslesDose0_activity" request CPGCommunicationRequest of `Ensure proper dosage based on patient weight.`.
 
 // Concept declaration
 concept "Check Immunizations":

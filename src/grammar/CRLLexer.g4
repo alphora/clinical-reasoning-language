@@ -1,37 +1,35 @@
 lexer grammar CRLLexer;
 
 // === Multi-word phrase tokens ===
-END_WHEN           : 'end when';
-RECOMMEND_ACTIVITY : 'recommend activity';
-USE_DECISION       : 'use decision';
-TYPE_IS            : 'type is' -> mode(CONCEPT_MODE);
-VALUETYPE_IS       : 'valuetype is' -> mode(VALUE_TYPE_MODE);
-EVIDENCE_IS        : 'evidence is';
-INFERRED_FROM      : 'inferred from';
-CODED_FROM         : 'coded from';
-APPLY_PATTERN      : 'apply pattern';
-IS_SYSTEM          : 'is system';
-IS_VALUESET        : 'is valueset';
-DO_NOT_PERFORM     : 'do not perform';
-ALL_BLOCK          : 'all:';
-ANY_BLOCK          : 'any:';
+END_WHEN            : 'end when';
+RECOMMEND_ACTIVITY  : 'recommend activity';
+USE_DECISION        : 'use decision';
+TYPE_IS             : 'type is' -> mode(CONCEPT_MODE);
+VALUETYPE_IS        : 'valuetype is' -> mode(VALUE_TYPE_MODE);
+EVIDENCE_IS         : 'evidence is';
+META_IS             : 'meta is';
+INFERRED_FROM       : 'inferred from';
+CODED_FROM          : 'coded from';
+APPLY_PATTERN       : 'apply pattern';
+IS_SYSTEM           : 'is system';
+AND_CODE            : 'and code';
+IS_VALUESET         : 'is valueset';
+IS_UNKNOWN_BACKTICK : 'is ``';
+DO_NOT_PERFORM      : 'do not perform';
+ALL_BLOCK           : 'all:';
+ANY_BLOCK           : 'any:';
 
 // === Keywords ===
 ACTIVITY     : 'activity';
 AND          : 'and';
 BECAUSE      : 'because';
-CODE         : 'code';
 CONCEPT      : 'concept';
 DECISION     : 'decision';
-IS           : 'is';
-META         : 'meta';
 NOT          : 'not';
 OR           : 'or';
 REQUEST      : 'request' -> mode(ACTIVITY_MODE);
-SYSTEM       : 'system';
 TERMINOLOGY  : 'terminology';
 THEN         : 'then';
-VALUESET     : 'valueset';
 WHEN         : 'when';
 WITH         : 'with';
 

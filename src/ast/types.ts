@@ -168,7 +168,7 @@ export const TerminologySystemCodeType = {
 export interface Activity extends ASTNode {
   type: "Activity";
   name: string;
-  perform: ActivityType;
+  request: ActivityType;
   terminologyReference?: string;
   activityTypeValue?: string;
   rationale?: string;

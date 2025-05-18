@@ -158,7 +158,7 @@ export function getActivityPerformClause(activityDef: ActivityDef): {
     return { clauseString: "", value };
   }
   // Compose the clause string
-  const clauseString = `\n    ${doNotPerform ? "do not perform" : "perform"} ${kind}${formatActivityValue(activityValue)}`;
+  const clauseString = `\n    ${doNotPerform ? "do not perform" : "request"} ${kind}${formatActivityValue(activityValue)}`;
   return { clauseString, value, terminology };
 }
 
@@ -288,7 +288,7 @@ export function emitActivityBlock(
       id: activityId,
       name: doIdentifier,
       value: activityDescription,
-      original: `activity ${doIdentifier}\n    perform CPGCommunicationRequest${formatActivityValue("`" + (activityDescription ?? "TODO: fill in message.") + "`")}${rationale ?? ""}.\n\n`,
+      original: `activity ${doIdentifier}\n    request CPGCommunicationRequest${formatActivityValue("`" + (activityDescription ?? "TODO: fill in message.") + "`")}${rationale ?? ""}.\n\n`,
     });
     doReferences.push({ id: activityId, placeholder });
   }

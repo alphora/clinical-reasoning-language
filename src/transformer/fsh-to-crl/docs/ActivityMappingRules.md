@@ -7,10 +7,10 @@ if action.definitionCanonical references a ActivityDefinition in any of the fsh 
   - decision.when.do < activitydef-description
   // create a activity
   - activity.identifier < activitydef-description
-  - activity.perform < activitydef-kind
-  - activity.perform.of < activitydef-code-display
+  - activity.request < activitydef-kind
+  - activity.request.of < activitydef-code-display
   if activity_def-donotperform = true
-    - activity.perform.doNot()
+    - activity.request.doNot()
   if activitydef-code.exists() then
     // create a terminology.  terminology can be duplicated in references, but must be unique in the crl file
     - create(terminology)
@@ -26,8 +26,8 @@ else
   - decision.when.do < plandef-condition-expression
   //create a activity
   - activity.identifier < plandef-condition-expression
-  - activity.perform < CPGCommunicationRequest
+  - activity.request < CPGCommunicationRequest
     // only add a message to CPGCommunicationRequest
-  - activity.perform.of < plandef-action-description
+  - activity.request.of < plandef-action-description
 // create an optional rationale
 - activity.because < plandef-rationale
