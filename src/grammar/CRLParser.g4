@@ -63,7 +63,11 @@ decisionBody
 
 whenBlock
     : DASH WHEN conceptReference THEN blockBody DASH END_WHEN         # WhenWithBody
-    | DASH WHEN conceptReference THEN singleActionStatement           # WhenSingleAction
+    | DASH WHEN conceptReference THEN actionStatement                 # WhenSingleAction
+    ;
+
+blockBody
+    : COLON ( anyOrAllClause? blockStatement+ )
     ;
 
 anyOrAllClause
@@ -71,29 +75,22 @@ anyOrAllClause
     | ALL_BLOCK
     ;
 
-blockBody
-    : COLON ( anyOrAllClause? blockStatement+ )
-    ;
-
 blockStatement
-    : whenBlock                # NestedWhenBlock
-    | actionStatement          # BlockAction
-    ;
-
-singleActionStatement
-    : actionStatement
+    : whenBlock                     # NestedWhenBlock
+    | DASH actionStatement          # BlockAction
     ;
 
 actionStatement
-    : ( recommendStatement | useStatement ) DOT
+    : recommendStatement
+    | useStatement
     ;
 
 recommendStatement
-    : RECOMMEND_ACTIVITY activityReference
+    : RECOMMEND_ACTIVITY activityReference DOT
     ;
 
 useStatement
-    : USE_DECISION decisionReference
+    : USE_DECISION decisionReference DOT
     ;
 
 // ============================
@@ -112,19 +109,23 @@ useStatement
 //   terminology "Colonoscopy" system `http://snomed.info/sct` code `73761001`.
 //
 terminologyStatement
-    : TERMINOLOGY terminologyIdentifier ( terminologyValueset | terminologySystemCode | teminologyUnknown ) DOT
+    : TERMINOLOGY terminologyIdentifier ( terminologyValueset | terminologySystemCode | terminologyUnknown ) DOT
     ;
 
 terminologyValueset
-    : IS_VALUESET identifier
+    : IS_VALUESET backtickString
     ;
 
 terminologySystemCode
     : IS_SYSTEM backtickString AND_CODE backtickString
     ;
 
-teminologyUnknown
+terminologyUnknown
     : IS_UNKNOWN_BACKTICK
+    ;
+
+doNotPerform
+    : DO_NOT_PERFORM_DO DO_NOT_PERFORM_NOT DO_NOT_PERFORM_PERFORM
     ;
 
 // ============================
@@ -140,7 +141,10 @@ teminologyUnknown
 //   activity "Inform Clinician" request CPGCommunicationRequest with `The message to send.` because `Clinician's should be messaged about these things.`.
 //
 activityStatement
-    : ACTIVITY activityIdentifier REQUEST ACTIVITY_TYPE (WITH (terminologyReference | activityTypeValue))? (BECAUSE rationale)? DOT
+    : ACTIVITY activityIdentifier REQUEST (doNotPerform)? ACTIVITY_TYPE 
+      (WITH (terminologyReference | activityTypeValue))? 
+      (BECAUSE rationale)? 
+      DOT
     ;
 
 // ============================
@@ -188,27 +192,27 @@ conceptBody
 // ============================
 
 typeLine
-    : TYPE_IS CONCEPT_TYPE DOT
+    : DASH TYPE_IS CONCEPT_TYPE DOT
     ;
 
 valueTypeLine
-    : VALUETYPE_IS CONCEPT_VALUE_TYPE DOT
+    : DASH VALUETYPE_IS CONCEPT_VALUE_TYPE DOT
     ;
 
 metaLine
-    : META_IS backtickString DOT
+    : DASH META_IS backtickString DOT
     ;
     
 evidenceLine
-    : EVIDENCE_IS backtickString DOT
+    : DASH EVIDENCE_IS backtickString DOT
     ;
 
 codedFromLine
-    : CODED_FROM terminologyReference DOT
+    : DASH CODED_FROM terminologyReference DOT
     ;
 
 inferredFromLine
-    : INFERRED_FROM inferredBody DOT
+    : DASH INFERRED_FROM inferredBody DOT
     ;
 
 // ============================

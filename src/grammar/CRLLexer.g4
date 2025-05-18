@@ -15,7 +15,6 @@ IS_SYSTEM           : 'is system';
 AND_CODE            : 'and code';
 IS_VALUESET         : 'is valueset';
 IS_UNKNOWN_BACKTICK : 'is ``';
-DO_NOT_PERFORM      : 'do not perform';
 ALL_BLOCK           : 'all:';
 ANY_BLOCK           : 'any:';
 
@@ -86,6 +85,10 @@ ERROR        : 'error'; // DO NOT remove as this is used by the lexer error list
 
 // === Modes ===
 mode ACTIVITY_MODE;
+
+DO_NOT_PERFORM_DO             : 'do';
+DO_NOT_PERFORM_NOT            : 'not';
+DO_NOT_PERFORM_PERFORM        : 'perform';
 
 // ACTIVITY_TYPE possibilities (case sensitive)
 ACTIVITY_TYPE
