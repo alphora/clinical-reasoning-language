@@ -11,16 +11,24 @@ const filePath =
 const input = readFileSync(filePath, "utf-8");
 
 // Create the parser (new API)
-const { parser, parserErrorListener } = createParser(input);
+const { parser, parserErrorListener, lexerErrorListener } = createParser(input);
 
 // Parse the input
 const tree = parser.crl();
 
-// Print errors and exit if any are present
-const errors = parserErrorListener.getErrors();
-if (errors.length > 0) {
+// Print parser errors and exit if any are present
+const parserErrors = parserErrorListener.getErrors();
+if (parserErrors.length > 0) {
   console.error("Parser errors:");
-  errors.forEach((e) => console.error(JSON.stringify(e, null, 2)));
+  parserErrors.forEach((e) => console.error(JSON.stringify(e, null, 2)));
+  process.exit(1);
+}
+
+// Check for lexer errors after checking for parser errors, JIC
+const lexerErrors = lexerErrorListener.getErrors();
+if (lexerErrors.length > 0) {
+  console.error("Lexer errors:");
+  lexerErrors.forEach((e) => console.error(JSON.stringify(e, null, 2)));
   process.exit(1);
 }
 

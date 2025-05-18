@@ -6,7 +6,7 @@ import { CRLLexer } from "./grammar/generated/antlr/CRLLexer";
 import { createLexer } from "./lexer/createLexer";
 import { createParser } from "./parser/createParser";
 import { CRLError } from "./types/errors";
-import { Validator } from "./validator/validator";
+//import { Validator } from "./validator/validator";
 
 export interface Token {
   line: number;
@@ -72,9 +72,13 @@ export function parseCRL(input: string): ParseResult<ParseTree> {
     lexerErrorListener = parserSetup.lexerErrorListener;
     parserErrorListener = parserSetup.parserErrorListener;
     const tree = parserSetup.parser.crl();
-    const errors = [...lexerErrorListener.getErrors(), ...parserErrorListener.getErrors()];
-    if (errors.length > 0) {
-      return { success: false, errors };
+    const parserErrors = parserErrorListener.getErrors();
+    if (parserErrors.length > 0) {
+      return { success: false, errors: parserErrors };
+    }
+    const lexerErrors = lexerErrorListener.getErrors();
+    if (lexerErrors.length > 0) {
+      return { success: false, errors: lexerErrors };
     }
     return { success: true, result: tree };
   } catch (error) {
@@ -108,13 +112,17 @@ export function buildCRL(input: string): ParseResult<CRL> {
     const tree = parserSetup.parser.crl();
     builder = new CRLAstBuilder();
     const ast = builder.visit(tree) as CRL;
-    const errors = [
-      ...lexerErrorListener.getErrors(),
-      ...parserErrorListener.getErrors(),
-      ...builder.getErrors(),
-    ];
-    if (errors.length > 0) {
-      return { success: false, errors };
+    const parserErrors = parserErrorListener.getErrors();
+    if (parserErrors.length > 0) {
+      return { success: false, errors: parserErrors };
+    }
+    const lexerErrors = lexerErrorListener.getErrors();
+    if (lexerErrors.length > 0) {
+      return { success: false, errors: lexerErrors };
+    }
+    const builderErrors = builder.getErrors();
+    if (builderErrors.length > 0) {
+      return { success: false, errors: builderErrors };
     }
     return { success: true, result: ast };
   } catch (error) {
@@ -141,42 +149,60 @@ export function buildCRL(input: string): ParseResult<CRL> {
  * @returns ParseResult containing validation result or errors
  */
 export function validateCRL(input: string): ParseResult<CRL> {
-  try {
-    const { parser, lexerErrorListener, parserErrorListener } = createParser(input);
-    const tree = parser.crl();
-    const builder = new CRLAstBuilder();
-    const ast = builder.visit(tree) as CRL;
-    const errors = [...lexerErrorListener.getErrors(), ...parserErrorListener.getErrors()];
-    if (errors.length > 0) {
-      return { success: false, errors };
-    }
-    const validator = new Validator();
-    const validationResult = validator.validate(ast);
-    if (!validationResult.isValid) {
-      return {
-        success: false,
-        errors: [
-          ...validationResult.errors.map((e) => ({
-            type: "Exception" as const,
-            message: e.message,
-          })),
-          ...validationResult.warnings.map((w) => ({
-            type: "Exception" as const,
-            message: w.message,
-          })),
-        ],
-      };
-    }
-    return { success: true, result: ast };
-  } catch (error) {
-    return {
-      success: false,
-      errors: [
-        {
-          type: "Exception",
-          message: error instanceof Error ? error.message : String(error),
-        },
-      ],
-    };
+  const result = buildCRL(input);
+  if (!result.success) {
+    throw new Error(
+      `validateCRL is not currently implemented. Use buildCRL instead. Look for updates in the future. Build errors: ${JSON.stringify(result.errors, null, 2)}`,
+    );
   }
+  throw new Error(
+    "validateCRL is not currently implemented. Use buildCRL instead. Look for updates in the future.",
+  );
+  // TODO: Implement this
+  // try {
+  //   const { parser, lexerErrorListener, parserErrorListener } = createParser(input);
+  //   const tree = parser.crl();
+  //   const builder = new CRLAstBuilder();
+  //   const ast = builder.visit(tree) as CRL;
+  //   const parserErrors = parserErrorListener.getErrors();
+  //   if (parserErrors.length > 0) {
+  //     return { success: false, errors: parserErrors };
+  //   }
+  //   const lexerErrors = lexerErrorListener.getErrors();
+  //   if (lexerErrors.length > 0) {
+  //     return { success: false, errors: lexerErrors };
+  //   }
+  //   const builderErrors = builder.getErrors();
+  //   if (builderErrors.length > 0) {
+  //     return { success: false, errors: builderErrors };
+  //   }
+  //   const validator = new Validator();
+  //   const validationResult = validator.validate(ast);
+  //   if (!validationResult.isValid) {
+  //     return {
+  //       success: false,
+  //       errors: [
+  //         ...validationResult.errors.map((e) => ({
+  //           type: "Exception" as const,
+  //           message: e.message,
+  //         })),
+  //         ...validationResult.warnings.map((w) => ({
+  //           type: "Exception" as const,
+  //           message: w.message,
+  //         })),
+  //       ],
+  //     };
+  //   }
+  //   return { success: true, result: ast };
+  // } catch (error) {
+  //   return {
+  //     success: false,
+  //     errors: [
+  //       {
+  //         type: "Exception",
+  //         message: error instanceof Error ? error.message : String(error),
+  //       },
+  //     ],
+  //   };
+  // }
 }

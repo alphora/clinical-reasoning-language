@@ -13,10 +13,24 @@ const filePath =
 const input = readFileSync(filePath, "utf-8");
 
 // Create the parser (new API)
-const { parser } = createParser(input);
+const { parser, parserErrorListener, lexerErrorListener } = createParser(input);
 
 // Parse the input
 const tree = parser.crl();
+
+// Check for lexer and parser errors before building the AST
+const lexerErrors = lexerErrorListener.getErrors();
+const parserErrors = parserErrorListener.getErrors();
+if (parserErrors.length > 0) {
+  console.error("Parser errors:");
+  parserErrors.forEach((e) => console.error(JSON.stringify(e, null, 2)));
+  process.exit(1);
+}
+if (lexerErrors.length > 0) {
+  console.error("Lexer errors:");
+  lexerErrors.forEach((e) => console.error(JSON.stringify(e, null, 2)));
+  process.exit(1);
+}
 
 // Create the AST builder and visit the parse tree
 const { ast, errors } = createBuilder(tree);
