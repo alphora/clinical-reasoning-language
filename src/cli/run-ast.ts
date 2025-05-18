@@ -1,7 +1,7 @@
 import { readFileSync } from "fs";
 import { join } from "path";
 
-import { createBuilder } from "../ast/builder";
+import { createBuilder } from "../ast/createBuilder";
 import { printAST } from "../ast/utils";
 import { createParser } from "../parser/createParser";
 

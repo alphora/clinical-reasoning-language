@@ -1,5 +1,5 @@
 import { createParser } from "../../parser/createParser";
-import { createBuilder } from "../builder";
+import { createBuilder } from "../createBuilder";
 import { CRL } from "../types";
 
 export const parseInput = (input: string): CRL => {
