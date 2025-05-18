@@ -57,34 +57,34 @@ export class ActionUniquenessValidator {
   }
 
   private validateBlockBody(blockBody: BlockBody, errors: ValidationError[]): void {
-    const doStatements = new Set<string>();
+    const recommendStatements = new Set<string>();
     const useStatements = new Set<string>();
 
     for (const statement of blockBody.statements) {
       if (statement.type === "WhenBlock") {
         this.validateWhenBlock(statement, errors);
       } else if (statement.type === "ActionStatement") {
-        this.validateActionStatement(statement, doStatements, useStatements, errors);
+        this.validateActionStatement(statement, recommendStatements, useStatements, errors);
       }
     }
   }
 
   private validateActionStatement(
     statement: ActionStatement,
-    doStatements: Set<string>,
+    recommendStatements: Set<string>,
     useStatements: Set<string>,
     errors: ValidationError[],
   ): void {
     const action = statement.action;
     if (action.type === "DoActivity") {
-      if (doStatements.has(action.activityName)) {
+      if (recommendStatements.has(action.activityName)) {
         errors.push({
           message: `Duplicate do statement: ${action.activityName}`,
           location: action.location,
           severity: "error",
         });
       }
-      doStatements.add(action.activityName);
+      recommendStatements.add(action.activityName);
     } else if (action.type === "UseDecision") {
       if (useStatements.has(action.decisionName)) {
         errors.push({

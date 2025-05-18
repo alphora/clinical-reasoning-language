@@ -332,24 +332,24 @@ describe("CRLAstBuilder", () => {
 
   describe("Activity Statements", () => {
     it("should parse a simple activity", () => {
-      const input = 'activity "Vaccinate" perform CPGImmunizationRequest.';
+      const input = 'activity "Vaccinate" request CPGImmunizationRequest.';
 
       const result = parseInput(input);
       const ast = result.statements[0] as Activity;
       expect(ast.type).toBe("Activity");
       expect(ast.name).toBe("Vaccinate");
-      expect(ast.perform).toBe("CPGImmunizationRequest");
+      expect(ast.request).toBe("CPGImmunizationRequest");
       expect(ast.terminologyReference).toBeUndefined();
     });
 
     it("should parse an activity with of clause", () => {
-      const input = 'activity "Indicate" perform CPGProposeDiagnosisTask with "Colonoscopy".';
+      const input = 'activity "Indicate" request CPGProposeDiagnosisTask with "Colonoscopy".';
 
       const result = parseInput(input);
       const ast = result.statements[0] as Activity;
       expect(ast.type).toBe("Activity");
       expect(ast.name).toBe("Indicate");
-      expect(ast.perform).toBe("CPGProposeDiagnosisTask");
+      expect(ast.request).toBe("CPGProposeDiagnosisTask");
       expect(ast.terminologyReference).toBe("Colonoscopy");
     });
   });
@@ -514,7 +514,7 @@ describe("CRLAstBuilder", () => {
   //   it('should parse multiple statements of different types', () => {
   //     const input = `
   //       terminology "BMI Valueset" valueset "bmi valueset".
-  //       activity "Vaccinate" perform CPGImmunizationRequest.
+  //       activity "Vaccinate" request CPGImmunizationRequest.
   //       concept "BMI":
   //         has type Observation.
   //         has valuetype Quantity.
@@ -604,7 +604,7 @@ done
 
   describe("buildCRL error reporting", () => {
     it("should return errors in ParseResult for invalid activity type", () => {
-      const input = "perform invalidActivity";
+      const input = "request invalidActivity";
       const result = buildCRL(input);
       expect(result.success).toBe(false);
       expect(result.errors && result.errors.length).toBeGreaterThan(0);

@@ -129,13 +129,13 @@ describe("Structures", () => {
 
   describe("Terminology Structure", () => {
     it("should tokenize terminology with valueset", () => {
-      const input = 'terminology "BMI Valueset" valueset `bmi valueset`.';
+      const input = 'terminology "BMI Valueset" is valueset `bmi valueset`.';
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(tokens, [
         CRLLexer.TERMINOLOGY,
         CRLLexer.QUOTED_STRING,
-        CRLLexer.VALUESET,
+        CRLLexer.IS_VALUESET,
         CRLLexer.BACKTICK_STRING,
         CRLLexer.DOT,
       ]);
@@ -154,15 +154,16 @@ describe("Structures", () => {
     });
 
     it("should tokenize terminology with system and code", () => {
-      const input = 'terminology "Colonoscopy" system `http://snomed.info/sct` code `73761001`.';
+      const input =
+        'terminology "Colonoscopy" is system `http://snomed.info/sct` and code `73761001`.';
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(tokens, [
         CRLLexer.TERMINOLOGY,
         CRLLexer.QUOTED_STRING,
-        CRLLexer.SYSTEM,
+        CRLLexer.IS_SYSTEM,
         CRLLexer.BACKTICK_STRING,
-        CRLLexer.CODE,
+        CRLLexer.AND_CODE,
         CRLLexer.BACKTICK_STRING,
         CRLLexer.DOT,
       ]);

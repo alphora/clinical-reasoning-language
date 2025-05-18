@@ -76,9 +76,9 @@ terminology "Colonoscopy" is system `http://snomed.info/sct` and code `73761001`
 
 concept "Most Recent BMI":
 
-- meta is `Some meta information`.
 - type is Observation.
 - valuetype is boolean.
+- meta is `Some meta information`.
 - evidence is `Calculated by Smile`.
 - inferred from "BMI" apply pattern `Most Recent(this, lookbackMonths)`.
 

@@ -5,7 +5,7 @@
 ### A. Conditional "do not" for Activity
 **Rule:**  
 Apply to `ActivityMapping`.
-- If the FSH `ActivityDefinition` has `doNotPerform = true`, the CRL `activity` block should use the `do not perform` syntax instead of `perform`.
+- If the FSH `ActivityDefinition` has `doNotPerform = true`, the CRL `activity` block should use the `do not perform` syntax instead of `request`.
 
 ### B. Conditional Terminology Block for Activity
 **Rule:**  
@@ -51,7 +51,7 @@ Boolean property in the FSH `ActivityDefinition`.
   ```
 - Otherwise, emit:
   ```crl
-  activity "..." perform ...
+  activity "..." request ...
   ```
 
 ### B. Terminology Block
@@ -68,7 +68,7 @@ Boolean property in the FSH `ActivityDefinition`.
 | FSH Property/Rule          | CRL Output           | Function/Transformation                        |
 |---------------------------|------------------------|----------------------------------------|
 | doNotPerform = true       | do not perform         | Boolean check                          |
-| doNotPerform = false      | perform                | Default                                 |
+| doNotPerform = false      | request                | Default                                 |
 | medicationCodeableConcept    | terminology block      | extractCode, extractCodeDisplay         |
 | dynamicValue (code.coding)| terminology block      | extractCodeExpression, extractCodeDisplay |
 | code exists               | emit terminology       | Only if code is present                 |
@@ -77,7 +77,7 @@ Boolean property in the FSH `ActivityDefinition`.
 ## 6. Implementation Implications
 - Activity emission logic must:
   - Check `doNotPerform`
-  - Switch between `perform` and `do not perform`
+  - Switch between `request` and `do not perform`
 
 - Terminology emission logic for activities must:
   - Only emit if a code exists

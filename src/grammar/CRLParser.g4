@@ -48,7 +48,7 @@ statement
 //   done
 //
 decisionStatement
-    : DECISION decisionIdentifier COLON decisionBody DONE
+    : DECISION decisionIdentifier COLON decisionBody
     ;
 
 decisionBody
@@ -62,20 +62,17 @@ decisionBody
 // A whenBlock covers a "when <concept> then ..." clause.
 
 whenBlock
-    : WHEN conceptReference THEN blockBody              # WhenWithBody
-    | WHEN conceptReference THEN singleActionStatement  # WhenSingleAction
+    : DASH WHEN conceptReference THEN blockBody DASH END_WHEN         # WhenWithBody
+    | DASH WHEN conceptReference THEN singleActionStatement           # WhenSingleAction
     ;
 
 anyOrAllClause
-    : (ANY | ALL) COLON
+    : ANY_BLOCK
+    | ALL_BLOCK
     ;
 
 blockBody
-    : COLON (anyOrAllClause? blockStatement+ ) DONE
-    ;
-
-singleActionStatement
-    : (doStatement | useStatement) DOT
+    : COLON ( anyOrAllClause? blockStatement+ )
     ;
 
 blockStatement
@@ -83,16 +80,20 @@ blockStatement
     | actionStatement          # BlockAction
     ;
 
-actionStatement
-    : (doStatement | useStatement) DOT
+singleActionStatement
+    : actionStatement
     ;
 
-doStatement
-    : DO activityReference
+actionStatement
+    : ( recommendStatement | useStatement ) DOT
+    ;
+
+recommendStatement
+    : RECOMMEND_ACTIVITY activityReference
     ;
 
 useStatement
-    : USE decisionReference
+    : USE_DECISION decisionReference
     ;
 
 // ============================
@@ -111,15 +112,19 @@ useStatement
 //   terminology "Colonoscopy" system `http://snomed.info/sct` code `73761001`.
 //
 terminologyStatement
-    : TERMINOLOGY terminologyIdentifier ( terminologyValueset | backtickString | terminologySystemCode ) DOT
+    : TERMINOLOGY terminologyIdentifier ( terminologyValueset | terminologySystemCode | teminologyUnknown ) DOT
     ;
 
 terminologyValueset
-    : VALUESET identifier
+    : IS_VALUESET identifier
     ;
 
 terminologySystemCode
-    : SYSTEM backtickString CODE backtickString
+    : IS_SYSTEM backtickString AND_CODE backtickString
+    ;
+
+teminologyUnknown
+    : IS_UNKNOWN_BACKTICK
     ;
 
 // ============================
@@ -130,12 +135,12 @@ terminologySystemCode
 // Can reference a terminology or a custom CQL string for dynamic configuration.
 //
 // Examples:
-//   activity "Vaccinate" perform Immunization.
-//   activity "Indicate" perform ProposeDiagnosis with "Colonoscopy".
-//   activity "Inform Clinician" perform CPGCommunicationRequest with `The message to send.` because `Clinician's should be messaged about these things.`.
+//   activity "Vaccinate" request Immunization.
+//   activity "Indicate" request ProposeDiagnosis with "Colonoscopy".
+//   activity "Inform Clinician" request CPGCommunicationRequest with `The message to send.` because `Clinician's should be messaged about these things.`.
 //
 activityStatement
-    : ACTIVITY activityIdentifier PERFORM ACTIVITY_TYPE (WITH (terminologyReference | activityTypeValue))? (BECAUSE rationale)? DOT
+    : ACTIVITY activityIdentifier REQUEST ACTIVITY_TYPE (WITH (terminologyReference | activityTypeValue))? (BECAUSE rationale)? DOT
     ;
 
 // ============================
@@ -167,12 +172,13 @@ activityStatement
 //   done
 //
 conceptStatement
-    : CONCEPT conceptIdentifier COLON conceptBody DONE
+    : CONCEPT conceptIdentifier COLON conceptBody
     ;
 
 conceptBody
     : typeLine
       valueTypeLine
+      (metaLine)?
       (evidenceLine)?
       (codedFromLine | inferredFromLine)
     ;
@@ -182,23 +188,27 @@ conceptBody
 // ============================
 
 typeLine
-    : TYPE IS CONCEPT_TYPE DOT
+    : TYPE_IS CONCEPT_TYPE DOT
     ;
 
 valueTypeLine
-    : VALUETYPE IS CONCEPT_VALUE_TYPE DOT
+    : VALUETYPE_IS CONCEPT_VALUE_TYPE DOT
     ;
 
+metaLine
+    : META_IS backtickString DOT
+    ;
+    
 evidenceLine
-    : EVIDENCE IS backtickString DOT
+    : EVIDENCE_IS backtickString DOT
     ;
 
 codedFromLine
-    : CODED FROM terminologyReference DOT
+    : CODED_FROM terminologyReference DOT
     ;
 
 inferredFromLine
-    : INFERRED FROM inferredBody DOT
+    : INFERRED_FROM inferredBody DOT
     ;
 
 // ============================
@@ -219,7 +229,7 @@ inferredFromConceptReference
     ;
 
 patternStatement
-    : APPLY PATTERN patternName
+    : APPLY_PATTERN patternName
     ;
 
 inferredFromDescriptiveLogic

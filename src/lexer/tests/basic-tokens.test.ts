@@ -612,13 +612,13 @@ describe("CRL Lexer - Basic Tokens", () => {
     });
 
     it("should tokenize terminology statement", () => {
-      const input = 'terminology "Test" valueset "TestSet"';
+      const input = 'terminology "Test" is valueset "TestSet"';
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(tokens, [
         CRLLexer.TERMINOLOGY,
         CRLLexer.QUOTED_STRING,
-        CRLLexer.VALUESET,
+        CRLLexer.IS_VALUESET,
         CRLLexer.QUOTED_STRING,
       ]);
     });
@@ -653,13 +653,13 @@ describe("CRL Lexer - Basic Tokens", () => {
     });
 
     it("should tokenize system and code statement", () => {
-      const input = 'system "http://snomed.info/sct" code "73761001"';
+      const input = 'is system "http://snomed.info/sct" and code "73761001"';
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(tokens, [
-        CRLLexer.SYSTEM,
+        CRLLexer.IS_SYSTEM,
         CRLLexer.QUOTED_STRING,
-        CRLLexer.CODE,
+        CRLLexer.AND_CODE,
         CRLLexer.QUOTED_STRING,
       ]);
     });
