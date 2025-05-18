@@ -490,31 +490,27 @@ describe("CRLAstBuilder", () => {
     });
   });
 
-  // TODO: Fix test
-  // describe('Multiple Statements', () => {
-  //   it('should parse multiple statements of different types', () => {
-  //     const input = `
-  //       terminology "BMI Valueset" valueset "bmi valueset".
-  //       activity "Vaccinate" request CPGImmunizationRequest.
-  //       concept "BMI":
-  //         has type Observation.
-  //         has valuetype Quantity.
-  //       done
-  //       decision "Check BMI":
-  //         when "BMI" then recommend activity "Record BMI".
-  //       done
-  //     `;
+  describe("Multiple Statements", () => {
+    it("should parse multiple statements of different types", () => {
+      const input = `# Test
+        terminology "BMI Valueset" is valueset "bmi valueset".
+        activity "Vaccinate" request CPGImmunizationRequest.
+        concept "BMI":
+          - type is Observation.
+          - valuetype is Quantity.
+          - coded from "BMI Valueset".
+        decision "Check BMI":
+          - when "BMI" then recommend activity "Record BMI".
+      `;
 
-  //     const result = parseInput(input);
-  //     const ast = result.statements;
-
-  //     expect(ast.length).toBe(4);
-  //     expect(ast[0].type).toBe(TerminologyType.type);
-  //     expect(ast[1].type).toBe('Activity');
-  //     expect(ast[2].type).toBe('Concept');
-  //     expect(ast[3].type).toBe(DecisionType.type);
-  //   });
-  // });
+      const result = parseInput(input);
+      expect(result.statements.length).toBe(4);
+      expect(result.statements[0].type).toBe("Terminology");
+      expect(result.statements[1].type).toBe("Activity");
+      expect(result.statements[2].type).toBe("Concept");
+      expect(result.statements[3].type).toBe("Decision");
+    });
+  });
 
   describe("Action Statements", () => {
     it("should parse a do activity", () => {
