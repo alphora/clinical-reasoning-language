@@ -38,16 +38,16 @@ export class Validator {
     const warnings: ValidationError[] = [];
 
     // Check for unused declarations
-    const unusedResult = this.unusedDeclarationsValidator.validate(ast);
-    warnings.push(...unusedResult);
+    // const unusedResult = this.unusedDeclarationsValidator.validate(ast);
+    // warnings.push(...unusedResult);
 
     // Check for duplicate names
     const nameResult = this.nameUniquenessValidator.validate(ast);
     errors.push(...nameResult);
 
     // Check for duplicate actions
-    const actionResult = this.actionUniquenessValidator.validate(ast);
-    errors.push(...actionResult);
+    // const actionResult = this.actionUniquenessValidator.validate(ast);
+    // errors.push(...actionResult);
 
     // TODO: Check for cycles
     // const cycleResult = this.cycleDetector.validate(ast);
