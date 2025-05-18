@@ -39,11 +39,9 @@ import {
   DecisionBody,
   DecisionBodyType,
   WhenBlock,
-  WhenBlockType,
   BlockBody,
   BlockBodyType,
   SingleAction,
-  SingleActionType,
   ActionStatement,
   RecommendActivity,
   RecommendActivityType,
@@ -149,13 +147,13 @@ export class CRLAstBuilder
   visitWhenWithBody(ctx: WhenBlockContext): WhenBlock {
     const conceptName = ctx.conceptReference().text.slice(1, -1);
     const body = this.visit(ctx.blockBody()!) as BlockBody;
-    return { type: WhenBlockType.type, conceptName, body, location: getLocation(ctx) };
+    return { type: "WhenBlock", conceptName, body, location: getLocation(ctx) };
   }
 
   visitWhenSingleAction(ctx: WhenBlockContext): WhenBlock {
     const conceptName = ctx.conceptReference().text.slice(1, -1);
     const action = this.visit(ctx.actionStatement()!) as SingleAction;
-    return { type: WhenBlockType.type, conceptName, body: action, location: getLocation(ctx) };
+    return { type: "WhenBlock", conceptName, body: action, location: getLocation(ctx) };
   }
 
   visitNestedWhenBlock(ctx: WhenBlockContext): WhenBlock {

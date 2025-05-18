@@ -18,9 +18,6 @@ export interface CRL extends ASTNode {
   location: Location;
   header?: string;
 }
-export const FileType = {
-  type: "CRL" as const,
-};
 
 // Union type for all possible statements
 export type Statement = Decision | Concept | Activity | Terminology;
@@ -34,9 +31,6 @@ export interface Decision extends ASTNode {
   body: DecisionBody;
   location: Location;
 }
-export const DecisionType = {
-  type: "Decision" as const,
-};
 
 // Decision body containing when blocks
 export interface DecisionBody extends ASTNode {
@@ -44,20 +38,14 @@ export interface DecisionBody extends ASTNode {
   statements: WhenBlock[];
   location: Location;
 }
-export const DecisionBodyType = {
-  type: "DecisionBody" as const,
-};
 
 // When block
 export interface WhenBlock extends ASTNode {
   type: "WhenBlock";
   conceptName: string;
-  body: BlockBody | SingleAction;
+  body: WhenBlockBody;
   location: Location;
 }
-export const WhenBlockType = {
-  type: "WhenBlock" as const,
-};
 
 // When block body can be a block body or single action
 export type WhenBlockBody = BlockBody | SingleAction;
@@ -69,9 +57,6 @@ export interface BlockBody extends ASTNode {
   statements: (WhenBlock | ActionStatement)[];
   location: Location;
 }
-export const BlockBodyType = {
-  type: "BlockBody" as const,
-};
 
 // Single action (do or use)
 export interface SingleAction extends ASTNode {
@@ -79,9 +64,6 @@ export interface SingleAction extends ASTNode {
   action: Action;
   location: Location;
 }
-export const SingleActionType = {
-  type: "SingleAction" as const,
-};
 
 // Action statement (do or use)
 export interface ActionStatement extends ASTNode {
@@ -89,9 +71,6 @@ export interface ActionStatement extends ASTNode {
   action: Action;
   location: Location;
 }
-export const ActionStatementType = {
-  type: "ActionStatement" as const,
-};
 
 // Recommend activity
 export interface RecommendActivity extends ASTNode {
@@ -99,9 +78,6 @@ export interface RecommendActivity extends ASTNode {
   activityName: string;
   location: Location;
 }
-export const RecommendActivityType = {
-  type: "RecommendActivity" as const,
-};
 
 // Use decision
 export interface UseDecision extends ASTNode {
@@ -109,9 +85,6 @@ export interface UseDecision extends ASTNode {
   decisionName: string;
   location: Location;
 }
-export const UseDecisionType = {
-  type: "UseDecision" as const,
-};
 
 // ------------------------- TERMINOLOGY STATEMENT --------------------------
 
@@ -122,9 +95,6 @@ export interface Terminology extends ASTNode {
   definition: TerminologyDefinition;
   location: Location;
 }
-export const TerminologyType = {
-  type: "Terminology" as const,
-};
 
 // Terminology definition can be a valueset, unknown, or system code
 export type TerminologyDefinition =
@@ -138,9 +108,6 @@ export interface TerminologyValueset extends ASTNode {
   valuesetName: string;
   location: Location;
 }
-export const TerminologyValuesetType = {
-  type: "TerminologyValueset" as const,
-};
 
 // Terminology unknown (is ``)
 export interface TerminologyUnknown extends ASTNode {
@@ -148,9 +115,6 @@ export interface TerminologyUnknown extends ASTNode {
   value: string;
   location: Location;
 }
-export const TerminologyUnknownType = {
-  type: "TerminologyUnknown" as const,
-};
 
 // Terminology system code
 export interface TerminologySystemCode extends ASTNode {
@@ -159,9 +123,6 @@ export interface TerminologySystemCode extends ASTNode {
   code: string;
   location: Location;
 }
-export const TerminologySystemCodeType = {
-  type: "TerminologySystemCode" as const,
-};
 
 // --------------------------- ACTIVITY STATEMENT ---------------------------
 
@@ -200,9 +161,6 @@ export interface CodedFromDefinition extends ASTNode {
   terminologyName: string;
   location: Location;
 }
-export const CodedFromDefinitionType = {
-  type: "CodedFromDefinition" as const,
-};
 
 // Inferred from definition
 // concept reference
@@ -210,33 +168,22 @@ export interface ConceptReference extends ASTNode {
   type: "ConceptReference";
   name: string;
 }
-export const ConceptReferenceType = {
-  type: "ConceptReference" as const,
-};
 
 // instead of a binary-only LogicalExpression, split AND/OR into n‑ary:
 export interface InformalAnd extends ASTNode {
   type: "AndExpression";
   terms: InferredFromExpression[]; // two or more
 }
-export const InformalAndType = {
-  type: "AndExpression" as const,
-};
 
 export interface InformalOr extends ASTNode {
   type: "OrExpression";
   terms: InferredFromExpression[]; // two or more
 }
-export const InformalOrType = {
-  type: "OrExpression" as const,
-};
+
 export interface NotExpression extends ASTNode {
   type: "NotExpression";
   expression: InferredFromExpression;
 }
-export const NotExpressionType = {
-  type: "NotExpression" as const,
-};
 
 // any node that can appear in a logical narrative
 export type InferredFromExpression =
@@ -251,9 +198,6 @@ export interface GroupExpression extends ASTNode {
   type: "GroupExpression";
   expression: InferredFromExpression;
 }
-export const GroupExpressionType = {
-  type: "GroupExpression" as const,
-};
 
 // inferred-from nodes
 export interface InferredFromConcept extends ASTNode {
@@ -261,17 +205,11 @@ export interface InferredFromConcept extends ASTNode {
   concept: string;
   pattern?: string;
 }
-export const InferredFromConceptType = {
-  type: "InferredFromDefinitionConcept" as const,
-};
 
 export interface InferredFromDefinition extends ASTNode {
   type: "InferredFromDefinition";
   body: InferredFromConcept | InferredFromExpression;
 }
-export const InferredFromDefinitionType = {
-  type: "InferredFromDefinition" as const,
-};
 
 export interface Location {
   start: { line: number; column: number };
