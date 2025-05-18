@@ -1,6 +1,5 @@
 import { ParserRuleContext } from "antlr4ts/ParserRuleContext";
 import { AbstractParseTreeVisitor } from "antlr4ts/tree/AbstractParseTreeVisitor";
-import type { ParseTree } from "antlr4ts/tree/ParseTree";
 
 import {
   CrlContext,
@@ -171,7 +170,7 @@ export class CRLAstBuilder
     const useStmt = ctx.useStatement?.();
     let action: RecommendActivity | UseDecision;
     if (recStmt) {
-      action = this.visitrecommendStatement(recStmt);
+      action = this.visitRecommendStatement(recStmt);
     } else if (useStmt) {
       action = this.visitUseStatement(useStmt);
     } else {
@@ -180,7 +179,7 @@ export class CRLAstBuilder
     return { type: "ActionStatement", action, location: getLocation(ctx) };
   }
 
-  visitrecommendStatement(ctx: RecommendStatementContext): RecommendActivity {
+  visitRecommendStatement(ctx: RecommendStatementContext): RecommendActivity {
     const activityName = ctx.activityReference().text.slice(1, -1);
     const result = { type: "RecommendActivity" as const, activityName, location: getLocation(ctx) };
     return result;
@@ -423,13 +422,11 @@ export class CRLAstBuilder
   visitDefinitionConcept(ctx: InferredBodyContext): InferredFromConcept {
     const refCtx = ctx.getRuleContext(0, InferredFromConceptReferenceContext);
     let pat: string | undefined = undefined;
-    if (refCtx && refCtx.patternStatement) {
-      const patternCtx = refCtx.patternStatement();
-      if (patternCtx?.patternName?.().backtickString) {
-        const backtickCtx = patternCtx.patternName().backtickString();
-        if (backtickCtx?.text !== undefined) {
-          pat = backtickCtx.text.slice(1, -1);
-        }
+    const patternCtx = refCtx?.patternStatement?.();
+    if (patternCtx?.patternName?.().backtickString) {
+      const backtickCtx = patternCtx.patternName().backtickString();
+      if (backtickCtx?.text !== undefined) {
+        pat = backtickCtx.text.slice(1, -1);
       }
     }
     const concept = refCtx?.conceptReference().text.slice(1, -1) ?? "";
@@ -500,16 +497,4 @@ export class CRLAstBuilder
       | GroupExpression;
     return { type: "GroupExpression", expression: expr, location: getLocation(ctx) };
   }
-}
-
-// Factory function to create a builder, build the AST, and collect errors
-export function createBuilder(tree: ParseTree): {
-  builder: CRLAstBuilder;
-  ast: CRL;
-  errors: CRLError[];
-} {
-  const builder = new CRLAstBuilder();
-  const ast = builder.visit(tree) as CRL;
-  const errors = builder.getErrors();
-  return { builder, ast, errors };
 }
