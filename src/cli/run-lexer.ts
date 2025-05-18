@@ -47,6 +47,7 @@ const errors = errorListener.getErrors();
 if (errors.length > 0) {
   console.error("Lexer errors:");
   errors.forEach((e) => console.error(JSON.stringify(e, null, 2)));
+  process.exit(1);
 }
 
 // Check if pretty output is requested
