@@ -23,7 +23,7 @@
     },
     {
       "name": "entity.name.type.crl",
-      "match": "(?<!\\buse\\s)(?<!\\brecommend\\s)\\b(decision|activity|concept|terminology)\\b(?![\\w`\"])"
+      "match": "(?<!\\buse\\s)(?<!\\brecommend\\s)\\b(decision|activity|concept|terminology|metric)\\b(?![\\w`\"])"
     },
     {
       "name": "keyword.control.flow.crl",
@@ -35,7 +35,7 @@
     },
     {
       "name": "keyword.control.structure.crl",
-      "match": "(?<![\\w`\"])\\b(when|end when|then)\\b(?![\\w`\"])"
+      "match": "(?<![\\w`\"])\\b(group|end group|when|end when|then)\\b(?![\\w`\"])"
     },
     {
       "name": "keyword.operator.logical.crl",
@@ -51,7 +51,7 @@
     },
     {
       "name": "variable.language.element.crl",
-      "match": "(?<![\\w`\"])\\b(is|meta is|type is|valuetype is|evidence is|inferred from|apply pattern|request|with|because|valueset|system|code|coded from)\\b(?![\\w`\"])"
+      "match": "(?<![\\w`\"])\\b(scoring is|improvement is|population|based on|meta is|type is|valuetype is|evidence is|inferred from|apply pattern|request|with|because|valueset is|system is|code is|coded from)\\b(?![\\w`\"])"
     }
   ],
   "uuid": "cc3b5b42-2f43-4fa4-94cc-b2fae909c22a",
