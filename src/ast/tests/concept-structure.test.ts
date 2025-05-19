@@ -2,11 +2,22 @@ import {
   Concept,
   CodedFromDefinition,
   GroupExpression,
+  InferredFromConcept,
   InferredFromExpression,
   InformalAnd,
+  InformalOr,
+  NotExpression,
 } from "../types";
 
 import { parseInput } from "./parseInput";
+
+type ConceptBodyNode =
+  | InferredFromConcept
+  | InferredFromExpression
+  | InformalOr
+  | InformalAnd
+  | GroupExpression
+  | NotExpression;
 
 describe("Concept Structure", () => {
   it("should correctly structure concept with inferred by concept reference", () => {
@@ -35,9 +46,9 @@ concept "Client Age Less Than 12 Months":
       "OrExpression",
       "NotExpression",
     ]).toContain(definition.type);
-    let body: any = definition;
+    let body: ConceptBodyNode = definition as unknown as ConceptBodyNode;
     if (definition.type === "InferredFromDefinition") {
-      body = definition.body;
+      body = definition.body as ConceptBodyNode;
     }
     if (body.type === "InferredFromDefinitionConcept") {
       expect(body.type).toBe("InferredFromDefinitionConcept");
@@ -66,9 +77,9 @@ concept "Client Is Due For MCV12":
     expect(["InferredFromDefinition", "AndExpression", "OrExpression", "NotExpression"]).toContain(
       definition.type,
     );
-    let body: any = definition;
+    let body: ConceptBodyNode = definition as unknown as ConceptBodyNode;
     if (definition.type === "InferredFromDefinition") {
-      body = definition.body;
+      body = definition.body as ConceptBodyNode;
     }
     expect(["AndExpression", "OrExpression", "NotExpression"]).toContain(body.type);
   });
@@ -111,9 +122,9 @@ concept "Complex Condition":
     expect(["InferredFromDefinition", "NotExpression", "AndExpression", "OrExpression"]).toContain(
       definition.type,
     );
-    let body: any = definition;
+    let body: ConceptBodyNode = definition as unknown as ConceptBodyNode;
     if (definition.type === "InferredFromDefinition") {
-      body = definition.body;
+      body = definition.body as ConceptBodyNode;
     }
     expect(body.type).toBe("NotExpression");
 
