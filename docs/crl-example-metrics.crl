@@ -1,0 +1,28 @@
+# CRL Example Metrics
+
+terminology "Office Visit":
+
+- valueset is `http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.464.1003.101.12.1001`.
+
+concept "Qualifying Encounter":
+
+- type is Encounter.
+- valuetype is codeableconcept.
+- coded from "Office Visit".
+
+concept "Minimum Age 50":
+
+- type is Observation.
+- valuetype is Quantity.
+- inferred from "Patient".
+  - apply pattern `Age(birthDate).Minimum(50)`.
+
+metric "Colorectal Screening":
+
+- scoring is continuous-variable.  //optional
+- improvement is increase. // optional
+- group
+  - population "Initial Population" based on ("Qualifying Encounter" and "Minimum Age 50").
+  - population "Denominator" based on ("Qualifying Encounter" and "Minimum Age 50").
+  - population "Numerator" based on ("Colorectal Exam Within 10 Years").
+- end group
