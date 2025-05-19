@@ -85,34 +85,30 @@ export interface UseDecision extends ASTNode {
 export interface Terminology extends ASTNode {
   type: "Terminology";
   name: string;
-  definition: TerminologyDefinition;
+  body: TerminologyBodyLine[];
   location: Location;
 }
 
-// Terminology definition can be a valueset, unknown, or system code
-export type TerminologyDefinition =
-  | TerminologyValueset
-  | TerminologyUnknown
-  | TerminologySystemCode;
+// Union type for all possible lines in a terminology body
+export type TerminologyBodyLine = TerminologyValueset | TerminologySystem | TerminologyCode;
 
-// Terminology valueset
+// Terminology valueset line
 export interface TerminologyValueset extends ASTNode {
   type: "TerminologyValueset";
   valuesetName: string;
   location: Location;
 }
 
-// Terminology unknown (is ``)
-export interface TerminologyUnknown extends ASTNode {
-  type: "TerminologyUnknown";
-  value: string;
+// Terminology system line
+export interface TerminologySystem extends ASTNode {
+  type: "TerminologySystem";
+  system: string;
   location: Location;
 }
 
-// Terminology system code
-export interface TerminologySystemCode extends ASTNode {
-  type: "TerminologySystemCode";
-  system: string;
+// Terminology code line (can be multiple per system)
+export interface TerminologyCode extends ASTNode {
+  type: "TerminologyCode";
   code: string;
   location: Location;
 }
@@ -123,11 +119,35 @@ export interface TerminologySystemCode extends ASTNode {
 export interface Activity extends ASTNode {
   type: "Activity";
   name: string;
-  request: ActivityType;
+  body: ActivityBody;
+  location: Location;
+}
+
+export interface ActivityBody extends ASTNode {
+  type: "ActivityBody";
+  request: ActivityRequest;
+  withClause?: ActivityWith;
+  becauseClause?: ActivityBecause;
+  location: Location;
+}
+
+export interface ActivityRequest extends ASTNode {
+  type: "ActivityRequest";
+  activityType: ActivityType;
+  doNotPerform?: boolean;
+  location: Location;
+}
+
+export interface ActivityWith extends ASTNode {
+  type: "ActivityWith";
   terminologyReference?: string;
   activityTypeValue?: string;
-  rationale?: string;
-  doNotPerform?: boolean;
+  location: Location;
+}
+
+export interface ActivityBecause extends ASTNode {
+  type: "ActivityBecause";
+  rationale: string;
   location: Location;
 }
 
@@ -196,7 +216,7 @@ export interface GroupExpression extends ASTNode {
 export interface InferredFromConcept extends ASTNode {
   type: "InferredFromDefinitionConcept";
   concept: string;
-  pattern?: string;
+  patterns?: string[];
 }
 
 export interface InferredFromDefinition extends ASTNode {
