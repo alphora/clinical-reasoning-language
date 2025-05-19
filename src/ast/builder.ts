@@ -341,7 +341,7 @@ export class CRLAstBuilder
     }
     if (ctx.activityTypeValue) {
       const atv = ctx.activityTypeValue();
-      if (atv && atv.backtickString) {
+      if (atv?.backtickString) {
         const backtickCtx = atv.backtickString();
         if (backtickCtx?.text !== undefined) {
           activityTypeValue = backtickCtx.text.slice(1, -1);
@@ -405,18 +405,14 @@ export class CRLAstBuilder
   private parseMeta(
     bodyCtx: import("../grammar/generated/antlr/CRLParser").ConceptBodyContext,
   ): string | undefined {
-    if (bodyCtx.metaLine?.()) {
-      const metaCtx = bodyCtx.metaLine?.();
-      if (metaCtx?.backtickString) {
-        const backtickCtx = metaCtx.backtickString();
-        if (backtickCtx?.text !== undefined) {
-          return backtickCtx.text.slice(1, -1);
-        } else if (backtickCtx?.BACKTICK_STRING) {
-          const token = backtickCtx.BACKTICK_STRING();
-          if (token?.text !== undefined) {
-            return token.text.slice(1, -1);
-          }
-        }
+    const metaCtx = bodyCtx.metaLine?.();
+    const backtickCtx = metaCtx?.backtickString?.();
+    if (backtickCtx?.text !== undefined) {
+      return backtickCtx.text.slice(1, -1);
+    } else if (backtickCtx?.BACKTICK_STRING) {
+      const token = backtickCtx.BACKTICK_STRING();
+      if (token?.text !== undefined) {
+        return token.text.slice(1, -1);
       }
     }
     return undefined;
@@ -513,15 +509,13 @@ export class CRLAstBuilder
   visitDefinitionConcept(ctx: InferredFromBodyContext): InferredFromConcept {
     const refCtx = ctx.getRuleContext(0, InferredFromConceptReferenceContext);
     const concept = refCtx?.conceptReference().text.slice(1, -1) ?? "";
+    const patternStmts = refCtx?.patternStatement?.();
     let patterns: string[] = [];
-    if (refCtx && refCtx.patternStatement) {
-      const patternStmts = refCtx.patternStatement();
-      if (patternStmts && patternStmts.length > 0) {
-        patterns = patternStmts.map((patCtx) => {
-          const backtickCtx = patCtx.patternName().backtickString();
-          return backtickCtx.text.slice(1, -1);
-        });
-      }
+    if (patternStmts && patternStmts.length > 0) {
+      patterns = patternStmts.map((patCtx) => {
+        const backtickCtx = patCtx.patternName().backtickString();
+        return backtickCtx.text.slice(1, -1);
+      });
     }
     return {
       type: "InferredFromDefinitionConcept",
