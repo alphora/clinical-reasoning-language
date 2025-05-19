@@ -285,7 +285,9 @@ describe("CRLAstBuilder", () => {
       const valuesetLine = ast.body.find((l) => l.type === "TerminologyValueset");
       expect(valuesetLine).toBeDefined();
       if (valuesetLine) {
-        expect((valuesetLine as any).valuesetName).toBe("bmi valueset");
+        expect((valuesetLine as import("../types").TerminologyValueset).valuesetName).toBe(
+          "bmi valueset",
+        );
       }
     });
 
@@ -300,9 +302,11 @@ describe("CRLAstBuilder", () => {
       const systemLine = ast.body.find((l) => l.type === "TerminologySystem");
       const codeLine = ast.body.find((l) => l.type === "TerminologyCode");
       expect(systemLine).toBeDefined();
-      expect((systemLine as any).system).toBe("http://snomed.info/sct");
+      expect((systemLine as import("../types").TerminologySystem).system).toBe(
+        "http://snomed.info/sct",
+      );
       expect(codeLine).toBeDefined();
-      expect((codeLine as any).code).toBe("73761001");
+      expect((codeLine as import("../types").TerminologyCode).code).toBe("73761001");
     });
 
     it("should parse a terminology system code with empty system and code", () => {
@@ -318,9 +322,9 @@ describe("CRLAstBuilder", () => {
       expect(ast.type).toBe("Terminology");
       expect(ast.name).toBe("Empty System Code");
       expect(systemLine).toBeDefined();
-      expect((systemLine as any).system).toBe("");
+      expect((systemLine as import("../types").TerminologySystem).system).toBe("");
       expect(codeLine).toBeDefined();
-      expect((codeLine as any).code).toBe("");
+      expect((codeLine as import("../types").TerminologyCode).code).toBe("");
     });
   });
 
