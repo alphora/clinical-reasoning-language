@@ -11,10 +11,9 @@ META_IS             : 'meta is';
 INFERRED_FROM       : 'inferred from';
 CODED_FROM          : 'coded from';
 APPLY_PATTERN       : 'apply pattern';
-IS_SYSTEM           : 'is system';
-AND_CODE            : 'and code';
-IS_VALUESET         : 'is valueset';
-IS_UNKNOWN_BACKTICK : 'is ``';
+CODE_IS             : 'code is';
+SYSTEM_IS           : 'system is';
+VALUESET_IS         : 'valueset is';
 ALL_BLOCK           : 'all:';
 ANY_BLOCK           : 'any:';
 
