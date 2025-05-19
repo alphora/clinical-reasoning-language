@@ -361,7 +361,7 @@ terminology "Client Is Due For MCV2":
 
 terminology "Two Primary Series Doses Administered":
 
-- system is `http://sdh.com/cqis/kalm`
+- system is `http://sdh.com/cqis/kalm`.
   - code is `two-primary-series-doses-administered`.
 
 terminology "Client Age Less Than 9 Months":

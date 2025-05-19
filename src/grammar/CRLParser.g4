@@ -101,31 +101,42 @@ useStatement
 // Terminologies can:
 //   - Reference a valueset (exclusive with system/code)
 //   - Reference a system/code pair
-//   - Provide an explicit empty placeholder (``)
 //
 // Examples:
-//   terminology "BMI Valueset" valueset `BMI`.
-//   terminology "Some Terminology" ``.
-//   terminology "Colonoscopy" system `http://snomed.info/sct` code `73761001`.
+//   terminology "BMI Valueset":
+//      - valueset is `BMI`.
+//   terminology "Some Terminology":
+//      - valueset is ``.
+//   terminology "Colonoscopy":
+//      - system is `http://snomed.info/sct`.
+//      - code is `73761001`.
 //
 terminologyStatement
-    : TERMINOLOGY terminologyIdentifier ( terminologyValueset | terminologySystemCode | terminologyUnknown ) DOT
+    : TERMINOLOGY terminologyIdentifier COLON terminologyBody
+    ;
+
+terminologyBody
+    : terminologyLine+
+    ;
+
+terminologyLine
+    : ( terminologyValueset | terminologySystemCode )
     ;
 
 terminologyValueset
-    : IS_VALUESET backtickString
+    : DASH VALUESET_IS backtickString DOT
     ;
 
 terminologySystemCode
-    : IS_SYSTEM backtickString AND_CODE backtickString
+    : terminologySystem terminologyCode+
     ;
 
-terminologyUnknown
-    : IS_UNKNOWN_BACKTICK
+terminologySystem
+    : DASH SYSTEM_IS backtickString DOT
     ;
 
-doNotPerform
-    : DO_NOT_PERFORM_DO DO_NOT_PERFORM_NOT DO_NOT_PERFORM_PERFORM
+terminologyCode
+    : DASH CODE_IS backtickString DOT
     ;
 
 // ============================
@@ -136,15 +147,38 @@ doNotPerform
 // Can reference a terminology or a custom CQL string for dynamic configuration.
 //
 // Examples:
-//   activity "Vaccinate" request Immunization.
-//   activity "Indicate" request ProposeDiagnosis with "Colonoscopy".
-//   activity "Inform Clinician" request CPGCommunicationRequest with `The message to send.` because `Clinician's should be messaged about these things.`.
+//   activity "Vaccinate":
+//      - request Immunization.
+//   activity "Indicate":
+//      - request ProposeDiagnosis.
+//      - with "Colonoscopy".
+//   activity "Inform Clinician":
+//      - request CPGCommunicationRequest.
+//      - with `The message to send.`.
+//      - because `Clinician's should be messaged about these things.`.
 //
+doNotPerform
+    : DO_NOT_PERFORM_DO DO_NOT_PERFORM_NOT DO_NOT_PERFORM_PERFORM
+    ;
+
 activityStatement
-    : ACTIVITY activityIdentifier REQUEST (doNotPerform)? ACTIVITY_TYPE 
-      (WITH (terminologyReference | activityTypeValue))? 
-      (BECAUSE rationale)? 
-      DOT
+    : ACTIVITY activityIdentifier COLON activityBody
+    ;
+
+activityBody
+    : activityRequest (activityWith)? (activityBecause)?
+    ;
+
+activityRequest
+    : DASH REQUEST (doNotPerform)? ACTIVITY_TYPE DOT
+    ;
+
+activityWith
+    : DASH WITH (terminologyReference | activityTypeValue) DOT
+    ;
+
+activityBecause
+    : DASH BECAUSE rationale DOT
     ;
 
 // ============================
@@ -184,7 +218,7 @@ conceptBody
       valueTypeLine
       (metaLine)?
       (evidenceLine)?
-      (codedFromLine | inferredFromLine)
+      (codedFromLine | inferredFromBody)
     ;
 
 // ============================
@@ -211,10 +245,6 @@ codedFromLine
     : DASH CODED_FROM terminologyReference DOT
     ;
 
-inferredFromLine
-    : DASH INFERRED_FROM inferredBody DOT
-    ;
-
 // ============================
 // Inference Body
 // ============================
@@ -223,21 +253,21 @@ inferredFromLine
 //   - a single concept (optionally applying a pattern)
 //   - or a logical expression combining multiple concepts.
 //
-inferredBody
+inferredFromBody
     : inferredFromConceptReference    # DefinitionConcept
     | inferredFromDescriptiveLogic    # DefinitionLogic
     ;
 
 inferredFromConceptReference
-    : conceptReference patternStatement?
+    : DASH INFERRED_FROM conceptReference DOT patternStatement*
     ;
 
 patternStatement
-    : APPLY_PATTERN patternName
+    : DASH APPLY_PATTERN patternName DOT
     ;
 
 inferredFromDescriptiveLogic
-    : LPAREN inferredFromExpression RPAREN
+    : DASH INFERRED_FROM LPAREN inferredFromExpression RPAREN DOT
     ;
 
 // ============================

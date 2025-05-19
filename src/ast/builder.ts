@@ -16,7 +16,7 @@ import {
   ActivityStatementContext,
   ConceptStatementContext,
   InferredFromLineContext,
-  InferredBodyContext,
+  InferredFromBodyContext,
   InferredFromConceptReferenceContext,
   InferredFromDescriptiveLogicContext,
   InferredFromExpressionContext,
@@ -439,7 +439,7 @@ export class CRLAstBuilder
   }
 
   visitInferredFromLine(ctx: InferredFromLineContext): InferredFromDefinition {
-    const defCtx = ctx.inferredBody();
+    const defCtx = ctx.inferredFromBody();
     const body = this.visit(defCtx) as
       | InferredFromConcept
       | InformalAnd
@@ -449,7 +449,7 @@ export class CRLAstBuilder
     return { type: "InferredFromDefinition", body, location: getLocation(ctx) };
   }
 
-  visitDefinitionConcept(ctx: InferredBodyContext): InferredFromConcept {
+  visitDefinitionConcept(ctx: InferredFromBodyContext): InferredFromConcept {
     const refCtx = ctx.getRuleContext(0, InferredFromConceptReferenceContext);
     let pat: string | undefined = undefined;
     const patternCtx = refCtx?.patternStatement?.();
@@ -468,7 +468,7 @@ export class CRLAstBuilder
     };
   }
 
-  visitDefinitionLogic(ctx: InferredBodyContext): GroupExpression | InferredFromConcept {
+  visitDefinitionLogic(ctx: InferredFromBodyContext): GroupExpression | InferredFromConcept {
     const descCtx = ctx.getRuleContext(0, InferredFromDescriptiveLogicContext);
     const exprCtx = descCtx?.inferredFromExpression();
     const expr = this.visit(exprCtx);
