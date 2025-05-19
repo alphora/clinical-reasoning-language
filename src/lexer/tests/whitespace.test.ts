@@ -62,26 +62,32 @@ describe("Whitespace Handling", () => {
 
   describe("Whitespace in Terminology Statements", () => {
     it("should handle whitespace in terminology valueset statements", () => {
-      const input = 'terminology\n  "BMI Valueset"\n\t\tis valueset\n  `bmi valueset`\t.';
+      const input = 'terminology\n  "BMI Valueset":\n\t\t- valueset is\n  `bmi valueset`\t.';
       const tokens = getTokensFromString(input);
       verifyTokenSequence(tokens, [
         CRLLexer.TERMINOLOGY,
         CRLLexer.QUOTED_STRING,
-        CRLLexer.IS_VALUESET,
+        CRLLexer.COLON,
+        CRLLexer.DASH,
+        CRLLexer.VALUESET_IS,
         CRLLexer.BACKTICK_STRING,
         CRLLexer.DOT,
       ]);
     });
 
     it("should handle whitespace in terminology system code statements", () => {
-      const input = 'terminology\n"term"\n is system\t`sys`\n and code\t`123`\t.';
+      const input = 'terminology\n"term":\n - system is\t`sys`.\n- code is\t`123`\t.';
       const tokens = getTokensFromString(input);
       verifyTokenSequence(tokens, [
         CRLLexer.TERMINOLOGY,
         CRLLexer.QUOTED_STRING,
-        CRLLexer.IS_SYSTEM,
+        CRLLexer.COLON,
+        CRLLexer.DASH,
+        CRLLexer.SYSTEM_IS,
         CRLLexer.BACKTICK_STRING,
-        CRLLexer.AND_CODE,
+        CRLLexer.DOT,
+        CRLLexer.DASH,
+        CRLLexer.CODE_IS,
         CRLLexer.BACKTICK_STRING,
         CRLLexer.DOT,
       ]);
@@ -90,11 +96,13 @@ describe("Whitespace Handling", () => {
 
   describe("Whitespace in Activity Statements", () => {
     it("should handle whitespace in activity statements", () => {
-      const input = 'activity\n  "Vaccinate"\n\t\trequest\n  CPGImmunizationRequest\t.';
+      const input = 'activity\n  "Vaccinate":\n\t\t- request\n  CPGImmunizationRequest\t.';
       const tokens = getTokensFromString(input);
       verifyTokenSequence(tokens, [
         CRLLexer.ACTIVITY,
         CRLLexer.QUOTED_STRING,
+        CRLLexer.COLON,
+        CRLLexer.DASH,
         CRLLexer.REQUEST,
         CRLLexer.ACTIVITY_TYPE,
         CRLLexer.DOT,
@@ -103,13 +111,16 @@ describe("Whitespace Handling", () => {
 
     it("should handle whitespace in activity statements with of clause", () => {
       const input =
-        'activity\n"Action"\n  request\tCPGProposeDiagnosisTask\n  with\t"diagnosis"\t.';
+        'activity\n"Action":\n - request\tCPGProposeDiagnosisTask\n - with\t"diagnosis"\t.';
       const tokens = getTokensFromString(input);
       verifyTokenSequence(tokens, [
         CRLLexer.ACTIVITY,
         CRLLexer.QUOTED_STRING,
+        CRLLexer.COLON,
+        CRLLexer.DASH,
         CRLLexer.REQUEST,
         CRLLexer.ACTIVITY_TYPE,
+        CRLLexer.DASH,
         CRLLexer.WITH,
         CRLLexer.QUOTED_STRING,
         CRLLexer.DOT,
@@ -121,18 +132,6 @@ describe("Whitespace Handling", () => {
     it("should handle whitespace in concept type declarations", () => {
       const input = 'concept\n"BMI"\n  :\n   - type is\n  Observation\t.';
       const tokens = getTokensFromString(input);
-
-      // [DEBUGGING] Print actual token types and texts for diagnosis
-      // eslint-disable-next-line no-console
-      console.log(
-        "[DEBUGGING] Actual token types:",
-        tokens.map((t) => t.type),
-      );
-      // eslint-disable-next-line no-console
-      console.log(
-        "[DEBUGGING] Actual token texts:",
-        tokens.map((t) => t.text),
-      );
 
       verifyTokenSequence(tokens, [
         CRLLexer.CONCEPT,
@@ -149,18 +148,6 @@ describe("Whitespace Handling", () => {
       const input = "- valuetype is\t\tQuantity\n.";
       const tokens = getTokensFromString(input);
 
-      // [DEBUGGING] Print actual token types and texts for diagnosis
-      // eslint-disable-next-line no-console
-      console.log(
-        "[DEBUGGING] Actual token types:",
-        tokens.map((t) => t.type),
-      );
-      // eslint-disable-next-line no-console
-      console.log(
-        "[DEBUGGING] Actual token texts:",
-        tokens.map((t) => t.text),
-      );
-
       verifyTokenSequence(tokens, [
         CRLLexer.DASH,
         CRLLexer.VALUETYPE_IS,
@@ -173,18 +160,6 @@ describe("Whitespace Handling", () => {
       const input =
         'inferred from\t(\n"Condition 1"\n  and\t"Condition 2"\n  or\t"Condition 3"\n)\t.';
       const tokens = getTokensFromString(input);
-
-      // [DEBUGGING] Print actual token types and texts for diagnosis
-      // eslint-disable-next-line no-console
-      console.log(
-        "[DEBUGGING] Actual token types:",
-        tokens.map((t) => t.type),
-      );
-      // eslint-disable-next-line no-console
-      console.log(
-        "[DEBUGGING] Actual token texts:",
-        tokens.map((t) => t.text),
-      );
 
       verifyTokenSequence(tokens, [
         CRLLexer.INFERRED_FROM,

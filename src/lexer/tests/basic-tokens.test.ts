@@ -128,12 +128,6 @@ describe("CRL Lexer - Basic Tokens", () => {
     it("should tokenize CPGProposeDiagnosis", () => {
       const input = "request CPGProposeDiagnosis";
       const tokens = getTokensFromString(input);
-      console.log(
-        "[DEBUGGING] Actual tokens:",
-        tokens.map((t) => ({ type: t.type, text: t.text })),
-      );
-      console.log("[DEBUGGING] Expected types:", [CRLLexer.REQUEST, CRLLexer.ERROR]);
-      console.log("[DEBUGGING] Expected texts:", ["request", "CPGProposeDiagnosis"]);
       verifyTokenSequence(
         tokens,
         [CRLLexer.REQUEST, CRLLexer.ERROR],
@@ -144,26 +138,6 @@ describe("CRL Lexer - Basic Tokens", () => {
     it("should tokenize medication-related activities", () => {
       const input = "request CPGMedicationRequest request CPGServiceRequest request CPGStop";
       const tokens = getTokensFromString(input);
-      console.log(
-        "[DEBUGGING] Actual tokens:",
-        tokens.map((t) => ({ type: t.type, text: t.text })),
-      );
-      console.log("[DEBUGGING] Expected types:", [
-        CRLLexer.REQUEST,
-        CRLLexer.ACTIVITY_TYPE,
-        CRLLexer.REQUEST,
-        CRLLexer.ACTIVITY_TYPE,
-        CRLLexer.REQUEST,
-        CRLLexer.ERROR,
-      ]);
-      console.log("[DEBUGGING] Expected texts:", [
-        "request",
-        "CPGMedicationRequest",
-        "request",
-        "CPGServiceRequest",
-        "request",
-        "CPGStop",
-      ]);
       verifyTokenSequence(
         tokens,
         [
@@ -182,26 +156,6 @@ describe("CRL Lexer - Basic Tokens", () => {
       const input =
         "request CPGCollectInformation request CPGCommunication request CPGGenerateReport";
       const tokens = getTokensFromString(input);
-      console.log(
-        "[DEBUGGING] Actual tokens:",
-        tokens.map((t) => ({ type: t.type, text: t.text })),
-      );
-      console.log("[DEBUGGING] Expected types:", [
-        CRLLexer.REQUEST,
-        CRLLexer.ACTIVITY_TYPE,
-        CRLLexer.REQUEST,
-        CRLLexer.ERROR,
-        CRLLexer.REQUEST,
-        CRLLexer.ACTIVITY_TYPE,
-      ]);
-      console.log("[DEBUGGING] Expected texts:", [
-        "request",
-        "CPGCollectInformation",
-        "request",
-        "CPGCommunication",
-        "request",
-        "CPGGenerateReport",
-      ]);
       verifyTokenSequence(
         tokens,
         [
@@ -252,30 +206,6 @@ describe("CRL Lexer - Basic Tokens", () => {
       const input =
         "request CPGEnrollment request CPGHold request CPGRecordDetectedIssue request CPGRecordInference";
       const tokens = getTokensFromString(input);
-      console.log(
-        "[DEBUGGING] Actual tokens:",
-        tokens.map((t) => ({ type: t.type, text: t.text })),
-      );
-      console.log("[DEBUGGING] Expected types:", [
-        CRLLexer.REQUEST,
-        CRLLexer.ACTIVITY_TYPE,
-        CRLLexer.REQUEST,
-        CRLLexer.ERROR,
-        CRLLexer.REQUEST,
-        CRLLexer.ACTIVITY_TYPE,
-        CRLLexer.REQUEST,
-        CRLLexer.ACTIVITY_TYPE,
-      ]);
-      console.log("[DEBUGGING] Expected texts:", [
-        "request",
-        "CPGEnrollment",
-        "request",
-        "CPGHold",
-        "request",
-        "CPGRecordDetectedIssue",
-        "request",
-        "CPGRecordInference",
-      ]);
       verifyTokenSequence(
         tokens,
         [
@@ -304,22 +234,6 @@ describe("CRL Lexer - Basic Tokens", () => {
     it("should tokenize report and resume activities", () => {
       const input = "request CPGReportFlag request CPGResume";
       const tokens = getTokensFromString(input);
-      console.log(
-        "[DEBUGGING] Actual tokens:",
-        tokens.map((t) => ({ type: t.type, text: t.text })),
-      );
-      console.log("[DEBUGGING] Expected types:", [
-        CRLLexer.REQUEST,
-        CRLLexer.ERROR,
-        CRLLexer.REQUEST,
-        CRLLexer.ERROR,
-      ]);
-      console.log("[DEBUGGING] Expected texts:", [
-        "request",
-        "CPGReportFlag",
-        "request",
-        "CPGResume",
-      ]);
       verifyTokenSequence(
         tokens,
         [CRLLexer.REQUEST, CRLLexer.ERROR, CRLLexer.REQUEST, CRLLexer.ERROR],
@@ -612,14 +526,17 @@ describe("CRL Lexer - Basic Tokens", () => {
     });
 
     it("should tokenize terminology statement", () => {
-      const input = 'terminology "Test" is valueset "TestSet"';
+      const input = `terminology "Test":\n- valueset is \`TestSet\`.`;
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(tokens, [
         CRLLexer.TERMINOLOGY,
         CRLLexer.QUOTED_STRING,
-        CRLLexer.IS_VALUESET,
-        CRLLexer.QUOTED_STRING,
+        CRLLexer.COLON,
+        CRLLexer.DASH,
+        CRLLexer.VALUESET_IS,
+        CRLLexer.BACKTICK_STRING,
+        CRLLexer.DOT,
       ]);
     });
 
@@ -653,22 +570,19 @@ describe("CRL Lexer - Basic Tokens", () => {
     });
 
     it("should tokenize system and code statement", () => {
-      const input = 'is system "http://snomed.info/sct" and code "73761001"';
+      const input = `- system is \`http://snomed.info/sct\`.\n- code is \`73761001\`.`;
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(tokens, [
-        CRLLexer.IS_SYSTEM,
-        CRLLexer.QUOTED_STRING,
-        CRLLexer.AND_CODE,
-        CRLLexer.QUOTED_STRING,
+        CRLLexer.DASH,
+        CRLLexer.SYSTEM_IS,
+        CRLLexer.BACKTICK_STRING,
+        CRLLexer.DOT,
+        CRLLexer.DASH,
+        CRLLexer.CODE_IS,
+        CRLLexer.BACKTICK_STRING,
+        CRLLexer.DOT,
       ]);
-    });
-
-    it("should tokenize period", () => {
-      const input = ".";
-      const tokens = getTokensFromString(input);
-
-      verifyTokenSequence(tokens, [CRLLexer.DOT], ["."]);
     });
   });
 
