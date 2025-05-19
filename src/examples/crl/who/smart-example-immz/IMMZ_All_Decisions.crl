@@ -302,109 +302,109 @@ concept "Contraindication Evaluation of the MCV dose":
 terminology "Measles Routine Immunization Schedule Incomplete":
 
 - system is `http://sdh.com/cqis/kalm`.
-- code is `measles-routine-immunization-schedule-incomplete`.
+  - code is `measles-routine-immunization-schedule-incomplete`.
 
 terminology "No MCV0 Doses Administered":
 
 - system is `http://sdh.com/cqis/kalm`.
-- code is `no-mcv0-doses-administered`.
+  - code is `no-mcv0-doses-administered`.
 
 terminology "Client Age Less Than 6 Months":
 
 - system is `http://sdh.com/cqis/kalm`.
-- code is `client-age-less-than-6-months`.
+  - code is `client-age-less-than-6-months`.
 
 terminology "Last Live Vaccine Administered Within 4 Weeks":
 
 - system is `http://sdh.com/cqis/kalm`.
-- code is `last-live-vaccine-administered-within-4-weeks`.
+  - code is `last-live-vaccine-administered-within-4-weeks`.
 
 terminology "Client Is Due For MCV0":
 
 - system is `http://sdh.com/cqis/kalm`.
-- code is `client-is-due-for-mcv0`.
+  - code is `client-is-due-for-mcv0`.
 
 terminology "MCV0 Dose Administered":
 
 - system is `http://sdh.com/cqis/kalm`.
-- code is `mcv0-dose-administered`.
+  - code is `mcv0-dose-administered`.
 
 terminology "No Primary Series Doses Administered":
 
 - system is `http://sdh.com/cqis/kalm`.
-- code is `no-primary-series-doses-administered`.
+  - code is `no-primary-series-doses-administered`.
 
 terminology "Client Age Less Than 12 Months":
 
 - system is `http://sdh.com/cqis/kalm`.
-- code is `client-age-less-than-12-months`.
+  - code is `client-age-less-than-12-months`.
 
 terminology "Client Is Due For MCV1":
 
 - system is `http://sdh.com/cqis/kalm`.
-- code is `client-is-due-for-mcv1`.
+  - code is `client-is-due-for-mcv1`.
 
 terminology "One Primary Series Dose Administered":
 
 - system is `http://sdh.com/cqis/kalm`.
-- code is `one-primary-series-dose-administered`.
+  - code is `one-primary-series-dose-administered`.
 
 terminology "Client Age Less Than 15 Months":
 
 - system is `http://sdh.com/cqis/kalm`.
-- code is `client-age-less-than-15-months`.
+  - code is `client-age-less-than-15-months`.
 
 terminology "Client Is Due For MCV2":
 
 - system is `http://sdh.com/cqis/kalm`.
-- code is `client-is-due-for-mcv2`.
+  - code is `client-is-due-for-mcv2`.
 
 terminology "Two Primary Series Doses Administered":
 
 - system is `http://sdh.com/cqis/kalm`
-- code is `two-primary-series-doses-administered`.
+  - code is `two-primary-series-doses-administered`.
 
 terminology "Client Age Less Than 9 Months":
 
 - system is `http://sdh.com/cqis/kalm`.
-- code is `client-age-less-than-9-months`.
+  - code is `client-age-less-than-9-months`.
 
 terminology "Measles Routine Immunization Schedule Complete":
 
 - system is `http://sdh.com/cqis/kalm`.
-- code is `measles-routine-immunization-schedule-complete`.
+  - code is `measles-routine-immunization-schedule-complete`.
 
 terminology "No Supplementary Dose Administered":
 
 - system is `http://sdh.com/cqis/kalm`.
-- code is `no-supplementary-dose-administered`.
+  - code is `no-supplementary-dose-administered`.
 
 terminology "Client Is Due For Supplementary Dose":
 
 - system is `http://sdh.com/cqis/kalm`.
-- code is `client-is-due-for-supplementary-dose`.
+  - code is `client-is-due-for-supplementary-dose`.
 
 terminology "Supplementary Dose Administered":
 
 - system is `http://sdh.com/cqis/kalm`.
-- code is `supplementary-dose-administered`.
+  - code is `supplementary-dose-administered`.
 
 terminology "MCV Dose Contraindicated":
 
 - system is `http://sdh.com/cqis/kalm`.
-- code is `mcv-dose-contraindicated`.
+  - code is `mcv-dose-contraindicated`.
 
 terminology "Contraindication Evaluation of the MCV dose":
 
 - system is `http://sdh.com/cqis/kalm`.
-- code is `contraindication-evaluation-of-the-mcv-dose`.
+  - code is `contraindication-evaluation-of-the-mcv-dose`.
 
 terminology "Measles vaccines":
 
 - system is `http://id.who.int/icd/release/11/mms`.
-- code is `XM28X5`.
+  - code is `XM28X5`.
 
 terminology "Measles Code":
 
 - system is `http://id.who.int/icd/release/11/mms`.
-- code is `XM28X5`.
+  - code is `XM28X5`.
