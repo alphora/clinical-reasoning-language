@@ -1,9 +1,9 @@
 import { ParserRuleContext } from "antlr4ts/ParserRuleContext";
 import { AbstractParseTreeVisitor } from "antlr4ts/tree/AbstractParseTreeVisitor";
-import { CrlContext, DecisionStatementContext, DecisionBodyContext, WhenBlockContext, BlockBodyContext, ActionStatementContext, RecommendStatementContext, UseStatementContext, TerminologyStatementContext, TerminologyValuesetContext, TerminologySystemCodeContext, ActivityStatementContext, ConceptStatementContext, InferredFromLineContext, InferredBodyContext, InferredFromExpressionContext, InformalOrContext, InformalAndContext, InformalNotContext, AtomContext, WhenWithBodyContext, WhenSingleActionContext, NestedWhenBlockContext, BlockActionContext, BlockStatementContext } from "../grammar/generated/antlr/CRLParser";
+import { CrlContext, DecisionStatementContext, DecisionBodyContext, WhenBlockContext, BlockBodyContext, ActionStatementContext, RecommendStatementContext, UseStatementContext, TerminologyStatementContext, TerminologyValuesetContext, ActivityStatementContext, ConceptStatementContext, InferredFromBodyContext, InferredFromExpressionContext, InformalOrContext, InformalAndContext, InformalNotContext, AtomContext, WhenWithBodyContext, WhenSingleActionContext, NestedWhenBlockContext, BlockActionContext, BlockStatementContext } from "../grammar/generated/antlr/CRLParser";
 import { CRLParserVisitor } from "../grammar/generated/antlr/CRLParserVisitor";
 import type { CRLError } from "../types/errors";
-import { ASTNode, Decision, DecisionBody, WhenBlock, BlockBody, ActionStatement, RecommendActivity, UseDecision, Terminology, TerminologyValueset, TerminologySystemCode, Activity, Concept, InferredFromDefinition, ConceptReference, InformalAnd, InformalOr, NotExpression, GroupExpression, InferredFromConcept } from "./types";
+import { ASTNode, Decision, DecisionBody, WhenBlock, BlockBody, ActionStatement, RecommendActivity, UseDecision, Terminology, TerminologyValueset, TerminologySystem, TerminologyCode, Activity, ActivityBody, ActivityRequest, ActivityWith, ActivityBecause, Concept, ConceptReference, InformalAnd, InformalOr, NotExpression, GroupExpression, InferredFromConcept } from "./types";
 import type { CRL } from "./types";
 type InformalNode = GroupExpression | ConceptReference | InformalAnd | NotExpression | InformalOr;
 export declare class CRLAstBuilder extends AbstractParseTreeVisitor<ASTNode> implements CRLParserVisitor<ASTNode> {
@@ -26,17 +26,20 @@ export declare class CRLAstBuilder extends AbstractParseTreeVisitor<ASTNode> imp
     visitUseStatement(ctx: UseStatementContext): UseDecision;
     visitTerminologyStatement(ctx: TerminologyStatementContext): Terminology;
     visitTerminologyValueset(ctx: TerminologyValuesetContext): TerminologyValueset;
-    visitTerminologySystemCode(ctx: TerminologySystemCodeContext): TerminologySystemCode;
-    private parseWithClause;
-    private parseRationaleClause;
+    visitTerminologySystem(ctx: import("../grammar/generated/antlr/CRLParser").TerminologySystemContext): TerminologySystem;
+    visitTerminologyCode(ctx: import("../grammar/generated/antlr/CRLParser").TerminologyCodeContext): TerminologyCode;
     visitActivityStatement(ctx: ActivityStatementContext): Activity;
+    visitActivityBody(ctx: import("../grammar/generated/antlr/CRLParser").ActivityBodyContext): ActivityBody;
+    visitActivityRequest(ctx: import("../grammar/generated/antlr/CRLParser").ActivityRequestContext): ActivityRequest;
+    visitActivityWith(ctx: import("../grammar/generated/antlr/CRLParser").ActivityWithContext): ActivityWith;
+    visitActivityBecause(ctx: import("../grammar/generated/antlr/CRLParser").ActivityBecauseContext): ActivityBecause;
     private parseConceptTypes;
+    private parseMeta;
     private parseEvidence;
     private parseConceptDefinition;
     visitConceptStatement(ctx: ConceptStatementContext): Concept;
-    visitInferredFromLine(ctx: InferredFromLineContext): InferredFromDefinition;
-    visitDefinitionConcept(ctx: InferredBodyContext): InferredFromConcept;
-    visitDefinitionLogic(ctx: InferredBodyContext): GroupExpression | InferredFromConcept;
+    visitDefinitionConcept(ctx: InferredFromBodyContext): InferredFromConcept;
+    visitDefinitionLogic(ctx: InferredFromBodyContext): GroupExpression | InferredFromConcept;
     visitInferredFromExpression(ctx: InferredFromExpressionContext): InformalNode;
     visitInformalOr(ctx: InformalOrContext): InformalOr;
     visitInformalAnd(ctx: InformalAndContext): InformalAnd | NotExpression | GroupExpression | ConceptReference;
