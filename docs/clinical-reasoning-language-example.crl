@@ -54,23 +54,53 @@ decision "Elderly Based":
   - end when
 - end when
 
-activity "Vaccinate" request CPGImmunizationRequest.
+activity "Vaccinate":
 
-activity "Indicate" request CPGProposeDiagnosisTask with "Colonoscopy".
+- request CPGImmunizationRequest.
 
-activity "Message Care Plan" request CPGCommunicationRequest with `Create a care plan` because `A new plan needs to be implemented.`.
+activity "Indicate":
 
-activity "Contraindicated" request do not perform CPGImmunizationRequest with "Immunization" because `Immunization is contraindicated`.
+- request CPGProposeDiagnosisTask.
+- with "Colonoscopy".
 
-terminology "BMI Range as a Condition" is ``.
+activity "Message Care Plan":
 
-terminology "BMI as an Observation" is valueset `BMI as an Observation`.
+- request CPGCommunicationRequest.
+- with `Create a care plan`.
+- because `A new plan needs to be implemented.`.
 
-terminology "Height Valueset" is valueset `height valueset`.
+activity "Contraindicated":
 
-terminology "Weight Valueset" is valueset `weight valueset`.
+- request do not perform CPGImmunizationRequest.
+- with "Immunization".
+- because `Immunization is contraindicated`.
 
-terminology "Colonoscopy" is system `http://snomed.info/sct` and code `73761001`.
+terminology "BMI Range as a Condition":
+
+- valueset is ``.
+
+terminology "BMI as an Observation":
+
+- valueset is `BMI as an Observation`.
+
+terminology "Height Valueset":
+
+- valueset is `height valueset`.
+
+terminology "Weight Valueset":
+
+- valueset is `weight valueset`.
+
+terminology "Colonoscopy":
+
+- system is `http://snomed.info/sct`.
+- code is `73761001`.
+
+terminology "Breast Cancer":
+
+- system is `http://snomed.info/sct`.
+- code is `73761002`.
+- code is `73761003`.
 
 // comments go into the auto generated README and, CQL when applicable
 
@@ -80,7 +110,8 @@ concept "Most Recent BMI":
 - valuetype is boolean.
 - meta is `Some meta information`.
 - evidence is `Calculated by Smile`.
-- inferred from "BMI" apply pattern `Most Recent(this, lookbackMonths)`.
+- inferred from "BMI".
+- apply pattern `Most Recent(this, lookbackMonths)`.
 
 concept "BMI":
 
