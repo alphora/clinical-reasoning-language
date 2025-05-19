@@ -100,65 +100,84 @@ decision "IMMZ.DT.Immunization Strategy":
   - end when
 - end when
 
-activity "Client Age Less Than 6 Months"
-    request CPGCommunicationRequest
-    with `Should not vaccinate client for MCV0 as client is less than 6 months. Check for any vaccines due, and inform the caregiver of when to come back for MCV0.`.
+activity "Client Age Less Than 6 Months":
 
-activity "Last Live Vaccine Administered Within 4 Weeks"
-    request CPGCommunicationRequest
-    with `Should not vaccinate client for MCV0 as live vaccine was administered in the last 4 weeks. Check for any vaccines due, and inform the caregiver of when to come back for MCV0.`.
+- request CPGCommunicationRequest.
+- with `Should not vaccinate client for MCV0 as client is less than 6 months. Check for any vaccines due, and inform the caregiver of when to come back for MCV0.`.
 
-activity "Provide Measles Vaccine" request CPGMedicationRequest with "Measles vaccines".
+activity "Last Live Vaccine Administered Within 4 Weeks":
 
-activity "MCV0 Dose Administered"
-    request CPGCommunicationRequest
-    with `MCV0 was administered. Check measles routine immunization schedule.`.
+- request CPGCommunicationRequest.
+- with `Should not vaccinate client for MCV0 as live vaccine was administered in the last 4 weeks. Check for any vaccines due, and inform the caregiver of when to come back for MCV0.`.
 
-activity "Client Age Less Than 12 Months"
-    request CPGCommunicationRequest
-    with `Should not vaccinate client as client's age is less than 12 months. Check for any vaccines due, and inform the caregiver of when to come back for MCV1.`.
+activity "Provide Measles Vaccine":
 
-activity "Last Live Vaccine Administered Within 4 Weeks_2"
-    request CPGCommunicationRequest
-    with `Should not vaccinate client for MCV1 as live vaccine was administered in the last 4 weeks. Check for any vaccines due and inform the caregiver of when to come back for MCV1.`.
+- request CPGMedicationRequest.
+- with "Measles vaccines".
 
-activity "Client Age Less Than 15 Months"
-    request CPGCommunicationRequest
-    with `Should not vaccinate client for MCV2 as client's age is less than 15 months. Check for any vaccines due, and inform the caregiver of when to come back for MCV2.`.
+activity "MCV0 Dose Administered":
 
-activity "Last Live Vaccine Administered Within 4 Weeks_3"
-    request CPGCommunicationRequest
-    with `Should not vaccinate client for MCV2 as live vaccine was administered in the last 4 weeks. Check for any vaccines due, and inform the caregiver of when to come back for MCV2.`.
+- request CPGCommunicationRequest.
+- with `MCV0 was administered. Check measles routine immunization schedule.`.
 
-activity "Measles primary series is complete."
-    request CPGCommunicationRequest
-    with `Measles primary series is complete. Two measles primary series doses were administered. Check if a measles supplementary dose is appropriate for the client.`
-    because `An additional dose of MCV should be administered to HIV-infected children receiving HAART following immune reconstitution. If CD4+ T lymphocyte counts are monitored, an additional dose of MCV should be administered when immune reconstitution has been achieved, e.g. when the CD4+ T lymphocyte count reaches 20–25%. Where CD4+ T lymphocyte monitoring is not available, children should receive an additional dose of MCV 6–12 months after initiation of HAART.`.
+activity "Client Age Less Than 12 Months":
 
-activity "Client Age Less Than 9 Months"
-    request CPGCommunicationRequest
-    with `Should not vaccinate client as client's age is less than 9 months. Check for any vaccines due, and inform the caregiver of when to come back for MCV1.`.
+- request CPGCommunicationRequest.
+- with `Should not vaccinate client as client's age is less than 12 months. Check for any vaccines due, and inform the caregiver of when to come back for MCV1.`.
 
-activity "Measles primary series is complete"
-    request CPGCommunicationRequest
-    with `Measles primary series is complete. Two measles primary series doses were administered. Check if a measles supplementary dose is appropriate for the client.`
-    because `An additional dose of MCV should be administered to HIV-infected children receiving HAART following immune reconstitution. If CD4+ T lymphocyte counts are monitored, an additional dose of MCV should be administered when immune reconstitution has been achieved, e.g. when the CD4+ T lymphocyte count reaches 20–25%. Where CD4+ T lymphocyte monitoring is not available, children should receive an additional dose of MCV 6–12 months after initiation of HAART.`.
+activity "Last Live Vaccine Administered Within 4 Weeks_2":
 
-activity "Last Live Vaccine Administered Within 4 Weeks_4"
-    request CPGCommunicationRequest
-    with `Should not vaccinate client for measles supplementary dose as live vaccine was administered in the last 4 weeks. Check for any vaccines due, and inform the caregiver of when to come back for supplementary dose.`.
+- request CPGCommunicationRequest.
+- with `Should not vaccinate client for MCV1 as live vaccine was administered in the last 4 weeks. Check for any vaccines due and inform the caregiver of when to come back for MCV1.`.
 
-activity "Supplementary Dose Administered"
-    request CPGCommunicationRequest
-    with `Measles immunization schedule is complete. Measles supplementary dose was administered.`.
+activity "Client Age Less Than 15 Months":
 
-activity "Check Contraindication for Measles Immunization"
-    request CPGMedicationRequest with "Measles vaccines"
-    because `While vaccines are universally recommended, some clients may have contraindications to particular vaccines.<br/>Additional contraindications may be included in WHO position papers for the vaccine - Measles vaccines: WHO position paper (April 2017).`.
+- request CPGCommunicationRequest.
+- with `Should not vaccinate client for MCV2 as client's age is less than 15 months. Check for any vaccines due, and inform the caregiver of when to come back for MCV2.`.
 
-activity "Evaluate Contraindication for Measles"
-    request CPGServiceRequest with "Measles Code"
-    because `While vaccines are universally recommended, some clients may have contraindications to particular vaccines.<br/>Additional contraindications may be included in WHO position papers for the vaccine - Measles vaccines: WHO position paper (April 2017).`.
+activity "Last Live Vaccine Administered Within 4 Weeks_3":
+
+- request CPGCommunicationRequest.
+- with `Should not vaccinate client for MCV2 as live vaccine was administered in the last 4 weeks. Check for any vaccines due, and inform the caregiver of when to come back for MCV2.`.
+
+activity "Measles primary series is complete.":
+
+- request CPGCommunicationRequest.
+- with `Measles primary series is complete. Two measles primary series doses were administered. Check if a measles supplementary dose is appropriate for the client.`.
+- because `An additional dose of MCV should be administered to HIV-infected children receiving HAART following immune reconstitution. If CD4+ T lymphocyte counts are monitored, an additional dose of MCV should be administered when immune reconstitution has been achieved, e.g. when the CD4+ T lymphocyte count reaches 20–25%. Where CD4+ T lymphocyte monitoring is not available, children should receive an additional dose of MCV 6–12 months after initiation of HAART.`.
+
+activity "Client Age Less Than 9 Months":
+
+- request CPGCommunicationRequest.
+- with `Should not vaccinate client as client's age is less than 9 months. Check for any vaccines due, and inform the caregiver of when to come back for MCV1.`.
+
+activity "Measles primary series is complete":
+
+- request CPGCommunicationRequest.
+- with `Measles primary series is complete. Two measles primary series doses were administered. Check if a measles supplementary dose is appropriate for the client.`.
+- because `An additional dose of MCV should be administered to HIV-infected children receiving HAART following immune reconstitution. If CD4+ T lymphocyte counts are monitored, an additional dose of MCV should be administered when immune reconstitution has been achieved, e.g. when the CD4+ T lymphocyte count reaches 20–25%. Where CD4+ T lymphocyte monitoring is not available, children should receive an additional dose of MCV 6–12 months after initiation of HAART.`.
+
+activity "Last Live Vaccine Administered Within 4 Weeks_4":
+
+- request CPGCommunicationRequest.
+- with `Should not vaccinate client for measles supplementary dose as live vaccine was administered in the last 4 weeks. Check for any vaccines due, and inform the caregiver of when to come back for supplementary dose.`.
+
+activity "Supplementary Dose Administered":
+
+- request CPGCommunicationRequest.
+- with `Measles immunization schedule is complete. Measles supplementary dose was administered.`.
+
+activity "Check Contraindication for Measles Immunization":
+
+- request CPGMedicationRequest.
+- with "Measles vaccines".
+- because `While vaccines are universally recommended, some clients may have contraindications to particular vaccines.<br/>Additional contraindications may be included in WHO position papers for the vaccine - Measles vaccines: WHO position paper (April 2017).`.
+
+activity "Evaluate Contraindication for Measles":
+
+- request CPGServiceRequest.
+- with "Measles Code".
+- because `While vaccines are universally recommended, some clients may have contraindications to particular vaccines.<br/>Additional contraindications may be included in WHO position papers for the vaccine - Measles vaccines: WHO position paper (April 2017).`.
 
 concept "Measles Routine Immunization Schedule Incomplete":
 
@@ -280,46 +299,112 @@ concept "Contraindication Evaluation of the MCV dose":
 - valuetype is boolean.
 - coded from "Contraindication Evaluation of the MCV dose".
 
-terminology "Measles Routine Immunization Schedule Incomplete" is system `http://sdh.com/cqis/kalm` and code `measles-routine-immunization-schedule-incomplete`.
+terminology "Measles Routine Immunization Schedule Incomplete":
 
-terminology "No MCV0 Doses Administered" is system `http://sdh.com/cqis/kalm` and code `no-mcv0-doses-administered`.
+- system is `http://sdh.com/cqis/kalm`.
+- code is `measles-routine-immunization-schedule-incomplete`.
 
-terminology "Client Age Less Than 6 Months" is system `http://sdh.com/cqis/kalm` and code `client-age-less-than-6-months`.
+terminology "No MCV0 Doses Administered":
 
-terminology "Last Live Vaccine Administered Within 4 Weeks" is system `http://sdh.com/cqis/kalm` and code `last-live-vaccine-administered-within-4-weeks`.
+- system is `http://sdh.com/cqis/kalm`.
+- code is `no-mcv0-doses-administered`.
 
-terminology "Client Is Due For MCV0" is system `http://sdh.com/cqis/kalm` and code `client-is-due-for-mcv0`.
+terminology "Client Age Less Than 6 Months":
 
-terminology "MCV0 Dose Administered" is system `http://sdh.com/cqis/kalm` and code `mcv0-dose-administered`.
+- system is `http://sdh.com/cqis/kalm`.
+- code is `client-age-less-than-6-months`.
 
-terminology "No Primary Series Doses Administered" is system `http://sdh.com/cqis/kalm` and code `no-primary-series-doses-administered`.
+terminology "Last Live Vaccine Administered Within 4 Weeks":
 
-terminology "Client Age Less Than 12 Months" is system `http://sdh.com/cqis/kalm` and code `client-age-less-than-12-months`.
+- system is `http://sdh.com/cqis/kalm`.
+- code is `last-live-vaccine-administered-within-4-weeks`.
 
-terminology "Client Is Due For MCV1" is system `http://sdh.com/cqis/kalm` and code `client-is-due-for-mcv1`.
+terminology "Client Is Due For MCV0":
 
-terminology "One Primary Series Dose Administered" is system `http://sdh.com/cqis/kalm` and code `one-primary-series-dose-administered`.
+- system is `http://sdh.com/cqis/kalm`.
+- code is `client-is-due-for-mcv0`.
 
-terminology "Client Age Less Than 15 Months" is system `http://sdh.com/cqis/kalm` and code `client-age-less-than-15-months`.
+terminology "MCV0 Dose Administered":
 
-terminology "Client Is Due For MCV2" is system `http://sdh.com/cqis/kalm` and code `client-is-due-for-mcv2`.
+- system is `http://sdh.com/cqis/kalm`.
+- code is `mcv0-dose-administered`.
 
-terminology "Two Primary Series Doses Administered" is system `http://sdh.com/cqis/kalm` and code `two-primary-series-doses-administered`.
+terminology "No Primary Series Doses Administered":
 
-terminology "Client Age Less Than 9 Months" is system `http://sdh.com/cqis/kalm` and code `client-age-less-than-9-months`.
+- system is `http://sdh.com/cqis/kalm`.
+- code is `no-primary-series-doses-administered`.
 
-terminology "Measles Routine Immunization Schedule Complete" is system `http://sdh.com/cqis/kalm` and code `measles-routine-immunization-schedule-complete`.
+terminology "Client Age Less Than 12 Months":
 
-terminology "No Supplementary Dose Administered" is system `http://sdh.com/cqis/kalm` and code `no-supplementary-dose-administered`.
+- system is `http://sdh.com/cqis/kalm`.
+- code is `client-age-less-than-12-months`.
 
-terminology "Client Is Due For Supplementary Dose" is system `http://sdh.com/cqis/kalm` and code `client-is-due-for-supplementary-dose`.
+terminology "Client Is Due For MCV1":
 
-terminology "Supplementary Dose Administered" is system `http://sdh.com/cqis/kalm` and code `supplementary-dose-administered`.
+- system is `http://sdh.com/cqis/kalm`.
+- code is `client-is-due-for-mcv1`.
 
-terminology "MCV Dose Contraindicated" is system `http://sdh.com/cqis/kalm` and code `mcv-dose-contraindicated`.
+terminology "One Primary Series Dose Administered":
 
-terminology "Contraindication Evaluation of the MCV dose" is system `http://sdh.com/cqis/kalm` and code `contraindication-evaluation-of-the-mcv-dose`.
+- system is `http://sdh.com/cqis/kalm`.
+- code is `one-primary-series-dose-administered`.
 
-terminology "Measles vaccines" is system `http://id.who.int/icd/release/11/mms` and code `XM28X5`.
+terminology "Client Age Less Than 15 Months":
 
-terminology "Measles Code" is system `http://id.who.int/icd/release/11/mms` and code `XM28X5`.
+- system is `http://sdh.com/cqis/kalm`.
+- code is `client-age-less-than-15-months`.
+
+terminology "Client Is Due For MCV2":
+
+- system is `http://sdh.com/cqis/kalm`.
+- code is `client-is-due-for-mcv2`.
+
+terminology "Two Primary Series Doses Administered":
+
+- system is `http://sdh.com/cqis/kalm`
+- code is `two-primary-series-doses-administered`.
+
+terminology "Client Age Less Than 9 Months":
+
+- system is `http://sdh.com/cqis/kalm`.
+- code is `client-age-less-than-9-months`.
+
+terminology "Measles Routine Immunization Schedule Complete":
+
+- system is `http://sdh.com/cqis/kalm`.
+- code is `measles-routine-immunization-schedule-complete`.
+
+terminology "No Supplementary Dose Administered":
+
+- system is `http://sdh.com/cqis/kalm`.
+- code is `no-supplementary-dose-administered`.
+
+terminology "Client Is Due For Supplementary Dose":
+
+- system is `http://sdh.com/cqis/kalm`.
+- code is `client-is-due-for-supplementary-dose`.
+
+terminology "Supplementary Dose Administered":
+
+- system is `http://sdh.com/cqis/kalm`.
+- code is `supplementary-dose-administered`.
+
+terminology "MCV Dose Contraindicated":
+
+- system is `http://sdh.com/cqis/kalm`.
+- code is `mcv-dose-contraindicated`.
+
+terminology "Contraindication Evaluation of the MCV dose":
+
+- system is `http://sdh.com/cqis/kalm`.
+- code is `contraindication-evaluation-of-the-mcv-dose`.
+
+terminology "Measles vaccines":
+
+- system is `http://id.who.int/icd/release/11/mms`.
+- code is `XM28X5`.
+
+terminology "Measles Code":
+
+- system is `http://id.who.int/icd/release/11/mms`.
+- code is `XM28X5`.
