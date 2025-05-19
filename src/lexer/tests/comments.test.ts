@@ -71,14 +71,16 @@ decision "Test":
     });
 
     it("should ignore block comments in terminology statements", () => {
-      const input = `terminology /* name */ "BMI Valueset" /* type */ is valueset /* value */ "bmi valueset" /* end */ .`;
+      const input = `terminology /* name */ "BMI Valueset":\n /* type */ - valueset is /* value */ \`bmi valueset\` /* end */ .`;
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(tokens, [
         CRLLexer.TERMINOLOGY,
         CRLLexer.QUOTED_STRING,
-        CRLLexer.IS_VALUESET,
-        CRLLexer.QUOTED_STRING,
+        CRLLexer.COLON,
+        CRLLexer.DASH,
+        CRLLexer.VALUESET_IS,
+        CRLLexer.BACKTICK_STRING,
         CRLLexer.DOT,
       ]);
     });

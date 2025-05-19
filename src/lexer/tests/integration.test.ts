@@ -271,41 +271,50 @@ describe("Integration", () => {
 
   describe("Terminology Structure", () => {
     it("should handle terminology with valueset", () => {
-      const input = `terminology "BMI Valueset" is valueset "bmi valueset".`;
+      const input = `terminology "BMI Valueset":\n- valueset is \`bmi valueset\`.`;
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(tokens, [
         CRLLexer.TERMINOLOGY,
         CRLLexer.QUOTED_STRING,
-        CRLLexer.IS_VALUESET,
-        CRLLexer.QUOTED_STRING,
+        CRLLexer.COLON,
+        CRLLexer.DASH,
+        CRLLexer.VALUESET_IS,
+        CRLLexer.BACKTICK_STRING,
         CRLLexer.DOT,
       ]);
     });
 
     it("should handle terminology with unknown terminology", () => {
-      const input = `terminology "some terminology" is \`\`.`;
+      const input = `terminology "some terminology":\n- valueset is \`\`.`;
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(tokens, [
         CRLLexer.TERMINOLOGY,
         CRLLexer.QUOTED_STRING,
-        CRLLexer.IS_UNKNOWN_BACKTICK,
+        CRLLexer.COLON,
+        CRLLexer.DASH,
+        CRLLexer.VALUESET_IS,
+        CRLLexer.BACKTICK_STRING,
         CRLLexer.DOT,
       ]);
     });
 
     it("should handle terminology with system and code", () => {
-      const input = `terminology "Colonoscopy" is system "http://snomed.info/sct" and code "73761001".`;
+      const input = `terminology "Colonoscopy":\n- system is \`http://snomed.info/sct\`.\n- code is \`73761001\`.`;
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(tokens, [
         CRLLexer.TERMINOLOGY,
         CRLLexer.QUOTED_STRING,
-        CRLLexer.IS_SYSTEM,
-        CRLLexer.QUOTED_STRING,
-        CRLLexer.AND_CODE,
-        CRLLexer.QUOTED_STRING,
+        CRLLexer.COLON,
+        CRLLexer.DASH,
+        CRLLexer.SYSTEM_IS,
+        CRLLexer.BACKTICK_STRING,
+        CRLLexer.DOT,
+        CRLLexer.DASH,
+        CRLLexer.CODE_IS,
+        CRLLexer.BACKTICK_STRING,
         CRLLexer.DOT,
       ]);
     });
@@ -313,12 +322,14 @@ describe("Integration", () => {
 
   describe("Activity Structure", () => {
     it("should handle basic activity statements", () => {
-      const input = `activity "Vaccinate" request CPGImmunizationRequest.`;
+      const input = `activity "Vaccinate":\n- request CPGImmunizationRequest.`;
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(tokens, [
         CRLLexer.ACTIVITY,
         CRLLexer.QUOTED_STRING,
+        CRLLexer.COLON,
+        CRLLexer.DASH,
         CRLLexer.REQUEST,
         CRLLexer.ACTIVITY_TYPE,
         CRLLexer.DOT,
@@ -326,14 +337,18 @@ describe("Integration", () => {
     });
 
     it("should handle activity statements with clause", () => {
-      const input = 'activity "Indicate" request CPGProposeDiagnosisTask with "Colonoscopy".';
+      const input = `activity "Indicate":\n- request CPGProposeDiagnosisTask.\n- with "Colonoscopy".`;
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(tokens, [
         CRLLexer.ACTIVITY,
         CRLLexer.QUOTED_STRING,
+        CRLLexer.COLON,
+        CRLLexer.DASH,
         CRLLexer.REQUEST,
         CRLLexer.ACTIVITY_TYPE,
+        CRLLexer.DOT,
+        CRLLexer.DASH,
         CRLLexer.WITH,
         CRLLexer.QUOTED_STRING,
         CRLLexer.DOT,
