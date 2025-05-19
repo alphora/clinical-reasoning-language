@@ -1,5 +1,5 @@
 
-> @smile-digital-health/crl@0.7.0 cli:ast
+> @smile-digital-health/crl@1.0.0 cli:ast
 > ts-node src/cli/run-ast.ts D:\src\clinical-reasoning-language\src\tests\regression\testdata\smart-example-immz
 
 {
@@ -1582,146 +1582,377 @@
     {
       "type": "Activity",
       "name": "Client Age Less Than 6 Months",
-      "request": "CPGCommunicationRequest",
-      "activityTypeValue": "Should not vaccinate client for MCV0 as client is less than 6 months. Check for any vaccines due, and inform the caregiver of when to come back for MCV0.",
-      "doNotPerform": false,
+      "body": {
+        "type": "ActivityBody",
+        "request": {
+          "type": "ActivityRequest",
+          "activityType": "CPGCommunicationRequest",
+          "location": {
+            "start": {
+              "line": 105,
+              "column": 0
+            },
+            "end": {
+              "line": 105,
+              "column": 34
+            }
+          }
+        },
+        "withClause": {
+          "type": "ActivityWith",
+          "activityTypeValue": "Should not vaccinate client for MCV0 as client is less than 6 months. Check for any vaccines due, and inform the caregiver of when to come back for MCV0.",
+          "location": {
+            "start": {
+              "line": 106,
+              "column": 0
+            },
+            "end": {
+              "line": 106,
+              "column": 163
+            }
+          }
+        },
+        "location": {
+          "start": {
+            "line": 105,
+            "column": 0
+          },
+          "end": {
+            "line": 106,
+            "column": 163
+          }
+        }
+      },
       "location": {
         "start": {
           "line": 103,
           "column": 0
         },
         "end": {
-          "line": 105,
-          "column": 165
-        }
-      }
-    },
-    {
-      "type": "Activity",
-      "name": "Last Live Vaccine Administered Within 4 Weeks",
-      "request": "CPGCommunicationRequest",
-      "activityTypeValue": "Should not vaccinate client for MCV0 as live vaccine was administered in the last 4 weeks. Check for any vaccines due, and inform the caregiver of when to come back for MCV0.",
-      "doNotPerform": false,
-      "location": {
-        "start": {
-          "line": 107,
-          "column": 0
-        },
-        "end": {
-          "line": 109,
-          "column": 186
-        }
-      }
-    },
-    {
-      "type": "Activity",
-      "name": "Provide Measles Vaccine",
-      "request": "CPGMedicationRequest",
-      "terminologyReference": "Measles vaccines",
-      "doNotPerform": false,
-      "location": {
-        "start": {
-          "line": 111,
-          "column": 0
-        },
-        "end": {
-          "line": 111,
-          "column": 88
-        }
-      }
-    },
-    {
-      "type": "Activity",
-      "name": "MCV0 Dose Administered",
-      "request": "CPGCommunicationRequest",
-      "activityTypeValue": "MCV0 was administered. Check measles routine immunization schedule.",
-      "doNotPerform": false,
-      "location": {
-        "start": {
-          "line": 113,
-          "column": 0
-        },
-        "end": {
-          "line": 115,
-          "column": 79
-        }
-      }
-    },
-    {
-      "type": "Activity",
-      "name": "Client Age Less Than 12 Months",
-      "request": "CPGCommunicationRequest",
-      "activityTypeValue": "Should not vaccinate client as client's age is less than 12 months. Check for any vaccines due, and inform the caregiver of when to come back for MCV1.",
-      "doNotPerform": false,
-      "location": {
-        "start": {
-          "line": 117,
-          "column": 0
-        },
-        "end": {
-          "line": 119,
+          "line": 106,
           "column": 163
         }
       }
     },
     {
       "type": "Activity",
-      "name": "Last Live Vaccine Administered Within 4 Weeks_2",
-      "request": "CPGCommunicationRequest",
-      "activityTypeValue": "Should not vaccinate client for MCV1 as live vaccine was administered in the last 4 weeks. Check for any vaccines due and inform the caregiver of when to come back for MCV1.",
-      "doNotPerform": false,
+      "name": "Last Live Vaccine Administered Within 4 Weeks",
+      "body": {
+        "type": "ActivityBody",
+        "request": {
+          "type": "ActivityRequest",
+          "activityType": "CPGCommunicationRequest",
+          "location": {
+            "start": {
+              "line": 110,
+              "column": 0
+            },
+            "end": {
+              "line": 110,
+              "column": 34
+            }
+          }
+        },
+        "withClause": {
+          "type": "ActivityWith",
+          "activityTypeValue": "Should not vaccinate client for MCV0 as live vaccine was administered in the last 4 weeks. Check for any vaccines due, and inform the caregiver of when to come back for MCV0.",
+          "location": {
+            "start": {
+              "line": 111,
+              "column": 0
+            },
+            "end": {
+              "line": 111,
+              "column": 184
+            }
+          }
+        },
+        "location": {
+          "start": {
+            "line": 110,
+            "column": 0
+          },
+          "end": {
+            "line": 111,
+            "column": 184
+          }
+        }
+      },
       "location": {
         "start": {
-          "line": 121,
+          "line": 108,
           "column": 0
         },
         "end": {
+          "line": 111,
+          "column": 184
+        }
+      }
+    },
+    {
+      "type": "Activity",
+      "name": "Provide Measles Vaccine",
+      "body": {
+        "type": "ActivityBody",
+        "request": {
+          "type": "ActivityRequest",
+          "activityType": "CPGMedicationRequest",
+          "location": {
+            "start": {
+              "line": 115,
+              "column": 0
+            },
+            "end": {
+              "line": 115,
+              "column": 31
+            }
+          }
+        },
+        "withClause": {
+          "type": "ActivityWith",
+          "terminologyReference": "Measles vaccines",
+          "location": {
+            "start": {
+              "line": 116,
+              "column": 0
+            },
+            "end": {
+              "line": 116,
+              "column": 26
+            }
+          }
+        },
+        "location": {
+          "start": {
+            "line": 115,
+            "column": 0
+          },
+          "end": {
+            "line": 116,
+            "column": 26
+          }
+        }
+      },
+      "location": {
+        "start": {
+          "line": 113,
+          "column": 0
+        },
+        "end": {
+          "line": 116,
+          "column": 26
+        }
+      }
+    },
+    {
+      "type": "Activity",
+      "name": "MCV0 Dose Administered",
+      "body": {
+        "type": "ActivityBody",
+        "request": {
+          "type": "ActivityRequest",
+          "activityType": "CPGCommunicationRequest",
+          "location": {
+            "start": {
+              "line": 120,
+              "column": 0
+            },
+            "end": {
+              "line": 120,
+              "column": 34
+            }
+          }
+        },
+        "withClause": {
+          "type": "ActivityWith",
+          "activityTypeValue": "MCV0 was administered. Check measles routine immunization schedule.",
+          "location": {
+            "start": {
+              "line": 121,
+              "column": 0
+            },
+            "end": {
+              "line": 121,
+              "column": 77
+            }
+          }
+        },
+        "location": {
+          "start": {
+            "line": 120,
+            "column": 0
+          },
+          "end": {
+            "line": 121,
+            "column": 77
+          }
+        }
+      },
+      "location": {
+        "start": {
+          "line": 118,
+          "column": 0
+        },
+        "end": {
+          "line": 121,
+          "column": 77
+        }
+      }
+    },
+    {
+      "type": "Activity",
+      "name": "Client Age Less Than 12 Months",
+      "body": {
+        "type": "ActivityBody",
+        "request": {
+          "type": "ActivityRequest",
+          "activityType": "CPGCommunicationRequest",
+          "location": {
+            "start": {
+              "line": 125,
+              "column": 0
+            },
+            "end": {
+              "line": 125,
+              "column": 34
+            }
+          }
+        },
+        "withClause": {
+          "type": "ActivityWith",
+          "activityTypeValue": "Should not vaccinate client as client's age is less than 12 months. Check for any vaccines due, and inform the caregiver of when to come back for MCV1.",
+          "location": {
+            "start": {
+              "line": 126,
+              "column": 0
+            },
+            "end": {
+              "line": 126,
+              "column": 161
+            }
+          }
+        },
+        "location": {
+          "start": {
+            "line": 125,
+            "column": 0
+          },
+          "end": {
+            "line": 126,
+            "column": 161
+          }
+        }
+      },
+      "location": {
+        "start": {
           "line": 123,
-          "column": 185
+          "column": 0
+        },
+        "end": {
+          "line": 126,
+          "column": 161
+        }
+      }
+    },
+    {
+      "type": "Activity",
+      "name": "Last Live Vaccine Administered Within 4 Weeks_2",
+      "body": {
+        "type": "ActivityBody",
+        "request": {
+          "type": "ActivityRequest",
+          "activityType": "CPGCommunicationRequest",
+          "location": {
+            "start": {
+              "line": 130,
+              "column": 0
+            },
+            "end": {
+              "line": 130,
+              "column": 34
+            }
+          }
+        },
+        "withClause": {
+          "type": "ActivityWith",
+          "activityTypeValue": "Should not vaccinate client for MCV1 as live vaccine was administered in the last 4 weeks. Check for any vaccines due and inform the caregiver of when to come back for MCV1.",
+          "location": {
+            "start": {
+              "line": 131,
+              "column": 0
+            },
+            "end": {
+              "line": 131,
+              "column": 183
+            }
+          }
+        },
+        "location": {
+          "start": {
+            "line": 130,
+            "column": 0
+          },
+          "end": {
+            "line": 131,
+            "column": 183
+          }
+        }
+      },
+      "location": {
+        "start": {
+          "line": 128,
+          "column": 0
+        },
+        "end": {
+          "line": 131,
+          "column": 183
         }
       }
     },
     {
       "type": "Activity",
       "name": "Client Age Less Than 15 Months",
-      "request": "CPGCommunicationRequest",
-      "activityTypeValue": "Should not vaccinate client for MCV2 as client's age is less than 15 months. Check for any vaccines due, and inform the caregiver of when to come back for MCV2.",
-      "doNotPerform": false,
-      "location": {
-        "start": {
-          "line": 125,
-          "column": 0
+      "body": {
+        "type": "ActivityBody",
+        "request": {
+          "type": "ActivityRequest",
+          "activityType": "CPGCommunicationRequest",
+          "location": {
+            "start": {
+              "line": 135,
+              "column": 0
+            },
+            "end": {
+              "line": 135,
+              "column": 34
+            }
+          }
         },
-        "end": {
-          "line": 127,
-          "column": 172
-        }
-      }
-    },
-    {
-      "type": "Activity",
-      "name": "Last Live Vaccine Administered Within 4 Weeks_3",
-      "request": "CPGCommunicationRequest",
-      "activityTypeValue": "Should not vaccinate client for MCV2 as live vaccine was administered in the last 4 weeks. Check for any vaccines due, and inform the caregiver of when to come back for MCV2.",
-      "doNotPerform": false,
-      "location": {
-        "start": {
-          "line": 129,
-          "column": 0
+        "withClause": {
+          "type": "ActivityWith",
+          "activityTypeValue": "Should not vaccinate client for MCV2 as client's age is less than 15 months. Check for any vaccines due, and inform the caregiver of when to come back for MCV2.",
+          "location": {
+            "start": {
+              "line": 136,
+              "column": 0
+            },
+            "end": {
+              "line": 136,
+              "column": 170
+            }
+          }
         },
-        "end": {
-          "line": 131,
-          "column": 186
+        "location": {
+          "start": {
+            "line": 135,
+            "column": 0
+          },
+          "end": {
+            "line": 136,
+            "column": 170
+          }
         }
-      }
-    },
-    {
-      "type": "Activity",
-      "name": "Measles primary series is complete.",
-      "request": "CPGCommunicationRequest",
-      "activityTypeValue": "Measles primary series is complete. Two measles primary series doses were administered. Check if a measles supplementary dose is appropriate for the client.",
-      "rationale": "An additional dose of MCV should be administered to HIV-infected children receiving HAART following immune reconstitution. If CD4+ T lymphocyte counts are monitored, an additional dose of MCV should be administered when immune reconstitution has been achieved, e.g. when the CD4+ T lymphocyte count reaches 20–25%. Where CD4+ T lymphocyte monitoring is not available, children should receive an additional dose of MCV 6–12 months after initiation of HAART.",
-      "doNotPerform": false,
+      },
       "location": {
         "start": {
           "line": 133,
@@ -1729,112 +1960,503 @@
         },
         "end": {
           "line": 136,
-          "column": 471
+          "column": 170
         }
       }
     },
     {
       "type": "Activity",
-      "name": "Client Age Less Than 9 Months",
-      "request": "CPGCommunicationRequest",
-      "activityTypeValue": "Should not vaccinate client as client's age is less than 9 months. Check for any vaccines due, and inform the caregiver of when to come back for MCV1.",
-      "doNotPerform": false,
+      "name": "Last Live Vaccine Administered Within 4 Weeks_3",
+      "body": {
+        "type": "ActivityBody",
+        "request": {
+          "type": "ActivityRequest",
+          "activityType": "CPGCommunicationRequest",
+          "location": {
+            "start": {
+              "line": 140,
+              "column": 0
+            },
+            "end": {
+              "line": 140,
+              "column": 34
+            }
+          }
+        },
+        "withClause": {
+          "type": "ActivityWith",
+          "activityTypeValue": "Should not vaccinate client for MCV2 as live vaccine was administered in the last 4 weeks. Check for any vaccines due, and inform the caregiver of when to come back for MCV2.",
+          "location": {
+            "start": {
+              "line": 141,
+              "column": 0
+            },
+            "end": {
+              "line": 141,
+              "column": 184
+            }
+          }
+        },
+        "location": {
+          "start": {
+            "line": 140,
+            "column": 0
+          },
+          "end": {
+            "line": 141,
+            "column": 184
+          }
+        }
+      },
       "location": {
         "start": {
           "line": 138,
           "column": 0
         },
         "end": {
-          "line": 140,
-          "column": 162
+          "line": 141,
+          "column": 184
+        }
+      }
+    },
+    {
+      "type": "Activity",
+      "name": "Measles primary series is complete.",
+      "body": {
+        "type": "ActivityBody",
+        "request": {
+          "type": "ActivityRequest",
+          "activityType": "CPGCommunicationRequest",
+          "location": {
+            "start": {
+              "line": 145,
+              "column": 0
+            },
+            "end": {
+              "line": 145,
+              "column": 34
+            }
+          }
+        },
+        "withClause": {
+          "type": "ActivityWith",
+          "activityTypeValue": "Measles primary series is complete. Two measles primary series doses were administered. Check if a measles supplementary dose is appropriate for the client.",
+          "location": {
+            "start": {
+              "line": 146,
+              "column": 0
+            },
+            "end": {
+              "line": 146,
+              "column": 166
+            }
+          }
+        },
+        "becauseClause": {
+          "type": "ActivityBecause",
+          "rationale": "An additional dose of MCV should be administered to HIV-infected children receiving HAART following immune reconstitution. If CD4+ T lymphocyte counts are monitored, an additional dose of MCV should be administered when immune reconstitution has been achieved, e.g. when the CD4+ T lymphocyte count reaches 20–25%. Where CD4+ T lymphocyte monitoring is not available, children should receive an additional dose of MCV 6–12 months after initiation of HAART.",
+          "location": {
+            "start": {
+              "line": 147,
+              "column": 0
+            },
+            "end": {
+              "line": 147,
+              "column": 469
+            }
+          }
+        },
+        "location": {
+          "start": {
+            "line": 145,
+            "column": 0
+          },
+          "end": {
+            "line": 147,
+            "column": 469
+          }
+        }
+      },
+      "location": {
+        "start": {
+          "line": 143,
+          "column": 0
+        },
+        "end": {
+          "line": 147,
+          "column": 469
+        }
+      }
+    },
+    {
+      "type": "Activity",
+      "name": "Client Age Less Than 9 Months",
+      "body": {
+        "type": "ActivityBody",
+        "request": {
+          "type": "ActivityRequest",
+          "activityType": "CPGCommunicationRequest",
+          "location": {
+            "start": {
+              "line": 151,
+              "column": 0
+            },
+            "end": {
+              "line": 151,
+              "column": 34
+            }
+          }
+        },
+        "withClause": {
+          "type": "ActivityWith",
+          "activityTypeValue": "Should not vaccinate client as client's age is less than 9 months. Check for any vaccines due, and inform the caregiver of when to come back for MCV1.",
+          "location": {
+            "start": {
+              "line": 152,
+              "column": 0
+            },
+            "end": {
+              "line": 152,
+              "column": 160
+            }
+          }
+        },
+        "location": {
+          "start": {
+            "line": 151,
+            "column": 0
+          },
+          "end": {
+            "line": 152,
+            "column": 160
+          }
+        }
+      },
+      "location": {
+        "start": {
+          "line": 149,
+          "column": 0
+        },
+        "end": {
+          "line": 152,
+          "column": 160
         }
       }
     },
     {
       "type": "Activity",
       "name": "Measles primary series is complete",
-      "request": "CPGCommunicationRequest",
-      "activityTypeValue": "Measles primary series is complete. Two measles primary series doses were administered. Check if a measles supplementary dose is appropriate for the client.",
-      "rationale": "An additional dose of MCV should be administered to HIV-infected children receiving HAART following immune reconstitution. If CD4+ T lymphocyte counts are monitored, an additional dose of MCV should be administered when immune reconstitution has been achieved, e.g. when the CD4+ T lymphocyte count reaches 20–25%. Where CD4+ T lymphocyte monitoring is not available, children should receive an additional dose of MCV 6–12 months after initiation of HAART.",
-      "doNotPerform": false,
+      "body": {
+        "type": "ActivityBody",
+        "request": {
+          "type": "ActivityRequest",
+          "activityType": "CPGCommunicationRequest",
+          "location": {
+            "start": {
+              "line": 156,
+              "column": 0
+            },
+            "end": {
+              "line": 156,
+              "column": 34
+            }
+          }
+        },
+        "withClause": {
+          "type": "ActivityWith",
+          "activityTypeValue": "Measles primary series is complete. Two measles primary series doses were administered. Check if a measles supplementary dose is appropriate for the client.",
+          "location": {
+            "start": {
+              "line": 157,
+              "column": 0
+            },
+            "end": {
+              "line": 157,
+              "column": 166
+            }
+          }
+        },
+        "becauseClause": {
+          "type": "ActivityBecause",
+          "rationale": "An additional dose of MCV should be administered to HIV-infected children receiving HAART following immune reconstitution. If CD4+ T lymphocyte counts are monitored, an additional dose of MCV should be administered when immune reconstitution has been achieved, e.g. when the CD4+ T lymphocyte count reaches 20–25%. Where CD4+ T lymphocyte monitoring is not available, children should receive an additional dose of MCV 6–12 months after initiation of HAART.",
+          "location": {
+            "start": {
+              "line": 158,
+              "column": 0
+            },
+            "end": {
+              "line": 158,
+              "column": 469
+            }
+          }
+        },
+        "location": {
+          "start": {
+            "line": 156,
+            "column": 0
+          },
+          "end": {
+            "line": 158,
+            "column": 469
+          }
+        }
+      },
       "location": {
         "start": {
-          "line": 142,
+          "line": 154,
           "column": 0
         },
         "end": {
-          "line": 145,
-          "column": 471
+          "line": 158,
+          "column": 469
         }
       }
     },
     {
       "type": "Activity",
       "name": "Last Live Vaccine Administered Within 4 Weeks_4",
-      "request": "CPGCommunicationRequest",
-      "activityTypeValue": "Should not vaccinate client for measles supplementary dose as live vaccine was administered in the last 4 weeks. Check for any vaccines due, and inform the caregiver of when to come back for supplementary dose.",
-      "doNotPerform": false,
+      "body": {
+        "type": "ActivityBody",
+        "request": {
+          "type": "ActivityRequest",
+          "activityType": "CPGCommunicationRequest",
+          "location": {
+            "start": {
+              "line": 162,
+              "column": 0
+            },
+            "end": {
+              "line": 162,
+              "column": 34
+            }
+          }
+        },
+        "withClause": {
+          "type": "ActivityWith",
+          "activityTypeValue": "Should not vaccinate client for measles supplementary dose as live vaccine was administered in the last 4 weeks. Check for any vaccines due, and inform the caregiver of when to come back for supplementary dose.",
+          "location": {
+            "start": {
+              "line": 163,
+              "column": 0
+            },
+            "end": {
+              "line": 163,
+              "column": 220
+            }
+          }
+        },
+        "location": {
+          "start": {
+            "line": 162,
+            "column": 0
+          },
+          "end": {
+            "line": 163,
+            "column": 220
+          }
+        }
+      },
       "location": {
         "start": {
-          "line": 147,
+          "line": 160,
           "column": 0
         },
         "end": {
-          "line": 149,
-          "column": 222
+          "line": 163,
+          "column": 220
         }
       }
     },
     {
       "type": "Activity",
       "name": "Supplementary Dose Administered",
-      "request": "CPGCommunicationRequest",
-      "activityTypeValue": "Measles immunization schedule is complete. Measles supplementary dose was administered.",
-      "doNotPerform": false,
+      "body": {
+        "type": "ActivityBody",
+        "request": {
+          "type": "ActivityRequest",
+          "activityType": "CPGCommunicationRequest",
+          "location": {
+            "start": {
+              "line": 167,
+              "column": 0
+            },
+            "end": {
+              "line": 167,
+              "column": 34
+            }
+          }
+        },
+        "withClause": {
+          "type": "ActivityWith",
+          "activityTypeValue": "Measles immunization schedule is complete. Measles supplementary dose was administered.",
+          "location": {
+            "start": {
+              "line": 168,
+              "column": 0
+            },
+            "end": {
+              "line": 168,
+              "column": 97
+            }
+          }
+        },
+        "location": {
+          "start": {
+            "line": 167,
+            "column": 0
+          },
+          "end": {
+            "line": 168,
+            "column": 97
+          }
+        }
+      },
       "location": {
         "start": {
-          "line": 151,
+          "line": 165,
           "column": 0
         },
         "end": {
-          "line": 153,
-          "column": 99
+          "line": 168,
+          "column": 97
         }
       }
     },
     {
       "type": "Activity",
       "name": "Check Contraindication for Measles Immunization",
-      "request": "CPGMedicationRequest",
-      "terminologyReference": "Measles vaccines",
-      "rationale": "While vaccines are universally recommended, some clients may have contraindications to particular vaccines.<br/>Additional contraindications may be included in WHO position papers for the vaccine - Measles vaccines: WHO position paper (April 2017).",
-      "doNotPerform": false,
+      "body": {
+        "type": "ActivityBody",
+        "request": {
+          "type": "ActivityRequest",
+          "activityType": "CPGMedicationRequest",
+          "location": {
+            "start": {
+              "line": 172,
+              "column": 0
+            },
+            "end": {
+              "line": 172,
+              "column": 31
+            }
+          }
+        },
+        "withClause": {
+          "type": "ActivityWith",
+          "terminologyReference": "Measles vaccines",
+          "location": {
+            "start": {
+              "line": 173,
+              "column": 0
+            },
+            "end": {
+              "line": 173,
+              "column": 26
+            }
+          }
+        },
+        "becauseClause": {
+          "type": "ActivityBecause",
+          "rationale": "While vaccines are universally recommended, some clients may have contraindications to particular vaccines.<br/>Additional contraindications may be included in WHO position papers for the vaccine - Measles vaccines: WHO position paper (April 2017).",
+          "location": {
+            "start": {
+              "line": 174,
+              "column": 0
+            },
+            "end": {
+              "line": 174,
+              "column": 261
+            }
+          }
+        },
+        "location": {
+          "start": {
+            "line": 172,
+            "column": 0
+          },
+          "end": {
+            "line": 174,
+            "column": 261
+          }
+        }
+      },
       "location": {
         "start": {
-          "line": 155,
+          "line": 170,
           "column": 0
         },
         "end": {
-          "line": 157,
-          "column": 263
+          "line": 174,
+          "column": 261
         }
       }
     },
     {
       "type": "Activity",
       "name": "Evaluate Contraindication for Measles",
-      "request": "CPGServiceRequest",
-      "terminologyReference": "Measles Code",
-      "rationale": "While vaccines are universally recommended, some clients may have contraindications to particular vaccines.<br/>Additional contraindications may be included in WHO position papers for the vaccine - Measles vaccines: WHO position paper (April 2017).",
-      "doNotPerform": false,
+      "body": {
+        "type": "ActivityBody",
+        "request": {
+          "type": "ActivityRequest",
+          "activityType": "CPGServiceRequest",
+          "location": {
+            "start": {
+              "line": 178,
+              "column": 0
+            },
+            "end": {
+              "line": 178,
+              "column": 28
+            }
+          }
+        },
+        "withClause": {
+          "type": "ActivityWith",
+          "terminologyReference": "Measles Code",
+          "location": {
+            "start": {
+              "line": 179,
+              "column": 0
+            },
+            "end": {
+              "line": 179,
+              "column": 22
+            }
+          }
+        },
+        "becauseClause": {
+          "type": "ActivityBecause",
+          "rationale": "While vaccines are universally recommended, some clients may have contraindications to particular vaccines.<br/>Additional contraindications may be included in WHO position papers for the vaccine - Measles vaccines: WHO position paper (April 2017).",
+          "location": {
+            "start": {
+              "line": 180,
+              "column": 0
+            },
+            "end": {
+              "line": 180,
+              "column": 261
+            }
+          }
+        },
+        "location": {
+          "start": {
+            "line": 178,
+            "column": 0
+          },
+          "end": {
+            "line": 180,
+            "column": 261
+          }
+        }
+      },
       "location": {
         "start": {
-          "line": 159,
+          "line": 176,
           "column": 0
         },
         "end": {
-          "line": 161,
-          "column": 263
+          "line": 180,
+          "column": 261
         }
       }
     },
@@ -1848,22 +2470,22 @@
         "terminologyName": "Measles Routine Immunization Schedule Incomplete",
         "location": {
           "start": {
-            "line": 167,
+            "line": 186,
             "column": 0
           },
           "end": {
-            "line": 167,
+            "line": 186,
             "column": 64
           }
         }
       },
       "location": {
         "start": {
-          "line": 163,
+          "line": 182,
           "column": 0
         },
         "end": {
-          "line": 167,
+          "line": 186,
           "column": 64
         }
       }
@@ -1878,22 +2500,22 @@
         "terminologyName": "No MCV0 Doses Administered",
         "location": {
           "start": {
-            "line": 173,
+            "line": 192,
             "column": 0
           },
           "end": {
-            "line": 173,
+            "line": 192,
             "column": 42
           }
         }
       },
       "location": {
         "start": {
-          "line": 169,
+          "line": 188,
           "column": 0
         },
         "end": {
-          "line": 173,
+          "line": 192,
           "column": 42
         }
       }
@@ -1908,22 +2530,22 @@
         "terminologyName": "Client Age Less Than 6 Months",
         "location": {
           "start": {
-            "line": 179,
+            "line": 198,
             "column": 0
           },
           "end": {
-            "line": 179,
+            "line": 198,
             "column": 45
           }
         }
       },
       "location": {
         "start": {
-          "line": 175,
+          "line": 194,
           "column": 0
         },
         "end": {
-          "line": 179,
+          "line": 198,
           "column": 45
         }
       }
@@ -1938,22 +2560,22 @@
         "terminologyName": "Last Live Vaccine Administered Within 4 Weeks",
         "location": {
           "start": {
-            "line": 185,
+            "line": 204,
             "column": 0
           },
           "end": {
-            "line": 185,
+            "line": 204,
             "column": 61
           }
         }
       },
       "location": {
         "start": {
-          "line": 181,
+          "line": 200,
           "column": 0
         },
         "end": {
-          "line": 185,
+          "line": 204,
           "column": 61
         }
       }
@@ -1968,22 +2590,22 @@
         "terminologyName": "Client Is Due For MCV0",
         "location": {
           "start": {
-            "line": 191,
+            "line": 210,
             "column": 0
           },
           "end": {
-            "line": 191,
+            "line": 210,
             "column": 38
           }
         }
       },
       "location": {
         "start": {
-          "line": 187,
+          "line": 206,
           "column": 0
         },
         "end": {
-          "line": 191,
+          "line": 210,
           "column": 38
         }
       }
@@ -1998,22 +2620,22 @@
         "terminologyName": "MCV0 Dose Administered",
         "location": {
           "start": {
-            "line": 197,
+            "line": 216,
             "column": 0
           },
           "end": {
-            "line": 197,
+            "line": 216,
             "column": 38
           }
         }
       },
       "location": {
         "start": {
-          "line": 193,
+          "line": 212,
           "column": 0
         },
         "end": {
-          "line": 197,
+          "line": 216,
           "column": 38
         }
       }
@@ -2028,22 +2650,22 @@
         "terminologyName": "No Primary Series Doses Administered",
         "location": {
           "start": {
-            "line": 203,
+            "line": 222,
             "column": 0
           },
           "end": {
-            "line": 203,
+            "line": 222,
             "column": 52
           }
         }
       },
       "location": {
         "start": {
-          "line": 199,
+          "line": 218,
           "column": 0
         },
         "end": {
-          "line": 203,
+          "line": 222,
           "column": 52
         }
       }
@@ -2058,22 +2680,22 @@
         "terminologyName": "Client Age Less Than 12 Months",
         "location": {
           "start": {
-            "line": 209,
+            "line": 228,
             "column": 0
           },
           "end": {
-            "line": 209,
+            "line": 228,
             "column": 46
           }
         }
       },
       "location": {
         "start": {
-          "line": 205,
+          "line": 224,
           "column": 0
         },
         "end": {
-          "line": 209,
+          "line": 228,
           "column": 46
         }
       }
@@ -2088,22 +2710,22 @@
         "terminologyName": "Client Is Due For MCV1",
         "location": {
           "start": {
-            "line": 215,
+            "line": 234,
             "column": 0
           },
           "end": {
-            "line": 215,
+            "line": 234,
             "column": 38
           }
         }
       },
       "location": {
         "start": {
-          "line": 211,
+          "line": 230,
           "column": 0
         },
         "end": {
-          "line": 215,
+          "line": 234,
           "column": 38
         }
       }
@@ -2118,22 +2740,22 @@
         "terminologyName": "One Primary Series Dose Administered",
         "location": {
           "start": {
-            "line": 221,
+            "line": 240,
             "column": 0
           },
           "end": {
-            "line": 221,
+            "line": 240,
             "column": 52
           }
         }
       },
       "location": {
         "start": {
-          "line": 217,
+          "line": 236,
           "column": 0
         },
         "end": {
-          "line": 221,
+          "line": 240,
           "column": 52
         }
       }
@@ -2148,22 +2770,22 @@
         "terminologyName": "Client Age Less Than 15 Months",
         "location": {
           "start": {
-            "line": 227,
+            "line": 246,
             "column": 0
           },
           "end": {
-            "line": 227,
+            "line": 246,
             "column": 46
           }
         }
       },
       "location": {
         "start": {
-          "line": 223,
+          "line": 242,
           "column": 0
         },
         "end": {
-          "line": 227,
+          "line": 246,
           "column": 46
         }
       }
@@ -2178,22 +2800,22 @@
         "terminologyName": "Client Is Due For MCV2",
         "location": {
           "start": {
-            "line": 233,
+            "line": 252,
             "column": 0
           },
           "end": {
-            "line": 233,
+            "line": 252,
             "column": 38
           }
         }
       },
       "location": {
         "start": {
-          "line": 229,
+          "line": 248,
           "column": 0
         },
         "end": {
-          "line": 233,
+          "line": 252,
           "column": 38
         }
       }
@@ -2208,22 +2830,22 @@
         "terminologyName": "Two Primary Series Doses Administered",
         "location": {
           "start": {
-            "line": 239,
+            "line": 258,
             "column": 0
           },
           "end": {
-            "line": 239,
+            "line": 258,
             "column": 53
           }
         }
       },
       "location": {
         "start": {
-          "line": 235,
+          "line": 254,
           "column": 0
         },
         "end": {
-          "line": 239,
+          "line": 258,
           "column": 53
         }
       }
@@ -2238,22 +2860,22 @@
         "terminologyName": "Client Age Less Than 9 Months",
         "location": {
           "start": {
-            "line": 245,
+            "line": 264,
             "column": 0
           },
           "end": {
-            "line": 245,
+            "line": 264,
             "column": 45
           }
         }
       },
       "location": {
         "start": {
-          "line": 241,
+          "line": 260,
           "column": 0
         },
         "end": {
-          "line": 245,
+          "line": 264,
           "column": 45
         }
       }
@@ -2268,22 +2890,22 @@
         "terminologyName": "Measles Routine Immunization Schedule Complete",
         "location": {
           "start": {
-            "line": 251,
+            "line": 270,
             "column": 0
           },
           "end": {
-            "line": 251,
+            "line": 270,
             "column": 62
           }
         }
       },
       "location": {
         "start": {
-          "line": 247,
+          "line": 266,
           "column": 0
         },
         "end": {
-          "line": 251,
+          "line": 270,
           "column": 62
         }
       }
@@ -2298,22 +2920,22 @@
         "terminologyName": "No Supplementary Dose Administered",
         "location": {
           "start": {
-            "line": 257,
+            "line": 276,
             "column": 0
           },
           "end": {
-            "line": 257,
+            "line": 276,
             "column": 50
           }
         }
       },
       "location": {
         "start": {
-          "line": 253,
+          "line": 272,
           "column": 0
         },
         "end": {
-          "line": 257,
+          "line": 276,
           "column": 50
         }
       }
@@ -2328,22 +2950,22 @@
         "terminologyName": "Client Is Due For Supplementary Dose",
         "location": {
           "start": {
-            "line": 263,
+            "line": 282,
             "column": 0
           },
           "end": {
-            "line": 263,
+            "line": 282,
             "column": 52
           }
         }
       },
       "location": {
         "start": {
-          "line": 259,
+          "line": 278,
           "column": 0
         },
         "end": {
-          "line": 263,
+          "line": 282,
           "column": 52
         }
       }
@@ -2358,22 +2980,22 @@
         "terminologyName": "Supplementary Dose Administered",
         "location": {
           "start": {
-            "line": 269,
+            "line": 288,
             "column": 0
           },
           "end": {
-            "line": 269,
+            "line": 288,
             "column": 47
           }
         }
       },
       "location": {
         "start": {
-          "line": 265,
+          "line": 284,
           "column": 0
         },
         "end": {
-          "line": 269,
+          "line": 288,
           "column": 47
         }
       }
@@ -2388,22 +3010,22 @@
         "terminologyName": "MCV Dose Contraindicated",
         "location": {
           "start": {
-            "line": 275,
+            "line": 294,
             "column": 0
           },
           "end": {
-            "line": 275,
+            "line": 294,
             "column": 40
           }
         }
       },
       "location": {
         "start": {
-          "line": 271,
+          "line": 290,
           "column": 0
         },
         "end": {
-          "line": 275,
+          "line": 294,
           "column": 40
         }
       }
@@ -2418,22 +3040,22 @@
         "terminologyName": "Contraindication Evaluation of the MCV dose",
         "location": {
           "start": {
-            "line": 281,
+            "line": 300,
             "column": 0
           },
           "end": {
-            "line": 281,
+            "line": 300,
             "column": 59
           }
         }
       },
       "location": {
         "start": {
-          "line": 277,
+          "line": 296,
           "column": 0
         },
         "end": {
-          "line": 281,
+          "line": 300,
           "column": 59
         }
       }
@@ -2441,638 +3063,968 @@
     {
       "type": "Terminology",
       "name": "Measles Routine Immunization Schedule Incomplete",
-      "definition": {
-        "type": "TerminologySystemCode",
-        "system": "http://sdh.com/cqis/kalm",
-        "code": "measles-routine-immunization-schedule-incomplete",
-        "location": {
-          "start": {
-            "line": 283,
-            "column": 63
-          },
-          "end": {
-            "line": 283,
-            "column": 159
+      "body": [
+        {
+          "type": "TerminologySystem",
+          "system": "http://sdh.com/cqis/kalm",
+          "location": {
+            "start": {
+              "line": 304,
+              "column": 0
+            },
+            "end": {
+              "line": 304,
+              "column": 39
+            }
+          }
+        },
+        {
+          "type": "TerminologyCode",
+          "code": "measles-routine-immunization-schedule-incomplete",
+          "location": {
+            "start": {
+              "line": 305,
+              "column": 2
+            },
+            "end": {
+              "line": 305,
+              "column": 63
+            }
           }
         }
-      },
+      ],
       "location": {
         "start": {
-          "line": 283,
+          "line": 302,
           "column": 0
         },
         "end": {
-          "line": 283,
-          "column": 160
+          "line": 305,
+          "column": 63
         }
       }
     },
     {
       "type": "Terminology",
       "name": "No MCV0 Doses Administered",
-      "definition": {
-        "type": "TerminologySystemCode",
-        "system": "http://sdh.com/cqis/kalm",
-        "code": "no-mcv0-doses-administered",
-        "location": {
-          "start": {
-            "line": 285,
-            "column": 41
-          },
-          "end": {
-            "line": 285,
-            "column": 115
+      "body": [
+        {
+          "type": "TerminologySystem",
+          "system": "http://sdh.com/cqis/kalm",
+          "location": {
+            "start": {
+              "line": 309,
+              "column": 0
+            },
+            "end": {
+              "line": 309,
+              "column": 39
+            }
+          }
+        },
+        {
+          "type": "TerminologyCode",
+          "code": "no-mcv0-doses-administered",
+          "location": {
+            "start": {
+              "line": 310,
+              "column": 2
+            },
+            "end": {
+              "line": 310,
+              "column": 41
+            }
           }
         }
-      },
+      ],
       "location": {
         "start": {
-          "line": 285,
+          "line": 307,
           "column": 0
         },
         "end": {
-          "line": 285,
-          "column": 116
+          "line": 310,
+          "column": 41
         }
       }
     },
     {
       "type": "Terminology",
       "name": "Client Age Less Than 6 Months",
-      "definition": {
-        "type": "TerminologySystemCode",
-        "system": "http://sdh.com/cqis/kalm",
-        "code": "client-age-less-than-6-months",
-        "location": {
-          "start": {
-            "line": 287,
-            "column": 44
-          },
-          "end": {
-            "line": 287,
-            "column": 121
+      "body": [
+        {
+          "type": "TerminologySystem",
+          "system": "http://sdh.com/cqis/kalm",
+          "location": {
+            "start": {
+              "line": 314,
+              "column": 0
+            },
+            "end": {
+              "line": 314,
+              "column": 39
+            }
+          }
+        },
+        {
+          "type": "TerminologyCode",
+          "code": "client-age-less-than-6-months",
+          "location": {
+            "start": {
+              "line": 315,
+              "column": 2
+            },
+            "end": {
+              "line": 315,
+              "column": 44
+            }
           }
         }
-      },
+      ],
       "location": {
         "start": {
-          "line": 287,
+          "line": 312,
           "column": 0
         },
         "end": {
-          "line": 287,
-          "column": 122
+          "line": 315,
+          "column": 44
         }
       }
     },
     {
       "type": "Terminology",
       "name": "Last Live Vaccine Administered Within 4 Weeks",
-      "definition": {
-        "type": "TerminologySystemCode",
-        "system": "http://sdh.com/cqis/kalm",
-        "code": "last-live-vaccine-administered-within-4-weeks",
-        "location": {
-          "start": {
-            "line": 289,
-            "column": 60
-          },
-          "end": {
-            "line": 289,
-            "column": 153
+      "body": [
+        {
+          "type": "TerminologySystem",
+          "system": "http://sdh.com/cqis/kalm",
+          "location": {
+            "start": {
+              "line": 319,
+              "column": 0
+            },
+            "end": {
+              "line": 319,
+              "column": 39
+            }
+          }
+        },
+        {
+          "type": "TerminologyCode",
+          "code": "last-live-vaccine-administered-within-4-weeks",
+          "location": {
+            "start": {
+              "line": 320,
+              "column": 2
+            },
+            "end": {
+              "line": 320,
+              "column": 60
+            }
           }
         }
-      },
+      ],
       "location": {
         "start": {
-          "line": 289,
+          "line": 317,
           "column": 0
         },
         "end": {
-          "line": 289,
-          "column": 154
+          "line": 320,
+          "column": 60
         }
       }
     },
     {
       "type": "Terminology",
       "name": "Client Is Due For MCV0",
-      "definition": {
-        "type": "TerminologySystemCode",
-        "system": "http://sdh.com/cqis/kalm",
-        "code": "client-is-due-for-mcv0",
-        "location": {
-          "start": {
-            "line": 291,
-            "column": 37
-          },
-          "end": {
-            "line": 291,
-            "column": 107
+      "body": [
+        {
+          "type": "TerminologySystem",
+          "system": "http://sdh.com/cqis/kalm",
+          "location": {
+            "start": {
+              "line": 324,
+              "column": 0
+            },
+            "end": {
+              "line": 324,
+              "column": 39
+            }
+          }
+        },
+        {
+          "type": "TerminologyCode",
+          "code": "client-is-due-for-mcv0",
+          "location": {
+            "start": {
+              "line": 325,
+              "column": 2
+            },
+            "end": {
+              "line": 325,
+              "column": 37
+            }
           }
         }
-      },
+      ],
       "location": {
         "start": {
-          "line": 291,
+          "line": 322,
           "column": 0
         },
         "end": {
-          "line": 291,
-          "column": 108
+          "line": 325,
+          "column": 37
         }
       }
     },
     {
       "type": "Terminology",
       "name": "MCV0 Dose Administered",
-      "definition": {
-        "type": "TerminologySystemCode",
-        "system": "http://sdh.com/cqis/kalm",
-        "code": "mcv0-dose-administered",
-        "location": {
-          "start": {
-            "line": 293,
-            "column": 37
-          },
-          "end": {
-            "line": 293,
-            "column": 107
+      "body": [
+        {
+          "type": "TerminologySystem",
+          "system": "http://sdh.com/cqis/kalm",
+          "location": {
+            "start": {
+              "line": 329,
+              "column": 0
+            },
+            "end": {
+              "line": 329,
+              "column": 39
+            }
+          }
+        },
+        {
+          "type": "TerminologyCode",
+          "code": "mcv0-dose-administered",
+          "location": {
+            "start": {
+              "line": 330,
+              "column": 2
+            },
+            "end": {
+              "line": 330,
+              "column": 37
+            }
           }
         }
-      },
+      ],
       "location": {
         "start": {
-          "line": 293,
+          "line": 327,
           "column": 0
         },
         "end": {
-          "line": 293,
-          "column": 108
+          "line": 330,
+          "column": 37
         }
       }
     },
     {
       "type": "Terminology",
       "name": "No Primary Series Doses Administered",
-      "definition": {
-        "type": "TerminologySystemCode",
-        "system": "http://sdh.com/cqis/kalm",
-        "code": "no-primary-series-doses-administered",
-        "location": {
-          "start": {
-            "line": 295,
-            "column": 51
-          },
-          "end": {
-            "line": 295,
-            "column": 135
+      "body": [
+        {
+          "type": "TerminologySystem",
+          "system": "http://sdh.com/cqis/kalm",
+          "location": {
+            "start": {
+              "line": 334,
+              "column": 0
+            },
+            "end": {
+              "line": 334,
+              "column": 39
+            }
+          }
+        },
+        {
+          "type": "TerminologyCode",
+          "code": "no-primary-series-doses-administered",
+          "location": {
+            "start": {
+              "line": 335,
+              "column": 2
+            },
+            "end": {
+              "line": 335,
+              "column": 51
+            }
           }
         }
-      },
+      ],
       "location": {
         "start": {
-          "line": 295,
+          "line": 332,
           "column": 0
         },
         "end": {
-          "line": 295,
-          "column": 136
+          "line": 335,
+          "column": 51
         }
       }
     },
     {
       "type": "Terminology",
       "name": "Client Age Less Than 12 Months",
-      "definition": {
-        "type": "TerminologySystemCode",
-        "system": "http://sdh.com/cqis/kalm",
-        "code": "client-age-less-than-12-months",
-        "location": {
-          "start": {
-            "line": 297,
-            "column": 45
-          },
-          "end": {
-            "line": 297,
-            "column": 123
+      "body": [
+        {
+          "type": "TerminologySystem",
+          "system": "http://sdh.com/cqis/kalm",
+          "location": {
+            "start": {
+              "line": 339,
+              "column": 0
+            },
+            "end": {
+              "line": 339,
+              "column": 39
+            }
+          }
+        },
+        {
+          "type": "TerminologyCode",
+          "code": "client-age-less-than-12-months",
+          "location": {
+            "start": {
+              "line": 340,
+              "column": 2
+            },
+            "end": {
+              "line": 340,
+              "column": 45
+            }
           }
         }
-      },
+      ],
       "location": {
         "start": {
-          "line": 297,
+          "line": 337,
           "column": 0
         },
         "end": {
-          "line": 297,
-          "column": 124
+          "line": 340,
+          "column": 45
         }
       }
     },
     {
       "type": "Terminology",
       "name": "Client Is Due For MCV1",
-      "definition": {
-        "type": "TerminologySystemCode",
-        "system": "http://sdh.com/cqis/kalm",
-        "code": "client-is-due-for-mcv1",
-        "location": {
-          "start": {
-            "line": 299,
-            "column": 37
-          },
-          "end": {
-            "line": 299,
-            "column": 107
+      "body": [
+        {
+          "type": "TerminologySystem",
+          "system": "http://sdh.com/cqis/kalm",
+          "location": {
+            "start": {
+              "line": 344,
+              "column": 0
+            },
+            "end": {
+              "line": 344,
+              "column": 39
+            }
+          }
+        },
+        {
+          "type": "TerminologyCode",
+          "code": "client-is-due-for-mcv1",
+          "location": {
+            "start": {
+              "line": 345,
+              "column": 2
+            },
+            "end": {
+              "line": 345,
+              "column": 37
+            }
           }
         }
-      },
+      ],
       "location": {
         "start": {
-          "line": 299,
+          "line": 342,
           "column": 0
         },
         "end": {
-          "line": 299,
-          "column": 108
+          "line": 345,
+          "column": 37
         }
       }
     },
     {
       "type": "Terminology",
       "name": "One Primary Series Dose Administered",
-      "definition": {
-        "type": "TerminologySystemCode",
-        "system": "http://sdh.com/cqis/kalm",
-        "code": "one-primary-series-dose-administered",
-        "location": {
-          "start": {
-            "line": 301,
-            "column": 51
-          },
-          "end": {
-            "line": 301,
-            "column": 135
+      "body": [
+        {
+          "type": "TerminologySystem",
+          "system": "http://sdh.com/cqis/kalm",
+          "location": {
+            "start": {
+              "line": 349,
+              "column": 0
+            },
+            "end": {
+              "line": 349,
+              "column": 39
+            }
+          }
+        },
+        {
+          "type": "TerminologyCode",
+          "code": "one-primary-series-dose-administered",
+          "location": {
+            "start": {
+              "line": 350,
+              "column": 2
+            },
+            "end": {
+              "line": 350,
+              "column": 51
+            }
           }
         }
-      },
+      ],
       "location": {
         "start": {
-          "line": 301,
+          "line": 347,
           "column": 0
         },
         "end": {
-          "line": 301,
-          "column": 136
+          "line": 350,
+          "column": 51
         }
       }
     },
     {
       "type": "Terminology",
       "name": "Client Age Less Than 15 Months",
-      "definition": {
-        "type": "TerminologySystemCode",
-        "system": "http://sdh.com/cqis/kalm",
-        "code": "client-age-less-than-15-months",
-        "location": {
-          "start": {
-            "line": 303,
-            "column": 45
-          },
-          "end": {
-            "line": 303,
-            "column": 123
+      "body": [
+        {
+          "type": "TerminologySystem",
+          "system": "http://sdh.com/cqis/kalm",
+          "location": {
+            "start": {
+              "line": 354,
+              "column": 0
+            },
+            "end": {
+              "line": 354,
+              "column": 39
+            }
+          }
+        },
+        {
+          "type": "TerminologyCode",
+          "code": "client-age-less-than-15-months",
+          "location": {
+            "start": {
+              "line": 355,
+              "column": 2
+            },
+            "end": {
+              "line": 355,
+              "column": 45
+            }
           }
         }
-      },
+      ],
       "location": {
         "start": {
-          "line": 303,
+          "line": 352,
           "column": 0
         },
         "end": {
-          "line": 303,
-          "column": 124
+          "line": 355,
+          "column": 45
         }
       }
     },
     {
       "type": "Terminology",
       "name": "Client Is Due For MCV2",
-      "definition": {
-        "type": "TerminologySystemCode",
-        "system": "http://sdh.com/cqis/kalm",
-        "code": "client-is-due-for-mcv2",
-        "location": {
-          "start": {
-            "line": 305,
-            "column": 37
-          },
-          "end": {
-            "line": 305,
-            "column": 107
+      "body": [
+        {
+          "type": "TerminologySystem",
+          "system": "http://sdh.com/cqis/kalm",
+          "location": {
+            "start": {
+              "line": 359,
+              "column": 0
+            },
+            "end": {
+              "line": 359,
+              "column": 39
+            }
+          }
+        },
+        {
+          "type": "TerminologyCode",
+          "code": "client-is-due-for-mcv2",
+          "location": {
+            "start": {
+              "line": 360,
+              "column": 2
+            },
+            "end": {
+              "line": 360,
+              "column": 37
+            }
           }
         }
-      },
+      ],
       "location": {
         "start": {
-          "line": 305,
+          "line": 357,
           "column": 0
         },
         "end": {
-          "line": 305,
-          "column": 108
+          "line": 360,
+          "column": 37
         }
       }
     },
     {
       "type": "Terminology",
       "name": "Two Primary Series Doses Administered",
-      "definition": {
-        "type": "TerminologySystemCode",
-        "system": "http://sdh.com/cqis/kalm",
-        "code": "two-primary-series-doses-administered",
-        "location": {
-          "start": {
-            "line": 307,
-            "column": 52
-          },
-          "end": {
-            "line": 307,
-            "column": 137
+      "body": [
+        {
+          "type": "TerminologySystem",
+          "system": "http://sdh.com/cqis/kalm",
+          "location": {
+            "start": {
+              "line": 364,
+              "column": 0
+            },
+            "end": {
+              "line": 364,
+              "column": 39
+            }
+          }
+        },
+        {
+          "type": "TerminologyCode",
+          "code": "two-primary-series-doses-administered",
+          "location": {
+            "start": {
+              "line": 365,
+              "column": 2
+            },
+            "end": {
+              "line": 365,
+              "column": 52
+            }
           }
         }
-      },
+      ],
       "location": {
         "start": {
-          "line": 307,
+          "line": 362,
           "column": 0
         },
         "end": {
-          "line": 307,
-          "column": 138
+          "line": 365,
+          "column": 52
         }
       }
     },
     {
       "type": "Terminology",
       "name": "Client Age Less Than 9 Months",
-      "definition": {
-        "type": "TerminologySystemCode",
-        "system": "http://sdh.com/cqis/kalm",
-        "code": "client-age-less-than-9-months",
-        "location": {
-          "start": {
-            "line": 309,
-            "column": 44
-          },
-          "end": {
-            "line": 309,
-            "column": 121
+      "body": [
+        {
+          "type": "TerminologySystem",
+          "system": "http://sdh.com/cqis/kalm",
+          "location": {
+            "start": {
+              "line": 369,
+              "column": 0
+            },
+            "end": {
+              "line": 369,
+              "column": 39
+            }
+          }
+        },
+        {
+          "type": "TerminologyCode",
+          "code": "client-age-less-than-9-months",
+          "location": {
+            "start": {
+              "line": 370,
+              "column": 2
+            },
+            "end": {
+              "line": 370,
+              "column": 44
+            }
           }
         }
-      },
+      ],
       "location": {
         "start": {
-          "line": 309,
+          "line": 367,
           "column": 0
         },
         "end": {
-          "line": 309,
-          "column": 122
+          "line": 370,
+          "column": 44
         }
       }
     },
     {
       "type": "Terminology",
       "name": "Measles Routine Immunization Schedule Complete",
-      "definition": {
-        "type": "TerminologySystemCode",
-        "system": "http://sdh.com/cqis/kalm",
-        "code": "measles-routine-immunization-schedule-complete",
-        "location": {
-          "start": {
-            "line": 311,
-            "column": 61
-          },
-          "end": {
-            "line": 311,
-            "column": 155
+      "body": [
+        {
+          "type": "TerminologySystem",
+          "system": "http://sdh.com/cqis/kalm",
+          "location": {
+            "start": {
+              "line": 374,
+              "column": 0
+            },
+            "end": {
+              "line": 374,
+              "column": 39
+            }
+          }
+        },
+        {
+          "type": "TerminologyCode",
+          "code": "measles-routine-immunization-schedule-complete",
+          "location": {
+            "start": {
+              "line": 375,
+              "column": 2
+            },
+            "end": {
+              "line": 375,
+              "column": 61
+            }
           }
         }
-      },
+      ],
       "location": {
         "start": {
-          "line": 311,
+          "line": 372,
           "column": 0
         },
         "end": {
-          "line": 311,
-          "column": 156
+          "line": 375,
+          "column": 61
         }
       }
     },
     {
       "type": "Terminology",
       "name": "No Supplementary Dose Administered",
-      "definition": {
-        "type": "TerminologySystemCode",
-        "system": "http://sdh.com/cqis/kalm",
-        "code": "no-supplementary-dose-administered",
-        "location": {
-          "start": {
-            "line": 313,
-            "column": 49
-          },
-          "end": {
-            "line": 313,
-            "column": 131
+      "body": [
+        {
+          "type": "TerminologySystem",
+          "system": "http://sdh.com/cqis/kalm",
+          "location": {
+            "start": {
+              "line": 379,
+              "column": 0
+            },
+            "end": {
+              "line": 379,
+              "column": 39
+            }
+          }
+        },
+        {
+          "type": "TerminologyCode",
+          "code": "no-supplementary-dose-administered",
+          "location": {
+            "start": {
+              "line": 380,
+              "column": 2
+            },
+            "end": {
+              "line": 380,
+              "column": 49
+            }
           }
         }
-      },
+      ],
       "location": {
         "start": {
-          "line": 313,
+          "line": 377,
           "column": 0
         },
         "end": {
-          "line": 313,
-          "column": 132
+          "line": 380,
+          "column": 49
         }
       }
     },
     {
       "type": "Terminology",
       "name": "Client Is Due For Supplementary Dose",
-      "definition": {
-        "type": "TerminologySystemCode",
-        "system": "http://sdh.com/cqis/kalm",
-        "code": "client-is-due-for-supplementary-dose",
-        "location": {
-          "start": {
-            "line": 315,
-            "column": 51
-          },
-          "end": {
-            "line": 315,
-            "column": 135
+      "body": [
+        {
+          "type": "TerminologySystem",
+          "system": "http://sdh.com/cqis/kalm",
+          "location": {
+            "start": {
+              "line": 384,
+              "column": 0
+            },
+            "end": {
+              "line": 384,
+              "column": 39
+            }
+          }
+        },
+        {
+          "type": "TerminologyCode",
+          "code": "client-is-due-for-supplementary-dose",
+          "location": {
+            "start": {
+              "line": 385,
+              "column": 2
+            },
+            "end": {
+              "line": 385,
+              "column": 51
+            }
           }
         }
-      },
+      ],
       "location": {
         "start": {
-          "line": 315,
+          "line": 382,
           "column": 0
         },
         "end": {
-          "line": 315,
-          "column": 136
+          "line": 385,
+          "column": 51
         }
       }
     },
     {
       "type": "Terminology",
       "name": "Supplementary Dose Administered",
-      "definition": {
-        "type": "TerminologySystemCode",
-        "system": "http://sdh.com/cqis/kalm",
-        "code": "supplementary-dose-administered",
-        "location": {
-          "start": {
-            "line": 317,
-            "column": 46
-          },
-          "end": {
-            "line": 317,
-            "column": 125
+      "body": [
+        {
+          "type": "TerminologySystem",
+          "system": "http://sdh.com/cqis/kalm",
+          "location": {
+            "start": {
+              "line": 389,
+              "column": 0
+            },
+            "end": {
+              "line": 389,
+              "column": 39
+            }
+          }
+        },
+        {
+          "type": "TerminologyCode",
+          "code": "supplementary-dose-administered",
+          "location": {
+            "start": {
+              "line": 390,
+              "column": 2
+            },
+            "end": {
+              "line": 390,
+              "column": 46
+            }
           }
         }
-      },
+      ],
       "location": {
         "start": {
-          "line": 317,
+          "line": 387,
           "column": 0
         },
         "end": {
-          "line": 317,
-          "column": 126
+          "line": 390,
+          "column": 46
         }
       }
     },
     {
       "type": "Terminology",
       "name": "MCV Dose Contraindicated",
-      "definition": {
-        "type": "TerminologySystemCode",
-        "system": "http://sdh.com/cqis/kalm",
-        "code": "mcv-dose-contraindicated",
-        "location": {
-          "start": {
-            "line": 319,
-            "column": 39
-          },
-          "end": {
-            "line": 319,
-            "column": 111
+      "body": [
+        {
+          "type": "TerminologySystem",
+          "system": "http://sdh.com/cqis/kalm",
+          "location": {
+            "start": {
+              "line": 394,
+              "column": 0
+            },
+            "end": {
+              "line": 394,
+              "column": 39
+            }
+          }
+        },
+        {
+          "type": "TerminologyCode",
+          "code": "mcv-dose-contraindicated",
+          "location": {
+            "start": {
+              "line": 395,
+              "column": 2
+            },
+            "end": {
+              "line": 395,
+              "column": 39
+            }
           }
         }
-      },
+      ],
       "location": {
         "start": {
-          "line": 319,
+          "line": 392,
           "column": 0
         },
         "end": {
-          "line": 319,
-          "column": 112
+          "line": 395,
+          "column": 39
         }
       }
     },
     {
       "type": "Terminology",
       "name": "Contraindication Evaluation of the MCV dose",
-      "definition": {
-        "type": "TerminologySystemCode",
-        "system": "http://sdh.com/cqis/kalm",
-        "code": "contraindication-evaluation-of-the-mcv-dose",
-        "location": {
-          "start": {
-            "line": 321,
-            "column": 58
-          },
-          "end": {
-            "line": 321,
-            "column": 149
+      "body": [
+        {
+          "type": "TerminologySystem",
+          "system": "http://sdh.com/cqis/kalm",
+          "location": {
+            "start": {
+              "line": 399,
+              "column": 0
+            },
+            "end": {
+              "line": 399,
+              "column": 39
+            }
+          }
+        },
+        {
+          "type": "TerminologyCode",
+          "code": "contraindication-evaluation-of-the-mcv-dose",
+          "location": {
+            "start": {
+              "line": 400,
+              "column": 2
+            },
+            "end": {
+              "line": 400,
+              "column": 58
+            }
           }
         }
-      },
+      ],
       "location": {
         "start": {
-          "line": 321,
+          "line": 397,
           "column": 0
         },
         "end": {
-          "line": 321,
-          "column": 150
+          "line": 400,
+          "column": 58
         }
       }
     },
     {
       "type": "Terminology",
       "name": "Measles vaccines",
-      "definition": {
-        "type": "TerminologySystemCode",
-        "system": "http://id.who.int/icd/release/11/mms",
-        "code": "XM28X5",
-        "location": {
-          "start": {
-            "line": 323,
-            "column": 31
-          },
-          "end": {
-            "line": 323,
-            "column": 97
+      "body": [
+        {
+          "type": "TerminologySystem",
+          "system": "http://id.who.int/icd/release/11/mms",
+          "location": {
+            "start": {
+              "line": 404,
+              "column": 0
+            },
+            "end": {
+              "line": 404,
+              "column": 51
+            }
+          }
+        },
+        {
+          "type": "TerminologyCode",
+          "code": "XM28X5",
+          "location": {
+            "start": {
+              "line": 405,
+              "column": 2
+            },
+            "end": {
+              "line": 405,
+              "column": 21
+            }
           }
         }
-      },
+      ],
       "location": {
         "start": {
-          "line": 323,
+          "line": 402,
           "column": 0
         },
         "end": {
-          "line": 323,
-          "column": 98
+          "line": 405,
+          "column": 21
         }
       }
     },
     {
       "type": "Terminology",
       "name": "Measles Code",
-      "definition": {
-        "type": "TerminologySystemCode",
-        "system": "http://id.who.int/icd/release/11/mms",
-        "code": "XM28X5",
-        "location": {
-          "start": {
-            "line": 325,
-            "column": 27
-          },
-          "end": {
-            "line": 325,
-            "column": 93
+      "body": [
+        {
+          "type": "TerminologySystem",
+          "system": "http://id.who.int/icd/release/11/mms",
+          "location": {
+            "start": {
+              "line": 409,
+              "column": 0
+            },
+            "end": {
+              "line": 409,
+              "column": 51
+            }
+          }
+        },
+        {
+          "type": "TerminologyCode",
+          "code": "XM28X5",
+          "location": {
+            "start": {
+              "line": 410,
+              "column": 2
+            },
+            "end": {
+              "line": 410,
+              "column": 21
+            }
           }
         }
-      },
+      ],
       "location": {
         "start": {
-          "line": 325,
+          "line": 407,
           "column": 0
         },
         "end": {
-          "line": 325,
-          "column": 94
+          "line": 410,
+          "column": 21
         }
       }
     }
@@ -3083,7 +4035,7 @@
       "column": 0
     },
     "end": {
-      "line": 326,
+      "line": 411,
       "column": 5
     }
   }

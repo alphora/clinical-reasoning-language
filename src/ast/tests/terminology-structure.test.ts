@@ -1,11 +1,12 @@
-import { Terminology, TerminologyValueset, TerminologySystemCode } from "../types";
+import { Terminology, TerminologyValueset, TerminologySystem, TerminologyCode } from "../types";
 
 import { parseInput } from "./parseInput";
 
 describe("Terminology Structure", () => {
   it("should correctly structure terminology with valueset", () => {
     const input = `# Test
-terminology "MeaslesVaccineCodes" is valueset "bmi valueset".
+terminology "MeaslesVaccineCodes":
+- valueset is "bmi valueset".
 `;
 
     const result = parseInput(input);
@@ -14,15 +15,18 @@ terminology "MeaslesVaccineCodes" is valueset "bmi valueset".
     // Verify basic terminology structure
     expect(terminology.type).toBe("Terminology");
     expect(terminology.name).toBe("MeaslesVaccineCodes");
-    expect(terminology.definition).toBeDefined();
-    expect(terminology.definition?.type).toBe("TerminologyValueset");
-    const valuesetDef = terminology.definition as TerminologyValueset;
-    expect(valuesetDef.valuesetName).toBe("bmi valueset");
+    const valuesetLine = terminology.body.find(
+      (l) => l.type === "TerminologyValueset",
+    ) as TerminologyValueset;
+    expect(valuesetLine).toBeDefined();
+    expect(valuesetLine.valuesetName).toBe("bmi valueset");
   });
 
   it("should correctly structure terminology with system and code", () => {
     const input = `# Test
-terminology "MeaslesVaccineCodes" is system \`http://snomed.info/sct\` and code \`871807003\`.
+terminology "MeaslesVaccineCodes":
+- system is \`http://snomed.info/sct\`.
+- code is \`871807003\`.
 `;
 
     const result = parseInput(input);
@@ -31,10 +35,13 @@ terminology "MeaslesVaccineCodes" is system \`http://snomed.info/sct\` and code 
     // Verify basic terminology structure
     expect(terminology.type).toBe("Terminology");
     expect(terminology.name).toBe("MeaslesVaccineCodes");
-    expect(terminology.definition).toBeDefined();
-    expect(terminology.definition?.type).toBe("TerminologySystemCode");
-    const systemCodeDef = terminology.definition as TerminologySystemCode;
-    expect(systemCodeDef.system).toBe("http://snomed.info/sct");
-    expect(systemCodeDef.code).toBe("871807003");
+    const systemLine = terminology.body.find(
+      (l) => l.type === "TerminologySystem",
+    ) as TerminologySystem;
+    const codeLine = terminology.body.find((l) => l.type === "TerminologyCode") as TerminologyCode;
+    expect(systemLine).toBeDefined();
+    expect(systemLine.system).toBe("http://snomed.info/sct");
+    expect(codeLine).toBeDefined();
+    expect(codeLine.code).toBe("871807003");
   });
 });
