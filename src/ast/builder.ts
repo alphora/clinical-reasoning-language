@@ -402,6 +402,26 @@ export class CRLAstBuilder
     };
   }
 
+  private parseMeta(
+    bodyCtx: import("../grammar/generated/antlr/CRLParser").ConceptBodyContext,
+  ): string | undefined {
+    if (bodyCtx.metaLine?.()) {
+      const metaCtx = bodyCtx.metaLine?.();
+      if (metaCtx?.backtickString) {
+        const backtickCtx = metaCtx.backtickString();
+        if (backtickCtx?.text !== undefined) {
+          return backtickCtx.text.slice(1, -1);
+        } else if (backtickCtx?.BACKTICK_STRING) {
+          const token = backtickCtx.BACKTICK_STRING();
+          if (token?.text !== undefined) {
+            return token.text.slice(1, -1);
+          }
+        }
+      }
+    }
+    return undefined;
+  }
+
   private parseEvidence(
     bodyCtx: import("../grammar/generated/antlr/CRLParser").ConceptBodyContext,
   ): string | undefined {
@@ -472,6 +492,7 @@ export class CRLAstBuilder
       return null as unknown as Concept;
     }
     const { conceptType, valueType } = types;
+    const meta = this.parseMeta(bodyCtx);
     const evidence = this.parseEvidence(bodyCtx);
     const definition = this.parseConceptDefinition(bodyCtx, ctx);
     if (!definition) {
@@ -482,7 +503,8 @@ export class CRLAstBuilder
       name,
       conceptType,
       valueType,
-      evidence,
+      ...(meta ? { meta } : {}),
+      ...(evidence ? { evidence } : {}),
       definition,
       location: getLocation(ctx),
     };
