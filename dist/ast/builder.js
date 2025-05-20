@@ -292,18 +292,21 @@ class CRLAstBuilder extends AbstractParseTreeVisitor_1.AbstractParseTreeVisitor 
         };
     }
     parseMeta(bodyCtx) {
-        const metaCtx = bodyCtx.metaLine?.();
-        const backtickCtx = metaCtx?.backtickString?.();
-        if (backtickCtx?.text !== undefined) {
-            return backtickCtx.text.slice(1, -1);
-        }
-        else if (backtickCtx?.BACKTICK_STRING) {
-            const token = backtickCtx.BACKTICK_STRING();
-            if (token?.text !== undefined) {
-                return token.text.slice(1, -1);
+        const metaLines = bodyCtx.metaLine?.() ?? [];
+        const metas = [];
+        for (const metaCtx of metaLines) {
+            const backtickCtx = metaCtx?.backtickString?.();
+            if (backtickCtx?.text !== undefined) {
+                metas.push(backtickCtx.text.slice(1, -1));
+            }
+            else if (backtickCtx?.BACKTICK_STRING) {
+                const token = backtickCtx.BACKTICK_STRING();
+                if (token?.text !== undefined) {
+                    metas.push(token.text.slice(1, -1));
+                }
             }
         }
-        return undefined;
+        return metas;
     }
     parseEvidence(bodyCtx) {
         if (bodyCtx.evidenceLine?.()) {
@@ -381,7 +384,7 @@ class CRLAstBuilder extends AbstractParseTreeVisitor_1.AbstractParseTreeVisitor 
             name,
             conceptType,
             valueType,
-            ...(meta ? { meta } : {}),
+            ...(meta.length > 0 ? { meta } : {}),
             ...(evidence ? { evidence } : {}),
             definition,
             location: getLocation(ctx),

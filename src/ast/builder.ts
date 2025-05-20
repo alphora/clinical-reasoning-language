@@ -404,18 +404,21 @@ export class CRLAstBuilder
 
   private parseMeta(
     bodyCtx: import("../grammar/generated/antlr/CRLParser").ConceptBodyContext,
-  ): string | undefined {
-    const metaCtx = bodyCtx.metaLine?.();
-    const backtickCtx = metaCtx?.backtickString?.();
-    if (backtickCtx?.text !== undefined) {
-      return backtickCtx.text.slice(1, -1);
-    } else if (backtickCtx?.BACKTICK_STRING) {
-      const token = backtickCtx.BACKTICK_STRING();
-      if (token?.text !== undefined) {
-        return token.text.slice(1, -1);
+  ): string[] {
+    const metaLines = bodyCtx.metaLine?.() ?? [];
+    const metas: string[] = [];
+    for (const metaCtx of metaLines) {
+      const backtickCtx = metaCtx?.backtickString?.();
+      if (backtickCtx?.text !== undefined) {
+        metas.push(backtickCtx.text.slice(1, -1));
+      } else if (backtickCtx?.BACKTICK_STRING) {
+        const token = backtickCtx.BACKTICK_STRING();
+        if (token?.text !== undefined) {
+          metas.push(token.text.slice(1, -1));
+        }
       }
     }
-    return undefined;
+    return metas;
   }
 
   private parseEvidence(
@@ -499,7 +502,7 @@ export class CRLAstBuilder
       name,
       conceptType,
       valueType,
-      ...(meta ? { meta } : {}),
+      ...(meta.length > 0 ? { meta } : {}),
       ...(evidence ? { evidence } : {}),
       definition,
       location: getLocation(ctx),
