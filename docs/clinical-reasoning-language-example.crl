@@ -114,6 +114,7 @@ concept "Most Recent BMI":
 - type is Observation.
 - valuetype is boolean.
 - meta is `Some meta information`.
+- meta is `Some other meta information`.
 - evidence is `Calculated by Smile`.
 - inferred from "BMI".
   - apply pattern `Most Recent(this, lookbackMonths)`.
