@@ -20,9 +20,14 @@ Clinical Reasoning Language (CRL) is a domain-specific language for expressing c
 ## Quoting and String Conventions
 
 - **Identifiers** (names, references): Double quotes (`"..."`)
+
+
+  Double quotes in CRL are expected to resolve to defined statements—either the name of a statement or a reference to a corresponding statement with that name elsewhere in CRL.
   - Example: `"BMI Valueset"`, `"Colonoscopy"`
-- **Free text, markdown, evidence, meta, system/code values:** Backticks (`` `...` ``)
-  - Example: `` `Some *markdown* text` ``
+- **Free text, markdown, evidence, meta, and system/code values must be enclosed in backticks (`...`). Backticks are used for two purposes:
+  Text content – e.g., `Some *markdown* text` for human-readable descriptions or rationale.
+  External references – e.g., `http://snomed.info/sct` to denote URIs, system identifiers, or values outside the CRL namespace.
+  
 - **No escape characters** are allowed in quoted strings
 
 ---
@@ -57,7 +62,7 @@ decision "Decision Name":
 - `recommend activity "Activity Name".`
 - `use decision "Decision Name".`
 
->**Note**: `when ""` (an empty concept) is allowed by syntax and is used ensure the action always runs.
+>**Note**: `when ""` (an empty concept) is allowed by syntax and is used to ensure the action always runs (i.e., effectively condition = true).
 
 ---
 
