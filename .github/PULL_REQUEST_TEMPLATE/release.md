@@ -8,7 +8,6 @@ _This checklist is for release branches (e.g., `release/v0.1.0`)._
 - [ ] Create a release branch (`release/v<version>`)
 - [ ] Remove all debugging logs
 - [ ] Run the linter with auto-fix
-- [ ] Update the CHANGELOG
 - [ ] Commit all changes
 - [ ] Run tests to ensure there's no regression
 - [ ] Run the release script
@@ -49,30 +48,26 @@ To create a new release:
    npx eslint . --ext .ts --fix
    ```
 
-5. **Update the CHANGELOG**  
-   Prompt:
-   > Generate and append to the CHANGELOG based on git commits since the last tag.
-
-6. **Build the project**
+5. **Build the project**
 
    ```bash
    npm run build
    ```
 
-7. **Run tests to ensure no regression**
+6. **Run tests to ensure no regression**
 
    ```bash
    npm test
    ```
 
-8. **Commit all changes**
+7. **Commit all changes**
 
    ```bash
    git add .
    git commit -m "Prepare release v0.1.0"
    ```
 
-9. **Run the automated release script**
+8. **Run the automated release script**
 
    ```bash
    npm run prerelease -- <patch|minor|major|version>
@@ -89,15 +84,13 @@ To create a new release:
    - Bump the version and create a Git tag
    - Push commits and tags
 
-10. **Push commits and tags** (if not already pushed by the script)
+9. **Create and merge the Pull Request (PR)**
 
-11. **Create and merge the Pull Request (PR)**
-
-12. **Create and publish the GitHub Release**
+10. **Create and publish the GitHub Release**
     - Use the version tag (e.g., `v0.1.0`)
     - Generate release notes automatically if needed
 
-13. **Switch back to main and delete the release branch:**
+11. **Switch back to main and delete the release branch:**
 
     ```bash
     git checkout main
