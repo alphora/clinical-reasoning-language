@@ -1,3 +1,4 @@
+
 # Clinical Reasoning Language (CRL) User Guide
 
 ## Overview
@@ -8,7 +9,7 @@ Clinical Reasoning Language (CRL) is a domain-specific language for expressing c
 
 ## File Structure
 
-- **Header:** Every CRL file must start with a markdown header line beginning with `#`.
+- **Header:** Every CRL file must start with a markdown header line beginning with `#`, which is stored in the AST as the `header` field.
 - **Statements:** The file contains any number of statements: `decision`, `terminology`, `activity`, and `concept`.
 - **Comments:**
   - Single-line comments: `// ...`
@@ -18,11 +19,11 @@ Clinical Reasoning Language (CRL) is a domain-specific language for expressing c
 
 ## Quoting and String Conventions
 
-- **Identifiers** (names, references): Double quotes (`"...")`.
+- **Identifiers** (names, references): Double quotes (`"..."`)
   - Example: `"BMI Valueset"`, `"Colonoscopy"`
-- **Free text, markdown, evidence, meta, system/code values:** Backticks (`` `...` ``).
+- **Free text, markdown, evidence, meta, system/code values:** Backticks (`` `...` ``)
   - Example: `` `Some *markdown* text` ``
-- **No escape characters** are allowed in quoted strings.
+- **No escape characters** are allowed in quoted strings
 
 ---
 
@@ -42,25 +43,27 @@ decision "Decision Name":
 ```
 
 #### Structure
-- `decision "Name": ...` (colon required)
+
+- `decision "Name":` (colon required)
 - One or more `when` blocks
 - `when` block can:
   - Directly recommend or use an activity/decision
-  - Contain a block body (with `any:` or `all:` qualifier, optional)
+  - Contain a block body (with optional `any:` or `all:` qualifier)
   - Be nested
-- End block with `- end when`
+- End blocks with `- end when`
 
 #### Actions
+
 - `recommend activity "Activity Name".`
 - `use decision "Decision Name".`
 
-Note: `when ""` (an empty concept) is allowed by syntax and is used ensure the action always runs.
+>**Note**: `when ""` (an empty concept) is allowed by syntax and is used ensure the action always runs.
 
 ---
 
 ### 2. Terminology Statement
 
-Defines a terminology reference, which can be a valueset or a system/code pair. Multiple valuesets and system/code pairs are allowed.
+Defines a terminology reference using either a valueset or system/code. Multiple codes per system are allowed.
 
 ```crl
 terminology "BMI Valueset":
@@ -73,10 +76,12 @@ terminology "Colonoscopy":
 ```
 
 #### Structure
-- `terminology "Name": ...` (colon required)
-- One or more lines:
-  - `- valueset is `valuesetName`.`
-  - `- system is `systemUri`.` (followed by one or more `- code is `codeValue`.` lines)
+
+- `terminology "Name":` (colon required)
+- One or more of:
+  - ``- valueset is `valuesetName`.``
+  - ``- system is `systemUri`.``
+    - Followed by one or more ``- code is `codeValue`.`` lines
 
 ---
 
@@ -104,28 +109,30 @@ activity "Contraindicated":
 ```
 
 #### Structure
-- `activity "Name": ...` (colon required)
+
+- `activity "Name":` (colon required)
 - Required: `- request [do not perform] ACTIVITY_TYPE.`
-- Optional: `- with "Terminology".` or `- with `Free text`.`
-- Optional: `- because `Rationale`.`
+- Optional:
+  - `- with "Terminology".` or ``- with `Free text`.`` (only one allowed per activity)
+  - ``- because `Rationale`.``
 
 #### Activity Types
-- Must be one of the allowed types (see grammar for full list, e.g., `CPGImmunizationRequest`, `CPGProposeDiagnosisTask`, etc.)
 
-Note: do not perform marks the activity as contraindicated or not to be executed.
+Must be a custom-defined type conforming to FHIR resource names.
+
+> **Note:** `do not perform` marks the activity as contraindicated or not to be executed.
 
 ---
 
 ### 4. Concept Statement
 
-Defines a reusable clinical concept. Must be either coded from a terminology or inferred from other concepts. Supports multiple meta lines and optional evidence.
+Defines a reusable clinical concept. Must be either coded from a terminology or inferred from other concepts.
 
 ```crl
 concept "Most Recent BMI":
 - type is Observation.
 - valuetype is boolean.
 - meta is `Some meta information`.
-- meta is `Some other meta information`.
 - evidence is `Calculated by Smile`.
 - inferred from "BMI".
   - apply pattern `Most Recent(this, lookbackMonths)`.
@@ -142,13 +149,17 @@ concept "BMI Range as a Condition":
 ```
 
 #### Structure
-- `concept "Name": ...` (colon required)
-- Required: `- type is CONCEPT_TYPE.`
-- Required: `- valuetype is CONCEPT_VALUE_TYPE.`
-- Optional: Any number of `- meta is `Meta info`.` lines
-- Optional: `- evidence is `Evidence info`.`
-- Required: Either `- coded from "Terminology".` or one of the following inference forms:
-  - `- inferred from "Concept".` (optionally followed by one or more `- apply pattern `PatternName`.` lines)
+
+- `concept "Name":` (colon required)
+- Required:
+  - `- type is CONCEPT_TYPE.`
+  - `- valuetype is CONCEPT_VALUE_TYPE.`
+- Optional:
+  - One or more ``- meta is `Text`.`` lines
+  - One ``- evidence is `Text`.`` line
+- Required: Either `- coded from` or one of the following `inferred from` forms:
+  - `- inferred from "Concept".`
+    - Optional: ``- apply pattern `PatternName`.`` (can repeat)
   - `- inferred from ( ...logical expression... ).`
 
 #### Inference
@@ -156,7 +167,10 @@ concept "BMI Range as a Condition":
 - `inferred from ( ... )` — logical expression using `and`, `or`, `not`, parentheses, and concept references
 - `apply pattern` — can follow a single concept reference, and can be repeated
 
-#### Example Logical Expression
+> **Important:** `apply pattern` can **only** follow single concept inference (not logical expressions).
+
+#### Logical Expressions
+
 ```crl
 - inferred from (
     (
@@ -188,16 +202,16 @@ concept "BMI Range as a Condition":
 
 ## Notes and Best Practices
 
-- **Case Sensitivity:** CRL is case sensitive.
-- **Whitespace/Indentation:** Not significant.
-- **Header:** File must start with a markdown header line (`# ...`).
-- **Quoted Strings:** No escape characters allowed.
-- **Meta Lines:** Multiple `meta is` lines are allowed per concept.
-- **Evidence:** Only one `evidence is` line per concept.
-- **Pattern Application:** Only allowed after a single concept reference in `inferred from`.
-- **Terminology:** Can have multiple valueset and system/code pairs.
-- **Activity Types:** Must be from the allowed set (see grammar).
-- **Block Qualifiers:** `any:` and `all:` are optional in decision block bodies (default is `any`).
+- **Case Sensitivity:** CRL is case sensitive
+- **Whitespace/Indentation:** Not significant
+- **Header:** File must start with a markdown header line (`# ...`)
+- **Quoted Strings:** No escape characters allowed
+- **Meta Lines:** Multiple `meta is` lines allowed per concept
+- **Evidence Line:** Only one `evidence is` line per concept
+- **Pattern Application:** Allowed only after single concept references
+- **Terminology Entries:** Can have multiple valuesets and system/code pairs
+- **Activity Types:** Must be selected from valid resource types
+- **Block Qualifiers:** `any:` and `all:` are optional (default is `any:`)
 
 ---
 
