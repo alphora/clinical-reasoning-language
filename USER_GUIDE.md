@@ -24,7 +24,7 @@ Clinical Reasoning Language (CRL) is a domain-specific language for expressing c
 
   Double quotes in CRL are expected to resolve to defined statements—either the name of a statement or a reference to a corresponding statement with that name elsewhere in CRL.
   - Example: `"BMI Valueset"`, `"Colonoscopy"`
-- **Free text, markdown, evidence, meta, and system/code values must be enclosed in backticks (`...`). Backticks are used for two purposes:
+- **Free text, markdown, evidence, meta, and system/code** values must be enclosed in backticks (`...`). Backticks are used for two purposes:
   Text content – e.g., `Some *markdown* text` for human-readable descriptions or rationale.
   External references – e.g., `http://snomed.info/sct` to denote URIs, system identifiers, or values outside the CRL namespace.
   
