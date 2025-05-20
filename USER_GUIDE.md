@@ -36,7 +36,6 @@ Defines reusable decision logic blocks with `when` conditions and actions.
 decision "Decision Name":
   - when "Concept Name" then recommend activity "Activity Name".
   - when "Other Concept" then:
-      any:
       - recommend activity "A".
       - use decision "B".
   - end when
@@ -54,6 +53,8 @@ decision "Decision Name":
 #### Actions
 - `recommend activity "Activity Name".`
 - `use decision "Decision Name".`
+
+Note: `when ""` (an empty concept) is allowed by syntax and is used ensure the action always runs.
 
 ---
 
@@ -110,7 +111,8 @@ activity "Contraindicated":
 
 #### Activity Types
 - Must be one of the allowed types (see grammar for full list, e.g., `CPGImmunizationRequest`, `CPGProposeDiagnosisTask`, etc.)
-- `do not perform` is an optional prefix to the activity type.
+
+Note: do not perform marks the activity as contraindicated or not to be executed.
 
 ---
 
@@ -177,7 +179,7 @@ concept "BMI Range as a Condition":
 
 ## Keywords and Tokens
 
-- **Keywords:** `decision`, `terminology`, `activity`, `concept`, `when`, `then`, `recommend activity`, `use decision`, `request`, `with`, `because`, `type is`, `valuetype is`, `evidence is`, `meta is`, `coded from`, `inferred from`, `apply pattern`, `system is`, `code is`, `valueset is`, `any:`, `all:`, `do not perform`, `not`, `and`, `or`, `end when`, `:` (colon), `.` (dot), `-` (dash)
+- **Keywords:** `decision`, `terminology`, `activity`, `concept`, `when`, `then`, `recommend activity`, `use decision`, `request`, `with`, `because`, `type is`, `valuetype is`, `evidence is`, `meta is`, `coded from`, `inferred from`, `apply pattern`, `system is`, `code is`, `valueset is`, `any:`, `all:`, `do not perform`, `not`, `and`, `or`, `end when`, `:` (colon), `.` (dot), `-` (dash), `(` (left paren), `)` (right paren)
 - **Identifiers:** Double-quoted strings
 - **Free text/markdown:** Backtick-quoted strings
 - **Comments:** `// ...` or `/* ... */`
@@ -201,14 +203,14 @@ concept "BMI Range as a Condition":
 
 ## Full Example
 
-See `docs/clinical-reasoning-language-example.crl` for a comprehensive example covering all features and options.
+See [docs/clinical-reasoning-language-example.crl](`https://github.com/alphora/clinical-reasoning-language/blob/main/docs/clinical-reasoning-language-example.crl`) for a comprehensive example covering all features and options.
 
 ---
 
 ## Reference
 
 For the full, up-to-date grammar, see:
-- `src/grammar/CRLParser.g4` (parser rules)
-- `src/grammar/CRLLexer.g4` (lexer rules)
+- [src/grammar/CRLParser.g4](`https://github.com/alphora/clinical-reasoning-language/blob/main/src/grammar/CRLParser.g4`) parser rules)
+- [src/grammar/CRLLexer.g4](`https://github.com/alphora/clinical-reasoning-language/blob/main/src/grammar/CRLLexer.g4`) (lexer rules)
 
-For questions or contributions, see the project repository. 
+For questions or contributions, see the project repository.
