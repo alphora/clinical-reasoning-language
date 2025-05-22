@@ -1,11 +1,12 @@
 {
   "extends": "../../tsconfig.json",
   "include": [
-    "src/**/*.ts",
-    "tests/**/*.ts",
-    "jest.config.js"
+    "src/**/*.ts"
   ],
   "exclude": [
-    "src/validator/tests/**/*"
+    "src/**/*.test.ts",
+    "src/**/tests/**",
+    "tests/**",
+    "**/*.spec.ts"
   ]
 } 

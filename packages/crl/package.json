@@ -13,11 +13,9 @@
     }
   },
   "files": [
-    "dist/**/*.js",
-    "dist/**/*.json",
-    "dist/**/*.d.ts",
-    "dist/**/*.js.map",
-    "README.md"
+    "dist/",
+    "README.md",
+    "LICENSE"
   ],
   "publishConfig": {
     "access": "restricted"
