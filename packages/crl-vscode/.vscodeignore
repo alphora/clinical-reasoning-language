@@ -1,0 +1,11 @@
+# Ignore everything by default
+**/*
+
+# Explicitly allow only the essentials
+!README.md
+!LICENSE
+!LICENSE.md
+!LICENSE.txt
+!package.json
+!syntaxes/**
+!.gitignore 

@@ -45,9 +45,9 @@
     }
   },
   "ignorePatterns": [
-    "dist/",
+    "packages/crl/dist/",
     "node_modules/",
     "coverage/",
-    "src/grammar/generated/"
+    "packages/crl/src/grammar/generated/"
   ]
 }

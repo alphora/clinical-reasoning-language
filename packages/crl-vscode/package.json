@@ -1,0 +1,39 @@
+{
+  "name": "crl-vscode",
+  "private": true,
+  "displayName": "Clinical Reasoning Language Support",
+  "description": "Inject CRL keyword highlighting into CRL Markdown files (.crl) while preserving Markdown behavior.",
+  "version": "0.0.1",
+  "publisher": "smiledigitalhealth",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/alphora/clinical-reasoning-language.git"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "grammars": [
+      {
+        "scopeName": "source.crl-injection",
+        "path": "./syntaxes/crl-injection.tmLanguage.json",
+        "injectTo": [
+          "text.html.markdown"
+        ],
+        "language": "markdown"
+      }
+    ]
+  },
+  "scripts": {
+    "package": "ts-node scripts/package-extension.ts"
+  },
+  "devDependencies": {
+    "@types/fs-extra": "^11.0.4",
+    "@vscode/vsce": "^2.15.0",
+    "fs-extra": "^11.3.0",
+    "rimraf": "^5.0.5"
+  }
+}

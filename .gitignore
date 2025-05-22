@@ -40,18 +40,18 @@ temp/
 *.tmp
 
 # Ignore ANTLR generated listener (not used)
-src/grammar/generated/CRLParserListener.ts
+packages/crl/src/grammar/generated/CRLParserListener.ts
 
 # Don't put anything below this line as these are auto-generated
 
 # Ignore generated type lists
-src/grammar/generated/types/
+packages/crl/src/grammar/generated/types/
 
 # Ignore ANTLR generated files
-src/grammar/generated/antlr/
+packages/crl/src/grammar/generated/antlr/
 
 # Ignore FSH examples
 
-src/examples/fsh/smart-example-immz/
+packages/crl/src/examples/fsh/smart-example-immz/
 
-dist/
+packages/crl/dist/

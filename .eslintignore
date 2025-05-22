@@ -1,5 +1,9 @@
 # Ignore generated files
-src/grammar/generated/** 
+packages/crl/src/grammar/generated/** 
 
 # Ignore validator files and subdirectories
-src/validator/** 
+packages/crl/src/validator/** 
+
+# Ignore jest config files
+packages/crl/jest.config.js
+packages/crl/jest.setup.js 

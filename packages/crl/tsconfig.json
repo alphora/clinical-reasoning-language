@@ -1,0 +1,11 @@
+{
+  "extends": "../../tsconfig.json",
+  "include": [
+    "src/**/*.ts",
+    "tests/**/*.ts",
+    "jest.config.js"
+  ],
+  "exclude": [
+    "src/validator/tests/**/*"
+  ]
+} 

@@ -1,11 +1,12 @@
 {
   "extends": "./tsconfig.json",
   "include": [
-    "src/**/*.ts",
-    "tests/**/*.ts"
+    "packages/crl/src/**/*.ts",
+    "packages/crl/tests/**/*.ts",
+    "packages/crl-vscode/scripts/**/*.ts"
   ],
   "exclude": [
     "node_modules",
-    "dist"
+    "packages/crl/dist"
   ]
 }

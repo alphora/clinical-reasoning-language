@@ -1,9 +1,9 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "rootDir": "src"
+    "rootDir": "packages/crl/scripts"
   },
   "include": [
-    "scripts/**/*.ts"
+    "packages/crl/scripts/**/*.ts"
   ]
 } 

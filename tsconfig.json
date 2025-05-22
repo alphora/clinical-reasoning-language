@@ -4,7 +4,7 @@
     "module": "CommonJS",
     "lib": ["ES2020"],
     "declaration": true,
-    "outDir": "./dist",
+    "outDir": "./packages/crl/dist",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
@@ -21,20 +21,5 @@
       "./types",
       "./node_modules/@types"
     ]
-  },
-  "include": [
-    "src/**/*.ts",
-    "src/**/*.d.ts"
-  ],
-  "exclude": [
-    "node_modules",
-    "dist",
-    "**/*.test.ts",
-    "**/*.spec.ts",
-    "src/examples/**/*",
-    "src/**/tests/**/*",
-    "tmp/**/*",
-    "*.log",
-    "docs/**/*"
-  ]
+  }
 } 

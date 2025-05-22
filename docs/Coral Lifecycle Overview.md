@@ -1,21 +1,35 @@
-# 🌊 Coral Lifecycle Overview
+# 🌊 Coral Lifecycle in the Coral Framework
 
-- **🪸 coral spawn**  
-  Initialize a small local reef (i.e., start a new CRL project).
-
-- **✍️ manual authoring**  
-  Create `.crl` files to grow your local reef with clinical concepts, decisions, activities, terminologies, metrics, and summaries.
-
-- **🏊 coral blossom**  
-  Transform `.crl` files into **shells**, **coral concept**, **FHIR**, and **CQL** files for interoperable execution.
-
-- **🌱 coral migrate**  
-  Transfer authored shells to the **Great Reef** to contribute reusable knowledge.
-
-- **🐚 coral harvest**  
-  Pull reusable shells from the Great Reef into your local reef to reuse clinical knowledge.
+The Coral Lifecycle defines the steps for creating, transforming, and sharing clinical knowledge within the Coral Framework.
 
 ---
 
-Shells are portable files that define structured clinical reasoning components.  
-They can be blossomed from authored `.crl` files, migrated for sharing, and harvested for reuse as part of the **Coral Framework**.
+## 🪸 coral spawn (initialize)  
+Initialize a local reef — start a new CRL project with essential structure.
+
+---
+
+## ✍️ manual authoring (create `.crl` files)  
+Author `.crl` files to grow your local reef — define decisions, concepts, activities, terminologies, metrics, and summaries.
+
+---
+
+## 🏊 coral blossom (transform)  
+Transform `.crl` files into **shells**, **coral concepts**, **FHIR**, and **CQL** artifacts for interoperable execution.
+
+---
+
+## 🌱 coral migrate (share)  
+Migrate your shells to the **Great Reef** — contribute reusable clinical knowledge to the shared ecosystem.
+
+---
+
+## 🐚 coral harvest (reuse)  
+Harvest reusable shells from the **Great Reef** to enrich your local reef with shared clinical logic.
+
+---
+
+### 📦 What Are Shells?
+
+**Shells** are portable files representing structured clinical reasoning logic.  
+They are blossomed from `.crl` files, migrated to the **Great Reef** for sharing, and harvested for reuse — enabling collaborative clinical intelligence across the Coral Framework.
