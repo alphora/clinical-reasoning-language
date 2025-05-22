@@ -1,11 +1,15 @@
-# Coral Design
+# 🪸 Coral Design
 
-## Structure
+## 🌊 Structure
 
 ### The Great Reef
 
-The `Great Reef` is a github repository.
-The repository is organized as root level directories called `colonies`.
+The `Great Reef` is a GitHub repository that serves as the shared registry of reusable clinical knowledge artifacts.
+
+- The repository is organized into root-level directories called **colonies**.
+- Each colony represents a publishable unit of related clinical shells.
+- Colonies follow SNOMED hierarchy conventions.
+- The repository is a multi-package **npm workspace**.
 
 #### Great Reef Example (colony and shell detail excluded for clarity)
 
@@ -17,20 +21,22 @@ The repository is organized as root level directories called `colonies`.
 |   |   |-- general-characteristic/
 |   |   |   |-- body-measure/     # Another Colony
 |
-|-- package.json
-|-- README.md
+|-- package.json                  # Root workspace declaration
+|-- README.md                     # Project overview
 
-### Colonies
+---
 
-Colonies are the unit of shareable clinical knowledge.
-Each `colony` has one or more subdirectories called `shells`.
-Each `colony` is an npm Workspace within the Great Reef.
-Each `colony` is a SNOMED hierarchy, representing the package namespace.
-Each `colony` is published and consumed as an npm package.
+### 🧬 Colonies
 
-#### Colony Examples
+**Colonies** are the unit of shareable clinical knowledge.
 
-##### `finding.body-measurement` Colony (shell detail excluded for clarity)
+- Each colony consists of one or more **shells** (subdirectories).
+- Each colony is a **SNOMED hierarchy node**, and its path defines its **npm package namespace**.
+- Each colony is an **npm workspace**.
+- Each colony is published and consumed as an **npm package**.
+- Each colony includes an `index.json` — a machine-readable manifest listing all shells and their metadata for use in tooling, harvesting, and AI discovery.
+
+#### Colony Layout Example: `finding.body-measurement`
 
 |-- finding/
 |   |-- body-measurement/      # Colony
@@ -39,7 +45,7 @@ Each `colony` is published and consumed as an npm package.
 |   |   |-- package.json       # Colony npm Package
 |   |   |-- README.md
 
-##### `observable.clinical-history.general-characteristic.body-measure` Colony
+#### Colony Layout Example: `observable.clinical-history.general-characteristic.body-measure`
 
 |-- observable/
 |   |-- clinical-history/
@@ -52,20 +58,24 @@ Each `colony` is published and consumed as an npm package.
 |   |   |   |   |-- package.json
 |   |   |   |   |-- README.md
 
-### Shells
+---
 
-Shells are the unit of executable clinical knowledge.
-A `shell` is a unit of files:
+### 🐚 Shells
 
-- shell.yaml (shell manifest)
-- embedding.json (LLM embedding info for the shell)
-- CRL file
-- FHIR file
-- CQL file
+**Shells** are the unit of executable clinical knowledge.  
+Each shell is a self-contained folder containing all artifacts required to represent, transform, and reason over a clinical concept.
 
-#### Shell Examples
+Each shell contains:
 
-##### Obesity Shell
+- `shell.yaml` — the manifest describing the shell
+- `embedding.json` — the AI semantic representation
+- `*.crl` — Clinical Reasoning Language file
+- `*.json` — FHIR artifact (e.g. `PlanDefinition`, `ActivityDefinition`)
+- `*.cql` — Clinical Quality Language representation
+
+> Each shell folder contains all files necessary to define and execute a unit of clinical knowledge, including `shell.yaml`, `embedding.json`, and its associated `.crl`, `.cql`, and `.json` files.
+
+#### Shell Example: Obesity
 
 |-- finding/
 |   |-- body-measurement/
@@ -76,7 +86,7 @@ A `shell` is a unit of files:
 |   |   |   |-- obesity.json    # FHIR
 |   |   |   |-- obesity.cql
 
-##### BMI, Height, and Weight Shells
+#### Shell Examples: BMI, Height, and Weight
 
 |-- observable/
 |   |-- clinical-history/
@@ -101,7 +111,9 @@ A `shell` is a unit of files:
 |   |   |   |   |   |-- weight.json
 |   |   |   |   |   |-- weight.cql
 
-### Full Example
+---
+
+### 🧩 Combined Layout Example
 
 |-- finding/
 |   |-- body-measurement/
@@ -141,7 +153,7 @@ A `shell` is a unit of files:
 |   |   |   |   |-- package.json
 |   |   |   |   |-- README.md
 |
-|-- package.json
+|-- package.json  # Workspace root
 |-- README.md
 
 ## Process
