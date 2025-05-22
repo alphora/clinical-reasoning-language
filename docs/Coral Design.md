@@ -13,6 +13,7 @@ The `Great Reef` is a GitHub repository that serves as the shared registry of re
 
 #### Great Reef Example (colony and shell detail excluded for clarity)
 
+```bash
 |-- finding/
 |   |-- body-measurement/         # Colony
 |
@@ -21,8 +22,9 @@ The `Great Reef` is a GitHub repository that serves as the shared registry of re
 |   |   |-- general-characteristic/
 |   |   |   |-- body-measure/     # Another Colony
 |
-|-- package.json                  # Root workspace declaration
+|-- package.json                  # Root npm workspace declaration
 |-- README.md                     # Project overview
+```
 
 ---
 
@@ -38,15 +40,18 @@ The `Great Reef` is a GitHub repository that serves as the shared registry of re
 
 #### Colony Layout Example: `finding.body-measurement`
 
+```bash
 |-- finding/
 |   |-- body-measurement/      # Colony
 |   |   |-- obesity/           # Shell
-|   |   |-- index.json         # Colony Manifest
+|   |   |-- index.json         # Colony manifest
 |   |   |-- package.json       # Colony npm Package
-|   |   |-- README.md
+|   |   |-- README.md          # Colony purpose and use
+```
 
 #### Colony Layout Example: `observable.clinical-history.general-characteristic.body-measure`
 
+```bash
 |-- observable/
 |   |-- clinical-history/
 |   |   |-- general-characteristic/
@@ -57,6 +62,7 @@ The `Great Reef` is a GitHub repository that serves as the shared registry of re
 |   |   |   |   |-- index.json
 |   |   |   |   |-- package.json
 |   |   |   |   |-- README.md
+```
 
 ---
 
@@ -77,17 +83,20 @@ Each shell contains:
 
 #### Shell Example: Obesity
 
+```bash
 |-- finding/
 |   |-- body-measurement/
 |   |   |-- obesity/            # Shell
-|   |   |   |-- shell.yaml      # Shell Manifest
-|   |   |   |-- embedding.json  # Embedding Info
+|   |   |   |-- shell.yaml      # Shell manifest
+|   |   |   |-- embedding.json  # Embedding info
 |   |   |   |-- obesity.crl
 |   |   |   |-- obesity.json    # FHIR
 |   |   |   |-- obesity.cql
+```
 
 #### Shell Examples: BMI, Height, and Weight
 
+```bash
 |-- observable/
 |   |-- clinical-history/
 |   |   |-- general-characteristic/
@@ -110,11 +119,13 @@ Each shell contains:
 |   |   |   |   |   |-- weight.crl
 |   |   |   |   |   |-- weight.json
 |   |   |   |   |   |-- weight.cql
+```
 
 ---
 
 ### 🧩 Combined Layout Example
 
+```bash
 |-- finding/
 |   |-- body-measurement/
 |   |   |-- obesity/
@@ -153,8 +164,9 @@ Each shell contains:
 |   |   |   |   |-- package.json
 |   |   |   |   |-- README.md
 |
-|-- package.json  # Workspace root
+|-- package.json
 |-- README.md
+```
 
 ## Process
 
