@@ -6,12 +6,12 @@
 
 The `Great Reef` is a GitHub repository that serves as the shared registry of reusable clinical knowledge artifacts.
 
-- The repository is organized into root-level directories called **colonies**.
-- Each colony represents a publishable unit of related clinical shells.
+- The repository is organized into root-level directories called **`colonies`**.
+- Each `colony` represents a publishable unit of related clinical knowledge called `shells`.
 - Colonies follow SNOMED hierarchy conventions.
 - The repository is a multi-package **npm workspace**.
 
-#### Great Reef Example (colony and shell detail excluded for clarity)
+#### The Great Reef Example (`colony` and `shell` detail excluded for clarity)
 
 ```bash
 |-- finding/
@@ -30,13 +30,13 @@ The `Great Reef` is a GitHub repository that serves as the shared registry of re
 
 ### 🧬 Colonies
 
-**Colonies** are the unit of shareable clinical knowledge.
+**`Colonies`** are the unit of shareable clinical knowledge.
 
-- Each colony consists of one or more **shells** (subdirectories).
-- Each colony is a **SNOMED hierarchy node**, and its path defines its **npm package namespace**.
-- Each colony is an **npm workspace**.
-- Each colony is published and consumed as an **npm package**.
-- Each colony includes an `index.json` — a machine-readable manifest listing all shells and their metadata for use in tooling, harvesting, and AI discovery.
+- Each `colony` consists of one or more **`shells`** (subdirectories).
+- Each `colony` is a **SNOMED hierarchy node**, and its path defines its **npm package namespace**.
+- Each `colony` is an **npm workspace**.
+- Each `colony` is published and consumed as an **npm package**.
+- Each `colony` includes an `index.json` — a machine-readable manifest listing all `shells` and their metadata for use in tooling, `harvesting`, and AI discovery.
 
 #### Colony Layout Example: `finding.body-measurement`
 
@@ -68,18 +68,18 @@ The `Great Reef` is a GitHub repository that serves as the shared registry of re
 
 ### 🐚 Shells
 
-**Shells** are the unit of executable clinical knowledge.  
-Each shell is a self-contained folder containing all artifacts required to represent, transform, and reason over a clinical concept.
+**`Shells`** are the unit of executable clinical knowledge.  
+Each `shell` is a self-contained folder containing all artifacts required to represent, transform, and reason over a clinical `concept`.
 
-Each shell contains:
+Each `shell` contains:
 
-- `shell.yaml` — the manifest describing the shell
+- `shell.yaml` — the manifest describing the `shell`
 - `embedding.json` — the AI semantic representation
 - `*.crl` — Clinical Reasoning Language file
 - `*.json` — FHIR artifact (e.g. `PlanDefinition`, `ActivityDefinition`)
 - `*.cql` — Clinical Quality Language representation
 
-> Each shell folder contains all files necessary to define and execute a unit of clinical knowledge, including `shell.yaml`, `embedding.json`, and its associated `.crl`, `.cql`, and `.json` files.
+> Each `shell` folder contains all files necessary to define and execute a unit of clinical knowledge, including `shell.yaml`, `embedding.json`, and its associated `.crl`, `.cql`, and `.json` files.
 
 #### Shell Example: Obesity
 
@@ -168,22 +168,72 @@ Each shell contains:
 |-- README.md
 ```
 
-## Process
+---
 
-The user can start with migrate or harvest and then iterate between them as they develop their local project.  It's usually most advantageous to start with harvest, but that's up to the user.
+## 🔁 Processes
 
-### Harvest Process
+Users — whether human, AI agent, or process — can begin with either `harvest` or `migrate`, and often alternate between the two as they develop their local reef.
 
-- the user suspects concepts they need for their local project have already been authored and published to the Great Reef
-- the user locates and concept packages of interest in the Great Reef and runs harvest to install the packages locally
-- the user then references the FHIR and CQL in those concept packages in their local project
+It is typically advantageous to begin with `harvest`, but the entry point is flexible.
 
-### Migrate Process
+---
 
-- the user develops .crl and uses the crl api to transform to initial fhir/cql
-- the user then refines the fhir/cql until it's ready for release/publication
-- once the fhir/cql is ready to release/publish, the user runs migrate
+### 🌾 Harvest Process
 
-## Migrate
+- The user identifies a clinical concept needed in their local project and believes relevant `shells` may already exist in the **Great Reef**.
+- The user locates and selects relevant `shells` from the **Great Reef**, then runs `harvest` to install them into their local reef.
+- The user references the Coral concepts, FHIR, and CQL from the harvested `shells` within their local project.
 
-- 
+---
+
+### 🚚 Migrate Process
+
+- The user authors a new `shell` by defining Coral concepts and using the CRL API to generate initial FHIR and CQL artifacts.
+- The user iteratively refines these artifacts until they are ready for publication.
+- The user runs `migrate`, which performs the following steps:
+  1. Queries a `hierarchy-service` to determine the SNOMED-aligned path for each concept.
+  2. Clones the **Great Reef** repository locally.
+  3. Creates a new Git branch for the contribution.
+  4. Copies the `shell’s` `.crl`, `.json`, and `.cql` files into the appropriate path.
+  5. Generates `shell.yaml` and `embedding.json` for each `shell`.
+  6. Commits and pushes the changes, and opens a pull request against the Great Reef.
+- A human maintainer reviews and merges the PR.
+- Once merged, the **CI/CD pipeline**:
+  - Regenerates the `index.json` for the affected `colony`.
+  - Appends an entry to `meta/merged-shells.json` with metadata for the newly published `shell`.
+  - Builds and publishes a new version of the updated `colony` as an npm package.
+- On future runs of `migrate`, the CLI:
+  - Checks `meta/merged-shells.json` for any previously contributed `shells` that have since been merged and published.
+  - Installs the corresponding npm package.
+  - Automatically removes the user’s local copy of the `shell` from their project to avoid duplication or drift.
+
+---
+
+### 🔔 Merge Notification File: `meta/merged-shells.json`
+
+This file provides a durable, GitHub-independent way for CLI tools to detect which contributed `shells` have been accepted into `The Great Reef`.
+
+#### Example format
+
+```json
+[
+  {
+    "id": "finding.bodyMeasurement.bmi",
+    "colony": "finding/body-measurement",
+    "merged_at": "2025-05-21T14:22:00Z",
+    "package": "@coral/finding.body-measurement",
+    "version": "0.1.1"
+  },
+  {
+    "id": "observable.clinicalHistory.generalCharacteristic.bodyMeasure.weight",
+    "colony": "observable/clinical-history/general-characteristic/body-measure",
+    "merged_at": "2025-05-22T09:08:00Z",
+    "package": "@coral/observable.clinical-history.general-characteristic.body-measure",
+    "version": "0.3.0"
+  }
+]
+```
+
+The CLI checks this file to determine whether it should remove a local `shell` and replace it with the corresponding published package version.
+
+---
