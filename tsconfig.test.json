@@ -1,21 +1,9 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "rootDir": "packages/crl/src"
+    "rootDir": "./"
   },
   "include": [
-    "packages/crl/src/**/*.test.ts",
-    "packages/crl/src/**/*.spec.ts",
-    "packages/crl/src/**/tests/**/*.ts",
-    "packages/crl/src/ast/tests/**/*.ts",
-    "packages/crl/src/lexer/tests/**/*.ts",
-    "packages/crl/src/lexer/tests/*.ts",
-    "packages/crl/src/parser/tests/**/*.ts",
-    "packages/crl/src/parser/tests/*.ts",
-    "packages/crl/src/parser/tests/*.ts",
-    "packages/crl/src/parser/tests/*.d.ts",
-    "packages/crl/src/parser/tests/*.js",
-    "packages/crl/src/transformer/fsh-to-crl/mapping/**/*.test.ts",
-    "packages/crl/tests/**/*.ts"
+    "tests/**/*.ts"
   ]
 } 

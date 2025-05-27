@@ -3,10 +3,15 @@
   "include": [
     "packages/crl/src/**/*.ts",
     "packages/crl/tests/**/*.ts",
-    "packages/crl-vscode/scripts/**/*.ts"
+    "packages/coral/src/**/*.ts",
+    "packages/coral/tests/**/*.ts",
+    "packages/crl-vscode/scripts/**/*.ts",
+    "packages/coral/scripts/**/*.js",
+    "scripts/**/*.js"
   ],
   "exclude": [
     "node_modules",
-    "packages/crl/dist"
+    "packages/crl/dist",
+    "packages/coral/dist"
   ]
 }

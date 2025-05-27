@@ -1,7 +1,7 @@
 {
-  "name": "@smile-digital-health/crl",
-  "version": "1.1.1",
-  "description": "Clinical Reasoning Language (CRL) parser and validator",
+  "name": "@smile-digital-health/coral",
+  "version": "0.0.0",
+  "description": "Clinical Reasoning Language Lifecycle Framework (Coral)",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "sideEffects": false,
@@ -25,16 +25,13 @@
     "lint:fix": "eslint src/**/*.ts --fix",
     "format": "prettier --write 'src/**/*.ts'",
     "test": "jest tests/index.test.ts",
-    "prebuild": "rimraf dist && shx mkdir -p dist && npm run generate && cpx \"src/grammar/generated/types/*.json\" dist/grammar/generated/types/ && node scripts/checkGrammarJsonFiles.js",
+    "prebuild": "rimraf dist && shx mkdir -p dist",
     "build": "tsc",
     "clean": "rimraf dist",
     "watch": "onchange -i \"src/**/*.ts\" -- npm run build",
     "start": "npm run build && node dist/index.js",
     "compile": "tsc --noEmit",
     "prepare": "npm run build",
-    "extract-types": "node scripts/extractActivityTypes.js && node scripts/extractConceptTypes.js && node scripts/extractConceptValueTypes.js",
-    "move-generated-files": "node scripts/moveGeneratedFiles.js",
-    "generate": "antlr4ts -Xforce-atn src/grammar/CRLLexer.g4 && antlr4ts -Xforce-atn -visitor src/grammar/CRLParser.g4 && npm run move-generated-files && npm run extract-types",
     "cli:lexer": "ts-node src/cli/run-lexer.ts",
     "cli:lexer:pretty": "ts-node src/cli/run-lexer.ts --pretty",
     "cli:parser": "ts-node src/cli/run-parser.ts",
@@ -47,8 +44,7 @@
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "test:regression": "jest tests/regression/index.test.ts --verbose --no-cache --colors --forceExit --detectOpenHandles --watchAll=false",
-    "prerelease": "node ../../scripts/prereleaseGithub.js",
-    "util:clonefsh": "npx ts-node scripts/clone-fsh-repo.ts"
+    "prerelease": "node ../../scripts/prereleaseGithub.js"
   },
   "keywords": [
     "clinical",
@@ -60,17 +56,11 @@
   ],
   "author": "CQIS",
   "license": "MIT",
-  "dependencies": {
-    "antlr4ts": "^0.5.0-alpha.4",
-    "cpx": "^1.2.1",
-    "fsh-sushi": "^3.15.0"
-  },
   "devDependencies": {
     "@types/jest": "^29.5.12",
     "@types/node": "^20.11.19",
     "@typescript-eslint/eslint-plugin": "^8.31.0",
     "@typescript-eslint/parser": "^8.31.0",
-    "antlr4ts-cli": "^0.5.0-alpha.4",
     "eslint": "^8.57.1",
     "eslint-config-prettier": "^9.1.0",
     "eslint-import-resolver-typescript": "^4.3.4",

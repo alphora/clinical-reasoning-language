@@ -46,6 +46,7 @@
   },
   "ignorePatterns": [
     "packages/crl/dist/",
+    "packages/coral/dist/",
     "node_modules/",
     "coverage/",
     "packages/crl/src/grammar/generated/"

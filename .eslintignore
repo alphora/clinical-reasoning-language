@@ -7,3 +7,6 @@ packages/crl/src/validator/**
 # Ignore jest config files
 packages/crl/jest.config.js
 packages/crl/jest.setup.js 
+
+packages/coral/jest.config.js
+packages/coral/jest.setup.js 
