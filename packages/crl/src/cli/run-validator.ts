@@ -10,7 +10,7 @@ import { Validator } from "../validator/validator";
 const pathArgIndex = process.argv.indexOf("--path");
 const filePath =
   (pathArgIndex !== -1 && process.argv[pathArgIndex + 1]) ||
-  join(__dirname, "../examples/crl/who/smart-example-immz/IMMZ_All_Decisions.crl");
+  join(__dirname, "../../examples/crl/who/smart-example-immz/IMMZ_All_Decisions.crl");
 const input = readFileSync(filePath, "utf-8");
 
 // Create the parser (new API)

@@ -304,7 +304,7 @@ The comparison includes:
 
 ### FSH-to-CRL Example Data
 
-The example FSH files and CRL outputs in `src/examples/fsh/who/smart-example-immz/` and `src/examples/crl/who/smart-example-immz/` are derived from the [WHO SMART Guidelines - Example IG for Measles Immunization](https://github.com/WorldHealthOrganization/smart-example-immz).
+The example FSH files and CRL outputs in `examples/fsh/who/smart-example-immz/` and `examples/crl/who/smart-example-immz/` are derived from the [WHO SMART Guidelines - Example IG for Measles Immunization](https://github.com/WorldHealthOrganization/smart-example-immz).
 
 - **Source repository:** [WorldHealthOrganization/smart-example-immz](https://github.com/WorldHealthOrganization/smart-example-immz)
 - **License:** [CC BY-IGO 3.0](https://github.com/WorldHealthOrganization/smart-example-immz/blob/main/LICENSE.md)

@@ -3,7 +3,7 @@
  * Usage:
  *   npx ts-node scripts/clone-fsh-repo.ts <github-repo-url>
  *
- * - Clones the repo to src/examples/fsh/<repo-name>
+ * - Clones the repo to examples/fsh/<repo-name>
  * - Deletes everything in the root folder except .git
  * - Restores only the required files/folders using git restore
  * - Adds the root folder to .gitignore
@@ -86,7 +86,7 @@ try {
 
 // Add the root folder to .gitignore
 const igignorePath = path.join(".gitignore");
-const igLine = `src/examples/fsh/${repoName}/`;
+const igLine = `examples/fsh/${repoName}/`;
 let igContent = "";
 if (fs.existsSync(igignorePath)) {
   igContent = fs.readFileSync(igignorePath, "utf8");

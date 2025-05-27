@@ -8,7 +8,7 @@ import { createLexer } from "../lexer/createLexer";
 const pathArgIndex = process.argv.indexOf("--path");
 const filePath =
   (pathArgIndex !== -1 && process.argv[pathArgIndex + 1]) ||
-  join(__dirname, "../examples/crl/who/smart-example-immz/IMMZ_All_Decisions.crl");
+  join(__dirname, "../../examples/crl/who/smart-example-immz/IMMZ_All_Decisions.crl");
 
 // Read the file content
 const input = readFileSync(filePath, "utf8");
