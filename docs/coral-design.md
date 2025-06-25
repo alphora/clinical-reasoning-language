@@ -215,6 +215,11 @@ This file provides a durable, GitHub-independent way for CLI tools to detect whi
 
 #### Example format
 
+// this isn't sufficient.  It needs the local id of the shell <library>.<define>
+// and you need to call the cli periodically to see if it's merged
+// don't really need everything else  just the local and GR ids
+// the cli response would be to return "not yet" if it hasn't
+// or get the id package and replace locally if it had
 ```json
 [
   {
