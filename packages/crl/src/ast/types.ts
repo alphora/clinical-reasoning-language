@@ -158,7 +158,7 @@ export interface Concept extends ASTNode {
   type: "Concept";
   name: string;
   conceptType: ConceptType;
-  valueType: ConceptValueType;
+  valueType?: ConceptValueType;
   definition: ConceptDefinition;
   meta?: string[];
   evidence?: string;

@@ -158,6 +158,7 @@ CONCEPT_TYPE
             'FamilyMemberHistory',
             'Goal',
             'Immunization',
+            'ImagingStudy',
             'MedicationAdministration',
             'MedicationDispense',
             'MedicationRequest',

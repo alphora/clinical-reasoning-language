@@ -215,7 +215,7 @@ conceptStatement
 
 conceptBody
     : typeLine
-      valueTypeLine
+      (valueTypeLine)?
       (metaLine)*
       (evidenceLine)?
       (codedFromLine | inferredFromBody)
