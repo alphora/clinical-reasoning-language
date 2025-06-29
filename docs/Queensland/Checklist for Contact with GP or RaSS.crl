@@ -1,0 +1,68 @@
+# Checklist for Contact with GP or RaSS
+
+// ---------------------------------------------------------------------------
+// Decision: What to do BEFORE phoning the GP or the Residential Acute Support Service (RaSS)
+// ---------------------------------------------------------------------------
+
+decision "Prepare for GP / RaSS Contact":
+- when "Contact with GP or RaSS is required" then:
+  all:
+  - recommend activity "Collect Resident Clinical Information".
+  - recommend activity "Retrieve Decision-Support Tool".
+  - recommend activity "Review Advance Directives".
+  - recommend activity "Record Full Vital Signs".
+  - recommend activity "Have Pen and Paper Ready".
+  - recommend activity "Organise ISBAR Handover".
+  - recommend activity "Compile Transfer Documentation".
+  - recommend activity "Notify Substitute Decision-Maker".
+- end when
+
+// ---------------------------------------------------------------------------
+// Activities (each checklist step)
+// ---------------------------------------------------------------------------
+
+activity "Collect Resident Clinical Information":
+- request CPGCommunicationRequest.
+- with `Gather the resident’s medical record, medication chart, recent results, recent medication changes, substitute decision-maker and GP contact details.`.
+
+activity "Retrieve Decision-Support Tool":
+- request CPGCommunicationRequest.
+- with `Place the relevant RACF decision-support tool in front of you before the call.`.
+
+activity "Review Advance Directives":
+- request CPGCommunicationRequest.
+- with `Check the resident’s Advance Health Directive, Acute Resuscitation Plan and/or Advance Care Plan for documented wishes.`.
+
+activity "Record Full Vital Signs":
+- request CPGCommunicationRequest.
+- with `Undertake and document a full set of observations (response/cognition, airway-breathing, circulation, disability—including BGL, temperature and pain).`.
+
+activity "Have Pen and Paper Ready":
+- request CPGCommunicationRequest.
+- with `Ensure a means to write down instructions from GP/RaSS is immediately available.`.
+
+activity "Organise ISBAR Handover":
+- request CPGCommunicationRequest.
+- with `Prepare to present the case in ISBAR format (Identify, Situation, Background, Assessment, Recommendation).`.
+
+activity "Compile Transfer Documentation":
+- request CPGCommunicationRequest.
+- with `If GP/RaSS review on-site or hospital transfer is needed, photocopy or print all required documents (facility details, summary, vitals, history, medication charts, investigation results, directives, contacts).`.
+
+activity "Notify Substitute Decision-Maker":
+- request CPGCommunicationRequest.
+- with `If the resident lacks capacity, inform next-of-kin or substitute decision-maker of the resident’s condition and involve them in planning.`.
+
+// ---------------------------------------------------------------------------
+// Concepts & Terminology
+// ---------------------------------------------------------------------------
+
+concept "Contact with GP or RaSS is required":
+- type is Observation.
+- valuetype is boolean.
+- meta is `Trigger concept indicating a clinical situation that warrants phoning the GP or RaSS (e.g., acute clinical deterioration).`.
+- coded from "Contact with GP or RaSS".
+
+terminology "Contact with GP or RaSS":
+- system is `http://example.org/local`.
+  - code is `contact-gp-rass`.
