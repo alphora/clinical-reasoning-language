@@ -1,0 +1,33 @@
+# BMI
+
+concept "BMI":
+
+- type is Observation.
+- valuetype is Quantity.
+- inferred from ("BMI as an Observation" or "Calculated BMI").
+
+concept "BMI as an Observation":
+
+- type is Observation.
+- valuetype is Quantity.
+- coded from "BMI as an Observation".
+
+concept "Calculated BMI":
+
+- type is Observation.
+- valuetype is Quantity.
+
+  //calculate using (weight/height^2)
+- inferred from ("Patient Height" and "Patient Weight").
+
+concept "Patient Height":
+
+- type is Observation.
+- valuetype is integer.
+- coded from "Height Valueset".
+
+concept "Patient Weight":
+
+- type is Observation.
+- valuetype is integer.
+- coded from "Weight Valueset".
