@@ -1,0 +1,43 @@
+# Recognition of the deteriorating resident – Vital-sign trigger pathway
+
+decision "Deteriorating Resident – Response":
+
+- when "Danger Vital Signs Observed" then recommend activity "Urgent Medical Review".
+- when "Caution Vital Signs Observed" then recommend activity "Timely Medical Review".
+- when "Normal Vital Signs" then recommend activity "Continue Routine Monitoring".
+
+activity "Urgent Medical Review":
+- request CPGServiceRequest.
+- with `Immediate GP or emergency call; treat as life-threatening deterioration.`.
+
+activity "Timely Medical Review":
+- request CPGServiceRequest.
+- with `Arrange prompt GP review; potential clinical deterioration.`.
+
+activity "Continue Routine Monitoring":
+- request CPGCollectInformation.
+- with `Maintain regular observations; escalate if status changes.`.
+
+terminology "Danger Thresholds":
+- valueset is `Vital-sign red zone (respiratory rate <6 or >29, SpO₂ <88 %, heart-rate <40 or >130 bpm, systolic BP <90 or >200 mmHg with symptoms, temperature <35 °C or >39 °C, severe pain, sudden cognition change, glucose <4 mmol/L unresponsive, glucose >15 mmol/L with illness).`.
+
+terminology "Caution Thresholds":
+- valueset is `Vital-sign yellow zone (respiratory rate 6–9 or 25–29, SpO₂ 88–91 % or new O₂ need, heart-rate 40–49 or 101–130 bpm, systolic BP 90–109 or 181–200 mmHg, temperature 37.5–39 °C, moderate pain or reduced alertness, glucose 4–5.9 mmol/L or >15 mmol/L resident well).`.
+
+terminology "Normal Thresholds":
+- valueset is `Vital-sign normal zone (respiratory rate 10–24, SpO₂ ≥92 % usual, heart-rate 50–100 bpm, systolic BP 110–180 mmHg or personalised range, temperature 35.5–37.4 °C, tolerable pain, usual cognition, glucose 6–15 mmol/L or personalised range).`. 
+
+concept "Danger Vital Signs Observed":
+- type is Observation.
+- valuetype is boolean.
+- coded from "Danger Thresholds".
+
+concept "Caution Vital Signs Observed":
+- type is Observation.
+- valuetype is boolean.
+- coded from "Caution Thresholds".
+
+concept "Normal Vital Signs":
+- type is Observation.
+- valuetype is boolean.
+- coded from "Normal Thresholds".

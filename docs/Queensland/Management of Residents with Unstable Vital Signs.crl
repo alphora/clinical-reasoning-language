@@ -1,0 +1,183 @@
+# Management of Residents with Unstable Vital Signs – CRL
+
+decision "Unstable Vital Signs – Triage":
+- when "Resident Has Unstable Vital Signs" then:
+  any:
+  - when "Resident On Palliative Pathway" then use decision "Palliative Management".
+  - when "Documented Choice To Remain In RACF" then use decision "Remain In RACF".
+  - when "Documented Choice To Transfer To Hospital" then use decision "Transfer To Hospital".
+  - when "No Documented Choice" then use decision "Transfer To Hospital".
+- end when
+
+decision "Palliative Management":
+- when "Resident On Palliative Pathway" then:
+  all:
+  - recommend activity "Consult Usual Palliative Provider".
+  - recommend activity "Apply Immediate Supportive Care".
+  - when "Usual Palliative Provider Not Contactable Or Needs Specialist Support" then:
+      any:
+      - recommend activity "Contact HHS Specialist Palliative Care".
+      - recommend activity "Contact PallConsult".
+    - end when
+  - recommend activity "Follow Condition-Specific Pathway".
+- end when
+
+decision "Remain In RACF":
+- when "Documented Choice To Remain In RACF" then:
+  all:
+  - recommend activity "GP Review And Management Plan".
+  - recommend activity "Apply Immediate Supportive Care".
+  - recommend activity "Notify Substitute Decision Maker".
+  - recommend activity "Consider HHS RaSS Or Specialist Support".
+- end when
+
+decision "Transfer To Hospital":
+- when "Documented Choice To Transfer To Hospital" then:
+  all:
+  - recommend activity "Call QAS 000".
+  - recommend activity "Notify GP".
+  - recommend activity "Prepare Transfer Documentation".
+  - recommend activity "Notify Substitute Decision Maker".
+  - recommend activity "Notify HHS RaSS".
+- end when
+- when "No Documented Choice" then:
+  all:
+  - recommend activity "Call QAS 000".
+  - recommend activity "Notify GP".
+  - recommend activity "Prepare Transfer Documentation".
+  - recommend activity "Notify Substitute Decision Maker".
+  - recommend activity "Notify HHS RaSS".
+- end when
+
+decision "Assessment Of Unstable Resident":
+- when "Resident Appears Unwell" then:
+  all:
+  - recommend activity "Use Appropriate PPE".
+  - recommend activity "Primary Survey And Vital Signs".
+  - recommend activity "Check Advance Directives".
+  - when "Vital Signs Unstable" then use decision "Unstable Vital Signs – Triage".
+  - when "Vital Signs Stable" then:
+      all:
+      - recommend activity "Take History And Look For Red Flags".
+      - recommend activity "Re-check Vital Signs".
+      - when "Vital Signs Become Unstable" then use decision "Unstable Vital Signs – Triage".
+    - end when
+- end when
+
+activity "Use Appropriate PPE":
+- request CPGServiceRequest.
+- with `Ensure all staff wear appropriate personal protective equipment while assessing or managing the resident.`.
+
+activity "Primary Survey And Vital Signs":
+- request CPGCollectInformation.
+- with `Perform primary survey; measure and document vital signs; identify red-flag values.`.
+
+activity "Check Advance Directives":
+- request CPGCollectInformation.
+- with `Review resident’s chart and The Viewer for Advance Health Directive, Acute Resuscitation Plan, or Advance Care Plan.`.
+
+activity "Apply Immediate Supportive Care":
+- request CPGServiceRequest.
+- with `Remain with resident; apply oxygen to maintain SpO₂ 92–96 % (88–92 % if COPD); position for comfort.`.
+
+activity "Take History And Look For Red Flags":
+- request CPGCollectInformation.
+- with `Obtain history focusing on red-flag symptoms; seek collateral history if communication impaired.`.
+
+activity "Re-check Vital Signs":
+- request CPGCollectInformation.
+- with `Repeat vital signs after history to detect changes.`.
+
+activity "GP Review And Management Plan":
+- request CPGCommunicationRequest.
+- with `Contact resident’s GP or after-hours doctor to formulate management plan with resident or substitute decision maker.`.
+
+activity "Consider HHS RaSS Or Specialist Support":
+- request CPGCommunicationRequest.
+- with `At GP discretion, contact HHS RaSS or HHS specialist palliative care service for additional support.`.
+
+activity "Call QAS 000":
+- request CPGCommunicationRequest.
+- with `Dial emergency services (QAS 000) for ambulance transfer to hospital.`.
+
+activity "Notify GP":
+- request CPGCommunicationRequest.
+- with `Inform resident’s GP of deterioration if not already aware.`.
+
+activity "Prepare Transfer Documentation":
+- request CPGGenerateReport.
+- with `Complete transfer paperwork and include Checklist for contact information.`.
+
+activity "Notify Substitute Decision Maker":
+- request CPGCommunicationRequest.
+- with `Inform resident’s substitute health decision maker of situation and actions taken.`.
+
+activity "Notify HHS RaSS":
+- request CPGCommunicationRequest.
+- with `Notify HHS RaSS of resident status and transfer.`.
+
+activity "Consult Usual Palliative Provider":
+- request CPGCommunicationRequest.
+- with `Contact resident’s usual palliative care provider to determine management plan.`.
+
+activity "Contact HHS Specialist Palliative Care":
+- request CPGCommunicationRequest.
+- with `Contact HHS specialist palliative care service for advice or review.`.
+
+activity "Contact PallConsult":
+- request CPGCommunicationRequest.
+- with `Call PallConsult if HHS specialist palliative care service unavailable.`.
+
+activity "Follow Condition-Specific Pathway":
+- request CPGServiceRequest.
+- with `Provide care according to relevant clinical pathway aligned with resident’s goals of care.`.
+
+concept "Resident Appears Unwell":
+- type is Condition.
+- valuetype is boolean.
+- inferred from "Staff Observation Of Deterioration".
+
+concept "Resident Has Unstable Vital Signs":
+- type is Observation.
+- valuetype is boolean.
+- inferred from "Vital Signs Unstable".
+
+concept "Vital Signs Unstable":
+- type is Observation.
+- valuetype is boolean.
+- inferred from "Abnormal Vital Sign Measurements".
+
+concept "Vital Signs Stable":
+- type is Observation.
+- valuetype is boolean.
+- inferred from (not "Vital Signs Unstable").
+
+concept "Vital Signs Become Unstable":
+- type is Observation.
+- valuetype is boolean.
+- inferred from "Vital Signs Unstable".
+
+concept "Documented Choice To Remain In RACF":
+- type is Observation.
+- valuetype is boolean.
+- inferred from "Advance Directive Indicates Stay".
+
+concept "Documented Choice To Transfer To Hospital":
+- type is Observation.
+- valuetype is boolean.
+- inferred from "Advance Directive Indicates Transfer".
+
+concept "No Documented Choice":
+- type is Observation.
+- valuetype is boolean.
+- inferred from (not ("Documented Choice To Remain In RACF" or "Documented Choice To Transfer To Hospital")).
+
+concept "Resident On Palliative Pathway":
+- type is Condition.
+- valuetype is boolean.
+- inferred from "Palliative Pathway Flag".
+
+concept "Usual Palliative Provider Not Contactable Or Needs Specialist Support":
+- type is Observation.
+- valuetype is boolean.
+- inferred from ("Palliative Provider Not Contactable" or "Specialist Support Indicated").
