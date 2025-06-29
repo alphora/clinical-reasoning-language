@@ -134,4 +134,49 @@ concept "Complex Condition":
     const andExpr = (groupExpr as GroupExpression).expression as InformalAnd;
     expect(andExpr.type).toBe("AndExpression");
   });
+
+  it("should correctly handle concept without valueType (optional valueType)", () => {
+    const input = `# Test
+concept "Basic Concept Without ValueType":
+    - type is Observation.
+    - coded from "Some Terminology".
+.`;
+
+    const result = parseInput(input);
+    const concept = result.statements[0] as Concept;
+
+    // Verify basic concept structure
+    expect(concept.type).toBe("Concept");
+    expect(concept.name).toBe("Basic Concept Without ValueType");
+    expect(concept.conceptType).toBe("Observation");
+    expect(concept.valueType).toBeUndefined();
+
+    // Verify coded-by structure still works
+    const definition = concept.definition as CodedFromDefinition;
+    expect(definition.type).toBe("CodedFromDefinition");
+    expect(definition.terminologyName).toBe("Some Terminology");
+  });
+
+  it("should correctly handle concept with valueType (existing functionality)", () => {
+    const input = `# Test
+concept "Basic Concept With ValueType":
+    - type is Observation.
+    - valuetype is boolean.
+    - coded from "Some Terminology".
+.`;
+
+    const result = parseInput(input);
+    const concept = result.statements[0] as Concept;
+
+    // Verify basic concept structure
+    expect(concept.type).toBe("Concept");
+    expect(concept.name).toBe("Basic Concept With ValueType");
+    expect(concept.conceptType).toBe("Observation");
+    expect(concept.valueType).toBe("boolean");
+
+    // Verify coded-by structure still works
+    const definition = concept.definition as CodedFromDefinition;
+    expect(definition.type).toBe("CodedFromDefinition");
+    expect(definition.terminologyName).toBe("Some Terminology");
+  });
 });

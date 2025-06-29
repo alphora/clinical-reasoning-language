@@ -151,15 +151,21 @@ concept "BMI Range as a Condition":
 - type is Condition.
 - valuetype is CodeableConcept.
 - coded from "BMI Range as a Condition".
+
+concept "Simple Observation":
+- type is Observation.
+- coded from "Some Terminology".
 ```
+
+> **Note**: The `valuetype` line is optional. When omitted, the concept will not have a specific value type constraint.
 
 #### Structure
 
 - `concept "Name":` (colon required)
 - Required:
   - `- type is CONCEPT_TYPE.`
-  - `- valuetype is CONCEPT_VALUE_TYPE.`
 - Optional:
+  - `- valuetype is CONCEPT_VALUE_TYPE.`
   - One or more ``- meta is `Text`.`` lines
   - One ``- evidence is `Text`.`` line
 - Required: Either `- coded from` or one of the following `inferred from` forms:
