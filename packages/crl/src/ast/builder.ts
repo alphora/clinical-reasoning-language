@@ -370,12 +370,12 @@ export class CRLAstBuilder
   private parseConceptTypes(
     bodyCtx: import("../grammar/generated/antlr/CRLParser").ConceptBodyContext,
     ctx: import("../grammar/generated/antlr/CRLParser").ConceptStatementContext,
-  ): { conceptType: ConceptType; valueType: ConceptValueType } | null {
+  ): { conceptType: ConceptType; valueType?: ConceptValueType } | null {
     const typeLine = bodyCtx.typeLine?.();
     const valueTypeLine = bodyCtx.valueTypeLine?.();
-    if (!typeLine || !valueTypeLine) {
+    if (!typeLine) {
       this.reportError("AstError", ctx, {
-        message: "ConceptStatement: missing type or valueType line",
+        message: "ConceptStatement: missing type line",
       });
       return null;
     }
@@ -385,21 +385,26 @@ export class CRLAstBuilder
     } catch {
       conceptTypeToken = undefined;
     }
-    try {
-      valueTypeToken = valueTypeLine.CONCEPT_VALUE_TYPE();
-    } catch {
-      valueTypeToken = undefined;
+    if (valueTypeLine) {
+      try {
+        valueTypeToken = valueTypeLine.CONCEPT_VALUE_TYPE();
+      } catch {
+        valueTypeToken = undefined;
+      }
     }
-    if (!conceptTypeToken || !valueTypeToken) {
+    if (!conceptTypeToken) {
       this.reportError("AstError", ctx, {
-        message: "ConceptStatement: missing CONCEPT_TYPE or CONCEPT_VALUE_TYPE token",
+        message: "ConceptStatement: missing CONCEPT_TYPE token",
       });
       return null;
     }
-    return {
+    const result: { conceptType: ConceptType; valueType?: ConceptValueType } = {
       conceptType: conceptTypeToken.text as ConceptType,
-      valueType: valueTypeToken.text as ConceptValueType,
     };
+    if (valueTypeToken) {
+      result.valueType = valueTypeToken.text as ConceptValueType;
+    }
+    return result;
   }
 
   private parseMeta(
@@ -501,7 +506,7 @@ export class CRLAstBuilder
       type: "Concept",
       name,
       conceptType,
-      valueType,
+      ...(valueType ? { valueType } : {}),
       ...(meta.length > 0 ? { meta } : {}),
       ...(evidence ? { evidence } : {}),
       definition,
