@@ -79,7 +79,7 @@ async function parseFSHFiles(pathToFSH: string) {
   ```
   concept "<identifier>":
     has type Observation.
-    has valuetype boolean.
+    has valuetype boolean.  // Optional: may be omitted
     coded by "<terminology_id>".
   done
   ```
@@ -115,7 +115,7 @@ The CRL language is defined by the following ANTLR grammars:
 - **Statements**: `decision`, `activity`, `concept`, `terminology`
 - **Blocks**: Indented or colon-delimited, terminated by `done`
 - **Action statements**: `do`, `use`, `request`, `of`, `because`
-- **Concepts**: Have `type`, `valuetype`, and may be `coded by` or `inferred by`
+- **Concepts**: Have `type`, optionally `valuetype`, and may be `coded by` or `inferred by`
 - **Terminology**: May specify `system` and `code`
 
 For full details, see the referenced grammar files.

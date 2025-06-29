@@ -71,7 +71,7 @@ tar -ztvf <package-name>.tgz
 ### Language Features
 
 * Decision blocks with nested conditions
-* Concept definitions with type and value specifications
+* Concept definitions with type and optional value specifications
 * Activity statements with perform types
 * Terminology statements with valueset, system/code, and unknown definitions
 * FHIR resource type support
