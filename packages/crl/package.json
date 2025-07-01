@@ -47,7 +47,7 @@
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "test:regression": "jest tests/regression/index.test.ts --verbose --no-cache --colors --forceExit --detectOpenHandles --watchAll=false",
-    "prerelease": "node ../../scripts/prereleaseGithub.js",
+    "prerelease": "ts-node scripts/prereleaseGithub.mjs",
     "util:clonefsh": "npx ts-node scripts/clone-fsh-repo.ts"
   },
   "keywords": [
