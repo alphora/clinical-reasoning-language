@@ -177,3 +177,9 @@ concept "Client Age Greater Than 60":
         or "k"
         or "l"
     ).
+
+concept "Simple Check":
+
+- type is Observation.
+// Note: valuetype is optional and omitted here
+- coded from "BMI as an Observation".
