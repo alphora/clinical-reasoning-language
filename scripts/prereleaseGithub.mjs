@@ -37,18 +37,22 @@ function getPackageJsonVersion() {
 }
 
 function isWorkingDirectoryClean() {
-  const status = execSync("git status --porcelain").toString().trim();
+  // Check git status from repository root
+  const rootDir = execSync("git rev-parse --show-toplevel").toString().trim();
+  const status = execSync("git status --porcelain", { cwd: rootDir }).toString().trim();
   return status === "";
 }
 
 function isBranchUpToDate() {
-  execSync("git fetch");
-  const status = execSync("git status -uno").toString();
+  const rootDir = execSync("git rev-parse --show-toplevel").toString().trim();
+  execSync("git fetch", { cwd: rootDir });
+  const status = execSync("git status -uno", { cwd: rootDir }).toString();
   return !status.includes("Your branch is behind");
 }
 
 function verifyPostRollback(originalCommit, originalVersion, originalLocalTags) {
-  const currentCommit = execSync("git rev-parse HEAD").toString().trim();
+  const rootDir = execSync("git rev-parse --show-toplevel").toString().trim();
+  const currentCommit = execSync("git rev-parse HEAD", { cwd: rootDir }).toString().trim();
   const currentVersion = getPackageJsonVersion();
   const currentTags = getLocalTags();
   let ok = true;
@@ -114,7 +118,8 @@ function main() {
     process.exit(1);
   }
 
-  const originalCommit = execSync("git rev-parse HEAD").toString().trim();
+  const rootDir = execSync("git rev-parse --show-toplevel").toString().trim();
+  const originalCommit = execSync("git rev-parse HEAD", { cwd: rootDir }).toString().trim();
   const branch = getCurrentBranch();
   const originalRemoteCommit = getRemoteCommit(branch);
   const originalLocalTags = getLocalTags();
@@ -130,13 +135,21 @@ function main() {
     // 1. Build (keep this step, but do not add/commit dist/)
     run("npm run build");
 
-    // 2. Bump version and tag
+    // 2. Bump version and tag (this will commit package.json automatically)
     run(`npm version ${arg}`);
     taggedVersion = require(path.join(process.cwd(), "package.json")).version;
-    versionBumpCommit = execSync("git rev-parse HEAD").toString().trim();
+    versionBumpCommit = execSync("git rev-parse HEAD", { cwd: rootDir }).toString().trim();
     versionTagged = true;
 
-    // 3. Push commits and tags
+    // 3. Check if root package-lock.json was updated and commit it
+    const statusAfterVersion = execSync("git status --porcelain", { cwd: rootDir }).toString().trim();
+    if (statusAfterVersion.includes("package-lock.json")) {
+      console.log("[prerelease] Committing updated root package-lock.json");
+      run(`git add ${path.join(rootDir, "package-lock.json")}`);
+      run(`git commit -m "Update package-lock.json for v${taggedVersion}"`);
+    }
+
+    // 4. Push commits and tags
     run("git push");
     run("git push --tags");
     tagsPushed = true;
