@@ -1,6 +1,6 @@
 {
   "name": "@smile-digital-health/crl",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "description": "Clinical Reasoning Language (CRL) parser and validator",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -47,7 +47,7 @@
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "test:regression": "jest tests/regression/index.test.ts --verbose --no-cache --colors --forceExit --detectOpenHandles --watchAll=false",
-    "prerelease": "ts-node scripts/prereleaseGithub.mjs",
+    "prerelease": "node ../../scripts/prereleaseGithub.mjs",
     "util:clonefsh": "npx ts-node scripts/clone-fsh-repo.ts"
   },
   "keywords": [
