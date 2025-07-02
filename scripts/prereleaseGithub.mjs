@@ -139,6 +139,16 @@ function main() {
     run(`npm version ${arg}`);
     taggedVersion = require(path.join(process.cwd(), "package.json")).version;
     versionBumpCommit = execSync("git rev-parse HEAD", { cwd: rootDir }).toString().trim();
+    
+    // Check if the tag was actually created by npm version
+    const expectedTag = `v${taggedVersion}`;
+    const tagExists = execSync(`git tag -l ${expectedTag}`, { cwd: rootDir }).toString().trim();
+    
+    if (!tagExists) {
+      console.log(`[prerelease] npm version failed to create tag ${expectedTag}, creating it manually...`);
+      run(`git tag ${expectedTag}`);
+    }
+    
     versionTagged = true;
 
     // 3. Check if root package-lock.json was updated and commit it
