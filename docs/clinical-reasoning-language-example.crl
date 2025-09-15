@@ -42,6 +42,24 @@ decision "IMMZ.D2.D5.Measles":
   - when "Client Is Due For MCV12" then recommend activity "Vaccinate".
 - end when
 - when "Two Primary Series Doses Administered" then recommend activity "Indicate".
+- when not "Diabetes A1C Metric" then recommend activity "A1c goal not met".
+
+concept "Diabetes A1C Metric":
+
+- type is MeasureReport
+- inferred from "The goal", "Most Recent Hgb".
+  - apply pattern `Compare("Most Recent Hgb", "The goal")`.
+
+concept "The goal":
+
+- type is Goal.
+- valuetype is Quantity.
+- value = 9.5%
+
+activity "A1c goal not met":
+
+- request CPGServiceRequest.
+- with "A1c Lab".
 
 decision "Elderly Based":
 
@@ -73,6 +91,7 @@ activity "Message Care Plan":
 - request CPGCommunicationRequest.
 - with `Create a care plan`.
 - because `A new plan needs to be implemented.`.
+- goal "case feature name"
 
 activity "Contraindicated":
 
@@ -141,9 +160,8 @@ concept "Calculated BMI":
 
 - type is Observation.
 - valuetype is Quantity.
-
-  //calculate using (weight/height^2)
 - inferred from ("Patient Height" and "Patient Weight").
+  - apply pattern `Calculate(<Patient Weight>/<Patient Height>^2)`.
 
 concept "Patient Height":
 
