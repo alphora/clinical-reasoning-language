@@ -2,9 +2,11 @@
 node_modules/
 
 # Build outputs
+dist/
 build/
 lib/
 coverage/
+src/grammar/generated/
 tsconfig.tsbuildinfo
 *.tgz
 
