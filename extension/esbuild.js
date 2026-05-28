@@ -1,0 +1,94 @@
+const esbuild = require("esbuild");
+const path = require("path");
+const fs = require("fs");
+const { builtinModules } = require("module");
+
+// The CRL public entry — the exact artifact the package `exports` "." key
+// points at. We consume the PREBUILT dist; we do NOT build CRL from here.
+// Building CRL needs the root ANTLR/Java toolchain, so it is a separate,
+// explicitly-invoked prerequisite (`npm run build` at the repo root).
+const crlEntry = path.resolve(__dirname, "../dist/index.js");
+
+function assertCrlBuilt() {
+  if (!fs.existsSync(crlEntry)) {
+    throw new Error(
+      `CRL package not built: ${crlEntry} is missing.\n` +
+        "Run `npm run build` at the repo root first (needs the ANTLR/Java toolchain)."
+    );
+  }
+}
+
+const isBuiltin = (p) => builtinModules.includes(p.replace(/^node:/, ""));
+
+// Applied to BOTH bundles so the CRL specifier resolves identically whether
+// imported from the extension host or the server (today only mcp-server.ts
+// imports it; this keeps the resolution consistent if that ever changes).
+const crlAlias = { "@smile-digital-health/crl": crlEntry };
+
+async function build() {
+  assertCrlBuilt();
+
+  // Extension-host bundle. `vscode` is provided by the runtime, never bundled.
+  await esbuild.build({
+    entryPoints: [path.resolve(__dirname, "src/extension.ts")],
+    outfile: path.resolve(__dirname, "dist/extension.js"),
+    bundle: true,
+    platform: "node",
+    format: "cjs",
+    target: "node18",
+    external: ["vscode"],
+    alias: crlAlias,
+    sourcemap: true,
+  });
+
+  // Standalone MCP server bundle. Launched by the MCP host (Claude Code) via
+  // VS Code's embedded Node — must NOT import `vscode` and must inline all deps.
+  // minify is disabled deliberately: it aids debugging and avoids any risk to
+  // antlr4ts's large inline serialized-ATN string literal.
+  const result = await esbuild.build({
+    entryPoints: [path.resolve(__dirname, "src/mcp-server.ts")],
+    outfile: path.resolve(__dirname, "dist/mcp-server.js"),
+    bundle: true,
+    platform: "node",
+    format: "cjs",
+    target: "node18",
+    minify: false,
+    sourcemap: true,
+    metafile: true,
+    alias: crlAlias,
+  });
+
+  // Gate 1: heavy/unused deps must not leak into the server bundle.
+  const leaked = Object.keys(result.metafile.inputs)
+    .map((p) => p.replace(/\\/g, "/"))
+    .filter((p) => /(^|\/)node_modules\/(fsh-sushi|prompts|cpx)\//.test(p));
+  if (leaked.length) {
+    throw new Error(`Forbidden deps leaked into mcp-server bundle:\n${leaked.join("\n")}`);
+  }
+
+  // Gate 2: a standalone bundle must leave only Node builtins as external
+  // imports (esbuild records every unbundled import in the output metafile —
+  // more robust than scanning the emitted text for require() calls).
+  const serverKey = Object.keys(result.metafile.outputs).find((k) =>
+    k.endsWith("mcp-server.js")
+  );
+  const externalImports = (result.metafile.outputs[serverKey].imports || [])
+    .filter((i) => i.external)
+    .map((i) => i.path);
+  const nonBuiltin = externalImports.filter((p) => !isBuiltin(p));
+  if (nonBuiltin.length) {
+    throw new Error(
+      `mcp-server bundle has non-builtin external imports: ${[...new Set(nonBuiltin)].join(", ")}`
+    );
+  }
+
+  console.log(
+    "esbuild: built extension.js + mcp-server.js; gates passed " +
+      `(externals: ${[...new Set(externalImports)].join(", ") || "none"}).`
+  );
+}
+
+build().catch((e) => {
+  console.error(e.message || e);
+  process.exit(1);
+});
