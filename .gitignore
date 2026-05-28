@@ -40,3 +40,10 @@ yarn-error.log*
 tmp/
 temp/
 *.tmp
+
+# Vibe Tools — extension-managed assets (protocols/, prompts/) +
+# Claude-maintained local workflow artifacts (discussions/, retros/).
+# Safe to delete to reset the extension; you will lose any local
+# consultation transcripts and retros. Promote durable decisions to
+# your project's normal docs location before cleanup.
+.vibe-tools/

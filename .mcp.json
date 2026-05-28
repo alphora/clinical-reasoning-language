@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "llm-reviewers": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "c:\\Users\\Owner\\.vscode\\extensions\\vibe-tools-local.vibe-tools-0.1.1\\assets\\mcp-server\\dist\\server.js"
+      ],
+      "env": {
+        "LLM_REVIEWERS_ENDPOINTS": "{\"endpoints\":[{\"alias\":\"gpt55\",\"provider\":\"openai\",\"model\":\"gpt-5.5\",\"apiKeyEnv\":\"OPENAI_API_KEY\"},{\"alias\":\"gemini\",\"provider\":\"gemini\",\"model\":\"gemini-2.5-pro\",\"apiKeyEnv\":\"GEMINI_API_KEY\"}],\"maxModelTurnsPerReview\":30,\"maxToolCallsPerReview\":100,\"maxConcurrentToolCalls\":5}"
+      }
+    }
+  }
+}
