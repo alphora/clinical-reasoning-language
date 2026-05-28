@@ -36,14 +36,18 @@
     "compile": "npm run typecheck && node esbuild.js",
     "selftest": "node dist/mcp-server.js --selftest",
     "selftest:fixture": "node dist/mcp-server.js --selftest --file ../src/tests/regression/testdata/clinical-reasoning-language-example.crl",
+    "pretest:mcp": "npm run compile",
+    "test:mcp": "node src/mcp-server.test.mjs",
     "vscode:prepublish": "npm run compile",
     "package": "vsce package"
   },
   "devDependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@types/node": "^18.19.130",
     "@types/vscode": "^1.85.0",
     "@vscode/vsce": "^3.2.0",
     "esbuild": "^0.24.0",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "zod": "^4.4.3"
   }
 }

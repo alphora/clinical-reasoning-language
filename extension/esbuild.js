@@ -58,10 +58,15 @@ async function build() {
     alias: crlAlias,
   });
 
-  // Gate 1: heavy/unused deps must not leak into the server bundle.
+  // Gate 1: heavy/unused deps must not leak into the server bundle. Covers the
+  // CRL CLI/transformer deps (fsh-sushi/prompts/cpx) AND the MCP SDK's HTTP/OAuth
+  // transports (express/hono/jose/eventsource/cors), which a stdio server must
+  // tree-shake away — locking that in as a regression guard, not a one-time check.
   const leaked = Object.keys(result.metafile.inputs)
     .map((p) => p.replace(/\\/g, "/"))
-    .filter((p) => /(^|\/)node_modules\/(fsh-sushi|prompts|cpx)\//.test(p));
+    .filter((p) =>
+      /(^|\/)node_modules\/(fsh-sushi|prompts|cpx|express|hono|jose|eventsource|cors)\//.test(p)
+    );
   if (leaked.length) {
     throw new Error(`Forbidden deps leaked into mcp-server bundle:\n${leaked.join("\n")}`);
   }

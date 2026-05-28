@@ -1,24 +1,158 @@
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { z } from "zod";
+import { readFileSync, statSync } from "node:fs";
 import { tokenizeCRL, buildCRL } from "@smile-digital-health/crl";
-import { readFileSync } from "node:fs";
 
-// Todo 1: minimal standalone entry proving the bundled CRL functions execute
-// outside the repo (the antlr4ts ATN deserializes lazily on first lex/parse).
-// The real MCP stdio server is wired in todo 2.
+// Caps the CRL SOURCE (input) size. Response size scales with this — there is
+// no separate output cap, but bounding input keeps responses bounded enough.
+const MAX_INPUT_BYTES = 1_000_000;
+
+type CrlFn = (input: string) => { success: boolean; result?: unknown; errors?: unknown };
+type ToolArgs = { code?: string; path?: string };
+
+// Thrown for bad tool input (XOR violation, unreadable/oversized/dir path).
+// These map to MCP isError responses; CRL parse/build failures do NOT — those
+// are normal results with success:false.
+class ToolInputError extends Error {}
+
+function resolveSource(args: ToolArgs): string {
+  // `code` counts as supplied if it is a string at all (empty string is a
+  // valid — if degenerate — CRL document, not a bad argument). `path` must be
+  // a non-blank string.
+  const hasCode = typeof args.code === "string";
+  const hasPath = typeof args.path === "string" && args.path.trim().length > 0;
+  if (hasCode === hasPath) {
+    throw new ToolInputError(
+      "Provide exactly one of `code` (inline CRL) or `path` (a .crl file), not both or neither."
+    );
+  }
+
+  let text: string;
+  if (hasCode) {
+    text = args.code as string;
+  } else {
+    const p = (args.path as string).trim();
+    try {
+      const st = statSync(p);
+      if (st.isDirectory()) {
+        throw new ToolInputError(`Path is a directory, not a file: "${p}".`);
+      }
+      if (st.size > MAX_INPUT_BYTES) {
+        throw new ToolInputError(`File too large: ${st.size} bytes > ${MAX_INPUT_BYTES}.`);
+      }
+      text = readFileSync(p, "utf8");
+    } catch (e) {
+      if (e instanceof ToolInputError) throw e;
+      throw new ToolInputError(`Cannot read path "${p}": ${(e as Error).message}`);
+    }
+  }
+
+  if (Buffer.byteLength(text, "utf8") > MAX_INPUT_BYTES) {
+    throw new ToolInputError(`Input too large: > ${MAX_INPUT_BYTES} bytes.`);
+  }
+  // strip a leading UTF-8 BOM (clinical files are often saved with one)
+  return text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
+}
+
+function runTool(fn: CrlFn, args: ToolArgs) {
+  let source: string;
+  try {
+    source = resolveSource(args);
+  } catch (e) {
+    const msg = e instanceof ToolInputError ? e.message : `Unexpected error: ${(e as Error).message}`;
+    return { content: [{ type: "text" as const, text: msg }], isError: true };
+  }
+  // A CRL lexical/parse/build failure is a normal ParseResult (success:false),
+  // not a tool error — return it as content so the agent can read errors[].
+  // Compact JSON (no pretty-print) keeps the LLM-facing payload small.
+  const result = fn(source);
+  return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
+}
+
+const inputSchema = {
+  code: z
+    .string()
+    .optional()
+    .describe("Inline CRL source text. Provide this OR `path`, not both."),
+  path: z
+    .string()
+    .optional()
+    .describe(
+      "Path to a .crl file to read (absolute recommended; relative resolves against the server's working directory). Provide this OR `code`, not both."
+    ),
+};
+
+function createServer(): McpServer {
+  const server = new McpServer({ name: "crl", version: "0.1.0" });
+
+  server.registerTool(
+    "tokenize_crl",
+    {
+      title: "Tokenize CRL",
+      description:
+        "Lex Clinical Reasoning Language (CRL) source into tokens. Pass exactly one of `code` (inline) or `path` (file). " +
+        "Returns a ParseResult JSON envelope: { success: boolean; result?: Token[]; errors?: CRLError[] }. " +
+        "Check `success` first; on false, `errors` lists { type, line, column, message, details }. " +
+        "Token = { line, column, type, text }.",
+      inputSchema,
+    },
+    (args) => runTool(tokenizeCRL, args)
+  );
+
+  server.registerTool(
+    "build_crl_ast",
+    {
+      title: "Build CRL AST",
+      description:
+        "Parse CRL source and build its Abstract Syntax Tree. Pass exactly one of `code` (inline) or `path` (file). " +
+        "Returns a ParseResult JSON envelope: { success: boolean; result?: <AST>; errors?: CRLError[] }. " +
+        "success:true means lexing/parsing/AST construction succeeded — it does NOT perform semantic validation. " +
+        "The AST root is { type: 'CRL', identifier?, statements[], location } (identifier is present only when the document has a header).",
+      inputSchema,
+    },
+    (args) => runTool(buildCRL, args)
+  );
+
+  return server;
+}
+
+async function main(): Promise<void> {
+  // stdout is the MCP JSON-RPC channel. Route the stray console writers to
+  // stderr so a debug line (ours or a dependency's) can't corrupt the stream.
+  // The transport writes protocol frames to process.stdout directly, not via
+  // console, so this is safe. (console.warn is already stderr; included for
+  // completeness.)
+  console.log = console.info = console.debug = console.warn = console.error;
+
+  const server = createServer();
+  const transport = new StdioServerTransport();
+
+  // The host shuts us down by closing stdin (EOF) or signalling. The transport
+  // does not exit on its own (it listens only for stdin 'data'/'error'), so
+  // wire explicit teardown to avoid a lingering process.
+  const exit = () => process.exit(0);
+  process.stdin.on("end", exit);
+  process.on("SIGTERM", exit);
+  process.on("SIGINT", exit);
+
+  await server.connect(transport);
+}
+
+// Build-time smoke (dependency-free, fast): proves the bundled CRL functions
+// execute standalone. Distinct from `test:mcp`, which exercises the MCP layer.
 function selfTest(fixturePath?: string): number {
   const sample = 'decision "T":\n  - when "C" then recommend activity "A".\n';
   const tok = tokenizeCRL(sample);
-  const lexOk =
-    tok.success === true && Array.isArray(tok.result) && tok.result.length > 0;
+  const lexOk = tok.success === true && Array.isArray(tok.result) && tok.result.length > 0;
 
   let buildOk: boolean;
   let report: Record<string, unknown>;
   if (fixturePath) {
-    // Strong check (build-time): a known-valid CRL document must build to an AST.
     const built = buildCRL(readFileSync(fixturePath, "utf8"));
     buildOk = built.success === true;
     report = { lexOk, buildOk, fixture: fixturePath };
   } else {
-    // Standalone: assert the build path runs and returns a well-formed result.
     const built = buildCRL(sample);
     buildOk = typeof built.success === "boolean";
     report = { lexOk, buildRan: buildOk, tokenCount: tok.result?.length ?? 0 };
@@ -31,6 +165,10 @@ function selfTest(fixturePath?: string): number {
 
 if (process.argv.includes("--selftest")) {
   const fi = process.argv.indexOf("--file");
-  const fixture = fi !== -1 ? process.argv[fi + 1] : undefined;
-  process.exit(selfTest(fixture));
+  process.exit(selfTest(fi !== -1 ? process.argv[fi + 1] : undefined));
+} else {
+  main().catch((e) => {
+    console.error("crl mcp server failed to start:", e);
+    process.exit(1);
+  });
 }
