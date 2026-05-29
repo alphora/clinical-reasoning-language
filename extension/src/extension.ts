@@ -129,10 +129,10 @@ async function provisionAll(context: vscode.ExtensionContext, manual: boolean): 
   flushWarnings(warnings);
 
   if (mcpChanged) {
-    // A VS Code reload restarts the Claude Code extension, which re-reads
-    // .mcp.json on its next session and prompts to approve the new server.
+    // A VS Code reload restarts the Claude Code extension so it re-reads
+    // .mcp.json and the CRL tools become available.
     const choice = await vscode.window.showInformationMessage(
-      "CRL tools added/updated for this workspace. Reload to activate them — Claude Code will then ask you to approve the CRL server.",
+      "CRL tools are set up for this workspace. Reload to finish.",
       "Reload"
     );
     if (choice === "Reload") {
