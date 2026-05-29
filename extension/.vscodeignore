@@ -5,5 +5,6 @@ esbuild.js
 tsconfig.json
 **/*.ts
 **/*.map
+dist/provision.js
 .gitignore
 *.vsix

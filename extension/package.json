@@ -38,6 +38,9 @@
     "selftest:fixture": "node dist/mcp-server.js --selftest --file ../src/tests/regression/testdata/clinical-reasoning-language-example.crl",
     "pretest:mcp": "npm run compile",
     "test:mcp": "node src/mcp-server.test.mjs",
+    "pretest:provision": "npm run compile",
+    "test:provision": "node src/provision.test.mjs",
+    "test": "npm run compile && node src/mcp-server.test.mjs && node src/provision.test.mjs",
     "vscode:prepublish": "npm run compile",
     "package": "vsce package"
   },

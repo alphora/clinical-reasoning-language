@@ -1,0 +1,250 @@
+import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { randomBytes } from "node:crypto";
+
+// Project-scoped provisioning for Claude Code, mirroring the vibe-tools extension:
+// merge a `crl` stdio server into <workspace>/.mcp.json, and inject/refresh a
+// managed instructions block in <workspace>/CLAUDE.md. Pure (node fs only) — no
+// `vscode` dependency — so it is unit-testable against a temp workspace.
+
+export const SERVER_KEY = "crl";
+const BLOCK_START_PREFIX = "<!-- crl-tools-start";
+const BLOCK_END = "<!-- crl-tools-end -->";
+// Ownership fingerprint: the VS Code install dir is `<publisher>.crl-language-support-<version>`,
+// so our server path contains this regardless of version. Used by remove() to
+// avoid deleting a user's unrelated `crl` server.
+const OWNERSHIP_MARKER = "crl-language-support";
+
+export interface ProvisionContext {
+  workspaceRoot: string;
+  serverScriptPath: string;
+  extensionVersion: string;
+}
+
+export type McpOutcome = "created" | "updated" | "unchanged" | "removed";
+export type MdOutcome = "created" | "updated" | "appended" | "unchanged" | "skipped" | "removed";
+
+export interface ProvisionResult {
+  mcp: McpOutcome;
+  claudeMd: MdOutcome;
+  warnings: string[];
+}
+
+export interface ProvisionTarget {
+  readonly id: string;
+  readonly displayName: string;
+  apply(ctx: ProvisionContext): ProvisionResult;
+  remove(ctx: ProvisionContext): ProvisionResult;
+}
+
+function atomicWrite(file: string, content: string): void {
+  const tmp = `${file}.${process.pid}.${randomBytes(4).toString("hex")}.tmp`;
+  writeFileSync(tmp, content, "utf8");
+  // rename replaces the target (atomic on POSIX; replaces on Windows too, though
+  // it can throw EPERM/EBUSY if the target is held open by another process).
+  renameSync(tmp, file);
+}
+
+function isPlainObject(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null && !Array.isArray(v);
+}
+
+// --- .mcp.json ---
+
+function readMcpRoot(file: string): { raw: string; root: Record<string, unknown> } {
+  if (!existsSync(file)) return { raw: "", root: { mcpServers: {} } };
+  const raw = readFileSync(file, "utf8");
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new Error(".mcp.json is not valid JSON; refusing to modify it. Fix or remove it and retry.");
+  }
+  if (!isPlainObject(parsed)) {
+    throw new Error(".mcp.json root is not a JSON object; refusing to modify it.");
+  }
+  if (parsed.mcpServers !== undefined && !isPlainObject(parsed.mcpServers)) {
+    throw new Error('.mcp.json "mcpServers" is not an object; refusing to modify it.');
+  }
+  return { raw, root: parsed };
+}
+
+function mergeMcp(ctx: ProvisionContext): McpOutcome {
+  const file = join(ctx.workspaceRoot, ".mcp.json");
+  const preExisting = existsSync(file);
+  const { raw, root } = readMcpRoot(file);
+
+  const servers = isPlainObject(root.mcpServers) ? { ...root.mcpServers } : {};
+  // We own the `crl` key, but refuse to clobber a present-but-non-object value
+  // (consistent with the refuse-to-touch posture for the root/mcpServers above).
+  if (SERVER_KEY in servers && !isPlainObject(servers[SERVER_KEY])) {
+    throw new Error(`.mcp.json "${SERVER_KEY}" entry is not an object; refusing to overwrite it.`);
+  }
+  const existing = isPlainObject(servers[SERVER_KEY]) ? (servers[SERVER_KEY] as Record<string, unknown>) : {};
+
+  // Spread-then-override: preserve unknown fields + a user-pinned `command`;
+  // force `type` and `args`; never synthesize an `env` (the server reads none).
+  servers[SERVER_KEY] = {
+    ...existing,
+    type: "stdio",
+    command: typeof existing.command === "string" ? existing.command : "node",
+    args: [ctx.serverScriptPath],
+  };
+  root.mcpServers = servers;
+
+  // Full-file string compare (matching vibe-tools). A user file authored with a
+  // different key order or CRLF endings triggers one benign one-time rewrite to
+  // our canonical LF form; subsequent applies are stable.
+  const after = JSON.stringify(root, null, 2) + "\n";
+  if (preExisting && raw.trim() === after.trim()) return "unchanged";
+  atomicWrite(file, after);
+  return preExisting ? "updated" : "created";
+}
+
+function ownsMcpEntry(entry: unknown): boolean {
+  if (!isPlainObject(entry) || !Array.isArray(entry.args)) return false;
+  const first = entry.args[0];
+  if (typeof first !== "string") return false;
+  const norm = first.replace(/\\/g, "/"); // normalize Windows separators
+  return norm.includes(OWNERSHIP_MARKER) && norm.endsWith("mcp-server.js");
+}
+
+function removeMcp(ctx: ProvisionContext, warnings: string[]): McpOutcome {
+  const file = join(ctx.workspaceRoot, ".mcp.json");
+  if (!existsSync(file)) return "unchanged";
+  const { raw, root } = readMcpRoot(file);
+  if (!isPlainObject(root.mcpServers) || !(SERVER_KEY in root.mcpServers)) return "unchanged";
+
+  if (!ownsMcpEntry(root.mcpServers[SERVER_KEY])) {
+    warnings.push(`.mcp.json "${SERVER_KEY}" server is not managed by this extension; left unchanged.`);
+    return "unchanged";
+  }
+  const servers = { ...root.mcpServers };
+  delete servers[SERVER_KEY];
+  root.mcpServers = servers;
+  const after = JSON.stringify(root, null, 2) + "\n";
+  if (raw.trim() === after.trim()) return "unchanged";
+  atomicWrite(file, after);
+  return "removed";
+}
+
+// --- CLAUDE.md managed block ---
+
+export function crlBlockBody(): string {
+  return `## Clinical Reasoning Language (CRL) tools
+
+This workspace has the CRL parser available to you as MCP tools (server \`crl\`):
+
+- \`tokenize_crl\` — lex CRL source into tokens.
+- \`build_crl_ast\` — parse CRL source and build its Abstract Syntax Tree.
+
+Use these whenever the user is working with \`.crl\` files or Clinical Reasoning Language — to check syntax, inspect structure, or answer questions about a CRL document. Prefer \`build_crl_ast\` for structure/meaning; use \`tokenize_crl\` for token-level questions.
+
+Each tool takes exactly one of \`code\` (inline CRL text) or \`path\` (a \`.crl\` file — pass an **absolute** path; relative paths resolve against the server's working directory, not the workspace).
+
+On valid input a tool returns a JSON \`ParseResult\` envelope — always check \`success\` first, and on \`success: false\` read \`errors[]\` and report them to the user. See each tool's own description for the exact result and error shape. Bad arguments or an unreadable/oversized file come back as a tool error (fix the input and retry). \`build_crl_ast\` success means parsing/AST construction succeeded — it does NOT perform semantic validation.`;
+}
+
+function startMarker(version: string): string {
+  return `${BLOCK_START_PREFIX} version="${version}" -->`;
+}
+
+function renderBlock(version: string): string {
+  return `${startMarker(version)}\n${crlBlockBody()}\n${BLOCK_END}`;
+}
+
+function parseBlockVersion(content: string): string | null {
+  const m = content.match(/<!-- crl-tools-start version="([^"]*)" -->/);
+  return m ? m[1] : null;
+}
+
+// Assumes plain X.Y.Z versions (the extension's package.json version); prerelease
+// or build suffixes are not interpreted.
+function versionGt(a: string, b: string): boolean {
+  const pa = a.split(".").map((n) => parseInt(n, 10) || 0);
+  const pb = b.split(".").map((n) => parseInt(n, 10) || 0);
+  for (let i = 0; i < 3; i++) {
+    const x = pa[i] ?? 0;
+    const y = pb[i] ?? 0;
+    if (x !== y) return x > y;
+  }
+  return false;
+}
+
+// Returns the indices of the single well-formed managed block, or a marker error.
+function findBlock(content: string): { start: number; end: number } | "none" | "malformed" {
+  const startCount = content.split(BLOCK_START_PREFIX).length - 1;
+  const endCount = content.split(BLOCK_END).length - 1;
+  const start = content.indexOf(BLOCK_START_PREFIX);
+  const end = content.indexOf(BLOCK_END);
+  if (start === -1 && end === -1) return "none";
+  if (start === -1 || end === -1 || startCount > 1 || endCount > 1 || end < start) return "malformed";
+  return { start, end: end + BLOCK_END.length };
+}
+
+function writeClaudeMd(ctx: ProvisionContext, warnings: string[]): MdOutcome {
+  const file = join(ctx.workspaceRoot, "CLAUDE.md");
+  const block = renderBlock(ctx.extensionVersion);
+
+  if (!existsSync(file)) {
+    atomicWrite(file, block + "\n");
+    return "created";
+  }
+  const content = readFileSync(file, "utf8");
+  const loc = findBlock(content);
+  if (loc === "malformed") {
+    warnings.push("CLAUDE.md has malformed/duplicate crl-tools markers; left unchanged. Repair manually.");
+    return "skipped";
+  }
+  if (loc === "none") {
+    const sep = content.endsWith("\n") ? "\n" : "\n\n";
+    atomicWrite(file, content + sep + block + "\n");
+    return "appended";
+  }
+  const existingVersion = parseBlockVersion(content) ?? "0.0.0";
+  if (!versionGt(ctx.extensionVersion, existingVersion)) return "unchanged";
+  atomicWrite(file, content.slice(0, loc.start) + block + content.slice(loc.end));
+  return "updated";
+}
+
+function removeClaudeMd(ctx: ProvisionContext, warnings: string[]): MdOutcome {
+  const file = join(ctx.workspaceRoot, "CLAUDE.md");
+  if (!existsSync(file)) return "unchanged";
+  const content = readFileSync(file, "utf8");
+  const loc = findBlock(content);
+  if (loc === "none") return "unchanged";
+  if (loc === "malformed") {
+    warnings.push("CLAUDE.md has malformed/duplicate crl-tools markers; left unchanged. Repair manually.");
+    return "skipped";
+  }
+  // Join only at the seam — don't touch blank lines elsewhere in the user's file.
+  const head = content.slice(0, loc.start).replace(/\s+$/, "");
+  const tail = content.slice(loc.end).replace(/^\s+/, "");
+  const joined = head && tail ? `${head}\n\n${tail}` : head + tail;
+  atomicWrite(file, joined.length === 0 || joined.endsWith("\n") ? joined : joined + "\n");
+  return "removed";
+}
+
+export const claudeCodeTarget: ProvisionTarget = {
+  id: "claude-code",
+  displayName: "Claude Code",
+
+  apply(ctx) {
+    if (!existsSync(ctx.serverScriptPath)) {
+      throw new Error(`MCP server bundle missing at ${ctx.serverScriptPath}; the extension build may be incomplete.`);
+    }
+    const warnings: string[] = [];
+    // MCP first; mergeMcp throws on refuse-to-touch, so a malformed .mcp.json
+    // aborts before we advertise tools in CLAUDE.md that aren't registered.
+    const mcp = mergeMcp(ctx);
+    const claudeMd = writeClaudeMd(ctx, warnings);
+    return { mcp, claudeMd, warnings };
+  },
+
+  remove(ctx) {
+    const warnings: string[] = [];
+    const mcp = removeMcp(ctx, warnings);
+    const claudeMd = removeClaudeMd(ctx, warnings);
+    return { mcp, claudeMd, warnings };
+  },
+};
