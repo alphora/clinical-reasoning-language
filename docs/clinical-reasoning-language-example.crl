@@ -46,7 +46,7 @@ decision "IMMZ.D2.D5.Measles":
 
 concept "Diabetes A1C Metric":
 
-- type is MeasureReport
+- type is Metric.
 - inferred from "The goal", "Most Recent Hgb".
   - apply pattern `Compare("Most Recent Hgb", "The goal")`.
 
