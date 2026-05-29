@@ -220,6 +220,24 @@ Given a CRL file with duplicated `decision "blah"` and repeated `do "Vaccinate"`
 
 ---
 
+## Metadata Annotation Validation (proposed — CRL metadata model)
+
+> Status: design (not yet implemented). Specifies how the validator should treat `@tag` metadata annotations carried on ``- meta is `@tag: <body>`.`` lines. Full model + tag registry: `issues/crl/pending/crl-metadata-model/` (`description.md`, `examples.md`, `registry.json`).
+
+Metadata tags are a **string convention** inside the existing `meta` backtick text — there is **no grammar change**. The grammar accepts any `meta` body as an opaque string; the following are the validator's responsibility:
+
+1. **Tag recognition** — a `meta` body matching `^@([a-z][a-z0-9-]*):` is a typed annotation; the captured tag is looked up in the registry. A `meta` body **not** starting with `@` is a legitimate untyped note (back-compat) — no diagnostic.
+2. **Malformed-tag lint** — a `meta` body starting with `@` but **not** matching `^@[a-z][a-z0-9-]*:` is a **warning** (probable malformed tag — catches silent demotion of a typo'd tag to an untyped note).
+3. **Unknown tag** — a recognized-shape tag whose id is not in the registry is a **warning** (forward-compatible).
+4. **Value-shape mismatch** — e.g. an external-ref tag (`@kg-concept`, `@reef-reference`) missing its `ref`, or a `confidence` outside `[0,1]`, is an **error**.
+5. **Cardinality** — a tag exceeding its registry cardinality (e.g. two `@description` on one concept; `@description` is `0..1`) is an **error**.
+6. **Re-run staleness** — if two distinct extraction `run` ids' family-C exhaust (`@semantic-parse-text`, `@controlled-natural-language`) or candidate external-refs coexist on one concept, emit a **warning** (the producer is expected to replace the prior run's set on re-extraction).
+7. **Scope** — metadata tags attach to `concept` only (the `meta` carrier exists nowhere else in the grammar). Metadata on other statement types is out of scope for this phase.
+
+External-ref tags carry a display label + `;`-separated `key value` fields (`ref`, `confidence`, `rank`, `status`, `by`). `@kg-concept` references the **Concept Graph** (a hint for the decision); `@reef-reference` references **REEF** ("the great reef") — distinct stores. See the registry for the per-tag schema, the `emit` contract (e.g. `@ke-feedback` surfaces in generated CQL block comments; the emitter must sanitize `*/`), and the full rule set.
+
+---
+
 ### 9. Conclusion
 
 These requirements provide a clear outline of what the single-file CRL validator should check, how it should report errors, and how it should integrate into a larger DSL workflow. Key points include:

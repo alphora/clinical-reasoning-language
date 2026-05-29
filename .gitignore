@@ -52,3 +52,6 @@ temp/
 # extensions; they hold local paths / generated blocks, not project source).
 /CLAUDE.md
 /.mcp.json
+
+
+issues/

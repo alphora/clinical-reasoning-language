@@ -138,6 +138,7 @@ concept "Most Recent BMI":
 - type is Observation.
 - valuetype is boolean.
 - meta is `Some meta information`.
+- meta is `@ke-feedback: confirm the lookback window with the KE`.
 - evidence is `Calculated by Smile`.
 - inferred from "BMI".
   - apply pattern `Most Recent(this, lookbackMonths)`.
@@ -171,6 +172,20 @@ concept "BMI Range as a Condition":
 - `inferred from "Concept".` — single concept reference
 - `inferred from ( ... )` — logical expression using `and`, `or`, `not`, parentheses, and concept references
 - `apply pattern` — can follow a single concept reference, and can be repeated
+
+#### Metadata annotations (`@tag` convention)
+
+`meta is` lines hold free text. By convention, prefix the text with an `@tag:` to give the note a recognized **type**. This needs no special syntax — it is ordinary `meta` text — and is fully back-compatible: a `meta` line **without** a leading `@tag` is just an untyped note.
+
+```crl
+- meta is `@description: true when the patient is age 60 or older`.
+- meta is `@ke-feedback: confirm whether to anchor age on admission vs evaluation date; status open`.
+- meta is `@kg-concept: the "elderly" condition; ref kg:condition/elderly; confidence 0.94; status candidate`.
+```
+
+End the line with a `.` **after** the closing backtick (not inside it): `- meta is` + the backtick-quoted text + `.`.
+
+The tag vocabulary, value shapes, and cardinality are defined in a metadata registry and enforced by the Validator. This model is in design; the convention parses today (see `issues/crl/pending/crl-metadata-model/`).
 
 > **Important:** `apply pattern` can **only** follow single concept inference (not logical expressions).
 

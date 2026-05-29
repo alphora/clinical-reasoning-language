@@ -194,3 +194,14 @@ should not be an error.
 1. concept may have one and only one provenance.
 
 1. concept must have either a coded by or a inferred by
+
+## Metadata annotation rules (proposed — validator-enforced)
+
+These apply to `@tag` annotations on ``- meta is `@tag: <body>`.`` lines (concept-only). No grammar change; the validator enforces them. Full spec: `docs/Validator Requirements.md` and `issues/crl/pending/crl-metadata-model/`.
+
+1. a `meta` body starting with `@` but not matching `^@[a-z][a-z0-9-]*:` should be a **warning** (probable malformed tag).
+2. a recognized-shape tag whose id is not in the registry should be a **warning** (unknown tag).
+3. an external-ref tag (`@kg-concept`, `@reef-reference`) missing `ref`, or with `confidence` outside `[0,1]`, should be an **error** (value-shape).
+4. exceeding a tag's cardinality (e.g. two `@description` on one concept) should be an **error**.
+5. two distinct extraction `run` ids' family-C / candidate-ref exhaust coexisting on one concept should be a **warning** (stale pileup).
+6. a `meta` body **not** starting with `@` is a valid untyped note — no diagnostic.
