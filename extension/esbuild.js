@@ -87,20 +87,22 @@ async function build() {
     );
   }
 
-  // Provisioning module — pure node (fs/path/crypto). Bundled separately so the
-  // unit tests can import it directly; the extension host imports the same source.
-  await esbuild.build({
-    entryPoints: [path.resolve(__dirname, "src/provision.ts")],
-    outfile: path.resolve(__dirname, "dist/provision.js"),
-    bundle: true,
-    platform: "node",
-    format: "cjs",
-    target: "node18",
-    sourcemap: true,
-  });
+  // Pure node modules (fs/path/crypto). Bundled separately so the unit tests can
+  // import them directly; the extension host imports the same source.
+  for (const name of ["provision", "highlight"]) {
+    await esbuild.build({
+      entryPoints: [path.resolve(__dirname, `src/${name}.ts`)],
+      outfile: path.resolve(__dirname, `dist/${name}.js`),
+      bundle: true,
+      platform: "node",
+      format: "cjs",
+      target: "node18",
+      sourcemap: true,
+    });
+  }
 
   console.log(
-    "esbuild: built extension.js + mcp-server.js + provision.js; gates passed " +
+    "esbuild: built extension.js + mcp-server.js + provision.js + highlight.js; gates passed " +
       `(externals: ${[...new Set(externalImports)].join(", ") || "none"}).`
   );
 }

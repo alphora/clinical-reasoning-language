@@ -9,7 +9,7 @@
   },
   "main": "./dist/extension.js",
   "activationEvents": [
-    "onStartupFinished"
+    "workspaceContains:**/*.crl"
   ],
   "repository": {
     "type": "git",
@@ -28,7 +28,27 @@
         ],
         "language": "markdown"
       }
-    ]
+    ],
+    "commands": [
+      {
+        "command": "crl.setup",
+        "title": "CRL: Set up tools (MCP, CLAUDE.md, highlighting)"
+      },
+      {
+        "command": "crl.remove",
+        "title": "CRL: Remove tools (MCP, CLAUDE.md, highlighting)"
+      }
+    ],
+    "configuration": {
+      "title": "Clinical Reasoning Language",
+      "properties": {
+        "crl.autoProvision": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically configure CRL tools (MCP server + CLAUDE.md) and highlighting when a workspace containing .crl files is opened. Use the 'CRL: Set up tools' / 'CRL: Remove tools' commands to do it manually."
+        }
+      }
+    }
   },
   "scripts": {
     "build:crl": "npm --prefix .. run build",
@@ -40,7 +60,9 @@
     "test:mcp": "node src/mcp-server.test.mjs",
     "pretest:provision": "npm run compile",
     "test:provision": "node src/provision.test.mjs",
-    "test": "npm run compile && node src/mcp-server.test.mjs && node src/provision.test.mjs",
+    "pretest:highlight": "npm run compile",
+    "test:highlight": "node src/highlight.test.mjs",
+    "test": "npm run compile && node src/mcp-server.test.mjs && node src/provision.test.mjs && node src/highlight.test.mjs",
     "vscode:prepublish": "npm run compile",
     "package": "vsce package"
   },
