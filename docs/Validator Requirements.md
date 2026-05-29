@@ -222,7 +222,7 @@ Given a CRL file with duplicated `decision "blah"` and repeated `do "Vaccinate"`
 
 ## Metadata Annotation Validation (proposed — CRL metadata model)
 
-> Status: design (not yet implemented). Specifies how the validator should treat `@tag` metadata annotations carried on ``- meta is `@tag: <body>`.`` lines. Full model + tag registry: `issues/crl/pending/crl-metadata-model/` (`description.md`, `examples.md`, `registry.json`).
+> Status: design (not yet implemented). Specifies how the validator should treat `@tag` metadata annotations carried on ``- meta is `@tag: <body>`.`` lines. Full model + tag registry: [`spec/metadata-model.md`](../spec/metadata-model.md) + [`spec/metadata-registry.json`](../spec/metadata-registry.json).
 
 Metadata tags are a **string convention** inside the existing `meta` backtick text — there is **no grammar change**. The grammar accepts any `meta` body as an opaque string; the following are the validator's responsibility:
 

@@ -10,6 +10,10 @@ See the [User Guide](./USER_GUIDE.md) for a comprehensive introduction to the CR
 
 CRL is a domain-specific language designed for expressing clinical practice guidelines in a structured and machine-readable format. The language is implemented in TypeScript and provides a comprehensive set of tools for processing CRL documents.
 
+## Metadata annotations
+
+CRL concepts can carry typed metadata via an `@tag` convention on `meta` lines (e.g. `@description`, `@ke-feedback`, `@kg-concept`) — for descriptions, knowledge-engineer feedback, plain-language logic, external-store hints, and extraction provenance. See the [metadata model](./spec/metadata-model.md) and the canonical [tag registry](./spec/metadata-registry.json). *(Draft: the convention parses today; Validator enforcement is forthcoming.)*
+
 ## Installation
 
 This is a private package. To install it, you need:

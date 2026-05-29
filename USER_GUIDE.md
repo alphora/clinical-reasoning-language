@@ -185,7 +185,7 @@ concept "BMI Range as a Condition":
 
 End the line with a `.` **after** the closing backtick (not inside it): `- meta is` + the backtick-quoted text + `.`.
 
-The tag vocabulary, value shapes, and cardinality are defined in a metadata registry and enforced by the Validator. This model is in design; the convention parses today (see `issues/crl/pending/crl-metadata-model/`).
+The tag vocabulary, value shapes, and cardinality are defined in the [metadata registry](./spec/metadata-registry.json) and enforced by the Validator; see the [metadata model](./spec/metadata-model.md) for the full set of tags. This model is in design (draft); the convention parses today.
 
 > **Important:** `apply pattern` can **only** follow single concept inference (not logical expressions).
 

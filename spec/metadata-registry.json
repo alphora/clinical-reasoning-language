@@ -1,0 +1,164 @@
+{
+  "_about": "CRL metadata-annotation registry — the canonical tag vocabulary, value shapes, cardinality, and lifecycle for `@tag` annotations carried on `- meta is `@tag: <body>`.` lines. Consumed by the (future) Validator; human companion is metadata-model.md in this folder.",
+  "version": "0.1.0",
+  "status": "draft",
+  "statusNote": "Design stage: the model is settled but pending a round-2 review, and the Validator that enforces these rules is not yet implemented (see README — validateCRL is a placeholder). Ref schemes (kg:/reef:) are illustrative.",
+  "carrier": {
+    "element": "meta",
+    "rendering": "- meta is `@<tag>: <body>`.",
+    "tagPattern": "^@([a-z][a-z0-9-]*):\\s*(.*)$",
+    "terminator": "the `.` goes AFTER the closing backtick: - meta is `...`.",
+    "scope": ["concept"],
+    "scopeNote": "The `meta` carrier exists only on `concept` (metaLine* in conceptBody). Metadata on decision/activity/terminology is out of scope for v1.",
+    "backCompat": "A meta line with no leading @tag is a legitimate untyped note and passes validation."
+  },
+  "families": {
+    "B-narrative": "Durable, human-meaningful captures. Never auto-replaced.",
+    "A-external-ref": "Scored hints to an external store. Candidates are extraction-derived (replace-by-run); confirmed are durable.",
+    "C-provenance": "Extraction exhaust (regenerated each run; replace-by-run)."
+  },
+  "valueTypes": {
+    "ExternalReference": {
+      "note": "Shared shape for the two external-ref tags. KG (Concept Graph) and REEF are DISTINCT stores serving different purposes; both hold scored hints.",
+      "rendering": "<display label>; ref <ref>; confidence <0..1>; rank <int>; status <enum>; by <author>",
+      "fields": {
+        "system": { "type": "enum", "values": ["kg", "reef"], "source": "derived from the tag (@kg-concept -> kg [the Concept Graph, hint for the decision], @reef-reference -> reef [the great REEF, a hint])" },
+        "ref": { "type": "string", "required": true, "note": "identifier within the Concept Graph (kg) or REEF (reef)" },
+        "rank": { "type": "integer", "minimum": 1, "required": false, "note": "1-based; 1 = best-ranked candidate. Explicit; NOT inferred from line order." },
+        "confidence": { "type": "decimal", "range": [0, 1], "required": false, "note": "probability-like score, 0-1 decimal" },
+        "status": { "type": "enum", "values": ["candidate", "confirmed", "rejected", "superseded"], "required": false, "default": "candidate" }
+      }
+    },
+    "Origin": {
+      "rendering": "trailing `; by <author>; run <id>; at <iso-timestamp>; source <ref>#<hash>; span <range>; quote <text>`",
+      "fields": {
+        "by": { "type": "author", "shape": "<human name|id>  OR  agent <name>@<version>", "note": "omitted = implicit current author of the edit" },
+        "run": { "type": "string", "required": false },
+        "at": { "type": "iso-timestamp", "required": false },
+        "source": { "type": "string", "required": false, "shape": "<ref>#<hash>" },
+        "span": { "type": "string", "required": false, "note": "source span/range — more actionable than a whole-doc hash" },
+        "quote": { "type": "string", "required": false }
+      }
+    }
+  },
+  "tags": [
+    {
+      "id": "description",
+      "aliases": [],
+      "family": "B-narrative",
+      "valueShape": "text",
+      "cardinality": "0..1",
+      "attachmentTargets": ["concept"],
+      "origin": "human",
+      "retention": "inline",
+      "lifecycle": "append",
+      "emit": { "cql": false, "fhir": false },
+      "notes": "Author's gloss of the object. Distinct from `evidence` (verbatim source quote)."
+    },
+    {
+      "id": "ke-feedback",
+      "aliases": [],
+      "family": "B-narrative",
+      "valueShape": "text",
+      "extraFields": { "status": { "type": "enum", "values": ["open", "resolved", "deferred"], "default": "open" } },
+      "cardinality": "0..n",
+      "attachmentTargets": ["concept"],
+      "origin": "human",
+      "retention": "inline",
+      "lifecycle": "append",
+      "emit": { "cql": true, "fhir": false, "condition": "only unresolved (status open|deferred) emits; emitter MUST sanitize comment delimiters (*/)" },
+      "notes": "Informaticist -> KE collaboration note; must survive to generated CQL."
+    },
+    {
+      "id": "logic-expression-text",
+      "aliases": [],
+      "family": "B-narrative",
+      "valueShape": "text",
+      "cardinality": "0..1",
+      "attachmentTargets": ["concept"],
+      "origin": "either",
+      "retention": "inline",
+      "lifecycle": "append",
+      "emit": { "cql": false, "fhir": false },
+      "notes": "Captures THE LOGIC — the case features / decision points (what the logic tests). Pairs with controlled-natural-language (which captures the flow)."
+    },
+    {
+      "id": "controlled-natural-language",
+      "aliases": [],
+      "family": "B-narrative",
+      "valueShape": "text",
+      "cardinality": "0..1",
+      "attachmentTargets": ["concept"],
+      "origin": "either",
+      "retention": "inline",
+      "lifecycle": "append",
+      "emit": { "cql": false, "fhir": false },
+      "notes": "Captures THE LOGIC FLOW — the order and sequencing in which the logic is applied (how). Pairs with logic-expression-text (which captures the case features / decision points)."
+    },
+    {
+      "id": "crl-future-expression",
+      "aliases": [],
+      "family": "B-narrative",
+      "valueShape": "text",
+      "cardinality": "0..n",
+      "attachmentTargets": ["concept"],
+      "origin": "either",
+      "retention": "inline",
+      "lifecycle": "append",
+      "emit": { "cql": true, "fhir": false, "condition": "emit as CQL block comment; emitter MUST sanitize */" },
+      "notes": "CNL for logic CRL cannot express yet (missing CQL operators/valueTypes). Dual consumer: a local KE note AND CRL-roadmap telemetry."
+    },
+    {
+      "id": "kg-concept",
+      "aliases": [],
+      "family": "A-external-ref",
+      "valueShape": "ExternalReference",
+      "system": "kg",
+      "cardinality": "0..n",
+      "attachmentTargets": ["concept"],
+      "origin": "either",
+      "retention": "inline",
+      "lifecycle": "replace-by-run",
+      "lifecycleNote": "status=candidate entries replaced on re-extraction; status=confirmed entries are durable",
+      "emit": { "cql": false, "fhir": false },
+      "notes": "Scored HINT FOR THE DECISION — a reference to a node in the Concept Graph ('KG' = Concept Graph). ref scheme `kg:` illustrative."
+    },
+    {
+      "id": "reef-reference",
+      "aliases": [],
+      "family": "A-external-ref",
+      "valueShape": "ExternalReference",
+      "system": "reef",
+      "cardinality": "0..n",
+      "attachmentTargets": ["concept"],
+      "origin": "either",
+      "retention": "inline",
+      "lifecycle": "replace-by-run",
+      "lifecycleNote": "status=candidate entries replaced on re-extraction; status=confirmed entries are durable",
+      "emit": { "cql": false, "fhir": false },
+      "notes": "Scored HINT for REEF ('the great reef') — the likely concept in REEF, the downstream artifact repo the CRL->CQL/FHIR skill + compiler consume. A hint, not an authoritative mapping. ref scheme `reef:` illustrative."
+    },
+    {
+      "id": "semantic-parse-text",
+      "aliases": [],
+      "family": "C-provenance",
+      "valueShape": "text",
+      "cardinality": "0..n",
+      "attachmentTargets": ["concept"],
+      "origin": "either",
+      "retention": "inline",
+      "lifecycle": "replace-by-run",
+      "emit": { "cql": false, "fhir": false },
+      "notes": "Semantic parse of the SOURCE narrative (meaning representation). Extraction exhaust."
+    }
+  ],
+  "validatorRules": [
+    "unknown tag -> warning (forward-compatible)",
+    "value-shape mismatch (e.g. @kg-concept missing ref; confidence outside [0,1]; rank < 1) -> error",
+    "cardinality violation (e.g. two @description on one concept) -> error",
+    "malformed-tag lint: a meta line starting '@' but not matching ^@[a-z][a-z0-9-]*: -> warning (probable malformed tag — catches silent demotion to an untyped note)",
+    "a meta line NOT starting '@' -> legitimate untyped note (back-compat), no diagnostic",
+    "re-run staleness: warn if two distinct run ids' family-C / candidate-ref exhaust coexist on one concept"
+  ],
+  "reRunReplaceRule": "On re-extraction, the producer replaces the prior run's family-C tags (semantic-parse-text) and candidate (status=candidate) external refs for a concept, matched by by/run. Confirmed refs and family-B durable tags (description, ke-feedback, logic-expression-text, controlled-natural-language, crl-future-expression) are never auto-replaced."
+}

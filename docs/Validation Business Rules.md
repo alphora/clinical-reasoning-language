@@ -197,7 +197,7 @@ should not be an error.
 
 ## Metadata annotation rules (proposed — validator-enforced)
 
-These apply to `@tag` annotations on ``- meta is `@tag: <body>`.`` lines (concept-only). No grammar change; the validator enforces them. Full spec: `docs/Validator Requirements.md` and `issues/crl/pending/crl-metadata-model/`.
+These apply to `@tag` annotations on ``- meta is `@tag: <body>`.`` lines (concept-only). No grammar change; the validator enforces them. Full spec: `docs/Validator Requirements.md`, [`spec/metadata-model.md`](../spec/metadata-model.md), [`spec/metadata-registry.json`](../spec/metadata-registry.json).
 
 1. a `meta` body starting with `@` but not matching `^@[a-z][a-z0-9-]*:` should be a **warning** (probable malformed tag).
 2. a recognized-shape tag whose id is not in the registry should be a **warning** (unknown tag).
