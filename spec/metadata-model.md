@@ -1,8 +1,8 @@
 # CRL metadata model
 
-> **Status: draft.** The model is settled but pending a round-2 design review, and the Validator that enforces it is not yet implemented (README flags `validateCRL` as a placeholder). The `@tag` convention parses today; enforcement is forthcoming. Canonical registry: [`metadata-registry.json`](./metadata-registry.json).
+> **Status: vocabulary settled; enforcement pending.** Two design-review rounds complete. The Validator that enforces this spec is not yet implemented (README flags `validateCRL` as a placeholder). The `@tag` convention parses today; enforcement is forthcoming. Canonical registry: [`metadata-registry.json`](./metadata-registry.json).
 
-Captures information *about* CRL objects that lives outside CRL's formal logic — descriptions, knowledge-engineer feedback, plain-language logic, external-store hints, and extraction provenance — so it survives the Knowledge Engineering Lifecycle (KEL) from authoring through to generated FHIR+CQL.
+Captures information *about* a CRL `concept` that lives outside its formal logic — descriptions, knowledge-engineer feedback, plain-language logic, external-store hints, and extraction provenance — so it survives the Knowledge Engineering Lifecycle (KEL) from authoring through to generated FHIR+CQL. (**v1 limit:** metadata attaches to `concept` only; KE feedback on `decision`/`activity`/logic blocks is a known gap pending a future carrier.)
 
 ## How it works
 
@@ -20,6 +20,7 @@ The terminating `.` goes **after** the closing backtick: `` - meta is `...`. `` 
 
 | Tag | Meaning | Family | Author | Card. |
 |---|---|---|---|---|
+| `@id` | stable concept identifier; durable metadata keys on `@id` so renames don't orphan tags | B narrative | human | 0..1 |
 | `@description` | author's gloss of the object (distinct from `evidence` = verbatim source quote) | B narrative | human | 0..1 |
 | `@ke-feedback` | Informaticist→KE note; must reach the KE in generated CQL. Carries `status open\|resolved\|deferred`; only unresolved emits | B narrative | human | 0..n |
 | `@logic-expression-text` | **the logic** — the case features / decision points (*what* the logic tests) | B narrative | human/agent | 0..1 |
@@ -65,6 +66,12 @@ Fields: `ref` (required), `confidence` (decimal `[0,1]`), `rank` (1-based intege
 ## Lifecycle — re-run replace rule
 
 Everything lives inline; the `.crl` is the source of truth (no sidecar). Extraction-exhaust — `@semantic-parse-text` and **candidate** external refs — is regenerated each Step-2 run. A new run **replaces** the prior run's such tags for the concept (matched by `by`/`run`). **Confirmed** refs and all durable family-B tags are never auto-replaced. The Validator warns if two distinct `run` ids' exhaust coexist on one concept.
+
+Replace-eligible tags (family-C + candidate external refs) **require** a `run` so the match key is unambiguous — the Validator errors if it's omitted. Refs with `status: rejected` or `status: superseded` are **durable historical records** (preserved across re-runs so negative review work isn't lost).
+
+## Stable identity (recommended)
+
+Metadata is keyed on the concept name by default. To make durable metadata survive renames, attach an optional `@id` and key tags on it. Rename / split / merge handling is a known v1 gap; `@id` is the operator-recommended hedge until a fuller story exists.
 
 ## Design decisions (settled)
 

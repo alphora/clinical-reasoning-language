@@ -1,8 +1,8 @@
 {
   "_about": "CRL metadata-annotation registry — the canonical tag vocabulary, value shapes, cardinality, and lifecycle for `@tag` annotations carried on `- meta is `@tag: <body>`.` lines. Consumed by the (future) Validator; human companion is metadata-model.md in this folder.",
   "version": "0.1.0",
-  "status": "draft",
-  "statusNote": "Design stage: the model is settled but pending a round-2 review, and the Validator that enforces these rules is not yet implemented (see README — validateCRL is a placeholder). Ref schemes (kg:/reef:) are illustrative.",
+  "status": "vocabulary-settled",
+  "statusNote": "Two design-review rounds complete; vocabulary settled. The Validator that enforces these rules is not yet implemented (see README — validateCRL is a placeholder). Ref schemes (kg:/reef:) are illustrative.",
   "carrier": {
     "element": "meta",
     "rendering": "- meta is `@<tag>: <body>`.",
@@ -26,7 +26,7 @@
         "ref": { "type": "string", "required": true, "note": "identifier within the Concept Graph (kg) or REEF (reef)" },
         "rank": { "type": "integer", "minimum": 1, "required": false, "note": "1-based; 1 = best-ranked candidate. Explicit; NOT inferred from line order." },
         "confidence": { "type": "decimal", "range": [0, 1], "required": false, "note": "probability-like score, 0-1 decimal" },
-        "status": { "type": "enum", "values": ["candidate", "confirmed", "rejected", "superseded"], "required": false, "default": "candidate" }
+        "status": { "type": "enum", "values": ["candidate", "confirmed", "rejected", "superseded"], "required": false, "default": "candidate", "retention": { "candidate": "replace-by-run", "confirmed": "durable", "rejected": "durable (historical review record)", "superseded": "durable (historical review record)" } }
       }
     },
     "Origin": {
@@ -42,6 +42,19 @@
     }
   },
   "tags": [
+    {
+      "id": "id",
+      "aliases": [],
+      "family": "B-narrative",
+      "valueShape": "text",
+      "cardinality": "0..1",
+      "attachmentTargets": ["concept"],
+      "origin": "human",
+      "retention": "inline",
+      "lifecycle": "append",
+      "emit": { "cql": false, "fhir": false },
+      "notes": "Stable concept identifier. Durable metadata should key on @id so a concept rename does not orphan its tags. Rename/split/merge handling is a known v1 gap."
+    },
     {
       "id": "description",
       "aliases": [],
@@ -158,7 +171,8 @@
     "cardinality violation (e.g. two @description on one concept) -> error",
     "malformed-tag lint: a meta line starting '@' but not matching ^@[a-z][a-z0-9-]*: -> warning (probable malformed tag — catches silent demotion to an untyped note)",
     "a meta line NOT starting '@' -> legitimate untyped note (back-compat), no diagnostic",
-    "re-run staleness: warn if two distinct run ids' family-C / candidate-ref exhaust coexist on one concept"
+    "re-run staleness: warn if two distinct run ids' family-C / candidate-ref exhaust coexist on one concept",
+    "family-C tags and candidate (status=candidate) external refs MUST carry `run` -> error if omitted (otherwise the re-run replace match key is undefined)"
   ],
-  "reRunReplaceRule": "On re-extraction, the producer replaces the prior run's family-C tags (semantic-parse-text) and candidate (status=candidate) external refs for a concept, matched by by/run. Confirmed refs and family-B durable tags (description, ke-feedback, logic-expression-text, controlled-natural-language, crl-future-expression) are never auto-replaced."
+  "reRunReplaceRule": "On re-extraction, the producer replaces the prior run's family-C tags (semantic-parse-text) and candidate (status=candidate) external refs for a concept, matched by by/run. Confirmed refs and family-B durable tags (id, description, ke-feedback, logic-expression-text, controlled-natural-language, crl-future-expression) are never auto-replaced. Refs with status=rejected or status=superseded are durable historical records (preserved across re-runs so negative review work isn't lost)."
 }
