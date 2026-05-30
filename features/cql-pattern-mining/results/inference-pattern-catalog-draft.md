@@ -1,6 +1,6 @@
-# CRL clinical inference patterns — draft catalog v0.3.3
+# CRL clinical inference patterns — draft catalog v0.4.0
 
-> **Status: draft v0.3.3** (v0.3 + CMS69 modeling → v0.3.1 re-tier → v0.3.2 + CMS22 modeling → v0.3.3 round-3 reviewer sweep). **45 patterns** across the inference taxonomy — corpus-true count, no padding to 50. Operator notes the catalog should land "around 50 if discrimination is right"; 45 is in the corridor.
+> **Status: draft v0.4.0** (v0.3 + CMS69 modeling → v0.3.1 re-tier → v0.3.2 + CMS22 modeling → v0.3.3 round-3 reviewer sweep → v0.3.4 property-access policy → v0.3.5 umbrella-application sweep → v0.4.0 pattern bodies are narrative). **45 patterns** across the inference taxonomy — corpus-true count, no padding to 50. Operator notes the catalog should land "around 50 if discrimination is right"; 45 is in the corridor.
 >
 > **v0.3 additions** (from CMS69 modeling): `Justified` (specialization for reason-code checks), `OnOrBefore`, `SameDay`. The CMS69 `class != virtual` case is handled via **concept-based negation** — define `Virtual Encounters` as its own concept and negate it (`not "Virtual Encounters"`), rather than via an ad-hoc property-check pattern. This is the idiomatic CRL approach for "where property = value" checks; see `project_crl-cql-composition-architecture` memory.
 >
@@ -9,6 +9,12 @@
 > **v0.3.2 additions** (from CMS22 modeling): `Component(panel, discriminator)` (concept-based projection idiom for extracting Systolic/Diastolic from BP panels, sister to concept-based negation), `Between(value, lo, hi)` (closed-range threshold, completes the numeric-threshold set). Other CMS22 cross-checks **applied with tensions surfaced** (see round-3 reviewer notes): `Within`, `Justified`, `WasOrdered`, `SameDay`, `NotDoneWithReason`, `Active`, `Verified`, `Last`, `AtLeast`, `Below`, `AgeAt` all generalize from CMS69, but `Within`, `Active`, and `NotDoneWithReason` exposed semantic ambiguities resolved in v0.3.3.
 >
 > **v0.3.3 re-tier + card refinements** (round-3 reviewer sweep, post-CMS22): `Within(X, window)` moved from Qualification → Contextualization (it relates evidence to a clinically-named anchor via a window; sister to `AsOf`). `Component(panel, discriminator)` moved from Calculation → Contextualization (it relates a composite resource to its named component; extraction, not derivation). `Verified(X)` semantics widened to allow measure-defined acceptable verification sets including null/provisional. `NotDoneWithReason` card now explicitly notes the `reason` parameter accepts a disjunction of valuesets and the pattern generalizes across resource types. `Between(value, lo, hi)` card calls out closed-vs-half-open: half-open ranges decompose to `AtLeast`/`Below`. Added a **Property access in pattern bodies** subsection clarifying the `<concept>.<property>` grammar.
+>
+> **v0.3.4 policy tightening** (operator review): **No FHIR property access in pattern bodies.** Pattern bodies reference concepts by name only; FHIR properties (`.authoredOn`, `.performed`, `.prevalenceStart`, `.onset`, `.value`, `.issued`, etc.) are lifted into named CRL concepts. Quantity-typed concept refs are operated on directly by value-comparison patterns (`Below`, `Between`, `AtLeast`); no `.value` access. Rewrote the Property-access subsection from permissive to rule-bearing. Rationale: CRL is for clinical authors (doctors, nurses, informaticists). They write clinical concepts and clinical patterns, not FHIR navigations.
+>
+> **v0.3.5 umbrella-application sweep** (operator review): operator caught modeled measures composing from primitives where the existing umbrellas (`AsOf`, `Without`) were a better fit. Sweep applied: CMS22 denominator-exclusion driver refactored to use `AsOf("Qualifying Encounter", "Verified Hypertension")`; CMS22 `First Hypertensive Reading` refactored to use `Without(record-of, "Prior-Year Hypertensive Reading")`; CMS69 `Has Normal BMI` refactored to use `Without(documented, abnormal-BMI)`. `AsOf` anchor parameter widened from a fixed enum to **enum value OR concept reference** — the operator's principle is "the enum is meant to extend; extend it rather than skip the umbrella." See `feedback_parameterized-umbrella-patterns` memory's "Active use during modeling" section. Lesson: define umbrellas in the catalog AND reach for them during modeling — composing primitives where an umbrella exists undermines the catalog's purpose.
+>
+> **v0.4.0 pattern bodies are narrative** (operator review): function-call syntax in pattern bodies (`Justified("X", "Y")`, `AsOf("anchor", "X")`, `Below("value", target)`) replaced by clinical-narrative templates (`"X" justified by "Y"`, `"X" as of "anchor"`, `"value" below target`). CRL is for clinical authors — doctors, nurses, informaticists — who speak clinical narrative, not API. The rest of CRL is already prose-shaped (`inferred from ("X" and not "Y")`, `coded from "Valueset"`, `valuetype is Quantity`); pattern bodies wrapped in `\`...\`` were the last function-call holdover. The catalog now documents narrative templates as the canonical pattern form. Authoring is autocomplete-driven; the validator and emitter template-match the narrative form. New top-level **Pattern bodies are narrative** section establishes the rule. **Narrative form reference table** maps every pattern's function-call shape to its narrative template for transition convenience. See `feedback_narrative-pattern-bodies` memory.
 
 ## Reading the catalog
 
@@ -24,20 +30,185 @@ Every entry:
 
 Two patterns use the **parameterized-umbrella** technique (one name + a clinical discriminator enum, where each filled-in variant reads as the doctor's phrase): **`Without(kind, X)`** and **`AsOf(anchor, X)`**.
 
+## Pattern bodies are narrative
+
+**Rule (v0.4.0):** Pattern bodies are clinical-narrative templates, not function calls. The CRL author writes patterns the way a clinician speaks; the catalog documents the templates; autocomplete and the emitter drive composition and resolution.
+
+Function-call form was a holdover from "patterns are functions" thinking. CRL is for clinical authors (doctors, nurses, informaticists) — they don't write `Justified("Order", "Reason")`; they say "the order was justified by that reason." Pattern bodies should read the same way.
+
+**Examples of the shift:**
+
+```crl
+// before (function-call, deprecated)
+- apply pattern `Justified("Primary-Care Referrals", "Hypertensive Reading Findings") and WasOrdered("Primary-Care Referrals")`.
+
+// after (narrative, canonical v0.4.0+)
+- apply pattern `"Primary-Care Referrals" justified by "Hypertensive Reading Findings" and "Primary-Care Referrals" was ordered`.
+```
+
+```crl
+// before
+- apply pattern `Below("Last Systolic", 120 'mm[Hg]') and Below("Last Diastolic", 80 'mm[Hg]')`.
+
+// after
+- apply pattern `"Last Systolic" below 120 'mm[Hg]' and "Last Diastolic" below 80 'mm[Hg]'`.
+```
+
+```crl
+// before
+- apply pattern `AsOf("Qualifying Encounter", "Verified Hypertension")`.
+
+// after
+- apply pattern `"Verified Hypertension" as of "Qualifying Encounter"`.
+```
+
+**Why this works:** the rest of CRL is already prose-shaped (`inferred from ("X" and not "Y")`, `coded from "Valueset"`, `valuetype is Quantity`). Aligning pattern bodies with the surrounding language is consistent.
+
+**Composition.** Patterns combine with `and` / `or` / `not` connectors and `(...)` grouping — natural-language prose semantics. Nesting works naturally:
+
+```crl
+- apply pattern `("Last Systolic" between 130 'mm[Hg]' and 139 'mm[Hg]' or "Last Diastolic" between 80 'mm[Hg]' and 89 'mm[Hg]') and not ("Last Systolic" at least 140 'mm[Hg]' or "Last Diastolic" at least 90 'mm[Hg]')`.
+```
+
+**Authoring tooling.** Without function-call syntax to lean on, autocomplete drives discovery and composition. The VS Code extension sources completion templates from the catalog's narrative templates. **Authoring is autocomplete-first; the CRL surface is the clinical-narrative form, not the function-call form.**
+
+**Validator and emitter implications.** The validator template-matches the narrative form against the catalog. The emitter does the same and resolves to CQL. Bounded problem — ~45 patterns each with a fixed narrative template. Not blocking; emitter doesn't exist yet.
+
+## Narrative form reference
+
+Every pattern's canonical narrative template, by category. Placeholders are `<X>` (concept reference), `<value>` (Quantity-typed concept ref), `<target>` (Quantity literal), `<period>` (named period concept), `<anchor>` (concept ref naming a clinical event), `<kind>` (clinical-discriminator enum value).
+
+### Classification
+
+| Pattern | Narrative template |
+|---|---|
+| `Has(X[, when])` | `has <X>` (with optional `<when>` clause) |
+| `HasHistoryOf(X[, anchor])` | `has history of <X>` (optionally `prior to <anchor>`) |
+| `Without(kind, X)` | `without <kind> <X>` (kind ∈ record-of, documented, evidence-of, result-for) |
+| `CurrentlyTaking(med)` | `currently taking <med>` |
+| `HasAdverseReactionTo(X)` | `has adverse reaction to <X>` |
+
+### Contextualization
+
+| Pattern | Narrative template |
+|---|---|
+| `With(X, Y)` | `<X> with <Y>` |
+| `AsOf(anchor, X)` | `<X> as of <anchor>` |
+| `Within(X, window)` | `<X> within <window>` — window is a named period OR `<duration> <direction>-<edge>-of <anchor>` |
+| `Component(panel, discriminator)` | `<discriminator> component of <panel>` |
+| `NotDoneWithReason(action, reason)` | `<action> not done with reason <reason>` (reason may be a disjunction `(<A> or <B>)`) |
+| `BaselineAndFollowUp(initial, followup)` | `<initial> with follow-up <followup>` |
+| `InpatientStay(encounter[, includePrelude])` | `inpatient stay anchored on <encounter>` (with prelude qualifier) |
+| `WasOrdered(X)` | `<X> was ordered` |
+
+### Assertion
+
+| Pattern | Narrative template |
+|---|---|
+| `Justified(action, reason)` | `<action> justified by <reason>` |
+| `Active(X[, during])` | `<X> is active` (optionally `during <period>`) |
+| `Verified(X)` | `<X> is verified` |
+| `DocumentedAs(X, classification)` | `<X> documented as <classification>` |
+
+### Qualification (temporal)
+
+| Pattern | Narrative template |
+|---|---|
+| `MostRecent(X[, anchor])` | `most recent <X>` (optionally `<scope>`) |
+| `Last(X[, anchor])` | `last <X>` (optionally `<scope>` — e.g., `on day of <anchor>`, `within <duration> before start of <anchor>`) |
+| `Earliest(X[, anchor])` | `earliest <X>` (optionally `<scope>`) |
+| `First(X[, anchor])` | `first <X>` (optionally `<scope>`) |
+| `During(event, period)` | `<event> during <period>` |
+| `Overlaps(eventA, eventB)` | `<eventA> overlaps <eventB>` |
+| `OnDayOfOrAfter(X, anchor)` | `<X> on day of or after <anchor>` |
+| `OnOrBefore(X, anchor)` | `<X> on or before <anchor>` |
+| `SameDay(eventA, eventB)` | `<eventA> same day as <eventB>` |
+| `BetweenAnchors(X, start, end)` | `<X> between <start> and <end>` |
+| `AtLeastDaysApart(eventA, eventB, n)` | `<eventA> and <eventB> at least <n> days apart` |
+| `AtMostDaysApart(eventA, eventB, n)` | `<eventA> and <eventB> at most <n> days apart` |
+
+### Window-from-anchor (sub-grammar for Within / Last / etc.'s window argument)
+
+The window-from-anchor specification is a parameterized umbrella: one of 4 direction-edge discriminator values × `(duration: Quantity<time-unit>, anchor: concept-ref)`.
+
+| Discriminator | Narrative template |
+|---|---|
+| `before-start-of` | `<duration> before start of <anchor>` |
+| `after-start-of` | `<duration> after start of <anchor>` |
+| `before-end-of` | `<duration> before end of <anchor>` |
+| `after-end-of` | `<duration> after end of <anchor>` |
+
+Filled-in examples:
+- `last "BP Panels" within 1 year before start of "Qualifying Encounter"`
+- `last "BP Panels" within 30 days after end of "Procedure"`
+- `last "BP Panels" within 45 minutes before end of "ED Encounter"`
+
+### Calculation
+
+| Pattern | Narrative template |
+|---|---|
+| `AgeAt(anchor)` | `age at <anchor>` (used as a value in further comparisons) |
+| `Calculate(X)` | `calculated <X>` |
+| `Lowest(X)` | `lowest <X>` |
+| `Highest(X)` | `highest <X>` |
+| `AtLeastN(events, n)` | `at least <n> <events>` |
+| `Consecutive(events, n)` | `<n> consecutive <events>` |
+| `High(X)` | `<X> is high` |
+| `Low(X)` | `<X> is low` |
+| `Normal(X)` | `<X> is normal` |
+| `Abnormal(X)` | `<X> is abnormal` |
+| `AtLeast(value, target)` | `<value> at least <target>` |
+| `AtMost(value, target)` | `<value> at most <target>` |
+| `Between(value, lo, hi)` | `<value> between <lo> and <hi>` |
+| `Exceeds(value, target)` | `<value> exceeds <target>` |
+| `Below(value, target)` | `<value> below <target>` |
+
+### State / Process Inference
+
+| Pattern | Narrative template |
+|---|---|
+| `WasPerformed(X)` | `<X> was performed` |
+
+**Note on Quantity-valued concepts.** Patterns that compare numeric values (`Below`, `Between`, `AtLeast`, etc.) operate on a Quantity-typed concept reference directly — no `.value` access. The concept *is* the quantity (per v0.3.4 property-access policy).
+
 ## Property access in pattern bodies
 
-Pattern bodies sometimes reference concept properties — `<concept-name>.<property>` — to pick a clinically-named field of a resource. Examples from the modeled corpus:
+**Rule: no FHIR property access in CRL pattern bodies.** Pattern bodies reference concepts by name only — never `<concept>.<fhir-field>`. CRL is for clinical authors (doctors, nurses, informaticists). They write clinical concepts and clinical patterns, not FHIR navigations. `.authoredOn`, `.performed`, `.prevalenceStart`, `.onset`, `.value`, `.issued`, `.effective` are FHIR vocabulary, not clinical vocabulary.
 
-- `"BMI Observations".value` (CMS69) — the BMI quantity value
-- `"High BMI Medications".authoredOn` (CMS69) — the order-authored date on a MedicationRequest
-- `"High BMI Follow-up Procedures".performed` (CMS69) — the performed period of a Procedure
-- `"Hypertension Diagnoses".prevalenceStart` (CMS22) — the start of a Condition's prevalence interval
+When a pattern needs a property of a clinical concept (the date an order was placed, the start of a diagnosis's prevalence, the value of a measurement), lift that property into a separate named concept and reference the concept.
 
-**Grammar.** Inside a pattern body (`` `apply pattern \`...\`` ``), property references take the form `"<concept name>".<property>`. Property names are clinically-meaningful field labels — `.value`, `.authoredOn`, `.performed`, `.onset`, `.prevalenceStart`, `.issued`. The emitter resolves them to the corresponding FHIR / QI-Core / source-domain path (which may be a helper call like `prevalenceInterval().starts`, not a literal `Condition.onset` access).
+**Concept-based property naming — the lift idiom.**
 
-**WHAT vs HOW principle.** Property names in pattern bodies should be clinically-canonical, not implementation paths. Prefer `.prevalenceStart` (the clinical meaning) over `.onset` (the raw FHIR field) when the source is a helper-resolved interval. The emitter knows the mapping.
+```crl
+concept "High BMI Follow-up Order Date":
+- type is ServiceRequest.
+- valuetype is dateTime.
+- inferred from "High BMI Follow-up Service Requests".
+```
 
-**Catalog policy.** This catalog doesn't enumerate the property vocabulary; the set is open and resource-shape-driven. Patterns referencing properties should be readable as clinical phrases ("the order-authored date of the high-BMI medication"). If a property is implementation-leaky, lift it into a concept (concept-based projection — see `Component`).
+The lifted concept is the clinical name for "when the high-BMI follow-up was ordered." The emitter resolves it to `<source>.authoredOn` based on the source type (`ServiceRequest` → `authoredOn`), the valuetype (`dateTime`), and the clinical-name suffix (`Order Date`). Pattern bodies reference `"High BMI Follow-up Order Date"` by name; no FHIR knowledge required.
+
+**Quantity values.** Patterns that compare numeric values (`Below`, `Between`, `AtLeast`, `AtMost`, `Exceeds`) operate on a Quantity-typed concept reference directly:
+
+```crl
+- apply pattern `Below("Last Systolic on Qualifying Encounter Day", 120 'mm[Hg]')`.
+```
+
+The Quantity concept's numeric content is implicit — no `.value` access. If you find yourself wanting `.value` on a Quantity-typed concept, the concept itself is already the value; just reference it.
+
+**Common lifts (source type → resolved FHIR property):**
+
+| Lifted concept name | Source type | Emitter resolves to |
+|---|---|---|
+| `<thing> Order Date` | ServiceRequest / MedicationRequest | `.authoredOn` |
+| `<thing> Performed Date` | Procedure | `.performed` |
+| `<thing> Issued Date` | Observation | `.issued` |
+| `<thing> Established Date` / `<thing> Onset` | Condition | `.prevalenceStart` (helper-resolved) |
+| `<thing> Effective Date` | Observation / DiagnosticReport | `.effective` |
+
+The emitter holds the FHIR property mapping table. The CRL author never sees FHIR field names. Lifted concepts compose with temporal patterns (`OnOrBefore`, `During`, `SameDay`) by name reference: `OnOrBefore("Has Overweight or Obese", "High BMI Follow-up Order Date")`.
+
+**Why this matters.** The CRL surface is the catalog of clinical patterns + a vocabulary of clinically-named concepts. Mixing FHIR field names into pattern bodies breaks the WHAT-not-HOW principle and tells the wrong audience to write the wrong language. The lift idiom is the universal escape valve.
 
 ## Quick index
 
@@ -94,7 +265,7 @@ Pattern bodies sometimes reference concept properties — `<concept-name>.<prope
 
 ### `Without(kind, X)` *(parameterized umbrella)*
 - **intent** — qualifying evidence of X is absent (in a clinically specific way)
-- **params** — `kind` ∈ {`record-of`, `documented`, `evidence-of`, `result-for`}; `X`
+- **params** — `kind` ∈ {`record-of`, `documented`, `evidence-of`, `result-for`, …}; `X` (concept reference, or a disjunction of concepts in the pattern body — `"A" or "B"`)
 - **category** — Classification
 - **maturity** — strong
 - **filled-in reads:**
@@ -102,9 +273,12 @@ Pattern bodies sometimes reference concept properties — `<concept-name>.<prope
   - `Without(documented, allergy)` → "without documented allergy" (clinical assertion of absence)
   - `Without(evidence-of, screening)` → "without evidence of screening performed"
   - `Without(result-for, A1c-test)` → "without result for A1c test"
+  - `Without(documented, "Documented High BMI" or "Documented Low BMI")` → "without documented high or low BMI" *(v0.3.5: disjunction in X)*
+- **enum extension policy** — same as `AsOf`: the discriminator enum is open. Add a clinical-narrative discriminator if needed rather than skipping the umbrella for primitive `and not (...)` composition.
 - **evidence** — L1: `No VTE Prophylaxis` (10), `No Mechanical VTE` (8), `Has No Record Of`, `Without Result`. L2: 7 `absence-of`-tagged statements.
-- **examples** — `CMS108 :: No VTE Prophylaxis Medication Administered Or Ordered` (`evidence-of`), `CMS122 :: Has No Record Of Glycemic Status Assessment` (`record-of`), `CMS122 :: Has Most Recent Glycemic Status Assessment Without Result` (`result-for`)
+- **examples** — `CMS108 :: No VTE Prophylaxis Medication Administered Or Ordered` (`evidence-of`), `CMS122 :: Has No Record Of Glycemic Status Assessment` (`record-of`), `CMS122 :: Has Most Recent Glycemic Status Assessment Without Result` (`result-for`), `CMS22 :: First Hypertensive Reading` (`record-of` — no prior-year HTN reading), `CMS69 :: Has Normal BMI` (`documented` — no documented abnormal classification)
 - **anti-example** — when the absence has a documented reason, use `NotDoneWithReason(action, reason)` — the reason parameter is clinically load-bearing and distinct.
+- **modeling note (v0.3.5)** — when an `inferred from (X and not Y)` shape appears at the concept layer, the negation is often `Without(kind, Y)`. Check whether the absence reads as a clinician's clinical phrase (`without record of prior hypertensive reading`, `without documented abnormal BMI`). If yes, surface the umbrella.
 
 ### `CurrentlyTaking(med)`
 - **intent** — patient is currently on medication X
@@ -139,7 +313,7 @@ Pattern bodies sometimes reference concept properties — `<concept-name>.<prope
 
 ### `AsOf(anchor, X)` *(parameterized umbrella)*
 - **intent** — the clinical state of X as of a specific anchor point
-- **params** — `anchor` ∈ {`admission`, `discharge`, `encounter-start`, `encounter-end`, `procedure`, `delivery`, …}; `X`
+- **params** — `anchor` (one of: an enum value naming a generic clinical-anchor kind — `admission`, `discharge`, `encounter-start`, `encounter-end`, `procedure`, `delivery`, …; OR a **concept reference** naming a specific clinical anchor like `"Qualifying Encounter"`, `"Index Admission"`, `"Delivery Encounter"`); `X` (the clinical state, typically a verified/established status concept)
 - **category** — Contextualization *, secondary Classification*
 - **maturity** — strong
 - **filled-in reads:**
@@ -147,9 +321,12 @@ Pattern bodies sometimes reference concept properties — `<concept-name>.<prope
   - `AsOf(admission, anticoagulant-active)` → "as of admission, anticoagulant was active"
   - `AsOf(discharge, antithrombotic-ordered)` → "as of discharge, antithrombotic was ordered"
   - `AsOf(encounter-start, exclusion-active)` → "as of encounter start, exclusion was active"
+  - `AsOf("Qualifying Encounter", "Verified Hypertension")` → "as of the qualifying encounter, verified hypertension was established" *(v0.3.5: concept-reference anchor)*
+- **enum extension policy** — the discriminator enum is **deliberately open**. When modeling a measure that needs a new anchor concept not in the enum, either add the enum value (if generic-reusable) or pass the concept reference directly (if measure-specific). Don't skip the umbrella and fall back to primitive composition.
 - **evidence** — L1: `Present on Admission` (13), `On Admission` (4), `Active at Admission` (6), `At Discharge` (8), `at Start of ED Encounter`. L2: 21 `state-at-anchor`-tagged statements; L2 helper: `CQMCommon.isDiagnosisPresentOnAdmission` (14 calls). L3: dominant compositional pattern in CMS1017 HHFI risk-adjustment.
-- **examples** — `CMS1017 :: Risk Variable Encounter with Anticoagulant Active at Admission`, `CMS104 :: Reason For Not Giving Antithrombotic At Discharge`, `CMS996 :: Active Exclusion Diagnosis at Start of ED Encounter`, `CMS1017 :: Encounter With A Fall Present On Admission`
+- **examples** — `CMS1017 :: Risk Variable Encounter with Anticoagulant Active at Admission`, `CMS104 :: Reason For Not Giving Antithrombotic At Discharge`, `CMS996 :: Active Exclusion Diagnosis at Start of ED Encounter`, `CMS22 :: Verified Hypertension As Of Qualifying Encounter` (denominator exclusion driver, uses concept-ref anchor)
 - **anti-example** — `During(event, period)` when the question is whether the event occurred *anywhere within a period*, not specifically *as of a point in time*.
+- **modeling note (v0.3.5)** — `AsOf("encounter-X", "Verified Y")` encapsulates both "Y exists" and "Y was established by encounter-X" temporal anchoring. Don't compose `Verified(Y) and OnOrBefore(Y-established-date, encounter-X)` — that's the umbrella unwrapped into primitives. Use the umbrella.
 
 ### `Within(X, window)` *(re-tiered from Qualification in v0.3.3)*
 - **intent** — evidence of X exists in a window defined relative to a clinical anchor (look-back or look-forward)
