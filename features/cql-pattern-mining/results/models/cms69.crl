@@ -296,18 +296,18 @@ concept "Is Pregnant During Measurement Period":
 - inferred from ("Active Pregnancy Diagnosis" or "Verified Pregnancy Status").
 
 // --- Age predicate ---
-concept "Aged 18+ at Qualifying Encounter":
+concept "Aged 18+ at Measurement Period Start":
 - type is Encounter.
 - valuetype is boolean.
 - inferred from "Qualifying Encounter".
-- apply pattern `AtLeast(AgeAt(start of "Qualifying Encounter"), 18 years)`.
+- apply pattern `AtLeast(AgeAt(start of "Measurement Period"), 18 years)`.
 
 
 // --- Measure API ---
 concept "Initial Population":
 - type is Observation.
 - valuetype is boolean.
-- inferred from "Aged 18+ at Qualifying Encounter".
+- inferred from "Aged 18+ at Measurement Period Start".
 
 concept "Denominator":
 - type is Encounter.

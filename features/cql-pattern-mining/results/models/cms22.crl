@@ -34,6 +34,17 @@ concept "Diastolic Blood Pressure Code":
 - valuetype is CodeableConcept.
 - coded from "Diastolic Blood Pressure Code".
 
+// --- Standalone Systolic / Diastolic observations (for cancellation branches) ---
+concept "Standalone Systolic BP Observations":
+- type is Observation.
+- valuetype is Quantity.
+- coded from "Systolic Blood Pressure Code".
+
+concept "Standalone Diastolic BP Observations":
+- type is Observation.
+- valuetype is Quantity.
+- coded from "Diastolic Blood Pressure Code".
+
 // --- Intervention sources: follow-up service requests ---
 concept "Follow-up Within 4 Weeks":
 - type is ServiceRequest.
@@ -183,11 +194,29 @@ concept "Hypertensive Reading":
 - inferred from "Last BP Panel on Qualifying Encounter Day".
 - apply pattern `AtLeast("Last Systolic on Qualifying Encounter Day".value, 130 'mm[Hg]') or AtLeast("Last Diastolic on Qualifying Encounter Day".value, 80 'mm[Hg]')`.
 
+concept "Last BP Panel Within Year Prior to Qualifying Encounter":
+- type is Observation.
+- valuetype is CodeableConcept.
+- inferred from "Blood Pressure Panels".
+- apply pattern `Last("Blood Pressure Panels", in 1 year before start of "Qualifying Encounter")`.
+
+concept "Prior-Year Last Systolic":
+- type is Observation.
+- valuetype is Quantity.
+- inferred from "Last BP Panel Within Year Prior to Qualifying Encounter".
+- apply pattern `Component("Last BP Panel Within Year Prior to Qualifying Encounter", "Systolic Blood Pressure Code")`.
+
+concept "Prior-Year Last Diastolic":
+- type is Observation.
+- valuetype is Quantity.
+- inferred from "Last BP Panel Within Year Prior to Qualifying Encounter".
+- apply pattern `Component("Last BP Panel Within Year Prior to Qualifying Encounter", "Diastolic Blood Pressure Code")`.
+
 concept "Prior-Year Hypertensive Reading":
 - type is Observation.
 - valuetype is boolean.
-- inferred from "Blood Pressure Panels".
-- apply pattern `Within("Hypertensive Reading", 1 year before start of "Qualifying Encounter")`.
+- inferred from "Last BP Panel Within Year Prior to Qualifying Encounter".
+- apply pattern `AtLeast("Prior-Year Last Systolic".value, 130 'mm[Hg]') or AtLeast("Prior-Year Last Diastolic".value, 80 'mm[Hg]')`.
 
 concept "First Hypertensive Reading":
 - type is Observation.
@@ -255,7 +284,7 @@ concept "Antihypertensive Medication Order":
 - type is MedicationRequest.
 - valuetype is boolean.
 - inferred from "Antihypertensive Medications".
-- apply pattern `WasOrdered("Antihypertensive Medications") and Active("Antihypertensive Medications")`.
+- apply pattern `WasOrdered("Antihypertensive Medications")`.
 
 concept "Referral for Hypertensive Reading":
 - type is ServiceRequest.
@@ -294,11 +323,6 @@ concept "Second HTN 140+ Followup Bundle":
 
 // --- Per-class numerator components ---
 // Each = ReadingClass AND (intervention bundle for that class). Normal counts on its own.
-concept "Normal BP Numerator":
-- type is Observation.
-- valuetype is boolean.
-- inferred from "Normal BP Reading".
-
 concept "Elevated BP With Followup":
 - type is Observation.
 - valuetype is boolean.
@@ -319,19 +343,28 @@ concept "Second HTN 140+ With Followup":
 - valuetype is boolean.
 - inferred from ("Second Hypertensive Reading 140+" and "Second HTN 140+ Followup Bundle").
 
-// --- Active hypertension diagnosis (Denominator Exclusion driver) ---
-concept "Active Verified Hypertension Diagnosis":
+// --- Verified hypertension diagnosis established by encounter day (Denominator Exclusion driver) ---
+// Source CQL: prevalenceInterval() starts before or on day of encounter.period AND isVerified().
+// Note: .prevalenceStart denotes the emitter-resolved prevalence-interval start (not raw onset).
+concept "Verified Hypertension Established By Qualifying Encounter":
 - type is Condition.
 - valuetype is boolean.
 - inferred from "Hypertension Diagnoses".
-- apply pattern `Active("Hypertension Diagnoses") and Verified("Hypertension Diagnoses") and OnOrBefore("Hypertension Diagnoses".onset, "Qualifying Encounter")`.
+- apply pattern `Verified("Hypertension Diagnoses") and OnOrBefore("Hypertension Diagnoses".prevalenceStart, "Qualifying Encounter")`.
 
 // --- Exception branch 1: BP measurement not done with documented reason ---
+// Covers cancellation of the BP panel OR a standalone systolic OR a standalone diastolic observation,
+// with notDoneReason in (Medical Reason OR Patient Declined), same day as the qualifying encounter.
+concept "BP Measurement Sources":
+- type is Observation.
+- valuetype is CodeableConcept.
+- inferred from ("Blood Pressure Panels" or "Standalone Systolic BP Observations" or "Standalone Diastolic BP Observations").
+
 concept "BP Measurement Not Done With Reason":
 - type is Observation.
 - valuetype is boolean.
-- inferred from "Blood Pressure Panels".
-- apply pattern `NotDoneWithReason("Blood Pressure Panels", "Medical Reasons" or "Patient Declined Reasons") and SameDay("Blood Pressure Panels", "Qualifying Encounter")`.
+- inferred from "BP Measurement Sources".
+- apply pattern `NotDoneWithReason("BP Measurement Sources", "Medical Reasons" or "Patient Declined Reasons") and SameDay("BP Measurement Sources", "Qualifying Encounter")`.
 
 // --- Exception branch 2: HTN follow-up declined by patient ---
 concept "Four-Week Rescreen Declined":
@@ -423,33 +456,33 @@ concept "HTN Followup Declined By Patient":
                 or "Second HTN 140+ With Declined Followup").
 
 // --- Age predicate ---
-concept "Aged 18+ at Qualifying Encounter":
+concept "Aged 18+ at Measurement Period Start":
 - type is Encounter.
 - valuetype is boolean.
 - inferred from "Qualifying Encounter".
-- apply pattern `AtLeast(AgeAt(start of "Qualifying Encounter"), 18 years)`.
+- apply pattern `AtLeast(AgeAt(start of "Measurement Period"), 18 years)`.
 
 
 // --- Measure API ---
 concept "Initial Population":
 - type is Observation.
 - valuetype is boolean.
-- inferred from "Aged 18+ at Qualifying Encounter".
+- inferred from "Aged 18+ at Measurement Period Start".
 
 concept "Denominator":
-- type is Observation.
+- type is Encounter.
 - valuetype is boolean.
 - inferred from "Initial Population".
 
 concept "Denominator Exclusions":
 - type is Condition.
 - valuetype is boolean.
-- inferred from "Active Verified Hypertension Diagnosis".
+- inferred from "Verified Hypertension Established By Qualifying Encounter".
 
 concept "Numerator":
 - type is Observation.
 - valuetype is boolean.
-- inferred from ("Normal BP Numerator"
+- inferred from ("Normal BP Reading"
                 or "Elevated BP With Followup"
                 or "First HTN With Followup"
                 or "Second HTN 130s With Followup"
