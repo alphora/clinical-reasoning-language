@@ -1,12 +1,14 @@
-# CRL clinical inference patterns — draft catalog v0.3.2
+# CRL clinical inference patterns — draft catalog v0.3.3
 
-> **Status: draft v0.3.2** (v0.3 expanded after end-to-end modeling of CMS69 surfaced 4 gaps; v0.3.1 re-tiered two cards; v0.3.2 adds two cards surfaced by CMS22 modeling). **45 patterns** across the inference taxonomy — corpus-true count, no padding to 50. Operator notes the catalog should land "around 50 if discrimination is right"; 45 is in the corridor.
+> **Status: draft v0.3.3** (v0.3 + CMS69 modeling → v0.3.1 re-tier → v0.3.2 + CMS22 modeling → v0.3.3 round-3 reviewer sweep). **45 patterns** across the inference taxonomy — corpus-true count, no padding to 50. Operator notes the catalog should land "around 50 if discrimination is right"; 45 is in the corridor.
 >
 > **v0.3 additions** (from CMS69 modeling): `Justified` (specialization for reason-code checks), `OnOrBefore`, `SameDay`. The CMS69 `class != virtual` case is handled via **concept-based negation** — define `Virtual Encounters` as its own concept and negate it (`not "Virtual Encounters"`), rather than via an ad-hoc property-check pattern. This is the idiomatic CRL approach for "where property = value" checks; see `project_crl-cql-composition-architecture` memory.
 >
 > **v0.3.1 re-tier** (operator review): `Justified` moved from Contextualization → Assertion. `Active` moved from State/Process Inference → Assertion. Rationale: both add clinical-assertion semantics (justificatory link; currently-relevant status) rather than constraining or selecting. See the Assertion section note. `WasPerformed` stays in State/Process Inference as the remaining state-of-resource predicate.
 >
-> **v0.3.2 additions** (from CMS22 modeling): `Component(panel, discriminator)` (concept-based projection idiom for extracting Systolic/Diastolic from BP panels, sister to concept-based negation), `Between(value, lo, hi)` (closed-range threshold, completes the numeric-threshold set). Other CMS22 cross-checks confirmed without changes: `Within`, `Justified`, `WasOrdered`, `SameDay`, `NotDoneWithReason`, `Active`, `Verified`, `Last`, `AtLeast`, `Below`, `AgeAt` all generalize from CMS69.
+> **v0.3.2 additions** (from CMS22 modeling): `Component(panel, discriminator)` (concept-based projection idiom for extracting Systolic/Diastolic from BP panels, sister to concept-based negation), `Between(value, lo, hi)` (closed-range threshold, completes the numeric-threshold set). Other CMS22 cross-checks **applied with tensions surfaced** (see round-3 reviewer notes): `Within`, `Justified`, `WasOrdered`, `SameDay`, `NotDoneWithReason`, `Active`, `Verified`, `Last`, `AtLeast`, `Below`, `AgeAt` all generalize from CMS69, but `Within`, `Active`, and `NotDoneWithReason` exposed semantic ambiguities resolved in v0.3.3.
+>
+> **v0.3.3 re-tier + card refinements** (round-3 reviewer sweep, post-CMS22): `Within(X, window)` moved from Qualification → Contextualization (it relates evidence to a clinically-named anchor via a window; sister to `AsOf`). `Component(panel, discriminator)` moved from Calculation → Contextualization (it relates a composite resource to its named component; extraction, not derivation). `Verified(X)` semantics widened to allow measure-defined acceptable verification sets including null/provisional. `NotDoneWithReason` card now explicitly notes the `reason` parameter accepts a disjunction of valuesets and the pattern generalizes across resource types. `Between(value, lo, hi)` card calls out closed-vs-half-open: half-open ranges decompose to `AtLeast`/`Below`. Added a **Property access in pattern bodies** subsection clarifying the `<concept>.<property>` grammar.
 
 ## Reading the catalog
 
@@ -22,15 +24,30 @@ Every entry:
 
 Two patterns use the **parameterized-umbrella** technique (one name + a clinical discriminator enum, where each filled-in variant reads as the doctor's phrase): **`Without(kind, X)`** and **`AsOf(anchor, X)`**.
 
+## Property access in pattern bodies
+
+Pattern bodies sometimes reference concept properties — `<concept-name>.<property>` — to pick a clinically-named field of a resource. Examples from the modeled corpus:
+
+- `"BMI Observations".value` (CMS69) — the BMI quantity value
+- `"High BMI Medications".authoredOn` (CMS69) — the order-authored date on a MedicationRequest
+- `"High BMI Follow-up Procedures".performed` (CMS69) — the performed period of a Procedure
+- `"Hypertension Diagnoses".prevalenceStart` (CMS22) — the start of a Condition's prevalence interval
+
+**Grammar.** Inside a pattern body (`` `apply pattern \`...\`` ``), property references take the form `"<concept name>".<property>`. Property names are clinically-meaningful field labels — `.value`, `.authoredOn`, `.performed`, `.onset`, `.prevalenceStart`, `.issued`. The emitter resolves them to the corresponding FHIR / QI-Core / source-domain path (which may be a helper call like `prevalenceInterval().starts`, not a literal `Condition.onset` access).
+
+**WHAT vs HOW principle.** Property names in pattern bodies should be clinically-canonical, not implementation paths. Prefer `.prevalenceStart` (the clinical meaning) over `.onset` (the raw FHIR field) when the source is a helper-resolved interval. The emitter knows the mapping.
+
+**Catalog policy.** This catalog doesn't enumerate the property vocabulary; the set is open and resource-shape-driven. Patterns referencing properties should be readable as clinical phrases ("the order-authored date of the high-BMI medication"). If a property is implementation-leaky, lift it into a concept (concept-based projection — see `Component`).
+
 ## Quick index
 
 | Category | Patterns |
 |---|---|
 | Classification | `Has(X[, when])`, `HasHistoryOf(X[, anchor])`, `Without(kind, X)`, `CurrentlyTaking(med)`, `HasAdverseReactionTo(X)` |
-| Contextualization | `With(X, Y)`, `AsOf(anchor, X)`, `NotDoneWithReason(action, reason)`, `BaselineAndFollowUp(initial, followup)`, `InpatientStay(encounter[, includePrelude])`, `WasOrdered(X)` |
+| Contextualization | `With(X, Y)`, `AsOf(anchor, X)`, `Within(X, window)`, `Component(panel, discriminator)`, `NotDoneWithReason(action, reason)`, `BaselineAndFollowUp(initial, followup)`, `InpatientStay(encounter[, includePrelude])`, `WasOrdered(X)` |
 | Assertion | `Justified(action, reason)`, `Active(X[, during])`, `Verified(X)`, `DocumentedAs(X, classification)` |
-| Qualification (temporal) | `MostRecent(X[, anchor])`, `Last(X[, anchor])`, `Earliest(X[, anchor])`, `First(X[, anchor])`, `During(event, period)`, `Within(X, window)`, `Overlaps(eventA, eventB)`, `OnDayOfOrAfter(X, anchor)`, `OnOrBefore(X, anchor)`, `SameDay(eventA, eventB)`, `BetweenAnchors(X, start, end)`, `AtLeastDaysApart(eventA, eventB, n)`, `AtMostDaysApart(eventA, eventB, n)` |
-| Calculation | `AgeAt(anchor)`, `Calculate(X)`, `Component(panel, discriminator)`, `Lowest(X)`, `Highest(X)`, `AtLeastN(events, n)`, `Consecutive(events, n)`, `High(X)`, `Low(X)`, `Normal(X)`, `Abnormal(X)`, `AtLeast(value, target)`, `AtMost(value, target)`, `Between(value, lo, hi)`, `Exceeds(value, target)`, `Below(value, target)` |
+| Qualification (temporal) | `MostRecent(X[, anchor])`, `Last(X[, anchor])`, `Earliest(X[, anchor])`, `First(X[, anchor])`, `During(event, period)`, `Overlaps(eventA, eventB)`, `OnDayOfOrAfter(X, anchor)`, `OnOrBefore(X, anchor)`, `SameDay(eventA, eventB)`, `BetweenAnchors(X, start, end)`, `AtLeastDaysApart(eventA, eventB, n)`, `AtMostDaysApart(eventA, eventB, n)` |
+| Calculation | `AgeAt(anchor)`, `Calculate(X)`, `Lowest(X)`, `Highest(X)`, `AtLeastN(events, n)`, `Consecutive(events, n)`, `High(X)`, `Low(X)`, `Normal(X)`, `Abnormal(X)`, `AtLeast(value, target)`, `AtMost(value, target)`, `Between(value, lo, hi)`, `Exceeds(value, target)`, `Below(value, target)` |
 | State / Process Inference | `WasPerformed(X)` |
 
 ## Patterns dropped from v0.1 (and why)
@@ -134,14 +151,38 @@ Two patterns use the **parameterized-umbrella** technique (one name + a clinical
 - **examples** — `CMS1017 :: Risk Variable Encounter with Anticoagulant Active at Admission`, `CMS104 :: Reason For Not Giving Antithrombotic At Discharge`, `CMS996 :: Active Exclusion Diagnosis at Start of ED Encounter`, `CMS1017 :: Encounter With A Fall Present On Admission`
 - **anti-example** — `During(event, period)` when the question is whether the event occurred *anywhere within a period*, not specifically *as of a point in time*.
 
+### `Within(X, window)` *(re-tiered from Qualification in v0.3.3)*
+- **intent** — evidence of X exists in a window defined relative to a clinical anchor (look-back or look-forward)
+- **params** — `X`; `window` (one of: a named clinical period like `"Measurement Period"`; OR an anchor-anchored offset of the form `<duration> before|after start|end of <anchor>`, e.g. `1 year before start of "Qualifying Encounter"`)
+- **category** — Contextualization *, secondary Qualification*
+- **maturity** — moderate
+- **why Contextualization** — `Within` relates clinical evidence to a clinically-named anchor. Sister to `AsOf(anchor, X)`: `AsOf` is *state at* an anchor; `Within` is *evidence in a window from* an anchor. Both contextualize evidence against an anchor rather than constraining a single event temporally.
+- **evidence** — L1: `Year Prior` (5), `Look Back Period` (4), "Within 6 Months" formulations (anchor-anchored variants). L2: CMS22 prior-year hypertensive reading lookback.
+- **examples** — `CMS22 :: Prior-Year Hypertensive Reading` (`Within("Hypertensive Reading", 1 year before start of "Qualifying Encounter")`), `CMS131 :: Retinal Exam in Measurement Period or Year Prior`
+- **anti-example** — `During(event, period)` for containment in a named period (single-event temporal qualifier, no anchor relationship); `OnDayOfOrAfter(X, anchor)` for calendar-day specificity.
+- **note** — when `window` is an anchor-anchored offset, the second-argument grammar is `<duration> before|after start|end of <anchor-concept>`. The emitter resolves to a `Period` against the source.
+
+### `Component(panel, discriminator)` *(re-tiered from Calculation in v0.3.3)*
+- **intent** — extract the named component value from a composite measurement panel (Systolic / Diastolic from a BP panel; specific lab analyte from a lab-panel observation)
+- **params** — `panel` (composite Observation, e.g. a BP panel); `discriminator` (a concept naming which component — wraps the component-identifying code or code-valueset)
+- **category** — Contextualization *, secondary Classification*
+- **maturity** — moderate (clear in BP-panel measures; will widen as other panel-with-components measures surface)
+- **why Contextualization** — Component relates a composite resource shape to one of its named sub-elements. This is a domain-normalization move (taking a clinically-shaped composite and exposing a clinically-meaningful sub-thing), parallel to `InpatientStay`'s relationship with its constituent encounters. It's *extraction*, not derivation — closer to `AsOf` than to `Calculate(X)`.
+- **filled-in reads:** `Component("Blood Pressure Panels", "Systolic Blood Pressure Code")` → "the systolic component of the blood pressure panel"
+- **evidence** — L2: BP panel `.component` access via `singleton from … where C.code ~ "Systolic"` (CMS22). The discriminator-concept pattern wraps the component-identifying code at the Asserted layer.
+- **examples** — `CMS22 :: Systolic BP Reading`, `CMS22 :: Diastolic BP Reading`, `CMS22 :: Last Systolic on Qualifying Encounter Day`
+- **anti-example** — `Calculate(X)` is for *deriving* a new feature from raw inputs (gestational age from coded reading, BMI from height/weight); `Component` is for *extracting* an existing component from a composite resource.
+- **idiom note — concept-based projection** — Discriminator concepts at the Asserted layer wrap the component-identifying code/valueset. **The discriminator concept is type-degenerate** — it's a naming wrapper for a code or single-code valueset, not a retrieve in the same sense as a panel/observation source. The `type is Observation, valuetype is CodeableConcept` declaration is bookkeeping; the concept's role is to give the code a clinically-meaningful name. Sister idiom to concept-based negation (which wraps a code-to-exclude) — both keep code/property access out of pattern bodies, at the concept layer where informaticists name what they mean.
+
 ### `NotDoneWithReason(action, reason)`
 - **intent** — the expected action was not performed, with an accepted clinical or patient reason
-- **params** — `action`, `reason` (clinically load-bearing — *why* it wasn't done)
+- **params** — `action`; `reason` (clinically load-bearing — *why* it wasn't done). May be a single valueset OR a disjunction of valuesets in the pattern body (`"Medical Reasons" or "Patient Declined Reasons"`).
 - **category** — Contextualization *, secondary State Inference*
 - **maturity** — strong
 - **evidence** — L1: `Has Medical or Patient Reason for Not Ordering X` (5), `Encounter With No X Due To Medical Reason` (4). L2: 4 statements; body combines absence-of-action with presence-of-reason.
-- **examples** — `CMS135 :: Has Medical or Patient Reason for Not Ordering ACEI or ARB or ARNI`, `CMS22 :: Encounter with Medical Reason for Not Obtaining or Patient Declined Blood Pressure Measurement`
+- **examples** — `CMS135 :: Has Medical or Patient Reason for Not Ordering ACEI or ARB or ARNI`, `CMS22 :: Encounter with Medical Reason for Not Obtaining or Patient Declined Blood Pressure Measurement`, `CMS69 :: Medical Reason Or Patient Reason For Not Performing BMI Exam` (uses disjoined reason)
 - **anti-example** — `Without(kind, X)` when there's no documented reason — just absence.
+- **resource-type note** — Generalizes across action-resource families: Observation cancellation (e.g. CMS69 BMI not done — `notDoneReason`), ServiceRequest declined (`reasonRefused`), MedicationRequest not requested (`reasonRefused`). The emitter resolves to the resource-specific "not-done reason" property. The clinical assertion ("expected action not done with documented reason") is the same regardless of resource type.
 
 ### `BaselineAndFollowUp(initial, followup)`
 - **intent** — initial/baseline assessment paired with a follow-up assessment (often supports comparison or change-from-baseline)
@@ -201,13 +242,14 @@ Each of these "looks like a concept hiding inside a pattern" — it asserts a cl
 - **anti-example** — `Has(X)` when "active" status doesn't matter (just exists ever); `AsOf(anchor, X-active)` when the question is specifically state at one anchor point.
 
 ### `Verified(X)`
-- **intent** — the finding/diagnosis carries an acceptable verification status (asserted by a clinician, not provisional/refuted)
+- **intent** — the finding/diagnosis carries an acceptable verification status — measure-defined; "acceptable" typically means "not refuted" rather than strictly "confirmed"
 - **params** — `X` (a condition or finding)
 - **category** — Assertion *(recategorized from Classification; this is about confidence/source, not classification)*
 - **maturity** — strong
-- **evidence** — L2 helper: `Status.verified` (24 sample calls).
-- **examples** — `CMS117 :: Has HIV` (calls `Status.verified` on condition), `CMS117 :: Has Lymphoreticular Cancer, Multiple Myeloma or Leukemia`
+- **evidence** — L2 helper: `Status.verified` (24 sample calls); local-measure helpers like CMS22's `isVerified()` allow null + confirmed + unconfirmed + provisional + differential.
+- **examples** — `CMS117 :: Has HIV` (calls `Status.verified` on condition), `CMS22 :: Verified Hypertension Established By Qualifying Encounter`
 - **anti-example** — `Has(X)` if you don't care about verification status (e.g. screening-for-presence).
+- **semantics note (widened in v0.3.3)** — measures vary in which `verificationStatus` values they accept. CMS117's `Status.verified` enforces "confirmed". CMS22's local `isVerified()` is broader: null OR confirmed OR unconfirmed OR provisional OR differential — essentially "not refuted." The catalog `Verified(X)` pattern names the clinical assertion ("acceptable verification per the measure"); the emitter resolves to the measure-specific acceptable-set. Don't read `Verified` as strictly "confirmed."
 
 ### `DocumentedAs(X, classification)`
 - **intent** — a measurement or finding is documented as falling in a specific clinical classification (high, low, abnormal, …)
@@ -268,15 +310,6 @@ Each of these "looks like a concept hiding inside a pattern" — it asserts a cl
 - **evidence** — L1: `During Measurement Period` (25+ variants), `in Measurement Period` (6). L2: 50 temporal-rel-tagged statements.
 - **examples** — `CMS69 :: BMI During Measurement Period`, `CMS22 :: Qualifying Encounter during Measurement Period`
 - **anti-example** — `Within(X, window)` when the time-bound is a window-from-anchor (e.g. "6 months after"), not a pre-defined named period.
-
-### `Within(X, window)`
-- **intent** — X occurs within a bounded window (look-back or look-forward) relative to an anchor
-- **params** — `X`; `window` (duration + anchor)
-- **category** — Qualification
-- **maturity** — moderate
-- **evidence** — L1: `Year Prior` (5), `Look Back Period` (4), `Within 6 Months`.
-- **examples** — `CMS22 :: Follow up with Rescreen Within 6 Months`, `CMS131 :: Retinal Exam in Measurement Period or Year Prior`
-- **anti-example** — `During(event, period)` for containment in a named period; `OnDayOfOrAfter(X, anchor)` for calendar-day specificity.
 
 ### `Overlaps(eventA, eventB)`
 - **intent** — two events' intervals overlap (share any time)
@@ -361,17 +394,6 @@ Each of these "looks like a concept hiding inside a pattern" — it asserts a cl
 - **examples** — `CMS0334 :: Delivery Encounter With Calculated Gestational Age Greater Than Or Equal To 37 Weeks`, `CMS1244 :: Boarded Time Greater Than 240 Minutes`
 - **anti-example** — `MostRecent(X)` / `Lowest(X)` for selecting an existing value; `Compute` is for *deriving* a new feature.
 
-### `Component(panel, discriminator)`
-- **intent** — extract the named component value from a composite measurement panel (Systolic / Diastolic from a BP panel; specific lab analyte from a lab-panel observation)
-- **params** — `panel` (composite Observation, e.g. a BP panel); `discriminator` (a concept naming which component — wraps the component code or code-valueset)
-- **category** — Calculation *, secondary Classification*
-- **maturity** — moderate (clear in BP-panel measures; will widen as other panel-with-components measures surface)
-- **filled-in reads:** `Component("Blood Pressure Panels", "Systolic Blood Pressure Code")` → "the systolic component of the blood pressure panel"
-- **evidence** — L2: BP panel `.component` access via `singleton from … where C.code ~ "Systolic"` (CMS22, CMS165). The discriminator-concept pattern wraps the component-identifying code at the Asserted layer.
-- **examples** — `CMS22 :: Systolic BP Reading`, `CMS22 :: Diastolic BP Reading`, `CMS22 :: Last Systolic on Qualifying Encounter Day`
-- **anti-example** — `Calculate(X)` is for *deriving* a new feature from raw inputs (gestational age from coded reading, BMI from height/weight); `Component` is for *extracting* an existing component from a composite resource.
-- **idiom note** — Discriminator concepts at the Asserted layer wrap the component-identifying code/valueset. This is the **concept-based projection** idiom — sister to concept-based negation (which wraps a code-to-exclude). Both keep property-access out of the pattern body and at the concept layer where informaticists name what they mean.
-
 ### `Lowest(X)` / `Highest(X)`
 - **intent** — the lowest or highest reading of X (within an implicit scope)
 - **params** — `X` (the clinical kind of measurement)
@@ -419,13 +441,14 @@ Each of these "looks like a concept hiding inside a pattern" — it asserts a cl
 
 ### `Between(value, lo, hi)`
 - **intent** — numeric value falls in the closed range `[lo, hi]` (canonical for clinical range bucketing — BP class, A1c band, weight-for-age band)
-- **params** — `value`; `lo`, `hi` (typed Quantity, same units)
+- **params** — `value`; `lo`, `hi` (typed Quantity, same units; both inclusive)
 - **category** — Calculation *, secondary Classification*
 - **maturity** — moderate (canonical for BP / lab range bucketing; corpus expansion expected to widen)
 - **filled-in reads:** `Between(systolic, 120 'mm[Hg]', 129 'mm[Hg]')` → "systolic between 120 and 129 mmHg"
-- **evidence** — L1: range constructions "SBP 120 to 129", "SBP 130 to 139", "DBP 80 to 89". L2: `.value in Interval[lo, hi]` shape (CMS22 BP buckets; expected in CMS122 A1c bands).
+- **evidence** — L1: range constructions "SBP 120 to 129", "SBP 130 to 139", "DBP 80 to 89". L2: `.value in Interval[lo, hi]` shape (CMS22 BP buckets).
 - **examples** — `CMS22 :: Elevated BP Reading` (systolic between 120 and 129), `CMS22 :: Second Hypertensive Reading 130s` (systolic between 130 and 139 OR diastolic between 80 and 89)
 - **anti-example** — `AtLeast(value, target)` / `Below(value, target)` for one-sided thresholds; `Between` is for an *explicit closed range* with both bounds.
+- **closed-vs-half-open note** — `Between` is closed-closed `[lo, hi]` because clinicians describe bands inclusively ("120 to 129"). Half-open clinical ranges — e.g., CMS22 source `Interval[1 'mm[Hg]', 120 'mm[Hg]')` for the Normal-systolic upper bound — decompose to `AtLeast(value, lo) and Below(value, hi)`. Don't widen `Between` to cover half-open; compose the one-sided thresholds instead.
 
 ---
 
