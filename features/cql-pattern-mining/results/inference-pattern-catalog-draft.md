@@ -1,8 +1,10 @@
-# CRL clinical inference patterns — draft catalog v0.3
+# CRL clinical inference patterns — draft catalog v0.3.1
 
-> **Status: draft v0.3** (v0.2 expanded after end-to-end modeling of CMS69 surfaced 4 gaps; see `features/cql-pattern-mining/results/cms69-modeled.md`). **43 patterns** (was 40) across the inference taxonomy — corpus-true count, no padding to 50. Operator notes the catalog should land "around 50 if discrimination is right"; 43 is in the corridor.
+> **Status: draft v0.3.1** (v0.3 expanded after end-to-end modeling of CMS69 surfaced 4 gaps; v0.3.1 re-tiers two cards after operator review of `Justified`'s category). **43 patterns** across the inference taxonomy — corpus-true count, no padding to 50. Operator notes the catalog should land "around 50 if discrimination is right"; 43 is in the corridor.
 >
 > **v0.3 additions** (from CMS69 modeling): `Justified` (specialization for reason-code checks), `OnOrBefore`, `SameDay`. The CMS69 `class != virtual` case is handled via **concept-based negation** — define `Virtual Encounters` as its own concept and negate it (`not "Virtual Encounters"`), rather than via an ad-hoc property-check pattern. This is the idiomatic CRL approach for "where property = value" checks; see `project_crl-cql-composition-architecture` memory.
+>
+> **v0.3.1 re-tier** (operator review): `Justified` moved from Contextualization → Assertion. `Active` moved from State/Process Inference → Assertion. Rationale: both add clinical-assertion semantics (justificatory link; currently-relevant status) rather than constraining or selecting. See the Assertion section note. `WasPerformed` stays in State/Process Inference as the remaining state-of-resource predicate.
 
 ## Reading the catalog
 
@@ -23,11 +25,11 @@ Two patterns use the **parameterized-umbrella** technique (one name + a clinical
 | Category | Patterns |
 |---|---|
 | Classification | `Has(X[, when])`, `HasHistoryOf(X[, anchor])`, `Without(kind, X)`, `CurrentlyTaking(med)`, `HasAdverseReactionTo(X)` |
-| Contextualization | `With(X, Y)`, `AsOf(anchor, X)`, `NotDoneWithReason(action, reason)`, `Justified(action, reason)`, `BaselineAndFollowUp(initial, followup)`, `InpatientStay(encounter[, includePrelude])`, `WasOrdered(X)` |
-| Assertion | `Verified(X)`, `DocumentedAs(X, classification)` |
+| Contextualization | `With(X, Y)`, `AsOf(anchor, X)`, `NotDoneWithReason(action, reason)`, `BaselineAndFollowUp(initial, followup)`, `InpatientStay(encounter[, includePrelude])`, `WasOrdered(X)` |
+| Assertion | `Justified(action, reason)`, `Active(X[, during])`, `Verified(X)`, `DocumentedAs(X, classification)` |
 | Qualification (temporal) | `MostRecent(X[, anchor])`, `Last(X[, anchor])`, `Earliest(X[, anchor])`, `First(X[, anchor])`, `During(event, period)`, `Within(X, window)`, `Overlaps(eventA, eventB)`, `OnDayOfOrAfter(X, anchor)`, `OnOrBefore(X, anchor)`, `SameDay(eventA, eventB)`, `BetweenAnchors(X, start, end)`, `AtLeastDaysApart(eventA, eventB, n)`, `AtMostDaysApart(eventA, eventB, n)` |
 | Calculation | `AgeAt(anchor)`, `Calculate(X)`, `Lowest(X)`, `Highest(X)`, `AtLeastN(events, n)`, `Consecutive(events, n)`, `High(X)`, `Low(X)`, `Normal(X)`, `Abnormal(X)`, `AtLeast(value, target)`, `AtMost(value, target)`, `Exceeds(value, target)`, `Below(value, target)` |
-| State / Process Inference | `Active(X[, during])`, `WasPerformed(X)` |
+| State / Process Inference | `WasPerformed(X)` |
 
 ## Patterns dropped from v0.1 (and why)
 
@@ -139,15 +141,6 @@ Two patterns use the **parameterized-umbrella** technique (one name + a clinical
 - **examples** — `CMS135 :: Has Medical or Patient Reason for Not Ordering ACEI or ARB or ARNI`, `CMS22 :: Encounter with Medical Reason for Not Obtaining or Patient Declined Blood Pressure Measurement`
 - **anti-example** — `Without(kind, X)` when there's no documented reason — just absence.
 
-### `Justified(action, reason)`
-- **intent** — the action was performed/ordered with a clinical reason that matches the specified valueset (the action's reason property is in the criterion)
-- **params** — `action`; `reason` (a valueset of acceptable reason concepts)
-- **category** — Contextualization *, secondary Classification*
-- **maturity** — strong (specialization of `PropertyMatches` for reasonCode/reasonRefused — common enough to warrant its own name)
-- **evidence** — Pervasive — `reasonCode in valueset` is one of the most common qualifying clauses in DQM. CMS69 alone uses it 6× across the BMI intervention defines.
-- **examples** — `CMS69 :: High BMI Interventions Ordered` (justified by "Overweight or Obese"), `CMS69 :: Low BMI Interventions Performed` (justified by "Underweight")
-- **anti-example** — `NotDoneWithReason(action, reason)` — Justified is "performed *for* X reason"; NotDoneWithReason is "*not* performed *because of* Y reason." Different polarities.
-
 ### `BaselineAndFollowUp(initial, followup)`
 - **intent** — initial/baseline assessment paired with a follow-up assessment (often supports comparison or change-from-baseline)
 - **params** — `initial`, `followup`
@@ -178,6 +171,32 @@ Two patterns use the **parameterized-umbrella** technique (one name + a clinical
 ---
 
 ## Assertion
+
+**What "Assertion" means here.** Most patterns in this catalog either *constrain* (qualifiers like `During`, `Within`, `OnOrBefore`), *select* (`MostRecent`, `Earliest`, `Lowest`), *combine* (`With`), or *predicate over evidence* (`Has`, `Without`, `CurrentlyTaking`). Assertion patterns are different: they add a *clinical claim* about the subject — a relationship, a status, a confidence level, or a classification — that isn't a constraint or selection. Three sub-shapes:
+
+- **Justificatory** — `Justified(action, reason)` asserts a clinical-appropriateness link between an action and a diagnosis.
+- **Stateful** — `Active(X[, during])` asserts that a condition or medication is currently relevant (not just exists ever).
+- **Attestational** — `Verified(X)` and `DocumentedAs(X, classification)` assert a clinician's attestation about the finding's status or classification.
+
+Each of these "looks like a concept hiding inside a pattern" — it asserts a clinical relation rather than a structural one — but each is parameterized over its arguments, so the structural form is correct: write it once, apply across the corpus. The Assertion category names the gray zone explicitly so future entries land in the right bucket.
+
+### `Justified(action, reason)`
+- **intent** — the action was performed/ordered with a clinical reason that matches the specified valueset (the action's reason property is in the criterion)
+- **params** — `action`; `reason` (a valueset of acceptable reason concepts)
+- **category** — Assertion *(re-tiered from Contextualization in v0.3.1 — asserts a clinical-appropriateness link, not a contextual relation)*, secondary Classification
+- **maturity** — strong (specialization of reason-property checks — common enough to warrant its own name)
+- **evidence** — Pervasive — `reasonCode in valueset` is one of the most common qualifying clauses in DQM. CMS69 alone uses it 6× across the BMI intervention defines.
+- **examples** — `CMS69 :: High BMI Interventions Ordered` (justified by "Overweight or Obese"), `CMS69 :: Low BMI Interventions Performed` (justified by "Underweight")
+- **anti-example** — `NotDoneWithReason(action, reason)` — Justified is "performed *for* X reason"; NotDoneWithReason is "*not* performed *because of* Y reason." Different polarities.
+
+### `Active(X[, during])`
+- **intent** — X (condition or medication) is in an active state — currently clinically relevant — optionally during a clinically-named period
+- **params** — `X`; `during` optional (a period)
+- **category** — Assertion *(re-tiered from State/Process Inference in v0.3.1 — asserts currently-relevant status, which is a clinical claim about X, not a state-of-resource predicate)*, secondary Qualification
+- **maturity** — strong (this is the merged Active + ConditionActiveDuring + MedicationPeriod consumption)
+- **evidence** — L2 helper: `QICoreCommon.prevalenceInterval` (30 sample calls), `CMD.medicationRequestPeriod` (6), `CMD.medicationDispensePeriod` (3). L1: `Has Active` (4), `Active at Admission` (6).
+- **examples** — `CMS1157 :: Has Active HIV Diagnosis Starts On or Before First 240 Days of Measurement Period` (= `Active(HIV-diagnosis, during(first-240-days))`), `CMS153 :: Has Active Contraceptive Medications`, `CMS1154 :: Has Pregnancy Diagnosis During Measurement Period` (= `Active(pregnancy-diagnosis, during(measurement-period))`)
+- **anti-example** — `Has(X)` when "active" status doesn't matter (just exists ever); `AsOf(anchor, X-active)` when the question is specifically state at one anchor point.
 
 ### `Verified(X)`
 - **intent** — the finding/diagnosis carries an acceptable verification status (asserted by a clinician, not provisional/refuted)
@@ -389,14 +408,7 @@ Two patterns use the **parameterized-umbrella** technique (one name + a clinical
 
 ## State / Process Inference
 
-### `Active(X[, during])`
-- **intent** — X (condition or medication) is in an active state, optionally during a clinically-named period
-- **params** — `X`; `during` optional (a period)
-- **category** — State Inference *, secondary Qualification*
-- **maturity** — strong (this is the merged Active + ConditionActiveDuring + MedicationPeriod consumption)
-- **evidence** — L2 helper: `QICoreCommon.prevalenceInterval` (30 sample calls), `CMD.medicationRequestPeriod` (6), `CMD.medicationDispensePeriod` (3). L1: `Has Active` (4), `Active at Admission` (6).
-- **examples** — `CMS1157 :: Has Active HIV Diagnosis Starts On or Before First 240 Days of Measurement Period` (= `Active(HIV-diagnosis, during(first-240-days))`), `CMS153 :: Has Active Contraceptive Medications`, `CMS1154 :: Has Pregnancy Diagnosis During Measurement Period` (= `Active(pregnancy-diagnosis, during(measurement-period))`)
-- **anti-example** — `Has(X)` when "active" status doesn't matter (just exists ever); `AsOf(anchor, X-active)` when the question is specifically state at one anchor point.
+> `Active(X[, during])` was re-tiered to **Assertion** in v0.3.1 (it asserts currently-relevant status, a clinical claim about X — not a state-of-resource predicate). `WasPerformed(X)` remains here as a state-of-resource predicate on action resources (a status assertion about the resource itself, not a clinical claim).
 
 ### `WasPerformed(X)`
 - **intent** — the clinical action was performed (procedure / encounter / immunization / medication-administration completed)

@@ -1,15 +1,12 @@
-# CMS69 BMI Screening and Follow-Up — CRL representation
+# CMS69 BMI Screening and Follow-Up
 
-// Catalog reference: features/cql-pattern-mining/results/inference-pattern-catalog-draft.md (v0.3, 43 patterns).
-//
-// Composition architecture: three layers (Asserted / Inferred / Interface) per
-// project_crl-cql-composition-architecture memory. Property-value checks like
+// Composition architecture: three layers (Asserted / Inferred / Interface)/  
+// Property-value checks like
 // "encounter class is not virtual" are handled via concept-based negation — define
 // the property value as its own concept and negate at the concept level. CRL
 // doesn't formally model FHIR property paths; the canonical approach is concept
 // negation, not ad-hoc property-access predicates.
 //
-// Source CQL: features/cql-pattern-mining/data/cql/dqm-content-qicore-2025/CMS69FHIRPCSBMIScreenAndFollowUp.cql
 
 
 // ============================================================
@@ -118,14 +115,14 @@ concept "Qualifying Encounter":
 - type is Encounter.
 - valuetype is boolean.
 - inferred from "BMI Evaluation Encounter (not virtual)".
-- apply pattern `During(this, "Measurement Period") and WasPerformed(this)`.
+- apply pattern `During("BMI Evaluation Encounter (not virtual)", "Measurement Period") and WasPerformed("BMI Evaluation Encounter (not virtual)")`.
 
 // --- BMI observations during MP ---
 concept "BMI During Measurement Period":
 - type is Observation.
 - valuetype is Quantity.
 - inferred from "BMI Observations".
-- apply pattern `During(this, "Measurement Period") and Exceeds(this.value, 0 'kg/m2')`.
+- apply pattern `During("BMI Observations", "Measurement Period") and Exceeds("BMI Observations".value, 0 'kg/m2')`.
 
 // --- BMI clinical classifications ---
 // The agent emitter knows the standard cutoffs: <18.5 = Low, [18.5,25) = Normal, >=25 = High.
@@ -133,19 +130,19 @@ concept "Documented Low BMI":
 - type is Observation.
 - valuetype is boolean.
 - inferred from "BMI During Measurement Period".
-- apply pattern `Low(this)`.
+- apply pattern `Low("BMI During Measurement Period")`.
 
 concept "Documented High BMI":
 - type is Observation.
 - valuetype is boolean.
 - inferred from "BMI During Measurement Period".
-- apply pattern `High(this)`.
+- apply pattern `High("BMI During Measurement Period")`.
 
 concept "Normal BMI Range":
 - type is Observation.
 - valuetype is boolean.
 - inferred from "BMI During Measurement Period".
-- apply pattern `Normal(this)`.
+- apply pattern `Normal("BMI During Measurement Period")`.
 
 concept "Has Normal BMI":
 - type is Observation.
@@ -157,13 +154,13 @@ concept "Has Overweight or Obese":
 - type is Condition.
 - valuetype is boolean.
 - inferred from "Overweight or Obese Diagnoses".
-- apply pattern `Active(this)`.
+- apply pattern `Active("Overweight or Obese Diagnoses")`.
 
 concept "Has Underweight":
 - type is Condition.
 - valuetype is boolean.
 - inferred from "Underweight Diagnoses".
-- apply pattern `Active(this)`.
+- apply pattern `Active("Underweight Diagnoses")`.
 
 // --- High BMI Interventions Ordered ---
 // Each leaf type-specific intervention concept applies the catalog pattern
@@ -174,19 +171,19 @@ concept "High BMI Follow-up Order":
 - type is ServiceRequest.
 - valuetype is boolean.
 - inferred from "High BMI Follow-up Service Requests".
-- apply pattern `Justified(this, "Overweight or Obese Diagnoses") or OnOrBefore("Has Overweight or Obese", this.authoredOn)`.
+- apply pattern `Justified("High BMI Follow-up Service Requests", "Overweight or Obese Diagnoses") or OnOrBefore("Has Overweight or Obese", "High BMI Follow-up Service Requests".authoredOn)`.
 
 concept "High BMI Weight Assessment Referral":
 - type is ServiceRequest.
 - valuetype is boolean.
 - inferred from "Weight Assessment Referrals".
-- apply pattern `Justified(this, "Overweight or Obese Diagnoses") or OnOrBefore("Has Overweight or Obese", this.authoredOn)`.
+- apply pattern `Justified("Weight Assessment Referrals", "Overweight or Obese Diagnoses") or OnOrBefore("Has Overweight or Obese", "Weight Assessment Referrals".authoredOn)`.
 
 concept "High BMI Medication Order":
 - type is MedicationRequest.
 - valuetype is boolean.
 - inferred from "High BMI Medications".
-- apply pattern `Justified(this, "Overweight or Obese Diagnoses") or OnOrBefore("Has Overweight or Obese", this.authoredOn)`.
+- apply pattern `Justified("High BMI Medications", "Overweight or Obese Diagnoses") or OnOrBefore("Has Overweight or Obese", "High BMI Medications".authoredOn)`.
 
 concept "High BMI Interventions Ordered":
 - type is ServiceRequest.
@@ -198,7 +195,7 @@ concept "High BMI Procedure Performed":
 - type is Procedure.
 - valuetype is boolean.
 - inferred from "High BMI Follow-up Procedures".
-- apply pattern `Justified(this, "Overweight or Obese Diagnoses") or OnOrBefore("Has Overweight or Obese", this.performed)`.
+- apply pattern `Justified("High BMI Follow-up Procedures", "Overweight or Obese Diagnoses") or OnOrBefore("Has Overweight or Obese", "High BMI Follow-up Procedures".performed)`.
 
 concept "High BMI Interventions Performed":
 - type is Procedure.
@@ -210,7 +207,7 @@ concept "High BMI And Follow Up Provided":
 - type is Observation.
 - valuetype is boolean.
 - inferred from "Documented High BMI".
-- apply pattern `With(this, ("High BMI Interventions Ordered" or "High BMI Interventions Performed") and During(this, "Measurement Period"))`.
+- apply pattern `With("Documented High BMI", ("High BMI Interventions Ordered" or "High BMI Interventions Performed") and During("Documented High BMI", "Measurement Period"))`.
 
 // --- Low BMI analogous ---
 
@@ -218,19 +215,19 @@ concept "Low BMI Follow-up Order":
 - type is ServiceRequest.
 - valuetype is boolean.
 - inferred from "Low BMI Follow-up Service Requests".
-- apply pattern `Justified(this, "Underweight Diagnoses") or (OnOrBefore("Has Underweight", this.authoredOn) and During(this.authoredOn, "Measurement Period"))`.
+- apply pattern `Justified("Low BMI Follow-up Service Requests", "Underweight Diagnoses") or (OnOrBefore("Has Underweight", "Low BMI Follow-up Service Requests".authoredOn) and During("Low BMI Follow-up Service Requests".authoredOn, "Measurement Period"))`.
 
 concept "Low BMI Weight Assessment Referral":
 - type is ServiceRequest.
 - valuetype is boolean.
 - inferred from "Weight Assessment Referrals".
-- apply pattern `Justified(this, "Underweight Diagnoses") or (OnOrBefore("Has Underweight", this.authoredOn) and During(this.authoredOn, "Measurement Period"))`.
+- apply pattern `Justified("Weight Assessment Referrals", "Underweight Diagnoses") or (OnOrBefore("Has Underweight", "Weight Assessment Referrals".authoredOn) and During("Weight Assessment Referrals".authoredOn, "Measurement Period"))`.
 
 concept "Low BMI Medication Order":
 - type is MedicationRequest.
 - valuetype is boolean.
 - inferred from "Low BMI Medications".
-- apply pattern `Justified(this, "Underweight Diagnoses") or (OnOrBefore("Has Underweight", this.authoredOn) and During(this.authoredOn, "Measurement Period"))`.
+- apply pattern `Justified("Low BMI Medications", "Underweight Diagnoses") or (OnOrBefore("Has Underweight", "Low BMI Medications".authoredOn) and During("Low BMI Medications".authoredOn, "Measurement Period"))`.
 
 concept "Low BMI Interventions Ordered":
 - type is ServiceRequest.
@@ -241,7 +238,7 @@ concept "Low BMI Procedure Performed":
 - type is Procedure.
 - valuetype is boolean.
 - inferred from "Low BMI Follow-up Procedures".
-- apply pattern `(Justified(this, "Underweight Diagnoses") and WasPerformed(this)) or (OnOrBefore("Has Underweight", this.performed) and During(this.performed, "Measurement Period"))`.
+- apply pattern `(Justified("Low BMI Follow-up Procedures", "Underweight Diagnoses") and WasPerformed("Low BMI Follow-up Procedures")) or (OnOrBefore("Has Underweight", "Low BMI Follow-up Procedures".performed) and During("Low BMI Follow-up Procedures".performed, "Measurement Period"))`.
 
 concept "Low BMI Interventions Performed":
 - type is Procedure.
@@ -252,45 +249,45 @@ concept "Low BMI And Follow Up Provided":
 - type is Observation.
 - valuetype is boolean.
 - inferred from "Documented Low BMI".
-- apply pattern `With(this, ("Low BMI Interventions Ordered" or "Low BMI Interventions Performed") and During(this, "Measurement Period"))`.
+- apply pattern `With("Documented Low BMI", ("Low BMI Interventions Ordered" or "Low BMI Interventions Performed") and During("Documented Low BMI", "Measurement Period"))`.
 
 // --- BMI exam not performed with reason ---
 concept "Medical Reason Or Patient Reason For Not Performing BMI Exam":
 - type is Observation.
 - valuetype is boolean.
 - inferred from "BMI Observations".
-- apply pattern `NotDoneWithReason(this, "Medical Reasons" or "Patient Declined Reasons") and SameDay(this, "Qualifying Encounter")`.
+- apply pattern `NotDoneWithReason("BMI Observations", "Medical Reasons" or "Patient Declined Reasons") and SameDay("BMI Observations", "Qualifying Encounter")`.
 
 // --- BMI follow-up not documented with reason ---
 concept "High BMI Follow-up Not Done With Reason":
 - type is ServiceRequest.
 - valuetype is boolean.
 - inferred from "High BMI Follow-up Service Requests".
-- apply pattern `NotDoneWithReason(this, "Medical Reasons") and SameDay(this, "Qualifying Encounter") and WasPerformed(this)`.
+- apply pattern `NotDoneWithReason("High BMI Follow-up Service Requests", "Medical Reasons") and SameDay("High BMI Follow-up Service Requests", "Qualifying Encounter") and WasPerformed("High BMI Follow-up Service Requests")`.
 
 concept "Low BMI Follow-up Not Done With Reason":
 - type is ServiceRequest.
 - valuetype is boolean.
 - inferred from "Low BMI Follow-up Service Requests".
-- apply pattern `NotDoneWithReason(this, "Medical Reasons") and SameDay(this, "Qualifying Encounter") and WasPerformed(this)`.
+- apply pattern `NotDoneWithReason("Low BMI Follow-up Service Requests", "Medical Reasons") and SameDay("Low BMI Follow-up Service Requests", "Qualifying Encounter") and WasPerformed("Low BMI Follow-up Service Requests")`.
 
 concept "Weight Assessment Referral Not Done With Reason":
 - type is ServiceRequest.
 - valuetype is boolean.
 - inferred from "Weight Assessment Referrals".
-- apply pattern `NotDoneWithReason(this, "Medical Reasons") and SameDay(this, "Qualifying Encounter") and WasPerformed(this)`.
+- apply pattern `NotDoneWithReason("Weight Assessment Referrals", "Medical Reasons") and SameDay("Weight Assessment Referrals", "Qualifying Encounter") and WasPerformed("Weight Assessment Referrals")`.
 
 concept "High BMI Medication Not Done With Reason":
 - type is MedicationRequest.
 - valuetype is boolean.
 - inferred from "High BMI Medications".
-- apply pattern `NotDoneWithReason(this, "Medical Reasons") and SameDay(this, "Qualifying Encounter") and WasPerformed(this)`.
+- apply pattern `NotDoneWithReason("High BMI Medications", "Medical Reasons") and SameDay("High BMI Medications", "Qualifying Encounter") and WasPerformed("High BMI Medications")`.
 
 concept "Low BMI Medication Not Done With Reason":
 - type is MedicationRequest.
 - valuetype is boolean.
 - inferred from "Low BMI Medications".
-- apply pattern `NotDoneWithReason(this, "Medical Reasons") and SameDay(this, "Qualifying Encounter") and WasPerformed(this)`.
+- apply pattern `NotDoneWithReason("Low BMI Medications", "Medical Reasons") and SameDay("Low BMI Medications", "Qualifying Encounter") and WasPerformed("Low BMI Medications")`.
 
 concept "Medical Reason For Not Documenting A Follow Up Plan For Low Or High BMI":
 - type is ServiceRequest.
@@ -306,32 +303,31 @@ concept "Active Pregnancy Diagnosis":
 - type is Condition.
 - valuetype is boolean.
 - inferred from "Pregnancy Diagnoses".
-- apply pattern `Active(this, during "Measurement Period")`.
+- apply pattern `Active("Pregnancy Diagnoses", during "Measurement Period")`.
 
 concept "Verified Pregnancy Status":
 - type is Observation.
 - valuetype is boolean.
 - inferred from "Pregnancy Status Observations".
-- apply pattern `Overlaps(this, "Measurement Period") and Verified(this) and DocumentedAs(this, "Pregnancy or Other Related Diagnoses")`.
+- apply pattern `Overlaps("Pregnancy Status Observations", "Measurement Period") and Verified("Pregnancy Status Observations") and DocumentedAs("Pregnancy Status Observations", "Pregnancy or Other Related Diagnoses")`.
 
 concept "Is Pregnant During Measurement Period":
 - type is Condition.
 - valuetype is boolean.
 - inferred from ("Active Pregnancy Diagnosis" or "Verified Pregnancy Status").
 
+concept "Aged 18+ at Qualifying Encounter":
+- type is Encounter.
+- valuetype is boolean.
+- inferred from "Qualifying Encounter".
+- apply pattern `AtLeast(AgeAt(start of "Qualifying Encounter"), 18 years)`.
 
 // ============================================================
 // INTERFACE LAYER — measure API
 // ============================================================
 
-concept "Aged 18+ at Qualifying Encounter":
-- type is Encounter.
-- valuetype is boolean.
-- inferred from "Qualifying Encounter".
-- apply pattern `AtLeast(AgeAt(start of this), 18 years)`.
-
 concept "Initial Population":
-- type is Encounter.
+- type is Observation.
 - valuetype is boolean.
 - inferred from "Aged 18+ at Qualifying Encounter".
 
