@@ -1,23 +1,5 @@
 # CMS22 Blood Pressure Screening and Follow-Up
 
-// Composition architecture: three layers (Asserted / Inferred / Interface).
-// Mirrors CMS69's shape: screening → classification → intervention bundle.
-//
-// Differences vs CMS69 (notes for the catalog cross-check):
-// - BP is a *panel* observation with Systolic / Diastolic *components*; BMI was one
-//   observation. Component-selection inside a panel surfaces as a catalog gap.
-// - Numerator splits across 5 reading classes (Normal / Elevated / 1st-HTN / 2nd-HTN-130s / 2nd-HTN-140+),
-//   each with its own intervention bundle. CMS69 had just High/Low/Normal.
-// - "Second hypertensive reading" requires a prior hypertensive reading within the year prior —
-//   year-prior lookback is new (`Within(reading, year-prior-window)` or `OnOrBefore`).
-// - Exception branch uses `reasonRefused in "Patient Declined"` (vs CMS69 medical-reason +
-//   patient-declined union) — same `NotDoneWithReason` umbrella with different reason valueset.
-
-
-// ============================================================
-// ASSERTED LAYER — leaves of the expression tree
-// Source-domain valueset retrieves and code-based retrieves.
-// ============================================================
 
 // --- Encounter source ---
 concept "BP Screening Encounters":
@@ -25,8 +7,6 @@ concept "BP Screening Encounters":
 - valuetype is CodeableConcept.
 - coded from "Encounter to Screen for Blood Pressure".
 
-// Defined for concept-based negation: "encounter class != virtual" becomes
-// "not in this concept". The valueset is just the v3-ActCode 'VR' code.
 concept "Virtual Encounters":
 - type is Encounter.
 - valuetype is CodeableConcept.
@@ -39,15 +19,11 @@ concept "Hypertension Diagnoses":
 - coded from "Diagnosis of Hypertension".
 
 // --- BP observation source ---
-// BP panel is keyed on a single LOINC code; the panel's components carry Systolic / Diastolic.
 concept "Blood Pressure Panels":
 - type is Observation.
 - valuetype is CodeableConcept.
 - coded from "Blood pressure panel with all children optional".
 
-// Discriminator concepts for concept-based projection on BP panel components.
-// Same pattern as the concept-based-negation idiom (Virtual Encounters): wrap a code/valueset
-// as a concept so the Inferred layer can refer to it by name rather than by code-arg.
 concept "Systolic Blood Pressure Code":
 - type is Observation.
 - valuetype is CodeableConcept.
@@ -121,14 +97,13 @@ concept "Antihypertensive Medications":
 - valuetype is CodeableConcept.
 - coded from "Pharmacologic Therapy for Hypertension".
 
-// --- Hypertensive-reason qualifier ---
-// Reason code/criterion used to justify a referral as "for hypertensive reading".
+// --- Hypertensive-reading finding (reason qualifier) ---
 concept "Hypertensive Reading Findings":
 - type is Observation.
 - valuetype is CodeableConcept.
 - coded from "Finding of Elevated Blood Pressure or Hypertension".
 
-// --- Refusal / not-done reason qualifiers ---
+// --- Not-done reason qualifiers ---
 concept "Medical Reasons":
 - type is Observation.
 - valuetype is CodeableConcept.
@@ -140,12 +115,7 @@ concept "Patient Declined Reasons":
 - coded from "Patient Declined".
 
 
-// ============================================================
-// INFERRED LAYER — clinical-intent derivations
-// ============================================================
-
 // --- Qualifying Encounter ---
-// BP-screening encounter, during measurement period, finished, AND not virtual.
 concept "BP Evaluation Encounter (not virtual)":
 - type is Encounter.
 - valuetype is boolean.
@@ -157,11 +127,7 @@ concept "Qualifying Encounter":
 - inferred from "BP Evaluation Encounter (not virtual)".
 - apply pattern `During("BP Evaluation Encounter (not virtual)", "Measurement Period") and WasPerformed("BP Evaluation Encounter (not virtual)")`.
 
-// --- BP panel projections ---
-// Concept-based projection idiom (parallel to concept-based negation):
-// extract the Systolic / Diastolic component value from the BP panel.
-// `Component(panel, discriminator-concept)` is a v0.3.2 catalog candidate
-// (see cms22-modeled notes — surfaced by this measure).
+// --- BP panel projections (Systolic / Diastolic) ---
 concept "Systolic BP Reading":
 - type is Observation.
 - valuetype is Quantity.
@@ -175,7 +141,6 @@ concept "Diastolic BP Reading":
 - apply pattern `Component("Blood Pressure Panels", "Diastolic Blood Pressure Code")`.
 
 // --- Last BP reading on each qualifying encounter day ---
-// The encounter-day-anchored "last" reading drives all BP threshold checks.
 concept "Last BP Panel on Qualifying Encounter Day":
 - type is Observation.
 - valuetype is CodeableConcept.
@@ -195,13 +160,11 @@ concept "Last Diastolic on Qualifying Encounter Day":
 - apply pattern `Component("Last BP Panel on Qualifying Encounter Day", "Diastolic Blood Pressure Code")`.
 
 // --- BP classification ladder ---
-// Five clinical classes per the measure spec:
-// - Normal:           Systolic < 120 AND Diastolic < 80
-// - Elevated:         Systolic 120–129 AND Diastolic < 80
-// - First HTN:        Systolic >= 130 OR Diastolic >= 80, with no prior-year HTN reading
-// - Second HTN 130s:  Systolic 130–139 OR Diastolic 80–89, with prior-year HTN reading
-// - Second HTN 140+:  Systolic >= 140 OR Diastolic >= 90, with prior-year HTN reading
-
+// Normal:           Systolic < 120 AND Diastolic < 80
+// Elevated:         Systolic 120–129 AND Diastolic < 80
+// First HTN:        Systolic >= 130 OR Diastolic >= 80, with no prior-year HTN reading
+// Second HTN 130s:  Systolic 130–139 OR Diastolic 80–89, with prior-year HTN reading
+// Second HTN 140+:  Systolic >= 140 OR Diastolic >= 90, with prior-year HTN reading
 concept "Normal BP Reading":
 - type is Observation.
 - valuetype is boolean.
@@ -214,16 +177,12 @@ concept "Elevated BP Reading":
 - inferred from "Last BP Panel on Qualifying Encounter Day".
 - apply pattern `Between("Last Systolic on Qualifying Encounter Day".value, 120 'mm[Hg]', 129 'mm[Hg]') and Below("Last Diastolic on Qualifying Encounter Day".value, 80 'mm[Hg]')`.
 
-// "Hypertensive reading" is the umbrella for any reading at-or-above 130/80.
-// Used both directly and for the prior-year-lookback check.
 concept "Hypertensive Reading":
 - type is Observation.
 - valuetype is boolean.
 - inferred from "Last BP Panel on Qualifying Encounter Day".
 - apply pattern `AtLeast("Last Systolic on Qualifying Encounter Day".value, 130 'mm[Hg]') or AtLeast("Last Diastolic on Qualifying Encounter Day".value, 80 'mm[Hg]')`.
 
-// Prior-year lookback: did the patient have a hypertensive reading in the year before
-// the qualifying encounter? This drives the First-HTN vs Second-HTN split.
 concept "Prior-Year Hypertensive Reading":
 - type is Observation.
 - valuetype is boolean.
@@ -235,7 +194,6 @@ concept "First Hypertensive Reading":
 - valuetype is boolean.
 - inferred from ("Hypertensive Reading" and not "Prior-Year Hypertensive Reading").
 
-// Second-HTN subgroups: range-bucketing on Systolic / Diastolic, conditioned on having a prior reading.
 concept "Second Hypertensive Reading 130s Body":
 - type is Observation.
 - valuetype is boolean.
@@ -258,11 +216,7 @@ concept "Second Hypertensive Reading 140+":
 - valuetype is boolean.
 - inferred from ("Second Hypertensive Reading 140+ Body" and "Prior-Year Hypertensive Reading").
 
-
-// --- Intervention sources, filtered to "ordered" ---
-// Each is the underlying retrieve narrowed to intent-in-order-family.
-// Pattern: `WasOrdered(<source>)`.
-
+// --- Ordered-intervention concepts ---
 concept "Four-Week Rescreen Order":
 - type is ServiceRequest.
 - valuetype is boolean.
@@ -275,7 +229,6 @@ concept "Six-Month Rescreen Order":
 - inferred from "Follow-up Within 6 Months".
 - apply pattern `WasOrdered("Follow-up Within 6 Months")`.
 
-// Source union for non-pharmacological lifestyle interventions.
 concept "Non-Pharmacological Recommendations":
 - type is ServiceRequest.
 - valuetype is CodeableConcept.
@@ -287,7 +240,6 @@ concept "Non-Pharmacological Recommendation Order":
 - inferred from "Non-Pharmacological Recommendations".
 - apply pattern `WasOrdered("Non-Pharmacological Recommendations")`.
 
-// Source union for lab / EKG diagnostic workup.
 concept "Hypertension Lab or ECG Requests":
 - type is ServiceRequest.
 - valuetype is CodeableConcept.
@@ -299,26 +251,19 @@ concept "Hypertension Lab or ECG Order":
 - inferred from "Hypertension Lab or ECG Requests".
 - apply pattern `WasOrdered("Hypertension Lab or ECG Requests")`.
 
-// Antihypertensive medication, started/active during the qualifying encounter day.
 concept "Antihypertensive Medication Order":
 - type is MedicationRequest.
 - valuetype is boolean.
 - inferred from "Antihypertensive Medications".
 - apply pattern `WasOrdered("Antihypertensive Medications") and Active("Antihypertensive Medications")`.
 
-// Referral to primary care, justified by hypertensive reading finding.
 concept "Referral for Hypertensive Reading":
 - type is ServiceRequest.
 - valuetype is boolean.
 - inferred from "Primary-Care Referrals".
 - apply pattern `Justified("Primary-Care Referrals", "Hypertensive Reading Findings") and WasOrdered("Primary-Care Referrals")`.
 
-
 // --- Per-class intervention bundles ---
-// Each bundle = ordered intervention(s), same-day as the qualifying encounter.
-// "Same day" anchors the intervention to the BP-reading encounter (per CMS22's
-// `authoredOn during day of <Encounter>.period` clauses).
-
 // Elevated BP: 6-month rescreen + non-pharm, OR a referral.
 concept "Elevated BP Followup Bundle":
 - type is ServiceRequest.
@@ -347,11 +292,8 @@ concept "Second HTN 140+ Followup Bundle":
 - inferred from "Qualifying Encounter".
 - apply pattern `(SameDay("Four-Week Rescreen Order", "Qualifying Encounter") and SameDay("Hypertension Lab or ECG Order", "Qualifying Encounter") and SameDay("Non-Pharmacological Recommendation Order", "Qualifying Encounter") and SameDay("Antihypertensive Medication Order", "Qualifying Encounter")) or SameDay("Referral for Hypertensive Reading", "Qualifying Encounter")`.
 
-
 // --- Per-class numerator components ---
-// Each = ReadingClass AND (the intervention bundle for that class).
-// Normal BP needs no intervention; it counts on its own.
-
+// Each = ReadingClass AND (intervention bundle for that class). Normal counts on its own.
 concept "Normal BP Numerator":
 - type is Observation.
 - valuetype is boolean.
@@ -377,30 +319,21 @@ concept "Second HTN 140+ With Followup":
 - valuetype is boolean.
 - inferred from ("Second Hypertensive Reading 140+" and "Second HTN 140+ Followup Bundle").
 
-
 // --- Active hypertension diagnosis (Denominator Exclusion driver) ---
-// Verified HTN diagnosis active on or before the qualifying encounter day.
 concept "Active Verified Hypertension Diagnosis":
 - type is Condition.
 - valuetype is boolean.
 - inferred from "Hypertension Diagnoses".
 - apply pattern `Active("Hypertension Diagnoses") and Verified("Hypertension Diagnoses") and OnOrBefore("Hypertension Diagnoses".onset, "Qualifying Encounter")`.
 
-
 // --- Exception branch 1: BP measurement not done with documented reason ---
-// BP panel cancellation, with notDoneReason in (Medical Reason OR Patient Declined),
-// same day as the qualifying encounter.
 concept "BP Measurement Not Done With Reason":
 - type is Observation.
 - valuetype is boolean.
 - inferred from "Blood Pressure Panels".
 - apply pattern `NotDoneWithReason("Blood Pressure Panels", "Medical Reasons" or "Patient Declined Reasons") and SameDay("Blood Pressure Panels", "Qualifying Encounter")`.
 
-
 // --- Exception branch 2: HTN follow-up declined by patient ---
-// Per-intervention "not done with patient-declined reason" leaves.
-// Each = the intervention's NotRequested form, with reasonRefused in Patient Declined.
-
 concept "Four-Week Rescreen Declined":
 - type is ServiceRequest.
 - valuetype is boolean.
@@ -437,9 +370,6 @@ concept "Antihypertensive Medication Declined":
 - inferred from "Antihypertensive Medications".
 - apply pattern `NotDoneWithReason("Antihypertensive Medications", "Patient Declined Reasons")`.
 
-// --- Per-class declined bundles (same-day as qualifying encounter) ---
-// Mirrors the per-class followup bundles, but with declined-intervention leaves.
-
 concept "Elevated BP Declined Bundle":
 - type is ServiceRequest.
 - valuetype is boolean.
@@ -464,7 +394,6 @@ concept "Second HTN 140+ Declined Bundle":
 - inferred from "Qualifying Encounter".
 - apply pattern `(SameDay("Primary-Care Referral Declined", "Qualifying Encounter") or SameDay("Four-Week Rescreen Declined", "Qualifying Encounter")) or SameDay("Antihypertensive Medication Declined", "Qualifying Encounter") or SameDay("Hypertension Lab or ECG Declined", "Qualifying Encounter") or SameDay("Non-Pharm Recommendation Declined", "Qualifying Encounter")`.
 
-// Per-class declined-with-reading concepts.
 concept "Elevated BP With Declined Followup":
 - type is Observation.
 - valuetype is boolean.
@@ -485,7 +414,6 @@ concept "Second HTN 140+ With Declined Followup":
 - valuetype is boolean.
 - inferred from ("Second Hypertensive Reading 140+" and "Second HTN 140+ Declined Bundle").
 
-// Union across all per-class declined-followup branches.
 concept "HTN Followup Declined By Patient":
 - type is Observation.
 - valuetype is boolean.
@@ -494,17 +422,15 @@ concept "HTN Followup Declined By Patient":
                 or "Second HTN 130s With Declined Followup"
                 or "Second HTN 140+ With Declined Followup").
 
-
-// ============================================================
-// INTERFACE LAYER — measure API
-// ============================================================
-
+// --- Age predicate ---
 concept "Aged 18+ at Qualifying Encounter":
 - type is Encounter.
 - valuetype is boolean.
 - inferred from "Qualifying Encounter".
 - apply pattern `AtLeast(AgeAt(start of "Qualifying Encounter"), 18 years)`.
 
+
+// --- Measure API ---
 concept "Initial Population":
 - type is Observation.
 - valuetype is boolean.
@@ -515,14 +441,11 @@ concept "Denominator":
 - valuetype is boolean.
 - inferred from "Initial Population".
 
-// HTN diagnosis already established before this encounter → out of scope.
 concept "Denominator Exclusions":
 - type is Condition.
 - valuetype is boolean.
 - inferred from "Active Verified Hypertension Diagnosis".
 
-// Patient met clinical criteria for one of the five classes
-// (Normal alone, or any reading + followup bundle).
 concept "Numerator":
 - type is Observation.
 - valuetype is boolean.
@@ -532,7 +455,6 @@ concept "Numerator":
                 or "Second HTN 130s With Followup"
                 or "Second HTN 140+ With Followup").
 
-// BP not measured (medical/patient reason) OR HTN followup declined by patient.
 concept "Denominator Exceptions":
 - type is Observation.
 - valuetype is boolean.

@@ -1,24 +1,13 @@
 # CMS69 BMI Screening and Follow-Up
 
-// Composition architecture: three layers (Asserted / Inferred / Interface)/  
-// Property-value checks like
-// "encounter class is not virtual" are handled via concept-based negation — define
-// the property value as its own concept and negate at the concept level. CRL
-// doesn't formally model FHIR property paths; the canonical approach is concept
-// negation, not ad-hoc property-access predicates.
-//
 
-
-// ============================================================
-// ASSERTED LAYER — leaves of the expression tree
-// Source-domain valueset retrieves.
-// ============================================================
-
+// --- Source observations ---
 concept "BMI Observations":
 - type is Observation.
 - valuetype is Quantity.
 - coded from "Body Mass Index Observations".
 
+// --- Diagnosis sources ---
 concept "Pregnancy Diagnoses":
 - type is Condition.
 - valuetype is CodeableConcept.
@@ -29,18 +18,28 @@ concept "Pregnancy Status Observations":
 - valuetype is CodeableConcept.
 - coded from "Pregnancy Status".
 
+concept "Overweight or Obese Diagnoses":
+- type is Condition.
+- valuetype is CodeableConcept.
+- coded from "Overweight or Obese".
+
+concept "Underweight Diagnoses":
+- type is Condition.
+- valuetype is CodeableConcept.
+- coded from "Underweight".
+
+// --- Encounter source ---
 concept "Encounters to Evaluate BMI":
 - type is Encounter.
 - valuetype is CodeableConcept.
 - coded from "Encounter to Evaluate BMI".
 
-// Defined for concept-based negation: "encounter class != virtual" becomes
-// "not in this concept". The valueset has just the v3-ActCode 'VR' code.
 concept "Virtual Encounters":
 - type is Encounter.
 - valuetype is CodeableConcept.
 - coded from "Virtual Encounter Class".
 
+// --- Intervention sources: service requests ---
 concept "High BMI Follow-up Service Requests":
 - type is ServiceRequest.
 - valuetype is CodeableConcept.
@@ -56,6 +55,7 @@ concept "Weight Assessment Referrals":
 - valuetype is CodeableConcept.
 - coded from "Referrals Where Weight Assessment May Occur".
 
+// --- Intervention sources: medications ---
 concept "High BMI Medications":
 - type is MedicationRequest.
 - valuetype is CodeableConcept.
@@ -66,6 +66,7 @@ concept "Low BMI Medications":
 - valuetype is CodeableConcept.
 - coded from "Medications for Below Normal BMI".
 
+// --- Intervention sources: procedures ---
 concept "High BMI Follow-up Procedures":
 - type is Procedure.
 - valuetype is CodeableConcept.
@@ -76,17 +77,7 @@ concept "Low BMI Follow-up Procedures":
 - valuetype is CodeableConcept.
 - coded from "Follow Up for Below Normal BMI Procedures".
 
-concept "Overweight or Obese Diagnoses":
-- type is Condition.
-- valuetype is CodeableConcept.
-- coded from "Overweight or Obese".
-
-concept "Underweight Diagnoses":
-- type is Condition.
-- valuetype is CodeableConcept.
-- coded from "Underweight".
-
-// Reason valuesets used as property qualifiers on action resources.
+// --- Not-done reason qualifiers ---
 concept "Medical Reasons":
 - type is Observation.
 - valuetype is CodeableConcept.
@@ -98,14 +89,7 @@ concept "Patient Declined Reasons":
 - coded from "Patient Declined".
 
 
-// ============================================================
-// INFERRED LAYER — clinical-intent derivations
-// Each concept names a kind of clinical inference per the catalog.
-// ============================================================
-
 // --- Qualifying Encounter ---
-// BMI evaluation encounter, during measurement period, performed, AND not virtual.
-// Note: "not virtual" via concept-negation (Virtual Encounters defined above).
 concept "BMI Evaluation Encounter (not virtual)":
 - type is Encounter.
 - valuetype is boolean.
@@ -125,7 +109,7 @@ concept "BMI During Measurement Period":
 - apply pattern `During("BMI Observations", "Measurement Period") and Exceeds("BMI Observations".value, 0 'kg/m2')`.
 
 // --- BMI clinical classifications ---
-// The agent emitter knows the standard cutoffs: <18.5 = Low, [18.5,25) = Normal, >=25 = High.
+// Standard cutoffs: <18.5 = Low, [18.5,25) = Normal, >=25 = High.
 concept "Documented Low BMI":
 - type is Observation.
 - valuetype is boolean.
@@ -163,10 +147,6 @@ concept "Has Underweight":
 - apply pattern `Active("Underweight Diagnoses")`.
 
 // --- High BMI Interventions Ordered ---
-// Each leaf type-specific intervention concept applies the catalog pattern
-// (Justified by reason OR pre-existing diagnosis); a union concept then
-// combines them via boolean OR.
-
 concept "High BMI Follow-up Order":
 - type is ServiceRequest.
 - valuetype is boolean.
@@ -210,7 +190,6 @@ concept "High BMI And Follow Up Provided":
 - apply pattern `With("Documented High BMI", ("High BMI Interventions Ordered" or "High BMI Interventions Performed") and During("Documented High BMI", "Measurement Period"))`.
 
 // --- Low BMI analogous ---
-
 concept "Low BMI Follow-up Order":
 - type is ServiceRequest.
 - valuetype is boolean.
@@ -316,16 +295,15 @@ concept "Is Pregnant During Measurement Period":
 - valuetype is boolean.
 - inferred from ("Active Pregnancy Diagnosis" or "Verified Pregnancy Status").
 
+// --- Age predicate ---
 concept "Aged 18+ at Qualifying Encounter":
 - type is Encounter.
 - valuetype is boolean.
 - inferred from "Qualifying Encounter".
 - apply pattern `AtLeast(AgeAt(start of "Qualifying Encounter"), 18 years)`.
 
-// ============================================================
-// INTERFACE LAYER — measure API
-// ============================================================
 
+// --- Measure API ---
 concept "Initial Population":
 - type is Observation.
 - valuetype is boolean.
