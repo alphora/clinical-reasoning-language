@@ -1,10 +1,12 @@
-# CRL clinical inference patterns — draft catalog v0.3.1
+# CRL clinical inference patterns — draft catalog v0.3.2
 
-> **Status: draft v0.3.1** (v0.3 expanded after end-to-end modeling of CMS69 surfaced 4 gaps; v0.3.1 re-tiers two cards after operator review of `Justified`'s category). **43 patterns** across the inference taxonomy — corpus-true count, no padding to 50. Operator notes the catalog should land "around 50 if discrimination is right"; 43 is in the corridor.
+> **Status: draft v0.3.2** (v0.3 expanded after end-to-end modeling of CMS69 surfaced 4 gaps; v0.3.1 re-tiered two cards; v0.3.2 adds two cards surfaced by CMS22 modeling). **45 patterns** across the inference taxonomy — corpus-true count, no padding to 50. Operator notes the catalog should land "around 50 if discrimination is right"; 45 is in the corridor.
 >
 > **v0.3 additions** (from CMS69 modeling): `Justified` (specialization for reason-code checks), `OnOrBefore`, `SameDay`. The CMS69 `class != virtual` case is handled via **concept-based negation** — define `Virtual Encounters` as its own concept and negate it (`not "Virtual Encounters"`), rather than via an ad-hoc property-check pattern. This is the idiomatic CRL approach for "where property = value" checks; see `project_crl-cql-composition-architecture` memory.
 >
 > **v0.3.1 re-tier** (operator review): `Justified` moved from Contextualization → Assertion. `Active` moved from State/Process Inference → Assertion. Rationale: both add clinical-assertion semantics (justificatory link; currently-relevant status) rather than constraining or selecting. See the Assertion section note. `WasPerformed` stays in State/Process Inference as the remaining state-of-resource predicate.
+>
+> **v0.3.2 additions** (from CMS22 modeling): `Component(panel, discriminator)` (concept-based projection idiom for extracting Systolic/Diastolic from BP panels, sister to concept-based negation), `Between(value, lo, hi)` (closed-range threshold, completes the numeric-threshold set). Other CMS22 cross-checks confirmed without changes: `Within`, `Justified`, `WasOrdered`, `SameDay`, `NotDoneWithReason`, `Active`, `Verified`, `Last`, `AtLeast`, `Below`, `AgeAt` all generalize from CMS69.
 
 ## Reading the catalog
 
@@ -28,7 +30,7 @@ Two patterns use the **parameterized-umbrella** technique (one name + a clinical
 | Contextualization | `With(X, Y)`, `AsOf(anchor, X)`, `NotDoneWithReason(action, reason)`, `BaselineAndFollowUp(initial, followup)`, `InpatientStay(encounter[, includePrelude])`, `WasOrdered(X)` |
 | Assertion | `Justified(action, reason)`, `Active(X[, during])`, `Verified(X)`, `DocumentedAs(X, classification)` |
 | Qualification (temporal) | `MostRecent(X[, anchor])`, `Last(X[, anchor])`, `Earliest(X[, anchor])`, `First(X[, anchor])`, `During(event, period)`, `Within(X, window)`, `Overlaps(eventA, eventB)`, `OnDayOfOrAfter(X, anchor)`, `OnOrBefore(X, anchor)`, `SameDay(eventA, eventB)`, `BetweenAnchors(X, start, end)`, `AtLeastDaysApart(eventA, eventB, n)`, `AtMostDaysApart(eventA, eventB, n)` |
-| Calculation | `AgeAt(anchor)`, `Calculate(X)`, `Lowest(X)`, `Highest(X)`, `AtLeastN(events, n)`, `Consecutive(events, n)`, `High(X)`, `Low(X)`, `Normal(X)`, `Abnormal(X)`, `AtLeast(value, target)`, `AtMost(value, target)`, `Exceeds(value, target)`, `Below(value, target)` |
+| Calculation | `AgeAt(anchor)`, `Calculate(X)`, `Component(panel, discriminator)`, `Lowest(X)`, `Highest(X)`, `AtLeastN(events, n)`, `Consecutive(events, n)`, `High(X)`, `Low(X)`, `Normal(X)`, `Abnormal(X)`, `AtLeast(value, target)`, `AtMost(value, target)`, `Between(value, lo, hi)`, `Exceeds(value, target)`, `Below(value, target)` |
 | State / Process Inference | `WasPerformed(X)` |
 
 ## Patterns dropped from v0.1 (and why)
@@ -359,6 +361,17 @@ Each of these "looks like a concept hiding inside a pattern" — it asserts a cl
 - **examples** — `CMS0334 :: Delivery Encounter With Calculated Gestational Age Greater Than Or Equal To 37 Weeks`, `CMS1244 :: Boarded Time Greater Than 240 Minutes`
 - **anti-example** — `MostRecent(X)` / `Lowest(X)` for selecting an existing value; `Compute` is for *deriving* a new feature.
 
+### `Component(panel, discriminator)`
+- **intent** — extract the named component value from a composite measurement panel (Systolic / Diastolic from a BP panel; specific lab analyte from a lab-panel observation)
+- **params** — `panel` (composite Observation, e.g. a BP panel); `discriminator` (a concept naming which component — wraps the component code or code-valueset)
+- **category** — Calculation *, secondary Classification*
+- **maturity** — moderate (clear in BP-panel measures; will widen as other panel-with-components measures surface)
+- **filled-in reads:** `Component("Blood Pressure Panels", "Systolic Blood Pressure Code")` → "the systolic component of the blood pressure panel"
+- **evidence** — L2: BP panel `.component` access via `singleton from … where C.code ~ "Systolic"` (CMS22, CMS165). The discriminator-concept pattern wraps the component-identifying code at the Asserted layer.
+- **examples** — `CMS22 :: Systolic BP Reading`, `CMS22 :: Diastolic BP Reading`, `CMS22 :: Last Systolic on Qualifying Encounter Day`
+- **anti-example** — `Calculate(X)` is for *deriving* a new feature from raw inputs (gestational age from coded reading, BMI from height/weight); `Component` is for *extracting* an existing component from a composite resource.
+- **idiom note** — Discriminator concepts at the Asserted layer wrap the component-identifying code/valueset. This is the **concept-based projection** idiom — sister to concept-based negation (which wraps a code-to-exclude). Both keep property-access out of the pattern body and at the concept layer where informaticists name what they mean.
+
 ### `Lowest(X)` / `Highest(X)`
 - **intent** — the lowest or highest reading of X (within an implicit scope)
 - **params** — `X` (the clinical kind of measurement)
@@ -402,7 +415,17 @@ Each of these "looks like a concept hiding inside a pattern" — it asserts a cl
 - **maturity** — strong
 - **evidence** — L1: 18 `threshold-named`-tagged statements; "Greater Than 240 Minutes" (4), "Greater Than Or Equal To 37 Weeks" (6), "Less than 50".
 - **examples** — `CMS0334 :: Delivery Encounter With Calculated Gestational Age Greater Than Or Equal To 37 Weeks` (`AtLeast(GA, 37 weeks)`), `CMS1244 :: Boarded Time Greater Than 240 Minutes` (`Exceeds(boarded-time, 240 minutes)`)
-- **anti-example** — `High(X)` / `Low(X)` for *named clinical categories* (high BMI, low BP); these primitives are for *explicit numeric* thresholds.
+- **anti-example** — `High(X)` / `Low(X)` for *named clinical categories* (high BMI, low BP); these primitives are for *explicit numeric* thresholds. `Between(value, lo, hi)` for closed-range bucketing.
+
+### `Between(value, lo, hi)`
+- **intent** — numeric value falls in the closed range `[lo, hi]` (canonical for clinical range bucketing — BP class, A1c band, weight-for-age band)
+- **params** — `value`; `lo`, `hi` (typed Quantity, same units)
+- **category** — Calculation *, secondary Classification*
+- **maturity** — moderate (canonical for BP / lab range bucketing; corpus expansion expected to widen)
+- **filled-in reads:** `Between(systolic, 120 'mm[Hg]', 129 'mm[Hg]')` → "systolic between 120 and 129 mmHg"
+- **evidence** — L1: range constructions "SBP 120 to 129", "SBP 130 to 139", "DBP 80 to 89". L2: `.value in Interval[lo, hi]` shape (CMS22 BP buckets; expected in CMS122 A1c bands).
+- **examples** — `CMS22 :: Elevated BP Reading` (systolic between 120 and 129), `CMS22 :: Second Hypertensive Reading 130s` (systolic between 130 and 139 OR diastolic between 80 and 89)
+- **anti-example** — `AtLeast(value, target)` / `Below(value, target)` for one-sided thresholds; `Between` is for an *explicit closed range* with both bounds.
 
 ---
 
