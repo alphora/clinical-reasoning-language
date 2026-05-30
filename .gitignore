@@ -55,3 +55,10 @@ temp/
 
 
 issues/
+
+# Feature working artifacts: source corpora dropped in for analysis and
+# derived data (decoded ELM forests, etc.). Source folders often contain
+# their own .git checkouts and are huge; derived data is regenerable.
+# Committed artifacts (README, scripts, results) live alongside but stay tracked.
+features/*/sources/
+features/*/data/
