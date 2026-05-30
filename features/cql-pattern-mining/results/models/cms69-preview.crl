@@ -1,0 +1,483 @@
+# CMS69 BMI Screening and Follow-Up — NEW INFERRED-FROM SYNTAX PREVIEW
+
+// This is a v0.4.x grammar preview showing the proposed multi-clause
+// `inferred from` shape that absorbs `apply pattern` into one
+// declarative block. WON'T PARSE with the current grammar.
+//
+// Parseable v0.4.0 form: see cms69.crl (current HEAD).
+// Grammar update enabling this shape: separate work item.
+
+
+// ============ Asserted concepts (unchanged) ============
+
+concept "BMI Observations":
+- type is Observation.
+- valuetype is Quantity.
+- coded from "Body Mass Index Observations".
+
+concept "Pregnancy Diagnoses":
+- type is Condition.
+- valuetype is CodeableConcept.
+- coded from "Pregnancy or Other Related Diagnoses".
+
+concept "Pregnancy Status Observations":
+- type is Observation.
+- valuetype is CodeableConcept.
+- coded from "Pregnancy Status".
+
+concept "Overweight or Obese Diagnoses":
+- type is Condition.
+- valuetype is CodeableConcept.
+- coded from "Overweight or Obese".
+
+concept "Underweight Diagnoses":
+- type is Condition.
+- valuetype is CodeableConcept.
+- coded from "Underweight".
+
+concept "Encounters to Evaluate BMI":
+- type is Encounter.
+- valuetype is CodeableConcept.
+- coded from "Encounter to Evaluate BMI".
+
+concept "Virtual Encounters":
+- type is Encounter.
+- valuetype is CodeableConcept.
+- coded from "Virtual Encounter Class".
+
+concept "High BMI Follow-up Service Requests":
+- type is ServiceRequest.
+- valuetype is CodeableConcept.
+- coded from "Follow Up for Above Normal BMI".
+
+concept "Low BMI Follow-up Service Requests":
+- type is ServiceRequest.
+- valuetype is CodeableConcept.
+- coded from "Follow Up for Below Normal BMI".
+
+concept "Weight Assessment Referrals":
+- type is ServiceRequest.
+- valuetype is CodeableConcept.
+- coded from "Referrals Where Weight Assessment May Occur".
+
+concept "High BMI Medications":
+- type is MedicationRequest.
+- valuetype is CodeableConcept.
+- coded from "Medications for Above Normal BMI".
+
+concept "Low BMI Medications":
+- type is MedicationRequest.
+- valuetype is CodeableConcept.
+- coded from "Medications for Below Normal BMI".
+
+concept "High BMI Follow-up Procedures":
+- type is Procedure.
+- valuetype is CodeableConcept.
+- coded from "Follow Up for Above Normal BMI Procedures".
+
+concept "Low BMI Follow-up Procedures":
+- type is Procedure.
+- valuetype is CodeableConcept.
+- coded from "Follow Up for Below Normal BMI Procedures".
+
+concept "Medical Reasons":
+- type is Observation.
+- valuetype is CodeableConcept.
+- coded from "Medical Reason".
+
+concept "Patient Declined Reasons":
+- type is Observation.
+- valuetype is CodeableConcept.
+- coded from "Patient Declined".
+
+
+// ============ Inferred concepts (new syntax) ============
+
+// --- Qualifying Encounter ---
+// before: inferred from (X and not Y).
+// after:  multi-clause list-style with AND NOT
+concept "BMI Evaluation Encounter (not virtual)":
+- type is Encounter.
+- valuetype is boolean.
+- inferred from
+   - "Encounters to Evaluate BMI".
+   AND NOT
+   - "Virtual Encounters".
+
+// before: inferred from "X". + apply pattern `narrative`.
+// after:  inferred from absorbs the narrative as a multi-clause block.
+//         The implicit subject "BMI Evaluation Encounter (not virtual)"
+//         is now in each clause directly.
+concept "Qualifying Encounter":
+- type is Encounter.
+- valuetype is boolean.
+- inferred from
+   - "BMI Evaluation Encounter (not virtual)" during "Measurement Period".
+   AND
+   - "BMI Evaluation Encounter (not virtual)" was performed.
+
+concept "BMI During Measurement Period":
+- type is Observation.
+- valuetype is Quantity.
+- inferred from
+   - "BMI Observations" during "Measurement Period".
+   AND
+   - "BMI Observations" exceeds 0 'kg/m2'.
+
+// --- BMI clinical classifications ---
+// Single-clause cases inline: `- inferred from <narrative>.`
+concept "Documented Low BMI":
+- type is Observation.
+- valuetype is boolean.
+- inferred from "BMI During Measurement Period" is low.
+
+concept "Documented High BMI":
+- type is Observation.
+- valuetype is boolean.
+- inferred from "BMI During Measurement Period" is high.
+
+concept "Normal BMI Range":
+- type is Observation.
+- valuetype is boolean.
+- inferred from "BMI During Measurement Period" is normal.
+
+concept "Has Normal BMI":
+- type is Observation.
+- valuetype is boolean.
+- inferred from
+   - "Normal BMI Range".
+   AND
+   - without documented ("Documented High BMI" or "Documented Low BMI").
+
+// --- Co-existing diagnoses ---
+concept "Has Overweight or Obese":
+- type is Condition.
+- valuetype is boolean.
+- inferred from "Overweight or Obese Diagnoses" is active.
+
+concept "Has Underweight":
+- type is Condition.
+- valuetype is boolean.
+- inferred from "Underweight Diagnoses" is active.
+
+// --- Lifted property concepts (unchanged — single concept ref) ---
+concept "High BMI Follow-up Order Date":
+- type is ServiceRequest.
+- valuetype is dateTime.
+- inferred from "High BMI Follow-up Service Requests".
+
+concept "Weight Assessment Referral Date":
+- type is ServiceRequest.
+- valuetype is dateTime.
+- inferred from "Weight Assessment Referrals".
+
+concept "High BMI Medication Order Date":
+- type is MedicationRequest.
+- valuetype is dateTime.
+- inferred from "High BMI Medications".
+
+concept "Low BMI Follow-up Order Date":
+- type is ServiceRequest.
+- valuetype is dateTime.
+- inferred from "Low BMI Follow-up Service Requests".
+
+concept "Low BMI Medication Order Date":
+- type is MedicationRequest.
+- valuetype is dateTime.
+- inferred from "Low BMI Medications".
+
+concept "High BMI Procedure Performed Date":
+- type is Procedure.
+- valuetype is dateTime.
+- inferred from "High BMI Follow-up Procedures".
+
+concept "Low BMI Procedure Performed Date":
+- type is Procedure.
+- valuetype is dateTime.
+- inferred from "Low BMI Follow-up Procedures".
+
+// --- High BMI Interventions Ordered ---
+concept "High BMI Follow-up Order":
+- type is ServiceRequest.
+- valuetype is boolean.
+- inferred from
+   - "High BMI Follow-up Service Requests" justified by "Overweight or Obese Diagnoses".
+   OR
+   - "Has Overweight or Obese" on or before "High BMI Follow-up Order Date".
+
+concept "High BMI Weight Assessment Referral":
+- type is ServiceRequest.
+- valuetype is boolean.
+- inferred from
+   - "Weight Assessment Referrals" justified by "Overweight or Obese Diagnoses".
+   OR
+   - "Has Overweight or Obese" on or before "Weight Assessment Referral Date".
+
+concept "High BMI Medication Order":
+- type is MedicationRequest.
+- valuetype is boolean.
+- inferred from
+   - "High BMI Medications" justified by "Overweight or Obese Diagnoses".
+   OR
+   - "Has Overweight or Obese" on or before "High BMI Medication Order Date".
+
+// Union — list-style OR
+concept "High BMI Interventions Ordered":
+- type is ServiceRequest.
+- valuetype is boolean.
+- inferred from
+   - "High BMI Follow-up Order".
+   OR
+   - "High BMI Weight Assessment Referral".
+   OR
+   - "High BMI Medication Order".
+
+// --- High BMI Interventions Performed ---
+concept "High BMI Procedure Performed":
+- type is Procedure.
+- valuetype is boolean.
+- inferred from
+   - "High BMI Follow-up Procedures" justified by "Overweight or Obese Diagnoses".
+   OR
+   - "Has Overweight or Obese" on or before "High BMI Procedure Performed Date".
+
+concept "High BMI Interventions Performed":
+- type is Procedure.
+- valuetype is boolean.
+- inferred from "High BMI Procedure Performed".
+
+// --- High BMI With Follow-Up Provided ---
+// Note how the previous With pattern's inner composition is now natural
+// — the AND/OR boolean structure is at the inferred-from level.
+concept "High BMI And Follow Up Provided":
+- type is Observation.
+- valuetype is boolean.
+- inferred from
+   - "Documented High BMI" during "Measurement Period".
+   AND
+   (
+      - "High BMI Interventions Ordered".
+      OR
+      - "High BMI Interventions Performed".
+   ).
+
+// --- Low BMI analogous ---
+// This is the operator's example pattern
+concept "Low BMI Follow-up Order":
+- type is ServiceRequest.
+- valuetype is boolean.
+- inferred from
+   - "Low BMI Follow-up Service Requests" justified by "Underweight Diagnoses".
+   OR
+   (
+      - "Has Underweight" on or before "Low BMI Follow-up Order Date".
+      AND
+      - "Low BMI Follow-up Order Date" during "Measurement Period".
+   ).
+
+concept "Low BMI Weight Assessment Referral":
+- type is ServiceRequest.
+- valuetype is boolean.
+- inferred from
+   - "Weight Assessment Referrals" justified by "Underweight Diagnoses".
+   OR
+   (
+      - "Has Underweight" on or before "Weight Assessment Referral Date".
+      AND
+      - "Weight Assessment Referral Date" during "Measurement Period".
+   ).
+
+concept "Low BMI Medication Order":
+- type is MedicationRequest.
+- valuetype is boolean.
+- inferred from
+   - "Low BMI Medications" justified by "Underweight Diagnoses".
+   OR
+   (
+      - "Has Underweight" on or before "Low BMI Medication Order Date".
+      AND
+      - "Low BMI Medication Order Date" during "Measurement Period".
+   ).
+
+concept "Low BMI Interventions Ordered":
+- type is ServiceRequest.
+- valuetype is boolean.
+- inferred from
+   - "Low BMI Follow-up Order".
+   OR
+   - "Low BMI Weight Assessment Referral".
+   OR
+   - "Low BMI Medication Order".
+
+concept "Low BMI Procedure Performed":
+- type is Procedure.
+- valuetype is boolean.
+- inferred from
+   (
+      - "Low BMI Follow-up Procedures" justified by "Underweight Diagnoses".
+      AND
+      - "Low BMI Follow-up Procedures" was performed.
+   )
+   OR
+   (
+      - "Has Underweight" on or before "Low BMI Procedure Performed Date".
+      AND
+      - "Low BMI Procedure Performed Date" during "Measurement Period".
+   ).
+
+concept "Low BMI Interventions Performed":
+- type is Procedure.
+- valuetype is boolean.
+- inferred from "Low BMI Procedure Performed".
+
+concept "Low BMI And Follow Up Provided":
+- type is Observation.
+- valuetype is boolean.
+- inferred from
+   - "Documented Low BMI" during "Measurement Period".
+   AND
+   (
+      - "Low BMI Interventions Ordered".
+      OR
+      - "Low BMI Interventions Performed".
+   ).
+
+// --- BMI exam not performed with reason ---
+concept "Medical Reason Or Patient Reason For Not Performing BMI Exam":
+- type is Observation.
+- valuetype is boolean.
+- inferred from
+   - "BMI Observations" not done with reason ("Medical Reasons" or "Patient Declined Reasons").
+   AND
+   - "BMI Observations" same day as "Qualifying Encounter".
+
+// --- BMI follow-up not documented with reason ---
+concept "High BMI Follow-up Not Done With Reason":
+- type is ServiceRequest.
+- valuetype is boolean.
+- inferred from
+   - "High BMI Follow-up Service Requests" not done with reason "Medical Reasons".
+   AND
+   - "High BMI Follow-up Service Requests" same day as "Qualifying Encounter".
+   AND
+   - "High BMI Follow-up Service Requests" was performed.
+
+concept "Low BMI Follow-up Not Done With Reason":
+- type is ServiceRequest.
+- valuetype is boolean.
+- inferred from
+   - "Low BMI Follow-up Service Requests" not done with reason "Medical Reasons".
+   AND
+   - "Low BMI Follow-up Service Requests" same day as "Qualifying Encounter".
+   AND
+   - "Low BMI Follow-up Service Requests" was performed.
+
+concept "Weight Assessment Referral Not Done With Reason":
+- type is ServiceRequest.
+- valuetype is boolean.
+- inferred from
+   - "Weight Assessment Referrals" not done with reason "Medical Reasons".
+   AND
+   - "Weight Assessment Referrals" same day as "Qualifying Encounter".
+   AND
+   - "Weight Assessment Referrals" was performed.
+
+concept "High BMI Medication Not Done With Reason":
+- type is MedicationRequest.
+- valuetype is boolean.
+- inferred from
+   - "High BMI Medications" not done with reason "Medical Reasons".
+   AND
+   - "High BMI Medications" same day as "Qualifying Encounter".
+   AND
+   - "High BMI Medications" was performed.
+
+concept "Low BMI Medication Not Done With Reason":
+- type is MedicationRequest.
+- valuetype is boolean.
+- inferred from
+   - "Low BMI Medications" not done with reason "Medical Reasons".
+   AND
+   - "Low BMI Medications" same day as "Qualifying Encounter".
+   AND
+   - "Low BMI Medications" was performed.
+
+concept "Medical Reason For Not Documenting A Follow Up Plan For Low Or High BMI":
+- type is ServiceRequest.
+- valuetype is boolean.
+- inferred from
+   - "High BMI Follow-up Not Done With Reason".
+   OR
+   - "Low BMI Follow-up Not Done With Reason".
+   OR
+   - "Weight Assessment Referral Not Done With Reason".
+   OR
+   - "High BMI Medication Not Done With Reason".
+   OR
+   - "Low BMI Medication Not Done With Reason".
+
+// --- Pregnancy during measurement period ---
+concept "Active Pregnancy Diagnosis":
+- type is Condition.
+- valuetype is boolean.
+- inferred from "Pregnancy Diagnoses" is active during "Measurement Period".
+
+concept "Verified Pregnancy Status":
+- type is Observation.
+- valuetype is boolean.
+- inferred from
+   - "Pregnancy Status Observations" overlaps "Measurement Period".
+   AND
+   - "Pregnancy Status Observations" is verified.
+   AND
+   - "Pregnancy Status Observations" documented as "Pregnancy or Other Related Diagnoses".
+
+concept "Is Pregnant During Measurement Period":
+- type is Condition.
+- valuetype is boolean.
+- inferred from
+   - "Active Pregnancy Diagnosis".
+   OR
+   - "Verified Pregnancy Status".
+
+// --- Age predicate ---
+concept "Aged 18+ at Measurement Period Start":
+- type is Encounter.
+- valuetype is boolean.
+- inferred from age at start of "Measurement Period" at least 18 years.
+
+
+// ============ Measure API ============
+
+concept "Initial Population":
+- type is Observation.
+- valuetype is boolean.
+- inferred from "Aged 18+ at Measurement Period Start".
+
+concept "Denominator":
+- type is Encounter.
+- valuetype is boolean.
+- inferred from "Initial Population".
+
+concept "Denominator Exclusions":
+- type is Condition.
+- valuetype is boolean.
+- inferred from "Is Pregnant During Measurement Period".
+
+concept "Numerator":
+- type is Observation.
+- valuetype is boolean.
+- inferred from
+   - "High BMI And Follow Up Provided".
+   OR
+   - "Low BMI And Follow Up Provided".
+   OR
+   - "Has Normal BMI".
+
+concept "Denominator Exceptions":
+- type is ServiceRequest.
+- valuetype is boolean.
+- inferred from
+   - "Medical Reason For Not Documenting A Follow Up Plan For Low Or High BMI".
+   OR
+   - "Medical Reason Or Patient Reason For Not Performing BMI Exam".
