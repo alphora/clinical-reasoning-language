@@ -218,8 +218,7 @@ concept "Patient Declined Reasons":
 // --- Qualifying Encounter ---
 
 concept "BP Evaluation Encounter (not virtual)":
-- type is Observation.
-- valuetype is boolean.
+- type is Encounter.
 - inferred from
 (
    "BP Screening Encounters"
@@ -228,18 +227,15 @@ concept "BP Evaluation Encounter (not virtual)":
 ).
 
 concept "BP Evaluation Encounter (not virtual) During MP":
-- type is Observation.
-- valuetype is boolean.
+- type is Encounter.
 - logic is "BP Evaluation Encounter (not virtual)" during "Measurement Period".
 
 concept "BP Evaluation Encounter (not virtual) Performed":
-- type is Observation.
-- valuetype is boolean.
+- type is Encounter.
 - logic is "BP Evaluation Encounter (not virtual)" performed.
 
 concept "Qualifying Encounter":
-- type is Observation.
-- valuetype is boolean.
+- type is Encounter.
 - inferred from
 (
    "BP Evaluation Encounter (not virtual) During MP"
@@ -505,23 +501,19 @@ concept "Second Hypertensive Reading 140+":
 // --- Ordered-intervention concepts ---
 
 concept "Follow-up Within 4 Weeks Ordered":
-- type is Observation.
-- valuetype is boolean.
+- type is ServiceRequest.
 - logic is "Follow-up Within 4 Weeks" ordered.
 
 concept "Follow-up Within 6 Months Ordered":
-- type is Observation.
-- valuetype is boolean.
+- type is ServiceRequest.
 - logic is "Follow-up Within 6 Months" ordered.
 
 concept "Four-Week Rescreen Order":
-- type is Observation.
-- valuetype is boolean.
+- type is ServiceRequest.
 - inferred from "Follow-up Within 4 Weeks Ordered".
 
 concept "Six-Month Rescreen Order":
-- type is Observation.
-- valuetype is boolean.
+- type is ServiceRequest.
 - inferred from "Follow-up Within 6 Months Ordered".
 
 concept "Non-Pharmacological Recommendations":
@@ -541,13 +533,11 @@ concept "Non-Pharmacological Recommendations":
 ).
 
 concept "Non-Pharmacological Recommendations Ordered":
-- type is Observation.
-- valuetype is boolean.
+- type is ServiceRequest.
 - logic is "Non-Pharmacological Recommendations" ordered.
 
 concept "Non-Pharmacological Recommendation Order":
-- type is Observation.
-- valuetype is boolean.
+- type is ServiceRequest.
 - inferred from "Non-Pharmacological Recommendations Ordered".
 
 concept "Hypertension Lab or ECG Requests":
@@ -563,38 +553,31 @@ concept "Hypertension Lab or ECG Requests":
 ).
 
 concept "Hypertension Lab or ECG Requests Ordered":
-- type is Observation.
-- valuetype is boolean.
+- type is ServiceRequest.
 - logic is "Hypertension Lab or ECG Requests" ordered.
 
 concept "Hypertension Lab or ECG Order":
-- type is Observation.
-- valuetype is boolean.
+- type is ServiceRequest.
 - inferred from "Hypertension Lab or ECG Requests Ordered".
 
 concept "Antihypertensive Medications Ordered":
-- type is Observation.
-- valuetype is boolean.
+- type is MedicationRequest.
 - logic is "Antihypertensive Medications" ordered.
 
 concept "Antihypertensive Medication Order":
-- type is Observation.
-- valuetype is boolean.
+- type is MedicationRequest.
 - inferred from "Antihypertensive Medications Ordered".
 
 concept "Primary-Care Referral Justified by Hypertensive Reading":
-- type is Observation.
-- valuetype is boolean.
+- type is ServiceRequest.
 - logic is "Primary-Care Referrals" justified by "Hypertensive Reading Findings".
 
 concept "Primary-Care Referrals Ordered":
-- type is Observation.
-- valuetype is boolean.
+- type is ServiceRequest.
 - logic is "Primary-Care Referrals" ordered.
 
 concept "Referral for Hypertensive Reading":
-- type is Observation.
-- valuetype is boolean.
+- type is ServiceRequest.
 - inferred from
 (
    "Primary-Care Referral Justified by Hypertensive Reading"
@@ -606,33 +589,27 @@ concept "Referral for Hypertensive Reading":
 // --- Per-class intervention bundles ---
 
 concept "Six-Month Rescreen Order Same Day As Qualifying Encounter":
-- type is Observation.
-- valuetype is boolean.
+- type is ServiceRequest.
 - logic is "Six-Month Rescreen Order" same day as "Qualifying Encounter".
 
 concept "Non-Pharm Recommendation Order Same Day As Qualifying Encounter":
-- type is Observation.
-- valuetype is boolean.
+- type is ServiceRequest.
 - logic is "Non-Pharmacological Recommendation Order" same day as "Qualifying Encounter".
 
 concept "Referral for Hypertensive Reading Same Day As Qualifying Encounter":
-- type is Observation.
-- valuetype is boolean.
+- type is ServiceRequest.
 - logic is "Referral for Hypertensive Reading" same day as "Qualifying Encounter".
 
 concept "Four-Week Rescreen Order Same Day As Qualifying Encounter":
-- type is Observation.
-- valuetype is boolean.
+- type is ServiceRequest.
 - logic is "Four-Week Rescreen Order" same day as "Qualifying Encounter".
 
 concept "Hypertension Lab or ECG Order Same Day As Qualifying Encounter":
-- type is Observation.
-- valuetype is boolean.
+- type is ServiceRequest.
 - logic is "Hypertension Lab or ECG Order" same day as "Qualifying Encounter".
 
 concept "Antihypertensive Medication Order Same Day As Qualifying Encounter":
-- type is Observation.
-- valuetype is boolean.
+- type is MedicationRequest.
 - logic is "Antihypertensive Medication Order" same day as "Qualifying Encounter".
 
 concept "Elevated BP Followup Bundle":
@@ -744,23 +721,19 @@ concept "Second HTN 140+ With Followup":
 // --- Verified hypertension as of qualifying encounter (Denominator Exclusion driver) ---
 
 concept "Hypertension Diagnoses Is Verified":
-- type is Observation.
-- valuetype is boolean.
+- type is Condition.
 - logic is "Hypertension Diagnoses" is verified.
 
 concept "Verified Hypertension":
-- type is Observation.
-- valuetype is boolean.
+- type is Condition.
 - inferred from "Hypertension Diagnoses Is Verified".
 
 concept "Verified Hypertension As Of Qualifying Encounter Narrative":
-- type is Observation.
-- valuetype is boolean.
+- type is Condition.
 - logic is "Verified Hypertension" as of "Qualifying Encounter".
 
 concept "Verified Hypertension As Of Qualifying Encounter":
-- type is Observation.
-- valuetype is boolean.
+- type is Condition.
 - inferred from "Verified Hypertension As Of Qualifying Encounter Narrative".
 
 
@@ -780,12 +753,10 @@ concept "BP Measurement Sources":
 
 concept "BP Measurement Sources Not Done With Reason":
 - type is Observation.
-- valuetype is boolean.
 - logic is "BP Measurement Sources" not done with reason ("Medical Reasons" or "Patient Declined Reasons").
 
 concept "BP Measurement Sources Same Day As Qualifying Encounter":
 - type is Observation.
-- valuetype is boolean.
 - logic is "BP Measurement Sources" same day as "Qualifying Encounter".
 
 concept "BP Measurement Not Done With Reason":
@@ -802,93 +773,75 @@ concept "BP Measurement Not Done With Reason":
 // --- Exception branch 2: HTN follow-up declined by patient ---
 
 concept "Follow-up Within 4 Weeks Declined by Patient":
-- type is Observation.
-- valuetype is boolean.
+- type is ServiceRequest.
 - logic is "Follow-up Within 4 Weeks" not done with reason "Patient Declined Reasons".
 
 concept "Follow-up Within 6 Months Declined by Patient":
-- type is Observation.
-- valuetype is boolean.
+- type is ServiceRequest.
 - logic is "Follow-up Within 6 Months" not done with reason "Patient Declined Reasons".
 
 concept "Primary-Care Referrals Declined by Patient":
-- type is Observation.
-- valuetype is boolean.
+- type is ServiceRequest.
 - logic is "Primary-Care Referrals" not done with reason "Patient Declined Reasons".
 
 concept "Non-Pharmacological Recommendations Declined by Patient":
-- type is Observation.
-- valuetype is boolean.
+- type is ServiceRequest.
 - logic is "Non-Pharmacological Recommendations" not done with reason "Patient Declined Reasons".
 
 concept "Hypertension Lab or ECG Requests Declined by Patient":
-- type is Observation.
-- valuetype is boolean.
+- type is ServiceRequest.
 - logic is "Hypertension Lab or ECG Requests" not done with reason "Patient Declined Reasons".
 
 concept "Antihypertensive Medications Declined by Patient":
-- type is Observation.
-- valuetype is boolean.
+- type is MedicationRequest.
 - logic is "Antihypertensive Medications" not done with reason "Patient Declined Reasons".
 
 concept "Four-Week Rescreen Declined":
-- type is Observation.
-- valuetype is boolean.
+- type is ServiceRequest.
 - inferred from "Follow-up Within 4 Weeks Declined by Patient".
 
 concept "Six-Month Rescreen Declined":
-- type is Observation.
-- valuetype is boolean.
+- type is ServiceRequest.
 - inferred from "Follow-up Within 6 Months Declined by Patient".
 
 concept "Primary-Care Referral Declined":
-- type is Observation.
-- valuetype is boolean.
+- type is ServiceRequest.
 - inferred from "Primary-Care Referrals Declined by Patient".
 
 concept "Non-Pharm Recommendation Declined":
-- type is Observation.
-- valuetype is boolean.
+- type is ServiceRequest.
 - inferred from "Non-Pharmacological Recommendations Declined by Patient".
 
 concept "Hypertension Lab or ECG Declined":
-- type is Observation.
-- valuetype is boolean.
+- type is ServiceRequest.
 - inferred from "Hypertension Lab or ECG Requests Declined by Patient".
 
 concept "Antihypertensive Medication Declined":
-- type is Observation.
-- valuetype is boolean.
+- type is MedicationRequest.
 - inferred from "Antihypertensive Medications Declined by Patient".
 
 concept "Primary-Care Referral Declined Same Day As Qualifying Encounter":
-- type is Observation.
-- valuetype is boolean.
+- type is ServiceRequest.
 - logic is "Primary-Care Referral Declined" same day as "Qualifying Encounter".
 
 concept "Six-Month Rescreen Declined Same Day As Qualifying Encounter":
-- type is Observation.
-- valuetype is boolean.
+- type is ServiceRequest.
 - logic is "Six-Month Rescreen Declined" same day as "Qualifying Encounter".
 
 concept "Non-Pharm Recommendation Declined Same Day As Qualifying Encounter":
-- type is Observation.
-- valuetype is boolean.
+- type is ServiceRequest.
 - logic is "Non-Pharm Recommendation Declined" same day as "Qualifying Encounter".
 
 concept "Four-Week Rescreen Declined Same Day As Qualifying Encounter":
-- type is Observation.
-- valuetype is boolean.
+- type is ServiceRequest.
 - logic is "Four-Week Rescreen Declined" same day as "Qualifying Encounter".
 
 concept "Hypertension Lab or ECG Declined Same Day As Qualifying Encounter":
-- type is Observation.
-- valuetype is boolean.
+- type is ServiceRequest.
 - logic is "Hypertension Lab or ECG Declined" same day as "Qualifying Encounter".
 
 concept "Antihypertensive Medication Declined Same Day As Qualifying Encounter":
-- type is Observation.
-- valuetype is boolean.
+- type is MedicationRequest.
 - logic is "Antihypertensive Medication Declined" same day as "Qualifying Encounter".
 
 concept "Elevated BP Declined Bundle":
