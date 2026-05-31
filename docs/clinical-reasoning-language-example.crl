@@ -131,7 +131,7 @@ terminology "Breast Cancer":
 concept "Most Recent BMI":
 
 - type is Observation.
-- valuetype is boolean.
+- valuetype is Quantity.
 - meta is `Some meta information`.
 - meta is `Some other meta information`.
 - evidence is `Calculated by Smile`.

@@ -33,6 +33,7 @@ statement
     | terminologyStatement
     | activityStatement
     | conceptStatement
+    | inferenceStatement       // v0.5: new top-level statement for narrative predicates
     ;
 
 // ============================
@@ -246,56 +247,121 @@ codedFromLine
     ;
 
 // ============================
-// Inference Body
+// Inference Statement (v0.5)
 // ============================
 //
-// A concept can be inferred from:
-//   - a single concept (optionally applying a pattern)
-//   - or a logical expression combining multiple concepts.
+// Names a narrative predicate. The body is a single narrative phrase
+// introduced by `-` and terminated by `.`. Optional meta/evidence
+// lines (same shape as concept body).
+//
+// Examples:
+//   inference "BMI Evaluation Encounter Performed":
+//   - "BMI Evaluation Encounter (not virtual)" performed.
+//
+//   inference "Aged 18+ at MP Start":
+//   - evidence is `USPSTF age guidance`.
+//   - age at start of "Measurement Period" at least 18 years.
+//
+inferenceStatement
+    : INFERENCE inferenceIdentifier COLON
+      (metaLine)*
+      (evidenceLine)?
+      DASH narrative DOT
+    ;
+
+inferenceIdentifier
+    : identifier
+    ;
+
+// ============================
+// Inference Body (v0.5)
+// ============================
+//
+// A concept's `inferred from` body has two shapes:
+//   1. Bare reference to a named inference or concept
+//   2. Parenthesized composition with sem-or / sem-and / sem-not operators
+//
+// Composition operates on bare refs only (no narrative inside composition).
+// Narrative belongs in `inference` declarations.
+//
+// Examples:
+//   - inferred from "Underweight Active".
+//
+//   - inferred from
+//   (
+//      "BMI Evaluation Encounter During MP"
+//      sem-and
+//      "BMI Evaluation Encounter Performed"
+//   ).
 //
 inferredFromBody
-    : inferredFromConceptReference    # DefinitionConcept
-    | inferredFromDescriptiveLogic    # DefinitionLogic
+    : DASH INFERRED_FROM ifBody DOT
     ;
 
-inferredFromConceptReference
-    : DASH INFERRED_FROM conceptReference DOT patternStatement*
+ifBody
+    : conceptReference                                  # InferredFromBareRef
+    | LPAREN compositionExpression RPAREN               # InferredFromComposition
     ;
 
-patternStatement
-    : DASH APPLY_PATTERN patternName DOT
+compositionExpression
+    : semOr
     ;
 
-inferredFromDescriptiveLogic
-    : DASH INFERRED_FROM LPAREN inferredFromExpression RPAREN DOT
+semOr
+    : semAnd (SEM_OR semAnd)*
+    ;
+
+semAnd
+    : semNot (SEM_AND semNot)*
+    ;
+
+semNot
+    : SEM_NOT semNot
+    | compositionAtom
+    ;
+
+compositionAtom
+    : conceptReference                                  # CompositionRef
+    | LPAREN compositionExpression RPAREN               # CompositionGroup
     ;
 
 // ============================
-// Descriptive Logical Narratives
+// Narrative (used by inferenceStatement)
 // ============================
 //
-// Informal logical expressions using AND, OR, and NOT for clarity.
-
-inferredFromExpression
-    : informalOr
+// A narrative phrase is a sequence of narrative elements: quoted concept
+// references, narrative words (lowercase identifiers and the AND/OR/NOT/WITH
+// keywords used as English words), quantity literals, and in-arg groups
+// (parenthesized disjunctions/conjunctions of values).
+//
+narrative
+    : narrativeElement+
     ;
 
-informalOr
-    : informalAnd (OR informalAnd)*
+narrativeElement
+    : QUOTED_STRING                                          # NConceptRef
+    | quantity                                               # NQuantity
+    | (AND | OR | NOT | WITH | NARRATIVE_WORD | TIME_UNIT)   # NWord
+    | argGroup                                               # NArgGroupElement
     ;
 
-informalAnd
-    : informalNot (AND informalNot)*
+quantity
+    : NUMBER (UCUM_UNIT | TIME_UNIT)   // unit REQUIRED — design choice
     ;
 
-informalNot
-    : NOT informalNot
-    | atom
+// In-arg group: parenthesized disjunction/conjunction. Homogeneous per group
+// (mixed connectors require nested parens). argValue restricted to refs,
+// quantities, or nested groups — NO inner multi-token narrative.
+argGroup
+    : LPAREN argValue (OR argValue)+ RPAREN                  # ArgDisjunction
+    | LPAREN argValue (AND argValue)+ RPAREN                 # ArgConjunction
+    | LPAREN argValue RPAREN                                 # ArgSingleton
     ;
 
-atom
-    : conceptReference                      # ConceptAtom
-    | LPAREN inferredFromExpression RPAREN  # GroupExpression
+argValue
+    : QUOTED_STRING                                          # AVConceptRef
+    | quantity                                               # AVQuantity
+    | argGroup                                               # AVNestedGroup
     ;
 
 // ============================
@@ -340,10 +406,6 @@ conceptReference
 
 backtickString
     : BACKTICK_STRING
-    ;
-
-patternName
-    : backtickString
     ;
 
 activityTypeValue

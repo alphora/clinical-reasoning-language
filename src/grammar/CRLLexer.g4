@@ -10,7 +10,6 @@ EVIDENCE_IS         : 'evidence is';
 META_IS             : 'meta is';
 INFERRED_FROM       : 'inferred from';
 CODED_FROM          : 'coded from';
-APPLY_PATTERN       : 'apply pattern';
 CODE_IS             : 'code is';
 SYSTEM_IS           : 'system is';
 VALUESET_IS         : 'valueset is';
@@ -23,6 +22,7 @@ AND          : 'and';
 BECAUSE      : 'because';
 CONCEPT      : 'concept';
 DECISION     : 'decision';
+INFERENCE    : 'inference';     // v0.5: new top-level statement type
 NOT          : 'not';
 OR           : 'or';
 REQUEST      : 'request' -> mode(ACTIVITY_MODE);
@@ -30,6 +30,36 @@ TERMINOLOGY  : 'terminology';
 THEN         : 'then';
 WHEN         : 'when';
 WITH         : 'with';
+
+// === Composition operators (v0.5) ===
+// sem-or / sem-and / sem-not in concept's `inferred from` composition.
+// Distinct from boolean and from in-arg disjunction/conjunction (which use lowercase or/and).
+// Declared BEFORE NARRATIVE_WORD so 6-char `sem-or` matches SEM_OR not NARRATIVE_WORD.
+SEM_OR       : 'sem-or';
+SEM_AND      : 'sem-and';
+SEM_NOT      : 'sem-not';
+
+// === Narrative tokens (v0.5) ===
+// Used in inference body narrative and in-arg quantity literals.
+// TIME_UNIT must come BEFORE NARRATIVE_WORD so closed-set time units win on tie.
+TIME_UNIT
+    : 'years' | 'year' | 'months' | 'month' | 'weeks' | 'week'
+    | 'days' | 'day' | 'hours' | 'hour' | 'minutes' | 'minute'
+    | 'seconds' | 'second' | 'milliseconds' | 'millisecond'
+    ;
+
+// Quantity numeric literal. Accepts `30` and `30.5`. Trailing dot is the structural
+// DOT (terminator) — the optional decimal portion requires at least one digit, so
+// `18.` lexes as NUMBER(18) + DOT.
+NUMBER       : [0-9]+ ('.' [0-9]+)?;
+
+// UCUM-quoted unit like `'mm[Hg]'`, `'kg/m2'`, `'a'`. Single-quoted.
+UCUM_UNIT    : '\'' ~['\r\n]+ '\'';
+
+// Catch-all lowercase narrative word, including kebab-case (`record-of`, `not-virtual`).
+// Declared AFTER all specific lowercase keyword tokens (TIME_UNIT, AND, OR, NOT, WITH,
+// SEM_*, etc.) so those win on tie. Uppercase rejected — author must quote (`"BMI"`).
+NARRATIVE_WORD : [a-z]+ ('-' [a-z]+)*;
 
 // === Punctuation ===
 COLON        : ':';

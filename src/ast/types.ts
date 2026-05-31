@@ -20,7 +20,7 @@ export interface CRL extends ASTNode {
 }
 
 // Union type for all possible statements
-export type Statement = Decision | Concept | Activity | Terminology;
+export type Statement = Decision | Concept | Activity | Terminology | Inference;
 
 // --------------------------- DECISION STATEMENT ----------------------------
 
@@ -175,54 +175,150 @@ export interface CodedFromDefinition extends ASTNode {
   location: Location;
 }
 
-// Inferred from definition
-// concept reference
+// Concept reference — bare quoted name. Resolves to a Concept OR Inference
+// at validation time (shared namespace per v0.5).
 export interface ConceptReference extends ASTNode {
   type: "ConceptReference";
   name: string;
 }
 
-// instead of a binary-only LogicalExpression, split AND/OR into n‑ary:
-export interface InformalAnd extends ASTNode {
-  type: "AndExpression";
-  terms: InferredFromExpression[]; // two or more
-}
-
-export interface InformalOr extends ASTNode {
-  type: "OrExpression";
-  terms: InferredFromExpression[]; // two or more
-}
-
-export interface NotExpression extends ASTNode {
-  type: "NotExpression";
-  expression: InferredFromExpression;
-}
-
-// any node that can appear in a logical narrative
-export type InferredFromExpression =
-  | ConceptReference
-  | InformalAnd
-  | InformalOr
-  | GroupExpression
-  | NotExpression;
-
-// these are the parens
-export interface GroupExpression extends ASTNode {
-  type: "GroupExpression";
-  expression: InferredFromExpression;
-}
-
-// inferred-from nodes
-export interface InferredFromConcept extends ASTNode {
-  type: "InferredFromDefinitionConcept";
-  concept: string;
-  patterns?: string[];
-}
+// --------------------------- INFERRED FROM (v0.5) -------------------------
+//
+// A concept's `inferred from` body has two shapes:
+//   1. Bare reference to a named concept or inference
+//   2. Parenthesized composition with sem-or / sem-and / sem-not operators
+//
+// Composition operates on bare refs only. Narrative lives in `inference`
+// declarations, not in concept bodies.
 
 export interface InferredFromDefinition extends ASTNode {
   type: "InferredFromDefinition";
-  body: InferredFromConcept | InferredFromExpression;
+  body: InferredFromBareRef | InferredFromComposition;
 }
+
+export interface InferredFromBareRef extends ASTNode {
+  type: "InferredFromBareRef";
+  ref: string;
+}
+
+export interface InferredFromComposition extends ASTNode {
+  type: "InferredFromComposition";
+  expression: CompositionExpression;
+}
+
+// Composition expression tree. Operators are "semantic boolean" — operands
+// are typed refs (concept or inference), not booleans. See
+// project_sem-composition-operators memory.
+export type CompositionExpression =
+  | SemOrExpression
+  | SemAndExpression
+  | SemNotExpression
+  | CompositionRef
+  | CompositionGroup;
+
+export interface SemOrExpression extends ASTNode {
+  type: "SemOrExpression";
+  terms: CompositionExpression[]; // two or more (n-ary)
+}
+
+export interface SemAndExpression extends ASTNode {
+  type: "SemAndExpression";
+  terms: CompositionExpression[]; // two or more (n-ary)
+}
+
+export interface SemNotExpression extends ASTNode {
+  type: "SemNotExpression";
+  expression: CompositionExpression;
+}
+
+export interface CompositionRef extends ASTNode {
+  type: "CompositionRef";
+  ref: string;
+}
+
+export interface CompositionGroup extends ASTNode {
+  type: "CompositionGroup";
+  expression: CompositionExpression;
+}
+
+// --------------------------- INFERENCE (v0.5) -----------------------------
+//
+// Names a narrative predicate. Body is a single narrative phrase. Optional
+// meta/evidence lines mirror Concept body. Inference is referenced from
+// concepts via shared namespace; no `type`/`valuetype` declared (predicate,
+// not typed entity).
+
+export interface Inference extends ASTNode {
+  type: "Inference";
+  name: string;
+  meta?: string[];
+  evidence?: string;
+  body: NarrativeClause;
+  location: Location;
+}
+
+// Narrative structure. NDisjunction / NConjunction are flattened into
+// NarrativeElement directly (no wrapper). NSingleton is collapsed in
+// the AST builder — `("X")` becomes just the inner NConceptRef.
+
+export interface NarrativeClause extends ASTNode {
+  type: "NarrativeClause";
+  elements: NarrativeElement[]; // structural stream for Todo 3 template-match
+  location: Location;
+}
+
+export type NarrativeElement =
+  | NConceptRef
+  | NWord
+  | Quantity
+  | NDisjunction
+  | NConjunction;
+
+export interface NConceptRef extends ASTNode {
+  type: "NConceptRef";
+  value: string;
+  location: Location;
+}
+
+export interface NWord extends ASTNode {
+  type: "NWord";
+  value: string;
+  location: Location;
+}
+
+// Unified quantity node — used by both narrative-position and arg-value-position.
+// Unit is REQUIRED (no bare numbers; design choice for clinical-correctness).
+export interface Quantity extends ASTNode {
+  type: "Quantity";
+  value: number;
+  unit: string;
+  location: Location;
+}
+
+// In-arg disjunction: `("A" or "B")`. Constructs a Disjunction<T> value as a
+// pattern argument. Lowercase `or` per catalog convention (not boolean).
+export interface NDisjunction extends ASTNode {
+  type: "NDisjunction";
+  disjuncts: ArgValue[];
+  location: Location;
+}
+
+// In-arg conjunction: `("A" and "B")`. Symmetric to NDisjunction.
+// Catalog v0.5.5 added Conjunction<T> type to match.
+export interface NConjunction extends ASTNode {
+  type: "NConjunction";
+  conjuncts: ArgValue[];
+  location: Location;
+}
+
+// ArgValue reuses NConceptRef and Quantity to avoid duplicate AV* nodes.
+// argValue accepts refs/quantities/nested-groups only — no inner narrative
+// (grammar restriction; extract complex disjuncts to named inferences).
+export type ArgValue =
+  | NConceptRef
+  | Quantity
+  | NDisjunction
+  | NConjunction;
 
 export interface Location {
   start: { line: number; column: number };

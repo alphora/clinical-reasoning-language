@@ -1,6 +1,8 @@
-# CRL clinical inference patterns — draft catalog v0.5.4
+# CRL clinical inference patterns — draft catalog v0.5.5
 
-> **Status: draft v0.5.4** (v0.3 + CMS69 → v0.3.1 re-tier → v0.3.2 + CMS22 → v0.3.3 round-3 reviewer sweep → v0.3.4 property-access policy → v0.3.5 umbrella-application sweep → v0.4.0 pattern bodies are narrative → v0.5 catalog as source of truth → v0.5.1 reviewer-round-1 integration → v0.5.2 reviewer-round-2 integration → v0.5.3 operator-triage on Q1/Q2/Q3 → v0.5.4 round-3 cleanup). **45 patterns** across the inference taxonomy plus a **5-form window-from-anchor sub-grammar** (BeforeStartOf, AfterStartOf, BeforeEndOf, AfterEndOf, OnDayOf).
+> **Status: draft v0.5.5** (v0.3 + CMS69 → … → v0.5.4 round-3 cleanup → v0.5.5 Todo 2 grammar coordination). **45 patterns** across the inference taxonomy plus a **5-form window-from-anchor sub-grammar** (BeforeStartOf, AfterStartOf, BeforeEndOf, AfterEndOf, OnDayOf).
+>
+> **v0.5.5 — Todo 2 grammar coordination** (`.vibe-tools/discussions/015`): minor catalog updates landing alongside the v0.5 grammar work in Todo 2. (a) `WasPerformed(X)` narrative form changes from `<X> was performed` to `<X> performed` (drops the auxiliary "was"; reads more naturally; canonical name unchanged). (b) `WasOrdered(X)` narrative form changes from `<X> was ordered` to `<X> ordered` (same rationale). (c) New type `Conjunction<T>` added to the type notation — symmetric to `Disjunction<T>`, for future patterns where in-arg conjunction semantics ("all of these") are needed. No corpus measure currently uses this; added prospectively so the grammar's accepting in-arg `and` is matched by the catalog's type system.
 >
 > **v0.5.4 — round-3 reviewer cleanup** (`.vibe-tools/discussions/014`): three reviewers caught two real issues in the round-2/3 deltas — (a) the SubjectBoundPredicate definition contradicted its own `With("Encounter", AtLeast("BMI", 30 'kg/m2'))` rejection example (set was structurally permissive but example rejected on semantic grounds). Fixed by narrowing the closed set: value comparators (`AtLeast`/`AtMost`/`Between`/`Exceeds`/`Below`) and range classifiers (`High`/`Low`/`Normal`/`Abnormal`) excluded; added `CurrentlyTaking`/`HasAdverseReactionTo`/`AtLeastApart`/`AtMostApart`/`AtLeastN`/`Consecutive` to the subset where Y is at canonical position 0. (b) The AnchorEnum emission table had fabricated FHIR paths (`Encounter.hospitalization.dischargeDisposition.period.start` doesn't exist; `admitSource` is CodeableConcept not DateTime). Fixed by removing the alternatives and committing to the validated primary resolutions. Plus: documented ambient-encounter-context requirement for AnchorEnum; clarified `CRLPatterns.AsOf` / `CRLPatterns.AgeAt` as CQL-level overload sets (one per resolved-anchor type); fixed cross-table emission inconsistency (`AnchorEnum (literal)` row split out from `KindEnum (literal)`); updated umbrella meta-rule's AsOf parenthetical to match the closed AnchorEnum + AnchorExpr-modifier reality; fixed `pattern-usage.md` leftover `AtLeastDaysApart` reference.
 >
@@ -240,7 +242,7 @@ This table is the v0.5 source-of-truth. Return types are explicit. Per-card cont
 | `NotDoneWithReason(action, reason)` | `<action> not done with reason <reason>` (reason may be a disjunction `(<A> or <B>)`) | `NotDoneWithReason(action: ConceptRef, reason: ConceptRef \| Disjunction<ConceptRef>): boolean` | `CRLPatterns.NotDoneWithReason` |
 | `BaselineAndFollowUp(initial, followup)` | `<initial> with follow-up <followup>` | `BaselineAndFollowUp(initial: ConceptRef, followup: ConceptRef): boolean` | `CRLPatterns.BaselineAndFollowUp` |
 | `InpatientStay(encounter[, includePrelude])` | `inpatient stay anchored on <encounter>` (optionally `including prelude`) | `InpatientStay(encounter: ConceptRef[, includePrelude: boolean = false]): Period` | `CRLPatterns.InpatientStay` |
-| `WasOrdered(X)` | `<X> was ordered` | `WasOrdered(X: ConceptRef): boolean` | `CRLPatterns.WasOrdered` |
+| `WasOrdered(X)` | `<X> ordered` | `WasOrdered(X: ConceptRef): boolean` | `CRLPatterns.WasOrdered` |
 
 ### Assertion
 
@@ -312,7 +314,7 @@ A parameterized umbrella for windowed-from-anchor temporal scopes. Used as the `
 
 | Pattern | Narrative form | Canonical | CQL function |
 |---|---|---|---|
-| `WasPerformed(X)` | `<X> was performed` | `WasPerformed(X: ConceptRef): boolean` | `CRLPatterns.WasPerformed` |
+| `WasPerformed(X)` | `<X> performed` | `WasPerformed(X: ConceptRef): boolean` | `CRLPatterns.WasPerformed` |
 
 **Note on Quantity-valued concepts.** Patterns that compare numeric values operate on a Quantity-typed concept reference directly — no `.value` access. The concept *is* the quantity (per v0.3.4 property-access policy).
 
@@ -323,7 +325,8 @@ A parameterized umbrella for windowed-from-anchor temporal scopes. Used as the `
 - `Integer`, `boolean` — primitives.
 - `Period` — an `Interval<DateTime>`-like primitive returned by `InpatientStay`. Not used directly in narrative; consumed by lifting into a named concept (see `InpatientStay` card's lift idiom). Authors never write `Period` directly.
 - `Instance<T>` — a selected resource/event of the concept type T. Returned by `MostRecent`/`Last`/`Earliest`/`First`. Feeds into `ComponentOf(...)`, value comparators, and `WasOrdered`/`WasPerformed` as the "the actual selected resource."
-- `Disjunction<T>` — a disjunctive expression `(<A> or <B>[ or <C>…])` of T-typed elements (used by `Without`, `NotDoneWithReason`, `Justified` reason args). Supports two or more disjuncts; nested parens not currently in scope.
+- `Disjunction<T>` — a disjunctive expression `(<A> or <B>[ or <C>…])` of T-typed elements (used by `Without`, `NotDoneWithReason`, `Justified` reason args). Supports two or more disjuncts. CRL v0.5 grammar enforces homogeneous connectors per group (mixed `and`/`or` requires nested parens) and restricts in-arg group operands to refs / quantities / nested groups (no inner multi-token narrative — extract complex disjuncts to named inferences).
+- `Conjunction<T>` — a conjunctive expression `(<A> and <B>[ and <C>…])` of T-typed elements. Symmetric to `Disjunction<T>`. Added to the catalog in v0.5.5; no corpus measures use this yet but the grammar supports it for future patterns where pattern arguments require "all of these are true" semantics. Same homogeneity / argValue restrictions as `Disjunction<T>`.
 - `PatternCall` — any canonical-form pattern AST node (e.g. `WasOrdered("X")`, `OnOrBefore(X, Y)`).
 - `SubjectBoundPredicate` — a **boolean-returning** `PatternCall` from a closed set, where the first canonical-position argument is the bound subject Y (the parent `With(...)`'s second argument). Used to express "case feature X qualified by predicate-about-Y," where the X↔Y correlation is supplied by the `CRLPatterns.With` consumer.
   - **Closed set** (after canonicalization, Y appears at position 0):

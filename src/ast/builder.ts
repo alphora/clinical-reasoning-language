@@ -14,14 +14,34 @@ import {
   TerminologyValuesetContext,
   ActivityStatementContext,
   ConceptStatementContext,
+  ConceptBodyContext,
+  InferenceStatementContext,
   InferredFromBodyContext,
-  InferredFromConceptReferenceContext,
-  InferredFromDescriptiveLogicContext,
-  InferredFromExpressionContext,
-  InformalOrContext,
-  InformalAndContext,
-  InformalNotContext,
-  AtomContext,
+  IfBodyContext,
+  InferredFromBareRefContext,
+  InferredFromCompositionContext,
+  CompositionExpressionContext,
+  SemOrContext,
+  SemAndContext,
+  SemNotContext,
+  CompositionAtomContext,
+  CompositionRefContext,
+  CompositionGroupContext,
+  NarrativeContext,
+  NarrativeElementContext,
+  NConceptRefContext,
+  NQuantityContext,
+  NWordContext,
+  NArgGroupElementContext,
+  QuantityContext,
+  ArgGroupContext,
+  ArgDisjunctionContext,
+  ArgConjunctionContext,
+  ArgSingletonContext,
+  ArgValueContext,
+  AVConceptRefContext,
+  AVQuantityContext,
+  AVNestedGroupContext,
   ConceptReferenceContext,
   WhenWithBodyContext,
   WhenSingleActionContext,
@@ -56,19 +76,28 @@ import {
   ConceptType,
   ConceptDefinition,
   InferredFromDefinition,
+  InferredFromBareRef,
+  InferredFromComposition,
+  CompositionExpression,
+  SemOrExpression,
+  SemAndExpression,
+  SemNotExpression,
+  CompositionRef,
+  CompositionGroup,
   ConceptReference,
-  InformalAnd,
-  InformalOr,
-  NotExpression,
-  GroupExpression,
-  InferredFromConcept,
+  Inference,
+  NarrativeClause,
+  NarrativeElement,
+  NConceptRef,
+  NWord,
+  NDisjunction,
+  NConjunction,
+  Quantity,
+  ArgValue,
   Location,
   ConceptValueType,
 } from "./types";
 import type { CRL } from "./types";
-
-// Alias for all possible informal expression node types
-type InformalNode = GroupExpression | ConceptReference | InformalAnd | NotExpression | InformalOr;
 
 function getLocation(ctx: ParserRuleContext): Location {
   const start = ctx.start;
@@ -467,7 +496,7 @@ export class CRLAstBuilder
         });
         return null;
       }
-      return this.visit(infCtx) as InferredFromDefinition;
+      return this.visitInferredFromBody(infCtx);
     } else {
       this.reportError("AstError", ctx, {
         message: "ConceptStatement must have either codedFromLine or inferredFromBody",
@@ -509,93 +538,172 @@ export class CRLAstBuilder
     };
   }
 
-  visitDefinitionConcept(ctx: InferredFromBodyContext): InferredFromConcept {
-    const refCtx = ctx.getRuleContext(0, InferredFromConceptReferenceContext);
-    const concept = refCtx?.conceptReference().text.slice(1, -1) ?? "";
-    const patternStmts = refCtx?.patternStatement?.();
-    let patterns: string[] = [];
-    if (patternStmts && patternStmts.length > 0) {
-      patterns = patternStmts.map((patCtx) => {
-        const backtickCtx = patCtx.patternName().backtickString();
-        return backtickCtx.text.slice(1, -1);
-      });
-    }
+  // === v0.5 inferred from + composition visitors ===
+
+  visitInferredFromBareRef(ctx: InferredFromBareRefContext): InferredFromBareRef {
+    const ref = ctx.conceptReference().text.slice(1, -1);
     return {
-      type: "InferredFromDefinitionConcept",
-      concept,
-      ...(patterns.length > 0 ? { patterns } : {}),
+      type: "InferredFromBareRef",
+      ref,
       location: getLocation(ctx),
     };
   }
 
-  visitDefinitionLogic(ctx: InferredFromBodyContext): GroupExpression | InferredFromConcept {
-    const descCtx = ctx.getRuleContext(0, InferredFromDescriptiveLogicContext);
-    const exprCtx = descCtx?.inferredFromExpression();
-    const expr = this.visit(exprCtx);
-
-    // If the result is a single ConceptReference, wrap as InferredFromConcept
-    if (expr && expr.type === "ConceptReference") {
-      const conceptRef = expr as ConceptReference;
-      return {
-        type: "InferredFromDefinitionConcept",
-        concept: conceptRef.name,
-        location: getLocation(ctx),
-      };
-    }
-    return expr as GroupExpression;
+  visitInferredFromComposition(ctx: InferredFromCompositionContext): InferredFromComposition {
+    const expr = this.visit(ctx.compositionExpression()) as CompositionExpression;
+    return {
+      type: "InferredFromComposition",
+      expression: expr,
+      location: getLocation(ctx),
+    };
   }
 
-  visitInferredFromExpression(ctx: InferredFromExpressionContext): InformalNode {
-    return this.visit(ctx.informalOr()) as InformalNode;
+  visitCompositionExpression(ctx: CompositionExpressionContext): CompositionExpression {
+    return this.visit(ctx.semOr()) as CompositionExpression;
   }
 
-  visitInformalOr(ctx: InformalOrContext): InformalOr {
-    const terms = ctx.informalAnd().map((a: InformalAndContext) => this.visit(a) as InformalNode);
-    if (ctx.OR().length) {
-      return { type: "OrExpression", terms, location: getLocation(ctx) };
-    }
-    return terms[0] as InformalOr;
-  }
-
-  visitInformalAnd(
-    ctx: InformalAndContext,
-  ): InformalAnd | NotExpression | GroupExpression | ConceptReference {
-    const terms = ctx
-      .informalNot()
-      .map(
-        (n: InformalNotContext) =>
-          this.visit(n) as GroupExpression | ConceptReference | InformalAnd | NotExpression,
-      );
-    if (ctx.AND().length) {
-      return { type: "AndExpression", terms, location: getLocation(ctx) };
+  visitSemOr(ctx: SemOrContext): CompositionExpression {
+    const terms = ctx.semAnd().map((a) => this.visit(a) as CompositionExpression);
+    if (ctx.SEM_OR().length) {
+      return { type: "SemOrExpression", terms, location: getLocation(ctx) };
     }
     return terms[0];
   }
 
-  visitInformalNot(ctx: InformalNotContext): import("./types").InferredFromExpression {
-    if (ctx.NOT()) {
+  visitSemAnd(ctx: SemAndContext): CompositionExpression {
+    const terms = ctx.semNot().map((n) => this.visit(n) as CompositionExpression);
+    if (ctx.SEM_AND().length) {
+      return { type: "SemAndExpression", terms, location: getLocation(ctx) };
+    }
+    return terms[0];
+  }
+
+  visitSemNot(ctx: SemNotContext): CompositionExpression {
+    if (ctx.SEM_NOT()) {
       return {
-        type: "NotExpression" as const,
-        expression: this.visit(ctx.informalNot()!) as import("./types").InferredFromExpression,
+        type: "SemNotExpression",
+        expression: this.visit(ctx.semNot()!) as CompositionExpression,
         location: getLocation(ctx),
       };
     }
-    return this.visit(ctx.atom()!) as import("./types").InferredFromExpression;
+    return this.visit(ctx.compositionAtom()!) as CompositionExpression;
   }
 
-  visitConceptAtom(ctx: AtomContext): ConceptReference {
-    const conceptRefCtx = ctx.getRuleContext(0, ConceptReferenceContext);
-    const name = conceptRefCtx?.text?.slice(1, -1) ?? "";
-    return { type: "ConceptReference", name, location: getLocation(ctx) };
+  visitCompositionRef(ctx: CompositionRefContext): CompositionRef {
+    const ref = ctx.conceptReference().text.slice(1, -1);
+    return { type: "CompositionRef", ref, location: getLocation(ctx) };
   }
-  visitGroupExpression(ctx: AtomContext): GroupExpression {
-    const exprCtx = ctx.getRuleContext(0, InferredFromExpressionContext);
-    const expr = this.visit(exprCtx) as
-      | InformalAnd
-      | InformalOr
-      | NotExpression
-      | ConceptReference
-      | GroupExpression;
-    return { type: "GroupExpression", expression: expr, location: getLocation(ctx) };
+
+  visitCompositionGroup(ctx: CompositionGroupContext): CompositionGroup {
+    const expr = this.visit(ctx.compositionExpression()) as CompositionExpression;
+    return { type: "CompositionGroup", expression: expr, location: getLocation(ctx) };
+  }
+
+  // Wrapper for inferredFromBody — dispatches to the labeled alternatives via visit().
+  visitInferredFromBody(ctx: InferredFromBodyContext): InferredFromDefinition {
+    const ifBodyCtx = ctx.ifBody();
+    const body = this.visit(ifBodyCtx) as InferredFromBareRef | InferredFromComposition;
+    return {
+      type: "InferredFromDefinition",
+      body,
+      location: getLocation(ctx),
+    };
+  }
+
+  // === v0.5 inference statement + narrative visitors ===
+
+  visitInferenceStatement(ctx: InferenceStatementContext): Inference {
+    const name = ctx.inferenceIdentifier().text.slice(1, -1);
+    const metaCtxs = ctx.metaLine();
+    const evidenceCtx = ctx.evidenceLine();
+    const meta = metaCtxs.map((m) => m.backtickString().text.slice(1, -1));
+    const evidence = evidenceCtx ? evidenceCtx.backtickString().text.slice(1, -1) : undefined;
+    const narrative = this.visitNarrative(ctx.narrative());
+    return {
+      type: "Inference",
+      name,
+      ...(meta.length > 0 ? { meta } : {}),
+      ...(evidence ? { evidence } : {}),
+      body: narrative,
+      location: getLocation(ctx),
+    };
+  }
+
+  visitNarrative(ctx: NarrativeContext): NarrativeClause {
+    const elements = ctx
+      .narrativeElement()
+      .map((e) => this.visit(e) as NarrativeElement);
+    return {
+      type: "NarrativeClause",
+      elements,
+      location: getLocation(ctx),
+    };
+  }
+
+  visitNConceptRef(ctx: NConceptRefContext): NConceptRef {
+    const value = ctx.QUOTED_STRING().text.slice(1, -1);
+    return { type: "NConceptRef", value, location: getLocation(ctx) };
+  }
+
+  visitNQuantity(ctx: NQuantityContext): Quantity {
+    return this.visitQuantity(ctx.quantity());
+  }
+
+  visitNWord(ctx: NWordContext): NWord {
+    return { type: "NWord", value: ctx.text, location: getLocation(ctx) };
+  }
+
+  visitNArgGroupElement(ctx: NArgGroupElementContext): NDisjunction | NConjunction | NConceptRef | Quantity {
+    return this.visitArgGroup(ctx.argGroup()) as
+      | NDisjunction
+      | NConjunction
+      | NConceptRef
+      | Quantity;
+  }
+
+  visitQuantity(ctx: QuantityContext): Quantity {
+    const value = parseFloat(ctx.NUMBER().text);
+    const ucumCtx = ctx.UCUM_UNIT();
+    const timeCtx = ctx.TIME_UNIT();
+    const unit = ucumCtx ? ucumCtx.text.slice(1, -1) : timeCtx ? timeCtx.text : "";
+    return { type: "Quantity", value, unit, location: getLocation(ctx) };
+  }
+
+  // argGroup dispatches to ArgDisjunction / ArgConjunction / ArgSingleton labeled alts.
+  // NSingleton is collapsed here — `("X")` returns just the inner ArgValue, not a wrapper.
+  visitArgGroup(ctx: ArgGroupContext): NDisjunction | NConjunction | NConceptRef | Quantity {
+    return this.visit(ctx) as NDisjunction | NConjunction | NConceptRef | Quantity;
+  }
+
+  visitArgDisjunction(ctx: ArgDisjunctionContext): NDisjunction {
+    const disjuncts = ctx.argValue().map((av) => this.visit(av) as ArgValue);
+    return { type: "NDisjunction", disjuncts, location: getLocation(ctx) };
+  }
+
+  visitArgConjunction(ctx: ArgConjunctionContext): NConjunction {
+    const conjuncts = ctx.argValue().map((av) => this.visit(av) as ArgValue);
+    return { type: "NConjunction", conjuncts, location: getLocation(ctx) };
+  }
+
+  // ArgSingleton: `("X")` collapses to just the inner value (no wrapper node).
+  visitArgSingleton(ctx: ArgSingletonContext): NConceptRef | Quantity | NDisjunction | NConjunction {
+    return this.visit(ctx.argValue()) as
+      | NConceptRef
+      | Quantity
+      | NDisjunction
+      | NConjunction;
+  }
+
+  visitAVConceptRef(ctx: AVConceptRefContext): NConceptRef {
+    const value = ctx.QUOTED_STRING().text.slice(1, -1);
+    return { type: "NConceptRef", value, location: getLocation(ctx) };
+  }
+
+  visitAVQuantity(ctx: AVQuantityContext): Quantity {
+    return this.visitQuantity(ctx.quantity());
+  }
+
+  visitAVNestedGroup(ctx: AVNestedGroupContext): NDisjunction | NConjunction | NConceptRef | Quantity {
+    return this.visitArgGroup(ctx.argGroup());
   }
 }
