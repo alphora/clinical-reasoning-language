@@ -1,9 +1,10 @@
 # CRL Language Support for VS Code
 
-A VS Code extension for the Clinical Reasoning Language (CRL). It does two things:
+A VS Code extension for the Clinical Reasoning Language (CRL). It does three things:
 
 1. **Highlights `.crl` files** — CRL keywords, strings, and comments.
-2. **Gives your Claude Code agent CRL tools** — Claude can parse CRL for you, so you can ask things like *"validate this .crl file"* or *"what's the structure of this decision?"* and it can actually read the syntax tree.
+2. **Catalog-driven authoring help** — narrative-pattern completion and hover info inside `logic is` bodies, drawn from the 45-entry CRL inference-pattern catalog. Type `- logic is ` and pick from `<X> during <Y>`, `<X> performed`, `<X> justified by <Y>`, `has <X>`, etc.; hover an existing narrative phrase to see its canonical signature and CQL function reference.
+3. **Gives your Claude Code agent CRL tools** — Claude can parse CRL for you, so you can ask things like *"validate this .crl file"* or *"what's the structure of this decision?"* and it can actually read the syntax tree.
 
 It configures everything automatically — there are no settings to paste by hand.
 
@@ -33,6 +34,12 @@ When you open a workspace that contains `.crl` files, the extension configures t
 - **`build_crl_ast`** — parse CRL source and build its Abstract Syntax Tree.
 
 Each takes inline `code` or a `.crl` file `path` and returns a `ParseResult` (`{ success, result?, errors? }`).
+
+### Narrative completion + hover
+
+The catalog (45 inference patterns + 5-form window-from-anchor sub-grammar) is embedded into the extension at build time. Completion items appear inside any line beginning with `- logic is ` and offer the narrative form of each catalog pattern as a snippet — tab-stops drop you straight into the quoted concept-ref slots. Hover over a recognized narrative phrase to see the canonical signature, category, and CQL function reference.
+
+The catalog is the single source of truth for available patterns; new patterns added to `features/cql-pattern-mining/results/inference-pattern-catalog-draft.md` are picked up by the next `npm run compile`.
 
 ## Commands and settings
 

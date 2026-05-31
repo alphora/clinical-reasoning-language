@@ -89,7 +89,7 @@ async function build() {
 
   // Pure node modules (fs/path/crypto). Bundled separately so the unit tests can
   // import them directly; the extension host imports the same source.
-  for (const name of ["provision", "highlight"]) {
+  for (const name of ["provision", "highlight", "catalog"]) {
     await esbuild.build({
       entryPoints: [path.resolve(__dirname, `src/${name}.ts`)],
       outfile: path.resolve(__dirname, `dist/${name}.js`),
@@ -101,8 +101,30 @@ async function build() {
     });
   }
 
+  // Generate dist/catalog.json from the inference-pattern catalog markdown so
+  // the completion + hover providers have an embedded, parseable list. The
+  // parser is in src/catalog.ts and was just built into dist/catalog.js above.
+  const catalogMod = require(path.resolve(__dirname, "dist/catalog.js"));
+  const catalogMdPath = path.resolve(
+    __dirname,
+    "../features/cql-pattern-mining/results/inference-pattern-catalog-draft.md"
+  );
+  if (!fs.existsSync(catalogMdPath)) {
+    throw new Error(`Catalog markdown not found at ${catalogMdPath}`);
+  }
+  const catalogMd = fs.readFileSync(catalogMdPath, "utf-8");
+  const patterns = catalogMod.parseCatalog(catalogMd);
+  if (!patterns.length) {
+    throw new Error("Catalog parse produced 0 patterns — check the catalog markdown's reference table headers");
+  }
+  fs.writeFileSync(
+    path.resolve(__dirname, "dist/catalog.json"),
+    JSON.stringify(patterns, null, 2)
+  );
+
   console.log(
-    "esbuild: built extension.js + mcp-server.js + provision.js + highlight.js; gates passed " +
+    "esbuild: built extension.js + mcp-server.js + provision.js + highlight.js + catalog.js; " +
+      `embedded ${patterns.length} catalog patterns; gates passed ` +
       `(externals: ${[...new Set(externalImports)].join(", ") || "none"}).`
   );
 }

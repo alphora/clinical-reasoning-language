@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import * as path from "node:path";
+import * as fs from "node:fs";
 import { claudeCodeTarget, type ProvisionContext } from "./provision";
 import {
   applyHighlight,
@@ -8,8 +9,45 @@ import {
   type Associations,
   type TokenColors,
 } from "./highlight";
+import type { Pattern } from "./catalog";
+import { NarrativeCompletionProvider, CRL_DOCUMENT_SELECTOR } from "./completion";
+import { NarrativeHoverProvider } from "./hover";
 
 const messageOf = (e: unknown): string => (e instanceof Error ? e.message : String(e));
+
+function loadEmbeddedCatalog(context: vscode.ExtensionContext): Pattern[] {
+  const catalogJsonPath = path.join(context.extensionPath, "dist", "catalog.json");
+  try {
+    const raw = fs.readFileSync(catalogJsonPath, "utf-8");
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) {
+      throw new Error(`expected an array in ${catalogJsonPath}, got ${typeof parsed}`);
+    }
+    return parsed as Pattern[];
+  } catch (e) {
+    // Non-fatal: language features just won't work. Surface a quiet warning.
+    vscode.window.showWarningMessage(
+      `CRL: could not load embedded pattern catalog (${messageOf(e)}). ` +
+        "Completion + hover features disabled; provisioning and highlighting unaffected."
+    );
+    return [];
+  }
+}
+
+function registerLanguageFeatures(context: vscode.ExtensionContext, patterns: Pattern[]): void {
+  if (patterns.length === 0) return;
+  context.subscriptions.push(
+    vscode.languages.registerCompletionItemProvider(
+      CRL_DOCUMENT_SELECTOR,
+      new NarrativeCompletionProvider(patterns),
+      " " // trigger after a space — natural place to suggest a continuation
+    ),
+    vscode.languages.registerHoverProvider(
+      CRL_DOCUMENT_SELECTOR,
+      new NarrativeHoverProvider(patterns)
+    )
+  );
+}
 
 export function activate(context: vscode.ExtensionContext): void {
   // Register commands FIRST so they survive a provisioning failure.
@@ -21,6 +59,10 @@ export function activate(context: vscode.ExtensionContext): void {
       removeAll(context).catch((e) => vscode.window.showErrorMessage(`CRL: ${messageOf(e)}`))
     )
   );
+
+  // Language features (completion + hover) are independent of provisioning —
+  // they activate whenever the extension loads and a `.crl` file is opened.
+  registerLanguageFeatures(context, loadEmbeddedCatalog(context));
 
   const auto = vscode.workspace.getConfiguration("crl").get<boolean>("autoProvision", true);
   if (auto && vscode.workspace.workspaceFolders?.length) {
