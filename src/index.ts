@@ -6,7 +6,7 @@ import { CRLLexer } from "./grammar/generated/antlr/CRLLexer";
 import { createLexer } from "./lexer/createLexer";
 import { createParser } from "./parser/createParser";
 import { CRLError } from "./types/errors";
-//import { Validator } from "./validator/validator";
+import { Validator, type ValidationError } from "./validator/validator";
 
 export interface Token {
   line: number;
@@ -144,65 +144,68 @@ export function buildCRL(input: string): ParseResult<CRL> {
 }
 
 /**
- * Validates CRL input
- * @param input The CRL code to validate
- * @returns ParseResult containing validation result or errors
+ * ValidateCRL options.
+ *
+ * `soft`: relaxes reference-target-exists checks (unresolved concepts /
+ * terminologies become warnings instead of errors). Useful while authoring
+ * an incomplete document. Name uniqueness and cycle detection always stay
+ * errors regardless of this flag.
  */
-export function validateCRL(input: string): ParseResult<CRL> {
-  const result = buildCRL(input);
-  if (!result.success) {
-    throw new Error(
-      `validateCRL is not currently implemented. Use buildCRL instead. Look for updates in the future. Build errors: ${JSON.stringify(result.errors, null, 2)}`,
-    );
+export interface ValidateOptions {
+  soft?: boolean;
+}
+
+/**
+ * The result envelope for `validateCRL`. Extends `ParseResult<CRL>` with a
+ * `warnings` field so callers can surface both. When `success` is true the
+ * file is semantically clean in the requested mode (in soft mode some
+ * findings may have been demoted to warnings — they're still in the
+ * envelope).
+ */
+export interface ValidationResultEnvelope extends ParseResult<CRL> {
+  warnings?: CRLError[];
+}
+
+/**
+ * Validate a CRL document end-to-end: lex, parse, build AST, then run the
+ * semantic validator (name uniqueness, reference resolution, cycle
+ * detection, action uniqueness). Returns a ParseResult-shaped envelope
+ * with `errors` (and `warnings` in soft mode) suitable for surfacing to
+ * editor diagnostics, the MCP layer, or a CLI.
+ */
+export function validateCRL(input: string, options: ValidateOptions = {}): ValidationResultEnvelope {
+  const built = buildCRL(input);
+  if (!built.success || !built.result) {
+    // Lex/parse/build errors short-circuit semantic validation.
+    return { success: false, errors: built.errors };
   }
-  throw new Error(
-    "validateCRL is not currently implemented. Use buildCRL instead. Look for updates in the future.",
-  );
-  // TODO: Implement this
-  // try {
-  //   const { parser, lexerErrorListener, parserErrorListener } = createParser(input);
-  //   const tree = parser.crl();
-  //   const builder = new CRLAstBuilder();
-  //   const ast = builder.visit(tree) as CRL;
-  //   const parserErrors = parserErrorListener.getErrors();
-  //   if (parserErrors.length > 0) {
-  //     return { success: false, errors: parserErrors };
-  //   }
-  //   const lexerErrors = lexerErrorListener.getErrors();
-  //   if (lexerErrors.length > 0) {
-  //     return { success: false, errors: lexerErrors };
-  //   }
-  //   const builderErrors = builder.getErrors();
-  //   if (builderErrors.length > 0) {
-  //     return { success: false, errors: builderErrors };
-  //   }
-  //   const validator = new Validator();
-  //   const validationResult = validator.validate(ast);
-  //   if (!validationResult.isValid) {
-  //     return {
-  //       success: false,
-  //       errors: [
-  //         ...validationResult.errors.map((e) => ({
-  //           type: "Exception" as const,
-  //           message: e.message,
-  //         })),
-  //         ...validationResult.warnings.map((w) => ({
-  //           type: "Exception" as const,
-  //           message: w.message,
-  //         })),
-  //       ],
-  //     };
-  //   }
-  //   return { success: true, result: ast };
-  // } catch (error) {
-  //   return {
-  //     success: false,
-  //     errors: [
-  //       {
-  //         type: "Exception",
-  //         message: error instanceof Error ? error.message : String(error),
-  //       },
-  //     ],
-  //   };
-  // }
+  try {
+    const validator = new Validator();
+    const result = validator.validate(built.result, { soft: options.soft });
+    const errors = result.errors.map(toCrlError);
+    const warnings = result.warnings.map(toCrlError);
+    if (errors.length > 0) {
+      return { success: false, result: built.result, errors, warnings };
+    }
+    return { success: true, result: built.result, warnings };
+  } catch (error) {
+    return {
+      success: false,
+      errors: [
+        {
+          type: "Exception",
+          message: error instanceof Error ? error.message : String(error),
+        },
+      ],
+    };
+  }
+}
+
+function toCrlError(v: ValidationError): CRLError {
+  return {
+    type: "Validation",
+    message: v.message,
+    line: v.location?.start.line,
+    column: v.location?.start.column,
+  };
 }

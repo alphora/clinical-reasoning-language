@@ -61,12 +61,26 @@ check("apply preserves user's other association + token rule", () => {
   assert.ok(r.tokenColors.textMateRules.some((x) => x.scope === "entity.name.type.crl"));
 });
 
-check("apply leaves a user-customized .crl rule + warns", () => {
+check("apply leaves a user-customized .crl rule + reports the scope for prompting", () => {
   const mine = { scope: "entity.name.type.crl", settings: { foreground: "#123456" } };
   const r = applyHighlight(undefined, { textMateRules: [mine] }, rules);
   const got = r.tokenColors.textMateRules.find((x) => x.scope === "entity.name.type.crl");
   assert.equal(got.settings.foreground, "#123456"); // unchanged
-  assert.ok(r.warnings.some((w) => /entity\.name\.type\.crl/.test(w)));
+  assert.deepEqual(r.customizedScopes, ["entity.name.type.crl"]);
+  // The extension host handles the prompt — no warning fired from the pure helper.
+  assert.equal(r.warnings.length, 0);
+});
+
+check("apply with replaceScopes overwrites the user-customized rule", () => {
+  const mine = { scope: "entity.name.type.crl", settings: { foreground: "#123456" } };
+  const r = applyHighlight(undefined, { textMateRules: [mine] }, rules, {
+    replaceScopes: new Set(["entity.name.type.crl"]),
+  });
+  const got = r.tokenColors.textMateRules.find((x) => x.scope === "entity.name.type.crl");
+  const expected = rules.find((x) => x.scope === "entity.name.type.crl");
+  assert.deepEqual(got.settings, expected.settings, "replace must overwrite with CRL's canonical settings");
+  assert.equal(r.customizedScopes.length, 0, "replaced scopes are not re-reported as customized");
+  assert.equal(r.tokenColorsChanged, true);
 });
 
 check("remove deletes our association + our rules, keeps user's", () => {

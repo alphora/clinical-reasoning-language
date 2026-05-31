@@ -1,8 +1,8 @@
 {
   "name": "crl-language-support",
   "displayName": "Clinical Reasoning Language Support",
-  "description": "CRL keyword highlighting + catalog-driven narrative completion and hover for .crl Markdown files.",
-  "version": "1.4.0",
+  "description": "CRL keyword highlighting, live validation diagnostics, and catalog-driven authoring help (completion + hover) for .crl Markdown files.",
+  "version": "1.5.0",
   "publisher": "smiledigitalhealth",
   "engines": {
     "vscode": "^1.85.0"
@@ -65,7 +65,9 @@
     "test:highlight": "node src/highlight.test.mjs",
     "pretest:catalog": "npm run compile",
     "test:catalog": "node src/catalog.test.mjs && node src/embedded-catalog.test.mjs",
-    "test": "npm run compile && node src/mcp-server.test.mjs && node src/provision.test.mjs && node src/highlight.test.mjs && node src/catalog.test.mjs && node src/embedded-catalog.test.mjs",
+    "pretest:concepts": "npm run compile",
+    "test:concepts": "node src/concepts.test.mjs",
+    "test": "npm run compile && node src/mcp-server.test.mjs && node src/provision.test.mjs && node src/highlight.test.mjs && node src/catalog.test.mjs && node src/embedded-catalog.test.mjs && node src/concepts.test.mjs",
     "vscode:prepublish": "npm run compile",
     "package": "vsce package"
   },

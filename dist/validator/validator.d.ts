@@ -18,10 +18,15 @@ export interface ValidationResult {
     errors: ValidationError[];
     warnings: ValidationError[];
 }
+export interface ValidatorOptions {
+    soft?: boolean;
+}
 export declare class Validator {
     private readonly unusedDeclarationsValidator;
     private readonly nameUniquenessValidator;
     private readonly actionUniquenessValidator;
+    private readonly referenceResolver;
+    private readonly cycleDetector;
     constructor();
-    validate(ast: CRL): ValidationResult;
+    validate(ast: CRL, options?: ValidatorOptions): ValidationResult;
 }

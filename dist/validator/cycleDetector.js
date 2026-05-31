@@ -2,77 +2,152 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CycleDetector = void 0;
 class CycleDetector {
-    constructor() {
-        this.decisionAdjacencyList = new Map();
-        this.conceptAdjacencyList = new Map();
-    }
-    validate(declarations) {
+    validate(ast) {
         const errors = [];
-        for (const declaration of declarations) {
-            if (declaration.decisionReferences) {
-                const source = declaration.id;
-                if (!this.decisionAdjacencyList.has(source)) {
-                    this.decisionAdjacencyList.set(source, new Set());
-                }
-                for (const ref of declaration.decisionReferences) {
-                    this.decisionAdjacencyList.get(source).add(ref);
-                }
-            }
-            if (declaration.conceptInferences) {
-                const source = declaration.id;
-                if (!this.conceptAdjacencyList.has(source)) {
-                    this.conceptAdjacencyList.set(source, new Set());
-                }
-                for (const inf of declaration.conceptInferences) {
-                    this.conceptAdjacencyList.get(source).add(inf);
-                }
-            }
+        const adjacency = new Map();
+        const locations = new Map();
+        for (const statement of ast.statements) {
+            if (statement.type !== "Concept" || !statement.name)
+                continue;
+            const concept = statement;
+            locations.set(concept.name, concept.location);
+            const refs = new Set();
+            this.collectRefs(concept, refs);
+            adjacency.set(concept.name, refs);
         }
-        const decisionCycles = this.detectCycles(this.decisionAdjacencyList, "Decision");
-        errors.push(...decisionCycles);
-        const conceptCycles = this.detectCycles(this.conceptAdjacencyList, "Concept");
-        errors.push(...conceptCycles);
-        return errors;
-    }
-    detectCycles(adjacencyList, nodeType) {
-        const errors = [];
-        const visited = new Set();
-        const recursionStack = new Set();
-        const cycles = new Set();
+        const WHITE = 0, GRAY = 1, BLACK = 2;
+        const color = new Map();
+        const cyclesReported = new Set();
         const dfs = (node, path) => {
-            visited.add(node);
-            recursionStack.add(node);
+            color.set(node, GRAY);
             path.push(node);
-            const neighbors = adjacencyList.get(node) || new Set();
+            const neighbors = adjacency.get(node) ?? new Set();
             for (const neighbor of neighbors) {
-                if (!visited.has(neighbor)) {
-                    dfs(neighbor, [...path]);
+                if (!adjacency.has(neighbor))
+                    continue;
+                const c = color.get(neighbor) ?? WHITE;
+                if (c === WHITE) {
+                    dfs(neighbor, path);
                 }
-                else if (recursionStack.has(neighbor)) {
-                    const cycleStartIndex = path.indexOf(neighbor);
-                    const cycle = path.slice(cycleStartIndex);
-                    cycle.push(neighbor);
-                    if (cycle[0] === cycle[cycle.length - 1]) {
-                        const cyclePath = cycle.map((node) => `${nodeType}:${node}`).join(" -> ");
-                        if (!cycles.has(cyclePath)) {
-                            cycles.add(cyclePath);
+                else if (c === GRAY) {
+                    const idx = path.indexOf(neighbor);
+                    if (idx >= 0) {
+                        const cycle = path.slice(idx);
+                        cycle.push(neighbor);
+                        const cycleKey = this.canonicalizeCycle(cycle);
+                        if (!cyclesReported.has(cycleKey)) {
+                            cyclesReported.add(cycleKey);
+                            const display = cycle.map((n) => `"${n}"`).join(" → ");
                             errors.push({
-                                message: `Cycle detected in ${nodeType.toLowerCase()} references: ${cyclePath}`,
+                                message: `Reference cycle detected: ${display}`,
+                                location: locations.get(node) ?? {
+                                    start: { line: 1, column: 1 },
+                                    end: { line: 1, column: 1 },
+                                },
                                 severity: "error",
-                                location: { start: { line: 1, column: 1 }, end: { line: 1, column: 1 } },
                             });
                         }
                     }
                 }
             }
-            recursionStack.delete(node);
+            color.set(node, BLACK);
+            path.pop();
         };
-        for (const node of adjacencyList.keys()) {
-            if (!visited.has(node)) {
+        for (const node of adjacency.keys()) {
+            if ((color.get(node) ?? WHITE) === WHITE) {
                 dfs(node, []);
             }
         }
         return errors;
+    }
+    collectRefs(concept, refs) {
+        switch (concept.definition.type) {
+            case "CodedFromDefinition":
+                return;
+            case "InferredFromDefinition": {
+                const body = concept.definition.body;
+                if (body.type === "InferredFromBareRef") {
+                    refs.add(body.ref);
+                }
+                else if (body.type === "InferredFromComposition") {
+                    this.collectFromComposition(body.expression, refs);
+                }
+                return;
+            }
+            case "LogicIsDefinition":
+                this.collectFromNarrative(concept.definition.body, refs);
+                return;
+        }
+    }
+    collectFromComposition(expr, refs) {
+        switch (expr.type) {
+            case "SemOrExpression":
+            case "SemAndExpression":
+                for (const term of expr.terms) {
+                    this.collectFromComposition(term, refs);
+                }
+                return;
+            case "SemNotExpression":
+                this.collectFromComposition(expr.expression, refs);
+                return;
+            case "CompositionGroup":
+                this.collectFromComposition(expr.expression, refs);
+                return;
+            case "CompositionRef":
+                refs.add(expr.ref);
+                return;
+        }
+    }
+    collectFromNarrative(clause, refs) {
+        for (const el of clause.elements) {
+            this.collectFromNarrativeElement(el, refs);
+        }
+    }
+    collectFromNarrativeElement(el, refs) {
+        switch (el.type) {
+            case "NConceptRef":
+                refs.add(el.value);
+                return;
+            case "NDisjunction":
+                for (const av of el.disjuncts) {
+                    this.collectFromArgValue(av, refs);
+                }
+                return;
+            case "NConjunction":
+                for (const av of el.conjuncts) {
+                    this.collectFromArgValue(av, refs);
+                }
+                return;
+        }
+    }
+    collectFromArgValue(av, refs) {
+        switch (av.type) {
+            case "NConceptRef":
+                refs.add(av.value);
+                return;
+            case "NDisjunction":
+                for (const inner of av.disjuncts) {
+                    this.collectFromArgValue(inner, refs);
+                }
+                return;
+            case "NConjunction":
+                for (const inner of av.conjuncts) {
+                    this.collectFromArgValue(inner, refs);
+                }
+                return;
+        }
+    }
+    canonicalizeCycle(cycle) {
+        if (cycle.length === 0)
+            return "";
+        const nodes = cycle.slice(0, -1);
+        let min = 0;
+        for (let i = 1; i < nodes.length; i++) {
+            if (nodes[i] < nodes[min])
+                min = i;
+        }
+        const rotated = [...nodes.slice(min), ...nodes.slice(0, min)];
+        return rotated.join("→");
     }
 }
 exports.CycleDetector = CycleDetector;

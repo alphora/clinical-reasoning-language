@@ -15,6 +15,60 @@
  * captures whatever the canonical column contains.
  */
 
+/**
+ * FHIR concept types CRL recognizes. Source of truth: the `CONCEPT_TYPE`
+ * lexer rule in src/grammar/CRLLexer.g4 — keep in sync if the grammar adds
+ * a type. Used to populate the `- type is X.` completion menu and the
+ * type-keyword hover.
+ */
+export const CONCEPT_TYPES = [
+  "AdverseEvent",
+  "AllergyIntolerance",
+  "ClinicalImpression",
+  "Communication",
+  "CommunicationRequest",
+  "Condition",
+  "DetectedIssue",
+  "Device",
+  "DiagnosticReport",
+  "DocumentReference",
+  "Encounter",
+  "FamilyMemberHistory",
+  "Goal",
+  "Immunization",
+  "MedicationAdministration",
+  "MedicationDispense",
+  "MedicationRequest",
+  "NutritionIntake",
+  "NutritionOrder",
+  "Observation",
+  "Procedure",
+  "QuestionnaireResponse",
+  "RiskAssessment",
+  "ServiceRequest",
+  "Task",
+] as const;
+
+/**
+ * FHIR primitive / structured types CRL accepts as a `valuetype`. Source of
+ * truth: the `CONCEPT_VALUE_TYPE` lexer rule. Used to populate `- valuetype
+ * is X.` completion + hover.
+ */
+export const CONCEPT_VALUETYPES = [
+  "Attachment",
+  "boolean",
+  "CodeableConcept",
+  "dateTime",
+  "integer",
+  "Period",
+  "Quantity",
+  "Range",
+  "Ratio",
+  "SampledData",
+  "string",
+  "time",
+] as const;
+
 export interface Pattern {
   /** e.g., `Has(X)` — short canonical call form */
   canonical: string;

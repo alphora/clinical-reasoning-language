@@ -13,8 +13,9 @@ const { parser } = (0, createParser_1.createParser)(input);
 const tree = parser.crl();
 const builder = new builder_1.CRLAstBuilder();
 const ast = builder.visit(tree);
+const soft = process.argv.includes("--soft");
 const validator = new validator_1.Validator();
-const result = validator.validate(ast);
+const result = validator.validate(ast, { soft });
 const prettyOutput = process.argv.includes("--pretty");
 if (!prettyOutput) {
     console.log(JSON.stringify(result, null, 2));

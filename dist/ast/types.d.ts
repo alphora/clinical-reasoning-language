@@ -115,14 +115,14 @@ export interface ActivityBecause extends ASTNode {
 export interface Concept extends ASTNode {
     type: "Concept";
     name: string;
-    conceptType: ConceptType;
-    valueType: ConceptValueType;
+    conceptType?: ConceptType;
+    valueTypes: ConceptValueType[];
     definition: ConceptDefinition;
     meta?: string[];
     evidence?: string;
     location: Location;
 }
-export type ConceptDefinition = CodedFromDefinition | InferredFromDefinition;
+export type ConceptDefinition = CodedFromDefinition | InferredFromDefinition | LogicIsDefinition;
 export interface CodedFromDefinition extends ASTNode {
     type: "CodedFromDefinition";
     terminologyName: string;
@@ -132,32 +132,76 @@ export interface ConceptReference extends ASTNode {
     type: "ConceptReference";
     name: string;
 }
-export interface InformalAnd extends ASTNode {
-    type: "AndExpression";
-    terms: InferredFromExpression[];
-}
-export interface InformalOr extends ASTNode {
-    type: "OrExpression";
-    terms: InferredFromExpression[];
-}
-export interface NotExpression extends ASTNode {
-    type: "NotExpression";
-    expression: InferredFromExpression;
-}
-export type InferredFromExpression = ConceptReference | InformalAnd | InformalOr | GroupExpression | NotExpression;
-export interface GroupExpression extends ASTNode {
-    type: "GroupExpression";
-    expression: InferredFromExpression;
-}
-export interface InferredFromConcept extends ASTNode {
-    type: "InferredFromDefinitionConcept";
-    concept: string;
-    patterns?: string[];
-}
 export interface InferredFromDefinition extends ASTNode {
     type: "InferredFromDefinition";
-    body: InferredFromConcept | InferredFromExpression;
+    body: InferredFromBareRef | InferredFromComposition;
 }
+export interface InferredFromBareRef extends ASTNode {
+    type: "InferredFromBareRef";
+    ref: string;
+}
+export interface InferredFromComposition extends ASTNode {
+    type: "InferredFromComposition";
+    expression: CompositionExpression;
+}
+export type CompositionExpression = SemOrExpression | SemAndExpression | SemNotExpression | CompositionRef | CompositionGroup;
+export interface SemOrExpression extends ASTNode {
+    type: "SemOrExpression";
+    terms: CompositionExpression[];
+}
+export interface SemAndExpression extends ASTNode {
+    type: "SemAndExpression";
+    terms: CompositionExpression[];
+}
+export interface SemNotExpression extends ASTNode {
+    type: "SemNotExpression";
+    expression: CompositionExpression;
+}
+export interface CompositionRef extends ASTNode {
+    type: "CompositionRef";
+    ref: string;
+}
+export interface CompositionGroup extends ASTNode {
+    type: "CompositionGroup";
+    expression: CompositionExpression;
+}
+export interface LogicIsDefinition extends ASTNode {
+    type: "LogicIsDefinition";
+    body: NarrativeClause;
+}
+export interface NarrativeClause extends ASTNode {
+    type: "NarrativeClause";
+    elements: NarrativeElement[];
+    location: Location;
+}
+export type NarrativeElement = NConceptRef | NWord | Quantity | NDisjunction | NConjunction;
+export interface NConceptRef extends ASTNode {
+    type: "NConceptRef";
+    value: string;
+    location: Location;
+}
+export interface NWord extends ASTNode {
+    type: "NWord";
+    value: string;
+    location: Location;
+}
+export interface Quantity extends ASTNode {
+    type: "Quantity";
+    value: number;
+    unit: string;
+    location: Location;
+}
+export interface NDisjunction extends ASTNode {
+    type: "NDisjunction";
+    disjuncts: ArgValue[];
+    location: Location;
+}
+export interface NConjunction extends ASTNode {
+    type: "NConjunction";
+    conjuncts: ArgValue[];
+    location: Location;
+}
+export type ArgValue = NConceptRef | Quantity | NDisjunction | NConjunction;
 export interface Location {
     start: {
         line: number;

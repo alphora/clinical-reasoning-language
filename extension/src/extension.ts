@@ -10,8 +10,19 @@ import {
   type TokenColors,
 } from "./highlight";
 import type { Pattern } from "./catalog";
-import { NarrativeCompletionProvider, CRL_DOCUMENT_SELECTOR } from "./completion";
-import { NarrativeHoverProvider } from "./hover";
+import {
+  NarrativeCompletionProvider,
+  TypeCompletionProvider,
+  ValuetypeCompletionProvider,
+  ConceptRefCompletionProvider,
+  CRL_DOCUMENT_SELECTOR,
+} from "./completion";
+import {
+  NarrativeHoverProvider,
+  TypeValuetypeHoverProvider,
+  ConceptRefHoverProvider,
+} from "./hover";
+import { registerDiagnostics } from "./diagnostics";
 
 const messageOf = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 
@@ -35,18 +46,49 @@ function loadEmbeddedCatalog(context: vscode.ExtensionContext): Pattern[] {
 }
 
 function registerLanguageFeatures(context: vscode.ExtensionContext, patterns: Pattern[]): void {
-  if (patterns.length === 0) return;
+  // Narrative completion+hover requires the catalog; the others (type,
+  // valuetype, concept-refs) only depend on document content and the
+  // grammar-mirrored enums in catalog.ts, so they register regardless.
   context.subscriptions.push(
+    // Completion providers
     vscode.languages.registerCompletionItemProvider(
       CRL_DOCUMENT_SELECTOR,
-      new NarrativeCompletionProvider(patterns),
-      " " // trigger after a space — natural place to suggest a continuation
+      new TypeCompletionProvider(),
+      " "
+    ),
+    vscode.languages.registerCompletionItemProvider(
+      CRL_DOCUMENT_SELECTOR,
+      new ValuetypeCompletionProvider(),
+      " "
+    ),
+    vscode.languages.registerCompletionItemProvider(
+      CRL_DOCUMENT_SELECTOR,
+      new ConceptRefCompletionProvider(),
+      '"'
+    ),
+    // Hover providers
+    vscode.languages.registerHoverProvider(
+      CRL_DOCUMENT_SELECTOR,
+      new TypeValuetypeHoverProvider()
     ),
     vscode.languages.registerHoverProvider(
       CRL_DOCUMENT_SELECTOR,
-      new NarrativeHoverProvider(patterns)
+      new ConceptRefHoverProvider()
     )
   );
+  if (patterns.length > 0) {
+    context.subscriptions.push(
+      vscode.languages.registerCompletionItemProvider(
+        CRL_DOCUMENT_SELECTOR,
+        new NarrativeCompletionProvider(patterns),
+        " "
+      ),
+      vscode.languages.registerHoverProvider(
+        CRL_DOCUMENT_SELECTOR,
+        new NarrativeHoverProvider(patterns)
+      )
+    );
+  }
 }
 
 export function activate(context: vscode.ExtensionContext): void {
@@ -60,9 +102,11 @@ export function activate(context: vscode.ExtensionContext): void {
     )
   );
 
-  // Language features (completion + hover) are independent of provisioning —
-  // they activate whenever the extension loads and a `.crl` file is opened.
+  // Language features (completion + hover + diagnostics) are independent of
+  // provisioning — they activate whenever the extension loads and a `.crl`
+  // file is opened.
   registerLanguageFeatures(context, loadEmbeddedCatalog(context));
+  registerDiagnostics(context);
 
   const auto = vscode.workspace.getConfiguration("crl").get<boolean>("autoProvision", true);
   if (auto && vscode.workspace.workspaceFolders?.length) {
@@ -108,6 +152,70 @@ function grammarPath(context: vscode.ExtensionContext): string {
   return path.join(context.extensionPath, "syntaxes", "crl-injection.tmLanguage.json");
 }
 
+// Keys in extension globalState for the customized-scope dialog state.
+const SCOPE_DECISIONS_KEY = "crl.highlight.scopeDecisions";
+const SKIP_ALL_CUSTOMIZED_KEY = "crl.highlight.skipAllCustomized";
+type ScopeDecision = "replace" | "keep";
+
+function readScopeDecisions(context: vscode.ExtensionContext): Record<string, ScopeDecision> {
+  return context.globalState.get<Record<string, ScopeDecision>>(SCOPE_DECISIONS_KEY, {});
+}
+
+async function writeScopeDecisions(
+  context: vscode.ExtensionContext,
+  decisions: Record<string, ScopeDecision>
+): Promise<void> {
+  await context.globalState.update(SCOPE_DECISIONS_KEY, decisions);
+}
+
+/**
+ * Prompt the user for each unknown customized scope. Returns the set of
+ * scopes the user chose to replace. Persists keep/replace decisions per
+ * scope and a global "don't ask again" flag.
+ */
+async function promptForCustomizedScopes(
+  context: vscode.ExtensionContext,
+  customizedScopes: string[]
+): Promise<Set<string>> {
+  const replaceScopes = new Set<string>();
+  if (customizedScopes.length === 0) return replaceScopes;
+  if (context.globalState.get<boolean>(SKIP_ALL_CUSTOMIZED_KEY, false)) {
+    // User previously said "don't ask again" — leave everything alone.
+    return replaceScopes;
+  }
+  const decisions = { ...readScopeDecisions(context) };
+  let dirty = false;
+  for (const scope of customizedScopes) {
+    const prior = decisions[scope];
+    if (prior === "replace") {
+      replaceScopes.add(scope);
+      continue;
+    }
+    if (prior === "keep") continue;
+    const choice = await vscode.window.showInformationMessage(
+      `CRL: your settings have a customized token color for "${scope}". Replace with CRL's default?`,
+      "Replace",
+      "Keep mine",
+      "Don't ask again"
+    );
+    if (choice === "Replace") {
+      decisions[scope] = "replace";
+      replaceScopes.add(scope);
+      dirty = true;
+    } else if (choice === "Keep mine") {
+      decisions[scope] = "keep";
+      dirty = true;
+    } else if (choice === "Don't ask again") {
+      await context.globalState.update(SKIP_ALL_CUSTOMIZED_KEY, true);
+      // No per-scope decision; future activations won't prompt at all.
+      break;
+    }
+    // Dismissed (no choice) — leave alone this run, ask again next time.
+  }
+  if (dirty) await writeScopeDecisions(context, decisions);
+  return replaceScopes;
+}
+
 // Highlighting is written at GLOBAL scope (see highlight.ts header). We read the
 // global value (not the merged effective value) and write back only the section
 // that changed.
@@ -119,9 +227,15 @@ async function writeHighlight(
   const cfg = vscode.workspace.getConfiguration();
   const curAssoc = cfg.inspect<Associations>("files.associations")?.globalValue;
   const curColors = cfg.inspect<TokenColors>("editor.tokenColorCustomizations")?.globalValue;
-  const res = mode === "apply"
+  let res = mode === "apply"
     ? applyHighlight(curAssoc, curColors, rules)
     : removeHighlight(curAssoc, curColors, rules);
+  if (mode === "apply" && res.customizedScopes.length > 0) {
+    const replaceScopes = await promptForCustomizedScopes(context, res.customizedScopes);
+    if (replaceScopes.size > 0) {
+      res = applyHighlight(curAssoc, curColors, rules, { replaceScopes });
+    }
+  }
 
   // Token colors first, then the association, so a .crl file is never switched
   // to Markdown before its color rules exist.

@@ -2,7 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import { readFileSync, statSync } from "node:fs";
-import { tokenizeCRL, buildCRL } from "@smile-digital-health/crl";
+import { tokenizeCRL, buildCRL, validateCRL } from "@smile-digital-health/crl";
 
 // Caps the CRL SOURCE (input) size. Response size scales with this — there is
 // no separate output cap, but bounding input keeps responses bounded enough.
@@ -10,6 +10,7 @@ const MAX_INPUT_BYTES = 1_000_000;
 
 type CrlFn = (input: string) => { success: boolean; result?: unknown; errors?: unknown };
 type ToolArgs = { code?: string; path?: string };
+type ValidateArgs = ToolArgs & { soft?: boolean };
 
 // Thrown for bad tool input (XOR violation, unreadable/oversized/dir path).
 // These map to MCP isError responses; CRL parse/build failures do NOT — those
@@ -70,6 +71,22 @@ function runTool(fn: CrlFn, args: ToolArgs) {
   return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
 }
 
+function runValidate(args: ValidateArgs) {
+  let source: string;
+  try {
+    source = resolveSource(args);
+  } catch (e) {
+    const msg = e instanceof ToolInputError ? e.message : `Unexpected error: ${(e as Error).message}`;
+    return { content: [{ type: "text" as const, text: msg }], isError: true };
+  }
+  // Strip the (potentially large) AST from the response — the agent only
+  // needs the diagnostic envelope, not the full tree. Callers that need the
+  // tree should use `build_crl_ast` separately.
+  const full = validateCRL(source, { soft: args.soft === true });
+  const slim = { success: full.success, errors: full.errors, warnings: full.warnings };
+  return { content: [{ type: "text" as const, text: JSON.stringify(slim) }] };
+}
+
 const inputSchema = {
   code: z
     .string()
@@ -112,6 +129,28 @@ function createServer(): McpServer {
       inputSchema,
     },
     (args) => runTool(buildCRL, args)
+  );
+
+  server.registerTool(
+    "validate_crl",
+    {
+      title: "Validate CRL",
+      description:
+        "Validate a CRL document end-to-end: lex, parse, build AST, then run semantic checks (name uniqueness, " +
+        "reference resolution, cycle detection, action uniqueness). Pass exactly one of `code` (inline) or " +
+        "`path` (file), plus an optional `soft` flag. " +
+        "Returns { success, errors[], warnings[] } — the AST is omitted (use build_crl_ast for that). " +
+        "In soft mode, reference-target-exists checks demote to warnings (useful while authoring); name uniqueness " +
+        "and cycle detection remain errors.",
+      inputSchema: {
+        ...inputSchema,
+        soft: z
+          .boolean()
+          .optional()
+          .describe("If true, demote reference-target-exists errors to warnings."),
+      },
+    },
+    (args) => runValidate(args as ValidateArgs)
   );
 
   return server;

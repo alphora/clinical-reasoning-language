@@ -258,38 +258,31 @@ class CRLAstBuilder extends AbstractParseTreeVisitor_1.AbstractParseTreeVisitor 
             location: getLocation(ctx),
         };
     }
-    parseConceptTypes(bodyCtx, ctx) {
+    parseConceptTypes(bodyCtx, _ctx) {
         const typeLine = bodyCtx.typeLine?.();
-        const valueTypeLine = bodyCtx.valueTypeLine?.();
-        if (!typeLine || !valueTypeLine) {
-            this.reportError("AstError", ctx, {
-                message: "ConceptStatement: missing type or valueType line",
-            });
-            return null;
+        const valueTypeLines = bodyCtx.valueTypeLine?.() ?? [];
+        let conceptType;
+        if (typeLine) {
+            try {
+                const tok = typeLine.CONCEPT_TYPE();
+                if (tok)
+                    conceptType = tok.text;
+            }
+            catch {
+                conceptType = undefined;
+            }
         }
-        let conceptTypeToken, valueTypeToken;
-        try {
-            conceptTypeToken = typeLine.CONCEPT_TYPE();
+        const valueTypes = [];
+        for (const vtl of valueTypeLines) {
+            try {
+                const tok = vtl.CONCEPT_VALUE_TYPE();
+                if (tok)
+                    valueTypes.push(tok.text);
+            }
+            catch {
+            }
         }
-        catch {
-            conceptTypeToken = undefined;
-        }
-        try {
-            valueTypeToken = valueTypeLine.CONCEPT_VALUE_TYPE();
-        }
-        catch {
-            valueTypeToken = undefined;
-        }
-        if (!conceptTypeToken || !valueTypeToken) {
-            this.reportError("AstError", ctx, {
-                message: "ConceptStatement: missing CONCEPT_TYPE or CONCEPT_VALUE_TYPE token",
-            });
-            return null;
-        }
-        return {
-            conceptType: conceptTypeToken.text,
-            valueType: valueTypeToken.text,
-        };
+        return { conceptType, valueTypes };
     }
     parseMeta(bodyCtx) {
         const metaLines = bodyCtx.metaLine?.() ?? [];
@@ -350,11 +343,21 @@ class CRLAstBuilder extends AbstractParseTreeVisitor_1.AbstractParseTreeVisitor 
                 });
                 return null;
             }
-            return this.visit(infCtx);
+            return this.visitInferredFromBody(infCtx);
+        }
+        else if (bodyCtx.logicIsBody?.()) {
+            const logicCtx = bodyCtx.logicIsBody();
+            if (!logicCtx) {
+                this.reportError("AstError", ctx, {
+                    message: "ConceptStatement: logicIsBody() unexpectedly returned undefined",
+                });
+                return null;
+            }
+            return this.visitLogicIsBody(logicCtx);
         }
         else {
             this.reportError("AstError", ctx, {
-                message: "ConceptStatement must have either codedFromLine or inferredFromBody",
+                message: "ConceptStatement must have coded from, inferred from, or logic is body",
             });
             return null;
         }
@@ -369,10 +372,7 @@ class CRLAstBuilder extends AbstractParseTreeVisitor_1.AbstractParseTreeVisitor 
             return null;
         }
         const types = this.parseConceptTypes(bodyCtx, ctx);
-        if (!types) {
-            return null;
-        }
-        const { conceptType, valueType } = types;
+        const { conceptType, valueTypes } = types;
         const meta = this.parseMeta(bodyCtx);
         const evidence = this.parseEvidence(bodyCtx);
         const definition = this.parseConceptDefinition(bodyCtx, ctx);
@@ -382,84 +382,135 @@ class CRLAstBuilder extends AbstractParseTreeVisitor_1.AbstractParseTreeVisitor 
         return {
             type: "Concept",
             name,
-            conceptType,
-            valueType,
+            ...(conceptType ? { conceptType } : {}),
+            valueTypes,
             ...(meta.length > 0 ? { meta } : {}),
             ...(evidence ? { evidence } : {}),
             definition,
             location: getLocation(ctx),
         };
     }
-    visitDefinitionConcept(ctx) {
-        const refCtx = ctx.getRuleContext(0, CRLParser_1.InferredFromConceptReferenceContext);
-        const concept = refCtx?.conceptReference().text.slice(1, -1) ?? "";
-        const patternStmts = refCtx?.patternStatement?.();
-        let patterns = [];
-        if (patternStmts && patternStmts.length > 0) {
-            patterns = patternStmts.map((patCtx) => {
-                const backtickCtx = patCtx.patternName().backtickString();
-                return backtickCtx.text.slice(1, -1);
-            });
-        }
+    visitInferredFromBareRef(ctx) {
+        const ref = ctx.conceptReference().text.slice(1, -1);
         return {
-            type: "InferredFromDefinitionConcept",
-            concept,
-            ...(patterns.length > 0 ? { patterns } : {}),
+            type: "InferredFromBareRef",
+            ref,
             location: getLocation(ctx),
         };
     }
-    visitDefinitionLogic(ctx) {
-        const descCtx = ctx.getRuleContext(0, CRLParser_1.InferredFromDescriptiveLogicContext);
-        const exprCtx = descCtx?.inferredFromExpression();
-        const expr = this.visit(exprCtx);
-        if (expr && expr.type === "ConceptReference") {
-            const conceptRef = expr;
-            return {
-                type: "InferredFromDefinitionConcept",
-                concept: conceptRef.name,
-                location: getLocation(ctx),
-            };
-        }
-        return expr;
+    visitInferredFromComposition(ctx) {
+        const expr = this.visit(ctx.compositionExpression());
+        return {
+            type: "InferredFromComposition",
+            expression: expr,
+            location: getLocation(ctx),
+        };
     }
-    visitInferredFromExpression(ctx) {
-        return this.visit(ctx.informalOr());
+    visitCompositionExpression(ctx) {
+        return this.visit(ctx.semOr());
     }
-    visitInformalOr(ctx) {
-        const terms = ctx.informalAnd().map((a) => this.visit(a));
-        if (ctx.OR().length) {
-            return { type: "OrExpression", terms, location: getLocation(ctx) };
+    visitSemOr(ctx) {
+        const terms = ctx.semAnd().map((a) => this.visit(a));
+        if (ctx.SEM_OR().length) {
+            return { type: "SemOrExpression", terms, location: getLocation(ctx) };
         }
         return terms[0];
     }
-    visitInformalAnd(ctx) {
-        const terms = ctx
-            .informalNot()
-            .map((n) => this.visit(n));
-        if (ctx.AND().length) {
-            return { type: "AndExpression", terms, location: getLocation(ctx) };
+    visitSemAnd(ctx) {
+        const terms = ctx.semNot().map((n) => this.visit(n));
+        if (ctx.SEM_AND().length) {
+            return { type: "SemAndExpression", terms, location: getLocation(ctx) };
         }
         return terms[0];
     }
-    visitInformalNot(ctx) {
-        if (ctx.NOT()) {
+    visitSemNot(ctx) {
+        if (ctx.SEM_NOT()) {
             return {
-                type: "NotExpression",
-                expression: this.visit(ctx.informalNot()),
+                type: "SemNotExpression",
+                expression: this.visit(ctx.semNot()),
                 location: getLocation(ctx),
             };
         }
-        return this.visit(ctx.atom());
+        return this.visit(ctx.compositionAtom());
     }
-    visitConceptAtom(ctx) {
-        const conceptRefCtx = ctx.getRuleContext(0, CRLParser_1.ConceptReferenceContext);
-        const name = conceptRefCtx?.text?.slice(1, -1) ?? "";
-        return { type: "ConceptReference", name, location: getLocation(ctx) };
+    visitCompositionRef(ctx) {
+        const ref = ctx.conceptReference().text.slice(1, -1);
+        return { type: "CompositionRef", ref, location: getLocation(ctx) };
     }
-    visitGroupExpression(ctx) {
-        const exprCtx = ctx.getRuleContext(0, CRLParser_1.InferredFromExpressionContext);
-        const expr = this.visit(exprCtx);
-        return { type: "GroupExpression", expression: expr, location: getLocation(ctx) };
+    visitCompositionGroup(ctx) {
+        const expr = this.visit(ctx.compositionExpression());
+        return { type: "CompositionGroup", expression: expr, location: getLocation(ctx) };
+    }
+    visitInferredFromBody(ctx) {
+        const ifBodyCtx = ctx.ifBody();
+        const body = this.visit(ifBodyCtx);
+        return {
+            type: "InferredFromDefinition",
+            body,
+            location: getLocation(ctx),
+        };
+    }
+    visitLogicIsBody(ctx) {
+        const narrative = this.visitNarrative(ctx.narrative());
+        return {
+            type: "LogicIsDefinition",
+            body: narrative,
+            location: getLocation(ctx),
+        };
+    }
+    visitNarrative(ctx) {
+        const elements = ctx
+            .narrativeElement()
+            .map((e) => this.visit(e));
+        return {
+            type: "NarrativeClause",
+            elements,
+            location: getLocation(ctx),
+        };
+    }
+    visitNConceptRef(ctx) {
+        const value = ctx.QUOTED_STRING().text.slice(1, -1);
+        return { type: "NConceptRef", value, location: getLocation(ctx) };
+    }
+    visitNQuantity(ctx) {
+        return this.visitQuantity(ctx.quantity());
+    }
+    visitNWord(ctx) {
+        return { type: "NWord", value: ctx.text, location: getLocation(ctx) };
+    }
+    visitNArgGroupElement(ctx) {
+        return this.visitArgGroup(ctx.argGroup());
+    }
+    visitQuantity(ctx) {
+        const value = parseFloat(ctx.NUMBER().text);
+        const ucumCtx = ctx.UCUM_UNIT();
+        const timeCtx = ctx.TIME_UNIT();
+        const unit = ucumCtx ? ucumCtx.text.slice(1, -1) : timeCtx ? timeCtx.text : "";
+        return { type: "Quantity", value, unit, location: getLocation(ctx) };
+    }
+    visitArgGroup(ctx) {
+        return this.visit(ctx);
+    }
+    visitArgDisjunction(ctx) {
+        const disjuncts = ctx.argValue().map((av) => this.visit(av));
+        return { type: "NDisjunction", disjuncts, location: getLocation(ctx) };
+    }
+    visitArgConjunction(ctx) {
+        const conjuncts = ctx.argValue().map((av) => this.visit(av));
+        return { type: "NConjunction", conjuncts, location: getLocation(ctx) };
+    }
+    visitArgSingleton(ctx) {
+        return this.visit(ctx.argValue());
+    }
+    visitAVConceptRef(ctx) {
+        const value = ctx.QUOTED_STRING().text.slice(1, -1);
+        return { type: "NConceptRef", value, location: getLocation(ctx) };
+    }
+    visitAVQuantity(ctx) {
+        return this.visitQuantity(ctx.quantity());
+    }
+    visitAVNestedGroup(ctx) {
+        return this.visitArgGroup(ctx.argGroup());
     }
 }
 exports.CRLAstBuilder = CRLAstBuilder;

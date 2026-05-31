@@ -8,6 +8,7 @@ const builder_1 = require("./ast/builder");
 const CRLLexer_1 = require("./grammar/generated/antlr/CRLLexer");
 const createLexer_1 = require("./lexer/createLexer");
 const createParser_1 = require("./parser/createParser");
+const validator_1 = require("./validator/validator");
 function tokenizeCRL(input) {
     try {
         const { lexer, errorListener } = (0, createLexer_1.createLexer)(input);
@@ -110,11 +111,39 @@ function buildCRL(input) {
         };
     }
 }
-function validateCRL(input) {
-    const result = buildCRL(input);
-    if (!result.success) {
-        throw new Error(`validateCRL is not currently implemented. Use buildCRL instead. Look for updates in the future. Build errors: ${JSON.stringify(result.errors, null, 2)}`);
+function validateCRL(input, options = {}) {
+    const built = buildCRL(input);
+    if (!built.success || !built.result) {
+        return { success: false, errors: built.errors };
     }
-    throw new Error("validateCRL is not currently implemented. Use buildCRL instead. Look for updates in the future.");
+    try {
+        const validator = new validator_1.Validator();
+        const result = validator.validate(built.result, { soft: options.soft });
+        const errors = result.errors.map(toCrlError);
+        const warnings = result.warnings.map(toCrlError);
+        if (errors.length > 0) {
+            return { success: false, result: built.result, errors, warnings };
+        }
+        return { success: true, result: built.result, warnings };
+    }
+    catch (error) {
+        return {
+            success: false,
+            errors: [
+                {
+                    type: "Exception",
+                    message: error instanceof Error ? error.message : String(error),
+                },
+            ],
+        };
+    }
+}
+function toCrlError(v) {
+    return {
+        type: "Validation",
+        message: v.message,
+        line: v.location?.start.line,
+        column: v.location?.start.column,
+    };
 }
 //# sourceMappingURL=index.js.map

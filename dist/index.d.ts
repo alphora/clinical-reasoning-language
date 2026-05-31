@@ -15,4 +15,10 @@ export interface ParseResult<T> {
 export declare function tokenizeCRL(input: string): ParseResult<Token[]>;
 export declare function parseCRL(input: string): ParseResult<ParseTree>;
 export declare function buildCRL(input: string): ParseResult<CRL>;
-export declare function validateCRL(input: string): ParseResult<CRL>;
+export interface ValidateOptions {
+    soft?: boolean;
+}
+export interface ValidationResultEnvelope extends ParseResult<CRL> {
+    warnings?: CRLError[];
+}
+export declare function validateCRL(input: string, options?: ValidateOptions): ValidationResultEnvelope;

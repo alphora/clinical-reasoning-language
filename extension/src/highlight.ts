@@ -26,6 +26,20 @@ export interface HighlightResult {
   associationsChanged: boolean;
   tokenColorsChanged: boolean;
   warnings: string[];
+  /**
+   * Scopes whose existing user rule differed from CRL's canonical rule and
+   * were therefore LEFT UNCHANGED. The caller (the extension host) is
+   * expected to prompt the user about each one (replace / keep / don't ask
+   * again) and re-call applyHighlight with `replaceScopes` populated for the
+   * ones the user wants replaced. Empty array if every CRL scope is fresh
+   * or already-matching.
+   */
+  customizedScopes: string[];
+}
+
+export interface ApplyOptions {
+  /** Scopes the caller has decided to overwrite with CRL's canonical settings. */
+  replaceScopes?: Set<string>;
 }
 
 const ASSOCIATION_GLOB = "*.crl";
@@ -52,9 +66,11 @@ const sameSettings = (a: TmRule, b: TmRule): boolean =>
 export function applyHighlight(
   curAssoc: Associations | undefined,
   curColors: TokenColors | undefined,
-  rules: TmRule[]
+  rules: TmRule[],
+  options: ApplyOptions = {}
 ): HighlightResult {
   const warnings: string[] = [];
+  const replaceScopes = options.replaceScopes ?? new Set<string>();
 
   const associations: Associations = { ...(curAssoc ?? {}) };
   let associationsChanged = false;
@@ -70,22 +86,29 @@ export function applyHighlight(
 
   const tokenColors: TokenColors = { ...(curColors ?? {}) };
   const existing: TmRule[] = Array.isArray(tokenColors.textMateRules) ? [...tokenColors.textMateRules] : [];
-  const byScope = new Map(existing.map((r) => [scopeKey(r.scope), r]));
+  const byScope = new Map(existing.map((r, idx) => [scopeKey(r.scope), idx]));
   let tokenColorsChanged = false;
+  const customizedScopes: string[] = [];
   for (const rule of rules) {
     const key = scopeKey(rule.scope);
-    const prior = byScope.get(key);
-    if (!prior) {
+    const priorIdx = byScope.get(key);
+    if (priorIdx === undefined) {
       existing.push(rule);
-      byScope.set(key, rule);
+      byScope.set(key, existing.length - 1);
       tokenColorsChanged = true;
-    } else if (!sameSettings(prior, rule)) {
-      // The user (or a stale README copy) customized one of our scopes — leave it.
-      warnings.push(`Left your customized token color for "${key}" unchanged.`);
+      continue;
+    }
+    const prior = existing[priorIdx];
+    if (sameSettings(prior, rule)) continue; // already matches; no action
+    if (replaceScopes.has(key)) {
+      existing[priorIdx] = rule;
+      tokenColorsChanged = true;
+    } else {
+      customizedScopes.push(key);
     }
   }
   tokenColors.textMateRules = existing;
-  return { associations, tokenColors, associationsChanged, tokenColorsChanged, warnings };
+  return { associations, tokenColors, associationsChanged, tokenColorsChanged, warnings, customizedScopes };
 }
 
 export function removeHighlight(
@@ -118,5 +141,5 @@ export function removeHighlight(
     });
     tokenColors.textMateRules = kept;
   }
-  return { associations, tokenColors, associationsChanged, tokenColorsChanged, warnings: [] };
+  return { associations, tokenColors, associationsChanged, tokenColorsChanged, warnings: [], customizedScopes: [] };
 }

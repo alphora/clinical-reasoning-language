@@ -5,9 +5,9 @@ class NameUniquenessValidator {
     validate(ast) {
         const errors = [];
         const decisionNames = new Set();
-        const conceptNames = new Set();
         const activityNames = new Set();
         const terminologyNames = new Set();
+        const conceptNames = new Set();
         for (const statement of ast.statements) {
             switch (statement.type) {
                 case "Decision":
