@@ -35,10 +35,9 @@ library CRLPatterns version '0.1.0'
  *    narrative form, intent, and parameter naming.
  */
 
-using QICore version '6.0.0'
+using FHIR version '4.0.1'
 
-include FHIRHelpers version '4.4.000' called FHIRHelpers
-include QICoreCommon version '4.0.000' called QICoreCommon
+include FHIRHelpers version '4.0.1' called FHIRHelpers
 
 codesystem "ConditionClinicalStatusCodes": 'http://terminology.hl7.org/CodeSystem/condition-clinical'
 codesystem "ConditionVerStatusCodes": 'http://terminology.hl7.org/CodeSystem/condition-ver-status'
@@ -47,6 +46,8 @@ codesystem "AllergyIntoleranceClinicalStatusCodes": 'http://terminology.hl7.org/
 code "ActiveCondition": 'active' from "ConditionClinicalStatusCodes" display 'Active'
 code "Confirmed": 'confirmed' from "ConditionVerStatusCodes" display 'Confirmed'
 code "AllergyActive": 'active' from "AllergyIntoleranceClinicalStatusCodes" display 'Active'
+
+context Patient
 
 // ====================================================================
 // Classification
@@ -82,7 +83,7 @@ define function "Has"(X List<AllergyIntolerance>):
 define function "HasHistoryOf"(X List<Condition>):
   exists X
 define function "HasHistoryOf"(X List<Condition>, anchor DateTime):
-  exists (X) C where C.prevalenceInterval() ends before anchor
+  exists (X) C where (C.onset as Period) ends before anchor
 
 /**
  * Without(kind, X) — narrative: `without <kind> <X>`. The parameterized
@@ -138,11 +139,11 @@ define function "With"(X List<Observation>, Y Boolean):
  */
 define function "AsOf"(anchor List<Encounter>, X List<Condition>):
   exists (X) C with (anchor) E
-    such that C.prevalenceInterval() overlaps (E.period)
+    such that (C.onset as Period) overlaps (E.period)
 define function "AsOf"(anchor DateTime, X List<Condition>):
-  exists (X) C where C.prevalenceInterval() contains anchor
+  exists (X) C where (C.onset as Period) contains anchor
 define function "AsOf"(anchor Period, X List<Condition>):
-  exists (X) C where C.prevalenceInterval() overlaps (FHIRHelpers.ToInterval(anchor))
+  exists (X) C where (C.onset as Period) overlaps (FHIRHelpers.ToInterval(anchor))
 
 /**
  * Within(X, window) — narrative: `<X> within <window>`. X happens during
@@ -150,9 +151,9 @@ define function "AsOf"(anchor Period, X List<Condition>):
  * or a `WindowSpec` from a window-from-anchor sub-grammar call.
  */
 define function "Within"(X List<Observation>, window Interval<DateTime>):
-  exists (X) E where E.effective.toInterval() during window
+  exists (X) E where (E.effective as Period) during window
 define function "Within"(X List<Procedure>, window Interval<DateTime>):
-  exists (X) P where P.performed.toInterval() during window
+  exists (X) P where (P.performed as Period) during window
 define function "Within"(X List<Encounter>, window Interval<DateTime>):
   exists (X) E where E.period during window
 
@@ -191,7 +192,7 @@ define function "NotDoneWithReason"(action List<MedicationRequest>, reason List<
  */
 define function "BaselineAndFollowUp"(initial List<Observation>, followup List<Observation>):
   exists (initial) I with (followup) F
-    such that start of F.effective.toInterval() after end of I.effective.toInterval()
+    such that start of (F.effective as Period) after end of (I.effective as Period)
 
 /**
  * InpatientStay(encounter[, includePrelude]) — narrative: `inpatient stay
@@ -245,10 +246,10 @@ define function "Active"(X List<Condition>):
   exists (X) C where C.clinicalStatus ~ "ActiveCondition"
 define function "Active"(X List<Condition>, over List<Encounter>):
   exists (X) C where C.clinicalStatus ~ "ActiveCondition"
-    and exists (over) E where C.prevalenceInterval() overlaps (E.period)
+    and exists (over) E where (C.onset as Period) overlaps (E.period)
 define function "Active"(X List<Condition>, over Interval<DateTime>):
   exists (X) C where C.clinicalStatus ~ "ActiveCondition"
-    and C.prevalenceInterval() overlaps over
+    and (C.onset as Period) overlaps over
 
 /**
  * IsVerified(X) — narrative: `<X> is verified`. For Observation:
@@ -278,11 +279,11 @@ define function "DocumentedAs"(X List<Observation>, classification List<Observat
  */
 define function "During"(event List<Observation>, period List<Encounter>):
   exists (event) E with (period) P
-    such that E.effective.toInterval() during P.period
+    such that (E.effective as Period) during P.period
 define function "During"(event List<Encounter>, period Interval<DateTime>):
   exists (event) E where E.period during period
 define function "During"(event List<Procedure>, period Interval<DateTime>):
-  exists (event) P where P.performed.toInterval() during period
+  exists (event) P where (P.performed as Period) during period
 define function "During"(event DateTime, period Interval<DateTime>):
   event during period
 define function "During"(event Interval<DateTime>, period Interval<DateTime>):
@@ -294,12 +295,12 @@ define function "During"(event Interval<DateTime>, period Interval<DateTime>):
  */
 define function "Overlaps"(eventA List<Observation>, eventB List<Encounter>):
   exists (eventA) A with (eventB) B
-    such that A.effective.toInterval() overlaps B.period
+    such that (A.effective as Period) overlaps B.period
 define function "Overlaps"(eventA List<Condition>, eventB List<Encounter>):
   exists (eventA) A with (eventB) B
-    such that A.prevalenceInterval() overlaps B.period
+    such that (A.onset as Period) overlaps B.period
 define function "Overlaps"(eventA List<Observation>, eventB Interval<DateTime>):
-  exists (eventA) A where A.effective.toInterval() overlaps eventB
+  exists (eventA) A where (A.effective as Period) overlaps eventB
 
 /**
  * OnDayOfOrAfter(X, anchor) — narrative: `<X> on day of or after <anchor>`.
@@ -307,14 +308,14 @@ define function "Overlaps"(eventA List<Observation>, eventB Interval<DateTime>):
  */
 define function "OnDayOfOrAfter"(X List<Observation>, anchor List<Encounter>):
   exists (X) O with (anchor) E
-    such that O.effective.toInterval() starts on or after day of start of E.period
+    such that (O.effective as Period) starts on or after day of start of E.period
 
 /**
  * OnOrBefore(X, anchor) — narrative: `<X> on or before <anchor>`. X's
  * timing falls at or before the anchor.
  */
 define function "OnOrBefore"(X List<Condition>, anchor DateTime):
-  exists (X) C where C.prevalenceInterval() starts before or on day of anchor
+  exists (X) C where (C.onset as Period) starts before or on day of anchor
 define function "OnOrBefore"(X Boolean, anchor DateTime):
   X
 define function "OnOrBefore"(X DateTime, anchor DateTime):
@@ -326,7 +327,7 @@ define function "OnOrBefore"(X DateTime, anchor DateTime):
  */
 define function "SameDay"(eventA List<Observation>, eventB List<Encounter>):
   exists (eventA) A with (eventB) B
-    such that A.effective.toInterval() same day as B.period
+    such that (A.effective as Period) same day as B.period
 define function "SameDay"(eventA List<ServiceRequest>, eventB List<Encounter>):
   exists (eventA) S with (eventB) E
     such that S.authoredOn same day as start of E.period
@@ -335,7 +336,7 @@ define function "SameDay"(eventA List<MedicationRequest>, eventB List<Encounter>
     such that M.authoredOn same day as start of E.period
 define function "SameDay"(eventA List<Procedure>, eventB List<Encounter>):
   exists (eventA) P with (eventB) E
-    such that P.performed.toInterval() same day as E.period
+    such that (P.performed as Period) same day as E.period
 
 /**
  * BetweenAnchors(X, start, end) — narrative: `<X> between <start> and
@@ -343,7 +344,7 @@ define function "SameDay"(eventA List<Procedure>, eventB List<Encounter>):
  * Between(value, lo, hi) which compares Quantities.
  */
 define function "BetweenAnchors"(X List<Observation>, firstAnchor DateTime, lastAnchor DateTime):
-  exists (X) E where E.effective.toInterval() during Interval[firstAnchor, lastAnchor]
+  exists (X) E where (E.effective as Period) during Interval[firstAnchor, lastAnchor]
 define function "BetweenAnchors"(X List<Encounter>, firstAnchor DateTime, lastAnchor DateTime):
   exists (X) E where E.period during Interval[firstAnchor, lastAnchor]
 
@@ -354,7 +355,7 @@ define function "BetweenAnchors"(X List<Encounter>, firstAnchor DateTime, lastAn
 define function "AtLeastApart"(eventA List<Observation>, eventB List<Observation>, len Quantity):
   exists (eventA) A with (eventB) B
     such that difference in days between
-      (start of A.effective.toInterval()) and (start of B.effective.toInterval())
+      (start of (A.effective as Period)) and (start of (B.effective as Period))
       >= ToDays(len)
 
 /**
@@ -364,7 +365,7 @@ define function "AtLeastApart"(eventA List<Observation>, eventB List<Observation
 define function "AtMostApart"(eventA List<Observation>, eventB List<Observation>, len Quantity):
   exists (eventA) A with (eventB) B
     such that difference in days between
-      (start of A.effective.toInterval()) and (start of B.effective.toInterval())
+      (start of (A.effective as Period)) and (start of (B.effective as Period))
       <= ToDays(len)
 
 /**
@@ -387,16 +388,17 @@ define function "ToDays"(quantityValue Quantity):
 define function "MostRecent"(X List<Observation>):
   Last(X)
 define function "MostRecent"(X List<Observation>, scope Interval<DateTime>):
-  Last((X) O where O.effective.toInterval() during scope)
+  Last((X) O where (O.effective as Period) during scope)
 
 /**
  * Last(X[, scope]) — narrative: `last <X>`. Same as MostRecent — separate
- * pattern in the catalog to match natural narrative phrasing.
+ * pattern in the catalog to match natural narrative phrasing. User-defined
+ * with `Of` suffix to avoid shadowing the CQL built-in `Last(list)`.
  */
-define function "Last"(X List<Observation>):
+define function "LastOf"(X List<Observation>):
   Last(X)
-define function "Last"(X List<Observation>, scope Interval<DateTime>):
-  Last((X) O where O.effective.toInterval() during scope)
+define function "LastOf"(X List<Observation>, scope Interval<DateTime>):
+  Last((X) O where (O.effective as Period) during scope)
 
 /**
  * Earliest(X[, scope]) — narrative: `earliest <X>`. The earliest X by
@@ -405,15 +407,16 @@ define function "Last"(X List<Observation>, scope Interval<DateTime>):
 define function "Earliest"(X List<Observation>):
   First(X)
 define function "Earliest"(X List<Observation>, scope Interval<DateTime>):
-  First((X) O where O.effective.toInterval() during scope)
+  First((X) O where (O.effective as Period) during scope)
 
 /**
- * First(X[, scope]) — narrative: `first <X>`. Same as Earliest.
+ * First(X[, scope]) — narrative: `first <X>`. Same as Earliest — `Of`
+ * suffix avoids shadowing the CQL built-in.
  */
-define function "First"(X List<Observation>):
+define function "FirstOf"(X List<Observation>):
   First(X)
-define function "First"(X List<Observation>, scope Interval<DateTime>):
-  First((X) O where O.effective.toInterval() during scope)
+define function "FirstOf"(X List<Observation>, scope Interval<DateTime>):
+  First((X) O where (O.effective as Period) during scope)
 
 // ====================================================================
 // Window-from-anchor sub-grammar
@@ -498,7 +501,7 @@ define function "Lowest"(X List<Observation>):
   Min((X) O return FHIRHelpers.ToQuantity(O.value as Quantity))
 define function "Lowest"(X List<Observation>, scope Interval<DateTime>):
   Min((X) O
-    where O.effective.toInterval() during scope
+    where (O.effective as Period) during scope
     return FHIRHelpers.ToQuantity(O.value as Quantity))
 
 /**
@@ -509,7 +512,7 @@ define function "Highest"(X List<Observation>):
   Max((X) O return FHIRHelpers.ToQuantity(O.value as Quantity))
 define function "Highest"(X List<Observation>, scope Interval<DateTime>):
   Max((X) O
-    where O.effective.toInterval() during scope
+    where (O.effective as Period) during scope
     return FHIRHelpers.ToQuantity(O.value as Quantity))
 
 /**

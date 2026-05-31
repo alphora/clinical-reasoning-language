@@ -264,9 +264,9 @@ Selection patterns (`MostRecent`, `Last`, `Earliest`, `First`) return an `Instan
 | Pattern | Narrative form | Canonical | CQL function |
 |---|---|---|---|
 | `MostRecent(X[, scope])` | `most recent <X>` (optionally `<scope>`) | `MostRecent(X: ConceptRef[, scope: ScopeSpec])` | `CRLPatterns.MostRecent` |
-| `Last(X[, scope])` | `last <X>` (optionally `<scope>`) | `Last(X: ConceptRef[, scope: ScopeSpec])` | `CRLPatterns.Last` |
+| `Last(X[, scope])` | `last <X>` (optionally `<scope>`) | `Last(X: ConceptRef[, scope: ScopeSpec])` | `CRLPatterns.LastOf` |
 | `Earliest(X[, scope])` | `earliest <X>` (optionally `<scope>`) | `Earliest(X: ConceptRef[, scope: ScopeSpec])` | `CRLPatterns.Earliest` |
-| `First(X[, scope])` | `first <X>` (optionally `<scope>`) | `First(X: ConceptRef[, scope: ScopeSpec])` | `CRLPatterns.First` |
+| `First(X[, scope])` | `first <X>` (optionally `<scope>`) | `First(X: ConceptRef[, scope: ScopeSpec])` | `CRLPatterns.FirstOf` |
 | `During(event, period)` | `<event> during <period>` | `During(event: ConceptRef, period: ConceptRef)` | `CRLPatterns.During` |
 | `Overlaps(eventA, eventB)` | `<eventA> overlaps <eventB>` | `Overlaps(eventA: ConceptRef, eventB: ConceptRef)` | `CRLPatterns.Overlaps` |
 | `OnDayOfOrAfter(X, anchor)` | `<X> on day of or after <anchor>` | `OnDayOfOrAfter(X: ConceptRef, anchor: ConceptRef)` | `CRLPatterns.OnDayOfOrAfter` |

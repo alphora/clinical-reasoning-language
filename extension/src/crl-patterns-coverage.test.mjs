@@ -14,7 +14,7 @@ const { parseCatalog } = mod.default ?? mod;
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, "../..");
 const catalogPath = resolve(repoRoot, "features/cql-pattern-mining/results/inference-pattern-catalog-draft.md");
-const libraryPath = resolve(repoRoot, "cql/CRLPatterns.cql");
+const libraryPath = resolve(repoRoot, "cql/src/CRLPatterns.cql");
 
 const patterns = parseCatalog(readFileSync(catalogPath, "utf-8"));
 assert.ok(patterns.length >= 50, `expected >=50 catalog patterns, got ${patterns.length}`);
