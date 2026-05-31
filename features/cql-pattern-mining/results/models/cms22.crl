@@ -228,11 +228,9 @@ concept "BP Evaluation Encounter (not virtual)":
 ).
 
 concept "BP Evaluation Encounter (not virtual) During MP":
-- type is Encounter.
 - logic is "BP Evaluation Encounter (not virtual)" during "Measurement Period".
 
 concept "BP Evaluation Encounter (not virtual) Performed":
-- type is Encounter.
 - logic is "BP Evaluation Encounter (not virtual)" performed.
 
 concept "Qualifying Encounter":
@@ -249,11 +247,9 @@ concept "Qualifying Encounter":
 // --- BP panel projections ---
 
 concept "Systolic Code Component of BP Panels":
-- type is Observation.
 - logic is "Systolic Blood Pressure Code" component of "Blood Pressure Panels".
 
 concept "Diastolic Code Component of BP Panels":
-- type is Observation.
 - logic is "Diastolic Blood Pressure Code" component of "Blood Pressure Panels".
 
 concept "Systolic BP Reading":
@@ -270,7 +266,6 @@ concept "Diastolic BP Reading":
 // --- Last BP reading on each qualifying encounter day ---
 
 concept "Last BP Panels On Qualifying Encounter Day":
-- type is Observation.
 - logic is last "Blood Pressure Panels" on day of "Qualifying Encounter".
 
 concept "Last BP Panel on Qualifying Encounter Day":
@@ -279,11 +274,9 @@ concept "Last BP Panel on Qualifying Encounter Day":
 - inferred from "Last BP Panels On Qualifying Encounter Day".
 
 concept "Systolic Code Component of Last BP Panel On Encounter Day":
-- type is Observation.
 - logic is "Systolic Blood Pressure Code" component of "Last BP Panel on Qualifying Encounter Day".
 
 concept "Diastolic Code Component of Last BP Panel On Encounter Day":
-- type is Observation.
 - logic is "Diastolic Blood Pressure Code" component of "Last BP Panel on Qualifying Encounter Day".
 
 concept "Last Systolic on Qualifying Encounter Day":
@@ -300,39 +293,30 @@ concept "Last Diastolic on Qualifying Encounter Day":
 // --- BP classification ladder ---
 
 concept "Last Systolic Below 120":
-- type is Observation.
 - logic is "Last Systolic on Qualifying Encounter Day" below 120 'mm[Hg]'.
 
 concept "Last Diastolic Below 80":
-- type is Observation.
 - logic is "Last Diastolic on Qualifying Encounter Day" below 80 'mm[Hg]'.
 
 concept "Last Systolic Between 120 and 129":
-- type is Observation.
 - logic is "Last Systolic on Qualifying Encounter Day" between 120 'mm[Hg]' and 129 'mm[Hg]'.
 
 concept "Last Systolic At Least 130":
-- type is Observation.
 - logic is "Last Systolic on Qualifying Encounter Day" at least 130 'mm[Hg]'.
 
 concept "Last Diastolic At Least 80":
-- type is Observation.
 - logic is "Last Diastolic on Qualifying Encounter Day" at least 80 'mm[Hg]'.
 
 concept "Last Systolic Between 130 and 139":
-- type is Observation.
 - logic is "Last Systolic on Qualifying Encounter Day" between 130 'mm[Hg]' and 139 'mm[Hg]'.
 
 concept "Last Diastolic Between 80 and 89":
-- type is Observation.
 - logic is "Last Diastolic on Qualifying Encounter Day" between 80 'mm[Hg]' and 89 'mm[Hg]'.
 
 concept "Last Systolic At Least 140":
-- type is Observation.
 - logic is "Last Systolic on Qualifying Encounter Day" at least 140 'mm[Hg]'.
 
 concept "Last Diastolic At Least 90":
-- type is Observation.
 - logic is "Last Diastolic on Qualifying Encounter Day" at least 90 'mm[Hg]'.
 
 concept "Normal BP Reading":
@@ -369,7 +353,6 @@ concept "Hypertensive Reading":
 // --- Windowed-from-anchor scope (Prior-year readings) ---
 
 concept "Last BP Panels Within Year Prior To Qualifying Encounter":
-- type is Observation.
 - logic is last "Blood Pressure Panels" within 1 year before start of "Qualifying Encounter".
 
 concept "Last BP Panel Within Year Prior to Qualifying Encounter":
@@ -378,11 +361,9 @@ concept "Last BP Panel Within Year Prior to Qualifying Encounter":
 - inferred from "Last BP Panels Within Year Prior To Qualifying Encounter".
 
 concept "Systolic Code Component of Prior-Year Last BP Panel":
-- type is Observation.
 - logic is "Systolic Blood Pressure Code" component of "Last BP Panel Within Year Prior to Qualifying Encounter".
 
 concept "Diastolic Code Component of Prior-Year Last BP Panel":
-- type is Observation.
 - logic is "Diastolic Blood Pressure Code" component of "Last BP Panel Within Year Prior to Qualifying Encounter".
 
 concept "Prior-Year Last Systolic":
@@ -396,11 +377,9 @@ concept "Prior-Year Last Diastolic":
 - inferred from "Diastolic Code Component of Prior-Year Last BP Panel".
 
 concept "Prior-Year Last Systolic At Least 130":
-- type is Observation.
 - logic is "Prior-Year Last Systolic" at least 130 'mm[Hg]'.
 
 concept "Prior-Year Last Diastolic At Least 80":
-- type is Observation.
 - logic is "Prior-Year Last Diastolic" at least 80 'mm[Hg]'.
 
 concept "Prior-Year Hypertensive Reading":
@@ -414,7 +393,6 @@ concept "Prior-Year Hypertensive Reading":
 ).
 
 concept "Without Record Of Prior-Year Hypertensive Reading":
-- type is Observation.
 - logic is without record of "Prior-Year Hypertensive Reading".
 
 concept "First Hypertensive Reading":
@@ -483,11 +461,9 @@ concept "Second Hypertensive Reading 140+":
 // --- Ordered-intervention concepts ---
 
 concept "Follow-up Within 4 Weeks Ordered":
-- type is ServiceRequest.
 - logic is "Follow-up Within 4 Weeks" ordered.
 
 concept "Follow-up Within 6 Months Ordered":
-- type is ServiceRequest.
 - logic is "Follow-up Within 6 Months" ordered.
 
 concept "Four-Week Rescreen Order":
@@ -517,7 +493,6 @@ concept "Non-Pharmacological Recommendations":
 ).
 
 concept "Non-Pharmacological Recommendations Ordered":
-- type is ServiceRequest.
 - logic is "Non-Pharmacological Recommendations" ordered.
 
 concept "Non-Pharmacological Recommendation Order":
@@ -538,7 +513,6 @@ concept "Hypertension Lab or ECG Requests":
 ).
 
 concept "Hypertension Lab or ECG Requests Ordered":
-- type is ServiceRequest.
 - logic is "Hypertension Lab or ECG Requests" ordered.
 
 concept "Hypertension Lab or ECG Order":
@@ -547,7 +521,6 @@ concept "Hypertension Lab or ECG Order":
 - inferred from "Hypertension Lab or ECG Requests Ordered".
 
 concept "Antihypertensive Medications Ordered":
-- type is MedicationRequest.
 - logic is "Antihypertensive Medications" ordered.
 
 concept "Antihypertensive Medication Order":
@@ -556,11 +529,9 @@ concept "Antihypertensive Medication Order":
 - inferred from "Antihypertensive Medications Ordered".
 
 concept "Primary-Care Referral Justified by Hypertensive Reading":
-- type is ServiceRequest.
 - logic is "Primary-Care Referrals" justified by "Hypertensive Reading Findings".
 
 concept "Primary-Care Referrals Ordered":
-- type is ServiceRequest.
 - logic is "Primary-Care Referrals" ordered.
 
 concept "Referral for Hypertensive Reading":
@@ -577,27 +548,21 @@ concept "Referral for Hypertensive Reading":
 // --- Per-class intervention bundles ---
 
 concept "Six-Month Rescreen Order Same Day As Qualifying Encounter":
-- type is ServiceRequest.
 - logic is "Six-Month Rescreen Order" same day as "Qualifying Encounter".
 
 concept "Non-Pharm Recommendation Order Same Day As Qualifying Encounter":
-- type is ServiceRequest.
 - logic is "Non-Pharmacological Recommendation Order" same day as "Qualifying Encounter".
 
 concept "Referral for Hypertensive Reading Same Day As Qualifying Encounter":
-- type is ServiceRequest.
 - logic is "Referral for Hypertensive Reading" same day as "Qualifying Encounter".
 
 concept "Four-Week Rescreen Order Same Day As Qualifying Encounter":
-- type is ServiceRequest.
 - logic is "Four-Week Rescreen Order" same day as "Qualifying Encounter".
 
 concept "Hypertension Lab or ECG Order Same Day As Qualifying Encounter":
-- type is ServiceRequest.
 - logic is "Hypertension Lab or ECG Order" same day as "Qualifying Encounter".
 
 concept "Antihypertensive Medication Order Same Day As Qualifying Encounter":
-- type is MedicationRequest.
 - logic is "Antihypertensive Medication Order" same day as "Qualifying Encounter".
 
 concept "Elevated BP Followup Bundle":
@@ -709,7 +674,6 @@ concept "Second HTN 140+ With Followup":
 // --- Verified hypertension as of qualifying encounter (Denominator Exclusion driver) ---
 
 concept "Hypertension Diagnoses Is Verified":
-- type is Condition.
 - logic is "Hypertension Diagnoses" is verified.
 
 concept "Verified Hypertension":
@@ -718,7 +682,6 @@ concept "Verified Hypertension":
 - inferred from "Hypertension Diagnoses Is Verified".
 
 concept "Verified Hypertension As Of Qualifying Encounter Narrative":
-- type is Condition.
 - logic is "Verified Hypertension" as of "Qualifying Encounter".
 
 concept "Verified Hypertension As Of Qualifying Encounter":
@@ -742,11 +705,9 @@ concept "BP Measurement Sources":
 ).
 
 concept "BP Measurement Sources Not Done With Reason":
-- type is Observation.
 - logic is "BP Measurement Sources" not done with reason ("Medical Reasons" or "Patient Declined Reasons").
 
 concept "BP Measurement Sources Same Day As Qualifying Encounter":
-- type is Observation.
 - logic is "BP Measurement Sources" same day as "Qualifying Encounter".
 
 concept "BP Measurement Not Done With Reason":
@@ -763,27 +724,21 @@ concept "BP Measurement Not Done With Reason":
 // --- Exception branch 2: HTN follow-up declined by patient ---
 
 concept "Follow-up Within 4 Weeks Declined by Patient":
-- type is ServiceRequest.
 - logic is "Follow-up Within 4 Weeks" not done with reason "Patient Declined Reasons".
 
 concept "Follow-up Within 6 Months Declined by Patient":
-- type is ServiceRequest.
 - logic is "Follow-up Within 6 Months" not done with reason "Patient Declined Reasons".
 
 concept "Primary-Care Referrals Declined by Patient":
-- type is ServiceRequest.
 - logic is "Primary-Care Referrals" not done with reason "Patient Declined Reasons".
 
 concept "Non-Pharmacological Recommendations Declined by Patient":
-- type is ServiceRequest.
 - logic is "Non-Pharmacological Recommendations" not done with reason "Patient Declined Reasons".
 
 concept "Hypertension Lab or ECG Requests Declined by Patient":
-- type is ServiceRequest.
 - logic is "Hypertension Lab or ECG Requests" not done with reason "Patient Declined Reasons".
 
 concept "Antihypertensive Medications Declined by Patient":
-- type is MedicationRequest.
 - logic is "Antihypertensive Medications" not done with reason "Patient Declined Reasons".
 
 concept "Four-Week Rescreen Declined":
@@ -817,27 +772,21 @@ concept "Antihypertensive Medication Declined":
 - inferred from "Antihypertensive Medications Declined by Patient".
 
 concept "Primary-Care Referral Declined Same Day As Qualifying Encounter":
-- type is ServiceRequest.
 - logic is "Primary-Care Referral Declined" same day as "Qualifying Encounter".
 
 concept "Six-Month Rescreen Declined Same Day As Qualifying Encounter":
-- type is ServiceRequest.
 - logic is "Six-Month Rescreen Declined" same day as "Qualifying Encounter".
 
 concept "Non-Pharm Recommendation Declined Same Day As Qualifying Encounter":
-- type is ServiceRequest.
 - logic is "Non-Pharm Recommendation Declined" same day as "Qualifying Encounter".
 
 concept "Four-Week Rescreen Declined Same Day As Qualifying Encounter":
-- type is ServiceRequest.
 - logic is "Four-Week Rescreen Declined" same day as "Qualifying Encounter".
 
 concept "Hypertension Lab or ECG Declined Same Day As Qualifying Encounter":
-- type is ServiceRequest.
 - logic is "Hypertension Lab or ECG Declined" same day as "Qualifying Encounter".
 
 concept "Antihypertensive Medication Declined Same Day As Qualifying Encounter":
-- type is MedicationRequest.
 - logic is "Antihypertensive Medication Declined" same day as "Qualifying Encounter".
 
 concept "Elevated BP Declined Bundle":
@@ -952,7 +901,6 @@ concept "HTN Followup Declined By Patient":
 // --- Age predicate ---
 
 concept "Age At Start Of MP At Least 18 Years":
-- type is Encounter.
 - logic is age at start of "Measurement Period" at least 18 years.
 
 concept "Aged 18+ at Measurement Period Start":

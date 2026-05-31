@@ -224,11 +224,9 @@ concept "BMI Evaluation Encounter (not virtual)":
 ).
 
 concept "BMI Evaluation Encounter (not virtual) During MP":
-- type is Encounter.
 - logic is "BMI Evaluation Encounter (not virtual)" during "Measurement Period".
 
 concept "BMI Evaluation Encounter (not virtual) Performed":
-- type is Encounter.
 - logic is "BMI Evaluation Encounter (not virtual)" performed.
 
 concept "Qualifying Encounter":
@@ -245,11 +243,9 @@ concept "Qualifying Encounter":
 // --- BMI During Measurement Period ---
 
 concept "BMI Observation During MP":
-- type is Observation.
 - logic is "BMI Observations" during "Measurement Period".
 
 concept "BMI Observation Has Positive Value":
-- type is Observation.
 - logic is "BMI Observations" exceeds 0 'kg/m2'.
 
 concept "BMI During Measurement Period":
@@ -266,15 +262,12 @@ concept "BMI During Measurement Period":
 // --- BMI clinical classifications ---
 
 concept "BMI During MP Is Low":
-- type is Observation.
 - logic is "BMI During Measurement Period" is low.
 
 concept "BMI During MP Is High":
-- type is Observation.
 - logic is "BMI During Measurement Period" is high.
 
 concept "BMI During MP Is Normal":
-- type is Observation.
 - logic is "BMI During Measurement Period" is normal.
 
 concept "Documented Low BMI":
@@ -296,7 +289,6 @@ concept "Normal BMI Range":
 // --- Has Normal BMI ---
 
 concept "Without Documented Abnormal BMI":
-- type is Observation.
 - logic is without documented ("Documented High BMI" or "Documented Low BMI").
 
 concept "Has Normal BMI":
@@ -313,11 +305,9 @@ concept "Has Normal BMI":
 // --- Co-existing diagnoses ---
 
 concept "Overweight or Obese Diagnoses is Active":
-- type is Condition.
 - logic is "Overweight or Obese Diagnoses" is active.
 
 concept "Underweight Diagnoses is Active":
-- type is Condition.
 - logic is "Underweight Diagnoses" is active.
 
 concept "Has Overweight or Obese":
@@ -334,11 +324,9 @@ concept "Has Underweight":
 // --- High BMI Interventions Ordered ---
 
 concept "High BMI Follow-up Justified by Overweight Diagnosis":
-- type is ServiceRequest.
 - logic is "High BMI Follow-up Service Requests" justified by "Overweight or Obese Diagnoses".
 
 concept "Has Overweight On Or Before High BMI Follow-up Order":
-- type is Condition.
 - logic is "Has Overweight or Obese" on or before "High BMI Follow-up Order Date".
 
 concept "High BMI Follow-up Order":
@@ -352,11 +340,9 @@ concept "High BMI Follow-up Order":
 ).
 
 concept "Weight Assessment Referral Justified by Overweight Diagnosis":
-- type is ServiceRequest.
 - logic is "Weight Assessment Referrals" justified by "Overweight or Obese Diagnoses".
 
 concept "Has Overweight On Or Before Weight Assessment Referral":
-- type is Condition.
 - logic is "Has Overweight or Obese" on or before "Weight Assessment Referral Date".
 
 concept "High BMI Weight Assessment Referral":
@@ -370,11 +356,9 @@ concept "High BMI Weight Assessment Referral":
 ).
 
 concept "High BMI Medication Justified by Overweight Diagnosis":
-- type is MedicationRequest.
 - logic is "High BMI Medications" justified by "Overweight or Obese Diagnoses".
 
 concept "Has Overweight On Or Before High BMI Medication Order":
-- type is Condition.
 - logic is "Has Overweight or Obese" on or before "High BMI Medication Order Date".
 
 concept "High BMI Medication Order":
@@ -403,11 +387,9 @@ concept "High BMI Interventions Ordered":
 // --- High BMI Interventions Performed ---
 
 concept "High BMI Procedure Justified by Overweight Diagnosis":
-- type is Procedure.
 - logic is "High BMI Follow-up Procedures" justified by "Overweight or Obese Diagnoses".
 
 concept "Has Overweight On Or Before High BMI Procedure":
-- type is Condition.
 - logic is "Has Overweight or Obese" on or before "High BMI Procedure Performed Date".
 
 concept "High BMI Procedure Performed":
@@ -429,7 +411,6 @@ concept "High BMI Interventions Performed":
 // --- High BMI And Follow Up Provided ---
 
 concept "Documented High BMI During MP":
-- type is Observation.
 - logic is "Documented High BMI" during "Measurement Period".
 
 concept "High BMI And Follow Up Provided":
@@ -450,15 +431,12 @@ concept "High BMI And Follow Up Provided":
 // --- Low BMI analogous ---
 
 concept "Low BMI Follow-up Justified by Underweight Diagnosis":
-- type is ServiceRequest.
 - logic is "Low BMI Follow-up Service Requests" justified by "Underweight Diagnoses".
 
 concept "Has Underweight On Or Before Low BMI Follow-up Order":
-- type is Condition.
 - logic is "Has Underweight" on or before "Low BMI Follow-up Order Date".
 
 concept "Low BMI Follow-up Order Date During MP":
-- type is ServiceRequest.
 - logic is "Low BMI Follow-up Order Date" during "Measurement Period".
 
 concept "Low BMI Follow-up Order":
@@ -476,15 +454,12 @@ concept "Low BMI Follow-up Order":
 ).
 
 concept "Weight Assessment Referral Justified by Underweight Diagnosis":
-- type is ServiceRequest.
 - logic is "Weight Assessment Referrals" justified by "Underweight Diagnoses".
 
 concept "Has Underweight On Or Before Weight Assessment Referral":
-- type is Condition.
 - logic is "Has Underweight" on or before "Weight Assessment Referral Date".
 
 concept "Weight Assessment Referral Date During MP":
-- type is ServiceRequest.
 - logic is "Weight Assessment Referral Date" during "Measurement Period".
 
 concept "Low BMI Weight Assessment Referral":
@@ -502,15 +477,12 @@ concept "Low BMI Weight Assessment Referral":
 ).
 
 concept "Low BMI Medication Justified by Underweight Diagnosis":
-- type is MedicationRequest.
 - logic is "Low BMI Medications" justified by "Underweight Diagnoses".
 
 concept "Has Underweight On Or Before Low BMI Medication Order":
-- type is Condition.
 - logic is "Has Underweight" on or before "Low BMI Medication Order Date".
 
 concept "Low BMI Medication Order Date During MP":
-- type is MedicationRequest.
 - logic is "Low BMI Medication Order Date" during "Measurement Period".
 
 concept "Low BMI Medication Order":
@@ -543,19 +515,15 @@ concept "Low BMI Interventions Ordered":
 // --- Low BMI Interventions Performed ---
 
 concept "Low BMI Procedure Justified by Underweight Diagnosis":
-- type is Procedure.
 - logic is "Low BMI Follow-up Procedures" justified by "Underweight Diagnoses".
 
 concept "Low BMI Follow-up Procedures Performed":
-- type is Procedure.
 - logic is "Low BMI Follow-up Procedures" performed.
 
 concept "Has Underweight On Or Before Low BMI Procedure":
-- type is Condition.
 - logic is "Has Underweight" on or before "Low BMI Procedure Performed Date".
 
 concept "Low BMI Procedure Performed Date During MP":
-- type is Procedure.
 - logic is "Low BMI Procedure Performed Date" during "Measurement Period".
 
 concept "Low BMI Procedure Performed":
@@ -585,7 +553,6 @@ concept "Low BMI Interventions Performed":
 // --- Low BMI And Follow Up Provided ---
 
 concept "Documented Low BMI During MP":
-- type is Observation.
 - logic is "Documented Low BMI" during "Measurement Period".
 
 concept "Low BMI And Follow Up Provided":
@@ -606,11 +573,9 @@ concept "Low BMI And Follow Up Provided":
 // --- BMI exam not performed with reason ---
 
 concept "BMI Observation Not Done With Reason":
-- type is Observation.
 - logic is "BMI Observations" not done with reason ("Medical Reasons" or "Patient Declined Reasons").
 
 concept "BMI Observation Same Day As Qualifying Encounter":
-- type is Observation.
 - logic is "BMI Observations" same day as "Qualifying Encounter".
 
 concept "Medical Reason Or Patient Reason For Not Performing BMI Exam":
@@ -627,15 +592,12 @@ concept "Medical Reason Or Patient Reason For Not Performing BMI Exam":
 // --- BMI follow-up not documented with reason ---
 
 concept "High BMI Follow-up Not Done With Medical Reason":
-- type is ServiceRequest.
 - logic is "High BMI Follow-up Service Requests" not done with reason "Medical Reasons".
 
 concept "High BMI Follow-up Same Day As Qualifying Encounter":
-- type is ServiceRequest.
 - logic is "High BMI Follow-up Service Requests" same day as "Qualifying Encounter".
 
 concept "High BMI Follow-up Performed":
-- type is ServiceRequest.
 - logic is "High BMI Follow-up Service Requests" performed.
 
 concept "High BMI Follow-up Not Done With Reason":
@@ -651,15 +613,12 @@ concept "High BMI Follow-up Not Done With Reason":
 ).
 
 concept "Low BMI Follow-up Not Done With Medical Reason":
-- type is ServiceRequest.
 - logic is "Low BMI Follow-up Service Requests" not done with reason "Medical Reasons".
 
 concept "Low BMI Follow-up Same Day As Qualifying Encounter":
-- type is ServiceRequest.
 - logic is "Low BMI Follow-up Service Requests" same day as "Qualifying Encounter".
 
 concept "Low BMI Follow-up Performed":
-- type is ServiceRequest.
 - logic is "Low BMI Follow-up Service Requests" performed.
 
 concept "Low BMI Follow-up Not Done With Reason":
@@ -675,15 +634,12 @@ concept "Low BMI Follow-up Not Done With Reason":
 ).
 
 concept "Weight Assessment Referral Not Done With Medical Reason":
-- type is ServiceRequest.
 - logic is "Weight Assessment Referrals" not done with reason "Medical Reasons".
 
 concept "Weight Assessment Referral Same Day As Qualifying Encounter":
-- type is ServiceRequest.
 - logic is "Weight Assessment Referrals" same day as "Qualifying Encounter".
 
 concept "Weight Assessment Referral Performed":
-- type is ServiceRequest.
 - logic is "Weight Assessment Referrals" performed.
 
 concept "Weight Assessment Referral Not Done With Reason":
@@ -699,15 +655,12 @@ concept "Weight Assessment Referral Not Done With Reason":
 ).
 
 concept "High BMI Medication Not Done With Medical Reason":
-- type is MedicationRequest.
 - logic is "High BMI Medications" not done with reason "Medical Reasons".
 
 concept "High BMI Medication Same Day As Qualifying Encounter":
-- type is MedicationRequest.
 - logic is "High BMI Medications" same day as "Qualifying Encounter".
 
 concept "High BMI Medication Performed":
-- type is MedicationRequest.
 - logic is "High BMI Medications" performed.
 
 concept "High BMI Medication Not Done With Reason":
@@ -723,15 +676,12 @@ concept "High BMI Medication Not Done With Reason":
 ).
 
 concept "Low BMI Medication Not Done With Medical Reason":
-- type is MedicationRequest.
 - logic is "Low BMI Medications" not done with reason "Medical Reasons".
 
 concept "Low BMI Medication Same Day As Qualifying Encounter":
-- type is MedicationRequest.
 - logic is "Low BMI Medications" same day as "Qualifying Encounter".
 
 concept "Low BMI Medication Performed":
-- type is MedicationRequest.
 - logic is "Low BMI Medications" performed.
 
 concept "Low BMI Medication Not Done With Reason":
@@ -766,7 +716,6 @@ concept "Medical Reason For Not Documenting A Follow Up Plan For Low Or High BMI
 // --- Pregnancy during measurement period ---
 
 concept "Pregnancy Diagnoses Active During MP":
-- type is Condition.
 - logic is "Pregnancy Diagnoses" is active during "Measurement Period".
 
 concept "Active Pregnancy Diagnosis":
@@ -775,15 +724,12 @@ concept "Active Pregnancy Diagnosis":
 - inferred from "Pregnancy Diagnoses Active During MP".
 
 concept "Pregnancy Status Overlaps MP":
-- type is Observation.
 - logic is "Pregnancy Status Observations" overlaps "Measurement Period".
 
 concept "Pregnancy Status Is Verified":
-- type is Observation.
 - logic is "Pregnancy Status Observations" is verified.
 
 concept "Pregnancy Status Documented As Pregnancy Related":
-- type is Observation.
 - logic is "Pregnancy Status Observations" documented as "Pregnancy or Other Related Diagnoses".
 
 concept "Verified Pregnancy Status":
@@ -812,7 +758,6 @@ concept "Is Pregnant During Measurement Period":
 // --- Age predicate ---
 
 concept "Age At Start Of MP At Least 18 Years":
-- type is Encounter.
 - logic is age at start of "Measurement Period" at least 18 years.
 
 concept "Aged 18+ at Measurement Period Start":
