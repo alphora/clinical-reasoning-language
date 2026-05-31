@@ -53,27 +53,33 @@ terminology "Referral to Primary Care or Alternate Provider":
 terminology "Weight Reduction Recommended":
 - valueset is `http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.600.1510`.
 
-// Stub valuesets — codes-wrapped-as-1-element-valuesets per CRL convention
-// (`coded from` requires a valueset; CRL author chose to model these
-// single-code refs as named valuesets). Empty URL = placeholder.
+// Single-code terminologies — source CQL uses these as LOINC/ActCode codes
+// (not valuesets). Now declared as proper system+code terminologies with
+// the actual codes from the source CQL.
 
 terminology "Blood pressure panel with all children optional":
-- valueset is ``.
+- system is `http://loinc.org`.
+- code is `85354-9`.
 
 terminology "Systolic Blood Pressure Code":
-- valueset is ``.
+- system is `http://loinc.org`.
+- code is `8480-6`.
 
 terminology "Diastolic Blood Pressure Code":
-- valueset is ``.
+- system is `http://loinc.org`.
+- code is `8462-4`.
 
 terminology "EKG 12 Lead Panel Code":
-- valueset is ``.
+- system is `http://loinc.org`.
+- code is `34534-8`.
 
 terminology "EKG Study Code":
-- valueset is ``.
+- system is `http://loinc.org`.
+- code is `11524-6`.
 
 terminology "Virtual Encounter Class":
-- valueset is ``.
+- system is `http://terminology.hl7.org/CodeSystem/v3-ActCode`.
+- code is `VR`.
 
 
 // ============ Runtime stubs ============

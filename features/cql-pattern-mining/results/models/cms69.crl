@@ -50,8 +50,11 @@ terminology "Underweight":
 terminology "Body Mass Index Observations":
 - valueset is ``.
 
+// "Virtual Encounter Class" — source CQL uses the ActCode 'VR' code directly
+// (not a valueset). Declared here as system+code terminology.
 terminology "Virtual Encounter Class":
-- valueset is ``.
+- system is `http://terminology.hl7.org/CodeSystem/v3-ActCode`.
+- code is `VR`.
 
 terminology "Pregnancy Status":
 - valueset is ``.
