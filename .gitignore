@@ -56,6 +56,10 @@ temp/
 
 issues/
 
+# Regression test output artifacts: regenerated on every test run; only
+# the *-expected.* fixtures are committed baselines.
+src/tests/regression/testdata/*-actual.*
+
 # Feature working artifacts: source corpora dropped in for analysis and
 # derived data (decoded ELM forests, etc.). Source folders often contain
 # their own .git checkouts and are huge; derived data is regenerable.
