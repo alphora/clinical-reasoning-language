@@ -160,10 +160,10 @@ concept "BMI":
 // Predicates with narrative bodies live in `inference` declarations.
 // The composing concept then references them as bare refs.
 
-inference "Most Recent BMI Selection":
+concept "Most Recent BMI Selection":
 - meta is `Selects the most recent BMI observation within the configured lookback`.
 - evidence is `Calculated by Smile`.
-- most recent "BMI".
+- logic is most recent "BMI".
 
 concept "Most Recent BMI":
 - type is Observation.
@@ -172,9 +172,9 @@ concept "Most Recent BMI":
 - evidence is `Calculated by Smile`.
 - inferred from "Most Recent BMI Selection".
 
-inference "Calculated BMI Formula":
+concept "Calculated BMI Formula":
 - evidence is `Standard BMI formula: weight (kg) / height (m)^2`.
-- calculated "BMI".
+- logic is calculated "BMI".
 
 concept "Calculated BMI":
 - type is Observation.

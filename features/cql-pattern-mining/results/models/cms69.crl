@@ -1,8 +1,27 @@
-# CMS69 BMI Screening and Follow-Up — v0.5 grammar
+# CMS69 BMI Screening and Follow-Up — v0.6 grammar
 
-// Migrated to CRL v0.5: `inference` keyword for narrative predicates;
+// Migrated to CRL v0.6: `concept` is the only declaration kind; `logic is` body for narrative predicates;
 // concept `inferred from` body is bare ref or sem-or/sem-and/sem-not composition.
 // All multi-clause concepts now compose named inferences via sem-* operators.
+
+
+// ============ Runtime / valueset stubs ============
+// Temporary asserted-concept stubs for refs that don't resolve locally.
+// "Measurement Period" will become a parameter declaration when imports +
+// parameters land (issues/crl/todo/imports/, issues/crl/todo/parameters/).
+// "Pregnancy or Other Related Diagnoses" is a valueset ref used by the
+// `documented as` pattern; classification valueset refs need their own
+// reference rules (deferred).
+// Asserted bodies skip narrative ref checking — stubs satisfy resolution
+// without cascading more errors.
+
+concept "Measurement Period":
+- type is Encounter.
+- coded from "Measurement Period (stub valueset)".
+
+concept "Pregnancy or Other Related Diagnoses":
+- type is Condition.
+- coded from "Pregnancy or Other Related Diagnoses (stub valueset)".
 
 
 // ============ Asserted concepts (unchanged) ============
@@ -140,11 +159,11 @@ concept "BMI Evaluation Encounter (not virtual)":
    sem-not "Virtual Encounters"
 ).
 
-inference "BMI Evaluation Encounter (not virtual) During MP":
-- "BMI Evaluation Encounter (not virtual)" during "Measurement Period".
+concept "BMI Evaluation Encounter (not virtual) During MP":
+- logic is "BMI Evaluation Encounter (not virtual)" during "Measurement Period".
 
-inference "BMI Evaluation Encounter (not virtual) Performed":
-- "BMI Evaluation Encounter (not virtual)" performed.
+concept "BMI Evaluation Encounter (not virtual) Performed":
+- logic is "BMI Evaluation Encounter (not virtual)" performed.
 
 concept "Qualifying Encounter":
 - type is Encounter.
@@ -159,11 +178,11 @@ concept "Qualifying Encounter":
 
 // --- BMI During Measurement Period ---
 
-inference "BMI Observation During MP":
-- "BMI Observations" during "Measurement Period".
+concept "BMI Observation During MP":
+- logic is "BMI Observations" during "Measurement Period".
 
-inference "BMI Observation Has Positive Value":
-- "BMI Observations" exceeds 0 'kg/m2'.
+concept "BMI Observation Has Positive Value":
+- logic is "BMI Observations" exceeds 0 'kg/m2'.
 
 concept "BMI During Measurement Period":
 - type is Observation.
@@ -178,14 +197,14 @@ concept "BMI During Measurement Period":
 
 // --- BMI clinical classifications ---
 
-inference "BMI During MP Is Low":
-- "BMI During Measurement Period" is low.
+concept "BMI During MP Is Low":
+- logic is "BMI During Measurement Period" is low.
 
-inference "BMI During MP Is High":
-- "BMI During Measurement Period" is high.
+concept "BMI During MP Is High":
+- logic is "BMI During Measurement Period" is high.
 
-inference "BMI During MP Is Normal":
-- "BMI During Measurement Period" is normal.
+concept "BMI During MP Is Normal":
+- logic is "BMI During Measurement Period" is normal.
 
 concept "Documented Low BMI":
 - type is Observation.
@@ -205,8 +224,8 @@ concept "Normal BMI Range":
 
 // --- Has Normal BMI ---
 
-inference "Without Documented Abnormal BMI":
-- without documented ("Documented High BMI" or "Documented Low BMI").
+concept "Without Documented Abnormal BMI":
+- logic is without documented ("Documented High BMI" or "Documented Low BMI").
 
 concept "Has Normal BMI":
 - type is Observation.
@@ -221,11 +240,11 @@ concept "Has Normal BMI":
 
 // --- Co-existing diagnoses ---
 
-inference "Overweight or Obese Diagnoses is Active":
-- "Overweight or Obese Diagnoses" is active.
+concept "Overweight or Obese Diagnoses is Active":
+- logic is "Overweight or Obese Diagnoses" is active.
 
-inference "Underweight Diagnoses is Active":
-- "Underweight Diagnoses" is active.
+concept "Underweight Diagnoses is Active":
+- logic is "Underweight Diagnoses" is active.
 
 concept "Has Overweight or Obese":
 - type is Condition.
@@ -240,11 +259,11 @@ concept "Has Underweight":
 
 // --- High BMI Interventions Ordered ---
 
-inference "High BMI Follow-up Justified by Overweight Diagnosis":
-- "High BMI Follow-up Service Requests" justified by "Overweight or Obese Diagnoses".
+concept "High BMI Follow-up Justified by Overweight Diagnosis":
+- logic is "High BMI Follow-up Service Requests" justified by "Overweight or Obese Diagnoses".
 
-inference "Has Overweight On Or Before High BMI Follow-up Order":
-- "Has Overweight or Obese" on or before "High BMI Follow-up Order Date".
+concept "Has Overweight On Or Before High BMI Follow-up Order":
+- logic is "Has Overweight or Obese" on or before "High BMI Follow-up Order Date".
 
 concept "High BMI Follow-up Order":
 - type is ServiceRequest.
@@ -256,11 +275,11 @@ concept "High BMI Follow-up Order":
    "Has Overweight On Or Before High BMI Follow-up Order"
 ).
 
-inference "Weight Assessment Referral Justified by Overweight Diagnosis":
-- "Weight Assessment Referrals" justified by "Overweight or Obese Diagnoses".
+concept "Weight Assessment Referral Justified by Overweight Diagnosis":
+- logic is "Weight Assessment Referrals" justified by "Overweight or Obese Diagnoses".
 
-inference "Has Overweight On Or Before Weight Assessment Referral":
-- "Has Overweight or Obese" on or before "Weight Assessment Referral Date".
+concept "Has Overweight On Or Before Weight Assessment Referral":
+- logic is "Has Overweight or Obese" on or before "Weight Assessment Referral Date".
 
 concept "High BMI Weight Assessment Referral":
 - type is ServiceRequest.
@@ -272,11 +291,11 @@ concept "High BMI Weight Assessment Referral":
    "Has Overweight On Or Before Weight Assessment Referral"
 ).
 
-inference "High BMI Medication Justified by Overweight Diagnosis":
-- "High BMI Medications" justified by "Overweight or Obese Diagnoses".
+concept "High BMI Medication Justified by Overweight Diagnosis":
+- logic is "High BMI Medications" justified by "Overweight or Obese Diagnoses".
 
-inference "Has Overweight On Or Before High BMI Medication Order":
-- "Has Overweight or Obese" on or before "High BMI Medication Order Date".
+concept "Has Overweight On Or Before High BMI Medication Order":
+- logic is "Has Overweight or Obese" on or before "High BMI Medication Order Date".
 
 concept "High BMI Medication Order":
 - type is MedicationRequest.
@@ -303,11 +322,11 @@ concept "High BMI Interventions Ordered":
 
 // --- High BMI Interventions Performed ---
 
-inference "High BMI Procedure Justified by Overweight Diagnosis":
-- "High BMI Follow-up Procedures" justified by "Overweight or Obese Diagnoses".
+concept "High BMI Procedure Justified by Overweight Diagnosis":
+- logic is "High BMI Follow-up Procedures" justified by "Overweight or Obese Diagnoses".
 
-inference "Has Overweight On Or Before High BMI Procedure":
-- "Has Overweight or Obese" on or before "High BMI Procedure Performed Date".
+concept "Has Overweight On Or Before High BMI Procedure":
+- logic is "Has Overweight or Obese" on or before "High BMI Procedure Performed Date".
 
 concept "High BMI Procedure Performed":
 - type is Procedure.
@@ -327,8 +346,8 @@ concept "High BMI Interventions Performed":
 
 // --- High BMI And Follow Up Provided ---
 
-inference "Documented High BMI During MP":
-- "Documented High BMI" during "Measurement Period".
+concept "Documented High BMI During MP":
+- logic is "Documented High BMI" during "Measurement Period".
 
 concept "High BMI And Follow Up Provided":
 - type is Observation.
@@ -347,14 +366,14 @@ concept "High BMI And Follow Up Provided":
 
 // --- Low BMI analogous ---
 
-inference "Low BMI Follow-up Justified by Underweight Diagnosis":
-- "Low BMI Follow-up Service Requests" justified by "Underweight Diagnoses".
+concept "Low BMI Follow-up Justified by Underweight Diagnosis":
+- logic is "Low BMI Follow-up Service Requests" justified by "Underweight Diagnoses".
 
-inference "Has Underweight On Or Before Low BMI Follow-up Order":
-- "Has Underweight" on or before "Low BMI Follow-up Order Date".
+concept "Has Underweight On Or Before Low BMI Follow-up Order":
+- logic is "Has Underweight" on or before "Low BMI Follow-up Order Date".
 
-inference "Low BMI Follow-up Order Date During MP":
-- "Low BMI Follow-up Order Date" during "Measurement Period".
+concept "Low BMI Follow-up Order Date During MP":
+- logic is "Low BMI Follow-up Order Date" during "Measurement Period".
 
 concept "Low BMI Follow-up Order":
 - type is ServiceRequest.
@@ -370,14 +389,14 @@ concept "Low BMI Follow-up Order":
    )
 ).
 
-inference "Weight Assessment Referral Justified by Underweight Diagnosis":
-- "Weight Assessment Referrals" justified by "Underweight Diagnoses".
+concept "Weight Assessment Referral Justified by Underweight Diagnosis":
+- logic is "Weight Assessment Referrals" justified by "Underweight Diagnoses".
 
-inference "Has Underweight On Or Before Weight Assessment Referral":
-- "Has Underweight" on or before "Weight Assessment Referral Date".
+concept "Has Underweight On Or Before Weight Assessment Referral":
+- logic is "Has Underweight" on or before "Weight Assessment Referral Date".
 
-inference "Weight Assessment Referral Date During MP":
-- "Weight Assessment Referral Date" during "Measurement Period".
+concept "Weight Assessment Referral Date During MP":
+- logic is "Weight Assessment Referral Date" during "Measurement Period".
 
 concept "Low BMI Weight Assessment Referral":
 - type is ServiceRequest.
@@ -393,14 +412,14 @@ concept "Low BMI Weight Assessment Referral":
    )
 ).
 
-inference "Low BMI Medication Justified by Underweight Diagnosis":
-- "Low BMI Medications" justified by "Underweight Diagnoses".
+concept "Low BMI Medication Justified by Underweight Diagnosis":
+- logic is "Low BMI Medications" justified by "Underweight Diagnoses".
 
-inference "Has Underweight On Or Before Low BMI Medication Order":
-- "Has Underweight" on or before "Low BMI Medication Order Date".
+concept "Has Underweight On Or Before Low BMI Medication Order":
+- logic is "Has Underweight" on or before "Low BMI Medication Order Date".
 
-inference "Low BMI Medication Order Date During MP":
-- "Low BMI Medication Order Date" during "Measurement Period".
+concept "Low BMI Medication Order Date During MP":
+- logic is "Low BMI Medication Order Date" during "Measurement Period".
 
 concept "Low BMI Medication Order":
 - type is MedicationRequest.
@@ -431,17 +450,17 @@ concept "Low BMI Interventions Ordered":
 
 // --- Low BMI Interventions Performed ---
 
-inference "Low BMI Procedure Justified by Underweight Diagnosis":
-- "Low BMI Follow-up Procedures" justified by "Underweight Diagnoses".
+concept "Low BMI Procedure Justified by Underweight Diagnosis":
+- logic is "Low BMI Follow-up Procedures" justified by "Underweight Diagnoses".
 
-inference "Low BMI Follow-up Procedures Performed":
-- "Low BMI Follow-up Procedures" performed.
+concept "Low BMI Follow-up Procedures Performed":
+- logic is "Low BMI Follow-up Procedures" performed.
 
-inference "Has Underweight On Or Before Low BMI Procedure":
-- "Has Underweight" on or before "Low BMI Procedure Performed Date".
+concept "Has Underweight On Or Before Low BMI Procedure":
+- logic is "Has Underweight" on or before "Low BMI Procedure Performed Date".
 
-inference "Low BMI Procedure Performed Date During MP":
-- "Low BMI Procedure Performed Date" during "Measurement Period".
+concept "Low BMI Procedure Performed Date During MP":
+- logic is "Low BMI Procedure Performed Date" during "Measurement Period".
 
 concept "Low BMI Procedure Performed":
 - type is Procedure.
@@ -469,8 +488,8 @@ concept "Low BMI Interventions Performed":
 
 // --- Low BMI And Follow Up Provided ---
 
-inference "Documented Low BMI During MP":
-- "Documented Low BMI" during "Measurement Period".
+concept "Documented Low BMI During MP":
+- logic is "Documented Low BMI" during "Measurement Period".
 
 concept "Low BMI And Follow Up Provided":
 - type is Observation.
@@ -489,11 +508,11 @@ concept "Low BMI And Follow Up Provided":
 
 // --- BMI exam not performed with reason ---
 
-inference "BMI Observation Not Done With Reason":
-- "BMI Observations" not done with reason ("Medical Reasons" or "Patient Declined Reasons").
+concept "BMI Observation Not Done With Reason":
+- logic is "BMI Observations" not done with reason ("Medical Reasons" or "Patient Declined Reasons").
 
-inference "BMI Observation Same Day As Qualifying Encounter":
-- "BMI Observations" same day as "Qualifying Encounter".
+concept "BMI Observation Same Day As Qualifying Encounter":
+- logic is "BMI Observations" same day as "Qualifying Encounter".
 
 concept "Medical Reason Or Patient Reason For Not Performing BMI Exam":
 - type is Observation.
@@ -508,14 +527,14 @@ concept "Medical Reason Or Patient Reason For Not Performing BMI Exam":
 
 // --- BMI follow-up not documented with reason ---
 
-inference "High BMI Follow-up Not Done With Medical Reason":
-- "High BMI Follow-up Service Requests" not done with reason "Medical Reasons".
+concept "High BMI Follow-up Not Done With Medical Reason":
+- logic is "High BMI Follow-up Service Requests" not done with reason "Medical Reasons".
 
-inference "High BMI Follow-up Same Day As Qualifying Encounter":
-- "High BMI Follow-up Service Requests" same day as "Qualifying Encounter".
+concept "High BMI Follow-up Same Day As Qualifying Encounter":
+- logic is "High BMI Follow-up Service Requests" same day as "Qualifying Encounter".
 
-inference "High BMI Follow-up Performed":
-- "High BMI Follow-up Service Requests" performed.
+concept "High BMI Follow-up Performed":
+- logic is "High BMI Follow-up Service Requests" performed.
 
 concept "High BMI Follow-up Not Done With Reason":
 - type is ServiceRequest.
@@ -529,14 +548,14 @@ concept "High BMI Follow-up Not Done With Reason":
    "High BMI Follow-up Performed"
 ).
 
-inference "Low BMI Follow-up Not Done With Medical Reason":
-- "Low BMI Follow-up Service Requests" not done with reason "Medical Reasons".
+concept "Low BMI Follow-up Not Done With Medical Reason":
+- logic is "Low BMI Follow-up Service Requests" not done with reason "Medical Reasons".
 
-inference "Low BMI Follow-up Same Day As Qualifying Encounter":
-- "Low BMI Follow-up Service Requests" same day as "Qualifying Encounter".
+concept "Low BMI Follow-up Same Day As Qualifying Encounter":
+- logic is "Low BMI Follow-up Service Requests" same day as "Qualifying Encounter".
 
-inference "Low BMI Follow-up Performed":
-- "Low BMI Follow-up Service Requests" performed.
+concept "Low BMI Follow-up Performed":
+- logic is "Low BMI Follow-up Service Requests" performed.
 
 concept "Low BMI Follow-up Not Done With Reason":
 - type is ServiceRequest.
@@ -550,14 +569,14 @@ concept "Low BMI Follow-up Not Done With Reason":
    "Low BMI Follow-up Performed"
 ).
 
-inference "Weight Assessment Referral Not Done With Medical Reason":
-- "Weight Assessment Referrals" not done with reason "Medical Reasons".
+concept "Weight Assessment Referral Not Done With Medical Reason":
+- logic is "Weight Assessment Referrals" not done with reason "Medical Reasons".
 
-inference "Weight Assessment Referral Same Day As Qualifying Encounter":
-- "Weight Assessment Referrals" same day as "Qualifying Encounter".
+concept "Weight Assessment Referral Same Day As Qualifying Encounter":
+- logic is "Weight Assessment Referrals" same day as "Qualifying Encounter".
 
-inference "Weight Assessment Referral Performed":
-- "Weight Assessment Referrals" performed.
+concept "Weight Assessment Referral Performed":
+- logic is "Weight Assessment Referrals" performed.
 
 concept "Weight Assessment Referral Not Done With Reason":
 - type is ServiceRequest.
@@ -571,14 +590,14 @@ concept "Weight Assessment Referral Not Done With Reason":
    "Weight Assessment Referral Performed"
 ).
 
-inference "High BMI Medication Not Done With Medical Reason":
-- "High BMI Medications" not done with reason "Medical Reasons".
+concept "High BMI Medication Not Done With Medical Reason":
+- logic is "High BMI Medications" not done with reason "Medical Reasons".
 
-inference "High BMI Medication Same Day As Qualifying Encounter":
-- "High BMI Medications" same day as "Qualifying Encounter".
+concept "High BMI Medication Same Day As Qualifying Encounter":
+- logic is "High BMI Medications" same day as "Qualifying Encounter".
 
-inference "High BMI Medication Performed":
-- "High BMI Medications" performed.
+concept "High BMI Medication Performed":
+- logic is "High BMI Medications" performed.
 
 concept "High BMI Medication Not Done With Reason":
 - type is MedicationRequest.
@@ -592,14 +611,14 @@ concept "High BMI Medication Not Done With Reason":
    "High BMI Medication Performed"
 ).
 
-inference "Low BMI Medication Not Done With Medical Reason":
-- "Low BMI Medications" not done with reason "Medical Reasons".
+concept "Low BMI Medication Not Done With Medical Reason":
+- logic is "Low BMI Medications" not done with reason "Medical Reasons".
 
-inference "Low BMI Medication Same Day As Qualifying Encounter":
-- "Low BMI Medications" same day as "Qualifying Encounter".
+concept "Low BMI Medication Same Day As Qualifying Encounter":
+- logic is "Low BMI Medications" same day as "Qualifying Encounter".
 
-inference "Low BMI Medication Performed":
-- "Low BMI Medications" performed.
+concept "Low BMI Medication Performed":
+- logic is "Low BMI Medications" performed.
 
 concept "Low BMI Medication Not Done With Reason":
 - type is MedicationRequest.
@@ -632,22 +651,22 @@ concept "Medical Reason For Not Documenting A Follow Up Plan For Low Or High BMI
 
 // --- Pregnancy during measurement period ---
 
-inference "Pregnancy Diagnoses Active During MP":
-- "Pregnancy Diagnoses" is active during "Measurement Period".
+concept "Pregnancy Diagnoses Active During MP":
+- logic is "Pregnancy Diagnoses" is active during "Measurement Period".
 
 concept "Active Pregnancy Diagnosis":
 - type is Condition.
 - valuetype is boolean.
 - inferred from "Pregnancy Diagnoses Active During MP".
 
-inference "Pregnancy Status Overlaps MP":
-- "Pregnancy Status Observations" overlaps "Measurement Period".
+concept "Pregnancy Status Overlaps MP":
+- logic is "Pregnancy Status Observations" overlaps "Measurement Period".
 
-inference "Pregnancy Status Is Verified":
-- "Pregnancy Status Observations" is verified.
+concept "Pregnancy Status Is Verified":
+- logic is "Pregnancy Status Observations" is verified.
 
-inference "Pregnancy Status Documented As Pregnancy Related":
-- "Pregnancy Status Observations" documented as "Pregnancy or Other Related Diagnoses".
+concept "Pregnancy Status Documented As Pregnancy Related":
+- logic is "Pregnancy Status Observations" documented as "Pregnancy or Other Related Diagnoses".
 
 concept "Verified Pregnancy Status":
 - type is Observation.
@@ -674,8 +693,8 @@ concept "Is Pregnant During Measurement Period":
 
 // --- Age predicate ---
 
-inference "Age At Start Of MP At Least 18 Years":
-- age at start of "Measurement Period" at least 18 years.
+concept "Age At Start Of MP At Least 18 Years":
+- logic is age at start of "Measurement Period" at least 18 years.
 
 concept "Aged 18+ at Measurement Period Start":
 - type is Encounter.

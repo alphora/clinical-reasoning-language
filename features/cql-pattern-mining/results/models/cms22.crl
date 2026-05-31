@@ -1,8 +1,18 @@
-# CMS22 Blood Pressure Screening and Follow-Up — v0.5 grammar
+# CMS22 Blood Pressure Screening and Follow-Up — v0.6 grammar
 
-// Migrated to CRL v0.5: `inference` keyword for narrative predicates;
+// Migrated to CRL v0.6: `concept` is the only declaration kind; `logic is` body for narrative predicates;
 // concept `inferred from` body is bare ref or sem-or/sem-and/sem-not composition.
 // All multi-clause concepts now compose named inferences via sem-* operators.
+
+
+// ============ Runtime stubs ============
+// Temporary asserted-concept stub for "Measurement Period" — will become
+// a parameter declaration when imports + parameters land
+// (see issues/crl/todo/imports/, issues/crl/todo/parameters/).
+
+concept "Measurement Period":
+- type is Encounter.
+- coded from "Measurement Period (stub valueset)".
 
 
 // ============ Asserted concepts (unchanged) ============
@@ -137,11 +147,11 @@ concept "BP Evaluation Encounter (not virtual)":
    sem-not "Virtual Encounters"
 ).
 
-inference "BP Evaluation Encounter (not virtual) During MP":
-- "BP Evaluation Encounter (not virtual)" during "Measurement Period".
+concept "BP Evaluation Encounter (not virtual) During MP":
+- logic is "BP Evaluation Encounter (not virtual)" during "Measurement Period".
 
-inference "BP Evaluation Encounter (not virtual) Performed":
-- "BP Evaluation Encounter (not virtual)" performed.
+concept "BP Evaluation Encounter (not virtual) Performed":
+- logic is "BP Evaluation Encounter (not virtual)" performed.
 
 concept "Qualifying Encounter":
 - type is Encounter.
@@ -156,11 +166,11 @@ concept "Qualifying Encounter":
 
 // --- BP panel projections ---
 
-inference "Systolic Code Component of BP Panels":
-- "Systolic Blood Pressure Code" component of "Blood Pressure Panels".
+concept "Systolic Code Component of BP Panels":
+- logic is "Systolic Blood Pressure Code" component of "Blood Pressure Panels".
 
-inference "Diastolic Code Component of BP Panels":
-- "Diastolic Blood Pressure Code" component of "Blood Pressure Panels".
+concept "Diastolic Code Component of BP Panels":
+- logic is "Diastolic Blood Pressure Code" component of "Blood Pressure Panels".
 
 concept "Systolic BP Reading":
 - type is Observation.
@@ -175,19 +185,19 @@ concept "Diastolic BP Reading":
 
 // --- Last BP reading on each qualifying encounter day ---
 
-inference "Last BP Panels On Qualifying Encounter Day":
-- last "Blood Pressure Panels" on day of "Qualifying Encounter".
+concept "Last BP Panels On Qualifying Encounter Day":
+- logic is last "Blood Pressure Panels" on day of "Qualifying Encounter".
 
 concept "Last BP Panel on Qualifying Encounter Day":
 - type is Observation.
 - valuetype is CodeableConcept.
 - inferred from "Last BP Panels On Qualifying Encounter Day".
 
-inference "Systolic Code Component of Last BP Panel On Encounter Day":
-- "Systolic Blood Pressure Code" component of "Last BP Panel on Qualifying Encounter Day".
+concept "Systolic Code Component of Last BP Panel On Encounter Day":
+- logic is "Systolic Blood Pressure Code" component of "Last BP Panel on Qualifying Encounter Day".
 
-inference "Diastolic Code Component of Last BP Panel On Encounter Day":
-- "Diastolic Blood Pressure Code" component of "Last BP Panel on Qualifying Encounter Day".
+concept "Diastolic Code Component of Last BP Panel On Encounter Day":
+- logic is "Diastolic Blood Pressure Code" component of "Last BP Panel on Qualifying Encounter Day".
 
 concept "Last Systolic on Qualifying Encounter Day":
 - type is Observation.
@@ -202,32 +212,32 @@ concept "Last Diastolic on Qualifying Encounter Day":
 
 // --- BP classification ladder ---
 
-inference "Last Systolic Below 120":
-- "Last Systolic on Qualifying Encounter Day" below 120 'mm[Hg]'.
+concept "Last Systolic Below 120":
+- logic is "Last Systolic on Qualifying Encounter Day" below 120 'mm[Hg]'.
 
-inference "Last Diastolic Below 80":
-- "Last Diastolic on Qualifying Encounter Day" below 80 'mm[Hg]'.
+concept "Last Diastolic Below 80":
+- logic is "Last Diastolic on Qualifying Encounter Day" below 80 'mm[Hg]'.
 
-inference "Last Systolic Between 120 and 129":
-- "Last Systolic on Qualifying Encounter Day" between 120 'mm[Hg]' and 129 'mm[Hg]'.
+concept "Last Systolic Between 120 and 129":
+- logic is "Last Systolic on Qualifying Encounter Day" between 120 'mm[Hg]' and 129 'mm[Hg]'.
 
-inference "Last Systolic At Least 130":
-- "Last Systolic on Qualifying Encounter Day" at least 130 'mm[Hg]'.
+concept "Last Systolic At Least 130":
+- logic is "Last Systolic on Qualifying Encounter Day" at least 130 'mm[Hg]'.
 
-inference "Last Diastolic At Least 80":
-- "Last Diastolic on Qualifying Encounter Day" at least 80 'mm[Hg]'.
+concept "Last Diastolic At Least 80":
+- logic is "Last Diastolic on Qualifying Encounter Day" at least 80 'mm[Hg]'.
 
-inference "Last Systolic Between 130 and 139":
-- "Last Systolic on Qualifying Encounter Day" between 130 'mm[Hg]' and 139 'mm[Hg]'.
+concept "Last Systolic Between 130 and 139":
+- logic is "Last Systolic on Qualifying Encounter Day" between 130 'mm[Hg]' and 139 'mm[Hg]'.
 
-inference "Last Diastolic Between 80 and 89":
-- "Last Diastolic on Qualifying Encounter Day" between 80 'mm[Hg]' and 89 'mm[Hg]'.
+concept "Last Diastolic Between 80 and 89":
+- logic is "Last Diastolic on Qualifying Encounter Day" between 80 'mm[Hg]' and 89 'mm[Hg]'.
 
-inference "Last Systolic At Least 140":
-- "Last Systolic on Qualifying Encounter Day" at least 140 'mm[Hg]'.
+concept "Last Systolic At Least 140":
+- logic is "Last Systolic on Qualifying Encounter Day" at least 140 'mm[Hg]'.
 
-inference "Last Diastolic At Least 90":
-- "Last Diastolic on Qualifying Encounter Day" at least 90 'mm[Hg]'.
+concept "Last Diastolic At Least 90":
+- logic is "Last Diastolic on Qualifying Encounter Day" at least 90 'mm[Hg]'.
 
 concept "Normal BP Reading":
 - type is Observation.
@@ -262,19 +272,19 @@ concept "Hypertensive Reading":
 
 // --- Windowed-from-anchor scope (Prior-year readings) ---
 
-inference "Last BP Panels Within Year Prior To Qualifying Encounter":
-- last "Blood Pressure Panels" within 1 year before start of "Qualifying Encounter".
+concept "Last BP Panels Within Year Prior To Qualifying Encounter":
+- logic is last "Blood Pressure Panels" within 1 year before start of "Qualifying Encounter".
 
 concept "Last BP Panel Within Year Prior to Qualifying Encounter":
 - type is Observation.
 - valuetype is CodeableConcept.
 - inferred from "Last BP Panels Within Year Prior To Qualifying Encounter".
 
-inference "Systolic Code Component of Prior-Year Last BP Panel":
-- "Systolic Blood Pressure Code" component of "Last BP Panel Within Year Prior to Qualifying Encounter".
+concept "Systolic Code Component of Prior-Year Last BP Panel":
+- logic is "Systolic Blood Pressure Code" component of "Last BP Panel Within Year Prior to Qualifying Encounter".
 
-inference "Diastolic Code Component of Prior-Year Last BP Panel":
-- "Diastolic Blood Pressure Code" component of "Last BP Panel Within Year Prior to Qualifying Encounter".
+concept "Diastolic Code Component of Prior-Year Last BP Panel":
+- logic is "Diastolic Blood Pressure Code" component of "Last BP Panel Within Year Prior to Qualifying Encounter".
 
 concept "Prior-Year Last Systolic":
 - type is Observation.
@@ -286,11 +296,11 @@ concept "Prior-Year Last Diastolic":
 - valuetype is Quantity.
 - inferred from "Diastolic Code Component of Prior-Year Last BP Panel".
 
-inference "Prior-Year Last Systolic At Least 130":
-- "Prior-Year Last Systolic" at least 130 'mm[Hg]'.
+concept "Prior-Year Last Systolic At Least 130":
+- logic is "Prior-Year Last Systolic" at least 130 'mm[Hg]'.
 
-inference "Prior-Year Last Diastolic At Least 80":
-- "Prior-Year Last Diastolic" at least 80 'mm[Hg]'.
+concept "Prior-Year Last Diastolic At Least 80":
+- logic is "Prior-Year Last Diastolic" at least 80 'mm[Hg]'.
 
 concept "Prior-Year Hypertensive Reading":
 - type is Observation.
@@ -302,8 +312,8 @@ concept "Prior-Year Hypertensive Reading":
    "Prior-Year Last Diastolic At Least 80"
 ).
 
-inference "Without Record Of Prior-Year Hypertensive Reading":
-- without record of "Prior-Year Hypertensive Reading".
+concept "Without Record Of Prior-Year Hypertensive Reading":
+- logic is without record of "Prior-Year Hypertensive Reading".
 
 concept "First Hypertensive Reading":
 - type is Observation.
@@ -370,11 +380,11 @@ concept "Second Hypertensive Reading 140+":
 
 // --- Ordered-intervention concepts ---
 
-inference "Follow-up Within 4 Weeks Ordered":
-- "Follow-up Within 4 Weeks" ordered.
+concept "Follow-up Within 4 Weeks Ordered":
+- logic is "Follow-up Within 4 Weeks" ordered.
 
-inference "Follow-up Within 6 Months Ordered":
-- "Follow-up Within 6 Months" ordered.
+concept "Follow-up Within 6 Months Ordered":
+- logic is "Follow-up Within 6 Months" ordered.
 
 concept "Four-Week Rescreen Order":
 - type is ServiceRequest.
@@ -402,8 +412,8 @@ concept "Non-Pharmacological Recommendations":
    "Alcohol Counseling Referrals"
 ).
 
-inference "Non-Pharmacological Recommendations Ordered":
-- "Non-Pharmacological Recommendations" ordered.
+concept "Non-Pharmacological Recommendations Ordered":
+- logic is "Non-Pharmacological Recommendations" ordered.
 
 concept "Non-Pharmacological Recommendation Order":
 - type is ServiceRequest.
@@ -422,27 +432,27 @@ concept "Hypertension Lab or ECG Requests":
    "Hypertension Lab Tests"
 ).
 
-inference "Hypertension Lab or ECG Requests Ordered":
-- "Hypertension Lab or ECG Requests" ordered.
+concept "Hypertension Lab or ECG Requests Ordered":
+- logic is "Hypertension Lab or ECG Requests" ordered.
 
 concept "Hypertension Lab or ECG Order":
 - type is ServiceRequest.
 - valuetype is boolean.
 - inferred from "Hypertension Lab or ECG Requests Ordered".
 
-inference "Antihypertensive Medications Ordered":
-- "Antihypertensive Medications" ordered.
+concept "Antihypertensive Medications Ordered":
+- logic is "Antihypertensive Medications" ordered.
 
 concept "Antihypertensive Medication Order":
 - type is MedicationRequest.
 - valuetype is boolean.
 - inferred from "Antihypertensive Medications Ordered".
 
-inference "Primary-Care Referral Justified by Hypertensive Reading":
-- "Primary-Care Referrals" justified by "Hypertensive Reading Findings".
+concept "Primary-Care Referral Justified by Hypertensive Reading":
+- logic is "Primary-Care Referrals" justified by "Hypertensive Reading Findings".
 
-inference "Primary-Care Referrals Ordered":
-- "Primary-Care Referrals" ordered.
+concept "Primary-Care Referrals Ordered":
+- logic is "Primary-Care Referrals" ordered.
 
 concept "Referral for Hypertensive Reading":
 - type is ServiceRequest.
@@ -457,23 +467,23 @@ concept "Referral for Hypertensive Reading":
 
 // --- Per-class intervention bundles ---
 
-inference "Six-Month Rescreen Order Same Day As Qualifying Encounter":
-- "Six-Month Rescreen Order" same day as "Qualifying Encounter".
+concept "Six-Month Rescreen Order Same Day As Qualifying Encounter":
+- logic is "Six-Month Rescreen Order" same day as "Qualifying Encounter".
 
-inference "Non-Pharm Recommendation Order Same Day As Qualifying Encounter":
-- "Non-Pharmacological Recommendation Order" same day as "Qualifying Encounter".
+concept "Non-Pharm Recommendation Order Same Day As Qualifying Encounter":
+- logic is "Non-Pharmacological Recommendation Order" same day as "Qualifying Encounter".
 
-inference "Referral for Hypertensive Reading Same Day As Qualifying Encounter":
-- "Referral for Hypertensive Reading" same day as "Qualifying Encounter".
+concept "Referral for Hypertensive Reading Same Day As Qualifying Encounter":
+- logic is "Referral for Hypertensive Reading" same day as "Qualifying Encounter".
 
-inference "Four-Week Rescreen Order Same Day As Qualifying Encounter":
-- "Four-Week Rescreen Order" same day as "Qualifying Encounter".
+concept "Four-Week Rescreen Order Same Day As Qualifying Encounter":
+- logic is "Four-Week Rescreen Order" same day as "Qualifying Encounter".
 
-inference "Hypertension Lab or ECG Order Same Day As Qualifying Encounter":
-- "Hypertension Lab or ECG Order" same day as "Qualifying Encounter".
+concept "Hypertension Lab or ECG Order Same Day As Qualifying Encounter":
+- logic is "Hypertension Lab or ECG Order" same day as "Qualifying Encounter".
 
-inference "Antihypertensive Medication Order Same Day As Qualifying Encounter":
-- "Antihypertensive Medication Order" same day as "Qualifying Encounter".
+concept "Antihypertensive Medication Order Same Day As Qualifying Encounter":
+- logic is "Antihypertensive Medication Order" same day as "Qualifying Encounter".
 
 concept "Elevated BP Followup Bundle":
 - type is ServiceRequest.
@@ -583,16 +593,16 @@ concept "Second HTN 140+ With Followup":
 
 // --- Verified hypertension as of qualifying encounter (Denominator Exclusion driver) ---
 
-inference "Hypertension Diagnoses Is Verified":
-- "Hypertension Diagnoses" is verified.
+concept "Hypertension Diagnoses Is Verified":
+- logic is "Hypertension Diagnoses" is verified.
 
 concept "Verified Hypertension":
 - type is Condition.
 - valuetype is boolean.
 - inferred from "Hypertension Diagnoses Is Verified".
 
-inference "Verified Hypertension As Of Qualifying Encounter Narrative":
-- "Verified Hypertension" as of "Qualifying Encounter".
+concept "Verified Hypertension As Of Qualifying Encounter Narrative":
+- logic is "Verified Hypertension" as of "Qualifying Encounter".
 
 concept "Verified Hypertension As Of Qualifying Encounter":
 - type is Condition.
@@ -614,11 +624,11 @@ concept "BP Measurement Sources":
    "Standalone Diastolic BP Observations"
 ).
 
-inference "BP Measurement Sources Not Done With Reason":
-- "BP Measurement Sources" not done with reason ("Medical Reasons" or "Patient Declined Reasons").
+concept "BP Measurement Sources Not Done With Reason":
+- logic is "BP Measurement Sources" not done with reason ("Medical Reasons" or "Patient Declined Reasons").
 
-inference "BP Measurement Sources Same Day As Qualifying Encounter":
-- "BP Measurement Sources" same day as "Qualifying Encounter".
+concept "BP Measurement Sources Same Day As Qualifying Encounter":
+- logic is "BP Measurement Sources" same day as "Qualifying Encounter".
 
 concept "BP Measurement Not Done With Reason":
 - type is Observation.
@@ -633,23 +643,23 @@ concept "BP Measurement Not Done With Reason":
 
 // --- Exception branch 2: HTN follow-up declined by patient ---
 
-inference "Follow-up Within 4 Weeks Declined by Patient":
-- "Follow-up Within 4 Weeks" not done with reason "Patient Declined Reasons".
+concept "Follow-up Within 4 Weeks Declined by Patient":
+- logic is "Follow-up Within 4 Weeks" not done with reason "Patient Declined Reasons".
 
-inference "Follow-up Within 6 Months Declined by Patient":
-- "Follow-up Within 6 Months" not done with reason "Patient Declined Reasons".
+concept "Follow-up Within 6 Months Declined by Patient":
+- logic is "Follow-up Within 6 Months" not done with reason "Patient Declined Reasons".
 
-inference "Primary-Care Referrals Declined by Patient":
-- "Primary-Care Referrals" not done with reason "Patient Declined Reasons".
+concept "Primary-Care Referrals Declined by Patient":
+- logic is "Primary-Care Referrals" not done with reason "Patient Declined Reasons".
 
-inference "Non-Pharmacological Recommendations Declined by Patient":
-- "Non-Pharmacological Recommendations" not done with reason "Patient Declined Reasons".
+concept "Non-Pharmacological Recommendations Declined by Patient":
+- logic is "Non-Pharmacological Recommendations" not done with reason "Patient Declined Reasons".
 
-inference "Hypertension Lab or ECG Requests Declined by Patient":
-- "Hypertension Lab or ECG Requests" not done with reason "Patient Declined Reasons".
+concept "Hypertension Lab or ECG Requests Declined by Patient":
+- logic is "Hypertension Lab or ECG Requests" not done with reason "Patient Declined Reasons".
 
-inference "Antihypertensive Medications Declined by Patient":
-- "Antihypertensive Medications" not done with reason "Patient Declined Reasons".
+concept "Antihypertensive Medications Declined by Patient":
+- logic is "Antihypertensive Medications" not done with reason "Patient Declined Reasons".
 
 concept "Four-Week Rescreen Declined":
 - type is ServiceRequest.
@@ -681,23 +691,23 @@ concept "Antihypertensive Medication Declined":
 - valuetype is boolean.
 - inferred from "Antihypertensive Medications Declined by Patient".
 
-inference "Primary-Care Referral Declined Same Day As Qualifying Encounter":
-- "Primary-Care Referral Declined" same day as "Qualifying Encounter".
+concept "Primary-Care Referral Declined Same Day As Qualifying Encounter":
+- logic is "Primary-Care Referral Declined" same day as "Qualifying Encounter".
 
-inference "Six-Month Rescreen Declined Same Day As Qualifying Encounter":
-- "Six-Month Rescreen Declined" same day as "Qualifying Encounter".
+concept "Six-Month Rescreen Declined Same Day As Qualifying Encounter":
+- logic is "Six-Month Rescreen Declined" same day as "Qualifying Encounter".
 
-inference "Non-Pharm Recommendation Declined Same Day As Qualifying Encounter":
-- "Non-Pharm Recommendation Declined" same day as "Qualifying Encounter".
+concept "Non-Pharm Recommendation Declined Same Day As Qualifying Encounter":
+- logic is "Non-Pharm Recommendation Declined" same day as "Qualifying Encounter".
 
-inference "Four-Week Rescreen Declined Same Day As Qualifying Encounter":
-- "Four-Week Rescreen Declined" same day as "Qualifying Encounter".
+concept "Four-Week Rescreen Declined Same Day As Qualifying Encounter":
+- logic is "Four-Week Rescreen Declined" same day as "Qualifying Encounter".
 
-inference "Hypertension Lab or ECG Declined Same Day As Qualifying Encounter":
-- "Hypertension Lab or ECG Declined" same day as "Qualifying Encounter".
+concept "Hypertension Lab or ECG Declined Same Day As Qualifying Encounter":
+- logic is "Hypertension Lab or ECG Declined" same day as "Qualifying Encounter".
 
-inference "Antihypertensive Medication Declined Same Day As Qualifying Encounter":
-- "Antihypertensive Medication Declined" same day as "Qualifying Encounter".
+concept "Antihypertensive Medication Declined Same Day As Qualifying Encounter":
+- logic is "Antihypertensive Medication Declined" same day as "Qualifying Encounter".
 
 concept "Elevated BP Declined Bundle":
 - type is ServiceRequest.
@@ -810,8 +820,8 @@ concept "HTN Followup Declined By Patient":
 
 // --- Age predicate ---
 
-inference "Age At Start Of MP At Least 18 Years":
-- age at start of "Measurement Period" at least 18 years.
+concept "Age At Start Of MP At Least 18 Years":
+- logic is age at start of "Measurement Period" at least 18 years.
 
 concept "Aged 18+ at Measurement Period Start":
 - type is Encounter.
