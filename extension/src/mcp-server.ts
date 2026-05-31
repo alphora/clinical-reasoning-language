@@ -2,7 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import { readFileSync, statSync } from "node:fs";
-import { tokenizeCRL, buildCRL, validateCRL } from "@smile-digital-health/crl";
+import { tokenizeCRL, buildCRL, validateCRL, emitCQL } from "@smile-digital-health/crl";
 
 // Caps the CRL SOURCE (input) size. Response size scales with this — there is
 // no separate output cap, but bounding input keeps responses bounded enough.
@@ -11,6 +11,7 @@ const MAX_INPUT_BYTES = 1_000_000;
 type CrlFn = (input: string) => { success: boolean; result?: unknown; errors?: unknown };
 type ToolArgs = { code?: string; path?: string };
 type ValidateArgs = ToolArgs & { soft?: boolean };
+type EmitArgs = ToolArgs & { libraryName?: string; libraryVersion?: string };
 
 // Thrown for bad tool input (XOR violation, unreadable/oversized/dir path).
 // These map to MCP isError responses; CRL parse/build failures do NOT — those
@@ -68,6 +69,21 @@ function runTool(fn: CrlFn, args: ToolArgs) {
   // not a tool error — return it as content so the agent can read errors[].
   // Compact JSON (no pretty-print) keeps the LLM-facing payload small.
   const result = fn(source);
+  return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
+}
+
+function runEmit(args: EmitArgs) {
+  let source: string;
+  try {
+    source = resolveSource(args);
+  } catch (e) {
+    const msg = e instanceof ToolInputError ? e.message : `Unexpected error: ${(e as Error).message}`;
+    return { content: [{ type: "text" as const, text: msg }], isError: true };
+  }
+  const result = emitCQL(source, {
+    libraryName: args.libraryName,
+    libraryVersion: args.libraryVersion,
+  });
   return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
 }
 
@@ -151,6 +167,27 @@ function createServer(): McpServer {
       },
     },
     (args) => runValidate(args as ValidateArgs)
+  );
+
+  server.registerTool(
+    "emit_cql",
+    {
+      title: "Emit CQL",
+      description:
+        "Emit CQL from a CRL document. Pass exactly one of `code` (inline) or `path` (file), plus optional " +
+        "`libraryName` and `libraryVersion`. " +
+        "Returns { success, result?, errors? }: on success, `result` is the generated CQL text targeting " +
+        "the CRLPatterns library (cql/src/CRLPatterns.cql). Refinement-vs-boolean composition is detected " +
+        "per-operand; stub valuesets (empty URL) become parameter declarations; terminology/concept name " +
+        "collisions are disambiguated with a ' Code' / ' ValueSet' suffix. The output may still need a CQL " +
+        "compiler to validate end-to-end.",
+      inputSchema: {
+        ...inputSchema,
+        libraryName: z.string().optional().describe("Library name for the emitted CQL (default: GeneratedFromCRL)."),
+        libraryVersion: z.string().optional().describe("Library version (default: 0.1.0)."),
+      },
+    },
+    (args) => runEmit(args as EmitArgs)
   );
 
   return server;

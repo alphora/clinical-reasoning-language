@@ -1,6 +1,8 @@
 import { ParseTree } from "antlr4ts/tree/ParseTree";
 import { CRL } from "./ast/types";
 import { CRLError } from "./types/errors";
+export { emitCQL } from "./emitter";
+export type { EmitOptions, EmitResult } from "./emitter";
 export interface Token {
     line: number;
     column: number;

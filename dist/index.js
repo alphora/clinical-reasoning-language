@@ -1,5 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.emitCQL = void 0;
 exports.tokenizeCRL = tokenizeCRL;
 exports.parseCRL = parseCRL;
 exports.buildCRL = buildCRL;
@@ -9,6 +10,8 @@ const CRLLexer_1 = require("./grammar/generated/antlr/CRLLexer");
 const createLexer_1 = require("./lexer/createLexer");
 const createParser_1 = require("./parser/createParser");
 const validator_1 = require("./validator/validator");
+var emitter_1 = require("./emitter");
+Object.defineProperty(exports, "emitCQL", { enumerable: true, get: function () { return emitter_1.emitCQL; } });
 function tokenizeCRL(input) {
     try {
         const { lexer, errorListener } = (0, createLexer_1.createLexer)(input);

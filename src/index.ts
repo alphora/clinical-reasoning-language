@@ -8,6 +8,9 @@ import { createParser } from "./parser/createParser";
 import { CRLError } from "./types/errors";
 import { Validator, type ValidationError } from "./validator/validator";
 
+export { emitCQL } from "./emitter";
+export type { EmitOptions, EmitResult } from "./emitter";
+
 export interface Token {
   line: number;
   column: number;
