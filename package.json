@@ -46,6 +46,7 @@
     "cli:ast:pretty": "ts-node src/cli/run-ast.ts --pretty",
     "cli:validator": "ts-node src/cli/run-validator.ts",
     "cli:validator:pretty": "ts-node src/cli/run-validator.ts --pretty",
+    "cli:template-match": "ts-node src/cli/run-template-match.ts",
     "cli:transformer:fsh-to-crl": "ts-node src/cli/run-transformer-fsh-to-crl.ts",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
