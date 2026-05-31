@@ -236,6 +236,15 @@ define function "Justified"(action List<MedicationRequest>, reason List<Conditio
 define function "Justified"(action List<Procedure>, reason List<Condition>):
   exists (action) A
     where exists (reason) R where R.code ~ singleton from (A.reasonCode)
+define function "Justified"(action List<ServiceRequest>, reason List<Observation>):
+  exists (action) A
+    where exists (reason) R where (R.value as CodeableConcept) ~ singleton from (A.reasonCode)
+define function "Justified"(action List<MedicationRequest>, reason List<Observation>):
+  exists (action) A
+    where exists (reason) R where (R.value as CodeableConcept) ~ singleton from (A.reasonCode)
+define function "Justified"(action List<Procedure>, reason List<Observation>):
+  exists (action) A
+    where exists (reason) R where (R.value as CodeableConcept) ~ singleton from (A.reasonCode)
 
 /**
  * Active(X[, during]) — narrative: `<X> is active` (optionally `during

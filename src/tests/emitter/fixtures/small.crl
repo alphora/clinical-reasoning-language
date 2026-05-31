@@ -1,0 +1,32 @@
+# Small emitter test fixture
+
+terminology "Hypertensive Reading Findings":
+- valueset is `http://example.org/vs/htn`.
+
+concept "Primary-Care Referrals":
+- type is ServiceRequest.
+- valuetype is CodeableConcept.
+- coded from "Hypertensive Reading Findings".
+
+concept "Hypertensive Reading":
+- type is Observation.
+- valuetype is CodeableConcept.
+- coded from "Hypertensive Reading Findings".
+
+concept "Primary-Care Referral Justified by Hypertensive Reading":
+- type is ServiceRequest.
+- logic is "Primary-Care Referrals" justified by "Hypertensive Reading".
+
+concept "Primary-Care Referrals Ordered":
+- type is ServiceRequest.
+- logic is "Primary-Care Referrals" ordered.
+
+concept "Referral and Reading":
+- type is Observation.
+- valuetype is boolean.
+- inferred from
+(
+   "Primary-Care Referrals Ordered"
+   sem-and
+   "Primary-Care Referral Justified by Hypertensive Reading"
+).
