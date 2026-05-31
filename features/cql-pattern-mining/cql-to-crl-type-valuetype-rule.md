@@ -12,13 +12,17 @@ This is intended to outlast the current corpus and survive being lifted into an 
 
 ## 1. The core rule (read first, internalize before transforming anything)
 
-> **If the CQL define returns a Boolean** → model the CRL concept as `type is Observation, valuetype is boolean`, regardless of what FHIR resource(s) the underlying logic touches.
+> **If the CQL define returns a Boolean** → model the CRL concept with `valuetype is boolean`. The `type` is the target FHIR resource IF that resource has a native boolean value field; otherwise fall back to `Observation`. Concretely: `Observation+boolean` and `QuestionnaireResponse+boolean` are valid (they have `valueBoolean` / `answer.valueBoolean`); `Condition+boolean`, `Encounter+boolean`, `MedicationRequest+boolean`, `Procedure+boolean`, `ServiceRequest+boolean` are NOT (those resources have no boolean value field) — those flip to `Observation+boolean`.
 >
 > **Otherwise** (the define returns a List of a FHIR resource, or a single FHIR resource) → the `type` is that resource type traced back to its asserted concept, and the `valuetype` is the applicable valuetype for that resource (i.e., whatever the asserted concept declared, OR what its enclosing inferred-from chain has declared).
 
-The boolean case is **not** "the underlying resource type with valuetype boolean". FHIR `Condition`, `MedicationRequest`, `Encounter`, `Procedure`, `ServiceRequest` **do not have a boolean value**. A concept that is semantically a yes/no patient assertion is a boolean-valued **Observation** in CRL's model — it is asserting something about the patient, not refining a list of clinical resources.
+The corrected boolean rule is: `<Resource>+boolean` is valid ONLY when `<Resource>` has a native boolean value field in FHIR. The short list of resources with native boolean values is `Observation` (`valueBoolean`), `QuestionnaireResponse` (`item.answer.valueBoolean`), and a few rare ones (`Consent.policyRule`-adjacent flags, `Coverage` subscriber flags). For every other resource — and for every CRL boolean concept that is a *computed* patient-level predicate rather than a stored boolean value — the declaration is `Observation+boolean`.
 
-This is the single most consequential error to avoid. It is the error that motivated this document.
+This is the single most consequential error to avoid. The original framing "boolean is always Observation+boolean, never inherits" over-stated the rule; the corrected version is more precise but yields the same answer for the cms69/cms22 corpus because every NonObservation resource we use lacks a boolean value field.
+
+**On composition operators (`sem-and`, `sem-or`, `sem-not`):** these are **SEMANTIC composition** operators, not boolean logic. The author declares the resulting concept's `(type, valuetype)`; the sem-* operators describe HOW the meaning is composed (intersection / union / exclusion at the semantic layer); they DO NOT type-check the operands against each other or against the result. Operands of mixed shapes (e.g., one refinement and one boolean) compose legally under an explicit author declaration. The CQL emitter is responsible for bridging operand types to produce the declared result (e.g., wrapping a refinement operand in `exists` when the result is boolean). This is the same "What not How" principle CRL applies elsewhere: authors declare WHAT a concept means; the implementation handles HOW to compute it.
+
+**See [inferred-from-is-semantic-composition.md](inferred-from-is-semantic-composition.md)** for the full principle, worked examples, and the common mis-readings to avoid. That document is mandatory reading before authoring or auditing any CRL concept with composition bodies.
 
 ---
 
@@ -220,11 +224,21 @@ Let `(T_C, V_C)` = the concept's declared pair, `(T_S, V_S)` = the subject's dec
 
 | Shape | Constraint | Notes |
 |---|---|---|
-| **Boolean predicate** | `T_C = Observation` AND `V_C = boolean` | Subject `(T_S, V_S)` irrelevant. The concept asserts a yes/no patient-level finding. |
+| **Boolean predicate** | `V_C = boolean` AND `T_C ∈ {Observation, QuestionnaireResponse, Consent, Coverage}` (the resources with native boolean value fields) | Subject `(T_S, V_S)` irrelevant. Default `T_C = Observation` for computed predicates. `<NonObs>+boolean` (e.g. `Condition+boolean`) is an error — those resources have no boolean value field. |
 | **Refinement** | `T_C = T_S` AND `V_C = V_S` | The concept is a filtered view of the subject. Type AND valuetype both preserved. |
 | **Value-bearing** | `T_C = T_S` AND `V_C` ∈ {`dateTime`, `Quantity`, `integer`, `string`, ...} (a FHIR primitive) AND `V_C ≠ V_S` | The concept extracts a primitive value (e.g. `authoredOn`) from the subject. Type comes from the source resource; valuetype is the primitive. |
 
 Anything outside these three is an error.
+
+**Composition operators in the chain.** When `T_C` and `V_C` are validated against a composed body (`inferred from sem-and(...)` / `sem-or(...)` / `sem-not(...)`):
+
+- **The author declares the result `(T_C, V_C)`; that declaration is authoritative.** The sem-* operators are SEMANTIC (intersection / union / exclusion of meaning), not boolean logic. They do NOT impose type-matching constraints on operands.
+- **Mixed-shape operands are legal** under explicit author declaration. The CQL emitter bridges operand types to produce the declared result. The validator MAY warn on mixed operands as a code-smell (to help authors notice unintended mismatches), but MUST NOT block.
+- **For boolean-declared concepts**: any operand shape mix is acceptable. Emitter wraps refinements in `exists` and value-bearing extracts in null-checks as needed.
+- **For refinement-declared concepts**: the chain check applies to the SUBJECT (first concept ref in left-to-right traversal of the composition expression) — that subject's `(T_S, V_S)` must satisfy the refinement constraint `T_C = T_S` AND `V_C = V_S`. Other operands in the composition are free to be different shapes; the emitter interprets them per the operator's semantic meaning relative to the subject.
+- **Heterogeneous-resource composition** (e.g. `sem-or` of a `ServiceRequest` refinement with a `MedicationRequest` refinement) is supported by author declaration: the author picks an umbrella result type (typically `Observation+boolean` if no `DomainResource` umbrella exists yet) and the emitter unions / boolean-wraps each typed operand.
+
+See [inferred-from-is-semantic-composition.md](inferred-from-is-semantic-composition.md) for examples and the mis-readings to avoid.
 
 ### 7.3 Asserted concepts
 

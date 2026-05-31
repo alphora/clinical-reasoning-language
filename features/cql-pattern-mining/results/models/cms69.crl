@@ -85,6 +85,7 @@ concept "Measurement Period":
 // from concept args directly.
 concept "Pregnancy or Other Related Diagnoses":
 - type is Condition.
+- valuetype is CodeableConcept.
 - coded from "Pregnancy or Other Related Diagnoses".
 
 
@@ -214,7 +215,7 @@ concept "Low BMI Procedure Performed Date":
 // --- Qualifying Encounter ---
 
 concept "BMI Evaluation Encounter (not virtual)":
-- type is Encounter.
+- type is Observation.
 - valuetype is boolean.
 - inferred from
 (
@@ -224,13 +225,17 @@ concept "BMI Evaluation Encounter (not virtual)":
 ).
 
 concept "BMI Evaluation Encounter (not virtual) During MP":
+- type is Observation.
+- valuetype is boolean.
 - logic is "BMI Evaluation Encounter (not virtual)" during "Measurement Period".
 
 concept "BMI Evaluation Encounter (not virtual) Performed":
+- type is Observation.
+- valuetype is boolean.
 - logic is "BMI Evaluation Encounter (not virtual)" performed.
 
 concept "Qualifying Encounter":
-- type is Encounter.
+- type is Observation.
 - valuetype is boolean.
 - inferred from
 (
@@ -243,9 +248,13 @@ concept "Qualifying Encounter":
 // --- BMI During Measurement Period ---
 
 concept "BMI Observation During MP":
+- type is Observation.
+- valuetype is Quantity.
 - logic is "BMI Observations" during "Measurement Period".
 
 concept "BMI Observation Has Positive Value":
+- type is Observation.
+- valuetype is Quantity.
 - logic is "BMI Observations" exceeds 0 'kg/m2'.
 
 concept "BMI During Measurement Period":
@@ -262,12 +271,18 @@ concept "BMI During Measurement Period":
 // --- BMI clinical classifications ---
 
 concept "BMI During MP Is Low":
+- type is Observation.
+- valuetype is boolean.
 - logic is "BMI During Measurement Period" is low.
 
 concept "BMI During MP Is High":
+- type is Observation.
+- valuetype is boolean.
 - logic is "BMI During Measurement Period" is high.
 
 concept "BMI During MP Is Normal":
+- type is Observation.
+- valuetype is boolean.
 - logic is "BMI During Measurement Period" is normal.
 
 concept "Documented Low BMI":
@@ -289,6 +304,8 @@ concept "Normal BMI Range":
 // --- Has Normal BMI ---
 
 concept "Without Documented Abnormal BMI":
+- type is Observation.
+- valuetype is boolean.
 - logic is without documented ("Documented High BMI" or "Documented Low BMI").
 
 concept "Has Normal BMI":
@@ -305,18 +322,22 @@ concept "Has Normal BMI":
 // --- Co-existing diagnoses ---
 
 concept "Overweight or Obese Diagnoses is Active":
+- type is Observation.
+- valuetype is boolean.
 - logic is "Overweight or Obese Diagnoses" is active.
 
 concept "Underweight Diagnoses is Active":
+- type is Observation.
+- valuetype is boolean.
 - logic is "Underweight Diagnoses" is active.
 
 concept "Has Overweight or Obese":
-- type is Condition.
+- type is Observation.
 - valuetype is boolean.
 - inferred from "Overweight or Obese Diagnoses is Active".
 
 concept "Has Underweight":
-- type is Condition.
+- type is Observation.
 - valuetype is boolean.
 - inferred from "Underweight Diagnoses is Active".
 
@@ -324,13 +345,17 @@ concept "Has Underweight":
 // --- High BMI Interventions Ordered ---
 
 concept "High BMI Follow-up Justified by Overweight Diagnosis":
+- type is Observation.
+- valuetype is boolean.
 - logic is "High BMI Follow-up Service Requests" justified by "Overweight or Obese Diagnoses".
 
 concept "Has Overweight On Or Before High BMI Follow-up Order":
+- type is Observation.
+- valuetype is boolean.
 - logic is "Has Overweight or Obese" on or before "High BMI Follow-up Order Date".
 
 concept "High BMI Follow-up Order":
-- type is ServiceRequest.
+- type is Observation.
 - valuetype is boolean.
 - inferred from
 (
@@ -340,13 +365,17 @@ concept "High BMI Follow-up Order":
 ).
 
 concept "Weight Assessment Referral Justified by Overweight Diagnosis":
+- type is Observation.
+- valuetype is boolean.
 - logic is "Weight Assessment Referrals" justified by "Overweight or Obese Diagnoses".
 
 concept "Has Overweight On Or Before Weight Assessment Referral":
+- type is Observation.
+- valuetype is boolean.
 - logic is "Has Overweight or Obese" on or before "Weight Assessment Referral Date".
 
 concept "High BMI Weight Assessment Referral":
-- type is ServiceRequest.
+- type is Observation.
 - valuetype is boolean.
 - inferred from
 (
@@ -356,13 +385,17 @@ concept "High BMI Weight Assessment Referral":
 ).
 
 concept "High BMI Medication Justified by Overweight Diagnosis":
+- type is Observation.
+- valuetype is boolean.
 - logic is "High BMI Medications" justified by "Overweight or Obese Diagnoses".
 
 concept "Has Overweight On Or Before High BMI Medication Order":
+- type is Observation.
+- valuetype is boolean.
 - logic is "Has Overweight or Obese" on or before "High BMI Medication Order Date".
 
 concept "High BMI Medication Order":
-- type is MedicationRequest.
+- type is Observation.
 - valuetype is boolean.
 - inferred from
 (
@@ -372,7 +405,7 @@ concept "High BMI Medication Order":
 ).
 
 concept "High BMI Interventions Ordered":
-- type is ServiceRequest.
+- type is Observation.
 - valuetype is boolean.
 - inferred from
 (
@@ -387,13 +420,17 @@ concept "High BMI Interventions Ordered":
 // --- High BMI Interventions Performed ---
 
 concept "High BMI Procedure Justified by Overweight Diagnosis":
+- type is Observation.
+- valuetype is boolean.
 - logic is "High BMI Follow-up Procedures" justified by "Overweight or Obese Diagnoses".
 
 concept "Has Overweight On Or Before High BMI Procedure":
+- type is Observation.
+- valuetype is boolean.
 - logic is "Has Overweight or Obese" on or before "High BMI Procedure Performed Date".
 
 concept "High BMI Procedure Performed":
-- type is Procedure.
+- type is Observation.
 - valuetype is boolean.
 - inferred from
 (
@@ -403,7 +440,7 @@ concept "High BMI Procedure Performed":
 ).
 
 concept "High BMI Interventions Performed":
-- type is Procedure.
+- type is Observation.
 - valuetype is boolean.
 - inferred from "High BMI Procedure Performed".
 
@@ -411,6 +448,8 @@ concept "High BMI Interventions Performed":
 // --- High BMI And Follow Up Provided ---
 
 concept "Documented High BMI During MP":
+- type is Observation.
+- valuetype is boolean.
 - logic is "Documented High BMI" during "Measurement Period".
 
 concept "High BMI And Follow Up Provided":
@@ -431,16 +470,22 @@ concept "High BMI And Follow Up Provided":
 // --- Low BMI analogous ---
 
 concept "Low BMI Follow-up Justified by Underweight Diagnosis":
+- type is Observation.
+- valuetype is boolean.
 - logic is "Low BMI Follow-up Service Requests" justified by "Underweight Diagnoses".
 
 concept "Has Underweight On Or Before Low BMI Follow-up Order":
+- type is Observation.
+- valuetype is boolean.
 - logic is "Has Underweight" on or before "Low BMI Follow-up Order Date".
 
 concept "Low BMI Follow-up Order Date During MP":
+- type is Observation.
+- valuetype is boolean.
 - logic is "Low BMI Follow-up Order Date" during "Measurement Period".
 
 concept "Low BMI Follow-up Order":
-- type is ServiceRequest.
+- type is Observation.
 - valuetype is boolean.
 - inferred from
 (
@@ -454,16 +499,22 @@ concept "Low BMI Follow-up Order":
 ).
 
 concept "Weight Assessment Referral Justified by Underweight Diagnosis":
+- type is Observation.
+- valuetype is boolean.
 - logic is "Weight Assessment Referrals" justified by "Underweight Diagnoses".
 
 concept "Has Underweight On Or Before Weight Assessment Referral":
+- type is Observation.
+- valuetype is boolean.
 - logic is "Has Underweight" on or before "Weight Assessment Referral Date".
 
 concept "Weight Assessment Referral Date During MP":
+- type is Observation.
+- valuetype is boolean.
 - logic is "Weight Assessment Referral Date" during "Measurement Period".
 
 concept "Low BMI Weight Assessment Referral":
-- type is ServiceRequest.
+- type is Observation.
 - valuetype is boolean.
 - inferred from
 (
@@ -477,16 +528,22 @@ concept "Low BMI Weight Assessment Referral":
 ).
 
 concept "Low BMI Medication Justified by Underweight Diagnosis":
+- type is Observation.
+- valuetype is boolean.
 - logic is "Low BMI Medications" justified by "Underweight Diagnoses".
 
 concept "Has Underweight On Or Before Low BMI Medication Order":
+- type is Observation.
+- valuetype is boolean.
 - logic is "Has Underweight" on or before "Low BMI Medication Order Date".
 
 concept "Low BMI Medication Order Date During MP":
+- type is Observation.
+- valuetype is boolean.
 - logic is "Low BMI Medication Order Date" during "Measurement Period".
 
 concept "Low BMI Medication Order":
-- type is MedicationRequest.
+- type is Observation.
 - valuetype is boolean.
 - inferred from
 (
@@ -500,7 +557,7 @@ concept "Low BMI Medication Order":
 ).
 
 concept "Low BMI Interventions Ordered":
-- type is ServiceRequest.
+- type is Observation.
 - valuetype is boolean.
 - inferred from
 (
@@ -515,19 +572,27 @@ concept "Low BMI Interventions Ordered":
 // --- Low BMI Interventions Performed ---
 
 concept "Low BMI Procedure Justified by Underweight Diagnosis":
+- type is Observation.
+- valuetype is boolean.
 - logic is "Low BMI Follow-up Procedures" justified by "Underweight Diagnoses".
 
 concept "Low BMI Follow-up Procedures Performed":
+- type is Observation.
+- valuetype is boolean.
 - logic is "Low BMI Follow-up Procedures" performed.
 
 concept "Has Underweight On Or Before Low BMI Procedure":
+- type is Observation.
+- valuetype is boolean.
 - logic is "Has Underweight" on or before "Low BMI Procedure Performed Date".
 
 concept "Low BMI Procedure Performed Date During MP":
+- type is Observation.
+- valuetype is boolean.
 - logic is "Low BMI Procedure Performed Date" during "Measurement Period".
 
 concept "Low BMI Procedure Performed":
-- type is Procedure.
+- type is Observation.
 - valuetype is boolean.
 - inferred from
 (
@@ -545,7 +610,7 @@ concept "Low BMI Procedure Performed":
 ).
 
 concept "Low BMI Interventions Performed":
-- type is Procedure.
+- type is Observation.
 - valuetype is boolean.
 - inferred from "Low BMI Procedure Performed".
 
@@ -553,6 +618,8 @@ concept "Low BMI Interventions Performed":
 // --- Low BMI And Follow Up Provided ---
 
 concept "Documented Low BMI During MP":
+- type is Observation.
+- valuetype is boolean.
 - logic is "Documented Low BMI" during "Measurement Period".
 
 concept "Low BMI And Follow Up Provided":
@@ -573,9 +640,13 @@ concept "Low BMI And Follow Up Provided":
 // --- BMI exam not performed with reason ---
 
 concept "BMI Observation Not Done With Reason":
+- type is Observation.
+- valuetype is boolean.
 - logic is "BMI Observations" not done with reason ("Medical Reasons" or "Patient Declined Reasons").
 
 concept "BMI Observation Same Day As Qualifying Encounter":
+- type is Observation.
+- valuetype is boolean.
 - logic is "BMI Observations" same day as "Qualifying Encounter".
 
 concept "Medical Reason Or Patient Reason For Not Performing BMI Exam":
@@ -592,16 +663,22 @@ concept "Medical Reason Or Patient Reason For Not Performing BMI Exam":
 // --- BMI follow-up not documented with reason ---
 
 concept "High BMI Follow-up Not Done With Medical Reason":
+- type is Observation.
+- valuetype is boolean.
 - logic is "High BMI Follow-up Service Requests" not done with reason "Medical Reasons".
 
 concept "High BMI Follow-up Same Day As Qualifying Encounter":
+- type is Observation.
+- valuetype is boolean.
 - logic is "High BMI Follow-up Service Requests" same day as "Qualifying Encounter".
 
 concept "High BMI Follow-up Performed":
+- type is Observation.
+- valuetype is boolean.
 - logic is "High BMI Follow-up Service Requests" performed.
 
 concept "High BMI Follow-up Not Done With Reason":
-- type is ServiceRequest.
+- type is Observation.
 - valuetype is boolean.
 - inferred from
 (
@@ -613,16 +690,22 @@ concept "High BMI Follow-up Not Done With Reason":
 ).
 
 concept "Low BMI Follow-up Not Done With Medical Reason":
+- type is Observation.
+- valuetype is boolean.
 - logic is "Low BMI Follow-up Service Requests" not done with reason "Medical Reasons".
 
 concept "Low BMI Follow-up Same Day As Qualifying Encounter":
+- type is Observation.
+- valuetype is boolean.
 - logic is "Low BMI Follow-up Service Requests" same day as "Qualifying Encounter".
 
 concept "Low BMI Follow-up Performed":
+- type is Observation.
+- valuetype is boolean.
 - logic is "Low BMI Follow-up Service Requests" performed.
 
 concept "Low BMI Follow-up Not Done With Reason":
-- type is ServiceRequest.
+- type is Observation.
 - valuetype is boolean.
 - inferred from
 (
@@ -634,16 +717,22 @@ concept "Low BMI Follow-up Not Done With Reason":
 ).
 
 concept "Weight Assessment Referral Not Done With Medical Reason":
+- type is Observation.
+- valuetype is boolean.
 - logic is "Weight Assessment Referrals" not done with reason "Medical Reasons".
 
 concept "Weight Assessment Referral Same Day As Qualifying Encounter":
+- type is Observation.
+- valuetype is boolean.
 - logic is "Weight Assessment Referrals" same day as "Qualifying Encounter".
 
 concept "Weight Assessment Referral Performed":
+- type is Observation.
+- valuetype is boolean.
 - logic is "Weight Assessment Referrals" performed.
 
 concept "Weight Assessment Referral Not Done With Reason":
-- type is ServiceRequest.
+- type is Observation.
 - valuetype is boolean.
 - inferred from
 (
@@ -655,16 +744,22 @@ concept "Weight Assessment Referral Not Done With Reason":
 ).
 
 concept "High BMI Medication Not Done With Medical Reason":
+- type is Observation.
+- valuetype is boolean.
 - logic is "High BMI Medications" not done with reason "Medical Reasons".
 
 concept "High BMI Medication Same Day As Qualifying Encounter":
+- type is Observation.
+- valuetype is boolean.
 - logic is "High BMI Medications" same day as "Qualifying Encounter".
 
 concept "High BMI Medication Performed":
+- type is Observation.
+- valuetype is boolean.
 - logic is "High BMI Medications" performed.
 
 concept "High BMI Medication Not Done With Reason":
-- type is MedicationRequest.
+- type is Observation.
 - valuetype is boolean.
 - inferred from
 (
@@ -676,16 +771,22 @@ concept "High BMI Medication Not Done With Reason":
 ).
 
 concept "Low BMI Medication Not Done With Medical Reason":
+- type is Observation.
+- valuetype is boolean.
 - logic is "Low BMI Medications" not done with reason "Medical Reasons".
 
 concept "Low BMI Medication Same Day As Qualifying Encounter":
+- type is Observation.
+- valuetype is boolean.
 - logic is "Low BMI Medications" same day as "Qualifying Encounter".
 
 concept "Low BMI Medication Performed":
+- type is Observation.
+- valuetype is boolean.
 - logic is "Low BMI Medications" performed.
 
 concept "Low BMI Medication Not Done With Reason":
-- type is MedicationRequest.
+- type is Observation.
 - valuetype is boolean.
 - inferred from
 (
@@ -697,7 +798,7 @@ concept "Low BMI Medication Not Done With Reason":
 ).
 
 concept "Medical Reason For Not Documenting A Follow Up Plan For Low Or High BMI":
-- type is ServiceRequest.
+- type is Observation.
 - valuetype is boolean.
 - inferred from
 (
@@ -716,20 +817,28 @@ concept "Medical Reason For Not Documenting A Follow Up Plan For Low Or High BMI
 // --- Pregnancy during measurement period ---
 
 concept "Pregnancy Diagnoses Active During MP":
+- type is Observation.
+- valuetype is boolean.
 - logic is "Pregnancy Diagnoses" is active during "Measurement Period".
 
 concept "Active Pregnancy Diagnosis":
-- type is Condition.
+- type is Observation.
 - valuetype is boolean.
 - inferred from "Pregnancy Diagnoses Active During MP".
 
 concept "Pregnancy Status Overlaps MP":
+- type is Observation.
+- valuetype is boolean.
 - logic is "Pregnancy Status Observations" overlaps "Measurement Period".
 
 concept "Pregnancy Status Is Verified":
+- type is Observation.
+- valuetype is boolean.
 - logic is "Pregnancy Status Observations" is verified.
 
 concept "Pregnancy Status Documented As Pregnancy Related":
+- type is Observation.
+- valuetype is boolean.
 - logic is "Pregnancy Status Observations" documented as "Pregnancy or Other Related Diagnoses".
 
 concept "Verified Pregnancy Status":
@@ -745,7 +854,7 @@ concept "Verified Pregnancy Status":
 ).
 
 concept "Is Pregnant During Measurement Period":
-- type is Condition.
+- type is Observation.
 - valuetype is boolean.
 - inferred from
 (
@@ -758,10 +867,12 @@ concept "Is Pregnant During Measurement Period":
 // --- Age predicate ---
 
 concept "Age At Start Of MP At Least 18 Years":
+- type is Observation.
+- valuetype is boolean.
 - logic is age at start of "Measurement Period" at least 18 years.
 
 concept "Aged 18+ at Measurement Period Start":
-- type is Encounter.
+- type is Observation.
 - valuetype is boolean.
 - inferred from "Age At Start Of MP At Least 18 Years".
 
@@ -774,12 +885,12 @@ concept "Initial Population":
 - inferred from "Aged 18+ at Measurement Period Start".
 
 concept "Denominator":
-- type is Encounter.
+- type is Observation.
 - valuetype is boolean.
 - inferred from "Initial Population".
 
 concept "Denominator Exclusions":
-- type is Condition.
+- type is Observation.
 - valuetype is boolean.
 - inferred from "Is Pregnant During Measurement Period".
 
@@ -796,7 +907,7 @@ concept "Numerator":
 ).
 
 concept "Denominator Exceptions":
-- type is ServiceRequest.
+- type is Observation.
 - valuetype is boolean.
 - inferred from
 (
