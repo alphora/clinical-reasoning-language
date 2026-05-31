@@ -133,6 +133,57 @@ The transformer's job is intent-capture, not type-bridging. Type bridging is the
 
 ---
 
+## Open design question — explicit vs succinct valuetype on inferred concepts
+
+For an `inferred from` concept whose valuetype CAN be inferred from the subject (refinement preserves V_S, value-bearing primitive declared inline), should the author **restate** the valuetype explicitly, or **omit** it and let the reader / validator infer from the chain?
+
+Both are valid styles. CRL v0.6's grammar (`(valueTypeLine)*` — 0..*) and validator (skips chain check when V_C or V_S is missing) support both.
+
+**Style A — explicit:**
+
+```crl
+concept "BMI Evaluation Encounter (not virtual)":
+- type is Encounter.
+- valuetype is CodeableConcept.
+- inferred from
+(
+   "Encounters to Evaluate BMI"           // Encounter+CodeableConcept (asserted)
+   sem-and
+   sem-not "Virtual Encounters"           // Encounter+CodeableConcept (asserted)
+).
+```
+
+Pros: new readers see the result valuetype without tracing the subject chain; the validator can enforce the refinement chain (V_C = V_S) strictly; documentation cost is one extra line.
+
+Cons: redundant with the chain; if an asserted parent's valuetype changes, every downstream concept's declaration must be updated.
+
+**Style B — succinct:**
+
+```crl
+concept "BMI Evaluation Encounter (not virtual)":
+- type is Encounter.
+- inferred from
+(
+   "Encounters to Evaluate BMI"
+   sem-and
+   sem-not "Virtual Encounters"
+).
+```
+
+Pros: less repetition; valuetype changes at the asserted root propagate without per-concept edits; encourages thinking of refinements as "preserving" the subject's shape.
+
+Cons: readers must trace the chain to learn the valuetype; the validator can't enforce the refinement chain locally (the chain check is skipped when V_C is missing); ambiguity if the subject also has no valuetype.
+
+**Current corpus state (mixed):** cms69 and cms22 use Style A for the BMI/BP Quantity refinement chain (Quantity restated explicitly) and Style B for Encounter/Condition/SR/MR/Procedure refinements (resource type only, valuetype omitted). This isn't a deliberate policy — it's an artifact of the v3+v4 correction pass. A future convention decision could:
+
+1. Pick Style A uniformly (restate everywhere) — favors clarity and validator strictness.
+2. Pick Style B uniformly (omit when inferable) — favors succinctness and propagation.
+3. Pick Style A only when the valuetype carries semantic load downstream (e.g., Quantity matters for value-comparison consumers), Style B otherwise — what the corpus accidentally has now.
+
+This is an unresolved authoring-convention question, not a grammar or validator question. Both styles must continue to parse and validate. The recommended convention may emerge from real authoring experience.
+
+---
+
 ## See also
 
 - [cql-to-crl-type-valuetype-rule.md](cql-to-crl-type-valuetype-rule.md) — the canonical type/valuetype assignment rule (§1 and §7 reflect this principle).
