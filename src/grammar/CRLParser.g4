@@ -33,7 +33,6 @@ statement
     | terminologyStatement
     | activityStatement
     | conceptStatement
-    | inferenceStatement       // v0.5: new top-level statement for narrative predicates
     ;
 
 // ============================
@@ -190,36 +189,46 @@ activityBecause
 // Must either be coded from a terminology or inferred from other concepts.
 // Evidence (metadata/provenance) is optional.
 //
+// v0.6: a concept has one of THREE body kinds (cardinality 1..1):
+//   - asserted:   `coded from "Valueset"` (refs are valueset names)
+//   - inferred:   `inferred from (composition)` (refs are concept names)
+//   - inference:  `logic is <narrative>` (refs are concept names; body is a
+//                                         narrative phrase per catalog templates)
+//
+// `type is X` is OPTIONAL for inferred/inference (inferred from body refs if
+// omitted); REQUIRED for asserted (valuesets don't carry FHIR-type info).
+// `valuetype is X` is OPTIONAL and 0..* (lazily required when something
+// depends on it; inferred from type's default).
+//
 // Examples:
-//   concept "Most Recent BMI":
-//       type is Observation.
-//       valuetype is boolean.
-//       evidence is `some evidence`.
-//       inferred from "BMI" apply pattern `Most Recent(this, lookbackMonths)`.
-//   done
+//   concept "BMI Range as a Condition":
+//     - type is Condition.
+//     - valuetype is CodeableConcept.
+//     - coded from "BMI Valueset".
 //
-//   concept "BMI":
-//     type is Observation.
-//     valuetype is Quantity.
-//     inferred from ("BMI Range" or "BMI Observation").
-//   done
+//   concept "Qualifying Encounter":
+//     - type is Encounter.
+//     - inferred from
+//       (
+//         "BMI Evaluation Encounter (not virtual) During MP"
+//         sem-and
+//         "BMI Evaluation Encounter (not virtual) Performed"
+//       ).
 //
-//   concept "BMI Range":
-//     type is Condition.
-//     valuetype is CodeableConcept.
-//     coded from "BMI Valueset".
-//   done
+//   concept "BMI Evaluation Encounter (not virtual) Performed":
+//     - type is Encounter.
+//     - logic is "BMI Evaluation Encounter (not virtual)" performed.
 //
 conceptStatement
     : CONCEPT conceptIdentifier COLON conceptBody
     ;
 
 conceptBody
-    : typeLine
-      valueTypeLine
+    : (typeLine)?
+      (valueTypeLine)*
       (metaLine)*
       (evidenceLine)?
-      (codedFromLine | inferredFromBody)
+      (codedFromLine | inferredFromBody | logicIsBody)
     ;
 
 // ============================
@@ -247,42 +256,38 @@ codedFromLine
     ;
 
 // ============================
-// Inference Statement (v0.5)
+// Logic Is Body (v0.6)
 // ============================
 //
-// Names a narrative predicate. The body is a single narrative phrase
-// introduced by `-` and terminated by `.`. Optional meta/evidence
-// lines (same shape as concept body).
+// `logic is <narrative>.` — body keyword for an "inference type" concept
+// whose value is determined by a narrative predicate matched against the
+// catalog. The narrative phrase is a sequence of narrative elements
+// (concept refs, narrative words, quantities, in-arg groups).
 //
 // Examples:
-//   inference "BMI Evaluation Encounter Performed":
-//   - "BMI Evaluation Encounter (not virtual)" performed.
+//   concept "BMI Evaluation Encounter (not virtual) Performed":
+//   - type is Encounter.
+//   - logic is "BMI Evaluation Encounter (not virtual)" performed.
 //
-//   inference "Aged 18+ at MP Start":
+//   concept "Aged 18+ at MP Start":
+//   - type is Encounter.
 //   - evidence is `USPSTF age guidance`.
-//   - age at start of "Measurement Period" at least 18 years.
+//   - logic is age at start of "Measurement Period" at least 18 years.
 //
-inferenceStatement
-    : INFERENCE inferenceIdentifier COLON
-      (metaLine)*
-      (evidenceLine)?
-      DASH narrative DOT
-    ;
-
-inferenceIdentifier
-    : identifier
+logicIsBody
+    : DASH LOGIC_IS narrative DOT
     ;
 
 // ============================
-// Inference Body (v0.5)
+// Inferred From Body (v0.6)
 // ============================
 //
 // A concept's `inferred from` body has two shapes:
-//   1. Bare reference to a named inference or concept
+//   1. Bare reference to a named concept
 //   2. Parenthesized composition with sem-or / sem-and / sem-not operators
 //
 // Composition operates on bare refs only (no narrative inside composition).
-// Narrative belongs in `inference` declarations.
+// Narrative belongs in concept bodies with `logic is`.
 //
 // Examples:
 //   - inferred from "Underweight Active".

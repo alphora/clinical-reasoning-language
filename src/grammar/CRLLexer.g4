@@ -10,6 +10,7 @@ EVIDENCE_IS         : 'evidence is';
 META_IS             : 'meta is';
 INFERRED_FROM       : 'inferred from';
 CODED_FROM          : 'coded from';
+LOGIC_IS            : 'logic is';
 CODE_IS             : 'code is';
 SYSTEM_IS           : 'system is';
 VALUESET_IS         : 'valueset is';
@@ -22,7 +23,6 @@ AND          : 'and';
 BECAUSE      : 'because';
 CONCEPT      : 'concept';
 DECISION     : 'decision';
-INFERENCE    : 'inference';     // v0.5: new top-level statement type
 NOT          : 'not';
 OR           : 'or';
 REQUEST      : 'request' -> mode(ACTIVITY_MODE);
@@ -31,9 +31,12 @@ THEN         : 'then';
 WHEN         : 'when';
 WITH         : 'with';
 
-// === Composition operators (v0.5) ===
+// === Composition operators (v0.6) ===
 // sem-or / sem-and / sem-not in concept's `inferred from` composition.
-// Distinct from boolean and from in-arg disjunction/conjunction (which use lowercase or/and).
+// Uniform `sem-` prefix marks structural composition; distinguishes from
+// in-arg disjunction/conjunction (which use lowercase or/and) and from
+// narrative words. Hard rule: all structural composition operators carry
+// the sem- prefix, no exceptions.
 // Declared BEFORE NARRATIVE_WORD so 6-char `sem-or` matches SEM_OR not NARRATIVE_WORD.
 SEM_OR       : 'sem-or';
 SEM_AND      : 'sem-and';

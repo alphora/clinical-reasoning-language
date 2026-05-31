@@ -19,8 +19,9 @@ export interface CRL extends ASTNode {
   header?: string;
 }
 
-// Union type for all possible statements
-export type Statement = Decision | Concept | Activity | Terminology | Inference;
+// Union type for all possible statements (v0.6: inference statement merged
+// into concept-with-`logic is`-body)
+export type Statement = Decision | Concept | Activity | Terminology;
 
 // --------------------------- DECISION STATEMENT ----------------------------
 
@@ -153,20 +154,31 @@ export interface ActivityBecause extends ASTNode {
 
 // ---------------------------- CONCEPT STATEMENT ---------------------------
 
-// Concept node
+// Concept node (v0.6)
+// - conceptType (`type is X.`) is OPTIONAL for inferred/inference body kinds
+//   (inferred from body refs when omitted); REQUIRED for asserted body
+//   (valuesets don't carry FHIR-type info).
+// - valueTypes (`valuetype is X.`) is OPTIONAL and 0..*; lazily required
+//   when something depends on it, then inferred from type's default.
 export interface Concept extends ASTNode {
   type: "Concept";
   name: string;
-  conceptType: ConceptType;
-  valueType: ConceptValueType;
+  conceptType?: ConceptType;
+  valueTypes: ConceptValueType[];
   definition: ConceptDefinition;
   meta?: string[];
   evidence?: string;
   location: Location;
 }
 
-// Concept definition can be coded from or inferred from
-export type ConceptDefinition = CodedFromDefinition | InferredFromDefinition;
+// Concept definition has 3 kinds per v0.6:
+//   - CodedFromDefinition  : `coded from "Valueset"`     (asserted; ref is a valueset)
+//   - InferredFromDefinition : `inferred from (...)`     (composition over concept refs)
+//   - LogicIsDefinition    : `logic is <narrative>`      (catalog-matchable predicate)
+export type ConceptDefinition =
+  | CodedFromDefinition
+  | InferredFromDefinition
+  | LogicIsDefinition;
 
 // Coded from definition
 export interface CodedFromDefinition extends ASTNode {
@@ -241,20 +253,16 @@ export interface CompositionGroup extends ASTNode {
   expression: CompositionExpression;
 }
 
-// --------------------------- INFERENCE (v0.5) -----------------------------
+// --------------------------- LOGIC IS DEFINITION (v0.6) -------------------
 //
-// Names a narrative predicate. Body is a single narrative phrase. Optional
-// meta/evidence lines mirror Concept body. Inference is referenced from
-// concepts via shared namespace; no `type`/`valuetype` declared (predicate,
-// not typed entity).
+// `logic is <narrative>.` body — a clinical predicate matched against the
+// catalog. The narrative phrase is a single sequence of narrative elements.
+// In v0.6 this replaces the v0.5 standalone `inference` statement: an
+// "inference type" concept is now `concept "X": - type is Y. - logic is <narrative>.`
 
-export interface Inference extends ASTNode {
-  type: "Inference";
-  name: string;
-  meta?: string[];
-  evidence?: string;
+export interface LogicIsDefinition extends ASTNode {
+  type: "LogicIsDefinition";
   body: NarrativeClause;
-  location: Location;
 }
 
 // Narrative structure. NDisjunction / NConjunction are flattened into

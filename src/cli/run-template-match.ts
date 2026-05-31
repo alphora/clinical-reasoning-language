@@ -8,7 +8,7 @@
 import { readFileSync } from "fs";
 
 import { CRLAstBuilder } from "../ast/builder";
-import type { CRL, Inference } from "../ast/types";
+import type { CRL, Concept, LogicIsDefinition } from "../ast/types";
 import { createParser } from "../parser/createParser";
 import { matchNarrative } from "../template-match";
 
@@ -37,19 +37,24 @@ if (lexerErrors.length > 0) {
 const builder = new CRLAstBuilder();
 const ast = builder.visit(tree) as CRL;
 
-const inferences = ast.statements.filter((s): s is Inference => s.type === "Inference");
-console.log(`Found ${inferences.length} inferences in ${filePath}\n`);
+// v0.6: an "inference" is a `concept` with a `logic is` body.
+const logicConcepts = ast.statements.filter(
+  (s): s is Concept =>
+    s.type === "Concept" && s.definition.type === "LogicIsDefinition",
+);
+console.log(`Found ${logicConcepts.length} logic-is concepts in ${filePath}\n`);
 
 const summary: Record<string, number> = {};
 const unknowns: { name: string; text: string }[] = [];
 
-for (const inf of inferences) {
-  const call = matchNarrative(inf.body);
+for (const c of logicConcepts) {
+  const def = c.definition as LogicIsDefinition;
+  const call = matchNarrative(def.body);
   if (call.known) {
     summary[call.pattern] = (summary[call.pattern] ?? 0) + 1;
   } else {
     summary["<unknown>"] = (summary["<unknown>"] ?? 0) + 1;
-    unknowns.push({ name: inf.name, text: call.pattern });
+    unknowns.push({ name: c.name, text: call.pattern });
   }
 }
 
@@ -60,11 +65,11 @@ for (const [pattern, count] of sorted) {
 }
 
 if (unknowns.length > 0) {
-  console.log(`\n=== Unmatched inferences (${unknowns.length}) ===`);
+  console.log(`\n=== Unmatched logic-is concepts (${unknowns.length}) ===`);
   for (const u of unknowns) {
     console.log(`  "${u.name}"`);
     console.log(`     → ${u.text}`);
   }
 } else {
-  console.log("\nAll inferences matched a catalog pattern.");
+  console.log("\nAll logic-is concepts matched a catalog pattern.");
 }

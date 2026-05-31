@@ -5,11 +5,11 @@ import { ValidationError } from "./validator";
 /**
  * Enforces name uniqueness across CRL declarations.
  *
- * Per CRL v0.5: `concept` and `inference` share a single namespace because
- * both are referenced by quoted name from `inferred from` bodies and from
- * the composition layer. A duplicate name across these kinds would make
- * `inferred from "Foo"` ambiguous. Decisions, activities, and terminologies
- * still have their own namespaces (referenced via distinct keywords).
+ * Per CRL v0.6: `concept` is the sole "inferable" declaration kind. Concepts
+ * with different body kinds (`coded from`, `inferred from`, `logic is`) still
+ * share the concept namespace because they're all referenced by quoted name.
+ * Decisions, activities, and terminologies have their own namespaces
+ * (referenced via distinct keywords).
  */
 export class NameUniquenessValidator {
   validate(ast: CRL): ValidationError[] {
@@ -18,9 +18,7 @@ export class NameUniquenessValidator {
     const decisionNames = new Set<string>();
     const activityNames = new Set<string>();
     const terminologyNames = new Set<string>();
-    // Shared namespace: concept + inference. The map tracks which kind
-    // declared the name first so the diagnostic can mention both kinds.
-    const inferableNames = new Map<string, "Concept" | "Inference">();
+    const conceptNames = new Set<string>();
 
     for (const statement of ast.statements) {
       switch (statement.type) {
@@ -48,39 +46,14 @@ export class NameUniquenessValidator {
               location: statement.location,
               severity: "error",
             });
-          } else if (inferableNames.has(statement.name)) {
-            const priorKind = inferableNames.get(statement.name);
+          } else if (conceptNames.has(statement.name)) {
             errors.push({
-              message:
-                priorKind === "Concept"
-                  ? `Duplicate concept name: ${statement.name}`
-                  : `Name collision: concept "${statement.name}" conflicts with prior inference of the same name (concept and inference share a namespace)`,
+              message: `Duplicate concept name: ${statement.name}`,
               location: statement.location,
               severity: "error",
             });
           }
-          inferableNames.set(statement.name, "Concept");
-          break;
-
-        case "Inference":
-          if (!statement.name?.trim()) {
-            errors.push({
-              message: "Inference name cannot be empty",
-              location: statement.location,
-              severity: "error",
-            });
-          } else if (inferableNames.has(statement.name)) {
-            const priorKind = inferableNames.get(statement.name);
-            errors.push({
-              message:
-                priorKind === "Inference"
-                  ? `Duplicate inference name: ${statement.name}`
-                  : `Name collision: inference "${statement.name}" conflicts with prior concept of the same name (concept and inference share a namespace)`,
-              location: statement.location,
-              severity: "error",
-            });
-          }
-          inferableNames.set(statement.name, "Inference");
+          conceptNames.add(statement.name);
           break;
 
         case "Activity":

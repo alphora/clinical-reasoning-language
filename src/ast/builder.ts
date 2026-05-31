@@ -15,7 +15,7 @@ import {
   ActivityStatementContext,
   ConceptStatementContext,
   ConceptBodyContext,
-  InferenceStatementContext,
+  LogicIsBodyContext,
   InferredFromBodyContext,
   IfBodyContext,
   InferredFromBareRefContext,
@@ -85,7 +85,7 @@ import {
   CompositionRef,
   CompositionGroup,
   ConceptReference,
-  Inference,
+  LogicIsDefinition,
   NarrativeClause,
   NarrativeElement,
   NConceptRef,
@@ -396,39 +396,38 @@ export class CRLAstBuilder
     };
   }
 
+  // v0.6: type is optional (REQUIRED for asserted concepts; OPTIONAL with
+  // inference for inferred/logic-is concepts). valuetype is optional and
+  // 0..*. Returns whatever was declared; absence is fine here — the
+  // validator enforces type-required-for-asserted and the inference rules.
   private parseConceptTypes(
     bodyCtx: import("../grammar/generated/antlr/CRLParser").ConceptBodyContext,
-    ctx: import("../grammar/generated/antlr/CRLParser").ConceptStatementContext,
-  ): { conceptType: ConceptType; valueType: ConceptValueType } | null {
+    _ctx: import("../grammar/generated/antlr/CRLParser").ConceptStatementContext,
+  ): { conceptType?: ConceptType; valueTypes: ConceptValueType[] } {
     const typeLine = bodyCtx.typeLine?.();
-    const valueTypeLine = bodyCtx.valueTypeLine?.();
-    if (!typeLine || !valueTypeLine) {
-      this.reportError("AstError", ctx, {
-        message: "ConceptStatement: missing type or valueType line",
-      });
-      return null;
+    const valueTypeLines = bodyCtx.valueTypeLine?.() ?? [];
+
+    let conceptType: ConceptType | undefined;
+    if (typeLine) {
+      try {
+        const tok = typeLine.CONCEPT_TYPE();
+        if (tok) conceptType = tok.text as ConceptType;
+      } catch {
+        conceptType = undefined;
+      }
     }
-    let conceptTypeToken, valueTypeToken;
-    try {
-      conceptTypeToken = typeLine.CONCEPT_TYPE();
-    } catch {
-      conceptTypeToken = undefined;
+
+    const valueTypes: ConceptValueType[] = [];
+    for (const vtl of valueTypeLines) {
+      try {
+        const tok = vtl.CONCEPT_VALUE_TYPE();
+        if (tok) valueTypes.push(tok.text as ConceptValueType);
+      } catch {
+        // skip malformed valuetype line; lexer should have already reported
+      }
     }
-    try {
-      valueTypeToken = valueTypeLine.CONCEPT_VALUE_TYPE();
-    } catch {
-      valueTypeToken = undefined;
-    }
-    if (!conceptTypeToken || !valueTypeToken) {
-      this.reportError("AstError", ctx, {
-        message: "ConceptStatement: missing CONCEPT_TYPE or CONCEPT_VALUE_TYPE token",
-      });
-      return null;
-    }
-    return {
-      conceptType: conceptTypeToken.text as ConceptType,
-      valueType: valueTypeToken.text as ConceptValueType,
-    };
+
+    return { conceptType, valueTypes };
   }
 
   private parseMeta(
@@ -497,9 +496,18 @@ export class CRLAstBuilder
         return null;
       }
       return this.visitInferredFromBody(infCtx);
+    } else if (bodyCtx.logicIsBody?.()) {
+      const logicCtx = bodyCtx.logicIsBody();
+      if (!logicCtx) {
+        this.reportError("AstError", ctx, {
+          message: "ConceptStatement: logicIsBody() unexpectedly returned undefined",
+        });
+        return null;
+      }
+      return this.visitLogicIsBody(logicCtx);
     } else {
       this.reportError("AstError", ctx, {
-        message: "ConceptStatement must have either codedFromLine or inferredFromBody",
+        message: "ConceptStatement must have coded from, inferred from, or logic is body",
       });
       return null;
     }
@@ -516,10 +524,7 @@ export class CRLAstBuilder
     }
 
     const types = this.parseConceptTypes(bodyCtx, ctx);
-    if (!types) {
-      return null as unknown as Concept;
-    }
-    const { conceptType, valueType } = types;
+    const { conceptType, valueTypes } = types;
     const meta = this.parseMeta(bodyCtx);
     const evidence = this.parseEvidence(bodyCtx);
     const definition = this.parseConceptDefinition(bodyCtx, ctx);
@@ -529,8 +534,8 @@ export class CRLAstBuilder
     return {
       type: "Concept",
       name,
-      conceptType,
-      valueType,
+      ...(conceptType ? { conceptType } : {}),
+      valueTypes,
       ...(meta.length > 0 ? { meta } : {}),
       ...(evidence ? { evidence } : {}),
       definition,
@@ -538,7 +543,7 @@ export class CRLAstBuilder
     };
   }
 
-  // === v0.5 inferred from + composition visitors ===
+  // === v0.6 inferred from + composition visitors ===
 
   visitInferredFromBareRef(ctx: InferredFromBareRefContext): InferredFromBareRef {
     const ref = ctx.conceptReference().text.slice(1, -1);
@@ -610,20 +615,12 @@ export class CRLAstBuilder
     };
   }
 
-  // === v0.5 inference statement + narrative visitors ===
+  // === v0.6 logic-is body + narrative visitors ===
 
-  visitInferenceStatement(ctx: InferenceStatementContext): Inference {
-    const name = ctx.inferenceIdentifier().text.slice(1, -1);
-    const metaCtxs = ctx.metaLine();
-    const evidenceCtx = ctx.evidenceLine();
-    const meta = metaCtxs.map((m) => m.backtickString().text.slice(1, -1));
-    const evidence = evidenceCtx ? evidenceCtx.backtickString().text.slice(1, -1) : undefined;
+  visitLogicIsBody(ctx: LogicIsBodyContext): LogicIsDefinition {
     const narrative = this.visitNarrative(ctx.narrative());
     return {
-      type: "Inference",
-      name,
-      ...(meta.length > 0 ? { meta } : {}),
-      ...(evidence ? { evidence } : {}),
+      type: "LogicIsDefinition",
       body: narrative,
       location: getLocation(ctx),
     };
