@@ -5,23 +5,84 @@
 // All multi-clause concepts now compose named inferences via sem-* operators.
 
 
-// ============ Runtime / valueset stubs ============
-// Temporary asserted-concept stubs for refs that don't resolve locally.
-// "Measurement Period" will become a parameter declaration when imports +
-// parameters land (issues/crl/todo/imports/, issues/crl/todo/parameters/).
-// "Pregnancy or Other Related Diagnoses" is a valueset ref used by the
-// `documented as` pattern; classification valueset refs need their own
-// reference rules (deferred).
-// Asserted bodies skip narrative ref checking — stubs satisfy resolution
-// without cascading more errors.
+// ============ Terminologies (valuesets) ============
+// Real valuesets from the source CMS69 CQL library with VSAC URLs.
+
+terminology "Encounter to Evaluate BMI":
+- valueset is `http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.600.1.1751`.
+
+terminology "Follow Up for Above Normal BMI":
+- valueset is `http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.600.1.1525`.
+
+terminology "Follow Up for Below Normal BMI":
+- valueset is `http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.600.1.1528`.
+
+terminology "Medical Reason":
+- valueset is `http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.526.3.1007`.
+
+terminology "Medications for Above Normal BMI":
+- valueset is `http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.526.3.1561`.
+
+terminology "Medications for Below Normal BMI":
+- valueset is `http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.526.3.1562`.
+
+terminology "Overweight or Obese":
+- valueset is `http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113762.1.4.1047.502`.
+
+terminology "Patient Declined":
+- valueset is `http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.526.3.1582`.
+
+terminology "Pregnancy or Other Related Diagnoses":
+- valueset is `http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.600.1.1623`.
+
+terminology "Referrals Where Weight Assessment May Occur":
+- valueset is `http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.600.1.1527`.
+
+terminology "Underweight":
+- valueset is `http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.526.3.1563`.
+
+// Stub valuesets — referenced by the CRL but not in source CQL.
+// Some are codes-wrapped-as-1-element-valuesets (CRL convention since
+// `coded from` requires a valueset); others are author-added composites
+// the source CQL hadn't formalized. Empty URL = placeholder until proper
+// VSAC mapping is added.
+
+terminology "Body Mass Index Observations":
+- valueset is ``.
+
+terminology "Virtual Encounter Class":
+- valueset is ``.
+
+terminology "Pregnancy Status":
+- valueset is ``.
+
+terminology "Follow Up for Above Normal BMI Procedures":
+- valueset is ``.
+
+terminology "Follow Up for Below Normal BMI Procedures":
+- valueset is ``.
+
+
+// ============ Runtime stubs ============
+// "Measurement Period" is a runtime CQL parameter, not a valueset.
+// Kept as a stub asserted concept (coded from an empty stub valueset)
+// until `parameter` declarations land (issues/crl/todo/parameters/).
+
+terminology "Measurement Period (stub valueset)":
+- valueset is ``.
 
 concept "Measurement Period":
 - type is Encounter.
 - coded from "Measurement Period (stub valueset)".
 
+// "Pregnancy or Other Related Diagnoses" is a valueset (declared above)
+// referenced as a classification argument in `documented as` narrative.
+// Declared as a concept wrapper so the narrative ref resolver finds it.
+// Future: catalog signature for DocumentedAs may distinguish valueset args
+// from concept args directly.
 concept "Pregnancy or Other Related Diagnoses":
 - type is Condition.
-- coded from "Pregnancy or Other Related Diagnoses (stub valueset)".
+- coded from "Pregnancy or Other Related Diagnoses".
 
 
 // ============ Asserted concepts (unchanged) ============

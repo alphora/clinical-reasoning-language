@@ -6,35 +6,49 @@ import type {
   NarrativeClause,
   NarrativeElement,
   ArgValue,
+  Terminology,
 } from "../ast/types";
 
 import { ValidationError } from "./validator";
 
 /**
- * Verifies that concept references in concept bodies resolve to declared
- * concepts.
+ * Verifies that references in concept bodies resolve correctly per their
+ * declared kind:
  *
- * Per CRL v0.6 typed reference resolution:
- *   - In a `coded from` body: refs are valueset names (handled by a separate
- *     validator/multi-file resolver — not enforced here).
- *   - In an `inferred from` body: refs are concept names (must resolve).
- *   - In a `logic is` body: refs in the narrative (NConceptRef elements + refs
- *     inside in-arg disjunctions/conjunctions) are concept names (must resolve).
+ *   - `coded from "X"` body: "X" must reference a declared `terminology "X":`
+ *     AND that terminology MUST be defined as a `valueset` (not a system+code
+ *     pair). Asserted concepts reference valuesets only.
+ *   - `inferred from` body: refs must resolve to declared concepts.
+ *   - `logic is` body narrative: NConceptRef elements + refs inside
+ *     in-arg disjunctions/conjunctions must resolve to declared concepts.
  *
  * Magic runtime refs like "Measurement Period" aren't in the local namespace
  * today; they'll resolve once `imports` + `parameter` declarations land
- * (see issues/crl/todo/imports/ and issues/crl/todo/parameters/). For now,
- * narrative refs that look like runtime parameters will be flagged as
- * unresolved — accept this until imports land.
+ * (see issues/crl/todo/imports/ and issues/crl/todo/parameters/).
  */
 export class ReferenceResolver {
   validate(ast: CRL): ValidationError[] {
     const errors: ValidationError[] = [];
 
+    // Build the concept namespace and the terminology lookup. For terminologies,
+    // also record whether each is valueset-defined or system+code-defined.
     const conceptNames = new Set<string>();
+    const valuesetTerminologies = new Set<string>();
+    const codeTerminologies = new Set<string>(); // system+code-defined
+
     for (const statement of ast.statements) {
       if (statement.type === "Concept" && statement.name) {
         conceptNames.add(statement.name);
+      } else if (statement.type === "Terminology" && statement.name) {
+        const term = statement as Terminology;
+        // The body has at least one line — TerminologyValueset OR TerminologySystem+TerminologyCode.
+        // Per the grammar, a terminology block uses one shape, not both.
+        const hasValueset = term.body.some((b) => b.type === "TerminologyValueset");
+        if (hasValueset) {
+          valuesetTerminologies.add(term.name);
+        } else {
+          codeTerminologies.add(term.name);
+        }
       }
     }
 
@@ -43,9 +57,24 @@ export class ReferenceResolver {
       const concept = statement as Concept;
 
       switch (concept.definition.type) {
-        case "CodedFromDefinition":
-          // valueset refs — out of scope here
+        case "CodedFromDefinition": {
+          const termName = concept.definition.terminologyName;
+          if (!termName) break;
+          if (!valuesetTerminologies.has(termName) && !codeTerminologies.has(termName)) {
+            errors.push({
+              message: `Undeclared terminology "${termName}" in concept "${concept.name}" (no terminology block declares this name)`,
+              location: concept.definition.location,
+              severity: "error",
+            });
+          } else if (codeTerminologies.has(termName)) {
+            errors.push({
+              message: `Terminology "${termName}" referenced by concept "${concept.name}" via \`coded from\` must be a valueset, but it's declared as a system+code terminology`,
+              location: concept.definition.location,
+              severity: "error",
+            });
+          }
           continue;
+        }
 
         case "InferredFromDefinition": {
           const body = concept.definition.body;

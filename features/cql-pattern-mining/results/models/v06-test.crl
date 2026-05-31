@@ -1,5 +1,17 @@
 # v0.6 grammar test — subset of CMS69 for lexer/parser/AST/validator testing
 
+// ===== Terminologies (valuesets) =====
+
+terminology "Virtual Encounter Class":
+- valueset is ``.
+
+terminology "Encounter to Evaluate BMI":
+- valueset is `http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.600.1.1751`.
+
+terminology "Body Mass Index Observations":
+- valueset is ``.
+
+
 // ===== Asserted concepts =====
 // `coded from` body; refs in quotes are valueset names.
 // type REQUIRED; valuetype 0..* (multiple value views per type).

@@ -5,10 +5,84 @@
 // All multi-clause concepts now compose named inferences via sem-* operators.
 
 
+// ============ Terminologies (valuesets) ============
+// Real valuesets from the source CMS22 CQL library with VSAC URLs.
+
+terminology "Diagnosis of Hypertension":
+- valueset is `http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.600.263`.
+
+terminology "Dietary Recommendations":
+- valueset is `http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.600.1515`.
+
+terminology "Encounter to Screen for Blood Pressure":
+- valueset is `http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.600.1920`.
+
+terminology "Finding of Elevated Blood Pressure or Hypertension":
+- valueset is `http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113762.1.4.1047.514`.
+
+terminology "Follow Up Within 4 Weeks":
+- valueset is `http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.526.3.1578`.
+
+terminology "Follow Up Within 6 Months":
+- valueset is `http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113762.1.4.1108.125`.
+
+terminology "Laboratory Tests for Hypertension":
+- valueset is `http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.600.1482`.
+
+terminology "Lifestyle Recommendation":
+- valueset is `http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.526.3.1581`.
+
+terminology "Medical Reason":
+- valueset is `http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.526.3.1007`.
+
+terminology "Patient Declined":
+- valueset is `http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.526.3.1582`.
+
+terminology "Pharmacologic Therapy for Hypertension":
+- valueset is `http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.526.1577`.
+
+terminology "Recommendation to Increase Physical Activity":
+- valueset is `http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.600.1518`.
+
+terminology "Referral or Counseling for Alcohol Consumption":
+- valueset is `http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.526.3.1583`.
+
+terminology "Referral to Primary Care or Alternate Provider":
+- valueset is `http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.526.3.1580`.
+
+terminology "Weight Reduction Recommended":
+- valueset is `http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.600.1510`.
+
+// Stub valuesets — codes-wrapped-as-1-element-valuesets per CRL convention
+// (`coded from` requires a valueset; CRL author chose to model these
+// single-code refs as named valuesets). Empty URL = placeholder.
+
+terminology "Blood pressure panel with all children optional":
+- valueset is ``.
+
+terminology "Systolic Blood Pressure Code":
+- valueset is ``.
+
+terminology "Diastolic Blood Pressure Code":
+- valueset is ``.
+
+terminology "EKG 12 Lead Panel Code":
+- valueset is ``.
+
+terminology "EKG Study Code":
+- valueset is ``.
+
+terminology "Virtual Encounter Class":
+- valueset is ``.
+
+
 // ============ Runtime stubs ============
-// Temporary asserted-concept stub for "Measurement Period" — will become
-// a parameter declaration when imports + parameters land
-// (see issues/crl/todo/imports/, issues/crl/todo/parameters/).
+// "Measurement Period" is a runtime CQL parameter, not a valueset.
+// Kept as a stub asserted concept until `parameter` declarations land
+// (issues/crl/todo/parameters/).
+
+terminology "Measurement Period (stub valueset)":
+- valueset is ``.
 
 concept "Measurement Period":
 - type is Encounter.
