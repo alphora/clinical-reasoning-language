@@ -162,9 +162,11 @@ function parseTableRow(line: string): PatternFields | null {
   const cqlFunction = extractBackticked(cells[3]);
 
   if (!canonical || !narrative || !signature || !cqlFunction) return null;
-  // Heuristic: a real pattern row's canonical starts with an uppercase letter
-  // and contains a `(`. Filters out separator-style or notes-only rows.
-  if (!/^[A-Z][A-Za-z0-9]*\(/.test(canonical)) return null;
+  // Heuristic: a real pattern row's canonical starts with a letter and
+  // contains a `(`. Accepts PascalCase (`Has(X)`) AND kebab-case canonicals
+  // used by the window-from-anchor sub-grammar (`before-start-of(...)`).
+  // Filters out separator-style or notes-only rows.
+  if (!/^[A-Za-z][A-Za-z0-9-]*\(/.test(canonical)) return null;
 
   return { canonical, narrative, signature, cqlFunction };
 }

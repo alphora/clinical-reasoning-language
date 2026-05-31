@@ -67,7 +67,9 @@
     "test:catalog": "node src/catalog.test.mjs && node src/embedded-catalog.test.mjs",
     "pretest:concepts": "npm run compile",
     "test:concepts": "node src/concepts.test.mjs",
-    "test": "npm run compile && node src/mcp-server.test.mjs && node src/provision.test.mjs && node src/highlight.test.mjs && node src/catalog.test.mjs && node src/embedded-catalog.test.mjs && node src/concepts.test.mjs",
+    "pretest:crl-patterns": "npm run compile",
+    "test:crl-patterns": "node src/crl-patterns-coverage.test.mjs",
+    "test": "npm run compile && node src/mcp-server.test.mjs && node src/provision.test.mjs && node src/highlight.test.mjs && node src/catalog.test.mjs && node src/embedded-catalog.test.mjs && node src/concepts.test.mjs && node src/crl-patterns-coverage.test.mjs",
     "vscode:prepublish": "npm run compile",
     "package": "vsce package"
   },
