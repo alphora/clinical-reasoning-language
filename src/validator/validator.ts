@@ -1,7 +1,7 @@
 import { CRL } from "../ast/types";
 
 import { ActionUniquenessValidator } from "./actionUniquenessValidator";
-//import { CycleDetector } from './cycleDetector';
+import { CycleDetector } from "./cycleDetector";
 import { NameUniquenessValidator } from "./nameUniquenessValidator";
 import { ReferenceResolver } from "./referenceResolver";
 import { UnusedDeclarationsValidator } from "./unusedDeclarationsValidator";
@@ -21,45 +21,57 @@ export interface ValidationResult {
   warnings: ValidationError[];
 }
 
+/**
+ * Validator options.
+ *
+ * `soft`: when true, RELAXED checks demote certain "would-be-error" findings
+ * to warnings so authoring can continue with incomplete state. Currently:
+ *   - Reference-target-exists checks (unresolved concepts / terminologies)
+ *     become warnings instead of errors.
+ *   - Future: cardinality "required" checks (e.g. `type is` required for
+ *     asserted concepts) will also be relaxed under soft mode.
+ *
+ * Name uniqueness and cycle detection always stay as errors — these are
+ * structural defects, not just unresolved state.
+ */
+export interface ValidatorOptions {
+  soft?: boolean;
+}
+
 export class Validator {
   private readonly unusedDeclarationsValidator: UnusedDeclarationsValidator;
   private readonly nameUniquenessValidator: NameUniquenessValidator;
   private readonly actionUniquenessValidator: ActionUniquenessValidator;
   private readonly referenceResolver: ReferenceResolver;
-  //private cycleDetector: CycleDetector;
+  private readonly cycleDetector: CycleDetector;
 
   constructor() {
     this.unusedDeclarationsValidator = new UnusedDeclarationsValidator();
     this.nameUniquenessValidator = new NameUniquenessValidator();
     this.actionUniquenessValidator = new ActionUniquenessValidator();
     this.referenceResolver = new ReferenceResolver();
-    //this.cycleDetector = new CycleDetector();
+    this.cycleDetector = new CycleDetector();
   }
 
-  public validate(ast: CRL): ValidationResult {
+  public validate(ast: CRL, options: ValidatorOptions = {}): ValidationResult {
     const errors: ValidationError[] = [];
     const warnings: ValidationError[] = [];
 
-    // Check for unused declarations
-    // const unusedResult = this.unusedDeclarationsValidator.validate(ast);
-    // warnings.push(...unusedResult);
-
-    // Check for duplicate names (v0.5: concept + inference share a namespace)
+    // Duplicate names — always an error
     const nameResult = this.nameUniquenessValidator.validate(ast);
     errors.push(...nameResult);
 
-    // Check that every concept ref in inferred-from bodies resolves to a
-    // declared concept or inference (v0.5: shared namespace).
+    // Reference resolution — demoted to warnings in soft mode
     const refResult = this.referenceResolver.validate(ast);
-    errors.push(...refResult);
+    if (options.soft) {
+      warnings.push(...refResult.map((e) => ({ ...e, severity: "warning" as const })));
+    } else {
+      errors.push(...refResult);
+    }
 
-    // Check for duplicate actions
-    // const actionResult = this.actionUniquenessValidator.validate(ast);
-    // errors.push(...actionResult);
-
-    // TODO: Check for cycles
-    // const cycleResult = this.cycleDetector.validate(ast);
-    // errors.push(...cycleResult);
+    // Cycles — always an error (structural defect)
+    const cycleResult = this.cycleDetector.validate(ast);
+    errors.push(...cycleResult);
 
     return {
       isValid: errors.length === 0,

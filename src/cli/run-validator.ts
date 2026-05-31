@@ -24,8 +24,10 @@ const builder = new CRLAstBuilder();
 const ast = builder.visit(tree) as CRL;
 
 // Create the validator and validate the AST
+// `--soft` flag enables soft-validation mode (unresolved refs become warnings)
+const soft = process.argv.includes("--soft");
 const validator = new Validator();
-const result = validator.validate(ast);
+const result = validator.validate(ast, { soft });
 
 // Check if pretty output is requested
 const prettyOutput = process.argv.includes("--pretty");
