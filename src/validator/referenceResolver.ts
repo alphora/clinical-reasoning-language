@@ -16,8 +16,9 @@ import { ValidationError } from "./validator";
  * declared kind:
  *
  *   - `coded from "X"` body: "X" must reference a declared `terminology "X":`
- *     AND that terminology MUST be defined as a `valueset` (not a system+code
- *     pair). Asserted concepts reference valuesets only.
+ *     (either valueset-defined OR system+code-defined — both are valid).
+ *     The point is the ref kind: it has to be a terminology, not a concept
+ *     or decision or anything else.
  *   - `inferred from` body: refs must resolve to declared concepts.
  *   - `logic is` body narrative: NConceptRef elements + refs inside
  *     in-arg disjunctions/conjunctions must resolve to declared concepts.
@@ -30,25 +31,14 @@ export class ReferenceResolver {
   validate(ast: CRL): ValidationError[] {
     const errors: ValidationError[] = [];
 
-    // Build the concept namespace and the terminology lookup. For terminologies,
-    // also record whether each is valueset-defined or system+code-defined.
     const conceptNames = new Set<string>();
-    const valuesetTerminologies = new Set<string>();
-    const codeTerminologies = new Set<string>(); // system+code-defined
+    const terminologyNames = new Set<string>();
 
     for (const statement of ast.statements) {
       if (statement.type === "Concept" && statement.name) {
         conceptNames.add(statement.name);
       } else if (statement.type === "Terminology" && statement.name) {
-        const term = statement as Terminology;
-        // The body has at least one line — TerminologyValueset OR TerminologySystem+TerminologyCode.
-        // Per the grammar, a terminology block uses one shape, not both.
-        const hasValueset = term.body.some((b) => b.type === "TerminologyValueset");
-        if (hasValueset) {
-          valuesetTerminologies.add(term.name);
-        } else {
-          codeTerminologies.add(term.name);
-        }
+        terminologyNames.add(statement.name);
       }
     }
 
@@ -60,15 +50,9 @@ export class ReferenceResolver {
         case "CodedFromDefinition": {
           const termName = concept.definition.terminologyName;
           if (!termName) break;
-          if (!valuesetTerminologies.has(termName) && !codeTerminologies.has(termName)) {
+          if (!terminologyNames.has(termName)) {
             errors.push({
               message: `Undeclared terminology "${termName}" in concept "${concept.name}" (no terminology block declares this name)`,
-              location: concept.definition.location,
-              severity: "error",
-            });
-          } else if (codeTerminologies.has(termName)) {
-            errors.push({
-              message: `Terminology "${termName}" referenced by concept "${concept.name}" via \`coded from\` must be a valueset, but it's declared as a system+code terminology`,
               location: concept.definition.location,
               severity: "error",
             });
