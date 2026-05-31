@@ -1,29 +1,38 @@
 # Clinical Reasoning Language Example
 
 /*
-Clinical Reasoning Language (CRL):
-IS case sensitive.
-NOT whitespace sensitive.
-NOT indentation sensitive.
-The file must start with `#` and a markdown valid string.
-Quoted strings cannot contain escape characters.
-Quoted strings (not in comments) are identifiers.
-The `inferred from` value describes concept derivation using logical operators and references, indicating how those referenced concepts collectively infer the target concept, not as a strictly evaluatable Boolean formula.
-The `inferred from` value can include any number of concept identifiers.
-The keywords `any/all` are optional (if not present, defaults to any).
-The keyword `with` and `because` for `activity` are optional.
-The keyword phrase `evidence is` for concept is optional.
-The keyword phrase `meta is` for concept is optional and repeatable.
-One of either the keyword phrases `inferred from` or `coded from` are required for concept.
-The keyword phrase `apply pattern` for concept is optional and can only be used in conjunction with `inferred from`, of type single concept reference.
-The `inferred from` keyword phrase can have any number of `apply pattern` keyword phrases.
-One of either the keyword phrases `valueset is`, or the pair `system is` and `code is` are required for terminology.
-A terminology can have any number of combinations of `valueset is` and the pair of `system is` and `code is` keyword phrases.
-The keyword phrase `system is` can have any number of `code is` keyword phrases.
-The keyword phrase `do not perform` is an optional suffix to the `request` keyword.
-A crl can have any number of decision, terminology, activity, concept.
-The example includes all options for valid statements.
-Anything not identified as optional here is required.
+Clinical Reasoning Language (CRL) — v0.5 grammar reference example.
+
+Surface conventions:
+  - Case sensitive (keywords are lowercase: `inference`, `concept`, `inferred from`,
+    `sem-or`, `sem-and`, `sem-not`, `or`, `and`, `not`, etc.).
+  - Whitespace insensitive (indentation is decorative).
+  - File starts with `#` + markdown-valid header line.
+  - Quoted strings (`"..."`) are identifiers / refs to named declarations.
+  - Backtick strings (`` `...` ``) are free text / evidence / system / code.
+  - Single quotes (`'...'`) lex as UCUM units inside Quantity literals.
+
+Statement types:
+  - decision     — reusable decision logic; when/then/recommend|use
+  - terminology  — valueset reference OR system+code(s) pair
+  - activity     — executable clinical activity (CPG resource request)
+  - concept      — clinical concept; coded from a terminology OR inferred from refs
+  - inference    — named narrative predicate (NEW in v0.5)
+
+`inferred from` body shapes (v0.5):
+  - bare ref:        `- inferred from "X".`
+  - composition:     `- inferred from ( "A" sem-and "B" ).` (uses sem-or/sem-and/sem-not)
+
+Narrative inside an `inference` body uses lowercase `or` / `and` for in-arg
+disjunction (e.g. `("Medical Reasons" or "Patient Declined Reasons")`),
+which is distinct from the `sem-or`/`sem-and` in concept composition.
+See docs/CRL Compilation Pipeline.md and the
+project_sem-composition-operators memory for the rationale.
+
+Optional fields:
+  - `meta is` (repeatable) and `evidence is` on `concept` and `inference`
+  - `with` and `because` on `activity`
+  - `do not perform` suffix on `request` keyword (activity)
 */
 
 decision "IMMZ.D2.D5.Measles":
@@ -59,120 +68,136 @@ decision "Elderly Based":
   - end when
 - end when
 
-activity "Vaccinate":
 
+// ============ Activities ============
+
+activity "Vaccinate":
 - request CPGImmunizationRequest.
 
 activity "Indicate":
-
 - request CPGProposeDiagnosisTask.
 - with "Colonoscopy".
 
 activity "Message Care Plan":
-
 - request CPGCommunicationRequest.
 - with `Create a care plan`.
 - because `A new plan needs to be implemented.`.
 
 activity "Contraindicated":
-
 - request do not perform CPGImmunizationRequest.
 - with "Immunization".
 - because `Immunization is contraindicated`.
 
-terminology "BMI Range as a Condition":
 
+// ============ Terminologies ============
+
+terminology "BMI Range as a Condition":
 - valueset is ``.
 
 terminology "BMI as an Observation":
-
 - valueset is `BMI as an Observation`.
 
 terminology "Height Valueset":
-
 - valueset is `height valueset`.
 
 terminology "Weight Valueset":
-
 - valueset is `weight valueset`.
 
 terminology "Colonoscopy":
-
 - system is `http://snomed.info/sct`.
-  - code is `73761001`.
+- code is `73761001`.
 
 terminology "Breast Cancer":
-
 - system is `http://snomed.info/sct`.
-  - code is `73761002`.
-  - code is `73761003`.
+- code is `73761002`.
+- code is `73761003`.
 
-// comments go into the auto generated README and, CQL when applicable
 
-concept "Most Recent BMI":
+// ============ Concepts ============
 
-- type is Observation.
-- valuetype is boolean.
-- meta is `Some meta information`.
-- evidence is `Calculated by Smile`.
-- inferred from "BMI".
-  - apply pattern `Most Recent(this, lookbackMonths)`.
-
-concept "BMI":
-
-- type is Observation.
-- valuetype is Quantity.
-- inferred from ("BMI Range as a Condition" or "BMI as an Observation" or "Calculated BMI").
+// --- Asserted concepts (coded from a terminology) ---
 
 concept "BMI Range as a Condition":
-
 - type is Condition.
 - valuetype is CodeableConcept.
 - coded from "BMI Range as a Condition".
 
 concept "BMI as an Observation":
-
 - type is Observation.
 - valuetype is Quantity.
 - coded from "BMI as an Observation".
 
-concept "Calculated BMI":
-
-- type is Observation.
-- valuetype is Quantity.
-
-  //calculate using (weight/height^2)
-- inferred from ("Patient Height" and "Patient Weight").
-
 concept "Patient Height":
-
 - type is Observation.
 - valuetype is integer.
 - coded from "Height Valueset".
 
 concept "Patient Weight":
-
 - type is Observation.
 - valuetype is integer.
 - coded from "Weight Valueset".
 
-concept "Client Age Greater Than 60":
 
+// --- Inferred concepts: bare ref shape ---
+
+// "BMI" composes three sources via sem-or (semantic boolean — operands
+// can be cross-typed; the composition layer reconciles).
+concept "BMI":
 - type is Observation.
-- valuetype is boolean.
+- valuetype is Quantity.
 - inferred from
-    (
-        (
-            ("a" and "b")
-            or (
-                ("c" and "d")
-                and not ("e" or "f")
-            )
-        )
-        or (
-            ("x" or "y")
-            and "z"
-        )
-        or "k"
-        or "l"
-    ).
+(
+   "BMI Range as a Condition"
+   sem-or
+   "BMI as an Observation"
+   sem-or
+   "Calculated BMI"
+).
+
+
+// --- Inferred concepts: named inference + concept pair ---
+
+// Predicates with narrative bodies live in `inference` declarations.
+// The composing concept then references them as bare refs.
+
+inference "Most Recent BMI Selection":
+- meta is `Selects the most recent BMI observation within the configured lookback`.
+- evidence is `Calculated by Smile`.
+- most recent "BMI".
+
+concept "Most Recent BMI":
+- type is Observation.
+- valuetype is Quantity.
+- meta is `Some meta information`.
+- evidence is `Calculated by Smile`.
+- inferred from "Most Recent BMI Selection".
+
+inference "Calculated BMI Formula":
+- evidence is `Standard BMI formula: weight (kg) / height (m)^2`.
+- calculated "BMI".
+
+concept "Calculated BMI":
+- type is Observation.
+- valuetype is Quantity.
+- inferred from "Calculated BMI Formula".
+
+
+// --- Inferred concepts: composition with sem-not ---
+
+// `sem-not` is prefix unary; it negates the following operand or group.
+// "BMI With Confirmed Height-Weight Source" requires BMI from a calculated
+// source, NOT from a coded condition entry.
+concept "BMI With Confirmed Height-Weight Source":
+- type is Observation.
+- valuetype is Quantity.
+- inferred from
+(
+   "Calculated BMI"
+   sem-and
+   sem-not "BMI Range as a Condition"
+).
+
+// For more complex composition examples (deeply nested groups, AND NOT,
+// in-arg disjunctions inside inference narrative), see the modeled measures:
+//   features/cql-pattern-mining/results/models/cms22.crl
+//   features/cql-pattern-mining/results/models/cms69.crl

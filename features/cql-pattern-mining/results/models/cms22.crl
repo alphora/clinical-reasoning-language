@@ -1,7 +1,12 @@
-# CMS22 Blood Pressure Screening and Follow-Up
+# CMS22 Blood Pressure Screening and Follow-Up — v0.5 grammar
+
+// Migrated to CRL v0.5: `inference` keyword for narrative predicates;
+// concept `inferred from` body is bare ref or sem-or/sem-and/sem-not composition.
+// All multi-clause concepts now compose named inferences via sem-* operators.
 
 
-// --- Encounter source ---
+// ============ Asserted concepts (unchanged) ============
+
 concept "BP Screening Encounters":
 - type is Encounter.
 - valuetype is CodeableConcept.
@@ -12,13 +17,11 @@ concept "Virtual Encounters":
 - valuetype is CodeableConcept.
 - coded from "Virtual Encounter Class".
 
-// --- Diagnosis source ---
 concept "Hypertension Diagnoses":
 - type is Condition.
 - valuetype is CodeableConcept.
 - coded from "Diagnosis of Hypertension".
 
-// --- BP observation source ---
 concept "Blood Pressure Panels":
 - type is Observation.
 - valuetype is CodeableConcept.
@@ -34,7 +37,6 @@ concept "Diastolic Blood Pressure Code":
 - valuetype is CodeableConcept.
 - coded from "Diastolic Blood Pressure Code".
 
-// --- Standalone Systolic / Diastolic observations (for cancellation branches) ---
 concept "Standalone Systolic BP Observations":
 - type is Observation.
 - valuetype is Quantity.
@@ -45,7 +47,6 @@ concept "Standalone Diastolic BP Observations":
 - valuetype is Quantity.
 - coded from "Diastolic Blood Pressure Code".
 
-// --- Intervention sources: follow-up service requests ---
 concept "Follow-up Within 4 Weeks":
 - type is ServiceRequest.
 - valuetype is CodeableConcept.
@@ -56,7 +57,6 @@ concept "Follow-up Within 6 Months":
 - valuetype is CodeableConcept.
 - coded from "Follow Up Within 6 Months".
 
-// --- Intervention sources: lifestyle / non-pharmacological ---
 concept "Lifestyle Recommendations":
 - type is ServiceRequest.
 - valuetype is CodeableConcept.
@@ -82,7 +82,6 @@ concept "Alcohol Counseling Referrals":
 - valuetype is CodeableConcept.
 - coded from "Referral or Counseling for Alcohol Consumption".
 
-// --- Intervention sources: referral / lab / pharmacological ---
 concept "Primary-Care Referrals":
 - type is ServiceRequest.
 - valuetype is CodeableConcept.
@@ -108,13 +107,11 @@ concept "Antihypertensive Medications":
 - valuetype is CodeableConcept.
 - coded from "Pharmacologic Therapy for Hypertension".
 
-// --- Hypertensive-reading finding (reason qualifier) ---
 concept "Hypertensive Reading Findings":
 - type is Observation.
 - valuetype is CodeableConcept.
 - coded from "Finding of Elevated Blood Pressure or Hypertension".
 
-// --- Not-done reason qualifiers ---
 concept "Medical Reasons":
 - type is Observation.
 - valuetype is CodeableConcept.
@@ -126,347 +123,704 @@ concept "Patient Declined Reasons":
 - coded from "Patient Declined".
 
 
+// ============ Inference declarations + composing concepts ============
+
 // --- Qualifying Encounter ---
+
 concept "BP Evaluation Encounter (not virtual)":
 - type is Encounter.
 - valuetype is boolean.
-- inferred from ("BP Screening Encounters" and not "Virtual Encounters").
+- inferred from
+(
+   "BP Screening Encounters"
+   sem-and
+   sem-not "Virtual Encounters"
+).
+
+inference "BP Evaluation Encounter (not virtual) During MP":
+- "BP Evaluation Encounter (not virtual)" during "Measurement Period".
+
+inference "BP Evaluation Encounter (not virtual) Performed":
+- "BP Evaluation Encounter (not virtual)" performed.
 
 concept "Qualifying Encounter":
 - type is Encounter.
 - valuetype is boolean.
-- inferred from "BP Evaluation Encounter (not virtual)".
-- apply pattern `"BP Evaluation Encounter (not virtual)" during "Measurement Period" and "BP Evaluation Encounter (not virtual)" was performed`.
+- inferred from
+(
+   "BP Evaluation Encounter (not virtual) During MP"
+   sem-and
+   "BP Evaluation Encounter (not virtual) Performed"
+).
 
-// --- BP panel projections (Systolic / Diastolic) ---
+
+// --- BP panel projections ---
+
+inference "Systolic Code Component of BP Panels":
+- "Systolic Blood Pressure Code" component of "Blood Pressure Panels".
+
+inference "Diastolic Code Component of BP Panels":
+- "Diastolic Blood Pressure Code" component of "Blood Pressure Panels".
+
 concept "Systolic BP Reading":
 - type is Observation.
 - valuetype is Quantity.
-- inferred from "Blood Pressure Panels".
-- apply pattern `"Systolic Blood Pressure Code" component of "Blood Pressure Panels"`.
+- inferred from "Systolic Code Component of BP Panels".
 
 concept "Diastolic BP Reading":
 - type is Observation.
 - valuetype is Quantity.
-- inferred from "Blood Pressure Panels".
-- apply pattern `"Diastolic Blood Pressure Code" component of "Blood Pressure Panels"`.
+- inferred from "Diastolic Code Component of BP Panels".
+
 
 // --- Last BP reading on each qualifying encounter day ---
+
+inference "Last BP Panels On Qualifying Encounter Day":
+- last "Blood Pressure Panels" on day of "Qualifying Encounter".
+
 concept "Last BP Panel on Qualifying Encounter Day":
 - type is Observation.
 - valuetype is CodeableConcept.
-- inferred from "Blood Pressure Panels".
-- apply pattern `last "Blood Pressure Panels" on day of "Qualifying Encounter"`.
+- inferred from "Last BP Panels On Qualifying Encounter Day".
+
+inference "Systolic Code Component of Last BP Panel On Encounter Day":
+- "Systolic Blood Pressure Code" component of "Last BP Panel on Qualifying Encounter Day".
+
+inference "Diastolic Code Component of Last BP Panel On Encounter Day":
+- "Diastolic Blood Pressure Code" component of "Last BP Panel on Qualifying Encounter Day".
 
 concept "Last Systolic on Qualifying Encounter Day":
 - type is Observation.
 - valuetype is Quantity.
-- inferred from "Last BP Panel on Qualifying Encounter Day".
-- apply pattern `"Systolic Blood Pressure Code" component of "Last BP Panel on Qualifying Encounter Day"`.
+- inferred from "Systolic Code Component of Last BP Panel On Encounter Day".
 
 concept "Last Diastolic on Qualifying Encounter Day":
 - type is Observation.
 - valuetype is Quantity.
-- inferred from "Last BP Panel on Qualifying Encounter Day".
-- apply pattern `"Diastolic Blood Pressure Code" component of "Last BP Panel on Qualifying Encounter Day"`.
+- inferred from "Diastolic Code Component of Last BP Panel On Encounter Day".
+
 
 // --- BP classification ladder ---
-// Normal:           Systolic < 120 AND Diastolic < 80
-// Elevated:         Systolic 120–129 AND Diastolic < 80
-// First HTN:        Systolic >= 130 OR Diastolic >= 80, with no prior-year HTN reading
-// Second HTN 130s:  Systolic 130–139 OR Diastolic 80–89, with prior-year HTN reading
-// Second HTN 140+:  Systolic >= 140 OR Diastolic >= 90, with prior-year HTN reading
+
+inference "Last Systolic Below 120":
+- "Last Systolic on Qualifying Encounter Day" below 120 'mm[Hg]'.
+
+inference "Last Diastolic Below 80":
+- "Last Diastolic on Qualifying Encounter Day" below 80 'mm[Hg]'.
+
+inference "Last Systolic Between 120 and 129":
+- "Last Systolic on Qualifying Encounter Day" between 120 'mm[Hg]' and 129 'mm[Hg]'.
+
+inference "Last Systolic At Least 130":
+- "Last Systolic on Qualifying Encounter Day" at least 130 'mm[Hg]'.
+
+inference "Last Diastolic At Least 80":
+- "Last Diastolic on Qualifying Encounter Day" at least 80 'mm[Hg]'.
+
+inference "Last Systolic Between 130 and 139":
+- "Last Systolic on Qualifying Encounter Day" between 130 'mm[Hg]' and 139 'mm[Hg]'.
+
+inference "Last Diastolic Between 80 and 89":
+- "Last Diastolic on Qualifying Encounter Day" between 80 'mm[Hg]' and 89 'mm[Hg]'.
+
+inference "Last Systolic At Least 140":
+- "Last Systolic on Qualifying Encounter Day" at least 140 'mm[Hg]'.
+
+inference "Last Diastolic At Least 90":
+- "Last Diastolic on Qualifying Encounter Day" at least 90 'mm[Hg]'.
+
 concept "Normal BP Reading":
 - type is Observation.
 - valuetype is boolean.
-- inferred from "Last BP Panel on Qualifying Encounter Day".
-- apply pattern `"Last Systolic on Qualifying Encounter Day" below 120 'mm[Hg]' and "Last Diastolic on Qualifying Encounter Day" below 80 'mm[Hg]'`.
+- inferred from
+(
+   "Last Systolic Below 120"
+   sem-and
+   "Last Diastolic Below 80"
+).
 
 concept "Elevated BP Reading":
 - type is Observation.
 - valuetype is boolean.
-- inferred from "Last BP Panel on Qualifying Encounter Day".
-- apply pattern `"Last Systolic on Qualifying Encounter Day" between 120 'mm[Hg]' and 129 'mm[Hg]' and "Last Diastolic on Qualifying Encounter Day" below 80 'mm[Hg]'`.
+- inferred from
+(
+   "Last Systolic Between 120 and 129"
+   sem-and
+   "Last Diastolic Below 80"
+).
 
 concept "Hypertensive Reading":
 - type is Observation.
 - valuetype is boolean.
-- inferred from "Last BP Panel on Qualifying Encounter Day".
-- apply pattern `"Last Systolic on Qualifying Encounter Day" at least 130 'mm[Hg]' or "Last Diastolic on Qualifying Encounter Day" at least 80 'mm[Hg]'`.
+- inferred from
+(
+   "Last Systolic At Least 130"
+   sem-or
+   "Last Diastolic At Least 80"
+).
+
+
+// --- Windowed-from-anchor scope (Prior-year readings) ---
+
+inference "Last BP Panels Within Year Prior To Qualifying Encounter":
+- last "Blood Pressure Panels" within 1 year before start of "Qualifying Encounter".
 
 concept "Last BP Panel Within Year Prior to Qualifying Encounter":
 - type is Observation.
 - valuetype is CodeableConcept.
-- inferred from "Blood Pressure Panels".
-- apply pattern `last "Blood Pressure Panels" within 1 year before start of "Qualifying Encounter"`.
+- inferred from "Last BP Panels Within Year Prior To Qualifying Encounter".
+
+inference "Systolic Code Component of Prior-Year Last BP Panel":
+- "Systolic Blood Pressure Code" component of "Last BP Panel Within Year Prior to Qualifying Encounter".
+
+inference "Diastolic Code Component of Prior-Year Last BP Panel":
+- "Diastolic Blood Pressure Code" component of "Last BP Panel Within Year Prior to Qualifying Encounter".
 
 concept "Prior-Year Last Systolic":
 - type is Observation.
 - valuetype is Quantity.
-- inferred from "Last BP Panel Within Year Prior to Qualifying Encounter".
-- apply pattern `"Systolic Blood Pressure Code" component of "Last BP Panel Within Year Prior to Qualifying Encounter"`.
+- inferred from "Systolic Code Component of Prior-Year Last BP Panel".
 
 concept "Prior-Year Last Diastolic":
 - type is Observation.
 - valuetype is Quantity.
-- inferred from "Last BP Panel Within Year Prior to Qualifying Encounter".
-- apply pattern `"Diastolic Blood Pressure Code" component of "Last BP Panel Within Year Prior to Qualifying Encounter"`.
+- inferred from "Diastolic Code Component of Prior-Year Last BP Panel".
+
+inference "Prior-Year Last Systolic At Least 130":
+- "Prior-Year Last Systolic" at least 130 'mm[Hg]'.
+
+inference "Prior-Year Last Diastolic At Least 80":
+- "Prior-Year Last Diastolic" at least 80 'mm[Hg]'.
 
 concept "Prior-Year Hypertensive Reading":
 - type is Observation.
 - valuetype is boolean.
-- inferred from "Last BP Panel Within Year Prior to Qualifying Encounter".
-- apply pattern `"Prior-Year Last Systolic" at least 130 'mm[Hg]' or "Prior-Year Last Diastolic" at least 80 'mm[Hg]'`.
+- inferred from
+(
+   "Prior-Year Last Systolic At Least 130"
+   sem-or
+   "Prior-Year Last Diastolic At Least 80"
+).
+
+inference "Without Record Of Prior-Year Hypertensive Reading":
+- without record of "Prior-Year Hypertensive Reading".
 
 concept "First Hypertensive Reading":
 - type is Observation.
 - valuetype is boolean.
-- inferred from "Hypertensive Reading".
-- apply pattern `without record of "Prior-Year Hypertensive Reading"`.
+- inferred from
+(
+   "Hypertensive Reading"
+   sem-and
+   "Without Record Of Prior-Year Hypertensive Reading"
+).
+
+
+// --- Second Hypertensive Reading 130s (complex composition with nested groups) ---
 
 concept "Second Hypertensive Reading 130s Body":
 - type is Observation.
 - valuetype is boolean.
-- inferred from "Last BP Panel on Qualifying Encounter Day".
-- apply pattern `("Last Systolic on Qualifying Encounter Day" between 130 'mm[Hg]' and 139 'mm[Hg]' or "Last Diastolic on Qualifying Encounter Day" between 80 'mm[Hg]' and 89 'mm[Hg]') and not ("Last Systolic on Qualifying Encounter Day" at least 140 'mm[Hg]' or "Last Diastolic on Qualifying Encounter Day" at least 90 'mm[Hg]')`.
+- inferred from
+(
+   (
+      "Last Systolic Between 130 and 139"
+      sem-or
+      "Last Diastolic Between 80 and 89"
+   )
+   sem-and
+   sem-not
+   (
+      "Last Systolic At Least 140"
+      sem-or
+      "Last Diastolic At Least 90"
+   )
+).
 
 concept "Second Hypertensive Reading 130s":
 - type is Observation.
 - valuetype is boolean.
-- inferred from ("Second Hypertensive Reading 130s Body" and "Prior-Year Hypertensive Reading").
+- inferred from
+(
+   "Second Hypertensive Reading 130s Body"
+   sem-and
+   "Prior-Year Hypertensive Reading"
+).
 
 concept "Second Hypertensive Reading 140+ Body":
 - type is Observation.
 - valuetype is boolean.
-- inferred from "Last BP Panel on Qualifying Encounter Day".
-- apply pattern `"Last Systolic on Qualifying Encounter Day" at least 140 'mm[Hg]' or "Last Diastolic on Qualifying Encounter Day" at least 90 'mm[Hg]'`.
+- inferred from
+(
+   "Last Systolic At Least 140"
+   sem-or
+   "Last Diastolic At Least 90"
+).
 
 concept "Second Hypertensive Reading 140+":
 - type is Observation.
 - valuetype is boolean.
-- inferred from ("Second Hypertensive Reading 140+ Body" and "Prior-Year Hypertensive Reading").
+- inferred from
+(
+   "Second Hypertensive Reading 140+ Body"
+   sem-and
+   "Prior-Year Hypertensive Reading"
+).
+
 
 // --- Ordered-intervention concepts ---
+
+inference "Follow-up Within 4 Weeks Ordered":
+- "Follow-up Within 4 Weeks" ordered.
+
+inference "Follow-up Within 6 Months Ordered":
+- "Follow-up Within 6 Months" ordered.
+
 concept "Four-Week Rescreen Order":
 - type is ServiceRequest.
 - valuetype is boolean.
-- inferred from "Follow-up Within 4 Weeks".
-- apply pattern `"Follow-up Within 4 Weeks" was ordered`.
+- inferred from "Follow-up Within 4 Weeks Ordered".
 
 concept "Six-Month Rescreen Order":
 - type is ServiceRequest.
 - valuetype is boolean.
-- inferred from "Follow-up Within 6 Months".
-- apply pattern `"Follow-up Within 6 Months" was ordered`.
+- inferred from "Follow-up Within 6 Months Ordered".
 
 concept "Non-Pharmacological Recommendations":
 - type is ServiceRequest.
 - valuetype is CodeableConcept.
-- inferred from ("Lifestyle Recommendations" or "Weight Reduction Recommendations" or "Dietary Recommendations" or "Physical Activity Recommendations" or "Alcohol Counseling Referrals").
+- inferred from
+(
+   "Lifestyle Recommendations"
+   sem-or
+   "Weight Reduction Recommendations"
+   sem-or
+   "Dietary Recommendations"
+   sem-or
+   "Physical Activity Recommendations"
+   sem-or
+   "Alcohol Counseling Referrals"
+).
+
+inference "Non-Pharmacological Recommendations Ordered":
+- "Non-Pharmacological Recommendations" ordered.
 
 concept "Non-Pharmacological Recommendation Order":
 - type is ServiceRequest.
 - valuetype is boolean.
-- inferred from "Non-Pharmacological Recommendations".
-- apply pattern `"Non-Pharmacological Recommendations" was ordered`.
+- inferred from "Non-Pharmacological Recommendations Ordered".
 
 concept "Hypertension Lab or ECG Requests":
 - type is ServiceRequest.
 - valuetype is CodeableConcept.
-- inferred from ("EKG 12-Lead Panel Requests" or "EKG Study Requests" or "Hypertension Lab Tests").
+- inferred from
+(
+   "EKG 12-Lead Panel Requests"
+   sem-or
+   "EKG Study Requests"
+   sem-or
+   "Hypertension Lab Tests"
+).
+
+inference "Hypertension Lab or ECG Requests Ordered":
+- "Hypertension Lab or ECG Requests" ordered.
 
 concept "Hypertension Lab or ECG Order":
 - type is ServiceRequest.
 - valuetype is boolean.
-- inferred from "Hypertension Lab or ECG Requests".
-- apply pattern `"Hypertension Lab or ECG Requests" was ordered`.
+- inferred from "Hypertension Lab or ECG Requests Ordered".
+
+inference "Antihypertensive Medications Ordered":
+- "Antihypertensive Medications" ordered.
 
 concept "Antihypertensive Medication Order":
 - type is MedicationRequest.
 - valuetype is boolean.
-- inferred from "Antihypertensive Medications".
-- apply pattern `"Antihypertensive Medications" was ordered`.
+- inferred from "Antihypertensive Medications Ordered".
+
+inference "Primary-Care Referral Justified by Hypertensive Reading":
+- "Primary-Care Referrals" justified by "Hypertensive Reading Findings".
+
+inference "Primary-Care Referrals Ordered":
+- "Primary-Care Referrals" ordered.
 
 concept "Referral for Hypertensive Reading":
 - type is ServiceRequest.
 - valuetype is boolean.
-- inferred from "Primary-Care Referrals".
-- apply pattern `"Primary-Care Referrals" justified by "Hypertensive Reading Findings" and "Primary-Care Referrals" was ordered`.
+- inferred from
+(
+   "Primary-Care Referral Justified by Hypertensive Reading"
+   sem-and
+   "Primary-Care Referrals Ordered"
+).
+
 
 // --- Per-class intervention bundles ---
-// Elevated BP: 6-month rescreen + non-pharm, OR a referral.
+
+inference "Six-Month Rescreen Order Same Day As Qualifying Encounter":
+- "Six-Month Rescreen Order" same day as "Qualifying Encounter".
+
+inference "Non-Pharm Recommendation Order Same Day As Qualifying Encounter":
+- "Non-Pharmacological Recommendation Order" same day as "Qualifying Encounter".
+
+inference "Referral for Hypertensive Reading Same Day As Qualifying Encounter":
+- "Referral for Hypertensive Reading" same day as "Qualifying Encounter".
+
+inference "Four-Week Rescreen Order Same Day As Qualifying Encounter":
+- "Four-Week Rescreen Order" same day as "Qualifying Encounter".
+
+inference "Hypertension Lab or ECG Order Same Day As Qualifying Encounter":
+- "Hypertension Lab or ECG Order" same day as "Qualifying Encounter".
+
+inference "Antihypertensive Medication Order Same Day As Qualifying Encounter":
+- "Antihypertensive Medication Order" same day as "Qualifying Encounter".
+
 concept "Elevated BP Followup Bundle":
 - type is ServiceRequest.
 - valuetype is boolean.
-- inferred from "Qualifying Encounter".
-- apply pattern `("Six-Month Rescreen Order" same day as "Qualifying Encounter" and "Non-Pharmacological Recommendation Order" same day as "Qualifying Encounter") or "Referral for Hypertensive Reading" same day as "Qualifying Encounter"`.
+- inferred from
+(
+   (
+      "Six-Month Rescreen Order Same Day As Qualifying Encounter"
+      sem-and
+      "Non-Pharm Recommendation Order Same Day As Qualifying Encounter"
+   )
+   sem-or
+   "Referral for Hypertensive Reading Same Day As Qualifying Encounter"
+).
 
-// First HTN: 4-week rescreen + non-pharm, OR a referral.
 concept "First HTN Followup Bundle":
 - type is ServiceRequest.
 - valuetype is boolean.
-- inferred from "Qualifying Encounter".
-- apply pattern `("Four-Week Rescreen Order" same day as "Qualifying Encounter" and "Non-Pharmacological Recommendation Order" same day as "Qualifying Encounter") or "Referral for Hypertensive Reading" same day as "Qualifying Encounter"`.
+- inferred from
+(
+   (
+      "Four-Week Rescreen Order Same Day As Qualifying Encounter"
+      sem-and
+      "Non-Pharm Recommendation Order Same Day As Qualifying Encounter"
+   )
+   sem-or
+   "Referral for Hypertensive Reading Same Day As Qualifying Encounter"
+).
 
-// Second HTN 130s: 6-month rescreen + lab/ECG + non-pharm, OR a referral.
 concept "Second HTN 130s Followup Bundle":
 - type is ServiceRequest.
 - valuetype is boolean.
-- inferred from "Qualifying Encounter".
-- apply pattern `("Six-Month Rescreen Order" same day as "Qualifying Encounter" and "Hypertension Lab or ECG Order" same day as "Qualifying Encounter" and "Non-Pharmacological Recommendation Order" same day as "Qualifying Encounter") or "Referral for Hypertensive Reading" same day as "Qualifying Encounter"`.
+- inferred from
+(
+   (
+      "Six-Month Rescreen Order Same Day As Qualifying Encounter"
+      sem-and
+      "Hypertension Lab or ECG Order Same Day As Qualifying Encounter"
+      sem-and
+      "Non-Pharm Recommendation Order Same Day As Qualifying Encounter"
+   )
+   sem-or
+   "Referral for Hypertensive Reading Same Day As Qualifying Encounter"
+).
 
-// Second HTN 140+: 4-week rescreen + lab/ECG + non-pharm + antihypertensive med, OR a referral.
 concept "Second HTN 140+ Followup Bundle":
 - type is ServiceRequest.
 - valuetype is boolean.
-- inferred from "Qualifying Encounter".
-- apply pattern `("Four-Week Rescreen Order" same day as "Qualifying Encounter" and "Hypertension Lab or ECG Order" same day as "Qualifying Encounter" and "Non-Pharmacological Recommendation Order" same day as "Qualifying Encounter" and "Antihypertensive Medication Order" same day as "Qualifying Encounter") or "Referral for Hypertensive Reading" same day as "Qualifying Encounter"`.
+- inferred from
+(
+   (
+      "Four-Week Rescreen Order Same Day As Qualifying Encounter"
+      sem-and
+      "Hypertension Lab or ECG Order Same Day As Qualifying Encounter"
+      sem-and
+      "Non-Pharm Recommendation Order Same Day As Qualifying Encounter"
+      sem-and
+      "Antihypertensive Medication Order Same Day As Qualifying Encounter"
+   )
+   sem-or
+   "Referral for Hypertensive Reading Same Day As Qualifying Encounter"
+).
+
 
 // --- Per-class numerator components ---
-// Each = ReadingClass AND (intervention bundle for that class). Normal counts on its own.
+
 concept "Elevated BP With Followup":
 - type is Observation.
 - valuetype is boolean.
-- inferred from ("Elevated BP Reading" and "Elevated BP Followup Bundle").
+- inferred from
+(
+   "Elevated BP Reading"
+   sem-and
+   "Elevated BP Followup Bundle"
+).
 
 concept "First HTN With Followup":
 - type is Observation.
 - valuetype is boolean.
-- inferred from ("First Hypertensive Reading" and "First HTN Followup Bundle").
+- inferred from
+(
+   "First Hypertensive Reading"
+   sem-and
+   "First HTN Followup Bundle"
+).
 
 concept "Second HTN 130s With Followup":
 - type is Observation.
 - valuetype is boolean.
-- inferred from ("Second Hypertensive Reading 130s" and "Second HTN 130s Followup Bundle").
+- inferred from
+(
+   "Second Hypertensive Reading 130s"
+   sem-and
+   "Second HTN 130s Followup Bundle"
+).
 
 concept "Second HTN 140+ With Followup":
 - type is Observation.
 - valuetype is boolean.
-- inferred from ("Second Hypertensive Reading 140+" and "Second HTN 140+ Followup Bundle").
+- inferred from
+(
+   "Second Hypertensive Reading 140+"
+   sem-and
+   "Second HTN 140+ Followup Bundle"
+).
+
 
 // --- Verified hypertension as of qualifying encounter (Denominator Exclusion driver) ---
+
+inference "Hypertension Diagnoses Is Verified":
+- "Hypertension Diagnoses" is verified.
+
 concept "Verified Hypertension":
 - type is Condition.
 - valuetype is boolean.
-- inferred from "Hypertension Diagnoses".
-- apply pattern `"Hypertension Diagnoses" is verified`.
+- inferred from "Hypertension Diagnoses Is Verified".
+
+inference "Verified Hypertension As Of Qualifying Encounter Narrative":
+- "Verified Hypertension" as of "Qualifying Encounter".
 
 concept "Verified Hypertension As Of Qualifying Encounter":
 - type is Condition.
 - valuetype is boolean.
-- inferred from "Verified Hypertension".
-- apply pattern `"Verified Hypertension" as of "Qualifying Encounter"`.
+- inferred from "Verified Hypertension As Of Qualifying Encounter Narrative".
 
-// --- Exception branch 1: BP measurement not done with documented reason ---
+
+// --- Exception branch 1: BP measurement not done with reason ---
+
 concept "BP Measurement Sources":
 - type is Observation.
 - valuetype is CodeableConcept.
-- inferred from ("Blood Pressure Panels" or "Standalone Systolic BP Observations" or "Standalone Diastolic BP Observations").
+- inferred from
+(
+   "Blood Pressure Panels"
+   sem-or
+   "Standalone Systolic BP Observations"
+   sem-or
+   "Standalone Diastolic BP Observations"
+).
+
+inference "BP Measurement Sources Not Done With Reason":
+- "BP Measurement Sources" not done with reason ("Medical Reasons" or "Patient Declined Reasons").
+
+inference "BP Measurement Sources Same Day As Qualifying Encounter":
+- "BP Measurement Sources" same day as "Qualifying Encounter".
 
 concept "BP Measurement Not Done With Reason":
 - type is Observation.
 - valuetype is boolean.
-- inferred from "BP Measurement Sources".
-- apply pattern `"BP Measurement Sources" not done with reason ("Medical Reasons" or "Patient Declined Reasons") and "BP Measurement Sources" same day as "Qualifying Encounter"`.
+- inferred from
+(
+   "BP Measurement Sources Not Done With Reason"
+   sem-and
+   "BP Measurement Sources Same Day As Qualifying Encounter"
+).
+
 
 // --- Exception branch 2: HTN follow-up declined by patient ---
+
+inference "Follow-up Within 4 Weeks Declined by Patient":
+- "Follow-up Within 4 Weeks" not done with reason "Patient Declined Reasons".
+
+inference "Follow-up Within 6 Months Declined by Patient":
+- "Follow-up Within 6 Months" not done with reason "Patient Declined Reasons".
+
+inference "Primary-Care Referrals Declined by Patient":
+- "Primary-Care Referrals" not done with reason "Patient Declined Reasons".
+
+inference "Non-Pharmacological Recommendations Declined by Patient":
+- "Non-Pharmacological Recommendations" not done with reason "Patient Declined Reasons".
+
+inference "Hypertension Lab or ECG Requests Declined by Patient":
+- "Hypertension Lab or ECG Requests" not done with reason "Patient Declined Reasons".
+
+inference "Antihypertensive Medications Declined by Patient":
+- "Antihypertensive Medications" not done with reason "Patient Declined Reasons".
+
 concept "Four-Week Rescreen Declined":
 - type is ServiceRequest.
 - valuetype is boolean.
-- inferred from "Follow-up Within 4 Weeks".
-- apply pattern `"Follow-up Within 4 Weeks" not done with reason "Patient Declined Reasons"`.
+- inferred from "Follow-up Within 4 Weeks Declined by Patient".
 
 concept "Six-Month Rescreen Declined":
 - type is ServiceRequest.
 - valuetype is boolean.
-- inferred from "Follow-up Within 6 Months".
-- apply pattern `"Follow-up Within 6 Months" not done with reason "Patient Declined Reasons"`.
+- inferred from "Follow-up Within 6 Months Declined by Patient".
 
 concept "Primary-Care Referral Declined":
 - type is ServiceRequest.
 - valuetype is boolean.
-- inferred from "Primary-Care Referrals".
-- apply pattern `"Primary-Care Referrals" not done with reason "Patient Declined Reasons"`.
+- inferred from "Primary-Care Referrals Declined by Patient".
 
 concept "Non-Pharm Recommendation Declined":
 - type is ServiceRequest.
 - valuetype is boolean.
-- inferred from "Non-Pharmacological Recommendations".
-- apply pattern `"Non-Pharmacological Recommendations" not done with reason "Patient Declined Reasons"`.
+- inferred from "Non-Pharmacological Recommendations Declined by Patient".
 
 concept "Hypertension Lab or ECG Declined":
 - type is ServiceRequest.
 - valuetype is boolean.
-- inferred from "Hypertension Lab or ECG Requests".
-- apply pattern `"Hypertension Lab or ECG Requests" not done with reason "Patient Declined Reasons"`.
+- inferred from "Hypertension Lab or ECG Requests Declined by Patient".
 
 concept "Antihypertensive Medication Declined":
 - type is MedicationRequest.
 - valuetype is boolean.
-- inferred from "Antihypertensive Medications".
-- apply pattern `"Antihypertensive Medications" not done with reason "Patient Declined Reasons"`.
+- inferred from "Antihypertensive Medications Declined by Patient".
+
+inference "Primary-Care Referral Declined Same Day As Qualifying Encounter":
+- "Primary-Care Referral Declined" same day as "Qualifying Encounter".
+
+inference "Six-Month Rescreen Declined Same Day As Qualifying Encounter":
+- "Six-Month Rescreen Declined" same day as "Qualifying Encounter".
+
+inference "Non-Pharm Recommendation Declined Same Day As Qualifying Encounter":
+- "Non-Pharm Recommendation Declined" same day as "Qualifying Encounter".
+
+inference "Four-Week Rescreen Declined Same Day As Qualifying Encounter":
+- "Four-Week Rescreen Declined" same day as "Qualifying Encounter".
+
+inference "Hypertension Lab or ECG Declined Same Day As Qualifying Encounter":
+- "Hypertension Lab or ECG Declined" same day as "Qualifying Encounter".
+
+inference "Antihypertensive Medication Declined Same Day As Qualifying Encounter":
+- "Antihypertensive Medication Declined" same day as "Qualifying Encounter".
 
 concept "Elevated BP Declined Bundle":
 - type is ServiceRequest.
 - valuetype is boolean.
-- inferred from "Qualifying Encounter".
-- apply pattern `("Primary-Care Referral Declined" same day as "Qualifying Encounter" or "Six-Month Rescreen Declined" same day as "Qualifying Encounter") or "Non-Pharm Recommendation Declined" same day as "Qualifying Encounter"`.
+- inferred from
+(
+   "Primary-Care Referral Declined Same Day As Qualifying Encounter"
+   sem-or
+   "Six-Month Rescreen Declined Same Day As Qualifying Encounter"
+   sem-or
+   "Non-Pharm Recommendation Declined Same Day As Qualifying Encounter"
+).
 
 concept "First HTN Declined Bundle":
 - type is ServiceRequest.
 - valuetype is boolean.
-- inferred from "Qualifying Encounter".
-- apply pattern `("Four-Week Rescreen Declined" same day as "Qualifying Encounter" or "Primary-Care Referral Declined" same day as "Qualifying Encounter") or "Non-Pharm Recommendation Declined" same day as "Qualifying Encounter"`.
+- inferred from
+(
+   "Four-Week Rescreen Declined Same Day As Qualifying Encounter"
+   sem-or
+   "Primary-Care Referral Declined Same Day As Qualifying Encounter"
+   sem-or
+   "Non-Pharm Recommendation Declined Same Day As Qualifying Encounter"
+).
 
 concept "Second HTN 130s Declined Bundle":
 - type is ServiceRequest.
 - valuetype is boolean.
-- inferred from "Qualifying Encounter".
-- apply pattern `("Primary-Care Referral Declined" same day as "Qualifying Encounter" or "Six-Month Rescreen Declined" same day as "Qualifying Encounter") or "Hypertension Lab or ECG Declined" same day as "Qualifying Encounter" or "Non-Pharm Recommendation Declined" same day as "Qualifying Encounter"`.
+- inferred from
+(
+   "Primary-Care Referral Declined Same Day As Qualifying Encounter"
+   sem-or
+   "Six-Month Rescreen Declined Same Day As Qualifying Encounter"
+   sem-or
+   "Hypertension Lab or ECG Declined Same Day As Qualifying Encounter"
+   sem-or
+   "Non-Pharm Recommendation Declined Same Day As Qualifying Encounter"
+).
 
 concept "Second HTN 140+ Declined Bundle":
 - type is ServiceRequest.
 - valuetype is boolean.
-- inferred from "Qualifying Encounter".
-- apply pattern `("Primary-Care Referral Declined" same day as "Qualifying Encounter" or "Four-Week Rescreen Declined" same day as "Qualifying Encounter") or "Antihypertensive Medication Declined" same day as "Qualifying Encounter" or "Hypertension Lab or ECG Declined" same day as "Qualifying Encounter" or "Non-Pharm Recommendation Declined" same day as "Qualifying Encounter"`.
+- inferred from
+(
+   "Primary-Care Referral Declined Same Day As Qualifying Encounter"
+   sem-or
+   "Four-Week Rescreen Declined Same Day As Qualifying Encounter"
+   sem-or
+   "Antihypertensive Medication Declined Same Day As Qualifying Encounter"
+   sem-or
+   "Hypertension Lab or ECG Declined Same Day As Qualifying Encounter"
+   sem-or
+   "Non-Pharm Recommendation Declined Same Day As Qualifying Encounter"
+).
 
 concept "Elevated BP With Declined Followup":
 - type is Observation.
 - valuetype is boolean.
-- inferred from ("Elevated BP Reading" and "Elevated BP Declined Bundle").
+- inferred from
+(
+   "Elevated BP Reading"
+   sem-and
+   "Elevated BP Declined Bundle"
+).
 
 concept "First HTN With Declined Followup":
 - type is Observation.
 - valuetype is boolean.
-- inferred from ("First Hypertensive Reading" and "First HTN Declined Bundle").
+- inferred from
+(
+   "First Hypertensive Reading"
+   sem-and
+   "First HTN Declined Bundle"
+).
 
 concept "Second HTN 130s With Declined Followup":
 - type is Observation.
 - valuetype is boolean.
-- inferred from ("Second Hypertensive Reading 130s" and "Second HTN 130s Declined Bundle").
+- inferred from
+(
+   "Second Hypertensive Reading 130s"
+   sem-and
+   "Second HTN 130s Declined Bundle"
+).
 
 concept "Second HTN 140+ With Declined Followup":
 - type is Observation.
 - valuetype is boolean.
-- inferred from ("Second Hypertensive Reading 140+" and "Second HTN 140+ Declined Bundle").
+- inferred from
+(
+   "Second Hypertensive Reading 140+"
+   sem-and
+   "Second HTN 140+ Declined Bundle"
+).
 
 concept "HTN Followup Declined By Patient":
 - type is Observation.
 - valuetype is boolean.
-- inferred from ("Elevated BP With Declined Followup"
-                or "First HTN With Declined Followup"
-                or "Second HTN 130s With Declined Followup"
-                or "Second HTN 140+ With Declined Followup").
+- inferred from
+(
+   "Elevated BP With Declined Followup"
+   sem-or
+   "First HTN With Declined Followup"
+   sem-or
+   "Second HTN 130s With Declined Followup"
+   sem-or
+   "Second HTN 140+ With Declined Followup"
+).
+
 
 // --- Age predicate ---
+
+inference "Age At Start Of MP At Least 18 Years":
+- age at start of "Measurement Period" at least 18 years.
+
 concept "Aged 18+ at Measurement Period Start":
 - type is Encounter.
 - valuetype is boolean.
-- inferred from "Qualifying Encounter".
-- apply pattern `age at start of "Measurement Period" at least 18 years`.
+- inferred from "Age At Start Of MP At Least 18 Years".
 
 
-// --- Measure API ---
+// ============ Measure API ============
+
 concept "Initial Population":
 - type is Observation.
 - valuetype is boolean.
@@ -485,13 +839,25 @@ concept "Denominator Exclusions":
 concept "Numerator":
 - type is Observation.
 - valuetype is boolean.
-- inferred from ("Normal BP Reading"
-                or "Elevated BP With Followup"
-                or "First HTN With Followup"
-                or "Second HTN 130s With Followup"
-                or "Second HTN 140+ With Followup").
+- inferred from
+(
+   "Normal BP Reading"
+   sem-or
+   "Elevated BP With Followup"
+   sem-or
+   "First HTN With Followup"
+   sem-or
+   "Second HTN 130s With Followup"
+   sem-or
+   "Second HTN 140+ With Followup"
+).
 
 concept "Denominator Exceptions":
 - type is Observation.
 - valuetype is boolean.
-- inferred from ("BP Measurement Not Done With Reason" or "HTN Followup Declined By Patient").
+- inferred from
+(
+   "BP Measurement Not Done With Reason"
+   sem-or
+   "HTN Followup Declined By Patient"
+).

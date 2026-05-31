@@ -1,13 +1,17 @@
-# CMS69 BMI Screening and Follow-Up
+# CMS69 BMI Screening and Follow-Up — v0.5 grammar
+
+// Migrated to CRL v0.5: `inference` keyword for narrative predicates;
+// concept `inferred from` body is bare ref or sem-or/sem-and/sem-not composition.
+// All multi-clause concepts now compose named inferences via sem-* operators.
 
 
-// --- Source observations ---
+// ============ Asserted concepts (unchanged) ============
+
 concept "BMI Observations":
 - type is Observation.
 - valuetype is Quantity.
 - coded from "Body Mass Index Observations".
 
-// --- Diagnosis sources ---
 concept "Pregnancy Diagnoses":
 - type is Condition.
 - valuetype is CodeableConcept.
@@ -28,7 +32,6 @@ concept "Underweight Diagnoses":
 - valuetype is CodeableConcept.
 - coded from "Underweight".
 
-// --- Encounter source ---
 concept "Encounters to Evaluate BMI":
 - type is Encounter.
 - valuetype is CodeableConcept.
@@ -39,7 +42,6 @@ concept "Virtual Encounters":
 - valuetype is CodeableConcept.
 - coded from "Virtual Encounter Class".
 
-// --- Intervention sources: service requests ---
 concept "High BMI Follow-up Service Requests":
 - type is ServiceRequest.
 - valuetype is CodeableConcept.
@@ -55,7 +57,6 @@ concept "Weight Assessment Referrals":
 - valuetype is CodeableConcept.
 - coded from "Referrals Where Weight Assessment May Occur".
 
-// --- Intervention sources: medications ---
 concept "High BMI Medications":
 - type is MedicationRequest.
 - valuetype is CodeableConcept.
@@ -66,7 +67,6 @@ concept "Low BMI Medications":
 - valuetype is CodeableConcept.
 - coded from "Medications for Below Normal BMI".
 
-// --- Intervention sources: procedures ---
 concept "High BMI Follow-up Procedures":
 - type is Procedure.
 - valuetype is CodeableConcept.
@@ -77,7 +77,6 @@ concept "Low BMI Follow-up Procedures":
 - valuetype is CodeableConcept.
 - coded from "Follow Up for Below Normal BMI Procedures".
 
-// --- Not-done reason qualifiers ---
 concept "Medical Reasons":
 - type is Observation.
 - valuetype is CodeableConcept.
@@ -89,65 +88,8 @@ concept "Patient Declined Reasons":
 - coded from "Patient Declined".
 
 
-// --- Qualifying Encounter ---
-concept "BMI Evaluation Encounter (not virtual)":
-- type is Encounter.
-- valuetype is boolean.
-- inferred from ("Encounters to Evaluate BMI" and not "Virtual Encounters").
+// ============ Lifted property concepts (bare ref — type-only wrappers) ============
 
-concept "Qualifying Encounter":
-- type is Encounter.
-- valuetype is boolean.
-- inferred from "BMI Evaluation Encounter (not virtual)".
-- apply pattern `"BMI Evaluation Encounter (not virtual)" during "Measurement Period" and "BMI Evaluation Encounter (not virtual)" was performed`.
-
-// --- BMI observations during MP ---
-concept "BMI During Measurement Period":
-- type is Observation.
-- valuetype is Quantity.
-- inferred from "BMI Observations".
-- apply pattern `"BMI Observations" during "Measurement Period" and "BMI Observations" exceeds 0 'kg/m2'`.
-
-// --- BMI clinical classifications ---
-// Standard cutoffs: <18.5 = Low, [18.5,25) = Normal, >=25 = High.
-concept "Documented Low BMI":
-- type is Observation.
-- valuetype is boolean.
-- inferred from "BMI During Measurement Period".
-- apply pattern `"BMI During Measurement Period" is low`.
-
-concept "Documented High BMI":
-- type is Observation.
-- valuetype is boolean.
-- inferred from "BMI During Measurement Period".
-- apply pattern `"BMI During Measurement Period" is high`.
-
-concept "Normal BMI Range":
-- type is Observation.
-- valuetype is boolean.
-- inferred from "BMI During Measurement Period".
-- apply pattern `"BMI During Measurement Period" is normal`.
-
-concept "Has Normal BMI":
-- type is Observation.
-- valuetype is boolean.
-- inferred from "Normal BMI Range".
-- apply pattern `without documented ("Documented High BMI" or "Documented Low BMI")`.
-
-// --- Co-existing diagnoses ---
-concept "Has Overweight or Obese":
-- type is Condition.
-- valuetype is boolean.
-- inferred from "Overweight or Obese Diagnoses".
-- apply pattern `"Overweight or Obese Diagnoses" is active`.
-
-concept "Has Underweight":
-- type is Condition.
-- valuetype is boolean.
-- inferred from "Underweight Diagnoses".
-- apply pattern `"Underweight Diagnoses" is active`.
-
-// --- Lifted property concepts (order/performed dates per source action) ---
 concept "High BMI Follow-up Order Date":
 - type is ServiceRequest.
 - valuetype is dateTime.
@@ -183,164 +125,566 @@ concept "Low BMI Procedure Performed Date":
 - valuetype is dateTime.
 - inferred from "Low BMI Follow-up Procedures".
 
+
+// ============ Inference declarations + composing concepts ============
+
+// --- Qualifying Encounter ---
+
+concept "BMI Evaluation Encounter (not virtual)":
+- type is Encounter.
+- valuetype is boolean.
+- inferred from
+(
+   "Encounters to Evaluate BMI"
+   sem-and
+   sem-not "Virtual Encounters"
+).
+
+inference "BMI Evaluation Encounter (not virtual) During MP":
+- "BMI Evaluation Encounter (not virtual)" during "Measurement Period".
+
+inference "BMI Evaluation Encounter (not virtual) Performed":
+- "BMI Evaluation Encounter (not virtual)" performed.
+
+concept "Qualifying Encounter":
+- type is Encounter.
+- valuetype is boolean.
+- inferred from
+(
+   "BMI Evaluation Encounter (not virtual) During MP"
+   sem-and
+   "BMI Evaluation Encounter (not virtual) Performed"
+).
+
+
+// --- BMI During Measurement Period ---
+
+inference "BMI Observation During MP":
+- "BMI Observations" during "Measurement Period".
+
+inference "BMI Observation Has Positive Value":
+- "BMI Observations" exceeds 0 'kg/m2'.
+
+concept "BMI During Measurement Period":
+- type is Observation.
+- valuetype is Quantity.
+- inferred from
+(
+   "BMI Observation During MP"
+   sem-and
+   "BMI Observation Has Positive Value"
+).
+
+
+// --- BMI clinical classifications ---
+
+inference "BMI During MP Is Low":
+- "BMI During Measurement Period" is low.
+
+inference "BMI During MP Is High":
+- "BMI During Measurement Period" is high.
+
+inference "BMI During MP Is Normal":
+- "BMI During Measurement Period" is normal.
+
+concept "Documented Low BMI":
+- type is Observation.
+- valuetype is boolean.
+- inferred from "BMI During MP Is Low".
+
+concept "Documented High BMI":
+- type is Observation.
+- valuetype is boolean.
+- inferred from "BMI During MP Is High".
+
+concept "Normal BMI Range":
+- type is Observation.
+- valuetype is boolean.
+- inferred from "BMI During MP Is Normal".
+
+
+// --- Has Normal BMI ---
+
+inference "Without Documented Abnormal BMI":
+- without documented ("Documented High BMI" or "Documented Low BMI").
+
+concept "Has Normal BMI":
+- type is Observation.
+- valuetype is boolean.
+- inferred from
+(
+   "Normal BMI Range"
+   sem-and
+   "Without Documented Abnormal BMI"
+).
+
+
+// --- Co-existing diagnoses ---
+
+inference "Overweight or Obese Diagnoses is Active":
+- "Overweight or Obese Diagnoses" is active.
+
+inference "Underweight Diagnoses is Active":
+- "Underweight Diagnoses" is active.
+
+concept "Has Overweight or Obese":
+- type is Condition.
+- valuetype is boolean.
+- inferred from "Overweight or Obese Diagnoses is Active".
+
+concept "Has Underweight":
+- type is Condition.
+- valuetype is boolean.
+- inferred from "Underweight Diagnoses is Active".
+
+
 // --- High BMI Interventions Ordered ---
+
+inference "High BMI Follow-up Justified by Overweight Diagnosis":
+- "High BMI Follow-up Service Requests" justified by "Overweight or Obese Diagnoses".
+
+inference "Has Overweight On Or Before High BMI Follow-up Order":
+- "Has Overweight or Obese" on or before "High BMI Follow-up Order Date".
+
 concept "High BMI Follow-up Order":
 - type is ServiceRequest.
 - valuetype is boolean.
-- inferred from "High BMI Follow-up Service Requests".
-- apply pattern `"High BMI Follow-up Service Requests" justified by "Overweight or Obese Diagnoses" or "Has Overweight or Obese" on or before "High BMI Follow-up Order Date"`.
+- inferred from
+(
+   "High BMI Follow-up Justified by Overweight Diagnosis"
+   sem-or
+   "Has Overweight On Or Before High BMI Follow-up Order"
+).
+
+inference "Weight Assessment Referral Justified by Overweight Diagnosis":
+- "Weight Assessment Referrals" justified by "Overweight or Obese Diagnoses".
+
+inference "Has Overweight On Or Before Weight Assessment Referral":
+- "Has Overweight or Obese" on or before "Weight Assessment Referral Date".
 
 concept "High BMI Weight Assessment Referral":
 - type is ServiceRequest.
 - valuetype is boolean.
-- inferred from "Weight Assessment Referrals".
-- apply pattern `"Weight Assessment Referrals" justified by "Overweight or Obese Diagnoses" or "Has Overweight or Obese" on or before "Weight Assessment Referral Date"`.
+- inferred from
+(
+   "Weight Assessment Referral Justified by Overweight Diagnosis"
+   sem-or
+   "Has Overweight On Or Before Weight Assessment Referral"
+).
+
+inference "High BMI Medication Justified by Overweight Diagnosis":
+- "High BMI Medications" justified by "Overweight or Obese Diagnoses".
+
+inference "Has Overweight On Or Before High BMI Medication Order":
+- "Has Overweight or Obese" on or before "High BMI Medication Order Date".
 
 concept "High BMI Medication Order":
 - type is MedicationRequest.
 - valuetype is boolean.
-- inferred from "High BMI Medications".
-- apply pattern `"High BMI Medications" justified by "Overweight or Obese Diagnoses" or "Has Overweight or Obese" on or before "High BMI Medication Order Date"`.
+- inferred from
+(
+   "High BMI Medication Justified by Overweight Diagnosis"
+   sem-or
+   "Has Overweight On Or Before High BMI Medication Order"
+).
 
 concept "High BMI Interventions Ordered":
 - type is ServiceRequest.
 - valuetype is boolean.
-- inferred from ("High BMI Follow-up Order" or "High BMI Weight Assessment Referral" or "High BMI Medication Order").
+- inferred from
+(
+   "High BMI Follow-up Order"
+   sem-or
+   "High BMI Weight Assessment Referral"
+   sem-or
+   "High BMI Medication Order"
+).
+
 
 // --- High BMI Interventions Performed ---
+
+inference "High BMI Procedure Justified by Overweight Diagnosis":
+- "High BMI Follow-up Procedures" justified by "Overweight or Obese Diagnoses".
+
+inference "Has Overweight On Or Before High BMI Procedure":
+- "Has Overweight or Obese" on or before "High BMI Procedure Performed Date".
+
 concept "High BMI Procedure Performed":
 - type is Procedure.
 - valuetype is boolean.
-- inferred from "High BMI Follow-up Procedures".
-- apply pattern `"High BMI Follow-up Procedures" justified by "Overweight or Obese Diagnoses" or "Has Overweight or Obese" on or before "High BMI Procedure Performed Date"`.
+- inferred from
+(
+   "High BMI Procedure Justified by Overweight Diagnosis"
+   sem-or
+   "Has Overweight On Or Before High BMI Procedure"
+).
 
 concept "High BMI Interventions Performed":
 - type is Procedure.
 - valuetype is boolean.
 - inferred from "High BMI Procedure Performed".
 
-// --- High BMI With Follow-Up Provided ---
+
+// --- High BMI And Follow Up Provided ---
+
+inference "Documented High BMI During MP":
+- "Documented High BMI" during "Measurement Period".
+
 concept "High BMI And Follow Up Provided":
 - type is Observation.
 - valuetype is boolean.
-- inferred from "Documented High BMI".
-- apply pattern `"Documented High BMI" with (("High BMI Interventions Ordered" or "High BMI Interventions Performed") and "Documented High BMI" during "Measurement Period")`.
+- inferred from
+(
+   "Documented High BMI During MP"
+   sem-and
+   (
+      "High BMI Interventions Ordered"
+      sem-or
+      "High BMI Interventions Performed"
+   )
+).
+
 
 // --- Low BMI analogous ---
+
+inference "Low BMI Follow-up Justified by Underweight Diagnosis":
+- "Low BMI Follow-up Service Requests" justified by "Underweight Diagnoses".
+
+inference "Has Underweight On Or Before Low BMI Follow-up Order":
+- "Has Underweight" on or before "Low BMI Follow-up Order Date".
+
+inference "Low BMI Follow-up Order Date During MP":
+- "Low BMI Follow-up Order Date" during "Measurement Period".
+
 concept "Low BMI Follow-up Order":
 - type is ServiceRequest.
 - valuetype is boolean.
-- inferred from "Low BMI Follow-up Service Requests".
-- apply pattern `"Low BMI Follow-up Service Requests" justified by "Underweight Diagnoses" or ("Has Underweight" on or before "Low BMI Follow-up Order Date" and "Low BMI Follow-up Order Date" during "Measurement Period")`.
+- inferred from
+(
+   "Low BMI Follow-up Justified by Underweight Diagnosis"
+   sem-or
+   (
+      "Has Underweight On Or Before Low BMI Follow-up Order"
+      sem-and
+      "Low BMI Follow-up Order Date During MP"
+   )
+).
+
+inference "Weight Assessment Referral Justified by Underweight Diagnosis":
+- "Weight Assessment Referrals" justified by "Underweight Diagnoses".
+
+inference "Has Underweight On Or Before Weight Assessment Referral":
+- "Has Underweight" on or before "Weight Assessment Referral Date".
+
+inference "Weight Assessment Referral Date During MP":
+- "Weight Assessment Referral Date" during "Measurement Period".
 
 concept "Low BMI Weight Assessment Referral":
 - type is ServiceRequest.
 - valuetype is boolean.
-- inferred from "Weight Assessment Referrals".
-- apply pattern `"Weight Assessment Referrals" justified by "Underweight Diagnoses" or ("Has Underweight" on or before "Weight Assessment Referral Date" and "Weight Assessment Referral Date" during "Measurement Period")`.
+- inferred from
+(
+   "Weight Assessment Referral Justified by Underweight Diagnosis"
+   sem-or
+   (
+      "Has Underweight On Or Before Weight Assessment Referral"
+      sem-and
+      "Weight Assessment Referral Date During MP"
+   )
+).
+
+inference "Low BMI Medication Justified by Underweight Diagnosis":
+- "Low BMI Medications" justified by "Underweight Diagnoses".
+
+inference "Has Underweight On Or Before Low BMI Medication Order":
+- "Has Underweight" on or before "Low BMI Medication Order Date".
+
+inference "Low BMI Medication Order Date During MP":
+- "Low BMI Medication Order Date" during "Measurement Period".
 
 concept "Low BMI Medication Order":
 - type is MedicationRequest.
 - valuetype is boolean.
-- inferred from "Low BMI Medications".
-- apply pattern `"Low BMI Medications" justified by "Underweight Diagnoses" or ("Has Underweight" on or before "Low BMI Medication Order Date" and "Low BMI Medication Order Date" during "Measurement Period")`.
+- inferred from
+(
+   "Low BMI Medication Justified by Underweight Diagnosis"
+   sem-or
+   (
+      "Has Underweight On Or Before Low BMI Medication Order"
+      sem-and
+      "Low BMI Medication Order Date During MP"
+   )
+).
 
 concept "Low BMI Interventions Ordered":
 - type is ServiceRequest.
 - valuetype is boolean.
-- inferred from ("Low BMI Follow-up Order" or "Low BMI Weight Assessment Referral" or "Low BMI Medication Order").
+- inferred from
+(
+   "Low BMI Follow-up Order"
+   sem-or
+   "Low BMI Weight Assessment Referral"
+   sem-or
+   "Low BMI Medication Order"
+).
+
+
+// --- Low BMI Interventions Performed ---
+
+inference "Low BMI Procedure Justified by Underweight Diagnosis":
+- "Low BMI Follow-up Procedures" justified by "Underweight Diagnoses".
+
+inference "Low BMI Follow-up Procedures Performed":
+- "Low BMI Follow-up Procedures" performed.
+
+inference "Has Underweight On Or Before Low BMI Procedure":
+- "Has Underweight" on or before "Low BMI Procedure Performed Date".
+
+inference "Low BMI Procedure Performed Date During MP":
+- "Low BMI Procedure Performed Date" during "Measurement Period".
 
 concept "Low BMI Procedure Performed":
 - type is Procedure.
 - valuetype is boolean.
-- inferred from "Low BMI Follow-up Procedures".
-- apply pattern `("Low BMI Follow-up Procedures" justified by "Underweight Diagnoses" and "Low BMI Follow-up Procedures" was performed) or ("Has Underweight" on or before "Low BMI Procedure Performed Date" and "Low BMI Procedure Performed Date" during "Measurement Period")`.
+- inferred from
+(
+   (
+      "Low BMI Procedure Justified by Underweight Diagnosis"
+      sem-and
+      "Low BMI Follow-up Procedures Performed"
+   )
+   sem-or
+   (
+      "Has Underweight On Or Before Low BMI Procedure"
+      sem-and
+      "Low BMI Procedure Performed Date During MP"
+   )
+).
 
 concept "Low BMI Interventions Performed":
 - type is Procedure.
 - valuetype is boolean.
 - inferred from "Low BMI Procedure Performed".
 
+
+// --- Low BMI And Follow Up Provided ---
+
+inference "Documented Low BMI During MP":
+- "Documented Low BMI" during "Measurement Period".
+
 concept "Low BMI And Follow Up Provided":
 - type is Observation.
 - valuetype is boolean.
-- inferred from "Documented Low BMI".
-- apply pattern `"Documented Low BMI" with (("Low BMI Interventions Ordered" or "Low BMI Interventions Performed") and "Documented Low BMI" during "Measurement Period")`.
+- inferred from
+(
+   "Documented Low BMI During MP"
+   sem-and
+   (
+      "Low BMI Interventions Ordered"
+      sem-or
+      "Low BMI Interventions Performed"
+   )
+).
+
 
 // --- BMI exam not performed with reason ---
+
+inference "BMI Observation Not Done With Reason":
+- "BMI Observations" not done with reason ("Medical Reasons" or "Patient Declined Reasons").
+
+inference "BMI Observation Same Day As Qualifying Encounter":
+- "BMI Observations" same day as "Qualifying Encounter".
+
 concept "Medical Reason Or Patient Reason For Not Performing BMI Exam":
 - type is Observation.
 - valuetype is boolean.
-- inferred from "BMI Observations".
-- apply pattern `"BMI Observations" not done with reason ("Medical Reasons" or "Patient Declined Reasons") and "BMI Observations" same day as "Qualifying Encounter"`.
+- inferred from
+(
+   "BMI Observation Not Done With Reason"
+   sem-and
+   "BMI Observation Same Day As Qualifying Encounter"
+).
+
 
 // --- BMI follow-up not documented with reason ---
+
+inference "High BMI Follow-up Not Done With Medical Reason":
+- "High BMI Follow-up Service Requests" not done with reason "Medical Reasons".
+
+inference "High BMI Follow-up Same Day As Qualifying Encounter":
+- "High BMI Follow-up Service Requests" same day as "Qualifying Encounter".
+
+inference "High BMI Follow-up Performed":
+- "High BMI Follow-up Service Requests" performed.
+
 concept "High BMI Follow-up Not Done With Reason":
 - type is ServiceRequest.
 - valuetype is boolean.
-- inferred from "High BMI Follow-up Service Requests".
-- apply pattern `"High BMI Follow-up Service Requests" not done with reason "Medical Reasons" and "High BMI Follow-up Service Requests" same day as "Qualifying Encounter" and "High BMI Follow-up Service Requests" was performed`.
+- inferred from
+(
+   "High BMI Follow-up Not Done With Medical Reason"
+   sem-and
+   "High BMI Follow-up Same Day As Qualifying Encounter"
+   sem-and
+   "High BMI Follow-up Performed"
+).
+
+inference "Low BMI Follow-up Not Done With Medical Reason":
+- "Low BMI Follow-up Service Requests" not done with reason "Medical Reasons".
+
+inference "Low BMI Follow-up Same Day As Qualifying Encounter":
+- "Low BMI Follow-up Service Requests" same day as "Qualifying Encounter".
+
+inference "Low BMI Follow-up Performed":
+- "Low BMI Follow-up Service Requests" performed.
 
 concept "Low BMI Follow-up Not Done With Reason":
 - type is ServiceRequest.
 - valuetype is boolean.
-- inferred from "Low BMI Follow-up Service Requests".
-- apply pattern `"Low BMI Follow-up Service Requests" not done with reason "Medical Reasons" and "Low BMI Follow-up Service Requests" same day as "Qualifying Encounter" and "Low BMI Follow-up Service Requests" was performed`.
+- inferred from
+(
+   "Low BMI Follow-up Not Done With Medical Reason"
+   sem-and
+   "Low BMI Follow-up Same Day As Qualifying Encounter"
+   sem-and
+   "Low BMI Follow-up Performed"
+).
+
+inference "Weight Assessment Referral Not Done With Medical Reason":
+- "Weight Assessment Referrals" not done with reason "Medical Reasons".
+
+inference "Weight Assessment Referral Same Day As Qualifying Encounter":
+- "Weight Assessment Referrals" same day as "Qualifying Encounter".
+
+inference "Weight Assessment Referral Performed":
+- "Weight Assessment Referrals" performed.
 
 concept "Weight Assessment Referral Not Done With Reason":
 - type is ServiceRequest.
 - valuetype is boolean.
-- inferred from "Weight Assessment Referrals".
-- apply pattern `"Weight Assessment Referrals" not done with reason "Medical Reasons" and "Weight Assessment Referrals" same day as "Qualifying Encounter" and "Weight Assessment Referrals" was performed`.
+- inferred from
+(
+   "Weight Assessment Referral Not Done With Medical Reason"
+   sem-and
+   "Weight Assessment Referral Same Day As Qualifying Encounter"
+   sem-and
+   "Weight Assessment Referral Performed"
+).
+
+inference "High BMI Medication Not Done With Medical Reason":
+- "High BMI Medications" not done with reason "Medical Reasons".
+
+inference "High BMI Medication Same Day As Qualifying Encounter":
+- "High BMI Medications" same day as "Qualifying Encounter".
+
+inference "High BMI Medication Performed":
+- "High BMI Medications" performed.
 
 concept "High BMI Medication Not Done With Reason":
 - type is MedicationRequest.
 - valuetype is boolean.
-- inferred from "High BMI Medications".
-- apply pattern `"High BMI Medications" not done with reason "Medical Reasons" and "High BMI Medications" same day as "Qualifying Encounter" and "High BMI Medications" was performed`.
+- inferred from
+(
+   "High BMI Medication Not Done With Medical Reason"
+   sem-and
+   "High BMI Medication Same Day As Qualifying Encounter"
+   sem-and
+   "High BMI Medication Performed"
+).
+
+inference "Low BMI Medication Not Done With Medical Reason":
+- "Low BMI Medications" not done with reason "Medical Reasons".
+
+inference "Low BMI Medication Same Day As Qualifying Encounter":
+- "Low BMI Medications" same day as "Qualifying Encounter".
+
+inference "Low BMI Medication Performed":
+- "Low BMI Medications" performed.
 
 concept "Low BMI Medication Not Done With Reason":
 - type is MedicationRequest.
 - valuetype is boolean.
-- inferred from "Low BMI Medications".
-- apply pattern `"Low BMI Medications" not done with reason "Medical Reasons" and "Low BMI Medications" same day as "Qualifying Encounter" and "Low BMI Medications" was performed`.
+- inferred from
+(
+   "Low BMI Medication Not Done With Medical Reason"
+   sem-and
+   "Low BMI Medication Same Day As Qualifying Encounter"
+   sem-and
+   "Low BMI Medication Performed"
+).
 
 concept "Medical Reason For Not Documenting A Follow Up Plan For Low Or High BMI":
 - type is ServiceRequest.
 - valuetype is boolean.
-- inferred from ("High BMI Follow-up Not Done With Reason"
-                or "Low BMI Follow-up Not Done With Reason"
-                or "Weight Assessment Referral Not Done With Reason"
-                or "High BMI Medication Not Done With Reason"
-                or "Low BMI Medication Not Done With Reason").
+- inferred from
+(
+   "High BMI Follow-up Not Done With Reason"
+   sem-or
+   "Low BMI Follow-up Not Done With Reason"
+   sem-or
+   "Weight Assessment Referral Not Done With Reason"
+   sem-or
+   "High BMI Medication Not Done With Reason"
+   sem-or
+   "Low BMI Medication Not Done With Reason"
+).
+
 
 // --- Pregnancy during measurement period ---
+
+inference "Pregnancy Diagnoses Active During MP":
+- "Pregnancy Diagnoses" is active during "Measurement Period".
+
 concept "Active Pregnancy Diagnosis":
 - type is Condition.
 - valuetype is boolean.
-- inferred from "Pregnancy Diagnoses".
-- apply pattern `"Pregnancy Diagnoses" is active during "Measurement Period"`.
+- inferred from "Pregnancy Diagnoses Active During MP".
+
+inference "Pregnancy Status Overlaps MP":
+- "Pregnancy Status Observations" overlaps "Measurement Period".
+
+inference "Pregnancy Status Is Verified":
+- "Pregnancy Status Observations" is verified.
+
+inference "Pregnancy Status Documented As Pregnancy Related":
+- "Pregnancy Status Observations" documented as "Pregnancy or Other Related Diagnoses".
 
 concept "Verified Pregnancy Status":
 - type is Observation.
 - valuetype is boolean.
-- inferred from "Pregnancy Status Observations".
-- apply pattern `"Pregnancy Status Observations" overlaps "Measurement Period" and "Pregnancy Status Observations" is verified and "Pregnancy Status Observations" documented as "Pregnancy or Other Related Diagnoses"`.
+- inferred from
+(
+   "Pregnancy Status Overlaps MP"
+   sem-and
+   "Pregnancy Status Is Verified"
+   sem-and
+   "Pregnancy Status Documented As Pregnancy Related"
+).
 
 concept "Is Pregnant During Measurement Period":
 - type is Condition.
 - valuetype is boolean.
-- inferred from ("Active Pregnancy Diagnosis" or "Verified Pregnancy Status").
+- inferred from
+(
+   "Active Pregnancy Diagnosis"
+   sem-or
+   "Verified Pregnancy Status"
+).
+
 
 // --- Age predicate ---
+
+inference "Age At Start Of MP At Least 18 Years":
+- age at start of "Measurement Period" at least 18 years.
+
 concept "Aged 18+ at Measurement Period Start":
 - type is Encounter.
 - valuetype is boolean.
-- inferred from "Qualifying Encounter".
-- apply pattern `age at start of "Measurement Period" at least 18 years`.
+- inferred from "Age At Start Of MP At Least 18 Years".
 
 
-// --- Measure API ---
+// ============ Measure API ============
+
 concept "Initial Population":
 - type is Observation.
 - valuetype is boolean.
@@ -359,9 +703,21 @@ concept "Denominator Exclusions":
 concept "Numerator":
 - type is Observation.
 - valuetype is boolean.
-- inferred from ("High BMI And Follow Up Provided" or "Low BMI And Follow Up Provided" or "Has Normal BMI").
+- inferred from
+(
+   "High BMI And Follow Up Provided"
+   sem-or
+   "Low BMI And Follow Up Provided"
+   sem-or
+   "Has Normal BMI"
+).
 
 concept "Denominator Exceptions":
 - type is ServiceRequest.
 - valuetype is boolean.
-- inferred from ("Medical Reason For Not Documenting A Follow Up Plan For Low Or High BMI" or "Medical Reason Or Patient Reason For Not Performing BMI Exam").
+- inferred from
+(
+   "Medical Reason For Not Documenting A Follow Up Plan For Low Or High BMI"
+   sem-or
+   "Medical Reason Or Patient Reason For Not Performing BMI Exam"
+).
