@@ -1,6 +1,10 @@
-# CRL clinical inference patterns — draft catalog v0.5.5
+# CRL clinical inference patterns — draft catalog v0.6.0
 
-> **Status: draft v0.5.5** (v0.3 + CMS69 → … → v0.5.4 round-3 cleanup → v0.5.5 Todo 2 grammar coordination). **45 patterns** across the inference taxonomy plus a **5-form window-from-anchor sub-grammar** (BeforeStartOf, AfterStartOf, BeforeEndOf, AfterEndOf, OnDayOf).
+> **Status: draft v0.6.0** ("What not How" catalog sweep — return-type annotations stripped from canonical signatures per `features/cql-pattern-mining/inferred-from-is-semantic-composition.md`). **45 patterns** across the inference taxonomy plus a **5-form window-from-anchor sub-grammar** (BeforeStartOf, AfterStartOf, BeforeEndOf, AfterEndOf, OnDayOf).
+>
+> **v0.6.0 — "What not How" sweep.** Canonical signatures no longer carry return-type annotations (the `: boolean` / `: Period` / `: Instance<X>` / `: WindowSpec` / `: T` parts after the closing paren). Per the v0.6 design discovered while correcting cms69/cms22: `inferred from` is **semantic composition**, not boolean logic — the CRL author declares each concept's `(type, valuetype)` based on semantic intent; the catalog describes pattern FORM (narrative + canonical name + parameter types for autocomplete + CQL function name), not return SHAPE. Treating catalog return types as authoritative for concept shape caused a multi-round correction loop (see `.vibe-tools/discussions/016`). Return types still appear in the CQL function definitions shown later in the document (those are CQL-side / emitter-side, accurate description of the function's CQL return type). The canonical column of the reference table is now author-facing form only.
+>
+> **v0.5.5 — Todo 2 grammar coordination** (`.vibe-tools/discussions/015`): minor catalog updates landing alongside the v0.5 grammar work in Todo 2. (a) `WasPerformed(X)` narrative form changes from `<X> was performed` to `<X> performed` (drops the auxiliary "was"; reads more naturally; canonical name unchanged). (b) `WasOrdered(X)` narrative form changes from `<X> was ordered` to `<X> ordered` (same rationale). (c) New type `Conjunction<T>` added to the type notation — symmetric to `Disjunction<T>`, for future patterns where in-arg conjunction semantics ("all of these") are needed. No corpus measure currently uses this; added prospectively so the grammar's accepting in-arg `and` is matched by the catalog's type system.
 >
 > **v0.5.5 — Todo 2 grammar coordination** (`.vibe-tools/discussions/015`): minor catalog updates landing alongside the v0.5 grammar work in Todo 2. (a) `WasPerformed(X)` narrative form changes from `<X> was performed` to `<X> performed` (drops the auxiliary "was"; reads more naturally; canonical name unchanged). (b) `WasOrdered(X)` narrative form changes from `<X> was ordered` to `<X> ordered` (same rationale). (c) New type `Conjunction<T>` added to the type notation — symmetric to `Disjunction<T>`, for future patterns where in-arg conjunction semantics ("all of these") are needed. No corpus measure currently uses this; added prospectively so the grammar's accepting in-arg `and` is matched by the catalog's type system.
 >
@@ -38,7 +42,7 @@ The **reference table** (next section) is the authoritative source of truth for 
 
 ```
 narrative:  <discriminator> component of <panel>
-canonical:  ComponentOf(panel: ConceptRef, discriminator: ConceptRef<T>): T
+canonical:  ComponentOf(panel: ConceptRef, discriminator: ConceptRef)
             ─ <discriminator> in the narrative binds to the `discriminator` canonical param.
             ─ <panel> in the narrative binds to the `panel` canonical param.
             ─ Surface order (discriminator first, panel second) does NOT determine binding.
@@ -57,7 +61,7 @@ canonical:  ComponentOf(panel: ConceptRef, discriminator: ConceptRef<T>): T
 
 **Dispatch rules** (where narrative templates overlap):
 - `<X> between <A> and <B>` → `Between(value, lo, hi)` when A/B are Quantity literals; `BetweenAnchors(X, start, end)` when A/B are concept refs. Decided by argument kind, not template.
-- `<X> within <window>` (top-level) → `Within(X, window): boolean`. `last/first/most recent/earliest <X> within <window>` (embedded in selection pattern) → the selection pattern with `<window>` as its scope; the `within` is a connector, not a `Within(...)` call.
+- `<X> within <window>` (top-level) → `Within(X, window)`. `last/first/most recent/earliest <X> within <window>` (embedded in selection pattern) → the selection pattern with `<window>` as its scope; the `within` is a connector, not a `Within(...)` call.
 - `has <X>` matches `Has(X)`; `has history of <X>` matches `HasHistoryOf(X)`; longest-match wins.
 
 **Naming convention** (narrative kebab-case → canonical PascalCase):
@@ -225,33 +229,33 @@ This table is the v0.5 source-of-truth. Return types are explicit. Per-card cont
 
 | Pattern | Narrative form | Canonical | CQL function |
 |---|---|---|---|
-| `Has(X)` | `has <X>` | `Has(X: ConceptRef): boolean` | `CRLPatterns.Has` |
-| `HasHistoryOf(X[, anchor])` | `has history of <X>` (optionally `prior to <anchor>`) | `HasHistoryOf(X: ConceptRef[, anchor: ConceptRef]): boolean` | `CRLPatterns.HasHistoryOf` |
-| `Without(kind, X)` | `without <kind> <X>` (kind ∈ record-of, documented, evidence-of, result-for, …) | `Without(kind: KindEnum \| ConceptRef, X: ConceptRef \| Disjunction<ConceptRef>): boolean` | `CRLPatterns.Without` |
-| `CurrentlyTaking(med)` | `currently taking <med>` | `CurrentlyTaking(med: ConceptRef): boolean` | `CRLPatterns.CurrentlyTaking` |
-| `HasAdverseReactionTo(X)` | `has adverse reaction to <X>` | `HasAdverseReactionTo(X: ConceptRef): boolean` | `CRLPatterns.HasAdverseReactionTo` |
+| `Has(X)` | `has <X>` | `Has(X: ConceptRef)` | `CRLPatterns.Has` |
+| `HasHistoryOf(X[, anchor])` | `has history of <X>` (optionally `prior to <anchor>`) | `HasHistoryOf(X: ConceptRef[, anchor: ConceptRef])` | `CRLPatterns.HasHistoryOf` |
+| `Without(kind, X)` | `without <kind> <X>` (kind ∈ record-of, documented, evidence-of, result-for, …) | `Without(kind: KindEnum \| ConceptRef, X: ConceptRef \| Disjunction<ConceptRef>)` | `CRLPatterns.Without` |
+| `CurrentlyTaking(med)` | `currently taking <med>` | `CurrentlyTaking(med: ConceptRef)` | `CRLPatterns.CurrentlyTaking` |
+| `HasAdverseReactionTo(X)` | `has adverse reaction to <X>` | `HasAdverseReactionTo(X: ConceptRef)` | `CRLPatterns.HasAdverseReactionTo` |
 
 ### Contextualization
 
 | Pattern | Narrative form | Canonical | CQL function |
 |---|---|---|---|
-| `With(X, Y)` | `<X> with <Y>` | `With(X: ConceptRef, Y: ConceptRef \| SubjectBoundPredicate): boolean` | `CRLPatterns.With` |
-| `AsOf(anchor, X)` | `<X> as of <anchor>` | `AsOf(anchor: AnchorExpr, X: ConceptRef): boolean` | `CRLPatterns.AsOf` |
-| `Within(X, window)` | `<X> within <window>` — window is a named period OR a window-from-anchor | `Within(X: ConceptRef, window: ConceptRef \| WindowSpec): boolean` | `CRLPatterns.Within` |
-| `ComponentOf(panel, discriminator)` | `<discriminator> component of <panel>` | `ComponentOf(panel: ConceptRef, discriminator: ConceptRef<T>): T` (T from discriminator's valuetype) | `CRLPatterns.ComponentOf` |
-| `NotDoneWithReason(action, reason)` | `<action> not done with reason <reason>` (reason may be a disjunction `(<A> or <B>)`) | `NotDoneWithReason(action: ConceptRef, reason: ConceptRef \| Disjunction<ConceptRef>): boolean` | `CRLPatterns.NotDoneWithReason` |
-| `BaselineAndFollowUp(initial, followup)` | `<initial> with follow-up <followup>` | `BaselineAndFollowUp(initial: ConceptRef, followup: ConceptRef): boolean` | `CRLPatterns.BaselineAndFollowUp` |
-| `InpatientStay(encounter[, includePrelude])` | `inpatient stay anchored on <encounter>` (optionally `including prelude`) | `InpatientStay(encounter: ConceptRef[, includePrelude: boolean = false]): Period` | `CRLPatterns.InpatientStay` |
-| `WasOrdered(X)` | `<X> ordered` | `WasOrdered(X: ConceptRef): boolean` | `CRLPatterns.WasOrdered` |
+| `With(X, Y)` | `<X> with <Y>` | `With(X: ConceptRef, Y: ConceptRef \| SubjectBoundPredicate)` | `CRLPatterns.With` |
+| `AsOf(anchor, X)` | `<X> as of <anchor>` | `AsOf(anchor: AnchorExpr, X: ConceptRef)` | `CRLPatterns.AsOf` |
+| `Within(X, window)` | `<X> within <window>` — window is a named period OR a window-from-anchor | `Within(X: ConceptRef, window: ConceptRef \| WindowSpec)` | `CRLPatterns.Within` |
+| `ComponentOf(panel, discriminator)` | `<discriminator> component of <panel>` | `ComponentOf(panel: ConceptRef, discriminator: ConceptRef<T>)` (T from discriminator's valuetype) | `CRLPatterns.ComponentOf` |
+| `NotDoneWithReason(action, reason)` | `<action> not done with reason <reason>` (reason may be a disjunction `(<A> or <B>)`) | `NotDoneWithReason(action: ConceptRef, reason: ConceptRef \| Disjunction<ConceptRef>)` | `CRLPatterns.NotDoneWithReason` |
+| `BaselineAndFollowUp(initial, followup)` | `<initial> with follow-up <followup>` | `BaselineAndFollowUp(initial: ConceptRef, followup: ConceptRef)` | `CRLPatterns.BaselineAndFollowUp` |
+| `InpatientStay(encounter[, includePrelude])` | `inpatient stay anchored on <encounter>` (optionally `including prelude`) | `InpatientStay(encounter: ConceptRef[, includePrelude: boolean = false])` | `CRLPatterns.InpatientStay` |
+| `WasOrdered(X)` | `<X> ordered` | `WasOrdered(X: ConceptRef)` | `CRLPatterns.WasOrdered` |
 
 ### Assertion
 
 | Pattern | Narrative form | Canonical | CQL function |
 |---|---|---|---|
-| `Justified(action, reason)` | `<action> justified by <reason>` | `Justified(action: ConceptRef, reason: ReasonExpr): boolean` (see Type notation — heterogeneous disjunction supported) | `CRLPatterns.Justified` |
-| `Active(X[, during])` | `<X> is active` (optionally `during <period>`) | `Active(X: ConceptRef[, during: ConceptRef]): boolean` | `CRLPatterns.Active` |
-| `IsVerified(X)` | `<X> is verified` | `IsVerified(X: ConceptRef): boolean` | `CRLPatterns.IsVerified` |
-| `DocumentedAs(X, classification)` | `<X> documented as <classification>` | `DocumentedAs(X: ConceptRef, classification: ConceptRef): boolean` | `CRLPatterns.DocumentedAs` |
+| `Justified(action, reason)` | `<action> justified by <reason>` | `Justified(action: ConceptRef, reason: ReasonExpr)` (see Type notation — heterogeneous disjunction supported) | `CRLPatterns.Justified` |
+| `Active(X[, during])` | `<X> is active` (optionally `during <period>`) | `Active(X: ConceptRef[, during: ConceptRef])` | `CRLPatterns.Active` |
+| `IsVerified(X)` | `<X> is verified` | `IsVerified(X: ConceptRef)` | `CRLPatterns.IsVerified` |
+| `DocumentedAs(X, classification)` | `<X> documented as <classification>` | `DocumentedAs(X: ConceptRef, classification: ConceptRef)` | `CRLPatterns.DocumentedAs` |
 
 ### Qualification (temporal)
 
@@ -259,18 +263,18 @@ Selection patterns (`MostRecent`, `Last`, `Earliest`, `First`) return an `Instan
 
 | Pattern | Narrative form | Canonical | CQL function |
 |---|---|---|---|
-| `MostRecent(X[, scope])` | `most recent <X>` (optionally `<scope>`) | `MostRecent(X: ConceptRef[, scope: ScopeSpec]): Instance<X>` | `CRLPatterns.MostRecent` |
-| `Last(X[, scope])` | `last <X>` (optionally `<scope>`) | `Last(X: ConceptRef[, scope: ScopeSpec]): Instance<X>` | `CRLPatterns.Last` |
-| `Earliest(X[, scope])` | `earliest <X>` (optionally `<scope>`) | `Earliest(X: ConceptRef[, scope: ScopeSpec]): Instance<X>` | `CRLPatterns.Earliest` |
-| `First(X[, scope])` | `first <X>` (optionally `<scope>`) | `First(X: ConceptRef[, scope: ScopeSpec]): Instance<X>` | `CRLPatterns.First` |
-| `During(event, period)` | `<event> during <period>` | `During(event: ConceptRef, period: ConceptRef): boolean` | `CRLPatterns.During` |
-| `Overlaps(eventA, eventB)` | `<eventA> overlaps <eventB>` | `Overlaps(eventA: ConceptRef, eventB: ConceptRef): boolean` | `CRLPatterns.Overlaps` |
-| `OnDayOfOrAfter(X, anchor)` | `<X> on day of or after <anchor>` | `OnDayOfOrAfter(X: ConceptRef, anchor: ConceptRef): boolean` | `CRLPatterns.OnDayOfOrAfter` |
-| `OnOrBefore(X, anchor)` | `<X> on or before <anchor>` | `OnOrBefore(X: ConceptRef, anchor: ConceptRef): boolean` | `CRLPatterns.OnOrBefore` |
-| `SameDay(eventA, eventB)` | `<eventA> same day as <eventB>` | `SameDay(eventA: ConceptRef, eventB: ConceptRef): boolean` | `CRLPatterns.SameDay` |
-| `BetweenAnchors(X, start, end)` | `<X> between <start> and <end>` (start/end are concept refs — see dispatch rule) | `BetweenAnchors(X: ConceptRef, start: ConceptRef, end: ConceptRef): boolean` | `CRLPatterns.BetweenAnchors` |
-| `AtLeastApart(eventA, eventB, duration)` | `<eventA> and <eventB> at least <duration> apart` | `AtLeastApart(eventA: ConceptRef, eventB: ConceptRef, duration: Quantity<time>): boolean` | `CRLPatterns.AtLeastApart` |
-| `AtMostApart(eventA, eventB, duration)` | `<eventA> and <eventB> at most <duration> apart` | `AtMostApart(eventA: ConceptRef, eventB: ConceptRef, duration: Quantity<time>): boolean` | `CRLPatterns.AtMostApart` |
+| `MostRecent(X[, scope])` | `most recent <X>` (optionally `<scope>`) | `MostRecent(X: ConceptRef[, scope: ScopeSpec])` | `CRLPatterns.MostRecent` |
+| `Last(X[, scope])` | `last <X>` (optionally `<scope>`) | `Last(X: ConceptRef[, scope: ScopeSpec])` | `CRLPatterns.Last` |
+| `Earliest(X[, scope])` | `earliest <X>` (optionally `<scope>`) | `Earliest(X: ConceptRef[, scope: ScopeSpec])` | `CRLPatterns.Earliest` |
+| `First(X[, scope])` | `first <X>` (optionally `<scope>`) | `First(X: ConceptRef[, scope: ScopeSpec])` | `CRLPatterns.First` |
+| `During(event, period)` | `<event> during <period>` | `During(event: ConceptRef, period: ConceptRef)` | `CRLPatterns.During` |
+| `Overlaps(eventA, eventB)` | `<eventA> overlaps <eventB>` | `Overlaps(eventA: ConceptRef, eventB: ConceptRef)` | `CRLPatterns.Overlaps` |
+| `OnDayOfOrAfter(X, anchor)` | `<X> on day of or after <anchor>` | `OnDayOfOrAfter(X: ConceptRef, anchor: ConceptRef)` | `CRLPatterns.OnDayOfOrAfter` |
+| `OnOrBefore(X, anchor)` | `<X> on or before <anchor>` | `OnOrBefore(X: ConceptRef, anchor: ConceptRef)` | `CRLPatterns.OnOrBefore` |
+| `SameDay(eventA, eventB)` | `<eventA> same day as <eventB>` | `SameDay(eventA: ConceptRef, eventB: ConceptRef)` | `CRLPatterns.SameDay` |
+| `BetweenAnchors(X, start, end)` | `<X> between <start> and <end>` (start/end are concept refs — see dispatch rule) | `BetweenAnchors(X: ConceptRef, start: ConceptRef, end: ConceptRef)` | `CRLPatterns.BetweenAnchors` |
+| `AtLeastApart(eventA, eventB, duration)` | `<eventA> and <eventB> at least <duration> apart` | `AtLeastApart(eventA: ConceptRef, eventB: ConceptRef, duration: Quantity<time>)` | `CRLPatterns.AtLeastApart` |
+| `AtMostApart(eventA, eventB, duration)` | `<eventA> and <eventB> at most <duration> apart` | `AtMostApart(eventA: ConceptRef, eventB: ConceptRef, duration: Quantity<time>)` | `CRLPatterns.AtMostApart` |
 
 ### Window-from-anchor (sub-grammar — 5 sister forms)
 
@@ -278,11 +282,11 @@ A parameterized umbrella for windowed-from-anchor temporal scopes. Used as the `
 
 | Pattern | Narrative form | Canonical | CQL function |
 |---|---|---|---|
-| `before-start-of(duration, anchor)` | `<duration> before start of <anchor>` | `BeforeStartOf(duration: Quantity<time>, anchor: ConceptRef): WindowSpec` | `CRLPatterns.BeforeStartOf` |
-| `after-start-of(duration, anchor)` | `<duration> after start of <anchor>` | `AfterStartOf(duration: Quantity<time>, anchor: ConceptRef): WindowSpec` | `CRLPatterns.AfterStartOf` |
-| `before-end-of(duration, anchor)` | `<duration> before end of <anchor>` | `BeforeEndOf(duration: Quantity<time>, anchor: ConceptRef): WindowSpec` | `CRLPatterns.BeforeEndOf` |
-| `after-end-of(duration, anchor)` | `<duration> after end of <anchor>` | `AfterEndOf(duration: Quantity<time>, anchor: ConceptRef): WindowSpec` | `CRLPatterns.AfterEndOf` |
-| `on-day-of(anchor)` | `on day of <anchor>` | `OnDayOf(anchor: ConceptRef): WindowSpec` | `CRLPatterns.OnDayOf` |
+| `before-start-of(duration, anchor)` | `<duration> before start of <anchor>` | `BeforeStartOf(duration: Quantity<time>, anchor: ConceptRef)` | `CRLPatterns.BeforeStartOf` |
+| `after-start-of(duration, anchor)` | `<duration> after start of <anchor>` | `AfterStartOf(duration: Quantity<time>, anchor: ConceptRef)` | `CRLPatterns.AfterStartOf` |
+| `before-end-of(duration, anchor)` | `<duration> before end of <anchor>` | `BeforeEndOf(duration: Quantity<time>, anchor: ConceptRef)` | `CRLPatterns.BeforeEndOf` |
+| `after-end-of(duration, anchor)` | `<duration> after end of <anchor>` | `AfterEndOf(duration: Quantity<time>, anchor: ConceptRef)` | `CRLPatterns.AfterEndOf` |
+| `on-day-of(anchor)` | `on day of <anchor>` | `OnDayOf(anchor: ConceptRef)` | `CRLPatterns.OnDayOf` |
 
 **Filled-in examples** (showing how the `within` connector vanishes in canonical form):
 - `last "Blood Pressure Panels" within 1 year before start of "Qualifying Encounter"` → `Last("Blood Pressure Panels", BeforeStartOf(1 'year', "Qualifying Encounter"))`
@@ -294,27 +298,27 @@ A parameterized umbrella for windowed-from-anchor temporal scopes. Used as the `
 
 | Pattern | Narrative form | Canonical | CQL function |
 |---|---|---|---|
-| `AgeAt(anchor)` | `age at <anchor>` | `AgeAt(anchor: AnchorExpr): Quantity<year>` | `CRLPatterns.AgeAt` |
-| `Calculate(X)` | `calculated <X>` | `Calculate(X: ConceptRef<Quantity<U>>): Quantity<U>` (input-list shape thin; see card) | `CRLPatterns.Calculate` |
-| `Lowest(X[, scope])` | `lowest <X>` (optionally `<scope>`) | `Lowest(X: ConceptRef<Quantity<U>>[, scope: ScopeSpec]): Quantity<U>` | `CRLPatterns.Lowest` |
-| `Highest(X[, scope])` | `highest <X>` (optionally `<scope>`) | `Highest(X: ConceptRef<Quantity<U>>[, scope: ScopeSpec]): Quantity<U>` | `CRLPatterns.Highest` |
-| `AtLeastN(events, n)` | `at least <n> <events>` | `AtLeastN(events: ConceptRef, n: Integer): boolean` | `CRLPatterns.AtLeastN` |
-| `Consecutive(events, n)` | `<n> consecutive <events>` | `Consecutive(events: ConceptRef, n: Integer): boolean` | `CRLPatterns.Consecutive` |
-| `High(X)` | `<X> is high` | `High(X: ConceptRef<Quantity>): boolean` | `CRLPatterns.High` |
-| `Low(X)` | `<X> is low` | `Low(X: ConceptRef<Quantity>): boolean` | `CRLPatterns.Low` |
-| `Normal(X)` | `<X> is normal` | `Normal(X: ConceptRef<Quantity>): boolean` | `CRLPatterns.Normal` |
-| `Abnormal(X)` | `<X> is abnormal` | `Abnormal(X: ConceptRef<Quantity>): boolean` | `CRLPatterns.Abnormal` |
-| `AtLeast(value, target)` | `<value> at least <target>` | `AtLeast(value: ConceptRef<Quantity<U>>, target: Quantity<U>): boolean` | `CRLPatterns.AtLeast` |
-| `AtMost(value, target)` | `<value> at most <target>` | `AtMost(value: ConceptRef<Quantity<U>>, target: Quantity<U>): boolean` | `CRLPatterns.AtMost` |
-| `Between(value, lo, hi)` | `<value> between <lo> and <hi>` (lo/hi are Quantity literals — see dispatch rule) | `Between(value: ConceptRef<Quantity<U>>, lo: Quantity<U>, hi: Quantity<U>): boolean` | `CRLPatterns.Between` |
-| `Exceeds(value, target)` | `<value> exceeds <target>` | `Exceeds(value: ConceptRef<Quantity<U>>, target: Quantity<U>): boolean` | `CRLPatterns.Exceeds` |
-| `Below(value, target)` | `<value> below <target>` | `Below(value: ConceptRef<Quantity<U>>, target: Quantity<U>): boolean` | `CRLPatterns.Below` |
+| `AgeAt(anchor)` | `age at <anchor>` | `AgeAt(anchor: AnchorExpr)` | `CRLPatterns.AgeAt` |
+| `Calculate(X)` | `calculated <X>` | `Calculate(X: ConceptRef<Quantity<U>>)` (input-list shape thin; see card) | `CRLPatterns.Calculate` |
+| `Lowest(X[, scope])` | `lowest <X>` (optionally `<scope>`) | `Lowest(X: ConceptRef<Quantity<U>>[, scope: ScopeSpec])` | `CRLPatterns.Lowest` |
+| `Highest(X[, scope])` | `highest <X>` (optionally `<scope>`) | `Highest(X: ConceptRef<Quantity<U>>[, scope: ScopeSpec])` | `CRLPatterns.Highest` |
+| `AtLeastN(events, n)` | `at least <n> <events>` | `AtLeastN(events: ConceptRef, n: Integer)` | `CRLPatterns.AtLeastN` |
+| `Consecutive(events, n)` | `<n> consecutive <events>` | `Consecutive(events: ConceptRef, n: Integer)` | `CRLPatterns.Consecutive` |
+| `High(X)` | `<X> is high` | `High(X: ConceptRef<Quantity>)` | `CRLPatterns.High` |
+| `Low(X)` | `<X> is low` | `Low(X: ConceptRef<Quantity>)` | `CRLPatterns.Low` |
+| `Normal(X)` | `<X> is normal` | `Normal(X: ConceptRef<Quantity>)` | `CRLPatterns.Normal` |
+| `Abnormal(X)` | `<X> is abnormal` | `Abnormal(X: ConceptRef<Quantity>)` | `CRLPatterns.Abnormal` |
+| `AtLeast(value, target)` | `<value> at least <target>` | `AtLeast(value: ConceptRef<Quantity<U>>, target: Quantity<U>)` | `CRLPatterns.AtLeast` |
+| `AtMost(value, target)` | `<value> at most <target>` | `AtMost(value: ConceptRef<Quantity<U>>, target: Quantity<U>)` | `CRLPatterns.AtMost` |
+| `Between(value, lo, hi)` | `<value> between <lo> and <hi>` (lo/hi are Quantity literals — see dispatch rule) | `Between(value: ConceptRef<Quantity<U>>, lo: Quantity<U>, hi: Quantity<U>)` | `CRLPatterns.Between` |
+| `Exceeds(value, target)` | `<value> exceeds <target>` | `Exceeds(value: ConceptRef<Quantity<U>>, target: Quantity<U>)` | `CRLPatterns.Exceeds` |
+| `Below(value, target)` | `<value> below <target>` | `Below(value: ConceptRef<Quantity<U>>, target: Quantity<U>)` | `CRLPatterns.Below` |
 
 ### State / Process Inference
 
 | Pattern | Narrative form | Canonical | CQL function |
 |---|---|---|---|
-| `WasPerformed(X)` | `<X> performed` | `WasPerformed(X: ConceptRef): boolean` | `CRLPatterns.WasPerformed` |
+| `WasPerformed(X)` | `<X> performed` | `WasPerformed(X: ConceptRef)` | `CRLPatterns.WasPerformed` |
 
 **Note on Quantity-valued concepts.** Patterns that compare numeric values operate on a Quantity-typed concept reference directly — no `.value` access. The concept *is* the quantity (per v0.3.4 property-access policy).
 
@@ -506,7 +510,7 @@ The lifted concept is the clinical name for "when the high-BMI follow-up was ord
 - **category** — Contextualization *, secondary Qualification*
 - **maturity** — moderate
 - **why Contextualization** — `Within` relates clinical evidence to a clinically-named anchor. Sister to `AsOf(anchor, X)`.
-- **dispatch note** — standalone `<X> within <window>` → `Within(X, window): boolean`. The `within` word also appears as a CONNECTOR inside selection patterns (`last <X> within <window-spec>`) — there it's narrative sugar for the selection's scope argument, NOT a `Within(...)` call. See the dispatch rule above.
+- **dispatch note** — standalone `<X> within <window>` → `Within(X, window)`. The `within` word also appears as a CONNECTOR inside selection patterns (`last <X> within <window-spec>`) — there it's narrative sugar for the selection's scope argument, NOT a `Within(...)` call. See the dispatch rule above.
 - **evidence** — L1: `Year Prior` (5), `Look Back Period` (4), "Within 6 Months" formulations. L2: CMS22 prior-year hypertensive reading lookback.
 - **examples** — `CMS22 :: Prior-Year Hypertensive Reading`, `CMS131 :: Retinal Exam in Measurement Period or Year Prior`
 - **anti-example** — `During(event, period)` for containment in a named period (single-event temporal qualifier); `OnDayOfOrAfter(X, anchor)` for calendar-day specificity.
