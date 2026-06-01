@@ -4,6 +4,14 @@
   "description": "Clinical Reasoning Language (CRL) parser and validator",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "bin": {
+    "crl-emit": "dist/cli/run-emitter.js",
+    "crl-validate": "dist/cli/run-validator.js",
+    "crl-lex": "dist/cli/run-lexer.js",
+    "crl-parse": "dist/cli/run-parser.js",
+    "crl-ast": "dist/cli/run-ast.js",
+    "crl-template-match": "dist/cli/run-template-match.js"
+  },
   "sideEffects": false,
   "exports": {
     ".": {

@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 /**
  * CLI: run template-match over all inferences in a CRL file and report
  * which patterns matched vs. which fell through to soft-compile placeholders.
