@@ -1,0 +1,5 @@
+# named library
+library "Named".
+
+terminology "T":
+- valueset is `t`.

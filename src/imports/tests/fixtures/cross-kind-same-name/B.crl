@@ -1,0 +1,5 @@
+# cross-kind B — terminology named "BMI"
+library "B".
+
+terminology "BMI":
+- valueset is `bmi`.

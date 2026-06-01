@@ -1,0 +1,4 @@
+# name-conflict root
+library "Root".
+include "A".
+include "B".

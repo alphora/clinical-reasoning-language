@@ -1,0 +1,3 @@
+# registry-duplicate root
+library "Root".
+include "Foo" version '1.0.0'.

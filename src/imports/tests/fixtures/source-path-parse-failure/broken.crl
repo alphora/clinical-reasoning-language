@@ -1,0 +1,3 @@
+# intentionally broken: missing concept body keyword
+concept "X":
+- type is Observation.

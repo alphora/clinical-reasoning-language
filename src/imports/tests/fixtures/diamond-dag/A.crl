@@ -1,0 +1,3 @@
+# diamond-dag A
+library "A".
+include "C".

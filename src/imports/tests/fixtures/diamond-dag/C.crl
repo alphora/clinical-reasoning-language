@@ -1,0 +1,5 @@
+# diamond-dag C (leaf)
+library "C".
+
+terminology "C Valueset":
+- valueset is `c`.

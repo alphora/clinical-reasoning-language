@@ -1,0 +1,4 @@
+# cross-kind-same-name root
+library "Root".
+include "A".
+include "B".

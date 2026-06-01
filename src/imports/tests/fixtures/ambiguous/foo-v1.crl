@@ -1,0 +1,5 @@
+# ambiguous Foo v1
+library "Foo" version '1.0.0'.
+
+terminology "T1":
+- valueset is `t1`.

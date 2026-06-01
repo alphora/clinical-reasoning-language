@@ -1,0 +1,3 @@
+# CMS22 BMI Screening and Follow-Up (test shell)
+library "CMS22" version '1.0.0'.
+include "CMS22 Interface" version '1.0.0'.

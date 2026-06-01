@@ -1,0 +1,6 @@
+# name-conflict A
+library "A".
+
+concept "X":
+- type is Observation.
+- coded from "VsA".

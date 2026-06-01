@@ -1,0 +1,5 @@
+# a valid library
+library "Good".
+
+terminology "T":
+- valueset is `t`.

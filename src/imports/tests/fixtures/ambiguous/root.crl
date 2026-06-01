@@ -1,0 +1,3 @@
+# ambiguous root
+library "Root".
+include "Foo".

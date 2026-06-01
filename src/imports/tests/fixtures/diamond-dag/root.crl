@@ -1,0 +1,4 @@
+# diamond-dag root
+library "Root".
+include "A".
+include "B".

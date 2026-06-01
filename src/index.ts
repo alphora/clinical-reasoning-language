@@ -11,6 +11,29 @@ import { Validator, type ValidationError } from "./validator/validator";
 export { emitCQL } from "./emitter";
 export type { EmitOptions, EmitResult } from "./emitter";
 
+export {
+  resolveImports,
+  scanSourcePaths,
+  walkIncludes,
+  buildCombinedNamespace,
+  emptyNamespace,
+} from "./imports";
+export type {
+  ResolvedGraph,
+  RegistryEntry,
+  Registry,
+  Namespace,
+  NamespaceEntry,
+  NodeKind,
+  ImportDiagnostic,
+  ParseFailureDiagnostic,
+  RegistryDuplicateDiagnostic,
+  UnresolvedIncludeDiagnostic,
+  AmbiguousIncludeDiagnostic,
+  CycleDiagnostic,
+  NameConflictDiagnostic,
+} from "./imports";
+
 export interface Token {
   line: number;
   column: number;

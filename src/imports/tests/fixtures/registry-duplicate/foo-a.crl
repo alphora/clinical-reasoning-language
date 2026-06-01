@@ -1,0 +1,5 @@
+# registry-duplicate foo-a
+library "Foo" version '1.0.0'.
+
+terminology "Ta":
+- valueset is `ta`.

@@ -1,0 +1,6 @@
+# name-conflict B
+library "B".
+
+concept "X":
+- type is Observation.
+- coded from "VsB".

@@ -1,0 +1,7 @@
+# CMS22 inferred concepts (test)
+library "CMS22 Inferred" version '1.0.0'.
+include "CMS22 Asserted" version '1.0.0'.
+
+concept "Qualifying Encounter":
+- type is Encounter.
+- definition is "Qualifying Encounter Source" performed.

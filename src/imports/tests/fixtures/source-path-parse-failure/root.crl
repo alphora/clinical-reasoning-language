@@ -1,0 +1,3 @@
+# source-path-parse-failure root
+library "Root".
+include "Good".
