@@ -75,12 +75,12 @@ function bodySnippet(c: Concept): string {
   switch (c.definition.type) {
     case "CodedFromDefinition":
       return `coded from "${c.definition.terminologyName}"`;
-    case "InferredFromDefinition": {
+    case "DefinedAsDefinition": {
       const body = c.definition.body;
-      if (body.type === "InferredFromBareRef") return `inferred from "${body.ref}"`;
-      return `inferred from <composition>`;
+      if (body.type === "DefinedAsBareRef") return `defined as "${body.ref}"`;
+      return `defined as <composition>`;
     }
-    case "LogicIsDefinition": {
+    case "DefinitionIsDefinition": {
       const els = c.definition.body.elements.map((el): string => {
         if (el.type === "NWord") return el.value;
         if (el.type === "NConceptRef") return `"${el.value}"`;
@@ -89,7 +89,7 @@ function bodySnippet(c: Concept): string {
         if (el.type === "NConjunction") return `(${el.conjuncts.length} conjuncts)`;
         return (el as { type: string }).type;
       });
-      const text = `logic is ${els.join(" ")}`;
+      const text = `definition is ${els.join(" ")}`;
       return text.length > 120 ? text.slice(0, 117) + "..." : text;
     }
   }

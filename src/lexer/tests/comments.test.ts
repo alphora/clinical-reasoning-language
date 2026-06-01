@@ -118,7 +118,7 @@ decision "Test":
         CRLLexer.CONCEPT_VALUE_TYPE,
         CRLLexer.DOT,
         CRLLexer.DASH,
-        CRLLexer.INFERRED_FROM,
+        CRLLexer.DEFINED_AS,
         CRLLexer.LPAREN,
         CRLLexer.QUOTED_STRING,
         CRLLexer.OR,
@@ -167,7 +167,7 @@ decision "Test":
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(tokens, [
-        CRLLexer.INFERRED_FROM,
+        CRLLexer.DEFINED_AS,
         CRLLexer.LPAREN,
         CRLLexer.QUOTED_STRING,
         CRLLexer.AND,

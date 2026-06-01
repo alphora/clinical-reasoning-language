@@ -162,7 +162,7 @@ describe("Whitespace Handling", () => {
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(tokens, [
-        CRLLexer.INFERRED_FROM,
+        CRLLexer.DEFINED_AS,
         CRLLexer.LPAREN,
         CRLLexer.QUOTED_STRING,
         CRLLexer.AND,

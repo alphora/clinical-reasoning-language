@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import {
   buildSnippetBody,
-  isLogicIsBody,
+  isDefinitionIsBody,
   CONCEPT_TYPES,
   CONCEPT_VALUETYPES,
   type Pattern,
@@ -16,9 +16,9 @@ export const CRL_DOCUMENT_SELECTOR: vscode.DocumentSelector = [
   { language: "markdown", scheme: "file", pattern: "**/*.crl" },
 ];
 
-function isInLogicIsBody(document: vscode.TextDocument, position: vscode.Position): boolean {
+function isInDefinitionIsBody(document: vscode.TextDocument, position: vscode.Position): boolean {
   const line = document.lineAt(position.line).text;
-  return isLogicIsBody(line.slice(0, position.character));
+  return isDefinitionIsBody(line.slice(0, position.character));
 }
 
 function buildNarrativeItem(pattern: Pattern): vscode.CompletionItem {
@@ -37,7 +37,7 @@ function buildNarrativeItem(pattern: Pattern): vscode.CompletionItem {
 }
 
 /**
- * Narrative-pattern completion inside `- logic is ` bodies. See
+ * Narrative-pattern completion inside `- definition is ` bodies. See
  * NarrativeCompletionProvider in the README.
  */
 export class NarrativeCompletionProvider implements vscode.CompletionItemProvider {
@@ -47,7 +47,7 @@ export class NarrativeCompletionProvider implements vscode.CompletionItemProvide
     document: vscode.TextDocument,
     position: vscode.Position
   ): vscode.ProviderResult<vscode.CompletionItem[]> {
-    if (!isInLogicIsBody(document, position)) return [];
+    if (!isInDefinitionIsBody(document, position)) return [];
     return this.patterns.map(buildNarrativeItem);
   }
 }

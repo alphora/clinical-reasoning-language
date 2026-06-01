@@ -236,12 +236,12 @@ export function buildSnippetBody(narrative: string): string {
 }
 
 /**
- * Return true if a line of CRL is a `logic is` body (the cursor is in a
+ * Return true if a line of CRL is a `definition is` body (the cursor is in a
  * position where narrative completion / hover is meaningful). Accepts the
  * line text up to and including the cursor position.
  */
-export function isLogicIsBody(linePrefix: string): boolean {
-  return /^\s*-\s*logic\s+is\s/i.test(linePrefix);
+export function isDefinitionIsBody(linePrefix: string): boolean {
+  return /^\s*-\s*definition\s+is\s/i.test(linePrefix);
 }
 
 /**

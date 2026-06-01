@@ -8,9 +8,9 @@ TYPE_IS             : 'type is' -> mode(CONCEPT_MODE);
 VALUETYPE_IS        : 'valuetype is' -> mode(VALUE_TYPE_MODE);
 EVIDENCE_IS         : 'evidence is';
 META_IS             : 'meta is';
-INFERRED_FROM       : 'inferred from';
+DEFINED_AS          : 'defined as';
 CODED_FROM          : 'coded from';
-LOGIC_IS            : 'logic is';
+DEFINITION_IS       : 'definition is';
 CODE_IS             : 'code is';
 SYSTEM_IS           : 'system is';
 VALUESET_IS         : 'valueset is';
@@ -32,7 +32,7 @@ WHEN         : 'when';
 WITH         : 'with';
 
 // === Composition operators (v0.6) ===
-// sem-or / sem-and / sem-not in concept's `inferred from` composition.
+// sem-or / sem-and / sem-not in concept's `defined as` composition.
 // Uniform `sem-` prefix marks structural composition; distinguishes from
 // in-arg disjunction/conjunction (which use lowercase or/and) and from
 // narrative words. Hard rule: all structural composition operators carry

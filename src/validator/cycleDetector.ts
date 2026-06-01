@@ -2,7 +2,7 @@ import type {
   CRL,
   Concept,
   CompositionExpression,
-  InferredFromComposition,
+  DefinedAsComposition,
   NarrativeClause,
   NarrativeElement,
   ArgValue,
@@ -15,9 +15,9 @@ import { ValidationError } from "./validator";
  * Detects cycles in concept reference graphs.
  *
  * Each concept's body may reference other concepts:
- *   - `inferred from` composition: walk SemOr/SemAnd/SemNot/CompositionRef/CompositionGroup
+ *   - `defined as` composition: walk SemOr/SemAnd/SemNot/CompositionRef/CompositionGroup
  *     for CompositionRef leaves.
- *   - `logic is` narrative: walk NarrativeClause for NConceptRef elements and
+ *   - `definition is` narrative: walk NarrativeClause for NConceptRef elements and
  *     recurse into NDisjunction/NConjunction ArgValues.
  *   - `coded from` body: references terminologies, not concepts — out of scope.
  *
@@ -106,19 +106,19 @@ export class CycleDetector {
     switch (concept.definition.type) {
       case "CodedFromDefinition":
         return; // terminology ref, not concept
-      case "InferredFromDefinition": {
+      case "DefinedAsDefinition": {
         const body = concept.definition.body;
-        if (body.type === "InferredFromBareRef") {
+        if (body.type === "DefinedAsBareRef") {
           refs.add(body.ref);
-        } else if (body.type === "InferredFromComposition") {
+        } else if (body.type === "DefinedAsComposition") {
           this.collectFromComposition(
-            (body as InferredFromComposition).expression,
+            (body as DefinedAsComposition).expression,
             refs,
           );
         }
         return;
       }
-      case "LogicIsDefinition":
+      case "DefinitionIsDefinition":
         this.collectFromNarrative(concept.definition.body, refs);
         return;
     }

@@ -2,7 +2,7 @@ import type {
   CRL,
   Concept,
   CompositionExpression,
-  InferredFromComposition,
+  DefinedAsComposition,
   NarrativeClause,
   NarrativeElement,
   ArgValue,
@@ -19,8 +19,8 @@ import { ValidationError } from "./validator";
  *     (either valueset-defined OR system+code-defined — both are valid).
  *     The point is the ref kind: it has to be a terminology, not a concept
  *     or decision or anything else.
- *   - `inferred from` body: refs must resolve to declared concepts.
- *   - `logic is` body narrative: NConceptRef elements + refs inside
+ *   - `defined as` body: refs must resolve to declared concepts.
+ *   - `definition is` body narrative: NConceptRef elements + refs inside
  *     in-arg disjunctions/conjunctions must resolve to declared concepts.
  *
  * Magic runtime refs like "Measurement Period" aren't in the local namespace
@@ -60,9 +60,9 @@ export class ReferenceResolver {
           continue;
         }
 
-        case "InferredFromDefinition": {
+        case "DefinedAsDefinition": {
           const body = concept.definition.body;
-          if (body.type === "InferredFromBareRef") {
+          if (body.type === "DefinedAsBareRef") {
             if (!conceptNames.has(body.ref)) {
               errors.push({
                 message: `Unresolved reference "${body.ref}" in concept "${concept.name}" (no concept declared with this name)`,
@@ -70,9 +70,9 @@ export class ReferenceResolver {
                 severity: "error",
               });
             }
-          } else if (body.type === "InferredFromComposition") {
+          } else if (body.type === "DefinedAsComposition") {
             this.walkComposition(
-              (body as InferredFromComposition).expression,
+              (body as DefinedAsComposition).expression,
               concept.name,
               conceptNames,
               errors,
@@ -81,7 +81,7 @@ export class ReferenceResolver {
           break;
         }
 
-        case "LogicIsDefinition":
+        case "DefinitionIsDefinition":
           this.walkNarrative(
             concept.definition.body,
             concept.name,

@@ -540,8 +540,8 @@ describe("CRL Lexer - Basic Tokens", () => {
       ]);
     });
 
-    it("should tokenize provenance and inferred statements", () => {
-      const input = "- evidence is `source` - inferred from `logic`";
+    it("should tokenize provenance and defined-as statements", () => {
+      const input = "- evidence is `source` - defined as `logic`";
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(
@@ -551,10 +551,10 @@ describe("CRL Lexer - Basic Tokens", () => {
           CRLLexer.EVIDENCE_IS,
           CRLLexer.BACKTICK_STRING,
           CRLLexer.DASH,
-          CRLLexer.INFERRED_FROM,
+          CRLLexer.DEFINED_AS,
           CRLLexer.BACKTICK_STRING,
         ],
-        ["-", "evidence is", "`source`", "-", "inferred from", "`logic`"],
+        ["-", "evidence is", "`source`", "-", "defined as", "`logic`"],
       );
     });
 

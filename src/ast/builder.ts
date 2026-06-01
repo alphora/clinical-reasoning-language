@@ -15,11 +15,11 @@ import {
   ActivityStatementContext,
   ConceptStatementContext,
   ConceptBodyContext,
-  LogicIsBodyContext,
-  InferredFromBodyContext,
-  IfBodyContext,
-  InferredFromBareRefContext,
-  InferredFromCompositionContext,
+  DefinitionIsBodyContext,
+  DefinedAsBodyContext,
+  DaBodyContext,
+  DefinedAsBareRefContext,
+  DefinedAsCompositionContext,
   CompositionExpressionContext,
   SemOrContext,
   SemAndContext,
@@ -75,9 +75,9 @@ import {
   Concept,
   ConceptType,
   ConceptDefinition,
-  InferredFromDefinition,
-  InferredFromBareRef,
-  InferredFromComposition,
+  DefinedAsDefinition,
+  DefinedAsBareRef,
+  DefinedAsComposition,
   CompositionExpression,
   SemOrExpression,
   SemAndExpression,
@@ -85,7 +85,7 @@ import {
   CompositionRef,
   CompositionGroup,
   ConceptReference,
-  LogicIsDefinition,
+  DefinitionIsDefinition,
   NarrativeClause,
   NarrativeElement,
   NConceptRef,
@@ -396,10 +396,10 @@ export class CRLAstBuilder
     };
   }
 
-  // v0.6: type is optional (REQUIRED for asserted concepts; OPTIONAL with
-  // inference for inferred/logic-is concepts). valuetype is optional and
-  // 0..*. Returns whatever was declared; absence is fine here — the
-  // validator enforces type-required-for-asserted and the inference rules.
+  // v0.7: type is optional (REQUIRED for asserted concepts; OPTIONAL for
+  // composition/predicate body kinds). valuetype is optional and 0..*.
+  // Returns whatever was declared; absence is fine here — the validator
+  // enforces type-required-for-asserted and the body-kind rules.
   private parseConceptTypes(
     bodyCtx: import("../grammar/generated/antlr/CRLParser").ConceptBodyContext,
     _ctx: import("../grammar/generated/antlr/CRLParser").ConceptStatementContext,
@@ -487,27 +487,27 @@ export class CRLAstBuilder
         terminologyName: termRef,
         location: getLocation(bodyCtx.codedFromLine()!),
       };
-    } else if (bodyCtx.inferredFromBody?.()) {
-      const infCtx = bodyCtx.inferredFromBody();
+    } else if (bodyCtx.definedAsBody?.()) {
+      const infCtx = bodyCtx.definedAsBody();
       if (!infCtx) {
         this.reportError("AstError", ctx, {
-          message: "ConceptStatement: inferredFromBody() unexpectedly returned undefined",
+          message: "ConceptStatement: definedAsBody() unexpectedly returned undefined",
         });
         return null;
       }
-      return this.visitInferredFromBody(infCtx);
-    } else if (bodyCtx.logicIsBody?.()) {
-      const logicCtx = bodyCtx.logicIsBody();
+      return this.visitDefinedAsBody(infCtx);
+    } else if (bodyCtx.definitionIsBody?.()) {
+      const logicCtx = bodyCtx.definitionIsBody();
       if (!logicCtx) {
         this.reportError("AstError", ctx, {
-          message: "ConceptStatement: logicIsBody() unexpectedly returned undefined",
+          message: "ConceptStatement: definitionIsBody() unexpectedly returned undefined",
         });
         return null;
       }
-      return this.visitLogicIsBody(logicCtx);
+      return this.visitDefinitionIsBody(logicCtx);
     } else {
       this.reportError("AstError", ctx, {
-        message: "ConceptStatement must have coded from, inferred from, or logic is body",
+        message: "ConceptStatement must have coded from, defined as, or definition is body",
       });
       return null;
     }
@@ -543,21 +543,21 @@ export class CRLAstBuilder
     };
   }
 
-  // === v0.6 inferred from + composition visitors ===
+  // === v0.7 defined as + composition visitors ===
 
-  visitInferredFromBareRef(ctx: InferredFromBareRefContext): InferredFromBareRef {
+  visitDefinedAsBareRef(ctx: DefinedAsBareRefContext): DefinedAsBareRef {
     const ref = ctx.conceptReference().text.slice(1, -1);
     return {
-      type: "InferredFromBareRef",
+      type: "DefinedAsBareRef",
       ref,
       location: getLocation(ctx),
     };
   }
 
-  visitInferredFromComposition(ctx: InferredFromCompositionContext): InferredFromComposition {
+  visitDefinedAsComposition(ctx: DefinedAsCompositionContext): DefinedAsComposition {
     const expr = this.visit(ctx.compositionExpression()) as CompositionExpression;
     return {
-      type: "InferredFromComposition",
+      type: "DefinedAsComposition",
       expression: expr,
       location: getLocation(ctx),
     };
@@ -604,23 +604,24 @@ export class CRLAstBuilder
     return { type: "CompositionGroup", expression: expr, location: getLocation(ctx) };
   }
 
-  // Wrapper for inferredFromBody — dispatches to the labeled alternatives via visit().
-  visitInferredFromBody(ctx: InferredFromBodyContext): InferredFromDefinition {
-    const ifBodyCtx = ctx.ifBody();
-    const body = this.visit(ifBodyCtx) as InferredFromBareRef | InferredFromComposition;
+  // Wrapper for definedAsBody — dispatches to the labeled alternatives via visit().
+  // The labeled alts (DefinedAsBareRef / DefinedAsComposition) live on the daBody rule.
+  visitDefinedAsBody(ctx: DefinedAsBodyContext): DefinedAsDefinition {
+    const daBodyCtx = ctx.daBody();
+    const body = this.visit(daBodyCtx) as DefinedAsBareRef | DefinedAsComposition;
     return {
-      type: "InferredFromDefinition",
+      type: "DefinedAsDefinition",
       body,
       location: getLocation(ctx),
     };
   }
 
-  // === v0.6 logic-is body + narrative visitors ===
+  // === v0.7 definition-is body + narrative visitors ===
 
-  visitLogicIsBody(ctx: LogicIsBodyContext): LogicIsDefinition {
+  visitDefinitionIsBody(ctx: DefinitionIsBodyContext): DefinitionIsDefinition {
     const narrative = this.visitNarrative(ctx.narrative());
     return {
-      type: "LogicIsDefinition",
+      type: "DefinitionIsDefinition",
       body: narrative,
       location: getLocation(ctx),
     };

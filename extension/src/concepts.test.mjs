@@ -52,11 +52,11 @@ concept "B":
   assert.equal(decls[1].valuetype, "CodeableConcept");
 }
 
-// --- inferred from body (multiline) — body preview captures first bullet ---
+// --- defined as body (multiline) — body preview captures first bullet ---
 {
   const src = `concept "Qualifying Encounter":
 - type is Encounter.
-- inferred from
+- defined as
 (
    "BMI Evaluation Encounter (not virtual) During MP"
    sem-and
@@ -66,18 +66,18 @@ concept "B":
   assert.equal(decls.length, 1);
   assert.equal(decls[0].name, "Qualifying Encounter");
   assert.equal(decls[0].type, "Encounter");
-  assert.equal(decls[0].bodyPreview, "inferred from");
+  assert.equal(decls[0].bodyPreview, "defined as");
 }
 
-// --- logic-is body ---
+// --- definition-is body ---
 {
   const src = `concept "BMI Observation During MP":
 - type is Observation.
 - valuetype is Quantity.
-- logic is "BMI Observations" during "Measurement Period".`;
+- definition is "BMI Observations" during "Measurement Period".`;
   const decls = scanDeclarations(src);
   assert.equal(decls.length, 1);
-  assert.equal(decls[0].bodyPreview, `logic is "BMI Observations" during "Measurement Period"`);
+  assert.equal(decls[0].bodyPreview, `definition is "BMI Observations" during "Measurement Period"`);
 }
 
 // --- declarationsByName: last-write-wins ---

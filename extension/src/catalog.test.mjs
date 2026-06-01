@@ -4,7 +4,7 @@ import { dirname, resolve } from "node:path";
 import assert from "node:assert/strict";
 
 import * as mod from "../dist/catalog.js";
-const { parseCatalog, narrativePlaceholders, buildSnippetBody, isLogicIsBody, compileNarrativeMatcher } =
+const { parseCatalog, narrativePlaceholders, buildSnippetBody, isDefinitionIsBody, compileNarrativeMatcher } =
   mod.default ?? mod;
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -56,13 +56,13 @@ assert.equal(
 );
 assert.equal(buildSnippetBody("no placeholders here"), "no placeholders here");
 
-// --- isLogicIsBody: cursor-context detection ---
-assert.equal(isLogicIsBody("- logic is "), true);
-assert.equal(isLogicIsBody("  - logic is "), true, "indented logic-is body should match");
-assert.equal(isLogicIsBody("- logic is \"BMI Observations\" during"), true);
-assert.equal(isLogicIsBody("concept \"X\":"), false, "concept header is NOT a logic-is body");
-assert.equal(isLogicIsBody("- type is Observation."), false);
-assert.equal(isLogicIsBody("- inferred from"), false);
+// --- isDefinitionIsBody: cursor-context detection ---
+assert.equal(isDefinitionIsBody("- definition is "), true);
+assert.equal(isDefinitionIsBody("  - definition is "), true, "indented definition-is body should match");
+assert.equal(isDefinitionIsBody("- definition is \"BMI Observations\" during"), true);
+assert.equal(isDefinitionIsBody("concept \"X\":"), false, "concept header is NOT a definition-is body");
+assert.equal(isDefinitionIsBody("- type is Observation."), false);
+assert.equal(isDefinitionIsBody("- defined as"), false);
 
 // --- compileNarrativeMatcher: regex generation for hover matching ---
 const hasMatcher = compileNarrativeMatcher("has <X>");

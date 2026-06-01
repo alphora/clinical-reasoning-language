@@ -1,10 +1,10 @@
 # Clinical Reasoning Language Example
 
 /*
-Clinical Reasoning Language (CRL) — v0.5 grammar reference example.
+Clinical Reasoning Language (CRL) — v0.7 grammar reference example.
 
 Surface conventions:
-  - Case sensitive (keywords are lowercase: `inference`, `concept`, `inferred from`,
+  - Case sensitive (keywords are lowercase: `concept`, `defined as`, `definition is`,
     `sem-or`, `sem-and`, `sem-not`, `or`, `and`, `not`, etc.).
   - Whitespace insensitive (indentation is decorative).
   - File starts with `#` + markdown-valid header line.
@@ -16,21 +16,23 @@ Statement types:
   - decision     — reusable decision logic; when/then/recommend|use
   - terminology  — valueset reference OR system+code(s) pair
   - activity     — executable clinical activity (CPG resource request)
-  - concept      — clinical concept; coded from a terminology OR inferred from refs
-  - inference    — named narrative predicate (NEW in v0.5)
+  - concept      — clinical concept; one of three body kinds:
+                     - `coded from` (asserted; ref is a valueset)
+                     - `defined as` (composition over named concept refs)
+                     - `definition is` (catalog-matched narrative predicate)
 
-`inferred from` body shapes (v0.5):
-  - bare ref:        `- inferred from "X".`
-  - composition:     `- inferred from ( "A" sem-and "B" ).` (uses sem-or/sem-and/sem-not)
+`defined as` body shapes:
+  - bare ref:        `- defined as "X".`
+  - composition:     `- defined as ( "A" sem-and "B" ).` (uses sem-or/sem-and/sem-not)
 
-Narrative inside an `inference` body uses lowercase `or` / `and` for in-arg
+Narrative inside a `definition is` body uses lowercase `or` / `and` for in-arg
 disjunction (e.g. `("Medical Reasons" or "Patient Declined Reasons")`),
 which is distinct from the `sem-or`/`sem-and` in concept composition.
 See docs/CRL Compilation Pipeline.md and the
 project_sem-composition-operators memory for the rationale.
 
 Optional fields:
-  - `meta is` (repeatable) and `evidence is` on `concept` and `inference`
+  - `meta is` (repeatable) and `evidence is` on `concept`
   - `with` and `because` on `activity`
   - `do not perform` suffix on `request` keyword (activity)
 */
@@ -138,14 +140,14 @@ concept "Patient Weight":
 - coded from "Weight Valueset".
 
 
-// --- Inferred concepts: bare ref shape ---
+// --- Composition concepts: bare ref + sem-* composition shapes ---
 
 // "BMI" composes three sources via sem-or (semantic boolean — operands
 // can be cross-typed; the composition layer reconciles).
 concept "BMI":
 - type is Observation.
 - valuetype is Quantity.
-- inferred from
+- defined as
 (
    "BMI Range as a Condition"
    sem-or
@@ -155,34 +157,34 @@ concept "BMI":
 ).
 
 
-// --- Inferred concepts: named inference + concept pair ---
+// --- Predicate-kind concepts: narrative body + composing concept pair ---
 
-// Predicates with narrative bodies live in `inference` declarations.
-// The composing concept then references them as bare refs.
+// Predicates with narrative bodies are concepts with `definition is` bodies.
+// A composing concept then references them as bare refs.
 
 concept "Most Recent BMI Selection":
 - meta is `Selects the most recent BMI observation within the configured lookback`.
 - evidence is `Calculated by Smile`.
-- logic is most recent "BMI".
+- definition is most recent "BMI".
 
 concept "Most Recent BMI":
 - type is Observation.
 - valuetype is Quantity.
 - meta is `Some meta information`.
 - evidence is `Calculated by Smile`.
-- inferred from "Most Recent BMI Selection".
+- defined as "Most Recent BMI Selection".
 
 concept "Calculated BMI Formula":
 - evidence is `Standard BMI formula: weight (kg) / height (m)^2`.
-- logic is calculated "BMI".
+- definition is calculated "BMI".
 
 concept "Calculated BMI":
 - type is Observation.
 - valuetype is Quantity.
-- inferred from "Calculated BMI Formula".
+- defined as "Calculated BMI Formula".
 
 
-// --- Inferred concepts: composition with sem-not ---
+// --- Composition concepts: with sem-not ---
 
 // `sem-not` is prefix unary; it negates the following operand or group.
 // "BMI With Confirmed Height-Weight Source" requires BMI from a calculated
@@ -190,7 +192,7 @@ concept "Calculated BMI":
 concept "BMI With Confirmed Height-Weight Source":
 - type is Observation.
 - valuetype is Quantity.
-- inferred from
+- defined as
 (
    "Calculated BMI"
    sem-and
@@ -198,6 +200,6 @@ concept "BMI With Confirmed Height-Weight Source":
 ).
 
 // For more complex composition examples (deeply nested groups, AND NOT,
-// in-arg disjunctions inside inference narrative), see the modeled measures:
+// in-arg disjunctions inside narrative bodies), see the modeled measures:
 //   features/cql-pattern-mining/results/models/cms22.crl
 //   features/cql-pattern-mining/results/models/cms69.crl

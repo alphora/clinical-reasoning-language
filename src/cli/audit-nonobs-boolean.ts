@@ -1,6 +1,6 @@
 /**
  * Full audit: for each (NonObservation, boolean) concept, examine its
- * inferred-from body and CLASSIFY it per the §1 rule.
+ * defined-as body and CLASSIFY it per the §1 rule.
  *
  * Classification:
  *   - BOOLEAN_GENUINE: all operands resolve to boolean predicates →
@@ -27,8 +27,8 @@ import type {
   CompositionExpression,
   ConceptType,
   ConceptValueType,
-  InferredFromComposition,
-  InferredFromBareRef,
+  DefinedAsComposition,
+  DefinedAsBareRef,
 } from "../ast/types";
 import { createParser } from "../parser/createParser";
 
@@ -77,7 +77,7 @@ function shapeOf(conceptName: string, seen = new Set<string>()): Shape {
     // Observation resources (each with a Quantity value field) — list shape.
     // For Order Date concepts (dateTime), it's value-bearing.
     // Heuristic: if the body is `coded from`, it's asserted → list shape.
-    // If logic-is/inferred-from with valuetype dateTime, it's value-bearing.
+    // If definition-is/defined-as with valuetype dateTime, it's value-bearing.
     if (c.definition.type === "CodedFromDefinition") return "list";
     if (vts.includes("dateTime") && vts.length === 1) return "value-bearing";
     return "list";
@@ -85,16 +85,16 @@ function shapeOf(conceptName: string, seen = new Set<string>()): Shape {
   if (vts.includes("CodeableConcept")) return "list";
   // No valuetype declared — fall back to body type.
   if (c.definition.type === "CodedFromDefinition") return "list";
-  if (c.definition.type === "InferredFromDefinition") {
+  if (c.definition.type === "DefinedAsDefinition") {
     const body = c.definition.body;
-    if (body.type === "InferredFromBareRef") return shapeOf(body.ref, seen);
+    if (body.type === "DefinedAsBareRef") return shapeOf(body.ref, seen);
     return shapeOfComposition(body, seen);
   }
-  if (c.definition.type === "LogicIsDefinition") return "unknown";
+  if (c.definition.type === "DefinitionIsDefinition") return "unknown";
   return "unknown";
 }
 
-function shapeOfComposition(body: InferredFromComposition, seen: Set<string>): Shape {
+function shapeOfComposition(body: DefinedAsComposition, seen: Set<string>): Shape {
   return shapeOfExpression(body.expression, seen);
 }
 
@@ -138,7 +138,7 @@ function tracedSubject(expr: CompositionExpression): { type?: ConceptType; value
   }
   const first = leaves[0];
   if (!first) return null;
-  // Walk back through inferred-from chain until we hit an asserted (CodedFrom).
+  // Walk back through defined-as chain until we hit an asserted (CodedFrom).
   const visited = new Set<string>();
   let current = first;
   while (!visited.has(current)) {
@@ -153,9 +153,9 @@ function tracedSubject(expr: CompositionExpression): { type?: ConceptType; value
         via: current,
       };
     }
-    if (c.definition.type === "InferredFromDefinition") {
+    if (c.definition.type === "DefinedAsDefinition") {
       const body = c.definition.body;
-      if (body.type === "InferredFromBareRef") {
+      if (body.type === "DefinedAsBareRef") {
         current = body.ref; continue;
       }
       // Composition — pick first leaf
@@ -174,7 +174,8 @@ function tracedSubject(expr: CompositionExpression): { type?: ConceptType; value
       current = innerLeaves[0];
       continue;
     }
-    // LogicIsDefinition — return its declaration as authoritative
+    // DefinitionIsDefinition — return its declaration as authoritative
+    // (the predicate's narrative body doesn't disambiguate shape; trust declared type)
     return {
       type: c.conceptType,
       valuetype: c.valueTypes?.[0],
@@ -205,9 +206,9 @@ for (const [name, info] of allConcepts) {
   let shape: Shape = "unknown";
   let subjectTrace: { type?: ConceptType; valuetype?: ConceptValueType; via: string } | null = null;
 
-  if (c.definition.type === "InferredFromDefinition") {
+  if (c.definition.type === "DefinedAsDefinition") {
     const body = c.definition.body;
-    if (body.type === "InferredFromBareRef") {
+    if (body.type === "DefinedAsBareRef") {
       shape = shapeOf(body.ref);
       // For bare ref, the "subject" is the referenced concept itself.
       const refInfo = allConcepts.get(body.ref);
@@ -222,7 +223,7 @@ for (const [name, info] of allConcepts) {
       shape = shapeOfComposition(body, new Set());
       subjectTrace = tracedSubject(body.expression);
     }
-  } else if (c.definition.type === "LogicIsDefinition") {
+  } else if (c.definition.type === "DefinitionIsDefinition") {
     shape = "unknown"; // Would need to inspect narrative semantics
   }
 

@@ -15,16 +15,16 @@ concept "Hypertensive Reading":
 
 concept "Primary-Care Referral Justified by Hypertensive Reading":
 - type is ServiceRequest.
-- logic is "Primary-Care Referrals" justified by "Hypertensive Reading".
+- definition is "Primary-Care Referrals" justified by "Hypertensive Reading".
 
 concept "Primary-Care Referrals Ordered":
 - type is ServiceRequest.
-- logic is "Primary-Care Referrals" ordered.
+- definition is "Primary-Care Referrals" ordered.
 
 concept "Referral and Reading":
 - type is Observation.
 - valuetype is boolean.
-- inferred from
+- defined as
 (
    "Primary-Care Referrals Ordered"
    sem-and

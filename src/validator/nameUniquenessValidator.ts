@@ -5,8 +5,8 @@ import { ValidationError } from "./validator";
 /**
  * Enforces name uniqueness across CRL declarations.
  *
- * Per CRL v0.6: `concept` is the sole "inferable" declaration kind. Concepts
- * with different body kinds (`coded from`, `inferred from`, `logic is`) still
+ * Per CRL v0.7: `concept` is the sole "inferable" declaration kind. Concepts
+ * with different body kinds (`coded from`, `defined as`, `definition is`) still
  * share the concept namespace because they're all referenced by quoted name.
  * Decisions, activities, and terminologies have their own namespaces
  * (referenced via distinct keywords).

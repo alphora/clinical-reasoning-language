@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import {
   compileNarrativeMatcher,
-  isLogicIsBody,
+  isDefinitionIsBody,
   CONCEPT_TYPES,
   CONCEPT_VALUETYPES,
   type Pattern,
@@ -17,7 +17,7 @@ interface CompiledPattern {
 }
 
 /**
- * Hover provider over a narrative pattern in a `- logic is ` body. Walks the
+ * Hover provider over a narrative pattern in a `- definition is ` body. Walks the
  * catalog at hover time and finds the longest match containing the cursor.
  */
 export class NarrativeHoverProvider implements vscode.HoverProvider {
@@ -31,7 +31,7 @@ export class NarrativeHoverProvider implements vscode.HoverProvider {
     document: vscode.TextDocument,
     position: vscode.Position
   ): vscode.ProviderResult<vscode.Hover> {
-    if (!isLogicIsBody(document.lineAt(position.line).text)) return null;
+    if (!isDefinitionIsBody(document.lineAt(position.line).text)) return null;
     const line = document.lineAt(position.line).text;
     const cursorCol = position.character;
 

@@ -44,9 +44,9 @@ import type {
   CompositionExpression,
   ConceptDefinition,
   CodedFromDefinition,
-  InferredFromBareRef,
-  InferredFromComposition,
-  LogicIsDefinition,
+  DefinedAsBareRef,
+  DefinedAsComposition,
+  DefinitionIsDefinition,
   Terminology,
   TerminologyBodyLine,
 } from "../ast/types";
@@ -127,7 +127,7 @@ class Emitter {
   private readonly conceptValuetype: Map<string, string | undefined> = new Map();
   /** Concept's body-definition kind — drives the shape-of-emit heuristic. */
   private readonly conceptBodyKind: Map<string, ConceptDefinition["type"]> = new Map();
-  /** For inferred-from concepts, the body so we can recurse for shape. */
+  /** For defined-as concepts, the body so we can recurse for shape. */
   private readonly conceptBody: Map<string, ConceptDefinition> = new Map();
   /** Terminology emit name (may differ from CRL name when disambiguated). */
   private readonly terminologyEmitName: Map<string, string> = new Map();
@@ -299,10 +299,10 @@ class Emitter {
     switch (def.type) {
       case "CodedFromDefinition":
         return this.emitCodedFrom(c, def);
-      case "InferredFromDefinition":
-        return this.emitInferredFrom(c, def.body);
-      case "LogicIsDefinition":
-        return this.emitLogicIs(def);
+      case "DefinedAsDefinition":
+        return this.emitDefinedAs(c, def.body);
+      case "DefinitionIsDefinition":
+        return this.emitDefinitionIs(def);
     }
   }
 
@@ -320,13 +320,13 @@ class Emitter {
    * the CRL author declared as intent). The discriminator is the concept's
    * body kind:
    *   - `coded from`      → a `[Resource: "VS"]` retrieve, list-shaped
-   *   - `logic is`        → a `CRLPatterns.<P>(…)` call. Most pattern
+   *   - `definition is`        → a `CRLPatterns.<P>(…)` call. Most pattern
    *                         functions return `Boolean`. v0.2 assumes
-   *                         boolean for all `logic is` concepts. Future
+   *                         boolean for all `definition is` concepts. Future
    *                         versions will consult the catalog for per-
    *                         pattern return types.
-   *   - `inferred from <bare>`     → recurse to the referent
-   *   - `inferred from <composition>` → recurse with the composition's
+   *   - `defined as <bare>`     → recurse to the referent
+   *   - `defined as <composition>` → recurse with the composition's
    *                         resolved shape
    * Returns `undefined` for names that don't resolve to a known concept or
    * terminology (the caller treats these as opaque refinements).
@@ -339,12 +339,12 @@ class Emitter {
     }
     const bodyKind = this.conceptBodyKind.get(name);
     if (bodyKind === "CodedFromDefinition") return "refinement";
-    if (bodyKind === "LogicIsDefinition") return "boolean";
-    if (bodyKind === "InferredFromDefinition") {
+    if (bodyKind === "DefinitionIsDefinition") return "boolean";
+    if (bodyKind === "DefinedAsDefinition") {
       const body = this.conceptBody.get(name);
-      if (body && body.type === "InferredFromDefinition") {
+      if (body && body.type === "DefinedAsDefinition") {
         const inner = body.body;
-        if (inner.type === "InferredFromBareRef") {
+        if (inner.type === "DefinedAsBareRef") {
           return this.shapeOfName(inner.ref, seen);
         }
         // Composition — pick shape from its leaves.
@@ -386,11 +386,11 @@ class Emitter {
     return "refinement";
   }
 
-  private emitInferredFrom(
+  private emitDefinedAs(
     c: Concept,
-    body: InferredFromBareRef | InferredFromComposition
+    body: DefinedAsBareRef | DefinedAsComposition
   ): string {
-    if (body.type === "InferredFromBareRef") {
+    if (body.type === "DefinedAsBareRef") {
       return cqlIdent(body.ref);
     }
     const shape = this.shapeForComposition(body.expression);
@@ -452,7 +452,7 @@ class Emitter {
       .join(`\n  ${op} `);
   }
 
-  private emitLogicIs(def: LogicIsDefinition): string {
+  private emitDefinitionIs(def: DefinitionIsDefinition): string {
     const matched = matchNarrative(def.body);
     if (!matched.known) {
       const text = def.body.elements.map((el) => narrativeElementText(el)).join(" ");

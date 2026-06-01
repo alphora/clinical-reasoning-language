@@ -2,10 +2,10 @@
  * One-shot correction pass for cms22.crl per the v3 transformation rule.
  *
  * Same logic as apply-cms69-corrections-v3.ts — see that file's header for
- * the design principle (inferred from is SEMANTIC composition).
+ * the design principle (defined as is SEMANTIC composition).
  *
  * cms22-specific: the BP Quantity refinement chain. The asserted BP/Systolic/
- * Diastolic concepts are Observation+Quantity; intermediate logic-is concepts
+ * Diastolic concepts are Observation+Quantity; intermediate definition-is concepts
  * that filter/extract from that chain stay Observation+Quantity; classifications
  * ("Last Systolic Below 120" etc.) become Observation+boolean predicates.
  */
@@ -43,7 +43,7 @@ const ast = builder.visit(tree) as CRL;
 
 interface PlannedChange {
   conceptName: string;
-  kind: "flip-type-to-observation" | "annotate-logic-is";
+  kind: "flip-type-to-observation" | "annotate-definition-is";
   current?: string;
   proposed: { type: ConceptType; valuetype?: ConceptValueType };
 }
@@ -69,12 +69,12 @@ for (const stmt of ast.statements) {
     continue;
   }
 
-  // Case 2: logic-is with no type declared → annotate
-  if (c.definition.type === "LogicIsDefinition" && !c.conceptType) {
+  // Case 2: definition-is with no type declared → annotate
+  if (c.definition.type === "DefinitionIsDefinition" && !c.conceptType) {
     const isBpRefinement = BP_QUANTITY_REFINEMENTS.has(c.name);
     changes.push({
       conceptName: c.name,
-      kind: "annotate-logic-is",
+      kind: "annotate-definition-is" as const,
       proposed: {
         type: "Observation",
         valuetype: isBpRefinement ? "Quantity" : "boolean",
@@ -105,11 +105,11 @@ for (const change of changes) {
       continue;
     }
     source = source.slice(0, match.index) + match[1] + "Observation" + match[2] + source.slice(match.index + match[0].length);
-  } else if (change.kind === "annotate-logic-is") {
-    const re = new RegExp(`(concept "${escaped}":\\s*\\n)([ \\t]*)(- logic is )`, "");
+  } else if (change.kind === "annotate-definition-is") {
+    const re = new RegExp(`(concept "${escaped}":\\s*\\n)([ \\t]*)(- definition is)`, "");
     const match = re.exec(source);
     if (!match) {
-      console.warn(`  WARN: could not locate logic-is block for "${change.conceptName}"`);
+      console.warn(`  WARN: could not locate definition-is block for "${change.conceptName}"`);
       continue;
     }
     const indent = match[2] || "";

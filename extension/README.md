@@ -2,12 +2,12 @@
 
 A VS Code extension for the Clinical Reasoning Language (CRL). It does four things:
 
-1. **Highlights `.crl` files** — CRL keywords, strings, comments. Updated for v0.6 grammar (covers `logic is`, `sem-and`, `sem-or`, `sem-not`).
+1. **Highlights `.crl` files** — CRL keywords, strings, comments. Updated for v0.7 grammar (covers `defined as`, `definition is`, `sem-and`, `sem-or`, `sem-not`).
 2. **Catalog-driven authoring help** — narrative-pattern, type, valuetype, and concept-reference completion + hover for `.crl` files:
-   - Inside `- logic is ` bodies, narrative-pattern snippets from the 45-entry catalog (`<X> during <Y>`, `<X> performed`, `<X> justified by <Y>`, `has <X>`, etc.).
+   - Inside `- definition is ` bodies, narrative-pattern snippets from the 45-entry catalog (`<X> during <Y>`, `<X> performed`, `<X> justified by <Y>`, `has <X>`, etc.).
    - After `- type is `, the list of FHIR resource types CRL recognizes (`Observation`, `Encounter`, `Condition`, …).
    - After `- valuetype is `, the list of FHIR value types (`boolean`, `CodeableConcept`, `Quantity`, `dateTime`, …).
-   - Inside any quoted name position (e.g. `inferred from "…"`, `logic is "…"`), the names of every `concept` / `terminology` declared in the file.
+   - Inside any quoted name position (e.g. `defined as "…"`, `definition is "…"`), the names of every `concept` / `terminology` declared in the file.
    - Hover any of the above to see what it is and where it's declared.
 3. **Live error checking** — the bundled CRL validator runs on every change (debounced 250 ms) and reports parser, AST-build, and semantic findings as VS Code diagnostics (squiggles). Runs in **soft mode** so unresolved references appear as warnings during authoring.
 4. **Gives your Claude Code agent CRL tools** — Claude can parse and **validate** CRL for you. The MCP server now exposes `validate_crl` with an optional `soft` flag in addition to `tokenize_crl` and `build_crl_ast`.
@@ -45,7 +45,7 @@ Each takes inline `code` or a `.crl` file `path` and returns a `ParseResult`-sha
 
 ### Authoring help in the editor
 
-- **Narrative pattern completion** — inside any `- logic is ` line, snippet for each of the 45 catalog patterns (`has <X>`, `<X> during <Y>`, `<X> justified by <Y>`, etc.). Tab-stops drop you into the quoted concept-ref slots. The catalog is embedded into the extension at build time from `features/cql-pattern-mining/results/inference-pattern-catalog-draft.md`; new patterns are picked up by the next `npm run compile`.
+- **Narrative pattern completion** — inside any `- definition is ` line, snippet for each of the 45 catalog patterns (`has <X>`, `<X> during <Y>`, `<X> justified by <Y>`, etc.). Tab-stops drop you into the quoted concept-ref slots. The catalog is embedded into the extension at build time from `features/cql-pattern-mining/results/inference-pattern-catalog-draft.md`; new patterns are picked up by the next `npm run compile`.
 - **Type / valuetype completion** — fires after `- type is ` and `- valuetype is ` with the enum allowed by the CRL grammar.
 - **Concept-reference completion** — inside any quoted name position, the names of every `concept` / `terminology` declared in the file (with their type / valuetype / body preview in the hover).
 - **Hover** over a narrative phrase, a type/valuetype token, or a concept reference for the catalog entry or declaration info.

@@ -22,7 +22,7 @@ export interface Declaration {
   type?: string;
   /** The valuetype (e.g., `boolean`) if the body declares one. */
   valuetype?: string;
-  /** First body bullet text (e.g. `coded from "X"`, `inferred from ...`, `logic is ...`) for hover preview. */
+  /** First body bullet text (e.g. `coded from "X"`, `defined as ...`, `definition is ...`) for hover preview. */
   bodyPreview?: string;
 }
 
@@ -68,7 +68,7 @@ export function scanDeclarations(source: string): Declaration[] {
         continue;
       }
       // The first non-type/valuetype bullet becomes the preview snippet
-      // (typically `coded from "X"`, `inferred from ...`, `logic is ...`).
+      // (typically `coded from "X"`, `defined as ...`, `definition is ...`).
       const bodyMatch = BODY_BULLET_RE.exec(bodyLine);
       if (bodyMatch && !decl.bodyPreview) {
         decl.bodyPreview = bodyMatch[1];

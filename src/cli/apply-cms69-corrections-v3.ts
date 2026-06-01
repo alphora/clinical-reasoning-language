@@ -1,8 +1,8 @@
 /**
  * One-shot correction pass for cms69.crl per the v3 transformation rule.
  *
- * Per the "inferred from is SEMANTIC composition, not boolean logic" principle
- * (see features/cql-pattern-mining/inferred-from-is-semantic-composition.md),
+ * Per the "defined as is SEMANTIC composition, not boolean logic" principle
+ * (see features/cql-pattern-mining/defined-as-is-semantic-composition.md),
  * the author declares each concept's (type, valuetype) based on its semantic
  * meaning; sem-* operators don't type-check operands.
  *
@@ -11,7 +11,7 @@
  *      `type is Observation.` (boolean rule: Resource+boolean valid only if
  *      that resource has a native boolean value field; Condition, Encounter,
  *      MR, Procedure, SR don't, so all flip to Observation).
- *   2. For every `logic is` concept lacking declared type/valuetype, add
+ *   2. For every `definition is` concept lacking declared type/valuetype, add
  *      both. The BMI Observation refinement chain gets Observation+Quantity;
  *      everything else gets Observation+boolean (semantic predicate intent).
  *   3. For the "Pregnancy or Other Related Diagnoses" wrapper concept,
@@ -45,7 +45,7 @@ const ast = builder.visit(tree) as CRL;
 
 interface PlannedChange {
   conceptName: string;
-  kind: "flip-type-to-observation" | "annotate-logic-is" | "add-valuetype-cc";
+  kind: "flip-type-to-observation" | "annotate-definition-is" | "add-valuetype-cc";
   current?: string;
   proposed: { type: ConceptType; valuetype?: ConceptValueType };
 }
@@ -81,12 +81,12 @@ for (const stmt of ast.statements) {
     continue;
   }
 
-  // Case 2: logic-is with no type declared → annotate
-  if (c.definition.type === "LogicIsDefinition" && !c.conceptType) {
+  // Case 2: definition-is with no type declared → annotate
+  if (c.definition.type === "DefinitionIsDefinition" && !c.conceptType) {
     const isBmiRefinement = BMI_QUANTITY_REFINEMENTS.has(c.name);
     changes.push({
       conceptName: c.name,
-      kind: "annotate-logic-is",
+      kind: "annotate-definition-is" as const,
       proposed: {
         type: "Observation",
         valuetype: isBmiRefinement ? "Quantity" : "boolean",
@@ -119,13 +119,13 @@ for (const change of changes) {
       continue;
     }
     source = source.slice(0, match.index) + match[1] + "Observation" + match[2] + source.slice(match.index + match[0].length);
-  } else if (change.kind === "annotate-logic-is") {
+  } else if (change.kind === "annotate-definition-is") {
     // Insert `- type is Observation.\n- valuetype is X.\n` between
-    // `concept "Name":` and `- logic is ...`.
-    const re = new RegExp(`(concept "${escaped}":\\s*\\n)([ \\t]*)(- logic is )`, "");
+    // `concept "Name":` and `- definition is...`.
+    const re = new RegExp(`(concept "${escaped}":\\s*\\n)([ \\t]*)(- definition is)`, "");
     const match = re.exec(source);
     if (!match) {
-      console.warn(`  WARN: could not locate logic-is block for "${change.conceptName}"`);
+      console.warn(`  WARN: could not locate definition-is block for "${change.conceptName}"`);
       continue;
     }
     const indent = match[2] || "";
