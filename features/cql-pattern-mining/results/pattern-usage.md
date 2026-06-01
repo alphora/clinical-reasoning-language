@@ -36,8 +36,8 @@ Patterns with zero usage across all modeled measures are listed at the bottom un
 | Pattern | Narrative phrase | CMS69 | CMS22 | Total |
 |---|---|---:|---:|---:|
 | `Justified(action, reason)` | `<action> justified by <reason>` | 8 | 1 | 9 |
-| `Active(X[, during])` | `<X> is active` | 3 | 0 | 3 |
-| `IsVerified(X)` | `<X> is verified` | 1 | 1 | 2 |
+| `Active(X[, during])` | `<X> active` | 3 | 0 | 3 |
+| `IsVerified(X)` | `<X> verified` | 1 | 1 | 2 |
 | `DocumentedAs(X, classification)` | `<X> documented as <classification>` | 1 | 0 | 1 |
 
 ## Qualification (temporal)
@@ -67,10 +67,10 @@ Patterns with zero usage across all modeled measures are listed at the bottom un
 | `Highest(X)` | `highest <X>` | 0 | 0 | 0 |
 | `AtLeastN(events, n)` | `at least <n> <events>` | 0 | 0 | 0 |
 | `Consecutive(events, n)` | `<n> consecutive <events>` | 0 | 0 | 0 |
-| `High(X)` | `<X> is high` | 1 | 0 | 1 |
-| `Low(X)` | `<X> is low` | 1 | 0 | 1 |
-| `Normal(X)` | `<X> is normal` | 1 | 0 | 1 |
-| `Abnormal(X)` | `<X> is abnormal` | 0 | 0 | 0 |
+| `High(X)` | `<X> high` | 1 | 0 | 1 |
+| `Low(X)` | `<X> low` | 1 | 0 | 1 |
+| `Normal(X)` | `<X> normal` | 1 | 0 | 1 |
+| `Abnormal(X)` | `<X> abnormal` | 0 | 0 | 0 |
 | `AtLeast(value, target)` | `<value> at least <target>` | 1 | 9 | 10 |
 | `AtMost(value, target)` | `<value> at most <target>` | 0 | 0 | 0 |
 | `Between(value, lo, hi)` | `<value> between <lo> and <hi>` | 0 | 3 | 3 |

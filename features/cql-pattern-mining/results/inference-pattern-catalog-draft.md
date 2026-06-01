@@ -1,8 +1,10 @@
-# CRL clinical inference patterns — draft catalog v0.6.0
+# CRL clinical inference patterns — draft catalog v0.7.0
 
-> **Status: draft v0.6.0** ("What not How" catalog sweep — return-type annotations stripped from canonical signatures per `features/cql-pattern-mining/inferred-from-is-semantic-composition.md`). **45 patterns** across the inference taxonomy plus a **5-form window-from-anchor sub-grammar** (BeforeStartOf, AfterStartOf, BeforeEndOf, AfterEndOf, OnDayOf).
+> **Status: draft v0.7.0** (catalog migration of 6 `<X> is <state>` patterns to suffix-adjective form, paired with the `definition is` body-kind rename in CRL v0.7). **45 patterns** across the inference taxonomy plus a **5-form window-from-anchor sub-grammar** (BeforeStartOf, AfterStartOf, BeforeEndOf, AfterEndOf, OnDayOf).
 >
-> **v0.6.0 — "What not How" sweep.** Canonical signatures no longer carry return-type annotations (the `: boolean` / `: Period` / `: Instance<X>` / `: WindowSpec` / `: T` parts after the closing paren). Per the v0.6 design discovered while correcting cms69/cms22: `inferred from` is **semantic composition**, not boolean logic — the CRL author declares each concept's `(type, valuetype)` based on semantic intent; the catalog describes pattern FORM (narrative + canonical name + parameter types for autocomplete + CQL function name), not return SHAPE. Treating catalog return types as authoritative for concept shape caused a multi-round correction loop (see `.vibe-tools/discussions/016`). Return types still appear in the CQL function definitions shown later in the document (those are CQL-side / emitter-side, accurate description of the function's CQL return type). The canonical column of the reference table is now author-facing form only.
+> **v0.7.0 — catalog migration paired with `definition is` keyword.** The 6 `<X> is <state>` patterns (Active, IsVerified, High, Low, Normal, Abnormal) drop their inner `is`, becoming `<X> active`, `<X> verified`, `<X> high/low/normal/abnormal`. The change pairs with CRL v0.7's renamed `definition is` body keyword (see `.vibe-tools/discussions/017-logic-is-keyword-rename.md` round 4 Path 1): under the new keyword, `definition is "X" is active` reads as doubly-copular, so the catalog migration drops the inner `is` to eliminate the collision. Canonical names (`Active`, `IsVerified`, `High`, `Low`, `Normal`, `Abnormal`) and CQL function names (`CRLPatterns.Active`, etc.) unchanged — only the narrative-surface form changes. Same surgery as the v0.5.5 `WasOrdered`/`WasPerformed` migration that dropped `was`.
+>
+> **v0.6.0 — "What not How" sweep.** Canonical signatures no longer carry return-type annotations (the `: boolean` / `: Period` / `: Instance<X>` / `: WindowSpec` / `: T` parts after the closing paren). Per the v0.6 design discovered while correcting cms69/cms22: `defined as` is **semantic composition**, not boolean logic — the CRL author declares each concept's `(type, valuetype)` based on semantic intent; the catalog describes pattern FORM (narrative + canonical name + parameter types for autocomplete + CQL function name), not return SHAPE. Treating catalog return types as authoritative for concept shape caused a multi-round correction loop (see `.vibe-tools/discussions/016`). Return types still appear in the CQL function definitions shown later in the document (those are CQL-side / emitter-side, accurate description of the function's CQL return type). The canonical column of the reference table is now author-facing form only.
 >
 > **v0.5.5 — Todo 2 grammar coordination** (`.vibe-tools/discussions/015`): minor catalog updates landing alongside the v0.5 grammar work in Todo 2. (a) `WasPerformed(X)` narrative form changes from `<X> was performed` to `<X> performed` (drops the auxiliary "was"; reads more naturally; canonical name unchanged). (b) `WasOrdered(X)` narrative form changes from `<X> was ordered` to `<X> ordered` (same rationale). (c) New type `Conjunction<T>` added to the type notation — symmetric to `Disjunction<T>`, for future patterns where in-arg conjunction semantics ("all of these") are needed. No corpus measure currently uses this; added prospectively so the grammar's accepting in-arg `and` is matched by the catalog's type system.
 >
@@ -253,8 +255,8 @@ This table is the v0.5 source-of-truth. Return types are explicit. Per-card cont
 | Pattern | Narrative form | Canonical | CQL function |
 |---|---|---|---|
 | `Justified(action, reason)` | `<action> justified by <reason>` | `Justified(action: ConceptRef, reason: ReasonExpr)` (see Type notation — heterogeneous disjunction supported) | `CRLPatterns.Justified` |
-| `Active(X[, during])` | `<X> is active` (optionally `during <period>`) | `Active(X: ConceptRef[, during: ConceptRef])` | `CRLPatterns.Active` |
-| `IsVerified(X)` | `<X> is verified` | `IsVerified(X: ConceptRef)` | `CRLPatterns.IsVerified` |
+| `Active(X[, during])` | `<X> active` (optionally `during <period>`) | `Active(X: ConceptRef[, during: ConceptRef])` | `CRLPatterns.Active` |
+| `IsVerified(X)` | `<X> verified` | `IsVerified(X: ConceptRef)` | `CRLPatterns.IsVerified` |
 | `DocumentedAs(X, classification)` | `<X> documented as <classification>` | `DocumentedAs(X: ConceptRef, classification: ConceptRef)` | `CRLPatterns.DocumentedAs` |
 
 ### Qualification (temporal)
@@ -304,10 +306,10 @@ A parameterized umbrella for windowed-from-anchor temporal scopes. Used as the `
 | `Highest(X[, scope])` | `highest <X>` (optionally `<scope>`) | `Highest(X: ConceptRef<Quantity<U>>[, scope: ScopeSpec])` | `CRLPatterns.Highest` |
 | `AtLeastN(events, n)` | `at least <n> <events>` | `AtLeastN(events: ConceptRef, n: Integer)` | `CRLPatterns.AtLeastN` |
 | `Consecutive(events, n)` | `<n> consecutive <events>` | `Consecutive(events: ConceptRef, n: Integer)` | `CRLPatterns.Consecutive` |
-| `High(X)` | `<X> is high` | `High(X: ConceptRef<Quantity>)` | `CRLPatterns.High` |
-| `Low(X)` | `<X> is low` | `Low(X: ConceptRef<Quantity>)` | `CRLPatterns.Low` |
-| `Normal(X)` | `<X> is normal` | `Normal(X: ConceptRef<Quantity>)` | `CRLPatterns.Normal` |
-| `Abnormal(X)` | `<X> is abnormal` | `Abnormal(X: ConceptRef<Quantity>)` | `CRLPatterns.Abnormal` |
+| `High(X)` | `<X> high` | `High(X: ConceptRef<Quantity>)` | `CRLPatterns.High` |
+| `Low(X)` | `<X> low` | `Low(X: ConceptRef<Quantity>)` | `CRLPatterns.Low` |
+| `Normal(X)` | `<X> normal` | `Normal(X: ConceptRef<Quantity>)` | `CRLPatterns.Normal` |
+| `Abnormal(X)` | `<X> abnormal` | `Abnormal(X: ConceptRef<Quantity>)` | `CRLPatterns.Abnormal` |
 | `AtLeast(value, target)` | `<value> at least <target>` | `AtLeast(value: ConceptRef<Quantity<U>>, target: Quantity<U>)` | `CRLPatterns.AtLeast` |
 | `AtMost(value, target)` | `<value> at most <target>` | `AtMost(value: ConceptRef<Quantity<U>>, target: Quantity<U>)` | `CRLPatterns.AtMost` |
 | `Between(value, lo, hi)` | `<value> between <lo> and <hi>` (lo/hi are Quantity literals — see dispatch rule) | `Between(value: ConceptRef<Quantity<U>>, lo: Quantity<U>, hi: Quantity<U>)` | `CRLPatterns.Between` |

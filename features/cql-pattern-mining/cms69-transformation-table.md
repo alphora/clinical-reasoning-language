@@ -83,7 +83,7 @@ Source CQL `"Documented Low BMI During Measurement Period": "BMI During Measurem
 
 | Concept | Current | Proposed | Conf | Reason |
 |---|---|---|---|---|
-| BMI During MP Is Low | (none) | **Observation+Quantity** | MEDIUM | `X is low` = `BMI.value < 18.5`; refinement (filter). Author-synthesized |
+| BMI During MP Is Low | (none) | **Observation+Quantity** | MEDIUM | `X low` = `BMI.value < 18.5`; refinement (filter). Author-synthesized |
 | BMI During MP Is High | (none) | **Observation+Quantity** | MEDIUM | Same with `>= 25`; refinement |
 | BMI During MP Is Normal | (none) | **Observation+Quantity** | MEDIUM | Same with `[18.5, 25)`; refinement (used inside `Has Normal BMI`'s exists) |
 | Documented Low BMI | Observation+boolean | **Observation+Quantity** | MEDIUM | Bare ref to refinement; the boolean shape happens at consumer's `exists`. Keeping refinement here preserves list semantics. (v2: gemini argued boolean per chain-check-via-consumer; rejected — chain check is local, not consumer-driven; the `exists` at `Has Normal BMI` is a separate concept and a separate boolean wrap) |
@@ -93,13 +93,13 @@ Source CQL `"Documented Low BMI During Measurement Period": "BMI During Measurem
 
 ## Group F — Diagnosis-active refinements (Condition+CodeableConcept)
 
-`X is active` in CQL filters a Condition list to clinicalStatus active. Refinement.
+`X active` in CQL filters a Condition list to clinicalStatus active. Refinement.
 
 | Concept | Current | Proposed | Conf | Reason |
 |---|---|---|---|---|
 | Overweight or Obese Diagnoses is Active | (none) | **Condition+CodeableConcept** | MEDIUM | Filter to active; refinement. Author-synthesized |
 | Underweight Diagnoses is Active | (none) | **Condition+CodeableConcept** | MEDIUM | Same |
-| Pregnancy Diagnoses Active During MP | (none) | **Condition+CodeableConcept** | MEDIUM | Filter combining `is active` + `during MP` |
+| Pregnancy Diagnoses Active During MP | (none) | **Condition+CodeableConcept** | MEDIUM | Filter combining `active` + `during MP` |
 
 ## Group G — "Has X" existence checks (Observation+boolean)
 
@@ -118,7 +118,7 @@ Source CQL `"Documented Low BMI During Measurement Period": "BMI During Measurem
 | Concept | Current | Proposed | Conf | Reason |
 |---|---|---|---|---|
 | Pregnancy Status Overlaps MP | (none) | **Observation+CodeableConcept** | MEDIUM | `X overlaps Y` filter; refinement of Obs list. Author-synthesized |
-| Pregnancy Status Is Verified | (none) | **Observation+CodeableConcept** | MEDIUM | `X is verified` = filter to status in {final, amended, corrected}; refinement |
+| Pregnancy Status Is Verified | (none) | **Observation+CodeableConcept** | MEDIUM | `X verified` = filter to status in {final, amended, corrected}; refinement |
 | Pregnancy Status Documented As Pregnancy Related | (none) | **Observation+CodeableConcept** | MEDIUM | Filter on value; refinement |
 
 ## Group I — Justified-by / on-or-before / performed / same-day patterns

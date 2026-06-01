@@ -260,15 +260,14 @@ const componentOf: PatternMatcher = (els, loc) => {
   return makeCall("ComponentOf", [conceptRefArg(els[3]), conceptRefArg(els[0])], loc);
 };
 
-/** `<X> is active during <Y>` → Active(X, [during: Y]) */
-const isActiveDuring: PatternMatcher = (els, loc) => {
-  if (els.length !== 5) return null;
+/** `<X> active during <Y>` → Active(X, [during: Y]) */
+const activeDuring: PatternMatcher = (els, loc) => {
+  if (els.length !== 4) return null;
   if (!isConceptRef(els[0])) return null;
-  if (!isWord(els[1], "is")) return null;
-  if (!isWord(els[2], "active")) return null;
-  if (!isWord(els[3], "during")) return null;
-  if (!isConceptRef(els[4])) return null;
-  return makeCall("Active", [conceptRefArg(els[0]), conceptRefArg(els[4])], loc);
+  if (!isWord(els[1], "active")) return null;
+  if (!isWord(els[2], "during")) return null;
+  if (!isConceptRef(els[3])) return null;
+  return makeCall("Active", [conceptRefArg(els[0]), conceptRefArg(els[3])], loc);
 };
 
 /** `<X> during <Y>` → During(event, period) */
@@ -342,30 +341,27 @@ const between: PatternMatcher = (els, loc) => {
   );
 };
 
-/** `<X> is verified` → IsVerified(X) */
-const isVerified: PatternMatcher = (els, loc) => {
-  if (els.length !== 3) return null;
+/** `<X> verified` → IsVerified(X) */
+const verified: PatternMatcher = (els, loc) => {
+  if (els.length !== 2) return null;
   if (!isConceptRef(els[0])) return null;
-  if (!isWord(els[1], "is")) return null;
-  if (!isWord(els[2], "verified")) return null;
+  if (!isWord(els[1], "verified")) return null;
   return makeCall("IsVerified", [conceptRefArg(els[0])], loc);
 };
 
-/** `<X> is active` → Active(X) */
-const isActive: PatternMatcher = (els, loc) => {
-  if (els.length !== 3) return null;
+/** `<X> active` → Active(X) */
+const active: PatternMatcher = (els, loc) => {
+  if (els.length !== 2) return null;
   if (!isConceptRef(els[0])) return null;
-  if (!isWord(els[1], "is")) return null;
-  if (!isWord(els[2], "active")) return null;
+  if (!isWord(els[1], "active")) return null;
   return makeCall("Active", [conceptRefArg(els[0])], loc);
 };
 
-/** `<X> is low|high|normal|abnormal` → Low|High|Normal|Abnormal(X) */
+/** `<X> low|high|normal|abnormal` → Low|High|Normal|Abnormal(X) */
 const valueClass: PatternMatcher = (els, loc) => {
-  if (els.length !== 3) return null;
+  if (els.length !== 2) return null;
   if (!isConceptRef(els[0])) return null;
-  if (!isWord(els[1], "is")) return null;
-  const classifier = els[2];
+  const classifier = els[1];
   if (!isWord(classifier, "low", "high", "normal", "abnormal")) return null;
   const name = (classifier as NWord).value;
   const cap = name[0].toUpperCase() + name.slice(1);
@@ -556,8 +552,8 @@ const PATTERNS: PatternMatcher[] = [
   withoutDocumentedDisjunction,    // 3 (with disjunction element)
   onOrBefore,                      // 5
   sameDayAs,                       // 5
-  isActiveDuring,                  // 5
   between,                         // 5
+  activeDuring,                    // 4 (post-catalog-v0.7: `<X> active during <Y>`)
   documentedAs,                    // 4
   justifiedBy,                     // 4
   componentOf,                     // 4
@@ -566,15 +562,15 @@ const PATTERNS: PatternMatcher[] = [
   asOf,                            // 4
   during,                          // 3
   overlaps,                        // 3
-  isVerified,                      // 3
-  isActive,                        // 3
-  valueClass,                      // 3
   below,                           // 3
   exceeds,                         // 3
   without,                         // 3 (last among 3-element patterns; less specific)
   mostRecent,                      // 3
   performed,                       // 2
   ordered,                         // 2
+  active,                          // 2 (post-catalog-v0.7: `<X> active`)
+  verified,                        // 2 (post-catalog-v0.7: `<X> verified`)
+  valueClass,                      // 2 (post-catalog-v0.7: `<X> low|high|normal|abnormal`)
   earliest,                        // 2
   first,                           // 2
   lastBare,                        // 2 (after lastOnDayOf / lastWithinBeforeStartOf)

@@ -69,8 +69,8 @@ These narratives return a Boolean from CQL — patient-level assertions.
 | `X exists` | Existence test |
 | `Has X` (where X is a Condition/diagnosis) | Existence test on the patient |
 | `X is documented` | Existence test for documentation |
-| `X is active` | Active-status predicate on a Condition |
-| `X is low` / `X is high` / `X is normal` | Classification predicate over a value range |
+| `X active` | Active-status predicate on a Condition |
+| `X low` / `X high` / `X normal` | Classification predicate over a value range |
 | `X is documented as Y` | Documentation predicate |
 | `X exceeds N 'unit'` / `X below N 'unit'` / `X at least N 'unit'` / `X between N and M 'unit'` | Quantity comparison |
 | `without documented X` / `without documented (X or Y)` | Negated existence |
@@ -147,7 +147,7 @@ concept "BMI Observation During MP":
 concept "BMI During MP Is Low":
 - type is Observation.
 - valuetype is boolean.
-- logic is "BMI During Measurement Period" is low.
+- definition is "BMI During Measurement Period" low.
 
 // VALUE-BEARING shape — extracts authoredOn from ServiceRequest
 concept "High BMI Follow-up Order Date":
