@@ -25,7 +25,6 @@ End-to-end via the import-aware emit CLI:
 ```bash
 node dist/cli/run-emitter.js \
   --path features/cql-pattern-mining/results/models/cms22-split/cms22.crl \
-  --source-path features/cql-pattern-mining/results/models/cms22-split \
   --library-name CMS22
 ```
 
@@ -58,7 +57,6 @@ From the repo root:
 npm run build  # rebuild dist/ if anything in src/ changed
 node dist/cli/run-emitter.js \
   --path features/cql-pattern-mining/results/models/cms22-split/cms22.crl \
-  --source-path features/cql-pattern-mining/results/models/cms22-split \
   --library-name CMS22
 ```
 
@@ -67,7 +65,6 @@ To validate (semantic checks):
 ```bash
 node dist/cli/run-validator.js \
   --path features/cql-pattern-mining/results/models/cms22-split/cms22.crl \
-  --source-path features/cql-pattern-mining/results/models/cms22-split \
   --pretty
 ```
 

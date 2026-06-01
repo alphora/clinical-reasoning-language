@@ -1,7 +1,7 @@
 # CMS22 Measure Interface
 
-library "CMS22 Interface" version '1.0.0'.
-include "CMS22 Inferred" version '1.0.0'.
+library "CMS22 Interface".
+include "CMS22 Inferred".
 
 // ============ Measure API ============
 

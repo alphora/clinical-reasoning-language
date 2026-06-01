@@ -4,10 +4,8 @@ import { Validator, ValidationError } from "../validator/validator";
 import { resolveImports } from "./index";
 import {
   ImportDiagnostic,
-  ParseFailureDiagnostic,
   RegistryEntry,
   ResolvedGraph,
-  emptyNamespace,
 } from "./types";
 
 export interface ValidateImportsOptions {
@@ -62,40 +60,12 @@ function attachSource(
 
 export function validateCRLImports(
   rootPath: string,
-  sourcePaths: string[] = [],
   options: ValidateImportsOptions = {},
 ): ValidateImportsResult {
-  let graph: ResolvedGraph;
-  try {
-    graph = resolveImports(rootPath, sourcePaths);
-  } catch (err) {
-    // Only known throw site today: scanSourcePaths on missing explicit source path.
-    const diag: ParseFailureDiagnostic = {
-      kind: "parse-failure",
-      severity: "error",
-      filePath: rootPath,
-      errors: [
-        {
-          type: "Exception",
-          message: err instanceof Error ? err.message : String(err),
-        },
-      ],
-    };
-    return {
-      success: false,
-      graph: {
-        rootPath,
-        resolvedLibraries: [],
-        namespace: emptyNamespace(),
-        diagnostics: [diag],
-      },
-      importDiagnostics: [diag],
-      validationErrors: [],
-      validationWarnings: [],
-    };
-  }
+  const graph: ResolvedGraph = resolveImports(rootPath);
 
-  // Root parse failure already populated diagnostics; short-circuit.
+  // Short-circuit when there's no graph to validate (root parse failed or
+  // project-root-not-found). The diagnostics already explain why.
   if (graph.resolvedLibraries.length === 0) {
     return {
       success: false,

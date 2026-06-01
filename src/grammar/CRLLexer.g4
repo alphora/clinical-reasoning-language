@@ -30,7 +30,6 @@ OR           : 'or';
 REQUEST      : 'request' -> mode(ACTIVITY_MODE);
 TERMINOLOGY  : 'terminology';
 THEN         : 'then';
-VERSION      : 'version';
 WHEN         : 'when';
 WITH         : 'with';
 
@@ -59,12 +58,9 @@ TIME_UNIT
 // `18.` lexes as NUMBER(18) + DOT.
 NUMBER       : [0-9]+ ('.' [0-9]+)?;
 
-// Single-quoted string token. Used for:
-//   (1) UCUM units in quantity literals — `'mm[Hg]'`, `'kg/m2'`, `'a'`.
-//   (2) Library/include version literals — `'1.0.0'`.
-// Body excludes single-quote, CR, LF; `+` (not `*`) keeps empty `''` a lex error
-// (UCUM-empty is meaningless; empty version is meaningless).
-// Parser context disambiguates the two uses; the token is shape-only.
+// Single-quoted string token. Used for UCUM units in quantity literals
+// (e.g. `30 'mm[Hg]'`, `'kg/m2'`, `'a'`).
+// Body excludes single-quote, CR, LF; `+` (not `*`) keeps empty `''` a lex error.
 SINGLE_QUOTED_STRING : '\'' ~['\r\n]+ '\'';
 
 // Catch-all lowercase narrative word, including kebab-case (`record-of`, `not-virtual`).

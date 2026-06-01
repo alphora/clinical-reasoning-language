@@ -16,9 +16,8 @@ options {
 //   Example: `it's the right thing to do`, `Some *markdown* text`
 //   Used for: evidence, markdown, system/code values, and non-identifier strings.
 //
-// Single quotes (') wrap shape-only string literals: UCUM units inside
-// quantity literals (`30 'mm[Hg]'`) and library/include version pins
-// (`library "Foo" version '1.0.0'.`). Parser context distinguishes the two.
+// Single quotes (') wrap UCUM units inside quantity literals
+// (`30 'mm[Hg]'`).
 //
 // This ensures unambiguous parsing and user-friendly authoring.
 
@@ -34,26 +33,26 @@ crl
 // Library / Include (cross-file imports — see Imports Todo 1)
 // ============================
 //
-// `library "Name" version '<v>'?.` — optional file-level identity declaration.
+// `library "Name".` — optional file-level identity declaration.
 //   - When omitted, the file is "anonymous": valid as a CLI root, but cannot
 //     be `include`d by name from another file.
 //   - At most one per file; must precede any `include` or other statement.
+//   - Version pinning is handled by npm (the installed package is the version).
 //
-// `include "Name" version '<v>'?.` — repeatable; declares a dependency on
-//   another library by name (resolved by the resolver against --source-path).
+// `include "Name".` — repeatable; declares a dependency on another library
+//   by name. Resolved by name lookup against the project's local CRL files
+//   plus `node_modules` packages that declare `crl.libraries` in their
+//   package.json.
 //   - Order-preserving (parser keeps the source order in the AST).
 //   - Must precede any non-include statement.
 //   - No aliasing in v0.7 (syntax position reserved; CALLED token deferred).
 //
-// Version literal is the raw text inside single quotes; semantic semver
-// matching is the resolver's concern, not the parser's.
-//
 libraryStatement
-    : LIBRARY identifier (VERSION SINGLE_QUOTED_STRING)? DOT
+    : LIBRARY identifier DOT
     ;
 
 includeStatement
-    : INCLUDE identifier (VERSION SINGLE_QUOTED_STRING)? DOT
+    : INCLUDE identifier DOT
     ;
 
 statement
@@ -374,7 +373,7 @@ narrative
 narrativeElement
     : QUOTED_STRING                                                                              # NConceptRef
     | quantity                                                                                   # NQuantity
-    | (AND | OR | NOT | WITH | LIBRARY | INCLUDE | VERSION | NARRATIVE_WORD | TIME_UNIT)         # NWord
+    | (AND | OR | NOT | WITH | LIBRARY | INCLUDE | NARRATIVE_WORD | TIME_UNIT)                   # NWord
     | argGroup                                                                                   # NArgGroupElement
     ;
 

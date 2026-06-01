@@ -5,7 +5,7 @@ import { parseInput } from "./parseInput";
 
 describe("Library + Include Structure", () => {
   describe("library declaration", () => {
-    it("should parse a library declaration without version", () => {
+    it("parses a library declaration", () => {
       const input = `# H
 library "Foo".
 concept "X":
@@ -15,25 +15,11 @@ concept "X":
       const ast: CRL = parseInput(input);
       expect(ast.library).toBeDefined();
       expect(ast.library?.name).toBe("Foo");
-      expect(ast.library?.version).toBeUndefined();
     });
 
-    it("should parse a library declaration with version", () => {
+    it("preserves library location info", () => {
       const input = `# H
-library "Foo" version '1.0.0'.
-concept "X":
-- type is Observation.
-- coded from "Y".
-`;
-      const ast: CRL = parseInput(input);
-      expect(ast.library).toBeDefined();
-      expect(ast.library?.name).toBe("Foo");
-      expect(ast.library?.version).toBe("1.0.0");
-    });
-
-    it("should preserve library location info", () => {
-      const input = `# H
-library "Foo" version '1.0.0'.
+library "Foo".
 concept "X":
 - type is Observation.
 - coded from "Y".
@@ -41,23 +27,20 @@ concept "X":
       const ast: CRL = parseInput(input);
       expect(ast.library?.location.start.line).toBe(2);
     });
+
+    it("rejects a library statement carrying a version clause", () => {
+      // version was dropped in the npm-resolution redesign; the parser must reject
+      // any leftover `version '...'` syntax so old files fail loudly.
+      const input = `# H
+library "Foo" version '1.0.0'.
+`;
+      const result = buildCRL(input);
+      expect(result.success).toBe(false);
+    });
   });
 
   describe("include declarations", () => {
-    it("should parse a single include", () => {
-      const input = `# H
-include "Bar" version '2.0.0'.
-concept "X":
-- type is Observation.
-- coded from "Y".
-`;
-      const ast: CRL = parseInput(input);
-      expect(ast.includes).toHaveLength(1);
-      expect(ast.includes[0].name).toBe("Bar");
-      expect(ast.includes[0].version).toBe("2.0.0");
-    });
-
-    it("should parse a single include without version", () => {
+    it("parses a single include", () => {
       const input = `# H
 include "Bar".
 concept "X":
@@ -67,14 +50,13 @@ concept "X":
       const ast: CRL = parseInput(input);
       expect(ast.includes).toHaveLength(1);
       expect(ast.includes[0].name).toBe("Bar");
-      expect(ast.includes[0].version).toBeUndefined();
     });
 
-    it("should parse multiple includes preserving order", () => {
+    it("parses multiple includes preserving order", () => {
       const input = `# H
-include "A" version '1.0.0'.
+include "A".
 include "B".
-include "C" version '3.0.0'.
+include "C".
 concept "X":
 - type is Observation.
 - coded from "Y".
@@ -82,14 +64,11 @@ concept "X":
       const ast: CRL = parseInput(input);
       expect(ast.includes).toHaveLength(3);
       expect(ast.includes.map((i: Include) => i.name)).toEqual(["A", "B", "C"]);
-      expect(ast.includes[0].version).toBe("1.0.0");
-      expect(ast.includes[1].version).toBeUndefined();
-      expect(ast.includes[2].version).toBe("3.0.0");
     });
 
-    it("should preserve include location info", () => {
+    it("preserves include location info", () => {
       const input = `# H
-include "Bar" version '2.0.0'.
+include "Bar".
 concept "X":
 - type is Observation.
 - coded from "Y".
@@ -97,32 +76,33 @@ concept "X":
       const ast: CRL = parseInput(input);
       expect(ast.includes[0].location.start.line).toBe(2);
     });
+
+    it("rejects an include statement carrying a version clause", () => {
+      const input = `# H
+include "Bar" version '1.0.0'.
+`;
+      const result = buildCRL(input);
+      expect(result.success).toBe(false);
+    });
   });
 
   describe("library + includes together (cms22 shell shape)", () => {
-    it("should parse library followed by multiple includes", () => {
-      const input = `# CMS22 BMI Screening and Follow-Up
-library "CMS22" version '1.0.0'.
-include "CMS22 Terminology" version '1.0.0'.
-include "CMS22 Asserted" version '1.0.0'.
-include "CMS22 Inferred" version '1.0.0'.
-include "CMS22 Interface" version '1.0.0'.
+    it("parses library followed by multiple includes", () => {
+      const input = `# CMS22
+library "CMS22".
+include "CMS22 Terminology".
+include "CMS22 Asserted".
+include "CMS22 Inferred".
+include "CMS22 Interface".
 `;
       const ast: CRL = parseInput(input);
       expect(ast.library?.name).toBe("CMS22");
-      expect(ast.library?.version).toBe("1.0.0");
       expect(ast.includes).toHaveLength(4);
-      expect(ast.includes.map((i: Include) => i.name)).toEqual([
-        "CMS22 Terminology",
-        "CMS22 Asserted",
-        "CMS22 Inferred",
-        "CMS22 Interface",
-      ]);
     });
   });
 
   describe("backward compatibility (no library / no includes)", () => {
-    it("should parse zero library + zero includes — every existing file continues to parse", () => {
+    it("parses zero library + zero includes", () => {
       const input = `# H
 concept "X":
 - type is Observation.
@@ -134,7 +114,7 @@ concept "X":
       expect(ast.statements).toHaveLength(1);
     });
 
-    it("should parse zero library + includes-only (anonymous file with deps)", () => {
+    it("parses zero library + includes-only", () => {
       const input = `# H
 include "Common".
 concept "X":
@@ -146,9 +126,9 @@ concept "X":
       expect(ast.includes).toHaveLength(1);
     });
 
-    it("should parse library-only (no includes, no statements)", () => {
+    it("parses library-only (no includes, no statements)", () => {
       const input = `# H
-library "Empty" version '1.0.0'.
+library "Empty".
 `;
       const ast: CRL = parseInput(input);
       expect(ast.library?.name).toBe("Empty");
@@ -158,7 +138,7 @@ library "Empty" version '1.0.0'.
   });
 
   describe("parse-error rejections", () => {
-    it("should reject library after include (strict ordering)", () => {
+    it("rejects library after include (strict ordering)", () => {
       const input = `# H
 include "Bar".
 library "Foo".
@@ -167,7 +147,7 @@ library "Foo".
       expect(result.success).toBe(false);
     });
 
-    it("should reject library after a statement", () => {
+    it("rejects library after a statement", () => {
       const input = `# H
 concept "X":
 - type is Observation.
@@ -178,7 +158,7 @@ library "Foo".
       expect(result.success).toBe(false);
     });
 
-    it("should reject include after a statement", () => {
+    it("rejects include after a statement", () => {
       const input = `# H
 concept "X":
 - type is Observation.
@@ -189,7 +169,7 @@ include "Bar".
       expect(result.success).toBe(false);
     });
 
-    it("should reject multiple library declarations", () => {
+    it("rejects multiple library declarations", () => {
       const input = `# H
 library "A".
 library "B".
@@ -198,7 +178,7 @@ library "B".
       expect(result.success).toBe(false);
     });
 
-    it("should reject library without trailing dot", () => {
+    it("rejects library without trailing dot", () => {
       const input = `# H
 library "Foo"
 concept "X":
@@ -209,7 +189,7 @@ concept "X":
       expect(result.success).toBe(false);
     });
 
-    it("should reject include without trailing dot", () => {
+    it("rejects include without trailing dot", () => {
       const input = `# H
 include "Bar"
 concept "X":
@@ -219,22 +199,12 @@ concept "X":
       const result = buildCRL(input);
       expect(result.success).toBe(false);
     });
-
-    it("should reject empty single-quoted version (lex error per regex `+`)", () => {
-      const input = `# H
-library "Foo" version ''.
-`;
-      const result = buildCRL(input);
-      expect(result.success).toBe(false);
-    });
   });
 
   describe("narrative use of new reserved words", () => {
-    // The new LIBRARY / INCLUDE / VERSION keywords are added to the
-    // narrativeElement#NWord alternative — they remain usable as narrative
-    // words inside `definition is` bodies so existing narrative authoring
-    // is not constrained by the new top-level grammar.
-    it("should allow 'library' as a narrative word in definition is", () => {
+    // `library` and `include` are reserved at the top level but still
+    // usable as narrative words inside `definition is` bodies.
+    it("allows 'library' as a narrative word in definition is", () => {
       const input = `# H
 concept "X":
 - type is Encounter.
@@ -244,7 +214,7 @@ concept "X":
       expect(result.success).toBe(true);
     });
 
-    it("should allow 'include' as a narrative word in definition is", () => {
+    it("allows 'include' as a narrative word in definition is", () => {
       const input = `# H
 concept "X":
 - type is Encounter.
@@ -253,31 +223,21 @@ concept "X":
       const result = buildCRL(input);
       expect(result.success).toBe(true);
     });
-
-    it("should allow 'version' as a narrative word in definition is", () => {
-      const input = `# H
-concept "X":
-- type is Encounter.
-- definition is "Y" version performed.
-`;
-      const result = buildCRL(input);
-      expect(result.success).toBe(true);
-    });
   });
 
   describe("LibraryDeclaration / Include AST node shape", () => {
-    it("should produce LibraryDeclaration with correct type tag", () => {
+    it("LibraryDeclaration has the correct type tag", () => {
       const input = `# H
-library "Foo" version '1.0.0'.
+library "Foo".
 `;
       const ast: CRL = parseInput(input);
       const lib = ast.library as LibraryDeclaration;
       expect(lib.type).toBe("LibraryDeclaration");
     });
 
-    it("should produce Include with correct type tag", () => {
+    it("Include has the correct type tag", () => {
       const input = `# H
-include "Bar" version '2.0.0'.
+include "Bar".
 `;
       const ast: CRL = parseInput(input);
       expect(ast.includes[0].type).toBe("Include");

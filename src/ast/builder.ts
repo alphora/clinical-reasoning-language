@@ -176,24 +176,18 @@ export class CRLAstBuilder
 
   visitLibraryStatement(ctx: LibraryStatementContext): LibraryDeclaration {
     const name = ctx.identifier().text.slice(1, -1);
-    const versionToken = ctx.SINGLE_QUOTED_STRING();
-    const version = versionToken ? versionToken.text.slice(1, -1) : undefined;
     return {
       type: "LibraryDeclaration",
       name,
-      ...(version !== undefined ? { version } : {}),
       location: getLocation(ctx),
     };
   }
 
   visitIncludeStatement(ctx: IncludeStatementContext): Include {
     const name = ctx.identifier().text.slice(1, -1);
-    const versionToken = ctx.SINGLE_QUOTED_STRING();
-    const version = versionToken ? versionToken.text.slice(1, -1) : undefined;
     return {
       type: "Include",
       name,
-      ...(version !== undefined ? { version } : {}),
       location: getLocation(ctx),
     };
   }

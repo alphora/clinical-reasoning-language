@@ -1,5 +1,5 @@
 # CMS22 terminology (test)
-library "CMS22 Terminology" version '1.0.0'.
+library "CMS22 Terminology".
 
 terminology "Qualifying Encounters Valueset":
 - valueset is `2.16.840.1.113883.3.464.1003.101.12.1061`.

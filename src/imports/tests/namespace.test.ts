@@ -38,7 +38,7 @@ function makeLibrary(name: string, filePath: string, statements: CRL["statements
     statements,
     location: dummyLoc,
   };
-  return { name, filePath, ast, isRoot: false };
+  return { name, filePath, ast, isRoot: false, origin: "local" };
 }
 
 describe("buildCombinedNamespace", () => {

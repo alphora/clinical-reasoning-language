@@ -1,5 +1,0 @@
-# ambiguous Foo v2
-library "Foo" version '2.0.0'.
-
-terminology "T2":
-- valueset is `t2`.

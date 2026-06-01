@@ -27,23 +27,19 @@ export type Statement = Decision | Concept | Activity | Terminology;
 
 // File-level library identity declaration. Optional; max one per file.
 // When omitted, the file is anonymous (valid as CLI root, cannot be included).
-// `version` is the raw text inside the single quotes; semver parsing is the
-// resolver's job (Imports Todo 2), not the parser's.
+// Version pinning is handled by npm — the installed package's npm version
+// is the library version.
 export interface LibraryDeclaration extends ASTNode {
   type: "LibraryDeclaration";
   name: string;
-  version?: string;
   location: Location;
 }
 
-// File-level dependency on another library, resolved by name against the
-// resolver's source-path registry (Imports Todo 2). Order is preserved.
-// `version`, when present, is a constraint the resolver applies; absent
-// means "any version." Semver parsing is the resolver's concern.
+// File-level dependency on another library, resolved by name lookup against
+// local project files + node_modules packages. Order is preserved.
 export interface Include extends ASTNode {
   type: "Include";
   name: string;
-  version?: string;
   location: Location;
 }
 

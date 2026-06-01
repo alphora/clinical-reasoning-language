@@ -4,20 +4,18 @@ import * as path from "path";
 import { buildCRL } from "../index";
 
 import { buildCombinedNamespace } from "./namespace";
-import { scanSourcePaths } from "./registry";
+import { buildRegistry, findProjectRoot } from "./registry";
 import { walkIncludes } from "./resolver";
 import {
   ImportDiagnostic,
   ParseFailureDiagnostic,
+  ProjectRootNotFoundDiagnostic,
   RegistryEntry,
   ResolvedGraph,
   emptyNamespace,
 } from "./types";
 
-export function resolveImports(
-  rootPath: string,
-  explicitSourcePaths: string[] = [],
-): ResolvedGraph {
+export function resolveImports(rootPath: string): ResolvedGraph {
   const canonicalRoot = path.resolve(rootPath);
 
   let rootSource: string;
@@ -59,33 +57,37 @@ export function resolveImports(
     };
   }
 
+  const projectRoot = findProjectRoot(canonicalRoot);
+  if (projectRoot === null) {
+    const diag: ProjectRootNotFoundDiagnostic = {
+      kind: "project-root-not-found",
+      severity: "error",
+      fromPath: canonicalRoot,
+    };
+    return {
+      rootPath: canonicalRoot,
+      resolvedLibraries: [],
+      namespace: emptyNamespace(),
+      diagnostics: [diag],
+    };
+  }
+
   const rootAst = parsed.result;
   const rootEntry: RegistryEntry = {
     name: rootAst.library?.name ?? null,
-    ...(rootAst.library?.version !== undefined
-      ? { version: rootAst.library.version }
-      : {}),
     filePath: canonicalRoot,
     ast: rootAst,
     isRoot: true,
+    origin: "root",
   };
 
-  const implicitDir = path.dirname(canonicalRoot);
-  const sourcePathInputs = [
-    ...explicitSourcePaths.map((p) => ({ path: p, implicit: false })),
-    { path: implicitDir, implicit: true },
-  ];
+  const { registry, diagnostics: registryDiags } = buildRegistry(projectRoot);
 
-  const { registry, diagnostics: registryDiags } = scanSourcePaths(sourcePathInputs);
-
-  // The root's library (if it has one) takes precedence over a registry entry
-  // pointing at the same file. Replace the same-path entry with the canonical
-  // root entry so includes back to root resolve to the same object (cycle
-  // detection compares filePath, but other consumers want object identity).
+  // The root file may also be in the local scan. Replace any same-path entry
+  // (or same-name entry pointing at the root path) with the canonical root
+  // entry so cycle detection and topo order treat root as one identity.
   if (rootAst.library) {
-    const sameNameEntries = registry.byName.get(rootAst.library.name) ?? [];
-    const filtered = sameNameEntries.filter((e) => e.filePath !== canonicalRoot);
-    registry.byName.set(rootAst.library.name, [rootEntry, ...filtered]);
+    registry.byName.set(rootAst.library.name, rootEntry);
   }
 
   const { resolvedLibraries, diagnostics: resolverDiags } = walkIncludes(
@@ -104,6 +106,7 @@ export function resolveImports(
 
   return {
     rootPath: canonicalRoot,
+    projectRoot,
     resolvedLibraries,
     namespace,
     diagnostics,
@@ -119,14 +122,15 @@ export type {
   NodeKind,
   ImportDiagnostic,
   ParseFailureDiagnostic,
+  ProjectRootNotFoundDiagnostic,
+  PackageResolutionFailureDiagnostic,
   RegistryDuplicateDiagnostic,
   UnresolvedIncludeDiagnostic,
-  AmbiguousIncludeDiagnostic,
   CycleDiagnostic,
   NameConflictDiagnostic,
 } from "./types";
 
-export { scanSourcePaths } from "./registry";
+export { buildRegistry, findProjectRoot } from "./registry";
 export { walkIncludes } from "./resolver";
 export { buildCombinedNamespace } from "./namespace";
 export { emptyNamespace } from "./types";

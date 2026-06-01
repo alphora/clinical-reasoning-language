@@ -16,7 +16,8 @@ export type { EmitImportsResult } from "./imports/emit";
 
 export {
   resolveImports,
-  scanSourcePaths,
+  findProjectRoot,
+  buildRegistry,
   walkIncludes,
   buildCombinedNamespace,
   emptyNamespace,
@@ -30,9 +31,10 @@ export type {
   NodeKind,
   ImportDiagnostic,
   ParseFailureDiagnostic,
+  ProjectRootNotFoundDiagnostic,
+  PackageResolutionFailureDiagnostic,
   RegistryDuplicateDiagnostic,
   UnresolvedIncludeDiagnostic,
-  AmbiguousIncludeDiagnostic,
   CycleDiagnostic,
   NameConflictDiagnostic,
 } from "./imports";

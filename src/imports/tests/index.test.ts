@@ -23,18 +23,14 @@ describe("resolveImports (end-to-end)", () => {
       "CMS22 Interface",
       "CMS22",
     ]);
-    // Combined namespace surfaces the operator's measure entry concept from
-    // the interface library and the leaf-level terminology.
     expect(graph.namespace.concepts.has("Initial Population")).toBe(true);
     expect(graph.namespace.terminologies.has("Qualifying Encounters Valueset")).toBe(true);
   });
 
-  it("treats the root file's directory as an implicit source path", () => {
+  it("exposes projectRoot in the resolved graph", () => {
     const root = path.join(FIXTURES, "cms22-split", "cms22.crl");
-    // No explicit source paths — relies on implicit root-dir.
-    const graph = resolveImports(root, []);
-    const errs = graph.diagnostics.filter((d) => d.severity === "error");
-    expect(errs).toHaveLength(0);
+    const graph = resolveImports(root);
+    expect(graph.projectRoot).toBe(path.join(FIXTURES, "cms22-split"));
   });
 
   it("returns a partial graph with parse-failure when the root fails to parse", () => {
@@ -72,13 +68,6 @@ describe("resolveImports (end-to-end)", () => {
     expect(unresolved).toBeDefined();
   });
 
-  it("surfaces an ambiguous-include when versioned candidates match unversioned include", () => {
-    const root = path.join(FIXTURES, "ambiguous", "root.crl");
-    const graph = resolveImports(root);
-    const amb = graph.diagnostics.find((d) => d.kind === "ambiguous-include");
-    expect(amb).toBeDefined();
-  });
-
   it("surfaces a cycle diagnostic when A includes B and B includes A", () => {
     const root = path.join(FIXTURES, "cycle", "A.crl");
     const graph = resolveImports(root);
@@ -93,20 +82,19 @@ describe("resolveImports (end-to-end)", () => {
     expect(conflict).toBeDefined();
   });
 
-  it("surfaces a registry-duplicate when two source-path files declare the same (name, version)", () => {
+  it("surfaces a registry-duplicate when two local files declare the same library name", () => {
     const root = path.join(FIXTURES, "registry-duplicate", "root.crl");
     const graph = resolveImports(root);
     const dup = graph.diagnostics.find((d) => d.kind === "registry-duplicate");
     expect(dup).toBeDefined();
   });
 
-  it("surfaces a parse-failure warning when a source-path file is broken (resolution continues)", () => {
+  it("surfaces a parse-failure warning when a local file is broken (resolution continues)", () => {
     const root = path.join(FIXTURES, "source-path-parse-failure", "root.crl");
     const graph = resolveImports(root);
     const parseFail = graph.diagnostics.find((d) => d.kind === "parse-failure");
     expect(parseFail).toBeDefined();
     expect(parseFail?.severity).toBe("warning");
-    // The valid "Good" include still resolves.
     expect(graph.resolvedLibraries.find((e) => e.name === "Good")).toBeDefined();
   });
 });

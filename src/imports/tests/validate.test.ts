@@ -35,14 +35,14 @@ describe("validateCRLImports", () => {
 
   it("soft mode demotes cross-file unresolved-ref errors to warnings", () => {
     const root = path.join(FIXTURES, "cross-file-unresolved-ref", "root.crl");
-    const result = validateCRLImports(root, [], { soft: true });
+    const result = validateCRLImports(root, { soft: true });
     expect(result.validationErrors.filter((e) => /Not Declared Anywhere/.test(e.message))).toHaveLength(0);
     expect(result.validationWarnings.find((e) => /Not Declared Anywhere/.test(e.message))).toBeDefined();
   });
 
   it("soft mode does NOT demote unresolved-include diagnostics from the resolver", () => {
     const root = path.join(FIXTURES, "unresolved", "root.crl");
-    const result = validateCRLImports(root, [], { soft: true });
+    const result = validateCRLImports(root, { soft: true });
     const unresolved = result.importDiagnostics.find((d) => d.kind === "unresolved-include");
     expect(unresolved).toBeDefined();
     expect(unresolved?.severity).toBe("error");
@@ -75,34 +75,19 @@ describe("validateCRLImports", () => {
     expect(result.validationErrors).toHaveLength(0);
   });
 
-  it("source-path parse-failure warnings do not block success", () => {
+  it("parse-failure warnings on a broken local file do not block success", () => {
     const root = path.join(FIXTURES, "source-path-parse-failure", "root.crl");
     const result = validateCRLImports(root);
     const warningDiags = result.importDiagnostics.filter(
       (d) => d.kind === "parse-failure" && d.severity === "warning",
     );
     expect(warningDiags.length).toBeGreaterThan(0);
-    // The root validates clean and the only error-severity diagnostics are absent → success.
     expect(result.success).toBe(true);
   });
 
-  it("documents global-namespace visibility: any transitive declaration is visible to any library in the graph (v0.7 simplification)", () => {
-    // Root → Leaf; Root defines a concept that references Leaf's declarations.
-    // After flatten + validate, the ref resolves because the v0.7 namespace is global
-    // (all transitive declarations visible to all libraries in the include closure).
-    // Future v0.8 may add direction-aware visibility.
+  it("documents global-namespace visibility: any transitive declaration is visible to any library", () => {
     const root = path.join(FIXTURES, "cross-file-ref", "root.crl");
     const result = validateCRLImports(root);
     expect(result.success).toBe(true);
-  });
-
-  it("returns an error result (not throw) when an explicit source path is missing", () => {
-    const root = path.join(FIXTURES, "cms22-split", "cms22.crl");
-    const result = validateCRLImports(root, [path.join(FIXTURES, "does-not-exist")]);
-    expect(result.success).toBe(false);
-    const parseFailErr = result.importDiagnostics.find(
-      (d) => d.kind === "parse-failure" && d.severity === "error",
-    );
-    expect(parseFailErr).toBeDefined();
   });
 });

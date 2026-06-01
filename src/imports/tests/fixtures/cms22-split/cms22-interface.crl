@@ -1,6 +1,6 @@
 # CMS22 measure interface (test)
-library "CMS22 Interface" version '1.0.0'.
-include "CMS22 Inferred" version '1.0.0'.
+library "CMS22 Interface".
+include "CMS22 Inferred".
 
 concept "Initial Population":
 - type is Encounter.

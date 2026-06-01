@@ -1,7 +1,7 @@
 import type { CRL, Statement, Include } from "../ast/types";
 import type { CRLError } from "../types/errors";
 
-// === Diagnostics (the single union surfaced to all consumers) ===
+// === Diagnostics ===
 
 export interface ParseFailureDiagnostic {
   kind: "parse-failure";
@@ -10,11 +10,38 @@ export interface ParseFailureDiagnostic {
   errors: CRLError[];
 }
 
+export interface ProjectRootNotFoundDiagnostic {
+  kind: "project-root-not-found";
+  severity: "error";
+  // The path the resolver started from (root .crl) — included for diagnostic
+  // surface so callers can render "no package.json found upward from <path>".
+  fromPath: string;
+}
+
+export interface PackageResolutionFailureDiagnostic {
+  kind: "package-resolution-failure";
+  severity: "warning";
+  // The npm package whose crl.libraries entry was problematic. Absolute path
+  // to the package directory.
+  packagePath: string;
+  // The crl.libraries entry that failed (when applicable; absent if the whole
+  // crl field is malformed).
+  listedPath?: string;
+  reason:
+    | "missing-file"            // listed file doesn't exist
+    | "invalid-json"            // package.json failed to parse
+    | "crl-libraries-not-array" // crl field exists but crl.libraries isn't an array of strings
+    | "no-library-declaration"  // listed file parsed but has no library "X". line
+    | "path-escapes-package"    // listed path used .. to escape the package dir
+    | "parse-error";            // listed file failed to parse
+  message: string;
+}
+
 export interface RegistryDuplicateDiagnostic {
   kind: "registry-duplicate";
   severity: "error";
+  // The library name declared by both files.
   name: string;
-  version?: string;
   filePaths: string[];
 }
 
@@ -25,24 +52,18 @@ export interface UnresolvedIncludeDiagnostic {
   from: { filePath: string; libraryName?: string };
 }
 
-export interface AmbiguousIncludeDiagnostic {
-  kind: "ambiguous-include";
-  severity: "error";
-  include: Include;
-  from: { filePath: string; libraryName?: string };
-  candidates: RegistryEntry[];
-}
-
 export interface CycleDiagnostic {
   kind: "cycle";
   severity: "error";
-  filePaths: string[];       // [A, B, ..., A] — closure
-  includeChain: Include[];   // each include node that opens the next step
+  filePaths: string[];       // [A, B, ..., A] closure
+  includeChain: Include[];
 }
 
 export interface NameConflictDiagnostic {
   kind: "name-conflict";
   severity: "error";
+  // Statement name (concept/decision/activity/terminology) declared in
+  // multiple resolved libraries.
   name: string;
   nodeKind: NodeKind;
   sources: { libraryName: string | null; filePath: string }[];
@@ -50,24 +71,29 @@ export interface NameConflictDiagnostic {
 
 export type ImportDiagnostic =
   | ParseFailureDiagnostic
+  | ProjectRootNotFoundDiagnostic
+  | PackageResolutionFailureDiagnostic
   | RegistryDuplicateDiagnostic
   | UnresolvedIncludeDiagnostic
-  | AmbiguousIncludeDiagnostic
   | CycleDiagnostic
   | NameConflictDiagnostic;
 
 // === Registry ===
 
 export interface RegistryEntry {
-  name: string | null;
-  version?: string;
-  filePath: string;
+  name: string | null;       // null only when isRoot && root is anonymous
+  filePath: string;          // absolute canonical
   ast: CRL;
   isRoot: boolean;
+  // Source: where this library came from. "local" = scanned from the project
+  // directory; "package" = scanned from a node_modules package's crl.libraries.
+  origin: "local" | "package" | "root";
 }
 
+// Single entry per library name (second-write collisions emit registry-duplicate
+// and the second is rejected).
 export interface Registry {
-  byName: Map<string, RegistryEntry[]>;
+  byName: Map<string, RegistryEntry>;
 }
 
 // === Combined namespace (kind-separated) ===
@@ -97,10 +123,14 @@ export function emptyNamespace(): Namespace {
   };
 }
 
-// === Top-level returned shape ===
+// === Top-level ===
 
 export interface ResolvedGraph {
   rootPath: string;
+  // The project root directory (the one containing package.json). Absent
+  // when project-root-not-found.
+  projectRoot?: string;
+  // Topological order: leaves first, root last.
   resolvedLibraries: RegistryEntry[];
   namespace: Namespace;
   diagnostics: ImportDiagnostic[];

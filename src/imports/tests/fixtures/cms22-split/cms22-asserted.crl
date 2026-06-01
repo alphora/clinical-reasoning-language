@@ -1,6 +1,6 @@
 # CMS22 asserted concepts (test)
-library "CMS22 Asserted" version '1.0.0'.
-include "CMS22 Terminology" version '1.0.0'.
+library "CMS22 Asserted".
+include "CMS22 Terminology".
 
 concept "Qualifying Encounter Source":
 - type is Encounter.

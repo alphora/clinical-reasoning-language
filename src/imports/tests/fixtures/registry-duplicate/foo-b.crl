@@ -1,5 +1,5 @@
 # registry-duplicate foo-b
-library "Foo" version '1.0.0'.
+library "Foo".
 
 terminology "Tb":
 - valueset is `tb`.
