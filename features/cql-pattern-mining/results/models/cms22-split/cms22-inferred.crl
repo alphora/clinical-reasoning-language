@@ -1,0 +1,758 @@
+# CMS22 Inferred Concepts
+
+library "CMS22 Inferred" version '1.0.0'.
+include "CMS22 Asserted" version '1.0.0'.
+
+// ============ Inference declarations + composing concepts ============
+
+// --- Qualifying Encounter ---
+
+concept "BP Evaluation Encounter (not virtual)":
+- type is Encounter.
+- defined as
+(
+   "BP Screening Encounters"
+   sem-and
+   sem-not "Virtual Encounters"
+).
+
+concept "BP Evaluation Encounter (not virtual) During MP":
+- type is Encounter.
+- definition is "BP Evaluation Encounter (not virtual)" during "Measurement Period".
+
+concept "BP Evaluation Encounter (not virtual) Performed":
+- type is Encounter.
+- definition is "BP Evaluation Encounter (not virtual)" performed.
+
+concept "Qualifying Encounter":
+- type is Encounter.
+- defined as
+(
+   "BP Evaluation Encounter (not virtual) During MP"
+   sem-and
+   "BP Evaluation Encounter (not virtual) Performed"
+).
+
+
+// --- BP panel projections ---
+
+concept "Systolic Code Component of BP Panels":
+- type is Observation.
+- valuetype is Quantity.
+- definition is "Systolic Blood Pressure Code" component of "Blood Pressure Panels".
+
+concept "Diastolic Code Component of BP Panels":
+- type is Observation.
+- valuetype is Quantity.
+- definition is "Diastolic Blood Pressure Code" component of "Blood Pressure Panels".
+
+concept "Systolic BP Reading":
+- type is Observation.
+- valuetype is Quantity.
+- defined as "Systolic Code Component of BP Panels".
+
+concept "Diastolic BP Reading":
+- type is Observation.
+- valuetype is Quantity.
+- defined as "Diastolic Code Component of BP Panels".
+
+
+// --- Last BP reading on each qualifying encounter day ---
+
+concept "Last BP Panels On Qualifying Encounter Day":
+- type is Observation.
+- valuetype is Quantity.
+- definition is last "Blood Pressure Panels" on day of "Qualifying Encounter".
+
+concept "Last BP Panel on Qualifying Encounter Day":
+- type is Observation.
+- valuetype is CodeableConcept.
+- defined as "Last BP Panels On Qualifying Encounter Day".
+
+concept "Systolic Code Component of Last BP Panel On Encounter Day":
+- type is Observation.
+- valuetype is Quantity.
+- definition is "Systolic Blood Pressure Code" component of "Last BP Panel on Qualifying Encounter Day".
+
+concept "Diastolic Code Component of Last BP Panel On Encounter Day":
+- type is Observation.
+- valuetype is Quantity.
+- definition is "Diastolic Blood Pressure Code" component of "Last BP Panel on Qualifying Encounter Day".
+
+concept "Last Systolic on Qualifying Encounter Day":
+- type is Observation.
+- valuetype is Quantity.
+- defined as "Systolic Code Component of Last BP Panel On Encounter Day".
+
+concept "Last Diastolic on Qualifying Encounter Day":
+- type is Observation.
+- valuetype is Quantity.
+- defined as "Diastolic Code Component of Last BP Panel On Encounter Day".
+
+
+// --- BP classification ladder ---
+
+concept "Last Systolic Below 120":
+- type is Observation.
+- valuetype is boolean.
+- definition is "Last Systolic on Qualifying Encounter Day" below 120 'mm[Hg]'.
+
+concept "Last Diastolic Below 80":
+- type is Observation.
+- valuetype is boolean.
+- definition is "Last Diastolic on Qualifying Encounter Day" below 80 'mm[Hg]'.
+
+concept "Last Systolic Between 120 and 129":
+- type is Observation.
+- valuetype is boolean.
+- definition is "Last Systolic on Qualifying Encounter Day" between 120 'mm[Hg]' and 129 'mm[Hg]'.
+
+concept "Last Systolic At Least 130":
+- type is Observation.
+- valuetype is boolean.
+- definition is "Last Systolic on Qualifying Encounter Day" at least 130 'mm[Hg]'.
+
+concept "Last Diastolic At Least 80":
+- type is Observation.
+- valuetype is boolean.
+- definition is "Last Diastolic on Qualifying Encounter Day" at least 80 'mm[Hg]'.
+
+concept "Last Systolic Between 130 and 139":
+- type is Observation.
+- valuetype is boolean.
+- definition is "Last Systolic on Qualifying Encounter Day" between 130 'mm[Hg]' and 139 'mm[Hg]'.
+
+concept "Last Diastolic Between 80 and 89":
+- type is Observation.
+- valuetype is boolean.
+- definition is "Last Diastolic on Qualifying Encounter Day" between 80 'mm[Hg]' and 89 'mm[Hg]'.
+
+concept "Last Systolic At Least 140":
+- type is Observation.
+- valuetype is boolean.
+- definition is "Last Systolic on Qualifying Encounter Day" at least 140 'mm[Hg]'.
+
+concept "Last Diastolic At Least 90":
+- type is Observation.
+- valuetype is boolean.
+- definition is "Last Diastolic on Qualifying Encounter Day" at least 90 'mm[Hg]'.
+
+concept "Normal BP Reading":
+- type is Observation.
+- valuetype is boolean.
+- defined as
+(
+   "Last Systolic Below 120"
+   sem-and
+   "Last Diastolic Below 80"
+).
+
+concept "Elevated BP Reading":
+- type is Observation.
+- valuetype is boolean.
+- defined as
+(
+   "Last Systolic Between 120 and 129"
+   sem-and
+   "Last Diastolic Below 80"
+).
+
+concept "Hypertensive Reading":
+- type is Observation.
+- valuetype is boolean.
+- defined as
+(
+   "Last Systolic At Least 130"
+   sem-or
+   "Last Diastolic At Least 80"
+).
+
+
+// --- Windowed-from-anchor scope (Prior-year readings) ---
+
+concept "Last BP Panels Within Year Prior To Qualifying Encounter":
+- type is Observation.
+- valuetype is Quantity.
+- definition is last "Blood Pressure Panels" within 1 year before start of "Qualifying Encounter".
+
+concept "Last BP Panel Within Year Prior to Qualifying Encounter":
+- type is Observation.
+- valuetype is CodeableConcept.
+- defined as "Last BP Panels Within Year Prior To Qualifying Encounter".
+
+concept "Systolic Code Component of Prior-Year Last BP Panel":
+- type is Observation.
+- valuetype is Quantity.
+- definition is "Systolic Blood Pressure Code" component of "Last BP Panel Within Year Prior to Qualifying Encounter".
+
+concept "Diastolic Code Component of Prior-Year Last BP Panel":
+- type is Observation.
+- valuetype is Quantity.
+- definition is "Diastolic Blood Pressure Code" component of "Last BP Panel Within Year Prior to Qualifying Encounter".
+
+concept "Prior-Year Last Systolic":
+- type is Observation.
+- valuetype is Quantity.
+- defined as "Systolic Code Component of Prior-Year Last BP Panel".
+
+concept "Prior-Year Last Diastolic":
+- type is Observation.
+- valuetype is Quantity.
+- defined as "Diastolic Code Component of Prior-Year Last BP Panel".
+
+concept "Prior-Year Last Systolic At Least 130":
+- type is Observation.
+- valuetype is boolean.
+- definition is "Prior-Year Last Systolic" at least 130 'mm[Hg]'.
+
+concept "Prior-Year Last Diastolic At Least 80":
+- type is Observation.
+- valuetype is boolean.
+- definition is "Prior-Year Last Diastolic" at least 80 'mm[Hg]'.
+
+concept "Prior-Year Hypertensive Reading":
+- type is Observation.
+- valuetype is boolean.
+- defined as
+(
+   "Prior-Year Last Systolic At Least 130"
+   sem-or
+   "Prior-Year Last Diastolic At Least 80"
+).
+
+concept "Without Record Of Prior-Year Hypertensive Reading":
+- type is Observation.
+- valuetype is boolean.
+- definition is without record of "Prior-Year Hypertensive Reading".
+
+concept "First Hypertensive Reading":
+- type is Observation.
+- valuetype is boolean.
+- defined as
+(
+   "Hypertensive Reading"
+   sem-and
+   "Without Record Of Prior-Year Hypertensive Reading"
+).
+
+
+// --- Second Hypertensive Reading 130s (complex composition with nested groups) ---
+
+concept "Second Hypertensive Reading 130s Body":
+- type is Observation.
+- valuetype is boolean.
+- defined as
+(
+   (
+      "Last Systolic Between 130 and 139"
+      sem-or
+      "Last Diastolic Between 80 and 89"
+   )
+   sem-and
+   sem-not
+   (
+      "Last Systolic At Least 140"
+      sem-or
+      "Last Diastolic At Least 90"
+   )
+).
+
+concept "Second Hypertensive Reading 130s":
+- type is Observation.
+- valuetype is boolean.
+- defined as
+(
+   "Second Hypertensive Reading 130s Body"
+   sem-and
+   "Prior-Year Hypertensive Reading"
+).
+
+concept "Second Hypertensive Reading 140+ Body":
+- type is Observation.
+- valuetype is boolean.
+- defined as
+(
+   "Last Systolic At Least 140"
+   sem-or
+   "Last Diastolic At Least 90"
+).
+
+concept "Second Hypertensive Reading 140+":
+- type is Observation.
+- valuetype is boolean.
+- defined as
+(
+   "Second Hypertensive Reading 140+ Body"
+   sem-and
+   "Prior-Year Hypertensive Reading"
+).
+
+
+// --- Ordered-intervention concepts ---
+
+concept "Follow-up Within 4 Weeks Ordered":
+- type is ServiceRequest.
+- definition is "Follow-up Within 4 Weeks" ordered.
+
+concept "Follow-up Within 6 Months Ordered":
+- type is ServiceRequest.
+- definition is "Follow-up Within 6 Months" ordered.
+
+concept "Four-Week Rescreen Order":
+- type is ServiceRequest.
+- defined as "Follow-up Within 4 Weeks Ordered".
+
+concept "Six-Month Rescreen Order":
+- type is ServiceRequest.
+- defined as "Follow-up Within 6 Months Ordered".
+
+concept "Non-Pharmacological Recommendations":
+- type is ServiceRequest.
+- valuetype is CodeableConcept.
+- defined as
+(
+   "Lifestyle Recommendations"
+   sem-or
+   "Weight Reduction Recommendations"
+   sem-or
+   "Dietary Recommendations"
+   sem-or
+   "Physical Activity Recommendations"
+   sem-or
+   "Alcohol Counseling Referrals"
+).
+
+concept "Non-Pharmacological Recommendations Ordered":
+- type is ServiceRequest.
+- definition is "Non-Pharmacological Recommendations" ordered.
+
+concept "Non-Pharmacological Recommendation Order":
+- type is ServiceRequest.
+- defined as "Non-Pharmacological Recommendations Ordered".
+
+concept "Hypertension Lab or ECG Requests":
+- type is ServiceRequest.
+- valuetype is CodeableConcept.
+- defined as
+(
+   "EKG 12-Lead Panel Requests"
+   sem-or
+   "EKG Study Requests"
+   sem-or
+   "Hypertension Lab Tests"
+).
+
+concept "Hypertension Lab or ECG Requests Ordered":
+- type is ServiceRequest.
+- definition is "Hypertension Lab or ECG Requests" ordered.
+
+concept "Hypertension Lab or ECG Order":
+- type is ServiceRequest.
+- defined as "Hypertension Lab or ECG Requests Ordered".
+
+concept "Antihypertensive Medications Ordered":
+- type is MedicationRequest.
+- definition is "Antihypertensive Medications" ordered.
+
+concept "Antihypertensive Medication Order":
+- type is MedicationRequest.
+- defined as "Antihypertensive Medications Ordered".
+
+concept "Primary-Care Referral Justified by Hypertensive Reading":
+- type is ServiceRequest.
+- definition is "Primary-Care Referrals" justified by "Hypertensive Reading Findings".
+
+concept "Primary-Care Referrals Ordered":
+- type is ServiceRequest.
+- definition is "Primary-Care Referrals" ordered.
+
+concept "Referral for Hypertensive Reading":
+- type is ServiceRequest.
+- defined as
+(
+   "Primary-Care Referral Justified by Hypertensive Reading"
+   sem-and
+   "Primary-Care Referrals Ordered"
+).
+
+
+// --- Per-class intervention bundles ---
+
+concept "Six-Month Rescreen Order Same Day As Qualifying Encounter":
+- type is ServiceRequest.
+- definition is "Six-Month Rescreen Order" same day as "Qualifying Encounter".
+
+concept "Non-Pharm Recommendation Order Same Day As Qualifying Encounter":
+- type is ServiceRequest.
+- definition is "Non-Pharmacological Recommendation Order" same day as "Qualifying Encounter".
+
+concept "Referral for Hypertensive Reading Same Day As Qualifying Encounter":
+- type is ServiceRequest.
+- definition is "Referral for Hypertensive Reading" same day as "Qualifying Encounter".
+
+concept "Four-Week Rescreen Order Same Day As Qualifying Encounter":
+- type is ServiceRequest.
+- definition is "Four-Week Rescreen Order" same day as "Qualifying Encounter".
+
+concept "Hypertension Lab or ECG Order Same Day As Qualifying Encounter":
+- type is ServiceRequest.
+- definition is "Hypertension Lab or ECG Order" same day as "Qualifying Encounter".
+
+concept "Antihypertensive Medication Order Same Day As Qualifying Encounter":
+- type is MedicationRequest.
+- definition is "Antihypertensive Medication Order" same day as "Qualifying Encounter".
+
+concept "Elevated BP Followup Bundle":
+- type is Observation.
+- valuetype is boolean.
+- defined as
+(
+   (
+      "Six-Month Rescreen Order Same Day As Qualifying Encounter"
+      sem-and
+      "Non-Pharm Recommendation Order Same Day As Qualifying Encounter"
+   )
+   sem-or
+   "Referral for Hypertensive Reading Same Day As Qualifying Encounter"
+).
+
+concept "First HTN Followup Bundle":
+- type is Observation.
+- valuetype is boolean.
+- defined as
+(
+   (
+      "Four-Week Rescreen Order Same Day As Qualifying Encounter"
+      sem-and
+      "Non-Pharm Recommendation Order Same Day As Qualifying Encounter"
+   )
+   sem-or
+   "Referral for Hypertensive Reading Same Day As Qualifying Encounter"
+).
+
+concept "Second HTN 130s Followup Bundle":
+- type is Observation.
+- valuetype is boolean.
+- defined as
+(
+   (
+      "Six-Month Rescreen Order Same Day As Qualifying Encounter"
+      sem-and
+      "Hypertension Lab or ECG Order Same Day As Qualifying Encounter"
+      sem-and
+      "Non-Pharm Recommendation Order Same Day As Qualifying Encounter"
+   )
+   sem-or
+   "Referral for Hypertensive Reading Same Day As Qualifying Encounter"
+).
+
+concept "Second HTN 140+ Followup Bundle":
+- type is Observation.
+- valuetype is boolean.
+- defined as
+(
+   (
+      "Four-Week Rescreen Order Same Day As Qualifying Encounter"
+      sem-and
+      "Hypertension Lab or ECG Order Same Day As Qualifying Encounter"
+      sem-and
+      "Non-Pharm Recommendation Order Same Day As Qualifying Encounter"
+      sem-and
+      "Antihypertensive Medication Order Same Day As Qualifying Encounter"
+   )
+   sem-or
+   "Referral for Hypertensive Reading Same Day As Qualifying Encounter"
+).
+
+
+// --- Per-class numerator components ---
+
+concept "Elevated BP With Followup":
+- type is Observation.
+- valuetype is boolean.
+- defined as
+(
+   "Elevated BP Reading"
+   sem-and
+   "Elevated BP Followup Bundle"
+).
+
+concept "First HTN With Followup":
+- type is Observation.
+- valuetype is boolean.
+- defined as
+(
+   "First Hypertensive Reading"
+   sem-and
+   "First HTN Followup Bundle"
+).
+
+concept "Second HTN 130s With Followup":
+- type is Observation.
+- valuetype is boolean.
+- defined as
+(
+   "Second Hypertensive Reading 130s"
+   sem-and
+   "Second HTN 130s Followup Bundle"
+).
+
+concept "Second HTN 140+ With Followup":
+- type is Observation.
+- valuetype is boolean.
+- defined as
+(
+   "Second Hypertensive Reading 140+"
+   sem-and
+   "Second HTN 140+ Followup Bundle"
+).
+
+
+// --- Verified hypertension as of qualifying encounter (Denominator Exclusion driver) ---
+
+concept "Hypertension Diagnoses Verified":
+- type is Condition.
+- definition is "Hypertension Diagnoses" verified.
+
+concept "Verified Hypertension":
+- type is Condition.
+- defined as "Hypertension Diagnoses Verified".
+
+concept "Verified Hypertension As Of Qualifying Encounter Narrative":
+- type is Condition.
+- definition is "Verified Hypertension" as of "Qualifying Encounter".
+
+concept "Verified Hypertension As Of Qualifying Encounter":
+- type is Condition.
+- defined as "Verified Hypertension As Of Qualifying Encounter Narrative".
+
+
+// --- Exception branch 1: BP measurement not done with reason ---
+
+concept "BP Measurement Sources":
+- type is Observation.
+- valuetype is CodeableConcept.
+- defined as
+(
+   "Blood Pressure Panels"
+   sem-or
+   "Standalone Systolic BP Observations"
+   sem-or
+   "Standalone Diastolic BP Observations"
+).
+
+concept "BP Measurement Sources Not Done With Reason":
+- type is Observation.
+- definition is "BP Measurement Sources" not done with reason ("Medical Reasons" or "Patient Declined Reasons").
+
+concept "BP Measurement Sources Same Day As Qualifying Encounter":
+- type is Observation.
+- definition is "BP Measurement Sources" same day as "Qualifying Encounter".
+
+concept "BP Measurement Not Done With Reason":
+- type is Observation.
+- valuetype is boolean.
+- defined as
+(
+   "BP Measurement Sources Not Done With Reason"
+   sem-and
+   "BP Measurement Sources Same Day As Qualifying Encounter"
+).
+
+
+// --- Exception branch 2: HTN follow-up declined by patient ---
+
+concept "Follow-up Within 4 Weeks Declined by Patient":
+- type is ServiceRequest.
+- definition is "Follow-up Within 4 Weeks" not done with reason "Patient Declined Reasons".
+
+concept "Follow-up Within 6 Months Declined by Patient":
+- type is ServiceRequest.
+- definition is "Follow-up Within 6 Months" not done with reason "Patient Declined Reasons".
+
+concept "Primary-Care Referrals Declined by Patient":
+- type is ServiceRequest.
+- definition is "Primary-Care Referrals" not done with reason "Patient Declined Reasons".
+
+concept "Non-Pharmacological Recommendations Declined by Patient":
+- type is ServiceRequest.
+- definition is "Non-Pharmacological Recommendations" not done with reason "Patient Declined Reasons".
+
+concept "Hypertension Lab or ECG Requests Declined by Patient":
+- type is ServiceRequest.
+- definition is "Hypertension Lab or ECG Requests" not done with reason "Patient Declined Reasons".
+
+concept "Antihypertensive Medications Declined by Patient":
+- type is MedicationRequest.
+- definition is "Antihypertensive Medications" not done with reason "Patient Declined Reasons".
+
+concept "Four-Week Rescreen Declined":
+- type is ServiceRequest.
+- defined as "Follow-up Within 4 Weeks Declined by Patient".
+
+concept "Six-Month Rescreen Declined":
+- type is ServiceRequest.
+- defined as "Follow-up Within 6 Months Declined by Patient".
+
+concept "Primary-Care Referral Declined":
+- type is ServiceRequest.
+- defined as "Primary-Care Referrals Declined by Patient".
+
+concept "Non-Pharm Recommendation Declined":
+- type is ServiceRequest.
+- defined as "Non-Pharmacological Recommendations Declined by Patient".
+
+concept "Hypertension Lab or ECG Declined":
+- type is ServiceRequest.
+- defined as "Hypertension Lab or ECG Requests Declined by Patient".
+
+concept "Antihypertensive Medication Declined":
+- type is MedicationRequest.
+- defined as "Antihypertensive Medications Declined by Patient".
+
+concept "Primary-Care Referral Declined Same Day As Qualifying Encounter":
+- type is ServiceRequest.
+- definition is "Primary-Care Referral Declined" same day as "Qualifying Encounter".
+
+concept "Six-Month Rescreen Declined Same Day As Qualifying Encounter":
+- type is ServiceRequest.
+- definition is "Six-Month Rescreen Declined" same day as "Qualifying Encounter".
+
+concept "Non-Pharm Recommendation Declined Same Day As Qualifying Encounter":
+- type is ServiceRequest.
+- definition is "Non-Pharm Recommendation Declined" same day as "Qualifying Encounter".
+
+concept "Four-Week Rescreen Declined Same Day As Qualifying Encounter":
+- type is ServiceRequest.
+- definition is "Four-Week Rescreen Declined" same day as "Qualifying Encounter".
+
+concept "Hypertension Lab or ECG Declined Same Day As Qualifying Encounter":
+- type is ServiceRequest.
+- definition is "Hypertension Lab or ECG Declined" same day as "Qualifying Encounter".
+
+concept "Antihypertensive Medication Declined Same Day As Qualifying Encounter":
+- type is MedicationRequest.
+- definition is "Antihypertensive Medication Declined" same day as "Qualifying Encounter".
+
+concept "Elevated BP Declined Bundle":
+- type is Observation.
+- valuetype is boolean.
+- defined as
+(
+   "Primary-Care Referral Declined Same Day As Qualifying Encounter"
+   sem-or
+   "Six-Month Rescreen Declined Same Day As Qualifying Encounter"
+   sem-or
+   "Non-Pharm Recommendation Declined Same Day As Qualifying Encounter"
+).
+
+concept "First HTN Declined Bundle":
+- type is Observation.
+- valuetype is boolean.
+- defined as
+(
+   "Four-Week Rescreen Declined Same Day As Qualifying Encounter"
+   sem-or
+   "Primary-Care Referral Declined Same Day As Qualifying Encounter"
+   sem-or
+   "Non-Pharm Recommendation Declined Same Day As Qualifying Encounter"
+).
+
+concept "Second HTN 130s Declined Bundle":
+- type is Observation.
+- valuetype is boolean.
+- defined as
+(
+   "Primary-Care Referral Declined Same Day As Qualifying Encounter"
+   sem-or
+   "Six-Month Rescreen Declined Same Day As Qualifying Encounter"
+   sem-or
+   "Hypertension Lab or ECG Declined Same Day As Qualifying Encounter"
+   sem-or
+   "Non-Pharm Recommendation Declined Same Day As Qualifying Encounter"
+).
+
+concept "Second HTN 140+ Declined Bundle":
+- type is Observation.
+- valuetype is boolean.
+- defined as
+(
+   "Primary-Care Referral Declined Same Day As Qualifying Encounter"
+   sem-or
+   "Four-Week Rescreen Declined Same Day As Qualifying Encounter"
+   sem-or
+   "Antihypertensive Medication Declined Same Day As Qualifying Encounter"
+   sem-or
+   "Hypertension Lab or ECG Declined Same Day As Qualifying Encounter"
+   sem-or
+   "Non-Pharm Recommendation Declined Same Day As Qualifying Encounter"
+).
+
+concept "Elevated BP With Declined Followup":
+- type is Observation.
+- valuetype is boolean.
+- defined as
+(
+   "Elevated BP Reading"
+   sem-and
+   "Elevated BP Declined Bundle"
+).
+
+concept "First HTN With Declined Followup":
+- type is Observation.
+- valuetype is boolean.
+- defined as
+(
+   "First Hypertensive Reading"
+   sem-and
+   "First HTN Declined Bundle"
+).
+
+concept "Second HTN 130s With Declined Followup":
+- type is Observation.
+- valuetype is boolean.
+- defined as
+(
+   "Second Hypertensive Reading 130s"
+   sem-and
+   "Second HTN 130s Declined Bundle"
+).
+
+concept "Second HTN 140+ With Declined Followup":
+- type is Observation.
+- valuetype is boolean.
+- defined as
+(
+   "Second Hypertensive Reading 140+"
+   sem-and
+   "Second HTN 140+ Declined Bundle"
+).
+
+concept "HTN Followup Declined By Patient":
+- type is Observation.
+- valuetype is boolean.
+- defined as
+(
+   "Elevated BP With Declined Followup"
+   sem-or
+   "First HTN With Declined Followup"
+   sem-or
+   "Second HTN 130s With Declined Followup"
+   sem-or
+   "Second HTN 140+ With Declined Followup"
+).
+
+
+// --- Age predicate ---
+
+concept "Age At Start Of MP At Least 18 Years":
+- type is Observation.
+- valuetype is boolean.
+- definition is age at start of "Measurement Period" at least 18 years.
+
+concept "Aged 18+ at Measurement Period Start":
+- type is Observation.
+- valuetype is boolean.
+- defined as "Age At Start Of MP At Least 18 Years".
+
+
