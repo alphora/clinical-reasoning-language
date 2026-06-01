@@ -6,6 +6,7 @@ import "./registry.test";
 import "./resolver.test";
 import "./namespace.test";
 import "./validate.test";
+import "./emit.test";
 
 const FIXTURES = path.resolve(__dirname, "fixtures");
 

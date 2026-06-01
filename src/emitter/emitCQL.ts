@@ -174,13 +174,9 @@ const PATTERN_RETURN_SHAPE: Record<string, PatternReturnShape> = {
   Highest: "other",
 };
 
-export function emitCQL(input: string, options: EmitOptions = {}): EmitResult {
-  const parsed = buildCRL(input);
-  if (!parsed.success || !parsed.result) {
-    return { success: false, errors: parsed.errors };
-  }
+export function emitCQLFromAST(ast: CRL, options: EmitOptions = {}): EmitResult {
   try {
-    const out = new Emitter(parsed.result, options).emit();
+    const out = new Emitter(ast, options).emit();
     return { success: true, result: out };
   } catch (e) {
     return {
@@ -193,6 +189,14 @@ export function emitCQL(input: string, options: EmitOptions = {}): EmitResult {
       ],
     };
   }
+}
+
+export function emitCQL(input: string, options: EmitOptions = {}): EmitResult {
+  const parsed = buildCRL(input);
+  if (!parsed.success || !parsed.result) {
+    return { success: false, errors: parsed.errors };
+  }
+  return emitCQLFromAST(parsed.result, options);
 }
 
 class Emitter {
