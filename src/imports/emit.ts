@@ -1,6 +1,3 @@
-import { readFileSync } from "fs";
-import * as path from "path";
-
 import type { CRL, Statement } from "../ast/types";
 import { emitCQLFromAST } from "../emitter/emitCQL";
 import type { EmitOptions } from "../emitter/emitCQL";
@@ -13,11 +10,11 @@ import { ImportDiagnostic, ResolvedGraph } from "./types";
 // resolved include graph are flattened into one synthetic CRL AST and
 // emitted as a single CQL library. Per-library emit deferred to v0.8.
 //
-// CRL has no source-level version syntax — npm packaging handles versioning.
-// The emitted CQL library's `library X version 'Y'` line uses, in priority:
-//   1. explicit options.libraryVersion if provided,
-//   2. the project root's package.json `version` field,
-//   3. EmitOptions default ("0.1.0").
+// The emitted CQL library declaration carries no version — npm packaging
+// IS the version system, so emitting `library X version 'Y'` would just
+// duplicate npm metadata in the output. The `using FHIR version` and
+// `include FHIRHelpers/CRLPatterns version` lines stay because they're
+// CQL syntax for pinning ITS own dependencies.
 
 export interface EmitImportsResult {
   success: boolean;
@@ -27,18 +24,6 @@ export interface EmitImportsResult {
   // Populated only on EMITTER exception (not on import-side failures, which
   // surface via importDiagnostics).
   errors?: CRLError[];
-}
-
-function readPackageVersion(projectRoot: string | undefined): string | undefined {
-  if (!projectRoot) return undefined;
-  try {
-    const pkg = JSON.parse(
-      readFileSync(path.join(projectRoot, "package.json"), "utf-8"),
-    ) as { version?: unknown };
-    return typeof pkg.version === "string" ? pkg.version : undefined;
-  } catch {
-    return undefined;
-  }
 }
 
 export function emitCQLImports(
@@ -55,7 +40,6 @@ export function emitCQLImports(
     };
   }
 
-  // Short-circuit on error-severity import diagnostics.
   const errorDiags = graph.diagnostics.filter((d) => d.severity === "error");
   if (errorDiags.length > 0) {
     return {
@@ -88,15 +72,11 @@ export function emitCQLImports(
     location: rootAst.location,
   };
 
-  // Default emit options:
-  // - libraryName from root's `library "X".` declaration
-  // - libraryVersion from project root's package.json (the npm package version
-  //   IS the library version under the new model)
-  // Explicit options always override.
-  const packageVersion = readPackageVersion(graph.projectRoot);
+  // Default libraryName from root's `library "X".` declaration; explicit
+  // options.libraryName always overrides. No version field — the emitted
+  // CQL library declaration is unversioned.
   const merged: EmitOptions = {
     ...(rootAst.library?.name ? { libraryName: rootAst.library.name } : {}),
-    ...(packageVersion ? { libraryVersion: packageVersion } : {}),
     ...options,
   };
 

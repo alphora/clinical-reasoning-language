@@ -382,10 +382,18 @@ resolver at an arbitrary directory.
 present — it won't emit a CQL library with unresolved cross-file refs.
 On success, you get one flat-inlined CQL library on stdout.
 
-The emitted CQL library's `library X version 'Y'` line uses, in priority:
-(1) `--library-name` / `EmitOptions.libraryName` if provided; (2) the
-root's `library "X".` declaration; (3) `"GeneratedFromCRL"` default.
-The version comes from the project root's `package.json` `version` field.
+The emitted CQL library declaration is **unversioned** — `library X`,
+not `library X version 'Y'`. Same principle as CRL source: npm packaging
+IS the version system, so duplicating it in the output adds nothing. The
+emitter resolves the `X` in priority order: (1) `--library-name` /
+`EmitOptions.libraryName` if provided; (2) the root's `library "X".`
+declaration; (3) `"GeneratedFromCRL"` default.
+
+The same no-version rule applies to the emitted `include CRLPatterns called CRLPatterns`
+line — CRLPatterns is our library, so npm pins its version. The
+`include FHIRHelpers version '4.0.1' called FHIRHelpers` line keeps its
+version because FHIRHelpers ships versioned with the FHIR spec itself
+(it's not an npm package).
 
 #### Programmatic API
 
@@ -445,10 +453,11 @@ node dist/cli/run-emitter.js \
   > /tmp/cms22.cql
 ```
 
-The emitted CQL is byte-identical (except for the library identity line)
-to the previously JAR-validated `cql/src/CMS22Generated.cql`. The
-project's `package.json` `version` of `1.0.0` drives the emitted CQL
-library's version. See `cms22-split/NOTES.md` for layout details.
+The emitted CQL matches the previously JAR-validated
+`cql/src/CMS22Generated.cql` line-for-line except for the unversioned
+header (`library CMS22` instead of `library CMS22Generated version '0.1.0'`,
+and `include CRLPatterns called CRLPatterns` instead of `include CRLPatterns version '0.2.0' called CRLPatterns`).
+See `cms22-split/NOTES.md` for layout details.
 
 #### v0.7 scope summary
 

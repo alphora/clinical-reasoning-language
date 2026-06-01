@@ -11,9 +11,10 @@ describe("emitCQLImports", () => {
     expect(result.success).toBe(true);
     expect(result.cql).toBeDefined();
     const cql = result.cql ?? "";
-    // libraryName from root's `library "CMS22".`; libraryVersion derived from
-    // the fixture's package.json `version` field (0.0.0).
-    expect(cql).toMatch(/library CMS22 version '0\.0\.0'/);
+    // Library name from root's `library "CMS22".`; no version emitted
+    // (npm packaging IS the version system).
+    expect(cql).toMatch(/library CMS22\n/);
+    expect(cql).not.toMatch(/library CMS22 version/);
     expect((cql.match(/using FHIR version/g) ?? []).length).toBe(1);
     expect(cql).toMatch(/include CRLPatterns/);
     expect(cql).toMatch(/valueset "Qualifying Encounters Valueset"/);

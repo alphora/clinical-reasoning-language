@@ -54,9 +54,11 @@ import type { CRLError } from "../types/errors";
 
 export interface EmitOptions {
   libraryName?: string;
-  libraryVersion?: string;
+  // FHIRHelpers ships versioned with the FHIR spec (the R4 release pins
+  // its own FHIRHelpers version), so the emitted CQL keeps its version
+  // pin. CRLPatterns, in contrast, is our own library — npm packaging IS
+  // its version system, so we emit it without a `version '...'` clause.
   fhirHelpersVersion?: string;
-  crlPatternsVersion?: string;
 }
 
 export interface EmitResult {
@@ -230,9 +232,7 @@ class Emitter {
     this.ast = ast;
     this.options = {
       libraryName: options.libraryName ?? "GeneratedFromCRL",
-      libraryVersion: options.libraryVersion ?? "0.1.0",
       fhirHelpersVersion: options.fhirHelpersVersion ?? "4.0.1",
-      crlPatternsVersion: options.crlPatternsVersion ?? "0.2.0",
     };
     this.indexNames();
     this.detectStubsAndCollisions();
@@ -324,12 +324,17 @@ class Emitter {
 
   private header(): string {
     return [
-      `library ${this.options.libraryName} version '${this.options.libraryVersion}'`,
+      // CRL's library identity emits without a version (npm packaging
+      // handles the package version). CRLPatterns is our own library —
+      // also no version. `using FHIR version` is a semantic FHIR model
+      // identifier (R4 vs R5 is a different shape) — kept. FHIRHelpers
+      // ships versioned with the FHIR spec — version pin kept.
+      `library ${this.options.libraryName}`,
       "",
       "using FHIR version '4.0.1'",
       "",
       `include FHIRHelpers version '${this.options.fhirHelpersVersion}' called FHIRHelpers`,
-      `include CRLPatterns version '${this.options.crlPatternsVersion}' called CRLPatterns`,
+      "include CRLPatterns called CRLPatterns",
     ].join("\n");
   }
 
