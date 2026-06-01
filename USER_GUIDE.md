@@ -435,7 +435,93 @@ All four entry points return result envelopes — missing `package.json`,
 parse failures, malformed packages, etc. become diagnostics, never
 thrown exceptions.
 
-#### Worked example
+#### Worked example: two files referencing each other
+
+The simplest possible cross-file scenario — one root, one local sibling.
+Both files live in `my-project/src/crl/`. The project has a `package.json`
+at its root.
+
+```
+my-project/
+├── package.json
+└── src/crl/
+    ├── shared.crl
+    └── screening.crl    ← root (the file you pass to --path)
+```
+
+**`my-project/package.json`** (just the bare minimum):
+```json
+{
+  "name": "my-project",
+  "version": "0.1.0",
+  "private": true
+}
+```
+
+**`my-project/src/crl/shared.crl`**:
+```crl
+# Shared vocabulary
+library "Shared Vocabulary".
+
+terminology "BMI Valueset":
+- valueset is `http://example.org/fhir/ValueSet/bmi`.
+
+concept "BMI Observations":
+- type is Observation.
+- coded from "BMI Valueset".
+```
+
+**`my-project/src/crl/screening.crl`** (the root, includes the sibling):
+```crl
+# BMI Screening
+library "BMI Screening".
+include "Shared Vocabulary".
+
+concept "BMI Encounter Performed":
+- type is Encounter.
+- definition is "BMI Observations" performed.
+```
+
+Run it:
+
+```bash
+crl-validate --path my-project/src/crl/screening.crl --pretty
+crl-emit --path my-project/src/crl/screening.crl --library-name BMIScreening
+```
+
+What happens under the hood when you run either command:
+
+1. Resolver walks up from `screening.crl` → finds `my-project/package.json` → **project root** = `my-project/`.
+2. Local scan: walks `my-project/` recursively, finds `shared.crl` (declares `library "Shared Vocabulary".`) and `screening.crl` (declares `library "BMI Screening".`). Both register.
+3. Package scan: `my-project/node_modules/` is absent — no installed CRL packages to scan.
+4. Walk includes from `screening.crl`: `include "Shared Vocabulary".` → resolves to `shared.crl`. Topo order: `["Shared Vocabulary", "BMI Screening"]` (leaves first, root last).
+5. Combined namespace gets `BMI Valueset` (terminology), `BMI Observations` (concept), `BMI Encounter Performed` (concept). The `definition is "BMI Observations" performed.` ref in `screening.crl` resolves against the namespace.
+6. Emit: one CQL library combining both files' declarations, header `library BMIScreening` (or `BMI Screening` if no `--library-name`).
+
+Try modifying `shared.crl` to rename `BMI Observations` to `Observations of BMI`. Without changing `screening.crl`, run `crl-validate` — you get a validation error attributed to `screening.crl` pointing at the now-unresolved ref. The `filePath` and `libraryName` fields on the error tell you exactly which file holds the bad reference.
+
+#### Worked example: cross-package (npm install)
+
+A larger version of the same pattern, but the shared library is published
+as an npm package and `npm install`ed:
+
+```
+my-screening/
+├── package.json                   { "dependencies": { "@smile/bmi-shared": "^1.0.0" } }
+├── node_modules/
+│   └── @smile/bmi-shared/
+│       ├── package.json           { "crl": { "libraries": ["src/crl/bmi-shared.crl"] } }
+│       └── src/crl/bmi-shared.crl   declares: library "Shared Vocabulary".
+└── src/crl/screening.crl          declares: library "BMI Screening". includes "Shared Vocabulary".
+```
+
+`my-screening/src/crl/screening.crl` is unchanged from the local example
+above. The resolver finds `"Shared Vocabulary"` in node_modules instead
+of locally — same combined namespace, same emitted CQL. Switching
+between local-development and consume-via-npm is a file-move, not a code
+change.
+
+#### Worked example: cms22 4-layer split
 
 A 5-file split lives at `features/cql-pattern-mining/results/models/cms22-split/`
 (split from the original 1010-line `cms22.crl`). To exercise it:
