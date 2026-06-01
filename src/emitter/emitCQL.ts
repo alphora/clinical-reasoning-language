@@ -93,6 +93,80 @@ function indent(text: string, level = 1): string {
 
 type CompositionShape = "boolean" | "refinement";
 
+// === Pattern return-shape classification ===
+// CRLPatterns library (v0.2.0+) returns the primitive list-shaped form for
+// filter patterns. The boolean realization is composed at the call site by
+// wrapping with `exists(...)`. The author's `(type, valuetype)` declaration
+// drives whether the emitter wraps (boolean consumer) or calls directly
+// (refinement consumer). Per the principle [[patterns-are-semantic]] +
+// [[defined-as-is-semantic-composition]] + catalog v0.6.0 "What not How".
+//
+// "list"    — the function returns List<Resource>; emitter wraps with
+//             `exists(...)` for boolean consumers.
+// "boolean" — the function returns Boolean (inherently a predicate);
+//             refinement consumers get a FIXME comment.
+// "other"   — the function returns Period/Quantity/Instance/Interval/
+//             /DateTime; author declares matching shape; emitter just calls.
+type PatternReturnShape = "list" | "boolean" | "other";
+
+const PATTERN_RETURN_SHAPE: Record<string, PatternReturnShape> = {
+  // List-returning filter patterns (primitive form per v0.2.0 refactor).
+  Has: "list",
+  HasHistoryOf: "list",
+  CurrentlyTaking: "list",
+  HasAdverseReactionTo: "list",
+  AsOf: "list",
+  Within: "list",
+  ComponentOf: "list",
+  NotDoneWithReason: "list",
+  BaselineAndFollowUp: "list",
+  WasOrdered: "list",
+  Justified: "list",
+  Active: "list",
+  IsVerified: "list",
+  DocumentedAs: "list",
+  During: "list",
+  Overlaps: "list",
+  OnDayOfOrAfter: "list",
+  OnOrBefore: "list",
+  SameDay: "list",
+  BetweenAnchors: "list",
+  WasPerformed: "list",
+
+  // Inherently-boolean patterns (no meaningful list realization).
+  Without: "boolean",
+  With: "boolean",
+  AtLeastApart: "boolean",
+  AtMostApart: "boolean",
+  AtLeastN: "boolean",
+  Consecutive: "boolean",
+  High: "boolean",
+  Low: "boolean",
+  Normal: "boolean",
+  Abnormal: "boolean",
+  AtLeast: "boolean",
+  AtMost: "boolean",
+  Between: "boolean",
+  Exceeds: "boolean",
+  Below: "boolean",
+
+  // Other-shape patterns (Interval, Instance, Period, Quantity).
+  InpatientStay: "other",
+  MostRecent: "other",
+  LastOf: "other",
+  Earliest: "other",
+  FirstOf: "other",
+  BeforeStartOf: "other",
+  AfterStartOf: "other",
+  BeforeEndOf: "other",
+  AfterEndOf: "other",
+  OnDayOf: "other",
+  AgeAt: "other",
+  Calculate: "other",
+  Lowest: "other",
+  Highest: "other",
+};
+
 export function emitCQL(input: string, options: EmitOptions = {}): EmitResult {
   const parsed = buildCRL(input);
   if (!parsed.success || !parsed.result) {
@@ -302,7 +376,7 @@ class Emitter {
       case "DefinedAsDefinition":
         return this.emitDefinedAs(c, def.body);
       case "DefinitionIsDefinition":
-        return this.emitDefinitionIs(def);
+        return this.emitDefinitionIs(c, def);
     }
   }
 
@@ -316,74 +390,45 @@ class Emitter {
   }
 
   /**
-   * Determine what value-shape a concept name actually EMITS to (not what
-   * the CRL author declared as intent). The discriminator is the concept's
-   * body kind:
-   *   - `coded from`      → a `[Resource: "VS"]` retrieve, list-shaped
-   *   - `definition is`        → a `CRLPatterns.<P>(…)` call. Most pattern
-   *                         functions return `Boolean`. v0.2 assumes
-   *                         boolean for all `definition is` concepts. Future
-   *                         versions will consult the catalog for per-
-   *                         pattern return types.
-   *   - `defined as <bare>`     → recurse to the referent
-   *   - `defined as <composition>` → recurse with the composition's
-   *                         resolved shape
-   * Returns `undefined` for names that don't resolve to a known concept or
-   * terminology (the caller treats these as opaque refinements).
+   * Determine the AUTHOR's declared shape for a concept — boolean vs
+   * refinement. Per the principle [[defined-as-is-semantic-composition]],
+   * the author declares `(type, valuetype)`; the emitter delivers that
+   * shape. The body kind says WHAT operation; the declaration says WHAT
+   * the operation produces. Catalog patterns have NO return types; they
+   * are semantic expressions whose CQL realization shape is decided by
+   * the author's declaration.
+   *
+   *   - `valuetype is boolean` → boolean (predicate)
+   *   - otherwise              → refinement (list of declared `type`)
+   *
+   * For names that don't resolve to a known concept (e.g., raw
+   * terminology refs that escape into the composition), we fall back to
+   * refinement.
    */
-  private shapeOfName(name: string, seen: Set<string> = new Set()): CompositionShape | undefined {
-    if (seen.has(name)) return undefined; // break cycles defensively
-    seen.add(name);
+  private declaredShape(name: string): CompositionShape {
     if (!this.conceptNames.has(name)) {
-      return this.terminologyNames.has(name) ? "refinement" : undefined;
+      // Unknown ref — treat as refinement (the safer default for downstream).
+      return "refinement";
     }
-    const bodyKind = this.conceptBodyKind.get(name);
-    if (bodyKind === "CodedFromDefinition") return "refinement";
-    if (bodyKind === "DefinitionIsDefinition") return "boolean";
-    if (bodyKind === "DefinedAsDefinition") {
-      const body = this.conceptBody.get(name);
-      if (body && body.type === "DefinedAsDefinition") {
-        const inner = body.body;
-        if (inner.type === "DefinedAsBareRef") {
-          return this.shapeOfName(inner.ref, seen);
-        }
-        // Composition — pick shape from its leaves.
-        const leaves: string[] = [];
-        collectRefs(inner.expression, leaves);
-        let anyBool = false;
-        let anyRefinement = false;
-        for (const leaf of leaves) {
-          const s = this.shapeOfName(leaf, seen);
-          if (s === "boolean") anyBool = true;
-          else if (s === "refinement") anyRefinement = true;
-        }
-        if (anyBool && !anyRefinement) return "boolean";
-        return "refinement";
-      }
-    }
-    return undefined;
+    const valuetype = this.conceptValuetype.get(name);
+    if (valuetype === "boolean") return "boolean";
+    return "refinement";
+  }
+
+  private declaredShapeOfConcept(c: Concept): CompositionShape {
+    if (c.valueTypes?.includes("boolean")) return "boolean";
+    return "refinement";
   }
 
   /**
-   * Determine the shape to use for a composition expression. Walks all leaf
-   * CompositionRef nodes; if every leaf resolves to a known boolean concept,
-   * the composition is boolean. Otherwise refinement. Mixed-shape composition
-   * falls back to refinement (the user can wrap list-shaped subexpressions
-   * with `exists` upstream if they want boolean).
+   * Determine the shape to use for a composition expression FROM ITS
+   * PARENT's perspective. The parent concept's declared
+   * `(type, valuetype)` is authoritative — operands of a composition
+   * are bridged to match. This replaces the v0.2 leaf-walking heuristic
+   * which contradicted the principle.
    */
-  private shapeForComposition(expr: CompositionExpression): CompositionShape {
-    const leaves: string[] = [];
-    collectRefs(expr, leaves);
-    if (leaves.length === 0) return "refinement";
-    let anyBoolean = false;
-    let anyRefinement = false;
-    for (const ref of leaves) {
-      const s = this.shapeOfName(ref);
-      if (s === "boolean") anyBoolean = true;
-      else if (s === "refinement") anyRefinement = true;
-    }
-    if (anyBoolean && !anyRefinement) return "boolean";
-    return "refinement";
+  private shapeForComposition(parent: Concept, _expr: CompositionExpression): CompositionShape {
+    return this.declaredShapeOfConcept(parent);
   }
 
   private emitDefinedAs(
@@ -393,8 +438,29 @@ class Emitter {
     if (body.type === "DefinedAsBareRef") {
       return cqlIdent(body.ref);
     }
-    const shape = this.shapeForComposition(body.expression);
+    const shape = this.shapeForComposition(c, body.expression);
     return this.emitComposition(body.expression, shape);
+  }
+
+  /**
+   * Wrap an operand's emission to match the PARENT composition's declared
+   * shape. The principle: each operand may have its own declared shape
+   * (boolean or refinement); the emitter BRIDGES to deliver the parent's
+   * shape. Bridging rules:
+   *   - operand boolean, parent boolean: emit as-is
+   *   - operand refinement, parent refinement: emit as-is
+   *   - operand refinement, parent boolean: wrap with `exists (...)`
+   *   - operand boolean, parent refinement: unrepresentable in general (a
+   *     boolean isn't a list); emit FIXME + raw operand. This case is
+   *     rare in the corpus.
+   */
+  private bridgeOperand(operandCql: string, operandShape: CompositionShape, parentShape: CompositionShape): string {
+    if (operandShape === parentShape) return operandCql;
+    if (parentShape === "boolean" && operandShape === "refinement") {
+      return `exists (${operandCql})`;
+    }
+    // operandShape === 'boolean' && parentShape === 'refinement'
+    return `/* FIXME: boolean operand in refinement composition */ ${operandCql}`;
   }
 
   private emitComposition(
@@ -402,8 +468,10 @@ class Emitter {
     shape: CompositionShape
   ): string {
     switch (expr.type) {
-      case "CompositionRef":
-        return cqlIdent(expr.ref);
+      case "CompositionRef": {
+        const operandShape = this.declaredShape(expr.ref);
+        return this.bridgeOperand(cqlIdent(expr.ref), operandShape, shape);
+      }
       case "CompositionGroup":
         return `(${this.emitComposition(expr.expression, shape)})`;
       case "SemNotExpression":
@@ -452,13 +520,31 @@ class Emitter {
       .join(`\n  ${op} `);
   }
 
-  private emitDefinitionIs(def: DefinitionIsDefinition): string {
+  private emitDefinitionIs(c: Concept, def: DefinitionIsDefinition): string {
     const matched = matchNarrative(def.body);
     if (!matched.known) {
       const text = def.body.elements.map((el) => narrativeElementText(el)).join(" ");
       return `// FIXME: unmatched narrative pattern — ${text}\ntrue`;
     }
-    return this.emitPatternCall(matched);
+    // Generics-by-composition: CRLPatterns functions return their PRIMITIVE
+    // shape — list-shaped for filter patterns, boolean for inherently-boolean
+    // patterns, other-shape for Period/Quantity/Instance/Interval patterns.
+    // The author's declared `(type, valuetype)` says what the consumer wants;
+    // the emitter composes via `exists(...)` wrapping when consumer asks for
+    // boolean and pattern returns a list. Per [[patterns-are-semantic]].
+    const call = this.emitPatternCall(matched);
+    const declared = this.declaredShapeOfConcept(c);
+    const patternShape: PatternReturnShape = PATTERN_RETURN_SHAPE[matched.pattern] ?? "list";
+
+    if (declared === "boolean" && patternShape === "list") {
+      return `exists ${call}`;
+    }
+    if (declared === "refinement" && patternShape === "boolean") {
+      return `// FIXME: ${matched.pattern} is inherently boolean; refinement consumer cannot use it as a list\n${call}`;
+    }
+    // All other combinations: declared matches pattern shape (or pattern is
+    // "other"-shaped and the author chose a matching valuetype).
+    return call;
   }
 
   private emitPatternCall(call: CanonicalPatternCall): string {
@@ -466,6 +552,7 @@ class Emitter {
     const args = call.args.map((a) => this.emitArg(a)).join(", ");
     return `CRLPatterns.${fn}(${args})`;
   }
+
 
   private emitArg(arg: CanonicalArg): string {
     switch (arg.type) {
