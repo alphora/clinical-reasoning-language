@@ -13,6 +13,7 @@ describe('ActionUniquenessValidator', () => {
     it('should detect duplicate do statements in the same block', () => {
       const ast: CRL = {
         type: 'CRL',
+        includes: [],
         statements: [
           {
             type: 'Decision',
@@ -66,6 +67,7 @@ describe('ActionUniquenessValidator', () => {
     it('should not detect duplicate do statements in different blocks', () => {
       const ast: CRL = {
         type: 'CRL',
+        includes: [],
         statements: [
           {
             type: 'Decision',
@@ -131,6 +133,7 @@ describe('ActionUniquenessValidator', () => {
     it('should detect duplicate use statements in the same block', () => {
       const ast: CRL = {
         type: 'CRL',
+        includes: [],
         statements: [
           {
             type: 'Decision',
@@ -184,6 +187,7 @@ describe('ActionUniquenessValidator', () => {
     it('should not detect duplicate use statements in different blocks', () => {
       const ast: CRL = {
         type: 'CRL',
+        includes: [],
         statements: [
           {
             type: 'Decision',

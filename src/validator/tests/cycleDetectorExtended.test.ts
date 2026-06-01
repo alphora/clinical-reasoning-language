@@ -13,6 +13,7 @@ describe('CycleDetector Extended Tests', () => {
     it('should detect two separate decision cycles', () => {
       const ast: CRL = {
         type: 'CRL',
+        includes: [],
         statements: [
           // Cycle 1: DecisionX <-> DecisionY
           {
@@ -157,6 +158,7 @@ describe('CycleDetector Extended Tests', () => {
     it('should detect a self-loop decision cycle', () => {
       const ast: CRL = {
         type: 'CRL',
+        includes: [],
         statements: [
           {
             type: 'Decision',
@@ -204,6 +206,7 @@ describe('CycleDetector Extended Tests', () => {
     it('should detect a decision cycle with four nodes (A -> B -> C -> D -> A)', () => {
       const ast: CRL = {
         type: 'CRL',
+        includes: [],
         statements: [
           {
             type: 'Decision',
@@ -347,6 +350,7 @@ describe('CycleDetector Extended Tests', () => {
       // Cycle 2: DecisionB -> DecisionC -> DecisionD -> DecisionB
       const ast: CRL = {
         type: 'CRL',
+        includes: [],
         statements: [
           // Cycle 1
           {
@@ -501,6 +505,7 @@ describe('CycleDetector Extended Tests', () => {
     it('should detect both a cycle in decision references and a repeated do action', () => {
       const ast: CRL = {
         type: 'CRL',
+        includes: [],
         statements: [
           {
             type: 'Decision',

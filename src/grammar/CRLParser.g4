@@ -16,7 +16,9 @@ options {
 //   Example: `it's the right thing to do`, `Some *markdown* text`
 //   Used for: evidence, markdown, system/code values, and non-identifier strings.
 //
-// Single quotes (') are NOT used.
+// Single quotes (') wrap shape-only string literals: UCUM units inside
+// quantity literals (`30 'mm[Hg]'`) and library/include version pins
+// (`library "Foo" version '1.0.0'.`). Parser context distinguishes the two.
 //
 // This ensures unambiguous parsing and user-friendly authoring.
 
@@ -25,7 +27,33 @@ options {
 // ============================
 
 crl
-    : HEADER statement* EOF
+    : HEADER libraryStatement? includeStatement* statement* EOF
+    ;
+
+// ============================
+// Library / Include (cross-file imports — see Imports Todo 1)
+// ============================
+//
+// `library "Name" version '<v>'?.` — optional file-level identity declaration.
+//   - When omitted, the file is "anonymous": valid as a CLI root, but cannot
+//     be `include`d by name from another file.
+//   - At most one per file; must precede any `include` or other statement.
+//
+// `include "Name" version '<v>'?.` — repeatable; declares a dependency on
+//   another library by name (resolved by the resolver against --source-path).
+//   - Order-preserving (parser keeps the source order in the AST).
+//   - Must precede any non-include statement.
+//   - No aliasing in v0.7 (syntax position reserved; CALLED token deferred).
+//
+// Version literal is the raw text inside single quotes; semantic semver
+// matching is the resolver's concern, not the parser's.
+//
+libraryStatement
+    : LIBRARY identifier (VERSION SINGLE_QUOTED_STRING)? DOT
+    ;
+
+includeStatement
+    : INCLUDE identifier (VERSION SINGLE_QUOTED_STRING)? DOT
     ;
 
 statement
@@ -344,14 +372,14 @@ narrative
     ;
 
 narrativeElement
-    : QUOTED_STRING                                          # NConceptRef
-    | quantity                                               # NQuantity
-    | (AND | OR | NOT | WITH | NARRATIVE_WORD | TIME_UNIT)   # NWord
-    | argGroup                                               # NArgGroupElement
+    : QUOTED_STRING                                                                              # NConceptRef
+    | quantity                                                                                   # NQuantity
+    | (AND | OR | NOT | WITH | LIBRARY | INCLUDE | VERSION | NARRATIVE_WORD | TIME_UNIT)         # NWord
+    | argGroup                                                                                   # NArgGroupElement
     ;
 
 quantity
-    : NUMBER (UCUM_UNIT | TIME_UNIT)   // unit REQUIRED — design choice
+    : NUMBER (SINGLE_QUOTED_STRING | TIME_UNIT)   // unit REQUIRED — design choice
     ;
 
 // In-arg group: parenthesized disjunction/conjunction. Homogeneous per group

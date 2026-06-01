@@ -141,7 +141,7 @@ function createServer(): McpServer {
         "Parse CRL source and build its Abstract Syntax Tree. Pass exactly one of `code` (inline) or `path` (file). " +
         "Returns a ParseResult JSON envelope: { success: boolean; result?: <AST>; errors?: CRLError[] }. " +
         "success:true means lexing/parsing/AST construction succeeded — it does NOT perform semantic validation. " +
-        "The AST root is { type: 'CRL', identifier?, statements[], location } (identifier is present only when the document has a header).",
+        "The AST root is { type: 'CRL', header?, library?, includes[], statements[], location }. header is present only when the document opens with a '#' line; library is present only when the file declares `library \"Name\" version '<v>'?.`; includes is always an array (may be empty) of `include` declarations.",
       inputSchema,
     },
     (args) => runTool(buildCRL, args)

@@ -12,6 +12,7 @@ describe('CycleDetector', () => {
     it('should detect direct cycles in decision references', () => {
       const ast: CRL = {
         type: 'CRL',
+        includes: [],
         statements: [
           {
             type: 'Decision',
@@ -88,6 +89,7 @@ describe('CycleDetector', () => {
     it('should detect indirect cycles in decision references', () => {
       const ast: CRL = {
         type: 'CRL',
+        includes: [],
         statements: [
           {
             type: 'Decision',
@@ -197,6 +199,7 @@ describe('CycleDetector', () => {
     it('should detect direct cycles in concept inferences', () => {
       const ast: CRL = {
         type: 'CRL',
+        includes: [],
         statements: [
           {
             type: 'Concept',
@@ -235,6 +238,7 @@ describe('CycleDetector', () => {
     it('should detect indirect cycles in concept inferences', () => {
       const ast: CRL = {
         type: 'CRL',
+        includes: [],
         statements: [
           {
             type: 'Concept',
@@ -285,6 +289,7 @@ describe('CycleDetector', () => {
     it('should allow valid concept inference chains without cycles', () => {
       const ast: CRL = {
         type: 'CRL',
+        includes: [],
         statements: [
           {
             type: 'Concept',

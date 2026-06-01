@@ -12,6 +12,7 @@ describe('WhenBlockUniquenessValidator', () => {
     it('should detect duplicate when blocks in nested decisions', () => {
       const ast: CRL = {
         type: 'CRL',
+        includes: [],
         statements: [
           {
             type: 'Decision',
@@ -68,6 +69,7 @@ describe('WhenBlockUniquenessValidator', () => {
     it('should not detect duplicate when blocks in different contexts', () => {
       const ast: CRL = {
         type: 'CRL',
+        includes: [],
         statements: [
           {
             type: 'Decision',

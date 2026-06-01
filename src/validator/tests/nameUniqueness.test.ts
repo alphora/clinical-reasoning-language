@@ -12,6 +12,7 @@ describe('NameUniquenessValidator', () => {
     it('should detect duplicate decision names', () => {
       const ast: CRL = {
         type: 'CRL',
+        includes: [],
         statements: [
           {
             type: 'Decision',
@@ -46,6 +47,7 @@ describe('NameUniquenessValidator', () => {
     it('should allow different decision names', () => {
       const ast: CRL = {
         type: 'CRL',
+        includes: [],
         statements: [
           {
             type: 'Decision',
@@ -81,6 +83,7 @@ describe('NameUniquenessValidator', () => {
     it('should detect duplicate concept names', () => {
       const ast: CRL = {
         type: 'CRL',
+        includes: [],
         statements: [
           {
             type: 'Concept',
@@ -121,6 +124,7 @@ describe('NameUniquenessValidator', () => {
     it('should detect duplicate terminology names', () => {
       const ast: CRL = {
         type: 'CRL',
+        includes: [],
         statements: [
           {
             type: 'Terminology',
@@ -157,6 +161,7 @@ describe('NameUniquenessValidator', () => {
     it('should detect duplicate activity names', () => {
       const ast: CRL = {
         type: 'CRL',
+        includes: [],
         statements: [
           {
             type: 'Activity',
@@ -185,6 +190,7 @@ describe('NameUniquenessValidator', () => {
     it('should allow same name across different categories', () => {
       const ast: CRL = {
         type: 'CRL',
+        includes: [],
         statements: [
           {
             type: 'Decision',

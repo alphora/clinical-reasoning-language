@@ -14,6 +14,8 @@ import {
   TerminologyValuesetContext,
   ActivityStatementContext,
   ConceptStatementContext,
+  LibraryStatementContext,
+  IncludeStatementContext,
   ConceptBodyContext,
   DefinitionIsBodyContext,
   DefinedAsBodyContext,
@@ -97,7 +99,7 @@ import {
   Location,
   ConceptValueType,
 } from "./types";
-import type { CRL } from "./types";
+import type { CRL, LibraryDeclaration, Include } from "./types";
 
 function getLocation(ctx: ParserRuleContext): Location {
   const start = ctx.start;
@@ -153,11 +155,45 @@ export class CRLAstBuilder
       // Remove leading '#' and trim whitespace
       header = headerNode.text.replace(/^#\s*/, "");
     }
+
+    const libraryCtx = ctx.libraryStatement();
+    const library = libraryCtx ? this.visitLibraryStatement(libraryCtx) : undefined;
+
+    const includes = ctx
+      .includeStatement()
+      .map((i) => this.visitIncludeStatement(i));
+
     const statements = ctx.statement().map((s) => this.visit(s) as Statement);
     return {
       type: "CRL",
-      ...(header ? { identifier: header } : {}),
+      ...(header ? { header } : {}),
+      ...(library ? { library } : {}),
+      includes,
       statements,
+      location: getLocation(ctx),
+    };
+  }
+
+  visitLibraryStatement(ctx: LibraryStatementContext): LibraryDeclaration {
+    const name = ctx.identifier().text.slice(1, -1);
+    const versionToken = ctx.SINGLE_QUOTED_STRING();
+    const version = versionToken ? versionToken.text.slice(1, -1) : undefined;
+    return {
+      type: "LibraryDeclaration",
+      name,
+      ...(version !== undefined ? { version } : {}),
+      location: getLocation(ctx),
+    };
+  }
+
+  visitIncludeStatement(ctx: IncludeStatementContext): Include {
+    const name = ctx.identifier().text.slice(1, -1);
+    const versionToken = ctx.SINGLE_QUOTED_STRING();
+    const version = versionToken ? versionToken.text.slice(1, -1) : undefined;
+    return {
+      type: "Include",
+      name,
+      ...(version !== undefined ? { version } : {}),
       location: getLocation(ctx),
     };
   }
@@ -661,7 +697,7 @@ export class CRLAstBuilder
 
   visitQuantity(ctx: QuantityContext): Quantity {
     const value = parseFloat(ctx.NUMBER().text);
-    const ucumCtx = ctx.UCUM_UNIT();
+    const ucumCtx = ctx.SINGLE_QUOTED_STRING();
     const timeCtx = ctx.TIME_UNIT();
     const unit = ucumCtx ? ucumCtx.text.slice(1, -1) : timeCtx ? timeCtx.text : "";
     return { type: "Quantity", value, unit, location: getLocation(ctx) };
