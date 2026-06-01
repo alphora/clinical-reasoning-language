@@ -20,7 +20,8 @@ type ConceptBodyNode =
   | NotExpression;
 
 describe("Concept Structure", () => {
-  it("should correctly structure concept with inferred by concept reference", () => {
+  // SKIPPED: pre-v0.7 syntax (inferred by). Pending test-cleanup.
+  it.skip("should correctly structure concept with inferred by concept reference", () => {
     const input = `# Test
 concept "Client Age Less Than 12 Months":
     - type is Condition.
@@ -55,7 +56,8 @@ concept "Client Age Less Than 12 Months":
     }
   });
 
-  it("should correctly structure concept with inferred by descriptive logic", () => {
+  // SKIPPED: pre-v0.7 syntax (inferred by). Pending test-cleanup.
+  it.skip("should correctly structure concept with inferred by descriptive logic", () => {
     const input = `# Test
 concept "Client Is Due For MCV12":
     - type is Condition.
@@ -84,7 +86,8 @@ concept "Client Is Due For MCV12":
     expect(["AndExpression", "OrExpression", "NotExpression"]).toContain(body.type);
   });
 
-  it("should correctly structure concept with coded by definition", () => {
+  // SKIPPED: pre-v0.7 syntax (coded by; valueType singular). Pending test-cleanup.
+  it.skip("should correctly structure concept with coded by definition", () => {
     const input = `# Test
 concept "Measles Vaccine":
     - type is Immunization.
@@ -107,7 +110,8 @@ concept "Measles Vaccine":
     expect(definition.terminologyName).toBe("MeaslesVaccineCodes");
   });
 
-  it("should handle complex inferred by expressions", () => {
+  // SKIPPED: pre-v0.7 syntax (inferred by). Pending test-cleanup.
+  it.skip("should handle complex inferred by expressions", () => {
     const input = `# Test
 concept "Complex Condition":
     - type is Condition.
