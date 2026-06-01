@@ -1,4 +1,4 @@
-# v0.6 grammar test — subset of CMS69 for lexer/parser/AST/validator testing
+# v0.7 grammar test — subset of CMS69 for lexer/parser/AST/validator testing
 
 // ===== Terminologies (valuesets) =====
 
@@ -29,20 +29,20 @@ concept "Encounters to Evaluate BMI":
 - valuetype is Period.
 - coded from "Encounter to Evaluate BMI".
 
-// Variation C: omitted valuetype — should be lazy-inferred from type's default
+// Variation C: omitted valuetype — should be lazy-deduced from type's default
 //   (validator behavior pending Phase 4)
 concept "BMI Observations":
 - type is Observation.
 - coded from "Body Mass Index Observations".
 
 
-// ===== Inferred-type concepts (composition, `inferred from`) =====
-// `inferred from` body; refs in quotes are concept names; uses sem-or/sem-and/sem-not.
+// ===== Composition-kind concepts (`defined as`) =====
+// `defined as` body; refs in quotes are concept names; uses sem-or/sem-and/sem-not.
 
-// Type explicitly declared — refs must agree with the declared type (per v0.6 rules)
+// Type explicitly declared — refs must agree with the declared type (per v0.7 rules)
 concept "BMI Evaluation Encounter (not virtual)":
 - type is Encounter.
-- inferred from
+- defined as
 (
    "Encounters to Evaluate BMI"
    sem-and
@@ -50,27 +50,27 @@ concept "BMI Evaluation Encounter (not virtual)":
 ).
 
 
-// ===== Inference-type concepts (`logic is`, narrative) =====
-// `logic is` body; refs in quotes are concept names; narrative matched against catalog.
+// ===== Predicate-kind concepts (`definition is`, narrative) =====
+// `definition is` body; refs in quotes are concept names; narrative matched against catalog.
 
-// Type declared, valuetype omitted (Variation B' on logic-is)
+// Type declared, valuetype omitted (Variation B' on definition-is)
 concept "BMI Evaluation Encounter (not virtual) Performed":
 - type is Encounter.
-- logic is "BMI Evaluation Encounter (not virtual)" performed.
+- definition is "BMI Evaluation Encounter (not virtual)" performed.
 
 // Type declared, valuetype omitted; references "Measurement Period" which is
 // a runtime parameter (will be unresolved until imports + parameters land)
 concept "BMI Evaluation Encounter (not virtual) During MP":
 - type is Encounter.
-- logic is "BMI Evaluation Encounter (not virtual)" during "Measurement Period".
+- definition is "BMI Evaluation Encounter (not virtual)" during "Measurement Period".
 
 
-// ===== Composition over logic-is concepts =====
-// Inferred composing two logic-is concepts.
+// ===== Composition over definition-is concepts =====
+// Composition over two definition-is concepts.
 
 concept "Qualifying Encounter":
 - type is Encounter.
-- inferred from
+- defined as
 (
    "BMI Evaluation Encounter (not virtual) During MP"
    sem-and
@@ -80,17 +80,17 @@ concept "Qualifying Encounter":
 
 // ===== Optional-type variations (testing type-inference rules) =====
 
-// Variation D: inferred-type concept WITHOUT explicit type — should infer
+// Variation D: composition-kind concept WITHOUT explicit type — should infer
 // type from refs (all are Encounters, so type = Encounter)
 concept "Qualifying Encounter (no type declared)":
-- inferred from
+- defined as
 (
    "BMI Evaluation Encounter (not virtual) During MP"
    sem-and
    "BMI Evaluation Encounter (not virtual) Performed"
 ).
 
-// Variation E: logic-is concept WITHOUT explicit type — should infer
+// Variation E: definition-is concept WITHOUT explicit type — should infer
 // type from the subject ref (the first concept ref in the narrative)
 concept "BMI Encounter Performed (no type declared)":
-- logic is "BMI Evaluation Encounter (not virtual)" performed.
+- definition is "BMI Evaluation Encounter (not virtual)" performed.

@@ -35,14 +35,14 @@ const REFINEMENT_MAP: Record<string, string> = {
   "Qualifying Encounter": "Encounter",
 
   // Condition refinements
-  "Overweight or Obese Diagnoses is Active": "Condition",
-  "Underweight Diagnoses is Active": "Condition",
+  "Overweight or Obese Diagnoses Active": "Condition",
+  "Underweight Diagnoses Active": "Condition",
   "Pregnancy Diagnoses Active During MP": "Condition",
 
   // Observation refinements (non-BMI; BMI Quantity refinements stay
   // Observation+Quantity from v3 — don't touch them)
   "Pregnancy Status Overlaps MP": "Observation",
-  "Pregnancy Status Is Verified": "Observation",
+  "Pregnancy Status Verified": "Observation",
   "Pregnancy Status Documented As Pregnancy Related": "Observation",
   "BMI Observation Not Done With Reason": "Observation",
   "BMI Observation Same Day As Qualifying Encounter": "Observation",

@@ -19,7 +19,7 @@ const REFINEMENT_MAP: Record<string, string> = {
   "Qualifying Encounter": "Encounter",
 
   // Condition refinements
-  "Hypertension Diagnoses Is Verified": "Condition",
+  "Hypertension Diagnoses Verified": "Condition",
   "Verified Hypertension": "Condition",
   "Verified Hypertension As Of Qualifying Encounter Narrative": "Condition",
   "Verified Hypertension As Of Qualifying Encounter": "Condition",
