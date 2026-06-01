@@ -3,7 +3,7 @@ library CMS22Generated version '0.1.0'
 using FHIR version '4.0.1'
 
 include FHIRHelpers version '4.0.1' called FHIRHelpers
-include CRLPatterns version '0.1.0' called CRLPatterns
+include CRLPatterns version '0.2.0' called CRLPatterns
 
 valueset "Diagnosis of Hypertension": 'http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.600.263'
 valueset "Dietary Recommendations ValueSet": 'http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.600.1515'
@@ -119,7 +119,7 @@ define "BP Evaluation Encounter (not virtual) Performed":
 
 define "Qualifying Encounter":
   "BP Evaluation Encounter (not virtual) During MP"
-    and "BP Evaluation Encounter (not virtual) Performed"
+    intersect "BP Evaluation Encounter (not virtual) Performed"
 
 define "Systolic Code Component of BP Panels":
   CRLPatterns.ComponentOf("Blood Pressure Panels", "Systolic Blood Pressure Code")
@@ -134,7 +134,7 @@ define "Diastolic BP Reading":
   "Diastolic Code Component of BP Panels"
 
 define "Last BP Panels On Qualifying Encounter Day":
-  CRLPatterns.LastOf("Blood Pressure Panels", CRLPatterns.OnDayOf("Qualifying Encounter"))
+  { CRLPatterns.LastOf("Blood Pressure Panels", CRLPatterns.OnDayOf("Qualifying Encounter")) }
 
 define "Last BP Panel on Qualifying Encounter Day":
   "Last BP Panels On Qualifying Encounter Day"
@@ -191,7 +191,7 @@ define "Hypertensive Reading":
     or "Last Diastolic At Least 80"
 
 define "Last BP Panels Within Year Prior To Qualifying Encounter":
-  CRLPatterns.LastOf("Blood Pressure Panels", CRLPatterns.BeforeStartOf(1 'year', "Qualifying Encounter"))
+  { CRLPatterns.LastOf("Blood Pressure Panels", CRLPatterns.BeforeStartOf(1 'year', "Qualifying Encounter")) }
 
 define "Last BP Panel Within Year Prior to Qualifying Encounter":
   "Last BP Panels Within Year Prior To Qualifying Encounter"
@@ -293,7 +293,7 @@ define "Primary-Care Referrals Ordered":
 
 define "Referral for Hypertensive Reading":
   "Primary-Care Referral Justified by Hypertensive Reading"
-    and "Primary-Care Referrals Ordered"
+    intersect "Primary-Care Referrals Ordered"
 
 define "Six-Month Rescreen Order Same Day As Qualifying Encounter":
   CRLPatterns.SameDay("Six-Month Rescreen Order", "Qualifying Encounter")
@@ -314,27 +314,27 @@ define "Antihypertensive Medication Order Same Day As Qualifying Encounter":
   CRLPatterns.SameDay("Antihypertensive Medication Order", "Qualifying Encounter")
 
 define "Elevated BP Followup Bundle":
-  ("Six-Month Rescreen Order Same Day As Qualifying Encounter"
-    and "Non-Pharm Recommendation Order Same Day As Qualifying Encounter")
-    or "Referral for Hypertensive Reading Same Day As Qualifying Encounter"
+  (exists ("Six-Month Rescreen Order Same Day As Qualifying Encounter")
+    and exists ("Non-Pharm Recommendation Order Same Day As Qualifying Encounter"))
+    or exists ("Referral for Hypertensive Reading Same Day As Qualifying Encounter")
 
 define "First HTN Followup Bundle":
-  ("Four-Week Rescreen Order Same Day As Qualifying Encounter"
-    and "Non-Pharm Recommendation Order Same Day As Qualifying Encounter")
-    or "Referral for Hypertensive Reading Same Day As Qualifying Encounter"
+  (exists ("Four-Week Rescreen Order Same Day As Qualifying Encounter")
+    and exists ("Non-Pharm Recommendation Order Same Day As Qualifying Encounter"))
+    or exists ("Referral for Hypertensive Reading Same Day As Qualifying Encounter")
 
 define "Second HTN 130s Followup Bundle":
-  ("Six-Month Rescreen Order Same Day As Qualifying Encounter"
-    and "Hypertension Lab or ECG Order Same Day As Qualifying Encounter"
-    and "Non-Pharm Recommendation Order Same Day As Qualifying Encounter")
-    or "Referral for Hypertensive Reading Same Day As Qualifying Encounter"
+  (exists ("Six-Month Rescreen Order Same Day As Qualifying Encounter")
+    and exists ("Hypertension Lab or ECG Order Same Day As Qualifying Encounter")
+    and exists ("Non-Pharm Recommendation Order Same Day As Qualifying Encounter"))
+    or exists ("Referral for Hypertensive Reading Same Day As Qualifying Encounter")
 
 define "Second HTN 140+ Followup Bundle":
-  ("Four-Week Rescreen Order Same Day As Qualifying Encounter"
-    and "Hypertension Lab or ECG Order Same Day As Qualifying Encounter"
-    and "Non-Pharm Recommendation Order Same Day As Qualifying Encounter"
-    and "Antihypertensive Medication Order Same Day As Qualifying Encounter")
-    or "Referral for Hypertensive Reading Same Day As Qualifying Encounter"
+  (exists ("Four-Week Rescreen Order Same Day As Qualifying Encounter")
+    and exists ("Hypertension Lab or ECG Order Same Day As Qualifying Encounter")
+    and exists ("Non-Pharm Recommendation Order Same Day As Qualifying Encounter")
+    and exists ("Antihypertensive Medication Order Same Day As Qualifying Encounter"))
+    or exists ("Referral for Hypertensive Reading Same Day As Qualifying Encounter")
 
 define "Elevated BP With Followup":
   "Elevated BP Reading"
@@ -352,11 +352,11 @@ define "Second HTN 140+ With Followup":
   "Second Hypertensive Reading 140+"
     and "Second HTN 140+ Followup Bundle"
 
-define "Hypertension Diagnoses Is Verified":
+define "Hypertension Diagnoses Verified":
   CRLPatterns.IsVerified("Hypertension Diagnoses")
 
 define "Verified Hypertension":
-  "Hypertension Diagnoses Is Verified"
+  "Hypertension Diagnoses Verified"
 
 define "Verified Hypertension As Of Qualifying Encounter Narrative":
   CRLPatterns.AsOf("Qualifying Encounter", "Verified Hypertension")
@@ -370,14 +370,14 @@ define "BP Measurement Sources":
     union "Standalone Diastolic BP Observations"
 
 define "BP Measurement Sources Not Done With Reason":
-  CRLPatterns.NotDoneWithReason("BP Measurement Sources", { "Medical Reasons", "Patient Declined Reasons" })
+  CRLPatterns.NotDoneWithReason("BP Measurement Sources", ("Medical Reasons" union "Patient Declined Reasons"))
 
 define "BP Measurement Sources Same Day As Qualifying Encounter":
   CRLPatterns.SameDay("BP Measurement Sources", "Qualifying Encounter")
 
 define "BP Measurement Not Done With Reason":
-  "BP Measurement Sources Not Done With Reason"
-    and "BP Measurement Sources Same Day As Qualifying Encounter"
+  exists ("BP Measurement Sources Not Done With Reason")
+    and exists ("BP Measurement Sources Same Day As Qualifying Encounter")
 
 define "Follow-up Within 4 Weeks Declined by Patient":
   CRLPatterns.NotDoneWithReason("Follow-up Within 4 Weeks", "Patient Declined Reasons")
@@ -434,27 +434,27 @@ define "Antihypertensive Medication Declined Same Day As Qualifying Encounter":
   CRLPatterns.SameDay("Antihypertensive Medication Declined", "Qualifying Encounter")
 
 define "Elevated BP Declined Bundle":
-  "Primary-Care Referral Declined Same Day As Qualifying Encounter"
-    or "Six-Month Rescreen Declined Same Day As Qualifying Encounter"
-    or "Non-Pharm Recommendation Declined Same Day As Qualifying Encounter"
+  exists ("Primary-Care Referral Declined Same Day As Qualifying Encounter")
+    or exists ("Six-Month Rescreen Declined Same Day As Qualifying Encounter")
+    or exists ("Non-Pharm Recommendation Declined Same Day As Qualifying Encounter")
 
 define "First HTN Declined Bundle":
-  "Four-Week Rescreen Declined Same Day As Qualifying Encounter"
-    or "Primary-Care Referral Declined Same Day As Qualifying Encounter"
-    or "Non-Pharm Recommendation Declined Same Day As Qualifying Encounter"
+  exists ("Four-Week Rescreen Declined Same Day As Qualifying Encounter")
+    or exists ("Primary-Care Referral Declined Same Day As Qualifying Encounter")
+    or exists ("Non-Pharm Recommendation Declined Same Day As Qualifying Encounter")
 
 define "Second HTN 130s Declined Bundle":
-  "Primary-Care Referral Declined Same Day As Qualifying Encounter"
-    or "Six-Month Rescreen Declined Same Day As Qualifying Encounter"
-    or "Hypertension Lab or ECG Declined Same Day As Qualifying Encounter"
-    or "Non-Pharm Recommendation Declined Same Day As Qualifying Encounter"
+  exists ("Primary-Care Referral Declined Same Day As Qualifying Encounter")
+    or exists ("Six-Month Rescreen Declined Same Day As Qualifying Encounter")
+    or exists ("Hypertension Lab or ECG Declined Same Day As Qualifying Encounter")
+    or exists ("Non-Pharm Recommendation Declined Same Day As Qualifying Encounter")
 
 define "Second HTN 140+ Declined Bundle":
-  "Primary-Care Referral Declined Same Day As Qualifying Encounter"
-    or "Four-Week Rescreen Declined Same Day As Qualifying Encounter"
-    or "Antihypertensive Medication Declined Same Day As Qualifying Encounter"
-    or "Hypertension Lab or ECG Declined Same Day As Qualifying Encounter"
-    or "Non-Pharm Recommendation Declined Same Day As Qualifying Encounter"
+  exists ("Primary-Care Referral Declined Same Day As Qualifying Encounter")
+    or exists ("Four-Week Rescreen Declined Same Day As Qualifying Encounter")
+    or exists ("Antihypertensive Medication Declined Same Day As Qualifying Encounter")
+    or exists ("Hypertension Lab or ECG Declined Same Day As Qualifying Encounter")
+    or exists ("Non-Pharm Recommendation Declined Same Day As Qualifying Encounter")
 
 define "Elevated BP With Declined Followup":
   "Elevated BP Reading"
@@ -479,7 +479,7 @@ define "HTN Followup Declined By Patient":
     or "Second HTN 140+ With Declined Followup"
 
 define "Age At Start Of MP At Least 18 Years":
-  CRLPatterns.AtLeast(CRLPatterns.AgeAt(CRLPatterns.StartOf("Measurement Period")), 18 'years')
+  CRLPatterns.AtLeast(CRLPatterns.AgeAt(start of "Measurement Period"), 18 'years')
 
 define "Aged 18+ at Measurement Period Start":
   "Age At Start Of MP At Least 18 Years"
@@ -502,4 +502,4 @@ define "Numerator":
 
 define "Denominator Exceptions":
   "BP Measurement Not Done With Reason"
-    union "HTN Followup Declined By Patient"
+    or "HTN Followup Declined By Patient"

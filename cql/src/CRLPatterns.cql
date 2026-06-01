@@ -110,6 +110,8 @@ define function "Without"(kind String, X List<Observation>):
   not exists X
 define function "Without"(kind String, X List<Procedure>):
   not exists X
+define function "Without"(kind String, X Boolean):
+  not X
 
 /**
  * CurrentlyTaking(med) — narrative: `currently taking <med>`.
@@ -162,13 +164,17 @@ define function "Within"(X List<Encounter>, window Interval<DateTime>):
 
 /**
  * ComponentOf(panel, discriminator) — narrative: `<discriminator> component
- * of <panel>`. Returns the components of `panel` matching `discriminator`.
- * Already list-shaped pre-refactor.
+ * of <panel>`. Returns the matching components' Quantity values as a
+ * `List<Quantity>`. Returning Quantity directly (vs Observation.Component)
+ * lets downstream value-comparator patterns dispatch cleanly without having
+ * to know about CQL's awkward backbone-element type names.
  */
 define function "ComponentOf"(panel List<Observation>, discriminator List<Observation>):
   flatten (
     (panel) P return (
-      P.component O where exists ((discriminator) D where D.code ~ O.code)
+      P.component CMP
+        where exists ((discriminator) D where D.code ~ CMP.code)
+        return FHIRHelpers.ToQuantity(CMP.value as Quantity)
     )
   )
 
@@ -419,25 +425,25 @@ define function "FirstOf"(X List<Observation>, scope Interval<DateTime>):
 /**
  * Window-from-anchor sub-grammar. Return Interval<DateTime>. Stay as-is.
  */
-define function "BeforeStartOf"(len Quantity, anchor List<Encounter>):
+define function "BeforeStartOf"(len System.Quantity, anchor List<Encounter>):
   Interval[
     (start of (First(anchor)).period) - len,
     (start of (First(anchor)).period)
   ]
 
-define function "AfterStartOf"(len Quantity, anchor List<Encounter>):
+define function "AfterStartOf"(len System.Quantity, anchor List<Encounter>):
   Interval[
     (start of (First(anchor)).period),
     (start of (First(anchor)).period) + len
   ]
 
-define function "BeforeEndOf"(len Quantity, anchor List<Encounter>):
+define function "BeforeEndOf"(len System.Quantity, anchor List<Encounter>):
   Interval[
     (end of (First(anchor)).period) - len,
     (end of (First(anchor)).period)
   ]
 
-define function "AfterEndOf"(len Quantity, anchor List<Encounter>):
+define function "AfterEndOf"(len System.Quantity, anchor List<Encounter>):
   Interval[
     (end of (First(anchor)).period),
     (end of (First(anchor)).period) + len
@@ -510,32 +516,60 @@ define function "Abnormal"(X Quantity, lo Quantity, hi Quantity):
   X < lo or X >= hi
 
 /**
- * Value comparators — INHERENTLY BOOLEAN.
+ * Value comparators — INHERENTLY BOOLEAN. Overloads cover:
+ *   - scalar value (Quantity, Integer) — direct comparison
+ *   - list of values (List<Observation>, List<Observation.Component>) —
+ *     existential: "any element in the list satisfies the comparison"
+ *   - cross-type (Integer × Quantity) — for year-Integer ages compared
+ *     to Quantity-year thresholds.
  */
 define function "AtLeast"(value Quantity, target Quantity):
   value >= target
 define function "AtLeast"(value Integer, target Integer):
   value >= target
+define function "AtLeast"(value Integer, target System.Quantity):
+  value >= target.value
+define function "AtLeast"(values List<Observation>, target Quantity):
+  exists (values) V where (V.value as Quantity) >= target
+define function "AtLeast"(values List<System.Quantity>, target System.Quantity):
+  exists (values) v where v >= target
 
 define function "AtMost"(value Quantity, target Quantity):
   value <= target
 define function "AtMost"(value Integer, target Integer):
   value <= target
+define function "AtMost"(values List<Observation>, target Quantity):
+  exists (values) V where (V.value as Quantity) <= target
+define function "AtMost"(values List<System.Quantity>, target System.Quantity):
+  exists (values) v where v <= target
 
 define function "Between"(value Quantity, lo Quantity, hi Quantity):
   value >= lo and value < hi
 define function "Between"(value Integer, lo Integer, hi Integer):
   value >= lo and value < hi
+define function "Between"(values List<Observation>, lo Quantity, hi Quantity):
+  exists (values) V
+    where (V.value as Quantity) >= lo and (V.value as Quantity) < hi
+define function "Between"(values List<System.Quantity>, lo System.Quantity, hi System.Quantity):
+  exists (values) v where v >= lo and v < hi
 
 define function "Exceeds"(value Quantity, target Quantity):
   value > target
 define function "Exceeds"(value Integer, target Integer):
   value > target
+define function "Exceeds"(values List<Observation>, target Quantity):
+  exists (values) V where (V.value as Quantity) > target
+define function "Exceeds"(values List<System.Quantity>, target System.Quantity):
+  exists (values) v where v > target
 
 define function "Below"(value Quantity, target Quantity):
   value < target
 define function "Below"(value Integer, target Integer):
   value < target
+define function "Below"(values List<Observation>, target Quantity):
+  exists (values) V where (V.value as Quantity) < target
+define function "Below"(values List<System.Quantity>, target System.Quantity):
+  exists (values) v where v < target
 
 // ====================================================================
 // State / Process Inference

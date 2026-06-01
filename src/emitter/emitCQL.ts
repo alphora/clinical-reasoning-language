@@ -101,13 +101,16 @@ type CompositionShape = "boolean" | "refinement";
 // (refinement consumer). Per the principle [[patterns-are-semantic]] +
 // [[defined-as-is-semantic-composition]] + catalog v0.6.0 "What not How".
 //
-// "list"    — the function returns List<Resource>; emitter wraps with
-//             `exists(...)` for boolean consumers.
-// "boolean" — the function returns Boolean (inherently a predicate);
-//             refinement consumers get a FIXME comment.
-// "other"   — the function returns Period/Quantity/Instance/Interval/
-//             /DateTime; author declares matching shape; emitter just calls.
-type PatternReturnShape = "list" | "boolean" | "other";
+// "list"     — function returns List<Resource>; emitter wraps with
+//              `exists(...)` for boolean consumers.
+// "boolean"  — function returns Boolean (inherently a predicate);
+//              refinement consumers get a FIXME comment.
+// "instance" — function returns Instance<Resource> (singleton — e.g.
+//              MostRecent/Last/Earliest/First); for refinement consumers
+//              the emitter lifts to a singleton-list via `{...}`.
+// "other"    — function returns Period/Quantity/Interval/DateTime;
+//              author's valuetype should match, emitter just calls.
+type PatternReturnShape = "list" | "boolean" | "instance" | "other";
 
 const PATTERN_RETURN_SHAPE: Record<string, PatternReturnShape> = {
   // List-returning filter patterns (primitive form per v0.2.0 refactor).
@@ -150,12 +153,16 @@ const PATTERN_RETURN_SHAPE: Record<string, PatternReturnShape> = {
   Exceeds: "boolean",
   Below: "boolean",
 
-  // Other-shape patterns (Interval, Instance, Period, Quantity).
+  // Instance-returning selection patterns (singleton resource).
+  MostRecent: "instance",
+  Last: "instance",
+  LastOf: "instance",
+  Earliest: "instance",
+  First: "instance",
+  FirstOf: "instance",
+
+  // Other-shape patterns (Period, Quantity, Interval).
   InpatientStay: "other",
-  MostRecent: "other",
-  LastOf: "other",
-  Earliest: "other",
-  FirstOf: "other",
   BeforeStartOf: "other",
   AfterStartOf: "other",
   BeforeEndOf: "other",
@@ -221,7 +228,7 @@ class Emitter {
       libraryName: options.libraryName ?? "GeneratedFromCRL",
       libraryVersion: options.libraryVersion ?? "0.1.0",
       fhirHelpersVersion: options.fhirHelpersVersion ?? "4.0.1",
-      crlPatternsVersion: options.crlPatternsVersion ?? "0.1.0",
+      crlPatternsVersion: options.crlPatternsVersion ?? "0.2.0",
     };
     this.indexNames();
     this.detectStubsAndCollisions();
@@ -542,12 +549,28 @@ class Emitter {
     if (declared === "refinement" && patternShape === "boolean") {
       return `// FIXME: ${matched.pattern} is inherently boolean; refinement consumer cannot use it as a list\n${call}`;
     }
+    if (declared === "refinement" && patternShape === "instance") {
+      // Selection pattern returns a singleton resource; author declared
+      // refinement (list). Lift to a singleton-list via CQL list literal.
+      return `{ ${call} }`;
+    }
+    if (declared === "boolean" && patternShape === "instance") {
+      return `exists { ${call} }`;
+    }
     // All other combinations: declared matches pattern shape (or pattern is
     // "other"-shaped and the author chose a matching valuetype).
     return call;
   }
 
   private emitPatternCall(call: CanonicalPatternCall): string {
+    // Synthetic patterns (not catalog entries — they represent CQL keyword
+    // operators) emit as CQL syntax instead of CRLPatterns calls.
+    if (call.pattern === "StartOf") {
+      return `start of ${this.emitArg(call.args[0])}`;
+    }
+    if (call.pattern === "EndOf") {
+      return `end of ${this.emitArg(call.args[0])}`;
+    }
     const fn = functionNameFor(call.pattern);
     const args = call.args.map((a) => this.emitArg(a)).join(", ");
     return `CRLPatterns.${fn}(${args})`;
@@ -563,8 +586,20 @@ class Emitter {
       case "EnumArg":
         return cqlString(arg.value);
       case "DisjunctionArg":
+        // When all disjuncts are concept refs (each resolving to a
+        // List<Resource>), emit with `union` so the result is a flattened
+        // List<Resource>, not a List<List<Resource>>. For non-concept
+        // disjuncts (quantities, enums), keep CQL list-literal form.
+        if (arg.disjuncts.every((d) => d.type === "ConceptRefArg")) {
+          return `(${arg.disjuncts.map((d) => this.emitArg(d)).join(" union ")})`;
+        }
         return `{ ${arg.disjuncts.map((d) => this.emitArg(d)).join(", ")} }`;
       case "ConjunctionArg":
+        // Mirror DisjunctionArg: for concept-ref conjuncts, use `intersect`
+        // to produce a flattened List<Resource> instead of List<List>.
+        if (arg.conjuncts.every((c) => c.type === "ConceptRefArg")) {
+          return `(${arg.conjuncts.map((c) => this.emitArg(c)).join(" intersect ")})`;
+        }
         return `{ ${arg.conjuncts.map((c) => this.emitArg(c)).join(", ")} }`;
       case "NestedPatternArg":
         return this.emitPatternCall(arg.pattern);
