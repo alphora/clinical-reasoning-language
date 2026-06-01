@@ -34,6 +34,13 @@ export type {
   NameConflictDiagnostic,
 } from "./imports";
 
+export { validateCRLImports } from "./imports/validate";
+export type {
+  ValidateImportsOptions,
+  ValidateImportsResult,
+  ValidationErrorWithSource,
+} from "./imports/validate";
+
 export interface Token {
   line: number;
   column: number;

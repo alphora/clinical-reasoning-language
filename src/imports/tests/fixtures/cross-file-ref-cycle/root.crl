@@ -1,0 +1,4 @@
+# cross-file-ref-cycle root
+library "Root".
+include "Lib1".
+include "Lib2".

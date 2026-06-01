@@ -1,0 +1,6 @@
+# cross-file-ref-cycle lib2
+library "Lib2".
+
+concept "B":
+- type is Encounter.
+- defined as "A".

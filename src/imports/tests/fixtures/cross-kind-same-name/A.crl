@@ -1,6 +1,6 @@
-# cross-kind A — concept named "BMI"
+# cross-kind A — concept named "BMI" coded from terminology also named "BMI"
 library "A".
 
 concept "BMI":
 - type is Observation.
-- coded from "BMI Valueset".
+- coded from "BMI".

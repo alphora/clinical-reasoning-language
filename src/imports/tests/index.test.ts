@@ -5,6 +5,7 @@ import { resolveImports } from "../index";
 import "./registry.test";
 import "./resolver.test";
 import "./namespace.test";
+import "./validate.test";
 
 const FIXTURES = path.resolve(__dirname, "fixtures");
 

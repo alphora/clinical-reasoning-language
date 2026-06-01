@@ -1,0 +1,9 @@
+# cross-file-unresolved-ref leaf (no concept matching the bad ref)
+library "Leaf".
+
+concept "Leaf Concept":
+- type is Encounter.
+- coded from "Leaf Vs".
+
+terminology "Leaf Vs":
+- valueset is `leaf-vs`.

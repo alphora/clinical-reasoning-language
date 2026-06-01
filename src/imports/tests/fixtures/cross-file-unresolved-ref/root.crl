@@ -1,0 +1,7 @@
+# cross-file-unresolved-ref root
+library "Root".
+include "Leaf".
+
+concept "Root Concept":
+- type is Encounter.
+- defined as "Not Declared Anywhere".
