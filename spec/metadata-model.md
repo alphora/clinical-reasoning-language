@@ -46,10 +46,10 @@ concept "Elderly Patient":
 - meta is `@reef-reference: the "age 60 or over" observation; ref reef:obs/age-ge-60; confidence 0.88; status candidate`.
 - meta is `@semantic-parse-text: age(patient) >= 60; by agent crl-extractor@2.1.0; run r17`.
 - evidence is `Section 3.2 of the source policy`.
-- inferred from "Patient Age".
+- defined as "Patient Age".
 ```
 
-(Element order is fixed: `type`, `valuetype`, `meta`*, `evidence`?, then `coded/inferred from`.)
+(Element order is fixed: `type`, `valuetype`, `meta`*, `evidence`?, then one of `coded from` / `defined as` / `definition is`.)
 
 ## Value shapes
 
