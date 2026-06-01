@@ -14,7 +14,7 @@ This is intended to outlast the current corpus and survive being lifted into an 
 
 > **If the CQL define returns a Boolean** → model the CRL concept with `valuetype is boolean`. The `type` is the target FHIR resource IF that resource has a native boolean value field; otherwise fall back to `Observation`. Concretely: `Observation+boolean` and `QuestionnaireResponse+boolean` are valid (they have `valueBoolean` / `answer.valueBoolean`); `Condition+boolean`, `Encounter+boolean`, `MedicationRequest+boolean`, `Procedure+boolean`, `ServiceRequest+boolean` are NOT (those resources have no boolean value field) — those flip to `Observation+boolean`.
 >
-> **Otherwise** (the define returns a List of a FHIR resource, or a single FHIR resource) → the `type` is that resource type traced back to its asserted concept, and the `valuetype` is the applicable valuetype for that resource (i.e., whatever the asserted concept declared, OR what its enclosing inferred-from chain has declared).
+> **Otherwise** (the define returns a List of a FHIR resource, or a single FHIR resource) → the `type` is that resource type traced back to its asserted concept, and the `valuetype` is the applicable valuetype for that resource (i.e., whatever the asserted concept declared, OR what its enclosing defined-as chain has declared).
 
 The corrected boolean rule is: `<Resource>+boolean` is valid ONLY when `<Resource>` has a native boolean value field in FHIR. The short list of resources with native boolean values is `Observation` (`valueBoolean`), `QuestionnaireResponse` (`item.answer.valueBoolean`), and a few rare ones (`Consent.policyRule`-adjacent flags, `Coverage` subscriber flags). For every other resource — and for every CRL boolean concept that is a *computed* patient-level predicate rather than a stored boolean value — the declaration is `Observation+boolean`.
 
@@ -22,7 +22,7 @@ This is the single most consequential error to avoid. The original framing "bool
 
 **On composition operators (`sem-and`, `sem-or`, `sem-not`):** these are **SEMANTIC composition** operators, not boolean logic. The author declares the resulting concept's `(type, valuetype)`; the sem-* operators describe HOW the meaning is composed (intersection / union / exclusion at the semantic layer); they DO NOT type-check the operands against each other or against the result. Operands of mixed shapes (e.g., one refinement and one boolean) compose legally under an explicit author declaration. The CQL emitter is responsible for bridging operand types to produce the declared result (e.g., wrapping a refinement operand in `exists` when the result is boolean). This is the same "What not How" principle CRL applies elsewhere: authors declare WHAT a concept means; the implementation handles HOW to compute it.
 
-**See [inferred-from-is-semantic-composition.md](inferred-from-is-semantic-composition.md)** for the full principle, worked examples, and the common mis-readings to avoid. That document is mandatory reading before authoring or auditing any CRL concept with composition bodies.
+**See [defined-as-is-semantic-composition.md](defined-as-is-semantic-composition.md)** for the full principle, worked examples, and the common mis-readings to avoid. That document is mandatory reading before authoring or auditing any CRL concept with composition bodies.
 
 ---
 
@@ -37,7 +37,7 @@ Run these steps in order for every concept you produce.
 
 2. **If no source CQL is available**, the narrative form must classify into one of the shapes. Use the **semantic shape catalog** in §3 below. If the pattern is not in the catalog or the call is ambiguous, **stop and ask the operator**. Do not guess — the cost of a wrong guess is silent model corruption that we will spend hours auditing later.
 
-3. **Refinement shape.** Identify the *subject* — the first FHIR-resource-bearing concept ref in the narrative. Trace it back through the chain (`inferred from` → `inferred from` → `coded from`) until you reach the asserted concept. Then:
+3. **Refinement shape.** Identify the *subject* — the first FHIR-resource-bearing concept ref in the narrative. Trace it back through the chain (`defined as` → `defined as` → `coded from`) until you reach the asserted concept. Then:
    - `type` is the asserted concept's `type`.
    - `valuetype` is the asserted concept's `valuetype` (carried through unchanged — refinement preserves valuetype).
 
@@ -121,7 +121,7 @@ concept "High BMI Medications":
 concept "High BMI Medication Justified by Overweight Diagnosis":
 - type is MedicationRequest.
 - valuetype is CodeableConcept.
-- logic is "High BMI Medications" justified by "Overweight or Obese Diagnoses".
+- definition is "High BMI Medications" justified by "Overweight or Obese Diagnoses".
 
 // BOOLEAN shape (`on or before` returns a Boolean)
 //   Even though the subject is a Condition, the semantic is
@@ -129,7 +129,7 @@ concept "High BMI Medication Justified by Overweight Diagnosis":
 concept "Has Overweight On Or Before High BMI Medication Order":
 - type is Observation.
 - valuetype is boolean.
-- logic is "Has Overweight or Obese" on or before "High BMI Medication Order Date".
+- definition is "Has Overweight or Obese" on or before "High BMI Medication Order Date".
 
 // asserted Observation with Quantity value
 concept "BMI Observations":
@@ -141,7 +141,7 @@ concept "BMI Observations":
 concept "BMI Observation During MP":
 - type is Observation.
 - valuetype is Quantity.
-- logic is "BMI Observations" during "Measurement Period".
+- definition is "BMI Observations" during "Measurement Period".
 
 // BOOLEAN shape — classification predicate over the Quantity value
 concept "BMI During MP Is Low":
@@ -153,7 +153,7 @@ concept "BMI During MP Is Low":
 concept "High BMI Follow-up Order Date":
 - type is ServiceRequest.
 - valuetype is dateTime.
-- logic is authored date of "High BMI Follow-up Order".
+- definition is authored date of "High BMI Follow-up Order".
 ```
 
 ---
@@ -211,10 +211,10 @@ Authority for "is this concept's `(type, valuetype)` declaration correct?" lies 
 
 ### 7.1 Find the subject
 
-For a concept `C` with `inferred from` or `logic is` body:
+For a concept `C` with `defined as` or `definition is` body:
 
-- **`inferred from <composition>`** — subject is the first `CompositionRef` reached in left-to-right traversal of the composition expression (descending into `sem-and`/`sem-or`/`sem-not`/group as needed).
-- **`logic is <narrative>`** — subject is the first `NConceptRef` reached in left-to-right traversal of the narrative elements (descending into `NDisjunction`/`NConjunction` ArgValues as needed).
+- **`defined as <composition>`** — subject is the first `CompositionRef` reached in left-to-right traversal of the composition expression (descending into `sem-and`/`sem-or`/`sem-not`/group as needed).
+- **`definition is <narrative>`** — subject is the first `NConceptRef` reached in left-to-right traversal of the narrative elements (descending into `NDisjunction`/`NConjunction` ArgValues as needed).
 
 If the subject is itself a non-asserted concept, **do not recursively unwind**. The subject's declared `(type, valuetype)` is authoritative (we've already validated the subject when its turn came). Use the subject's declaration directly.
 
@@ -230,7 +230,7 @@ Let `(T_C, V_C)` = the concept's declared pair, `(T_S, V_S)` = the subject's dec
 
 Anything outside these three is an error.
 
-**Composition operators in the chain.** When `T_C` and `V_C` are validated against a composed body (`inferred from sem-and(...)` / `sem-or(...)` / `sem-not(...)`):
+**Composition operators in the chain.** When `T_C` and `V_C` are validated against a composed body (`defined as sem-and(...)` / `sem-or(...)` / `sem-not(...)`):
 
 - **The author declares the result `(T_C, V_C)`; that declaration is authoritative.** The sem-* operators are SEMANTIC (intersection / union / exclusion of meaning), not boolean logic. They do NOT impose type-matching constraints on operands.
 - **Mixed-shape operands are legal** under explicit author declaration. The CQL emitter bridges operand types to produce the declared result. The validator MAY warn on mixed operands as a code-smell (to help authors notice unintended mismatches), but MUST NOT block.
@@ -238,7 +238,7 @@ Anything outside these three is an error.
 - **For refinement-declared concepts**: the chain check applies to the SUBJECT (first concept ref in left-to-right traversal of the composition expression) — that subject's `(T_S, V_S)` must satisfy the refinement constraint `T_C = T_S` AND `V_C = V_S`. Other operands in the composition are free to be different shapes; the emitter interprets them per the operator's semantic meaning relative to the subject.
 - **Heterogeneous-resource composition** (e.g. `sem-or` of a `ServiceRequest` refinement with a `MedicationRequest` refinement) is supported by author declaration: the author picks an umbrella result type (typically `Observation+boolean` if no `DomainResource` umbrella exists yet) and the emitter unions / boolean-wraps each typed operand.
 
-See [inferred-from-is-semantic-composition.md](inferred-from-is-semantic-composition.md) for examples and the mis-readings to avoid.
+See [defined-as-is-semantic-composition.md](defined-as-is-semantic-composition.md) for examples and the mis-readings to avoid.
 
 ### 7.3 Asserted concepts
 
@@ -248,7 +248,7 @@ Asserted concepts (`coded from` body) have no subject chain — their `(type, va
 
 ### 7.4 Special case: subject lacks declared `valuetype`
 
-A subject concept may legitimately have `type is T_S.` with no `valuetype` declared (e.g. `logic is` concepts that are themselves boolean predicates — `T_S = Observation, V_S = boolean` is the implicit inheritance, but the boolean predicate rule covers this directly: the SUBJECT is `Observation + boolean`, and we don't need its absent `valuetype`).
+A subject concept may legitimately have `type is T_S.` with no `valuetype` declared (e.g. `definition is` concepts that are themselves boolean predicates — `T_S = Observation, V_S = boolean` is the implicit inheritance, but the boolean predicate rule covers this directly: the SUBJECT is `Observation + boolean`, and we don't need its absent `valuetype`).
 
 Rule: if the subject is itself a boolean-shape concept (`type is Observation` and either declared `valuetype is boolean` or no `valuetype`), the only valid `C` shapes are:
 - **Boolean predicate** (`T_C = Observation, V_C = boolean`) — a chained boolean predicate.

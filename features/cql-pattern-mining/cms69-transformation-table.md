@@ -42,7 +42,7 @@ These already have correct declarations. One missing valuetype to add.
 | Medical Reasons | Observation+CodeableConcept | (same) | HIGH | ✓ |
 | Patient Declined Reasons | Observation+CodeableConcept | (same) | HIGH | ✓ |
 
-## Group B — Value-bearing date concepts (bare-ref inferred-from)
+## Group B — Value-bearing date concepts (bare-ref defined-as)
 
 These already have correct value-bearing declarations.
 
@@ -63,7 +63,7 @@ Source CQL "Qualifying Encounter During Day Of Measurement Period" (l.173-177) r
 | Concept | Current | Proposed | Conf | Reason |
 |---|---|---|---|---|
 | BMI Evaluation Encounter (not virtual) | Encounter+boolean | **Encounter+CodeableConcept** | HIGH | sem-and of two Encounter lists = list intersection. Refinement |
-| BMI Evaluation Encounter (not virtual) During MP | (none) | **Encounter+CodeableConcept** | MEDIUM | `X during Y` filter; refinement of subject Encounter list. Author-synthesized (no source-CQL define); shape inferred from narrative pattern + downstream context |
+| BMI Evaluation Encounter (not virtual) During MP | (none) | **Encounter+CodeableConcept** | MEDIUM | `X during Y` filter; refinement of subject Encounter list. Author-synthesized (no source-CQL define); shape deduced from narrative pattern + downstream context |
 | BMI Evaluation Encounter (not virtual) Performed | (none) | **Encounter+CodeableConcept** | MEDIUM | `X performed` filter; refinement. Author-synthesized |
 | Qualifying Encounter | Encounter+boolean | **Encounter+CodeableConcept** | HIGH | Composition of two Encounter refinements; matches CQL l.173 |
 

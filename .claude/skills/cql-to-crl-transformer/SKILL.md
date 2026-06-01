@@ -17,9 +17,9 @@ This skill is the precursor to the future "CQL/Narrative → CRL transformer" MC
 
 Read these in full **once** at the start of a session and keep them in mind:
 
-1. **CRITICAL — DO NOT SKIP**: [features/cql-pattern-mining/inferred-from-is-semantic-composition.md](../../../features/cql-pattern-mining/inferred-from-is-semantic-composition.md). This document states the SINGLE most important design principle for this skill: `inferred from` is SEMANTIC composition, not boolean logic. The author declares the result `(type, valuetype)`; `sem-and` / `sem-or` / `sem-not` do NOT type-check operands. Mixed-shape operands are legal under explicit author declaration. Multiple agent runs have produced wrong transformations by mis-reading this — treating `sem-and` as boolean AND with strict operand-type matching, "fixing" non-defects, then introducing new ones. Read this doc end-to-end before doing any transformation work.
+1. **CRITICAL — DO NOT SKIP**: [features/cql-pattern-mining/defined-as-is-semantic-composition.md](../../../features/cql-pattern-mining/defined-as-is-semantic-composition.md). This document states the SINGLE most important design principle for this skill: `defined as` is SEMANTIC composition, not boolean logic. The author declares the result `(type, valuetype)`; `sem-and` / `sem-or` / `sem-not` do NOT type-check operands. Mixed-shape operands are legal under explicit author declaration. Multiple agent runs have produced wrong transformations by mis-reading this — treating `sem-and` as boolean AND with strict operand-type matching, "fixing" non-defects, then introducing new ones. Read this doc end-to-end before doing any transformation work. The same principle applies to the sibling body kind `definition is` (narrative-predicate form) — see the "sibling form" section of that doc.
 2. The canonical rule: [features/cql-pattern-mining/cql-to-crl-type-valuetype-rule.md](../../../features/cql-pattern-mining/cql-to-crl-type-valuetype-rule.md) — the whole document, especially §1 (core rule), §7 (validator chain check), and §10 (quick checklist).
-3. The CRL v0.6 grammar concepts: asserted (`coded from`), composition-typed (`inferred from`), narrative predicate (`logic is`).
+3. The CRL v0.7 grammar concepts: asserted (`coded from`), composition (`defined as`), narrative predicate (`definition is`).
 
 ## Inputs
 

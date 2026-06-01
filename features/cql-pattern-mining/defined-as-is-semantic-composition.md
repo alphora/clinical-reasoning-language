@@ -1,14 +1,16 @@
-# `inferred from` is SEMANTIC composition, not boolean logic
+# `defined as` is SEMANTIC composition, not boolean logic
 
 **Audience:** humans working on CRL design or transformation; agents asked to generate, audit, or review CRL concepts.
 
-**Status:** load-bearing design principle of CRL v0.6. Mis-reading this principle has been the single most expensive mistake in the corpus-correction work — it caused a multi-round review loop where each iteration "fixed" type mismatches that weren't actually defects, and introduced new ones in the process.
+**Status:** load-bearing design principle of CRL v0.7. Mis-reading this principle has been the single most expensive mistake in the corpus-correction work — it caused a multi-round review loop where each iteration "fixed" type mismatches that weren't actually defects, and introduced new ones in the process.
+
+> *"Defined" here means **author-declared semantic intent**, not algorithmic computation. A concept's meaning is what the author SAYS it means; the emitter figures out how to compute it.*
 
 ---
 
 ## The principle, in one paragraph
 
-In CRL, a concept declared with `inferred from <composition>` is a NEW concept whose `type` and `valuetype` are declared by the AUTHOR. The composition body — `sem-and`, `sem-or`, `sem-not` — describes HOW the meaning of the new concept is composed from existing concepts (semantic intersection / union / exclusion). It does NOT type-check the operands against each other or against the result. The author owns the semantic claim; the implementation (the CQL emitter, the runtime) is responsible for figuring out HOW to combine the operands' values to produce the declared result.
+In CRL, a concept declared with `defined as <composition>` is a NEW concept whose `type` and `valuetype` are declared by the AUTHOR. The composition body — `sem-and`, `sem-or`, `sem-not` — describes HOW the meaning of the new concept is composed from existing concepts (semantic intersection / union / exclusion). It does NOT type-check the operands against each other or against the result. The author owns the semantic claim; the implementation (the CQL emitter, the runtime) is responsible for figuring out HOW to combine the operands' values to produce the declared result.
 
 `sem-and` is NOT boolean `AND` with strict operand-type matching. It is a SEMANTIC operator: "the resulting concept's meaning is the intersection of the operand concepts' meanings, interpreted in the result's type/valuetype." Same for `sem-or` (union of meanings) and `sem-not` (exclusion of meaning).
 
@@ -26,7 +28,7 @@ When you write:
 concept "Has Normal BMI":
 - type is Observation.
 - valuetype is boolean.
-- inferred from
+- defined as
 (
    "Normal BMI Range"            // operand: refinement (Observation+Quantity list)
    sem-and
@@ -67,6 +69,23 @@ These are emitter-side translations, not author-side concerns. The author declar
 The transformation rule at [cql-to-crl-type-valuetype-rule.md](cql-to-crl-type-valuetype-rule.md) says: for any concept, the `(type, valuetype)` is decided by the author based on what the concept SEMANTICALLY MEANS, with the boolean rule as the one hard constraint (boolean valuetype requires a resource with a native boolean field, else fall back to Observation).
 
 The chain check in §7 of that rule has been updated to reflect this principle. Old version said: "mixed-shape sem-* composition is a defect, the validator flags it." That was wrong — it imposed a constraint the design doesn't have. New version says: mixed operands are legal under explicit author declaration; the validator may warn but does not block.
+
+---
+
+## The sibling form: `definition is`
+
+The principle above is about **`defined as`** — the composition body kind that uses `sem-*` operators over named concepts. CRL has a sibling body kind, **`definition is`**, that uses a narrative-predicate body matched against the [catalog](results/inference-pattern-catalog-draft.md). The two are siblings under the same author-declares-result framing:
+
+| Body kind | Surface | Body shape | Examples |
+|---|---|---|---|
+| Composition | `defined as <expression>` | Parenthesized tree of named concepts joined by `sem-or` / `sem-and` / `sem-not` | `defined as ( "A" sem-and sem-not "B" )` |
+| Narrative predicate | `definition is <narrative>` | Catalog-pattern narrative phrase whose elements are concept refs, narrative words, in-arg disjunctions/conjunctions | `definition is "BMI Observations" during "Measurement Period"` |
+
+Both body kinds carry the **same principle**: the author declares the result `(type, valuetype)`, and the body describes the meaning. For composition, the meaning is the sem-* combination of named concepts. For predicate, the meaning is the catalog pattern's canonical form applied to its arguments. In both cases, the emitter bridges to CQL — neither body kind asks the author to think about type alignment between operands / arguments and the declared result.
+
+The shared `defined` / `definition` stem is intentional — it signals the family. The `as` / `is` preposition distinguishes the body shape: `defined as` introduces an equivalence (the body IS the meaning, written as a sem-* expression), `definition is` introduces an attribute (the body IS the definition, written as a narrative phrase the catalog recognizes). The grammar treats them as parallel body kinds; the author picks the form that fits the concept's natural surface.
+
+For the predicate form's narrative grammar — placeholders, in-arg groups, catalog dispatch — see the [catalog](results/inference-pattern-catalog-draft.md). For why the catalog patterns dropped their inner `is` in v0.7 (e.g., `<X> active` instead of `<X> is active`), see [discussion 017](../../.vibe-tools/discussions/017-logic-is-keyword-rename.md) round 4 — the migration pairs with the `definition is` keyword choice to avoid a doubly-copular `definition is "X" is active` collision.
 
 ---
 
@@ -135,9 +154,9 @@ The transformer's job is intent-capture, not type-bridging. Type bridging is the
 
 ## Open design question — explicit vs succinct valuetype on inferred concepts
 
-For an `inferred from` concept whose valuetype CAN be inferred from the subject (refinement preserves V_S, value-bearing primitive declared inline), should the author **restate** the valuetype explicitly, or **omit** it and let the reader / validator infer from the chain?
+For a `defined as` concept whose valuetype CAN be deduced from the subject (refinement preserves V_S, value-bearing primitive declared inline), should the author **restate** the valuetype explicitly, or **omit** it and let the reader / validator deduce it from the chain?
 
-Both are valid styles. CRL v0.6's grammar (`(valueTypeLine)*` — 0..*) and validator (skips chain check when V_C or V_S is missing) support both.
+Both are valid styles. CRL v0.7's grammar (`(valueTypeLine)*` — 0..*) and validator (skips chain check when V_C or V_S is missing) support both.
 
 **Style A — explicit:**
 
@@ -145,7 +164,7 @@ Both are valid styles. CRL v0.6's grammar (`(valueTypeLine)*` — 0..*) and vali
 concept "BMI Evaluation Encounter (not virtual)":
 - type is Encounter.
 - valuetype is CodeableConcept.
-- inferred from
+- defined as
 (
    "Encounters to Evaluate BMI"           // Encounter+CodeableConcept (asserted)
    sem-and
@@ -162,7 +181,7 @@ Cons: redundant with the chain; if an asserted parent's valuetype changes, every
 ```crl
 concept "BMI Evaluation Encounter (not virtual)":
 - type is Encounter.
-- inferred from
+- defined as
 (
    "Encounters to Evaluate BMI"
    sem-and
