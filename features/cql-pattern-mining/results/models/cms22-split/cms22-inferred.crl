@@ -1,7 +1,6 @@
 # CMS22 Inferred Concepts
 
 library "CMS22 Inferred".
-include "CMS22 Asserted".
 
 // ============ Inference declarations + composing concepts ============
 

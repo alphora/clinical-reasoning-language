@@ -1,7 +1,6 @@
 # CMS22 Asserted Concepts
 
 library "CMS22 Asserted".
-include "CMS22 Terminology".
 
 // ============ Asserted concepts (unchanged) ============
 

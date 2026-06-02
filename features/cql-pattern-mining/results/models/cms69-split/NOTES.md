@@ -16,11 +16,15 @@ The unsuffixed file (`cms69.crl`) is the interface layer — this matches
 the CQL convention where `CMS69.cql` is the entry point downstream consumers
 (FHIR Measure resources, registries) reference.
 
-Each layer `include`s the next layer down: interface → inferred → asserted
-→ terminology. Per v2.1.0 lock 026, local sibling libraries auto-resolve
-via qualified refs without an `include`; the explicit `include` lines here
-are still emitted as CQL `include` statements so the resulting CQL has a
-self-contained dependency graph.
+Cross-layer refs use the qualified `"OtherLib"."Name"` syntax (e.g.
+`coded from "CMS69 Terminology"."Body Mass Index Observations"`). Per
+v2.1.0 lock 026, local sibling libraries auto-resolve via qualified refs
+without an `include`, so none of these files carry an `include` line. The
+per-CRL emitter still produces a self-contained CQL dependency graph by
+emitting a CQL `include` for every cross-library reference it sees in
+each layer's body. (For an externally-`npm install`ed CRL package the
+`include "Pkg".` line is still required at the CRL level — that's how
+v2.1.0 distinguishes local siblings from external deps.)
 
 ## How to re-emit
 

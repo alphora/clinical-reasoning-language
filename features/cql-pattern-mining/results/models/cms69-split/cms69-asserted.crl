@@ -1,7 +1,6 @@
 # CMS69 Asserted Concepts
 
 library "CMS69 Asserted".
-include "CMS69 Terminology".
 
 // "Pregnancy or Other Related Diagnoses" is a valueset (declared in
 // CMS69 Terminology) referenced as a classification argument in

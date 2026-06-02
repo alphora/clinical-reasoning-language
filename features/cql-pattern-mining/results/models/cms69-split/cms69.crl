@@ -1,6 +1,5 @@
 # CMS69 BMI Screening and Follow-Up
 library "CMS69".
-include "CMS69 Inferred".
 
 // The unsuffixed file is the Quality Measure interface layer
 // (IP / Denom / Numerator / Exclusions / Exceptions — what the Measure

@@ -1,6 +1,5 @@
 # CMS22 Blood Pressure Screening and Follow-Up
 library "CMS22".
-include "CMS22 Inferred".
 
 // The unsuffixed file is the Quality Measure interface layer
 // (IP / Denom / Numerator / Exclusions / Exceptions — what the Measure

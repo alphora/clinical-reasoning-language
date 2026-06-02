@@ -1,7 +1,6 @@
 # CMS69 Inferred Concepts
 
 library "CMS69 Inferred".
-include "CMS69 Asserted".
 
 // ============ Lifted property concepts (bare ref — type-only wrappers) ============
 
