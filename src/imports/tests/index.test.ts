@@ -73,11 +73,11 @@ describe("resolveImports (end-to-end)", () => {
     expect(cycle).toBeDefined();
   });
 
-  it("surfaces a name-conflict when two included libraries declare the same concept", () => {
+  it("v2.1.0: cross-library same concept name does NOT emit name-conflict (per-library scoping + per-CRL emit makes it benign)", () => {
     const root = path.join(FIXTURES, "name-conflict", "root.crl");
     const graph = resolveImports(root);
     const conflict = graph.diagnostics.find((d) => d.kind === "name-conflict");
-    expect(conflict).toBeDefined();
+    expect(conflict).toBeUndefined();
   });
 
   it("surfaces a registry-duplicate when two local files declare the same library name", () => {

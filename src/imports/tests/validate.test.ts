@@ -57,14 +57,15 @@ describe("validateCRLImports", () => {
     expect(cycleErr).toBeDefined();
   });
 
-  it("does NOT double-report a name-conflict as a validator nameUniqueness error", () => {
+  it("v2.1.0: same concept name across two libraries is benign — no name-conflict, no duplicate-name", () => {
     const root = path.join(FIXTURES, "name-conflict", "root.crl");
     const result = validateCRLImports(root);
-    // Resolver reports the conflict once.
+    // v2.1.0: cross-library same-name is legal under per-library scoping +
+    // per-CRL emit. Neither the resolver-level `name-conflict` nor the
+    // validator's `duplicate-name` fires.
     const conflicts = result.importDiagnostics.filter((d) => d.kind === "name-conflict");
-    expect(conflicts).toHaveLength(1);
-    // Validator does NOT re-fire (no duplicate concept/decision/activity/terminology name errors).
-    const duplicateErrors = result.validationErrors.filter((e) => /[Dd]uplicate/.test(e.message));
+    expect(conflicts).toHaveLength(0);
+    const duplicateErrors = result.validationErrors.filter((e) => e.kind === "duplicate-name");
     expect(duplicateErrors).toHaveLength(0);
   });
 

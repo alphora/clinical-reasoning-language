@@ -47,6 +47,12 @@ export type CanonicalArg =
 export interface ConceptRefArg {
   type: "ConceptRefArg";
   value: string;
+  /**
+   * Library qualifier from the source `"Lib"."X"` form. Present only when
+   * the narrative ref was qualified; absent for bare refs (which resolve
+   * in the owning library at emit time).
+   */
+  library?: string;
   location: Location;
 }
 

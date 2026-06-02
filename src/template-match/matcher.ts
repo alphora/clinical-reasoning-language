@@ -24,7 +24,7 @@ import type {
   NConjunction,
   Location,
 } from "../ast/types";
-import { getRefName } from "../ast/types";
+import { getRefName, getRefLibrary } from "../ast/types";
 
 import type {
   CanonicalArg,
@@ -85,7 +85,13 @@ function argValueText(v: NarrativeElement): string {
 // === Helper builders ===
 
 function conceptRefArg(e: NConceptRef): ConceptRefArg {
-  return { type: "ConceptRefArg", value: getRefName(e.value), location: e.location };
+  const library = getRefLibrary(e.value);
+  return {
+    type: "ConceptRefArg",
+    value: getRefName(e.value),
+    ...(library !== null ? { library } : {}),
+    location: e.location,
+  };
 }
 
 function quantityArg(e: Quantity): QuantityArg {

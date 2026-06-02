@@ -62,18 +62,18 @@ describe("buildCombinedNamespace", () => {
     expect(diagnostics).toHaveLength(0);
   });
 
-  it("emits name-conflict when two libraries declare the same concept name", () => {
+  it("v2.1.0: cross-library same-name is benign (no name-conflict fires)", () => {
+    // Under per-library scoping + per-CRL emit, two libraries declaring the
+    // same concept name is legal — each library has its own scope and its
+    // own emitted CQL namespace. The legacy flat `Namespace` view still
+    // first-wins-dedups for any consumer reading it, but no diagnostic
+    // fires.
     const libA = makeLibrary("LibA", "/lib-a.crl", [makeConcept("X")]);
     const libB = makeLibrary("LibB", "/lib-b.crl", [makeConcept("X")]);
     const { namespace, diagnostics } = buildCombinedNamespace([libA, libB]);
     const conflict = diagnostics.find((d) => d.kind === "name-conflict");
-    expect(conflict).toBeDefined();
-    if (conflict?.kind === "name-conflict") {
-      expect(conflict.name).toBe("X");
-      expect(conflict.nodeKind).toBe("Concept");
-      expect(conflict.sources).toHaveLength(2);
-    }
-    // First registration (leaves-win) survives.
+    expect(conflict).toBeUndefined();
+    // First registration still wins in the flat view (leaves-win).
     expect(namespace.concepts.get("X")?.libraryName).toBe("LibA");
   });
 

@@ -2,7 +2,6 @@ import {
   ImportDiagnostic,
   Namespace,
   NamespaceEntry,
-  NameConflictDiagnostic,
   NodeKind,
   RegistryEntry,
   emptyNamespace,
@@ -41,18 +40,13 @@ export function buildCombinedNamespace(
       };
 
       if (existing) {
-        const diag: NameConflictDiagnostic = {
-          kind: "name-conflict",
-          severity: "error",
-          name,
-          nodeKind: kind,
-          sources: [
-            { libraryName: existing.libraryName, filePath: existing.filePath },
-            { libraryName: newEntry.libraryName, filePath: newEntry.filePath },
-          ],
-        };
-        diagnostics.push(diag);
-        // leaves-win: keep the first registration
+        // v2.1.0: cross-library same-name declarations are benign under
+        // per-library scoping (each library has its own scope) and per-CRL
+        // emit (each library emits its own CQL with its own namespace).
+        // First-wins dedup is kept here only so the legacy flat `Namespace`
+        // shape stays well-formed for any consumer still reading it; no
+        // diagnostic fires. The legacy flat view itself is deprecated and
+        // will be removed when consumers migrate to per-library `scopes`.
         continue;
       }
 

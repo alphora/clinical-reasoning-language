@@ -50,7 +50,8 @@ import type {
   Terminology,
   TerminologyBodyLine,
 } from "../ast/types";
-import { getRefName } from "../ast/types";
+import { getRefName, getRefLibrary, isQualifiedRef } from "../ast/types";
+import type { ReferenceName } from "../ast/types";
 import type { CRLError } from "../types/errors";
 
 export interface EmitOptions {
@@ -60,6 +61,13 @@ export interface EmitOptions {
   // pin. CRLPatterns, in contrast, is our own library — npm packaging IS
   // its version system, so we emit it without a `version '...'` clause.
   fhirHelpersVersion?: string;
+  /**
+   * Other CRL libraries this emit should `include` natively (`include Foo`
+   * in the CQL header). Populated by `emitCQLImports` per-library based on
+   * cross-library qualified refs the AST contains. Caller-controlled — the
+   * emitter does NOT scan the AST itself.
+   */
+  crossLibraryIncludes?: string[];
 }
 
 export interface EmitResult {
@@ -84,6 +92,47 @@ function cqlString(s: string): string {
 
 function cqlIdent(s: string): string {
   return '"' + s.replace(/"/g, '\\"') + '"';
+}
+
+// CQL simple identifier: starts with letter or underscore, then word chars.
+// Library identifiers that match this can be emitted unquoted, EXCEPT when
+// the name happens to be a CQL reserved word — those must be quoted to
+// avoid parse errors (e.g. a library named "Context" would otherwise emit
+// `library Context` and break the translator).
+const SIMPLE_IDENT_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+// CQL reserved words that would parse as keywords if emitted unquoted as
+// a library/include identifier. Conservatively quote when matched. Not an
+// exhaustive list of CQL keywords — covers the ones a clinical library
+// is plausibly named after.
+const CQL_RESERVED = new Set([
+  "and", "as", "asc", "ascending", "case", "cast", "code", "codesystem",
+  "concept", "context", "convert", "default", "define", "desc", "descending",
+  "display", "div", "during", "else", "end", "ends", "except", "exists",
+  "expand", "false", "from", "function", "if", "in", "include", "includes",
+  "interval", "intersect", "is", "let", "library", "list", "maximum", "meets",
+  "minimum", "mod", "not", "null", "occurs", "of", "on", "or", "overlaps",
+  "parameter", "private", "properly", "public", "return", "same", "start",
+  "starts", "sort", "then", "this", "to", "true", "tuple", "union", "using",
+  "valueset", "version", "when", "where", "width", "with", "within", "without",
+  "year", "years", "month", "months", "week", "weeks", "day", "days", "hour",
+  "hours", "minute", "minutes", "second", "seconds", "millisecond", "milliseconds",
+]);
+
+function cqlLibIdent(s: string): string {
+  if (!SIMPLE_IDENT_RE.test(s)) return cqlIdent(s);
+  if (CQL_RESERVED.has(s.toLowerCase())) return cqlIdent(s);
+  return s;
+}
+
+/**
+ * Emit a qualified CQL reference `Lib."Name"` (or `"Lib Name"."Name"` when
+ * the library name needs quoting). Used wherever a CRL ref carries an
+ * explicit library qualifier that doesn't match the current emit's
+ * `options.libraryName`.
+ */
+function cqlQualifiedRef(libraryName: string, name: string): string {
+  return `${cqlLibIdent(libraryName)}.${cqlIdent(name)}`;
 }
 
 function indent(text: string, level = 1): string {
@@ -234,6 +283,7 @@ class Emitter {
     this.options = {
       libraryName: options.libraryName ?? ast.library.name,
       fhirHelpersVersion: options.fhirHelpersVersion ?? "4.0.1",
+      crossLibraryIncludes: options.crossLibraryIncludes ?? [],
     };
     this.indexNames();
     this.detectStubsAndCollisions();
@@ -293,7 +343,9 @@ class Emitter {
     for (const stmt of this.ast.statements) {
       if (stmt.type !== "Concept") continue;
       if (stmt.definition.type !== "CodedFromDefinition") continue;
-      if (stmt.definition.terminologyName === terminologyName) return stmt;
+      // ReferenceName is `string | QualifiedReference`; use `getRefName` to
+      // compare against the bare name (round-1 review C3 fix).
+      if (getRefName(stmt.definition.terminologyName) === terminologyName) return stmt;
     }
     return undefined;
   }
@@ -324,19 +376,39 @@ class Emitter {
   }
 
   private header(): string {
-    return [
+    const lines: string[] = [
       // CRL's library identity emits without a version (npm packaging
       // handles the package version). CRLPatterns is our own library —
       // also no version. `using FHIR version` is a semantic FHIR model
       // identifier (R4 vs R5 is a different shape) — kept. FHIRHelpers
       // ships versioned with the FHIR spec — version pin kept.
-      `library ${this.options.libraryName}`,
+      `library ${cqlLibIdent(this.options.libraryName ?? "GeneratedFromCRL")}`,
       "",
       "using FHIR version '4.0.1'",
       "",
       `include FHIRHelpers version '${this.options.fhirHelpersVersion}' called FHIRHelpers`,
       "include CRLPatterns called CRLPatterns",
-    ].join("\n");
+    ];
+    // Cross-library includes for per-CRL emit: every other CRL library this
+    // file qualified-refs gets its own `include` line. Simple include (no
+    // `called` alias) so qualified refs can use the natural `Lib."X"` form.
+    for (const otherLib of this.options.crossLibraryIncludes ?? []) {
+      lines.push(`include ${cqlLibIdent(otherLib)}`);
+    }
+    return lines.join("\n");
+  }
+
+  /**
+   * Decide if a ref's library qualifier should produce a cross-library
+   * CQL emit. Returns null for self-refs (qualifier matches current
+   * library) and bare refs. Returns the qualifier string for cross-lib refs.
+   */
+  private crossLibraryOf(ref: ReferenceName): string | null {
+    if (!isQualifiedRef(ref)) return null;
+    const lib = getRefLibrary(ref);
+    if (lib === null) return null;
+    if (lib === this.options.libraryName) return null;
+    return lib;
   }
 
   /**
@@ -399,7 +471,13 @@ class Emitter {
 
   private emitCodedFrom(c: Concept, def: CodedFromDefinition): string {
     const resource = c.conceptType ?? "Observation";
+    const crossLib = this.crossLibraryOf(def.terminologyName);
     const termName = getRefName(def.terminologyName);
+    if (crossLib !== null) {
+      // Cross-library terminology ref: emit `[Resource: Lib."Term"]`. No
+      // collision suffix — the other library owns its terminology naming.
+      return `[${resource}: ${cqlQualifiedRef(crossLib, termName)}]`;
+    }
     if (!this.terminologyNames.has(termName)) {
       return `// FIXME: unresolved terminology ${cqlIdent(termName)}\n[${resource}: ${cqlIdent(termName)}]`;
     }
@@ -454,7 +532,12 @@ class Emitter {
     body: DefinedAsBareRef | DefinedAsComposition
   ): string {
     if (body.type === "DefinedAsBareRef") {
-      return cqlIdent(getRefName(body.ref));
+      const crossLib = this.crossLibraryOf(body.ref);
+      const refName = getRefName(body.ref);
+      if (crossLib !== null) {
+        return cqlQualifiedRef(crossLib, refName);
+      }
+      return cqlIdent(refName);
     }
     const shape = this.shapeForComposition(c, body.expression);
     return this.emitComposition(body.expression, shape);
@@ -487,7 +570,14 @@ class Emitter {
   ): string {
     switch (expr.type) {
       case "CompositionRef": {
+        const crossLib = this.crossLibraryOf(expr.ref);
         const refName = getRefName(expr.ref);
+        if (crossLib !== null) {
+          // Cross-library composition ref: emit `Lib."Name"`. Operand
+          // shape is unknown without cross-library scope info; default to
+          // "refinement" (the existing fallback for unknown names).
+          return this.bridgeOperand(cqlQualifiedRef(crossLib, refName), "refinement", shape);
+        }
         const operandShape = this.declaredShape(refName);
         return this.bridgeOperand(cqlIdent(refName), operandShape, shape);
       }
@@ -592,6 +682,9 @@ class Emitter {
   private emitArg(arg: CanonicalArg): string {
     switch (arg.type) {
       case "ConceptRefArg":
+        if (arg.library && arg.library !== this.options.libraryName) {
+          return cqlQualifiedRef(arg.library, arg.value);
+        }
         return cqlIdent(arg.value);
       case "QuantityArg":
         return arg.unit ? `${arg.value} ${cqlString(arg.unit)}` : `${arg.value}`;
