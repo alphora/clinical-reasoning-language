@@ -41,12 +41,11 @@ describe("buildRegistry", () => {
     }
   });
 
-  it("skips anonymous files silently (no library declaration = not registered)", () => {
-    const projectRoot = path.join(FIXTURES, "anonymous-root");
-    const { registry } = buildRegistry(projectRoot);
-    // anonymous-root/root.crl has no `library` line; named.crl declares "Named"
-    expect(registry.byName.has("Named")).toBe(true);
-    expect(registry.byName.size).toBe(1);
+  // Anonymous-mode is gone in v2.1.0 — every CRL file must declare a library.
+  // The anonymous-root fixture is deleted; this test is preserved as a marker
+  // of the removed behavior.
+  it.skip("REMOVED v2.1.0: skips anonymous files silently", () => {
+    // The anonymous-root fixture has been deleted along with this test's premise.
   });
 
   it("emits parse-failure warning for a broken local file but keeps going", () => {

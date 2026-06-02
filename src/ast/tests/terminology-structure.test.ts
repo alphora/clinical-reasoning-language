@@ -5,6 +5,7 @@ import { parseInput } from "./parseInput";
 describe("Terminology Structure", () => {
   it("should correctly structure terminology with valueset", () => {
     const input = `# Test
+library "Test".
 terminology "MeaslesVaccineCodes":
 - valueset is "bmi valueset".
 `;
@@ -24,6 +25,7 @@ terminology "MeaslesVaccineCodes":
 
   it("should correctly structure terminology with system and code", () => {
     const input = `# Test
+library "Test".
 terminology "MeaslesVaccineCodes":
 - system is \`http://snomed.info/sct\`.
 - code is \`871807003\`.

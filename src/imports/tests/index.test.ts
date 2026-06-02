@@ -51,14 +51,10 @@ describe("resolveImports (end-to-end)", () => {
     expect(graph.namespace.terminologies.has("BMI")).toBe(true);
   });
 
-  it("supports an anonymous root with includes", () => {
-    const root = path.join(FIXTURES, "anonymous-root", "root.crl");
-    const graph = resolveImports(root);
-    const errs = graph.diagnostics.filter((d) => d.severity === "error");
-    expect(errs).toHaveLength(0);
-    expect(graph.resolvedLibraries[graph.resolvedLibraries.length - 1].name).toBeNull();
-    expect(graph.resolvedLibraries[graph.resolvedLibraries.length - 1].isRoot).toBe(true);
-    expect(graph.namespace.terminologies.has("T")).toBe(true);
+  // The anonymous-root fixture and its tests are gone in v2.1.0 — every CRL
+  // file must declare a `library "Foo".` line.
+  it.skip("REMOVED v2.1.0: supports an anonymous root with includes", () => {
+    // Anonymous-root mode no longer exists.
   });
 
   it("surfaces an unresolved-include when an include can't be found", () => {

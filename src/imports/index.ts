@@ -86,7 +86,11 @@ export function resolveImports(rootPath: string): ResolvedGraph {
   // The root file may also be in the local scan. Replace any same-path entry
   // (or same-name entry pointing at the root path) with the canonical root
   // entry so cycle detection and topo order treat root as one identity.
-  if (rootAst.library) {
+  //
+  // Guard on a non-empty library name — under v2.1.0's required-library
+  // contract, an empty-name placeholder means the builder synthesized a
+  // marker after a parse error. Don't pollute the registry with `""`.
+  if (rootAst.library && rootAst.library.name !== "") {
     registry.byName.set(rootAst.library.name, rootEntry);
   }
 

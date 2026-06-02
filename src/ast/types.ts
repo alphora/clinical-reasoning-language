@@ -13,13 +13,14 @@ export interface ASTNode {
 
 // CRL represents the root of the AST.
 //
-// `library` remains optional in the AST shape for the v2.1.0 Phase 1 release
-// (qualified-ref support without the breaking "library required" tightening).
-// Phase 2 will require it and migrate every test fixture in one focused pass.
+// v2.1.0: `library` is REQUIRED. The parser rejects files without a
+// `library "Foo".` line; the AST type carries it as a required field.
+// Every CRL file declares its library identity — the "anonymous file"
+// mode that existed in v2.0.0 is gone.
 export interface CRL extends ASTNode {
   type: "CRL";
   header?: string;
-  library?: LibraryDeclaration;
+  library: LibraryDeclaration;
   includes: Include[];
   statements: Statement[];
   location: Location;

@@ -23,6 +23,7 @@ describe("CRLAstBuilder", () => {
   describe("Decision Statements", () => {
     it("should parse a simple decision with when block", () => {
       const input = `# Test
+library "Test".
         decision "BMI":
           - when "BMI > 30" then recommend activity "Propose Diagnosis Task".
       `;
@@ -48,6 +49,7 @@ describe("CRLAstBuilder", () => {
 
     it("should parse a decision with multiple when blocks", () => {
       const input = `# Test
+library "Test".
         decision "Check BMI":
           - when "BMI" then recommend activity "Record BMI".
           - when "Weight" then recommend activity "Record Weight".
@@ -62,6 +64,7 @@ describe("CRLAstBuilder", () => {
 
     it("should parse a decision with any/all qualifiers", () => {
       const input = `# Test
+library "Test".
         decision "Check Vitals":
           - when "Temperature" then:
             any:
@@ -91,6 +94,7 @@ describe("CRLAstBuilder", () => {
     describe("Action Statements in Block Body", () => {
       it("should parse a single do statement", () => {
         const input = `# Test
+library "Test".
           decision "Test":
             - when "Concept" then:
               - recommend activity "Activity".
@@ -110,6 +114,7 @@ describe("CRLAstBuilder", () => {
 
       it("should parse two do statements", () => {
         const input = `# Test
+library "Test".
           decision "Test":
             - when "Concept" then:
               - recommend activity "First Activity".
@@ -134,6 +139,7 @@ describe("CRLAstBuilder", () => {
 
       it("should not parse zero action statements", () => {
         const input = `# Test
+library "Test".
           decision "Test":
             - when "Concept" then:
             - end when
@@ -146,6 +152,7 @@ describe("CRLAstBuilder", () => {
 
       it("should parse a single use statement", () => {
         const input = `# Test
+library "Test".
           decision "Test":
             - when "Concept" then:
               - use decision "Other Decision".
@@ -165,6 +172,7 @@ describe("CRLAstBuilder", () => {
 
       it("should parse two use statements", () => {
         const input = `# Test
+library "Test".
           decision "Test":
             - when "Concept" then:
               - use decision "First Decision".
@@ -189,6 +197,7 @@ describe("CRLAstBuilder", () => {
 
       it("should parse a mixture of do and use statements", () => {
         const input = `# Test
+library "Test".
           decision "Test":
             - when "Concept" then:
               - recommend activity "First Activity".
@@ -224,6 +233,7 @@ describe("CRLAstBuilder", () => {
 
       it("should parse a block with only do statements (debug)", () => {
         const input = `# Test
+library "Test".
           decision "Test":
             - when "Concept" then:
               - recommend activity "First Activity".
@@ -248,6 +258,7 @@ describe("CRLAstBuilder", () => {
 
       it("should parse a block with only use statements (debug)", () => {
         const input = `# Test
+library "Test".
           decision "Test":
             - when "Concept" then:
               - use decision "First Decision".
@@ -275,6 +286,7 @@ describe("CRLAstBuilder", () => {
   describe("Terminology Statements", () => {
     it("should parse a terminology valueset", () => {
       const input = `# Test
+library "Test".
         terminology "BMI Valueset":
         - valueset is "bmi valueset".`;
 
@@ -294,6 +306,7 @@ describe("CRLAstBuilder", () => {
     it("should parse a terminology system code", () => {
       const input =
         `# Test
+library "Test".
         terminology "Colonoscopy":
         - system is ` + "`http://snomed.info/sct`.\n        - code is `73761001`.";
 
@@ -311,6 +324,7 @@ describe("CRLAstBuilder", () => {
 
     it("should parse a terminology system code with empty system and code", () => {
       const input = `# Test
+library "Test".
         terminology "Empty System Code":
         - system is \`\`.
         - code is \`\`.`;
@@ -331,6 +345,7 @@ describe("CRLAstBuilder", () => {
   describe("Activity Statements", () => {
     it("should parse a simple activity", () => {
       const input = `# Test
+library "Test".
       activity "Vaccinate":\n- request CPGImmunizationRequest.`;
 
       const result = parseInput(input);
@@ -343,6 +358,7 @@ describe("CRLAstBuilder", () => {
 
     it("should parse an activity with of clause", () => {
       const input = `# Test
+library "Test".
       activity "Indicate":\n- request CPGProposeDiagnosisTask\n- with "Colonoscopy".`;
 
       const result = parseInput(input);
@@ -358,6 +374,7 @@ describe("CRLAstBuilder", () => {
     // SKIPPED: pre-v0.7 syntax (coded by; valueType singular). Pending test-cleanup.
     it.skip("should parse a simple concept with coded by", () => {
       const input = `# Test
+library "Test".
         concept "BMI Range as a Condition":
           - type is Condition.
           - valuetype is CodeableConcept.
@@ -415,6 +432,7 @@ describe("CRLAstBuilder", () => {
     // SKIPPED: pre-v0.7 syntax (inferred by). Pending test-cleanup.
     it.skip("should parse a concept with inferred by", () => {
       const input = `# Test
+library "Test".
         concept "BMI":
           - type is Observation.
           - valuetype is Quantity.
@@ -471,6 +489,7 @@ describe("CRLAstBuilder", () => {
     // SKIPPED: pre-v0.7 syntax (inferred by). Pending test-cleanup.
     it.skip("should parse a concept with inferred by descriptive logic using and/or combinations", () => {
       const input = `# Test
+library "Test".
         concept "Complex BMI":
           - type is Observation.
           - valuetype is Quantity.
@@ -531,6 +550,7 @@ describe("CRLAstBuilder", () => {
     it.skip("should parse a concept with empty provenance", () => {
       const input = [
         `# Test
+library "Test".
         concept "Empty Provenance":`,
         " - type is Observation.",
         " - valuetype is boolean.",
@@ -550,6 +570,7 @@ describe("CRLAstBuilder", () => {
   describe("Multiple Statements", () => {
     it("should parse multiple statements of different types", () => {
       const input = `# Test
+library "Test".
         terminology "BMI Valueset":
         - valueset is "bmi valueset".
         activity "Vaccinate":
@@ -574,6 +595,7 @@ describe("CRLAstBuilder", () => {
   describe("Action Statements", () => {
     it("should parse a do activity", () => {
       const input = `# Test
+library "Test".
 decision "Test":
   - when "BMI > 30" then recommend activity "Propose Diagnosis Task".
 `;
@@ -593,6 +615,7 @@ decision "Test":
 
     it("should parse a use decision", () => {
       const input = `# Test
+library "Test".
 decision "Test":
   - when "BMI > 30" then use decision "SomeDecision".
 `;
@@ -610,6 +633,7 @@ decision "Test":
   describe("Decision Structure", () => {
     it("should properly nest WhenBlocks under DecisionBody", () => {
       const input = `# Test
+library "Test".
         decision "IMMZ.D2.D5.Measles":
           - when "Measles Routine Immunization Schedule Incomplete" then:
             any:
@@ -652,6 +676,7 @@ decision "Test":
 
     it("should return errors in ParseResult for syntax errors", () => {
       const input = `# Test
+library "Test".
       decision "Test" - when "Condition" then recommend activity "Action"`; // period missing
       const result = buildCRL(input);
       expect(result.success).toBe(false);
@@ -664,6 +689,7 @@ decision "Test":
     it("should return all error details for input with both lexical and parser errors", () => {
       // User's problematic input (missing closing quote and colon)
       const input = `# Test
+library "Test".
       decision "Test: - when "Condition" then recommend activity "Action". done`;
       const result = buildCRL(input);
       expect(result.success).toBe(false);
@@ -680,6 +706,7 @@ decision "Test":
   describe("parseCRL and buildCRL direct API tests", () => {
     it("parseCRL should succeed on valid input", () => {
       const input = `# Test
+library "Test".
       decision "Test": - when "Condition" then recommend activity "Action".`;
       const result = parseCRL(input);
       expect(result.success).toBe(true);
@@ -689,6 +716,7 @@ decision "Test":
 
     it("parseCRL should return errors on invalid input", () => {
       const input = `# Test
+library "Test".
       decision "Test" when "Condition" then recommend activity "Action"`; // missing done
       const result = parseCRL(input);
       expect(result.success).toBe(false);
@@ -699,6 +727,7 @@ decision "Test":
 
     it("buildCRL should succeed on valid input", () => {
       const input = `# Test
+library "Test".
         decision "Test":
           - when "Condition" then recommend activity "Action".
         `;
@@ -710,6 +739,7 @@ decision "Test":
 
     it("buildCRL should return errors on invalid input", () => {
       const input = `# Test
+library "Test".
       decision "Test" - when "Condition" then recommend activity "Action"`; // missing done
       const result = buildCRL(input);
       expect(result.success).toBe(false);

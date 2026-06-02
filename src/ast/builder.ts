@@ -200,8 +200,23 @@ export class CRLAstBuilder
       header = headerNode.text.replace(/^#\s*/, "");
     }
 
+    // v2.1.0: library is required by grammar. Parser already rejects files
+    // without it; if we somehow reached here past error recovery, synthesize
+    // an empty-name placeholder so the AST stays well-typed AND report a
+    // builder error so callers that read the AST without parser-error checks
+    // (e.g. tests using `parseInput` directly) still fail loudly.
     const libraryCtx = ctx.libraryStatement();
-    const library = libraryCtx ? this.visitLibraryStatement(libraryCtx) : undefined;
+    let library: LibraryDeclaration;
+    if (libraryCtx) {
+      library = this.visitLibraryStatement(libraryCtx);
+    } else {
+      this.reportError(
+        "AstError",
+        ctx,
+        { message: "CRL file must declare `library \"Foo\".` (v2.1.0 — anonymous-file mode removed)" },
+      );
+      library = { type: "LibraryDeclaration", name: "", location: getLocation(ctx) };
+    }
 
     const includes = ctx
       .includeStatement()
@@ -211,7 +226,7 @@ export class CRLAstBuilder
     return {
       type: "CRL",
       ...(header ? { header } : {}),
-      ...(library ? { library } : {}),
+      library,
       includes,
       statements,
       location: getLocation(ctx),

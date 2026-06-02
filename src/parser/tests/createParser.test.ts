@@ -3,7 +3,7 @@ import { createParser } from "../createParser";
 describe("createParser", () => {
   it("should create a parser instance from valid input", () => {
     const input =
-      '# Testing\ndecision "Test": - when "Condition" then recommend activity "Action".';
+      '# Testing\nlibrary "Test".\ndecision "Test": - when "Condition" then recommend activity "Action".';
     const { parser, parserErrorListener } = createParser(input);
     expect(parser).toBeDefined();
     expect(typeof parser.crl).toBe("function");
@@ -17,7 +17,7 @@ describe("createParser", () => {
 
   it("should emit custom errors for invalid input", () => {
     // Missing '.' at the end
-    const input = '# Testing\ndecision "Test": - when "Condition" then recommend activity "Action"';
+    const input = '# Testing\nlibrary "Test".\ndecision "Test": - when "Condition" then recommend activity "Action"';
     const { parser, parserErrorListener } = createParser(input);
     try {
       parser.crl();

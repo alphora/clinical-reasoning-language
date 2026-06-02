@@ -21,6 +21,7 @@ import { parseInput } from "./parseInput";
 describe("Decision Structure", () => {
   it("should maintain correct structure for nested decisions", () => {
     const input = `# Test
+library "Test".
 decision "IMMZ.D2.D5.Measles":
     - when "Measles Routine Immunization Schedule Incomplete" then:
         any:
@@ -48,6 +49,7 @@ decision "IMMZ.D2.D5.Measles":
 
   it("should handle single action statements", () => {
     const input = `# Test
+library "Test".
 decision "Test Decision":
     - when "Age" then recommend activity "Vaccinate".`;
 
@@ -64,6 +66,7 @@ decision "Test Decision":
 
   it("should handle block bodies with any qualifier", () => {
     const input = `# Test
+library "Test".
 decision "Test Decision":
     - when "Age" then:
         any:
@@ -82,6 +85,7 @@ decision "Test Decision":
 
   it("should handle block bodies with all qualifier", () => {
     const input = `# Test
+library "Test".
 decision "Test Decision":
     - when "Age" then:
         all:
@@ -100,6 +104,7 @@ decision "Test Decision":
 
   it("should handle mixed action types in block bodies", () => {
     const input = `# Test
+library "Test".
 decision "Test Decision":
     - when "Age" then:
         - recommend activity "Vaccinate".
@@ -133,6 +138,7 @@ decision "Test Decision":
 
   it("should not duplicate when blocks in nested decisions", () => {
     const input = `# Test
+library "Test".
 decision "IMMZ.D2.D5.Measles":
     - when "Measles Routine Immunization Schedule Incomplete" then:
         any:
@@ -160,6 +166,7 @@ decision "IMMZ.D2.D5.Measles":
 
   it("should not duplicate action statements in block bodies", () => {
     const input = `# Test
+library "Test".
 decision "Elderly Based":
     - when "Client Age Less Than 60" then:
         - recommend activity "Vaccinate".
@@ -177,6 +184,7 @@ decision "Elderly Based":
 
   it("should not duplicate nested when blocks with the same concept name", () => {
     const input = `# Test
+library "Test".
 decision "Elderly Based":
     - when "Client Age Greater Than 60" then:
         - when "Most Recent BMI" then:
@@ -199,6 +207,7 @@ decision "Elderly Based":
 
   it("should handle complex nested decisions without duplication", () => {
     const input = `# Test
+library "Test".
 decision "IMMZ.D2.D5.Measles":
     - when "Measles Routine Immunization Schedule Incomplete" then:
         any:
@@ -238,6 +247,7 @@ decision "IMMZ.D2.D5.Measles":
 describe("Repeated Statements in Decision Blocks", () => {
   it("should preserve repeated when statements", () => {
     const input = `# Test
+library "Test".
 decision "Test Decision":
     - when "Age Greater Than 18" then recommend activity "Standard Care".
     - when "Age Greater Than 18" then recommend activity "Monitor Vital Signs".`;
@@ -253,6 +263,7 @@ decision "Test Decision":
 
   it("should preserve repeated use statements", () => {
     const input = `# Test
+library "Test".
 decision "Test Decision":
     - when "Age" then:
         - use decision "Protocol1".
@@ -280,6 +291,7 @@ decision "Test Decision":
 
   it("should preserve repeated do statements", () => {
     const input = `# Test
+library "Test".
 decision "Test Decision":
     - when "Age" then:
         - recommend activity "Action1".
@@ -307,6 +319,7 @@ decision "Test Decision":
 
   it("should preserve mixed repeated statements", () => {
     const input = `# Test
+library "Test".
 decision "Test Decision":
     - when "Age" then:
         - recommend activity "Action1".

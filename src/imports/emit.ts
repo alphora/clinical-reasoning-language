@@ -66,7 +66,7 @@ export function emitCQLImports(
   const synthetic: CRL = {
     type: "CRL",
     ...(rootAst.header ? { header: rootAst.header } : {}),
-    ...(rootAst.library ? { library: rootAst.library } : {}),
+    library: rootAst.library,
     includes: [],
     statements: flatStatements,
     location: rootAst.location,

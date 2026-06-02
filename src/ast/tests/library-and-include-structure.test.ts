@@ -42,6 +42,7 @@ library "Foo" version '1.0.0'.
   describe("include declarations", () => {
     it("parses a single include", () => {
       const input = `# H
+library "Root".
 include "Bar".
 concept "X":
 - type is Observation.
@@ -54,6 +55,7 @@ concept "X":
 
     it("parses multiple includes preserving order", () => {
       const input = `# H
+library "Root".
 include "A".
 include "B".
 include "C".
@@ -68,13 +70,14 @@ concept "X":
 
     it("preserves include location info", () => {
       const input = `# H
+library "Root".
 include "Bar".
 concept "X":
 - type is Observation.
 - coded from "Y".
 `;
       const ast: CRL = parseInput(input);
-      expect(ast.includes[0].location.start.line).toBe(2);
+      expect(ast.includes[0].location.start.line).toBe(3);
     });
 
     it("rejects an include statement carrying a version clause", () => {
@@ -101,29 +104,29 @@ include "CMS22 Interface".
     });
   });
 
-  describe("backward compatibility (no library / no includes)", () => {
-    it("parses zero library + zero includes", () => {
+  describe("library-required (v2.1.0)", () => {
+    // The anonymous-file mode that existed in v2.0.0 is gone in v2.1.0.
+    // Files without a `library "Foo".` declaration fail to parse.
+
+    it("rejects a file with no library declaration", () => {
       const input = `# H
 concept "X":
 - type is Observation.
 - coded from "Y".
 `;
-      const ast: CRL = parseInput(input);
-      expect(ast.library).toBeUndefined();
-      expect(ast.includes).toEqual([]);
-      expect(ast.statements).toHaveLength(1);
+      const result = buildCRL(input);
+      expect(result.success).toBe(false);
     });
 
-    it("parses zero library + includes-only", () => {
+    it("rejects a file with includes but no library declaration", () => {
       const input = `# H
 include "Common".
 concept "X":
 - type is Observation.
 - coded from "Y".
 `;
-      const ast: CRL = parseInput(input);
-      expect(ast.library).toBeUndefined();
-      expect(ast.includes).toHaveLength(1);
+      const result = buildCRL(input);
+      expect(result.success).toBe(false);
     });
 
     it("parses library-only (no includes, no statements)", () => {
@@ -206,6 +209,7 @@ concept "X":
     // usable as narrative words inside `definition is` bodies.
     it("allows 'library' as a narrative word in definition is", () => {
       const input = `# H
+library "Root".
 concept "X":
 - type is Encounter.
 - definition is "Y" library performed.
@@ -216,6 +220,7 @@ concept "X":
 
     it("allows 'include' as a narrative word in definition is", () => {
       const input = `# H
+library "Root".
 concept "X":
 - type is Encounter.
 - definition is "Y" include performed.
@@ -237,6 +242,7 @@ library "Foo".
 
     it("Include has the correct type tag", () => {
       const input = `# H
+library "Root".
 include "Bar".
 `;
       const ast: CRL = parseInput(input);

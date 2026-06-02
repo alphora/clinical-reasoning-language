@@ -23,6 +23,7 @@ describe("Concept Structure", () => {
   // SKIPPED: pre-v0.7 syntax (inferred by). Pending test-cleanup.
   it.skip("should correctly structure concept with inferred by concept reference", () => {
     const input = `# Test
+library "Test".
 concept "Client Age Less Than 12 Months":
     - type is Condition.
     - valuetype is boolean.
@@ -59,6 +60,7 @@ concept "Client Age Less Than 12 Months":
   // SKIPPED: pre-v0.7 syntax (inferred by). Pending test-cleanup.
   it.skip("should correctly structure concept with inferred by descriptive logic", () => {
     const input = `# Test
+library "Test".
 concept "Client Is Due For MCV12":
     - type is Condition.
     - valuetype is boolean.
@@ -89,6 +91,7 @@ concept "Client Is Due For MCV12":
   // SKIPPED: pre-v0.7 syntax (coded by; valueType singular). Pending test-cleanup.
   it.skip("should correctly structure concept with coded by definition", () => {
     const input = `# Test
+library "Test".
 concept "Measles Vaccine":
     - type is Immunization.
     - valuetype is CodeableConcept.
@@ -113,6 +116,7 @@ concept "Measles Vaccine":
   // SKIPPED: pre-v0.7 syntax (inferred by). Pending test-cleanup.
   it.skip("should handle complex inferred by expressions", () => {
     const input = `# Test
+library "Test".
 concept "Complex Condition":
     - type is Condition.
     - valuetype is boolean.

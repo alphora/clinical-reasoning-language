@@ -32,12 +32,11 @@ describe("emitCQLImports", () => {
     expect(cql).toMatch(/define "Leaf Concept"/);
   });
 
-  it("falls back to GeneratedFromCRL when the root is anonymous", () => {
-    const root = path.join(FIXTURES, "anonymous-root", "root.crl");
-    const result = emitCQLImports(root);
-    expect(result.success).toBe(true);
-    const cql = result.cql ?? "";
-    expect(cql).toMatch(/library GeneratedFromCRL/);
+  // The anonymous-root fixture and its tests are gone in v2.1.0 — every CRL
+  // file must declare a `library "Foo".` line, so the "anonymous" mode the
+  // fixture exercised is no longer expressible.
+  it.skip("REMOVED v2.1.0: falls back to GeneratedFromCRL when the root is anonymous", () => {
+    // Anonymous-root mode no longer exists.
   });
 
   it("short-circuits on unresolved-include (no CQL produced)", () => {
