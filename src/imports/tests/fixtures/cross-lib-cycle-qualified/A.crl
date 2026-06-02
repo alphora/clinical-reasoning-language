@@ -1,0 +1,6 @@
+# cross-lib cycle: A.X refs B.Y; B.Y refs A.X
+library "A".
+
+concept "X":
+- type is Observation.
+- defined as "B"."Y".

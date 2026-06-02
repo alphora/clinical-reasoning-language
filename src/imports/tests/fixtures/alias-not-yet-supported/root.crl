@@ -1,0 +1,7 @@
+# alias-not-yet-supported root — aliased include warns; alias semantics deferred to v2.2
+library "Root".
+include "SomePkg" as "P".
+
+concept "Root C":
+- type is Observation.
+- defined as "SomePkg"."Pkg C".

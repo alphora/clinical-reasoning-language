@@ -1,0 +1,6 @@
+# qualified-ref-unresolved root
+library "Root".
+
+concept "Root C":
+- type is Observation.
+- defined as "Sib"."MissingName".

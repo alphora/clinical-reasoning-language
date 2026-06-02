@@ -1,0 +1,9 @@
+# qualified-ref-positive sibling (non-included; auto-resolves)
+library "Sib".
+
+concept "Sib C":
+- type is Observation.
+- coded from "Sib T".
+
+terminology "Sib T":
+- valueset is `urn:sib-vs`.

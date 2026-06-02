@@ -1,0 +1,9 @@
+# per-library-name-uniqueness root (LibA); LibB sibling is NOT included
+library "LibA".
+
+concept "Shared Name":
+- type is Observation.
+- coded from "LibA T".
+
+terminology "LibA T":
+- valueset is `urn:liba-vs`.

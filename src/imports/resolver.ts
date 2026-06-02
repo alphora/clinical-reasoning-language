@@ -6,6 +6,7 @@ import {
   ImportDiagnostic,
   CycleDiagnostic,
   UnresolvedIncludeDiagnostic,
+  AliasNotYetSupportedDiagnostic,
 } from "./types";
 
 /**
@@ -72,6 +73,19 @@ export function walkIncludes(
     activeIncludes.push(viaInclude);
 
     for (const include of entry.ast.includes) {
+      // v2.1.0: alias clause parses + carries into AST but resolver doesn't
+      // honor it yet. Emit a warning so users aren't silently surprised when
+      // `include "Foo" as "Ext".` doesn't expose Ext. Full alias semantics
+      // ship in v2.2.
+      if (include.alias && entry.name !== null) {
+        diagnostics.push({
+          kind: "alias-not-yet-supported",
+          severity: "warning",
+          include,
+          from: { filePath: entry.filePath, libraryName: entry.name },
+        } as AliasNotYetSupportedDiagnostic);
+      }
+
       const found = resolveIncludeTarget(entry, include.name, registry);
       if (!found) {
         diagnostics.push({

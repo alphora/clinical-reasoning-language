@@ -3,4 +3,4 @@ library "A".
 
 concept "BMI":
 - type is Observation.
-- coded from "BMI".
+- coded from "B"."BMI".

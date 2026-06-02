@@ -1,0 +1,6 @@
+# qualified-ref-positive root
+library "Root".
+
+concept "Root C":
+- type is Observation.
+- defined as "Sib"."Sib C".

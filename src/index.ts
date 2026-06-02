@@ -45,7 +45,6 @@ export { validateCRLImports } from "./imports/validate";
 export type {
   ValidateImportsOptions,
   ValidateImportsResult,
-  ValidationErrorWithSource,
 } from "./imports/validate";
 
 export interface Token {
@@ -244,6 +243,7 @@ export function validateCRL(input: string, options: ValidateOptions = {}): Valid
 function toCrlError(v: ValidationError): CRLError {
   return {
     type: "Validation",
+    kind: v.kind,
     message: v.message,
     line: v.location?.start.line,
     column: v.location?.start.column,

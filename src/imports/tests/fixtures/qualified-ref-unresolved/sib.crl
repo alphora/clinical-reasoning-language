@@ -1,0 +1,9 @@
+# qualified-ref-unresolved sibling — declares NameThatExists, not MissingName
+library "Sib".
+
+concept "NameThatExists":
+- type is Observation.
+- coded from "Sib T".
+
+terminology "Sib T":
+- valueset is `urn:sib-vs`.

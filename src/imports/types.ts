@@ -74,7 +74,7 @@ export interface NameConflictDiagnostic {
  * (`as "X"`) is present in the AST but not yet honored by the resolver.
  * v2.1.0 ships with alias semantics deferred to v2.2; the warning prevents
  * silent semantic failure when a user writes `include "Foo" as "Ext".`.
- * Producer lands in commit 2e.
+ * Producer: `src/imports/resolver.ts` `walkIncludes`.
  */
 export interface AliasNotYetSupportedDiagnostic {
   kind: "alias-not-yet-supported";
@@ -174,9 +174,14 @@ export interface ResolvedGraph {
   // `resolvedLibraries` (root didn't include them; v2.1.0 lock 026 allows
   // qualified refs to local siblings without an include). Path-sorted for
   // determinism. Empty for projects where every local file is reachable via
-  // includes. Consumed by 2c's scope-builder and 2d's per-CRL emit; today's
-  // emit/validate code does NOT iterate this field.
+  // includes.
   localLibraries: RegistryEntry[];
+  // The full registry indexed by `buildRegistry` (all local files + all
+  // node_modules packages). Surfaced on the graph so downstream consumers
+  // (validate.ts, future autocomplete) can build scopes from the entire
+  // universe of known libraries — not just what include-walking reached
+  // from root. Absent when project-root-not-found.
+  registry?: Registry;
   namespace: Namespace;
   diagnostics: ImportDiagnostic[];
 }

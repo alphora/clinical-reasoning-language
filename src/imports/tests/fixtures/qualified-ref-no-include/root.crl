@@ -1,0 +1,6 @@
+# qualified-ref-no-include root — refs SomePkg without an `include`
+library "Root".
+
+concept "Root C":
+- type is Observation.
+- defined as "SomePkg"."Pkg C".

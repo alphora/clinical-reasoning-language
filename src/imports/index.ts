@@ -39,7 +39,7 @@ export function resolveImports(rootPath: string): ResolvedGraph {
       localLibraries: [],
       namespace: emptyNamespace(),
       diagnostics: [diag],
-    };
+    } as ResolvedGraph;
   }
 
   const parsed = buildCRL(rootSource);
@@ -56,7 +56,7 @@ export function resolveImports(rootPath: string): ResolvedGraph {
       localLibraries: [],
       namespace: emptyNamespace(),
       diagnostics: [diag],
-    };
+    } as ResolvedGraph;
   }
 
   const projectRoot = findProjectRoot(canonicalRoot);
@@ -72,7 +72,7 @@ export function resolveImports(rootPath: string): ResolvedGraph {
       localLibraries: [],
       namespace: emptyNamespace(),
       diagnostics: [diag],
-    };
+    } as ResolvedGraph;
   }
 
   const rootAst = parsed.result;
@@ -128,6 +128,7 @@ export function resolveImports(rootPath: string): ResolvedGraph {
     projectRoot,
     resolvedLibraries,
     localLibraries,
+    registry,
     namespace,
     diagnostics,
   };

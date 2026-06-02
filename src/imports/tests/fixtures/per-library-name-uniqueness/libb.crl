@@ -1,0 +1,9 @@
+# per-library-name-uniqueness sibling — same concept name as LibA, benign
+library "LibB".
+
+concept "Shared Name":
+- type is Observation.
+- coded from "LibB T".
+
+terminology "LibB T":
+- valueset is `urn:libb-vs`.

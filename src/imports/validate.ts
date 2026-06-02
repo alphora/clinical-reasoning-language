@@ -1,61 +1,20 @@
-import type { CRL, Statement, Location } from "../ast/types";
+import type { CRL, Statement } from "../ast/types";
 import { Validator, ValidationError } from "../validator/validator";
 
 import { resolveImports } from "./index";
-import {
-  ImportDiagnostic,
-  RegistryEntry,
-  ResolvedGraph,
-} from "./types";
+import { buildLibraryScopes, SourceContext } from "./scopes";
+import { ImportDiagnostic, ResolvedGraph } from "./types";
 
 export interface ValidateImportsOptions {
   soft?: boolean;
-}
-
-export interface ValidationErrorWithSource extends ValidationError {
-  filePath?: string;
-  libraryName?: string | null;
 }
 
 export interface ValidateImportsResult {
   success: boolean;
   graph: ResolvedGraph;
   importDiagnostics: ImportDiagnostic[];
-  validationErrors: ValidationErrorWithSource[];
-  validationWarnings: ValidationErrorWithSource[];
-}
-
-function locationContains(outer: Location, inner: { start: { line: number; column: number } }): boolean {
-  const startsAfter =
-    outer.start.line < inner.start.line ||
-    (outer.start.line === inner.start.line && outer.start.column <= inner.start.column);
-  const endsBefore =
-    outer.end.line > inner.start.line ||
-    (outer.end.line === inner.start.line && outer.end.column >= inner.start.column);
-  return startsAfter && endsBefore;
-}
-
-function findOwningLibrary(
-  errLoc: ValidationError["location"],
-  sources: { stmt: Statement; entry: RegistryEntry }[],
-): RegistryEntry | undefined {
-  for (const { stmt, entry } of sources) {
-    if (locationContains(stmt.location, errLoc)) return entry;
-  }
-  return undefined;
-}
-
-function attachSource(
-  err: ValidationError,
-  sources: { stmt: Statement; entry: RegistryEntry }[],
-): ValidationErrorWithSource {
-  const owner = findOwningLibrary(err.location, sources);
-  if (!owner) return { ...err };
-  return {
-    ...err,
-    filePath: owner.filePath,
-    libraryName: owner.name,
-  };
+  validationErrors: ValidationError[];
+  validationWarnings: ValidationError[];
 }
 
 export function validateCRLImports(
@@ -64,8 +23,6 @@ export function validateCRLImports(
 ): ValidateImportsResult {
   const graph: ResolvedGraph = resolveImports(rootPath);
 
-  // Short-circuit when there's no graph to validate (root parse failed or
-  // project-root-not-found). The diagnostics already explain why.
   if (graph.resolvedLibraries.length === 0) {
     return {
       success: false,
@@ -76,22 +33,44 @@ export function validateCRLImports(
     };
   }
 
-  // Flatten with first-wins-per-(kind, name) dedup; track source per kept statement.
-  const seen = new Set<string>();
-  const flatStatements: Statement[] = [];
-  const sources: { stmt: Statement; entry: RegistryEntry }[] = [];
+  // Build per-library scopes covering BOTH the include-walked closure AND
+  // any non-included local siblings (per 030 round-1 disposition: locals
+  // auto-resolve via qualified refs without `include` per v2.1.0 lock 026).
+  // The graph's full registry feeds `knownLibraries` so a sibling's
+  // `include "Pkg".` resolves even if root didn't transitively pull Pkg in.
+  const registry = graph.registry ?? { byNameLocal: new Map(), byNamePackage: new Map() };
+  const scopes = buildLibraryScopes(
+    graph.resolvedLibraries,
+    graph.localLibraries,
+    registry,
+  );
 
-  for (const entry of graph.resolvedLibraries) {
+  // Build the per-statement source context list. Includes EVERY library's
+  // statements, not just the include-walked closure — so cross-local cycles
+  // and references to non-included siblings are validated.
+  //
+  // No first-wins (kind, name) dedup: under per-library scoping, the same
+  // declaration name across libraries is benign and must be preserved for
+  // per-library uniqueness + scoped resolution to work.
+  const sources: SourceContext[] = [];
+  const flatStatements: Statement[] = [];
+  const allEntries = new Map<string, typeof graph.resolvedLibraries[number]>();
+  for (const e of graph.resolvedLibraries) allEntries.set(e.filePath, e);
+  for (const e of graph.localLibraries) {
+    if (!allEntries.has(e.filePath)) allEntries.set(e.filePath, e);
+  }
+  for (const entry of allEntries.values()) {
+    const scope = scopes.get(entry.filePath);
+    if (!scope) continue;
     for (const stmt of entry.ast.statements) {
-      const key = `${stmt.type}|${stmt.name}`;
-      if (seen.has(key)) continue; // resolver already emitted name-conflict
-      seen.add(key);
       flatStatements.push(stmt);
-      sources.push({ stmt, entry });
+      sources.push({ stmt, entry, scope });
     }
   }
 
-  // Root entry is last in topo order; its AST is the synthetic shell.
+  // Build the synthetic flat AST the Validator iterates. Root entry is last
+  // in resolvedLibraries; use its shell (header, library, location) so the
+  // synthetic AST is well-typed.
   const rootEntry = graph.resolvedLibraries[graph.resolvedLibraries.length - 1];
   const synthetic: CRL = {
     type: "CRL",
@@ -103,19 +82,16 @@ export function validateCRLImports(
   };
 
   const validator = new Validator();
-  const result = validator.validate(synthetic, { soft: options.soft });
-
-  const validationErrors = result.errors.map((e) => attachSource(e, sources));
-  const validationWarnings = result.warnings.map((e) => attachSource(e, sources));
+  const result = validator.validate(synthetic, { soft: options.soft }, sources);
 
   const importErrorSeverity = graph.diagnostics.filter((d) => d.severity === "error");
-  const success = validationErrors.length === 0 && importErrorSeverity.length === 0;
+  const success = result.errors.length === 0 && importErrorSeverity.length === 0;
 
   return {
     success,
     graph,
     importDiagnostics: graph.diagnostics,
-    validationErrors,
-    validationWarnings,
+    validationErrors: result.errors,
+    validationWarnings: result.warnings,
   };
 }
