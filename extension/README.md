@@ -81,4 +81,8 @@ npm test                 # typecheck + bundle + unit/integration tests
 npm run package          # produces crl-language-support-<version>.vsix
 ```
 
+**Heads-up (Windows):** if VS Code is open with the CRL extension active, its bundled MCP server holds `dist/` files open and `npm run package` will fail with `EPERM`. Close VS Code (or disable the CRL extension) before building the VSIX.
+
 Publishing to the Marketplace uses `vsce` (`vsce login <publisher>`, then `vsce publish`).
+
+For the **full release flow** (npm tarball + VSIX produced together, then uploaded to a GitHub release), see [`README.md` § Cutting a release](../README.md#cutting-a-release-build-both-artifacts--upload-to-github) in the repo root.

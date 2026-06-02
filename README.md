@@ -70,6 +70,25 @@ npm pack
 tar -ztvf <package-name>.tgz
 ```
 
+#### Cutting a release (build both artifacts + upload to GitHub)
+
+Releases ship two artifacts side-by-side: the npm tarball (`@smile-digital-health/crl-<version>.tgz`) and the VS Code extension VSIX (`crl-language-support-<version>.vsix`).
+
+**Heads-up (Windows):** if you have VS Code open with the CRL extension active, its bundled MCP server keeps `dist/` files open and both `npm pack` and `npm run package` will fail with `EPERM` on `dist/`. Close VS Code (or just disable the CRL extension) before running the build commands below.
+
+```bash
+# 1. Close VS Code (or disable the CRL extension) so the MCP server releases its lock on dist/.
+# 2. From the repo root, build the npm tarball:
+npm pack
+
+# 3. Build the extension VSIX:
+cd extension && npm run package
+
+# 4. Upload the resulting .tgz and .vsix to the corresponding GitHub release.
+```
+
+Both artifacts are produced at the version declared in their respective `package.json` files. Bump those (and tag the commit `v<version>`) before running the steps above so the produced filenames match the release tag.
+
 ## Features
 
 ### Language Features
