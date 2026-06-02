@@ -305,14 +305,27 @@ End-to-end verification: the cms22 4-layer split at `features/cql-pattern-mining
 
 ---
 
-## What's NOT in this release (deferred)
+## What's NOT in this release
 
-- **Aliasing.** CQL's `include "Foo" called F` is reserved for v0.8+.
-- **Selective imports.** No `from "Foo" include only-these` syntax.
-- **Direction-aware visibility.** v0.7 namespace is global across the include closure; future v0.8 may add scoped visibility if real authoring breaks under global.
-- **Semver range matching on package versions.** npm handles install-time resolution; the CRL resolver just sees what's in `node_modules/`.
-- **Multi-file editor support in the VS Code extension.** Diagnostics, completion, and hover still operate file-by-file via the single-file `validateCRL` API. Wiring through `validateCRLImports` is the next planned change. See [extension/src/diagnostics.ts](extension/src/diagnostics.ts) for the current single-file path.
-- **Modernizing the 21 skipped pre-v0.7 tests.** Tracked as a follow-up.
+### Tracked for v2.1.0
+
+- **Required `library "Foo".` declaration** in every CRL file (drops the v2.0 "anonymous file" mode).
+- **Qualified cross-library references** — `"OtherLibrary"."Concept"`. Bare `"Foo"` becomes same-file-only. Sibling libraries in the same project auto-resolve via qualifier (no `include` line needed); `include` becomes exclusively for external `node_modules` packages.
+- **Emergency aliasing** on `include` — only for the case where a local library name collides with an external package's library name (`include "Foo" as "ExternalFoo".`). Not a general user-facing feature.
+- **Multi-file editor support** — wire the extension's diagnostics through `validateCRLImports` so cross-file refs stop showing as yellow squiggles.
+- **LSP reference navigation** — Go to Definition (F12), Peek Definition (Alt+F12), Find All References (Shift+F12), Document Outline, Workspace Symbols (Ctrl+T), cross-file Rename Symbol (F2).
+- **Kind-restricted autocomplete** — `coded from` offers terminologies only; `defined as` / `definition is` ref slots offer concepts only. Closes [#54](https://github.com/alphora/clinical-reasoning-language/issues/54).
+- **Qualified-ref autocomplete** — typing `"Lib".` pops up everything that library exports, grouped by kind with icons.
+- **Modernizing the 21 skipped pre-v0.7 tests.**
+
+### Backlog (issues/, deferred indefinitely)
+
+- **Selective imports** — `from "Foo" include only-these` syntax. Nice-to-have for deep dep graphs; not blocking any current use case.
+- **Direction-aware visibility** — `private` / `public` markers so package authors can hide internal helpers. Becomes real when packages get widely shared; not pressing while the ecosystem is small.
+
+### Intentionally not a CRL concern
+
+- **Semver range matching on package versions.** npm handles install-time resolution; the CRL resolver just sees what's in `node_modules/`. A CRL-source-level version constraint would duplicate npm's job.
 
 ---
 
