@@ -803,7 +803,15 @@ function sourceFor(filePath: string, overlays: ReadonlyMap<string, string>): str
   }
 }
 
-function canonicalize(absPath: string): string {
+/**
+ * Drive-letter-canonical absolute path. Must be used at every boundary
+ * where `document.uri.fsPath` (lowercase drive on Windows) is compared
+ * against an `IndexedDeclaration.filePath` (uppercase drive — set by
+ * the package's `canonicalizeFsPath`). Without this, every "is this
+ * decl in the current file?" filter strips its entire input on
+ * Windows.
+ */
+export function canonicalize(absPath: string): string {
   const resolved = path.resolve(absPath);
   if (process.platform === "win32" && /^[a-z]:/.test(resolved)) {
     return resolved.charAt(0).toUpperCase() + resolved.slice(1);

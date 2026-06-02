@@ -1,9 +1,10 @@
-import type {
-  IndexedDeclaration,
-  IndexedLibrary,
-  IndexedReference,
-  ProjectIndex,
-  ZeroBasedRange,
+import {
+  canonicalize,
+  type IndexedDeclaration,
+  type IndexedLibrary,
+  type IndexedReference,
+  type ProjectIndex,
+  type ZeroBasedRange,
 } from "./projectIndex";
 
 /**
@@ -27,23 +28,29 @@ export function findDeclarationAtPosition(
   position: { line: number; character: number },
   index: ProjectIndex,
 ): Resolution {
+  // Canonicalize: callers usually hand us `document.uri.fsPath`, which on
+  // Windows has a lowercase drive letter. Indexed entries' `filePath` is
+  // always upper-cased (it flows through the package's canonicalize).
+  // Without normalizing both sides, every `decl.filePath !== filePath`
+  // check below strips every entry.
+  const canonical = canonicalize(filePath);
   // Declarations first — declaration headers are unique in their file.
-  for (const decl of index.getDeclarations(filePath)) {
-    if (decl.filePath !== filePath) continue;
+  for (const decl of index.getDeclarations(canonical)) {
+    if (decl.filePath !== canonical) continue;
     if (inRange(position, decl.nameRange)) {
       return { kind: "declaration", decl };
     }
   }
   // Then library declarations (the `library "X".` line).
-  for (const lib of index.getLibraries(filePath)) {
-    if (lib.filePath !== filePath) continue;
+  for (const lib of index.getLibraries(canonical)) {
+    if (lib.filePath !== canonical) continue;
     if (inRange(position, lib.nameRange)) {
       return { kind: "library", lib };
     }
   }
   // Then references. Check qualifier first (more specific), then name.
-  for (const ref of index.getReferences(filePath)) {
-    if (ref.filePath !== filePath) continue;
+  for (const ref of index.getReferences(canonical)) {
+    if (ref.filePath !== canonical) continue;
     if (ref.qualifierRange && inRange(position, ref.qualifierRange)) {
       return { kind: "reference-qualifier", ref };
     }

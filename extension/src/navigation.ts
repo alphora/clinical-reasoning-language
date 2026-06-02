@@ -1,11 +1,12 @@
 import * as vscode from "vscode";
 
 import { findDeclarationAtPosition } from "./findDeclaration";
-import type {
-  IndexedDeclaration,
-  IndexedLibrary,
-  ProjectIndex,
-  ZeroBasedRange,
+import {
+  canonicalize,
+  type IndexedDeclaration,
+  type IndexedLibrary,
+  type ProjectIndex,
+  type ZeroBasedRange,
 } from "./projectIndex";
 
 /**
@@ -54,7 +55,7 @@ export class CrlDefinitionProvider implements vscode.DefinitionProvider {
     document: vscode.TextDocument,
     position: vscode.Position,
   ): vscode.ProviderResult<vscode.Definition> {
-    const filePath = document.uri.fsPath;
+    const filePath = canonicalize(document.uri.fsPath);
     const res = findDeclarationAtPosition(
       filePath,
       { line: position.line, character: position.character },
@@ -101,7 +102,7 @@ export class CrlReferenceProvider implements vscode.ReferenceProvider {
     position: vscode.Position,
     context: vscode.ReferenceContext,
   ): vscode.ProviderResult<vscode.Location[]> {
-    const filePath = document.uri.fsPath;
+    const filePath = canonicalize(document.uri.fsPath);
     const res = findDeclarationAtPosition(
       filePath,
       { line: position.line, character: position.character },
@@ -146,7 +147,7 @@ export class CrlDocumentSymbolProvider implements vscode.DocumentSymbolProvider 
   provideDocumentSymbols(
     document: vscode.TextDocument,
   ): vscode.ProviderResult<vscode.DocumentSymbol[]> {
-    const filePath = document.uri.fsPath;
+    const filePath = canonicalize(document.uri.fsPath);
     const decls = this.index.getDeclarations(filePath).filter((d) => d.filePath === filePath);
     const libs = this.index.getLibraries(filePath).filter((l) => l.filePath === filePath);
 
@@ -232,7 +233,7 @@ export class CrlRenameProvider implements vscode.RenameProvider {
     document: vscode.TextDocument,
     position: vscode.Position,
   ): vscode.ProviderResult<vscode.Range | { range: vscode.Range; placeholder: string }> {
-    const filePath = document.uri.fsPath;
+    const filePath = canonicalize(document.uri.fsPath);
     const res = findDeclarationAtPosition(
       filePath,
       { line: position.line, character: position.character },
@@ -257,7 +258,7 @@ export class CrlRenameProvider implements vscode.RenameProvider {
     position: vscode.Position,
     newName: string,
   ): vscode.ProviderResult<vscode.WorkspaceEdit> {
-    const filePath = document.uri.fsPath;
+    const filePath = canonicalize(document.uri.fsPath);
     const res = findDeclarationAtPosition(
       filePath,
       { line: position.line, character: position.character },
@@ -326,7 +327,7 @@ export class CrlDocumentLinkProvider implements vscode.DocumentLinkProvider {
   provideDocumentLinks(
     document: vscode.TextDocument,
   ): vscode.ProviderResult<vscode.DocumentLink[]> {
-    const filePath = document.uri.fsPath;
+    const filePath = canonicalize(document.uri.fsPath);
     const graph = this.index.getGraph(filePath);
     if (!graph) return [];
 

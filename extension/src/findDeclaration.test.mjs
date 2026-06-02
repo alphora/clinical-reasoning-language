@@ -3,6 +3,7 @@
 // Runs via `npm run test:find-declaration`.
 
 import { strict as assert } from "node:assert";
+import { canonicalize } from "../dist/projectIndex.js";
 import { findDeclarationAtPosition } from "../dist/findDeclaration.js";
 
 function fakeIndex({ declarations = [], libraries = [], references = [] } = {}) {
@@ -17,13 +18,19 @@ function r(startLine, startCol, endCol) {
   return { startLine, startCol, endLine: startLine, endCol };
 }
 
+// The provider canonicalizes its input filePath, and matches it against
+// IndexedDeclaration.filePath (which is set to canonical form by the
+// package's resolveImports). Mirror that in the fixture so the test
+// works on both POSIX and Windows.
+const FILE = canonicalize("/p/a.crl");
+
 // Declaration at (line 5, col 9–12) — the name "BMI" inside `concept "BMI":`
 {
   const decl = {
     name: "BMI",
     kind: "concept",
     libraryName: "L",
-    filePath: "/p/a.crl",
+    filePath: FILE,
     line: 5,
     nameRange: r(5, 9, 12),
     bodyRange: r(5, 0, 12),
@@ -32,12 +39,12 @@ function r(startLine, startCol, endCol) {
   const idx = fakeIndex({ declarations: [decl] });
 
   // Cursor on the name → declaration hit.
-  const hit = findDeclarationAtPosition("/p/a.crl", { line: 5, character: 10 }, idx);
+  const hit = findDeclarationAtPosition(FILE, { line: 5, character: 10 }, idx);
   assert.equal(hit?.kind, "declaration");
   assert.equal(hit.decl.name, "BMI");
 
   // Cursor outside the name range → null.
-  const miss = findDeclarationAtPosition("/p/a.crl", { line: 5, character: 4 }, idx);
+  const miss = findDeclarationAtPosition(FILE, { line: 5, character: 4 }, idx);
   assert.equal(miss, null);
 }
 
@@ -45,13 +52,13 @@ function r(startLine, startCol, endCol) {
 {
   const lib = {
     libraryName: "L",
-    filePath: "/p/a.crl",
+    filePath: FILE,
     origin: "local",
     range: r(1, 0, 13),
     nameRange: r(1, 9, 10),
   };
   const idx = fakeIndex({ libraries: [lib] });
-  const hit = findDeclarationAtPosition("/p/a.crl", { line: 1, character: 9 }, idx);
+  const hit = findDeclarationAtPosition(FILE, { line: 1, character: 9 }, idx);
   assert.equal(hit?.kind, "library");
   assert.equal(hit.lib.libraryName, "L");
 }
@@ -62,13 +69,13 @@ function r(startLine, startCol, endCol) {
     targetLibrary: "L",
     targetName: "BMI",
     targetKind: "concept",
-    filePath: "/p/a.crl",
+    filePath: FILE,
     nameRange: r(10, 14, 17),
     qualifierRange: null,
     qualified: false,
   };
   const idx = fakeIndex({ references: [ref] });
-  const hit = findDeclarationAtPosition("/p/a.crl", { line: 10, character: 15 }, idx);
+  const hit = findDeclarationAtPosition(FILE, { line: 10, character: 15 }, idx);
   assert.equal(hit?.kind, "reference-name");
   assert.equal(hit.ref.targetName, "BMI");
 }
@@ -79,15 +86,15 @@ function r(startLine, startCol, endCol) {
     targetLibrary: "Other",
     targetName: "BMI",
     targetKind: "concept",
-    filePath: "/p/a.crl",
+    filePath: FILE,
     nameRange: r(10, 24, 27),
     qualifierRange: r(10, 15, 20),
     qualified: true,
   };
   const idx = fakeIndex({ references: [ref] });
-  const onQual = findDeclarationAtPosition("/p/a.crl", { line: 10, character: 17 }, idx);
+  const onQual = findDeclarationAtPosition(FILE, { line: 10, character: 17 }, idx);
   assert.equal(onQual?.kind, "reference-qualifier");
-  const onName = findDeclarationAtPosition("/p/a.crl", { line: 10, character: 25 }, idx);
+  const onName = findDeclarationAtPosition(FILE, { line: 10, character: 25 }, idx);
   assert.equal(onName?.kind, "reference-name");
 }
 
