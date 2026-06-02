@@ -30,6 +30,7 @@ import type {
   DefinedAsComposition,
   DefinedAsBareRef,
 } from "../ast/types";
+import { getRefName } from "../ast/types";
 import { createParser } from "../parser/createParser";
 
 const files = process.argv.slice(2);
@@ -87,7 +88,7 @@ function shapeOf(conceptName: string, seen = new Set<string>()): Shape {
   if (c.definition.type === "CodedFromDefinition") return "list";
   if (c.definition.type === "DefinedAsDefinition") {
     const body = c.definition.body;
-    if (body.type === "DefinedAsBareRef") return shapeOf(body.ref, seen);
+    if (body.type === "DefinedAsBareRef") return shapeOf(getRefName(body.ref), seen);
     return shapeOfComposition(body, seen);
   }
   if (c.definition.type === "DefinitionIsDefinition") return "unknown";
@@ -101,7 +102,7 @@ function shapeOfComposition(body: DefinedAsComposition, seen: Set<string>): Shap
 function shapeOfExpression(expr: CompositionExpression, seen: Set<string>): Shape {
   switch (expr.type) {
     case "CompositionRef":
-      return shapeOf(expr.ref, seen);
+      return shapeOf(getRefName(expr.ref), seen);
     case "SemNotExpression":
       return shapeOfExpression(expr.expression, seen);
     case "SemOrExpression":
@@ -126,7 +127,7 @@ function tracedSubject(expr: CompositionExpression): { type?: ConceptType; value
   function walk(e: CompositionExpression): void {
     switch (e.type) {
       case "CompositionRef":
-        leaves.push(e.ref); return;
+        leaves.push(getRefName(e.ref)); return;
       case "SemNotExpression":
         walk(e.expression); return;
       case "SemOrExpression":
@@ -156,13 +157,13 @@ function tracedSubject(expr: CompositionExpression): { type?: ConceptType; value
     if (c.definition.type === "DefinedAsDefinition") {
       const body = c.definition.body;
       if (body.type === "DefinedAsBareRef") {
-        current = body.ref; continue;
+        current = getRefName(body.ref); continue;
       }
       // Composition — pick first leaf
       const innerLeaves: string[] = [];
       const walk2 = (e: CompositionExpression): void => {
         switch (e.type) {
-          case "CompositionRef": innerLeaves.push(e.ref); return;
+          case "CompositionRef": innerLeaves.push(getRefName(e.ref)); return;
           case "SemNotExpression": walk2(e.expression); return;
           case "SemOrExpression":
           case "SemAndExpression": for (const t of e.terms) walk2(t); return;
@@ -209,14 +210,15 @@ for (const [name, info] of allConcepts) {
   if (c.definition.type === "DefinedAsDefinition") {
     const body = c.definition.body;
     if (body.type === "DefinedAsBareRef") {
-      shape = shapeOf(body.ref);
+      const refName = getRefName(body.ref);
+      shape = shapeOf(refName);
       // For bare ref, the "subject" is the referenced concept itself.
-      const refInfo = allConcepts.get(body.ref);
+      const refInfo = allConcepts.get(refName);
       if (refInfo) {
         subjectTrace = {
           type: refInfo.concept.conceptType,
           valuetype: refInfo.concept.valueTypes?.[0],
-          via: body.ref,
+          via: refName,
         };
       }
     } else {

@@ -16,6 +16,11 @@ import {
   ConceptStatementContext,
   LibraryStatementContext,
   IncludeStatementContext,
+  QualifiableReferenceContext,
+  ConceptReferenceContext,
+  DecisionReferenceContext,
+  ActivityReferenceContext,
+  TerminologyReferenceContext,
   ConceptBodyContext,
   DefinitionIsBodyContext,
   DefinedAsBodyContext,
@@ -44,7 +49,6 @@ import {
   AVConceptRefContext,
   AVQuantityContext,
   AVNestedGroupContext,
-  ConceptReferenceContext,
   WhenWithBodyContext,
   WhenSingleActionContext,
   NestedWhenBlockContext,
@@ -99,7 +103,7 @@ import {
   Location,
   ConceptValueType,
 } from "./types";
-import type { CRL, LibraryDeclaration, Include } from "./types";
+import type { CRL, LibraryDeclaration, Include, ReferenceName, QualifiedReference } from "./types";
 
 function getLocation(ctx: ParserRuleContext): Location {
   const start = ctx.start;
@@ -115,6 +119,46 @@ function getLocation(ctx: ParserRuleContext): Location {
       column: stop.charPositionInLine + (stop.text?.length ?? 0),
     },
   };
+}
+
+/** Strip the surrounding `"..."` from a `QUOTED_STRING` token's text. */
+function unquote(text: string): string {
+  return text.slice(1, -1);
+}
+
+/**
+ * Build a `ReferenceName` (string for bare, QualifiedReference for `"Lib"."X"`)
+ * from a qualifiableReference parser context. Used by every visitor that
+ * reads a reference slot.
+ */
+function refFromQualifiable(ctx: QualifiableReferenceContext): ReferenceName {
+  const parts = ctx.QUOTED_STRING();
+  if (parts.length === 1) {
+    return unquote(parts[0].text);
+  }
+  const libraryName = unquote(parts[0].text);
+  const name = unquote(parts[1].text);
+  return {
+    type: "QualifiedReference",
+    libraryName,
+    name,
+    location: getLocation(ctx),
+  };
+}
+
+/**
+ * The four `*Reference` contexts (conceptReference, decisionReference,
+ * activityReference, terminologyReference) each delegate to a single
+ * `qualifiableReference` child. This helper finds it.
+ */
+function refFromRefContext(
+  ctx:
+    | ConceptReferenceContext
+    | DecisionReferenceContext
+    | ActivityReferenceContext
+    | TerminologyReferenceContext,
+): ReferenceName {
+  return refFromQualifiable(ctx.qualifiableReference());
 }
 
 export class CRLAstBuilder
@@ -184,10 +228,13 @@ export class CRLAstBuilder
   }
 
   visitIncludeStatement(ctx: IncludeStatementContext): Include {
-    const name = ctx.identifier().text.slice(1, -1);
+    const idents = ctx.identifier();
+    const name = unquote(idents[0].text);
+    const alias = idents.length > 1 ? unquote(idents[1].text) : undefined;
     return {
       type: "Include",
       name,
+      ...(alias !== undefined ? { alias } : {}),
       location: getLocation(ctx),
     };
   }
@@ -214,13 +261,13 @@ export class CRLAstBuilder
   }
 
   visitWhenWithBody(ctx: WhenWithBodyContext): WhenBlock {
-    const conceptName = ctx.conceptReference().text.slice(1, -1);
+    const conceptName = refFromRefContext(ctx.conceptReference());
     const body = this.visit(ctx.blockBody()) as BlockBody;
     return { type: "WhenBlock", conceptName, body, location: getLocation(ctx) };
   }
 
   visitWhenSingleAction(ctx: WhenSingleActionContext): WhenBlock {
-    const conceptName = ctx.conceptReference().text.slice(1, -1);
+    const conceptName = refFromRefContext(ctx.conceptReference());
     const action = this.visit(ctx.actionStatement()) as ActionStatement;
     return { type: "WhenBlock", conceptName, body: action, location: getLocation(ctx) };
   }
@@ -272,15 +319,13 @@ export class CRLAstBuilder
   }
 
   visitRecommendStatement(ctx: RecommendStatementContext): RecommendActivity {
-    const activityName = ctx.activityReference().text.slice(1, -1);
-    const result = { type: "RecommendActivity" as const, activityName, location: getLocation(ctx) };
-    return result;
+    const activityName = refFromRefContext(ctx.activityReference());
+    return { type: "RecommendActivity" as const, activityName, location: getLocation(ctx) };
   }
 
   visitUseStatement(ctx: UseStatementContext): UseDecision {
-    const decisionName = ctx.decisionReference().text.slice(1, -1);
-    const result = { type: "UseDecision" as const, decisionName, location: getLocation(ctx) };
-    return result;
+    const decisionName = refFromRefContext(ctx.decisionReference());
+    return { type: "UseDecision" as const, decisionName, location: getLocation(ctx) };
   }
 
   visitTerminologyStatement(ctx: TerminologyStatementContext): Terminology {
@@ -392,11 +437,11 @@ export class CRLAstBuilder
   visitActivityWith(
     ctx: import("../grammar/generated/antlr/CRLParser").ActivityWithContext,
   ): ActivityWith {
-    let terminologyReference: string | undefined;
+    let terminologyReference: ReferenceName | undefined;
     let activityTypeValue: string | undefined;
     if (ctx.terminologyReference) {
       const ref = ctx.terminologyReference();
-      if (ref) terminologyReference = ref.text.slice(1, -1);
+      if (ref) terminologyReference = refFromRefContext(ref);
     }
     if (ctx.activityTypeValue) {
       const atv = ctx.activityTypeValue();
@@ -576,7 +621,7 @@ export class CRLAstBuilder
   // === v0.7 defined as + composition visitors ===
 
   visitDefinedAsBareRef(ctx: DefinedAsBareRefContext): DefinedAsBareRef {
-    const ref = ctx.conceptReference().text.slice(1, -1);
+    const ref = refFromRefContext(ctx.conceptReference());
     return {
       type: "DefinedAsBareRef",
       ref,
@@ -625,7 +670,7 @@ export class CRLAstBuilder
   }
 
   visitCompositionRef(ctx: CompositionRefContext): CompositionRef {
-    const ref = ctx.conceptReference().text.slice(1, -1);
+    const ref = refFromRefContext(ctx.conceptReference());
     return { type: "CompositionRef", ref, location: getLocation(ctx) };
   }
 
@@ -669,7 +714,9 @@ export class CRLAstBuilder
   }
 
   visitNConceptRef(ctx: NConceptRefContext): NConceptRef {
-    const value = ctx.QUOTED_STRING().text.slice(1, -1);
+    // narrativeElement#NConceptRef now uses qualifiableReference instead of
+    // raw QUOTED_STRING — refs inside `definition is` bodies can be qualified.
+    const value = refFromQualifiable(ctx.qualifiableReference());
     return { type: "NConceptRef", value, location: getLocation(ctx) };
   }
 
@@ -723,7 +770,9 @@ export class CRLAstBuilder
   }
 
   visitAVConceptRef(ctx: AVConceptRefContext): NConceptRef {
-    const value = ctx.QUOTED_STRING().text.slice(1, -1);
+    // argValue#AVConceptRef now uses qualifiableReference — argGroup refs
+    // can be qualified.
+    const value = refFromQualifiable(ctx.qualifiableReference());
     return { type: "NConceptRef", value, location: getLocation(ctx) };
   }
 

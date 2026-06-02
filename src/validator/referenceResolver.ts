@@ -8,6 +8,7 @@ import type {
   ArgValue,
   Terminology,
 } from "../ast/types";
+import { getRefName } from "../ast/types";
 
 import { ValidationError } from "./validator";
 
@@ -48,7 +49,8 @@ export class ReferenceResolver {
 
       switch (concept.definition.type) {
         case "CodedFromDefinition": {
-          const termName = concept.definition.terminologyName;
+          const termRef = concept.definition.terminologyName;
+          const termName = getRefName(termRef);
           if (!termName) break;
           if (!terminologyNames.has(termName)) {
             errors.push({
@@ -63,9 +65,10 @@ export class ReferenceResolver {
         case "DefinedAsDefinition": {
           const body = concept.definition.body;
           if (body.type === "DefinedAsBareRef") {
-            if (!conceptNames.has(body.ref)) {
+            const refName = getRefName(body.ref);
+            if (!conceptNames.has(refName)) {
               errors.push({
-                message: `Unresolved reference "${body.ref}" in concept "${concept.name}" (no concept declared with this name)`,
+                message: `Unresolved reference "${refName}" in concept "${concept.name}" (no concept declared with this name)`,
                 location: body.location,
                 severity: "error",
               });
@@ -114,15 +117,17 @@ export class ReferenceResolver {
       case "CompositionGroup":
         this.walkComposition(expr.expression, parentName, conceptNames, errors);
         break;
-      case "CompositionRef":
-        if (!conceptNames.has(expr.ref)) {
+      case "CompositionRef": {
+        const refName = getRefName(expr.ref);
+        if (!conceptNames.has(refName)) {
           errors.push({
-            message: `Unresolved reference "${expr.ref}" in concept "${parentName}" (no concept declared with this name)`,
+            message: `Unresolved reference "${refName}" in concept "${parentName}" (no concept declared with this name)`,
             location: expr.location,
             severity: "error",
           });
         }
         break;
+      }
     }
   }
 
@@ -144,15 +149,17 @@ export class ReferenceResolver {
     errors: ValidationError[],
   ): void {
     switch (el.type) {
-      case "NConceptRef":
-        if (!conceptNames.has(el.value)) {
+      case "NConceptRef": {
+        const refName = getRefName(el.value);
+        if (!conceptNames.has(refName)) {
           errors.push({
-            message: `Unresolved reference "${el.value}" in concept "${parentName}" (no concept declared with this name)`,
+            message: `Unresolved reference "${refName}" in concept "${parentName}" (no concept declared with this name)`,
             location: el.location,
             severity: "error",
           });
         }
         break;
+      }
       case "NDisjunction":
         for (const av of el.disjuncts) {
           this.walkArgValue(av, parentName, conceptNames, errors);
@@ -174,15 +181,17 @@ export class ReferenceResolver {
     errors: ValidationError[],
   ): void {
     switch (av.type) {
-      case "NConceptRef":
-        if (!conceptNames.has(av.value)) {
+      case "NConceptRef": {
+        const refName = getRefName(av.value);
+        if (!conceptNames.has(refName)) {
           errors.push({
-            message: `Unresolved reference "${av.value}" in concept "${parentName}" (no concept declared with this name)`,
+            message: `Unresolved reference "${refName}" in concept "${parentName}" (no concept declared with this name)`,
             location: av.location,
             severity: "error",
           });
         }
         break;
+      }
       case "NDisjunction":
         for (const inner of av.disjuncts) {
           this.walkArgValue(inner, parentName, conceptNames, errors);

@@ -24,6 +24,7 @@ import type {
   NConjunction,
   Location,
 } from "../ast/types";
+import { getRefName } from "../ast/types";
 
 import type {
   CanonicalArg,
@@ -63,7 +64,9 @@ function softCompileUnknown(clause: NarrativeClause): CanonicalPatternCall {
 function narrativeElementText(e: NarrativeElement): string {
   switch (e.type) {
     case "NConceptRef":
-      return `"${e.value}"`;
+      return typeof e.value === "string"
+        ? `"${e.value}"`
+        : `"${e.value.libraryName}"."${e.value.name}"`;
     case "NWord":
       return e.value;
     case "Quantity":
@@ -82,7 +85,7 @@ function argValueText(v: NarrativeElement): string {
 // === Helper builders ===
 
 function conceptRefArg(e: NConceptRef): ConceptRefArg {
-  return { type: "ConceptRefArg", value: e.value, location: e.location };
+  return { type: "ConceptRefArg", value: getRefName(e.value), location: e.location };
 }
 
 function quantityArg(e: Quantity): QuantityArg {

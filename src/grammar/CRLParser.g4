@@ -30,29 +30,28 @@ crl
     ;
 
 // ============================
-// Library / Include (cross-file imports — see Imports Todo 1)
+// Library / Include (v2.1.0)
 // ============================
 //
-// `library "Name".` — optional file-level identity declaration.
-//   - When omitted, the file is "anonymous": valid as a CLI root, but cannot
-//     be `include`d by name from another file.
-//   - At most one per file; must precede any `include` or other statement.
-//   - Version pinning is handled by npm (the installed package is the version).
+// `library "Name".` — REQUIRED file-level identity declaration (v2.1.0
+//   tightened from optional). Every CRL file must declare its library;
+//   the "anonymous file" mode is gone. Exactly one per file.
 //
-// `include "Name".` — repeatable; declares a dependency on another library
-//   by name. Resolved by name lookup against the project's local CRL files
-//   plus `node_modules` packages that declare `crl.libraries` in their
-//   package.json.
-//   - Order-preserving (parser keeps the source order in the AST).
-//   - Must precede any non-include statement.
-//   - No aliasing in v0.7 (syntax position reserved; CALLED token deferred).
+// `include "Name".` — repeatable; declares a dependency on an EXTERNAL
+//   library (one shipped in a node_modules package's `crl.libraries`).
+//   Local sibling libraries in the same project auto-resolve via the
+//   qualifier syntax `"Lib"."X"` — no `include` line needed for them.
+//
+// `include "Name" as "Alias".` — emergency aliasing. Only used when a
+//   local library and an installed package both declare the same library
+//   name; the `as` clause renames the package's library inside this file.
 //
 libraryStatement
     : LIBRARY identifier DOT
     ;
 
 includeStatement
-    : INCLUDE identifier DOT
+    : INCLUDE identifier (AS identifier)? DOT
     ;
 
 statement
@@ -371,9 +370,9 @@ narrative
     ;
 
 narrativeElement
-    : QUOTED_STRING                                                                              # NConceptRef
+    : qualifiableReference                                                                       # NConceptRef
     | quantity                                                                                   # NQuantity
-    | (AND | OR | NOT | WITH | LIBRARY | INCLUDE | NARRATIVE_WORD | TIME_UNIT)                   # NWord
+    | (AND | OR | NOT | WITH | LIBRARY | INCLUDE | AS | NARRATIVE_WORD | TIME_UNIT)              # NWord
     | argGroup                                                                                   # NArgGroupElement
     ;
 
@@ -391,7 +390,7 @@ argGroup
     ;
 
 argValue
-    : QUOTED_STRING                                          # AVConceptRef
+    : qualifiableReference                                   # AVConceptRef
     | quantity                                               # AVQuantity
     | argGroup                                               # AVNestedGroup
     ;
@@ -399,9 +398,22 @@ argValue
 // ============================
 // Identifier and Token Mappings
 // ============================
+//
+// v2.1.0 split:
+//   - `identifier` (bare `QUOTED_STRING`) is used at DECLARATION sites
+//     (`concept "X":`, `decision "X":`, etc.) — declaration names are
+//     always bare.
+//   - `qualifiableReference` is used at REFERENCE sites (`defined as ...`,
+//     `coded from ...`, narrative refs, etc.) — references may be bare
+//     (same-file) or qualified (`"OtherLib"."Foo"`) for cross-library.
+//
 
 identifier
     : QUOTED_STRING
+    ;
+
+qualifiableReference
+    : QUOTED_STRING (DOT QUOTED_STRING)?
     ;
 
 decisionIdentifier
@@ -409,7 +421,7 @@ decisionIdentifier
     ;
 
 decisionReference
-    : decisionIdentifier
+    : qualifiableReference
     ;
 
 terminologyIdentifier
@@ -417,7 +429,7 @@ terminologyIdentifier
     ;
 
 terminologyReference
-    : identifier
+    : qualifiableReference
     ;
 
 activityIdentifier
@@ -425,7 +437,7 @@ activityIdentifier
     ;
 
 activityReference
-    : activityIdentifier
+    : qualifiableReference
     ;
 
 conceptIdentifier
@@ -433,7 +445,7 @@ conceptIdentifier
     ;
 
 conceptReference
-    : conceptIdentifier
+    : qualifiableReference
     ;
 
 backtickString

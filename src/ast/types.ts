@@ -11,7 +11,11 @@ export interface ASTNode {
   };
 }
 
-// CRL represents the root of the AST
+// CRL represents the root of the AST.
+//
+// `library` remains optional in the AST shape for the v2.1.0 Phase 1 release
+// (qualified-ref support without the breaking "library required" tightening).
+// Phase 2 will require it and migrate every test fixture in one focused pass.
 export interface CRL extends ASTNode {
   type: "CRL";
   header?: string;
@@ -25,22 +29,68 @@ export interface CRL extends ASTNode {
 // uses `definition is`; the v0.5 standalone `inference` statement is gone)
 export type Statement = Decision | Concept | Activity | Terminology;
 
-// File-level library identity declaration. Optional; max one per file.
-// When omitted, the file is anonymous (valid as CLI root, cannot be included).
-// Version pinning is handled by npm — the installed package's npm version
-// is the library version.
+// File-level library identity declaration. Required in v2.1.0.
+// npm packaging IS the version system — no version field on the AST node.
 export interface LibraryDeclaration extends ASTNode {
   type: "LibraryDeclaration";
   name: string;
   location: Location;
 }
 
-// File-level dependency on another library, resolved by name lookup against
-// local project files + node_modules packages. Order is preserved.
+// File-level dependency on an EXTERNAL library (one shipped in a node_modules
+// package's `crl.libraries`). Local sibling libraries in the same project
+// auto-resolve via the `"Lib"."X"` qualifier syntax — no `include` line
+// needed for them.
+//
+// `alias` is populated only when the source carried `include "Foo" as "Bar".`.
+// Emergency aliasing only — used when a local library name collides with the
+// package library name. References inside this file use the alias
+// (`"Bar"."X"`) to disambiguate from the local "Foo".
 export interface Include extends ASTNode {
   type: "Include";
   name: string;
+  alias?: string;
   location: Location;
+}
+
+// v2.1.0 qualified-reference shape.
+//
+// A reference to a concept/decision/activity/terminology may be:
+//   - BARE — just the declaration name; resolves to same-file declarations.
+//     Carried as a plain `string` on AST nodes for backward compatibility.
+//   - QUALIFIED — `"Lib"."X"` source syntax; resolves to the named library.
+//     Carried as a `QualifiedReference` object on AST nodes.
+//
+// Use the helpers `getRefName`, `getRefLibrary`, `isQualifiedRef` to read
+// ref fields uniformly. Most consumers want only the bare name; they can use
+// `getRefName(ref)` and ignore the library part.
+export interface QualifiedReference extends ASTNode {
+  type: "QualifiedReference";
+  libraryName: string;
+  name: string;
+  location: Location;
+}
+
+export type ReferenceName = string | QualifiedReference;
+
+/** True when the reference carries an explicit library qualifier. */
+export function isQualifiedRef(ref: ReferenceName): ref is QualifiedReference {
+  return typeof ref !== "string";
+}
+
+/** The declaration-side name (the second `"..."` of a qualified ref, or the bare name). */
+export function getRefName(ref: ReferenceName): string {
+  return typeof ref === "string" ? ref : ref.name;
+}
+
+/** The library qualifier, or null for a bare reference. */
+export function getRefLibrary(ref: ReferenceName): string | null {
+  return typeof ref === "string" ? null : ref.libraryName;
+}
+
+/** Human-readable form, e.g. `"Shared"."Foo"` or just `"Foo"`. */
+export function refDisplay(ref: ReferenceName): string {
+  return typeof ref === "string" ? `"${ref}"` : `"${ref.libraryName}"."${ref.name}"`;
 }
 
 // --------------------------- DECISION STATEMENT ----------------------------
@@ -63,7 +113,7 @@ export interface DecisionBody extends ASTNode {
 // When block
 export interface WhenBlock extends ASTNode {
   type: "WhenBlock";
-  conceptName: string;
+  conceptName: ReferenceName;
   body: WhenBlockBody;
   location: Location;
 }
@@ -89,14 +139,14 @@ export interface ActionStatement extends ASTNode {
 // Recommend activity
 export interface RecommendActivity extends ASTNode {
   type: "RecommendActivity";
-  activityName: string;
+  activityName: ReferenceName;
   location: Location;
 }
 
 // Use decision
 export interface UseDecision extends ASTNode {
   type: "UseDecision";
-  decisionName: string;
+  decisionName: ReferenceName;
   location: Location;
 }
 
@@ -161,7 +211,7 @@ export interface ActivityRequest extends ASTNode {
 
 export interface ActivityWith extends ASTNode {
   type: "ActivityWith";
-  terminologyReference?: string;
+  terminologyReference?: ReferenceName;
   activityTypeValue?: string;
   location: Location;
 }
@@ -203,7 +253,7 @@ export type ConceptDefinition =
 // Coded from definition
 export interface CodedFromDefinition extends ASTNode {
   type: "CodedFromDefinition";
-  terminologyName: string;
+  terminologyName: ReferenceName;
   location: Location;
 }
 
@@ -230,7 +280,7 @@ export interface DefinedAsDefinition extends ASTNode {
 
 export interface DefinedAsBareRef extends ASTNode {
   type: "DefinedAsBareRef";
-  ref: string;
+  ref: ReferenceName;
 }
 
 export interface DefinedAsComposition extends ASTNode {
@@ -265,7 +315,7 @@ export interface SemNotExpression extends ASTNode {
 
 export interface CompositionRef extends ASTNode {
   type: "CompositionRef";
-  ref: string;
+  ref: ReferenceName;
 }
 
 export interface CompositionGroup extends ASTNode {
@@ -303,7 +353,7 @@ export type NarrativeElement =
 
 export interface NConceptRef extends ASTNode {
   type: "NConceptRef";
-  value: string;
+  value: ReferenceName;
   location: Location;
 }
 

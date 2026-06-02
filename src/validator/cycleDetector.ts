@@ -8,6 +8,7 @@ import type {
   ArgValue,
   Location,
 } from "../ast/types";
+import { getRefName } from "../ast/types";
 
 import { ValidationError } from "./validator";
 
@@ -109,7 +110,7 @@ export class CycleDetector {
       case "DefinedAsDefinition": {
         const body = concept.definition.body;
         if (body.type === "DefinedAsBareRef") {
-          refs.add(body.ref);
+          refs.add(getRefName(body.ref));
         } else if (body.type === "DefinedAsComposition") {
           this.collectFromComposition(
             (body as DefinedAsComposition).expression,
@@ -139,7 +140,7 @@ export class CycleDetector {
         this.collectFromComposition(expr.expression, refs);
         return;
       case "CompositionRef":
-        refs.add(expr.ref);
+        refs.add(getRefName(expr.ref));
         return;
     }
   }
@@ -153,7 +154,7 @@ export class CycleDetector {
   private collectFromNarrativeElement(el: NarrativeElement, refs: Set<string>): void {
     switch (el.type) {
       case "NConceptRef":
-        refs.add(el.value);
+        refs.add(getRefName(el.value));
         return;
       case "NDisjunction":
         for (const av of el.disjuncts) {
@@ -172,7 +173,7 @@ export class CycleDetector {
   private collectFromArgValue(av: ArgValue, refs: Set<string>): void {
     switch (av.type) {
       case "NConceptRef":
-        refs.add(av.value);
+        refs.add(getRefName(av.value));
         return;
       case "NDisjunction":
         for (const inner of av.disjuncts) {

@@ -20,6 +20,7 @@ ANY_BLOCK           : 'any:';
 // === Keywords ===
 ACTIVITY     : 'activity';
 AND          : 'and';
+AS           : 'as';
 BECAUSE      : 'because';
 CONCEPT      : 'concept';
 DECISION     : 'decision';

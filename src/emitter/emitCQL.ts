@@ -50,6 +50,7 @@ import type {
   Terminology,
   TerminologyBodyLine,
 } from "../ast/types";
+import { getRefName } from "../ast/types";
 import type { CRLError } from "../types/errors";
 
 export interface EmitOptions {
@@ -398,10 +399,11 @@ class Emitter {
 
   private emitCodedFrom(c: Concept, def: CodedFromDefinition): string {
     const resource = c.conceptType ?? "Observation";
-    if (!this.terminologyNames.has(def.terminologyName)) {
-      return `// FIXME: unresolved terminology ${cqlIdent(def.terminologyName)}\n[${resource}: ${cqlIdent(def.terminologyName)}]`;
+    const termName = getRefName(def.terminologyName);
+    if (!this.terminologyNames.has(termName)) {
+      return `// FIXME: unresolved terminology ${cqlIdent(termName)}\n[${resource}: ${cqlIdent(termName)}]`;
     }
-    const refName = this.terminologyEmitName.get(def.terminologyName) ?? def.terminologyName;
+    const refName = this.terminologyEmitName.get(termName) ?? termName;
     return `[${resource}: ${cqlIdent(refName)}]`;
   }
 
@@ -452,7 +454,7 @@ class Emitter {
     body: DefinedAsBareRef | DefinedAsComposition
   ): string {
     if (body.type === "DefinedAsBareRef") {
-      return cqlIdent(body.ref);
+      return cqlIdent(getRefName(body.ref));
     }
     const shape = this.shapeForComposition(c, body.expression);
     return this.emitComposition(body.expression, shape);
@@ -485,8 +487,9 @@ class Emitter {
   ): string {
     switch (expr.type) {
       case "CompositionRef": {
-        const operandShape = this.declaredShape(expr.ref);
-        return this.bridgeOperand(cqlIdent(expr.ref), operandShape, shape);
+        const refName = getRefName(expr.ref);
+        const operandShape = this.declaredShape(refName);
+        return this.bridgeOperand(cqlIdent(refName), operandShape, shape);
       }
       case "CompositionGroup":
         return `(${this.emitComposition(expr.expression, shape)})`;
@@ -625,7 +628,7 @@ class Emitter {
 function collectRefs(expr: CompositionExpression, out: string[]): void {
   switch (expr.type) {
     case "CompositionRef":
-      out.push(expr.ref);
+      out.push(getRefName(expr.ref));
       return;
     case "SemNotExpression":
       collectRefs(expr.expression, out);
