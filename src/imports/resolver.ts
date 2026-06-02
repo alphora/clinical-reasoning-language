@@ -8,6 +8,33 @@ import {
   UnresolvedIncludeDiagnostic,
 } from "./types";
 
+/**
+ * Resolve a single `include` declaration to a registry entry.
+ *
+ * Lookup precedence per discussion 030:
+ *   - From `origin: "local" | "root"`: check `byNamePackage` first
+ *     (`include` is external-only per v2.1.0 lock 026), fall back to
+ *     `byNameLocal` for fixtures that still write `include "Sibling".`.
+ *     Commit 2e adds a `redundant-local-include` warning when the local
+ *     fallback path is hit.
+ *   - From `origin: "package"`: check `byNamePackage` only. A package
+ *     cannot depend on consumer-local libraries.
+ *
+ * Returns `undefined` if no match; the caller emits `unresolved-include`.
+ */
+function resolveIncludeTarget(
+  from: RegistryEntry,
+  includeName: string,
+  registry: Registry,
+): RegistryEntry | undefined {
+  const pkg = registry.byNamePackage.get(includeName);
+  if (pkg) return pkg;
+  if (from.origin === "local" || from.origin === "root") {
+    return registry.byNameLocal.get(includeName);
+  }
+  return undefined;
+}
+
 export function walkIncludes(
   rootEntry: RegistryEntry,
   registry: Registry,
@@ -45,7 +72,7 @@ export function walkIncludes(
     activeIncludes.push(viaInclude);
 
     for (const include of entry.ast.includes) {
-      const found = registry.byName.get(include.name);
+      const found = resolveIncludeTarget(entry, include.name, registry);
       if (!found) {
         diagnostics.push({
           kind: "unresolved-include",

@@ -1,9 +1,4 @@
-// Import all test files to ensure they are run
-import './unusedDecisions.test';
-//import './unusedConcepts.test';
-//import './unusedActivities.test';
-import './unusedTerminology.test';
-import './nameUniqueness.test';
-import './actionUniqueness.test';
-//import './cycleDetector.test';
-//import './cycleDetectorExtended.test';
+// Validator-internal test suite. Imported by `src/tests/index.test.ts`
+// so these run as part of `npm test`.
+import "./nameUniqueness.test";
+import "./cycleDetector.test";

@@ -29,7 +29,7 @@ describe("walkIncludes", () => {
     const dir = path.join(FIXTURES, "cms22-split");
     const root = loadRoot(path.join(dir, "cms22.crl"));
     const { registry } = buildRegistry(dir);
-    if (root.name) registry.byName.set(root.name, root); // route root by name
+    if (root.name) registry.byNameLocal.set(root.name, root); // route root by name
 
     const { resolvedLibraries, diagnostics } = walkIncludes(root, registry);
     expect(diagnostics.filter((d) => d.severity === "error")).toHaveLength(0);
@@ -47,7 +47,7 @@ describe("walkIncludes", () => {
     const dir = path.join(FIXTURES, "diamond-dag");
     const root = loadRoot(path.join(dir, "root.crl"));
     const { registry } = buildRegistry(dir);
-    if (root.name) registry.byName.set(root.name, root);
+    if (root.name) registry.byNameLocal.set(root.name, root);
 
     const { resolvedLibraries } = walkIncludes(root, registry);
     const cCount = resolvedLibraries.filter((e) => e.name === "C").length;
@@ -58,7 +58,7 @@ describe("walkIncludes", () => {
     const dir = path.join(FIXTURES, "cycle");
     const root = loadRoot(path.join(dir, "A.crl"));
     const { registry } = buildRegistry(dir);
-    if (root.name) registry.byName.set(root.name, root);
+    if (root.name) registry.byNameLocal.set(root.name, root);
 
     const { diagnostics } = walkIncludes(root, registry);
     const cycle = diagnostics.find((d) => d.kind === "cycle");
@@ -69,7 +69,7 @@ describe("walkIncludes", () => {
     const dir = path.join(FIXTURES, "self-include");
     const root = loadRoot(path.join(dir, "A.crl"));
     const { registry } = buildRegistry(dir);
-    if (root.name) registry.byName.set(root.name, root);
+    if (root.name) registry.byNameLocal.set(root.name, root);
 
     const { diagnostics } = walkIncludes(root, registry);
     const cycle = diagnostics.find((d) => d.kind === "cycle");
@@ -80,7 +80,7 @@ describe("walkIncludes", () => {
     const dir = path.join(FIXTURES, "unresolved");
     const root = loadRoot(path.join(dir, "root.crl"));
     const { registry } = buildRegistry(dir);
-    if (root.name) registry.byName.set(root.name, root);
+    if (root.name) registry.byNameLocal.set(root.name, root);
 
     const { diagnostics } = walkIncludes(root, registry);
     const unresolved = diagnostics.find((d) => d.kind === "unresolved-include");

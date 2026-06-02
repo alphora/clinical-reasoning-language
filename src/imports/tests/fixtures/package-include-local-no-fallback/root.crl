@@ -1,0 +1,7 @@
+# package-include-local-no-fallback root
+library "Root".
+include "BadPkg".
+
+concept "Root C":
+- type is Encounter.
+- defined as "BadPkg"."Pkg C".

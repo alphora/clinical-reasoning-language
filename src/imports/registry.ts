@@ -302,22 +302,33 @@ function scanNodeModules(projectRoot: string): {
 /**
  * Build the registry from a project root.
  *
- * Local files (scanned recursively from the project root) are added first,
- * then node_modules packages. Cross-source name collisions emit
- * `registry-duplicate` and the later registration is rejected.
+ * Local files (scanned recursively from the project root) populate
+ * `byNameLocal`; node_modules packages populate `byNamePackage`. The two
+ * indexes are independent — a local library and a package may declare the
+ * same name without firing `registry-duplicate` (lookup precedence is then
+ * the include's responsibility; see `src/imports/resolver.ts`).
+ *
+ * Within each bucket, second-write collisions emit `registry-duplicate` and
+ * the later registration is rejected.
+ *
+ * Entries with `name === null` (today: only possible for anonymous-mode
+ * residue, which v2.1.0 removed) are skipped without registration.
  */
 export function buildRegistry(projectRoot: string): {
   registry: Registry;
   diagnostics: ImportDiagnostic[];
 } {
   const diagnostics: ImportDiagnostic[] = [];
-  const registry: Registry = { byName: new Map() };
+  const registry: Registry = {
+    byNameLocal: new Map(),
+    byNamePackage: new Map(),
+  };
 
   const { entries: localEntries, diagnostics: localDiags } = scanProjectLocal(projectRoot);
   diagnostics.push(...localDiags);
   for (const entry of localEntries) {
     if (entry.name === null) continue;
-    const existing = registry.byName.get(entry.name);
+    const existing = registry.byNameLocal.get(entry.name);
     if (existing) {
       diagnostics.push({
         kind: "registry-duplicate",
@@ -327,14 +338,14 @@ export function buildRegistry(projectRoot: string): {
       } as RegistryDuplicateDiagnostic);
       continue;
     }
-    registry.byName.set(entry.name, entry);
+    registry.byNameLocal.set(entry.name, entry);
   }
 
   const { entries: pkgEntries, diagnostics: pkgDiags } = scanNodeModules(projectRoot);
   diagnostics.push(...pkgDiags);
   for (const entry of pkgEntries) {
     if (entry.name === null) continue;
-    const existing = registry.byName.get(entry.name);
+    const existing = registry.byNamePackage.get(entry.name);
     if (existing) {
       diagnostics.push({
         kind: "registry-duplicate",
@@ -344,7 +355,7 @@ export function buildRegistry(projectRoot: string): {
       } as RegistryDuplicateDiagnostic);
       continue;
     }
-    registry.byName.set(entry.name, entry);
+    registry.byNamePackage.set(entry.name, entry);
   }
 
   return { registry, diagnostics };

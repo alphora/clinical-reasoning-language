@@ -1,0 +1,9 @@
+# local library ProjectOnly — should NOT satisfy BadPkg's include
+library "ProjectOnly".
+
+concept "Local C":
+- type is Encounter.
+- coded from "Local T".
+
+terminology "Local T":
+- valueset is `urn:local-vs`.

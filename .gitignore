@@ -1,5 +1,9 @@
 # Dependency directories
 node_modules/
+# ...except test fixture node_modules — these are committed fake packages
+# exercised by resolver tests; they are not real npm dependencies.
+!src/imports/tests/fixtures/**/node_modules/
+!src/imports/tests/fixtures/**/node_modules/**
 
 # Build outputs
 dist/

@@ -82,26 +82,22 @@ While the validator is a single component, conceptually we can separate checks i
    - A main `validate(ast: AST): ValidationResult` method.  
    - Returns an aggregated list of `ValidationError` or `ValidationWarning` objects, each describing the **type** of violation, its **severity**, and the AST node’s **location** (line, column).
 
-2. **Validation Components**  
-   - **NameUniquenessValidator**:  
-     - Verifies each top-level `decision`, `concept`, `activity`, and `terminology` name is unique within that keyword’s space.  
-     - Logs an **error** if duplicate names are found in the same keyword category.  
-   - **ActionUniquenessValidator**:  
-     - Within a single `when` or `blockBody`, checks for repeated `do "X"` or `use "Y"` calls.  
-     - Logs an **error** if such duplicates exist in the same block.  
-   - **CycleDetector**:  
-     1. **DecisionCycle**: Builds a directed graph of `decision` → `decision` edges (via `use`). Checks for cycles.  
-     2. **ConceptCycle**: Builds a directed graph of `concept` → `concept` edges (via `inferred by`). Checks for cycles.  
-     - Logs an **error** if a cycle is found.  
-   - **UnusedDeclarationsValidator**:  
-     - Tracks references to each named declaration (decisions, concepts, activities, terminologies).  
-     - Logs a **warning** for any declarations never referenced.
+2. **Validation Components** (current as of v2.1.0)
+   - **NameUniquenessValidator** (`src/validator/nameUniquenessValidator.ts`):
+     - Verifies each top-level `decision`, `concept`, `activity`, and `terminology` name is unique within that keyword's space.
+     - Logs an **error** if duplicate names are found in the same keyword category. Emits `kind: "empty-name"` for blank names, `kind: "duplicate-name"` for collisions.
+   - **ReferenceResolver** (`src/validator/referenceResolver.ts`):
+     - Walks concept body refs (`coded from`, `defined as`, `definition is`) and reports unresolved references with `kind: "unresolved-reference"`.
+     - Multi-slot ref coverage (when-block conceptName, use-decision, recommend-activity, activity-with terminology) is in the v2.1.0 backlog.
+   - **CycleDetector** (`src/validator/cycleDetector.ts`):
+     - Builds a directed graph of `concept` → `concept` edges from `defined as`/`definition is` bodies. Checks for cycles. Logs `kind: "reference-cycle"`.
+     - Does NOT yet track decision-reference cycles or action cycles — those validators were removed in v2.1.0 commit 2b (never implemented; tests were asserting non-existent behavior).
 
-3. **Validation Pipeline**  
-   - The pipeline coordinates these components:  
-     1. **NameUniquenessValidator** → 2. **ActionUniquenessValidator** → 3. **CycleDetector** → 4. **UnusedDeclarationsValidator**.  
-   - The pipeline accumulates **all** errors and warnings.  
-   - Optionally, if “critical” errors occur (e.g., a cycle or missing essential data structure), the pipeline can stop early or continue to accumulate errors, based on user preference.  
+3. **Validation Pipeline** (current as of v2.1.0)
+   - The pipeline coordinates the three components above in `src/validator/validator.ts`:
+     1. **NameUniquenessValidator** → 2. **ReferenceResolver** → 3. **CycleDetector**.
+   - Each pass accumulates all errors/warnings independently. Reference resolution demotes to warnings in soft mode (`ValidatorOptions.soft`).
+   - **Removed v2.1.0 commit 2b**: `ActionUniquenessValidator` and `UnusedDeclarationsValidator` were stub classes with no implementation and have been deleted. If those features are wanted, they need fresh designs per the v2.1.0 no-back-compat directive.  
 
 ---
 
@@ -157,42 +153,38 @@ interface ValidationIssue {
   column: number;
 }
 
-function validate(ast: AST): ValidationResult {
+function validate(ast: AST, options: ValidatorOptions = {}): ValidationResult {
   const result: ValidationResult = { errors: [], warnings: [] };
 
   // Phase 1: Name Uniqueness
   NameUniquenessValidator.check(ast, result);
 
-  // Phase 2: Action Uniqueness
-  ActionUniquenessValidator.check(ast, result);
+  // Phase 2: Reference Resolution
+  ReferenceResolver.check(ast, result);  // soft mode demotes to warnings
 
-  // Phase 3: Cycle Detection
-  CycleDetector.checkDecisions(ast, result);
-  CycleDetector.checkConcepts(ast, result);
-
-  // Phase 4: Unused Declarations
-  UnusedDeclarationsValidator.check(ast, result);
+  // Phase 3: Cycle Detection (concept references only)
+  CycleDetector.check(ast, result);
 
   return result;
 }
 ```
 
-Each validator component would implement logic specific to its domain, e.g.:
+Each validator component implements logic specific to its domain:
 
-**NameUniquenessValidator**  
-- Collects and groups top-level statements by type (decision, concept, etc.).  
-- Any group with duplicates triggers an error.
+**NameUniquenessValidator**
+- Collects and groups top-level statements by type (decision, concept, activity, terminology).
+- Any group with duplicates emits `kind: "duplicate-name"`; blank names emit `kind: "empty-name"`.
 
-**ActionUniquenessValidator**  
-- Recursively visits `when`/`blockBody` nodes, tracking sets of encountered `do` or `use` strings in each scope.
+**ReferenceResolver**
+- Walks concept body refs (`coded from "T"`, `defined as "X"`, `definition is …`).
+- Emits `kind: "unresolved-reference"` when a target name doesn't exist in the local namespace.
 
-**CycleDetector**  
-- Gathers adjacency lists from each decision to the decisions they “use”.  
-- Gathers adjacency lists from each concept to the concepts they “inferred by”.  
-- Applies standard graph cycle checks (DFS or Tarjan’s strongly connected components).
+**CycleDetector**
+- Gathers adjacency from each concept's `defined as`/`definition is` body refs.
+- Applies standard DFS cycle detection (white/gray/black coloring).
+- Emits `kind: "reference-cycle"` with the cycle path.
 
-**UnusedDeclarationsValidator**  
-- Tracks references encountered in `when`, `do`, `use`, or `inferred by`, and compares them to all declared names.
+**Removed v2.1.0 commit 2b**: `ActionUniquenessValidator` and `UnusedDeclarationsValidator` were stubs with no real implementation. Their tests were asserting behavior that didn't exist; both classes and tests were deleted.
 
 ---
 

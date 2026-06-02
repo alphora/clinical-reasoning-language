@@ -69,6 +69,33 @@ export interface NameConflictDiagnostic {
   sources: { libraryName: string | null; filePath: string }[];
 }
 
+/**
+ * Warning: an `include` statement names a library whose alias clause
+ * (`as "X"`) is present in the AST but not yet honored by the resolver.
+ * v2.1.0 ships with alias semantics deferred to v2.2; the warning prevents
+ * silent semantic failure when a user writes `include "Foo" as "Ext".`.
+ * Producer lands in commit 2e.
+ */
+export interface AliasNotYetSupportedDiagnostic {
+  kind: "alias-not-yet-supported";
+  severity: "warning";
+  include: Include;
+  from: { filePath: string; libraryName: string };
+}
+
+/**
+ * Warning: an `include` statement names a LOCAL-origin library. Per v2.1.0
+ * lock 026, local sibling libraries auto-resolve via qualified refs without
+ * an `include`; writing one is redundant. Producer lands in commit 2e (fires
+ * when the local-fallback path of `resolveIncludeTarget` is hit).
+ */
+export interface RedundantLocalIncludeDiagnostic {
+  kind: "redundant-local-include";
+  severity: "warning";
+  include: Include;
+  from: { filePath: string; libraryName: string };
+}
+
 export type ImportDiagnostic =
   | ParseFailureDiagnostic
   | ProjectRootNotFoundDiagnostic
@@ -76,7 +103,9 @@ export type ImportDiagnostic =
   | RegistryDuplicateDiagnostic
   | UnresolvedIncludeDiagnostic
   | CycleDiagnostic
-  | NameConflictDiagnostic;
+  | NameConflictDiagnostic
+  | AliasNotYetSupportedDiagnostic
+  | RedundantLocalIncludeDiagnostic;
 
 // === Registry ===
 
@@ -90,10 +119,18 @@ export interface RegistryEntry {
   origin: "local" | "package" | "root";
 }
 
-// Single entry per library name (second-write collisions emit registry-duplicate
-// and the second is rejected).
+// Two separate indexes per origin (local vs package). v2.1.0 lock per
+// discussion 027 C2 + 030: local and package may declare the same library
+// name without firing `registry-duplicate`. `include "Foo"` from a local/root
+// file checks `byNamePackage` first then falls back to `byNameLocal`; from a
+// package file it checks `byNamePackage` only (packages cannot depend on
+// consumer locals).
+//
+// Within each map, second-write collisions still emit `registry-duplicate` and
+// the second is rejected (local-vs-local or package-vs-package).
 export interface Registry {
-  byName: Map<string, RegistryEntry>;
+  byNameLocal: Map<string, RegistryEntry>;
+  byNamePackage: Map<string, RegistryEntry>;
 }
 
 // === Combined namespace (kind-separated) ===
@@ -130,8 +167,16 @@ export interface ResolvedGraph {
   // The project root directory (the one containing package.json). Absent
   // when project-root-not-found.
   projectRoot?: string;
-  // Topological order: leaves first, root last.
+  // Topological order: leaves first, root last. Include-walked closure from
+  // root — every entry was reached via an `include` chain starting at root.
   resolvedLibraries: RegistryEntry[];
+  // Local-origin libraries that exist in the project but are NOT in
+  // `resolvedLibraries` (root didn't include them; v2.1.0 lock 026 allows
+  // qualified refs to local siblings without an include). Path-sorted for
+  // determinism. Empty for projects where every local file is reachable via
+  // includes. Consumed by 2c's scope-builder and 2d's per-CRL emit; today's
+  // emit/validate code does NOT iterate this field.
+  localLibraries: RegistryEntry[];
   namespace: Namespace;
   diagnostics: ImportDiagnostic[];
 }

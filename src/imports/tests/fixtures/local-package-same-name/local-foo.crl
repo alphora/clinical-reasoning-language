@@ -1,0 +1,9 @@
+# local-package-same-name local Foo
+library "Foo".
+
+concept "Foo Concept":
+- type is Encounter.
+- coded from "Foo Local T".
+
+terminology "Foo Local T":
+- valueset is `urn:local-foo-vs`.

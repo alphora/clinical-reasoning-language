@@ -1,0 +1,9 @@
+# root-name-collision root
+library "Shared".
+
+concept "Root C":
+- type is Encounter.
+- coded from "Root T".
+
+terminology "Root T":
+- valueset is `urn:root-vs`.

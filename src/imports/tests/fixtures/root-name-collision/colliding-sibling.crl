@@ -1,0 +1,9 @@
+# sibling declaring the same library name — fires registry-duplicate
+library "Shared".
+
+concept "Sibling C":
+- type is Encounter.
+- coded from "Sibling T".
+
+terminology "Sibling T":
+- valueset is `urn:sibling-vs`.

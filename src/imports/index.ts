@@ -36,6 +36,7 @@ export function resolveImports(rootPath: string): ResolvedGraph {
     return {
       rootPath: canonicalRoot,
       resolvedLibraries: [],
+      localLibraries: [],
       namespace: emptyNamespace(),
       diagnostics: [diag],
     };
@@ -52,6 +53,7 @@ export function resolveImports(rootPath: string): ResolvedGraph {
     return {
       rootPath: canonicalRoot,
       resolvedLibraries: [],
+      localLibraries: [],
       namespace: emptyNamespace(),
       diagnostics: [diag],
     };
@@ -67,6 +69,7 @@ export function resolveImports(rootPath: string): ResolvedGraph {
     return {
       rootPath: canonicalRoot,
       resolvedLibraries: [],
+      localLibraries: [],
       namespace: emptyNamespace(),
       diagnostics: [diag],
     };
@@ -83,21 +86,33 @@ export function resolveImports(rootPath: string): ResolvedGraph {
 
   const { registry, diagnostics: registryDiags } = buildRegistry(projectRoot);
 
-  // The root file may also be in the local scan. Replace any same-path entry
-  // (or same-name entry pointing at the root path) with the canonical root
-  // entry so cycle detection and topo order treat root as one identity.
-  //
-  // Guard on a non-empty library name — under v2.1.0's required-library
-  // contract, an empty-name placeholder means the builder synthesized a
-  // marker after a parse error. Don't pollute the registry with `""`.
+  // The root file is also seen by the local scan. Replace the scan's entry
+  // (same path) with the canonical root entry so cycle detection and topo
+  // order treat root as one identity. Guard on non-empty name (placeholder
+  // post-parse-error) and on same-path: if `byNameLocal[rootName]` exists at
+  // a DIFFERENT path, that's a local-vs-local name collision and the
+  // registry-duplicate diagnostic already fired — don't silently overwrite.
   if (rootAst.library && rootAst.library.name !== "") {
-    registry.byName.set(rootAst.library.name, rootEntry);
+    const existing = registry.byNameLocal.get(rootAst.library.name);
+    if (!existing || existing.filePath === rootEntry.filePath) {
+      registry.byNameLocal.set(rootAst.library.name, rootEntry);
+    }
   }
 
   const { resolvedLibraries, diagnostics: resolverDiags } = walkIncludes(
     rootEntry,
     registry,
   );
+
+  // Surface every local-origin library NOT include-walked from root as an
+  // implicit local. 2c's scope-builder + 2d's per-CRL emit consume this set;
+  // 2b emit/validate paths still iterate `resolvedLibraries` only, so this
+  // is a non-behavior-change additive field for now. Path-sort with byte
+  // comparison for determinism (no locale dependence).
+  const walkedPaths = new Set(resolvedLibraries.map((e) => e.filePath));
+  const localLibraries = Array.from(registry.byNameLocal.values())
+    .filter((e) => !walkedPaths.has(e.filePath))
+    .sort((a, b) => (a.filePath < b.filePath ? -1 : a.filePath > b.filePath ? 1 : 0));
 
   const { namespace, diagnostics: namespaceDiags } =
     buildCombinedNamespace(resolvedLibraries);
@@ -112,6 +127,7 @@ export function resolveImports(rootPath: string): ResolvedGraph {
     rootPath: canonicalRoot,
     projectRoot,
     resolvedLibraries,
+    localLibraries,
     namespace,
     diagnostics,
   };
@@ -132,6 +148,8 @@ export type {
   UnresolvedIncludeDiagnostic,
   CycleDiagnostic,
   NameConflictDiagnostic,
+  AliasNotYetSupportedDiagnostic,
+  RedundantLocalIncludeDiagnostic,
 } from "./types";
 
 export { buildRegistry, findProjectRoot } from "./registry";

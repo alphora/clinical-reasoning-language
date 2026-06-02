@@ -1,0 +1,7 @@
+# local-package-same-name root
+library "Root".
+include "Foo".
+
+concept "Root C":
+- type is Encounter.
+- defined as "Foo"."Foo Concept".

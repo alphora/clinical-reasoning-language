@@ -13,10 +13,8 @@ import { parseInput } from "./parseInput";
  * This test suite verifies the correct structure of nested decisions in the AST.
  * It ensures that the AST builder correctly parses and structures nested decision blocks.
  *
- * Note: For actual duplication checks, see the validator tests in:
- * - whenBlockUniqueness.test.ts
- * - actionUniqueness.test.ts
- * - nameUniqueness.test.ts
+ * Note: For duplication checks, see the validator tests in:
+ * - nameUniqueness.test.ts (top-level decision/concept/activity/terminology names)
  */
 describe("Decision Structure", () => {
   it("should maintain correct structure for nested decisions", () => {

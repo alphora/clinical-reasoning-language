@@ -37,6 +37,8 @@ export type {
   UnresolvedIncludeDiagnostic,
   CycleDiagnostic,
   NameConflictDiagnostic,
+  AliasNotYetSupportedDiagnostic,
+  RedundantLocalIncludeDiagnostic,
 } from "./imports";
 
 export { validateCRLImports } from "./imports/validate";

@@ -1,10 +1,8 @@
 import { CRL } from "../ast/types";
 
-import { ActionUniquenessValidator } from "./actionUniquenessValidator";
 import { CycleDetector } from "./cycleDetector";
 import { NameUniquenessValidator } from "./nameUniquenessValidator";
 import { ReferenceResolver } from "./referenceResolver";
-import { UnusedDeclarationsValidator } from "./unusedDeclarationsValidator";
 
 /**
  * Stable, machine-readable discriminator for validation errors. Lets
@@ -12,23 +10,29 @@ import { UnusedDeclarationsValidator } from "./unusedDeclarationsValidator";
  * grepping message text. Add new variants here when a new validator pass
  * introduces a structurally distinct error class.
  *
- * Existing kinds (commit 2a, v2.1.0):
+ * Existing kinds:
  *   - "empty-name"           — declaration name is blank
  *   - "duplicate-name"       — two declarations of the same kind share a name
  *   - "unresolved-reference" — ref target doesn't exist in the local namespace
  *   - "reference-cycle"      — concept refs form a cycle
  *
- * Reserved for commit 2b (per-library scoping; not in use yet):
- *   - "external-library-not-included"
- *   - "qualified-ref-unresolved"
- *   - "alias-not-yet-supported"
- *   - "redundant-local-include"
+ * Reserved (producers land in commit 2e, when per-library scoping fires
+ * qualified-ref diagnostics from `validateCRLImports`):
+ *   - "external-library-not-included" — qualified ref `"Pkg"."X"` to a package
+ *     library that the current file did not `include`.
+ *   - "qualified-ref-unresolved"      — qualified ref `"Lib"."X"` where Lib is
+ *     in scope but X isn't declared there for the requested kind.
+ *
+ * Import-graph diagnostics (`alias-not-yet-supported`, `redundant-local-include`)
+ * are `ImportDiagnostic`s, not `ValidationError`s — see `src/imports/types.ts`.
  */
 export type ValidationErrorKind =
   | "empty-name"
   | "duplicate-name"
   | "unresolved-reference"
-  | "reference-cycle";
+  | "reference-cycle"
+  | "external-library-not-included"
+  | "qualified-ref-unresolved";
 
 export interface ValidationError {
   /**
@@ -69,16 +73,12 @@ export interface ValidatorOptions {
 }
 
 export class Validator {
-  private readonly unusedDeclarationsValidator: UnusedDeclarationsValidator;
   private readonly nameUniquenessValidator: NameUniquenessValidator;
-  private readonly actionUniquenessValidator: ActionUniquenessValidator;
   private readonly referenceResolver: ReferenceResolver;
   private readonly cycleDetector: CycleDetector;
 
   constructor() {
-    this.unusedDeclarationsValidator = new UnusedDeclarationsValidator();
     this.nameUniquenessValidator = new NameUniquenessValidator();
-    this.actionUniquenessValidator = new ActionUniquenessValidator();
     this.referenceResolver = new ReferenceResolver();
     this.cycleDetector = new CycleDetector();
   }
