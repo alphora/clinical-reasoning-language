@@ -2,7 +2,7 @@
   "name": "crl-language-support",
   "displayName": "Clinical Reasoning Language Support",
   "description": "CRL keyword highlighting, live validation diagnostics, CRL→CQL emit, and catalog-driven authoring help (completion + hover) for .crl Markdown files.",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "publisher": "smiledigitalhealth",
   "engines": {
     "vscode": "^1.85.0"
