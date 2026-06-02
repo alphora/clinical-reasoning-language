@@ -18,19 +18,26 @@ describe("emitCQLImports (per-CRL v2.1.0)", () => {
     expect(result.success).toBe(true);
 
     // Every library in the include-walk closure gets its own CQL.
+    // 4 layers: cms22 (interface) → inferred → asserted → terminology.
     const names = result.cqlByLibrary.map((e) => e.libraryName).sort();
     expect(names).toEqual([
       "CMS22",
       "CMS22 Asserted",
       "CMS22 Inferred",
-      "CMS22 Interface",
       "CMS22 Terminology",
     ]);
 
-    // The shell library declaration uses simple identifier when no spaces.
+    // The interface library (the unsuffixed file) emits as `library CMS22`
+    // — simple identifier, unquoted (CQL convention for the public entry
+    // point that the FHIR Measure resource references).
     const cms22 = findLib(result, "CMS22") ?? "";
     expect(cms22).toMatch(/library CMS22\n/);
     expect(cms22).not.toMatch(/library CMS22 version/);
+
+    // The cms22 (interface) library has its IP concept + an include of
+    // the inferred layer.
+    expect(cms22).toMatch(/define "Initial Population"/);
+    expect(cms22).toMatch(/include "CMS22 Inferred"/);
 
     // Library names with spaces emit as quoted CQL identifiers.
     const inferred = findLib(result, "CMS22 Inferred") ?? "";
@@ -54,22 +61,12 @@ describe("emitCQLImports (per-CRL v2.1.0)", () => {
     // Terminology lives in the terminology library only.
     const term = findLib(result, "CMS22 Terminology") ?? "";
     expect(term).toMatch(/valueset "Qualifying Encounters Valueset"/);
-    // And the interface library REFERS to it via a qualified concept ref,
-    // not by inlining it.
-    const interfaceCql = findLib(result, "CMS22 Interface") ?? "";
-    expect(interfaceCql).not.toMatch(/valueset "Qualifying Encounters Valueset"/);
+    // And the interface library does NOT inline the terminology.
+    expect(cms22).not.toMatch(/valueset "Qualifying Encounters Valueset"/);
 
-    // Concepts live in their declaring library.
+    // Asserted concepts live in their declaring library.
     const asserted = findLib(result, "CMS22 Asserted") ?? "";
     expect(asserted).toMatch(/define "Qualifying Encounter Source"/);
-    expect(interfaceCql).toMatch(/define "Initial Population"/);
-
-    // Shell-root pattern: the root library (CMS22) has zero concepts and
-    // only an `include "CMS22 Interface"`. Per round-1 code-review C-1,
-    // the source-level include must surface in the emitted CQL so the
-    // shell actually wires up downstream. (Was a silent dropper before
-    // the fix.)
-    expect(cms22).toMatch(/include "CMS22 Interface"/);
   });
 
   it("renders cross-file qualified refs as native CQL qualified refs", () => {

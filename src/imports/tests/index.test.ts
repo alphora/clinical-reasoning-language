@@ -22,7 +22,6 @@ describe("resolveImports (end-to-end)", () => {
       "CMS22 Terminology",
       "CMS22 Asserted",
       "CMS22 Inferred",
-      "CMS22 Interface",
       "CMS22",
     ]);
     expect(graph.namespace.concepts.has("Initial Population")).toBe(true);

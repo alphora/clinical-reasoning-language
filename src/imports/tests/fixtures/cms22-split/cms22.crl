@@ -1,3 +1,7 @@
-# CMS22 BMI Screening and Follow-Up (test shell)
+# CMS22 measure (test) — the unsuffixed file is the Quality Measure interface layer
 library "CMS22".
-include "CMS22 Interface".
+include "CMS22 Inferred".
+
+concept "Initial Population":
+- type is Encounter.
+- defined as "CMS22 Inferred"."Qualifying Encounter".

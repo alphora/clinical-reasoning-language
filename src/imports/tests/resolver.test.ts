@@ -37,7 +37,6 @@ describe("walkIncludes", () => {
       "CMS22 Terminology",
       "CMS22 Asserted",
       "CMS22 Inferred",
-      "CMS22 Interface",
       "CMS22",
     ]);
     expect(resolvedLibraries[resolvedLibraries.length - 1].isRoot).toBe(true);
