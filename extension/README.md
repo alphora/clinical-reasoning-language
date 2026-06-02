@@ -51,6 +51,56 @@ Each takes inline `code` or a `.crl` file `path` and returns a `ParseResult`-sha
 - **Hover** over a narrative phrase, a type/valuetype token, or a concept reference for the catalog entry or declaration info.
 - **Diagnostics** — the bundled CRL validator runs on document open / change (debounced 250 ms) / save. Findings appear as VS Code diagnostics (red for errors, yellow for unresolved-reference warnings in soft mode). Hard-mode validation is available via the `validate_crl` MCP tool.
 
+### Keystroke reference
+
+All gestures below work in any `.crl` file once the extension is active.
+"Click" assumes a left-click; substitute the equivalent VS Code chord on
+your keyboard layout if different.
+
+#### Navigation
+
+| Gesture | What it does |
+|---|---|
+| **F12** / **Ctrl+Click** on a quoted ref | Jump to the declaration of that concept / terminology / decision / activity. Works for bare refs (resolved in the local library) and qualified refs (`"Lib"."Name"` → that library's file). |
+| **F12** on the `"Lib"` qualifier portion of a ref | Jump to that library's `library "Lib".` line in its source file. |
+| **Ctrl+Click** on `include "Lib"` | Open the included library's file. |
+| **Shift+F12** on a declaration or any ref site | Open the References view listing every site that uses that name across the project. |
+| **Ctrl+T** | Workspace Symbols — fuzzy-search every concept / terminology / decision / activity across every CRL project in the workspace. |
+| **F2** on a declaration or ref name | Rename the declaration and every reference to it (atomic multi-file edit). Per-(library, kind) collision check matches validator semantics. Library rename is rejected in v2.1.0. |
+
+#### Outline / overview
+
+| Gesture | What it does |
+|---|---|
+| **View → Outline** (Explorer side panel) | Per-file outline. Top node is the file's library; children are its concepts (Variable icon) / terminologies (Constant) / decisions (Function) / activities (Class). Click to jump. |
+| **Ctrl+Shift+O** | Same outline, but in the Command Palette as a quick-picker. |
+
+#### Authoring help
+
+| Gesture | What it does |
+|---|---|
+| **Ctrl+Space** | Manually open the completion popup. Filtered to the slot's expected kind: `coded from "│"` → terminologies, `defined as "│"` / `definition is "│"` ref slots → concepts, `recommend "│"` → activities, `use "│"` → decisions. |
+| Typing `"` inside a body | Auto-triggers the completion popup with the same kind-filtered list. |
+| Typing `.` after `"Lib"` | Auto-triggers qualified-ref completion — only that library's declarations of the slot's expected kind appear. |
+| Mouse hover on a narrative phrase / type token / concept ref | Inline catalog entry or declaration info (signature, library, body preview). |
+| **Ctrl+K Ctrl+I** | Force the hover popup at the cursor. |
+
+#### Diagnostics
+
+No keystroke required — diagnostics run automatically on document open
+and on every change (debounced 250 ms) and on save. Red squiggles =
+errors, yellow squiggles = warnings (soft mode demotes
+unresolved-reference findings to warnings during authoring; the
+`validate_crl` MCP tool runs hard mode if you want errors instead).
+
+#### Commands
+
+Open the Command Palette with **Ctrl+Shift+P** and type:
+
+- **CRL: Set up tools** — run setup manually (e.g. if automatic setup is off).
+- **CRL: Remove tools** — undo everything.
+- **CRL: Refresh project cache** — force a full re-scan of all `.crl` files in the workspace (useful after large external file changes).
+
 ### Customized highlight colors
 
 If your existing user settings already have a token color for a CRL scope (e.g. you customized `entity.name.type.crl`), the extension prompts you per scope on first run: **Replace**, **Keep mine**, or **Don't ask again**. Choices persist in the extension's global state, so subsequent activations don't re-ask. **CRL: Remove tools** clears nothing of yours; the persisted preferences just stop being consulted.

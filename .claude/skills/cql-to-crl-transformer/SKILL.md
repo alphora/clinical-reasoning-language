@@ -18,7 +18,7 @@ This skill is the precursor to the future "CQL/Narrative → CRL transformer" MC
 Read these in full **once** at the start of a session and keep them in mind:
 
 1. **CRITICAL — DO NOT SKIP**: [features/cql-pattern-mining/defined-as-is-semantic-composition.md](../../../features/cql-pattern-mining/defined-as-is-semantic-composition.md). This document states the SINGLE most important design principle for this skill: `defined as` is SEMANTIC composition, not boolean logic. The author declares the result `(type, valuetype)`; `sem-and` / `sem-or` / `sem-not` do NOT type-check operands. Mixed-shape operands are legal under explicit author declaration. Multiple agent runs have produced wrong transformations by mis-reading this — treating `sem-and` as boolean AND with strict operand-type matching, "fixing" non-defects, then introducing new ones. Read this doc end-to-end before doing any transformation work. The same principle applies to the sibling body kind `definition is` (narrative-predicate form) — see the "sibling form" section of that doc.
-2. The canonical rule: [features/cql-pattern-mining/cql-to-crl-type-valuetype-rule.md](../../../features/cql-pattern-mining/cql-to-crl-type-valuetype-rule.md) — the whole document, especially §1 (core rule), §7 (validator chain check), and §10 (quick checklist).
+2. The canonical rule: [features/cql-pattern-mining/cql-to-crl-type-valuetype-rule.md](../../../features/cql-pattern-mining/cql-to-crl-type-valuetype-rule.md) — the whole document, especially §1 (core rule), §7 (validator chain check, including §7.5 the asserted-as-contract post-pass), and §10 (quick checklist).
 3. The CRL v0.7 grammar concepts: asserted (`coded from`), composition (`defined as`), narrative predicate (`definition is`).
 
 ## Inputs
@@ -27,7 +27,44 @@ The skill works at three granularities. Pick the one that matches the caller's i
 
 1. **Single CQL define** — text of one define + name → produce one CRL concept declaration.
 2. **A CRL concept name + a path to a CQL library** — find the define, then transform it.
-3. **A whole CQL library + a target CRL filename** — produce a full CRL file (declarations + bodies).
+3. **A whole CQL library + a target directory** — produce a **4-file split** (terminology / asserted / inferred / interface), not a monolithic CRL file. See "Whole-library output layout" below.
+
+### Whole-library output layout (per v2.1.0)
+
+A whole-library transform emits four `.crl` files under the target
+directory, mirroring the cms22-split / cms69-split convention:
+
+| File              | `library "X".`            | Layer        | Contents |
+|---|---|---|---|
+| `<base>.crl`              | `"<Measure>"`             | interface    | The Quality Measure API: Initial Population / Denominator / Denominator Exclusions / Numerator / Denominator Exceptions. Whatever the downstream consumer (Measure engine / registry) reads. |
+| `<base>-inferred.crl`     | `"<Measure> Inferred"`    | inferred     | Every `defined as` / `definition is` concept — the measure logic. |
+| `<base>-asserted.crl`     | `"<Measure> Asserted"`    | asserted     | Every `coded from` concept — FHIR resource-to-valueset bindings. |
+| `<base>-terminology.crl`  | `"<Measure> Terminology"` | terminology  | Every `terminology` declaration plus the `Measurement Period` stub. |
+
+Rules for the output:
+
+- The **interface file is unsuffixed** so its emitted CQL filename
+  matches the downstream identifier (e.g. `CMS69.cql` is the entry
+  point for the FHIR `Measure` resource).
+- **No `include` lines** between local layers. Per v2.1.0 lock 026,
+  local sibling libraries auto-resolve via qualified refs without an
+  `include`; emitting them would just produce
+  `redundant-local-include` warnings. The per-CRL emitter still emits
+  a CQL `include` for every cross-library reference it sees in each
+  layer's body, so the produced CQL has a self-contained dependency
+  graph.
+- **`include` IS required** for any externally-`npm install`ed CRL
+  package (`include "Pkg".`) — that's how v2.1.0 distinguishes local
+  siblings from external deps.
+- **Cross-layer refs are qualified**: write
+  `"<Measure> Asserted"."BMI Observations"` from the inferred layer,
+  not bare `"BMI Observations"`. Bare refs are local-only under
+  per-library scoping (validator §7).
+- Emit a `package.json` `{ "name": "<base>-demonstration-split",
+  "version": "1.0.0", "private": true }` alongside so
+  `findProjectRoot` stops at the split directory.
+- Emit a `NOTES.md` listing the layout table and the re-emit/validate
+  commands (mirror cms22-split/NOTES.md format).
 
 ## Procedure (per concept)
 
@@ -97,6 +134,44 @@ For each transformation, tag confidence:
 - **LOW** — Shape is ambiguous, chain is unresolvable, or the pair is outside the §5 allowed set.
 
 **Stop and escalate for any LOW.** Do not commit a low-confidence transformation; surface it to the operator for judgment.
+
+## Post-pass — asserted concepts as required-valuetypes contracts
+
+After every individual concept has been transformed (every surface
+concept has a final `(type, valuetype)`), run this whole-corpus pass.
+It only applies to **whole-library** runs, not single-concept ones.
+
+For each **asserted concept** `A` in the model:
+
+1. Compute the **reverse-dependency closure** of `A` — every concept
+   `C` in the model whose body, transitively followed through every
+   `defined as` / `definition is` ref, eventually reaches `A` as its
+   first FHIR-resource-bearing subject (§7.1 of the rule doc).
+2. Collect the `valuetype` of every `C` in that closure, with one
+   exclusion: **`boolean` does NOT propagate**. Per §1, boolean is the
+   consumer's property (it represents a patient-level predicate the
+   consumer derives), not a property the asserted source needs to
+   advertise. Drop boolean-valued consumers from the set.
+3. Union the resulting set with `A`'s own declared valuetypes.
+4. Emit `A` with the full union as multiple `valuetype is X.` lines —
+   the AST supports a `valueTypes?: string[]` array, so multi-valuetype
+   on a single concept is grammatical:
+
+   ```crl
+   concept "Blood Pressure Panels":
+   - type is Observation.
+   - valuetype is CodeableConcept.
+   - valuetype is Quantity.
+   - coded from "Blood pressure panel with all children optional".
+   ```
+
+The asserted concept ends up advertising **every shape its consumers
+project from it** — the asserted-as-contract pattern. Downstream tools
+(emitter, future model viewers, IDE completion) read the asserted's
+valuetypes set to know what projections are legal.
+
+Confidence rules apply here too: if a consumer's `(type, valuetype)`
+puts the asserted's union outside §5's per-FHIR-type set, flag it.
 
 ## Escalation criteria
 

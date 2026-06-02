@@ -256,7 +256,37 @@ Rule: if the subject is itself a boolean-shape concept (`type is Observation` an
 
 If the subject's `valuetype` is missing AND the subject is not Observation, error: cannot validate refinement/value-bearing without a `V_S` to compare against.
 
-### 7.5 Future cross-check against CRLPatterns.cql
+### 7.5 Asserted concepts as required-valuetypes contracts (post-pass)
+
+An asserted concept's declared valuetypes are the **set of projections
+its consumers may legally take**. Concretely, after all surface concepts
+have been declared via §1–§5 above, run this whole-corpus pass:
+
+For each asserted concept `A`:
+
+1. Walk the reverse-dependency closure of `A` — every concept `C` in the
+   model whose chain (per §7.1's subject-tracing rules) bottoms out at
+   `A`.
+2. Collect `V_C` for every such `C`, with one exclusion: **`boolean`
+   does NOT contribute** to the set. Boolean is the consumer's property
+   per §1 — a patient-level predicate the consumer derives, not a shape
+   the source advertises. If every asserted absorbed boolean from every
+   downstream predicate, every asserted would end up boolean.
+3. Union the result with `A`'s own declared valuetypes.
+4. Emit `A` with the union as multiple `valuetype is X.` lines (the AST
+   supports `valueTypes?: string[]`).
+
+The asserted advertises **every shape its consumers project from it**.
+This is the contract surface — downstream tools (the emitter, future
+model viewers, IDE qualified-ref completion) read the asserted's
+valuetypes set to know what projections are legal.
+
+The validator's check on this set is: for any refinement-shape consumer
+`C` of `A` with `(T_C = T_A, V_C)`, `V_C` must be in `A`'s valuetypes
+set. (`V_C = boolean` is exempt per the rule above — boolean predicates
+don't need a matching valuetype on the asserted.)
+
+### 7.6 Future cross-check against CRLPatterns.cql
 
 Once todo 5 ships, each pattern function in CRLPatterns.cql has a concrete return type. The validator gains a second consistency check: the function's return type must match the concept's `(T_C, V_C)` according to:
 
