@@ -1,19 +1,19 @@
-# CMS22 Blood Pressure Screening and Follow-Up
-library "CMS22".
-include "CMS22 Inferred".
+# CMS69 BMI Screening and Follow-Up
+library "CMS69".
+include "CMS69 Inferred".
 
 // The unsuffixed file is the Quality Measure interface layer
 // (IP / Denom / Numerator / Exclusions / Exceptions — what the Measure
 // evaluation engine consumes). Asserted concepts, inferred derivations,
-// and terminology live in cms22-asserted.crl / cms22-inferred.crl /
-// cms22-terminology.crl.
+// and terminology live in cms69-asserted.crl / cms69-inferred.crl /
+// cms69-terminology.crl.
 
 // ============ Measure API ============
 
 concept "Initial Population":
 - type is Observation.
 - valuetype is boolean.
-- defined as "CMS22 Inferred"."Aged 18+ at Measurement Period Start".
+- defined as "CMS69 Inferred"."Aged 18+ at Measurement Period Start".
 
 concept "Denominator":
 - type is Observation.
@@ -23,22 +23,18 @@ concept "Denominator":
 concept "Denominator Exclusions":
 - type is Observation.
 - valuetype is boolean.
-- defined as "CMS22 Inferred"."Verified Hypertension As Of Qualifying Encounter".
+- defined as "CMS69 Inferred"."Is Pregnant During Measurement Period".
 
 concept "Numerator":
 - type is Observation.
 - valuetype is boolean.
 - defined as
 (
-   "CMS22 Inferred"."Normal BP Reading"
+   "CMS69 Inferred"."High BMI And Follow Up Provided"
    sem-or
-   "CMS22 Inferred"."Elevated BP With Followup"
+   "CMS69 Inferred"."Low BMI And Follow Up Provided"
    sem-or
-   "CMS22 Inferred"."First HTN With Followup"
-   sem-or
-   "CMS22 Inferred"."Second HTN 130s With Followup"
-   sem-or
-   "CMS22 Inferred"."Second HTN 140+ With Followup"
+   "CMS69 Inferred"."Has Normal BMI"
 ).
 
 concept "Denominator Exceptions":
@@ -46,7 +42,7 @@ concept "Denominator Exceptions":
 - valuetype is boolean.
 - defined as
 (
-   "CMS22 Inferred"."BP Measurement Not Done With Reason"
+   "CMS69 Inferred"."Medical Reason For Not Documenting A Follow Up Plan For Low Or High BMI"
    sem-or
-   "CMS22 Inferred"."HTN Followup Declined By Patient"
+   "CMS69 Inferred"."Medical Reason Or Patient Reason For Not Performing BMI Exam"
 ).
