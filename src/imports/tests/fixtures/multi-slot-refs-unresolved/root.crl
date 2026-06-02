@@ -1,0 +1,19 @@
+# Unresolved refs in every decision/activity slot
+library "UnresolvedRefs".
+
+activity "Some Activity":
+- request CPGServiceRequest.
+- with "Missing Terminology".
+
+decision "Bad Triage":
+- when "Missing Concept" then recommend activity "Missing Activity".
+
+decision "Calls Other":
+- when "Some Trigger" then use decision "Missing Decision".
+
+concept "Some Trigger":
+- type is Encounter.
+- coded from "Trigger VS".
+
+terminology "Trigger VS":
+- valueset is `urn:trigger-vs`.

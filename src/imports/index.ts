@@ -148,7 +148,6 @@ export type {
   RegistryDuplicateDiagnostic,
   UnresolvedIncludeDiagnostic,
   CycleDiagnostic,
-  NameConflictDiagnostic,
   AliasNotYetSupportedDiagnostic,
   RedundantLocalIncludeDiagnostic,
 } from "./types";

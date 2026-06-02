@@ -7,6 +7,7 @@ import {
   CycleDiagnostic,
   UnresolvedIncludeDiagnostic,
   AliasNotYetSupportedDiagnostic,
+  RedundantLocalIncludeDiagnostic,
 } from "./types";
 
 /**
@@ -23,15 +24,27 @@ import {
  *
  * Returns `undefined` if no match; the caller emits `unresolved-include`.
  */
+interface IncludeResolution {
+  entry: RegistryEntry;
+  // True only when the package lookup MISSED and the local-fallback path
+  // returned the result. The caller uses this to fire
+  // `redundant-local-include` per v2.1.0 lock 026 (locals auto-resolve
+  // without an `include`). Carrying the flag avoids reconstructing the
+  // decision from `entry.origin` post-hoc, which would mis-fire when
+  // package wins package-first while a local of the same name exists.
+  viaLocalFallback: boolean;
+}
+
 function resolveIncludeTarget(
   from: RegistryEntry,
   includeName: string,
   registry: Registry,
-): RegistryEntry | undefined {
+): IncludeResolution | undefined {
   const pkg = registry.byNamePackage.get(includeName);
-  if (pkg) return pkg;
+  if (pkg) return { entry: pkg, viaLocalFallback: false };
   if (from.origin === "local" || from.origin === "root") {
-    return registry.byNameLocal.get(includeName);
+    const local = registry.byNameLocal.get(includeName);
+    if (local) return { entry: local, viaLocalFallback: true };
   }
   return undefined;
 }
@@ -99,7 +112,20 @@ export function walkIncludes(
         } as UnresolvedIncludeDiagnostic);
         continue;
       }
-      visit(found, include);
+      // v2.1.0: warn when the include resolved via the local-fallback
+      // path. Per lock 026, local siblings auto-resolve via qualified
+      // refs without an `include`; writing `include "Sibling"` is
+      // redundant scaffolding. Warning, not error — operators may still
+      // be in the habit of writing them.
+      if (found.viaLocalFallback && entry.name !== null) {
+        diagnostics.push({
+          kind: "redundant-local-include",
+          severity: "warning",
+          include,
+          from: { filePath: entry.filePath, libraryName: entry.name },
+        } as RedundantLocalIncludeDiagnostic);
+      }
+      visit(found.entry, include);
     }
 
     activeStack.pop();

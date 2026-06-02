@@ -1,6 +1,13 @@
 import type {
   CRL,
+  Statement,
   Concept,
+  Decision,
+  Activity,
+  WhenBlock,
+  WhenBlockBody,
+  BlockBody,
+  ActionStatement,
   CompositionExpression,
   DefinedAsComposition,
   NarrativeClause,
@@ -15,30 +22,44 @@ import { lookupKnownLibrary } from "../imports/scopes";
 
 import { ValidationError } from "./validator";
 
-type RefKind = "concept" | "terminology";
+type RefKind = "concept" | "terminology" | "decision" | "activity";
+
+// Map RefKind (singular) to the plural keys used by `LibraryScopeNames`
+// in `src/imports/scopes.ts`. The scope shape uses plural for historical
+// reasons; the validator uses singular to match the RefKind discriminator.
+const REF_KIND_TO_PLURAL = {
+  concept: "concepts",
+  terminology: "terminologies",
+  decision: "decisions",
+  activity: "activities",
+} as const;
 
 /**
- * Resolves references in concept body slots:
- *   - `coded from "T"` — T must be a terminology
- *   - `defined as ...` — refs must be concepts (bare or composition)
- *   - `definition is <narrative>` — concept refs in narrative + in arg
- *     disjunction/conjunction
+ * Resolves references across every ref slot in the AST:
+ *   - concept body:
+ *       `coded from "T"`               (T is a terminology)
+ *       `defined as "X"` / composition (X is a concept)
+ *       `definition is <narrative>`     (concept refs in narrative)
+ *   - decision body (recursive through nested WhenBlock + BlockBody):
+ *       `when "C"`                     (C is a concept)
+ *       `recommend activity "A"`       (A is an activity)
+ *       `use decision "D"`             (D is a decision)
+ *   - activity body:
+ *       `with "T"`                     (T is a terminology, when slot used)
+ *
+ * Empty refs (`when "" then ...`) are treated as the documented sentinel
+ * and skipped without firing a diagnostic.
  *
  * Single-file mode (no `sources`): synthetic self-scope from `ast.library`.
  * Bare refs resolve against the AST's own declarations. Qualified refs
  * whose qualifier == `ast.library.name` are treated as bare; any other
- * qualifier emits `external-library-not-included`.
+ * qualifier emits `external-library-not-included` (operator-approved
+ * extension squiggles until Chunk B).
  *
- * Multi-file mode (with `sources`): each concept walked with its owning
- * scope. Bare refs resolve in `scope.localNames`. Qualified refs are
- * gated by `scope.knownLibraries` + `scope.explicitIncludes` per the
+ * Multi-file mode (with `sources`): each statement walked with its owning
+ * scope. Bare refs resolve in `scope.localNames[kind]`. Qualified refs
+ * are gated by `scope.knownLibraries` + `scope.explicitIncludes` per the
  * v2.1.0 lock 026 visibility rules.
- *
- * NOTE — v2.1.0 commit 2c: this validator does NOT yet walk non-concept-body
- * ref slots (WhenBlock.conceptName, UseDecision.decisionName,
- * RecommendActivity.activityName, ActivityWith.terminologyReference).
- * Those refs parse to ReferenceName but go un-validated until commit 2e
- * (or later). Known limitation; operator-approved.
  */
 export class ReferenceResolver {
   validate(ast: CRL, sources?: SourceContext[]): ValidationError[] {
@@ -52,15 +73,7 @@ export class ReferenceResolver {
 
   private validateSelfScope(ast: CRL): ValidationError[] {
     const errors: ValidationError[] = [];
-    const conceptNames = new Set<string>();
-    const terminologyNames = new Set<string>();
-    for (const statement of ast.statements) {
-      if (statement.type === "Concept" && statement.name) {
-        conceptNames.add(statement.name);
-      } else if (statement.type === "Terminology" && statement.name) {
-        terminologyNames.add(statement.name);
-      }
-    }
+    const names = collectNames(ast.statements);
 
     // Empty-name self-scope (post-parse-error placeholder): skip qualified-ref
     // policing — the parse error is the real diagnostic, don't pile on.
@@ -68,13 +81,14 @@ export class ReferenceResolver {
     const policeQualified = selfLibrary !== "";
 
     for (const statement of ast.statements) {
-      if (statement.type !== "Concept") continue;
-      this.walkConcept(
+      this.walkStatement(
         statement,
         {
-          parentName: statement.name,
-          conceptNames,
-          terminologyNames,
+          parentName: statement.type === "Concept" || statement.type === "Decision" || statement.type === "Activity"
+            ? statement.name
+            : "<unknown>",
+          parentKind: parentKindOf(statement),
+          localNames: names,
           selfLibrary,
           policeQualified,
           libraryName: undefined,
@@ -94,13 +108,21 @@ export class ReferenceResolver {
     const errors: ValidationError[] = [];
 
     for (const { stmt, scope } of sources) {
-      if (stmt.type !== "Concept") continue;
-      this.walkConcept(
+      // Scope's localNames already pre-populated with per-library decls
+      // (concepts + terminologies + decisions + activities) by buildLibraryScopes.
+      this.walkStatement(
         stmt,
         {
-          parentName: stmt.name,
-          conceptNames: scope.localNames.concepts,
-          terminologyNames: scope.localNames.terminologies,
+          parentName: stmt.type === "Concept" || stmt.type === "Decision" || stmt.type === "Activity"
+            ? stmt.name
+            : "<unknown>",
+          parentKind: parentKindOf(stmt),
+          localNames: {
+            concept: scope.localNames.concepts,
+            terminology: scope.localNames.terminologies,
+            decision: scope.localNames.decisions,
+            activity: scope.localNames.activities,
+          },
           selfLibrary: scope.currentLibrary,
           policeQualified: true,
           libraryName: scope.currentLibrary,
@@ -114,13 +136,28 @@ export class ReferenceResolver {
     return errors;
   }
 
-  // ------------------------ shared concept walk -------------------------
+  // -------------------------- top-level dispatch ------------------------
 
-  private walkConcept(
-    concept: Concept,
-    ctx: WalkContext,
-    errors: ValidationError[],
-  ): void {
+  private walkStatement(stmt: Statement, ctx: WalkContext, errors: ValidationError[]): void {
+    switch (stmt.type) {
+      case "Concept":
+        this.walkConcept(stmt as Concept, ctx, errors);
+        return;
+      case "Decision":
+        this.walkDecision(stmt as Decision, ctx, errors);
+        return;
+      case "Activity":
+        this.walkActivity(stmt as Activity, ctx, errors);
+        return;
+      case "Terminology":
+        // Terminology bodies don't carry refs (just valueset URLs + codes).
+        return;
+    }
+  }
+
+  // ------------------------ concept body walk ---------------------------
+
+  private walkConcept(concept: Concept, ctx: WalkContext, errors: ValidationError[]): void {
     switch (concept.definition.type) {
       case "CodedFromDefinition": {
         const termRef = concept.definition.terminologyName;
@@ -146,11 +183,7 @@ export class ReferenceResolver {
     }
   }
 
-  private walkComposition(
-    expr: CompositionExpression,
-    ctx: WalkContext,
-    errors: ValidationError[],
-  ): void {
+  private walkComposition(expr: CompositionExpression, ctx: WalkContext, errors: ValidationError[]): void {
     switch (expr.type) {
       case "SemOrExpression":
       case "SemAndExpression":
@@ -170,21 +203,13 @@ export class ReferenceResolver {
     }
   }
 
-  private walkNarrative(
-    clause: NarrativeClause,
-    ctx: WalkContext,
-    errors: ValidationError[],
-  ): void {
+  private walkNarrative(clause: NarrativeClause, ctx: WalkContext, errors: ValidationError[]): void {
     for (const el of clause.elements) {
       this.walkNarrativeElement(el, ctx, errors);
     }
   }
 
-  private walkNarrativeElement(
-    el: NarrativeElement,
-    ctx: WalkContext,
-    errors: ValidationError[],
-  ): void {
+  private walkNarrativeElement(el: NarrativeElement, ctx: WalkContext, errors: ValidationError[]): void {
     switch (el.type) {
       case "NConceptRef":
         this.checkRef(el.value, "concept", el.location, ctx, errors);
@@ -203,11 +228,7 @@ export class ReferenceResolver {
     }
   }
 
-  private walkArgValue(
-    av: ArgValue,
-    ctx: WalkContext,
-    errors: ValidationError[],
-  ): void {
+  private walkArgValue(av: ArgValue, ctx: WalkContext, errors: ValidationError[]): void {
     switch (av.type) {
       case "NConceptRef":
         this.checkRef(av.value, "concept", av.location, ctx, errors);
@@ -226,6 +247,65 @@ export class ReferenceResolver {
     }
   }
 
+  // ------------------------ decision body walk --------------------------
+
+  private walkDecision(decision: Decision, ctx: WalkContext, errors: ValidationError[]): void {
+    for (const wb of decision.body.statements) {
+      this.walkWhenBlock(wb, ctx, errors);
+    }
+  }
+
+  private walkWhenBlock(wb: WhenBlock, ctx: WalkContext, errors: ValidationError[]): void {
+    // `when "Concept"` — the conceptName ref. Empty name is the documented
+    // sentinel for "always" (per USER_GUIDE); checkRef skips empty refs.
+    this.checkRef(wb.conceptName, "concept", wb.location, ctx, errors);
+    this.walkWhenBlockBody(wb.body, ctx, errors);
+  }
+
+  private walkWhenBlockBody(body: WhenBlockBody, ctx: WalkContext, errors: ValidationError[]): void {
+    if (body.type === "BlockBody") {
+      this.walkBlockBody(body, ctx, errors);
+    } else {
+      // ActionStatement
+      this.walkActionStatement(body as ActionStatement, ctx, errors);
+    }
+  }
+
+  private walkBlockBody(block: BlockBody, ctx: WalkContext, errors: ValidationError[]): void {
+    for (const stmt of block.statements) {
+      if (stmt.type === "WhenBlock") {
+        this.walkWhenBlock(stmt, ctx, errors);
+      } else {
+        // ActionStatement
+        this.walkActionStatement(stmt, ctx, errors);
+      }
+    }
+  }
+
+  private walkActionStatement(stmt: ActionStatement, ctx: WalkContext, errors: ValidationError[]): void {
+    const action = stmt.action;
+    if (action.type === "RecommendActivity") {
+      this.checkRef(action.activityName, "activity", action.location, ctx, errors);
+    } else if (action.type === "UseDecision") {
+      this.checkRef(action.decisionName, "decision", action.location, ctx, errors);
+    }
+  }
+
+  // ------------------------ activity body walk --------------------------
+
+  private walkActivity(activity: Activity, ctx: WalkContext, errors: ValidationError[]): void {
+    const withClause = activity.body.withClause;
+    if (withClause && withClause.terminologyReference !== undefined) {
+      this.checkRef(
+        withClause.terminologyReference,
+        "terminology",
+        withClause.location,
+        ctx,
+        errors,
+      );
+    }
+  }
+
   // ---------------------------- ref check -------------------------------
 
   private checkRef(
@@ -236,14 +316,12 @@ export class ReferenceResolver {
     errors: ValidationError[],
   ): void {
     const refName = getRefName(ref);
-    if (!refName) return;
+    if (!refName) return; // empty sentinel — `when ""` etc. — skip silently
 
     if (!isQualifiedRef(ref)) {
-      // Bare ref: resolve in current library's local names.
-      const found = refKind === "concept"
-        ? ctx.conceptNames.has(refName)
-        : ctx.terminologyNames.has(refName);
-      if (!found) {
+      // Bare ref: resolve in current library's local names for the
+      // expected kind.
+      if (!ctx.localNames[refKind].has(refName)) {
         errors.push(this.unresolvedRefError(refKind, refName, ctx, location));
       }
       return;
@@ -252,11 +330,7 @@ export class ReferenceResolver {
     // Qualified ref `"Lib"."Name"`.
     const targetLib = getRefLibrary(ref) ?? "";
     if (targetLib === ctx.selfLibrary) {
-      // Treat as bare in current library.
-      const found = refKind === "concept"
-        ? ctx.conceptNames.has(refName)
-        : ctx.terminologyNames.has(refName);
-      if (!found) {
+      if (!ctx.localNames[refKind].has(refName)) {
         errors.push(this.unresolvedRefError(refKind, refName, ctx, location));
       }
       return;
@@ -264,7 +338,6 @@ export class ReferenceResolver {
 
     if (!ctx.policeQualified) {
       // Self-scope mode with empty library name (parse-error placeholder).
-      // Skip new diagnostic firing.
       return;
     }
 
@@ -283,9 +356,7 @@ export class ReferenceResolver {
         errors.push(externalLibraryNotIncluded(targetLib, ctx, location));
         return;
       }
-      const targetSet = refKind === "concept"
-        ? target.names.concepts
-        : target.names.terminologies;
+      const targetSet = target.names[REF_KIND_TO_PLURAL[refKind]];
       if (!targetSet.has(refName)) {
         errors.push(qualifiedRefUnresolved(targetLib, refName, ctx, location));
       }
@@ -302,9 +373,7 @@ export class ReferenceResolver {
     ctx: WalkContext,
     location: Location,
   ): ValidationError {
-    const msg = refKind === "terminology"
-      ? `Undeclared terminology "${refName}" in concept "${ctx.parentName}" (no terminology block declares this name)`
-      : `Unresolved reference "${refName}" in concept "${ctx.parentName}" (no concept declared with this name)`;
+    const msg = unresolvedMessage(refKind, refName, ctx);
     return {
       kind: "unresolved-reference",
       message: msg,
@@ -316,10 +385,64 @@ export class ReferenceResolver {
   }
 }
 
+interface NameBuckets {
+  concept: Set<string>;
+  terminology: Set<string>;
+  decision: Set<string>;
+  activity: Set<string>;
+}
+
+function emptyBuckets(): NameBuckets {
+  return {
+    concept: new Set(),
+    terminology: new Set(),
+    decision: new Set(),
+    activity: new Set(),
+  };
+}
+
+function collectNames(statements: Statement[]): NameBuckets {
+  const buckets = emptyBuckets();
+  for (const s of statements) {
+    if (!s.name) continue;
+    switch (s.type) {
+      case "Concept":
+        buckets.concept.add(s.name);
+        break;
+      case "Terminology":
+        buckets.terminology.add(s.name);
+        break;
+      case "Decision":
+        buckets.decision.add(s.name);
+        break;
+      case "Activity":
+        buckets.activity.add(s.name);
+        break;
+    }
+  }
+  return buckets;
+}
+
+function parentKindOf(stmt: Statement): RefKind | "<other>" {
+  if (stmt.type === "Concept") return "concept";
+  if (stmt.type === "Decision") return "decision";
+  if (stmt.type === "Activity") return "activity";
+  if (stmt.type === "Terminology") return "terminology";
+  return "<other>";
+}
+
 interface WalkContext {
   parentName: string;
-  conceptNames: Set<string>;
-  terminologyNames: Set<string>;
+  parentKind: RefKind | "<other>";
+  // Per-kind name sets for bare-ref lookup. In single-file mode this is
+  // derived from the AST's own statements; in multi-file mode it comes
+  // from `scope.localNames` (mapped to per-kind sets).
+  localNames: {
+    concept: Set<string>;
+    terminology: Set<string>;
+    decision: Set<string>;
+    activity: Set<string>;
+  };
   selfLibrary: string;
   // false only in single-file self-scope with empty library name; suppresses
   // qualified-ref diagnostic firing because the parse error is the real signal.
@@ -329,6 +452,21 @@ interface WalkContext {
   // Present only in multi-file mode; carries known-libraries + explicit
   // includes for the qualified-ref decision.
   scopeForQualified: LibraryScope | undefined;
+}
+
+function unresolvedMessage(refKind: RefKind, refName: string, ctx: WalkContext): string {
+  const parent = ctx.parentName;
+  const parentLabel = ctx.parentKind === "<other>" ? "statement" : ctx.parentKind;
+  switch (refKind) {
+    case "terminology":
+      return `Undeclared terminology "${refName}" in ${parentLabel} "${parent}" (no terminology block declares this name)`;
+    case "concept":
+      return `Unresolved reference "${refName}" in ${parentLabel} "${parent}" (no concept declared with this name)`;
+    case "decision":
+      return `Unresolved reference "${refName}" in ${parentLabel} "${parent}" (no decision declared with this name)`;
+    case "activity":
+      return `Unresolved reference "${refName}" in ${parentLabel} "${parent}" (no activity declared with this name)`;
+  }
 }
 
 function externalLibraryNotIncluded(

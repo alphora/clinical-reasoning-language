@@ -1,0 +1,9 @@
+# redundant-local-include sibling
+library "Sibling".
+
+concept "Sib C":
+- type is Encounter.
+- coded from "Sib T".
+
+terminology "Sib T":
+- valueset is `urn:sib-vs`.

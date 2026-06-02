@@ -12,8 +12,8 @@ Clinical Reasoning Language (CRL) is a domain-specific language for expressing c
 A CRL file (also called a **library**) is structured as:
 
 1. **Header** (required): A markdown line beginning with `#`. Stored in the AST as the `header` field.
-2. **Library declaration** (optional): One `library "Name" version '<v>'?.` line declaring this file's identity. Files without a `library` line are *anonymous* — valid as a CLI root, but cannot be `include`d by name from other files.
-3. **Include declarations** (optional, repeatable): `include "Name" version '<v>'?.` lines naming other libraries this file depends on. Resolved by name against a CLI `--source-path` registry, not by file path.
+2. **Library declaration** (required): One `library "Name".` line declaring this file's identity. v2.1.0 removed the previous anonymous-file mode — every CRL file must declare its library name.
+3. **Include declarations** (optional, repeatable): `include "Name".` lines naming **external** libraries this file depends on. Local sibling libraries in the same project auto-resolve via qualified refs without needing an `include` line. There is no `version` clause — npm packaging IS the version system.
 4. **Statements** (any number): `decision`, `terminology`, `activity`, and `concept`.
 
 Ordering is strict: `library` → `include`s → other statements. The library + include feature is covered in detail in [§5 Cross-library imports](#5-cross-library-imports-library--include).
@@ -218,7 +218,7 @@ The tag vocabulary, value shapes, and cardinality are defined in the [metadata r
 
 ---
 
-### 5. Cross-library imports (`library` + `include`)
+### 5. Cross-library imports (`library` + `include`) — v2.1.0
 
 CRL files are called **libraries**. A project is an npm package — it has a
 `package.json` at its root, plus its CRL source files. Other CRL libraries
@@ -233,26 +233,273 @@ version. There is no `version` clause in CRL source.
 #### Syntax
 
 ```crl
-# CMS22 BMI Screening and Follow-Up
+# CMS22 Blood Pressure Screening and Follow-Up
 library "CMS22".
+include "Some External Package Library".
 
-include "CMS22 Terminology".
-include "CMS22 Asserted".
-include "CMS22 Inferred".
-include "CMS22 Interface".
-
-# (concept / decision / activity / terminology statements follow — optional)
+# (concept / decision / activity / terminology statements follow)
 ```
 
 #### Rules
 
-- `library` is **optional** (max one per file). A file without `library` is **anonymous** — it can be a CLI root but can't be `include`d by name.
+- `library` is **required** (max one per file). v2.1.0 removed the previous anonymous-file mode.
+- `include` is **for external (package) libraries only**. Local sibling libraries in the same project auto-resolve via qualified refs without needing an `include` line. Writing `include "LocalSibling".` produces a `redundant-local-include` warning.
 - `library` must come **before** any `include`; `include`s must come **before** any `concept`/`decision`/`activity`/`terminology`.
 - `include` is repeatable; source order is preserved in the AST.
 - Both `library` and `include` end with `.` (CRL statement convention).
 - Identifiers are double-quoted (`"CMS22 Inferred"`).
-- `library` and `include` are reserved keywords at the top level but remain usable as narrative words inside `definition is` bodies.
-- **No aliasing in v0.7.** CQL's `called Foo` is reserved for a future v0.8.
+- `library`, `include`, and `as` are reserved keywords at the top level but remain usable as narrative words inside `definition is` bodies.
+- **`include "Foo" as "Bar".` aliasing parses but is not yet honored** — the resolver emits an `alias-not-yet-supported` warning and treats the include as if no alias were present. Full alias semantics defer to v2.2.
+
+#### Cross-library references — qualified refs
+
+References across library boundaries use the qualified form `"Library"."Name"`:
+
+```crl
+library "CMS22 Interface".
+
+concept "Initial Population":
+- type is Encounter.
+- defined as "CMS22 Inferred"."Qualifying Encounter".
+```
+
+Resolution rules:
+
+- **Bare refs** (`"X"`) resolve to declarations **in the same library** only. v2.1.0 ended global-namespace lookup.
+- **Qualified refs** to a **local sibling** (any library in the same project) work without an `include` line — locals auto-resolve.
+- **Qualified refs** to a **package** library require the asking file to `include` that package. Otherwise → `external-library-not-included`.
+- **Same `(kind, name)` across libraries is legal** under per-library scoping. Each library has its own scope; both libraries' `concept "BMI"` can coexist; refs disambiguate via qualifier.
+
+#### Project layout
+
+A CRL project is an npm package:
+
+```
+my-cms22/                              ← project root
+├── package.json                       ← standard npm package.json
+├── node_modules/                      ← installed CRL packages live here
+│   └── @smile/bmi-concepts/
+│       ├── package.json               ← declares its CRL libraries (see below)
+│       └── src/crl/
+│           └── bmi-asserted.crl       ← declares `library "BMI Asserted".`
+├── src/crl/                           ← author's .crl files (convention)
+│   ├── cms22.crl                      ← the root file (or any other; CLI takes --path)
+│   ├── cms22-inferred.crl
+│   ├── cms22-asserted.crl
+│   └── cms22-terminology.crl
+└── tests/...
+```
+
+`src/crl/` is the **convention** for where authors put `.crl` files, but
+the resolver doesn't hard-code that path — it scans the whole project
+root recursively (skipping `node_modules`, `dist`, `build`, dot-dirs), so
+`.crl` files anywhere in the project are picked up.
+
+#### Publishing a CRL package
+
+The published package's `package.json` declares which files contribute
+CRL libraries via a `crl.libraries` array:
+
+```json
+{
+  "name": "@smile/bmi-concepts",
+  "version": "1.0.0",
+  "crl": {
+    "libraries": [
+      "src/crl/bmi-asserted.crl",
+      "src/crl/bmi-inferred.crl",
+      "src/crl/bmi-terminology.crl"
+    ]
+  },
+  "files": ["src/crl/**/*.crl", "package.json", "README.md"]
+}
+```
+
+- `crl` is an object (not a bare array) so future fields can be added
+  (`crl.exclude`, `crl.aliases`, …) without breaking the schema.
+  Unknown sub-fields under `crl` are silently ignored.
+- Paths in `crl.libraries` are **package-relative**. Paths that escape
+  the package directory (`..`) are rejected.
+- Each listed file should declare its own `library "Name".`. Listed
+  files without a library declaration produce a
+  `package-resolution-failure` warning.
+- A package without a `crl` field contributes nothing (most npm packages
+  aren't CRL packages — no error).
+
+Consumers `npm install @smile/bmi-concepts` and use qualified refs like
+`"BMI Asserted"."BMI Code"` plus `include "BMI Asserted".` in the asking
+file — the resolver finds the file via the package's `crl.libraries`
+declaration.
+
+#### Resolution
+
+When given a root `.crl` (e.g. via `crl-validate --path src/crl/cms22.crl`),
+the resolver:
+
+1. **Walks up** from the root file to the nearest `package.json` — that
+   directory is the **project root**. If no `package.json` is found,
+   the diagnostic `project-root-not-found` is emitted and resolution
+   stops.
+2. **Local scan**: recursively walks the project root for `.crl` files
+   (skipping `node_modules`, `dist`, `build`, dot-dirs). Each file with
+   a `library "Name".` declaration registers under that name in
+   `byNameLocal`.
+3. **Package scan**: walks top-level entries in `node_modules/` (including
+   `@org/*` scoped subdirs). For each package with a `crl.libraries`
+   field, parses each listed file and registers it under its library name
+   in `byNamePackage`. Transitive CRL deps are assumed hoisted to
+   top-level by npm.
+4. **Walks includes** from the root transitively. Detects cycles. Local
+   sibling libraries that aren't include-walked still appear in the
+   graph's `localLibraries` field so qualified refs to them resolve.
+5. **Builds per-library scopes** so each library's bare-ref lookups stay
+   in that library, and qualified-ref lookups respect the
+   local-auto-resolve vs package-include rules.
+
+#### Per-library validator scoping
+
+Under v2.1.0, the validator runs per-library:
+
+- `NameUniquenessValidator` keys uniqueness per `(library, kind, name)`,
+  so two libraries with `concept "BMI"` don't collide.
+- `ReferenceResolver` resolves bare refs in the owning library's local
+  names, and qualified refs via the per-file include + local-auto-resolve
+  rules above.
+- `CycleDetector` builds a global concept-ref graph keyed by
+  `(library, name)` so cross-library cycles surface.
+
+Validation walks all four ref slots: concept body refs, decision
+`when "C"` / `recommend activity "A"` / `use decision "D"`, and activity
+`with "T"`.
+
+#### Per-CRL emit
+
+v2.1.0 emits **one CQL file per CRL library** (not one big flat-inlined CQL
+file like v2.0). Each library produces its own `<libraryName>.cql` with
+its own `library X` header, its own `include FHIRHelpers` + `include
+CRLPatterns`, and a CQL `include OtherLib` line for each cross-library
+qualified ref it makes.
+
+What's emitted today:
+- `concept` declarations (via `defined as` / `definition is` / `coded from`)
+- `terminology` declarations (valuesets, codes)
+- Cross-library qualified refs emit as CQL native `"Lib"."Name"` /
+  `Lib."Name"` (quoted when the library name contains spaces).
+
+What's NOT emitted today (validation-only support):
+- `decision` declarations
+- `activity` declarations
+
+The validator surfaces ref errors in decision/activity body slots, but
+the emitter doesn't render those statements into CQL. Quality-Measure
+consumers get the `concept` outputs; decision/activity emission is a
+future feature.
+
+#### Diagnostic kinds
+
+Every import-side diagnostic carries `kind`, `severity` (`"error"` or `"warning"`), and a kind-specific payload:
+
+| `kind` | When | Severity |
+|---|---|---|
+| `parse-failure` | A `.crl` file failed to parse. **Error** when it's the root; **warning** when it's another file in the project. | varies |
+| `project-root-not-found` | No `package.json` was found walking up from the root file. | error |
+| `package-resolution-failure` | An installed package's `crl.libraries` entry couldn't be loaded. Carries a `reason` field: `"missing-file"`, `"invalid-json"`, `"crl-libraries-not-array"`, `"no-library-declaration"`, `"path-escapes-package"`, `"parse-error"`. | warning |
+| `registry-duplicate` | Two libraries in the SAME registry (local-vs-local or package-vs-package) declared the same name. Local-vs-package same-name is benign. | error |
+| `unresolved-include` | An `include` couldn't find a matching library. | error |
+| `cycle` | The include graph has a cycle. Carries `filePaths` (e.g. `[A, B, A]`) and parallel `includeChain`. | error |
+| `alias-not-yet-supported` | An `include "Foo" as "Bar".` is parsed but alias semantics are deferred to v2.2; the include is treated as if no alias were given. | warning |
+| `redundant-local-include` | An `include` names a local-origin library. Per v2.1.0, locals auto-resolve via qualified refs without an `include` — the include is redundant scaffolding. | warning |
+
+Validator-side diagnostics (from `ValidationError.kind`):
+
+| `kind` | When | Severity |
+|---|---|---|
+| `empty-name` | A declaration's name is blank. | error |
+| `duplicate-name` | Two declarations within the same library + same kind share a name. | error |
+| `unresolved-reference` | A bare ref doesn't match any declaration in the owning library. | error |
+| `reference-cycle` | Concept refs form a cycle (within or across libraries). | error |
+| `external-library-not-included` | A qualified ref `"Pkg"."X"` to a package library is missing its `include` line, OR references a library the resolver doesn't know about. | error |
+| `qualified-ref-unresolved` | A qualified ref `"Lib"."X"` to a known/included library but the name `X` isn't declared there for the expected kind. | error |
+
+`unresolved-reference` and `qualified-ref-unresolved` demote to warnings
+under soft mode. Structural diagnostics
+(`external-library-not-included`, cycle, name uniqueness) never demote.
+
+#### CLI
+
+```bash
+# Validate
+crl-validate --path src/crl/cms22.crl
+crl-validate --path src/crl/cms22.crl --soft     # demote ref-target errors to warnings
+crl-validate --path src/crl/cms22.crl --pretty   # grouped human-readable output
+
+# Emit (per-CRL — one CQL file per library)
+crl-emit --path src/crl/cms22.crl --out-dir ./out/
+```
+
+`--out-dir` is required for `crl-emit`. The CLI writes one
+`<libraryName>.cql` file per library in the emit closure (root's
+include-walked closure + any local sibling transitively qualified-referenced).
+Library names are preserved verbatim in filenames (so the on-disk file
+matches the CQL `include "Lib Name"` reference).
+
+`crl-emit` short-circuits when any error-severity import diagnostic is
+present — it won't emit broken CQL. On success, the CLI writes the files
+and prints `wrote <path>` per file.
+
+The emitted CQL library declarations are **unversioned** — `library X`
+(or `library "X With Spaces"`), not `library X version 'Y'`. Same
+principle as CRL source: npm packaging IS the version system, so
+duplicating it in the output adds nothing. CQL `include` statements
+between emitted libraries are also unversioned.
+
+The same no-version rule applies to the emitted `include CRLPatterns
+called CRLPatterns` line — CRLPatterns is our library, so npm pins its
+version. The `include FHIRHelpers version '4.0.1' called FHIRHelpers`
+line keeps its version because FHIRHelpers ships versioned with the
+FHIR spec itself (it's not an npm package).
+
+#### Programmatic API
+
+The npm package `@smile-digital-health/crl` exports:
+
+```ts
+import {
+  validateCRL,           // single-file validation
+  validateCRLImports,    // import-aware validation
+  emitCQLImports,        // import-aware emit (per-CRL)
+  resolveImports,        // lower-level: just resolve the graph
+  emitCQLFromAST,        // emit from a CRL AST (skip parsing)
+} from '@smile-digital-health/crl';
+
+// Validate
+const v = validateCRLImports('/abs/path/cms22.crl', { soft: false });
+v.success;                  // boolean — zero validator errors AND zero error-severity import diagnostics
+v.graph;                    // full ResolvedGraph (resolvedLibraries, localLibraries, registry, namespace, diagnostics, projectRoot)
+v.importDiagnostics;        // ImportDiagnostic[] — pre-filtered convenience
+v.validationErrors;         // each has { kind, message, location, severity, libraryName?, filePath?, targetLibrary?, targetName? }
+v.validationWarnings;
+
+// Emit (per-CRL — returns one CQL per library)
+const e = emitCQLImports('/abs/path/cms22.crl');
+e.success;
+e.cqlByLibrary;             // Array<{ libraryName, filePath, outputFilename, cql }>
+e.graph;
+e.importDiagnostics;
+e.errors;                   // only present on emitter exception
+
+// Just resolve
+const g = resolveImports('/abs/path/cms22.crl');
+g.projectRoot;              // string — the dir containing package.json
+g.resolvedLibraries;        // RegistryEntry[] — include-walked closure (leaves first, root last)
+g.localLibraries;           // RegistryEntry[] — local-origin libs NOT in the include walk
+g.registry;                 // { byNameLocal, byNamePackage } — full registry universe
+g.diagnostics;              // ImportDiagnostic[]
+```
+
+All entry points return result envelopes — missing `package.json`,
+parse failures, malformed packages, etc. become diagnostics, never
+thrown exceptions.
 
 #### Project layout
 
@@ -471,34 +718,35 @@ concept "BMI Observations":
 - coded from "BMI Valueset".
 ```
 
-**`my-project/src/crl/screening.crl`** (the root, includes the sibling):
+**`my-project/src/crl/screening.crl`** (the root — uses a qualified ref into Shared Vocabulary; no `include` line needed because it's a local sibling):
 ```crl
 # BMI Screening
 library "BMI Screening".
-include "Shared Vocabulary".
 
 concept "BMI Encounter Performed":
 - type is Encounter.
-- definition is "BMI Observations" performed.
+- definition is "Shared Vocabulary"."BMI Observations" performed.
 ```
 
 Run it:
 
 ```bash
 crl-validate --path my-project/src/crl/screening.crl --pretty
-crl-emit --path my-project/src/crl/screening.crl --library-name BMIScreening
+crl-emit --path my-project/src/crl/screening.crl --out-dir ./out/
 ```
 
-What happens under the hood when you run either command:
+What happens under the hood:
 
 1. Resolver walks up from `screening.crl` → finds `my-project/package.json` → **project root** = `my-project/`.
-2. Local scan: walks `my-project/` recursively, finds `shared.crl` (declares `library "Shared Vocabulary".`) and `screening.crl` (declares `library "BMI Screening".`). Both register.
-3. Package scan: `my-project/node_modules/` is absent — no installed CRL packages to scan.
-4. Walk includes from `screening.crl`: `include "Shared Vocabulary".` → resolves to `shared.crl`. Topo order: `["Shared Vocabulary", "BMI Screening"]` (leaves first, root last).
-5. Combined namespace gets `BMI Valueset` (terminology), `BMI Observations` (concept), `BMI Encounter Performed` (concept). The `definition is "BMI Observations" performed.` ref in `screening.crl` resolves against the namespace.
-6. Emit: one CQL library combining both files' declarations, header `library BMIScreening` (or `BMI Screening` if no `--library-name`).
+2. Local scan: walks `my-project/` recursively, finds both `.crl` files and registers them in `byNameLocal` under their declared library names.
+3. Package scan: `my-project/node_modules/` is absent — no installed CRL packages.
+4. Per-library scopes built. `BMI Screening`'s scope sees `Shared Vocabulary` in `knownLibraries` (a local sibling — auto-resolves without `include`).
+5. Validator: the qualified ref `"Shared Vocabulary"."BMI Observations"` looks up `BMI Observations` in `Shared Vocabulary`'s local names. Resolves cleanly.
+6. Emit: two CQL files written to `./out/` — `BMI Screening.cql` (with `include "Shared Vocabulary"`) and `Shared Vocabulary.cql` (with the valueset + concept).
 
-Try modifying `shared.crl` to rename `BMI Observations` to `Observations of BMI`. Without changing `screening.crl`, run `crl-validate` — you get a validation error attributed to `screening.crl` pointing at the now-unresolved ref. The `filePath` and `libraryName` fields on the error tell you exactly which file holds the bad reference.
+If `screening.crl` instead wrote `include "Shared Vocabulary".`, the validator would emit a `redundant-local-include` warning — the include is unnecessary because local siblings auto-resolve.
+
+Try modifying `shared.crl` to rename `BMI Observations` to `Observations of BMI`. Without changing `screening.crl`, run `crl-validate` — you get a `qualified-ref-unresolved` error attributed to `screening.crl` pointing at the now-stale qualified ref. The `targetLibrary`, `targetName`, `filePath`, and `libraryName` fields on the error tell you exactly which library the missing name was looked up in.
 
 #### Worked example: cross-package (npm install)
 
@@ -515,16 +763,16 @@ my-screening/
 └── src/crl/screening.crl          declares: library "BMI Screening". includes "Shared Vocabulary".
 ```
 
-`my-screening/src/crl/screening.crl` is unchanged from the local example
-above. The resolver finds `"Shared Vocabulary"` in node_modules instead
-of locally — same combined namespace, same emitted CQL. Switching
-between local-development and consume-via-npm is a file-move, not a code
-change.
+For the package case, `screening.crl` DOES need `include "Shared Vocabulary".`
+because it's now reaching an external (package) library, not a local
+sibling. The qualified ref form is the same: `"Shared Vocabulary"."BMI Observations"`.
 
 #### Worked example: cms22 4-layer split
 
-A 5-file split lives at `features/cql-pattern-mining/results/models/cms22-split/`
-(split from the original 1010-line `cms22.crl`). To exercise it:
+A 4-file split lives at `features/cql-pattern-mining/results/models/cms22-split/`
+(split from the original 1010-line `cms22.crl`). The layers are
+interface (`cms22.crl`, the public Measure API), inferred, asserted,
+and terminology. To exercise it:
 
 ```bash
 # From repo root, after `npm run build`:
@@ -535,25 +783,32 @@ node dist/cli/run-validator.js \
 
 node dist/cli/run-emitter.js \
   --path features/cql-pattern-mining/results/models/cms22-split/cms22.crl \
-  --library-name CMS22 \
-  > /tmp/cms22.cql
+  --out-dir /tmp/cms22-out/
 ```
 
-The emitted CQL matches the previously JAR-validated
-`cql/src/CMS22Generated.cql` line-for-line except for the unversioned
-header (`library CMS22` instead of `library CMS22Generated version '0.1.0'`,
-and `include CRLPatterns called CRLPatterns` instead of `include CRLPatterns version '0.2.0' called CRLPatterns`).
-See `cms22-split/NOTES.md` for layout details.
+The emitter produces four CQL files: `CMS22.cql` (the interface),
+`CMS22 Inferred.cql`, `CMS22 Asserted.cql`, `CMS22 Terminology.cql`.
+Cross-library refs emit as CQL native `"OtherLib"."Name"` so the
+generated CQL has a self-contained dependency graph. See
+`cms22-split/NOTES.md` for layout details.
 
-#### v0.7 scope summary
+#### v2.1.0 scope summary
 
-- **No version syntax.** npm packaging is the version system; the package
-  IS the version.
-- **Global namespace** (transitive visibility, no scoping).
-- **No aliasing** (`include "Foo" called "F"` reserved for v0.8).
+- **`library` declarations are required.** No anonymous-file mode.
+- **Per-library scoping.** Bare refs resolve locally; cross-library refs
+  must be qualified.
+- **`include` is external-only.** Local siblings auto-resolve via
+  qualified refs without needing `include`.
+- **Per-CRL emit.** One CQL file per CRL library; cross-library refs
+  emit as CQL native qualified references.
+- **No version syntax.** npm packaging is the version system; the
+  package IS the version. No `version` clause in CRL source or emitted
+  CQL.
+- **Alias parses but doesn't yet apply** (`include "Foo" as "Bar".` →
+  `alias-not-yet-supported` warning, treated as raw include). Defers to
+  v2.2.
 - **No fallback.** Missing `package.json` is an error, not "treat the
   root's directory as the project."
-- **Flat-inline emit** (one CQL library out, regardless of N CRL files in).
 - **Library functions never throw** — all errors return as diagnostics.
 
 ---
@@ -578,7 +833,7 @@ These lists are generated from the grammar (`src/grammar/CRLLexer.g4`); only the
 
 ## Keywords and Tokens
 
-- **Keywords:** `library`, `include`, `version`, `decision`, `terminology`, `activity`, `concept`, `when`, `then`, `recommend activity`, `use decision`, `request`, `with`, `because`, `type is`, `valuetype is`, `evidence is`, `meta is`, `coded from`, `defined as`, `definition is`, `apply pattern`, `system is`, `code is`, `valueset is`, `any:`, `all:`, `do not perform`, `not`, `and`, `or`, `sem-and`, `sem-or`, `sem-not`, `end when`, `:` (colon), `.` (dot), `-` (dash), `(` (left paren), `)` (right paren)
+- **Keywords:** `library`, `include`, `as`, `decision`, `terminology`, `activity`, `concept`, `when`, `then`, `recommend activity`, `use decision`, `request`, `with`, `because`, `type is`, `valuetype is`, `evidence is`, `meta is`, `coded from`, `defined as`, `definition is`, `apply pattern`, `system is`, `code is`, `valueset is`, `any:`, `all:`, `do not perform`, `not`, `and`, `or`, `sem-and`, `sem-or`, `sem-not`, `end when`, `:` (colon), `.` (dot), `-` (dash), `(` (left paren), `)` (right paren)
 - **Identifiers:** Double-quoted strings
 - **Free text/markdown:** Backtick-quoted strings
 - **Comments:** `// ...` or `/* ... */`

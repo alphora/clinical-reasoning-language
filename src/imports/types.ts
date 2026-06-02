@@ -59,16 +59,6 @@ export interface CycleDiagnostic {
   includeChain: Include[];
 }
 
-export interface NameConflictDiagnostic {
-  kind: "name-conflict";
-  severity: "error";
-  // Statement name (concept/decision/activity/terminology) declared in
-  // multiple resolved libraries.
-  name: string;
-  nodeKind: NodeKind;
-  sources: { libraryName: string | null; filePath: string }[];
-}
-
 /**
  * Warning: an `include` statement names a library whose alias clause
  * (`as "X"`) is present in the AST but not yet honored by the resolver.
@@ -103,7 +93,6 @@ export type ImportDiagnostic =
   | RegistryDuplicateDiagnostic
   | UnresolvedIncludeDiagnostic
   | CycleDiagnostic
-  | NameConflictDiagnostic
   | AliasNotYetSupportedDiagnostic
   | RedundantLocalIncludeDiagnostic;
 

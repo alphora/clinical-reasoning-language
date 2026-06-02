@@ -1,0 +1,19 @@
+# multi-slot-refs root — exercises decision / activity body refs
+library "Root".
+
+concept "Trigger":
+- type is Encounter.
+- coded from "Trigger Valueset".
+
+terminology "Trigger Valueset":
+- valueset is `urn:trigger-vs`.
+
+terminology "Activity Reason Valueset":
+- valueset is `urn:reason-vs`.
+
+activity "Refer to Specialist":
+- request CPGServiceRequest.
+- with "Activity Reason Valueset".
+
+decision "Triage":
+- when "Trigger" then recommend activity "Refer to Specialist".

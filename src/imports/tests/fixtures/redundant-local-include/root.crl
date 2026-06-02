@@ -1,0 +1,7 @@
+# redundant-local-include root — include of a local sibling
+library "Root".
+include "Sibling".
+
+concept "Root C":
+- type is Encounter.
+- defined as "Sibling"."Sib C".

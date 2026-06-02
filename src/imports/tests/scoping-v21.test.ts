@@ -122,6 +122,64 @@ describe("v2.1.0 per-library scoping (commit 2c)", () => {
     });
   });
 
+  describe("redundant-local-include (v2.1.0 commit 2e)", () => {
+    it("warns when an `include` resolves to a local sibling (auto-resolve makes it redundant)", () => {
+      const root = path.join(FIXTURES, "redundant-local-include", "root.crl");
+      const result = validateCRLImports(root);
+      // Local include is redundant but the file is otherwise clean.
+      expect(result.success).toBe(true);
+      const warning = result.graph.diagnostics.find(
+        (d) => d.kind === "redundant-local-include",
+      );
+      expect(warning).toBeDefined();
+      if (warning?.kind === "redundant-local-include") {
+        expect(warning.include.name).toBe("Sibling");
+        expect(warning.from.libraryName).toBe("Root");
+      }
+    });
+
+    it("does NOT warn when an include resolves to a package (even if a local of same name shadows)", () => {
+      // local-package-same-name fixture: root explicitly includes Foo;
+      // both local Foo and package Foo exist. Package wins package-first.
+      // No redundant-local-include should fire — the include legitimately
+      // resolved to the package.
+      const root = path.join(FIXTURES, "local-package-same-name", "root.crl");
+      const result = validateCRLImports(root);
+      const warning = result.graph.diagnostics.find(
+        (d) => d.kind === "redundant-local-include",
+      );
+      expect(warning).toBeUndefined();
+    });
+  });
+
+  describe("multi-slot ref validation (v2.1.0 commit 2e)", () => {
+    it("validates clean decision + activity body refs", () => {
+      const root = path.join(FIXTURES, "multi-slot-refs", "root.crl");
+      const result = validateCRLImports(root);
+      expect(result.success).toBe(true);
+      expect(result.validationErrors).toHaveLength(0);
+    });
+
+    it("fires unresolved-reference for each missing decision/activity body ref", () => {
+      const root = path.join(FIXTURES, "multi-slot-refs-unresolved", "root.crl");
+      const result = validateCRLImports(root);
+      expect(result.success).toBe(false);
+      const errs = result.validationErrors.filter(
+        (e) => e.kind === "unresolved-reference",
+      );
+      // Expected:
+      //   activity "Some Activity" with "Missing Terminology"     → 1
+      //   decision "Bad Triage" when "Missing Concept" ...         → 1
+      //   decision "Bad Triage" do "Missing Activity"              → 1
+      //   decision "Calls Other" use decision "Missing Decision"   → 1
+      expect(errs.length).toBeGreaterThanOrEqual(4);
+      expect(errs.some((e) => e.message.includes("Missing Terminology"))).toBe(true);
+      expect(errs.some((e) => e.message.includes("Missing Concept"))).toBe(true);
+      expect(errs.some((e) => e.message.includes("Missing Activity"))).toBe(true);
+      expect(errs.some((e) => e.message.includes("Missing Decision"))).toBe(true);
+    });
+  });
+
   describe("single-file validateCRL self-scope (operator-approved squiggles)", () => {
     it("treats qualified refs to the self library as bare", () => {
       const src = `# self-scope same-lib
