@@ -4,4 +4,4 @@ include "CMS22 Terminology".
 
 concept "Qualifying Encounter Source":
 - type is Encounter.
-- coded from "Qualifying Encounters Valueset".
+- coded from "CMS22 Terminology"."Qualifying Encounters Valueset".

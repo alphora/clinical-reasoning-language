@@ -232,7 +232,7 @@ class Emitter {
   constructor(ast: CRL, options: EmitOptions) {
     this.ast = ast;
     this.options = {
-      libraryName: options.libraryName ?? "GeneratedFromCRL",
+      libraryName: options.libraryName ?? ast.library.name,
       fhirHelpersVersion: options.fhirHelpersVersion ?? "4.0.1",
     };
     this.indexNames();

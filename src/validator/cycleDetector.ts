@@ -76,6 +76,7 @@ export class CycleDetector {
               cyclesReported.add(cycleKey);
               const display = cycle.map((n) => `"${n}"`).join(" → ");
               errors.push({
+                kind: "reference-cycle",
                 message: `Reference cycle detected: ${display}`,
                 location: locations.get(node) ?? {
                   start: { line: 1, column: 1 },

@@ -25,12 +25,14 @@ export class NameUniquenessValidator {
         case "Decision":
           if (!statement.name?.trim()) {
             errors.push({
+              kind: "empty-name",
               message: "Decision name cannot be empty",
               location: statement.location,
               severity: "error",
             });
           } else if (decisionNames.has(statement.name)) {
             errors.push({
+              kind: "duplicate-name",
               message: `Duplicate decision name: ${statement.name}`,
               location: statement.location,
               severity: "error",
@@ -42,12 +44,14 @@ export class NameUniquenessValidator {
         case "Concept":
           if (!statement.name?.trim()) {
             errors.push({
+              kind: "empty-name",
               message: "Concept name cannot be empty",
               location: statement.location,
               severity: "error",
             });
           } else if (conceptNames.has(statement.name)) {
             errors.push({
+              kind: "duplicate-name",
               message: `Duplicate concept name: ${statement.name}`,
               location: statement.location,
               severity: "error",
@@ -59,12 +63,14 @@ export class NameUniquenessValidator {
         case "Activity":
           if (!statement.name?.trim()) {
             errors.push({
+              kind: "empty-name",
               message: "Activity name cannot be empty",
               location: statement.location,
               severity: "error",
             });
           } else if (activityNames.has(statement.name)) {
             errors.push({
+              kind: "duplicate-name",
               message: `Duplicate activity name: ${statement.name}`,
               location: statement.location,
               severity: "error",
@@ -76,12 +82,14 @@ export class NameUniquenessValidator {
         case "Terminology":
           if (!statement.name?.trim()) {
             errors.push({
+              kind: "empty-name",
               message: "Terminology name cannot be empty",
               location: statement.location,
               severity: "error",
             });
           } else if (terminologyNames.has(statement.name)) {
             errors.push({
+              kind: "duplicate-name",
               message: `Duplicate terminology name: ${statement.name}`,
               location: statement.location,
               severity: "error",

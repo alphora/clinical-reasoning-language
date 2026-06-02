@@ -4,4 +4,4 @@ include "CMS22 Asserted".
 
 concept "Qualifying Encounter":
 - type is Encounter.
-- definition is "Qualifying Encounter Source" performed.
+- definition is "CMS22 Asserted"."Qualifying Encounter Source" performed.

@@ -3,4 +3,4 @@ library "Lib2".
 
 concept "B":
 - type is Encounter.
-- defined as "A".
+- defined as "Lib1"."A".

@@ -6,7 +6,37 @@ import { NameUniquenessValidator } from "./nameUniquenessValidator";
 import { ReferenceResolver } from "./referenceResolver";
 import { UnusedDeclarationsValidator } from "./unusedDeclarationsValidator";
 
+/**
+ * Stable, machine-readable discriminator for validation errors. Lets
+ * consumers (CLI, extension, MCP) filter or specialize on the kind without
+ * grepping message text. Add new variants here when a new validator pass
+ * introduces a structurally distinct error class.
+ *
+ * Existing kinds (commit 2a, v2.1.0):
+ *   - "empty-name"           — declaration name is blank
+ *   - "duplicate-name"       — two declarations of the same kind share a name
+ *   - "unresolved-reference" — ref target doesn't exist in the local namespace
+ *   - "reference-cycle"      — concept refs form a cycle
+ *
+ * Reserved for commit 2b (per-library scoping; not in use yet):
+ *   - "external-library-not-included"
+ *   - "qualified-ref-unresolved"
+ *   - "alias-not-yet-supported"
+ *   - "redundant-local-include"
+ */
+export type ValidationErrorKind =
+  | "empty-name"
+  | "duplicate-name"
+  | "unresolved-reference"
+  | "reference-cycle";
+
 export interface ValidationError {
+  /**
+   * Stable discriminator. See {@link ValidationErrorKind}. The human-readable
+   * `message` is for display; consumers that want to specialize behavior
+   * should switch on `kind` instead of parsing `message`.
+   */
+  kind: ValidationErrorKind;
   message: string;
   location: {
     start: { line: number; column: number };

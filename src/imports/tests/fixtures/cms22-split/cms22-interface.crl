@@ -4,4 +4,4 @@ include "CMS22 Inferred".
 
 concept "Initial Population":
 - type is Encounter.
-- defined as "Qualifying Encounter".
+- defined as "CMS22 Inferred"."Qualifying Encounter".

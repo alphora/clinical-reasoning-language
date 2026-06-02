@@ -54,6 +54,7 @@ export class ReferenceResolver {
           if (!termName) break;
           if (!terminologyNames.has(termName)) {
             errors.push({
+              kind: "unresolved-reference",
               message: `Undeclared terminology "${termName}" in concept "${concept.name}" (no terminology block declares this name)`,
               location: concept.definition.location,
               severity: "error",
@@ -68,6 +69,7 @@ export class ReferenceResolver {
             const refName = getRefName(body.ref);
             if (!conceptNames.has(refName)) {
               errors.push({
+                kind: "unresolved-reference",
                 message: `Unresolved reference "${refName}" in concept "${concept.name}" (no concept declared with this name)`,
                 location: body.location,
                 severity: "error",
@@ -121,6 +123,7 @@ export class ReferenceResolver {
         const refName = getRefName(expr.ref);
         if (!conceptNames.has(refName)) {
           errors.push({
+            kind: "unresolved-reference",
             message: `Unresolved reference "${refName}" in concept "${parentName}" (no concept declared with this name)`,
             location: expr.location,
             severity: "error",
@@ -153,6 +156,7 @@ export class ReferenceResolver {
         const refName = getRefName(el.value);
         if (!conceptNames.has(refName)) {
           errors.push({
+            kind: "unresolved-reference",
             message: `Unresolved reference "${refName}" in concept "${parentName}" (no concept declared with this name)`,
             location: el.location,
             severity: "error",
@@ -185,6 +189,7 @@ export class ReferenceResolver {
         const refName = getRefName(av.value);
         if (!conceptNames.has(refName)) {
           errors.push({
+            kind: "unresolved-reference",
             message: `Unresolved reference "${refName}" in concept "${parentName}" (no concept declared with this name)`,
             location: av.location,
             severity: "error",

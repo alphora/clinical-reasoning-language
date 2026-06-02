@@ -565,8 +565,8 @@ export class CRLAstBuilder
   ): ConceptDefinition | null {
     if (bodyCtx.codedFromLine?.()) {
       const codedFrom = bodyCtx.codedFromLine();
-      const termRef = codedFrom?.terminologyReference?.()?.text?.slice(1, -1);
-      if (!termRef) {
+      const termRefCtx = codedFrom?.terminologyReference?.();
+      if (!termRefCtx) {
         this.reportError("AstError", ctx, {
           message: "ConceptStatement: missing terminologyReference in codedFromLine",
         });
@@ -574,7 +574,7 @@ export class CRLAstBuilder
       }
       return {
         type: "CodedFromDefinition" as const,
-        terminologyName: termRef,
+        terminologyName: refFromRefContext(termRefCtx),
         location: getLocation(bodyCtx.codedFromLine()!),
       };
     } else if (bodyCtx.definedAsBody?.()) {
