@@ -148,18 +148,48 @@ export class CrlDocumentSymbolProvider implements vscode.DocumentSymbolProvider 
   ): vscode.ProviderResult<vscode.DocumentSymbol[]> {
     const filePath = document.uri.fsPath;
     const decls = this.index.getDeclarations(filePath).filter((d) => d.filePath === filePath);
-    if (decls.length === 0) return [];
-    return decls.map((d) => {
-      const sym = new vscode.DocumentSymbol(
-        d.name,
-        d.libraryName,
-        symbolKindFor(d.kind),
-        toRange(d.bodyRange),
-        toRange(d.nameRange),
+    const libs = this.index.getLibraries(filePath).filter((l) => l.filePath === filePath);
+
+    const declsByLib = new Map<string, IndexedDeclaration[]>();
+    for (const d of decls) {
+      let arr = declsByLib.get(d.libraryName);
+      if (!arr) {
+        arr = [];
+        declsByLib.set(d.libraryName, arr);
+      }
+      arr.push(d);
+    }
+
+    const out: vscode.DocumentSymbol[] = [];
+    for (const lib of libs) {
+      const children = declsByLib.get(lib.libraryName) ?? [];
+      declsByLib.delete(lib.libraryName);
+      const parent = new vscode.DocumentSymbol(
+        lib.libraryName,
+        `library (${children.length})`,
+        vscode.SymbolKind.Namespace,
+        toRange(lib.range),
+        toRange(lib.nameRange),
       );
-      return sym;
-    });
+      parent.children = children.map(declToSymbol);
+      out.push(parent);
+    }
+    // Orphan decls (no matching library entry) surface flat so they're not dropped.
+    for (const orphans of declsByLib.values()) {
+      for (const d of orphans) out.push(declToSymbol(d));
+    }
+    return out;
   }
+}
+
+function declToSymbol(d: IndexedDeclaration): vscode.DocumentSymbol {
+  return new vscode.DocumentSymbol(
+    d.name,
+    d.kind,
+    symbolKindFor(d.kind),
+    toRange(d.bodyRange),
+    toRange(d.nameRange),
+  );
 }
 
 // ============================================================================

@@ -26,6 +26,10 @@
       "match": "(?<!\\buse\\s)(?<!\\brecommend\\s)\\b(decision|activity|concept|terminology)\\b(?![\\w`\"])"
     },
     {
+      "name": "keyword.control.import.crl",
+      "match": "(?<![\\w`\"])\\b(library|include)\\b(?![\\w`\"])"
+    },
+    {
       "name": "keyword.control.flow.crl",
       "match": "(?<![\\w`\"])\\b(recommend activity|use decision)\\b(?![\\w`\"])"
     },
@@ -63,6 +67,12 @@
           "settings": {
             "foreground": "#9CDCFE",
             "fontStyle": "bold"
+          }
+        },
+        {
+          "scope": "keyword.control.import.crl",
+          "settings": {
+            "foreground": "#4FC1FF"
           }
         },
         {
