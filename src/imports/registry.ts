@@ -3,6 +3,7 @@ import * as path from "path";
 
 import { buildCRL } from "../index";
 
+import { canonicalizeFsPath } from "./paths";
 import {
   Registry,
   RegistryEntry,
@@ -81,7 +82,7 @@ function scanProjectLocal(
   const diagnostics: ImportDiagnostic[] = [];
 
   for (const filePath of listCrlFiles(projectRoot)) {
-    const canonical = path.resolve(filePath);
+    const canonical = canonicalizeFsPath(filePath);
     let source: string;
     const overlay = overlays?.get(canonical);
     if (overlay !== undefined) {

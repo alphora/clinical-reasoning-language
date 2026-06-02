@@ -1,9 +1,9 @@
 import { readFileSync } from "fs";
-import * as path from "path";
 
 import { buildCRL } from "../index";
 
 import { buildCombinedNamespace } from "./namespace";
+import { canonicalizeFsPath } from "./paths";
 import { buildRegistry, findProjectRoot } from "./registry";
 import { walkIncludes } from "./resolver";
 import {
@@ -29,8 +29,8 @@ export function resolveImports(
   rootPath: string,
   options: ResolveImportsOptions = {},
 ): ResolvedGraph {
-  const canonicalRoot = path.resolve(rootPath);
-  const overlays = options.overlays;
+  const canonicalRoot = canonicalizeFsPath(rootPath);
+  const overlays = normalizeOverlayKeys(options.overlays);
 
   let rootSource: string;
   const rootOverlay = overlays?.get(canonicalRoot);
@@ -174,4 +174,22 @@ export type {
 export { buildRegistry, findProjectRoot } from "./registry";
 export { walkIncludes } from "./resolver";
 export { buildCombinedNamespace } from "./namespace";
+export { canonicalizeFsPath } from "./paths";
 export { emptyNamespace } from "./types";
+
+/**
+ * Canonicalize every overlay key on entry so internal lookups (against
+ * `canonicalizeFsPath`-normalized paths) hit regardless of what case the
+ * caller used. Tolerates lowercase-drive `fsPath` strings from VS Code,
+ * which differ from `path.resolve()`'s output on Windows.
+ */
+function normalizeOverlayKeys(
+  overlays: ReadonlyMap<string, string> | undefined,
+): ReadonlyMap<string, string> | undefined {
+  if (!overlays || overlays.size === 0) return overlays;
+  const out = new Map<string, string>();
+  for (const [k, v] of overlays) {
+    out.set(canonicalizeFsPath(k), v);
+  }
+  return out;
+}
