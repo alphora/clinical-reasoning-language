@@ -96,7 +96,7 @@ export function validateCRLImports(
   const synthetic: CRL = {
     type: "CRL",
     ...(rootEntry.ast.header ? { header: rootEntry.ast.header } : {}),
-    ...(rootEntry.ast.library ? { library: rootEntry.ast.library } : {}),
+    library: rootEntry.ast.library,
     includes: [],
     statements: flatStatements,
     location: rootEntry.ast.location,

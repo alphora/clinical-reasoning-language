@@ -1,4 +1,5 @@
 import { CRL } from '../../ast/types';
+import { makeTestCRL } from './testUtils';
 import { Validator } from '../validator';
 
 describe('CycleDetector Extended Tests', () => {
@@ -12,8 +13,7 @@ describe('CycleDetector Extended Tests', () => {
   describe('Multiple Independent Decision Cycles', () => {
     it('should detect two separate decision cycles', () => {
       const ast: CRL = {
-        type: 'CRL',
-        includes: [],
+        ...makeTestCRL([]),
         statements: [
           // Cycle 1: DecisionX <-> DecisionY
           {
@@ -157,8 +157,7 @@ describe('CycleDetector Extended Tests', () => {
   describe('Self-loop Decision Cycle', () => {
     it('should detect a self-loop decision cycle', () => {
       const ast: CRL = {
-        type: 'CRL',
-        includes: [],
+        ...makeTestCRL([]),
         statements: [
           {
             type: 'Decision',
@@ -205,8 +204,7 @@ describe('CycleDetector Extended Tests', () => {
   describe('Complex Indirect Decision Cycle', () => {
     it('should detect a decision cycle with four nodes (A -> B -> C -> D -> A)', () => {
       const ast: CRL = {
-        type: 'CRL',
-        includes: [],
+        ...makeTestCRL([]),
         statements: [
           {
             type: 'Decision',
@@ -349,8 +347,7 @@ describe('CycleDetector Extended Tests', () => {
       // Cycle 1: DecisionA -> DecisionB -> DecisionA
       // Cycle 2: DecisionB -> DecisionC -> DecisionD -> DecisionB
       const ast: CRL = {
-        type: 'CRL',
-        includes: [],
+        ...makeTestCRL([]),
         statements: [
           // Cycle 1
           {
@@ -504,8 +501,7 @@ describe('CycleDetector Extended Tests', () => {
   describe('Mixed Errors: Cycle and Repeated Action', () => {
     it('should detect both a cycle in decision references and a repeated do action', () => {
       const ast: CRL = {
-        type: 'CRL',
-        includes: [],
+        ...makeTestCRL([]),
         statements: [
           {
             type: 'Decision',

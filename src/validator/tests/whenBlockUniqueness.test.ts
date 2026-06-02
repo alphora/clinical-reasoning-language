@@ -1,4 +1,5 @@
 import { CRL } from '../../ast/types';
+import { makeTestCRL } from './testUtils';
 import { Validator } from '../validator';
 
 describe('WhenBlockUniquenessValidator', () => {
@@ -11,8 +12,7 @@ describe('WhenBlockUniquenessValidator', () => {
   describe('When Block Uniqueness', () => {
     it('should detect duplicate when blocks in nested decisions', () => {
       const ast: CRL = {
-        type: 'CRL',
-        includes: [],
+        ...makeTestCRL([]),
         statements: [
           {
             type: 'Decision',
@@ -68,8 +68,7 @@ describe('WhenBlockUniquenessValidator', () => {
 
     it('should not detect duplicate when blocks in different contexts', () => {
       const ast: CRL = {
-        type: 'CRL',
-        includes: [],
+        ...makeTestCRL([]),
         statements: [
           {
             type: 'Decision',

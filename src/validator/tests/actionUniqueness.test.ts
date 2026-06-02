@@ -1,4 +1,5 @@
 import { CRL } from '../../ast/types';
+import { makeTestCRL } from './testUtils';
 import { ActionUniquenessValidator } from '../actionUniquenessValidator';
 import { ValidationError } from '../validator';
 
@@ -12,8 +13,7 @@ describe('ActionUniquenessValidator', () => {
   describe('Do Statement Uniqueness', () => {
     it('should detect duplicate do statements in the same block', () => {
       const ast: CRL = {
-        type: 'CRL',
-        includes: [],
+        ...makeTestCRL([]),
         statements: [
           {
             type: 'Decision',
@@ -66,8 +66,7 @@ describe('ActionUniquenessValidator', () => {
 
     it('should not detect duplicate do statements in different blocks', () => {
       const ast: CRL = {
-        type: 'CRL',
-        includes: [],
+        ...makeTestCRL([]),
         statements: [
           {
             type: 'Decision',
@@ -132,8 +131,7 @@ describe('ActionUniquenessValidator', () => {
   describe('Use Statement Uniqueness', () => {
     it('should detect duplicate use statements in the same block', () => {
       const ast: CRL = {
-        type: 'CRL',
-        includes: [],
+        ...makeTestCRL([]),
         statements: [
           {
             type: 'Decision',
@@ -186,8 +184,7 @@ describe('ActionUniquenessValidator', () => {
 
     it('should not detect duplicate use statements in different blocks', () => {
       const ast: CRL = {
-        type: 'CRL',
-        includes: [],
+        ...makeTestCRL([]),
         statements: [
           {
             type: 'Decision',

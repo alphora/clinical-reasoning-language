@@ -1,3 +1,4 @@
 # intentionally broken: missing concept body keyword
+library "Test-source-path-parse-failure".
 concept "X":
 - type is Observation.
