@@ -11,7 +11,7 @@ const MAX_INPUT_BYTES = 1_000_000;
 type CrlFn = (input: string) => { success: boolean; result?: unknown; errors?: unknown };
 type ToolArgs = { code?: string; path?: string };
 type ValidateArgs = ToolArgs & { soft?: boolean };
-type EmitArgs = ToolArgs & { libraryName?: string; libraryVersion?: string };
+type EmitArgs = ToolArgs & { libraryName?: string };
 
 // Thrown for bad tool input (XOR violation, unreadable/oversized/dir path).
 // These map to MCP isError responses; CRL parse/build failures do NOT — those
@@ -82,7 +82,6 @@ function runEmit(args: EmitArgs) {
   }
   const result = emitCQL(source, {
     libraryName: args.libraryName,
-    libraryVersion: args.libraryVersion,
   });
   return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
 }
@@ -175,16 +174,16 @@ function createServer(): McpServer {
       title: "Emit CQL",
       description:
         "Emit CQL from a CRL document. Pass exactly one of `code` (inline) or `path` (file), plus optional " +
-        "`libraryName` and `libraryVersion`. " +
+        "`libraryName`. " +
         "Returns { success, result?, errors? }: on success, `result` is the generated CQL text targeting " +
-        "the CRLPatterns library (cql/src/CRLPatterns.cql). Refinement-vs-boolean composition is detected " +
-        "per-operand; stub valuesets (empty URL) become parameter declarations; terminology/concept name " +
-        "collisions are disambiguated with a ' Code' / ' ValueSet' suffix. The output may still need a CQL " +
-        "compiler to validate end-to-end.",
+        "the CRLPatterns library (cql/src/CRLPatterns.cql). The emitted CQL library declaration is " +
+        "unversioned (npm packaging IS the version system); `include CRLPatterns` is also unversioned. " +
+        "Refinement-vs-boolean composition is detected per-operand; stub valuesets (empty URL) become " +
+        "parameter declarations; terminology/concept name collisions are disambiguated with a ' Code' / " +
+        "' ValueSet' suffix. The output may still need a CQL compiler to validate end-to-end.",
       inputSchema: {
         ...inputSchema,
         libraryName: z.string().optional().describe("Library name for the emitted CQL (default: GeneratedFromCRL)."),
-        libraryVersion: z.string().optional().describe("Library version (default: 0.1.0)."),
       },
     },
     (args) => runEmit(args as EmitArgs)
