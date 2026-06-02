@@ -23,6 +23,14 @@ import {
   ConceptRefHoverProvider,
 } from "./hover";
 import { registerDiagnostics } from "./diagnostics";
+import {
+  CrlDefinitionProvider,
+  CrlReferenceProvider,
+  CrlDocumentSymbolProvider,
+  CrlWorkspaceSymbolProvider,
+  CrlRenameProvider,
+  CrlDocumentLinkProvider,
+} from "./navigation";
 import { ProjectIndex } from "./projectIndex";
 
 const messageOf = (e: unknown): string => (e instanceof Error ? e.message : String(e));
@@ -83,6 +91,30 @@ function registerLanguageFeatures(
     vscode.languages.registerHoverProvider(
       CRL_DOCUMENT_SELECTOR,
       new ConceptRefHoverProvider(index)
+    ),
+    // Navigation providers (Chunk C)
+    vscode.languages.registerDefinitionProvider(
+      CRL_DOCUMENT_SELECTOR,
+      new CrlDefinitionProvider(index)
+    ),
+    vscode.languages.registerReferenceProvider(
+      CRL_DOCUMENT_SELECTOR,
+      new CrlReferenceProvider(index)
+    ),
+    vscode.languages.registerDocumentSymbolProvider(
+      CRL_DOCUMENT_SELECTOR,
+      new CrlDocumentSymbolProvider(index)
+    ),
+    vscode.languages.registerWorkspaceSymbolProvider(
+      new CrlWorkspaceSymbolProvider(index)
+    ),
+    vscode.languages.registerRenameProvider(
+      CRL_DOCUMENT_SELECTOR,
+      new CrlRenameProvider(index)
+    ),
+    vscode.languages.registerDocumentLinkProvider(
+      CRL_DOCUMENT_SELECTOR,
+      new CrlDocumentLinkProvider(index)
     )
   );
   if (patterns.length > 0) {

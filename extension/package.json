@@ -75,7 +75,11 @@
     "test:crl-patterns": "node src/crl-patterns-coverage.test.mjs",
     "pretest:context-detect": "npm run compile",
     "test:context-detect": "node src/contextDetect.test.mjs",
-    "test": "npm run compile && node src/mcp-server.test.mjs && node src/provision.test.mjs && node src/highlight.test.mjs && node src/catalog.test.mjs && node src/embedded-catalog.test.mjs && node src/concepts.test.mjs && node src/crl-patterns-coverage.test.mjs && node src/contextDetect.test.mjs",
+    "pretest:find-declaration": "npm run compile",
+    "test:find-declaration": "node src/findDeclaration.test.mjs",
+    "pretest:project-index": "npm run compile",
+    "test:project-index": "node src/projectIndex.test.mjs",
+    "test": "npm run compile && node src/mcp-server.test.mjs && node src/provision.test.mjs && node src/highlight.test.mjs && node src/catalog.test.mjs && node src/embedded-catalog.test.mjs && node src/concepts.test.mjs && node src/crl-patterns-coverage.test.mjs && node src/contextDetect.test.mjs && node src/findDeclaration.test.mjs && node src/projectIndex.test.mjs",
     "vscode:prepublish": "npm run compile",
     "package": "vsce package"
   },

@@ -89,7 +89,7 @@ async function build() {
 
   // Pure node modules (fs/path/crypto). Bundled separately so the unit tests can
   // import them directly; the extension host imports the same source.
-  for (const name of ["provision", "highlight", "catalog", "concepts", "contextDetect"]) {
+  for (const name of ["provision", "highlight", "catalog", "concepts", "contextDetect", "findDeclaration", "projectIndex"]) {
     await esbuild.build({
       entryPoints: [path.resolve(__dirname, `src/${name}.ts`)],
       outfile: path.resolve(__dirname, `dist/${name}.js`),
@@ -98,6 +98,7 @@ async function build() {
       format: "cjs",
       target: "node18",
       sourcemap: true,
+      alias: crlAlias, // projectIndex needs the CRL package; others ignore
     });
   }
 
