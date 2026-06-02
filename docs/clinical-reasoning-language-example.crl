@@ -1,4 +1,5 @@
 # Clinical Reasoning Language Example
+library "Clinical Reasoning Language Example".
 
 /*
 Clinical Reasoning Language (CRL) — v0.7 grammar reference example.

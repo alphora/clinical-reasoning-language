@@ -7,6 +7,7 @@ import {
   type Pattern,
 } from "./catalog";
 import { scanDeclarations, declarationsByName, type Declaration } from "./concepts";
+import type { IndexedDeclaration, ProjectIndex } from "./projectIndex";
 
 const CONCEPT_TYPE_SET: ReadonlySet<string> = new Set(CONCEPT_TYPES);
 const CONCEPT_VALUETYPE_SET: ReadonlySet<string> = new Set(CONCEPT_VALUETYPES);
@@ -112,26 +113,64 @@ export class TypeValuetypeHoverProvider implements vscode.HoverProvider {
  * the reference in the document's declared concept/terminology list.
  */
 export class ConceptRefHoverProvider implements vscode.HoverProvider {
+  constructor(private readonly index: ProjectIndex) {}
+
   public provideHover(
     document: vscode.TextDocument,
     position: vscode.Position
   ): vscode.ProviderResult<vscode.Hover> {
-    const span = quotedSpanAt(document.lineAt(position.line).text, position.character);
+    const line = document.lineAt(position.line).text;
+    const span = quotedSpanAt(line, position.character);
     if (!span) return null;
     const name = span.text;
+
+    // Detect qualified ref: if the hovered span is the SECOND quoted segment
+    // of `"Lib"."<here>"`, look up by libraryName + name in the project
+    // index. Otherwise (bare ref or first segment), use either the project
+    // index (multi-file) or the file-local scan (orphan file).
+    const prefixBeforeSpan = line.slice(0, span.start);
+    const qualifierMatch = /"([^"]+)"\s*\.\s*$/.exec(prefixBeforeSpan);
+
+    const indexed = this.index.getDeclarations(document.uri.fsPath);
+    if (indexed.length > 0) {
+      const decl = qualifierMatch
+        ? indexed.find((d) => d.libraryName === qualifierMatch[1] && d.name === name)
+        : indexed.find((d) => d.name === name);
+      if (!decl) return null;
+      return new vscode.Hover(
+        formatIndexedHover(decl),
+        new vscode.Range(position.line, span.start, position.line, span.end),
+      );
+    }
+
+    // Orphan-file fallback.
     const decls = scanDeclarations(document.getText());
     const byName = declarationsByName(decls);
     const decl = byName.get(name);
     if (!decl) return null;
-
-    const md = new vscode.MarkdownString();
-    md.appendMarkdown(`**${decl.name}** — ${decl.kind}\n\n`);
-    if (decl.type) md.appendMarkdown(`Type: \`${decl.type}\`\n\n`);
-    if (decl.valuetype) md.appendMarkdown(`Valuetype: \`${decl.valuetype}\`\n\n`);
-    if (decl.bodyPreview) md.appendMarkdown(`Body: \`${decl.bodyPreview}\`\n\n`);
-    md.appendMarkdown(`Declared at line ${decl.line + 1}.`);
-    return new vscode.Hover(md, new vscode.Range(position.line, span.start, position.line, span.end));
+    return new vscode.Hover(formatLocalHover(decl), new vscode.Range(position.line, span.start, position.line, span.end));
   }
+}
+
+function formatIndexedHover(decl: IndexedDeclaration): vscode.MarkdownString {
+  const md = new vscode.MarkdownString();
+  md.appendMarkdown(`**${decl.name}** — ${decl.kind}\n\n`);
+  md.appendMarkdown(`Library: \`${decl.libraryName}\`\n\n`);
+  if (decl.type) md.appendMarkdown(`Type: \`${decl.type}\`\n\n`);
+  if (decl.valuetype) md.appendMarkdown(`Valuetype: \`${decl.valuetype}\`\n\n`);
+  if (decl.bodyPreview) md.appendMarkdown(`Body: \`${decl.bodyPreview}\`\n\n`);
+  md.appendMarkdown(`Declared at \`${decl.filePath}\`:${decl.line + 1}.`);
+  return md;
+}
+
+function formatLocalHover(decl: Declaration): vscode.MarkdownString {
+  const md = new vscode.MarkdownString();
+  md.appendMarkdown(`**${decl.name}** — ${decl.kind}\n\n`);
+  if (decl.type) md.appendMarkdown(`Type: \`${decl.type}\`\n\n`);
+  if (decl.valuetype) md.appendMarkdown(`Valuetype: \`${decl.valuetype}\`\n\n`);
+  if (decl.bodyPreview) md.appendMarkdown(`Body: \`${decl.bodyPreview}\`\n\n`);
+  md.appendMarkdown(`Declared at line ${decl.line + 1}.`);
+  return md;
 }
 
 /** Return the span (start+end+inner text) of the quoted string under `col`, if any. */

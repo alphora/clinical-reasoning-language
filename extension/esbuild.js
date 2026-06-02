@@ -89,7 +89,7 @@ async function build() {
 
   // Pure node modules (fs/path/crypto). Bundled separately so the unit tests can
   // import them directly; the extension host imports the same source.
-  for (const name of ["provision", "highlight", "catalog", "concepts"]) {
+  for (const name of ["provision", "highlight", "catalog", "concepts", "contextDetect"]) {
     await esbuild.build({
       entryPoints: [path.resolve(__dirname, `src/${name}.ts`)],
       outfile: path.resolve(__dirname, `dist/${name}.js`),

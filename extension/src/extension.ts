@@ -23,6 +23,7 @@ import {
   ConceptRefHoverProvider,
 } from "./hover";
 import { registerDiagnostics } from "./diagnostics";
+import { ProjectIndex } from "./projectIndex";
 
 const messageOf = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 
@@ -45,7 +46,11 @@ function loadEmbeddedCatalog(context: vscode.ExtensionContext): Pattern[] {
   }
 }
 
-function registerLanguageFeatures(context: vscode.ExtensionContext, patterns: Pattern[]): void {
+function registerLanguageFeatures(
+  context: vscode.ExtensionContext,
+  patterns: Pattern[],
+  index: ProjectIndex,
+): void {
   // Narrative completion+hover requires the catalog; the others (type,
   // valuetype, concept-refs) only depend on document content and the
   // grammar-mirrored enums in catalog.ts, so they register regardless.
@@ -61,10 +66,14 @@ function registerLanguageFeatures(context: vscode.ExtensionContext, patterns: Pa
       new ValuetypeCompletionProvider(),
       " "
     ),
+    // ConceptRefCompletionProvider triggers on `"` AND `.` so qualified-ref
+    // completion (`"Lib".<here>"`) fires after the dot without waiting for
+    // the user to manually open the completion popup.
     vscode.languages.registerCompletionItemProvider(
       CRL_DOCUMENT_SELECTOR,
-      new ConceptRefCompletionProvider(),
-      '"'
+      new ConceptRefCompletionProvider(index),
+      '"',
+      "."
     ),
     // Hover providers
     vscode.languages.registerHoverProvider(
@@ -73,7 +82,7 @@ function registerLanguageFeatures(context: vscode.ExtensionContext, patterns: Pa
     ),
     vscode.languages.registerHoverProvider(
       CRL_DOCUMENT_SELECTOR,
-      new ConceptRefHoverProvider()
+      new ConceptRefHoverProvider(index)
     )
   );
   if (patterns.length > 0) {
@@ -104,9 +113,16 @@ export function activate(context: vscode.ExtensionContext): void {
 
   // Language features (completion + hover + diagnostics) are independent of
   // provisioning — they activate whenever the extension loads and a `.crl`
-  // file is opened.
-  registerLanguageFeatures(context, loadEmbeddedCatalog(context));
-  registerDiagnostics(context);
+  // file is opened. ProjectIndex is the shared multi-file scope source.
+  const index = new ProjectIndex();
+  context.subscriptions.push(
+    vscode.commands.registerCommand("crl.refreshProjectCache", () => {
+      index.invalidateAll();
+      vscode.window.showInformationMessage("CRL: project cache refreshed.");
+    }),
+  );
+  registerLanguageFeatures(context, loadEmbeddedCatalog(context), index);
+  registerDiagnostics(context, index);
 
   const auto = vscode.workspace.getConfiguration("crl").get<boolean>("autoProvision", true);
   if (auto && vscode.workspace.workspaceFolders?.length) {

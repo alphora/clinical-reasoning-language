@@ -7,6 +7,13 @@ import { ImportDiagnostic, ResolvedGraph } from "./types";
 
 export interface ValidateImportsOptions {
   soft?: boolean;
+  /**
+   * In-memory overrides for file content, keyed by absolute canonical path.
+   * Threaded through to `resolveImports` so editor callers (extension /
+   * MCP / future LSP) can validate against open-but-unsaved buffers
+   * without writing to disk.
+   */
+  overlays?: ReadonlyMap<string, string>;
 }
 
 export interface ValidateImportsResult {
@@ -21,7 +28,7 @@ export function validateCRLImports(
   rootPath: string,
   options: ValidateImportsOptions = {},
 ): ValidateImportsResult {
-  const graph: ResolvedGraph = resolveImports(rootPath);
+  const graph: ResolvedGraph = resolveImports(rootPath, { overlays: options.overlays });
 
   if (graph.resolvedLibraries.length === 0) {
     return {

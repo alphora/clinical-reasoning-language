@@ -15,31 +15,50 @@ import {
   emptyNamespace,
 } from "./types";
 
-export function resolveImports(rootPath: string): ResolvedGraph {
+export interface ResolveImportsOptions {
+  /**
+   * In-memory overrides for file content, keyed by absolute canonical path.
+   * When the resolver is about to read a file from disk, it consults the
+   * overlay map first and uses the overlay text if present. Used by the
+   * VSCode extension to validate against open-but-unsaved editor buffers.
+   */
+  overlays?: ReadonlyMap<string, string>;
+}
+
+export function resolveImports(
+  rootPath: string,
+  options: ResolveImportsOptions = {},
+): ResolvedGraph {
   const canonicalRoot = path.resolve(rootPath);
+  const overlays = options.overlays;
 
   let rootSource: string;
-  try {
-    rootSource = readFileSync(canonicalRoot, "utf-8");
-  } catch (err) {
-    const diag: ParseFailureDiagnostic = {
-      kind: "parse-failure",
-      severity: "error",
-      filePath: canonicalRoot,
-      errors: [
-        {
-          type: "Exception",
-          message: err instanceof Error ? err.message : String(err),
-        },
-      ],
-    };
-    return {
-      rootPath: canonicalRoot,
-      resolvedLibraries: [],
-      localLibraries: [],
-      namespace: emptyNamespace(),
-      diagnostics: [diag],
-    } as ResolvedGraph;
+  const rootOverlay = overlays?.get(canonicalRoot);
+  if (rootOverlay !== undefined) {
+    rootSource = rootOverlay;
+  } else {
+    try {
+      rootSource = readFileSync(canonicalRoot, "utf-8");
+    } catch (err) {
+      const diag: ParseFailureDiagnostic = {
+        kind: "parse-failure",
+        severity: "error",
+        filePath: canonicalRoot,
+        errors: [
+          {
+            type: "Exception",
+            message: err instanceof Error ? err.message : String(err),
+          },
+        ],
+      };
+      return {
+        rootPath: canonicalRoot,
+        resolvedLibraries: [],
+        localLibraries: [],
+        namespace: emptyNamespace(),
+        diagnostics: [diag],
+      } as ResolvedGraph;
+    }
   }
 
   const parsed = buildCRL(rootSource);
@@ -84,7 +103,7 @@ export function resolveImports(rootPath: string): ResolvedGraph {
     origin: "root",
   };
 
-  const { registry, diagnostics: registryDiags } = buildRegistry(projectRoot);
+  const { registry, diagnostics: registryDiags } = buildRegistry(projectRoot, overlays);
 
   // The root file is also seen by the local scan. Replace the scan's entry
   // (same path) with the canonical root entry so cycle detection and topo

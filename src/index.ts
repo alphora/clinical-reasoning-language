@@ -45,6 +45,11 @@ export type {
   ValidateImportsOptions,
   ValidateImportsResult,
 } from "./imports/validate";
+export type {
+  ValidationError,
+  ValidationErrorKind,
+  ValidationResult,
+} from "./validator/validator";
 
 export interface Token {
   line: number;

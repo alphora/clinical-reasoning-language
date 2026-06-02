@@ -7,6 +7,13 @@ import {
   type Pattern,
 } from "./catalog";
 import { scanDeclarations, type Declaration } from "./concepts";
+import {
+  detectExpectedKind,
+  detectQualifiedRefQualifier,
+  isInsideOpenQuote,
+  type ExpectedRefKind,
+} from "./contextDetect";
+import type { ProjectIndex } from "./projectIndex";
 
 // Document selector: match `.crl` files. The repo's setup associates `.crl`
 // with the `markdown` language ID, so we select on language + scheme + a
@@ -37,8 +44,7 @@ function buildNarrativeItem(pattern: Pattern): vscode.CompletionItem {
 }
 
 /**
- * Narrative-pattern completion inside `- definition is ` bodies. See
- * NarrativeCompletionProvider in the README.
+ * Narrative-pattern completion inside `- definition is ` bodies.
  */
 export class NarrativeCompletionProvider implements vscode.CompletionItemProvider {
   constructor(private readonly patterns: Pattern[]) {}
@@ -53,9 +59,7 @@ export class NarrativeCompletionProvider implements vscode.CompletionItemProvide
 }
 
 /**
- * Completion for `- type is <X>.` lines. Fires after `- type is ` and
- * suggests every FHIR resource type CRL recognizes. The enum is sourced from
- * `CONCEPT_TYPES` in catalog.ts which mirrors the grammar's lexer rule.
+ * Completion for `- type is <X>.` lines.
  */
 export class TypeCompletionProvider implements vscode.CompletionItemProvider {
   public provideCompletionItems(
@@ -73,8 +77,7 @@ export class TypeCompletionProvider implements vscode.CompletionItemProvider {
 }
 
 /**
- * Completion for `- valuetype is <X>.` lines. Fires after `- valuetype is `
- * and suggests every FHIR primitive / structured type CRL recognizes.
+ * Completion for `- valuetype is <X>.` lines.
  */
 export class ValuetypeCompletionProvider implements vscode.CompletionItemProvider {
   public provideCompletionItems(
@@ -92,14 +95,24 @@ export class ValuetypeCompletionProvider implements vscode.CompletionItemProvide
 }
 
 /**
- * Completion for quoted concept references. Fires when the user is inside a
- * quoted string at most positions in a CRL document; suggests every concept
- * and terminology declared in the file (in source order).
+ * Completion for quoted concept/terminology/decision/activity references.
  *
- * Suppressed when the cursor is on a header line (`concept "X":` — the user
- * is naming a NEW declaration, not referencing an existing one).
+ * Filters by:
+ *   - The expected kind at the cursor position (from `detectExpectedKind`).
+ *     E.g. `coded from "` only suggests terminologies (closes #54).
+ *   - The qualifier when editing the SECOND segment of a qualified ref
+ *     `"Lib"."<here>"`: only declarations from `Lib`.
+ *
+ * Pulls declarations from `ProjectIndex` (project-wide, parser-backed)
+ * when available; falls back to file-local `scanDeclarations` for orphan
+ * files without a project root.
+ *
+ * Suppressed on declaration headers (`concept "X":` etc. — the user is
+ * naming a NEW declaration, not referencing one).
  */
 export class ConceptRefCompletionProvider implements vscode.CompletionItemProvider {
+  constructor(private readonly index: ProjectIndex) {}
+
   public provideCompletionItems(
     document: vscode.TextDocument,
     position: vscode.Position
@@ -107,51 +120,90 @@ export class ConceptRefCompletionProvider implements vscode.CompletionItemProvid
     const line = document.lineAt(position.line).text;
     const prefix = line.slice(0, position.character);
     if (!isInsideOpenQuote(prefix)) return [];
-    // Suppress on declaration headers (`concept "X":` / `terminology "X":`).
-    if (/^\s*(concept|terminology)\s+"[^"]*$/.test(prefix)) return [];
+    if (/^\s*(concept|terminology|decision|activity)\s+"[^"]*$/.test(prefix)) return [];
 
-    const decls = scanDeclarations(document.getText());
-    return decls.map((d) => buildConceptRefItem(d));
+    const expectedKind = detectExpectedKind(prefix);
+    const qualifier = detectQualifiedRefQualifier(prefix);
+
+    const decls = this.getDeclarations(document);
+    return decls
+      .filter((d) => matchesKind(d, expectedKind))
+      .filter((d) => matchesQualifier(d, qualifier))
+      .map((d) => buildRefItem(d));
   }
-}
 
-/**
- * Heuristic: return true if the cursor is inside an open double-quoted string
- * on this line. Counts unescaped `"` to the left of the cursor; odd count
- * means we're inside a quote.
- */
-function isInsideOpenQuote(prefix: string): boolean {
-  let count = 0;
-  for (let i = 0; i < prefix.length; i++) {
-    if (prefix[i] === "\\" && prefix[i + 1] === '"') {
-      i++;
-      continue;
+  private getDeclarations(document: vscode.TextDocument): RefSuggestion[] {
+    const indexed = this.index.getDeclarations(document.uri.fsPath);
+    if (indexed.length > 0) {
+      return indexed.map((d) => ({
+        name: d.name,
+        kind: d.kind,
+        libraryName: d.libraryName,
+        type: d.type,
+        valuetype: d.valuetype,
+        bodyPreview: d.bodyPreview,
+      }));
     }
-    if (prefix[i] === '"') count++;
+    const local: Declaration[] = scanDeclarations(document.getText());
+    return local.map((d) => ({
+      name: d.name,
+      kind: d.kind,
+      libraryName: undefined,
+      type: d.type,
+      valuetype: d.valuetype,
+      bodyPreview: d.bodyPreview,
+    }));
   }
-  return count % 2 === 1;
 }
 
-function buildConceptRefItem(decl: Declaration): vscode.CompletionItem {
-  const kindLabel = decl.kind === "terminology" ? "Reference" : "Variable";
-  const item = new vscode.CompletionItem(
-    decl.name,
-    decl.kind === "terminology" ? vscode.CompletionItemKind.Reference : vscode.CompletionItemKind.Variable
-  );
-  item.detail = formatDeclarationDetail(decl);
+interface RefSuggestion {
+  name: string;
+  kind: "concept" | "terminology" | "decision" | "activity";
+  libraryName: string | undefined;
+  type?: string;
+  valuetype?: string;
+  bodyPreview?: string;
+}
+
+function matchesKind(d: RefSuggestion, expected: ExpectedRefKind): boolean {
+  if (expected === "any") return true;
+  return d.kind === expected;
+}
+
+function matchesQualifier(d: RefSuggestion, qualifier: string | null): boolean {
+  if (qualifier === null) return true;
+  return d.libraryName === qualifier;
+}
+
+function buildRefItem(d: RefSuggestion): vscode.CompletionItem {
+  const item = new vscode.CompletionItem(d.name, completionKindFor(d.kind));
+  item.detail = formatDeclarationDetail(d);
   const md = new vscode.MarkdownString();
-  md.appendMarkdown(`**${decl.name}** — ${kindLabel.toLowerCase()}\n\n`);
-  if (decl.type) md.appendMarkdown(`Type: \`${decl.type}\`\n\n`);
-  if (decl.valuetype) md.appendMarkdown(`Valuetype: \`${decl.valuetype}\`\n\n`);
-  if (decl.bodyPreview) md.appendMarkdown(`Body: \`${decl.bodyPreview}\``);
+  md.appendMarkdown(`**${d.name}** — ${d.kind}\n\n`);
+  if (d.libraryName) md.appendMarkdown(`Library: \`${d.libraryName}\`\n\n`);
+  if (d.type) md.appendMarkdown(`Type: \`${d.type}\`\n\n`);
+  if (d.valuetype) md.appendMarkdown(`Valuetype: \`${d.valuetype}\`\n\n`);
+  if (d.bodyPreview) md.appendMarkdown(`Body: \`${d.bodyPreview}\``);
   item.documentation = md;
   return item;
 }
 
-function formatDeclarationDetail(decl: Declaration): string {
-  if (decl.kind === "terminology") return "terminology";
+function completionKindFor(kind: "concept" | "terminology" | "decision" | "activity"): vscode.CompletionItemKind {
+  switch (kind) {
+    case "concept": return vscode.CompletionItemKind.Variable;
+    case "terminology": return vscode.CompletionItemKind.Reference;
+    case "decision": return vscode.CompletionItemKind.Method;
+    case "activity": return vscode.CompletionItemKind.Class;
+  }
+}
+
+function formatDeclarationDetail(d: RefSuggestion): string {
+  if (d.kind === "terminology") return d.libraryName ? `terminology — ${d.libraryName}` : "terminology";
+  if (d.kind === "decision") return d.libraryName ? `decision — ${d.libraryName}` : "decision";
+  if (d.kind === "activity") return d.libraryName ? `activity — ${d.libraryName}` : "activity";
   const parts: string[] = ["concept"];
-  if (decl.type) parts.push(decl.type);
-  if (decl.valuetype) parts.push(`+ ${decl.valuetype}`);
+  if (d.type) parts.push(d.type);
+  if (d.valuetype) parts.push(`+ ${d.valuetype}`);
+  if (d.libraryName) parts.push(`— ${d.libraryName}`);
   return parts.join(" ");
 }

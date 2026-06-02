@@ -32,10 +32,10 @@ const check = async (label, fn) => {
 
 await client.connect(transport);
 try {
-  await check("exactly two tools: build_crl_ast, tokenize_crl", async () => {
+  await check("MCP tools: build_crl_ast, tokenize_crl, validate_crl, emit_cql", async () => {
     const { tools } = await client.listTools();
     const names = tools.map((t) => t.name).sort();
-    assert.deepEqual(names, ["build_crl_ast", "tokenize_crl"]);
+    assert.deepEqual(names, ["build_crl_ast", "emit_cql", "tokenize_crl", "validate_crl"]);
   });
 
   await check("build_crl_ast via path → valid AST with expected structure", async () => {
@@ -44,7 +44,7 @@ try {
     const ast = JSON.parse(r.content[0].text);
     assert.equal(ast.success, true);
     assert.equal(ast.result.type, "CRL");
-    assert.equal(ast.result.identifier, "Clinical Reasoning Language Example");
+    assert.equal(ast.result.library?.name, "Clinical Reasoning Language Example");
     assert.equal(ast.result.statements[0].type, "Decision");
     assert.equal(ast.result.statements[0].name, "IMMZ.D2.D5.Measles");
   });
@@ -104,7 +104,7 @@ try {
     assert.ok(!r.isError);
     const out = JSON.parse(r.content[0].text);
     assert.equal(out.success, true);
-    assert.equal(out.result.identifier, "Clinical Reasoning Language Example");
+    assert.equal(out.result.library?.name, "Clinical Reasoning Language Example");
   });
 } finally {
   await client.close();

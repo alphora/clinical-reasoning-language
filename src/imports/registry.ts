@@ -70,7 +70,10 @@ export function findProjectRoot(startPath: string): string | null {
  *
  * Skips node_modules/, dist/, build/, and dot-prefixed directories.
  */
-function scanProjectLocal(projectRoot: string): {
+function scanProjectLocal(
+  projectRoot: string,
+  overlays?: ReadonlyMap<string, string>,
+): {
   entries: RegistryEntry[];
   diagnostics: ImportDiagnostic[];
 } {
@@ -80,22 +83,30 @@ function scanProjectLocal(projectRoot: string): {
   for (const filePath of listCrlFiles(projectRoot)) {
     const canonical = path.resolve(filePath);
     let source: string;
-    try {
-      source = readFileSync(canonical, "utf-8");
-    } catch (err) {
-      const diag: ParseFailureDiagnostic = {
-        kind: "parse-failure",
-        severity: "warning",
-        filePath: canonical,
-        errors: [
-          {
-            type: "Exception",
-            message: err instanceof Error ? err.message : String(err),
-          },
-        ],
-      };
-      diagnostics.push(diag);
-      continue;
+    const overlay = overlays?.get(canonical);
+    if (overlay !== undefined) {
+      // Editor passed an in-memory text override for this path (e.g. an
+      // open editor with unsaved changes). Validate against the live text,
+      // not the stale on-disk content.
+      source = overlay;
+    } else {
+      try {
+        source = readFileSync(canonical, "utf-8");
+      } catch (err) {
+        const diag: ParseFailureDiagnostic = {
+          kind: "parse-failure",
+          severity: "warning",
+          filePath: canonical,
+          errors: [
+            {
+              type: "Exception",
+              message: err instanceof Error ? err.message : String(err),
+            },
+          ],
+        };
+        diagnostics.push(diag);
+        continue;
+      }
     }
     const parsed = buildCRL(source);
     if (!parsed.success || !parsed.result) {
@@ -314,7 +325,10 @@ function scanNodeModules(projectRoot: string): {
  * Entries with `name === null` (today: only possible for anonymous-mode
  * residue, which v2.1.0 removed) are skipped without registration.
  */
-export function buildRegistry(projectRoot: string): {
+export function buildRegistry(
+  projectRoot: string,
+  overlays?: ReadonlyMap<string, string>,
+): {
   registry: Registry;
   diagnostics: ImportDiagnostic[];
 } {
@@ -324,7 +338,7 @@ export function buildRegistry(projectRoot: string): {
     byNamePackage: new Map(),
   };
 
-  const { entries: localEntries, diagnostics: localDiags } = scanProjectLocal(projectRoot);
+  const { entries: localEntries, diagnostics: localDiags } = scanProjectLocal(projectRoot, overlays);
   diagnostics.push(...localDiags);
   for (const entry of localEntries) {
     if (entry.name === null) continue;
