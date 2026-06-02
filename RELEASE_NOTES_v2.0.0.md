@@ -309,15 +309,28 @@ End-to-end verification: the cms22 4-layer split at `features/cql-pattern-mining
 
 ### Tracked for v2.1.0
 
-- **Required `library "Foo".` declaration** in every CRL file (drops the v2.0 "anonymous file" mode).
-- **Qualified cross-library references** — `"OtherLibrary"."Concept"`. Bare `"Foo"` becomes same-file-only. Sibling libraries in the same project auto-resolve via qualifier (no `include` line needed); `include` becomes exclusively for external `node_modules` packages.
-- **Emergency aliasing** on `include` — only for the case where a local library name collides with an external package's library name (`include "Foo" as "ExternalFoo".`). Not a general user-facing feature.
+**Chunk A Phase 1 (shipped 4d2f3f8 on main, post-v2.0.0):**
+- ✅ **Qualified cross-library references** parse end-to-end — `"OtherLibrary"."Concept"` syntax accepted by parser, carried through the AST as a new `QualifiedReference` node, reachable via helpers `getRefName(ref)` / `getRefLibrary(ref)` / `isQualifiedRef(ref)` / `refDisplay(ref)`.
+- ✅ **Emergency aliasing on `include`** parses end-to-end — `include "Foo" as "ExternalFoo".` syntax accepted, populates `Include.alias?: string` on the AST.
+
+**Chunk A Phase 2 (next session — semantic enforcement):**
+- **Required `library "Foo".` declaration** in every CRL file (still optional in Phase 1; the AST type already accepts both, but the parser hasn't tightened yet).
+- **Per-library validator scoping** — bare `"Foo"` resolves same-file-only, qualified `"Lib"."X"` resolves to the named library. Today (Phase 1) qualified refs flatten to their bare name for validation; semantics still v2.0.
+- **`include` external-only enforcement** — local sibling libraries auto-resolve in the same project without `include` lines; `include` becomes exclusively for `node_modules` packages.
+- **CycleDetector refactor** — adjacency keys become `(libraryName, conceptName)` instead of bare names.
+- **Registry split** — separate local-vs-package indexes so `include "Foo" as "Bar".` can disambiguate a local↔package name collision.
+- **New diagnostics** — `external-library-not-included` (error), `redundant-local-include` (warning), `alias-collides-with-local` (error).
+- **Fixture migration + USER_GUIDE rewrite** — ~22 validator-test CRL literals + ~13 imports-test fixtures get migrated to the new model; USER_GUIDE §5 rewritten with the new resolution rules.
+
+**Chunks B / C / D (depend on Chunk A Phase 2):**
 - **Multi-file editor support** — wire the extension's diagnostics through `validateCRLImports` so cross-file refs stop showing as yellow squiggles.
 - **LSP reference navigation** — Go to Definition (F12), Peek Definition (Alt+F12), Find All References (Shift+F12), Document Outline, Workspace Symbols (Ctrl+T), cross-file Rename Symbol (F2).
 - **Kind-restricted autocomplete** — `coded from` offers terminologies only; `defined as` / `definition is` ref slots offer concepts only. Closes [#54](https://github.com/alphora/clinical-reasoning-language/issues/54).
 - **Qualified-ref autocomplete** — typing `"Lib".` pops up everything that library exports, grouped by kind with icons.
 - **Corpus migration** — `features/cql-pattern-mining/results/models/cms22.crl` and `cms69.crl` (both currently monolithic) get folder-ified into 4-library layouts (terminology / asserted / inferred / interface) under the v2.1.0 qualified-ref syntax. JAR-validated round-trip preserved.
-- **Modernizing the 21 skipped pre-v0.7 tests.**
+
+**Test cleanup:**
+- **Modernizing the 22 skipped pre-v0.7 + Phase-1 snapshot tests.**
 
 ### Backlog (issues/, deferred indefinitely)
 
