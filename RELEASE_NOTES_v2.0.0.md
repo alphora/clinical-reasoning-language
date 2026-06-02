@@ -316,6 +316,7 @@ End-to-end verification: the cms22 4-layer split at `features/cql-pattern-mining
 - **LSP reference navigation** — Go to Definition (F12), Peek Definition (Alt+F12), Find All References (Shift+F12), Document Outline, Workspace Symbols (Ctrl+T), cross-file Rename Symbol (F2).
 - **Kind-restricted autocomplete** — `coded from` offers terminologies only; `defined as` / `definition is` ref slots offer concepts only. Closes [#54](https://github.com/alphora/clinical-reasoning-language/issues/54).
 - **Qualified-ref autocomplete** — typing `"Lib".` pops up everything that library exports, grouped by kind with icons.
+- **Corpus migration** — `features/cql-pattern-mining/results/models/cms22.crl` and `cms69.crl` (both currently monolithic) get folder-ified into 4-library layouts (terminology / asserted / inferred / interface) under the v2.1.0 qualified-ref syntax. JAR-validated round-trip preserved.
 - **Modernizing the 21 skipped pre-v0.7 tests.**
 
 ### Backlog (issues/, deferred indefinitely)
