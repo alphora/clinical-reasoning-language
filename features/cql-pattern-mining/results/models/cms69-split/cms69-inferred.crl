@@ -6,37 +6,37 @@ library "CMS69 Inferred".
 
 concept "High BMI Follow-up Order Date":
 - type is ServiceRequest.
-- valuetype is dateTime.
+- value type is dateTime.
 - defined as "CMS69 Asserted"."High BMI Follow-up Service Requests".
 
 concept "Weight Assessment Referral Date":
 - type is ServiceRequest.
-- valuetype is dateTime.
+- value type is dateTime.
 - defined as "CMS69 Asserted"."Weight Assessment Referrals".
 
 concept "High BMI Medication Order Date":
 - type is MedicationRequest.
-- valuetype is dateTime.
+- value type is dateTime.
 - defined as "CMS69 Asserted"."High BMI Medications".
 
 concept "Low BMI Follow-up Order Date":
 - type is ServiceRequest.
-- valuetype is dateTime.
+- value type is dateTime.
 - defined as "CMS69 Asserted"."Low BMI Follow-up Service Requests".
 
 concept "Low BMI Medication Order Date":
 - type is MedicationRequest.
-- valuetype is dateTime.
+- value type is dateTime.
 - defined as "CMS69 Asserted"."Low BMI Medications".
 
 concept "High BMI Procedure Performed Date":
 - type is Procedure.
-- valuetype is dateTime.
+- value type is dateTime.
 - defined as "CMS69 Asserted"."High BMI Follow-up Procedures".
 
 concept "Low BMI Procedure Performed Date":
 - type is Procedure.
-- valuetype is dateTime.
+- value type is dateTime.
 - defined as "CMS69 Asserted"."Low BMI Follow-up Procedures".
 
 
@@ -75,17 +75,17 @@ concept "Qualifying Encounter":
 
 concept "BMI Observation During MP":
 - type is Observation.
-- valuetype is Quantity.
+- value type is Quantity.
 - definition is "CMS69 Asserted"."BMI Observations" during "CMS69 Terminology"."Measurement Period".
 
 concept "BMI Observation Has Positive Value":
 - type is Observation.
-- valuetype is Quantity.
+- value type is Quantity.
 - definition is "CMS69 Asserted"."BMI Observations" exceeds 0 'kg/m2'.
 
 concept "BMI During Measurement Period":
 - type is Observation.
-- valuetype is Quantity.
+- value type is Quantity.
 - defined as
 (
    "BMI Observation During MP"
@@ -98,32 +98,32 @@ concept "BMI During Measurement Period":
 
 concept "BMI During MP Low":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - definition is "BMI During Measurement Period" low.
 
 concept "BMI During MP High":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - definition is "BMI During Measurement Period" high.
 
 concept "BMI During MP Normal":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - definition is "BMI During Measurement Period" normal.
 
 concept "Documented Low BMI":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - defined as "BMI During MP Low".
 
 concept "Documented High BMI":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - defined as "BMI During MP High".
 
 concept "Normal BMI Range":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - defined as "BMI During MP Normal".
 
 
@@ -131,12 +131,12 @@ concept "Normal BMI Range":
 
 concept "Without Documented Abnormal BMI":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - definition is without documented ("Documented High BMI" or "Documented Low BMI").
 
 concept "Has Normal BMI":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - defined as
 (
    "Normal BMI Range"
@@ -157,12 +157,12 @@ concept "Underweight Diagnoses Active":
 
 concept "Has Overweight or Obese":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - defined as "Overweight or Obese Diagnoses Active".
 
 concept "Has Underweight":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - defined as "Underweight Diagnoses Active".
 
 
@@ -174,7 +174,7 @@ concept "High BMI Follow-up Justified by Overweight Diagnosis":
 
 concept "Has Overweight On Or Before High BMI Follow-up Order":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - definition is "Has Overweight or Obese" on or before "High BMI Follow-up Order Date".
 
 concept "High BMI Follow-up Order":
@@ -192,7 +192,7 @@ concept "Weight Assessment Referral Justified by Overweight Diagnosis":
 
 concept "Has Overweight On Or Before Weight Assessment Referral":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - definition is "Has Overweight or Obese" on or before "Weight Assessment Referral Date".
 
 concept "High BMI Weight Assessment Referral":
@@ -210,7 +210,7 @@ concept "High BMI Medication Justified by Overweight Diagnosis":
 
 concept "Has Overweight On Or Before High BMI Medication Order":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - definition is "Has Overweight or Obese" on or before "High BMI Medication Order Date".
 
 concept "High BMI Medication Order":
@@ -224,7 +224,7 @@ concept "High BMI Medication Order":
 
 concept "High BMI Interventions Ordered":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - defined as
 (
    "High BMI Follow-up Order"
@@ -243,7 +243,7 @@ concept "High BMI Procedure Justified by Overweight Diagnosis":
 
 concept "Has Overweight On Or Before High BMI Procedure":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - definition is "Has Overweight or Obese" on or before "High BMI Procedure Performed Date".
 
 concept "High BMI Procedure Performed":
@@ -264,12 +264,12 @@ concept "High BMI Interventions Performed":
 
 concept "Documented High BMI During MP":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - definition is "Documented High BMI" during "CMS69 Terminology"."Measurement Period".
 
 concept "High BMI And Follow Up Provided":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - defined as
 (
    "Documented High BMI During MP"
@@ -290,12 +290,12 @@ concept "Low BMI Follow-up Justified by Underweight Diagnosis":
 
 concept "Has Underweight On Or Before Low BMI Follow-up Order":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - definition is "Has Underweight" on or before "Low BMI Follow-up Order Date".
 
 concept "Low BMI Follow-up Order Date During MP":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - definition is "Low BMI Follow-up Order Date" during "CMS69 Terminology"."Measurement Period".
 
 concept "Low BMI Follow-up Order":
@@ -313,17 +313,17 @@ concept "Low BMI Follow-up Order":
 
 concept "Weight Assessment Referral Justified by Underweight Diagnosis":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - definition is "CMS69 Asserted"."Weight Assessment Referrals" justified by "CMS69 Asserted"."Underweight Diagnoses".
 
 concept "Has Underweight On Or Before Weight Assessment Referral":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - definition is "Has Underweight" on or before "Weight Assessment Referral Date".
 
 concept "Weight Assessment Referral Date During MP":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - definition is "Weight Assessment Referral Date" during "CMS69 Terminology"."Measurement Period".
 
 concept "Low BMI Weight Assessment Referral":
@@ -345,12 +345,12 @@ concept "Low BMI Medication Justified by Underweight Diagnosis":
 
 concept "Has Underweight On Or Before Low BMI Medication Order":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - definition is "Has Underweight" on or before "Low BMI Medication Order Date".
 
 concept "Low BMI Medication Order Date During MP":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - definition is "Low BMI Medication Order Date" during "CMS69 Terminology"."Measurement Period".
 
 concept "Low BMI Medication Order":
@@ -368,7 +368,7 @@ concept "Low BMI Medication Order":
 
 concept "Low BMI Interventions Ordered":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - defined as
 (
    "Low BMI Follow-up Order"
@@ -391,12 +391,12 @@ concept "Low BMI Follow-up Procedures Performed":
 
 concept "Has Underweight On Or Before Low BMI Procedure":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - definition is "Has Underweight" on or before "Low BMI Procedure Performed Date".
 
 concept "Low BMI Procedure Performed Date During MP":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - definition is "Low BMI Procedure Performed Date" during "CMS69 Terminology"."Measurement Period".
 
 concept "Low BMI Procedure Performed":
@@ -425,12 +425,12 @@ concept "Low BMI Interventions Performed":
 
 concept "Documented Low BMI During MP":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - definition is "Documented Low BMI" during "CMS69 Terminology"."Measurement Period".
 
 concept "Low BMI And Follow Up Provided":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - defined as
 (
    "Documented Low BMI During MP"
@@ -455,7 +455,7 @@ concept "BMI Observation Same Day As Qualifying Encounter":
 
 concept "Medical Reason Or Patient Reason For Not Performing BMI Exam":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - defined as
 (
    "BMI Observation Not Done With Reason"
@@ -583,7 +583,7 @@ concept "Low BMI Medication Not Done With Reason":
 
 concept "Medical Reason For Not Documenting A Follow Up Plan For Low Or High BMI":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - defined as
 (
    "High BMI Follow-up Not Done With Reason"
@@ -606,7 +606,7 @@ concept "Pregnancy Diagnoses Active During MP":
 
 concept "Active Pregnancy Diagnosis":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - defined as "Pregnancy Diagnoses Active During MP".
 
 concept "Pregnancy Status Overlaps MP":
@@ -623,7 +623,7 @@ concept "Pregnancy Status Documented As Pregnancy Related":
 
 concept "Verified Pregnancy Status":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - defined as
 (
    "Pregnancy Status Overlaps MP"
@@ -635,7 +635,7 @@ concept "Verified Pregnancy Status":
 
 concept "Is Pregnant During Measurement Period":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - defined as
 (
    "Active Pregnancy Diagnosis"
@@ -648,10 +648,10 @@ concept "Is Pregnant During Measurement Period":
 
 concept "Age At Start Of MP At Least 18 Years":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - definition is age at start of "CMS69 Terminology"."Measurement Period" at least 18 years.
 
 concept "Aged 18+ at Measurement Period Start":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - defined as "Age At Start Of MP At Least 18 Years".

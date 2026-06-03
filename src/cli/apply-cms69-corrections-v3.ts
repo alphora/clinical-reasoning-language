@@ -15,7 +15,7 @@
  *      both. The BMI Observation refinement chain gets Observation+Quantity;
  *      everything else gets Observation+boolean (semantic predicate intent).
  *   3. For the "Pregnancy or Other Related Diagnoses" wrapper concept,
- *      add `valuetype is CodeableConcept.` (currently missing).
+ *      add `value type is CodeableConcept.` (currently missing).
  */
 
 import { readFileSync, writeFileSync } from "fs";
@@ -120,7 +120,7 @@ for (const change of changes) {
     }
     source = source.slice(0, match.index) + match[1] + "Observation" + match[2] + source.slice(match.index + match[0].length);
   } else if (change.kind === "annotate-definition-is") {
-    // Insert `- type is Observation.\n- valuetype is X.\n` between
+    // Insert `- type is Observation.\n- value type is X.\n` between
     // `concept "Name":` and `- definition is...`.
     const re = new RegExp(`(concept "${escaped}":\\s*\\n)([ \\t]*)(- definition is)`, "");
     const match = re.exec(source);
@@ -129,10 +129,10 @@ for (const change of changes) {
       continue;
     }
     const indent = match[2] || "";
-    const replacement = `${match[1]}${indent}- type is ${change.proposed.type}.\n${indent}- valuetype is ${change.proposed.valuetype}.\n${indent}${match[3]}`;
+    const replacement = `${match[1]}${indent}- type is ${change.proposed.type}.\n${indent}- value type is ${change.proposed.valuetype}.\n${indent}${match[3]}`;
     source = source.slice(0, match.index) + replacement + source.slice(match.index + match[0].length);
   } else if (change.kind === "add-valuetype-cc") {
-    // Insert `- valuetype is CodeableConcept.` after the `- type is X.` line.
+    // Insert `- value type is CodeableConcept.` after the `- type is X.` line.
     const re = new RegExp(
       `(concept "${escaped}":\\s*\\n[ \\t]*- type is [A-Za-z]+\\.\\s*\\n)`,
       "",
@@ -144,7 +144,7 @@ for (const change of changes) {
     }
     const indentMatch = /\n([ \t]*)- type is/.exec(match[0]);
     const indent = (indentMatch && indentMatch[1]) || "";
-    source = source.slice(0, match.index) + match[0] + `${indent}- valuetype is CodeableConcept.\n` + source.slice(match.index + match[0].length);
+    source = source.slice(0, match.index) + match[0] + `${indent}- value type is CodeableConcept.\n` + source.slice(match.index + match[0].length);
   }
 }
 

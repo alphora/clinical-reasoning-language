@@ -28,7 +28,7 @@ export interface Declaration {
 
 const HEADER_RE = /^(concept|terminology)\s+"([^"]+)"\s*:\s*$/;
 const TYPE_BULLET_RE = /^\s*-\s*type\s+is\s+([A-Za-z][A-Za-z0-9]*)\s*\.\s*$/;
-const VALUETYPE_BULLET_RE = /^\s*-\s*valuetype\s+is\s+([A-Za-z][A-Za-z0-9]*)\s*\.\s*$/;
+const VALUETYPE_BULLET_RE = /^\s*-\s*value type\s+is\s+([A-Za-z][A-Za-z0-9]*)\s*\.\s*$/;
 const BODY_BULLET_RE = /^\s*-\s*(.+?)\s*\.?\s*$/;
 
 /**

@@ -28,6 +28,12 @@ export function buildCombinedNamespace(
 
   for (const entry of resolvedLibraries) {
     for (const statement of entry.ast.statements) {
+      // v2.2 issue #59: `Parameter` joins the Statement union but its
+      // namespace bucket lands in Todo 2. Skip the cast here so we
+      // don't smuggle "Parameter" into NodeKind via `as` — the
+      // downstream `mapForKind` is still 4-arm and Map.get/set would
+      // fail at runtime.
+      if (statement.type === "Parameter") continue;
       const kind = statement.type as NodeKind;
       const name = statement.name;
       const map = mapForKind(namespace, kind);

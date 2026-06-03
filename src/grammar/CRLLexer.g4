@@ -5,7 +5,8 @@ END_WHEN            : 'end when';
 RECOMMEND_ACTIVITY  : 'recommend activity';
 USE_DECISION        : 'use decision';
 TYPE_IS             : 'type is' -> mode(CONCEPT_MODE);
-VALUETYPE_IS        : 'valuetype is' -> mode(VALUE_TYPE_MODE);
+VALUE_TYPE_IS       : 'value type is' -> mode(VALUE_TYPE_MODE);
+PARAM_TYPE_IS       : 'param type is' -> mode(PARAMETER_TYPE_MODE);
 EVIDENCE_IS         : 'evidence is';
 META_IS             : 'meta is';
 DEFINED_AS          : 'defined as';
@@ -28,6 +29,7 @@ INCLUDE      : 'include';
 LIBRARY      : 'library';
 NOT          : 'not';
 OR           : 'or';
+PARAMETER    : 'parameter';
 REQUEST      : 'request' -> mode(ACTIVITY_MODE);
 TERMINOLOGY  : 'terminology';
 THEN         : 'then';
@@ -260,6 +262,77 @@ VALUE_TYPE_WS
     : [ \t\r\n]+ -> skip
     ;
 VALUE_TYPE_COMMENT_BLOCK
+    : BLOCK_COMMENT -> skip
+    ;
+
+mode PARAMETER_TYPE_MODE;
+// PARAMETER_TYPE possibilities (case sensitive) — union of CONCEPT_TYPE
+// (FHIR resource types) and CONCEPT_VALUE_TYPE (FHIR data types).
+// Hand-maintained here to match the existing extract pipeline direction
+// (the .g4 is the source; the JSON is extracted from it). When either
+// of the two source lists gains a new entry, this list must gain the
+// same entry. The extract script (scripts/extractParameterTypes.js)
+// verifies parameterTypes ⊇ conceptTypes ∪ conceptValueTypes at build
+// time and fails the build on drift.
+PARAMETER_TYPE
+    : ~[ \t\r\n.:()]+ {
+        const validTypes = [
+            // Resources (mirrors CONCEPT_TYPE allowlist)
+            'AdverseEvent',
+            'AllergyIntolerance',
+            'ClinicalImpression',
+            'Communication',
+            'CommunicationRequest',
+            'Condition',
+            'DetectedIssue',
+            'Device',
+            'DiagnosticReport',
+            'DocumentReference',
+            'Encounter',
+            'FamilyMemberHistory',
+            'Goal',
+            'Immunization',
+            'MedicationAdministration',
+            'MedicationDispense',
+            'MedicationRequest',
+            'NutritionIntake',
+            'NutritionOrder',
+            'Observation',
+            'Patient',
+            'Procedure',
+            'QuestionnaireResponse',
+            'RiskAssessment',
+            'ServiceRequest',
+            'Task',
+            // Data types (mirrors CONCEPT_VALUE_TYPE allowlist)
+            'Attachment',
+            'boolean',
+            'CodeableConcept',
+            'dateTime',
+            'integer',
+            'Period',
+            'Quantity',
+            'Range',
+            'Ratio',
+            'SampledData',
+            'string',
+            'time'
+        ];
+        if (!validTypes.includes(this.text)) {
+            this.text = JSON.stringify({
+                errorType: 'InvalidParameterType',
+                value: this.text,
+                validTypes
+            });
+            this.type = CRLLexer.ERROR;
+        }
+    }
+    -> mode(DEFAULT_MODE)
+    ;
+PARAMETER_TYPE_WS
+    : [ \t\r\n]+ -> skip
+    ;
+PARAMETER_TYPE_COMMENT_BLOCK
     : BLOCK_COMMENT -> skip
     ;
 

@@ -27,7 +27,7 @@ When you write:
 ```crl
 concept "Has Normal BMI":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - defined as
 (
    "Normal BMI Range"            // operand: refinement (Observation+Quantity list)
@@ -123,7 +123,7 @@ Per concept:
 2. **Declare `(type, valuetype)` to match that meaning.**
    - Boolean predicate: `<Resource>+boolean` if the resource has a native boolean value field (`Observation`, `QuestionnaireResponse`, etc.), else `Observation+boolean`.
    - Refinement: type and valuetype inherited from the subject of the refinement.
-   - Value-bearing: type is the source resource; valuetype is the primitive extracted.
+   - Value-bearing: type is the source resource; value type is the primitive extracted.
 3. **For composition bodies**: don't worry about whether operands "type-check". The composition is semantic. Declare the result; trust the emitter.
 4. **For source-CQL audits**: read the define for SEMANTIC INTENT, not return-type mechanics. An `exists` in the define means the WHOLE define is a boolean; an `exists` at an OUTER define wrapping a list-shaped concept means the OUTER define is boolean — but the inner concept could be authored as either boolean (predicate-shaped intent) or refinement (list-shaped intent). Author decides.
 
@@ -163,7 +163,7 @@ Both are valid styles. CRL v0.7's grammar (`(valueTypeLine)*` — 0..*) and vali
 ```crl
 concept "BMI Evaluation Encounter (not virtual)":
 - type is Encounter.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - defined as
 (
    "Encounters to Evaluate BMI"           // Encounter+CodeableConcept (asserted)

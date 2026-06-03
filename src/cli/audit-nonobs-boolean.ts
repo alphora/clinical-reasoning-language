@@ -233,13 +233,13 @@ for (const [name, info] of allConcepts) {
   let suggestion: string;
   if (shape === "boolean") {
     classification = "BOOLEAN_GENUINE";
-    suggestion = `type is Observation. valuetype is boolean.`;
+    suggestion = `type is Observation. value type is boolean.`;
   } else if (shape === "list" && subjectTrace?.type && subjectTrace?.valuetype) {
     classification = "REFINEMENT_MISDECLARED";
-    suggestion = `type is ${subjectTrace.type}. valuetype is ${subjectTrace.valuetype}. (from subject "${subjectTrace.via}")`;
+    suggestion = `type is ${subjectTrace.type}. value type is ${subjectTrace.valuetype}. (from subject "${subjectTrace.via}")`;
   } else if (shape === "value-bearing") {
     classification = "VALUE_BEARING_MISDECLARED";
-    suggestion = `type is ${subjectTrace?.type ?? c.conceptType}. valuetype is dateTime/Quantity (NOT boolean).`;
+    suggestion = `type is ${subjectTrace?.type ?? c.conceptType}. value type is dateTime/Quantity (NOT boolean).`;
   } else {
     classification = "MIXED_OR_UNKNOWN";
     suggestion = `audit manually; subject="${subjectTrace?.via ?? "?"}" subjectShape="${shape}"`;

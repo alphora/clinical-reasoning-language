@@ -1,7 +1,7 @@
 /**
  * Survey the corpus for type→valuetype pairings.
  *
- * For every concept that has BOTH `type is X.` and one or more `valuetype is V.`
+ * For every concept that has BOTH `type is X.` and one or more `value type is V.`
  * declarations, record (X, V) pairs. Emit a summary table grouped by FHIR type
  * with the set of valuetypes observed and how many concepts contributed each.
  *

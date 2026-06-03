@@ -77,7 +77,7 @@ let missed = 0;
 for (const [name, targetType] of Object.entries(REFINEMENT_MAP)) {
   const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const re = new RegExp(
-    `(concept "${escaped}":\\s*\\n)([ \\t]*)- type is Observation\\.\\s*\\n[ \\t]*- valuetype is boolean\\.\\s*\\n`,
+    `(concept "${escaped}":\\s*\\n)([ \\t]*)- type is Observation\\.\\s*\\n[ \\t]*- value type is boolean\\.\\s*\\n`,
     "",
   );
   const match = re.exec(source);

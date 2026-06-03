@@ -26,7 +26,7 @@ describe("Concept Structure", () => {
 library "Test".
 concept "Client Age Less Than 12 Months":
     - type is Condition.
-    - valuetype is boolean.
+    - value type is boolean.
     - inferred from ("Less Than").
 .`;
 
@@ -63,7 +63,7 @@ concept "Client Age Less Than 12 Months":
 library "Test".
 concept "Client Is Due For MCV12":
     - type is Condition.
-    - valuetype is boolean.
+    - value type is boolean.
     - inferred from ("Last MCV Dose Administered" and "More Than 4 Weeks Ago").
 .`;
 
@@ -94,7 +94,7 @@ concept "Client Is Due For MCV12":
 library "Test".
 concept "Measles Vaccine":
     - type is Immunization.
-    - valuetype is CodeableConcept.
+    - value type is CodeableConcept.
     - coded from "MeaslesVaccineCodes".
 .`;
 
@@ -119,7 +119,7 @@ concept "Measles Vaccine":
 library "Test".
 concept "Complex Condition":
     - type is Condition.
-    - valuetype is boolean.
+    - value type is boolean.
     - inferred from (not ("Age Greater Than 18" and "Age Less Than 65")).
 .`;
 

@@ -19,14 +19,14 @@ terminology "Body Mass Index Observations":
 // Variation A: single valuetype
 concept "Virtual Encounters":
 - type is Encounter.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - coded from "Virtual Encounter Class".
 
 // Variation B: multiple valuetypes (the operator's flagship example)
 concept "Encounters to Evaluate BMI":
 - type is Encounter.
-- valuetype is CodeableConcept.
-- valuetype is Period.
+- value type is CodeableConcept.
+- value type is Period.
 - coded from "Encounter to Evaluate BMI".
 
 // Variation C: omitted valuetype — should be lazy-deduced from type's default

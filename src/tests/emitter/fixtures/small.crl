@@ -5,12 +5,12 @@ terminology "Hypertensive Reading Findings":
 
 concept "Primary-Care Referrals":
 - type is ServiceRequest.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - coded from "Hypertensive Reading Findings".
 
 concept "Hypertensive Reading":
 - type is Observation.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - coded from "Hypertensive Reading Findings".
 
 concept "Primary-Care Referral Justified by Hypertensive Reading":
@@ -23,7 +23,7 @@ concept "Primary-Care Referrals Ordered":
 
 concept "Referral and Reading":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - defined as
 (
    "Primary-Care Referrals Ordered"

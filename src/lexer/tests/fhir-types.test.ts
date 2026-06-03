@@ -101,28 +101,28 @@ describe("Case Feature FHIR Types", () => {
 
 describe("Concept Value Types", () => {
   test("should recognize Quantity value type", () => {
-    const input = "valuetype is Quantity.";
+    const input = "value type is Quantity.";
     const expectedTokens = getValueTypeTokenSequence();
-    const expectedText = ["valuetype is", "Quantity", "."];
+    const expectedText = ["value type is", "Quantity", "."];
     verifyTokenSequence(input, expectedTokens, expectedText);
   });
 
   test("should recognize CodeableConcept value type", () => {
-    const input = "valuetype is CodeableConcept.";
+    const input = "value type is CodeableConcept.";
     const expectedTokens = getValueTypeTokenSequence();
-    const expectedText = ["valuetype is", "CodeableConcept", "."];
+    const expectedText = ["value type is", "CodeableConcept", "."];
     verifyTokenSequence(input, expectedTokens, expectedText);
   });
 
   test("should recognize boolean value type", () => {
-    const input = "valuetype is boolean.";
+    const input = "value type is boolean.";
     const expectedTokens = getValueTypeTokenSequence();
-    const expectedText = ["valuetype is", "boolean", "."];
+    const expectedText = ["value type is", "boolean", "."];
     verifyTokenSequence(input, expectedTokens, expectedText);
   });
 
   test("should throw error for invalid value type", () => {
-    const input = "valuetype is InvalidValueType.";
+    const input = "value type is InvalidValueType.";
     const { lexer, errorListener } = createLexer(input);
     while (lexer.nextToken().type !== CRLLexer.EOF) {
       /* empty */

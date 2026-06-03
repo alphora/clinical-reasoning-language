@@ -9,7 +9,7 @@ library "CMS69 Asserted".
 // DocumentedAs may distinguish valueset args from concept args directly.
 concept "Pregnancy or Other Related Diagnoses":
 - type is Condition.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - coded from "CMS69 Terminology"."Pregnancy or Other Related Diagnoses".
 
 
@@ -17,87 +17,87 @@ concept "Pregnancy or Other Related Diagnoses":
 
 concept "BMI Observations":
 - type is Observation.
-- valuetype is Quantity.
+- value type is Quantity.
 - coded from "CMS69 Terminology"."Body Mass Index Observations".
 
 concept "Pregnancy Diagnoses":
 - type is Condition.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - coded from "CMS69 Terminology"."Pregnancy or Other Related Diagnoses".
 
 concept "Pregnancy Status Observations":
 - type is Observation.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - coded from "CMS69 Terminology"."Pregnancy Status".
 
 concept "Overweight or Obese Diagnoses":
 - type is Condition.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - coded from "CMS69 Terminology"."Overweight or Obese".
 
 concept "Underweight Diagnoses":
 - type is Condition.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - coded from "CMS69 Terminology"."Underweight".
 
 concept "Encounters to Evaluate BMI":
 - type is Encounter.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - coded from "CMS69 Terminology"."Encounter to Evaluate BMI".
 
 concept "Virtual Encounters":
 - type is Encounter.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - coded from "CMS69 Terminology"."Virtual Encounter Class".
 
 concept "High BMI Follow-up Service Requests":
 - type is ServiceRequest.
-- valuetype is CodeableConcept.
-- valuetype is dateTime.
+- value type is CodeableConcept.
+- value type is dateTime.
 - coded from "CMS69 Terminology"."Follow Up for Above Normal BMI".
 
 concept "Low BMI Follow-up Service Requests":
 - type is ServiceRequest.
-- valuetype is CodeableConcept.
-- valuetype is dateTime.
+- value type is CodeableConcept.
+- value type is dateTime.
 - coded from "CMS69 Terminology"."Follow Up for Below Normal BMI".
 
 concept "Weight Assessment Referrals":
 - type is ServiceRequest.
-- valuetype is CodeableConcept.
-- valuetype is dateTime.
+- value type is CodeableConcept.
+- value type is dateTime.
 - coded from "CMS69 Terminology"."Referrals Where Weight Assessment May Occur".
 
 concept "High BMI Medications":
 - type is MedicationRequest.
-- valuetype is CodeableConcept.
-- valuetype is dateTime.
+- value type is CodeableConcept.
+- value type is dateTime.
 - coded from "CMS69 Terminology"."Medications for Above Normal BMI".
 
 concept "Low BMI Medications":
 - type is MedicationRequest.
-- valuetype is CodeableConcept.
-- valuetype is dateTime.
+- value type is CodeableConcept.
+- value type is dateTime.
 - coded from "CMS69 Terminology"."Medications for Below Normal BMI".
 
 concept "High BMI Follow-up Procedures":
 - type is Procedure.
-- valuetype is CodeableConcept.
-- valuetype is dateTime.
+- value type is CodeableConcept.
+- value type is dateTime.
 - coded from "CMS69 Terminology"."Follow Up for Above Normal BMI Procedures".
 
 concept "Low BMI Follow-up Procedures":
 - type is Procedure.
-- valuetype is CodeableConcept.
-- valuetype is dateTime.
+- value type is CodeableConcept.
+- value type is dateTime.
 - coded from "CMS69 Terminology"."Follow Up for Below Normal BMI Procedures".
 
 concept "Medical Reasons":
 - type is Observation.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - coded from "CMS69 Terminology"."Medical Reason".
 
 concept "Patient Declined Reasons":
 - type is Observation.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - coded from "CMS69 Terminology"."Patient Declined".

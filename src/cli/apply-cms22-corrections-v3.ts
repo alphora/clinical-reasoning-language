@@ -113,7 +113,7 @@ for (const change of changes) {
       continue;
     }
     const indent = match[2] || "";
-    const replacement = `${match[1]}${indent}- type is ${change.proposed.type}.\n${indent}- valuetype is ${change.proposed.valuetype}.\n${indent}${match[3]}`;
+    const replacement = `${match[1]}${indent}- type is ${change.proposed.type}.\n${indent}- value type is ${change.proposed.valuetype}.\n${indent}${match[3]}`;
     source = source.slice(0, match.index) + replacement + source.slice(match.index + match[0].length);
   }
 }

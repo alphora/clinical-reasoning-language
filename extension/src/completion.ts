@@ -77,7 +77,7 @@ export class TypeCompletionProvider implements vscode.CompletionItemProvider {
 }
 
 /**
- * Completion for `- valuetype is <X>.` lines.
+ * Completion for `- value type is <X>.` lines.
  */
 export class ValuetypeCompletionProvider implements vscode.CompletionItemProvider {
   public provideCompletionItems(
@@ -85,10 +85,10 @@ export class ValuetypeCompletionProvider implements vscode.CompletionItemProvide
     position: vscode.Position
   ): vscode.ProviderResult<vscode.CompletionItem[]> {
     const prefix = document.lineAt(position.line).text.slice(0, position.character);
-    if (!/^\s*-\s*valuetype\s+is\s+\S*$/i.test(prefix)) return [];
+    if (!/^\s*-\s*value type\s+is\s+\S*$/i.test(prefix)) return [];
     return CONCEPT_VALUETYPES.map((vt) => {
       const item = new vscode.CompletionItem(vt, vscode.CompletionItemKind.TypeParameter);
-      item.detail = `FHIR value type — \`valuetype is ${vt}.\``;
+      item.detail = `FHIR value type — \`value type is ${vt}.\``;
       return item;
     });
   }
@@ -120,7 +120,7 @@ export class ConceptRefCompletionProvider implements vscode.CompletionItemProvid
     const line = document.lineAt(position.line).text;
     const prefix = line.slice(0, position.character);
     if (!isInsideOpenQuote(prefix)) return [];
-    if (/^\s*(concept|terminology|decision|activity)\s+"[^"]*$/.test(prefix)) return [];
+    if (/^\s*(concept|terminology|decision|activity|parameter)\s+"[^"]*$/.test(prefix)) return [];
 
     const expectedKind = detectExpectedKind(prefix);
     const qualifier = detectQualifiedRefQualifier(prefix);
@@ -158,7 +158,7 @@ export class ConceptRefCompletionProvider implements vscode.CompletionItemProvid
 
 interface RefSuggestion {
   name: string;
-  kind: "concept" | "terminology" | "decision" | "activity";
+  kind: "concept" | "terminology" | "decision" | "activity" | "parameter";
   libraryName: string | undefined;
   type?: string;
   valuetype?: string;
@@ -188,12 +188,13 @@ function buildRefItem(d: RefSuggestion): vscode.CompletionItem {
   return item;
 }
 
-function completionKindFor(kind: "concept" | "terminology" | "decision" | "activity"): vscode.CompletionItemKind {
+function completionKindFor(kind: "concept" | "terminology" | "decision" | "activity" | "parameter"): vscode.CompletionItemKind {
   switch (kind) {
     case "concept": return vscode.CompletionItemKind.Variable;
     case "terminology": return vscode.CompletionItemKind.Reference;
     case "decision": return vscode.CompletionItemKind.Method;
     case "activity": return vscode.CompletionItemKind.Class;
+    case "parameter": return vscode.CompletionItemKind.Property;
   }
 }
 
@@ -201,6 +202,12 @@ function formatDeclarationDetail(d: RefSuggestion): string {
   if (d.kind === "terminology") return d.libraryName ? `terminology — ${d.libraryName}` : "terminology";
   if (d.kind === "decision") return d.libraryName ? `decision — ${d.libraryName}` : "decision";
   if (d.kind === "activity") return d.libraryName ? `activity — ${d.libraryName}` : "activity";
+  if (d.kind === "parameter") {
+    const parts: string[] = ["parameter"];
+    if (d.type) parts.push(d.type);
+    if (d.libraryName) parts.push(`— ${d.libraryName}`);
+    return parts.join(" ");
+  }
   const parts: string[] = ["concept"];
   if (d.type) parts.push(d.type);
   if (d.valuetype) parts.push(`+ ${d.valuetype}`);

@@ -278,6 +278,22 @@ class Emitter {
   /** Names of concept refs that emit as parameter references. */
   private readonly parameterNames: Set<string> = new Set();
 
+  // ──────────────────────────────────────────────────────────────────────
+  // v2.2 Todo 3 (issue #59) — RECONCILE WITH AST `Parameter` NODES.
+  //
+  // Today this class has TWO independent "parameter" mechanisms that
+  // Todo 3 needs to merge with the new AST `Parameter` declaration:
+  //   - `parameterNames` above + `detectStubsAndCollisions` (line ~311):
+  //     synthesizes CQL `parameter "X" String` lines from empty-URL stub
+  //     valuesets (the existing "Measurement Period stub" workaround).
+  //   - `sections.push("context Patient")` (line ~367): hardcodes the
+  //     default CQL context. Per the operator's emit-context rule, an
+  //     AST `parameter "X": - param type is Patient.` should emit as
+  //     `context Patient` here (and `Practitioner` similarly).
+  // Todo 1 deliberately does NOT touch either. AST `Parameter` nodes
+  // flow through positive-match filters as no-ops. Todo 3 reconciles.
+  // ──────────────────────────────────────────────────────────────────────
+
   constructor(ast: CRL, options: EmitOptions) {
     this.ast = ast;
     this.options = {
@@ -494,7 +510,7 @@ class Emitter {
    * are semantic expressions whose CQL realization shape is decided by
    * the author's declaration.
    *
-   *   - `valuetype is boolean` → boolean (predicate)
+   *   - `value type is boolean` → boolean (predicate)
    *   - otherwise              → refinement (list of declared `type`)
    *
    * For names that don't resolve to a known concept (e.g., raw

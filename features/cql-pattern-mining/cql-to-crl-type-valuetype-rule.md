@@ -1,6 +1,6 @@
 # CQL → CRL: `type` and `valuetype` assignment rule
 
-**Purpose.** When transforming a CQL `define` (or an existing narrative form of one) into a CRL `concept`, this document is the canonical rule for choosing `type is X.` and `valuetype is Y.`. Use this as the body of a transformation skill / prompt. The skill should refuse to guess and consult the source CQL when the semantics are ambiguous.
+**Purpose.** When transforming a CQL `define` (or an existing narrative form of one) into a CRL `concept`, this document is the canonical rule for choosing `type is X.` and `value type is Y.`. Use this as the body of a transformation skill / prompt. The skill should refuse to guess and consult the source CQL when the semantics are ambiguous.
 
 This is intended to outlast the current corpus and survive being lifted into an MCP server later (the "CQL/Narrative → CRL transformer" the user described). Encode every claim here as a checkable step, not a heuristic.
 
@@ -12,7 +12,7 @@ This is intended to outlast the current corpus and survive being lifted into an 
 
 ## 1. The core rule (read first, internalize before transforming anything)
 
-> **If the CQL define returns a Boolean** → model the CRL concept with `valuetype is boolean`. The `type` is the target FHIR resource IF that resource has a native boolean value field; otherwise fall back to `Observation`. Concretely: `Observation+boolean` and `QuestionnaireResponse+boolean` are valid (they have `valueBoolean` / `answer.valueBoolean`); `Condition+boolean`, `Encounter+boolean`, `MedicationRequest+boolean`, `Procedure+boolean`, `ServiceRequest+boolean` are NOT (those resources have no boolean value field) — those flip to `Observation+boolean`.
+> **If the CQL define returns a Boolean** → model the CRL concept with `value type is boolean`. The `type` is the target FHIR resource IF that resource has a native boolean value field; otherwise fall back to `Observation`. Concretely: `Observation+boolean` and `QuestionnaireResponse+boolean` are valid (they have `valueBoolean` / `answer.valueBoolean`); `Condition+boolean`, `Encounter+boolean`, `MedicationRequest+boolean`, `Procedure+boolean`, `ServiceRequest+boolean` are NOT (those resources have no boolean value field) — those flip to `Observation+boolean`.
 >
 > **Otherwise** (the define returns a List of a FHIR resource, or a single FHIR resource) → the `type` is that resource type traced back to its asserted concept, and the `valuetype` is the applicable valuetype for that resource (i.e., whatever the asserted concept declared, OR what its enclosing defined-as chain has declared).
 
@@ -43,7 +43,7 @@ Run these steps in order for every concept you produce.
 
 4. **Boolean shape.** Set:
    - `type is Observation.`
-   - `valuetype is boolean.`
+   - `value type is boolean.`
    - Do **NOT** inherit the underlying resource type from the subject. The boolean shape is a patient-level observation, not a refined view of the subject's FHIR resource.
 
 5. **Value-bearing shape** (returns a `DateTime`/`Date`/`Quantity` value directly — e.g. `*-Order Date` defines that return an `authoredOn`):
@@ -112,7 +112,7 @@ These are concepts whose CQL extracts a single value out of a resource. The `typ
 // asserted — coded list of MR resources
 concept "High BMI Medications":
 - type is MedicationRequest.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - coded from "High BMI Medications".
 
 // REFINEMENT shape (justified-by filters the list)
@@ -120,7 +120,7 @@ concept "High BMI Medications":
 //   Output:  refined MR list, same valuetype.
 concept "High BMI Medication Justified by Overweight Diagnosis":
 - type is MedicationRequest.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - definition is "High BMI Medications" justified by "Overweight or Obese Diagnoses".
 
 // BOOLEAN shape (`on or before` returns a Boolean)
@@ -128,31 +128,31 @@ concept "High BMI Medication Justified by Overweight Diagnosis":
 //   "did the patient have Overweight on or before that date?" — yes/no.
 concept "Has Overweight On Or Before High BMI Medication Order":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - definition is "Has Overweight or Obese" on or before "High BMI Medication Order Date".
 
 // asserted Observation with Quantity value
 concept "BMI Observations":
 - type is Observation.
-- valuetype is Quantity.
+- value type is Quantity.
 - coded from "Body Mass Index Observations".
 
 // REFINEMENT shape — filtered list of Observations, valuetype preserved
 concept "BMI Observation During MP":
 - type is Observation.
-- valuetype is Quantity.
+- value type is Quantity.
 - definition is "BMI Observations" during "Measurement Period".
 
 // BOOLEAN shape — classification predicate over the Quantity value
 concept "BMI During MP Is Low":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - definition is "BMI During Measurement Period" low.
 
 // VALUE-BEARING shape — extracts authoredOn from ServiceRequest
 concept "High BMI Follow-up Order Date":
 - type is ServiceRequest.
-- valuetype is dateTime.
+- value type is dateTime.
 - definition is authored date of "High BMI Follow-up Order".
 ```
 
@@ -226,7 +226,7 @@ Let `(T_C, V_C)` = the concept's declared pair, `(T_S, V_S)` = the subject's dec
 |---|---|---|
 | **Boolean predicate** | `V_C = boolean` AND `T_C ∈ {Observation, QuestionnaireResponse, Consent, Coverage}` (the resources with native boolean value fields) | Subject `(T_S, V_S)` irrelevant. Default `T_C = Observation` for computed predicates. `<NonObs>+boolean` (e.g. `Condition+boolean`) is an error — those resources have no boolean value field. |
 | **Refinement** | `T_C = T_S` AND `V_C = V_S` | The concept is a filtered view of the subject. Type AND valuetype both preserved. |
-| **Value-bearing** | `T_C = T_S` AND `V_C` ∈ {`dateTime`, `Quantity`, `integer`, `string`, ...} (a FHIR primitive) AND `V_C ≠ V_S` | The concept extracts a primitive value (e.g. `authoredOn`) from the subject. Type comes from the source resource; valuetype is the primitive. |
+| **Value-bearing** | `T_C = T_S` AND `V_C` ∈ {`dateTime`, `Quantity`, `integer`, `string`, ...} (a FHIR primitive) AND `V_C ≠ V_S` | The concept extracts a primitive value (e.g. `authoredOn`) from the subject. Type comes from the source resource; value type is the primitive. |
 
 Anything outside these three is an error.
 
@@ -250,7 +250,7 @@ Asserted concepts (`coded from` body) have no subject chain — their `(type, va
 
 A subject concept may legitimately have `type is T_S.` with no `valuetype` declared (e.g. `definition is` concepts that are themselves boolean predicates — `T_S = Observation, V_S = boolean` is the implicit inheritance, but the boolean predicate rule covers this directly: the SUBJECT is `Observation + boolean`, and we don't need its absent `valuetype`).
 
-Rule: if the subject is itself a boolean-shape concept (`type is Observation` and either declared `valuetype is boolean` or no `valuetype`), the only valid `C` shapes are:
+Rule: if the subject is itself a boolean-shape concept (`type is Observation` and either declared `value type is boolean` or no `valuetype`), the only valid `C` shapes are:
 - **Boolean predicate** (`T_C = Observation, V_C = boolean`) — a chained boolean predicate.
 - A new boolean predicate over a boolean subject is fine (e.g. `"Has X" on or before "Date"`).
 
@@ -273,7 +273,7 @@ For each asserted concept `A`:
    the source advertises. If every asserted absorbed boolean from every
    downstream predicate, every asserted would end up boolean.
 3. Union the result with `A`'s own declared valuetypes.
-4. Emit `A` with the union as multiple `valuetype is X.` lines (the AST
+4. Emit `A` with the union as multiple `value type is X.` lines (the AST
    supports `valueTypes?: string[]`).
 
 The asserted advertises **every shape its consumers project from it**.
@@ -327,9 +327,9 @@ These do not block the skill's first version, but the future MCP must answer the
 When transforming a CQL define or narrative form into a CRL concept, answer these in order:
 
 1. Read the source CQL. What is its return type as ELM would compute it?
-   - `Boolean` → declare `type is Observation. valuetype is boolean.` Done.
+   - `Boolean` → declare `type is Observation. value type is boolean.` Done.
    - `List<Resource>` or single `Resource` (refinement of the subject) → identify the subject, copy ITS `type` AND `valuetype` to this concept. Done.
-   - A primitive value (`DateTime`, `Quantity`, `Integer`, etc.) extracted from a resource → declare `type is <source Resource>. valuetype is <primitive>.` Done.
+   - A primitive value (`DateTime`, `Quantity`, `Integer`, etc.) extracted from a resource → declare `type is <source Resource>. value type is <primitive>.` Done.
 2. No source CQL? Use §3's narrative-pattern guidance as a default guess — but flag it as a guess for review, not a commit.
 3. Catalog-derived defaults conflict with what the CQL actually returns? → CQL wins. Update the concept declaration; do NOT trust the catalog default.
 4. None of the above apply confidently? → **stop and escalate.**

@@ -14,6 +14,7 @@ import {
   TerminologyValuesetContext,
   ActivityStatementContext,
   ConceptStatementContext,
+  ParameterStatementContext,
   LibraryStatementContext,
   IncludeStatementContext,
   QualifiableReferenceContext,
@@ -80,6 +81,7 @@ import {
   ActivityType,
   Concept,
   ConceptType,
+  Parameter,
   ConceptDefinition,
   DefinedAsDefinition,
   DefinedAsBareRef,
@@ -487,7 +489,7 @@ export class CRLAstBuilder
   }
 
   // v0.7: type is optional (REQUIRED for asserted concepts; OPTIONAL for
-  // composition/predicate body kinds). valuetype is optional and 0..*.
+  // composition/predicate body kinds). value type is optional and 0..*.
   // Returns whatever was declared; absence is fine here — the validator
   // enforces type-required-for-asserted and the body-kind rules.
   private parseConceptTypes(
@@ -601,6 +603,42 @@ export class CRLAstBuilder
       });
       return null;
     }
+  }
+
+  visitParameterStatement(ctx: ParameterStatementContext): Parameter {
+    const ident = ctx.parameterIdentifier?.();
+    const name = ident?.text?.slice(1, -1);
+    if (!name) {
+      this.reportError("AstError", ctx, {
+        message: "ParameterStatement: missing parameterIdentifier",
+      });
+      return null as unknown as Parameter;
+    }
+    const body = ctx.parameterBody?.();
+    const typeLine = body?.parameterTypeLine?.();
+    const typeToken = typeLine?.PARAMETER_TYPE?.();
+    const rawText = typeToken?.text ?? "";
+    let parameterType = rawText;
+    // The lexer error path stores a JSON envelope as the token text when
+    // the type name isn't in the allowlist. Try/catch + reportError
+    // mirrors how `parseConceptTypes` handles InvalidConceptType.
+    try {
+      const parsed = JSON.parse(rawText);
+      if (parsed && parsed.errorType === "InvalidParameterType") {
+        this.reportError("AstError", ctx, {
+          message: `Invalid parameter type "${parsed.value}". Valid types: ${parsed.validTypes.join(", ")}`,
+        });
+        parameterType = "";
+      }
+    } catch {
+      // Not a JSON envelope — keep rawText as the type name.
+    }
+    return {
+      type: "Parameter",
+      name,
+      parameterType,
+      location: getLocation(ctx),
+    };
   }
 
   visitConceptStatement(ctx: ConceptStatementContext): Concept {

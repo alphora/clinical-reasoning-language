@@ -145,12 +145,12 @@ describe("Whitespace Handling", () => {
     });
 
     it("should handle whitespace in concept value type declarations", () => {
-      const input = "- valuetype is\t\tQuantity\n.";
+      const input = "- value type is\t\tQuantity\n.";
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(tokens, [
         CRLLexer.DASH,
-        CRLLexer.VALUETYPE_IS,
+        CRLLexer.VALUE_TYPE_IS,
         CRLLexer.CONCEPT_VALUE_TYPE,
         CRLLexer.DOT,
       ]);

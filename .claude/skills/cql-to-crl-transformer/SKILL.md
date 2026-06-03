@@ -1,6 +1,6 @@
 ---
 name: cql-to-crl-transformer
-description: Transform a CQL define (or a list of defines) into one or more CRL concepts with correct `type is …` and `valuetype is …` declarations per the canonical rule. Use this whenever (a) creating new CRL concepts from existing CQL source, (b) auditing existing CRL concepts for type/valuetype correctness, or (c) the user asks for the "CQL→CRL transformer".
+description: Transform a CQL define (or a list of defines) into one or more CRL concepts with correct `type is …` and `value type is …` declarations per the canonical rule. Use this whenever (a) creating new CRL concepts from existing CQL source, (b) auditing existing CRL concepts for type/valuetype correctness, or (c) the user asks for the "CQL→CRL transformer".
 ---
 
 # CQL → CRL transformer
@@ -99,9 +99,9 @@ When the define **chains** through other defines, you may need to follow the cha
 
 Per the shape determined in Step 2:
 
-- **Boolean shape** → `type is Observation. valuetype is boolean.` Subject's type is irrelevant.
+- **Boolean shape** → `type is Observation. value type is boolean.` Subject's type is irrelevant.
 - **Refinement shape** → identify the subject (first FHIR-resource-bearing thing in the body, traced back to its asserted concept). Inherit BOTH `type` and `valuetype` from the asserted subject. Do not change them.
-- **Value-bearing shape** → `type is <source FHIR resource>. valuetype is <primitive>.` (e.g. `type is ServiceRequest. valuetype is dateTime.` for an `authoredOn` extract.)
+- **Value-bearing shape** → `type is <source FHIR resource>. value type is <primitive>.` (e.g. `type is ServiceRequest. value type is dateTime.` for an `authoredOn` extract.)
 
 ### Step 4 — Sanity check against §5
 
@@ -114,7 +114,7 @@ For each concept, emit:
 ```
 concept "<Name>":
 - type is <Type>.
-- valuetype is <Valuetype>.
+- value type is <Valuetype>.
 - <body unchanged>.
 ```
 
@@ -153,15 +153,15 @@ For each **asserted concept** `A` in the model:
    consumer derives), not a property the asserted source needs to
    advertise. Drop boolean-valued consumers from the set.
 3. Union the resulting set with `A`'s own declared valuetypes.
-4. Emit `A` with the full union as multiple `valuetype is X.` lines —
+4. Emit `A` with the full union as multiple `value type is X.` lines —
    the AST supports a `valueTypes?: string[]` array, so multi-valuetype
    on a single concept is grammatical:
 
    ```crl
    concept "Blood Pressure Panels":
    - type is Observation.
-   - valuetype is CodeableConcept.
-   - valuetype is Quantity.
+   - value type is CodeableConcept.
+   - value type is Quantity.
    - coded from "Blood pressure panel with all children optional".
    ```
 

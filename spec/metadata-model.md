@@ -37,7 +37,7 @@ The terminating `.` goes **after** the closing backtick: `` - meta is `...`. `` 
 ```crl
 concept "Elderly Patient":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - meta is `@description: true when the patient is age 60 or older at the time of evaluation`.
 - meta is `@ke-feedback: confirm whether to anchor age on admission vs evaluation date; status open`.
 - meta is `@logic-expression-text: the patient is at least 60 years old`.

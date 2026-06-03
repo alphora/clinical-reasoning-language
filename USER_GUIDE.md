@@ -143,7 +143,7 @@ Defines a reusable clinical concept. Must be either coded from a terminology or 
 ```crl
 concept "Most Recent BMI":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - meta is `Some meta information`.
 - meta is `@ke-feedback: confirm the lookback window with the KE`.
 - evidence is `Calculated by Smile`.
@@ -152,12 +152,12 @@ concept "Most Recent BMI":
 
 concept "BMI":
 - type is Observation.
-- valuetype is Quantity.
+- value type is Quantity.
 - inferred from ("BMI Range as a Condition" or "BMI as an Observation" or "Calculated BMI").
 
 concept "BMI Range as a Condition":
 - type is Condition.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - coded from "BMI Range as a Condition".
 ```
 
@@ -166,7 +166,7 @@ concept "BMI Range as a Condition":
 - `concept "Name":` (colon required)
 - Required:
   - `- type is CONCEPT_TYPE.`
-  - `- valuetype is CONCEPT_VALUE_TYPE.`
+  - `- value type is CONCEPT_VALUE_TYPE.`
 - Optional:
   - One or more ``- meta is `Text`.`` lines
   - One ``- evidence is `Text`.`` line
@@ -817,7 +817,7 @@ generated CQL has a self-contained dependency graph. See
 
 These lists are generated from the grammar (`src/grammar/CRLLexer.g4`); only these values are accepted by the parser.
 
-### Concept value types (`valuetype is`)
+### Concept value types (`value type is`)
 
 `Attachment`, `boolean`, `CodeableConcept`, `dateTime`, `integer`, `Period`, `Quantity`, `Range`, `Ratio`, `SampledData`, `string`, `time`
 
@@ -833,7 +833,7 @@ These lists are generated from the grammar (`src/grammar/CRLLexer.g4`); only the
 
 ## Keywords and Tokens
 
-- **Keywords:** `library`, `include`, `as`, `decision`, `terminology`, `activity`, `concept`, `when`, `then`, `recommend activity`, `use decision`, `request`, `with`, `because`, `type is`, `valuetype is`, `evidence is`, `meta is`, `coded from`, `defined as`, `definition is`, `apply pattern`, `system is`, `code is`, `valueset is`, `any:`, `all:`, `do not perform`, `not`, `and`, `or`, `sem-and`, `sem-or`, `sem-not`, `end when`, `:` (colon), `.` (dot), `-` (dash), `(` (left paren), `)` (right paren)
+- **Keywords:** `library`, `include`, `as`, `decision`, `terminology`, `activity`, `concept`, `when`, `then`, `recommend activity`, `use decision`, `request`, `with`, `because`, `type is`, `value type is`, `evidence is`, `meta is`, `coded from`, `defined as`, `definition is`, `apply pattern`, `system is`, `code is`, `valueset is`, `any:`, `all:`, `do not perform`, `not`, `and`, `or`, `sem-and`, `sem-or`, `sem-not`, `end when`, `:` (colon), `.` (dot), `-` (dash), `(` (left paren), `)` (right paren)
 - **Identifiers:** Double-quoted strings
 - **Free text/markdown:** Backtick-quoted strings
 - **Comments:** `// ...` or `/* ... */`

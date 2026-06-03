@@ -379,118 +379,118 @@ describe("CRL Lexer - Basic Tokens", () => {
 
   describe("Concept Value Types", () => {
     it("should tokenize Quantity", () => {
-      const input = "valuetype is Quantity";
+      const input = "value type is Quantity";
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(
         tokens,
-        [CRLLexer.VALUETYPE_IS, CRLLexer.CONCEPT_VALUE_TYPE],
-        ["valuetype is", "Quantity"],
+        [CRLLexer.VALUE_TYPE_IS, CRLLexer.CONCEPT_VALUE_TYPE],
+        ["value type is", "Quantity"],
       );
     });
 
     it("should tokenize CodeableConcept", () => {
-      const input = "valuetype is CodeableConcept";
+      const input = "value type is CodeableConcept";
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(
         tokens,
-        [CRLLexer.VALUETYPE_IS, CRLLexer.CONCEPT_VALUE_TYPE],
-        ["valuetype is", "CodeableConcept"],
+        [CRLLexer.VALUE_TYPE_IS, CRLLexer.CONCEPT_VALUE_TYPE],
+        ["value type is", "CodeableConcept"],
       );
     });
 
     it("should tokenize basic value types", () => {
-      const input = "- valuetype is string\n- valuetype is boolean\n- valuetype is integer";
+      const input = "- value type is string\n- value type is boolean\n- value type is integer";
       const tokens = getTokensFromString(input);
       verifyTokenSequence(
         tokens,
         [
           CRLLexer.DASH,
-          CRLLexer.VALUETYPE_IS,
+          CRLLexer.VALUE_TYPE_IS,
           CRLLexer.CONCEPT_VALUE_TYPE,
           CRLLexer.DASH,
-          CRLLexer.VALUETYPE_IS,
+          CRLLexer.VALUE_TYPE_IS,
           CRLLexer.CONCEPT_VALUE_TYPE,
           CRLLexer.DASH,
-          CRLLexer.VALUETYPE_IS,
+          CRLLexer.VALUE_TYPE_IS,
           CRLLexer.CONCEPT_VALUE_TYPE,
         ],
         [
           "-",
-          "valuetype is",
+          "value type is",
           "string",
           "-",
-          "valuetype is",
+          "value type is",
           "boolean",
           "-",
-          "valuetype is",
+          "value type is",
           "integer",
         ],
       );
     });
 
     it("should tokenize range and ratio types", () => {
-      const input = "- valuetype is Range\n- valuetype is Ratio";
+      const input = "- value type is Range\n- value type is Ratio";
       const tokens = getTokensFromString(input);
       verifyTokenSequence(
         tokens,
         [
           CRLLexer.DASH,
-          CRLLexer.VALUETYPE_IS,
+          CRLLexer.VALUE_TYPE_IS,
           CRLLexer.CONCEPT_VALUE_TYPE,
           CRLLexer.DASH,
-          CRLLexer.VALUETYPE_IS,
+          CRLLexer.VALUE_TYPE_IS,
           CRLLexer.CONCEPT_VALUE_TYPE,
         ],
-        ["-", "valuetype is", "Range", "-", "valuetype is", "Ratio"],
+        ["-", "value type is", "Range", "-", "value type is", "Ratio"],
       );
     });
 
     it("should tokenize sampled data and time types", () => {
-      const input = "- valuetype is SampledData\n- valuetype is time\n- valuetype is dateTime";
+      const input = "- value type is SampledData\n- value type is time\n- value type is dateTime";
       const tokens = getTokensFromString(input);
       verifyTokenSequence(
         tokens,
         [
           CRLLexer.DASH,
-          CRLLexer.VALUETYPE_IS,
+          CRLLexer.VALUE_TYPE_IS,
           CRLLexer.CONCEPT_VALUE_TYPE,
           CRLLexer.DASH,
-          CRLLexer.VALUETYPE_IS,
+          CRLLexer.VALUE_TYPE_IS,
           CRLLexer.CONCEPT_VALUE_TYPE,
           CRLLexer.DASH,
-          CRLLexer.VALUETYPE_IS,
+          CRLLexer.VALUE_TYPE_IS,
           CRLLexer.CONCEPT_VALUE_TYPE,
         ],
         [
           "-",
-          "valuetype is",
+          "value type is",
           "SampledData",
           "-",
-          "valuetype is",
+          "value type is",
           "time",
           "-",
-          "valuetype is",
+          "value type is",
           "dateTime",
         ],
       );
     });
 
     it("should tokenize period and attachment types", () => {
-      const input = "- valuetype is Period\n- valuetype is Attachment";
+      const input = "- value type is Period\n- value type is Attachment";
       const tokens = getTokensFromString(input);
       verifyTokenSequence(
         tokens,
         [
           CRLLexer.DASH,
-          CRLLexer.VALUETYPE_IS,
+          CRLLexer.VALUE_TYPE_IS,
           CRLLexer.CONCEPT_VALUE_TYPE,
           CRLLexer.DASH,
-          CRLLexer.VALUETYPE_IS,
+          CRLLexer.VALUE_TYPE_IS,
           CRLLexer.CONCEPT_VALUE_TYPE,
         ],
-        ["-", "valuetype is", "Period", "-", "valuetype is", "Attachment"],
+        ["-", "value type is", "Period", "-", "value type is", "Attachment"],
       );
     });
   });
@@ -509,7 +509,7 @@ describe("CRL Lexer - Basic Tokens", () => {
     });
 
     it("should tokenize concept statement", () => {
-      const input = 'concept "Test":\n- type is Observation\n- valuetype is Quantity';
+      const input = 'concept "Test":\n- type is Observation\n- value type is Quantity';
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(tokens, [
@@ -520,7 +520,7 @@ describe("CRL Lexer - Basic Tokens", () => {
         CRLLexer.TYPE_IS,
         CRLLexer.CONCEPT_TYPE,
         CRLLexer.DASH,
-        CRLLexer.VALUETYPE_IS,
+        CRLLexer.VALUE_TYPE_IS,
         CRLLexer.CONCEPT_VALUE_TYPE,
       ]);
     });

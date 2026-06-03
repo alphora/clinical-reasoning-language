@@ -103,117 +103,117 @@ concept "Measurement Period":
 
 concept "BP Screening Encounters":
 - type is Encounter.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - coded from "Encounter to Screen for Blood Pressure".
 
 concept "Virtual Encounters":
 - type is Encounter.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - coded from "Virtual Encounter Class".
 
 concept "Hypertension Diagnoses":
 - type is Condition.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - coded from "Diagnosis of Hypertension".
 
 concept "Blood Pressure Panels":
 - type is Observation.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - coded from "Blood pressure panel with all children optional".
 
 concept "Systolic Blood Pressure Code":
 - type is Observation.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - coded from "Systolic Blood Pressure Code".
 
 concept "Diastolic Blood Pressure Code":
 - type is Observation.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - coded from "Diastolic Blood Pressure Code".
 
 concept "Standalone Systolic BP Observations":
 - type is Observation.
-- valuetype is Quantity.
+- value type is Quantity.
 - coded from "Systolic Blood Pressure Code".
 
 concept "Standalone Diastolic BP Observations":
 - type is Observation.
-- valuetype is Quantity.
+- value type is Quantity.
 - coded from "Diastolic Blood Pressure Code".
 
 concept "Follow-up Within 4 Weeks":
 - type is ServiceRequest.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - coded from "Follow Up Within 4 Weeks".
 
 concept "Follow-up Within 6 Months":
 - type is ServiceRequest.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - coded from "Follow Up Within 6 Months".
 
 concept "Lifestyle Recommendations":
 - type is ServiceRequest.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - coded from "Lifestyle Recommendation".
 
 concept "Weight Reduction Recommendations":
 - type is ServiceRequest.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - coded from "Weight Reduction Recommended".
 
 concept "Dietary Recommendations":
 - type is ServiceRequest.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - coded from "Dietary Recommendations".
 
 concept "Physical Activity Recommendations":
 - type is ServiceRequest.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - coded from "Recommendation to Increase Physical Activity".
 
 concept "Alcohol Counseling Referrals":
 - type is ServiceRequest.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - coded from "Referral or Counseling for Alcohol Consumption".
 
 concept "Primary-Care Referrals":
 - type is ServiceRequest.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - coded from "Referral to Primary Care or Alternate Provider".
 
 concept "Hypertension Lab Tests":
 - type is ServiceRequest.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - coded from "Laboratory Tests for Hypertension".
 
 concept "EKG 12-Lead Panel Requests":
 - type is ServiceRequest.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - coded from "EKG 12 Lead Panel Code".
 
 concept "EKG Study Requests":
 - type is ServiceRequest.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - coded from "EKG Study Code".
 
 concept "Antihypertensive Medications":
 - type is MedicationRequest.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - coded from "Pharmacologic Therapy for Hypertension".
 
 concept "Hypertensive Reading Findings":
 - type is Observation.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - coded from "Finding of Elevated Blood Pressure or Hypertension".
 
 concept "Medical Reasons":
 - type is Observation.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - coded from "Medical Reason".
 
 concept "Patient Declined Reasons":
 - type is Observation.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - coded from "Patient Declined".
 
 
@@ -252,22 +252,22 @@ concept "Qualifying Encounter":
 
 concept "Systolic Code Component of BP Panels":
 - type is Observation.
-- valuetype is Quantity.
+- value type is Quantity.
 - definition is "Systolic Blood Pressure Code" component of "Blood Pressure Panels".
 
 concept "Diastolic Code Component of BP Panels":
 - type is Observation.
-- valuetype is Quantity.
+- value type is Quantity.
 - definition is "Diastolic Blood Pressure Code" component of "Blood Pressure Panels".
 
 concept "Systolic BP Reading":
 - type is Observation.
-- valuetype is Quantity.
+- value type is Quantity.
 - defined as "Systolic Code Component of BP Panels".
 
 concept "Diastolic BP Reading":
 - type is Observation.
-- valuetype is Quantity.
+- value type is Quantity.
 - defined as "Diastolic Code Component of BP Panels".
 
 
@@ -275,32 +275,32 @@ concept "Diastolic BP Reading":
 
 concept "Last BP Panels On Qualifying Encounter Day":
 - type is Observation.
-- valuetype is Quantity.
+- value type is Quantity.
 - definition is last "Blood Pressure Panels" on day of "Qualifying Encounter".
 
 concept "Last BP Panel on Qualifying Encounter Day":
 - type is Observation.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - defined as "Last BP Panels On Qualifying Encounter Day".
 
 concept "Systolic Code Component of Last BP Panel On Encounter Day":
 - type is Observation.
-- valuetype is Quantity.
+- value type is Quantity.
 - definition is "Systolic Blood Pressure Code" component of "Last BP Panel on Qualifying Encounter Day".
 
 concept "Diastolic Code Component of Last BP Panel On Encounter Day":
 - type is Observation.
-- valuetype is Quantity.
+- value type is Quantity.
 - definition is "Diastolic Blood Pressure Code" component of "Last BP Panel on Qualifying Encounter Day".
 
 concept "Last Systolic on Qualifying Encounter Day":
 - type is Observation.
-- valuetype is Quantity.
+- value type is Quantity.
 - defined as "Systolic Code Component of Last BP Panel On Encounter Day".
 
 concept "Last Diastolic on Qualifying Encounter Day":
 - type is Observation.
-- valuetype is Quantity.
+- value type is Quantity.
 - defined as "Diastolic Code Component of Last BP Panel On Encounter Day".
 
 
@@ -308,52 +308,52 @@ concept "Last Diastolic on Qualifying Encounter Day":
 
 concept "Last Systolic Below 120":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - definition is "Last Systolic on Qualifying Encounter Day" below 120 'mm[Hg]'.
 
 concept "Last Diastolic Below 80":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - definition is "Last Diastolic on Qualifying Encounter Day" below 80 'mm[Hg]'.
 
 concept "Last Systolic Between 120 and 129":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - definition is "Last Systolic on Qualifying Encounter Day" between 120 'mm[Hg]' and 129 'mm[Hg]'.
 
 concept "Last Systolic At Least 130":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - definition is "Last Systolic on Qualifying Encounter Day" at least 130 'mm[Hg]'.
 
 concept "Last Diastolic At Least 80":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - definition is "Last Diastolic on Qualifying Encounter Day" at least 80 'mm[Hg]'.
 
 concept "Last Systolic Between 130 and 139":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - definition is "Last Systolic on Qualifying Encounter Day" between 130 'mm[Hg]' and 139 'mm[Hg]'.
 
 concept "Last Diastolic Between 80 and 89":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - definition is "Last Diastolic on Qualifying Encounter Day" between 80 'mm[Hg]' and 89 'mm[Hg]'.
 
 concept "Last Systolic At Least 140":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - definition is "Last Systolic on Qualifying Encounter Day" at least 140 'mm[Hg]'.
 
 concept "Last Diastolic At Least 90":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - definition is "Last Diastolic on Qualifying Encounter Day" at least 90 'mm[Hg]'.
 
 concept "Normal BP Reading":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - defined as
 (
    "Last Systolic Below 120"
@@ -363,7 +363,7 @@ concept "Normal BP Reading":
 
 concept "Elevated BP Reading":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - defined as
 (
    "Last Systolic Between 120 and 129"
@@ -373,7 +373,7 @@ concept "Elevated BP Reading":
 
 concept "Hypertensive Reading":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - defined as
 (
    "Last Systolic At Least 130"
@@ -386,47 +386,47 @@ concept "Hypertensive Reading":
 
 concept "Last BP Panels Within Year Prior To Qualifying Encounter":
 - type is Observation.
-- valuetype is Quantity.
+- value type is Quantity.
 - definition is last "Blood Pressure Panels" within 1 year before start of "Qualifying Encounter".
 
 concept "Last BP Panel Within Year Prior to Qualifying Encounter":
 - type is Observation.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - defined as "Last BP Panels Within Year Prior To Qualifying Encounter".
 
 concept "Systolic Code Component of Prior-Year Last BP Panel":
 - type is Observation.
-- valuetype is Quantity.
+- value type is Quantity.
 - definition is "Systolic Blood Pressure Code" component of "Last BP Panel Within Year Prior to Qualifying Encounter".
 
 concept "Diastolic Code Component of Prior-Year Last BP Panel":
 - type is Observation.
-- valuetype is Quantity.
+- value type is Quantity.
 - definition is "Diastolic Blood Pressure Code" component of "Last BP Panel Within Year Prior to Qualifying Encounter".
 
 concept "Prior-Year Last Systolic":
 - type is Observation.
-- valuetype is Quantity.
+- value type is Quantity.
 - defined as "Systolic Code Component of Prior-Year Last BP Panel".
 
 concept "Prior-Year Last Diastolic":
 - type is Observation.
-- valuetype is Quantity.
+- value type is Quantity.
 - defined as "Diastolic Code Component of Prior-Year Last BP Panel".
 
 concept "Prior-Year Last Systolic At Least 130":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - definition is "Prior-Year Last Systolic" at least 130 'mm[Hg]'.
 
 concept "Prior-Year Last Diastolic At Least 80":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - definition is "Prior-Year Last Diastolic" at least 80 'mm[Hg]'.
 
 concept "Prior-Year Hypertensive Reading":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - defined as
 (
    "Prior-Year Last Systolic At Least 130"
@@ -436,12 +436,12 @@ concept "Prior-Year Hypertensive Reading":
 
 concept "Without Record Of Prior-Year Hypertensive Reading":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - definition is without record of "Prior-Year Hypertensive Reading".
 
 concept "First Hypertensive Reading":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - defined as
 (
    "Hypertensive Reading"
@@ -454,7 +454,7 @@ concept "First Hypertensive Reading":
 
 concept "Second Hypertensive Reading 130s Body":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - defined as
 (
    (
@@ -473,7 +473,7 @@ concept "Second Hypertensive Reading 130s Body":
 
 concept "Second Hypertensive Reading 130s":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - defined as
 (
    "Second Hypertensive Reading 130s Body"
@@ -483,7 +483,7 @@ concept "Second Hypertensive Reading 130s":
 
 concept "Second Hypertensive Reading 140+ Body":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - defined as
 (
    "Last Systolic At Least 140"
@@ -493,7 +493,7 @@ concept "Second Hypertensive Reading 140+ Body":
 
 concept "Second Hypertensive Reading 140+":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - defined as
 (
    "Second Hypertensive Reading 140+ Body"
@@ -522,7 +522,7 @@ concept "Six-Month Rescreen Order":
 
 concept "Non-Pharmacological Recommendations":
 - type is ServiceRequest.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - defined as
 (
    "Lifestyle Recommendations"
@@ -546,7 +546,7 @@ concept "Non-Pharmacological Recommendation Order":
 
 concept "Hypertension Lab or ECG Requests":
 - type is ServiceRequest.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - defined as
 (
    "EKG 12-Lead Panel Requests"
@@ -618,7 +618,7 @@ concept "Antihypertensive Medication Order Same Day As Qualifying Encounter":
 
 concept "Elevated BP Followup Bundle":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - defined as
 (
    (
@@ -632,7 +632,7 @@ concept "Elevated BP Followup Bundle":
 
 concept "First HTN Followup Bundle":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - defined as
 (
    (
@@ -646,7 +646,7 @@ concept "First HTN Followup Bundle":
 
 concept "Second HTN 130s Followup Bundle":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - defined as
 (
    (
@@ -662,7 +662,7 @@ concept "Second HTN 130s Followup Bundle":
 
 concept "Second HTN 140+ Followup Bundle":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - defined as
 (
    (
@@ -683,7 +683,7 @@ concept "Second HTN 140+ Followup Bundle":
 
 concept "Elevated BP With Followup":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - defined as
 (
    "Elevated BP Reading"
@@ -693,7 +693,7 @@ concept "Elevated BP With Followup":
 
 concept "First HTN With Followup":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - defined as
 (
    "First Hypertensive Reading"
@@ -703,7 +703,7 @@ concept "First HTN With Followup":
 
 concept "Second HTN 130s With Followup":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - defined as
 (
    "Second Hypertensive Reading 130s"
@@ -713,7 +713,7 @@ concept "Second HTN 130s With Followup":
 
 concept "Second HTN 140+ With Followup":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - defined as
 (
    "Second Hypertensive Reading 140+"
@@ -745,7 +745,7 @@ concept "Verified Hypertension As Of Qualifying Encounter":
 
 concept "BP Measurement Sources":
 - type is Observation.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - defined as
 (
    "Blood Pressure Panels"
@@ -765,7 +765,7 @@ concept "BP Measurement Sources Same Day As Qualifying Encounter":
 
 concept "BP Measurement Not Done With Reason":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - defined as
 (
    "BP Measurement Sources Not Done With Reason"
@@ -850,7 +850,7 @@ concept "Antihypertensive Medication Declined Same Day As Qualifying Encounter":
 
 concept "Elevated BP Declined Bundle":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - defined as
 (
    "Primary-Care Referral Declined Same Day As Qualifying Encounter"
@@ -862,7 +862,7 @@ concept "Elevated BP Declined Bundle":
 
 concept "First HTN Declined Bundle":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - defined as
 (
    "Four-Week Rescreen Declined Same Day As Qualifying Encounter"
@@ -874,7 +874,7 @@ concept "First HTN Declined Bundle":
 
 concept "Second HTN 130s Declined Bundle":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - defined as
 (
    "Primary-Care Referral Declined Same Day As Qualifying Encounter"
@@ -888,7 +888,7 @@ concept "Second HTN 130s Declined Bundle":
 
 concept "Second HTN 140+ Declined Bundle":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - defined as
 (
    "Primary-Care Referral Declined Same Day As Qualifying Encounter"
@@ -904,7 +904,7 @@ concept "Second HTN 140+ Declined Bundle":
 
 concept "Elevated BP With Declined Followup":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - defined as
 (
    "Elevated BP Reading"
@@ -914,7 +914,7 @@ concept "Elevated BP With Declined Followup":
 
 concept "First HTN With Declined Followup":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - defined as
 (
    "First Hypertensive Reading"
@@ -924,7 +924,7 @@ concept "First HTN With Declined Followup":
 
 concept "Second HTN 130s With Declined Followup":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - defined as
 (
    "Second Hypertensive Reading 130s"
@@ -934,7 +934,7 @@ concept "Second HTN 130s With Declined Followup":
 
 concept "Second HTN 140+ With Declined Followup":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - defined as
 (
    "Second Hypertensive Reading 140+"
@@ -944,7 +944,7 @@ concept "Second HTN 140+ With Declined Followup":
 
 concept "HTN Followup Declined By Patient":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - defined as
 (
    "Elevated BP With Declined Followup"
@@ -961,12 +961,12 @@ concept "HTN Followup Declined By Patient":
 
 concept "Age At Start Of MP At Least 18 Years":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - definition is age at start of "Measurement Period" at least 18 years.
 
 concept "Aged 18+ at Measurement Period Start":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - defined as "Age At Start Of MP At Least 18 Years".
 
 
@@ -974,22 +974,22 @@ concept "Aged 18+ at Measurement Period Start":
 
 concept "Initial Population":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - defined as "Aged 18+ at Measurement Period Start".
 
 concept "Denominator":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - defined as "Initial Population".
 
 concept "Denominator Exclusions":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - defined as "Verified Hypertension As Of Qualifying Encounter".
 
 concept "Numerator":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - defined as
 (
    "Normal BP Reading"
@@ -1005,7 +1005,7 @@ concept "Numerator":
 
 concept "Denominator Exceptions":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - defined as
 (
    "BP Measurement Not Done With Reason"

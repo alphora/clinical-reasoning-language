@@ -166,7 +166,7 @@ The emitter knows the concept's kind from its declaration and inserts the correc
 | `ConceptRef` (Asserted, type=Condition/Encounter/...) | `List<Resource>` or `Choice<...>` | the retrieve/list expression |
 | `ConceptRef<Quantity>` (Asserted) | `Quantity` | the singleton-quantity expression |
 | `ConceptRef` (Inferred, boolean) | `Boolean` | the `define`'s boolean expression |
-| `ConceptRef` (Inferred, with `valuetype is X`) | `X` | the lifted value expression |
+| `ConceptRef` (Inferred, with `value type is X`) | `X` | the lifted value expression |
 | `Instance<T>` (selection return) | `T` | the selected resource/value |
 | `Quantity` (literal) | `Quantity` | the literal value (`120 'mm[Hg]'`) |
 | `Integer` (literal) | `Integer` | the literal |
@@ -368,7 +368,7 @@ When a pattern needs a property of a clinical concept (the date an order was pla
 ```crl
 concept "High BMI Follow-up Order Date":
 - type is ServiceRequest.
-- valuetype is dateTime.
+- value type is dateTime.
 - inferred from "High BMI Follow-up Service Requests".
 ```
 
@@ -526,7 +526,7 @@ The lifted concept is the clinical name for "when the high-BMI follow-up was ord
 - **maturity** — moderate
 - **why Contextualization** — relates a composite resource shape to one of its named sub-elements. Extraction, not derivation.
 - **return type** — `T` where T is the discriminator concept's `valuetype` (NOT the panel's; the panel is `Observation` while the component's value is `Quantity`/etc.). The validator reads T from the discriminator's concept declaration.
-- **filled-in reads:** `ComponentOf("Blood Pressure Panels", "Systolic Blood Pressure Code")` → "the systolic component of the blood pressure panel"; returns `Quantity<mm[Hg]>` because `"Systolic Blood Pressure Code"` has `valuetype is Quantity<mm[Hg]>`.
+- **filled-in reads:** `ComponentOf("Blood Pressure Panels", "Systolic Blood Pressure Code")` → "the systolic component of the blood pressure panel"; returns `Quantity<mm[Hg]>` because `"Systolic Blood Pressure Code"` has `value type is Quantity<mm[Hg]>`.
 - **evidence** — L2: BP panel `.component` access via `singleton from … where C.code ~ "Systolic"` (CMS22). The discriminator-concept pattern wraps the component-identifying code at the Asserted layer.
 - **examples** — `CMS22 :: Systolic BP Reading`, `CMS22 :: Diastolic BP Reading`, `CMS22 :: Last Systolic on Qualifying Encounter Day`
 - **anti-example** — `Calculate(X)` is for *deriving* a new feature; `ComponentOf` is for *extracting* an existing component.

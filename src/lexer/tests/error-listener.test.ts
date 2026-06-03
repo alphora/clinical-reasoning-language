@@ -128,7 +128,7 @@ describe("CRLLexerErrorListener with CRL-specific input", () => {
   // SKIPPED: asserts error count expected pre-v0.7 lexer-mode rework. Pending test-cleanup.
   it.skip("should handle invalid concept value type", () => {
     const { lexer, errorListener } = createLexer(
-      'concept "Invalid Concept": valuetype is InvalidValueType. done',
+      'concept "Invalid Concept": value type is InvalidValueType. done',
     );
     const tokenStream = new CommonTokenStream(lexer);
     tokenStream.fill();

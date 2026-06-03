@@ -6,6 +6,7 @@ import { CRLLexer } from "../grammar/generated/antlr/CRLLexer";
 import activityTypesJson from "../grammar/generated/types/activityTypes.json";
 import conceptTypesJson from "../grammar/generated/types/conceptTypes.json";
 import conceptValueTypesJson from "../grammar/generated/types/conceptValueTypes.json";
+import parameterTypesJson from "../grammar/generated/types/parameterTypes.json";
 import { CRLError } from "../types/errors";
 
 export class CRLLexerErrorListener implements ANTLRErrorListener<number> {
@@ -16,6 +17,7 @@ export class CRLLexerErrorListener implements ANTLRErrorListener<number> {
   private readonly validActivityTypes = activityTypesJson as string[];
   private readonly validConceptTypes = conceptTypesJson as string[];
   private readonly validConceptValueTypes = conceptValueTypesJson as string[];
+  private readonly validParameterTypes = parameterTypesJson as string[];
 
   private parseErrorText(input: CharStream): string {
     let errorText = "";
@@ -87,6 +89,16 @@ export class CRLLexerErrorListener implements ANTLRErrorListener<number> {
       console.error(errorMsg);
       throw new Error(errorMsg);
     }
+    if (!this.validParameterTypes) {
+      const errorMsg = [
+        "validParameterTypes is undefined. This usually means the parameterTypes array was not initialized.",
+        "Check: src/grammar/generated/types/parameterTypes.json exists and is valid.",
+        "If the file is missing, re-run the code generation step (npm run generate) which produces it via scripts/extractParameterTypes.js.",
+      ].join("\n");
+
+      console.error(errorMsg);
+      throw new Error(errorMsg);
+    }
     if (this.validActivityTypes.some((type) => errorText.startsWith(type))) {
       return `Invalid character in activity type: ${errorText}`;
     }
@@ -95,6 +107,9 @@ export class CRLLexerErrorListener implements ANTLRErrorListener<number> {
     }
     if (this.validConceptValueTypes.some((type) => errorText.startsWith(type))) {
       return `Invalid character in concept value type: ${errorText}`;
+    }
+    if (this.validParameterTypes.some((type) => errorText.startsWith(type))) {
+      return `Invalid character in parameter type: ${errorText}`;
     }
     return `Invalid token: ${errorText}`;
   }
@@ -185,6 +200,12 @@ export class CRLLexerErrorListener implements ANTLRErrorListener<number> {
             break;
           case "InvalidCharacterInConceptValueType":
             message = `Invalid character in concept value type: ${parsed.value}`;
+            break;
+          case "InvalidParameterType":
+            message = `Invalid parameter type: ${parsed.value}`;
+            break;
+          case "InvalidCharacterInParameterType":
+            message = `Invalid character in parameter type: ${parsed.value}`;
             break;
           default:
             message = `Invalid token: ${typeof parsed.value === "string" ? parsed.value : token.text}`;

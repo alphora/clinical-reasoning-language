@@ -170,7 +170,7 @@ describe("Structures", () => {
   describe("Concept Structure", () => {
     it("should tokenize basic concept with type and value type", () => {
       const input =
-        'concept "Most Recent BMI":\n   - type is Observation.\n   - valuetype is boolean.';
+        'concept "Most Recent BMI":\n   - type is Observation.\n   - value type is boolean.';
 
       const tokens = getTokensFromString(input);
 
@@ -183,7 +183,7 @@ describe("Structures", () => {
         CRLLexer.CONCEPT_TYPE,
         CRLLexer.DOT,
         CRLLexer.DASH,
-        CRLLexer.VALUETYPE_IS,
+        CRLLexer.VALUE_TYPE_IS,
         CRLLexer.CONCEPT_VALUE_TYPE,
         CRLLexer.DOT,
       ]);
@@ -191,7 +191,7 @@ describe("Structures", () => {
 
     it("should tokenize concept with provenance and coded by", () => {
       const input =
-        'concept "BMI Range as a Condition":\n   - type is Condition.\n   - valuetype is CodeableConcept.\n   - evidence is `some provenance`.\n   - coded from "BMI Valueset".';
+        'concept "BMI Range as a Condition":\n   - type is Condition.\n   - value type is CodeableConcept.\n   - evidence is `some provenance`.\n   - coded from "BMI Valueset".';
 
       const tokens = getTokensFromString(input);
 
@@ -204,7 +204,7 @@ describe("Structures", () => {
         CRLLexer.CONCEPT_TYPE,
         CRLLexer.DOT,
         CRLLexer.DASH,
-        CRLLexer.VALUETYPE_IS,
+        CRLLexer.VALUE_TYPE_IS,
         CRLLexer.CONCEPT_VALUE_TYPE,
         CRLLexer.DOT,
         CRLLexer.DASH,
@@ -221,7 +221,7 @@ describe("Structures", () => {
     // SKIPPED: pre-v0.7 syntax (inferred by). Pending test-cleanup.
     it.skip("should tokenize concept with inferred by pattern", () => {
       const input =
-        'concept "BMI":\n   - type is Observation.\n   - valuetype is Quantity.\n   - inferred from "BMI" apply pattern `Most Recent(this, lookbackMonths)`.';
+        'concept "BMI":\n   - type is Observation.\n   - value type is Quantity.\n   - inferred from "BMI" apply pattern `Most Recent(this, lookbackMonths)`.';
 
       const tokens = getTokensFromString(input);
 
@@ -234,7 +234,7 @@ describe("Structures", () => {
         CRLLexer.CONCEPT_TYPE,
         CRLLexer.DOT,
         CRLLexer.DASH,
-        CRLLexer.VALUETYPE_IS,
+        CRLLexer.VALUE_TYPE_IS,
         CRLLexer.CONCEPT_VALUE_TYPE,
         CRLLexer.DOT,
         CRLLexer.DASH,
@@ -249,7 +249,7 @@ describe("Structures", () => {
     // SKIPPED: pre-v0.7 syntax (inferred by). Pending test-cleanup.
     it.skip("should tokenize concept with inferred by expression", () => {
       const input =
-        'concept "BMI":\n   - type is Observation.\n   - valuetype is Quantity.\n   - inferred from ("BMI Range as a Condition" or "BMI as an Observation" or "Calculated BMI").';
+        'concept "BMI":\n   - type is Observation.\n   - value type is Quantity.\n   - inferred from ("BMI Range as a Condition" or "BMI as an Observation" or "Calculated BMI").';
 
       const tokens = getTokensFromString(input);
 
@@ -262,7 +262,7 @@ describe("Structures", () => {
         CRLLexer.CONCEPT_TYPE,
         CRLLexer.DOT,
         CRLLexer.DASH,
-        CRLLexer.VALUETYPE_IS,
+        CRLLexer.VALUE_TYPE_IS,
         CRLLexer.CONCEPT_VALUE_TYPE,
         CRLLexer.DOT,
         CRLLexer.DASH,

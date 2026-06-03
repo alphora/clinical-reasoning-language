@@ -84,6 +84,11 @@ function collectLocalNames(entry: RegistryEntry): LibraryScopeNames {
       case "Activity":
         if (stmt.name) names.activities.add(stmt.name);
         break;
+      case "Parameter":
+        // v2.2 issue #59: parameter declarations don't populate the
+        // four existing scope buckets. Their own bucket lands in
+        // Todo 2 alongside the RefKind/NameBuckets widening.
+        break;
     }
   }
   return names;

@@ -59,6 +59,7 @@ statement
     | terminologyStatement
     | activityStatement
     | conceptStatement
+    | parameterStatement
     ;
 
 // ============================
@@ -223,13 +224,13 @@ activityBecause
 //
 // `type is X` is OPTIONAL for composition/predicate kinds (deduced from body
 // refs if omitted); REQUIRED for asserted (valuesets don't carry FHIR-type info).
-// `valuetype is X` is OPTIONAL and 0..* (lazily required when something
+// `value type is X` is OPTIONAL and 0..* (lazily required when something
 // depends on it; deduced from type's default).
 //
 // Examples:
 //   concept "BMI Range as a Condition":
 //     - type is Condition.
-//     - valuetype is CodeableConcept.
+//     - value type is CodeableConcept.
 //     - coded from "BMI Valueset".
 //
 //   concept "Qualifying Encounter":
@@ -266,7 +267,35 @@ typeLine
     ;
 
 valueTypeLine
-    : DASH VALUETYPE_IS CONCEPT_VALUE_TYPE DOT
+    : DASH VALUE_TYPE_IS CONCEPT_VALUE_TYPE DOT
+    ;
+
+// ============================
+// Parameter Statement
+// ============================
+//
+// Runtime parameter declaration. Reference target for narrative
+// patterns that need a value supplied by the measure-execution
+// environment (e.g. "Measurement Period", "Patient"). Per v2.2.0:
+//   - 0..* per library
+//   - per-(library, kind) uniqueness on name (Todo 2 enforces)
+//   - reference-resolution + ref-slot acceptance (Todo 2)
+//   - CQL emit as `parameter "Name" Type` or as `context Patient` /
+//     `context Practitioner` per CQL spec (Todo 3)
+parameterStatement
+    : PARAMETER parameterIdentifier COLON parameterBody
+    ;
+
+parameterIdentifier
+    : QUOTED_STRING
+    ;
+
+parameterBody
+    : parameterTypeLine
+    ;
+
+parameterTypeLine
+    : DASH PARAM_TYPE_IS PARAMETER_TYPE DOT
     ;
 
 metaLine

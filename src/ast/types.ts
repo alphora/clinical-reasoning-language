@@ -1,6 +1,7 @@
 import type { ActivityType } from "../grammar/activityTypes";
 import type { ConceptType } from "../grammar/conceptTypes";
 import type { ConceptValueType } from "../grammar/conceptValueTypes";
+import type { ParameterType } from "../grammar/parameterTypes";
 
 // Base AST Node interface
 export interface ASTNode {
@@ -26,9 +27,11 @@ export interface CRL extends ASTNode {
   location: Location;
 }
 
-// Union type for all possible statements (v0.7: predicate-kind concept body
-// uses `definition is`; the v0.5 standalone `inference` statement is gone)
-export type Statement = Decision | Concept | Activity | Terminology;
+// Union type for all possible statements. v2.2: parameter declarations
+// land as the fifth top-level kind (issue #59). Reference resolution +
+// per-library uniqueness for parameters are Todo 2; emit is Todo 3;
+// extension UI is Todo 4.
+export type Statement = Decision | Concept | Activity | Terminology | Parameter;
 
 // File-level library identity declaration. Required in v2.1.0.
 // npm packaging IS the version system — no version field on the AST node.
@@ -185,6 +188,23 @@ export interface TerminologyCode extends ASTNode {
   location: Location;
 }
 
+// --------------------------- PARAMETER STATEMENT ---------------------------
+
+// Runtime parameter declaration (issue #59). 0..* per library; the name
+// is quoted. The `paramType` field is conceptually a `ConceptType |
+// ConceptValueType` (per-context resource OR data type), exposed at
+// runtime as `string` via the generated wrapper.
+//
+// Reference resolution / per-library uniqueness / ref-slot acceptance
+// are Todo 2. CQL emit (`parameter "Name" Type` OR `context Patient` /
+// `context Practitioner` per CQL spec) is Todo 3.
+export interface Parameter extends ASTNode {
+  type: "Parameter";
+  name: string;
+  parameterType: ParameterType;
+  location: Location;
+}
+
 // --------------------------- ACTIVITY STATEMENT ---------------------------
 
 // Activity node
@@ -229,7 +249,7 @@ export interface ActivityBecause extends ASTNode {
 // - conceptType (`type is X.`) is OPTIONAL for composition/predicate body
 //   kinds (deduced from body refs when omitted); REQUIRED for asserted body
 //   (valuesets don't carry FHIR-type info).
-// - valueTypes (`valuetype is X.`) is OPTIONAL and 0..*; lazily required
+// - valueTypes (`value type is X.`) is OPTIONAL and 0..*; lazily required
 //   when something depends on it, then deduced from type's default.
 export interface Concept extends ASTNode {
   type: "Concept";

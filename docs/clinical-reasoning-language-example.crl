@@ -185,67 +185,67 @@ terminology "Colonoscopy":
 
 concept "BMI Range as a Condition":
 - type is Condition.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - coded from "BMI Range as a Condition".
 
 concept "BMI as an Observation":
 - type is Observation.
-- valuetype is Quantity.
+- value type is Quantity.
 - coded from "BMI as an Observation".
 
 concept "Patient Height":
 - type is Observation.
-- valuetype is integer.
+- value type is integer.
 - coded from "Height Valueset".
 
 concept "Patient Weight":
 - type is Observation.
-- valuetype is integer.
+- value type is integer.
 - coded from "Weight Valueset".
 
 concept "Overweight or Obese Diagnoses":
 - type is Condition.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - coded from "Overweight or Obese Diagnoses VS".
 
 concept "Underweight Diagnoses":
 - type is Condition.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - coded from "Underweight Diagnoses VS".
 
 concept "Pregnancy Diagnoses":
 - type is Condition.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - coded from "Pregnancy Diagnoses VS".
 
 concept "Weight Assessment Referrals":
 - type is ServiceRequest.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - coded from "Weight Assessment Referrals VS".
 
 concept "Anti-Obesity Medications":
 - type is MedicationRequest.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - coded from "Anti-Obesity Medications VS".
 
 concept "Low BMI Follow-up Service Requests":
 - type is ServiceRequest.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - coded from "Low BMI Follow-up Service Requests VS".
 
 concept "Medical Reasons":
 - type is Observation.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - coded from "Medical Reason VS".
 
 concept "Patient Declined Reasons":
 - type is Observation.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - coded from "Patient Declined VS".
 
 concept "Anti-Obesity Medication Contraindication":
 - type is Observation.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - coded from "Anti-Obesity Medication Contraindication VS".
 
 
@@ -256,7 +256,7 @@ concept "Anti-Obesity Medication Contraindication":
 // This is the value the rest of the file works with.
 concept "BMI":
 - type is Observation.
-- valuetype is Quantity.
+- value type is Quantity.
 - defined as
 (
    "BMI Range as a Condition"
@@ -280,7 +280,7 @@ concept "Most Recent BMI Selection":
 
 concept "Most Recent BMI":
 - type is Observation.
-- valuetype is Quantity.
+- value type is Quantity.
 - meta is `Most recent qualifying BMI for the current encounter context`.
 - evidence is `Calculated by Smile`.
 - defined as "Most Recent BMI Selection".
@@ -292,7 +292,7 @@ concept "Most Recent BMI":
 // the WHAT-vs-HOW principle keeps the formula out of the CRL grammar.
 concept "Calculated BMI":
 - type is Observation.
-- valuetype is Quantity.
+- value type is Quantity.
 - evidence is `Standard BMI formula: weight (kg) / height (m)^2`.
 - defined as
 (
@@ -309,7 +309,7 @@ concept "Calculated BMI":
 // calculated source, NOT from a coded condition entry.
 concept "BMI With Confirmed Height-Weight Source":
 - type is Observation.
-- valuetype is Quantity.
+- value type is Quantity.
 - defined as
 (
    "Calculated BMI"
@@ -326,7 +326,7 @@ concept "BMI With Confirmed Height-Weight Source":
 // out the denominator exceptions.
 concept "Patient Eligible For BMI Screening":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - defined as
 (
    sem-not "Pregnancy Diagnoses"
@@ -338,32 +338,32 @@ concept "Patient Eligible For BMI Screening":
 
 concept "BMI Not Documented During Measurement Period":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - definition is without documented "BMI".
 
 concept "Has Documented High BMI":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - definition is "BMI" high.
 
 concept "Has Documented Low BMI":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - definition is "BMI" low.
 
 concept "Patient Has Overweight or Obese Diagnosis":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - definition is "Overweight or Obese Diagnoses" active.
 
 concept "Patient Has Underweight Diagnosis":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - definition is "Underweight Diagnoses" active.
 
 concept "Has Anti-Obesity Medication Contraindication":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - definition is documented "Anti-Obesity Medication Contraindication".
 
 

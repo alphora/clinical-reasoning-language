@@ -377,7 +377,7 @@ library "Test".
 library "Test".
         concept "BMI Range as a Condition":
           - type is Condition.
-          - valuetype is CodeableConcept.
+          - value type is CodeableConcept.
           - coded from "BMI Valueset".
       `;
 
@@ -397,7 +397,7 @@ library "Test".
         `# Test `,
         `concept "Most Recent BMI":`,
         "  - type is Observation.",
-        "  - valuetype is boolean.",
+        "  - value type is boolean.",
         "  - evidence is `some provenance`.",
         '  - inferred from "BMI".',
         "  - apply pattern `Most Recent(this, lookbackMonths)`.",
@@ -435,7 +435,7 @@ library "Test".
 library "Test".
         concept "BMI":
           - type is Observation.
-          - valuetype is Quantity.
+          - value type is Quantity.
           - inferred from ("BMI Range as a Condition" or "BMI as an Observation" or "Calculated BMI").
         `;
 
@@ -492,7 +492,7 @@ library "Test".
 library "Test".
         concept "Complex BMI":
           - type is Observation.
-          - valuetype is Quantity.
+          - value type is Quantity.
           - inferred from (("BMI Range as a Condition" and "Recent") or ("BMI as an Observation" and "Valid") or "Calculated BMI").
       `;
 
@@ -553,7 +553,7 @@ library "Test".
 library "Test".
         concept "Empty Provenance":`,
         " - type is Observation.",
-        " - valuetype is boolean.",
+        " - value type is boolean.",
         " - evidence is ``.",
         ` - inferred from ("Some Pattern" or "Some Concept").`,
       ].join("\n");
@@ -577,7 +577,7 @@ library "Test".
           - request CPGImmunizationRequest.
         concept "BMI":
           - type is Observation.
-          - valuetype is Quantity.
+          - value type is Quantity.
           - coded from "BMI Valueset".
         decision "Check BMI":
           - when "BMI" then recommend activity "Record BMI".

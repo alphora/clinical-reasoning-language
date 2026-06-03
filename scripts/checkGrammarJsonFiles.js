@@ -6,6 +6,7 @@ const requiredFiles = [
   'activityTypes.json',
   'conceptTypes.json',
   'conceptValueTypes.json',
+  'parameterTypes.json',
 ];
 
 const locations = [

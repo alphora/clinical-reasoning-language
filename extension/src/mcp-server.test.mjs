@@ -44,9 +44,9 @@ try {
     const ast = JSON.parse(r.content[0].text);
     assert.equal(ast.success, true);
     assert.equal(ast.result.type, "CRL");
-    assert.equal(ast.result.library?.name, "Clinical Reasoning Language Example");
+    assert.equal(ast.result.library?.name, "CMS69 BMI Screening GPG Strategy example");
     assert.equal(ast.result.statements[0].type, "Decision");
-    assert.equal(ast.result.statements[0].name, "IMMZ.D2.D5.Measles");
+    assert.equal(ast.result.statements[0].name, "CMS69 BMI Screening Strategy");
   });
 
   await check("tokenize_crl via code → tokens", async () => {
@@ -104,7 +104,7 @@ try {
     assert.ok(!r.isError);
     const out = JSON.parse(r.content[0].text);
     assert.equal(out.success, true);
-    assert.equal(out.result.library?.name, "Clinical Reasoning Language Example");
+    assert.equal(out.result.library?.name, "CMS69 BMI Screening GPG Strategy example");
   });
 } finally {
   await client.close();

@@ -152,6 +152,11 @@ export class ReferenceResolver {
       case "Terminology":
         // Terminology bodies don't carry refs (just valueset URLs + codes).
         return;
+      case "Parameter":
+        // v2.2 issue #59: parameter bodies declare a single type
+        // token; no narrative refs to walk. Resolution of refs TO
+        // parameters lands in Todo 2.
+        return;
     }
   }
 
@@ -417,6 +422,10 @@ function collectNames(statements: Statement[]): NameBuckets {
         break;
       case "Activity":
         buckets.activity.add(s.name);
+        break;
+      case "Parameter":
+        // v2.2 issue #59: parameter name collection lands in Todo 2
+        // alongside the RefKind/NameBuckets widening.
         break;
     }
   }

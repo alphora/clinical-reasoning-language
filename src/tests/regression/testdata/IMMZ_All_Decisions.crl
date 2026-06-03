@@ -163,121 +163,121 @@ activity "Evaluate Contraindication for Measles"
 concept "Measles Routine Immunization Schedule Incomplete":
 
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - coded from "Measles Routine Immunization Schedule Incomplete".
 
 concept "No MCV0 Doses Administered":
 
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - coded from "No MCV0 Doses Administered".
 
 concept "Client Age Less Than 6 Months":
 
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - coded from "Client Age Less Than 6 Months".
 
 concept "Last Live Vaccine Administered Within 4 Weeks":
 
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - coded from "Last Live Vaccine Administered Within 4 Weeks".
 
 concept "Client Is Due For MCV0":
 
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - coded from "Client Is Due For MCV0".
 
 concept "MCV0 Dose Administered":
 
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - coded from "MCV0 Dose Administered".
 
 concept "No Primary Series Doses Administered":
 
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - coded from "No Primary Series Doses Administered".
 
 concept "Client Age Less Than 12 Months":
 
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - coded from "Client Age Less Than 12 Months".
 
 concept "Client Is Due For MCV1":
 
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - coded from "Client Is Due For MCV1".
 
 concept "One Primary Series Dose Administered":
 
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - coded from "One Primary Series Dose Administered".
 
 concept "Client Age Less Than 15 Months":
 
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - coded from "Client Age Less Than 15 Months".
 
 concept "Client Is Due For MCV2":
 
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - coded from "Client Is Due For MCV2".
 
 concept "Two Primary Series Doses Administered":
 
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - coded from "Two Primary Series Doses Administered".
 
 concept "Client Age Less Than 9 Months":
 
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - coded from "Client Age Less Than 9 Months".
 
 concept "Measles Routine Immunization Schedule Complete":
 
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - coded from "Measles Routine Immunization Schedule Complete".
 
 concept "No Supplementary Dose Administered":
 
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - coded from "No Supplementary Dose Administered".
 
 concept "Client Is Due For Supplementary Dose":
 
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - coded from "Client Is Due For Supplementary Dose".
 
 concept "Supplementary Dose Administered":
 
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - coded from "Supplementary Dose Administered".
 
 concept "MCV Dose Contraindicated":
 
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - coded from "MCV Dose Contraindicated".
 
 concept "Contraindication Evaluation of the MCV dose":
 
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - coded from "Contraindication Evaluation of the MCV dose".
 
 terminology "Measles Routine Immunization Schedule Incomplete" is system `http://sdh.com/cqis/kalm` and code `measles-routine-immunization-schedule-incomplete`.

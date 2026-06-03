@@ -23,7 +23,7 @@ const { scanDeclarations, declarationsByName } = mod.default ?? mod;
 {
   const src = `concept "BMI Observations":
 - type is Observation.
-- valuetype is Quantity.
+- value type is Quantity.
 - coded from "Body Mass Index Observations".`;
   const decls = scanDeclarations(src);
   assert.equal(decls.length, 1);
@@ -42,7 +42,7 @@ const { scanDeclarations, declarationsByName } = mod.default ?? mod;
 
 concept "B":
 - type is Condition.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - coded from "VS-B".`;
   const decls = scanDeclarations(src);
   assert.equal(decls.length, 2);
@@ -73,7 +73,7 @@ concept "B":
 {
   const src = `concept "BMI Observation During MP":
 - type is Observation.
-- valuetype is Quantity.
+- value type is Quantity.
 - definition is "BMI Observations" during "Measurement Period".`;
   const decls = scanDeclarations(src);
   assert.equal(decls.length, 1);

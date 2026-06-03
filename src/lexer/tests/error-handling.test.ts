@@ -73,7 +73,7 @@ describe("Lexer Error Handling", () => {
         expectedMessage: "Invalid concept type: @invalid",
       },
       {
-        input: "- valuetype is @invalid",
+        input: "- value type is @invalid",
         expectedMessage: "Invalid concept value type: @invalid",
       },
     ];
@@ -138,11 +138,11 @@ describe("Lexer Error Handling", () => {
   it("should throw an exception for invalid concept value types", () => {
     const testCases = [
       {
-        input: 'concept "blah": - valuetype is InvalidValueType.',
+        input: 'concept "blah": - value type is InvalidValueType.',
         expectedMessage: "Invalid concept value type",
       },
       {
-        input: 'concept "blah": - valuetype is SomeRandomValueType.',
+        input: 'concept "blah": - value type is SomeRandomValueType.',
         expectedMessage: "Invalid concept value type",
       },
     ];
@@ -182,11 +182,11 @@ describe("Lexer Error Handling", () => {
   it("should throw an exception for invalid characters in value type mode", () => {
     const testCases = [
       {
-        input: 'concept "blah": - valuetype is @invalid.',
+        input: 'concept "blah": - value type is @invalid.',
         expectedMessage: "Invalid concept value type: @invalid",
       },
       {
-        input: 'concept "blah": - valuetype is $invalid',
+        input: 'concept "blah": - value type is $invalid',
         expectedMessage: "Invalid concept value type: $invalid",
       },
     ];

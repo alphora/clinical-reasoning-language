@@ -117,6 +117,7 @@ import "./error-handling.test";
 import "./error-listener.test";
 import "./fhir-types.test";
 import "./integration.test";
+import "./parameter.test";
 import "./structures.test";
 import "./whitespace.test";
 

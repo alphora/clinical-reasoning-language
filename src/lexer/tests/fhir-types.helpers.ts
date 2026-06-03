@@ -26,8 +26,8 @@ export function getCaseFeatureTokenSequence(): number[] {
  * Helper function to generate token sequence for a value type declaration
  * @returns Array of token types for a value type declaration
  * example:
- * valuetype is Quantity.
+ * value type is Quantity.
  */
 export function getValueTypeTokenSequence(): number[] {
-  return [CRLLexer.VALUETYPE_IS, CRLLexer.CONCEPT_VALUE_TYPE, CRLLexer.DOT];
+  return [CRLLexer.VALUE_TYPE_IS, CRLLexer.CONCEPT_VALUE_TYPE, CRLLexer.DOT];
 }

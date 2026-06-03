@@ -6,7 +6,7 @@ A VS Code extension for the Clinical Reasoning Language (CRL). It does four thin
 2. **Catalog-driven authoring help** — narrative-pattern, type, valuetype, and concept-reference completion + hover for `.crl` files:
    - Inside `- definition is ` bodies, narrative-pattern snippets from the 45-entry catalog (`<X> during <Y>`, `<X> performed`, `<X> justified by <Y>`, `has <X>`, etc.).
    - After `- type is `, the list of FHIR resource types CRL recognizes (`Observation`, `Encounter`, `Condition`, …).
-   - After `- valuetype is `, the list of FHIR value types (`boolean`, `CodeableConcept`, `Quantity`, `dateTime`, …).
+   - After `- value type is `, the list of FHIR value types (`boolean`, `CodeableConcept`, `Quantity`, `dateTime`, …).
    - Inside any quoted name position (e.g. `defined as "…"`, `definition is "…"`), the names of every `concept` / `terminology` declared in the file.
    - Hover any of the above to see what it is and where it's declared.
 3. **Live error checking** — the bundled CRL validator runs on every change (debounced 250 ms) and reports parser, AST-build, and semantic findings as VS Code diagnostics (squiggles). Runs in **soft mode** so unresolved references appear as warnings during authoring.
@@ -46,7 +46,7 @@ Each takes inline `code` or a `.crl` file `path` and returns a `ParseResult`-sha
 ### Authoring help in the editor
 
 - **Narrative pattern completion** — inside any `- definition is ` line, snippet for each of the 45 catalog patterns (`has <X>`, `<X> during <Y>`, `<X> justified by <Y>`, etc.). Tab-stops drop you into the quoted concept-ref slots. The catalog is embedded into the extension at build time from `features/cql-pattern-mining/results/inference-pattern-catalog-draft.md`; new patterns are picked up by the next `npm run compile`.
-- **Type / valuetype completion** — fires after `- type is ` and `- valuetype is ` with the enum allowed by the CRL grammar.
+- **Type / valuetype completion** — fires after `- type is ` and `- value type is ` with the enum allowed by the CRL grammar.
 - **Concept-reference completion** — inside any quoted name position, the names of every `concept` / `terminology` declared in the file (with their type / valuetype / body preview in the hover).
 - **Hover** over a narrative phrase, a type/valuetype token, or a concept reference for the catalog entry or declaration info.
 - **Diagnostics** — the bundled CRL validator runs on document open / change (debounced 250 ms) / save. Findings appear as VS Code diagnostics (red for errors, yellow for unresolved-reference warnings in soft mode). Hard-mode validation is available via the `validate_crl` MCP tool.

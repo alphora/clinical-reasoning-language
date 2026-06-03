@@ -6,120 +6,120 @@ library "CMS22 Asserted".
 
 concept "BP Screening Encounters":
 - type is Encounter.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - coded from "CMS22 Terminology"."Encounter to Screen for Blood Pressure".
 
 concept "Virtual Encounters":
 - type is Encounter.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - coded from "CMS22 Terminology"."Virtual Encounter Class".
 
 concept "Hypertension Diagnoses":
 - type is Condition.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - coded from "CMS22 Terminology"."Diagnosis of Hypertension".
 
 concept "Blood Pressure Panels":
 - type is Observation.
-- valuetype is CodeableConcept.
-- valuetype is Quantity.
+- value type is CodeableConcept.
+- value type is Quantity.
 - coded from "CMS22 Terminology"."Blood pressure panel with all children optional".
 
 concept "Systolic Blood Pressure Code":
 - type is Observation.
-- valuetype is CodeableConcept.
-- valuetype is Quantity.
+- value type is CodeableConcept.
+- value type is Quantity.
 - coded from "CMS22 Terminology"."Systolic Blood Pressure Code".
 
 concept "Diastolic Blood Pressure Code":
 - type is Observation.
-- valuetype is CodeableConcept.
-- valuetype is Quantity.
+- value type is CodeableConcept.
+- value type is Quantity.
 - coded from "CMS22 Terminology"."Diastolic Blood Pressure Code".
 
 concept "Standalone Systolic BP Observations":
 - type is Observation.
-- valuetype is Quantity.
+- value type is Quantity.
 - coded from "CMS22 Terminology"."Systolic Blood Pressure Code".
 
 concept "Standalone Diastolic BP Observations":
 - type is Observation.
-- valuetype is Quantity.
+- value type is Quantity.
 - coded from "CMS22 Terminology"."Diastolic Blood Pressure Code".
 
 concept "Follow-up Within 4 Weeks":
 - type is ServiceRequest.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - coded from "CMS22 Terminology"."Follow Up Within 4 Weeks".
 
 concept "Follow-up Within 6 Months":
 - type is ServiceRequest.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - coded from "CMS22 Terminology"."Follow Up Within 6 Months".
 
 concept "Lifestyle Recommendations":
 - type is ServiceRequest.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - coded from "CMS22 Terminology"."Lifestyle Recommendation".
 
 concept "Weight Reduction Recommendations":
 - type is ServiceRequest.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - coded from "CMS22 Terminology"."Weight Reduction Recommended".
 
 concept "Dietary Recommendations":
 - type is ServiceRequest.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - coded from "CMS22 Terminology"."Dietary Recommendations".
 
 concept "Physical Activity Recommendations":
 - type is ServiceRequest.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - coded from "CMS22 Terminology"."Recommendation to Increase Physical Activity".
 
 concept "Alcohol Counseling Referrals":
 - type is ServiceRequest.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - coded from "CMS22 Terminology"."Referral or Counseling for Alcohol Consumption".
 
 concept "Primary-Care Referrals":
 - type is ServiceRequest.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - coded from "CMS22 Terminology"."Referral to Primary Care or Alternate Provider".
 
 concept "Hypertension Lab Tests":
 - type is ServiceRequest.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - coded from "CMS22 Terminology"."Laboratory Tests for Hypertension".
 
 concept "EKG 12-Lead Panel Requests":
 - type is ServiceRequest.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - coded from "CMS22 Terminology"."EKG 12 Lead Panel Code".
 
 concept "EKG Study Requests":
 - type is ServiceRequest.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - coded from "CMS22 Terminology"."EKG Study Code".
 
 concept "Antihypertensive Medications":
 - type is MedicationRequest.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - coded from "CMS22 Terminology"."Pharmacologic Therapy for Hypertension".
 
 concept "Hypertensive Reading Findings":
 - type is Observation.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - coded from "CMS22 Terminology"."Finding of Elevated Blood Pressure or Hypertension".
 
 concept "Medical Reasons":
 - type is Observation.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - coded from "CMS22 Terminology"."Medical Reason".
 
 concept "Patient Declined Reasons":
 - type is Observation.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - coded from "CMS22 Terminology"."Patient Declined".
 
 

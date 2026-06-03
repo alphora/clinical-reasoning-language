@@ -58,7 +58,7 @@ export class NarrativeHoverProvider implements vscode.HoverProvider {
 }
 
 /**
- * Hover provider over a `type is <T>.` or `valuetype is <V>.` token. Shows
+ * Hover provider over a `type is <T>.` or `value type is <V>.` token. Shows
  * the kind (resource type / value type) so authors can recall what a less-
  * familiar FHIR resource is meant to be.
  */
@@ -68,7 +68,7 @@ export class TypeValuetypeHoverProvider implements vscode.HoverProvider {
     position: vscode.Position
   ): vscode.ProviderResult<vscode.Hover> {
     const line = document.lineAt(position.line).text;
-    // Match `- type is X.` or `- valuetype is X.` and find the token under the cursor.
+    // Match `- type is X.` or `- value type is X.` and find the token under the cursor.
     const typeMatch = /^(\s*-\s*type\s+is\s+)([A-Za-z][A-Za-z0-9]*)(\s*\.\s*)?$/.exec(line);
     if (typeMatch) {
       const tokenStart = typeMatch[1].length;
@@ -86,7 +86,7 @@ export class TypeValuetypeHoverProvider implements vscode.HoverProvider {
         return new vscode.Hover(md, new vscode.Range(position.line, tokenStart, position.line, tokenEnd));
       }
     }
-    const vtMatch = /^(\s*-\s*valuetype\s+is\s+)([A-Za-z][A-Za-z0-9]*)(\s*\.\s*)?$/.exec(line);
+    const vtMatch = /^(\s*-\s*value type\s+is\s+)([A-Za-z][A-Za-z0-9]*)(\s*\.\s*)?$/.exec(line);
     if (vtMatch) {
       const tokenStart = vtMatch[1].length;
       const tokenEnd = tokenStart + vtMatch[2].length;
@@ -98,7 +98,7 @@ export class TypeValuetypeHoverProvider implements vscode.HoverProvider {
         if (!isValid) {
           md.appendMarkdown(`⚠ Not in the recognized valuetype set. Valid: ${[...CONCEPT_VALUETYPES].join(", ")}.`);
         } else {
-          md.appendMarkdown(`Used in \`- valuetype is ${name}.\` to declare the concept's value-bearing type.`);
+          md.appendMarkdown(`Used in \`- value type is ${name}.\` to declare the concept's value-bearing type.`);
         }
         return new vscode.Hover(md, new vscode.Range(position.line, tokenStart, position.line, tokenEnd));
       }

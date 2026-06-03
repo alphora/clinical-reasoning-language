@@ -140,53 +140,53 @@ terminology "Patient Declined VS":
 
 concept "Blood Pressure Panels":
 - type is Observation.
-- valuetype is CodeableConcept.
-- valuetype is Quantity.
+- value type is CodeableConcept.
+- value type is Quantity.
 - coded from "Blood Pressure Panels VS".
 
 concept "Standalone Systolic BP Observations":
 - type is Observation.
-- valuetype is Quantity.
+- value type is Quantity.
 - coded from "Standalone Systolic BP VS".
 
 concept "Standalone Diastolic BP Observations":
 - type is Observation.
-- valuetype is Quantity.
+- value type is Quantity.
 - coded from "Standalone Diastolic BP VS".
 
 concept "Hypertension Diagnoses":
 - type is Condition.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - coded from "Hypertension Diagnoses VS".
 
 concept "Antihypertensive Medications":
 - type is MedicationRequest.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - coded from "Antihypertensive Medications VS".
 
 concept "Follow-up Within 4 Weeks":
 - type is ServiceRequest.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - coded from "Follow Up Within 4 Weeks VS".
 
 concept "Lifestyle Recommendations":
 - type is ServiceRequest.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - coded from "Lifestyle Recommendation VS".
 
 concept "Antihypertensive Contraindication":
 - type is Observation.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - coded from "Antihypertensive Contraindication VS".
 
 concept "Medical Reasons":
 - type is Observation.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - coded from "Medical Reason VS".
 
 concept "Patient Declined Reasons":
 - type is Observation.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - coded from "Patient Declined VS".
 
 
@@ -197,7 +197,7 @@ concept "Patient Declined Reasons":
 // support layer doesn't care which source — it just needs a reading.
 concept "BP Reading":
 - type is Observation.
-- valuetype is Quantity.
+- value type is Quantity.
 - defined as
 (
    "Blood Pressure Panels"
@@ -217,7 +217,7 @@ concept "Last BP Reading At This Encounter Selection":
 
 concept "Last BP Reading At This Encounter":
 - type is Observation.
-- valuetype is Quantity.
+- value type is Quantity.
 - defined as "Last BP Reading At This Encounter Selection".
 
 
@@ -229,7 +229,7 @@ concept "Last BP Reading At This Encounter":
 // the clinician confirms across encounters before committing.
 concept "Hypertensive Reading Without Diagnosis":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - defined as
 (
    "Has Hypertensive Reading"
@@ -242,7 +242,7 @@ concept "Hypertensive Reading Without Diagnosis":
 
 concept "Patient Eligible For BP Cognitive Support":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - defined as
 (
    sem-not "Medical Reasons"
@@ -252,17 +252,17 @@ concept "Patient Eligible For BP Cognitive Support":
 
 concept "No BP Reading At This Encounter":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - definition is without documented "BP Reading".
 
 concept "Has Hypertensive Reading":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - definition is "Last BP Reading At This Encounter" high.
 
 concept "Has Normal Reading With Hypertension On File":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - defined as
 (
    "Has Normal Reading"
@@ -272,17 +272,17 @@ concept "Has Normal Reading With Hypertension On File":
 
 concept "Has Normal Reading":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - definition is "Last BP Reading At This Encounter" normal.
 
 concept "Has Confirmed Hypertension Diagnosis":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - definition is "Hypertension Diagnoses" active.
 
 concept "Has Antihypertensive Contraindication":
 - type is Observation.
-- valuetype is boolean.
+- value type is boolean.
 - definition is documented "Antihypertensive Contraindication".
 
 

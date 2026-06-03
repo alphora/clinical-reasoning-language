@@ -14,77 +14,77 @@
 
 concept "BMI Observations":
 - type is Observation.
-- valuetype is Quantity.
+- value type is Quantity.
 - coded from "USCore BMI Profile" or "Body Mass Index LOINC".
 
 concept "Pregnancy Diagnoses":
 - type is Condition.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - coded from "Pregnancy or Other Related Diagnoses Valueset".
 
 concept "Pregnancy Status Observations":
 - type is Observation.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - coded from "USCore Observation Pregnancy Status Profile".
 
 concept "Encounters to Evaluate BMI":
 - type is Encounter.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - coded from "Encounter to Evaluate BMI Valueset".
 
 concept "High BMI Follow-up Service Requests":
 - type is ServiceRequest.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - coded from "Follow Up for Above Normal BMI Valueset".
 
 concept "Low BMI Follow-up Service Requests":
 - type is ServiceRequest.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - coded from "Follow Up for Below Normal BMI Valueset".
 
 concept "Weight Assessment Referrals":
 - type is ServiceRequest.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - coded from "Referrals Where Weight Assessment May Occur Valueset".
 
 concept "High BMI Medications":
 - type is MedicationRequest.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - coded from "Medications for Above Normal BMI Valueset".
 
 concept "Low BMI Medications":
 - type is MedicationRequest.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - coded from "Medications for Below Normal BMI Valueset".
 
 concept "High BMI Follow-up Procedures":
 - type is Procedure.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - coded from "Follow Up for Above Normal BMI Valueset".
 
 concept "Low BMI Follow-up Procedures":
 - type is Procedure.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - coded from "Follow Up for Below Normal BMI Valueset".
 
 concept "Overweight or Obese Diagnoses":
 - type is Condition.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - coded from "Overweight or Obese Valueset".
 
 concept "Underweight Diagnoses":
 - type is Condition.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - coded from "Underweight Valueset".
 
 concept "Medical Reason":
 - type is Observation.  // used as a CodeableConcept reason-set in this measure
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - coded from "Medical Reason Valueset".
 
 concept "Patient Declined":
 - type is Observation.
-- valuetype is CodeableConcept.
+- value type is CodeableConcept.
 - coded from "Patient Declined Valueset".
 ```
 

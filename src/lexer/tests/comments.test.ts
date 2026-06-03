@@ -102,7 +102,7 @@ decision "Test":
     it.skip("should ignore block comments in concept statements", () => {
       const input = `concept /* name */ "BMI" /* start */ :
     /* type */ - type is /* value */ Observation /* end */ .
-    /* valuetype */ - valuetype is Quantity /* end */ .
+    /* valuetype */ - value type is Quantity /* end */ .
     /* inference */ - inferred from /* expr */ ("BMI Range" /* or */ or /* value */ "BMI Value") /* end */ .`;
       const tokens = getTokensFromString(input);
 
@@ -115,7 +115,7 @@ decision "Test":
         CRLLexer.CONCEPT_TYPE,
         CRLLexer.DOT,
         CRLLexer.DASH,
-        CRLLexer.VALUETYPE_IS,
+        CRLLexer.VALUE_TYPE_IS,
         CRLLexer.CONCEPT_VALUE_TYPE,
         CRLLexer.DOT,
         CRLLexer.DASH,

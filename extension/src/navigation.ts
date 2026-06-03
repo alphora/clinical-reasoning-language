@@ -41,6 +41,7 @@ function symbolKindFor(kind: IndexedDeclaration["kind"]): vscode.SymbolKind {
     case "terminology": return vscode.SymbolKind.Constant;
     case "decision": return vscode.SymbolKind.Function;
     case "activity": return vscode.SymbolKind.Class;
+    case "parameter": return vscode.SymbolKind.Property;
   }
 }
 

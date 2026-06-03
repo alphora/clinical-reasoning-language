@@ -15,7 +15,7 @@ import {
 export interface IndexedDeclaration {
   /** The quoted name as written, without surrounding quotes. */
   name: string;
-  kind: "concept" | "terminology" | "decision" | "activity";
+  kind: "concept" | "terminology" | "decision" | "activity" | "parameter";
   /** The library this declaration belongs to. */
   libraryName: string;
   /** Absolute path of the .crl file containing the declaration. */
@@ -29,7 +29,7 @@ export interface IndexedDeclaration {
   origin: "local" | "package" | "root";
   /** Concept-only: declared `type is X.` */
   type?: string;
-  /** Concept-only: declared `valuetype is X.` */
+  /** Concept-only: declared `value type is X.` */
   valuetype?: string;
   /** First body bullet text for hover preview. */
   bodyPreview?: string;
@@ -367,6 +367,18 @@ function enumerateDeclarations(
           case "Activity":
             out.push({ ...base, kind: "activity" });
             break;
+          case "Parameter": {
+            // v2.2 issue #59: parameter index entries; bodyPreview
+            // shows the declared type so hover / outline see it.
+            const p = stmt as { parameterType?: string };
+            out.push({
+              ...base,
+              kind: "parameter",
+              ...(p.parameterType ? { type: p.parameterType } : {}),
+              bodyPreview: p.parameterType ? `param type is ${p.parameterType}` : "param type is …",
+            });
+            break;
+          }
         }
       }
     }
@@ -462,6 +474,13 @@ function walkStatementRefs(
       if (wc && wc.terminologyReference !== undefined && wc.location) {
         addRef(wc.terminologyReference, "terminology", owningLib, filePath, source, wc.location, out);
       }
+      return;
+    }
+    case "Parameter": {
+      // v2.2 issue #59: parameter bodies declare a single type token; no
+      // narrative refs to walk. Explicit arm so a future regression
+      // (e.g. someone adds a body field that does carry refs) surfaces
+      // as a TS exhaustiveness check rather than a silent no-op.
       return;
     }
   }
