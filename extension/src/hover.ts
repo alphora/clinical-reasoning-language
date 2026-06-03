@@ -4,13 +4,16 @@ import {
   isDefinitionIsBody,
   CONCEPT_TYPES,
   CONCEPT_VALUETYPES,
+  PARAMETER_TYPES,
   type Pattern,
 } from "./catalog";
-import { scanDeclarations, declarationsByName, type Declaration } from "./concepts";
+import { scanDeclarations, findNarrativeDeclaration, type Declaration } from "./concepts";
+import { findByConceptFirstPrecedence } from "./completionHelpers";
 import type { IndexedDeclaration, ProjectIndex } from "./projectIndex";
 
 const CONCEPT_TYPE_SET: ReadonlySet<string> = new Set(CONCEPT_TYPES);
 const CONCEPT_VALUETYPE_SET: ReadonlySet<string> = new Set(CONCEPT_VALUETYPES);
+const PARAMETER_TYPE_SET: ReadonlySet<string> = new Set(PARAMETER_TYPES);
 
 interface CompiledPattern {
   pattern: Pattern;
@@ -103,6 +106,36 @@ export class TypeValuetypeHoverProvider implements vscode.HoverProvider {
         return new vscode.Hover(md, new vscode.Range(position.line, tokenStart, position.line, tokenEnd));
       }
     }
+    // v2.2 Todo 4 (issue #59) — `- param type is X.` slot. Mirrors the
+    // `type is` and `value type is` arms; adds a Patient-specific note
+    // because the emitter collapses Patient-typed parameters to the CQL
+    // `context Patient` line per the CQL spec (the parameter's quoted CRL
+    // name is not emitted; the CQL `context Patient` line has no per-name
+    // identifier).
+    const paramMatch = /^(\s*-\s*param\s+type\s+is\s+)([A-Za-z][A-Za-z0-9]*)(\s*\.\s*)?$/.exec(line);
+    if (paramMatch) {
+      const tokenStart = paramMatch[1].length;
+      const tokenEnd = tokenStart + paramMatch[2].length;
+      if (position.character >= tokenStart && position.character <= tokenEnd) {
+        const name = paramMatch[2];
+        const isValid = PARAMETER_TYPE_SET.has(name);
+        const md = new vscode.MarkdownString();
+        md.appendMarkdown(`**${name}** — CRL parameter type\n\n`);
+        if (!isValid) {
+          md.appendMarkdown(`⚠ Not in the recognized parameter type set.`);
+        } else if (name === "Patient") {
+          md.appendMarkdown(
+            `Used in \`- param type is Patient.\` to declare a patient-scoped runtime input. `,
+          );
+          md.appendMarkdown(
+            `The emitter collapses this to CQL \`context Patient\`; the parameter's quoted CRL name is not emitted, and the CQL \`context Patient\` line has no per-name identifier.`,
+          );
+        } else {
+          md.appendMarkdown(`Used in \`- param type is ${name}.\` to declare the parameter's runtime type.`);
+        }
+        return new vscode.Hover(md, new vscode.Range(position.line, tokenStart, position.line, tokenEnd));
+      }
+    }
     return null;
   }
 }
@@ -134,8 +167,8 @@ export class ConceptRefHoverProvider implements vscode.HoverProvider {
     const indexed = this.index.getDeclarations(document.uri.fsPath);
     if (indexed.length > 0) {
       const decl = qualifierMatch
-        ? indexed.find((d) => d.libraryName === qualifierMatch[1] && d.name === name)
-        : indexed.find((d) => d.name === name);
+        ? findIndexedNarrative(indexed, qualifierMatch[1], name)
+        : findIndexedNarrative(indexed, undefined, name);
       if (!decl) return null;
       return new vscode.Hover(
         formatIndexedHover(decl),
@@ -143,13 +176,38 @@ export class ConceptRefHoverProvider implements vscode.HoverProvider {
       );
     }
 
-    // Orphan-file fallback.
+    // Orphan-file fallback — narrative-slot precedence so the orphan path
+    // surfaces the same declaration the validator/ProjectIndex would.
     const decls = scanDeclarations(document.getText());
-    const byName = declarationsByName(decls);
-    const decl = byName.get(name);
+    const decl = findNarrativeDeclaration(decls, name);
     if (!decl) return null;
     return new vscode.Hover(formatLocalHover(decl), new vscode.Range(position.line, span.start, position.line, span.end));
   }
+}
+
+/**
+ * v2.2 Todo 4 (issue #59) — name lookup against the project index with
+ * concept-first precedence for the concept/parameter pair. Thin wrapper
+ * over the shared `findByConceptFirstPrecedence` helper; see its docstring
+ * in `completionHelpers.ts` for the precedence rule.
+ *
+ * Cross-origin same-library-name lookups (e.g. local "Lib" + package "Lib"
+ * both holding a "BMI" concept) currently fall back to source-enumeration
+ * order — hover's qualifier filter only matches `libraryName`, not origin.
+ * That diverges from `ProjectIndex.resolveTargetKind`'s origin precedence
+ * (local → root → package). Tolerable for hover because the cross-origin
+ * case is rare and the validator already enforces the canonical resolution
+ * at parse time; documented here so future work can sharpen it.
+ */
+function findIndexedNarrative(
+  indexed: IndexedDeclaration[],
+  qualifier: string | undefined,
+  name: string,
+): IndexedDeclaration | undefined {
+  return findByConceptFirstPrecedence(
+    indexed,
+    (d) => d.name === name && (qualifier === undefined || d.libraryName === qualifier),
+  );
 }
 
 function formatIndexedHover(decl: IndexedDeclaration): vscode.MarkdownString {

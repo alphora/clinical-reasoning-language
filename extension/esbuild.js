@@ -89,7 +89,7 @@ async function build() {
 
   // Pure node modules (fs/path/crypto). Bundled separately so the unit tests can
   // import them directly; the extension host imports the same source.
-  for (const name of ["provision", "highlight", "catalog", "concepts", "contextDetect", "findDeclaration", "projectIndex"]) {
+  for (const name of ["provision", "highlight", "catalog", "concepts", "contextDetect", "completionHelpers", "findDeclaration", "projectIndex"]) {
     await esbuild.build({
       entryPoints: [path.resolve(__dirname, `src/${name}.ts`)],
       outfile: path.resolve(__dirname, `dist/${name}.js`),
@@ -124,7 +124,7 @@ async function build() {
   );
 
   console.log(
-    "esbuild: built extension.js + mcp-server.js + provision.js + highlight.js + catalog.js + concepts.js; " +
+    "esbuild: built extension.js + mcp-server.js + provision.js + highlight.js + catalog.js + concepts.js + completionHelpers.js; " +
       `embedded ${patterns.length} catalog patterns; gates passed ` +
       `(externals: ${[...new Set(externalImports)].join(", ") || "none"}).`
   );

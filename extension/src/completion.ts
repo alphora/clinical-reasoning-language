@@ -4,9 +4,27 @@ import {
   isDefinitionIsBody,
   CONCEPT_TYPES,
   CONCEPT_VALUETYPES,
+  PARAMETER_TYPES,
   type Pattern,
 } from "./catalog";
 import { scanDeclarations, type Declaration } from "./concepts";
+// v2.2 Todo 4 (issue #59) — pure helpers live in a vscode-free module so
+// `completion.test.mjs` can import them under plain Node.
+import {
+  applyNarrativePrecedence,
+  isParamTypeCompletionPrefix,
+  isTypeCompletionPrefix,
+  isValuetypeCompletionPrefix,
+} from "./completionHelpers";
+
+// Re-export so existing consumers (and tests against the dist bundle) keep
+// resolving these names through `completion.ts`.
+export {
+  applyNarrativePrecedence,
+  isParamTypeCompletionPrefix,
+  isTypeCompletionPrefix,
+  isValuetypeCompletionPrefix,
+};
 import {
   detectExpectedKind,
   detectQualifiedRefQualifier,
@@ -67,7 +85,7 @@ export class TypeCompletionProvider implements vscode.CompletionItemProvider {
     position: vscode.Position
   ): vscode.ProviderResult<vscode.CompletionItem[]> {
     const prefix = document.lineAt(position.line).text.slice(0, position.character);
-    if (!/^\s*-\s*type\s+is\s+\S*$/i.test(prefix)) return [];
+    if (!isTypeCompletionPrefix(prefix)) return [];
     return CONCEPT_TYPES.map((t) => {
       const item = new vscode.CompletionItem(t, vscode.CompletionItemKind.TypeParameter);
       item.detail = `FHIR resource type — \`type is ${t}.\``;
@@ -85,10 +103,33 @@ export class ValuetypeCompletionProvider implements vscode.CompletionItemProvide
     position: vscode.Position
   ): vscode.ProviderResult<vscode.CompletionItem[]> {
     const prefix = document.lineAt(position.line).text.slice(0, position.character);
-    if (!/^\s*-\s*value type\s+is\s+\S*$/i.test(prefix)) return [];
+    if (!isValuetypeCompletionPrefix(prefix)) return [];
     return CONCEPT_VALUETYPES.map((vt) => {
       const item = new vscode.CompletionItem(vt, vscode.CompletionItemKind.TypeParameter);
       item.detail = `FHIR value type — \`value type is ${vt}.\``;
+      return item;
+    });
+  }
+}
+
+/**
+ * v2.2 Todo 4 (issue #59) — completion for `- param type is <X>.` lines on
+ * a parameter declaration. Suggests every type in `PARAMETER_TYPES`
+ * (mirrored from the grammar allowlist). Patient is in the set — when an
+ * author picks it, the parameter declaration validates AND the emitter
+ * collapses the parameter to `context Patient` per the CQL spec; hover
+ * documents that special case.
+ */
+export class ParamTypeCompletionProvider implements vscode.CompletionItemProvider {
+  public provideCompletionItems(
+    document: vscode.TextDocument,
+    position: vscode.Position
+  ): vscode.ProviderResult<vscode.CompletionItem[]> {
+    const prefix = document.lineAt(position.line).text.slice(0, position.character);
+    if (!isParamTypeCompletionPrefix(prefix)) return [];
+    return PARAMETER_TYPES.map((t) => {
+      const item = new vscode.CompletionItem(t, vscode.CompletionItemKind.TypeParameter);
+      item.detail = `CRL parameter type — \`param type is ${t}.\``;
       return item;
     });
   }
@@ -126,10 +167,10 @@ export class ConceptRefCompletionProvider implements vscode.CompletionItemProvid
     const qualifier = detectQualifiedRefQualifier(prefix);
 
     const decls = this.getDeclarations(document);
-    return decls
+    const filtered = decls
       .filter((d) => matchesKind(d, expectedKind))
-      .filter((d) => matchesQualifier(d, qualifier))
-      .map((d) => buildRefItem(d));
+      .filter((d) => matchesQualifier(d, qualifier));
+    return applyNarrativePrecedence(filtered).map((d) => buildRefItem(d));
   }
 
   private getDeclarations(document: vscode.TextDocument): RefSuggestion[] {
@@ -139,6 +180,7 @@ export class ConceptRefCompletionProvider implements vscode.CompletionItemProvid
         name: d.name,
         kind: d.kind,
         libraryName: d.libraryName,
+        origin: d.origin,
         type: d.type,
         valuetype: d.valuetype,
         bodyPreview: d.bodyPreview,
@@ -149,6 +191,7 @@ export class ConceptRefCompletionProvider implements vscode.CompletionItemProvid
       name: d.name,
       kind: d.kind,
       libraryName: undefined,
+      origin: undefined,
       type: d.type,
       valuetype: d.valuetype,
       bodyPreview: d.bodyPreview,
@@ -160,6 +203,10 @@ interface RefSuggestion {
   name: string;
   kind: "concept" | "terminology" | "decision" | "activity" | "parameter";
   libraryName: string | undefined;
+  // v2.2 Todo 4 (issue #59) — origin participates in the precedence key so
+  // a local "Foo" and a package "Foo" stay distinct (matches ProjectIndex's
+  // `resolveTargetKind` semantics).
+  origin: string | undefined;
   type?: string;
   valuetype?: string;
   bodyPreview?: string;

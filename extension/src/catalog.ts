@@ -42,6 +42,7 @@ export const CONCEPT_TYPES = [
   "NutritionIntake",
   "NutritionOrder",
   "Observation",
+  "Patient",
   "Procedure",
   "QuestionnaireResponse",
   "RiskAssessment",
@@ -67,6 +68,22 @@ export const CONCEPT_VALUETYPES = [
   "SampledData",
   "string",
   "time",
+] as const;
+
+/**
+ * v2.2 Todo 4 (issue #59) — types accepted in a `parameter` declaration's
+ * `- param type is X.` slot. Source of truth: the `PARAMETER_TYPE` lexer rule
+ * in `src/grammar/CRLLexer.g4`. Build-validated invariant per
+ * `scripts/extractParameterTypes.js`: the allowlist is exactly
+ * `CONCEPT_TYPES ∪ CONCEPT_VALUETYPES`.
+ *
+ * Static mirror — drift-guard tests in `catalog.test.mjs` assert exact
+ * equality with `src/grammar/generated/types/parameterTypes.json` so a
+ * grammar change immediately fails the extension build.
+ */
+export const PARAMETER_TYPES = [
+  ...CONCEPT_TYPES,
+  ...CONCEPT_VALUETYPES,
 ] as const;
 
 export interface Pattern {

@@ -4,8 +4,16 @@ import { dirname, resolve } from "node:path";
 import assert from "node:assert/strict";
 
 import * as mod from "../dist/catalog.js";
-const { parseCatalog, narrativePlaceholders, buildSnippetBody, isDefinitionIsBody, compileNarrativeMatcher } =
-  mod.default ?? mod;
+const {
+  parseCatalog,
+  narrativePlaceholders,
+  buildSnippetBody,
+  isDefinitionIsBody,
+  compileNarrativeMatcher,
+  CONCEPT_TYPES,
+  CONCEPT_VALUETYPES,
+  PARAMETER_TYPES,
+} = mod.default ?? mod;
 
 const here = dirname(fileURLToPath(import.meta.url));
 const catalogPath = resolve(here, "../../features/cql-pattern-mining/results/inference-pattern-catalog-draft.md");
@@ -80,5 +88,66 @@ assert.ok(!performedMatcher.test(`"Some Service Requests" not performed`), "must
 // wrap or indent narrative tokens freely.
 const onOrBeforeMatcher = compileNarrativeMatcher("<X> on or before <Y>");
 assert.ok(onOrBeforeMatcher.test(`"A"   on   or   before   "B"`), "matcher should tolerate extra whitespace");
+
+// --- v2.2 Todo 4: drift-guard tests for the static type mirrors ---
+//
+// The extension's catalog.ts hand-mirrors three allowlists that originate
+// in the grammar's lexer rules. The grammar emits the same allowlists as
+// generated JSON at build time. These tests assert EXACT equality so any
+// future grammar addition immediately fails the extension build instead
+// of silently drifting (the way "Patient" did between commit 16d0634 and
+// this Todo).
+const grammarTypesDir = resolve(here, "../../src/grammar/generated/types");
+const conceptTypesJson = JSON.parse(readFileSync(resolve(grammarTypesDir, "conceptTypes.json"), "utf-8"));
+const conceptValueTypesJson = JSON.parse(readFileSync(resolve(grammarTypesDir, "conceptValueTypes.json"), "utf-8"));
+const parameterTypesJson = JSON.parse(readFileSync(resolve(grammarTypesDir, "parameterTypes.json"), "utf-8"));
+
+// Exact equality (order included) — the JSON sources are stable lexer-order
+// outputs, and `PARAMETER_TYPES = [...CONCEPT_TYPES, ...CONCEPT_VALUETYPES]`
+// produces a deterministic order. Sorting before comparison would miss
+// ordering drift in the generated JSON.
+assert.deepEqual(
+  [...CONCEPT_TYPES],
+  [...conceptTypesJson],
+  "CONCEPT_TYPES must match src/grammar/generated/types/conceptTypes.json — keep the static mirror in sync",
+);
+assert.deepEqual(
+  [...CONCEPT_VALUETYPES],
+  [...conceptValueTypesJson],
+  "CONCEPT_VALUETYPES must match src/grammar/generated/types/conceptValueTypes.json — keep the static mirror in sync",
+);
+assert.deepEqual(
+  [...PARAMETER_TYPES],
+  [...parameterTypesJson],
+  "PARAMETER_TYPES must match src/grammar/generated/types/parameterTypes.json — keep the static mirror in sync",
+);
+// Symmetric assertion: the JSON itself must also not contain Practitioner
+// while it remains the deliberate v2.2 deferral. If a future grammar change
+// widens parameterTypes.json AND PARAMETER_TYPES together, both this and
+// the static-mirror exclusion below need to update.
+assert.equal(
+  parameterTypesJson.includes("Practitioner"),
+  false,
+  "parameterTypes.json must not contain Practitioner — see Todo 4 R3-Δ13",
+);
+
+// Practitioner deferral lock: while Practitioner is NOT in the grammar
+// allowlist (deliberate v2.2 deferral — the emitter's Practitioner branch
+// is future-proofing), the extension must not surface it as a completion
+// suggestion either. If Practitioner is added to parameterTypes.json this
+// assertion must be updated AS PART OF that change.
+assert.equal(
+  PARAMETER_TYPES.includes("Practitioner"),
+  false,
+  "Practitioner deferral lock — see Todo 4 R3-Δ13 in .vibe-tools/discussions/040-*.md",
+);
+// Patient catch-up: was added to the grammar in commit 16d0634; this asserts
+// the extension mirror picked it up so the type hover doesn't flag valid
+// CRL as invalid and the completion menu offers it.
+assert.equal(
+  CONCEPT_TYPES.includes("Patient"),
+  true,
+  "Patient must be in CONCEPT_TYPES — grammar added it in commit 16d0634",
+);
 
 console.log(`catalog.test.mjs: ${patterns.length} patterns parsed; spot-checks + helper tests passed.`);

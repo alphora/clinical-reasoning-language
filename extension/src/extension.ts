@@ -14,6 +14,7 @@ import {
   NarrativeCompletionProvider,
   TypeCompletionProvider,
   ValuetypeCompletionProvider,
+  ParamTypeCompletionProvider,
   ConceptRefCompletionProvider,
   CRL_DOCUMENT_SELECTOR,
 } from "./completion";
@@ -72,6 +73,11 @@ function registerLanguageFeatures(
     vscode.languages.registerCompletionItemProvider(
       CRL_DOCUMENT_SELECTOR,
       new ValuetypeCompletionProvider(),
+      " "
+    ),
+    vscode.languages.registerCompletionItemProvider(
+      CRL_DOCUMENT_SELECTOR,
+      new ParamTypeCompletionProvider(),
       " "
     ),
     // ConceptRefCompletionProvider triggers on `"` AND `.` so qualified-ref
