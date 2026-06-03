@@ -7,6 +7,9 @@
 
 import assert from "node:assert/strict";
 
+import * as cdMod from "../dist/contextDetect.js";
+const { detectQualifiedRefQualifier, isInsideOpenQuote } = cdMod.default ?? cdMod;
+
 import * as mod from "../dist/completionHelpers.js";
 const {
   isTypeCompletionPrefix,
@@ -41,6 +44,40 @@ assert.equal(isParamTypeCompletionPrefix("- type is "), false, "type slot must N
 assert.equal(isParamTypeCompletionPrefix("- value type is "), false, "value-type slot must NOT match param-type predicate");
 assert.equal(isParamTypeCompletionPrefix("parameter \"X\":"), false);
 assert.equal(isParamTypeCompletionPrefix("- param type is Period "), false, "trailing space closes the slot");
+
+// --- REGRESSION GUARD: qualified-ref completion fires on `.` trigger too ---
+// Bug: typing `"CMS22 Inferred".` (just the dot, before the second `"`) caused
+// ConceptRefCompletionProvider to bail out at the `isInsideOpenQuote` early
+// exit, even though the `.` trigger char was registered specifically to
+// surface qualified-ref completion EARLY. The provider's gate must accept
+// EITHER inside-open-quote OR qualifier-detected.
+//
+// This is the predicate-level recipe the provider's gate now follows.
+function shouldProviderFire(prefix) {
+  const inQuote = isInsideOpenQuote(prefix);
+  const qualifier = detectQualifiedRefQualifier(prefix);
+  return inQuote || qualifier !== null;
+}
+
+// `.` trigger paths — these used to be silently dropped
+assert.equal(shouldProviderFire('- defined as "CMS22 Inferred".'), true, "dot-trigger after qualified-ref opener");
+assert.equal(shouldProviderFire('- definition is "CMS22 Inferred".'), true);
+assert.equal(shouldProviderFire('- coded from "CMS22 Terminology".'), true);
+assert.equal(shouldProviderFire('  - defined as "Lib".'), true, "indented dot-trigger");
+
+// `"` trigger paths — these continued to work
+assert.equal(shouldProviderFire('- defined as "CMS22 Inferred"."'), true);
+assert.equal(shouldProviderFire('- definition is "CMS22 Inferred"."'), true);
+
+// Bare-quote (no qualifier yet) — still fires via inside-open-quote
+assert.equal(shouldProviderFire('- defined as "'), true);
+assert.equal(shouldProviderFire('- definition is "'), true);
+
+// Negative — provider should still NOT fire outside any ref context
+assert.equal(shouldProviderFire('- type is Observation.'), false, "end of unquoted-type statement");
+assert.equal(shouldProviderFire('parameter "Foo":'), false, "post-colon declaration header");
+assert.equal(shouldProviderFire(''), false, "empty line");
+assert.equal(shouldProviderFire('library "CMS22 Inferred"'), false, "library declaration, no following dot");
 
 // --- isUnquotedTypeSlotPrefix: REGRESSION GUARD for "concept refs leak into type slots" ---
 // Bug: typing `"` on a `- param type is "` line fired ConceptRefCompletionProvider

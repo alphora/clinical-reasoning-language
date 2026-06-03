@@ -162,7 +162,11 @@ export class ConceptRefCompletionProvider implements vscode.CompletionItemProvid
   ): vscode.ProviderResult<vscode.CompletionItem[]> {
     const line = document.lineAt(position.line).text;
     const prefix = line.slice(0, position.character);
-    if (!isInsideOpenQuote(prefix)) return [];
+    // Two valid trigger states: cursor inside an open quote (typed `"`), OR
+    // cursor right after `"Lib".` (typed `.` — qualified-ref completion
+    // surfaces the target library's decls before the second `"` is typed).
+    const qualifier = detectQualifiedRefQualifier(prefix);
+    if (!isInsideOpenQuote(prefix) && qualifier === null) return [];
     if (/^\s*(concept|terminology|decision|activity|parameter)\s+"[^"]*$/.test(prefix)) return [];
     // Unquoted-identifier slots (`- type is`, `- value type is`, `- param type
     // is`) don't accept quoted refs. Typing `"` here would otherwise leak a
@@ -171,7 +175,6 @@ export class ConceptRefCompletionProvider implements vscode.CompletionItemProvid
     if (isUnquotedTypeSlotPrefix(prefix)) return [];
 
     const expectedKind = detectExpectedKind(prefix);
-    const qualifier = detectQualifiedRefQualifier(prefix);
 
     const decls = this.getDeclarations(document);
     const filtered = decls
