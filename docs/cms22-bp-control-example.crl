@@ -125,7 +125,7 @@ terminology "Lifestyle Recommendation VS":
 - valueset is `http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.526.3.1581`.
 
 terminology "Antihypertensive Contraindication VS":
-- valueset is ``.
+- valueset is `urn:example:placeholder`.
 
 terminology "Medical Reason VS":
 - valueset is `http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.526.3.1007`.

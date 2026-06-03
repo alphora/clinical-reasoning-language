@@ -218,21 +218,24 @@ concept "Observed":
     expect(cql).not.toMatch(/CRLPatterns\.WasPerformed\(Patient\)/);
   });
 
-  it("AST context parameter name suppresses a colliding stub-derived parameter line (gpt55 impl review I2)", () => {
-    // Hand-built: a Patient-typed AST parameter named "Measurement Period"
-    // co-existing with a stub-derived "Measurement Period" parameter. The
-    // legacy stub path would emit `parameter "Measurement Period"
-    // Interval<DateTime>`; the AST path suppresses it (the literal name
-    // never survives into CQL for a Patient-typed parameter).
+  it("Patient-typed AST parameter coexists with same-name empty-URL terminology — context emits, terminology gets collision suffix", () => {
+    // v2.2 Todo 5 — after stub-mechanism removal, an empty-URL terminology
+    // is no longer silently magic-converted to a runtime parameter; it
+    // emits as a literal `valueset "X": ''` declaration. When it collides
+    // with a same-named AST parameter, the existing collision-suffix
+    // branch fires (the AST parameter populates `astParameters` BEFORE
+    // `detectCollisions` runs, so the suffix `" ValueSet"` lands).
     const cql = ok(lib("T", `parameter "Measurement Period":
 - param type is Patient.
 terminology "Measurement Period":
 - valueset is \`\`.
 `));
-    // No stub-derived `parameter` line — AST suppressed it.
-    expect(cql).not.toMatch(/parameter "Measurement Period"/);
-    // Only `context Patient` declares the runtime input.
+    // Patient-typed parameter → CQL context, no `parameter` line for it.
     expect(cql).toMatch(/context Patient/);
+    expect(cql).not.toMatch(/parameter "Measurement Period"/);
+    // Collision-suffixed terminology — surfaces the author's empty-URL TODO
+    // rather than masking it.
+    expect(cql).toMatch(/valueset "Measurement Period ValueSet": ''/);
   });
 
   it("`coded from` to a parameter name produces the parameter-shadow FIXME (not the generic unresolved-terminology one)", () => {
@@ -249,21 +252,28 @@ concept "X":
     expect(cql).toMatch(/\/\/ FIXME: "MyParam" is a parameter, not a terminology/);
   });
 
-  it("AST-derived Period parameter has NO default; stub-derived parameter KEEPS its default (back-compat during Todo 5 transition)", () => {
+  it("AST-derived Period parameter emits without a default-Interval clause", () => {
     const astCql = ok(lib("T", `parameter "Measurement Period":
 - param type is Period.
 `));
-    // AST path: no default.
     expect(astCql).toMatch(/parameter "Measurement Period" Interval<DateTime>/);
     expect(astCql).not.toMatch(/default Interval\[/);
+  });
 
-    // Stub path: existing default preserved.
-    const stubCql = ok(lib("T", `terminology "Measurement Period":
+  it("AST Period parameter + same-name empty-URL terminology — terminology gets collision suffix, no synthesized default", () => {
+    // v2.2 Todo 5 — replaces the previous "stub-derived parameter keeps
+    // its default" test. After stub-mechanism removal, the empty-URL
+    // terminology emits as a literal `valueset "X ValueSet": ''` (the
+    // collision-suffix branch fires because the AST parameter already
+    // claims `"Measurement Period"`). No magic Interval<DateTime> default
+    // synthesis anywhere.
+    const cql = ok(lib("T", `parameter "Measurement Period":
+- param type is Period.
+terminology "Measurement Period":
 - valueset is \`\`.
-concept "Measurement Period":
-- type is Observation.
-- coded from "Measurement Period".
 `));
-    expect(stubCql).toMatch(/parameter "Measurement Period" Interval<DateTime>\n  default Interval\[/);
+    expect(cql).toMatch(/parameter "Measurement Period" Interval<DateTime>/);
+    expect(cql).not.toMatch(/default Interval\[/);
+    expect(cql).toMatch(/valueset "Measurement Period ValueSet": ''/);
   });
 });

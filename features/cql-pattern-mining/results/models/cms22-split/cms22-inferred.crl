@@ -2,6 +2,15 @@
 
 library "CMS22 Inferred".
 
+// ============ Runtime parameters ============
+// "Measurement Period" is a runtime CQL parameter (issue #59) — declared in
+// the inferred library because that's where its consumers live. Terminology
+// libraries (which don't reference it) don't carry the declaration.
+
+parameter "Measurement Period":
+- param type is Period.
+
+
 // ============ Inference declarations + composing concepts ============
 
 // --- Qualifying Encounter ---
@@ -17,7 +26,7 @@ concept "BP Evaluation Encounter (not virtual)":
 
 concept "BP Evaluation Encounter (not virtual) During MP":
 - type is Encounter.
-- definition is "BP Evaluation Encounter (not virtual)" during "CMS22 Terminology"."Measurement Period".
+- definition is "BP Evaluation Encounter (not virtual)" during "Measurement Period".
 
 concept "BP Evaluation Encounter (not virtual) Performed":
 - type is Encounter.
@@ -747,7 +756,7 @@ concept "HTN Followup Declined By Patient":
 concept "Age At Start Of MP At Least 18 Years":
 - type is Observation.
 - value type is boolean.
-- definition is age at start of "CMS22 Terminology"."Measurement Period" at least 18 years.
+- definition is age at start of "Measurement Period" at least 18 years.
 
 concept "Aged 18+ at Measurement Period Start":
 - type is Observation.

@@ -10,7 +10,7 @@ mirroring the cms22-split layout.
 | `cms69.crl` | `"CMS69"` | interface | Initial Population / Numerator / Denominator / Exclusions / Exceptions — the Quality Measure API (what the Measure evaluation engine consumes) |
 | `cms69-inferred.crl` | `"CMS69 Inferred"` | inferred | `defined as` + `definition is` concepts: lifted property concepts, BMI classifications, intervention bundles, pregnancy logic, age predicate |
 | `cms69-asserted.crl` | `"CMS69 Asserted"` | asserted | `coded from` concepts (asserted FHIR resource-to-valueset bindings) |
-| `cms69-terminology.crl` | `"CMS69 Terminology"` | terminology | terminology declarations (valuesets, codes) + the Measurement Period runtime stub |
+| `cms69-terminology.crl` | `"CMS69 Terminology"` | terminology | terminology declarations (valuesets, codes) + the Measurement Period runtime parameter (declarative since v2.2.0) |
 
 The unsuffixed file (`cms69.crl`) is the interface layer — this matches
 the CQL convention where `CMS69.cql` is the entry point downstream consumers

@@ -83,17 +83,3 @@ terminology "Virtual Encounter Class":
 - system is `http://terminology.hl7.org/CodeSystem/v3-ActCode`.
 - code is `VR`.
 
-
-// ============ Runtime stubs ============
-// "Measurement Period" is a runtime CQL parameter, not a valueset.
-// Kept as a stub asserted concept until `parameter` declarations land
-// (issues/crl/todo/parameters/).
-
-terminology "Measurement Period (stub valueset)":
-- valueset is ``.
-
-concept "Measurement Period":
-- type is Encounter.
-- coded from "Measurement Period (stub valueset)".
-
-

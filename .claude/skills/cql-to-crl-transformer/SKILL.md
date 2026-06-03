@@ -39,7 +39,7 @@ directory, mirroring the cms22-split / cms69-split convention:
 | `<base>.crl`              | `"<Measure>"`             | interface    | The Quality Measure API: Initial Population / Denominator / Denominator Exclusions / Numerator / Denominator Exceptions. Whatever the downstream consumer (Measure engine / registry) reads. |
 | `<base>-inferred.crl`     | `"<Measure> Inferred"`    | inferred     | Every `defined as` / `definition is` concept — the measure logic. |
 | `<base>-asserted.crl`     | `"<Measure> Asserted"`    | asserted     | Every `coded from` concept — FHIR resource-to-valueset bindings. |
-| `<base>-terminology.crl`  | `"<Measure> Terminology"` | terminology  | Every `terminology` declaration plus the `Measurement Period` stub. |
+| `<base>-terminology.crl`  | `"<Measure> Terminology"` | terminology  | Every `terminology` declaration. Runtime parameters (e.g. `Measurement Period`) do NOT live here — see the parameter rule below. |
 
 Rules for the output:
 
@@ -60,6 +60,28 @@ Rules for the output:
   `"<Measure> Asserted"."BMI Observations"` from the inferred layer,
   not bare `"BMI Observations"`. Bare refs are local-only under
   per-library scoping (validator §7).
+- **Runtime parameters are LIBRARY-LOCAL** (v2.2.0, issue #59). The CQL
+  source `parameter "Measurement Period" Interval<DateTime>` becomes the
+  CRL declarative form `parameter "Measurement Period": - param type is
+  Period.`. The rule for placement in a split project:
+  - Every library that REFERENCES a parameter declares it locally.
+  - Do NOT reference parameters from other libraries via qualified refs
+    (`"OtherLib"."Param"`). The validator allows the syntax, but the
+    canonical authoring pattern is local-only.
+  - For a typical measure split, this puts `Measurement Period` in the
+    inferred layer (where the timing-window narrative refs live —
+    `"Encounter" during "Measurement Period"`). Terminology and asserted
+    layers usually don't reference it, so they don't declare it. The
+    interface layer typically references inferred concepts whose NAMES
+    contain "Measurement Period" (e.g. `"Aged 18+ at Measurement Period
+    Start"`); those are concept refs, not parameter refs, so the
+    interface layer doesn't declare the parameter either.
+  - Emit-time consequence: each emitted CQL file contains the `parameter`
+    line ONLY in the libraries whose CRL source actually references the
+    parameter. The cms22-split / cms69-split corpora are the canonical
+    examples — `CMS22 Inferred.cql` carries `parameter "Measurement Period"
+    Interval<DateTime>`; `CMS22 Terminology.cql`, `CMS22 Asserted.cql`, and
+    `CMS22.cql` do not.
 - Emit a `package.json` `{ "name": "<base>-demonstration-split",
   "version": "1.0.0", "private": true }` alongside so
   `findProjectRoot` stops at the split directory.

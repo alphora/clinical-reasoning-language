@@ -14,16 +14,13 @@
  *     sem-not is hoisted out of sem-and into an `except` clause so that
  *     `A sem-and sem-not B` cleanly produces `A except B`.
  *   - Duplicate-identifier collision detection: when a CRL terminology and
- *     concept share a name (the corpus pattern for single-code "X" with an
- *     asserted "X" concept that codes from it), the terminology emission
+ *     concept (or AST parameter) share a name, the terminology emission
  *     gets a " Code" / " ValueSet" suffix and the concept's reference is
  *     rewritten accordingly.
- *   - Stub-valueset detection: terminology declarations with an empty
- *     valueset URL are treated as runtime parameter stubs. The terminology
- *     is omitted, the corresponding concept is omitted, and a `parameter`
- *     declaration takes their place with a one-year default Interval.
- *     Downstream `"Measurement Period"` references resolve to the
- *     parameter.
+ *   - Runtime parameters: declared explicitly as `parameter "X": - param
+ *     type is T.` (issue #59) and emit as native CQL `parameter "X" T`
+ *     lines (Patient/Practitioner-typed parameters collapse to `context
+ *     Patient` / `context Practitioner`).
  *
  * Out of scope for v0.2:
  *   - Value-bearing date concepts (`.authoredOn` / `.performed` extraction)
@@ -265,11 +262,10 @@ const PATTERN_RETURN_SHAPE: Record<string, PatternReturnShape> = {
  * NOT produce a `parameter` line. This map covers types that emit as
  * ordinary `parameter "X" Type` declarations.
  *
- *   - Period → Interval<DateTime>: matches the existing stub mechanism's
- *     emission shape AND the CRLPatterns timing-arg signatures
- *     (`During(period Interval<DateTime>)` etc.). A CRL author writing
- *     `param type is Period.` is asking for the CQL Interval the patterns
- *     expect — not the FHIR `Period` resource datatype.
+ *   - Period → Interval<DateTime>: matches the CRLPatterns timing-arg
+ *     signatures (`During(period Interval<DateTime>)` etc.). A CRL author
+ *     writing `param type is Period.` is asking for the CQL Interval the
+ *     patterns expect — not the FHIR `Period` resource datatype.
  *   - Primitives: PascalCase token per CQL 1.5 grammar.
  *   - FHIR data + resource types: passthrough — unqualified type names
  *     resolve via the library's `using FHIR version '4.0.1'` declaration.
@@ -356,14 +352,12 @@ class Emitter {
   /** Terminology emit name (may differ from CRL name when disambiguated). */
   private readonly terminologyEmitName: Map<string, string> = new Map();
   /**
-   * Names of CRL declarations to SKIP emitting because they're either stub
-   * runtime parameters (empty-URL valuesets) or the matching concept that
-   * just wraps such a stub. References to these names elsewhere in the
-   * library will resolve to the emitted `parameter` declaration.
+   * Names of CRL declarations to SKIP emitting. Currently only collisions
+   * fold into the emit pipeline through this set — kept as a Set rather
+   * than an inline filter so future SKIP cases (cross-library shadowing,
+   * deprecation markers) plug in here.
    */
   private readonly skipNames: Set<string> = new Set();
-  /** Names of concept refs that emit as parameter references (stub-derived). */
-  private readonly parameterNames: Set<string> = new Set();
   /**
    * v2.2 Todo 3 (issue #59) — indexed AST `Parameter` declarations. Populated
    * by `indexNames`'s second pass; respects the same-name-concept shadow
@@ -382,7 +376,7 @@ class Emitter {
       crossLibraryParameters: options.crossLibraryParameters ?? new Map(),
     };
     this.indexNames();
-    this.detectStubsAndCollisions();
+    this.detectCollisions();
   }
 
   /**
@@ -422,33 +416,14 @@ class Emitter {
   }
 
   /**
-   * Second pass: detect stub valuesets, name collisions, and decide each
-   * terminology's emit name + each concept's emit strategy.
+   * Second pass: resolve terminology emit names — when a terminology name
+   * collides with a concept OR an AST parameter of the same name (both
+   * produce CQL top-level identifiers `define X` / `parameter X`), the
+   * terminology gets the " ValueSet" / " Code" disambiguating suffix.
    */
-  private detectStubsAndCollisions(): void {
+  private detectCollisions(): void {
     for (const stmt of this.ast.statements) {
       if (stmt.type !== "Terminology" || !stmt.name) continue;
-      const isStub = isStubTerminology(stmt);
-      if (isStub) {
-        // The terminology is a runtime-parameter stub. Find the concept that
-        // codes from it (the user's "Measurement Period" style alias) and
-        // mark both for parameter emission.
-        const aliasConcept = this.findConceptCodingFrom(stmt.name);
-        this.skipNames.add(stmt.name);
-        if (aliasConcept) {
-          this.skipNames.add(aliasConcept.name);
-          this.parameterNames.add(aliasConcept.name);
-          this.terminologyEmitName.set(stmt.name, aliasConcept.name);
-        } else {
-          this.parameterNames.add(stmt.name);
-          this.terminologyEmitName.set(stmt.name, stmt.name);
-        }
-        continue;
-      }
-      // Non-stub terminologies: disambiguate name if it collides with a
-      // concept OR an AST parameter of the same name. Both produce a CQL
-      // top-level identifier (`define X` / `parameter X`), so a same-named
-      // terminology gets the existing " ValueSet" / " Code" suffix.
       if (this.conceptNames.has(stmt.name) || this.astParameters.has(stmt.name)) {
         const suffix = hasOnlyValueset(stmt) ? " ValueSet" : " Code";
         this.terminologyEmitName.set(stmt.name, stmt.name + suffix);
@@ -456,17 +431,6 @@ class Emitter {
         this.terminologyEmitName.set(stmt.name, stmt.name);
       }
     }
-  }
-
-  private findConceptCodingFrom(terminologyName: string): Concept | undefined {
-    for (const stmt of this.ast.statements) {
-      if (stmt.type !== "Concept") continue;
-      if (stmt.definition.type !== "CodedFromDefinition") continue;
-      // ReferenceName is `string | QualifiedReference`; use `getRefName` to
-      // compare against the bare name (round-1 review C3 fix).
-      if (getRefName(stmt.definition.terminologyName) === terminologyName) return stmt;
-    }
-    return undefined;
   }
 
   emit(): string {
@@ -531,42 +495,17 @@ class Emitter {
   }
 
   /**
-   * Emit parameter declarations in two layers:
-   *   1. AST `Parameter` nodes with `kind: "parameter"` (Patient/Practitioner
-   *      land in `emitContext` instead, not here). No default clause —
-   *      runtime callers supply values explicitly.
-   *   2. Stub-derived parameters (existing `parameterNames` set populated by
-   *      `detectStubsAndCollisions` from empty-URL valuesets). Keeps its
-   *      one-year default Interval for back-compat during the Todo 5
-   *      corpus migration.
-   *
-   * AST takes precedence on name collision: a stub-derived parameter with
-   * the same name as ANY AST parameter (ordinary OR context-typed) is
-   * dropped. For context-typed AST parameters, this means a stub-derived
-   * `parameter "X" Interval<DateTime>` is suppressed when `parameter "X"
-   * Patient` exists — the literal name does not survive into CQL either way.
-   *
-   * Concept-first shadow (R3-Δ1) interacts: when a stub mechanism's alias
-   * concept shadows the AST parameter at index time, the AST entry is
-   * dropped from `astParameters` entirely, so the stub line emits with its
-   * default. This is the Todo 5 transition path — when the corpus moves to
-   * declarative parameters, the stub terminology and alias concept go away
-   * together.
-   *
-   * Returns empty string when both layers produce no output.
+   * Emit `parameter "Name" Type` lines for each AST `Parameter` node with
+   * `kind: "parameter"`. Patient/Practitioner-typed AST parameters land in
+   * `emitContext` instead. No default clause — runtime callers supply
+   * values explicitly. Returns empty string when no ordinary parameters
+   * are declared.
    */
   private emitParameters(): string {
     const lines: string[] = [];
-    const astEmittedNames = new Set(this.astParameters.keys());
     for (const [name, info] of this.astParameters) {
       if (info.kind !== "parameter") continue;
       lines.push(`parameter ${cqlIdent(name)} ${info.cqlType}`);
-    }
-    for (const name of this.parameterNames) {
-      if (astEmittedNames.has(name)) continue;
-      lines.push(
-        `parameter ${cqlIdent(name)} Interval<DateTime>\n  default Interval[@2024-01-01T00:00:00.000Z, @2025-01-01T00:00:00.000Z)`
-      );
     }
     if (lines.length === 0) return "";
     return lines.join("\n");
@@ -926,11 +865,6 @@ class Emitter {
   }
 }
 
-/**
- * A terminology is a "stub" runtime-parameter alias if it declares a
- * valueset with an empty URL (the corpus pattern for `Measurement Period
- * (stub valueset)` and similar).
- */
 /** Walk a composition expression and collect every CompositionRef name. */
 function collectRefs(expr: CompositionExpression, out: string[]): void {
   switch (expr.type) {
@@ -948,12 +882,6 @@ function collectRefs(expr: CompositionExpression, out: string[]): void {
       collectRefs(expr.expression, out);
       return;
   }
-}
-
-function isStubTerminology(t: Terminology): boolean {
-  if (t.body.length !== 1) return false;
-  const body = t.body[0];
-  return body.type === "TerminologyValueset" && body.valuesetName === "";
 }
 
 function hasOnlyValueset(t: Terminology): boolean {

@@ -70,17 +70,11 @@ terminology "Follow Up for Below Normal BMI Procedures":
 - valueset is ``.
 
 
-// ============ Runtime stubs ============
-// "Measurement Period" is a runtime CQL parameter, not a valueset.
-// Kept as a stub asserted concept (coded from an empty stub valueset)
-// until `parameter` declarations land (issues/crl/todo/parameters/).
+// ============ Runtime parameters ============
+// "Measurement Period" is a runtime CQL parameter (issue #59).
 
-terminology "Measurement Period (stub valueset)":
-- valueset is ``.
-
-concept "Measurement Period":
-- type is Encounter.
-- coded from "Measurement Period (stub valueset)".
+parameter "Measurement Period":
+- param type is Period.
 
 // "Pregnancy or Other Related Diagnoses" is a valueset (declared above)
 // referenced as a classification argument in `documented as` narrative.

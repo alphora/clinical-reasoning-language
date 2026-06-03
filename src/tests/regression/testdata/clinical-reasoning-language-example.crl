@@ -134,7 +134,7 @@ activity "Contraindicated Anti-Obesity Medication":
 // or a single system+code pair (or repeatable codes).
 
 terminology "BMI Range as a Condition":
-- valueset is ``.
+- valueset is `urn:example:placeholder`.
 
 terminology "BMI as an Observation":
 - valueset is `BMI as an Observation`.
@@ -170,7 +170,7 @@ terminology "Patient Declined VS":
 - valueset is `http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.526.3.1582`.
 
 terminology "Anti-Obesity Medication Contraindication VS":
-- valueset is ``.
+- valueset is `urn:example:placeholder`.
 
 // A code-based terminology (system + code pair), useful when the
 // reference is a single concept rather than a whole valueset.
