@@ -1,19 +1,19 @@
-# CMS69 BMI Screening CDS Example
+# CMS69 BMI Screening Cognitive Support Example
 library "CMS69 BMI Screening GPG Strategy example".
 
 /*
 Clinical Reasoning Language (CRL) — v2.1.0 grammar reference example.
 
-This file is the canonical small example. It models a Clinical Decision
-Support (CDS) workflow that supports a clinician in satisfying the
+This file is the canonical small example. It models a **cognitive
+support** workflow that supports a clinician in satisfying the
 **CMS69 (BMI Screening and Follow-Up)** quality measure at point of
 care, using a small set of BMI-related concepts and activities.
 
 The full quality-measure encoding (Initial Population / Numerator /
 Denominator / Exclusions / Exceptions) lives in
 features/cql-pattern-mining/results/models/cms69-split/. This file shows
-the CDS facet: at an encounter, what should the clinician do so the
-visit ends up in CMS69's numerator?
+the cognitive-support facet: at an encounter, what should the clinician
+do so the visit ends up in CMS69's numerator?
 
 Surface conventions:
   - Case sensitive (keywords are lowercase: `concept`, `defined as`,
@@ -57,12 +57,13 @@ file is single-library so every ref below is bare.
 
 // ============ Decisions ============
 
-// Top-level CDS decision. Walked at every qualifying encounter for an
-// adult patient. The when/then branches mirror CMS69's clinical flow:
+// Top-level cognitive-support decision. Walked at every qualifying
+// encounter for an adult patient. The when/then branches mirror CMS69's
+// clinical flow:
 //   1. document BMI if it isn't already recorded this period,
 //   2. recommend a high-BMI intervention if BMI is high,
 //   3. recommend a low-BMI intervention if BMI is low.
-decision "CMS69 BMI Screening CDS":
+decision "CMS69 BMI Screening Cognitive Support":
 
 - when "Patient Eligible For BMI Screening" then:
   - when "BMI Not Documented During Measurement Period" then recommend activity "Document BMI".
@@ -94,8 +95,8 @@ decision "Recommend Low BMI Intervention":
 
 // ============ Activities ============
 
-// Activities are the executable side of a decision — what the CDS
-// surface actually proposes to the clinician. Each `request` line maps
+// Activities are the executable side of a decision — what the cognitive
+// support surface actually proposes to the clinician. Each `request` line maps
 // to a CPG-on-FHIR proposal resource. `with`, `because`, and the
 // `do not perform` suffix are optional.
 
@@ -317,7 +318,7 @@ concept "BMI With Confirmed Height-Weight Source":
 ).
 
 
-// --- CDS-support predicates (narrative bodies feeding the decision) ---
+// --- Cognitive-support predicates (narrative bodies feeding the decision) ---
 
 // Eligibility = "could this encounter satisfy CMS69?" The decision
 // short-circuits when this is false. Sem-not on Pregnancy carves out
