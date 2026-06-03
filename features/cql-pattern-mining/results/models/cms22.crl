@@ -1,8 +1,12 @@
-# CMS22 Blood Pressure Screening and Follow-Up — v0.7 grammar
+# CMS22 Original — Blood Pressure Screening and Follow-Up
+library "CMS22 Original".
 
-// Migrated to CRL v0.7: `concept` is the only declaration kind; `definition is` body for narrative predicates;
-// concept `defined as` body is bare ref or sem-or/sem-and/sem-not composition.
-// All multi-clause concepts now compose named inferences via sem-* operators.
+// HISTORICAL REFERENCE — the single-file monolith preserved for context.
+// The canonical authoring shape is the 4-file split at
+// `./cms22-split/` (one library per layer: terminology / asserted /
+// inferred / interface). Open that directory in VS Code for the live
+// example; this file is here only so the original monolith stays
+// readable next to the split.
 
 
 // ============ Terminologies (valuesets) ============
