@@ -147,4 +147,33 @@ describe("emitCQLImports (per-CRL v2.1.0)", () => {
     const inferred = result.cqlByLibrary.find((e) => e.libraryName === "CMS22 Inferred");
     expect(inferred?.outputFilename).toBe("CMS22 Inferred.cql");
   });
+
+  // v2.2 Todo 3 (issue #59) — cross-library parameter refs.
+  it("cross-library qualified Period parameter ref emits target lib's `parameter` line + caller's `Sib.\"Measurement Period\"` qualified ref", () => {
+    const root = path.join(FIXTURES, "cross-lib-parameter-period", "root.crl");
+    const result = emitCQLImports(root);
+    expect(result.success).toBe(true);
+    const sibCql = findLib(result, "Sib") ?? "";
+    const rootCql = findLib(result, "Root") ?? "";
+    // Sib library emits the parameter declaration (AST-derived; no default).
+    expect(sibCql).toMatch(/parameter "Measurement Period" Interval<DateTime>/);
+    expect(sibCql).not.toMatch(/default Interval\[/);
+    // Root library emits the qualified ref as `Sib."Measurement Period"`.
+    expect(rootCql).toMatch(/Sib\."Measurement Period"/);
+  });
+
+  it("cross-library qualified Patient parameter ref REWRITES to bare `Patient` (NOT `Sib.\"Index Patient\"`)", () => {
+    const root = path.join(FIXTURES, "cross-lib-parameter-patient", "root.crl");
+    const result = emitCQLImports(root);
+    expect(result.success).toBe(true);
+    const sibCql = findLib(result, "Sib") ?? "";
+    const rootCql = findLib(result, "Root") ?? "";
+    // Sib has only `context Patient` — no parameter line for "Index Patient".
+    expect(sibCql).toMatch(/context Patient/);
+    expect(sibCql).not.toMatch(/parameter "Index Patient"/);
+    // Root's narrative ref `"Sib"."Index Patient"` collapses to bare `Patient`
+    // identifier in emitted CQL per operator's rule + CQL spec.
+    expect(rootCql).toMatch(/CRLPatterns\.WasPerformed\([^)]*Patient\)/);
+    expect(rootCql).not.toMatch(/Sib\."Index Patient"/);
+  });
 });

@@ -1,0 +1,6 @@
+# cross-library Period parameter ref (root)
+library "Root".
+
+concept "Active in MP":
+- type is Encounter.
+- definition is "Encounter" during "Sib"."Measurement Period".

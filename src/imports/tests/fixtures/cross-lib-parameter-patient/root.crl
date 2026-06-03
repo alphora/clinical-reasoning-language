@@ -1,0 +1,7 @@
+# cross-library Patient parameter ref (root)
+library "Root".
+
+concept "Index Encounter Active":
+- type is Encounter.
+- value type is boolean.
+- definition is "Sib"."Index Patient" performed.

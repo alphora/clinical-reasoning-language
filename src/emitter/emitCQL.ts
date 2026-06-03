@@ -47,12 +47,22 @@ import type {
   DefinedAsBareRef,
   DefinedAsComposition,
   DefinitionIsDefinition,
+  Parameter,
   Terminology,
   TerminologyBodyLine,
 } from "../ast/types";
 import { getRefName, getRefLibrary, isQualifiedRef } from "../ast/types";
 import type { ReferenceName } from "../ast/types";
 import type { CRLError } from "../types/errors";
+
+/**
+ * v2.2 Todo 3 (issue #59) — classified per-parameter info indexed at emit time.
+ * Discriminated union so context-only fields (`contextType`) and parameter-only
+ * fields (`cqlType`) can't be confused at the call site.
+ */
+export type AstParameterInfo =
+  | { kind: "context"; contextType: "Patient" | "Practitioner" }
+  | { kind: "parameter"; cqlType: string };
 
 export interface EmitOptions {
   libraryName?: string;
@@ -68,6 +78,28 @@ export interface EmitOptions {
    * emitter does NOT scan the AST itself.
    */
   crossLibraryIncludes?: string[];
+  /**
+   * v2.2 Todo 3 (issue #59) — cross-library parameter metadata for resolving
+   * qualified refs to AST parameters in other libraries. Keyed by library
+   * name (matching the qualifier string used in `arg.library` of a
+   * `ConceptRefArg`) → parameter name → info. Populated by `emitCQLImports`
+   * after the per-library AST scan + same-name concept shadow rule applied.
+   * Single-file `emitCQL` callers leave this undefined; only the bare/self
+   * dispatch through `astParameters` is needed in that mode.
+   *
+   * NOTE — the plan (R4-Δ1) called for keying by resolved `LibraryScope`
+   * identity to disambiguate local-vs-package same-name. The actual map is
+   * keyed by library NAME string, which is safe TODAY because:
+   *   - Packages are excluded from the emit closure (`emit.ts:287`), so no
+   *     package parameters ever land in this map — the only entries are
+   *     local-origin libraries.
+   *   - Two locals sharing a name already fire `registry-duplicate` before
+   *     emit reaches this code path.
+   * If Todo 4+ extends the map to include package-origin entries (e.g. for
+   * cross-package context-rewrite), reshape this to key by `filePath` /
+   * scope-resolved identity per R4-Δ1.
+   */
+  crossLibraryParameters?: Map<string, Map<string, AstParameterInfo>>;
 }
 
 export interface EmitResult {
@@ -226,6 +258,61 @@ const PATTERN_RETURN_SHAPE: Record<string, PatternReturnShape> = {
   Highest: "other",
 };
 
+/**
+ * v2.2 Todo 3 — CRL parameter type → CQL parameter type token.
+ *
+ * Patient and Practitioner are handled separately (`emitContext`) — they do
+ * NOT produce a `parameter` line. This map covers types that emit as
+ * ordinary `parameter "X" Type` declarations.
+ *
+ *   - Period → Interval<DateTime>: matches the existing stub mechanism's
+ *     emission shape AND the CRLPatterns timing-arg signatures
+ *     (`During(period Interval<DateTime>)` etc.). A CRL author writing
+ *     `param type is Period.` is asking for the CQL Interval the patterns
+ *     expect — not the FHIR `Period` resource datatype.
+ *   - Primitives: PascalCase token per CQL 1.5 grammar.
+ *   - FHIR data + resource types: passthrough — unqualified type names
+ *     resolve via the library's `using FHIR version '4.0.1'` declaration.
+ */
+const CRL_PARAMETER_TYPE_TO_CQL: Record<string, string> = {
+  // Primitives → PascalCase CQL primitive
+  boolean: "Boolean",
+  integer: "Integer",
+  string: "String",
+  date: "Date",
+  dateTime: "DateTime",
+  time: "Time",
+  decimal: "Decimal",
+  // Special: Period collapses to Interval<DateTime>
+  Period: "Interval<DateTime>",
+};
+
+function cqlTypeForParameter(crlType: string): string {
+  return CRL_PARAMETER_TYPE_TO_CQL[crlType] ?? crlType;
+}
+
+/**
+ * Classify a `Parameter` AST node as either a CQL `context` declaration
+ * (Patient/Practitioner) or an ordinary `parameter` line.
+ *
+ * Per operator's rule: every Patient-typed parameter — regardless of its
+ * declared name — collapses into `context Patient`. The literal parameter
+ * name does NOT survive into emitted CQL; references to a Patient-typed
+ * parameter rewrite to the bare `Patient` identifier.
+ */
+export function infoForParameterStatement(stmt: Parameter): AstParameterInfo {
+  if (stmt.parameterType === "Patient") {
+    return { kind: "context", contextType: "Patient" };
+  }
+  if ((stmt.parameterType as string) === "Practitioner") {
+    // Practitioner widening DEFERRED in Todo 3 — `parameterTypes.json`
+    // currently rejects this at parse time. The branch is future-proofing
+    // so the emitter is correct the moment the lexer allowlist widens.
+    return { kind: "context", contextType: "Practitioner" };
+  }
+  return { kind: "parameter", cqlType: cqlTypeForParameter(stmt.parameterType) };
+}
+
 export function emitCQLFromAST(ast: CRL, options: EmitOptions = {}): EmitResult {
   try {
     const out = new Emitter(ast, options).emit();
@@ -275,24 +362,16 @@ class Emitter {
    * library will resolve to the emitted `parameter` declaration.
    */
   private readonly skipNames: Set<string> = new Set();
-  /** Names of concept refs that emit as parameter references. */
+  /** Names of concept refs that emit as parameter references (stub-derived). */
   private readonly parameterNames: Set<string> = new Set();
-
-  // ──────────────────────────────────────────────────────────────────────
-  // v2.2 Todo 3 (issue #59) — RECONCILE WITH AST `Parameter` NODES.
-  //
-  // Today this class has TWO independent "parameter" mechanisms that
-  // Todo 3 needs to merge with the new AST `Parameter` declaration:
-  //   - `parameterNames` above + `detectStubsAndCollisions` (line ~311):
-  //     synthesizes CQL `parameter "X" String` lines from empty-URL stub
-  //     valuesets (the existing "Measurement Period stub" workaround).
-  //   - `sections.push("context Patient")` (line ~367): hardcodes the
-  //     default CQL context. Per the operator's emit-context rule, an
-  //     AST `parameter "X": - param type is Patient.` should emit as
-  //     `context Patient` here (and `Practitioner` similarly).
-  // Todo 1 deliberately does NOT touch either. AST `Parameter` nodes
-  // flow through positive-match filters as no-ops. Todo 3 reconciles.
-  // ──────────────────────────────────────────────────────────────────────
+  /**
+   * v2.2 Todo 3 (issue #59) — indexed AST `Parameter` declarations. Populated
+   * by `indexNames`'s second pass; respects the same-name-concept shadow
+   * rule (parameter skipped if a concept of the same name exists). Drives
+   * both `emitContext` (Patient/Practitioner) and `emitParameters` (ordinary
+   * parameter lines). See [[038-v2.2.0-parameters-todo3-emitter]] R3-Δ1.
+   */
+  private readonly astParameters: Map<string, AstParameterInfo> = new Map();
 
   constructor(ast: CRL, options: EmitOptions) {
     this.ast = ast;
@@ -300,12 +379,25 @@ class Emitter {
       libraryName: options.libraryName ?? ast.library.name,
       fhirHelpersVersion: options.fhirHelpersVersion ?? "4.0.1",
       crossLibraryIncludes: options.crossLibraryIncludes ?? [],
+      crossLibraryParameters: options.crossLibraryParameters ?? new Map(),
     };
     this.indexNames();
     this.detectStubsAndCollisions();
   }
 
-  /** First pass: index every declaration name + kind. */
+  /**
+   * First pass: index every declaration name + kind.
+   *
+   * Two-pass over `ast.statements`:
+   *   - Pass A: Concept + Terminology. Populates `conceptNames` +
+   *     `terminologyNames` so pass B can shadow-check.
+   *   - Pass B: Parameter. Per R3-Δ1, an AST parameter whose name collides
+   *     with a concept is NOT added to `astParameters` at all (the concept
+   *     wins narrative-ref precedence; the parameter is silently shadowed).
+   *
+   * The single-pass form would depend on Concept-before-Parameter source
+   * order, which the corpus follows but the grammar doesn't promise.
+   */
   private indexNames(): void {
     for (const stmt of this.ast.statements) {
       if (stmt.type === "Concept" && stmt.name) {
@@ -317,6 +409,15 @@ class Emitter {
       } else if (stmt.type === "Terminology" && stmt.name) {
         this.terminologyNames.add(stmt.name);
       }
+    }
+    for (const stmt of this.ast.statements) {
+      if (stmt.type !== "Parameter" || !stmt.name) continue;
+      // Concept-first shadow: validator allows concept "X" + parameter "X"
+      // to coexist; narrative-ref precedence resolves to the concept, so
+      // the parameter is effectively unused in CQL. Skip it at index time
+      // so `emitContext` and `emitParameters` never see the shadowed entry.
+      if (this.conceptNames.has(stmt.name)) continue;
+      this.astParameters.set(stmt.name, infoForParameterStatement(stmt));
     }
   }
 
@@ -345,8 +446,10 @@ class Emitter {
         continue;
       }
       // Non-stub terminologies: disambiguate name if it collides with a
-      // concept of the same name.
-      if (this.conceptNames.has(stmt.name)) {
+      // concept OR an AST parameter of the same name. Both produce a CQL
+      // top-level identifier (`define X` / `parameter X`), so a same-named
+      // terminology gets the existing " ValueSet" / " Code" suffix.
+      if (this.conceptNames.has(stmt.name) || this.astParameters.has(stmt.name)) {
         const suffix = hasOnlyValueset(stmt) ? " ValueSet" : " Code";
         this.terminologyEmitName.set(stmt.name, stmt.name + suffix);
       } else {
@@ -380,7 +483,7 @@ class Emitter {
     const parameters = this.emitParameters();
     if (parameters) sections.push(parameters);
 
-    sections.push("context Patient");
+    sections.push(this.emitContext());
 
     const concepts = this.ast.statements
       .filter((s): s is Concept => s.type === "Concept" && !!s.name)
@@ -428,18 +531,98 @@ class Emitter {
   }
 
   /**
-   * Emit `parameter "X" Interval<DateTime> default Interval[...]` for every
-   * stub-valueset-derived parameter. Returns empty string if none.
+   * Emit parameter declarations in two layers:
+   *   1. AST `Parameter` nodes with `kind: "parameter"` (Patient/Practitioner
+   *      land in `emitContext` instead, not here). No default clause —
+   *      runtime callers supply values explicitly.
+   *   2. Stub-derived parameters (existing `parameterNames` set populated by
+   *      `detectStubsAndCollisions` from empty-URL valuesets). Keeps its
+   *      one-year default Interval for back-compat during the Todo 5
+   *      corpus migration.
+   *
+   * AST takes precedence on name collision: a stub-derived parameter with
+   * the same name as ANY AST parameter (ordinary OR context-typed) is
+   * dropped. For context-typed AST parameters, this means a stub-derived
+   * `parameter "X" Interval<DateTime>` is suppressed when `parameter "X"
+   * Patient` exists — the literal name does not survive into CQL either way.
+   *
+   * Concept-first shadow (R3-Δ1) interacts: when a stub mechanism's alias
+   * concept shadows the AST parameter at index time, the AST entry is
+   * dropped from `astParameters` entirely, so the stub line emits with its
+   * default. This is the Todo 5 transition path — when the corpus moves to
+   * declarative parameters, the stub terminology and alias concept go away
+   * together.
+   *
+   * Returns empty string when both layers produce no output.
    */
   private emitParameters(): string {
-    if (this.parameterNames.size === 0) return "";
     const lines: string[] = [];
+    const astEmittedNames = new Set(this.astParameters.keys());
+    for (const [name, info] of this.astParameters) {
+      if (info.kind !== "parameter") continue;
+      lines.push(`parameter ${cqlIdent(name)} ${info.cqlType}`);
+    }
     for (const name of this.parameterNames) {
+      if (astEmittedNames.has(name)) continue;
       lines.push(
         `parameter ${cqlIdent(name)} Interval<DateTime>\n  default Interval[@2024-01-01T00:00:00.000Z, @2025-01-01T00:00:00.000Z)`
       );
     }
+    if (lines.length === 0) return "";
     return lines.join("\n");
+  }
+
+  /**
+   * Emit the CQL `context` line. Defaults to `context Patient`; promotes to
+   * `context Practitioner` when any AST parameter declares `param type is
+   * Practitioner.` (operator's rule: Practitioner takes precedence).
+   *
+   * When both Patient AND Practitioner-typed parameters coexist (currently
+   * undetected by the validator), a `// FIXME` comment lands above the
+   * chosen `context` line so the divergence is visible in the generated CQL.
+   * A hardening validator diagnostic is tracked for a follow-up.
+   */
+  private emitContext(): string {
+    let hasPatient = false;
+    let hasPractitioner = false;
+    for (const info of this.astParameters.values()) {
+      if (info.kind !== "context") continue;
+      if (info.contextType === "Patient") hasPatient = true;
+      else if (info.contextType === "Practitioner") hasPractitioner = true;
+    }
+    const chosen = hasPractitioner ? "Practitioner" : "Patient";
+    if (hasPatient && hasPractitioner) {
+      return `// FIXME: multiple context-typed parameters declared; emitted as ${chosen}\ncontext ${chosen}`;
+    }
+    return `context ${chosen}`;
+  }
+
+  /**
+   * Look up a `ConceptRefArg` (possibly qualified) against the parameter
+   * indexes. Returns context-rewrite info when the ref resolves to a
+   * `kind: "context"` AST parameter — bare local, qualified self-ref, or
+   * qualified cross-library — so `emitArg` can emit the CQL context type
+   * (`Patient` / `Practitioner`) in place of the literal name.
+   *
+   * Dispatch (per R4-Δ1):
+   *   - Bare ref OR qualified self-ref → consult internal `astParameters`.
+   *   - Foreign qualified ref → consult `EmitOptions.crossLibraryParameters`
+   *     keyed by the qualifier string.
+   */
+  private lookupContextParameter(
+    library: string | undefined,
+    name: string,
+  ): { contextType: "Patient" | "Practitioner" } | null {
+    if (library === undefined || library === this.options.libraryName) {
+      const info = this.astParameters.get(name);
+      if (info && info.kind === "context") return { contextType: info.contextType };
+      return null;
+    }
+    const targetMap = this.options.crossLibraryParameters.get(library);
+    if (!targetMap) return null;
+    const info = targetMap.get(name);
+    if (info && info.kind === "context") return { contextType: info.contextType };
+    return null;
   }
 
   private emitTerminologies(terms: Terminology[]): string {
@@ -495,6 +678,13 @@ class Emitter {
       return `[${resource}: ${cqlQualifiedRef(crossLib, termName)}]`;
     }
     if (!this.terminologyNames.has(termName)) {
+      // v2.2 Todo 3 (issue #59) — if the unresolved name is shadowed by an
+      // AST parameter, surface that in the FIXME so the author isn't sent
+      // chasing a missing terminology that was actually a parameter ref in
+      // the wrong slot.
+      if (this.astParameters.has(termName)) {
+        return `// FIXME: ${cqlIdent(termName)} is a parameter, not a terminology\n[${resource}: ${cqlIdent(termName)}]`;
+      }
       return `// FIXME: unresolved terminology ${cqlIdent(termName)}\n[${resource}: ${cqlIdent(termName)}]`;
     }
     const refName = this.terminologyEmitName.get(termName) ?? termName;
@@ -697,11 +887,19 @@ class Emitter {
 
   private emitArg(arg: CanonicalArg): string {
     switch (arg.type) {
-      case "ConceptRefArg":
+      case "ConceptRefArg": {
+        // v2.2 Todo 3 (issue #59) — Patient/Practitioner-typed AST
+        // parameter refs rewrite to the bare CQL context type. Applies to
+        // bare local, qualified self, AND qualified cross-library refs.
+        // Per operator: "ALL concepts that reference that parameter should
+        // use that Patient context (per the CQL spec)."
+        const ctx = this.lookupContextParameter(arg.library, arg.value);
+        if (ctx) return ctx.contextType;
         if (arg.library && arg.library !== this.options.libraryName) {
           return cqlQualifiedRef(arg.library, arg.value);
         }
         return cqlIdent(arg.value);
+      }
       case "QuantityArg":
         return arg.unit ? `${arg.value} ${cqlString(arg.unit)}` : `${arg.value}`;
       case "EnumArg":

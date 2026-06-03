@@ -9,7 +9,8 @@ import type {
   ReferenceName,
 } from "../ast/types";
 import { getRefLibrary, isQualifiedRef } from "../ast/types";
-import { emitCQLFromAST } from "../emitter/emitCQL";
+import { emitCQLFromAST, infoForParameterStatement } from "../emitter/emitCQL";
+import type { AstParameterInfo } from "../emitter/emitCQL";
 import type { CRLError } from "../types/errors";
 
 import { resolveImports } from "./index";
@@ -202,6 +203,35 @@ function collectCrossLibraryRefs(entry: RegistryEntry): Set<string> {
   return refs;
 }
 
+/**
+ * v2.2 Todo 3 (issue #59) — build per-library AST parameter index for
+ * cross-library qualified-ref resolution in the emitter. Mirrors the
+ * Emitter's own `indexNames` second pass: concept-first shadow rule (a
+ * parameter is omitted from this map when a same-named concept exists in
+ * the same library).
+ *
+ * Returned shape: outer Map keyed by library NAME (the qualifier string used
+ * in `arg.library`); inner Map keyed by parameter name → info.
+ */
+function buildAstParameterIndex(emitClosure: RegistryEntry[]): Map<string, Map<string, AstParameterInfo>> {
+  const out = new Map<string, Map<string, AstParameterInfo>>();
+  for (const entry of emitClosure) {
+    if (!entry.name) continue;
+    const conceptNames = new Set<string>();
+    for (const stmt of entry.ast.statements) {
+      if (stmt.type === "Concept" && stmt.name) conceptNames.add(stmt.name);
+    }
+    const map = new Map<string, AstParameterInfo>();
+    for (const stmt of entry.ast.statements) {
+      if (stmt.type !== "Parameter" || !stmt.name) continue;
+      if (conceptNames.has(stmt.name)) continue;
+      map.set(stmt.name, infoForParameterStatement(stmt));
+    }
+    if (map.size > 0) out.set(entry.name, map);
+  }
+  return out;
+}
+
 export function emitCQLImports(rootPath: string): EmitImportsResult {
   const graph: ResolvedGraph = resolveImports(rootPath);
 
@@ -266,6 +296,10 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
     }
   }
 
+  // v2.2 Todo 3 (issue #59) — index every emitted library's AST parameters
+  // once so per-library emit can resolve qualified context-parameter refs.
+  const crossLibraryParameters = buildAstParameterIndex(emitClosure);
+
   // Emit each library independently.
   const cqlByLibrary: PerLibraryEmit[] = [];
   for (const entry of emitClosure) {
@@ -302,6 +336,7 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
     const emit = emitCQLFromAST(synthetic, {
       libraryName: entry.name,
       crossLibraryIncludes: crossLibs,
+      crossLibraryParameters,
     });
     if (!emit.success || !emit.result) {
       return {

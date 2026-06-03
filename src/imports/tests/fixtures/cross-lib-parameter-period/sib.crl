@@ -1,0 +1,5 @@
+# cross-library Period parameter ref (sibling)
+library "Sib".
+
+parameter "Measurement Period":
+- param type is Period.

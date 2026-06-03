@@ -1,0 +1,5 @@
+# cross-library Patient parameter ref (sibling)
+library "Sib".
+
+parameter "Index Patient":
+- param type is Patient.
