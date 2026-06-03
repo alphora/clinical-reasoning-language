@@ -2,7 +2,7 @@
   "name": "crl-language-support",
   "displayName": "Clinical Reasoning Language Support",
   "description": "CRL keyword highlighting, live validation diagnostics, CRL→CQL emit, and catalog-driven authoring help (completion + hover) for .crl Markdown files.",
-  "version": "2.2.1",
+  "version": "2.2.2",
   "publisher": "smiledigitalhealth",
   "engines": {
     "vscode": "^1.85.0"
@@ -82,7 +82,7 @@
     "pretest:completion": "npm run compile",
     "test:completion": "node src/completion.test.mjs",
     "test": "npm run compile && node src/mcp-server.test.mjs && node src/provision.test.mjs && node src/highlight.test.mjs && node src/catalog.test.mjs && node src/embedded-catalog.test.mjs && node src/concepts.test.mjs && node src/crl-patterns-coverage.test.mjs && node src/contextDetect.test.mjs && node src/findDeclaration.test.mjs && node src/projectIndex.test.mjs && node src/completion.test.mjs",
-    "vscode:prepublish": "npm run compile",
+    "vscode:prepublish": "npm run build:crl && npm run compile",
     "package": "vsce package"
   },
   "devDependencies": {
