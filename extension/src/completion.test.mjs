@@ -12,6 +12,7 @@ const {
   isTypeCompletionPrefix,
   isValuetypeCompletionPrefix,
   isParamTypeCompletionPrefix,
+  isUnquotedTypeSlotPrefix,
   applyNarrativePrecedence,
   findByConceptFirstPrecedence,
 } = mod.default ?? mod;
@@ -40,6 +41,34 @@ assert.equal(isParamTypeCompletionPrefix("- type is "), false, "type slot must N
 assert.equal(isParamTypeCompletionPrefix("- value type is "), false, "value-type slot must NOT match param-type predicate");
 assert.equal(isParamTypeCompletionPrefix("parameter \"X\":"), false);
 assert.equal(isParamTypeCompletionPrefix("- param type is Period "), false, "trailing space closes the slot");
+
+// --- isUnquotedTypeSlotPrefix: REGRESSION GUARD for "concept refs leak into type slots" ---
+// Bug: typing `"` on a `- param type is "` line fired ConceptRefCompletionProvider
+// and showed concept/terminology/decision suggestions. The slot expects an
+// UNQUOTED identifier (Patient, Period, etc.); concept-ref completion has
+// nothing to offer there. This predicate gates the suppression.
+
+// Positive — should suppress
+assert.equal(isUnquotedTypeSlotPrefix("- param type is "), true);
+assert.equal(isUnquotedTypeSlotPrefix("- param type is \""), true, "open quote on param-type line still in slot");
+assert.equal(isUnquotedTypeSlotPrefix("- param type is \"Foo"), true, "cursor inside an open quote in slot");
+assert.equal(isUnquotedTypeSlotPrefix("- type is "), true);
+assert.equal(isUnquotedTypeSlotPrefix("- type is \"Obs"), true);
+assert.equal(isUnquotedTypeSlotPrefix("- value type is "), true);
+assert.equal(isUnquotedTypeSlotPrefix("  - value type is \""), true, "indented value-type slot still detected");
+
+// Negative — should NOT suppress (other slots that DO accept quoted refs)
+assert.equal(isUnquotedTypeSlotPrefix("- coded from \""), false);
+assert.equal(isUnquotedTypeSlotPrefix("- defined as \""), false);
+assert.equal(isUnquotedTypeSlotPrefix("- definition is \""), false);
+assert.equal(isUnquotedTypeSlotPrefix("- with \""), false);
+assert.equal(isUnquotedTypeSlotPrefix("when \""), false);
+assert.equal(isUnquotedTypeSlotPrefix("concept \"X\":"), false);
+assert.equal(isUnquotedTypeSlotPrefix("parameter \""), false, "declaration header isn't a type slot");
+
+// Negative — close-similar words that aren't the slot
+assert.equal(isUnquotedTypeSlotPrefix("- typespecific is \""), false);
+assert.equal(isUnquotedTypeSlotPrefix("- type isSome \""), false, "isSome lacks word boundary after `is`");
 
 // --- applyNarrativePrecedence: concept-of-same-name suppresses the parameter ---
 {

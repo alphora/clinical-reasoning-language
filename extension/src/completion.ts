@@ -14,6 +14,7 @@ import {
   applyNarrativePrecedence,
   isParamTypeCompletionPrefix,
   isTypeCompletionPrefix,
+  isUnquotedTypeSlotPrefix,
   isValuetypeCompletionPrefix,
 } from "./completionHelpers";
 
@@ -23,6 +24,7 @@ export {
   applyNarrativePrecedence,
   isParamTypeCompletionPrefix,
   isTypeCompletionPrefix,
+  isUnquotedTypeSlotPrefix,
   isValuetypeCompletionPrefix,
 };
 import {
@@ -162,6 +164,11 @@ export class ConceptRefCompletionProvider implements vscode.CompletionItemProvid
     const prefix = line.slice(0, position.character);
     if (!isInsideOpenQuote(prefix)) return [];
     if (/^\s*(concept|terminology|decision|activity|parameter)\s+"[^"]*$/.test(prefix)) return [];
+    // Unquoted-identifier slots (`- type is`, `- value type is`, `- param type
+    // is`) don't accept quoted refs. Typing `"` here would otherwise leak a
+    // bogus list of concept/terminology suggestions (the `"` trigger char
+    // fires this provider before the slot-specific ones can claim the slot).
+    if (isUnquotedTypeSlotPrefix(prefix)) return [];
 
     const expectedKind = detectExpectedKind(prefix);
     const qualifier = detectQualifiedRefQualifier(prefix);

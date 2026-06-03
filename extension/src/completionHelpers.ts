@@ -24,6 +24,24 @@ export function isParamTypeCompletionPrefix(prefix: string): boolean {
 }
 
 /**
+ * True when the cursor is anywhere inside a `- type is`, `- value type is`,
+ * or `- param type is` slot. These slots expect UNQUOTED identifier tokens
+ * (e.g. `Observation`, `boolean`, `Patient`) — not quoted refs. Used by
+ * `ConceptRefCompletionProvider` to suppress concept/terminology/decision/
+ * activity/parameter suggestions when the user types `"` in one of these
+ * slots (which would otherwise leak a bogus suggestion list).
+ *
+ * More permissive than the three slot-completion predicates above — those
+ * require the cursor to sit right after the keyword with no quote
+ * intervening. This one just needs the LINE to start with one of the
+ * unquoted slots; the caller separately checks that the cursor is inside
+ * an open quote.
+ */
+export function isUnquotedTypeSlotPrefix(prefix: string): boolean {
+  return /^\s*-\s*(value type|param\s+type|type)\s+is\b/i.test(prefix);
+}
+
+/**
  * Concept-first precedence for the concept/parameter same-name pair. When
  * `concept "X"` AND `parameter "X"` coexist in the same library + origin
  * scope, the validator + ProjectIndex resolve narrative refs to the
