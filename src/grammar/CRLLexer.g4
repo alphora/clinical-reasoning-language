@@ -202,6 +202,7 @@ CONCEPT_TYPE
             'NutritionIntake',
             'NutritionOrder',
             'Observation',
+            'Patient',
             'Procedure',
             'QuestionnaireResponse',
             'RiskAssessment',
