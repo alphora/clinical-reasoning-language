@@ -233,7 +233,7 @@ function buildRefItem(d: RefSuggestion): vscode.CompletionItem {
   md.appendMarkdown(`**${d.name}** — ${d.kind}\n\n`);
   if (d.libraryName) md.appendMarkdown(`Library: \`${d.libraryName}\`\n\n`);
   if (d.type) md.appendMarkdown(`Type: \`${d.type}\`\n\n`);
-  if (d.valuetype) md.appendMarkdown(`Valuetype: \`${d.valuetype}\`\n\n`);
+  if (d.valuetype) md.appendMarkdown(`Value type: \`${d.valuetype}\`\n\n`);
   if (d.bodyPreview) md.appendMarkdown(`Body: \`${d.bodyPreview}\``);
   item.documentation = md;
   return item;

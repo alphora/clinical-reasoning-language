@@ -99,7 +99,7 @@ export class TypeValuetypeHoverProvider implements vscode.HoverProvider {
         const md = new vscode.MarkdownString();
         md.appendMarkdown(`**${name}** — FHIR value type\n\n`);
         if (!isValid) {
-          md.appendMarkdown(`⚠ Not in the recognized valuetype set. Valid: ${[...CONCEPT_VALUETYPES].join(", ")}.`);
+          md.appendMarkdown(`⚠ Not in the recognized value type set. Valid: ${[...CONCEPT_VALUETYPES].join(", ")}.`);
         } else {
           md.appendMarkdown(`Used in \`- value type is ${name}.\` to declare the concept's value-bearing type.`);
         }
@@ -215,7 +215,7 @@ function formatIndexedHover(decl: IndexedDeclaration): vscode.MarkdownString {
   md.appendMarkdown(`**${decl.name}** — ${decl.kind}\n\n`);
   md.appendMarkdown(`Library: \`${decl.libraryName}\`\n\n`);
   if (decl.type) md.appendMarkdown(`Type: \`${decl.type}\`\n\n`);
-  if (decl.valuetype) md.appendMarkdown(`Valuetype: \`${decl.valuetype}\`\n\n`);
+  if (decl.valuetype) md.appendMarkdown(`Value type: \`${decl.valuetype}\`\n\n`);
   if (decl.bodyPreview) md.appendMarkdown(`Body: \`${decl.bodyPreview}\`\n\n`);
   md.appendMarkdown(`Declared at \`${decl.filePath}\`:${decl.line + 1}.`);
   return md;
@@ -225,7 +225,7 @@ function formatLocalHover(decl: Declaration): vscode.MarkdownString {
   const md = new vscode.MarkdownString();
   md.appendMarkdown(`**${decl.name}** — ${decl.kind}\n\n`);
   if (decl.type) md.appendMarkdown(`Type: \`${decl.type}\`\n\n`);
-  if (decl.valuetype) md.appendMarkdown(`Valuetype: \`${decl.valuetype}\`\n\n`);
+  if (decl.valuetype) md.appendMarkdown(`Value type: \`${decl.valuetype}\`\n\n`);
   if (decl.bodyPreview) md.appendMarkdown(`Body: \`${decl.bodyPreview}\`\n\n`);
   md.appendMarkdown(`Declared at line ${decl.line + 1}.`);
   return md;

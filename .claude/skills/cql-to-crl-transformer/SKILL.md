@@ -136,7 +136,7 @@ For each concept, emit:
 ```
 concept "<Name>":
 - type is <Type>.
-- value type is <Valuetype>.
+- value type is <ValueType>.
 - <body unchanged>.
 ```
 

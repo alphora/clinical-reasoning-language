@@ -28,7 +28,7 @@ This document details the requirements for implementing a lexer for the Decision
 The lexer must produce tokens for the following:
 
 - **Keywords:**  
-  `decision`, `when`, `then`, `do`, `use`, `action`, `casefeature`, `code`, `fhirtype`, `url`, `valuetype`
+  `decision`, `when`, `then`, `do`, `use`, `action`, `casefeature`, `code`, `fhirtype`, `url`, `value type`
   
 - **Special Symbols:**  
   Quoted strings (for names, conditions, etc.), identifiers (for resource types), and any punctuation used by the DSL.
@@ -120,7 +120,7 @@ The lexer must produce tokens for the following:
   An identifier can be defined as a sequence of letters, digits, and underscores, starting with a letter or underscore.
   
 - **Usage:**  
-  Use identifiers for resource types, keywords in properties (e.g., for `fhirtype`, `valuetype`), and other unquoted tokens.
+  Use identifiers for resource types, keywords in properties (e.g., for `fhirtype`, `value type`), and other unquoted tokens.
 
 ---
 

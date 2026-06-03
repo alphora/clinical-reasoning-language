@@ -189,7 +189,7 @@ should not be an error.
 
 1. concept must have one and only one has type.
 
-1. concept must have one and only one valuetype.
+1. concept must have one and only one value type.
 
 1. concept may have one and only one provenance.
 

@@ -51,8 +51,8 @@ export const CONCEPT_TYPES = [
 ] as const;
 
 /**
- * FHIR primitive / structured types CRL accepts as a `valuetype`. Source of
- * truth: the `CONCEPT_VALUE_TYPE` lexer rule. Used to populate `- valuetype
+ * FHIR primitive / structured types CRL accepts as a `value type`. Source of
+ * truth: the `CONCEPT_VALUE_TYPE` lexer rule. Used to populate `- value type
  * is X.` completion + hover.
  */
 export const CONCEPT_VALUETYPES = [

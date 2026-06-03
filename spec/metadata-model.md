@@ -49,7 +49,7 @@ concept "Elderly Patient":
 - defined as "Patient Age".
 ```
 
-(Element order is fixed: `type`, `valuetype`, `meta`*, `evidence`?, then one of `coded from` / `defined as` / `definition is`.)
+(Element order is fixed: `type`, `value type`, `meta`*, `evidence`?, then one of `coded from` / `defined as` / `definition is`.)
 
 ## Value shapes
 

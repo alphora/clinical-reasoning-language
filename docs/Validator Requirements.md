@@ -22,7 +22,7 @@ These requirements specify the design and implementation details for a **Typescr
      - A `when` clause must contain at least one action (`do`/`use`) or nested `when`s.
      - `terminology` must have exactly one of: `valueset`, `unknown`, or `system/code`.
      - `activity` must have exactly one `perform` clause.
-     - A `concept` must have exactly one `has type`, exactly one `has valuetype`, optionally one `provenance`, and must have either `coded by` **or** `inferred by`.
+     - A `concept` must have exactly one `has type`, exactly one `has value type`, optionally one `provenance`, and must have either `coded by` **or** `inferred by`.
    - The user’s decisions and prior references have indicated no immediate need to enforce references existing in the same file. Cross-file references will be addressed later.
 
 ---
