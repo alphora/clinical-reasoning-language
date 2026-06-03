@@ -1,14 +1,27 @@
-# Clinical Reasoning Language Example
-library "Clinical Reasoning Language Example".
+# CMS69 BMI Screening CDS Example
+library "CMS69 BMI Screening GPG Strategy example".
 
 /*
-Clinical Reasoning Language (CRL) — v0.7 grammar reference example.
+Clinical Reasoning Language (CRL) — v2.1.0 grammar reference example.
+
+This file is the canonical small example. It models a Clinical Decision
+Support (CDS) workflow that supports a clinician in satisfying the
+**CMS69 (BMI Screening and Follow-Up)** quality measure at point of
+care, using a small set of BMI-related concepts and activities.
+
+The full quality-measure encoding (Initial Population / Numerator /
+Denominator / Exclusions / Exceptions) lives in
+features/cql-pattern-mining/results/models/cms69-split/. This file shows
+the CDS facet: at an encounter, what should the clinician do so the
+visit ends up in CMS69's numerator?
 
 Surface conventions:
-  - Case sensitive (keywords are lowercase: `concept`, `defined as`, `definition is`,
-    `sem-or`, `sem-and`, `sem-not`, `or`, `and`, `not`, etc.).
+  - Case sensitive (keywords are lowercase: `concept`, `defined as`,
+    `definition is`, `sem-or`, `sem-and`, `sem-not`, `or`, `and`, `not`,
+    `library`, `include`, etc.).
   - Whitespace insensitive (indentation is decorative).
-  - File starts with `#` + markdown-valid header line.
+  - File starts with `#` + markdown-valid header line; the
+    `library "Name".` declaration is REQUIRED in v2.1.0.
   - Quoted strings (`"..."`) are identifiers / refs to named declarations.
   - Backtick strings (`` `...` ``) are free text / evidence / system / code.
   - Single quotes (`'...'`) lex as UCUM units inside Quantity literals.
@@ -26,8 +39,8 @@ Statement types:
   - bare ref:        `- defined as "X".`
   - composition:     `- defined as ( "A" sem-and "B" ).` (uses sem-or/sem-and/sem-not)
 
-Narrative inside a `definition is` body uses lowercase `or` / `and` for in-arg
-disjunction (e.g. `("Medical Reasons" or "Patient Declined Reasons")`),
+Narrative inside a `definition is` body uses lowercase `or` / `and` for
+in-arg disjunction (e.g. `("Medical Reasons" or "Patient Declined Reasons")`),
 which is distinct from the `sem-or`/`sem-and` in concept composition.
 See docs/CRL Compilation Pipeline.md and the
 project_sem-composition-operators memory for the rationale.
@@ -36,63 +49,88 @@ Optional fields:
   - `meta is` (repeatable) and `evidence is` on `concept`
   - `with` and `because` on `activity`
   - `do not perform` suffix on `request` keyword (activity)
+
+Per v2.1.0 lock 026: under per-library scoping, bare refs are local to
+the asking library. Cross-library refs use `"OtherLib"."Name"`. This
+file is single-library so every ref below is bare.
 */
 
-decision "IMMZ.D2.D5.Measles":
+// ============ Decisions ============
 
-- when "Measles Routine Immunization Schedule Incomplete" then:
-  - when "No Primary Series Doses Administered" then:
-    - when "Client Age Less Than 12 Months" then recommend activity "Indicate".
-    - when "Last Live Vaccine Administered has had in 4 Weeks" then use decision "Elderly Based".
-  - end when
+// Top-level CDS decision. Walked at every qualifying encounter for an
+// adult patient. The when/then branches mirror CMS69's clinical flow:
+//   1. document BMI if it isn't already recorded this period,
+//   2. recommend a high-BMI intervention if BMI is high,
+//   3. recommend a low-BMI intervention if BMI is low.
+decision "CMS69 BMI Screening CDS":
+
+- when "Patient Eligible For BMI Screening" then:
+  - when "BMI Not Documented During Measurement Period" then recommend activity "Document BMI".
+  - when "Has Documented High BMI" then use decision "Recommend High BMI Intervention".
+  - when "Has Documented Low BMI" then use decision "Recommend Low BMI Intervention".
 - end when
-- when "Client Is Due For MCV12" then recommend activity "Vaccinate".
-- when "One Primary Series Dose Administered" then:
+
+// High-BMI sub-decision. Several intervention paths are CMS69-acceptable;
+// `any:` says any one of these recommendations satisfies the measure.
+decision "Recommend High BMI Intervention":
+
+- when "Patient Has Overweight or Obese Diagnosis" then:
   any:
-  - when "Client Age Less Than 15 Months" then recommend activity "Indicate".
-  - when "Last Live Vaccine Administered has had in 4 Weeks" then use decision "Elderly Based".
-  - when "Client Is Due For MCV12" then recommend activity "Vaccinate".
+  - recommend activity "Order Weight Assessment Referral".
+  - recommend activity "Order High BMI Medication".
 - end when
-- when "Two Primary Series Doses Administered" then recommend activity "Indicate".
+- when "Has Anti-Obesity Medication Contraindication" then recommend activity "Contraindicated Anti-Obesity Medication".
 
-decision "Elderly Based":
+// Low-BMI sub-decision. CMS69 expects BOTH a follow-up order AND a
+// documented care plan, so `all:` requires both recommendations.
+decision "Recommend Low BMI Intervention":
 
-- when "Client Age Greater Than 60" then recommend activity "Indicate".
-- when "Client Age Less Than 60" then:
+- when "Patient Has Underweight Diagnosis" then:
   all:
-  - recommend activity "Vaccinate".
-  - recommend activity "another thing".
-  - recommend activity "something else".
-- end when
-- when "Client Age Greater Than 60" then:
-  - when "Most Recent BMI" then:
-    - use decision "Some Other Decision".
-    - use decision "Some Other Other Decision".
-  - end when
+  - recommend activity "Order Low BMI Follow-up".
+  - recommend activity "Send BMI Care Communication".
 - end when
 
 
 // ============ Activities ============
 
-activity "Vaccinate":
-- request CPGImmunizationRequest.
+// Activities are the executable side of a decision — what the CDS
+// surface actually proposes to the clinician. Each `request` line maps
+// to a CPG-on-FHIR proposal resource. `with`, `because`, and the
+// `do not perform` suffix are optional.
 
-activity "Indicate":
-- request CPGProposeDiagnosisTask.
-- with "Colonoscopy".
+activity "Document BMI":
+- request CPGCollectInformation.
+- with "BMI as an Observation".
 
-activity "Message Care Plan":
+activity "Order Weight Assessment Referral":
+- request CPGServiceRequest.
+- with "Weight Assessment Referrals VS".
+- because `Patient has documented high BMI without a current referral`.
+
+activity "Order High BMI Medication":
+- request CPGMedicationRequest.
+- with "Anti-Obesity Medications VS".
+
+activity "Order Low BMI Follow-up":
+- request CPGServiceRequest.
+- with "Low BMI Follow-up Service Requests VS".
+
+activity "Send BMI Care Communication":
 - request CPGCommunicationRequest.
-- with `Create a care plan`.
-- because `A new plan needs to be implemented.`.
+- with `Document a follow-up care plan for low BMI`.
+- because `CMS69 requires documented care planning when BMI is low`.
 
-activity "Contraindicated":
-- request do not perform CPGImmunizationRequest.
-- with "Immunization".
-- because `Immunization is contraindicated`.
+activity "Contraindicated Anti-Obesity Medication":
+- request do not perform CPGMedicationRequest.
+- with "Anti-Obesity Medications VS".
+- because `Patient has a documented contraindication to anti-obesity pharmacotherapy`.
 
 
 // ============ Terminologies ============
+
+// Terminologies are either a valueset reference (used by `coded from`)
+// or a single system+code pair (or repeatable codes).
 
 terminology "BMI Range as a Condition":
 - valueset is ``.
@@ -106,14 +144,38 @@ terminology "Height Valueset":
 terminology "Weight Valueset":
 - valueset is `weight valueset`.
 
+terminology "Overweight or Obese Diagnoses VS":
+- valueset is `http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113762.1.4.1047.502`.
+
+terminology "Underweight Diagnoses VS":
+- valueset is `http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.526.3.1563`.
+
+terminology "Pregnancy Diagnoses VS":
+- valueset is `http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.600.1.1623`.
+
+terminology "Weight Assessment Referrals VS":
+- valueset is `http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.600.1.1527`.
+
+terminology "Anti-Obesity Medications VS":
+- valueset is `http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.526.3.1561`.
+
+terminology "Low BMI Follow-up Service Requests VS":
+- valueset is `http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.600.1.1528`.
+
+terminology "Medical Reason VS":
+- valueset is `http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.526.3.1007`.
+
+terminology "Patient Declined VS":
+- valueset is `http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.526.3.1582`.
+
+terminology "Anti-Obesity Medication Contraindication VS":
+- valueset is ``.
+
+// A code-based terminology (system + code pair), useful when the
+// reference is a single concept rather than a whole valueset.
 terminology "Colonoscopy":
 - system is `http://snomed.info/sct`.
 - code is `73761001`.
-
-terminology "Breast Cancer":
-- system is `http://snomed.info/sct`.
-- code is `73761002`.
-- code is `73761003`.
 
 
 // ============ Concepts ============
@@ -140,11 +202,57 @@ concept "Patient Weight":
 - valuetype is integer.
 - coded from "Weight Valueset".
 
+concept "Overweight or Obese Diagnoses":
+- type is Condition.
+- valuetype is CodeableConcept.
+- coded from "Overweight or Obese Diagnoses VS".
+
+concept "Underweight Diagnoses":
+- type is Condition.
+- valuetype is CodeableConcept.
+- coded from "Underweight Diagnoses VS".
+
+concept "Pregnancy Diagnoses":
+- type is Condition.
+- valuetype is CodeableConcept.
+- coded from "Pregnancy Diagnoses VS".
+
+concept "Weight Assessment Referrals":
+- type is ServiceRequest.
+- valuetype is CodeableConcept.
+- coded from "Weight Assessment Referrals VS".
+
+concept "Anti-Obesity Medications":
+- type is MedicationRequest.
+- valuetype is CodeableConcept.
+- coded from "Anti-Obesity Medications VS".
+
+concept "Low BMI Follow-up Service Requests":
+- type is ServiceRequest.
+- valuetype is CodeableConcept.
+- coded from "Low BMI Follow-up Service Requests VS".
+
+concept "Medical Reasons":
+- type is Observation.
+- valuetype is CodeableConcept.
+- coded from "Medical Reason VS".
+
+concept "Patient Declined Reasons":
+- type is Observation.
+- valuetype is CodeableConcept.
+- coded from "Patient Declined VS".
+
+concept "Anti-Obesity Medication Contraindication":
+- type is Observation.
+- valuetype is CodeableConcept.
+- coded from "Anti-Obesity Medication Contraindication VS".
+
 
 // --- Composition concepts: bare ref + sem-* composition shapes ---
 
-// "BMI" composes three sources via sem-or (semantic boolean — operands
-// can be cross-typed; the composition layer reconciles).
+// "BMI" composes three sources via sem-or (semantic composition —
+// operands can be cross-typed; the composition layer reconciles).
+// This is the value the rest of the file works with.
 concept "BMI":
 - type is Observation.
 - valuetype is Quantity.
@@ -161,7 +269,8 @@ concept "BMI":
 // --- Predicate-kind concepts: narrative body + composing concept pair ---
 
 // Predicates with narrative bodies are concepts with `definition is` bodies.
-// A composing concept then references them as bare refs.
+// A composing concept then references them as bare refs. This pair is
+// the canonical "narrative + composer" shape.
 
 concept "Most Recent BMI Selection":
 - meta is `Selects the most recent BMI observation within the configured lookback`.
@@ -171,25 +280,32 @@ concept "Most Recent BMI Selection":
 concept "Most Recent BMI":
 - type is Observation.
 - valuetype is Quantity.
-- meta is `Some meta information`.
+- meta is `Most recent qualifying BMI for the current encounter context`.
 - evidence is `Calculated by Smile`.
 - defined as "Most Recent BMI Selection".
 
-concept "Calculated BMI Formula":
-- evidence is `Standard BMI formula: weight (kg) / height (m)^2`.
-- definition is calculated "BMI".
-
+// "Calculated BMI" preserves the BMI = weight / height² derivation
+// chain. It composes the two source primitives (Height + Weight) via
+// sem-and — semantic intersection at the composition layer. The
+// `evidence is` text records the formula the implementation honors;
+// the WHAT-vs-HOW principle keeps the formula out of the CRL grammar.
 concept "Calculated BMI":
 - type is Observation.
 - valuetype is Quantity.
-- defined as "Calculated BMI Formula".
+- evidence is `Standard BMI formula: weight (kg) / height (m)^2`.
+- defined as
+(
+   "Patient Height"
+   sem-and
+   "Patient Weight"
+).
 
 
 // --- Composition concepts: with sem-not ---
 
 // `sem-not` is prefix unary; it negates the following operand or group.
-// "BMI With Confirmed Height-Weight Source" requires BMI from a calculated
-// source, NOT from a coded condition entry.
+// "BMI With Confirmed Height-Weight Source" requires BMI from a
+// calculated source, NOT from a coded condition entry.
 concept "BMI With Confirmed Height-Weight Source":
 - type is Observation.
 - valuetype is Quantity.
@@ -200,7 +316,59 @@ concept "BMI With Confirmed Height-Weight Source":
    sem-not "BMI Range as a Condition"
 ).
 
-// For more complex composition examples (deeply nested groups, AND NOT,
-// in-arg disjunctions inside narrative bodies), see the modeled measures:
-//   features/cql-pattern-mining/results/models/cms22.crl
-//   features/cql-pattern-mining/results/models/cms69.crl
+
+// --- CDS-support predicates (narrative bodies feeding the decision) ---
+
+// Eligibility = "could this encounter satisfy CMS69?" The decision
+// short-circuits when this is false. Sem-not on Pregnancy carves out
+// CMS69's denominator exclusion; sem-not on the reason concepts carves
+// out the denominator exceptions.
+concept "Patient Eligible For BMI Screening":
+- type is Observation.
+- valuetype is boolean.
+- defined as
+(
+   sem-not "Pregnancy Diagnoses"
+   sem-and
+   sem-not "Medical Reasons"
+   sem-and
+   sem-not "Patient Declined Reasons"
+).
+
+concept "BMI Not Documented During Measurement Period":
+- type is Observation.
+- valuetype is boolean.
+- definition is without documented "BMI".
+
+concept "Has Documented High BMI":
+- type is Observation.
+- valuetype is boolean.
+- definition is "BMI" high.
+
+concept "Has Documented Low BMI":
+- type is Observation.
+- valuetype is boolean.
+- definition is "BMI" low.
+
+concept "Patient Has Overweight or Obese Diagnosis":
+- type is Observation.
+- valuetype is boolean.
+- definition is "Overweight or Obese Diagnoses" active.
+
+concept "Patient Has Underweight Diagnosis":
+- type is Observation.
+- valuetype is boolean.
+- definition is "Underweight Diagnoses" active.
+
+concept "Has Anti-Obesity Medication Contraindication":
+- type is Observation.
+- valuetype is boolean.
+- definition is documented "Anti-Obesity Medication Contraindication".
+
+
+// For deeper composition examples (deeply nested groups, AND NOT,
+// in-arg disjunctions inside narrative bodies, and the full
+// Initial Population / Numerator / Denominator structure), see the
+// modeled measures:
+//   features/cql-pattern-mining/results/models/cms22-split/
+//   features/cql-pattern-mining/results/models/cms69-split/

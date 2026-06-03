@@ -45,11 +45,13 @@ describe("AST builder regression test: Example files run without error", () => {
   ];
 
   EXAMPLES.forEach((examplePath) => {
-    // SKIPPED in v2.1.0: these regression .crl files lack the now-required
-    // `library "Foo".` declaration. Adding library lines also surfaces
-    // unrelated pre-existing issues in IMMZ_All_Decisions.crl. Pending the
-    // test-cleanup follow-up.
-    it.skip(`should build AST for ${path.basename(examplePath)} without error`, () => {
+    // IMMZ_All_Decisions.crl is FSH-generated; the FSH→CRL transformer is
+    // deprecated and its output doesn't parse under v2.1.0. The other
+    // example (clinical-reasoning-language-example.crl) is a refreshed
+    // copy of docs/…example.crl (CMS69 BMI Screening CDS) and parses.
+    const isDeprecatedImmz = path.basename(examplePath).startsWith("IMMZ");
+    const runner = isDeprecatedImmz ? it.skip : it;
+    runner(`should build AST for ${path.basename(examplePath)} without error`, () => {
       expect(() => {
         execSync(`npm run cli:ast -- ${examplePath}`, { encoding: "utf8" });
       }).not.toThrow();
