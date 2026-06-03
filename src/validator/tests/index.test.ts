@@ -2,3 +2,4 @@
 // so these run as part of `npm test`.
 import "./nameUniqueness.test";
 import "./cycleDetector.test";
+import "./parameter.test";

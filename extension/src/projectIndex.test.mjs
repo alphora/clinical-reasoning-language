@@ -71,7 +71,7 @@ assert.ok(qualRef, "qualified cross-library ref must be indexed");
 assert.ok(qualRef.qualifierRange !== null, "qualified ref must have a qualifierRange");
 
 // findRefsTo: O(1) lookup
-const found = index.findRefsTo(rootFile, "Root", "BMI");
+const found = index.findRefsTo(rootFile, "Root", "BMI", "concept");
 assert.equal(found.length, 1, "findRefsTo Root.BMI should return exactly the bare ref");
 
 console.log(`projectIndex tests passed (${decls.length} decls, ${refs.length} refs indexed).`);

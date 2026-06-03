@@ -26,13 +26,16 @@ const cases = [
   ['  "A" sem-and "', "concept"],
   ['  "A" sem-or "', "concept"],
   ['  "A" sem-or sem-not "', "concept"],
-  ['  - definition is "', "concept"],
+  // v2.2 issue #59: narrative slot accepts concept OR parameter
+  // refs; mapped to a distinct ExpectedRefKind so non-narrative
+  // concept slots stay strict.
+  ['  - definition is "', "narrative"],
   // Narrative connectors
-  ['"X" during "', "concept"],
-  ['"X" before "', "concept"],
-  ['"X" after "', "concept"],
-  ['"X" as of "', "concept"],
-  ['"X" on day of "', "concept"],
+  ['"X" during "', "narrative"],
+  ['"X" before "', "narrative"],
+  ['"X" after "', "narrative"],
+  ['"X" as of "', "narrative"],
+  ['"X" on day of "', "narrative"],
   // Uncategorized → any
   ['just some text "', "any"],
 ];

@@ -113,21 +113,24 @@ export class CrlReferenceProvider implements vscode.ReferenceProvider {
 
     let targetLib: string;
     let targetName: string;
+    let targetKind: IndexedDeclaration["kind"];
     let declLocation: vscode.Location | null = null;
     if (res.kind === "declaration") {
       targetLib = res.decl.libraryName;
       targetName = res.decl.name;
+      targetKind = res.decl.kind;
       declLocation = declToLocation(res.decl);
     } else if (res.kind === "reference-name" || res.kind === "reference-qualifier") {
       targetLib = res.ref.targetLibrary;
       targetName = res.ref.targetName;
+      targetKind = res.ref.targetKind;
       const decl = this.index.findDeclarationByLibAndName(filePath, targetLib, targetName, res.ref.targetKind);
       if (decl) declLocation = declToLocation(decl);
     } else {
       return [];
     }
 
-    const refs = this.index.findRefsTo(filePath, targetLib, targetName);
+    const refs = this.index.findRefsTo(filePath, targetLib, targetName, targetKind);
     const out: vscode.Location[] = refs.map(
       (r) => new vscode.Location(vscode.Uri.file(r.filePath), toRange(r.nameRange)),
     );
@@ -308,9 +311,10 @@ export class CrlRenameProvider implements vscode.RenameProvider {
       edit.replace(vscode.Uri.file(decl.filePath), toRange(decl.nameRange), newName);
     }
 
-    // Replace every reference site's name token.
-    for (const ref of this.index.findRefsTo(filePath, targetLib, targetName)) {
-      if (ref.targetKind !== targetKind) continue;
+    // Replace every reference site's name token. The keying-by-kind in
+    // findRefsTo means the post-filter for targetKind is no longer
+    // needed — refs only return entries matching the requested kind.
+    for (const ref of this.index.findRefsTo(filePath, targetLib, targetName, targetKind)) {
       edit.replace(vscode.Uri.file(ref.filePath), toRange(ref.nameRange), newName);
     }
 

@@ -3,13 +3,14 @@ import type { SourceContext } from "../imports/scopes";
 
 import { ValidationError } from "./validator";
 
-type Kind = "Decision" | "Concept" | "Activity" | "Terminology";
+type Kind = "Decision" | "Concept" | "Activity" | "Terminology" | "Parameter";
 
 const DUPLICATE_MESSAGES: Record<Kind, string> = {
   Decision: "Duplicate decision name",
   Concept: "Duplicate concept name",
   Activity: "Duplicate activity name",
   Terminology: "Duplicate terminology name",
+  Parameter: "Duplicate parameter name",
 };
 
 const EMPTY_MESSAGES: Record<Kind, string> = {
@@ -17,6 +18,7 @@ const EMPTY_MESSAGES: Record<Kind, string> = {
   Concept: "Concept name cannot be empty",
   Activity: "Activity name cannot be empty",
   Terminology: "Terminology name cannot be empty",
+  Parameter: "Parameter name cannot be empty",
 };
 
 /**
@@ -44,6 +46,7 @@ export class NameUniquenessValidator {
       Concept: new Set(),
       Activity: new Set(),
       Terminology: new Set(),
+      Parameter: new Set(),
     };
 
     for (const statement of ast.statements) {
@@ -72,6 +75,7 @@ export class NameUniquenessValidator {
           Concept: new Set(),
           Activity: new Set(),
           Terminology: new Set(),
+          Parameter: new Set(),
         };
         perLibrary.set(bucketKey, buckets);
       }
@@ -123,5 +127,5 @@ export class NameUniquenessValidator {
 }
 
 function isKind(t: string): t is Kind {
-  return t === "Decision" || t === "Concept" || t === "Activity" || t === "Terminology";
+  return t === "Decision" || t === "Concept" || t === "Activity" || t === "Terminology" || t === "Parameter";
 }

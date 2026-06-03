@@ -167,6 +167,10 @@ interface RefSuggestion {
 
 function matchesKind(d: RefSuggestion, expected: ExpectedRefKind): boolean {
   if (expected === "any") return true;
+  // v2.2 issue #59: only NARRATIVE slots accept concept-or-parameter.
+  // "concept" stays strict — `defined as` / composition / `when` get
+  // concept-only completion, matching the validator's slot table.
+  if (expected === "narrative") return d.kind === "concept" || d.kind === "parameter";
   return d.kind === expected;
 }
 

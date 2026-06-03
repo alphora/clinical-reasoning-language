@@ -124,7 +124,7 @@ export interface Registry {
 
 // === Combined namespace (kind-separated) ===
 
-export type NodeKind = "Concept" | "Decision" | "Activity" | "Terminology";
+export type NodeKind = "Concept" | "Decision" | "Activity" | "Terminology" | "Parameter";
 
 export interface NamespaceEntry {
   kind: NodeKind;
@@ -138,6 +138,7 @@ export interface Namespace {
   terminologies: Map<string, NamespaceEntry>;
   decisions: Map<string, NamespaceEntry>;
   activities: Map<string, NamespaceEntry>;
+  parameters: Map<string, NamespaceEntry>;
 }
 
 export function emptyNamespace(): Namespace {
@@ -146,6 +147,7 @@ export function emptyNamespace(): Namespace {
     terminologies: new Map(),
     decisions: new Map(),
     activities: new Map(),
+    parameters: new Map(),
   };
 }
 

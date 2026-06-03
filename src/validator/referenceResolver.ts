@@ -22,7 +22,24 @@ import { lookupKnownLibrary } from "../imports/scopes";
 
 import { ValidationError } from "./validator";
 
-type RefKind = "concept" | "terminology" | "decision" | "activity";
+type RefKind = "concept" | "terminology" | "decision" | "activity" | "parameter";
+
+/**
+ * v2.2 issue #59 — acceptable-kinds set for a ref slot. First element is
+ * the precedence-winner / fallback. Non-empty by construction.
+ */
+type AcceptableKinds = readonly [RefKind, ...RefKind[]];
+
+/** Concept-accepting slot — also accepts parameter for narrative refs. */
+const NARRATIVE_REF_KINDS: AcceptableKinds = ["concept", "parameter"] as const;
+/** Concept-only slot — `defined as` bare ref, composition refs, `when "C"`. */
+const CONCEPT_REF_KINDS: AcceptableKinds = ["concept"] as const;
+/** Terminology-only slot — `coded from`, activity `with`. */
+const TERMINOLOGY_REF_KINDS: AcceptableKinds = ["terminology"] as const;
+/** Decision-only slot — `use decision`. */
+const DECISION_REF_KINDS: AcceptableKinds = ["decision"] as const;
+/** Activity-only slot — `recommend activity`. */
+const ACTIVITY_REF_KINDS: AcceptableKinds = ["activity"] as const;
 
 // Map RefKind (singular) to the plural keys used by `LibraryScopeNames`
 // in `src/imports/scopes.ts`. The scope shape uses plural for historical
@@ -32,6 +49,7 @@ const REF_KIND_TO_PLURAL = {
   terminology: "terminologies",
   decision: "decisions",
   activity: "activities",
+  parameter: "parameters",
 } as const;
 
 /**
@@ -81,6 +99,11 @@ export class ReferenceResolver {
     const policeQualified = selfLibrary !== "";
 
     for (const statement of ast.statements) {
+      // v2.2 issue #59: parameter bodies declare a single type token,
+      // no narrative refs to walk. Short-circuit BEFORE WalkContext
+      // construction (round-2 catch — context was being built then
+      // thrown away).
+      if (statement.type === "Parameter") continue;
       this.walkStatement(
         statement,
         {
@@ -108,8 +131,9 @@ export class ReferenceResolver {
     const errors: ValidationError[] = [];
 
     for (const { stmt, scope } of sources) {
+      if (stmt.type === "Parameter") continue;
       // Scope's localNames already pre-populated with per-library decls
-      // (concepts + terminologies + decisions + activities) by buildLibraryScopes.
+      // by buildLibraryScopes — including parameters as of v2.2.
       this.walkStatement(
         stmt,
         {
@@ -122,6 +146,7 @@ export class ReferenceResolver {
             terminology: scope.localNames.terminologies,
             decision: scope.localNames.decisions,
             activity: scope.localNames.activities,
+            parameter: scope.localNames.parameters,
           },
           selfLibrary: scope.currentLibrary,
           policeQualified: true,
@@ -154,8 +179,9 @@ export class ReferenceResolver {
         return;
       case "Parameter":
         // v2.2 issue #59: parameter bodies declare a single type
-        // token; no narrative refs to walk. Resolution of refs TO
-        // parameters lands in Todo 2.
+        // token; no narrative refs to walk. Short-circuit also lives
+        // in validateSelfScope/validateScoped to avoid wasted
+        // WalkContext construction (round-2 catch).
         return;
     }
   }
@@ -166,13 +192,13 @@ export class ReferenceResolver {
     switch (concept.definition.type) {
       case "CodedFromDefinition": {
         const termRef = concept.definition.terminologyName;
-        this.checkRef(termRef, "terminology", concept.definition.location, ctx, errors);
+        this.checkRef(termRef, TERMINOLOGY_REF_KINDS, concept.definition.location, ctx, errors);
         break;
       }
       case "DefinedAsDefinition": {
         const body = concept.definition.body;
         if (body.type === "DefinedAsBareRef") {
-          this.checkRef(body.ref, "concept", body.location, ctx, errors);
+          this.checkRef(body.ref, CONCEPT_REF_KINDS, body.location, ctx, errors);
         } else if (body.type === "DefinedAsComposition") {
           this.walkComposition(
             (body as DefinedAsComposition).expression,
@@ -203,7 +229,7 @@ export class ReferenceResolver {
         this.walkComposition(expr.expression, ctx, errors);
         return;
       case "CompositionRef":
-        this.checkRef(expr.ref, "concept", expr.location, ctx, errors);
+        this.checkRef(expr.ref, CONCEPT_REF_KINDS, expr.location, ctx, errors);
         return;
     }
   }
@@ -217,7 +243,7 @@ export class ReferenceResolver {
   private walkNarrativeElement(el: NarrativeElement, ctx: WalkContext, errors: ValidationError[]): void {
     switch (el.type) {
       case "NConceptRef":
-        this.checkRef(el.value, "concept", el.location, ctx, errors);
+        this.checkRef(el.value, NARRATIVE_REF_KINDS, el.location, ctx, errors);
         return;
       case "NDisjunction":
         for (const av of el.disjuncts) {
@@ -236,7 +262,7 @@ export class ReferenceResolver {
   private walkArgValue(av: ArgValue, ctx: WalkContext, errors: ValidationError[]): void {
     switch (av.type) {
       case "NConceptRef":
-        this.checkRef(av.value, "concept", av.location, ctx, errors);
+        this.checkRef(av.value, NARRATIVE_REF_KINDS, av.location, ctx, errors);
         return;
       case "NDisjunction":
         for (const inner of av.disjuncts) {
@@ -263,7 +289,7 @@ export class ReferenceResolver {
   private walkWhenBlock(wb: WhenBlock, ctx: WalkContext, errors: ValidationError[]): void {
     // `when "Concept"` — the conceptName ref. Empty name is the documented
     // sentinel for "always" (per USER_GUIDE); checkRef skips empty refs.
-    this.checkRef(wb.conceptName, "concept", wb.location, ctx, errors);
+    this.checkRef(wb.conceptName, CONCEPT_REF_KINDS, wb.location, ctx, errors);
     this.walkWhenBlockBody(wb.body, ctx, errors);
   }
 
@@ -290,9 +316,9 @@ export class ReferenceResolver {
   private walkActionStatement(stmt: ActionStatement, ctx: WalkContext, errors: ValidationError[]): void {
     const action = stmt.action;
     if (action.type === "RecommendActivity") {
-      this.checkRef(action.activityName, "activity", action.location, ctx, errors);
+      this.checkRef(action.activityName, ACTIVITY_REF_KINDS, action.location, ctx, errors);
     } else if (action.type === "UseDecision") {
-      this.checkRef(action.decisionName, "decision", action.location, ctx, errors);
+      this.checkRef(action.decisionName, DECISION_REF_KINDS, action.location, ctx, errors);
     }
   }
 
@@ -303,7 +329,7 @@ export class ReferenceResolver {
     if (withClause && withClause.terminologyReference !== undefined) {
       this.checkRef(
         withClause.terminologyReference,
-        "terminology",
+        TERMINOLOGY_REF_KINDS,
         withClause.location,
         ctx,
         errors,
@@ -315,7 +341,7 @@ export class ReferenceResolver {
 
   private checkRef(
     ref: ReferenceName,
-    refKind: RefKind,
+    acceptableKinds: AcceptableKinds,
     location: Location,
     ctx: WalkContext,
     errors: ValidationError[],
@@ -324,20 +350,21 @@ export class ReferenceResolver {
     if (!refName) return; // empty sentinel — `when ""` etc. — skip silently
 
     if (!isQualifiedRef(ref)) {
-      // Bare ref: resolve in current library's local names for the
-      // expected kind.
-      if (!ctx.localNames[refKind].has(refName)) {
-        errors.push(this.unresolvedRefError(refKind, refName, ctx, location));
+      // Bare ref: try each acceptable bucket in precedence order; succeed on first hit.
+      for (const kind of acceptableKinds) {
+        if (ctx.localNames[kind].has(refName)) return;
       }
+      errors.push(this.unresolvedRefError(acceptableKinds, refName, ctx, location));
       return;
     }
 
     // Qualified ref `"Lib"."Name"`.
     const targetLib = getRefLibrary(ref) ?? "";
     if (targetLib === ctx.selfLibrary) {
-      if (!ctx.localNames[refKind].has(refName)) {
-        errors.push(this.unresolvedRefError(refKind, refName, ctx, location));
+      for (const kind of acceptableKinds) {
+        if (ctx.localNames[kind].has(refName)) return;
       }
+      errors.push(this.unresolvedRefError(acceptableKinds, refName, ctx, location));
       return;
     }
 
@@ -361,10 +388,11 @@ export class ReferenceResolver {
         errors.push(externalLibraryNotIncluded(targetLib, ctx, location));
         return;
       }
-      const targetSet = target.names[REF_KIND_TO_PLURAL[refKind]];
-      if (!targetSet.has(refName)) {
-        errors.push(qualifiedRefUnresolved(targetLib, refName, ctx, location));
+      for (const kind of acceptableKinds) {
+        const targetSet = target.names[REF_KIND_TO_PLURAL[kind]];
+        if (targetSet.has(refName)) return;
       }
+      errors.push(qualifiedRefUnresolved(targetLib, refName, acceptableKinds, ctx, location));
       return;
     }
 
@@ -373,12 +401,12 @@ export class ReferenceResolver {
   }
 
   private unresolvedRefError(
-    refKind: RefKind,
+    acceptableKinds: AcceptableKinds,
     refName: string,
     ctx: WalkContext,
     location: Location,
   ): ValidationError {
-    const msg = unresolvedMessage(refKind, refName, ctx);
+    const msg = unresolvedMessage(acceptableKinds, refName, ctx);
     return {
       kind: "unresolved-reference",
       message: msg,
@@ -395,6 +423,7 @@ interface NameBuckets {
   terminology: Set<string>;
   decision: Set<string>;
   activity: Set<string>;
+  parameter: Set<string>;
 }
 
 function emptyBuckets(): NameBuckets {
@@ -403,6 +432,7 @@ function emptyBuckets(): NameBuckets {
     terminology: new Set(),
     decision: new Set(),
     activity: new Set(),
+    parameter: new Set(),
   };
 }
 
@@ -424,8 +454,7 @@ function collectNames(statements: Statement[]): NameBuckets {
         buckets.activity.add(s.name);
         break;
       case "Parameter":
-        // v2.2 issue #59: parameter name collection lands in Todo 2
-        // alongside the RefKind/NameBuckets widening.
+        buckets.parameter.add(s.name);
         break;
     }
   }
@@ -437,6 +466,7 @@ function parentKindOf(stmt: Statement): RefKind | "<other>" {
   if (stmt.type === "Decision") return "decision";
   if (stmt.type === "Activity") return "activity";
   if (stmt.type === "Terminology") return "terminology";
+  if (stmt.type === "Parameter") return "parameter";
   return "<other>";
 }
 
@@ -451,6 +481,7 @@ interface WalkContext {
     terminology: Set<string>;
     decision: Set<string>;
     activity: Set<string>;
+    parameter: Set<string>;
   };
   selfLibrary: string;
   // false only in single-file self-scope with empty library name; suppresses
@@ -463,19 +494,27 @@ interface WalkContext {
   scopeForQualified: LibraryScope | undefined;
 }
 
-function unresolvedMessage(refKind: RefKind, refName: string, ctx: WalkContext): string {
+/**
+ * Render the trailing parenthetical from the acceptable-kinds set. For
+ * pure-terminology slots the existing "no terminology block declares
+ * this name" wording is preserved (round-2 catch: factored template
+ * would have flattened this to "no terminology declared with this
+ * name", a user-visible diagnostic change).
+ */
+function unresolvedMessage(acceptableKinds: AcceptableKinds, refName: string, ctx: WalkContext): string {
   const parent = ctx.parentName;
   const parentLabel = ctx.parentKind === "<other>" ? "statement" : ctx.parentKind;
-  switch (refKind) {
-    case "terminology":
-      return `Undeclared terminology "${refName}" in ${parentLabel} "${parent}" (no terminology block declares this name)`;
-    case "concept":
-      return `Unresolved reference "${refName}" in ${parentLabel} "${parent}" (no concept declared with this name)`;
-    case "decision":
-      return `Unresolved reference "${refName}" in ${parentLabel} "${parent}" (no decision declared with this name)`;
-    case "activity":
-      return `Unresolved reference "${refName}" in ${parentLabel} "${parent}" (no activity declared with this name)`;
+
+  // Preserve the special terminology wording when the slot is terminology-only.
+  if (acceptableKinds.length === 1 && acceptableKinds[0] === "terminology") {
+    return `Undeclared terminology "${refName}" in ${parentLabel} "${parent}" (no terminology block declares this name)`;
   }
+
+  // "no concept declared", "no concept or parameter declared", etc.
+  const list = acceptableKinds.length === 1
+    ? acceptableKinds[0]
+    : acceptableKinds.slice(0, -1).join(", ") + " or " + acceptableKinds[acceptableKinds.length - 1];
+  return `Unresolved reference "${refName}" in ${parentLabel} "${parent}" (no ${list} declared with this name)`;
 }
 
 function externalLibraryNotIncluded(
@@ -497,12 +536,16 @@ function externalLibraryNotIncluded(
 function qualifiedRefUnresolved(
   targetLib: string,
   targetName: string,
+  acceptableKinds: AcceptableKinds,
   ctx: WalkContext,
   location: Location,
 ): ValidationError {
+  const list = acceptableKinds.length === 1
+    ? acceptableKinds[0]
+    : acceptableKinds.slice(0, -1).join(", ") + " or " + acceptableKinds[acceptableKinds.length - 1];
   return {
     kind: "qualified-ref-unresolved",
-    message: `Qualified reference "${targetLib}"."${targetName}" — library "${targetLib}" has no declaration named "${targetName}" of the expected kind`,
+    message: `Qualified reference "${targetLib}"."${targetName}" — library "${targetLib}" has no ${list} declaration named "${targetName}"`,
     location,
     severity: "error",
     targetLibrary: targetLib,

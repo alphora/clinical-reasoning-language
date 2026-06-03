@@ -57,7 +57,7 @@ export interface IndexedLibrary {
 export interface IndexedReference {
   targetLibrary: string;
   targetName: string;
-  targetKind: "concept" | "terminology" | "decision" | "activity";
+  targetKind: "concept" | "terminology" | "decision" | "activity" | "parameter";
   filePath: string;
   /** Range of the name segment (inside the quotes). */
   nameRange: ZeroBasedRange;
@@ -83,7 +83,7 @@ interface CachedProject {
   declarations: IndexedDeclaration[];
   libraries: IndexedLibrary[];
   references: IndexedReference[];
-  /** `${libName}::${name}` → IndexedReference[] for O(1) findRefsTo. */
+  /** `${libName}::${kind}::${name}` → IndexedReference[] for O(1) findRefsTo. v2.2: keyed by kind too so concept+parameter same-name don't cross-contaminate. */
   refsByTarget: Map<string, IndexedReference[]>;
   /** Set of file paths the validator touched on the last validate pass. */
   knownFilePaths: Set<string>;
@@ -170,10 +170,14 @@ export class ProjectIndex {
   }
 
   /** O(1) lookup via internal map. */
-  findRefsTo(filePath: string, libraryName: string, name: string): IndexedReference[] {
+  /**
+   * v2.2: `kind` is REQUIRED. Without it, parameter + concept of the
+   * same name would cross-contaminate find-refs / rename results.
+   */
+  findRefsTo(filePath: string, libraryName: string, name: string, kind: IndexedDeclaration["kind"]): IndexedReference[] {
     const cached = this.getCached(filePath);
     if (!cached) return [];
-    return cached.refsByTarget.get(refKey(libraryName, name)) ?? [];
+    return cached.refsByTarget.get(refKey(libraryName, kind, name)) ?? [];
   }
 
   /**
@@ -217,7 +221,7 @@ export class ProjectIndex {
     const references = enumerateReferences(graph, this.overlays);
     const refsByTarget = new Map<string, IndexedReference[]>();
     for (const r of references) {
-      const k = refKey(r.targetLibrary, r.targetName);
+      const k = refKey(r.targetLibrary, r.targetKind, r.targetName);
       let arr = refsByTarget.get(k);
       if (!arr) {
         arr = [];
@@ -242,8 +246,8 @@ export class ProjectIndex {
   }
 }
 
-function refKey(libraryName: string, name: string): string {
-  return `${libraryName}::${name}`;
+function refKey(libraryName: string, kind: IndexedDeclaration["kind"], name: string): string {
+  return `${libraryName}::${kind}::${name}`;
 }
 
 function isCrlProject(projectRoot: string): boolean {
@@ -420,9 +424,105 @@ function enumerateLibraries(
 }
 
 /**
+ * Per-library kind→names map for the index-time `targetKind` resolution
+ * walker uses on narrative refs (v2.2 issue #59). Built once from the
+ * graph so each ref-site lookup is O(1).
+ */
+type LibKindNames = {
+  concept: Set<string>;
+  parameter: Set<string>;
+  terminology: Set<string>;
+  decision: Set<string>;
+  activity: Set<string>;
+};
+/**
+ * v2.2 issue #59 — keyed by `${origin}|${libraryName}` to mirror the
+ * validator's `KNOWN_KEY` shape (src/imports/scopes.ts:97-98). Local
+ * "Foo" and package "Foo" are DISTINCT entries — same-name-cross-origin
+ * declarations don't merge and silently mask each other. This matches
+ * what `lookupKnownLibrary` does at validation time so the walker's
+ * `resolveTargetKind` agrees with the validator's view.
+ */
+type LibNamespaces = Map<string, LibKindNames>;
+
+function nsKey(origin: "local" | "package" | "root", name: string): string {
+  return `${origin}|${name}`;
+}
+
+function buildLibNamespaces(graph: ResolvedGraph): LibNamespaces {
+  const out: LibNamespaces = new Map();
+  const all: RegistryEntry[] = [...graph.resolvedLibraries, ...graph.localLibraries];
+  for (const entry of all) {
+    if (entry.name === null) continue;
+    const key = nsKey(entry.origin, entry.name);
+    let names = out.get(key);
+    if (!names) {
+      names = { concept: new Set(), parameter: new Set(), terminology: new Set(), decision: new Set(), activity: new Set() };
+      out.set(key, names);
+    }
+    for (const stmt of entry.ast.statements) {
+      const name = (stmt as { name?: string }).name;
+      if (!name) continue;
+      switch ((stmt as { type?: string }).type) {
+        case "Concept": names.concept.add(name); break;
+        case "Parameter": names.parameter.add(name); break;
+        case "Terminology": names.terminology.add(name); break;
+        case "Decision": names.decision.add(name); break;
+        case "Activity": names.activity.add(name); break;
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * Resolve the target kind for a narrative-pattern ref at index time.
+ * Tries each acceptable kind in precedence order; first hit wins. Falls
+ * back to `acceptableKinds[0]` (the slot's primary kind) on miss —
+ * matches the validator's `unresolvedMessage` precedence so a dangling
+ * ref surfaces a diagnostic in the same kind context everywhere.
+ *
+ * Origin precedence (mirrors `src/imports/scopes.ts:lookupKnownLibrary`):
+ * local-or-root asker tries local first, then root, then package as a
+ * fallback so `external-library-not-included` still fires downstream.
+ * Same-name-cross-origin libraries don't merge: a local "Foo" with
+ * `concept X` and a package "Foo" with `parameter X` stay separate.
+ */
+function resolveTargetKind(
+  ref: unknown,
+  owningLib: string,
+  ownerOrigin: "local" | "package" | "root",
+  acceptableKinds: readonly ("concept" | "parameter")[],
+  ns: LibNamespaces,
+): "concept" | "parameter" {
+  const refLib = typeof ref === "string"
+    ? owningLib
+    : (ref as { libraryName?: string }).libraryName ?? owningLib;
+  const refName = typeof ref === "string" ? ref : (ref as { name?: string }).name ?? "";
+  // Origin precedence: for a local/root asker try local first then root
+  // then package; for a package asker only its own origin.
+  const tryOrigins: readonly ("local" | "package" | "root")[] =
+    ownerOrigin === "package"
+      ? ["package"]
+      : ["local", "root", "package"];
+  for (const origin of tryOrigins) {
+    const libNames = ns.get(nsKey(origin, refLib));
+    if (!libNames) continue;
+    for (const kind of acceptableKinds) {
+      if (libNames[kind].has(refName)) return kind;
+    }
+  }
+  return acceptableKinds[0];
+}
+
+/**
  * Walk every concept/decision/activity body ref slot and emit one
  * IndexedReference per ref site. Mirrors `ReferenceResolver`'s coverage
  * (concept body + when/recommend/use + activity-with).
+ *
+ * v2.2 issue #59: narrative refs that could resolve to a parameter
+ * get their `targetKind` determined at index time via the per-library
+ * namespace lookup (see `resolveTargetKind`).
  */
 function enumerateReferences(
   graph: ResolvedGraph,
@@ -430,6 +530,7 @@ function enumerateReferences(
 ): IndexedReference[] {
   const out: IndexedReference[] = [];
   const seen = new Set<string>();
+  const ns = buildLibNamespaces(graph);
   const collect = (entries: RegistryEntry[]): void => {
     for (const entry of entries) {
       if (seen.has(entry.filePath)) continue;
@@ -437,8 +538,9 @@ function enumerateReferences(
       if (entry.name === null) continue;
       const source = sourceFor(entry.filePath, overlays);
       const owningLib = entry.name;
+      const owningOrigin = entry.origin;
       for (const stmt of entry.ast.statements) {
-        walkStatementRefs(stmt, owningLib, entry.filePath, source, out);
+        walkStatementRefs(stmt, owningLib, owningOrigin, entry.filePath, source, ns, out);
       }
     }
   };
@@ -450,15 +552,17 @@ function enumerateReferences(
 function walkStatementRefs(
   stmt: unknown,
   owningLib: string,
+  owningOrigin: "local" | "package" | "root",
   filePath: string,
   source: string,
+  ns: LibNamespaces,
   out: IndexedReference[],
 ): void {
   const s = stmt as { type?: string };
   switch (s.type) {
     case "Concept": {
       const c = stmt as { definition?: unknown };
-      walkConceptBody(c.definition, owningLib, filePath, source, out);
+      walkConceptBody(c.definition, owningLib, owningOrigin, filePath, source, ns, out);
       return;
     }
     case "Decision": {
@@ -478,9 +582,7 @@ function walkStatementRefs(
     }
     case "Parameter": {
       // v2.2 issue #59: parameter bodies declare a single type token; no
-      // narrative refs to walk. Explicit arm so a future regression
-      // (e.g. someone adds a body field that does carry refs) surfaces
-      // as a TS exhaustiveness check rather than a silent no-op.
+      // narrative refs to walk.
       return;
     }
   }
@@ -491,8 +593,10 @@ type Loc = { start: { line: number; column: number }; end: { line: number; colum
 function walkConceptBody(
   def: unknown,
   owningLib: string,
+  owningOrigin: "local" | "package" | "root",
   filePath: string,
   source: string,
+  ns: LibNamespaces,
   out: IndexedReference[],
 ): void {
   if (!def || typeof def !== "object") return;
@@ -511,7 +615,7 @@ function walkConceptBody(
     case "DefinitionIsDefinition": {
       const di = def as { body?: { elements?: unknown[] } };
       for (const el of di.body?.elements ?? []) {
-        walkNarrativeElement(el, owningLib, filePath, source, out);
+        walkNarrativeElement(el, owningLib, owningOrigin, filePath, source, ns, out);
       }
       return;
     }
@@ -528,6 +632,7 @@ function walkDefinedAsBody(
   if (!body || typeof body !== "object") return;
   const b = body as { type?: string; ref?: unknown; expression?: unknown; location?: Loc };
   if (b.type === "DefinedAsBareRef" && b.location) {
+    // `defined as` bare ref is concept-only per the slot table.
     addRef(b.ref, "concept", owningLib, filePath, source, b.location, out);
   } else if (b.type === "DefinedAsComposition") {
     walkComposition(b.expression, owningLib, filePath, source, out);
@@ -553,29 +658,42 @@ function walkComposition(
       walkComposition(e.expression, owningLib, filePath, source, out);
       return;
     case "CompositionRef":
+      // composition refs are concept-only per the slot table.
       if (e.location) addRef(e.ref, "concept", owningLib, filePath, source, e.location, out);
       return;
   }
 }
 
+const NARRATIVE_KINDS: readonly ("concept" | "parameter")[] = ["concept", "parameter"] as const;
+
 function walkNarrativeElement(
   el: unknown,
   owningLib: string,
+  owningOrigin: "local" | "package" | "root",
   filePath: string,
   source: string,
+  ns: LibNamespaces,
   out: IndexedReference[],
 ): void {
   if (!el || typeof el !== "object") return;
   const e = el as { type?: string; value?: unknown; disjuncts?: unknown[]; conjuncts?: unknown[]; location?: Loc };
   switch (e.type) {
     case "NConceptRef":
-      if (e.location) addRef(e.value, "concept", owningLib, filePath, source, e.location, out);
+      if (e.location) {
+        // v2.2 issue #59: narrative ref slot accepts concept OR parameter.
+        // Resolve at index time against the origin-keyed namespace map
+        // so `targetKind` reflects the actual declaration kind (not just
+        // the slot's primary kind) AND respects local/package origin
+        // precedence (same-name-cross-origin doesn't merge).
+        const kind = resolveTargetKind(e.value, owningLib, owningOrigin, NARRATIVE_KINDS, ns);
+        addRef(e.value, kind, owningLib, filePath, source, e.location, out);
+      }
       return;
     case "NDisjunction":
-      for (const av of e.disjuncts ?? []) walkNarrativeElement(av, owningLib, filePath, source, out);
+      for (const av of e.disjuncts ?? []) walkNarrativeElement(av, owningLib, owningOrigin, filePath, source, ns, out);
       return;
     case "NConjunction":
-      for (const av of e.conjuncts ?? []) walkNarrativeElement(av, owningLib, filePath, source, out);
+      for (const av of e.conjuncts ?? []) walkNarrativeElement(av, owningLib, owningOrigin, filePath, source, ns, out);
       return;
   }
 }

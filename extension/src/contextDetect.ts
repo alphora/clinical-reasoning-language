@@ -9,7 +9,14 @@
  * dist without any vscode bindings.
  */
 
-export type ExpectedRefKind = "concept" | "terminology" | "decision" | "activity" | "any";
+/**
+ * Slot context for ref completion. v2.2 issue #59 introduces "narrative"
+ * — the only slot where parameters are also acceptable refs. Keeping
+ * "concept" strict (no parameter fallback) so `defined as` /
+ * composition / `when` autocomplete don't offer parameters the
+ * validator would reject.
+ */
+export type ExpectedRefKind = "concept" | "terminology" | "decision" | "activity" | "parameter" | "narrative" | "any";
 
 /**
  * Classify the line prefix to decide which declaration kinds should
@@ -55,17 +62,15 @@ export function detectExpectedKind(linePrefix: string): ExpectedRefKind {
   if (/\bdefined\s+as\s+(?:"[^"]*"\s*\.\s*)?$/.test(beforeQuote)) return "concept";
   if (/(?:\(|sem-and|sem-or|sem-not|,)\s*(?:"[^"]*"\s*\.\s*)?$/.test(beforeQuote)) return "concept";
 
-  // `definition is …` narrative — every ref is a concept. The narrative
-  // body wraps across lines; if the prefix mentions `definition is` OR
-  // the ref appears mid-narrative without any other keyword classifier,
-  // treat as concept.
-  if (/\bdefinition\s+is\b/.test(beforeQuote)) return "concept";
+  // `definition is …` narrative body. Slot accepts concept OR
+  // parameter refs per v2.2 issue #59's Option C-lite slot table.
+  if (/\bdefinition\s+is\b/.test(beforeQuote)) return "narrative";
 
   // Common narrative connectors (`during`, `before`, `after`, `as of`,
   // `at least`, `at most`, `on day of`, `on or before`) that immediately
-  // precede a concept ref.
+  // precede a concept-or-parameter ref.
   if (/\b(?:during|before|after|as\s+of|on\s+day\s+of|on\s+or\s+before)\s+(?:"[^"]*"\s*\.\s*)?$/.test(beforeQuote)) {
-    return "concept";
+    return "narrative";
   }
 
   return "any";

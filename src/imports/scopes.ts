@@ -10,6 +10,7 @@ export interface LibraryScopeNames {
   terminologies: Set<string>;
   decisions: Set<string>;
   activities: Set<string>;
+  parameters: Set<string>;
 }
 
 /**
@@ -65,6 +66,7 @@ function emptyNames(): LibraryScopeNames {
     terminologies: new Set(),
     decisions: new Set(),
     activities: new Set(),
+    parameters: new Set(),
   };
 }
 
@@ -85,9 +87,7 @@ function collectLocalNames(entry: RegistryEntry): LibraryScopeNames {
         if (stmt.name) names.activities.add(stmt.name);
         break;
       case "Parameter":
-        // v2.2 issue #59: parameter declarations don't populate the
-        // four existing scope buckets. Their own bucket lands in
-        // Todo 2 alongside the RefKind/NameBuckets widening.
+        if (stmt.name) names.parameters.add(stmt.name);
         break;
     }
   }
