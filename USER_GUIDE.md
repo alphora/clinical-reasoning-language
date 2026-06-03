@@ -218,7 +218,44 @@ The tag vocabulary, value shapes, and cardinality are defined in the [metadata r
 
 ---
 
-### 5. Cross-library imports (`library` + `include`) — v2.1.0
+### 5. Parameter Statement
+
+Declares a runtime CQL parameter — a value the measure execution environment supplies (e.g. `"Measurement Period"`, the calendar window the measure runs against). Added in v2.2.0.
+
+```crl
+parameter "Measurement Period":
+- param type is Period.
+
+parameter "Index Patient":
+- param type is Patient.
+```
+
+#### Structure
+
+- `parameter "Name":` (colon required)
+- Exactly one body line: `- param type is <PARAMETER_TYPE>.`
+- No `coded from` / `defined as` / `definition is` — parameters are runtime inputs, not derived.
+
+#### Library-local rule
+
+Every library that references a parameter declares it locally. Do NOT use qualified refs (`"OtherLib"."Param"`) to reach parameters declared in other libraries. In a split project, the parameter declaration lives in the library that uses it — typically the inferred / measure-logic layer where the timing-window narrative refs live. See the [cms22-split corpus](./features/cql-pattern-mining/results/models/cms22-split/) for the canonical pattern.
+
+#### Reference resolution
+
+Narrative slots (`- definition is ...`) accept concept-or-parameter refs; the resolver prefers a concept first when both exist with the same name. Non-narrative slots (`coded from`, `defined as` bare-ref, composition operands `sem-and` / `sem-or` / `sem-not`, `when ... then ...`, activity `with`) remain concept- or terminology-only.
+
+#### CQL emit semantics
+
+- **`Patient`-typed parameter** → emitted CQL has a `context Patient` line per the CQL spec. The parameter's quoted CRL name is NOT emitted; the `context Patient` line has no per-name identifier. Every narrative ref to the parameter rewrites to the bare `Patient` identifier in emitted CQL.
+- **`Period`-typed parameter** → emitted as `parameter "Name" Interval<DateTime>` (matches `CRLPatterns` timing-arg signatures).
+- **Primitives** → PascalCase (`boolean → Boolean`, etc.).
+- **FHIR data + resource types** → passthrough (resolve via the library's `using FHIR version '4.0.1'` declaration).
+
+See [Valid Types → Parameter types](#parameter-types-param-type-is) below for the full allowlist.
+
+---
+
+### 6. Cross-library imports (`library` + `include`) — v2.1.0
 
 CRL files are called **libraries**. A project is an npm package — it has a
 `package.json` at its root, plus its CRL source files. Other CRL libraries
@@ -829,11 +866,17 @@ These lists are generated from the grammar (`src/grammar/CRLLexer.g4`); only the
 
 `CPGAdministerMedication`, `CPGCollectInformation`, `CPGCommunicationRequest`, `CPGDispenseMedication`, `CPGDocumentMedication`, `CPGEnrollment`, `CPGGenerateReport`, `CPGImmunizationRequest`, `CPGMedicationRequest`, `CPGProposeDiagnosisTask`, `CPGRecordDetectedIssue`, `CPGRecordInference`, `CPGReportFlagTask`, `CPGServiceRequest`
 
+### Parameter types (`param type is`)
+
+The union of concept value types and concept types. v2.2.0 deliberately omits `Practitioner` from the allowlist; emitter-side support exists as a defensive AST path but author syntax is rejected at parse time.
+
+`AdverseEvent`, `AllergyIntolerance`, `Attachment`, `boolean`, `ClinicalImpression`, `CodeableConcept`, `Communication`, `CommunicationRequest`, `Condition`, `dateTime`, `DetectedIssue`, `Device`, `DiagnosticReport`, `DocumentReference`, `Encounter`, `FamilyMemberHistory`, `Goal`, `Immunization`, `integer`, `MedicationAdministration`, `MedicationDispense`, `MedicationRequest`, `NutritionIntake`, `NutritionOrder`, `Observation`, `Patient`, `Period`, `Procedure`, `Quantity`, `QuestionnaireResponse`, `Range`, `Ratio`, `RiskAssessment`, `SampledData`, `ServiceRequest`, `string`, `Task`, `time`
+
 ---
 
 ## Keywords and Tokens
 
-- **Keywords:** `library`, `include`, `as`, `decision`, `terminology`, `activity`, `concept`, `when`, `then`, `recommend activity`, `use decision`, `request`, `with`, `because`, `type is`, `value type is`, `evidence is`, `meta is`, `coded from`, `defined as`, `definition is`, `apply pattern`, `system is`, `code is`, `valueset is`, `any:`, `all:`, `do not perform`, `not`, `and`, `or`, `sem-and`, `sem-or`, `sem-not`, `end when`, `:` (colon), `.` (dot), `-` (dash), `(` (left paren), `)` (right paren)
+- **Keywords:** `library`, `include`, `as`, `decision`, `terminology`, `activity`, `concept`, `parameter`, `when`, `then`, `recommend activity`, `use decision`, `request`, `with`, `because`, `type is`, `value type is`, `param type is`, `evidence is`, `meta is`, `coded from`, `defined as`, `definition is`, `apply pattern`, `system is`, `code is`, `valueset is`, `any:`, `all:`, `do not perform`, `not`, `and`, `or`, `sem-and`, `sem-or`, `sem-not`, `end when`, `:` (colon), `.` (dot), `-` (dash), `(` (left paren), `)` (right paren)
 - **Identifiers:** Double-quoted strings
 - **Free text/markdown:** Backtick-quoted strings
 - **Comments:** `// ...` or `/* ... */`
