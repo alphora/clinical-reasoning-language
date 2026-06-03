@@ -38,7 +38,7 @@ surface rules. This file's structural variety:
 //   2. if BP is hypertensive, drive treatment OR documentation,
 //   3. if BP is normal but the patient has hypertension on file,
 //      remind the clinician to confirm continued control.
-decision "CMS22 BP Control Cognitive Support":
+decision "CMS22 BP Control Strategy":
 
 - when "Patient Eligible For BP Cognitive Support" then:
   - when "No BP Reading At This Encounter" then recommend activity "Measure BP".

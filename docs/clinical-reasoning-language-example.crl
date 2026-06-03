@@ -63,7 +63,7 @@ file is single-library so every ref below is bare.
 //   1. document BMI if it isn't already recorded this period,
 //   2. recommend a high-BMI intervention if BMI is high,
 //   3. recommend a low-BMI intervention if BMI is low.
-decision "CMS69 BMI Screening Cognitive Support":
+decision "CMS69 BMI Screening Strategy":
 
 - when "Patient Eligible For BMI Screening" then:
   - when "BMI Not Documented During Measurement Period" then recommend activity "Document BMI".
