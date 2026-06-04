@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { validateCELFile } from "../cel/validator";
 import { validateCRLImports } from "../imports/validate";
 
 function parseArgs(argv: string[]): {
@@ -44,8 +45,49 @@ function parseArgs(argv: string[]): {
 const { filePath, soft, pretty } = parseArgs(process.argv.slice(2));
 
 if (!filePath) {
-  console.error("Usage: crl-validate --path <file.crl> [--soft] [--pretty]");
+  console.error("Usage: crl-validate --path <file.{crl,cel}> [--soft] [--pretty]");
   process.exit(1);
+}
+
+// Pitch v4 critical decision #1 option (d): crl-validate auto-dispatches by
+// file extension. `.cel` → CEL validator; `.crl` (default) → CRL.
+if (filePath.toLowerCase().endsWith(".cel")) {
+  const celResult = validateCELFile(filePath, { soft });
+  if (!pretty) {
+    const out = {
+      success: celResult.errors.length === 0,
+      errors: celResult.errors,
+      warnings: celResult.warnings,
+    };
+    console.log(JSON.stringify(out, null, 2));
+  } else {
+    console.log(`Validation: ${filePath}`);
+    if (celResult.graph.projectRoot) {
+      console.log(`Project root: ${celResult.graph.projectRoot}`);
+    }
+    if (celResult.graph.coversTarget) {
+      console.log(`Covers: ${celResult.graph.coversTarget.name}`);
+    }
+    console.log("==================");
+    console.log(`Valid: ${celResult.errors.length === 0}`);
+    if (celResult.errors.length > 0) {
+      console.log("\nErrors:");
+      celResult.errors.forEach((e) => {
+        const where = e.filePath ?? "<unknown>";
+        const loc = e.location ? `:${e.location.start.line}:${e.location.start.column}` : "";
+        console.log(`- ${where}${loc} [${e.kind}] ${e.message}`);
+      });
+    }
+    if (celResult.warnings.length > 0) {
+      console.log("\nWarnings:");
+      celResult.warnings.forEach((w) => {
+        const where = w.filePath ?? "<unknown>";
+        const loc = w.location ? `:${w.location.start.line}:${w.location.start.column}` : "";
+        console.log(`- ${where}${loc} [${w.kind}] ${w.message}`);
+      });
+    }
+  }
+  process.exit(celResult.errors.length === 0 ? 0 : 1);
 }
 
 const result = validateCRLImports(filePath, { soft });
