@@ -45,6 +45,32 @@ export type {
   ValidateImportsOptions,
   ValidateImportsResult,
 } from "./imports/validate";
+
+// === CEL (Case Example Language) — sibling DSL ===
+export { tokenizeCEL, parseCEL, buildCEL } from "./cel";
+export type { CELToken, CELParseResult } from "./cel";
+export type {
+  CEL,
+  CELLibraryDeclaration,
+  CELCoversDeclaration,
+  CELInclude,
+  CELStatement,
+  CELFact,
+  CELFactBody,
+  CELCase,
+  CELCaseBody,
+  CELAnchorField,
+  CELAnchorExpr,
+  CELFactRefField,
+  CELAtClause,
+  CELDurationOffset,
+  CELResultField,
+  CELResultValue,
+  CELCrossResourceField,
+  CELReferenceName,
+  IntentModifier,
+  CrossResourceRelation,
+} from "./cel/ast/types";
 export type {
   ValidationError,
   ValidationErrorKind,

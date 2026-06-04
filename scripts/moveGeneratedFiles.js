@@ -35,13 +35,13 @@ const antlrDir = path.join(__dirname, '../src/grammar/generated/antlr');
 const grammarDir = path.join(__dirname, '../src/grammar');
 
 // Move ANTLR generated files - for development builds
-moveFiles(rootDir, /^CRLLexer.*\.ts$/, antlrDir);
-moveFiles(rootDir, /^CRLParser.*\.ts$/, antlrDir);
+moveFiles(rootDir, /^(CRL|CEL)Lexer.*\.ts$/, antlrDir);
+moveFiles(rootDir, /^(CRL|CEL)Parser.*\.ts$/, antlrDir);
 moveFiles(rootDir, /\.tokens$/, antlrDir);
 moveFiles(rootDir, /\.interp$/, antlrDir);
 
 // Move ANTLR generated files - for automated builds
-moveFiles(grammarDir, /^CRLLexer.*\.ts$/, antlrDir);
-moveFiles(grammarDir, /^CRLParser.*\.ts$/, antlrDir);
+moveFiles(grammarDir, /^(CRL|CEL)Lexer.*\.ts$/, antlrDir);
+moveFiles(grammarDir, /^(CRL|CEL)Parser.*\.ts$/, antlrDir);
 moveFiles(grammarDir, /\.tokens$/, antlrDir);
 moveFiles(grammarDir, /\.interp$/, antlrDir);

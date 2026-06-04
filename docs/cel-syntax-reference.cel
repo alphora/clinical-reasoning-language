@@ -86,7 +86,7 @@ fact "Contraindication Notation":
 // Useful when the scenario should always emit "today" relative to whenever
 // the test data is regenerated.
 case "Dynamic-anchor scenario":
-- description is `Demonstrates `now` as the case anchor and relative
+- description is `Demonstrates \`now\` as the case anchor and relative
   offsets from it. The emitted FHIR resources' dates float forward
   whenever this is re-emitted.`.
 - subject is "Subject A".
@@ -101,7 +101,7 @@ case "Dynamic-anchor scenario":
 // Case 2 — fixed-date anchor + absolute-date escape hatch + intent variants.
 case "Fixed-anchor scenario with intent variants":
 - description is `Demonstrates a fixed case anchor, relative-from-anchor
-  dates, the absolute-date `on` escape hatch, and the absent + negative
+  dates, the absolute-date \`on\` escape hatch, and the absent + negative
   intent modifiers.`.
 - subject is "Subject A".
 - encounter is "Outpatient Visit".
@@ -133,10 +133,10 @@ case "Multi-anchor inpatient-flow scenario":
 // documented-contraindication-via-positive-fact pattern.
 case "Cross-resource reference scenario":
 - description is `Demonstrates the case-scope cross-resource wiring
-  vocabulary: `based on`, `part of`, `during encounter`, `requested by`,
-  `performed by`, and `not done because`. Also shows the
-  documented-contraindication pattern using a positive `DetectedIssue`
-  fact rather than a `documented intent` modifier.`.
+  vocabulary: \`based on\`, \`part of\`, \`during encounter\`, \`requested by\`,
+  \`performed by\`, and \`not done because\`. Also shows the
+  documented-contraindication pattern using a positive \`DetectedIssue\`
+  fact rather than a \`documented intent\` modifier.`.
 - subject is "Subject A".
 - encounter is "Outpatient Visit".
 - anchor is now.
