@@ -29,7 +29,9 @@ This is the rule. Every CRL `request CPG<Type>` token references a specific Requ
 
 ### Verified token ↔ IG profile mapping
 
-Each row was verified against the source FSH in `HL7/cqf-recommendations/input/fsh/profiles/activity-profiles/` on 2026-06-04. The Definition column profile fixes `kind`, `intent`, `code`, `profile`, `doNotPerform` per the IG (relevant for the FHIR-def emit lane, Todo 2).
+Each row was verified against the published `StructureDefinition-<id>.json` artifacts at `https://build.fhir.org/ig/HL7/cqf-recommendations/`. The Definition column profile fixes `kind` and `intent`, patterns `code`, and constrains `profile` and `doNotPerform` per the IG (relevant for the FHIR-def emit lane, Todo 2).
+
+**Important distinction the published spec exposes that FSH source hid:** the `code` element is constrained via `patternCodeableConcept`, not `fixedCodeableConcept`. The activity-type Coding entry MUST be present in `code.coding[]`, but additional codings MAY be added by emitters / consumers. The FHIR-def emit lane should append, not overwrite.
 
 | CRL token | IG Definition profile (Id) | IG Request profile | FHIR resource (`kind`) | IG activity-type code (`cpg-activity-type-cs`) |
 |---|---|---|---|---|
@@ -156,8 +158,9 @@ These are unresolved as of 2026-06-04 and feed into the FHIR-def emit lane (Todo
 | CRL→CEL emit CPG-to-FHIR-kind mapping | [`src/cel/emitter/emitFhir.ts:32-47`](../src/cel/emitter/emitFhir.ts#L32-L47) |
 | CEL FHIR-instance emit semantics | [`docs/cel-spec.md`](cel-spec.md) (section "Activity") |
 | CRL→FHIR-def emit pitch / plans / discussions | [`.vibe-tools/discussions/055-crl-fhir-def-emit-pitch.md`](../.vibe-tools/discussions/055-crl-fhir-def-emit-pitch.md), `056`-`058` (Todo 1), `059+` (Todo 2) |
-| CPG IG source (live build) | https://build.fhir.org/ig/HL7/cqf-recommendations/ |
-| CPG IG activity-profile FSH | `HL7/cqf-recommendations/input/fsh/profiles/activity-profiles/` |
+| **CPG IG (canonical spec)** | https://build.fhir.org/ig/HL7/cqf-recommendations/ |
+| **Published StructureDefinition JSONs (per profile)** | `https://build.fhir.org/ig/HL7/cqf-recommendations/StructureDefinition-<id>.json` (the **canonical source of truth** for differential constraints; verify against these, not the FSH authoring source) |
+| CPG IG activity-profile FSH source (authoring artifacts; not the spec) | `HL7/cqf-recommendations/input/fsh/profiles/activity-profiles/` |
 | CPG IG activity-type CodeSystem | `cpg-activity-type-cs` at `http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-activity-type-cs` |
 
 ## Verification log
@@ -165,3 +168,4 @@ These are unresolved as of 2026-06-04 and feed into the FHIR-def emit lane (Todo
 | Date | What | Outcome |
 |---|---|---|
 | 2026-06-04 | Verified all 14 CPG activity profile Ids + `kind` + `code` + `profile` (target) + `intent` + `doNotPerform` fields against `HL7/cqf-recommendations/input/fsh/profiles/activity-profiles/*.fsh` via the GitHub API. | 8 CEL CPG_TO_FHIR `kind` values were wrong against the IG; fixed in commit `887528a`. CRL grammar tokens needed 3 renames; landed in `887528a`. 3 missing concept types added in commit (this commit). |
+| 2026-06-04 | Cross-checked the FSH-derived facts against the published `StructureDefinition-cpg-servicerequestactivity.json` artifact. | All facts confirmed. One FSH-vs-spec distinction surfaced: `code` is `patternCodeableConcept`, not `fixedCodeableConcept` — additional codings are allowed. Going forward, verify against the published StructureDefinition JSONs, not the FSH source. Doc updated to reflect this. |
