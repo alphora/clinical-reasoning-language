@@ -1,0 +1,56 @@
+# CMS22 Blood Pressure Screening — measure caseload
+
+// A clinical scenario where a patient at a routine annual wellness visit
+// has their blood pressure measured and the reading is normal. The
+// patient satisfies the CMS22 Numerator via the Normal BP Reading path.
+
+library "CMS22 Blood Pressure Screening".
+covers "CMS22".
+
+
+// ============ Patient facts ============
+
+fact "Maria Garcia":
+- name is "Maria Garcia".
+- birth date is "1972-08-22".
+- defined by "Patient".
+
+
+// ============ Clinical facts ============
+
+fact "Annual Wellness Visit":
+- code is "G0438".
+- date is "2026-03-10".
+- defined by "CMS22 Asserted"."BP Screening Encounters".
+
+fact "Normal BP Panel":
+- code is "85354-9".
+- date is "2026-03-10".
+- defined by "CMS22 Asserted"."Blood Pressure Panels".
+
+fact "Normal Systolic Component":
+- code is "8480-6".
+- date is "2026-03-10".
+- value is 118.
+- defined by "CMS22 Asserted"."Systolic Blood Pressure Code".
+
+fact "Normal Diastolic Component":
+- code is "8462-4".
+- date is "2026-03-10".
+- value is 76.
+- defined by "CMS22 Asserted"."Diastolic Blood Pressure Code".
+
+
+// ============ Cases ============
+
+case "Maria has normal BP at her wellness visit":
+- description is `Maria's last systolic and diastolic readings on her
+  qualifying encounter day are both below the Normal-BP thresholds (118/76).
+  She satisfies the Numerator via the Normal BP Reading path.`.
+- subject is "Maria Garcia".
+- fact is "Annual Wellness Visit".
+- fact is "Normal BP Panel".
+- fact is "Normal Systolic Component".
+- fact is "Normal Diastolic Component".
+- result is "Initial Population" is true.
+- result is "Numerator" is true.

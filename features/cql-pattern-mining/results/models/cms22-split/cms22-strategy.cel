@@ -1,0 +1,73 @@
+# CMS22 BP Control Cognitive Support — caseload
+
+// Scenario: a patient with previously-confirmed hypertension presents
+// for a routine wellness visit. Their BP reading is hypertensive. The
+// CMS22 BP Control Strategy decision walks the hypertensive-reading
+// branch and the Recommend Hypertension Intervention sub-decision
+// chooses the antihypertensive-medication-order path.
+//
+// This case exercises the decision-tree path:
+//   CMS22 BP Control Strategy
+//     when Patient Eligible For BP Cognitive Support
+//       when Has Hypertensive Reading
+//         use decision Recommend Hypertension Intervention
+//           when Has Confirmed Hypertension Diagnosis
+//             any: recommend Order Antihypertensive Medication
+
+library "CMS22 BP Cognitive Support — Hypertensive Reading".
+covers "CMS22 BP Control Cognitive Support Example".
+
+
+// ============ Patient facts ============
+
+fact "Robert Lee":
+- name is "Robert Lee".
+- birth date is "1958-11-04".
+- defined by "Patient".
+
+
+// ============ Clinical facts ============
+
+fact "Wellness Visit":
+- code is "G0438".
+- date is "2026-04-12".
+- defined by "Encounter".
+
+fact "Confirmed Hypertension Diagnosis":
+- code is "I10".
+- date is "2024-05-12".
+- defined by "CMS22 BP Control Cognitive Support Example"."Hypertension Diagnoses".
+
+fact "Hypertensive BP Reading":
+- code is "85354-9".
+- date is "2026-04-12".
+- defined by "CMS22 BP Control Cognitive Support Example"."BP Reading".
+
+fact "Hypertensive Systolic":
+- code is "8480-6".
+- date is "2026-04-12".
+- value is 152.
+- defined by "CMS22 BP Control Cognitive Support Example"."Standalone Systolic BP Observations".
+
+fact "Hypertensive Diastolic":
+- code is "8462-4".
+- date is "2026-04-12".
+- value is 96.
+- defined by "CMS22 BP Control Cognitive Support Example"."Standalone Diastolic BP Observations".
+
+
+// ============ Cases ============
+
+case "Robert: hypertensive reading triggers antihypertensive recommendation":
+- description is `Robert is eligible for BP cognitive support and has a
+  hypertensive reading at his wellness encounter. He has a confirmed
+  hypertension diagnosis on file, so the Recommend Hypertension
+  Intervention sub-decision selects the antihypertensive-medication
+  branch.`.
+- subject is "Robert Lee".
+- fact is "Wellness Visit".
+- fact is "Confirmed Hypertension Diagnosis".
+- fact is "Hypertensive BP Reading".
+- fact is "Hypertensive Systolic".
+- fact is "Hypertensive Diastolic".
+- result is "CMS22 BP Control Strategy" is "Order Antihypertensive Medication".
