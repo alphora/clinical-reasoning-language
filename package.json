@@ -10,7 +10,8 @@
     "crl-lex": "dist/cli/run-lexer.js",
     "crl-parse": "dist/cli/run-parser.js",
     "crl-ast": "dist/cli/run-ast.js",
-    "crl-template-match": "dist/cli/run-template-match.js"
+    "crl-template-match": "dist/cli/run-template-match.js",
+    "crl-mcp": "dist/cli/run-mcp-server.js"
   },
   "sideEffects": false,
   "exports": {
@@ -36,6 +37,8 @@
     "lint:fix": "eslint src/**/*.ts --fix",
     "format": "prettier --write 'src/**/*.ts'",
     "test": "jest src/tests/index.test.ts",
+    "pretest:mcp": "npm run build",
+    "test:mcp": "node src/cli/tests/run-mcp-server.test.mjs",
     "prebuild": "rimraf dist && shx mkdir -p dist && npm run generate && cpx \"src/grammar/generated/types/*.json\" dist/grammar/generated/types/ && node scripts/checkGrammarJsonFiles.js",
     "build": "tsc",
     "clean": "rimraf dist",
@@ -74,10 +77,12 @@
   "author": "CQIS",
   "license": "MIT",
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "antlr4ts": "^0.5.0-alpha.4",
     "cpx": "^1.2.1",
     "fsh-sushi": "^3.15.0",
-    "prompts": "^2.4.2"
+    "prompts": "^2.4.2",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/jest": "^29.5.12",
