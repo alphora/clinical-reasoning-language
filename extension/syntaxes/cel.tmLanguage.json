@@ -2,50 +2,54 @@
   "scopeName": "source.crl-cel",
   "patterns": [
     {
-      "name": "comment.line.number-sign.cel",
+      "name": "comment.line.number-sign.crl",
       "match": "^\\s*#.*$"
     },
     {
-      "name": "comment.line.double-slash.cel",
+      "name": "comment.line.double-slash.crl",
       "match": "(?<!:)//.*$"
     },
     {
-      "name": "comment.block.cel",
+      "name": "comment.block.crl",
       "begin": "/\\*",
       "end": "\\*/"
     },
     {
-      "name": "string.quoted.double.cel",
+      "name": "string.quoted.double.crl",
       "begin": "\"",
       "end": "\""
     },
     {
-      "name": "string.quoted.backtick.cel",
+      "name": "string.quoted.backtick.crl",
       "begin": "`",
       "end": "`"
     },
     {
-      "name": "entity.name.type.cel",
-      "match": "(?<![\\w`\"])\\b(library|covers|include|fact|case)\\b(?![\\w`\"])"
+      "name": "keyword.control.import.crl",
+      "match": "(?<![\\w`\"])\\b(library|covers|include)\\b(?![\\w`\"])"
     },
     {
-      "name": "keyword.control.binder.cel",
+      "name": "entity.name.type.crl",
+      "match": "(?<![\\w`\"])\\b(fact|case)\\b(?![\\w`\"])"
+    },
+    {
+      "name": "variable.language.element.crl",
       "match": "(?<![\\w`\"])\\b(subject is|encounter is|anchor is|anchor|fact is|result is)\\b(?![\\w`\"])"
     },
     {
-      "name": "keyword.control.field.cel",
+      "name": "variable.language.element.crl",
       "match": "(?<![\\w`\"])\\b(name is|birth date is|code is|date is|value is|stage is|defined by|description is|because)\\b(?![\\w`\"])"
     },
     {
-      "name": "keyword.control.intent.cel",
+      "name": "keyword.control.flow.crl",
       "match": "(?<![\\w`\"])\\b(with absent intent|with negative intent|absent intent|negative intent)\\b(?![\\w`\"])"
     },
     {
-      "name": "keyword.control.anchor.cel",
+      "name": "variable.language.element.crl",
       "match": "(?<![\\w`\"])\\b(at anchor|at|on|now|is|as)\\b(?![\\w`\"])"
     },
     {
-      "name": "keyword.control.cross-resource.cel",
+      "name": "keyword.control.flow.crl",
       "match": "(?<![\\w`\"])\\b(based on|part of|during encounter|requested by|performed by|not done because)\\b(?![\\w`\"])"
     },
     {

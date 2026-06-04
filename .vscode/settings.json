@@ -53,7 +53,7 @@
     ]
   ],
   "files.associations": {
-    "*.crl": "markdown"
+    "*.crl": "crl"
   },
   "editor.tokenColorCustomizations": {
     "textMateRules": [

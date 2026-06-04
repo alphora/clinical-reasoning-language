@@ -53,9 +53,12 @@ check("CRL grammar: first pattern is #-line comment", () => {
   assert.equal(first.match, "^\\s*#.*$");
 });
 
-check("CEL grammar: first pattern is #-line comment", () => {
+check("CEL grammar: first pattern is #-line comment (CRL parity scope)", () => {
+  // Per operator parity request: CEL pattern scopes are renamed to `.crl`
+  // suffix so the user's existing CRL editor.tokenColorCustomizations rules
+  // apply to CEL too. CEL keywords get the same colors as their CRL analogs.
   const first = cel.patterns[0];
-  assert.equal(first.name, "comment.line.number-sign.cel");
+  assert.equal(first.name, "comment.line.number-sign.crl");
   assert.equal(first.match, "^\\s*#.*$");
 });
 
