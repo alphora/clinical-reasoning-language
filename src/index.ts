@@ -49,6 +49,12 @@ export type {
 // === CEL (Case Example Language) — sibling DSL ===
 export { tokenizeCEL, parseCEL, buildCEL } from "./cel";
 export type { CELToken, CELParseResult } from "./cel";
+export { resolveCelImports } from "./cel/imports";
+export type {
+  ResolveCelImportsOptions,
+  ResolvedCelGraph,
+  CelImportDiagnostic,
+} from "./cel/imports";
 export type {
   CEL,
   CELLibraryDeclaration,
