@@ -106,6 +106,47 @@ try {
     assert.equal(out.success, true);
     assert.equal(out.result.library?.name, "CMS69 BMI Screening GPG Strategy example");
   });
+
+  // --- Cross-file validation (issue #66) ---
+  //
+  // The cms22-split corpus has sibling libraries that reference each other
+  // via qualified refs. Single-file validation can't see across files and
+  // would flag every cross-library ref as missing-include; project-mode
+  // validation resolves them through the resolved-imports graph.
+  const cms22SplitInferred = resolve(
+    here,
+    "../../features/cql-pattern-mining/results/models/cms22-split/cms22-inferred.crl"
+  );
+
+  await check("validate_crl via path → project mode resolves sibling libraries", async () => {
+    const r = await client.callTool({
+      name: "validate_crl",
+      arguments: { path: cms22SplitInferred },
+    });
+    assert.ok(!r.isError, "should not be a tool error");
+    const out = JSON.parse(r.content[0].text);
+    assert.equal(
+      out.success,
+      true,
+      `cms22-inferred should validate cleanly in project mode; got errors: ${JSON.stringify(out.errors).slice(0, 200)}`
+    );
+    assert.equal(out.errors.length, 0);
+  });
+
+  await check("validate_crl via inline code → single-file mode (no cross-file context)", async () => {
+    // A file that uses qualified refs into a sibling library will be flagged
+    // when validated as inline code — there's no project context to resolve
+    // against. This is the documented inline-code behavior.
+    const code = readFileSync(cms22SplitInferred, "utf8");
+    const r = await client.callTool({ name: "validate_crl", arguments: { code } });
+    assert.ok(!r.isError);
+    const out = JSON.parse(r.content[0].text);
+    assert.equal(out.success, false, "inline-code mode cannot resolve cross-library refs");
+    assert.ok(
+      out.errors.some((e) => e.kind === "external-library-not-included"),
+      "expected at least one external-library-not-included error in single-file mode"
+    );
+  });
 } finally {
   await client.close();
 }

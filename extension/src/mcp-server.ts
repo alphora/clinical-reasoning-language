@@ -2,7 +2,14 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import { readFileSync, statSync } from "node:fs";
-import { tokenizeCRL, buildCRL, validateCRL, emitCQL } from "@smile-digital-health/crl";
+import {
+  tokenizeCRL,
+  buildCRL,
+  validateCRL,
+  validateCRLImports,
+  emitCQL,
+} from "@smile-digital-health/crl";
+import type { ImportDiagnostic } from "@smile-digital-health/crl";
 
 // Caps the CRL SOURCE (input) size. Response size scales with this — there is
 // no separate output cap, but bounding input keeps responses bounded enough.
@@ -86,7 +93,121 @@ function runEmit(args: EmitArgs) {
   return { content: [{ type: "text" as const, text: JSON.stringify(result) }] };
 }
 
+function importDiagnosticToError(d: ImportDiagnostic): Record<string, unknown> {
+  // Project ImportDiagnostic variants into a uniform { type, kind, message,
+  // filePath?, line?, column? } shape so the slim response stays consistent
+  // with single-file validation errors. The `kind` discriminator is preserved
+  // so callers can branch on it without parsing the message.
+  const base: Record<string, unknown> = { type: "Import", kind: d.kind };
+  switch (d.kind) {
+    case "parse-failure": {
+      const first = d.errors[0];
+      base.filePath = d.filePath;
+      base.message = `Parse failure in ${d.filePath}${first ? `: ${first.message}` : ""}`;
+      if (first) {
+        base.line = first.line;
+        base.column = first.column;
+      }
+      return base;
+    }
+    case "project-root-not-found":
+      base.message = `No package.json found upward from ${d.fromPath}`;
+      return base;
+    case "package-resolution-failure":
+      base.filePath = d.packagePath;
+      base.message = d.message;
+      return base;
+    case "registry-duplicate":
+      base.message = `Duplicate library "${d.name}" declared in ${d.filePaths.join(", ")}`;
+      return base;
+    case "unresolved-include":
+      base.filePath = d.from.filePath;
+      base.line = d.include.location?.start.line;
+      base.column = d.include.location?.start.column;
+      base.message = `Unresolved include of library "${d.include.name}" from ${d.from.filePath}`;
+      return base;
+    case "cycle":
+      base.message = `Include cycle: ${d.filePaths.join(" → ")}`;
+      return base;
+    case "alias-not-yet-supported":
+      base.filePath = d.from.filePath;
+      base.line = d.include.location?.start.line;
+      base.column = d.include.location?.start.column;
+      base.message = `Include alias not yet supported (library "${d.include.name}")`;
+      return base;
+    case "redundant-local-include":
+      base.filePath = d.from.filePath;
+      base.line = d.include.location?.start.line;
+      base.column = d.include.location?.start.column;
+      base.message = `Redundant local include "${d.include.name}" (sibling libraries auto-resolve via qualified refs)`;
+      return base;
+  }
+}
+
+function validationErrorToSlim(v: {
+  kind: string;
+  message: string;
+  location?: { start: { line: number; column: number } };
+  filePath?: string;
+  libraryName?: string;
+}): Record<string, unknown> {
+  return {
+    type: "Validation",
+    kind: v.kind,
+    message: v.message,
+    line: v.location?.start.line,
+    column: v.location?.start.column,
+    filePath: v.filePath,
+    libraryName: v.libraryName,
+  };
+}
+
 function runValidate(args: ValidateArgs) {
+  const hasCode = typeof args.code === "string";
+  const hasPath = typeof args.path === "string" && args.path.trim().length > 0;
+  if (hasCode === hasPath) {
+    return {
+      content: [
+        {
+          type: "text" as const,
+          text: "Provide exactly one of `code` (inline CRL) or `path` (a .crl file), not both or neither.",
+        },
+      ],
+      isError: true,
+    };
+  }
+
+  // Path mode → cross-file/project validation. Sees sibling libraries the
+  // same way the VS Code in-editor diagnostic surface does.
+  if (hasPath) {
+    const p = (args.path as string).trim();
+    try {
+      const st = statSync(p);
+      if (st.isDirectory()) {
+        throw new ToolInputError(`Path is a directory, not a file: "${p}".`);
+      }
+      if (st.size > MAX_INPUT_BYTES) {
+        throw new ToolInputError(`File too large: ${st.size} bytes > ${MAX_INPUT_BYTES}.`);
+      }
+    } catch (e) {
+      const msg =
+        e instanceof ToolInputError ? e.message : `Cannot read path "${p}": ${(e as Error).message}`;
+      return { content: [{ type: "text" as const, text: msg }], isError: true };
+    }
+    const full = validateCRLImports(p, { soft: args.soft === true });
+    const errors: Record<string, unknown>[] = [
+      ...full.importDiagnostics.filter((d) => d.severity === "error").map(importDiagnosticToError),
+      ...full.validationErrors.map(validationErrorToSlim),
+    ];
+    const warnings: Record<string, unknown>[] = [
+      ...full.importDiagnostics.filter((d) => d.severity === "warning").map(importDiagnosticToError),
+      ...full.validationWarnings.map(validationErrorToSlim),
+    ];
+    const slim = { success: full.success, errors, warnings };
+    return { content: [{ type: "text" as const, text: JSON.stringify(slim) }] };
+  }
+
+  // Inline-code mode → single-file validation (no sibling-file context to see).
   let source: string;
   try {
     source = resolveSource(args);
@@ -154,6 +275,10 @@ function createServer(): McpServer {
         "Validate a CRL document end-to-end: lex, parse, build AST, then run semantic checks (name uniqueness, " +
         "reference resolution, cycle detection, action uniqueness). Pass exactly one of `code` (inline) or " +
         "`path` (file), plus an optional `soft` flag. " +
+        "When `path` is provided the validator runs in PROJECT mode: it walks up to the nearest package.json and " +
+        "validates the file in the context of its sibling local libraries and node_modules packages — so " +
+        "qualified refs like \"OtherLib\".\"X\" resolve the same way they do for the VS Code in-editor " +
+        "diagnostics. When `code` is provided the validator runs in SINGLE-FILE mode (no sibling context). " +
         "Returns { success, errors[], warnings[] } — the AST is omitted (use build_crl_ast for that). " +
         "In soft mode, reference-target-exists checks demote to warnings (useful while authoring); name uniqueness " +
         "and cycle detection remain errors.",
