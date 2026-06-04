@@ -862,17 +862,21 @@ These lists are generated from the grammar (`src/grammar/CRLLexer.g4`); only the
 
 ### Concept types (`type is`)
 
-`AdverseEvent`, `AllergyIntolerance`, `ClinicalImpression`, `Communication`, `CommunicationRequest`, `Condition`, `DetectedIssue`, `Device`, `DiagnosticReport`, `DocumentReference`, `Encounter`, `FamilyMemberHistory`, `Goal`, `Immunization`, `MedicationAdministration`, `MedicationDispense`, `MedicationRequest`, `NutritionIntake`, `NutritionOrder`, `Observation`, `Patient`, `Procedure`, `QuestionnaireResponse`, `RiskAssessment`, `ServiceRequest`, `Task`
+Allowlist covers every base FHIR resource referenced by a CPG IG Request or Event profile, plus subject/contextual resources. See [`docs/cpg-ig-alignment.md`](docs/cpg-ig-alignment.md) for the full CRL↔CPG-IG mapping rationale.
+
+`AdverseEvent`, `AllergyIntolerance`, `ClinicalImpression`, `Communication`, `CommunicationRequest`, `Condition`, `DetectedIssue`, `Device`, `DiagnosticReport`, `DocumentReference`, `Encounter`, `EpisodeOfCare`, `FamilyMemberHistory`, `Flag`, `Goal`, `Immunization`, `MedicationAdministration`, `MedicationDispense`, `MedicationRequest`, `MedicationStatement`, `NutritionIntake`, `NutritionOrder`, `Observation`, `Patient`, `Procedure`, `QuestionnaireResponse`, `RiskAssessment`, `ServiceRequest`, `Task`
 
 ### Activity types (`request`)
 
-`CPGAdministerMedication`, `CPGQuestionnaire`, `CPGCommunicationRequest`, `CPGDispenseMedication`, `CPGDocumentMedication`, `CPGEnrollment`, `CPGGenerateReport`, `CPGImmunizationRequest`, `CPGMedicationRequest`, `CPGProposeDiagnosis`, `CPGRecordDetectedIssue`, `CPGRecordInference`, `CPGReportFlag`, `CPGServiceRequest`
+CRL tokens align with the CPG IG Activity Profiles table's Request column with the `Task` suffix dropped consistently. See [`docs/cpg-ig-alignment.md`](docs/cpg-ig-alignment.md) for the full mapping.
+
+`CPGAdministerMedication`, `CPGCommunicationRequest`, `CPGDispenseMedication`, `CPGDocumentMedication`, `CPGEnrollment`, `CPGGenerateReport`, `CPGImmunizationRequest`, `CPGMedicationRequest`, `CPGProposeDiagnosis`, `CPGQuestionnaire`, `CPGRecordDetectedIssue`, `CPGRecordInference`, `CPGReportFlag`, `CPGServiceRequest`
 
 ### Parameter types (`param type is`)
 
 The union of concept value types and concept types. v2.2.0 deliberately omits `Practitioner` from the allowlist; emitter-side support exists as a defensive AST path but author syntax is rejected at parse time.
 
-`AdverseEvent`, `AllergyIntolerance`, `Attachment`, `boolean`, `ClinicalImpression`, `CodeableConcept`, `Communication`, `CommunicationRequest`, `Condition`, `dateTime`, `DetectedIssue`, `Device`, `DiagnosticReport`, `DocumentReference`, `Encounter`, `FamilyMemberHistory`, `Goal`, `Immunization`, `integer`, `MedicationAdministration`, `MedicationDispense`, `MedicationRequest`, `NutritionIntake`, `NutritionOrder`, `Observation`, `Patient`, `Period`, `Procedure`, `Quantity`, `QuestionnaireResponse`, `Range`, `Ratio`, `RiskAssessment`, `SampledData`, `ServiceRequest`, `string`, `Task`, `time`
+`AdverseEvent`, `AllergyIntolerance`, `Attachment`, `boolean`, `ClinicalImpression`, `CodeableConcept`, `Communication`, `CommunicationRequest`, `Condition`, `dateTime`, `DetectedIssue`, `Device`, `DiagnosticReport`, `DocumentReference`, `Encounter`, `EpisodeOfCare`, `FamilyMemberHistory`, `Flag`, `Goal`, `Immunization`, `integer`, `MedicationAdministration`, `MedicationDispense`, `MedicationRequest`, `MedicationStatement`, `NutritionIntake`, `NutritionOrder`, `Observation`, `Patient`, `Period`, `Procedure`, `Quantity`, `QuestionnaireResponse`, `Range`, `Ratio`, `RiskAssessment`, `SampledData`, `ServiceRequest`, `string`, `Task`, `time`
 
 ---
 

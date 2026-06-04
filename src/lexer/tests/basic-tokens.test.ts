@@ -283,7 +283,7 @@ describe("CRL Lexer - Basic Tokens", () => {
           CRLLexer.CONCEPT_TYPE,
           CRLLexer.DASH,
           CRLLexer.TYPE_IS,
-          CRLLexer.ERROR,
+          CRLLexer.CONCEPT_TYPE,
         ],
         [
           "-",

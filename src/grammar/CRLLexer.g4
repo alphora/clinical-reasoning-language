@@ -169,15 +169,31 @@ ACTIVITY_COMMENT_BLOCK
 mode CONCEPT_MODE;
 
 // CONCEPT_TYPE possibilities (case sensitive)
-// Consider adding:
+//
+// Aligned to the CPG IG Activity Profiles table
+// (https://build.fhir.org/ig/HL7/cqf-recommendations/profiles.html#activity-profiles).
+// The allowlist covers every base FHIR resource referenced by an IG
+// Request or Event profile, plus subject/contextual resources (Patient,
+// Device, DocumentReference, Goal) that CRL authors reference even when
+// they aren't directly tied to a CPG activity.
+//
+// See docs/cpg-ig-alignment.md for the full CRL↔IG mapping including
+// which IG profiles map to which CRL concept types.
+//
+// Three IG Event-column resources are NOT here because CRL plans to
+// model them via dedicated top-level declaration kinds rather than as
+// `concept - type is X.`:
+//   CPGMetricReport / MeasureReport       — CRL `metric` declaration (backlog)
+//   CPGCaseSummary etc. / Composition     — CRL `summary` declaration (backlog)
+//
+// Consider adding (not yet warranted by the corpus):
 // ImagingStudy (maybe- though DiagnosticReport and Observation likely cover most use cases without it)
 // MolecularSequence (maybe- see ImagingStudy)
 // GenomicStudy (maybe- see ImagingStudy)
-
+//
 // Consider adding for ERAS:
 // Location (certain things need to happen in certain "locations" eg for ERAS, but their is a distinction between a "physical location" and the "role" it plays as part of a "business unit"- to be discussed)
 // HealthcareService
-// EpisodeOfCare
 // EncounterHistory (need to understand better where to use vs EpisodeOfCare for surgical "patient flow")
 // Appointment
 // AppointmentResponse
@@ -195,12 +211,15 @@ CONCEPT_TYPE
             'DiagnosticReport',
             'DocumentReference',
             'Encounter',
+            'EpisodeOfCare',
             'FamilyMemberHistory',
+            'Flag',
             'Goal',
             'Immunization',
             'MedicationAdministration',
             'MedicationDispense',
             'MedicationRequest',
+            'MedicationStatement',
             'NutritionIntake',
             'NutritionOrder',
             'Observation',
@@ -289,12 +308,15 @@ PARAMETER_TYPE
             'DiagnosticReport',
             'DocumentReference',
             'Encounter',
+            'EpisodeOfCare',
             'FamilyMemberHistory',
+            'Flag',
             'Goal',
             'Immunization',
             'MedicationAdministration',
             'MedicationDispense',
             'MedicationRequest',
+            'MedicationStatement',
             'NutritionIntake',
             'NutritionOrder',
             'Observation',

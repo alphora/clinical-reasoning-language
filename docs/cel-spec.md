@@ -190,7 +190,7 @@ CRL kind → FHIR resource:
   - Concept → its `conceptType` (must be in allowlist; else `unsupported-yet`).
   - Activity → mapped via the CPG profile table:
 
-CRL `request CPG<Type>` tokens align with the [CPG IG Activity Profiles](https://build.fhir.org/ig/HL7/cqf-recommendations/profiles.html#activity-profiles) Request-column profile names (with the `Task` suffix dropped consistently per CRL convention). The FHIR resource produced when a recommendation is applied derives from the parent of the IG Request profile.
+CRL `request CPG<Type>` tokens align with the [CPG IG Activity Profiles](https://build.fhir.org/ig/HL7/cqf-recommendations/profiles.html#activity-profiles) Request-column profile names (with the `Task` suffix dropped consistently per CRL convention). The FHIR resource produced when a recommendation is applied derives from the parent of the IG Request profile. See [`docs/cpg-ig-alignment.md`](cpg-ig-alignment.md) for the verified token mapping table + the design rationale + how to add a new activity / concept type.
 
 | CRL token | IG Request profile (extends) | FHIR resource |
 |---|---|---|
