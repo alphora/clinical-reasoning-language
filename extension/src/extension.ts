@@ -197,9 +197,60 @@ function ctxFor(context: vscode.ExtensionContext, root: string): ProvisionContex
   const version = context.extension?.packageJSON?.version;
   return {
     workspaceRoot: root,
-    serverScriptPath: path.join(context.extensionPath, "dist", "mcp-server.js"),
+    serverScriptPath: resolveStableMcpServerScript(context),
     extensionVersion: typeof version === "string" ? version : "0.0.0",
   };
+}
+
+/**
+ * Returns a STABLE path to the MCP server script — one that doesn't change
+ * when the extension is updated, so `.mcp.json` entries written by
+ * `crl.setup` survive version updates.
+ *
+ * Implementation: copy the extension's bundled `dist/mcp-server.js` into the
+ * per-extension `globalStorageUri` directory (version-independent, persists
+ * across extension updates). The copy is refreshed on every activation so
+ * the stable file always matches the currently-installed extension's MCP
+ * server logic.
+ *
+ * Why this matters: `context.extensionPath` resolves to a versioned install
+ * dir (e.g., `...crl-language-support-2.2.3/`). Writing that path into
+ * `.mcp.json` pins the MCP server to that specific version on disk — so
+ * extension updates leave `.mcp.json` pointing at the OLD install dir, and
+ * the new version's server logic never gets loaded by MCP clients. See
+ * issues #66 / #68 for symptoms.
+ */
+function resolveStableMcpServerScript(context: vscode.ExtensionContext): string {
+  const stableDir = context.globalStorageUri.fsPath;
+  const stablePath = path.join(stableDir, "mcp-server.js");
+  const bundledPath = path.join(context.extensionPath, "dist", "mcp-server.js");
+  const log = getOutputChannel();
+  try {
+    fs.mkdirSync(stableDir, { recursive: true });
+    fs.copyFileSync(bundledPath, stablePath);
+  } catch (e) {
+    log.appendLine(
+      `[mcp] WARN refresh failed at ${stablePath}: ${messageOf(e)} — falling back to bundled path`,
+    );
+    vscode.window.showWarningMessage(
+      `CRL: could not refresh MCP server at ${stablePath}: ${messageOf(e)}. ` +
+        `Falling back to the bundled path; the MCP server may stop tracking ` +
+        `extension updates until the storage directory becomes writable.`,
+    );
+    return bundledPath;
+  }
+  const version = context.extension?.packageJSON?.version ?? "0.0.0";
+  log.appendLine(`[mcp] resolved server (v${version}) → ${stablePath}`);
+  log.appendLine(`[mcp] bundled source → ${bundledPath}`);
+  return stablePath;
+}
+
+let outputChannel: vscode.OutputChannel | undefined;
+function getOutputChannel(): vscode.OutputChannel {
+  if (!outputChannel) {
+    outputChannel = vscode.window.createOutputChannel("CRL");
+  }
+  return outputChannel;
 }
 
 function grammarPath(context: vscode.ExtensionContext): string {
