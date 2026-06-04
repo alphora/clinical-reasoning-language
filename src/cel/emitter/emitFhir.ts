@@ -316,10 +316,10 @@ function applyDateField(body: Record<string, unknown>, fhirType: string, isoDate
     ServiceRequest: "authoredOn",
     Task: "authoredOn",
     DiagnosticReport: "effectiveDateTime",
-    ImmunizationRequest: "authoredOn",
     CommunicationRequest: "authoredOn",
     EpisodeOfCare: "period",
     DetectedIssue: "identifiedDateTime",
+    Flag: "period",
   };
   const field = map[fhirType];
   if (!field) return;
@@ -342,7 +342,6 @@ const SUBJECT_RESOURCES: ReadonlySet<string> = new Set([
   "ServiceRequest",
   "Task",
   "DiagnosticReport",
-  "ImmunizationRequest",
   "CommunicationRequest",
   "EpisodeOfCare",
   "DetectedIssue",
@@ -356,6 +355,7 @@ const SUBJECT_RESOURCES: ReadonlySet<string> = new Set([
   "FamilyMemberHistory",
   "RiskAssessment",
   "Communication",
+  "Flag",
 ]);
 
 const ENCOUNTER_RESOURCES: ReadonlySet<string> = new Set([
