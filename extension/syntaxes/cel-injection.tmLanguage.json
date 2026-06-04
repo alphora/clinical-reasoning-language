@@ -1,0 +1,61 @@
+{
+  "scopeName": "source.cel-injection",
+  "injectionSelector": "L:text.html.markdown",
+  "patterns": [
+    {
+      "name": "comment.line.double-slash.cel",
+      "match": "(?<!:)//.*$"
+    },
+    {
+      "name": "comment.block.cel",
+      "begin": "/\\*",
+      "end": "\\*/"
+    },
+    {
+      "name": "string.quoted.double.cel",
+      "begin": "\"",
+      "end": "\""
+    },
+    {
+      "name": "string.quoted.backtick.cel",
+      "begin": "`",
+      "end": "`"
+    },
+    {
+      "name": "entity.name.type.cel",
+      "match": "(?<![\\w`\"])\\b(library|covers|include|fact|case)\\b(?![\\w`\"])"
+    },
+    {
+      "name": "keyword.control.binder.cel",
+      "match": "(?<![\\w`\"])\\b(subject is|encounter is|anchor is|anchor|fact is|result is)\\b(?![\\w`\"])"
+    },
+    {
+      "name": "keyword.control.field.cel",
+      "match": "(?<![\\w`\"])\\b(name is|birth date is|code is|date is|value is|stage is|defined by|description is|because)\\b(?![\\w`\"])"
+    },
+    {
+      "name": "keyword.control.intent.cel",
+      "match": "(?<![\\w`\"])\\b(with absent intent|with negative intent|absent intent|negative intent)\\b(?![\\w`\"])"
+    },
+    {
+      "name": "keyword.control.anchor.cel",
+      "match": "(?<![\\w`\"])\\b(at anchor|at|on|now|is|as)\\b(?![\\w`\"])"
+    },
+    {
+      "name": "keyword.control.cross-resource.cel",
+      "match": "(?<![\\w`\"])\\b(based on|part of|during encounter|requested by|performed by|not done because)\\b(?![\\w`\"])"
+    },
+    {
+      "name": "constant.language.boolean.cel",
+      "match": "(?<![\\w`\"])\\b(true|false)\\b(?![\\w`\"])"
+    },
+    {
+      "name": "constant.numeric.cel",
+      "match": "\\b\\d{4}-\\d{2}-\\d{2}\\b|\\b\\d+(?:\\.\\d+)?\\b"
+    },
+    {
+      "name": "support.constant.time-unit.cel",
+      "match": "(?<![\\w`\"])\\b(years|year|months|month|weeks|week|days|day|hours|hour|minutes|minute|seconds|second|milliseconds|millisecond)\\b(?![\\w`\"])"
+    }
+  ]
+}

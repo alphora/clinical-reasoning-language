@@ -1,7 +1,7 @@
 {
   "name": "crl-language-support",
   "displayName": "Clinical Reasoning Language Support",
-  "description": "CRL keyword highlighting, live validation diagnostics, CRL→CQL emit, and catalog-driven authoring help (completion + hover) for .crl Markdown files.",
+  "description": "CRL + CEL keyword highlighting, live validation diagnostics, CRL→CQL + CEL→FHIR-JSON emit, and catalog-driven authoring help (completion + hover) for .crl / .cel Markdown files.",
   "version": "2.2.4",
   "publisher": "smiledigitalhealth",
   "engines": {
@@ -10,6 +10,7 @@
   "main": "./dist/extension.js",
   "activationEvents": [
     "workspaceContains:**/*.crl",
+    "workspaceContains:**/*.cel",
     "onLanguage:markdown"
   ],
   "repository": {
@@ -24,6 +25,14 @@
       {
         "scopeName": "source.crl-injection",
         "path": "./syntaxes/crl-injection.tmLanguage.json",
+        "injectTo": [
+          "text.html.markdown"
+        ],
+        "language": "markdown"
+      },
+      {
+        "scopeName": "source.cel-injection",
+        "path": "./syntaxes/cel-injection.tmLanguage.json",
         "injectTo": [
           "text.html.markdown"
         ],

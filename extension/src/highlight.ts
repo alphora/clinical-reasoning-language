@@ -42,8 +42,12 @@ export interface ApplyOptions {
   replaceScopes?: Set<string>;
 }
 
-const ASSOCIATION_GLOB = "*.crl";
-const ASSOCIATION_LANG = "markdown"; // the grammar injects into Markdown
+// Both `.crl` and `.cel` files use the Markdown injection grammar pattern.
+// The TextMate grammar injection is registered separately per DSL in
+// extension/package.json; the file-association just routes both extensions
+// to Markdown so VS Code applies the injections.
+const ASSOCIATION_GLOBS = ["*.crl", "*.cel"] as const;
+const ASSOCIATION_LANG = "markdown";
 
 export function loadCrlRules(grammarJsonPath: string): TmRule[] {
   const json = JSON.parse(readFileSync(grammarJsonPath, "utf8")) as Record<string, unknown>;
@@ -74,14 +78,16 @@ export function applyHighlight(
 
   const associations: Associations = { ...(curAssoc ?? {}) };
   let associationsChanged = false;
-  if (associations[ASSOCIATION_GLOB] !== ASSOCIATION_LANG) {
-    if (associations[ASSOCIATION_GLOB] !== undefined) {
-      warnings.push(
-        `files.associations "${ASSOCIATION_GLOB}" was "${associations[ASSOCIATION_GLOB]}"; changed to "${ASSOCIATION_LANG}" for CRL highlighting.`
-      );
+  for (const glob of ASSOCIATION_GLOBS) {
+    if (associations[glob] !== ASSOCIATION_LANG) {
+      if (associations[glob] !== undefined) {
+        warnings.push(
+          `files.associations "${glob}" was "${associations[glob]}"; changed to "${ASSOCIATION_LANG}" for CRL highlighting.`,
+        );
+      }
+      associations[glob] = ASSOCIATION_LANG;
+      associationsChanged = true;
     }
-    associations[ASSOCIATION_GLOB] = ASSOCIATION_LANG;
-    associationsChanged = true;
   }
 
   const tokenColors: TokenColors = { ...(curColors ?? {}) };
@@ -120,9 +126,11 @@ export function removeHighlight(
 
   const associations: Associations = { ...(curAssoc ?? {}) };
   let associationsChanged = false;
-  if (associations[ASSOCIATION_GLOB] === ASSOCIATION_LANG) {
-    delete associations[ASSOCIATION_GLOB];
-    associationsChanged = true;
+  for (const glob of ASSOCIATION_GLOBS) {
+    if (associations[glob] === ASSOCIATION_LANG) {
+      delete associations[glob];
+      associationsChanged = true;
+    }
   }
 
   const tokenColors: TokenColors = { ...(curColors ?? {}) };
