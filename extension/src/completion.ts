@@ -40,7 +40,7 @@ import type { ProjectIndex } from "./projectIndex";
 // glob pattern matching files ending in `.crl`. This avoids polluting plain
 // markdown files with CRL completions.
 export const CRL_DOCUMENT_SELECTOR: vscode.DocumentSelector = [
-  { language: "markdown", scheme: "file", pattern: "**/*.crl" },
+  { language: "crl", scheme: "file" },
 ];
 
 function isInDefinitionIsBody(document: vscode.TextDocument, position: vscode.Position): boolean {

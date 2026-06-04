@@ -10,8 +10,7 @@
   "main": "./dist/extension.js",
   "activationEvents": [
     "workspaceContains:**/*.crl",
-    "workspaceContains:**/*.cel",
-    "onLanguage:markdown"
+    "workspaceContains:**/*.cel"
   ],
   "repository": {
     "type": "git",
@@ -21,22 +20,30 @@
     "Programming Languages"
   ],
   "contributes": {
-    "grammars": [
+    "languages": [
       {
-        "scopeName": "source.crl-injection",
-        "path": "./syntaxes/crl-injection.tmLanguage.json",
-        "injectTo": [
-          "text.html.markdown"
-        ],
-        "language": "markdown"
+        "id": "crl",
+        "aliases": ["Clinical Reasoning Language", "crl"],
+        "extensions": [".crl"],
+        "configuration": "./syntaxes/crl.language-configuration.json"
       },
       {
-        "scopeName": "source.cel-injection",
-        "path": "./syntaxes/cel-injection.tmLanguage.json",
-        "injectTo": [
-          "text.html.markdown"
-        ],
-        "language": "markdown"
+        "id": "crl-cel",
+        "aliases": ["Case Example Language", "CEL", "cel"],
+        "extensions": [".cel"],
+        "configuration": "./syntaxes/cel.language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "crl",
+        "scopeName": "source.crl",
+        "path": "./syntaxes/crl.tmLanguage.json"
+      },
+      {
+        "language": "crl-cel",
+        "scopeName": "source.crl-cel",
+        "path": "./syntaxes/cel.tmLanguage.json"
       }
     ],
     "commands": [
@@ -90,7 +97,10 @@
     "test:project-index": "node src/projectIndex.test.mjs",
     "pretest:completion": "npm run compile",
     "test:completion": "node src/completion.test.mjs",
-    "test": "npm run compile && node src/mcp-server.test.mjs && node src/provision.test.mjs && node src/highlight.test.mjs && node src/catalog.test.mjs && node src/embedded-catalog.test.mjs && node src/concepts.test.mjs && node src/crl-patterns-coverage.test.mjs && node src/contextDetect.test.mjs && node src/findDeclaration.test.mjs && node src/projectIndex.test.mjs && node src/completion.test.mjs",
+    "test:grammar": "node src/grammar.test.mjs",
+    "test:package": "node src/package.test.mjs",
+    "test:language-config": "node src/language-config.test.mjs",
+    "test": "npm run compile && node src/mcp-server.test.mjs && node src/provision.test.mjs && node src/highlight.test.mjs && node src/catalog.test.mjs && node src/embedded-catalog.test.mjs && node src/concepts.test.mjs && node src/crl-patterns-coverage.test.mjs && node src/contextDetect.test.mjs && node src/findDeclaration.test.mjs && node src/projectIndex.test.mjs && node src/completion.test.mjs && node src/grammar.test.mjs && node src/package.test.mjs && node src/language-config.test.mjs",
     "vscode:prepublish": "npm run build:crl && npm run compile",
     "package": "vsce package"
   },

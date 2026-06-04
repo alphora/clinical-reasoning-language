@@ -5,9 +5,9 @@ import assert from "node:assert/strict";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const { loadCrlRules, applyHighlight, removeHighlight } = mod.default ?? mod;
+const { loadCrlRules, applyHighlight, removeHighlight, clearStaleCrlAssociations } = mod.default ?? mod;
 const here = dirname(fileURLToPath(import.meta.url));
-const grammar = resolve(here, "../syntaxes/crl-injection.tmLanguage.json");
+const grammar = resolve(here, "../syntaxes/crl.tmLanguage.json");
 
 let failed = false;
 const check = (label, fn) => {
@@ -29,11 +29,17 @@ check("loadCrlRules returns the grammar's rule set", () => {
   assert.ok(scopes.includes("keyword.control.flow.crl"));
 });
 
-check("apply on empty config adds association + all rules (changed)", () => {
+check("apply on empty config adds all rules + does NOT write any file-association (v2.3.0)", () => {
   const r = applyHighlight(undefined, undefined, rules);
-  assert.equal(r.associationsChanged, true);
+  // v2.3.0: applyHighlight does NOT touch files.associations anymore. The
+  // *.crl → markdown write that pre-v2.3.0 versions did is removed; the
+  // native `crl` language registration in package.json drives buffer
+  // language resolution. clearStaleCrlAssociations() is the helper that
+  // cleans up leftover pre-v2.3.0 entries on activation.
+  assert.equal(r.associationsChanged, false);
   assert.equal(r.tokenColorsChanged, true);
-  assert.equal(r.associations["*.crl"], "markdown");
+  assert.equal(r.associations["*.crl"], undefined);
+  assert.equal(r.associations["*.cel"], undefined);
   assert.equal(r.tokenColors.textMateRules.length, rules.length);
 });
 
@@ -44,11 +50,13 @@ check("apply is idempotent on its own output", () => {
   assert.equal(second.tokenColorsChanged, false);
 });
 
-check("apply flags only the section that changed", () => {
+check("apply flags only the section that changed (associations no longer toggled in v2.3.0)", () => {
   const applied = applyHighlight(undefined, undefined, rules);
-  // association absent, colors already present → only associationsChanged
+  // Colors already present → tokenColorsChanged is false. Associations
+  // never change in v2.3.0 (clearStaleCrlAssociations is the only path
+  // that mutates them).
   const r = applyHighlight(undefined, applied.tokenColors, rules);
-  assert.equal(r.associationsChanged, true);
+  assert.equal(r.associationsChanged, false);
   assert.equal(r.tokenColorsChanged, false);
 });
 
@@ -83,14 +91,47 @@ check("apply with replaceScopes overwrites the user-customized rule", () => {
   assert.equal(r.tokenColorsChanged, true);
 });
 
-check("remove deletes our association + our rules, keeps user's", () => {
+check("remove deletes our rules, keeps user's (v2.3.0: does NOT touch associations)", () => {
+  // Pre-existing user state: a non-CRL association + a user textMate rule.
+  // applyHighlight adds our rules; removeHighlight strips them. v2.3.0:
+  // neither path touches files.associations — that's clearStaleCrlAssociations's job.
   const applied = applyHighlight({ "*.foo": "json" }, { textMateRules: [{ scope: "x.mine", settings: { foreground: "#1" } }] }, rules);
   const r = removeHighlight(applied.associations, applied.tokenColors, rules);
-  assert.ok(r.associationsChanged && r.tokenColorsChanged);
+  assert.equal(r.associationsChanged, false);
+  assert.equal(r.tokenColorsChanged, true);
   assert.equal(r.associations["*.crl"], undefined);
   assert.equal(r.associations["*.foo"], "json");
   assert.ok(r.tokenColors.textMateRules.some((x) => x.scope === "x.mine"));
   assert.ok(!r.tokenColors.textMateRules.some((x) => x.scope === "entity.name.type.crl"));
+});
+
+check("clearStaleCrlAssociations: deletes *.crl → markdown + *.cel → markdown", () => {
+  const cur = { "*.crl": "markdown", "*.cel": "markdown", "*.foo": "json" };
+  const r = clearStaleCrlAssociations(cur);
+  assert.equal(r.changed, true);
+  assert.equal(r.associations["*.crl"], undefined);
+  assert.equal(r.associations["*.cel"], undefined);
+  assert.equal(r.associations["*.foo"], "json", "non-CRL associations must be left alone");
+});
+
+check("clearStaleCrlAssociations: leaves *.crl pointed at non-markdown (user customization) alone", () => {
+  const cur = { "*.crl": "html" };
+  const r = clearStaleCrlAssociations(cur);
+  assert.equal(r.changed, false);
+  assert.equal(r.associations["*.crl"], "html");
+});
+
+check("clearStaleCrlAssociations: no-op on undefined", () => {
+  const r = clearStaleCrlAssociations(undefined);
+  assert.equal(r.changed, false);
+  assert.deepEqual(r.associations, {});
+});
+
+check("clearStaleCrlAssociations: no-op when neither key is `markdown`", () => {
+  const cur = { "*.foo": "json" };
+  const r = clearStaleCrlAssociations(cur);
+  assert.equal(r.changed, false);
+  assert.equal(r.associations["*.foo"], "json");
 });
 
 check("remove leaves a user-customized .crl rule (settings differ)", () => {

@@ -1,7 +1,10 @@
 {
-  "scopeName": "source.cel-injection",
-  "injectionSelector": "L:text.html.markdown",
+  "scopeName": "source.crl-cel",
   "patterns": [
+    {
+      "name": "comment.line.number-sign.cel",
+      "match": "^\\s*#.*$"
+    },
     {
       "name": "comment.line.double-slash.cel",
       "match": "(?<!:)//.*$"

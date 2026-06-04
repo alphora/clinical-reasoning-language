@@ -1,7 +1,10 @@
 {
-  "scopeName": "source.crl-injection",
-  "injectionSelector": "L:text.html.markdown",
+  "scopeName": "source.crl",
   "patterns": [
+    {
+      "name": "comment.line.number-sign.crl",
+      "match": "^\\s*#.*$"
+    },
     {
       "name": "comment.line.double-slash.crl",
       "match": "(?<!:)//.*$"
@@ -119,6 +122,13 @@
         },
         {
           "scope": "comment.line.double-slash.crl",
+          "settings": {
+            "foreground": "#6A9955",
+            "fontStyle": "italic"
+          }
+        },
+        {
+          "scope": "comment.line.number-sign.crl",
           "settings": {
             "foreground": "#6A9955",
             "fontStyle": "italic"

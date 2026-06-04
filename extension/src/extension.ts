@@ -4,6 +4,7 @@ import * as fs from "node:fs";
 import { claudeCodeTarget, type ProvisionContext } from "./provision";
 import {
   applyHighlight,
+  clearStaleCrlAssociations,
   loadCrlRules,
   removeHighlight,
   type Associations,
@@ -162,12 +163,45 @@ export function activate(context: vscode.ExtensionContext): void {
   registerLanguageFeatures(context, loadEmbeddedCatalog(context), index);
   registerDiagnostics(context, index);
 
+  // v2.3.0 migration + provisioning. Sequenced (migration first, then
+  // provision) so provisionAll's downstream `applyHighlight` writes see the
+  // post-migration `files.associations` snapshot. With Todo 1's deletion of
+  // the legacy `ASSOCIATION_GLOBS → markdown` write in `applyHighlight`, the
+  // ordering is only load-bearing for the FIRST activation post-upgrade —
+  // subsequent activations are clean either way. Kept the ordering anyway
+  // because explicit > implicit.
   const auto = vscode.workspace.getConfiguration("crl").get<boolean>("autoProvision", true);
-  if (auto && vscode.workspace.workspaceFolders?.length) {
-    void provisionAll(context, false).catch((e) =>
-      vscode.window.showErrorMessage(`CRL: unexpected setup failure — ${messageOf(e)}`)
-    );
-  }
+  const wantProvision = auto && (vscode.workspace.workspaceFolders?.length ?? 0) > 0;
+  void (async () => {
+    try {
+      await clearStaleAssociationsAtActivation();
+    } catch (e) {
+      // Migration failure is unactionable for the user (settings may be
+      // managed/readonly). Log to output channel; don't pop up an error.
+      getOutputChannel().appendLine(`CRL migration: ${messageOf(e)}`);
+    }
+    if (wantProvision) {
+      try {
+        await provisionAll(context, false);
+      } catch (e) {
+        vscode.window.showErrorMessage(`CRL: unexpected setup failure — ${messageOf(e)}`);
+      }
+    }
+  })();
+}
+
+/**
+ * v2.3.0 migration. Runs on every activation. Idempotent. Removes
+ * `*.crl → markdown` / `*.cel → markdown` from the user's globally-scoped
+ * `files.associations` so the native `crl` / `crl-cel` language ids
+ * contributed by this extension take effect for the next file open.
+ */
+async function clearStaleAssociationsAtActivation(): Promise<void> {
+  const cfg = vscode.workspace.getConfiguration();
+  const curAssoc = cfg.inspect<Associations>("files.associations")?.globalValue;
+  const res = clearStaleCrlAssociations(curAssoc);
+  if (!res.changed) return;
+  await cfg.update("files.associations", res.associations, vscode.ConfigurationTarget.Global);
 }
 
 export function deactivate(): void {
@@ -254,7 +288,7 @@ function getOutputChannel(): vscode.OutputChannel {
 }
 
 function grammarPath(context: vscode.ExtensionContext): string {
-  return path.join(context.extensionPath, "syntaxes", "crl-injection.tmLanguage.json");
+  return path.join(context.extensionPath, "syntaxes", "crl.tmLanguage.json");
 }
 
 // Keys in extension globalState for the customized-scope dialog state.

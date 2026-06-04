@@ -49,6 +49,36 @@ export interface ApplyOptions {
 const ASSOCIATION_GLOBS = ["*.crl", "*.cel"] as const;
 const ASSOCIATION_LANG = "markdown";
 
+/**
+ * v2.3.0 migration helper. Pre-v2.3.0 the extension shipped `.crl` and `.cel`
+ * as Markdown injections, which required writing `*.crl → markdown` and
+ * `*.cel → markdown` into the user's `files.associations`. v2.3.0 contributes
+ * `crl` and `crl-cel` as native VS Code languages, so those associations now
+ * actively prevent VS Code from routing buffers to the native language id.
+ *
+ * Pure helper: takes the current `files.associations` snapshot, returns the
+ * updated snapshot + a flag indicating whether anything changed. The extension
+ * `activate()` calls this on every activation and writes back to user settings
+ * when changed. Idempotent — running it twice is a no-op on the second call.
+ *
+ * Only deletes associations whose value is `"markdown"`. If the user has
+ * explicitly remapped `*.crl` to some other language, leave it alone (their
+ * customization, not our stale write).
+ */
+export function clearStaleCrlAssociations(
+  curAssoc: Associations | undefined,
+): { associations: Associations; changed: boolean } {
+  const associations: Associations = { ...(curAssoc ?? {}) };
+  let changed = false;
+  for (const glob of ASSOCIATION_GLOBS) {
+    if (associations[glob] === ASSOCIATION_LANG) {
+      delete associations[glob];
+      changed = true;
+    }
+  }
+  return { associations, changed };
+}
+
 export function loadCrlRules(grammarJsonPath: string): TmRule[] {
   const json = JSON.parse(readFileSync(grammarJsonPath, "utf8")) as Record<string, unknown>;
   const snippet = json["__readme_token_color_customizations_snippet__"] as
@@ -76,19 +106,14 @@ export function applyHighlight(
   const warnings: string[] = [];
   const replaceScopes = options.replaceScopes ?? new Set<string>();
 
+  // v2.3.0: `.crl` and `.cel` are native VS Code languages now. The
+  // file-association write (`*.crl → markdown`) that pre-v2.3.0 versions
+  // did is REMOVED — it actively prevents VS Code from routing buffers to
+  // the new native language ids. `clearStaleCrlAssociations()` is the
+  // migration helper that cleans up entries pre-v2.3.0 versions wrote.
+  // Pass-through the input associations unchanged.
   const associations: Associations = { ...(curAssoc ?? {}) };
-  let associationsChanged = false;
-  for (const glob of ASSOCIATION_GLOBS) {
-    if (associations[glob] !== ASSOCIATION_LANG) {
-      if (associations[glob] !== undefined) {
-        warnings.push(
-          `files.associations "${glob}" was "${associations[glob]}"; changed to "${ASSOCIATION_LANG}" for CRL highlighting.`,
-        );
-      }
-      associations[glob] = ASSOCIATION_LANG;
-      associationsChanged = true;
-    }
-  }
+  const associationsChanged = false;
 
   const tokenColors: TokenColors = { ...(curColors ?? {}) };
   const existing: TmRule[] = Array.isArray(tokenColors.textMateRules) ? [...tokenColors.textMateRules] : [];
@@ -124,14 +149,13 @@ export function removeHighlight(
 ): HighlightResult {
   const ruleByKey = new Map(rules.map((r) => [scopeKey(r.scope), r]));
 
+  // v2.3.0: file-association removal happens via `clearStaleCrlAssociations()`
+  // not via the `removeHighlight` path. Pre-v2.3.0 the extension owned both
+  // sides (apply writes, remove deletes), but now the migration helper is the
+  // single source of truth for `files.associations` cleanup and runs
+  // unconditionally on activation. Pass-through unchanged here.
   const associations: Associations = { ...(curAssoc ?? {}) };
-  let associationsChanged = false;
-  for (const glob of ASSOCIATION_GLOBS) {
-    if (associations[glob] === ASSOCIATION_LANG) {
-      delete associations[glob];
-      associationsChanged = true;
-    }
-  }
+  const associationsChanged = false;
 
   const tokenColors: TokenColors = { ...(curColors ?? {}) };
   let tokenColorsChanged = false;
