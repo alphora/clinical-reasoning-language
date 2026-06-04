@@ -42,10 +42,10 @@ describe("Action FHIR Types", () => {
     verifyTokenSequence(input, expectedTokens, expectedText);
   });
 
-  test("should recognize CPGProposeDiagnosisTask", () => {
-    const input = "request CPGProposeDiagnosisTask.";
+  test("should recognize CPGProposeDiagnosis", () => {
+    const input = "request CPGProposeDiagnosis.";
     const expectedTokens = getActionTokenSequence();
-    const expectedText = ["request", "CPGProposeDiagnosisTask", "."];
+    const expectedText = ["request", "CPGProposeDiagnosis", "."];
     verifyTokenSequence(input, expectedTokens, expectedText);
   });
 

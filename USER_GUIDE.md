@@ -108,7 +108,7 @@ activity "Vaccinate":
 - request CPGImmunizationRequest.
 
 activity "Indicate":
-- request CPGProposeDiagnosisTask.
+- request CPGProposeDiagnosis.
 - with "Colonoscopy".
 
 activity "Message Care Plan":
@@ -866,7 +866,7 @@ These lists are generated from the grammar (`src/grammar/CRLLexer.g4`); only the
 
 ### Activity types (`request`)
 
-`CPGAdministerMedication`, `CPGCollectInformation`, `CPGCommunicationRequest`, `CPGDispenseMedication`, `CPGDocumentMedication`, `CPGEnrollment`, `CPGGenerateReport`, `CPGImmunizationRequest`, `CPGMedicationRequest`, `CPGProposeDiagnosisTask`, `CPGRecordDetectedIssue`, `CPGRecordInference`, `CPGReportFlagTask`, `CPGServiceRequest`
+`CPGAdministerMedication`, `CPGQuestionnaire`, `CPGCommunicationRequest`, `CPGDispenseMedication`, `CPGDocumentMedication`, `CPGEnrollment`, `CPGGenerateReport`, `CPGImmunizationRequest`, `CPGMedicationRequest`, `CPGProposeDiagnosis`, `CPGRecordDetectedIssue`, `CPGRecordInference`, `CPGReportFlag`, `CPGServiceRequest`
 
 ### Parameter types (`param type is`)
 

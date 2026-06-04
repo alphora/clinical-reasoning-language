@@ -111,7 +111,7 @@ describe("Whitespace Handling", () => {
 
     it("should handle whitespace in activity statements with of clause", () => {
       const input =
-        'activity\n"Action":\n - request\tCPGProposeDiagnosisTask\n - with\t"diagnosis"\t.';
+        'activity\n"Action":\n - request\tCPGProposeDiagnosis\n - with\t"diagnosis"\t.';
       const tokens = getTokensFromString(input);
       verifyTokenSequence(tokens, [
         CRLLexer.ACTIVITY,

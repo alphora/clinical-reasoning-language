@@ -190,22 +190,24 @@ CRL kind → FHIR resource:
   - Concept → its `conceptType` (must be in allowlist; else `unsupported-yet`).
   - Activity → mapped via the CPG profile table:
 
-| CPG profile | FHIR resource |
-|---|---|
-| `CPGCollectInformation` | `Observation` |
-| `CPGServiceRequest` | `ServiceRequest` |
-| `CPGMedicationRequest` | `MedicationRequest` |
-| `CPGImmunizationRequest` | `ImmunizationRequest` |
-| `CPGCommunicationRequest` | `CommunicationRequest` |
-| `CPGEnrollment` | `EpisodeOfCare` |
-| `CPGProposeDiagnosisTask` | `Task` |
-| `CPGRecordDetectedIssue` | `DetectedIssue` |
-| `CPGRecordInference` | `Observation` |
-| `CPGReportFlagTask` | `Task` |
-| `CPGGenerateReport` | `DiagnosticReport` |
-| `CPGDispenseMedication` | `MedicationDispense` |
-| `CPGDocumentMedication` | `MedicationStatement` |
-| `CPGAdministerMedication` | `MedicationAdministration` |
+CRL `request CPG<Type>` tokens align with the [CPG IG Activity Profiles](https://build.fhir.org/ig/HL7/cqf-recommendations/profiles.html#activity-profiles) Request-column profile names (with the `Task` suffix dropped consistently per CRL convention). The FHIR resource produced when a recommendation is applied derives from the parent of the IG Request profile.
+
+| CRL token | IG Request profile (extends) | FHIR resource |
+|---|---|---|
+| `CPGServiceRequest` | `CPGServiceRequest` extends `ServiceRequest` | `ServiceRequest` |
+| `CPGMedicationRequest` | `CPGMedicationRequest` extends `MedicationRequest` | `MedicationRequest` |
+| `CPGImmunizationRequest` | `CPGImmunizationRequest` extends `MedicationRequest` | `MedicationRequest` |
+| `CPGCommunicationRequest` | `CPGCommunicationRequest` extends `CommunicationRequest` | `CommunicationRequest` |
+| `CPGQuestionnaire` | `CPGQuestionnaireTask` extends `CPGTask` (Task) | `Task` |
+| `CPGEnrollment` | `CPGEnrollmentTask` extends `CPGTask` | `Task` |
+| `CPGProposeDiagnosis` | `CPGProposeDiagnosisTask` extends `CPGTask` | `Task` |
+| `CPGRecordDetectedIssue` | `CPGRecordDetectedIssueTask` extends `CPGTask` | `Task` |
+| `CPGRecordInference` | `CPGRecordInferenceTask` extends `CPGTask` | `Task` |
+| `CPGReportFlag` | `CPGReportFlagTask` extends `CPGTask` | `Task` |
+| `CPGGenerateReport` | `CPGGenerateReportTask` extends `CPGTask` | `Task` |
+| `CPGDispenseMedication` | `CPGDispenseMedicationTask` extends `CPGTask` | `Task` |
+| `CPGDocumentMedication` | `CPGDocumentMedicationTask` extends `CPGTask` | `Task` |
+| `CPGAdministerMedication` | `CPGAdministerMedicationTask` extends `CPGTask` | `Task` |
 
 Stage → FHIR intent:
 - `stage is proposed.` → `intent: "proposal"`

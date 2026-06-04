@@ -130,7 +130,7 @@ describe("CRL Lexer - Basic Tokens", () => {
       const tokens = getTokensFromString(input);
       verifyTokenSequence(
         tokens,
-        [CRLLexer.REQUEST, CRLLexer.ERROR],
+        [CRLLexer.REQUEST, CRLLexer.ACTIVITY_TYPE],
         ["request", "CPGProposeDiagnosis"],
       );
     });
@@ -154,7 +154,7 @@ describe("CRL Lexer - Basic Tokens", () => {
 
     it("should tokenize information and communication activities", () => {
       const input =
-        "request CPGCollectInformation request CPGCommunication request CPGGenerateReport";
+        "request CPGQuestionnaire request CPGCommunication request CPGGenerateReport";
       const tokens = getTokensFromString(input);
       verifyTokenSequence(
         tokens,
@@ -168,7 +168,7 @@ describe("CRL Lexer - Basic Tokens", () => {
         ],
         [
           "request",
-          "CPGCollectInformation",
+          "CPGQuestionnaire",
           "request",
           "CPGCommunication",
           "request",
@@ -236,7 +236,7 @@ describe("CRL Lexer - Basic Tokens", () => {
       const tokens = getTokensFromString(input);
       verifyTokenSequence(
         tokens,
-        [CRLLexer.REQUEST, CRLLexer.ERROR, CRLLexer.REQUEST, CRLLexer.ERROR],
+        [CRLLexer.REQUEST, CRLLexer.ACTIVITY_TYPE, CRLLexer.REQUEST, CRLLexer.ERROR],
         ["request", "CPGReportFlag", "request", "CPGResume"],
       );
     });

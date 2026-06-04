@@ -29,21 +29,44 @@ const CONCEPT_TYPE_SET: Set<string> = new Set<string>(conceptTypes as readonly C
  * Activity (CPG profile) → FHIR resource type mapping (per pitch v4 critical
  * decision #2 bounded MVP). Every entry in `activityTypes.json` maps somewhere.
  */
+// CRL `request CPG<Type>` token → FHIR resource kind (the `kind` value
+// on the emitted ActivityDefinition / the type of resource the activity
+// instantiates when applied). Tokens align with the CPG IG Request
+// column (https://build.fhir.org/ig/HL7/cqf-recommendations/profiles.html#activity-profiles)
+// with the `Task` suffix consistently dropped — see grammar rename
+// commit aligning to that convention.
+//
+// `kind` values verified against each cpg-XXX-activity profile FSH
+// in HL7/cqf-recommendations:
+//   * cpg-servicerequestactivity      kind = #ServiceRequest
+//   * cpg-medicationrequestactivity   kind = #MedicationRequest
+//   * cpg-immunizationactivity        kind = #MedicationRequest  (NOT ImmunizationRequest — IG models immunization recommendation as MedicationRequest)
+//   * cpg-communicationactivity       kind = #CommunicationRequest
+//   * cpg-collectinformationactivity  kind = #Task
+//   * cpg-enrollmentactivity          kind = #Task
+//   * cpg-proposediagnosisactivity    kind = #Task
+//   * cpg-recorddetectedissueactivity kind = #Task
+//   * cpg-recordinferenceactivity     kind = #Task
+//   * cpg-reportflagactivity          kind = #Task
+//   * cpg-generatereportactivity      kind = #Task
+//   * cpg-dispensemedicationactivity  kind = #Task
+//   * cpg-documentmedicationactivity  kind = #Task
+//   * cpg-administermedicationactivity kind = #Task
 const CPG_TO_FHIR: Record<string, string> = {
-  CPGCollectInformation: "Observation",
   CPGServiceRequest: "ServiceRequest",
   CPGMedicationRequest: "MedicationRequest",
-  CPGImmunizationRequest: "ImmunizationRequest",
+  CPGImmunizationRequest: "MedicationRequest",
   CPGCommunicationRequest: "CommunicationRequest",
-  CPGEnrollment: "EpisodeOfCare",
-  CPGProposeDiagnosisTask: "Task",
-  CPGRecordDetectedIssue: "DetectedIssue",
-  CPGRecordInference: "Observation",
-  CPGReportFlagTask: "Task",
-  CPGGenerateReport: "DiagnosticReport",
-  CPGDispenseMedication: "MedicationDispense",
-  CPGDocumentMedication: "MedicationStatement",
-  CPGAdministerMedication: "MedicationAdministration",
+  CPGQuestionnaire: "Task",
+  CPGEnrollment: "Task",
+  CPGProposeDiagnosis: "Task",
+  CPGRecordDetectedIssue: "Task",
+  CPGRecordInference: "Task",
+  CPGReportFlag: "Task",
+  CPGGenerateReport: "Task",
+  CPGDispenseMedication: "Task",
+  CPGDocumentMedication: "Task",
+  CPGAdministerMedication: "Task",
 };
 
 // Slugify moved to `src/fhir-emitter/slug.ts` so CRL and CEL emitters

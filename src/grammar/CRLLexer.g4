@@ -134,7 +134,6 @@ ACTIVITY_TYPE
     : ~[ \t\r\n.:()]+ {
         const validTypes = [
             'CPGAdministerMedication',
-            'CPGCollectInformation',
             'CPGCommunicationRequest',
             'CPGDispenseMedication',
             'CPGDocumentMedication',
@@ -142,10 +141,11 @@ ACTIVITY_TYPE
             'CPGGenerateReport',
             'CPGImmunizationRequest',
             'CPGMedicationRequest',
-            'CPGProposeDiagnosisTask',
+            'CPGProposeDiagnosis',
+            'CPGQuestionnaire',
             'CPGRecordDetectedIssue',
             'CPGRecordInference',
-            'CPGReportFlagTask',
+            'CPGReportFlag',
             'CPGServiceRequest'
         ];
         if (!validTypes.includes(this.text)) {

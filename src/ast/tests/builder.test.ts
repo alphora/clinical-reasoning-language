@@ -359,13 +359,13 @@ library "Test".
     it("should parse an activity with of clause", () => {
       const input = `# Test
 library "Test".
-      activity "Indicate":\n- request CPGProposeDiagnosisTask\n- with "Colonoscopy".`;
+      activity "Indicate":\n- request CPGProposeDiagnosis\n- with "Colonoscopy".`;
 
       const result = parseInput(input);
       const ast = result.statements[0] as Activity;
       expect(ast.type).toBe("Activity");
       expect(ast.name).toBe("Indicate");
-      expect(ast.body.request.activityType).toBe("CPGProposeDiagnosisTask");
+      expect(ast.body.request.activityType).toBe("CPGProposeDiagnosis");
       expect(ast.body.withClause?.terminologyReference).toBe("Colonoscopy");
     });
   });

@@ -97,7 +97,7 @@ describe("Structures", () => {
     });
 
     it("should tokenize activity statements with of clause", () => {
-      const input = `activity "Indicate":\n- request CPGProposeDiagnosisTask.\n- with "Colonoscopy".`;
+      const input = `activity "Indicate":\n- request CPGProposeDiagnosis.\n- with "Colonoscopy".`;
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(tokens, [

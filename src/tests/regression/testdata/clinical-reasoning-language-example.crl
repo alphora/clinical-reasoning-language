@@ -101,7 +101,7 @@ decision "Recommend Low BMI Intervention":
 // `do not perform` suffix are optional.
 
 activity "Document BMI":
-- request CPGCollectInformation.
+- request CPGQuestionnaire.
 - with "BMI as an Observation".
 
 activity "Order Weight Assessment Referral":

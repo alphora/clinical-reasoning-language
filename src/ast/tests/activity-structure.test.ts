@@ -20,7 +20,7 @@ describe("Activity Structure", () => {
   });
 
   it("should correctly structure activity with type and terminology", () => {
-    const input = '# Test\nlibrary "Test".\nactivity "Indicate":\n- request CPGProposeDiagnosisTask\n- with "Colonoscopy".';
+    const input = '# Test\nlibrary "Test".\nactivity "Indicate":\n- request CPGProposeDiagnosis\n- with "Colonoscopy".';
 
     const result = parseInput(input);
     const activity = result.statements[0] as Activity;
@@ -28,7 +28,7 @@ describe("Activity Structure", () => {
     // Verify basic activity structure
     expect(activity.type).toBe("Activity");
     expect(activity.name).toBe("Indicate");
-    expect(activity.body.request.activityType).toBe("CPGProposeDiagnosisTask");
+    expect(activity.body.request.activityType).toBe("CPGProposeDiagnosis");
     expect(activity.body.withClause?.terminologyReference).toBe("Colonoscopy");
   });
 
@@ -47,7 +47,7 @@ describe("Activity Structure", () => {
   });
 
   it("should correctly structure activity with type and terminology or free text", () => {
-    const input1 = '# Test\nlibrary "Test".\nactivity "Indicate":\n- request CPGProposeDiagnosisTask\n- with "Colonoscopy".';
+    const input1 = '# Test\nlibrary "Test".\nactivity "Indicate":\n- request CPGProposeDiagnosis\n- with "Colonoscopy".';
     const input2 =
       '# Test\nlibrary "Test".\nactivity "Notify":\n- request CPGCommunicationRequest\n- with `A notification message`.';
 
