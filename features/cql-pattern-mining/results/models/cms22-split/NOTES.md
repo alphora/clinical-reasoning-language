@@ -49,9 +49,9 @@ node dist/cli/run-validator.js \
   --pretty
 ```
 
-## Relationship to the original single-file `../cms22.crl`
+## Relationship to the original single-file `../cms22-monolith/cms22.crl`
 
-The original `features/cql-pattern-mining/results/models/cms22.crl` is
+The original `features/cql-pattern-mining/results/models/cms22-monolith/cms22.crl` is
 preserved as the historical reference. This split demonstrates that the
 imports feature lets a human break the monolith into navigable layers —
 and under v2.1.0 per-CRL emit, those layers become separate CQL libraries

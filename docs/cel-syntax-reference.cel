@@ -32,49 +32,49 @@ fact "Subject A":
 
 // Encounter fact — provides the case's encounter context.
 fact "Outpatient Visit":
-- code is "VISIT-1".
+- code is "http://example.org/codesystem/placeholder|VISIT-1".
 - defined by "Encounter".
 
 fact "Admission Encounter":
-- code is "INPT-1".
+- code is "http://example.org/codesystem/placeholder|INPT-1".
 - defined by "Encounter".
 
 fact "Discharge Encounter":
-- code is "DSCH-1".
+- code is "http://example.org/codesystem/placeholder|DSCH-1".
 - defined by "Encounter".
 
 // `defined by` qualified CRL concept reference. The class declares the
 // slots; the fact hydrates whatever the logic queries (here `code` and
 // `value` come from the concept's declared value types).
 fact "Baseline Reading":
-- code is "OBS-1".
+- code is "http://example.org/codesystem/placeholder|OBS-1".
 - value is 42.
 - defined by "Some Strategy Library"."Some Observation".
 
 // Same concept, different reading — facts are templates, the date is
 // assigned per-case via `at`.
 fact "Follow-up Reading":
-- code is "OBS-1".
+- code is "http://example.org/codesystem/placeholder|OBS-1".
 - value is 36.
 - defined by "Some Strategy Library"."Some Observation".
 
 // Activity-class fact. `stage is X.` comes from the activity class's
 // CPG intent/status enum.
 fact "Recommended Activity":
-- code is "REQ-1".
+- code is "http://example.org/codesystem/placeholder|REQ-1".
 - stage is proposed.
 - defined by "Some Strategy Library"."Some Activity".
 
 // Event-class fact (something that happened).
 fact "Performed Event":
-- code is "EVT-1".
+- code is "http://example.org/codesystem/placeholder|EVT-1".
 - defined by "Procedure".
 
 // Documentation/attestation fact — used as a positive fact to express
 // "documented reason" rather than via a `documented intent` modifier
 // (which is intentionally NOT in the intent enum; see #65 Q1c).
 fact "Contraindication Notation":
-- code is "DOC-1".
+- code is "http://example.org/codesystem/placeholder|DOC-1".
 - defined by "DetectedIssue".
 
 

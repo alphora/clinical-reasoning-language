@@ -1,7 +1,7 @@
 # CMS22 source CQL → CRL → round-trip CQL — define mapping
 
 **Source:** `features/cql-pattern-mining/data/cql/dqm-content-qicore-2025/CMS22FHIRPCSBPScreeningFollowUp.cql` (~410 lines, 30 named defines + 4 SDE + 1 fluent helper).
-**Source CRL:** `features/cql-pattern-mining/results/models/cms22.crl` (hand-authored CRL of the same measure).
+**Source CRL:** `features/cql-pattern-mining/results/models/cms22-monolith/cms22.crl` (hand-authored CRL of the same measure).
 **Round-trip CQL:** `cql/src/CMS22Generated.cql` (505 lines, 135 defines — committed `59636ae`).
 
 The round-trip decomposes each source define into a chain of named CRL concepts, then re-emits each as its own `define`. The expansion ratio (~1 : 4–5) is the cost of declarative authoring: every conceptual step gets a name, is individually inspectable, and can be reused.

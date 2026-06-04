@@ -900,7 +900,7 @@ The union of concept value types and concept types. v2.2.0 deliberately omits `P
 
 ## Full Example
 
-See [docs/clinical-reasoning-language-example.crl](`https://github.com/alphora/clinical-reasoning-language/blob/main/docs/clinical-reasoning-language-example.crl`) for a comprehensive example covering all features and options.
+See [features/cql-pattern-mining/results/models/cms69-split/clinical-reasoning-language-example.crl](`https://github.com/alphora/clinical-reasoning-language/blob/main/features/cql-pattern-mining/results/models/cms69-split/clinical-reasoning-language-example.crl`) for a comprehensive example covering all features and options. A second canonical example built on CMS22 ships at [features/cql-pattern-mining/results/models/cms22-split/cms22-bp-control-example.crl](`https://github.com/alphora/clinical-reasoning-language/blob/main/features/cql-pattern-mining/results/models/cms22-split/cms22-bp-control-example.crl`).
 
 ---
 

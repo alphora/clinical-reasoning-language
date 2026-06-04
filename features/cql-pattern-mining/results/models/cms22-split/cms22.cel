@@ -19,23 +19,23 @@ fact "Maria Garcia":
 // ============ Clinical facts ============
 
 fact "Annual Wellness Visit":
-- code is "G0438".
+- code is "http://hl7.org/fhir/sid/hcpcs|G0438".
 - date is "2026-03-10".
 - defined by "CMS22 Asserted"."BP Screening Encounters".
 
 fact "Normal BP Panel":
-- code is "85354-9".
+- code is "http://loinc.org|85354-9".
 - date is "2026-03-10".
 - defined by "CMS22 Asserted"."Blood Pressure Panels".
 
 fact "Normal Systolic Component":
-- code is "8480-6".
+- code is "http://loinc.org|8480-6".
 - date is "2026-03-10".
 - value is 118.
 - defined by "CMS22 Asserted"."Systolic Blood Pressure Code".
 
 fact "Normal Diastolic Component":
-- code is "8462-4".
+- code is "http://loinc.org|8462-4".
 - date is "2026-03-10".
 - value is 76.
 - defined by "CMS22 Asserted"."Diastolic Blood Pressure Code".

@@ -10,7 +10,7 @@ deprecated: its output does not parse under the v2.1.0 grammar and the
 transformer itself is not on the roadmap.
 
 For the canonical CDS-style decision example (CMS69 BMI screening), see:
-    docs/clinical-reasoning-language-example.crl
+    features/cql-pattern-mining/results/models/cms69-split/clinical-reasoning-language-example.crl
 
 For the source FSH project this file was generated from, see:
     packages/crl/examples/fsh/smart-example-immz/

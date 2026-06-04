@@ -29,18 +29,18 @@ fact "Jane Doe":
 // ============ Clinical facts ============
 
 fact "Wellness Visit":
-- code is "99395".
+- code is "http://www.ama-assn.org/go/cpt|99395".
 - date is "2026-01-15".
 - defined by "Encounter".
 
 fact "Documented High BMI":
-- code is "39156-5".
+- code is "http://loinc.org|39156-5".
 - date is "2026-01-15".
 - value is 32.4.
 - defined by "CMS69 BMI Screening GPG Strategy example"."BMI as an Observation".
 
 fact "Overweight Diagnosis":
-- code is "E66.3".
+- code is "http://hl7.org/fhir/sid/icd-10-cm|E66.3".
 - date is "2024-09-08".
 - defined by "CMS69 BMI Screening GPG Strategy example"."Overweight or Obese Diagnoses".
 

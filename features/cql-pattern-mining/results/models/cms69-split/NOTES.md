@@ -1,6 +1,6 @@
 # cms69 split (4-layer layout)
 
-The 4-layer split of the original single-file `../cms69.crl` (867 lines),
+The 4-layer split of the original single-file `../cms69-monolith/cms69.crl` (867 lines),
 mirroring the cms22-split layout.
 
 ## Layout
@@ -49,9 +49,9 @@ node dist/cli/run-validator.js \
   --pretty
 ```
 
-## Relationship to the original single-file `../cms69.crl`
+## Relationship to the original single-file `../cms69-monolith/cms69.crl`
 
-The original `features/cql-pattern-mining/results/models/cms69.crl` is
+The original `features/cql-pattern-mining/results/models/cms69-monolith/cms69.crl` is
 preserved as the historical reference. This split demonstrates that the
 imports feature lets a human break the monolith into navigable layers —
 and under v2.1.0 per-CRL emit, those layers become separate CQL libraries
