@@ -79,6 +79,20 @@ Every base FHIR resource referenced by an IG Request or Event profile is in CRL'
 **Subject/contextual resources** (referenced by CRL concepts but not strictly Request or Event):
 - `Patient`, `Device`, `DocumentReference`, `Goal`
 
+### Transitively covers CEL `fact` declarations too
+
+CEL's validator imports the same `conceptTypes` allowlist ([`src/cel/validator/validator.ts:1`](../src/cel/validator/validator.ts#L1)) and applies it to two `defined by` resolution paths:
+
+- **Bare `defined by "X"`** — `X` must be in `conceptTypes`. The fact instantiates that bare FHIR resource type directly.
+- **Qualified `defined by "Lib"."Decl"`** — resolves via the qualified CRL concept's `- type is X.`, which is itself from `conceptTypes`.
+
+So **every CEL fact transitively lands on a FHIR resource from the same allowlist that covers both Request and Event patterns.** The split is:
+- CRL `concept` = definitional side (the clinical data point's schema).
+- CEL `fact` = instance side (a specific data point realization for a test case).
+- Both kinds of declaration name resources from the same `conceptTypes` shared module.
+
+This is what gives CRL+CEL the symmetric "Request-and-Event coverage" the IG envisions — neither DSL needs a separate notion of "request-concept" vs "event-concept"; the FHIR resource type the declaration names is the discriminator.
+
 ### IG Event-column resources intentionally NOT in `CONCEPT_TYPE`
 
 Three IG Event profiles' base resources are deliberately absent from the concept-type allowlist because CRL plans to model them via dedicated top-level declaration kinds:
