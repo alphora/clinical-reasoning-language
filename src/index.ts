@@ -71,6 +71,32 @@ export type {
   EmitDiagnosticKind,
   EmitOptions,
 } from "./cel/emitter";
+
+// v2.3.0 CRL → FHIR Definition emit lane (#73). Types prefixed
+// `FhirDef`/`Cpg` to disambiguate from the CEL FHIR-instance emit
+// types already exported above (both lanes have `EmitOptions` and
+// `EmittedResource` — the CEL ones are FHIR-instance-side, these
+// are FHIR-definition-side).
+export {
+  readPackageMetadata,
+  normalizePackageMetadata,
+  slugify as fhirSlugify,
+  pascalCaseName,
+  emitValueSet,
+  emitValueSetsForLibrary,
+  writeFhirResources,
+} from "./fhir-emitter";
+export type {
+  CpgMetadata,
+  CodeableConcept,
+  ContactPoint,
+  UsageContext,
+  EmittedResource as FhirDefEmittedResource,
+  EmitOptions as FhirDefEmitOptions,
+  FhirDefEmitResult,
+  UnmatchedReference,
+  MetadataResult,
+} from "./fhir-emitter";
 export type {
   CEL,
   CELLibraryDeclaration,

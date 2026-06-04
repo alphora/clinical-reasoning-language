@@ -1,5 +1,12 @@
 {
   "name": "cms69-demonstration-split",
   "version": "1.0.0",
-  "private": true
+  "private": true,
+  "description": "CMS69 BMI Screening demonstration corpus",
+  "author": "Smile Digital Health",
+  "crl": {
+    "canonicalBase": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69",
+    "status": "draft",
+    "experimental": true
+  }
 }

@@ -1,0 +1,192 @@
+import { describe, expect, it } from "@jest/globals";
+
+import { normalizePackageMetadata, readPackageMetadata } from "../metadata";
+
+const COMPLETE_PKG = {
+  name: "cms22-demo",
+  version: "1.0.0",
+  description: "CMS22 Blood Pressure Control demonstration corpus",
+  author: "Smile Digital Health <ops@smiledigitalhealth.com> (https://smiledigitalhealth.com)",
+  crl: {
+    canonicalBase: "http://hl7.org/fhir/us/cqfmeasures/crl/cms22",
+    status: "draft",
+    experimental: true,
+    jurisdiction: [],
+    useContext: [],
+  },
+};
+
+describe("fhir-emitter metadata.normalizePackageMetadata", () => {
+  it("returns a complete CpgMetadata for a fully-populated package.json", () => {
+    const r = normalizePackageMetadata(COMPLETE_PKG);
+    expect(r.metadata).not.toBeNull();
+    expect(r.errors).toEqual([]);
+    expect(r.metadata!.version).toBe("1.0.0");
+    expect(r.metadata!.canonicalBase).toBe("http://hl7.org/fhir/us/cqfmeasures/crl/cms22");
+    expect(r.metadata!.publisher).toBe("Smile Digital Health");
+    expect(r.metadata!.contact).toEqual([
+      { system: "email", value: "ops@smiledigitalhealth.com" },
+      { system: "url", value: "https://smiledigitalhealth.com" },
+    ]);
+    expect(r.metadata!.status).toBe("draft");
+    expect(r.metadata!.experimental).toBe(true);
+    expect(r.metadata!.jurisdiction).toEqual([]);
+    expect(r.metadata!.useContext).toEqual([]);
+  });
+
+  it("defaults missing version, author, status, experimental, jurisdiction, useContext", () => {
+    const r = normalizePackageMetadata({
+      name: "foo",
+      crl: { canonicalBase: "http://example.org/x" },
+    });
+    expect(r.metadata).not.toBeNull();
+    expect(r.metadata!.version).toBe("0.0.0");
+    expect(r.metadata!.publisher).toBe("unknown");
+    expect(r.metadata!.contact).toEqual([]);
+    expect(r.metadata!.status).toBe("draft");
+    expect(r.metadata!.experimental).toBe(true);
+    expect(r.metadata!.jurisdiction).toEqual([]);
+    expect(r.metadata!.useContext).toEqual([]);
+  });
+
+  it("title is empty when description is empty (emitter defaults to library name)", () => {
+    const r = normalizePackageMetadata({
+      crl: { canonicalBase: "http://example.org/x" },
+    });
+    expect(r.metadata!.title).toBe("");
+    expect(r.metadata!.description).toBe("");
+  });
+
+  it("title is the first line of description when description is multiline", () => {
+    const r = normalizePackageMetadata({
+      description: "Short title\n\nLonger description on a separate line.",
+      crl: { canonicalBase: "http://example.org/x" },
+    });
+    expect(r.metadata!.title).toBe("Short title");
+    expect(r.metadata!.description).toBe("Short title\n\nLonger description on a separate line.");
+  });
+
+  it("Δ3 — missing crl.canonicalBase → error envelope, metadata null", () => {
+    const r = normalizePackageMetadata({ name: "foo", version: "1.0.0" });
+    expect(r.metadata).toBeNull();
+    expect(r.errors).toHaveLength(1);
+    expect(r.errors[0]!.kind).toBe("missing-canonical-url-base");
+  });
+
+  it("author-as-object form", () => {
+    const r = normalizePackageMetadata({
+      author: { name: "Smile", email: "a@b.com", url: "https://b.com" },
+      crl: { canonicalBase: "http://example.org/x" },
+    });
+    expect(r.metadata!.publisher).toBe("Smile");
+    expect(r.metadata!.contact).toEqual([
+      { system: "email", value: "a@b.com" },
+      { system: "url", value: "https://b.com" },
+    ]);
+  });
+
+  it("Δ12 — malformed crl.useContext (not an array) → error", () => {
+    const r = normalizePackageMetadata({
+      crl: {
+        canonicalBase: "http://example.org/x",
+        useContext: "not-an-array",
+      },
+    });
+    expect(r.metadata).toBeNull();
+    expect(r.errors.some((e) => e.kind === "malformed-crl-metadata")).toBe(true);
+  });
+
+  it("Δ12 — malformed crl.useContext entry shape → error", () => {
+    const r = normalizePackageMetadata({
+      crl: {
+        canonicalBase: "http://example.org/x",
+        useContext: [{ code: "wrong-shape" }],
+      },
+    });
+    expect(r.metadata).toBeNull();
+    expect(r.errors.some((e) => e.kind === "malformed-crl-metadata")).toBe(true);
+  });
+
+  it("Δ12 — malformed crl.jurisdiction (not an array) → error", () => {
+    const r = normalizePackageMetadata({
+      crl: { canonicalBase: "http://example.org/x", jurisdiction: 42 },
+    });
+    expect(r.metadata).toBeNull();
+    expect(r.errors.some((e) => e.kind === "malformed-crl-metadata")).toBe(true);
+  });
+
+  it("Δ12 — rejects unknown crl.status value", () => {
+    const r = normalizePackageMetadata({
+      crl: { canonicalBase: "http://example.org/x", status: "bogus" },
+    });
+    expect(r.metadata).toBeNull();
+    expect(r.errors.some((e) => e.kind === "malformed-crl-metadata")).toBe(true);
+  });
+
+  it("non-object package.json → error envelope", () => {
+    const r = normalizePackageMetadata(42);
+    expect(r.metadata).toBeNull();
+    expect(r.errors[0]!.kind).toBe("unreadable-package-json");
+  });
+
+  it("round-2 (gpt55 important #4) strips trailing slash from canonicalBase", () => {
+    const r = normalizePackageMetadata({
+      crl: { canonicalBase: "http://example.org/base/" },
+    });
+    expect(r.metadata!.canonicalBase).toBe("http://example.org/base");
+  });
+
+  it("round-2 (gpt55 important #4) collapses multiple trailing slashes", () => {
+    const r = normalizePackageMetadata({
+      crl: { canonicalBase: "http://example.org/base///" },
+    });
+    expect(r.metadata!.canonicalBase).toBe("http://example.org/base");
+  });
+
+  it("round-2 (gpt55 important #6) parses email-only author '<email>'", () => {
+    const r = normalizePackageMetadata({
+      author: "<ops@example.org>",
+      crl: { canonicalBase: "http://example.org/x" },
+    });
+    expect(r.metadata!.publisher).toBe("unknown");
+    expect(r.metadata!.contact).toContainEqual({ system: "email", value: "ops@example.org" });
+  });
+
+  it("round-2 (gpt55 important #7) validates jurisdiction inner coding shape", () => {
+    const r = normalizePackageMetadata({
+      crl: {
+        canonicalBase: "http://example.org/x",
+        jurisdiction: [{ coding: [{ system: "x" }] }], // missing `code`
+      },
+    });
+    expect(r.metadata).toBeNull();
+    expect(r.errors.some((e) => e.kind === "malformed-crl-metadata")).toBe(true);
+  });
+});
+
+describe("fhir-emitter metadata.readPackageMetadata (filesystem)", () => {
+  it("Δ14 — unreadable path returns error envelope (does NOT throw)", () => {
+    const r = readPackageMetadata("/no/such/path/that/exists");
+    expect(r.metadata).toBeNull();
+    expect(r.errors[0]!.kind).toBe("unreadable-package-json");
+  });
+
+  it("reads the cms22-split corpus package.json end-to-end", () => {
+    const corpus = require("path").resolve(
+      __dirname,
+      "..",
+      "..",
+      "..",
+      "features",
+      "cql-pattern-mining",
+      "results",
+      "models",
+      "cms22-split",
+    );
+    const r = readPackageMetadata(corpus);
+    expect(r.metadata).not.toBeNull();
+    expect(r.errors).toEqual([]);
+    expect(r.metadata!.canonicalBase).toBe("http://hl7.org/fhir/us/cqfmeasures/crl/cms22");
+    expect(r.metadata!.publisher).toBe("Smile Digital Health");
+  });
+});

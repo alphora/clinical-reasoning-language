@@ -46,15 +46,11 @@ const CPG_TO_FHIR: Record<string, string> = {
   CPGAdministerMedication: "MedicationAdministration",
 };
 
-function slugify(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, "")
-    .replace(/\s+/g, "-")
-    .replace(/-+/g, "-")
-    .replace(/(^-|-$)/g, "")
-    || "unnamed";
-}
+// Slugify moved to `src/fhir-emitter/slug.ts` so CRL and CEL emitters
+// share one helper. v2.3.0-FHIR-Todo-1 also added a 64-char truncation
+// cap matching the FHIR `id` regex — CEL slugify wasn't hitting the cap
+// in the corpus, but inheriting the cap is correct.
+import { slugify } from "../../fhir-emitter/slug";
 
 interface DerivedType {
   fhirType: string;
