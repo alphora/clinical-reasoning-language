@@ -2,6 +2,8 @@
 import { mkdirSync, writeFileSync } from "fs";
 import * as path from "path";
 
+import { emitCelToFhir, writeEmitResult } from "../cel/emitter";
+import { resolveCelImports } from "../cel/imports";
 import { emitCQLImports } from "../imports/emit";
 
 function parseArgs(argv: string[]): {
@@ -58,12 +60,39 @@ if (!filePath) {
 
 if (!outDir) {
   console.error(
-    "Usage: crl-emit --path <file.crl> --out-dir <output-directory>\n" +
+    "Usage: crl-emit --path <file.{crl,cel}> --out-dir <output-directory>\n" +
       "\n" +
-      "v2.1.0: per-CRL emit produces one CQL file per library in the import\n" +
-      "closure. --out-dir is required.",
+      ".crl input → per-CRL CQL emit (one library per file in the import closure).\n" +
+      ".cel input → per-case FHIR JSON instance emit (KALM-style directory tree).\n" +
+      "--out-dir is required.",
   );
   process.exit(1);
+}
+
+// Pitch v4 critical decision #1 option (d): crl-emit auto-dispatches by
+// file extension. `.cel` → FHIR JSON; `.crl` (default) → CQL.
+if (filePath.toLowerCase().endsWith(".cel")) {
+  const graph = resolveCelImports(filePath);
+  const result = emitCelToFhir(graph);
+  const blockers = result.diagnostics.filter((d) => d.severity === "error");
+  if (blockers.length > 0) {
+    process.stderr.write(JSON.stringify({ diagnostics: blockers }, null, 2) + "\n");
+    process.exit(1);
+  }
+  try {
+    mkdirSync(outDir, { recursive: true });
+  } catch (e) {
+    process.stderr.write(`Failed to create output directory "${outDir}": ${(e as Error).message}\n`);
+    process.exit(1);
+  }
+  const written = writeEmitResult(result, outDir);
+  process.stdout.write(`wrote ${written} FHIR resource(s) under ${outDir}\n`);
+  const unsupported = result.diagnostics.filter((d) => d.kind === "unsupported-yet");
+  if (unsupported.length > 0) {
+    process.stderr.write(JSON.stringify({ unsupportedYet: unsupported }, null, 2) + "\n");
+    process.exit(2);
+  }
+  process.exit(0);
 }
 
 const result = emitCQLImports(filePath);

@@ -9,7 +9,7 @@ import { CRLError } from "./types/errors";
 import { Validator, type ValidationError } from "./validator/validator";
 
 export { emitCQL, emitCQLFromAST } from "./emitter";
-export type { EmitOptions, EmitResult } from "./emitter";
+export type { EmitOptions as CqlEmitOptions, EmitResult as CqlEmitResult } from "./emitter";
 
 export { emitCQLImports } from "./imports/emit";
 export type { EmitImportsResult } from "./imports/emit";
@@ -62,6 +62,15 @@ export type {
   CELValidationResult,
   CELValidationOptions,
 } from "./cel/validator";
+export { emitCelToFhir, writeEmitResult } from "./cel/emitter";
+export type {
+  EmitResult,
+  EmittedCase,
+  EmittedResource,
+  EmitDiagnostic,
+  EmitDiagnosticKind,
+  EmitOptions,
+} from "./cel/emitter";
 export type {
   CEL,
   CELLibraryDeclaration,
