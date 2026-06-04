@@ -55,6 +55,13 @@ export type {
   ResolvedCelGraph,
   CelImportDiagnostic,
 } from "./cel/imports";
+export { validateCEL, validateCELFile } from "./cel/validator";
+export type {
+  CELValidationError,
+  CELValidationErrorKind,
+  CELValidationResult,
+  CELValidationOptions,
+} from "./cel/validator";
 export type {
   CEL,
   CELLibraryDeclaration,
