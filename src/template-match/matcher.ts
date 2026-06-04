@@ -377,6 +377,53 @@ const valueClass: PatternMatcher = (els, loc) => {
   return makeCall(cap, [conceptRefArg(els[0])], loc);
 };
 
+/** `has <X>` → Has(X). Issue #77 catalog↔matcher drift fix. */
+const hasOf: PatternMatcher = (els, loc) => {
+  if (els.length !== 2) return null;
+  if (!isWord(els[0], "has")) return null;
+  if (!isConceptRef(els[1])) return null;
+  return makeCall("Has", [conceptRefArg(els[1])], loc);
+};
+
+/** `has history of <X>` → HasHistoryOf(X). Issue #77. */
+const hasHistoryOf: PatternMatcher = (els, loc) => {
+  if (els.length !== 4) return null;
+  if (!isWord(els[0], "has")) return null;
+  if (!isWord(els[1], "history")) return null;
+  if (!isWord(els[2], "of")) return null;
+  if (!isConceptRef(els[3])) return null;
+  return makeCall("HasHistoryOf", [conceptRefArg(els[3])], loc);
+};
+
+/** `has adverse reaction to <X>` → HasAdverseReactionTo(X). Issue #77 audit. */
+const hasAdverseReactionTo: PatternMatcher = (els, loc) => {
+  if (els.length !== 5) return null;
+  if (!isWord(els[0], "has")) return null;
+  if (!isWord(els[1], "adverse")) return null;
+  if (!isWord(els[2], "reaction")) return null;
+  if (!isWord(els[3], "to")) return null;
+  if (!isConceptRef(els[4])) return null;
+  return makeCall("HasAdverseReactionTo", [conceptRefArg(els[4])], loc);
+};
+
+/** `currently taking <med>` → CurrentlyTaking(med). Issue #77. */
+const currentlyTaking: PatternMatcher = (els, loc) => {
+  if (els.length !== 3) return null;
+  if (!isWord(els[0], "currently")) return null;
+  if (!isWord(els[1], "taking")) return null;
+  if (!isConceptRef(els[2])) return null;
+  return makeCall("CurrentlyTaking", [conceptRefArg(els[2])], loc);
+};
+
+/** `age at <anchor>` → AgeAt(anchor). Issue #77 audit. */
+const ageAt: PatternMatcher = (els, loc) => {
+  if (els.length !== 3) return null;
+  if (!isWord(els[0], "age")) return null;
+  if (!isWord(els[1], "at")) return null;
+  if (!isConceptRef(els[2])) return null;
+  return makeCall("AgeAt", [conceptRefArg(els[2])], loc);
+};
+
 /** `most recent <X>` → MostRecent(X) */
 const mostRecent: PatternMatcher = (els, loc) => {
   if (els.length !== 3) return null;
@@ -557,6 +604,7 @@ const PATTERNS: PatternMatcher[] = [
   onDayOfOrAfter,                  // 7
   lastOnDayOf,                     // 6
   notDoneWithReason,               // 6+ (variable)
+  hasAdverseReactionTo,            // 5 (issue #77 audit)
   withoutRecordOf,                 // 4
   withoutDocumentedDisjunction,    // 3 (with disjunction element)
   onOrBefore,                      // 5
@@ -569,12 +617,15 @@ const PATTERNS: PatternMatcher[] = [
   atLeast,                         // 4
   atMost,                          // 4
   asOf,                            // 4
+  hasHistoryOf,                    // 4 (issue #77)
   during,                          // 3
   overlaps,                        // 3
   below,                           // 3
   exceeds,                         // 3
   without,                         // 3 (last among 3-element patterns; less specific)
   mostRecent,                      // 3
+  currentlyTaking,                 // 3 (issue #77)
+  ageAt,                           // 3 (issue #77 audit; AFTER ageAtStartOfAtLeast since len differs)
   performed,                       // 2
   ordered,                         // 2
   active,                          // 2 (post-catalog-v0.7: `<X> active`)
@@ -586,4 +637,29 @@ const PATTERNS: PatternMatcher[] = [
   calculated,                      // 2
   lowest,                          // 2
   highest,                         // 2
+  hasOf,                           // 2 (issue #77 audit; after specific has-* forms above)
 ];
+
+// === #77 catalog↔matcher audit: still-deferred patterns ===
+// The catalog defines these narrative forms; the matcher does not yet wire
+// them. Each is deferred for a specific reason that needs operator alignment
+// before adding (overlapping shape with an existing pattern, or design
+// ambiguity in narrative). Adding any of these in isolation could make
+// existing corpus parses regress, so they are gated behind a follow-up.
+//
+//   - `<X> with <Y>` → With                   — collides with the broader
+//                                                "X with follow-up Y" form
+//                                                (BaselineAndFollowUp) and
+//                                                with bare-narrative "with"
+//                                                ambiguity in real corpora.
+//   - `<X> with follow-up <Y>` → BaselineAndFollowUp
+//   - `<X> within <window>` → Within (top-level; embedded form already
+//                                                works via lastWithinBeforeStartOf)
+//   - `inpatient stay anchored on <X>[ including prelude]` → InpatientStay
+//   - `<X> between <start> and <end>` → BetweenAnchors (collides shape-wise
+//                                                with `Between(value, lo, hi)`;
+//                                                dispatch needs operator call).
+//   - `<eventA> and <eventB> at least <duration> apart` → AtLeastApart
+//   - `<eventA> and <eventB> at most <duration> apart` → AtMostApart
+//   - `at least <n> <events>` → AtLeastN     — needs Integer-token support.
+//   - `<n> consecutive <events>` → Consecutive — needs Integer-token support.

@@ -1,2 +1,2 @@
 export { emitCQL, emitCQLFromAST } from "./emitCQL";
-export type { EmitOptions, EmitResult } from "./emitCQL";
+export type { EmitOptions, EmitResult, UnmatchedNarrative } from "./emitCQL";

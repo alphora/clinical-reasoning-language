@@ -123,7 +123,13 @@ parameter "Foo":
             type: "DefinitionIsDefinition",
             body: {
               type: "NarrativeClause",
-              elements: [{ type: "NWord", value: "true" }],
+              // Use a matched narrative (`<X> performed`) so issue #79's
+              // unmatched-narrative envelope flip doesn't fail this test —
+              // the test's concern is parameter shadowing, not emit fidelity.
+              elements: [
+                { type: "NConceptRef", value: "Y", location: { start: { line: 1, column: 0 }, end: { line: 1, column: 0 } } },
+                { type: "NWord", value: "performed", location: { start: { line: 1, column: 0 }, end: { line: 1, column: 0 } } },
+              ],
               location: { start: { line: 1, column: 0 }, end: { line: 1, column: 0 } },
             },
             location: { start: { line: 1, column: 0 }, end: { line: 1, column: 0 } },

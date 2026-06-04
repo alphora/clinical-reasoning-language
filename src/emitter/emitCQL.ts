@@ -99,10 +99,31 @@ export interface EmitOptions {
   crossLibraryParameters?: Map<string, Map<string, AstParameterInfo>>;
 }
 
+/**
+ * Issue #79 — Unmatched narrative pattern bookkeeping. Each entry records a
+ * `- definition is <narrative>` body that fell through the template matcher.
+ * The emitted CQL still contains a sentinel call (see emitDefinitionIs) so
+ * downstream CQL compile fails loudly even if the caller ignores this array;
+ * `EmitResult.success` is forced to `false` whenever any entry is present.
+ */
+export interface UnmatchedNarrative {
+  text: string;
+  line?: number;
+  column?: number;
+}
+
 export interface EmitResult {
   success: boolean;
   result?: string;
   errors?: CRLError[];
+  /**
+   * Issue #79 — populated when one or more `- definition is …` bodies failed
+   * to match a catalog pattern. When non-empty, `success` is `false` AND the
+   * emitted `result` is still populated (with a compile-failing sentinel call
+   * in each unmatched spot) so callers can inspect the partial output. Absent
+   * field — never an empty array — means every narrative matched.
+   */
+  unmatched?: UnmatchedNarrative[];
 }
 
 /** Map a canonical pattern name to its `CRLPatterns.X` function name. */
@@ -311,7 +332,25 @@ export function infoForParameterStatement(stmt: Parameter): AstParameterInfo {
 
 export function emitCQLFromAST(ast: CRL, options: EmitOptions = {}): EmitResult {
   try {
-    const out = new Emitter(ast, options).emit();
+    const emitter = new Emitter(ast, options);
+    const out = emitter.emit();
+    const unmatched = emitter.getUnmatched();
+    if (unmatched.length > 0) {
+      // Issue #79 — at least one `- definition is …` body fell through the
+      // template matcher. The emitted `result` is still populated (with a
+      // compile-failing sentinel call per unmatched spot) so callers can
+      // inspect partial output, but `success` is forced to `false` and the
+      // unmatched diagnostics are mirrored into `errors[]` as Validation
+      // entries keyed by `kind: "emit-unmatched-narrative"`.
+      const errors: CRLError[] = unmatched.map((u) => ({
+        type: "Validation",
+        kind: "emit-unmatched-narrative",
+        line: u.line,
+        column: u.column,
+        message: `Unmatched narrative pattern: \`${u.text}\` (no catalog pattern matched). Emitted CQL contains a compile-failing CRLPatterns.UnmatchedNarrative(…) sentinel; downstream CQL translation will fail until the body is rewritten to a known canonical narrative.`,
+      }));
+      return { success: false, result: out, errors, unmatched };
+    }
     return { success: true, result: out };
   } catch (e) {
     return {
@@ -366,6 +405,15 @@ class Emitter {
    * parameter lines). See [[038-v2.2.0-parameters-todo3-emitter]] R3-Δ1.
    */
   private readonly astParameters: Map<string, AstParameterInfo> = new Map();
+  /**
+   * Issue #79 — narratives that fell through the template matcher during
+   * `emitDefinitionIs`. Each entry's `text` is the joined narrative; the
+   * location pins the source span. Surfaced via the `EmitResult.unmatched`
+   * field and as `kind: "emit-unmatched-narrative"` validation errors in
+   * `EmitResult.errors` (see `emitCQLFromAST`). The CQL string itself
+   * contains a compile-failing sentinel call at each spot.
+   */
+  private readonly unmatchedNarratives: UnmatchedNarrative[] = [];
 
   constructor(ast: CRL, options: EmitOptions) {
     this.ast = ast;
@@ -456,6 +504,11 @@ class Emitter {
       sections.push(this.emitConcepts(concepts));
     }
     return sections.join("\n\n") + "\n";
+  }
+
+  /** Issue #79 — unmatched narratives accumulated during this emit. */
+  getUnmatched(): UnmatchedNarrative[] {
+    return this.unmatchedNarratives;
   }
 
   private header(): string {
@@ -778,7 +831,17 @@ class Emitter {
     const matched = matchNarrative(def.body);
     if (!matched.known) {
       const text = def.body.elements.map((el) => narrativeElementText(el)).join(" ");
-      return `// FIXME: unmatched narrative pattern — ${text}\ntrue`;
+      this.unmatchedNarratives.push({
+        text,
+        line: def.body.location?.start.line,
+        column: def.body.location?.start.column,
+      });
+      // Issue #79 — compile-failing sentinel. `CRLPatterns.UnmatchedNarrative`
+      // is intentionally undefined in CRLPatterns.cql so a downstream CQL
+      // compile fails loudly rather than silently shipping always-`true`. The
+      // EmitResult.unmatched envelope field is the primary signal; this
+      // sentinel is the operational safety net for callers that miss it.
+      return `// FIXME: unmatched narrative pattern — ${text}\nCRLPatterns.UnmatchedNarrative(${cqlString(text)})`;
     }
     // Generics-by-composition: CRLPatterns functions return their PRIMITIVE
     // shape — list-shaped for filter patterns, boolean for inherently-boolean

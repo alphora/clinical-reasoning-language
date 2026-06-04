@@ -367,12 +367,19 @@ export function createServer(): McpServer {
       description:
         "Emit CQL from a CRL document. Pass exactly one of `code` (inline) or `path` (file), plus optional " +
         "`libraryName`. " +
-        "Returns { success, result?, errors? }: on success, `result` is the generated CQL text targeting " +
-        "the CRLPatterns library (cql/src/CRLPatterns.cql). The emitted CQL library declaration is " +
+        "Returns { success, result?, errors?, unmatched? }: on full success, `result` is the generated CQL text " +
+        "targeting the CRLPatterns library (cql/src/CRLPatterns.cql). The emitted CQL library declaration is " +
         "unversioned (npm packaging IS the version system); `include CRLPatterns` is also unversioned. " +
         "Refinement-vs-boolean composition is detected per-operand; stub valuesets (empty URL) become " +
         "parameter declarations; terminology/concept name collisions are disambiguated with a ' Code' / " +
-        "' ValueSet' suffix. The output may still need a CQL compiler to validate end-to-end.",
+        "' ValueSet' suffix. " +
+        "Issue #79 — when one or more `- definition is …` narrative bodies fail to match a catalog " +
+        "pattern, `success` becomes `false`, `unmatched[]` lists each failing narrative ({text, line, column}), " +
+        "and `errors[]` mirrors them as `kind: \"emit-unmatched-narrative\"`. The `result` CQL is still " +
+        "populated so callers can inspect partial output — each unmatched spot contains a compile-failing " +
+        "`CRLPatterns.UnmatchedNarrative(...)` sentinel that downstream CQL translation will reject. " +
+        "Callers gating on emit fidelity should check `success` (or `unmatched.length === 0`), NOT just " +
+        "the presence of `result`. The output may still need a CQL compiler to validate end-to-end.",
       inputSchema: {
         ...inputSchema,
         libraryName: z.string().optional().describe("Library name for the emitted CQL (default: GeneratedFromCRL)."),
