@@ -5,6 +5,8 @@
 
 Clinical Reasoning Language (CRL) is a domain-specific language for expressing clinical logic, concepts, activities, terminologies, and decisions in a readable, structured, and computable format. This guide describes the syntax, structure, and features of CRL as defined by the latest grammar and lexer.
 
+**CEL** (Case Example Language) is the sibling DSL covering the **instance / scenario side** of Clinical Quality content — patient-agnostic facts and concrete case scenarios that exercise CRL logic. See [docs/cel-spec.md](./docs/cel-spec.md) for the locked CEL spec.
+
 ---
 
 ## File Structure
