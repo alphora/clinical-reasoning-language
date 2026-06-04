@@ -15,7 +15,7 @@ parameter "Measurement Period":
 
 // --- Qualifying Encounter ---
 
-concept "BMI":
+concept "BP Evaluation Encounter (not virtual)":
 - type is Encounter.
 - defined as
 (
