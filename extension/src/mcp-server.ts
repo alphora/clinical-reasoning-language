@@ -7,6 +7,7 @@ import {
   buildCRL,
   validateCRL,
   validateCRLImports,
+  validateCELFile,
   emitCQL,
 } from "@smile-digital-health/crl";
 import type { ImportDiagnostic } from "@smile-digital-health/crl";
@@ -223,6 +224,42 @@ function runValidate(args: ValidateArgs) {
   return { content: [{ type: "text" as const, text: JSON.stringify(slim) }] };
 }
 
+function runValidateCel(args: { path?: string; soft?: boolean }) {
+  const hasPath = typeof args.path === "string" && args.path.trim().length > 0;
+  if (!hasPath) {
+    return {
+      content: [
+        {
+          type: "text" as const,
+          text: "validate_cel requires a `path` argument (path to a .cel file).",
+        },
+      ],
+      isError: true,
+    };
+  }
+  const p = (args.path as string).trim();
+  try {
+    const st = statSync(p);
+    if (st.isDirectory()) {
+      throw new ToolInputError(`Path is a directory, not a file: "${p}".`);
+    }
+    if (st.size > MAX_INPUT_BYTES) {
+      throw new ToolInputError(`File too large: ${st.size} bytes > ${MAX_INPUT_BYTES}.`);
+    }
+  } catch (e) {
+    const msg =
+      e instanceof ToolInputError ? e.message : `Cannot read path "${p}": ${(e as Error).message}`;
+    return { content: [{ type: "text" as const, text: msg }], isError: true };
+  }
+  const result = validateCELFile(p, { soft: args.soft === true });
+  const slim = {
+    success: result.errors.length === 0,
+    errors: result.errors,
+    warnings: result.warnings,
+  };
+  return { content: [{ type: "text" as const, text: JSON.stringify(slim) }] };
+}
+
 const inputSchema = {
   code: z
     .string()
@@ -291,6 +328,37 @@ function createServer(): McpServer {
       },
     },
     (args) => runValidate(args as ValidateArgs)
+  );
+
+  server.registerTool(
+    "validate_cel",
+    {
+      title: "Validate CEL",
+      description:
+        "Validate a CEL (Case Example Language) document end-to-end against the covered CRL library's " +
+        "closure. Pass `path` (a .cel file); inline `code` is not supported in this tool because the " +
+        "validator needs the file's project root to walk the CRL closure. " +
+        "Returns { success, errors[], warnings[] } — the AST is omitted (use buildCEL from the npm " +
+        "package for AST inspection). " +
+        "Diagnostic kinds include: unresolved-bare-type, unresolved-qualified-library, " +
+        "unresolved-qualified-declaration, unsupported-yet, unresolved-result-leaf, invalid-result-shape, " +
+        "invalid-result-leaf-kind, unresolved-fact-ref, duplicate-fact-name, duplicate-case-name, " +
+        "unresolved-cel-include, alias-not-yet-supported, plus passthrough kinds from the resolver " +
+        "(parse-failure, project-root-not-found, unresolved-covers, covers-missing-but-cases-present, " +
+        "crl-import). See docs/cel-spec.md for the full semantics. " +
+        "In soft mode, unsupported-yet and alias-not-yet-supported warnings are silenced; ref-resolution " +
+        "and structural errors stay strict (CEL diverges from CRL's soft-mode semantics).",
+      inputSchema: {
+        path: z
+          .string()
+          .describe("Path to a .cel file (absolute recommended; relative resolves against the server CWD)."),
+        soft: z
+          .boolean()
+          .optional()
+          .describe("If true, silence unsupported-yet and alias-not-yet-supported warnings."),
+      },
+    },
+    (args) => runValidateCel(args as { path?: string; soft?: boolean })
   );
 
   server.registerTool(

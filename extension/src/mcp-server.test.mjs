@@ -32,10 +32,24 @@ const check = async (label, fn) => {
 
 await client.connect(transport);
 try {
-  await check("MCP tools: build_crl_ast, tokenize_crl, validate_crl, emit_cql", async () => {
+  await check("MCP tools: build_crl_ast, tokenize_crl, validate_crl, validate_cel, emit_cql", async () => {
     const { tools } = await client.listTools();
     const names = tools.map((t) => t.name).sort();
-    assert.deepEqual(names, ["build_crl_ast", "emit_cql", "tokenize_crl", "validate_crl"]);
+    assert.deepEqual(names, ["build_crl_ast", "emit_cql", "tokenize_crl", "validate_cel", "validate_crl"]);
+  });
+
+  await check("validate_cel via path → cms22.cel validates clean", async () => {
+    const cms22Cel = resolve(here, "../../features/cql-pattern-mining/results/models/cms22-split/cms22.cel");
+    const r = await client.callTool({ name: "validate_cel", arguments: { path: cms22Cel } });
+    assert.ok(!r.isError);
+    const out = JSON.parse(r.content[0].text);
+    assert.equal(out.success, true, `cms22.cel should validate cleanly; errors: ${JSON.stringify(out.errors).slice(0, 200)}`);
+    assert.equal(out.errors.length, 0);
+  });
+
+  await check("validate_cel without path → isError", async () => {
+    const r = await client.callTool({ name: "validate_cel", arguments: {} });
+    assert.equal(r.isError, true);
   });
 
   await check("build_crl_ast via path → valid AST with expected structure", async () => {
