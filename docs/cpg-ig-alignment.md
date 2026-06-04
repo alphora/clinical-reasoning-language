@@ -31,7 +31,34 @@ This is the rule. Every CRL `request CPG<Type>` token references a specific Requ
 
 Each row was verified against the published `StructureDefinition-<id>.json` artifacts at `https://build.fhir.org/ig/HL7/cqf-recommendations/`. The Definition column profile fixes `kind` and `intent`, patterns `code`, and constrains `profile` and `doNotPerform` per the IG (relevant for the FHIR-def emit lane, Todo 2).
 
-**Important distinction the published spec exposes that FSH source hid:** the `code` element is constrained via `patternCodeableConcept`, not `fixedCodeableConcept`. The activity-type Coding entry MUST be present in `code.coding[]`, but additional codings MAY be added by emitters / consumers. The FHIR-def emit lane should append, not overwrite.
+**Important distinction the published spec exposes that FSH source hid:** the `ActivityDefinition.code` element is constrained via `patternCodeableConcept`, not `fixedCodeableConcept`. The activity-type Coding entry MUST be present in `code.coding[]`, but additional codings MAY be added by emitters / consumers. The FHIR-def emit lane should append, not overwrite.
+
+**Critical distinction between two `code` fields on two profiles** — the Activity profile (`cpg-<lowercase>activity`, on ActivityDefinition) and its target Request profile (`cpg-<name>`, on ServiceRequest / MedicationRequest / CommunicationRequest / Task) BOTH have a `code` element, but they carry DIFFERENT semantics:
+
+| Profile | Resource | `code` carries |
+|---|---|---|
+| `cpg-servicerequestactivity` | `ActivityDefinition` | The ACTIVITY-TYPE meta-code (e.g. `cpg-activity-type-cs#order-service`). Pattern-constrained per profile — invariant per CPG activity type. Identifies *what kind* of recommendation the ActivityDefinition represents. |
+| `cpg-servicerequest` | `ServiceRequest` (the target Request resource) | The CLINICAL code of the actual ordered service (e.g. a LOINC procedure code). `binding.strength = example` to the `procedure-code` valueset; no fixed/pattern value. Carries the patient-facing clinical content when an instance is produced. |
+
+The same shape repeats across kinds: `cpg-medicationrequestactivity.ActivityDefinition.code = #order-medication` (meta) versus `cpg-medicationrequest.MedicationRequest.medicationCodeableConcept = <clinical drug code>` (clinical).
+
+This distinction has a direct consequence for the CRL→FHIR-def emit lane (Todo 2): **the CRL `activity "X": - with "Terminology".` clause is naming the CLINICAL code that lands on the produced Request instance, NOT the ActivityDefinition's `code`.** The activity-type meta-code on the ActivityDefinition is invariant per CPG type (the lookup table above); the `with` terminology has to flow into a *different* slot.
+
+The FHIR-supported mechanism for "definitional resource produces an instance with this clinical code" is `ActivityDefinition.dynamicValue` — an array of expressions evaluated when the ActivityDefinition is applied. For a `with "BP Codes"` clause on a service-request activity, the emit lane should produce roughly:
+
+```json
+"dynamicValue": [
+  {
+    "path": "code",
+    "expression": {
+      "language": "text/cql-expression",
+      "expression": "ValueSet '<canonical of BP Codes ValueSet>'"
+    }
+  }
+]
+```
+
+The exact `path` per profile (`code` for ServiceRequest-like, `medicationCodeableConcept` for MedicationRequest, `vaccineCode` for Immunization, etc.) needs per-row verification against each cpg-* Request profile's element bindings.
 
 | CRL token | IG Definition profile (Id) | IG Request profile | FHIR resource (`kind`) | IG activity-type code (`cpg-activity-type-cs`) |
 |---|---|---|---|---|
@@ -142,10 +169,7 @@ Bigger surface than a concept-type addition because the CRL token also drives th
 
 These are unresolved as of 2026-06-04 and feed into the FHIR-def emit lane (Todo 2 specifically):
 
-1. **`with` terminology resolution.** CRL `activity "X": - with "Term".` references a terminology. The CPG IG ActivityDefinition profiles have NO standard slot for binding terminology — the `code` field on every activity profile is FIXED to a `cpg-activity-type-cs#<literal>` value, not the author's `with`. Three options (none verified yet):
-   - **(A)** Omit from emit entirely; the relationship is encoded only via the activity's CQL library; downstream consumers resolve at apply time.
-   - **(B)** Emit as a `dynamicValue` entry on the ActivityDefinition with `path = "code"` (or `productCodeableConcept` per kind) and `expression` set to a CQL ValueSet reference.
-   - **(C)** Use profile-specific extensions where they exist (`cpg-collectinformationactivity` has `CPGCollectWith`; most don't).
+1. **`with` terminology resolution — RESOLVED to Option B (2026-06-04).** CRL `activity "X": - with "Term".` references a clinical terminology. Per the operator's spec audit and the two-`code`-fields distinction documented above, the `with` terminology must land on the produced Request instance's clinical-code field (e.g. `ServiceRequest.code`, `MedicationRequest.medicationCodeableConcept`), NOT the ActivityDefinition's activity-type `code`. The FHIR-supported mechanism is `ActivityDefinition.dynamicValue` with a CQL ValueSet expression. The per-profile target `path` (`code` / `productCodeableConcept` / `vaccineCode` / ...) needs per-row verification against each cpg-* Request profile's element bindings — pending Todo 2 plan v2.
 2. **`metric` declaration kind.** Scope, body shape, FHIR emit target (MeasureReport).
 3. **`summary` declaration kind.** Scope, body shape, FHIR emit target (Composition).
 4. **Workflow-state activities (Stop / Hold / Resume).** Out of scope for v2.x; revisit when there's a real authoring use case.
