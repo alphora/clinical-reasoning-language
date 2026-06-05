@@ -1,5 +1,5 @@
 # Colorectal Cancer Screening Cognitive Support
-library "Colorectal Cancer Screening Recommendation".
+library "CRC Recommendation".
 
 // CRL representation of the demo-content-r4 colorectal cancer screening
 // COGNITIVE SUPPORT example. Used for round-trip validation:
@@ -46,9 +46,18 @@ concept "Exclusion Criteria":
 - type is Observation.
 - definition is documented.
 
+// One terminology to exercise Inv 2(b) (Library.relatedArtifact integrity)
+// in the closure orchestrator. Plan v3.2 round-4 disposition.
+terminology "Coverage Concern VS":
+- valueset is `http://example.org/sdh/demo/ValueSet/coverage-concern-vs`.
+
+// Body-only swap from `definition is documented` to `coded from "VS"`
+// so this concept now drives a Library.relatedArtifact[depends-on]
+// entry on its emitted Library. Other 9 concepts keep their original
+// body — they're irrelevant to Inv 2(b) test coverage.
 concept "Has Coverage Concern":
 - type is Observation.
-- definition is documented.
+- coded from "Coverage Concern VS".
 
 concept "No Coverage Concern":
 - type is Observation.

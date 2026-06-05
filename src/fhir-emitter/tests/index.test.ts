@@ -11,3 +11,4 @@ import "./recommendation.test";
 import "./decision.test";
 import "./corpusProbe.test";
 import "./ccScreeningRoundTrip.test";
+import "./closureOrchestrator.test";

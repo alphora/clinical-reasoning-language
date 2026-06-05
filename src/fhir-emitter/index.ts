@@ -33,6 +33,15 @@ export {
 } from "./decision";
 
 export {
+  emitFhirDefClosure,
+  emitFhirDefFromPath,
+  type FhirDefClosureEmitResult,
+  type FhirDefFromPathResult,
+} from "./closureOrchestrator";
+
+export { FHIR_DEF_WARNING_KINDS, isFhirDefError, isFhirDefWarning } from "./types";
+
+export {
   ALL_CPG_ACTIVITY_PROFILES,
   CPG_ACTIVITY_TYPE_CODE_SYSTEM,
   lookupCpgActivityProfile,
