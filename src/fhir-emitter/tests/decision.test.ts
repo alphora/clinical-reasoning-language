@@ -339,7 +339,7 @@ describe("decision — cascade-suppression rules", () => {
     expect((children[0]!.condition as Array<{ expression: { expression: string } }>)[0]!.expression.expression).toBe("Present");
   });
 
-  it("rule 4: all children suppress → parent suppressed + unresolved-reference-cascade-suppression warning", () => {
+  it("rule 4 + 7 (round-6): all-the-way-up cascade fires decision-cascade-suppressed ONLY (no separate cascade warning per level)", () => {
     const d = decision("D", [
       when("Outer", block(undefined, [
         when("Missing1", leaf(recommend("A"))),
@@ -353,20 +353,73 @@ describe("decision — cascade-suppression rules", () => {
     const { resource, errors } = emitDecisionPlanDefinition(
       d, "Lib", METADATA, onlyOuterResolves, RESOLVE_ACT_OK, RESOLVE_DEC_OK, true, { clock: FIXED_CLOCK },
     );
-    expect(errors.some((e) => e.kind === "unresolved-reference-cascade-suppression")).toBe(true);
-    // The outer WhenBlock's only child is suppressed → outer cascade-suppresses too →
-    // root has zero surviving actions → strategy-root-cascade-suppressed + skip.
+    // Per Rule 7: cascade-suppression goes all the way up to root →
+    // decision-cascade-suppressed fires; no intermediate cascade-warning
+    // (those are subsumed by the root-level error).
+    expect(errors.filter((e) => e.kind === "unresolved-reference-cascade-suppression")).toHaveLength(0);
     expect(resource).toBeNull();
-    expect(errors.some((e) => e.kind === "strategy-root-cascade-suppressed")).toBe(true);
+    expect(errors.some((e) => e.kind === "decision-cascade-suppressed")).toBe(true);
   });
 
-  it("rule 6: all top-level actions cascade-suppressed → strategy-root-cascade-suppressed + skip resource", () => {
+  it("rule 4 + 7 (round-6): mixed top-level (cascade + survive) emits ONE cascade warning at the cascade root", () => {
+    // Top-level has 2 WhenBlocks: "CascadeBranch" whose subtree all
+    // suppresses + "SurvivingBranch" that emits. The cascade warning
+    // fires at CascadeBranch (its parent — the decision itself —
+    // does NOT cascade).
+    const d = decision("D", [
+      when("CascadeBranch", block(undefined, [
+        when("Missing1", leaf(recommend("A"))),
+        when("Missing2", leaf(recommend("B"))),
+      ])),
+      when("SurvivingBranch", leaf(recommend("C"))),
+    ]);
+    const partial: ConceptResolver = (ref) => {
+      const name = typeof ref === "string" ? ref : ref.name;
+      return name.startsWith("Missing") ? null : name;
+    };
+    const { resource, errors } = emitDecisionPlanDefinition(
+      d, "Lib", METADATA, partial, RESOLVE_ACT_OK, RESOLVE_DEC_OK, true, { clock: FIXED_CLOCK },
+    );
+    expect(resource).not.toBeNull();
+    // Exactly 1 cascade warning — at CascadeBranch, the cascade root.
+    expect(errors.filter((e) => e.kind === "unresolved-reference-cascade-suppression")).toHaveLength(1);
+    // The 2 unresolved-concept UnmatchedReferences ARE collected (rule 1 fires per concept).
+  });
+
+  it("rule 7 (round-6 Claude): deeply-nested all-suppress emits ZERO mid-tree cascade warnings (decision-cascade-suppressed subsumes)", () => {
+    // Outer → Mid1 → [Leaf1, Leaf2] + Mid2 → [Leaf3, Leaf4]; all 4 leaves unresolved.
+    // Pre-fix bug emitted 3 cascade warnings (Mid1, Mid2, Outer) + 1 decision-cascade.
+    // Post-fix: 0 cascade warnings + 1 decision-cascade.
+    const d = decision("D", [
+      when("Outer", block(undefined, [
+        when("Mid1", block(undefined, [
+          when("MissingLeaf1", leaf(recommend("A"))),
+          when("MissingLeaf2", leaf(recommend("B"))),
+        ])),
+        when("Mid2", block(undefined, [
+          when("MissingLeaf3", leaf(recommend("C"))),
+          when("MissingLeaf4", leaf(recommend("D"))),
+        ])),
+      ])),
+    ]);
+    const partial: ConceptResolver = (ref) => {
+      const name = typeof ref === "string" ? ref : ref.name;
+      return name.startsWith("Missing") ? null : name;
+    };
+    const { errors } = emitDecisionPlanDefinition(
+      d, "Lib", METADATA, partial, RESOLVE_ACT_OK, RESOLVE_DEC_OK, true, { clock: FIXED_CLOCK },
+    );
+    expect(errors.filter((e) => e.kind === "unresolved-reference-cascade-suppression")).toHaveLength(0);
+    expect(errors.filter((e) => e.kind === "decision-cascade-suppressed")).toHaveLength(1);
+  });
+
+  it("rule 6: all top-level actions cascade-suppressed → decision-cascade-suppressed + skip resource", () => {
     const d = decision("D", [when("Missing", leaf(recommend("A")))]);
     const { resource, errors } = emitDecisionPlanDefinition(
       d, "Lib", METADATA, RESOLVE_NONE as ConceptResolver, RESOLVE_ACT_OK, RESOLVE_DEC_OK, true, { clock: FIXED_CLOCK },
     );
     expect(resource).toBeNull();
-    expect(errors.some((e) => e.kind === "strategy-root-cascade-suppressed")).toBe(true);
+    expect(errors.some((e) => e.kind === "decision-cascade-suppressed")).toBe(true);
   });
 
   it("rule 5: top-level mixed → resource emits with surviving actions only", () => {
@@ -490,6 +543,37 @@ describe("decision — emitDecisionPlanDefinitionsForLibrary", () => {
     expect(unmatched.some((u) => u.kind === "unresolved-decision")).toBe(true);
     // Root cascade-suppressed since the only action's leaf is unresolved.
     expect(resources).toHaveLength(0);
+  });
+
+  it("round-6 C1 regression: foreign-qualified `use decision` does NOT create a phantom local cycle even when name collides", () => {
+    // Local decision "A" uses foreign `"OtherLib"."A"`. Pre-fix bug:
+    // collectUseDecisions stripped the qualifier → recorded a self-loop
+    // on local A → emitted circular-decision-reference. Post-fix: foreign
+    // ref is normalized + ignored for graph purposes; cascade-suppression
+    // fires from unresolved leaf instead.
+    const a = decision("A", [when("C", leaf(useDec({ libraryName: "OtherLib", name: "A" })))]);
+    const { errors, unmatched } = emitDecisionPlanDefinitionsForLibrary(
+      [a], [], [concept("C")], "Lib", METADATA, { clock: FIXED_CLOCK },
+    );
+    expect(errors.some((e) => e.kind === "circular-decision-reference")).toBe(false);
+    expect(unmatched.some((u) => u.kind === "unresolved-decision")).toBe(true);
+  });
+
+  it("round-6 C1 regression: foreign-qualified `use decision` does NOT misclassify local same-name decision as sub-decision", () => {
+    // Root references `"OtherLib"."Sub"` (foreign), and local `Sub` has
+    // no incoming refs. Pre-fix bug: foreign edge stripped → recorded
+    // phantom Root→Sub edge → local Sub misclassified as sub-decision.
+    // Post-fix: both Root and Sub classified as roots.
+    const root = decision("Root", [when("C", leaf(useDec({ libraryName: "OtherLib", name: "Sub" })))]);
+    const sub = decision("Sub", [when("C", leaf(recommend("X")))]);
+    const { resources } = emitDecisionPlanDefinitionsForLibrary(
+      [root, sub], [activity("X")], [concept("C")], "Lib", METADATA, { clock: FIXED_CLOCK },
+    );
+    // Local Sub should be classified as a Strategy (no incoming local refs).
+    const subResource = resources.find((r) => (r.resource as { id: string }).id === "lib-sub");
+    expect(subResource).toBeDefined();
+    const subProfiles = (subResource!.resource as { meta: { profile: string[] } }).meta.profile;
+    expect(subProfiles).toContain("http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-strategydefinition");
   });
 
   it("libraryName contract: when slug ≠ name (`\"My Library\"` vs `my-library`), qualified ref still resolves locally", () => {

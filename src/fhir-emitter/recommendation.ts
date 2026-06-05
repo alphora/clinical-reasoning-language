@@ -38,7 +38,7 @@ import type { Activity } from "../ast/types";
 import type { CRLError } from "../types/errors";
 import { libraryCanonicalUrl } from "./library";
 import { activityDefinitionCanonicalUrl } from "./activity";
-import { capSlug, capSlugForSuffix, pascalCaseName, slugify } from "./slug";
+import { capSlugForSuffix, pascalCaseName, slugify } from "./slug";
 import type {
   CpgMetadata,
   EmitOptions,
@@ -261,6 +261,3 @@ export function emitRecommendationDefinitionsForLibrary(
   return { resources, errors, unmatched };
 }
 
-// Suppress unused-import warning — capSlug is part of the slug API
-// surface and we may need it in future closure-level work.
-void capSlug;

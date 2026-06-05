@@ -35,7 +35,7 @@ import type { CRLError } from "../types/errors";
  *   empty-terminology                              warning  Terminology body has neither `valueset is` nor `system is`+`code is`.
  *   circular-decision-reference                    error    Dependency-graph cycle among decisions. (Todo 3)
  *   empty-strategy-entrypoint                      error    Closure has no root decision (every decision is referenced; acyclic graph, no root). (Todo 3)
- *   strategy-root-cascade-suppressed               error    Root decision would emit with zero surviving actions due to cascade suppression. (Todo 3)
+ *   decision-cascade-suppressed                    error    A decision (root or sub) would emit with zero surviving top-level actions due to cascade suppression. (Todo 3 — round-6 renamed from strategy-root-cascade-suppressed for accuracy: same disposition fires for sub-decisions, not just strategies)
  *   unresolved-reference-cascade-suppression       warning  Non-root parent action suppressed because all children were suppressed. (Todo 3)
  */
 

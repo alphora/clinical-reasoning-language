@@ -70,7 +70,6 @@ import {
   refDisplay,
 } from "../ast/types";
 import type { CRLError } from "../types/errors";
-import { activityDefinitionCanonicalUrl } from "./activity";
 import { libraryCanonicalUrl } from "./library";
 import { recommendationDefinitionCanonicalUrl } from "./recommendation";
 import { capSlug, pascalCaseName, slugify } from "./slug";
@@ -244,25 +243,43 @@ export function emitDecisionPlanDefinition(
     errors,
     unmatched,
   };
-  const topLevelActions: Array<Record<string, unknown>> = [];
-  for (const wb of decision.body.statements) {
-    const result = emitWhenBlock(wb, ctx);
-    if (result.kind === "emitted") topLevelActions.push(result.action);
-    // If suppressed at top-level: rule 5 — surviving siblings still emit.
-  }
+  const topLevelResults = decision.body.statements.map((wb) => emitWhenBlock(wb, ctx));
+  const topLevelActions = topLevelResults
+    .filter((r): r is { kind: "emitted"; action: Record<string, unknown> } => r.kind === "emitted")
+    .map((r) => r.action);
 
   if (topLevelActions.length === 0) {
-    // Rule 6: root all-suppressed → strategy-root-cascade-suppressed
-    // + skip resource. (Same disposition applies whether root or sub —
-    // both emit no-resource + error; sub case is rare but possible.)
+    // Rule 6: top-level all-suppressed → decision-cascade-suppressed
+    // error + skip resource. (Round-6 gpt55 I1: name was previously
+    // `strategy-root-cascade-suppressed` but the same disposition fires
+    // for sub-decisions too; renamed for accuracy.) The
+    // strategy-root-style failure subsumes any intermediate cascade
+    // warnings — no additional cascade-suppression warning needed.
     errors.push({
       type: "Validation",
-      kind: "strategy-root-cascade-suppressed",
-      message: `Decision "${decision.name}" would emit with zero surviving actions due to cascade suppression. Skipping resource. Resolve the underlying unresolved-* references.`,
+      kind: "decision-cascade-suppressed",
+      message: `Decision "${decision.name}" would emit with zero surviving top-level actions due to cascade suppression. Skipping resource. Resolve the underlying unresolved-* references.`,
       line: decision.location?.start.line,
       column: decision.location?.start.column,
     });
     return { resource: null, errors, unmatched };
+  }
+
+  // Rule 4/7 at the top level: top-level WhenBlocks that cascade-suppress
+  // while OTHER top-level siblings survive get their cascade warning
+  // emitted here (the enclosing resource is the non-cascading "parent").
+  for (let i = 0; i < topLevelResults.length; i++) {
+    const r = topLevelResults[i]!;
+    if (r.kind === "suppressed" && r.reason === "all-children-suppressed") {
+      const wb = decision.body.statements[i]!;
+      errors.push({
+        type: "Validation",
+        kind: "unresolved-reference-cascade-suppression",
+        message: `Top-level "when ${getRefName(wb.conceptName)} then..." suppressed because all its children were suppressed.`,
+        line: wb.location?.start.line,
+        column: wb.location?.start.column,
+      });
+    }
   }
 
   const date = (opts.clock ?? defaultClock)().toISOString();
@@ -375,18 +392,37 @@ function emitWhenBlock(wb: WhenBlock, ctx: EmitCtx): EmitActionResult {
     .map((r) => r.action);
 
   if (survivingChildren.length === 0) {
-    // Rule 4: all children suppressed → suppress this parent + warn.
-    ctx.errors.push({
-      type: "Validation",
-      kind: "unresolved-reference-cascade-suppression",
-      message: `Action under "when ${getRefName(wb.conceptName)} then..." suppressed because all ${childResults.length} children were suppressed.`,
-      line: wb.location?.start.line,
-      column: wb.location?.start.column,
-    });
+    // Round-6 Claude I-Rule7 fix: do NOT emit cascade-suppression warning
+    // here. Pass cascade silently up the chain. Warning fires exactly ONCE
+    // per cascade chain — at the suppressed child of the lowest non-
+    // cascading ancestor (emitted in the mixed-children branch below), or
+    // gets subsumed by `strategy-root-cascade-suppressed` if the cascade
+    // reaches the top-level. Plan v3.2 rule 7: "1 diagnostic per cascade
+    // root, not N."
     return { kind: "suppressed", reason: "all-children-suppressed" };
   }
 
-  // Rule 3: mixed children → emit parent with survivors only, no aggregate diagnostic.
+  // Rule 3: mixed children → emit parent with survivors only, no aggregate
+  // diagnostic for the survivors. Rule 4/7 (round-6 fix): for each cascade-
+  // suppressed child, emit ONE `unresolved-reference-cascade-suppression`
+  // warning at the CHILD's location — the child is THE cascade root for its
+  // sub-chain, since this parent (emitting) terminates the upward cascade.
+  for (let i = 0; i < childResults.length; i++) {
+    const cr = childResults[i]!;
+    if (cr.kind === "suppressed" && cr.reason === "all-children-suppressed") {
+      const childStmt = body.statements[i]!;
+      const childName = childStmt.type === "WhenBlock"
+        ? getRefName(childStmt.conceptName)
+        : actionTitle(childStmt.action);
+      ctx.errors.push({
+        type: "Validation",
+        kind: "unresolved-reference-cascade-suppression",
+        message: `Action under "when ${childName} then..." suppressed because all its children were suppressed.`,
+        line: childStmt.location?.start.line,
+        column: childStmt.location?.start.column,
+      });
+    }
+  }
   action.action = survivingChildren;
 
   // `any:` qualifier → crl-logical-switch extension.
@@ -482,6 +518,7 @@ function actionTitle(action: Action): string {
  */
 function classifyAndDetectCycles(
   decisions: ReadonlyArray<Decision>,
+  libraryName: string,
 ): {
   rootNames: Set<string>;
   cycleMembers: Set<string>;
@@ -492,7 +529,7 @@ function classifyAndDetectCycles(
   const outgoing = new Map<string, Set<string>>(); // d -> set of decisions d uses
   const incoming = new Map<string, Set<string>>();
   for (const d of decisions) {
-    outgoing.set(d.name, collectUseDecisions(d, decisionNames));
+    outgoing.set(d.name, collectUseDecisions(d, decisionNames, libraryName));
     incoming.set(d.name, new Set());
   }
   for (const [from, tos] of outgoing) {
@@ -528,14 +565,31 @@ function classifyAndDetectCycles(
   return { rootNames, cycleMembers, errors };
 }
 
-function collectUseDecisions(d: Decision, knownDecisionNames: Set<string>): Set<string> {
+/**
+ * Walk a Decision's body collecting `use decision` refs that ARE local
+ * to `libraryName`. Foreign cross-library refs (e.g. `"OtherLib"."X"`)
+ * are skipped — they do NOT contribute to the local dependency graph
+ * (round-6 gpt55 C1 + Claude sub-agent confirmed: prior impl stripped
+ * qualifiers via getRefName without checking library context, causing
+ * phantom self-loops + root/sub misclassification).
+ */
+function collectUseDecisions(
+  d: Decision,
+  knownDecisionNames: Set<string>,
+  libraryName: string,
+): Set<string> {
   const refs = new Set<string>();
+  function tryAddDecisionRef(ref: ReferenceName): void {
+    const normalized = normalizeLocalRef(ref, libraryName);
+    if (isQualifiedRef(normalized)) return; // foreign — not a local edge
+    const name = getRefName(normalized);
+    if (knownDecisionNames.has(name)) refs.add(name);
+  }
   function visitWhenBlock(wb: WhenBlock): void {
     const body = wb.body;
     if (body.type === "ActionStatement") {
       if (body.action.type === "UseDecision") {
-        const name = getRefName(body.action.decisionName);
-        if (knownDecisionNames.has(name)) refs.add(name);
+        tryAddDecisionRef(body.action.decisionName);
       }
       return;
     }
@@ -543,8 +597,7 @@ function collectUseDecisions(d: Decision, knownDecisionNames: Set<string>): Set<
     for (const stmt of body.statements) {
       if (stmt.type === "WhenBlock") visitWhenBlock(stmt);
       else if (stmt.action.type === "UseDecision") {
-        const name = getRefName(stmt.action.decisionName);
-        if (knownDecisionNames.has(name)) refs.add(name);
+        tryAddDecisionRef(stmt.action.decisionName);
       }
     }
   }
@@ -626,7 +679,7 @@ export function emitDecisionPlanDefinitionsForLibrary(
   const unmatched: UnmatchedReference[] = [];
 
   // 1. Dependency-graph classification + cycle detection.
-  const classification = classifyAndDetectCycles(decisions);
+  const classification = classifyAndDetectCycles(decisions, libraryName);
   errors.push(...classification.errors);
 
   // 2. `empty-strategy-entrypoint` — only when acyclic with no root.
