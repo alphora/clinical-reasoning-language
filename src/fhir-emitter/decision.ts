@@ -73,6 +73,7 @@ import type { CRLError } from "../types/errors";
 import { libraryCanonicalUrl } from "./library";
 import { recommendationDefinitionCanonicalUrl } from "./recommendation";
 import { capSlug, pascalCaseName, slugify } from "./slug";
+import { tarjanSCC } from "./tarjan";
 import type {
   CpgMetadata,
   EmitOptions,
@@ -608,49 +609,9 @@ function collectUseDecisions(
   return refs;
 }
 
-function tarjanSCC(
-  nodes: ReadonlyArray<string>,
-  outgoing: Map<string, Set<string>>,
-): string[][] {
-  let index = 0;
-  const indices = new Map<string, number>();
-  const lowlinks = new Map<string, number>();
-  const onStack = new Set<string>();
-  const stack: string[] = [];
-  const sccs: string[][] = [];
-
-  function strongConnect(v: string): void {
-    indices.set(v, index);
-    lowlinks.set(v, index);
-    index++;
-    stack.push(v);
-    onStack.add(v);
-    for (const w of outgoing.get(v) ?? []) {
-      if (!indices.has(w)) {
-        strongConnect(w);
-        lowlinks.set(v, Math.min(lowlinks.get(v)!, lowlinks.get(w)!));
-      } else if (onStack.has(w)) {
-        lowlinks.set(v, Math.min(lowlinks.get(v)!, indices.get(w)!));
-      }
-    }
-    if (lowlinks.get(v) === indices.get(v)) {
-      const scc: string[] = [];
-      let w: string;
-      do {
-        w = stack.pop()!;
-        onStack.delete(w);
-        scc.push(w);
-      } while (w !== v);
-      sccs.push(scc);
-    }
-  }
-
-  for (const node of nodes) {
-    if (!indices.has(node)) strongConnect(node);
-  }
-
-  return sccs;
-}
+// Tarjan SCC factored to ./tarjan for shared use between per-library
+// (this file) and closure-level (closureOrchestrator.ts) cycle detection
+// — v2.4.0 round-5 Gemini disposition.
 
 /* ─── Closure-level wrapper ──────────────────────────────────────── */
 

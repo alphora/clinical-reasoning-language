@@ -95,13 +95,15 @@ if (!outDir) {
   process.exit(1);
 }
 
-// Plan v3.2 §"CLI extension": .cel + --target fhir-def is a category
-// error (CEL emits FHIR instances; --target fhir-def is for CRL→FHIR
-// Definition resources). Hard-error to prevent silent confusion.
-if (filePath.toLowerCase().endsWith(".cel") && target === "fhir-def") {
+// Plan v3.2 §"CLI extension": .cel input is not compatible with either
+// CRL emit target. CEL has its own FHIR-instance emit pipeline.
+// Round-5 Claude [nit]: be symmetric — reject .cel + --target cql too,
+// not just .cel + --target fhir-def.
+if (filePath.toLowerCase().endsWith(".cel") && target !== undefined) {
+  const kind = target === "fhir-def" ? "cli-cel-fhir-def-incompatible" : "cli-cel-cql-incompatible";
   process.stderr.write(
-    `cli-cel-fhir-def-incompatible: CEL input is not compatible with --target fhir-def. ` +
-      `CEL emits FHIR instances; remove the flag or pass a .crl file.\n`,
+    `${kind}: CEL input is not compatible with --target ${target}. ` +
+      `CEL emits FHIR instances via the existing pipeline (omit --target); remove the flag or pass a .crl file.\n`,
   );
   process.exit(1);
 }

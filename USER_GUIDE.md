@@ -914,12 +914,14 @@ CRL emits CPG-IG-conformant FHIR Definition resources (ValueSet, Library, Activi
 crl-emit --path <root.crl> --out-dir <project-root> --target fhir-def
 ```
 
-Output layout (matches the operator's locked project convention):
+**One invocation writes both lanes.** `--target fhir-def` runs the CQL emit lane AND the FHIR-def emit lane atomically — either both succeed and write, or neither writes (no partial state). This is required because the emitted Library resources reference the sibling CQL files via `content[0].attachment.url = "../../cql/<name>.cql"`; shipping FHIR without CQL would produce broken Library references.
+
+Output layout (operator's locked project convention):
 
 ```
 <project-root>/
    cql/
-      <library-name>.cql           ← from existing --target cql
+      <library-name>.cql           ← written from CQL emit lane
    fhir/
       ValueSet/<id>.json
       Library/<id>.json
@@ -927,9 +929,11 @@ Output layout (matches the operator's locked project convention):
       PlanDefinition/<id>.json     ← Recommendations + Decisions both
 ```
 
-Exit codes: `0` = clean; `1` = hard errors; `2` = warnings or unresolved references without hard errors.
+The legacy `--target cql` (or omitting `--target` on a `.crl` file) writes CQL output flat to `--out-dir` per the v2.2.x behavior — useful when you want only CQL.
 
-`.cel` input with `--target fhir-def` is a hard error (CEL files emit FHIR instances via a separate pipeline, not Definition resources).
+Exit codes: `0` = clean; `1` = hard errors (CRLError of error severity, or import-time error, or metadata error); `2` = warnings or unresolved references without hard errors.
+
+`.cel` input with `--target` (either value) is a hard error. CEL files emit FHIR instances via the existing CEL pipeline (omit `--target`); definitions are CRL-only.
 
 ### What gets emitted per CRL declaration
 

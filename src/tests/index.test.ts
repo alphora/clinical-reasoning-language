@@ -5,4 +5,5 @@ import "../imports/tests/index.test";
 import "../validator/tests/index.test";
 import "../emitter/tests/index.test";
 import "../fhir-emitter/tests/index.test";
+import "../cli/tests/run-emitter.test";
 import "./regression/index.test";

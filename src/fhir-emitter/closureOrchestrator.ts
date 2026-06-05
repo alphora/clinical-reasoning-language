@@ -179,6 +179,7 @@ function makeResolversForSourceLibrary(
 /* ─── slug helpers (mirror per-emit-module slug rules) ──────────────── */
 
 import { capSlug, capSlugForSuffix, slugify } from "./slug";
+import { tarjanSCC } from "./tarjan";
 
 function decisionIdForLib(libraryName: string, decisionName: string): string {
   return capSlug(`${slugify(libraryName)}-${slugify(decisionName)}`);
@@ -299,45 +300,9 @@ function classifyClosureDecisions(
   return { rootKeys, cycleMemberKeys, errors };
 }
 
-function tarjanSCC(nodes: ReadonlyArray<string>, outgoing: Map<string, Set<string>>): string[][] {
-  let index = 0;
-  const indices = new Map<string, number>();
-  const lowlinks = new Map<string, number>();
-  const onStack = new Set<string>();
-  const stack: string[] = [];
-  const sccs: string[][] = [];
-
-  function strongConnect(v: string): void {
-    indices.set(v, index);
-    lowlinks.set(v, index);
-    index++;
-    stack.push(v);
-    onStack.add(v);
-    for (const w of outgoing.get(v) ?? []) {
-      if (!indices.has(w)) {
-        strongConnect(w);
-        lowlinks.set(v, Math.min(lowlinks.get(v)!, lowlinks.get(w)!));
-      } else if (onStack.has(w)) {
-        lowlinks.set(v, Math.min(lowlinks.get(v)!, indices.get(w)!));
-      }
-    }
-    if (lowlinks.get(v) === indices.get(v)) {
-      const scc: string[] = [];
-      let w: string;
-      do {
-        w = stack.pop()!;
-        onStack.delete(w);
-        scc.push(w);
-      } while (w !== v);
-      sccs.push(scc);
-    }
-  }
-
-  for (const node of nodes) {
-    if (!indices.has(node)) strongConnect(node);
-  }
-  return sccs;
-}
+// tarjanSCC factored to ./tarjan for shared use between per-library
+// (decision.ts) and closure-level (this file) cycle detection — v2.4.0
+// round-5 Gemini disposition.
 
 /* ─── Closure invariants ────────────────────────────────────────────── */
 
@@ -485,10 +450,15 @@ function applyInvariant3(resources: ReadonlyArray<EmittedResource>, droppedPaths
 }
 
 function downstreamContext(url: string, droppedPaths: Set<string>): string {
-  // Heuristic: if any dropped path's stem appears in the URL, mention it.
+  // Tightened per round-5 Claude nit: require BOTH the resource-type
+  // prefix AND the id stem to match, so a dropped `ValueSet/foo.json`
+  // doesn't false-positive-annotate an unrelated PlanDefinition URL
+  // that happens to end in `/foo`.
   for (const dropped of droppedPaths) {
-    const stem = dropped.replace(/\.json$/, "");
-    if (url.endsWith(stem.split("/").pop() ?? "")) {
+    const [resourceType, idJson] = dropped.split("/");
+    if (!resourceType || !idJson) continue;
+    const id = idJson.replace(/\.json$/, "");
+    if (url.includes(`/${resourceType}/${id}`)) {
       return ` (downstream of collision on ${dropped})`;
     }
   }
