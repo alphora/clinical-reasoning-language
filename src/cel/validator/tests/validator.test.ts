@@ -447,6 +447,73 @@ describe("CEL T03 / #86 — result branch arm cross-check", () => {
     });
   });
 
+  test("Quantity-valued concept + `is true` → result-leaf-not-boolean-valued (T04 / #100)", () => {
+    withProject((root) => {
+      write(root, "lib.crl", [
+        "# L",
+        "library \"L\".",
+        "concept \"Cov Calculate\":",
+        "- type is Observation.",
+        "- value type is Quantity.",
+        "- defined as \"Cov Calculate\".",
+      ].join("\n"));
+      const file = write(root, "f.cel", [
+        ...ENC_FACT_HEADER,
+        "case \"C\":",
+        "- subject is \"Subject\".",
+        "- result is \"Cov Calculate\" is true.",
+      ].join("\n"));
+      const r = validateCELFile(file);
+      const errs = r.errors.filter((e) => e.kind === "result-leaf-not-boolean-valued");
+      expect(errs).toHaveLength(1);
+      expect(errs[0].message).toContain("Quantity");
+      expect(errs[0].message).toContain("Cov Calculate");
+    });
+  });
+
+  test("Concept with no value type + `is true` → result-leaf-not-boolean-valued (absent)", () => {
+    withProject((root) => {
+      write(root, "lib.crl", [
+        "# L",
+        "library \"L\".",
+        "concept \"Cov NoType\":",
+        "- type is Observation.",
+        "- defined as \"Cov NoType\".",
+      ].join("\n"));
+      const file = write(root, "f.cel", [
+        ...ENC_FACT_HEADER,
+        "case \"C\":",
+        "- subject is \"Subject\".",
+        "- result is \"Cov NoType\" is false.",
+      ].join("\n"));
+      const r = validateCELFile(file);
+      const errs = r.errors.filter((e) => e.kind === "result-leaf-not-boolean-valued");
+      expect(errs).toHaveLength(1);
+      expect(errs[0].message).toContain("absent");
+    });
+  });
+
+  test("boolean-valued concept + `is true` → clean (no result-leaf-not-boolean-valued)", () => {
+    withProject((root) => {
+      write(root, "lib.crl", [
+        "# L",
+        "library \"L\".",
+        "concept \"Cov Abnormal\":",
+        "- type is Observation.",
+        "- value type is boolean.",
+        "- defined as \"Cov Abnormal\".",
+      ].join("\n"));
+      const file = write(root, "f.cel", [
+        ...ENC_FACT_HEADER,
+        "case \"C\":",
+        "- subject is \"Subject\".",
+        "- result is \"Cov Abnormal\" is true.",
+      ].join("\n"));
+      const r = validateCELFile(file);
+      expect(r.errors.filter((e) => e.kind === "result-leaf-not-boolean-valued")).toEqual([]);
+    });
+  });
+
   test("decision with no arms (empty body) + any branch → unresolved-result-branch", () => {
     withProject((root) => {
       write(root, "lib.crl", [

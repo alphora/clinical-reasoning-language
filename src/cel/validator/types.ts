@@ -11,6 +11,7 @@ export type CELValidationErrorKind =
   | "invalid-result-shape"
   | "invalid-result-leaf-kind"
   | "unresolved-result-branch"
+  | "result-leaf-not-boolean-valued"
   // Fact / case / cross-resource
   | "unresolved-fact-ref"
   | "duplicate-fact-name"

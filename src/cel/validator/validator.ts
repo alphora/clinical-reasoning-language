@@ -497,6 +497,26 @@ function validateResult(
           fp,
         ),
       );
+    } else {
+      // T04 / #100: cross-check the concept's CRL `value type`. A boolean
+      // result assertion is only meaningful against a boolean-valued
+      // concept. Quantity/CodeableConcept/Reference/absent value types
+      // raise `result-leaf-not-boolean-valued`.
+      const valueTypes = leaf.valueTypes ?? [];
+      if (!valueTypes.includes("boolean")) {
+        errors.push(
+          err(
+            "result-leaf-not-boolean-valued",
+            `Result leaf "${cb.leafName}" in case "${caseName}" is a Concept with value type ${
+              valueTypes.length === 0
+                ? "absent"
+                : valueTypes.map((v) => `"${v}"`).join("/")
+            }; only boolean-valued concepts accept a true/false result assertion.`,
+            cb.value.location,
+            fp,
+          ),
+        );
+      }
     }
   } else {
     // Activity / Terminology / Parameter — not valid result leaves.
