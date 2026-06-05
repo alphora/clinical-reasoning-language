@@ -210,7 +210,7 @@ describe("CEL Todo 2 — AST shape spot-checks", () => {
     );
     const v = (branchResult as { value: { type: string; branchName?: string } }).value;
     expect(v.type).toBe("CELBranchResult");
-    expect(v.branchName).toBe("Order Antihypertensive Medication");
+    expect(v.branchName).toBe("Antihypertensive Medication");
   });
 });
 

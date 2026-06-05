@@ -12,7 +12,7 @@
 //       when Has Hypertensive Reading
 //         use decision Recommend Hypertension Intervention
 //           when Has Confirmed Hypertension Diagnosis
-//             any: recommend Order Antihypertensive Medication
+//             any: recommend Antihypertensive Medication
 
 library "CMS22 BP Cognitive Support — Hypertensive Reading".
 covers "CMS22 BP Control Cognitive Support Example".
@@ -70,4 +70,4 @@ case "Robert: hypertensive reading triggers antihypertensive recommendation":
 - fact is "Hypertensive BP Reading".
 - fact is "Hypertensive Systolic".
 - fact is "Hypertensive Diastolic".
-- result is "CMS22 BP Control Strategy" is "Order Antihypertensive Medication".
+- result is "CMS22 BP Control Strategy" is "Antihypertensive Medication".

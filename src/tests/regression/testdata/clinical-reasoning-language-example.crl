@@ -169,7 +169,7 @@ terminology "Medical Reason VS":
 terminology "Patient Declined VS":
 - valueset is `http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.526.3.1582`.
 
-terminology "Anti-Obesity Medication Contraindication VS":
+terminology "Anti-Obesity Contraindication VS":
 - valueset is `urn:example:placeholder`.
 
 // A code-based terminology (system + code pair), useful when the
@@ -246,7 +246,7 @@ concept "Patient Declined Reasons":
 concept "Anti-Obesity Medication Contraindication":
 - type is Observation.
 - value type is CodeableConcept.
-- coded from "Anti-Obesity Medication Contraindication VS".
+- coded from "Anti-Obesity Contraindication VS".
 
 
 // --- Composition concepts: bare ref + sem-* composition shapes ---

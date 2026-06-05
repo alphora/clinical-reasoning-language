@@ -54,13 +54,13 @@ decision "Recommend Hypertension Intervention":
 
 - when "Has Confirmed Hypertension Diagnosis" then:
   any:
-  - recommend activity "Order Antihypertensive Medication".
-  - recommend activity "Order Follow-up Rescreen".
-  - recommend activity "Order Lifestyle Referral".
+  - recommend activity "Antihypertensive Medication".
+  - recommend activity "Follow-up Rescreen".
+  - recommend activity "Lifestyle Referral".
 - end when
 - when "Hypertensive Reading Without Diagnosis" then:
   all:
-  - recommend activity "Order Follow-up Rescreen".
+  - recommend activity "Follow-up Rescreen".
   - recommend activity "Document Provisional Hypertension".
 - end when
 - when "Has Antihypertensive Contraindication" then recommend activity "Contraindicated Antihypertensive".
@@ -72,16 +72,16 @@ activity "Measure BP":
 - request CPGServiceRequest.
 - with "Blood Pressure Panels VS".
 
-activity "Order Antihypertensive Medication":
+activity "Antihypertensive Medication":
 - request CPGMedicationRequest.
 - with "Antihypertensive Medications VS".
 - because `Patient has confirmed hypertension and an in-range encounter`.
 
-activity "Order Follow-up Rescreen":
+activity "Follow-up Rescreen":
 - request CPGServiceRequest.
 - with "Follow Up Within 4 Weeks VS".
 
-activity "Order Lifestyle Referral":
+activity "Lifestyle Referral":
 - request CPGServiceRequest.
 - with "Lifestyle Recommendation VS".
 - because `Lifestyle counselling is the first-line intervention for stage-1 hypertension`.
