@@ -15,6 +15,95 @@ function lib(name: string, body: string): string {
 
 const terms = (n: string) => `terminology "${n}":\n- valueset is \`${n}\`.\n`;
 
+describe("T10 / #78 — recency × state-predicate composition", () => {
+  it("`most recent <X> active` → MostRecent wrapping Active", () => {
+    const src = lib(
+      "T",
+      terms("HBV Test") +
+        `concept "Recent Active":\n- type is Observation.\n- value type is boolean.\n- definition is most recent "HBV Test" active.\n`,
+    );
+    const r = emitCQL(src, { libraryName: "T" });
+    expect(r.success).toBe(true);
+    expect(r.unmatched).toBeUndefined();
+    expect(r.result).toMatch(/CRLPatterns\.MostRecent\(/);
+    expect(r.result).toMatch(/CRLPatterns\.Active\(/);
+  });
+
+  it("`most recent <X> verified` → MostRecent wrapping IsVerified", () => {
+    const src = lib(
+      "T",
+      terms("HBV Test") +
+        `concept "Recent Verified":\n- type is Observation.\n- value type is boolean.\n- definition is most recent "HBV Test" verified.\n`,
+    );
+    const r = emitCQL(src, { libraryName: "T" });
+    expect(r.success).toBe(true);
+    expect(r.result).toMatch(/CRLPatterns\.MostRecent\(/);
+    expect(r.result).toMatch(/CRLPatterns\.IsVerified\(/);
+  });
+
+  it("`most recent <X> documented as <Y>` → MostRecent wrapping DocumentedAs", () => {
+    const src = lib(
+      "T",
+      terms("HBV Test") +
+        terms("Resolved") +
+        `concept "Recent Doc":\n- type is Observation.\n- value type is boolean.\n- definition is most recent "HBV Test" documented as "Resolved".\n`,
+    );
+    const r = emitCQL(src, { libraryName: "T" });
+    expect(r.success).toBe(true);
+    expect(r.result).toMatch(/CRLPatterns\.MostRecent\(/);
+    expect(r.result).toMatch(/CRLPatterns\.DocumentedAs\(/);
+  });
+
+  it("`last <X> active` → Last wrapping Active", () => {
+    const src = lib(
+      "T",
+      terms("HBV Test") +
+        `concept "Last Active":\n- type is Observation.\n- value type is boolean.\n- definition is last "HBV Test" active.\n`,
+    );
+    const r = emitCQL(src, { libraryName: "T" });
+    expect(r.success).toBe(true);
+    expect(r.result).toMatch(/CRLPatterns\.LastOf\(/);
+    expect(r.result).toMatch(/CRLPatterns\.Active\(/);
+  });
+
+  it("`last <X> verified` → Last wrapping IsVerified", () => {
+    const src = lib(
+      "T",
+      terms("HBV Test") +
+        `concept "Last Verified":\n- type is Observation.\n- value type is boolean.\n- definition is last "HBV Test" verified.\n`,
+    );
+    const r = emitCQL(src, { libraryName: "T" });
+    expect(r.success).toBe(true);
+    expect(r.result).toMatch(/CRLPatterns\.LastOf\(/);
+    expect(r.result).toMatch(/CRLPatterns\.IsVerified\(/);
+  });
+
+  it("`last <X> documented as <Y>` → Last wrapping DocumentedAs", () => {
+    const src = lib(
+      "T",
+      terms("HBV Test") +
+        terms("Resolved") +
+        `concept "Last Doc":\n- type is Observation.\n- value type is boolean.\n- definition is last "HBV Test" documented as "Resolved".\n`,
+    );
+    const r = emitCQL(src, { libraryName: "T" });
+    expect(r.success).toBe(true);
+    expect(r.result).toMatch(/CRLPatterns\.LastOf\(/);
+    expect(r.result).toMatch(/CRLPatterns\.DocumentedAs\(/);
+  });
+
+  it("bare `most recent <X>` still matches plain MostRecent (regression)", () => {
+    const src = lib(
+      "T",
+      terms("HBV Test") +
+        `concept "Recent":\n- type is Observation.\n- value type is boolean.\n- definition is most recent "HBV Test".\n`,
+    );
+    const r = emitCQL(src, { libraryName: "T" });
+    expect(r.success).toBe(true);
+    expect(r.result).toMatch(/CRLPatterns\.MostRecent\(/);
+    expect(r.result).not.toMatch(/CRLPatterns\.Active\(/);
+  });
+});
+
 describe("T08 / #98 — window-from-anchor 3 missing sisters", () => {
   it("`last <X> within <Q> after end of <Y>` → CRLPatterns.AfterEndOf inside Last", () => {
     const src = lib(

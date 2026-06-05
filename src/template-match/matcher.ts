@@ -467,6 +467,81 @@ const mostRecent: PatternMatcher = (els, loc) => {
   return makeCall("MostRecent", [conceptRefArg(els[2])], loc);
 };
 
+/** `most recent <X> active` → MostRecent(Active(X)) — T10 / #78 */
+const mostRecentActive: PatternMatcher = (els, loc) => {
+  if (els.length !== 4) return null;
+  if (!isWord(els[0], "most")) return null;
+  if (!isWord(els[1], "recent")) return null;
+  if (!isConceptRef(els[2])) return null;
+  if (!isWord(els[3], "active")) return null;
+  const inner = makeCall("Active", [conceptRefArg(els[2])], loc);
+  return makeCall("MostRecent", [nestedArg(inner)], loc);
+};
+
+/** `most recent <X> verified` → MostRecent(IsVerified(X)) — T10 / #78 */
+const mostRecentVerified: PatternMatcher = (els, loc) => {
+  if (els.length !== 4) return null;
+  if (!isWord(els[0], "most")) return null;
+  if (!isWord(els[1], "recent")) return null;
+  if (!isConceptRef(els[2])) return null;
+  if (!isWord(els[3], "verified")) return null;
+  const inner = makeCall("IsVerified", [conceptRefArg(els[2])], loc);
+  return makeCall("MostRecent", [nestedArg(inner)], loc);
+};
+
+/** `most recent <X> documented as <Y>` → MostRecent(DocumentedAs(X, Y)) — T10 / #78 */
+const mostRecentDocumentedAs: PatternMatcher = (els, loc) => {
+  if (els.length !== 6) return null;
+  if (!isWord(els[0], "most")) return null;
+  if (!isWord(els[1], "recent")) return null;
+  if (!isConceptRef(els[2])) return null;
+  if (!isWord(els[3], "documented")) return null;
+  if (!isWord(els[4], "as")) return null;
+  if (!isConceptRef(els[5])) return null;
+  const inner = makeCall(
+    "DocumentedAs",
+    [conceptRefArg(els[2]), conceptRefArg(els[5])],
+    loc,
+  );
+  return makeCall("MostRecent", [nestedArg(inner)], loc);
+};
+
+/** `last <X> active` → Last(Active(X)) — T10 / #78 */
+const lastActive: PatternMatcher = (els, loc) => {
+  if (els.length !== 3) return null;
+  if (!isWord(els[0], "last")) return null;
+  if (!isConceptRef(els[1])) return null;
+  if (!isWord(els[2], "active")) return null;
+  const inner = makeCall("Active", [conceptRefArg(els[1])], loc);
+  return makeCall("Last", [nestedArg(inner)], loc);
+};
+
+/** `last <X> verified` → Last(IsVerified(X)) — T10 / #78 */
+const lastVerified: PatternMatcher = (els, loc) => {
+  if (els.length !== 3) return null;
+  if (!isWord(els[0], "last")) return null;
+  if (!isConceptRef(els[1])) return null;
+  if (!isWord(els[2], "verified")) return null;
+  const inner = makeCall("IsVerified", [conceptRefArg(els[1])], loc);
+  return makeCall("Last", [nestedArg(inner)], loc);
+};
+
+/** `last <X> documented as <Y>` → Last(DocumentedAs(X, Y)) — T10 / #78 */
+const lastDocumentedAs: PatternMatcher = (els, loc) => {
+  if (els.length !== 5) return null;
+  if (!isWord(els[0], "last")) return null;
+  if (!isConceptRef(els[1])) return null;
+  if (!isWord(els[2], "documented")) return null;
+  if (!isWord(els[3], "as")) return null;
+  if (!isConceptRef(els[4])) return null;
+  const inner = makeCall(
+    "DocumentedAs",
+    [conceptRefArg(els[1]), conceptRefArg(els[4])],
+    loc,
+  );
+  return makeCall("Last", [nestedArg(inner)], loc);
+};
+
 /** `earliest <X>` → Earliest(X) */
 const earliest: PatternMatcher = (els, loc) => {
   if (els.length !== 2) return null;
@@ -697,12 +772,16 @@ const PATTERNS: PatternMatcher[] = [
   atMostApart,                     // 7 (T07 / #93)
   lastOnDayOf,                     // 6
   notDoneWithReason,               // 6+ (variable)
+  mostRecentDocumentedAs,          // 6 (T10 / #78)
   hasAdverseReactionTo,            // 5 (issue #77 audit)
   withoutRecordOf,                 // 4
   withoutDocumentedDisjunction,    // 3 (with disjunction element)
+  lastDocumentedAs,                // 5 (T10 / #78)
   onOrBefore,                      // 5
   sameDayAs,                       // 5
   between,                         // 5
+  mostRecentActive,                // 4 (T10 / #78)
+  mostRecentVerified,              // 4 (T10 / #78)
   activeDuring,                    // 4 (post-catalog-v0.7: `<X> active during <Y>`)
   documentedAs,                    // 4
   justifiedBy,                     // 4
@@ -716,6 +795,8 @@ const PATTERNS: PatternMatcher[] = [
   below,                           // 3
   exceeds,                         // 3
   without,                         // 3 (last among 3-element patterns; less specific)
+  lastActive,                      // 3 (T10 / #78 — BEFORE mostRecent/lastBare)
+  lastVerified,                    // 3 (T10 / #78)
   mostRecent,                      // 3
   currentlyTaking,                 // 3 (issue #77)
   ageAt,                           // 3 (issue #77 audit; AFTER ageAtStartOfAtLeast since len differs)
