@@ -32,8 +32,12 @@ import type {
   UnmatchedReference,
 } from "./types";
 
+// #104: shareable-valueset lifecycle profile moved from CPG STU1's uv/cpg
+// namespace to CRMI IG (uv/crmi) in CPG 2.0.0. Consumers should add
+// hl7.fhir.uv.crmi to their IG deps alongside the CPG package — CPG 2.0.0
+// itself does NOT declare a CRMI dependency.
 const PROFILE_URL =
-  "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-shareablevalueset";
+  "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareablevalueset";
 
 /**
  * Emit one cpg-shareableValueSet from a single CRL Terminology.

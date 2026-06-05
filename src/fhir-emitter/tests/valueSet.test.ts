@@ -45,7 +45,7 @@ describe("fhir-emitter valueSet.emitValueSet", () => {
     expect(r.resourceType).toBe("ValueSet");
     expect(r.id).toBe("cms22-terminology-bp-screening-encounter-codes");
     expect((r.meta as { profile: string[] }).profile).toEqual([
-      "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-shareablevalueset",
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareablevalueset",
     ]);
     expect(r.url).toBe(
       "http://hl7.org/fhir/us/cqfmeasures/crl/cms22/ValueSet/cms22-terminology-bp-screening-encounter-codes",

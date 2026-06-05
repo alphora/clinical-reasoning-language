@@ -994,6 +994,12 @@ Exit codes: `0` = clean; `1` = hard errors (CRLError of error severity, or impor
 - **Cross-library concept / terminology references are unsupported in v0.** Same-library qualified refs (`"CurrentLib"."X"`) resolve as bare locals. True cross-library refs cascade-suppress through the existing Todo 3 cascade rules with `unresolved-*` UnmatchedReference entries.
 - **`cpg-strategydefinition.action.definition[x]` target-profile** — the published spec constrains this to `canonical(cpg-recommendationdefinition)` only. CRL emit deliberately violates this constraint by referencing publishable-only sub-decisions (matches the cc-screening reference example pattern). The operator is amending the published spec.
 
+### IG dependency note (#104, post-v2.5.0)
+
+The publishable + shareable plan-definition lifecycle profiles moved from CPG STU1's `uv/cpg` namespace into the **CRMI IG** at `uv/crmi` in CPG 2.0.0. CRL emit now stamps the correct canonicals (`crmi-publishableplandefinition`, `crmi-shareablevalueset`). However, **CPG IG 2.0.0 itself does NOT declare a CRMI dependency**, so consumers of these emitted resources should add `hl7.fhir.uv.crmi` to their IG `dependencies` alongside the CPG package.
+
+The two knowledge-* extensions (`cqf-knowledgeCapability`, `cqf-knowledgeRepresentationLevel`) are FHIR-core extensions — no extra dependency needed; they resolve at `hl7.org/fhir/extensions`.
+
 ### MCP tools
 
 The `emit_crl_fhir` MCP tool exposes the same emit pipeline for AI assistants. Path-only argument; returns a summary envelope by default. Pass `includeResources: true` to also receive the full `resources[]` array.

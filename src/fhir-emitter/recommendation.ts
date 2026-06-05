@@ -18,7 +18,8 @@
  * the fixture README.
  *
  * Recommendation profile: `[cpg-recommendationdefinition,
- * cpg-publishableplandefinition]`, type `eca-rule`. No `version`
+ * crmi-publishableplandefinition]` (per #104 namespace fix), type
+ * `eca-rule`. No `version`
  * field (per `feedback_no-version-on-emitted-artifacts` memory rule).
  * knowledgeCapability emits 3 (`shareable + computable + publishable`;
  * NOT `executable` per round-2 Gemini disposition — overclaim).
@@ -47,12 +48,17 @@ import type {
 } from "./types";
 
 const CPG_BASE = "http://hl7.org/fhir/uv/cpg/StructureDefinition";
+// #104: see decision.ts for the namespace migration rationale. CRMI for
+// publishable-plan-definition lifecycle; FHIR-core cqf- for the knowledge*
+// extensions.
+const CRMI_BASE = "http://hl7.org/fhir/uv/crmi/StructureDefinition";
+const FHIR_CORE_EXT_BASE = "http://hl7.org/fhir/StructureDefinition";
 const REC_PROFILES: readonly string[] = [
   `${CPG_BASE}/cpg-recommendationdefinition`,
-  `${CPG_BASE}/cpg-publishableplandefinition`,
+  `${CRMI_BASE}/crmi-publishableplandefinition`,
 ];
-const KNOWLEDGE_CAPABILITY_EXT = `${CPG_BASE}/cpg-knowledgeCapability`;
-const KNOWLEDGE_REPRESENTATION_EXT = `${CPG_BASE}/cpg-knowledgeRepresentationLevel`;
+const KNOWLEDGE_CAPABILITY_EXT = `${FHIR_CORE_EXT_BASE}/cqf-knowledgeCapability`;
+const KNOWLEDGE_REPRESENTATION_EXT = `${FHIR_CORE_EXT_BASE}/cqf-knowledgeRepresentationLevel`;
 const PLAN_DEFINITION_TYPE_CS = "http://terminology.hl7.org/CodeSystem/plan-definition-type";
 const ACTION_TYPE_CS = "http://terminology.hl7.org/CodeSystem/action-type";
 const CPG_COMMON_PROCESS_CS = "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs";

@@ -133,7 +133,7 @@ describe("decision — emitDecisionPlanDefinition Strategy (isRoot=true)", () =>
     const r = resource!.resource as Record<string, unknown>;
     expect((r.meta as { profile: string[] }).profile).toEqual([
       "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-strategydefinition",
-      "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-publishableplandefinition",
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-publishableplandefinition",
     ]);
     expect((r.type as { coding: Array<{ code: string }> }).coding[0]!.code).toBe("workflow-definition");
   });
@@ -155,7 +155,7 @@ describe("decision — emitDecisionPlanDefinition Strategy (isRoot=true)", () =>
     const r = resource!.resource as Record<string, unknown>;
     const extensions = r.extension as Array<{ url: string; valueCode: string }>;
     const capCodes = extensions
-      .filter((e) => e.url.endsWith("/cpg-knowledgeCapability"))
+      .filter((e) => e.url.endsWith("/cqf-knowledgeCapability"))
       .map((e) => e.valueCode);
     expect(capCodes).toEqual(["shareable", "computable", "publishable"]);
   });
@@ -201,7 +201,7 @@ describe("decision — emitDecisionPlanDefinition Sub-decision (isRoot=false)", 
     );
     const r = resource!.resource as Record<string, unknown>;
     expect((r.meta as { profile: string[] }).profile).toEqual([
-      "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-publishableplandefinition",
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-publishableplandefinition",
     ]);
     expect((r.type as { coding: Array<{ code: string }> }).coding[0]!.code).toBe("eca-rule");
   });
@@ -460,7 +460,7 @@ describe("decision — emitDecisionPlanDefinitionsForLibrary", () => {
     const subR = byId.get("lib-sub")!;
     expect((rootR.meta as { profile: string[] }).profile).toContain("http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-strategydefinition");
     expect((subR.meta as { profile: string[] }).profile).not.toContain("http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-strategydefinition");
-    expect((subR.meta as { profile: string[] }).profile).toEqual(["http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-publishableplandefinition"]);
+    expect((subR.meta as { profile: string[] }).profile).toEqual(["http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-publishableplandefinition"]);
   });
 
   it("Strategy → Sub-decision reference uses planDefinitionCanonicalUrl (byte-equality)", () => {

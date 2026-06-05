@@ -54,7 +54,7 @@ describe("recommendation — emitRecommendationDefinition", () => {
     expect(r.id).toBe("lib-colonoscopy-recommendation");
     expect((r.meta as { profile: string[] }).profile).toEqual([
       "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-recommendationdefinition",
-      "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-publishableplandefinition",
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-publishableplandefinition",
     ]);
     expect(r.url).toBe("http://example.org/sdh/demo/PlanDefinition/lib-colonoscopy-recommendation");
     expect(r.title).toBe("Colonoscopy");
@@ -71,13 +71,13 @@ describe("recommendation — emitRecommendationDefinition", () => {
     const r = resource!.resource as Record<string, unknown>;
     const extensions = r.extension as Array<{ url: string; valueCode: string }>;
     const capabilityCodes = extensions
-      .filter((e) => e.url.endsWith("/cpg-knowledgeCapability"))
+      .filter((e) => e.url.endsWith("/cqf-knowledgeCapability"))
       .map((e) => e.valueCode);
     expect(capabilityCodes).toEqual(["shareable", "computable", "publishable"]);
     expect(capabilityCodes).not.toContain("executable");
-    const levelExts = extensions.filter((e) => e.url.endsWith("/cpg-knowledgeRepresentationLevel"));
+    const levelExts = extensions.filter((e) => e.url.endsWith("/cqf-knowledgeRepresentationLevel"));
     expect(levelExts).toEqual([
-      { url: "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-knowledgeRepresentationLevel", valueCode: "structured" },
+      { url: "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeRepresentationLevel", valueCode: "structured" },
     ]);
   });
 

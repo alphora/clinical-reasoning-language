@@ -1,13 +1,13 @@
 /**
- * CRL Decision → cpg-strategydefinition / cpg-publishableplandefinition
+ * CRL Decision → cpg-strategydefinition / crmi-publishableplandefinition
  * PlanDefinition emit (Todo 3, Decision lane).
  *
- * Per plan v3.2 [065]:
+ * Per plan v3.2 [065] + #104 namespace fix:
  *   - Root CRL decision (no incoming `use decision` refs)
  *       → Strategy PlanDef with profiles `[cpg-strategydefinition,
- *         cpg-publishableplandefinition]`, type `workflow-definition`.
+ *         crmi-publishableplandefinition]`, type `workflow-definition`.
  *   - Sub CRL decision (referenced by ≥1 `use decision`)
- *       → Sub-decision PlanDef with profile `[cpg-publishableplandefinition]`
+ *       → Sub-decision PlanDef with profile `[crmi-publishableplandefinition]`
  *         only, type `eca-rule`. Matches the demo-content-r4
  *         "decisiontree" pattern (renamed conceptually to "decision").
  *
@@ -82,15 +82,25 @@ import type {
 } from "./types";
 
 const CPG_BASE = "http://hl7.org/fhir/uv/cpg/StructureDefinition";
+// #104: publishable + shareable plan-definition lifecycle profiles moved
+// from CPG STU1's uv/cpg namespace into the CRMI IG at uv/crmi in CPG 2.0.0.
+// CPG 2.0.0 does NOT declare a CRMI dependency itself — consumers of these
+// emitted resources should add hl7.fhir.uv.crmi to their IG deps alongside
+// the CPG package (see USER_GUIDE §"Emitting FHIR Definition resources").
+const CRMI_BASE = "http://hl7.org/fhir/uv/crmi/StructureDefinition";
+// #104: knowledgeCapability + knowledgeRepresentationLevel are FHIR-core
+// extensions (cqf- prefix), NOT CPG-IG extensions. Resolves at
+// hl7.org/fhir/extensions with no IG dependency.
+const FHIR_CORE_EXT_BASE = "http://hl7.org/fhir/StructureDefinition";
 const STRATEGY_PROFILES: readonly string[] = [
   `${CPG_BASE}/cpg-strategydefinition`,
-  `${CPG_BASE}/cpg-publishableplandefinition`,
+  `${CRMI_BASE}/crmi-publishableplandefinition`,
 ];
 const SUBDECISION_PROFILES: readonly string[] = [
-  `${CPG_BASE}/cpg-publishableplandefinition`,
+  `${CRMI_BASE}/crmi-publishableplandefinition`,
 ];
-const KNOWLEDGE_CAPABILITY_EXT = `${CPG_BASE}/cpg-knowledgeCapability`;
-const KNOWLEDGE_REPRESENTATION_EXT = `${CPG_BASE}/cpg-knowledgeRepresentationLevel`;
+const KNOWLEDGE_CAPABILITY_EXT = `${FHIR_CORE_EXT_BASE}/cqf-knowledgeCapability`;
+const KNOWLEDGE_REPRESENTATION_EXT = `${FHIR_CORE_EXT_BASE}/cqf-knowledgeRepresentationLevel`;
 const PLAN_DEFINITION_TYPE_CS = "http://terminology.hl7.org/CodeSystem/plan-definition-type";
 const CPG_COMMON_PROCESS_CS = "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs";
 
