@@ -194,6 +194,11 @@ export function emitRecommendationDefinition(
       resourceType: "PlanDefinition",
       relativePath: `PlanDefinition/${id}.json`,
       resource,
+      // 1:1 generated from the activity declaration (per plan v3.2);
+      // sourceName is the activity's CRL name (no synthesized suffix).
+      sourceKind: "Recommendation",
+      sourceName: activity.name,
+      ...(activity.location ? { location: activity.location } : {}),
     },
     errors,
     unmatched,

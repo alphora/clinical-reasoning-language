@@ -17,6 +17,7 @@
  * variants documented in this file's NEW_CRL_ERROR_KINDS comment.
  */
 
+import type { Location } from "../ast/types";
 import type { CRLError } from "../types/errors";
 
 /**
@@ -37,7 +38,32 @@ import type { CRLError } from "../types/errors";
  *   empty-strategy-entrypoint                      error    Closure has no root decision (every decision is referenced; acyclic graph, no root). (Todo 3)
  *   decision-cascade-suppressed                    error    A decision (root or sub) would emit with zero surviving top-level actions due to cascade suppression. (Todo 3 — round-6 renamed from strategy-root-cascade-suppressed for accuracy: same disposition fires for sub-decisions, not just strategies)
  *   unresolved-reference-cascade-suppression       warning  Non-root parent action suppressed because all children were suppressed. (Todo 3)
+ *   closure-resource-collision                     error    Two emitted resources within the closure produce the same `<resourceType>/<id>.json` relative path. (Todo 4)
+ *   unresolved-library-reference                   error    An emitted resource's `library[]` URL doesn't resolve to an emitted Library. (Todo 4)
+ *   unresolved-related-artifact                    error    An emitted Library's `relatedArtifact[depends-on]` URL is under canonicalBase but doesn't resolve to an emitted resource. (Todo 4)
+ *   unresolved-definition-target                   error    An emitted PlanDef's `action.definitionCanonical` doesn't resolve to an emitted PlanDef/ActivityDef. (Todo 4)
+ *   cli-cel-fhir-def-incompatible                  error    CLI: `.cel` input + `--target fhir-def` flag. (Todo 4)
  */
+
+/**
+ * Todo 4 severity classifier. CRLError.kind is unconstrained string so
+ * the CLI needs a deterministic warning/error split. Maintain explicitly.
+ *
+ * Any CRLError whose kind is NOT in this set is treated as a hard error.
+ */
+export const FHIR_DEF_WARNING_KINDS: ReadonlySet<string> = new Set([
+  "non-ascii-slug-fallback",
+  "empty-terminology",
+  "unresolved-reference-cascade-suppression",
+]);
+
+export function isFhirDefWarning(error: CRLError): boolean {
+  return error.kind !== undefined && FHIR_DEF_WARNING_KINDS.has(error.kind);
+}
+
+export function isFhirDefError(error: CRLError): boolean {
+  return !isFhirDefWarning(error);
+}
 
 /**
  * CPG-IG-shareable knowledge-artifact metadata. Δ7: ONE per closure
@@ -82,6 +108,19 @@ export interface EmittedResource {
   resourceType: "ValueSet" | "ActivityDefinition" | "PlanDefinition" | "Library";
   relativePath: string;
   resource: Record<string, unknown>;
+  /**
+   * Todo 4: closure-level collision-attribution support. Each per-library
+   * emitter populates these so Invariant 1's `closure-resource-collision`
+   * error can name the source declaration + AST location for each collider.
+   * Optional for backward compat with existing tests.
+   *
+   * For Recommendation PlanDefs (1:1 generated from an `activity` declaration),
+   * sourceKind = "Recommendation" and sourceName = the activity's CRL name
+   * (NOT a synthesized "<name> Recommendation" string).
+   */
+  sourceKind?: "Terminology" | "Library" | "Activity" | "Recommendation" | "Decision";
+  sourceName?: string;
+  location?: Location;
 }
 
 /**
