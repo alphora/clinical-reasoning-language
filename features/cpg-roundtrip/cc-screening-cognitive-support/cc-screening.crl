@@ -1,0 +1,108 @@
+// CRL representation of the demo-content-r4 colorectal cancer screening
+// COGNITIVE SUPPORT example. Used for round-trip validation:
+//
+//   CRL author writes this file
+//     → CRL→FHIR-def emit pipeline (Todo 1+2+3)
+//     → produces FHIR resources
+//     → compared to expected-fhir/ (copied from demo-content-r4)
+//
+// Round-trip test confirms emit shape matches the IG reference example
+// in terms of resource set, profile claims, type codings, action
+// nesting, and cross-resource canonical references.
+//
+// The Prior Authorization (PA) flavor of the cc-screening corpus is
+// intentionally NOT modeled here — operator scope: cognitive support
+// first, PA in a future fixture.
+//
+// Concept names are clinical-narrative phrasing chosen to be readable
+// in the emitted action.title/description and the action.condition
+// CQL identifier. The actual CQL implementation of these concepts
+// lives in the existing demo-content-r4 ColorectalCancerCaseFeatures
+// library (see ../expected-fhir/library/).
+
+library "Colorectal Cancer Screening Recommendation"
+
+// ============ Concepts ============
+// One concept per condition referenced in the decision tree.
+// Round-trip note: these become CQL define names in the emitted
+// Library and are referenced from action.condition.expression as
+// text/cql-identifier values.
+
+concept "Inclusion Criteria":
+- type is boolean.
+
+concept "Exclusion Criteria":
+- type is boolean.
+
+concept "Has Coverage Concern":
+- type is boolean.
+
+concept "No Coverage Concern":
+- type is boolean.
+
+concept "Has Sedation Concern":
+- type is boolean.
+
+concept "No Sedation Concern":
+- type is boolean.
+
+concept "Has Sigmoidoscopy Complications":
+- type is boolean.
+
+concept "No Sigmoidoscopy Complications":
+- type is boolean.
+
+concept "Has Colonoscopy Complications":
+- type is boolean.
+
+concept "No Colonoscopy Complications":
+- type is boolean.
+
+// ============ Activities ============
+// Each `activity` declaration produces TWO FHIR resources:
+//   1. cpg-recommendationdefinition PlanDefinition (the wrapping layer
+//      that strategies/sub-decisions reference)
+//   2. cpg-servicerequestactivity ActivityDefinition (the actual
+//      resource the consumer instantiates)
+
+activity "FIT DNA":
+- request CPGServiceRequest.
+
+activity "Colonoscopy":
+- request CPGServiceRequest.
+
+activity "CT Colonography":
+- request CPGServiceRequest.
+
+activity "Sigmoidoscopy":
+- request CPGServiceRequest.
+
+// ============ Decisions ============
+
+// Root strategy decision. Produces a cpg-strategydefinition PlanDef
+// (type workflow-definition). The two when-then branches map to two
+// top-level action[] entries; each delegates to a sub-decision via
+// `use decision`.
+
+decision "Colorectal Cancer Screening Strategy":
+- when "Inclusion Criteria" then use decision "Colorectal Cancer Screening Decision".
+
+// Sub-decision: the actual screening choice tree. Produces a sub-
+// decision PlanDef (cpg-publishableplandefinition only; type
+// eca-rule). Nested when-then becomes nested action.action[] —
+// no leaf `definitionCanonical` until the innermost layer.
+//
+// The leaves use `recommend activity X` which emits as
+// action.definitionCanonical → the wrapping Recommendation PlanDef
+// for activity X (NOT directly the ActivityDef — round-2 plan
+// review C1 fix).
+
+decision "Colorectal Cancer Screening Decision":
+- when "Has Coverage Concern" then recommend activity "FIT DNA".
+- when "No Coverage Concern" then:
+  - when "Has Sedation Concern" then:
+    - when "Has Sigmoidoscopy Complications" then recommend activity "CT Colonography".
+    - when "No Sigmoidoscopy Complications" then recommend activity "Sigmoidoscopy".
+  - when "No Sedation Concern" then:
+    - when "Has Colonoscopy Complications" then recommend activity "CT Colonography".
+    - when "No Colonoscopy Complications" then recommend activity "Colonoscopy".

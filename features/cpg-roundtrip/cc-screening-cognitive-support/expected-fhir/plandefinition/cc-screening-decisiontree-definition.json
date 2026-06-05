@@ -1,0 +1,313 @@
+{
+    "resourceType": "PlanDefinition",
+    "id": "cc-screening-decisiontree-definition",
+    "meta": {
+        "profile": [
+            "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-publishableplandefinition"
+        ]
+    },
+    "extension": [
+        {
+            "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-knowledgeCapability",
+            "valueCode": "shareable"
+        },
+        {
+            "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-knowledgeCapability",
+            "valueCode": "computable"
+        },
+        {
+            "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-knowledgeCapability",
+            "valueCode": "executable"
+        },
+        {
+            "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-knowledgeCapability",
+            "valueCode": "publishable"
+        },
+        {
+            "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-knowledgeRepresentationLevel",
+            "valueCode": "structured"
+        },
+        {
+            "url": "http://hl7.org/fhir/us/cqfmeasures/StructureDefinition/cqfm-softwaresystem",
+            "valueReference": {
+                "reference": "Device/cqf-tooling"
+            }
+        },
+        {
+            "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-questionnaire-generate",
+            "valueBoolean": true
+        }
+    ],
+    "url": "http://example.org/sdh/demo/PlanDefinition/cc-screening-decisiontree-definition",
+    "identifier": [
+        {
+            "use": "official",
+            "value": "cc-screening-decisiontree-definition"
+        }
+    ],
+    "version": "0.0.2",
+    "name": "ColorectalCancerScreeningDecisionDefinition",
+    "title": "Colorectal Cancer Screening Decision Definition",
+    "type": {
+        "coding": [
+            {
+                "system": "http://terminology.hl7.org/CodeSystem/plan-definition-type",
+                "code": "eca-rule",
+                "display": "ECA Rule"
+            }
+        ]
+    },
+    "status": "draft",
+    "experimental": true,
+    "publisher": "Smile Digital Health",
+    "description": "The ACS recommends that people at average risk of colorectal cancer start regular screening at age 45. This can be done either with a sensitive test that looks for signs of cancer in a person’s stool (a stool-based test), or with an exam that looks at the colon and rectum (a visual exam).",
+    "purpose": "Screening for colorectal cancer",
+    "library": [
+        "http://example.org/sdh/demo/Library/ColorectalCancerCaseFeatures"
+    ],
+    "action": [
+        {
+            "title": "Coverage Concern Input",
+            "description": "Input for whether there is a concern with coverage for the patient.",
+            "input": [
+                {
+                    "extension": [
+                        {
+                            "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                            "valueString": "Cost is a great concern?"
+                        },
+                        {
+                            "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                            "valueMarkdown": "There is a concern with coverage for the patient.  For example, the patient does not have insurance coverage."
+                        },
+                        {
+                            "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-featureExpression",
+                            "valueExpression": {
+                                "language": "text/cql-identifier",
+                                "expression": "Coverage Concern",
+                                "reference": "http://example.org/sdh/demo/Library/ColorectalCancerCaseFeatures"
+                            }
+                        }
+                    ],
+                    "type": "Observation",
+                    "profile": [
+                        "http://example.org/sdh/demo/StructureDefinition/coverage-concern-casefeature-definition"
+                    ]
+                }
+            ],
+            "action": [
+                {
+                    "title": "Has Coverage Concern",
+                    "description": "There is a concern with coverage for the patient.",
+                    "condition": [
+                        {
+                            "kind": "applicability",
+                            "expression": {
+                                "language": "text/cql-identifier",
+                                "expression": "Has Coverage Concern"
+                            }
+                        }
+                    ],
+                    "definitionCanonical": "http://example.org/sdh/demo/PlanDefinition/cc-screening-recommendation-definition-fitdna"
+                },
+                {
+                    "title": "No Coverage Concern",
+                    "description": "There is not a concern with coverage for the patient.",
+                    "condition": [
+                        {
+                            "kind": "applicability",
+                            "expression": {
+                                "language": "text/cql-identifier",
+                                "expression": "No Coverage Concern"
+                            }
+                        }
+                    ],
+                    "action": [
+                        {
+                            "title": "Sedation Concern Input",
+                            "description": "Input for whether there is a concern with sedation for the patient.",
+                            "input": [
+                                {
+                                    "extension": [
+                                        {
+                                            "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                                            "valueString": "Sedation Concern?"
+                                        },
+                                        {
+                                            "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                                            "valueMarkdown": "There is a concern with sedating the patient.  For example, the patient has a medical history that presents a risk for sedation."
+                                        },
+                                        {
+                                            "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-featureExpression",
+                                            "valueExpression": {
+                                                "language": "text/cql-identifier",
+                                                "expression": "Sedation Concern",
+                                                "reference": "http://example.org/sdh/demo/Library/ColorectalCancerCaseFeatures"
+                                            }
+                                        }
+                                    ],
+                                    "type": "Observation",
+                                    "profile": [
+                                        "http://example.org/sdh/demo/StructureDefinition/sedation-concern-casefeature-definition"
+                                    ]
+                                }
+                            ],
+                            "action": [
+                                {
+                                    "title": "Sedation Concern",
+                                    "description": "There is a concern with sedating the patient.",
+                                    "condition": [
+                                        {
+                                            "kind": "applicability",
+                                            "expression": {
+                                                "language": "text/cql-identifier",
+                                                "expression": "Has Sedation Concern"
+                                            }
+                                        }
+                                    ],
+                                    "action": [
+                                        {
+                                            "title": "Sigmoidoscopy Complication Input",
+                                            "description": "Input for whether there is a complication with a Sigmoidoscopy procedure for the patient.",
+                                            "input": [
+                                                {
+                                                    "extension": [
+                                                        {
+                                                            "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                                                            "valueString": "Sigmoidoscopy Complication?"
+                                                        },
+                                                        {
+                                                            "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                                                            "valueMarkdown": "There is a concern with complications in performing a sigmoidoscopy.  For example, the patient has a medical history that presents a risk for an invasive procedure."
+                                                        },
+                                                        {
+                                                            "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-featureExpression",
+                                                            "valueExpression": {
+                                                                "language": "text/cql-identifier",
+                                                                "expression": "Sigmoidoscopy Complications",
+                                                                "reference": "http://example.org/sdh/demo/Library/ColorectalCancerCaseFeatures"
+                                                            }
+                                                        }
+                                                    ],
+                                                    "type": "Observation",
+                                                    "profile": [
+                                                        "http://example.org/sdh/demo/StructureDefinition/sigmoidoscopy-complication-casefeature-definition"
+                                                    ]
+                                                }
+                                            ],
+                                            "action": [
+                                                {
+                                                    "title": "Sigmoidoscopy Complication",
+                                                    "description": "There is a concern with complications in performing a sigmoidoscopy.",
+                                                    "condition": [
+                                                        {
+                                                            "kind": "applicability",
+                                                            "expression": {
+                                                                "language": "text/cql-identifier",
+                                                                "expression": "Has Sigmoidoscopy Complications"
+                                                            }
+                                                        }
+                                                    ],
+                                                    "definitionCanonical": "http://example.org/sdh/demo/PlanDefinition/cc-screening-recommendation-definition-ct-colonography"
+                                                },
+                                                {
+                                                    "title": "No Sigmoidoscopy Complication",
+                                                    "description": "There is not a concern with complications in performing a sigmoidoscopy.",
+                                                    "condition": [
+                                                        {
+                                                            "kind": "applicability",
+                                                            "expression": {
+                                                                "language": "text/cql-identifier",
+                                                                "expression": "No Sigmoidoscopy Complications"
+                                                            }
+                                                        }
+                                                    ],
+                                                    "definitionCanonical": "http://example.org/sdh/demo/PlanDefinition/cc-screening-recommendation-definition-sigmoidoscopy"
+                                                }
+                                            ]
+                                        }
+                                    ]
+                                },
+                                {
+                                    "title": "No Sedation Concern",
+                                    "description": "There is not a concern with sedating the patient.",
+                                    "condition": [
+                                        {
+                                            "kind": "applicability",
+                                            "expression": {
+                                                "language": "text/cql-identifier",
+                                                "expression": "No Sedation Concern"
+                                            }
+                                        }
+                                    ],
+                                    "action": [
+                                        {
+                                            "title": "Colonoscopy Complication Input",
+                                            "description": "Input for whether there is a concern with performing a Colonoscopy procedure for the patient.",
+                                            "input": [
+                                                {
+                                                    "extension": [
+                                                        {
+                                                            "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                                                            "valueString": "Colonoscopy Complication?"
+                                                        },
+                                                        {
+                                                            "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                                                            "valueMarkdown": "There is a concern with complications in performing a colonoscopy.  For example, the patient has a medical history that presents a risk for an invasive procedure."
+                                                        },
+                                                        {
+                                                            "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-featureExpression",
+                                                            "valueExpression": {
+                                                                "language": "text/cql-identifier",
+                                                                "expression": "Colonoscopy Complications",
+                                                                "reference": "http://example.org/sdh/demo/Library/ColorectalCancerCaseFeatures"
+                                                            }
+                                                        }
+                                                    ],
+                                                    "type": "Observation",
+                                                    "profile": [
+                                                        "http://example.org/sdh/demo/StructureDefinition/colonoscopy-complication-casefeature-definition"
+                                                    ]
+                                                }
+                                            ],
+                                            "action": [
+                                                {
+                                                    "title": "Colonoscopy Complication",
+                                                    "description": "There is a concern with complications in performing a colonoscopy.",
+                                                    "condition": [
+                                                        {
+                                                            "kind": "applicability",
+                                                            "expression": {
+                                                                "language": "text/cql-identifier",
+                                                                "expression": "Has Colonoscopy Complications"
+                                                            }
+                                                        }
+                                                    ],
+                                                    "definitionCanonical": "http://example.org/sdh/demo/PlanDefinition/cc-screening-recommendation-definition-ct-colonography"
+                                                },
+                                                {
+                                                    "title": "No Colonoscopy Complication",
+                                                    "description": "There is not a concern with complications in performing a colonoscopy.",
+                                                    "condition": [
+                                                        {
+                                                            "kind": "applicability",
+                                                            "expression": {
+                                                                "language": "text/cql-identifier",
+                                                                "expression": "No Colonoscopy Complications"
+                                                            }
+                                                        }
+                                                    ],
+                                                    "definitionCanonical": "http://example.org/sdh/demo/PlanDefinition/cc-screening-recommendation-definition-colonoscopy"
+                                                }
+                                            ]
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}
