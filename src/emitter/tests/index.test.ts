@@ -2,3 +2,4 @@
 // so these run as part of `npm test`.
 import "./emitCQL-parameters.test";
 import "./unmatched-narrative.test";
+import "./emitCQL-meta.test";

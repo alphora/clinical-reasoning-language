@@ -112,6 +112,20 @@ export interface UnmatchedNarrative {
   column?: number;
 }
 
+/**
+ * #108 — a concept carried an `@crl-future-expression: <body>` meta
+ * annotation. Each entry is an actionable "the catalog needs to support
+ * this narrative" request attached to a concrete authoring site. The
+ * canonical text in `expression` is what the author wrote after the
+ * `@crl-future-expression:` prefix.
+ */
+export interface FutureExpressionRequest {
+  conceptName: string;
+  expression: string;
+  line?: number;
+  column?: number;
+}
+
 export interface EmitResult {
   success: boolean;
   result?: string;
@@ -124,6 +138,15 @@ export interface EmitResult {
    * field — never an empty array — means every narrative matched.
    */
   unmatched?: UnmatchedNarrative[];
+  /**
+   * #108 — populated when concepts carry `@crl-future-expression: <body>`
+   * meta annotations. Each entry is a machine-trackable catalog-gap
+   * request. Does NOT force `success: false` (the emit is still successful);
+   * it's an informational signal for tooling that wants to round-trip
+   * catalog-gap data. Absent field — never an empty array — means no
+   * `@crl-future-expression` annotations were seen.
+   */
+  futureExpressions?: FutureExpressionRequest[];
 }
 
 /** Map a canonical pattern name to its `CRLPatterns.X` function name. */
@@ -191,6 +214,16 @@ function indent(text: string, level = 1): string {
     .split("\n")
     .map((l) => (l.length ? pad + l : l))
     .join("\n");
+}
+
+// #108: render a CRL `meta is …` array as a CQL block comment to prepend to
+// the concept's emitted `define`. Returns "" when there are no annotations.
+// The defusing replacement keeps CRL meta text that contains the sequence
+// "asterisk slash" from accidentally closing the comment early.
+function renderMetaBlock(meta: string[] | undefined): string {
+  if (!meta || meta.length === 0) return "";
+  const safe = meta.map((line) => line.replace(/\*\//g, "* /"));
+  return `/*\n${safe.map((l) => ` * ${l}`).join("\n")}\n */\n`;
 }
 
 type CompositionShape = "boolean" | "refinement";
@@ -349,9 +382,23 @@ export function emitCQLFromAST(ast: CRL, options: EmitOptions = {}): EmitResult 
         column: u.column,
         message: `Unmatched narrative pattern: \`${u.text}\` (no catalog pattern matched). Emitted CQL contains a compile-failing CRLPatterns.UnmatchedNarrative(…) sentinel; downstream CQL translation will fail until the body is rewritten to a known canonical narrative.`,
       }));
-      return { success: false, result: out, errors, unmatched };
+      return {
+        success: false,
+        result: out,
+        errors,
+        unmatched,
+        ...(emitter.getFutureExpressions().length > 0
+          ? { futureExpressions: emitter.getFutureExpressions() }
+          : {}),
+      };
     }
-    return { success: true, result: out };
+    return {
+      success: true,
+      result: out,
+      ...(emitter.getFutureExpressions().length > 0
+        ? { futureExpressions: emitter.getFutureExpressions() }
+        : {}),
+    };
   } catch (e) {
     return {
       success: false,
@@ -414,6 +461,12 @@ class Emitter {
    * contains a compile-failing sentinel call at each spot.
    */
   private readonly unmatchedNarratives: UnmatchedNarrative[] = [];
+
+  // #108 — concepts carrying `@crl-future-expression: …` annotations;
+  // surfaced via the EmitResult.futureExpressions envelope so tooling
+  // can track catalog-gap requests programmatically (in addition to
+  // the block comment on the emitted define).
+  private readonly futureExpressions: FutureExpressionRequest[] = [];
 
   constructor(ast: CRL, options: EmitOptions) {
     this.ast = ast;
@@ -509,6 +562,11 @@ class Emitter {
   /** Issue #79 — unmatched narratives accumulated during this emit. */
   getUnmatched(): UnmatchedNarrative[] {
     return this.unmatchedNarratives;
+  }
+
+  /** #108 — `@crl-future-expression` annotations seen during this emit. */
+  getFutureExpressions(): FutureExpressionRequest[] {
+    return this.futureExpressions;
   }
 
   private header(): string {
@@ -646,7 +704,31 @@ class Emitter {
   private emitConcept(c: Concept): string {
     const header = `define ${cqlIdent(c.name)}:`;
     const body = this.emitConceptBody(c, c.definition);
-    return `${header}\n${indent(body, 1)}`;
+    // #108: emit `meta is` annotations as a leading block comment on the
+    // concept's `define`. CRL preserves them on Concept.meta but the
+    // emitter was dropping them silently. `@logic-expression-text`,
+    // `@crl-future-expression`, and `@ke-feedback` are authoring
+    // conventions that specifically need to land in the emitted artifact
+    // for downstream readers (knowledge engineers + catalog-gap trackers).
+    const metaBlock = renderMetaBlock(c.meta);
+    // #108: surface `@crl-future-expression` annotations as machine-trackable
+    // catalog-gap requests in the EmitResult envelope (in addition to the
+    // block comment). Other `@tag` prefixes (e.g. `@ke-feedback`,
+    // `@logic-expression-text`) get only the comment.
+    if (c.meta) {
+      for (const line of c.meta) {
+        const m = /^@crl-future-expression:\s*(.+)$/.exec(line);
+        if (m) {
+          this.futureExpressions.push({
+            conceptName: c.name,
+            expression: m[1].trim(),
+            line: c.location.start.line,
+            column: c.location.start.column,
+          });
+        }
+      }
+    }
+    return `${metaBlock}${header}\n${indent(body, 1)}`;
   }
 
   private emitConceptBody(c: Concept, def: ConceptDefinition): string {
