@@ -364,7 +364,9 @@ concept "Patient Has Underweight Diagnosis":
 concept "Has Anti-Obesity Medication Contraindication":
 - type is Observation.
 - value type is boolean.
-- definition is documented "Anti-Obesity Medication Contraindication".
+// T13 / #94: bare `documented "X"` is not a catalog pattern. Canonical
+// form is `has <AssertedConcept>`.
+- definition is has "Anti-Obesity Medication Contraindication".
 
 
 // For deeper composition examples (deeply nested groups, AND NOT,

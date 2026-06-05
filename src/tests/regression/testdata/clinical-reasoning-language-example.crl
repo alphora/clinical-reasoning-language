@@ -364,7 +364,13 @@ concept "Patient Has Underweight Diagnosis":
 concept "Has Anti-Obesity Medication Contraindication":
 - type is Observation.
 - value type is boolean.
-- definition is documented "Anti-Obesity Medication Contraindication".
+// T13 / #94: the previous body `documented "Anti-Obesity Medication
+// Contraindication"` is not a catalog pattern and emit-failed with an
+// UnmatchedNarrative sentinel. Canonical form is `has <AssertedConcept>`
+// against the asserted concept declared above (line 246, coded from
+// "Anti-Obesity Contraindication VS"). See USER_GUIDE.md for the
+// dimensionless-threshold convention and #94 for the documented-X gap.
+- definition is has "Anti-Obesity Medication Contraindication".
 
 
 // For deeper composition examples (deeply nested groups, AND NOT,

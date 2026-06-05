@@ -127,14 +127,16 @@ describe("CLI dispatch matrix — `.crl + --target fhir-def` two-lane contract (
     }
   });
 
-  it("cms22: CQL lane fails (one upstream library narrative) → exit 1, neither <out-dir>/cql NOR <out-dir>/fhir written", () => {
-    const { outDir, cleanup } = makeOutDir("cms22-fail");
+  // T13 / #94 made cms22 emit cleanly — the original fail-fast test
+  // premise no longer holds. Repurposed: assert atomic write SUCCESS
+  // (both lanes written together) when both lanes can emit.
+  it("cms22: both lanes succeed → exit 0 or 2 (warnings), BOTH <out-dir>/cql AND <out-dir>/fhir written", () => {
+    const { outDir, cleanup } = makeOutDir("cms22-success");
     try {
       const r = runCli(["--path", CMS22, "--target", "fhir-def", "--out-dir", outDir]);
-      expect(r.exitCode).toBe(1);
-      expect(r.stderr).toContain("cql-emit");
-      expect(existsSync(join(outDir, "cql"))).toBe(false);
-      expect(existsSync(join(outDir, "fhir"))).toBe(false);
+      expect([0, 2]).toContain(r.exitCode);
+      expect(existsSync(join(outDir, "cql"))).toBe(true);
+      expect(existsSync(join(outDir, "fhir"))).toBe(true);
     } finally {
       cleanup();
     }

@@ -283,7 +283,10 @@ concept "Has Confirmed Hypertension Diagnosis":
 concept "Has Antihypertensive Contraindication":
 - type is Observation.
 - value type is boolean.
-- definition is documented "Antihypertensive Contraindication".
+// T13 / #94: bare `documented "X"` is not a catalog pattern. Canonical
+// form is `has <AssertedConcept>` referencing the asserted concept
+// declared above (coded from "Antihypertensive Contraindication VS").
+- definition is has "Antihypertensive Contraindication".
 
 
 // For the full Initial Population / Numerator / Denominator structure

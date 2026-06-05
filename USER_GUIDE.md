@@ -198,6 +198,26 @@ The tag vocabulary, value shapes, and cardinality are defined in the [metadata r
 
 > **Important:** `apply pattern` can **only** follow single concept inference (not logical expressions).
 
+#### Documenting status assertions — use `has <X>`, not bare `documented <X>`
+
+Bare `documented "X"` is not a catalog pattern (only `<X> documented as <Y>` and `without documented <X>` exist). The canonical way to assert that a contraindication / finding / etc. is documented in the chart is to declare an asserted concept `coded from "<Terminology VS>"` and reference it with `has <X>`:
+
+```crl
+// Asserted: code-based detection of a contraindication.
+concept "Antihypertensive Contraindication":
+- type is Observation.
+- value type is CodeableConcept.
+- coded from "Antihypertensive Contraindication VS".
+
+// Inferred: boolean assertion that the contraindication is documented.
+concept "Has Antihypertensive Contraindication":
+- type is Observation.
+- value type is boolean.
+- definition is has "Antihypertensive Contraindication".
+```
+
+See issue [#94](https://github.com/alphora/clinical-reasoning-language/issues/94).
+
 #### Dimensionless thresholds — `'{score}'` convention
 
 CRL's quantity grammar requires a UCUM unit on every numeric literal — this means a unitless clinical-score threshold (e.g. MADRS ≥ 28, PHQ-9 ≥ 10, QIDS ≥ 11) cannot be written as a bare number. The canonical workaround is the UCUM dimensionless annotation `'{score}'`:
