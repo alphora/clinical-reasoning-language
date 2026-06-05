@@ -317,6 +317,40 @@ const atMost: PatternMatcher = (els, loc) => {
   return makeCall("AtMost", [conceptRefArg(els[0]), quantityArg(els[3])], loc);
 };
 
+/** `<A> and <B> at least <Q> apart` → AtLeastApart(eventA, eventB, duration) — T07 / #93 */
+const atLeastApart: PatternMatcher = (els, loc) => {
+  if (els.length !== 7) return null;
+  if (!isConceptRef(els[0])) return null;
+  if (!isWord(els[1], "and")) return null;
+  if (!isConceptRef(els[2])) return null;
+  if (!isWord(els[3], "at")) return null;
+  if (!isWord(els[4], "least")) return null;
+  if (!isQuantity(els[5])) return null;
+  if (!isWord(els[6], "apart")) return null;
+  return makeCall(
+    "AtLeastApart",
+    [conceptRefArg(els[0]), conceptRefArg(els[2]), quantityArg(els[5])],
+    loc,
+  );
+};
+
+/** `<A> and <B> at most <Q> apart` → AtMostApart(eventA, eventB, duration) — T07 / #93 */
+const atMostApart: PatternMatcher = (els, loc) => {
+  if (els.length !== 7) return null;
+  if (!isConceptRef(els[0])) return null;
+  if (!isWord(els[1], "and")) return null;
+  if (!isConceptRef(els[2])) return null;
+  if (!isWord(els[3], "at")) return null;
+  if (!isWord(els[4], "most")) return null;
+  if (!isQuantity(els[5])) return null;
+  if (!isWord(els[6], "apart")) return null;
+  return makeCall(
+    "AtMostApart",
+    [conceptRefArg(els[0]), conceptRefArg(els[2]), quantityArg(els[5])],
+    loc,
+  );
+};
+
 /** `<X> below <Q>` → Below(value, target) */
 const below: PatternMatcher = (els, loc) => {
   if (els.length !== 3) return null;
@@ -602,6 +636,8 @@ const PATTERNS: PatternMatcher[] = [
   ageAtStartOfAtLeast,             // 8 elements
   lastWithinBeforeStartOf,         // 8
   onDayOfOrAfter,                  // 7
+  atLeastApart,                    // 7 (T07 / #93)
+  atMostApart,                     // 7 (T07 / #93)
   lastOnDayOf,                     // 6
   notDoneWithReason,               // 6+ (variable)
   hasAdverseReactionTo,            // 5 (issue #77 audit)
@@ -659,7 +695,5 @@ const PATTERNS: PatternMatcher[] = [
 //   - `<X> between <start> and <end>` → BetweenAnchors (collides shape-wise
 //                                                with `Between(value, lo, hi)`;
 //                                                dispatch needs operator call).
-//   - `<eventA> and <eventB> at least <duration> apart` → AtLeastApart
-//   - `<eventA> and <eventB> at most <duration> apart` → AtMostApart
 //   - `at least <n> <events>` → AtLeastN     — needs Integer-token support.
 //   - `<n> consecutive <events>` → Consecutive — needs Integer-token support.

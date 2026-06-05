@@ -15,6 +15,45 @@ function lib(name: string, body: string): string {
 
 const terms = (n: string) => `terminology "${n}":\n- valueset is \`${n}\`.\n`;
 
+describe("T07 / #93 — AtLeastApart / AtMostApart matcher wiring", () => {
+  it("`<A> and <B> at least <Q> apart` → emits CRLPatterns.AtLeastApart, no unmatched", () => {
+    const src = lib(
+      "T",
+      terms("Reading A") +
+        terms("Reading B") +
+        `concept "Two Readings Far Apart":\n- type is Observation.\n- value type is boolean.\n- definition is "Reading A" and "Reading B" at least 6 'wk' apart.\n`,
+    );
+    const r = emitCQL(src, { libraryName: "T" });
+    expect(r.success).toBe(true);
+    expect(r.unmatched).toBeUndefined();
+    expect(r.result).toMatch(/CRLPatterns\.AtLeastApart/);
+  });
+
+  it("`<A> and <B> at most <Q> apart` → emits CRLPatterns.AtMostApart", () => {
+    const src = lib(
+      "T",
+      terms("Reading A") +
+        terms("Reading B") +
+        `concept "Two Readings Close":\n- type is Observation.\n- value type is boolean.\n- definition is "Reading A" and "Reading B" at most 4 'd' apart.\n`,
+    );
+    const r = emitCQL(src, { libraryName: "T" });
+    expect(r.success).toBe(true);
+    expect(r.result).toMatch(/CRLPatterns\.AtMostApart/);
+  });
+
+  it("bare `at least <Q>` (3 elements, no `apart`) still matches AtLeast — not AtLeastApart", () => {
+    const src = lib(
+      "T",
+      terms("Score") +
+        `concept "Above Threshold":\n- type is Observation.\n- value type is boolean.\n- definition is "Score" at least 5 '{score}'.\n`,
+    );
+    const r = emitCQL(src, { libraryName: "T" });
+    expect(r.success).toBe(true);
+    expect(r.result).toMatch(/CRLPatterns\.AtLeast\(/);
+    expect(r.result).not.toMatch(/AtLeastApart/);
+  });
+});
+
 describe("issue #79 — unmatched narrative envelope + sentinel", () => {
   it("unmatched narrative → success:false + unmatched[] populated + compile-failing sentinel in result", () => {
     const src = lib(
