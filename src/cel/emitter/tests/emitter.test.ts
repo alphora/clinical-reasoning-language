@@ -82,13 +82,18 @@ describe("CEL Todo 5 — emitted resource shape spot-checks", () => {
     expect(pat.body.birthDate).toBe("1972-08-22");
   });
 
-  test("Observations carry subject reference", () => {
+  test("Observations carry subject reference (#91: id namespaced per case)", () => {
     const r = emit(CORPUS.cms22);
+    const patient = r.emittedCases[0].resources.find((res) => res.resourceType === "Patient")!;
     const obs = r.emittedCases[0].resources.filter((res) => res.resourceType === "Observation");
     for (const o of obs) {
       const sub = (o.body as { subject?: { reference: string } }).subject;
-      expect(sub?.reference).toBe("Patient/maria-garcia");
+      expect(sub?.reference).toBe(`Patient/${patient.id}`);
     }
+    // Lock the namespaced shape — T12 / #91 prevents id collisions in
+    // multi-case Bundles.
+    expect(patient.id).toMatch(/-maria-garcia$/);
+    expect(patient.id.length).toBeGreaterThan("maria-garcia".length);
   });
 
   test("Observation code parses canonical token form into Coding", () => {
@@ -114,6 +119,14 @@ describe("CEL Todo 5 — emitted resource shape spot-checks", () => {
     const r = emit(CORPUS.cms69);
     const sr = r.emittedCases[0].resources.find((res) => res.resourceType === "ServiceRequest")!;
     expect(sr.body.intent).toBe("order");
+  });
+
+  test("T12 / #89: Activity-derived ServiceRequest carries meta.profile (CPG canonical)", () => {
+    const r = emit(CORPUS.cms69);
+    const sr = r.emittedCases[0].resources.find((res) => res.resourceType === "ServiceRequest")!;
+    const meta = (sr.body as { meta?: { profile: string[] } }).meta;
+    expect(meta?.profile).toBeDefined();
+    expect(meta?.profile?.[0]).toMatch(/cpg-servicerequest$/);
   });
 
   test("Encounter from cms22-strategy gets a period.start date", () => {

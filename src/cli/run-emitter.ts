@@ -269,9 +269,23 @@ if (filePath.toLowerCase().endsWith(".cel")) {
   }
   const written = writeEmitResult(result, outDir);
   process.stdout.write(`wrote ${written} FHIR resource(s) under ${outDir}\n`);
+  // T12 / #85: surface result-deferred (outcomes parsed but not emitted —
+  // tied to #70 / `metric`) on stderr the same way unsupported-yet is
+  // surfaced, with exit code 2. Pre-fix the deferral was silent and the
+  // CLI read as success despite zero outcome resources.
   const unsupported = result.diagnostics.filter((d) => d.kind === "unsupported-yet");
-  if (unsupported.length > 0) {
-    process.stderr.write(JSON.stringify({ unsupportedYet: unsupported }, null, 2) + "\n");
+  const deferred = result.diagnostics.filter((d) => d.kind === "result-deferred");
+  if (unsupported.length > 0 || deferred.length > 0) {
+    process.stderr.write(
+      JSON.stringify(
+        {
+          ...(unsupported.length > 0 ? { unsupportedYet: unsupported } : {}),
+          ...(deferred.length > 0 ? { resultDeferred: deferred } : {}),
+        },
+        null,
+        2,
+      ) + "\n",
+    );
     process.exit(2);
   }
   process.exit(0);

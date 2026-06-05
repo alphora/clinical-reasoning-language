@@ -55,7 +55,10 @@ const CONCEPT_TYPE_SET: Set<string> = new Set<string>(conceptTypes as readonly C
 const CPG_TO_FHIR: Record<string, string> = {
   CPGServiceRequest: "ServiceRequest",
   CPGMedicationRequest: "MedicationRequest",
-  CPGImmunizationRequest: "MedicationRequest",
+  // T12 / #88: was "MedicationRequest" — not the right R4 type for an
+  // immunization. R4 doesn't have an ImmunizationRequest resource;
+  // ImmunizationRecommendation is the planning/request-shaped R4 type.
+  CPGImmunizationRequest: "ImmunizationRecommendation",
   CPGCommunicationRequest: "CommunicationRequest",
   CPGQuestionnaire: "Task",
   CPGEnrollment: "Task",
@@ -74,11 +77,28 @@ const CPG_TO_FHIR: Record<string, string> = {
 // cap matching the FHIR `id` regex — CEL slugify wasn't hitting the cap
 // in the corpus, but inheriting the cap is correct.
 import { slugify } from "../../fhir-emitter/slug";
+import { lookupCpgActivityProfile } from "../../fhir-emitter/cpgActivityProfiles";
 
 interface DerivedType {
   fhirType: string;
   /** Source kind from the resolved CRL declaration; `undefined` for bare refs. */
   kind?: "Concept" | "Activity";
+  /**
+   * CPG-IG instance profile canonical (e.g. cpg-servicerequest). Present only
+   * for Activity-kind derivations where the CPG activityType has a known
+   * targetProfile (see fhir-emitter/cpgActivityProfiles.ts). Stamped onto
+   * emitted instances as meta.profile per T12 / #89.
+   */
+  profileUrl?: string;
+  /**
+   * T12 / #87: the Activity declared `request do not perform <Type>`. The
+   * emitted instance gets `doNotPerform: true` (for resources that support
+   * it) so the prohibition propagates from the definition to every
+   * instance — pre-fix the flag only fired when the CEL fact itself
+   * carried `with absent intent`, inverting the clinical meaning of
+   * contraindication scenarios.
+   */
+  definitionalDoNotPerform?: boolean;
 }
 
 /**
@@ -124,8 +144,16 @@ function deriveFhirType(
   if (target.type === "Activity") {
     const activityType = target.body.request.activityType;
     const fhir = CPG_TO_FHIR[activityType];
-    if (fhir) return { fhirType: fhir, kind: "Activity" };
-    return undefined;
+    if (!fhir) return undefined;
+    // T12 / #89: also pull the CPG instance profile canonical so the emitter
+    // can stamp meta.profile on the emitted resource.
+    const cpgProfile = lookupCpgActivityProfile(activityType);
+    return {
+      fhirType: fhir,
+      kind: "Activity",
+      ...(cpgProfile ? { profileUrl: cpgProfile.targetProfile } : {}),
+      ...(target.body.request.doNotPerform === true ? { definitionalDoNotPerform: true } : {}),
+    };
   }
 
   return undefined;
@@ -275,14 +303,19 @@ function makeResourceId(ctx: EmitContext, factName: string): string {
   return `${ctx.librarySlug}-${ctx.caseSlug}-${slugify(factName)}`;
 }
 
-function makePatientId(factName: string): string {
-  return slugify(factName);
+// T12 / #91: per-case namespace prefix so subject Patient ids don't collide
+// when multiple cases share the same subject fact and resources merge into
+// a single Bundle. Previously `slugify(factName)` only; now matches the
+// `<librarySlug>-<caseSlug>-<factSlug>` shape every other emitted resource
+// already uses.
+function makePatientId(ctx: EmitContext, factName: string): string {
+  return `${ctx.librarySlug}-${ctx.caseSlug}-${slugify(factName)}`;
 }
 
 /** Emit the subject Patient resource. */
 function emitSubjectPatient(ctx: EmitContext, patientFact: CELFact): EmittedResource | undefined {
   const body = readFactBody(patientFact);
-  const id = makePatientId(patientFact.name);
+  const id = makePatientId(ctx, patientFact.name);
   const out: Record<string, unknown> = {
     resourceType: "Patient",
     id,
@@ -438,12 +471,14 @@ function emitOneFact(args: EmitOneArgs): EmittedResource | undefined {
   const resourceBody: Record<string, unknown> = {
     resourceType: fhirType,
     id,
+    // T12 / #89: stamp the CPG instance profile canonical when known.
+    ...(derived.profileUrl ? { meta: { profile: [derived.profileUrl] } } : {}),
   };
 
   // Subject reference.
   const subject = findSubject(ctx);
   if (subject && SUBJECT_RESOURCES.has(fhirType)) {
-    resourceBody.subject = { reference: `Patient/${makePatientId(subject.name)}` };
+    resourceBody.subject = { reference: `Patient/${makePatientId(ctx, subject.name)}` };
   }
 
   // Encounter reference (case-level ambient; cross-resource `during encounter` may override later).
@@ -486,7 +521,22 @@ function emitOneFact(args: EmitOneArgs): EmittedResource | undefined {
     }
   }
 
-  // Status / intent modifiers.
+  // T12 / #87: definitional `do not perform` from the Activity declaration
+  // takes precedence — applies even when the CEL fact carries no intent
+  // modifier.
+  if (derived.definitionalDoNotPerform === true) {
+    if (
+      fhirType === "ServiceRequest" ||
+      fhirType === "MedicationRequest" ||
+      fhirType === "Task"
+    ) {
+      resourceBody.doNotPerform = true;
+    } else {
+      resourceBody.status = "entered-in-error";
+    }
+  }
+  // Status / intent modifiers (fact-level — combine with or override the
+  // definitional flag above).
   if (factRefField?.intent === "absent") {
     if (
       fhirType === "ServiceRequest" ||
