@@ -14,6 +14,44 @@ import { emitCQLImports } from "../imports/emit";
 
 type TargetMode = "cql" | "fhir-def" | undefined;
 
+const HELP_TEXT = `crl-emit — CRL/CEL → CQL or FHIR resource emitter
+
+USAGE:
+  crl-emit --path <file.{crl,cel}> --out-dir <dir> [--target <mode>] [--quiet]
+  crl-emit --help
+
+FLAGS:
+  --path <file>     Input file (.crl or .cel). Required.
+  --out-dir <dir>   Output directory. Required.
+  --target <mode>   Emit target for .crl input:
+                      cql       (default) CQL library files flat under <out-dir>/
+                      fhir-def  FHIR Definition resources + CQL libraries written
+                                atomically (either both lanes succeed or nothing is
+                                written). Layout:
+                                  <out-dir>/cql/<library-name>.cql
+                                  <out-dir>/fhir/<ResourceType>/<id>.json
+                    Rejected with .cel input (CEL has its own FHIR-instance pipeline).
+  --quiet           Print one summary line instead of one "wrote <path>" line per file
+                    (--target fhir-def only).
+  --help            Show this message and exit 0.
+
+INPUT DISPATCH:
+  .crl              CRL → CQL emit (default) or CRL → FHIR Definition + CQL emit
+                    (--target fhir-def).
+  .cel              CEL → FHIR instance emit (KALM-style directory tree). --target is
+                    rejected on .cel input.
+
+EXIT CODES:
+  0  Success.
+  1  Hard error: parse failure, unresolved reference, write failure, or incompatible
+     flags (e.g. .cel + --target, unknown --target value).
+  2  Soft warnings: unresolved bare references, empty terminologies, ASCII-fallback
+     slug warnings, or unmatched concept narratives surfaced after a successful write.
+
+See USER_GUIDE.md §"Emitting FHIR Definition resources" for the full --target fhir-def
+contract, deliberate spec deviations, and the MCP \`emit_crl_fhir\` companion tool.
+`;
+
 function parseArgs(argv: string[]): {
   filePath: string | undefined;
   outDir: string | undefined;
@@ -26,7 +64,10 @@ function parseArgs(argv: string[]): {
   let quiet = false;
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
-    if (a === "--path") {
+    if (a === "--help" || a === "-h") {
+      process.stdout.write(HELP_TEXT);
+      process.exit(0);
+    } else if (a === "--path") {
       const v = argv[i + 1];
       if (!v || v.startsWith("--")) {
         console.error("--path requires a value");

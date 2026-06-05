@@ -912,7 +912,10 @@ CRL emits CPG-IG-conformant FHIR Definition resources (ValueSet, Library, Activi
 
 ```
 crl-emit --path <root.crl> --out-dir <project-root> --target fhir-def
+crl-emit --help                                       # print flag reference + exit 0
 ```
+
+`--help` (alias `-h`) prints the full flag reference, input-dispatch rules, and exit-code table, then exits 0.
 
 **One invocation writes both lanes.** `--target fhir-def` runs the CQL emit lane AND the FHIR-def emit lane atomically — either both succeed and write, or neither writes (no partial state). This is required because the emitted Library resources reference the sibling CQL files via `content[0].attachment.url = "../../cql/<name>.cql"`; shipping FHIR without CQL would produce broken Library references.
 

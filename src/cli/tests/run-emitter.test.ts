@@ -76,6 +76,22 @@ describe("CLI dispatch matrix — .cel input + --target combos (round-5 [importa
   });
 });
 
+describe("CLI dispatch matrix — --help flag (v2.4.1)", () => {
+  it("`--help` exits 0 with usage reference on stdout", () => {
+    const r = runCli(["--help"]);
+    expect(r.exitCode).toBe(0);
+    expect(r.stdout).toContain("crl-emit");
+    expect(r.stdout).toContain("--target");
+    expect(r.stdout).toContain("EXIT CODES");
+  });
+
+  it("`-h` is an alias for --help", () => {
+    const r = runCli(["-h"]);
+    expect(r.exitCode).toBe(0);
+    expect(r.stdout).toContain("USAGE:");
+  });
+});
+
 describe("CLI dispatch matrix — flag validation", () => {
   it("`--target invalid-value` exits 1 with usage error", () => {
     const r = runCli(["--path", CMS22, "--target", "json", "--out-dir", "/tmp/unused"]);
