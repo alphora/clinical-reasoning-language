@@ -4,3 +4,7 @@ import "./slug.test";
 import "./metadata.test";
 import "./valueSet.test";
 import "./writer.test";
+import "./cpgActivityProfiles.test";
+import "./library.test";
+import "./activity.test";
+import "./corpusProbe.test";

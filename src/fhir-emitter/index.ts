@@ -8,6 +8,21 @@ export { slugify, pascalCaseName } from "./slug";
 
 export { emitValueSet, emitValueSetsForLibrary } from "./valueSet";
 
+export { emitLibrary, emitLibrariesForClosure } from "./library";
+
+export {
+  emitActivityDefinition,
+  emitActivityDefinitionsForLibrary,
+  type TerminologyResolver,
+} from "./activity";
+
+export {
+  ALL_CPG_ACTIVITY_PROFILES,
+  CPG_ACTIVITY_TYPE_CODE_SYSTEM,
+  lookupCpgActivityProfile,
+  type CpgActivityProfile,
+} from "./cpgActivityProfiles";
+
 export { writeFhirResources } from "./writer";
 
 export type {

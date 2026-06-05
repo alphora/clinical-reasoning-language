@@ -56,6 +56,23 @@ describe("fhir-emitter writer.writeFhirResources", () => {
     }
   });
 
+  it("round-2 F3: writes Library/<id>.json into a Library/ subdir (Todo 2a addition to the union)", () => {
+    const { dir, cleanup } = tmpDir();
+    try {
+      const emit: FhirDefEmitResult = {
+        success: true,
+        resources: [fakeResource("Library/cms22-asserted.json", "Library")],
+      };
+      const paths = writeFhirResources(emit, dir);
+      expect(paths).toHaveLength(1);
+      expect(existsSync(join(dir, "Library", "cms22-asserted.json"))).toBe(true);
+      const json = JSON.parse(readFileSync(join(dir, "Library", "cms22-asserted.json"), "utf8"));
+      expect(json).toEqual({ resourceType: "Library", id: "x" });
+    } finally {
+      cleanup();
+    }
+  });
+
   it("round-2 (gpt55 important #5) throws on path traversal via ../ in relativePath", () => {
     const { dir, cleanup } = tmpDir();
     try {

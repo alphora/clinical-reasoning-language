@@ -75,7 +75,7 @@ export interface UsageContext {
  * caller-provided `outDir` by the writer.
  */
 export interface EmittedResource {
-  resourceType: "ValueSet" | "ActivityDefinition" | "PlanDefinition";
+  resourceType: "ValueSet" | "ActivityDefinition" | "PlanDefinition" | "Library";
   relativePath: string;
   resource: Record<string, unknown>;
 }
@@ -101,7 +101,14 @@ export interface FhirDefEmitResult {
  * resolved against the closure.
  */
 export interface UnmatchedReference {
-  kind: "empty-terminology" | "unresolved-activity" | "unresolved-decision" | "unresolved-terminology";
+  kind:
+    | "empty-terminology"
+    | "unresolved-activity"
+    | "unresolved-decision"
+    | "unresolved-terminology"
+    | "unsupported-with-text"
+    | "unsupported-communication-with-terminology"
+    | "unsupported-questionnaire-with";
   text: string;
   line?: number;
   column?: number;

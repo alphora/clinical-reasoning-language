@@ -84,7 +84,16 @@ export {
   pascalCaseName,
   emitValueSet,
   emitValueSetsForLibrary,
+  emitLibrary,
+  emitLibrariesForClosure,
+  emitActivityDefinition,
+  emitActivityDefinitionsForLibrary,
+  lookupCpgActivityProfile,
+  ALL_CPG_ACTIVITY_PROFILES,
+  CPG_ACTIVITY_TYPE_CODE_SYSTEM,
   writeFhirResources,
+  type CpgActivityProfile,
+  type TerminologyResolver,
 } from "./fhir-emitter";
 export type {
   CpgMetadata,
