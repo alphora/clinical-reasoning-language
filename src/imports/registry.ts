@@ -28,6 +28,11 @@ function listCrlFiles(dir: string): string[] {
     if (SKIP_DIRS.has(entry.name)) continue;
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) {
+      // T06 / #75: a subdirectory carrying its own package.json is its own
+      // CRL project — skip the recursion so the parent's scan doesn't sweep
+      // its libraries into a flat duplicate-detection bucket. Matches the
+      // v2.2.4 release-notes contract: "sub-packages are closure boundaries."
+      if (pathExists(path.join(full, "package.json"))) continue;
       out.push(...listCrlFiles(full));
     } else if (entry.isFile() && entry.name.endsWith(".crl")) {
       out.push(full);
