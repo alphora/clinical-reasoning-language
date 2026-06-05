@@ -198,6 +198,19 @@ The tag vocabulary, value shapes, and cardinality are defined in the [metadata r
 
 > **Important:** `apply pattern` can **only** follow single concept inference (not logical expressions).
 
+#### Dimensionless thresholds — `'{score}'` convention
+
+CRL's quantity grammar requires a UCUM unit on every numeric literal — this means a unitless clinical-score threshold (e.g. MADRS ≥ 28, PHQ-9 ≥ 10, QIDS ≥ 11) cannot be written as a bare number. The canonical workaround is the UCUM dimensionless annotation `'{score}'`:
+
+```crl
+- definition is "MADRS Score" at least 28 '{score}'.
+- definition is "PHQ-9 Score" at least 10 '{score}'.
+```
+
+`'{score}'` is a real UCUM curly-braces annotation that emits as `Quantity { value: 28, code: "{score}", system: "http://unitsofmeasure.org" }` — well-formed FHIR + cleanly round-trips. Use it for any dimensionless integer/decimal threshold (clinical assessment scales, dose counts, dimensionless ratios). A future minor release may accept a bare integer directly; until then, `'{score}'` is the convention.
+
+See issue [#95](https://github.com/alphora/clinical-reasoning-language/issues/95) for tracking.
+
 #### Logical Expressions
 
 ```crl
