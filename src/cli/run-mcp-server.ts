@@ -7,6 +7,7 @@ import { tokenizeCRL, buildCRL, validateCRL, emitCQL } from "../index";
 import { validateCRLImports } from "../imports/validate";
 import type { ImportDiagnostic } from "../imports/types";
 import { validateCELFile } from "../cel/validator";
+import { emitFhirDefFromPath } from "../fhir-emitter";
 
 // Caps the CRL SOURCE (input) size. Response size scales with this — there is
 // no separate output cap, but bounding input keeps responses bounded enough.
@@ -388,7 +389,74 @@ export function createServer(): McpServer {
     (args) => runEmit(args as EmitArgs),
   );
 
+  server.registerTool(
+    "emit_crl_fhir",
+    {
+      title: "Emit FHIR Definition Resources from CRL",
+      description:
+        "Emit cpg-conformant FHIR Definition resources (ValueSet, Library, ActivityDefinition, PlanDefinition) from a CRL document. " +
+        "Closure walks from the file's nearest package.json. Returns a SUMMARY envelope by default to keep tool output small: " +
+        "`{ success, resourceCount, resourceManifest:[{resourceType, id, relativePath, sourceKind, sourceName}], errors, unmatched, importDiagnostics, metadataErrors }`. " +
+        "Pass `includeResources: true` to also receive the full `resources[]` array (each with the full FHIR JSON). " +
+        "The npm package owns the version — emitted resources carry NO `version` field. " +
+        "Decision actions using the CRL `any:` qualifier emit a `crl-logical-switch` extension URL whose corresponding StructureDefinition is not yet shipped (pending CPG ballot); strict validators may require an ignore-list for the URL until then. " +
+        "Cross-library concept/terminology refs are unsupported in v0 (cascade-suppression surfaces via unresolved-* UnmatchedReference). Same-library qualified refs `\"CurrentLib\".\"X\"` still resolve. " +
+        "Deliberate spec deviation: PlanDefinitions reference publishable-only sub-decisions via action.definitionCanonical (the published cpg-strategydefinition target-profile constraint is wrong; operator is amending the spec).",
+      inputSchema: {
+        path: z.string().min(1).describe("Absolute path to a .crl file. Imports walk to nearest package.json."),
+        includeResources: z
+          .boolean()
+          .optional()
+          .describe("Include the full resources[] array in the result. Default false (summary only)."),
+      },
+    },
+    (args) => runEmitCrlFhir(args as { path: string; includeResources?: boolean }),
+  );
+
   return server;
+}
+
+function runEmitCrlFhir(args: { path: string; includeResources?: boolean }): {
+  content: Array<{ type: "text"; text: string }>;
+  isError?: boolean;
+} {
+  let stat;
+  try {
+    stat = statSync(args.path);
+  } catch {
+    return {
+      content: [{ type: "text", text: `Path "${args.path}" not readable.` }],
+      isError: true,
+    };
+  }
+  if (!stat.isFile()) {
+    return {
+      content: [{ type: "text", text: `Path "${args.path}" is not a file.` }],
+      isError: true,
+    };
+  }
+
+  const result = emitFhirDefFromPath(args.path);
+  const summary = {
+    success: result.success,
+    resourceCount: result.resources.length,
+    resourceManifest: result.resources.map((r) => ({
+      resourceType: r.resourceType,
+      id: (r.resource as { id?: string }).id ?? null,
+      relativePath: r.relativePath,
+      sourceKind: r.sourceKind,
+      sourceName: r.sourceName,
+    })),
+    errors: result.errors,
+    unmatched: result.unmatched,
+    importDiagnostics: result.importDiagnostics,
+    metadataErrors: result.metadataErrors,
+    ...(args.includeResources ? { resources: result.resources } : {}),
+  };
+
+  return {
+    content: [{ type: "text", text: JSON.stringify(summary, null, 2) }],
+  };
 }
 
 export async function main(): Promise<void> {

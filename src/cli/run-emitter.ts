@@ -4,14 +4,26 @@ import * as path from "path";
 
 import { emitCelToFhir, writeEmitResult } from "../cel/emitter";
 import { resolveCelImports } from "../cel/imports";
+import {
+  emitFhirDefFromPath,
+  isFhirDefError,
+  isFhirDefWarning,
+  writeFhirResources,
+} from "../fhir-emitter";
 import { emitCQLImports } from "../imports/emit";
+
+type TargetMode = "cql" | "fhir-def" | undefined;
 
 function parseArgs(argv: string[]): {
   filePath: string | undefined;
   outDir: string | undefined;
+  target: TargetMode;
+  quiet: boolean;
 } {
   let filePath: string | undefined;
   let outDir: string | undefined;
+  let target: TargetMode = undefined;
+  let quiet = false;
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--path") {
@@ -30,6 +42,20 @@ function parseArgs(argv: string[]): {
       }
       outDir = v;
       i++;
+    } else if (a === "--target") {
+      const v = argv[i + 1];
+      if (!v || v.startsWith("--")) {
+        console.error("--target requires a value (cql | fhir-def)");
+        process.exit(1);
+      }
+      if (v !== "cql" && v !== "fhir-def") {
+        console.error(`--target must be 'cql' or 'fhir-def' (got: ${v})`);
+        process.exit(1);
+      }
+      target = v;
+      i++;
+    } else if (a === "--quiet") {
+      quiet = true;
     } else if (a === "--library-name") {
       console.error(
         "--library-name has been removed in v2.1.0. Under per-CRL emit each " +
@@ -48,10 +74,10 @@ function parseArgs(argv: string[]): {
       process.exit(1);
     }
   }
-  return { filePath, outDir };
+  return { filePath, outDir, target, quiet };
 }
 
-const { filePath, outDir } = parseArgs(process.argv.slice(2));
+const { filePath, outDir, target, quiet } = parseArgs(process.argv.slice(2));
 
 if (!filePath) {
   console.error("Usage: crl-emit --path <file.crl> --out-dir <output-directory>");
@@ -67,6 +93,66 @@ if (!outDir) {
       "--out-dir is required.",
   );
   process.exit(1);
+}
+
+// Plan v3.2 §"CLI extension": .cel + --target fhir-def is a category
+// error (CEL emits FHIR instances; --target fhir-def is for CRL→FHIR
+// Definition resources). Hard-error to prevent silent confusion.
+if (filePath.toLowerCase().endsWith(".cel") && target === "fhir-def") {
+  process.stderr.write(
+    `cli-cel-fhir-def-incompatible: CEL input is not compatible with --target fhir-def. ` +
+      `CEL emits FHIR instances; remove the flag or pass a .crl file.\n`,
+  );
+  process.exit(1);
+}
+
+// .crl + --target fhir-def: closure orchestrator path.
+if (filePath.toLowerCase().endsWith(".crl") && target === "fhir-def") {
+  const result = emitFhirDefFromPath(filePath);
+
+  const hardErrors = [
+    ...result.errors.filter(isFhirDefError),
+    ...result.metadataErrors,
+    ...result.importDiagnostics.filter((d) => d.severity === "error"),
+  ];
+  const warnings = [
+    ...result.errors.filter(isFhirDefWarning),
+    ...result.importDiagnostics.filter((d) => d.severity === "warning"),
+  ];
+
+  if (hardErrors.length > 0) {
+    process.stderr.write(
+      JSON.stringify(
+        { errors: hardErrors, importDiagnostics: result.importDiagnostics, metadataErrors: result.metadataErrors },
+        null,
+        2,
+      ) + "\n",
+    );
+    process.exit(1);
+  }
+
+  // Resources land at <out-dir>/fhir/<rt>/<id>.json per plan v3.2 layout.
+  const fhirOutDir = path.join(outDir, "fhir");
+  try {
+    mkdirSync(fhirOutDir, { recursive: true });
+  } catch (e) {
+    process.stderr.write(`Failed to create output directory "${fhirOutDir}": ${(e as Error).message}\n`);
+    process.exit(1);
+  }
+  const written = writeFhirResources({ success: true, resources: result.resources }, fhirOutDir);
+  if (!quiet) {
+    for (const p of written) process.stdout.write(`wrote ${p}\n`);
+  } else {
+    process.stdout.write(`wrote ${written.length} resource(s) under ${fhirOutDir}\n`);
+  }
+
+  if (warnings.length > 0 || result.unmatched.length > 0) {
+    process.stderr.write(
+      JSON.stringify({ warnings, unmatched: result.unmatched }, null, 2) + "\n",
+    );
+    process.exit(2);
+  }
+  process.exit(0);
 }
 
 // Pitch v4 critical decision #1 option (d): crl-emit auto-dispatches by
