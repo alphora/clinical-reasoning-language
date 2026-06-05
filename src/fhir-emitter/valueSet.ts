@@ -102,7 +102,9 @@ export function emitValueSet(
     id,
     meta: { profile: [PROFILE_URL] },
     url,
-    version: metadata.version,
+    // `version` deliberately omitted — npm package owns the version;
+    // applied at package time. See memory feedback_no-version-on-
+    // emitted-artifacts.
     name: computableName,
     title,
     status: metadata.status,

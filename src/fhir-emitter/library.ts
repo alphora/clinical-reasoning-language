@@ -109,7 +109,7 @@ export function emitLibrary(
     resourceType: "Library",
     id,
     url,
-    version: metadata.version,
+    // `version` deliberately omitted — npm package owns the version.
     name: computableName,
     title,
     status: metadata.status,

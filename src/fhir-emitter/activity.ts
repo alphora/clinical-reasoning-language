@@ -157,7 +157,7 @@ export function emitActivityDefinition(
     id,
     meta: { profile: [profile.profileUrl] },
     url,
-    version: metadata.version,
+    // `version` deliberately omitted — npm package owns the version.
     name: computableName,
     title,
     status: metadata.status,

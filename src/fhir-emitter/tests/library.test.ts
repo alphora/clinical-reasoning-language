@@ -38,7 +38,9 @@ describe("library — emitLibrary", () => {
     expect(r.resourceType).toBe("Library");
     expect(r.id).toBe("cms22-asserted");
     expect(r.url).toBe("http://hl7.org/fhir/us/cqfmeasures/crl/cms22/Library/cms22-asserted");
-    expect(r.version).toBe("1.0.0");
+    // `version` deliberately not emitted — npm package owns the version
+    // (memory: feedback_no-version-on-emitted-artifacts). Assert absence.
+    expect(r.version).toBeUndefined();
     expect(r.name).toBe("Cms22Asserted");
     // v2.1 round-2: title is the per-Library name, not the package-level metadata.title.
     expect(r.title).toBe("CMS22 Asserted");
