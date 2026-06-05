@@ -69,7 +69,7 @@ decision "Recommend Hypertension Intervention":
 // ============ Activities ============
 
 activity "Measure BP":
-- request CPGQuestionnaire.
+- request CPGServiceRequest.
 - with "Blood Pressure Panels VS".
 
 activity "Order Antihypertensive Medication":
