@@ -48,6 +48,24 @@ export function capSlug(slug: string): string {
 }
 
 /**
+ * Cap a base slug + append a suffix so the combined result fits in
+ * the FHIR id 64-char limit. Used by emit modules that suffix their
+ * id (e.g. recommendation.ts: `<base>-recommendation`). Always trims
+ * trailing hyphens from the truncated base to avoid `--` runs at the
+ * base/suffix boundary.
+ *
+ * Per round-3 (Claude F1 + round-5 boundary verification): the base
+ * is pre-capped to `SLUG_MAX_LEN - suffix.length` so cross-resource
+ * boundary collisions (e.g. ActivityDef id vs Recommendation id at
+ * the truncation boundary) cannot occur.
+ */
+export function capSlugForSuffix(base: string, suffix: string): string {
+  const precapLen = SLUG_MAX_LEN - suffix.length;
+  const trimmed = base.slice(0, precapLen).replace(/-+$/, "");
+  return trimmed + suffix;
+}
+
+/**
  * Δ15 — PascalCase a name for the FHIR `name` (computable) field.
  * Lowercase → strip non-alphanumeric (keep spaces + hyphens + underscore)
  * → split on `[-_\s]+` → capitalize first letter per token → concat.

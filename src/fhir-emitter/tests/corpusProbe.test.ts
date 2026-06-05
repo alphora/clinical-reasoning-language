@@ -18,8 +18,10 @@ import { join } from "node:path";
 import { describe, expect, it } from "@jest/globals";
 
 import { buildCRL } from "../../index";
-import type { Activity } from "../../ast/types";
+import type { Activity, Concept, Decision } from "../../ast/types";
 import { emitActivityDefinition, type TerminologyResolver } from "../activity";
+import { emitDecisionPlanDefinitionsForLibrary } from "../decision";
+import { emitRecommendationDefinitionsForLibrary } from "../recommendation";
 import type { CpgMetadata } from "../types";
 
 const ROOT = join(__dirname, "..", "..", "..");
@@ -42,6 +44,26 @@ const METADATA: CpgMetadata = {
 // Stub resolver — returns the bare term name as the CQL identifier.
 const STUB_RESOLVER: TerminologyResolver = (ref) =>
   typeof ref === "string" ? ref : `${ref.libraryName}.${ref.name}`;
+
+interface CorpusFixture {
+  libraryName: string;
+  activities: Activity[];
+  decisions: Decision[];
+  concepts: Concept[];
+}
+
+function loadCorpusFixture(relPath: string): CorpusFixture {
+  const source = readFileSync(join(ROOT, relPath), "utf-8");
+  const result = buildCRL(source);
+  if (!result.success || !result.result) {
+    throw new Error(`Failed to parse ${relPath}: ${JSON.stringify(result.errors)}`);
+  }
+  const ast = result.result;
+  const activities = ast.statements.filter((s): s is Activity => s.type === "Activity");
+  const decisions = ast.statements.filter((s): s is Decision => s.type === "Decision");
+  const concepts = ast.statements.filter((s): s is Concept => s.type === "Concept");
+  return { libraryName: ast.libraryName ?? "Unknown Library", activities, decisions, concepts };
+}
 
 function loadFixtureActivities(relPath: string): { libraryName: string; activities: Activity[] } {
   const source = readFileSync(join(ROOT, relPath), "utf-8");
@@ -138,5 +160,68 @@ describe("corpus probe — cms69-strategy.crl", () => {
     // the floor-style assertion tolerates the corpus growing in shape.
     expect(unmatchedWithTextCount).toBe(1);
     expect(unmatchedOther).toBe(0);
+  });
+});
+
+/* ─── Todo 3 corpus probes — Recommendation + Decision emit ─────── */
+
+describe("corpus probe — cms22-strategy Recommendation + Decision emit", () => {
+  it("emits one Recommendation PlanDef per activity + Strategy + Sub-decision PlanDefs", () => {
+    const fixture = loadCorpusFixture(
+      "features/cql-pattern-mining/results/models/cms22-split/cms22-strategy.crl",
+    );
+
+    // Recommendations: one per activity.
+    const rec = emitRecommendationDefinitionsForLibrary(
+      fixture.activities, fixture.libraryName, METADATA, { clock: FIXED_CLOCK },
+    );
+    expect(rec.errors).toEqual([]);
+    expect(rec.unmatched).toEqual([]);
+    expect(rec.resources.length).toBe(fixture.activities.length);
+    for (const r of rec.resources) {
+      expect((r.resource as { resourceType: string }).resourceType).toBe("PlanDefinition");
+      const meta = (r.resource as { meta: { profile: string[] } }).meta;
+      expect(meta.profile).toContain("http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-recommendationdefinition");
+    }
+
+    // Decisions: 1 Strategy (root) + 1 Sub-decision per cms22.
+    const dec = emitDecisionPlanDefinitionsForLibrary(
+      fixture.decisions, fixture.activities, fixture.concepts, fixture.libraryName, METADATA, { clock: FIXED_CLOCK },
+    );
+    expect(dec.errors).toEqual([]);
+    expect(dec.resources.length).toBe(fixture.decisions.length);
+
+    const profiles = dec.resources.map((r) => (r.resource as { meta: { profile: string[] } }).meta.profile);
+    const strategyCount = profiles.filter((p) => p.includes("http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-strategydefinition")).length;
+    const subOnlyCount = profiles.filter((p) => !p.includes("http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-strategydefinition")).length;
+    expect(strategyCount).toBe(1);
+    expect(subOnlyCount).toBe(fixture.decisions.length - 1);
+  });
+});
+
+describe("corpus probe — cms69-strategy Recommendation + Decision emit", () => {
+  it("emits Recommendations + 1 Strategy + N-1 Sub-decisions for cms69", () => {
+    const fixture = loadCorpusFixture(
+      "features/cql-pattern-mining/results/models/cms69-split/cms69-strategy.crl",
+    );
+
+    const rec = emitRecommendationDefinitionsForLibrary(
+      fixture.activities, fixture.libraryName, METADATA, { clock: FIXED_CLOCK },
+    );
+    expect(rec.errors).toEqual([]);
+    expect(rec.resources.length).toBe(fixture.activities.length);
+
+    const dec = emitDecisionPlanDefinitionsForLibrary(
+      fixture.decisions, fixture.activities, fixture.concepts, fixture.libraryName, METADATA, { clock: FIXED_CLOCK },
+    );
+    expect(dec.errors).toEqual([]);
+    expect(dec.resources.length).toBe(fixture.decisions.length);
+
+    const strategyCount = dec.resources.filter((r) =>
+      (r.resource as { meta: { profile: string[] } }).meta.profile.includes(
+        "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-strategydefinition",
+      ),
+    ).length;
+    expect(strategyCount).toBe(1);
   });
 });

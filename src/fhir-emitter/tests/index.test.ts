@@ -7,4 +7,7 @@ import "./writer.test";
 import "./cpgActivityProfiles.test";
 import "./library.test";
 import "./activity.test";
+import "./recommendation.test";
+import "./decision.test";
 import "./corpusProbe.test";
+import "./ccScreeningRoundTrip.test";

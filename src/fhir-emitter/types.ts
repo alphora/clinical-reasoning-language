@@ -26,13 +26,17 @@ import type { CRLError } from "../types/errors";
  * the new values for callers (e.g. the MCP tool description and
  * future caller-side filtering).
  *
- *   missing-canonical-url-base    error    package.json lacks `crl.canonicalBase`. Strict-refuse-to-emit.
- *   missing-description           error    Library + package.json description both empty after defaulting.
- *   slug-collision                error    Two CRL declarations slugify to the same FHIR id.
- *   non-ascii-slug-fallback       warning  A non-empty CRL name slugified to "unnamed" (non-ASCII strip).
- *   malformed-crl-metadata        error    `crl.useContext` / `crl.jurisdiction` has wrong shape.
- *   unreadable-package-json       error    Filesystem error reading package.json.
- *   empty-terminology             warning  Terminology body has neither `valueset is` nor `system is`+`code is`.
+ *   missing-canonical-url-base                     error    package.json lacks `crl.canonicalBase`. Strict-refuse-to-emit.
+ *   missing-description                            error    Library + package.json description both empty after defaulting.
+ *   slug-collision                                 error    Two CRL declarations slugify to the same FHIR id.
+ *   non-ascii-slug-fallback                        warning  A non-empty CRL name slugified to "unnamed" (non-ASCII strip).
+ *   malformed-crl-metadata                         error    `crl.useContext` / `crl.jurisdiction` has wrong shape.
+ *   unreadable-package-json                        error    Filesystem error reading package.json.
+ *   empty-terminology                              warning  Terminology body has neither `valueset is` nor `system is`+`code is`.
+ *   circular-decision-reference                    error    Dependency-graph cycle among decisions. (Todo 3)
+ *   empty-strategy-entrypoint                      error    Closure has no root decision (every decision is referenced; acyclic graph, no root). (Todo 3)
+ *   strategy-root-cascade-suppressed               error    Root decision would emit with zero surviving actions due to cascade suppression. (Todo 3)
+ *   unresolved-reference-cascade-suppression       warning  Non-root parent action suppressed because all children were suppressed. (Todo 3)
  */
 
 /**
@@ -104,6 +108,7 @@ export interface UnmatchedReference {
   kind:
     | "empty-terminology"
     | "unresolved-activity"
+    | "unresolved-concept"
     | "unresolved-decision"
     | "unresolved-terminology"
     | "unsupported-with-text"

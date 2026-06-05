@@ -95,8 +95,15 @@ export {
   emitLibrariesForClosure,
   emitActivityDefinition,
   emitActivityDefinitionsForLibrary,
+  emitRecommendationDefinition,
+  emitRecommendationDefinitionsForLibrary,
+  emitDecisionPlanDefinition,
+  emitDecisionPlanDefinitionsForLibrary,
   writeFhirResources,
   type TerminologyResolver,
+  type ConceptResolver,
+  type ActivityResolver,
+  type DecisionResolver,
 } from "./fhir-emitter";
 export type {
   CpgMetadata,

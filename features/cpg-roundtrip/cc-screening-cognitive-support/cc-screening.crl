@@ -1,3 +1,6 @@
+# Colorectal Cancer Screening Cognitive Support
+library "Colorectal Cancer Screening Recommendation".
+
 // CRL representation of the demo-content-r4 colorectal cancer screening
 // COGNITIVE SUPPORT example. Used for round-trip validation:
 //
@@ -20,43 +23,60 @@
 // lives in the existing demo-content-r4 ColorectalCancerCaseFeatures
 // library (see ../expected-fhir/library/).
 
-library "Colorectal Cancer Screening Recommendation"
-
 // ============ Concepts ============
 // One concept per condition referenced in the decision tree.
-// Round-trip note: these become CQL define names in the emitted
-// Library and are referenced from action.condition.expression as
-// text/cql-identifier values.
+// These are CaseFeature-style booleans on patient state — typed
+// as Observation since the IG models them as Observation
+// CaseFeatures (see ColorectalCancerCaseFeatures.json).
+
+// Each concept needs a body terminator (coded-from / defined-as /
+// definition-is) per CRL grammar. For these fixture concepts —
+// CaseFeature-style booleans whose actual CQL lives in the existing
+// demo-content-r4 ColorectalCancerCaseFeatures library — the
+// `definition is documented.` form is the lightest valid placeholder.
+// The emit pipeline only needs the concept name (it becomes the CQL
+// identifier in action.condition.expression); the body's semantics
+// don't affect FHIR-def emit. Future Homeostasis lane may revise.
 
 concept "Inclusion Criteria":
-- type is boolean.
+- type is Observation.
+- definition is documented.
 
 concept "Exclusion Criteria":
-- type is boolean.
+- type is Observation.
+- definition is documented.
 
 concept "Has Coverage Concern":
-- type is boolean.
+- type is Observation.
+- definition is documented.
 
 concept "No Coverage Concern":
-- type is boolean.
+- type is Observation.
+- definition is documented.
 
 concept "Has Sedation Concern":
-- type is boolean.
+- type is Observation.
+- definition is documented.
 
 concept "No Sedation Concern":
-- type is boolean.
+- type is Observation.
+- definition is documented.
 
 concept "Has Sigmoidoscopy Complications":
-- type is boolean.
+- type is Observation.
+- definition is documented.
 
 concept "No Sigmoidoscopy Complications":
-- type is boolean.
+- type is Observation.
+- definition is documented.
 
 concept "Has Colonoscopy Complications":
-- type is boolean.
+- type is Observation.
+- definition is documented.
 
 concept "No Colonoscopy Complications":
-- type is boolean.
+- type is Observation.
+- definition is documented.
 
 // ============ Activities ============
 // Each `activity` declaration produces TWO FHIR resources:
@@ -80,9 +100,11 @@ activity "Sigmoidoscopy":
 // ============ Decisions ============
 
 // Root strategy decision. Produces a cpg-strategydefinition PlanDef
-// (type workflow-definition). The two when-then branches map to two
-// top-level action[] entries; each delegates to a sub-decision via
-// `use decision`.
+// (type workflow-definition). The single when-then branch (Inclusion)
+// delegates to the sub-decision via `use decision`. The example's
+// Exclusion branch is intentionally omitted (Drift B per README:
+// the example's no-recommendation target has an empty body, which is
+// unparseable per CRL grammar `decisionBody : whenBlock+`).
 
 decision "Colorectal Cancer Screening Strategy":
 - when "Inclusion Criteria" then use decision "Colorectal Cancer Screening Decision".
@@ -103,6 +125,9 @@ decision "Colorectal Cancer Screening Decision":
   - when "Has Sedation Concern" then:
     - when "Has Sigmoidoscopy Complications" then recommend activity "CT Colonography".
     - when "No Sigmoidoscopy Complications" then recommend activity "Sigmoidoscopy".
+  - end when
   - when "No Sedation Concern" then:
     - when "Has Colonoscopy Complications" then recommend activity "CT Colonography".
     - when "No Colonoscopy Complications" then recommend activity "Colonoscopy".
+  - end when
+- end when
