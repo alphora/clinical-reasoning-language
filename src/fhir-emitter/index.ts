@@ -11,6 +11,7 @@ export { emitValueSet, emitValueSetsForLibrary } from "./valueSet";
 export { emitLibrary, emitLibrariesForClosure } from "./library";
 
 export {
+  activityDefinitionCanonicalUrl,
   emitActivityDefinition,
   emitActivityDefinitionsForLibrary,
   type TerminologyResolver,

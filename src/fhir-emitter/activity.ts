@@ -68,6 +68,26 @@ export type TerminologyResolver = (termName: ReferenceName) => string | null;
 // the emitted Library's `url`.
 
 /**
+ * Canonical URL the emitted ActivityDefinition claims (`ActivityDefinition.url`)
+ * AND the URL a PlanDefinition action's `definitionCanonical` references
+ * for that CRL activity (Todo 3). Both sides MUST byte-equal — this helper
+ * is the single source of truth, preventing the same class of bug that
+ * round-2 caught for Library URLs.
+ *
+ * Slug rule is `capSlug(<librarySlug>-<activitySlug>)`, identical to
+ * what `emitActivityDefinition` uses for the resource id. canonicalBase
+ * is assumed pre-normalized by the metadata loader (no trailing slash).
+ */
+export function activityDefinitionCanonicalUrl(
+  canonicalBase: string,
+  libraryName: string,
+  activityName: string,
+): string {
+  const id = capSlug(`${slugify(libraryName)}-${slugify(activityName)}`);
+  return `${canonicalBase}/ActivityDefinition/${id}`;
+}
+
+/**
  * Emit one cpg-<lowercase>activity ActivityDefinition from a single CRL
  * Activity. Mirrors `emitValueSet`'s envelope shape.
  */
@@ -127,7 +147,7 @@ export function emitActivityDefinition(
   }
 
   const date = (opts.clock ?? defaultClock)().toISOString();
-  const url = `${metadata.canonicalBase}/ActivityDefinition/${id}`;
+  const url = activityDefinitionCanonicalUrl(metadata.canonicalBase, libraryName, activity.name);
   const libraryUrl = libraryCanonicalUrl(metadata.canonicalBase, libraryName);
 
   const doNotPerform = activity.body.request.doNotPerform === true;

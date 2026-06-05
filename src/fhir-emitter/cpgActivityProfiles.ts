@@ -1,9 +1,16 @@
 /**
  * CRL → CPG IG ActivityDefinition profile mapping table.
  *
- * Each entry is verified against the published `StructureDefinition-cpg-
- * <lowercase>activity.json` artifact at
- * https://build.fhir.org/ig/HL7/cqf-recommendations/.
+ * Each entry is **manually verified once** against the published
+ * `StructureDefinition-cpg-<lowercase>activity.json` artifact at
+ * https://build.fhir.org/ig/HL7/cqf-recommendations/ (verification log
+ * in `docs/cpg-ig-alignment.md`). The verification is for the
+ * ActivityDefinition-side profile facts (kind, intent, code, profile
+ * canonical) — NOT for the per-row `dynamicValuePath` against the
+ * TARGET Request profile's element schema. That continuous check is
+ * deferred to Todo 4's validator probe (plan v2.1 disposition; gpt55
+ * round-3 reaffirmed the deferral as acceptable but flagged the
+ * code-comment vs plan-promise gap, which this comment closes).
  *
  * The CPG IG fixes the following per profile (all `1..1 MS`):
  *   - `kind` to a FHIR resource type

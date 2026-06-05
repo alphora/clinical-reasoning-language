@@ -77,6 +77,13 @@ export type {
 // types already exported above (both lanes have `EmitOptions` and
 // `EmittedResource` — the CEL ones are FHIR-instance-side, these
 // are FHIR-definition-side).
+// Round-3 gpt55 disposition: keep the public surface to the emit functions
+// + the resolver callback type that callers MUST supply. Internal-only:
+// the per-profile lookup table, CodeSystem constant, and CpgActivityProfile
+// shape — these are tightly coupled to the CPG IG and may evolve;
+// exporting them at the root would make a published-IG change a breaking
+// surface change. Internal Todo 4 wiring imports from "./fhir-emitter"
+// directly.
 export {
   readPackageMetadata,
   normalizePackageMetadata,
@@ -88,11 +95,7 @@ export {
   emitLibrariesForClosure,
   emitActivityDefinition,
   emitActivityDefinitionsForLibrary,
-  lookupCpgActivityProfile,
-  ALL_CPG_ACTIVITY_PROFILES,
-  CPG_ACTIVITY_TYPE_CODE_SYSTEM,
   writeFhirResources,
-  type CpgActivityProfile,
   type TerminologyResolver,
 } from "./fhir-emitter";
 export type {

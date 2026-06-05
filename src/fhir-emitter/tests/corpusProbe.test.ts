@@ -131,8 +131,11 @@ describe("corpus probe — cms69-strategy.crl", () => {
 
     expect(resourceCount).toBe(activities.length);
     expect(errors).toBe(0);
-    // Corpus has 1 free-text `with` case (cms69-strategy.crl:122
-    // "Order Low BMI Follow-up Care Plan").
+    // Exact count (toBe, not toBeGreaterThanOrEqual): the cms69 strategy
+    // is a semantic regression lock — a new free-text `with` is a
+    // modeling change that should make this test fail loudly so the
+    // operator decides whether to accept it. Contrast cms22 above, where
+    // the floor-style assertion tolerates the corpus growing in shape.
     expect(unmatchedWithTextCount).toBe(1);
     expect(unmatchedOther).toBe(0);
   });
