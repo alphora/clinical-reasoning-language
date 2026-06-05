@@ -1,0 +1,33 @@
+{
+  "$comment": "Single source of truth for the repo label taxonomy. See .github/LABELS.md for the prose version. Consumed by scripts/apply-labels.ts.",
+  "labels": [
+    { "name": "kind/bug", "color": "d73a4a", "description": "Defect: behavior doesn't match documented or intended semantics." },
+    { "name": "kind/feat", "color": "0e8a16", "description": "New capability or expansion of existing capability." },
+    { "name": "kind/design-q", "color": "7057ff", "description": "Design question requiring a decision before implementation; close + file feat/chore on resolution." },
+    { "name": "kind/chore", "color": "bfd4f2", "description": "Maintenance, refactor, dependency bump, or other non-feature/non-bug work." },
+    { "name": "kind/doc", "color": "0075ca", "description": "User-facing documentation change (README, USER_GUIDE, etc.)." },
+    { "name": "kind/meta", "color": "fef2c0", "description": "About the project or process itself (labels, conventions, governance)." },
+
+    { "name": "area/validator", "color": "cccccc", "description": "CRL or CEL validators (src/validator/, src/cel/validator/)." },
+    { "name": "area/cql-emitter", "color": "cccccc", "description": "CRL -> CQL emit lane (src/emitter/, src/imports/emit.ts)." },
+    { "name": "area/fhir-emitter", "color": "cccccc", "description": "CRL -> FHIR Definition resource emit (src/fhir-emitter/)." },
+    { "name": "area/cel-emitter", "color": "cccccc", "description": "CEL -> FHIR instance emit (src/cel/emitter/)." },
+    { "name": "area/template-match", "color": "cccccc", "description": "Narrative-pattern matcher (src/template-match/)." },
+    { "name": "area/grammar", "color": "cccccc", "description": "Surface syntax: CRL + CEL lexer/parser/AST/transformer. See LABELS.md for directory map." },
+    { "name": "area/catalog", "color": "cccccc", "description": "Narrative-pattern catalog (catalog.json + inference-pattern-catalog-draft.md)." },
+    { "name": "area/cli", "color": "cccccc", "description": "CLI entrypoints (src/cli/run-*.ts except run-mcp-server.ts)." },
+    { "name": "area/mcp", "color": "cccccc", "description": "MCP server + tool registrations (src/cli/run-mcp-server.ts)." },
+    { "name": "area/extension", "color": "cccccc", "description": "VS Code extension (extension/)." },
+    { "name": "area/imports", "color": "cccccc", "description": "Cross-file / cross-library resolution (src/imports/, src/cel/imports/)." },
+    { "name": "area/corpus", "color": "cccccc", "description": "Shipped exemplars + corpus fixtures. See LABELS.md for directory map." },
+    { "name": "area/spec", "color": "cccccc", "description": "Language specifications (spec/, docs/cel-spec.md, docs/cpg-ig-alignment.md)." },
+    { "name": "area/packages", "color": "cccccc", "description": "npm package boundaries / monorepo structure (packages/)." },
+    { "name": "area/docs", "color": "cccccc", "description": "User-facing docs (README.md, USER_GUIDE.md, docs/ non-spec content)." },
+    { "name": "area/repo", "color": "cccccc", "description": "The repo as a whole: .github/, CLAUDE.md, release process, label scheme, dev environment." },
+
+    { "name": "priority/p0", "color": "b60205", "description": "Critical — blocks shipping or causes data loss; must-fix." },
+    { "name": "priority/p1", "color": "d93f0b", "description": "High — significant impact; address in current release window." },
+    { "name": "priority/p2", "color": "fbca04", "description": "Medium — should fix in a reasonable timeframe." },
+    { "name": "priority/p3", "color": "c5def5", "description": "Low — nice to have." }
+  ]
+}
