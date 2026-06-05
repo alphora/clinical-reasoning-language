@@ -31,10 +31,53 @@ const check = async (label, fn) => {
 
 await client.connect(transport);
 try {
-  await check("MCP tools: build_crl_ast, tokenize_crl, validate_crl, validate_cel, emit_cql", async () => {
+  await check("MCP tools: 7 registered (tokenize_crl, build_crl_ast, validate_crl, validate_cel, emit_cql, emit_crl_fhir, emit_cel)", async () => {
     const { tools } = await client.listTools();
     const names = tools.map((t) => t.name).sort();
-    assert.deepEqual(names, ["build_crl_ast", "emit_cql", "tokenize_crl", "validate_cel", "validate_crl"]);
+    assert.deepEqual(names, [
+      "build_crl_ast",
+      "emit_cel",
+      "emit_cql",
+      "emit_crl_fhir",
+      "tokenize_crl",
+      "validate_cel",
+      "validate_crl",
+    ]);
+  });
+
+  await check("emit_cel via path → cms22.cel returns summary envelope with cases", async () => {
+    const cms22Cel = resolve(here, "../../../features/cql-pattern-mining/results/models/cms22-split/cms22.cel");
+    const r = await client.callTool({ name: "emit_cel", arguments: { path: cms22Cel } });
+    assert.ok(!r.isError, "should not be a tool error");
+    const out = JSON.parse(r.content[0].text);
+    assert.equal(typeof out.success, "boolean");
+    assert.equal(typeof out.caseCount, "number");
+    assert.equal(typeof out.resourceCount, "number");
+    assert.ok(Array.isArray(out.caseManifest));
+    assert.ok(Array.isArray(out.resourceManifest));
+    assert.ok(Array.isArray(out.diagnostics));
+    assert.equal(out.emittedCases, undefined, "summary envelope must NOT include full cases by default");
+  });
+
+  await check("emit_cel with includeResources:true → full emittedCases included", async () => {
+    const cms22Cel = resolve(here, "../../../features/cql-pattern-mining/results/models/cms22-split/cms22.cel");
+    const r = await client.callTool({
+      name: "emit_cel",
+      arguments: { path: cms22Cel, includeResources: true },
+    });
+    assert.ok(!r.isError);
+    const out = JSON.parse(r.content[0].text);
+    assert.ok(Array.isArray(out.emittedCases), "includeResources:true should expose emittedCases array");
+  });
+
+  await check("emit_cel without path → isError", async () => {
+    const r = await client.callTool({ name: "emit_cel", arguments: {} });
+    assert.equal(r.isError, true);
+  });
+
+  await check("emit_cel with nonexistent path → isError", async () => {
+    const r = await client.callTool({ name: "emit_cel", arguments: { path: "/nonexistent/never-going-to-exist.cel" } });
+    assert.equal(r.isError, true);
   });
 
   await check("validate_cel via path → 4 CMS corpus files validate clean", async () => {

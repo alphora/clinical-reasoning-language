@@ -961,9 +961,11 @@ Exit codes: `0` = clean; `1` = hard errors (CRLError of error severity, or impor
 - **Cross-library concept / terminology references are unsupported in v0.** Same-library qualified refs (`"CurrentLib"."X"`) resolve as bare locals. True cross-library refs cascade-suppress through the existing Todo 3 cascade rules with `unresolved-*` UnmatchedReference entries.
 - **`cpg-strategydefinition.action.definition[x]` target-profile** — the published spec constrains this to `canonical(cpg-recommendationdefinition)` only. CRL emit deliberately violates this constraint by referencing publishable-only sub-decisions (matches the cc-screening reference example pattern). The operator is amending the published spec.
 
-### MCP tool
+### MCP tools
 
 The `emit_crl_fhir` MCP tool exposes the same emit pipeline for AI assistants. Path-only argument; returns a summary envelope by default. Pass `includeResources: true` to also receive the full `resources[]` array.
+
+The companion **`emit_cel`** MCP tool (added in v2.4.1) emits FHIR instance resources from `.cel` Case Example documents — parity with `emit_cql` + `emit_crl_fhir`. Same shape: path-only, summary by default, `includeResources: true` opts in to the full `emittedCases[]` array.
 
 ### Round-trip fixture
 
