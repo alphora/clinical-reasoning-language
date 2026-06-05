@@ -904,6 +904,69 @@ The union of concept value types and concept types. v2.2.0 deliberately omits `P
 
 ---
 
+## Emitting FHIR Definition resources
+
+CRL emits CPG-IG-conformant FHIR Definition resources (ValueSet, Library, ActivityDefinition, PlanDefinition) alongside the existing CQL emit.
+
+### CLI
+
+```
+crl-emit --path <root.crl> --out-dir <project-root> --target fhir-def
+```
+
+Output layout (matches the operator's locked project convention):
+
+```
+<project-root>/
+   cql/
+      <library-name>.cql           ← from existing --target cql
+   fhir/
+      ValueSet/<id>.json
+      Library/<id>.json
+      ActivityDefinition/<id>.json
+      PlanDefinition/<id>.json     ← Recommendations + Decisions both
+```
+
+Exit codes: `0` = clean; `1` = hard errors; `2` = warnings or unresolved references without hard errors.
+
+`.cel` input with `--target fhir-def` is a hard error (CEL files emit FHIR instances via a separate pipeline, not Definition resources).
+
+### What gets emitted per CRL declaration
+
+| CRL declaration | Emitted resources |
+|---|---|
+| `library "X"` | one `Library` |
+| `terminology "T"` | one `ValueSet` |
+| `activity "A"` | TWO resources: one `ActivityDefinition` (cpg-`<type>`activity profile) + one wrapping `PlanDefinition` (cpg-recommendationdefinition profile, 1:1 wrapping) |
+| `decision "D"` (root — not referenced by any other `use decision`) | one `PlanDefinition` (cpg-strategydefinition profile, workflow-definition type) |
+| `decision "D"` (sub — referenced by ≥1 `use decision`) | one `PlanDefinition` (cpg-publishableplandefinition only, eca-rule type) |
+
+### CRL ⟷ FHIR semantics
+
+- `when "C" then recommend activity "A"` → an `action` whose `condition` references concept `C` (CQL identifier expression) and whose `definitionCanonical` points at the Recommendation PlanDefinition wrapping activity `A`.
+- `when "C" then use decision "D"` → an `action` whose `definitionCanonical` points at sub-decision `D`.
+- Nested `when ... then:` produces nested `action.action[]` until a leaf adds `definitionCanonical`.
+- `any:` qualifier → custom `crl-logical-switch` extension URL on the parent action. The corresponding StructureDefinition is NOT shipped (pending CPG ballot). Strict validators may need an ignore-list for the extension URL until the ballot publishes.
+
+### Deliberate deviations from the published CPG IG
+
+- **No `version` field** on any emitted resource. The npm package owns the version; bundling assigns it at package time. Supersedes CPG IG `version 1..1` requirements.
+- **Cross-library concept / terminology references are unsupported in v0.** Same-library qualified refs (`"CurrentLib"."X"`) resolve as bare locals. True cross-library refs cascade-suppress through the existing Todo 3 cascade rules with `unresolved-*` UnmatchedReference entries.
+- **`cpg-strategydefinition.action.definition[x]` target-profile** — the published spec constrains this to `canonical(cpg-recommendationdefinition)` only. CRL emit deliberately violates this constraint by referencing publishable-only sub-decisions (matches the cc-screening reference example pattern). The operator is amending the published spec.
+
+### MCP tool
+
+The `emit_crl_fhir` MCP tool exposes the same emit pipeline for AI assistants. Path-only argument; returns a summary envelope by default. Pass `includeResources: true` to also receive the full `resources[]` array.
+
+### Round-trip fixture
+
+A reference round-trip fixture lives at `features/cpg-roundtrip/cc-screening-cognitive-support/`:
+- `cc-screening.crl` — the CRL author's representation.
+- `expected-fhir/` — the IG reference resources (copied verbatim from the demo-content-r4 colorectal-cancer-screening example).
+- `README.md` — documents the 4 deliberate shape deviations (Drift A/B/C/D) where CRL v0's emit differs structurally from the example.
+
+---
+
 ## Full Example
 
 See [features/cql-pattern-mining/results/models/cms69-split/cms69-strategy.crl](`https://github.com/alphora/clinical-reasoning-language/blob/main/features/cql-pattern-mining/results/models/cms69-split/cms69-strategy.crl`) for a comprehensive example covering all features and options. A second canonical example built on CMS22 ships at [features/cql-pattern-mining/results/models/cms22-split/cms22-strategy.crl](`https://github.com/alphora/clinical-reasoning-language/blob/main/features/cql-pattern-mining/results/models/cms22-split/cms22-strategy.crl`).

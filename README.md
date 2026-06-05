@@ -199,6 +199,18 @@ npm run cli:lexer
 
 Replace `<module>` with the desired CLI module name (e.g., `lexer`, `parser`, etc.).
 
+## FHIR Definition Emit (v2.4.0)
+
+CRL emits CPG-IG-conformant FHIR Definition resources (ValueSet, Library, ActivityDefinition, PlanDefinition) alongside the existing CQL emit.
+
+```bash
+crl-emit --path <root.crl> --out-dir <project-root> --target fhir-def
+```
+
+Output lands at `<project-root>/fhir/<ResourceType>/<id>.json`. CQL emit (the existing `--target cql` / default behavior) lands at `<project-root>/cql/<library-name>.cql`. Library content references the CQL file via the relative path `../../cql/<library-name>.cql`.
+
+For semantic rules, layout details, deliberate spec deviations, and the MCP `emit_crl_fhir` tool, see [`USER_GUIDE.md` §"Emitting FHIR Definition resources"](USER_GUIDE.md#emitting-fhir-definition-resources).
+
 ## API Usage & Reference
 
 **All API functions return a `ParseResult` object. If there are any lexical or syntax errors, these are collected and returned in the `errors` array (not just printed to the console). You should always check `result.success` and handle errors accordingly.**

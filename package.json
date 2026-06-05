@@ -1,6 +1,6 @@
 {
   "name": "@smile-digital-health/crl",
-  "version": "2.3.0",
+  "version": "2.4.0",
   "description": "Clinical Reasoning Language (CRL) parser and validator",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
