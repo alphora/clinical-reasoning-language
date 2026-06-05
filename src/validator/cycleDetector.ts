@@ -1,6 +1,11 @@
 import type {
   CRL,
   Concept,
+  Decision,
+  WhenBlock,
+  WhenBlockBody,
+  BlockBody,
+  ActionStatement,
   CompositionExpression,
   DefinedAsComposition,
   NarrativeClause,
@@ -15,31 +20,67 @@ import { lookupKnownLibrary } from "../imports/scopes";
 import { ValidationError } from "./validator";
 
 /**
- * Detects cycles in concept reference graphs.
+ * Detects cycles in BOTH concept-reference and decision-delegation graphs
+ * over a CRL document (or a multi-file SourceContext).
  *
- * Single-file mode (no `sources`): bare-name adjacency over the AST's
- * concepts. Same behavior as v2.0.
+ * Concept graph: `concept "A" defined as "B"` adds edge A→B; `definition is
+ * has "B"` likewise. Emits `kind: "reference-cycle"`.
+ *
+ * Decision graph (T02 / #96): `decision "D" - when … then use decision "E"`
+ * adds edge D→E. Emits `kind: "decision-delegation-cycle"`. Decision walk
+ * mirrors `referenceResolver.ts:walkDecision/walkWhenBlock/walkWhenBlockBody/
+ * walkBlockBody/walkActionStatement`.
+ *
+ * Single-file mode (no `sources`): bare-name adjacency keyed by the
+ * declared `library "X".`'s X (passed to flat collectors as
+ * `currentLibName`). A qualified ref `"Other"."Y"` whose qualifier is NOT
+ * the current library's name is IGNORED — ReferenceResolver fires
+ * `external-library-not-included` for that case; treating the qualifier as
+ * a same-namespace lookup would false-positive-cycle when a local `"Y"`
+ * exists. Qualified self-ref `"Self"."Y"` (qualifier === currentLibName)
+ * collapses to bare `"Y"`.
  *
  * Multi-file mode (with `sources`): adjacency keyed by
- * `${currentLibrary}|${conceptName}`. Bare refs in library L create an
- * edge to `L|refName`; qualified refs `"Other"."X"` create an edge to
- * `Other|X`. DFS once over the union; cycles report with library prefixes
- * when the path crosses libraries.
+ * `${origin}|${currentLibrary}|${refName}`. Bare refs in library L create
+ * an edge to `L|refName`; qualified refs `"Other"."X"` are resolved via
+ * `lookupKnownLibrary` to their actual origin (local vs. package) and
+ * keyed accordingly.
  *
- * Algorithm: standard WHITE/GRAY/BLACK DFS. Back edge to GRAY = cycle;
- * the cycle path is canonicalized before deduplication.
+ * Algorithm: standard WHITE/GRAY/BLACK DFS. Back edge to GRAY = cycle; the
+ * cycle path is canonicalized (rotated lowest-key-first) before dedupe.
+ *
+ * Soft mode: cycles are structural defects; both `reference-cycle` and
+ * `decision-delegation-cycle` are NEVER demoted by `SOFT_DEMOTABLE_KINDS`.
+ *
+ * Note on dual cycle-detection: the FHIR emitter's
+ * `closureOrchestrator.ts:classifyClosureDecisions` independently emits
+ * `kind: "circular-decision-reference"` at emit time. That kind is in
+ * `CRLError.kind` (fhir-emitter side), NOT in `ValidationErrorKind`. The
+ * two paths have different message shapes; callers filtering by kind may
+ * need to handle both. See `.vibe-tools/discussions/074-...` for rationale.
+ *
+ * Known limitation: multi-file node keys use `|` as delimiter, so a
+ * library name containing `|` (e.g. `"A|B"`) can collide with a
+ * different (library, name) pair (e.g. lib `"A"` + name `"B|<something>"`).
+ * QUOTED_STRING grammar permits `|`. Operator + corpus authors don't use
+ * `|` in names; deferred to a follow-up that aligns with the orchestrator's
+ * tuple-key approach (`closureOrchestrator.ts:qualifiedKey`).
  */
 export class CycleDetector {
   validate(ast: CRL, sources?: SourceContext[]): ValidationError[] {
-    if (sources) {
-      return this.validateScoped(sources);
-    }
-    return this.validateFlat(ast);
+    const conceptErrors = sources
+      ? this.validateConceptCyclesScoped(sources)
+      : this.validateConceptCyclesFlat(ast);
+    const decisionErrors = sources
+      ? this.validateDecisionCyclesScoped(sources)
+      : this.validateDecisionCyclesFlat(ast);
+    return [...conceptErrors, ...decisionErrors];
   }
 
-  // -------------------------- single-file path --------------------------
+  // ─────────────────────── CONCEPT — single-file ───────────────────────
 
-  private validateFlat(ast: CRL): ValidationError[] {
+  private validateConceptCyclesFlat(ast: CRL): ValidationError[] {
+    const currentLibName = ast.library?.name ?? "";
     const adjacency = new Map<string, Set<string>>();
     const locations = new Map<string, Location>();
 
@@ -48,7 +89,7 @@ export class CycleDetector {
       const concept = statement as Concept;
       locations.set(concept.name, concept.location);
       const refs = new Set<string>();
-      this.collectRefs(concept, refs, undefined);
+      this.collectConceptRefs(concept, refs, undefined, currentLibName);
       adjacency.set(concept.name, refs);
     }
 
@@ -56,18 +97,17 @@ export class CycleDetector {
       adjacency,
       locations,
       undefined,
+      "reference-cycle",
+      "Reference cycle detected",
       (display) => display.map((n) => `"${n}"`).join(" → "),
     );
   }
 
-  // --------------------------- multi-file path --------------------------
+  // ─────────────────────── CONCEPT — multi-file ────────────────────────
 
-  private validateScoped(sources: SourceContext[]): ValidationError[] {
+  private validateConceptCyclesScoped(sources: SourceContext[]): ValidationError[] {
     const adjacency = new Map<string, Set<string>>();
     const locations = new Map<string, Location>();
-    // Track owner metadata per node key so cycle errors carry source
-    // attribution (libraryName + filePath of the node where the back-edge
-    // was detected).
     const sourcesByNode = new Map<string, { libraryName: string; filePath: string }>();
 
     for (const { stmt, scope } of sources) {
@@ -80,38 +120,85 @@ export class CycleDetector {
         filePath: scope.filePath,
       });
       const refs = new Set<string>();
-      // Note: edges to package-origin libraries the asker did NOT include
-      // would still be added (this CycleDetector doesn't enforce visibility);
-      // the back-edge would also not exist because that package's statements
-      // get keyed under "package|...". If the user's bug is "qualified ref
-      // to unincluded package", ReferenceResolver fires
-      // external-library-not-included; the cycle path through that ref
-      // simply doesn't close because no edge from the package back to the
-      // asker exists. So no false cycles in practice.
-      this.collectRefs(concept, refs, scope);
+      this.collectConceptRefs(concept, refs, scope, scope.currentLibrary);
       adjacency.set(key, refs);
     }
 
-    // Render cycle as `"LibA"."C1" → "LibB"."C2" → "LibA"."C1"` so authors
-    // see which library each node lives in.
-    return this.runDfs(adjacency, locations, sourcesByNode, (display) =>
-      display
-        .map((k) => {
-          const parts = k.split("|");
-          // Keys are ${origin}|${lib}|${name}; render as `"lib"."name"`.
-          if (parts.length === 3) return `"${parts[1]}"."${parts[2]}"`;
-          return `"${k}"`;
-        })
-        .join(" → "),
+    return this.runDfs(
+      adjacency,
+      locations,
+      sourcesByNode,
+      "reference-cycle",
+      "Reference cycle detected",
+      (display) => formatScopedPath(display),
     );
   }
 
-  // ------------------------ shared DFS routine --------------------------
+  // ─────────────────────── DECISION — single-file ──────────────────────
+
+  private validateDecisionCyclesFlat(ast: CRL): ValidationError[] {
+    const currentLibName = ast.library?.name ?? "";
+    const adjacency = new Map<string, Set<string>>();
+    const locations = new Map<string, Location>();
+
+    for (const statement of ast.statements) {
+      if (statement.type !== "Decision" || !statement.name) continue;
+      const decision = statement as Decision;
+      locations.set(decision.name, decision.location);
+      const refs = new Set<string>();
+      this.collectDecisionRefs(decision, refs, undefined, currentLibName);
+      adjacency.set(decision.name, refs);
+    }
+
+    return this.runDfs(
+      adjacency,
+      locations,
+      undefined,
+      "decision-delegation-cycle",
+      "Decision delegation cycle detected",
+      (display) => display.map((n) => `"${n}"`).join(" → "),
+    );
+  }
+
+  // ─────────────────────── DECISION — multi-file ───────────────────────
+
+  private validateDecisionCyclesScoped(sources: SourceContext[]): ValidationError[] {
+    const adjacency = new Map<string, Set<string>>();
+    const locations = new Map<string, Location>();
+    const sourcesByNode = new Map<string, { libraryName: string; filePath: string }>();
+
+    for (const { stmt, scope } of sources) {
+      if (stmt.type !== "Decision" || !stmt.name) continue;
+      const decision = stmt as Decision;
+      const key = nodeKey(scope.origin, scope.currentLibrary, decision.name);
+      locations.set(key, decision.location);
+      sourcesByNode.set(key, {
+        libraryName: scope.currentLibrary,
+        filePath: scope.filePath,
+      });
+      const refs = new Set<string>();
+      this.collectDecisionRefs(decision, refs, scope, scope.currentLibrary);
+      adjacency.set(key, refs);
+    }
+
+    return this.runDfs(
+      adjacency,
+      locations,
+      sourcesByNode,
+      "decision-delegation-cycle",
+      "Decision delegation cycle detected",
+      (display) => formatScopedPath(display),
+    );
+  }
+
+  // ─────────────────────── shared DFS routine ──────────────────────────
 
   private runDfs(
     adjacency: Map<string, Set<string>>,
     locations: Map<string, Location>,
     sourcesByNode: Map<string, { libraryName: string; filePath: string }> | undefined,
+    kind: "reference-cycle" | "decision-delegation-cycle",
+    messagePrefix: string,
     formatDisplay: (path: string[]) => string,
   ): ValidationError[] {
     const errors: ValidationError[] = [];
@@ -125,8 +212,6 @@ export class CycleDetector {
 
       const neighbors = adjacency.get(node) ?? new Set<string>();
       for (const neighbor of neighbors) {
-        // Skip neighbors not in adjacency — ReferenceResolver would have
-        // caught them as unresolved-reference or external-library-not-included.
         if (!adjacency.has(neighbor)) continue;
 
         const c = color.get(neighbor) ?? WHITE;
@@ -136,14 +221,14 @@ export class CycleDetector {
           const idx = path.indexOf(neighbor);
           if (idx >= 0) {
             const cycle = path.slice(idx);
-            cycle.push(neighbor); // close the loop
+            cycle.push(neighbor);
             const cycleKey = this.canonicalizeCycle(cycle);
             if (!cyclesReported.has(cycleKey)) {
               cyclesReported.add(cycleKey);
               const sourceMeta = sourcesByNode?.get(node);
               errors.push({
-                kind: "reference-cycle",
-                message: `Reference cycle detected: ${formatDisplay(cycle)}`,
+                kind,
+                message: `${messagePrefix}: ${formatDisplay(cycle)}`,
                 location: locations.get(node) ?? {
                   start: { line: 1, column: 1 },
                   end: { line: 1, column: 1 },
@@ -169,37 +254,33 @@ export class CycleDetector {
     return errors;
   }
 
-  // ------------------------ ref collection ------------------------------
+  // ─────────────────────── CONCEPT ref collection ──────────────────────
 
-  /**
-   * Walk a concept body and add edge keys for every concept ref it makes.
-   * Multi-file mode passes `currentLibrary`; bare refs go to
-   * `currentLibrary|refName`, qualified refs to `qualifier|refName`.
-   * Single-file mode passes undefined; refs stay bare.
-   */
-  private collectRefs(
+  private collectConceptRefs(
     concept: Concept,
     refs: Set<string>,
     scope: LibraryScope | undefined,
+    currentLibName: string,
   ): void {
     switch (concept.definition.type) {
       case "CodedFromDefinition":
-        return; // terminology ref, not concept
+        return;
       case "DefinedAsDefinition": {
         const body = concept.definition.body;
         if (body.type === "DefinedAsBareRef") {
-          this.addEdge(body.ref, refs, scope);
+          this.addEdge(body.ref, refs, scope, currentLibName);
         } else if (body.type === "DefinedAsComposition") {
           this.collectFromComposition(
             (body as DefinedAsComposition).expression,
             refs,
             scope,
+            currentLibName,
           );
         }
         return;
       }
       case "DefinitionIsDefinition":
-        this.collectFromNarrative(concept.definition.body, refs, scope);
+        this.collectFromNarrative(concept.definition.body, refs, scope, currentLibName);
         return;
     }
   }
@@ -208,22 +289,23 @@ export class CycleDetector {
     expr: CompositionExpression,
     refs: Set<string>,
     scope: LibraryScope | undefined,
+    currentLibName: string,
   ): void {
     switch (expr.type) {
       case "SemOrExpression":
       case "SemAndExpression":
         for (const term of expr.terms) {
-          this.collectFromComposition(term, refs, scope);
+          this.collectFromComposition(term, refs, scope, currentLibName);
         }
         return;
       case "SemNotExpression":
-        this.collectFromComposition(expr.expression, refs, scope);
+        this.collectFromComposition(expr.expression, refs, scope, currentLibName);
         return;
       case "CompositionGroup":
-        this.collectFromComposition(expr.expression, refs, scope);
+        this.collectFromComposition(expr.expression, refs, scope, currentLibName);
         return;
       case "CompositionRef":
-        this.addEdge(expr.ref, refs, scope);
+        this.addEdge(expr.ref, refs, scope, currentLibName);
         return;
     }
   }
@@ -232,9 +314,10 @@ export class CycleDetector {
     clause: NarrativeClause,
     refs: Set<string>,
     scope: LibraryScope | undefined,
+    currentLibName: string,
   ): void {
     for (const el of clause.elements) {
-      this.collectFromNarrativeElement(el, refs, scope);
+      this.collectFromNarrativeElement(el, refs, scope, currentLibName);
     }
   }
 
@@ -242,22 +325,22 @@ export class CycleDetector {
     el: NarrativeElement,
     refs: Set<string>,
     scope: LibraryScope | undefined,
+    currentLibName: string,
   ): void {
     switch (el.type) {
       case "NConceptRef":
-        this.addEdge(el.value, refs, scope);
+        this.addEdge(el.value, refs, scope, currentLibName);
         return;
       case "NDisjunction":
         for (const av of el.disjuncts) {
-          this.collectFromArgValue(av, refs, scope);
+          this.collectFromArgValue(av, refs, scope, currentLibName);
         }
         return;
       case "NConjunction":
         for (const av of el.conjuncts) {
-          this.collectFromArgValue(av, refs, scope);
+          this.collectFromArgValue(av, refs, scope, currentLibName);
         }
         return;
-      // NWord, Quantity — no refs
     }
   }
 
@@ -265,58 +348,139 @@ export class CycleDetector {
     av: ArgValue,
     refs: Set<string>,
     scope: LibraryScope | undefined,
+    currentLibName: string,
   ): void {
     switch (av.type) {
       case "NConceptRef":
-        this.addEdge(av.value, refs, scope);
+        this.addEdge(av.value, refs, scope, currentLibName);
         return;
       case "NDisjunction":
         for (const inner of av.disjuncts) {
-          this.collectFromArgValue(inner, refs, scope);
+          this.collectFromArgValue(inner, refs, scope, currentLibName);
         }
         return;
       case "NConjunction":
         for (const inner of av.conjuncts) {
-          this.collectFromArgValue(inner, refs, scope);
+          this.collectFromArgValue(inner, refs, scope, currentLibName);
         }
         return;
-      // Quantity — no ref
     }
   }
 
+  // ─────────────────────── DECISION ref collection ─────────────────────
+  // Mirrors src/validator/referenceResolver.ts:283-323 — walkDecision /
+  // walkWhenBlock / walkWhenBlockBody / walkBlockBody / walkActionStatement.
+
+  private collectDecisionRefs(
+    decision: Decision,
+    refs: Set<string>,
+    scope: LibraryScope | undefined,
+    currentLibName: string,
+  ): void {
+    for (const whenBlock of decision.body.statements) {
+      this.walkDecisionWhenBlock(whenBlock, refs, scope, currentLibName);
+    }
+  }
+
+  private walkDecisionWhenBlock(
+    wb: WhenBlock,
+    refs: Set<string>,
+    scope: LibraryScope | undefined,
+    currentLibName: string,
+  ): void {
+    // `when "C"`'s conceptName is a concept ref, not a decision ref —
+    // irrelevant for delegation cycles. Walk the body for nested UseDecisions.
+    this.walkDecisionWhenBlockBody(wb.body, refs, scope, currentLibName);
+  }
+
+  private walkDecisionWhenBlockBody(
+    body: WhenBlockBody,
+    refs: Set<string>,
+    scope: LibraryScope | undefined,
+    currentLibName: string,
+  ): void {
+    if (body.type === "BlockBody") {
+      this.walkDecisionBlockBody(body, refs, scope, currentLibName);
+    } else {
+      this.walkDecisionActionStatement(body as ActionStatement, refs, scope, currentLibName);
+    }
+  }
+
+  private walkDecisionBlockBody(
+    block: BlockBody,
+    refs: Set<string>,
+    scope: LibraryScope | undefined,
+    currentLibName: string,
+  ): void {
+    for (const stmt of block.statements) {
+      if (stmt.type === "WhenBlock") {
+        this.walkDecisionWhenBlock(stmt, refs, scope, currentLibName);
+      } else {
+        this.walkDecisionActionStatement(stmt, refs, scope, currentLibName);
+      }
+    }
+  }
+
+  private walkDecisionActionStatement(
+    stmt: ActionStatement,
+    refs: Set<string>,
+    scope: LibraryScope | undefined,
+    currentLibName: string,
+  ): void {
+    const action = stmt.action;
+    if (action.type === "UseDecision") {
+      this.addEdge(action.decisionName, refs, scope, currentLibName);
+    }
+    // RecommendActivity: not a decision edge.
+  }
+
+  // ─────────────────────── edge resolution ─────────────────────────────
+
   /**
-   * Add an adjacency edge for a concept reference.
-   * Multi-file: bare ref → `${scope.origin}|${scope.currentLibrary}|${refName}`;
-   * qualified ref `"Other"."X"` → resolved via `lookupKnownLibrary` to its
-   * actual origin (local vs. package) then keyed accordingly.
-   * Single-file: bare name only.
+   * Single-file mode: foreign-qualified refs (qualifier !== currentLibName)
+   * are IGNORED. ReferenceResolver fires external-library-not-included for
+   * those; treating them as bare same-namespace lookups would
+   * false-positive-cycle when a local target of the same name exists.
+   * Qualified self-ref `"<currentLibName>"."X"` collapses to bare `"X"`.
    *
-   * Returns silently when the qualified ref's library can't be resolved
-   * (ReferenceResolver fires `external-library-not-included` for those).
+   * Multi-file mode: qualified refs resolve via `lookupKnownLibrary` to the
+   * actual origin (local vs. package). No `explicitIncludes` visibility
+   * gate — ReferenceResolver handles visibility; CycleDetector adds all
+   * edges (orthogonal concerns). Package-origin refs that aren't visible
+   * to the asker still won't close a cycle because the package's nodes
+   * are keyed under their own origin/library and have their own
+   * adjacency; if there's no edge back, no cycle.
    */
   private addEdge(
     ref: import("../ast/types").ReferenceName,
     refs: Set<string>,
     scope: LibraryScope | undefined,
+    currentLibName: string,
   ): void {
     const refName = getRefName(ref);
     if (!refName) return;
+
     if (scope === undefined) {
+      // Single-file mode.
+      if (isQualifiedRef(ref)) {
+        const qual = getRefLibrary(ref);
+        if (!qual) return;
+        if (qual !== currentLibName) return; // foreign-qualified — skip
+      }
       refs.add(refName);
       return;
     }
+
+    // Multi-file mode.
     if (isQualifiedRef(ref)) {
       const qual = getRefLibrary(ref);
-      if (!qual) return; // malformed qualified ref — let the parser surface it
-      // Resolve to the right origin so adjacency keys match the target
-      // node's key (which was registered by validateScoped using its own
-      // scope.origin).
+      if (!qual) return;
       if (qual === scope.currentLibrary) {
         refs.add(nodeKey(scope.origin, qual, refName));
         return;
       }
       const target = lookupKnownLibrary(scope, qual);
-      if (!target) return; // unknown lib — external-library-not-included
+      if (!target) return; // unknown lib — ReferenceResolver flags
       refs.add(nodeKey(target.origin, target.libraryName, refName));
       return;
     }
@@ -337,4 +501,14 @@ export class CycleDetector {
 
 function nodeKey(origin: "local" | "package" | "root", libraryName: string, name: string): string {
   return `${origin}|${libraryName}|${name}`;
+}
+
+function formatScopedPath(display: string[]): string {
+  return display
+    .map((k) => {
+      const parts = k.split("|");
+      if (parts.length === 3) return `"${parts[1]}"."${parts[2]}"`;
+      return `"${k}"`;
+    })
+    .join(" → ");
 }

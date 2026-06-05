@@ -31,6 +31,7 @@ export type ValidationErrorKind =
   | "duplicate-name"
   | "unresolved-reference"
   | "reference-cycle"
+  | "decision-delegation-cycle"
   | "external-library-not-included"
   | "qualified-ref-unresolved";
 
@@ -60,6 +61,13 @@ export interface UnresolvedReferenceError extends ValidationErrorBase {
 export interface ReferenceCycleError extends ValidationErrorBase {
   kind: "reference-cycle";
 }
+// T02 / #96. Validator-side decision-delegation cycle. The FHIR-emitter side
+// emits a separate `circular-decision-reference` kind (see fhir-emitter/types.ts)
+// from its own SCC classification — distinct kind, distinct message shape,
+// distinct call path; callers filtering by kind may need to handle both.
+export interface DecisionDelegationCycleError extends ValidationErrorBase {
+  kind: "decision-delegation-cycle";
+}
 export interface ExternalLibraryNotIncludedError extends ValidationErrorBase {
   kind: "external-library-not-included";
   // The library name in the offending qualified ref `"<targetLibrary>"."X"`.
@@ -77,6 +85,7 @@ export type ValidationError =
   | DuplicateNameError
   | UnresolvedReferenceError
   | ReferenceCycleError
+  | DecisionDelegationCycleError
   | ExternalLibraryNotIncludedError
   | QualifiedRefUnresolvedError;
 
