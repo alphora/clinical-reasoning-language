@@ -17,7 +17,9 @@ const catalogPath = resolve(repoRoot, "features/cql-pattern-mining/results/infer
 const libraryPath = resolve(repoRoot, "cql/src/CRLPatterns.cql");
 
 const patterns = parseCatalog(readFileSync(catalogPath, "utf-8"));
-assert.ok(patterns.length >= 50, `expected >=50 catalog patterns, got ${patterns.length}`);
+// 28 after the v2.5.0 #99-sync (7 unreachable patterns commented out at source).
+// Threshold is permissive — fail if the catalog gets gutted further.
+assert.ok(patterns.length >= 25, `expected >=25 catalog patterns, got ${patterns.length}`);
 
 const library = readFileSync(libraryPath, "utf-8");
 // Match `define function "Name"(...)` — captures the name. Multiple

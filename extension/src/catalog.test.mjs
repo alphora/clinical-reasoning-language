@@ -21,8 +21,9 @@ const catalogPath = resolve(here, "../../features/cql-pattern-mining/results/inf
 const markdown = readFileSync(catalogPath, "utf-8");
 const patterns = parseCatalog(markdown);
 
-// Sanity: the catalog has ~45 patterns. Asserting a permissive lower bound.
-assert.ok(patterns.length >= 30, `expected >=30 patterns, got ${patterns.length}`);
+// Sanity: the catalog has ~28 patterns after the v2.5.0 #99-sync (7 unreachable
+// patterns commented out at source). Asserting a permissive lower bound.
+assert.ok(patterns.length >= 25, `expected >=25 patterns, got ${patterns.length}`);
 
 // Spot-check: every pattern row has all four fields populated and category text.
 for (const p of patterns) {

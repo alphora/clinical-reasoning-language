@@ -241,15 +241,21 @@ This table is the v0.5 source-of-truth. Return types are explicit. Per-card cont
 
 ### Contextualization
 
+> **#99 catalog-sync (v2.5.0)** — 4 rows below are commented out because the matcher does not yet wire them. They round-trip-fail via the #79 envelope (validate clean → emit UnmatchedNarrative sentinel). The canonical phrasings are preserved here for when the implementation lands. Tracked at #99 (umbrella).
+
 | Pattern | Narrative form | Canonical | CQL function |
 |---|---|---|---|
-| `With(X, Y)` | `<X> with <Y>` | `With(X: ConceptRef, Y: ConceptRef \| SubjectBoundPredicate)` | `CRLPatterns.With` |
+<!-- #99 deferred: shape collision with the `<X> with follow-up <Y>` (BaselineAndFollowUp) form and with bare-narrative `with` ambiguity in real corpora — needs operator design call before implementing. -->
+<!-- | `With(X, Y)` | `<X> with <Y>` | `With(X: ConceptRef, Y: ConceptRef \| SubjectBoundPredicate)` | `CRLPatterns.With` | -->
 | `AsOf(anchor, X)` | `<X> as of <anchor>` | `AsOf(anchor: AnchorExpr, X: ConceptRef)` | `CRLPatterns.AsOf` |
-| `Within(X, window)` | `<X> within <window>` — window is a named period OR a window-from-anchor | `Within(X: ConceptRef, window: ConceptRef \| WindowSpec)` | `CRLPatterns.Within` |
+<!-- #99 deferred: top-level `<X> within <window>` not wired. Embedded form (e.g. `last <X> within <Q> before start of <Y>`) works via `lastWithinBeforeStartOf` etc. -->
+<!-- | `Within(X, window)` | `<X> within <window>` — window is a named period OR a window-from-anchor | `Within(X: ConceptRef, window: ConceptRef \| WindowSpec)` | `CRLPatterns.Within` | -->
 | `ComponentOf(panel, discriminator)` | `<discriminator> component of <panel>` | `ComponentOf(panel: ConceptRef, discriminator: ConceptRef<T>)` (T from discriminator's valuetype) | `CRLPatterns.ComponentOf` |
 | `NotDoneWithReason(action, reason)` | `<action> not done with reason <reason>` (reason may be a disjunction `(<A> or <B>)`) | `NotDoneWithReason(action: ConceptRef, reason: ConceptRef \| Disjunction<ConceptRef>)` | `CRLPatterns.NotDoneWithReason` |
-| `BaselineAndFollowUp(initial, followup)` | `<initial> with follow-up <followup>` | `BaselineAndFollowUp(initial: ConceptRef, followup: ConceptRef)` | `CRLPatterns.BaselineAndFollowUp` |
-| `InpatientStay(encounter[, includePrelude])` | `inpatient stay anchored on <encounter>` (optionally `including prelude`) | `InpatientStay(encounter: ConceptRef[, includePrelude: boolean = false])` | `CRLPatterns.InpatientStay` |
+<!-- #99 deferred: shape collision with the broader `<X> with <Y>` (With) form. -->
+<!-- | `BaselineAndFollowUp(initial, followup)` | `<initial> with follow-up <followup>` | `BaselineAndFollowUp(initial: ConceptRef, followup: ConceptRef)` | `CRLPatterns.BaselineAndFollowUp` | -->
+<!-- #99 deferred: 5+ element narrative not wired in matcher; needs the `inpatient stay anchored on <X> [including prelude]` form added. -->
+<!-- | `InpatientStay(encounter[, includePrelude])` | `inpatient stay anchored on <encounter>` (optionally `including prelude`) | `InpatientStay(encounter: ConceptRef[, includePrelude: boolean = false])` | `CRLPatterns.InpatientStay` | -->
 | `WasOrdered(X)` | `<X> ordered` | `WasOrdered(X: ConceptRef)` | `CRLPatterns.WasOrdered` |
 
 ### Assertion
@@ -276,7 +282,8 @@ Selection patterns (`MostRecent`, `Last`, `Earliest`, `First`) return an `Instan
 | `OnDayOfOrAfter(X, anchor)` | `<X> on day of or after <anchor>` | `OnDayOfOrAfter(X: ConceptRef, anchor: ConceptRef)` | `CRLPatterns.OnDayOfOrAfter` |
 | `OnOrBefore(X, anchor)` | `<X> on or before <anchor>` | `OnOrBefore(X: ConceptRef, anchor: ConceptRef)` | `CRLPatterns.OnOrBefore` |
 | `SameDay(eventA, eventB)` | `<eventA> same day as <eventB>` | `SameDay(eventA: ConceptRef, eventB: ConceptRef)` | `CRLPatterns.SameDay` |
-| `BetweenAnchors(X, start, end)` | `<X> between <start> and <end>` (start/end are concept refs — see dispatch rule) | `BetweenAnchors(X: ConceptRef, start: ConceptRef, end: ConceptRef)` | `CRLPatterns.BetweenAnchors` |
+<!-- #99 deferred: shape collision with `Between(value, lo, hi)` — dispatch needs operator-call disambiguation between Quantity-vs-ConceptRef args. -->
+<!-- | `BetweenAnchors(X, start, end)` | `<X> between <start> and <end>` (start/end are concept refs — see dispatch rule) | `BetweenAnchors(X: ConceptRef, start: ConceptRef, end: ConceptRef)` | `CRLPatterns.BetweenAnchors` | -->
 | `AtLeastApart(eventA, eventB, duration)` | `<eventA> and <eventB> at least <duration> apart` | `AtLeastApart(eventA: ConceptRef, eventB: ConceptRef, duration: Quantity<time>)` | `CRLPatterns.AtLeastApart` |
 | `AtMostApart(eventA, eventB, duration)` | `<eventA> and <eventB> at most <duration> apart` | `AtMostApart(eventA: ConceptRef, eventB: ConceptRef, duration: Quantity<time>)` | `CRLPatterns.AtMostApart` |
 
@@ -306,8 +313,10 @@ A parameterized umbrella for windowed-from-anchor temporal scopes. Used as the `
 | `Calculate(X)` | `calculated <X>` | `Calculate(X: ConceptRef<Quantity<U>>)` (input-list shape thin; see card) | `CRLPatterns.Calculate` |
 | `Lowest(X[, scope])` | `lowest <X>` (optionally `<scope>`) | `Lowest(X: ConceptRef<Quantity<U>>[, scope: ScopeSpec])` | `CRLPatterns.Lowest` |
 | `Highest(X[, scope])` | `highest <X>` (optionally `<scope>`) | `Highest(X: ConceptRef<Quantity<U>>[, scope: ScopeSpec])` | `CRLPatterns.Highest` |
-| `AtLeastN(events, n)` | `at least <n> <events>` | `AtLeastN(events: ConceptRef, n: Integer)` | `CRLPatterns.AtLeastN` |
-| `Consecutive(events, n)` | `<n> consecutive <events>` | `Consecutive(events: ConceptRef, n: Integer)` | `CRLPatterns.Consecutive` |
+<!-- #83 grammar gap: bare integer + concept ref fails at parse (NUMBER currently requires a UCUM unit). Needs `narrativeElement` to accept a bare NUMBER alongside `quantity`. Tracked at #83. -->
+<!-- | `AtLeastN(events, n)` | `at least <n> <events>` | `AtLeastN(events: ConceptRef, n: Integer)` | `CRLPatterns.AtLeastN` | -->
+<!-- #83 grammar gap: leading integer parsed as start of a value-threshold quantity; `consecutive` is unexpected. -->
+<!-- | `Consecutive(events, n)` | `<n> consecutive <events>` | `Consecutive(events: ConceptRef, n: Integer)` | `CRLPatterns.Consecutive` | -->
 | `High(X)` | `<X> high` | `High(X: ConceptRef<Quantity>)` | `CRLPatterns.High` |
 | `Low(X)` | `<X> low` | `Low(X: ConceptRef<Quantity>)` | `CRLPatterns.Low` |
 | `Normal(X)` | `<X> normal` | `Normal(X: ConceptRef<Quantity>)` | `CRLPatterns.Normal` |
