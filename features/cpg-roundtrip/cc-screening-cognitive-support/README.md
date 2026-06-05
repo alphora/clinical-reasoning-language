@@ -68,14 +68,15 @@ features/cpg-roundtrip/cc-screening-cognitive-support/
 
 ## Deliberate deviations from the example
 
-Captured in memory (`C:\Users\Owner\.claude\projects\d--src-clinical-reasoning-language\memory\`):
+The round-trip test (`src/fhir-emitter/tests/ccScreeningRoundTrip.test.ts` — wired post-Todo-3-impl) compares loose shape (resource count by profile type, library bindings, cross-canonical resolution, type coding), NOT byte-equality. It explicitly accepts the following deviations:
+
+### Project-wide rules
 
 - **`feedback_no-version-on-emitted-artifacts`** — CRL emit strips
   `version` from every resource; npm package owns the version. Expect
   to see `version: "0.0.3"` etc. in the expected-fhir/ files (these
   are the example's hand-authored values); CRL emit will produce
-  resources without that field. This is a deliberate deviation that
-  round-trip validation accepts.
+  resources without that field.
 
 - **`project_strategy-target-profile-spec-deviation`** —
   `cpg-strategydefinition.action.definition[x]` is constrained to
@@ -84,13 +85,70 @@ Captured in memory (`C:\Users\Owner\.claude\projects\d--src-clinical-reasoning-l
   by referencing publishable-only sub-decisions. Operator is working
   to amend the spec.
 
+- **`knowledgeCapability#executable` omitted by CRL emit** — example
+  resources claim 4 (shareable + computable + executable + publishable);
+  CRL emit claims 3 (drops `executable` per round-2 Gemini finding —
+  overclaim; many CRL-emitted plans aren't auto-executable end-to-end).
+  Round-trip accepts the count difference.
+
+### Structural drifts (CRL v0 vs cc-screening example)
+
+**Drift A — Recommendation 1:1 vs example's 1:N.**
+Each expected Recommendation PlanDef in the example (e.g.
+`cc-screening-recommendation-definition-colonoscopy.json`) contains
+**4 sibling actions, one per alternative activity** (FIT DNA,
+Colonoscopy, CT Colonography, Sigmoidoscopy), with the
+`cpg-option-recommended: true` extension flagging the named one.
+Different decision-tree paths point at different "menu-with-highlight"
+Recommendations. CRL v0's grammar has no syntax for alternative
+groups → each CRL `activity X` declaration emits a separate
+Recommendation PlanDef containing ONE wrapping action pointing at X.
+This produces a structurally different shape: the example has 4
+Recommendations × 4 actions each = 16 actions; CRL v0 emits 4
+Recommendations × 1 action each = 4 actions. **Round-trip accepts**
+this difference (comparator does NOT check action counts inside
+Recommendations). When CRL grammar grows alternative-group syntax,
+emit can shift to 1:N to match.
+
+**Drift B — Strategy emits 1 top-level action; example has 2.**
+The example's `cc-screening-strategy-definition.json` has two
+top-level actions: `Inclusion Criteria` → decisiontree AND
+`Exclusion Criteria` → `cc-screening-no-recommendation-definition`.
+The CRL omits the Exclusion branch because its target (`no-recommendation`)
+has an empty decision body in the example, which is not parseable by
+the CRL grammar (`decisionBody : whenBlock+` requires ≥1 when block).
+The CRL emit produces a Strategy with 1 top-level action (Inclusion
+branch only). **Round-trip accepts**; when CRL grammar adds support
+for "no-op" decisions (or the example is rewritten with a non-empty
+exclusion path), this can match.
+
+**Drift C — Input-wrapper actions in the decisiontree are absent in CRL emit.**
+The expected `cc-screening-decisiontree-definition.json` interleaves
+a layer of "Input" actions (e.g. "Coverage Concern Input") before
+each `Has X / No X` branching pair. These Input actions carry
+`action.input[]` entries with the `cpg-featureExpression` extension
+pointing at a CaseFeature CQL expression. CRL has no syntax for these
+Input/featureExpression wrappers in v0 (concepts → CaseFeature
+emit is the Homeostasis lane, deferred). CRL emit produces a flat
+decision tree without the Input wrapper layer. **Round-trip accepts**;
+Homeostasis lane will land this layer in a future Todo.
+
+**Drift D — Recommendation library binding.**
+The example's Recommendation PlanDefs bind `library` to
+`ColorectalCancerCaseFeatures` (the CaseFeature library) since their
+applicability conditions evaluate CaseFeature expressions. CRL v0
+emits all CQL into ONE library per CRL `library` declaration → the
+Recommendation's `library[0]` points at the single emitted Library
+canonical URL. **Round-trip accepts**; when the Homeostasis lane
+splits CaseFeatures into a sibling library, this binding can match.
+
 ## Resource correspondence table
 
 | Expected-FHIR resource | CRL representation | Emitted by |
 |---|---|---|
 | `plandefinition/cc-screening-strategy-definition.json` | `decision "Colorectal Cancer Screening Strategy":` (root) | Todo 3 — Strategy PlanDef |
 | `plandefinition/cc-screening-decisiontree-definition.json` | `decision "Colorectal Cancer Screening Decision":` (sub) | Todo 3 — Sub-decision PlanDef |
-| `plandefinition/cc-screening-no-recommendation-definition.json` | *(NO CRL representation in v0 — empty body unparseable per `decisionBody : whenBlock+`)* | — |
+| `plandefinition/cc-screening-no-recommendation-definition.json` | *(NO CRL representation in v0 — empty body unparseable per `decisionBody : whenBlock+`; see Drift B)* | — |
 | `plandefinition/cc-screening-recommendation-definition-<name>.json` (×4) | one per `activity "X":` declaration | Todo 3 — Recommendation PlanDef wrapping each Activity |
 | `activitydefinition/cc-cds-<name>.json` (×4) | one per `activity "X":` declaration | Todo 2b — already shipped |
 | `library/ColorectalCancerRecommendation.json` | the library's emitted CQL library + ValueSet declarations | Todo 2a — Library shipped + Todo 1 ValueSet shipped |
