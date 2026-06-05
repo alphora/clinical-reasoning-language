@@ -36,7 +36,7 @@
  */
 
 import type { Activity, Concept, Decision, ReferenceName, Terminology, WhenBlock } from "../ast/types";
-import { getRefLibrary, getRefName, isQualifiedRef, refDisplay } from "../ast/types";
+import { getRefLibrary, getRefName, isQualifiedRef } from "../ast/types";
 import { computeFhirEmitClosure } from "../imports/computeEmitClosure";
 import { safeOutputFilename } from "../imports/safeOutputFilename";
 import { resolveImports } from "../imports/index";
@@ -48,6 +48,7 @@ import { emitDecisionPlanDefinition, type ActivityResolver, type ConceptResolver
 import { emitLibrary } from "./library";
 import { readPackageMetadata } from "./metadata";
 import { emitRecommendationDefinitionsForLibrary } from "./recommendation";
+import { isFhirDefError } from "./types";
 import type { CpgMetadata, EmitOptions, EmittedResource, UnmatchedReference } from "./types";
 import { emitValueSetsForLibrary } from "./valueSet";
 
@@ -523,7 +524,20 @@ export function emitFhirDefClosure(
       const concepts = statements.filter((s): s is Concept => s.type === "Concept");
       const decisions = statements.filter((s): s is Decision => s.type === "Decision");
       const terminologies = statements.filter((s): s is Terminology => s.type === "Terminology");
-      const cqlFileName = `../../cql/${safeOutputFilename(libraryName)}`;
+      let cqlFileName: string;
+      try {
+        cqlFileName = `../../cql/${safeOutputFilename(libraryName)}`;
+      } catch (e) {
+        // Round-5 Claude [important]: unsafe library names can throw out
+        // of safeOutputFilename. Surface as a structured CRLError instead
+        // of crashing the orchestrator boundary.
+        errors.push({
+          type: "Validation",
+          kind: "unsafe-library-filename",
+          message: `Library "${libraryName}" cannot be safely written as a CQL filename: ${(e as Error).message}`,
+        });
+        cqlFileName = `../../cql/${libraryName}.cql`; // best-effort placeholder; the error already flagged
+      }
       return { libraryName, ast: entry.ast, activities, concepts, decisions, terminologies, cqlFileName };
     });
 
@@ -617,8 +631,10 @@ export function emitFhirDefClosure(
   const inv3errors = applyInvariant3(inv1.surviving, inv1.droppedPaths);
   errors.push(...inv2errors, ...inv3errors);
 
-  const success =
-    errors.length === 0 && unmatched.length === 0;
+  // Round-5 gpt55 [important]: severity-aware success (warnings don't sink
+  // success). Hard errors (non-warning CRLErrors) + any unmatched still flip
+  // success to false; warning-kind errors do not.
+  const success = errors.filter(isFhirDefError).length === 0 && unmatched.length === 0;
 
   return {
     success,
@@ -661,8 +677,14 @@ export function emitFhirDefFromPath(
   }
 
   const closureResult = emitFhirDefClosure(graph, metadata, opts);
+  // Round-5 gpt55 [important]: fold importDiagnostics + metadataErrors
+  // into success. Otherwise MCP can return success:true with fatal
+  // import-time errors.
+  const importErrors = graph.diagnostics.filter((d) => d.severity === "error");
+  const success = closureResult.success && metadataErrors.length === 0 && importErrors.length === 0;
   return {
     ...closureResult,
+    success,
     importDiagnostics: graph.diagnostics,
     metadataErrors,
   };

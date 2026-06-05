@@ -106,7 +106,11 @@ if (filePath.toLowerCase().endsWith(".cel") && target === "fhir-def") {
   process.exit(1);
 }
 
-// .crl + --target fhir-def: closure orchestrator path.
+// .crl + --target fhir-def: closure orchestrator path. Writes BOTH the
+// CQL closure AND the FHIR-def resources, because the emitted Library
+// resources' content[0].attachment.url points at the sibling CQL file
+// at `../../cql/<name>.cql` — emitting one without the other ships
+// broken Library references (round-5 gpt55 [critical]).
 if (filePath.toLowerCase().endsWith(".crl") && target === "fhir-def") {
   const result = emitFhirDefFromPath(filePath);
 
@@ -131,19 +135,68 @@ if (filePath.toLowerCase().endsWith(".crl") && target === "fhir-def") {
     process.exit(1);
   }
 
-  // Resources land at <out-dir>/fhir/<rt>/<id>.json per plan v3.2 layout.
-  const fhirOutDir = path.join(outDir, "fhir");
-  try {
-    mkdirSync(fhirOutDir, { recursive: true });
-  } catch (e) {
-    process.stderr.write(`Failed to create output directory "${fhirOutDir}": ${(e as Error).message}\n`);
+  // ── CQL side ──
+  const cqlResult = emitCQLImports(filePath);
+  if (!cqlResult.success) {
+    process.stderr.write(
+      JSON.stringify(
+        { stage: "cql-emit", importDiagnostics: cqlResult.importDiagnostics, errors: cqlResult.errors },
+        null,
+        2,
+      ) + "\n",
+    );
     process.exit(1);
   }
-  const written = writeFhirResources({ success: true, resources: result.resources }, fhirOutDir);
+  // Pre-check filename collisions before writing anything.
+  const seenCqlFilenames = new Set<string>();
+  for (const entry of cqlResult.cqlByLibrary) {
+    if (seenCqlFilenames.has(entry.outputFilename)) {
+      process.stderr.write(
+        `Filename collision: multiple CQL libraries would write to "${entry.outputFilename}"\n`,
+      );
+      process.exit(1);
+    }
+    seenCqlFilenames.add(entry.outputFilename);
+  }
+
+  const cqlOutDir = path.join(outDir, "cql");
+  const fhirOutDir = path.join(outDir, "fhir");
+  try {
+    mkdirSync(cqlOutDir, { recursive: true });
+    mkdirSync(fhirOutDir, { recursive: true });
+  } catch (e) {
+    process.stderr.write(`Failed to create output directory: ${(e as Error).message}\n`);
+    process.exit(1);
+  }
+
+  const writtenCql: string[] = [];
+  for (const entry of cqlResult.cqlByLibrary) {
+    const outPath = path.join(cqlOutDir, entry.outputFilename);
+    try {
+      writeFileSync(outPath, entry.cql, "utf-8");
+      writtenCql.push(outPath);
+    } catch (e) {
+      process.stderr.write(`Failed to write ${outPath}: ${(e as Error).message}\n`);
+      process.exit(1);
+    }
+  }
+
+  // ── FHIR side ──
+  let writtenFhir: string[];
+  try {
+    writtenFhir = writeFhirResources({ success: true, resources: result.resources }, fhirOutDir);
+  } catch (e) {
+    process.stderr.write(`Failed to write FHIR resources: ${(e as Error).message}\n`);
+    process.exit(1);
+  }
+
   if (!quiet) {
-    for (const p of written) process.stdout.write(`wrote ${p}\n`);
+    for (const p of writtenCql) process.stdout.write(`wrote ${p}\n`);
+    for (const p of writtenFhir) process.stdout.write(`wrote ${p}\n`);
   } else {
-    process.stdout.write(`wrote ${written.length} resource(s) under ${fhirOutDir}\n`);
+    process.stdout.write(
+      `wrote ${writtenCql.length} CQL + ${writtenFhir.length} FHIR resource(s) under ${outDir}\n`,
+    );
   }
 
   if (warnings.length > 0 || result.unmatched.length > 0) {
