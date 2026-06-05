@@ -99,11 +99,15 @@ export {
   emitRecommendationDefinitionsForLibrary,
   emitDecisionPlanDefinition,
   emitDecisionPlanDefinitionsForLibrary,
+  emitFhirDefFromPath,
+  isFhirDefError,
+  isFhirDefWarning,
   writeFhirResources,
   type TerminologyResolver,
   type ConceptResolver,
   type ActivityResolver,
   type DecisionResolver,
+  type FhirDefFromPathResult,
 } from "./fhir-emitter";
 export type {
   CpgMetadata,

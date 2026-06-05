@@ -9,6 +9,9 @@ import {
   validateCRLImports,
   validateCELFile,
   emitCQL,
+  emitCelToFhir,
+  resolveCelImports,
+  emitFhirDefFromPath,
 } from "@smile-digital-health/crl";
 import type { ImportDiagnostic } from "@smile-digital-health/crl";
 
@@ -389,7 +392,150 @@ function createServer(): McpServer {
     (args) => runEmit(args as EmitArgs)
   );
 
+  server.registerTool(
+    "emit_crl_fhir",
+    {
+      title: "Emit FHIR Definition Resources from CRL",
+      description:
+        "Emit cpg-conformant FHIR Definition resources (ValueSet, Library, ActivityDefinition, PlanDefinition) from a CRL document. " +
+        "Closure walks from the file's nearest package.json. Returns a SUMMARY envelope by default to keep tool output small: " +
+        "`{ success, resourceCount, resourceManifest:[{resourceType, id, relativePath, sourceKind, sourceName}], errors, unmatched, importDiagnostics, metadataErrors }`. " +
+        "Pass `includeResources: true` to also receive the full `resources[]` array (each with the full FHIR JSON). " +
+        "The npm package owns the version — emitted resources carry NO `version` field. " +
+        "Decision actions using the CRL `any:` qualifier emit a `crl-logical-switch` extension URL whose corresponding StructureDefinition is not yet shipped (pending CPG ballot); strict validators may require an ignore-list for the URL until then. " +
+        "Cross-library concept/terminology refs are unsupported in v0 (cascade-suppression surfaces via unresolved-* UnmatchedReference). Same-library qualified refs `\"CurrentLib\".\"X\"` still resolve. " +
+        "Deliberate spec deviation: PlanDefinitions reference publishable-only sub-decisions via action.definitionCanonical (the published cpg-strategydefinition target-profile constraint is wrong; operator is amending the spec).",
+      inputSchema: {
+        path: z.string().min(1).describe("Absolute path to a .crl file. Imports walk to nearest package.json."),
+        includeResources: z
+          .boolean()
+          .optional()
+          .describe("Include the full resources[] array in the result. Default false (summary only)."),
+      },
+    },
+    (args) => runEmitCrlFhir(args as { path: string; includeResources?: boolean })
+  );
+
+  server.registerTool(
+    "emit_cel",
+    {
+      title: "Emit FHIR Instance Resources from CEL",
+      description:
+        "Emit FHIR instance resources (Patient + 1-per-fact-reference per case) from a CEL (Case Example Language) document. " +
+        "Pass `path` (an absolute .cel file path); the resolver walks to the nearest package.json to load the covered CRL closure. " +
+        "Returns a SUMMARY envelope by default: " +
+        "`{ success, caseCount, resourceCount, caseManifest:[{caseSlug, librarySlug, resourceCount}], resourceManifest:[{caseSlug, resourceType, id, outputPath}], diagnostics }`. " +
+        "Pass `includeResources: true` to also receive the full `emittedCases[]` array (each case's full FHIR JSON bodies). " +
+        "success is true iff there are zero error-severity diagnostics; `unsupported-yet`, `result-deferred`, and `precondition-failed` (when not error) are warnings, surfaced but non-fatal. " +
+        "Diagnostic kinds: unsupported-yet (fact's `defined by` couldn't derive a bare FHIR type — case skipped), " +
+        "result-deferred (`result is` parsed but not emitted, deferred to #70/metric), " +
+        "precondition-failed (parse error / unresolved covers / etc. — case skipped).",
+      inputSchema: {
+        path: z.string().min(1).describe("Absolute path to a .cel file. Imports walk to nearest package.json."),
+        includeResources: z
+          .boolean()
+          .optional()
+          .describe("Include the full emittedCases[] array (with resource bodies). Default false (summary only)."),
+      },
+    },
+    (args) => runEmitCel(args as { path: string; includeResources?: boolean })
+  );
+
   return server;
+}
+
+function runEmitCrlFhir(args: { path: string; includeResources?: boolean }): {
+  content: Array<{ type: "text"; text: string }>;
+  isError?: boolean;
+} {
+  let stat;
+  try {
+    stat = statSync(args.path);
+  } catch {
+    return {
+      content: [{ type: "text", text: `Path "${args.path}" not readable.` }],
+      isError: true,
+    };
+  }
+  if (!stat.isFile()) {
+    return {
+      content: [{ type: "text", text: `Path "${args.path}" is not a file.` }],
+      isError: true,
+    };
+  }
+
+  const result = emitFhirDefFromPath(args.path);
+  const summary = {
+    success: result.success,
+    resourceCount: result.resources.length,
+    resourceManifest: result.resources.map((r) => ({
+      resourceType: r.resourceType,
+      id: (r.resource as { id?: string }).id ?? null,
+      relativePath: r.relativePath,
+      sourceKind: r.sourceKind,
+      sourceName: r.sourceName,
+    })),
+    errors: result.errors,
+    unmatched: result.unmatched,
+    importDiagnostics: result.importDiagnostics,
+    metadataErrors: result.metadataErrors,
+    ...(args.includeResources ? { resources: result.resources } : {}),
+  };
+
+  return {
+    content: [{ type: "text", text: JSON.stringify(summary, null, 2) }],
+  };
+}
+
+function runEmitCel(args: { path: string; includeResources?: boolean }): {
+  content: Array<{ type: "text"; text: string }>;
+  isError?: boolean;
+} {
+  let stat;
+  try {
+    stat = statSync(args.path);
+  } catch {
+    return {
+      content: [{ type: "text", text: `Path "${args.path}" not readable.` }],
+      isError: true,
+    };
+  }
+  if (!stat.isFile()) {
+    return {
+      content: [{ type: "text", text: `Path "${args.path}" is not a file.` }],
+      isError: true,
+    };
+  }
+
+  const graph = resolveCelImports(args.path);
+  const result = emitCelToFhir(graph);
+  const hasErrors = result.diagnostics.some((d) => d.severity === "error");
+
+  const resourceCount = result.emittedCases.reduce((n, c) => n + c.resources.length, 0);
+  const summary = {
+    success: !hasErrors,
+    caseCount: result.emittedCases.length,
+    resourceCount,
+    caseManifest: result.emittedCases.map((c) => ({
+      caseSlug: c.caseSlug,
+      librarySlug: c.librarySlug,
+      resourceCount: c.resources.length,
+    })),
+    resourceManifest: result.emittedCases.flatMap((c) =>
+      c.resources.map((r) => ({
+        caseSlug: c.caseSlug,
+        resourceType: r.resourceType,
+        id: r.id,
+        outputPath: r.outputPath,
+      }))
+    ),
+    diagnostics: result.diagnostics,
+    ...(args.includeResources ? { emittedCases: result.emittedCases } : {}),
+  };
+
+  return {
+    content: [{ type: "text", text: JSON.stringify(summary, null, 2) }],
+  };
 }
 
 async function main(): Promise<void> {

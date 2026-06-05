@@ -32,10 +32,18 @@ const check = async (label, fn) => {
 
 await client.connect(transport);
 try {
-  await check("MCP tools: build_crl_ast, tokenize_crl, validate_crl, validate_cel, emit_cql", async () => {
+  await check("MCP tools: 7 registered (tokenize_crl, build_crl_ast, validate_crl, validate_cel, emit_cql, emit_crl_fhir, emit_cel)", async () => {
     const { tools } = await client.listTools();
     const names = tools.map((t) => t.name).sort();
-    assert.deepEqual(names, ["build_crl_ast", "emit_cql", "tokenize_crl", "validate_cel", "validate_crl"]);
+    assert.deepEqual(names, [
+      "build_crl_ast",
+      "emit_cel",
+      "emit_cql",
+      "emit_crl_fhir",
+      "tokenize_crl",
+      "validate_cel",
+      "validate_crl",
+    ]);
   });
 
   await check("validate_cel via path → cms22.cel validates clean", async () => {
