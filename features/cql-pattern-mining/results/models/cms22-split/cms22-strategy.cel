@@ -70,4 +70,4 @@ case "Robert: hypertensive reading triggers antihypertensive recommendation":
 - fact is "Hypertensive BP Reading".
 - fact is "Hypertensive Systolic".
 - fact is "Hypertensive Diastolic".
-- result is "CMS22 BP Control Strategy" is "Antihypertensive Medication".
+- result is "Recommend Hypertension Intervention" is "Antihypertensive Medication".

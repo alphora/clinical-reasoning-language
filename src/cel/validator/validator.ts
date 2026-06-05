@@ -1,5 +1,16 @@
 import { conceptTypes, type ConceptType } from "../../grammar/conceptTypes";
-import { isQualifiedRef, getRefName, getRefLibrary, type Location, type Statement } from "../../ast/types";
+import {
+  isQualifiedRef,
+  getRefName,
+  getRefLibrary,
+  type Decision,
+  type WhenBlock,
+  type WhenBlockBody,
+  type BlockBody,
+  type ActionStatement,
+  type Location,
+  type Statement,
+} from "../../ast/types";
 import { resolveCelImports, type ResolveCelImportsOptions } from "../imports";
 import type { ResolvedCelGraph } from "../imports/types";
 import type { CEL, CELFact, CELCase, CELDefinedByField, CELResultField, CELFactRefField, CELCrossResourceField, CELInclude } from "../ast/types";
@@ -369,6 +380,57 @@ function validateCrossResource(
   }
 }
 
+/**
+ * T03 / #86: collect the set of bare names a CEL `result is "<D>" is "<X>"`
+ * branch may target — the DIRECT arms of decision D. An arm is the bare
+ * name of either a `recommend activity` target or a `use decision` target.
+ * No transitive walk through sub-decisions: the branch identifies what
+ * D's case landed at, not which leaves are eventually reachable.
+ *
+ * Mirrors the decision-body walk shape in src/validator/referenceResolver.ts:283-323
+ * and src/validator/cycleDetector.ts (T02).
+ */
+function collectDecisionArms(decision: Decision): Set<string> {
+  const arms = new Set<string>();
+  for (const wb of decision.body.statements) {
+    walkArmsWhenBlock(wb, arms);
+  }
+  return arms;
+}
+
+function walkArmsWhenBlock(wb: WhenBlock, arms: Set<string>): void {
+  walkArmsWhenBlockBody(wb.body, arms);
+}
+
+function walkArmsWhenBlockBody(body: WhenBlockBody, arms: Set<string>): void {
+  if (body.type === "BlockBody") {
+    walkArmsBlockBody(body, arms);
+  } else {
+    walkArmsActionStatement(body as ActionStatement, arms);
+  }
+}
+
+function walkArmsBlockBody(block: BlockBody, arms: Set<string>): void {
+  for (const stmt of block.statements) {
+    if (stmt.type === "WhenBlock") {
+      walkArmsWhenBlock(stmt, arms);
+    } else {
+      walkArmsActionStatement(stmt, arms);
+    }
+  }
+}
+
+function walkArmsActionStatement(stmt: ActionStatement, arms: Set<string>): void {
+  const action = stmt.action;
+  if (action.type === "RecommendActivity") {
+    const n = getRefName(action.activityName);
+    if (n) arms.add(n);
+  } else if (action.type === "UseDecision") {
+    const n = getRefName(action.decisionName);
+    if (n) arms.add(n);
+  }
+}
+
 function validateResult(
   cb: CELResultField,
   leafCandidates: Map<string, Statement>,
@@ -402,6 +464,28 @@ function validateResult(
           fp,
         ),
       );
+    } else {
+      // T03 / #86: cross-check the branch string against the decision's
+      // reachable arms (direct RecommendActivity.activityName +
+      // UseDecision.decisionName). No transitive walk — a `use decision "D1"`
+      // arm of D7 makes "D1" a valid branch for D7, but D1's own arms are
+      // NOT valid branches for D7. Per issue #86's "real but unreachable
+      // arm" example.
+      const arms = collectDecisionArms(leaf as Decision);
+      if (!arms.has(cb.value.branchName)) {
+        errors.push(
+          err(
+            "unresolved-result-branch",
+            `Result branch "${cb.value.branchName}" in case "${caseName}" is not a reachable arm of decision "${cb.leafName}". Reachable arms: ${
+              arms.size === 0
+                ? "(none)"
+                : Array.from(arms).sort().map((a) => `"${a}"`).join(", ")
+            }.`,
+            cb.value.location,
+            fp,
+          ),
+        );
+      }
     }
   } else if (leaf.type === "Concept") {
     if (cb.value.type !== "CELBooleanResult") {

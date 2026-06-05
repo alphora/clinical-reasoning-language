@@ -56,4 +56,4 @@ case "Jane: documented high BMI triggers weight-assessment-referral recommendati
 - fact is "Wellness Visit".
 - fact is "Documented High BMI".
 - fact is "Overweight Diagnosis".
-- result is "CMS69 BMI Screening Strategy" is "Order Weight Assessment Referral".
+- result is "Recommend High BMI Intervention" is "Order Weight Assessment Referral".

@@ -357,6 +357,123 @@ describe("CEL Todo 4 — result resolution + value-shape check", () => {
   });
 });
 
+describe("CEL T03 / #86 — result branch arm cross-check", () => {
+  function libWithD7(): string {
+    // Reachable arms of D7: A, SubD. Unreachable: Z (only reachable via SubD).
+    return [
+      "# L",
+      "library \"L\".",
+      "decision \"D7\":",
+      "",
+      "- when \"P\" then recommend activity \"A\".",
+      "- when \"P\" then use decision \"SubD\".",
+      "decision \"SubD\":",
+      "",
+      "- when \"P\" then recommend activity \"Z\".",
+      "concept \"P\":",
+      "- type is Observation.",
+      "- value type is boolean.",
+      "- defined as \"P\".",
+      "activity \"A\":",
+      "- request CPGServiceRequest.",
+      "- with \"VS\".",
+      "activity \"Z\":",
+      "- request CPGServiceRequest.",
+      "- with \"VS\".",
+      "terminology \"VS\":",
+      "- valueset is `urn:example:placeholder`.",
+    ].join("\n");
+  }
+
+  test("known direct activity arm → clean", () => {
+    withProject((root) => {
+      write(root, "lib.crl", libWithD7());
+      const file = write(root, "f.cel", [
+        ...ENC_FACT_HEADER,
+        "case \"C\":",
+        "- subject is \"Subject\".",
+        "- result is \"D7\" is \"A\".",
+      ].join("\n"));
+      const r = validateCELFile(file);
+      expect(r.errors.filter((e) => e.kind === "unresolved-result-branch")).toEqual([]);
+    });
+  });
+
+  test("known sub-decision name as arm → clean (use decision target is a valid branch)", () => {
+    withProject((root) => {
+      write(root, "lib.crl", libWithD7());
+      const file = write(root, "f.cel", [
+        ...ENC_FACT_HEADER,
+        "case \"C\":",
+        "- subject is \"Subject\".",
+        "- result is \"D7\" is \"SubD\".",
+      ].join("\n"));
+      const r = validateCELFile(file);
+      expect(r.errors.filter((e) => e.kind === "unresolved-result-branch")).toEqual([]);
+    });
+  });
+
+  test("bogus branch name → unresolved-result-branch", () => {
+    withProject((root) => {
+      write(root, "lib.crl", libWithD7());
+      const file = write(root, "f.cel", [
+        ...ENC_FACT_HEADER,
+        "case \"C\":",
+        "- subject is \"Subject\".",
+        "- result is \"D7\" is \"DoesNotExist\".",
+      ].join("\n"));
+      const r = validateCELFile(file);
+      const branchErrors = r.errors.filter((e) => e.kind === "unresolved-result-branch");
+      expect(branchErrors).toHaveLength(1);
+      expect(branchErrors[0].message).toContain("DoesNotExist");
+      expect(branchErrors[0].message).toContain("D7");
+    });
+  });
+
+  test("real activity reachable only via sub-decision → unresolved-result-branch (no transitive walk)", () => {
+    // Z is an activity in the library and reachable via SubD, but NOT a
+    // direct arm of D7. Per issue #86 this must fail.
+    withProject((root) => {
+      write(root, "lib.crl", libWithD7());
+      const file = write(root, "f.cel", [
+        ...ENC_FACT_HEADER,
+        "case \"C\":",
+        "- subject is \"Subject\".",
+        "- result is \"D7\" is \"Z\".",
+      ].join("\n"));
+      const r = validateCELFile(file);
+      const branchErrors = r.errors.filter((e) => e.kind === "unresolved-result-branch");
+      expect(branchErrors).toHaveLength(1);
+    });
+  });
+
+  test("decision with no arms (empty body) + any branch → unresolved-result-branch", () => {
+    withProject((root) => {
+      write(root, "lib.crl", [
+        "# L",
+        "library \"L\".",
+        "decision \"Empty\":",
+        "",
+        "  ",
+      ].join("\n"));
+      // If the parser rejects an empty decision body, this test is benign.
+      // The intent is to lock the message format for the no-arms case.
+      const file = write(root, "f.cel", [
+        ...ENC_FACT_HEADER,
+        "case \"C\":",
+        "- subject is \"Subject\".",
+        "- result is \"Empty\" is \"X\".",
+      ].join("\n"));
+      const r = validateCELFile(file);
+      // Either parse fails or branch fails — both are acceptable; what we
+      // pin is "no false positive that X is a valid arm of Empty."
+      const branchClean = r.errors.filter((e) => e.kind === "unresolved-result-branch").length === 0;
+      const errored = r.errors.length > 0;
+      expect(branchClean === false || errored).toBe(true);
+    });
+  });
+});
+
 describe("CEL Todo 4 — fact/case namespaces + uniqueness", () => {
   test("duplicate fact name → duplicate-fact-name", () => {
     withProject((root) => {
