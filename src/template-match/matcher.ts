@@ -613,6 +613,60 @@ const lastWithinBeforeStartOf: PatternMatcher = (els, loc) => {
   return makeCall("Last", [conceptRefArg(els[1]), nestedArg(scope)], loc);
 };
 
+/** `last <X> within <Q> after end of <Y>` → Last(X, AfterEndOf(Q, Y))   — T08 / #98 */
+const lastWithinAfterEndOf: PatternMatcher = (els, loc) => {
+  if (els.length !== 8) return null;
+  if (!isWord(els[0], "last")) return null;
+  if (!isConceptRef(els[1])) return null;
+  if (!isWord(els[2], "within")) return null;
+  if (!isQuantity(els[3])) return null;
+  const after = matchWords(els, 4, ["after", "end", "of"]);
+  if (after === null) return null;
+  if (!isConceptRef(els[after])) return null;
+  const scope = makeCall(
+    "AfterEndOf",
+    [quantityArg(els[3]), conceptRefArg(els[after] as NConceptRef)],
+    loc,
+  );
+  return makeCall("Last", [conceptRefArg(els[1]), nestedArg(scope)], loc);
+};
+
+/** `last <X> within <Q> after start of <Y>` → Last(X, AfterStartOf(Q, Y)) — T08 / #98 */
+const lastWithinAfterStartOf: PatternMatcher = (els, loc) => {
+  if (els.length !== 8) return null;
+  if (!isWord(els[0], "last")) return null;
+  if (!isConceptRef(els[1])) return null;
+  if (!isWord(els[2], "within")) return null;
+  if (!isQuantity(els[3])) return null;
+  const after = matchWords(els, 4, ["after", "start", "of"]);
+  if (after === null) return null;
+  if (!isConceptRef(els[after])) return null;
+  const scope = makeCall(
+    "AfterStartOf",
+    [quantityArg(els[3]), conceptRefArg(els[after] as NConceptRef)],
+    loc,
+  );
+  return makeCall("Last", [conceptRefArg(els[1]), nestedArg(scope)], loc);
+};
+
+/** `last <X> within <Q> before end of <Y>` → Last(X, BeforeEndOf(Q, Y)) — T08 / #98 */
+const lastWithinBeforeEndOf: PatternMatcher = (els, loc) => {
+  if (els.length !== 8) return null;
+  if (!isWord(els[0], "last")) return null;
+  if (!isConceptRef(els[1])) return null;
+  if (!isWord(els[2], "within")) return null;
+  if (!isQuantity(els[3])) return null;
+  const after = matchWords(els, 4, ["before", "end", "of"]);
+  if (after === null) return null;
+  if (!isConceptRef(els[after])) return null;
+  const scope = makeCall(
+    "BeforeEndOf",
+    [quantityArg(els[3]), conceptRefArg(els[after] as NConceptRef)],
+    loc,
+  );
+  return makeCall("Last", [conceptRefArg(els[1]), nestedArg(scope)], loc);
+};
+
 /** `age at start of <X> at least <Q>` → AtLeast(AgeAt(StartOf(X)), Q) */
 const ageAtStartOfAtLeast: PatternMatcher = (els, loc) => {
   if (els.length !== 8) return null;
@@ -635,6 +689,9 @@ const PATTERNS: PatternMatcher[] = [
   // Longest / most specific first
   ageAtStartOfAtLeast,             // 8 elements
   lastWithinBeforeStartOf,         // 8
+  lastWithinAfterEndOf,            // 8 (T08 / #98)
+  lastWithinAfterStartOf,          // 8 (T08 / #98)
+  lastWithinBeforeEndOf,           // 8 (T08 / #98)
   onDayOfOrAfter,                  // 7
   atLeastApart,                    // 7 (T07 / #93)
   atMostApart,                     // 7 (T07 / #93)

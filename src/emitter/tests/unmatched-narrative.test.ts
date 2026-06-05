@@ -15,6 +15,58 @@ function lib(name: string, body: string): string {
 
 const terms = (n: string) => `terminology "${n}":\n- valueset is \`${n}\`.\n`;
 
+describe("T08 / #98 — window-from-anchor 3 missing sisters", () => {
+  it("`last <X> within <Q> after end of <Y>` → CRLPatterns.AfterEndOf inside Last", () => {
+    const src = lib(
+      "T",
+      terms("X") +
+        terms("Anchor") +
+        `concept "AfterEnd":\n- type is Observation.\n- value type is boolean.\n- definition is last "X" within 1 year after end of "Anchor".\n`,
+    );
+    const r = emitCQL(src, { libraryName: "T" });
+    expect(r.success).toBe(true);
+    expect(r.unmatched).toBeUndefined();
+    expect(r.result).toMatch(/CRLPatterns\.AfterEndOf/);
+    expect(r.result).toMatch(/CRLPatterns\.LastOf\(/);
+  });
+
+  it("`last <X> within <Q> after start of <Y>` → CRLPatterns.AfterStartOf", () => {
+    const src = lib(
+      "T",
+      terms("X") +
+        terms("Anchor") +
+        `concept "AfterStart":\n- type is Observation.\n- value type is boolean.\n- definition is last "X" within 30 day after start of "Anchor".\n`,
+    );
+    const r = emitCQL(src, { libraryName: "T" });
+    expect(r.success).toBe(true);
+    expect(r.result).toMatch(/CRLPatterns\.AfterStartOf/);
+  });
+
+  it("`last <X> within <Q> before end of <Y>` → CRLPatterns.BeforeEndOf", () => {
+    const src = lib(
+      "T",
+      terms("X") +
+        terms("Anchor") +
+        `concept "BeforeEnd":\n- type is Observation.\n- value type is boolean.\n- definition is last "X" within 7 day before end of "Anchor".\n`,
+    );
+    const r = emitCQL(src, { libraryName: "T" });
+    expect(r.success).toBe(true);
+    expect(r.result).toMatch(/CRLPatterns\.BeforeEndOf/);
+  });
+
+  it("existing `before start of` sister keeps matching (regression guard)", () => {
+    const src = lib(
+      "T",
+      terms("X") +
+        terms("Anchor") +
+        `concept "BeforeStart":\n- type is Observation.\n- value type is boolean.\n- definition is last "X" within 1 year before start of "Anchor".\n`,
+    );
+    const r = emitCQL(src, { libraryName: "T" });
+    expect(r.success).toBe(true);
+    expect(r.result).toMatch(/CRLPatterns\.BeforeStartOf/);
+  });
+});
+
 describe("T07 / #93 — AtLeastApart / AtMostApart matcher wiring", () => {
   it("`<A> and <B> at least <Q> apart` → emits CRLPatterns.AtLeastApart, no unmatched", () => {
     const src = lib(
