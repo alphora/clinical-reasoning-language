@@ -253,46 +253,31 @@ A typical clinical artifact project has authored CRL/CEL sources plus generated 
 Which CLI command reads what, and writes what, when invoked from a project root:
 
 ```
-                            ┌──────────────────────────────────────────────┐
-                            │                project filesystem            │
-                            └──────────────────────────────────────────────┘
-   ┌─ authored sources ────────────────┐   ┌─ generated outputs ─────────────────┐
-   │                                   │   │                                     │
-   │   src/crl/*.crl ◄──┐  ┌──► src/cql/<library>.cql                            │
-   │                    │  │                                                     │
-   │   src/cel/*.cel ──┐│  │┌► src/fhir/<ResourceType>/<id>.json                 │
-   │                   ││  ││                                                    │
-   │                   ││  ││   tests/data/patient/<lib>/<case>/<RT>/<id>.json   │
-   │                   ││  ││                                            ▲       │
-   └───────────────────┼┼──┼┼────────────────────────────────────────────┼───────┘
-                       ││  ││                                            │
-                read ──┘│  │└── write                                    │
-                        │  │                                             │
-                        │  │ ┌──────────────────────────────────────┐    │
-                        │  └─┤ crl-emit --target fhir-def           │    │
-                        │    │   --path src/crl/<lib>.crl           │    │
-                        │    │   --out-dir .                        │    │
-                        │    │ (atomic two-lane write — both        │    │
-                        │    │  src/cql/* and src/fhir/<RT>/* land  │    │
-                        │    │  together, or neither does)          │    │
-                        │    └──────────────────────────────────────┘    │
-                        │                                                │
-                        │    ┌──────────────────────────────────────┐    │
-                        └────┤ crl-emit                             │────┘
-                             │   --path src/cel/<cases>.cel         │
-                             │   --out-dir tests/data               │
-                             │ (reads the CRL closure for           │
-                             │  validation, then emits instances)   │
-                             └──────────────────────────────────────┘
+   READS                                   COMMAND                                     WRITES
+   ─────────────────────────────       ─────────────────────────────       ─────────────────────────────
 
-                             ┌──────────────────────────────────────┐
-            src/crl/<lib>.crl │ crl-validate                         │
-                       ──read─►   --path src/crl/<lib>.crl           │── stdout: {success, errors[], warnings[]}
-                             │   [--soft]                           │   (no filesystem writes)
-                             └──────────────────────────────────────┘
+   src/crl/<lib>.crl              ──►  crl-emit --target fhir-def    ──┬─► src/cql/<library>.cql
+   (+ closure via package.json         --path src/crl/<lib>.crl        │   (one per library in
+    and node_modules)                  --out-dir .                     │    the import closure)
+                                                                       │
+                                       atomic two-lane write:          ├─► src/fhir/<ResourceType>/<id>.json
+                                       BOTH lanes succeed and write,   │   (ValueSet / Library /
+                                       or NEITHER writes               │    ActivityDef / PlanDef)
+
+
+   src/cel/<cases>.cel              ┐
+                                    ├─► crl-emit                   ──► tests/data/patient/<lib>/<case>/<RT>/<id>.json
+   src/crl/<lib>.crl                ┘   --path src/cel/<cases>.cel      (one tree per case)
+   (closure named in the .cel           --out-dir tests/data
+    `covers "<Library>"` clause)
+
+
+   src/crl/<lib>.crl                ──► crl-validate              ──►  stdout — JSON {success, errors[], warnings[]}
+   (+ closure)                          --path src/crl/<lib>.crl       (no filesystem writes)
+                                        [--soft]
 ```
 
-The two reads on the CEL emit line are important: a `.cel` file references CRL declarations from its `covers "<Library>"` clause, so the emitter resolves the full CRL closure under `src/crl/` (and any `node_modules` packages it imports) before emitting any FHIR instance.
+The two-input CEL row matters: a `.cel` file references CRL declarations from its `covers "<Library>"` clause, so the emitter resolves the full CRL closure under `src/crl/` (and any `node_modules` packages it imports) before emitting any FHIR instance.
 
 Concrete invocations from a project root:
 
