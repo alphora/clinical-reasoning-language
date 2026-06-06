@@ -583,3 +583,8 @@ We provide a Visual Studio Code extension for CRL files:
 - Language basics for a better editing experience
 
 For installation instructions and full details, see [extension/README.md](./extension/README.md)
+
+## License
+
+This project is licensed under the Apache License 2.0.
+See the LICENSE file for details.
