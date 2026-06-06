@@ -1,9 +1,10 @@
 # CRL / CEL tooling — CLI and MCP reference
 
-This is the reference for consuming the CRL toolchain. The package ships two surfaces:
+This is the reference for consuming the CRL toolchain. The package ships three surfaces:
 
-- **CLI** — scripted invocation. The primary surface; use this from build scripts, CI, and host applications (e.g. KELP).
+- **CLI** — scripted invocation. Use this from build scripts, CI, and host applications (e.g. KELP) that want to shell out to `crl-emit` / `crl-validate`.
 - **MCP** — Model Context Protocol tools, registered by a server the package ships. Use this from AI assistants (Claude Code, etc.) for interactive workflows.
+- **Library API** — typed in-process function calls. Use this when you're **embedding CRL into your own tool** — another VS Code extension, a Node service, a notebook — and want to call the functions directly rather than shelling out.
 
 For the **languages** themselves see [USER_GUIDE.md](./USER_GUIDE.md) (CRL) and [docs/cel-spec.md](./docs/cel-spec.md) (CEL).
 
@@ -76,9 +77,13 @@ Lowest-friction path if you want the language server, validation, and the MCP to
    ```
 3. Open VS Code in any workspace. The extension activates automatically (via `onStartupFinished`) and writes the `crl` server into `<workspace>/.mcp.json`. Any MCP host (Claude Code, etc.) picks up the 7 tools on its next start.
 
-### Option B — npm tarball (`.tgz`) — for scripting / CI / host applications
+### Option B — npm tarball (`.tgz`) — for host apps + downstream code
 
-Use this when you need the `crl-emit` and `crl-validate` binaries from a script or a host application's filesystem pipeline.
+The tarball delivers three surfaces in one package — pick whichever fits your call site:
+
+- **CLI binaries** — `crl-emit` and `crl-validate` land in your project's `node_modules/.bin/`. The right vector for a host application or build pipeline (KELP-style use) that wants to script the CLI deterministically. See [Using the CLI with a project filesystem](#using-the-cli-with-a-project-filesystem) below.
+- **Library API** — typed in-process access to the same primitives the CLI uses (`tokenizeCRL`, `buildCRL`, `validateCRL`, `emitCQL`, `emitCelToFhir`, `emitFhirDefFromPath`, …). The right vector when you're **embedding CRL into your own tool** — another VS Code extension, a web service, a notebook, a custom validator. See [Library API](#library-api) below.
+- **MCP server bin** — `crl-mcp` lands in `node_modules/.bin/` too, in case you want to point another MCP host at this package's stdio server without going through the bundled VS Code extension.
 
 1. Download `smile-digital-health-crl-X.Y.Z.tgz` from the [Releases page](https://github.com/alphora/clinical-reasoning-language/releases/latest).
 2. Install into your project:
@@ -262,6 +267,92 @@ Tools that need project context (the validators, FHIR-def emit, CEL emit) requir
   ```
 - `includeResources: true` adds `emittedCases[]` with full FHIR JSON.
 - `success: true` iff there are zero error-severity diagnostics. Diagnostic kinds include `unsupported-yet`, `result-deferred`, `precondition-failed`.
+
+---
+
+<a id="library-api"></a>
+## Library API — embedding CRL in another tool
+
+When you're building a downstream tool that wants CRL functionality **in-process** — another VS Code extension, a Node service, a notebook, a custom linter — install the package via [Option B (.tgz)](#option-b--npm-tarball-tgz--for-host-apps--downstream-code) and import the public API directly.
+
+### What's exported
+
+The package's `exports` field gives typed access to the same primitives the CLI and MCP server use internally.
+
+| Surface | Primary exports |
+|---|---|
+| **CRL lex/parse/AST** | `tokenizeCRL`, `parseCRL`, `buildCRL`, `Token`, `ParseResult<T>`, AST types from `../ast/types` re-exported |
+| **CRL validation** | `validateCRL`, `validateCRLImports`, `ValidateOptions`, `ValidationResultEnvelope` |
+| **CRL → CQL emit** | `emitCQL`, `emitCQLFromAST`, `emitCQLImports`, `CqlEmitOptions`, `CqlEmitResult`, `EmitImportsResult` |
+| **CRL → FHIR Definition emit** | `emitFhirDefFromPath`, `emitFhirDefClosure`, `emitLibrary`, `emitValueSet`, `emitActivityDefinition`, `emitRecommendationDefinition`, `emitDecisionPlanDefinition`, `writeFhirResources`, plus `isFhirDefError`, `isFhirDefWarning`, `FHIR_DEF_WARNING_KINDS` |
+| **CEL lex/parse/AST** | `tokenizeCEL`, `parseCEL`, `buildCEL`, `CELToken`, `CELParseResult`, CEL AST types |
+| **CEL validation** | `validateCEL`, `validateCELFile` |
+| **CEL → FHIR instance emit** | `emitCelToFhir`, `writeEmitResult`, `resolveCelImports`, `EmittedResource`, `EmittedCase`, `EmitResult`, `EmitDiagnostic` |
+| **Shared types** | `CRLError`, `Location`, the full AST `Statement` union, FHIR-def resource shapes |
+
+All exports are typed. Source-of-truth is `dist/index.d.ts` (shipped in the tarball).
+
+### Minimal example
+
+```ts
+import { tokenizeCRL, buildCRL, validateCRL, emitCQL } from "@smile-digital-health/crl";
+
+// Tokenize
+const tok = tokenizeCRL('library "X". concept "Foo": ...');
+if (!tok.success) { console.error(tok.errors); }
+
+// Parse + AST
+const ast = buildCRL('library "X". concept "Foo": ...');
+
+// Semantic validate (inline / single-file mode)
+const v = validateCRL('library "X". concept "Foo": ...');
+if (!v.success) { console.error(v.errors); }
+
+// Emit CQL
+const { success, result, unmatched, futureExpressions } =
+  emitCQL('library "X". concept "Foo": ...', { libraryName: "X" });
+```
+
+### Canonical pattern: building another VS Code extension
+
+This is the same pattern the bundled `crl-language-support` extension uses internally to consume its own npm package. The shape:
+
+1. **Add the tarball to your extension's `package.json`** as a regular dependency:
+   ```json
+   {
+     "dependencies": {
+       "@smile-digital-health/crl": "file:./vendor/smile-digital-health-crl-2.5.1.tgz"
+     }
+   }
+   ```
+   (Or, once the npm publish vector goes live, drop the `file:` prefix and pin a semver range.)
+
+2. **Bundle the dep into your extension** with esbuild / webpack / your bundler of choice. VS Code extensions ship as a single `dist/extension.js`; the CRL code gets inlined just like any other dep.
+
+3. **Import + call**:
+   ```ts
+   import * as vscode from "vscode";
+   import { validateCRL, buildCRL, emitCQL } from "@smile-digital-health/crl";
+
+   export function activate(ctx: vscode.ExtensionContext) {
+     ctx.subscriptions.push(
+       vscode.languages.registerCodeActionsProvider("crl", {
+         provideCodeActions(doc) {
+           const result = validateCRL(doc.getText(), { soft: true });
+           // ... produce diagnostics, quick-fixes, etc.
+         },
+       }),
+     );
+   }
+   ```
+
+The CRL package has no `vscode` dependency of its own, so it composes cleanly into any extension host. If your extension also wants the bundled MCP server (instead of running validation in-process), you can spawn `crl-mcp` as a stdio subprocess from your extension's `activate` — same shape `crl-language-support` uses for the MCP-host case.
+
+### Other embedding shapes
+
+- **Node service / CLI of your own** — same `import { … } from "@smile-digital-health/crl"`, no bundler needed if you're already shipping Node.
+- **Notebook / interactive REPL** — works out of the box; the package is plain Node + side-effect-free.
+- **Browser** — not supported today. The package targets Node (uses `fs` for project-mode validation and emit). A browser build would need a shim for the filesystem walk.
 
 ---
 
