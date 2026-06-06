@@ -6,7 +6,7 @@ Clinical Reasoning Language (CRL) provides a structured way to model clinical de
 
 ## Overview
 
-See the [User Guide](./USER_GUIDE.md) for a comprehensive introduction to the CRL language, syntax, and authoring best practices.
+See the [User Guide](./USER_GUIDE.md) for a comprehensive introduction to the CRL language, syntax, and authoring best practices. For the **CLI and MCP tool reference** (emit, validate, the 7 MCP tools — for both CRL and CEL), see [TOOLING.md](./TOOLING.md).
 
 CRL is a domain-specific language designed for expressing clinical practice guidelines in a structured and machine-readable format. The language is implemented in TypeScript and provides a comprehensive set of tools for processing CRL documents.
 
