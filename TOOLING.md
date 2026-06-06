@@ -1,6 +1,11 @@
 # CRL / CEL tooling — CLI and MCP reference
 
-This document is the reference for the **interfaces** to the CRL toolchain — the command-line entrypoints and the Model Context Protocol (MCP) tools that AI assistants can use. For the **languages** themselves, see [USER_GUIDE.md](./USER_GUIDE.md) (CRL) and [docs/cel-spec.md](./docs/cel-spec.md) (CEL).
+This is the reference for consuming the CRL toolchain. The package ships two surfaces:
+
+- **CLI** — scripted invocation. The primary surface; use this from build scripts, CI, and host applications (e.g. KELP).
+- **MCP** — Model Context Protocol tools, registered by a server the package ships. Use this from AI assistants (Claude Code, etc.) for interactive workflows.
+
+For the **languages** themselves see [USER_GUIDE.md](./USER_GUIDE.md) (CRL) and [docs/cel-spec.md](./docs/cel-spec.md) (CEL).
 
 ---
 
@@ -47,17 +52,12 @@ Two source languages, three emit targets:
              └─────────────────────────────────┘
 ```
 
-| Source | Purpose | Emits |
+| Source | What it is | What it produces |
 |---|---|---|
-| **CRL** | Author inference logic, decision trees, activities, terminologies | CQL libraries; FHIR Definition resources (ValueSet, Library, ActivityDefinition, PlanDefinition) |
-| **CEL** | Author test cases over a CRL library | FHIR instance resources (Patient + per-fact resources per case) |
+| **CRL** | Author DSL for inference, decisions, activities, terminologies | CQL libraries; FHIR Definition resources (ValueSet, Library, ActivityDefinition, PlanDefinition) |
+| **CEL** | Test-case DSL over a CRL library | FHIR instance resources (Patient + per-fact resources per case) |
 
-Two interface surfaces:
-
-| Surface | Audience | Entry points |
-|---|---|---|
-| **CLI** | Scripts, CI pipelines, batch operations | `crl-emit`, `crl-validate`, `crl-lex`, `crl-parse`, `crl-ast`, `crl-template-match`, `crl-mcp` |
-| **MCP** | AI assistants (Claude Code, etc.) | 7 tools registered by `crl-mcp` |
+A single CLI binary (`crl-emit`) dispatches all three emit paths by the input file's extension plus an optional `--target` flag.
 
 ---
 
@@ -67,28 +67,20 @@ Two interface surfaces:
 npm install @smile-digital-health/crl
 ```
 
-All CLI entry points become available as binaries:
+CLI binaries are then available via `npx`:
 
 ```bash
 npx crl-emit --help
 npx crl-validate --path mylib.crl
 ```
 
-For VS Code authoring + MCP integration, install the extension:
-
-```bash
-code --install-extension extension/crl-language-support-X.Y.Z.vsix --force
-```
-
-The extension auto-provisions `<workspace>/.mcp.json` pointing at a stable `crl-mcp` server — Claude Code (or any MCP host) picks up the 7 tools automatically. See [provision.ts](./extension/src/provision.ts) for the auto-provisioning behavior.
+For interactive authoring in VS Code with MCP integration, also install the bundled extension (`crl-language-support-X.Y.Z.vsix`); it auto-provisions `<workspace>/.mcp.json` so any MCP host (Claude Code, etc.) picks up the 7 tools automatically.
 
 ---
 
 ## CLI reference
 
-### `crl-emit` — emit CQL or FHIR resources
-
-The single multi-target emit entrypoint. Dispatches on input extension + `--target` flag.
+### `crl-emit` — the dispatcher
 
 ```
 crl-emit --path <file.{crl,cel}> --out-dir <dir> [--target <mode>] [--quiet]
@@ -102,71 +94,74 @@ crl-emit --help
 | `--path` | yes | path to `.crl` or `.cel` file | — | Absolute path recommended |
 | `--out-dir` | yes | output directory | — | Created if missing |
 | `--target` | for `.crl` | `cql` \| `fhir-def` | `cql` for `.crl`; rejected for `.cel` | See dispatch table below |
-| `--quiet` | no | (flag) | off | Suppress per-file `wrote …` lines (only meaningful with `--target fhir-def`) |
+| `--quiet` | no | (flag) | off | Suppress per-file `wrote …` lines (`--target fhir-def` only) |
 | `--help` / `-h` | no | (flag) | — | Print usage + exit 0 |
 
 **Input → output dispatch**
 
 | Input | `--target` | Output layout |
 |---|---|---|
-| `.crl` | (omitted) or `cql` | `<out-dir>/<library-name>.cql` (flat — v2.2.x behavior) |
+| `.crl` | (omitted) or `cql` | `<out-dir>/<library-name>.cql` (flat) |
 | `.crl` | `fhir-def` | **BOTH lanes written atomically:** `<out-dir>/cql/<library-name>.cql` + `<out-dir>/fhir/<ResourceType>/<id>.json` |
 | `.cel` | (omitted) | `<out-dir>/patient/<library-slug>/<case-slug>/<ResourceType>/<id>.json` (KALM-style per-case tree) |
 | `.cel` | any | **Hard error** — CEL has its own pipeline; `--target` is rejected |
 
-**Atomic write contract** (`--target fhir-def` only): either both the CQL lane AND the FHIR-def lane succeed and write, or neither writes. This guarantees emitted `Library.content[0].attachment.url = "../../cql/<name>.cql"` references always resolve.
+**Atomic-write contract** (`--target fhir-def` only): either both the CQL lane AND the FHIR-def lane succeed and write, or neither writes. This guarantees the emitted `Library.content[0].attachment.url = "../../cql/<name>.cql"` references always resolve.
 
 **Exit codes**
 
-| Code | Meaning |
-|---|---|
-| `0` | Success |
-| `1` | Hard error — parse failure, unresolved reference, write failure, incompatible flags |
-| `2` | Soft warnings — unresolved bare refs, empty terminologies, ASCII-fallback slugs, unmatched concept narratives, `result-deferred` outcomes |
+| Code | Meaning | Typical CI handling |
+|---|---|---|
+| `0` | Success | green |
+| `1` | Hard error — parse failure, unresolved reference, write failure, incompatible flags | fail |
+| `2` | Soft warnings — unresolved bare refs, empty terminologies, ASCII-fallback slugs, unmatched concept narratives, `result-deferred` outcomes | warn (your call whether to gate on it) |
+
+`--target fhir-def` walks the import closure from the input `.crl` file's nearest `package.json`. Cross-library qualified refs (`"OtherLib"."X"`) resolve through that closure.
 
 ### `crl-validate` — validate without emitting
-
-Runs semantic validation (name uniqueness, reference resolution, cycle detection, decision-delegation cycles) on a `.crl` file.
 
 ```
 crl-validate --path <file.crl> [--soft]
 ```
 
-In `--soft` mode, reference-resolution errors demote to warnings (useful while authoring); structural errors (cycles, name uniqueness) stay strict.
+Runs semantic validation (name uniqueness, reference resolution, cycle detection — both concept and decision-delegation) on the file and prints `{success, errors[], warnings[]}` as JSON on stdout. Always exits 0.
 
-Returns `{ success, errors[], warnings[] }` as JSON on stdout. Exit 0 always.
+In `--soft` mode, reference-resolution errors demote to warnings (useful while authoring); cycles + duplicate-name errors never demote.
 
-### `crl-mcp` — start the MCP server
+### Common combinations
 
+```bash
+# Lint a CRL file
+npx crl-validate --path lib.crl | jq .success
+
+# Emit CQL only (flat layout — legacy)
+npx crl-emit --path lib.crl --out-dir out/
+
+# Emit FHIR-def + CQL together (atomic two-lane write)
+npx crl-emit --path lib.crl --out-dir out/ --target fhir-def
+
+# Emit FHIR instances from CEL test cases
+npx crl-emit --path cases.cel --out-dir out/
+
+# CI exit-code gate
+npx crl-emit --path lib.crl --out-dir out/ --target fhir-def --quiet
+case $? in
+  0) echo "clean" ;;
+  1) echo "hard error"; exit 1 ;;
+  2) echo "warnings"   ;;
+esac
 ```
-crl-mcp
-```
-
-Speaks the Model Context Protocol over stdio. Used by the VS Code extension's auto-provisioning; usually not invoked directly. See [MCP reference](#mcp-reference) below for the 7 tools it exposes.
-
-### Lower-level tools
-
-For grammar / lexer / matcher debugging:
-
-| Bin | Purpose |
-|---|---|
-| `crl-lex` | Tokenize a `.crl` file and print the token stream |
-| `crl-parse` | Parse a `.crl` file and print parser-level result |
-| `crl-ast` | Build the full AST and print it |
-| `crl-template-match` | Run a narrative through the catalog matcher and print the canonical pattern call |
-
-Each accepts `--path <file>` or `--code "<source>"`.
 
 ---
 
 ## MCP reference
 
-The `crl-mcp` server registers **7 tools**. Each tool returns a JSON envelope on success; bad arguments (XOR violation, unreadable path, oversized input) come back as a tool error.
+The bundled MCP server registers **7 tools** for interactive AI workflows. Each returns a JSON envelope on success; invalid arguments (XOR violation, unreadable path, oversized input) come back as a tool error.
 
 | Tool | Input | Returns | Use when |
 |---|---|---|---|
 | [`tokenize_crl`](#tokenize_crl) | CRL source | `Token[]` | Token-level inspection |
-| [`build_crl_ast`](#build_crl_ast) | CRL source | AST root | Structural inspection |
+| [`build_crl_ast`](#build_crl_ast) | CRL source | AST root | Structural inspection (no semantic check) |
 | [`validate_crl`](#validate_crl) | CRL source + project context | `{success, errors[], warnings[]}` | Pre-emit correctness check |
 | [`validate_cel`](#validate_cel) | `.cel` path + project context | `{success, errors[], warnings[]}` | Pre-emit CEL correctness check |
 | [`emit_cql`](#emit_cql) | CRL source | `{success, result, errors?, unmatched?, futureExpressions?}` | CRL → CQL |
@@ -175,227 +170,112 @@ The `crl-mcp` server registers **7 tools**. Each tool returns a JSON envelope on
 
 ### Input conventions
 
-Every tool that takes CRL source accepts **exactly one** of:
+Tools that take CRL source accept **exactly one** of:
 
 - `code` (string) — inline CRL text. Empty string is a valid (degenerate) document.
 - `path` (string) — file path. Absolute path recommended; relative paths resolve against the MCP server's working directory, not the workspace.
 
-Tools that need project context (validators, FHIR-def emit, CEL emit) require `path` and walk to the nearest `package.json` to find the closure.
+Tools that need project context (the validators, FHIR-def emit, CEL emit) require `path` and walk to the nearest `package.json` to find the closure.
 
 ### Tool details
 
 <a id="tokenize_crl"></a>**`tokenize_crl`** — lex CRL into tokens.
-
-```
-{ code?: string, path?: string }
-```
-
-Returns `{ success: boolean, result?: Token[], errors?: CRLError[] }`. Token shape: `{ line, column, type, text }`.
-
----
+- Input: `{ code?: string, path?: string }`
+- Returns: `{ success, result?: Token[], errors? }` where each token is `{ line, column, type, text }`
 
 <a id="build_crl_ast"></a>**`build_crl_ast`** — parse + build AST.
-
-```
-{ code?: string, path?: string }
-```
-
-Returns `{ success, result?: AST, errors?: CRLError[] }`. `success: true` means lexing/parsing/AST construction succeeded — **NOT** that semantic validation passed. AST root: `{ type: 'CRL', header?, library?, includes[], statements[], location }`.
-
----
+- Input: `{ code?: string, path?: string }`
+- Returns: `{ success, result?: AST, errors? }`. `success: true` means lexing/parsing/AST construction succeeded — **NOT** that semantic validation passed.
 
 <a id="validate_crl"></a>**`validate_crl`** — semantic validation.
+- Input: `{ code?: string, path?: string, soft?: boolean }`
+- Returns: `{ success, errors[], warnings[] }`
+- **Project mode** (when `path` provided): walks to the nearest `package.json` and validates in the context of sibling local libraries + `node_modules` packages. Qualified refs like `"OtherLib"."X"` resolve the same way they do for in-editor diagnostics.
+- **Single-file mode** (when `code` provided): no sibling context.
+- Error kinds: `empty-name`, `duplicate-name`, `unresolved-reference`, `qualified-ref-unresolved`, `external-library-not-included`, `reference-cycle`, `decision-delegation-cycle`.
+- `soft: true` demotes reference-resolution kinds to warnings; cycles + duplicate-name never demote.
 
-```
-{ code?: string, path?: string, soft?: boolean }
-```
-
-When `path` is provided, runs in **project mode**: walks to the nearest `package.json` and validates the file in the context of its sibling local libraries + `node_modules` packages — qualified refs like `"OtherLib"."X"` resolve the same way they do for VS Code in-editor diagnostics. When `code` is provided, runs in **single-file mode** (no sibling context).
-
-Returns `{ success, errors[], warnings[] }`. Error kinds include:
-
-- `empty-name`, `duplicate-name`
-- `unresolved-reference`, `qualified-ref-unresolved`, `external-library-not-included`
-- `reference-cycle` (concepts), `decision-delegation-cycle` (decisions — added in v2.5.0)
-
-In `soft: true`, reference-resolution kinds demote to warnings; cycle and duplicate-name errors never demote.
-
----
-
-<a id="validate_cel"></a>**`validate_cel`** — semantic validation of a `.cel` document against its covered CRL closure.
-
-```
-{ path: string, soft?: boolean }
-```
-
-`path` is required — CEL validation needs the file's project root to walk the CRL closure (inline `code` not supported).
-
-Returns `{ success, errors[], warnings[] }`. Error kinds include:
-
-- `unresolved-bare-type`, `unresolved-qualified-library`, `unresolved-qualified-declaration`
-- `unresolved-result-leaf`, `invalid-result-shape`, `invalid-result-leaf-kind`
-- `unresolved-result-branch` (added v2.5.0 — branch string must be a direct arm of the decision)
-- `result-leaf-not-boolean-valued` (added v2.5.0 — `is true|false` requires `value type is boolean`)
-- `unresolved-fact-ref`, `duplicate-fact-name`, `duplicate-case-name`
-- `unresolved-cel-include`, `alias-not-yet-supported`
-- Passthrough kinds from the resolver: `parse-failure`, `project-root-not-found`, `unresolved-covers`, `covers-missing-but-cases-present`, `crl-import`
-
-In `soft: true`, `unsupported-yet` + `alias-not-yet-supported` warnings are silenced; reference resolution and structural errors stay strict.
-
----
+<a id="validate_cel"></a>**`validate_cel`** — validate a CEL document against its covered CRL closure.
+- Input: `{ path: string, soft?: boolean }` (path required — inline `code` not supported)
+- Returns: `{ success, errors[], warnings[] }`
+- Error kinds: `unresolved-bare-type`, `unresolved-qualified-library`, `unresolved-qualified-declaration`, `unresolved-result-leaf`, `invalid-result-shape`, `invalid-result-leaf-kind`, `unresolved-result-branch`, `result-leaf-not-boolean-valued`, `unresolved-fact-ref`, `duplicate-fact-name`, `duplicate-case-name`, `unresolved-cel-include`, `alias-not-yet-supported`, plus passthrough kinds from the resolver (`parse-failure`, `project-root-not-found`, `unresolved-covers`, `covers-missing-but-cases-present`, `crl-import`).
+- `soft: true` silences `unsupported-yet` + `alias-not-yet-supported` warnings; reference-resolution + structural errors stay strict.
 
 <a id="emit_cql"></a>**`emit_cql`** — CRL → CQL.
-
-```
-{ code?: string, path?: string, libraryName?: string }
-```
-
-Returns `{ success, result?, errors?, unmatched?, futureExpressions? }`. On full success, `result` is the generated CQL targeting the `CRLPatterns` library (`cql/src/CRLPatterns.cql`).
-
-**Issue #79 (unmatched narrative)** — when one or more `- definition is …` bodies fail to match a catalog pattern, `success: false`, `unmatched[]` lists each failing narrative `{text, line, column}`, and the emitted CQL still populates `result` with a compile-failing `CRLPatterns.UnmatchedNarrative(…)` sentinel for each unmatched spot.
-
-**Issue #108 (future expressions)** — when a concept carries `@crl-future-expression: <body>` in a `meta is` line, the emitted CQL gets a leading block comment AND `futureExpressions[]` is populated with `{conceptName, expression, line, column}` records. Does NOT force `success: false`.
-
-**No version** — the emitted `library` declaration is unversioned; `include CRLPatterns` is also unversioned.
-
----
+- Input: `{ code?: string, path?: string, libraryName?: string }`
+- Returns: `{ success, result?, errors?, unmatched?, futureExpressions? }`
+- On full success, `result` is the generated CQL targeting the bundled `CRLPatterns` library (unversioned `include`).
+- When at least one `- definition is …` body fails to match a catalog pattern, `success: false` and `unmatched[]` lists each failing narrative. The emitted CQL still populates `result` with compile-failing `CRLPatterns.UnmatchedNarrative(…)` sentinels so downstream CQL translation fails loudly.
+- `meta is` annotations on concepts emit as a leading block comment on each `define`. `@crl-future-expression: <body>` annotations also surface as structured `futureExpressions[]` records `{conceptName, expression, line, column}` — informational, does NOT force `success: false`.
 
 <a id="emit_crl_fhir"></a>**`emit_crl_fhir`** — CRL → FHIR Definition resources.
-
-```
-{ path: string, includeResources?: boolean }
-```
-
-`path` is required and must be absolute. The closure orchestrator walks to the nearest `package.json`.
-
-Returns a **summary envelope** by default to keep tool output small:
-
-```
-{
-  success: boolean,
-  resourceCount: number,
-  resourceManifest: [{ resourceType, id, relativePath, sourceKind, sourceName }],
-  errors: CRLError[],
-  unmatched: UnmatchedReference[],
-  importDiagnostics: ImportDiagnostic[],
-  metadataErrors: MetadataError[]
-}
-```
-
-Pass `includeResources: true` to also receive `resources[]` with the full FHIR JSON.
-
-**Notes:**
-- Emitted resources carry NO `version` field (npm package owns the version).
-- `meta.profile` canonicals are stamped per v2.5.1's #104 remap: `cpg-strategydefinition`, `cpg-recommendationdefinition` (CPG IG); `crmi-publishableplandefinition`, `crmi-shareablevalueset` (CRMI IG); `cqf-knowledgeCapability`, `cqf-knowledgeRepresentationLevel` (FHIR-core).
+- Input: `{ path: string, includeResources?: boolean }` (path required + absolute)
+- Returns a summary envelope by default:
+  ```
+  { success, resourceCount, resourceManifest: [{resourceType, id, relativePath, sourceKind, sourceName}],
+    errors, unmatched, importDiagnostics, metadataErrors }
+  ```
+- `includeResources: true` adds `resources[]` with the full FHIR JSON.
+- The closure walks from the file's nearest `package.json`.
+- Emitted resources carry NO `version` field (consumer's package owns the version).
+- `meta.profile` canonicals: `cpg-strategydefinition`, `cpg-recommendationdefinition` (CPG IG); `crmi-publishableplandefinition`, `crmi-shareablevalueset` (CRMI IG); `cqf-knowledgeCapability`, `cqf-knowledgeRepresentationLevel` (FHIR-core).
 - Cross-library concept/terminology refs are unsupported in v0; same-library qualified refs `"CurrentLib"."X"` resolve as bare locals.
-- `any:` qualifier emits a `crl-logical-switch` extension URL; the StructureDefinition is not yet shipped (pending CPG ballot).
-
----
+- `any:` qualifier emits a `crl-logical-switch` extension URL (StructureDefinition not yet shipped — pending CPG ballot).
 
 <a id="emit_cel"></a>**`emit_cel`** — CEL → FHIR instance resources.
-
-```
-{ path: string, includeResources?: boolean }
-```
-
-`path` is required and must be absolute. The resolver walks to the nearest `package.json` to load the covered CRL closure.
-
-Returns a **summary envelope** by default:
-
-```
-{
-  success: boolean,
-  caseCount: number,
-  resourceCount: number,
-  caseManifest:     [{ caseSlug, librarySlug, resourceCount }],
-  resourceManifest: [{ caseSlug, resourceType, id, outputPath }],
-  diagnostics: EmitDiagnostic[]
-}
-```
-
-Pass `includeResources: true` to receive `emittedCases[]` with the full FHIR JSON.
-
-`success: true` iff there are zero error-severity diagnostics. Diagnostic kinds include:
-
-- `unsupported-yet` — a fact's `defined by` couldn't derive a bare FHIR type; case is skipped
-- `result-deferred` — a `result is` line was parsed but outcome emit is deferred to #70 / `metric`
-- `precondition-failed` — parse error / unresolved covers / etc.; case skipped
+- Input: `{ path: string, includeResources?: boolean }` (path required + absolute)
+- Returns a summary envelope by default:
+  ```
+  { success, caseCount, resourceCount,
+    caseManifest:     [{caseSlug, librarySlug, resourceCount}],
+    resourceManifest: [{caseSlug, resourceType, id, outputPath}],
+    diagnostics }
+  ```
+- `includeResources: true` adds `emittedCases[]` with full FHIR JSON.
+- `success: true` iff there are zero error-severity diagnostics. Diagnostic kinds include `unsupported-yet`, `result-deferred`, `precondition-failed`.
 
 ---
 
-## Quick recipes
+## Integration with the KELP application framework
 
-### Validate a CRL file before emit
+KELP is the canonical host consumer for this toolchain. KELP defines a filesystem contract for a clinical artifact project; the CRL CLI is the engine that materializes the generated lanes of that contract.
 
-```bash
-npx crl-validate --path mylib.crl | jq .success
-```
+### KELP's filesystem contract → CLI invocation map
 
-### Emit CQL flat
+| KELP folder | Contains | Authored by | CLI invocation that writes it |
+|---|---|---|---|
+| `src/crl/` | N `.crl` files (one per CRL library in the project) | operator / agent (authored) | — (sources, not generated) |
+| `src/cel/` | N `.cel` files (one per case-example library) | operator / agent (authored) | — (sources, not generated) |
+| `src/scn/<id>.csv` | Scenario CSV (feeds CEL) | operator | — (sources, not generated) |
+| `src/cql/` | N `.cql` files | `crl-emit … --target fhir-def` (and the CQL lane of `--target cql`) | `npx crl-emit --path src/crl/<entry>.crl --out-dir . --target fhir-def` writes `src/cql/<library>.cql` |
+| `src/fhir/` | N `.json` files (ValueSet / Library / ActivityDef / PlanDef) | `crl-emit … --target fhir-def` | same call — writes `src/fhir/<ResourceType>/<id>.json` alongside `src/cql/` |
+| `tests/data/fhir/patient/<patient>/...` | N subfolders, each with FHIR instance JSON | `crl-emit` on `.cel` | `npx crl-emit --path src/cel/<entry>.cel --out-dir tests/data` writes `tests/data/patient/<library>/<case>/<ResourceType>/*.json` |
 
-```bash
-npx crl-emit --path mylib.crl --out-dir out/
-# → out/MyLib.cql, out/MyLib Inferred.cql, ...
-```
+### Two ways to drive the CRL engine from KELP
 
-### Emit FHIR Definition resources + paired CQL
-
-```bash
-npx crl-emit --path mylib.crl --out-dir out/ --target fhir-def
-# → out/cql/MyLib.cql
-# → out/fhir/Library/mylib.json
-# → out/fhir/ValueSet/*.json
-# → out/fhir/ActivityDefinition/*.json
-# → out/fhir/PlanDefinition/*.json
-```
-
-### Emit FHIR instances from a CEL case file
+**1. CLI (host-driven, scripted).** The KELP host (or a CI step) invokes `crl-emit` directly for the four engineering folders (`src/cql/`, `src/fhir/`, plus the CEL instance tree under `tests/data/`). Deterministic, reproducible, suitable for build pipelines.
 
 ```bash
-npx crl-emit --path mycases.cel --out-dir out/
-# → out/patient/<library-slug>/<case-slug>/<ResourceType>/*.json
+# From a KELP project root:
+npx crl-emit --path src/crl/cms22.crl       --out-dir . --target fhir-def   # writes src/cql/* + src/fhir/*
+npx crl-emit --path src/cel/cms22-cases.cel --out-dir tests/data            # writes tests/data/patient/...
 ```
 
-### Programmatic use of MCP from an AI assistant
+The atomic two-lane contract for `--target fhir-def` is the right primitive here: a single CRL change regenerates both lanes together, so `Library.content` URLs never drift.
 
-The 7 tools appear in any MCP-aware host (Claude Code, etc.) after the extension provisions `.mcp.json`. Typical assistant invocation:
+**2. MCP (agent-driven, interactive).** KELP's agent host (e.g. Claude Code) calls the MCP tools directly. Useful for the read-only inspection tools (`tokenize_crl`, `build_crl_ast`, `validate_crl`, `validate_cel`) where the agent is reasoning about author intent, and for the emit tools when the agent wants the structured envelope (e.g. `emit_crl_fhir`'s summary manifest) without touching the filesystem.
 
-```
-build_crl_ast(path="/abs/path/mylib.crl")  → AST inspection
-emit_cql(path="/abs/path/mylib.crl")        → CQL preview
-emit_crl_fhir(path="/abs/path/mylib.crl", includeResources=true)  → full FHIR
-```
+The two surfaces are equivalent for the emit tools — the CLI produces the same FHIR JSON the MCP tool returns. Pick the surface that fits the call site: CLI for batch / CI / KELP-host filesystem writes; MCP for interactive AI workflows.
 
-### Exit-code-driven CI gating
+### Lock / clean rule
 
-```bash
-npx crl-emit --path mylib.crl --out-dir out/ --target fhir-def --quiet
-case $? in
-  0) echo "clean" ;;
-  1) echo "hard error"; exit 1 ;;
-  2) echo "warnings" ;;
-esac
-```
+KELP's filesystem contract treats the four generated folders (`src/cql/`, `src/fhir/`, the CEL instance tree) as **engine-owned**: do not hand-edit. The CRL CLI is the only writer. A clean rebuild from `src/crl/` + `src/cel/` is always the source of truth.
 
 ---
-
-## Where things live
-
-| Concern | File / dir |
-|---|---|
-| CLI dispatcher | [`src/cli/run-emitter.ts`](./src/cli/run-emitter.ts) |
-| CLI validator | [`src/cli/run-validator.ts`](./src/cli/run-validator.ts) |
-| MCP server (npm) | [`src/cli/run-mcp-server.ts`](./src/cli/run-mcp-server.ts) |
-| MCP server (extension bundle) | [`extension/src/mcp-server.ts`](./extension/src/mcp-server.ts) |
-| CRL → CQL emitter | [`src/emitter/emitCQL.ts`](./src/emitter/emitCQL.ts) |
-| CRL → FHIR-def emitter | [`src/fhir-emitter/`](./src/fhir-emitter/) |
-| CEL → FHIR-instance emitter | [`src/cel/emitter/`](./src/cel/emitter/) |
-| Validators | [`src/validator/`](./src/validator/), [`src/cel/validator/`](./src/cel/validator/) |
-| Auto-provisioning | [`extension/src/provision.ts`](./extension/src/provision.ts) |
 
 ## Related reading
 
+- [README.md](./README.md) — install + features overview
 - [USER_GUIDE.md](./USER_GUIDE.md) — CRL language reference
 - [docs/cel-spec.md](./docs/cel-spec.md) — CEL language reference
-- [features/cql-pattern-mining/results/inference-pattern-catalog-draft.md](./features/cql-pattern-mining/results/inference-pattern-catalog-draft.md) — narrative-pattern catalog
-- [README.md](./README.md) — install + features overview
+- [features/cql-pattern-mining/results/inference-pattern-catalog-draft.md](./features/cql-pattern-mining/results/inference-pattern-catalog-draft.md) — narrative-pattern catalog (the matchable forms `definition is <…>` accepts)
