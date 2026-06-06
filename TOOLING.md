@@ -236,40 +236,32 @@ Tools that need project context (the validators, FHIR-def emit, CEL emit) requir
 
 ---
 
-## Integration with the KELP application framework
+## Using the CLI with a project filesystem
 
-KELP is the canonical host consumer for this toolchain. KELP defines a filesystem contract for a clinical artifact project; the CRL CLI is the engine that materializes the generated lanes of that contract.
+A typical clinical artifact project has authored CRL/CEL sources plus generated CQL and FHIR outputs. The table below shows where each kind of file lives and which CLI invocation writes it. The CRL CLI is opinionated about its own output layouts (see [Input → output dispatch](#crl-emit--the-dispatcher) above); the project-level paths below are the conventional places a host application asks it to write to.
 
-### KELP's filesystem contract → CLI invocation map
+| Path | Contents | How it gets there |
+|---|---|---|
+| `src/crl/*.crl` | CRL libraries (authored) | hand-authored |
+| `src/cel/*.cel` | CEL case-example libraries (authored) | hand-authored |
+| `src/cql/<library>.cql` | Emitted CQL libraries | CQL lane of `--target fhir-def`, or `--target cql` |
+| `src/fhir/<ResourceType>/<id>.json` | Emitted FHIR Definition resources (ValueSet / Library / ActivityDef / PlanDef) | FHIR lane of `--target fhir-def` |
+| `tests/data/patient/<library>/<case>/<ResourceType>/<id>.json` | Emitted FHIR instance resources per CEL case | `crl-emit` on a `.cel` file |
 
-| KELP folder | Contains | Authored by | CLI invocation that writes it |
-|---|---|---|---|
-| `src/crl/` | N `.crl` files (one per CRL library in the project) | operator / agent (authored) | — (sources, not generated) |
-| `src/cel/` | N `.cel` files (one per case-example library) | operator / agent (authored) | — (sources, not generated) |
-| `src/scn/<id>.csv` | Scenario CSV (feeds CEL) | operator | — (sources, not generated) |
-| `src/cql/` | N `.cql` files | `crl-emit … --target fhir-def` (and the CQL lane of `--target cql`) | `npx crl-emit --path src/crl/<entry>.crl --out-dir . --target fhir-def` writes `src/cql/<library>.cql` |
-| `src/fhir/` | N `.json` files (ValueSet / Library / ActivityDef / PlanDef) | `crl-emit … --target fhir-def` | same call — writes `src/fhir/<ResourceType>/<id>.json` alongside `src/cql/` |
-| `tests/data/fhir/patient/<patient>/...` | N subfolders, each with FHIR instance JSON | `crl-emit` on `.cel` | `npx crl-emit --path src/cel/<entry>.cel --out-dir tests/data` writes `tests/data/patient/<library>/<case>/<ResourceType>/*.json` |
-
-### Two ways to drive the CRL engine from KELP
-
-**1. CLI (host-driven, scripted).** The KELP host (or a CI step) invokes `crl-emit` directly for the four engineering folders (`src/cql/`, `src/fhir/`, plus the CEL instance tree under `tests/data/`). Deterministic, reproducible, suitable for build pipelines.
+Concrete invocations from a project root:
 
 ```bash
-# From a KELP project root:
-npx crl-emit --path src/crl/cms22.crl       --out-dir . --target fhir-def   # writes src/cql/* + src/fhir/*
-npx crl-emit --path src/cel/cms22-cases.cel --out-dir tests/data            # writes tests/data/patient/...
+# Regenerate both CQL + FHIR-def lanes for one CRL library (atomic two-lane write):
+npx crl-emit --path src/crl/cms22.crl --out-dir . --target fhir-def
+#   writes  src/cql/<library>.cql           (one per library in the import closure)
+#           src/fhir/<ResourceType>/*.json  (ValueSet / Library / ActivityDef / PlanDef)
+
+# Regenerate FHIR instance resources for one CEL case file:
+npx crl-emit --path src/cel/cms22-cases.cel --out-dir tests/data
+#   writes  tests/data/patient/<library>/<case>/<ResourceType>/*.json
 ```
 
-The atomic two-lane contract for `--target fhir-def` is the right primitive here: a single CRL change regenerates both lanes together, so `Library.content` URLs never drift.
-
-**2. MCP (agent-driven, interactive).** KELP's agent host (e.g. Claude Code) calls the MCP tools directly. Useful for the read-only inspection tools (`tokenize_crl`, `build_crl_ast`, `validate_crl`, `validate_cel`) where the agent is reasoning about author intent, and for the emit tools when the agent wants the structured envelope (e.g. `emit_crl_fhir`'s summary manifest) without touching the filesystem.
-
-The two surfaces are equivalent for the emit tools — the CLI produces the same FHIR JSON the MCP tool returns. Pick the surface that fits the call site: CLI for batch / CI / KELP-host filesystem writes; MCP for interactive AI workflows.
-
-### Lock / clean rule
-
-KELP's filesystem contract treats the four generated folders (`src/cql/`, `src/fhir/`, the CEL instance tree) as **engine-owned**: do not hand-edit. The CRL CLI is the only writer. A clean rebuild from `src/crl/` + `src/cel/` is always the source of truth.
+The atomic two-lane contract on `--target fhir-def` is the load-bearing piece: a single CRL change regenerates `src/cql/` and `src/fhir/` together so `Library.content` URLs never drift out of sync.
 
 ---
 
