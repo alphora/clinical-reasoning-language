@@ -248,17 +248,70 @@ A typical clinical artifact project has authored CRL/CEL sources plus generated 
 | `src/fhir/<ResourceType>/<id>.json` | Emitted FHIR Definition resources (ValueSet / Library / ActivityDef / PlanDef) | FHIR lane of `--target fhir-def` |
 | `tests/data/patient/<library>/<case>/<ResourceType>/<id>.json` | Emitted FHIR instance resources per CEL case | `crl-emit` on a `.cel` file |
 
+### Read / write flow
+
+Which CLI command reads what, and writes what, when invoked from a project root:
+
+```
+                            ┌──────────────────────────────────────────────┐
+                            │                project filesystem            │
+                            └──────────────────────────────────────────────┘
+   ┌─ authored sources ────────────────┐   ┌─ generated outputs ─────────────────┐
+   │                                   │   │                                     │
+   │   src/crl/*.crl ◄──┐  ┌──► src/cql/<library>.cql                            │
+   │                    │  │                                                     │
+   │   src/cel/*.cel ──┐│  │┌► src/fhir/<ResourceType>/<id>.json                 │
+   │                   ││  ││                                                    │
+   │                   ││  ││   tests/data/patient/<lib>/<case>/<RT>/<id>.json   │
+   │                   ││  ││                                            ▲       │
+   └───────────────────┼┼──┼┼────────────────────────────────────────────┼───────┘
+                       ││  ││                                            │
+                read ──┘│  │└── write                                    │
+                        │  │                                             │
+                        │  │ ┌──────────────────────────────────────┐    │
+                        │  └─┤ crl-emit --target fhir-def           │    │
+                        │    │   --path src/crl/<lib>.crl           │    │
+                        │    │   --out-dir .                        │    │
+                        │    │ (atomic two-lane write — both        │    │
+                        │    │  src/cql/* and src/fhir/<RT>/* land  │    │
+                        │    │  together, or neither does)          │    │
+                        │    └──────────────────────────────────────┘    │
+                        │                                                │
+                        │    ┌──────────────────────────────────────┐    │
+                        └────┤ crl-emit                             │────┘
+                             │   --path src/cel/<cases>.cel         │
+                             │   --out-dir tests/data               │
+                             │ (reads the CRL closure for           │
+                             │  validation, then emits instances)   │
+                             └──────────────────────────────────────┘
+
+                             ┌──────────────────────────────────────┐
+            src/crl/<lib>.crl │ crl-validate                         │
+                       ──read─►   --path src/crl/<lib>.crl           │── stdout: {success, errors[], warnings[]}
+                             │   [--soft]                           │   (no filesystem writes)
+                             └──────────────────────────────────────┘
+```
+
+The two reads on the CEL emit line are important: a `.cel` file references CRL declarations from its `covers "<Library>"` clause, so the emitter resolves the full CRL closure under `src/crl/` (and any `node_modules` packages it imports) before emitting any FHIR instance.
+
 Concrete invocations from a project root:
 
 ```bash
 # Regenerate both CQL + FHIR-def lanes for one CRL library (atomic two-lane write):
 npx crl-emit --path src/crl/cms22.crl --out-dir . --target fhir-def
+#   reads   src/crl/cms22.crl  (+ closure via package.json / node_modules)
 #   writes  src/cql/<library>.cql           (one per library in the import closure)
 #           src/fhir/<ResourceType>/*.json  (ValueSet / Library / ActivityDef / PlanDef)
 
 # Regenerate FHIR instance resources for one CEL case file:
 npx crl-emit --path src/cel/cms22-cases.cel --out-dir tests/data
+#   reads   src/cel/cms22-cases.cel + the CRL closure named in its `covers` clause
 #   writes  tests/data/patient/<library>/<case>/<ResourceType>/*.json
+
+# Validate a CRL file without writing anything:
+npx crl-validate --path src/crl/cms22.crl
+#   reads   src/crl/cms22.crl + closure
+#   writes  nothing — emits `{success, errors[], warnings[]}` on stdout
 ```
 
 The atomic two-lane contract on `--target fhir-def` is the load-bearing piece: a single CRL change regenerates `src/cql/` and `src/fhir/` together so `Library.content` URLs never drift out of sync.
