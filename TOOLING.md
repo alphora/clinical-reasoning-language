@@ -63,18 +63,47 @@ A single CLI binary (`crl-emit`) dispatches all three emit paths by the input fi
 
 ## Installation
 
+The package is **not yet published to the public npm registry**. Until it is, three delivery vectors are available — pick the one that matches your use case:
+
+### Option A — VS Code extension (vsix) — for interactive authoring + MCP
+
+Lowest-friction path if you want the language server, validation, and the MCP tools available inside VS Code / Claude Code. The extension carries its own bundled MCP server and auto-provisions `<workspace>/.mcp.json` on first activation.
+
+1. Download `crl-language-support-X.Y.Z.vsix` from the [Releases page](https://github.com/alphora/clinical-reasoning-language/releases/latest).
+2. Install:
+   ```bash
+   code --install-extension crl-language-support-X.Y.Z.vsix --force
+   ```
+3. Open VS Code in any workspace. The extension activates automatically (via `onStartupFinished`) and writes the `crl` server into `<workspace>/.mcp.json`. Any MCP host (Claude Code, etc.) picks up the 7 tools on its next start.
+
+### Option B — npm tarball (`.tgz`) — for scripting / CI / host applications
+
+Use this when you need the `crl-emit` and `crl-validate` binaries from a script or a host application's filesystem pipeline.
+
+1. Download `smile-digital-health-crl-X.Y.Z.tgz` from the [Releases page](https://github.com/alphora/clinical-reasoning-language/releases/latest).
+2. Install into your project:
+   ```bash
+   npm install ./smile-digital-health-crl-X.Y.Z.tgz
+   ```
+3. Use the binaries:
+   ```bash
+   npx crl-emit --help
+   npx crl-validate --path mylib.crl
+   ```
+
+### Option C — git clone (for contributors / advanced users)
+
 ```bash
-npm install @smile-digital-health/crl
+git clone https://github.com/alphora/clinical-reasoning-language.git
+cd clinical-reasoning-language
+npm install
+npm run build
+npm link    # or invoke binaries directly via dist/cli/run-*.js
 ```
 
-CLI binaries are then available via `npx`:
+### Once npm publish goes public
 
-```bash
-npx crl-emit --help
-npx crl-validate --path mylib.crl
-```
-
-For interactive authoring in VS Code with MCP integration, also install the bundled extension (`crl-language-support-X.Y.Z.vsix`); it auto-provisions `<workspace>/.mcp.json` so any MCP host (Claude Code, etc.) picks up the 7 tools automatically.
+The intent is for the package to become publicly installable as `npm install @smile-digital-health/crl`. Until that happens, Options A–C above are the supported vectors. This document will be updated when the registry vector goes live.
 
 ---
 
