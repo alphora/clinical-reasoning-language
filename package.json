@@ -58,6 +58,8 @@
     "cli:validator": "ts-node src/cli/run-validator.ts",
     "cli:validator:pretty": "ts-node src/cli/run-validator.ts --pretty",
     "cli:template-match": "ts-node src/cli/run-template-match.ts",
+    "cli:emitter": "ts-node src/cli/run-emitter.ts",
+    "cli:mcp": "ts-node src/cli/run-mcp-server.ts",
     "cli:transformer:fsh-to-crl": "ts-node src/cli/run-transformer-fsh-to-crl.ts",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
@@ -75,7 +77,7 @@
     "validator"
   ],
   "author": "CQIS",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
     "antlr4ts": "^0.5.0-alpha.4",
