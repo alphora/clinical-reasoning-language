@@ -66,9 +66,10 @@ issues/
 # the *-expected.* fixtures are committed baselines.
 src/tests/regression/testdata/*-actual.*
 
-# Feature working artifacts: source corpora dropped in for analysis and
-# derived data (decoded ELM forests, etc.). Source folders often contain
-# their own .git checkouts and are huge; derived data is regenerable.
-# Committed artifacts (README, scripts, results) live alongside but stay tracked.
-features/*/sources/
-features/*/data/
+# Feature working artifacts: local analysis corpora, derived data, and
+# modeling scratch work. Kept local, not tracked in version control.
+features/
+
+# Local-only content removed from version control. Kept on disk, not tracked.
+cql/
+docs/
