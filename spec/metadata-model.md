@@ -23,12 +23,16 @@ The terminating `.` goes **after** the closing backtick: `` - meta is `...`. `` 
 | `@id` | stable concept identifier; durable metadata keys on `@id` so renames don't orphan tags | B narrative | human | 0..1 |
 | `@description` | author's gloss of the object (distinct from `evidence` = verbatim source quote) | B narrative | human | 0..1 |
 | `@ke-feedback` | Informaticist→KE note; must reach the KE in generated CQL. Carries `status open\|resolved\|deferred`; only unresolved emits | B narrative | human | 0..n |
-| `@logic-expression-text` | **the logic** — the case features / decision points (*what* the logic tests) | B narrative | human/agent | 0..1 |
+| `@logic-expression-text` | **the logic** — the case features / decision points (*what* the logic tests); lands in a CQL block comment | B narrative | human/agent | 0..1 |
 | `@controlled-natural-language` | **the logic flow** — the order & sequencing in which the logic is applied (*how*) | B narrative | human/agent | 0..1 |
 | `@crl-future-expression` | plain-language logic CRL can't express yet; lands in a CQL block comment + feeds the CRL roadmap | B narrative | human/agent | 0..n |
+| `@business-logic-deferred` | business logic intentionally not yet implemented; lands in a CQL block comment as a tracked gap | B narrative | human/agent | 0..n |
+| `@clinical-logic-deferred` | clinical decision logic intentionally not yet implemented; lands in a CQL block comment as a tracked gap | B narrative | human/agent | 0..n |
 | `@kg-concept` | scored **hint for the decision** — a node in the **Concept Graph** ("KG" = Concept Graph) | A external-ref | agent/human | 0..n |
 | `@reef-reference` | scored **hint** for **REEF** ("the great reef"), the downstream artifact repo the CRL→CQL/FHIR skill + compiler consume | A external-ref | agent/human | 0..n |
 | `@semantic-parse-text` | semantic parse of the **source narrative** (extraction exhaust) | C provenance | human/agent | 0..n |
+
+**Emitted to CQL.** The CQL emitter renders exactly the tags with `emit.cql: true` in the registry as a leading block comment on the concept's `define`: `@logic-expression-text`, `@crl-future-expression`, `@ke-feedback`, `@business-logic-deferred`, `@clinical-logic-deferred`. All other tags and untyped notes are not emitted to CQL. (`@crl-future-expression` additionally surfaces as a structured `futureExpressions` entry on the emit result.)
 
 `@logic-expression-text` (the logic) and `@controlled-natural-language` (the logic flow) are a complementary pair. `@kg-concept` (Concept Graph) and `@reef-reference` (REEF) are **distinct** stores — both hold scored hints, shaped by the shared `ExternalReference` value type with a `system` discriminator (`kg` / `reef`).
 

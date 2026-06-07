@@ -176,11 +176,9 @@ describe("fhir-emitter metadata.readPackageMetadata (filesystem)", () => {
       __dirname,
       "..",
       "..",
-      "..",
-      "features",
-      "cql-pattern-mining",
-      "results",
-      "models",
+      "tests",
+      "fixtures",
+      "corpus",
       "cms22-split",
     );
     const r = readPackageMetadata(corpus);

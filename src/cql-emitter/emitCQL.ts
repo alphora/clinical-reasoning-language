@@ -216,13 +216,40 @@ function indent(text: string, level = 1): string {
     .join("\n");
 }
 
-// #108: render a CRL `meta is …` array as a CQL block comment to prepend to
-// the concept's emitted `define`. Returns "" when there are no annotations.
-// The defusing replacement keeps CRL meta text that contains the sequence
-// "asterisk slash" from accidentally closing the comment early.
+/**
+ * Tags whose `@tag: <body>` meta lines are rendered into a CQL block comment
+ * on the concept's `define`. Source of truth: the tags with `emit.cql: true`
+ * in spec/metadata-registry.json. The drift-guard test
+ * `meta-emit-registry.test.ts` asserts this set stays in sync with the registry
+ * so adding/flipping a tag there fails the build until this mirror is updated.
+ */
+export const EMIT_CQL_COMMENT_TAGS: ReadonlySet<string> = new Set([
+  "logic-expression-text",
+  "crl-future-expression",
+  "ke-feedback",
+  "business-logic-deferred",
+  "clinical-logic-deferred",
+]);
+
+const META_TAG_RE = /^@([a-z][a-z0-9-]*):/;
+
+// A meta line reaches the generated CQL iff it carries an `@tag` whose tag is
+// in the emit.cql allowlist. Other tags (external refs, provenance) and untyped
+// notes stay in the .crl source only.
+function metaEmitsToCql(line: string): boolean {
+  const m = META_TAG_RE.exec(line.trim());
+  return m !== null && EMIT_CQL_COMMENT_TAGS.has(m[1]);
+}
+
+// #108: render the emit.cql-eligible CRL `meta is …` lines as a CQL block
+// comment to prepend to the concept's emitted `define`. Returns "" when no
+// eligible annotations are present. The defusing replacement keeps CRL meta
+// text containing "asterisk slash" from accidentally closing the comment early.
 function renderMetaBlock(meta: string[] | undefined): string {
   if (!meta || meta.length === 0) return "";
-  const safe = meta.map((line) => line.replace(/\*\//g, "* /"));
+  const emitted = meta.filter(metaEmitsToCql);
+  if (emitted.length === 0) return "";
+  const safe = emitted.map((line) => line.replace(/\*\//g, "* /"));
   return `/*\n${safe.map((l) => ` * ${l}`).join("\n")}\n */\n`;
 }
 
