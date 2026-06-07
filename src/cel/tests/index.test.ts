@@ -7,11 +7,11 @@ import type { CEL, CELCase, CELFact, CELFactRefField, CELDefinedByField } from "
 const REPO_ROOT = path.resolve(__dirname, "..", "..", "..");
 
 const CORPUS = {
-  cms22: path.join(REPO_ROOT, "features/cql-pattern-mining/results/models/cms22-split/cms22.cel"),
-  cms22Strategy: path.join(REPO_ROOT, "features/cql-pattern-mining/results/models/cms22-split/cms22-strategy.cel"),
-  cms69: path.join(REPO_ROOT, "features/cql-pattern-mining/results/models/cms69-split/cms69.cel"),
-  cms69Strategy: path.join(REPO_ROOT, "features/cql-pattern-mining/results/models/cms69-split/cms69-strategy.cel"),
-  syntaxRef: path.join(REPO_ROOT, "docs/cel-syntax-reference.cel"),
+  cms22: path.join(REPO_ROOT, "src/tests/fixtures/corpus/cms22-split/cms22.cel"),
+  cms22Strategy: path.join(REPO_ROOT, "src/tests/fixtures/corpus/cms22-split/cms22-strategy.cel"),
+  cms69: path.join(REPO_ROOT, "src/tests/fixtures/corpus/cms69-split/cms69.cel"),
+  cms69Strategy: path.join(REPO_ROOT, "src/tests/fixtures/corpus/cms69-split/cms69-strategy.cel"),
+  syntaxRef: path.join(__dirname, "fixtures/cel-syntax-reference.cel"),
 };
 
 function readSource(p: string): string {
@@ -64,7 +64,7 @@ describe("CEL Todo 2 — buildCEL regression on worked corpus", () => {
     expect(r.result?.library.name).toBe("CMS69 BMI Cognitive Support — High BMI");
   });
 
-  test("docs/cel-syntax-reference.cel parses cleanly (normative coverage)", () => {
+  test("cel-syntax-reference.cel fixture parses cleanly (normative coverage)", () => {
     const r = buildCEL(readSource(CORPUS.syntaxRef));
     if (r.errors) {
       // Surface useful diagnostics if it fails.

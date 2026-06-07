@@ -1,0 +1,59 @@
+# CMS69 BMI Screening — measure caseload
+
+// A clinical scenario where a patient with a high baseline BMI receives
+// a weight assessment referral, and a follow-up reading later in the
+// measurement period shows improvement. The patient satisfies the CMS69
+// Numerator via the High-BMI-and-Follow-Up path.
+
+library "CMS69 BMI Screening".
+covers "CMS69".
+
+
+// ============ Patient facts ============
+
+fact "Jane Doe":
+- name is "Jane Doe".
+- birth date is "1980-01-01".
+- defined by "Patient".
+
+
+// ============ Clinical facts ============
+
+fact "Baseline Wellness Visit":
+- code is "http://www.ama-assn.org/go/cpt|99395".
+- date is "2026-01-15".
+- defined by "CMS69 Asserted"."Encounters to Evaluate BMI".
+
+fact "High Baseline BMI":
+- code is "http://loinc.org|39156-5".
+- date is "2026-01-15".
+- value is 32.4.
+- defined by "CMS69 Asserted"."BMI Observations".
+
+fact "Weight Assessment Referral Order":
+- code is "http://snomed.info/sct|306163007".
+- date is "2026-01-15".
+- stage is ordered.
+- defined by "CMS69 BMI Screening GPG Strategy example"."Order Weight Assessment Referral".
+
+fact "Follow-up Normal BMI":
+- code is "http://loinc.org|39156-5".
+- date is "2026-07-15".
+- value is 24.1.
+- defined by "CMS69 Asserted"."BMI Observations".
+
+
+// ============ Cases ============
+
+case "Jane's high BMI is followed up with a weight assessment referral":
+- description is `Jane's baseline BMI at her wellness visit is high.
+  She receives a weight assessment referral and her follow-up reading
+  later in the measurement period is normal. She satisfies the Numerator
+  via the High-BMI-and-Follow-Up path.`.
+- subject is "Jane Doe".
+- fact is "Baseline Wellness Visit".
+- fact is "High Baseline BMI".
+- fact is "Weight Assessment Referral Order".
+- fact is "Follow-up Normal BMI".
+- result is "Initial Population" is true.
+- result is "Numerator" is true.

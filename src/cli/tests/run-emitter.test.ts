@@ -21,15 +21,15 @@ const REPO_ROOT = join(__dirname, "..", "..", "..");
 const CLI = join(REPO_ROOT, "src", "cli", "run-emitter.ts");
 const CC_SCREENING = join(
   REPO_ROOT,
-  "features/cpg-roundtrip/cc-screening-cognitive-support/cc-screening.crl",
+  "src/tests/fixtures/cpg-roundtrip/cc-screening-cognitive-support/cc-screening.crl",
 );
 const CMS22 = join(
   REPO_ROOT,
-  "features/cql-pattern-mining/results/models/cms22-split/cms22-strategy.crl",
+  "src/tests/fixtures/corpus/cms22-split/cms22-strategy.crl",
 );
 const CMS22_CEL = join(
   REPO_ROOT,
-  "features/cql-pattern-mining/results/models/cms22-split/cms22-strategy.cel",
+  "src/tests/fixtures/corpus/cms22-split/cms22-strategy.cel",
 );
 
 function runCli(args: string[]): { exitCode: number; stdout: string; stderr: string } {
@@ -111,7 +111,7 @@ describe("CLI dispatch matrix — `.crl + --target fhir-def` two-lane contract (
   // <out-dir>/fhir/<rt>/*.json write atomically, OR neither does.
   // cc-screening + cms22 both exercise the failure path because their
   // concept bodies use placeholder/unmatched narratives that the
-  // CRLPatterns catalog rejects — exactly the case where partial
+  // CRLCommon catalog rejects — exactly the case where partial
   // emission would have shipped broken Library.content URLs.
 
   it("cc-screening: CQL lane fails (placeholder narratives) → exit 1, neither <out-dir>/cql NOR <out-dir>/fhir written", () => {

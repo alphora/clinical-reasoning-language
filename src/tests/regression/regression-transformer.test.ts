@@ -4,7 +4,12 @@ import * as path from "path";
 
 import stripAnsi from "strip-ansi";
 
-describe("Transformer regression test: IMMZ example", () => {
+// DEPRECATED: the FSH→CRL transformer is no longer a supported lane of this
+// project, so this regression test is skipped. It is retained for reference
+// only; do not treat its failures as actionable. Already excluded from the
+// regression aggregator (see regression/index.test.ts). Remove when the FSH
+// transformer is removed.
+describe.skip("Transformer regression test: IMMZ example (DEPRECATED — FSH lane)", () => {
   const TMP_FILE = path.join(__dirname, "testdata", "regression-transformer-actual.crl");
   const EXPECTED_FILE = path.join(__dirname, "testdata", "regression-transformer-expected.crl");
   const MARKER = "// Instance: IMMZD2DTMeaslesDose0";

@@ -6,7 +6,7 @@ import { emitCQL } from "../emitCQL";
 //   - Issue #79 — `EmitResult.unmatched[]` + `success: false` + compile-failing
 //     sentinel call when a `- definition is …` narrative has no catalog match.
 //   - Issue #77 — `currently taking <X>` and `has history of <X>` were in the
-//     catalog + CRLPatterns.cql but missing from the matcher. The same audit
+//     catalog + CRLCommon.cql but missing from the matcher. The same audit
 //     pass also wires `has`, `has adverse reaction to`, and `age at`.
 
 function lib(name: string, body: string): string {
@@ -25,8 +25,8 @@ describe("T10 / #78 — recency × state-predicate composition", () => {
     const r = emitCQL(src, { libraryName: "T" });
     expect(r.success).toBe(true);
     expect(r.unmatched).toBeUndefined();
-    expect(r.result).toMatch(/CRLPatterns\.MostRecent\(/);
-    expect(r.result).toMatch(/CRLPatterns\.Active\(/);
+    expect(r.result).toMatch(/CRLCommon\.MostRecent\(/);
+    expect(r.result).toMatch(/CRLCommon\.Active\(/);
   });
 
   it("`most recent <X> verified` → MostRecent wrapping IsVerified", () => {
@@ -37,8 +37,8 @@ describe("T10 / #78 — recency × state-predicate composition", () => {
     );
     const r = emitCQL(src, { libraryName: "T" });
     expect(r.success).toBe(true);
-    expect(r.result).toMatch(/CRLPatterns\.MostRecent\(/);
-    expect(r.result).toMatch(/CRLPatterns\.IsVerified\(/);
+    expect(r.result).toMatch(/CRLCommon\.MostRecent\(/);
+    expect(r.result).toMatch(/CRLCommon\.IsVerified\(/);
   });
 
   it("`most recent <X> documented as <Y>` → MostRecent wrapping DocumentedAs", () => {
@@ -50,8 +50,8 @@ describe("T10 / #78 — recency × state-predicate composition", () => {
     );
     const r = emitCQL(src, { libraryName: "T" });
     expect(r.success).toBe(true);
-    expect(r.result).toMatch(/CRLPatterns\.MostRecent\(/);
-    expect(r.result).toMatch(/CRLPatterns\.DocumentedAs\(/);
+    expect(r.result).toMatch(/CRLCommon\.MostRecent\(/);
+    expect(r.result).toMatch(/CRLCommon\.DocumentedAs\(/);
   });
 
   it("`last <X> active` → Last wrapping Active", () => {
@@ -62,8 +62,8 @@ describe("T10 / #78 — recency × state-predicate composition", () => {
     );
     const r = emitCQL(src, { libraryName: "T" });
     expect(r.success).toBe(true);
-    expect(r.result).toMatch(/CRLPatterns\.LastOf\(/);
-    expect(r.result).toMatch(/CRLPatterns\.Active\(/);
+    expect(r.result).toMatch(/CRLCommon\.LastOf\(/);
+    expect(r.result).toMatch(/CRLCommon\.Active\(/);
   });
 
   it("`last <X> verified` → Last wrapping IsVerified", () => {
@@ -74,8 +74,8 @@ describe("T10 / #78 — recency × state-predicate composition", () => {
     );
     const r = emitCQL(src, { libraryName: "T" });
     expect(r.success).toBe(true);
-    expect(r.result).toMatch(/CRLPatterns\.LastOf\(/);
-    expect(r.result).toMatch(/CRLPatterns\.IsVerified\(/);
+    expect(r.result).toMatch(/CRLCommon\.LastOf\(/);
+    expect(r.result).toMatch(/CRLCommon\.IsVerified\(/);
   });
 
   it("`last <X> documented as <Y>` → Last wrapping DocumentedAs", () => {
@@ -87,8 +87,8 @@ describe("T10 / #78 — recency × state-predicate composition", () => {
     );
     const r = emitCQL(src, { libraryName: "T" });
     expect(r.success).toBe(true);
-    expect(r.result).toMatch(/CRLPatterns\.LastOf\(/);
-    expect(r.result).toMatch(/CRLPatterns\.DocumentedAs\(/);
+    expect(r.result).toMatch(/CRLCommon\.LastOf\(/);
+    expect(r.result).toMatch(/CRLCommon\.DocumentedAs\(/);
   });
 
   it("bare `most recent <X>` still matches plain MostRecent (regression)", () => {
@@ -99,13 +99,13 @@ describe("T10 / #78 — recency × state-predicate composition", () => {
     );
     const r = emitCQL(src, { libraryName: "T" });
     expect(r.success).toBe(true);
-    expect(r.result).toMatch(/CRLPatterns\.MostRecent\(/);
-    expect(r.result).not.toMatch(/CRLPatterns\.Active\(/);
+    expect(r.result).toMatch(/CRLCommon\.MostRecent\(/);
+    expect(r.result).not.toMatch(/CRLCommon\.Active\(/);
   });
 });
 
 describe("T08 / #98 — window-from-anchor 3 missing sisters", () => {
-  it("`last <X> within <Q> after end of <Y>` → CRLPatterns.AfterEndOf inside Last", () => {
+  it("`last <X> within <Q> after end of <Y>` → CRLCommon.AfterEndOf inside Last", () => {
     const src = lib(
       "T",
       terms("X") +
@@ -115,11 +115,11 @@ describe("T08 / #98 — window-from-anchor 3 missing sisters", () => {
     const r = emitCQL(src, { libraryName: "T" });
     expect(r.success).toBe(true);
     expect(r.unmatched).toBeUndefined();
-    expect(r.result).toMatch(/CRLPatterns\.AfterEndOf/);
-    expect(r.result).toMatch(/CRLPatterns\.LastOf\(/);
+    expect(r.result).toMatch(/CRLCommon\.AfterEndOf/);
+    expect(r.result).toMatch(/CRLCommon\.LastOf\(/);
   });
 
-  it("`last <X> within <Q> after start of <Y>` → CRLPatterns.AfterStartOf", () => {
+  it("`last <X> within <Q> after start of <Y>` → CRLCommon.AfterStartOf", () => {
     const src = lib(
       "T",
       terms("X") +
@@ -128,10 +128,10 @@ describe("T08 / #98 — window-from-anchor 3 missing sisters", () => {
     );
     const r = emitCQL(src, { libraryName: "T" });
     expect(r.success).toBe(true);
-    expect(r.result).toMatch(/CRLPatterns\.AfterStartOf/);
+    expect(r.result).toMatch(/CRLCommon\.AfterStartOf/);
   });
 
-  it("`last <X> within <Q> before end of <Y>` → CRLPatterns.BeforeEndOf", () => {
+  it("`last <X> within <Q> before end of <Y>` → CRLCommon.BeforeEndOf", () => {
     const src = lib(
       "T",
       terms("X") +
@@ -140,7 +140,7 @@ describe("T08 / #98 — window-from-anchor 3 missing sisters", () => {
     );
     const r = emitCQL(src, { libraryName: "T" });
     expect(r.success).toBe(true);
-    expect(r.result).toMatch(/CRLPatterns\.BeforeEndOf/);
+    expect(r.result).toMatch(/CRLCommon\.BeforeEndOf/);
   });
 
   it("existing `before start of` sister keeps matching (regression guard)", () => {
@@ -152,12 +152,12 @@ describe("T08 / #98 — window-from-anchor 3 missing sisters", () => {
     );
     const r = emitCQL(src, { libraryName: "T" });
     expect(r.success).toBe(true);
-    expect(r.result).toMatch(/CRLPatterns\.BeforeStartOf/);
+    expect(r.result).toMatch(/CRLCommon\.BeforeStartOf/);
   });
 });
 
 describe("T07 / #93 — AtLeastApart / AtMostApart matcher wiring", () => {
-  it("`<A> and <B> at least <Q> apart` → emits CRLPatterns.AtLeastApart, no unmatched", () => {
+  it("`<A> and <B> at least <Q> apart` → emits CRLCommon.AtLeastApart, no unmatched", () => {
     const src = lib(
       "T",
       terms("Reading A") +
@@ -167,10 +167,10 @@ describe("T07 / #93 — AtLeastApart / AtMostApart matcher wiring", () => {
     const r = emitCQL(src, { libraryName: "T" });
     expect(r.success).toBe(true);
     expect(r.unmatched).toBeUndefined();
-    expect(r.result).toMatch(/CRLPatterns\.AtLeastApart/);
+    expect(r.result).toMatch(/CRLCommon\.AtLeastApart/);
   });
 
-  it("`<A> and <B> at most <Q> apart` → emits CRLPatterns.AtMostApart", () => {
+  it("`<A> and <B> at most <Q> apart` → emits CRLCommon.AtMostApart", () => {
     const src = lib(
       "T",
       terms("Reading A") +
@@ -179,7 +179,7 @@ describe("T07 / #93 — AtLeastApart / AtMostApart matcher wiring", () => {
     );
     const r = emitCQL(src, { libraryName: "T" });
     expect(r.success).toBe(true);
-    expect(r.result).toMatch(/CRLPatterns\.AtMostApart/);
+    expect(r.result).toMatch(/CRLCommon\.AtMostApart/);
   });
 
   it("bare `at least <Q>` (3 elements, no `apart`) still matches AtLeast — not AtLeastApart", () => {
@@ -190,7 +190,7 @@ describe("T07 / #93 — AtLeastApart / AtMostApart matcher wiring", () => {
     );
     const r = emitCQL(src, { libraryName: "T" });
     expect(r.success).toBe(true);
-    expect(r.result).toMatch(/CRLPatterns\.AtLeast\(/);
+    expect(r.result).toMatch(/CRLCommon\.AtLeast\(/);
     expect(r.result).not.toMatch(/AtLeastApart/);
   });
 });
@@ -208,9 +208,9 @@ describe("issue #79 — unmatched narrative envelope + sentinel", () => {
     expect(r.unmatched!.length).toBe(1);
     expect(r.unmatched![0].text).toMatch(/wibbles/);
     expect(r.unmatched![0].line).toBeGreaterThan(0);
-    // Sentinel call references CRLPatterns.UnmatchedNarrative — not defined
-    // in CRLPatterns.cql, so a downstream CQL compiler will reject the output.
-    expect(r.result).toMatch(/CRLPatterns\.UnmatchedNarrative\(/);
+    // Sentinel call references CRLCommon.UnmatchedNarrative — not defined
+    // in CRLCommon.cql, so a downstream CQL compiler will reject the output.
+    expect(r.result).toMatch(/CRLCommon\.UnmatchedNarrative\(/);
     // Old failure mode (literal `true`) must NOT appear.
     expect(r.result).not.toMatch(/\n  true\n/);
     // Mirrored in errors[] as a Validation diagnostic keyed by kind.
@@ -227,7 +227,7 @@ describe("issue #79 — unmatched narrative envelope + sentinel", () => {
     const r = emitCQL(src, { libraryName: "T" });
     expect(r.success).toBe(true);
     expect(r.unmatched).toBeUndefined();
-    expect(r.result).toMatch(/CRLPatterns\.MostRecent/);
+    expect(r.result).toMatch(/CRLCommon\.MostRecent/);
   });
 
   it("multiple unmatched narratives all surface in unmatched[] with distinct locations", () => {
@@ -246,7 +246,7 @@ describe("issue #79 — unmatched narrative envelope + sentinel", () => {
 
 describe("issue #77 — catalog↔matcher drift fix (plus audit additions)", () => {
   // mymobiledoc's exact repro from the bug report.
-  it("currently taking <med> → CRLPatterns.CurrentlyTaking(...)", () => {
+  it("currently taking <med> → CRLCommon.CurrentlyTaking(...)", () => {
     const src = lib(
       "T",
       terms("Beta Blocker") +
@@ -255,10 +255,10 @@ describe("issue #77 — catalog↔matcher drift fix (plus audit additions)", () 
     const r = emitCQL(src, { libraryName: "T" });
     expect(r.success).toBe(true);
     expect(r.unmatched).toBeUndefined();
-    expect(r.result).toMatch(/CRLPatterns\.CurrentlyTaking\("Beta Blocker"\)/);
+    expect(r.result).toMatch(/CRLCommon\.CurrentlyTaking\("Beta Blocker"\)/);
   });
 
-  it("has history of <X> → CRLPatterns.HasHistoryOf(...)", () => {
+  it("has history of <X> → CRLCommon.HasHistoryOf(...)", () => {
     const src = lib(
       "T",
       terms("Steroid") +
@@ -266,10 +266,10 @@ describe("issue #77 — catalog↔matcher drift fix (plus audit additions)", () 
     );
     const r = emitCQL(src, { libraryName: "T" });
     expect(r.success).toBe(true);
-    expect(r.result).toMatch(/CRLPatterns\.HasHistoryOf\(/);
+    expect(r.result).toMatch(/CRLCommon\.HasHistoryOf\(/);
   });
 
-  it("has <X> → CRLPatterns.Has(...)", () => {
+  it("has <X> → CRLCommon.Has(...)", () => {
     const src = lib(
       "T",
       terms("Diabetes") +
@@ -277,10 +277,10 @@ describe("issue #77 — catalog↔matcher drift fix (plus audit additions)", () 
     );
     const r = emitCQL(src, { libraryName: "T" });
     expect(r.success).toBe(true);
-    expect(r.result).toMatch(/CRLPatterns\.Has\(/);
+    expect(r.result).toMatch(/CRLCommon\.Has\(/);
   });
 
-  it("has adverse reaction to <X> → CRLPatterns.HasAdverseReactionTo(...)", () => {
+  it("has adverse reaction to <X> → CRLCommon.HasAdverseReactionTo(...)", () => {
     const src = lib(
       "T",
       terms("Penicillin") +
@@ -288,10 +288,10 @@ describe("issue #77 — catalog↔matcher drift fix (plus audit additions)", () 
     );
     const r = emitCQL(src, { libraryName: "T" });
     expect(r.success).toBe(true);
-    expect(r.result).toMatch(/CRLPatterns\.HasAdverseReactionTo\(/);
+    expect(r.result).toMatch(/CRLCommon\.HasAdverseReactionTo\(/);
   });
 
-  it("age at <anchor> → CRLPatterns.AgeAt(...)", () => {
+  it("age at <anchor> → CRLCommon.AgeAt(...)", () => {
     const src = lib(
       "T",
       terms("Index Encounter") +
@@ -299,6 +299,6 @@ describe("issue #77 — catalog↔matcher drift fix (plus audit additions)", () 
     );
     const r = emitCQL(src, { libraryName: "T" });
     expect(r.success).toBe(true);
-    expect(r.result).toMatch(/CRLPatterns\.AgeAt\(/);
+    expect(r.result).toMatch(/CRLCommon\.AgeAt\(/);
   });
 });

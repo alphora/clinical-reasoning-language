@@ -9,7 +9,7 @@
     { "name": "kind/meta", "color": "fef2c0", "description": "About the project or process itself (labels, conventions, governance)." },
 
     { "name": "area/validator", "color": "cccccc", "description": "CRL or CEL validators (src/validator/, src/cel/validator/)." },
-    { "name": "area/cql-emitter", "color": "cccccc", "description": "CRL -> CQL emit lane (src/emitter/, src/imports/emit.ts)." },
+    { "name": "area/cql-emitter", "color": "cccccc", "description": "CRL -> CQL emit lane (src/cql-emitter/, src/imports/emit.ts)." },
     { "name": "area/fhir-emitter", "color": "cccccc", "description": "CRL -> FHIR Definition resource emit (src/fhir-emitter/)." },
     { "name": "area/cel-emitter", "color": "cccccc", "description": "CEL -> FHIR instance emit (src/cel/emitter/)." },
     { "name": "area/template-match", "color": "cccccc", "description": "Narrative-pattern matcher (src/template-match/)." },

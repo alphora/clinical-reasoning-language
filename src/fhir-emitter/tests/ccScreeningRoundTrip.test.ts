@@ -3,9 +3,9 @@
  * ccScreeningRoundTrip.test.ts).
  *
  * Validates that the CRL fixture at
- * `features/cpg-roundtrip/cc-screening-cognitive-support/cc-screening.crl`
+ * `src/tests/fixtures/cpg-roundtrip/cc-screening-cognitive-support/cc-screening.crl`
  * emits FHIR resources that match the expected reference shape in
- * `features/cpg-roundtrip/cc-screening-cognitive-support/expected-fhir/`
+ * `src/tests/fixtures/cpg-roundtrip/cc-screening-cognitive-support/expected-fhir/`
  * modulo the deliberate deviations documented in the fixture README:
  *   - no `version` field on emitted resources (project-wide rule);
  *   - no `executable` knowledgeCapability;
@@ -35,7 +35,7 @@ import { emitRecommendationDefinitionsForLibrary } from "../recommendation";
 import type { CpgMetadata } from "../types";
 
 const ROOT = join(__dirname, "..", "..", "..");
-const FIXTURE_DIR = join(ROOT, "features/cpg-roundtrip/cc-screening-cognitive-support");
+const FIXTURE_DIR = join(ROOT, "src/tests/fixtures/cpg-roundtrip/cc-screening-cognitive-support");
 const EXPECTED_FHIR = join(FIXTURE_DIR, "expected-fhir");
 const FIXED_CLOCK = () => new Date("2026-06-04T15:30:00.000Z");
 

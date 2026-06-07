@@ -1,0 +1,294 @@
+# CMS22 Blood Pressure Control Cognitive Support Example
+library "CMS22 BP Control Cognitive Support Example".
+
+/*
+Clinical Reasoning Language (CRL) — v2.1.0 grammar reference example.
+
+A second canonical small example built on the **CMS22 (Controlling High
+Blood Pressure)** quality measure, framed as a point-of-care cognitive
+support workflow for hypertension management. Sister to
+clinical-reasoning-language-example.crl (which targets CMS69 BMI
+screening); pick whichever fits your scenario.
+
+The full quality-measure encoding lives in
+features/cql-pattern-mining/results/models/cms22-split/. This file shows
+the cognitive-support facet: at an encounter, what should the clinician
+do so the patient ends up in CMS22's numerator (BP controlled or a
+documented appropriate follow-up plan)?
+
+Same grammar conventions as the CMS69 example — see that file for the
+surface rules. This file's structural variety:
+  - `defined as ( ... sem-or ... )`: multi-source composition
+    (BP reading from a panel OR standalone systolic/diastolic obs).
+  - `defined as ( "X" sem-and sem-not "Y" )`: the sem-not example
+    (last reading is hypertensive but NOT yet diagnosed).
+  - `definition is X high`, `definition is X performed`,
+    `definition is X documented`: narrative-predicate body kinds.
+  - `any:` / `all:` recommendation blocks inside `when/then` bodies.
+  - `use decision` chaining between top-level + sub-decisions.
+  - `recommend activity` with `do not perform`.
+*/
+
+// ============ Decisions ============
+
+// Top-level cognitive-support decision for hypertension. Walked at
+// every qualifying encounter for an adult patient. The when/then
+// branches mirror CMS22's clinical flow:
+//   1. capture a BP reading if none for this visit,
+//   2. if BP is hypertensive, drive treatment OR documentation,
+//   3. if BP is normal but the patient has hypertension on file,
+//      remind the clinician to confirm continued control.
+decision "CMS22 BP Control Strategy":
+
+- when "Patient Eligible For BP Cognitive Support" then:
+  - when "No BP Reading At This Encounter" then recommend activity "Measure BP".
+  - when "Has Hypertensive Reading" then use decision "Recommend Hypertension Intervention".
+  - when "Has Normal Reading With Hypertension On File" then recommend activity "Confirm Continued Control".
+- end when
+
+// Hypertensive-reading sub-decision. CMS22 accepts any one of:
+// a medication order, a follow-up rescreen order, or a documented
+// lifestyle/dietary referral. `any:` says any one of these
+// recommendations satisfies the measure.
+decision "Recommend Hypertension Intervention":
+
+- when "Has Confirmed Hypertension Diagnosis" then:
+  any:
+  - recommend activity "Antihypertensive Medication".
+  - recommend activity "Follow-up Rescreen".
+  - recommend activity "Lifestyle Referral".
+- end when
+- when "Hypertensive Reading Without Diagnosis" then:
+  all:
+  - recommend activity "Follow-up Rescreen".
+  - recommend activity "Document Provisional Hypertension".
+- end when
+- when "Has Antihypertensive Contraindication" then recommend activity "Contraindicated Antihypertensive".
+
+
+// ============ Activities ============
+
+activity "Measure BP":
+- request CPGServiceRequest.
+- with "Blood Pressure Panels VS".
+
+activity "Antihypertensive Medication":
+- request CPGMedicationRequest.
+- with "Antihypertensive Medications VS".
+- because `Patient has confirmed hypertension and an in-range encounter`.
+
+activity "Follow-up Rescreen":
+- request CPGServiceRequest.
+- with "Follow Up Within 4 Weeks VS".
+
+activity "Lifestyle Referral":
+- request CPGServiceRequest.
+- with "Lifestyle Recommendation VS".
+- because `Lifestyle counselling is the first-line intervention for stage-1 hypertension`.
+
+activity "Confirm Continued Control":
+- request CPGCommunicationRequest.
+- with `Confirm BP control remains adequate; no escalation needed this visit`.
+
+activity "Document Provisional Hypertension":
+- request CPGCommunicationRequest.
+- with `Single hypertensive reading without prior diagnosis — document provisional status and rescreen`.
+- because `Quality measure requires confirmation across encounters before a hypertension diagnosis is durable`.
+
+activity "Contraindicated Antihypertensive":
+- request do not perform CPGMedicationRequest.
+- with "Antihypertensive Medications VS".
+- because `Patient has a documented contraindication to antihypertensive pharmacotherapy`.
+
+
+// ============ Terminologies ============
+
+terminology "Blood Pressure Panels VS":
+- valueset is `http://loinc.org/vs/85354-9`.
+
+terminology "Standalone Systolic BP VS":
+- valueset is `http://loinc.org/vs/8480-6`.
+
+terminology "Standalone Diastolic BP VS":
+- valueset is `http://loinc.org/vs/8462-4`.
+
+terminology "Hypertension Diagnoses VS":
+- valueset is `http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.600.263`.
+
+terminology "Antihypertensive Medications VS":
+- valueset is `http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.526.1577`.
+
+terminology "Follow Up Within 4 Weeks VS":
+- valueset is `http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.526.3.1578`.
+
+terminology "Lifestyle Recommendation VS":
+- valueset is `http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.526.3.1581`.
+
+terminology "Antihypertensive Contraindication VS":
+- valueset is `urn:example:placeholder`.
+
+terminology "Medical Reason VS":
+- valueset is `http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.526.3.1007`.
+
+terminology "Patient Declined VS":
+- valueset is `http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.526.3.1582`.
+
+
+// ============ Concepts ============
+
+// --- Asserted concepts (coded from a terminology) ---
+
+concept "Blood Pressure Panels":
+- type is Observation.
+- value type is CodeableConcept.
+- value type is Quantity.
+- coded from "Blood Pressure Panels VS".
+
+concept "Standalone Systolic BP Observations":
+- type is Observation.
+- value type is Quantity.
+- coded from "Standalone Systolic BP VS".
+
+concept "Standalone Diastolic BP Observations":
+- type is Observation.
+- value type is Quantity.
+- coded from "Standalone Diastolic BP VS".
+
+concept "Hypertension Diagnoses":
+- type is Condition.
+- value type is CodeableConcept.
+- coded from "Hypertension Diagnoses VS".
+
+concept "Antihypertensive Medications":
+- type is MedicationRequest.
+- value type is CodeableConcept.
+- coded from "Antihypertensive Medications VS".
+
+concept "Follow-up Within 4 Weeks":
+- type is ServiceRequest.
+- value type is CodeableConcept.
+- coded from "Follow Up Within 4 Weeks VS".
+
+concept "Lifestyle Recommendations":
+- type is ServiceRequest.
+- value type is CodeableConcept.
+- coded from "Lifestyle Recommendation VS".
+
+concept "Antihypertensive Contraindication":
+- type is Observation.
+- value type is CodeableConcept.
+- coded from "Antihypertensive Contraindication VS".
+
+concept "Medical Reasons":
+- type is Observation.
+- value type is CodeableConcept.
+- coded from "Medical Reason VS".
+
+concept "Patient Declined Reasons":
+- type is Observation.
+- value type is CodeableConcept.
+- coded from "Patient Declined VS".
+
+
+// --- Composition concepts: multi-source BP reading ---
+
+// A BP reading can come from a paired panel observation OR from a
+// pair of standalone systolic + diastolic observations. The cognitive
+// support layer doesn't care which source — it just needs a reading.
+concept "BP Reading":
+- type is Observation.
+- value type is Quantity.
+- defined as
+(
+   "Blood Pressure Panels"
+   sem-or
+   "Standalone Systolic BP Observations"
+   sem-or
+   "Standalone Diastolic BP Observations"
+).
+
+
+// --- Predicate-kind concepts: narrative body + composing concept pair ---
+
+concept "Last BP Reading At This Encounter Selection":
+- meta is `Picks the latest BP observation tied to the current encounter`.
+- evidence is `Calculated by Smile`.
+- definition is most recent "BP Reading".
+
+concept "Last BP Reading At This Encounter":
+- type is Observation.
+- value type is Quantity.
+- defined as "Last BP Reading At This Encounter Selection".
+
+
+// --- sem-not example: hypertensive reading without confirmed diagnosis ---
+
+// The patient's last reading is hypertensive, but no Hypertension
+// Diagnoses are on file — a single high reading is not yet a durable
+// diagnosis under CMS22. The cognitive support layer flags this so
+// the clinician confirms across encounters before committing.
+concept "Hypertensive Reading Without Diagnosis":
+- type is Observation.
+- value type is boolean.
+- defined as
+(
+   "Has Hypertensive Reading"
+   sem-and
+   sem-not "Hypertension Diagnoses"
+).
+
+
+// --- Cognitive-support predicates (narrative bodies feeding the decision) ---
+
+concept "Patient Eligible For BP Cognitive Support":
+- type is Observation.
+- value type is boolean.
+- defined as
+(
+   sem-not "Medical Reasons"
+   sem-and
+   sem-not "Patient Declined Reasons"
+).
+
+concept "No BP Reading At This Encounter":
+- type is Observation.
+- value type is boolean.
+- definition is without documented "BP Reading".
+
+concept "Has Hypertensive Reading":
+- type is Observation.
+- value type is boolean.
+- definition is "Last BP Reading At This Encounter" high.
+
+concept "Has Normal Reading With Hypertension On File":
+- type is Observation.
+- value type is boolean.
+- defined as
+(
+   "Has Normal Reading"
+   sem-and
+   "Has Confirmed Hypertension Diagnosis"
+).
+
+concept "Has Normal Reading":
+- type is Observation.
+- value type is boolean.
+- definition is "Last BP Reading At This Encounter" normal.
+
+concept "Has Confirmed Hypertension Diagnosis":
+- type is Observation.
+- value type is boolean.
+- definition is "Hypertension Diagnoses" active.
+
+concept "Has Antihypertensive Contraindication":
+- type is Observation.
+- value type is boolean.
+// T13 / #94: bare `documented "X"` is not a catalog pattern. Canonical
+// form is `has <AssertedConcept>` referencing the asserted concept
+// declared above (coded from "Antihypertensive Contraindication VS").
+- definition is has "Antihypertensive Contraindication".
+
+
+// For the full Initial Population / Numerator / Denominator structure
+// behind this measure, see:
+//   features/cql-pattern-mining/results/models/cms22-split/

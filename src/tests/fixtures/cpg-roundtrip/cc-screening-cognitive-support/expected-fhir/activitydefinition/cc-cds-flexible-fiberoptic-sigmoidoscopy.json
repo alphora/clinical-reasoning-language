@@ -1,0 +1,119 @@
+{
+  "resourceType": "ActivityDefinition",
+  "id": "cc-cds-flexible-fiberoptic-sigmoidoscopy",
+  "meta": {
+    "profile": [
+      "http://hl7.org/fhir/uv/cpg/ActivityDefinition/cpg-servicerequest-activitydefinition"
+    ]
+  },
+  "extension": [
+    {
+      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-knowledgeCapability",
+      "valueCode": "shareable"
+    },
+    {
+      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-knowledgeCapability",
+      "valueCode": "computable"
+    },
+    {
+      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-knowledgeCapability",
+      "valueCode": "publishable"
+    },
+    {
+      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-knowledgeRepresentationLevel",
+      "valueCode": "structured"
+    },
+    {
+      "url": "http://hl7.org/fhir/us/davinci-crd/StructureDefinition/ext-coverage-information",
+      "extension": [
+        {
+          "url": "doc-needed",
+          "valueCode": "clinical"
+        },
+        {
+          "url": "doc-purpose",
+          "valueCode": "withpa"
+        },
+        {
+          "url": "questionnaire",
+          "valueCanonical": "http://example.org/some-payer/Questionnaire/cc-cds-flexible-fiberoptic-sigmoidoscopy|0.0.1"
+        }
+      ]
+    }
+  ],
+  "url": "http://example.org/sdh/demo/ActivityDefinition/cc-cds-flexible-fiberoptic-sigmoidoscopy",
+  "version": "0.0.1",
+  "name": "FlexibleFiberopticSigmoidoscopyActivityDefinition",
+  "title": "Flexible Fiberoptic Sigmoidoscopy",
+  "status": "active",
+  "date": "2023-04-11",
+  "experimental": true,
+  "publisher": "Smile Digital Health",
+  "description": "Order a Flexible Fiberoptic Sigmoidoscopy",
+  "kind": "ServiceRequest",
+  "profile": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-servicerequest",
+  "code": {
+    "coding": [
+      {
+        "system": "http://snomed.info/sct",
+        "code": "44441009",
+        "display": "Flexible fiberoptic sigmoidoscopy (procedure)"
+      }
+    ],
+    "text": "Referral to service (procedure)"
+  },
+  "intent": "proposal",
+  "doNotPerform": false,
+  "library": [
+    "http://example.org/sdh/demo/Library/ColorectalCancerCaseFeatures"
+  ],
+  "dynamicValue": [
+    {
+      "path": "extension[0].extension[3]",
+      "expression": {
+        "language": "text/cql-identifier",
+        "expression": "Prior Authorization Coverage",
+        "reference": "http://example.org/sdh/demo/Library/ColorectalCancerCaseFeatures"
+      }
+    },
+    {
+      "path": "extension[0].extension[4]",
+      "expression": {
+        "language": "text/cql-identifier",
+        "expression": "Prior Authorization Covered FlexSig",
+        "reference": "http://example.org/sdh/demo/Library/ColorectalCancerCaseFeatures"
+      }
+    },
+    {
+      "path": "extension[0].extension[5]",
+      "expression": {
+        "language": "text/cql-identifier",
+        "expression": "Prior Authorization Needed FlexSig",
+        "reference": "http://example.org/sdh/demo/Library/ColorectalCancerCaseFeatures"
+      }
+    },
+    {
+      "path": "extension[0].extension[6]",
+      "expression": {
+        "language": "text/cql-expression",
+        "expression": "Extension { url: uri { value: 'date' }, value: dateTime { value: Today() } }"
+      }
+    },
+    {
+      "path": "extension[0].extension[7]",
+      "expression": {
+        "language": "text/cql-identifier",
+        "expression": "Prior Authorization Coding FlexSig",
+        "reference": "http://example.org/sdh/demo/Library/ColorectalCancerCaseFeatures"
+      }
+    },
+    {
+      "path": "extension[0].extension[8]",
+      "expression": {
+        "language": "text/cql-identifier",
+        "expression": "Prior Authorization Detail FlexSig",
+        "reference": "http://example.org/sdh/demo/Library/ColorectalCancerCaseFeatures"
+      }
+    }
+  ]
+}

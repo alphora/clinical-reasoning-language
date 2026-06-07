@@ -96,7 +96,7 @@ export interface Pattern {
   narrative: string;
   /** e.g., `Has(X: ConceptRef)` — full signature with parameter types */
   signature: string;
-  /** e.g., `CRLPatterns.Has` — the emitter's CQL function reference */
+  /** e.g., `CRLCommon.Has` — the emitter's CQL function reference */
   cqlFunction: string;
   /** the category header text under which this pattern's table appeared, e.g. "Assertion" */
   category: string;
@@ -138,8 +138,18 @@ export function parseCatalog(markdown: string): Pattern[] {
 
     if (!inTable) continue;
 
+    // An HTML comment inside a reference table (used to defer/disable rows —
+    // e.g. the #99 catalog-sync deferrals) must NOT terminate the table:
+    // active rows can follow a comment. Skip the comment (single- or
+    // multi-line) and keep scanning. Without this, the first `<!-- ... -->`
+    // line drops every row beneath it (issue #109).
+    if (line.trim().startsWith("<!--")) {
+      while (!lines[i].includes("-->") && i + 1 < lines.length) i++;
+      continue;
+    }
+
     // A table row in the canonical tables looks like:
-    //   | `Name(args)` | `narrative <X>` | `Name(args: T)` | `CRLPatterns.Name` |
+    //   | `Name(args)` | `narrative <X>` | `Name(args: T)` | `CRLCommon.Name` |
     // A blank line or a non-table line ends the table.
     if (!line.startsWith("|")) {
       inTable = false;

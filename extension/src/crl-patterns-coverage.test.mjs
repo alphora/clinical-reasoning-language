@@ -1,5 +1,5 @@
-// Catalog ↔ CRLPatterns.cql coverage check. Reads the catalog markdown,
-// parses out every `CRLPatterns.X` reference, then scans cql/CRLPatterns.cql
+// Catalog ↔ CRLCommon.cql coverage check. Reads the catalog markdown,
+// parses out every `CRLCommon.X` reference, then scans src/cql-emitter/catalog/CRLCommon.cql
 // for a `define function "X"(...)` for each. Fails on missing functions so
 // catalog additions can't drift ahead of the library.
 
@@ -13,8 +13,8 @@ const { parseCatalog } = mod.default ?? mod;
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, "../..");
-const catalogPath = resolve(repoRoot, "features/cql-pattern-mining/results/inference-pattern-catalog-draft.md");
-const libraryPath = resolve(repoRoot, "cql/src/CRLPatterns.cql");
+const catalogPath = resolve(repoRoot, "src/cql-emitter/catalog/inference-pattern-catalog-draft.md");
+const libraryPath = resolve(repoRoot, "src/cql-emitter/catalog/CRLCommon.cql");
 
 const patterns = parseCatalog(readFileSync(catalogPath, "utf-8"));
 // 28 after the v2.5.0 #99-sync (7 unreachable patterns commented out at source).
@@ -31,18 +31,18 @@ while ((m = fnRe.exec(library)) !== null) {
   definedFns.add(m[1]);
 }
 
-// Every catalog row points at `CRLPatterns.<Name>`; extract <Name> and
+// Every catalog row points at `CRLCommon.<Name>`; extract <Name> and
 // confirm it's defined.
 const missing = [];
 for (const p of patterns) {
-  const expected = p.cqlFunction.replace(/^CRLPatterns\./, "");
+  const expected = p.cqlFunction.replace(/^CRLCommon\./, "");
   if (!definedFns.has(expected)) {
     missing.push(`${expected} (catalog row: ${p.canonical}, ${p.cqlFunction})`);
   }
 }
 
 if (missing.length > 0) {
-  console.error("Missing CRLPatterns.cql functions:");
+  console.error("Missing CRLCommon.cql functions:");
   for (const m of missing) console.error(`  - ${m}`);
   process.exit(1);
 }

@@ -1,0 +1,85 @@
+# CMS22 Terminology
+
+library "CMS22 Terminology".
+
+// Migrated to CRL v0.7: `concept` is the only declaration kind; `definition is` body for narrative predicates;
+// concept `defined as` body is bare ref or sem-or/sem-and/sem-not composition.
+// All multi-clause concepts now compose named inferences via sem-* operators.
+
+
+// ============ Terminologies (valuesets) ============
+// Real valuesets from the source CMS22 CQL library with VSAC URLs.
+
+terminology "Diagnosis of Hypertension":
+- valueset is `http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.600.263`.
+
+terminology "Dietary Recommendations":
+- valueset is `http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.600.1515`.
+
+terminology "Encounter to Screen for Blood Pressure":
+- valueset is `http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.600.1920`.
+
+terminology "Finding of Elevated Blood Pressure or Hypertension":
+- valueset is `http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113762.1.4.1047.514`.
+
+terminology "Follow Up Within 4 Weeks":
+- valueset is `http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.526.3.1578`.
+
+terminology "Follow Up Within 6 Months":
+- valueset is `http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113762.1.4.1108.125`.
+
+terminology "Laboratory Tests for Hypertension":
+- valueset is `http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.600.1482`.
+
+terminology "Lifestyle Recommendation":
+- valueset is `http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.526.3.1581`.
+
+terminology "Medical Reason":
+- valueset is `http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.526.3.1007`.
+
+terminology "Patient Declined":
+- valueset is `http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.526.3.1582`.
+
+terminology "Pharmacologic Therapy for Hypertension":
+- valueset is `http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.526.1577`.
+
+terminology "Recommendation to Increase Physical Activity":
+- valueset is `http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.600.1518`.
+
+terminology "Referral or Counseling for Alcohol Consumption":
+- valueset is `http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.526.3.1583`.
+
+terminology "Referral to Primary Care or Alternate Provider":
+- valueset is `http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.526.3.1580`.
+
+terminology "Weight Reduction Recommended":
+- valueset is `http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.600.1510`.
+
+// Single-code terminologies — source CQL uses these as LOINC/ActCode codes
+// (not valuesets). Now declared as proper system+code terminologies with
+// the actual codes from the source CQL.
+
+terminology "Blood pressure panel with all children optional":
+- system is `http://loinc.org`.
+- code is `85354-9`.
+
+terminology "Systolic Blood Pressure Code":
+- system is `http://loinc.org`.
+- code is `8480-6`.
+
+terminology "Diastolic Blood Pressure Code":
+- system is `http://loinc.org`.
+- code is `8462-4`.
+
+terminology "EKG 12 Lead Panel Code":
+- system is `http://loinc.org`.
+- code is `34534-8`.
+
+terminology "EKG Study Code":
+- system is `http://loinc.org`.
+- code is `11524-6`.
+
+terminology "Virtual Encounter Class":
+- system is `http://terminology.hl7.org/CodeSystem/v3-ActCode`.
+- code is `VR`.
+

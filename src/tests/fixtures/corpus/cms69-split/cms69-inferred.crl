@@ -1,0 +1,666 @@
+# CMS69 Inferred Concepts
+
+library "CMS69 Inferred".
+
+// ============ Runtime parameters ============
+// "Measurement Period" is a runtime CQL parameter (issue #59) — declared in
+// the inferred library because that's where its consumers live. Terminology
+// libraries (which don't reference it) don't carry the declaration.
+
+parameter "Measurement Period":
+- param type is Period.
+
+
+// ============ Lifted property concepts (bare ref — type-only wrappers) ============
+
+concept "High BMI Follow-up Order Date":
+- type is ServiceRequest.
+- value type is dateTime.
+- defined as "CMS69 Asserted"."High BMI Follow-up Service Requests".
+
+concept "Weight Assessment Referral Date":
+- type is ServiceRequest.
+- value type is dateTime.
+- defined as "CMS69 Asserted"."Weight Assessment Referrals".
+
+concept "High BMI Medication Order Date":
+- type is MedicationRequest.
+- value type is dateTime.
+- defined as "CMS69 Asserted"."High BMI Medications".
+
+concept "Low BMI Follow-up Order Date":
+- type is ServiceRequest.
+- value type is dateTime.
+- defined as "CMS69 Asserted"."Low BMI Follow-up Service Requests".
+
+concept "Low BMI Medication Order Date":
+- type is MedicationRequest.
+- value type is dateTime.
+- defined as "CMS69 Asserted"."Low BMI Medications".
+
+concept "High BMI Procedure Performed Date":
+- type is Procedure.
+- value type is dateTime.
+- defined as "CMS69 Asserted"."High BMI Follow-up Procedures".
+
+concept "Low BMI Procedure Performed Date":
+- type is Procedure.
+- value type is dateTime.
+- defined as "CMS69 Asserted"."Low BMI Follow-up Procedures".
+
+
+// ============ Inference declarations + composing concepts ============
+
+// --- Qualifying Encounter ---
+
+concept "BMI Evaluation Encounter (not virtual)":
+- type is Encounter.
+- defined as
+(
+   "CMS69 Asserted"."Encounters to Evaluate BMI"
+   sem-and
+   sem-not "CMS69 Asserted"."Virtual Encounters"
+).
+
+concept "BMI Evaluation Encounter (not virtual) During MP":
+- type is Encounter.
+- definition is "BMI Evaluation Encounter (not virtual)" during "Measurement Period".
+
+concept "BMI Evaluation Encounter (not virtual) Performed":
+- type is Encounter.
+- definition is "BMI Evaluation Encounter (not virtual)" performed.
+
+concept "Qualifying Encounter":
+- type is Encounter.
+- defined as
+(
+   "BMI Evaluation Encounter (not virtual) During MP"
+   sem-and
+   "BMI Evaluation Encounter (not virtual) Performed"
+).
+
+
+// --- BMI During Measurement Period ---
+
+concept "BMI Observation During MP":
+- type is Observation.
+- value type is Quantity.
+- definition is "CMS69 Asserted"."BMI Observations" during "Measurement Period".
+
+concept "BMI Observation Has Positive Value":
+- type is Observation.
+- value type is Quantity.
+- definition is "CMS69 Asserted"."BMI Observations" exceeds 0 'kg/m2'.
+
+concept "BMI During Measurement Period":
+- type is Observation.
+- value type is Quantity.
+- defined as
+(
+   "BMI Observation During MP"
+   sem-and
+   "BMI Observation Has Positive Value"
+).
+
+
+// --- BMI clinical classifications ---
+
+concept "BMI During MP Low":
+- type is Observation.
+- value type is boolean.
+- definition is "BMI During Measurement Period" low.
+
+concept "BMI During MP High":
+- type is Observation.
+- value type is boolean.
+- definition is "BMI During Measurement Period" high.
+
+concept "BMI During MP Normal":
+- type is Observation.
+- value type is boolean.
+- definition is "BMI During Measurement Period" normal.
+
+concept "Documented Low BMI":
+- type is Observation.
+- value type is boolean.
+- defined as "BMI During MP Low".
+
+concept "Documented High BMI":
+- type is Observation.
+- value type is boolean.
+- defined as "BMI During MP High".
+
+concept "Normal BMI Range":
+- type is Observation.
+- value type is boolean.
+- defined as "BMI During MP Normal".
+
+
+// --- Has Normal BMI ---
+
+concept "Without Documented Abnormal BMI":
+- type is Observation.
+- value type is boolean.
+- definition is without documented ("Documented High BMI" or "Documented Low BMI").
+
+concept "Has Normal BMI":
+- type is Observation.
+- value type is boolean.
+- defined as
+(
+   "Normal BMI Range"
+   sem-and
+   "Without Documented Abnormal BMI"
+).
+
+
+// --- Co-existing diagnoses ---
+
+concept "Overweight or Obese Diagnoses Active":
+- type is Condition.
+- definition is "CMS69 Asserted"."Overweight or Obese Diagnoses" active.
+
+concept "Underweight Diagnoses Active":
+- type is Condition.
+- definition is "CMS69 Asserted"."Underweight Diagnoses" active.
+
+concept "Has Overweight or Obese":
+- type is Observation.
+- value type is boolean.
+- defined as "Overweight or Obese Diagnoses Active".
+
+concept "Has Underweight":
+- type is Observation.
+- value type is boolean.
+- defined as "Underweight Diagnoses Active".
+
+
+// --- High BMI Interventions Ordered ---
+
+concept "High BMI Follow-up Justified by Overweight Diagnosis":
+- type is ServiceRequest.
+- definition is "CMS69 Asserted"."High BMI Follow-up Service Requests" justified by "CMS69 Asserted"."Overweight or Obese Diagnoses".
+
+concept "Has Overweight On Or Before High BMI Follow-up Order":
+- type is Observation.
+- value type is boolean.
+- definition is "Has Overweight or Obese" on or before "High BMI Follow-up Order Date".
+
+concept "High BMI Follow-up Order":
+- type is ServiceRequest.
+- defined as
+(
+   "High BMI Follow-up Justified by Overweight Diagnosis"
+   sem-or
+   "Has Overweight On Or Before High BMI Follow-up Order"
+).
+
+concept "Weight Assessment Referral Justified by Overweight Diagnosis":
+- type is ServiceRequest.
+- definition is "CMS69 Asserted"."Weight Assessment Referrals" justified by "CMS69 Asserted"."Overweight or Obese Diagnoses".
+
+concept "Has Overweight On Or Before Weight Assessment Referral":
+- type is Observation.
+- value type is boolean.
+- definition is "Has Overweight or Obese" on or before "Weight Assessment Referral Date".
+
+concept "High BMI Weight Assessment Referral":
+- type is ServiceRequest.
+- defined as
+(
+   "Weight Assessment Referral Justified by Overweight Diagnosis"
+   sem-or
+   "Has Overweight On Or Before Weight Assessment Referral"
+).
+
+concept "High BMI Medication Justified by Overweight Diagnosis":
+- type is MedicationRequest.
+- definition is "CMS69 Asserted"."High BMI Medications" justified by "CMS69 Asserted"."Overweight or Obese Diagnoses".
+
+concept "Has Overweight On Or Before High BMI Medication Order":
+- type is Observation.
+- value type is boolean.
+- definition is "Has Overweight or Obese" on or before "High BMI Medication Order Date".
+
+concept "High BMI Medication Order":
+- type is MedicationRequest.
+- defined as
+(
+   "High BMI Medication Justified by Overweight Diagnosis"
+   sem-or
+   "Has Overweight On Or Before High BMI Medication Order"
+).
+
+concept "High BMI Interventions Ordered":
+- type is Observation.
+- value type is boolean.
+- defined as
+(
+   "High BMI Follow-up Order"
+   sem-or
+   "High BMI Weight Assessment Referral"
+   sem-or
+   "High BMI Medication Order"
+).
+
+
+// --- High BMI Interventions Performed ---
+
+concept "High BMI Procedure Justified by Overweight Diagnosis":
+- type is Procedure.
+- definition is "CMS69 Asserted"."High BMI Follow-up Procedures" justified by "CMS69 Asserted"."Overweight or Obese Diagnoses".
+
+concept "Has Overweight On Or Before High BMI Procedure":
+- type is Observation.
+- value type is boolean.
+- definition is "Has Overweight or Obese" on or before "High BMI Procedure Performed Date".
+
+concept "High BMI Procedure Performed":
+- type is Procedure.
+- defined as
+(
+   "High BMI Procedure Justified by Overweight Diagnosis"
+   sem-or
+   "Has Overweight On Or Before High BMI Procedure"
+).
+
+concept "High BMI Interventions Performed":
+- type is Procedure.
+- defined as "High BMI Procedure Performed".
+
+
+// --- High BMI And Follow Up Provided ---
+
+concept "Documented High BMI During MP":
+- type is Observation.
+- value type is boolean.
+- definition is "Documented High BMI" during "Measurement Period".
+
+concept "High BMI And Follow Up Provided":
+- type is Observation.
+- value type is boolean.
+- defined as
+(
+   "Documented High BMI During MP"
+   sem-and
+   (
+      "High BMI Interventions Ordered"
+      sem-or
+      "High BMI Interventions Performed"
+   )
+).
+
+
+// --- Low BMI analogous ---
+
+concept "Low BMI Follow-up Justified by Underweight Diagnosis":
+- type is ServiceRequest.
+- definition is "CMS69 Asserted"."Low BMI Follow-up Service Requests" justified by "CMS69 Asserted"."Underweight Diagnoses".
+
+concept "Has Underweight On Or Before Low BMI Follow-up Order":
+- type is Observation.
+- value type is boolean.
+- definition is "Has Underweight" on or before "Low BMI Follow-up Order Date".
+
+concept "Low BMI Follow-up Order Date During MP":
+- type is Observation.
+- value type is boolean.
+- definition is "Low BMI Follow-up Order Date" during "Measurement Period".
+
+concept "Low BMI Follow-up Order":
+- type is ServiceRequest.
+- defined as
+(
+   "Low BMI Follow-up Justified by Underweight Diagnosis"
+   sem-or
+   (
+      "Has Underweight On Or Before Low BMI Follow-up Order"
+      sem-and
+      "Low BMI Follow-up Order Date During MP"
+   )
+).
+
+concept "Weight Assessment Referral Justified by Underweight Diagnosis":
+- type is Observation.
+- value type is boolean.
+- definition is "CMS69 Asserted"."Weight Assessment Referrals" justified by "CMS69 Asserted"."Underweight Diagnoses".
+
+concept "Has Underweight On Or Before Weight Assessment Referral":
+- type is Observation.
+- value type is boolean.
+- definition is "Has Underweight" on or before "Weight Assessment Referral Date".
+
+concept "Weight Assessment Referral Date During MP":
+- type is Observation.
+- value type is boolean.
+- definition is "Weight Assessment Referral Date" during "Measurement Period".
+
+concept "Low BMI Weight Assessment Referral":
+- type is ServiceRequest.
+- defined as
+(
+   "Weight Assessment Referral Justified by Underweight Diagnosis"
+   sem-or
+   (
+      "Has Underweight On Or Before Weight Assessment Referral"
+      sem-and
+      "Weight Assessment Referral Date During MP"
+   )
+).
+
+concept "Low BMI Medication Justified by Underweight Diagnosis":
+- type is MedicationRequest.
+- definition is "CMS69 Asserted"."Low BMI Medications" justified by "CMS69 Asserted"."Underweight Diagnoses".
+
+concept "Has Underweight On Or Before Low BMI Medication Order":
+- type is Observation.
+- value type is boolean.
+- definition is "Has Underweight" on or before "Low BMI Medication Order Date".
+
+concept "Low BMI Medication Order Date During MP":
+- type is Observation.
+- value type is boolean.
+- definition is "Low BMI Medication Order Date" during "Measurement Period".
+
+concept "Low BMI Medication Order":
+- type is MedicationRequest.
+- defined as
+(
+   "Low BMI Medication Justified by Underweight Diagnosis"
+   sem-or
+   (
+      "Has Underweight On Or Before Low BMI Medication Order"
+      sem-and
+      "Low BMI Medication Order Date During MP"
+   )
+).
+
+concept "Low BMI Interventions Ordered":
+- type is Observation.
+- value type is boolean.
+- defined as
+(
+   "Low BMI Follow-up Order"
+   sem-or
+   "Low BMI Weight Assessment Referral"
+   sem-or
+   "Low BMI Medication Order"
+).
+
+
+// --- Low BMI Interventions Performed ---
+
+concept "Low BMI Procedure Justified by Underweight Diagnosis":
+- type is Procedure.
+- definition is "CMS69 Asserted"."Low BMI Follow-up Procedures" justified by "CMS69 Asserted"."Underweight Diagnoses".
+
+concept "Low BMI Follow-up Procedures Performed":
+- type is Procedure.
+- definition is "CMS69 Asserted"."Low BMI Follow-up Procedures" performed.
+
+concept "Has Underweight On Or Before Low BMI Procedure":
+- type is Observation.
+- value type is boolean.
+- definition is "Has Underweight" on or before "Low BMI Procedure Performed Date".
+
+concept "Low BMI Procedure Performed Date During MP":
+- type is Observation.
+- value type is boolean.
+- definition is "Low BMI Procedure Performed Date" during "Measurement Period".
+
+concept "Low BMI Procedure Performed":
+- type is Procedure.
+- defined as
+(
+   (
+      "Low BMI Procedure Justified by Underweight Diagnosis"
+      sem-and
+      "Low BMI Follow-up Procedures Performed"
+   )
+   sem-or
+   (
+      "Has Underweight On Or Before Low BMI Procedure"
+      sem-and
+      "Low BMI Procedure Performed Date During MP"
+   )
+).
+
+concept "Low BMI Interventions Performed":
+- type is Procedure.
+- defined as "Low BMI Procedure Performed".
+
+
+// --- Low BMI And Follow Up Provided ---
+
+concept "Documented Low BMI During MP":
+- type is Observation.
+- value type is boolean.
+- definition is "Documented Low BMI" during "Measurement Period".
+
+concept "Low BMI And Follow Up Provided":
+- type is Observation.
+- value type is boolean.
+- defined as
+(
+   "Documented Low BMI During MP"
+   sem-and
+   (
+      "Low BMI Interventions Ordered"
+      sem-or
+      "Low BMI Interventions Performed"
+   )
+).
+
+
+// --- BMI exam not performed with reason ---
+
+concept "BMI Observation Not Done With Reason":
+- type is Observation.
+- definition is "CMS69 Asserted"."BMI Observations" not done with reason ("CMS69 Asserted"."Medical Reasons" or "CMS69 Asserted"."Patient Declined Reasons").
+
+concept "BMI Observation Same Day As Qualifying Encounter":
+- type is Observation.
+- definition is "CMS69 Asserted"."BMI Observations" same day as "Qualifying Encounter".
+
+concept "Medical Reason Or Patient Reason For Not Performing BMI Exam":
+- type is Observation.
+- value type is boolean.
+- defined as
+(
+   "BMI Observation Not Done With Reason"
+   sem-and
+   "BMI Observation Same Day As Qualifying Encounter"
+).
+
+
+// --- BMI follow-up not documented with reason ---
+
+concept "High BMI Follow-up Not Done With Medical Reason":
+- type is ServiceRequest.
+- definition is "CMS69 Asserted"."High BMI Follow-up Service Requests" not done with reason "CMS69 Asserted"."Medical Reasons".
+
+concept "High BMI Follow-up Same Day As Qualifying Encounter":
+- type is ServiceRequest.
+- definition is "CMS69 Asserted"."High BMI Follow-up Service Requests" same day as "Qualifying Encounter".
+
+concept "High BMI Follow-up Performed":
+- type is ServiceRequest.
+- definition is "CMS69 Asserted"."High BMI Follow-up Service Requests" performed.
+
+concept "High BMI Follow-up Not Done With Reason":
+- type is ServiceRequest.
+- defined as
+(
+   "High BMI Follow-up Not Done With Medical Reason"
+   sem-and
+   "High BMI Follow-up Same Day As Qualifying Encounter"
+   sem-and
+   "High BMI Follow-up Performed"
+).
+
+concept "Low BMI Follow-up Not Done With Medical Reason":
+- type is ServiceRequest.
+- definition is "CMS69 Asserted"."Low BMI Follow-up Service Requests" not done with reason "CMS69 Asserted"."Medical Reasons".
+
+concept "Low BMI Follow-up Same Day As Qualifying Encounter":
+- type is ServiceRequest.
+- definition is "CMS69 Asserted"."Low BMI Follow-up Service Requests" same day as "Qualifying Encounter".
+
+concept "Low BMI Follow-up Performed":
+- type is ServiceRequest.
+- definition is "CMS69 Asserted"."Low BMI Follow-up Service Requests" performed.
+
+concept "Low BMI Follow-up Not Done With Reason":
+- type is ServiceRequest.
+- defined as
+(
+   "Low BMI Follow-up Not Done With Medical Reason"
+   sem-and
+   "Low BMI Follow-up Same Day As Qualifying Encounter"
+   sem-and
+   "Low BMI Follow-up Performed"
+).
+
+concept "Weight Assessment Referral Not Done With Medical Reason":
+- type is ServiceRequest.
+- definition is "CMS69 Asserted"."Weight Assessment Referrals" not done with reason "CMS69 Asserted"."Medical Reasons".
+
+concept "Weight Assessment Referral Same Day As Qualifying Encounter":
+- type is ServiceRequest.
+- definition is "CMS69 Asserted"."Weight Assessment Referrals" same day as "Qualifying Encounter".
+
+concept "Weight Assessment Referral Performed":
+- type is ServiceRequest.
+- definition is "CMS69 Asserted"."Weight Assessment Referrals" performed.
+
+concept "Weight Assessment Referral Not Done With Reason":
+- type is ServiceRequest.
+- defined as
+(
+   "Weight Assessment Referral Not Done With Medical Reason"
+   sem-and
+   "Weight Assessment Referral Same Day As Qualifying Encounter"
+   sem-and
+   "Weight Assessment Referral Performed"
+).
+
+concept "High BMI Medication Not Done With Medical Reason":
+- type is MedicationRequest.
+- definition is "CMS69 Asserted"."High BMI Medications" not done with reason "CMS69 Asserted"."Medical Reasons".
+
+concept "High BMI Medication Same Day As Qualifying Encounter":
+- type is MedicationRequest.
+- definition is "CMS69 Asserted"."High BMI Medications" same day as "Qualifying Encounter".
+
+concept "High BMI Medication Performed":
+- type is MedicationRequest.
+- definition is "CMS69 Asserted"."High BMI Medications" performed.
+
+concept "High BMI Medication Not Done With Reason":
+- type is MedicationRequest.
+- defined as
+(
+   "High BMI Medication Not Done With Medical Reason"
+   sem-and
+   "High BMI Medication Same Day As Qualifying Encounter"
+   sem-and
+   "High BMI Medication Performed"
+).
+
+concept "Low BMI Medication Not Done With Medical Reason":
+- type is MedicationRequest.
+- definition is "CMS69 Asserted"."Low BMI Medications" not done with reason "CMS69 Asserted"."Medical Reasons".
+
+concept "Low BMI Medication Same Day As Qualifying Encounter":
+- type is MedicationRequest.
+- definition is "CMS69 Asserted"."Low BMI Medications" same day as "Qualifying Encounter".
+
+concept "Low BMI Medication Performed":
+- type is MedicationRequest.
+- definition is "CMS69 Asserted"."Low BMI Medications" performed.
+
+concept "Low BMI Medication Not Done With Reason":
+- type is MedicationRequest.
+- defined as
+(
+   "Low BMI Medication Not Done With Medical Reason"
+   sem-and
+   "Low BMI Medication Same Day As Qualifying Encounter"
+   sem-and
+   "Low BMI Medication Performed"
+).
+
+concept "Medical Reason For Not Documenting A Follow Up Plan For Low Or High BMI":
+- type is Observation.
+- value type is boolean.
+- defined as
+(
+   "High BMI Follow-up Not Done With Reason"
+   sem-or
+   "Low BMI Follow-up Not Done With Reason"
+   sem-or
+   "Weight Assessment Referral Not Done With Reason"
+   sem-or
+   "High BMI Medication Not Done With Reason"
+   sem-or
+   "Low BMI Medication Not Done With Reason"
+).
+
+
+// --- Pregnancy during measurement period ---
+
+concept "Pregnancy Diagnoses Active During MP":
+- type is Condition.
+- definition is "CMS69 Asserted"."Pregnancy Diagnoses" active during "Measurement Period".
+
+concept "Active Pregnancy Diagnosis":
+- type is Observation.
+- value type is boolean.
+- defined as "Pregnancy Diagnoses Active During MP".
+
+concept "Pregnancy Status Overlaps MP":
+- type is Observation.
+- definition is "CMS69 Asserted"."Pregnancy Status Observations" overlaps "Measurement Period".
+
+concept "Pregnancy Status Verified":
+- type is Observation.
+- definition is "CMS69 Asserted"."Pregnancy Status Observations" verified.
+
+concept "Pregnancy Status Documented As Pregnancy Related":
+- type is Observation.
+- definition is "CMS69 Asserted"."Pregnancy Status Observations" documented as "CMS69 Asserted"."Pregnancy or Other Related Diagnoses".
+
+concept "Verified Pregnancy Status":
+- type is Observation.
+- value type is boolean.
+- defined as
+(
+   "Pregnancy Status Overlaps MP"
+   sem-and
+   "Pregnancy Status Verified"
+   sem-and
+   "Pregnancy Status Documented As Pregnancy Related"
+).
+
+concept "Is Pregnant During Measurement Period":
+- type is Observation.
+- value type is boolean.
+- defined as
+(
+   "Active Pregnancy Diagnosis"
+   sem-or
+   "Verified Pregnancy Status"
+).
+
+
+// --- Age predicate ---
+
+concept "Age At Start Of MP At Least 18 Years":
+- type is Observation.
+- value type is boolean.
+- definition is age at start of "Measurement Period" at least 18 years.
+
+concept "Aged 18+ at Measurement Period Start":
+- type is Observation.
+- value type is boolean.
+- defined as "Age At Start Of MP At Least 18 Years".

@@ -8,11 +8,11 @@ import { resolveCelImports } from "../../imports";
 const REPO_ROOT = path.resolve(__dirname, "..", "..", "..", "..");
 
 const CORPUS = {
-  cms22: path.join(REPO_ROOT, "features/cql-pattern-mining/results/models/cms22-split/cms22.cel"),
-  cms22Strategy: path.join(REPO_ROOT, "features/cql-pattern-mining/results/models/cms22-split/cms22-strategy.cel"),
-  cms69: path.join(REPO_ROOT, "features/cql-pattern-mining/results/models/cms69-split/cms69.cel"),
-  cms69Strategy: path.join(REPO_ROOT, "features/cql-pattern-mining/results/models/cms69-split/cms69-strategy.cel"),
-  syntaxRef: path.join(REPO_ROOT, "docs/cel-syntax-reference.cel"),
+  cms22: path.join(REPO_ROOT, "src/tests/fixtures/corpus/cms22-split/cms22.cel"),
+  cms22Strategy: path.join(REPO_ROOT, "src/tests/fixtures/corpus/cms22-split/cms22-strategy.cel"),
+  cms69: path.join(REPO_ROOT, "src/tests/fixtures/corpus/cms69-split/cms69.cel"),
+  cms69Strategy: path.join(REPO_ROOT, "src/tests/fixtures/corpus/cms69-split/cms69-strategy.cel"),
+  syntaxRef: path.join(__dirname, "../../tests/fixtures/cel-syntax-reference.cel"),
 };
 
 describe("CEL Todo 4 — validator: 4 CMS corpus files clean (errors + warnings empty)", () => {

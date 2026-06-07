@@ -2,7 +2,7 @@
  * CRL → CQL emitter (v0.2).
  *
  * Walks a parsed CRL document and produces a CQL library targeting
- * `CRLPatterns.cql` (see cql/src/CRLPatterns.cql). The catalog is the source
+ * `CRLCommon.cql` (see src/cql-emitter/catalog/CRLCommon.cql). The catalog is the source
  * of truth for narrative → canonical → CQL function name mapping; this
  * emitter consumes the canonical AST produced by `matchNarrative` from
  * `src/template-match`.
@@ -65,7 +65,7 @@ export interface EmitOptions {
   libraryName?: string;
   // FHIRHelpers ships versioned with the FHIR spec (the R4 release pins
   // its own FHIRHelpers version), so the emitted CQL keeps its version
-  // pin. CRLPatterns, in contrast, is our own library — npm packaging IS
+  // pin. CRLCommon, in contrast, is our own library — npm packaging IS
   // its version system, so we emit it without a `version '...'` clause.
   fhirHelpersVersion?: string;
   /**
@@ -149,7 +149,7 @@ export interface EmitResult {
   futureExpressions?: FutureExpressionRequest[];
 }
 
-/** Map a canonical pattern name to its `CRLPatterns.X` function name. */
+/** Map a canonical pattern name to its `CRLCommon.X` function name. */
 const FUNCTION_NAME_OVERRIDES: Record<string, string> = {
   Last: "LastOf",
   First: "FirstOf",
@@ -229,7 +229,7 @@ function renderMetaBlock(meta: string[] | undefined): string {
 type CompositionShape = "boolean" | "refinement";
 
 // === Pattern return-shape classification ===
-// CRLPatterns library (v0.2.0+) returns the primitive list-shaped form for
+// CRLCommon library (v0.2.0+) returns the primitive list-shaped form for
 // filter patterns. The boolean realization is composed at the call site by
 // wrapping with `exists(...)`. The author's `(type, valuetype)` declaration
 // drives whether the emitter wraps (boolean consumer) or calls directly
@@ -316,7 +316,7 @@ const PATTERN_RETURN_SHAPE: Record<string, PatternReturnShape> = {
  * NOT produce a `parameter` line. This map covers types that emit as
  * ordinary `parameter "X" Type` declarations.
  *
- *   - Period → Interval<DateTime>: matches the CRLPatterns timing-arg
+ *   - Period → Interval<DateTime>: matches the CRLCommon timing-arg
  *     signatures (`During(period Interval<DateTime>)` etc.). A CRL author
  *     writing `param type is Period.` is asking for the CQL Interval the
  *     patterns expect — not the FHIR `Period` resource datatype.
@@ -380,7 +380,7 @@ export function emitCQLFromAST(ast: CRL, options: EmitOptions = {}): EmitResult 
         kind: "emit-unmatched-narrative",
         line: u.line,
         column: u.column,
-        message: `Unmatched narrative pattern: \`${u.text}\` (no catalog pattern matched). Emitted CQL contains a compile-failing CRLPatterns.UnmatchedNarrative(…) sentinel; downstream CQL translation will fail until the body is rewritten to a known canonical narrative.`,
+        message: `Unmatched narrative pattern: \`${u.text}\` (no catalog pattern matched). Emitted CQL contains a compile-failing CRLCommon.UnmatchedNarrative(…) sentinel; downstream CQL translation will fail until the body is rewritten to a known canonical narrative.`,
       }));
       return {
         success: false,
@@ -572,7 +572,7 @@ class Emitter {
   private header(): string {
     const lines: string[] = [
       // CRL's library identity emits without a version (npm packaging
-      // handles the package version). CRLPatterns is our own library —
+      // handles the package version). CRLCommon is our own library —
       // also no version. `using FHIR version` is a semantic FHIR model
       // identifier (R4 vs R5 is a different shape) — kept. FHIRHelpers
       // ships versioned with the FHIR spec — version pin kept.
@@ -581,7 +581,7 @@ class Emitter {
       "using FHIR version '4.0.1'",
       "",
       `include FHIRHelpers version '${this.options.fhirHelpersVersion}' called FHIRHelpers`,
-      "include CRLPatterns called CRLPatterns",
+      "include CRLCommon called CRLCommon",
     ];
     // Cross-library includes for per-CRL emit: every other CRL library this
     // file qualified-refs gets its own `include` line. Simple include (no
@@ -918,14 +918,14 @@ class Emitter {
         line: def.body.location?.start.line,
         column: def.body.location?.start.column,
       });
-      // Issue #79 — compile-failing sentinel. `CRLPatterns.UnmatchedNarrative`
-      // is intentionally undefined in CRLPatterns.cql so a downstream CQL
+      // Issue #79 — compile-failing sentinel. `CRLCommon.UnmatchedNarrative`
+      // is intentionally undefined in CRLCommon.cql so a downstream CQL
       // compile fails loudly rather than silently shipping always-`true`. The
       // EmitResult.unmatched envelope field is the primary signal; this
       // sentinel is the operational safety net for callers that miss it.
-      return `// FIXME: unmatched narrative pattern — ${text}\nCRLPatterns.UnmatchedNarrative(${cqlString(text)})`;
+      return `// FIXME: unmatched narrative pattern — ${text}\nCRLCommon.UnmatchedNarrative(${cqlString(text)})`;
     }
-    // Generics-by-composition: CRLPatterns functions return their PRIMITIVE
+    // Generics-by-composition: CRLCommon functions return their PRIMITIVE
     // shape — list-shaped for filter patterns, boolean for inherently-boolean
     // patterns, other-shape for Period/Quantity/Instance/Interval patterns.
     // The author's declared `(type, valuetype)` says what the consumer wants;
@@ -956,7 +956,7 @@ class Emitter {
 
   private emitPatternCall(call: CanonicalPatternCall): string {
     // Synthetic patterns (not catalog entries — they represent CQL keyword
-    // operators) emit as CQL syntax instead of CRLPatterns calls.
+    // operators) emit as CQL syntax instead of CRLCommon calls.
     if (call.pattern === "StartOf") {
       return `start of ${this.emitArg(call.args[0])}`;
     }
@@ -965,7 +965,7 @@ class Emitter {
     }
     const fn = functionNameFor(call.pattern);
     const args = call.args.map((a) => this.emitArg(a)).join(", ");
-    return `CRLPatterns.${fn}(${args})`;
+    return `CRLCommon.${fn}(${args})`;
   }
 
 

@@ -9,8 +9,8 @@ import type {
   ReferenceName,
 } from "../ast/types";
 import { getRefLibrary, isQualifiedRef } from "../ast/types";
-import { emitCQLFromAST, infoForParameterStatement } from "../emitter/emitCQL";
-import type { AstParameterInfo } from "../emitter/emitCQL";
+import { emitCQLFromAST, infoForParameterStatement } from "../cql-emitter/emitCQL";
+import type { AstParameterInfo } from "../cql-emitter/emitCQL";
 import type { CRLError } from "../types/errors";
 
 import { resolveImports } from "./index";
@@ -21,7 +21,7 @@ import { ImportDiagnostic, RegistryEntry, ResolvedGraph } from "./types";
  * Per-CRL emit (v2.1.0): one CQL file per CRL library.
  *
  * Each library in the emit closure produces its own `<libraryName>.cql` with
- * its own `library X` header, native `include FHIRHelpers`/`include CRLPatterns`
+ * its own `library X` header, native `include FHIRHelpers`/`include CRLCommon`
  * lines, AND native CQL `include OtherLib` for every CRL library it
  * qualified-refs. Cross-library refs `"Lib"."X"` in CRL emit as CQL's native
  * `Lib."X"`. No more flat-inlining; same-name across libraries is now benign

@@ -16,14 +16,43 @@ const {
 } = mod.default ?? mod;
 
 const here = dirname(fileURLToPath(import.meta.url));
-const catalogPath = resolve(here, "../../features/cql-pattern-mining/results/inference-pattern-catalog-draft.md");
+const catalogPath = resolve(here, "../../src/cql-emitter/catalog/inference-pattern-catalog-draft.md");
 
 const markdown = readFileSync(catalogPath, "utf-8");
 const patterns = parseCatalog(markdown);
 
-// Sanity: the catalog has ~28 patterns after the v2.5.0 #99-sync (7 unreachable
-// patterns commented out at source). Asserting a permissive lower bound.
+// Sanity: the catalog has 40+ active patterns (deferred/unreachable rows stay
+// commented out at source per #99). Asserting a permissive lower bound.
 assert.ok(patterns.length >= 25, `expected >=25 patterns, got ${patterns.length}`);
+
+// Regression for #109: an HTML comment inside a reference table (used to defer
+// rows) must NOT terminate the table — active rows below a comment must still
+// parse. Before the fix, the first `<!-- ... -->` line dropped every row under
+// it; the four Contextualization patterns vanished from the shipped catalog.
+{
+  const header =
+    "| Pattern | Narrative form | Canonical | CQL function |\n|---|---|---|---|";
+  const row =
+    "| `AsOf(anchor, X)` | `<X> as of <anchor>` | `AsOf(anchor: AnchorExpr, X: ConceptRef)` | `CRLCommon.AsOf` |";
+  const commentedRow =
+    "<!-- | `With(X, Y)` | `<X> with <Y>` | `With(X: ConceptRef, Y: ConceptRef)` | `CRLCommon.With` | -->";
+  const md = `## Contextualization\n\n${header}\n<!-- #99 deferred -->\n${commentedRow}\n${row}\n`;
+  const got = parseCatalog(md);
+  assert.equal(got.length, 1, "active row after a comment should parse");
+  assert.equal(got[0].canonical, "AsOf(anchor, X)");
+  assert.ok(
+    !got.some((p) => p.canonical.startsWith("With(")),
+    "a commented-out row must NOT be parsed",
+  );
+}
+
+// #109: the four Contextualization patterns must be present in the real catalog.
+for (const name of ["AsOf", "ComponentOf", "NotDoneWithReason", "WasOrdered"]) {
+  assert.ok(
+    patterns.some((p) => p.canonical.startsWith(`${name}(`)),
+    `Contextualization pattern ${name} missing from catalog (regression of #109)`,
+  );
+}
 
 // Spot-check: every pattern row has all four fields populated and category text.
 for (const p of patterns) {
@@ -31,7 +60,7 @@ for (const p of patterns) {
   assert.ok(p.narrative.length > 0, `empty narrative in ${JSON.stringify(p)}`);
   assert.ok(p.signature.length > 0, `empty signature in ${JSON.stringify(p)}`);
   assert.ok(p.cqlFunction.length > 0, `empty cqlFunction in ${JSON.stringify(p)}`);
-  assert.ok(p.cqlFunction.startsWith("CRLPatterns."), `non-CRLPatterns cqlFunction: ${p.cqlFunction}`);
+  assert.ok(p.cqlFunction.startsWith("CRLCommon."), `non-CRLCommon cqlFunction: ${p.cqlFunction}`);
 }
 
 // Spot-check the well-known Has pattern.
@@ -39,7 +68,7 @@ const has = patterns.find((p) => p.canonical === "Has(X)");
 assert.ok(has, "Has(X) pattern not found");
 assert.equal(has.narrative, "has <X>");
 assert.equal(has.signature, "Has(X: ConceptRef)");
-assert.equal(has.cqlFunction, "CRLPatterns.Has");
+assert.equal(has.cqlFunction, "CRLCommon.Has");
 
 // Spot-check the During pattern (two placeholders).
 const during = patterns.find((p) => p.canonical === "During(event, period)");

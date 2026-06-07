@@ -51,10 +51,10 @@ describe("emitCQLImports (per-CRL v2.1.0)", () => {
     // And the includes header carries the dep.
     expect(inferred).toMatch(/include "CMS22 Asserted"/);
 
-    // Each emitted CQL declares its own FHIRHelpers + CRLPatterns includes.
+    // Each emitted CQL declares its own FHIRHelpers + CRLCommon includes.
     for (const entry of result.cqlByLibrary) {
       expect(entry.cql).toMatch(/include FHIRHelpers/);
-      expect(entry.cql).toMatch(/include CRLPatterns/);
+      expect(entry.cql).toMatch(/include CRLCommon/);
       expect(entry.cql).toMatch(/using FHIR version/);
     }
 
@@ -173,7 +173,7 @@ describe("emitCQLImports (per-CRL v2.1.0)", () => {
     expect(sibCql).not.toMatch(/parameter "Index Patient"/);
     // Root's narrative ref `"Sib"."Index Patient"` collapses to bare `Patient`
     // identifier in emitted CQL per operator's rule + CQL spec.
-    expect(rootCql).toMatch(/CRLPatterns\.WasPerformed\([^)]*Patient\)/);
+    expect(rootCql).toMatch(/CRLCommon\.WasPerformed\([^)]*Patient\)/);
     expect(rootCql).not.toMatch(/Sib\."Index Patient"/);
   });
 });

@@ -171,7 +171,7 @@ concept "Observed":
 `));
     // The narrative ref `"Eligible Patient"` must rewrite to bare `Patient`
     // in the emitted CQL — NOT the literal quoted parameter name.
-    expect(cql).toMatch(/CRLPatterns\.WasPerformed\([^)]*Patient\)/);
+    expect(cql).toMatch(/CRLCommon\.WasPerformed\([^)]*Patient\)/);
     expect(cql).not.toMatch(/"Eligible Patient"/);
   });
 
@@ -183,7 +183,7 @@ concept "Observed":
 - value type is boolean.
 - definition is "T"."Eligible Patient" performed.
 `));
-    expect(cql).toMatch(/CRLPatterns\.WasPerformed\([^)]*Patient\)/);
+    expect(cql).toMatch(/CRLCommon\.WasPerformed\([^)]*Patient\)/);
     expect(cql).not.toMatch(/"Eligible Patient"/);
   });
 
@@ -220,8 +220,8 @@ concept "Observed":
 - definition is "Eligible Patient" performed.
 `));
     // The ref resolves to the concept's quoted identifier, not bare `Patient`.
-    expect(cql).toMatch(/CRLPatterns\.WasPerformed\("Eligible Patient"\)/);
-    expect(cql).not.toMatch(/CRLPatterns\.WasPerformed\(Patient\)/);
+    expect(cql).toMatch(/CRLCommon\.WasPerformed\("Eligible Patient"\)/);
+    expect(cql).not.toMatch(/CRLCommon\.WasPerformed\(Patient\)/);
   });
 
   it("Patient-typed AST parameter coexists with same-name empty-URL terminology — context emits, terminology gets collision suffix", () => {

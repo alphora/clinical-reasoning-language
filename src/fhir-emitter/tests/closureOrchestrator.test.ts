@@ -23,7 +23,7 @@ const METADATA: CpgMetadata = {
   useContext: [],
 };
 
-const FIXTURE = join(ROOT, "features/cpg-roundtrip/cc-screening-cognitive-support/cc-screening.crl");
+const FIXTURE = join(ROOT, "src/tests/fixtures/cpg-roundtrip/cc-screening-cognitive-support/cc-screening.crl");
 
 describe("closureOrchestrator — emitFhirDefFromPath (cc-screening end-to-end)", () => {
   it("emits the expected resource set for the cc-screening fixture", () => {

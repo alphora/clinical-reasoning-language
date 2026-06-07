@@ -17,7 +17,7 @@
  * and `pattern` carries the unmatched narrative text as a debugging hint.
  *
  * See:
- *   - features/cql-pattern-mining/results/inference-pattern-catalog-draft.md
+ *   - src/cql-emitter/catalog/inference-pattern-catalog-draft.md
  *   - docs/CRL Compilation Pipeline.md
  *   - memory: project_canonical-ast-intermediate
  */

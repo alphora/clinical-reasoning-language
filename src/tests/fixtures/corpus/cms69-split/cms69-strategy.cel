@@ -1,0 +1,59 @@
+# CMS69 BMI Screening Cognitive Support — caseload
+
+// Scenario: a patient eligible for BMI screening has a documented high
+// BMI and an overweight diagnosis on file. The CMS69 BMI Screening
+// Strategy decision walks the high-BMI branch and the Recommend High
+// BMI Intervention sub-decision chooses the weight-assessment-referral
+// path.
+//
+// This case exercises the decision-tree path:
+//   CMS69 BMI Screening Strategy
+//     when Patient Eligible For BMI Screening
+//       when Has Documented High BMI
+//         use decision Recommend High BMI Intervention
+//           when Patient Has Overweight or Obese Diagnosis
+//             any: recommend Order Weight Assessment Referral
+
+library "CMS69 BMI Cognitive Support — High BMI".
+covers "CMS69 BMI Screening GPG Strategy example".
+
+
+// ============ Patient facts ============
+
+fact "Jane Doe":
+- name is "Jane Doe".
+- birth date is "1980-01-01".
+- defined by "Patient".
+
+
+// ============ Clinical facts ============
+
+fact "Wellness Visit":
+- code is "http://www.ama-assn.org/go/cpt|99395".
+- date is "2026-01-15".
+- defined by "Encounter".
+
+fact "Documented High BMI":
+- code is "http://loinc.org|39156-5".
+- date is "2026-01-15".
+- value is 32.4.
+- defined by "CMS69 BMI Screening GPG Strategy example"."BMI as an Observation".
+
+fact "Overweight Diagnosis":
+- code is "http://hl7.org/fhir/sid/icd-10-cm|E66.3".
+- date is "2024-09-08".
+- defined by "CMS69 BMI Screening GPG Strategy example"."Overweight or Obese Diagnoses".
+
+
+// ============ Cases ============
+
+case "Jane: documented high BMI triggers weight-assessment-referral recommendation":
+- description is `Jane is eligible for BMI screening, has a recently-
+  documented high BMI, and an existing overweight diagnosis on file.
+  The Recommend High BMI Intervention sub-decision selects the
+  weight-assessment-referral branch.`.
+- subject is "Jane Doe".
+- fact is "Wellness Visit".
+- fact is "Documented High BMI".
+- fact is "Overweight Diagnosis".
+- result is "Recommend High BMI Intervention" is "Order Weight Assessment Referral".

@@ -1,0 +1,14 @@
+{
+  "name": "cc-screening-cognitive-support",
+  "version": "0.0.0",
+  "description": "CPG-IG round-trip fixture — colorectal cancer screening cognitive support example. CRL author's representation of the demo-content-r4 cc-screening cognitive-support corpus, used to validate the CRL→FHIR-def emit pipeline against the IG reference example. See README.md.",
+  "author": "Smile Digital Health",
+  "license": "UNLICENSED",
+  "private": true,
+  "crl": {
+    "canonicalBase": "http://example.org/sdh/demo",
+    "status": "draft",
+    "experimental": true,
+    "publisher": "Smile Digital Health"
+  }
+}

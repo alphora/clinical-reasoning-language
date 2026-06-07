@@ -1,0 +1,12 @@
+{
+  "name": "cms22-demonstration-split",
+  "version": "1.0.0",
+  "private": true,
+  "description": "CMS22 Blood Pressure Control demonstration corpus",
+  "author": "Smile Digital Health",
+  "crl": {
+    "canonicalBase": "http://hl7.org/fhir/us/cqfmeasures/crl/cms22",
+    "status": "draft",
+    "experimental": true
+  }
+}

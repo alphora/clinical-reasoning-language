@@ -108,7 +108,7 @@ async function build() {
   const catalogMod = require(path.resolve(__dirname, "dist/catalog.js"));
   const catalogMdPath = path.resolve(
     __dirname,
-    "../features/cql-pattern-mining/results/inference-pattern-catalog-draft.md"
+    "../src/cql-emitter/catalog/inference-pattern-catalog-draft.md"
   );
   if (!fs.existsSync(catalogMdPath)) {
     throw new Error(`Catalog markdown not found at ${catalogMdPath}`);

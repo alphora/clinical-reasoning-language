@@ -12,7 +12,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const serverPath = resolve(here, "../../../dist/cli/run-mcp-server.js");
 const cms22SplitInferred = resolve(
   here,
-  "../../../features/cql-pattern-mining/results/models/cms22-split/cms22-inferred.crl"
+  "../../../src/tests/fixtures/corpus/cms22-split/cms22-inferred.crl"
 );
 
 const transport = new StdioClientTransport({ command: process.execPath, args: [serverPath] });
@@ -46,7 +46,7 @@ try {
   });
 
   await check("emit_cel via path → cms22.cel returns summary envelope with cases", async () => {
-    const cms22Cel = resolve(here, "../../../features/cql-pattern-mining/results/models/cms22-split/cms22.cel");
+    const cms22Cel = resolve(here, "../../../src/tests/fixtures/corpus/cms22-split/cms22.cel");
     const r = await client.callTool({ name: "emit_cel", arguments: { path: cms22Cel } });
     assert.ok(!r.isError, "should not be a tool error");
     const out = JSON.parse(r.content[0].text);
@@ -60,7 +60,7 @@ try {
   });
 
   await check("emit_cel with includeResources:true → full emittedCases included", async () => {
-    const cms22Cel = resolve(here, "../../../features/cql-pattern-mining/results/models/cms22-split/cms22.cel");
+    const cms22Cel = resolve(here, "../../../src/tests/fixtures/corpus/cms22-split/cms22.cel");
     const r = await client.callTool({
       name: "emit_cel",
       arguments: { path: cms22Cel, includeResources: true },
@@ -81,7 +81,7 @@ try {
   });
 
   await check("validate_cel via path → 4 CMS corpus files validate clean", async () => {
-    const cms22Cel = resolve(here, "../../../features/cql-pattern-mining/results/models/cms22-split/cms22.cel");
+    const cms22Cel = resolve(here, "../../../src/tests/fixtures/corpus/cms22-split/cms22.cel");
     const r = await client.callTool({ name: "validate_cel", arguments: { path: cms22Cel } });
     assert.ok(!r.isError, "should not be a tool error");
     const out = JSON.parse(r.content[0].text);

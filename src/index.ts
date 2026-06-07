@@ -8,8 +8,8 @@ import { createParser } from "./parser/createParser";
 import { CRLError } from "./types/errors";
 import { Validator, type ValidationError } from "./validator/validator";
 
-export { emitCQL, emitCQLFromAST } from "./emitter";
-export type { EmitOptions as CqlEmitOptions, EmitResult as CqlEmitResult } from "./emitter";
+export { emitCQL, emitCQLFromAST } from "./cql-emitter";
+export type { EmitOptions as CqlEmitOptions, EmitResult as CqlEmitResult } from "./cql-emitter";
 
 export { emitCQLImports } from "./imports/emit";
 export type { EmitImportsResult } from "./imports/emit";

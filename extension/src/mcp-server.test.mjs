@@ -47,7 +47,7 @@ try {
   });
 
   await check("validate_cel via path → cms22.cel validates clean", async () => {
-    const cms22Cel = resolve(here, "../../features/cql-pattern-mining/results/models/cms22-split/cms22.cel");
+    const cms22Cel = resolve(here, "../../src/tests/fixtures/corpus/cms22-split/cms22.cel");
     const r = await client.callTool({ name: "validate_cel", arguments: { path: cms22Cel } });
     assert.ok(!r.isError);
     const out = JSON.parse(r.content[0].text);
@@ -137,7 +137,7 @@ try {
   // validation resolves them through the resolved-imports graph.
   const cms22SplitInferred = resolve(
     here,
-    "../../features/cql-pattern-mining/results/models/cms22-split/cms22-inferred.crl"
+    "../../src/tests/fixtures/corpus/cms22-split/cms22-inferred.crl"
   );
 
   await check("validate_crl via path → project mode resolves sibling libraries", async () => {

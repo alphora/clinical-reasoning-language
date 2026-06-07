@@ -11,7 +11,7 @@ import * as catalogMod from "../dist/catalog.js";
 const { parseCatalog } = catalogMod.default ?? catalogMod;
 
 const here = dirname(fileURLToPath(import.meta.url));
-const catalogMdPath = resolve(here, "../../features/cql-pattern-mining/results/inference-pattern-catalog-draft.md");
+const catalogMdPath = resolve(here, "../../src/cql-emitter/catalog/inference-pattern-catalog-draft.md");
 const catalogJsonPath = resolve(here, "../dist/catalog.json");
 
 const embedded = JSON.parse(readFileSync(catalogJsonPath, "utf-8"));
