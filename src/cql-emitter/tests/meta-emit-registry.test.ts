@@ -82,6 +82,26 @@ describe("meta emit behavior", () => {
     );
   });
 
+  it("`@cql-comment` emits its body as a comment with the tag prefix stripped", () => {
+    const src = lib(
+      "T",
+      term("BMI VS") +
+        `concept "BMI Obs":\n- type is Observation.\n- value type is Quantity.\n- coded from "BMI VS".\n` +
+        `concept "Passthrough":\n- type is Observation.\n- value type is Quantity.\n` +
+        "- meta is `@cql-comment: see SME guidance doc section 4.2`.\n" +
+        "- meta is `@ke-feedback: keep tag prefix here`.\n" +
+        `- definition is highest "BMI Obs".\n`,
+    );
+    const r = emitCQL(src, { libraryName: "T" });
+    expect(r.success).toBe(true);
+    const cql = r.result ?? "";
+    // Body present, prefix stripped.
+    expect(cql).toContain(" * see SME guidance doc section 4.2");
+    expect(cql).not.toContain("@cql-comment:");
+    // Other emit.cql tags still keep their prefix.
+    expect(cql).toContain(" * @ke-feedback: keep tag prefix here");
+  });
+
   it("a concept whose only meta is non-emit tags gets no block comment", () => {
     const src = lib(
       "T",

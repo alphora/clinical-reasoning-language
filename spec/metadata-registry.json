@@ -148,6 +148,19 @@
       "notes": "Clinical decision logic intentionally deferred (not yet implemented in CRL/CQL). Lands in a CQL block comment so the deferral is visible to downstream CQL readers. Distinct from business-logic-deferred."
     },
     {
+      "id": "cql-comment",
+      "aliases": [],
+      "family": "B-narrative",
+      "valueShape": "text",
+      "cardinality": "0..n",
+      "attachmentTargets": ["concept"],
+      "origin": "either",
+      "retention": "inline",
+      "lifecycle": "append",
+      "emit": { "cql": true, "fhir": false, "condition": "emit the BODY as a plain CQL block-comment line with NO `@cql-comment:` tag prefix (raw passthrough); emitter MUST sanitize */" },
+      "notes": "Verbatim author comment to carry into the generated CQL. Unlike the other emit.cql tags, the `@cql-comment:` prefix is stripped — only the body text appears in the emitted CQL comment."
+    },
+    {
       "id": "kg-concept",
       "aliases": [],
       "family": "A-external-ref",
@@ -200,5 +213,5 @@
     "re-run staleness: warn if two distinct run ids' family-C / candidate-ref exhaust coexist on one concept",
     "family-C tags and candidate (status=candidate) external refs MUST carry `run` -> error if omitted (otherwise the re-run replace match key is undefined)"
   ],
-  "reRunReplaceRule": "On re-extraction, the producer replaces the prior run's family-C tags (semantic-parse-text) and candidate (status=candidate) external refs for a concept, matched by by/run. Confirmed refs and family-B durable tags (id, description, ke-feedback, logic-expression-text, controlled-natural-language, crl-future-expression, business-logic-deferred, clinical-logic-deferred) are never auto-replaced. Refs with status=rejected or status=superseded are durable historical records (preserved across re-runs so negative review work isn't lost)."
+  "reRunReplaceRule": "On re-extraction, the producer replaces the prior run's family-C tags (semantic-parse-text) and candidate (status=candidate) external refs for a concept, matched by by/run. Confirmed refs and family-B durable tags (id, description, ke-feedback, logic-expression-text, controlled-natural-language, crl-future-expression, business-logic-deferred, clinical-logic-deferred, cql-comment) are never auto-replaced. Refs with status=rejected or status=superseded are durable historical records (preserved across re-runs so negative review work isn't lost)."
 }

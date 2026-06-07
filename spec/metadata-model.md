@@ -28,11 +28,12 @@ The terminating `.` goes **after** the closing backtick: `` - meta is `...`. `` 
 | `@crl-future-expression` | plain-language logic CRL can't express yet; lands in a CQL block comment + feeds the CRL roadmap | B narrative | human/agent | 0..n |
 | `@business-logic-deferred` | business logic intentionally not yet implemented; lands in a CQL block comment as a tracked gap | B narrative | human/agent | 0..n |
 | `@clinical-logic-deferred` | clinical decision logic intentionally not yet implemented; lands in a CQL block comment as a tracked gap | B narrative | human/agent | 0..n |
+| `@cql-comment` | verbatim author comment to carry into the generated CQL; the `@cql-comment:` prefix is stripped — only the body appears | B narrative | human/agent | 0..n |
 | `@kg-concept` | scored **hint for the decision** — a node in the **Concept Graph** ("KG" = Concept Graph) | A external-ref | agent/human | 0..n |
 | `@reef-reference` | scored **hint** for **REEF** ("the great reef"), the downstream artifact repo the CRL→CQL/FHIR skill + compiler consume | A external-ref | agent/human | 0..n |
 | `@semantic-parse-text` | semantic parse of the **source narrative** (extraction exhaust) | C provenance | human/agent | 0..n |
 
-**Emitted to CQL.** The CQL emitter renders exactly the tags with `emit.cql: true` in the registry as a leading block comment on the concept's `define`: `@logic-expression-text`, `@crl-future-expression`, `@ke-feedback`, `@business-logic-deferred`, `@clinical-logic-deferred`. All other tags and untyped notes are not emitted to CQL. (`@crl-future-expression` additionally surfaces as a structured `futureExpressions` entry on the emit result.)
+**Emitted to CQL.** The CQL emitter renders exactly the tags with `emit.cql: true` in the registry as a leading block comment on the concept's `define`: `@logic-expression-text`, `@crl-future-expression`, `@ke-feedback`, `@business-logic-deferred`, `@clinical-logic-deferred`, `@cql-comment`. All other tags and untyped notes are not emitted to CQL. Each tagged line keeps its `@tag: body` form in the comment **except** `@cql-comment`, whose prefix is stripped so only the body appears (a verbatim passthrough comment). (`@crl-future-expression` additionally surfaces as a structured `futureExpressions` entry on the emit result.)
 
 `@logic-expression-text` (the logic) and `@controlled-natural-language` (the logic flow) are a complementary pair. `@kg-concept` (Concept Graph) and `@reef-reference` (REEF) are **distinct** stores — both hold scored hints, shaped by the shared `ExternalReference` value type with a `system` discriminator (`kg` / `reef`).
 

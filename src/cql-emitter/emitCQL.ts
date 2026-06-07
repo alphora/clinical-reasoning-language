@@ -229,9 +229,14 @@ export const EMIT_CQL_COMMENT_TAGS: ReadonlySet<string> = new Set([
   "ke-feedback",
   "business-logic-deferred",
   "clinical-logic-deferred",
+  "cql-comment",
 ]);
 
 const META_TAG_RE = /^@([a-z][a-z0-9-]*):/;
+// `@cql-comment` is a verbatim passthrough: its prefix is stripped so only the
+// body appears in the emitted comment (unlike the other emit.cql tags, which
+// keep their `@tag: body` form).
+const CQL_COMMENT_RE = /^@cql-comment:\s*(.*)$/;
 
 // A meta line reaches the generated CQL iff it carries an `@tag` whose tag is
 // in the emit.cql allowlist. Other tags (external refs, provenance) and untyped
@@ -241,13 +246,20 @@ function metaEmitsToCql(line: string): boolean {
   return m !== null && EMIT_CQL_COMMENT_TAGS.has(m[1]);
 }
 
+// The text rendered into the CQL comment for an emit.cql line: the body alone
+// for `@cql-comment`, otherwise the full `@tag: body` line verbatim.
+function metaCommentText(line: string): string {
+  const m = CQL_COMMENT_RE.exec(line.trim());
+  return m ? m[1] : line;
+}
+
 // #108: render the emit.cql-eligible CRL `meta is …` lines as a CQL block
 // comment to prepend to the concept's emitted `define`. Returns "" when no
 // eligible annotations are present. The defusing replacement keeps CRL meta
 // text containing "asterisk slash" from accidentally closing the comment early.
 function renderMetaBlock(meta: string[] | undefined): string {
   if (!meta || meta.length === 0) return "";
-  const emitted = meta.filter(metaEmitsToCql);
+  const emitted = meta.filter(metaEmitsToCql).map(metaCommentText);
   if (emitted.length === 0) return "";
   const safe = emitted.map((line) => line.replace(/\*\//g, "* /"));
   return `/*\n${safe.map((l) => ` * ${l}`).join("\n")}\n */\n`;
