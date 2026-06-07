@@ -428,4 +428,4 @@ The atomic two-lane contract on `--target fhir-def` is the load-bearing piece: a
 - [README.md](./README.md) — install + features overview
 - [USER_GUIDE.md](./USER_GUIDE.md) — CRL language reference
 - [docs/cel-spec.md](./docs/cel-spec.md) — CEL language reference
-- [features/cql-pattern-mining/results/inference-pattern-catalog-draft.md](./features/cql-pattern-mining/results/inference-pattern-catalog-draft.md) — narrative-pattern catalog (the matchable forms `definition is <…>` accepts)
+- [src/cql-emitter/catalog/inference-pattern-catalog.md](./src/cql-emitter/catalog/inference-pattern-catalog.md) — narrative-pattern catalog (the matchable forms `definition is <…>` accepts)

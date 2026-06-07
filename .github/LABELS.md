@@ -36,7 +36,7 @@ This repo uses a 3-axis label scheme (kind / area / priority) to triage issues a
 | `area/cel-emitter` | CEL -> FHIR instance emit (src/cel/emitter/). |
 | `area/template-match` | Narrative-pattern matcher (src/template-match/). |
 | `area/grammar` | Surface syntax: CRL + CEL lexer/parser/AST/transformer. See LABELS.md for directory map. |
-| `area/catalog` | Narrative-pattern catalog (catalog.json + inference-pattern-catalog-draft.md). |
+| `area/catalog` | Narrative-pattern catalog (catalog.json + inference-pattern-catalog.md). |
 | `area/cli` | CLI entrypoints (src/cli/run-*.ts except run-mcp-server.ts). |
 | `area/mcp` | MCP server + tool registrations (src/cli/run-mcp-server.ts). |
 | `area/extension` | VS Code extension (extension/). |

@@ -4,7 +4,7 @@ library CRLCommon version '0.2.0'
  * CRLCommon — the CRL→CQL emitter's target library.
  *
  * Each function below implements one entry in the inference-pattern catalog
- * (src/cql-emitter/catalog/inference-pattern-catalog-draft.md).
+ * (src/cql-emitter/catalog/inference-pattern-catalog.md).
  * The catalog row's `CQL function` column points here.
  *
  * Design notes:

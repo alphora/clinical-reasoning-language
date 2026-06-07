@@ -1,6 +1,6 @@
 /**
  * Catalog parser. Extracts CRL inference-pattern entries from the
- * inference-pattern-catalog-draft.md reference tables and exposes them as
+ * inference-pattern-catalog.md reference tables and exposes them as
  * typed data for the completion + hover providers.
  *
  * The catalog has multiple reference tables (one per category: Assertion,

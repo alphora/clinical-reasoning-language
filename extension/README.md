@@ -45,7 +45,7 @@ Each takes inline `code` or a `.crl` file `path` and returns a `ParseResult`-sha
 
 ### Authoring help in the editor
 
-- **Narrative pattern completion** — inside any `- definition is ` line, snippet for each of the 45 catalog patterns (`has <X>`, `<X> during <Y>`, `<X> justified by <Y>`, etc.). Tab-stops drop you into the quoted concept-ref slots. The catalog is embedded into the extension at build time from `features/cql-pattern-mining/results/inference-pattern-catalog-draft.md`; new patterns are picked up by the next `npm run compile`.
+- **Narrative pattern completion** — inside any `- definition is ` line, snippet for each of the 45 catalog patterns (`has <X>`, `<X> during <Y>`, `<X> justified by <Y>`, etc.). Tab-stops drop you into the quoted concept-ref slots. The catalog is embedded into the extension at build time from `src/cql-emitter/catalog/inference-pattern-catalog.md`; new patterns are picked up by the next `npm run compile`.
 - **Type / valuetype completion** — fires after `- type is ` and `- value type is ` with the enum allowed by the CRL grammar.
 - **Concept-reference completion** — inside any quoted name position, the names of every `concept` / `terminology` declared in the file (with their type / valuetype / body preview in the hover).
 - **Hover** over a narrative phrase, a type/valuetype token, or a concept reference for the catalog entry or declaration info.

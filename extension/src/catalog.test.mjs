@@ -16,7 +16,7 @@ const {
 } = mod.default ?? mod;
 
 const here = dirname(fileURLToPath(import.meta.url));
-const catalogPath = resolve(here, "../../src/cql-emitter/catalog/inference-pattern-catalog-draft.md");
+const catalogPath = resolve(here, "../../src/cql-emitter/catalog/inference-pattern-catalog.md");
 
 const markdown = readFileSync(catalogPath, "utf-8");
 const patterns = parseCatalog(markdown);
