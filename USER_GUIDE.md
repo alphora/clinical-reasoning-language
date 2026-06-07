@@ -282,7 +282,7 @@ Narrative slots (`- definition is ...`) accept concept-or-parameter refs; the re
 #### CQL emit semantics
 
 - **`Patient`-typed parameter** → emitted CQL has a `context Patient` line per the CQL spec. The parameter's quoted CRL name is NOT emitted; the `context Patient` line has no per-name identifier. Every narrative ref to the parameter rewrites to the bare `Patient` identifier in emitted CQL.
-- **`Period`-typed parameter** → emitted as `parameter "Name" Interval<DateTime>` (matches `CRLPatterns` timing-arg signatures).
+- **`Period`-typed parameter** → emitted as `parameter "Name" Interval<DateTime>` (matches `CRLCommon` timing-arg signatures).
 - **Primitives** → PascalCase (`boolean → Boolean`, etc.).
 - **FHIR data + resource types** → passthrough (resolve via the library's `using FHIR version '4.0.1'` declaration).
 
@@ -449,7 +449,7 @@ Validation walks all four ref slots: concept body refs, decision
 v2.1.0 emits **one CQL file per CRL library** (not one big flat-inlined CQL
 file like v2.0). Each library produces its own `<libraryName>.cql` with
 its own `library X` header, its own `include FHIRHelpers` + `include
-CRLPatterns`, and a CQL `include OtherLib` line for each cross-library
+CRLCommon`, and a CQL `include OtherLib` line for each cross-library
 qualified ref it makes.
 
 What's emitted today:
@@ -525,8 +525,8 @@ principle as CRL source: npm packaging IS the version system, so
 duplicating it in the output adds nothing. CQL `include` statements
 between emitted libraries are also unversioned.
 
-The same no-version rule applies to the emitted `include CRLPatterns
-called CRLPatterns` line — CRLPatterns is our library, so npm pins its
+The same no-version rule applies to the emitted `include CRLCommon
+called CRLCommon` line — CRLCommon is our library, so npm pins its
 version. The `include FHIRHelpers version '4.0.1' called FHIRHelpers`
 line keeps its version because FHIRHelpers ships versioned with the
 FHIR spec itself (it's not an npm package).
@@ -708,8 +708,8 @@ emitter resolves the `X` in priority order: (1) `--library-name` /
 `EmitOptions.libraryName` if provided; (2) the root's `library "X".`
 declaration; (3) `"GeneratedFromCRL"` default.
 
-The same no-version rule applies to the emitted `include CRLPatterns called CRLPatterns`
-line — CRLPatterns is our library, so npm pins its version. The
+The same no-version rule applies to the emitted `include CRLCommon called CRLCommon`
+line — CRLCommon is our library, so npm pins its version. The
 `include FHIRHelpers version '4.0.1' called FHIRHelpers` line keeps its
 version because FHIRHelpers ships versioned with the FHIR spec itself
 (it's not an npm package).

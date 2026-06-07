@@ -238,8 +238,8 @@ Tools that need project context (the validators, FHIR-def emit, CEL emit) requir
 <a id="emit_cql"></a>**`emit_cql`** — CRL → CQL.
 - Input: `{ code?: string, path?: string, libraryName?: string }`
 - Returns: `{ success, result?, errors?, unmatched?, futureExpressions? }`
-- On full success, `result` is the generated CQL targeting the bundled `CRLPatterns` library (unversioned `include`).
-- When at least one `- definition is …` body fails to match a catalog pattern, `success: false` and `unmatched[]` lists each failing narrative. The emitted CQL still populates `result` with compile-failing `CRLPatterns.UnmatchedNarrative(…)` sentinels so downstream CQL translation fails loudly.
+- On full success, `result` is the generated CQL targeting the bundled `CRLCommon` library (unversioned `include`).
+- When at least one `- definition is …` body fails to match a catalog pattern, `success: false` and `unmatched[]` lists each failing narrative. The emitted CQL still populates `result` with compile-failing `CRLCommon.UnmatchedNarrative(…)` sentinels so downstream CQL translation fails loudly.
 - `meta is` annotations on concepts emit as a leading block comment on each `define`. `@crl-future-expression: <body>` annotations also surface as structured `futureExpressions[]` records `{conceptName, expression, line, column}` — informational, does NOT force `success: false`.
 
 <a id="emit_crl_fhir"></a>**`emit_crl_fhir`** — CRL → FHIR Definition resources.

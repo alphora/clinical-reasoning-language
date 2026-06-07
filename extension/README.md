@@ -39,7 +39,7 @@ When you open a workspace that contains `.crl` files, the extension configures t
 - **`tokenize_crl`** — lex CRL source into tokens.
 - **`build_crl_ast`** — parse CRL source and build its AST. No semantic checks.
 - **`validate_crl`** — lex + parse + build + run all semantic validators (name uniqueness, reference resolution, cycle detection, action uniqueness). Optional `soft: true` demotes reference-target-exists findings to warnings. Returns `{ success, errors[], warnings[] }`.
-- **`emit_cql`** — emit a CQL library from a CRL document targeting the shared `CRLPatterns.cql` library. Optional `libraryName` and `libraryVersion` parameters. Returns `{ success, result?, errors? }` with the generated CQL text on success.
+- **`emit_cql`** — emit a CQL library from a CRL document targeting the shared `CRLCommon.cql` library. Optional `libraryName` and `libraryVersion` parameters. Returns `{ success, result?, errors? }` with the generated CQL text on success.
 
 Each takes inline `code` or a `.crl` file `path` and returns a `ParseResult`-shaped envelope (validate/emit add extra fields).
 

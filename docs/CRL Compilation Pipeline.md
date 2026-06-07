@@ -26,9 +26,9 @@ representations**:
 │                    │  WasPerformed(X), Last(X, BeforeStartOf(d, anchor))
 └────────────────────┘
           │
-          ▼  Emit using catalog's `CQL function` field + CRLPatterns library
+          ▼  Emit using catalog's `CQL function` field + CRLCommon library
 ┌────────────────────┐
-│  CQL output (.cql) │  CRLPatterns.Justified(...), CRLPatterns.WasPerformed(...)
+│  CQL output (.cql) │  CRLCommon.Justified(...), CRLCommon.WasPerformed(...)
 └────────────────────┘
 ```
 
@@ -78,9 +78,9 @@ they land in the catalog.
 **Output:** CQL source.
 
 The catalog's `CQL function` field maps each canonical pattern to a function
-in the shared `CRLPatterns.cql` library. The emitter generates CQL calls:
+in the shared `CRLCommon.cql` library. The emitter generates CQL calls:
 
-- `WasPerformed("BMI Evaluation Encounter")` → `CRLPatterns.WasPerformed(<resolved expression for "BMI Evaluation Encounter">)`
+- `WasPerformed("BMI Evaluation Encounter")` → `CRLCommon.WasPerformed(<resolved expression for "BMI Evaluation Encounter">)`
 - Sem-composition (`sem-or` / `sem-and` / `sem-not`) emits as boolean CQL
   combining the operand expressions.
 - Concept references resolve to their declared expression (an Inferred concept's
@@ -115,9 +115,9 @@ is the **single source of truth** mapping all three layers:
 |---|---|---|
 | **narrative form** | Stage 2 template-match | input pattern matched against author narrative |
 | **canonical signature** | Stage 2 type-check + Stage 3 emit | typed function signature for validation + AST shape |
-| **CQL function** | Stage 3 emit | name of the function in CRLPatterns.cql |
+| **CQL function** | Stage 3 emit | name of the function in CRLCommon.cql |
 
-Adding a new pattern is three steps: add a catalog row, add a CRLPatterns
+Adding a new pattern is three steps: add a catalog row, add a CRLCommon
 CQL function, write a couple of test cases. The pipeline picks up the new
 pattern automatically.
 
@@ -130,6 +130,6 @@ pattern automatically.
 | Validator: cycle detection across kinds | ⏳ Deferred (existing detector broken) |
 | Template-match → canonical AST | ⏳ Planned (Todo 3) |
 | Soft compile (unknown patterns) | ⏳ Planned (Todo 4) |
-| CRLPatterns.cql shared library | ⏳ Planned (Todo 5) |
+| CRLCommon.cql shared library | ⏳ Planned (Todo 5) |
 | CRL → CQL emitter | ⏳ Planned ([issues/crl/todo/crl-to-cql-emitter/](../issues/crl/todo/crl-to-cql-emitter/)) |
 | VS Code extension (autocomplete + hover from catalog) | ⏳ Planned (Todo 6) |
