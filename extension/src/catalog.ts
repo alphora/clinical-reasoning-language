@@ -10,9 +10,9 @@
  * Pattern[] list.
  *
  * Catalog return-type annotations are stripped as of v0.6.0 ("What not How"
- * sweep) — see `features/cql-pattern-mining/inferred-from-is-semantic-
- * composition.md`. The parser does not handle them specially; it just
- * captures whatever the canonical column contains.
+ * sweep) — see `docs/defined-as-is-semantic-composition.md`. The parser does
+ * not handle them specially; it just captures whatever the canonical column
+ * contains.
  */
 
 /**
