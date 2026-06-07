@@ -69,7 +69,3 @@ src/tests/regression/testdata/*-actual.*
 # Feature working artifacts: local analysis corpora, derived data, and
 # modeling scratch work. Kept local, not tracked in version control.
 features/
-
-# Local-only content removed from version control. Kept on disk, not tracked.
-cql/
-docs/
