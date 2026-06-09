@@ -1,0 +1,19 @@
+{
+  "resourceType": "Observation",
+  "id": "cms69-bmi-screening-janes-high-bmi-is-followed-up-with-a-weight-assessment-referral-follow-up-normal-bmi",
+  "subject": {
+    "reference": "Patient/cms69-bmi-screening-janes-high-bmi-is-followed-up-with-a-weight-assessment-referral-jane-doe"
+  },
+  "code": {
+    "coding": [
+      {
+        "system": "http://loinc.org",
+        "code": "39156-5"
+      }
+    ]
+  },
+  "valueQuantity": {
+    "value": 24.1
+  },
+  "effectiveDateTime": "2026-07-15"
+}

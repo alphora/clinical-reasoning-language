@@ -1,0 +1,10 @@
+{
+  "resourceType": "Patient",
+  "id": "cms69-bmi-screening-janes-high-bmi-is-followed-up-with-a-weight-assessment-referral-jane-doe",
+  "name": [
+    {
+      "text": "Jane Doe"
+    }
+  ],
+  "birthDate": "1980-01-01"
+}

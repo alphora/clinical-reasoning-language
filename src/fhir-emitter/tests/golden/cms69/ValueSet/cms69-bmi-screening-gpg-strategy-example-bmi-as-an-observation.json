@@ -1,0 +1,26 @@
+{
+  "resourceType": "ValueSet",
+  "id": "cms69-bmi-screening-gpg-strategy-example-bmi-as-an-observation",
+  "meta": {
+    "profile": [
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareablevalueset"
+    ]
+  },
+  "url": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/ValueSet/cms69-bmi-screening-gpg-strategy-example-bmi-as-an-observation",
+  "name": "Cms69BmiScreeningGpgStrategyExampleBmiAsAnObservation",
+  "title": "CMS69 BMI Screening demonstration corpus",
+  "status": "draft",
+  "experimental": true,
+  "date": "<EMIT_TIMESTAMP>",
+  "publisher": "Smile Digital Health",
+  "description": "CMS69 BMI Screening demonstration corpus",
+  "compose": {
+    "include": [
+      {
+        "valueSet": [
+          "BMI as an Observation"
+        ]
+      }
+    ]
+  }
+}

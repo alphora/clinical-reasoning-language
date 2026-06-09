@@ -1,0 +1,26 @@
+{
+  "resourceType": "ValueSet",
+  "id": "cms22-bp-control-cognitive-support-example-antihypertensive-cont",
+  "meta": {
+    "profile": [
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareablevalueset"
+    ]
+  },
+  "url": "http://hl7.org/fhir/us/cqfmeasures/crl/cms22/ValueSet/cms22-bp-control-cognitive-support-example-antihypertensive-cont",
+  "name": "Cms22BpControlCognitiveSupportExampleAntihypertensiveContraindicationVs",
+  "title": "CMS22 Blood Pressure Control demonstration corpus",
+  "status": "draft",
+  "experimental": true,
+  "date": "<EMIT_TIMESTAMP>",
+  "publisher": "Smile Digital Health",
+  "description": "CMS22 Blood Pressure Control demonstration corpus",
+  "compose": {
+    "include": [
+      {
+        "valueSet": [
+          "urn:example:placeholder"
+        ]
+      }
+    ]
+  }
+}

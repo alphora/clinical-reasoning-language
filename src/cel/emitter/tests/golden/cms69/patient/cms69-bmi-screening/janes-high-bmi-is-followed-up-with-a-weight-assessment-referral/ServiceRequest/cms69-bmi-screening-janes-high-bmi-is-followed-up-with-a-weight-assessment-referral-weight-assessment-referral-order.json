@@ -1,0 +1,22 @@
+{
+  "resourceType": "ServiceRequest",
+  "id": "cms69-bmi-screening-janes-high-bmi-is-followed-up-with-a-weight-assessment-referral-weight-assessment-referral-order",
+  "meta": {
+    "profile": [
+      "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-servicerequest"
+    ]
+  },
+  "subject": {
+    "reference": "Patient/cms69-bmi-screening-janes-high-bmi-is-followed-up-with-a-weight-assessment-referral-jane-doe"
+  },
+  "code": {
+    "coding": [
+      {
+        "system": "http://snomed.info/sct",
+        "code": "306163007"
+      }
+    ]
+  },
+  "intent": "order",
+  "authoredOn": "2026-01-15"
+}

@@ -1,0 +1,84 @@
+{
+  "resourceType": "Library",
+  "id": "cms69-bmi-screening-gpg-strategy-example",
+  "url": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/Library/cms69-bmi-screening-gpg-strategy-example",
+  "name": "Cms69BmiScreeningGpgStrategyExample",
+  "title": "CMS69 BMI Screening GPG Strategy example",
+  "status": "draft",
+  "experimental": true,
+  "date": "<EMIT_TIMESTAMP>",
+  "publisher": "Smile Digital Health",
+  "description": "CMS69 BMI Screening demonstration corpus",
+  "type": {
+    "coding": [
+      {
+        "system": "http://terminology.hl7.org/CodeSystem/library-type",
+        "code": "logic-library"
+      }
+    ]
+  },
+  "relatedArtifact": [
+    {
+      "type": "depends-on",
+      "resource": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/ValueSet/cms69-bmi-screening-gpg-strategy-example-bmi-range-as-a-conditio"
+    },
+    {
+      "type": "depends-on",
+      "resource": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/ValueSet/cms69-bmi-screening-gpg-strategy-example-bmi-as-an-observation"
+    },
+    {
+      "type": "depends-on",
+      "resource": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/ValueSet/cms69-bmi-screening-gpg-strategy-example-height-valueset"
+    },
+    {
+      "type": "depends-on",
+      "resource": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/ValueSet/cms69-bmi-screening-gpg-strategy-example-weight-valueset"
+    },
+    {
+      "type": "depends-on",
+      "resource": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/ValueSet/cms69-bmi-screening-gpg-strategy-example-overweight-or-obese-dia"
+    },
+    {
+      "type": "depends-on",
+      "resource": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/ValueSet/cms69-bmi-screening-gpg-strategy-example-underweight-diagnoses-v"
+    },
+    {
+      "type": "depends-on",
+      "resource": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/ValueSet/cms69-bmi-screening-gpg-strategy-example-pregnancy-diagnoses-vs"
+    },
+    {
+      "type": "depends-on",
+      "resource": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/ValueSet/cms69-bmi-screening-gpg-strategy-example-weight-assessment-refer"
+    },
+    {
+      "type": "depends-on",
+      "resource": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/ValueSet/cms69-bmi-screening-gpg-strategy-example-anti-obesity-medication"
+    },
+    {
+      "type": "depends-on",
+      "resource": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/ValueSet/cms69-bmi-screening-gpg-strategy-example-low-bmi-follow-up-servi"
+    },
+    {
+      "type": "depends-on",
+      "resource": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/ValueSet/cms69-bmi-screening-gpg-strategy-example-medical-reason-vs"
+    },
+    {
+      "type": "depends-on",
+      "resource": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/ValueSet/cms69-bmi-screening-gpg-strategy-example-patient-declined-vs"
+    },
+    {
+      "type": "depends-on",
+      "resource": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/ValueSet/cms69-bmi-screening-gpg-strategy-example-anti-obesity-contraindi"
+    },
+    {
+      "type": "depends-on",
+      "resource": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/ValueSet/cms69-bmi-screening-gpg-strategy-example-colonoscopy"
+    }
+  ],
+  "content": [
+    {
+      "contentType": "text/cql",
+      "url": "../../cql/CMS69 BMI Screening GPG Strategy example.cql"
+    }
+  ]
+}

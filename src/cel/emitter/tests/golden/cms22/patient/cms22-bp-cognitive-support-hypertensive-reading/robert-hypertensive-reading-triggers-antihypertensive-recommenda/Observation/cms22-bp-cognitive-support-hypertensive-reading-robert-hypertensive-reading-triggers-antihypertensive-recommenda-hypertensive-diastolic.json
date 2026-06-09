@@ -1,0 +1,19 @@
+{
+  "resourceType": "Observation",
+  "id": "cms22-bp-cognitive-support-hypertensive-reading-robert-hypertensive-reading-triggers-antihypertensive-recommenda-hypertensive-diastolic",
+  "subject": {
+    "reference": "Patient/cms22-bp-cognitive-support-hypertensive-reading-robert-hypertensive-reading-triggers-antihypertensive-recommenda-robert-lee"
+  },
+  "code": {
+    "coding": [
+      {
+        "system": "http://loinc.org",
+        "code": "8462-4"
+      }
+    ]
+  },
+  "valueQuantity": {
+    "value": 96
+  },
+  "effectiveDateTime": "2026-04-12"
+}

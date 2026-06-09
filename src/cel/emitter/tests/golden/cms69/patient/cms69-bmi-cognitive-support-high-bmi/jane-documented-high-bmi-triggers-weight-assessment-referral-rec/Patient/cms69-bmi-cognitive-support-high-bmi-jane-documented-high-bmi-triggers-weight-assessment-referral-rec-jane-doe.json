@@ -1,0 +1,10 @@
+{
+  "resourceType": "Patient",
+  "id": "cms69-bmi-cognitive-support-high-bmi-jane-documented-high-bmi-triggers-weight-assessment-referral-rec-jane-doe",
+  "name": [
+    {
+      "text": "Jane Doe"
+    }
+  ],
+  "birthDate": "1980-01-01"
+}

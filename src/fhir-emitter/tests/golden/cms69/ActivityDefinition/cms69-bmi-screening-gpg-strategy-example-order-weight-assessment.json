@@ -1,0 +1,41 @@
+{
+  "resourceType": "ActivityDefinition",
+  "id": "cms69-bmi-screening-gpg-strategy-example-order-weight-assessment",
+  "meta": {
+    "profile": [
+      "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-servicerequestactivity"
+    ]
+  },
+  "url": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/ActivityDefinition/cms69-bmi-screening-gpg-strategy-example-order-weight-assessment",
+  "name": "Cms69BmiScreeningGpgStrategyExampleOrderWeightAssessmentReferral",
+  "title": "Order Weight Assessment Referral",
+  "status": "draft",
+  "experimental": true,
+  "date": "<EMIT_TIMESTAMP>",
+  "publisher": "Smile Digital Health",
+  "description": "Patient has documented high BMI without a current referral",
+  "library": [
+    "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/Library/cms69-bmi-screening-gpg-strategy-example"
+  ],
+  "kind": "ServiceRequest",
+  "profile": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-servicerequest",
+  "intent": "proposal",
+  "doNotPerform": false,
+  "code": {
+    "coding": [
+      {
+        "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-activity-type-cs",
+        "code": "order-service"
+      }
+    ]
+  },
+  "dynamicValue": [
+    {
+      "path": "code",
+      "expression": {
+        "language": "text/cql-identifier",
+        "expression": "Weight Assessment Referrals VS"
+      }
+    }
+  ]
+}

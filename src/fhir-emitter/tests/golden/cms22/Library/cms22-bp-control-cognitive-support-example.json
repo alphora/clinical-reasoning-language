@@ -1,0 +1,68 @@
+{
+  "resourceType": "Library",
+  "id": "cms22-bp-control-cognitive-support-example",
+  "url": "http://hl7.org/fhir/us/cqfmeasures/crl/cms22/Library/cms22-bp-control-cognitive-support-example",
+  "name": "Cms22BpControlCognitiveSupportExample",
+  "title": "CMS22 BP Control Cognitive Support Example",
+  "status": "draft",
+  "experimental": true,
+  "date": "<EMIT_TIMESTAMP>",
+  "publisher": "Smile Digital Health",
+  "description": "CMS22 Blood Pressure Control demonstration corpus",
+  "type": {
+    "coding": [
+      {
+        "system": "http://terminology.hl7.org/CodeSystem/library-type",
+        "code": "logic-library"
+      }
+    ]
+  },
+  "relatedArtifact": [
+    {
+      "type": "depends-on",
+      "resource": "http://hl7.org/fhir/us/cqfmeasures/crl/cms22/ValueSet/cms22-bp-control-cognitive-support-example-blood-pressure-panels"
+    },
+    {
+      "type": "depends-on",
+      "resource": "http://hl7.org/fhir/us/cqfmeasures/crl/cms22/ValueSet/cms22-bp-control-cognitive-support-example-standalone-systolic-b"
+    },
+    {
+      "type": "depends-on",
+      "resource": "http://hl7.org/fhir/us/cqfmeasures/crl/cms22/ValueSet/cms22-bp-control-cognitive-support-example-standalone-diastolic"
+    },
+    {
+      "type": "depends-on",
+      "resource": "http://hl7.org/fhir/us/cqfmeasures/crl/cms22/ValueSet/cms22-bp-control-cognitive-support-example-hypertension-diagnose"
+    },
+    {
+      "type": "depends-on",
+      "resource": "http://hl7.org/fhir/us/cqfmeasures/crl/cms22/ValueSet/cms22-bp-control-cognitive-support-example-antihypertensive-medi"
+    },
+    {
+      "type": "depends-on",
+      "resource": "http://hl7.org/fhir/us/cqfmeasures/crl/cms22/ValueSet/cms22-bp-control-cognitive-support-example-follow-up-within-4-we"
+    },
+    {
+      "type": "depends-on",
+      "resource": "http://hl7.org/fhir/us/cqfmeasures/crl/cms22/ValueSet/cms22-bp-control-cognitive-support-example-lifestyle-recommendat"
+    },
+    {
+      "type": "depends-on",
+      "resource": "http://hl7.org/fhir/us/cqfmeasures/crl/cms22/ValueSet/cms22-bp-control-cognitive-support-example-antihypertensive-cont"
+    },
+    {
+      "type": "depends-on",
+      "resource": "http://hl7.org/fhir/us/cqfmeasures/crl/cms22/ValueSet/cms22-bp-control-cognitive-support-example-medical-reason-vs"
+    },
+    {
+      "type": "depends-on",
+      "resource": "http://hl7.org/fhir/us/cqfmeasures/crl/cms22/ValueSet/cms22-bp-control-cognitive-support-example-patient-declined-vs"
+    }
+  ],
+  "content": [
+    {
+      "contentType": "text/cql",
+      "url": "../../cql/CMS22 BP Control Cognitive Support Example.cql"
+    }
+  ]
+}

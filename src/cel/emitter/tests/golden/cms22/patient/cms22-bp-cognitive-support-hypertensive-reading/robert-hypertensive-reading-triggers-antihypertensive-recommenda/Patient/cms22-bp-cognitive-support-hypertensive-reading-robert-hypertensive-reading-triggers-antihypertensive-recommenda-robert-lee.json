@@ -1,0 +1,10 @@
+{
+  "resourceType": "Patient",
+  "id": "cms22-bp-cognitive-support-hypertensive-reading-robert-hypertensive-reading-triggers-antihypertensive-recommenda-robert-lee",
+  "name": [
+    {
+      "text": "Robert Lee"
+    }
+  ],
+  "birthDate": "1958-11-04"
+}

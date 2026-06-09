@@ -1,0 +1,19 @@
+{
+  "resourceType": "Observation",
+  "id": "cms22-blood-pressure-screening-maria-has-normal-bp-at-her-wellness-visit-normal-systolic-component",
+  "subject": {
+    "reference": "Patient/cms22-blood-pressure-screening-maria-has-normal-bp-at-her-wellness-visit-maria-garcia"
+  },
+  "code": {
+    "coding": [
+      {
+        "system": "http://loinc.org",
+        "code": "8480-6"
+      }
+    ]
+  },
+  "valueQuantity": {
+    "value": 118
+  },
+  "effectiveDateTime": "2026-03-10"
+}

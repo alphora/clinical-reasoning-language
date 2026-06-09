@@ -1,0 +1,10 @@
+{
+  "resourceType": "Patient",
+  "id": "cms22-blood-pressure-screening-maria-has-normal-bp-at-her-wellness-visit-maria-garcia",
+  "name": [
+    {
+      "text": "Maria Garcia"
+    }
+  ],
+  "birthDate": "1972-08-22"
+}

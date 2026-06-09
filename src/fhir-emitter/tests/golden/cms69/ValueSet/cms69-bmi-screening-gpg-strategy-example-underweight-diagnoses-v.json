@@ -1,0 +1,26 @@
+{
+  "resourceType": "ValueSet",
+  "id": "cms69-bmi-screening-gpg-strategy-example-underweight-diagnoses-v",
+  "meta": {
+    "profile": [
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareablevalueset"
+    ]
+  },
+  "url": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/ValueSet/cms69-bmi-screening-gpg-strategy-example-underweight-diagnoses-v",
+  "name": "Cms69BmiScreeningGpgStrategyExampleUnderweightDiagnosesVs",
+  "title": "CMS69 BMI Screening demonstration corpus",
+  "status": "draft",
+  "experimental": true,
+  "date": "<EMIT_TIMESTAMP>",
+  "publisher": "Smile Digital Health",
+  "description": "CMS69 BMI Screening demonstration corpus",
+  "compose": {
+    "include": [
+      {
+        "valueSet": [
+          "http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.526.3.1563"
+        ]
+      }
+    ]
+  }
+}

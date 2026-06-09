@@ -1,0 +1,16 @@
+{
+  "resourceType": "Observation",
+  "id": "cms22-bp-cognitive-support-hypertensive-reading-robert-hypertensive-reading-triggers-antihypertensive-recommenda-hypertensive-bp-reading",
+  "subject": {
+    "reference": "Patient/cms22-bp-cognitive-support-hypertensive-reading-robert-hypertensive-reading-triggers-antihypertensive-recommenda-robert-lee"
+  },
+  "code": {
+    "coding": [
+      {
+        "system": "http://loinc.org",
+        "code": "85354-9"
+      }
+    ]
+  },
+  "effectiveDateTime": "2026-04-12"
+}
