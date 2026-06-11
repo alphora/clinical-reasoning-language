@@ -46,20 +46,13 @@ import type {
   EmittedResource,
   UnmatchedReference,
 } from "./types";
-import { capabilitiesUpTo, isPublishablePlus } from "./types";
+import { capabilitiesUpTo, crmiCapabilityProfiles, isPublishablePlus } from "./types";
 
 const CPG_BASE = "http://hl7.org/fhir/uv/cpg/StructureDefinition";
-// #104: see decision.ts for the namespace migration rationale. CRMI for
-// publishable-plan-definition lifecycle; FHIR-core cqf- for the knowledge*
-// extensions.
-const CRMI_BASE = "http://hl7.org/fhir/uv/crmi/StructureDefinition";
+// #104: FHIR-core cqf- for the knowledge* extensions; CRMI lifecycle profiles
+// come (additively) from crmiCapabilityProfiles.
 const FHIR_CORE_EXT_BASE = "http://hl7.org/fhir/StructureDefinition";
 const REC_CPG_PROFILE = `${CPG_BASE}/cpg-recommendationdefinition`;
-// CRMI 1.0.0: publishable requires `date` (1..1); shareable does not. The
-// capability level selects which lifecycle profile is claimed (coherent with
-// the date gate + the knowledgeCapability list).
-const PUBLISHABLE_PLANDEF_PROFILE = `${CRMI_BASE}/crmi-publishableplandefinition`;
-const SHAREABLE_PLANDEF_PROFILE = `${CRMI_BASE}/crmi-shareableplandefinition`;
 const KNOWLEDGE_CAPABILITY_EXT = `${FHIR_CORE_EXT_BASE}/cqf-knowledgeCapability`;
 const KNOWLEDGE_REPRESENTATION_EXT = `${FHIR_CORE_EXT_BASE}/cqf-knowledgeRepresentationLevel`;
 const PLAN_DEFINITION_TYPE_CS = "http://terminology.hl7.org/CodeSystem/plan-definition-type";
@@ -151,7 +144,7 @@ export function emitRecommendationDefinition(
     resourceType: "PlanDefinition",
     id,
     meta: {
-      profile: [REC_CPG_PROFILE, publishable ? PUBLISHABLE_PLANDEF_PROFILE : SHAREABLE_PLANDEF_PROFILE],
+      profile: [REC_CPG_PROFILE, ...crmiCapabilityProfiles("plandefinition", level)],
     },
     extension: [
       ...capabilitiesUpTo(level).map((c) => ({ url: KNOWLEDGE_CAPABILITY_EXT, valueCode: c })),

@@ -25,7 +25,7 @@ import type { Terminology, TerminologyBodyLine } from "../ast/types";
 import type { CRLError } from "../types/errors";
 
 import { capSlug, pascalCaseName, slugify } from "./slug";
-import { isPublishablePlus } from "./types";
+import { crmiCapabilityProfiles, isPublishablePlus } from "./types";
 import type {
   CpgMetadata,
   EmitOptions,
@@ -33,15 +33,9 @@ import type {
   UnmatchedReference,
 } from "./types";
 
-// #104: shareable-valueset lifecycle profile moved from CPG STU1's uv/cpg
-// namespace to CRMI IG (uv/crmi) in CPG 2.0.0. Consumers should add
-// hl7.fhir.uv.crmi to their IG deps alongside the CPG package — CPG 2.0.0
-// itself does NOT declare a CRMI dependency. CRMI 1.0.0: shareable profile
-// requires `version` (1..1); publishable adds `date` (1..1).
-const SHAREABLE_PROFILE_URL =
-  "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareablevalueset";
-const PUBLISHABLE_PROFILE_URL =
-  "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-publishablevalueset";
+// #104: ValueSet lifecycle profiles live in the CRMI IG (uv/crmi); consumers add
+// hl7.fhir.uv.crmi to their IG deps alongside CPG. CRMI capability profiles are
+// ADDITIVE (shareable → +computable → +publishable) — see crmiCapabilityProfiles.
 
 /**
  * Emit one cpg-shareableValueSet from a single CRL Terminology.
@@ -109,7 +103,7 @@ export function emitValueSet(
   const resource: Record<string, unknown> = {
     resourceType: "ValueSet",
     id,
-    meta: { profile: [publishable ? PUBLISHABLE_PROFILE_URL : SHAREABLE_PROFILE_URL] },
+    meta: { profile: crmiCapabilityProfiles("valueset", level) },
     url,
     // version: CRMI requires `version` (1..1) at the shareable floor; sourced
     // from the npm package (authoritative SoT).

@@ -44,8 +44,10 @@ describe("fhir-emitter valueSet.emitValueSet", () => {
     const r = resource!.resource as Record<string, unknown>;
     expect(r.resourceType).toBe("ValueSet");
     expect(r.id).toBe("cms22-terminology-bp-screening-encounter-codes");
-    // default capability = publishable → publishable lifecycle profile.
+    // default capability = publishable → additive CRMI profiles (shareable→publishable).
     expect((r.meta as { profile: string[] }).profile).toEqual([
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareablevalueset",
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-computablevalueset",
       "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-publishablevalueset",
     ]);
     expect(r.url).toBe(

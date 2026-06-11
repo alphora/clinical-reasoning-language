@@ -126,6 +126,32 @@ export function isPublishablePlus(level: Capability): boolean {
   return CAPABILITY_ORDER.indexOf(level) >= CAPABILITY_ORDER.indexOf("publishable");
 }
 
+export type CrmiProfileResource = "valueset" | "library" | "activitydefinition" | "plandefinition";
+
+const CRMI_SD_BASE = "http://hl7.org/fhir/uv/crmi/StructureDefinition";
+
+// CRMI 1.0.0: which capability levels actually publish a `crmi-<level><resource>`
+// StructureDefinition (verified from the hl7.fhir.uv.crmi#1.0.0 package).
+const CRMI_PROFILE_LEVELS: Record<CrmiProfileResource, readonly Capability[]> = {
+  valueset: ["shareable", "computable", "publishable"],
+  library: ["shareable", "computable", "publishable", "executable"],
+  activitydefinition: ["shareable", "publishable"],
+  plandefinition: ["shareable", "publishable"],
+};
+
+/**
+ * CRMI capability profiles for a resource, **additive** up to `level`: profiles
+ * accumulate as capability progresses (a publishable resource claims shareable +
+ * computable + publishable — whichever exist for the resource — not just the top
+ * one), mirroring the cumulative `cqf-knowledgeCapability` list.
+ */
+export function crmiCapabilityProfiles(resource: CrmiProfileResource, level: Capability): string[] {
+  const available = CRMI_PROFILE_LEVELS[resource];
+  return capabilitiesUpTo(level)
+    .filter((c) => available.includes(c))
+    .map((c) => `${CRMI_SD_BASE}/crmi-${c}${resource}`);
+}
+
 export interface ContactPoint {
   system: "url" | "email" | "phone";
   value: string;

@@ -1,6 +1,13 @@
 {
   "resourceType": "Library",
   "id": "cms22-bp-control-cognitive-support-example",
+  "meta": {
+    "profile": [
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareablelibrary",
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-computablelibrary",
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-publishablelibrary"
+    ]
+  },
   "url": "http://hl7.org/fhir/us/cqfmeasures/crl/cms22/Library/cms22-bp-control-cognitive-support-example",
   "version": "1.0.0",
   "name": "Cms22BpControlCognitiveSupportExample",
