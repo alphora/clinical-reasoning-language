@@ -234,10 +234,16 @@ export interface UnmatchedReference {
  * injected as `clock: () => resolved`, so the per-resource emitters stay
  * unchanged. `clock` remains the test/override seam.
  *
- * `capability` selects the CRMI capability level (default `publishable` —
- * reproduces the historical output: shareable+computable+publishable, NOT
- * executable). It gates `meta.profile`, the knowledgeCapability list, and the
- * `date` element together.
+ * `capability` selects the CRMI capability level (default `publishable`). It
+ * drives, on every definitional resource, the additive `meta.profile` set
+ * (`crmiCapabilityProfiles` — accumulates the lifecycle profiles that EXIST for
+ * the resource up to the level) and the `date` element (emitted at publishable+).
+ * On PlanDefinitions it also drives the cumulative `cqf-knowledgeCapability`
+ * list. Note these are not perfectly symmetric: the `knowledgeCapability` codes
+ * are orthogonal to profile existence (CRMI binds them `0..* mustSupport`, no
+ * fixed code), so a PlanDefinition can claim `computable` capability even though
+ * no `crmi-computableplandefinition` profile exists. ValueSet/ActivityDefinition/
+ * Library carry no `cqf-knowledgeCapability` extension today.
  */
 export interface EmitOptions {
   /** Test/override seam: returns the emit-time date. */

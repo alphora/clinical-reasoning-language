@@ -137,3 +137,70 @@ describe("capability gate — version always, date only at publishable+", () => 
     expect(caps).toEqual(["shareable"]);
   });
 });
+
+describe("capability profile matrix — additive CRMI lifecycle profiles per resource", () => {
+  const STRATEGY = path.join(REPO_ROOT, "src/tests/fixtures/corpus/cms22-split/cms22-strategy.crl");
+  const FIXED = new Date("2020-01-01T00:00:00.000Z");
+  const C = "http://hl7.org/fhir/uv/crmi/StructureDefinition";
+
+  const crmiProfilesOf = (
+    resources: { relativePath: string; resource: Record<string, unknown> }[],
+    prefix: string,
+  ): string[] => {
+    const r = resources.find((x) => x.relativePath.startsWith(prefix));
+    if (!r) throw new Error(`no emitted ${prefix} resource`);
+    return ((r.resource as { meta?: { profile?: string[] } }).meta?.profile ?? []).filter((p) =>
+      p.includes("/crmi-"),
+    );
+  };
+  const emitAt = (capability: "shareable" | "computable" | "publishable" | "executable") => {
+    const r = emitFhirDefFromPath(STRATEGY, { date: FIXED, capability });
+    expect(r.errors.length).toBe(0);
+    return r.resources as { relativePath: string; resource: Record<string, unknown> }[];
+  };
+
+  it("ValueSet accumulates shareable→computable→publishable (no executable profile exists)", () => {
+    expect(crmiProfilesOf(emitAt("shareable"), "ValueSet/")).toEqual([
+      `${C}/crmi-shareablevalueset`,
+    ]);
+    expect(crmiProfilesOf(emitAt("computable"), "ValueSet/")).toEqual([
+      `${C}/crmi-shareablevalueset`,
+      `${C}/crmi-computablevalueset`,
+    ]);
+    expect(crmiProfilesOf(emitAt("executable"), "ValueSet/")).toEqual([
+      `${C}/crmi-shareablevalueset`,
+      `${C}/crmi-computablevalueset`,
+      `${C}/crmi-publishablevalueset`,
+    ]);
+  });
+
+  it("Library accumulates all four levels including executable", () => {
+    expect(crmiProfilesOf(emitAt("shareable"), "Library/")).toEqual([`${C}/crmi-shareablelibrary`]);
+    expect(crmiProfilesOf(emitAt("executable"), "Library/")).toEqual([
+      `${C}/crmi-shareablelibrary`,
+      `${C}/crmi-computablelibrary`,
+      `${C}/crmi-publishablelibrary`,
+      `${C}/crmi-executablelibrary`,
+    ]);
+  });
+
+  it("ActivityDefinition has only shareable+publishable profiles (computable/executable filtered out)", () => {
+    expect(crmiProfilesOf(emitAt("computable"), "ActivityDefinition/")).toEqual([
+      `${C}/crmi-shareableactivitydefinition`,
+    ]);
+    expect(crmiProfilesOf(emitAt("executable"), "ActivityDefinition/")).toEqual([
+      `${C}/crmi-shareableactivitydefinition`,
+      `${C}/crmi-publishableactivitydefinition`,
+    ]);
+  });
+
+  it("PlanDefinition has only shareable+publishable profiles (computable/executable filtered out)", () => {
+    expect(crmiProfilesOf(emitAt("computable"), "PlanDefinition/")).toEqual([
+      `${C}/crmi-shareableplandefinition`,
+    ]);
+    expect(crmiProfilesOf(emitAt("executable"), "PlanDefinition/")).toEqual([
+      `${C}/crmi-shareableplandefinition`,
+      `${C}/crmi-publishableplandefinition`,
+    ]);
+  });
+});

@@ -17,12 +17,12 @@
  * groups in v0, so 1:1 is the natural map. Documented as Drift A in
  * the fixture README.
  *
- * Recommendation profile: `[cpg-recommendationdefinition,
- * crmi-publishableplandefinition]` (per #104 namespace fix), type
- * `eca-rule`. No `version`
- * field (per `feedback_no-version-on-emitted-artifacts` memory rule).
- * knowledgeCapability emits 3 (`shareable + computable + publishable`;
- * NOT `executable` per round-2 Gemini disposition — overclaim).
+ * Recommendation profile: `[cpg-recommendationdefinition, …additive CRMI
+ * plandefinition lifecycle profiles up to the target capability]` (per #104 +
+ * the additive-capability work), type `eca-rule`. `version` is stamped from
+ * package.json (CRMI Shareable requires it); `date` at publishable+.
+ * knowledgeCapability is the cumulative `capabilitiesUpTo(level)` list
+ * (default shareable + computable + publishable).
  *
  * Slug rule: `recommendation-id = capSlugForSuffix(<librarySlug>-
  * <activitySlug>, "-recommendation")`. The pre-cap base ≤ 49 chars
@@ -147,6 +147,10 @@ export function emitRecommendationDefinition(
       profile: [REC_CPG_PROFILE, ...crmiCapabilityProfiles("plandefinition", level)],
     },
     extension: [
+      // knowledgeCapability codes are cumulative and ORTHOGONAL to profile
+      // existence (CRMI binds this extension 0..* mustSupport, no fixed code) —
+      // the list may include e.g. `computable` though no crmi-computable*
+      // PlanDefinition profile exists. Do NOT reconcile it with meta.profile.
       ...capabilitiesUpTo(level).map((c) => ({ url: KNOWLEDGE_CAPABILITY_EXT, valueCode: c })),
       { url: KNOWLEDGE_REPRESENTATION_EXT, valueCode: "structured" },
     ],
