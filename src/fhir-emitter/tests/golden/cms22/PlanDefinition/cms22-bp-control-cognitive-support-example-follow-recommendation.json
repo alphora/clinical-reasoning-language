@@ -26,6 +26,7 @@
     }
   ],
   "url": "http://hl7.org/fhir/us/cqfmeasures/crl/cms22/PlanDefinition/cms22-bp-control-cognitive-support-example-follow-recommendation",
+  "version": "1.0.0",
   "name": "Cms22BpControlCognitiveSupportExampleFollowUpRescreenRecommendation",
   "title": "Follow-up Rescreen",
   "status": "draft",

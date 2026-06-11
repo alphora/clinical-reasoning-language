@@ -59,4 +59,6 @@ export type {
   EmitOptions,
   FhirDefEmitResult,
   UnmatchedReference,
+  Capability,
 } from "./types";
+export { CAPABILITY_ORDER } from "./types";

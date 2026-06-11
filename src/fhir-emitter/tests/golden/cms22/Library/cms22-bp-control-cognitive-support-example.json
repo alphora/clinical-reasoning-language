@@ -2,6 +2,7 @@
   "resourceType": "Library",
   "id": "cms22-bp-control-cognitive-support-example",
   "url": "http://hl7.org/fhir/us/cqfmeasures/crl/cms22/Library/cms22-bp-control-cognitive-support-example",
+  "version": "1.0.0",
   "name": "Cms22BpControlCognitiveSupportExample",
   "title": "CMS22 BP Control Cognitive Support Example",
   "status": "draft",

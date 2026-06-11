@@ -19,7 +19,9 @@ function listCrlFiles(dir: string): string[] {
   const out: string[] = [];
   let entries: ReturnType<typeof readdirSync>;
   try {
-    entries = readdirSync(dir, { withFileTypes: true });
+    // Sort for deterministic traversal — filesystem readdir order is not
+    // guaranteed and would make emit output (resource/closure order) vary.
+    entries = readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name));
   } catch {
     return out;
   }
@@ -181,7 +183,7 @@ function scanNodeModules(projectRoot: string): {
   const candidates: string[] = [];
   let topLevel: ReturnType<typeof readdirSync>;
   try {
-    topLevel = readdirSync(nodeModules, { withFileTypes: true });
+    topLevel = readdirSync(nodeModules, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name));
   } catch {
     return { entries, diagnostics };
   }
@@ -193,7 +195,7 @@ function scanNodeModules(projectRoot: string): {
       // Scoped: walk one more level for @org/pkg
       let scoped: ReturnType<typeof readdirSync>;
       try {
-        scoped = readdirSync(full, { withFileTypes: true });
+        scoped = readdirSync(full, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name));
       } catch {
         continue;
       }

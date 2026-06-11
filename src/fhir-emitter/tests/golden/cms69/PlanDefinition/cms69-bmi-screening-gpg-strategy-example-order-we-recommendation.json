@@ -26,6 +26,7 @@
     }
   ],
   "url": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/PlanDefinition/cms69-bmi-screening-gpg-strategy-example-order-we-recommendation",
+  "version": "1.0.0",
   "name": "Cms69BmiScreeningGpgStrategyExampleOrderWeightAssessmentReferralRecommendation",
   "title": "Order Weight Assessment Referral",
   "status": "draft",

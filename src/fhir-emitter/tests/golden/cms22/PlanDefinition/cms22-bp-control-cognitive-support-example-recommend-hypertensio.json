@@ -25,6 +25,7 @@
     }
   ],
   "url": "http://hl7.org/fhir/us/cqfmeasures/crl/cms22/PlanDefinition/cms22-bp-control-cognitive-support-example-recommend-hypertensio",
+  "version": "1.0.0",
   "name": "Cms22BpControlCognitiveSupportExampleRecommendHypertensionIntervention",
   "title": "Recommend Hypertension Intervention",
   "status": "draft",

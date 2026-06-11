@@ -26,6 +26,7 @@
     }
   ],
   "url": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/PlanDefinition/cms69-bmi-screening-gpg-strategy-example-cms69-bmi-screening-str",
+  "version": "1.0.0",
   "name": "Cms69BmiScreeningGpgStrategyExampleCms69BmiScreeningStrategy",
   "title": "CMS69 BMI Screening Strategy",
   "status": "draft",

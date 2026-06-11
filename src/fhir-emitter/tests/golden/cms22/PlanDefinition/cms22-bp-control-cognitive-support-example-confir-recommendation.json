@@ -26,6 +26,7 @@
     }
   ],
   "url": "http://hl7.org/fhir/us/cqfmeasures/crl/cms22/PlanDefinition/cms22-bp-control-cognitive-support-example-confir-recommendation",
+  "version": "1.0.0",
   "name": "Cms22BpControlCognitiveSupportExampleConfirmContinuedControlRecommendation",
   "title": "Confirm Continued Control",
   "status": "draft",

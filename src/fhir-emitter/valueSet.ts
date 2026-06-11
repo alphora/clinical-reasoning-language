@@ -25,6 +25,7 @@ import type { Terminology, TerminologyBodyLine } from "../ast/types";
 import type { CRLError } from "../types/errors";
 
 import { capSlug, pascalCaseName, slugify } from "./slug";
+import { isPublishablePlus } from "./types";
 import type {
   CpgMetadata,
   EmitOptions,
@@ -35,9 +36,12 @@ import type {
 // #104: shareable-valueset lifecycle profile moved from CPG STU1's uv/cpg
 // namespace to CRMI IG (uv/crmi) in CPG 2.0.0. Consumers should add
 // hl7.fhir.uv.crmi to their IG deps alongside the CPG package — CPG 2.0.0
-// itself does NOT declare a CRMI dependency.
-const PROFILE_URL =
+// itself does NOT declare a CRMI dependency. CRMI 1.0.0: shareable profile
+// requires `version` (1..1); publishable adds `date` (1..1).
+const SHAREABLE_PROFILE_URL =
   "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareablevalueset";
+const PUBLISHABLE_PROFILE_URL =
+  "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-publishablevalueset";
 
 /**
  * Emit one cpg-shareableValueSet from a single CRL Terminology.
@@ -96,7 +100,8 @@ export function emitValueSet(
     return { resource: null, errors, unmatched };
   }
 
-  const date = (opts.clock ?? defaultClock)().toISOString();
+  const level = opts.capability ?? "publishable";
+  const publishable = isPublishablePlus(level);
   const url = `${metadata.canonicalBase}/ValueSet/${id}`;
 
   const compose = buildCompose(terminology.body, terminology, unmatched);
@@ -104,16 +109,17 @@ export function emitValueSet(
   const resource: Record<string, unknown> = {
     resourceType: "ValueSet",
     id,
-    meta: { profile: [PROFILE_URL] },
+    meta: { profile: [publishable ? PUBLISHABLE_PROFILE_URL : SHAREABLE_PROFILE_URL] },
     url,
-    // `version` deliberately omitted — npm package owns the version;
-    // applied at package time. See memory feedback_no-version-on-
-    // emitted-artifacts.
+    // version: CRMI requires `version` (1..1) at the shareable floor; sourced
+    // from the npm package (authoritative SoT).
+    version: metadata.version,
     name: computableName,
     title,
     status: metadata.status,
     experimental: metadata.experimental,
-    date,
+    // date: CRMI requires `date` only at publishable+ — omitted below that.
+    ...(publishable ? { date: (opts.clock ?? defaultClock)().toISOString() } : {}),
     publisher: metadata.publisher,
     description,
     compose,

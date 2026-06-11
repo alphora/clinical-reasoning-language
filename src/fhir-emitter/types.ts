@@ -43,6 +43,10 @@ import type { CRLError } from "../types/errors";
  *   unresolved-related-artifact                    error    An emitted Library's `relatedArtifact[depends-on]` URL is under canonicalBase but doesn't resolve to an emitted resource. (Todo 4)
  *   unresolved-definition-target                   error    An emitted PlanDef's `action.definitionCanonical` doesn't resolve to an emitted PlanDef/ActivityDef. (Todo 4)
  *   cli-cel-fhir-def-incompatible                  error    CLI: `.cel` input + `--target fhir-def` flag. (Todo 4)
+ *   missing-package-version                         error    package.json has no `version`. CRMI requires `version` 1..1 at the shareable floor.
+ *   invalid-emit-date                              error    `--date`/`opts.date`/`crl.date` is not a parseable date.
+ *   invalid-source-date-epoch                      error    `SOURCE_DATE_EPOCH` env is not a non-negative integer of epoch seconds (rejects ms-shaped values).
+ *   missing-publishable-date                       error    Publishable+ emit with no resolvable date (no --date/SOURCE_DATE_EPOCH/crl.date). Reproducibility is not opt-in.
  */
 
 /**
@@ -83,6 +87,43 @@ export interface CpgMetadata {
   experimental: boolean;
   jurisdiction: CodeableConcept[];
   useContext: UsageContext[];
+  /**
+   * Reproducible-emit managed publication date (`crl.date`, ISO). Authoritative
+   * source for the FHIR `date` when emitting at publishable+. Undefined when not
+   * declared; the date-resolution chain then falls back to env/clock.
+   */
+  crlDate?: string;
+  /**
+   * Targeted FHIR IG dependency versions (`crl.fhirDependencies`, e.g.
+   * `{ "hl7.fhir.uv.crmi": "1.0.0" }`). Provenance / the FHIR-package assembly
+   * manifest's deps — NEVER stamped onto an emitted resource.
+   */
+  fhirDependencies?: Record<string, string>;
+}
+
+/**
+ * CRMI artifact capability levels (cumulative; shareable is the floor).
+ * Drives, as one gate: `meta.profile`, the `cqf-knowledgeCapability` list, and
+ * whether `date` is emitted (publishable+ per CRMI 1.0.0). `version` is required
+ * at the shareable floor → always emitted on definitional FHIR.
+ */
+export type Capability = "shareable" | "computable" | "publishable" | "executable";
+
+export const CAPABILITY_ORDER: readonly Capability[] = [
+  "shareable",
+  "computable",
+  "publishable",
+  "executable",
+];
+
+/** Cumulative capability list up to and including `level` (lattice order). */
+export function capabilitiesUpTo(level: Capability): Capability[] {
+  return CAPABILITY_ORDER.slice(0, CAPABILITY_ORDER.indexOf(level) + 1);
+}
+
+/** True when `level` is at or above publishable (i.e., `date` must be emitted). */
+export function isPublishablePlus(level: Capability): boolean {
+  return CAPABILITY_ORDER.indexOf(level) >= CAPABILITY_ORDER.indexOf("publishable");
 }
 
 export interface ContactPoint {
@@ -159,10 +200,24 @@ export interface UnmatchedReference {
 }
 
 /**
- * Δ8 — Emit options. `clock` is injected so tests get deterministic
- * timestamps. Default `() => new Date()` matches the natural emit-time
- * behavior.
+ * Emit options.
+ *
+ * Reproducible-emit date resolution (resolved ONCE at the `emitFhirDefFromPath`
+ * boundary, then carried internally): `date` → `SOURCE_DATE_EPOCH` env →
+ * `crl.date` (package.json) → `clock()` → wall clock. The resolved value is
+ * injected as `clock: () => resolved`, so the per-resource emitters stay
+ * unchanged. `clock` remains the test/override seam.
+ *
+ * `capability` selects the CRMI capability level (default `publishable` —
+ * reproduces the historical output: shareable+computable+publishable, NOT
+ * executable). It gates `meta.profile`, the knowledgeCapability list, and the
+ * `date` element together.
  */
 export interface EmitOptions {
+  /** Test/override seam: returns the emit-time date. */
   clock?: () => Date;
+  /** Explicit publication date override (ISO string or Date). Highest precedence. */
+  date?: string | Date;
+  /** CRMI capability level. Default `publishable`. */
+  capability?: Capability;
 }
