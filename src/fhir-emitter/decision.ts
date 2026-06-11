@@ -4,11 +4,11 @@
  *
  * Per plan v3.2 [065] + #104 namespace fix:
  *   - Root CRL decision (no incoming `use decision` refs)
- *       → Strategy PlanDef with profiles `[cpg-strategydefinition,
- *         crmi-publishableplandefinition]`, type `workflow-definition`.
+ *       → Strategy PlanDef: `[cpg-strategydefinition, …additive CRMI
+ *         plandefinition profiles up to capability]`, type `workflow-definition`.
  *   - Sub CRL decision (referenced by ≥1 `use decision`)
- *       → Sub-decision PlanDef with profile `[crmi-publishableplandefinition]`
- *         only, type `eca-rule`. Matches the demo-content-r4
+ *       → Sub-decision PlanDef: the additive CRMI plandefinition profiles only
+ *         (no CPG strategy profile), type `eca-rule`. Matches the demo-content-r4
  *         "decisiontree" pattern (renamed conceptually to "decision").
  *
  * DELIBERATE SPEC DEVIATION 2026-06-04:
@@ -309,6 +309,11 @@ export function emitDecisionPlanDefinition(
     id,
     meta: { profile: planDefProfiles(isRoot, level) },
     extension: [
+      // knowledgeCapability codes are cumulative and ORTHOGONAL to profile
+      // existence (CRMI binds this extension 0..* mustSupport, no fixed code) —
+      // so the list may include e.g. `computable` even though no
+      // crmi-computableplandefinition profile exists. Do NOT reconcile it with
+      // meta.profile (which only claims profiles that exist for the resource).
       ...capabilitiesUpTo(level).map((c) => ({ url: KNOWLEDGE_CAPABILITY_EXT, valueCode: c })),
       { url: KNOWLEDGE_REPRESENTATION_EXT, valueCode: "structured" },
     ],
