@@ -33,16 +33,16 @@ const CORPORA: Record<string, string> = {
   cms69: "cms69-split/cms69-strategy.crl",
 };
 
-// The FHIR-def emitter stamps a fresh ISO timestamp (`date`) on each resource,
-// so raw output is non-reproducible. Normalize that one volatile shape (ISO
-// datetime with millis + Z) to a placeholder so the golden is stable; clinical
-// date-only values (YYYY-MM-DD) are untouched.
-const EMIT_TS = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
-const ser = (body: unknown): string =>
-  JSON.stringify(body, (_k, v) => (typeof v === "string" && EMIT_TS.test(v) ? "<EMIT_TIMESTAMP>" : v), 2) + "\n";
+// The FHIR-def emitter stamps `date` via the injectable EmitOptions.clock seam
+// (defaultClock = wall clock). The golden injects a FIXED clock so the output is
+// reproducible at the source — no test-side timestamp normalization needed.
+const FIXED_DATE = new Date("2020-01-01T00:00:00.000Z");
+const ser = (body: unknown): string => JSON.stringify(body, null, 2) + "\n";
 
 function emitCorpus(crlRel: string): { files: Map<string, string>; unmatched: string } {
-  const r = emitFhirDefFromPath(path.join(REPO_ROOT, "src/tests/fixtures/corpus", crlRel));
+  const r = emitFhirDefFromPath(path.join(REPO_ROOT, "src/tests/fixtures/corpus", crlRel), {
+    clock: () => FIXED_DATE,
+  });
   if (r.errors.length) {
     throw new Error(`CRL→FHIR errors for ${crlRel}: ${JSON.stringify(r.errors)}`);
   }

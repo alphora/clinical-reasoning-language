@@ -30,7 +30,7 @@
   "title": "Contraindicated Anti-Obesity Medication",
   "status": "draft",
   "experimental": true,
-  "date": "<EMIT_TIMESTAMP>",
+  "date": "2020-01-01T00:00:00.000Z",
   "publisher": "Smile Digital Health",
   "description": "Patient has a documented contraindication to anti-obesity pharmacotherapy",
   "type": {

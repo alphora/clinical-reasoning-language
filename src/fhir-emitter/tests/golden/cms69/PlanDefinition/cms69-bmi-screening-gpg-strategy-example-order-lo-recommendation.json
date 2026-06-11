@@ -30,7 +30,7 @@
   "title": "Order Low BMI Follow-up",
   "status": "draft",
   "experimental": true,
-  "date": "<EMIT_TIMESTAMP>",
+  "date": "2020-01-01T00:00:00.000Z",
   "publisher": "Smile Digital Health",
   "description": "Order Low BMI Follow-up",
   "type": {

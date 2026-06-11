@@ -11,7 +11,7 @@
   "title": "CMS69 BMI Screening demonstration corpus",
   "status": "draft",
   "experimental": true,
-  "date": "<EMIT_TIMESTAMP>",
+  "date": "2020-01-01T00:00:00.000Z",
   "publisher": "Smile Digital Health",
   "description": "CMS69 BMI Screening demonstration corpus",
   "compose": {

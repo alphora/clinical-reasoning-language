@@ -30,7 +30,7 @@
   "title": "Send BMI Care Communication",
   "status": "draft",
   "experimental": true,
-  "date": "<EMIT_TIMESTAMP>",
+  "date": "2020-01-01T00:00:00.000Z",
   "publisher": "Smile Digital Health",
   "description": "CMS69 requires documented care planning when BMI is low",
   "type": {
