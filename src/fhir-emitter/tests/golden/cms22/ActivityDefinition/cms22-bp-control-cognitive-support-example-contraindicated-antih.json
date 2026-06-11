@@ -3,7 +3,9 @@
   "id": "cms22-bp-control-cognitive-support-example-contraindicated-antih",
   "meta": {
     "profile": [
-      "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-medicationrequestactivity"
+      "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-medicationrequestactivity",
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareableactivitydefinition",
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-publishableactivitydefinition"
     ]
   },
   "url": "http://hl7.org/fhir/us/cqfmeasures/crl/cms22/ActivityDefinition/cms22-bp-control-cognitive-support-example-contraindicated-antih",

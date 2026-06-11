@@ -1,6 +1,13 @@
 {
   "resourceType": "Library",
   "id": "cms69-bmi-screening-gpg-strategy-example",
+  "meta": {
+    "profile": [
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareablelibrary",
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-computablelibrary",
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-publishablelibrary"
+    ]
+  },
   "url": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/Library/cms69-bmi-screening-gpg-strategy-example",
   "version": "1.0.0",
   "name": "Cms69BmiScreeningGpgStrategyExample",

@@ -55,10 +55,14 @@ describe("library — emitLibrary", () => {
     expect(resource!.relativePath).toBe("Library/cms22-asserted.json");
   });
 
-  it("Library does NOT claim a meta.profile (no active CPG Library profile in the IG)", () => {
+  it("Library claims additive CRMI library profiles (default publishable)", () => {
     const { resource } = emitLibrary("CMS22 Asserted", METADATA, [], "cms22-asserted.cql", { clock: FIXED_CLOCK });
     const r = resource!.resource as Record<string, unknown>;
-    expect(r.meta).toBeUndefined();
+    expect((r.meta as { profile: string[] }).profile).toEqual([
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareablelibrary",
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-computablelibrary",
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-publishablelibrary",
+    ]);
   });
 
   it("relatedArtifact emits depends-on per ValueSet canonical, deduped + order-preserved", () => {

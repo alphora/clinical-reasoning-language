@@ -46,7 +46,7 @@ import {
 } from "./cpgActivityProfiles";
 import { libraryCanonicalUrl } from "./library";
 import { capSlug, pascalCaseName, slugify } from "./slug";
-import { isPublishablePlus } from "./types";
+import { crmiCapabilityProfiles, isPublishablePlus } from "./types";
 import type {
   CpgMetadata,
   EmitOptions,
@@ -157,7 +157,7 @@ export function emitActivityDefinition(
   const resource: Record<string, unknown> = {
     resourceType: "ActivityDefinition",
     id,
-    meta: { profile: [profile.profileUrl] },
+    meta: { profile: [profile.profileUrl, ...crmiCapabilityProfiles("activitydefinition", level)] },
     url,
     // version: CRMI requires `version` (1..1) at the shareable floor; from the
     // npm package (authoritative). date: CRMI requires it only at publishable+.

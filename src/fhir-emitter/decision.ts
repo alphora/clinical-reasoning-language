@@ -74,8 +74,9 @@ import { libraryCanonicalUrl } from "./library";
 import { recommendationDefinitionCanonicalUrl } from "./recommendation";
 import { capSlug, pascalCaseName, slugify } from "./slug";
 import { tarjanSCC } from "./tarjan";
-import { capabilitiesUpTo, isPublishablePlus } from "./types";
+import { capabilitiesUpTo, crmiCapabilityProfiles, isPublishablePlus } from "./types";
 import type {
+  Capability,
   CpgMetadata,
   EmitOptions,
   EmittedResource,
@@ -88,20 +89,20 @@ const CPG_BASE = "http://hl7.org/fhir/uv/cpg/StructureDefinition";
 // CPG 2.0.0 does NOT declare a CRMI dependency itself — consumers of these
 // emitted resources should add hl7.fhir.uv.crmi to their IG deps alongside
 // the CPG package (see USER_GUIDE §"Emitting FHIR Definition resources").
-const CRMI_BASE = "http://hl7.org/fhir/uv/crmi/StructureDefinition";
 // #104: knowledgeCapability + knowledgeRepresentationLevel are FHIR-core
 // extensions (cqf- prefix), NOT CPG-IG extensions. Resolves at
 // hl7.org/fhir/extensions with no IG dependency.
 const FHIR_CORE_EXT_BASE = "http://hl7.org/fhir/StructureDefinition";
 const STRATEGY_CPG_PROFILE = `${CPG_BASE}/cpg-strategydefinition`;
-// CRMI 1.0.0: publishable requires `date` (1..1); shareable does not. Capability
-// level selects the lifecycle profile (coherent with date gate + knowledgeCapability).
-const PUBLISHABLE_PLANDEF_PROFILE = `${CRMI_BASE}/crmi-publishableplandefinition`;
-const SHAREABLE_PLANDEF_PROFILE = `${CRMI_BASE}/crmi-shareableplandefinition`;
 
-function planDefProfiles(isRoot: boolean, publishable: boolean): string[] {
-  const lifecycle = publishable ? PUBLISHABLE_PLANDEF_PROFILE : SHAREABLE_PLANDEF_PROFILE;
-  return isRoot ? [STRATEGY_CPG_PROFILE, lifecycle] : [lifecycle];
+// CRMI lifecycle profiles accumulate additively up to the capability level
+// (shareable → +publishable for PlanDefinition); strategy roots prepend the
+// CPG strategy profile.
+function planDefProfiles(isRoot: boolean, level: Capability): string[] {
+  return [
+    ...(isRoot ? [STRATEGY_CPG_PROFILE] : []),
+    ...crmiCapabilityProfiles("plandefinition", level),
+  ];
 }
 const KNOWLEDGE_CAPABILITY_EXT = `${FHIR_CORE_EXT_BASE}/cqf-knowledgeCapability`;
 const KNOWLEDGE_REPRESENTATION_EXT = `${FHIR_CORE_EXT_BASE}/cqf-knowledgeRepresentationLevel`;
@@ -306,7 +307,7 @@ export function emitDecisionPlanDefinition(
   const resource: Record<string, unknown> = {
     resourceType: "PlanDefinition",
     id,
-    meta: { profile: planDefProfiles(isRoot, publishable) },
+    meta: { profile: planDefProfiles(isRoot, level) },
     extension: [
       ...capabilitiesUpTo(level).map((c) => ({ url: KNOWLEDGE_CAPABILITY_EXT, valueCode: c })),
       { url: KNOWLEDGE_REPRESENTATION_EXT, valueCode: "structured" },
