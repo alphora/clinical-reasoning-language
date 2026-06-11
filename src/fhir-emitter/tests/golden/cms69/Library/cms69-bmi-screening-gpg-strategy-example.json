@@ -2,6 +2,7 @@
   "resourceType": "Library",
   "id": "cms69-bmi-screening-gpg-strategy-example",
   "url": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/Library/cms69-bmi-screening-gpg-strategy-example",
+  "version": "1.0.0",
   "name": "Cms69BmiScreeningGpgStrategyExample",
   "title": "CMS69 BMI Screening GPG Strategy example",
   "status": "draft",

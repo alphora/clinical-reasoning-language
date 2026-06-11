@@ -74,6 +74,7 @@ import { libraryCanonicalUrl } from "./library";
 import { recommendationDefinitionCanonicalUrl } from "./recommendation";
 import { capSlug, pascalCaseName, slugify } from "./slug";
 import { tarjanSCC } from "./tarjan";
+import { capabilitiesUpTo, isPublishablePlus } from "./types";
 import type {
   CpgMetadata,
   EmitOptions,
@@ -92,13 +93,16 @@ const CRMI_BASE = "http://hl7.org/fhir/uv/crmi/StructureDefinition";
 // extensions (cqf- prefix), NOT CPG-IG extensions. Resolves at
 // hl7.org/fhir/extensions with no IG dependency.
 const FHIR_CORE_EXT_BASE = "http://hl7.org/fhir/StructureDefinition";
-const STRATEGY_PROFILES: readonly string[] = [
-  `${CPG_BASE}/cpg-strategydefinition`,
-  `${CRMI_BASE}/crmi-publishableplandefinition`,
-];
-const SUBDECISION_PROFILES: readonly string[] = [
-  `${CRMI_BASE}/crmi-publishableplandefinition`,
-];
+const STRATEGY_CPG_PROFILE = `${CPG_BASE}/cpg-strategydefinition`;
+// CRMI 1.0.0: publishable requires `date` (1..1); shareable does not. Capability
+// level selects the lifecycle profile (coherent with date gate + knowledgeCapability).
+const PUBLISHABLE_PLANDEF_PROFILE = `${CRMI_BASE}/crmi-publishableplandefinition`;
+const SHAREABLE_PLANDEF_PROFILE = `${CRMI_BASE}/crmi-shareableplandefinition`;
+
+function planDefProfiles(isRoot: boolean, publishable: boolean): string[] {
+  const lifecycle = publishable ? PUBLISHABLE_PLANDEF_PROFILE : SHAREABLE_PLANDEF_PROFILE;
+  return isRoot ? [STRATEGY_CPG_PROFILE, lifecycle] : [lifecycle];
+}
 const KNOWLEDGE_CAPABILITY_EXT = `${FHIR_CORE_EXT_BASE}/cqf-knowledgeCapability`;
 const KNOWLEDGE_REPRESENTATION_EXT = `${FHIR_CORE_EXT_BASE}/cqf-knowledgeRepresentationLevel`;
 const PLAN_DEFINITION_TYPE_CS = "http://terminology.hl7.org/CodeSystem/plan-definition-type";
@@ -293,7 +297,8 @@ export function emitDecisionPlanDefinition(
     }
   }
 
-  const date = (opts.clock ?? defaultClock)().toISOString();
+  const level = opts.capability ?? "publishable";
+  const publishable = isPublishablePlus(level);
   const url = planDefinitionCanonicalUrl(metadata.canonicalBase, libraryName, decision.name);
   const libraryUrl = libraryCanonicalUrl(metadata.canonicalBase, libraryName);
   const planTypeCode = isRoot ? "workflow-definition" : "eca-rule";
@@ -301,20 +306,20 @@ export function emitDecisionPlanDefinition(
   const resource: Record<string, unknown> = {
     resourceType: "PlanDefinition",
     id,
-    meta: { profile: (isRoot ? STRATEGY_PROFILES : SUBDECISION_PROFILES).slice() },
+    meta: { profile: planDefProfiles(isRoot, publishable) },
     extension: [
-      { url: KNOWLEDGE_CAPABILITY_EXT, valueCode: "shareable" },
-      { url: KNOWLEDGE_CAPABILITY_EXT, valueCode: "computable" },
-      { url: KNOWLEDGE_CAPABILITY_EXT, valueCode: "publishable" },
+      ...capabilitiesUpTo(level).map((c) => ({ url: KNOWLEDGE_CAPABILITY_EXT, valueCode: c })),
       { url: KNOWLEDGE_REPRESENTATION_EXT, valueCode: "structured" },
     ],
     url,
-    // `version` deliberately omitted — npm package owns the version.
+    // version: CRMI requires `version` (1..1) at the shareable floor; from the
+    // npm package (authoritative).
+    version: metadata.version,
     name: computableName,
     title,
     status: metadata.status,
     experimental: metadata.experimental,
-    date,
+    ...(publishable ? { date: (opts.clock ?? defaultClock)().toISOString() } : {}),
     publisher: metadata.publisher,
     description,
     type: {

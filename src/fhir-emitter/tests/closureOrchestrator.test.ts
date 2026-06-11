@@ -63,10 +63,10 @@ describe("closureOrchestrator — emitFhirDefFromPath (cc-screening end-to-end)"
     }
   });
 
-  it("no emitted resource carries a `version` field (no-version rule)", () => {
+  it("every emitted resource carries `version` from package.json (CRMI shareable floor)", () => {
     const result = emitFhirDefFromPath(FIXTURE, { clock: FIXED_CLOCK });
     for (const r of result.resources) {
-      expect((r.resource as Record<string, unknown>).version).toBeUndefined();
+      expect((r.resource as Record<string, unknown>).version).toBe("0.0.0");
     }
   });
 

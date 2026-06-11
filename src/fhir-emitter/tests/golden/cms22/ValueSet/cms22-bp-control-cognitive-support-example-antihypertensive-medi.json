@@ -3,10 +3,11 @@
   "id": "cms22-bp-control-cognitive-support-example-antihypertensive-medi",
   "meta": {
     "profile": [
-      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareablevalueset"
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-publishablevalueset"
     ]
   },
   "url": "http://hl7.org/fhir/us/cqfmeasures/crl/cms22/ValueSet/cms22-bp-control-cognitive-support-example-antihypertensive-medi",
+  "version": "1.0.0",
   "name": "Cms22BpControlCognitiveSupportExampleAntihypertensiveMedicationsVs",
   "title": "CMS22 Blood Pressure Control demonstration corpus",
   "status": "draft",

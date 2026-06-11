@@ -5,11 +5,13 @@ import * as path from "path";
 import { emitCelToFhir, writeEmitResult } from "../cel/emitter";
 import { resolveCelImports } from "../cel/imports";
 import {
+  CAPABILITY_ORDER,
   emitFhirDefFromPath,
   isFhirDefError,
   isFhirDefWarning,
   writeFhirResources,
 } from "../fhir-emitter";
+import type { Capability } from "../fhir-emitter";
 import { emitCQLImports } from "../imports/emit";
 
 type TargetMode = "cql" | "fhir-def" | undefined;
@@ -33,6 +35,12 @@ FLAGS:
                     Rejected with .cel input (CEL has its own FHIR-instance pipeline).
   --quiet           Print one summary line instead of one "wrote <path>" line per file
                     (--target fhir-def only).
+  --date <iso>      (fhir-def) Publication date for reproducible emit. Highest
+                    precedence; else SOURCE_DATE_EPOCH env, else package.json
+                    crl.date, else wall clock. Only stamped at publishable+.
+  --capability <c>  (fhir-def) CRMI capability level: shareable | computable |
+                    publishable | executable. Default publishable. Gates date +
+                    meta.profile + knowledgeCapability together.
   --help            Show this message and exit 0.
 
 INPUT DISPATCH:
@@ -57,11 +65,15 @@ function parseArgs(argv: string[]): {
   outDir: string | undefined;
   target: TargetMode;
   quiet: boolean;
+  date: string | undefined;
+  capability: Capability | undefined;
 } {
   let filePath: string | undefined;
   let outDir: string | undefined;
   let target: TargetMode = undefined;
   let quiet = false;
+  let date: string | undefined;
+  let capability: Capability | undefined;
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--help" || a === "-h") {
@@ -97,6 +109,26 @@ function parseArgs(argv: string[]): {
       i++;
     } else if (a === "--quiet") {
       quiet = true;
+    } else if (a === "--date") {
+      const v = argv[i + 1];
+      if (!v || v.startsWith("--")) {
+        console.error("--date requires an ISO date value (e.g. 2024-01-01T00:00:00.000Z)");
+        process.exit(1);
+      }
+      date = v;
+      i++;
+    } else if (a === "--capability") {
+      const v = argv[i + 1];
+      if (!v || v.startsWith("--")) {
+        console.error(`--capability requires a value (${CAPABILITY_ORDER.join(" | ")})`);
+        process.exit(1);
+      }
+      if (!CAPABILITY_ORDER.includes(v as Capability)) {
+        console.error(`--capability must be one of ${CAPABILITY_ORDER.join(", ")} (got: ${v})`);
+        process.exit(1);
+      }
+      capability = v as Capability;
+      i++;
     } else if (a === "--library-name") {
       console.error(
         "--library-name has been removed in v2.1.0. Under per-CRL emit each " +
@@ -115,10 +147,10 @@ function parseArgs(argv: string[]): {
       process.exit(1);
     }
   }
-  return { filePath, outDir, target, quiet };
+  return { filePath, outDir, target, quiet, date, capability };
 }
 
-const { filePath, outDir, target, quiet } = parseArgs(process.argv.slice(2));
+const { filePath, outDir, target, quiet, date, capability } = parseArgs(process.argv.slice(2));
 
 if (!filePath) {
   console.error("Usage: crl-emit --path <file.crl> --out-dir <output-directory>");
@@ -155,7 +187,10 @@ if (filePath.toLowerCase().endsWith(".cel") && target !== undefined) {
 // at `../../cql/<name>.cql` — emitting one without the other ships
 // broken Library references (round-5 gpt55 [critical]).
 if (filePath.toLowerCase().endsWith(".crl") && target === "fhir-def") {
-  const result = emitFhirDefFromPath(filePath);
+  const result = emitFhirDefFromPath(filePath, {
+    ...(date !== undefined ? { date } : {}),
+    ...(capability !== undefined ? { capability } : {}),
+  });
 
   const hardErrors = [
     ...result.errors.filter(isFhirDefError),

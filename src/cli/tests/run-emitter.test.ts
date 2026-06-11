@@ -117,7 +117,18 @@ describe("CLI dispatch matrix — `.crl + --target fhir-def` two-lane contract (
   it("cc-screening: CQL lane fails (placeholder narratives) → exit 1, neither <out-dir>/cql NOR <out-dir>/fhir written", () => {
     const { outDir, cleanup } = makeOutDir("cc-fail");
     try {
-      const r = runCli(["--path", CC_SCREENING, "--target", "fhir-def", "--out-dir", outDir]);
+      // --date so the FHIR lane passes its (publishable) date gate; this test
+      // isolates the CQL-lane failure as the atomic-abort trigger.
+      const r = runCli([
+        "--path",
+        CC_SCREENING,
+        "--target",
+        "fhir-def",
+        "--out-dir",
+        outDir,
+        "--date",
+        "2020-01-01T00:00:00.000Z",
+      ]);
       expect(r.exitCode).toBe(1);
       expect(r.stderr).toContain("cql-emit");
       expect(existsSync(join(outDir, "cql"))).toBe(false);

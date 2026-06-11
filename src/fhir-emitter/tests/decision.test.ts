@@ -138,13 +138,13 @@ describe("decision — emitDecisionPlanDefinition Strategy (isRoot=true)", () =>
     expect((r.type as { coding: Array<{ code: string }> }).coding[0]!.code).toBe("workflow-definition");
   });
 
-  it("does NOT emit version field (no-version rule)", () => {
+  it("emits `version` from package.json (CRMI shareable floor)", () => {
     const d = decision("Top", [when("C", leaf(recommend("A")))]);
     const { resource } = emitDecisionPlanDefinition(
       d, "Lib", METADATA, RESOLVE_ALL, RESOLVE_ACT_OK, RESOLVE_DEC_OK, true, { clock: FIXED_CLOCK },
     );
     const r = resource!.resource as Record<string, unknown>;
-    expect(r.version).toBeUndefined();
+    expect(r.version).toBe("1.0.0");
   });
 
   it("emits 3 knowledgeCapability extensions (NOT executable)", () => {

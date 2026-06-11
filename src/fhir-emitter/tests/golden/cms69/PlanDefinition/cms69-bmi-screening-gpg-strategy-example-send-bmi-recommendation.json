@@ -26,6 +26,7 @@
     }
   ],
   "url": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/PlanDefinition/cms69-bmi-screening-gpg-strategy-example-send-bmi-recommendation",
+  "version": "1.0.0",
   "name": "Cms69BmiScreeningGpgStrategyExampleSendBmiCareCommunicationRecommendation",
   "title": "Send BMI Care Communication",
   "status": "draft",

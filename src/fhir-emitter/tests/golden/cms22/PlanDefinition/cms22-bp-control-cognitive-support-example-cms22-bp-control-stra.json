@@ -26,6 +26,7 @@
     }
   ],
   "url": "http://hl7.org/fhir/us/cqfmeasures/crl/cms22/PlanDefinition/cms22-bp-control-cognitive-support-example-cms22-bp-control-stra",
+  "version": "1.0.0",
   "name": "Cms22BpControlCognitiveSupportExampleCms22BpControlStrategy",
   "title": "CMS22 BP Control Strategy",
   "status": "draft",

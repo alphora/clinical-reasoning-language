@@ -81,12 +81,12 @@ describe("recommendation — emitRecommendationDefinition", () => {
     ]);
   });
 
-  it("does NOT emit a `version` field (no-version rule)", () => {
+  it("emits `version` from package.json (CRMI shareable floor)", () => {
     const { resource } = emitRecommendationDefinition(activity("X"), "Lib", METADATA, {
       clock: FIXED_CLOCK,
     });
     const r = resource!.resource as Record<string, unknown>;
-    expect(r.version).toBeUndefined();
+    expect(r.version).toBe("1.0.0");
   });
 
   it("wrapping action has groupingBehavior=logical-group + NO selectionBehavior + NO condition", () => {

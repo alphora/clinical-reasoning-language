@@ -990,7 +990,7 @@ Exit codes: `0` = clean; `1` = hard errors (CRLError of error severity, or impor
 
 ### Deliberate deviations from the published CPG IG
 
-- **No `version` field** on any emitted resource. The npm package owns the version; bundling assigns it at package time. Supersedes CPG IG `version 1..1` requirements.
+- **`version` is stamped on every emitted FHIR definitional resource**, sourced from the npm `package.json` `version` (the authoritative single source of truth). CRMI 1.0.0 requires `version` (1..1) at the Shareable floor, so it is emitted unconditionally. Emitted **CQL stays version-less** (the package owns the CQL version). `date` is stamped only at publishable+ capability (CRMI requires `date` 1..1 at Publishable) and is reproducible: resolved from `--date` → `SOURCE_DATE_EPOCH` (env, epoch seconds) → `crl.date` (package.json, ISO) → wall clock. A publishable+ emit with no resolvable date is a hard error (`missing-publishable-date`). The targeted CRMI version is declared in `package.json` `crl.fhirDependencies` (e.g. `{ "hl7.fhir.uv.crmi": "1.0.0" }`) for provenance — never stamped on a resource.
 - **Cross-library concept / terminology references are unsupported in v0.** Same-library qualified refs (`"CurrentLib"."X"`) resolve as bare locals. True cross-library refs cascade-suppress through the existing Todo 3 cascade rules with `unresolved-*` UnmatchedReference entries.
 - **`cpg-strategydefinition.action.definition[x]` target-profile** — the published spec constrains this to `canonical(cpg-recommendationdefinition)` only. CRL emit deliberately violates this constraint by referencing publishable-only sub-decisions (matches the cc-screening reference example pattern). The operator is amending the published spec.
 

@@ -26,6 +26,7 @@
     }
   ],
   "url": "http://hl7.org/fhir/us/cqfmeasures/crl/cms22/PlanDefinition/cms22-bp-control-cognitive-support-example-contra-recommendation",
+  "version": "1.0.0",
   "name": "Cms22BpControlCognitiveSupportExampleContraindicatedAntihypertensiveRecommendation",
   "title": "Contraindicated Antihypertensive",
   "status": "draft",

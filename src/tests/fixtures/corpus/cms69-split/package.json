@@ -7,6 +7,8 @@
   "crl": {
     "canonicalBase": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69",
     "status": "draft",
-    "experimental": true
+    "experimental": true,
+    "date": "2024-01-01T00:00:00.000Z",
+    "fhirDependencies": { "hl7.fhir.uv.crmi": "1.0.0" }
   }
 }

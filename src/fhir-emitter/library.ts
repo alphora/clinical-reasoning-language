@@ -28,6 +28,7 @@
 
 import type { CRLError } from "../types/errors";
 import { capSlug, pascalCaseName, slugify } from "./slug";
+import { isPublishablePlus } from "./types";
 import type {
   CpgMetadata,
   EmitOptions,
@@ -102,19 +103,22 @@ export function emitLibrary(
     return { resource: null, errors, unmatched };
   }
 
-  const date = (opts.clock ?? defaultClock)().toISOString();
+  const level = opts.capability ?? "publishable";
+  const publishable = isPublishablePlus(level);
   const url = libraryCanonicalUrl(metadata.canonicalBase, libraryName);
 
   const resource: Record<string, unknown> = {
     resourceType: "Library",
     id,
     url,
-    // `version` deliberately omitted — npm package owns the version.
+    // version: CRMI requires `version` (1..1) at the shareable floor; from the
+    // npm package (authoritative). date: CRMI requires it only at publishable+.
+    version: metadata.version,
     name: computableName,
     title,
     status: metadata.status,
     experimental: metadata.experimental,
-    date,
+    ...(publishable ? { date: (opts.clock ?? defaultClock)().toISOString() } : {}),
     publisher: metadata.publisher,
     description,
     type: {

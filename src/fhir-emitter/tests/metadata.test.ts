@@ -34,13 +34,23 @@ describe("fhir-emitter metadata.normalizePackageMetadata", () => {
     expect(r.metadata!.useContext).toEqual([]);
   });
 
-  it("defaults missing version, author, status, experimental, jurisdiction, useContext", () => {
+  it("missing `version` is a hard error (CRMI requires version on emitted FHIR)", () => {
     const r = normalizePackageMetadata({
       name: "foo",
       crl: { canonicalBase: "http://example.org/x" },
     });
+    expect(r.metadata).toBeNull();
+    expect(r.errors.some((e) => e.kind === "missing-package-version")).toBe(true);
+  });
+
+  it("defaults missing author, status, experimental, jurisdiction, useContext", () => {
+    const r = normalizePackageMetadata({
+      name: "foo",
+      version: "1.0.0",
+      crl: { canonicalBase: "http://example.org/x" },
+    });
     expect(r.metadata).not.toBeNull();
-    expect(r.metadata!.version).toBe("0.0.0");
+    expect(r.metadata!.version).toBe("1.0.0");
     expect(r.metadata!.publisher).toBe("unknown");
     expect(r.metadata!.contact).toEqual([]);
     expect(r.metadata!.status).toBe("draft");
@@ -51,6 +61,7 @@ describe("fhir-emitter metadata.normalizePackageMetadata", () => {
 
   it("title is empty when description is empty (emitter defaults to library name)", () => {
     const r = normalizePackageMetadata({
+      version: "1.0.0",
       crl: { canonicalBase: "http://example.org/x" },
     });
     expect(r.metadata!.title).toBe("");
@@ -59,6 +70,7 @@ describe("fhir-emitter metadata.normalizePackageMetadata", () => {
 
   it("title is the first line of description when description is multiline", () => {
     const r = normalizePackageMetadata({
+      version: "1.0.0",
       description: "Short title\n\nLonger description on a separate line.",
       crl: { canonicalBase: "http://example.org/x" },
     });
@@ -75,6 +87,7 @@ describe("fhir-emitter metadata.normalizePackageMetadata", () => {
 
   it("author-as-object form", () => {
     const r = normalizePackageMetadata({
+      version: "1.0.0",
       author: { name: "Smile", email: "a@b.com", url: "https://b.com" },
       crl: { canonicalBase: "http://example.org/x" },
     });
@@ -131,6 +144,7 @@ describe("fhir-emitter metadata.normalizePackageMetadata", () => {
 
   it("round-2 (gpt55 important #4) strips trailing slash from canonicalBase", () => {
     const r = normalizePackageMetadata({
+      version: "1.0.0",
       crl: { canonicalBase: "http://example.org/base/" },
     });
     expect(r.metadata!.canonicalBase).toBe("http://example.org/base");
@@ -138,6 +152,7 @@ describe("fhir-emitter metadata.normalizePackageMetadata", () => {
 
   it("round-2 (gpt55 important #4) collapses multiple trailing slashes", () => {
     const r = normalizePackageMetadata({
+      version: "1.0.0",
       crl: { canonicalBase: "http://example.org/base///" },
     });
     expect(r.metadata!.canonicalBase).toBe("http://example.org/base");
@@ -145,6 +160,7 @@ describe("fhir-emitter metadata.normalizePackageMetadata", () => {
 
   it("round-2 (gpt55 important #6) parses email-only author '<email>'", () => {
     const r = normalizePackageMetadata({
+      version: "1.0.0",
       author: "<ops@example.org>",
       crl: { canonicalBase: "http://example.org/x" },
     });

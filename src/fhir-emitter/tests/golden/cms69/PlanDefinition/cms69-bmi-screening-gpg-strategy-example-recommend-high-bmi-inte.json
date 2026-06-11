@@ -25,6 +25,7 @@
     }
   ],
   "url": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/PlanDefinition/cms69-bmi-screening-gpg-strategy-example-recommend-high-bmi-inte",
+  "version": "1.0.0",
   "name": "Cms69BmiScreeningGpgStrategyExampleRecommendHighBmiIntervention",
   "title": "Recommend High BMI Intervention",
   "status": "draft",
