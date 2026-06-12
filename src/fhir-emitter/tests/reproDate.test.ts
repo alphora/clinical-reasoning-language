@@ -153,13 +153,15 @@ describe("capability profile matrix — additive CRMI lifecycle profiles per res
       p.includes("/crmi-"),
     );
   };
-  const emitAt = (capability: "shareable" | "computable" | "publishable" | "executable") => {
+  // Supported (emittable) capability levels only — `executable` is rejected
+  // (covered by its own test below), so this helper asserts a clean emit.
+  const emitAt = (capability: "shareable" | "computable" | "publishable") => {
     const r = emitFhirDefFromPath(STRATEGY, { date: FIXED, capability });
     expect(r.errors.length).toBe(0);
     return r.resources as { relativePath: string; resource: Record<string, unknown> }[];
   };
 
-  it("ValueSet accumulates shareable→computable→publishable (no executable profile exists)", () => {
+  it("ValueSet accumulates shareable→computable→publishable", () => {
     expect(crmiProfilesOf(emitAt("shareable"), "ValueSet/")).toEqual([
       `${C}/crmi-shareablevalueset`,
     ]);
@@ -167,41 +169,47 @@ describe("capability profile matrix — additive CRMI lifecycle profiles per res
       `${C}/crmi-shareablevalueset`,
       `${C}/crmi-computablevalueset`,
     ]);
-    expect(crmiProfilesOf(emitAt("executable"), "ValueSet/")).toEqual([
+    expect(crmiProfilesOf(emitAt("publishable"), "ValueSet/")).toEqual([
       `${C}/crmi-shareablevalueset`,
       `${C}/crmi-computablevalueset`,
       `${C}/crmi-publishablevalueset`,
     ]);
   });
 
-  it("Library accumulates all four levels including executable", () => {
+  it("Library accumulates shareable→computable→publishable (executable profile needs ELM — capped)", () => {
     expect(crmiProfilesOf(emitAt("shareable"), "Library/")).toEqual([`${C}/crmi-shareablelibrary`]);
-    expect(crmiProfilesOf(emitAt("executable"), "Library/")).toEqual([
+    expect(crmiProfilesOf(emitAt("publishable"), "Library/")).toEqual([
       `${C}/crmi-shareablelibrary`,
       `${C}/crmi-computablelibrary`,
       `${C}/crmi-publishablelibrary`,
-      `${C}/crmi-executablelibrary`,
     ]);
   });
 
-  it("ActivityDefinition has only shareable+publishable profiles (computable/executable filtered out)", () => {
+  it("ActivityDefinition has only shareable+publishable profiles (no computable profile)", () => {
     expect(crmiProfilesOf(emitAt("computable"), "ActivityDefinition/")).toEqual([
       `${C}/crmi-shareableactivitydefinition`,
     ]);
-    expect(crmiProfilesOf(emitAt("executable"), "ActivityDefinition/")).toEqual([
+    expect(crmiProfilesOf(emitAt("publishable"), "ActivityDefinition/")).toEqual([
       `${C}/crmi-shareableactivitydefinition`,
       `${C}/crmi-publishableactivitydefinition`,
     ]);
   });
 
-  it("PlanDefinition has only shareable+publishable profiles (computable/executable filtered out)", () => {
+  it("PlanDefinition has only shareable+publishable profiles (no computable profile)", () => {
     expect(crmiProfilesOf(emitAt("computable"), "PlanDefinition/")).toEqual([
       `${C}/crmi-shareableplandefinition`,
     ]);
-    expect(crmiProfilesOf(emitAt("executable"), "PlanDefinition/")).toEqual([
+    expect(crmiProfilesOf(emitAt("publishable"), "PlanDefinition/")).toEqual([
       `${C}/crmi-shareableplandefinition`,
       `${C}/crmi-publishableplandefinition`,
     ]);
+  });
+
+  it("`--capability executable` is rejected (emit produces design-time forms, not ELM/expansion)", () => {
+    const r = emitFhirDefFromPath(STRATEGY, { date: FIXED, capability: "executable" });
+    expect(r.success).toBe(false);
+    expect(r.errors.some((e) => e.kind === "executable-capability-unsupported")).toBe(true);
+    expect(r.resources.length).toBe(0);
   });
 });
 

@@ -47,6 +47,7 @@ import type { CRLError } from "../types/errors";
  *   invalid-emit-date                              error    `--date`/`opts.date`/`crl.date` is not a parseable date.
  *   invalid-source-date-epoch                      error    `SOURCE_DATE_EPOCH` env is not a non-negative integer of epoch seconds (rejects ms-shaped values).
  *   missing-publishable-date                       error    Publishable+ emit with no resolvable date (no --date/SOURCE_DATE_EPOCH/crl.date). Reproducibility is not opt-in.
+ *   executable-capability-unsupported              error    `--capability executable` requested, but emit produces design-time forms (text/cql, value-set compose), not run-time forms (ELM, expansion). Max is publishable. See #113.
  */
 
 /**
@@ -130,13 +131,15 @@ export type CrmiProfileResource = "valueset" | "library" | "activitydefinition" 
 
 const CRMI_SD_BASE = "http://hl7.org/fhir/uv/crmi/StructureDefinition";
 
-// CRMI 2.0.0-ballot: which capability levels actually publish a
-// `crmi-<level><resource>` StructureDefinition (verified from the
-// hl7.fhir.uv.crmi#2.0.0-ballot package; identical to 1.0.0). `meta.profile`
-// canonicals are unversioned, so the emitted URLs are version-independent.
+// CRMI 2.0.0-ballot: the `crmi-<level><resource>` profiles this emitter can
+// claim (verified from the hl7.fhir.uv.crmi#2.0.0-ballot package). Capped at
+// `publishable`: the `executable`-tier profiles (`crmi-executablelibrary` needs
+// compiled ELM; `crmi-expandedvalueset` needs a value-set `expansion`) require
+// run-time forms the emitter does not produce — emit rejects `--capability
+// executable` (see issue #113). `meta.profile` canonicals are unversioned.
 const CRMI_PROFILE_LEVELS: Record<CrmiProfileResource, readonly Capability[]> = {
   valueset: ["shareable", "computable", "publishable"],
-  library: ["shareable", "computable", "publishable", "executable"],
+  library: ["shareable", "computable", "publishable"],
   activitydefinition: ["shareable", "publishable"],
   plandefinition: ["shareable", "publishable"],
 };
@@ -178,7 +181,13 @@ export function knowledgeExtensions(
   level: Capability,
   representationLevel?: RepresentationLevel,
 ): Array<{ url: string; valueCode: string }> {
-  const ext: Array<{ url: string; valueCode: string }> = capabilitiesUpTo(level).map((c) => ({
+  // Never claim the `executable` capability code: the emitter produces
+  // design-time forms only (text/cql, value-set compose), not the run-time
+  // forms `executable` requires (ELM, expansion). Capped here as defense for
+  // direct per-resource callers (the emitFhirDefClosure boundary also rejects
+  // `--capability executable`). Lifted by #113 when ELM/expansion are produced.
+  const codes = capabilitiesUpTo(level).filter((c) => c !== "executable");
+  const ext: Array<{ url: string; valueCode: string }> = codes.map((c) => ({
     url: KNOWLEDGE_CAPABILITY_EXT,
     valueCode: c,
   }));

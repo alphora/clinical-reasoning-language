@@ -130,7 +130,7 @@ crl-emit --help
 | `--target` | for `.crl` | `cql` \| `fhir-def` | `cql` for `.crl`; rejected for `.cel` | See dispatch table below |
 | `--quiet` | no | (flag) | off | Suppress per-file `wrote …` lines (`--target fhir-def` only) |
 | `--date` | no | ISO date | `SOURCE_DATE_EPOCH` → `crl.date` → wall clock | Reproducible publication date (`--target fhir-def`); only stamped at publishable+ |
-| `--capability` | no | `shareable` \| `computable` \| `publishable` \| `executable` | `publishable` | CRMI capability level (`--target fhir-def`); gates `date` + `meta.profile` + `knowledgeCapability` |
+| `--capability` | no | `shareable` \| `computable` \| `publishable` | `publishable` | CRMI capability level (`--target fhir-def`); gates `date` + `meta.profile` + `knowledgeCapability`. `executable` is not yet supported (needs ELM/expansion — [#113](https://github.com/alphora/clinical-reasoning-language/issues/113)) |
 | `--help` / `-h` | no | (flag) | — | Print usage + exit 0 |
 
 **Input → output dispatch**
@@ -253,7 +253,7 @@ Tools that need project context (the validators, FHIR-def emit, CEL emit) requir
   ```
 - `includeResources: true` adds `resources[]` with the full FHIR JSON.
 - The closure walks from the file's nearest `package.json`.
-- Emitted FHIR definitional resources carry `version` (from `package.json`; CRMI Shareable requires it 1..1) and, at publishable+ capability, a reproducible `date` (resolved from `--date`/`date` → `SOURCE_DATE_EPOCH` env → `crl.date` → wall clock). Emitted CQL stays version-less. Optional inputs: `date` (ISO) and `capability` (`shareable|computable|publishable|executable`, default `publishable`).
+- Emitted FHIR definitional resources carry `version` (from `package.json`; CRMI Shareable requires it 1..1) and, at publishable+ capability, a reproducible `date` (resolved from `--date`/`date` → `SOURCE_DATE_EPOCH` env → `crl.date` → wall clock). Emitted CQL stays version-less. Optional inputs: `date` (ISO) and `capability` (`shareable|computable|publishable`, default `publishable`; `executable` is rejected — needs ELM/expansion, #113).
 - `meta.profile` canonicals: `cpg-strategydefinition`, `cpg-recommendationdefinition` (CPG IG); at publishable+ `crmi-publishableplandefinition`/`crmi-publishablevalueset`, at shareable `crmi-shareableplandefinition`/`crmi-shareablevalueset` (CRMI IG); `cqf-knowledgeCapability`, `cqf-knowledgeRepresentationLevel` (FHIR-core).
 - Cross-library concept/terminology refs are unsupported in v0; same-library qualified refs `"CurrentLib"."X"` resolve as bare locals.
 - `any:` qualifier emits a `crl-logical-switch` extension URL (StructureDefinition not yet shipped — pending CPG ballot).

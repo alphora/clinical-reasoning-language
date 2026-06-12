@@ -418,7 +418,7 @@ export function createServer(): McpServer {
         capability: z
           .enum(["shareable", "computable", "publishable", "executable"])
           .optional()
-          .describe("CRMI capability level (default publishable). Gates date + meta.profile + knowledgeCapability together."),
+          .describe("CRMI capability level (shareable|computable|publishable; default publishable). Gates date + meta.profile + knowledgeCapability together. `executable` is not yet supported (needs ELM/expansion — issue #113)."),
       },
     },
     (args) =>

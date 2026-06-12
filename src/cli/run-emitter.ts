@@ -39,9 +39,11 @@ FLAGS:
                     precedence; else SOURCE_DATE_EPOCH env, else package.json
                     crl.date, else wall clock. Only stamped at publishable+.
   --capability <c>  (fhir-def) CRMI capability level: shareable | computable |
-                    publishable | executable. Default publishable. Drives the
-                    additive meta.profile set + date (publishable+) on all
-                    resources, and the knowledgeCapability list on PlanDefinitions.
+                    publishable. Default publishable. Drives, on all emitted
+                    definitional resources, the additive meta.profile set, the
+                    cqf-knowledgeCapability list, and date (publishable+).
+                    'executable' is not yet supported (needs compiled ELM /
+                    value-set expansion — see issue #113).
   --help            Show this message and exit 0.
 
 INPUT DISPATCH:
