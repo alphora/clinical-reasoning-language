@@ -9,7 +9,7 @@
  * declares the valueset identifiers referenced by the expression.
  *
  * Per `docs/cpg-ig-alignment.md` + plan v2.1 [060]:
- *   - The CPG IG has no active Library profile, but CRMI 1.0.0 does — we claim
+ *   - The CPG IG has no active Library profile, but CRMI does — we claim
  *     the additive CRMI library lifecycle profiles (crmi-shareable/computable/
  *     publishable/executable-library, up to the target capability) via
  *     `crmiCapabilityProfiles`. No CPG `meta.profile` claim.
@@ -29,7 +29,7 @@
 
 import type { CRLError } from "../types/errors";
 import { capSlug, pascalCaseName, slugify } from "./slug";
-import { crmiCapabilityProfiles, isPublishablePlus } from "./types";
+import { crmiCapabilityProfiles, isPublishablePlus, knowledgeExtensions } from "./types";
 import type {
   CpgMetadata,
   EmitOptions,
@@ -112,6 +112,11 @@ export function emitLibrary(
     resourceType: "Library",
     id,
     meta: { profile: crmiCapabilityProfiles("library", level) },
+    // cqf-knowledgeCapability (mustSupport on the CRMI shareable Library profile)
+    // + representationLevel `structured`: the Library carries CQL SOURCE (a
+    // `text/cql` attachment), which is structured-computable. `executable` is
+    // reserved for compiled ELM.
+    extension: knowledgeExtensions(level, "structured"),
     url,
     // version: CRMI requires `version` (1..1) at the shareable floor; from the
     // npm package (authoritative). date: CRMI requires it only at publishable+.

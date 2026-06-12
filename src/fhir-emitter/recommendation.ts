@@ -46,15 +46,10 @@ import type {
   EmittedResource,
   UnmatchedReference,
 } from "./types";
-import { capabilitiesUpTo, crmiCapabilityProfiles, isPublishablePlus } from "./types";
+import { crmiCapabilityProfiles, isPublishablePlus, knowledgeExtensions } from "./types";
 
 const CPG_BASE = "http://hl7.org/fhir/uv/cpg/StructureDefinition";
-// #104: FHIR-core cqf- for the knowledge* extensions; CRMI lifecycle profiles
-// come (additively) from crmiCapabilityProfiles.
-const FHIR_CORE_EXT_BASE = "http://hl7.org/fhir/StructureDefinition";
 const REC_CPG_PROFILE = `${CPG_BASE}/cpg-recommendationdefinition`;
-const KNOWLEDGE_CAPABILITY_EXT = `${FHIR_CORE_EXT_BASE}/cqf-knowledgeCapability`;
-const KNOWLEDGE_REPRESENTATION_EXT = `${FHIR_CORE_EXT_BASE}/cqf-knowledgeRepresentationLevel`;
 const PLAN_DEFINITION_TYPE_CS = "http://terminology.hl7.org/CodeSystem/plan-definition-type";
 const ACTION_TYPE_CS = "http://terminology.hl7.org/CodeSystem/action-type";
 const CPG_COMMON_PROCESS_CS = "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs";
@@ -146,14 +141,7 @@ export function emitRecommendationDefinition(
     meta: {
       profile: [REC_CPG_PROFILE, ...crmiCapabilityProfiles("plandefinition", level)],
     },
-    extension: [
-      // knowledgeCapability codes are cumulative and ORTHOGONAL to profile
-      // existence (CRMI binds this extension 0..* mustSupport, no fixed code) —
-      // the list may include e.g. `computable` though no crmi-computable*
-      // PlanDefinition profile exists. Do NOT reconcile it with meta.profile.
-      ...capabilitiesUpTo(level).map((c) => ({ url: KNOWLEDGE_CAPABILITY_EXT, valueCode: c })),
-      { url: KNOWLEDGE_REPRESENTATION_EXT, valueCode: "structured" },
-    ],
+    extension: knowledgeExtensions(level, "structured"),
     url,
     // version: CRMI requires `version` (1..1) at the shareable floor; from the
     // npm package (authoritative).

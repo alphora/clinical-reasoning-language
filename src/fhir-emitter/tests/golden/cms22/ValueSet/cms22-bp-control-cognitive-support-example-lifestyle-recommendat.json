@@ -8,6 +8,20 @@
       "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-publishablevalueset"
     ]
   },
+  "extension": [
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "shareable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "computable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "publishable"
+    }
+  ],
   "url": "http://hl7.org/fhir/us/cqfmeasures/crl/cms22/ValueSet/cms22-bp-control-cognitive-support-example-lifestyle-recommendat",
   "version": "1.0.0",
   "name": "Cms22BpControlCognitiveSupportExampleLifestyleRecommendationVs",
