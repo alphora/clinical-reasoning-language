@@ -74,7 +74,7 @@ import { libraryCanonicalUrl } from "./library";
 import { recommendationDefinitionCanonicalUrl } from "./recommendation";
 import { capSlug, pascalCaseName, slugify } from "./slug";
 import { tarjanSCC } from "./tarjan";
-import { capabilitiesUpTo, crmiCapabilityProfiles, isPublishablePlus } from "./types";
+import { crmiCapabilityProfiles, isPublishablePlus, knowledgeExtensions } from "./types";
 import type {
   Capability,
   CpgMetadata,
@@ -89,10 +89,8 @@ const CPG_BASE = "http://hl7.org/fhir/uv/cpg/StructureDefinition";
 // CPG 2.0.0 does NOT declare a CRMI dependency itself — consumers of these
 // emitted resources should add hl7.fhir.uv.crmi to their IG deps alongside
 // the CPG package (see USER_GUIDE §"Emitting FHIR Definition resources").
-// #104: knowledgeCapability + knowledgeRepresentationLevel are FHIR-core
-// extensions (cqf- prefix), NOT CPG-IG extensions. Resolves at
-// hl7.org/fhir/extensions with no IG dependency.
-const FHIR_CORE_EXT_BASE = "http://hl7.org/fhir/StructureDefinition";
+// knowledgeCapability + knowledgeRepresentationLevel are FHIR-core `cqf-`
+// extensions, built by `knowledgeExtensions` in ./types.
 const STRATEGY_CPG_PROFILE = `${CPG_BASE}/cpg-strategydefinition`;
 
 // CRMI lifecycle profiles accumulate additively up to the capability level
@@ -104,8 +102,6 @@ function planDefProfiles(isRoot: boolean, level: Capability): string[] {
     ...crmiCapabilityProfiles("plandefinition", level),
   ];
 }
-const KNOWLEDGE_CAPABILITY_EXT = `${FHIR_CORE_EXT_BASE}/cqf-knowledgeCapability`;
-const KNOWLEDGE_REPRESENTATION_EXT = `${FHIR_CORE_EXT_BASE}/cqf-knowledgeRepresentationLevel`;
 const PLAN_DEFINITION_TYPE_CS = "http://terminology.hl7.org/CodeSystem/plan-definition-type";
 const CPG_COMMON_PROCESS_CS = "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs";
 
@@ -308,15 +304,7 @@ export function emitDecisionPlanDefinition(
     resourceType: "PlanDefinition",
     id,
     meta: { profile: planDefProfiles(isRoot, level) },
-    extension: [
-      // knowledgeCapability codes are cumulative and ORTHOGONAL to profile
-      // existence (CRMI binds this extension 0..* mustSupport, no fixed code) —
-      // so the list may include e.g. `computable` even though no
-      // crmi-computableplandefinition profile exists. Do NOT reconcile it with
-      // meta.profile (which only claims profiles that exist for the resource).
-      ...capabilitiesUpTo(level).map((c) => ({ url: KNOWLEDGE_CAPABILITY_EXT, valueCode: c })),
-      { url: KNOWLEDGE_REPRESENTATION_EXT, valueCode: "structured" },
-    ],
+    extension: knowledgeExtensions(level, "structured"),
     url,
     // version: CRMI requires `version` (1..1) at the shareable floor; from the
     // npm package (authoritative).

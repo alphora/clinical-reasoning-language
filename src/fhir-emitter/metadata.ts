@@ -196,7 +196,7 @@ export function normalizePackageMetadata(raw: unknown): MetadataResult {
 
 /**
  * Normalize `crl.fhirDependencies` — a flat map of FHIR IG package id → version
- * string (e.g. `{ "hl7.fhir.uv.crmi": "1.0.0" }`). Provenance only; not emitted.
+ * string (e.g. `{ "hl7.fhir.uv.cpg": "2.0.0", "hl7.fhir.uv.crmi": "2.0.0-ballot" }`). Provenance only; not emitted.
  * Returns undefined when absent; pushes `malformed-crl-metadata` on bad shape.
  */
 function normalizeFhirDependencies(

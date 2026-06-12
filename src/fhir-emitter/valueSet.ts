@@ -25,7 +25,7 @@ import type { Terminology, TerminologyBodyLine } from "../ast/types";
 import type { CRLError } from "../types/errors";
 
 import { capSlug, pascalCaseName, slugify } from "./slug";
-import { crmiCapabilityProfiles, isPublishablePlus } from "./types";
+import { crmiCapabilityProfiles, isPublishablePlus, knowledgeExtensions } from "./types";
 import type {
   CpgMetadata,
   EmitOptions,
@@ -104,6 +104,9 @@ export function emitValueSet(
     resourceType: "ValueSet",
     id,
     meta: { profile: crmiCapabilityProfiles("valueset", level) },
+    // cqf-knowledgeCapability is mustSupport on the CRMI shareable ValueSet
+    // profile. No representationLevel — a value set is terminology, not logic.
+    extension: knowledgeExtensions(level),
     url,
     // version: CRMI requires `version` (1..1) at the shareable floor; sourced
     // from the npm package (authoritative SoT).

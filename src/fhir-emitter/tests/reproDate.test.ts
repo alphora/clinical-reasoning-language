@@ -204,3 +204,47 @@ describe("capability profile matrix — additive CRMI lifecycle profiles per res
     ]);
   });
 });
+
+describe("knowledge extensions per artifact (cqf-knowledgeCapability + representationLevel)", () => {
+  const STRATEGY = path.join(REPO_ROOT, "src/tests/fixtures/corpus/cms22-split/cms22-strategy.crl");
+  const FIXED = new Date("2020-01-01T00:00:00.000Z");
+  const KC = "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability";
+  const KRL = "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeRepresentationLevel";
+
+  const ext = (prefix: string): { url: string; valueCode: string }[] => {
+    const r = emitFhirDefFromPath(STRATEGY, { date: FIXED, capability: "publishable" });
+    expect(r.errors.length).toBe(0);
+    const res = r.resources.find((x) => x.relativePath.startsWith(prefix))!.resource as {
+      extension?: { url: string; valueCode: string }[];
+    };
+    return res.extension ?? [];
+  };
+  const caps = (e: { url: string; valueCode: string }[]): string[] =>
+    e.filter((x) => x.url === KC).map((x) => x.valueCode);
+  const repLevel = (e: { url: string; valueCode: string }[]): string | undefined =>
+    e.find((x) => x.url === KRL)?.valueCode;
+
+  it("ValueSet: knowledgeCapability only (no representationLevel — terminology)", () => {
+    const e = ext("ValueSet/");
+    expect(caps(e)).toEqual(["shareable", "computable", "publishable"]);
+    expect(repLevel(e)).toBeUndefined();
+  });
+
+  it("Library: knowledgeCapability + representationLevel `structured` (CQL source, not compiled ELM)", () => {
+    const e = ext("Library/");
+    expect(caps(e)).toEqual(["shareable", "computable", "publishable"]);
+    expect(repLevel(e)).toBe("structured");
+  });
+
+  it("ActivityDefinition: knowledgeCapability + representationLevel `structured`", () => {
+    const e = ext("ActivityDefinition/");
+    expect(caps(e)).toEqual(["shareable", "computable", "publishable"]);
+    expect(repLevel(e)).toBe("structured");
+  });
+
+  it("PlanDefinition: knowledgeCapability + representationLevel `structured`", () => {
+    const e = ext("PlanDefinition/");
+    expect(caps(e)).toEqual(["shareable", "computable", "publishable"]);
+    expect(repLevel(e)).toBe("structured");
+  });
+});

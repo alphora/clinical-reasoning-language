@@ -95,7 +95,7 @@ export interface CpgMetadata {
   crlDate?: string;
   /**
    * Targeted FHIR IG dependency versions (`crl.fhirDependencies`, e.g.
-   * `{ "hl7.fhir.uv.crmi": "1.0.0" }`). Provenance / the FHIR-package assembly
+   * `{ "hl7.fhir.uv.cpg": "2.0.0", "hl7.fhir.uv.crmi": "2.0.0-ballot" }`). Provenance / the FHIR-package assembly
    * manifest's deps — NEVER stamped onto an emitted resource.
    */
   fhirDependencies?: Record<string, string>;
@@ -104,7 +104,7 @@ export interface CpgMetadata {
 /**
  * CRMI artifact capability levels (cumulative; shareable is the floor).
  * Drives, as one gate: `meta.profile`, the `cqf-knowledgeCapability` list, and
- * whether `date` is emitted (publishable+ per CRMI 1.0.0). `version` is required
+ * whether `date` is emitted (publishable+ per CRMI). `version` is required
  * at the shareable floor → always emitted on definitional FHIR.
  */
 export type Capability = "shareable" | "computable" | "publishable" | "executable";
@@ -130,8 +130,10 @@ export type CrmiProfileResource = "valueset" | "library" | "activitydefinition" 
 
 const CRMI_SD_BASE = "http://hl7.org/fhir/uv/crmi/StructureDefinition";
 
-// CRMI 1.0.0: which capability levels actually publish a `crmi-<level><resource>`
-// StructureDefinition (verified from the hl7.fhir.uv.crmi#1.0.0 package).
+// CRMI 2.0.0-ballot: which capability levels actually publish a
+// `crmi-<level><resource>` StructureDefinition (verified from the
+// hl7.fhir.uv.crmi#2.0.0-ballot package; identical to 1.0.0). `meta.profile`
+// canonicals are unversioned, so the emitted URLs are version-independent.
 const CRMI_PROFILE_LEVELS: Record<CrmiProfileResource, readonly Capability[]> = {
   valueset: ["shareable", "computable", "publishable"],
   library: ["shareable", "computable", "publishable", "executable"],
@@ -150,6 +152,40 @@ export function crmiCapabilityProfiles(resource: CrmiProfileResource, level: Cap
   return capabilitiesUpTo(level)
     .filter((c) => available.includes(c))
     .map((c) => `${CRMI_SD_BASE}/crmi-${c}${resource}`);
+}
+
+export type RepresentationLevel = "narrative" | "semi-structured" | "structured" | "executable";
+
+const FHIR_CORE_EXT_BASE = "http://hl7.org/fhir/StructureDefinition";
+const KNOWLEDGE_CAPABILITY_EXT = `${FHIR_CORE_EXT_BASE}/cqf-knowledgeCapability`;
+const KNOWLEDGE_REPRESENTATION_EXT = `${FHIR_CORE_EXT_BASE}/cqf-knowledgeRepresentationLevel`;
+
+/**
+ * `cqf-knowledgeCapability` (cumulative, per the CRMI shareable-profile
+ * `mustSupport` on EVERY artifact type — so emitted on all definitional
+ * resources, not just PlanDefinition) plus an optional
+ * `cqf-knowledgeRepresentationLevel`. Both are the FHIR-core `cqf-` extensions
+ * (NOT the CPG IG's `cpg-` variants): the CRMI shareable-profile `knowledgeCapability`
+ * slice binds the `cqf-knowledgeCapability` URL, so `cqf-` is the conformant choice
+ * for CRMI-targeted emit. Independent of the CRMI IG version.
+ *
+ * The capability codes are ORTHOGONAL to lifecycle-profile existence (CRMI binds
+ * the extension `0..* mustSupport`, no fixed code): the list may include e.g.
+ * `computable` even though no `crmi-computableplandefinition` profile exists. Do
+ * NOT reconcile this list with `crmiCapabilityProfiles`.
+ */
+export function knowledgeExtensions(
+  level: Capability,
+  representationLevel?: RepresentationLevel,
+): Array<{ url: string; valueCode: string }> {
+  const ext: Array<{ url: string; valueCode: string }> = capabilitiesUpTo(level).map((c) => ({
+    url: KNOWLEDGE_CAPABILITY_EXT,
+    valueCode: c,
+  }));
+  if (representationLevel) {
+    ext.push({ url: KNOWLEDGE_REPRESENTATION_EXT, valueCode: representationLevel });
+  }
+  return ext;
 }
 
 export interface ContactPoint {
@@ -238,12 +274,12 @@ export interface UnmatchedReference {
  * drives, on every definitional resource, the additive `meta.profile` set
  * (`crmiCapabilityProfiles` — accumulates the lifecycle profiles that EXIST for
  * the resource up to the level) and the `date` element (emitted at publishable+).
- * On PlanDefinitions it also drives the cumulative `cqf-knowledgeCapability`
- * list. Note these are not perfectly symmetric: the `knowledgeCapability` codes
- * are orthogonal to profile existence (CRMI binds them `0..* mustSupport`, no
- * fixed code), so a PlanDefinition can claim `computable` capability even though
- * no `crmi-computableplandefinition` profile exists. ValueSet/ActivityDefinition/
- * Library carry no `cqf-knowledgeCapability` extension today.
+ * It also drives the cumulative `cqf-knowledgeCapability` list (emitted on every
+ * definitional resource — `knowledgeExtensions`). Note these are not perfectly
+ * symmetric: the `knowledgeCapability` codes are orthogonal to profile existence
+ * (CRMI binds them `0..* mustSupport`, no fixed code), so a PlanDefinition can
+ * claim `computable` capability even though no `crmi-computableplandefinition`
+ * profile exists.
  */
 export interface EmitOptions {
   /** Test/override seam: returns the emit-time date. */

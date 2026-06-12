@@ -46,7 +46,7 @@ import {
 } from "./cpgActivityProfiles";
 import { libraryCanonicalUrl } from "./library";
 import { capSlug, pascalCaseName, slugify } from "./slug";
-import { crmiCapabilityProfiles, isPublishablePlus } from "./types";
+import { crmiCapabilityProfiles, isPublishablePlus, knowledgeExtensions } from "./types";
 import type {
   CpgMetadata,
   EmitOptions,
@@ -158,6 +158,9 @@ export function emitActivityDefinition(
     resourceType: "ActivityDefinition",
     id,
     meta: { profile: [profile.profileUrl, ...crmiCapabilityProfiles("activitydefinition", level)] },
+    // cqf-knowledgeCapability (mustSupport on the CRMI shareable AD profile) +
+    // representationLevel `structured` (matches the cc-screening reference).
+    extension: knowledgeExtensions(level, "structured"),
     url,
     // version: CRMI requires `version` (1..1) at the shareable floor; from the
     // npm package (authoritative). date: CRMI requires it only at publishable+.
