@@ -11,8 +11,9 @@
  * Per `docs/cpg-ig-alignment.md` + plan v2.1 [060]:
  *   - The CPG IG has no active Library profile, but CRMI does — we claim
  *     the additive CRMI library lifecycle profiles (crmi-shareable/computable/
- *     publishable/executable-library, up to the target capability) via
- *     `crmiCapabilityProfiles`. No CPG `meta.profile` claim.
+ *     publishable-library, up to the target capability) via
+ *     `crmiCapabilityProfiles`. No CPG `meta.profile` claim. (The executable
+ *     tier — crmi-executablelibrary — needs ELM and is out of scope; see #113.)
  *   - `Library.type = #logic-library` (CodeableConcept from FHIR R4
  *     `library-type` valueset; CRL libraries contain CQL logic).
  *   - `Library.relatedArtifact[]` enumerates `depends-on` entries per

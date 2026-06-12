@@ -482,6 +482,26 @@ export function emitFhirDefClosure(
   const unmatched: UnmatchedReference[] = [];
   const resources: EmittedResource[] = [];
 
+  // `executable` is not supported: emit produces design-time forms (text/cql
+  // Library content, value-set `compose`), not the run-time forms `executable`
+  // requires (compiled ELM, value-set `expansion`). Max capability = publishable.
+  // Tracked in #113.
+  if ((opts.capability ?? "publishable") === "executable") {
+    return {
+      success: false,
+      resources: [],
+      errors: [
+        {
+          type: "Validation",
+          kind: "executable-capability-unsupported",
+          message:
+            "`--capability executable` is not supported: CRL→FHIR emit produces design-time forms (text/cql Library content, value-set `compose`), not the run-time forms `executable` requires (compiled ELM for Library, an `expansion` for ValueSet). Max capability is `publishable`. Track: alphora/clinical-reasoning-language#113.",
+        },
+      ],
+      unmatched: [],
+    };
+  }
+
   // Reproducible emit: resolve the publication date ONCE (opts.date →
   // SOURCE_DATE_EPOCH → crl.date → clock → wall clock) and inject it as a fixed
   // clock so every per-resource emitter stamps the identical timestamp with no
