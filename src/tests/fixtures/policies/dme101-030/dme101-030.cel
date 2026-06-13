@@ -16,12 +16,12 @@ fact "Pat Jones":
 fact "Documented Tibial Nonunion":
 - code is "http://snomed.info/sct|263212004".
 - date is "2026-02-01".
-- defined by "Ultrasonic Osteogenesis Stimulator Coverage"."Fracture Nonunion".
+- defined by "Ultrasonic Osteogenesis Stimulator Coverage"."Documented Fracture Nonunion".
 
 fact "Skull Fracture Finding":
 - code is "http://snomed.info/sct|208394000".
 - date is "2026-02-01".
-- defined by "Ultrasonic Osteogenesis Stimulator Coverage"."Skull Or Vertebrae Fracture".
+- defined by "Ultrasonic Osteogenesis Stimulator Coverage"."Fracture Of Skull Or Vertebrae".
 
 // ============ Cases ============
 
@@ -31,7 +31,7 @@ case "Tibial nonunion, no exclusions → medically necessary":
   stimulator. All four coverage criteria hold → medically necessary.`.
 - subject is "Pat Jones".
 - fact is "Documented Tibial Nonunion".
-- result is "Ultrasonic Osteogenesis Stimulator Coverage" is "Medically Necessary".
+- result is "Ultrasonic Osteogenesis Stimulator Coverage" is "Communicate Approved".
 
 case "Skull fracture → not medically necessary (exclusion)":
 - description is `A documented nonunion, but the fracture is of the skull — the
@@ -39,10 +39,10 @@ case "Skull fracture → not medically necessary (exclusion)":
 - subject is "Pat Jones".
 - fact is "Documented Tibial Nonunion".
 - fact is "Skull Fracture Finding".
-- result is "Ultrasonic Osteogenesis Stimulator Coverage" is "Not Medically Necessary".
+- result is "Ultrasonic Osteogenesis Stimulator Coverage" is "Communicate Not Approved".
 
 case "No documented nonunion (fresh fracture) → not medically necessary":
 - description is `No documented fracture nonunion (e.g. a fresh fracture or
   delayed union) → the nonunion criterion fails → not medically necessary.`.
 - subject is "Pat Jones".
-- result is "Ultrasonic Osteogenesis Stimulator Coverage" is "Not Medically Necessary".
+- result is "Ultrasonic Osteogenesis Stimulator Coverage" is "Communicate Not Approved".
