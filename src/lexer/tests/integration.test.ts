@@ -33,10 +33,10 @@ describe("Integration", () => {
             - when "Level 3" then:
                 - recommend activity "Action 1".
                 - recommend activity "Action 2".
-            end.
+            end
             - when "Level 3b" then use decision "Action 3".
-        end.
-    end.`;
+        end
+    end`;
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(tokens, [
@@ -69,7 +69,6 @@ describe("Integration", () => {
         CRLLexer.QUOTED_STRING,
         CRLLexer.DOT,
         CRLLexer.END,
-        CRLLexer.DOT,
         CRLLexer.DASH,
         CRLLexer.WHEN,
         CRLLexer.QUOTED_STRING,
@@ -78,9 +77,7 @@ describe("Integration", () => {
         CRLLexer.QUOTED_STRING,
         CRLLexer.DOT,
         CRLLexer.END,
-        CRLLexer.DOT,
         CRLLexer.END,
-        CRLLexer.DOT,
       ]);
     });
   });
@@ -124,11 +121,11 @@ describe("Integration", () => {
     - when "Client Age Less Than 60" then:
         - recommend activity "Vaccinate".
         - recommend activity "another thing".
-    end.
+    end
     - when "Client Age Greater Than 60" then:
         - use decision "Elderly Based".
         - use decision "IMMZ.D2.D5.Measles".
-    end.`;
+    end`;
 
         const tokens = getTokensFromString(input);
 
@@ -158,7 +155,6 @@ describe("Integration", () => {
           CRLLexer.QUOTED_STRING,
           CRLLexer.DOT,
           CRLLexer.END,
-          CRLLexer.DOT,
           CRLLexer.DASH,
           CRLLexer.WHEN,
           CRLLexer.QUOTED_STRING,
@@ -173,7 +169,6 @@ describe("Integration", () => {
           CRLLexer.QUOTED_STRING,
           CRLLexer.DOT,
           CRLLexer.END,
-          CRLLexer.DOT,
         ]);
       });
 
@@ -186,7 +181,7 @@ describe("Integration", () => {
    - when "Condition 3" then:
         - recommend activity  "Action 2".
         - recommend activity "Action 3".
-    end.`;
+    end`;
 
         const tokens = getTokensFromString(input);
 
@@ -222,7 +217,6 @@ describe("Integration", () => {
           CRLLexer.QUOTED_STRING,
           CRLLexer.DOT,
           CRLLexer.END,
-          CRLLexer.DOT,
         ]);
       });
 

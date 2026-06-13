@@ -55,7 +55,7 @@ first:
       all:
       - recommend activity "A".
       - use decision "B".
-      end.
+      end
   - otherwise then recommend activity "Default Activity".
 ```
 
@@ -68,7 +68,7 @@ first:
   - A multi-branch block must declare `first:` or `all:`; a single branch needs none.
 - A branch may directly recommend/use, or open a `then:` body, or nest.
 - A `then:` body is a homogeneous block — either nested branches (`first:`/`all:`)
-  or actions (`any:` = offer one / `all:` = do all) — closed by `end.`.
+  or actions (`any:` = offer one / `all:` = do all) — closed by `end`.
 - `otherwise` is the catch-all: only inside a `first:` block, must be last,
   required at the top level.
 

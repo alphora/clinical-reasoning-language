@@ -70,7 +70,7 @@ decision "CMS69 BMI Screening Strategy":
   - when "BMI Not Documented During Measurement Period" then recommend activity "Document BMI".
   - when "Has Documented High BMI" then use decision "Recommend High BMI Intervention".
   - when "Has Documented Low BMI" then use decision "Recommend Low BMI Intervention".
-  end.
+  end
 
 // High-BMI sub-decision. Several intervention paths are CMS69-acceptable;
 // `any:` says any one of these recommendations satisfies the measure.
@@ -80,7 +80,7 @@ all:
   any:
   - recommend activity "Order Weight Assessment Referral".
   - recommend activity "Order High BMI Medication".
-  end.
+  end
 - when "Has Anti-Obesity Medication Contraindication" then recommend activity "Contraindicated Anti-Obesity Medication".
 
 // Low-BMI sub-decision. CMS69 expects BOTH a follow-up order AND a
@@ -91,7 +91,7 @@ decision "Recommend Low BMI Intervention":
   all:
   - recommend activity "Order Low BMI Follow-up".
   - recommend activity "Send BMI Care Communication".
-  end.
+  end
 
 
 // ============ Activities ============

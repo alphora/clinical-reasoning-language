@@ -93,7 +93,7 @@ decisionBody
 //
 // A branchItem is a `when <concept> then ...` clause or the `otherwise` catch-all.
 // `then <action>` is the inline single-action form (no closer); `then: <body>` is
-// the block form, always closed by `end.`.
+// the block form, always closed by `end`.
 
 blockQualifier
     : FIRST_BLOCK
@@ -109,14 +109,15 @@ branchItem
     ;
 
 // A nested `then:` block body. Homogeneous: branches XOR actions
-// (grammar-enforced). ALWAYS closed by `end.` — a dashless, period-terminated
-// closer (matching CRL's statement convention) that frames the dashless `any:`/
-// `all:`/`first:` opener. The mandatory closer is what keeps the sibling
-// boundary in `decisionBody`'s `branchItem+` unambiguous; do NOT make it
-// optional. `branchItem` starts `- when`/`- otherwise`, `actionItem` starts
-// `- recommend`/`- use`, and the closer is `end` — all LL-distinct.
+// (grammar-enforced). ALWAYS closed by a dashless `end` — a structural
+// delimiter (no period, like the dashless `any:`/`all:`/`first:` openers and
+// `decision "X":` headers it frames; only content/statement lines take `.`).
+// The mandatory closer is what keeps the sibling boundary in `decisionBody`'s
+// `branchItem+` unambiguous; do NOT make it optional. `branchItem` starts
+// `- when`/`- otherwise`, `actionItem` starts `- recommend`/`- use`, and the
+// closer is the bare `end` keyword — all LL-distinct (verified: no ATN ambiguity).
 blockBody
-    : COLON blockQualifier? ( branchItem+ | actionItem+ ) END DOT
+    : COLON blockQualifier? ( branchItem+ | actionItem+ ) END
     ;
 
 actionItem
@@ -197,7 +198,7 @@ terminologyCode
 //      - with "Colonoscopy".
 //   activity "Inform Clinician":
 //      - request CPGCommunicationRequest.
-//      - with `The message to send.`.
+//      - with `The message to send`.
 //      - because `Clinician's should be messaged about these things.`.
 //
 doNotPerform

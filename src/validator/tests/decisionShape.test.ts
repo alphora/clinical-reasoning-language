@@ -13,7 +13,7 @@ import { parseInput } from "../../ast/tests/parseInput";
  * Decision-shape structural rules (first/any/all/otherwise legality).
  * See src/validator/decisionShapeValidator.ts and docs/decision-shapes.md.
  *
- * These cases are all grammatically VALID — homogeneity and the `end.` closer
+ * These cases are all grammatically VALID — homogeneity and the `end` closer
  * are grammar-enforced — so they parse cleanly and exercise only the semantic
  * rules. Unresolved-reference errors (the snippets reference undeclared
  * concepts/activities) are filtered out; we assert only on `decision-shape`.
@@ -68,7 +68,7 @@ first:
   any:
   - recommend activity "X".
   - recommend activity "Y".
-  end.
+  end
 - otherwise then recommend activity "Z".`),
       ).toEqual([]);
     });
@@ -88,7 +88,7 @@ first:
   first:
   - when "B" then recommend activity "X".
   - when "C" then recommend activity "Y".
-  end.
+  end
 - otherwise then recommend activity "Z".`),
       ).toEqual([]);
     });
@@ -111,7 +111,7 @@ any:
   first:
   - recommend activity "X".
   - recommend activity "Y".
-  end.`),
+  end`),
       ).toContain("first-over-actions");
     });
 
