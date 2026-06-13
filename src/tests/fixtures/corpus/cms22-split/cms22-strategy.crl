@@ -45,7 +45,7 @@ decision "CMS22 BP Control Strategy":
   - when "No BP Reading At This Encounter" then recommend activity "Measure BP".
   - when "Has Hypertensive Reading" then use decision "Recommend Hypertension Intervention".
   - when "Has Normal Reading With Hypertension On File" then recommend activity "Confirm Continued Control".
-  - end
+  end.
 
 // Hypertensive-reading sub-decision. CMS22 accepts any one of:
 // a medication order, a follow-up rescreen order, or a documented
@@ -58,12 +58,12 @@ all:
   - recommend activity "Antihypertensive Medication".
   - recommend activity "Follow-up Rescreen".
   - recommend activity "Lifestyle Referral".
-  - end
+  end.
 - when "Hypertensive Reading Without Diagnosis" then:
   all:
   - recommend activity "Follow-up Rescreen".
   - recommend activity "Document Provisional Hypertension".
-  - end
+  end.
 - when "Has Antihypertensive Contraindication" then recommend activity "Contraindicated Antihypertensive".
 
 

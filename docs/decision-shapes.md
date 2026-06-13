@@ -29,7 +29,7 @@ Rules:
   `first:` decision (so every case reaches a disposition). In a *nested*
   `first:` block `otherwise` is optional (omit it when the inner branches are
   already exhaustive).
-- A `then:` body (the colon form) is always closed by `- end`. The inline
+- A `then:` body (the colon form) is always closed by `end.`. The inline
   single-action form (`- when "X" then recommend activity "Y".`) has no `then:`
   and no closer.
 
@@ -65,7 +65,7 @@ first:
   any:
   - recommend activity "Order MRI".
   - recommend activity "Order CT".
-  - end
+  end.
 - otherwise then recommend activity "No Imaging Indicated".
 ```
 
@@ -77,7 +77,7 @@ first:
   all:
   - recommend activity "Communicate Denial".
   - recommend activity "Record Rationale".
-  - end
+  end.
 - otherwise then recommend activity "Approve".
 ```
 
@@ -91,12 +91,12 @@ first:
   first:
   - when "Documentation Complete" then recommend activity "Approve".
   - otherwise then recommend activity "Pend For Records".
-  - end
+  end.
 - otherwise then:
   all:
   - recommend activity "Deny".
   - recommend activity "Notify Provider".
-  - end
+  end.
 ```
 
 ### "Any one indication qualifies" — compose with `sem-or`, not `any:`-over-branches
@@ -123,7 +123,7 @@ first:
   all:
   - when "Needs Imaging" then recommend activity "Order Imaging".
   - when "Needs Labs" then recommend activity "Order Labs".
-  - end
+  end.
 - otherwise then recommend activity "Deny".
 ```
 
@@ -147,7 +147,7 @@ branch should fire.
   first:
   - recommend activity "Order MRI".
   - recommend activity "Order CT".
-  - end
+  end.
 ```
 Actions carry no condition, so "first match" is meaningless. **Do this instead:**
 use `any:` (offer either) or `all:` (do both).
@@ -158,7 +158,7 @@ use `any:` (offer either) or `all:` (do both).
   all:
   - recommend activity "Communicate Approved".
   - when "Requires Prior Authorization" then recommend activity "Request PA".
-  - end
+  end.
 ```
 Ambiguous: does the bare action always fire, or only as a fallback? **Do this
 instead:** keep the block homogeneous — put the unconditional actions in their

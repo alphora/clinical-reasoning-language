@@ -93,7 +93,7 @@ decisionBody
 //
 // A branchItem is a `when <concept> then ...` clause or the `otherwise` catch-all.
 // `then <action>` is the inline single-action form (no closer); `then: <body>` is
-// the block form, always closed by `- end`.
+// the block form, always closed by `end.`.
 
 blockQualifier
     : FIRST_BLOCK
@@ -109,12 +109,14 @@ branchItem
     ;
 
 // A nested `then:` block body. Homogeneous: branches XOR actions
-// (grammar-enforced). ALWAYS closed by `- end` — the mandatory closer is what
-// keeps the sibling boundary in `decisionBody`'s `branchItem+` unambiguous; do
-// NOT make it optional. `branchItem` starts `- when`/`- otherwise`, `actionItem`
-// starts `- recommend`/`- use`, and the closer is `- end` — all LL-distinct.
+// (grammar-enforced). ALWAYS closed by `end.` — a dashless, period-terminated
+// closer (matching CRL's statement convention) that frames the dashless `any:`/
+// `all:`/`first:` opener. The mandatory closer is what keeps the sibling
+// boundary in `decisionBody`'s `branchItem+` unambiguous; do NOT make it
+// optional. `branchItem` starts `- when`/`- otherwise`, `actionItem` starts
+// `- recommend`/`- use`, and the closer is `end` — all LL-distinct.
 blockBody
-    : COLON blockQualifier? ( branchItem+ | actionItem+ ) DASH END
+    : COLON blockQualifier? ( branchItem+ | actionItem+ ) END DOT
     ;
 
 actionItem

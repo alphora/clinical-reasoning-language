@@ -137,10 +137,10 @@ all:
     all:
     - when "Has Sigmoidoscopy Complications" then recommend activity "CT Colonography".
     - when "No Sigmoidoscopy Complications" then recommend activity "Sigmoidoscopy".
-    - end
+    end.
   - when "No Sedation Concern" then:
     all:
     - when "Has Colonoscopy Complications" then recommend activity "CT Colonography".
     - when "No Colonoscopy Complications" then recommend activity "Colonoscopy".
-    - end
-  - end
+    end.
+  end.

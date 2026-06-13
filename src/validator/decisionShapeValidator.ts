@@ -20,7 +20,7 @@ interface Attribution {
  * legality rules from the converged language design (see docs/decision-shapes.md).
  *
  * The grammar already enforces homogeneity (a block is all branches XOR all
- * actions) and the `- end` closer. This validator enforces the *semantic* rules
+ * actions) and the `end.` closer. This validator enforces the *semantic* rules
  * the grammar deliberately leaves permissive, so authors get precise diagnostics
  * rather than parse failures:
  *
