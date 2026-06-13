@@ -719,6 +719,11 @@ function walkWhenBlock(
     walkWhenBlock(w.body, owningLib, filePath, source, out);
     return;
   }
+  if (w.type === "OtherwiseBlock") {
+    // `otherwise` carries no condition ref — just index its body.
+    walkWhenBlock(w.body, owningLib, filePath, source, out);
+    return;
+  }
   if (w.type === "BlockBody") {
     for (const st of w.statements ?? []) walkWhenBlock(st, owningLib, filePath, source, out);
     return;

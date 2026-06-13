@@ -136,7 +136,7 @@ decision "Test":
     - when "Condition" then:
         - recommend activity "Action" /* comment */.
         - recommend activity "Action 2" /* another comment */.
-   - end when
+   - end
 `;
 
       const tokens = getTokensFromString(input);
@@ -159,7 +159,7 @@ decision "Test":
         CRLLexer.QUOTED_STRING,
         CRLLexer.DOT,
         CRLLexer.DASH,
-        CRLLexer.END_WHEN,
+        CRLLexer.END,
       ]);
     });
 

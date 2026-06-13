@@ -1,0 +1,25 @@
+# DME101.030 — Ultrasonic Osteogenesis Stimulator
+library "Ultrasonic Osteogenesis Stimulator Coverage".
+
+/*
+STEP 1 — decision points only. The concepts referenced here are stubs,
+implemented in step 3. `first:` makes the branches ordered (first match wins);
+the exclusions are tested before the approval branch so a denial wins by
+position, and `otherwise` is the catch-all disposition. See docs/decision-shapes.md.
+*/
+
+decision "Ultrasonic Osteogenesis Stimulator Coverage":
+first:
+- when "Fracture Of Skull Or Vertebrae" then recommend activity "Communicate Not Approved".
+- when "Tumor-Related Fracture" then recommend activity "Communicate Not Approved".
+- when "Concurrent Noninvasive Stimulator In Use" then recommend activity "Communicate Not Approved".
+- when "Documented Fracture Nonunion" then recommend activity "Communicate Approved".
+- otherwise then recommend activity "Communicate Not Approved".
+
+activity "Communicate Approved":
+- request CPGCommunicationRequest.
+- with `Ultrasonic osteogenesis stimulator may be considered medically necessary.`.
+
+activity "Communicate Not Approved":
+- request CPGCommunicationRequest.
+- with `Ultrasonic osteogenesis stimulator is not medically necessary.`.

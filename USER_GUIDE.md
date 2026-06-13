@@ -49,29 +49,37 @@ Defines reusable decision logic blocks with `when` conditions and actions.
 
 ```crl
 decision "Decision Name":
+first:
   - when "Concept Name" then recommend activity "Activity Name".
   - when "Other Concept" then:
+      all:
       - recommend activity "A".
       - use decision "B".
-  - end when
+      - end
+  - otherwise then recommend activity "Default Activity".
 ```
 
 #### Structure
 
 - `decision "Name":` (colon required)
-- One or more `when` blocks
-- `when` block can:
-  - Directly recommend or use an activity/decision
-  - Contain a block body (with optional `any:` or `all:` qualifier)
-  - Be nested
-- End blocks with `- end when`
+- A block of `when` branches, combined with a qualifier:
+  - **`first:`** — ordered; the first matching branch wins; requires a trailing
+    `otherwise`. **`all:`** — every matching branch fires.
+  - A multi-branch block must declare `first:` or `all:`; a single branch needs none.
+- A branch may directly recommend/use, or open a `then:` body, or nest.
+- A `then:` body is a homogeneous block — either nested branches (`first:`/`all:`)
+  or actions (`any:` = offer one / `all:` = do all) — closed by `- end`.
+- `otherwise` is the catch-all: only inside a `first:` block, must be last,
+  required at the top level.
 
 #### Actions
 
 - `recommend activity "Activity Name".`
 - `use decision "Decision Name".`
 
->**Note**: `when ""` (an empty concept) is allowed by syntax and is used to ensure the action always runs (i.e., effectively condition = true).
+> **See [decision-shapes.md](docs/decision-shapes.md)** for the full set of
+> `first` / `any` / `all` / `otherwise` combinations, with worked examples and
+> the common mistakes to avoid.
 
 ---
 

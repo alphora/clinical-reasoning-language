@@ -35,8 +35,8 @@ describe("Structures", () => {
                     ERROR.
                 - when "Subsubcondition 2" then
                     use decision ERROR.
-       - end when
-    - end when`;
+       - end
+    - end`;
       const tokens = getTokensFromString(input);
 
       verifyTokenSequence(tokens, [
@@ -75,9 +75,9 @@ describe("Structures", () => {
         CRLLexer.ERROR,
         CRLLexer.DOT,
         CRLLexer.DASH,
-        CRLLexer.END_WHEN,
+        CRLLexer.END,
         CRLLexer.DASH,
-        CRLLexer.END_WHEN,
+        CRLLexer.END,
       ]);
     });
 

@@ -5,8 +5,10 @@ import {
   CrlContext,
   DecisionStatementContext,
   DecisionBodyContext,
-  WhenBlockContext,
+  BranchItemContext,
   BlockBodyContext,
+  BlockQualifierContext,
+  ActionItemContext,
   ActionStatementContext,
   RecommendStatementContext,
   UseStatementContext,
@@ -52,9 +54,8 @@ import {
   AVNestedGroupContext,
   WhenWithBodyContext,
   WhenSingleActionContext,
-  NestedWhenBlockContext,
-  BlockActionContext,
-  BlockStatementContext,
+  OtherwiseWithBodyContext,
+  OtherwiseSingleActionContext,
 } from "../grammar/generated/antlr/CRLParser";
 import { CRLParserVisitor } from "../grammar/generated/antlr/CRLParserVisitor";
 import type { CRLError } from "../types/errors";
@@ -65,6 +66,10 @@ import {
   Decision,
   DecisionBody,
   WhenBlock,
+  OtherwiseBlock,
+  BranchBlock,
+  BlockMember,
+  BlockQualifier,
   BlockBody,
   ActionStatement,
   RecommendActivity,
@@ -121,6 +126,15 @@ function getLocation(ctx: ParserRuleContext): Location {
       column: stop.charPositionInLine + (stop.text?.length ?? 0),
     },
   };
+}
+
+/**
+ * A `blockQualifier` token carries its colon (`first:`/`any:`/`all:`); strip it
+ * to the bare `BlockQualifier`. Returns undefined when no qualifier is present.
+ */
+function qualifierFrom(ctx: BlockQualifierContext | undefined): BlockQualifier | undefined {
+  if (!ctx) return undefined;
+  return ctx.text.slice(0, -1) as BlockQualifier;
 }
 
 /** Strip the surrounding `"..."` from a `QUOTED_STRING` token's text. */
@@ -263,18 +277,23 @@ export class CRLAstBuilder
   }
 
   visitDecisionBody(ctx: DecisionBodyContext): DecisionBody {
-    const statements = ctx.whenBlock().map((w) => this.visit(w) as WhenBlock);
-    return { type: "DecisionBody", statements, location: getLocation(ctx) };
+    const qualifier = qualifierFrom(ctx.blockQualifier());
+    const statements = ctx.branchItem().map((b) => this.visitBranchItem(b));
+    return {
+      type: "DecisionBody",
+      ...(qualifier ? { qualifier } : {}),
+      statements,
+      location: getLocation(ctx),
+    };
   }
 
-  visitWhenBlock(ctx: WhenBlockContext): WhenBlock {
-    if (ctx instanceof WhenWithBodyContext) {
-      return this.visitWhenWithBody(ctx);
-    } else if (ctx instanceof WhenSingleActionContext) {
-      return this.visitWhenSingleAction(ctx);
-    }
-    this.reportError("Unknown whenBlock alternative", ctx);
-    return null as unknown as WhenBlock;
+  visitBranchItem(ctx: BranchItemContext): BranchBlock {
+    if (ctx instanceof WhenWithBodyContext) return this.visitWhenWithBody(ctx);
+    if (ctx instanceof WhenSingleActionContext) return this.visitWhenSingleAction(ctx);
+    if (ctx instanceof OtherwiseWithBodyContext) return this.visitOtherwiseWithBody(ctx);
+    if (ctx instanceof OtherwiseSingleActionContext) return this.visitOtherwiseSingleAction(ctx);
+    this.reportError("Unknown branchItem alternative", ctx);
+    return null as unknown as BranchBlock;
   }
 
   visitWhenWithBody(ctx: WhenWithBodyContext): WhenBlock {
@@ -289,35 +308,34 @@ export class CRLAstBuilder
     return { type: "WhenBlock", conceptName, body: action, location: getLocation(ctx) };
   }
 
-  visitNestedWhenBlock(ctx: NestedWhenBlockContext): WhenBlock {
-    return this.visit(ctx.whenBlock()) as WhenBlock;
+  visitOtherwiseWithBody(ctx: OtherwiseWithBodyContext): OtherwiseBlock {
+    const body = this.visit(ctx.blockBody()) as BlockBody;
+    return { type: "OtherwiseBlock", body, location: getLocation(ctx) };
   }
 
-  visitBlockStatement(ctx: BlockStatementContext): WhenBlock | ActionStatement {
-    if (ctx instanceof NestedWhenBlockContext) {
-      return this.visitNestedWhenBlock(ctx);
-    } else if (ctx instanceof BlockActionContext) {
-      return this.visitBlockAction(ctx);
-    }
-    this.reportError("Unknown blockStatement alternative", ctx);
-    return null as unknown as WhenBlock;
+  visitOtherwiseSingleAction(ctx: OtherwiseSingleActionContext): OtherwiseBlock {
+    const action = this.visit(ctx.actionStatement()) as ActionStatement;
+    return { type: "OtherwiseBlock", body: action, location: getLocation(ctx) };
   }
 
   visitBlockBody(ctx: BlockBodyContext): BlockBody {
-    const qualifier = ctx.anyOrAllClause() ? ctx.anyOrAllClause()!.text.slice(0, -1) : undefined;
-    const statements: (WhenBlock | ActionStatement)[] = [];
-    for (const stmtCtx of ctx.blockStatement()) {
-      statements.push(this.visitBlockStatement(stmtCtx));
+    const qualifier = qualifierFrom(ctx.blockQualifier());
+    const statements: BlockMember[] = [];
+    const branchItems = ctx.branchItem();
+    if (branchItems.length > 0) {
+      for (const b of branchItems) statements.push(this.visitBranchItem(b));
+    } else {
+      for (const a of ctx.actionItem()) statements.push(this.visitActionItem(a));
     }
     return {
       type: "BlockBody",
-      qualifier,
+      ...(qualifier ? { qualifier } : {}),
       statements,
       location: getLocation(ctx),
     };
   }
 
-  visitBlockAction(ctx: BlockActionContext): ActionStatement {
+  visitActionItem(ctx: ActionItemContext): ActionStatement {
     return this.visit(ctx.actionStatement()) as ActionStatement;
   }
 

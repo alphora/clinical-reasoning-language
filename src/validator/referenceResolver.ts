@@ -4,7 +4,7 @@ import type {
   Concept,
   Decision,
   Activity,
-  WhenBlock,
+  BranchBlock,
   WhenBlockBody,
   BlockBody,
   ActionStatement,
@@ -65,8 +65,9 @@ const REF_KIND_TO_PLURAL = {
  *   - activity body:
  *       `with "T"`                     (T is a terminology, when slot used)
  *
- * Empty refs (`when "" then ...`) are treated as the documented sentinel
- * and skipped without firing a diagnostic.
+ * Empty refs (`""`) fire a normal unresolved-reference diagnostic. The former
+ * `when ""` "always" sentinel is gone — `otherwise` is now the structural
+ * catch-all (see docs/decision-shapes.md), so an empty ref is just a typo.
  *
  * Single-file mode (no `sources`): synthetic self-scope from `ast.library`.
  * Bare refs resolve against the AST's own declarations. Qualified refs
@@ -281,16 +282,17 @@ export class ReferenceResolver {
   // ------------------------ decision body walk --------------------------
 
   private walkDecision(decision: Decision, ctx: WalkContext, errors: ValidationError[]): void {
-    for (const wb of decision.body.statements) {
-      this.walkWhenBlock(wb, ctx, errors);
+    for (const branch of decision.body.statements) {
+      this.walkBranch(branch, ctx, errors);
     }
   }
 
-  private walkWhenBlock(wb: WhenBlock, ctx: WalkContext, errors: ValidationError[]): void {
-    // `when "Concept"` — the conceptName ref. Empty name is the documented
-    // sentinel for "always" (per USER_GUIDE); checkRef skips empty refs.
-    this.checkRef(wb.conceptName, CONCEPT_REF_KINDS, wb.location, ctx, errors);
-    this.walkWhenBlockBody(wb.body, ctx, errors);
+  private walkBranch(branch: BranchBlock, ctx: WalkContext, errors: ValidationError[]): void {
+    // `when "Concept"` carries a concept ref; `otherwise` carries no condition.
+    if (branch.type === "WhenBlock") {
+      this.checkRef(branch.conceptName, CONCEPT_REF_KINDS, branch.location, ctx, errors);
+    }
+    this.walkWhenBlockBody(branch.body, ctx, errors);
   }
 
   private walkWhenBlockBody(body: WhenBlockBody, ctx: WalkContext, errors: ValidationError[]): void {
@@ -304,8 +306,8 @@ export class ReferenceResolver {
 
   private walkBlockBody(block: BlockBody, ctx: WalkContext, errors: ValidationError[]): void {
     for (const stmt of block.statements) {
-      if (stmt.type === "WhenBlock") {
-        this.walkWhenBlock(stmt, ctx, errors);
+      if (stmt.type === "WhenBlock" || stmt.type === "OtherwiseBlock") {
+        this.walkBranch(stmt, ctx, errors);
       } else {
         // ActionStatement
         this.walkActionStatement(stmt, ctx, errors);
@@ -347,7 +349,6 @@ export class ReferenceResolver {
     errors: ValidationError[],
   ): void {
     const refName = getRefName(ref);
-    if (!refName) return; // empty sentinel — `when ""` etc. — skip silently
 
     if (!isQualifiedRef(ref)) {
       // Bare ref: try each acceptable bucket in precedence order; succeed on first hit.

@@ -5,9 +5,12 @@ import type {
   Activity,
   ActivityType,
   BlockBody,
+  BlockQualifier,
+  BranchBlock,
   Concept,
   ConceptType,
   Decision,
+  OtherwiseBlock,
   RecommendActivity,
   UseDecision,
   WhenBlock,
@@ -64,7 +67,7 @@ function useDec(name: string): UseDecision {
 function leaf(action: Action): WhenBlockBody {
   return { type: "ActionStatement", action, location: LOC };
 }
-function block(qualifier: "any" | "all" | undefined, statements: BlockBody["statements"]): BlockBody {
+function block(qualifier: BlockQualifier | undefined, statements: BlockBody["statements"]): BlockBody {
   const body: BlockBody = {
     type: "BlockBody",
     statements,
@@ -81,11 +84,19 @@ function when(condition: string, body: WhenBlockBody): WhenBlock {
     location: LOC,
   };
 }
-function decision(name: string, statements: WhenBlock[]): Decision {
+function otherwise(body: WhenBlockBody): OtherwiseBlock {
+  return { type: "OtherwiseBlock", body, location: LOC };
+}
+function decision(name: string, statements: BranchBlock[], qualifier?: BlockQualifier): Decision {
   return {
     type: "Decision",
     name,
-    body: { type: "DecisionBody", statements, location: LOC },
+    body: {
+      type: "DecisionBody",
+      statements,
+      location: LOC,
+      ...(qualifier !== undefined ? { qualifier } : {}),
+    },
     location: LOC,
   };
 }
@@ -582,5 +593,77 @@ describe("decision — emitDecisionPlanDefinitionsForLibrary", () => {
       [d], [activity("A")], [concept("C")], "My Library", METADATA, { clock: FIXED_CLOCK },
     );
     expect(resources).toHaveLength(1);
+  });
+});
+
+/* ─── otherwise / first emit paths (phase-1 stand-in) ──────────────── */
+
+describe("decision — otherwise and first emit", () => {
+  it("otherwise branch emits an action with NO condition[]", () => {
+    const d = decision(
+      "Cov",
+      [when("Excl", leaf(recommend("Deny"))), otherwise(leaf(recommend("Approve")))],
+      "first",
+    );
+    const { resource } = emitDecisionPlanDefinition(
+      d, "Lib", METADATA, RESOLVE_ALL, RESOLVE_ACT_OK, RESOLVE_DEC_OK, true, { clock: FIXED_CLOCK },
+    );
+    const actions = (resource!.resource as { action: Array<Record<string, unknown>> }).action;
+    expect(actions).toHaveLength(2);
+    // First branch carries an applicability condition; the otherwise does not.
+    expect(actions[0]!.condition).toBeDefined();
+    expect(actions[1]!.condition).toBeUndefined();
+    expect(actions[1]!.definitionCanonical).toBeDefined();
+  });
+
+  it("unresolved leaf under otherwise suppresses that branch but keeps surviving siblings", () => {
+    const d = decision(
+      "Cov",
+      [when("Excl", leaf(recommend("Deny"))), otherwise(leaf(recommend("Missing")))],
+      "first",
+    );
+    const onlyDeny: ActivityResolver = (ref) =>
+      (typeof ref === "string" ? ref : ref.name) === "Deny" ? RESOLVE_ACT_OK(ref) : null;
+    const { resource, unmatched } = emitDecisionPlanDefinition(
+      d, "Lib", METADATA, RESOLVE_ALL, onlyDeny, RESOLVE_DEC_OK, true, { clock: FIXED_CLOCK },
+    );
+    const actions = (resource!.resource as { action: Array<Record<string, unknown>> }).action;
+    expect(actions).toHaveLength(1); // otherwise suppressed, when survives
+    expect(unmatched.some((u) => u.kind === "unresolved-activity")).toBe(true);
+  });
+
+  it("first: nested block carries the crl-logical-switch extension (phase-1 stand-in)", () => {
+    const d = decision("Cov", [
+      when(
+        "C",
+        block("first", [
+          when("A", leaf(recommend("X"))),
+          when("B", leaf(recommend("Y"))),
+        ]),
+      ),
+    ]);
+    const { resource } = emitDecisionPlanDefinition(
+      d, "Lib", METADATA, RESOLVE_ALL, RESOLVE_ACT_OK, RESOLVE_DEC_OK, true, { clock: FIXED_CLOCK },
+    );
+    const action = (resource!.resource as { action: Array<Record<string, unknown>> }).action[0]!;
+    const ext = action.extension as Array<{ url: string; valueBoolean?: boolean }> | undefined;
+    expect(ext?.some((e) => e.url.endsWith("/crl-logical-switch") && e.valueBoolean === true)).toBe(true);
+  });
+
+  it("all: nested block carries NO extension (emit-neutral)", () => {
+    const d = decision("Cov", [
+      when(
+        "C",
+        block("all", [
+          when("A", leaf(recommend("X"))),
+          when("B", leaf(recommend("Y"))),
+        ]),
+      ),
+    ]);
+    const { resource } = emitDecisionPlanDefinition(
+      d, "Lib", METADATA, RESOLVE_ALL, RESOLVE_ACT_OK, RESOLVE_DEC_OK, true, { clock: FIXED_CLOCK },
+    );
+    const action = (resource!.resource as { action: Array<Record<string, unknown>> }).action[0]!;
+    expect(action.extension).toBeUndefined();
   });
 });

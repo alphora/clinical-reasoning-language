@@ -78,33 +78,47 @@ decisionStatement
     : DECISION decisionIdentifier COLON decisionBody
     ;
 
+// The top-level decision block: `when`/`otherwise` branches with an optional
+// leading qualifier (`first:` / `all:`). The qualifier is grammatically optional
+// — the validator requires it for a >1-branch block and rejects `any:` here. No
+// closer: the block ends at the next top-level declaration (same boundary the
+// former `whenBlock+` relied on).
 decisionBody
-    : whenBlock+
+    : blockQualifier? branchItem+
     ;
 
 // ============================
-// When Blocks and Actions
+// Branches, Blocks, and Actions
 // ============================
 //
-// A whenBlock covers a "when <concept> then ..." clause.
+// A branchItem is a `when <concept> then ...` clause or the `otherwise` catch-all.
+// `then <action>` is the inline single-action form (no closer); `then: <body>` is
+// the block form, always closed by `- end`.
 
-whenBlock
-    : DASH WHEN conceptReference THEN blockBody DASH END_WHEN         # WhenWithBody
-    | DASH WHEN conceptReference THEN actionStatement                 # WhenSingleAction
-    ;
-
-blockBody
-    : COLON ( anyOrAllClause? blockStatement+ )
-    ;
-
-anyOrAllClause
-    : ANY_BLOCK
+blockQualifier
+    : FIRST_BLOCK
+    | ANY_BLOCK
     | ALL_BLOCK
     ;
 
-blockStatement
-    : whenBlock                     # NestedWhenBlock
-    | DASH actionStatement          # BlockAction
+branchItem
+    : DASH WHEN conceptReference THEN blockBody              # WhenWithBody
+    | DASH WHEN conceptReference THEN actionStatement        # WhenSingleAction
+    | DASH OTHERWISE THEN blockBody                          # OtherwiseWithBody
+    | DASH OTHERWISE THEN actionStatement                    # OtherwiseSingleAction
+    ;
+
+// A nested `then:` block body. Homogeneous: branches XOR actions
+// (grammar-enforced). ALWAYS closed by `- end` — the mandatory closer is what
+// keeps the sibling boundary in `decisionBody`'s `branchItem+` unambiguous; do
+// NOT make it optional. `branchItem` starts `- when`/`- otherwise`, `actionItem`
+// starts `- recommend`/`- use`, and the closer is `- end` — all LL-distinct.
+blockBody
+    : COLON blockQualifier? ( branchItem+ | actionItem+ ) DASH END
+    ;
+
+actionItem
+    : DASH actionStatement
     ;
 
 actionStatement
@@ -401,7 +415,7 @@ narrative
 narrativeElement
     : qualifiableReference                                                                       # NConceptRef
     | quantity                                                                                   # NQuantity
-    | (AND | OR | NOT | WITH | LIBRARY | INCLUDE | AS | NARRATIVE_WORD | TIME_UNIT)              # NWord
+    | (AND | OR | NOT | WITH | LIBRARY | INCLUDE | AS | END | OTHERWISE | NARRATIVE_WORD | TIME_UNIT)  # NWord
     | argGroup                                                                                   # NArgGroupElement
     ;
 

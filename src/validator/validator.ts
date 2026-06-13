@@ -2,6 +2,7 @@ import { CRL } from "../ast/types";
 import type { SourceContext } from "../imports/scopes";
 
 import { CycleDetector } from "./cycleDetector";
+import { DecisionShapeValidator } from "./decisionShapeValidator";
 import { NameUniquenessValidator } from "./nameUniquenessValidator";
 import { ReferenceResolver } from "./referenceResolver";
 
@@ -33,7 +34,21 @@ export type ValidationErrorKind =
   | "reference-cycle"
   | "decision-delegation-cycle"
   | "external-library-not-included"
-  | "qualified-ref-unresolved";
+  | "qualified-ref-unresolved"
+  | "decision-shape";
+
+/**
+ * The specific decision-shape rule a `decision-shape` error violates. Lets
+ * consumers specialize without parsing message text. See docs/decision-shapes.md.
+ */
+export type DecisionShapeRule =
+  | "qualifier-required"
+  | "qualifier-on-single-member"
+  | "any-over-branches"
+  | "first-over-actions"
+  | "otherwise-misplaced"
+  | "otherwise-required"
+  | "otherwise-only";
 
 interface ValidationErrorBase {
   message: string;
@@ -79,6 +94,13 @@ export interface QualifiedRefUnresolvedError extends ValidationErrorBase {
   targetLibrary: string;
   targetName: string;
 }
+// Decision-shape structural rule violation (first/any/all/otherwise legality).
+// Never demoted under `soft` — a malformed decision shape is a structural
+// defect, not incomplete-but-fixable authoring state.
+export interface DecisionShapeError extends ValidationErrorBase {
+  kind: "decision-shape";
+  rule: DecisionShapeRule;
+}
 
 export type ValidationError =
   | EmptyNameError
@@ -87,7 +109,8 @@ export type ValidationError =
   | ReferenceCycleError
   | DecisionDelegationCycleError
   | ExternalLibraryNotIncludedError
-  | QualifiedRefUnresolvedError;
+  | QualifiedRefUnresolvedError
+  | DecisionShapeError;
 
 export interface ValidationResult {
   isValid: boolean;
@@ -125,11 +148,13 @@ export class Validator {
   private readonly nameUniquenessValidator: NameUniquenessValidator;
   private readonly referenceResolver: ReferenceResolver;
   private readonly cycleDetector: CycleDetector;
+  private readonly decisionShapeValidator: DecisionShapeValidator;
 
   constructor() {
     this.nameUniquenessValidator = new NameUniquenessValidator();
     this.referenceResolver = new ReferenceResolver();
     this.cycleDetector = new CycleDetector();
+    this.decisionShapeValidator = new DecisionShapeValidator();
   }
 
   /**
@@ -174,6 +199,10 @@ export class Validator {
     // Cycles — always an error (structural defect)
     const cycleResult = this.cycleDetector.validate(ast, sources);
     errors.push(...cycleResult);
+
+    // Decision-shape structural rules — always an error (never demoted)
+    const shapeResult = this.decisionShapeValidator.validate(ast, sources);
+    errors.push(...shapeResult);
 
     return {
       isValid: errors.length === 0,

@@ -41,28 +41,29 @@ surface rules. This file's structural variety:
 decision "CMS22 BP Control Strategy":
 
 - when "Patient Eligible For BP Cognitive Support" then:
+  all:
   - when "No BP Reading At This Encounter" then recommend activity "Measure BP".
   - when "Has Hypertensive Reading" then use decision "Recommend Hypertension Intervention".
   - when "Has Normal Reading With Hypertension On File" then recommend activity "Confirm Continued Control".
-- end when
+  - end
 
 // Hypertensive-reading sub-decision. CMS22 accepts any one of:
 // a medication order, a follow-up rescreen order, or a documented
 // lifestyle/dietary referral. `any:` says any one of these
 // recommendations satisfies the measure.
 decision "Recommend Hypertension Intervention":
-
+all:
 - when "Has Confirmed Hypertension Diagnosis" then:
   any:
   - recommend activity "Antihypertensive Medication".
   - recommend activity "Follow-up Rescreen".
   - recommend activity "Lifestyle Referral".
-- end when
+  - end
 - when "Hypertensive Reading Without Diagnosis" then:
   all:
   - recommend activity "Follow-up Rescreen".
   - recommend activity "Document Provisional Hypertension".
-- end when
+  - end
 - when "Has Antihypertensive Contraindication" then recommend activity "Contraindicated Antihypertensive".
 
 

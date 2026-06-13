@@ -35,7 +35,7 @@
  *     resolve locally via normalizeLocalRef.
  */
 
-import type { Activity, Concept, Decision, ReferenceName, Terminology, WhenBlock } from "../ast/types";
+import type { Activity, BranchBlock, Concept, Decision, ReferenceName, Terminology } from "../ast/types";
 import { getRefLibrary, getRefName, isQualifiedRef } from "../ast/types";
 import { computeFhirEmitClosure } from "../imports/computeEmitClosure";
 import { safeOutputFilename } from "../imports/safeOutputFilename";
@@ -219,8 +219,8 @@ function classifyClosureDecisions(
   for (const lib of libraries) {
     for (const dec of lib.decisions) {
       const edges = new Set<string>();
-      const visitWhenBlock = (wb: WhenBlock): void => {
-        const body = wb.body;
+      const visitBranch = (branch: BranchBlock): void => {
+        const body = branch.body;
         const visitUseDec = (ref: ReferenceName): void => {
           const normalized = normalizeLocalRef(ref, lib.libraryName);
           if (isQualifiedRef(normalized)) {
@@ -239,11 +239,11 @@ function classifyClosureDecisions(
           return;
         }
         for (const stmt of body.statements) {
-          if (stmt.type === "WhenBlock") visitWhenBlock(stmt);
+          if (stmt.type === "WhenBlock" || stmt.type === "OtherwiseBlock") visitBranch(stmt);
           else if (stmt.action.type === "UseDecision") visitUseDec(stmt.action.decisionName);
         }
       };
-      for (const wb of dec.body.statements) visitWhenBlock(wb);
+      for (const branch of dec.body.statements) visitBranch(branch);
       outgoing.set(qualifiedKey([lib.libraryName, dec.name]), edges);
     }
   }
