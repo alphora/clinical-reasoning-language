@@ -156,6 +156,22 @@ Author `.cel` facts + cases so each case asserts `result is "<decision>" is "<br
 - **Validate** with the `validate_cel` MCP tool (takes a `path`). (If a doc says there is no
   `validate_cel` tool, the doc is stale — the tool exists; grammar + tools are the source of truth.)
 
+### Step 5 — Review & learn (the vibe loop)
+A policy encoding is non-trivial + durable, so it runs the standard vibe cadence — the
+medical-policy agents are first-class participants, not a side path (see vibe-tools
+`protocols/contributing.md` §3):
+- **Review.** Run the consultant loop per the per-todo cadence: the external reviewers
+  (design/impl as applicable) **plus the `policy-encoding-reviewer` subagent** (clinical
+  + decision-shape + CRL/CEL-idiom critique). Process every point accept/refine/reject;
+  iterate to convergence.
+- **Discussion.** Log the round(s) in `.vibe-tools/discussions/<NNN>-<topic>.md` like any
+  other review.
+- **Retro / tuning.** At convergence, capture a retro. Route proposed patches per the
+  contribute-back protocol: patches to THIS skill or the `policy-encoding-reviewer`
+  (domain) land in the CRL repo (`.claude/skills/` / `.claude/agents/`, tracked); generic
+  patches (cadence, reviewer-format) go to vibe-tools. This is how the encoder + reviewer
+  get tuned over time.
+
 ## Worked few-shot — HCSC DME101.030 (Ultrasonic Osteogenesis Stimulator)
 
 Narrative (paraphrased): medically necessary when a fracture nonunion is documented AND the
