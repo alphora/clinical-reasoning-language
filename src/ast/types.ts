@@ -256,7 +256,13 @@ export interface Concept extends ASTNode {
   name: string;
   conceptType?: ConceptType;
   valueTypes: ConceptValueType[];
-  definition: ConceptDefinition;
+  // The concept's own local code (`- code is `…`.`). System = the package's
+  // local domain (implicit). Present => locally assertable; absent => read-only.
+  code?: string;
+  // Optional: a concept may be representations-only (no top-level definition).
+  definition?: ConceptDefinition;
+  // `possible representation:` entries (ADR 0001 §3). May be empty.
+  representations: Representation[];
   meta?: string[];
   evidence?: string;
   location: Location;
@@ -271,10 +277,22 @@ export type ConceptDefinition =
   | DefinedAsDefinition
   | DefinitionIsDefinition;
 
-// Coded from definition
+// Coded from definition — binds to a NAMED terminology / value set (an external
+// source). The concept's own local code lives on `Concept.code` (ADR 0001 §2).
 export interface CodedFromDefinition extends ASTNode {
   type: "CodedFromDefinition";
   terminologyName: ReferenceName;
+  location: Location;
+}
+
+// A `possible representation:` — an anonymous concept that inherits the
+// enclosing concept's fields except those it overrides (ADR 0001 §3). A
+// NON-LOCAL (external) source shape: `type` + a named `coded from`.
+export interface Representation extends ASTNode {
+  type: "Representation";
+  conceptType?: ConceptType;
+  valueTypes: ConceptValueType[];
+  terminologyName?: ReferenceName; // named coded-from
   location: Location;
 }
 

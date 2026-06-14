@@ -46,23 +46,24 @@ A concept (e.g. "Mammogram") has a single identity. Whether a value was supplied
   determined by the layer — which is intended, not a contradiction. `System` denotes the reasoning
   engine that computed the value, and is distinct from the `application` authority, which is an actor
   that **asserts** a value.)*
-- **Code domain** (*which* codes). `standardized` (a named `terminology`/value set) vs `local` (an inline
-  coding `coded from: - system is …. - code is ….`, no terminology object needed for a single local code).
+- **Code domain** (*which* codes). `standardized` (a named `terminology`/value set, via `coded from`) vs
+  `local` (the concept's own `- code is `…`.`; the system is the package's local domain, implicit — no
+  terminology object needed). The local code is the slot where local/user assertions land.
 
-### 3. `possible representation:`
-An anonymous concept that **inherits every field of the enclosing asserted concept except what it
-overrides** — shorthand for explicit source leaves without names or a hand-written union.
-- A representation's **structural identity = `{ type, value type, terminology }`** (where *terminology*
-  is a named value set **or** an inline `{ system, code }` — never a missing key).
-- It stays in the **asserted layer** (same clinical concept, many shapes).
-- The top-level `coded from` is the **base representation + defaults** (the base representation is
-  itself a member of the deduped source set); each `possible representation:` inherits the defaults and
-  may override; a field in a representation **replaces** the inherited one. A representation is written
-  in the **same concept-body syntax** (dashed statements) and states only what it adds/overrides —
-  inherited fields (`type`, `value type`, the default `coded from`) are omitted. The nesting is
-  **recursive**: a structured value is itself a block — an inline code is
-  `coded from: - system is …. - code is ….` (whereas a named reference stays inline,
-  `coded from "X"`).
+### 3. Local representation (`code is`) and source representations
+A concept's **own local representation** is its `- code is `…`.` — how it is coded in **our (local)
+domain**; the system is the package's local domain (implicit, not authored). It is where local/user
+assertions land. A concept **with** a `code is` is **locally assertable**; one **without** is
+**read-only**. The local representation is intrinsic — it is **not** a source representation.
+
+A **`source representation:`** is an anonymous concept describing a **non-local (external) source shape**
+of the *same* clinical concept. It **inherits every field of the enclosing concept except what it
+overrides** (written in concept-body dashed syntax; inherited fields omitted), and is external-only
+(`type` + a named `coded from`).
+- A representation's **structural identity = `{ type, value type, terminology }`**.
+- The top-level `coded from` is the **base representation + defaults** (itself a member of the deduped
+  source set); a `source representation:` that omits `coded from`/`type` inherits them; a field it
+  states **replaces** the inherited one.
 - A representation is **never independently nameable/referenceable** — it is reached only through
   resolution of the enclosing concept (this preserves B; a nameable partition would be A-ward drift).
 
@@ -122,13 +123,13 @@ The model operates under the **closed-world assumption**.
   being newer, recency lets it override a positive **in selection/predicate contexts** (not by being
   counted as a positive).
 
-### 8. Mixed concepts (assertable inferred concepts)
-A concept may carry **both** a `definition is` (calculation) **and** a `possible representation:`
-(explicit assertion-catch). Its value = **most-recent over { calculated value } ∪ { asserted records }**.
-This is how an *inferred* concept becomes directly assertable ("calculate as if 'High BMI'") without
-reconstructing leaves — the assertion is persisted and read back through the catch representation
-(origin `user`). Invariants:
-- the assertion-catch representation is **non-nameable** (§3) — so the concept keeps one identity (B);
+### 8. Mixed concepts (assertable derived / sourced concepts)
+A concept may carry a `definition is`/`defined as` (derivation) and/or `coded from`/`source
+representation:`s (external sources) **and** a `code is` (local). Its value = **most-recent over
+{ calculated value } ∪ { local-asserted records } ∪ { source records }**. The `code is` is how an
+*inferred* concept becomes directly assertable ("calculate as if 'High BMI'") — the assertion lands on
+the concept's **own local code**; no leaf reconstruction. Invariants:
+- the local code is the concept's **own** code, not a separate identity — keeps one identity (B);
 - candidate values **share the concept's declared value type / unit** (a coherent resolution set).
 Cross-level what-if states are intended (e.g. `BMI = 32` with an asserted `High BMI = false`); a KE
 policy knob (allow / prohibit / diagnostic) governs whether they are permitted. (Cycle risk is handled
@@ -153,23 +154,20 @@ never writes a representation's or a partition's name on the left-hand side of a
 terminology "Mammogram VS":                  - valueset is `http://example.org/screening/ValueSet/mammogram`.
 terminology "Mammogram DiagnosticReport VS": - valueset is `http://example.org/screening/ValueSet/mammogram-dr`.
 
-# ASSERTED layer — grouped by source class (top-level coded from = base rep + defaults)
+// external source groupings (source representations only; read-only)
 concept "Clinical Mammogram":
-- type is Observation.
-- coded from "Mammogram VS".
-- possible representation: - type is ImagingStudy.
-- possible representation: - type is DiagnosticReport. - coded from "Mammogram DiagnosticReport VS".
-- possible representation: - coded from: - system is `http://example.org/local`. - code is `mammogram`.
+- source representation: - type is ImagingStudy. - coded from "Mammogram VS".
+- source representation: - type is DiagnosticReport. - coded from "Mammogram DiagnosticReport VS".
 
 concept "Administrative Mammogram":
-- type is Observation.
-- possible representation: - type is Claim. - coded from "Mammogram VS".
-- possible representation: - type is ExplanationOfBenefit. - coded from "Mammogram VS".
-- possible representation: - coded from: - system is `http://example.org/local`. - code is `mammogram`.
+- coded from "Mammogram VS".
+- source representation: - type is Claim.
+- source representation: - type is ExplanationOfBenefit.
 
-# INFERRED layer — composition + derivations
+// locally coded (`code is`, system = the package) + composed
 concept "Mammogram":
 - type is Observation.
+- code is `mammogram`.
 - defined as ( "Clinical Mammogram" sem-or "Administrative Mammogram" ).
 
 concept "Most Recent Mammogram":
@@ -185,47 +183,48 @@ concept "Mammograms In Last Six Months":
 concept "Up To Date On Mammography":
 - type is Observation.
 - value type is boolean.
+- code is `up-to-date-on-mammography`.
 - definition is "Most Recent Mammogram" within last 27 months.
 ```
-The local Observation source, present in both groupings, collapses to one by the
-`{ type, value type, terminology }` key. Records are not deduped by CRL.
+`Mammogram` and `Up To Date On Mammography` are locally assertable (they have a `code is`); the source
+groupings are read-only. A local/user assertion lands on the concept's own `code is`; records are not
+deduped by CRL.
 
-## Example B — BMI (inference cascade; assertable at every level)
+## Example B — BMI (inference cascade; locally codable at every level)
 ```crl
-terminology "Height VS":   - valueset is `http://example.org/vitals/ValueSet/height`.
-terminology "Weight VS":   - valueset is `http://example.org/vitals/ValueSet/weight`.
+terminology "Height VS":    - valueset is `http://example.org/vitals/ValueSet/height`.
+terminology "Weight VS":    - valueset is `http://example.org/vitals/ValueSet/weight`.
 terminology "Clinical BMI": - valueset is `http://example.org/vitals/ValueSet/bmi`.
 
 concept "Height":
 - type is Observation.
 - value type is Quantity.
-- coded from "Height VS".
-- possible representation: - coded from: - system is `http://example.org/local`. - code is `height`.
+- code is `height`.
+- source representation: - coded from "Height VS".
 
 concept "Weight":
 - type is Observation.
 - value type is Quantity.
-- coded from "Weight VS".
-- possible representation: - coded from: - system is `http://example.org/local`. - code is `weight`.
+- code is `weight`.
+- source representation: - coded from "Weight VS".
 
 concept "BMI":
 - type is Observation.
 - value type is Quantity.
-- definition is "Weight" / ( "Height" * "Height" ).                              # computed
-- possible representation: - coded from "Clinical BMI".                          # directly recorded clinical BMI (origin clinical)
-- possible representation: - coded from: - system is `http://example.org/local`. - code is `bmi`.   # user assertion (origin user)
+- code is `bmi`.
+- definition is body mass index of "Weight" and "Height".
+- source representation: - coded from "Clinical BMI".
 
 concept "High BMI":
 - type is Observation.
 - value type is boolean.
-- definition is "BMI" >= 30 'kg/m2'.
-- possible representation: - coded from: - system is `http://example.org/local`. - code is `high-bmi`.
+- code is `high-bmi`.
+- definition is "BMI" at least 30 'kg/m2'.
 ```
-Cascade `High BMI ← BMI ← {Height, Weight}`. `BMI` is the fully-mixed form: it may be **computed**
-(from Height/Weight), **retrieved** (a directly recorded clinical BMI), or **asserted** (local) —
-most-recent over all three wins. Assert at any level; recency selects; a later source recompute can
-supersede an older assertion **only when all inputs it uses are newer than that assertion** (the
-recompute's as-of time is the oldest input), with provenance explaining. `BMI`/`High BMI` are mixed
+Cascade `High BMI ← BMI ← {Height, Weight}`. Each level has a `code is`, so it is assertable; `BMI` may
+be **computed** (from Height/Weight), **retrieved** (the clinical-BMI source representation), or
+**asserted** (local code) — most-recent wins. A later source recompute supersedes an older assertion
+**only when all inputs it uses are newer** (calc as-of = oldest input). `BMI`/`High BMI` are mixed
 concepts (§8).
 
 ## Consequences
@@ -238,8 +237,11 @@ concepts (§8).
   lowered level) — assess/keep parts deliberately; do not copy wholesale. (B) is the author-facing model
   it should lower *from*.
 
-## Deferred to the *how*-round
-Exact grammar for `possible representation:` and inline `coded from: - system is …. - code is ….`; the
-inheritance/override production details; the origin-derivation mapping (type/code-domain → authority);
-effective-vs-entry time semantics; local-code governance (scope/versioning); the narrative/expression
-grammar for `definition is …`; the KE policy-knob surface (§8); and the CRE + emit lowering.
+## Deferred to the *how*-round (execution half)
+The **authoring grammar is built** (`code is`, `source representation:`, `coded from`, mixed/reps-only
+concept bodies — grammar/AST/validator green). Deferred: the package **local-system URI** that backs
+`code is` (library-derived vs config); the **origin-derivation** mapping (type/code-domain → authority);
+effective-vs-entry time semantics; local-code governance (scope/versioning); the **catalog patterns /
+semantic interpretation** for derivation narratives (most-recent, count, arithmetic like "body mass
+index of", comparison like "at least") — the narrative *grammar* already parses these; the KE
+policy-knob surface (§8); and the CRE + emit lowering.

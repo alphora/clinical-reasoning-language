@@ -183,22 +183,29 @@ export function computeFhirEmitClosure(graph: ResolvedGraph): RegistryEntry[] {
 /* ─── ref-walker helpers (Concept / Decision / Activity) ─────────── */
 
 function visitConceptRefs(concept: Concept, visit: (ref: ReferenceName) => void): void {
-  switch (concept.definition.type) {
-    case "CodedFromDefinition":
-      visit(concept.definition.terminologyName);
-      return;
-    case "DefinedAsDefinition": {
-      const body = concept.definition.body;
-      if (body.type === "DefinedAsBareRef") {
-        visit(body.ref);
-      } else if (body.type === "DefinedAsComposition") {
-        visitComposition((body as DefinedAsComposition).expression, visit);
+  const def = concept.definition;
+  if (def) {
+    switch (def.type) {
+      case "CodedFromDefinition":
+        if (def.terminologyName) visit(def.terminologyName);
+        break;
+      case "DefinedAsDefinition": {
+        const body = def.body;
+        if (body.type === "DefinedAsBareRef") {
+          visit(body.ref);
+        } else if (body.type === "DefinedAsComposition") {
+          visitComposition((body as DefinedAsComposition).expression, visit);
+        }
+        break;
       }
-      return;
+      case "DefinitionIsDefinition":
+        visitNarrative(def.body, visit);
+        break;
     }
-    case "DefinitionIsDefinition":
-      visitNarrative(concept.definition.body, visit);
-      return;
+  }
+  // possible-representation named terminologies are part of the emit closure.
+  for (const rep of concept.representations ?? []) {
+    if (rep.terminologyName) visit(rep.terminologyName);
   }
 }
 
