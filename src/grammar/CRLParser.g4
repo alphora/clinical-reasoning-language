@@ -255,7 +255,30 @@ conceptBody
       (valueTypeLine)*
       (metaLine)*
       (evidenceLine)?
-      (codedFromLine | definedAsBody | definitionIsBody)
+      (codeIsLine)?
+      (codedFromLine | definedAsBody | definitionIsBody)?
+      sourceRepresentationLine*
+    ;
+
+// ============================
+// Source Representation (ADR 0001 §3)
+// ============================
+//
+// A `source representation:` is an anonymous concept describing a NON-LOCAL
+// (external) source shape of the same clinical concept. It INHERITS the
+// enclosing concept's fields except those it overrides; written in
+// concept-body (dashed) syntax; inherited fields omitted. (The concept's own
+// LOCAL representation is its `code is`.) Non-emptiness is a validator rule.
+//
+//   - source representation: - type is ImagingStudy.
+//   - source representation: - type is Claim.
+//
+sourceRepresentationLine
+    : DASH SOURCE_REPRESENTATION COLON representationBody
+    ;
+
+representationBody
+    : (typeLine)? (valueTypeLine)* (codedFromLine)?
     ;
 
 // ============================
@@ -306,8 +329,17 @@ evidenceLine
     : DASH EVIDENCE_IS backtickString DOT
     ;
 
+// `coded from` binds to a NAMED terminology / value set — an external source
+// (ADR 0001 §2). Used as a read-only base and inside possible representations.
 codedFromLine
     : DASH CODED_FROM terminologyReference DOT
+    ;
+
+// `code is` declares the concept's OWN local code. The system is the package's
+// local domain (implicit — not authored). Present => the concept is locally
+// assertable; absent => read-only. External codings use named `coded from`.
+codeIsLine
+    : DASH CODE_IS backtickString DOT
     ;
 
 // ============================

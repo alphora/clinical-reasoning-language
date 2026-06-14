@@ -12,6 +12,7 @@ META_IS             : 'meta is';
 DEFINED_AS          : 'defined as';
 CODED_FROM          : 'coded from';
 DEFINITION_IS       : 'definition is';
+SOURCE_REPRESENTATION : 'source representation';
 CODE_IS             : 'code is';
 SYSTEM_IS           : 'system is';
 VALUESET_IS         : 'valueset is';
@@ -202,6 +203,7 @@ CONCEPT_TYPE
         const validTypes = [
             'AdverseEvent',
             'AllergyIntolerance',
+            'Claim',
             'ClinicalImpression',
             'Communication',
             'CommunicationRequest',
@@ -212,9 +214,11 @@ CONCEPT_TYPE
             'DocumentReference',
             'Encounter',
             'EpisodeOfCare',
+            'ExplanationOfBenefit',
             'FamilyMemberHistory',
             'Flag',
             'Goal',
+            'ImagingStudy',
             'Immunization',
             'MedicationAdministration',
             'MedicationDispense',
@@ -299,6 +303,7 @@ PARAMETER_TYPE
             // Resources (mirrors CONCEPT_TYPE allowlist)
             'AdverseEvent',
             'AllergyIntolerance',
+            'Claim',
             'ClinicalImpression',
             'Communication',
             'CommunicationRequest',
@@ -309,9 +314,11 @@ PARAMETER_TYPE
             'DocumentReference',
             'Encounter',
             'EpisodeOfCare',
+            'ExplanationOfBenefit',
             'FamilyMemberHistory',
             'Flag',
             'Goal',
+            'ImagingStudy',
             'Immunization',
             'MedicationAdministration',
             'MedicationDispense',
