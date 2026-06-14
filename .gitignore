@@ -56,7 +56,12 @@ temp/
 # extensions; they hold local paths / generated blocks, not project source).
 /CLAUDE.md
 /.mcp.json
-.claude/
+# .claude/ holds per-machine provisioned files (settings.local.json, etc.) — ignored —
+# EXCEPT skills/ and agents/, which are versioned CRL-domain project tooling
+# (co-versioned with the grammar; see .claude/skills/encode-policy-to-crl, .claude/agents).
+.claude/*
+!.claude/skills/
+!.claude/agents/
 .cursor/
 
 
