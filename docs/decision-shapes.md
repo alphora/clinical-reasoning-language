@@ -4,6 +4,34 @@ How to structure a CRL `decision`: when does a branch fire, how do multiple
 branches or actions combine, and how to write the catch-all. The grammar and
 validator are the source of truth; this page is the authoring guide.
 
+## Why these qualifiers (not `if` / `then` / `else`)
+
+CRL decisions use explicit block qualifiers (`first:` / `all:` / `any:`) over
+`when` branches rather than `if` / `then` / `else`. The deciding reason is
+**structural**: `any:` / `all:` over *actions* are unavoidable — a recommendation
+routinely needs "offer any one of {MRI, CT}" or "do all of {communicate denial,
+record rationale}" (see the action-block examples below), and `if` / `then` /
+`else` has no native multi-action construct, so an `if`-based surface would
+*still* need `any:` / `all:` for actions. The real choice was therefore never
+"`first`/`all`/`any` vs `if`/`then`/`else`"; it was **one uniform vocabulary**
+(`when` + `first`/`all`/`any`, for both branches and actions) versus **two mental
+models** (`if`/`else` for branches, `any`/`all` for actions). The uniform surface
+wins on coherence.
+
+Secondary: the qualifier makes the **inclusive-vs-exclusive** choice explicit at
+the top of each block (`all:` = every match fires; `first:` = first match wins)
+instead of leaving it implicit in `if`-vs-`else-if` adjacency; and the dashless
+`end.` closer is context-free — nothing to mismatch — which suits agent authoring.
+
+This was reviewed against an `if`/`then`/`else` alternative, including an
+empirical agent-generation study. The study was **not** sufficient to justify an
+irreversible migration (small sample, single model family, generated-not-executed);
+the structural argument above carried the decision. Note also that the corpus's
+headline strategy decisions (`cms22-strategy`, `cms69-strategy`) are **guarded
+`all:` blocks of independent recommendations**, not `first:`/`otherwise` exclusive
+chains — so the most common real shape is the inclusive one, where `if`/`else`'s
+exclusive-chain familiarity helps least.
+
 ## The three qualifiers and the catch-all
 
 A `decision` body is a list of `when` branches. When more than one branch (or
@@ -29,9 +57,10 @@ Rules:
   `first:` decision (so every case reaches a disposition). In a *nested*
   `first:` block `otherwise` is optional (omit it when the inner branches are
   already exhaustive).
-- A `then:` body (the colon form) is always closed by `end`. The inline
-  single-action form (`- when "X" then recommend activity "Y".`) has no `then:`
-  and no closer.
+- A `then:` body (the colon form) is always closed by `end.` — a dashless,
+  context-free closer; the trailing period keeps every CRL line ending in `.`
+  (leaf) or `:` (opener). The inline single-action form
+  (`- when "X" then recommend activity "Y".`) has no `then:` and no closer.
 
 ## Good examples
 
