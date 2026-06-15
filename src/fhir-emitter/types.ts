@@ -43,6 +43,11 @@ import type { CRLError } from "../types/errors";
  *   unresolved-related-artifact                    error    An emitted Library's `relatedArtifact[depends-on]` URL is under canonicalBase but doesn't resolve to an emitted resource. (Todo 4)
  *   unresolved-definition-target                   error    An emitted PlanDef's `action.definitionCanonical` doesn't resolve to an emitted PlanDef/ActivityDef. (Todo 4)
  *   cli-cel-fhir-def-incompatible                  error    CLI: `.cel` input + `--target fhir-def` flag. (Todo 4)
+ *   missing-package-version                         error    package.json has no `version`. CRMI requires `version` 1..1 at the shareable floor.
+ *   invalid-emit-date                              error    `--date`/`opts.date`/`crl.date` is not a parseable date.
+ *   invalid-source-date-epoch                      error    `SOURCE_DATE_EPOCH` env is not a non-negative integer of epoch seconds (rejects ms-shaped values).
+ *   missing-publishable-date                       error    Publishable+ emit with no resolvable date (no --date/SOURCE_DATE_EPOCH/crl.date). Reproducibility is not opt-in.
+ *   executable-capability-unsupported              error    `--capability executable` requested, but emit produces design-time forms (text/cql, value-set compose), not run-time forms (ELM, expansion). Max is publishable. See #113.
  */
 
 /**
@@ -83,6 +88,113 @@ export interface CpgMetadata {
   experimental: boolean;
   jurisdiction: CodeableConcept[];
   useContext: UsageContext[];
+  /**
+   * Reproducible-emit managed publication date (`crl.date`, ISO). Authoritative
+   * source for the FHIR `date` when emitting at publishable+. Undefined when not
+   * declared; the date-resolution chain then falls back to env/clock.
+   */
+  crlDate?: string;
+  /**
+   * Targeted FHIR IG dependency versions (`crl.fhirDependencies`, e.g.
+   * `{ "hl7.fhir.uv.cpg": "2.0.0", "hl7.fhir.uv.crmi": "2.0.0-ballot" }`). Provenance / the FHIR-package assembly
+   * manifest's deps — NEVER stamped onto an emitted resource.
+   */
+  fhirDependencies?: Record<string, string>;
+}
+
+/**
+ * CRMI artifact capability levels (cumulative; shareable is the floor).
+ * Drives, as one gate: `meta.profile`, the `cqf-knowledgeCapability` list, and
+ * whether `date` is emitted (publishable+ per CRMI). `version` is required
+ * at the shareable floor → always emitted on definitional FHIR.
+ */
+export type Capability = "shareable" | "computable" | "publishable" | "executable";
+
+export const CAPABILITY_ORDER: readonly Capability[] = [
+  "shareable",
+  "computable",
+  "publishable",
+  "executable",
+];
+
+/** Cumulative capability list up to and including `level` (lattice order). */
+export function capabilitiesUpTo(level: Capability): Capability[] {
+  return CAPABILITY_ORDER.slice(0, CAPABILITY_ORDER.indexOf(level) + 1);
+}
+
+/** True when `level` is at or above publishable (i.e., `date` must be emitted). */
+export function isPublishablePlus(level: Capability): boolean {
+  return CAPABILITY_ORDER.indexOf(level) >= CAPABILITY_ORDER.indexOf("publishable");
+}
+
+export type CrmiProfileResource = "valueset" | "library" | "activitydefinition" | "plandefinition";
+
+const CRMI_SD_BASE = "http://hl7.org/fhir/uv/crmi/StructureDefinition";
+
+// CRMI 2.0.0-ballot: the `crmi-<level><resource>` profiles this emitter can
+// claim (verified from the hl7.fhir.uv.crmi#2.0.0-ballot package). Capped at
+// `publishable`: the `executable`-tier profiles (`crmi-executablelibrary` needs
+// compiled ELM; `crmi-expandedvalueset` needs a value-set `expansion`) require
+// run-time forms the emitter does not produce — emit rejects `--capability
+// executable` (see issue #113). `meta.profile` canonicals are unversioned.
+const CRMI_PROFILE_LEVELS: Record<CrmiProfileResource, readonly Capability[]> = {
+  valueset: ["shareable", "computable", "publishable"],
+  library: ["shareable", "computable", "publishable"],
+  activitydefinition: ["shareable", "publishable"],
+  plandefinition: ["shareable", "publishable"],
+};
+
+/**
+ * CRMI capability profiles for a resource, **additive** up to `level`: profiles
+ * accumulate as capability progresses (a publishable resource claims shareable +
+ * computable + publishable — whichever exist for the resource — not just the top
+ * one), mirroring the cumulative `cqf-knowledgeCapability` list.
+ */
+export function crmiCapabilityProfiles(resource: CrmiProfileResource, level: Capability): string[] {
+  const available = CRMI_PROFILE_LEVELS[resource];
+  return capabilitiesUpTo(level)
+    .filter((c) => available.includes(c))
+    .map((c) => `${CRMI_SD_BASE}/crmi-${c}${resource}`);
+}
+
+export type RepresentationLevel = "narrative" | "semi-structured" | "structured" | "executable";
+
+const FHIR_CORE_EXT_BASE = "http://hl7.org/fhir/StructureDefinition";
+const KNOWLEDGE_CAPABILITY_EXT = `${FHIR_CORE_EXT_BASE}/cqf-knowledgeCapability`;
+const KNOWLEDGE_REPRESENTATION_EXT = `${FHIR_CORE_EXT_BASE}/cqf-knowledgeRepresentationLevel`;
+
+/**
+ * `cqf-knowledgeCapability` (cumulative, per the CRMI shareable-profile
+ * `mustSupport` on EVERY artifact type — so emitted on all definitional
+ * resources, not just PlanDefinition) plus an optional
+ * `cqf-knowledgeRepresentationLevel`. Both are the FHIR-core `cqf-` extensions
+ * (NOT the CPG IG's `cpg-` variants): the CRMI shareable-profile `knowledgeCapability`
+ * slice binds the `cqf-knowledgeCapability` URL, so `cqf-` is the conformant choice
+ * for CRMI-targeted emit. Independent of the CRMI IG version.
+ *
+ * The capability codes are ORTHOGONAL to lifecycle-profile existence (CRMI binds
+ * the extension `0..* mustSupport`, no fixed code): the list may include e.g.
+ * `computable` even though no `crmi-computableplandefinition` profile exists. Do
+ * NOT reconcile this list with `crmiCapabilityProfiles`.
+ */
+export function knowledgeExtensions(
+  level: Capability,
+  representationLevel?: RepresentationLevel,
+): Array<{ url: string; valueCode: string }> {
+  // Never claim the `executable` capability code: the emitter produces
+  // design-time forms only (text/cql, value-set compose), not the run-time
+  // forms `executable` requires (ELM, expansion). Capped here as defense for
+  // direct per-resource callers (the emitFhirDefClosure boundary also rejects
+  // `--capability executable`). Lifted by #113 when ELM/expansion are produced.
+  const codes = capabilitiesUpTo(level).filter((c) => c !== "executable");
+  const ext: Array<{ url: string; valueCode: string }> = codes.map((c) => ({
+    url: KNOWLEDGE_CAPABILITY_EXT,
+    valueCode: c,
+  }));
+  if (representationLevel) {
+    ext.push({ url: KNOWLEDGE_REPRESENTATION_EXT, valueCode: representationLevel });
+  }
+  return ext;
 }
 
 export interface ContactPoint {
@@ -159,10 +271,30 @@ export interface UnmatchedReference {
 }
 
 /**
- * Δ8 — Emit options. `clock` is injected so tests get deterministic
- * timestamps. Default `() => new Date()` matches the natural emit-time
- * behavior.
+ * Emit options.
+ *
+ * Reproducible-emit date resolution (resolved ONCE at the `emitFhirDefFromPath`
+ * boundary, then carried internally): `date` → `SOURCE_DATE_EPOCH` env →
+ * `crl.date` (package.json) → `clock()` → wall clock. The resolved value is
+ * injected as `clock: () => resolved`, so the per-resource emitters stay
+ * unchanged. `clock` remains the test/override seam.
+ *
+ * `capability` selects the CRMI capability level (default `publishable`). It
+ * drives, on every definitional resource, the additive `meta.profile` set
+ * (`crmiCapabilityProfiles` — accumulates the lifecycle profiles that EXIST for
+ * the resource up to the level) and the `date` element (emitted at publishable+).
+ * It also drives the cumulative `cqf-knowledgeCapability` list (emitted on every
+ * definitional resource — `knowledgeExtensions`). Note these are not perfectly
+ * symmetric: the `knowledgeCapability` codes are orthogonal to profile existence
+ * (CRMI binds them `0..* mustSupport`, no fixed code), so a PlanDefinition can
+ * claim `computable` capability even though no `crmi-computableplandefinition`
+ * profile exists.
  */
 export interface EmitOptions {
+  /** Test/override seam: returns the emit-time date. */
   clock?: () => Date;
+  /** Explicit publication date override (ISO string or Date). Highest precedence. */
+  date?: string | Date;
+  /** CRMI capability level. Default `publishable`. */
+  capability?: Capability;
 }

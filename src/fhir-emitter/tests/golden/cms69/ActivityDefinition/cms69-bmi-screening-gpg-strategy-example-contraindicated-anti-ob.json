@@ -3,10 +3,31 @@
   "id": "cms69-bmi-screening-gpg-strategy-example-contraindicated-anti-ob",
   "meta": {
     "profile": [
-      "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-medicationrequestactivity"
+      "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-medicationrequestactivity",
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareableactivitydefinition",
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-publishableactivitydefinition"
     ]
   },
+  "extension": [
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "shareable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "computable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "publishable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeRepresentationLevel",
+      "valueCode": "structured"
+    }
+  ],
   "url": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/ActivityDefinition/cms69-bmi-screening-gpg-strategy-example-contraindicated-anti-ob",
+  "version": "1.0.0",
   "name": "Cms69BmiScreeningGpgStrategyExampleContraindicatedAntiObesityMedication",
   "title": "Contraindicated Anti-Obesity Medication",
   "status": "draft",

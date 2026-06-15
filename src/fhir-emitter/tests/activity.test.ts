@@ -80,8 +80,11 @@ describe("activity — emitActivityDefinition", () => {
     const r = resource!.resource as Record<string, unknown>;
     expect(r.resourceType).toBe("ActivityDefinition");
     expect(r.id).toBe("cms22-bp-control-cognitive-support-example-order-antihypertensiv");
+    // CPG activity profile + additive CRMI activitydefinition profiles (default publishable).
     expect((r.meta as { profile: string[] }).profile).toEqual([
       "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-medicationrequestactivity",
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareableactivitydefinition",
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-publishableactivitydefinition",
     ]);
     expect(r.url).toBe(
       `http://hl7.org/fhir/us/cqfmeasures/crl/cms22/ActivityDefinition/${r.id}`,
@@ -119,7 +122,11 @@ describe("activity — emitActivityDefinition", () => {
       expect(errors).toEqual([]);
       expect(resource).not.toBeNull();
       const r = resource!.resource as Record<string, unknown>;
-      expect((r.meta as { profile: string[] }).profile).toEqual([profile.profileUrl]);
+      expect((r.meta as { profile: string[] }).profile).toEqual([
+        profile.profileUrl,
+        "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareableactivitydefinition",
+        "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-publishableactivitydefinition",
+      ]);
       expect(r.kind).toBe(profile.kind);
       expect(r.profile).toBe(profile.targetProfile);
       expect(r.intent).toBe("proposal");

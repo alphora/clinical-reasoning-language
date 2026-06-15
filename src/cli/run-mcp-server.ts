@@ -400,7 +400,7 @@ export function createServer(): McpServer {
         "Closure walks from the file's nearest package.json. Returns a SUMMARY envelope by default to keep tool output small: " +
         "`{ success, resourceCount, resourceManifest:[{resourceType, id, relativePath, sourceKind, sourceName}], errors, unmatched, importDiagnostics, metadataErrors }`. " +
         "Pass `includeResources: true` to also receive the full `resources[]` array (each with the full FHIR JSON). " +
-        "The npm package owns the version — emitted resources carry NO `version` field. " +
+        "Emitted FHIR definitional resources carry `version` (sourced from the npm package.json — CRMI Shareable requires version 1..1) and, at publishable+ capability, a reproducible `date` (resolved from SOURCE_DATE_EPOCH env or package.json `crl.date`, else wall clock). Emitted CQL stays version-less. Default capability is publishable. " +
         "Decision actions using the CRL `any:` qualifier emit a `crl-logical-switch` extension URL whose corresponding StructureDefinition is not yet shipped (pending CPG ballot); strict validators may require an ignore-list for the URL until then. " +
         "Cross-library concept/terminology refs are unsupported in v0 (cascade-suppression surfaces via unresolved-* UnmatchedReference). Same-library qualified refs `\"CurrentLib\".\"X\"` still resolve. " +
         "Deliberate spec deviation: PlanDefinitions reference publishable-only sub-decisions via action.definitionCanonical (the published cpg-strategydefinition target-profile constraint is wrong; operator is amending the spec).",
@@ -410,9 +410,26 @@ export function createServer(): McpServer {
           .boolean()
           .optional()
           .describe("Include the full resources[] array in the result. Default false (summary only)."),
+        date: z
+          .string()
+          .min(1)
+          .optional()
+          .describe("Publication date (ISO) for reproducible emit. Highest precedence (over SOURCE_DATE_EPOCH env and package.json crl.date). Only stamped at publishable+."),
+        capability: z
+          .enum(["shareable", "computable", "publishable", "executable"])
+          .optional()
+          .describe("CRMI capability level (shareable|computable|publishable; default publishable). Gates date + meta.profile + knowledgeCapability together. `executable` is not yet supported (needs ELM/expansion — issue #113)."),
       },
     },
-    (args) => runEmitCrlFhir(args as { path: string; includeResources?: boolean }),
+    (args) =>
+      runEmitCrlFhir(
+        args as {
+          path: string;
+          includeResources?: boolean;
+          date?: string;
+          capability?: "shareable" | "computable" | "publishable" | "executable";
+        },
+      ),
   );
 
   server.registerTool(
@@ -443,7 +460,12 @@ export function createServer(): McpServer {
   return server;
 }
 
-function runEmitCrlFhir(args: { path: string; includeResources?: boolean }): {
+function runEmitCrlFhir(args: {
+  path: string;
+  includeResources?: boolean;
+  date?: string;
+  capability?: "shareable" | "computable" | "publishable" | "executable";
+}): {
   content: Array<{ type: "text"; text: string }>;
   isError?: boolean;
 } {
@@ -463,7 +485,10 @@ function runEmitCrlFhir(args: { path: string; includeResources?: boolean }): {
     };
   }
 
-  const result = emitFhirDefFromPath(args.path);
+  const result = emitFhirDefFromPath(args.path, {
+    ...(args.date !== undefined ? { date: args.date } : {}),
+    ...(args.capability !== undefined ? { capability: args.capability } : {}),
+  });
   const summary = {
     success: result.success,
     resourceCount: result.resources.length,

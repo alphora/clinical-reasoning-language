@@ -38,9 +38,9 @@ describe("library — emitLibrary", () => {
     expect(r.resourceType).toBe("Library");
     expect(r.id).toBe("cms22-asserted");
     expect(r.url).toBe("http://hl7.org/fhir/us/cqfmeasures/crl/cms22/Library/cms22-asserted");
-    // `version` deliberately not emitted — npm package owns the version
-    // (memory: feedback_no-version-on-emitted-artifacts). Assert absence.
-    expect(r.version).toBeUndefined();
+    // version sourced from package.json (CRMI requires `version` 1..1 at the
+    // shareable floor on emitted FHIR; npm package is authoritative).
+    expect(r.version).toBe("1.0.0");
     expect(r.name).toBe("Cms22Asserted");
     // v2.1 round-2: title is the per-Library name, not the package-level metadata.title.
     expect(r.title).toBe("CMS22 Asserted");
@@ -55,10 +55,14 @@ describe("library — emitLibrary", () => {
     expect(resource!.relativePath).toBe("Library/cms22-asserted.json");
   });
 
-  it("Library does NOT claim a meta.profile (no active CPG Library profile in the IG)", () => {
+  it("Library claims additive CRMI library profiles (default publishable)", () => {
     const { resource } = emitLibrary("CMS22 Asserted", METADATA, [], "cms22-asserted.cql", { clock: FIXED_CLOCK });
     const r = resource!.resource as Record<string, unknown>;
-    expect(r.meta).toBeUndefined();
+    expect((r.meta as { profile: string[] }).profile).toEqual([
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareablelibrary",
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-computablelibrary",
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-publishablelibrary",
+    ]);
   });
 
   it("relatedArtifact emits depends-on per ValueSet canonical, deduped + order-preserved", () => {

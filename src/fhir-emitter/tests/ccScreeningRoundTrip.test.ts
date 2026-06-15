@@ -184,7 +184,7 @@ describe("cc-screening round-trip — emit vs expected (loose comparator)", () =
     }
   });
 
-  it("no emitted PlanDef carries a `version` field (project-wide no-version rule)", () => {
+  it("every emitted PlanDef carries `version` from package.json (CRMI shareable floor)", () => {
     const parsed = parseFixtureCrl();
     const rec = emitRecommendationDefinitionsForLibrary(
       parsed.activities, parsed.libraryName, METADATA, { clock: FIXED_CLOCK },
@@ -193,7 +193,7 @@ describe("cc-screening round-trip — emit vs expected (loose comparator)", () =
       parsed.decisions, parsed.activities, parsed.concepts, parsed.libraryName, METADATA, { clock: FIXED_CLOCK },
     );
     for (const r of [...rec.resources, ...dec.resources]) {
-      expect((r.resource as Record<string, unknown>).version).toBeUndefined();
+      expect((r.resource as Record<string, unknown>).version).toBe("0.0.0");
     }
   });
 });

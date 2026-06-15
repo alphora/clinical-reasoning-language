@@ -17,12 +17,12 @@
  * groups in v0, so 1:1 is the natural map. Documented as Drift A in
  * the fixture README.
  *
- * Recommendation profile: `[cpg-recommendationdefinition,
- * crmi-publishableplandefinition]` (per #104 namespace fix), type
- * `eca-rule`. No `version`
- * field (per `feedback_no-version-on-emitted-artifacts` memory rule).
- * knowledgeCapability emits 3 (`shareable + computable + publishable`;
- * NOT `executable` per round-2 Gemini disposition — overclaim).
+ * Recommendation profile: `[cpg-recommendationdefinition, …additive CRMI
+ * plandefinition lifecycle profiles up to the target capability]` (per #104 +
+ * the additive-capability work), type `eca-rule`. `version` is stamped from
+ * package.json (CRMI Shareable requires it); `date` at publishable+.
+ * knowledgeCapability is the cumulative `capabilitiesUpTo(level)` list
+ * (default shareable + computable + publishable).
  *
  * Slug rule: `recommendation-id = capSlugForSuffix(<librarySlug>-
  * <activitySlug>, "-recommendation")`. The pre-cap base ≤ 49 chars
@@ -46,19 +46,10 @@ import type {
   EmittedResource,
   UnmatchedReference,
 } from "./types";
+import { crmiCapabilityProfiles, isPublishablePlus, knowledgeExtensions } from "./types";
 
 const CPG_BASE = "http://hl7.org/fhir/uv/cpg/StructureDefinition";
-// #104: see decision.ts for the namespace migration rationale. CRMI for
-// publishable-plan-definition lifecycle; FHIR-core cqf- for the knowledge*
-// extensions.
-const CRMI_BASE = "http://hl7.org/fhir/uv/crmi/StructureDefinition";
-const FHIR_CORE_EXT_BASE = "http://hl7.org/fhir/StructureDefinition";
-const REC_PROFILES: readonly string[] = [
-  `${CPG_BASE}/cpg-recommendationdefinition`,
-  `${CRMI_BASE}/crmi-publishableplandefinition`,
-];
-const KNOWLEDGE_CAPABILITY_EXT = `${FHIR_CORE_EXT_BASE}/cqf-knowledgeCapability`;
-const KNOWLEDGE_REPRESENTATION_EXT = `${FHIR_CORE_EXT_BASE}/cqf-knowledgeRepresentationLevel`;
+const REC_CPG_PROFILE = `${CPG_BASE}/cpg-recommendationdefinition`;
 const PLAN_DEFINITION_TYPE_CS = "http://terminology.hl7.org/CodeSystem/plan-definition-type";
 const ACTION_TYPE_CS = "http://terminology.hl7.org/CodeSystem/action-type";
 const CPG_COMMON_PROCESS_CS = "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs";
@@ -134,7 +125,8 @@ export function emitRecommendationDefinition(
     return { resource: null, errors, unmatched };
   }
 
-  const date = (opts.clock ?? defaultClock)().toISOString();
+  const level = opts.capability ?? "publishable";
+  const publishable = isPublishablePlus(level);
   const url = recommendationDefinitionCanonicalUrl(metadata.canonicalBase, libraryName, activity.name);
   const libraryUrl = libraryCanonicalUrl(metadata.canonicalBase, libraryName);
   const activityUrl = activityDefinitionCanonicalUrl(
@@ -146,21 +138,19 @@ export function emitRecommendationDefinition(
   const resource: Record<string, unknown> = {
     resourceType: "PlanDefinition",
     id,
-    meta: { profile: REC_PROFILES.slice() },
-    extension: [
-      { url: KNOWLEDGE_CAPABILITY_EXT, valueCode: "shareable" },
-      { url: KNOWLEDGE_CAPABILITY_EXT, valueCode: "computable" },
-      { url: KNOWLEDGE_CAPABILITY_EXT, valueCode: "publishable" },
-      { url: KNOWLEDGE_REPRESENTATION_EXT, valueCode: "structured" },
-    ],
+    meta: {
+      profile: [REC_CPG_PROFILE, ...crmiCapabilityProfiles("plandefinition", level)],
+    },
+    extension: knowledgeExtensions(level, "structured"),
     url,
-    // `version` deliberately omitted — npm package owns the version
-    // (memory: feedback_no-version-on-emitted-artifacts).
+    // version: CRMI requires `version` (1..1) at the shareable floor; from the
+    // npm package (authoritative).
+    version: metadata.version,
     name: computableName,
     title,
     status: metadata.status,
     experimental: metadata.experimental,
-    date,
+    ...(publishable ? { date: (opts.clock ?? defaultClock)().toISOString() } : {}),
     publisher: metadata.publisher,
     description,
     type: {

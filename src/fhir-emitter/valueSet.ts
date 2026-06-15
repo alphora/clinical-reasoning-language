@@ -25,6 +25,7 @@ import type { Terminology, TerminologyBodyLine } from "../ast/types";
 import type { CRLError } from "../types/errors";
 
 import { capSlug, pascalCaseName, slugify } from "./slug";
+import { crmiCapabilityProfiles, isPublishablePlus, knowledgeExtensions } from "./types";
 import type {
   CpgMetadata,
   EmitOptions,
@@ -32,12 +33,9 @@ import type {
   UnmatchedReference,
 } from "./types";
 
-// #104: shareable-valueset lifecycle profile moved from CPG STU1's uv/cpg
-// namespace to CRMI IG (uv/crmi) in CPG 2.0.0. Consumers should add
-// hl7.fhir.uv.crmi to their IG deps alongside the CPG package — CPG 2.0.0
-// itself does NOT declare a CRMI dependency.
-const PROFILE_URL =
-  "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareablevalueset";
+// #104: ValueSet lifecycle profiles live in the CRMI IG (uv/crmi); consumers add
+// hl7.fhir.uv.crmi to their IG deps alongside CPG. CRMI capability profiles are
+// ADDITIVE (shareable → +computable → +publishable) — see crmiCapabilityProfiles.
 
 /**
  * Emit one cpg-shareableValueSet from a single CRL Terminology.
@@ -96,7 +94,8 @@ export function emitValueSet(
     return { resource: null, errors, unmatched };
   }
 
-  const date = (opts.clock ?? defaultClock)().toISOString();
+  const level = opts.capability ?? "publishable";
+  const publishable = isPublishablePlus(level);
   const url = `${metadata.canonicalBase}/ValueSet/${id}`;
 
   const compose = buildCompose(terminology.body, terminology, unmatched);
@@ -104,16 +103,20 @@ export function emitValueSet(
   const resource: Record<string, unknown> = {
     resourceType: "ValueSet",
     id,
-    meta: { profile: [PROFILE_URL] },
+    meta: { profile: crmiCapabilityProfiles("valueset", level) },
+    // cqf-knowledgeCapability is mustSupport on the CRMI shareable ValueSet
+    // profile. No representationLevel — a value set is terminology, not logic.
+    extension: knowledgeExtensions(level),
     url,
-    // `version` deliberately omitted — npm package owns the version;
-    // applied at package time. See memory feedback_no-version-on-
-    // emitted-artifacts.
+    // version: CRMI requires `version` (1..1) at the shareable floor; sourced
+    // from the npm package (authoritative SoT).
+    version: metadata.version,
     name: computableName,
     title,
     status: metadata.status,
     experimental: metadata.experimental,
-    date,
+    // date: CRMI requires `date` only at publishable+ — omitted below that.
+    ...(publishable ? { date: (opts.clock ?? defaultClock)().toISOString() } : {}),
     publisher: metadata.publisher,
     description,
     compose,

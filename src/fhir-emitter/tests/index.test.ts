@@ -13,3 +13,4 @@ import "./corpusProbe.test";
 import "./ccScreeningRoundTrip.test";
 import "./closureOrchestrator.test";
 import "./emit-fhir-golden.test";
+import "./reproDate.test";

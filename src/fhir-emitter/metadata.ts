@@ -116,8 +116,39 @@ export function normalizePackageMetadata(raw: unknown): MetadataResult {
     return { metadata: null, errors };
   }
 
-  const version = typeof obj.version === "string" && obj.version.trim() ? obj.version.trim() : "0.0.0";
+  // CRMI requires `version` (1..1) at the shareable floor → it lands on every
+  // emitted definitional resource, sourced from the npm package (authoritative).
+  // Missing version is a hard error, not a "0.0.0" default.
+  const version = typeof obj.version === "string" && obj.version.trim() ? obj.version.trim() : "";
+  if (!version) {
+    errors.push({
+      type: "Validation",
+      kind: "missing-package-version",
+      message:
+        "package.json `version` is required — CRMI requires `version` (1..1) at the shareable level on emitted FHIR, and the npm package is the authoritative source of truth.",
+    });
+  }
   const name = typeof obj.name === "string" && obj.name.trim() ? obj.name.trim() : "";
+
+  // Reproducible-emit managed publication date (`crl.date`, ISO). Optional here;
+  // the date-resolution chain (env / clock) covers the rest. Validate parseability
+  // so a malformed value fails loudly at metadata load, not at serialization.
+  let crlDate: string | undefined;
+  if (crl.date !== undefined) {
+    if (typeof crl.date !== "string" || Number.isNaN(Date.parse(crl.date))) {
+      errors.push({
+        type: "Validation",
+        kind: "invalid-emit-date",
+        message: `\`crl.date\` must be a parseable ISO date string; got ${JSON.stringify(crl.date)}`,
+      });
+    } else {
+      crlDate = crl.date;
+    }
+  }
+
+  // Targeted FHIR IG dependency versions (`crl.fhirDependencies`) — provenance /
+  // assembly-manifest deps; NEVER stamped onto a resource.
+  const fhirDependencies = normalizeFhirDependencies(crl.fhirDependencies, errors);
 
   const rawDescription = typeof obj.description === "string" ? obj.description.trim() : "";
   const title = rawDescription ? rawDescription.split(/\r?\n/)[0]!.trim() : "";
@@ -131,8 +162,17 @@ export function normalizePackageMetadata(raw: unknown): MetadataResult {
   const jurisdiction = normalizeCodeableConceptList(crl.jurisdiction, "crl.jurisdiction", errors);
   const useContext = normalizeUseContextList(crl.useContext, errors);
 
-  // If any malformed-metadata error fired, abort — don't ship half-baked metadata.
-  if (errors.some((e) => e.kind === "malformed-crl-metadata")) {
+  // If any blocking metadata error fired, abort — don't ship half-baked metadata.
+  // A malformed `crl.date` blocks too: emitting with a silently-dropped managed
+  // date would defeat reproducibility.
+  if (
+    errors.some(
+      (e) =>
+        e.kind === "malformed-crl-metadata" ||
+        e.kind === "missing-package-version" ||
+        e.kind === "invalid-emit-date",
+    )
+  ) {
     return { metadata: null, errors };
   }
 
@@ -148,8 +188,43 @@ export function normalizePackageMetadata(raw: unknown): MetadataResult {
     experimental,
     jurisdiction,
     useContext,
+    ...(crlDate ? { crlDate } : {}),
+    ...(fhirDependencies ? { fhirDependencies } : {}),
   };
   return { metadata, errors };
+}
+
+/**
+ * Normalize `crl.fhirDependencies` — a flat map of FHIR IG package id → version
+ * string (e.g. `{ "hl7.fhir.uv.cpg": "2.0.0", "hl7.fhir.uv.crmi": "2.0.0-ballot" }`). Provenance only; not emitted.
+ * Returns undefined when absent; pushes `malformed-crl-metadata` on bad shape.
+ */
+function normalizeFhirDependencies(
+  raw: unknown,
+  errors: CRLError[],
+): Record<string, string> | undefined {
+  if (raw === undefined) return undefined;
+  if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
+    errors.push({
+      type: "Validation",
+      kind: "malformed-crl-metadata",
+      message: `\`crl.fhirDependencies\` must be an object of "<package-id>": "<version>"; got ${Array.isArray(raw) ? "array" : typeof raw}`,
+    });
+    return undefined;
+  }
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (typeof v !== "string" || !v.trim()) {
+      errors.push({
+        type: "Validation",
+        kind: "malformed-crl-metadata",
+        message: `\`crl.fhirDependencies["${k}"]\` must be a non-empty version string`,
+      });
+      continue;
+    }
+    out[k] = v.trim();
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
 }
 
 function normalizeStatus(
