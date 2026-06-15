@@ -190,28 +190,40 @@ export class ReferenceResolver {
   // ------------------------ concept body walk ---------------------------
 
   private walkConcept(concept: Concept, ctx: WalkContext, errors: ValidationError[]): void {
-    switch (concept.definition.type) {
-      case "CodedFromDefinition": {
-        const termRef = concept.definition.terminologyName;
-        this.checkRef(termRef, TERMINOLOGY_REF_KINDS, concept.definition.location, ctx, errors);
-        break;
-      }
-      case "DefinedAsDefinition": {
-        const body = concept.definition.body;
-        if (body.type === "DefinedAsBareRef") {
-          this.checkRef(body.ref, CONCEPT_REF_KINDS, body.location, ctx, errors);
-        } else if (body.type === "DefinedAsComposition") {
-          this.walkComposition(
-            (body as DefinedAsComposition).expression,
-            ctx,
-            errors,
-          );
+    const def = concept.definition;
+    if (def) {
+      switch (def.type) {
+        case "CodedFromDefinition": {
+          // Named coded-from resolves to a terminology; inline coding carries no ref.
+          if (def.terminologyName) {
+            this.checkRef(def.terminologyName, TERMINOLOGY_REF_KINDS, def.location, ctx, errors);
+          }
+          break;
         }
-        break;
+        case "DefinedAsDefinition": {
+          const body = def.body;
+          if (body.type === "DefinedAsBareRef") {
+            this.checkRef(body.ref, CONCEPT_REF_KINDS, body.location, ctx, errors);
+          } else if (body.type === "DefinedAsComposition") {
+            this.walkComposition(
+              (body as DefinedAsComposition).expression,
+              ctx,
+              errors,
+            );
+          }
+          break;
+        }
+        case "DefinitionIsDefinition":
+          this.walkNarrative(def.body, ctx, errors);
+          break;
       }
-      case "DefinitionIsDefinition":
-        this.walkNarrative(concept.definition.body, ctx, errors);
-        break;
+    }
+    // possible representations (ADR 0001 §3): validate named coded-from refs;
+    // inline codings carry no terminology reference.
+    for (const rep of concept.representations ?? []) {
+      if (rep.terminologyName) {
+        this.checkRef(rep.terminologyName, TERMINOLOGY_REF_KINDS, rep.location, ctx, errors);
+      }
     }
   }
 

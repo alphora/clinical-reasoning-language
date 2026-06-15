@@ -46,6 +46,7 @@ import {
 } from "./cpgActivityProfiles";
 import { libraryCanonicalUrl } from "./library";
 import { capSlug, pascalCaseName, slugify } from "./slug";
+import { crmiCapabilityProfiles, isPublishablePlus, knowledgeExtensions } from "./types";
 import type {
   CpgMetadata,
   EmitOptions,
@@ -146,7 +147,8 @@ export function emitActivityDefinition(
     return { resource: null, errors, unmatched };
   }
 
-  const date = (opts.clock ?? defaultClock)().toISOString();
+  const level = opts.capability ?? "publishable";
+  const publishable = isPublishablePlus(level);
   const url = activityDefinitionCanonicalUrl(metadata.canonicalBase, libraryName, activity.name);
   const libraryUrl = libraryCanonicalUrl(metadata.canonicalBase, libraryName);
 
@@ -155,14 +157,19 @@ export function emitActivityDefinition(
   const resource: Record<string, unknown> = {
     resourceType: "ActivityDefinition",
     id,
-    meta: { profile: [profile.profileUrl] },
+    meta: { profile: [profile.profileUrl, ...crmiCapabilityProfiles("activitydefinition", level)] },
+    // cqf-knowledgeCapability (mustSupport on the CRMI shareable AD profile) +
+    // representationLevel `structured` (matches the cc-screening reference).
+    extension: knowledgeExtensions(level, "structured"),
     url,
-    // `version` deliberately omitted — npm package owns the version.
+    // version: CRMI requires `version` (1..1) at the shareable floor; from the
+    // npm package (authoritative). date: CRMI requires it only at publishable+.
+    version: metadata.version,
     name: computableName,
     title,
     status: metadata.status,
     experimental: metadata.experimental,
-    date,
+    ...(publishable ? { date: (opts.clock ?? defaultClock)().toISOString() } : {}),
     publisher: metadata.publisher,
     description,
     library: [libraryUrl],

@@ -54,6 +54,7 @@ describe("recommendation — emitRecommendationDefinition", () => {
     expect(r.id).toBe("lib-colonoscopy-recommendation");
     expect((r.meta as { profile: string[] }).profile).toEqual([
       "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-recommendationdefinition",
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareableplandefinition",
       "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-publishableplandefinition",
     ]);
     expect(r.url).toBe("http://example.org/sdh/demo/PlanDefinition/lib-colonoscopy-recommendation");
@@ -81,12 +82,12 @@ describe("recommendation — emitRecommendationDefinition", () => {
     ]);
   });
 
-  it("does NOT emit a `version` field (no-version rule)", () => {
+  it("emits `version` from package.json (CRMI shareable floor)", () => {
     const { resource } = emitRecommendationDefinition(activity("X"), "Lib", METADATA, {
       clock: FIXED_CLOCK,
     });
     const r = resource!.resource as Record<string, unknown>;
-    expect(r.version).toBeUndefined();
+    expect(r.version).toBe("1.0.0");
   });
 
   it("wrapping action has groupingBehavior=logical-group + NO selectionBehavior + NO condition", () => {

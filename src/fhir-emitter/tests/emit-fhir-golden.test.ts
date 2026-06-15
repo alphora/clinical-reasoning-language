@@ -33,15 +33,15 @@ const CORPORA: Record<string, string> = {
   cms69: "cms69-split/cms69-strategy.crl",
 };
 
-// The FHIR-def emitter stamps `date` via the injectable EmitOptions.clock seam
-// (defaultClock = wall clock). The golden injects a FIXED clock so the output is
-// reproducible at the source — no test-side timestamp normalization needed.
+// Hermetic, reproducible emit: pass an explicit `date` override (highest
+// precedence — immune to SOURCE_DATE_EPOCH env and the corpus `crl.date`), so
+// the golden is stable regardless of environment. No test-side normalization.
 const FIXED_DATE = new Date("2020-01-01T00:00:00.000Z");
 const ser = (body: unknown): string => JSON.stringify(body, null, 2) + "\n";
 
 function emitCorpus(crlRel: string): { files: Map<string, string>; unmatched: string } {
   const r = emitFhirDefFromPath(path.join(REPO_ROOT, "src/tests/fixtures/corpus", crlRel), {
-    clock: () => FIXED_DATE,
+    date: FIXED_DATE,
   });
   if (r.errors.length) {
     throw new Error(`CRL→FHIR errors for ${crlRel}: ${JSON.stringify(r.errors)}`);

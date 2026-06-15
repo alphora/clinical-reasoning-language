@@ -9,9 +9,11 @@
  * declares the valueset identifiers referenced by the expression.
  *
  * Per `docs/cpg-ig-alignment.md` + plan v2.1 [060]:
- *   - The CPG IG has NO active Library profile (the cpg-shareable/computable/
- *     publishable-library FSH files are in `_unused-fsh/`). We emit base
- *     FHIR R4 Library without a CPG `meta.profile` claim.
+ *   - The CPG IG has no active Library profile, but CRMI does — we claim
+ *     the additive CRMI library lifecycle profiles (crmi-shareable/computable/
+ *     publishable-library, up to the target capability) via
+ *     `crmiCapabilityProfiles`. No CPG `meta.profile` claim. (The executable
+ *     tier — crmi-executablelibrary — needs ELM and is out of scope; see #113.)
  *   - `Library.type = #logic-library` (CodeableConcept from FHIR R4
  *     `library-type` valueset; CRL libraries contain CQL logic).
  *   - `Library.relatedArtifact[]` enumerates `depends-on` entries per
@@ -28,6 +30,7 @@
 
 import type { CRLError } from "../types/errors";
 import { capSlug, pascalCaseName, slugify } from "./slug";
+import { crmiCapabilityProfiles, isPublishablePlus, knowledgeExtensions } from "./types";
 import type {
   CpgMetadata,
   EmitOptions,
@@ -102,19 +105,28 @@ export function emitLibrary(
     return { resource: null, errors, unmatched };
   }
 
-  const date = (opts.clock ?? defaultClock)().toISOString();
+  const level = opts.capability ?? "publishable";
+  const publishable = isPublishablePlus(level);
   const url = libraryCanonicalUrl(metadata.canonicalBase, libraryName);
 
   const resource: Record<string, unknown> = {
     resourceType: "Library",
     id,
+    meta: { profile: crmiCapabilityProfiles("library", level) },
+    // cqf-knowledgeCapability (mustSupport on the CRMI shareable Library profile)
+    // + representationLevel `structured`: the Library carries CQL SOURCE (a
+    // `text/cql` attachment), which is structured-computable. `executable` is
+    // reserved for compiled ELM.
+    extension: knowledgeExtensions(level, "structured"),
     url,
-    // `version` deliberately omitted — npm package owns the version.
+    // version: CRMI requires `version` (1..1) at the shareable floor; from the
+    // npm package (authoritative). date: CRMI requires it only at publishable+.
+    version: metadata.version,
     name: computableName,
     title,
     status: metadata.status,
     experimental: metadata.experimental,
-    date,
+    ...(publishable ? { date: (opts.clock ?? defaultClock)().toISOString() } : {}),
     publisher: metadata.publisher,
     description,
     type: {

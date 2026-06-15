@@ -23,24 +23,19 @@ const CC_SCREENING = join(
   REPO_ROOT,
   "src/tests/fixtures/cpg-roundtrip/cc-screening-cognitive-support/cc-screening.crl",
 );
-const CMS22 = join(
-  REPO_ROOT,
-  "src/tests/fixtures/corpus/cms22-split/cms22-strategy.crl",
-);
-const CMS22_CEL = join(
-  REPO_ROOT,
-  "src/tests/fixtures/corpus/cms22-split/cms22-strategy.cel",
-);
+const CMS22 = join(REPO_ROOT, "src/tests/fixtures/corpus/cms22-split/cms22-strategy.crl");
+const CMS22_CEL = join(REPO_ROOT, "src/tests/fixtures/corpus/cms22-split/cms22-strategy.cel");
 
 function runCli(args: string[]): { exitCode: number; stdout: string; stderr: string } {
   // Use npx tsx via shell — tsx isn't a direct dep so we can't import its
   // loader as a bare module from the test harness. Shell overhead is ~1s
   // per run; acceptable for the small dispatch matrix.
-  const result = spawnSync(
-    "npx",
-    ["tsx", CLI, ...args],
-    { cwd: REPO_ROOT, encoding: "utf-8", timeout: 60_000, shell: true },
-  );
+  const result = spawnSync("npx", ["tsx", CLI, ...args], {
+    cwd: REPO_ROOT,
+    encoding: "utf-8",
+    timeout: 60_000,
+    shell: true,
+  });
   return {
     exitCode: result.status ?? -1,
     stdout: result.stdout ?? "",
@@ -117,7 +112,18 @@ describe("CLI dispatch matrix — `.crl + --target fhir-def` two-lane contract (
   it("cc-screening: CQL lane fails (placeholder narratives) → exit 1, neither <out-dir>/cql NOR <out-dir>/fhir written", () => {
     const { outDir, cleanup } = makeOutDir("cc-fail");
     try {
-      const r = runCli(["--path", CC_SCREENING, "--target", "fhir-def", "--out-dir", outDir]);
+      // --date so the FHIR lane passes its (publishable) date gate; this test
+      // isolates the CQL-lane failure as the atomic-abort trigger.
+      const r = runCli([
+        "--path",
+        CC_SCREENING,
+        "--target",
+        "fhir-def",
+        "--out-dir",
+        outDir,
+        "--date",
+        "2020-01-01T00:00:00.000Z",
+      ]);
       expect(r.exitCode).toBe(1);
       expect(r.stderr).toContain("cql-emit");
       expect(existsSync(join(outDir, "cql"))).toBe(false);
@@ -137,6 +143,30 @@ describe("CLI dispatch matrix — `.crl + --target fhir-def` two-lane contract (
       expect([0, 2]).toContain(r.exitCode);
       expect(existsSync(join(outDir, "cql"))).toBe(true);
       expect(existsSync(join(outDir, "fhir"))).toBe(true);
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("`--capability executable` → exit 1 (unsupported), neither lane written", () => {
+    const { outDir, cleanup } = makeOutDir("exec-reject");
+    try {
+      const r = runCli([
+        "--path",
+        CMS22,
+        "--target",
+        "fhir-def",
+        "--out-dir",
+        outDir,
+        "--date",
+        "2020-01-01T00:00:00.000Z",
+        "--capability",
+        "executable",
+      ]);
+      expect(r.exitCode).toBe(1);
+      expect(r.stderr).toContain("executable-capability-unsupported");
+      expect(existsSync(join(outDir, "cql"))).toBe(false);
+      expect(existsSync(join(outDir, "fhir"))).toBe(false);
     } finally {
       cleanup();
     }

@@ -262,6 +262,9 @@ export class CycleDetector {
     scope: LibraryScope | undefined,
     currentLibName: string,
   ): void {
+    // Reps-only concepts have no top-level definition; representations
+    // reference terminologies (not concepts), so they add no cycle edges.
+    if (!concept.definition) return;
     switch (concept.definition.type) {
       case "CodedFromDefinition":
         return;

@@ -4,11 +4,11 @@
  *
  * Per plan v3.2 [065] + #104 namespace fix:
  *   - Root CRL decision (no incoming `use decision` refs)
- *       → Strategy PlanDef with profiles `[cpg-strategydefinition,
- *         crmi-publishableplandefinition]`, type `workflow-definition`.
+ *       → Strategy PlanDef: `[cpg-strategydefinition, …additive CRMI
+ *         plandefinition profiles up to capability]`, type `workflow-definition`.
  *   - Sub CRL decision (referenced by ≥1 `use decision`)
- *       → Sub-decision PlanDef with profile `[crmi-publishableplandefinition]`
- *         only, type `eca-rule`. Matches the demo-content-r4
+ *       → Sub-decision PlanDef: the additive CRMI plandefinition profiles only
+ *         (no CPG strategy profile), type `eca-rule`. Matches the demo-content-r4
  *         "decisiontree" pattern (renamed conceptually to "decision").
  *
  * DELIBERATE SPEC DEVIATION 2026-06-04:
@@ -78,7 +78,9 @@ import { libraryCanonicalUrl } from "./library";
 import { recommendationDefinitionCanonicalUrl } from "./recommendation";
 import { capSlug, pascalCaseName, slugify } from "./slug";
 import { tarjanSCC } from "./tarjan";
+import { crmiCapabilityProfiles, isPublishablePlus, knowledgeExtensions } from "./types";
 import type {
+  Capability,
   CpgMetadata,
   EmitOptions,
   EmittedResource,
@@ -91,20 +93,19 @@ const CPG_BASE = "http://hl7.org/fhir/uv/cpg/StructureDefinition";
 // CPG 2.0.0 does NOT declare a CRMI dependency itself — consumers of these
 // emitted resources should add hl7.fhir.uv.crmi to their IG deps alongside
 // the CPG package (see USER_GUIDE §"Emitting FHIR Definition resources").
-const CRMI_BASE = "http://hl7.org/fhir/uv/crmi/StructureDefinition";
-// #104: knowledgeCapability + knowledgeRepresentationLevel are FHIR-core
-// extensions (cqf- prefix), NOT CPG-IG extensions. Resolves at
-// hl7.org/fhir/extensions with no IG dependency.
-const FHIR_CORE_EXT_BASE = "http://hl7.org/fhir/StructureDefinition";
-const STRATEGY_PROFILES: readonly string[] = [
-  `${CPG_BASE}/cpg-strategydefinition`,
-  `${CRMI_BASE}/crmi-publishableplandefinition`,
-];
-const SUBDECISION_PROFILES: readonly string[] = [
-  `${CRMI_BASE}/crmi-publishableplandefinition`,
-];
-const KNOWLEDGE_CAPABILITY_EXT = `${FHIR_CORE_EXT_BASE}/cqf-knowledgeCapability`;
-const KNOWLEDGE_REPRESENTATION_EXT = `${FHIR_CORE_EXT_BASE}/cqf-knowledgeRepresentationLevel`;
+// knowledgeCapability + knowledgeRepresentationLevel are FHIR-core `cqf-`
+// extensions, built by `knowledgeExtensions` in ./types.
+const STRATEGY_CPG_PROFILE = `${CPG_BASE}/cpg-strategydefinition`;
+
+// CRMI lifecycle profiles accumulate additively up to the capability level
+// (shareable → +publishable for PlanDefinition); strategy roots prepend the
+// CPG strategy profile.
+function planDefProfiles(isRoot: boolean, level: Capability): string[] {
+  return [
+    ...(isRoot ? [STRATEGY_CPG_PROFILE] : []),
+    ...crmiCapabilityProfiles("plandefinition", level),
+  ];
+}
 const PLAN_DEFINITION_TYPE_CS = "http://terminology.hl7.org/CodeSystem/plan-definition-type";
 const CPG_COMMON_PROCESS_CS = "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs";
 
@@ -298,7 +299,8 @@ export function emitDecisionPlanDefinition(
     }
   }
 
-  const date = (opts.clock ?? defaultClock)().toISOString();
+  const level = opts.capability ?? "publishable";
+  const publishable = isPublishablePlus(level);
   const url = planDefinitionCanonicalUrl(metadata.canonicalBase, libraryName, decision.name);
   const libraryUrl = libraryCanonicalUrl(metadata.canonicalBase, libraryName);
   const planTypeCode = isRoot ? "workflow-definition" : "eca-rule";
@@ -306,20 +308,17 @@ export function emitDecisionPlanDefinition(
   const resource: Record<string, unknown> = {
     resourceType: "PlanDefinition",
     id,
-    meta: { profile: (isRoot ? STRATEGY_PROFILES : SUBDECISION_PROFILES).slice() },
-    extension: [
-      { url: KNOWLEDGE_CAPABILITY_EXT, valueCode: "shareable" },
-      { url: KNOWLEDGE_CAPABILITY_EXT, valueCode: "computable" },
-      { url: KNOWLEDGE_CAPABILITY_EXT, valueCode: "publishable" },
-      { url: KNOWLEDGE_REPRESENTATION_EXT, valueCode: "structured" },
-    ],
+    meta: { profile: planDefProfiles(isRoot, level) },
+    extension: knowledgeExtensions(level, "structured"),
     url,
-    // `version` deliberately omitted — npm package owns the version.
+    // version: CRMI requires `version` (1..1) at the shareable floor; from the
+    // npm package (authoritative).
+    version: metadata.version,
     name: computableName,
     title,
     status: metadata.status,
     experimental: metadata.experimental,
-    date,
+    ...(publishable ? { date: (opts.clock ?? defaultClock)().toISOString() } : {}),
     publisher: metadata.publisher,
     description,
     type: {

@@ -144,18 +144,19 @@ describe("decision — emitDecisionPlanDefinition Strategy (isRoot=true)", () =>
     const r = resource!.resource as Record<string, unknown>;
     expect((r.meta as { profile: string[] }).profile).toEqual([
       "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-strategydefinition",
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareableplandefinition",
       "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-publishableplandefinition",
     ]);
     expect((r.type as { coding: Array<{ code: string }> }).coding[0]!.code).toBe("workflow-definition");
   });
 
-  it("does NOT emit version field (no-version rule)", () => {
+  it("emits `version` from package.json (CRMI shareable floor)", () => {
     const d = decision("Top", [when("C", leaf(recommend("A")))]);
     const { resource } = emitDecisionPlanDefinition(
       d, "Lib", METADATA, RESOLVE_ALL, RESOLVE_ACT_OK, RESOLVE_DEC_OK, true, { clock: FIXED_CLOCK },
     );
     const r = resource!.resource as Record<string, unknown>;
-    expect(r.version).toBeUndefined();
+    expect(r.version).toBe("1.0.0");
   });
 
   it("emits 3 knowledgeCapability extensions (NOT executable)", () => {
@@ -205,13 +206,14 @@ describe("decision — emitDecisionPlanDefinition Strategy (isRoot=true)", () =>
 });
 
 describe("decision — emitDecisionPlanDefinition Sub-decision (isRoot=false)", () => {
-  it("emits publishable-only profile + eca-rule type", () => {
+  it("emits additive CRMI plandefinition profiles (no CPG strategy profile) + eca-rule type", () => {
     const d = decision("Sub", [when("C", leaf(recommend("A")))]);
     const { resource } = emitDecisionPlanDefinition(
       d, "Lib", METADATA, RESOLVE_ALL, RESOLVE_ACT_OK, RESOLVE_DEC_OK, false, { clock: FIXED_CLOCK },
     );
     const r = resource!.resource as Record<string, unknown>;
     expect((r.meta as { profile: string[] }).profile).toEqual([
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareableplandefinition",
       "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-publishableplandefinition",
     ]);
     expect((r.type as { coding: Array<{ code: string }> }).coding[0]!.code).toBe("eca-rule");
@@ -471,7 +473,10 @@ describe("decision — emitDecisionPlanDefinitionsForLibrary", () => {
     const subR = byId.get("lib-sub")!;
     expect((rootR.meta as { profile: string[] }).profile).toContain("http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-strategydefinition");
     expect((subR.meta as { profile: string[] }).profile).not.toContain("http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-strategydefinition");
-    expect((subR.meta as { profile: string[] }).profile).toEqual(["http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-publishableplandefinition"]);
+    expect((subR.meta as { profile: string[] }).profile).toEqual([
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareableplandefinition",
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-publishableplandefinition",
+    ]);
   });
 
   it("Strategy → Sub-decision reference uses planDefinitionCanonicalUrl (byte-equality)", () => {

@@ -538,8 +538,10 @@ class Emitter {
         this.conceptNames.add(stmt.name);
         this.conceptType.set(stmt.name, stmt.conceptType);
         this.conceptValuetype.set(stmt.name, stmt.valueTypes?.[0]);
-        this.conceptBodyKind.set(stmt.name, stmt.definition.type);
-        this.conceptBody.set(stmt.name, stmt.definition);
+        if (stmt.definition) {
+          this.conceptBodyKind.set(stmt.name, stmt.definition.type);
+          this.conceptBody.set(stmt.name, stmt.definition);
+        }
       } else if (stmt.type === "Terminology" && stmt.name) {
         this.terminologyNames.add(stmt.name);
       }
@@ -742,7 +744,9 @@ class Emitter {
 
   private emitConcept(c: Concept): string {
     const header = `define ${cqlIdent(c.name)}:`;
-    const body = this.emitConceptBody(c, c.definition);
+    const body = c.definition
+      ? this.emitConceptBody(c, c.definition)
+      : "// TODO: representations-only concept (emit lowering deferred to how-round execution half)";
     // #108: emit `meta is` annotations as a leading block comment on the
     // concept's `define`. CRL preserves them on Concept.meta but the
     // emitter was dropping them silently. `@logic-expression-text`,

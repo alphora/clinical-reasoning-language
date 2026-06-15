@@ -58,7 +58,7 @@
     },
     {
       "name": "variable.language.element.crl",
-      "match": "(?<![\\w`\"])\\b(meta is|type is|value type is|param type is|evidence is|defined as|definition is|request|with|because|valueset is|system is|code is|coded from)\\b(?![\\w`\"])"
+      "match": "(?<![\\w`\"])\\b(meta is|type is|value type is|param type is|evidence is|defined as|definition is|request|with|because|valueset is|system is|code is|coded from|source representation)\\b(?![\\w`\"])"
     }
   ],
   "uuid": "cc3b5b42-2f43-4fa4-94cc-b2fae909c22a",

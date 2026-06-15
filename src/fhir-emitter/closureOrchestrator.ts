@@ -47,6 +47,7 @@ import { emitActivityDefinitionsForLibrary, type TerminologyResolver } from "./a
 import { emitDecisionPlanDefinition, type ActivityResolver, type ConceptResolver, type DecisionResolver } from "./decision";
 import { emitLibrary } from "./library";
 import { readPackageMetadata } from "./metadata";
+import { resolveEmitClock } from "./reproDate";
 import { emitRecommendationDefinitionsForLibrary } from "./recommendation";
 import { isFhirDefError } from "./types";
 import type { CpgMetadata, EmitOptions, EmittedResource, UnmatchedReference } from "./types";
@@ -481,6 +482,34 @@ export function emitFhirDefClosure(
   const unmatched: UnmatchedReference[] = [];
   const resources: EmittedResource[] = [];
 
+  // `executable` is not supported: emit produces design-time forms (text/cql
+  // Library content, value-set `compose`), not the run-time forms `executable`
+  // requires (compiled ELM, value-set `expansion`). Max capability = publishable.
+  // Tracked in #113.
+  if ((opts.capability ?? "publishable") === "executable") {
+    return {
+      success: false,
+      resources: [],
+      errors: [
+        {
+          type: "Validation",
+          kind: "executable-capability-unsupported",
+          message:
+            "`--capability executable` is not supported: CRL→FHIR emit produces design-time forms (text/cql Library content, value-set `compose`), not the run-time forms `executable` requires (compiled ELM for Library, an `expansion` for ValueSet). Max capability is `publishable`. Track: alphora/clinical-reasoning-language#113.",
+        },
+      ],
+      unmatched: [],
+    };
+  }
+
+  // Reproducible emit: resolve the publication date ONCE (opts.date →
+  // SOURCE_DATE_EPOCH → crl.date → clock → wall clock) and inject it as a fixed
+  // clock so every per-resource emitter stamps the identical timestamp with no
+  // intra-emit drift. Invalid explicit/env inputs surface as hard errors.
+  const { clock, errors: dateErrors } = resolveEmitClock(opts, metadata);
+  errors.push(...dateErrors);
+  const resolvedOpts: EmitOptions = { ...opts, clock };
+
   const expandedClosure = computeFhirEmitClosure(graph);
 
   // Filter out parse-error placeholders (null/empty names — parse-failure
@@ -529,7 +558,7 @@ export function emitFhirDefClosure(
     );
 
     // (1) ValueSets
-    const vsResult = emitValueSetsForLibrary(lib.terminologies, lib.libraryName, metadata, opts);
+    const vsResult = emitValueSetsForLibrary(lib.terminologies, lib.libraryName, metadata, resolvedOpts);
     resources.push(...vsResult.resources);
     errors.push(...vsResult.errors);
     unmatched.push(...vsResult.unmatched);
@@ -543,7 +572,7 @@ export function emitFhirDefClosure(
       metadata,
       emittedValueSetCanonicals,
       lib.cqlFileName,
-      opts,
+      resolvedOpts,
     );
     if (libResult.resource) {
       // Plan v3.2 §"emitLibrary post-decorate"
@@ -561,14 +590,14 @@ export function emitFhirDefClosure(
       lib.libraryName,
       metadata,
       sourceLibResolvers.terminologyResolver,
-      opts,
+      resolvedOpts,
     );
     resources.push(...actResult.resources);
     errors.push(...actResult.errors);
     unmatched.push(...actResult.unmatched);
 
     // (4) Recommendation PlanDefs
-    const recResult = emitRecommendationDefinitionsForLibrary(lib.activities, lib.libraryName, metadata, opts);
+    const recResult = emitRecommendationDefinitionsForLibrary(lib.activities, lib.libraryName, metadata, resolvedOpts);
     resources.push(...recResult.resources);
     errors.push(...recResult.errors);
     unmatched.push(...recResult.unmatched);
@@ -586,7 +615,7 @@ export function emitFhirDefClosure(
         sourceLibResolvers.activityResolver,
         sourceLibResolvers.decisionResolver,
         isRoot,
-        opts,
+        resolvedOpts,
       );
       if (decResult.resource) resources.push(decResult.resource);
       errors.push(...decResult.errors);

@@ -41,7 +41,7 @@ const ast = builder.visit(tree) as CRL;
 // v0.7: a predicate-kind concept is a `concept` with a `definition is` body.
 const predicateConcepts = ast.statements.filter(
   (s): s is Concept =>
-    s.type === "Concept" && s.definition.type === "DefinitionIsDefinition",
+    s.type === "Concept" && s.definition?.type === "DefinitionIsDefinition",
 );
 console.log(`Found ${predicateConcepts.length} definition-is concepts in ${filePath}\n`);
 

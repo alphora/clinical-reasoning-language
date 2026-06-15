@@ -103,6 +103,7 @@ export {
   isFhirDefError,
   isFhirDefWarning,
   writeFhirResources,
+  CAPABILITY_ORDER,
   type TerminologyResolver,
   type ConceptResolver,
   type ActivityResolver,
@@ -119,6 +120,7 @@ export type {
   FhirDefEmitResult,
   UnmatchedReference,
   MetadataResult,
+  Capability,
 } from "./fhir-emitter";
 export type {
   CEL,

@@ -1,0 +1,22 @@
+# Representation edge cases — local code + value-type override + multiline layout
+library "Representation Edge Cases".
+
+terminology "Serum Potassium VS":
+- valueset is `http://example.org/labs/ValueSet/potassium`.
+
+terminology "Serum Potassium Categorical VS":
+- valueset is `http://example.org/labs/ValueSet/potassium-categorical`.
+
+// Exercises the grammar corners:
+//   - a local code (`- code is`; system = the package's local domain)
+//   - a base `coded from` (external source) alongside the local code
+//   - a representation that OVERRIDES value type (base Quantity; categorical source is CodeableConcept)
+//   - the MULTILINE `possible representation:` form (layout-equivalent to the one-line form)
+concept "Serum Potassium":
+- type is Observation.
+- value type is Quantity.
+- code is `serum-potassium`.
+- coded from "Serum Potassium VS".
+- source representation:
+  - value type is CodeableConcept.
+  - coded from "Serum Potassium Categorical VS".

@@ -109,6 +109,7 @@ import {
   ArgValue,
   Location,
   ConceptValueType,
+  Representation,
 } from "./types";
 import type { CRL, LibraryDeclaration, Include, ReferenceName, QualifiedReference } from "./types";
 
@@ -584,19 +585,7 @@ export class CRLAstBuilder
     ctx: import("../grammar/generated/antlr/CRLParser").ConceptStatementContext,
   ): ConceptDefinition | null {
     if (bodyCtx.codedFromLine?.()) {
-      const codedFrom = bodyCtx.codedFromLine();
-      const termRefCtx = codedFrom?.terminologyReference?.();
-      if (!termRefCtx) {
-        this.reportError("AstError", ctx, {
-          message: "ConceptStatement: missing terminologyReference in codedFromLine",
-        });
-        return null;
-      }
-      return {
-        type: "CodedFromDefinition" as const,
-        terminologyName: refFromRefContext(termRefCtx),
-        location: getLocation(bodyCtx.codedFromLine()!),
-      };
+      return this.buildCodedFrom(bodyCtx.codedFromLine()!, ctx);
     } else if (bodyCtx.definedAsBody?.()) {
       const infCtx = bodyCtx.definedAsBody();
       if (!infCtx) {
@@ -615,12 +604,90 @@ export class CRLAstBuilder
         return null;
       }
       return this.visitDefinitionIsBody(logicCtx);
-    } else {
+    }
+    // No top-level definition body — valid only when representations exist;
+    // visitConceptStatement enforces "definition OR >=1 representation".
+    return null;
+  }
+
+  // `coded from` binds to a named terminology / value set (external source).
+  private buildCodedFrom(
+    codedFrom: import("../grammar/generated/antlr/CRLParser").CodedFromLineContext,
+    ctx: import("../grammar/generated/antlr/CRLParser").ConceptStatementContext,
+  ): ConceptDefinition | null {
+    const termRefCtx = codedFrom.terminologyReference?.();
+    if (!termRefCtx) {
       this.reportError("AstError", ctx, {
-        message: "ConceptStatement must have coded from, defined as, or definition is body",
+        message: "ConceptStatement: missing terminologyReference in codedFromLine",
       });
       return null;
     }
+    return {
+      type: "CodedFromDefinition" as const,
+      terminologyName: refFromRefContext(termRefCtx),
+      location: getLocation(codedFrom),
+    };
+  }
+
+  // The concept's own local code (`- code is `…`.`); the system is the package's
+  // local domain (implicit). Present => the concept is locally assertable.
+  private parseCode(
+    bodyCtx: import("../grammar/generated/antlr/CRLParser").ConceptBodyContext,
+  ): string | undefined {
+    const codeLine = bodyCtx.codeIsLine?.();
+    const bt = codeLine?.backtickString?.();
+    return bt?.text !== undefined ? bt.text.slice(1, -1) : undefined;
+  }
+
+  // Build the `possible representation:` entries — anonymous inheriting source
+  // shapes. Each is type/value-type/coded-from (named or inline); inherited
+  // fields are absent (ADR 0001 §3).
+  private parseRepresentations(
+    bodyCtx: import("../grammar/generated/antlr/CRLParser").ConceptBodyContext,
+  ): Representation[] {
+    const repLines = bodyCtx.sourceRepresentationLine?.() ?? [];
+    const reps: Representation[] = [];
+    for (const rl of repLines) {
+      const rb = rl.representationBody();
+      if (!rb) continue;
+
+      let conceptType: ConceptType | undefined;
+      const tl = rb.typeLine?.();
+      if (tl) {
+        try {
+          const tok = tl.CONCEPT_TYPE();
+          if (tok) conceptType = tok.text as ConceptType;
+        } catch {
+          conceptType = undefined;
+        }
+      }
+
+      const valueTypes: ConceptValueType[] = [];
+      for (const vtl of rb.valueTypeLine?.() ?? []) {
+        try {
+          const tok = vtl.CONCEPT_VALUE_TYPE();
+          if (tok) valueTypes.push(tok.text as ConceptValueType);
+        } catch {
+          // skip malformed value-type line
+        }
+      }
+
+      let terminologyName: ReferenceName | undefined;
+      const cf = rb.codedFromLine?.();
+      if (cf) {
+        const termRef = cf.terminologyReference?.();
+        if (termRef) terminologyName = refFromRefContext(termRef);
+      }
+
+      reps.push({
+        type: "Representation",
+        ...(conceptType ? { conceptType } : {}),
+        valueTypes,
+        ...(terminologyName ? { terminologyName } : {}),
+        location: getLocation(rl),
+      });
+    }
+    return reps;
   }
 
   visitParameterStatement(ctx: ParameterStatementContext): Parameter {
@@ -673,8 +740,14 @@ export class CRLAstBuilder
     const { conceptType, valueTypes } = types;
     const meta = this.parseMeta(bodyCtx);
     const evidence = this.parseEvidence(bodyCtx);
+    const code = this.parseCode(bodyCtx);
     const definition = this.parseConceptDefinition(bodyCtx, ctx);
-    if (!definition) {
+    const representations = this.parseRepresentations(bodyCtx);
+    if (!definition && representations.length === 0 && !code) {
+      this.reportError("AstError", ctx, {
+        message:
+          "ConceptStatement must have a local code, coded from, defined as, definition is, or at least one possible representation",
+      });
       return null as unknown as Concept;
     }
     return {
@@ -682,9 +755,11 @@ export class CRLAstBuilder
       name,
       ...(conceptType ? { conceptType } : {}),
       valueTypes,
+      ...(code ? { code } : {}),
       ...(meta.length > 0 ? { meta } : {}),
       ...(evidence ? { evidence } : {}),
-      definition,
+      ...(definition ? { definition } : {}),
+      representations,
       location: getLocation(ctx),
     };
   }

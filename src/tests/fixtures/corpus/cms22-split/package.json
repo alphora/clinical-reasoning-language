@@ -7,6 +7,8 @@
   "crl": {
     "canonicalBase": "http://hl7.org/fhir/us/cqfmeasures/crl/cms22",
     "status": "draft",
-    "experimental": true
+    "experimental": true,
+    "date": "2024-01-01T00:00:00.000Z",
+    "fhirDependencies": { "hl7.fhir.uv.cpg": "2.0.0", "hl7.fhir.uv.crmi": "2.0.0-ballot", "hl7.fhir.uv.extensions.r4": "5.1.0" }
   }
 }

@@ -1,0 +1,79 @@
+# Representation-model reference — Mammogram (multi-source) + BMI (cascade)
+library "Representation Examples".
+
+// ============ Terminologies (external systems / value sets) ============
+terminology "Mammogram VS":
+- valueset is `http://example.org/screening/ValueSet/mammogram`.
+
+terminology "Mammogram DiagnosticReport VS":
+- valueset is `http://example.org/screening/ValueSet/mammogram-dr`.
+
+terminology "Height VS":
+- valueset is `http://example.org/vitals/ValueSet/height`.
+
+terminology "Weight VS":
+- valueset is `http://example.org/vitals/ValueSet/weight`.
+
+terminology "Clinical BMI":
+- valueset is `http://example.org/vitals/ValueSet/bmi`.
+
+// ============ Mammogram — external source groupings (possible representations only; read-only) ============
+concept "Clinical Mammogram":
+- source representation: - type is ImagingStudy. - coded from "Mammogram VS".
+- source representation: - type is DiagnosticReport. - coded from "Mammogram DiagnosticReport VS".
+
+concept "Administrative Mammogram":
+- coded from "Mammogram VS".
+- source representation: - type is Claim. 
+- source representation: - type is ExplanationOfBenefit.
+
+// ============ Mammogram — locally coded (`code is`, system = the package) + composed ============
+concept "Mammogram":
+- type is Observation.
+- code is `mammogram`.
+- defined as ( "Clinical Mammogram" sem-or "Administrative Mammogram" ).
+
+concept "Most Recent Mammogram":
+- type is Observation.
+- value type is dateTime.
+- definition is most recent "Mammogram".
+
+concept "Mammograms In Last Six Months":
+- type is Observation.
+- value type is integer.
+- definition is count of "Mammogram" within last 6 months.
+
+// Two natural user-assertion points (assert at any level, ADR 0001 §8):
+//   - assert the EVENT ("Mammogram") → flows to most-recent, count, and up-to-date;
+//   - assert the BOOLEAN ("Up To Date On Mammography") → directly answers the screening question.
+concept "Up To Date On Mammography":
+- type is Observation.
+- value type is boolean.
+- code is `up-to-date-on-mammography`.
+- definition is "Most Recent Mammogram" within last 27 months.
+
+// ============ BMI cascade — locally coded at every level ============
+concept "Height":
+- type is Observation.
+- value type is Quantity.
+- code is `height`.
+- source representation: - coded from "Height VS".
+
+concept "Weight":
+- type is Observation.
+- value type is Quantity.
+- code is `weight`.
+- source representation: - coded from "Weight VS".
+
+concept "BMI":
+- type is Observation.
+- value type is Quantity.
+- code is `bmi`.
+- definition is body mass index of "Weight" and "Height".
+- source representation: - coded from "Clinical BMI".
+
+concept "High BMI":
+- type is Observation.
+- value type is boolean.
+- code is `high-bmi`.
+- definition is "BMI" at least 30 'kg/m2'.
