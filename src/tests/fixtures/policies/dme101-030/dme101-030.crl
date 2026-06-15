@@ -2,64 +2,52 @@
 library "Ultrasonic Osteogenesis Stimulator Coverage".
 
 /*
-Coverage model for ultrasonic osteogenesis stimulators. `first:` makes the
-decision branches ordered (first match wins): the three exclusions are tested
-before the approval branch so a denial wins by position, and `otherwise` is the
-catch-all disposition. See docs/decision-shapes.md.
+Prior-authorization coverage model for ultrasonic osteogenesis stimulators.
+`first:` makes the branches ordered (first match wins): the three exclusions are
+tested before the approval branch so a denial wins by position, and `otherwise`
+is the catch-all (deny). See docs/decision-shapes.md.
 
-The four conditions are modeled as asserted case-features — each `coded from` a
-value set and matched against patient facts (see dme101-030.cel). No Has/No
-concept pairs: the `first:` ordering + `otherwise` express the negative paths.
+Per the PA authoring approach:
+- the four conditions are local case-features, each carrying its own LOCAL domain
+  `code is` (no value sets / `coded from`, no terminology — source-representation
+  expansion is a later phase);
+- the dispositions are the shareable `Approve` / `Deny` determination activities.
 */
 
-// ============ Concepts (case-features) ============
+// ============ Concepts (local case-features) ============
 
 concept "Fracture Of Skull Or Vertebrae":
 - type is Condition.
-- coded from "Skull Or Vertebrae Fracture VS".
+- code is `skull-or-vertebrae-fracture`.
 
 concept "Tumor-Related Fracture":
 - type is Condition.
-- coded from "Tumor-Related Fracture VS".
+- code is `tumor-related-fracture`.
 
 concept "Concurrent Noninvasive Stimulator In Use":
 - type is Device.
-- coded from "Noninvasive Osteogenesis Stimulator VS".
+- code is `concurrent-noninvasive-stimulator`.
 
 concept "Documented Fracture Nonunion":
 - type is Condition.
-- coded from "Fracture Nonunion VS".
-
-// ============ Terminology ============
-
-terminology "Skull Or Vertebrae Fracture VS":
-- valueset is `http://example.org/dme101/ValueSet/skull-or-vertebrae-fracture-vs`.
-
-terminology "Tumor-Related Fracture VS":
-- valueset is `http://example.org/dme101/ValueSet/tumor-related-fracture-vs`.
-
-terminology "Noninvasive Osteogenesis Stimulator VS":
-- valueset is `http://example.org/dme101/ValueSet/noninvasive-osteogenesis-stimulator-vs`.
-
-terminology "Fracture Nonunion VS":
-- valueset is `http://example.org/dme101/ValueSet/fracture-nonunion-vs`.
+- code is `documented-fracture-nonunion`.
 
 // ============ Decision ============
 
 decision "Ultrasonic Osteogenesis Stimulator Coverage":
 first:
-- when "Fracture Of Skull Or Vertebrae" then recommend activity "Communicate Not Approved".
-- when "Tumor-Related Fracture" then recommend activity "Communicate Not Approved".
-- when "Concurrent Noninvasive Stimulator In Use" then recommend activity "Communicate Not Approved".
-- when "Documented Fracture Nonunion" then recommend activity "Communicate Approved".
-- otherwise then recommend activity "Communicate Not Approved".
+- when "Fracture Of Skull Or Vertebrae" then recommend activity "Deny".
+- when "Tumor-Related Fracture" then recommend activity "Deny".
+- when "Concurrent Noninvasive Stimulator In Use" then recommend activity "Deny".
+- when "Documented Fracture Nonunion" then recommend activity "Approve".
+- otherwise then recommend activity "Deny".
 
-// ============ Activities ============
+// ============ Activities (shareable PA determinations) ============
 
-activity "Communicate Approved":
+activity "Approve":
 - request CPGCommunicationRequest.
-- with `Ultrasonic osteogenesis stimulator may be considered medically necessary.`.
+- with `Prior authorization request approved.`.
 
-activity "Communicate Not Approved":
+activity "Deny":
 - request CPGCommunicationRequest.
-- with `Ultrasonic osteogenesis stimulator is not medically necessary.`.
+- with `Prior authorization request denied.`.

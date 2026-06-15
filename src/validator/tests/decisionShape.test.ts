@@ -202,8 +202,9 @@ activity "X":
 describe("dme101-030 fixture (the real authoring artifact)", () => {
   it("parses and has a valid decision shape (no decision-shape errors)", () => {
     // Guards the first real policy encoding against grammar/shape regressions.
-    // Concepts are now implemented as `coded from` case-features (see the .cel
-    // cases that assert against them); the decision SHAPE must stay clean.
+    // Concepts are local `code is` case-features (PA approach: local domain codes,
+    // no `coded from`/terminology — source-rep expansion is a later phase); the
+    // decision SHAPE must stay clean.
     const src = readFileSync(
       join(__dirname, "../../tests/fixtures/policies/dme101-030/dme101-030.crl"),
       "utf-8",
