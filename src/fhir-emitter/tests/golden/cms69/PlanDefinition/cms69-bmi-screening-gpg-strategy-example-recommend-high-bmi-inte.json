@@ -106,30 +106,6 @@
           "valueBoolean": true
         }
       ]
-    },
-    {
-      "title": "Has Anti-Obesity Medication Contraindication",
-      "description": "Has Anti-Obesity Medication Contraindication",
-      "code": [
-        {
-          "coding": [
-            {
-              "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
-              "code": "guideline-based-care"
-            }
-          ]
-        }
-      ],
-      "condition": [
-        {
-          "kind": "applicability",
-          "expression": {
-            "language": "text/cql-identifier",
-            "expression": "Has Anti-Obesity Medication Contraindication"
-          }
-        }
-      ],
-      "definitionCanonical": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/PlanDefinition/cms69-bmi-screening-gpg-strategy-example-contrain-recommendation"
     }
   ]
 }

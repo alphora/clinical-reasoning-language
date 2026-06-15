@@ -176,30 +176,6 @@
           "definitionCanonical": "http://hl7.org/fhir/us/cqfmeasures/crl/cms22/PlanDefinition/cms22-bp-control-cognitive-support-example-docume-recommendation"
         }
       ]
-    },
-    {
-      "title": "Has Antihypertensive Contraindication",
-      "description": "Has Antihypertensive Contraindication",
-      "code": [
-        {
-          "coding": [
-            {
-              "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
-              "code": "guideline-based-care"
-            }
-          ]
-        }
-      ],
-      "condition": [
-        {
-          "kind": "applicability",
-          "expression": {
-            "language": "text/cql-identifier",
-            "expression": "Has Antihypertensive Contraindication"
-          }
-        }
-      ],
-      "definitionCanonical": "http://hl7.org/fhir/us/cqfmeasures/crl/cms22/PlanDefinition/cms22-bp-control-cognitive-support-example-contra-recommendation"
     }
   ]
 }

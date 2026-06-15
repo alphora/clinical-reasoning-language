@@ -113,8 +113,13 @@ describe("corpus probe — cms22-strategy.crl", () => {
     expect(resourceCount).toBe(activities.length);
     // No emitter errors expected for the clean corpus.
     expect(errors).toBe(0);
-    // Corpus has the "Contraindicated Antihypertensive" do-not-perform variant.
-    expect(doNotPerformCount).toBeGreaterThan(0);
+    // The "Contraindicated Antihypertensive" do-not-perform card was removed
+    // when the contraindication moved to a per-action `unless` guard (the med
+    // is simply not offered when contraindicated — see discussion 082), so the
+    // strategy corpus no longer carries a do-not-perform activity.
+    // TODO: restore do-not-perform emit coverage with a dedicated example in a
+    // context where suppression is genuinely the recommendation.
+    expect(doNotPerformCount).toBe(0);
     // Corpus has free-text `with` cases (CPGCommunicationRequest activities
     // "Confirm Continued Control" + "Document Provisional Hypertension").
     expect(unmatchedWithTextCount).toBeGreaterThanOrEqual(2);
