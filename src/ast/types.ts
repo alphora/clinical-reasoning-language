@@ -155,10 +155,25 @@ export interface BlockBody extends ASTNode {
   location: Location;
 }
 
+// A per-action guard on a menu item: `unless "C"` drops the item when C holds;
+// `only when "C"` includes it only when C holds. An applicability polarity
+// (lowered at emit time, unless -> not), NOT a sem-* composition operator.
+// Legal only on action-block members (any:/all:), never on an inline
+// `when … then <action>` or `otherwise` (grammar-enforced).
+export type ActionGuardPolarity = "unless" | "only-when";
+
+export interface ActionGuard extends ASTNode {
+  type: "ActionGuard";
+  polarity: ActionGuardPolarity;
+  conceptName: ReferenceName;
+  location: Location;
+}
+
 // Action statement (do or use)
 export interface ActionStatement extends ASTNode {
   type: "ActionStatement";
   action: Action;
+  guard?: ActionGuard;
   location: Location;
 }
 

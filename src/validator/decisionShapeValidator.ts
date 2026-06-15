@@ -4,6 +4,7 @@ import type {
   BlockMember,
   BranchBlock,
   BlockQualifier,
+  ActionStatement,
   Location,
 } from "../ast/types";
 import type { SourceContext } from "../imports/scopes";
@@ -110,6 +111,22 @@ export class DecisionShapeValidator {
         location,
         attrib,
       );
+    }
+
+    // A per-action guard ('unless'/'only when') filters a menu, so it is only
+    // meaningful on a member of a multi-item action block. A lone action has no
+    // menu to subtract from — express the condition as a `when` branch instead.
+    if (!isBranchBlock && members.length === 1) {
+      const only = members[0] as ActionStatement;
+      if (only.guard) {
+        this.push(
+          errors,
+          "guard-on-single-action",
+          `A per-action guard ('unless'/'only when') is only meaningful on a menu member; a single action has no menu to subtract from. Use a 'when' branch (optionally over a composed concept) instead.`,
+          only.guard.location,
+          attrib,
+        );
+      }
     }
 
     // 2. Qualifier legality by context.

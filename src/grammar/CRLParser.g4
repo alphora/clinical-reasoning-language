@@ -103,9 +103,9 @@ blockQualifier
 
 branchItem
     : DASH WHEN conceptReference THEN blockBody              # WhenWithBody
-    | DASH WHEN conceptReference THEN actionStatement        # WhenSingleAction
+    | DASH WHEN conceptReference THEN actionStatement DOT    # WhenSingleAction
     | DASH OTHERWISE THEN blockBody                          # OtherwiseWithBody
-    | DASH OTHERWISE THEN actionStatement                    # OtherwiseSingleAction
+    | DASH OTHERWISE THEN actionStatement DOT                # OtherwiseSingleAction
     ;
 
 // A nested `then:` block body. Homogeneous: branches XOR actions
@@ -122,8 +122,22 @@ blockBody
     : COLON blockQualifier? ( branchItem+ | actionItem+ ) END DOT
     ;
 
+// An action-block member. The terminating `.` lives here (not on the action
+// statements) so that a per-action guard can sit before it. A guard is legal
+// ONLY here — never on an inline `when … then <action>` or on `otherwise`,
+// which keeps the catch-all unconditional and one condition slot per line.
 actionItem
-    : DASH actionStatement
+    : DASH actionStatement actionGuard? DOT
+    ;
+
+// Per-action guard: conditions a single menu item. `unless "C"` drops the item
+// when C holds; `only when "C"` includes it only when C holds. These are
+// applicability polarities lowered at emit time (unless -> not), NOT sem-*
+// composition operators (which live only in `defined as`). The guard reuses the
+// same condition resolution path as a `when` branch.
+actionGuard
+    : UNLESS conceptReference
+    | ONLY_WHEN conceptReference
     ;
 
 actionStatement
@@ -132,11 +146,11 @@ actionStatement
     ;
 
 recommendStatement
-    : RECOMMEND_ACTIVITY activityReference DOT
+    : RECOMMEND_ACTIVITY activityReference
     ;
 
 useStatement
-    : USE_DECISION decisionReference DOT
+    : USE_DECISION decisionReference
     ;
 
 // ============================
@@ -452,7 +466,7 @@ narrative
 narrativeElement
     : qualifiableReference                                                                       # NConceptRef
     | quantity                                                                                   # NQuantity
-    | (AND | OR | NOT | WITH | LIBRARY | INCLUDE | AS | END | OTHERWISE | NARRATIVE_WORD | TIME_UNIT)  # NWord
+    | (AND | OR | NOT | WITH | LIBRARY | INCLUDE | AS | END | OTHERWISE | UNLESS | ONLY_WHEN | NARRATIVE_WORD | TIME_UNIT)  # NWord
     | argGroup                                                                                   # NArgGroupElement
     ;
 

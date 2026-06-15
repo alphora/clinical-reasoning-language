@@ -8,6 +8,7 @@ import type { DecisionShapeError, ValidationError } from "../validator";
 import { Validator } from "../validator";
 
 import { parseInput } from "../../ast/tests/parseInput";
+import { createParser } from "../../parser/createParser";
 
 /**
  * Decision-shape structural rules (first/any/all/otherwise legality).
@@ -234,5 +235,97 @@ first:
     expect(shape.rule).toBe("otherwise-required");
     expect(shape.libraryName).toBe("Lib A");
     expect(shape.filePath).toBe("/proj/a.crl");
+  });
+});
+
+describe("per-action guards (unless / only when)", () => {
+  it("guarded menu items in an any: block are valid", () => {
+    expect(
+      shapeRules(`decision "D":
+- when "A" then:
+  any:
+  - recommend activity "X".
+  - recommend activity "Y" unless "C".
+  - recommend activity "Z" only when "E".
+  end.`),
+    ).toEqual([]);
+  });
+
+  it("guarded menu items in an all: block are valid", () => {
+    expect(
+      shapeRules(`decision "D":
+- when "A" then:
+  all:
+  - recommend activity "X" unless "C".
+  - recommend activity "Y".
+  end.`),
+    ).toEqual([]);
+  });
+
+  it("a guard on a single (menu-less) action is rejected", () => {
+    expect(
+      shapeRules(`decision "D":
+- when "A" then:
+  - recommend activity "X" unless "C".
+  end.`),
+    ).toEqual(["guard-on-single-action"]);
+  });
+});
+
+/** Count parser (syntax) errors — for grammar-placement assertions. */
+function parseErrorCount(src: string): number {
+  const { parser, parserErrorListener } = createParser(`# T\nlibrary "T".\n${src}`);
+  parser.crl();
+  return parserErrorListener.getErrors().length;
+}
+
+describe("per-action guard grammar placement", () => {
+  it("accepts guards on action-block members (recommend + use decision)", () => {
+    expect(
+      parseErrorCount(`decision "D":
+- when "A" then:
+  any:
+  - recommend activity "X" unless "C".
+  - use decision "Sub" only when "E".
+  end.`),
+    ).toBe(0);
+  });
+
+  it("rejects a guard on an inline when-action", () => {
+    expect(
+      parseErrorCount(`decision "D":
+- when "A" then recommend activity "X" unless "C".`),
+    ).toBeGreaterThan(0);
+  });
+
+  it("rejects a guard on an otherwise action", () => {
+    expect(
+      parseErrorCount(`decision "D":
+first:
+- when "A" then recommend activity "X".
+- otherwise then recommend activity "Y" unless "C".`),
+    ).toBeGreaterThan(0);
+  });
+
+  it("'unless' / 'only when' still parse as narrative words", () => {
+    expect(
+      parseErrorCount(`concept "X":
+- type is Observation.
+- definition is documented unless only when later.`),
+    ).toBe(0);
+  });
+});
+
+describe("per-action guard reference resolution", () => {
+  it("an unknown guard concept is an unresolved reference", () => {
+    const errs = validate(`decision "D":
+- when "A" then:
+  any:
+  - recommend activity "X".
+  - recommend activity "Y" unless "Ghost".
+  end.`);
+    expect(
+      errs.some((e) => e.kind === "unresolved-reference" && /Ghost/.test(e.message)),
+    ).toBe(true);
   });
 });

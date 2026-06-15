@@ -512,6 +512,12 @@ function emitBlockStatement(
   // ActionStatement at the body level (no enclosing WhenBlock condition).
   // Per CRL grammar this happens inside a BlockBody with no condition —
   // emit a bare action with definitionCanonical, no condition[].
+  //
+  // TODO (per-action guards — emit-lowering phase): a menu member may carry
+  // `stmt.guard` (an `unless` / `only when` applicability guard). It must lower
+  // to this action's `condition[kind=applicability]` (unless -> not, only when
+  // -> identity), mirroring the `when`-branch condition path in emitBranch.
+  // Guarded members currently emit WITHOUT their condition. See docs/decision-shapes.md.
   const leafResult = emitLeafAction(stmt.action, ctx);
   if (leafResult === null) return { kind: "suppressed", reason: "unresolved-ref" };
 

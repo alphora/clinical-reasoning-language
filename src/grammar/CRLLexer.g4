@@ -34,12 +34,14 @@ END          : 'end';
 INCLUDE      : 'include';
 LIBRARY      : 'library';
 NOT          : 'not';
+ONLY_WHEN    : 'only when';
 OR           : 'or';
 OTHERWISE    : 'otherwise';
 PARAMETER    : 'parameter';
 REQUEST      : 'request' -> mode(ACTIVITY_MODE);
 TERMINOLOGY  : 'terminology';
 THEN         : 'then';
+UNLESS       : 'unless';
 WHEN         : 'when';
 WITH         : 'with';
 

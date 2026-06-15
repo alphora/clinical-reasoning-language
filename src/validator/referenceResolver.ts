@@ -334,6 +334,11 @@ export class ReferenceResolver {
     } else if (action.type === "UseDecision") {
       this.checkRef(action.decisionName, DECISION_REF_KINDS, action.location, ctx, errors);
     }
+    // A per-action guard references a concept (same ref kinds as a `when`
+    // condition); resolve it so an unknown guard concept is a reference error.
+    if (stmt.guard) {
+      this.checkRef(stmt.guard.conceptName, CONCEPT_REF_KINDS, stmt.guard.location, ctx, errors);
+    }
   }
 
   // ------------------------ activity body walk --------------------------

@@ -268,6 +268,7 @@ function visitDecisionRefs(decision: Decision, visit: (ref: ReferenceName) => vo
       const action = body.action;
       if (action.type === "RecommendActivity") visit(action.activityName);
       else visit(action.decisionName);
+      if (body.guard) visit(body.guard.conceptName);
       return;
     }
     for (const stmt of body.statements) {
@@ -276,6 +277,7 @@ function visitDecisionRefs(decision: Decision, visit: (ref: ReferenceName) => vo
         const action = stmt.action;
         if (action.type === "RecommendActivity") visit(action.activityName);
         else visit(action.decisionName);
+        if (stmt.guard) visit(stmt.guard.conceptName);
       }
     }
   }

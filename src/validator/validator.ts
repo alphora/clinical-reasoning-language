@@ -48,7 +48,8 @@ export type DecisionShapeRule =
   | "first-over-actions"
   | "otherwise-misplaced"
   | "otherwise-required"
-  | "otherwise-only";
+  | "otherwise-only"
+  | "guard-on-single-action";
 
 interface ValidationErrorBase {
   message: string;

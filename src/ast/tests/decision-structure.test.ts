@@ -45,6 +45,28 @@ decision "IMMZ.D2.D5.Measles":
     expect(nestedBlockBody.statements).toHaveLength(2);
   });
 
+  it("attaches a per-action guard (unless / only when) to menu members", () => {
+    const input = `# Test
+library "Test".
+decision "Menu":
+- when "Eligible" then:
+  any:
+  - recommend activity "Referral".
+  - recommend activity "Medication" unless "Has Contraindication".
+  - recommend activity "Trial" only when "In Study".
+  end.`;
+
+    const decision = parseInput(input).statements[0] as Decision;
+    const menu = (decision.body.statements[0] as WhenBlock).body as BlockBody;
+    const [referral, med, trial] = menu.statements as ActionStatement[];
+
+    expect(referral.guard).toBeUndefined();
+    expect(med.guard?.polarity).toBe("unless");
+    expect(med.guard?.conceptName).toBe("Has Contraindication");
+    expect(trial.guard?.polarity).toBe("only-when");
+    expect(trial.guard?.conceptName).toBe("In Study");
+  });
+
   it("should handle single action statements", () => {
     const input = `# Test
 library "Test".

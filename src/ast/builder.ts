@@ -10,6 +10,7 @@ import {
   BlockQualifierContext,
   ActionItemContext,
   ActionStatementContext,
+  ActionGuardContext,
   RecommendStatementContext,
   UseStatementContext,
   TerminologyStatementContext,
@@ -72,6 +73,8 @@ import {
   BlockQualifier,
   BlockBody,
   ActionStatement,
+  ActionGuard,
+  ActionGuardPolarity,
   RecommendActivity,
   UseDecision,
   Terminology,
@@ -337,7 +340,22 @@ export class CRLAstBuilder
   }
 
   visitActionItem(ctx: ActionItemContext): ActionStatement {
-    return this.visit(ctx.actionStatement()) as ActionStatement;
+    const stmt = this.visit(ctx.actionStatement()) as ActionStatement;
+    const guardCtx = ctx.actionGuard();
+    if (guardCtx) {
+      stmt.guard = this.buildActionGuard(guardCtx);
+    }
+    return stmt;
+  }
+
+  private buildActionGuard(ctx: ActionGuardContext): ActionGuard {
+    const polarity: ActionGuardPolarity = ctx.UNLESS() ? "unless" : "only-when";
+    return {
+      type: "ActionGuard",
+      polarity,
+      conceptName: refFromRefContext(ctx.conceptReference()),
+      location: getLocation(ctx),
+    };
   }
 
   visitActionStatement(ctx: ActionStatementContext): ActionStatement {
