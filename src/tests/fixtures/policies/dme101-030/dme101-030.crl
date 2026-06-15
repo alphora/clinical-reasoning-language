@@ -2,11 +2,49 @@
 library "Ultrasonic Osteogenesis Stimulator Coverage".
 
 /*
-STEP 1 — decision points only. The concepts referenced here are stubs,
-implemented in step 3. `first:` makes the branches ordered (first match wins);
-the exclusions are tested before the approval branch so a denial wins by
-position, and `otherwise` is the catch-all disposition. See docs/decision-shapes.md.
+Coverage model for ultrasonic osteogenesis stimulators. `first:` makes the
+decision branches ordered (first match wins): the three exclusions are tested
+before the approval branch so a denial wins by position, and `otherwise` is the
+catch-all disposition. See docs/decision-shapes.md.
+
+The four conditions are modeled as asserted case-features — each `coded from` a
+value set and matched against patient facts (see dme101-030.cel). No Has/No
+concept pairs: the `first:` ordering + `otherwise` express the negative paths.
 */
+
+// ============ Concepts (case-features) ============
+
+concept "Fracture Of Skull Or Vertebrae":
+- type is Condition.
+- coded from "Skull Or Vertebrae Fracture VS".
+
+concept "Tumor-Related Fracture":
+- type is Condition.
+- coded from "Tumor-Related Fracture VS".
+
+concept "Concurrent Noninvasive Stimulator In Use":
+- type is Device.
+- coded from "Noninvasive Osteogenesis Stimulator VS".
+
+concept "Documented Fracture Nonunion":
+- type is Condition.
+- coded from "Fracture Nonunion VS".
+
+// ============ Terminology ============
+
+terminology "Skull Or Vertebrae Fracture VS":
+- valueset is `http://example.org/dme101/ValueSet/skull-or-vertebrae-fracture-vs`.
+
+terminology "Tumor-Related Fracture VS":
+- valueset is `http://example.org/dme101/ValueSet/tumor-related-fracture-vs`.
+
+terminology "Noninvasive Osteogenesis Stimulator VS":
+- valueset is `http://example.org/dme101/ValueSet/noninvasive-osteogenesis-stimulator-vs`.
+
+terminology "Fracture Nonunion VS":
+- valueset is `http://example.org/dme101/ValueSet/fracture-nonunion-vs`.
+
+// ============ Decision ============
 
 decision "Ultrasonic Osteogenesis Stimulator Coverage":
 first:
@@ -15,6 +53,8 @@ first:
 - when "Concurrent Noninvasive Stimulator In Use" then recommend activity "Communicate Not Approved".
 - when "Documented Fracture Nonunion" then recommend activity "Communicate Approved".
 - otherwise then recommend activity "Communicate Not Approved".
+
+// ============ Activities ============
 
 activity "Communicate Approved":
 - request CPGCommunicationRequest.
