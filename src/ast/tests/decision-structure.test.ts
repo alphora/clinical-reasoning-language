@@ -26,7 +26,7 @@ decision "IMMZ.D2.D5.Measles":
             - when "No Primary Series Doses Administered" then:
                 - when "Client Age Less Than 12 Months" then recommend activity "Indicate".
                 - when "Last Live Vaccine Administered has had in 4 Weeks" then use decision "Elderly Based".
-            end
+            end.
             - when "Client Is Due For MCV12" then recommend activity "Vaccinate".
         end`;
 
@@ -107,7 +107,7 @@ decision "Test Decision":
     - when "Age" then:
         - recommend activity "Vaccinate".
         - use decision "Protocol".
-    end
+    end.
     - when "Condition" then recommend activity "Action".`;
 
     const result = parseInput(input);
@@ -143,7 +143,7 @@ decision "IMMZ.D2.D5.Measles":
         - when "No Primary Series Doses Administered" then:
             - when "Client Age Less Than 12 Months" then recommend activity "Indicate".
             - when "Last Live Vaccine Administered has had in 4 Weeks" then use decision "Elderly Based".
-        end
+        end.
         - when "Client Is Due For MCV12" then recommend activity "Vaccinate".
     end`;
 
@@ -188,7 +188,7 @@ decision "Elderly Based":
         - when "Most Recent BMI" then:
             - use decision "Some Other Decision".
             - use decision "Some Other Other Decision".
-        end
+        end.
     end`;
 
     const result = parseInput(input);
@@ -212,15 +212,15 @@ decision "IMMZ.D2.D5.Measles":
         - when "No Primary Series Doses Administered" then:
             - when "Client Age Less Than 12 Months" then recommend activity "Indicate".
             - when "Last Live Vaccine Administered has had in 4 Weeks" then use decision "Elderly Based".
-        end
+        end.
         - when "Client Is Due For MCV12" then recommend activity "Vaccinate".
-    end
+    end.
     - when "One Primary Series Dose Administered" then:
         all:
         - when "Client Age Less Than 15 Months" then recommend activity "Indicate".
         - when "Last Live Vaccine Administered has had in 4 Weeks" then use decision "Elderly Based".
         - when "Client Is Due For MCV12" then recommend activity "Vaccinate".
-    end
+    end.
     - when "Two Primary Series Doses Administered" then recommend activity "Indicate".`;
 
     const result = parseInput(input);

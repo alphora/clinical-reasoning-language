@@ -68,7 +68,7 @@ first:
   any:
   - recommend activity "X".
   - recommend activity "Y".
-  end
+  end.
 - otherwise then recommend activity "Z".`),
       ).toEqual([]);
     });
@@ -88,7 +88,7 @@ first:
   first:
   - when "B" then recommend activity "X".
   - when "C" then recommend activity "Y".
-  end
+  end.
 - otherwise then recommend activity "Z".`),
       ).toEqual([]);
     });

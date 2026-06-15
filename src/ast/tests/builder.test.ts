@@ -70,12 +70,12 @@ library "Test".
             any:
               - when "High" then recommend activity "Record High Temp".
               - when "Low" then recommend activity "Record Low Temp".
-          end
+          end.
           - when "Blood Pressure" then:
             all:
               - when "Systolic High" then recommend activity "Record Systolic".
               - when "Diastolic High" then recommend activity "Record Diastolic".
-          end
+          end.
         `;
 
       const result = parseInput(input);
@@ -98,7 +98,7 @@ library "Test".
           decision "Test":
             - when "Concept" then:
               - recommend activity "Activity".
-            end
+            end.
         `;
 
         const result = parseInput(input);
@@ -119,7 +119,7 @@ library "Test".
             - when "Concept" then:
               - recommend activity "First Activity".
               - recommend activity "Second Activity".
-            end
+            end.
         `;
 
         const result = parseInput(input);
@@ -142,7 +142,7 @@ library "Test".
 library "Test".
           decision "Test":
             - when "Concept" then:
-            end
+            end.
         `;
 
         const result = buildCRL(input);
@@ -156,7 +156,7 @@ library "Test".
           decision "Test":
             - when "Concept" then:
               - use decision "Other Decision".
-            end
+            end.
         `;
 
         const result = parseInput(input);
@@ -177,7 +177,7 @@ library "Test".
             - when "Concept" then:
               - use decision "First Decision".
               - use decision "Second Decision".
-            end
+            end.
         `;
 
         const result = parseInput(input);
@@ -204,7 +204,7 @@ library "Test".
               - use decision "First Decision".
               - recommend activity "Second Activity".
               - use decision "Second Decision".
-            end
+            end.
         `;
 
         const result = parseInput(input);
@@ -238,7 +238,7 @@ library "Test".
             - when "Concept" then:
               - recommend activity "First Activity".
               - recommend activity "Second Activity".
-            end
+            end.
         `;
         const result = parseInput(input);
         const decision = result.statements[0] as Decision;
@@ -263,7 +263,7 @@ library "Test".
             - when "Concept" then:
               - use decision "First Decision".
               - use decision "Second Decision".
-            end
+            end.
         `;
         const result = parseInput(input);
         const decision = result.statements[0] as Decision;
@@ -640,9 +640,9 @@ library "Test".
               - when "No Primary Series Doses Administered" then:
                 - when "Client Age Less Than 12 Months" then recommend activity "Indicate".
                 - when "Last Live Vaccine Administered has had in 4 Weeks" then use decision "Elderly Based".
-              end
+              end.
               - when "Client Is Due For MCV12" then recommend activity "Vaccinate".
-            end
+            end.
       `;
 
       const result = parseInput(input);

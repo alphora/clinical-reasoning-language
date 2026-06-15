@@ -109,15 +109,17 @@ branchItem
     ;
 
 // A nested `then:` block body. Homogeneous: branches XOR actions
-// (grammar-enforced). ALWAYS closed by a dashless `end` — a structural
-// delimiter (no period, like the dashless `any:`/`all:`/`first:` openers and
-// `decision "X":` headers it frames; only content/statement lines take `.`).
+// (grammar-enforced). ALWAYS closed by a dashless `end.` — the trailing period
+// makes the line-ending model exceptionless (every CRL line ends in `.` or `:`,
+// matching the period-prior authors and agents already follow), while the closer
+// itself stays context-free: a bare `end` with nothing to mismatch (unlike the
+// former `end when` / a hypothetical `end otherwise`).
 // The mandatory closer is what keeps the sibling boundary in `decisionBody`'s
 // `branchItem+` unambiguous; do NOT make it optional. `branchItem` starts
 // `- when`/`- otherwise`, `actionItem` starts `- recommend`/`- use`, and the
-// closer is the bare `end` keyword — all LL-distinct (verified: no ATN ambiguity).
+// closer is `end` `.` — all LL-distinct (verified: no ATN ambiguity).
 blockBody
-    : COLON blockQualifier? ( branchItem+ | actionItem+ ) END
+    : COLON blockQualifier? ( branchItem+ | actionItem+ ) END DOT
     ;
 
 actionItem

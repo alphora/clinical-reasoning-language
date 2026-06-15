@@ -55,7 +55,7 @@ first:
       all:
       - recommend activity "A".
       - use decision "B".
-      end
+      end.
   - otherwise then recommend activity "Default Activity".
 ```
 
