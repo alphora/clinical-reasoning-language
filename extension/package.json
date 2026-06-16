@@ -2,7 +2,7 @@
   "name": "crl-language-support",
   "displayName": "Clinical Reasoning Language Support",
   "description": "CRL + CEL keyword highlighting, live validation diagnostics, CRL→CQL + CEL→FHIR-JSON emit, and catalog-driven authoring help (completion + hover) for .crl / .cel Markdown files.",
-  "version": "4.0.2",
+  "version": "4.1.0",
   "publisher": "smiledigitalhealth",
   "engines": {
     "vscode": "^1.85.0"
@@ -24,14 +24,25 @@
     "languages": [
       {
         "id": "crl",
-        "aliases": ["Clinical Reasoning Language", "crl"],
-        "extensions": [".crl"],
+        "aliases": [
+          "Clinical Reasoning Language",
+          "crl"
+        ],
+        "extensions": [
+          ".crl"
+        ],
         "configuration": "./syntaxes/crl.language-configuration.json"
       },
       {
         "id": "crl-cel",
-        "aliases": ["Case Example Language", "CEL", "cel"],
-        "extensions": [".cel"],
+        "aliases": [
+          "Case Example Language",
+          "CEL",
+          "cel"
+        ],
+        "extensions": [
+          ".cel"
+        ],
         "configuration": "./syntaxes/cel.language-configuration.json"
       }
     ],
