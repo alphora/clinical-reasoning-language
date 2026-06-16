@@ -66,7 +66,7 @@ try {
     const crl = kit.referenceArtifacts.find((a) => a.name === "decision-reference.crl").source;
     const r = await client.callTool({ name: "validate_crl", arguments: { code: crl } });
     const out = JSON.parse(r.content[0].text);
-    assert.equal(out.success, true, `embedded reference CRL must validate clean; errors: ${JSON.stringify(out.errors).slice(0, 200)}`);
+    assert.equal(out.success, true, `embedded reference CRL must validate clean; errors: ${JSON.stringify(out.errors ?? []).slice(0, 200)}`);
   });
 
   await check("authoring_kit with unknown stage → isError listing valid stages", async () => {
