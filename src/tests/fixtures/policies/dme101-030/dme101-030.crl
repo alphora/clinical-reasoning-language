@@ -1,0 +1,53 @@
+# DME101.030 — Ultrasonic Osteogenesis Stimulator
+library "Ultrasonic Osteogenesis Stimulator Coverage".
+
+/*
+Prior-authorization coverage model for ultrasonic osteogenesis stimulators.
+`first:` makes the branches ordered (first match wins): the three exclusions are
+tested before the approval branch so a denial wins by position, and `otherwise`
+is the catch-all (deny). See docs/decision-shapes.md.
+
+Per the PA authoring approach:
+- the four conditions are local case-features, each carrying its own LOCAL domain
+  `code is` (no value sets / `coded from`, no terminology — source-representation
+  expansion is a later phase);
+- the dispositions are the shareable `Approve` / `Deny` determination activities.
+*/
+
+// ============ Concepts (local case-features) ============
+
+concept "Fracture Of Skull Or Vertebrae":
+- type is Condition.
+- code is `skull-or-vertebrae-fracture`.
+
+concept "Tumor-Related Fracture":
+- type is Condition.
+- code is `tumor-related-fracture`.
+
+concept "Concurrent Noninvasive Stimulator In Use":
+- type is Device.
+- code is `concurrent-noninvasive-stimulator`.
+
+concept "Documented Fracture Nonunion":
+- type is Condition.
+- code is `documented-fracture-nonunion`.
+
+// ============ Decision ============
+
+decision "Ultrasonic Osteogenesis Stimulator Coverage":
+first:
+- when "Fracture Of Skull Or Vertebrae" then recommend activity "Deny".
+- when "Tumor-Related Fracture" then recommend activity "Deny".
+- when "Concurrent Noninvasive Stimulator In Use" then recommend activity "Deny".
+- when "Documented Fracture Nonunion" then recommend activity "Approve".
+- otherwise then recommend activity "Deny".
+
+// ============ Activities (shareable PA determinations) ============
+
+activity "Approve":
+- request CPGCommunicationRequest.
+- with `Prior authorization request approved.`.
+
+activity "Deny":
+- request CPGCommunicationRequest.
+- with `Prior authorization request denied.`.

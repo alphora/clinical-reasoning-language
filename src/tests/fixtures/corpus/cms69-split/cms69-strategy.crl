@@ -66,21 +66,23 @@ file is single-library so every ref below is bare.
 decision "CMS69 BMI Screening Strategy":
 
 - when "Patient Eligible For BMI Screening" then:
+  all:
   - when "BMI Not Documented During Measurement Period" then recommend activity "Document BMI".
   - when "Has Documented High BMI" then use decision "Recommend High BMI Intervention".
   - when "Has Documented Low BMI" then use decision "Recommend Low BMI Intervention".
-- end when
+  end.
 
 // High-BMI sub-decision. Several intervention paths are CMS69-acceptable;
-// `any:` says any one of these recommendations satisfies the measure.
+// `any:` says any one satisfies the measure. The medication option is guarded
+// `unless` a contraindication, so a contraindicated patient is offered the
+// non-medication options (the contraindication is a denominator exception, not
+// a co-fired "do not perform" card — see .vibe-tools/discussions/082).
 decision "Recommend High BMI Intervention":
-
 - when "Patient Has Overweight or Obese Diagnosis" then:
   any:
   - recommend activity "Order Weight Assessment Referral".
-  - recommend activity "Order High BMI Medication".
-- end when
-- when "Has Anti-Obesity Medication Contraindication" then recommend activity "Contraindicated Anti-Obesity Medication".
+  - recommend activity "Order High BMI Medication" unless "Has Anti-Obesity Medication Contraindication".
+  end.
 
 // Low-BMI sub-decision. CMS69 expects BOTH a follow-up order AND a
 // documented care plan, so `all:` requires both recommendations.
@@ -90,7 +92,7 @@ decision "Recommend Low BMI Intervention":
   all:
   - recommend activity "Order Low BMI Follow-up".
   - recommend activity "Send BMI Care Communication".
-- end when
+  end.
 
 
 // ============ Activities ============
@@ -122,10 +124,6 @@ activity "Send BMI Care Communication":
 - with `Document a follow-up care plan for low BMI`.
 - because `CMS69 requires documented care planning when BMI is low`.
 
-activity "Contraindicated Anti-Obesity Medication":
-- request do not perform CPGMedicationRequest.
-- with "Anti-Obesity Medications VS".
-- because `Patient has a documented contraindication to anti-obesity pharmacotherapy`.
 
 
 // ============ Terminologies ============

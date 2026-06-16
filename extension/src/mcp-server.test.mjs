@@ -32,18 +32,53 @@ const check = async (label, fn) => {
 
 await client.connect(transport);
 try {
-  await check("MCP tools: 7 registered (tokenize_crl, build_crl_ast, validate_crl, validate_cel, emit_cql, emit_crl_fhir, emit_cel)", async () => {
+  await check("MCP tools: 9 registered (…, run_decision, authoring_kit)", async () => {
     const { tools } = await client.listTools();
     const names = tools.map((t) => t.name).sort();
     assert.deepEqual(names, [
+      "authoring_kit",
       "build_crl_ast",
       "emit_cel",
       "emit_cql",
       "emit_crl_fhir",
+      "run_decision",
       "tokenize_crl",
       "validate_cel",
       "validate_crl",
     ]);
+  });
+
+  await check("authoring_kit (default stage) → payload + embedded reference validates clean", async () => {
+    const r = await client.callTool({ name: "authoring_kit", arguments: {} });
+    assert.ok(!r.isError, "should not be a tool error");
+    const kit = JSON.parse(r.content[0].text);
+    assert.equal(kit.stage, "local-decision-support");
+    assert.match(kit.contentHash, /^[0-9a-f]{64}$/);
+    const crl = kit.referenceArtifacts.find((a) => a.name === "decision-reference.crl").source;
+    const v = JSON.parse((await client.callTool({ name: "validate_crl", arguments: { code: crl } })).content[0].text);
+    assert.equal(v.success, true, "embedded reference CRL must validate clean through the bundled server");
+  });
+
+  await check("authoring_kit unknown stage → isError listing valid stages", async () => {
+    const r = await client.callTool({ name: "authoring_kit", arguments: { stage: "emit" } });
+    assert.equal(r.isError, true);
+    assert.match(r.content[0].text, /local-decision-support/);
+  });
+
+  await check("run_decision via path → dme101-030.cel: 3 cases pass the result-is oracle", async () => {
+    const dme101Cel = resolve(here, "../../src/tests/fixtures/policies/dme101-030/dme101-030.cel");
+    const r = await client.callTool({ name: "run_decision", arguments: { path: dme101Cel } });
+    assert.ok(!r.isError, "should not be a tool error");
+    const out = JSON.parse(r.content[0].text);
+    assert.equal(out.success, true);
+    assert.equal(out.caseCount, 3);
+    assert.equal(out.passCount, 3);
+    assert.equal(out.errorCount, 0);
+  });
+
+  await check("run_decision without path → isError", async () => {
+    const r = await client.callTool({ name: "run_decision", arguments: {} });
+    assert.equal(r.isError, true);
   });
 
   await check("validate_cel via path → cms22.cel validates clean", async () => {
@@ -168,6 +203,28 @@ try {
       out.errors.some((e) => e.kind === "external-library-not-included"),
       "expected at least one external-library-not-included error in single-file mode"
     );
+  });
+  // --- Cross-server tool parity (drift guard) ---
+  // The CLI server (src/cli/run-mcp-server.ts → dist) and this extension bundle
+  // historically drift: a tool added to one but not the other ships a broken
+  // VSIX. Spawn BOTH and assert identical tool NAME sets. Requires the root
+  // package to be built (dist/cli/run-mcp-server.js present).
+  await check("CLI and extension MCP servers expose the identical tool set (drift guard)", async () => {
+    const cliServerPath = resolve(here, "../../dist/cli/run-mcp-server.js");
+    const cliTransport = new StdioClientTransport({ command: process.execPath, args: [cliServerPath] });
+    const cliClient = new Client({ name: "crl-cli-parity", version: "0.0.0" });
+    await cliClient.connect(cliTransport);
+    try {
+      const extNames = (await client.listTools()).tools.map((t) => t.name).sort();
+      const cliNames = (await cliClient.listTools()).tools.map((t) => t.name).sort();
+      assert.deepEqual(
+        extNames,
+        cliNames,
+        `tool sets diverge — extension: ${JSON.stringify(extNames)} vs CLI: ${JSON.stringify(cliNames)}`,
+      );
+    } finally {
+      await cliClient.close();
+    }
   });
 } finally {
   await client.close();

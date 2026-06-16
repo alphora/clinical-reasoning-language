@@ -4,7 +4,7 @@ import {
   getRefName,
   getRefLibrary,
   type Decision,
-  type WhenBlock,
+  type BranchBlock,
   type WhenBlockBody,
   type BlockBody,
   type ActionStatement,
@@ -390,16 +390,18 @@ function validateCrossResource(
  * Mirrors the decision-body walk shape in src/validator/referenceResolver.ts:283-323
  * and src/validator/cycleDetector.ts (T02).
  */
-function collectDecisionArms(decision: Decision): Set<string> {
+export function collectDecisionArms(decision: Decision): Set<string> {
   const arms = new Set<string>();
-  for (const wb of decision.body.statements) {
-    walkArmsWhenBlock(wb, arms);
+  for (const branch of decision.body.statements) {
+    walkArmsBranch(branch, arms);
   }
   return arms;
 }
 
-function walkArmsWhenBlock(wb: WhenBlock, arms: Set<string>): void {
-  walkArmsWhenBlockBody(wb.body, arms);
+function walkArmsBranch(branch: BranchBlock, arms: Set<string>): void {
+  // `when` and `otherwise` arms both reach their body's leaf targets — an
+  // `otherwise then recommend activity "Deny"` is a real arm a case may assert.
+  walkArmsWhenBlockBody(branch.body, arms);
 }
 
 function walkArmsWhenBlockBody(body: WhenBlockBody, arms: Set<string>): void {
@@ -412,8 +414,8 @@ function walkArmsWhenBlockBody(body: WhenBlockBody, arms: Set<string>): void {
 
 function walkArmsBlockBody(block: BlockBody, arms: Set<string>): void {
   for (const stmt of block.statements) {
-    if (stmt.type === "WhenBlock") {
-      walkArmsWhenBlock(stmt, arms);
+    if (stmt.type === "WhenBlock" || stmt.type === "OtherwiseBlock") {
+      walkArmsBranch(stmt, arms);
     } else {
       walkArmsActionStatement(stmt, arms);
     }

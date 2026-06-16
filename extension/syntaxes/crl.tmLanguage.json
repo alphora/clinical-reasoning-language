@@ -38,11 +38,11 @@
     },
     {
       "name": "keyword.control.applicability.crl",
-      "match": "(?<![\\w`\"])\\b(any|all)\\b(?![\\w`\"])"
+      "match": "(?<![\\w`\"])\\b(any|all|first|end)\\b(?![\\w`\"])"
     },
     {
       "name": "keyword.control.structure.crl",
-      "match": "(?<![\\w`\"])\\b(when|end when|then)\\b(?![\\w`\"])"
+      "match": "(?<![\\w`\"])\\b(when|otherwise|then)\\b(?![\\w`\"])"
     },
     {
       "name": "keyword.operator.logical.crl",

@@ -1,5 +1,12 @@
 # IMMZ_All_Decisions
 
+// ⚠ NOT VALID CURRENT CRL. Snapshot of output from the FSH→CRL transformer,
+// which is GATED OFF (its regression test is disabled — see
+// src/tests/regression/index.test.ts). It uses removed syntax (`when ""`,
+// `- end when`) that no longer parses. Do NOT copy from this file. Current
+// decision syntax is `first:`/`any:`/`all:`/`otherwise` closed by `end.`
+// (docs/decision-shapes.md). Regenerates only if the transformer is revived.
+
 // Instance: IMMZD2DTMeaslesDose0
 // Description: If the child or patient has not been given MCV0 between 6 and 9 months
 // Provenance: WHO recommendations for routine immunization - summary tables (March 2023)

@@ -35,11 +35,11 @@ describe("Lexer Error Handling", () => {
         minTokens: 0,
       },
       {
-        input: "end when\n@invalid",
+        input: "end.\n@invalid",
         minTokens: 1,
       },
       {
-        input: "end when\n  @invalid",
+        input: "end.\n  @invalid",
         minTokens: 1,
       },
     ];

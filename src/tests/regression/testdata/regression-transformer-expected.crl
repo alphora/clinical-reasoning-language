@@ -1,3 +1,6 @@
+// ⚠ NOT VALID CURRENT CRL — golden for the GATED-OFF FSH→CRL transformer
+// (regression disabled). Uses removed `when ""` / `- end when` syntax. Current
+// decision syntax: `first:`/`any:`/`all:`/`otherwise` + `end.` (docs/decision-shapes.md).
 // Instance: IMMZD2DTMeaslesDose0
 // Description: If the child or patient has not been given MCV0 between 6 and 9 months
 // Provenance: WHO recommendations for routine immunization - summary tables (March 2023)

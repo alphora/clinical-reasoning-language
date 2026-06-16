@@ -2,7 +2,7 @@ import type {
   CRL,
   Concept,
   Decision,
-  WhenBlock,
+  BranchBlock,
   WhenBlockBody,
   BlockBody,
   ActionStatement,
@@ -380,20 +380,21 @@ export class CycleDetector {
     scope: LibraryScope | undefined,
     currentLibName: string,
   ): void {
-    for (const whenBlock of decision.body.statements) {
-      this.walkDecisionWhenBlock(whenBlock, refs, scope, currentLibName);
+    for (const branch of decision.body.statements) {
+      this.walkDecisionBranch(branch, refs, scope, currentLibName);
     }
   }
 
-  private walkDecisionWhenBlock(
-    wb: WhenBlock,
+  private walkDecisionBranch(
+    branch: BranchBlock,
     refs: Set<string>,
     scope: LibraryScope | undefined,
     currentLibName: string,
   ): void {
-    // `when "C"`'s conceptName is a concept ref, not a decision ref —
-    // irrelevant for delegation cycles. Walk the body for nested UseDecisions.
-    this.walkDecisionWhenBlockBody(wb.body, refs, scope, currentLibName);
+    // A `when`'s conceptName is a concept ref, not a decision ref; `otherwise`
+    // carries no condition. Either way, walk the body for nested UseDecisions —
+    // a `use decision` reached only through `otherwise` is still a delegation edge.
+    this.walkDecisionWhenBlockBody(branch.body, refs, scope, currentLibName);
   }
 
   private walkDecisionWhenBlockBody(
@@ -416,8 +417,8 @@ export class CycleDetector {
     currentLibName: string,
   ): void {
     for (const stmt of block.statements) {
-      if (stmt.type === "WhenBlock") {
-        this.walkDecisionWhenBlock(stmt, refs, scope, currentLibName);
+      if (stmt.type === "WhenBlock" || stmt.type === "OtherwiseBlock") {
+        this.walkDecisionBranch(stmt, refs, scope, currentLibName);
       } else {
         this.walkDecisionActionStatement(stmt, refs, scope, currentLibName);
       }

@@ -1,0 +1,278 @@
+/**
+ * CRE — CRL Clinical Reasoning Engine (#115), v1.
+ *
+ * A headless, authoring-time interpreter: evaluate a CRL `decision` over a CEL
+ * `case`'s facts, produce a recommendation set + trace, and check the case's
+ * `result is` assertion (the oracle). It MIRRORS the FHIR/CQL engine at the
+ * CRL/CEL level for fast authoring feedback — it is NOT the engine.
+ *
+ * v1 SCOPE (narrow + shallow; see .vibe-tools/discussions/083):
+ *  - Concept satisfaction is ASSERTED only: a concept is satisfied for a case
+ *    iff ≥1 of the case's (non-subject) facts is `defined by` it (resolved to a
+ *    (library, name) identity). The concept body (`code is` / `coded from`) is
+ *    NOT evaluated; `defined as` / `definition is` (inference), temporal, and
+ *    value-thresholds are deferred to a later "deepen" slice.
+ *  - Decision walk: `first:` (ordered, first match wins, short-circuit),
+ *    `all:` (every matching branch fires), `any:`/`all:` over actions (members
+ *    enter the produced set; qualifier recorded), `otherwise` (catch-all), and
+ *    the per-action guards `unless "C"` / `only when "C"`.
+ *  - Oracle: a decision-leaf `result is` passes iff the expected branch is in
+ *    the produced set (membership — a case asserts one valid disposition).
+ *  - `use decision` targets are produced as direct recommendations (their NAME),
+ *    NOT recursed — matching the CEL validator's direct-arm model. Transitive
+ *    recursion is deferred.
+ */
+import type { CELCase, CELDefinedByField, CELFact, CELResultField } from "../cel/ast/types";
+import type { ResolvedCelGraph } from "../cel/imports/types";
+import type {
+  ActionGuard,
+  ActionStatement,
+  BlockBody,
+  BlockMember,
+  BlockQualifier,
+  BranchBlock,
+  Decision,
+  ReferenceName,
+  WhenBlockBody,
+} from "../ast/types";
+import { getRefLibrary, getRefName } from "../ast/types";
+
+type Id = string;
+const idOf = (lib: string, name: string): Id => `${lib} ${name}`;
+
+export interface ProducedRec {
+  recommendation: string;
+  viaWhen: string | null;
+  qualifier: BlockQualifier | null;
+}
+
+export interface TraceNode {
+  node: string;
+  kind: "when" | "otherwise" | "action";
+  concept?: string;
+  satisfied?: boolean;
+  evaluated: boolean;
+  guardedOut?: boolean;
+  guard?: { polarity: "unless" | "only-when"; concept: string; satisfied: boolean };
+  facts?: string[];
+  children?: TraceNode[];
+}
+
+export interface CaseRun {
+  case: string;
+  decision: string | null;
+  status: "pass" | "fail" | "error";
+  expected: { leaf: string; branch: string } | null;
+  produced: ProducedRec[];
+  trace: TraceNode[];
+  diagnostics: string[];
+}
+
+export interface CelRunResult {
+  success: boolean;
+  runs: CaseRun[];
+  errors: string[];
+}
+
+interface Ctx {
+  satisfied: Set<Id>;
+  factsByConcept: Map<Id, string[]>;
+  coveredLib: string;
+  produced: ProducedRec[];
+  trace: TraceNode[];
+  diagnostics: string[];
+}
+
+function conceptSatisfied(ref: ReferenceName, ctx: Ctx): { sat: boolean; facts: string[] } {
+  const i = idOf(getRefLibrary(ref) ?? ctx.coveredLib, getRefName(ref));
+  return { sat: ctx.satisfied.has(i), facts: ctx.factsByConcept.get(i) ?? [] };
+}
+
+function recName(action: ActionStatement["action"]): string {
+  return action.type === "RecommendActivity"
+    ? getRefName(action.activityName)
+    : getRefName(action.decisionName);
+}
+
+/** A guard EXCLUDES an item when `unless C` and C holds, or `only when C` and C does not hold. */
+function evalGuard(
+  guard: ActionGuard | undefined,
+  ctx: Ctx,
+): { excluded: boolean; info?: TraceNode["guard"] } {
+  if (!guard) return { excluded: false };
+  const { sat } = conceptSatisfied(guard.conceptName, ctx);
+  const excluded = guard.polarity === "unless" ? sat : !sat;
+  return { excluded, info: { polarity: guard.polarity, concept: getRefName(guard.conceptName), satisfied: sat } };
+}
+
+function executeBody(body: WhenBlockBody, viaWhen: string | null, ctx: Ctx, into: TraceNode[]): void {
+  if (body.type === "ActionStatement") {
+    // Inline single action — the grammar forbids a guard here.
+    ctx.produced.push({ recommendation: recName(body.action), viaWhen, qualifier: null });
+    into.push({ node: recName(body.action), kind: "action", evaluated: true });
+    return;
+  }
+  const block: BlockBody = body;
+  const isBranch = block.statements.some((m) => m.type === "WhenBlock" || m.type === "OtherwiseBlock");
+  if (isBranch) {
+    walkBranches(block.qualifier, block.statements as BranchBlock[], ctx, into);
+    return;
+  }
+  // Action menu (`any:` / `all:` / single).
+  let produced = 0;
+  for (const stmt of block.statements as ActionStatement[]) {
+    const name = recName(stmt.action);
+    const g = evalGuard(stmt.guard, ctx);
+    if (g.excluded) {
+      into.push({ node: name, kind: "action", evaluated: true, guardedOut: true, guard: g.info });
+      continue;
+    }
+    ctx.produced.push({ recommendation: name, viaWhen, qualifier: block.qualifier ?? null });
+    into.push({ node: name, kind: "action", evaluated: true, ...(g.info ? { guard: g.info } : {}) });
+    produced++;
+  }
+  if (produced === 0 && block.statements.length > 0) {
+    ctx.diagnostics.push(
+      `every option in the menu under "${viaWhen ?? "otherwise"}" was guarded out — branch produced nothing`,
+    );
+  }
+}
+
+function walkBranches(
+  qualifier: BlockQualifier | undefined,
+  branches: BranchBlock[],
+  ctx: Ctx,
+  into: TraceNode[],
+): void {
+  // `all:` = every matching branch fires; `first:` (or a single-member block) = ordered, first match wins.
+  const ordered = qualifier !== "all";
+  for (const b of branches) {
+    if (b.type === "OtherwiseBlock") {
+      const node: TraceNode = { node: "otherwise", kind: "otherwise", evaluated: true, children: [] };
+      into.push(node);
+      executeBody(b.body, null, ctx, node.children!);
+      if (ordered) return;
+      continue;
+    }
+    const { sat, facts } = conceptSatisfied(b.conceptName, ctx);
+    const node: TraceNode = {
+      node: `when ${getRefName(b.conceptName)}`,
+      kind: "when",
+      concept: getRefName(b.conceptName),
+      satisfied: sat,
+      evaluated: true,
+      facts,
+      children: [],
+    };
+    into.push(node);
+    if (sat) {
+      executeBody(b.body, getRefName(b.conceptName), ctx, node.children!);
+      if (ordered) return; // first match wins — remaining branches are not evaluated.
+    }
+  }
+}
+
+function runCase(
+  c: CELCase,
+  decisions: Map<string, Decision>,
+  facts: Map<string, CELFact>,
+  coveredLib: string,
+): CaseRun {
+  const diagnostics: string[] = [];
+  let subjectFact: string | undefined;
+  const factRefs: string[] = [];
+  let result: CELResultField | undefined;
+  for (const b of c.body) {
+    if (b.type === "CELSubjectField") subjectFact = b.factName;
+    else if (b.type === "CELFactRefField") factRefs.push(b.factName);
+    else if (b.type === "CELResultField") result = b; // v1: single decision-result assertion
+  }
+
+  // Build the satisfied-concept set from the case's clinical (non-subject) facts.
+  const satisfied = new Set<Id>();
+  const factsByConcept = new Map<Id, string[]>();
+  for (const fn of factRefs) {
+    if (fn === subjectFact) continue;
+    const fact = facts.get(fn);
+    if (!fact) {
+      diagnostics.push(`unknown fact "${fn}"`);
+      continue;
+    }
+    const db = fact.body.find((x): x is CELDefinedByField => x.type === "CELDefinedByField");
+    if (!db) continue; // a fact with no `defined by` satisfies no concept
+    const name = getRefName(db.ref);
+    if (name === "Patient") continue; // subject-type fact never satisfies a clinical concept
+    const i = idOf(getRefLibrary(db.ref) ?? coveredLib, name);
+    satisfied.add(i);
+    const arr = factsByConcept.get(i) ?? [];
+    arr.push(fn);
+    factsByConcept.set(i, arr);
+  }
+
+  if (!result || result.value.type !== "CELBranchResult") {
+    return {
+      case: c.name,
+      decision: null,
+      status: "error",
+      expected: null,
+      produced: [],
+      trace: [],
+      diagnostics: [...diagnostics, "v1 CRE supports only a decision-branch `result is`"],
+    };
+  }
+  const decisionName = result.leafName;
+  const expectedBranch = result.value.branchName;
+  const decision = decisions.get(decisionName);
+  if (!decision) {
+    return {
+      case: c.name,
+      decision: decisionName,
+      status: "error",
+      expected: { leaf: decisionName, branch: expectedBranch },
+      produced: [],
+      trace: [],
+      diagnostics: [...diagnostics, `decision "${decisionName}" not found in the covered library`],
+    };
+  }
+
+  const ctx: Ctx = { satisfied, factsByConcept, coveredLib, produced: [], trace: [], diagnostics };
+  walkBranches(decision.body.qualifier, decision.body.statements, ctx, ctx.trace);
+
+  const producedNames = new Set(ctx.produced.map((p) => p.recommendation));
+  const status: CaseRun["status"] = producedNames.has(expectedBranch) ? "pass" : "fail";
+  return {
+    case: c.name,
+    decision: decisionName,
+    status,
+    expected: { leaf: decisionName, branch: expectedBranch },
+    produced: ctx.produced,
+    trace: ctx.trace,
+    diagnostics: ctx.diagnostics,
+  };
+}
+
+/** Run every case in a resolved CEL graph against its covered CRL decision(s). */
+export function runCel(graph: ResolvedCelGraph): CelRunResult {
+  const errors: string[] = [];
+  if (!graph.cel) return { success: false, runs: [], errors: ["CEL did not parse"] };
+  if (!graph.coversTarget) return { success: false, runs: [], errors: ["`covers` target unresolved"] };
+
+  const coveredLib = graph.coversTarget.name;
+  if (coveredLib === null) {
+    return { success: false, runs: [], errors: ["covered library has no name"] };
+  }
+  const decisions = new Map<string, Decision>();
+  for (const s of graph.coversTarget.ast.statements) {
+    if (s.type === "Decision") decisions.set(s.name, s);
+  }
+  const facts = new Map<string, CELFact>();
+  for (const s of graph.cel.statements) {
+    if (s.type === "CELFact") facts.set(s.name, s);
+  }
+
+  const runs: CaseRun[] = [];
+  for (const s of graph.cel.statements) {
+    if (s.type === "CELCase") runs.push(runCase(s, decisions, facts, coveredLib));
+  }
+  return { success: true, runs, errors };
+}

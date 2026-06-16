@@ -107,10 +107,24 @@ export interface Decision extends ASTNode {
   location: Location;
 }
 
-// Decision body containing when blocks
+// Block combination qualifier. Over branches: `first` = ordered first-match,
+// `all` = every matching branch. Over actions: `any` = offer one, `all` = do all.
+// (`any` over branches and `first` over actions are rejected by the validator,
+// not the grammar.)
+export type BlockQualifier = "first" | "any" | "all";
+
+// A branch is a `when` block or the `otherwise` catch-all.
+export type BranchBlock = WhenBlock | OtherwiseBlock;
+
+// A block member is a branch or a bare action. A block is homogeneous (all
+// branches XOR all actions) — enforced by the grammar.
+export type BlockMember = BranchBlock | ActionStatement;
+
+// Decision body: a block of branches with an optional combination qualifier.
 export interface DecisionBody extends ASTNode {
   type: "DecisionBody";
-  statements: WhenBlock[];
+  qualifier?: BlockQualifier;
+  statements: BranchBlock[];
   location: Location;
 }
 
@@ -122,14 +136,36 @@ export interface WhenBlock extends ASTNode {
   location: Location;
 }
 
-// When block body can be a block body or action statement
+// Otherwise (catch-all) branch — no condition. Legal only as the last member of
+// a `first:` block (validator-enforced).
+export interface OtherwiseBlock extends ASTNode {
+  type: "OtherwiseBlock";
+  body: WhenBlockBody;
+  location: Location;
+}
+
+// When/otherwise block body can be a block body or action statement
 export type WhenBlockBody = BlockBody | ActionStatement;
 
-// Block body containing multiple statements
+// Block body containing multiple statements (homogeneous: branches XOR actions)
 export interface BlockBody extends ASTNode {
   type: "BlockBody";
-  qualifier?: string; // 'any' or 'all'
-  statements: (WhenBlock | ActionStatement)[];
+  qualifier?: BlockQualifier;
+  statements: BlockMember[];
+  location: Location;
+}
+
+// A per-action guard on a menu item: `unless "C"` drops the item when C holds;
+// `only when "C"` includes it only when C holds. An applicability polarity
+// (lowered at emit time, unless -> not), NOT a sem-* composition operator.
+// Legal only on action-block members (any:/all:), never on an inline
+// `when … then <action>` or `otherwise` (grammar-enforced).
+export type ActionGuardPolarity = "unless" | "only-when";
+
+export interface ActionGuard extends ASTNode {
+  type: "ActionGuard";
+  polarity: ActionGuardPolarity;
+  conceptName: ReferenceName;
   location: Location;
 }
 
@@ -137,6 +173,7 @@ export interface BlockBody extends ASTNode {
 export interface ActionStatement extends ASTNode {
   type: "ActionStatement";
   action: Action;
+  guard?: ActionGuard;
   location: Location;
 }
 

@@ -78,33 +78,66 @@ decisionStatement
     : DECISION decisionIdentifier COLON decisionBody
     ;
 
+// The top-level decision block: `when`/`otherwise` branches with an optional
+// leading qualifier (`first:` / `all:`). The qualifier is grammatically optional
+// — the validator requires it for a >1-branch block and rejects `any:` here. No
+// closer: the block ends at the next top-level declaration (same boundary the
+// former `whenBlock+` relied on).
 decisionBody
-    : whenBlock+
+    : blockQualifier? branchItem+
     ;
 
 // ============================
-// When Blocks and Actions
+// Branches, Blocks, and Actions
 // ============================
 //
-// A whenBlock covers a "when <concept> then ..." clause.
+// A branchItem is a `when <concept> then ...` clause or the `otherwise` catch-all.
+// `then <action>` is the inline single-action form (no closer); `then: <body>` is
+// the block form, always closed by `end`.
 
-whenBlock
-    : DASH WHEN conceptReference THEN blockBody DASH END_WHEN         # WhenWithBody
-    | DASH WHEN conceptReference THEN actionStatement                 # WhenSingleAction
-    ;
-
-blockBody
-    : COLON ( anyOrAllClause? blockStatement+ )
-    ;
-
-anyOrAllClause
-    : ANY_BLOCK
+blockQualifier
+    : FIRST_BLOCK
+    | ANY_BLOCK
     | ALL_BLOCK
     ;
 
-blockStatement
-    : whenBlock                     # NestedWhenBlock
-    | DASH actionStatement          # BlockAction
+branchItem
+    : DASH WHEN conceptReference THEN blockBody              # WhenWithBody
+    | DASH WHEN conceptReference THEN actionStatement DOT    # WhenSingleAction
+    | DASH OTHERWISE THEN blockBody                          # OtherwiseWithBody
+    | DASH OTHERWISE THEN actionStatement DOT                # OtherwiseSingleAction
+    ;
+
+// A nested `then:` block body. Homogeneous: branches XOR actions
+// (grammar-enforced). ALWAYS closed by a dashless `end.` — the trailing period
+// makes the line-ending model exceptionless (every CRL line ends in `.` or `:`,
+// matching the period-prior authors and agents already follow), while the closer
+// itself stays context-free: a bare `end` with nothing to mismatch (unlike the
+// former `end when` / a hypothetical `end otherwise`).
+// The mandatory closer is what keeps the sibling boundary in `decisionBody`'s
+// `branchItem+` unambiguous; do NOT make it optional. `branchItem` starts
+// `- when`/`- otherwise`, `actionItem` starts `- recommend`/`- use`, and the
+// closer is `end` `.` — all LL-distinct (verified: no ATN ambiguity).
+blockBody
+    : COLON blockQualifier? ( branchItem+ | actionItem+ ) END DOT
+    ;
+
+// An action-block member. The terminating `.` lives here (not on the action
+// statements) so that a per-action guard can sit before it. A guard is legal
+// ONLY here — never on an inline `when … then <action>` or on `otherwise`,
+// which keeps the catch-all unconditional and one condition slot per line.
+actionItem
+    : DASH actionStatement actionGuard? DOT
+    ;
+
+// Per-action guard: conditions a single menu item. `unless "C"` drops the item
+// when C holds; `only when "C"` includes it only when C holds. These are
+// applicability polarities lowered at emit time (unless -> not), NOT sem-*
+// composition operators (which live only in `defined as`). The guard reuses the
+// same condition resolution path as a `when` branch.
+actionGuard
+    : UNLESS conceptReference
+    | ONLY_WHEN conceptReference
     ;
 
 actionStatement
@@ -113,11 +146,11 @@ actionStatement
     ;
 
 recommendStatement
-    : RECOMMEND_ACTIVITY activityReference DOT
+    : RECOMMEND_ACTIVITY activityReference
     ;
 
 useStatement
-    : USE_DECISION decisionReference DOT
+    : USE_DECISION decisionReference
     ;
 
 // ============================
@@ -181,7 +214,7 @@ terminologyCode
 //      - with "Colonoscopy".
 //   activity "Inform Clinician":
 //      - request CPGCommunicationRequest.
-//      - with `The message to send.`.
+//      - with `The message to send`.
 //      - because `Clinician's should be messaged about these things.`.
 //
 doNotPerform
@@ -433,7 +466,7 @@ narrative
 narrativeElement
     : qualifiableReference                                                                       # NConceptRef
     | quantity                                                                                   # NQuantity
-    | (AND | OR | NOT | WITH | LIBRARY | INCLUDE | AS | NARRATIVE_WORD | TIME_UNIT)              # NWord
+    | (AND | OR | NOT | WITH | LIBRARY | INCLUDE | AS | END | OTHERWISE | UNLESS | ONLY_WHEN | NARRATIVE_WORD | TIME_UNIT)  # NWord
     | argGroup                                                                                   # NArgGroupElement
     ;
 

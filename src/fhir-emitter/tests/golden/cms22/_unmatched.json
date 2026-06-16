@@ -2,13 +2,13 @@
   {
     "kind": "unsupported-with-text",
     "text": "CPGCommunicationRequest: Confirm BP control remains adequate; no escalation needed this visit",
-    "line": 91,
+    "line": 94,
     "column": 0
   },
   {
     "kind": "unsupported-with-text",
     "text": "CPGCommunicationRequest: Single hypertensive reading without prior diagnosis — document provisional status and rescreen",
-    "line": 95,
+    "line": 98,
     "column": 0
   }
 ]

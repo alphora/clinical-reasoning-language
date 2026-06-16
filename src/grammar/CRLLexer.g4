@@ -1,7 +1,6 @@
 lexer grammar CRLLexer;
 
 // === Multi-word phrase tokens ===
-END_WHEN            : 'end when';
 RECOMMEND_ACTIVITY  : 'recommend activity';
 USE_DECISION        : 'use decision';
 TYPE_IS             : 'type is' -> mode(CONCEPT_MODE);
@@ -18,22 +17,31 @@ SYSTEM_IS           : 'system is';
 VALUESET_IS         : 'valueset is';
 ALL_BLOCK           : 'all:';
 ANY_BLOCK           : 'any:';
+FIRST_BLOCK         : 'first:';
 
 // === Keywords ===
+// `END` ('end') is the generic closer for a `then:` block body (replaces the
+// former `END_WHEN` 'end when'). `OTHERWISE` ('otherwise') is the catch-all
+// branch keyword. Both are also admitted as narrative words in `narrativeElement`
+// (CRLParser.g4) so clinical prose like "at end of <period>" still parses.
 ACTIVITY     : 'activity';
 AND          : 'and';
 AS           : 'as';
 BECAUSE      : 'because';
 CONCEPT      : 'concept';
 DECISION     : 'decision';
+END          : 'end';
 INCLUDE      : 'include';
 LIBRARY      : 'library';
 NOT          : 'not';
+ONLY_WHEN    : 'only when';
 OR           : 'or';
+OTHERWISE    : 'otherwise';
 PARAMETER    : 'parameter';
 REQUEST      : 'request' -> mode(ACTIVITY_MODE);
 TERMINOLOGY  : 'terminology';
 THEN         : 'then';
+UNLESS       : 'unless';
 WHEN         : 'when';
 WITH         : 'with';
 

@@ -33,7 +33,7 @@ import type {
   NarrativeElement,
   ArgValue,
   ReferenceName,
-  WhenBlock,
+  BranchBlock,
 } from "../ast/types";
 import { getRefLibrary, isQualifiedRef } from "../ast/types";
 
@@ -260,25 +260,28 @@ function visitArgValue(av: ArgValue, visit: (ref: ReferenceName) => void): void 
 }
 
 function visitDecisionRefs(decision: Decision, visit: (ref: ReferenceName) => void): void {
-  function visitWhenBlock(wb: WhenBlock): void {
-    visit(wb.conceptName);
-    const body = wb.body;
+  function visitBranch(branch: BranchBlock): void {
+    // `when` carries a concept ref; `otherwise` carries none.
+    if (branch.type === "WhenBlock") visit(branch.conceptName);
+    const body = branch.body;
     if (body.type === "ActionStatement") {
       const action = body.action;
       if (action.type === "RecommendActivity") visit(action.activityName);
       else visit(action.decisionName);
+      if (body.guard) visit(body.guard.conceptName);
       return;
     }
     for (const stmt of body.statements) {
-      if (stmt.type === "WhenBlock") visitWhenBlock(stmt);
+      if (stmt.type === "WhenBlock" || stmt.type === "OtherwiseBlock") visitBranch(stmt);
       else {
         const action = stmt.action;
         if (action.type === "RecommendActivity") visit(action.activityName);
         else visit(action.decisionName);
+        if (stmt.guard) visit(stmt.guard.conceptName);
       }
     }
   }
-  for (const wb of decision.body.statements) visitWhenBlock(wb);
+  for (const branch of decision.body.statements) visitBranch(branch);
 }
 
 function visitActivityRefs(activity: Activity, visit: (ref: ReferenceName) => void): void {

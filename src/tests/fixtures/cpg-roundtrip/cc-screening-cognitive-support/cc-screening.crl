@@ -129,14 +129,18 @@ decision "Colorectal Cancer Screening Strategy":
 // review C1 fix).
 
 decision "Colorectal Cancer Screening Decision":
+all:
 - when "Has Coverage Concern" then recommend activity "FIT DNA".
 - when "No Coverage Concern" then:
+  all:
   - when "Has Sedation Concern" then:
+    all:
     - when "Has Sigmoidoscopy Complications" then recommend activity "CT Colonography".
     - when "No Sigmoidoscopy Complications" then recommend activity "Sigmoidoscopy".
-  - end when
+    end.
   - when "No Sedation Concern" then:
+    all:
     - when "Has Colonoscopy Complications" then recommend activity "CT Colonography".
     - when "No Colonoscopy Complications" then recommend activity "Colonoscopy".
-  - end when
-- end when
+    end.
+  end.

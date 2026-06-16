@@ -41,29 +41,32 @@ surface rules. This file's structural variety:
 decision "CMS22 BP Control Strategy":
 
 - when "Patient Eligible For BP Cognitive Support" then:
+  all:
   - when "No BP Reading At This Encounter" then recommend activity "Measure BP".
   - when "Has Hypertensive Reading" then use decision "Recommend Hypertension Intervention".
   - when "Has Normal Reading With Hypertension On File" then recommend activity "Confirm Continued Control".
-- end when
+  end.
 
 // Hypertensive-reading sub-decision. CMS22 accepts any one of:
 // a medication order, a follow-up rescreen order, or a documented
-// lifestyle/dietary referral. `any:` says any one of these
-// recommendations satisfies the measure.
+// lifestyle/dietary referral. `any:` says any one of these satisfies the
+// measure; the medication option is guarded `unless` a contraindication, so a
+// contraindicated patient is simply offered the non-medication options (the
+// contraindication is a denominator exception, not a co-fired "do not perform"
+// card — see .vibe-tools/discussions/082).
 decision "Recommend Hypertension Intervention":
-
+all:
 - when "Has Confirmed Hypertension Diagnosis" then:
   any:
-  - recommend activity "Antihypertensive Medication".
+  - recommend activity "Antihypertensive Medication" unless "Has Antihypertensive Contraindication".
   - recommend activity "Follow-up Rescreen".
   - recommend activity "Lifestyle Referral".
-- end when
+  end.
 - when "Hypertensive Reading Without Diagnosis" then:
   all:
   - recommend activity "Follow-up Rescreen".
   - recommend activity "Document Provisional Hypertension".
-- end when
-- when "Has Antihypertensive Contraindication" then recommend activity "Contraindicated Antihypertensive".
+  end.
 
 
 // ============ Activities ============
@@ -94,12 +97,6 @@ activity "Document Provisional Hypertension":
 - request CPGCommunicationRequest.
 - with `Single hypertensive reading without prior diagnosis — document provisional status and rescreen`.
 - because `Quality measure requires confirmation across encounters before a hypertension diagnosis is durable`.
-
-activity "Contraindicated Antihypertensive":
-- request do not perform CPGMedicationRequest.
-- with "Antihypertensive Medications VS".
-- because `Patient has a documented contraindication to antihypertensive pharmacotherapy`.
-
 
 // ============ Terminologies ============
 

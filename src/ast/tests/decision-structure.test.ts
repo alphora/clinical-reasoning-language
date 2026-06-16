@@ -26,9 +26,9 @@ decision "IMMZ.D2.D5.Measles":
             - when "No Primary Series Doses Administered" then:
                 - when "Client Age Less Than 12 Months" then recommend activity "Indicate".
                 - when "Last Live Vaccine Administered has had in 4 Weeks" then use decision "Elderly Based".
-            - end when
+            end.
             - when "Client Is Due For MCV12" then recommend activity "Vaccinate".
-        - end when`;
+        end`;
 
     const result = parseInput(input);
     const decision = result.statements[0] as Decision;
@@ -43,6 +43,28 @@ decision "IMMZ.D2.D5.Measles":
     const nestedWhenBlock = firstBlockBody.statements[0] as WhenBlock;
     const nestedBlockBody = nestedWhenBlock.body as BlockBody;
     expect(nestedBlockBody.statements).toHaveLength(2);
+  });
+
+  it("attaches a per-action guard (unless / only when) to menu members", () => {
+    const input = `# Test
+library "Test".
+decision "Menu":
+- when "Eligible" then:
+  any:
+  - recommend activity "Referral".
+  - recommend activity "Medication" unless "Has Contraindication".
+  - recommend activity "Trial" only when "In Study".
+  end.`;
+
+    const decision = parseInput(input).statements[0] as Decision;
+    const menu = (decision.body.statements[0] as WhenBlock).body as BlockBody;
+    const [referral, med, trial] = menu.statements as ActionStatement[];
+
+    expect(referral.guard).toBeUndefined();
+    expect(med.guard?.polarity).toBe("unless");
+    expect(med.guard?.conceptName).toBe("Has Contraindication");
+    expect(trial.guard?.polarity).toBe("only-when");
+    expect(trial.guard?.conceptName).toBe("In Study");
   });
 
   it("should handle single action statements", () => {
@@ -70,7 +92,7 @@ decision "Test Decision":
         any:
             - when "Greater Than 18" then recommend activity "Adult Protocol".
             - when "Less Than 65" then recommend activity "Standard Care".
-        - end when`;
+        end`;
 
     const result = parseInput(input);
     const decision = result.statements[0] as Decision;
@@ -89,7 +111,7 @@ decision "Test Decision":
         all:
             - when "Greater Than 18" then recommend activity "Adult Protocol".
             - when "Less Than 65" then recommend activity "Standard Care".
-        - end when`;
+        end`;
 
     const result = parseInput(input);
     const decision = result.statements[0] as Decision;
@@ -107,7 +129,7 @@ decision "Test Decision":
     - when "Age" then:
         - recommend activity "Vaccinate".
         - use decision "Protocol".
-    - end when
+    end.
     - when "Condition" then recommend activity "Action".`;
 
     const result = parseInput(input);
@@ -143,9 +165,9 @@ decision "IMMZ.D2.D5.Measles":
         - when "No Primary Series Doses Administered" then:
             - when "Client Age Less Than 12 Months" then recommend activity "Indicate".
             - when "Last Live Vaccine Administered has had in 4 Weeks" then use decision "Elderly Based".
-        - end when
+        end.
         - when "Client Is Due For MCV12" then recommend activity "Vaccinate".
-    - end when`;
+    end`;
 
     const result = parseInput(input);
     const decision = result.statements[0] as Decision;
@@ -170,7 +192,7 @@ decision "Elderly Based":
         - recommend activity "Vaccinate".
         - recommend activity "another thing".
         - recommend activity "something else".
-    - end when`;
+    end`;
 
     const result = parseInput(input);
     const decision = result.statements[0] as Decision;
@@ -188,8 +210,8 @@ decision "Elderly Based":
         - when "Most Recent BMI" then:
             - use decision "Some Other Decision".
             - use decision "Some Other Other Decision".
-        - end when
-    - end when`;
+        end.
+    end`;
 
     const result = parseInput(input);
     const decision = result.statements[0] as Decision;
@@ -212,15 +234,15 @@ decision "IMMZ.D2.D5.Measles":
         - when "No Primary Series Doses Administered" then:
             - when "Client Age Less Than 12 Months" then recommend activity "Indicate".
             - when "Last Live Vaccine Administered has had in 4 Weeks" then use decision "Elderly Based".
-        - end when
+        end.
         - when "Client Is Due For MCV12" then recommend activity "Vaccinate".
-    - end when
+    end.
     - when "One Primary Series Dose Administered" then:
         all:
         - when "Client Age Less Than 15 Months" then recommend activity "Indicate".
         - when "Last Live Vaccine Administered has had in 4 Weeks" then use decision "Elderly Based".
         - when "Client Is Due For MCV12" then recommend activity "Vaccinate".
-    - end when
+    end.
     - when "Two Primary Series Doses Administered" then recommend activity "Indicate".`;
 
     const result = parseInput(input);
@@ -266,7 +288,7 @@ decision "Test Decision":
     - when "Age" then:
         - use decision "Protocol1".
         - use decision "Protocol2".
-    - end when`;
+    end`;
 
     const result = parseInput(input);
     const decision = result.statements[0] as Decision;
@@ -294,7 +316,7 @@ decision "Test Decision":
     - when "Age" then:
         - recommend activity "Action1".
         - recommend activity "Action2".
-    - end when`;
+    end`;
 
     const result = parseInput(input);
     const decision = result.statements[0] as Decision;
@@ -324,7 +346,7 @@ decision "Test Decision":
         - use decision "Protocol1".
         - recommend activity "Action2".
         - use decision "Protocol2".
-    - end when`;
+    end`;
 
     const result = parseInput(input);
     const decision = result.statements[0] as Decision;

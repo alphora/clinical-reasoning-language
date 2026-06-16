@@ -712,10 +712,16 @@ function walkWhenBlock(
     body?: unknown;
     statements?: unknown[];
     action?: { type?: string; activityName?: unknown; decisionName?: unknown; location?: Loc };
+    guard?: { conceptName?: unknown; location?: Loc };
     location?: Loc;
   };
   if (w.type === "WhenBlock" && w.location) {
     addRef(w.conceptName, "concept", owningLib, filePath, source, w.location, out);
+    walkWhenBlock(w.body, owningLib, filePath, source, out);
+    return;
+  }
+  if (w.type === "OtherwiseBlock") {
+    // `otherwise` carries no condition ref — just index its body.
     walkWhenBlock(w.body, owningLib, filePath, source, out);
     return;
   }
@@ -725,11 +731,17 @@ function walkWhenBlock(
   }
   if (w.type === "ActionStatement") {
     const action = w.action;
-    if (!action || !action.location) return;
-    if (action.type === "RecommendActivity") {
-      addRef(action.activityName, "activity", owningLib, filePath, source, action.location, out);
-    } else if (action.type === "UseDecision") {
-      addRef(action.decisionName, "decision", owningLib, filePath, source, action.location, out);
+    if (action && action.location) {
+      if (action.type === "RecommendActivity") {
+        addRef(action.activityName, "activity", owningLib, filePath, source, action.location, out);
+      } else if (action.type === "UseDecision") {
+        addRef(action.decisionName, "decision", owningLib, filePath, source, action.location, out);
+      }
+    }
+    // A per-action guard references a concept — index it so go-to-definition
+    // and find-references work on the guard concept in the editor.
+    if (w.guard && w.guard.location) {
+      addRef(w.guard.conceptName, "concept", owningLib, filePath, source, w.guard.location, out);
     }
   }
 }

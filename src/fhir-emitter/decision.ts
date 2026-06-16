@@ -38,7 +38,7 @@
  * extension (operator-stubbed for CPG ballot; URL derives from
  * canonicalBase) on the parent action with valueBoolean=true.
  *
- * Cascade-suppression contract: a WhenBlock whose condition concept
+ * Cascade-suppression contract: a branch (when/otherwise) whose condition concept
  * (or whose leaf activity/decision) is unresolved suppresses the
  * entire WhenBlock. Parent actions with ALL children suppressed are
  * also suppressed (emit `unresolved-reference-cascade-suppression`
@@ -58,10 +58,14 @@ import type {
   Activity,
   ActionStatement,
   BlockBody,
+  BlockMember,
+  BranchBlock,
   Concept,
   Decision,
+  OtherwiseBlock,
   ReferenceName,
   WhenBlock,
+  WhenBlockBody,
 } from "../ast/types";
 import {
   getRefLibrary,
@@ -244,7 +248,7 @@ export function emitDecisionPlanDefinition(
   const title = decision.name;
   const description = decision.name;
 
-  // Emit each top-level WhenBlock; collect surviving actions.
+  // Emit each top-level branch (when/otherwise); collect surviving actions.
   const ctx: EmitCtx = {
     libraryName,
     canonicalBase: metadata.canonicalBase,
@@ -255,7 +259,7 @@ export function emitDecisionPlanDefinition(
     errors,
     unmatched,
   };
-  const topLevelResults = decision.body.statements.map((wb) => emitWhenBlock(wb, ctx));
+  const topLevelResults = decision.body.statements.map((branch) => emitBranch(branch, ctx));
   const topLevelActions = topLevelResults
     .filter((r): r is { kind: "emitted"; action: Record<string, unknown> } => r.kind === "emitted")
     .map((r) => r.action);
@@ -277,19 +281,20 @@ export function emitDecisionPlanDefinition(
     return { resource: null, errors, unmatched };
   }
 
-  // Rule 4/7 at the top level: top-level WhenBlocks that cascade-suppress
+  // Rule 4/7 at the top level: top-level branches that cascade-suppress
   // while OTHER top-level siblings survive get their cascade warning
   // emitted here (the enclosing resource is the non-cascading "parent").
   for (let i = 0; i < topLevelResults.length; i++) {
     const r = topLevelResults[i]!;
     if (r.kind === "suppressed" && r.reason === "all-children-suppressed") {
-      const wb = decision.body.statements[i]!;
+      const branch = decision.body.statements[i]!;
+      const label = branch.type === "WhenBlock" ? `when ${getRefName(branch.conceptName)}` : "otherwise";
       errors.push({
         type: "Validation",
         kind: "unresolved-reference-cascade-suppression",
-        message: `Top-level "when ${getRefName(wb.conceptName)} then..." suppressed because all its children were suppressed.`,
-        line: wb.location?.start.line,
-        column: wb.location?.start.column,
+        message: `Top-level "${label} then..." suppressed because all its children were suppressed.`,
+        line: branch.location?.start.line,
+        column: branch.location?.start.column,
       });
     }
   }
@@ -352,6 +357,11 @@ interface EmitCtx {
   unmatched: UnmatchedReference[];
 }
 
+/** Dispatch a branch to its when/otherwise emit. */
+function emitBranch(branch: BranchBlock, ctx: EmitCtx): EmitActionResult {
+  return branch.type === "WhenBlock" ? emitWhenBlock(branch, ctx) : emitOtherwiseBlock(branch, ctx);
+}
+
 /**
  * Recursive WhenBlock → action emit. Returns the tri-state result.
  * Cascade rules per plan v3.2 §"Cascade-suppression behavior".
@@ -369,7 +379,7 @@ function emitWhenBlock(wb: WhenBlock, ctx: EmitCtx): EmitActionResult {
     return { kind: "suppressed", reason: "unresolved-ref" };
   }
 
-  // 2. Build action skeleton.
+  // 2. Build action skeleton (with applicability condition).
   const action: Record<string, unknown> = {
     title: getRefName(wb.conceptName),
     description: getRefName(wb.conceptName),
@@ -386,12 +396,46 @@ function emitWhenBlock(wb: WhenBlock, ctx: EmitCtx): EmitActionResult {
     ],
   };
 
-  // 3. Body: leaf (ActionStatement) or branching (BlockBody).
-  const body = wb.body;
+  return fillBranchBody(action, wb.body, ctx);
+}
+
+/**
+ * `otherwise` (catch-all) → action emit.
+ *
+ * TODO(phase-2): proper FHIR lowering of the `otherwise` fallback and `first:`
+ * selection semantics. Phase-1 emits a no-condition action (the catch-all is
+ * unconditional) so the build, cascade handling, and emit closure stay correct;
+ * `first:` reuses the `any:` crl-logical-switch stand-in (see fillBranchBody).
+ */
+function emitOtherwiseBlock(ob: OtherwiseBlock, ctx: EmitCtx): EmitActionResult {
+  const action: Record<string, unknown> = {
+    title: "otherwise",
+    description: "otherwise",
+    code: [
+      {
+        coding: [{ system: CPG_COMMON_PROCESS_CS, code: "guideline-based-care" }],
+      },
+    ],
+    // No `condition[]` — the catch-all is unconditional.
+  };
+
+  return fillBranchBody(action, ob.body, ctx);
+}
+
+/**
+ * Fill a branch's action skeleton from its body — leaf (ActionStatement) or
+ * branching (BlockBody) — and apply cascade rules. Shared by when/otherwise.
+ */
+function fillBranchBody(
+  action: Record<string, unknown>,
+  body: WhenBlockBody,
+  ctx: EmitCtx,
+): EmitActionResult {
+  // Body: leaf (ActionStatement) or branching (BlockBody).
   if (body.type === "ActionStatement") {
     const leafResult = emitLeafAction(body.action, ctx);
     if (leafResult === null) {
-      // Leaf ref unresolved → suppress the entire WhenBlock.
+      // Leaf ref unresolved → suppress the entire branch.
       return { kind: "suppressed", reason: "unresolved-ref" };
     }
     action.definitionCanonical = leafResult;
@@ -424,13 +468,16 @@ function emitWhenBlock(wb: WhenBlock, ctx: EmitCtx): EmitActionResult {
     const cr = childResults[i]!;
     if (cr.kind === "suppressed" && cr.reason === "all-children-suppressed") {
       const childStmt = body.statements[i]!;
-      const childName = childStmt.type === "WhenBlock"
-        ? getRefName(childStmt.conceptName)
-        : actionTitle(childStmt.action);
+      const childName =
+        childStmt.type === "WhenBlock"
+          ? `when ${getRefName(childStmt.conceptName)}`
+          : childStmt.type === "OtherwiseBlock"
+          ? "otherwise"
+          : actionTitle(childStmt.action);
       ctx.errors.push({
         type: "Validation",
         kind: "unresolved-reference-cascade-suppression",
-        message: `Action under "when ${childName} then..." suppressed because all its children were suppressed.`,
+        message: `Action under "${childName} then..." suppressed because all its children were suppressed.`,
         line: childStmt.location?.start.line,
         column: childStmt.location?.start.column,
       });
@@ -438,8 +485,8 @@ function emitWhenBlock(wb: WhenBlock, ctx: EmitCtx): EmitActionResult {
   }
   action.action = survivingChildren;
 
-  // `any:` qualifier → crl-logical-switch extension.
-  if (body.qualifier === "any") {
+  // `any:`/`first:` qualifier → crl-logical-switch extension (phase-1 stand-in).
+  if (body.qualifier === "any" || body.qualifier === "first") {
     action.extension = [
       {
         url: crlLogicalSwitchExtensionUrl(ctx.canonicalBase),
@@ -452,19 +499,25 @@ function emitWhenBlock(wb: WhenBlock, ctx: EmitCtx): EmitActionResult {
 }
 
 /**
- * Emit a BlockStatement (either a nested WhenBlock or an
- * ActionStatement). Wraps the recursion + action-statement leaf
- * emission paths uniformly.
+ * Emit a BlockStatement (a nested branch — when/otherwise — or a bare
+ * ActionStatement). Wraps the recursion + action-statement leaf emission
+ * paths uniformly.
  */
 function emitBlockStatement(
-  stmt: WhenBlock | ActionStatement,
+  stmt: BlockMember,
   ctx: EmitCtx,
 ): EmitActionResult {
-  if (stmt.type === "WhenBlock") return emitWhenBlock(stmt, ctx);
+  if (stmt.type === "WhenBlock" || stmt.type === "OtherwiseBlock") return emitBranch(stmt, ctx);
 
   // ActionStatement at the body level (no enclosing WhenBlock condition).
   // Per CRL grammar this happens inside a BlockBody with no condition —
   // emit a bare action with definitionCanonical, no condition[].
+  //
+  // TODO (per-action guards — emit-lowering phase): a menu member may carry
+  // `stmt.guard` (an `unless` / `only when` applicability guard). It must lower
+  // to this action's `condition[kind=applicability]` (unless -> not, only when
+  // -> identity), mirroring the `when`-branch condition path in emitBranch.
+  // Guarded members currently emit WITHOUT their condition. See docs/decision-shapes.md.
   const leafResult = emitLeafAction(stmt.action, ctx);
   if (leafResult === null) return { kind: "suppressed", reason: "unresolved-ref" };
 
@@ -598,8 +651,10 @@ function collectUseDecisions(
     const name = getRefName(normalized);
     if (knownDecisionNames.has(name)) refs.add(name);
   }
-  function visitWhenBlock(wb: WhenBlock): void {
-    const body = wb.body;
+  function visitBranch(branch: BranchBlock): void {
+    // `when`/`otherwise` both walk their body for `use decision` edges; an
+    // `otherwise` body's delegation is a real edge.
+    const body = branch.body;
     if (body.type === "ActionStatement") {
       if (body.action.type === "UseDecision") {
         tryAddDecisionRef(body.action.decisionName);
@@ -608,13 +663,13 @@ function collectUseDecisions(
     }
     // BlockBody
     for (const stmt of body.statements) {
-      if (stmt.type === "WhenBlock") visitWhenBlock(stmt);
+      if (stmt.type === "WhenBlock" || stmt.type === "OtherwiseBlock") visitBranch(stmt);
       else if (stmt.action.type === "UseDecision") {
         tryAddDecisionRef(stmt.action.decisionName);
       }
     }
   }
-  for (const wb of d.body.statements) visitWhenBlock(wb);
+  for (const branch of d.body.statements) visitBranch(branch);
   return refs;
 }
 
