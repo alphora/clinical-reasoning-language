@@ -31,10 +31,11 @@ const check = async (label, fn) => {
 
 await client.connect(transport);
 try {
-  await check("MCP tools: 8 registered (tokenize_crl, build_crl_ast, validate_crl, validate_cel, emit_cql, emit_crl_fhir, emit_cel, run_decision)", async () => {
+  await check("MCP tools: 9 registered (…, run_decision, authoring_kit)", async () => {
     const { tools } = await client.listTools();
     const names = tools.map((t) => t.name).sort();
     assert.deepEqual(names, [
+      "authoring_kit",
       "build_crl_ast",
       "emit_cel",
       "emit_cql",
@@ -44,6 +45,34 @@ try {
       "validate_cel",
       "validate_crl",
     ]);
+  });
+
+  await check("authoring_kit (default stage) → local-decision-support payload with embedded reference artifacts", async () => {
+    const r = await client.callTool({ name: "authoring_kit", arguments: {} });
+    assert.ok(!r.isError, "should not be a tool error");
+    const kit = JSON.parse(r.content[0].text);
+    assert.equal(kit.stage, "local-decision-support");
+    assert.equal(typeof kit.schemaVersion, "string");
+    assert.match(kit.contentHash, /^[0-9a-f]{64}$/);
+    assert.ok(Array.isArray(kit.rules) && kit.rules.length > 0);
+    assert.ok(Array.isArray(kit.typeAllowlist.conceptTypes) && kit.typeAllowlist.conceptTypes.includes("Condition"));
+    const refNames = kit.referenceArtifacts.map((a) => a.name).sort();
+    assert.deepEqual(refNames, ["decision-reference.cel", "decision-reference.crl"]);
+    assert.ok(kit.verifyLoop.doesNotProve.length > 0, "verifyLoop must state what a green run does NOT prove");
+  });
+
+  await check("authoring_kit embedded decision-reference.crl validates clean via validate_crl", async () => {
+    const kit = JSON.parse((await client.callTool({ name: "authoring_kit", arguments: {} })).content[0].text);
+    const crl = kit.referenceArtifacts.find((a) => a.name === "decision-reference.crl").source;
+    const r = await client.callTool({ name: "validate_crl", arguments: { code: crl } });
+    const out = JSON.parse(r.content[0].text);
+    assert.equal(out.success, true, `embedded reference CRL must validate clean; errors: ${JSON.stringify(out.errors).slice(0, 200)}`);
+  });
+
+  await check("authoring_kit with unknown stage → isError listing valid stages", async () => {
+    const r = await client.callTool({ name: "authoring_kit", arguments: { stage: "emit" } });
+    assert.equal(r.isError, true);
+    assert.match(r.content[0].text, /local-decision-support/);
   });
 
   await check("run_decision via path → dme101-030.cel: 3 cases pass the result-is oracle", async () => {

@@ -57,6 +57,17 @@ export type {
 } from "./cel/imports";
 export { runCel } from "./cre";
 export type { CaseRun, CelRunResult, ProducedRec, TraceNode } from "./cre";
+export { getAuthoringKit, STAGES, DEFAULT_STAGE } from "./authoring-kit";
+export type {
+  AuthoringKit,
+  AuthoringStage,
+  ConceptLayerEntry,
+  KitRule,
+  KitExample,
+  ReferenceArtifact,
+  TypeAllowlist,
+  VerifyLoop,
+} from "./authoring-kit/types";
 export { validateCEL, validateCELFile } from "./cel/validator";
 export type {
   CELValidationError,

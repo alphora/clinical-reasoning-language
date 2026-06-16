@@ -13,6 +13,8 @@ import {
   resolveCelImports,
   emitFhirDefFromPath,
   runCel,
+  getAuthoringKit,
+  DEFAULT_STAGE,
 } from "@smile-digital-health/crl";
 import type { ImportDiagnostic } from "@smile-digital-health/crl";
 
@@ -485,7 +487,43 @@ function createServer(): McpServer {
     (args) => runDecision(args as { path: string; case?: string })
   );
 
+  server.registerTool(
+    "authoring_kit",
+    {
+      title: "CRL authoring kit (stage-sliced)",
+      description:
+        "Return the self-contained authoring knowledge a Knowledge-Engineering agent needs to encode one " +
+        "CRL artifact for a given stage: the concept-layer model, authoring rules (decision shapes, guards, " +
+        "dispositions, CEL cases, the verify loop), the grammar type allowlists (full + a stage-recommended " +
+        "subset), validated reference artifacts (decision-reference.crl/.cel embedded inline), do/don't " +
+        "examples, and a feedback URL. The verify loop states what a green `run_decision` does AND does NOT " +
+        "prove (it is asserted-only — it never evaluates `code is`). v1 stage: \"local-decision-support\" " +
+        "(narrow: local `code is` sources only; shallow: asserted decision-supporting concepts only). " +
+        "Returns the kit JSON incl. `schemaVersion` + a derived `contentHash`. Unknown stage → tool error " +
+        "listing valid stages.",
+      inputSchema: {
+        stage: z
+          .string()
+          .optional()
+          .describe('Authoring stage. Default "local-decision-support". Unknown → error listing valid stages.')
+      }
+    },
+    (args) => runAuthoringKit(args as { stage?: string })
+  );
+
   return server;
+}
+
+function runAuthoringKit(args: { stage?: string }): {
+  content: Array<{ type: "text"; text: string }>;
+  isError?: boolean;
+} {
+  try {
+    const kit = getAuthoringKit(args.stage ?? DEFAULT_STAGE);
+    return { content: [{ type: "text", text: JSON.stringify(kit, null, 2) }] };
+  } catch (e) {
+    return { content: [{ type: "text", text: (e as Error).message }], isError: true };
+  }
 }
 
 function runDecision(args: { path: string; case?: string }): {
