@@ -390,7 +390,7 @@ function validateCrossResource(
  * Mirrors the decision-body walk shape in src/validator/referenceResolver.ts:283-323
  * and src/validator/cycleDetector.ts (T02).
  */
-function collectDecisionArms(decision: Decision): Set<string> {
+export function collectDecisionArms(decision: Decision): Set<string> {
   const arms = new Set<string>();
   for (const branch of decision.body.statements) {
     walkArmsBranch(branch, arms);
