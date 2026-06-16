@@ -32,7 +32,7 @@ const check = async (label, fn) => {
 
 await client.connect(transport);
 try {
-  await check("MCP tools: 7 registered (tokenize_crl, build_crl_ast, validate_crl, validate_cel, emit_cql, emit_crl_fhir, emit_cel)", async () => {
+  await check("MCP tools: 8 registered (tokenize_crl, build_crl_ast, validate_crl, validate_cel, emit_cql, emit_crl_fhir, emit_cel, run_decision)", async () => {
     const { tools } = await client.listTools();
     const names = tools.map((t) => t.name).sort();
     assert.deepEqual(names, [
@@ -40,10 +40,27 @@ try {
       "emit_cel",
       "emit_cql",
       "emit_crl_fhir",
+      "run_decision",
       "tokenize_crl",
       "validate_cel",
       "validate_crl",
     ]);
+  });
+
+  await check("run_decision via path → dme101-030.cel: 3 cases pass the result-is oracle", async () => {
+    const dme101Cel = resolve(here, "../../src/tests/fixtures/policies/dme101-030/dme101-030.cel");
+    const r = await client.callTool({ name: "run_decision", arguments: { path: dme101Cel } });
+    assert.ok(!r.isError, "should not be a tool error");
+    const out = JSON.parse(r.content[0].text);
+    assert.equal(out.success, true);
+    assert.equal(out.caseCount, 3);
+    assert.equal(out.passCount, 3);
+    assert.equal(out.errorCount, 0);
+  });
+
+  await check("run_decision without path → isError", async () => {
+    const r = await client.callTool({ name: "run_decision", arguments: {} });
+    assert.equal(r.isError, true);
   });
 
   await check("validate_cel via path → cms22.cel validates clean", async () => {

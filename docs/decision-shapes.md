@@ -110,6 +110,34 @@ first:
 - otherwise then recommend activity "Approve".
 ```
 
+### Per-action guards — `unless` / `only when`
+Inside a multi-action `any:` / `all:` block, a menu item may carry a guard so the
+menu adapts per case — "offer this menu, minus the items this patient can't have":
+
+- **`unless "C"`** — drop this item when concept `C` holds.
+- **`only when "C"`** — include this item only when concept `C` holds.
+
+```
+decision "Therapy Options":
+- when "Has Indication" then:
+  any:
+  - recommend activity "Refer To Specialist".
+  - recommend activity "Start Medication" unless "Medication Contraindicated".
+  - recommend activity "Order Advanced Imaging" only when "Imaging Eligible".
+  end.
+```
+Here `Refer To Specialist` is always offered; `Start Medication` is offered unless
+contraindicated; `Order Advanced Imaging` is offered only when the patient is
+eligible. If every item in the menu is guarded out, the branch produces nothing
+(a runtime diagnostic) — keep at least one always-offered item when a disposition
+is required.
+
+Guards are legal **only** on members of a multi-action `any:` / `all:` block. They
+are rejected on an inline `when … then recommend …` action, on an `otherwise`
+action, and on a single (menu-less) action — see the don't-case below. The guard
+concept resolves like any other reference (an unknown concept is an unresolved
+reference).
+
 ### Nested `first:` and an `otherwise` carrying a body
 A nested `first:` may omit `otherwise` when its branches are exhaustive.
 ```

@@ -55,6 +55,8 @@ export type {
   ResolvedCelGraph,
   CelImportDiagnostic,
 } from "./cel/imports";
+export { runCel } from "./cre";
+export type { CaseRun, CelRunResult, ProducedRec, TraceNode } from "./cre";
 export { validateCEL, validateCELFile } from "./cel/validator";
 export type {
   CELValidationError,

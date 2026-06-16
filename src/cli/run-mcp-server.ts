@@ -9,6 +9,7 @@ import type { ImportDiagnostic } from "../imports/types";
 import { validateCELFile } from "../cel/validator";
 import { emitCelToFhir } from "../cel/emitter";
 import { resolveCelImports } from "../cel/imports";
+import { runCel } from "../cre";
 import { emitFhirDefFromPath } from "../fhir-emitter";
 
 // Caps the CRL SOURCE (input) size. Response size scales with this — there is
@@ -457,7 +458,62 @@ export function createServer(): McpServer {
     (args) => runEmitCel(args as { path: string; includeResources?: boolean }),
   );
 
+  server.registerTool(
+    "run_decision",
+    {
+      title: "Run CRL decisions over CEL cases (CRE)",
+      description:
+        "Evaluate the CRL decision(s) a CEL document covers over each case's facts and check the case's " +
+        "`result is` oracle — the CRL Clinical Reasoning Engine (#115), an authoring-time interpreter " +
+        "(NOT the FHIR/CQL engine). Pass `path` (an absolute .cel file path); the resolver walks to the " +
+        "nearest package.json to load the covered CRL closure. v1 is asserted-only: a concept is satisfied " +
+        "iff a case fact is `defined by` it; it walks the full decision shape (first:/all:/any:/otherwise " +
+        "+ `unless`/`only when` guards) and a decision-leaf `result is` passes iff the expected branch is " +
+        "in the produced recommendation set. Returns { success, caseCount, passCount, failCount, " +
+        "errorCount, runs:[{case, decision, status, expected, produced, trace, diagnostics}], errors, " +
+        "importDiagnostics }. NOT yet evaluated (deferred): `defined as`/`definition is` inference, " +
+        "temporal, value thresholds, transitive `use decision`.",
+      inputSchema: {
+        path: z
+          .string()
+          .min(1)
+          .describe("Absolute path to a .cel file. Imports walk to nearest package.json."),
+        case: z.string().optional().describe("Optional: run only the named case (default: all cases)."),
+      },
+    },
+    (args) => runDecision(args as { path: string; case?: string }),
+  );
+
   return server;
+}
+
+function runDecision(args: { path: string; case?: string }): {
+  content: Array<{ type: "text"; text: string }>;
+  isError?: boolean;
+} {
+  let stat;
+  try {
+    stat = statSync(args.path);
+  } catch {
+    return { content: [{ type: "text", text: `Path "${args.path}" not readable.` }], isError: true };
+  }
+  if (!stat.isFile()) {
+    return { content: [{ type: "text", text: `Path "${args.path}" is not a file.` }], isError: true };
+  }
+  const graph = resolveCelImports(args.path);
+  const result = runCel(graph);
+  const runs = args.case ? result.runs.filter((r) => r.case === args.case) : result.runs;
+  const summary = {
+    success: result.success && runs.every((r) => r.status !== "error"),
+    caseCount: runs.length,
+    passCount: runs.filter((r) => r.status === "pass").length,
+    failCount: runs.filter((r) => r.status === "fail").length,
+    errorCount: runs.filter((r) => r.status === "error").length,
+    runs,
+    errors: result.errors,
+    importDiagnostics: graph.diagnostics.filter((d) => d.severity === "error"),
+  };
+  return { content: [{ type: "text", text: JSON.stringify(summary, null, 2) }] };
 }
 
 function runEmitCrlFhir(args: {
