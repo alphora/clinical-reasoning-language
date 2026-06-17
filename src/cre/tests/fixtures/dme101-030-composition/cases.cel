@@ -1,0 +1,205 @@
+# DME101.030 — Ultrasonic Osteogenesis Stimulator — cases (Stage 1 CEL, DECOMPOSED)
+library "Ultrasonic Osteogenesis Stimulator Coverage Cases".
+covers "Ultrasonic Osteogenesis Stimulator Coverage".
+
+/*
+========================= NOT PROMOTABLE (proof-pending) =========================
+Companion to the DECOMPOSED dme-101-030-medical-policy.crl. The CANARY case
+"documented nonunion (all six elements) -> Approve" asserts the six NOTE-1 LEAVES
+(not the composite). run_decision v1 does NOT evaluate `defined as`, so today that
+case FAILS (composite unsatisfied -> otherwise -> Deny) — the intended
+proof-pending signal. The six drop-one-leaf cases prove each NOTE-1 element is
+NECESSARY: today they pass for the WRONG reason (the engine never satisfies the
+composite, so everything denies); after alphora/clinical-reasoning-language#126
+they pass for the RIGHT reason (the missing leaf breaks the sem-and). PROMOTE only
+once #126 lands and the canary goes green.
+=================================================================================
+
+Leaf coverage of the decision: 4 `when` branches + `otherwise`. The approval leaf
+is exercised through the full NOTE-1 composition (all six elements), and each
+element is proven necessary by a drop-one-leaf case.
+*/
+
+// ============ Patient ============
+
+fact "Sample Patient":
+- name is "Sample Patient".
+- birth date is "1965-04-12".
+- defined by "Patient".
+
+// ============ NOTE-1 documentation leaves ============
+
+fact "Nonunion Exists Finding":
+- code is "http://example.org/hcsc/dme101-030|nonunion-exists".
+- date is "2026-01-15".
+- defined by "Ultrasonic Osteogenesis Stimulator Coverage"."Nonunion Exists".
+
+fact "Two Sets Finding":
+- code is "http://example.org/hcsc/dme101-030|at-least-two-radiograph-sets".
+- date is "2026-01-15".
+- defined by "Ultrasonic Osteogenesis Stimulator Coverage"."At Least Two Radiograph Sets".
+
+fact "Prior To Treatment Finding":
+- code is "http://example.org/hcsc/dme101-030|radiographs-prior-to-treatment".
+- date is "2026-01-15".
+- defined by "Ultrasonic Osteogenesis Stimulator Coverage"."Radiographs Obtained Prior To Treatment".
+
+fact "Ninety Days Apart Finding":
+- code is "http://example.org/hcsc/dme101-030|radiograph-sets-at-least-ninety-days-apart".
+- date is "2026-01-15".
+- defined by "Ultrasonic Osteogenesis Stimulator Coverage"."Radiograph Sets At Least Ninety Days Apart".
+
+fact "Multiple Views Finding":
+- code is "http://example.org/hcsc/dme101-030|multiple-views-per-radiograph-set".
+- date is "2026-01-15".
+- defined by "Ultrasonic Osteogenesis Stimulator Coverage"."Multiple Views Per Radiograph Set".
+
+fact "No Healing Finding":
+- code is "http://example.org/hcsc/dme101-030|no-interval-healing-attested".
+- date is "2026-01-15".
+- defined by "Ultrasonic Osteogenesis Stimulator Coverage"."No Clinically Significant Interval Healing".
+
+// ============ Exclusion facts ============
+
+fact "Concurrent Stimulator Device":
+- code is "http://example.org/hcsc/dme101-030|concurrent-noninvasive-stimulator".
+- date is "2026-01-15".
+- defined by "Ultrasonic Osteogenesis Stimulator Coverage"."Concurrent Noninvasive Stimulator".
+
+fact "Skull Or Vertebral Fracture Finding":
+- code is "http://example.org/hcsc/dme101-030|skull-or-vertebral-fracture".
+- date is "2026-01-15".
+- defined by "Ultrasonic Osteogenesis Stimulator Coverage"."Skull Or Vertebral Fracture".
+
+fact "Tumor Related Fracture Finding":
+- code is "http://example.org/hcsc/dme101-030|tumor-related-fracture".
+- date is "2026-01-15".
+- defined by "Ultrasonic Osteogenesis Stimulator Coverage"."Tumor Related Fracture".
+
+// ============ Approval canary (RED until #126) ============
+
+case "documented nonunion (all six NOTE-1 elements), no exclusion -> approved":
+- description is `All six NOTE-1 documentation elements are asserted and no
+  exclusion applies, so the composed "Documented Nonunion" is satisfied and
+  coverage is approved. CANARY: fails until run_decision evaluates the
+  composition (#126).`.
+- subject is "Sample Patient".
+- fact is "Nonunion Exists Finding".
+- fact is "Two Sets Finding".
+- fact is "Prior To Treatment Finding".
+- fact is "Ninety Days Apart Finding".
+- fact is "Multiple Views Finding".
+- fact is "No Healing Finding".
+- result is "Ultrasonic Osteogenesis Stimulator Coverage Determination" is "Approve".
+
+// ============ Drop-one-leaf necessity proofs (meaningful post-#126) ============
+
+case "missing: nonunion exists -> denied":
+- description is `Five of six NOTE-1 elements present, "Nonunion Exists" absent:
+  the composition is not satisfied, so the determination denies.`.
+- subject is "Sample Patient".
+- fact is "Two Sets Finding".
+- fact is "Prior To Treatment Finding".
+- fact is "Ninety Days Apart Finding".
+- fact is "Multiple Views Finding".
+- fact is "No Healing Finding".
+- result is "Ultrasonic Osteogenesis Stimulator Coverage Determination" is "Deny".
+
+case "missing: at least two radiograph sets -> denied":
+- description is `"At Least Two Radiograph Sets" absent; the documentation
+  standard is not met, so the determination denies.`.
+- subject is "Sample Patient".
+- fact is "Nonunion Exists Finding".
+- fact is "Prior To Treatment Finding".
+- fact is "Ninety Days Apart Finding".
+- fact is "Multiple Views Finding".
+- fact is "No Healing Finding".
+- result is "Ultrasonic Osteogenesis Stimulator Coverage Determination" is "Deny".
+
+case "missing: radiographs prior to treatment -> denied":
+- description is `"Radiographs Obtained Prior To Treatment" absent; denies.`.
+- subject is "Sample Patient".
+- fact is "Nonunion Exists Finding".
+- fact is "Two Sets Finding".
+- fact is "Ninety Days Apart Finding".
+- fact is "Multiple Views Finding".
+- fact is "No Healing Finding".
+- result is "Ultrasonic Osteogenesis Stimulator Coverage Determination" is "Deny".
+
+case "missing: ninety days apart -> denied":
+- description is `"Radiograph Sets At Least Ninety Days Apart" absent; denies.`.
+- subject is "Sample Patient".
+- fact is "Nonunion Exists Finding".
+- fact is "Two Sets Finding".
+- fact is "Prior To Treatment Finding".
+- fact is "Multiple Views Finding".
+- fact is "No Healing Finding".
+- result is "Ultrasonic Osteogenesis Stimulator Coverage Determination" is "Deny".
+
+case "missing: multiple views per set -> denied":
+- description is `"Multiple Views Per Radiograph Set" absent; denies.`.
+- subject is "Sample Patient".
+- fact is "Nonunion Exists Finding".
+- fact is "Two Sets Finding".
+- fact is "Prior To Treatment Finding".
+- fact is "Ninety Days Apart Finding".
+- fact is "No Healing Finding".
+- result is "Ultrasonic Osteogenesis Stimulator Coverage Determination" is "Deny".
+
+case "missing: no interval healing attestation -> denied":
+- description is `"No Clinically Significant Interval Healing" absent; denies.`.
+- subject is "Sample Patient".
+- fact is "Nonunion Exists Finding".
+- fact is "Two Sets Finding".
+- fact is "Prior To Treatment Finding".
+- fact is "Ninety Days Apart Finding".
+- fact is "Multiple Views Finding".
+- result is "Ultrasonic Osteogenesis Stimulator Coverage Determination" is "Deny".
+
+// ============ Exclusion + precedence + otherwise leaves ============
+
+case "concurrent noninvasive stimulator -> denied":
+- description is `Use with another noninvasive osteogenesis stimulator denies via
+  the first exclusion branch, even with full documentation present.`.
+- subject is "Sample Patient".
+- fact is "Nonunion Exists Finding".
+- fact is "Two Sets Finding".
+- fact is "Prior To Treatment Finding".
+- fact is "Ninety Days Apart Finding".
+- fact is "Multiple Views Finding".
+- fact is "No Healing Finding".
+- fact is "Concurrent Stimulator Device".
+- result is "Ultrasonic Osteogenesis Stimulator Coverage Determination" is "Deny".
+
+case "skull or vertebral fracture -> denied":
+- description is `A fracture of the skull or vertebrae is excluded; denies.`.
+- subject is "Sample Patient".
+- fact is "Skull Or Vertebral Fracture Finding".
+- result is "Ultrasonic Osteogenesis Stimulator Coverage Determination" is "Deny".
+
+case "tumor related fracture -> denied":
+- description is `A tumor-related fracture is excluded; denies.`.
+- subject is "Sample Patient".
+- fact is "Tumor Related Fracture Finding".
+- result is "Ultrasonic Osteogenesis Stimulator Coverage Determination" is "Deny".
+
+case "exclusion overrides full documentation -> denied (ordered precedence)":
+- description is `A tumor-related fracture co-occurs with full NOTE-1
+  documentation. By ordered precedence the exclusion precedes the approval
+  branch, so the determination denies.`.
+- subject is "Sample Patient".
+- fact is "Nonunion Exists Finding".
+- fact is "Two Sets Finding".
+- fact is "Prior To Treatment Finding".
+- fact is "Ninety Days Apart Finding".
+- fact is "Multiple Views Finding".
+- fact is "No Healing Finding".
+- fact is "Tumor Related Fracture Finding".
+- result is "Ultrasonic Osteogenesis Stimulator Coverage Determination" is "Deny".
+
+case "no qualifying criteria asserted -> denied (otherwise)":
+- description is `No documentation element and no exclusion is asserted; the
+  otherwise leaf denies (e.g. a fresh fracture / delayed union — absence of a
+  documented nonunion).`.
+- subject is "Sample Patient".
+- result is "Ultrasonic Osteogenesis Stimulator Coverage Determination" is "Deny".

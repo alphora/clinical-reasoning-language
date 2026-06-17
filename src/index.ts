@@ -56,7 +56,7 @@ export type {
   CelImportDiagnostic,
 } from "./cel/imports";
 export { runCel } from "./cre";
-export type { CaseRun, CelRunResult, ProducedRec, TraceNode } from "./cre";
+export type { CaseRun, CelRunResult, ProducedRec, TraceNode, CompositionTrace } from "./cre";
 export { getAuthoringKit, STAGES, DEFAULT_STAGE } from "./authoring-kit";
 export type {
   AuthoringKit,
