@@ -3,17 +3,14 @@ library "Ultrasonic Osteogenesis Stimulator Coverage Cases".
 covers "Ultrasonic Osteogenesis Stimulator Coverage".
 
 /*
-========================= NOT PROMOTABLE (proof-pending) =========================
-Companion to the DECOMPOSED dme-101-030-medical-policy.crl. The CANARY case
-"documented nonunion (all six elements) -> Approve" asserts the six NOTE-1 LEAVES
-(not the composite). run_decision v1 does NOT evaluate `defined as`, so today that
-case FAILS (composite unsatisfied -> otherwise -> Deny) — the intended
-proof-pending signal. The six drop-one-leaf cases prove each NOTE-1 element is
-NECESSARY: today they pass for the WRONG reason (the engine never satisfies the
-composite, so everything denies); after alphora/clinical-reasoning-language#126
-they pass for the RIGHT reason (the missing leaf breaks the sem-and). PROMOTE only
-once #126 lands and the canary goes green.
-=================================================================================
+============================ Companion CEL (DECOMPOSED) ============================
+Companion to the DECOMPOSED dme-101-030-medical-policy.crl. The approval case
+asserts the six NOTE-1 LEAVES; run_decision evaluates the `defined as` composite
+(#126, landed) and approves. The six drop-one-leaf cases prove each NOTE-1 element
+is NECESSARY — each denies because the one missing leaf breaks the `sem-and` (the
+run_decision composition trace shows the single false operand). Verify loop GREEN:
+run_decision 12/12.
+===================================================================================
 
 Leaf coverage of the decision: 4 `when` branches + `otherwise`. The approval leaf
 is exercised through the full NOTE-1 composition (all six elements), and each
@@ -76,13 +73,13 @@ fact "Tumor Related Fracture Finding":
 - date is "2026-01-15".
 - defined by "Ultrasonic Osteogenesis Stimulator Coverage"."Tumor Related Fracture".
 
-// ============ Approval canary (RED until #126) ============
+// ============ Approval (full NOTE-1 composition) ============
 
 case "documented nonunion (all six NOTE-1 elements), no exclusion -> approved":
 - description is `All six NOTE-1 documentation elements are asserted and no
-  exclusion applies, so the composed "Documented Nonunion" is satisfied and
-  coverage is approved. CANARY: fails until run_decision evaluates the
-  composition (#126).`.
+  exclusion applies, so the composed "Documented Nonunion" sem-and is
+  satisfied (run_decision evaluates the composition, #126) and coverage is
+  approved.`.
 - subject is "Sample Patient".
 - fact is "Nonunion Exists Finding".
 - fact is "Two Sets Finding".
