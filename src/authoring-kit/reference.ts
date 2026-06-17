@@ -162,3 +162,86 @@ case "hard exclusion -> denied":
 - fact is "Exclusion Finding".
 - result is "Imaging Coverage" is "Deny".
 `;
+
+/**
+ * Tools-authored composition reference (Stage-1 `defined as`, now in scope per
+ * #126). Shows the shape: a coverage criterion modeled as a `defined as` boolean
+ * composition over LOCAL `code is` leaves, used directly in a `first:`/`otherwise`
+ * decision — and adversarially testable (drop one leaf → the composite fails →
+ * deny). The kit's unit test materializes this and drives the real CRE over it.
+ */
+export const COMPOSITION_REFERENCE_CRL = `# Composition Reference — Coverage Criteria (Stage 1: defined as)
+library "Coverage Criteria Reference".
+
+/*
+The coverage criterion is a LOCAL composition: two asserted \`code is\` leaves
+combined by \`defined as ( ... sem-and ... )\`. run_decision (#126) evaluates the
+composition, so the criterion is expressed at full granularity AND proven by
+drop-one-leaf cases — not folded into one opaque concept.
+*/
+
+concept "Has Qualifying Diagnosis":
+- type is Condition.
+- code is \`qualifying-diagnosis\`.
+
+concept "Failed Conservative Therapy":
+- type is Observation.
+- code is \`failed-conservative-therapy\`.
+
+concept "Meets Coverage Criteria":
+- defined as ( "Has Qualifying Diagnosis" sem-and "Failed Conservative Therapy" ).
+
+decision "Coverage Determination":
+first:
+- when "Meets Coverage Criteria" then recommend activity "Approve".
+- otherwise then recommend activity "Deny".
+
+activity "Approve":
+- request CPGServiceRequest.
+- with \`Authorize coverage as medically necessary.\`.
+
+activity "Deny":
+- request CPGCommunicationRequest.
+- with \`Coverage criteria are not met.\`.
+`;
+
+export const COMPOSITION_REFERENCE_CEL = `# Composition Reference — Coverage Criteria — cases (Stage 1: defined as)
+library "Coverage Criteria Reference Cases".
+covers "Coverage Criteria Reference".
+
+/*
+Each criterion leaf is asserted as its own fact; the CRE evaluates the composite.
+The drop-one case proves each leaf is necessary (a missing leaf fails the sem-and
+→ deny).
+*/
+
+fact "Sample Patient":
+- name is "Sample Patient".
+- birth date is "1970-01-01".
+- defined by "Patient".
+
+fact "Diagnosis Finding":
+- code is "http://example.org/local|qualifying-diagnosis".
+- date is "2026-01-01".
+- defined by "Coverage Criteria Reference"."Has Qualifying Diagnosis".
+
+fact "Failed Therapy Finding":
+- code is "http://example.org/local|failed-conservative-therapy".
+- date is "2026-01-01".
+- defined by "Coverage Criteria Reference"."Failed Conservative Therapy".
+
+case "both criteria met -> approve":
+- subject is "Sample Patient".
+- fact is "Diagnosis Finding".
+- fact is "Failed Therapy Finding".
+- result is "Coverage Determination" is "Approve".
+
+case "missing failed-therapy leaf -> deny (drop-one)":
+- subject is "Sample Patient".
+- fact is "Diagnosis Finding".
+- result is "Coverage Determination" is "Deny".
+
+case "no criteria -> deny (otherwise)":
+- subject is "Sample Patient".
+- result is "Coverage Determination" is "Deny".
+`;
