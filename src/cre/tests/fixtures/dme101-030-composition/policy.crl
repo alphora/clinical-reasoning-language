@@ -2,18 +2,16 @@
 library "Ultrasonic Osteogenesis Stimulator Coverage".
 
 /*
-========================= NOT PROMOTABLE (proof-pending) =========================
-This is the DECOMPOSED reference encoding. It expresses the policy's full local
-granularity: NOTE 1's documentation standard is modeled as six LOCAL asserted
-`code is` leaves combined by `defined as`. The CRE (run_decision v1) does NOT yet
-evaluate `defined as` composition (asserting the leaves does not satisfy the
-composite), so the canary case "documented nonunion (all six elements), no
-exclusion -> Approve" FAILS today. That red is the intended proof-pending signal.
-PROMOTE only after alphora/clinical-reasoning-language#126 lands and that canary
-(and the drop-one-leaf adversarial cases) pass for the right reason.
-The prior single-asserted-fold encoding (green, promoted) is preserved in git
-history (commit on branch dme101-030-encoding).
-=================================================================================
+============================ DECOMPOSED reference encoding ============================
+Expresses the policy's full LOCAL granularity: NOTE 1's documentation standard is
+modeled as six LOCAL asserted `code is` leaves combined by `defined as`.
+run_decision evaluates the composition (alphora/clinical-reasoning-language#126,
+landed 2026-06-17), so the approval branch is satisfied through the full
+six-element `sem-and` AND each element is proven NECESSARY by a drop-one-leaf
+case. Verify loop GREEN: validate_crl / validate_cel clean; run_decision 12/12.
+The prior single-asserted-fold encoding is preserved in git history (commit
+3b21405 on branch dme101-030-encoding).
+======================================================================================
 
 Encoding of HCSC Medical Policy DME101.030 (effective 2026-01-01), authored from
 the refined source. Stage 1 (local-decision-support): every LEAF concept is a
