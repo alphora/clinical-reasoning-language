@@ -15,7 +15,12 @@ import { activityTypes } from "../grammar/activityTypes";
 import { conceptTypes } from "../grammar/conceptTypes";
 import { conceptValueTypes } from "../grammar/conceptValueTypes";
 
-import { DECISION_REFERENCE_CEL, DECISION_REFERENCE_CRL } from "./reference";
+import {
+  COMPOSITION_REFERENCE_CEL,
+  COMPOSITION_REFERENCE_CRL,
+  DECISION_REFERENCE_CEL,
+  DECISION_REFERENCE_CRL,
+} from "./reference";
 import type {
   AuthoringKit,
   AuthoringStage,
@@ -38,7 +43,8 @@ const FEEDBACK_URL = "https://github.com/alphora/clinical-reasoning-language/iss
 const SUMMARY =
   "Stage 1 — local-decision-support. Encode a clinical decision over LOCAL coded " +
   "case-features and prove it with CEL cases + the CRE oracle. Narrow (local `code is` " +
-  "sources only) + shallow (asserted decision-supporting concepts only).";
+  "sources only) + shallow (asserted concepts + `defined as` boolean composition; no " +
+  "`definition is` predicates or external sources).";
 
 const CONCEPT_LAYER_MODEL: ConceptLayerEntry[] = [
   {
@@ -53,12 +59,13 @@ const CONCEPT_LAYER_MODEL: ConceptLayerEntry[] = [
   },
   {
     form: "- defined as ( ... sem-and / sem-or / sem-not ... ).",
-    meaning: "Semantic composition of other concepts. The INFERRED layer.",
-    scope: "out",
+    meaning:
+      "Boolean composition over other LOCAL concepts (the only added depth this stage; #126). run_decision evaluates it: sem-and = all, sem-or = any, sem-not = not (closed-world). Bare operands resolve within the defining library; cross-library operands must be qualified.",
+    scope: "in",
   },
   {
     form: "- definition is <predicate>.",
-    meaning: "A predicate (most recent / count within / temporal). The INFERRED layer.",
+    meaning: "A predicate (most recent / count within / temporal / value). The INFERRED layer — computes over a source.",
     scope: "out",
   },
 ];
@@ -67,8 +74,8 @@ const RULES: KitRule[] = [
   {
     id: "concept-form",
     category: "concept-model",
-    rule: "Stage-1 concepts carry `type is` + `code is` only. The stage boundary is the concept FORM — no `source representation`, no `defined as` / `definition is` — NOT the type vocabulary: any FHIR type may be a local `code is` concept. `meta is` is optional metadata and is allowed.",
-    why: "Narrow + shallow first pass proves local-source decision authoring before inference/external sources are added.",
+    rule: "Stage-1 leaf concepts carry `type is` + `code is` (local). Multi-part criteria may be composed with `defined as` boolean composition over those local leaves (run_decision evaluates it) — PREFER decomposing a criterion into named leaves + a `defined as` composite so each part is adversarially testable (drop-one-leaf → the composite fails), rather than one opaque concept. Still OUT this stage: `source representation`/`coded from` (external) and `definition is` predicates (count/temporal/value). The boundary is the concept FORM, not the type vocabulary: any FHIR type may be a local `code is` concept. `meta is` is optional.",
+    why: "Local-source pass proves decision authoring (incl. local composition) before external sources and predicate inference are added.",
     ref: "concept-layer-model; src/tests/fixtures/representation/mammogram-and-bmi.crl",
   },
   {
@@ -150,7 +157,15 @@ const EXAMPLES: KitExample[] = [
     language: "crl",
     snippet: 'concept "Documented Nonunion":\n- type is Condition.\n- code is `documented-nonunion`.',
     valid: true,
-    note: "type is + code is only — the Stage-1 concept form.",
+    note: "type is + code is only — the Stage-1 leaf concept form.",
+  },
+  {
+    title: "Decompose a multi-part criterion with `defined as` composition",
+    language: "crl",
+    snippet:
+      'concept "Has Dx":\n- type is Condition.\n- code is `dx`.\nconcept "Failed Therapy":\n- type is Observation.\n- code is `failed-therapy`.\nconcept "Meets Criteria":\n- defined as ( "Has Dx" sem-and "Failed Therapy" ).',
+    valid: true,
+    note: "Each leaf is a local `code is` concept; the composite ANDs them. run_decision evaluates the composition, so a drop-one-leaf case proves each leaf necessary.",
   },
   {
     title: "Matched branch with a guarded `any:` menu",
@@ -193,9 +208,8 @@ const VERIFY_LOOP: VerifyLoop = {
 };
 
 const BOUNDARY = [
-  "concept inference (`defined as` / `definition is`)",
+  "`definition is` predicates (count / most-recent / temporal / value thresholds — compute over a source)",
   "external / value-set sources (`source representation` / `coded from`)",
-  "temporal & value-threshold predicates",
   "emit to FHIR / CQL",
 ];
 
@@ -221,6 +235,20 @@ function buildBase(stage: AuthoringStage): Omit<AuthoringKit, "contentHash"> {
         purpose:
           "Companion cases for decision-reference.crl: Patient subject, concept-linked facts, and one `result is` oracle per path (the unless drop, the only-when enable, ordered exclusion, a plain offer).",
         source: DECISION_REFERENCE_CEL,
+      },
+      {
+        name: "composition-reference.crl",
+        language: "crl",
+        purpose:
+          "A coverage criterion modeled as a `defined as` boolean composition over local `code is` leaves, used in a first:/otherwise decision — the now-in-scope composition shape (#126).",
+        source: COMPOSITION_REFERENCE_CRL,
+      },
+      {
+        name: "composition-reference.cel",
+        language: "cel",
+        purpose:
+          "Companion cases: both-criteria-met (composite satisfied → approve), a drop-one-leaf necessity proof (→ deny), and otherwise.",
+        source: COMPOSITION_REFERENCE_CEL,
       },
     ],
     examples: EXAMPLES,

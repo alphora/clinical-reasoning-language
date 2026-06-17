@@ -13,7 +13,12 @@ import { conceptValueTypes } from "../../grammar/conceptValueTypes";
 import type { DecisionShapeError } from "../../validator/validator";
 import { Validator } from "../../validator/validator";
 
-import { DECISION_REFERENCE_CEL, DECISION_REFERENCE_CRL } from "../reference";
+import {
+  COMPOSITION_REFERENCE_CEL,
+  COMPOSITION_REFERENCE_CRL,
+  DECISION_REFERENCE_CEL,
+  DECISION_REFERENCE_CRL,
+} from "../reference";
 import { getAuthoringKit, STAGES } from "../index";
 
 function crlErrors(src: string) {
@@ -68,6 +73,42 @@ describe("authoring-kit — reference artifacts", () => {
     const built = buildCEL(DECISION_REFERENCE_CEL);
     expect(built.success).toBe(true);
   });
+
+  it("composition-reference.crl validates clean (incl. the pure-composition concept)", () => {
+    expect(crlErrors(COMPOSITION_REFERENCE_CRL)).toEqual([]);
+  });
+
+  it("composition-reference.cel + .crl: validate clean and the CRE evaluates the composition (real path)", () => {
+    const dir = mkdtempSync(join(tmpdir(), "authoring-kit-comp-"));
+    writeFileSync(
+      join(dir, "package.json"),
+      JSON.stringify({
+        name: "authoring-kit-composition-reference",
+        version: "1.0.0",
+        private: true,
+        crl: {
+          canonicalBase: "http://example.org/authoring-kit-composition-reference",
+          status: "draft",
+          experimental: true,
+        },
+      }),
+    );
+    writeFileSync(join(dir, "composition-reference.crl"), COMPOSITION_REFERENCE_CRL);
+    const celPath = join(dir, "composition-reference.cel");
+    writeFileSync(celPath, COMPOSITION_REFERENCE_CEL);
+
+    const v = validateCELFile(celPath);
+    expect(v.errors).toEqual([]);
+
+    const run = runCel(resolveCelImports(celPath));
+    expect(run.success).toBe(true);
+    expect(run.runs.length).toBe(3);
+    expect(run.runs.every((r) => r.status === "pass")).toBe(true);
+    // The composite is satisfied via composition (not a direct fact).
+    const canary = run.runs.find((r) => r.case.startsWith("both criteria met"))!;
+    const node = canary.trace.find((n) => n.concept === "Meets Coverage Criteria")!;
+    expect(node.composition?.satisfied).toBe(true);
+  });
 });
 
 describe("authoring-kit — getAuthoringKit", () => {
@@ -100,16 +141,29 @@ describe("authoring-kit — getAuthoringKit", () => {
     }
   });
 
-  it("embeds both reference artifacts inline", () => {
+  it("embeds the reference artifacts inline (decision + composition)", () => {
     const kit = getAuthoringKit();
     const names = kit.referenceArtifacts.map((a) => a.name).sort();
-    expect(names).toEqual(["decision-reference.cel", "decision-reference.crl"]);
-    expect(kit.referenceArtifacts.find((a) => a.name === "decision-reference.crl")?.source).toBe(
-      DECISION_REFERENCE_CRL,
-    );
-    expect(kit.referenceArtifacts.find((a) => a.name === "decision-reference.cel")?.source).toBe(
-      DECISION_REFERENCE_CEL,
-    );
+    expect(names).toEqual([
+      "composition-reference.cel",
+      "composition-reference.crl",
+      "decision-reference.cel",
+      "decision-reference.crl",
+    ]);
+    const src = (n: string) => kit.referenceArtifacts.find((a) => a.name === n)?.source;
+    expect(src("decision-reference.crl")).toBe(DECISION_REFERENCE_CRL);
+    expect(src("decision-reference.cel")).toBe(DECISION_REFERENCE_CEL);
+    expect(src("composition-reference.crl")).toBe(COMPOSITION_REFERENCE_CRL);
+    expect(src("composition-reference.cel")).toBe(COMPOSITION_REFERENCE_CEL);
+  });
+
+  it("conceptLayerModel marks `defined as` composition IN scope; predicates/external OUT", () => {
+    const kit = getAuthoringKit();
+    const byForm = (frag: string) => kit.conceptLayerModel.find((e) => e.form.includes(frag))!;
+    expect(byForm("code is").scope).toBe("in");
+    expect(byForm("defined as").scope).toBe("in");
+    expect(byForm("definition is").scope).toBe("out");
+    expect(byForm("source representation").scope).toBe("out");
   });
 
   it("verifyLoop is honest about what a green run does and does not prove", () => {
@@ -124,7 +178,7 @@ describe("authoring-kit — getAuthoringKit", () => {
     expect(a.contentHash).toMatch(/^[0-9a-f]{64}$/);
     expect(a.contentHash).toBe(b.contentHash);
     // Pinned snapshot — any payload byte change must update this deliberately.
-    expect(a.contentHash).toBe("51f99d1e3a58c0a5f5a0b10e1d5d8b33c6cd0c6bf32d3941b4e42ed58ba6150d");
+    expect(a.contentHash).toBe("bc1d36378e8a73144cc3b385beb45efcbdc93fde0e601c9dd7d501f443973ae1");
   });
 
   it("STAGES contains exactly the one Stage-1 slice", () => {
