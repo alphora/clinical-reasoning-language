@@ -19,6 +19,11 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.js"
+    },
+    "./language-services": {
+      "types": "./dist/language-services/index.d.ts",
+      "import": "./dist/language-services/index.js",
+      "require": "./dist/language-services/index.js"
     }
   },
   "files": [

@@ -7,9 +7,9 @@ import {
   PARAMETER_TYPES,
   type Pattern,
 } from "./catalog";
-import { scanDeclarations, findNarrativeDeclaration, type Declaration } from "./concepts";
-import { findByConceptFirstPrecedence } from "./completionHelpers";
-import type { IndexedDeclaration, ProjectIndex } from "./projectIndex";
+import { scanDeclarations, findNarrativeDeclaration, type Declaration } from "@smile-digital-health/crl/language-services";
+import { findByConceptFirstPrecedence } from "@smile-digital-health/crl/language-services";
+import type { IndexedDeclaration, ProjectIndex } from "@smile-digital-health/crl/language-services";
 
 const CONCEPT_TYPE_SET: ReadonlySet<string> = new Set(CONCEPT_TYPES);
 const CONCEPT_VALUETYPE_SET: ReadonlySet<string> = new Set(CONCEPT_VALUETYPES);

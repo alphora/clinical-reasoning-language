@@ -3,7 +3,7 @@
 // match the repo's existing extension test scaffolding.
 
 import { strict as assert } from "node:assert";
-import { detectExpectedKind, detectQualifiedRefQualifier, isInsideOpenQuote } from "../dist/contextDetect.js";
+import { detectExpectedKind, detectQualifiedRefQualifier, isInsideOpenQuote } from "@smile-digital-health/crl/language-services";
 
 const cases = [
   // [prefix, expectedKind]

@@ -1,6 +1,6 @@
 // Unit tests for the pure highlight helpers. Imports the BUILT bundle.
 // Run via `npm run test:highlight`.
-import * as mod from "../dist/highlight.js";
+import * as mod from "@smile-digital-health/crl/language-services";
 import assert from "node:assert/strict";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";

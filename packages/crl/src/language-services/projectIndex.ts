@@ -1,12 +1,9 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 
-import {
-  findProjectRoot,
-  resolveImports,
-  type ResolvedGraph,
-  type RegistryEntry,
-} from "@smile-digital-health/crl";
+import { resolveImports } from "../imports";
+import { findProjectRoot } from "../imports/registry";
+import type { ResolvedGraph, RegistryEntry } from "../imports/types";
 
 /**
  * Project-wide indexed view of a single .crl file: which library it

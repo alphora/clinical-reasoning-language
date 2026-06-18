@@ -7,10 +7,10 @@
 
 import assert from "node:assert/strict";
 
-import * as cdMod from "../dist/contextDetect.js";
+import * as cdMod from "@smile-digital-health/crl/language-services";
 const { detectQualifiedRefQualifier, isInsideOpenQuote } = cdMod.default ?? cdMod;
 
-import * as mod from "../dist/completionHelpers.js";
+import * as mod from "@smile-digital-health/crl/language-services";
 const {
   isTypeCompletionPrefix,
   isValuetypeCompletionPrefix,

@@ -20,6 +20,17 @@ function assertCrlBuilt() {
         "Run `npm run build -w @smile-digital-health/crl` first (needs the ANTLR/Java toolchain)."
     );
   }
+  // #132 step 1: the host bundle pulls language-services from core via the subpath —
+  // verify it resolves + is built (a stale core build may have dist/index.js but not this).
+  let lsEntry;
+  try {
+    lsEntry = require.resolve("@smile-digital-health/crl/language-services");
+  } catch {
+    throw new Error("@smile-digital-health/crl/language-services unresolvable: rebuild core (`npm run build -w @smile-digital-health/crl`).");
+  }
+  if (!fs.existsSync(lsEntry)) {
+    throw new Error(`CRL language-services not built: ${lsEntry} is missing — run \`npm run build -w @smile-digital-health/crl\`.`);
+  }
 }
 
 const isBuiltin = (p) => builtinModules.includes(p.replace(/^node:/, ""));
@@ -91,9 +102,11 @@ async function build() {
     );
   }
 
-  // Pure node modules (fs/path/crypto). Bundled separately so the unit tests can
-  // import them directly; the extension host imports the same source.
-  for (const name of ["provision", "highlight", "catalog", "concepts", "contextDetect", "completionHelpers", "findDeclaration", "projectIndex"]) {
+  // provision + catalog: pure node modules bundled separately so the unit tests can
+  // import them directly. (The language-services modules — concepts, completionHelpers,
+  // contextDetect, findDeclaration, projectIndex, highlight — moved to core in #132
+  // step 1; their tests now import them from @smile-digital-health/crl/language-services.)
+  for (const name of ["provision", "catalog"]) {
     await esbuild.build({
       entryPoints: [path.resolve(__dirname, `src/${name}.ts`)],
       outfile: path.resolve(__dirname, `dist/${name}.js`),
@@ -127,7 +140,7 @@ async function build() {
   );
 
   console.log(
-    "esbuild: built extension.js + mcp-server.js + provision.js + highlight.js + catalog.js + concepts.js + completionHelpers.js; " +
+    "esbuild: built extension.js + mcp-server.js + provision.js + catalog.js; " +
       `embedded ${patterns.length} catalog patterns; gates passed ` +
       `(externals: ${[...new Set(externalImports)].join(", ") || "none"}).`
   );

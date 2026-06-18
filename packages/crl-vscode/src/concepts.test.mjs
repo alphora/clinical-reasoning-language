@@ -4,7 +4,7 @@
 
 import assert from "node:assert/strict";
 
-import * as mod from "../dist/concepts.js";
+import * as mod from "@smile-digital-health/crl/language-services";
 const { scanDeclarations, declarationsByName, findNarrativeDeclaration } = mod.default ?? mod;
 
 // --- terminology header + body ---
