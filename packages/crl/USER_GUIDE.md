@@ -1032,7 +1032,7 @@ See [features/cql-pattern-mining/results/models/cms69-split/cms69-strategy.crl](
 ## Reference
 
 For the full, up-to-date grammar, see:
-- [src/grammar/CRLParser.g4](`https://github.com/alphora/clinical-reasoning-language/blob/main/src/grammar/CRLParser.g4`) parser rules)
-- [src/grammar/CRLLexer.g4](`https://github.com/alphora/clinical-reasoning-language/blob/main/src/grammar/CRLLexer.g4`) (lexer rules)
+- [src/grammar/CRLParser.g4](`https://github.com/alphora/clinical-reasoning-language/blob/main/packages/crl/src/grammar/CRLParser.g4`) parser rules)
+- [src/grammar/CRLLexer.g4](`https://github.com/alphora/clinical-reasoning-language/blob/main/packages/crl/src/grammar/CRLLexer.g4`) (lexer rules)
 
 For questions or contributions, see the project repository.

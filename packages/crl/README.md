@@ -72,17 +72,17 @@ tar -ztvf <package-name>.tgz
 
 #### Cutting a release (build both artifacts + upload to GitHub)
 
-Releases ship two artifacts side-by-side: the npm tarball (`@smile-digital-health/crl-<version>.tgz`) and the VS Code extension VSIX (`crl-language-support-<version>.vsix`).
+Releases ship two artifacts side-by-side: the npm tarball (`smile-digital-health-crl-<version>.tgz`) and the VS Code extension VSIX (`crl-language-support-<version>.vsix`).
 
 **Heads-up (Windows):** if you have VS Code open with the CRL extension active, its bundled MCP server keeps `dist/` files open and both `npm pack` and `npm run package` will fail with `EPERM` on `dist/`. Close VS Code (or just disable the CRL extension) before running the build commands below.
 
 ```bash
-# 1. Close VS Code (or disable the CRL extension) so the MCP server releases its lock on dist/.
-# 2. From the repo root, build the npm tarball:
-npm pack
+# 1. Close VS Code (or disable the CRL extension) so the MCP server releases any lock on dist/.
+# 2. From the repo root, build the npm tarball for the core package:
+npm pack -w @smile-digital-health/crl
 
-# 3. Build the extension VSIX:
-cd ../crl-vscode && npm run package
+# 3. Build the extension VSIX (also from the repo root):
+npm run package -w crl-language-support
 
 # 4. Upload the resulting .tgz and .vsix to the corresponding GitHub release.
 ```
@@ -511,7 +511,7 @@ Note: This project uses a custom AST implementation that uses ANTLR's visitor pa
 >
 > The authoritative release checklist and instructions are maintained in a single location:
 > 
-> **[.github/PULL_REQUEST_TEMPLATE/release.md](.github/PULL_REQUEST_TEMPLATE/release.md)**
+> **[.github/PULL_REQUEST_TEMPLATE/release.md](../../.github/PULL_REQUEST_TEMPLATE/release.md)**
 >
 > Always follow the steps in this file when preparing a new release. This ensures consistency and reduces maintenance overhead. If you need to update the release process, update the PR template only.
 
@@ -525,7 +525,7 @@ Note: This project uses a custom AST implementation that uses ANTLR's visitor pa
 - **Generated Files:** Auto-generated files (e.g., ANTLR outputs, grammar-driven types) are ignored by git and should never be edited manually. Always use the provided scripts to regenerate them.
 - **Documentation:** Keep all documentation referencing the release checklist up-to-date by linking to the PR template.
 
-For more details, see the [release PR template](.github/PULL_REQUEST_TEMPLATE/release.md) and the automation scripts in `.github/scripts/`.
+For more details, see the [release PR template](../../.github/PULL_REQUEST_TEMPLATE/release.md) and the automation scripts in `.github/scripts/`.
 
 ### Error Handling Strategy
 
