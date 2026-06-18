@@ -1,8 +1,7 @@
 // Pre-flight for the extension build. The extension consumes the core package
-// `@smile-digital-health/crl` via a `file:..` dependency, which npm links as a
-// junction (extension/node_modules/@smile-digital-health/crl -> repo root). That
-// junction stores an ABSOLUTE path, so it breaks if the repo directory moves
-// (e.g. a drive change); `npm install` in extension/ regenerates it. This guard
+// `@smile-digital-health/crl` as an npm workspace dependency (packages/crl),
+// which npm links into node_modules. If the link is missing/stale (e.g. before
+// `npm install`, or after a repo move) or core's dist is unbuilt, this guard
 // turns the otherwise-cryptic downstream tsc/esbuild failure into a clear action.
 try {
   const entry = require.resolve("@smile-digital-health/crl"); // throws if junction is missing/stale
@@ -10,8 +9,8 @@ try {
 } catch (e) {
   console.error(
     "\n[crl] Core package `@smile-digital-health/crl` is not resolvable/built.\n" +
-      "  From extension/:  npm install     (relinks the file:.. junction to core)\n" +
-      "  From repo root:   npm run build    (builds core's dist)\n"
+      "  At the repo root:  npm install                                  (links the workspace dep)\n" +
+      "  At the repo root:  npm run build -w @smile-digital-health/crl   (builds core)\n"
   );
   process.exit(1);
 }

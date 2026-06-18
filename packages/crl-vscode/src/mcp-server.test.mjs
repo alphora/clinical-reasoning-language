@@ -12,7 +12,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const serverPath = resolve(here, "../dist/mcp-server.js");
 const fixturePath = resolve(
   here,
-  "../../src/tests/regression/testdata/clinical-reasoning-language-example.crl"
+  "../../crl/src/tests/regression/testdata/clinical-reasoning-language-example.crl"
 );
 const BOM = String.fromCharCode(0xfeff);
 
@@ -66,7 +66,7 @@ try {
   });
 
   await check("run_decision via path → dme101-030.cel: 3 cases pass the result-is oracle", async () => {
-    const dme101Cel = resolve(here, "../../src/tests/fixtures/policies/dme101-030/dme101-030.cel");
+    const dme101Cel = resolve(here, "../../crl/src/tests/fixtures/policies/dme101-030/dme101-030.cel");
     const r = await client.callTool({ name: "run_decision", arguments: { path: dme101Cel } });
     assert.ok(!r.isError, "should not be a tool error");
     const out = JSON.parse(r.content[0].text);
@@ -82,7 +82,7 @@ try {
   });
 
   await check("validate_cel via path → cms22.cel validates clean", async () => {
-    const cms22Cel = resolve(here, "../../src/tests/fixtures/corpus/cms22-split/cms22.cel");
+    const cms22Cel = resolve(here, "../../crl/src/tests/fixtures/corpus/cms22-split/cms22.cel");
     const r = await client.callTool({ name: "validate_cel", arguments: { path: cms22Cel } });
     assert.ok(!r.isError);
     const out = JSON.parse(r.content[0].text);
@@ -172,7 +172,7 @@ try {
   // validation resolves them through the resolved-imports graph.
   const cms22SplitInferred = resolve(
     here,
-    "../../src/tests/fixtures/corpus/cms22-split/cms22-inferred.crl"
+    "../../crl/src/tests/fixtures/corpus/cms22-split/cms22-inferred.crl"
   );
 
   await check("validate_crl via path → project mode resolves sibling libraries", async () => {
@@ -210,7 +210,7 @@ try {
   // VSIX. Spawn BOTH and assert identical tool NAME sets. Requires the root
   // package to be built (dist/cli/run-mcp-server.js present).
   await check("CLI and extension MCP servers expose the identical tool set (drift guard)", async () => {
-    const cliServerPath = resolve(here, "../../dist/cli/run-mcp-server.js");
+    const cliServerPath = resolve(here, "../../crl/dist/cli/run-mcp-server.js");
     const cliTransport = new StdioClientTransport({ command: process.execPath, args: [cliServerPath] });
     const cliClient = new Client({ name: "crl-cli-parity", version: "0.0.0" });
     await cliClient.connect(cliTransport);

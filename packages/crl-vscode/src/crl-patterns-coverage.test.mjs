@@ -12,7 +12,7 @@ import * as mod from "../dist/catalog.js";
 const { parseCatalog } = mod.default ?? mod;
 
 const here = dirname(fileURLToPath(import.meta.url));
-const repoRoot = resolve(here, "../..");
+const repoRoot = resolve(here, "../../crl");
 const catalogPath = resolve(repoRoot, "src/cql-emitter/catalog/inference-pattern-catalog.md");
 const libraryPath = resolve(repoRoot, "src/cql-emitter/catalog/CRLCommon.cql");
 

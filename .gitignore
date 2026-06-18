@@ -2,15 +2,15 @@
 node_modules/
 # ...except test fixture node_modules — these are committed fake packages
 # exercised by resolver tests; they are not real npm dependencies.
-!src/imports/tests/fixtures/**/node_modules/
-!src/imports/tests/fixtures/**/node_modules/**
+!packages/crl/src/imports/tests/fixtures/**/node_modules/
+!packages/crl/src/imports/tests/fixtures/**/node_modules/**
 
 # Build outputs
 dist/
 build/
 lib/
 coverage/
-src/grammar/generated/
+packages/crl/src/grammar/generated/
 tsconfig.tsbuildinfo
 *.tgz
 
@@ -69,7 +69,7 @@ issues/
 
 # Regression test output artifacts: regenerated on every test run; only
 # the *-expected.* fixtures are committed baselines.
-src/tests/regression/testdata/*-actual.*
+packages/crl/src/tests/regression/testdata/*-actual.*
 
 # Feature working artifacts: local analysis corpora, derived data, and
 # modeling scratch work. Kept local, not tracked in version control.

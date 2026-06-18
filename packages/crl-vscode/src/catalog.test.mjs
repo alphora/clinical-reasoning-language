@@ -16,7 +16,7 @@ const {
 } = mod.default ?? mod;
 
 const here = dirname(fileURLToPath(import.meta.url));
-const catalogPath = resolve(here, "../../src/cql-emitter/catalog/inference-pattern-catalog.md");
+const catalogPath = resolve(here, "../../crl/src/cql-emitter/catalog/inference-pattern-catalog.md");
 
 const markdown = readFileSync(catalogPath, "utf-8");
 const patterns = parseCatalog(markdown);
@@ -127,7 +127,7 @@ assert.ok(onOrBeforeMatcher.test(`"A"   on   or   before   "B"`), "matcher shoul
 // future grammar addition immediately fails the extension build instead
 // of silently drifting (the way "Patient" did between commit 16d0634 and
 // this Todo).
-const grammarTypesDir = resolve(here, "../../src/grammar/generated/types");
+const grammarTypesDir = resolve(here, "../../crl/src/grammar/generated/types");
 const conceptTypesJson = JSON.parse(readFileSync(resolve(grammarTypesDir, "conceptTypes.json"), "utf-8"));
 const conceptValueTypesJson = JSON.parse(readFileSync(resolve(grammarTypesDir, "conceptValueTypes.json"), "utf-8"));
 const parameterTypesJson = JSON.parse(readFileSync(resolve(grammarTypesDir, "parameterTypes.json"), "utf-8"));

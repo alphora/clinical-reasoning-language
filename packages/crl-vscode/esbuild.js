@@ -3,17 +3,21 @@ const path = require("path");
 const fs = require("fs");
 const { builtinModules } = require("module");
 
-// The CRL public entry — the exact artifact the package `exports` "." key
-// points at. We consume the PREBUILT dist; we do NOT build CRL from here.
-// Building CRL needs the root ANTLR/Java toolchain, so it is a separate,
-// explicitly-invoked prerequisite (`npm run build` at the repo root).
-const crlEntry = path.resolve(__dirname, "../dist/index.js");
-
+// CRL core is resolved via node (the npm workspace link), not a hardcoded path,
+// so the extension build is independent of the on-disk layout. We consume the
+// PREBUILT dist; building core (ANTLR/Java) is a separate prerequisite
+// (`npm run build -w @smile-digital-health/crl`).
 function assertCrlBuilt() {
-  if (!fs.existsSync(crlEntry)) {
+  let entry;
+  try {
+    entry = require.resolve("@smile-digital-health/crl");
+  } catch {
+    throw new Error("CRL core not linked: run `npm install` at the repo root (workspaces).");
+  }
+  if (!fs.existsSync(entry)) {
     throw new Error(
-      `CRL package not built: ${crlEntry} is missing.\n` +
-        "Run `npm run build` at the repo root first (needs the ANTLR/Java toolchain)."
+      `CRL core not built: ${entry} is missing.\n` +
+        "Run `npm run build -w @smile-digital-health/crl` first (needs the ANTLR/Java toolchain)."
     );
   }
 }
@@ -21,11 +25,11 @@ function assertCrlBuilt() {
 const isBuiltin = (p) => builtinModules.includes(p.replace(/^node:/, ""));
 
 // The CRL specifier (`@smile-digital-health/crl`) resolves through node_modules:
-// the extension declares a real `file:..` dependency on core, which npm links as
-// a junction (extension/node_modules/@smile-digital-health/crl -> repo root), so
-// esbuild finds it via normal node resolution — no explicit alias needed. The
-// `precompile` guard (scripts/check-core.cjs) + `assertCrlBuilt` verify the
-// junction resolves and the built dist exists before bundling.
+// the extension declares a real workspace dependency on core (packages/crl),
+// which npm links into node_modules, so esbuild finds it via normal node
+// resolution — no explicit alias needed. The `precompile` guard
+// (scripts/check-core.cjs) + `assertCrlBuilt` verify the link resolves and the
+// built dist exists before bundling.
 
 async function build() {
   assertCrlBuilt();
@@ -107,7 +111,7 @@ async function build() {
   const catalogMod = require(path.resolve(__dirname, "dist/catalog.js"));
   const catalogMdPath = path.resolve(
     __dirname,
-    "../src/cql-emitter/catalog/inference-pattern-catalog.md"
+    "../crl/src/cql-emitter/catalog/inference-pattern-catalog.md"
   );
   if (!fs.existsSync(catalogMdPath)) {
     throw new Error(`Catalog markdown not found at ${catalogMdPath}`);

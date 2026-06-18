@@ -16,15 +16,12 @@
     "removeComments": true,
     "noEmitOnError": true,
     "incremental": false,
-    "composite": false,
-    "typeRoots": [
-      "./types",
-      "./node_modules/@types"
-    ]
+    "composite": false
   },
   "include": [
     "src/**/*.ts",
-    "src/**/*.d.ts"
+    "src/**/*.d.ts",
+    "types/**/*.d.ts"
   ],
   "exclude": [
     "node_modules",
