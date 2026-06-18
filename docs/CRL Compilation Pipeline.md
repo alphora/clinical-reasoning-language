@@ -108,7 +108,7 @@ model this catalog uses, the cost is worth it.
 
 ## Catalog as the bridge between stages
 
-The catalog (`src/cql-emitter/catalog/inference-pattern-catalog.md`)
+The catalog (`packages/crl/src/cql-emitter/catalog/inference-pattern-catalog.md`)
 is the **single source of truth** mapping all three layers:
 
 | Field | Used by stage | Purpose |

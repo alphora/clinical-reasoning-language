@@ -125,7 +125,7 @@ npm install
 npm run build            # regenerates the ANTLR parser + compiles to dist/
 
 # extension
-cd extension
+cd packages/crl-vscode
 npm install
 npm test                 # typecheck + bundle + unit/integration tests
 npm run package          # produces crl-language-support-<version>.vsix

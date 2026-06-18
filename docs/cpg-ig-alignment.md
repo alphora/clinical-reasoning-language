@@ -95,7 +95,7 @@ The IG defines three additional activity profiles the CRL grammar deliberately o
 
 ## The CRL `concept - type is X.` allowlist ↔ IG Request/Event resources
 
-Every base FHIR resource referenced by an IG Request or Event profile is in CRL's `CONCEPT_TYPE` allowlist (with three exceptions modeled by other declaration kinds — see below). The allowlist source of truth is the `CONCEPT_TYPE` lexer rule in [`src/grammar/CRLLexer.g4`](src/grammar/CRLLexer.g4); a build-time gate verifies `parameterTypes ⊇ conceptTypes ∪ conceptValueTypes`.
+Every base FHIR resource referenced by an IG Request or Event profile is in CRL's `CONCEPT_TYPE` allowlist (with three exceptions modeled by other declaration kinds — see below). The allowlist source of truth is the `CONCEPT_TYPE` lexer rule in [`packages/crl/src/grammar/CRLLexer.g4`](../packages/crl/src/grammar/CRLLexer.g4); a build-time gate verifies `parameterTypes ⊇ conceptTypes ∪ conceptValueTypes`.
 
 ### Resources covered
 
@@ -110,7 +110,7 @@ Every base FHIR resource referenced by an IG Request or Event profile is in CRL'
 
 ### Transitively covers CEL `fact` declarations too
 
-CEL's validator imports the same `conceptTypes` allowlist ([`src/cel/validator/validator.ts:1`](../src/cel/validator/validator.ts#L1)) and applies it to two `defined by` resolution paths:
+CEL's validator imports the same `conceptTypes` allowlist ([`packages/crl/src/cel/validator/validator.ts:1`](../packages/crl/src/cel/validator/validator.ts#L1)) and applies it to two `defined by` resolution paths:
 
 - **Bare `defined by "X"`** — `X` must be in `conceptTypes`. The fact instantiates that bare FHIR resource type directly.
 - **Qualified `defined by "Lib"."Decl"`** — resolves via the qualified CRL concept's `- type is X.`, which is itself from `conceptTypes`.
@@ -138,8 +138,8 @@ Three IG Event profiles' base resources are deliberately absent from the concept
 
 When the IG adds a new activity profile (or the operator wants to add a resource that wasn't in the original allowlist):
 
-1. Edit [`src/grammar/CRLLexer.g4`](src/grammar/CRLLexer.g4) — add the resource name to BOTH the `CONCEPT_TYPE.validTypes` list AND the `PARAMETER_TYPE.validTypes` resources section. Both lists must stay sorted; the build-time gate (`scripts/extractParameterTypes.js`) verifies `parameterTypes ⊇ conceptTypes`.
-2. Run `npm run generate` — regenerates `src/grammar/generated/types/conceptTypes.json` + `parameterTypes.json` + the ANTLR-generated `CRLLexer.ts`.
+1. Edit [`packages/crl/src/grammar/CRLLexer.g4`](../packages/crl/src/grammar/CRLLexer.g4) — add the resource name to BOTH the `CONCEPT_TYPE.validTypes` list AND the `PARAMETER_TYPE.validTypes` resources section. Both lists must stay sorted; the build-time gate (`scripts/extractParameterTypes.js`) verifies `parameterTypes ⊇ conceptTypes`.
+2. Run `npm run generate` — regenerates `packages/crl/src/grammar/generated/types/conceptTypes.json` + `parameterTypes.json` + the ANTLR-generated `CRLLexer.ts`.
 3. Update [`USER_GUIDE.md`](../USER_GUIDE.md) `### Concept types` and `### Parameter types` reference lists.
 4. Update this doc's "Resources covered" section above if the addition crosses a new pattern (Request/Event/Contextual).
 5. `npm test` — the lexer regression tests pick up the new token automatically.
@@ -150,7 +150,7 @@ Bigger surface than a concept-type addition because the CRL token also drives th
 
 1. Verify against the IG: fetch the source FSH for the new activity profile from `HL7/cqf-recommendations/input/fsh/profiles/activity-profiles/cpg-<name>-activity.fsh`. Confirm the Id, the Request profile binding, the `kind`, and the `code = $cpg-activity-type-cs#<literal>` value.
 2. Add to `ACTIVITY_TYPE.validTypes` in `CRLLexer.g4` (drop `Task` suffix per the convention).
-3. Update the CEL emitter's `CPG_TO_FHIR` map (`src/cel/emitter/emitFhir.ts:32-47`) with the verified `kind`.
+3. Update the CEL emitter's `CPG_TO_FHIR` map (`packages/crl/src/cel/emitter/emitFhir.ts:32-47`) with the verified `kind`.
 4. Update the "Verified token ↔ IG profile mapping" table in this doc.
 5. Update `USER_GUIDE.md` `### Activity types` reference list.
 6. When the FHIR-def emit lane Todo 2 lands, add an entry to its activity-profile mapping table with the verified IG canonical URL fragment + `code` value + `profile` (target Request) canonical.
@@ -161,7 +161,7 @@ Bigger surface than a concept-type addition because the CRL token also drives th
 | Lane | Status | Notes |
 |---|---|---|
 | **CRL → CQL emit** | Shipped (v2.2.6) | Activity declarations emit as CQL no-op stubs today; the meaningful FHIR-def emit is a separate lane. |
-| **CEL → FHIR JSON instance emit** | Shipped (v2.2.5 CEL Todo 5) | CEL emits Request/Event resources; `src/cel/emitter/emitFhir.ts`'s `CPG_TO_FHIR` map drives the FHIR kind per CRL `request CPG<Type>` token. The kinds were corrected against verified IG FSH on 2026-06-04. |
+| **CEL → FHIR JSON instance emit** | Shipped (v2.2.5 CEL Todo 5) | CEL emits Request/Event resources; `packages/crl/src/cel/emitter/emitFhir.ts`'s `CPG_TO_FHIR` map drives the FHIR kind per CRL `request CPG<Type>` token. The kinds were corrected against verified IG FSH on 2026-06-04. |
 | **CRL → FHIR Definition emit** | Partial — Todo 1 shipped (ValueSet); Todo 2 in design (Activity → ActivityDefinition); Todo 3 not started (Decision → PlanDefinition); Todo 4 not started (CLI/MCP/release) | Closes [#73](https://github.com/alphora/clinical-reasoning-language/issues/73). Discussion log at [`.vibe-tools/discussions/055-crl-fhir-def-emit-pitch.md`](../.vibe-tools/discussions/055-crl-fhir-def-emit-pitch.md) onward. |
 | **Homeostasis (cross-DSL validation)** | Not started | Tracked at [#76](https://github.com/alphora/clinical-reasoning-language/issues/76). Includes FHIR-version targeting, profile-driven required-element validation, and CRL↔CEL consistency. |
 
@@ -178,8 +178,8 @@ These are unresolved as of 2026-06-04 and feed into the FHIR-def emit lane (Todo
 
 | Resource | Location |
 |---|---|
-| CRL grammar (concept type + activity type allowlists) | [`src/grammar/CRLLexer.g4`](../src/grammar/CRLLexer.g4) |
-| CRL→CEL emit CPG-to-FHIR-kind mapping | [`src/cel/emitter/emitFhir.ts:32-47`](../src/cel/emitter/emitFhir.ts#L32-L47) |
+| CRL grammar (concept type + activity type allowlists) | [`packages/crl/src/grammar/CRLLexer.g4`](../packages/crl/src/grammar/CRLLexer.g4) |
+| CRL→CEL emit CPG-to-FHIR-kind mapping | [`packages/crl/src/cel/emitter/emitFhir.ts:32-47`](../packages/crl/src/cel/emitter/emitFhir.ts#L32-L47) |
 | CEL FHIR-instance emit semantics | [`docs/cel-spec.md`](cel-spec.md) (section "Activity") |
 | CRL→FHIR-def emit pitch / plans / discussions | [`.vibe-tools/discussions/055-crl-fhir-def-emit-pitch.md`](../.vibe-tools/discussions/055-crl-fhir-def-emit-pitch.md), `056`-`058` (Todo 1), `059+` (Todo 2) |
 | **CPG IG (canonical spec)** | https://build.fhir.org/ig/HL7/cqf-recommendations/ |

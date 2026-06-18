@@ -82,7 +82,7 @@ Releases ship two artifacts side-by-side: the npm tarball (`@smile-digital-healt
 npm pack
 
 # 3. Build the extension VSIX:
-cd extension && npm run package
+cd ../crl-vscode && npm run package
 
 # 4. Upload the resulting .tgz and .vsix to the corresponding GitHub release.
 ```
@@ -582,7 +582,7 @@ We provide a Visual Studio Code extension for CRL files:
 - Comment support
 - Language basics for a better editing experience
 
-For installation instructions and full details, see [extension/README.md](./extension/README.md)
+For installation instructions and full details, see [crl-vscode/README.md](../crl-vscode/README.md)
 
 ## License
 
