@@ -84,11 +84,12 @@
     }
   },
   "scripts": {
-    "build:crl": "npm --prefix .. run build",
+    "build:crl": "npm --prefix ../crl run build",
     "typecheck": "tsc -p tsconfig.json",
+    "precompile": "node scripts/check-core.cjs",
     "compile": "npm run typecheck && node esbuild.js",
     "selftest": "node dist/mcp-server.js --selftest",
-    "selftest:fixture": "node dist/mcp-server.js --selftest --file ../src/tests/regression/testdata/clinical-reasoning-language-example.crl",
+    "selftest:fixture": "node dist/mcp-server.js --selftest --file ../crl/src/tests/regression/testdata/clinical-reasoning-language-example.crl",
     "pretest:mcp": "npm run compile",
     "test:mcp": "node src/mcp-server.test.mjs",
     "pretest:provision": "npm run compile",
@@ -114,10 +115,11 @@
     "test:language-config": "node src/language-config.test.mjs",
     "test": "npm run compile && node src/mcp-server.test.mjs && node src/provision.test.mjs && node src/highlight.test.mjs && node src/catalog.test.mjs && node src/embedded-catalog.test.mjs && node src/concepts.test.mjs && node src/crl-patterns-coverage.test.mjs && node src/contextDetect.test.mjs && node src/findDeclaration.test.mjs && node src/projectIndex.test.mjs && node src/completion.test.mjs && node src/grammar.test.mjs && node src/package.test.mjs && node src/language-config.test.mjs",
     "vscode:prepublish": "npm run build:crl && npm run compile",
-    "package": "vsce package"
+    "package": "vsce package --no-dependencies"
   },
   "devDependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
+    "@smile-digital-health/crl": "*",
     "@types/node": "^18.19.130",
     "@types/vscode": "^1.85.0",
     "@vscode/vsce": "^3.2.0",

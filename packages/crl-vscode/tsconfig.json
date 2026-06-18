@@ -10,10 +10,7 @@
     "skipLibCheck": true,
     "noEmit": true,
     "baseUrl": ".",
-    "types": ["node", "vscode"],
-    "paths": {
-      "@smile-digital-health/crl": ["../dist/index.d.ts"]
-    }
+    "types": ["node", "vscode"]
   },
   "include": ["src"]
 }

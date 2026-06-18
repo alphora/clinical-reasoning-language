@@ -21,14 +21,20 @@ jobs:
         with:
           node-version: '18'
 
-      - name: Install dependencies
+      - name: Install dependencies (workspaces)
         run: npm install
 
-      - name: Run tests
-        run: npm test 
+      - name: Build core
+        run: npm run build -w @smile-digital-health/crl
+
+      - name: Test core
+        run: npm test -w @smile-digital-health/crl
+
+      - name: Test extension
+        run: npm test -w crl-language-support
 
   publish-npm:
-    name: Publish to npm
+    name: Publish core (@smile-digital-health/crl) to npm
     runs-on: ubuntu-latest
     needs: test-release
     if: github.event_name == 'release' && github.event.action == 'published' && !github.event.release.draft && !github.event.release.prerelease
@@ -39,19 +45,19 @@ jobs:
         with:
           node-version: '18'
           registry-url: 'https://registry.npmjs.org/'
-      - name: Install dependencies
+      - name: Install dependencies (workspaces)
         run: npm ci
-      - name: Build
-        run: npm run build
+      - name: Build core
+        run: npm run build -w @smile-digital-health/crl
       - name: Pack and verify
         run: |
-          npm pack --dry-run
+          npm pack -w @smile-digital-health/crl --dry-run
           echo "Verifying package contents..."
-          npm pack
+          npm pack -w @smile-digital-health/crl
           PACKAGE_FILE=$(ls *.tgz)
           tar -ztvf $PACKAGE_FILE
           echo "Package contents verified."
       - name: Publish to npm
-        run: npm publish
+        run: npm publish -w @smile-digital-health/crl
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }} 
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
