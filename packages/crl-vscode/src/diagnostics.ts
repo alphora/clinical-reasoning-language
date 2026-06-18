@@ -3,7 +3,7 @@ import * as vscode from "vscode";
 import { validateCRL, validateCRLImports, type ValidationError } from "@smile-digital-health/crl";
 
 import { mapImportDiagnostic } from "./diagnosticMap";
-import type { ProjectIndex } from "./projectIndex";
+import type { ProjectIndex } from "@smile-digital-health/crl/language-services";
 
 /**
  * Live diagnostics: validate every `.crl` document on open, edit (debounced),

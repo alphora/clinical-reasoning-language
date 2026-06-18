@@ -9,7 +9,7 @@ import {
   removeHighlight,
   type Associations,
   type TokenColors,
-} from "./highlight";
+} from "@smile-digital-health/crl/language-services";
 import type { Pattern } from "./catalog";
 import {
   NarrativeCompletionProvider,
@@ -33,7 +33,7 @@ import {
   CrlRenameProvider,
   CrlDocumentLinkProvider,
 } from "./navigation";
-import { ProjectIndex } from "./projectIndex";
+import { ProjectIndex } from "@smile-digital-health/crl/language-services";
 
 const messageOf = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 

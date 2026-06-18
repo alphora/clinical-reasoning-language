@@ -1,0 +1,139 @@
+# something
+library "temp".
+
+decision "Stimulator Coverage":
+first:
+- when "Skull Or Vertebrae Fracture" then recommend activity "Deny".
+- when "Tumor-Related Fracture" then recommend activity "Deny".
+- when "Documented Fracture Nonunion" then recommend activity "Approve".
+- otherwise then recommend activity "Deny".
+
+decision "Documentation Review":
+all:
+- when "Missing Imaging Report" then recommend activity "Request Imaging".
+- when "Missing Therapy History" then recommend activity "Request Therapy History".
+
+decision "Imaging Order":
+first:
+- when "Needs Advanced Imaging" then:
+  any:
+  - recommend activity "Order MRI".
+  - recommend activity "Order CT".
+  end.
+- otherwise then recommend activity "No Imaging Indicated".
+
+decision "Denial Handling":
+first:
+- when "Not Covered" then:
+  all:
+  - recommend activity "Communicate Denial".
+  - recommend activity "Record Rationale".
+  end.
+- otherwise then recommend activity "Approve".
+
+
+decision "Coverage With Documentation Gate":
+first:
+- when "Has Exclusion" then recommend activity "Deny".
+- when "Meets Criteria" then:
+  first:
+  - when "Documentation Complete" then recommend activity "Approve".
+  - otherwise then recommend activity "Pend For Records".
+  end.
+- otherwise then:
+  all:
+  - recommend activity "Deny".
+  - recommend activity "Notify Provider".
+  end.
+
+
+concept "Any Qualifying Indication":
+- type is Condition.
+- defined as ( "Documented Fracture Nonunion" sem-or "Failed Conservative Therapy" ).
+
+decision "Coverage":
+first:
+- when "Has Hard Exclusion" then recommend activity "Deny".
+- when "Any Qualifying Indication" then recommend activity "Approve".
+- otherwise then recommend activity "Deny".
+
+decision "Eligibility With Workup":
+first:
+- when "Not Eligible" then recommend activity "Deny".
+- when "Eligible" then:
+  all:
+  - when "Needs Imaging" then recommend activity "Order Imaging".
+  - when "Needs Labs" then recommend activity "Order Labs".
+  end.
+- otherwise then recommend activity "Deny".
+
+
+decision "CMS69 BMI Screening Strategy":
+- when "Patient Eligible For BMI Screening" then:
+  all:
+  - when "BMI Not Documented During Measurement Period" then recommend activity "Document BMI".
+  - when "Has Documented High BMI" then use decision "Recommend High BMI Intervention".
+  - when "Has Documented Low BMI" then use decision "Recommend Low BMI Intervention".
+  end.
+
+decision "Recommend High BMI Intervention":
+- when "Patient Has Overweight or Obese Diagnosis" then:
+  first:
+  - when "Has Anti-Obesity Medication Contraindication" then:
+    all:
+    - recommend activity "Order Weight Assessment Referral".
+    - recommend activity "Contraindicated Anti-Obesity Medication".
+    end.
+  - otherwise then:
+    any:
+    - recommend activity "Order Weight Assessment Referral".
+    - recommend activity "Order High BMI Medication".
+    end.
+  end.
+
+decision "Recommend Low BMI Intervention":
+- when "Has Documented Low BMI" then:
+  all:
+  - recommend activity "Order Low BMI Follow-up".
+  - recommend activity "Send BMI Care Communication".
+  end.
+
+
+
+decision "Colorectal Cancer Screening Strategy":
+- when "Inclusion Criteria" then use decision "Colorectal Cancer Screening Decision".
+
+decision "Colorectal Cancer Screening Decision":
+all:
+- when "Has Coverage Concern" then recommend activity "FIT DNA".
+- when "No Coverage Concern" then:
+  all:
+  - when "Has Sedation Concern" then:
+    all:
+    - when "Has Sigmoidoscopy Complications" then recommend activity "CT Colonography".
+    - when "No Sigmoidoscopy Complications" then recommend activity "Sigmoidoscopy".
+    end.
+  - when "No Sedation Concern" then:
+    all:
+    - when "Has Colonoscopy Complications" then recommend activity "CT Colonography".
+    - when "No Colonoscopy Complications" then recommend activity "Colonoscopy".
+    end.
+  end.
+
+
+decision "Colorectal Cancer Screening Decision New":
+first:
+- when "Has Coverage Concern" then recommend activity "FIT DNA".
+- otherwise then:
+  first:
+  - when "Has Sedation Concern" then:
+    first:
+    - when "Has Sigmoidoscopy Complications" then recommend activity "CT Colonography".
+    - otherwise then recommend activity "Sigmoidoscopy".
+    end.
+  - otherwise then:
+    first:
+    - when "Has Colonoscopy Complications" then recommend activity "CT Colonography".
+    - otherwise then recommend activity "Colonoscopy".
+    end.
+  end.

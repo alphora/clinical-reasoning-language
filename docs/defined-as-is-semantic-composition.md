@@ -74,7 +74,7 @@ The chain check in §7 of that rule has been updated to reflect this principle. 
 
 ## The sibling form: `definition is`
 
-The principle above is about **`defined as`** — the composition body kind that uses `sem-*` operators over named concepts. CRL has a sibling body kind, **`definition is`**, that uses a narrative-predicate body matched against the [catalog](../src/cql-emitter/catalog/inference-pattern-catalog.md). The two are siblings under the same author-declares-result framing:
+The principle above is about **`defined as`** — the composition body kind that uses `sem-*` operators over named concepts. CRL has a sibling body kind, **`definition is`**, that uses a narrative-predicate body matched against the [catalog](../packages/crl/src/cql-emitter/catalog/inference-pattern-catalog.md). The two are siblings under the same author-declares-result framing:
 
 | Body kind | Surface | Body shape | Examples |
 |---|---|---|---|
@@ -85,7 +85,7 @@ Both body kinds carry the **same principle**: the author declares the result `(t
 
 The shared `defined` / `definition` stem is intentional — it signals the family. The `as` / `is` preposition distinguishes the body shape: `defined as` introduces an equivalence (the body IS the meaning, written as a sem-* expression), `definition is` introduces an attribute (the body IS the definition, written as a narrative phrase the catalog recognizes). The grammar treats them as parallel body kinds; the author picks the form that fits the concept's natural surface.
 
-For the predicate form's narrative grammar — placeholders, in-arg groups, catalog dispatch — see the [catalog](../src/cql-emitter/catalog/inference-pattern-catalog.md). For why the catalog patterns dropped their inner `is` in v0.7 (e.g., `<X> active` instead of `<X> is active`), see [discussion 017](../.vibe-tools/discussions/017-logic-is-keyword-rename.md) round 4 — the migration pairs with the `definition is` keyword choice to avoid a doubly-copular `definition is "X" is active` collision.
+For the predicate form's narrative grammar — placeholders, in-arg groups, catalog dispatch — see the [catalog](../packages/crl/src/cql-emitter/catalog/inference-pattern-catalog.md). For why the catalog patterns dropped their inner `is` in v0.7 (e.g., `<X> active` instead of `<X> is active`), see [discussion 017](../.vibe-tools/discussions/017-logic-is-keyword-rename.md) round 4 — the migration pairs with the `definition is` keyword choice to avoid a doubly-copular `definition is "X" is active` collision.
 
 ---
 

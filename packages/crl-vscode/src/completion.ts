@@ -7,33 +7,25 @@ import {
   PARAMETER_TYPES,
   type Pattern,
 } from "./catalog";
-import { scanDeclarations, type Declaration } from "./concepts";
-// v2.2 Todo 4 (issue #59) — pure helpers live in a vscode-free module so
-// `completion.test.mjs` can import them under plain Node.
+// Language services (vscode-free) live in core since #132 step 1; the pure
+// completion helpers (issue #59) are consumed internally here. Their tests import
+// them from the same subpath, not through this module.
 import {
+  scanDeclarations,
   applyNarrativePrecedence,
   isParamTypeCompletionPrefix,
   isTypeCompletionPrefix,
   isUnquotedTypeSlotPrefix,
   isValuetypeCompletionPrefix,
-} from "./completionHelpers";
-
-// Re-export so existing consumers (and tests against the dist bundle) keep
-// resolving these names through `completion.ts`.
-export {
-  applyNarrativePrecedence,
-  isParamTypeCompletionPrefix,
-  isTypeCompletionPrefix,
-  isUnquotedTypeSlotPrefix,
-  isValuetypeCompletionPrefix,
-};
-import {
   detectExpectedKind,
   detectQualifiedRefQualifier,
   isInsideOpenQuote,
-  type ExpectedRefKind,
-} from "./contextDetect";
-import type { ProjectIndex } from "./projectIndex";
+} from "@smile-digital-health/crl/language-services";
+import type {
+  Declaration,
+  ExpectedRefKind,
+  ProjectIndex,
+} from "@smile-digital-health/crl/language-services";
 
 // Document selector: match `.crl` files. The repo's setup associates `.crl`
 // with the `markdown` language ID, so we select on language + scheme + a

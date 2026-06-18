@@ -1,13 +1,13 @@
 import * as vscode from "vscode";
 
-import { findDeclarationAtPosition } from "./findDeclaration";
+import { findDeclarationAtPosition } from "@smile-digital-health/crl/language-services";
 import {
   canonicalize,
   type IndexedDeclaration,
   type IndexedLibrary,
   type ProjectIndex,
   type ZeroBasedRange,
-} from "./projectIndex";
+} from "@smile-digital-health/crl/language-services";
 
 /**
  * v2.1.0 Chunk C — LSP navigation providers, all backed by the

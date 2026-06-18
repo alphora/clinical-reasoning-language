@@ -19,7 +19,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '18'
+          node-version: '20'
 
       - name: Install dependencies (workspaces)
         run: npm install
@@ -43,7 +43,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '18'
+          node-version: '20'
           registry-url: 'https://registry.npmjs.org/'
       - name: Install dependencies (workspaces)
         run: npm ci
@@ -54,8 +54,8 @@ jobs:
           npm pack -w @smile-digital-health/crl --dry-run
           echo "Verifying package contents..."
           npm pack -w @smile-digital-health/crl
-          PACKAGE_FILE=$(ls *.tgz)
-          tar -ztvf $PACKAGE_FILE
+          PACKAGE_FILE=$(ls -t smile-digital-health-crl-*.tgz | head -1)
+          tar -ztvf "$PACKAGE_FILE"
           echo "Package contents verified."
       - name: Publish to npm
         run: npm publish -w @smile-digital-health/crl

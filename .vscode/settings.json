@@ -25,7 +25,7 @@
       "level": "off",
       "parameters": {
         "exclusions": [
-          "src/grammar/generated/**/*.ts"
+          "packages/crl/src/grammar/generated/**/*.ts"
         ]
       }
     },
@@ -33,7 +33,7 @@
       "level": "off",
       "parameters": {
         "exclusions": [
-          "src/grammar/generated/**/*.ts"
+          "packages/crl/src/grammar/generated/**/*.ts"
         ]
       }
     },
@@ -41,7 +41,7 @@
       "level": "off",
       "parameters": {
         "exclusions": [
-          "src/grammar/generated/**/*.ts"
+          "packages/crl/src/grammar/generated/**/*.ts"
         ]
       }
     },
@@ -49,7 +49,7 @@
       "level": "off",
       "parameters": {
         "exclusions": [
-          "src/grammar/generated/**/*.ts"
+          "packages/crl/src/grammar/generated/**/*.ts"
         ]
       }
     }

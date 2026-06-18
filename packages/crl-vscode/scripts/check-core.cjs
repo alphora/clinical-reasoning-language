@@ -6,6 +6,9 @@
 try {
   const entry = require.resolve("@smile-digital-health/crl"); // throws if junction is missing/stale
   require("fs").accessSync(entry); // throws if core's built dist is absent
+  // also verify the ./language-services subpath the extension imports directly (#132 step 1):
+  // catches a stale/partial core build where dist/index.js exists but dist/language-services/ doesn't.
+  require("fs").accessSync(require.resolve("@smile-digital-health/crl/language-services"));
 } catch (e) {
   console.error(
     "\n[crl] Core package `@smile-digital-health/crl` is not resolvable/built.\n" +

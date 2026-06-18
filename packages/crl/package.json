@@ -19,6 +19,11 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.js"
+    },
+    "./language-services": {
+      "types": "./dist/language-services/index.d.ts",
+      "import": "./dist/language-services/index.js",
+      "require": "./dist/language-services/index.js"
     }
   },
   "files": [
@@ -44,7 +49,7 @@
     "watch": "onchange -i \"src/**/*.ts\" -- npm run build",
     "start": "npm run build && node dist/index.js",
     "compile": "tsc --noEmit",
-    "prepare": "npm run build",
+    "prepack": "npm run build",
     "extract-types": "node scripts/extractActivityTypes.js && node scripts/extractConceptTypes.js && node scripts/extractConceptValueTypes.js && node scripts/extractParameterTypes.js",
     "move-generated-files": "node scripts/moveGeneratedFiles.js",
     "generate": "antlr4ts -Xforce-atn src/grammar/CRLLexer.g4 && antlr4ts -Xforce-atn -visitor src/grammar/CRLParser.g4 && antlr4ts -Xforce-atn src/grammar/CELLexer.g4 && antlr4ts -Xforce-atn -visitor src/grammar/CELParser.g4 && npm run move-generated-files && npm run extract-types",

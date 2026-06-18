@@ -3,8 +3,8 @@
 // Runs via `npm run test:find-declaration`.
 
 import { strict as assert } from "node:assert";
-import { canonicalize } from "../dist/projectIndex.js";
-import { findDeclarationAtPosition } from "../dist/findDeclaration.js";
+import { canonicalize } from "@smile-digital-health/crl/language-services";
+import { findDeclarationAtPosition } from "@smile-digital-health/crl/language-services";
 
 function fakeIndex({ declarations = [], libraries = [], references = [] } = {}) {
   return {

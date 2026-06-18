@@ -7,7 +7,7 @@ import { strict as assert } from "node:assert";
 import { mkdtempSync, writeFileSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { ProjectIndex } from "../dist/projectIndex.js";
+import { ProjectIndex } from "@smile-digital-health/crl/language-services";
 
 const root = mkdtempSync(join(tmpdir(), "crl-index-test-"));
 writeFileSync(join(root, "package.json"), JSON.stringify({ name: "tmp", version: "0.0.0" }));
