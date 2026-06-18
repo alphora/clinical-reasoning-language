@@ -3,7 +3,7 @@
  * providers. Lives in its own module because `completion.ts` imports
  * `vscode`, which cannot be loaded under plain Node; isolating these
  * makes them unit-testable via `completion.test.mjs` against
- * `dist/completionHelpers.js`.
+ * the `@smile-digital-health/crl/language-services` subpath.
  *
  * Symmetric to the `contextDetect.ts` testability pattern.
  */
@@ -94,7 +94,7 @@ function precedenceKey(d: {
  * and the parser-backed `ProjectIndex` path (`hover.ts → findIndexedNarrative`).
  *
  * Pure function — testable directly via `completion.test.mjs` against
- * `dist/completionHelpers.js`.
+ * the `@smile-digital-health/crl/language-services` subpath.
  */
 export function findByConceptFirstPrecedence<
   T extends { name: string; kind: string },

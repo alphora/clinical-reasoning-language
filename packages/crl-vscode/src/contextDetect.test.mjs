@@ -1,5 +1,5 @@
 // Pure-function tests for detectExpectedKind / detectQualifiedRefQualifier
-// + isInsideOpenQuote. Runs against compiled dist/contextDetect.js to
+// + isInsideOpenQuote. Runs against the @smile-digital-health/crl/language-services subpath to
 // match the repo's existing extension test scaffolding.
 
 import { strict as assert } from "node:assert";

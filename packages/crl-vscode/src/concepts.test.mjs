@@ -1,5 +1,5 @@
 // Unit tests for the document scanner (concepts.ts). Runs against the
-// just-built dist/concepts.js. Validates that headers, type/valuetype
+// the @smile-digital-health/crl/language-services subpath. Validates that headers, type/valuetype
 // bullets, and body previews are extracted from realistic CRL fragments.
 
 import assert from "node:assert/strict";
