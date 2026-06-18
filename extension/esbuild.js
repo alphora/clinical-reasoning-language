@@ -20,10 +20,12 @@ function assertCrlBuilt() {
 
 const isBuiltin = (p) => builtinModules.includes(p.replace(/^node:/, ""));
 
-// Applied to BOTH bundles so the CRL specifier resolves identically whether
-// imported from the extension host or the server (today only mcp-server.ts
-// imports it; this keeps the resolution consistent if that ever changes).
-const crlAlias = { "@smile-digital-health/crl": crlEntry };
+// The CRL specifier (`@smile-digital-health/crl`) resolves through node_modules:
+// the extension declares a real `file:..` dependency on core, which npm links as
+// a junction (extension/node_modules/@smile-digital-health/crl -> repo root), so
+// esbuild finds it via normal node resolution — no explicit alias needed. The
+// `precompile` guard (scripts/check-core.cjs) + `assertCrlBuilt` verify the
+// junction resolves and the built dist exists before bundling.
 
 async function build() {
   assertCrlBuilt();
@@ -37,7 +39,6 @@ async function build() {
     format: "cjs",
     target: "node18",
     external: ["vscode"],
-    alias: crlAlias,
     sourcemap: true,
   });
 
@@ -55,7 +56,6 @@ async function build() {
     minify: false,
     sourcemap: true,
     metafile: true,
-    alias: crlAlias,
   });
 
   // Gate 1: heavy/unused deps must not leak into the server bundle. Covers the
@@ -98,7 +98,6 @@ async function build() {
       format: "cjs",
       target: "node18",
       sourcemap: true,
-      alias: crlAlias, // projectIndex needs the CRL package; others ignore
     });
   }
 

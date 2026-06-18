@@ -86,6 +86,7 @@
   "scripts": {
     "build:crl": "npm --prefix .. run build",
     "typecheck": "tsc -p tsconfig.json",
+    "precompile": "node scripts/check-core.cjs",
     "compile": "npm run typecheck && node esbuild.js",
     "selftest": "node dist/mcp-server.js --selftest",
     "selftest:fixture": "node dist/mcp-server.js --selftest --file ../src/tests/regression/testdata/clinical-reasoning-language-example.crl",
@@ -118,6 +119,7 @@
   },
   "devDependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
+    "@smile-digital-health/crl": "file:..",
     "@types/node": "^18.19.130",
     "@types/vscode": "^1.85.0",
     "@vscode/vsce": "^3.2.0",
