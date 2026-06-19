@@ -102,11 +102,11 @@ async function build() {
     );
   }
 
-  // provision + catalog: pure node modules bundled separately so the unit tests can
-  // import them directly. (The language-services modules — concepts, completionHelpers,
-  // contextDetect, findDeclaration, projectIndex, highlight — moved to core in #132
-  // step 1; their tests now import them from @smile-digital-health/crl/language-services.)
-  for (const name of ["provision", "catalog"]) {
+  // provision: a pure node module bundled separately so its unit tests can import it
+  // directly. (The language-services modules — concepts, completionHelpers, contextDetect,
+  // findDeclaration, projectIndex, highlight, and as of #132 step 3 the catalog — live in
+  // core; their tests import them from @smile-digital-health/crl/language-services.)
+  for (const name of ["provision"]) {
     await esbuild.build({
       entryPoints: [path.resolve(__dirname, `src/${name}.ts`)],
       outfile: path.resolve(__dirname, `dist/${name}.js`),
@@ -119,9 +119,18 @@ async function build() {
   }
 
   // Generate dist/catalog.json from the inference-pattern catalog markdown so
-  // the completion + hover providers have an embedded, parseable list. The
-  // parser is in src/catalog.ts and was just built into dist/catalog.js above.
-  const catalogMod = require(path.resolve(__dirname, "dist/catalog.js"));
+  // the completion + hover providers have an embedded, parseable list. The parser
+  // moved to core in #132 step 3 — consume it via the package subpath (resolved +
+  // existence-checked by assertCrlBuilt above). The catalog md still lives in core src
+  // (a pre-existing cross-package read; relocating the generation into core's build is a
+  // deferred follow-up).
+  const catalogMod = require("@smile-digital-health/crl/language-services");
+  if (typeof catalogMod.parseCatalog !== "function") {
+    throw new Error(
+      "@smile-digital-health/crl/language-services has no parseCatalog — rebuild core " +
+        "(`npm run build -w @smile-digital-health/crl`)."
+    );
+  }
   const catalogMdPath = path.resolve(
     __dirname,
     "../crl/src/cql-emitter/catalog/inference-pattern-catalog.md"
@@ -140,7 +149,7 @@ async function build() {
   );
 
   console.log(
-    "esbuild: built extension.js + mcp-server.js + provision.js + catalog.js; " +
+    "esbuild: built extension.js + mcp-server.js + provision.js; " +
       `embedded ${patterns.length} catalog patterns; gates passed ` +
       `(externals: ${[...new Set(externalImports)].join(", ") || "none"}).`
   );

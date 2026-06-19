@@ -6,8 +6,7 @@
 // `@smile-digital-health/crl/language-services` API surface (verified collision-free).
 // The surface is intentionally broad for this mechanical extraction; curating it
 // (explicit re-exports / narrower sub-paths) is a follow-up if external consumers
-// need a tighter contract. `catalog.ts` is deferred — its dist/catalog.json
-// generation is entangled with the extension's esbuild step.
+// need a tighter contract.
 export * from "./concepts";
 export * from "./completionHelpers";
 export * from "./contextDetect";
@@ -20,3 +19,6 @@ export * from "./paths";
 export * from "./host";
 // #132 step 3 — headless compute* services (the extension wraps these in vscode adapters).
 export * from "./hover";
+// catalog (allowlists + parser + narrative helpers) moved from the extension in #132 step 3;
+// the extension's esbuild generates dist/catalog.json via this module's parseCatalog.
+export * from "./catalog";

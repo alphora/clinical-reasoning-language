@@ -6,7 +6,7 @@ import {
   CONCEPT_VALUETYPES,
   PARAMETER_TYPES,
   type Pattern,
-} from "./catalog";
+} from "@smile-digital-health/crl/language-services";
 // Language services (vscode-free) live in core since #132 step 1; the pure
 // completion helpers (issue #59) are consumed internally here. Their tests import
 // them from the same subpath, not through this module.

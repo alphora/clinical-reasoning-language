@@ -10,7 +10,7 @@ import {
   CONCEPT_VALUETYPES,
   PARAMETER_TYPES,
   type Pattern,
-} from "./catalog";
+} from "@smile-digital-health/crl/language-services";
 import {
   computeNarrativeHover,
   computeTypeValuetypeHover,
