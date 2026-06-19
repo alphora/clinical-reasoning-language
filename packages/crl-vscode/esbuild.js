@@ -31,6 +31,17 @@ function assertCrlBuilt() {
   if (!fs.existsSync(lsEntry)) {
     throw new Error(`CRL language-services not built: ${lsEntry} is missing — run \`npm run build -w @smile-digital-health/crl\`.`);
   }
+  // #132 step 4: the bundled MCP server (mcp-server.ts) pulls the shared factory via the subpath —
+  // verify it resolves + is built (a stale core may have dist/index.js but not dist/mcp).
+  let mcpEntry;
+  try {
+    mcpEntry = require.resolve("@smile-digital-health/crl/mcp");
+  } catch {
+    throw new Error("@smile-digital-health/crl/mcp unresolvable: rebuild core (`npm run build -w @smile-digital-health/crl`).");
+  }
+  if (!fs.existsSync(mcpEntry)) {
+    throw new Error(`CRL mcp factory not built: ${mcpEntry} is missing — run \`npm run build -w @smile-digital-health/crl\`.`);
+  }
 }
 
 const isBuiltin = (p) => builtinModules.includes(p.replace(/^node:/, ""));

@@ -24,6 +24,11 @@
       "types": "./dist/language-services/index.d.ts",
       "import": "./dist/language-services/index.js",
       "require": "./dist/language-services/index.js"
+    },
+    "./mcp": {
+      "types": "./dist/mcp/index.d.ts",
+      "import": "./dist/mcp/index.js",
+      "require": "./dist/mcp/index.js"
     }
   },
   "files": [
