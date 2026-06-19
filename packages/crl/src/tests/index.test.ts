@@ -14,3 +14,4 @@ import "../cli/tests/run-emitter.test";
 import "./regression/index.test";
 import "../language-services/tests/host.test";
 import "../language-services/tests/hover.test";
+import "../language-services/tests/completion.test";

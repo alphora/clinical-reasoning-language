@@ -9,7 +9,7 @@ import {
   TypeValuetypeHoverProvider,
   ConceptRefHoverProvider,
 } from "../../src/hover";
-import { parseCatalog } from "../../src/catalog";
+import { parseCatalog } from "@smile-digital-health/crl/language-services";
 import { Position } from "./vscode-stub";
 import { makeDoc, toPlain } from "./harness-lib";
 
@@ -97,9 +97,10 @@ async function main() {
   await run("boundary-token-end", typevtProv, doc, 4, 21); // cursor at inclusive end → hover
   await run("boundary-past-end", typevtProv, doc, 4, 22); // one past end → null
 
-  const outDir = path.resolve(process.cwd(), "test/oracle/golden");
-  fs.mkdirSync(outDir, { recursive: true });
-  fs.writeFileSync(path.join(outDir, "hover.json"), JSON.stringify(results, null, 2) + "\n");
+  // CRL_ORACLE_OUT lets check.mjs redirect output to a temp file for diffing vs the golden.
+  const outFile = process.env.CRL_ORACLE_OUT ?? path.resolve(process.cwd(), "test/oracle/golden/hover.json");
+  fs.mkdirSync(path.dirname(outFile), { recursive: true });
+  fs.writeFileSync(outFile, JSON.stringify(results, null, 2) + "\n");
   console.log(`hover golden: ${results.length} cases (narrative pattern0 = ${JSON.stringify(patterns[0].narrative)}) →`);
   for (const r of results as { provider: string; hover: { kind?: string } | null }[])
     console.log(`  ${r.provider} → ${r.hover?.kind ?? "null"}`);
