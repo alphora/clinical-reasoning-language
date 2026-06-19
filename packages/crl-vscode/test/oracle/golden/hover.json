@@ -1,0 +1,56 @@
+[
+  {
+    "provider": "typevaluetype",
+    "line": 3,
+    "character": 15,
+    "hover": {
+      "kind": "hover",
+      "contents": {
+        "markdown": "**Observation** — FHIR resource type\n\nUsed in `- type is Observation.` to declare the concept's FHIR resource type."
+      },
+      "range": {
+        "start": {
+          "line": 3,
+          "character": 10
+        },
+        "end": {
+          "line": 3,
+          "character": 21
+        }
+      }
+    }
+  },
+  {
+    "provider": "typevaluetype",
+    "line": 4,
+    "character": 20,
+    "hover": {
+      "kind": "hover",
+      "contents": {
+        "markdown": "**Quantity** — FHIR value type\n\nUsed in `- value type is Quantity.` to declare the concept's value-bearing type."
+      },
+      "range": {
+        "start": {
+          "line": 4,
+          "character": 16
+        },
+        "end": {
+          "line": 4,
+          "character": 24
+        }
+      }
+    }
+  },
+  {
+    "provider": "conceptRefOrphan",
+    "line": 8,
+    "character": 12,
+    "hover": null
+  },
+  {
+    "provider": "narrative",
+    "line": 3,
+    "character": 15,
+    "hover": null
+  }
+]
