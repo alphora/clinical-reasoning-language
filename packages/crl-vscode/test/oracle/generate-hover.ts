@@ -1,7 +1,7 @@
-// Golden generator for the hover providers (#132 step 3.0). Runs the CURRENT providers
-// (via the vscode stub) on a fixture and snapshots their output. After the hover
-// extraction, the same harness runs the thin delegating providers and must reproduce
-// these goldens byte-for-byte.
+// Golden generator for the hover providers (#132 step 3.0/hover). Runs the CURRENT
+// providers (via the vscode stub) on fixtures that exercise all three + serializes.
+// After the hover extraction, the same harness runs the thin delegating providers and
+// must reproduce these goldens byte-for-byte.
 import * as fs from "node:fs";
 import * as path from "node:path";
 import {
@@ -20,53 +20,89 @@ async function main() {
     "utf-8",
   );
   const patterns = parseCatalog(catalogMd);
-  // Fake index with no declarations → exercises the ConceptRef ORPHAN path (scanDeclarations).
+  if (patterns.length === 0) throw new Error("oracle: catalog parsed 0 patterns");
+
+  // A concrete narrative instance built from the first pattern (robust to catalog drift):
+  // `<X>` slots → `"Foo"`, prefixed with `- definition is ` so isDefinitionIsBody fires.
+  const concrete = patterns[0].narrative.replace(/<[A-Za-z][A-Za-z0-9_]*>/g, '"Foo"');
+  const narrativeLine = `- definition is ${concrete}`;
+  const narrativeCol = "- definition is ".length + 1; // inside the matched span
+
+  // Fake index with no declarations → exercises the ConceptRef ORPHAN path.
   const fakeIndex = { getDeclarations: () => [] } as unknown as ConstructorParameters<
     typeof ConceptRefHoverProvider
   >[0];
 
-  const providers: Record<string, { provideHover: (d: unknown, p: Position) => unknown }> = {
-    narrative: new NarrativeHoverProvider(patterns) as never,
-    typevaluetype: new TypeValuetypeHoverProvider() as never,
-    conceptRefOrphan: new ConceptRefHoverProvider(fakeIndex) as never,
+  // A non-empty index → exercises the ConceptRef INDEXED path (bare + qualified ref).
+  const indexedDecl = {
+    name: "Diabetic",
+    kind: "concept",
+    libraryName: "Conditions",
+    filePath: "/proj/conditions.crl",
+    line: 4,
+    bodyPreview: 'definition is has "Diabetes"',
   };
+  const indexedIndex = { getDeclarations: () => [indexedDecl] } as unknown as ConstructorParameters<
+    typeof ConceptRefHoverProvider
+  >[0];
 
+  const narrativeProv = new NarrativeHoverProvider(patterns);
+  const typevtProv = new TypeValuetypeHoverProvider();
+  const conceptrefProv = new ConceptRefHoverProvider(fakeIndex);
+  const conceptrefIndexedProv = new ConceptRefHoverProvider(indexedIndex);
+
+  // Concept headers need the trailing colon for scanDeclarations to pick them up.
   const FIXTURE = [
-    "# Concepts",
-    "",
-    'concept "Body Mass Index"',
-    "- type is Observation.",
-    "- value type is Quantity.",
-    "",
-    'decision "X"',
-    "first:",
-    '- when "Body Mass Index" then recommend activity "Y".',
-    "end.",
+    'concept "Diabetic":', //                                   0
+    '- definition is has "Diabetes".', //                       1
+    "", //                                                      2
+    'concept "Body Weight":', //                                3
+    "- type is Observation.", //                                4
+    "- value type is Quantity.", //                             5
+    "", //                                                      6
+    'decision "Screen":', //                                    7
+    "first:", //                                                8
+    '- when "Diabetic" then recommend activity "Refer".', //    9
+    "end.", //                                                  10
   ].join("\n");
   const doc = makeDoc(FIXTURE, "/fake/hover.crl");
+  const narrativeDoc = makeDoc(narrativeLine, "/fake/narrative.crl");
+  // Qualified ref `"Lib"."Concept"` — the indexed path's qualifierMatch branch.
+  const qualifiedDoc = makeDoc(
+    '- when "Conditions"."Diabetic" then recommend activity "Refer".',
+    "/fake/q.crl",
+  );
 
-  const cases = [
-    { provider: "typevaluetype", line: 3, character: 15 }, // inside "Observation"
-    { provider: "typevaluetype", line: 4, character: 20 }, // inside "Quantity"
-    { provider: "conceptRefOrphan", line: 8, character: 12 }, // inside quoted "Body Mass Index"
-    { provider: "narrative", line: 3, character: 15 }, // a non-`definition is` line → expect null
-  ];
+  const results: unknown[] = [];
+  const run = async (
+    label: string,
+    prov: { provideHover: (d: unknown, p: Position) => unknown },
+    d: unknown,
+    line: number,
+    character: number,
+  ) => {
+    const hover = await Promise.resolve(prov.provideHover(d, new Position(line, character)));
+    results.push({ provider: label, line, character, hover: toPlain(hover ?? null) });
+  };
 
-  const results = [];
-  for (const c of cases) {
-    const hover = await Promise.resolve(
-      providers[c.provider].provideHover(doc, new Position(c.line, c.character)),
-    );
-    results.push({ ...c, hover: toPlain(hover ?? null) });
-  }
+  await run("narrative", narrativeProv, narrativeDoc, 0, narrativeCol);
+  await run("typevaluetype-type", typevtProv, doc, 4, 12); // inside "Observation"
+  await run("typevaluetype-valuetype", typevtProv, doc, 5, 18); // inside "Quantity"
+  await run("conceptRef-orphan", conceptrefProv, doc, 9, 12); // on "Diabetic" ref
+  await run("conceptRef-miss", conceptrefProv, doc, 9, 2); // not on a quoted ref → null
+  await run("conceptRef-indexed-bare", conceptrefIndexedProv, doc, 9, 12); // indexed path, bare ref
+  await run("conceptRef-indexed-qualified", conceptrefIndexedProv, qualifiedDoc, 0, 25); // "Conditions"."Diabetic"
+  // Inclusive-end hit-testing on the `- type is Observation.` token (cols 10..21):
+  await run("boundary-token-start", typevtProv, doc, 4, 10); // cursor at token start → hover
+  await run("boundary-token-end", typevtProv, doc, 4, 21); // cursor at inclusive end → hover
+  await run("boundary-past-end", typevtProv, doc, 4, 22); // one past end → null
 
-  // Run from packages/crl-vscode (the bundle's __dirname is the throwaway .gen/ dir).
   const outDir = path.resolve(process.cwd(), "test/oracle/golden");
   fs.mkdirSync(outDir, { recursive: true });
   fs.writeFileSync(path.join(outDir, "hover.json"), JSON.stringify(results, null, 2) + "\n");
-  console.log(`hover golden written: ${results.length} cases →`);
-  for (const r of results)
-    console.log(`  ${r.provider} @${r.line}:${r.character} → ${(r.hover as { kind?: string } | null)?.kind ?? "null"}`);
+  console.log(`hover golden: ${results.length} cases (narrative pattern0 = ${JSON.stringify(patterns[0].narrative)}) →`);
+  for (const r of results as { provider: string; hover: { kind?: string } | null }[])
+    console.log(`  ${r.provider} → ${r.hover?.kind ?? "null"}`);
 }
 main().catch((e) => {
   console.error(e);

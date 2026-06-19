@@ -28,6 +28,13 @@ export interface ZeroBasedRange {
   endCol: number;
 }
 
+/** 0-based line/character position — the input position for the compute* functions
+ *  (character is a UTF-16 code unit, matching ZeroBasedRange's columns + LSP). */
+export interface LsPosition {
+  line: number;
+  character: number;
+}
+
 export type LsSeverity = "error" | "warning" | "information" | "hint";
 
 export type LsCompletionKind =

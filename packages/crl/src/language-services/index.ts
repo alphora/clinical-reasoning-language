@@ -18,3 +18,5 @@ export * from "./highlight";
 export * from "./contracts";
 export * from "./paths";
 export * from "./host";
+// #132 step 3 — headless compute* services (the extension wraps these in vscode adapters).
+export * from "./hover";
