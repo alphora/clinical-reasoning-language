@@ -12,6 +12,8 @@ import type {
   LsDocumentLink,
   LsTextEdit,
   LsSymbolKind,
+  LsDiagnostic,
+  LsSeverity,
   ZeroBasedRange,
 } from "@smile-digital-health/crl/language-services";
 
@@ -103,4 +105,19 @@ export function toWorkspaceEdit(edits: LsTextEdit[]): vscode.WorkspaceEdit {
   const edit = new vscode.WorkspaceEdit();
   for (const e of edits) edit.replace(vscode.Uri.file(e.filePath), toVscodeRange(e.range), e.newText);
   return edit;
+}
+
+const DIAGNOSTIC_SEVERITY: Record<LsSeverity, vscode.DiagnosticSeverity> = {
+  error: vscode.DiagnosticSeverity.Error,
+  warning: vscode.DiagnosticSeverity.Warning,
+  information: vscode.DiagnosticSeverity.Information,
+  hint: vscode.DiagnosticSeverity.Hint,
+};
+
+/** LsDiagnostic → vscode.Diagnostic (source + code set post-construction, matching the providers). */
+export function toVscodeDiagnostic(d: LsDiagnostic): vscode.Diagnostic {
+  const diag = new vscode.Diagnostic(toVscodeRange(d.range), d.message, DIAGNOSTIC_SEVERITY[d.severity]);
+  if (d.source !== undefined) diag.source = d.source;
+  if (d.code !== undefined) diag.code = d.code;
+  return diag;
 }

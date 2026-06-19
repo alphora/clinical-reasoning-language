@@ -16,3 +16,4 @@ import "../language-services/tests/host.test";
 import "../language-services/tests/hover.test";
 import "../language-services/tests/completion.test";
 import "../language-services/tests/navigation.test";
+import "../language-services/tests/diagnostics.test";

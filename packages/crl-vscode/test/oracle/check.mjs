@@ -15,7 +15,7 @@ import assert from "node:assert/strict";
 const here = dirname(fileURLToPath(import.meta.url));
 const pkgDir = resolve(here, "../.."); // packages/crl-vscode — the generators resolve the catalog md from cwd
 const stub = resolve(here, "vscode-stub.ts");
-const services = ["hover", "completion", "navigation"];
+const services = ["hover", "completion", "navigation", "diagnostics"];
 
 for (const svc of services) {
   const bundle = resolve(here, `.gen/check-${svc}.cjs`);
