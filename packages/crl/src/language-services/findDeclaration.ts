@@ -1,10 +1,10 @@
-import {
-  canonicalize,
-  type IndexedDeclaration,
-  type IndexedLibrary,
-  type IndexedReference,
-  type ProjectIndex,
-  type ZeroBasedRange,
+import { canonicalize } from "./paths";
+import type { ZeroBasedRange } from "./contracts";
+import type {
+  IndexedDeclaration,
+  IndexedLibrary,
+  IndexedReference,
+  ProjectIndex,
 } from "./projectIndex";
 
 /**

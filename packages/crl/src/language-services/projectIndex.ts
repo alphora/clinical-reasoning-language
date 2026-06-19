@@ -4,6 +4,8 @@ import * as path from "node:path";
 import { resolveImports } from "../imports";
 import { findProjectRoot } from "../imports/registry";
 import type { ResolvedGraph, RegistryEntry } from "../imports/types";
+import type { ZeroBasedRange } from "./contracts";
+import { canonicalize } from "./paths";
 
 /**
  * Project-wide indexed view of a single .crl file: which library it
@@ -63,16 +65,7 @@ export interface IndexedReference {
   qualified: boolean;
 }
 
-/**
- * Zero-based, inclusive-start, exclusive-end range. Matches the shape
- * VS Code's `Range` consumes; converted by the providers at the boundary.
- */
-export interface ZeroBasedRange {
-  startLine: number;
-  startCol: number;
-  endLine: number;
-  endCol: number;
-}
+// ZeroBasedRange is defined in ./contracts (imported above) — the canonical range type.
 
 interface CachedProject {
   projectRoot: string;
@@ -949,18 +942,4 @@ function sourceFor(filePath: string, overlays: ReadonlyMap<string, string>): str
   }
 }
 
-/**
- * Drive-letter-canonical absolute path. Must be used at every boundary
- * where `document.uri.fsPath` (lowercase drive on Windows) is compared
- * against an `IndexedDeclaration.filePath` (uppercase drive — set by
- * the package's `canonicalizeFsPath`). Without this, every "is this
- * decl in the current file?" filter strips its entire input on
- * Windows.
- */
-export function canonicalize(absPath: string): string {
-  const resolved = path.resolve(absPath);
-  if (process.platform === "win32" && /^[a-z]:/.test(resolved)) {
-    return resolved.charAt(0).toUpperCase() + resolved.slice(1);
-  }
-  return resolved;
-}
+// canonicalize is defined in ./paths (imported above).

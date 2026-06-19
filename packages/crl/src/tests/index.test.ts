@@ -12,3 +12,4 @@ import "../cel/emitter/tests/emitter.test";
 import "../cel/emitter/tests/emit-fhir-golden.test";
 import "../cli/tests/run-emitter.test";
 import "./regression/index.test";
+import "../language-services/tests/host.test";
