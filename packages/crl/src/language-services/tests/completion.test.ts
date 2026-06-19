@@ -6,9 +6,10 @@ import {
   computeTypeCompletion,
   computeValuetypeCompletion,
   computeParamTypeCompletion,
+  computeRequestCompletion,
   computeConceptRefCompletion,
 } from "../completion";
-import { CONCEPT_TYPES, CONCEPT_VALUETYPES, PARAMETER_TYPES, type Pattern } from "../catalog";
+import { CONCEPT_TYPES, CONCEPT_VALUETYPES, PARAMETER_TYPES, ACTIVITY_TYPES, type Pattern } from "../catalog";
 import type { ProjectIndex } from "../projectIndex";
 
 const PATTERNS: Pattern[] = [
@@ -60,6 +61,24 @@ describe("computeType/Valuetype/ParamTypeCompletion (#132 step 3b)", () => {
   it("valuetype + param slots return their full allowlists", () => {
     expect(computeValuetypeCompletion("- value type is ")).toHaveLength(CONCEPT_VALUETYPES.length);
     expect(computeParamTypeCompletion("- param type is ")).toHaveLength(PARAMETER_TYPES.length);
+  });
+
+  it("request slot → every ACTIVITY_TYPE as a typeParameter item", () => {
+    const items = computeRequestCompletion("- request ");
+    expect(items).toHaveLength(ACTIVITY_TYPES.length);
+    expect(items[0]).toEqual({
+      label: ACTIVITY_TYPES[0],
+      kind: "typeParameter",
+      detail: `CPG activity type — \`request ${ACTIVITY_TYPES[0]}.\``,
+    });
+  });
+
+  it("request slot miss → []", () => {
+    expect(computeRequestCompletion("- type is ")).toEqual([]);
+  });
+
+  it("request slot accepts the grammar's optional `do not perform` modifier", () => {
+    expect(computeRequestCompletion("- request do not perform ")).toHaveLength(ACTIVITY_TYPES.length);
   });
 });
 

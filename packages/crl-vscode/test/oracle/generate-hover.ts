@@ -88,6 +88,8 @@ async function main() {
   await run("narrative", narrativeProv, narrativeDoc, 0, narrativeCol);
   await run("typevaluetype-type", typevtProv, doc, 4, 12); // inside "Observation"
   await run("typevaluetype-valuetype", typevtProv, doc, 5, 18); // inside "Quantity"
+  await run("typevaluetype-request", typevtProv, makeDoc("- request CPGServiceRequest.", "/fake/r.crl"), 0, 18); // activity request type
+  await run("typevaluetype-request-dnp", typevtProv, makeDoc("- request do not perform CPGServiceRequest.", "/fake/rd.crl"), 0, 30); // do-not-perform modifier
   await run("conceptRef-orphan", conceptrefProv, doc, 9, 12); // on "Diabetic" ref
   await run("conceptRef-miss", conceptrefProv, doc, 9, 2); // not on a quoted ref → null
   await run("conceptRef-indexed-bare", conceptrefIndexedProv, doc, 9, 12); // indexed path, bare ref

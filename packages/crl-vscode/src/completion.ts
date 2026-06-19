@@ -9,6 +9,7 @@ import {
   computeTypeCompletion,
   computeValuetypeCompletion,
   computeParamTypeCompletion,
+  computeRequestCompletion,
   computeConceptRefCompletion,
   type Pattern,
   type ProjectIndex,
@@ -63,6 +64,17 @@ export class ParamTypeCompletionProvider implements vscode.CompletionItemProvide
   ): vscode.ProviderResult<vscode.CompletionItem[]> {
     const prefix = document.lineAt(position.line).text.slice(0, position.character);
     return computeParamTypeCompletion(prefix).map(toVscodeCompletionItem);
+  }
+}
+
+/** Completion for `- request <X>.` lines (an activity's request resource type). */
+export class RequestCompletionProvider implements vscode.CompletionItemProvider {
+  public provideCompletionItems(
+    document: vscode.TextDocument,
+    position: vscode.Position,
+  ): vscode.ProviderResult<vscode.CompletionItem[]> {
+    const prefix = document.lineAt(position.line).text.slice(0, position.character);
+    return computeRequestCompletion(prefix).map(toVscodeCompletionItem);
   }
 }
 

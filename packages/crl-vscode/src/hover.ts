@@ -9,6 +9,7 @@ import {
   CONCEPT_TYPES,
   CONCEPT_VALUETYPES,
   PARAMETER_TYPES,
+  ACTIVITY_TYPES,
   type Pattern,
 } from "@smile-digital-health/crl/language-services";
 import {
@@ -56,6 +57,7 @@ export class TypeValuetypeHoverProvider implements vscode.HoverProvider {
       conceptTypes: CONCEPT_TYPES,
       valueTypes: CONCEPT_VALUETYPES,
       paramTypes: PARAMETER_TYPES,
+      activityTypes: ACTIVITY_TYPES,
     });
     return ls ? toVscodeHover(ls) : null;
   }

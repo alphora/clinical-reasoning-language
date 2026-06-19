@@ -63,6 +63,48 @@
     }
   },
   {
+    "provider": "typevaluetype-request",
+    "line": 0,
+    "character": 18,
+    "hover": {
+      "kind": "hover",
+      "contents": {
+        "markdown": "**CPGServiceRequest** — CPG activity type\n\nUsed in `- request CPGServiceRequest.` to declare the activity's request resource type."
+      },
+      "range": {
+        "start": {
+          "line": 0,
+          "character": 10
+        },
+        "end": {
+          "line": 0,
+          "character": 27
+        }
+      }
+    }
+  },
+  {
+    "provider": "typevaluetype-request-dnp",
+    "line": 0,
+    "character": 30,
+    "hover": {
+      "kind": "hover",
+      "contents": {
+        "markdown": "**CPGServiceRequest** — CPG activity type\n\nUsed in `- request CPGServiceRequest.` to declare the activity's request resource type."
+      },
+      "range": {
+        "start": {
+          "line": 0,
+          "character": 25
+        },
+        "end": {
+          "line": 0,
+          "character": 42
+        }
+      }
+    }
+  },
+  {
     "provider": "conceptRef-orphan",
     "line": 9,
     "character": 12,

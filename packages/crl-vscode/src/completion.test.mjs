@@ -15,6 +15,7 @@ const {
   isTypeCompletionPrefix,
   isValuetypeCompletionPrefix,
   isParamTypeCompletionPrefix,
+  isRequestCompletionPrefix,
   isUnquotedTypeSlotPrefix,
   applyNarrativePrecedence,
   findByConceptFirstPrecedence,
@@ -44,6 +45,20 @@ assert.equal(isParamTypeCompletionPrefix("- type is "), false, "type slot must N
 assert.equal(isParamTypeCompletionPrefix("- value type is "), false, "value-type slot must NOT match param-type predicate");
 assert.equal(isParamTypeCompletionPrefix("parameter \"X\":"), false);
 assert.equal(isParamTypeCompletionPrefix("- param type is Period "), false, "trailing space closes the slot");
+
+// --- isRequestCompletionPrefix (activity request slot — no `is`; allows `do not perform`) ---
+assert.equal(isRequestCompletionPrefix("- request "), true);
+assert.equal(isRequestCompletionPrefix("  - request CPG"), true);
+assert.equal(isRequestCompletionPrefix("- request do not perform "), true, "allows the do-not-perform modifier");
+assert.equal(isRequestCompletionPrefix("- type is "), false);
+assert.equal(isRequestCompletionPrefix("- requested by "), false, "must NOT match the `requested by` keyword prefix");
+assert.equal(isRequestCompletionPrefix("- request CPGServiceRequest "), false, "trailing space closes the slot");
+
+// --- isUnquotedTypeSlotPrefix now also covers the `- request` slot (suppresses ref completion) ---
+assert.equal(isUnquotedTypeSlotPrefix('- request "'), true);
+assert.equal(isUnquotedTypeSlotPrefix('- request do not perform "'), true);
+assert.equal(isUnquotedTypeSlotPrefix('- requested by "'), false, "`requested by` is not a request slot");
+assert.equal(isUnquotedTypeSlotPrefix('- requestx "'), false);
 
 // --- REGRESSION GUARD: qualified-ref completion fires on `.` trigger too ---
 // Bug: typing `"CMS22 Inferred".` (just the dot, before the second `"`) caused

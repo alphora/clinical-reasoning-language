@@ -48,6 +48,7 @@ describe("computeTypeValuetypeHover (#132 step 3)", () => {
     conceptTypes: ["Observation", "Condition"],
     valueTypes: ["Quantity", "boolean"],
     paramTypes: ["Patient", "Period"],
+    activityTypes: ["CPGServiceRequest", "CPGCommunicationRequest"],
   };
 
   it("hovers a valid `- type is X.` token", () => {
@@ -80,6 +81,27 @@ describe("computeTypeValuetypeHover (#132 step 3)", () => {
       "**Patient** — CRL parameter type\n\n" +
         "Used in `- param type is Patient.` to declare a patient-scoped runtime input. " +
         "The emitter collapses this to CQL `context Patient`; the parameter's quoted CRL name is not emitted, and the CQL `context Patient` line has no per-name identifier.",
+    );
+  });
+
+  it("hovers a valid `- request X.` token (activity request type)", () => {
+    const h = computeTypeValuetypeHover("- request CPGServiceRequest.", { line: 0, character: 18 }, allow);
+    expect(h?.markdown).toBe(
+      "**CPGServiceRequest** — CPG activity type\n\nUsed in `- request CPGServiceRequest.` to declare the activity's request resource type.",
+    );
+  });
+
+  it("warns on an unrecognized request type, listing the valid set", () => {
+    const h = computeTypeValuetypeHover("- request Nope.", { line: 0, character: 12 }, allow);
+    expect(h?.markdown).toBe(
+      "**Nope** — CPG activity type\n\n⚠ Not in the recognized activity type set. Valid: CPGServiceRequest, CPGCommunicationRequest.",
+    );
+  });
+
+  it("hovers the type after the `do not perform` modifier", () => {
+    const h = computeTypeValuetypeHover("- request do not perform CPGServiceRequest.", { line: 0, character: 30 }, allow);
+    expect(h?.markdown).toBe(
+      "**CPGServiceRequest** — CPG activity type\n\nUsed in `- request CPGServiceRequest.` to declare the activity's request resource type.",
     );
   });
 
