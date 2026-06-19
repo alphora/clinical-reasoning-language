@@ -31,7 +31,7 @@ const check = async (label, fn) => {
 
 await client.connect(transport);
 try {
-  await check("MCP tools: 9 registered (…, run_decision, authoring_kit)", async () => {
+  await check("MCP tools: 10 registered (…, run_decision, render_scenario, authoring_kit)", async () => {
     const { tools } = await client.listTools();
     const names = tools.map((t) => t.name).sort();
     assert.deepEqual(names, [
@@ -40,6 +40,7 @@ try {
       "emit_cel",
       "emit_cql",
       "emit_crl_fhir",
+      "render_scenario",
       "run_decision",
       "tokenize_crl",
       "validate_cel",
@@ -135,6 +136,35 @@ try {
 
   await check("run_decision with nonexistent path → isError", async () => {
     const r = await client.callTool({ name: "run_decision", arguments: { path: "/nonexistent/never.cel" } });
+    assert.equal(r.isError, true);
+  });
+
+  await check("render_scenario via path → dme101-030.cel: view-model envelope (schemaVersion + tree)", async () => {
+    const dme101Cel = resolve(here, "../../../src/tests/fixtures/policies/dme101-030/dme101-030.cel");
+    const r = await client.callTool({ name: "render_scenario", arguments: { path: dme101Cel } });
+    assert.ok(!r.isError, "should not be a tool error");
+    const out = JSON.parse(r.content[0].text);
+    assert.equal(typeof out.schemaVersion, "number");
+    assert.equal(out.success, true);
+    assert.equal(out.caseCount, 3);
+    assert.ok(Array.isArray(out.scenarios) && out.scenarios.length === 3);
+    const sc = out.scenarios[0];
+    assert.ok(Array.isArray(sc.tree), "each scenario carries a decision tree");
+    assert.ok(sc.tree.every((n) => typeof n.nodeId === "string" && n.source && n.source.range), "tree nodes carry nodeId + source");
+  });
+
+  await check("render_scenario with case filter → one scenario", async () => {
+    const dme101Cel = resolve(here, "../../../src/tests/fixtures/policies/dme101-030/dme101-030.cel");
+    const all = JSON.parse((await client.callTool({ name: "render_scenario", arguments: { path: dme101Cel } })).content[0].text);
+    const one = all.scenarios[0].case.name;
+    const r = await client.callTool({ name: "render_scenario", arguments: { path: dme101Cel, case: one } });
+    const out = JSON.parse(r.content[0].text);
+    assert.equal(out.caseCount, 1);
+    assert.equal(out.scenarios[0].case.name, one);
+  });
+
+  await check("render_scenario without path → isError", async () => {
+    const r = await client.callTool({ name: "render_scenario", arguments: {} });
     assert.equal(r.isError, true);
   });
 

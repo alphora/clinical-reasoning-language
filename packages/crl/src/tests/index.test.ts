@@ -17,3 +17,7 @@ import "../language-services/tests/hover.test";
 import "../language-services/tests/completion.test";
 import "../language-services/tests/navigation.test";
 import "../language-services/tests/diagnostics.test";
+import "../language-services/tests/contracts.test";
+import "../cre/tests/run.test";
+import "../cre/tests/composition.test";
+import "../cre/tests/viewModel.test";
