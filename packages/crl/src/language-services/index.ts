@@ -14,3 +14,7 @@ export * from "./contextDetect";
 export * from "./findDeclaration";
 export * from "./projectIndex";
 export * from "./highlight";
+// #132 step 2 — plain-data contracts + the LanguageServiceHost fs abstraction + paths util.
+export * from "./contracts";
+export * from "./paths";
+export * from "./host";
