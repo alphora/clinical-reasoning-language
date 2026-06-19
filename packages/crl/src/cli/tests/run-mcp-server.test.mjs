@@ -78,6 +78,24 @@ try {
     assert.equal(out.success, true, `embedded reference CRL must validate clean; errors: ${JSON.stringify(out.errors ?? []).slice(0, 200)}`);
   });
 
+  await check("emit_cql via inline code → runs without a tool error (the kit's decision-reference.crl)", async () => {
+    const kit = JSON.parse((await client.callTool({ name: "authoring_kit", arguments: {} })).content[0].text);
+    const crl = kit.referenceArtifacts.find((a) => a.name === "decision-reference.crl").source;
+    const r = await client.callTool({ name: "emit_cql", arguments: { code: crl } });
+    assert.ok(!r.isError, `emit_cql should not be a tool error; got ${r.content?.[0]?.text?.slice(0, 200)}`);
+    assert.ok((r.content?.[0]?.text?.length ?? 0) > 0, "emit_cql should return content");
+  });
+
+  await check("emit_cql with neither code nor path → isError", async () => {
+    const r = await client.callTool({ name: "emit_cql", arguments: {} });
+    assert.equal(r.isError, true);
+  });
+
+  await check("emit_crl_fhir without path → isError", async () => {
+    const r = await client.callTool({ name: "emit_crl_fhir", arguments: {} });
+    assert.equal(r.isError, true);
+  });
+
   await check("authoring_kit with unknown stage → isError listing valid stages", async () => {
     const r = await client.callTool({ name: "authoring_kit", arguments: { stage: "emit" } });
     assert.equal(r.isError, true);
