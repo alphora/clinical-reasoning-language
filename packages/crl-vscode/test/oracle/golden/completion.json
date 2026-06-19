@@ -1,0 +1,1713 @@
+[
+  {
+    "label": "narrative-in-body",
+    "line": 0,
+    "character": 16,
+    "items": [
+      {
+        "kind": "completion",
+        "label": "has <X>",
+        "itemKind": 14,
+        "insertText": {
+          "snippet": "has \"${1:X}\""
+        },
+        "sortText": "has",
+        "detail": "Has(X: ConceptRef)",
+        "documentation": {
+          "markdown": "**Has(X)** — *Classification*\n\nNarrative: `has <X>`\n\nSignature: `Has(X: ConceptRef)`\n\nCQL: `CRLCommon.Has`"
+        },
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "has history of <X>",
+        "itemKind": 14,
+        "insertText": {
+          "snippet": "has history of \"${1:X}\""
+        },
+        "sortText": "has history of",
+        "detail": "HasHistoryOf(X: ConceptRef[, anchor: ConceptRef])",
+        "documentation": {
+          "markdown": "**HasHistoryOf(X[, anchor])** — *Classification*\n\nNarrative: `has history of <X>`\n\nSignature: `HasHistoryOf(X: ConceptRef[, anchor: ConceptRef])`\n\nCQL: `CRLCommon.HasHistoryOf`"
+        },
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "without <kind> <X>",
+        "itemKind": 14,
+        "insertText": {
+          "snippet": "without \"${1:kind}\" \"${2:X}\""
+        },
+        "sortText": "without",
+        "detail": "Without(kind: KindEnum | ConceptRef, X: ConceptRef | Disjunction<ConceptRef>)",
+        "documentation": {
+          "markdown": "**Without(kind, X)** — *Classification*\n\nNarrative: `without <kind> <X>`\n\nSignature: `Without(kind: KindEnum | ConceptRef, X: ConceptRef | Disjunction<ConceptRef>)`\n\nCQL: `CRLCommon.Without`"
+        },
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "currently taking <med>",
+        "itemKind": 14,
+        "insertText": {
+          "snippet": "currently taking \"${1:med}\""
+        },
+        "sortText": "currently taking",
+        "detail": "CurrentlyTaking(med: ConceptRef)",
+        "documentation": {
+          "markdown": "**CurrentlyTaking(med)** — *Classification*\n\nNarrative: `currently taking <med>`\n\nSignature: `CurrentlyTaking(med: ConceptRef)`\n\nCQL: `CRLCommon.CurrentlyTaking`"
+        },
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "has adverse reaction to <X>",
+        "itemKind": 14,
+        "insertText": {
+          "snippet": "has adverse reaction to \"${1:X}\""
+        },
+        "sortText": "has adverse reaction to",
+        "detail": "HasAdverseReactionTo(X: ConceptRef)",
+        "documentation": {
+          "markdown": "**HasAdverseReactionTo(X)** — *Classification*\n\nNarrative: `has adverse reaction to <X>`\n\nSignature: `HasAdverseReactionTo(X: ConceptRef)`\n\nCQL: `CRLCommon.HasAdverseReactionTo`"
+        },
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "<X> as of <anchor>",
+        "itemKind": 14,
+        "insertText": {
+          "snippet": "\"${1:X}\" as of \"${2:anchor}\""
+        },
+        "sortText": "asof(anchor, x)",
+        "detail": "AsOf(anchor: AnchorExpr, X: ConceptRef)",
+        "documentation": {
+          "markdown": "**AsOf(anchor, X)** — *Contextualization*\n\nNarrative: `<X> as of <anchor>`\n\nSignature: `AsOf(anchor: AnchorExpr, X: ConceptRef)`\n\nCQL: `CRLCommon.AsOf`"
+        },
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "<discriminator> component of <panel>",
+        "itemKind": 14,
+        "insertText": {
+          "snippet": "\"${1:discriminator}\" component of \"${2:panel}\""
+        },
+        "sortText": "componentof(panel, discriminator)",
+        "detail": "ComponentOf(panel: ConceptRef, discriminator: ConceptRef<T>)",
+        "documentation": {
+          "markdown": "**ComponentOf(panel, discriminator)** — *Contextualization*\n\nNarrative: `<discriminator> component of <panel>`\n\nSignature: `ComponentOf(panel: ConceptRef, discriminator: ConceptRef<T>)`\n\nCQL: `CRLCommon.ComponentOf`"
+        },
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "<action> not done with reason <reason>",
+        "itemKind": 14,
+        "insertText": {
+          "snippet": "\"${1:action}\" not done with reason \"${2:reason}\""
+        },
+        "sortText": "notdonewithreason(action, reason)",
+        "detail": "NotDoneWithReason(action: ConceptRef, reason: ConceptRef | Disjunction<ConceptRef>)",
+        "documentation": {
+          "markdown": "**NotDoneWithReason(action, reason)** — *Contextualization*\n\nNarrative: `<action> not done with reason <reason>`\n\nSignature: `NotDoneWithReason(action: ConceptRef, reason: ConceptRef | Disjunction<ConceptRef>)`\n\nCQL: `CRLCommon.NotDoneWithReason`"
+        },
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "<X> ordered",
+        "itemKind": 14,
+        "insertText": {
+          "snippet": "\"${1:X}\" ordered"
+        },
+        "sortText": "wasordered(x)",
+        "detail": "WasOrdered(X: ConceptRef)",
+        "documentation": {
+          "markdown": "**WasOrdered(X)** — *Contextualization*\n\nNarrative: `<X> ordered`\n\nSignature: `WasOrdered(X: ConceptRef)`\n\nCQL: `CRLCommon.WasOrdered`"
+        },
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "<action> justified by <reason>",
+        "itemKind": 14,
+        "insertText": {
+          "snippet": "\"${1:action}\" justified by \"${2:reason}\""
+        },
+        "sortText": "justified(action, reason)",
+        "detail": "Justified(action: ConceptRef, reason: ReasonExpr)",
+        "documentation": {
+          "markdown": "**Justified(action, reason)** — *Assertion*\n\nNarrative: `<action> justified by <reason>`\n\nSignature: `Justified(action: ConceptRef, reason: ReasonExpr)`\n\nCQL: `CRLCommon.Justified`"
+        },
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "<X> active",
+        "itemKind": 14,
+        "insertText": {
+          "snippet": "\"${1:X}\" active"
+        },
+        "sortText": "active(x[, during])",
+        "detail": "Active(X: ConceptRef[, during: ConceptRef])",
+        "documentation": {
+          "markdown": "**Active(X[, during])** — *Assertion*\n\nNarrative: `<X> active`\n\nSignature: `Active(X: ConceptRef[, during: ConceptRef])`\n\nCQL: `CRLCommon.Active`"
+        },
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "<X> verified",
+        "itemKind": 14,
+        "insertText": {
+          "snippet": "\"${1:X}\" verified"
+        },
+        "sortText": "isverified(x)",
+        "detail": "IsVerified(X: ConceptRef)",
+        "documentation": {
+          "markdown": "**IsVerified(X)** — *Assertion*\n\nNarrative: `<X> verified`\n\nSignature: `IsVerified(X: ConceptRef)`\n\nCQL: `CRLCommon.IsVerified`"
+        },
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "<X> documented as <classification>",
+        "itemKind": 14,
+        "insertText": {
+          "snippet": "\"${1:X}\" documented as \"${2:classification}\""
+        },
+        "sortText": "documentedas(x, classification)",
+        "detail": "DocumentedAs(X: ConceptRef, classification: ConceptRef)",
+        "documentation": {
+          "markdown": "**DocumentedAs(X, classification)** — *Assertion*\n\nNarrative: `<X> documented as <classification>`\n\nSignature: `DocumentedAs(X: ConceptRef, classification: ConceptRef)`\n\nCQL: `CRLCommon.DocumentedAs`"
+        },
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "most recent <X>",
+        "itemKind": 14,
+        "insertText": {
+          "snippet": "most recent \"${1:X}\""
+        },
+        "sortText": "most recent",
+        "detail": "MostRecent(X: ConceptRef[, scope: ScopeSpec])",
+        "documentation": {
+          "markdown": "**MostRecent(X[, scope])** — *Qualification (temporal)*\n\nNarrative: `most recent <X>`\n\nSignature: `MostRecent(X: ConceptRef[, scope: ScopeSpec])`\n\nCQL: `CRLCommon.MostRecent`"
+        },
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "last <X>",
+        "itemKind": 14,
+        "insertText": {
+          "snippet": "last \"${1:X}\""
+        },
+        "sortText": "last",
+        "detail": "Last(X: ConceptRef[, scope: ScopeSpec])",
+        "documentation": {
+          "markdown": "**Last(X[, scope])** — *Qualification (temporal)*\n\nNarrative: `last <X>`\n\nSignature: `Last(X: ConceptRef[, scope: ScopeSpec])`\n\nCQL: `CRLCommon.LastOf`"
+        },
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "earliest <X>",
+        "itemKind": 14,
+        "insertText": {
+          "snippet": "earliest \"${1:X}\""
+        },
+        "sortText": "earliest",
+        "detail": "Earliest(X: ConceptRef[, scope: ScopeSpec])",
+        "documentation": {
+          "markdown": "**Earliest(X[, scope])** — *Qualification (temporal)*\n\nNarrative: `earliest <X>`\n\nSignature: `Earliest(X: ConceptRef[, scope: ScopeSpec])`\n\nCQL: `CRLCommon.Earliest`"
+        },
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "first <X>",
+        "itemKind": 14,
+        "insertText": {
+          "snippet": "first \"${1:X}\""
+        },
+        "sortText": "first",
+        "detail": "First(X: ConceptRef[, scope: ScopeSpec])",
+        "documentation": {
+          "markdown": "**First(X[, scope])** — *Qualification (temporal)*\n\nNarrative: `first <X>`\n\nSignature: `First(X: ConceptRef[, scope: ScopeSpec])`\n\nCQL: `CRLCommon.FirstOf`"
+        },
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "<event> during <period>",
+        "itemKind": 14,
+        "insertText": {
+          "snippet": "\"${1:event}\" during \"${2:period}\""
+        },
+        "sortText": "during(event, period)",
+        "detail": "During(event: ConceptRef, period: ConceptRef)",
+        "documentation": {
+          "markdown": "**During(event, period)** — *Qualification (temporal)*\n\nNarrative: `<event> during <period>`\n\nSignature: `During(event: ConceptRef, period: ConceptRef)`\n\nCQL: `CRLCommon.During`"
+        },
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "<eventA> overlaps <eventB>",
+        "itemKind": 14,
+        "insertText": {
+          "snippet": "\"${1:eventA}\" overlaps \"${2:eventB}\""
+        },
+        "sortText": "overlaps(eventa, eventb)",
+        "detail": "Overlaps(eventA: ConceptRef, eventB: ConceptRef)",
+        "documentation": {
+          "markdown": "**Overlaps(eventA, eventB)** — *Qualification (temporal)*\n\nNarrative: `<eventA> overlaps <eventB>`\n\nSignature: `Overlaps(eventA: ConceptRef, eventB: ConceptRef)`\n\nCQL: `CRLCommon.Overlaps`"
+        },
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "<X> on day of or after <anchor>",
+        "itemKind": 14,
+        "insertText": {
+          "snippet": "\"${1:X}\" on day of or after \"${2:anchor}\""
+        },
+        "sortText": "ondayoforafter(x, anchor)",
+        "detail": "OnDayOfOrAfter(X: ConceptRef, anchor: ConceptRef)",
+        "documentation": {
+          "markdown": "**OnDayOfOrAfter(X, anchor)** — *Qualification (temporal)*\n\nNarrative: `<X> on day of or after <anchor>`\n\nSignature: `OnDayOfOrAfter(X: ConceptRef, anchor: ConceptRef)`\n\nCQL: `CRLCommon.OnDayOfOrAfter`"
+        },
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "<X> on or before <anchor>",
+        "itemKind": 14,
+        "insertText": {
+          "snippet": "\"${1:X}\" on or before \"${2:anchor}\""
+        },
+        "sortText": "onorbefore(x, anchor)",
+        "detail": "OnOrBefore(X: ConceptRef, anchor: ConceptRef)",
+        "documentation": {
+          "markdown": "**OnOrBefore(X, anchor)** — *Qualification (temporal)*\n\nNarrative: `<X> on or before <anchor>`\n\nSignature: `OnOrBefore(X: ConceptRef, anchor: ConceptRef)`\n\nCQL: `CRLCommon.OnOrBefore`"
+        },
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "<eventA> same day as <eventB>",
+        "itemKind": 14,
+        "insertText": {
+          "snippet": "\"${1:eventA}\" same day as \"${2:eventB}\""
+        },
+        "sortText": "sameday(eventa, eventb)",
+        "detail": "SameDay(eventA: ConceptRef, eventB: ConceptRef)",
+        "documentation": {
+          "markdown": "**SameDay(eventA, eventB)** — *Qualification (temporal)*\n\nNarrative: `<eventA> same day as <eventB>`\n\nSignature: `SameDay(eventA: ConceptRef, eventB: ConceptRef)`\n\nCQL: `CRLCommon.SameDay`"
+        },
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "<eventA> and <eventB> at least <duration> apart",
+        "itemKind": 14,
+        "insertText": {
+          "snippet": "\"${1:eventA}\" and \"${2:eventB}\" at least \"${3:duration}\" apart"
+        },
+        "sortText": "atleastapart(eventa, eventb, duration)",
+        "detail": "AtLeastApart(eventA: ConceptRef, eventB: ConceptRef, duration: Quantity<time>)",
+        "documentation": {
+          "markdown": "**AtLeastApart(eventA, eventB, duration)** — *Qualification (temporal)*\n\nNarrative: `<eventA> and <eventB> at least <duration> apart`\n\nSignature: `AtLeastApart(eventA: ConceptRef, eventB: ConceptRef, duration: Quantity<time>)`\n\nCQL: `CRLCommon.AtLeastApart`"
+        },
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "<eventA> and <eventB> at most <duration> apart",
+        "itemKind": 14,
+        "insertText": {
+          "snippet": "\"${1:eventA}\" and \"${2:eventB}\" at most \"${3:duration}\" apart"
+        },
+        "sortText": "atmostapart(eventa, eventb, duration)",
+        "detail": "AtMostApart(eventA: ConceptRef, eventB: ConceptRef, duration: Quantity<time>)",
+        "documentation": {
+          "markdown": "**AtMostApart(eventA, eventB, duration)** — *Qualification (temporal)*\n\nNarrative: `<eventA> and <eventB> at most <duration> apart`\n\nSignature: `AtMostApart(eventA: ConceptRef, eventB: ConceptRef, duration: Quantity<time>)`\n\nCQL: `CRLCommon.AtMostApart`"
+        },
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "<duration> before start of <anchor>",
+        "itemKind": 14,
+        "insertText": {
+          "snippet": "\"${1:duration}\" before start of \"${2:anchor}\""
+        },
+        "sortText": "before-start-of(duration, anchor)",
+        "detail": "BeforeStartOf(duration: Quantity<time>, anchor: ConceptRef)",
+        "documentation": {
+          "markdown": "**before-start-of(duration, anchor)** — *Window-from-anchor (sub-grammar — 5 sister forms)*\n\nNarrative: `<duration> before start of <anchor>`\n\nSignature: `BeforeStartOf(duration: Quantity<time>, anchor: ConceptRef)`\n\nCQL: `CRLCommon.BeforeStartOf`"
+        },
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "<duration> after start of <anchor>",
+        "itemKind": 14,
+        "insertText": {
+          "snippet": "\"${1:duration}\" after start of \"${2:anchor}\""
+        },
+        "sortText": "after-start-of(duration, anchor)",
+        "detail": "AfterStartOf(duration: Quantity<time>, anchor: ConceptRef)",
+        "documentation": {
+          "markdown": "**after-start-of(duration, anchor)** — *Window-from-anchor (sub-grammar — 5 sister forms)*\n\nNarrative: `<duration> after start of <anchor>`\n\nSignature: `AfterStartOf(duration: Quantity<time>, anchor: ConceptRef)`\n\nCQL: `CRLCommon.AfterStartOf`"
+        },
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "<duration> before end of <anchor>",
+        "itemKind": 14,
+        "insertText": {
+          "snippet": "\"${1:duration}\" before end of \"${2:anchor}\""
+        },
+        "sortText": "before-end-of(duration, anchor)",
+        "detail": "BeforeEndOf(duration: Quantity<time>, anchor: ConceptRef)",
+        "documentation": {
+          "markdown": "**before-end-of(duration, anchor)** — *Window-from-anchor (sub-grammar — 5 sister forms)*\n\nNarrative: `<duration> before end of <anchor>`\n\nSignature: `BeforeEndOf(duration: Quantity<time>, anchor: ConceptRef)`\n\nCQL: `CRLCommon.BeforeEndOf`"
+        },
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "<duration> after end of <anchor>",
+        "itemKind": 14,
+        "insertText": {
+          "snippet": "\"${1:duration}\" after end of \"${2:anchor}\""
+        },
+        "sortText": "after-end-of(duration, anchor)",
+        "detail": "AfterEndOf(duration: Quantity<time>, anchor: ConceptRef)",
+        "documentation": {
+          "markdown": "**after-end-of(duration, anchor)** — *Window-from-anchor (sub-grammar — 5 sister forms)*\n\nNarrative: `<duration> after end of <anchor>`\n\nSignature: `AfterEndOf(duration: Quantity<time>, anchor: ConceptRef)`\n\nCQL: `CRLCommon.AfterEndOf`"
+        },
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "on day of <anchor>",
+        "itemKind": 14,
+        "insertText": {
+          "snippet": "on day of \"${1:anchor}\""
+        },
+        "sortText": "on day of",
+        "detail": "OnDayOf(anchor: ConceptRef)",
+        "documentation": {
+          "markdown": "**on-day-of(anchor)** — *Window-from-anchor (sub-grammar — 5 sister forms)*\n\nNarrative: `on day of <anchor>`\n\nSignature: `OnDayOf(anchor: ConceptRef)`\n\nCQL: `CRLCommon.OnDayOf`"
+        },
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "age at <anchor>",
+        "itemKind": 14,
+        "insertText": {
+          "snippet": "age at \"${1:anchor}\""
+        },
+        "sortText": "age at",
+        "detail": "AgeAt(anchor: AnchorExpr)",
+        "documentation": {
+          "markdown": "**AgeAt(anchor)** — *Calculation*\n\nNarrative: `age at <anchor>`\n\nSignature: `AgeAt(anchor: AnchorExpr)`\n\nCQL: `CRLCommon.AgeAt`"
+        },
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "calculated <X>",
+        "itemKind": 14,
+        "insertText": {
+          "snippet": "calculated \"${1:X}\""
+        },
+        "sortText": "calculated",
+        "detail": "Calculate(X: ConceptRef<Quantity<U>>)",
+        "documentation": {
+          "markdown": "**Calculate(X)** — *Calculation*\n\nNarrative: `calculated <X>`\n\nSignature: `Calculate(X: ConceptRef<Quantity<U>>)`\n\nCQL: `CRLCommon.Calculate`"
+        },
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "lowest <X>",
+        "itemKind": 14,
+        "insertText": {
+          "snippet": "lowest \"${1:X}\""
+        },
+        "sortText": "lowest",
+        "detail": "Lowest(X: ConceptRef<Quantity<U>>[, scope: ScopeSpec])",
+        "documentation": {
+          "markdown": "**Lowest(X[, scope])** — *Calculation*\n\nNarrative: `lowest <X>`\n\nSignature: `Lowest(X: ConceptRef<Quantity<U>>[, scope: ScopeSpec])`\n\nCQL: `CRLCommon.Lowest`"
+        },
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "highest <X>",
+        "itemKind": 14,
+        "insertText": {
+          "snippet": "highest \"${1:X}\""
+        },
+        "sortText": "highest",
+        "detail": "Highest(X: ConceptRef<Quantity<U>>[, scope: ScopeSpec])",
+        "documentation": {
+          "markdown": "**Highest(X[, scope])** — *Calculation*\n\nNarrative: `highest <X>`\n\nSignature: `Highest(X: ConceptRef<Quantity<U>>[, scope: ScopeSpec])`\n\nCQL: `CRLCommon.Highest`"
+        },
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "<X> high",
+        "itemKind": 14,
+        "insertText": {
+          "snippet": "\"${1:X}\" high"
+        },
+        "sortText": "high(x)",
+        "detail": "High(X: ConceptRef<Quantity>)",
+        "documentation": {
+          "markdown": "**High(X)** — *Calculation*\n\nNarrative: `<X> high`\n\nSignature: `High(X: ConceptRef<Quantity>)`\n\nCQL: `CRLCommon.High`"
+        },
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "<X> low",
+        "itemKind": 14,
+        "insertText": {
+          "snippet": "\"${1:X}\" low"
+        },
+        "sortText": "low(x)",
+        "detail": "Low(X: ConceptRef<Quantity>)",
+        "documentation": {
+          "markdown": "**Low(X)** — *Calculation*\n\nNarrative: `<X> low`\n\nSignature: `Low(X: ConceptRef<Quantity>)`\n\nCQL: `CRLCommon.Low`"
+        },
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "<X> normal",
+        "itemKind": 14,
+        "insertText": {
+          "snippet": "\"${1:X}\" normal"
+        },
+        "sortText": "normal(x)",
+        "detail": "Normal(X: ConceptRef<Quantity>)",
+        "documentation": {
+          "markdown": "**Normal(X)** — *Calculation*\n\nNarrative: `<X> normal`\n\nSignature: `Normal(X: ConceptRef<Quantity>)`\n\nCQL: `CRLCommon.Normal`"
+        },
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "<X> abnormal",
+        "itemKind": 14,
+        "insertText": {
+          "snippet": "\"${1:X}\" abnormal"
+        },
+        "sortText": "abnormal(x)",
+        "detail": "Abnormal(X: ConceptRef<Quantity>)",
+        "documentation": {
+          "markdown": "**Abnormal(X)** — *Calculation*\n\nNarrative: `<X> abnormal`\n\nSignature: `Abnormal(X: ConceptRef<Quantity>)`\n\nCQL: `CRLCommon.Abnormal`"
+        },
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "<value> at least <target>",
+        "itemKind": 14,
+        "insertText": {
+          "snippet": "\"${1:value}\" at least \"${2:target}\""
+        },
+        "sortText": "atleast(value, target)",
+        "detail": "AtLeast(value: ConceptRef<Quantity<U>>, target: Quantity<U>)",
+        "documentation": {
+          "markdown": "**AtLeast(value, target)** — *Calculation*\n\nNarrative: `<value> at least <target>`\n\nSignature: `AtLeast(value: ConceptRef<Quantity<U>>, target: Quantity<U>)`\n\nCQL: `CRLCommon.AtLeast`"
+        },
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "<value> at most <target>",
+        "itemKind": 14,
+        "insertText": {
+          "snippet": "\"${1:value}\" at most \"${2:target}\""
+        },
+        "sortText": "atmost(value, target)",
+        "detail": "AtMost(value: ConceptRef<Quantity<U>>, target: Quantity<U>)",
+        "documentation": {
+          "markdown": "**AtMost(value, target)** — *Calculation*\n\nNarrative: `<value> at most <target>`\n\nSignature: `AtMost(value: ConceptRef<Quantity<U>>, target: Quantity<U>)`\n\nCQL: `CRLCommon.AtMost`"
+        },
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "<value> between <lo> and <hi>",
+        "itemKind": 14,
+        "insertText": {
+          "snippet": "\"${1:value}\" between \"${2:lo}\" and \"${3:hi}\""
+        },
+        "sortText": "between(value, lo, hi)",
+        "detail": "Between(value: ConceptRef<Quantity<U>>, lo: Quantity<U>, hi: Quantity<U>)",
+        "documentation": {
+          "markdown": "**Between(value, lo, hi)** — *Calculation*\n\nNarrative: `<value> between <lo> and <hi>`\n\nSignature: `Between(value: ConceptRef<Quantity<U>>, lo: Quantity<U>, hi: Quantity<U>)`\n\nCQL: `CRLCommon.Between`"
+        },
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "<value> exceeds <target>",
+        "itemKind": 14,
+        "insertText": {
+          "snippet": "\"${1:value}\" exceeds \"${2:target}\""
+        },
+        "sortText": "exceeds(value, target)",
+        "detail": "Exceeds(value: ConceptRef<Quantity<U>>, target: Quantity<U>)",
+        "documentation": {
+          "markdown": "**Exceeds(value, target)** — *Calculation*\n\nNarrative: `<value> exceeds <target>`\n\nSignature: `Exceeds(value: ConceptRef<Quantity<U>>, target: Quantity<U>)`\n\nCQL: `CRLCommon.Exceeds`"
+        },
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "<value> below <target>",
+        "itemKind": 14,
+        "insertText": {
+          "snippet": "\"${1:value}\" below \"${2:target}\""
+        },
+        "sortText": "below(value, target)",
+        "detail": "Below(value: ConceptRef<Quantity<U>>, target: Quantity<U>)",
+        "documentation": {
+          "markdown": "**Below(value, target)** — *Calculation*\n\nNarrative: `<value> below <target>`\n\nSignature: `Below(value: ConceptRef<Quantity<U>>, target: Quantity<U>)`\n\nCQL: `CRLCommon.Below`"
+        },
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "<X> performed",
+        "itemKind": 14,
+        "insertText": {
+          "snippet": "\"${1:X}\" performed"
+        },
+        "sortText": "wasperformed(x)",
+        "detail": "WasPerformed(X: ConceptRef)",
+        "documentation": {
+          "markdown": "**WasPerformed(X)** — *State / Process Inference*\n\nNarrative: `<X> performed`\n\nSignature: `WasPerformed(X: ConceptRef)`\n\nCQL: `CRLCommon.WasPerformed`"
+        },
+        "range": null
+      }
+    ]
+  },
+  {
+    "label": "narrative-not-body",
+    "line": 0,
+    "character": 7,
+    "items": []
+  },
+  {
+    "label": "type",
+    "line": 0,
+    "character": 10,
+    "items": [
+      {
+        "kind": "completion",
+        "label": "AdverseEvent",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "FHIR resource type — `type is AdverseEvent.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "AllergyIntolerance",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "FHIR resource type — `type is AllergyIntolerance.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "Claim",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "FHIR resource type — `type is Claim.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "ClinicalImpression",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "FHIR resource type — `type is ClinicalImpression.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "Communication",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "FHIR resource type — `type is Communication.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "CommunicationRequest",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "FHIR resource type — `type is CommunicationRequest.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "Condition",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "FHIR resource type — `type is Condition.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "DetectedIssue",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "FHIR resource type — `type is DetectedIssue.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "Device",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "FHIR resource type — `type is Device.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "DiagnosticReport",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "FHIR resource type — `type is DiagnosticReport.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "DocumentReference",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "FHIR resource type — `type is DocumentReference.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "Encounter",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "FHIR resource type — `type is Encounter.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "EpisodeOfCare",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "FHIR resource type — `type is EpisodeOfCare.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "ExplanationOfBenefit",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "FHIR resource type — `type is ExplanationOfBenefit.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "FamilyMemberHistory",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "FHIR resource type — `type is FamilyMemberHistory.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "Flag",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "FHIR resource type — `type is Flag.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "Goal",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "FHIR resource type — `type is Goal.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "ImagingStudy",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "FHIR resource type — `type is ImagingStudy.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "Immunization",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "FHIR resource type — `type is Immunization.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "MedicationAdministration",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "FHIR resource type — `type is MedicationAdministration.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "MedicationDispense",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "FHIR resource type — `type is MedicationDispense.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "MedicationRequest",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "FHIR resource type — `type is MedicationRequest.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "MedicationStatement",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "FHIR resource type — `type is MedicationStatement.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "NutritionIntake",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "FHIR resource type — `type is NutritionIntake.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "NutritionOrder",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "FHIR resource type — `type is NutritionOrder.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "Observation",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "FHIR resource type — `type is Observation.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "Patient",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "FHIR resource type — `type is Patient.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "Procedure",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "FHIR resource type — `type is Procedure.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "QuestionnaireResponse",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "FHIR resource type — `type is QuestionnaireResponse.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "RiskAssessment",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "FHIR resource type — `type is RiskAssessment.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "ServiceRequest",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "FHIR resource type — `type is ServiceRequest.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "Task",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "FHIR resource type — `type is Task.`",
+        "documentation": null,
+        "range": null
+      }
+    ]
+  },
+  {
+    "label": "type-miss",
+    "line": 0,
+    "character": 7,
+    "items": []
+  },
+  {
+    "label": "valuetype",
+    "line": 0,
+    "character": 16,
+    "items": [
+      {
+        "kind": "completion",
+        "label": "Attachment",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "FHIR value type — `value type is Attachment.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "boolean",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "FHIR value type — `value type is boolean.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "CodeableConcept",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "FHIR value type — `value type is CodeableConcept.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "dateTime",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "FHIR value type — `value type is dateTime.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "integer",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "FHIR value type — `value type is integer.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "Period",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "FHIR value type — `value type is Period.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "Quantity",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "FHIR value type — `value type is Quantity.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "Range",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "FHIR value type — `value type is Range.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "Ratio",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "FHIR value type — `value type is Ratio.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "SampledData",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "FHIR value type — `value type is SampledData.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "string",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "FHIR value type — `value type is string.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "time",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "FHIR value type — `value type is time.`",
+        "documentation": null,
+        "range": null
+      }
+    ]
+  },
+  {
+    "label": "paramtype",
+    "line": 0,
+    "character": 16,
+    "items": [
+      {
+        "kind": "completion",
+        "label": "AdverseEvent",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "CRL parameter type — `param type is AdverseEvent.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "AllergyIntolerance",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "CRL parameter type — `param type is AllergyIntolerance.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "Claim",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "CRL parameter type — `param type is Claim.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "ClinicalImpression",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "CRL parameter type — `param type is ClinicalImpression.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "Communication",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "CRL parameter type — `param type is Communication.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "CommunicationRequest",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "CRL parameter type — `param type is CommunicationRequest.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "Condition",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "CRL parameter type — `param type is Condition.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "DetectedIssue",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "CRL parameter type — `param type is DetectedIssue.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "Device",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "CRL parameter type — `param type is Device.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "DiagnosticReport",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "CRL parameter type — `param type is DiagnosticReport.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "DocumentReference",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "CRL parameter type — `param type is DocumentReference.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "Encounter",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "CRL parameter type — `param type is Encounter.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "EpisodeOfCare",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "CRL parameter type — `param type is EpisodeOfCare.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "ExplanationOfBenefit",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "CRL parameter type — `param type is ExplanationOfBenefit.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "FamilyMemberHistory",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "CRL parameter type — `param type is FamilyMemberHistory.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "Flag",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "CRL parameter type — `param type is Flag.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "Goal",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "CRL parameter type — `param type is Goal.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "ImagingStudy",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "CRL parameter type — `param type is ImagingStudy.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "Immunization",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "CRL parameter type — `param type is Immunization.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "MedicationAdministration",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "CRL parameter type — `param type is MedicationAdministration.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "MedicationDispense",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "CRL parameter type — `param type is MedicationDispense.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "MedicationRequest",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "CRL parameter type — `param type is MedicationRequest.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "MedicationStatement",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "CRL parameter type — `param type is MedicationStatement.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "NutritionIntake",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "CRL parameter type — `param type is NutritionIntake.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "NutritionOrder",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "CRL parameter type — `param type is NutritionOrder.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "Observation",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "CRL parameter type — `param type is Observation.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "Patient",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "CRL parameter type — `param type is Patient.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "Procedure",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "CRL parameter type — `param type is Procedure.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "QuestionnaireResponse",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "CRL parameter type — `param type is QuestionnaireResponse.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "RiskAssessment",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "CRL parameter type — `param type is RiskAssessment.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "ServiceRequest",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "CRL parameter type — `param type is ServiceRequest.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "Task",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "CRL parameter type — `param type is Task.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "Attachment",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "CRL parameter type — `param type is Attachment.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "boolean",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "CRL parameter type — `param type is boolean.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "CodeableConcept",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "CRL parameter type — `param type is CodeableConcept.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "dateTime",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "CRL parameter type — `param type is dateTime.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "integer",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "CRL parameter type — `param type is integer.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "Period",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "CRL parameter type — `param type is Period.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "Quantity",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "CRL parameter type — `param type is Quantity.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "Range",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "CRL parameter type — `param type is Range.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "Ratio",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "CRL parameter type — `param type is Ratio.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "SampledData",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "CRL parameter type — `param type is SampledData.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "string",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "CRL parameter type — `param type is string.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "time",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "CRL parameter type — `param type is time.`",
+        "documentation": null,
+        "range": null
+      }
+    ]
+  },
+  {
+    "label": "ref-orphan-when",
+    "line": 6,
+    "character": 8,
+    "items": [
+      {
+        "kind": "completion",
+        "label": "BMI",
+        "itemKind": 5,
+        "insertText": null,
+        "sortText": null,
+        "detail": "concept Observation",
+        "documentation": {
+          "markdown": "**BMI** — concept\n\nType: `Observation`\n\n"
+        },
+        "range": null
+      }
+    ]
+  },
+  {
+    "label": "ref-orphan-coded-from",
+    "line": 6,
+    "character": 14,
+    "items": [
+      {
+        "kind": "completion",
+        "label": "Diabetes Codes",
+        "itemKind": 17,
+        "insertText": null,
+        "sortText": null,
+        "detail": "terminology",
+        "documentation": {
+          "markdown": "**Diabetes Codes** — terminology\n\nBody: `coded from \"http://x\"`"
+        },
+        "range": null
+      }
+    ]
+  },
+  {
+    "label": "ref-orphan-header-suppress",
+    "line": 6,
+    "character": 9,
+    "items": []
+  },
+  {
+    "label": "ref-orphan-unquoted-slot",
+    "line": 6,
+    "character": 11,
+    "items": []
+  },
+  {
+    "label": "ref-orphan-no-quote",
+    "line": 6,
+    "character": 8,
+    "items": []
+  },
+  {
+    "label": "ref-indexed-when",
+    "line": 0,
+    "character": 8,
+    "items": [
+      {
+        "kind": "completion",
+        "label": "BMI",
+        "itemKind": 5,
+        "insertText": null,
+        "sortText": null,
+        "detail": "concept Observation — Vitals",
+        "documentation": {
+          "markdown": "**BMI** — concept\n\nLibrary: `Vitals`\n\nType: `Observation`\n\n"
+        },
+        "range": null
+      }
+    ]
+  },
+  {
+    "label": "ref-indexed-coded-from",
+    "line": 0,
+    "character": 14,
+    "items": [
+      {
+        "kind": "completion",
+        "label": "Diabetes Codes",
+        "itemKind": 17,
+        "insertText": null,
+        "sortText": null,
+        "detail": "terminology — Vitals",
+        "documentation": {
+          "markdown": "**Diabetes Codes** — terminology\n\nLibrary: `Vitals`\n\n"
+        },
+        "range": null
+      }
+    ]
+  },
+  {
+    "label": "ref-indexed-recommend-activity",
+    "line": 0,
+    "character": 25,
+    "items": [
+      {
+        "kind": "completion",
+        "label": "Refer",
+        "itemKind": 6,
+        "insertText": null,
+        "sortText": null,
+        "detail": "activity — Logic",
+        "documentation": {
+          "markdown": "**Refer** — activity\n\nLibrary: `Logic`\n\n"
+        },
+        "range": null
+      }
+    ]
+  },
+  {
+    "label": "ref-indexed-use-decision",
+    "line": 0,
+    "character": 16,
+    "items": [
+      {
+        "kind": "completion",
+        "label": "Screen",
+        "itemKind": 1,
+        "insertText": null,
+        "sortText": null,
+        "detail": "decision — Logic",
+        "documentation": {
+          "markdown": "**Screen** — decision\n\nLibrary: `Logic`\n\n"
+        },
+        "range": null
+      }
+    ]
+  },
+  {
+    "label": "ref-indexed-qualified-dot",
+    "line": 0,
+    "character": 16,
+    "items": [
+      {
+        "kind": "completion",
+        "label": "BMI",
+        "itemKind": 5,
+        "insertText": null,
+        "sortText": null,
+        "detail": "concept Observation — Vitals",
+        "documentation": {
+          "markdown": "**BMI** — concept\n\nLibrary: `Vitals`\n\nType: `Observation`\n\n"
+        },
+        "range": null
+      }
+    ]
+  },
+  {
+    "label": "ref-indexed-qualified-quote",
+    "line": 0,
+    "character": 17,
+    "items": [
+      {
+        "kind": "completion",
+        "label": "BMI",
+        "itemKind": 5,
+        "insertText": null,
+        "sortText": null,
+        "detail": "concept Observation — Vitals",
+        "documentation": {
+          "markdown": "**BMI** — concept\n\nLibrary: `Vitals`\n\nType: `Observation`\n\n"
+        },
+        "range": null
+      }
+    ]
+  },
+  {
+    "label": "ref-narrative-precedence",
+    "line": 0,
+    "character": 21,
+    "items": [
+      {
+        "kind": "completion",
+        "label": "Lookback",
+        "itemKind": 5,
+        "insertText": null,
+        "sortText": null,
+        "detail": "concept — L",
+        "documentation": {
+          "markdown": "**Lookback** — concept\n\nLibrary: `L`\n\n"
+        },
+        "range": null
+      }
+    ]
+  }
+]

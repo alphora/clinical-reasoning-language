@@ -13,3 +13,7 @@ import "../cel/emitter/tests/emit-fhir-golden.test";
 import "../cli/tests/run-emitter.test";
 import "./regression/index.test";
 import "../language-services/tests/host.test";
+import "../language-services/tests/hover.test";
+import "../language-services/tests/completion.test";
+import "../language-services/tests/navigation.test";
+import "../language-services/tests/diagnostics.test";

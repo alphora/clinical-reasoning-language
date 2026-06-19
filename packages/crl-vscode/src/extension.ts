@@ -10,7 +10,7 @@ import {
   type Associations,
   type TokenColors,
 } from "@smile-digital-health/crl/language-services";
-import type { Pattern } from "./catalog";
+import type { Pattern } from "@smile-digital-health/crl/language-services";
 import {
   NarrativeCompletionProvider,
   TypeCompletionProvider,

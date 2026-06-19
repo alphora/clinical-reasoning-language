@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import assert from "node:assert/strict";
 
-import * as mod from "../dist/catalog.js";
+import * as mod from "@smile-digital-health/crl/language-services";
 const {
   parseCatalog,
   narrativePlaceholders,

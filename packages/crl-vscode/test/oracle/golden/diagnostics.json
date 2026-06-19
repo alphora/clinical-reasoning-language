@@ -1,0 +1,88 @@
+[
+  {
+    "label": "orphan-validation-errors",
+    "mode": "orphan",
+    "projectRoot": null,
+    "entries": [
+      {
+        "uri": {
+          "fsPath": "$TMP\\solo.crl"
+        },
+        "diagnostics": [
+          {
+            "kind": "diagnostic",
+            "range": {
+              "start": {
+                "line": 4,
+                "character": 0
+              },
+              "end": {
+                "line": 4,
+                "character": 1
+              }
+            },
+            "message": "Undeclared terminology \"Undeclared T\" in concept \"A\" (no terminology block declares this name)",
+            "severity": 1,
+            "source": "crl",
+            "code": "unresolved-reference"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "label": "project-import-diagnostic",
+    "mode": "project",
+    "projectRoot": "$TMP",
+    "entries": [
+      {
+        "uri": {
+          "fsPath": "$TMP\\a.crl"
+        },
+        "diagnostics": [
+          {
+            "kind": "diagnostic",
+            "range": {
+              "start": {
+                "line": 0,
+                "character": 0
+              },
+              "end": {
+                "line": 0,
+                "character": 1
+              }
+            },
+            "message": "Duplicate library \"Same\" — registered in multiple files",
+            "severity": 0,
+            "source": "crl",
+            "code": "registry-duplicate"
+          }
+        ]
+      },
+      {
+        "uri": {
+          "fsPath": "$TMP\\b.crl"
+        },
+        "diagnostics": [
+          {
+            "kind": "diagnostic",
+            "range": {
+              "start": {
+                "line": 0,
+                "character": 0
+              },
+              "end": {
+                "line": 0,
+                "character": 1
+              }
+            },
+            "message": "Duplicate library \"Same\" — registered in multiple files",
+            "severity": 0,
+            "source": "crl",
+            "code": "registry-duplicate"
+          }
+        ]
+      }
+    ]
+  }
+]

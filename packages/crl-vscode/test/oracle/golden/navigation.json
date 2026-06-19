@@ -1,0 +1,553 @@
+[
+  {
+    "label": "def-on-decl",
+    "result": {
+      "kind": "location",
+      "uri": {
+        "fsPath": "$TMP\\root.crl"
+      },
+      "range": {
+        "start": {
+          "line": 7,
+          "character": 9
+        },
+        "end": {
+          "line": 7,
+          "character": 12
+        }
+      }
+    }
+  },
+  {
+    "label": "def-on-bare-ref",
+    "result": {
+      "kind": "location",
+      "uri": {
+        "fsPath": "$TMP\\root.crl"
+      },
+      "range": {
+        "start": {
+          "line": 7,
+          "character": 9
+        },
+        "end": {
+          "line": 7,
+          "character": 12
+        }
+      }
+    }
+  },
+  {
+    "label": "def-on-include",
+    "result": null
+  },
+  {
+    "label": "def-on-qualifier",
+    "result": null
+  },
+  {
+    "label": "def-on-qualified-name",
+    "result": null
+  },
+  {
+    "label": "refs-BMI-withDecl",
+    "result": [
+      {
+        "kind": "location",
+        "uri": {
+          "fsPath": "$TMP\\root.crl"
+        },
+        "range": {
+          "start": {
+            "line": 7,
+            "character": 9
+          },
+          "end": {
+            "line": 7,
+            "character": 12
+          }
+        }
+      },
+      {
+        "kind": "location",
+        "uri": {
+          "fsPath": "$TMP\\root.crl"
+        },
+        "range": {
+          "start": {
+            "line": 13,
+            "character": 14
+          },
+          "end": {
+            "line": 13,
+            "character": 17
+          }
+        }
+      }
+    ]
+  },
+  {
+    "label": "refs-BMI-noDecl",
+    "result": [
+      {
+        "kind": "location",
+        "uri": {
+          "fsPath": "$TMP\\root.crl"
+        },
+        "range": {
+          "start": {
+            "line": 13,
+            "character": 14
+          },
+          "end": {
+            "line": 13,
+            "character": 17
+          }
+        }
+      }
+    ]
+  },
+  {
+    "label": "docsymbols",
+    "result": [
+      {
+        "kind": "documentSymbol",
+        "name": "Root",
+        "detail": "library (4)",
+        "symbolKind": 2,
+        "range": {
+          "start": {
+            "line": 1,
+            "character": 0
+          },
+          "end": {
+            "line": 1,
+            "character": 15
+          }
+        },
+        "selectionRange": {
+          "start": {
+            "line": 1,
+            "character": 9
+          },
+          "end": {
+            "line": 1,
+            "character": 13
+          }
+        },
+        "children": [
+          {
+            "kind": "documentSymbol",
+            "name": "BMI Valueset",
+            "detail": "terminology",
+            "symbolKind": 13,
+            "range": {
+              "start": {
+                "line": 4,
+                "character": 0
+              },
+              "end": {
+                "line": 5,
+                "character": 24
+              }
+            },
+            "selectionRange": {
+              "start": {
+                "line": 4,
+                "character": 13
+              },
+              "end": {
+                "line": 4,
+                "character": 25
+              }
+            },
+            "children": []
+          },
+          {
+            "kind": "documentSymbol",
+            "name": "BMI",
+            "detail": "concept",
+            "symbolKind": 12,
+            "range": {
+              "start": {
+                "line": 7,
+                "character": 0
+              },
+              "end": {
+                "line": 9,
+                "character": 28
+              }
+            },
+            "selectionRange": {
+              "start": {
+                "line": 7,
+                "character": 9
+              },
+              "end": {
+                "line": 7,
+                "character": 12
+              }
+            },
+            "children": []
+          },
+          {
+            "kind": "documentSymbol",
+            "name": "BMI Composed",
+            "detail": "concept",
+            "symbolKind": 12,
+            "range": {
+              "start": {
+                "line": 11,
+                "character": 0
+              },
+              "end": {
+                "line": 13,
+                "character": 19
+              }
+            },
+            "selectionRange": {
+              "start": {
+                "line": 11,
+                "character": 9
+              },
+              "end": {
+                "line": 11,
+                "character": 21
+              }
+            },
+            "children": []
+          },
+          {
+            "kind": "documentSymbol",
+            "name": "BMI Cross",
+            "detail": "concept",
+            "symbolKind": 12,
+            "range": {
+              "start": {
+                "line": 15,
+                "character": 0
+              },
+              "end": {
+                "line": 17,
+                "character": 33
+              }
+            },
+            "selectionRange": {
+              "start": {
+                "line": 15,
+                "character": 9
+              },
+              "end": {
+                "line": 15,
+                "character": 18
+              }
+            },
+            "children": []
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "label": "worksymbols-query-BMI",
+    "result": [
+      {
+        "kind": "symbolInformation",
+        "name": "BMI Valueset",
+        "symbolKind": 13,
+        "containerName": "Root",
+        "location": {
+          "kind": "location",
+          "uri": {
+            "fsPath": "$TMP\\root.crl"
+          },
+          "range": {
+            "start": {
+              "line": 4,
+              "character": 13
+            },
+            "end": {
+              "line": 4,
+              "character": 25
+            }
+          }
+        }
+      },
+      {
+        "kind": "symbolInformation",
+        "name": "BMI",
+        "symbolKind": 12,
+        "containerName": "Root",
+        "location": {
+          "kind": "location",
+          "uri": {
+            "fsPath": "$TMP\\root.crl"
+          },
+          "range": {
+            "start": {
+              "line": 7,
+              "character": 9
+            },
+            "end": {
+              "line": 7,
+              "character": 12
+            }
+          }
+        }
+      },
+      {
+        "kind": "symbolInformation",
+        "name": "BMI Composed",
+        "symbolKind": 12,
+        "containerName": "Root",
+        "location": {
+          "kind": "location",
+          "uri": {
+            "fsPath": "$TMP\\root.crl"
+          },
+          "range": {
+            "start": {
+              "line": 11,
+              "character": 9
+            },
+            "end": {
+              "line": 11,
+              "character": 21
+            }
+          }
+        }
+      },
+      {
+        "kind": "symbolInformation",
+        "name": "BMI Cross",
+        "symbolKind": 12,
+        "containerName": "Root",
+        "location": {
+          "kind": "location",
+          "uri": {
+            "fsPath": "$TMP\\root.crl"
+          },
+          "range": {
+            "start": {
+              "line": 15,
+              "character": 9
+            },
+            "end": {
+              "line": 15,
+              "character": 18
+            }
+          }
+        }
+      }
+    ]
+  },
+  {
+    "label": "worksymbols-empty-query",
+    "result": [
+      {
+        "kind": "symbolInformation",
+        "name": "BMI Valueset",
+        "symbolKind": 13,
+        "containerName": "Root",
+        "location": {
+          "kind": "location",
+          "uri": {
+            "fsPath": "$TMP\\root.crl"
+          },
+          "range": {
+            "start": {
+              "line": 4,
+              "character": 13
+            },
+            "end": {
+              "line": 4,
+              "character": 25
+            }
+          }
+        }
+      },
+      {
+        "kind": "symbolInformation",
+        "name": "BMI",
+        "symbolKind": 12,
+        "containerName": "Root",
+        "location": {
+          "kind": "location",
+          "uri": {
+            "fsPath": "$TMP\\root.crl"
+          },
+          "range": {
+            "start": {
+              "line": 7,
+              "character": 9
+            },
+            "end": {
+              "line": 7,
+              "character": 12
+            }
+          }
+        }
+      },
+      {
+        "kind": "symbolInformation",
+        "name": "BMI Composed",
+        "symbolKind": 12,
+        "containerName": "Root",
+        "location": {
+          "kind": "location",
+          "uri": {
+            "fsPath": "$TMP\\root.crl"
+          },
+          "range": {
+            "start": {
+              "line": 11,
+              "character": 9
+            },
+            "end": {
+              "line": 11,
+              "character": 21
+            }
+          }
+        }
+      },
+      {
+        "kind": "symbolInformation",
+        "name": "BMI Cross",
+        "symbolKind": 12,
+        "containerName": "Root",
+        "location": {
+          "kind": "location",
+          "uri": {
+            "fsPath": "$TMP\\root.crl"
+          },
+          "range": {
+            "start": {
+              "line": 15,
+              "character": 9
+            },
+            "end": {
+              "line": 15,
+              "character": 18
+            }
+          }
+        }
+      }
+    ]
+  },
+  {
+    "label": "worksymbols-empty-roots",
+    "result": []
+  },
+  {
+    "label": "rename-prepare-decl",
+    "result": {
+      "range": {
+        "start": {
+          "line": 7,
+          "character": 9
+        },
+        "end": {
+          "line": 7,
+          "character": 12
+        }
+      },
+      "placeholder": "BMI"
+    }
+  },
+  {
+    "label": "rename-prepare-library",
+    "error": "Library rename is not supported in v2.1.0 (defers to v2.2)."
+  },
+  {
+    "label": "rename-prepare-qualifier",
+    "error": "Cannot rename the library qualifier — rename the library declaration instead (unsupported in v2.1.0)."
+  },
+  {
+    "label": "rename-prepare-nosymbol",
+    "error": "No symbol at cursor to rename."
+  },
+  {
+    "label": "rename-edits-success",
+    "result": {
+      "kind": "workspaceEdit",
+      "edits": [
+        {
+          "uri": {
+            "fsPath": "$TMP\\root.crl"
+          },
+          "range": {
+            "start": {
+              "line": 7,
+              "character": 9
+            },
+            "end": {
+              "line": 7,
+              "character": 12
+            }
+          },
+          "newText": "BMI2"
+        },
+        {
+          "uri": {
+            "fsPath": "$TMP\\root.crl"
+          },
+          "range": {
+            "start": {
+              "line": 13,
+              "character": 14
+            },
+            "end": {
+              "line": 13,
+              "character": 17
+            }
+          },
+          "newText": "BMI2"
+        }
+      ]
+    }
+  },
+  {
+    "label": "rename-edits-via-qualified-ref",
+    "result": {
+      "kind": "workspaceEdit",
+      "edits": [
+        {
+          "uri": {
+            "fsPath": "$TMP\\root.crl"
+          },
+          "range": {
+            "start": {
+              "line": 17,
+              "character": 20
+            },
+            "end": {
+              "line": 17,
+              "character": 31
+            }
+          },
+          "newText": "Sib Concept 2"
+        }
+      ]
+    }
+  },
+  {
+    "label": "rename-edits-noop",
+    "result": null
+  },
+  {
+    "label": "rename-edits-invalid",
+    "error": "Invalid name: must not contain double quotes."
+  },
+  {
+    "label": "rename-edits-collision",
+    "error": "Name \"BMI Composed\" already exists as a concept in library \"Root\"."
+  },
+  {
+    "label": "rename-edits-nosymbol",
+    "result": null
+  },
+  {
+    "label": "doclinks",
+    "result": []
+  }
+]

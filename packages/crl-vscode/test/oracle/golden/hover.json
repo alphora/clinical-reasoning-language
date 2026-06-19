@@ -1,0 +1,182 @@
+[
+  {
+    "provider": "narrative",
+    "line": 0,
+    "character": 17,
+    "hover": {
+      "kind": "hover",
+      "contents": {
+        "markdown": "**Has(X)** — *Classification*\n\nNarrative: `has <X>`\n\nSignature: `Has(X: ConceptRef)`\n\nCQL: `CRLCommon.Has`"
+      },
+      "range": {
+        "start": {
+          "line": 0,
+          "character": 16
+        },
+        "end": {
+          "line": 0,
+          "character": 25
+        }
+      }
+    }
+  },
+  {
+    "provider": "typevaluetype-type",
+    "line": 4,
+    "character": 12,
+    "hover": {
+      "kind": "hover",
+      "contents": {
+        "markdown": "**Observation** — FHIR resource type\n\nUsed in `- type is Observation.` to declare the concept's FHIR resource type."
+      },
+      "range": {
+        "start": {
+          "line": 4,
+          "character": 10
+        },
+        "end": {
+          "line": 4,
+          "character": 21
+        }
+      }
+    }
+  },
+  {
+    "provider": "typevaluetype-valuetype",
+    "line": 5,
+    "character": 18,
+    "hover": {
+      "kind": "hover",
+      "contents": {
+        "markdown": "**Quantity** — FHIR value type\n\nUsed in `- value type is Quantity.` to declare the concept's value-bearing type."
+      },
+      "range": {
+        "start": {
+          "line": 5,
+          "character": 16
+        },
+        "end": {
+          "line": 5,
+          "character": 24
+        }
+      }
+    }
+  },
+  {
+    "provider": "conceptRef-orphan",
+    "line": 9,
+    "character": 12,
+    "hover": {
+      "kind": "hover",
+      "contents": {
+        "markdown": "**Diabetic** — concept\n\nBody: `definition is has \"Diabetes\"`\n\nDeclared at line 1."
+      },
+      "range": {
+        "start": {
+          "line": 9,
+          "character": 7
+        },
+        "end": {
+          "line": 9,
+          "character": 17
+        }
+      }
+    }
+  },
+  {
+    "provider": "conceptRef-miss",
+    "line": 9,
+    "character": 2,
+    "hover": null
+  },
+  {
+    "provider": "conceptRef-indexed-bare",
+    "line": 9,
+    "character": 12,
+    "hover": {
+      "kind": "hover",
+      "contents": {
+        "markdown": "**Diabetic** — concept\n\nLibrary: `Conditions`\n\nBody: `definition is has \"Diabetes\"`\n\nDeclared at `/proj/conditions.crl`:5."
+      },
+      "range": {
+        "start": {
+          "line": 9,
+          "character": 7
+        },
+        "end": {
+          "line": 9,
+          "character": 17
+        }
+      }
+    }
+  },
+  {
+    "provider": "conceptRef-indexed-qualified",
+    "line": 0,
+    "character": 25,
+    "hover": {
+      "kind": "hover",
+      "contents": {
+        "markdown": "**Diabetic** — concept\n\nLibrary: `Conditions`\n\nBody: `definition is has \"Diabetes\"`\n\nDeclared at `/proj/conditions.crl`:5."
+      },
+      "range": {
+        "start": {
+          "line": 0,
+          "character": 20
+        },
+        "end": {
+          "line": 0,
+          "character": 30
+        }
+      }
+    }
+  },
+  {
+    "provider": "boundary-token-start",
+    "line": 4,
+    "character": 10,
+    "hover": {
+      "kind": "hover",
+      "contents": {
+        "markdown": "**Observation** — FHIR resource type\n\nUsed in `- type is Observation.` to declare the concept's FHIR resource type."
+      },
+      "range": {
+        "start": {
+          "line": 4,
+          "character": 10
+        },
+        "end": {
+          "line": 4,
+          "character": 21
+        }
+      }
+    }
+  },
+  {
+    "provider": "boundary-token-end",
+    "line": 4,
+    "character": 21,
+    "hover": {
+      "kind": "hover",
+      "contents": {
+        "markdown": "**Observation** — FHIR resource type\n\nUsed in `- type is Observation.` to declare the concept's FHIR resource type."
+      },
+      "range": {
+        "start": {
+          "line": 4,
+          "character": 10
+        },
+        "end": {
+          "line": 4,
+          "character": 21
+        }
+      }
+    }
+  },
+  {
+    "provider": "boundary-past-end",
+    "line": 4,
+    "character": 22,
+    "hover": null
+  }
+]

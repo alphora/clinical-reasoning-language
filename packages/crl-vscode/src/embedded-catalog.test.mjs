@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import assert from "node:assert/strict";
 
-import * as catalogMod from "../dist/catalog.js";
+import * as catalogMod from "@smile-digital-health/crl/language-services";
 const { parseCatalog } = catalogMod.default ?? catalogMod;
 
 const here = dirname(fileURLToPath(import.meta.url));
