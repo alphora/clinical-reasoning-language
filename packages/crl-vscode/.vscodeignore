@@ -9,3 +9,5 @@ dist/provision.js
 dist/highlight.js
 .gitignore
 *.vsix
+test/**
+scripts/**
