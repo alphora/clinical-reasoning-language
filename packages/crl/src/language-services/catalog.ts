@@ -92,6 +92,17 @@ export const PARAMETER_TYPES = [
   ...CONCEPT_VALUETYPES,
 ] as const;
 
+/**
+ * CPG activity request types for an `activity` declaration's `- request X.` slot. RE-EXPORTED from
+ * the grammar's single source (`grammar/activityTypes.ts` → activityTypes.json, auto-generated from
+ * the CRLLexer ACTIVITY_MODE validTypes) — the SAME list the lexer's `InvalidActivityType` error and
+ * `authoring_kit.activityTypes` consume, so the editor's completion/hover can't drift from
+ * validation/the kit. No hand-maintained copy + no drift-guard needed.
+ * (CONCEPT_TYPES / CONCEPT_VALUETYPES / PARAMETER_TYPES above predate this and still hand-mirror with
+ * a drift-guard; they have const-tuple consumers, so consolidating them similarly is a separate task.)
+ */
+export { activityTypes as ACTIVITY_TYPES } from "../grammar/activityTypes";
+
 export interface Pattern {
   /** e.g., `Has(X)` — short canonical call form */
   canonical: string;

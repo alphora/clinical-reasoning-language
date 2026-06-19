@@ -1522,6 +1522,306 @@
     ]
   },
   {
+    "label": "request",
+    "line": 0,
+    "character": 10,
+    "items": [
+      {
+        "kind": "completion",
+        "label": "CPGAdministerMedication",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "CPG activity type — `request CPGAdministerMedication.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "CPGCommunicationRequest",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "CPG activity type — `request CPGCommunicationRequest.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "CPGDispenseMedication",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "CPG activity type — `request CPGDispenseMedication.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "CPGDocumentMedication",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "CPG activity type — `request CPGDocumentMedication.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "CPGEnrollment",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "CPG activity type — `request CPGEnrollment.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "CPGGenerateReport",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "CPG activity type — `request CPGGenerateReport.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "CPGImmunizationRequest",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "CPG activity type — `request CPGImmunizationRequest.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "CPGMedicationRequest",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "CPG activity type — `request CPGMedicationRequest.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "CPGProposeDiagnosis",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "CPG activity type — `request CPGProposeDiagnosis.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "CPGQuestionnaire",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "CPG activity type — `request CPGQuestionnaire.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "CPGRecordDetectedIssue",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "CPG activity type — `request CPGRecordDetectedIssue.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "CPGRecordInference",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "CPG activity type — `request CPGRecordInference.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "CPGReportFlag",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "CPG activity type — `request CPGReportFlag.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "CPGServiceRequest",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "CPG activity type — `request CPGServiceRequest.`",
+        "documentation": null,
+        "range": null
+      }
+    ]
+  },
+  {
+    "label": "request-do-not-perform",
+    "line": 0,
+    "character": 25,
+    "items": [
+      {
+        "kind": "completion",
+        "label": "CPGAdministerMedication",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "CPG activity type — `request CPGAdministerMedication.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "CPGCommunicationRequest",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "CPG activity type — `request CPGCommunicationRequest.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "CPGDispenseMedication",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "CPG activity type — `request CPGDispenseMedication.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "CPGDocumentMedication",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "CPG activity type — `request CPGDocumentMedication.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "CPGEnrollment",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "CPG activity type — `request CPGEnrollment.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "CPGGenerateReport",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "CPG activity type — `request CPGGenerateReport.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "CPGImmunizationRequest",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "CPG activity type — `request CPGImmunizationRequest.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "CPGMedicationRequest",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "CPG activity type — `request CPGMedicationRequest.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "CPGProposeDiagnosis",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "CPG activity type — `request CPGProposeDiagnosis.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "CPGQuestionnaire",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "CPG activity type — `request CPGQuestionnaire.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "CPGRecordDetectedIssue",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "CPG activity type — `request CPGRecordDetectedIssue.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "CPGRecordInference",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "CPG activity type — `request CPGRecordInference.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "CPGReportFlag",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "CPG activity type — `request CPGReportFlag.`",
+        "documentation": null,
+        "range": null
+      },
+      {
+        "kind": "completion",
+        "label": "CPGServiceRequest",
+        "itemKind": 24,
+        "insertText": null,
+        "sortText": null,
+        "detail": "CPG activity type — `request CPGServiceRequest.`",
+        "documentation": null,
+        "range": null
+      }
+    ]
+  },
+  {
+    "label": "request-miss",
+    "line": 0,
+    "character": 10,
+    "items": []
+  },
+  {
     "label": "ref-orphan-when",
     "line": 6,
     "character": 8,
@@ -1567,6 +1867,12 @@
   },
   {
     "label": "ref-orphan-unquoted-slot",
+    "line": 6,
+    "character": 11,
+    "items": []
+  },
+  {
+    "label": "ref-orphan-request-slot",
     "line": 6,
     "character": 11,
     "items": []

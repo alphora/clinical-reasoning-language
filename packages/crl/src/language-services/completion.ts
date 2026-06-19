@@ -12,6 +12,7 @@ import {
   CONCEPT_TYPES,
   CONCEPT_VALUETYPES,
   PARAMETER_TYPES,
+  ACTIVITY_TYPES,
   type Pattern,
 } from "./catalog";
 import { scanDeclarations, type Declaration } from "./concepts";
@@ -26,6 +27,7 @@ import {
   isTypeCompletionPrefix,
   isValuetypeCompletionPrefix,
   isParamTypeCompletionPrefix,
+  isRequestCompletionPrefix,
   isUnquotedTypeSlotPrefix,
 } from "./completionHelpers";
 import type { ProjectIndex } from "./projectIndex";
@@ -75,6 +77,16 @@ export function computeValuetypeCompletion(linePrefix: string): LsCompletionItem
     label: vt,
     kind: "typeParameter" as const,
     detail: `FHIR value type — \`value type is ${vt}.\``,
+  }));
+}
+
+/** Completion for an `- request <X>.` line (an activity's request resource type). */
+export function computeRequestCompletion(linePrefix: string): LsCompletionItem[] {
+  if (!isRequestCompletionPrefix(linePrefix)) return [];
+  return ACTIVITY_TYPES.map((t) => ({
+    label: t,
+    kind: "typeParameter" as const,
+    detail: `CPG activity type — \`request ${t}.\``,
   }));
 }
 

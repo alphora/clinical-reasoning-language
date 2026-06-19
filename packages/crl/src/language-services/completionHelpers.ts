@@ -23,9 +23,16 @@ export function isParamTypeCompletionPrefix(prefix: string): boolean {
   return /^\s*-\s*param\s+type\s+is\s+\S*$/i.test(prefix);
 }
 
+/** True when `prefix` ends inside a `- request <here>` slot (activity request type — no `is`).
+ *  Allows the optional `do not perform` modifier the grammar permits before the type
+ *  (`activityRequest : DASH REQUEST (doNotPerform)? ACTIVITY_TYPE DOT`). */
+export function isRequestCompletionPrefix(prefix: string): boolean {
+  return /^\s*-\s*request\s+(?:do\s+not\s+perform\s+)?\S*$/i.test(prefix);
+}
+
 /**
  * True when the cursor is anywhere inside a `- type is`, `- value type is`,
- * or `- param type is` slot. These slots expect UNQUOTED identifier tokens
+ * `- param type is`, or `- request` slot. These slots expect UNQUOTED identifier tokens
  * (e.g. `Observation`, `boolean`, `Patient`) — not quoted refs. Used by
  * `ConceptRefCompletionProvider` to suppress concept/terminology/decision/
  * activity/parameter suggestions when the user types `"` in one of these
@@ -38,7 +45,7 @@ export function isParamTypeCompletionPrefix(prefix: string): boolean {
  * an open quote.
  */
 export function isUnquotedTypeSlotPrefix(prefix: string): boolean {
-  return /^\s*-\s*(value type|param\s+type|type)\s+is\b/i.test(prefix);
+  return /^\s*-\s*((?:value type|param\s+type|type)\s+is|request)\b/i.test(prefix);
 }
 
 /**

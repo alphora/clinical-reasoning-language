@@ -13,6 +13,7 @@ import {
   TypeCompletionProvider,
   ValuetypeCompletionProvider,
   ParamTypeCompletionProvider,
+  RequestCompletionProvider,
   ConceptRefCompletionProvider,
 } from "../../src/completion";
 import { parseCatalog } from "@smile-digital-health/crl/language-services";
@@ -50,6 +51,7 @@ async function main() {
   const typeProv = new TypeCompletionProvider();
   const valuetypeProv = new ValuetypeCompletionProvider();
   const paramProv = new ParamTypeCompletionProvider();
+  const requestProv = new RequestCompletionProvider();
   const refOrphanProv = new ConceptRefCompletionProvider(emptyIndex);
   const refIndexedProv = new ConceptRefCompletionProvider(fullIndex);
   const refPrecedenceProv = new ConceptRefCompletionProvider(precedenceIndex);
@@ -90,11 +92,15 @@ async function main() {
   await run("type-miss", typeProv, oneLine("- when "), 0, 7);
   await run("valuetype", valuetypeProv, oneLine("- value type is "), 0, 16);
   await run("paramtype", paramProv, oneLine("- param type is "), 0, 16);
+  await run("request", requestProv, oneLine("- request "), 0, 10);
+  await run("request-do-not-perform", requestProv, oneLine("- request do not perform "), 0, 25);
+  await run("request-miss", requestProv, oneLine("- type is "), 0, 10);
   // ConceptRef — orphan path (concept/terminology/parameter only)
   await orphan("ref-orphan-when", "- when \"");
   await orphan("ref-orphan-coded-from", "- coded from \"");
   await orphan("ref-orphan-header-suppress", "concept \"");
   await orphan("ref-orphan-unquoted-slot", "- type is \"");
+  await orphan("ref-orphan-request-slot", "- request \"");
   await orphan("ref-orphan-no-quote", "- when x");
   // ConceptRef — indexed path (all 5 kinds available; expectedKind narrows)
   await indexed("ref-indexed-when", "- when \"");

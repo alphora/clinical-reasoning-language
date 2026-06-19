@@ -63,9 +63,10 @@ export interface TypeAllowlists {
   conceptTypes: readonly string[];
   valueTypes: readonly string[];
   paramTypes: readonly string[];
+  activityTypes: readonly string[];
 }
 
-/** Hover over a `- type is X.` / `- value type is X.` / `- param type is X.` token. */
+/** Hover over a `- type is X.` / `- value type is X.` / `- param type is X.` / `- request X.` token. */
 export function computeTypeValuetypeHover(
   lineText: string,
   position: LsPosition,
@@ -74,6 +75,7 @@ export function computeTypeValuetypeHover(
   const conceptSet = new Set(allow.conceptTypes);
   const valueSet = new Set(allow.valueTypes);
   const paramSet = new Set(allow.paramTypes);
+  const activitySet = new Set(allow.activityTypes);
 
   const typeMatch = /^(\s*-\s*type\s+is\s+)([A-Za-z][A-Za-z0-9]*)(\s*\.\s*)?$/.exec(lineText);
   if (typeMatch) {
@@ -121,6 +123,23 @@ export function computeTypeValuetypeHover(
         markdown += `The emitter collapses this to CQL \`context Patient\`; the parameter's quoted CRL name is not emitted, and the CQL \`context Patient\` line has no per-name identifier.`;
       } else {
         markdown += `Used in \`- param type is ${name}.\` to declare the parameter's runtime type.`;
+      }
+      return { markdown, range: lineRange(position.line, tokenStart, tokenEnd) };
+    }
+  }
+
+  // `(?:do not perform)?` mirrors the grammar's optional doNotPerform before the activity type.
+  const requestMatch = /^(\s*-\s*request\s+(?:do\s+not\s+perform\s+)?)([A-Za-z][A-Za-z0-9]*)(\s*\.\s*)?$/.exec(lineText);
+  if (requestMatch) {
+    const tokenStart = requestMatch[1].length;
+    const tokenEnd = tokenStart + requestMatch[2].length;
+    if (position.character >= tokenStart && position.character <= tokenEnd) {
+      const name = requestMatch[2];
+      let markdown = `**${name}** — CPG activity type\n\n`;
+      if (!activitySet.has(name)) {
+        markdown += `⚠ Not in the recognized activity type set. Valid: ${allow.activityTypes.join(", ")}.`;
+      } else {
+        markdown += `Used in \`- request ${name}.\` to declare the activity's request resource type.`;
       }
       return { markdown, range: lineRange(position.line, tokenStart, tokenEnd) };
     }
