@@ -13,7 +13,7 @@ import type { ImportDiagnostic } from "../imports/types";
 import { validateCELFile } from "../cel/validator";
 import { emitCelToFhir } from "../cel/emitter";
 import { resolveCelImports } from "../cel/imports";
-import { runCel } from "../cre";
+import { runCel, renderScenario } from "../cre";
 import { getAuthoringKit, DEFAULT_STAGE } from "../authoring-kit";
 import { emitFhirDefFromPath } from "../fhir-emitter";
 
@@ -471,13 +471,14 @@ export function createServer(): McpServer {
         "Evaluate the CRL decision(s) a CEL document covers over each case's facts and check the case's " +
         "`result is` oracle — the CRL Clinical Reasoning Engine (#115), an authoring-time interpreter " +
         "(NOT the FHIR/CQL engine). Pass `path` (an absolute .cel file path); the resolver walks to the " +
-        "nearest package.json to load the covered CRL closure. v1 is asserted-only: a concept is satisfied " +
-        "iff a case fact is `defined by` it; it walks the full decision shape (first:/all:/any:/otherwise " +
-        "+ `unless`/`only when` guards) and a decision-leaf `result is` passes iff the expected branch is " +
+        "nearest package.json to load the covered CRL closure. A concept is satisfied when a case fact is " +
+        "`defined by` it (asserted) OR its `defined as` composition (sem-and/sem-or/sem-not, closed-world) " +
+        "evaluates true (#126); it walks the full decision shape (first:/all:/any:/otherwise + " +
+        "`unless`/`only when` guards) and a decision-leaf `result is` passes iff the expected branch is " +
         "in the produced recommendation set. Returns { success, caseCount, passCount, failCount, " +
-        "errorCount, runs:[{case, decision, status, expected, produced, trace, diagnostics}], errors, " +
-        "importDiagnostics }. NOT yet evaluated (deferred): `defined as`/`definition is` inference, " +
-        "temporal, value thresholds, transitive `use decision`.",
+        "errorCount, runs:[{case, decision, status, expected, produced, trace:[{node, nodeId, source, " +
+        "...}], diagnostics}], errors, importDiagnostics }. NOT yet evaluated (deferred): `definition is` " +
+        "predicates (count/temporal/value), `coded from`/external value sets, transitive `use decision`.",
       inputSchema: {
         path: z
           .string()
@@ -487,6 +488,29 @@ export function createServer(): McpServer {
       },
     },
     (args) => runDecision(args as { path: string; case?: string }),
+  );
+
+  server.registerTool(
+    "render_scenario",
+    {
+      title: "Render the scenario/decision view-model (CRE→UI contract)",
+      description:
+        "Run the CRE over a CEL document and project each case into the stable scenario view-model — the " +
+        "host-independent CRE↔UI contract (roadmap item #2) the scenario-runner UI consumes. Unlike " +
+        "`run_decision` (raw evaluation trace), this returns the FULL decision tree (the CRL AST is the " +
+        "structural spine — EVERY branch and action, reached or not) overlaid with per-node run state: " +
+        "`evaluated` (reached?), `condition` (satisfied + which facts + a `defined as` explanation), " +
+        "`guard` provenance, `guardedOut`, `action` (recommend-activity vs use-decision, qualifier, " +
+        "produced), `unreachedReason:\"preempted\"` for first:-short-circuited branches, and a `source` " +
+        "span (filePath + 0-based range) per node for navigation. Pass `path` (absolute .cel); `case` " +
+        "renders only one case. Returns { schemaVersion, success, source, caseCount, passCount, failCount, " +
+        "errorCount, scenarios:[{case, decision, status, expected, produced, tree, diagnostics}], errors }.",
+      inputSchema: {
+        path: z.string().min(1).describe("Absolute path to a .cel file. Imports walk to nearest package.json."),
+        case: z.string().optional().describe("Optional: render only the named case (default: all cases)."),
+      },
+    },
+    (args) => runRenderScenario(args as { path: string; case?: string }),
   );
 
   server.registerTool(
@@ -555,6 +579,24 @@ function runDecision(args: { path: string; case?: string }): {
     importDiagnostics: graph.diagnostics.filter((d) => d.severity === "error"),
   };
   return { content: [{ type: "text", text: JSON.stringify(summary, null, 2) }] };
+}
+
+function runRenderScenario(args: { path: string; case?: string }): {
+  content: Array<{ type: "text"; text: string }>;
+  isError?: boolean;
+} {
+  let stat;
+  try {
+    stat = statSync(args.path);
+  } catch {
+    return { content: [{ type: "text", text: `Path "${args.path}" not readable.` }], isError: true };
+  }
+  if (!stat.isFile()) {
+    return { content: [{ type: "text", text: `Path "${args.path}" is not a file.` }], isError: true };
+  }
+  const graph = resolveCelImports(args.path);
+  const vm = renderScenario(graph, args.case ? { case: args.case } : undefined);
+  return { content: [{ type: "text", text: JSON.stringify(vm, null, 2) }] };
 }
 
 function runEmitCrlFhir(args: {

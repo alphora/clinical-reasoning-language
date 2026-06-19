@@ -187,6 +187,27 @@ case "contraindication -> med is NOT produced (expected fail)":
     expect(contraRun.produced.map((p) => p.recommendation)).toEqual(["Referral"]);
   });
 
+  it("trace nodes carry decision-relative nodeId paths + a covered-library source span", () => {
+    // Roadmap item #2 prerequisite (#132 follow-on): the trace is the view-model's alignment key.
+    const r = runCel(graphFrom(COVERAGE_CRL, COVERAGE_CEL));
+    const indic = r.runs.find((x) => x.case.startsWith("indication only"))!;
+    // first:: when[0]"Excl" (unsatisfied, body not run), when[1]"Indic" (satisfied → action),
+    // otherwise short-circuited away — so the EXECUTED trace stops at the match. The full tree
+    // (incl. the absent `otherwise`) is reconstructed by the view-model from the AST.
+    expect(indic.trace.map((n) => n.nodeId)).toEqual(["when[0]", "when[1]"]);
+    const excl = indic.trace[0];
+    expect(excl).toMatchObject({ nodeId: "when[0]", kind: "when", concept: "Excl", satisfied: false });
+    expect(excl.children).toEqual([]); // unsatisfied → body not executed
+    const indicNode = indic.trace[1];
+    expect(indicNode).toMatchObject({ nodeId: "when[1]", kind: "when", satisfied: true });
+    expect(indicNode.children?.[0]).toMatchObject({ nodeId: "when[1]/action[0]", kind: "action", node: "Approve" });
+    // source span: the covered library file, a well-formed 0-based range.
+    expect(indicNode.source.filePath).toBe("inline.crl");
+    const rng = indicNode.source.range;
+    expect(rng.startLine).toBeGreaterThanOrEqual(0);
+    expect(rng.endLine > rng.startLine || (rng.endLine === rng.startLine && rng.endCol > rng.startCol)).toBe(true);
+  });
+
   const ALL_CRL = `# A
 library "A".
 concept "NeedsImaging":

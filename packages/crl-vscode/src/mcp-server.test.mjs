@@ -32,7 +32,7 @@ const check = async (label, fn) => {
 
 await client.connect(transport);
 try {
-  await check("MCP tools: 9 registered (…, run_decision, authoring_kit)", async () => {
+  await check("MCP tools: 10 registered (…, run_decision, render_scenario, authoring_kit)", async () => {
     const { tools } = await client.listTools();
     const names = tools.map((t) => t.name).sort();
     assert.deepEqual(names, [
@@ -41,6 +41,7 @@ try {
       "emit_cel",
       "emit_cql",
       "emit_crl_fhir",
+      "render_scenario",
       "run_decision",
       "tokenize_crl",
       "validate_cel",
@@ -79,6 +80,17 @@ try {
   await check("run_decision without path → isError", async () => {
     const r = await client.callTool({ name: "run_decision", arguments: {} });
     assert.equal(r.isError, true);
+  });
+
+  await check("render_scenario via path → dme101-030.cel: view-model envelope through the bundled server", async () => {
+    const dme101Cel = resolve(here, "../../crl/src/tests/fixtures/policies/dme101-030/dme101-030.cel");
+    const r = await client.callTool({ name: "render_scenario", arguments: { path: dme101Cel } });
+    assert.ok(!r.isError, "should not be a tool error");
+    const out = JSON.parse(r.content[0].text);
+    assert.equal(typeof out.schemaVersion, "number");
+    assert.equal(out.success, true);
+    assert.equal(out.caseCount, 3);
+    assert.ok(out.scenarios[0].tree.every((n) => typeof n.nodeId === "string" && n.source?.range), "tree nodes carry nodeId + source");
   });
 
   await check("validate_cel via path → cms22.cel validates clean", async () => {

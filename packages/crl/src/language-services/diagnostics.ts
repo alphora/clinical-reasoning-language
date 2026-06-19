@@ -10,6 +10,7 @@
 // ported verbatim from the providers (two distinct shapes: CRLError for orphan, ValidationError
 // for project) — only the result type changed (vscode.Diagnostic → LsDiagnostic).
 import type { LsDiagnostic, LsSeverity, ZeroBasedRange } from "./contracts";
+import { toZeroBasedRange } from "./contracts";
 import type { ProjectIndex } from "./projectIndex";
 import type { ImportDiagnostic } from "../imports/types";
 import type { ValidationError } from "../validator/validator";
@@ -129,18 +130,6 @@ function validationErrorToLs(e: ValidationError, severity: LsSeverity, docFilePa
 
 const ZERO_RANGE: ZeroBasedRange = { startLine: 0, startCol: 0, endLine: 0, endCol: 1 };
 
-function locationToRange(loc: {
-  start: { line: number; column: number };
-  end: { line: number; column: number };
-}): ZeroBasedRange {
-  const sl = Math.max(0, loc.start.line - 1);
-  const sc = Math.max(0, loc.start.column);
-  const el = Math.max(0, loc.end.line - 1);
-  const ec = Math.max(0, loc.end.column);
-  if (el < sl || (el === sl && ec <= sc)) return { startLine: sl, startCol: sc, endLine: sl, endCol: sc + 1 };
-  return { startLine: sl, startCol: sc, endLine: el, endCol: ec };
-}
-
 /**
  * Map an ImportDiagnostic to one or more LsDiagnostic (each on the right file). The union has 8
  * kinds with different source-file shapes; ported verbatim from the extension's diagnosticMap.
@@ -206,7 +195,7 @@ export function mapImportDiagnostic(diag: ImportDiagnostic): LsDiagnostic[] {
       return [
         {
           filePath: diag.from.filePath,
-          range: locationToRange(diag.include.location),
+          range: toZeroBasedRange(diag.include.location),
           severity: sev,
           message: `Cannot resolve include "${diag.include.name}"`,
           code: diag.kind,
@@ -222,7 +211,7 @@ export function mapImportDiagnostic(diag: ImportDiagnostic): LsDiagnostic[] {
         const inc = diag.includeChain[i];
         out.push({
           filePath: diag.filePaths[i],
-          range: locationToRange(inc.location),
+          range: toZeroBasedRange(inc.location),
           severity: sev,
           message: cycleMsg,
           code: diag.kind,
@@ -241,7 +230,7 @@ export function mapImportDiagnostic(diag: ImportDiagnostic): LsDiagnostic[] {
       return [
         {
           filePath: diag.from.filePath,
-          range: locationToRange(diag.include.location),
+          range: toZeroBasedRange(diag.include.location),
           severity: sev,
           message: `\`include "${diag.include.name}" as "${diag.include.alias ?? ""}".\` — alias semantics defer to v2.2; the include is treated as if no alias were given`,
           code: diag.kind,
@@ -253,7 +242,7 @@ export function mapImportDiagnostic(diag: ImportDiagnostic): LsDiagnostic[] {
       return [
         {
           filePath: diag.from.filePath,
-          range: locationToRange(diag.include.location),
+          range: toZeroBasedRange(diag.include.location),
           severity: sev,
           message: `\`include "${diag.include.name}".\` is redundant — local sibling libraries auto-resolve via qualified refs without an \`include\``,
           code: diag.kind,

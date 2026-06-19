@@ -28,6 +28,24 @@ export interface ZeroBasedRange {
   endCol: number;
 }
 
+/**
+ * Convert an AST `Location` (1-based line, 0-based column) to a 0-based, end-exclusive
+ * ZeroBasedRange. A degenerate/empty span collapses to a one-char range so the result is
+ * always non-empty (renderable as a highlight). Single source for AST→range conversion —
+ * shared by language-service diagnostics and the CRE scenario/trace contract.
+ */
+export function toZeroBasedRange(loc: {
+  start: { line: number; column: number };
+  end: { line: number; column: number };
+}): ZeroBasedRange {
+  const sl = Math.max(0, loc.start.line - 1);
+  const sc = Math.max(0, loc.start.column);
+  const el = Math.max(0, loc.end.line - 1);
+  const ec = Math.max(0, loc.end.column);
+  if (el < sl || (el === sl && ec <= sc)) return { startLine: sl, startCol: sc, endLine: sl, endCol: sc + 1 };
+  return { startLine: sl, startCol: sc, endLine: el, endCol: ec };
+}
+
 /** 0-based line/character position — the input position for the compute* functions
  *  (character is a UTF-16 code unit, matching ZeroBasedRange's columns + LSP). */
 export interface LsPosition {

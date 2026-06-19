@@ -49,10 +49,17 @@ import type {
   Decision,
   DefinedAsBareRef,
   DefinedAsComposition,
+  Location,
   ReferenceName,
   WhenBlockBody,
 } from "../ast/types";
 import { getRefLibrary, getRefName } from "../ast/types";
+import type { LsLocation } from "../language-services/contracts";
+import { toZeroBasedRange } from "../language-services/contracts";
+
+/** Child nodeId by appending a path segment (decision-relative; "" parent ⇒ the segment alone).
+ *  Exported so the scenario view-model walker assigns IDENTICAL ids when it walks the AST spine. */
+export const childId = (parent: string, seg: string): string => (parent ? `${parent}/${seg}` : seg);
 
 type Id = string;
 // Injective key over (library, name). Names contain spaces (e.g. "Documented
@@ -80,7 +87,13 @@ export interface CompositionTrace {
 
 export interface TraceNode {
   node: string;
+  /** Decision-relative structural path id (e.g. "when[0]/action[1]", "otherwise", "when[1]/when[0]") —
+   *  stable across re-runs of an unchanged decision; the key the scenario view-model aligns run-state
+   *  onto the AST by. Single-sourced with the view-model walker via the same index-path scheme. */
+  nodeId: string;
   kind: "when" | "otherwise" | "action";
+  /** Source span of the originating CRL AST node, in the covered library's file. */
+  source: LsLocation;
   concept?: string;
   satisfied?: boolean;
   evaluated: boolean;
@@ -125,6 +138,8 @@ interface Ctx {
   /** All concept definitions in the closure, by id, with their owning library. */
   concepts: Map<Id, ConceptEntry>;
   coveredLib: string;
+  /** Absolute path of the covered CRL library — the source file every decision tree node belongs to. */
+  filePath: string;
   /** Per-case memo of concept satisfaction (composition can re-reference). */
   cache: Map<Id, ConceptEval>;
   /** Concepts currently on the evaluation stack — cycle guard. */
@@ -234,7 +249,7 @@ function conceptSatisfied(
   };
 }
 
-function recName(action: ActionStatement["action"]): string {
+export function recName(action: ActionStatement["action"]): string {
   return action.type === "RecommendActivity"
     ? getRefName(action.activityName)
     : getRefName(action.decisionName);
@@ -259,32 +274,43 @@ function evalGuard(
   };
 }
 
-function executeBody(body: WhenBlockBody, viaWhen: string | null, ctx: Ctx, into: TraceNode[]): void {
+/** Source span of an AST node in the covered library file. */
+const spanOf = (loc: Location, ctx: Ctx): LsLocation => ({ filePath: ctx.filePath, range: toZeroBasedRange(loc) });
+
+function executeBody(body: WhenBlockBody, viaWhen: string | null, ctx: Ctx, into: TraceNode[], parentId: string): void {
   if (body.type === "ActionStatement") {
     // Inline single action — the grammar forbids a guard here.
     ctx.produced.push({ recommendation: recName(body.action), viaWhen, qualifier: null });
-    into.push({ node: recName(body.action), kind: "action", evaluated: true });
+    into.push({
+      node: recName(body.action),
+      nodeId: childId(parentId, "action[0]"),
+      kind: "action",
+      source: spanOf(body.location, ctx),
+      evaluated: true,
+    });
     return;
   }
   const block: BlockBody = body;
   const isBranch = block.statements.some((m) => m.type === "WhenBlock" || m.type === "OtherwiseBlock");
   if (isBranch) {
-    walkBranches(block.qualifier, block.statements as BranchBlock[], ctx, into);
+    walkBranches(block.qualifier, block.statements as BranchBlock[], ctx, into, parentId);
     return;
   }
   // Action menu (`any:` / `all:` / single).
   let produced = 0;
-  for (const stmt of block.statements as ActionStatement[]) {
+  (block.statements as ActionStatement[]).forEach((stmt, j) => {
     const name = recName(stmt.action);
+    const nodeId = childId(parentId, `action[${j}]`);
+    const source = spanOf(stmt.location, ctx);
     const g = evalGuard(stmt.guard, ctx);
     if (g.excluded) {
-      into.push({ node: name, kind: "action", evaluated: true, guardedOut: true, guard: g.info });
-      continue;
+      into.push({ node: name, nodeId, kind: "action", source, evaluated: true, guardedOut: true, guard: g.info });
+      return;
     }
     ctx.produced.push({ recommendation: name, viaWhen, qualifier: block.qualifier ?? null });
-    into.push({ node: name, kind: "action", evaluated: true, ...(g.info ? { guard: g.info } : {}) });
+    into.push({ node: name, nodeId, kind: "action", source, evaluated: true, ...(g.info ? { guard: g.info } : {}) });
     produced++;
-  }
+  });
   if (produced === 0 && block.statements.length > 0) {
     ctx.diagnostics.push(
       `every option in the menu under "${viaWhen ?? "otherwise"}" was guarded out — branch produced nothing`,
@@ -297,21 +323,34 @@ function walkBranches(
   branches: BranchBlock[],
   ctx: Ctx,
   into: TraceNode[],
+  parentId: string,
 ): void {
   // `all:` = every matching branch fires; `first:` (or a single-member block) = ordered, first match wins.
   const ordered = qualifier !== "all";
-  for (const b of branches) {
+  for (let i = 0; i < branches.length; i++) {
+    const b = branches[i];
     if (b.type === "OtherwiseBlock") {
-      const node: TraceNode = { node: "otherwise", kind: "otherwise", evaluated: true, children: [] };
+      const nodeId = childId(parentId, "otherwise");
+      const node: TraceNode = {
+        node: "otherwise",
+        nodeId,
+        kind: "otherwise",
+        source: spanOf(b.location, ctx),
+        evaluated: true,
+        children: [],
+      };
       into.push(node);
-      executeBody(b.body, null, ctx, node.children!);
+      executeBody(b.body, null, ctx, node.children!, nodeId);
       if (ordered) return;
       continue;
     }
     const { sat, facts, composition } = conceptSatisfied(b.conceptName, ctx);
+    const nodeId = childId(parentId, `when[${i}]`);
     const node: TraceNode = {
       node: `when ${getRefName(b.conceptName)}`,
+      nodeId,
       kind: "when",
+      source: spanOf(b.location, ctx),
       concept: getRefName(b.conceptName),
       satisfied: sat,
       evaluated: true,
@@ -321,7 +360,7 @@ function walkBranches(
     };
     into.push(node);
     if (sat) {
-      executeBody(b.body, getRefName(b.conceptName), ctx, node.children!);
+      executeBody(b.body, getRefName(b.conceptName), ctx, node.children!, nodeId);
       if (ordered) return; // first match wins — remaining branches are not evaluated.
     }
   }
@@ -332,6 +371,7 @@ function runCase(
   decisions: Map<string, Decision>,
   facts: Map<string, CELFact>,
   coveredLib: string,
+  filePath: string,
   concepts: Map<Id, ConceptEntry>,
 ): CaseRun {
   const diagnostics: string[] = [];
@@ -396,6 +436,7 @@ function runCase(
     factsByConcept,
     concepts,
     coveredLib,
+    filePath,
     cache: new Map(),
     stack: new Set(),
     cycleHits: 0,
@@ -404,7 +445,7 @@ function runCase(
     trace: [],
     diagnostics,
   };
-  walkBranches(decision.body.qualifier, decision.body.statements, ctx, ctx.trace);
+  walkBranches(decision.body.qualifier, decision.body.statements, ctx, ctx.trace, "");
 
   const producedNames = new Set(ctx.produced.map((p) => p.recommendation));
   const status: CaseRun["status"] = producedNames.has(expectedBranch) ? "pass" : "fail";
@@ -457,9 +498,10 @@ export function runCel(graph: ResolvedCelGraph): CelRunResult {
     if (s.type === "CELFact") facts.set(s.name, s);
   }
 
+  const filePath = graph.coversTarget.filePath;
   const runs: CaseRun[] = [];
   for (const s of graph.cel.statements) {
-    if (s.type === "CELCase") runs.push(runCase(s, decisions, facts, coveredLib, concepts));
+    if (s.type === "CELCase") runs.push(runCase(s, decisions, facts, coveredLib, filePath, concepts));
   }
   return { success: true, runs, errors };
 }
