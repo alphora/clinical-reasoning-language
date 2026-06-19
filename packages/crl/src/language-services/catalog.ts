@@ -93,27 +93,15 @@ export const PARAMETER_TYPES = [
 ] as const;
 
 /**
- * CPG activity request types CRL recognizes in an `activity` declaration's `- request X.` slot.
- * Source of truth: the `REQUEST` / ACTIVITY_MODE lexer rules in `src/grammar/CRLLexer.g4`. Static
- * mirror — a drift-guard test in `catalog.test.mjs` asserts exact equality with
- * `src/grammar/generated/types/activityTypes.json` so a grammar change fails the build.
+ * CPG activity request types for an `activity` declaration's `- request X.` slot. RE-EXPORTED from
+ * the grammar's single source (`grammar/activityTypes.ts` → activityTypes.json, auto-generated from
+ * the CRLLexer ACTIVITY_MODE validTypes) — the SAME list the lexer's `InvalidActivityType` error and
+ * `authoring_kit.activityTypes` consume, so the editor's completion/hover can't drift from
+ * validation/the kit. No hand-maintained copy + no drift-guard needed.
+ * (CONCEPT_TYPES / CONCEPT_VALUETYPES / PARAMETER_TYPES above predate this and still hand-mirror with
+ * a drift-guard; they have const-tuple consumers, so consolidating them similarly is a separate task.)
  */
-export const ACTIVITY_TYPES = [
-  "CPGAdministerMedication",
-  "CPGCommunicationRequest",
-  "CPGDispenseMedication",
-  "CPGDocumentMedication",
-  "CPGEnrollment",
-  "CPGGenerateReport",
-  "CPGImmunizationRequest",
-  "CPGMedicationRequest",
-  "CPGProposeDiagnosis",
-  "CPGQuestionnaire",
-  "CPGRecordDetectedIssue",
-  "CPGRecordInference",
-  "CPGReportFlag",
-  "CPGServiceRequest",
-] as const;
+export { activityTypes as ACTIVITY_TYPES } from "../grammar/activityTypes";
 
 export interface Pattern {
   /** e.g., `Has(X)` — short canonical call form */

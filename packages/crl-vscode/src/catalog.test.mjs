@@ -13,7 +13,6 @@ const {
   CONCEPT_TYPES,
   CONCEPT_VALUETYPES,
   PARAMETER_TYPES,
-  ACTIVITY_TYPES,
 } = mod.default ?? mod;
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -132,7 +131,6 @@ const grammarTypesDir = resolve(here, "../../crl/src/grammar/generated/types");
 const conceptTypesJson = JSON.parse(readFileSync(resolve(grammarTypesDir, "conceptTypes.json"), "utf-8"));
 const conceptValueTypesJson = JSON.parse(readFileSync(resolve(grammarTypesDir, "conceptValueTypes.json"), "utf-8"));
 const parameterTypesJson = JSON.parse(readFileSync(resolve(grammarTypesDir, "parameterTypes.json"), "utf-8"));
-const activityTypesJson = JSON.parse(readFileSync(resolve(grammarTypesDir, "activityTypes.json"), "utf-8"));
 
 // Exact equality (order included) — the JSON sources are stable lexer-order
 // outputs, and `PARAMETER_TYPES = [...CONCEPT_TYPES, ...CONCEPT_VALUETYPES]`
@@ -152,11 +150,6 @@ assert.deepEqual(
   [...PARAMETER_TYPES],
   [...parameterTypesJson],
   "PARAMETER_TYPES must match src/grammar/generated/types/parameterTypes.json — keep the static mirror in sync",
-);
-assert.deepEqual(
-  [...ACTIVITY_TYPES],
-  [...activityTypesJson],
-  "ACTIVITY_TYPES must match src/grammar/generated/types/activityTypes.json — keep the static mirror in sync",
 );
 // Symmetric assertion: the JSON itself must also not contain Practitioner
 // while it remains the deliberate v2.2 deferral. If a future grammar change
