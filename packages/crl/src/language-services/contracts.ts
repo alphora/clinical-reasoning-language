@@ -113,9 +113,14 @@ export interface LsPrepareRenameResult {
   range: ZeroBasedRange;
   placeholder: string;
 }
-// Rename convention: a successful rename returns LsTextEdit[]; unsupported targets,
-// invalid names, and name collisions are signaled by THROWING an Error with a
-// user-facing message (the VS Code adapter surfaces it as a rejected ProviderResult).
+// Rename convention (two phases — matches the providers' preserved behavior):
+// - computePrepareRename: returns LsPrepareRenameResult on a renameable target; THROWS an
+//   Error for an unsupported target (library / qualifier) or no symbol at the cursor — the
+//   adapter surfaces it as a rejected prepare probe.
+// - computeRename: returns LsTextEdit[] on success; returns null for a no-op (newName ===
+//   current name), no symbol, or an unsupported-kind target; THROWS an Error ONLY for an
+//   invalid name or a name collision. The adapter maps null → a null ProviderResult and
+//   re-rejects thrown errors.
 
 export interface LsDocumentSymbol {
   name: string;

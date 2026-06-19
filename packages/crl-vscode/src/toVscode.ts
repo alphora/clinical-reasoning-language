@@ -6,6 +6,12 @@ import type {
   LsHover,
   LsCompletionItem,
   LsCompletionKind,
+  LsLocation,
+  LsDocumentSymbol,
+  LsWorkspaceSymbol,
+  LsDocumentLink,
+  LsTextEdit,
+  LsSymbolKind,
   ZeroBasedRange,
 } from "@smile-digital-health/crl/language-services";
 
@@ -50,4 +56,51 @@ export function toVscodeCompletionItem(ls: LsCompletionItem): vscode.CompletionI
   if (ls.sortText !== undefined) item.sortText = ls.sortText;
   if (ls.range !== undefined) item.range = toVscodeRange(ls.range);
   return item;
+}
+
+const SYMBOL_KIND: Record<LsSymbolKind, vscode.SymbolKind> = {
+  namespace: vscode.SymbolKind.Namespace,
+  class: vscode.SymbolKind.Class,
+  constant: vscode.SymbolKind.Constant,
+  function: vscode.SymbolKind.Function,
+  property: vscode.SymbolKind.Property,
+  variable: vscode.SymbolKind.Variable,
+};
+
+export function toVscodeLocation(l: LsLocation): vscode.Location {
+  return new vscode.Location(vscode.Uri.file(l.filePath), toVscodeRange(l.range));
+}
+
+export function toVscodeDocumentSymbol(s: LsDocumentSymbol): vscode.DocumentSymbol {
+  const sym = new vscode.DocumentSymbol(
+    s.name,
+    s.detail ?? "",
+    SYMBOL_KIND[s.kind],
+    toVscodeRange(s.range),
+    toVscodeRange(s.selectionRange),
+  );
+  if (s.children) sym.children = s.children.map(toVscodeDocumentSymbol);
+  return sym;
+}
+
+export function toVscodeSymbolInformation(s: LsWorkspaceSymbol): vscode.SymbolInformation {
+  return new vscode.SymbolInformation(
+    s.name,
+    SYMBOL_KIND[s.kind],
+    s.containerName ?? "",
+    toVscodeLocation(s.location),
+  );
+}
+
+export function toVscodeDocumentLink(l: LsDocumentLink): vscode.DocumentLink {
+  const link = new vscode.DocumentLink(toVscodeRange(l.range), vscode.Uri.file(l.target));
+  if (l.tooltip !== undefined) link.tooltip = l.tooltip;
+  return link;
+}
+
+/** LsTextEdit[] → a single WorkspaceEdit (replace ops in array order). */
+export function toWorkspaceEdit(edits: LsTextEdit[]): vscode.WorkspaceEdit {
+  const edit = new vscode.WorkspaceEdit();
+  for (const e of edits) edit.replace(vscode.Uri.file(e.filePath), toVscodeRange(e.range), e.newText);
+  return edit;
 }
