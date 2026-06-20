@@ -70,8 +70,28 @@
       {
         "command": "crl.refreshProjectCache",
         "title": "CRL: Refresh project cache (re-scan all .crl files)"
+      },
+      {
+        "command": "crl.runScenario",
+        "title": "CRL: Run Scenario",
+        "icon": "$(play)"
       }
     ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "crl.runScenario",
+          "when": "resourceExtname == .cel",
+          "group": "navigation"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "crl.runScenario",
+          "when": "resourceExtname == .cel"
+        }
+      ]
+    },
     "configuration": {
       "title": "Clinical Reasoning Language",
       "properties": {
@@ -113,7 +133,7 @@
     "test:grammar": "node src/grammar.test.mjs",
     "test:package": "node src/package.test.mjs",
     "test:language-config": "node src/language-config.test.mjs",
-    "test": "npm run compile && node src/mcp-server.test.mjs && node src/provision.test.mjs && node src/highlight.test.mjs && node src/catalog.test.mjs && node src/embedded-catalog.test.mjs && node src/concepts.test.mjs && node src/crl-patterns-coverage.test.mjs && node src/contextDetect.test.mjs && node src/findDeclaration.test.mjs && node src/projectIndex.test.mjs && node src/completion.test.mjs && node src/grammar.test.mjs && node src/package.test.mjs && node src/language-config.test.mjs && node test/oracle/check.mjs",
+    "test": "npm run compile && node src/mcp-server.test.mjs && node src/provision.test.mjs && node src/highlight.test.mjs && node src/catalog.test.mjs && node src/embedded-catalog.test.mjs && node src/concepts.test.mjs && node src/crl-patterns-coverage.test.mjs && node src/contextDetect.test.mjs && node src/findDeclaration.test.mjs && node src/projectIndex.test.mjs && node src/completion.test.mjs && node src/grammar.test.mjs && node src/package.test.mjs && node src/language-config.test.mjs && node src/renderScenarioHtml.test.mjs && node test/oracle/check.mjs",
     "vscode:prepublish": "npm run build:crl && npm run compile",
     "package": "vsce package --no-dependencies"
   },

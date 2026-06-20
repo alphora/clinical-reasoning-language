@@ -72,6 +72,15 @@ check("activationEvents retains workspaceContains (migration-load-bearing) + dro
   );
 });
 
+check("contributes the crl.runScenario command + its .cel-scoped editor/title menu", () => {
+  const cmds = (c.commands ?? []).map((x) => x.command);
+  assert.ok(cmds.includes("crl.runScenario"), "expected the crl.runScenario command");
+  const titleMenu = c.menus?.["editor/title"] ?? [];
+  const entry = titleMenu.find((m) => m.command === "crl.runScenario");
+  assert.ok(entry, "crl.runScenario must be in menus.editor/title");
+  assert.equal(entry.when, "resourceExtname == .cel", "the scenario-runner button is scoped to .cel files");
+});
+
 // Verify the referenced language-configuration files exist on disk so a
 // package.json typo doesn't make it to release.
 check("contributes.languages.configuration paths resolve to real files", () => {

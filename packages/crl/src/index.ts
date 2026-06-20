@@ -57,6 +57,18 @@ export type {
 } from "./cel/imports";
 export { runCel } from "./cre";
 export type { CaseRun, CelRunResult, ProducedRec, TraceNode, CompositionTrace } from "./cre";
+export { renderScenario, SCENARIO_VIEW_MODEL_SCHEMA_VERSION } from "./cre";
+export type {
+  RenderScenarioResult,
+  ScenarioViewModel,
+  CaseView,
+  DecisionView,
+  ViewNode,
+  ConditionView,
+  GuardView,
+  ActionView,
+  ExplanationView,
+} from "./cre";
 export { getAuthoringKit, STAGES, DEFAULT_STAGE } from "./authoring-kit";
 export type {
   AuthoringKit,

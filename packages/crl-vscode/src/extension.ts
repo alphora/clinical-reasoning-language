@@ -26,6 +26,7 @@ import {
   ConceptRefHoverProvider,
 } from "./hover";
 import { registerDiagnostics } from "./diagnostics";
+import { registerScenarioRunner } from "./scenarioRunner";
 import {
   CrlDefinitionProvider,
   CrlReferenceProvider,
@@ -167,6 +168,7 @@ export function activate(context: vscode.ExtensionContext): void {
     }),
   );
   registerLanguageFeatures(context, loadEmbeddedCatalog(context), index);
+  registerScenarioRunner(context);
   registerDiagnostics(context, index);
 
   // v2.3.0 migration + provisioning. Sequenced (migration first, then
