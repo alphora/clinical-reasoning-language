@@ -3,6 +3,8 @@ import * as path from "node:path";
 
 import { resolveImports } from "../imports";
 import { findProjectRoot } from "../imports/registry";
+import { collectDecisionArms } from "../ast/decisionArms";
+import type { Decision } from "../ast/types";
 import type { ResolvedGraph, RegistryEntry } from "../imports/types";
 import type { ZeroBasedRange } from "./contracts";
 import { canonicalize } from "./paths";
@@ -32,6 +34,9 @@ export interface IndexedDeclaration {
   valuetype?: string;
   /** First body bullet text for hover preview. */
   bodyPreview?: string;
+  /** Decision-only: the direct arm names (sorted) a CEL `result is "<D>" is "<arm>"` may target.
+   *  Populated via collectDecisionArms — single source of truth with the CEL validator's accepted set. */
+  arms?: string[];
 }
 
 /**
@@ -356,7 +361,7 @@ function enumerateDeclarations(
             out.push({ ...base, kind: "terminology" });
             break;
           case "Decision":
-            out.push({ ...base, kind: "decision" });
+            out.push({ ...base, kind: "decision", arms: [...collectDecisionArms(stmt as unknown as Decision)].sort() });
             break;
           case "Activity":
             out.push({ ...base, kind: "activity" });
