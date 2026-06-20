@@ -44,6 +44,21 @@ assert.ok(html.includes("preempted"), "marks a preempted branch (the exclusion s
 assert.ok(html.includes("satisfied"), "marks a satisfied condition");
 assert.ok(html.includes('data-reveal="'), "nodes carry an opaque reveal key");
 
+// meta header tweaks: expected = branch only; "produced" → "actual"; expected/actual color-tagged
+assert.ok(html.includes("<dt>actual</dt>"), "the produced row is relabeled 'actual'");
+assert.ok(!html.includes("<dt>produced</dt>"), "no legacy 'produced' meta label remains");
+assert.ok(html.includes('class="actual pass"'), "the actual value carries the status class for coloring");
+assert.ok(html.includes('class="expected pass"'), "the expected value carries the status class");
+assert.ok(html.includes('<span class="mark">✓</span>'), "expected/actual prefixed with a ✓ on a passing case");
+assert.ok(!/Coverage is (Approve|Deny)/.test(html), "expected shows just the branch, not '<decision> is <branch>'");
+
+// a failing case shows a red ✗ mark + the fail status class on expected/actual
+const failVm = JSON.parse(JSON.stringify(result));
+failVm.scenarios[0].status = "fail";
+const failHtml = renderScenarioHtml(failVm).html;
+assert.ok(failHtml.includes('<span class="mark">✗</span>'), "a failing case uses the ✗ mark");
+assert.ok(failHtml.includes('class="actual fail"'), "a failing case tags actual with the fail status");
+
 const keys = Object.keys(reveals);
 assert.ok(keys.length > 0, "reveals map is populated");
 for (const k of keys) {
