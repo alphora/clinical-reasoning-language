@@ -27,6 +27,7 @@ import {
 } from "./hover";
 import { registerDiagnostics } from "./diagnostics";
 import { registerScenarioRunner } from "./scenarioRunner";
+import { CelCompletionProvider, CEL_DOCUMENT_SELECTOR } from "./celCompletion";
 import {
   CrlDefinitionProvider,
   CrlReferenceProvider,
@@ -96,6 +97,15 @@ function registerLanguageFeatures(
       new ConceptRefCompletionProvider(index),
       '"',
       "."
+    ),
+    // CEL (.cel) completion — one provider for all CEL slots (covers/subject/fact/defined-by/result-is),
+    // triggers on `"` (quote slots) and `.` (qualified `defined by "Lib"."…"`). #4 slice 1.
+    vscode.languages.registerCompletionItemProvider(
+      CEL_DOCUMENT_SELECTOR,
+      new CelCompletionProvider(index),
+      '"',
+      ".",
+      " "
     ),
     // Hover providers
     vscode.languages.registerHoverProvider(

@@ -193,6 +193,25 @@ export class ProjectIndex {
     return out;
   }
 
+  /**
+   * Enumerate library entries across every CRL project reachable from the given workspace folders.
+   * Mirrors getAllProjectDeclarations; used by CEL `covers`/`include` completion so a library with zero
+   * declarations is still offered.
+   */
+  getAllProjectLibraries(workspaceFolders: readonly string[]): IndexedLibrary[] {
+    const seen = new Set<string>();
+    const out: IndexedLibrary[] = [];
+    for (const folder of workspaceFolders) {
+      const seeds = findCrlSeed(folder);
+      if (!seeds) continue;
+      const root = this.getProjectRoot(seeds);
+      if (root === null || seen.has(root)) continue;
+      seen.add(root);
+      out.push(...this.getLibraries(seeds));
+    }
+    return out;
+  }
+
   invalidate(projectRoot: string): void {
     this.cache.delete(projectRoot);
   }
