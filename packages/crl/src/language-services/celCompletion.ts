@@ -120,6 +120,6 @@ function uniqueSorted(xs: string[]): string[] {
 }
 
 /** local/root before package — mirrors the CEL resolver's covers precedence (resolver.ts). */
-function originRank(origin: string | undefined): number {
+export function originRank(origin: string | undefined): number {
   return origin === "package" ? 1 : 0;
 }

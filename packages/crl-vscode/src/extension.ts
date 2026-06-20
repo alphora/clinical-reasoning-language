@@ -28,6 +28,7 @@ import {
 import { registerDiagnostics } from "./diagnostics";
 import { registerScenarioRunner } from "./scenarioRunner";
 import { CelCompletionProvider, CEL_DOCUMENT_SELECTOR } from "./celCompletion";
+import { CelHoverProvider } from "./celHover";
 import {
   CrlDefinitionProvider,
   CrlReferenceProvider,
@@ -115,6 +116,11 @@ function registerLanguageFeatures(
     vscode.languages.registerHoverProvider(
       CRL_DOCUMENT_SELECTOR,
       new ConceptRefHoverProvider(index)
+    ),
+    // CEL (.cel) hover — resolves the token under the cursor (fact / concept / decision / arm). #4 slice 2.
+    vscode.languages.registerHoverProvider(
+      CEL_DOCUMENT_SELECTOR,
+      new CelHoverProvider(index)
     ),
     // Navigation providers (Chunk C)
     vscode.languages.registerDefinitionProvider(
