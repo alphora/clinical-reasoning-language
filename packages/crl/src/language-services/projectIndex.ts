@@ -103,6 +103,7 @@ export class ProjectIndex {
 
   setOverlay(absPath: string, text: string): void {
     const canonical = canonicalize(absPath);
+    if (this.overlays.get(canonical) === text) return; // no-op: identical content — don't thrash the cache
     this.overlays.set(canonical, text);
     this.cache.clear();
   }

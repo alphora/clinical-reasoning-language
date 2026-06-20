@@ -22,6 +22,7 @@ import "../language-services/tests/celCompletion.test";
 import "../language-services/tests/celCompletion.integration.test";
 import "../language-services/tests/celHover.test";
 import "../language-services/tests/celNavigation.test";
+import "../language-services/tests/celDiagnostics.test";
 import "../cre/tests/run.test";
 import "../cre/tests/composition.test";
 import "../cre/tests/viewModel.test";

@@ -26,6 +26,7 @@ import {
   ConceptRefHoverProvider,
 } from "./hover";
 import { registerDiagnostics } from "./diagnostics";
+import { registerCelDiagnostics } from "./celDiagnostics";
 import { registerScenarioRunner } from "./scenarioRunner";
 import { CelCompletionProvider, CEL_DOCUMENT_SELECTOR } from "./celCompletion";
 import { CelHoverProvider } from "./celHover";
@@ -196,6 +197,7 @@ export function activate(context: vscode.ExtensionContext): void {
   registerLanguageFeatures(context, loadEmbeddedCatalog(context), index);
   registerScenarioRunner(context);
   registerDiagnostics(context, index);
+  registerCelDiagnostics(context, index);
 
   // v2.3.0 migration + provisioning. Sequenced (migration first, then
   // provision) so provisionAll's downstream `applyHighlight` writes see the
