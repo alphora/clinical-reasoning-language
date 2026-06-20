@@ -80,9 +80,11 @@ function renderNode(n: ViewNode, caseIdx: number, prefix: string, reveals: Rende
 
 function renderCase(s: ScenarioViewModel, caseIdx: number, prefix: string, reveals: RenderedScenario["reveals"]): string {
   const statusCls = s.status === "pass" ? "pass" : s.status === "fail" ? "fail" : "err";
+  const mark = s.status === "pass" ? "✓" : "✗"; // green check on a match, red X otherwise (unit-test style)
   const facts = s.case.facts.map((f) => esc(f.name) + (f.conceptRef ? ` <em>(${esc(f.conceptRef)})</em>` : "")).join(", ");
-  const expected = s.expected ? `${esc(s.expected.decision)} is ${esc(s.expected.branch)}` : "—";
-  const produced = s.produced.length ? s.produced.map((p) => esc(p.recommendation)).join(", ") : "(none)";
+  // expected = just the branch (the decision name is already on the `decision` row above).
+  const expected = s.expected ? esc(s.expected.branch) : "—";
+  const actual = s.produced.length ? s.produced.map((p) => esc(p.recommendation)).join(", ") : "(none)";
   const decision = s.decision
     ? esc(s.decision.name) + (s.decision.resolved ? "" : " <span class=\"err\">(unresolved)</span>")
     : "(no decision)";
@@ -96,8 +98,8 @@ function renderCase(s: ScenarioViewModel, caseIdx: number, prefix: string, revea
     (s.case.subject ? `<dt>subject</dt><dd>${esc(s.case.subject)}</dd>` : "") +
     `<dt>facts</dt><dd>${facts || "(none)"}</dd>` +
     `<dt>decision</dt><dd>${decision}</dd>` +
-    `<dt>expected</dt><dd>${expected}</dd>` +
-    `<dt>produced</dt><dd>${produced}</dd>` +
+    `<dt>expected</dt><dd class="expected ${statusCls}"><span class="mark">${mark}</span>${expected}</dd>` +
+    `<dt>actual</dt><dd class="actual ${statusCls}"><span class="mark">${mark}</span>${actual}</dd>` +
     `</dl>` +
     tree +
     (s.diagnostics.length ? `<ul class="diags">${s.diagnostics.map((d) => `<li>${esc(d)}</li>`).join("")}</ul>` : "") +
@@ -121,6 +123,10 @@ body, .sr { font-family: var(--vscode-font-family); font-size: var(--vscode-font
 dl.meta { display: grid; grid-template-columns: max-content 1fr; gap: 0 10px; margin: 4px 0 8px; }
 dl.meta dt { opacity: .65; }
 dl.meta dd { margin: 0; }
+dl.meta dd.expected, dl.meta dd.actual { font-weight: 600; }
+dl.meta dd.expected.pass, dl.meta dd.actual.pass { color: var(--vscode-testing-iconPassed, #3fb950); }
+dl.meta dd.expected.fail, dl.meta dd.expected.err, dl.meta dd.actual.fail, dl.meta dd.actual.err { color: var(--vscode-testing-iconFailed, #f85149); }
+dl.meta dd .mark { margin-right: 5px; font-weight: 700; }
 ul.tree, ul.tree ul { list-style: none; margin: 0; padding-left: 16px; border-left: 1px dotted var(--vscode-panel-border); }
 ul.tree { padding-left: 4px; border-left: none; }
 .node .row { cursor: pointer; padding: 1px 4px; border-radius: 3px; display: inline-block; }
