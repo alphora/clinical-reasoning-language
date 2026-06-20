@@ -26,6 +26,7 @@ export * from "./diagnostics";
 export * from "./celContextDetect";
 export * from "./celCompletion";
 export * from "./celHover";
+export * from "./celNavigation";
 // catalog (allowlists + parser + narrative helpers) moved from the extension in #132 step 3;
 // the extension's esbuild generates dist/catalog.json via this module's parseCatalog.
 export * from "./catalog";

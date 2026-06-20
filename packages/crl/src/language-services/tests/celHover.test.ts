@@ -45,8 +45,8 @@ describe("computeCelHover (#4)", () => {
     expect(computeCelHover('- subject is "fA".', { line: 0, character: 2 }, ctx, index, ["/p"])).toBeNull());
   it("leaf/result hover with no covered library → null", () =>
     expect(computeCelHover('- result is "Coverage".', { line: 0, character: 14 }, { facts: [] }, index, ["/p"])).toBeNull());
-  it("cross-resource `based on` tokens are not yet a hover slot (deferred) → null", () =>
-    expect(md('- "fA" based on "fB".', '"fA"')).toBeNull());
+  it("cross-resource operand → resolves as a fact (unified with the fact slot)", () =>
+    expect(md('- "fA" based on "fB".', '"fA"')).toBe("**fA** — fact\n\nDefined by `Patient`."));
 });
 
 describe("celHoverContext (#4)", () => {

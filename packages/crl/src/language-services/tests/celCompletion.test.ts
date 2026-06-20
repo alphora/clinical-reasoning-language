@@ -23,6 +23,10 @@ describe("detectCelSlot (#4)", () => {
     expect(detectCelSlot('- result is "IsBool" is ')).toEqual({ kind: "result-bool" });
     expect(detectCelSlot('- result is "IsBool" is fa')).toEqual({ kind: "result-bool" }); // partial bare word
   });
+  it("cross-resource operands → fact (both `- \"src\"` and after the relation)", () => {
+    expect(detectCelSlot('- "')).toEqual({ kind: "fact" });
+    expect(detectCelSlot('- "fA" based on "')).toEqual({ kind: "fact" });
+  });
   it("literal / free-text slots → null (no completion)", () => {
     expect(detectCelSlot('- name is "')).toBeNull();
     expect(detectCelSlot('- code is "')).toBeNull();
@@ -53,6 +57,7 @@ describe("computeCelCompletion (#4)", () => {
     computeCelCompletion(prefix, d, index, ["/proj"], TYPES).map((i) => i.label);
 
   it("fact slot → file-local facts", () => expect(labels('- subject is "')).toEqual(["fA", "fB"]));
+  it("cross-resource operand slot → file-local facts", () => expect(labels('- "')).toEqual(["fA", "fB"]));
   it("fhir-type slot → conceptTypes", () => expect(labels('- defined by "')).toEqual(["Condition", "Observation"]));
   it("library slot → unique project libraries", () => expect(labels('covers "')).toEqual(["Lib", "OtherLib"]));
   it("qualified defined by → the library's concepts + activities", () =>

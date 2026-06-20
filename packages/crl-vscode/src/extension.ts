@@ -29,6 +29,7 @@ import { registerDiagnostics } from "./diagnostics";
 import { registerScenarioRunner } from "./scenarioRunner";
 import { CelCompletionProvider, CEL_DOCUMENT_SELECTOR } from "./celCompletion";
 import { CelHoverProvider } from "./celHover";
+import { CelDefinitionProvider, CelReferenceProvider } from "./celNavigation";
 import {
   CrlDefinitionProvider,
   CrlReferenceProvider,
@@ -121,6 +122,15 @@ function registerLanguageFeatures(
     vscode.languages.registerHoverProvider(
       CEL_DOCUMENT_SELECTOR,
       new CelHoverProvider(index)
+    ),
+    // CEL (.cel) navigation — go-to-definition (.cel → .crl / file-local fact) + file-local fact refs. #4 slice 3.
+    vscode.languages.registerDefinitionProvider(
+      CEL_DOCUMENT_SELECTOR,
+      new CelDefinitionProvider(index)
+    ),
+    vscode.languages.registerReferenceProvider(
+      CEL_DOCUMENT_SELECTOR,
+      new CelReferenceProvider()
     ),
     // Navigation providers (Chunk C)
     vscode.languages.registerDefinitionProvider(

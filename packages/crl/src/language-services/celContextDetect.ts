@@ -29,5 +29,12 @@ export function detectCelSlot(linePrefix: string): CelSlot | null {
 
   if (/^\s*(?:covers|include)\s+"[^"]*$/i.test(linePrefix)) return { kind: "library" };
 
+  // cross-resource `- "src" <rel> "tgt"` — BOTH operands are facts (CELParser.g4 crossResourceField).
+  if (CROSS_RESOURCE_2ND.test(linePrefix)) return { kind: "fact" }; // 2nd operand (after the relation)
+  if (/^\s*-\s*"[^"]*$/.test(linePrefix)) return { kind: "fact" }; // 1st operand (a bullet line led by a quote)
+
   return null;
 }
+
+const CROSS_RESOURCE_2ND =
+  /^\s*-\s*"[^"]+"\s+(?:based on|part of|during encounter|requested by|performed by|not done because)\s+"[^"]*$/i;
