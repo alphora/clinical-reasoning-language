@@ -180,8 +180,7 @@ export class CELAstBuilder
   // ============================================================
 
   visitCel = (ctx: CelContext): CEL => {
-    const headerTok = ctx.HEADER();
-    const header = headerTok?.text ?? "";
+    const headerTok = ctx.HEADER(); // optional — omit the field when absent (don't synthesize "")
     const library = this.visit(ctx.libraryStatement()) as CELLibraryDeclaration;
     const coversCtx = ctx.coversStatement();
     const covers = coversCtx ? (this.visit(coversCtx) as CELCoversDeclaration) : undefined;
@@ -189,7 +188,7 @@ export class CELAstBuilder
     const statements = ctx.statement().map((s) => this.visit(s) as CELStatement);
     return {
       type: "CEL",
-      header,
+      ...(headerTok ? { header: headerTok.text } : {}),
       library,
       ...(covers ? { covers } : {}),
       includes,

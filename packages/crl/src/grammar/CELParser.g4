@@ -15,7 +15,7 @@ options {
 // ============================================================
 
 cel
-    : HEADER libraryStatement coversStatement? includeStatement* statement* EOF
+    : HEADER? libraryStatement coversStatement? includeStatement* statement* EOF
     ;
 
 // ============================
