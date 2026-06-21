@@ -45,6 +45,20 @@ What already exists: CRL+CEL parsers/validators, all emitters (CQL, FHIR-def, CE
 
 **The Great Reef / targeted QM-mining** is *not* needed for the first loop demo (runs on existing corpus) but is the key enabler the moment the agent generates a *real* policy from narrative — sequenced right after the spine proves out, fed by **policy↔QM cross-reference** (CQL is a richer, more-correct source than narrative).
 
+## Sequencing decision (2026-06-21): stage-based, deadline-driven
+
+Re-sequenced from spine-vs-editor to **stage-based**: complete **all of Stage 1 (CRL/CEL)** — agent authoring, the medical-validation loop, and the editor(s) *to the degree validation requires* — **before** Stage 2 (CQL/FHIR emit). This supersedes the "spine proves out, then editor" framing of the prior development order; the development order's *items* still hold, they're now grouped by stage.
+
+**Rationale.** The deadline is reachable on CRL/CEL alone. Medical validation is performed on the CRL/CEL **source** via the CRE scenario oracle (clinician runs CEL scenarios, judges outcomes), and it **transfers to the emitted FHIR/CQL by inference** once the CRE↔emit golden check (#153) proves the compiler preserves semantics. So **CRL/CEL is the work; CQL/FHIR is a verified-compiler concern.**
+
+**The inference's load-bearing dependency:** it holds only where the compiler is proven. Today's emit *silently drops* clinically load-bearing semantics in places (#107 data-collection binding, #119 duration threshold, #121 `without`-kind, the #116–#121 sentinels). Two mitigations: (a) the **CRE↔emit golden check (#153)** is the keystone — it converts silent drops into loud failures; build a skeleton early as Stage-1 insurance. (b) Keep agent authoring **within the `authoring_kit` stage scope**, which already excludes the not-yet-faithfully-emittable predicate/temporal forms — bounding the eventual compiler-proof surface to constructs with a clean emit path.
+
+**Stage 1 (to the deadline)** — `stage/crl-cel`: #5 agent authoring → clinician validation via the scenario-runner (#3, done) + comprehension views → **editor scope pulled by what validation needs** (not built blind; scope TBD in a dedicated discussion) → Stage-1 substrate gaps pulled only as a target policy demands.
+
+**Stage 2 (compiler-proof, post-deadline)** — `stage/fhir-cql`: the full CRE↔emit golden check (#153) + emit-conformance (#105/#106/#107, catalog drops #116–#121, deploy #111–#113).
+
+Resolves #5-vs-#6: **#5 is next; #6 moves wholesale into Stage 2.** The editor is Stage 1, scope pending the validation loop + discussion. GitHub labels `stage/crl-cel` / `stage/fhir-cql` mark the remaining work by stage; `status/done-in-develop` marks shipped-but-unmerged-to-main.
+
 ## Target fixtures
 The acceptance fixtures are the curated HCSC medical policies (`kelp/tmp/hcsc-discover/extracted/*.docx`, ~20). **Pick the simplest real one** as the item-#1 (CRE) target; it bounds the CRE's evaluation scope and tells us which substrate gaps to pull first. Shared with mymobiledoc.
 
