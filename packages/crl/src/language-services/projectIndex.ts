@@ -3,6 +3,8 @@ import * as path from "node:path";
 
 import { resolveImports } from "../imports";
 import { findProjectRoot } from "../imports/registry";
+import { collectDecisionArms } from "../ast/decisionArms";
+import type { Decision } from "../ast/types";
 import type { ResolvedGraph, RegistryEntry } from "../imports/types";
 import type { ZeroBasedRange } from "./contracts";
 import { canonicalize } from "./paths";
@@ -32,6 +34,9 @@ export interface IndexedDeclaration {
   valuetype?: string;
   /** First body bullet text for hover preview. */
   bodyPreview?: string;
+  /** Decision-only: the direct arm names (sorted) a CEL `result is "<D>" is "<arm>"` may target.
+   *  Populated via collectDecisionArms — single source of truth with the CEL validator's accepted set. */
+  arms?: string[];
 }
 
 /**
@@ -98,6 +103,7 @@ export class ProjectIndex {
 
   setOverlay(absPath: string, text: string): void {
     const canonical = canonicalize(absPath);
+    if (this.overlays.get(canonical) === text) return; // no-op: identical content — don't thrash the cache
     this.overlays.set(canonical, text);
     this.cache.clear();
   }
@@ -184,6 +190,25 @@ export class ProjectIndex {
       if (root === null || seen.has(root)) continue;
       seen.add(root);
       out.push(...this.getDeclarations(seeds));
+    }
+    return out;
+  }
+
+  /**
+   * Enumerate library entries across every CRL project reachable from the given workspace folders.
+   * Mirrors getAllProjectDeclarations; used by CEL `covers`/`include` completion so a library with zero
+   * declarations is still offered.
+   */
+  getAllProjectLibraries(workspaceFolders: readonly string[]): IndexedLibrary[] {
+    const seen = new Set<string>();
+    const out: IndexedLibrary[] = [];
+    for (const folder of workspaceFolders) {
+      const seeds = findCrlSeed(folder);
+      if (!seeds) continue;
+      const root = this.getProjectRoot(seeds);
+      if (root === null || seen.has(root)) continue;
+      seen.add(root);
+      out.push(...this.getLibraries(seeds));
     }
     return out;
   }
@@ -356,7 +381,7 @@ function enumerateDeclarations(
             out.push({ ...base, kind: "terminology" });
             break;
           case "Decision":
-            out.push({ ...base, kind: "decision" });
+            out.push({ ...base, kind: "decision", arms: [...collectDecisionArms(stmt as unknown as Decision)].sort() });
             break;
           case "Activity":
             out.push({ ...base, kind: "activity" });

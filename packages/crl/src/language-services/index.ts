@@ -22,6 +22,13 @@ export * from "./hover";
 export * from "./completion";
 export * from "./navigation";
 export * from "./diagnostics";
+// #4 — CEL language services (compute* over .cel; mirror the CRL ones).
+export * from "./celContextDetect";
+export * from "./celSymbols";
+export * from "./celCompletion";
+export * from "./celHover";
+export * from "./celNavigation";
+export * from "./celDiagnostics";
 // catalog (allowlists + parser + narrative helpers) moved from the extension in #132 step 3;
 // the extension's esbuild generates dist/catalog.json via this module's parseCatalog.
 export * from "./catalog";

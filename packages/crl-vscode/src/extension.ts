@@ -26,7 +26,11 @@ import {
   ConceptRefHoverProvider,
 } from "./hover";
 import { registerDiagnostics } from "./diagnostics";
+import { registerCelDiagnostics } from "./celDiagnostics";
 import { registerScenarioRunner } from "./scenarioRunner";
+import { CelCompletionProvider, CEL_DOCUMENT_SELECTOR } from "./celCompletion";
+import { CelHoverProvider } from "./celHover";
+import { CelDefinitionProvider, CelReferenceProvider } from "./celNavigation";
 import {
   CrlDefinitionProvider,
   CrlReferenceProvider,
@@ -97,6 +101,15 @@ function registerLanguageFeatures(
       '"',
       "."
     ),
+    // CEL (.cel) completion — one provider for all CEL slots (covers/subject/fact/defined-by/result-is),
+    // triggers on `"` (quote slots) and `.` (qualified `defined by "Lib"."…"`). #4 slice 1.
+    vscode.languages.registerCompletionItemProvider(
+      CEL_DOCUMENT_SELECTOR,
+      new CelCompletionProvider(index),
+      '"',
+      ".",
+      " "
+    ),
     // Hover providers
     vscode.languages.registerHoverProvider(
       CRL_DOCUMENT_SELECTOR,
@@ -105,6 +118,20 @@ function registerLanguageFeatures(
     vscode.languages.registerHoverProvider(
       CRL_DOCUMENT_SELECTOR,
       new ConceptRefHoverProvider(index)
+    ),
+    // CEL (.cel) hover — resolves the token under the cursor (fact / concept / decision / arm). #4 slice 2.
+    vscode.languages.registerHoverProvider(
+      CEL_DOCUMENT_SELECTOR,
+      new CelHoverProvider(index)
+    ),
+    // CEL (.cel) navigation — go-to-definition (.cel → .crl / file-local fact) + file-local fact refs. #4 slice 3.
+    vscode.languages.registerDefinitionProvider(
+      CEL_DOCUMENT_SELECTOR,
+      new CelDefinitionProvider(index)
+    ),
+    vscode.languages.registerReferenceProvider(
+      CEL_DOCUMENT_SELECTOR,
+      new CelReferenceProvider()
     ),
     // Navigation providers (Chunk C)
     vscode.languages.registerDefinitionProvider(
@@ -170,6 +197,7 @@ export function activate(context: vscode.ExtensionContext): void {
   registerLanguageFeatures(context, loadEmbeddedCatalog(context), index);
   registerScenarioRunner(context);
   registerDiagnostics(context, index);
+  registerCelDiagnostics(context, index);
 
   // v2.3.0 migration + provisioning. Sequenced (migration first, then
   // provision) so provisionAll's downstream `applyHighlight` writes see the

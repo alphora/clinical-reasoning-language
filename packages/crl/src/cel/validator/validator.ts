@@ -4,13 +4,10 @@ import {
   getRefName,
   getRefLibrary,
   type Decision,
-  type BranchBlock,
-  type WhenBlockBody,
-  type BlockBody,
-  type ActionStatement,
   type Location,
   type Statement,
 } from "../../ast/types";
+import { collectDecisionArms } from "../../ast/decisionArms";
 import { resolveCelImports, type ResolveCelImportsOptions } from "../imports";
 import type { ResolvedCelGraph } from "../imports/types";
 import type { CEL, CELFact, CELCase, CELDefinedByField, CELResultField, CELFactRefField, CELCrossResourceField, CELInclude } from "../ast/types";
@@ -380,58 +377,10 @@ function validateCrossResource(
   }
 }
 
-/**
- * T03 / #86: collect the set of bare names a CEL `result is "<D>" is "<X>"`
- * branch may target — the DIRECT arms of decision D. An arm is the bare
- * name of either a `recommend activity` target or a `use decision` target.
- * No transitive walk through sub-decisions: the branch identifies what
- * D's case landed at, not which leaves are eventually reachable.
- *
- * Mirrors the decision-body walk shape in src/validator/referenceResolver.ts:283-323
- * and src/validator/cycleDetector.ts (T02).
- */
-export function collectDecisionArms(decision: Decision): Set<string> {
-  const arms = new Set<string>();
-  for (const branch of decision.body.statements) {
-    walkArmsBranch(branch, arms);
-  }
-  return arms;
-}
-
-function walkArmsBranch(branch: BranchBlock, arms: Set<string>): void {
-  // `when` and `otherwise` arms both reach their body's leaf targets — an
-  // `otherwise then recommend activity "Deny"` is a real arm a case may assert.
-  walkArmsWhenBlockBody(branch.body, arms);
-}
-
-function walkArmsWhenBlockBody(body: WhenBlockBody, arms: Set<string>): void {
-  if (body.type === "BlockBody") {
-    walkArmsBlockBody(body, arms);
-  } else {
-    walkArmsActionStatement(body as ActionStatement, arms);
-  }
-}
-
-function walkArmsBlockBody(block: BlockBody, arms: Set<string>): void {
-  for (const stmt of block.statements) {
-    if (stmt.type === "WhenBlock" || stmt.type === "OtherwiseBlock") {
-      walkArmsBranch(stmt, arms);
-    } else {
-      walkArmsActionStatement(stmt, arms);
-    }
-  }
-}
-
-function walkArmsActionStatement(stmt: ActionStatement, arms: Set<string>): void {
-  const action = stmt.action;
-  if (action.type === "RecommendActivity") {
-    const n = getRefName(action.activityName);
-    if (n) arms.add(n);
-  } else if (action.type === "UseDecision") {
-    const n = getRefName(action.decisionName);
-    if (n) arms.add(n);
-  }
-}
+// collectDecisionArms (T03/#86) extracted to ../../ast/decisionArms (shared with the language-services
+// index, which needs it WITHOUT pulling the CEL validator into the lean subpath). Re-exported for the
+// existing consumers (the CRE tests import it from here).
+export { collectDecisionArms } from "../../ast/decisionArms";
 
 function validateResult(
   cb: CELResultField,
