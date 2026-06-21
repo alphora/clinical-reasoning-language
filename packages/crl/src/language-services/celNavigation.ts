@@ -7,7 +7,8 @@
 import type { CEL, CELFact } from "../cel/ast/types";
 import type { LsLocation, LsPosition, ZeroBasedRange } from "./contracts";
 import { toZeroBasedRange } from "./contracts";
-import type { IndexedDeclaration, ProjectIndex } from "./projectIndex";
+import type { IndexedDeclaration } from "./projectIndex";
+import type { CelSymbolSource } from "./celSymbols";
 import { detectCelSlot } from "./celContextDetect";
 import { originRank } from "./celCompletion";
 import { quotedSpanAt } from "./hover";
@@ -31,7 +32,7 @@ export function computeCelDefinition(
   position: LsPosition,
   celFilePath: string,
   ctx: CelNavContext,
-  index: ProjectIndex,
+  index: CelSymbolSource,
   workspaceFolders: readonly string[],
 ): LsLocation | null {
   const span = quotedSpanAt(lineText, position.character);

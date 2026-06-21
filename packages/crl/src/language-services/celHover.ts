@@ -9,7 +9,8 @@
 import type { CEL, CELDefinedByField, CELFact } from "../cel/ast/types";
 import { getRefLibrary, getRefName } from "../ast/types";
 import type { LsHover, LsPosition, ZeroBasedRange } from "./contracts";
-import type { IndexedDeclaration, ProjectIndex } from "./projectIndex";
+import type { IndexedDeclaration } from "./projectIndex";
+import type { CelSymbolSource } from "./celSymbols";
 import { detectCelSlot } from "./celContextDetect";
 import { originRank } from "./celCompletion";
 import { quotedSpanAt } from "./hover";
@@ -37,7 +38,7 @@ export function computeCelHover(
   lineText: string,
   position: LsPosition,
   ctx: CelHoverContext,
-  index: ProjectIndex,
+  index: CelSymbolSource,
   workspaceFolders: readonly string[],
 ): LsHover | null {
   const span = quotedSpanAt(lineText, position.character);

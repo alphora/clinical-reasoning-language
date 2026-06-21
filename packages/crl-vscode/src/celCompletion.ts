@@ -9,6 +9,7 @@ import {
   CONCEPT_TYPES,
   type ProjectIndex,
 } from "@smile-digital-health/crl/language-services";
+import { celSymbolSource } from "./celSymbolSource";
 import { toVscodeCompletionItem } from "./toVscode";
 
 export const CEL_DOCUMENT_SELECTOR: vscode.DocumentSelector = [{ language: "crl-cel", scheme: "file" }];
@@ -25,7 +26,7 @@ export class CelCompletionProvider implements vscode.CompletionItemProvider {
     // buffer is mid-edit (unterminated string) and buildCEL would fail, dropping facts/coveredLib exactly
     // when completion fires. celDocContextFromSource regex-scans `fact "X":` + `covers "X"` regardless.
     const doc = celDocContextFromSource(document.getText());
-    const folders = (vscode.workspace.workspaceFolders ?? []).map((f) => f.uri.fsPath);
-    return computeCelCompletion(linePrefix, doc, this.index, folders, [...CONCEPT_TYPES]).map(toVscodeCompletionItem);
+    const symbols = celSymbolSource(document, this.index); // CRL symbols via the .cel's covered closure
+    return computeCelCompletion(linePrefix, doc, symbols, [], [...CONCEPT_TYPES]).map(toVscodeCompletionItem);
   }
 }

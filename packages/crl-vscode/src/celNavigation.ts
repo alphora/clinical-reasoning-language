@@ -9,6 +9,7 @@ import {
   type CelNavContext,
   type ProjectIndex,
 } from "@smile-digital-health/crl/language-services";
+import { celSymbolSource } from "./celSymbolSource";
 import { toVscodeLocation } from "./toVscode";
 
 export class CelDefinitionProvider implements vscode.DefinitionProvider {
@@ -21,14 +22,14 @@ export class CelDefinitionProvider implements vscode.DefinitionProvider {
     const built = buildCEL(text);
     const factDecls = built.success && built.result ? celNavContext(built.result).factDecls : [];
     const ctx: CelNavContext = { coveredLib: tol.coveredLib, factDecls };
-    const folders = (vscode.workspace.workspaceFolders ?? []).map((f) => f.uri.fsPath);
+    const symbols = celSymbolSource(document, this.index); // CRL symbols via the .cel's covered closure
     const loc = computeCelDefinition(
       document.lineAt(position.line).text,
       { line: position.line, character: position.character },
       document.uri.fsPath,
       ctx,
-      this.index,
-      folders,
+      symbols,
+      [],
     );
     return loc ? toVscodeLocation(loc) : null;
   }

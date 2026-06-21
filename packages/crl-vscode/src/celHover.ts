@@ -10,6 +10,7 @@ import {
   type CelHoverContext,
   type ProjectIndex,
 } from "@smile-digital-health/crl/language-services";
+import { celSymbolSource } from "./celSymbolSource";
 import { CEL_DOCUMENT_SELECTOR } from "./celCompletion";
 import { toVscodeHover } from "./toVscode";
 
@@ -31,13 +32,13 @@ export class CelHoverProvider implements vscode.HoverProvider {
       coveredLib: tol.coveredLib,
       facts: tol.facts.map((name) => ({ name, conceptRef: refByName.get(name) })),
     };
-    const folders = (vscode.workspace.workspaceFolders ?? []).map((f) => f.uri.fsPath);
+    const symbols = celSymbolSource(document, this.index); // CRL symbols via the .cel's covered closure
     const h = computeCelHover(
       document.lineAt(position.line).text,
       { line: position.line, character: position.character },
       ctx,
-      this.index,
-      folders,
+      symbols,
+      [],
     );
     return h ? toVscodeHover(h) : null;
   }

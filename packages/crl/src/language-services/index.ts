@@ -24,6 +24,7 @@ export * from "./navigation";
 export * from "./diagnostics";
 // #4 — CEL language services (compute* over .cel; mirror the CRL ones).
 export * from "./celContextDetect";
+export * from "./celSymbols";
 export * from "./celCompletion";
 export * from "./celHover";
 export * from "./celNavigation";

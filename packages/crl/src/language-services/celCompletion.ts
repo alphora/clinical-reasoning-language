@@ -13,7 +13,7 @@
 //  - result-bool        → bare true/false (an UNQUOTED value: `is true` — a concept's boolean result)
 import type { CEL, CELFact } from "../cel/ast/types";
 import type { LsCompletionItem, LsCompletionKind } from "./contracts";
-import type { ProjectIndex } from "./projectIndex";
+import type { CelSymbolSource } from "./celSymbols";
 import { detectCelSlot } from "./celContextDetect";
 
 /** Parsed-document context the completion needs — extracted by the caller from `buildCEL(text)`. */
@@ -54,14 +54,16 @@ export function celDocContextFromSource(source: string): CelDocContext {
 export function computeCelCompletion(
   linePrefix: string,
   doc: CelDocContext,
-  index: ProjectIndex,
+  index: CelSymbolSource,
   workspaceFolders: readonly string[],
   conceptTypes: readonly string[],
 ): LsCompletionItem[] {
   const slot = detectCelSlot(linePrefix);
   if (!slot) return [];
 
-  // Cross-language CRL symbols come from the CACHED index (not resolveCelImports per keystroke).
+  // Cross-language CRL symbols come from the injected CelSymbolSource (the adapter builds it from the .cel's
+  // resolved covered closure; tests pass a ProjectIndex). workspaceFolders is forwarded but a closure-backed
+  // source ignores it.
   const projectDecls = () => index.getAllProjectDeclarations(workspaceFolders);
 
   switch (slot.kind) {
