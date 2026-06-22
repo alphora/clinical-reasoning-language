@@ -20,6 +20,9 @@ import {
   COMPOSITION_REFERENCE_CRL,
   DECISION_REFERENCE_CEL,
   DECISION_REFERENCE_CRL,
+  MEDICAL_POLICY_DETERMINATION_CRL,
+  PA_DETERMINATION_REFERENCE_CEL,
+  PA_DETERMINATION_REFERENCE_CRL,
 } from "./reference";
 import type {
   AuthoringKit,
@@ -93,9 +96,16 @@ const RULES: KitRule[] = [
   {
     id: "dispositions",
     category: "dispositions",
-    rule: "Model dispositions as plain `activity` declarations (e.g. Approve / Deny / Order X). CRL has no approve/deny/pend verbs — do not invent them. Do not author rationale at the decision/recommend site; the reason a branch fired IS its triggering `when` concept, which the emitter can surface (from the concept's `meta is`). Activity-level `- because \`…\`.` exists but is optional and not needed in this stage.",
-    why: "CRL is general (cognitive support, CDS, prior-auth, quality measures), not a PA-specific language; keep the core minimal.",
-    ref: "crl-not-a-pa-language",
+    rule: "Model dispositions as plain `activity` declarations. CRL has no approve/deny/pend verbs — do not invent them. Do not author rationale at the decision/recommend site; the reason a branch fired IS its triggering `when` concept, which the emitter can surface (from the concept's `meta is`). DISPOSITION TYPE follows the ACT: a CDS recommendation to ORDER a service uses `request CPGServiceRequest` (see decision-reference). A PA / medical-policy coverage DETERMINATION is COMMUNICATED, never ordered — reference the SHARED `Medical Policy Determination` library's `\"Approve\"` (CPGCommunicationRequest / X12 A1) / `\"Deny\"` (A3) by qualified name; never `CPGServiceRequest`, never a per-policy re-authored Approve/Deny (see pa-determination-reference).",
+    why: "CRL is general (cognitive support, CDS, prior-auth, quality measures), not a PA-specific language; keep the core minimal. But a coverage determination is a communicated decision, not a service order — modeling it as CPGServiceRequest is a clinical-safety error (#134).",
+    ref: "crl-not-a-pa-language; #134",
+  },
+  {
+    id: "pa-disposition-set",
+    category: "dispositions",
+    rule: "For a medical-policy / PA coverage decision, the set of activities the decision can `recommend` MUST equal exactly { \"Medical Policy Determination\".\"Approve\", \"Medical Policy Determination\".\"Deny\" } — no third disposition (no per-policy Approve/Deny, no Order/Refer/Pend leaf). Pended (X12 A4) is an async/workflow state resolved OUTSIDE the per-policy decision, not a clinical leaf. AND each case must produce EXACTLY ONE determination (Approve XOR Deny): author mutually-exclusive branches (`first:` + `otherwise`), never an `all:` / `any:` shape that could emit both Approve and Deny in one run. Set-equality + mutual-exclusivity is the invariant — it prevents modeling a coverage determination as a service order, inventing a phantom branch, AND emitting a contradictory double-determination.",
+    why: "A PA determination communicates exactly Approve (A1) / Deny (A3) from the shared library; any other recommend target on a coverage decision is a modeling error.",
+    ref: "#134",
   },
   {
     id: "minimalism",
@@ -210,6 +220,8 @@ const VERIFY_LOOP: VerifyLoop = {
 const BOUNDARY = [
   "`definition is` predicates (count / most-recent / temporal / value thresholds — compute over a source)",
   "external / value-set sources (`source representation` / `coded from`)",
+  "PA Pended (X12 278 HCR01 A4) — an async/workflow disposition resolved OUTSIDE the per-policy clinical decision; not a determination leaf",
+  "coded HCR01 outcome value-set binding for PA determinations — Stage 1 carries the A1/A3 outcome in the `with` narrative; coding it is a later external-terminology stage",
   "emit to FHIR / CQL",
 ];
 
@@ -247,8 +259,29 @@ function buildBase(stage: AuthoringStage): Omit<AuthoringKit, "contentHash"> {
         name: "composition-reference.cel",
         language: "cel",
         purpose:
-          "Companion cases: both-criteria-met (composite satisfied → approve), a drop-one-leaf necessity proof (→ deny), and otherwise.",
+          "Companion cases: both-criteria-met (composite satisfied → approve), two drop-one-leaf necessity proofs (each → deny), and otherwise.",
         source: COMPOSITION_REFERENCE_CEL,
+      },
+      {
+        name: "medical-policy-determination.crl",
+        language: "crl",
+        purpose:
+          "The SHARED, reusable PA determination activities (#134): Approve = CPGCommunicationRequest / X12 A1, Deny = A3 — communicated, never ordered. Imported by every medical-policy artifact via qualified ref; never re-authored. (No companion CEL — a shared activity lib has no decision to run.)",
+        source: MEDICAL_POLICY_DETERMINATION_CRL,
+      },
+      {
+        name: "pa-determination-reference.crl",
+        language: "crl",
+        purpose:
+          "Canonical PRIOR-AUTHORIZATION exemplar (#134) — distinct from the CDS decision-reference (which ORDERs a service). The payer COMMUNICATES Approve/Deny via the shared determination library; two final leaves, Pended (A4) is async/workflow.",
+        source: PA_DETERMINATION_REFERENCE_CRL,
+      },
+      {
+        name: "pa-determination-reference.cel",
+        language: "cel",
+        purpose:
+          "Companion cases for the PA exemplar: qualifying diagnosis → approve; otherwise → deny. Resolves the shared determination activities via the vendored-sibling library (no `include`).",
+        source: PA_DETERMINATION_REFERENCE_CEL,
       },
     ],
     examples: EXAMPLES,

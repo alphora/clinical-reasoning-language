@@ -18,6 +18,9 @@ import {
   COMPOSITION_REFERENCE_CRL,
   DECISION_REFERENCE_CEL,
   DECISION_REFERENCE_CRL,
+  MEDICAL_POLICY_DETERMINATION_CRL,
+  PA_DETERMINATION_REFERENCE_CEL,
+  PA_DETERMINATION_REFERENCE_CRL,
 } from "../reference";
 import { getAuthoringKit, STAGES } from "../index";
 
@@ -74,11 +77,22 @@ describe("authoring-kit — reference artifacts", () => {
     expect(built.success).toBe(true);
   });
 
-  it("composition-reference.crl validates clean (incl. the pure-composition concept)", () => {
-    expect(crlErrors(COMPOSITION_REFERENCE_CRL)).toEqual([]);
+  it("medical-policy-determination.crl (shared lib) validates clean (self-contained)", () => {
+    expect(crlErrors(MEDICAL_POLICY_DETERMINATION_CRL)).toEqual([]);
   });
 
-  it("composition-reference.cel + .crl: validate clean and the CRE evaluates the composition (real path)", () => {
+  it("composition-reference.crl is shape-clean; only the shared-lib determination refs flag single-file", () => {
+    // The determination now lives in the shared "Medical Policy Determination" lib (qualified ref). Single-file
+    // (no sibling context) the validator flags the two Approve/Deny refs `external-library-not-included` — no
+    // shape/parse errors. With the vendored sibling present it validates fully clean (materialized test below).
+    const errs = crlErrors(COMPOSITION_REFERENCE_CRL);
+    const ext = errs.filter((e) => e.kind === "external-library-not-included");
+    expect(ext.length).toBe(2); // the two shared-lib determination refs (Approve, Deny)
+    expect(errs.length).toBe(ext.length); // ...and NOTHING else — no shape/parse error
+    expect(ext.every((e) => (e.message ?? "").includes("Medical Policy Determination"))).toBe(true);
+  });
+
+  it("composition-reference.cel + .crl: validate clean and the CRE evaluates the composition (real path, shared determination lib)", () => {
     const dir = mkdtempSync(join(tmpdir(), "authoring-kit-comp-"));
     writeFileSync(
       join(dir, "package.json"),
@@ -94,6 +108,8 @@ describe("authoring-kit — reference artifacts", () => {
       }),
     );
     writeFileSync(join(dir, "composition-reference.crl"), COMPOSITION_REFERENCE_CRL);
+    // The determination activities live in the shared lib, resolved as a vendored sibling (no `include`).
+    writeFileSync(join(dir, "medical-policy-determination.crl"), MEDICAL_POLICY_DETERMINATION_CRL);
     const celPath = join(dir, "composition-reference.cel");
     writeFileSync(celPath, COMPOSITION_REFERENCE_CEL);
 
@@ -102,12 +118,41 @@ describe("authoring-kit — reference artifacts", () => {
 
     const run = runCel(resolveCelImports(celPath));
     expect(run.success).toBe(true);
-    expect(run.runs.length).toBe(3);
+    expect(run.runs.length).toBe(4); // both-met→approve; drop-failed-therapy→deny; drop-diagnosis→deny; otherwise→deny
     expect(run.runs.every((r) => r.status === "pass")).toBe(true);
     // The composite is satisfied via composition (not a direct fact).
     const canary = run.runs.find((r) => r.case.startsWith("both criteria met"))!;
     const node = canary.trace.find((n) => n.concept === "Meets Coverage Criteria")!;
     expect(node.composition?.satisfied).toBe(true);
+  });
+
+  it("pa-determination-reference.cel + .crl: validate clean and both cases pass via the shared determination lib (real path)", () => {
+    const dir = mkdtempSync(join(tmpdir(), "authoring-kit-pa-"));
+    writeFileSync(
+      join(dir, "package.json"),
+      JSON.stringify({
+        name: "authoring-kit-pa-determination-reference",
+        version: "1.0.0",
+        private: true,
+        crl: {
+          canonicalBase: "http://example.org/authoring-kit-pa-determination-reference",
+          status: "draft",
+          experimental: true,
+        },
+      }),
+    );
+    writeFileSync(join(dir, "pa-determination-reference.crl"), PA_DETERMINATION_REFERENCE_CRL);
+    writeFileSync(join(dir, "medical-policy-determination.crl"), MEDICAL_POLICY_DETERMINATION_CRL);
+    const celPath = join(dir, "pa-determination-reference.cel");
+    writeFileSync(celPath, PA_DETERMINATION_REFERENCE_CEL);
+
+    const v = validateCELFile(celPath);
+    expect(v.errors).toEqual([]);
+
+    const run = runCel(resolveCelImports(celPath));
+    expect(run.success).toBe(true);
+    expect(run.runs.length).toBe(2); // qualifying diagnosis→approve; otherwise→deny
+    expect(run.runs.every((r) => r.status === "pass")).toBe(true);
   });
 });
 
@@ -141,7 +186,7 @@ describe("authoring-kit — getAuthoringKit", () => {
     }
   });
 
-  it("embeds the reference artifacts inline (decision + composition)", () => {
+  it("embeds the reference artifacts inline (decision + composition + shared determination lib + PA)", () => {
     const kit = getAuthoringKit();
     const names = kit.referenceArtifacts.map((a) => a.name).sort();
     expect(names).toEqual([
@@ -149,12 +194,18 @@ describe("authoring-kit — getAuthoringKit", () => {
       "composition-reference.crl",
       "decision-reference.cel",
       "decision-reference.crl",
+      "medical-policy-determination.crl",
+      "pa-determination-reference.cel",
+      "pa-determination-reference.crl",
     ]);
     const src = (n: string) => kit.referenceArtifacts.find((a) => a.name === n)?.source;
     expect(src("decision-reference.crl")).toBe(DECISION_REFERENCE_CRL);
     expect(src("decision-reference.cel")).toBe(DECISION_REFERENCE_CEL);
     expect(src("composition-reference.crl")).toBe(COMPOSITION_REFERENCE_CRL);
     expect(src("composition-reference.cel")).toBe(COMPOSITION_REFERENCE_CEL);
+    expect(src("medical-policy-determination.crl")).toBe(MEDICAL_POLICY_DETERMINATION_CRL);
+    expect(src("pa-determination-reference.crl")).toBe(PA_DETERMINATION_REFERENCE_CRL);
+    expect(src("pa-determination-reference.cel")).toBe(PA_DETERMINATION_REFERENCE_CEL);
   });
 
   it("conceptLayerModel marks `defined as` composition IN scope; predicates/external OUT", () => {
@@ -178,11 +229,21 @@ describe("authoring-kit — getAuthoringKit", () => {
     expect(a.contentHash).toMatch(/^[0-9a-f]{64}$/);
     expect(a.contentHash).toBe(b.contentHash);
     // Pinned snapshot — any payload byte change must update this deliberately.
-    expect(a.contentHash).toBe("bc1d36378e8a73144cc3b385beb45efcbdc93fde0e601c9dd7d501f443973ae1");
+    // Re-pinned for #134 (shared Medical Policy Determination lib + PA exemplar + composition rewrite + new rules).
+    expect(a.contentHash).toBe("2b8e1719868769249cac5ad9e810957c75e61df4ba455d1e41ca30b6a3778e31");
   });
 
   it("STAGES contains exactly the one Stage-1 slice", () => {
     expect([...STAGES]).toEqual(["local-decision-support"]);
+  });
+
+  it("the pa-disposition-set rule (#134) states set-equality over the shared Approve/Deny + mutual exclusivity", () => {
+    const rule = getAuthoringKit().rules.find((r) => r.id === "pa-disposition-set");
+    expect(rule).toBeDefined();
+    expect(rule!.rule).toMatch(/"Medical Policy Determination"\."Approve"/);
+    expect(rule!.rule).toMatch(/"Medical Policy Determination"\."Deny"/);
+    expect(rule!.rule).toMatch(/Pended/);
+    expect(rule!.rule).toMatch(/exactly one|XOR|mutually-exclusive/i);
   });
 });
 
