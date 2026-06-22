@@ -63,6 +63,9 @@ try {
       "composition-reference.crl",
       "decision-reference.cel",
       "decision-reference.crl",
+      "medical-policy-determination.crl",
+      "pa-determination-reference.cel",
+      "pa-determination-reference.crl",
     ]);
     assert.ok(kit.verifyLoop.doesNotProve.length > 0, "verifyLoop must state what a green run does NOT prove");
     // `defined as` composition is in-scope this stage (#126); predicates/external out.

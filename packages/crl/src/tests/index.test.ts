@@ -27,3 +27,4 @@ import "../language-services/tests/celDiagnostics.test";
 import "../cre/tests/run.test";
 import "../cre/tests/composition.test";
 import "../cre/tests/viewModel.test";
+import "../authoring-kit/tests/authoring-kit.test";

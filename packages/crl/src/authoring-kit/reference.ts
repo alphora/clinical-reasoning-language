@@ -28,6 +28,12 @@ case-feature: \`type is\` + \`code is\` only — no \`source representation\` an
 the full shape: \`first:\` ordered precedence with a required \`otherwise\`, and a
 matched branch opening an \`any:\` menu with per-action guards. "Order MRI" is
 always offered, so a matched branch can never produce nothing.
+
+SIGNPOST — this is a CDS exemplar: "Order MRI"/"Order CT" are CPGServiceRequest
+service ORDERS, correct here because CDS recommends the clinician ORDER a service.
+A PA / medical-policy DETERMINATION is different: it COMMUNICATES Approve/Deny via
+the shared "Medical Policy Determination" library — do NOT copy this order pattern
+into coverage content; see pa-determination-reference.
 */
 
 // ============ Concepts (local case-features: type is + code is only) ============
@@ -177,7 +183,11 @@ library "Coverage Criteria Reference".
 The coverage criterion is a LOCAL composition: two asserted \`code is\` leaves
 combined by \`defined as ( ... sem-and ... )\`. run_decision (#126) evaluates the
 composition, so the criterion is expressed at full granularity AND proven by
-drop-one-leaf cases — not folded into one opaque concept.
+drop-one-leaf cases. The determination uses the SHARED "Medical Policy
+Determination" library (Approve = CPGCommunicationRequest A1 / Deny = A3) —
+imported, never re-authored, so there is no inline approve/deny to drift or go
+asymmetric. (Qualified refs auto-resolve from the vendored sibling lib; no
+\`include\` is needed — an \`include\` would fire \`redundant-local-include\`.)
 */
 
 concept "Has Qualifying Diagnosis":
@@ -193,16 +203,8 @@ concept "Meets Coverage Criteria":
 
 decision "Coverage Determination":
 first:
-- when "Meets Coverage Criteria" then recommend activity "Approve".
-- otherwise then recommend activity "Deny".
-
-activity "Approve":
-- request CPGServiceRequest.
-- with \`Authorize coverage as medically necessary.\`.
-
-activity "Deny":
-- request CPGCommunicationRequest.
-- with \`Coverage criteria are not met.\`.
+- when "Meets Coverage Criteria" then recommend activity "Medical Policy Determination"."Approve".
+- otherwise then recommend activity "Medical Policy Determination"."Deny".
 `;
 
 export const COMPOSITION_REFERENCE_CEL = `# Composition Reference — Coverage Criteria — cases (Stage 1: defined as)
@@ -241,7 +243,109 @@ case "missing failed-therapy leaf -> deny (drop-one)":
 - fact is "Diagnosis Finding".
 - result is "Coverage Determination" is "Deny".
 
+case "missing diagnosis leaf -> deny (drop-one, other operand)":
+- subject is "Sample Patient".
+- fact is "Failed Therapy Finding".
+- result is "Coverage Determination" is "Deny".
+
 case "no criteria -> deny (otherwise)":
+- subject is "Sample Patient".
+- result is "Coverage Determination" is "Deny".
+`;
+
+/**
+ * Shared PA determination activities (#134). The CANONICAL, reusable
+ * prior-authorization Approve/Deny — `CPGCommunicationRequest` carrying the X12 278
+ * HCR01 outcome (Approve = A1 Certified / Deny = A3 Not Certified). A PA
+ * determination is COMMUNICATED, never ORDERed (never `CPGServiceRequest`). Pended
+ * (A4) is an async/workflow state, not a per-policy clinical leaf. Imported by every
+ * medical-policy artifact via qualified ref (`"Medical Policy Determination"."Approve"`),
+ * never re-authored — so the determination can't drift or go asymmetric per policy.
+ */
+export const MEDICAL_POLICY_DETERMINATION_CRL = `# Medical Policy Determination — shared PA determination activities (CANONICAL)
+library "Medical Policy Determination".
+
+/*
+The SHARED, reusable prior-authorization DETERMINATION activities for every medical-policy
+coverage decision. Per Da Vinci PAS (a PA response is a ClaimResponse) and X12 278 HCR01
+"review action code": Approve = A1 (Certified in total); Deny = A3 (Not Certified). Both are
+COMMUNICATED determinations (CPGCommunicationRequest) — the payer communicates a decision; it
+NEVER orders the service (never CPGServiceRequest). Pended (A4) is a NON-FINAL asynchronous
+workflow state (more time/info needed; requester polls for the eventual A1/A3) — NOT a
+per-policy clinical determination leaf; handled at the workflow layer, not here.
+
+The \`with\` text states ONLY the neutral X12 outcome (Certified / Not Certified). The REASON a
+determination fired is the triggering \`when\` concept in the policy, NOT baked in here — so this
+Deny is reusable by a medical-necessity denial AND an eligibility/business denial alike.
+
+Reuse: a policy references these by qualified name —
+  recommend activity "Medical Policy Determination"."Approve" / ."Deny".
+At Stage 1 the X12 outcome is carried in the \`with\` narrative; a coded HCR01 value-set binding
+is a later-stage (external-terminology) concern, out of scope for local-decision-support.
+*/
+
+activity "Approve":
+- request CPGCommunicationRequest.
+- with \`Coverage determination: APPROVE / Certified in total (X12 278 HCR01 A1). A communicated prior-authorization coverage determination certifying the requested service; NOT a service order.\`.
+
+activity "Deny":
+- request CPGCommunicationRequest.
+- with \`Coverage determination: DENY / Not Certified (X12 278 HCR01 A3). A communicated prior-authorization coverage determination denying certification of the requested service; NOT a service order.\`.
+`;
+
+/**
+ * Canonical PRIOR-AUTHORIZATION exemplar (#134) — distinct from the CDS
+ * `decision-reference` (which ORDERs a service via `CPGServiceRequest`). Here the
+ * payer COMMUNICATES a coverage determination via the SHARED "Medical Policy
+ * Determination" library (imported, not re-authored). Approve/Deny are the two
+ * FINAL leaves; Pended (A4) is async/workflow, not a leaf. A single local criterion
+ * keeps the focus on the determination pattern; compose multi-part criteria with
+ * `defined as` (see composition-reference).
+ */
+export const PA_DETERMINATION_REFERENCE_CRL = `# PA Determination Reference — Coverage Determination (Stage 1 PA exemplar)
+library "PA Determination Reference".
+
+/*
+The canonical PRIOR-AUTHORIZATION exemplar — distinct from the CDS decision-reference (which
+ORDERs a service via CPGServiceRequest). Here the payer COMMUNICATES a coverage determination:
+Approve (X12 HCR01 A1) / Deny (A3), via the SHARED "Medical Policy Determination" library
+(imported, NOT re-authored per policy). Approve/Deny are the two FINAL leaves; Pended (A4) is an
+async/workflow state, not a per-policy clinical leaf. A single local criterion is shown; compose
+multi-part criteria with \`defined as\` (see composition-reference).
+*/
+
+// (illustrative placeholder criterion — a real policy decomposes its stated criteria;
+// here a single local leaf keeps the focus on the determination pattern)
+concept "Has Qualifying Diagnosis":
+- type is Condition.
+- code is \`qualifying-diagnosis\`.
+
+decision "Coverage Determination":
+first:
+- when "Has Qualifying Diagnosis" then recommend activity "Medical Policy Determination"."Approve".
+- otherwise then recommend activity "Medical Policy Determination"."Deny".
+`;
+
+export const PA_DETERMINATION_REFERENCE_CEL = `# PA Determination Reference — cases (Stage 1 PA exemplar)
+library "PA Determination Reference Cases".
+covers "PA Determination Reference".
+
+fact "Sample Patient":
+- name is "Sample Patient".
+- birth date is "1970-01-01".
+- defined by "Patient".
+
+fact "Diagnosis Finding":
+- code is "http://example.org/local|qualifying-diagnosis".
+- date is "2026-01-01".
+- defined by "PA Determination Reference"."Has Qualifying Diagnosis".
+
+case "qualifying diagnosis -> approve":
+- subject is "Sample Patient".
+- fact is "Diagnosis Finding".
+- result is "Coverage Determination" is "Approve".
+
+case "no qualifying diagnosis -> deny (otherwise)":
 - subject is "Sample Patient".
 - result is "Coverage Determination" is "Deny".
 `;

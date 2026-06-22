@@ -55,6 +55,16 @@ try {
     const kit = JSON.parse(r.content[0].text);
     assert.equal(kit.stage, "local-decision-support");
     assert.match(kit.contentHash, /^[0-9a-f]{64}$/);
+    // Durable guard that the bundled server carries the full #134 kit (not just a grep) — the 7-artifact set.
+    assert.deepEqual(kit.referenceArtifacts.map((a) => a.name).sort(), [
+      "composition-reference.cel",
+      "composition-reference.crl",
+      "decision-reference.cel",
+      "decision-reference.crl",
+      "medical-policy-determination.crl",
+      "pa-determination-reference.cel",
+      "pa-determination-reference.crl",
+    ]);
     const crl = kit.referenceArtifacts.find((a) => a.name === "decision-reference.crl").source;
     const v = JSON.parse((await client.callTool({ name: "validate_crl", arguments: { code: crl } })).content[0].text);
     assert.equal(v.success, true, "embedded reference CRL must validate clean through the bundled server");

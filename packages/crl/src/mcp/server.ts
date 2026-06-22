@@ -520,13 +520,16 @@ export function createServer(): McpServer {
       description:
         "Return the self-contained authoring knowledge a Knowledge-Engineering agent needs to encode one " +
         "CRL artifact for a given stage: the concept-layer model, authoring rules (decision shapes, guards, " +
-        "dispositions, CEL cases, the verify loop), the grammar type allowlists (full + a stage-recommended " +
-        "subset), validated reference artifacts (decision-reference.crl/.cel embedded inline), do/don't " +
-        "examples, and a feedback URL. The verify loop states what a green `run_decision` does AND does NOT " +
-        "prove (it is asserted-only — it never evaluates `code is`). v1 stage: \"local-decision-support\" " +
-        "(narrow: local `code is` sources only; shallow: asserted decision-supporting concepts only). " +
-        "Returns the kit JSON incl. `schemaVersion` + a derived `contentHash`. Unknown stage → tool error " +
-        "listing valid stages.",
+        "dispositions incl. PA Approve/Deny determination handling, CEL cases, the verify loop), the grammar " +
+        "type allowlists (full + a stage-recommended subset), seven validated reference artifacts embedded " +
+        "inline (CDS decision-reference.crl/.cel; composition-reference.crl/.cel using `defined as` boolean " +
+        "composition; the shared medical-policy-determination.crl determination library; and the " +
+        "pa-determination-reference.crl/.cel prior-authorization exemplar), do/don't examples, and a feedback " +
+        "URL. The verify loop states what a green `run_decision` does AND does NOT prove (it is asserted-only " +
+        "— it never evaluates `code is`). v1 stage: \"local-decision-support\" (narrow: local `code is` sources " +
+        "only; shallow: asserted concepts + `defined as` local composition; no `definition is` predicates or " +
+        "external sources). Returns the kit JSON incl. `schemaVersion` + a derived `contentHash`. Unknown " +
+        "stage → tool error listing valid stages.",
       inputSchema: {
         stage: z
           .string()
