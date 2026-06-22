@@ -10,7 +10,8 @@ import {
 import { collectDecisionArms } from "../../ast/decisionArms";
 import { resolveCelImports, type ResolveCelImportsOptions } from "../imports";
 import type { ResolvedCelGraph } from "../imports/types";
-import type { CEL, CELFact, CELCase, CELDefinedByField, CELResultField, CELFactRefField, CELCrossResourceField, CELInclude } from "../ast/types";
+import type { CEL, CELFact, CELCase, CELIdField, CELDefinedByField, CELResultField, CELFactRefField, CELCrossResourceField, CELInclude } from "../ast/types";
+import { CASE_ID_RE, DERIVED_CASE_ID_RE } from "../ast/caseId";
 
 import type {
   CELValidationError,
@@ -167,6 +168,27 @@ export function validateCEL(
       } else {
         cases.set(s.name, s);
       }
+    }
+  }
+
+  // 4b. Case ids (provenance spec §7): at-most-one per case, bounded format, reserved namespace, per-file uniqueness.
+  const seenCaseIds = new Map<string, CELCase>();
+  for (const s of cel.statements) {
+    if (s.type !== "CELCase") continue;
+    const idFields = s.body.filter((b): b is CELIdField => b.type === "CELIdField");
+    for (const extra of idFields.slice(1)) {
+      errors.push(err("multiple-case-ids", `Case "${s.name}" has more than one 'id is' field`, extra.location, fp));
+    }
+    if (s.caseId === undefined) continue;
+    const idLoc = idFields[0]?.location ?? s.location;
+    if (!CASE_ID_RE.test(s.caseId)) {
+      errors.push(err("malformed-case-id", `Case id "${s.caseId}" must be alphanumeric-start, [A-Za-z0-9_-], ≤64 chars`, idLoc, fp));
+    } else if (DERIVED_CASE_ID_RE.test(s.caseId)) {
+      errors.push(err("reserved-case-id", `Case id "${s.caseId}" is reserved for derived ids (k<number>); choose another`, idLoc, fp));
+    } else if (seenCaseIds.has(s.caseId)) {
+      errors.push(err("duplicate-case-id", `Duplicate case id "${s.caseId}"`, idLoc, fp));
+    } else {
+      seenCaseIds.set(s.caseId, s);
     }
   }
 

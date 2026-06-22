@@ -151,11 +151,25 @@ export interface CELDefinedByField {
 export interface CELCase {
   type: "CELCase";
   name: string;
+  /**
+   * Authored case id (provenance spec §7), optional — hoisted from the first `- id is "<id>".` body field; omitted
+   * when absent (omit-don't-synthesize, like the optional `header`). The DERIVED fallback for an un-id'd case lives in
+   * `effectiveCaseId(...)`, never here. Becoming a STABLE provenance address (grammar-optional / provenance-mandatory)
+   * is enforced at the provenance-emit step, not in T4.2.
+   */
+  caseId?: string;
   body: CELCaseBody[];
   location: Location;
 }
 
+export interface CELIdField {
+  type: "CELIdField";
+  value: string;
+  location: Location;
+}
+
 export type CELCaseBody =
+  | CELIdField
   | CELDescriptionField
   | CELSubjectField
   | CELEncounterField

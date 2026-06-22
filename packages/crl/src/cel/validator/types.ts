@@ -16,6 +16,11 @@ export type CELValidationErrorKind =
   | "unresolved-fact-ref"
   | "duplicate-fact-name"
   | "duplicate-case-name"
+  // Case id (provenance spec §7)
+  | "malformed-case-id"
+  | "reserved-case-id"
+  | "duplicate-case-id"
+  | "multiple-case-ids"
   // CEL include
   | "unresolved-cel-include"
   | "alias-not-yet-supported"

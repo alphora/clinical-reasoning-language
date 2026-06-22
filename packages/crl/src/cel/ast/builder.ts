@@ -22,6 +22,7 @@ import {
   BareRefContext,
   CaseStatementContext,
   CaseBodyContext,
+  IdFieldContext,
   DescriptionFieldContext,
   SubjectFieldContext,
   EncounterFieldContext,
@@ -62,6 +63,7 @@ import type {
   CELDefinedByField,
   CELCase,
   CELCaseBody,
+  CELIdField,
   CELDescriptionField,
   CELSubjectField,
   CELEncounterField,
@@ -341,11 +343,15 @@ export class CELAstBuilder
   visitCaseStatement = (ctx: CaseStatementContext): CELCase => {
     const name = unquote(ctx.stringLiteral().text);
     const body = ctx.caseBody().map((b) => this.visit(b) as CELCaseBody);
-    return { type: "CELCase", name, body, location: getLocation(ctx) };
+    // Hoist the FIRST explicit id onto the case (omit when absent, #135 style). A second `id is` is kept in body[]
+    // and rejected by the validator (multiple-id-fields) — never silently dropped, so body[] can't diverge from caseId.
+    const caseId = body.find((b): b is CELIdField => b.type === "CELIdField")?.value;
+    return { type: "CELCase", name, ...(caseId !== undefined ? { caseId } : {}), body, location: getLocation(ctx) };
   };
 
   visitCaseBody = (ctx: CaseBodyContext): CELCaseBody => {
     const child =
+      ctx.idField() ??
       ctx.descriptionField() ??
       ctx.subjectField() ??
       ctx.encounterField() ??
@@ -356,6 +362,12 @@ export class CELAstBuilder
     if (!child) throw new Error(`Empty caseBody at ${getLocation(ctx).start.line}`);
     return this.visit(child) as CELCaseBody;
   };
+
+  visitIdField = (ctx: IdFieldContext): CELIdField => ({
+    type: "CELIdField",
+    value: unquote(ctx.stringLiteral().text),
+    location: getLocation(ctx),
+  });
 
   visitDescriptionField = (ctx: DescriptionFieldContext): CELDescriptionField => {
     const shim = this.visit(ctx.backtickLiteral()) as BacktickLiteralShim;

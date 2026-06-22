@@ -96,7 +96,8 @@ caseStatement
 
 caseBody
     : DASH (
-          descriptionField
+          idField
+        | descriptionField
         | subjectField
         | encounterField
         | anchorField
@@ -106,6 +107,7 @@ caseBody
       ) DOT
     ;
 
+idField          : ID_IS stringLiteral ;
 descriptionField : DESCRIPTION_IS backtickLiteral ;
 subjectField     : SUBJECT_IS stringLiteral ;
 encounterField   : ENCOUNTER_IS stringLiteral ;

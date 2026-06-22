@@ -23,6 +23,7 @@ DATE_IS             : 'date is';
 VALUE_IS            : 'value is';
 STAGE_IS            : 'stage is' -> mode(STAGE_MODE);
 DESCRIPTION_IS      : 'description is';
+ID_IS               : 'id is';
 DEFINED_BY          : 'defined by';
 SUBJECT_IS          : 'subject is';
 ENCOUNTER_IS        : 'encounter is';

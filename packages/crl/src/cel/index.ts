@@ -9,6 +9,7 @@ import { createCELLexer } from "./lexer/createLexer";
 import { createCELParser } from "./parser/createParser";
 
 export * from "./ast/types";
+export * from "./ast/caseId";
 
 export interface CELToken {
   line: number;

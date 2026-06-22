@@ -6,6 +6,7 @@ import "../validator/tests/index.test";
 import "../cql-emitter/tests/index.test";
 import "../fhir-emitter/tests/index.test";
 import "../cel/tests/index.test";
+import "../cel/tests/caseId.test";
 import "../cel/imports/tests/resolver.test";
 import "../cel/validator/tests/validator.test";
 import "../cel/emitter/tests/emitter.test";
