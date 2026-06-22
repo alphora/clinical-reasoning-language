@@ -11,6 +11,7 @@
     "crl-parse": "dist/cli/run-parser.js",
     "crl-ast": "dist/cli/run-ast.js",
     "crl-template-match": "dist/cli/run-template-match.js",
+    "crl-canonicalize-source": "dist/cli/run-canonicalize-source.js",
     "crl-mcp": "dist/cli/run-mcp-server.js"
   },
   "sideEffects": false,

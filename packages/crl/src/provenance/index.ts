@@ -1,5 +1,6 @@
 export {
   canonicalizeDocx,
+  buildAnchorArtifact,
   sliceUtf8Bytes,
   byteOffsetToDisplayRange,
   byteRangeToDisplayRange,
@@ -8,7 +9,9 @@ export {
 } from "./canonicalize";
 export type {
   AnchorMetaCore,
+  AnchorMeta,
   CanonicalizeResult,
+  AnchorArtifactResult,
   CanonicalizeWarning,
   CanonicalizeError,
 } from "./canonicalize";

@@ -44,6 +44,17 @@ export type CanonicalizeResult =
   | { ok: true; text: string; metaCore: AnchorMetaCore; warnings: CanonicalizeWarning[] }
   | { ok: false; error: CanonicalizeError; warnings: CanonicalizeWarning[] };
 
+/** Persisted sidecar metadata (`<name>.anchormeta.json`): the core fields + provenance back-pointers + warnings. */
+export interface AnchorMeta extends AnchorMetaCore {
+  path: string; // the canonical-text artifact this metadata describes
+  derivedFrom: string; // the source .docx it was derived from
+  derivedFromHash: string; // sha256:<hex> of the source .docx bytes
+  warnings: CanonicalizeWarning[]; // durable: a consumer (KELP) gates on these, not on stderr
+}
+export type AnchorArtifactResult =
+  | { ok: true; text: string; meta: AnchorMeta }
+  | { ok: false; error: CanonicalizeError; warnings: CanonicalizeWarning[] };
+
 class CanonicalizeFailure extends Error {
   constructor(public readonly kind: string, message: string) {
     super(message);
@@ -518,6 +529,19 @@ export function canonicalizeDocx(input: Buffer): CanonicalizeResult {
     if (e instanceof CanonicalizeFailure) return { ok: false, error: { kind: e.kind, message: e.message }, warnings };
     return { ok: false, error: { kind: "unexpected", message: e instanceof Error ? e.message : String(e) }, warnings };
   }
+}
+
+/**
+ * File-artifact wrapper over {@link canonicalizeDocx}: attaches provenance back-pointers (the sidecar metadata).
+ * Pure (no I/O) — the CLI/caller owns reading the `.docx` and writing `<name>.txt` + `<name>.anchormeta.json`.
+ * @param artifactPath the canonical-text artifact path this metadata will describe (stored in `meta.path`)
+ * @param derivedFrom  a label for the source `.docx` (e.g. its path), stored in `meta.derivedFrom`
+ */
+export function buildAnchorArtifact(input: Buffer, artifactPath: string, derivedFrom: string): AnchorArtifactResult {
+  const r = canonicalizeDocx(input);
+  if (!r.ok) return r;
+  const derivedFromHash = "sha256:" + createHash("sha256").update(input).digest("hex");
+  return { ok: true, text: r.text, meta: { ...r.metaCore, path: artifactPath, derivedFrom, derivedFromHash, warnings: r.warnings } };
 }
 
 // ============================================================

@@ -3,6 +3,7 @@ import { deflateRawSync } from "node:zlib";
 
 import {
   canonicalizeDocx,
+  buildAnchorArtifact,
   sliceUtf8Bytes,
   byteOffsetToDisplayRange,
   byteRangeToDisplayRange,
@@ -282,6 +283,24 @@ describe("canonicalizeDocx — warnings + fail-closed errors", () => {
   });
   it("unsupported compression method → unsupported-compression", () => {
     expect(failKind(makeZip({ "word/document.xml": doc(para(t("a"))) }, { deflate: false, method: 99 }))).toBe("unsupported-compression");
+  });
+});
+
+describe("buildAnchorArtifact (file-artifact wrapper)", () => {
+  it("attaches path/derivedFrom/derivedFromHash + propagates warnings; derivedFromHash = sha256 of input bytes", () => {
+    const buf = docx(para(t("body")), { "word/footnotes.xml": `<w:footnotes ${NS}>${para(t("fn"))}</w:footnotes>` });
+    const r = buildAnchorArtifact(buf, "rx501.txt", "src/refined-source/rx501.docx");
+    if (!r.ok) throw new Error("expected ok");
+    expect(r.text).toBe("body");
+    expect(r.meta.path).toBe("rx501.txt");
+    expect(r.meta.derivedFrom).toBe("src/refined-source/rx501.docx");
+    expect(r.meta.derivedFromHash).toBe("sha256:" + createHash("sha256").update(buf).digest("hex"));
+    expect(r.meta.textHash).toBe(canonicalizeDocx(buf).ok && (canonicalizeDocx(buf) as { metaCore: { textHash: string } }).metaCore.textHash);
+    expect(r.meta.warnings.some((w) => w.kind === "excluded-part-text")).toBe(true); // durable in the sidecar
+  });
+  it("propagates the hard-error result on bad input", () => {
+    const r = buildAnchorArtifact(Buffer.from("nope"), "x.txt", "x.docx");
+    expect(r.ok).toBe(false);
   });
 });
 
