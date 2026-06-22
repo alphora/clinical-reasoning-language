@@ -28,3 +28,4 @@ import "../cre/tests/run.test";
 import "../cre/tests/composition.test";
 import "../cre/tests/viewModel.test";
 import "../authoring-kit/tests/authoring-kit.test";
+import "../provenance/tests/canonicalize.test";
