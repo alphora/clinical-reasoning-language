@@ -15,6 +15,17 @@ export type {
   CanonicalizeWarning,
   CanonicalizeError,
 } from "./canonicalize";
+export { buildProvenanceIndex, nodeKey } from "./indexer";
+export type {
+  ProvenanceIndex,
+  IndexedCrlNode,
+  ProvNodeRef,
+  DeclKind,
+  StructuralRelation,
+  ReachInfo,
+  ReachEdge,
+  ProvenanceIndexDiagnostic,
+} from "./indexer";
 export { PROVENANCE_SCHEMA_VERSION } from "./artifact";
 export type {
   ProvenanceArtifact,
