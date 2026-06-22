@@ -26,7 +26,7 @@ options {
 // ============================
 
 crl
-    : HEADER libraryStatement includeStatement* statement* EOF
+    : HEADER? libraryStatement includeStatement* statement* EOF
     ;
 
 // ============================

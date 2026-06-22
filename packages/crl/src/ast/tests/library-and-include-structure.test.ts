@@ -140,6 +140,28 @@ library "Empty".
     });
   });
 
+  describe("#135 — leading `# header` is optional (library stays required)", () => {
+    it("parses a file with no header (starts directly with `library`)", () => {
+      const ast: CRL = parseInput(`library "NoHdr".\n`);
+      expect(ast.library?.name).toBe("NoHdr");
+      expect(ast.header).toBeUndefined(); // omitted, not ""
+    });
+
+    it("still accepts a header when present (CRL strips the leading '#')", () => {
+      const ast: CRL = parseInput(`# A Title\nlibrary "Hdr".\n`);
+      expect(ast.header).toBe("A Title");
+      expect(ast.library?.name).toBe("Hdr");
+    });
+
+    it("rejects a header after the library statement", () => {
+      expect(buildCRL(`library "Late".\n# late\n`).success).toBe(false);
+    });
+
+    it("rejects two leading `#` lines", () => {
+      expect(buildCRL(`# one\n# two\nlibrary "Two".\n`).success).toBe(false);
+    });
+  });
+
   describe("parse-error rejections", () => {
     it("rejects library after include (strict ordering)", () => {
       const input = `# H

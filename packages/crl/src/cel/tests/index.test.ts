@@ -260,7 +260,7 @@ describe("CEL Todo 2 — negative fixtures (parse-success boundary cases)", () =
     expect(r.errors?.length).toBeGreaterThan(0);
   });
 
-  test("empty file — header required per R2-C", () => {
+  test("empty file — library required (header is optional, library is not)", () => {
     const r = buildCEL("");
     expect(r.success).toBe(false);
   });
@@ -268,5 +268,31 @@ describe("CEL Todo 2 — negative fixtures (parse-success boundary cases)", () =
   test("header-only — library required", () => {
     const r = buildCEL("# header only\n");
     expect(r.success).toBe(false);
+  });
+});
+
+describe("CEL #135 — leading `# header` is optional (library stays required)", () => {
+  test("no header — a file starting directly with `library` parses", () => {
+    const src = ['library "NoHdr".', 'fact "X":', '- code is "s|c".', '- defined by "Patient".'].join("\n");
+    const r = buildCEL(src);
+    expect(r.success).toBe(true);
+    expect(r.result?.header).toBeUndefined(); // omitted, not ""
+  });
+
+  test("with header — still allowed; raw text preserved", () => {
+    const src = ['# A Title', 'library "Hdr".', 'fact "X":', '- code is "s|c".', '- defined by "Patient".'].join("\n");
+    const r = buildCEL(src);
+    expect(r.success).toBe(true);
+    expect(r.result?.header).toBe("# A Title");
+  });
+
+  test("header AFTER library — rejected (header is only the optional leading slot)", () => {
+    const src = ['library "Late".', '# late header', 'fact "X":', '- defined by "Patient".'].join("\n");
+    expect(buildCEL(src).success).toBe(false);
+  });
+
+  test("two leading `#` lines — rejected (only a single optional header)", () => {
+    const src = ['# one', '# two', 'library "Two".', 'fact "X":', '- defined by "Patient".'].join("\n");
+    expect(buildCEL(src).success).toBe(false);
   });
 });

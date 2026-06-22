@@ -49,7 +49,9 @@ export type CrossResourceRelation =
 
 export interface CEL {
   type: "CEL";
-  header: string;
+  /** Optional leading `# title` line. Omitted when absent (the header is now optional — `library` is the
+   *  canonical identifier). Raw text incl. the `#`, mirroring the pre-existing CEL builder behavior. */
+  header?: string;
   library: CELLibraryDeclaration;
   covers?: CELCoversDeclaration;
   includes: CELInclude[];
