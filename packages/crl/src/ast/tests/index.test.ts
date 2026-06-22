@@ -1,5 +1,6 @@
 // Test suite imports
 import "./builder.test";
+import "./decisionSpine.test";
 import "./decision-structure.test";
 import "./concept-structure.test";
 import "./representation-structure.test";

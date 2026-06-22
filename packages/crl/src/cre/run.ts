@@ -56,10 +56,9 @@ import type {
 import { getRefLibrary, getRefName } from "../ast/types";
 import type { LsLocation } from "../language-services/contracts";
 import { toZeroBasedRange } from "../language-services/contracts";
-
-/** Child nodeId by appending a path segment (decision-relative; "" parent ⇒ the segment alone).
- *  Exported so the scenario view-model walker assigns IDENTICAL ids when it walks the AST spine. */
-export const childId = (parent: string, seg: string): string => (parent ? `${parent}/${seg}` : seg);
+// childId is single-sourced in ast/ (natural layer direction); re-exported here for existing consumers (viewModel, etc.).
+import { childId } from "../ast/decisionSpine";
+export { childId };
 
 type Id = string;
 // Injective key over (library, name). Names contain spaces (e.g. "Documented
