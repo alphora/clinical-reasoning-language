@@ -39,16 +39,29 @@ export type Role =
 export type RoleStatus = "provisional" | "reconciled";
 
 /** §2.2 — derived from role. (`no-link` reserved/unused for now.) */
-export type LinkRequirement = "must-link-decision" | "may-link-concept" | "rationale-only" | "no-link";
+export type LinkRequirement =
+  | "must-link-decision"
+  | "may-link-concept"
+  | "rationale-only"
+  | "no-link";
 
 /** §2.1 optional refinement of an `administrative` item. */
-export type AdministrativeSubtype = "coding" | "pa-meta" | "background" | "disclaimer" | "versioning";
+export type AdministrativeSubtype =
+  | "coding"
+  | "pa-meta"
+  | "background"
+  | "disclaimer"
+  | "versioning";
 
 /**
  * §4-2 disposition-class rationale that ACKNOWLEDGES a non-decision source span without emitting a clinical Deny.
  * route-elsewhere | pend | presumed-scope ⇒ applicability/workflow-precondition; no-operational-disposition ⇒ admin/definition.
  */
-export type DispositionClass = "route-elsewhere" | "pend" | "presumed-scope" | "no-operational-disposition";
+export type DispositionClass =
+  | "route-elsewhere"
+  | "pend"
+  | "presumed-scope"
+  | "no-operational-disposition";
 
 /** §2.4 — STRUCTURAL assertion (validator-checked, §9): the criterion's CRL node must be an ANCESTOR of the determination's. */
 export interface DrivesDeterminationEdge {
@@ -66,7 +79,11 @@ export type KnownExpectedDisposition = "approve" | "deny";
 export type ExpectedDisposition = KnownExpectedDisposition | (string & {});
 
 /** §2.3 origin:authored taxonomy. */
-export type AuthoredKind = "modeling-rationale" | "clinical-assumption" | "derived-glue" | "implementation-artifact";
+export type AuthoredKind =
+  | "modeling-rationale"
+  | "clinical-assumption"
+  | "derived-glue"
+  | "implementation-artifact";
 
 /** §2.3 — the authored item must be a member of `cluster`; it suppresses over-reach ONLY for nodes in that cluster (§4). */
 export interface SupportsRef {
@@ -113,7 +130,13 @@ export type CrlRelation =
 export type CelRelation = "tests-branch" | "tests-otherwise" | "asserts-fact";
 
 /** §5 derived. over-reach EXCLUDES composition, shared-reference, terminology, parameter. */
-export type NodeKind = "leaf" | "composition" | "decision-node" | "shared-reference" | "terminology" | "parameter";
+export type NodeKind =
+  | "leaf"
+  | "composition"
+  | "decision-node"
+  | "shared-reference"
+  | "terminology"
+  | "parameter";
 
 /** §5 — engine-resolution authoritative. shared-reference ⇔ resolves to a vendored/shared library; else policy-owned. */
 export type Ownership = "policy-owned" | "shared-reference";
@@ -129,7 +152,13 @@ export type RelinkHint =
   | { kind: "rename"; matchedBy?: MatchRank; from?: string; to?: string; note?: string }
   | { kind: "split"; matchedBy?: MatchRank; from?: string; to?: string[]; note?: string }
   | { kind: "merge"; matchedBy?: MatchRank; from?: string[]; to?: string; note?: string }
-  | { kind: "branch-reshape"; matchedBy?: MatchRank; from?: string | string[]; to?: string | string[]; note?: string };
+  | {
+      kind: "branch-reshape";
+      matchedBy?: MatchRank;
+      from?: string | string[];
+      to?: string | string[];
+      note?: string;
+    };
 
 export interface CrlNodeRef {
   lib: string;

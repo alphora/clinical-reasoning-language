@@ -84,7 +84,12 @@ case "c":
 function withIndex(crlShared: boolean, fn: (idx: ProvenanceIndex) => void): void {
   const root = mkdtempSync(path.join(os.tmpdir(), "prov-idx-"));
   try {
-    const pkg = { name: "p", version: "0.0.0", private: true, crl: crlShared ? { sharedLibraries: ["Shared Lib"] } : {} };
+    const pkg = {
+      name: "p",
+      version: "0.0.0",
+      private: true,
+      crl: crlShared ? { sharedLibraries: ["Shared Lib"] } : {},
+    };
     writeFileSync(path.join(root, "package.json"), JSON.stringify(pkg));
     writeFileSync(path.join(root, "policy.crl"), POLICY_CRL);
     writeFileSync(path.join(root, "shared.crl"), SHARED_CRL);
@@ -105,7 +110,9 @@ describe("buildProvenanceIndex — inventory + nodeKind + ownership (§5)", () =
       expect(idx.nodeKindOf(c("Composed"))).toBe("composition"); // defined as
       expect(idx.nodeKindOf(c("OperA"))).toBe("leaf"); // code is
       expect(idx.nodeKindOf({ lib: "Policy", kind: "activity", name: "LocalAct" })).toBe("leaf");
-      expect(idx.nodeKindOf({ lib: "Policy", kind: "decision", name: "PolicyDec" })).toBe("decision-node");
+      expect(idx.nodeKindOf({ lib: "Policy", kind: "decision", name: "PolicyDec" })).toBe(
+        "decision-node",
+      );
     });
   });
 
@@ -120,7 +127,12 @@ describe("buildProvenanceIndex — inventory + nodeKind + ownership (§5)", () =
 
   it("materializes decision sub-nodes into the inventory (the over-reach denominator)", () => {
     withIndex(true, (idx) => {
-      const sub: ProvNodeRef = { lib: "Policy", kind: "decision", name: "PolicyDec", nodeId: "when[0]/action[0]" };
+      const sub: ProvNodeRef = {
+        lib: "Policy",
+        kind: "decision",
+        name: "PolicyDec",
+        nodeId: "when[0]/action[0]",
+      };
       expect(idx.nodeKindOf(sub)).toBe("decision-node");
       const loc = idx.resolveCrlNodeRef(sub);
       expect("filePath" in loc && loc.filePath.endsWith("policy.crl")).toBe(true);
@@ -130,7 +142,9 @@ describe("buildProvenanceIndex — inventory + nodeKind + ownership (§5)", () =
   it("an undeclared local lib → diagnostic + defaults policy-owned", () => {
     withIndex(false, (idx) => {
       expect(idx.diagnostics.some((d) => d.kind === "undeclared-library-ownership")).toBe(true);
-      expect(idx.ownershipOf({ lib: "Shared Lib", kind: "activity", name: "SharedAct" })).toBe("policy-owned");
+      expect(idx.ownershipOf({ lib: "Shared Lib", kind: "activity", name: "SharedAct" })).toBe(
+        "policy-owned",
+      );
     });
   });
 });
@@ -151,7 +165,9 @@ describe("buildProvenanceIndex — static reachability (§5)", () => {
       expect(reached(idx, c("Composed"))).toBe(true);
       expect(reached(idx, c("OperA"))).toBe(true); // operand of Composed (also a when in SubDec)
       expect(reached(idx, c("OperB"))).toBe(true); // operand of Composed only
-      const edges = idx.decisionReachability.get(JSON.stringify(["Policy", "concept", "OperB", null]))!.edges;
+      const edges = idx.decisionReachability.get(
+        JSON.stringify(["Policy", "concept", "OperB", null]),
+      )!.edges;
       expect(edges.some((e) => e.relation === "composition-operand")).toBe(true);
     });
   });
@@ -160,8 +176,12 @@ describe("buildProvenanceIndex — static reachability (§5)", () => {
     withIndex(true, (idx) => {
       // OperA is reached from PolicyDec (Composed's operand + via SubDec use-decision) AND is SubDec's own when-concept;
       // both PolicyDec and SubDec are top-level (seed) decisions, so per-seed cycle-guard reset must record both.
-      const info = idx.decisionReachability.get(JSON.stringify(["Policy", "concept", "OperA", null]))!;
-      expect(info.reachedBy.has(JSON.stringify(["Policy", "decision", "PolicyDec", null]))).toBe(true);
+      const info = idx.decisionReachability.get(
+        JSON.stringify(["Policy", "concept", "OperA", null]),
+      )!;
+      expect(info.reachedBy.has(JSON.stringify(["Policy", "decision", "PolicyDec", null]))).toBe(
+        true,
+      );
       expect(info.reachedBy.has(JSON.stringify(["Policy", "decision", "SubDec", null]))).toBe(true);
     });
   });
@@ -172,7 +192,7 @@ describe("buildProvenanceIndex — static reachability (§5)", () => {
     });
   });
 
-  it("cross-kind same-name: `when \"Dual\"` resolves the CONCEPT, `recommend \"Dual\"` resolves the ACTIVITY", () => {
+  it('cross-kind same-name: `when "Dual"` resolves the CONCEPT, `recommend "Dual"` resolves the ACTIVITY', () => {
     withIndex(true, (idx) => {
       expect(idx.nodeKindOf(c("Dual"))).toBe("leaf"); // concept Dual inventoried
       expect(idx.nodeKindOf({ lib: "Policy", kind: "activity", name: "Dual" })).toBe("leaf"); // activity Dual inventoried
@@ -197,7 +217,12 @@ describe("buildProvenanceIndex — static reachability (§5)", () => {
 
   it("a reached decision's sub-nodes are themselves decision-reached (spine-member, for §9.2)", () => {
     withIndex(true, (idx) => {
-      const d = (nodeId?: string): ProvNodeRef => ({ lib: "Policy", kind: "decision", name: "PolicyDec", nodeId });
+      const d = (nodeId?: string): ProvNodeRef => ({
+        lib: "Policy",
+        kind: "decision",
+        name: "PolicyDec",
+        nodeId,
+      });
       expect(reached(idx, d())).toBe(true); // the decision decl
       expect(reached(idx, d("when[0]"))).toBe(true); // a branch sub-node
       expect(reached(idx, d("when[0]/action[0]"))).toBe(true); // an action sub-node
@@ -209,9 +234,15 @@ describe("buildProvenanceIndex — degenerate input", () => {
   it("no resolved coversTarget → empty index + no-policy-anchor diagnostic (never throws)", () => {
     const root = mkdtempSync(path.join(os.tmpdir(), "prov-idx-deg-"));
     try {
-      writeFileSync(path.join(root, "package.json"), JSON.stringify({ name: "p", version: "0.0.0", private: true }));
+      writeFileSync(
+        path.join(root, "package.json"),
+        JSON.stringify({ name: "p", version: "0.0.0", private: true }),
+      );
       const celPath = path.join(root, "f.cel");
-      writeFileSync(celPath, '# C\nlibrary "C".\ncovers "Does Not Exist".\nfact "P":\n- name is "p".\n- defined by "Patient".\ncase "c":\n- subject is "P".');
+      writeFileSync(
+        celPath,
+        '# C\nlibrary "C".\ncovers "Does Not Exist".\nfact "P":\n- name is "p".\n- defined by "Patient".\ncase "c":\n- subject is "P".',
+      );
       const idx = buildProvenanceIndex(resolveCelImports(celPath));
       expect(idx.nodes.size).toBe(0);
       expect(idx.diagnostics.some((dg) => dg.kind === "no-policy-anchor")).toBe(true);
@@ -222,7 +253,12 @@ describe("buildProvenanceIndex — degenerate input", () => {
 
   it("a bad nodeId → unresolved", () => {
     withIndex(true, (idx) => {
-      const miss = idx.resolveCrlNodeRef({ lib: "Policy", kind: "decision", name: "PolicyDec", nodeId: "when[99]" });
+      const miss = idx.resolveCrlNodeRef({
+        lib: "Policy",
+        kind: "decision",
+        name: "PolicyDec",
+        nodeId: "when[99]",
+      });
       expect("unresolved" in miss && miss.unresolved).toBe(true);
     });
   });
@@ -242,11 +278,19 @@ describe("buildProvenanceIndex — degenerate input", () => {
   }
 
   it("malformed package.json JSON → manifest-unreadable", () => {
-    withRawPkg('{ "name": "p", this is not json', (kinds) => expect(kinds).toContain("manifest-unreadable"));
+    withRawPkg('{ "name": "p", this is not json', (kinds) =>
+      expect(kinds).toContain("manifest-unreadable"),
+    );
   });
   it("crl.sharedLibraries not a string[] → shared-libraries-not-array", () => {
-    withRawPkg(JSON.stringify({ name: "p", version: "0.0.0", private: true, crl: { sharedLibraries: "Shared Lib" } }), (kinds) =>
-      expect(kinds).toContain("shared-libraries-not-array"),
+    withRawPkg(
+      JSON.stringify({
+        name: "p",
+        version: "0.0.0",
+        private: true,
+        crl: { sharedLibraries: "Shared Lib" },
+      }),
+      (kinds) => expect(kinds).toContain("shared-libraries-not-array"),
     );
   });
 });

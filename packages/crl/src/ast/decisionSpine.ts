@@ -61,7 +61,9 @@ function walkBody(body: WhenBlockBody, parentId: string, out: SpineNode[]): void
     return;
   }
   const block = body as BlockBody;
-  const isBranch = block.statements.some((m) => m.type === "WhenBlock" || m.type === "OtherwiseBlock");
+  const isBranch = block.statements.some(
+    (m) => m.type === "WhenBlock" || m.type === "OtherwiseBlock",
+  );
   if (isBranch) {
     walkBranches(block.statements as BranchBlock[], parentId, out);
     return;

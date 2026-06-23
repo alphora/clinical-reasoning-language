@@ -56,7 +56,10 @@ export type AnchorArtifactResult =
   | { ok: false; error: CanonicalizeError; warnings: CanonicalizeWarning[] };
 
 class CanonicalizeFailure extends Error {
-  constructor(public readonly kind: string, message: string) {
+  constructor(
+    public readonly kind: string,
+    message: string,
+  ) {
     super(message);
   }
 }
@@ -92,7 +95,8 @@ function findEocd(buf: Buffer): number {
   if (buf.length < 22) fail("not-a-zip", "Too small to be a .docx/ZIP.");
   const min = Math.max(0, buf.length - (22 + 0xffff));
   for (let i = buf.length - 22; i >= min; i--) {
-    if (buf.readUInt32LE(i) === SIG_EOCD && i + 22 + buf.readUInt16LE(i + 20) === buf.length) return i;
+    if (buf.readUInt32LE(i) === SIG_EOCD && i + 22 + buf.readUInt16LE(i + 20) === buf.length)
+      return i;
   }
   fail("not-a-zip", "End-of-central-directory record not found (not a valid .docx/ZIP).");
 }
@@ -105,14 +109,16 @@ function parseCentralDirectory(buf: Buffer): ZipEntry[] {
   }
   const diskNo = buf.readUInt16LE(eocd + 4);
   const cdDisk = buf.readUInt16LE(eocd + 6);
-  if (diskNo !== 0 || cdDisk !== 0) fail("multi-disk-unsupported", "Multi-disk ZIP is not supported.");
+  if (diskNo !== 0 || cdDisk !== 0)
+    fail("multi-disk-unsupported", "Multi-disk ZIP is not supported.");
   const total = buf.readUInt16LE(eocd + 10);
   const cdSize = buf.readUInt32LE(eocd + 12);
   const cdOffset = buf.readUInt32LE(eocd + 16);
   if (total === 0xffff || cdSize === 0xffffffff || cdOffset === 0xffffffff) {
     fail("zip64-unsupported", "ZIP64 sentinel sizes/offsets are not supported.");
   }
-  if (cdOffset + cdSize > buf.length) fail("malformed-zip", "Central directory extends past end of file.");
+  if (cdOffset + cdSize > buf.length)
+    fail("malformed-zip", "Central directory extends past end of file.");
 
   const entries: ZipEntry[] = [];
   let p = cdOffset;
@@ -131,7 +137,8 @@ function parseCentralDirectory(buf: Buffer): ZipEntry[] {
     const commentLen = buf.readUInt16LE(p + 32);
     const diskStart = buf.readUInt16LE(p + 34);
     const localOffset = buf.readUInt32LE(p + 42);
-    if (p + 46 + nameLen + extraLen + commentLen > cdEnd) fail("malformed-zip", "Central-directory entry extends past the directory.");
+    if (p + 46 + nameLen + extraLen + commentLen > cdEnd)
+      fail("malformed-zip", "Central-directory entry extends past the directory.");
     const name = buf.toString("utf8", p + 46, p + 46 + nameLen);
     entries.push({ name, method, crc32: crc, compSize, uncompSize, localOffset, flags, diskStart });
     p += 46 + nameLen + extraLen + commentLen;
@@ -143,17 +150,23 @@ function readEntry(buf: Buffer, entry: ZipEntry): Buffer {
   if (entry.flags & 0x0001) fail("encrypted-unsupported", `Encrypted ZIP entry: ${entry.name}`);
   if (entry.diskStart !== 0) fail("multi-disk-unsupported", "Multi-disk ZIP is not supported.");
   if (entry.uncompSize > MAX_UNCOMPRESSED) {
-    fail("entry-too-large", `Entry ${entry.name} uncompressed size ${entry.uncompSize} exceeds the ${MAX_UNCOMPRESSED}-byte cap.`);
+    fail(
+      "entry-too-large",
+      `Entry ${entry.name} uncompressed size ${entry.uncompSize} exceeds the ${MAX_UNCOMPRESSED}-byte cap.`,
+    );
   }
   const lo = entry.localOffset;
-  if (lo + 30 > buf.length || buf.readUInt32LE(lo) !== SIG_LOC) fail("malformed-zip", `Bad local header for ${entry.name}.`);
+  if (lo + 30 > buf.length || buf.readUInt32LE(lo) !== SIG_LOC)
+    fail("malformed-zip", `Bad local header for ${entry.name}.`);
   // The local header's name/extra lengths differ from the central directory's — re-read them here.
   const locNameLen = buf.readUInt16LE(lo + 26);
   const locExtraLen = buf.readUInt16LE(lo + 28);
   const locName = buf.toString("utf8", lo + 30, lo + 30 + locNameLen);
-  if (locName !== entry.name) fail("malformed-zip", `Local/central name mismatch: ${locName} vs ${entry.name}.`);
+  if (locName !== entry.name)
+    fail("malformed-zip", `Local/central name mismatch: ${locName} vs ${entry.name}.`);
   const dataStart = lo + 30 + locNameLen + locExtraLen;
-  if (dataStart + entry.compSize > buf.length) fail("malformed-zip", `Entry data for ${entry.name} extends past end of file.`);
+  if (dataStart + entry.compSize > buf.length)
+    fail("malformed-zip", `Entry data for ${entry.name} extends past end of file.`);
   const compressed = buf.subarray(dataStart, dataStart + entry.compSize);
 
   let out: Buffer;
@@ -164,13 +177,24 @@ function readEntry(buf: Buffer, entry: ZipEntry): Buffer {
       // maxOutputLength bounds memory — a zip bomb (small deflate → huge inflate) throws rather than allocating.
       out = inflateRawSync(compressed, { maxOutputLength: MAX_UNCOMPRESSED });
     } catch (e) {
-      fail("inflate-failed", `Deflate decompression failed for ${entry.name}: ${e instanceof Error ? e.message : String(e)}`);
+      fail(
+        "inflate-failed",
+        `Deflate decompression failed for ${entry.name}: ${e instanceof Error ? e.message : String(e)}`,
+      );
     }
   } else {
-    fail("unsupported-compression", `Unsupported ZIP compression method ${entry.method} for ${entry.name}.`);
+    fail(
+      "unsupported-compression",
+      `Unsupported ZIP compression method ${entry.method} for ${entry.name}.`,
+    );
   }
-  if (out.length > MAX_UNCOMPRESSED) fail("entry-too-large", `Entry ${entry.name} inflated beyond the ${MAX_UNCOMPRESSED}-byte cap.`);
-  if (crc32(out) !== entry.crc32) fail("crc-mismatch", `CRC32 mismatch for ${entry.name} (ZIP corruption).`);
+  if (out.length > MAX_UNCOMPRESSED)
+    fail(
+      "entry-too-large",
+      `Entry ${entry.name} inflated beyond the ${MAX_UNCOMPRESSED}-byte cap.`,
+    );
+  if (crc32(out) !== entry.crc32)
+    fail("crc-mismatch", `CRC32 mismatch for ${entry.name} (ZIP corruption).`);
   return out;
 }
 
@@ -209,20 +233,32 @@ function decodeOneEntity(body: string, raw: string): string {
   if (body[0] === "#") {
     const hex = body[1] === "x" || body[1] === "X";
     const digits = hex ? body.slice(2) : body.slice(1);
-    if (!(hex ? /^[0-9a-fA-F]+$/ : /^[0-9]+$/).test(digits)) fail("bad-entity", `Invalid numeric character reference ${ref}.`);
+    if (!(hex ? /^[0-9a-fA-F]+$/ : /^[0-9]+$/).test(digits))
+      fail("bad-entity", `Invalid numeric character reference ${ref}.`);
     const cp = parseInt(digits, hex ? 16 : 10);
-    if (cp > 0x10ffff || (cp >= 0xd800 && cp <= 0xdfff)) fail("bad-entity", `Out-of-range/surrogate character reference ${ref}.`);
+    if (cp > 0x10ffff || (cp >= 0xd800 && cp <= 0xdfff))
+      fail("bad-entity", `Out-of-range/surrogate character reference ${ref}.`);
     // C0/C1 control chars would collide with the structural \t/\n — fail closed (none expected in real .docx).
-    if (cp <= 0x1f || (cp >= 0x7f && cp <= 0x9f)) fail("control-char-ref", `Control-character reference ${ref} is not supported in anchor text.`);
+    if (cp <= 0x1f || (cp >= 0x7f && cp <= 0x9f))
+      fail(
+        "control-char-ref",
+        `Control-character reference ${ref} is not supported in anchor text.`,
+      );
     return String.fromCodePoint(cp);
   }
   switch (body) {
-    case "lt": return "<";
-    case "gt": return ">";
-    case "amp": return "&";
-    case "quot": return '"';
-    case "apos": return "'"; // one of the five predefined XML entities
-    default: fail("bad-entity", `Unknown XML entity ${ref}.`);
+    case "lt":
+      return "<";
+    case "gt":
+      return ">";
+    case "amp":
+      return "&";
+    case "quot":
+      return '"';
+    case "apos":
+      return "'"; // one of the five predefined XML entities
+    default:
+      fail("bad-entity", `Unknown XML entity ${ref}.`);
   }
 }
 
@@ -239,7 +275,8 @@ function decodeEntities(s: string): string {
     }
     out += s.slice(i, amp);
     const semi = s.indexOf(";", amp);
-    if (semi === -1) fail("bad-entity", `Unterminated entity reference near "${s.slice(amp, amp + 12)}".`);
+    if (semi === -1)
+      fail("bad-entity", `Unterminated entity reference near "${s.slice(amp, amp + 12)}".`);
     out += decodeOneEntity(s.slice(amp + 1, semi), s.slice(amp, semi + 1));
     i = semi + 1;
   }
@@ -279,7 +316,8 @@ function parseXml(xml: string): XmlEl {
     const lt = s.indexOf("<", i);
     if (lt === -1) {
       // trailing text after the last tag must be whitespace only (no markup past the root element)
-      if (/\S/.test(s.slice(i))) fail("malformed-xml", "Non-whitespace text outside the root element.");
+      if (/\S/.test(s.slice(i)))
+        fail("malformed-xml", "Non-whitespace text outside the root element.");
       break;
     }
     if (lt > i) {
@@ -334,7 +372,8 @@ function parseXml(xml: string): XmlEl {
     i = gt + 1;
   }
   if (stack.length !== 1) fail("malformed-xml", "Unclosed XML element(s) at end of document.");
-  if (root.children.filter(isEl).length !== 1) fail("malformed-xml", "XML must have exactly one root element.");
+  if (root.children.filter(isEl).length !== 1)
+    fail("malformed-xml", "XML must have exactly one root element.");
   return root;
 }
 
@@ -353,7 +392,15 @@ function hasNonWhitespaceText(node: XmlNode): boolean {
 // ============================================================
 
 // Run-level children that are dropped (their text is not body content); flagged if they carry text.
-const SKIP_SUBTREES = new Set(["drawing", "pict", "object", "instrText", "delText", "del", "moveFrom"]);
+const SKIP_SUBTREES = new Set([
+  "drawing",
+  "pict",
+  "object",
+  "instrText",
+  "delText",
+  "del",
+  "moveFrom",
+]);
 
 function renderParagraph(p: XmlEl, warnings: CanonicalizeWarning[]): string {
   let out = "";
@@ -378,7 +425,10 @@ function renderParagraph(p: XmlEl, warnings: CanonicalizeWarning[]): string {
     }
     if (SKIP_SUBTREES.has(node.local)) {
       if (hasNonWhitespaceText(node)) {
-        warnings.push({ kind: "dropped-body-text", message: `Non-whitespace text in a dropped <${node.local}> was excluded.` });
+        warnings.push({
+          kind: "dropped-body-text",
+          message: `Non-whitespace text in a dropped <${node.local}> was excluded.`,
+        });
       }
       return;
     }
@@ -407,7 +457,8 @@ function collectBlocks(el: XmlEl): XmlEl[] {
 
 /** Hard-error on mc:AlternateContent anywhere in the tree (Choice + Fallback both carry text → ambiguous). */
 function assertNoAlternateContent(el: XmlEl): void {
-  if (el.local === "AlternateContent") fail("alternate-content", "mc:AlternateContent is not supported (ambiguous Choice/Fallback).");
+  if (el.local === "AlternateContent")
+    fail("alternate-content", "mc:AlternateContent is not supported (ambiguous Choice/Fallback).");
   for (const c of el.children) if (isEl(c)) assertNoAlternateContent(c);
 }
 
@@ -434,7 +485,9 @@ function renderTable(tbl: XmlEl, warnings: CanonicalizeWarning[]): string {
 function renderBody(body: XmlEl, warnings: CanonicalizeWarning[]): string {
   const blocks: string[] = [];
   for (const block of collectBlocks(body)) {
-    blocks.push(block.local === "p" ? renderParagraph(block, warnings) : renderTable(block, warnings));
+    blocks.push(
+      block.local === "p" ? renderParagraph(block, warnings) : renderTable(block, warnings),
+    );
   }
   return blocks.join("\n");
 }
@@ -447,7 +500,11 @@ const EXCLUDED_PART_RE = /^word\/(footnotes|endnotes|comments)\.xml$/i;
 // Attribute extraction tolerant of single/double quotes; type matched on the captured value, anchored to its end
 // (so ".../commentsExtended" does not match "comments"). rels manifests are flat machine-generated XML — a regex is
 // adequate here (a miss only downgrades a warning, never affects canonical text), unlike the nested document body.
-const attr = (name: string, tag: string): string | undefined => new RegExp(`\\b${name}=("([^"]*)"|'([^']*)')`, "i").exec(tag)?.slice(2).find((g) => g !== undefined);
+const attr = (name: string, tag: string): string | undefined =>
+  new RegExp(`\\b${name}=("([^"]*)"|'([^']*)')`, "i")
+    .exec(tag)
+    ?.slice(2)
+    .find((g) => g !== undefined);
 const REL_TYPE_RE = /\/(footnotes|endnotes|comments)$/i;
 
 /** Resolve a document.xml.rels Target (relative to `word/`) to a part name; null for external/absolute targets. */
@@ -472,7 +529,12 @@ function findExcludedContentParts(entries: ZipEntry[], input: Buffer): Set<strin
     for (const m of xml.matchAll(/<(?:[\w.-]+:)?Relationship\b[^>]*>/gi)) {
       const tag = m[0];
       const type = attr("Type", tag);
-      if (!type || !REL_TYPE_RE.test(type) || (attr("TargetMode", tag) ?? "").toLowerCase() === "external") continue;
+      if (
+        !type ||
+        !REL_TYPE_RE.test(type) ||
+        (attr("TargetMode", tag) ?? "").toLowerCase() === "external"
+      )
+        continue;
       const target = attr("Target", tag);
       const resolved = target && resolveWordRelTarget(target);
       if (resolved) parts.add(resolved);
@@ -491,14 +553,18 @@ export function canonicalizeDocx(input: Buffer): CanonicalizeResult {
     const entries = parseCentralDirectory(input);
     const docEntries = entries.filter((e) => e.name === "word/document.xml");
     if (docEntries.length === 0) fail("no-document", "word/document.xml not found in the .docx.");
-    if (docEntries.length > 1) fail("duplicate-document", "Multiple word/document.xml entries (ambiguous).");
+    if (docEntries.length > 1)
+      fail("duplicate-document", "Multiple word/document.xml entries (ambiguous).");
 
     // WARN (not drop) if a content-bearing excluded part carries non-whitespace text — surfaces a future criterion-in-footnote.
     const byName = new Map(entries.map((e) => [e.name, e]));
     for (const partName of findExcludedContentParts(entries, input)) {
       const e = byName.get(partName);
       if (e && hasNonWhitespaceText(parseXml(readEntry(input, e).toString("utf8")))) {
-        warnings.push({ kind: "excluded-part-text", message: `Excluded part ${partName} contains text not represented in the anchor source.` });
+        warnings.push({
+          kind: "excluded-part-text",
+          message: `Excluded part ${partName} contains text not represented in the anchor source.`,
+        });
       }
     }
 
@@ -511,7 +577,8 @@ export function canonicalizeDocx(input: Buffer): CanonicalizeResult {
 
     const raw = renderBody(body, warnings);
     const text = raw.normalize("NFC"); // NFC before hashing + offsets; visible characters preserved.
-    const textHash = "sha256:" + createHash("sha256").update(Buffer.from(text, "utf8")).digest("hex");
+    const textHash =
+      "sha256:" + createHash("sha256").update(Buffer.from(text, "utf8")).digest("hex");
     return {
       ok: true,
       text,
@@ -526,8 +593,13 @@ export function canonicalizeDocx(input: Buffer): CanonicalizeResult {
       warnings,
     };
   } catch (e) {
-    if (e instanceof CanonicalizeFailure) return { ok: false, error: { kind: e.kind, message: e.message }, warnings };
-    return { ok: false, error: { kind: "unexpected", message: e instanceof Error ? e.message : String(e) }, warnings };
+    if (e instanceof CanonicalizeFailure)
+      return { ok: false, error: { kind: e.kind, message: e.message }, warnings };
+    return {
+      ok: false,
+      error: { kind: "unexpected", message: e instanceof Error ? e.message : String(e) },
+      warnings,
+    };
   }
 }
 
@@ -537,11 +609,19 @@ export function canonicalizeDocx(input: Buffer): CanonicalizeResult {
  * @param artifactPath the canonical-text artifact path this metadata will describe (stored in `meta.path`)
  * @param derivedFrom  a label for the source `.docx` (e.g. its path), stored in `meta.derivedFrom`
  */
-export function buildAnchorArtifact(input: Buffer, artifactPath: string, derivedFrom: string): AnchorArtifactResult {
+export function buildAnchorArtifact(
+  input: Buffer,
+  artifactPath: string,
+  derivedFrom: string,
+): AnchorArtifactResult {
   const r = canonicalizeDocx(input);
   if (!r.ok) return r;
   const derivedFromHash = "sha256:" + createHash("sha256").update(input).digest("hex");
-  return { ok: true, text: r.text, meta: { ...r.metaCore, path: artifactPath, derivedFrom, derivedFromHash, warnings: r.warnings } };
+  return {
+    ok: true,
+    text: r.text,
+    meta: { ...r.metaCore, path: artifactPath, derivedFrom, derivedFromHash, warnings: r.warnings },
+  };
 }
 
 // ============================================================
@@ -558,18 +638,26 @@ function isUtf8Boundary(buf: Buffer, byteOffset: number): boolean {
 /** Exact substring for a half-open [startByte, endByte) UTF-8 range. Hard-errors on a non-boundary/out-of-range offset. */
 export function sliceUtf8Bytes(text: string, startByte: number, endByte: number): string {
   const buf = Buffer.from(text, "utf8");
-  if (startByte > endByte) throw new RangeError(`sliceUtf8Bytes: start ${startByte} > end ${endByte}`);
+  if (startByte > endByte)
+    throw new RangeError(`sliceUtf8Bytes: start ${startByte} > end ${endByte}`);
   if (!isUtf8Boundary(buf, startByte) || !isUtf8Boundary(buf, endByte)) {
-    throw new RangeError(`sliceUtf8Bytes: offset not on a UTF-8 character boundary or out of range [${startByte},${endByte}) len=${buf.length}`);
+    throw new RangeError(
+      `sliceUtf8Bytes: offset not on a UTF-8 character boundary or out of range [${startByte},${endByte}) len=${buf.length}`,
+    );
   }
   return buf.subarray(startByte, endByte).toString("utf8");
 }
 
 /** Map a utf8-byte offset → 0-based {line, col}; col is UTF-16 code units (matches VS Code Position.character). */
-export function byteOffsetToDisplayRange(text: string, byteOffset: number): { line: number; col: number } {
+export function byteOffsetToDisplayRange(
+  text: string,
+  byteOffset: number,
+): { line: number; col: number } {
   const buf = Buffer.from(text, "utf8");
   if (!isUtf8Boundary(buf, byteOffset)) {
-    throw new RangeError(`byteOffsetToDisplayRange: offset ${byteOffset} not on a UTF-8 boundary or out of range (len=${buf.length})`);
+    throw new RangeError(
+      `byteOffsetToDisplayRange: offset ${byteOffset} not on a UTF-8 boundary or out of range (len=${buf.length})`,
+    );
   }
   const prefix = buf.subarray(0, byteOffset).toString("utf8");
   let line = 0;
@@ -589,6 +677,10 @@ export function byteRangeToDisplayRange(
   text: string,
   range: { start: number; end: number },
 ): { start: { line: number; col: number }; end: { line: number; col: number } } {
-  if (range.start > range.end) throw new RangeError(`byteRangeToDisplayRange: start ${range.start} > end ${range.end}`);
-  return { start: byteOffsetToDisplayRange(text, range.start), end: byteOffsetToDisplayRange(text, range.end) };
+  if (range.start > range.end)
+    throw new RangeError(`byteRangeToDisplayRange: start ${range.start} > end ${range.end}`);
+  return {
+    start: byteOffsetToDisplayRange(text, range.start),
+    end: byteOffsetToDisplayRange(text, range.end),
+  };
 }

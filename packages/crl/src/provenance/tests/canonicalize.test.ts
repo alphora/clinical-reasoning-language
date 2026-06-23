@@ -94,7 +94,8 @@ function makeZip(parts: Record<string, string>, opts: ZipOpts = {}): Buffer {
 }
 
 const NS = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"';
-const doc = (body: string): string => `<?xml version="1.0"?><w:document ${NS}><w:body>${body}</w:body></w:document>`;
+const doc = (body: string): string =>
+  `<?xml version="1.0"?><w:document ${NS}><w:body>${body}</w:body></w:document>`;
 const para = (runs: string): string => `<w:p>${runs}</w:p>`;
 const t = (s: string): string => `<w:r><w:t>${s}</w:t></w:r>`;
 const docx = (body: string, extra: Record<string, string> = {}, opts: ZipOpts = {}): Buffer =>
@@ -108,18 +109,24 @@ function expectOk(buf: Buffer) {
 
 describe("canonicalizeDocx — text walk determinism", () => {
   it("joins paragraphs with single \\n; multi-run / multi-<w:t> same visible text is identical (no separator)", () => {
-    const split = expectOk(docx(para(`<w:r><w:t>Hel</w:t><w:t>lo</w:t></w:r>${t(" world")}`) + para(t("Line 2")))).text;
+    const split = expectOk(
+      docx(para(`<w:r><w:t>Hel</w:t><w:t>lo</w:t></w:r>${t(" world")}`) + para(t("Line 2"))),
+    ).text;
     const single = expectOk(docx(para(t("Hello world")) + para(t("Line 2")))).text;
     expect(split).toBe("Hello world\nLine 2");
     expect(single).toBe(split);
   });
 
   it("<w:tab>→\\t, <w:br>/<w:cr>→\\n", () => {
-    expect(expectOk(docx(para(`${t("a")}<w:r><w:tab/></w:r>${t("b")}<w:r><w:br/></w:r>${t("c")}`))).text).toBe("a\tb\nc");
+    expect(
+      expectOk(docx(para(`${t("a")}<w:r><w:tab/></w:r>${t("b")}<w:r><w:br/></w:r>${t("c")}`))).text,
+    ).toBe("a\tb\nc");
   });
 
   it("<w:t> char data is verbatim (xml:space ignored; whitespace never collapsed)", () => {
-    expect(expectOk(docx(para(`<w:r><w:t xml:space="preserve">  lead  and   gaps  </w:t></w:r>`))).text).toBe("  lead  and   gaps  ");
+    expect(
+      expectOk(docx(para(`<w:r><w:t xml:space="preserve">  lead  and   gaps  </w:t></w:r>`))).text,
+    ).toBe("  lead  and   gaps  ");
   });
 
   it("decodes named + numeric (non-control) entities", () => {
@@ -129,7 +136,9 @@ describe("canonicalizeDocx — text walk determinism", () => {
   it("empty paragraph → empty line; para→table→para single \\n", () => {
     expect(expectOk(docx(para(t("A")) + "<w:p/>" + para(t("B")))).text).toBe("A\n\nB");
     const table = `<w:tbl><w:tr><w:tc>${para(t("c1"))}</w:tc><w:tc>${para(t("c2"))}</w:tc></w:tr></w:tbl>`;
-    expect(expectOk(docx(para(t("before")) + table + para(t("after")))).text).toBe("before\nc1\tc2\nafter");
+    expect(expectOk(docx(para(t("before")) + table + para(t("after")))).text).toBe(
+      "before\nc1\tc2\nafter",
+    );
   });
 
   it("table: cell \\t / row \\n; multi-paragraph cell → \\n-joined", () => {
@@ -138,12 +147,22 @@ describe("canonicalizeDocx — text walk determinism", () => {
   });
 
   it("tracked changes: keep <w:ins>/<w:moveTo>, drop <w:del>/<w:delText>/<w:moveFrom>", () => {
-    const body = para(`${t("keep ")}<w:ins>${t("added ")}</w:ins><w:del><w:r><w:delText>removed </w:delText></w:r></w:del><w:moveTo>${t("moved")}</w:moveTo>`);
+    const body = para(
+      `${t("keep ")}<w:ins>${t("added ")}</w:ins><w:del><w:r><w:delText>removed </w:delText></w:r></w:del><w:moveTo>${t("moved")}</w:moveTo>`,
+    );
     expect(expectOk(docx(body)).text).toBe("keep added moved");
   });
 
   it("noBreakHyphen → ‑ (visible); softHyphen dropped", () => {
-    expect(expectOk(docx(para(`${t("co")}<w:r><w:softHyphen/></w:r>${t("op")}<w:r><w:noBreakHyphen/></w:r>${t("x")}`))).text).toBe("coop‑x");
+    expect(
+      expectOk(
+        docx(
+          para(
+            `${t("co")}<w:r><w:softHyphen/></w:r>${t("op")}<w:r><w:noBreakHyphen/></w:r>${t("x")}`,
+          ),
+        ),
+      ).text,
+    ).toBe("coop‑x");
   });
 
   it("NFC-normalizes (decomposed → composed)", () => {
@@ -153,7 +172,10 @@ describe("canonicalizeDocx — text walk determinism", () => {
   });
 
   it("CRLF / bare CR in char data normalize to \\n", () => {
-    expect(expectOk(makeZip({ "word/document.xml": doc(para(t("a"))).replace(/\n/g, "") + "\r\n" })).text).toBe("a");
+    expect(
+      expectOk(makeZip({ "word/document.xml": doc(para(t("a"))).replace(/\n/g, "") + "\r\n" }))
+        .text,
+    ).toBe("a");
   });
 
   it("strips a leading BOM on document.xml", () => {
@@ -161,16 +183,27 @@ describe("canonicalizeDocx — text walk determinism", () => {
   });
 
   it("is byte-identical across two runs + matches a committed text + textHash (golden, deflate path)", () => {
-    const body = para(t("Adults (18+) with moderate-to-severe Crohn's disease")) + para(t("may be considered medically necessary."));
-    const buf = docx(body, { "[Content_Types].xml": "<Types/>", "_rels/.rels": "<Relationships/>" }, { deflate: true });
+    const body =
+      para(t("Adults (18+) with moderate-to-severe Crohn's disease")) +
+      para(t("may be considered medically necessary."));
+    const buf = docx(
+      body,
+      { "[Content_Types].xml": "<Types/>", "_rels/.rels": "<Relationships/>" },
+      { deflate: true },
+    );
     const a = expectOk(buf);
     const b = expectOk(buf);
-    const EXPECTED = "Adults (18+) with moderate-to-severe Crohn's disease\nmay be considered medically necessary.";
+    const EXPECTED =
+      "Adults (18+) with moderate-to-severe Crohn's disease\nmay be considered medically necessary.";
     expect(a.text).toBe(EXPECTED);
     expect(b.text).toBe(a.text);
     // Frozen literal (NOT recomputed) — this is the tripwire that forces a CANONICALIZER_VERSION bump on any rule change.
-    expect(a.metaCore.textHash).toBe("sha256:788f826311e8df21c451093c4fd7f14f95d9288adb64006eda83de489fcae07d");
-    expect(a.metaCore.textHash).toBe("sha256:" + createHash("sha256").update(Buffer.from(EXPECTED, "utf8")).digest("hex"));
+    expect(a.metaCore.textHash).toBe(
+      "sha256:788f826311e8df21c451093c4fd7f14f95d9288adb64006eda83de489fcae07d",
+    );
+    expect(a.metaCore.textHash).toBe(
+      "sha256:" + createHash("sha256").update(Buffer.from(EXPECTED, "utf8")).digest("hex"),
+    );
     expect(a.metaCore.canonicalizerVersion).toBe(CANONICALIZER_VERSION);
     expect(a.metaCore.offsetUnit).toBe("utf8-byte");
   });
@@ -181,14 +214,22 @@ describe("canonicalizeDocx — text walk determinism", () => {
 
   it("Word-style data-descriptor entries (GP-bit-3, zeroed local sizes) parse via central-dir sizes", () => {
     // Word commonly streams entries with a trailing data descriptor; the reader must use the central-dir sizes/CRC.
-    const buf = docx(para(t("streamed via data descriptor")), {}, { deflate: true, dataDescriptor: true });
+    const buf = docx(
+      para(t("streamed via data descriptor")),
+      {},
+      { deflate: true, dataDescriptor: true },
+    );
     expect(expectOk(buf).text).toBe("streamed via data descriptor");
   });
 });
 
 describe("canonicalizeDocx — warnings + fail-closed errors", () => {
   it("WARNS (does not drop) when an excluded part carries text", () => {
-    const r = expectOk(docx(para(t("body")), { "word/footnotes.xml": `<w:footnotes ${NS}>${para(t("a footnote criterion"))}</w:footnotes>` }));
+    const r = expectOk(
+      docx(para(t("body")), {
+        "word/footnotes.xml": `<w:footnotes ${NS}>${para(t("a footnote criterion"))}</w:footnotes>`,
+      }),
+    );
     expect(r.text).toBe("body");
     expect(r.warnings.some((w) => w.kind === "excluded-part-text")).toBe(true);
   });
@@ -214,15 +255,24 @@ describe("canonicalizeDocx — warnings + fail-closed errors", () => {
       `<Relationship Id="r1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="http://x" TargetMode="External"/>` +
       `<Relationship Id="r2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>` +
       `</Relationships>`;
-    const r = expectOk(docx(para(t("body")), { "word/_rels/document.xml.rels": rels, "word/styles.xml": "<w:styles/>" }));
+    const r = expectOk(
+      docx(para(t("body")), {
+        "word/_rels/document.xml.rels": rels,
+        "word/styles.xml": "<w:styles/>",
+      }),
+    );
     expect(r.warnings.length).toBe(0);
   });
 
   it("malformed XML — trailing markup/text after the root element → malformed-xml", () => {
-    expect(failKind(makeZip({ "word/document.xml": doc(para(t("a"))) + "GARBAGE" }))).toBe("malformed-xml");
+    expect(failKind(makeZip({ "word/document.xml": doc(para(t("a"))) + "GARBAGE" }))).toBe(
+      "malformed-xml",
+    );
   });
   it("malformed XML — two root elements → malformed-xml", () => {
-    expect(failKind(makeZip({ "word/document.xml": doc(para(t("a"))) + "<extra/>" }))).toBe("malformed-xml");
+    expect(failKind(makeZip({ "word/document.xml": doc(para(t("a"))) + "<extra/>" }))).toBe(
+      "malformed-xml",
+    );
   });
 
   const failKind = (buf: Buffer) => {
@@ -235,23 +285,49 @@ describe("canonicalizeDocx — warnings + fail-closed errors", () => {
   });
   it("nested table → nested-table", () => {
     const inner = `<w:tbl><w:tr><w:tc>${para(t("x"))}</w:tc></w:tr></w:tbl>`;
-    expect(failKind(docx(`<w:tbl><w:tr><w:tc>${inner}</w:tc></w:tr></w:tbl>`))).toBe("nested-table");
+    expect(failKind(docx(`<w:tbl><w:tr><w:tc>${inner}</w:tc></w:tr></w:tbl>`))).toBe(
+      "nested-table",
+    );
   });
   it("mc:AlternateContent → alternate-content (paragraph scope)", () => {
-    expect(failKind(docx(para(`<mc:AlternateContent><mc:Choice>${t("a")}</mc:Choice><mc:Fallback>${t("a")}</mc:Fallback></mc:AlternateContent>`)))).toBe("alternate-content");
+    expect(
+      failKind(
+        docx(
+          para(
+            `<mc:AlternateContent><mc:Choice>${t("a")}</mc:Choice><mc:Fallback>${t("a")}</mc:Fallback></mc:AlternateContent>`,
+          ),
+        ),
+      ),
+    ).toBe("alternate-content");
   });
   it("mc:AlternateContent → alternate-content (block scope, not just paragraph)", () => {
-    expect(failKind(docx(`<mc:AlternateContent><mc:Choice>${para(t("a"))}</mc:Choice></mc:AlternateContent>`))).toBe("alternate-content");
+    expect(
+      failKind(
+        docx(`<mc:AlternateContent><mc:Choice>${para(t("a"))}</mc:Choice></mc:AlternateContent>`),
+      ),
+    ).toBe("alternate-content");
   });
   it("nested table wrapped in <w:sdt> is still detected (not silently dropped)", () => {
     const inner = `<w:sdt><w:sdtContent><w:tbl><w:tr><w:tc>${para(t("x"))}</w:tc></w:tr></w:tbl></w:sdtContent></w:sdt>`;
-    expect(failKind(docx(`<w:tbl><w:tr><w:tc>${inner}</w:tc></w:tr></w:tbl>`))).toBe("nested-table");
+    expect(failKind(docx(`<w:tbl><w:tr><w:tc>${inner}</w:tc></w:tr></w:tbl>`))).toBe(
+      "nested-table",
+    );
   });
   it("malformed XML — missing close tag at EOF → malformed-xml (no partial text)", () => {
-    expect(failKind(makeZip({ "word/document.xml": `<w:document ${NS}><w:body><w:p><w:r><w:t>A</w:t></w:r>` }))).toBe("malformed-xml");
+    expect(
+      failKind(
+        makeZip({ "word/document.xml": `<w:document ${NS}><w:body><w:p><w:r><w:t>A</w:t></w:r>` }),
+      ),
+    ).toBe("malformed-xml");
   });
   it("malformed XML — mismatched end tag → malformed-xml", () => {
-    expect(failKind(makeZip({ "word/document.xml": `<w:document ${NS}><w:body><w:p>${t("a")}</w:body></w:document>` }))).toBe("malformed-xml");
+    expect(
+      failKind(
+        makeZip({
+          "word/document.xml": `<w:document ${NS}><w:body><w:p>${t("a")}</w:body></w:document>`,
+        }),
+      ),
+    ).toBe("malformed-xml");
   });
   it("'>' inside an attribute value does not corrupt tokenization", () => {
     expect(expectOk(docx(para(`<w:r><w:t someAttr="a>b">hello</w:t></w:r>`))).text).toBe("hello");
@@ -262,10 +338,14 @@ describe("canonicalizeDocx — warnings + fail-closed errors", () => {
     expect(failKind(docx(para(t("z&#x110000;w"))))).toBe("bad-entity"); // beyond U+10FFFF
   });
   it("block content wrapped in <w:sdt> is rendered, not dropped", () => {
-    expect(expectOk(docx(`<w:sdt><w:sdtContent>${para(t("wrapped"))}</w:sdtContent></w:sdt>`)).text).toBe("wrapped");
+    expect(
+      expectOk(docx(`<w:sdt><w:sdtContent>${para(t("wrapped"))}</w:sdtContent></w:sdt>`)).text,
+    ).toBe("wrapped");
   });
   it("WARNS dropped-body-text when a skipped subtree (e.g. <w:instrText>) carries text", () => {
-    const r = expectOk(docx(para(`${t("a")}<w:r><w:instrText>HYPERLINK http://x</w:instrText></w:r>${t("b")}`)));
+    const r = expectOk(
+      docx(para(`${t("a")}<w:r><w:instrText>HYPERLINK http://x</w:instrText></w:r>${t("b")}`)),
+    );
     expect(r.text).toBe("ab");
     expect(r.warnings.some((w) => w.kind === "dropped-body-text")).toBe(true);
   });
@@ -276,26 +356,39 @@ describe("canonicalizeDocx — warnings + fail-closed errors", () => {
     expect(failKind(makeZip({ "word/other.xml": "<x/>" }))).toBe("no-document");
   });
   it("duplicate document.xml → duplicate-document", () => {
-    expect(failKind(makeZip({ "word/document.xml": doc(para(t("a"))) }, { duplicateName: "word/document.xml" }))).toBe("duplicate-document");
+    expect(
+      failKind(
+        makeZip({ "word/document.xml": doc(para(t("a"))) }, { duplicateName: "word/document.xml" }),
+      ),
+    ).toBe("duplicate-document");
   });
   it("CRC mismatch → crc-mismatch", () => {
-    expect(failKind(makeZip({ "word/document.xml": doc(para(t("a"))) }, { corruptCrc: true }))).toBe("crc-mismatch");
+    expect(
+      failKind(makeZip({ "word/document.xml": doc(para(t("a"))) }, { corruptCrc: true })),
+    ).toBe("crc-mismatch");
   });
   it("unsupported compression method → unsupported-compression", () => {
-    expect(failKind(makeZip({ "word/document.xml": doc(para(t("a"))) }, { deflate: false, method: 99 }))).toBe("unsupported-compression");
+    expect(
+      failKind(makeZip({ "word/document.xml": doc(para(t("a"))) }, { deflate: false, method: 99 })),
+    ).toBe("unsupported-compression");
   });
 });
 
 describe("buildAnchorArtifact (file-artifact wrapper)", () => {
   it("attaches path/derivedFrom/derivedFromHash + propagates warnings; derivedFromHash = sha256 of input bytes", () => {
-    const buf = docx(para(t("body")), { "word/footnotes.xml": `<w:footnotes ${NS}>${para(t("fn"))}</w:footnotes>` });
+    const buf = docx(para(t("body")), {
+      "word/footnotes.xml": `<w:footnotes ${NS}>${para(t("fn"))}</w:footnotes>`,
+    });
     const r = buildAnchorArtifact(buf, "rx501.txt", "src/refined-source/rx501.docx");
     if (!r.ok) throw new Error("expected ok");
     expect(r.text).toBe("body");
     expect(r.meta.path).toBe("rx501.txt");
     expect(r.meta.derivedFrom).toBe("src/refined-source/rx501.docx");
     expect(r.meta.derivedFromHash).toBe("sha256:" + createHash("sha256").update(buf).digest("hex"));
-    expect(r.meta.textHash).toBe(canonicalizeDocx(buf).ok && (canonicalizeDocx(buf) as { metaCore: { textHash: string } }).metaCore.textHash);
+    expect(r.meta.textHash).toBe(
+      canonicalizeDocx(buf).ok &&
+        (canonicalizeDocx(buf) as { metaCore: { textHash: string } }).metaCore.textHash,
+    );
     expect(r.meta.warnings.some((w) => w.kind === "excluded-part-text")).toBe(true); // durable in the sidecar
   });
   it("propagates the hard-error result on bad input", () => {
@@ -330,7 +423,10 @@ describe("UTF-8 offset helpers", () => {
     expect(() => byteOffsetToDisplayRange(s, 1.5)).toThrow(RangeError);
   });
   it("byteRangeToDisplayRange composes start+end and rejects inverted ranges", () => {
-    expect(byteRangeToDisplayRange(s, { start: 0, end: 6 })).toEqual({ start: { line: 0, col: 0 }, end: { line: 1, col: 0 } });
+    expect(byteRangeToDisplayRange(s, { start: 0, end: 6 })).toEqual({
+      start: { line: 0, col: 0 },
+      end: { line: 1, col: 0 },
+    });
     expect(() => byteRangeToDisplayRange(s, { start: 6, end: 2 })).toThrow(RangeError);
   });
 });

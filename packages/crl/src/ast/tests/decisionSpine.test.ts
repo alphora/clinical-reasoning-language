@@ -1,17 +1,31 @@
-import { parseInput } from "./parseInput";
 import { buildCEL } from "../../cel";
 import type { ResolvedCelGraph } from "../../cel/imports/types";
-import type { RegistryEntry } from "../../imports/types";
 import { renderScenario, type ViewNode } from "../../cre/viewModel";
+import type { RegistryEntry } from "../../imports/types";
 import { decisionSpine } from "../decisionSpine";
 import type { Decision } from "../types";
+
+import { parseInput } from "./parseInput";
 
 function graphFrom(crlSrc: string, celSrc: string): ResolvedCelGraph {
   const crl = parseInput(crlSrc);
   const built = buildCEL(celSrc);
-  if (!built.success || !built.result) throw new Error("inline CEL build failed: " + JSON.stringify(built.errors));
-  const coversTarget: RegistryEntry = { name: crl.library.name, filePath: "inline.crl", ast: crl, isRoot: true, origin: "root" };
-  return { filePath: "inline.cel", cel: built.result, coversTarget, celParseErrors: [], diagnostics: [] };
+  if (!built.success || !built.result)
+    throw new Error("inline CEL build failed: " + JSON.stringify(built.errors));
+  const coversTarget: RegistryEntry = {
+    name: crl.library.name,
+    filePath: "inline.crl",
+    ast: crl,
+    isRoot: true,
+    origin: "root",
+  };
+  return {
+    filePath: "inline.cel",
+    cel: built.result,
+    coversTarget,
+    celParseErrors: [],
+    diagnostics: [],
+  };
 }
 
 function collectIds(nodes: ViewNode[], acc: Set<string>): void {

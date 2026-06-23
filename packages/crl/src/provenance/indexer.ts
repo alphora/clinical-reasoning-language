@@ -35,6 +35,7 @@ import type { ResolvedCelGraph } from "../cel/imports/types";
 import type { RegistryEntry } from "../imports/types";
 import type { LsLocation, ZeroBasedRange } from "../language-services/contracts";
 import { toZeroBasedRange } from "../language-services/contracts";
+
 import type { NodeKind, Ownership } from "./artifact";
 
 export type DeclKind = "concept" | "decision" | "activity" | "terminology" | "parameter";
@@ -107,7 +108,8 @@ export interface ProvenanceIndex {
   isDecisionReached(ref: ProvNodeRef): boolean;
 }
 
-export const nodeKey = (ref: ProvNodeRef): string => JSON.stringify([ref.lib, ref.kind, ref.name, ref.nodeId ?? null]);
+export const nodeKey = (ref: ProvNodeRef): string =>
+  JSON.stringify([ref.lib, ref.kind, ref.name, ref.nodeId ?? null]);
 
 const collapseToStart = (r: ZeroBasedRange): ZeroBasedRange => ({
   startLine: r.startLine,
@@ -131,40 +133,58 @@ function emptyIndex(diagnostics: ProvenanceIndexDiagnostic[]): ProvenanceIndex {
     nodes: new Map(),
     decisionReachability: new Map(),
     diagnostics,
-    resolveCrlNodeRef: (ref) => ({ unresolved: true, reason: `No node for ${nodeKey(ref)} (empty index)` }),
+    resolveCrlNodeRef: (ref) => ({
+      unresolved: true,
+      reason: `No node for ${nodeKey(ref)} (empty index)`,
+    }),
     nodeKindOf: () => undefined,
     ownershipOf: () => undefined,
     isDecisionReached: () => false,
   };
 }
 
-function readManifestShared(projectRoot: string | undefined, diags: ProvenanceIndexDiagnostic[]): string[] {
+function readManifestShared(
+  projectRoot: string | undefined,
+  diags: ProvenanceIndexDiagnostic[],
+): string[] {
   if (!projectRoot) return [];
   let raw: string;
   try {
     raw = readFileSync(join(projectRoot, "package.json"), "utf8");
   } catch (e) {
     if ((e as NodeJS.ErrnoException)?.code === "ENOENT") return []; // no package.json — silent (a project may lack one)
-    diags.push({ kind: "manifest-unreadable", message: "package.json could not be read; ignoring crl.sharedLibraries." });
+    diags.push({
+      kind: "manifest-unreadable",
+      message: "package.json could not be read; ignoring crl.sharedLibraries.",
+    });
     return [];
   }
   let pkg: unknown;
   try {
     pkg = JSON.parse(raw);
   } catch {
-    diags.push({ kind: "manifest-unreadable", message: "package.json is not valid JSON; ignoring crl.sharedLibraries." });
+    diags.push({
+      kind: "manifest-unreadable",
+      message: "package.json is not valid JSON; ignoring crl.sharedLibraries.",
+    });
     return [];
   }
   const shared = (pkg as { crl?: { sharedLibraries?: unknown } })?.crl?.sharedLibraries;
   if (shared === undefined) return [];
   if (!Array.isArray(shared) || shared.some((s) => typeof s !== "string")) {
-    diags.push({ kind: "shared-libraries-not-array", message: "package.json crl.sharedLibraries must be a string[]; ignoring." });
+    diags.push({
+      kind: "shared-libraries-not-array",
+      message: "package.json crl.sharedLibraries must be a string[]; ignoring.",
+    });
     return [];
   }
   return shared as string[];
 }
 
-export function buildProvenanceIndex(graph: ResolvedCelGraph, opts?: { sharedLibraries?: string[] }): ProvenanceIndex {
+export function buildProvenanceIndex(
+  graph: ResolvedCelGraph,
+  opts?: { sharedLibraries?: string[] },
+): ProvenanceIndex {
   const diagnostics: ProvenanceIndexDiagnostic[] = [];
   const nodes = new Map<string, IndexedCrlNode>();
   const decisionReachability = new Map<string, ReachInfo>();
@@ -176,7 +196,10 @@ export function buildProvenanceIndex(graph: ResolvedCelGraph, opts?: { sharedLib
   // Degenerate input: with no resolved policy anchor there is no ownership basis — return an EMPTY index + diagnostic
   // rather than inventorying the whole registry as (misleadingly) policy-owned.
   if (!coversName) {
-    diagnostics.push({ kind: "no-policy-anchor", message: "No resolved coversTarget with a name; provenance index is empty." });
+    diagnostics.push({
+      kind: "no-policy-anchor",
+      message: "No resolved coversTarget with a name; provenance index is empty.",
+    });
     return emptyIndex(diagnostics);
   }
 
@@ -223,7 +246,9 @@ export function buildProvenanceIndex(graph: ResolvedCelGraph, opts?: { sharedLib
       case "decision":
         return "decision-node";
       case "concept":
-        return (node as Concept).definition?.type === "DefinedAsDefinition" ? "composition" : "leaf";
+        return (node as Concept).definition?.type === "DefinedAsDefinition"
+          ? "composition"
+          : "leaf";
     }
   };
 
@@ -234,8 +259,17 @@ export function buildProvenanceIndex(graph: ResolvedCelGraph, opts?: { sharedLib
         const loc = lsLoc(info.entry.filePath, (node as { location?: Location }).location);
         if (!loc) continue;
         const ref: ProvNodeRef = { lib: libName, kind, name };
-        const nodeKindV: NodeKind = info.ownership === "shared-reference" ? "shared-reference" : intrinsicNodeKind(kind, node);
-        nodes.set(nodeKey(ref), { ref, declKind: kind, nodeKind: nodeKindV, ownership: info.ownership, location: loc });
+        const nodeKindV: NodeKind =
+          info.ownership === "shared-reference"
+            ? "shared-reference"
+            : intrinsicNodeKind(kind, node);
+        nodes.set(nodeKey(ref), {
+          ref,
+          declKind: kind,
+          nodeKind: nodeKindV,
+          ownership: info.ownership,
+          location: loc,
+        });
         if (kind === "decision") {
           for (const sn of decisionSpine(node as Decision)) {
             const snRef: ProvNodeRef = { lib: libName, kind: "decision", name, nodeId: sn.nodeId };
@@ -244,7 +278,8 @@ export function buildProvenanceIndex(graph: ResolvedCelGraph, opts?: { sharedLib
             nodes.set(nodeKey(snRef), {
               ref: snRef,
               declKind: "decision",
-              nodeKind: info.ownership === "shared-reference" ? "shared-reference" : "decision-node",
+              nodeKind:
+                info.ownership === "shared-reference" ? "shared-reference" : "decision-node",
               ownership: info.ownership,
               location: snLoc,
             });
@@ -334,7 +369,12 @@ export function buildProvenanceIndex(graph: ResolvedCelGraph, opts?: { sharedLib
   const seenConcepts = new Set<string>();
   const seenDecisions = new Set<string>();
 
-  const expandConcept = (c: Concept, lib: string, fromDecision: string, fromNodeId: string): void => {
+  const expandConcept = (
+    c: Concept,
+    lib: string,
+    fromDecision: string,
+    fromNodeId: string,
+  ): void => {
     const key = nodeKey({ lib, kind: "concept", name: c.name });
     if (seenConcepts.has(key)) return;
     seenConcepts.add(key);
@@ -354,9 +394,22 @@ export function buildProvenanceIndex(graph: ResolvedCelGraph, opts?: { sharedLib
     for (const r of refs) reach(r, lib, fromDecision, fromNodeId, relation, key);
   };
 
-  const expandActivity = (a: Activity, lib: string, fromDecision: string, fromNodeId: string): void => {
+  const expandActivity = (
+    a: Activity,
+    lib: string,
+    fromDecision: string,
+    fromNodeId: string,
+  ): void => {
     const term = a.body.withClause?.terminologyReference;
-    if (term) reach(term, lib, fromDecision, fromNodeId, "activity-dependency", nodeKey({ lib, kind: "activity", name: a.name }));
+    if (term)
+      reach(
+        term,
+        lib,
+        fromDecision,
+        fromNodeId,
+        "activity-dependency",
+        nodeKey({ lib, kind: "activity", name: a.name }),
+      );
   };
 
   function reach(
@@ -369,9 +422,15 @@ export function buildProvenanceIndex(graph: ResolvedCelGraph, opts?: { sharedLib
   ): void {
     const t = resolveRef(ref, containingLib, ACCEPTABLE[relation]);
     if (!t) return; // unresolved / wrong-kind refs are a validator concern (T4.5), not a reachability crash
-    recordEdge(nodeKey({ lib: t.lib, kind: t.kind, name: t.name }), { fromDecision, fromNodeId, relation, via });
+    recordEdge(nodeKey({ lib: t.lib, kind: t.kind, name: t.name }), {
+      fromDecision,
+      fromNodeId,
+      relation,
+      via,
+    });
     if (t.kind === "concept") expandConcept(t.node as Concept, t.lib, fromDecision, fromNodeId);
-    else if (t.kind === "activity") expandActivity(t.node as Activity, t.lib, fromDecision, fromNodeId);
+    else if (t.kind === "activity")
+      expandActivity(t.node as Activity, t.lib, fromDecision, fromNodeId);
     else if (t.kind === "decision") walkDecision(t.node as Decision, t.lib, fromDecision);
   }
 
@@ -389,7 +448,13 @@ export function buildProvenanceIndex(graph: ResolvedCelGraph, opts?: { sharedLib
         relation: "spine-member",
       });
       if (sn.kind === "when") {
-        reach((sn.node as { conceptName: ReferenceName }).conceptName, lib, fromDecision, sn.nodeId, "when-condition");
+        reach(
+          (sn.node as { conceptName: ReferenceName }).conceptName,
+          lib,
+          fromDecision,
+          sn.nodeId,
+          "when-condition",
+        );
       } else if (sn.kind === "action") {
         const stmt = sn.node as {
           action: { type: string; activityName?: ReferenceName; decisionName?: ReferenceName };
