@@ -1,21 +1,12 @@
 #!/usr/bin/env node
-import { readFileSync } from "node:fs";
 import { basename } from "node:path";
 
-import { effectiveCaseId } from "../cel/ast/caseId";
-import type { CELCase } from "../cel/ast/types";
-import { resolveCelImports } from "../cel/imports";
-import type { ProvenanceArtifact } from "../provenance/artifact";
-import { buildProvenanceIndex } from "../provenance/indexer";
-import { validateProvenance, type ProvenanceFinding } from "../provenance/validators";
+import { validateProvenanceFiles, type ProvenanceFinding } from "../provenance";
 
 /**
- * crl-validate-provenance — run the §9 provenance validators on a policy's provenance artifact.
- *
- * Builds the CRL index from the .cel's covered closure, derives coverage, and runs validateProvenance against the
- * canonical anchor-source text. celCaseIds (existence) + frozenCaseIds (explicit/authored ids) are computed from the
- * resolved .cel's cases, keyed by BOTH the .cel basename and its absolute path (so the artifact's CelNodeRef.file may
- * use either). Exit 0 = no error-severity findings; 1 = bad args / errors found.
+ * crl-validate-provenance — run the §9 provenance validators on a policy's provenance artifact (shares its
+ * implementation with the `validate_provenance` MCP tool via validateProvenanceFiles). Prints index diagnostics +
+ * findings grouped by severity; exits 0 = no error-severity findings, 1 = bad args / errors found.
  *
  * Usage: crl-validate-provenance --artifact <a.json> --cel <f.cel> --anchor <anchor-source.txt>
  */
@@ -39,15 +30,6 @@ function parseArgs(argv: string[]): { artifact?: string; cel?: string; anchor?: 
   return out;
 }
 
-function read(path: string, label: string): string {
-  try {
-    return readFileSync(path, "utf8");
-  } catch (e) {
-    console.error(`Cannot read ${label} ${path}: ${e instanceof Error ? e.message : String(e)}`);
-    process.exit(1);
-  }
-}
-
 const {
   artifact: artifactPath,
   cel: celPath,
@@ -60,35 +42,6 @@ if (!artifactPath || !celPath || !anchorPath) {
   process.exit(1);
 }
 
-let artifact: ProvenanceArtifact;
-try {
-  artifact = JSON.parse(read(artifactPath, "artifact")) as ProvenanceArtifact;
-} catch (e) {
-  console.error(
-    `Artifact ${artifactPath} is not valid JSON: ${e instanceof Error ? e.message : String(e)}`,
-  );
-  process.exit(1);
-}
-
-const anchorText = read(anchorPath, "anchor-source");
-const graph = resolveCelImports(celPath);
-const index = buildProvenanceIndex(graph);
-
-// caseId sets from the resolved .cel, keyed by both basename and absolute path.
-const cases = (graph.cel?.statements ?? []).filter((s): s is CELCase => s.type === "CELCase");
-const effective = new Set(cases.map((c, i) => effectiveCaseId(c, i)));
-const frozen = new Set(cases.filter((c) => c.caseId !== undefined).map((c) => c.caseId as string));
-const celCaseIds = new Map([
-  [basename(celPath), effective],
-  [graph.filePath, effective],
-]);
-const frozenCaseIds = new Map([
-  [basename(celPath), frozen],
-  [graph.filePath, frozen],
-]);
-
-const findings = validateProvenance(artifact, index, anchorText, { celCaseIds, frozenCaseIds });
-
 const where = (f: ProvenanceFinding): string => {
   const bits = [
     f.itemId ? `item=${f.itemId}` : "",
@@ -99,24 +52,27 @@ const where = (f: ProvenanceFinding): string => {
   return bits.length ? ` (${bits.join(", ")})` : "";
 };
 
-console.log(
-  `Provenance validation: ${basename(artifactPath)} (policy ${artifact.policyId} v${artifact.policyVersion})`,
-);
-if (index.diagnostics.length) {
-  console.log(`\nIndex diagnostics (${index.diagnostics.length}):`);
-  for (const d of index.diagnostics) console.log(`  [${d.kind}] ${d.message}`);
+try {
+  const r = validateProvenanceFiles(artifactPath, celPath, anchorPath);
+  console.log(
+    `Provenance validation: ${basename(artifactPath)} (policy ${r.policyId} v${r.policyVersion})`,
+  );
+  if (r.diagnostics.length) {
+    console.log(`\nIndex diagnostics (${r.diagnostics.length}):`);
+    for (const d of r.diagnostics) console.log(`  [${d.kind}] ${d.message}`);
+  }
+  console.log(
+    `\nFindings: ${r.findings.length} — ${r.errorCount} error, ${r.manualReviewCount} manual-review, ${r.warningCount} warning`,
+  );
+  const order = { error: 0, "manual-review": 1, warning: 2 } as const;
+  for (const f of [...r.findings].sort((a, b) => order[a.severity] - order[b.severity])) {
+    console.log(`  [${f.severity}] ${f.kind}: ${f.message}${where(f)}`);
+  }
+  console.log(
+    `\n${r.pass ? "PASS — no error-severity findings" : `FAIL — ${r.errorCount} error-severity finding(s)`}`,
+  );
+  process.exit(r.pass ? 0 : 1);
+} catch (e) {
+  console.error(`validate failed: ${e instanceof Error ? e.message : String(e)}`);
+  process.exit(1);
 }
-
-const errors = findings.filter((f) => f.severity === "error");
-const warnings = findings.filter((f) => f.severity === "warning");
-const manual = findings.filter((f) => f.severity === "manual-review");
-console.log(
-  `\nFindings: ${findings.length} — ${errors.length} error, ${manual.length} manual-review, ${warnings.length} warning`,
-);
-for (const f of [...errors, ...manual, ...warnings])
-  console.log(`  [${f.severity}] ${f.kind}: ${f.message}${where(f)}`);
-
-console.log(
-  `\n${errors.length === 0 ? "PASS — no error-severity findings" : `FAIL — ${errors.length} error-severity finding(s)`}`,
-);
-process.exit(errors.length === 0 ? 0 : 1);

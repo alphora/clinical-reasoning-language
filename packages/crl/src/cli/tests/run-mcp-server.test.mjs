@@ -31,7 +31,7 @@ const check = async (label, fn) => {
 
 await client.connect(transport);
 try {
-  await check("MCP tools: 10 registered (…, run_decision, render_scenario, authoring_kit)", async () => {
+  await check("MCP tools: 11 registered (…, render_scenario, authoring_kit, validate_provenance)", async () => {
     const { tools } = await client.listTools();
     const names = tools.map((t) => t.name).sort();
     assert.deepEqual(names, [
@@ -45,6 +45,7 @@ try {
       "tokenize_crl",
       "validate_cel",
       "validate_crl",
+      "validate_provenance",
     ]);
   });
 
@@ -250,6 +251,44 @@ try {
       out.errors.some((e) => e.kind === "external-library-not-included"),
       "expected at least one external-library-not-included error in single-file mode"
     );
+  });
+
+  await check("validate_provenance with nonexistent artifact → isError", async () => {
+    const dme101Cel = resolve(here, "../../../src/tests/fixtures/policies/dme101-030/dme101-030.cel");
+    const r = await client.callTool({
+      name: "validate_provenance",
+      arguments: { artifact: resolve(here, "no-such-artifact.json"), cel: dme101Cel, anchor: dme101Cel },
+    });
+    assert.equal(r.isError, true);
+  });
+
+  await check("validate_provenance via paths → dme101-030: empty artifact yields findings (over-reach + unacknowledged)", async () => {
+    const { writeFileSync, mkdtempSync, rmSync } = await import("node:fs");
+    const { createHash } = await import("node:crypto");
+    const os = await import("node:os");
+    const dme101Cel = resolve(here, "../../../src/tests/fixtures/policies/dme101-030/dme101-030.cel");
+    const tmp = mkdtempSync(resolve(os.tmpdir(), "mcp-prov-"));
+    try {
+      const anchorText = "Some policy narrative text.";
+      const anchorPath = resolve(tmp, "anchor.txt");
+      writeFileSync(anchorPath, anchorText);
+      const meta = {
+        path: "anchor.txt", derivedFrom: "x.docx", derivedFromHash: "sha256:0",
+        canonicalizer: "crl-anchor-docx-text", canonicalizerVersion: "1.0.0",
+        textHash: "sha256:" + createHash("sha256").update(Buffer.from(anchorText, "utf8")).digest("hex"),
+        offsetUnit: "utf8-byte", unicodeNormalization: "NFC", rangeConvention: "half-open",
+      };
+      const artifactPath = resolve(tmp, "artifact.json");
+      writeFileSync(artifactPath, JSON.stringify({ schemaVersion: "1.0", policyId: "DME101.030", policyVersion: "1", anchorSource: meta, items: [], ignoredRanges: [], clusters: [] }));
+      const r = await client.callTool({ name: "validate_provenance", arguments: { artifact: artifactPath, cel: dme101Cel, anchor: anchorPath } });
+      assert.ok(!r.isError, "should not be a tool error");
+      const out = JSON.parse(r.content[0].text);
+      assert.equal(out.pass, false, "empty artifact must not pass");
+      assert.ok(out.findings.some((f) => f.kind === "over-reach"), "expected over-reach findings");
+      assert.ok(out.findings.some((f) => f.kind === "uncovered-span"), "expected the unacknowledged anchor text");
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
   });
 } finally {
   await client.close();

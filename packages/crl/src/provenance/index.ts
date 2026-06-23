@@ -35,6 +35,8 @@ export type {
   Severity,
   ValidateOpts,
 } from "./validators";
+export { validateProvenanceFiles } from "./validateFiles";
+export type { ValidateProvenanceFilesResult } from "./validateFiles";
 export { PROVENANCE_SCHEMA_VERSION } from "./artifact";
 export type {
   ProvenanceArtifact,

@@ -3,19 +3,22 @@
 // bundled server (packages/crl-vscode/src/mcp-server.ts) — both are thin shims that import
 // createServer/main/selfTest from here, so the two can no longer drift. No module-level dispatch:
 // importing this module must NOT start a server (the thin entries own the argv dispatch).
+import { readFileSync, statSync } from "node:fs";
+
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
-import { readFileSync, statSync } from "node:fs";
-import { tokenizeCRL, buildCRL, validateCRL, emitCQL } from "../index";
-import { validateCRLImports } from "../imports/validate";
-import type { ImportDiagnostic } from "../imports/types";
-import { validateCELFile } from "../cel/validator";
+
+import { getAuthoringKit, DEFAULT_STAGE } from "../authoring-kit";
 import { emitCelToFhir } from "../cel/emitter";
 import { resolveCelImports } from "../cel/imports";
+import { validateCELFile } from "../cel/validator";
 import { runCel, renderScenario } from "../cre";
-import { getAuthoringKit, DEFAULT_STAGE } from "../authoring-kit";
 import { emitFhirDefFromPath } from "../fhir-emitter";
+import type { ImportDiagnostic } from "../imports/types";
+import { validateCRLImports } from "../imports/validate";
+import { tokenizeCRL, buildCRL, validateCRL, emitCQL } from "../index";
+import { validateProvenanceFiles } from "../provenance";
 
 // Caps the CRL SOURCE (input) size. Response size scales with this — there is
 // no separate output cap, but bounding input keeps responses bounded enough.
@@ -75,7 +78,8 @@ function runTool(fn: CrlFn, args: ToolArgs) {
   try {
     source = resolveSource(args);
   } catch (e) {
-    const msg = e instanceof ToolInputError ? e.message : `Unexpected error: ${(e as Error).message}`;
+    const msg =
+      e instanceof ToolInputError ? e.message : `Unexpected error: ${(e as Error).message}`;
     return { content: [{ type: "text" as const, text: msg }], isError: true };
   }
   // A CRL lexical/parse/build failure is a normal ParseResult (success:false),
@@ -90,7 +94,8 @@ function runEmit(args: EmitArgs) {
   try {
     source = resolveSource(args);
   } catch (e) {
-    const msg = e instanceof ToolInputError ? e.message : `Unexpected error: ${(e as Error).message}`;
+    const msg =
+      e instanceof ToolInputError ? e.message : `Unexpected error: ${(e as Error).message}`;
     return { content: [{ type: "text" as const, text: msg }], isError: true };
   }
   const result = emitCQL(source, {
@@ -197,7 +202,9 @@ function runValidate(args: ValidateArgs) {
       }
     } catch (e) {
       const msg =
-        e instanceof ToolInputError ? e.message : `Cannot read path "${p}": ${(e as Error).message}`;
+        e instanceof ToolInputError
+          ? e.message
+          : `Cannot read path "${p}": ${(e as Error).message}`;
       return { content: [{ type: "text" as const, text: msg }], isError: true };
     }
     const full = validateCRLImports(p, { soft: args.soft === true });
@@ -206,7 +213,9 @@ function runValidate(args: ValidateArgs) {
       ...full.validationErrors.map(validationErrorToSlim),
     ];
     const warnings: Record<string, unknown>[] = [
-      ...full.importDiagnostics.filter((d) => d.severity === "warning").map(importDiagnosticToError),
+      ...full.importDiagnostics
+        .filter((d) => d.severity === "warning")
+        .map(importDiagnosticToError),
       ...full.validationWarnings.map(validationErrorToSlim),
     ];
     const slim = { success: full.success, errors, warnings };
@@ -218,7 +227,8 @@ function runValidate(args: ValidateArgs) {
   try {
     source = resolveSource(args);
   } catch (e) {
-    const msg = e instanceof ToolInputError ? e.message : `Unexpected error: ${(e as Error).message}`;
+    const msg =
+      e instanceof ToolInputError ? e.message : `Unexpected error: ${(e as Error).message}`;
     return { content: [{ type: "text" as const, text: msg }], isError: true };
   }
   // Strip the (potentially large) AST from the response — the agent only
@@ -269,10 +279,7 @@ function runValidateCel(args: { path?: string; soft?: boolean }) {
 }
 
 const inputSchema = {
-  code: z
-    .string()
-    .optional()
-    .describe("Inline CRL source text. Provide this OR `path`, not both."),
+  code: z.string().optional().describe("Inline CRL source text. Provide this OR `path`, not both."),
   path: z
     .string()
     .optional()
@@ -359,7 +366,9 @@ export function createServer(): McpServer {
       inputSchema: {
         path: z
           .string()
-          .describe("Path to a .cel file (absolute recommended; relative resolves against the server CWD)."),
+          .describe(
+            "Path to a .cel file (absolute recommended; relative resolves against the server CWD).",
+          ),
         soft: z
           .boolean()
           .optional()
@@ -384,14 +393,17 @@ export function createServer(): McpServer {
         "' ValueSet' suffix. " +
         "Issue #79 — when one or more `- definition is …` narrative bodies fail to match a catalog " +
         "pattern, `success` becomes `false`, `unmatched[]` lists each failing narrative ({text, line, column}), " +
-        "and `errors[]` mirrors them as `kind: \"emit-unmatched-narrative\"`. The `result` CQL is still " +
+        'and `errors[]` mirrors them as `kind: "emit-unmatched-narrative"`. The `result` CQL is still ' +
         "populated so callers can inspect partial output — each unmatched spot contains a compile-failing " +
         "`CRLCommon.UnmatchedNarrative(...)` sentinel that downstream CQL translation will reject. " +
         "Callers gating on emit fidelity should check `success` (or `unmatched.length === 0`), NOT just " +
         "the presence of `result`. The output may still need a CQL compiler to validate end-to-end.",
       inputSchema: {
         ...inputSchema,
-        libraryName: z.string().optional().describe("Library name for the emitted CQL (default: GeneratedFromCRL)."),
+        libraryName: z
+          .string()
+          .optional()
+          .describe("Library name for the emitted CQL (default: GeneratedFromCRL)."),
       },
     },
     (args) => runEmit(args as EmitArgs),
@@ -408,23 +420,32 @@ export function createServer(): McpServer {
         "Pass `includeResources: true` to also receive the full `resources[]` array (each with the full FHIR JSON). " +
         "Emitted FHIR definitional resources carry `version` (sourced from the npm package.json — CRMI Shareable requires version 1..1) and, at publishable+ capability, a reproducible `date` (resolved from SOURCE_DATE_EPOCH env or package.json `crl.date`, else wall clock). Emitted CQL stays version-less. Default capability is publishable. " +
         "Decision actions using the CRL `any:` qualifier emit a `crl-logical-switch` extension URL whose corresponding StructureDefinition is not yet shipped (pending CPG ballot); strict validators may require an ignore-list for the URL until then. " +
-        "Cross-library concept/terminology refs are unsupported in v0 (cascade-suppression surfaces via unresolved-* UnmatchedReference). Same-library qualified refs `\"CurrentLib\".\"X\"` still resolve. " +
+        'Cross-library concept/terminology refs are unsupported in v0 (cascade-suppression surfaces via unresolved-* UnmatchedReference). Same-library qualified refs `"CurrentLib"."X"` still resolve. ' +
         "Deliberate spec deviation: PlanDefinitions reference publishable-only sub-decisions via action.definitionCanonical (the published cpg-strategydefinition target-profile constraint is wrong; operator is amending the spec).",
       inputSchema: {
-        path: z.string().min(1).describe("Absolute path to a .crl file. Imports walk to nearest package.json."),
+        path: z
+          .string()
+          .min(1)
+          .describe("Absolute path to a .crl file. Imports walk to nearest package.json."),
         includeResources: z
           .boolean()
           .optional()
-          .describe("Include the full resources[] array in the result. Default false (summary only)."),
+          .describe(
+            "Include the full resources[] array in the result. Default false (summary only).",
+          ),
         date: z
           .string()
           .min(1)
           .optional()
-          .describe("Publication date (ISO) for reproducible emit. Highest precedence (over SOURCE_DATE_EPOCH env and package.json crl.date). Only stamped at publishable+."),
+          .describe(
+            "Publication date (ISO) for reproducible emit. Highest precedence (over SOURCE_DATE_EPOCH env and package.json crl.date). Only stamped at publishable+.",
+          ),
         capability: z
           .enum(["shareable", "computable", "publishable", "executable"])
           .optional()
-          .describe("CRMI capability level (shareable|computable|publishable; default publishable). Gates date + meta.profile + knowledgeCapability together. `executable` is not yet supported (needs ELM/expansion — issue #113)."),
+          .describe(
+            "CRMI capability level (shareable|computable|publishable; default publishable). Gates date + meta.profile + knowledgeCapability together. `executable` is not yet supported (needs ELM/expansion — issue #113).",
+          ),
       },
     },
     (args) =>
@@ -453,11 +474,16 @@ export function createServer(): McpServer {
         "result-deferred (`result is` parsed but not emitted, deferred to #70/metric), " +
         "precondition-failed (parse error / unresolved covers / etc. — case skipped).",
       inputSchema: {
-        path: z.string().min(1).describe("Absolute path to a .cel file. Imports walk to nearest package.json."),
+        path: z
+          .string()
+          .min(1)
+          .describe("Absolute path to a .cel file. Imports walk to nearest package.json."),
         includeResources: z
           .boolean()
           .optional()
-          .describe("Include the full emittedCases[] array (with resource bodies). Default false (summary only)."),
+          .describe(
+            "Include the full emittedCases[] array (with resource bodies). Default false (summary only).",
+          ),
       },
     },
     (args) => runEmitCel(args as { path: string; includeResources?: boolean }),
@@ -484,7 +510,10 @@ export function createServer(): McpServer {
           .string()
           .min(1)
           .describe("Absolute path to a .cel file. Imports walk to nearest package.json."),
-        case: z.string().optional().describe("Optional: run only the named case (default: all cases)."),
+        case: z
+          .string()
+          .optional()
+          .describe("Optional: run only the named case (default: all cases)."),
       },
     },
     (args) => runDecision(args as { path: string; case?: string }),
@@ -501,13 +530,19 @@ export function createServer(): McpServer {
         "structural spine — EVERY branch and action, reached or not) overlaid with per-node run state: " +
         "`evaluated` (reached?), `condition` (satisfied + which facts + a `defined as` explanation), " +
         "`guard` provenance, `guardedOut`, `action` (recommend-activity vs use-decision, qualifier, " +
-        "produced), `unreachedReason:\"preempted\"` for first:-short-circuited branches, and a `source` " +
+        'produced), `unreachedReason:"preempted"` for first:-short-circuited branches, and a `source` ' +
         "span (filePath + 0-based range) per node for navigation. Pass `path` (absolute .cel); `case` " +
         "renders only one case. Returns { schemaVersion, success, source, caseCount, passCount, failCount, " +
         "errorCount, scenarios:[{case, decision, status, expected, produced, tree, diagnostics}], errors }.",
       inputSchema: {
-        path: z.string().min(1).describe("Absolute path to a .cel file. Imports walk to nearest package.json."),
-        case: z.string().optional().describe("Optional: render only the named case (default: all cases)."),
+        path: z
+          .string()
+          .min(1)
+          .describe("Absolute path to a .cel file. Imports walk to nearest package.json."),
+        case: z
+          .string()
+          .optional()
+          .describe("Optional: render only the named case (default: all cases)."),
       },
     },
     (args) => runRenderScenario(args as { path: string; case?: string }),
@@ -526,7 +561,7 @@ export function createServer(): McpServer {
         "composition; the shared medical-policy-determination.crl determination library; and the " +
         "pa-determination-reference.crl/.cel prior-authorization exemplar), do/don't examples, and a feedback " +
         "URL. The verify loop states what a green `run_decision` does AND does NOT prove (it is asserted-only " +
-        "— it never evaluates `code is`). v1 stage: \"local-decision-support\" (narrow: local `code is` sources " +
+        '— it never evaluates `code is`). v1 stage: "local-decision-support" (narrow: local `code is` sources ' +
         "only; shallow: asserted concepts + `defined as` local composition; no `definition is` predicates or " +
         "external sources). Returns the kit JSON incl. `schemaVersion` + a derived `contentHash`. Unknown " +
         "stage → tool error listing valid stages.",
@@ -534,13 +569,75 @@ export function createServer(): McpServer {
         stage: z
           .string()
           .optional()
-          .describe('Authoring stage. Default "local-decision-support". Unknown → error listing valid stages.'),
+          .describe(
+            'Authoring stage. Default "local-decision-support". Unknown → error listing valid stages.',
+          ),
       },
     },
     (args) => runAuthoringKit(args as { stage?: string }),
   );
 
+  server.registerTool(
+    "validate_provenance",
+    {
+      title: "Validate a provenance artifact (§9)",
+      description:
+        "Run the §9 provenance validators on a policy's provenance artifact: resolve the .cel's CRL closure, build the " +
+        "AST index, derive two-sense coverage, and check referential integrity, content-hash drift, source-acknowledgement, " +
+        "linkRequirement (Missed₁), drivesDetermination ancestry, authored-item discipline, §9.1 MN-keyword, §9.2 structural " +
+        "mis-tag, and over-reach. A CEL ref to a case lacking an explicit (frozen) `- id is` → provenance-references-unfrozen-case " +
+        "(§7). Pass three ABSOLUTE paths. Returns { policyId, policyVersion, diagnostics[], findings:[{kind, severity " +
+        "(error|manual-review|warning), message, itemId?, cluster?, ref?, range?}], errorCount, manualReviewCount, " +
+        "warningCount, pass }. pass=true ⇔ zero error-severity findings.",
+      inputSchema: {
+        artifact: z.string().min(1).describe("Absolute path to the provenance artifact JSON."),
+        cel: z
+          .string()
+          .min(1)
+          .describe("Absolute path to the policy .cel (imports walk to nearest package.json)."),
+        anchor: z.string().min(1).describe("Absolute path to the canonical anchor-source .txt."),
+      },
+    },
+    (args) => runValidateProvenance(args as { artifact: string; cel: string; anchor: string }),
+  );
+
   return server;
+}
+
+function runValidateProvenance(args: { artifact: string; cel: string; anchor: string }): {
+  content: Array<{ type: "text"; text: string }>;
+  isError?: boolean;
+} {
+  for (const [label, p] of [
+    ["artifact", args.artifact],
+    ["cel", args.cel],
+    ["anchor", args.anchor],
+  ] as const) {
+    let stat;
+    try {
+      stat = statSync(p);
+    } catch {
+      return {
+        content: [{ type: "text", text: `${label} path "${p}" not readable.` }],
+        isError: true,
+      };
+    }
+    if (!stat.isFile()) {
+      return {
+        content: [{ type: "text", text: `${label} path "${p}" is not a file.` }],
+        isError: true,
+      };
+    }
+  }
+  try {
+    const result = validateProvenanceFiles(args.artifact, args.cel, args.anchor);
+    return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+  } catch (e) {
+    return {
+      content: [{ type: "text", text: `validate_provenance failed: ${(e as Error).message}` }],
+      isError: true,
+    };
+  }
 }
 
 function runAuthoringKit(args: { stage?: string }): {
@@ -563,10 +660,16 @@ function runDecision(args: { path: string; case?: string }): {
   try {
     stat = statSync(args.path);
   } catch {
-    return { content: [{ type: "text", text: `Path "${args.path}" not readable.` }], isError: true };
+    return {
+      content: [{ type: "text", text: `Path "${args.path}" not readable.` }],
+      isError: true,
+    };
   }
   if (!stat.isFile()) {
-    return { content: [{ type: "text", text: `Path "${args.path}" is not a file.` }], isError: true };
+    return {
+      content: [{ type: "text", text: `Path "${args.path}" is not a file.` }],
+      isError: true,
+    };
   }
   const graph = resolveCelImports(args.path);
   const result = runCel(graph);
@@ -592,10 +695,16 @@ function runRenderScenario(args: { path: string; case?: string }): {
   try {
     stat = statSync(args.path);
   } catch {
-    return { content: [{ type: "text", text: `Path "${args.path}" not readable.` }], isError: true };
+    return {
+      content: [{ type: "text", text: `Path "${args.path}" not readable.` }],
+      isError: true,
+    };
   }
   if (!stat.isFile()) {
-    return { content: [{ type: "text", text: `Path "${args.path}" is not a file.` }], isError: true };
+    return {
+      content: [{ type: "text", text: `Path "${args.path}" is not a file.` }],
+      isError: true,
+    };
   }
   const graph = resolveCelImports(args.path);
   const vm = renderScenario(graph, args.case ? { case: args.case } : undefined);
