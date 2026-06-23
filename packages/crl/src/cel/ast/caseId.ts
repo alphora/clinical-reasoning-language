@@ -1,7 +1,9 @@
 import type { CELCase } from "./types";
 
-/** Bounded explicit-id format (provenance spec §7 "bounded, like #135"): alnum start, then alnum/_/-, ≤ 64 chars. */
-export const CASE_ID_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
+/** Bounded explicit-id format (provenance spec §7 "bounded, like #135"): alnum start, then alnum/_/-, ≤ 128 chars.
+ *  (Raised from 64 per T5 sur716-011 feedback — descriptive stable ids like
+ *  "contralateral-reduction-mammaplasty-for-symmetry-after-mastectomy" exceed 64; still bounded.) */
+export const CASE_ID_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
 
 /** Reserved derived-id namespace — an EXPLICIT id matching this is rejected (it would shadow a derived ordinal). */
 export const DERIVED_CASE_ID_RE = /^k\d+$/;

@@ -43,7 +43,8 @@ describe("CEL caseId — grammar + AST hoist (§7)", () => {
     expect(CASE_ID_RE.test("crohns-adult_2")).toBe(true);
     expect(CASE_ID_RE.test("-leading")).toBe(false);
     expect(CASE_ID_RE.test("has space")).toBe(false);
-    expect(CASE_ID_RE.test("a".repeat(65))).toBe(false);
+    expect(CASE_ID_RE.test("a".repeat(128))).toBe(true); // ≤128 allowed (raised from 64 per sur716-011 feedback)
+    expect(CASE_ID_RE.test("a".repeat(129))).toBe(false);
     expect(DERIVED_CASE_ID_RE.test("k12")).toBe(true);
     expect(DERIVED_CASE_ID_RE.test("k12a")).toBe(false);
   });
