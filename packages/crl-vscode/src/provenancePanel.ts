@@ -2,7 +2,7 @@
 // A TreeView grouped by severity (soft §9.1 keyword findings low-prominence), each finding click-navigable to its
 // CRL/CEL node or source span. Re-discovers + rebuilds on save of the .cel/.crl (editor) AND on regeneration of the
 // artifact/anchor (a FileSystemWatcher over the policy-root globs — those are tool-generated, not editor-saved).
-import { basename } from "node:path";
+import { basename, isAbsolute, relative } from "node:path";
 
 import { buildCorrespondenceModel } from "@smile-digital-health/crl";
 import { canonicalize } from "@smile-digital-health/crl/language-services";
@@ -204,7 +204,10 @@ export function registerProvenancePanel(context: vscode.ExtensionContext): void 
     const p = doc.uri.fsPath;
     if (canonicalize(p) === canonicalize(currentCel)) return scheduleRebuild();
     const src = findPolicySrc(currentCel);
-    if (src && canonicalize(p).startsWith(canonicalize(src))) scheduleRebuild();
+    if (!src) return;
+    // `relative` (not startsWith) for a real path-boundary check — startsWith would false-match a sibling like `…/src-other`.
+    const rel = relative(canonicalize(src), canonicalize(p));
+    if (rel && !rel.startsWith("..") && !isAbsolute(rel)) scheduleRebuild();
   });
 
   view.message = "Open a .cel and run “CRL: Show Provenance”.";
