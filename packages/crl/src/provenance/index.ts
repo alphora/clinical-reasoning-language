@@ -28,6 +28,13 @@ export type {
 } from "./indexer";
 export { deriveCoverage, decisionImplemented, isOverReach } from "./coverage";
 export type { CoverageReport } from "./coverage";
+export { validateProvenance } from "./validators";
+export type {
+  ProvenanceFinding,
+  ProvenanceFindingKind,
+  Severity,
+  ValidateOpts,
+} from "./validators";
 export { PROVENANCE_SCHEMA_VERSION } from "./artifact";
 export type {
   ProvenanceArtifact,

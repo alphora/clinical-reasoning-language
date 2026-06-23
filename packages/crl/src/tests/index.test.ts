@@ -32,3 +32,4 @@ import "../authoring-kit/tests/authoring-kit.test";
 import "../provenance/tests/canonicalize.test";
 import "../provenance/tests/indexer.test";
 import "../provenance/tests/coverage.test";
+import "../provenance/tests/validators.test";
