@@ -52,6 +52,24 @@ export function initialState(): State {
   return { primary: "source", paneVisibility: { source: true, crl: true, cel: true } };
 }
 
+/** Headless navigator model — the items the navigator (a TreeView in C2a; a webview adapter later) renders. */
+export interface NavigatorItem {
+  id: string;
+  label: string;
+  description?: string;
+  selection: Selection;
+}
+
+/** Derive the current-primary navigator list from state. C2a: the source-bearing steps in cycle order. */
+export function navigatorItems(state: State): NavigatorItem[] {
+  if (!state.index || state.primary !== "source") return [];
+  const byId = new Map(state.index.steps.map((s) => [s.unitId, s]));
+  return state.index.sourceCycleIds
+    .map((id) => byId.get(id))
+    .filter((s): s is CycleStep => s !== undefined)
+    .map((s) => ({ id: s.unitId, label: s.label, selection: { primary: "source", unitId: s.unitId } }));
+}
+
 const PANES: Pane[] = ["source", "crl", "cel"];
 
 function selectionTarget(sel: Selection): RevealEffect["target"] {

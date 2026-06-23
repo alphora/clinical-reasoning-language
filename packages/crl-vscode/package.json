@@ -2,7 +2,7 @@
   "name": "crl-language-support",
   "displayName": "Clinical Reasoning Language Support",
   "description": "CRL + CEL keyword highlighting, live validation diagnostics, CRL→CQL + CEL→FHIR-JSON emit, and catalog-driven authoring help (completion + hover) for .crl / .cel Markdown files.",
-  "version": "4.6.1",
+  "version": "4.7.0",
   "publisher": "smiledigitalhealth",
   "engines": {
     "vscode": "^1.85.0"
@@ -84,13 +84,53 @@
       {
         "command": "crl.revealProvenanceTarget",
         "title": "CRL: Reveal Provenance Target"
+      },
+      {
+        "command": "crl.cockpit.show",
+        "title": "CRL: Show Cockpit",
+        "icon": "$(layout)"
+      },
+      {
+        "command": "crl.cockpit.selectItem",
+        "title": "CRL: Select Cockpit Item"
+      },
+      {
+        "command": "crl.cockpit.next",
+        "title": "CRL: Next Unit",
+        "icon": "$(arrow-down)"
+      },
+      {
+        "command": "crl.cockpit.prev",
+        "title": "CRL: Previous Unit",
+        "icon": "$(arrow-up)"
+      },
+      {
+        "command": "crl.cockpit.openRaw",
+        "title": "CRL: Open Raw Source at Locus",
+        "icon": "$(go-to-file)"
       }
     ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "crlCockpit",
+          "title": "CRL",
+          "icon": "$(law)"
+        }
+      ]
+    },
     "views": {
       "explorer": [
         {
           "id": "crlProvenanceFindings",
           "name": "CRL Provenance",
+          "when": "crl.active"
+        }
+      ],
+      "crlCockpit": [
+        {
+          "id": "crlCockpitNavigator",
+          "name": "Correspondence",
           "when": "crl.active"
         }
       ]
@@ -106,6 +146,28 @@
           "command": "crl.showProvenance",
           "when": "resourceExtname == .cel",
           "group": "navigation"
+        },
+        {
+          "command": "crl.cockpit.show",
+          "when": "resourceExtname == .cel",
+          "group": "navigation"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "crl.cockpit.prev",
+          "when": "view == crlCockpitNavigator",
+          "group": "navigation@1"
+        },
+        {
+          "command": "crl.cockpit.next",
+          "when": "view == crlCockpitNavigator",
+          "group": "navigation@2"
+        },
+        {
+          "command": "crl.cockpit.openRaw",
+          "when": "view == crlCockpitNavigator",
+          "group": "navigation@3"
         }
       ],
       "commandPalette": [
@@ -120,6 +182,26 @@
         {
           "command": "crl.revealProvenanceTarget",
           "when": "false"
+        },
+        {
+          "command": "crl.cockpit.show",
+          "when": "resourceExtname == .cel"
+        },
+        {
+          "command": "crl.cockpit.selectItem",
+          "when": "false"
+        },
+        {
+          "command": "crl.cockpit.next",
+          "when": "crl.active"
+        },
+        {
+          "command": "crl.cockpit.prev",
+          "when": "crl.active"
+        },
+        {
+          "command": "crl.cockpit.openRaw",
+          "when": "crl.active"
         }
       ]
     },
@@ -169,10 +251,12 @@
     "test:correspondence-engine": "node src/correspondenceEngine.test.mjs",
     "pretest:pane-reveal-coordinator": "npm run compile",
     "test:pane-reveal-coordinator": "node src/paneRevealCoordinator.test.mjs",
+    "pretest:source-pane-html": "npm run compile",
+    "test:source-pane-html": "node src/sourcePaneHtml.test.mjs",
     "test:grammar": "node src/grammar.test.mjs",
     "test:package": "node src/package.test.mjs",
     "test:language-config": "node src/language-config.test.mjs",
-    "test": "npm run compile && node src/mcp-server.test.mjs && node src/provision.test.mjs && node src/highlight.test.mjs && node src/catalog.test.mjs && node src/embedded-catalog.test.mjs && node src/concepts.test.mjs && node src/crl-patterns-coverage.test.mjs && node src/contextDetect.test.mjs && node src/findDeclaration.test.mjs && node src/projectIndex.test.mjs && node src/completion.test.mjs && node src/grammar.test.mjs && node src/package.test.mjs && node src/language-config.test.mjs && node src/renderScenarioHtml.test.mjs && node src/provenanceFindings.test.mjs && node src/provenanceViewer.test.mjs && node src/correspondenceEngine.test.mjs && node src/paneRevealCoordinator.test.mjs && node test/oracle/check.mjs",
+    "test": "npm run compile && node src/mcp-server.test.mjs && node src/provision.test.mjs && node src/highlight.test.mjs && node src/catalog.test.mjs && node src/embedded-catalog.test.mjs && node src/concepts.test.mjs && node src/crl-patterns-coverage.test.mjs && node src/contextDetect.test.mjs && node src/findDeclaration.test.mjs && node src/projectIndex.test.mjs && node src/completion.test.mjs && node src/grammar.test.mjs && node src/package.test.mjs && node src/language-config.test.mjs && node src/renderScenarioHtml.test.mjs && node src/provenanceFindings.test.mjs && node src/provenanceViewer.test.mjs && node src/correspondenceEngine.test.mjs && node src/paneRevealCoordinator.test.mjs && node src/sourcePaneHtml.test.mjs && node test/oracle/check.mjs",
     "vscode:prepublish": "npm run build:crl && npm run compile",
     "package": "vsce package --no-dependencies"
   },

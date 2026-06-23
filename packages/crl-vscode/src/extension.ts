@@ -27,6 +27,7 @@ import {
 } from "./hover";
 import { registerDiagnostics } from "./diagnostics";
 import { registerCelDiagnostics } from "./celDiagnostics";
+import { registerCorrespondenceCockpit } from "./correspondenceCockpit";
 import { registerProvenancePanel } from "./provenancePanel";
 import { registerScenarioRunner } from "./scenarioRunner";
 import { CelCompletionProvider, CEL_DOCUMENT_SELECTOR } from "./celCompletion";
@@ -198,6 +199,7 @@ export function activate(context: vscode.ExtensionContext): void {
   registerLanguageFeatures(context, loadEmbeddedCatalog(context), index);
   registerScenarioRunner(context);
   registerProvenancePanel(context);
+  registerCorrespondenceCockpit(context);
   registerDiagnostics(context, index);
   registerCelDiagnostics(context, index);
 

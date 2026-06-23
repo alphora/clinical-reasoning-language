@@ -13,7 +13,7 @@ async function load(tsFile) {
   await build({ entryPoints: [resolve(here, tsFile)], bundle: true, platform: "node", format: "cjs", target: "node18", outfile: out, logLevel: "silent" });
   return require(out);
 }
-const { reduce, initialState } = await load("correspondenceEngine.ts");
+const { reduce, initialState, navigatorItems } = await load("correspondenceEngine.ts");
 
 let pass = 0;
 const check = (label, fn) => {
@@ -79,6 +79,13 @@ check("effects are SEMANTIC only (pane + {kind,id}; no DOM/column/key)", () => {
     assert.deepEqual(Object.keys(e).sort(), ["pane", "target", "type"]);
     assert.deepEqual(Object.keys(e.target).sort(), ["id", "kind"]);
   }
+});
+
+check("navigatorItems lists source-bearing steps in cycle order (skips source-less)", () => {
+  const s = seeded(["u1", "u2", "u3"], ["u1", "u3"]); // u2 source-less
+  assert.deepEqual(navigatorItems(s).map((i) => i.id), ["u1", "u3"]);
+  assert.deepEqual(navigatorItems(s)[0].selection, sel("u1"));
+  assert.deepEqual(navigatorItems(initialState()), []); // no index → empty
 });
 
 console.log(`\ncorrespondenceEngine.test: ${pass} checks passed`);
