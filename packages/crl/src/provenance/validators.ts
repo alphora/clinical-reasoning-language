@@ -17,6 +17,7 @@ export type Severity = "error" | "warning" | "manual-review";
 export type ProvenanceFindingKind =
   | "unresolved-ref"
   | "cel-unresolved"
+  | "provenance-references-unfrozen-case"
   | "nodekind-mismatch"
   | "ownership-mismatch"
   | "anchor-hash-drift"
@@ -49,8 +50,14 @@ export interface ProvenanceFinding {
 }
 
 export interface ValidateOpts {
-  /** Effective caseIds per .cel file (T4.2 effectiveCaseIds), keyed by the CelNodeRef.file. Absent → CEL refs not validated. */
+  /** Effective caseIds per .cel file (T4.2 effectiveCaseIds), keyed by the CelNodeRef.file. Absent → CEL ref existence not validated. */
   celCaseIds?: Map<string, Set<string>>;
+  /**
+   * EXPLICIT (frozen) caseIds per .cel file — cases that carry an authored `- id is "..."`. Absent → the freeze check
+   * is skipped. A provenance ref to a case NOT in this set is referencing an unfrozen/provisional id (spec §7
+   * grammar-optional/provenance-mandatory) → `provenance-references-unfrozen-case`.
+   */
+  frozenCaseIds?: Map<string, Set<string>>;
 }
 
 const DECISION_RELATIONS = new Set([
@@ -174,6 +181,20 @@ export function validateProvenance(
             kind: "cel-unresolved",
             severity: "error",
             message: `CEL ref ${cr.file}#${cr.caseId} does not resolve.`,
+            cluster: c.id,
+          });
+      }
+    }
+    // Freeze check (spec §7): a provenance ref to a case that lacks an explicit/frozen caseId is referencing a
+    // provisional, position-dependent id — durable authoring requires the case be frozen first.
+    if (opts?.frozenCaseIds) {
+      for (const cr of c.cel) {
+        const frozen = opts.frozenCaseIds.get(cr.file);
+        if (!frozen?.has(cr.caseId))
+          findings.push({
+            kind: "provenance-references-unfrozen-case",
+            severity: "error",
+            message: `CEL ref ${cr.file}#${cr.caseId} targets a case without an explicit (frozen) id — add a \`- id is "..."\` to that case before referencing it (§7).`,
             cluster: c.id,
           });
       }

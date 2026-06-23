@@ -4,7 +4,14 @@ import * as os from "os";
 import * as path from "path";
 
 import { resolveCelImports } from "../../cel/imports";
-import type { ProvenanceArtifact, Item, Cluster, CrlNodeRef, AnchorSourceMeta } from "../artifact";
+import type {
+  ProvenanceArtifact,
+  Item,
+  Cluster,
+  CrlNodeRef,
+  CelNodeRef,
+  AnchorSourceMeta,
+} from "../artifact";
 import { buildProvenanceIndex, type ProvenanceIndex } from "../indexer";
 import { validateProvenance, isStrictAncestor, type ProvenanceFinding } from "../validators";
 
@@ -530,6 +537,37 @@ describe("validateProvenance — V8 §9.1 MN-keyword (hard before soft)", () => 
     const neg = kinds(run(art({ items: [mk("d", "an undiscovered uncovered region")] })));
     expect(neg).not.toContain("mn-keyword-hard");
     expect(neg).not.toContain("mn-keyword-soft");
+  });
+});
+
+describe("validateProvenance — §7 freeze check (provenance-mandatory caseId)", () => {
+  const cel = (caseId: string): CelNodeRef => ({
+    file: "f.cel",
+    kind: "case",
+    caseId,
+    relation: "tests-branch",
+    status: "linked",
+  });
+  const frozen = new Map([["f.cel", new Set(["crohns-adult"])]]);
+  it("CEL ref to a case lacking an explicit/frozen id → provenance-references-unfrozen-case; a frozen id → none", () => {
+    const unfrozen: Cluster[] = [{ id: "c1", label: "", items: [], crl: [], cel: [cel("k2")] }];
+    expect(
+      validateProvenance(art({ clusters: unfrozen }), idx, "", { frozenCaseIds: frozen }).map(
+        (f) => f.kind,
+      ),
+    ).toContain("provenance-references-unfrozen-case");
+    const ok: Cluster[] = [{ id: "c1", label: "", items: [], crl: [], cel: [cel("crohns-adult")] }];
+    expect(
+      validateProvenance(art({ clusters: ok }), idx, "", { frozenCaseIds: frozen }).map(
+        (f) => f.kind,
+      ),
+    ).not.toContain("provenance-references-unfrozen-case");
+  });
+  it("without frozenCaseIds the freeze check is skipped", () => {
+    const unfrozen: Cluster[] = [{ id: "c1", label: "", items: [], crl: [], cel: [cel("k2")] }];
+    expect(run(art({ clusters: unfrozen })).map((f) => f.kind)).not.toContain(
+      "provenance-references-unfrozen-case",
+    );
   });
 });
 
