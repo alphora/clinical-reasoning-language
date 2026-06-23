@@ -27,6 +27,7 @@ import {
 } from "./hover";
 import { registerDiagnostics } from "./diagnostics";
 import { registerCelDiagnostics } from "./celDiagnostics";
+import { registerProvenancePanel } from "./provenancePanel";
 import { registerScenarioRunner } from "./scenarioRunner";
 import { CelCompletionProvider, CEL_DOCUMENT_SELECTOR } from "./celCompletion";
 import { CelHoverProvider } from "./celHover";
@@ -196,6 +197,7 @@ export function activate(context: vscode.ExtensionContext): void {
   );
   registerLanguageFeatures(context, loadEmbeddedCatalog(context), index);
   registerScenarioRunner(context);
+  registerProvenancePanel(context);
   registerDiagnostics(context, index);
   registerCelDiagnostics(context, index);
 

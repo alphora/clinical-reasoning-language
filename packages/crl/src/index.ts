@@ -41,10 +41,7 @@ export type {
 } from "./imports";
 
 export { validateCRLImports } from "./imports/validate";
-export type {
-  ValidateImportsOptions,
-  ValidateImportsResult,
-} from "./imports/validate";
+export type { ValidateImportsOptions, ValidateImportsResult } from "./imports/validate";
 
 // === CEL (Case Example Language) — sibling DSL ===
 export { tokenizeCEL, parseCEL, buildCEL } from "./cel";
@@ -80,6 +77,26 @@ export type {
   TypeAllowlist,
   VerifyLoop,
 } from "./authoring-kit/types";
+// === Provenance correspondence view-model (validation cockpit, #156) ===
+export { buildCorrespondenceModel } from "./provenance";
+export type {
+  CorrespondenceModel,
+  CorrespondenceUnit,
+  ResolvedItem,
+  ResolvedSourceSpan,
+  ResolvedCrlNode,
+  ResolvedCelNode,
+  AttachedFinding,
+  FindingTarget,
+  Rollup,
+  CorrespondenceDiagnostic,
+  ByteRange,
+  ProvenanceFinding,
+  ProvenanceFindingKind,
+  Severity as ProvenanceSeverity,
+  AnchorSourceMeta,
+} from "./provenance";
+
 export { validateCEL, validateCELFile } from "./cel/validator";
 export type {
   CELValidationError,
@@ -169,11 +186,7 @@ export type {
   IntentModifier,
   CrossResourceRelation,
 } from "./cel/ast/types";
-export type {
-  ValidationError,
-  ValidationErrorKind,
-  ValidationResult,
-} from "./validator/validator";
+export type { ValidationError, ValidationErrorKind, ValidationResult } from "./validator/validator";
 
 export interface Token {
   line: number;
@@ -340,7 +353,10 @@ export interface ValidationResultEnvelope extends ParseResult<CRL> {
  * with `errors` (and `warnings` in soft mode) suitable for surfacing to
  * editor diagnostics, the MCP layer, or a CLI.
  */
-export function validateCRL(input: string, options: ValidateOptions = {}): ValidationResultEnvelope {
+export function validateCRL(
+  input: string,
+  options: ValidateOptions = {},
+): ValidationResultEnvelope {
   const built = buildCRL(input);
   if (!built.success || !built.result) {
     // Lex/parse/build errors short-circuit semantic validation.
