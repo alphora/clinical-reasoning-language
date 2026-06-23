@@ -267,10 +267,18 @@ export function buildFindingsTree(model: CorrespondenceModel, notices: string[] 
   };
 }
 
-/** The one-line headline for the panel (TreeView.message). Never claims clean when manual-review > 0. */
+/**
+ * The one-line headline for the panel (TreeView.message). Glyph reflects the WORST severity present (✗ errors, ⚠
+ * manual-review/warnings, ✓ otherwise); only non-zero counts are shown — so a 0-error policy never reads "✗ 0 error(s)".
+ */
 export function headline(s: FindingsSummary, ambiguousVersion?: boolean): string {
   const coverage = `coverage ${s.mustLinkImplemented}/${s.mustLinkTotal}`;
   const v = ambiguousVersion && s.policyVersion ? ` · v${s.policyVersion}` : "";
-  if (s.clean) return `✓ clean · ${coverage}${v}`;
-  return `✗ ${s.errors} error(s) · ${s.manualReview} manual-review · ${s.warnings} warning(s) · ${coverage}${v}`;
+  const parts: string[] = [];
+  if (s.errors) parts.push(`${s.errors} error${s.errors === 1 ? "" : "s"}`);
+  if (s.manualReview) parts.push(`${s.manualReview} manual-review`);
+  if (s.warnings) parts.push(`${s.warnings} warning${s.warnings === 1 ? "" : "s"}`);
+  const glyph = s.errors ? "✗" : s.manualReview || s.warnings ? "⚠" : "✓";
+  const lead = parts.length ? parts.join(" · ") : "clean";
+  return `${glyph} ${lead} · ${coverage}${v}`;
 }

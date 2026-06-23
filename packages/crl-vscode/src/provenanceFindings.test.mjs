@@ -218,14 +218,18 @@ check("a source target's filePath is COMPOSED from model.anchor.filePath (model 
   assert.equal(soft.targets[0].filePath, "/x/anchor.txt");
 });
 
-check("summary.clean is false when errors/manual-review present; headline never says clean", () => {
-  const t = buildFindingsTree(model);
+check("headline: glyph by worst severity; never prints a zero count; clean → ✓", () => {
+  const t = buildFindingsTree(model); // errors:2, manualReview:1, warnings:1
   assert.equal(t.summary.clean, false);
   assert.ok(headline(t.summary).startsWith("✗"));
   assert.ok(headline(t.summary).includes("coverage 2/3"));
-  // a clean model → ✓
-  const clean = { ...t.summary, errors: 0, manualReview: 0, clean: true };
-  assert.ok(headline(clean).startsWith("✓"));
+  // 0 errors but a manual-review present → ⚠, NOT "✗ 0 error(s)"
+  const mr = headline({ ...t.summary, errors: 0, manualReview: 1, warnings: 3 });
+  assert.ok(mr.startsWith("⚠"), `expected ⚠ headline, got: ${mr}`);
+  assert.ok(!mr.includes("0 error"), `must not print a zero error count: ${mr}`);
+  assert.ok(mr.includes("1 manual-review") && mr.includes("3 warnings"));
+  // truly clean → ✓ clean
+  assert.equal(headline({ ...t.summary, errors: 0, manualReview: 0, warnings: 0 }), `✓ clean · coverage 2/3`);
 });
 
 const barrel = await import("@smile-digital-health/crl");
