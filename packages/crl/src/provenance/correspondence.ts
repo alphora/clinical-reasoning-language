@@ -242,9 +242,18 @@ export function buildCorrespondenceModel(
     if (s.type === "CELCase" && s.caseId !== undefined) frozenCases.set(s.caseId, s);
   }
   const effectiveCaseIds = r.celCaseIds.get(graph.filePath) ?? new Set<string>();
+  // File-aware, mirroring the validator: celCaseIds/frozenCaseIds are keyed by basename + abs (validators.ts:178). A ref
+  // to a different file is unresolved even if the caseId happens to exist in the policy .cel — so the model agrees with
+  // the validator (otherwise a cel-unresolved finding on a wrong-file ref would lose its cel target).
+  const knownCelFiles = new Set([graph.filePath, basename(graph.filePath)]);
   const resolveCel = (ref: CelNodeRef): ResolvedCelNode => {
+    const base = { ref, file: graph.filePath, caseId: ref.caseId, explicitCaseId: false };
+    if (!knownCelFiles.has(ref.file))
+      return {
+        ...base,
+        unresolved: `CEL ref file "${ref.file}" is not the policy .cel (${basename(graph.filePath)})`,
+      };
     const c = frozenCases.get(ref.caseId);
-    const base = { ref, file: graph.filePath, caseId: ref.caseId, explicitCaseId: c !== undefined };
     if (!c)
       return {
         ...base,
@@ -252,7 +261,11 @@ export function buildCorrespondenceModel(
           ? `CEL case "${ref.caseId}" exists but is not frozen (no \`- id is\`) in ${basename(graph.filePath)}`
           : `no CEL case with id "${ref.caseId}" in ${basename(graph.filePath)}`,
       };
-    return { ...base, location: { filePath: graph.filePath, range: toZeroBasedRange(c.location) } };
+    return {
+      ...base,
+      explicitCaseId: true,
+      location: { filePath: graph.filePath, range: toZeroBasedRange(c.location) },
+    };
   };
 
   const resolveItem = (id: string): ResolvedItem | undefined => {

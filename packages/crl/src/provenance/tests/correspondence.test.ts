@@ -41,6 +41,9 @@ fact "Pat":
 case "approve case":
 - id is "case-approve".
 - subject is "Pat".
+- result is "Dec" is "Approve".
+case "unfrozen case":
+- subject is "Pat".
 - result is "Dec" is "Approve".`;
 
 // "—" is a 3-byte em-dash (U+2014); "coverage applies" sits AFTER it → multi-byte offset.
@@ -158,6 +161,24 @@ function buildArtifact(textHash: string): ProvenanceArtifact {
       crl: [crlRef("Crit", "implements-criterion")],
       cel: [],
     },
+    // wrong file but an existing caseId → builder must agree with the file-aware validator (unresolved, not resolved)
+    {
+      id: "cl7",
+      label: "wrong-file",
+      items: ["i1"],
+      crl: [],
+      cel: [
+        {
+          file: "wrong.cel",
+          kind: "case",
+          caseId: "case-approve",
+          relation: "tests-branch",
+          status: "linked",
+        },
+      ],
+    },
+    // a case that EXISTS but is not frozen (referenced by its provisional ordinal k2) → unfrozen, not "no such case"
+    { id: "cl8", label: "unfrozen", items: ["i1"], crl: [], cel: [celRef("k2")] },
   ];
   const ignoredRanges: IgnoredRange[] = [{ ...bspan("Patient"), reason: "subject heading" }];
   return {
@@ -202,7 +223,16 @@ const unit = (id: string) => model.units.find((u) => u.id === id)!;
 describe("buildCorrespondenceModel — units + resolution", () => {
   it("builds one unit per cluster with policy identity", () => {
     expect(model.policyId).toBe("P");
-    expect(model.units.map((u) => u.id).sort()).toEqual(["cl1", "cl2", "cl3", "cl4", "cl5", "cl6"]);
+    expect(model.units.map((u) => u.id).sort()).toEqual([
+      "cl1",
+      "cl2",
+      "cl3",
+      "cl4",
+      "cl5",
+      "cl6",
+      "cl7",
+      "cl8",
+    ]);
     expect(model.anchor.text).toBe(ANCHOR);
   });
 
@@ -305,6 +335,22 @@ describe("buildCorrespondenceModel — finding targets", () => {
     expect(f.targets.some((t) => t.pane === "cel" && t.resolution === "unresolved")).toBe(true);
   });
 
+  it("a wrong-file CEL ref (existing caseId, wrong file) is unresolved — builder agrees with the file-aware validator", () => {
+    const wrong = unit("cl7").cel[0];
+    expect(wrong.unresolved).toMatch(/not the policy/i); // NOT silently resolved by caseId alone
+    const f = findBy("cel-unresolved").find((x) => x.finding.cluster === "cl7")!;
+    expect(f.targets.some((t) => t.pane === "cel" && t.resolution === "unresolved")).toBe(true);
+  });
+
+  it("an exists-but-unfrozen case (referenced by its provisional ordinal) reports 'not frozen', not 'no such case'", () => {
+    const unfrozen = unit("cl8").cel[0];
+    expect(unfrozen.explicitCaseId).toBe(false);
+    expect(unfrozen.unresolved).toMatch(/not frozen/i);
+    expect(
+      findBy("provenance-references-unfrozen-case").some((x) => x.finding.cluster === "cl8"),
+    ).toBe(true);
+  });
+
   it("item-text-drift (item text ≠ anchor bytes) carries a source target on its item", () => {
     const f = findBy("item-text-drift").find((x) => x.finding.itemId === "i4")!;
     expect(f).toBeDefined();
@@ -338,7 +384,7 @@ describe("buildCorrespondenceModel — degenerate input", () => {
     const badCel = path.join(root, "broken.cel");
     writeFileSync(badCel, "this is not valid CEL @@@");
     const m = buildCorrespondenceModel(writeArtifact(buildArtifact(TEXT_HASH)), badCel, anchorPath);
-    expect(m.units.length).toBe(6); // artifact still renders (source + CRL marks)
+    expect(m.units.length).toBe(8); // artifact still renders (source + CRL marks)
     expect(m.units.flatMap((u) => u.cel).every((c) => c.unresolved)).toBe(true); // CEL marks unresolved
     expect(m.diagnostics.some((d) => d.source === "cel-parse")).toBe(true);
   });
