@@ -33,3 +33,4 @@ import "../provenance/tests/canonicalize.test";
 import "../provenance/tests/indexer.test";
 import "../provenance/tests/coverage.test";
 import "../provenance/tests/validators.test";
+import "../provenance/tests/correspondence.test";
