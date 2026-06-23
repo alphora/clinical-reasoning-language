@@ -12,6 +12,7 @@
     "crl-ast": "dist/cli/run-ast.js",
     "crl-template-match": "dist/cli/run-template-match.js",
     "crl-canonicalize-source": "dist/cli/run-canonicalize-source.js",
+    "crl-validate-provenance": "dist/cli/run-validate-provenance.js",
     "crl-mcp": "dist/cli/run-mcp-server.js"
   },
   "sideEffects": false,
