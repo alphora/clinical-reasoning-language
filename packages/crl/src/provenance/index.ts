@@ -26,6 +26,8 @@ export type {
   ReachEdge,
   ProvenanceIndexDiagnostic,
 } from "./indexer";
+export { deriveCoverage, decisionImplemented, isOverReach } from "./coverage";
+export type { CoverageReport } from "./coverage";
 export { PROVENANCE_SCHEMA_VERSION } from "./artifact";
 export type {
   ProvenanceArtifact,

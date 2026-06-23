@@ -31,3 +31,4 @@ import "../cre/tests/viewModel.test";
 import "../authoring-kit/tests/authoring-kit.test";
 import "../provenance/tests/canonicalize.test";
 import "../provenance/tests/indexer.test";
+import "../provenance/tests/coverage.test";
