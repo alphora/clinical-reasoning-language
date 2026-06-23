@@ -2,7 +2,7 @@
 // A TreeView grouped by severity (soft §9.1 keyword findings low-prominence), each finding click-navigable to its
 // CRL/CEL node or source span. Re-discovers + rebuilds on save of the .cel/.crl (editor) AND on regeneration of the
 // artifact/anchor (a FileSystemWatcher over the policy-root globs — those are tool-generated, not editor-saved).
-import { basename, isAbsolute, relative } from "node:path";
+import { basename, isAbsolute, relative, sep } from "node:path";
 
 import { buildCorrespondenceModel } from "@smile-digital-health/crl";
 import { canonicalize } from "@smile-digital-health/crl/language-services";
@@ -87,7 +87,8 @@ class ProvenanceTreeProvider implements vscode.TreeDataProvider<Node> {
       // Surface the unresolved reason when nothing is navigable (else a single non-navigable target's reason
       // would be lost — the finding doesn't expand at targets.length <= 1).
       const unresolvedReason = primary ? undefined : n.targets.find((t) => !t.navigable)?.reason;
-      it.description = n.prominence === "soft" ? `${n.kind} (soft)` : unresolvedReason ? `${n.kind} — ${unresolvedReason}` : n.kind;
+      const base = unresolvedReason ? `${n.kind} — ${unresolvedReason}` : n.kind;
+      it.description = n.prominence === "soft" ? `${base} (soft)` : base;
       it.tooltip = `[${n.prominence}] ${n.kind}\n${n.label}${unresolvedReason ? `\n⚠ ${unresolvedReason}` : ""}`;
       if (primary) it.command = revealCommand(primary);
       return it;
@@ -180,6 +181,8 @@ export function registerProvenancePanel(context: vscode.ExtensionContext): void 
       return;
     }
     currentCel = ed.document.uri.fsPath;
+    // Ensure the view is revealed even if the workspace had no .crl/.cel at activation (the gate's findFiles is one-shot).
+    void vscode.commands.executeCommand("setContext", "crl.active", true);
     setupWatcher();
     rebuild();
   });
@@ -207,7 +210,7 @@ export function registerProvenancePanel(context: vscode.ExtensionContext): void 
     if (!src) return;
     // `relative` (not startsWith) for a real path-boundary check — startsWith would false-match a sibling like `…/src-other`.
     const rel = relative(canonicalize(src), canonicalize(p));
-    if (rel && !rel.startsWith("..") && !isAbsolute(rel)) scheduleRebuild();
+    if (rel && rel !== ".." && !rel.startsWith(".." + sep) && !isAbsolute(rel)) scheduleRebuild();
   });
 
   view.message = "Open a .cel and run “CRL: Show Provenance”.";
