@@ -67,18 +67,18 @@ check("rowNodeKeysForUnit: source unit → referencing CRL row; unresolved-crl u
 check("unitsForRow: a CRL click → SOURCE-BEARING candidates only (cover → multiple; u4 excluded)", () => {
   const m = buildCrlRevealMaps(correspondence, structure);
   // clicking `when A` → units citing cA = u1,u3,u4; u4 lacks a resolved span → filtered → quick-pick over u1,u3
-  assert.deepEqual(unitsForRow({ nodeKey: "when0", refKeys: ["cA"] }, m), ["u1", "u3"]);
+  assert.deepEqual(unitsForRow("when0", m), ["u1", "u3"]);
 });
 
 check("unitsForRow filters out source-less units (no-op, not a spurious quick-pick)", () => {
   const m = buildCrlRevealMaps(correspondence, structure);
   // clicking recommend X → unit u2 cites aX but has no source span → filtered → no candidates
-  assert.deepEqual(unitsForRow({ nodeKey: "when0act0", refKeys: ["aX"] }, m), []);
+  assert.deepEqual(unitsForRow("when0act0", m), []);
 });
 
 check("unmapped row → no candidates (clean no-op)", () => {
   const m = buildCrlRevealMaps(correspondence, structure);
-  assert.deepEqual(unitsForRow({ nodeKey: "oth", refKeys: [] }, m), []);
+  assert.deepEqual(unitsForRow("oth", m), []);
   assert.deepEqual(rowNodeKeysForUnit("nope", m), []);
 });
 
@@ -105,6 +105,12 @@ check("context-scoping: a shared activity does NOT bleed across branches (the rx
 check("no branch context (unit cites only the shared activity) → all action matches (best effort)", () => {
   const m = buildCrlRevealMaps({ units: [{ id: "uA", source: [{ displayRange: {} }], crl: [{ nodeKey: "aApprove" }] }] }, sharedStruct);
   assert.deepEqual(rowNodeKeysForUnit("uA", m).sort(), ["w0a0", "w1a0"]);
+});
+
+check("REVERSE scoping: clicking the shared Crohn's Approve selects only the Crohn's unit (no chooser)", () => {
+  const m = buildCrlRevealMaps(sharedCorr, sharedStruct);
+  assert.deepEqual(unitsForRow("w0a0", m), ["uCrohn"]); // not [uCrohn, uUC]
+  assert.deepEqual(unitsForRow("w1a0", m), ["uUC"]);
 });
 
 console.log(`\ncrlRevealMaps.test: ${pass} checks passed`);

@@ -11,7 +11,6 @@ import {
   buildCockpitModel,
   type CorrespondenceModel,
   type CrlDecisionStructure,
-  type CrlStructureNode,
 } from "@smile-digital-health/crl";
 import type { ZeroBasedRange } from "@smile-digital-health/crl/language-services";
 import * as vscode from "vscode";
@@ -80,8 +79,6 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   let correspondence: CorrespondenceModel | undefined;
   let crlStructure: CrlDecisionStructure[] = [];
   let crlMaps: CrlRevealMaps | undefined;
-  /** nodeKey → its structure row (for a CRL click: resolve the row's keys → candidate source units). */
-  const crlNodeByKey = new Map<string, { nodeKey: string; refKeys: string[] }>();
   let indexVersion = 0;
   let currentCel: string | undefined;
   /** last span-click locus (trusted, from the renderer) — open-raw uses it when it still matches the selection. */
@@ -95,8 +92,12 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   const navProvider: vscode.TreeDataProvider<NavigatorItem> = {
     onDidChangeTreeData: onNav.event,
     getChildren: () => navigatorItems(state),
+    // reveal() requires getParent (flat list → all roots) + a stable TreeItem.id, so reflecting a pane-driven selection
+    // back to the navigator matches the rendered item across refreshes (navigatorItems returns fresh objects each call).
+    getParent: () => undefined,
     getTreeItem: (it) => {
       const t = new vscode.TreeItem(it.label, vscode.TreeItemCollapsibleState.None);
+      t.id = it.id;
       if (it.description) t.description = it.description;
       // A TreeItem command fires only on USER click/enter — programmatic reveal() does not invoke it, so no round-trip guard is needed.
       t.command = { command: "crl.cockpit.selectItem", title: "Select", arguments: [it.id] };
@@ -240,11 +241,10 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     }
   }
 
-  /** Resolve a CRL row click → candidate source-bearing units → select (1) / quick-pick (>1) / no-op (0). */
+  /** Resolve a CRL row click → candidate source-bearing units (branch-scoped) → select (1) / quick-pick (>1) / no-op (0). */
   function onCrlClick(nodeKey: string): void {
-    const node = crlNodeByKey.get(nodeKey);
-    if (!node || !crlMaps) return;
-    const candidates = unitsForRow(node, crlMaps);
+    if (!crlMaps) return;
+    const candidates = unitsForRow(nodeKey, crlMaps);
     if (candidates.length === 0) return; // this CRL node maps to no source-bearing unit
     if (candidates.length === 1) {
       dispatch({ type: "select", selection: { primary: "source", unitId: candidates[0] } });
@@ -301,27 +301,11 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     indexVersion += 1;
     lastClicked = undefined;
     crlMaps = buildCrlRevealMaps(correspondence, crlStructure);
-    populateCrlNodeIndex();
     for (const pane of PANES) coord.clearPending(pane);
     dispatch({ type: "setInputs", index: toIndex(model, indexVersion) });
     navView.message =
       state.index && state.index.sourceCycleIds.length === 0 ? "No source-linked units in this policy." : undefined;
     for (const pane of PANES) renderPane(pane);
-  }
-
-  /** Flatten the CRL structure into a nodeKey → row index (roots carry no refKeys) for CRL-click resolution. */
-  function populateCrlNodeIndex(): void {
-    crlNodeByKey.clear();
-    const walk = (nodes: CrlStructureNode[]): void => {
-      for (const n of nodes) {
-        crlNodeByKey.set(n.nodeKey, { nodeKey: n.nodeKey, refKeys: n.refKeys });
-        walk(n.children);
-      }
-    };
-    for (const d of crlStructure) {
-      crlNodeByKey.set(d.nodeKey, { nodeKey: d.nodeKey, refKeys: [] });
-      walk(d.children);
-    }
   }
 
   /** On a discovery/build failure, drop stale provenance so the panes never stay interactive with wrong data. */
@@ -330,7 +314,6 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     correspondence = undefined;
     crlStructure = [];
     crlMaps = undefined;
-    crlNodeByKey.clear();
     lastClicked = undefined;
     indexVersion += 1;
     for (const pane of PANES) coord.clearPending(pane);

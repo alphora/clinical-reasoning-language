@@ -11,6 +11,7 @@ interface RowMeta {
   kind: string; // "when" | "otherwise" | "action" | "decision" (root)
   decision: string;
   lib: string;
+  refKeys: string[]; // the leaf keys this row references (for reverse click resolution)
 }
 
 export interface CrlRevealMaps {
@@ -68,10 +69,10 @@ export function buildCrlRevealMaps(
   for (const d of structure) {
     // a decision root is itself addressable (decl-level refs are legal)
     push(keyToRowNodeKeys, d.nodeKey, d.nodeKey);
-    nodeByKey.set(d.nodeKey, { nodeKey: d.nodeKey, nodeId: "", kind: "decision", decision: d.decision, lib: d.lib });
+    nodeByKey.set(d.nodeKey, { nodeKey: d.nodeKey, nodeId: "", kind: "decision", decision: d.decision, lib: d.lib, refKeys: [] });
     walk(d.children, (n) => {
       for (const key of [n.nodeKey, ...n.refKeys]) push(keyToRowNodeKeys, key, n.nodeKey);
-      nodeByKey.set(n.nodeKey, { nodeKey: n.nodeKey, nodeId: n.nodeId, kind: n.kind, decision: n.decision, lib: n.lib });
+      nodeByKey.set(n.nodeKey, { nodeKey: n.nodeKey, nodeId: n.nodeId, kind: n.kind, decision: n.decision, lib: n.lib, refKeys: n.refKeys });
     });
   }
 
@@ -104,11 +105,34 @@ export function rowNodeKeysForUnit(unitId: string, maps: CrlRevealMaps): string[
   return keep;
 }
 
-/** CRL row click → the candidate SOURCE-BEARING units (a row is targetable by its own key or any refKey). */
-export function unitsForRow(node: { nodeKey: string; refKeys: string[] }, maps: CrlRevealMaps): string[] {
-  const out: string[] = [];
-  for (const key of [node.nodeKey, ...node.refKeys])
+/**
+ * CRL row click → candidate SOURCE-BEARING units, branch-scoped. A row is targetable by its own key or any refKey; a
+ * shared activity key would otherwise return units from EVERY branch. So when >1 unit matches, prefer those whose own
+ * branch condition (a when/otherwise they cite) is in the CLICKED row's branch — the symmetric counterpart to
+ * rowNodeKeysForUnit. Falls back to all matches when scoping finds none (genuine ambiguity → the caller quick-picks).
+ */
+export function unitsForRow(nodeKey: string, maps: CrlRevealMaps): string[] {
+  const meta = maps.nodeByKey.get(nodeKey);
+  if (!meta) return [];
+  const raw: string[] = [];
+  for (const key of [meta.nodeKey, ...meta.refKeys])
     for (const unitId of maps.keyToUnitIds.get(key) ?? [])
-      if (maps.sourceBearingUnits.has(unitId) && !out.includes(unitId)) out.push(unitId);
-  return out;
+      if (maps.sourceBearingUnits.has(unitId) && !raw.includes(unitId)) raw.push(unitId);
+  if (raw.length <= 1) return raw;
+
+  const inBranch = raw.filter((unitId) =>
+    (maps.unitToKeys.get(unitId) ?? []).some((k) =>
+      (maps.keyToRowNodeKeys.get(k) ?? []).some((rowKey) => {
+        const r = maps.nodeByKey.get(rowKey);
+        return (
+          r !== undefined &&
+          (r.kind === "when" || r.kind === "otherwise") &&
+          r.decision === meta.decision &&
+          r.lib === meta.lib &&
+          isUnder(r.nodeId, meta.nodeId)
+        );
+      }),
+    ),
+  );
+  return inBranch.length >= 1 ? inBranch : raw;
 }
