@@ -2,7 +2,7 @@
   "name": "crl-language-support",
   "displayName": "Clinical Reasoning Language Support",
   "description": "CRL + CEL keyword highlighting, live validation diagnostics, CRL→CQL + CEL→FHIR-JSON emit, and catalog-driven authoring help (completion + hover) for .crl / .cel Markdown files.",
-  "version": "4.9.0",
+  "version": "4.10.0",
   "publisher": "smiledigitalhealth",
   "engines": {
     "vscode": "^1.85.0"
@@ -236,6 +236,24 @@
           "default": "source",
           "scope": "window",
           "description": "The cockpit's default primary pane — which pane the Correspondence navigator walks. 'source' lists source units; 'crl' lists CRL decision nodes. Set per-window; toggle live with 'CRL: Toggle Primary Pane'."
+        },
+        "crl.correspondence.paneOrder": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "source",
+              "crl",
+              "cel"
+            ]
+          },
+          "default": [
+            "source",
+            "crl",
+            "cel"
+          ],
+          "scope": "application",
+          "description": "Left-to-right column order of the cockpit panes. A global (cross-project) layout preference — NOT overridable per-workspace. A malformed list is repaired automatically. Changes apply live to open panes."
         }
       }
     }
@@ -281,10 +299,12 @@
     "test:crl-pane-html": "node src/crlPaneHtml.test.mjs",
     "pretest:crl-reveal-maps": "npm run compile",
     "test:crl-reveal-maps": "node src/crlRevealMaps.test.mjs",
+    "pretest:pane-order": "npm run compile",
+    "test:pane-order": "node src/paneOrder.test.mjs",
     "test:grammar": "node src/grammar.test.mjs",
     "test:package": "node src/package.test.mjs",
     "test:language-config": "node src/language-config.test.mjs",
-    "test": "npm run compile && node src/mcp-server.test.mjs && node src/provision.test.mjs && node src/highlight.test.mjs && node src/catalog.test.mjs && node src/embedded-catalog.test.mjs && node src/concepts.test.mjs && node src/crl-patterns-coverage.test.mjs && node src/contextDetect.test.mjs && node src/findDeclaration.test.mjs && node src/projectIndex.test.mjs && node src/completion.test.mjs && node src/grammar.test.mjs && node src/package.test.mjs && node src/language-config.test.mjs && node src/renderScenarioHtml.test.mjs && node src/provenanceFindings.test.mjs && node src/provenanceViewer.test.mjs && node src/correspondenceEngine.test.mjs && node src/paneRevealCoordinator.test.mjs && node src/sourcePaneHtml.test.mjs && node src/crlPaneHtml.test.mjs && node src/crlRevealMaps.test.mjs && node test/oracle/check.mjs",
+    "test": "npm run compile && node src/mcp-server.test.mjs && node src/provision.test.mjs && node src/highlight.test.mjs && node src/catalog.test.mjs && node src/embedded-catalog.test.mjs && node src/concepts.test.mjs && node src/crl-patterns-coverage.test.mjs && node src/contextDetect.test.mjs && node src/findDeclaration.test.mjs && node src/projectIndex.test.mjs && node src/completion.test.mjs && node src/grammar.test.mjs && node src/package.test.mjs && node src/language-config.test.mjs && node src/renderScenarioHtml.test.mjs && node src/provenanceFindings.test.mjs && node src/provenanceViewer.test.mjs && node src/correspondenceEngine.test.mjs && node src/paneRevealCoordinator.test.mjs && node src/sourcePaneHtml.test.mjs && node src/crlPaneHtml.test.mjs && node src/crlRevealMaps.test.mjs && node src/paneOrder.test.mjs && node test/oracle/check.mjs",
     "vscode:prepublish": "npm run build:crl && npm run compile",
     "package": "vsce package --no-dependencies"
   },

@@ -104,6 +104,15 @@ check("contributes the crl.correspondence.primary setting (enum source|crl, defa
   assert.equal(prop.scope, "window");
 });
 
+check("contributes the crl.correspondence.paneOrder setting (array of pane enums, default order, application scope)", () => {
+  const prop = c.configuration?.properties?.["crl.correspondence.paneOrder"];
+  assert.ok(prop, "expected crl.correspondence.paneOrder in contributes.configuration.properties");
+  assert.equal(prop.type, "array");
+  assert.deepEqual(prop.items?.enum, ["source", "crl", "cel"]);
+  assert.deepEqual(prop.default, ["source", "crl", "cel"]);
+  assert.equal(prop.scope, "application"); // global / cross-project, per the original requirement
+});
+
 // Verify the referenced language-configuration files exist on disk so a
 // package.json typo doesn't make it to release.
 check("contributes.languages.configuration paths resolve to real files", () => {

@@ -31,17 +31,16 @@ import {
 } from "./correspondenceEngine";
 import { renderCrlPane } from "./crlPaneHtml";
 import { buildCrlRevealMaps, rowNodeKeysForUnit, unitsForRow, type CrlRevealMaps } from "./crlRevealMaps";
+import { CANONICAL_PANE_ORDER, normalizePaneOrder } from "./paneOrder";
 import { PaneRevealCoordinator, type SemanticTarget } from "./paneRevealCoordinator";
 import { discoverProvenance, findPolicySrc } from "./provenanceFindings";
 import { buildViewerModel, type ViewerModel } from "./provenanceViewer";
 import { renderSourcePane, type OverlaySpan, type UnitSpan } from "./sourcePaneHtml";
 
 const PANES: Pane[] = ["source", "crl", "cel"];
-const COLUMN: Record<Pane, vscode.ViewColumn> = {
-  source: vscode.ViewColumn.One,
-  crl: vscode.ViewColumn.Two,
-  cel: vscode.ViewColumn.Three,
-};
+// Column slots by position (explicit, not ViewColumn arithmetic). A pane's column = its index among the OPEN panes in
+// the user's paneOrder (so hiding a pane never leaves a column gap).
+const ORDERED_COLUMNS = [vscode.ViewColumn.One, vscode.ViewColumn.Two, vscode.ViewColumn.Three];
 const PANE_TITLE: Record<Pane, string> = { source: "Source", crl: "CRL", cel: "CEL" };
 // Perf gate (disc 118): the measured full-render floor. Over → fall back to a navigation-only placeholder, don't freeze.
 const MAX_SOURCE_CHARS = 200_000;
@@ -105,8 +104,24 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   /** last span-click locus (trusted, from the renderer) — open-raw uses it when it still matches the selection. */
   let lastClicked: { unitId: string; range: ZeroBasedRange } | undefined;
   const views = new Map<Pane, PaneView>();
+  let paneOrder: Pane[] = [...CANONICAL_PANE_ORDER]; // user layout (crl.correspondence.paneOrder), normalized
   let watcher: vscode.FileSystemWatcher | undefined;
   let debounce: ReturnType<typeof setTimeout> | undefined;
+  let orderDebounce: ReturnType<typeof setTimeout> | undefined;
+
+  /** The column a pane opens in = its index among the OPEN panes in paneOrder (panels already created PLUS the one being
+   *  opened) — gap-free when a pane is hidden. Uses `views` (the same runtime signal applyPaneOrder uses) so creation-time
+   *  and live-reorder columns stay in lockstep — keep both predicates `views`-based. */
+  const columnFor = (paneToOpen: Pane): vscode.ViewColumn => {
+    const open = paneOrder.filter((p) => views.has(p) || p === paneToOpen);
+    return ORDERED_COLUMNS[Math.max(0, open.indexOf(paneToOpen))] ?? vscode.ViewColumn.One;
+  };
+
+  /** Reassert the full pane layout from paneOrder by revealing each OPEN panel at its slot (ascending column). */
+  const applyPaneOrder = (): void => {
+    const open = paneOrder.filter((p) => views.has(p));
+    open.forEach((pane, i) => views.get(pane)?.panel.reveal(ORDERED_COLUMNS[i] ?? vscode.ViewColumn.One, true));
+  };
 
   // ── navigator TreeView (adapter over the headless navigatorItems model) ──
   const onNav = new vscode.EventEmitter<NavigatorItem | undefined>();
@@ -343,7 +358,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     const panel = vscode.window.createWebviewPanel(
       `crlCockpit.${pane}`,
       PANE_TITLE[pane],
-      { viewColumn: COLUMN[pane], preserveFocus: true },
+      { viewColumn: columnFor(pane), preserveFocus: true },
       { enableScripts: true, retainContextWhenHidden: true },
     );
     panel.webview.html = shellHtml();
@@ -432,7 +447,9 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     // Apply the persisted default primary BEFORE the first rebuild's navigator render (else it flips visibly).
     const pref = vscode.workspace.getConfiguration("crl.correspondence", ed.document.uri).get<string>("primary");
     if (pref === "crl" || pref === "source") state = reduce(state, { type: "setPrimary", primary: pref }).state;
-    for (const pane of PANES) if (state.paneVisibility[pane]) ensurePane(pane);
+    // paneOrder is application-scoped (global, cross-project) → read WITHOUT a resource URI; open panes in that order.
+    paneOrder = normalizePaneOrder(vscode.workspace.getConfiguration("crl.correspondence").get("paneOrder"));
+    for (const pane of paneOrder) if (state.paneVisibility[pane]) ensurePane(pane);
     setupWatcher();
     rebuild();
   });
@@ -500,6 +517,17 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     }
   });
 
+  // Live pane reorder on a paneOrder setting change (debounced — settings.json edits fire per keystroke-settle). Gated on
+  // affectsConfiguration + currentCel. (application scope: an edit in another window may only take effect on reload — fine.)
+  const onConfig = vscode.workspace.onDidChangeConfiguration((e) => {
+    if (!currentCel || !e.affectsConfiguration("crl.correspondence.paneOrder")) return;
+    if (orderDebounce) clearTimeout(orderDebounce);
+    orderDebounce = setTimeout(() => {
+      paneOrder = normalizePaneOrder(vscode.workspace.getConfiguration("crl.correspondence").get("paneOrder"));
+      applyPaneOrder();
+    }, 150);
+  });
+
   navView.message = "Open a .cel and run “CRL: Show Cockpit”.";
   context.subscriptions.push(
     navView,
@@ -510,7 +538,14 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     prevCmd,
     openRawCmd,
     onSave,
-    { dispose: () => watcher?.dispose() },
+    onConfig,
+    {
+      dispose: () => {
+        watcher?.dispose();
+        if (debounce) clearTimeout(debounce); // a pending rebuild/reorder must not fire on disposed panels
+        if (orderDebounce) clearTimeout(orderDebounce);
+      },
+    },
   );
 }
 
