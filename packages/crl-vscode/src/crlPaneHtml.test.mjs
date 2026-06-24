@@ -14,6 +14,7 @@ async function load(tsFile) {
   return require(out);
 }
 const { renderCrlPane } = await load("crlPaneHtml.ts");
+const { corrColorClass } = await load("corrKey.ts");
 
 let pass = 0;
 const check = (label, fn) => {
@@ -31,12 +32,12 @@ const structure = [
   },
 ];
 
-check("renders a row per node (decision root + when/action/otherwise) with kind classes", () => {
+check("renders a flex row per node; kind classes on the label span; row carries id/data-reveal", () => {
   const out = renderCrlPane(structure);
-  assert.match(out.html, /class="crl-node crl-decision"[^>]*>decision &quot;D&quot;</);
-  assert.match(out.html, /class="crl-node when"[^>]*>when A</);
-  assert.match(out.html, /class="crl-node action recommend-activity"[^>]*>X</);
-  assert.match(out.html, /class="crl-node otherwise"[^>]*>otherwise</);
+  assert.match(out.html, /<div id="crl0" class="crl-row" data-reveal="[^"]*"><span class="crl-node crl-decision corr-d0">decision &quot;D&quot;<\/span><\/div>/);
+  assert.match(out.html, /class="crl-node when corr-d1">when A</);
+  assert.match(out.html, /class="crl-node action recommend-activity corr-d2">X</);
+  assert.match(out.html, /class="crl-node otherwise corr-d1">otherwise</);
 });
 
 check("anchors keyed by nodeKey (1:1), reveals by opaque key → nodeKey", () => {
@@ -49,11 +50,23 @@ check("anchors keyed by nodeKey (1:1), reveals by opaque key → nodeKey", () =>
   assert.deepEqual(revVals, ["dD", "oth", "when0", "when0act0"]);
 });
 
-check("indentation deepens with tree depth (decision 0 < when 1 < action 2)", () => {
+check("indentation via depth CSS classes (CSP-safe; NO inline style=), deepening with tree depth", () => {
   const out = renderCrlPane(structure);
-  const pad = (key) => Number(out.html.match(new RegExp(`>${key}<`)) && out.html.match(new RegExp(`padding-left:(\\d+)px"[^>]*>${key}<`))[1]);
-  assert.ok(pad("decision &quot;D&quot;") < pad("when A"));
-  assert.ok(pad("when A") < pad("X"));
+  assert.ok(!out.html.includes("style="), "no inline style= (CSP would drop it)");
+  const depth = (key) => Number(out.html.match(new RegExp(`corr-d(\\d+)">${key}<`))[1]);
+  assert.ok(depth("decision &quot;D&quot;") < depth("when A"));
+  assert.ok(depth("when A") < depth("X")); // 0 < 1 < 2
+});
+
+check("at-rest key (#163): showKeys + rowKeyNumbers → a key slot (swatch + number) before the label; off → none", () => {
+  const rowKeyNumbers = { when0: [3], when0act0: [3, 7] };
+  const on = renderCrlPane(structure, { rowKeyNumbers, showKeys: true });
+  assert.match(on.html, new RegExp(`<span class="corr-key"[^>]*><span class="corr-sw ${corrColorClass(3)}"></span><span class="corr-num">3</span></span><span class="crl-node when`));
+  assert.ok(on.html.includes('<span class="corr-num">3,7</span>'), "multi-unit row shows sorted numbers");
+  const off = renderCrlPane(structure, { rowKeyNumbers, showKeys: false });
+  assert.ok(!off.html.includes("corr-key"), "showKeys off → no key slot");
+  const noNums = renderCrlPane(structure, { rowKeyNumbers: {}, showKeys: true });
+  assert.ok(!noNums.html.includes("corr-key"), "a row with no numbers gets no slot");
 });
 
 check("XSS: labels are escaped", () => {

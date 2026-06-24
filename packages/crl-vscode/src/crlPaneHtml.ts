@@ -5,6 +5,8 @@
 // Mirrors sourcePaneHtml's conventions (gen-prefixed ids/keys, XSS-escaped, opaque reveal keys). Design: disc 120.
 import type { CrlDecisionStructure, CrlStructureNode } from "@smile-digital-health/crl";
 
+import { corrDepthClass, corrKeyHtml } from "./corrKey";
+
 export interface CrlAnchor {
   scrollTo: string;
   segmentIds: string[];
@@ -22,23 +24,31 @@ const escapeHtml = (s: string): string => s.replace(/[&<>"']/g, (c) => ESC[c]);
 
 export function renderCrlPane(
   structure: CrlDecisionStructure[],
-  opts: { revealPrefix?: string } = {},
+  // rowKeyNumbers: nodeKey → its corresponding units' numbers (#163 at-rest key). showKeys gates the slot.
+  opts: { revealPrefix?: string; rowKeyNumbers?: Record<string, number[]>; showKeys?: boolean } = {},
 ): RenderedCrl {
   const prefix = opts.revealPrefix ?? "";
+  const rowKeyNumbers = opts.rowKeyNumbers ?? {};
+  const showKeys = opts.showKeys ?? false;
   const anchors: Record<string, CrlAnchor> = {};
   const reveals: Record<string, { nodeKey: string }> = {};
   let idx = 0;
   let html = "";
 
-  const emit = (nodeKey: string, label: string, classes: string[], depth: number): void => {
+  // A row = flex container [at-rest key slot | depth-classed label]. Indentation is a CSS depth class on the LABEL (NOT
+  // an inline style — the webview CSP forbids `style=`; the old inline padding was silently dropped) so the key column
+  // stays left-aligned regardless of branch depth. The container carries the id/data-reveal (the whole row is the target).
+  const emit = (nodeKey: string, label: string, labelClasses: string[], depth: number): void => {
     const id = `${prefix}crl${idx++}`;
     const key = `${prefix}k${id}`;
     anchors[nodeKey] = { scrollTo: id, segmentIds: [id] };
     reveals[key] = { nodeKey };
-    const pad = depth * 14;
+    const keySlot = showKeys ? corrKeyHtml(rowKeyNumbers[nodeKey] ?? []) : "";
     html +=
-      `<div id="${escapeHtml(id)}" class="${classes.join(" ")}" data-reveal="${escapeHtml(key)}" ` +
-      `style="padding-left:${pad}px">${escapeHtml(label)}</div>`;
+      `<div id="${escapeHtml(id)}" class="crl-row" data-reveal="${escapeHtml(key)}">` +
+      keySlot +
+      `<span class="${[...labelClasses, corrDepthClass(depth)].join(" ")}">${escapeHtml(label)}</span>` +
+      `</div>`;
   };
 
   const walk = (nodes: CrlStructureNode[], depth: number): void => {

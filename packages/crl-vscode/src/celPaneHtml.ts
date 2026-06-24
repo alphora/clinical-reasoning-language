@@ -10,6 +10,8 @@
 // Fact peek is independent of the case's frozen id — the concept's correspondence doesn't depend on the case anchor.
 import { nodeKey, type RenderScenarioResult } from "@smile-digital-health/crl";
 
+import { corrKeyHtml } from "./corrKey";
+
 export interface CelAnchor {
   scrollTo: string;
   segmentIds: string[];
@@ -58,10 +60,13 @@ const BADGE: Record<string, string> = { pass: "✓", fail: "✗", error: "⚠" }
 export function renderCelPane(
   result: RenderScenarioResult,
   caseIdByName: Record<string, string>,
-  opts: { revealPrefix?: string; revealableConceptKeys?: ReadonlySet<string> } = {},
+  // caseKeyNumbers: caseId → its corresponding units' numbers (#163 at-rest key). showKeys gates the slot.
+  opts: { revealPrefix?: string; revealableConceptKeys?: ReadonlySet<string>; caseKeyNumbers?: Record<string, number[]>; showKeys?: boolean } = {},
 ): RenderedCel {
   const prefix = opts.revealPrefix ?? "";
   const revealable = opts.revealableConceptKeys;
+  const caseKeyNumbers = opts.caseKeyNumbers ?? {};
+  const showKeys = opts.showKeys ?? false;
   const anchors: Record<string, CelAnchor> = {};
   const reveals: Record<string, CelReveal> = {};
   const conceptToFactAnchors: Record<string, string[]> = {};
@@ -104,8 +109,11 @@ export function renderCelPane(
       return escapeHtml(f.name);
     });
     const produced = sc.produced.map((p) => escapeHtml(p.recommendation)).join(", ");
+    // At-rest key slot (#163): the units this case corresponds to. Only when the case is frozen (caseId-keyed) + showKeys.
+    const keySlot = showKeys && caseId !== undefined ? corrKeyHtml(caseKeyNumbers[caseId] ?? []) : "";
     html +=
       `<div ${attrs.join(" ")}>` +
+      keySlot +
       `<span class="cel-status">${BADGE[sc.status] ?? "·"}</span> ` +
       `<span class="cel-name">${escapeHtml(sc.case.name)}</span>` +
       (sc.case.subject ? ` <span class="cel-subject">(${escapeHtml(sc.case.subject)})</span>` : "") +

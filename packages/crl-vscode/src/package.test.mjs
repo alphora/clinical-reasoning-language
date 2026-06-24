@@ -93,6 +93,26 @@ check("contributes the crl.cockpit.setPrimary command + navigator-title button +
   assert.ok(palette.some((m) => m.command === "crl.cockpit.setPrimary"), "setPrimary must have a commandPalette entry");
 });
 
+check("contributes the crl.cockpit.toggleKeys command + navigator-title button + palette entry (#163)", () => {
+  const cmds = (c.commands ?? []).map((x) => x.command);
+  assert.ok(cmds.includes("crl.cockpit.toggleKeys"), "expected the crl.cockpit.toggleKeys command");
+  const viewTitle = c.menus?.["view/title"] ?? [];
+  assert.ok(
+    viewTitle.some((m) => m.command === "crl.cockpit.toggleKeys" && m.when === "view == crlCockpitNavigator"),
+    "toggleKeys must be a navigator-title button",
+  );
+  const palette = c.menus?.commandPalette ?? [];
+  assert.ok(palette.some((m) => m.command === "crl.cockpit.toggleKeys"), "toggleKeys must have a commandPalette entry");
+});
+
+check("contributes the crl.correspondence.showKeys setting (boolean, default true, window scope) (#163)", () => {
+  const prop = c.configuration?.properties?.["crl.correspondence.showKeys"];
+  assert.ok(prop, "expected crl.correspondence.showKeys in contributes.configuration.properties");
+  assert.equal(prop.type, "boolean");
+  assert.equal(prop.default, true);
+  assert.equal(prop.scope, "window");
+});
+
 check("contributes the crl.correspondence.primary setting (enum source|crl|cel, default source, window scope)", () => {
   const prop = c.configuration?.properties?.["crl.correspondence.primary"];
   assert.ok(prop, "expected crl.correspondence.primary in contributes.configuration.properties");

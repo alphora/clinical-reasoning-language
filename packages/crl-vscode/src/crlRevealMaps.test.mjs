@@ -13,7 +13,7 @@ async function load(tsFile) {
   await build({ entryPoints: [resolve(here, tsFile)], bundle: true, platform: "node", format: "cjs", target: "node18", outfile: out, logLevel: "silent" });
   return require(out);
 }
-const { buildCrlRevealMaps, rowNodeKeysForUnit, unitsForRow, caseIdsForUnit, unitsForCase, caseIdsForNode, unitsForConcept, rowsForConcept, conceptKeysForUnit, conceptKeysForNode } = await load("crlRevealMaps.ts");
+const { buildCrlRevealMaps, rowNodeKeysForUnit, unitsForRow, caseIdsForUnit, unitsForCase, caseIdsForNode, unitsForConcept, rowsForConcept, conceptKeysForUnit, conceptKeysForNode, unitsForRowAll, unitNumbersForRow, unitNumbersForCase } = await load("crlRevealMaps.ts");
 
 let pass = 0;
 const check = (label, fn) => {
@@ -165,6 +165,35 @@ check("conceptKeysForUnit: the keys a unit cites; conceptKeysForNode: row nodeKe
   assert.deepEqual(conceptKeysForNode("when0act0", m).sort(), ["aX", "when0act0"]); // action: own key + activity ref
   assert.deepEqual(conceptKeysForUnit("nope", m), []);
   assert.deepEqual(conceptKeysForNode("nope", m), []);
+});
+
+// #163 at-rest key: unitsForRowAll (branch-scoped, NO source-bearing filter) + the number helpers.
+check("unitsForRowAll INCLUDES source-less units (unlike unitsForRow which filters them)", () => {
+  const m = buildCrlRevealMaps(correspondence, structure);
+  assert.deepEqual(unitsForRow("when0act0", m), []); // u2 cites aX but is source-less → filtered
+  assert.deepEqual(unitsForRowAll("when0act0", m), ["u2"]); // at-rest key still numbers it
+});
+
+check("unitsForRowAll branch-scopes a shared activity (the rx501 over-tag), source-less included", () => {
+  // uCrohn/uUC both source-bearing here; the point is the branch-scoping still applies in the no-filter variant
+  const m = buildCrlRevealMaps(sharedCorr, sharedStruct);
+  assert.deepEqual(unitsForRowAll("w0a0", m).sort(), ["uCrohn"]);
+  assert.deepEqual(unitsForRowAll("w1a0", m).sort(), ["uUC"]);
+});
+
+check("unitNumbersForRow: branch-scoped units → sorted numbers, filtered to numbered units", () => {
+  const m = buildCrlRevealMaps(correspondence, structure);
+  const unitNumber = new Map([["u1", 1], ["u3", 2], ["u4", 3]]);
+  assert.deepEqual(unitNumbersForRow("when0", m, unitNumber), [1, 2, 3]); // cA cited by u1,u3,u4
+  assert.deepEqual(unitNumbersForRow("when0", m, new Map([["u1", 1], ["u3", 2]])), [1, 2]); // u4 unnumbered → dropped
+  assert.deepEqual(unitNumbersForRow("oth", m, unitNumber), []); // unmapped row
+});
+
+check("unitNumbersForCase: case → its units' numbers (unscoped), sorted + deduped", () => {
+  const m = buildCrlRevealMaps(celCorr, []);
+  assert.deepEqual(unitNumbersForCase("caseX", m, new Map([["u1", 1], ["u2", 2]])), [1, 2]);
+  assert.deepEqual(unitNumbersForCase("caseX", m, new Map([["u2", 5]])), [5]); // u1 unnumbered → dropped
+  assert.deepEqual(unitNumbersForCase("nope", m, new Map()), []);
 });
 
 console.log(`\ncrlRevealMaps.test: ${pass} checks passed`);

@@ -2,7 +2,7 @@
   "name": "crl-language-support",
   "displayName": "Clinical Reasoning Language Support",
   "description": "CRL + CEL keyword highlighting, live validation diagnostics, CRL→CQL + CEL→FHIR-JSON emit, and catalog-driven authoring help (completion + hover) for .crl / .cel Markdown files.",
-  "version": "4.13.0",
+  "version": "4.14.0",
   "publisher": "smiledigitalhealth",
   "engines": {
     "vscode": "^1.85.0"
@@ -113,6 +113,11 @@
         "command": "crl.cockpit.setPrimary",
         "title": "CRL: Set Navigator Primary Pane (Source / CRL / CEL)",
         "icon": "$(arrow-swap)"
+      },
+      {
+        "command": "crl.cockpit.toggleKeys",
+        "title": "CRL: Toggle Correspondence Keys",
+        "icon": "$(symbol-numeric)"
       }
     ],
     "viewsContainers": {
@@ -178,6 +183,11 @@
           "command": "crl.cockpit.openRaw",
           "when": "view == crlCockpitNavigator",
           "group": "navigation@3"
+        },
+        {
+          "command": "crl.cockpit.toggleKeys",
+          "when": "view == crlCockpitNavigator",
+          "group": "navigation@4"
         }
       ],
       "commandPalette": [
@@ -215,6 +225,10 @@
         },
         {
           "command": "crl.cockpit.setPrimary",
+          "when": "crl.active"
+        },
+        {
+          "command": "crl.cockpit.toggleKeys",
           "when": "crl.active"
         }
       ]
@@ -255,6 +269,12 @@
           ],
           "scope": "window",
           "description": "Left-to-right column order of the cockpit panes. Set it in User settings to persist across all projects, or in Workspace settings for one project. A malformed list is repaired automatically. Changes apply live to open panes."
+        },
+        "crl.correspondence.showKeys": {
+          "type": "boolean",
+          "default": true,
+          "scope": "window",
+          "description": "Show the at-rest correspondence key (a per-unit number + cycled color) on each corresponding element across the cockpit's CRL / CEL panes and the navigator, so 'what links to what' is visible without selecting. Toggle live with 'CRL: Toggle Correspondence Keys'."
         }
       }
     }
@@ -302,6 +322,8 @@
     "test:crl-reveal-maps": "node src/crlRevealMaps.test.mjs",
     "pretest:cel-pane-html": "npm run compile",
     "test:cel-pane-html": "node src/celPaneHtml.test.mjs",
+    "pretest:corr-key": "npm run compile",
+    "test:corr-key": "node src/corrKey.test.mjs",
     "pretest:webview-hit": "npm run compile",
     "test:webview-hit": "node src/webviewHit.test.mjs",
     "pretest:pane-order": "npm run compile",
@@ -309,7 +331,7 @@
     "test:grammar": "node src/grammar.test.mjs",
     "test:package": "node src/package.test.mjs",
     "test:language-config": "node src/language-config.test.mjs",
-    "test": "npm run compile && node src/mcp-server.test.mjs && node src/provision.test.mjs && node src/highlight.test.mjs && node src/catalog.test.mjs && node src/embedded-catalog.test.mjs && node src/concepts.test.mjs && node src/crl-patterns-coverage.test.mjs && node src/contextDetect.test.mjs && node src/findDeclaration.test.mjs && node src/projectIndex.test.mjs && node src/completion.test.mjs && node src/grammar.test.mjs && node src/package.test.mjs && node src/language-config.test.mjs && node src/renderScenarioHtml.test.mjs && node src/provenanceFindings.test.mjs && node src/provenanceViewer.test.mjs && node src/correspondenceEngine.test.mjs && node src/paneRevealCoordinator.test.mjs && node src/sourcePaneHtml.test.mjs && node src/crlPaneHtml.test.mjs && node src/crlRevealMaps.test.mjs && node src/celPaneHtml.test.mjs && node src/webviewHit.test.mjs && node src/paneOrder.test.mjs && node test/oracle/check.mjs",
+    "test": "npm run compile && node src/mcp-server.test.mjs && node src/provision.test.mjs && node src/highlight.test.mjs && node src/catalog.test.mjs && node src/embedded-catalog.test.mjs && node src/concepts.test.mjs && node src/crl-patterns-coverage.test.mjs && node src/contextDetect.test.mjs && node src/findDeclaration.test.mjs && node src/projectIndex.test.mjs && node src/completion.test.mjs && node src/grammar.test.mjs && node src/package.test.mjs && node src/language-config.test.mjs && node src/renderScenarioHtml.test.mjs && node src/provenanceFindings.test.mjs && node src/provenanceViewer.test.mjs && node src/correspondenceEngine.test.mjs && node src/paneRevealCoordinator.test.mjs && node src/sourcePaneHtml.test.mjs && node src/crlPaneHtml.test.mjs && node src/crlRevealMaps.test.mjs && node src/celPaneHtml.test.mjs && node src/webviewHit.test.mjs && node src/corrKey.test.mjs && node src/paneOrder.test.mjs && node test/oracle/check.mjs",
     "vscode:prepublish": "npm run build:crl && npm run compile",
     "package": "vsce package --no-dependencies"
   },

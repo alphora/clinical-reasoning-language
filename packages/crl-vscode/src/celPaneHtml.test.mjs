@@ -167,4 +167,13 @@ check("reverseCelAnchors: dedupes a key appearing in both fact + case sets", () 
   assert.deepEqual(out, ["dup", "fact:g_cel0:f0", "cB"]);
 });
 
+check("at-rest key (#163): showKeys + caseKeyNumbers → a key slot in the case block; off → none; un-frozen → none", () => {
+  const on = renderCelPane(result([sc("A", "pass")]), { A: "cA" }, { caseKeyNumbers: { cA: [2, 5] }, showKeys: true });
+  assert.ok(on.html.includes('<span class="corr-num">2,5</span>'), "case shows its sorted unit numbers");
+  const off = renderCelPane(result([sc("A", "pass")]), { A: "cA" }, { caseKeyNumbers: { cA: [2, 5] }, showKeys: false });
+  assert.ok(!off.html.includes("corr-key"), "showKeys off → no slot");
+  const unfrozen = renderCelPane(result([sc("U", "pass")]), {}, { caseKeyNumbers: {}, showKeys: true });
+  assert.ok(!unfrozen.html.includes("corr-key"), "un-frozen case (no caseId) → no key slot");
+});
+
 console.log(`\ncelPaneHtml.test: ${pass} checks passed`);

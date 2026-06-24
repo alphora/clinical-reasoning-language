@@ -175,12 +175,27 @@ export function rowNodeKeysForUnit(unitId: string, maps: CrlRevealMaps): string[
  * rowNodeKeysForUnit. Falls back to all matches when scoping finds none (genuine ambiguity → the caller quick-picks).
  */
 export function unitsForRow(nodeKey: string, maps: CrlRevealMaps): string[] {
+  return rowUnits(nodeKey, maps, true);
+}
+
+/**
+ * The at-rest KEY counterpart (#163): the units a CRL row corresponds to, branch-scoped EXACTLY like `unitsForRow` but
+ * WITHOUT the source-bearing filter — a unit with no source span still has a number to display on the row. Same fallback
+ * (no in-branch match → all matched units, so a genuinely-ambiguous shared row over-numbers rather than under-numbers).
+ */
+export function unitsForRowAll(nodeKey: string, maps: CrlRevealMaps): string[] {
+  return rowUnits(nodeKey, maps, false);
+}
+
+/** Shared core for unitsForRow / unitsForRowAll. The source-bearing predicate is fused into raw collection (so the
+ *  `raw.length <= 1` early-out is computed on the right set), then branch-scoping prefers in-branch units. */
+function rowUnits(nodeKey: string, maps: CrlRevealMaps, requireSourceBearing: boolean): string[] {
   const meta = maps.nodeByKey.get(nodeKey);
   if (!meta) return [];
   const raw: string[] = [];
   for (const key of [meta.nodeKey, ...meta.refKeys])
     for (const unitId of maps.keyToUnitIds.get(key) ?? [])
-      if (maps.sourceBearingUnits.has(unitId) && !raw.includes(unitId)) raw.push(unitId);
+      if ((!requireSourceBearing || maps.sourceBearingUnits.has(unitId)) && !raw.includes(unitId)) raw.push(unitId);
   if (raw.length <= 1) return raw;
 
   const inBranch = raw.filter((unitId) =>
@@ -198,4 +213,24 @@ export function unitsForRow(nodeKey: string, maps: CrlRevealMaps): string[] {
     ),
   );
   return inBranch.length >= 1 ? inBranch : raw;
+}
+
+/** At-rest key (#163): a CRL row → its corresponding units' NUMBERS (branch-scoped via unitsForRowAll), filtered to
+ *  numbered units (a CRL ref with no renderable locus isn't in `unitNumber`), sorted ascending + deduped. */
+export function unitNumbersForRow(nodeKey: string, maps: CrlRevealMaps, unitNumber: Map<string, number>): number[] {
+  return toSortedNumbers(unitsForRowAll(nodeKey, maps), unitNumber);
+}
+
+/** At-rest key (#163): a CEL case → its units' NUMBERS (unscoped — a case is coarser than a branch), sorted + deduped. */
+export function unitNumbersForCase(caseId: string, maps: CrlRevealMaps, unitNumber: Map<string, number>): number[] {
+  return toSortedNumbers(unitsForCase(caseId, maps), unitNumber);
+}
+
+function toSortedNumbers(unitIds: string[], unitNumber: Map<string, number>): number[] {
+  const nums = new Set<number>();
+  for (const u of unitIds) {
+    const n = unitNumber.get(u);
+    if (n !== undefined) nums.add(n);
+  }
+  return [...nums].sort((a, b) => a - b);
 }

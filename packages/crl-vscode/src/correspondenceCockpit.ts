@@ -32,6 +32,7 @@ import {
   type State,
 } from "./correspondenceEngine";
 import { renderCelPane, reverseCelAnchors } from "./celPaneHtml";
+import { CORR_STYLE } from "./corrKey";
 import { renderCrlPane } from "./crlPaneHtml";
 import {
   buildCrlRevealMaps,
@@ -41,6 +42,8 @@ import {
   conceptKeysForUnit,
   rowNodeKeysForUnit,
   rowsForConcept,
+  unitNumbersForCase,
+  unitNumbersForRow,
   unitsForCase,
   unitsForConcept,
   unitsForRow,
@@ -144,6 +147,14 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
    *  A single shell global (not per-PaneView) is safe because there is exactly one CEL pane and every rebuild renders it;
    *  revisit if panes ever re-render independently. */
   let conceptToFactAnchors: Record<string, string[]> = {};
+  // #163 at-rest correspondence key. `unitNumber` = unitId → its 1-based index in `model.steps` order (= the navigator
+  // order; an ephemeral within-render index, re-numbered each rebuild). `rowKeyNumbers`/`caseKeyNumbers` = the per-element
+  // number lists the CRL/CEL renderers stamp. `showKeys` gates the whole channel. All recomputed in rebuild + cached here
+  // so the onConfig toggle can re-render WITHOUT a full rebuild.
+  let unitNumber: Map<string, number> = new Map();
+  let rowKeyNumbers: Record<string, number[]> = {};
+  let caseKeyNumbers: Record<string, number[]> = {};
+  let showKeys = true;
   let indexVersion = 0;
   let currentCel: string | undefined;
   /** last span-click locus (trusted, from the renderer) — open-raw uses it when it still matches the selection. */
@@ -177,7 +188,19 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     // back to the navigator matches the rendered item across refreshes (navigatorItems returns fresh objects each call).
     getParent: () => undefined,
     getTreeItem: (it) => {
-      const t = new vscode.TreeItem(it.label, vscode.TreeItemCollapsibleState.None);
+      // #163 at-rest key: prefix the row with the unit number(s) it corresponds to (shell-side, so the pure engine
+      // stays number-free). Source item = its own unit number; CRL/CEL item = the units its row/case maps to. id +
+      // description are untouched (reveal-match by id / decision-status text unaffected).
+      const navNums =
+        it.selection.primary === "source"
+          ? unitNumber.has(it.id)
+            ? [unitNumber.get(it.id)!]
+            : []
+          : it.selection.primary === "crl"
+            ? rowKeyNumbers[it.id] ?? []
+            : caseKeyNumbers[it.id] ?? [];
+      const label = showKeys && navNums.length ? `${navNums.join(",")} · ${it.label}` : it.label;
+      const t = new vscode.TreeItem(label, vscode.TreeItemCollapsibleState.None);
       t.id = it.id;
       if (it.description) t.description = it.description;
       // A TreeItem command fires only on USER click/enter — programmatic reveal() does not invoke it, so no round-trip guard is needed.
@@ -334,14 +357,14 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       v.reveals = r.reveals;
       void v.panel.webview.postMessage({ type: "render", html: r.html, gen, indexVersion });
     } else if (pane === "crl") {
-      const r = renderCrlPane(crlStructure, { revealPrefix: `g${gen}_` });
+      const r = renderCrlPane(crlStructure, { revealPrefix: `g${gen}_`, rowKeyNumbers, showKeys });
       v.anchors = r.anchors;
       v.reveals = r.reveals;
       void v.panel.webview.postMessage({ type: "render", html: r.html, gen, indexVersion });
     } else {
       // CEL pane — condensed scenario cases (C2c-1).
       const r = scenarios
-        ? renderCelPane(scenarios, caseIdByName, { revealPrefix: `g${gen}_`, revealableConceptKeys })
+        ? renderCelPane(scenarios, caseIdByName, { revealPrefix: `g${gen}_`, revealableConceptKeys, caseKeyNumbers, showKeys })
         : { html: '<p class="placeholder">No CEL.</p>', anchors: {}, reveals: {}, conceptToFactAnchors: {} };
       v.anchors = r.anchors;
       v.reveals = r.reveals;
@@ -501,6 +524,27 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       ...[...m.keyToUnitIds].filter(([, units]) => units.some((u) => m.sourceBearingUnits.has(u))).map(([k]) => k),
       ...m.keyToRowNodeKeys.keys(),
     ]);
+    // #163 at-rest key: number units by model.steps order (= nav order); precompute the CRL-row + CEL-case number lists
+    // (branch-scoped for rows). Cached so the showKeys toggle re-renders without rebuilding. Only non-empty entries stored.
+    unitNumber = new Map(model.steps.map((s, i) => [s.unitId, i + 1]));
+    rowKeyNumbers = {};
+    const numberRows = (nodes: CrlStructureNode[]): void => {
+      for (const n of nodes) {
+        const nums = unitNumbersForRow(n.nodeKey, m, unitNumber);
+        if (nums.length) rowKeyNumbers[n.nodeKey] = nums;
+        numberRows(n.children);
+      }
+    };
+    for (const d of crlStructure) {
+      const nums = unitNumbersForRow(d.nodeKey, m, unitNumber);
+      if (nums.length) rowKeyNumbers[d.nodeKey] = nums;
+      numberRows(d.children);
+    }
+    caseKeyNumbers = {};
+    for (const caseId of Object.values(caseIdByName)) {
+      const nums = unitNumbersForCase(caseId, m, unitNumber);
+      if (nums.length) caseKeyNumbers[caseId] = nums;
+    }
     for (const pane of PANES) coord.clearPending(pane);
     dispatch({ type: "setInputs", index: toIndex(model, crlStructure, toCelNav(scenarios, caseIdByName), indexVersion) });
     updateNavMessage();
@@ -517,6 +561,9 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     caseIdByName = {};
     revealableConceptKeys = new Set();
     conceptToFactAnchors = {};
+    unitNumber = new Map();
+    rowKeyNumbers = {};
+    caseKeyNumbers = {};
     lastClicked = undefined;
     indexVersion += 1;
     for (const pane of PANES) coord.clearPending(pane);
@@ -561,6 +608,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     paneOrder = normalizePaneOrder(
       vscode.workspace.getConfiguration("crl.correspondence", ed.document.uri).get("paneOrder"),
     );
+    showKeys = vscode.workspace.getConfiguration("crl.correspondence", ed.document.uri).get<boolean>("showKeys") ?? true;
     for (const pane of paneOrder) if (state.paneVisibility[pane]) ensurePane(pane);
     setupWatcher();
     rebuild();
@@ -593,6 +641,30 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   const selectItemCmd = vscode.commands.registerCommand("crl.cockpit.selectItem", (selection: Selection) => {
     lastClicked = undefined; // navigator click → no specific span; open-raw falls back to the unit's earliest range
     dispatch({ type: "select", selection });
+  });
+
+  /** Apply a showKeys change WITHOUT a rebuild: re-render the key-bearing panes (CRL/CEL — source carries no key in
+   *  #163-1) + refresh the navigator labels (the prefix is read in getTreeItem). The cached number maps are still valid
+   *  (same model). Re-rendering swaps the pane DOM (dropping the selection's `.current`), so re-drive the current
+   *  selection afterwards to restore its highlight (queues a reveal that lands when the re-rendered panes re-ack). */
+  function applyShowKeys(next: boolean): void {
+    showKeys = next;
+    renderPane("crl");
+    renderPane("cel");
+    onNav.fire(undefined); // re-run getTreeItem → label prefixes appear/disappear
+    if (state.selection) dispatch({ type: "select", selection: state.selection }); // restore highlights post-re-render
+  }
+
+  const toggleKeysCmd = vscode.commands.registerCommand("crl.cockpit.toggleKeys", () => {
+    if (!currentCel) return;
+    // Read the LIVE persisted value (not the cached render-state `showKeys`) and write its inverse, to the most-specific
+    // writable scope (resource-aware like primary/paneOrder). The onConfig handler is the single re-render path (so a
+    // manual settings.json edit behaves identically to the button).
+    const cfg = vscode.workspace.getConfiguration("crl.correspondence", vscode.Uri.file(currentCel));
+    const cur = cfg.get<boolean>("showKeys") ?? true;
+    void cfg
+      .update("showKeys", !cur)
+      .then(undefined, (e) => console.warn(`[crl.cockpit] could not persist showKeys: ${e instanceof Error ? e.message : e}`));
   });
   const nextCmd = vscode.commands.registerCommand("crl.cockpit.next", () => {
     lastClicked = undefined;
@@ -643,13 +715,21 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   // Live pane reorder on a paneOrder setting change (debounced — settings.json edits fire per keystroke-settle). Gated on
   // affectsConfiguration + currentCel. (application scope: an edit in another window may only take effect on reload — fine.)
   const onConfig = vscode.workspace.onDidChangeConfiguration((e) => {
-    if (!currentCel || !e.affectsConfiguration("crl.correspondence.paneOrder")) return;
-    if (orderDebounce) clearTimeout(orderDebounce);
-    orderDebounce = setTimeout(() => {
-      const uri = currentCel ? vscode.Uri.file(currentCel) : undefined;
-      paneOrder = normalizePaneOrder(vscode.workspace.getConfiguration("crl.correspondence", uri).get("paneOrder"));
-      applyPaneOrder();
-    }, 150);
+    if (!currentCel) return;
+    if (e.affectsConfiguration("crl.correspondence.paneOrder")) {
+      if (orderDebounce) clearTimeout(orderDebounce);
+      orderDebounce = setTimeout(() => {
+        const uri = currentCel ? vscode.Uri.file(currentCel) : undefined;
+        paneOrder = normalizePaneOrder(vscode.workspace.getConfiguration("crl.correspondence", uri).get("paneOrder"));
+        applyPaneOrder();
+      }, 150);
+    }
+    // showKeys (#163): re-render with the at-rest key channel on/off. Separate branch — a showKeys edit must re-render
+    // even when paneOrder didn't change. Re-render only (no rebuild — the number maps are unchanged).
+    if (e.affectsConfiguration("crl.correspondence.showKeys")) {
+      const next = vscode.workspace.getConfiguration("crl.correspondence", vscode.Uri.file(currentCel)).get<boolean>("showKeys") ?? true;
+      if (next !== showKeys) applyShowKeys(next);
+    }
   });
 
   navView.message = "Open a .cel and run “CRL: Show Cockpit”.";
@@ -657,6 +737,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     navView,
     showCmd,
     setPrimaryCmd,
+    toggleKeysCmd,
     selectItemCmd,
     nextCmd,
     prevCmd,
@@ -685,8 +766,10 @@ function shellHtml(): string {
 .ignored{opacity:.55}
 .current{outline:2px solid var(--vscode-focusBorder,#3794ff);background:var(--vscode-editor-findMatchBackground,rgba(100,170,255,.4))}
 [data-reveal]{cursor:pointer}.placeholder{opacity:.6;font-style:italic}
-.crl-node{display:block;padding:1px 4px;border-radius:2px}
-.crl-decision{font-weight:bold;margin-top:4px}
+.crl-row{display:flex;align-items:baseline;padding:1px 4px;border-radius:2px}
+.crl-row:has(.crl-decision){margin-top:4px}
+.crl-node{border-radius:2px}
+.crl-decision{font-weight:bold}
 .crl-node.when{color:var(--vscode-symbolIcon-keywordForeground,#c586c0)}
 .crl-node.otherwise{opacity:.75;font-style:italic}
 .crl-node.action{color:var(--vscode-symbolIcon-functionForeground,#dcdcaa)}
@@ -698,7 +781,8 @@ function shellHtml(): string {
 .cel-name{font-weight:bold}.cel-subject{opacity:.7}
 .cel-facts,.cel-produced{opacity:.8;padding-left:14px;font-size:.95em}
 .cel-fact{cursor:pointer;text-decoration:underline dotted;text-underline-offset:2px}
-.cel-fact:hover{color:var(--vscode-textLink-activeForeground)}`;
+.cel-fact:hover{color:var(--vscode-textLink-activeForeground)}
+${CORR_STYLE}`;
   return (
     `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">` +
     `<meta http-equiv="Content-Security-Policy" content="${csp}">` +
