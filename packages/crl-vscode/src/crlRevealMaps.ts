@@ -25,6 +25,10 @@ export interface CrlRevealMaps {
   sourceBearingUnits: Set<string>;
   /** row nodeKey → its tree metadata (for context-scoping a reveal to a branch). */
   nodeByKey: Map<string, RowMeta>;
+  /** unitId → the frozen caseIds it cites (deduped, UNFILTERED — a source-less unit can still own a case). */
+  unitToCaseIds: Map<string, string[]>;
+  /** frozen caseId → the units that cite it (deduped). */
+  caseIdToUnits: Map<string, string[]>;
 }
 
 /** Segment-aware descendant test on the `/`-delimited nodeId path (a row IS itself its own context). */
@@ -53,6 +57,8 @@ export function buildCrlRevealMaps(
   const unitToKeys = new Map<string, string[]>();
   const keyToUnitIds = new Map<string, string[]>();
   const sourceBearingUnits = new Set<string>();
+  const unitToCaseIds = new Map<string, string[]>();
+  const caseIdToUnits = new Map<string, string[]>();
   for (const u of correspondence.units) {
     // "source-bearing" = has a RESOLVED span (a displayRange) — the source pane only renders/cycles those, so a unit
     // with only malformed source refs can't be a CRL→source reveal target.
@@ -61,6 +67,11 @@ export function buildCrlRevealMaps(
       if (c.unresolved) continue; // an unresolved cluster ref must not bridge by string equality → clean no-op
       push(unitToKeys, u.id, c.nodeKey);
       push(keyToUnitIds, c.nodeKey, u.id);
+    }
+    for (const cn of u.cel ?? []) {
+      if (cn.unresolved) continue; // skip an unresolved cel ref (no anchorable frozen case)
+      push(unitToCaseIds, u.id, cn.caseId);
+      push(caseIdToUnits, cn.caseId, u.id);
     }
   }
 
@@ -76,7 +87,30 @@ export function buildCrlRevealMaps(
     });
   }
 
-  return { unitToKeys, keyToRowNodeKeys, keyToUnitIds, sourceBearingUnits, nodeByKey };
+  return { unitToKeys, keyToRowNodeKeys, keyToUnitIds, sourceBearingUnits, nodeByKey, unitToCaseIds, caseIdToUnits };
+}
+
+/** Source-unit reveal → the CEL caseIds to highlight (the unit's cited frozen cases). */
+export function caseIdsForUnit(unitId: string, maps: CrlRevealMaps): string[] {
+  return maps.unitToCaseIds.get(unitId) ?? [];
+}
+
+/** CRL-node reveal → the CEL caseIds to highlight: the node's units (UNFILTERED — a case may attach via a source-less
+ *  unit) → their caseIds. (No branch-scoping: a case is coarser than a branch.) */
+export function caseIdsForNode(nodeKey: string, maps: CrlRevealMaps): string[] {
+  const meta = maps.nodeByKey.get(nodeKey);
+  if (!meta) return [];
+  const out: string[] = [];
+  for (const key of [meta.nodeKey, ...meta.refKeys])
+    for (const unitId of maps.keyToUnitIds.get(key) ?? [])
+      for (const caseId of maps.unitToCaseIds.get(unitId) ?? []) if (!out.includes(caseId)) out.push(caseId);
+  return out;
+}
+
+/** CEL-case reveal/click → the units citing it (all; the caller filters source-bearing for the source pane, or maps each
+ *  to its CRL rows via rowNodeKeysForUnit for the crl pane). */
+export function unitsForCase(caseId: string, maps: CrlRevealMaps): string[] {
+  return maps.caseIdToUnits.get(caseId) ?? [];
 }
 
 /**

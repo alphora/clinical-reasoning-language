@@ -13,7 +13,7 @@ async function load(tsFile) {
   await build({ entryPoints: [resolve(here, tsFile)], bundle: true, platform: "node", format: "cjs", target: "node18", outfile: out, logLevel: "silent" });
   return require(out);
 }
-const { buildCrlRevealMaps, rowNodeKeysForUnit, unitsForRow } = await load("crlRevealMaps.ts");
+const { buildCrlRevealMaps, rowNodeKeysForUnit, unitsForRow, caseIdsForUnit, unitsForCase, caseIdsForNode } = await load("crlRevealMaps.ts");
 
 let pass = 0;
 const check = (label, fn) => {
@@ -111,6 +111,30 @@ check("REVERSE scoping: clicking the shared Crohn's Approve selects only the Cro
   const m = buildCrlRevealMaps(sharedCorr, sharedStruct);
   assert.deepEqual(unitsForRow("w0a0", m), ["uCrohn"]); // not [uCrohn, uUC]
   assert.deepEqual(unitsForRow("w1a0", m), ["uUC"]);
+});
+
+// CEL direction (C2c-1): unit↔case, UNFILTERED by source-bearing; unresolved cel refs skipped.
+const celCorr = {
+  units: [
+    { id: "u1", source: [{ displayRange: {} }], crl: [{ nodeKey: "cCrohn" }], cel: [{ caseId: "caseX" }] },
+    { id: "u2", source: [], crl: [], cel: [{ caseId: "caseX" }] }, // source-less but still maps caseX
+    { id: "u3", source: [{ displayRange: {} }], crl: [], cel: [{ caseId: "caseY", unresolved: "x" }] }, // unresolved → skip
+  ],
+};
+
+check("caseIdsForUnit / unitsForCase (unit↔case, unfiltered; unresolved skipped)", () => {
+  const m = buildCrlRevealMaps(celCorr, []);
+  assert.deepEqual(caseIdsForUnit("u1", m), ["caseX"]);
+  assert.deepEqual(unitsForCase("caseX", m), ["u1", "u2"]); // includes the source-less u2 (unfiltered)
+  assert.deepEqual(caseIdsForUnit("u3", m), []); // its only cel ref was unresolved
+  assert.deepEqual(unitsForCase("caseY", m), []);
+});
+
+check("caseIdsForNode: a CRL node → its units → their cases (unfiltered)", () => {
+  const struct = [{ decision: "D", lib: "T", nodeKey: "dD", location: {}, children: [node("w0", "when", ["cCrohn"])] }];
+  const m = buildCrlRevealMaps(celCorr, struct);
+  // u1 cites cCrohn (→ row w0) AND caseX; clicking/selecting w0 reveals caseX
+  assert.deepEqual(caseIdsForNode("w0", m), ["caseX"]);
 });
 
 console.log(`\ncrlRevealMaps.test: ${pass} checks passed`);

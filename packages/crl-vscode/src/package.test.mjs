@@ -81,25 +81,22 @@ check("contributes the crl.runScenario command + its .cel-scoped editor/title me
   assert.equal(entry.when, "resourceExtname == .cel", "the scenario-runner button is scoped to .cel files");
 });
 
-check("contributes the crl.cockpit.togglePrimary command + navigator-title button + palette entry (C2b-3)", () => {
+check("contributes the crl.cockpit.setPrimary command + navigator-title button + palette entry (C2b-3/C2c-1)", () => {
   const cmds = (c.commands ?? []).map((x) => x.command);
-  assert.ok(cmds.includes("crl.cockpit.togglePrimary"), "expected the crl.cockpit.togglePrimary command");
+  assert.ok(cmds.includes("crl.cockpit.setPrimary"), "expected the crl.cockpit.setPrimary command");
   const viewTitle = c.menus?.["view/title"] ?? [];
   assert.ok(
-    viewTitle.some((m) => m.command === "crl.cockpit.togglePrimary" && m.when === "view == crlCockpitNavigator"),
-    "togglePrimary must be a navigator-title button",
+    viewTitle.some((m) => m.command === "crl.cockpit.setPrimary" && m.when === "view == crlCockpitNavigator"),
+    "setPrimary must be a navigator-title button",
   );
   const palette = c.menus?.commandPalette ?? [];
-  assert.ok(
-    palette.some((m) => m.command === "crl.cockpit.togglePrimary"),
-    "togglePrimary must have a commandPalette entry",
-  );
+  assert.ok(palette.some((m) => m.command === "crl.cockpit.setPrimary"), "setPrimary must have a commandPalette entry");
 });
 
-check("contributes the crl.correspondence.primary setting (enum source|crl, default source, window scope)", () => {
+check("contributes the crl.correspondence.primary setting (enum source|crl|cel, default source, window scope)", () => {
   const prop = c.configuration?.properties?.["crl.correspondence.primary"];
   assert.ok(prop, "expected crl.correspondence.primary in contributes.configuration.properties");
-  assert.deepEqual(prop.enum, ["source", "crl"]);
+  assert.deepEqual(prop.enum, ["source", "crl", "cel"]);
   assert.equal(prop.default, "source");
   assert.equal(prop.scope, "window");
 });

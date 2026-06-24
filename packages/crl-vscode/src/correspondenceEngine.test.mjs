@@ -22,11 +22,13 @@ const check = (label, fn) => {
 };
 
 const step = (unitId) => ({ unitId, label: unitId, source: [], secondaryCrl: [], cel: [], unresolved: { source: [], crl: [], cel: [] }, findingIds: [] });
-const idx = (unitIds, sourceCycleIds, crlNav = []) => ({ version: 1, anchorFilePath: "/a.txt", steps: unitIds.map(step), sourceCycleIds, crlNav });
+const idx = (unitIds, sourceCycleIds, crlNav = [], celNav = []) => ({ version: 1, anchorFilePath: "/a.txt", steps: unitIds.map(step), sourceCycleIds, crlNav, celNav });
 const seeded = (unitIds, cycleIds = unitIds) => reduce(initialState(), { type: "setInputs", index: idx(unitIds, cycleIds) }).state;
 const sel = (unitId) => ({ primary: "source", unitId });
 const crlNav = (...keys) => keys.map((k) => ({ nodeKey: k, label: k }));
 const seededCrl = (keys) => reduce(reduce(initialState(), { type: "setInputs", index: idx([], [], crlNav(...keys)) }).state, { type: "setPrimary", primary: "crl" }).state;
+const celNav = (...ids) => ids.map((c) => ({ caseId: c, label: c }));
+const seededCel = (ids) => reduce(reduce(initialState(), { type: "setInputs", index: idx([], [], [], celNav(...ids)) }).state, { type: "setPrimary", primary: "cel" }).state;
 
 check("select → a reveal for ALL visible panes (pane-agnostic, incl. crl/cel placeholders), targeting the unit", () => {
   const r = reduce(seeded(["u1", "u2", "u3"]), { type: "select", selection: sel("u2") });
@@ -114,6 +116,28 @@ check("setInputs keeps a surviving crl selection (+re-reveal), clears a vanished
   const gone = reduce(s, { type: "setInputs", index: idx([], [], crlNav("n9")) });
   assert.equal(gone.state.selection, undefined);
   assert.deepEqual(gone.effects, []);
+});
+
+check("cel primary: navigatorItems lists celNav; next/prev cycles caseIds + wraps", () => {
+  let s = seededCel(["c1", "c2", "c3"]);
+  assert.deepEqual(navigatorItems(s).map((i) => i.id), ["c1", "c2", "c3"]);
+  assert.deepEqual(navigatorItems(s)[0].selection, { primary: "cel", caseId: "c1" });
+  s = reduce(s, { type: "next" }).state; assert.deepEqual(s.selection, { primary: "cel", caseId: "c1" });
+  s = reduce(s, { type: "next" }).state; assert.equal(s.selection.caseId, "c2");
+  s = reduce(s, { type: "prev" }).state; assert.equal(s.selection.caseId, "c1");
+  s = reduce(s, { type: "prev" }).state; assert.equal(s.selection.caseId, "c3"); // wrap
+});
+
+check("cel primary: select → a celCase reveal for ALL visible panes", () => {
+  const r = reduce(seededCel(["c1"]), { type: "select", selection: { primary: "cel", caseId: "c1" } });
+  assert.deepEqual(r.effects.map((e) => e.pane).sort(), ["cel", "crl", "source"]);
+  assert.ok(r.effects.every((e) => e.target.kind === "celCase" && e.target.id === "c1"));
+});
+
+check("setInputs keeps a surviving cel selection, clears a vanished one", () => {
+  const s = reduce(seededCel(["c1", "c2"]), { type: "select", selection: { primary: "cel", caseId: "c2" } }).state;
+  assert.deepEqual(reduce(s, { type: "setInputs", index: idx([], [], [], celNav("c2", "c3")) }).state.selection, { primary: "cel", caseId: "c2" });
+  assert.equal(reduce(s, { type: "setInputs", index: idx([], [], [], celNav("c9")) }).state.selection, undefined);
 });
 
 check("select is ignored when it doesn't resolve OR mismatches the current primary", () => {

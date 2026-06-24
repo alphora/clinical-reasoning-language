@@ -17,10 +17,18 @@ export interface CockpitIndex {
   /** CRL nav list (pre-order; the cycle/selectable set for primary:"crl"). SUPERSET of every row a source unit can
    *  map to, so a source-click-mapped crl node always resolves. */
   crlNav: CrlNavItem[];
+  /** CEL nav list (the cycle/selectable set for primary:"cel" — frozen-caseId cases only). */
+  celNav: CelNavItem[];
 }
 
 export interface CrlNavItem {
   nodeKey: string;
+  label: string;
+  description?: string;
+}
+
+export interface CelNavItem {
+  caseId: string;
   label: string;
   description?: string;
 }
@@ -88,7 +96,12 @@ export function navigatorItems(state: State): NavigatorItem[] {
       selection: { primary: "crl", nodeKey: n.nodeKey },
     }));
   }
-  return []; // cel — C2c
+  return idx.celNav.map((n) => ({
+    id: n.caseId,
+    label: n.label,
+    ...(n.description ? { description: n.description } : {}),
+    selection: { primary: "cel", caseId: n.caseId },
+  }));
 }
 
 const PANES: Pane[] = ["source", "crl", "cel"];
@@ -110,7 +123,7 @@ function selectionResolves(index: CockpitIndex | undefined, sel: Selection | und
   if (!index || !sel) return false;
   if (sel.primary === "source") return index.sourceCycleIds.includes(sel.unitId);
   if (sel.primary === "crl") return index.crlNav.some((n) => n.nodeKey === sel.nodeKey);
-  return false; // cel — C2c
+  return index.celNav.some((n) => n.caseId === sel.caseId);
 }
 
 function cycle(ids: string[], currentId: string | undefined, dir: 1 | -1): string | undefined {
@@ -169,7 +182,17 @@ export function reduce(state: State, action: Action): ReduceResult {
         const next: State = { ...state, selection };
         return { state: next, effects: revealAllVisible(next, selection) };
       }
-      return { state, effects: [] };
+      // cel
+      const cur = state.selection?.primary === "cel" ? state.selection.caseId : undefined;
+      const id = cycle(
+        state.index.celNav.map((n) => n.caseId),
+        cur,
+        dir,
+      );
+      if (id === undefined) return { state, effects: [] };
+      const selection: Selection = { primary: "cel", caseId: id };
+      const next: State = { ...state, selection };
+      return { state: next, effects: revealAllVisible(next, selection) };
     }
     case "setPaneVisible": {
       if (state.paneVisibility[action.pane] === action.visible) return { state, effects: [] };
