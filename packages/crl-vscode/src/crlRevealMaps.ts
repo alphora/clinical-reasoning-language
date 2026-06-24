@@ -129,6 +129,19 @@ export function rowsForConcept(conceptKey: string, maps: CrlRevealMaps): string[
   return maps.keyToRowNodeKeys.get(conceptKey) ?? [];
 }
 
+/** Reverse fact-highlight (C2c-2b): the concept keys a SELECTED source unit cites — to look up the CEL fact spans that
+ *  reference them. (All cited keys; non-concept keys simply miss the concept-keyed fact-anchor map → no over-highlight.) */
+export function conceptKeysForUnit(unitId: string, maps: CrlRevealMaps): string[] {
+  return maps.unitToKeys.get(unitId) ?? [];
+}
+
+/** Reverse fact-highlight (C2c-2b): the keys a SELECTED CRL row references (its own nodeKey + refKeys — concepts it
+ *  branches on / guards on / its target). Same set `caseIdsForNode` uses; non-concept keys miss the fact-anchor map. */
+export function conceptKeysForNode(nodeKey: string, maps: CrlRevealMaps): string[] {
+  const meta = maps.nodeByKey.get(nodeKey);
+  return meta ? [meta.nodeKey, ...meta.refKeys] : [];
+}
+
 /**
  * Source-unit reveal → the CRL row nodeKeys to highlight, CONTEXT-SCOPED. A unit cites a set of leaf keys; a shared leaf
  * (e.g. an activity `Approve` recommended in several branches) would otherwise light up EVERY branch's action. So when the

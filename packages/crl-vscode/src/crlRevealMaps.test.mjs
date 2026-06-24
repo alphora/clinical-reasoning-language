@@ -13,7 +13,7 @@ async function load(tsFile) {
   await build({ entryPoints: [resolve(here, tsFile)], bundle: true, platform: "node", format: "cjs", target: "node18", outfile: out, logLevel: "silent" });
   return require(out);
 }
-const { buildCrlRevealMaps, rowNodeKeysForUnit, unitsForRow, caseIdsForUnit, unitsForCase, caseIdsForNode, unitsForConcept, rowsForConcept } = await load("crlRevealMaps.ts");
+const { buildCrlRevealMaps, rowNodeKeysForUnit, unitsForRow, caseIdsForUnit, unitsForCase, caseIdsForNode, unitsForConcept, rowsForConcept, conceptKeysForUnit, conceptKeysForNode } = await load("crlRevealMaps.ts");
 
 let pass = 0;
 const check = (label, fn) => {
@@ -155,6 +155,16 @@ check("rowsForConcept does NOT branch-scope a shared activity (unlike rowNodeKey
   const m = buildCrlRevealMaps(sharedCorr, sharedStruct);
   // a concept peek is a precise leaf identity → every referencing row corresponds (both branches' Approve rows)
   assert.deepEqual(rowsForConcept("aApprove", m).sort(), ["w0a0", "w1a0"]);
+});
+
+// C2c-2b reverse fact-highlight: the concept keys a selected unit/node references (to look up CEL fact spans).
+check("conceptKeysForUnit: the keys a unit cites; conceptKeysForNode: row nodeKey + refKeys", () => {
+  const m = buildCrlRevealMaps(correspondence, structure);
+  assert.deepEqual(conceptKeysForUnit("u1", m), ["cA"]); // u1 cites concept A
+  assert.deepEqual(conceptKeysForNode("when0", m).sort(), ["cA", "when0"]); // own key + the concept it branches on
+  assert.deepEqual(conceptKeysForNode("when0act0", m).sort(), ["aX", "when0act0"]); // action: own key + activity ref
+  assert.deepEqual(conceptKeysForUnit("nope", m), []);
+  assert.deepEqual(conceptKeysForNode("nope", m), []);
 });
 
 console.log(`\ncrlRevealMaps.test: ${pass} checks passed`);

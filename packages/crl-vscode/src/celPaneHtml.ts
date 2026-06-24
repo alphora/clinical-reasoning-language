@@ -24,6 +24,31 @@ export interface RenderedCel {
   anchors: Record<string, CelAnchor>;
   /** opaque data-reveal key (per render) → the trusted payload a click resolves to. */
   reveals: Record<string, CelReveal>;
+  /** REVERSE map (C2c-2b): concept key → the fact anchor keys rendered THIS render for that concept (accumulated across
+   *  cases — a concept can be a fact in several). Domain = the revealable concept-kind facts that got a `fact:` span;
+   *  the values embed the per-render gen prefix, so capture this ATOMICALLY with `anchors` (don't cache across renders).
+   *  Lets a source/CRL selection highlight the specific fact spans that reference its concepts. */
+  conceptToFactAnchors: Record<string, string[]>;
+}
+
+/** Facts-first, deduped union of a selection's fact-anchor keys (from its concept keys) + its case-block anchor keys.
+ *  Facts first so highlightRows scrolls to the pinpoint fact (case block still highlighted for context). Pure. */
+export function reverseCelAnchors(
+  conceptKeys: string[],
+  caseAnchorKeys: string[],
+  conceptToFactAnchors: Record<string, string[]>,
+): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  const add = (k: string): void => {
+    if (!seen.has(k)) {
+      seen.add(k);
+      out.push(k);
+    }
+  };
+  for (const ck of conceptKeys) for (const fa of conceptToFactAnchors[ck] ?? []) add(fa); // fact pinpoints first
+  for (const ca of caseAnchorKeys) add(ca); // then case blocks for context
+  return out;
 }
 
 const ESC: Record<string, string> = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
@@ -39,11 +64,12 @@ export function renderCelPane(
   const revealable = opts.revealableConceptKeys;
   const anchors: Record<string, CelAnchor> = {};
   const reveals: Record<string, CelReveal> = {};
+  const conceptToFactAnchors: Record<string, string[]> = {};
 
   if (!result.success || result.scenarios.length === 0) {
     const why = result.errors.length ? `: ${escapeHtml(result.errors.join("; "))}` : "";
     const msg = result.errors.length ? `CEL did not render${why}` : "No CEL cases.";
-    return { html: `<p class="placeholder">${msg}</p>`, anchors, reveals };
+    return { html: `<p class="placeholder">${msg}</p>`, anchors, reveals, conceptToFactAnchors };
   }
 
   let html = "";
@@ -71,6 +97,7 @@ export function renderCelPane(
           const factAnchorKey = `fact:${id}:f${fi}`; // colon → never collides with a caseId anchor
           anchors[factAnchorKey] = { scrollTo: factElId, segmentIds: [factElId] };
           reveals[factAnchorKey] = { conceptKey, factAnchorKey };
+          (conceptToFactAnchors[conceptKey] ??= []).push(factAnchorKey); // reverse: a concept can be a fact in many cases
           return `<span id="${escapeHtml(factElId)}" class="cel-fact" data-reveal="${escapeHtml(factAnchorKey)}">${escapeHtml(f.name)}</span>`;
         }
       }
@@ -87,5 +114,5 @@ export function renderCelPane(
       `</div>`;
     idx++;
   }
-  return { html, anchors, reveals };
+  return { html, anchors, reveals, conceptToFactAnchors };
 }

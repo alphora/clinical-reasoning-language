@@ -31,12 +31,14 @@ import {
   type Selection,
   type State,
 } from "./correspondenceEngine";
-import { renderCelPane } from "./celPaneHtml";
+import { renderCelPane, reverseCelAnchors } from "./celPaneHtml";
 import { renderCrlPane } from "./crlPaneHtml";
 import {
   buildCrlRevealMaps,
   caseIdsForNode,
   caseIdsForUnit,
+  conceptKeysForNode,
+  conceptKeysForUnit,
   rowNodeKeysForUnit,
   rowsForConcept,
   unitsForCase,
@@ -136,6 +138,12 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   /** Concept keys that have ≥1 source-bearing unit OR ≥1 CRL row — the gate for a fact being a clickable peek anchor
    *  (recomputed from crlMaps each rebuild; read at CEL render time, mirroring caseIdByName). */
   let revealableConceptKeys: ReadonlySet<string> = new Set();
+  /** REVERSE map (C2c-2b): concept key → CEL fact anchors of the CURRENT cel render. UNLIKE revealableConceptKeys above
+   *  (rebuild-cadence, render-stable), this is RENDER-scoped: its values embed the render gen, so it's captured atomically
+   *  with the cel pane's `v.anchors` in renderPane's cel branch — NEVER set in rebuild() / never cached across renders.
+   *  A single shell global (not per-PaneView) is safe because there is exactly one CEL pane and every rebuild renders it;
+   *  revisit if panes ever re-render independently. */
+  let conceptToFactAnchors: Record<string, string[]> = {};
   let indexVersion = 0;
   let currentCel: string | undefined;
   /** last span-click locus (trusted, from the renderer) — open-raw uses it when it still matches the selection. */
@@ -238,11 +246,12 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     if (target.kind === "unit") {
       if (pane === "source") highlightRows(v, [target.id]);
       else if (pane === "crl") highlightRows(v, rowNodeKeysForUnit(target.id, m)); // unit → its CRL rows (branch-scoped)
-      else highlightRows(v, caseIdsForUnit(target.id, m)); // unit → its CEL cases
+      // CEL: the unit's artifact cases (block-level) + the fact spans referencing its concepts (C2c-2b reverse, facts first)
+      else highlightRows(v, reverseCelAnchors(conceptKeysForUnit(target.id, m), caseIdsForUnit(target.id, m), conceptToFactAnchors));
     } else if (target.kind === "crlNode") {
       if (pane === "crl") highlightRows(v, [target.id]);
       else if (pane === "source") highlightRows(v, unitsForRow(target.id, m)); // crl node → its source units
-      else highlightRows(v, caseIdsForNode(target.id, m)); // crl node → its CEL cases
+      else highlightRows(v, reverseCelAnchors(conceptKeysForNode(target.id, m), caseIdsForNode(target.id, m), conceptToFactAnchors));
     } else {
       // celCase
       if (pane === "cel") highlightRows(v, [target.id]);
@@ -333,9 +342,10 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       // CEL pane — condensed scenario cases (C2c-1).
       const r = scenarios
         ? renderCelPane(scenarios, caseIdByName, { revealPrefix: `g${gen}_`, revealableConceptKeys })
-        : { html: '<p class="placeholder">No CEL.</p>', anchors: {}, reveals: {} };
+        : { html: '<p class="placeholder">No CEL.</p>', anchors: {}, reveals: {}, conceptToFactAnchors: {} };
       v.anchors = r.anchors;
       v.reveals = r.reveals;
+      conceptToFactAnchors = r.conceptToFactAnchors; // captured atomically with this render's anchors (gen-scoped keys)
       void v.panel.webview.postMessage({ type: "render", html: r.html, gen, indexVersion });
     }
   }
@@ -506,6 +516,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     scenarios = undefined;
     caseIdByName = {};
     revealableConceptKeys = new Set();
+    conceptToFactAnchors = {};
     lastClicked = undefined;
     indexVersion += 1;
     for (const pane of PANES) coord.clearPending(pane);

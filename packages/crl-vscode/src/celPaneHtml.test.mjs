@@ -13,7 +13,7 @@ async function load(tsFile) {
   await build({ entryPoints: [resolve(here, tsFile)], bundle: true, platform: "node", format: "cjs", target: "node18", outfile: out, logLevel: "silent" });
   return require(out);
 }
-const { renderCelPane } = await load("celPaneHtml.ts");
+const { renderCelPane, reverseCelAnchors } = await load("celPaneHtml.ts");
 // Use the REAL nodeKey (the same fn celPaneHtml + crlStructure call) so the gate-key format is proven, not assumed.
 const { nodeKey } = await import("@smile-digital-health/crl");
 
@@ -129,6 +129,42 @@ check("fact peek works in an UN-FROZEN case (concept correspondence is case-inde
   assert.ok(out.html.includes('class="cel-fact"'), "fact still clickable without a frozen case id");
   assert.ok(Object.keys(out.anchors).some((k) => k.startsWith("fact:")));
   assert.ok(!Object.keys(out.anchors).some((k) => !k.startsWith("fact:")), "no case anchor for an un-frozen case");
+});
+
+// --- C2c-2b reverse fact-highlighting ---
+
+check("conceptToFactAnchors: a concept that is a fact in MULTIPLE cases accumulates all its anchors", () => {
+  const key = ck("Pol", "Diabetes");
+  const out = renderCelPane(
+    result([
+      sc("A", "pass", [conceptFact("dx", "Pol", "Diabetes")]),
+      sc("B", "fail", [conceptFact("dx2", "Pol", "Diabetes")]),
+    ]),
+    { A: "cA", B: "cB" },
+    { revealableConceptKeys: new Set([key]) },
+  );
+  assert.equal(out.conceptToFactAnchors[key].length, 2, "both cases' fact spans collected");
+  assert.ok(out.conceptToFactAnchors[key].every((k) => k.startsWith("fact:")));
+});
+
+check("conceptToFactAnchors: only revealable concept-kind facts appear (activity/bare/non-revealable excluded)", () => {
+  const out = renderCelPane(
+    result([sc("A", "pass", [conceptFact("act", "Pol", "Approve", "activity"), "Patient", conceptFact("dx", "Pol", "Diabetes")])]),
+    { A: "cA" },
+    { revealableConceptKeys: new Set([ck("Pol", "Diabetes")]) }, // Approve/Patient not in the set / not concept
+  );
+  assert.deepEqual(Object.keys(out.conceptToFactAnchors), [ck("Pol", "Diabetes")]);
+});
+
+check("reverseCelAnchors: facts FIRST (scroll pinpoint), then case blocks; deduped; non-concept keys add nothing", () => {
+  const c2fa = { [ck("Pol", "Diabetes")]: ["fact:g_cel0:f0", "fact:g_cel1:f0"] };
+  const out = reverseCelAnchors([ck("Pol", "Diabetes"), ck("Pol", "Unmapped")], ["cA", "cB"], c2fa);
+  assert.deepEqual(out, ["fact:g_cel0:f0", "fact:g_cel1:f0", "cA", "cB"]); // facts first, unmapped concept contributes none
+});
+
+check("reverseCelAnchors: dedupes a key appearing in both fact + case sets", () => {
+  const out = reverseCelAnchors([ck("Pol", "X")], ["dup", "cB"], { [ck("Pol", "X")]: ["dup", "fact:g_cel0:f0"] });
+  assert.deepEqual(out, ["dup", "fact:g_cel0:f0", "cB"]);
 });
 
 console.log(`\ncelPaneHtml.test: ${pass} checks passed`);
