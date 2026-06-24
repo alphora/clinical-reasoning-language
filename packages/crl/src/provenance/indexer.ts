@@ -118,14 +118,89 @@ const collapseToStart = (r: ZeroBasedRange): ZeroBasedRange => ({
   endCol: r.startCol,
 });
 
-interface DeclEntry {
+/** CRL loci are point-anchors: collapse to start. Shared with crlStructure so structure locations are byte-identical. */
+export const lsLoc = (filePath: string, loc: Location | undefined): LsLocation | undefined =>
+  loc ? { filePath, range: collapseToStart(toZeroBasedRange(loc)) } : undefined;
+
+/** Decision ref constructors — the SINGLE source of the decision decl + sub-node ref shape, shared with crlStructure so
+ *  nodeKeys cannot drift. (The generic decl-inventory loop is unchanged; only the sub-node ref routes through here.) */
+export const decisionDeclRef = (lib: string, name: string): ProvNodeRef => ({
+  lib,
+  kind: "decision",
+  name,
+});
+export const decisionSubNodeRef = (lib: string, name: string, nodeId: string): ProvNodeRef => ({
+  lib,
+  kind: "decision",
+  name,
+  nodeId,
+});
+
+export interface DeclEntry {
   kind: DeclKind;
   node: Statement;
 }
-interface LibInfo {
+export interface LibInfo {
   entry: RegistryEntry;
   ownership: Ownership;
   decls: Map<string, DeclEntry[]>; // by name → all decls (a name may exist across kinds, e.g. concept + activity)
+}
+export interface CollectedLibs {
+  libs: Map<string, LibInfo>;
+  coversName: string | null;
+  diagnostics: ProvenanceIndexDiagnostic[];
+}
+
+/**
+ * Gather the libraries the provenance index inventories — `coversTarget` + EVERY registry library (local + package),
+ * deduped by name — with each library's decls + ownership. Shared by `buildProvenanceIndex` and `buildCrlStructure` so
+ * the decision set + lib names cannot diverge. `coversName: null` (no policy anchor) → empty libs + a diagnostic.
+ */
+export function collectLibs(
+  graph: ResolvedCelGraph,
+  opts?: { sharedLibraries?: string[] },
+): CollectedLibs {
+  const diagnostics: ProvenanceIndexDiagnostic[] = [];
+  const shared = opts?.sharedLibraries ?? readManifestShared(graph.projectRoot, diagnostics);
+  const sharedSet = new Set(shared);
+  const coversName = graph.coversTarget?.name ?? null;
+  const libs = new Map<string, LibInfo>();
+
+  if (!coversName) {
+    diagnostics.push({
+      kind: "no-policy-anchor",
+      message: "No resolved coversTarget with a name; provenance index is empty.",
+    });
+    return { libs, coversName: null, diagnostics };
+  }
+
+  const addLib = (entry: RegistryEntry): void => {
+    if (!entry.name || libs.has(entry.name)) return;
+    const isShared = sharedSet.has(entry.name) || entry.origin === "package";
+    const ownership: Ownership = isShared ? "shared-reference" : "policy-owned";
+    const decls = new Map<string, DeclEntry[]>();
+    for (const s of entry.ast.statements) {
+      const kind = STATEMENT_KIND[s.type];
+      if (!kind || !s.name) continue;
+      const arr = decls.get(s.name);
+      if (arr) arr.push({ kind, node: s });
+      else decls.set(s.name, [{ kind, node: s }]);
+    }
+    libs.set(entry.name, { entry, ownership, decls });
+    // Warn on a local lib that is neither the covered policy nor declared shared (silent policy-owned → false over-reach).
+    if (entry.origin === "local" && entry.name !== coversName && !sharedSet.has(entry.name)) {
+      diagnostics.push({
+        kind: "undeclared-library-ownership",
+        message: `Local library "${entry.name}" is neither the covered policy nor in crl.sharedLibraries; defaulting to policy-owned (add it to crl.sharedLibraries only if shared).`,
+      });
+    }
+  };
+  if (graph.coversTarget) addLib(graph.coversTarget);
+  if (graph.crlRegistry) {
+    for (const e of graph.crlRegistry.byNameLocal.values()) addLib(e);
+    for (const e of graph.crlRegistry.byNamePackage.values()) addLib(e);
+  }
+  return { libs, coversName, diagnostics };
 }
 
 function emptyIndex(diagnostics: ProvenanceIndexDiagnostic[]): ProvenanceIndex {
@@ -185,55 +260,13 @@ export function buildProvenanceIndex(
   graph: ResolvedCelGraph,
   opts?: { sharedLibraries?: string[] },
 ): ProvenanceIndex {
-  const diagnostics: ProvenanceIndexDiagnostic[] = [];
   const nodes = new Map<string, IndexedCrlNode>();
   const decisionReachability = new Map<string, ReachInfo>();
 
-  const shared = opts?.sharedLibraries ?? readManifestShared(graph.projectRoot, diagnostics);
-  const sharedSet = new Set(shared);
-  const coversName = graph.coversTarget?.name ?? null;
-
-  // Degenerate input: with no resolved policy anchor there is no ownership basis — return an EMPTY index + diagnostic
-  // rather than inventorying the whole registry as (misleadingly) policy-owned.
-  if (!coversName) {
-    diagnostics.push({
-      kind: "no-policy-anchor",
-      message: "No resolved coversTarget with a name; provenance index is empty.",
-    });
-    return emptyIndex(diagnostics);
-  }
-
-  // ── gather libs (coversTarget + every registry library), dedup by name ──
-  const libs = new Map<string, LibInfo>();
-  const addLib = (entry: RegistryEntry): void => {
-    if (!entry.name || libs.has(entry.name)) return;
-    const isShared = sharedSet.has(entry.name) || entry.origin === "package";
-    const ownership: Ownership = isShared ? "shared-reference" : "policy-owned";
-    const decls = new Map<string, DeclEntry[]>();
-    for (const s of entry.ast.statements) {
-      const kind = STATEMENT_KIND[s.type];
-      if (!kind || !s.name) continue;
-      const arr = decls.get(s.name);
-      if (arr) arr.push({ kind, node: s });
-      else decls.set(s.name, [{ kind, node: s }]);
-    }
-    libs.set(entry.name, { entry, ownership, decls });
-    // Warn on a local lib that is neither the covered policy nor declared shared (silent policy-owned → false over-reach).
-    if (entry.origin === "local" && entry.name !== coversName && !sharedSet.has(entry.name)) {
-      diagnostics.push({
-        kind: "undeclared-library-ownership",
-        message: `Local library "${entry.name}" is neither the covered policy nor in crl.sharedLibraries; defaulting to policy-owned (add it to crl.sharedLibraries only if shared).`,
-      });
-    }
-  };
-  if (graph.coversTarget) addLib(graph.coversTarget);
-  if (graph.crlRegistry) {
-    for (const e of graph.crlRegistry.byNameLocal.values()) addLib(e);
-    for (const e of graph.crlRegistry.byNamePackage.values()) addLib(e);
-  }
-
-  const lsLoc = (filePath: string, loc: Location | undefined): LsLocation | undefined =>
-    loc ? { filePath, range: collapseToStart(toZeroBasedRange(loc)) } : undefined;
+  // Degenerate input: with no resolved policy anchor there is no ownership basis — collectLibs returns empty + the
+  // no-policy-anchor diagnostic; return an EMPTY index rather than inventorying the whole registry as policy-owned.
+  const { libs, coversName, diagnostics } = collectLibs(graph, opts);
+  if (!coversName) return emptyIndex(diagnostics);
 
   const intrinsicNodeKind = (declKind: DeclKind, node: Statement): NodeKind => {
     switch (declKind) {
@@ -272,7 +305,7 @@ export function buildProvenanceIndex(
         });
         if (kind === "decision") {
           for (const sn of decisionSpine(node as Decision)) {
-            const snRef: ProvNodeRef = { lib: libName, kind: "decision", name, nodeId: sn.nodeId };
+            const snRef = decisionSubNodeRef(libName, name, sn.nodeId);
             const snLoc = lsLoc(info.entry.filePath, sn.node.location);
             if (!snLoc) continue;
             nodes.set(nodeKey(snRef), {

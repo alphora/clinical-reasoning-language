@@ -26,6 +26,10 @@ export type {
   ReachEdge,
   ProvenanceIndexDiagnostic,
 } from "./indexer";
+export { buildCrlStructure } from "./crlStructure";
+export type { CrlStructureNode, CrlDecisionStructure, CrlNodeKind, CrlActionKind } from "./crlStructure";
+export { decisionSpine } from "../ast/decisionSpine";
+export type { SpineNode, SpineNodeKind } from "../ast/decisionSpine";
 export { deriveCoverage, decisionImplemented, isOverReach } from "./coverage";
 export type { CoverageReport } from "./coverage";
 export { validateProvenance } from "./validators";
