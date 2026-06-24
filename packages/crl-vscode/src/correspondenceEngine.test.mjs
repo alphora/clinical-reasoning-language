@@ -22,9 +22,11 @@ const check = (label, fn) => {
 };
 
 const step = (unitId) => ({ unitId, label: unitId, source: [], secondaryCrl: [], cel: [], unresolved: { source: [], crl: [], cel: [] }, findingIds: [] });
-const idx = (unitIds, sourceCycleIds) => ({ version: 1, anchorFilePath: "/a.txt", steps: unitIds.map(step), sourceCycleIds });
+const idx = (unitIds, sourceCycleIds, crlNav = []) => ({ version: 1, anchorFilePath: "/a.txt", steps: unitIds.map(step), sourceCycleIds, crlNav });
 const seeded = (unitIds, cycleIds = unitIds) => reduce(initialState(), { type: "setInputs", index: idx(unitIds, cycleIds) }).state;
 const sel = (unitId) => ({ primary: "source", unitId });
+const crlNav = (...keys) => keys.map((k) => ({ nodeKey: k, label: k }));
+const seededCrl = (keys) => reduce(reduce(initialState(), { type: "setInputs", index: idx([], [], crlNav(...keys)) }).state, { type: "setPrimary", primary: "crl" }).state;
 
 check("select → a reveal for ALL visible panes (pane-agnostic, incl. crl/cel placeholders), targeting the unit", () => {
   const r = reduce(seeded(["u1", "u2", "u3"]), { type: "select", selection: sel("u2") });
@@ -86,6 +88,48 @@ check("navigatorItems lists source-bearing steps in cycle order (skips source-le
   assert.deepEqual(navigatorItems(s).map((i) => i.id), ["u1", "u3"]);
   assert.deepEqual(navigatorItems(s)[0].selection, sel("u1"));
   assert.deepEqual(navigatorItems(initialState()), []); // no index → empty
+});
+
+check("crl primary: navigatorItems lists crlNav; next/prev cycles crl nodeKeys + wraps", () => {
+  let s = seededCrl(["n1", "n2", "n3"]);
+  assert.deepEqual(navigatorItems(s).map((i) => i.id), ["n1", "n2", "n3"]);
+  assert.deepEqual(navigatorItems(s)[0].selection, { primary: "crl", nodeKey: "n1" });
+  s = reduce(s, { type: "next" }).state; assert.deepEqual(s.selection, { primary: "crl", nodeKey: "n1" });
+  s = reduce(s, { type: "next" }).state; assert.equal(s.selection.nodeKey, "n2");
+  s = reduce(s, { type: "prev" }).state; assert.equal(s.selection.nodeKey, "n1");
+  s = reduce(s, { type: "prev" }).state; assert.equal(s.selection.nodeKey, "n3"); // wrap
+});
+
+check("crl primary: select → a crlNode reveal for ALL visible panes", () => {
+  const r = reduce(seededCrl(["n1"]), { type: "select", selection: { primary: "crl", nodeKey: "n1" } });
+  assert.deepEqual(r.effects.map((e) => e.pane).sort(), ["cel", "crl", "source"]);
+  assert.ok(r.effects.every((e) => e.target.kind === "crlNode" && e.target.id === "n1"));
+});
+
+check("setInputs keeps a surviving crl selection (+re-reveal), clears a vanished one", () => {
+  const s = reduce(seededCrl(["n1", "n2"]), { type: "select", selection: { primary: "crl", nodeKey: "n2" } }).state;
+  const kept = reduce(s, { type: "setInputs", index: idx([], [], crlNav("n2", "n3")) });
+  assert.deepEqual(kept.state.selection, { primary: "crl", nodeKey: "n2" });
+  assert.equal(kept.effects.length, 3);
+  const gone = reduce(s, { type: "setInputs", index: idx([], [], crlNav("n9")) });
+  assert.equal(gone.state.selection, undefined);
+  assert.deepEqual(gone.effects, []);
+});
+
+check("select is ignored when it doesn't resolve OR mismatches the current primary", () => {
+  const s = seeded(["u1", "u2"]); // source primary
+  assert.deepEqual(reduce(s, { type: "select", selection: sel("nope") }).effects, []); // unresolved → no-op
+  assert.equal(reduce(s, { type: "select", selection: sel("nope") }).state.selection, undefined);
+  // a crl selection while source-primary → ignored (wrong primary space)
+  const r = reduce(s, { type: "select", selection: { primary: "crl", nodeKey: "n1" } });
+  assert.deepEqual(r.effects, []);
+  assert.equal(r.state.selection, undefined);
+});
+
+check("source selection survives setInputs only if still source-BEARING (not just in steps)", () => {
+  const s = reduce(seeded(["u1", "u2"]), { type: "select", selection: sel("u1") }).state;
+  const r = reduce(s, { type: "setInputs", index: idx(["u1", "u2"], ["u2"]) }); // u1 in steps but dropped from cycle
+  assert.equal(r.state.selection, undefined);
 });
 
 console.log(`\ncorrespondenceEngine.test: ${pass} checks passed`);

@@ -11,6 +11,7 @@ import {
   buildCockpitModel,
   type CorrespondenceModel,
   type CrlDecisionStructure,
+  type CrlStructureNode,
 } from "@smile-digital-health/crl";
 import type { ZeroBasedRange } from "@smile-digital-health/crl/language-services";
 import * as vscode from "vscode";
@@ -21,9 +22,11 @@ import {
   reduce,
   type Action,
   type CockpitIndex,
+  type CrlNavItem,
   type Effect,
   type NavigatorItem,
   type Pane,
+  type Selection,
   type State,
 } from "./correspondenceEngine";
 import { renderCrlPane } from "./crlPaneHtml";
@@ -60,12 +63,30 @@ interface PaneView {
   disposables: vscode.Disposable[];
 }
 
-function toIndex(model: ViewerModel, version: number): CockpitIndex {
+/** CRL nav list — pre-order flatten of the structure (roots + when/otherwise/action); the crl-primary cycle/selectable
+ *  set + a SUPERSET of every row a source unit can map to. Description = the owning decision (flat labels duplicate). */
+function toCrlNav(structure: CrlDecisionStructure[]): CrlNavItem[] {
+  const out: CrlNavItem[] = [];
+  const walk = (nodes: CrlStructureNode[]): void => {
+    for (const n of nodes) {
+      out.push({ nodeKey: n.nodeKey, label: n.label, description: n.decision });
+      walk(n.children);
+    }
+  };
+  for (const d of structure) {
+    out.push({ nodeKey: d.nodeKey, label: `decision "${d.decision}"` });
+    walk(d.children);
+  }
+  return out;
+}
+
+function toIndex(model: ViewerModel, structure: CrlDecisionStructure[], version: number): CockpitIndex {
   return {
     version,
     anchorFilePath: model.anchor.filePath,
     steps: model.steps,
     sourceCycleIds: model.steps.filter((s) => s.source.length > 0).map((s) => s.unitId),
+    crlNav: toCrlNav(structure),
   };
 }
 
@@ -100,7 +121,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       t.id = it.id;
       if (it.description) t.description = it.description;
       // A TreeItem command fires only on USER click/enter — programmatic reveal() does not invoke it, so no round-trip guard is needed.
-      t.command = { command: "crl.cockpit.selectItem", title: "Select", arguments: [it.id] };
+      t.command = { command: "crl.cockpit.selectItem", title: "Select", arguments: [it.selection] };
       return t;
     },
   };
@@ -130,31 +151,57 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     }
   }
 
+  /** Post a highlight for a set of anchor keys (source anchors keyed by unitId; CRL anchors by nodeKey). Accumulates
+   *  segmentIds across all keys + scrolls to the first found — so a target spanning N units/rows highlights them all. */
+  function highlightRows(v: PaneView, anchorKeys: string[]): void {
+    const segmentIds: string[] = [];
+    let scrollTo: string | undefined;
+    for (const k of anchorKeys) {
+      const a = v.anchors[k];
+      if (!a) continue;
+      if (!scrollTo) scrollTo = a.scrollTo;
+      for (const id of a.segmentIds) if (!segmentIds.includes(id)) segmentIds.push(id);
+    }
+    // No anchor for this selection in this pane → CLEAR its prior highlight rather than leave it stale.
+    void v.panel.webview.postMessage(
+      scrollTo ? { type: "highlight", gen: v.gen, scrollTo, segmentIds } : { type: "clearHighlight" },
+    );
+  }
+
+  /** Resolve a SEMANTIC reveal target to a pane's anchor keys (the 2×2 of target.kind × pane), then highlight. */
   function postReveal(pane: Pane, target: SemanticTarget): void {
     const v = views.get(pane);
-    if (!v || target.kind !== "unit") return; // C2b-2 reveal originates from a source unit (crlNode/celCase: C2b-3/C2c)
-    if (pane === "source") {
-      const a = v.anchors[target.id]; // source anchors are keyed by unitId
-      if (a) void v.panel.webview.postMessage({ type: "highlight", gen: v.gen, scrollTo: a.scrollTo, segmentIds: a.segmentIds });
-    } else if (pane === "crl" && crlMaps) {
-      // a unit may reference several CRL rows (concept/activity/decision refs) → highlight all; scroll to the first.
-      const segmentIds: string[] = [];
-      let scrollTo: string | undefined;
-      for (const rowKey of rowNodeKeysForUnit(target.id, crlMaps)) {
-        const a = v.anchors[rowKey];
-        if (!a) continue;
-        if (!scrollTo) scrollTo = a.scrollTo;
-        segmentIds.push(...a.segmentIds);
-      }
-      if (scrollTo) void v.panel.webview.postMessage({ type: "highlight", gen: v.gen, scrollTo, segmentIds });
+    if (!v) return;
+    if (target.kind === "unit") {
+      if (pane === "source") highlightRows(v, [target.id]); // source anchors keyed by unitId
+      else if (pane === "crl" && crlMaps) highlightRows(v, rowNodeKeysForUnit(target.id, crlMaps)); // unit → its CRL rows
+    } else if (target.kind === "crlNode") {
+      if (pane === "crl") highlightRows(v, [target.id]); // CRL anchors keyed by nodeKey
+      else if (pane === "source" && crlMaps) highlightRows(v, unitsForRow(target.id, crlMaps)); // crl node → its source units
     }
-    // cel: placeholder — no-op
+    // cel: placeholder — no-op (C2c)
+  }
+
+  function clearAllHighlights(): void {
+    for (const v of views.values()) void v.panel.webview.postMessage({ type: "clearHighlight" });
+  }
+
+  function updateNavMessage(): void {
+    const empty = navigatorItems(state).length === 0;
+    navView.message = empty
+      ? state.primary === "crl"
+        ? "No CRL decisions in this policy."
+        : "No source-linked units in this policy."
+      : undefined;
   }
 
   function reflectSelectionToTree(): void {
     const sel = state.selection;
-    if (sel?.primary !== "source") return;
-    const item = navigatorItems(state).find((i) => i.id === sel.unitId);
+    // only reflect when the selection is in the CURRENT primary's space (the navigator shows that space)
+    if (!sel || sel.primary !== state.primary) return;
+    const id = sel.primary === "source" ? sel.unitId : sel.primary === "crl" ? sel.nodeKey : undefined;
+    if (id === undefined) return;
+    const item = navigatorItems(state).find((i) => i.id === id);
     if (item) void navView.reveal(item, { select: true, focus: false }).then(undefined, () => undefined);
   }
 
@@ -230,31 +277,64 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     } else if (msg.type === "reveal" && typeof msg.key === "string") {
       const hit = v.reveals[msg.key]; // trusted: looked up by opaque key, not a path/range from the webview
       if (!hit) return;
+      // A click sets the selection in the CURRENT primary's space (mapping cross-pane as needed).
       if ("unitId" in hit) {
-        // Source span click → select that source unit (records the clicked locus for open-raw).
-        lastClicked = { unitId: hit.unitId, range: hit.range };
-        dispatch({ type: "select", selection: { primary: "source", unitId: hit.unitId } });
+        if (state.primary === "crl") {
+          onSourceClickCrlPrimary(hit.unitId); // map the source span → its CRL node(s)
+        } else {
+          // Source span click, source-primary → select that source unit (records the clicked locus for open-raw).
+          lastClicked = { unitId: hit.unitId, range: hit.range };
+          dispatch({ type: "select", selection: { primary: "source", unitId: hit.unitId } });
+        }
       } else {
-        // CRL row click → its source unit(s) (source primary in C2b-2). Don't touch lastClicked (no source range).
-        onCrlClick(hit.nodeKey);
+        if (state.primary === "crl") {
+          dispatch({ type: "select", selection: { primary: "crl", nodeKey: hit.nodeKey } }); // CRL row click, crl-primary
+        } else {
+          onCrlClick(hit.nodeKey); // source-primary → map the CRL row → its source unit(s)
+        }
       }
     }
   }
 
-  /** Resolve a CRL row click → candidate source-bearing units (branch-scoped) → select (1) / quick-pick (>1) / no-op (0). */
+  /** Async-safe pick-then-select: filters a stale pick after a rebuild. */
+  function pickThenSelect<T>(items: (vscode.QuickPickItem & { value: T })[], placeHolder: string, toSel: (v: T) => Selection): void {
+    const ver = indexVersion;
+    void vscode.window.showQuickPick(items, { placeHolder }).then((pick) => {
+      if (pick && indexVersion === ver) dispatch({ type: "select", selection: toSel(pick.value) });
+    });
+  }
+
+  /** Source-primary CRL-row click → its candidate source-bearing units (branch-scoped) → select (1) / quick-pick (>1) / no-op (0). */
   function onCrlClick(nodeKey: string): void {
     if (!crlMaps) return;
     const candidates = unitsForRow(nodeKey, crlMaps);
-    if (candidates.length === 0) return; // this CRL node maps to no source-bearing unit
+    if (candidates.length === 0) return;
     if (candidates.length === 1) {
       dispatch({ type: "select", selection: { primary: "source", unitId: candidates[0] } });
       return;
     }
-    const ver = indexVersion; // the picker is async — a rebuild meanwhile invalidates this selection
-    const items = candidates.map((id) => ({ label: correspondence?.units.find((u) => u.id === id)?.label ?? id, description: id, id }));
-    void vscode.window.showQuickPick(items, { placeHolder: "This CRL node maps to multiple source units" }).then((pick) => {
-      if (pick && indexVersion === ver) dispatch({ type: "select", selection: { primary: "source", unitId: pick.id } });
-    });
+    pickThenSelect(
+      candidates.map((id) => ({ label: correspondence?.units.find((u) => u.id === id)?.label ?? id, description: id, value: id })),
+      "This CRL node maps to multiple source units",
+      (id) => ({ primary: "source", unitId: id }),
+    );
+  }
+
+  /** CRL-primary source-span click → its candidate CRL rows (branch-scoped) → select the crl node (1) / quick-pick (>1) / no-op (0). */
+  function onSourceClickCrlPrimary(unitId: string): void {
+    if (!crlMaps) return;
+    const rows = rowNodeKeysForUnit(unitId, crlMaps);
+    if (rows.length === 0) return;
+    if (rows.length === 1) {
+      dispatch({ type: "select", selection: { primary: "crl", nodeKey: rows[0] } });
+      return;
+    }
+    const navByKey = new Map((state.index?.crlNav ?? []).map((n) => [n.nodeKey, n]));
+    pickThenSelect(
+      rows.map((nk) => ({ label: navByKey.get(nk)?.label ?? nk, description: navByKey.get(nk)?.description, value: nk })),
+      "This source span maps to multiple CRL nodes",
+      (nk) => ({ primary: "crl", nodeKey: nk }),
+    );
   }
 
   function ensurePane(pane: Pane): PaneView {
@@ -302,9 +382,8 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     lastClicked = undefined;
     crlMaps = buildCrlRevealMaps(correspondence, crlStructure);
     for (const pane of PANES) coord.clearPending(pane);
-    dispatch({ type: "setInputs", index: toIndex(model, indexVersion) });
-    navView.message =
-      state.index && state.index.sourceCycleIds.length === 0 ? "No source-linked units in this policy." : undefined;
+    dispatch({ type: "setInputs", index: toIndex(model, crlStructure, indexVersion) });
+    updateNavMessage();
     for (const pane of PANES) renderPane(pane);
   }
 
@@ -317,7 +396,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     lastClicked = undefined;
     indexVersion += 1;
     for (const pane of PANES) coord.clearPending(pane);
-    dispatch({ type: "setInputs", index: { version: indexVersion, anchorFilePath: "", steps: [], sourceCycleIds: [] } });
+    dispatch({ type: "setInputs", index: { version: indexVersion, anchorFilePath: "", steps: [], sourceCycleIds: [], crlNav: [] } });
     navView.message = message;
     renderEmpty(message);
   }
@@ -350,14 +429,30 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     // Safe on-demand reveal (mirrors provenancePanel) — runs only when the user explicitly opens the cockpit on a .cel,
     // NOT unconditionally at activation. Ensures the navigator shows even if the gate's one-shot findFiles missed.
     void vscode.commands.executeCommand("setContext", "crl.active", true);
+    // Apply the persisted default primary BEFORE the first rebuild's navigator render (else it flips visibly).
+    const pref = vscode.workspace.getConfiguration("crl.correspondence", ed.document.uri).get<string>("primary");
+    if (pref === "crl" || pref === "source") state = reduce(state, { type: "setPrimary", primary: pref }).state;
     for (const pane of PANES) if (state.paneVisibility[pane]) ensurePane(pane);
     setupWatcher();
     rebuild();
   });
 
-  const selectItemCmd = vscode.commands.registerCommand("crl.cockpit.selectItem", (unitId: string) => {
+  const togglePrimaryCmd = vscode.commands.registerCommand("crl.cockpit.togglePrimary", () => {
+    if (!currentCel || !model) return; // not shown yet → don't flip + persist a default before the cockpit exists
+    const next: Pane = state.primary === "crl" ? "source" : "crl";
+    for (const pane of PANES) coord.clearPending(pane); // drop reveals queued under the old primary
+    dispatch({ type: "setPrimary", primary: next }); // clears selection + refreshes the navigator
+    clearAllHighlights(); // setPrimary emits no reveals → drop the now-orphaned highlights
+    updateNavMessage();
+    void vscode.workspace
+      .getConfiguration("crl.correspondence", vscode.Uri.file(currentCel))
+      .update("primary", next) // most-specific writable scope (workspace if open, else global)
+      .then(undefined, (e) => console.warn(`[crl.cockpit] could not persist primary: ${e instanceof Error ? e.message : e}`));
+  });
+
+  const selectItemCmd = vscode.commands.registerCommand("crl.cockpit.selectItem", (selection: Selection) => {
     lastClicked = undefined; // navigator click → no specific span; open-raw falls back to the unit's earliest range
-    dispatch({ type: "select", selection: { primary: "source", unitId } });
+    dispatch({ type: "select", selection });
   });
   const nextCmd = vscode.commands.registerCommand("crl.cockpit.next", () => {
     lastClicked = undefined;
@@ -409,6 +504,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   context.subscriptions.push(
     navView,
     showCmd,
+    togglePrimaryCmd,
     selectItemCmd,
     nextCmd,
     prevCmd,
@@ -444,6 +540,7 @@ function shellHtml(): string {
     `const v=acquireVsCodeApi();const root=document.getElementById('root');let gen=-1;` +
     `window.addEventListener('message',(e)=>{const m=e.data;` +
     `if(m.type==='render'){gen=m.gen;root.innerHTML=m.html;v.postMessage({type:'ready',gen:m.gen,indexVersion:m.indexVersion});}` +
+    `else if(m.type==='clearHighlight'){for(const el of root.querySelectorAll('.current'))el.classList.remove('current');}` +
     `else if(m.type==='highlight'){if(m.gen!==gen)return;` + // drop a reveal aimed at a superseded render
     `for(const el of root.querySelectorAll('.current'))el.classList.remove('current');` +
     `for(const id of m.segmentIds){const el=document.getElementById(id);if(el)el.classList.add('current');}` +

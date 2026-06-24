@@ -14,6 +14,15 @@ export interface CockpitIndex {
   steps: CycleStep[];
   /** source-bearing step unitIds, in order — the cycle order for primary:"source" (skips source-less steps). */
   sourceCycleIds: string[];
+  /** CRL nav list (pre-order; the cycle/selectable set for primary:"crl"). SUPERSET of every row a source unit can
+   *  map to, so a source-click-mapped crl node always resolves. */
+  crlNav: CrlNavItem[];
+}
+
+export interface CrlNavItem {
+  nodeKey: string;
+  label: string;
+  description?: string;
 }
 
 export type Selection =
@@ -60,14 +69,26 @@ export interface NavigatorItem {
   selection: Selection;
 }
 
-/** Derive the current-primary navigator list from state. C2a: the source-bearing steps in cycle order. */
+/** Derive the current-primary navigator list from state: source-bearing steps (source) or the CRL nav list (crl). */
 export function navigatorItems(state: State): NavigatorItem[] {
-  if (!state.index || state.primary !== "source") return [];
-  const byId = new Map(state.index.steps.map((s) => [s.unitId, s]));
-  return state.index.sourceCycleIds
-    .map((id) => byId.get(id))
-    .filter((s): s is CycleStep => s !== undefined)
-    .map((s) => ({ id: s.unitId, label: s.label, selection: { primary: "source", unitId: s.unitId } }));
+  const idx = state.index;
+  if (!idx) return [];
+  if (state.primary === "source") {
+    const byId = new Map(idx.steps.map((s) => [s.unitId, s]));
+    return idx.sourceCycleIds
+      .map((id) => byId.get(id))
+      .filter((s): s is CycleStep => s !== undefined)
+      .map((s) => ({ id: s.unitId, label: s.label, selection: { primary: "source", unitId: s.unitId } }));
+  }
+  if (state.primary === "crl") {
+    return idx.crlNav.map((n) => ({
+      id: n.nodeKey,
+      label: n.label,
+      ...(n.description ? { description: n.description } : {}),
+      selection: { primary: "crl", nodeKey: n.nodeKey },
+    }));
+  }
+  return []; // cel — C2c
 }
 
 const PANES: Pane[] = ["source", "crl", "cel"];
@@ -84,11 +105,12 @@ function revealAllVisible(state: State, sel: Selection): Effect[] {
   return PANES.filter((p) => state.paneVisibility[p]).map((pane) => ({ type: "reveal", pane, target }));
 }
 
-/** Does the selection's referent still exist in the index? (C2a resolves the source arm; crl/cel land in C2b/C2c.) */
+/** Does the selection's referent still exist + remain navigable in the index? (source: must stay source-bearing.) */
 function selectionResolves(index: CockpitIndex | undefined, sel: Selection | undefined): boolean {
   if (!index || !sel) return false;
-  if (sel.primary === "source") return index.steps.some((s) => s.unitId === sel.unitId);
-  return false; // crl/cel selections — C2b/C2c
+  if (sel.primary === "source") return index.sourceCycleIds.includes(sel.unitId);
+  if (sel.primary === "crl") return index.crlNav.some((n) => n.nodeKey === sel.nodeKey);
+  return false; // cel — C2c
 }
 
 function cycle(ids: string[], currentId: string | undefined, dir: 1 | -1): string | undefined {
@@ -115,18 +137,39 @@ export function reduce(state: State, action: Action): ReduceResult {
       return { state: { ...state, primary: action.primary, selection: undefined }, effects: [] };
     }
     case "select": {
+      // Harden the command surface (direct invocation, a stale async quick-pick after a primary toggle): only apply a
+      // selection that resolves in the current index AND is in the current primary's space.
+      if (!selectionResolves(state.index, action.selection) || action.selection.primary !== state.primary) {
+        return { state, effects: [] };
+      }
       const next: State = { ...state, selection: action.selection };
       return { state: next, effects: revealAllVisible(next, action.selection) };
     }
     case "next":
     case "prev": {
-      if (state.primary !== "source" || !state.index) return { state, effects: [] };
-      const cur = state.selection?.primary === "source" ? state.selection.unitId : undefined;
-      const id = cycle(state.index.sourceCycleIds, cur, action.type === "next" ? 1 : -1);
-      if (id === undefined) return { state, effects: [] };
-      const selection: Selection = { primary: "source", unitId: id };
-      const next: State = { ...state, selection };
-      return { state: next, effects: revealAllVisible(next, selection) };
+      if (!state.index) return { state, effects: [] };
+      const dir = action.type === "next" ? 1 : -1;
+      if (state.primary === "source") {
+        const cur = state.selection?.primary === "source" ? state.selection.unitId : undefined;
+        const id = cycle(state.index.sourceCycleIds, cur, dir);
+        if (id === undefined) return { state, effects: [] };
+        const selection: Selection = { primary: "source", unitId: id };
+        const next: State = { ...state, selection };
+        return { state: next, effects: revealAllVisible(next, selection) };
+      }
+      if (state.primary === "crl") {
+        const cur = state.selection?.primary === "crl" ? state.selection.nodeKey : undefined;
+        const id = cycle(
+          state.index.crlNav.map((n) => n.nodeKey),
+          cur,
+          dir,
+        );
+        if (id === undefined) return { state, effects: [] };
+        const selection: Selection = { primary: "crl", nodeKey: id };
+        const next: State = { ...state, selection };
+        return { state: next, effects: revealAllVisible(next, selection) };
+      }
+      return { state, effects: [] };
     }
     case "setPaneVisible": {
       if (state.paneVisibility[action.pane] === action.visible) return { state, effects: [] };
