@@ -82,4 +82,29 @@ check("unmapped row → no candidates (clean no-op)", () => {
   assert.deepEqual(rowNodeKeysForUnit("nope", m), []);
 });
 
+// The rx501 over-match repro: both branches recommend the SAME activity, with realistic nodeId paths for ancestry.
+const branch = (key, nodeId, label, concept, act) => ({
+  nodeKey: key, nodeId, decision: "D", lib: "T", kind: "when", label, refKeys: [concept], location: {},
+  children: [{ nodeKey: `${key}a0`, nodeId: `${nodeId}/action[0]`, decision: "D", lib: "T", kind: "action", label: "Approve", refKeys: [act], location: {}, children: [] }],
+});
+const sharedStruct = [{ decision: "D", lib: "T", nodeKey: "dD", location: {}, children: [branch("w0", "when[0]", "when Crohn", "cCrohn", "aApprove"), branch("w1", "when[1]", "when UC", "cUC", "aApprove")] }];
+const sharedCorr = {
+  units: [
+    { id: "uCrohn", source: [{ displayRange: {} }], crl: [{ nodeKey: "cCrohn" }, { nodeKey: "aApprove" }] },
+    { id: "uUC", source: [{ displayRange: {} }], crl: [{ nodeKey: "cUC" }, { nodeKey: "aApprove" }] },
+  ],
+};
+
+check("context-scoping: a shared activity does NOT bleed across branches (the rx501 over-match)", () => {
+  const m = buildCrlRevealMaps(sharedCorr, sharedStruct);
+  // each unit cites its concept + the shared Approve activity; only the IN-BRANCH Approve is highlighted
+  assert.deepEqual(rowNodeKeysForUnit("uCrohn", m).sort(), ["w0", "w0a0"]);
+  assert.deepEqual(rowNodeKeysForUnit("uUC", m).sort(), ["w1", "w1a0"]);
+});
+
+check("no branch context (unit cites only the shared activity) → all action matches (best effort)", () => {
+  const m = buildCrlRevealMaps({ units: [{ id: "uA", source: [{ displayRange: {} }], crl: [{ nodeKey: "aApprove" }] }] }, sharedStruct);
+  assert.deepEqual(rowNodeKeysForUnit("uA", m).sort(), ["w0a0", "w1a0"]);
+});
+
 console.log(`\ncrlRevealMaps.test: ${pass} checks passed`);
