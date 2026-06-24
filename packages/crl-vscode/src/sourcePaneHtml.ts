@@ -7,6 +7,8 @@
 // Design authority: .vibe-tools/discussions/118-c2a-source-spine.md.
 import type { ZeroBasedRange } from "@smile-digital-health/crl/language-services";
 
+import { corrKeyHtml } from "./corrKey";
+
 export interface UnitSpan {
   unitId: string;
   range: ZeroBasedRange;
@@ -58,9 +60,13 @@ export function renderSourcePane(
   anchorText: string,
   units: UnitSpan[],
   overlays: OverlaySpan[],
-  opts: { revealPrefix?: string } = {},
+  // unitNumber + showKeys = the #163 at-rest key. The source key is an INLINE badge before each covered run, deduped
+  // while membership is unchanged across adjacent covered runs (re-shown after an uncovered gap).
+  opts: { revealPrefix?: string; unitNumber?: Map<string, number>; showKeys?: boolean } = {},
 ): RenderedSource {
   const prefix = opts.revealPrefix ?? "";
+  const unitNumber = opts.unitNumber ?? new Map<string, number>();
+  const showKeys = opts.showKeys ?? false;
   const starts = lineStarts(anchorText);
   const len = anchorText.length;
   const toAbs = (r: ZeroBasedRange): { start: number; end: number } => ({
@@ -84,15 +90,16 @@ export function renderSourcePane(
   const reveals: Record<string, { unitId: string; range: ZeroBasedRange }> = {};
   let html = "";
   let segIdx = 0;
+  let lastBadgedKey = ""; // the unit-number membership of the last badge emitted; reset on a non-covered run
 
   for (let i = 0; i < bounds.length - 1; i++) {
     const a = bounds[i];
     const b = bounds[i + 1];
     if (b <= a) continue;
-    const text = escapeHtml(anchorText.slice(a, b));
     const covering = spans.filter((s) => s.start <= a && b <= s.end);
     if (covering.length === 0) {
-      html += text; // plain run, no marks
+      html += escapeHtml(anchorText.slice(a, b)); // plain run, no marks
+      lastBadgedKey = ""; // a gap → the next covered run re-shows its badge even if same membership
       continue;
     }
     const coveringUnits = covering.filter((s) => s.unitId);
@@ -113,7 +120,24 @@ export function renderSourcePane(
         anchor.segmentIds.push(id);
       }
     }
-    html += `<span ${attrs.join(" ")}>${text}</span>`;
+    // At-rest badge (#163-2): placed AFTER the run's leading whitespace (so it never sits before indentation), BEFORE the
+    // <span> (so it's not part of the covered highlight/click target → a badge click is an inert no-op). Deduped while the
+    // unit membership is unchanged across adjacent covered runs (a nested overlay splits a run into same-membership pieces
+    // → one badge). The span keeps the run's content (minus leading whitespace) so highlight/anchor/click are unchanged.
+    const raw = anchorText.slice(a, b);
+    const leadLen = raw.length - raw.trimStart().length;
+    const restHtml = escapeHtml(raw.slice(leadLen));
+    const numbers = [...new Set(unitIds.map((u) => unitNumber.get(u)).filter((n): n is number => n !== undefined))].sort((x, y) => x - y);
+    let badge = "";
+    if (numbers.length === 0) {
+      lastBadgedKey = ""; // an overlay-only / unnumbered covered run is a visual GAP → the next numbered run re-badges
+    } else if (showKeys && raw.slice(leadLen).length > 0 && numbers.join(",") !== lastBadgedKey) {
+      badge = corrKeyHtml(numbers);
+      lastBadgedKey = numbers.join(",");
+    }
+    // else: a numbered run with unchanged membership OR a whitespace-only numbered run → no badge, membership kept (so a
+    // unit split only by internal whitespace shows ONE badge, not one per piece).
+    html += escapeHtml(raw.slice(0, leadLen)) + badge + `<span ${attrs.join(" ")}>${restHtml}</span>`;
   }
 
   return { html, anchors, reveals };

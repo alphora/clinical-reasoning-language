@@ -352,7 +352,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
         void v.panel.webview.postMessage({ type: "render", html, gen, indexVersion });
         return;
       }
-      const r = renderSourcePane(model.anchor.text, units, overlays, { revealPrefix: `g${gen}_` });
+      const r = renderSourcePane(model.anchor.text, units, overlays, { revealPrefix: `g${gen}_`, unitNumber, showKeys });
       v.anchors = r.anchors;
       v.reveals = r.reveals;
       void v.panel.webview.postMessage({ type: "render", html: r.html, gen, indexVersion });
@@ -643,14 +643,13 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     dispatch({ type: "select", selection });
   });
 
-  /** Apply a showKeys change WITHOUT a rebuild: re-render the key-bearing panes (CRL/CEL — source carries no key in
-   *  #163-1) + refresh the navigator labels (the prefix is read in getTreeItem). The cached number maps are still valid
+  /** Apply a showKeys change WITHOUT a rebuild: re-render the key-bearing panes (all three — source badge landed in
+   *  #163-2) + refresh the navigator labels (the prefix is read in getTreeItem). The cached number maps are still valid
    *  (same model). Re-rendering swaps the pane DOM (dropping the selection's `.current`), so re-drive the current
    *  selection afterwards to restore its highlight (queues a reveal that lands when the re-rendered panes re-ack). */
   function applyShowKeys(next: boolean): void {
     showKeys = next;
-    renderPane("crl");
-    renderPane("cel");
+    for (const pane of PANES) renderPane(pane);
     onNav.fire(undefined); // re-run getTreeItem → label prefixes appear/disappear
     if (state.selection) dispatch({ type: "select", selection: state.selection }); // restore highlights post-re-render
   }

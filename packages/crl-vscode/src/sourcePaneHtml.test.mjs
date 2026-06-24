@@ -14,6 +14,7 @@ async function load(tsFile) {
   return require(out);
 }
 const { renderSourcePane } = await load("sourcePaneHtml.ts");
+const num = (...pairs) => new Map(pairs); // unitId→number map helper
 
 let pass = 0;
 const check = (label, fn) => {
@@ -106,6 +107,49 @@ check("revealPrefix namespaces segment + reveal keys (per-render generation safe
   const out = renderSourcePane("ABC", [unit("u1", 0, 3)], [], { revealPrefix: "7:" });
   assert.ok(Object.keys(out.reveals).every((k) => k.startsWith("7:")));
   assert.ok(out.anchors.u1.scrollTo.startsWith("7:"));
+});
+
+// --- #163-2 at-rest source badge ---
+
+check("showKeys + unitNumber → an inline key badge before the covered span; off → none", () => {
+  const on = renderSourcePane("ABCDEFGHIJ", [unit("u1", 0, 6)], [], { unitNumber: num(["u1", 3]), showKeys: true });
+  assert.match(on.html, /<span class="corr-key"[^>]*><span class="corr-sw [^"]*"><\/span><span class="corr-num">3<\/span><\/span><span [^>]*class="covered"/);
+  const off = renderSourcePane("ABCDEFGHIJ", [unit("u1", 0, 6)], [], { unitNumber: num(["u1", 3]), showKeys: false });
+  assert.ok(!off.html.includes("corr-key"), "showKeys off → no badge");
+});
+
+check("badge DEDUPED across same-membership adjacent runs (nested overlay → one badge, not three)", () => {
+  // u1 covers [0,9); an ignored overlay [3,6) splits it into covered/covered+ignored/covered — all unit {u1}
+  const out = renderSourcePane("ABCDEFGHI", [unit("u1", 0, 9)], [ov("ignored", 3, 6)], { unitNumber: num(["u1", 1]), showKeys: true });
+  assert.equal((out.html.match(/corr-key/g) || []).length, 1, "one badge for the continuous same-unit run");
+});
+
+check("badge RE-SHOWS after an uncovered gap between two runs of the same unit", () => {
+  // u1 covers [0,3) and [6,9); [3,6) is a plain gap → the second run re-badges
+  const out = renderSourcePane("ABCDEFGHI", [unit("u1", 0, 3), unit("u1", 6, 9)], [], { unitNumber: num(["u1", 2]), showKeys: true });
+  assert.equal((out.html.match(/corr-key/g) || []).length, 2, "badge re-appears after the gap");
+});
+
+check("leading whitespace → badge placed AFTER the indentation (not before)", () => {
+  const out = renderSourcePane("   word", [unit("u1", 0, 7)], [], { unitNumber: num(["u1", 5]), showKeys: true });
+  assert.match(out.html, /^ {3}<span class="corr-key"/, "3 spaces, then the badge, then the covered span");
+});
+
+check("badge RE-SHOWS after an UNCOVERED-overlay gap (not just a plain gap) between same-unit runs", () => {
+  // u1 [0,2) + uncovered [2,4) + u1 [4,6): the uncovered-only middle run is a visual gap → the second run re-badges
+  const out = renderSourcePane("ABCDEF", [unit("u1", 0, 2), unit("u1", 4, 6)], [ov("uncovered", 2, 4)], { unitNumber: num(["u1", 1]), showKeys: true });
+  assert.equal((out.html.match(/corr-key/g) || []).length, 2, "uncovered overlay gap re-shows the badge");
+});
+
+check("a unit split only by INTERNAL whitespace shows ONE badge (whitespace run is transparent)", () => {
+  // u1 covers "A B"; an ignored overlay on the space splits it into "A" / " " / "B" — all u1 → one badge
+  const out = renderSourcePane("A B", [unit("u1", 0, 3)], [ov("ignored", 1, 2)], { unitNumber: num(["u1", 1]), showKeys: true });
+  assert.equal((out.html.match(/corr-key/g) || []).length, 1, "internal whitespace does not re-badge a continuous unit");
+});
+
+check("multi-unit covered run → sorted numbers in the badge", () => {
+  const out = renderSourcePane("ABCDEF", [unit("u1", 0, 6), unit("u2", 0, 6)], [], { unitNumber: num(["u1", 7], ["u2", 3]), showKeys: true });
+  assert.ok(out.html.includes('<span class="corr-num">3,7</span>'), "sorted ascending regardless of unit order");
 });
 
 console.log(`\nsourcePaneHtml.test: ${pass} checks passed`);
