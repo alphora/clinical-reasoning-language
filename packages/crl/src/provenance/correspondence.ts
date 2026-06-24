@@ -43,7 +43,7 @@ import type {
 } from "./artifact";
 import { byteRangeToDisplayRange, sliceUtf8Bytes } from "./canonicalize";
 import { nodeKey, type ProvNodeRef } from "./indexer";
-import { resolveProvenance } from "./validateFiles";
+import { resolveProvenance, type ResolveProvenanceResult } from "./validateFiles";
 import type { ProvenanceFinding } from "./validators";
 
 // ── contract ───────────────────────────────────────────────────────────────
@@ -201,7 +201,23 @@ export function buildCorrespondenceModel(
   celPath: string,
   anchorPath: string,
 ): CorrespondenceModel {
-  const r = resolveProvenance(artifactPath, celPath, anchorPath);
+  return buildCorrespondenceModelFromResolved(resolveProvenance(artifactPath, celPath, anchorPath), {
+    artifactPath,
+    celPath,
+  });
+}
+
+/**
+ * Build the correspondence model from an ALREADY-resolved provenance result — the resolve-once seam the cockpit uses
+ * (see buildCockpitModel) so it can derive the correspondence model + the CRL structure from a single resolve. Internal:
+ * takes the large ResolveProvenanceResult, kept out of the public barrel. The thin buildCorrespondenceModel wrapper above
+ * keeps the existing public entry (and its test suite) as the regression guard.
+ */
+export function buildCorrespondenceModelFromResolved(
+  r: ResolveProvenanceResult,
+  paths: { artifactPath: string; celPath: string },
+): CorrespondenceModel {
+  const { artifactPath, celPath } = paths;
   const { artifact, anchor, graph, index, coverage, findings } = r;
 
   const itemsById = new Map(artifact.items.map((it) => [it.id, it]));

@@ -78,7 +78,7 @@ export type {
   VerifyLoop,
 } from "./authoring-kit/types";
 // === Provenance correspondence view-model (validation cockpit, #156) ===
-export { buildCorrespondenceModel, buildCrlStructure, decisionSpine, nodeKey } from "./provenance";
+export { buildCorrespondenceModel, buildCockpitModel, buildCrlStructure, decisionSpine, nodeKey } from "./provenance";
 export type {
   CorrespondenceModel,
   CorrespondenceUnit,
@@ -102,6 +102,7 @@ export type {
   SpineNode,
   SpineNodeKind,
   ProvNodeRef,
+  CockpitModel,
 } from "./provenance";
 
 export { validateCEL, validateCELFile } from "./cel/validator";

@@ -28,6 +28,8 @@ export type {
 } from "./indexer";
 export { buildCrlStructure } from "./crlStructure";
 export type { CrlStructureNode, CrlDecisionStructure, CrlNodeKind, CrlActionKind } from "./crlStructure";
+export { buildCockpitModel } from "./cockpitModel";
+export type { CockpitModel } from "./cockpitModel";
 export { decisionSpine } from "../ast/decisionSpine";
 export type { SpineNode, SpineNodeKind } from "../ast/decisionSpine";
 export { deriveCoverage, decisionImplemented, isOverReach } from "./coverage";

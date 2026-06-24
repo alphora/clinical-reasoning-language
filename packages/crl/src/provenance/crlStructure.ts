@@ -9,8 +9,8 @@
  * closure — a source viewer must not silently drop an authored-but-unreached decision.
  */
 import { decisionSpine, type SpineNodeKind } from "../ast/decisionSpine";
-import type { ActionStatement, WhenBlock } from "../ast/types";
-import { getRefName } from "../ast/types";
+import type { ActionStatement, ReferenceName, WhenBlock } from "../ast/types";
+import { getRefLibrary, getRefName } from "../ast/types";
 import type { ResolvedCelGraph } from "../cel/imports/types";
 import type { LsLocation } from "../language-services/contracts";
 
@@ -28,6 +28,10 @@ export interface CrlStructureNode {
   kind: CrlNodeKind;
   label: string;
   actionKind?: CrlActionKind; // present iff kind === "action"
+  /** The concept/activity/decision nodeKey(s) this row REFERENCES (when→its concept; action→its target [+ guard concept];
+   *  otherwise→[]). The cross-pane bridge: a source unit linking to concept "A" highlights the `when A` row. Built with
+   *  the same lib/kind/name rules as the indexer (byte-identical keys); pure string construction — NOT index-resolved. */
+  refKeys: string[];
   location: LsLocation; // always present: location-less nodes are skipped (mirrors the indexer) to keep nodeKey parity
   children: CrlStructureNode[];
 }
@@ -49,6 +53,30 @@ function labelOf(kind: CrlNodeKind, node: WhenBlock | ActionStatement | { type: 
 
 function actionKindOf(node: ActionStatement): CrlActionKind {
   return node.action.type === "RecommendActivity" ? "recommend-activity" : "use-decision";
+}
+
+/** Build a referenced leaf's nodeKey — same lib/kind/name rule the indexer uses (qualified-ref lib via getRefLibrary,
+ *  else the decision's lib). Pure string construction; not resolved against the index. */
+function refKey(ref: ReferenceName, kind: string, decisionLib: string): string {
+  return nodeKey({ lib: getRefLibrary(ref) ?? decisionLib, kind, name: getRefName(ref) });
+}
+
+/** The concept/activity/decision keys a row references — the cross-pane bridge. The kind is statically known from the
+ *  node type (no acceptable-kind search): when→concept; recommend→activity; use-decision→decision; guard→concept. */
+function refKeysOf(
+  kind: CrlNodeKind,
+  node: WhenBlock | ActionStatement | { type: string },
+  decisionLib: string,
+): string[] {
+  if (kind === "when") return [refKey((node as WhenBlock).conceptName, "concept", decisionLib)];
+  if (kind === "otherwise") return [];
+  const stmt = node as ActionStatement;
+  const a = stmt.action;
+  const target =
+    a.type === "RecommendActivity"
+      ? refKey(a.activityName, "activity", decisionLib)
+      : refKey(a.decisionName, "decision", decisionLib);
+  return stmt.guard ? [target, refKey(stmt.guard.conceptName, "concept", decisionLib)] : [target];
 }
 
 /**
@@ -96,6 +124,7 @@ export function buildCrlStructure(
           kind: sn.kind,
           label: labelOf(sn.kind, sn.node),
           ...(sn.kind === "action" ? { actionKind: actionKindOf(sn.node as ActionStatement) } : {}),
+          refKeys: refKeysOf(sn.kind, sn.node, lib),
           location,
           children: [],
         });

@@ -5,9 +5,14 @@
 // The pure logic lives in correspondenceEngine / paneRevealCoordinator / sourcePaneHtml (all unit-tested);
 // this file is the untested integration per the established split. Design: .vibe-tools/discussions/118-c2a-source-spine.md.
 import { randomBytes } from "node:crypto";
-import { basename } from "node:path";
+import { basename, isAbsolute, relative, sep } from "node:path";
 
-import { buildCorrespondenceModel } from "@smile-digital-health/crl";
+import {
+  buildCockpitModel,
+  type CorrespondenceModel,
+  type CrlDecisionStructure,
+  type CrlStructureNode,
+} from "@smile-digital-health/crl";
 import type { ZeroBasedRange } from "@smile-digital-health/crl/language-services";
 import * as vscode from "vscode";
 
@@ -22,7 +27,9 @@ import {
   type Pane,
   type State,
 } from "./correspondenceEngine";
-import { PaneRevealCoordinator } from "./paneRevealCoordinator";
+import { renderCrlPane } from "./crlPaneHtml";
+import { buildCrlRevealMaps, rowNodeKeysForUnit, unitsForRow, type CrlRevealMaps } from "./crlRevealMaps";
+import { PaneRevealCoordinator, type SemanticTarget } from "./paneRevealCoordinator";
 import { discoverProvenance, findPolicySrc } from "./provenanceFindings";
 import { buildViewerModel, type ViewerModel } from "./provenanceViewer";
 import { renderSourcePane, type OverlaySpan, type UnitSpan } from "./sourcePaneHtml";
@@ -38,14 +45,19 @@ const PANE_TITLE: Record<Pane, string> = { source: "Source", crl: "CRL", cel: "C
 const MAX_SOURCE_CHARS = 200_000;
 const MAX_SOURCE_MARKS = 2000;
 
+const ESC: Record<string, string> = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
+const escapeHtml = (s: string): string => s.replace(/[&<>"']/g, (c) => ESC[c]);
+
 interface PaneView {
   panel: vscode.WebviewPanel;
   gen: number;
   /** the indexVersion the current render was posted at — the authoritative freshness key (NOT trusted from the webview). */
   indexVersion: number;
   acked: boolean;
+  /** Source: keyed by unitId. CRL: keyed by row nodeKey. Value is the row/segment element(s) to highlight. */
   anchors: Record<string, { scrollTo: string; segmentIds: string[] }>;
-  reveals: Record<string, { unitId: string; range: ZeroBasedRange }>;
+  /** Per-pane click payload: source spans carry {unitId,range}; CRL rows carry {nodeKey}. */
+  reveals: Record<string, { unitId: string; range: ZeroBasedRange } | { nodeKey: string }>;
   disposables: vscode.Disposable[];
 }
 
@@ -65,6 +77,11 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   let state: State = initialState();
   const coord = new PaneRevealCoordinator();
   let model: ViewerModel | undefined;
+  let correspondence: CorrespondenceModel | undefined;
+  let crlStructure: CrlDecisionStructure[] = [];
+  let crlMaps: CrlRevealMaps | undefined;
+  /** nodeKey → its structure row (for a CRL click: resolve the row's keys → candidate source units). */
+  const crlNodeByKey = new Map<string, { nodeKey: string; refKeys: string[] }>();
   let indexVersion = 0;
   let currentCel: string | undefined;
   /** last span-click locus (trusted, from the renderer) — open-raw uses it when it still matches the selection. */
@@ -108,16 +125,29 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     // the new render's ack (avoiding a flush against the about-to-be-replaced DOM that would also drop the new reveal).
     if (v.acked && v.indexVersion === indexVersion) {
       const target = coord.ready(e.pane, v.gen, v.indexVersion);
-      if (target) postReveal(e.pane, target.id);
+      if (target) postReveal(e.pane, target);
     }
   }
 
-  function postReveal(pane: Pane, targetId: string): void {
-    if (pane !== "source") return; // C2a: only the Source pane has anchors; crl/cel are placeholders
+  function postReveal(pane: Pane, target: SemanticTarget): void {
     const v = views.get(pane);
-    const a = v?.anchors[targetId];
-    if (!v || !a) return;
-    void v.panel.webview.postMessage({ type: "highlight", gen: v.gen, scrollTo: a.scrollTo, segmentIds: a.segmentIds });
+    if (!v || target.kind !== "unit") return; // C2b-2 reveal originates from a source unit (crlNode/celCase: C2b-3/C2c)
+    if (pane === "source") {
+      const a = v.anchors[target.id]; // source anchors are keyed by unitId
+      if (a) void v.panel.webview.postMessage({ type: "highlight", gen: v.gen, scrollTo: a.scrollTo, segmentIds: a.segmentIds });
+    } else if (pane === "crl" && crlMaps) {
+      // a unit may reference several CRL rows (concept/activity/decision refs) → highlight all; scroll to the first.
+      const segmentIds: string[] = [];
+      let scrollTo: string | undefined;
+      for (const rowKey of rowNodeKeysForUnit(target.id, crlMaps)) {
+        const a = v.anchors[rowKey];
+        if (!a) continue;
+        if (!scrollTo) scrollTo = a.scrollTo;
+        segmentIds.push(...a.segmentIds);
+      }
+      if (scrollTo) void v.panel.webview.postMessage({ type: "highlight", gen: v.gen, scrollTo, segmentIds });
+    }
+    // cel: placeholder — no-op
   }
 
   function reflectSelectionToTree(): void {
@@ -160,9 +190,14 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       v.anchors = r.anchors;
       v.reveals = r.reveals;
       void v.panel.webview.postMessage({ type: "render", html: r.html, gen, indexVersion });
+    } else if (pane === "crl") {
+      const r = renderCrlPane(crlStructure, { revealPrefix: `g${gen}_` });
+      v.anchors = r.anchors;
+      v.reveals = r.reveals;
+      void v.panel.webview.postMessage({ type: "render", html: r.html, gen, indexVersion });
     } else {
-      // C2b/C2c TRAP: capability is set once at ensurePane(); when a pane becomes renderable it must be re-set there.
-      const html = `<p class="placeholder">${PANE_TITLE[pane]} pane — coming in ${pane === "crl" ? "C2b" : "C2c"}.</p>`;
+      // CEL pane — placeholder until C2c. (Capability is set per-pane at ensurePane; CEL stays "placeholder".)
+      const html = `<p class="placeholder">CEL pane — coming in C2c.</p>`;
       void v.panel.webview.postMessage({ type: "render", html, gen, indexVersion });
     }
   }
@@ -175,7 +210,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       v.acked = false;
       v.anchors = {};
       v.reveals = {};
-      void v.panel.webview.postMessage({ type: "render", html: `<p class="placeholder">${message}</p>`, gen, indexVersion });
+      void v.panel.webview.postMessage({ type: "render", html: `<p class="placeholder">${escapeHtml(message)}</p>`, gen, indexVersion });
     }
   }
 
@@ -190,14 +225,36 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       v.acked = true;
       // Use the render's authoritative indexVersion (stored shell-side), NOT a value echoed by the untrusted webview.
       const target = coord.ready(pane, v.gen, v.indexVersion);
-      if (target) postReveal(pane, target.id);
+      if (target) postReveal(pane, target);
     } else if (msg.type === "reveal" && typeof msg.key === "string") {
       const hit = v.reveals[msg.key]; // trusted: looked up by opaque key, not a path/range from the webview
-      if (hit) {
+      if (!hit) return;
+      if ("unitId" in hit) {
+        // Source span click → select that source unit (records the clicked locus for open-raw).
         lastClicked = { unitId: hit.unitId, range: hit.range };
         dispatch({ type: "select", selection: { primary: "source", unitId: hit.unitId } });
+      } else {
+        // CRL row click → its source unit(s) (source primary in C2b-2). Don't touch lastClicked (no source range).
+        onCrlClick(hit.nodeKey);
       }
     }
+  }
+
+  /** Resolve a CRL row click → candidate source-bearing units → select (1) / quick-pick (>1) / no-op (0). */
+  function onCrlClick(nodeKey: string): void {
+    const node = crlNodeByKey.get(nodeKey);
+    if (!node || !crlMaps) return;
+    const candidates = unitsForRow(node, crlMaps);
+    if (candidates.length === 0) return; // this CRL node maps to no source-bearing unit
+    if (candidates.length === 1) {
+      dispatch({ type: "select", selection: { primary: "source", unitId: candidates[0] } });
+      return;
+    }
+    const ver = indexVersion; // the picker is async — a rebuild meanwhile invalidates this selection
+    const items = candidates.map((id) => ({ label: correspondence?.units.find((u) => u.id === id)?.label ?? id, description: id, id }));
+    void vscode.window.showQuickPick(items, { placeHolder: "This CRL node maps to multiple source units" }).then((pick) => {
+      if (pick && indexVersion === ver) dispatch({ type: "select", selection: { primary: "source", unitId: pick.id } });
+    });
   }
 
   function ensurePane(pane: Pane): PaneView {
@@ -210,7 +267,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       { enableScripts: true, retainContextWhenHidden: true },
     );
     panel.webview.html = shellHtml();
-    coord.setPaneCapability(pane, pane === "source" ? "renderable" : "placeholder");
+    coord.setPaneCapability(pane, pane === "cel" ? "placeholder" : "renderable"); // CEL renderable in C2c
     const disposables: vscode.Disposable[] = [
       panel.webview.onDidReceiveMessage((m) => onWebviewMessage(pane, m)),
     ];
@@ -233,13 +290,18 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       return;
     }
     try {
-      model = buildViewerModel(buildCorrespondenceModel(d.artifactPath, currentCel, d.anchorPath));
+      const cm = buildCockpitModel(d.artifactPath, currentCel, d.anchorPath); // resolve ONCE → correspondence + structure
+      correspondence = cm.correspondence;
+      crlStructure = cm.crlStructure;
+      model = buildViewerModel(cm.correspondence);
     } catch (e) {
       resetToEmpty(`Failed to build provenance: ${e instanceof Error ? e.message : String(e)}`);
       return;
     }
     indexVersion += 1;
     lastClicked = undefined;
+    crlMaps = buildCrlRevealMaps(correspondence, crlStructure);
+    populateCrlNodeIndex();
     for (const pane of PANES) coord.clearPending(pane);
     dispatch({ type: "setInputs", index: toIndex(model, indexVersion) });
     navView.message =
@@ -247,9 +309,28 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     for (const pane of PANES) renderPane(pane);
   }
 
+  /** Flatten the CRL structure into a nodeKey → row index (roots carry no refKeys) for CRL-click resolution. */
+  function populateCrlNodeIndex(): void {
+    crlNodeByKey.clear();
+    const walk = (nodes: CrlStructureNode[]): void => {
+      for (const n of nodes) {
+        crlNodeByKey.set(n.nodeKey, { nodeKey: n.nodeKey, refKeys: n.refKeys });
+        walk(n.children);
+      }
+    };
+    for (const d of crlStructure) {
+      crlNodeByKey.set(d.nodeKey, { nodeKey: d.nodeKey, refKeys: [] });
+      walk(d.children);
+    }
+  }
+
   /** On a discovery/build failure, drop stale provenance so the panes never stay interactive with wrong data. */
   function resetToEmpty(message: string): void {
     model = undefined;
+    correspondence = undefined;
+    crlStructure = [];
+    crlMaps = undefined;
+    crlNodeByKey.clear();
     lastClicked = undefined;
     indexVersion += 1;
     for (const pane of PANES) coord.clearPending(pane);
@@ -324,6 +405,23 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     });
   });
 
+  // Rebuild on a save of the active .cel or a policy .crl (the rendered CRL pane reflects the resolved graph; re-resolve
+  // picks up logic edits even before the artifact is re-emitted). The FileSystemWatcher above covers artifact/anchor regen.
+  const onSave = vscode.workspace.onDidSaveTextDocument((doc) => {
+    if (!currentCel) return;
+    const p = doc.uri.fsPath;
+    const src = findPolicySrc(currentCel);
+    const under = (f: string): boolean => {
+      if (!src) return false;
+      const r = relative(src, f);
+      return r !== ".." && !r.startsWith(`..${sep}`) && !isAbsolute(r);
+    };
+    if (p === currentCel || (p.toLowerCase().endsWith(".crl") && under(p))) {
+      if (debounce) clearTimeout(debounce);
+      debounce = setTimeout(rebuild, 150);
+    }
+  });
+
   navView.message = "Open a .cel and run “CRL: Show Cockpit”.";
   context.subscriptions.push(
     navView,
@@ -332,6 +430,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     nextCmd,
     prevCmd,
     openRawCmd,
+    onSave,
     { dispose: () => watcher?.dispose() },
   );
 }
@@ -347,7 +446,13 @@ function shellHtml(): string {
 .uncovered{background:var(--vscode-diffEditor-removedTextBackground,rgba(255,170,80,.22))}
 .ignored{opacity:.55}
 .current{outline:2px solid var(--vscode-focusBorder,#3794ff);background:var(--vscode-editor-findMatchBackground,rgba(100,170,255,.4))}
-[data-reveal]{cursor:pointer}.placeholder{opacity:.6;font-style:italic}`;
+[data-reveal]{cursor:pointer}.placeholder{opacity:.6;font-style:italic}
+.crl-node{display:block;padding:1px 4px;border-radius:2px}
+.crl-decision{font-weight:bold;margin-top:4px}
+.crl-node.when{color:var(--vscode-symbolIcon-keywordForeground,#c586c0)}
+.crl-node.otherwise{opacity:.75;font-style:italic}
+.crl-node.action{color:var(--vscode-symbolIcon-functionForeground,#dcdcaa)}
+.crl-node.use-decision{text-decoration:underline}`;
   return (
     `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">` +
     `<meta http-equiv="Content-Security-Policy" content="${csp}">` +

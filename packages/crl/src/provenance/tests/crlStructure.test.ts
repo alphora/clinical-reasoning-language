@@ -259,6 +259,80 @@ first:
     expect(struct.some((d) => d.decision === "Unused" && d.lib === "U")).toBe(true);
   });
 
+  it("refKeys: when→concept, recommend→activity (+guard concept), use-decision→decision; all indexed", () => {
+    const graph = graphFrom(CRL, CEL);
+    const d = buildCrlStructure(graph).find((x) => x.decision === "D")!;
+    const index = buildProvenanceIndex(graph);
+    const all = new Map<string, CrlStructureNode>();
+    collect(d.children, all);
+    const k = (kind: string, name: string) => nodeKey({ lib: "T", kind, name });
+    expect(all.get("when[0]")!.refKeys).toEqual([k("concept", "A")]);
+    expect(all.get("when[0]/action[0]")!.refKeys).toEqual([k("activity", "X")]);
+    expect(all.get("when[1]/action[0]")!.refKeys).toEqual([k("activity", "Y"), k("concept", "G")]); // `unless "G"` guard
+    expect(all.get("when[1]/action[1]")!.refKeys).toEqual([k("decision", "Sub")]); // use decision "Sub"
+    expect(all.get("otherwise")!.refKeys).toEqual([]);
+    for (const key of [k("concept", "A"), k("activity", "X"), k("activity", "Y"), k("concept", "G"), k("decision", "Sub")])
+      expect(index.nodes.has(key)).toBe(true); // every refKey is a real indexed node (byte-identical)
+  });
+
+  it("refKeys use the OWNING decision's lib (a registry-lib decision keys to its own lib, not the policy)", () => {
+    const graph = graphFrom(CRL, CEL, [entry(U, "u.crl", "local")]);
+    const u = buildCrlStructure(graph).find((x) => x.decision === "Unused" && x.lib === "U")!;
+    const index = buildProvenanceIndex(graph);
+    const all = new Map<string, CrlStructureNode>();
+    collect(u.children, all);
+    const qKey = nodeKey({ lib: "U", kind: "concept", name: "Q" });
+    expect(all.get("when[0]")!.refKeys).toEqual([qKey]);
+    expect(index.nodes.has(qKey)).toBe(true);
+  });
+
+  it("refKeys honor a QUALIFIED ref's library (when \"U\".\"Q\" → lib U, not the decision's lib)", () => {
+    const Q = `# QT
+library "QT".
+activity "X":
+- request CPGCommunicationRequest.
+- with \`x\`.
+decision "D":
+first:
+- when "U"."Q" then recommend activity "X".
+- otherwise then recommend activity "X".`;
+    const celQ = CEL.replace(/covers "T"\./, 'covers "QT".').replace(/"D" is "Z"/, '"D" is "X"');
+    const d = buildCrlStructure(graphFrom(Q, celQ)).find((x) => x.decision === "D")!;
+    const all = new Map<string, CrlStructureNode>();
+    collect(d.children, all);
+    // the qualified library "U" overrides the decision's lib "QT" (getRefLibrary(ref) ?? decisionLib)
+    expect(all.get("when[0]")!.refKeys).toEqual([nodeKey({ lib: "U", kind: "concept", name: "Q" })]);
+  });
+
+  it("cross-kind same-name: when Z→concept, recommend Z→activity, use decision Z→decision", () => {
+    const X = `# X
+library "X".
+concept "Z":
+- type is Condition.
+- code is \`z\`.
+activity "Z":
+- request CPGCommunicationRequest.
+- with \`z\`.
+decision "Z":
+first:
+- otherwise then recommend activity "Z".
+decision "Main":
+first:
+- when "Z" then:
+  all:
+  - recommend activity "Z".
+  - use decision "Z".
+  end.
+- otherwise then recommend activity "Z".`;
+    const celX = CEL.replace(/covers "T"\./, 'covers "X".').replace(/"D" is "Z"/, '"Main" is "Z"');
+    const main = buildCrlStructure(graphFrom(X, celX)).find((x) => x.decision === "Main")!;
+    const all = new Map<string, CrlStructureNode>();
+    collect(main.children, all);
+    expect(all.get("when[0]")!.refKeys).toEqual([nodeKey({ lib: "X", kind: "concept", name: "Z" })]);
+    expect(all.get("when[0]/action[0]")!.refKeys).toEqual([nodeKey({ lib: "X", kind: "activity", name: "Z" })]);
+    expect(all.get("when[0]/action[1]")!.refKeys).toEqual([nodeKey({ lib: "X", kind: "decision", name: "Z" })]);
+  });
+
   it("degenerate: no policy anchor → []", () => {
     const graph = {
       filePath: "x.cel",
