@@ -1,4 +1,4 @@
-import { conceptTypes, type ConceptType } from "../../grammar/conceptTypes";
+import { collectDecisionArms } from "../../ast/decisionArms";
 import {
   isQualifiedRef,
   getRefName,
@@ -7,11 +7,21 @@ import {
   type Location,
   type Statement,
 } from "../../ast/types";
-import { collectDecisionArms } from "../../ast/decisionArms";
+import { conceptTypes, type ConceptType } from "../../grammar/conceptTypes";
+import { CASE_ID_RE, DERIVED_CASE_ID_RE } from "../ast/caseId";
+import type {
+  CELFact,
+  CELCase,
+  CELIdField,
+  CELDefinedByField,
+  CELResultField,
+  CELFactRefField,
+  CELCrossResourceField,
+  CELInclude,
+} from "../ast/types";
+import { buildDefinedByCandidates } from "../definedByResolve";
 import { resolveCelImports, type ResolveCelImportsOptions } from "../imports";
 import type { ResolvedCelGraph } from "../imports/types";
-import type { CEL, CELFact, CELCase, CELIdField, CELDefinedByField, CELResultField, CELFactRefField, CELCrossResourceField, CELInclude } from "../ast/types";
-import { CASE_ID_RE, DERIVED_CASE_ID_RE } from "../ast/caseId";
 
 import type {
   CELValidationError,
@@ -21,24 +31,6 @@ import type {
 } from "./types";
 
 const CONCEPT_TYPE_SET: Set<string> = new Set<string>(conceptTypes as readonly ConceptType[]);
-
-/**
- * Build the candidate set of statements in a library that are valid
- * `defined by` targets. Excludes Terminology, Decision, Parameter — only
- * Concept and Activity are valid target kinds (per plan v2 rule table
- * Step 2). Returns a map for O(1) name lookup.
- */
-function buildDefinedByCandidates(stmts: Statement[]): Map<string, Statement> {
-  const out = new Map<string, Statement>();
-  for (const s of stmts) {
-    if (s.type === "Concept" || s.type === "Activity") {
-      // First-write wins for cross-kind name collisions; within Concept+Activity
-      // the filter still applies (both kinds remain candidates).
-      if (!out.has(s.name)) out.set(s.name, s);
-    }
-  }
-  return out;
-}
 
 /**
  * Build the leaf-resolution map: top-level statements of the covered
@@ -59,7 +51,13 @@ function err(
   location?: Location,
   filePath?: string,
 ): CELValidationError {
-  return { kind, severity: "error", message, ...(location ? { location } : {}), ...(filePath ? { filePath } : {}) };
+  return {
+    kind,
+    severity: "error",
+    message,
+    ...(location ? { location } : {}),
+    ...(filePath ? { filePath } : {}),
+  };
 }
 
 function warn(
@@ -68,7 +66,13 @@ function warn(
   location?: Location,
   filePath?: string,
 ): CELValidationError {
-  return { kind, severity: "warning", message, ...(location ? { location } : {}), ...(filePath ? { filePath } : {}) };
+  return {
+    kind,
+    severity: "warning",
+    message,
+    ...(location ? { location } : {}),
+    ...(filePath ? { filePath } : {}),
+  };
 }
 
 /**
@@ -92,7 +96,12 @@ export function validateCEL(
       message: e.message ?? "Parse failure",
       filePath: fp,
       ...(typeof e.line === "number" && typeof e.column === "number"
-        ? { location: { start: { line: e.line, column: e.column }, end: { line: e.line, column: e.column } } }
+        ? {
+            location: {
+              start: { line: e.line, column: e.column },
+              end: { line: e.line, column: e.column },
+            },
+          }
         : {}),
     });
   }
@@ -144,27 +153,13 @@ export function validateCEL(
   for (const s of cel.statements) {
     if (s.type === "CELFact") {
       if (facts.has(s.name)) {
-        errors.push(
-          err(
-            "duplicate-fact-name",
-            `Duplicate fact name "${s.name}"`,
-            s.location,
-            fp,
-          ),
-        );
+        errors.push(err("duplicate-fact-name", `Duplicate fact name "${s.name}"`, s.location, fp));
       } else {
         facts.set(s.name, s);
       }
     } else if (s.type === "CELCase") {
       if (cases.has(s.name)) {
-        errors.push(
-          err(
-            "duplicate-case-name",
-            `Duplicate case name "${s.name}"`,
-            s.location,
-            fp,
-          ),
-        );
+        errors.push(err("duplicate-case-name", `Duplicate case name "${s.name}"`, s.location, fp));
       } else {
         cases.set(s.name, s);
       }
@@ -177,14 +172,35 @@ export function validateCEL(
     if (s.type !== "CELCase") continue;
     const idFields = s.body.filter((b): b is CELIdField => b.type === "CELIdField");
     for (const extra of idFields.slice(1)) {
-      errors.push(err("multiple-case-ids", `Case "${s.name}" has more than one 'id is' field`, extra.location, fp));
+      errors.push(
+        err(
+          "multiple-case-ids",
+          `Case "${s.name}" has more than one 'id is' field`,
+          extra.location,
+          fp,
+        ),
+      );
     }
     if (s.caseId === undefined) continue;
     const idLoc = idFields[0]?.location ?? s.location;
     if (!CASE_ID_RE.test(s.caseId)) {
-      errors.push(err("malformed-case-id", `Case id "${s.caseId}" must be alphanumeric-start, [A-Za-z0-9_-], ≤64 chars`, idLoc, fp));
+      errors.push(
+        err(
+          "malformed-case-id",
+          `Case id "${s.caseId}" must be alphanumeric-start, [A-Za-z0-9_-], ≤128 chars`,
+          idLoc,
+          fp,
+        ),
+      );
     } else if (DERIVED_CASE_ID_RE.test(s.caseId)) {
-      errors.push(err("reserved-case-id", `Case id "${s.caseId}" is reserved for derived ids (k<number>); choose another`, idLoc, fp));
+      errors.push(
+        err(
+          "reserved-case-id",
+          `Case id "${s.caseId}" is reserved for derived ids (k<number>); choose another`,
+          idLoc,
+          fp,
+        ),
+      );
     } else if (seenCaseIds.has(s.caseId)) {
       errors.push(err("duplicate-case-id", `Duplicate case id "${s.caseId}"`, idLoc, fp));
     } else {
@@ -229,7 +245,15 @@ export function validateCEL(
       } else if (cb.type === "CELFactRefField") {
         validateFactRef(cb, facts, c.name, errors, fp);
       } else if (cb.type === "CELResultField") {
-        validateResult(cb, leafCandidates, coversTarget?.name ?? undefined, c.name, errors, warnings, fp);
+        validateResult(
+          cb,
+          leafCandidates,
+          coversTarget?.name ?? undefined,
+          c.name,
+          errors,
+          warnings,
+          fp,
+        );
       } else if (cb.type === "CELCrossResourceField") {
         validateCrossResource(cb, facts, c.name, errors, fp);
       }
@@ -452,7 +476,10 @@ function validateResult(
             `Result branch "${cb.value.branchName}" in case "${caseName}" is not a reachable arm of decision "${cb.leafName}". Reachable arms: ${
               arms.size === 0
                 ? "(none)"
-                : Array.from(arms).sort().map((a) => `"${a}"`).join(", ")
+                : Array.from(arms)
+                    .sort()
+                    .map((a) => `"${a}"`)
+                    .join(", ")
             }.`,
             cb.value.location,
             fp,
@@ -481,9 +508,7 @@ function validateResult(
           err(
             "result-leaf-not-boolean-valued",
             `Result leaf "${cb.leafName}" in case "${caseName}" is a Concept with value type ${
-              valueTypes.length === 0
-                ? "absent"
-                : valueTypes.map((v) => `"${v}"`).join("/")
+              valueTypes.length === 0 ? "absent" : valueTypes.map((v) => `"${v}"`).join("/")
             }; only boolean-valued concepts accept a true/false result assertion.`,
             cb.value.location,
             fp,

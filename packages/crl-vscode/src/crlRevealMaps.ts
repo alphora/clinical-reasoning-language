@@ -114,6 +114,22 @@ export function unitsForCase(caseId: string, maps: CrlRevealMaps): string[] {
 }
 
 /**
+ * Fact-level peek (C2c-2): a key derived from a CEL fact's RESOLVED concept → its source units (source-bearing) / CRL
+ * rows. (The key isn't on the fact; it's `nodeKey(...)` built from the fact's `defined by` concept target.) Deliberately
+ * thin `Map.get` wrappers — NO branch-scoping (unlike `rowNodeKeysForUnit`/`unitsForRow`, whose heuristics are for
+ * row/unit clicks and would wrongly narrow a concept peek). The concept key is a precise leaf identity; every row/unit
+ * that references it corresponds. The CALLER gates clickability on the fact's resolved kind === "concept" first — these
+ * key maps hold MIXED keys (decision roots, activities), so a key hit alone does not mean the fact is a concept.
+ */
+export function unitsForConcept(conceptKey: string, maps: CrlRevealMaps): string[] {
+  return (maps.keyToUnitIds.get(conceptKey) ?? []).filter((u) => maps.sourceBearingUnits.has(u));
+}
+
+export function rowsForConcept(conceptKey: string, maps: CrlRevealMaps): string[] {
+  return maps.keyToRowNodeKeys.get(conceptKey) ?? [];
+}
+
+/**
  * Source-unit reveal → the CRL row nodeKeys to highlight, CONTEXT-SCOPED. A unit cites a set of leaf keys; a shared leaf
  * (e.g. an activity `Approve` recommended in several branches) would otherwise light up EVERY branch's action. So when the
  * unit also matches a branch condition (a `when`/`otherwise` row), keep only the action rows UNDER a matched branch —

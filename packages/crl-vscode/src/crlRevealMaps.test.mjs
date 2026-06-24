@@ -13,7 +13,7 @@ async function load(tsFile) {
   await build({ entryPoints: [resolve(here, tsFile)], bundle: true, platform: "node", format: "cjs", target: "node18", outfile: out, logLevel: "silent" });
   return require(out);
 }
-const { buildCrlRevealMaps, rowNodeKeysForUnit, unitsForRow, caseIdsForUnit, unitsForCase, caseIdsForNode } = await load("crlRevealMaps.ts");
+const { buildCrlRevealMaps, rowNodeKeysForUnit, unitsForRow, caseIdsForUnit, unitsForCase, caseIdsForNode, unitsForConcept, rowsForConcept } = await load("crlRevealMaps.ts");
 
 let pass = 0;
 const check = (label, fn) => {
@@ -135,6 +135,26 @@ check("caseIdsForNode: a CRL node → its units → their cases (unfiltered)", (
   const m = buildCrlRevealMaps(celCorr, struct);
   // u1 cites cCrohn (→ row w0) AND caseX; clicking/selecting w0 reveals caseX
   assert.deepEqual(caseIdsForNode("w0", m), ["caseX"]);
+});
+
+// C2c-2 fact peek: thin concept→units/rows wrappers (NO branch-scoping; units source-bearing-filtered).
+check("unitsForConcept: concept key → source-bearing units only (thin, unfiltered by branch)", () => {
+  const m = buildCrlRevealMaps(correspondence, structure);
+  assert.deepEqual(unitsForConcept("cA", m), ["u1", "u3"]); // u4 cites cA but lacks a resolved span → filtered
+  assert.deepEqual(unitsForConcept("nope", m), []);
+});
+
+check("rowsForConcept: concept key → ALL referencing rows (thin Map.get, NO context-scoping)", () => {
+  const m = buildCrlRevealMaps(correspondence, structure);
+  assert.deepEqual(rowsForConcept("cA", m), ["when0"]);
+  assert.deepEqual(rowsForConcept("aX", m), ["when0act0"]); // activity key too — caller's kind guard decides clickability
+  assert.deepEqual(rowsForConcept("nope", m), []);
+});
+
+check("rowsForConcept does NOT branch-scope a shared activity (unlike rowNodeKeysForUnit)", () => {
+  const m = buildCrlRevealMaps(sharedCorr, sharedStruct);
+  // a concept peek is a precise leaf identity → every referencing row corresponds (both branches' Approve rows)
+  assert.deepEqual(rowsForConcept("aApprove", m).sort(), ["w0a0", "w1a0"]);
 });
 
 console.log(`\ncrlRevealMaps.test: ${pass} checks passed`);

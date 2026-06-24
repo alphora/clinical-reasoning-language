@@ -38,11 +38,14 @@ import {
   caseIdsForNode,
   caseIdsForUnit,
   rowNodeKeysForUnit,
+  rowsForConcept,
   unitsForCase,
+  unitsForConcept,
   unitsForRow,
   type CrlRevealMaps,
 } from "./crlRevealMaps";
 import { CANONICAL_PANE_ORDER, normalizePaneOrder } from "./paneOrder";
+import { isFactHit, type RevealHit, type WebviewHit } from "./webviewHit";
 import { PaneRevealCoordinator, type SemanticTarget } from "./paneRevealCoordinator";
 import { discoverProvenance, findPolicySrc } from "./provenanceFindings";
 import { buildViewerModel, type ViewerModel } from "./provenanceViewer";
@@ -66,10 +69,11 @@ interface PaneView {
   /** the indexVersion the current render was posted at — the authoritative freshness key (NOT trusted from the webview). */
   indexVersion: number;
   acked: boolean;
-  /** Source: keyed by unitId. CRL: keyed by row nodeKey. CEL: keyed by caseId. Value = element(s) to highlight. */
+  /** Source: keyed by unitId. CRL: keyed by row nodeKey. CEL: case blocks by caseId, fact peeks by `fact:` key. */
   anchors: Record<string, { scrollTo: string; segmentIds: string[] }>;
-  /** Per-pane click payload: source spans → {unitId,range}; CRL rows → {nodeKey}; CEL cases → {caseId}. */
-  reveals: Record<string, { unitId: string; range: ZeroBasedRange } | { nodeKey: string } | { caseId: string }>;
+  /** Per-pane click payload (a WebviewHit): source spans → {unitId,range}; CRL rows → {nodeKey}; CEL cases → {caseId};
+   *  CEL facts → {conceptKey,factAnchorKey} (a peek, NOT an engine selection — routed before mapHitToPrimary). */
+  reveals: Record<string, WebviewHit>;
   disposables: vscode.Disposable[];
 }
 
@@ -129,6 +133,9 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   let crlMaps: CrlRevealMaps | undefined;
   let scenarios: RenderScenarioResult | undefined;
   let caseIdByName: Record<string, string> = {};
+  /** Concept keys that have ≥1 source-bearing unit OR ≥1 CRL row — the gate for a fact being a clickable peek anchor
+   *  (recomputed from crlMaps each rebuild; read at CEL render time, mirroring caseIdByName). */
+  let revealableConceptKeys: ReadonlySet<string> = new Set();
   let indexVersion = 0;
   let currentCel: string | undefined;
   /** last span-click locus (trusted, from the renderer) — open-raw uses it when it still matches the selection. */
@@ -248,6 +255,24 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     for (const v of views.values()) void v.panel.webview.postMessage({ type: "clearHighlight" });
   }
 
+  /** Fact peek (C2c-2): a transient cross-pane highlight of a CEL fact's CONCEPT — shell-side, NO engine selection (so
+   *  it never perturbs the navigator/coord/selection). Clears all panes FIRST so the peek is self-consistent; the next
+   *  engine reveal (selection / next / prev / primary-switch) touches every visible pane (highlightRows clears-on-empty)
+   *  and so wipes the peek. Posts directly to the webview (bypassing the coordinator, like clearAllHighlights) — safe
+   *  because a click only fires from an acked DOM and the shell drops a highlight whose gen ≠ the rendered gen; the
+   *  segmentIds are read LIVE from crlMaps/v.anchors, not a stale snapshot. A *clickable* fact's concept is in
+   *  revealableConceptKeys ⇒ at least one of the source/crl arms is non-empty, so a peek is never a blank clear. */
+  function peekConcept(hit: { conceptKey: string; factAnchorKey: string }): void {
+    clearAllHighlights(); // clear first → even a no-maps peek wipes any stale highlight
+    if (!crlMaps) return;
+    const src = views.get("source");
+    const crl = views.get("crl");
+    const cel = views.get("cel");
+    if (src) highlightRows(src, unitsForConcept(hit.conceptKey, crlMaps)); // concept → source-bearing units
+    if (crl) highlightRows(crl, rowsForConcept(hit.conceptKey, crlMaps)); // concept → CRL rows that reference it
+    if (cel) highlightRows(cel, [hit.factAnchorKey]); // self-highlight the clicked fact span
+  }
+
   function updateNavMessage(): void {
     const empty = navigatorItems(state).length === 0;
     navView.message = empty
@@ -307,7 +332,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     } else {
       // CEL pane — condensed scenario cases (C2c-1).
       const r = scenarios
-        ? renderCelPane(scenarios, caseIdByName, { revealPrefix: `g${gen}_` })
+        ? renderCelPane(scenarios, caseIdByName, { revealPrefix: `g${gen}_`, revealableConceptKeys })
         : { html: '<p class="placeholder">No CEL.</p>', anchors: {}, reveals: {} };
       v.anchors = r.anchors;
       v.reveals = r.reveals;
@@ -342,16 +367,20 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     } else if (msg.type === "reveal" && typeof msg.key === "string") {
       const hit = v.reveals[msg.key]; // trusted: looked up by opaque key, not a path/range from the webview
       if (!hit) return;
-      // A click sets the selection in the CURRENT primary's space (mapping cross-pane as needed).
+      // A fact peek is transient + shell-only — divert it BEFORE the engine-selection path (no lastClicked, no dispatch)
+      // AND before the !crlMaps guard, so a peek always clears prior highlights even if maps are momentarily absent.
+      if (isFactHit(hit)) {
+        peekConcept(hit);
+        return;
+      }
       if (!crlMaps) return;
+      // Otherwise the click sets the selection in the CURRENT primary's space (mapping cross-pane as needed).
       const p = state.primary;
       // record the open-raw locus only for a source-span click while source-primary
       lastClicked = "unitId" in hit && p === "source" ? { unitId: hit.unitId, range: hit.range } : undefined;
       selectInPrimary(mapHitToPrimary(hit, p, crlMaps), p);
     }
   }
-
-  type RevealHit = { unitId: string; range: ZeroBasedRange } | { nodeKey: string } | { caseId: string };
 
   /** Map a webview click hit → the candidate ids in the CURRENT primary's space (the 3×3 click matrix; cross arms via maps).
    *  NOTE: keep the cross-arm maps here in lockstep with postReveal's 3×3 (same helpers, different direction). */
@@ -454,6 +483,14 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     indexVersion += 1;
     lastClicked = undefined;
     crlMaps = buildCrlRevealMaps(correspondence, crlStructure);
+    // A concept key is fact-clickable iff it has ≥1 source-bearing unit OR ≥1 CRL row (the two map key spaces are
+    // independent — has-unit and has-row are separate quadrants). The fact-side kind guard (definedBy.kind==="concept")
+    // is applied in renderCelPane; this set just drops concepts with no correspondence to reveal.
+    const m = crlMaps;
+    revealableConceptKeys = new Set<string>([
+      ...[...m.keyToUnitIds].filter(([, units]) => units.some((u) => m.sourceBearingUnits.has(u))).map(([k]) => k),
+      ...m.keyToRowNodeKeys.keys(),
+    ]);
     for (const pane of PANES) coord.clearPending(pane);
     dispatch({ type: "setInputs", index: toIndex(model, crlStructure, toCelNav(scenarios, caseIdByName), indexVersion) });
     updateNavMessage();
@@ -468,6 +505,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     crlMaps = undefined;
     scenarios = undefined;
     caseIdByName = {};
+    revealableConceptKeys = new Set();
     lastClicked = undefined;
     indexVersion += 1;
     for (const pane of PANES) coord.clearPending(pane);
@@ -647,7 +685,9 @@ function shellHtml(): string {
 .cel-case.cel-fail{border-left-color:var(--vscode-testing-iconFailed,#f14c4c)}
 .cel-case.cel-error{border-left-color:var(--vscode-testing-iconErrored,#e2b33e)}
 .cel-name{font-weight:bold}.cel-subject{opacity:.7}
-.cel-facts,.cel-produced{opacity:.8;padding-left:14px;font-size:.95em}`;
+.cel-facts,.cel-produced{opacity:.8;padding-left:14px;font-size:.95em}
+.cel-fact{cursor:pointer;text-decoration:underline dotted;text-underline-offset:2px}
+.cel-fact:hover{color:var(--vscode-textLink-activeForeground)}`;
   return (
     `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">` +
     `<meta http-equiv="Content-Security-Policy" content="${csp}">` +

@@ -11,7 +11,6 @@
  * trace supplies state. `nodeId`/`recName`/`childId` are imported from `run.ts` so the walk assigns
  * ids IDENTICAL to the CRE's — the alignment key.
  */
-import type { ResolvedCelGraph } from "../cel/imports/types";
 import type {
   ActionStatement,
   BlockBody,
@@ -24,13 +23,17 @@ import type {
 } from "../ast/types";
 import { getRefLibrary, getRefName } from "../ast/types";
 import type { CELCase, CELDefinedByField, CELFact } from "../cel/ast/types";
+import { resolveDefinedByTarget } from "../cel/definedByResolve";
+import type { ResolvedCelGraph } from "../cel/imports/types";
+import type { CelImportDiagnostic } from "../cel/imports/types";
 import type { LsLocation } from "../language-services/contracts";
 import { toZeroBasedRange } from "../language-services/contracts";
-import type { CelImportDiagnostic } from "../cel/imports/types";
 import { mapImportDiagnostic } from "../language-services/diagnostics";
+
 import { childId, runCel, type CompositionTrace, type TraceNode } from "./run";
 
-/** Bump on any breaking change to the shapes below (the UI/agent contract). */
+/** Bump on any breaking change to the shapes below (the UI/agent contract). The C2c-2 `facts[].definedBy`
+ *  addition is OPTIONAL/additive — existing consumers reading `name`/`conceptRef` are unaffected (no bump). */
 export const SCENARIO_VIEW_MODEL_SCHEMA_VERSION = 1;
 
 type ActionKind = "recommend-activity" | "use-decision";
@@ -68,7 +71,17 @@ export interface CaseView {
   name: string;
   description?: string;
   subject?: string;
-  facts: { name: string; conceptRef?: string }[];
+  facts: FactView[];
+}
+
+export interface FactView {
+  name: string;
+  /** The `defined by` target's bare display name (FHIR type or declaration name). */
+  conceptRef?: string;
+  /** Present only when the fact's `defined by` is a QUALIFIED ref resolving to a Concept/Activity declaration.
+   *  A bare ref (FHIR type) or an unresolved ref omits this. Correspondence (C2c-2) makes a fact a cross-pane
+   *  reveal anchor ONLY when `definedBy.kind === "concept"` (an activity/FHIR-type fact is not a concept). */
+  definedBy?: { lib: string; name: string; kind: "concept" | "activity" };
 }
 
 export interface DecisionView {
@@ -129,7 +142,10 @@ export type ExplanationView =
 /** Run the CRE over a resolved CEL graph and project each case to a ScenarioViewModel. `opts.case`
  *  renders only the named case (bounds output for the agent). Mirrors `runCel`'s graph input so it
  *  shares the import-resolution path; the MCP/path entry resolves a `.cel` path to a graph first. */
-export function renderScenario(graph: ResolvedCelGraph, opts?: { case?: string }): RenderScenarioResult {
+export function renderScenario(
+  graph: ResolvedCelGraph,
+  opts?: { case?: string },
+): RenderScenarioResult {
   const result = runCel(graph);
   const celFilePath = graph.filePath;
   if (!result.success) {
@@ -150,7 +166,8 @@ export function renderScenario(graph: ResolvedCelGraph, opts?: { case?: string }
 
   const decisions = new Map<string, Decision>();
   if (graph.coversTarget) {
-    for (const s of graph.coversTarget.ast.statements) if (s.type === "Decision") decisions.set(s.name, s);
+    for (const s of graph.coversTarget.ast.statements)
+      if (s.type === "Decision") decisions.set(s.name, s);
   }
   const celCases = new Map<string, CELCase>();
   const facts = new Map<string, CELFact>();
@@ -165,7 +182,7 @@ export function renderScenario(graph: ResolvedCelGraph, opts?: { case?: string }
 
   const runs = opts?.case ? result.runs.filter((r) => r.case === opts.case) : result.runs;
   const scenarios = runs.map((run) =>
-    buildScenario(run, celCases.get(run.case), decisions, facts, filePath, coveredLib),
+    buildScenario(run, celCases.get(run.case), decisions, facts, filePath, coveredLib, graph),
   );
 
   const passCount = scenarios.filter((s) => s.status === "pass").length;
@@ -191,6 +208,7 @@ function buildScenario(
   facts: Map<string, CELFact>,
   filePath: string,
   coveredLib: string | undefined,
+  graph: ResolvedCelGraph,
 ): ScenarioViewModel {
   const dec = run.decision ? decisions.get(run.decision) : undefined;
   const decision: DecisionView | null = run.decision
@@ -222,7 +240,7 @@ function buildScenario(
   collectProduced(tree);
 
   return {
-    case: buildCaseView(run.case, celCase, facts),
+    case: buildCaseView(run.case, celCase, facts, graph),
     decision,
     status: run.status,
     expected: run.expected ? { decision: run.expected.leaf, branch: run.expected.branch } : null,
@@ -232,18 +250,34 @@ function buildScenario(
   };
 }
 
-function buildCaseView(name: string, celCase: CELCase | undefined, facts: Map<string, CELFact>): CaseView {
+function buildCaseView(
+  name: string,
+  celCase: CELCase | undefined,
+  facts: Map<string, CELFact>,
+  graph: ResolvedCelGraph,
+): CaseView {
   if (!celCase) return { name, facts: [] };
   let subject: string | undefined;
   let description: string | undefined;
-  const factRefs: { name: string; conceptRef?: string }[] = [];
+  const factRefs: FactView[] = [];
   for (const b of celCase.body) {
     if (b.type === "CELSubjectField") subject = b.factName;
     else if (b.type === "CELDescriptionField") description = b.value;
     else if (b.type === "CELFactRefField") {
       const f = facts.get(b.factName);
       const db = f?.body.find((x): x is CELDefinedByField => x.type === "CELDefinedByField");
-      factRefs.push(db ? { name: b.factName, conceptRef: getRefName(db.ref) } : { name: b.factName });
+      if (!db) {
+        factRefs.push({ name: b.factName });
+        continue;
+      }
+      // `definedBy` only when the ref resolves to a Concept/Activity declaration (qualified). A bare ref is a
+      // FHIR type → conceptRef carries the display name but there's no declaration target to anchor on.
+      const target = resolveDefinedByTarget(db.ref, graph);
+      factRefs.push({
+        name: b.factName,
+        conceptRef: getRefName(db.ref),
+        ...(target ? { definedBy: target } : {}),
+      });
     }
   }
   return {
@@ -332,8 +366,11 @@ function walkBodyVM(
     return [buildActionVM(body, childId(parentId, "action[0]"), undefined, traceIndex, filePath)];
   }
   const block = body as BlockBody;
-  const isBranch = block.statements.some((m) => m.type === "WhenBlock" || m.type === "OtherwiseBlock");
-  if (isBranch) return walkBranchesVM(block.statements as BranchBlock[], parentId, traceIndex, filePath);
+  const isBranch = block.statements.some(
+    (m) => m.type === "WhenBlock" || m.type === "OtherwiseBlock",
+  );
+  if (isBranch)
+    return walkBranchesVM(block.statements as BranchBlock[], parentId, traceIndex, filePath);
   const qualifier = block.qualifier;
   return (block.statements as ActionStatement[]).map((stmt, j) =>
     buildActionVM(stmt, childId(parentId, `action[${j}]`), qualifier, traceIndex, filePath),
@@ -349,8 +386,10 @@ function buildActionVM(
 ): ViewNode {
   const t = traceIndex.get(nodeId);
   const evaluated = !!t;
-  const actionRef = stmt.action.type === "RecommendActivity" ? stmt.action.activityName : stmt.action.decisionName;
-  const actionKind: ActionKind = stmt.action.type === "RecommendActivity" ? "recommend-activity" : "use-decision";
+  const actionRef =
+    stmt.action.type === "RecommendActivity" ? stmt.action.activityName : stmt.action.decisionName;
+  const actionKind: ActionKind =
+    stmt.action.type === "RecommendActivity" ? "recommend-activity" : "use-decision";
   const guardedOut = t?.guardedOut === true;
   const action: ActionView = {
     actionKind,
@@ -379,7 +418,11 @@ function buildActionVM(
       ...(t.guard.composition ? { explanation: mapComposition(t.guard.composition) } : {}),
     };
   } else if (stmt.guard) {
-    node.guard = { polarity: stmt.guard.polarity, concept: conceptView(stmt.guard.conceptName), evaluated: false };
+    node.guard = {
+      polarity: stmt.guard.polarity,
+      concept: conceptView(stmt.guard.conceptName),
+      evaluated: false,
+    };
   }
   return node;
 }
@@ -388,7 +431,11 @@ function mapComposition(ct: CompositionTrace): ExplanationView {
   switch (ct.op) {
     case "sem-and":
     case "sem-or":
-      return { op: ct.op, satisfied: ct.satisfied, operands: (ct.operands ?? []).map(mapComposition) };
+      return {
+        op: ct.op,
+        satisfied: ct.satisfied,
+        operands: (ct.operands ?? []).map(mapComposition),
+      };
     case "sem-not":
       return { op: "sem-not", satisfied: ct.satisfied, operand: mapComposition(ct.operand!) };
     case "ref":

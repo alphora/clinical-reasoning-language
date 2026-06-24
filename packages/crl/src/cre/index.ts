@@ -5,6 +5,7 @@ export type {
   RenderScenarioResult,
   ScenarioViewModel,
   CaseView,
+  FactView,
   DecisionView,
   ViewNode,
   ConditionView,
