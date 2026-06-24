@@ -447,8 +447,11 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     // Apply the persisted default primary BEFORE the first rebuild's navigator render (else it flips visibly).
     const pref = vscode.workspace.getConfiguration("crl.correspondence", ed.document.uri).get<string>("primary");
     if (pref === "crl" || pref === "source") state = reduce(state, { type: "setPrimary", primary: pref }).state;
-    // paneOrder is application-scoped (global, cross-project) → read WITHOUT a resource URI; open panes in that order.
-    paneOrder = normalizePaneOrder(vscode.workspace.getConfiguration("crl.correspondence").get("paneOrder"));
+    // paneOrder is window-scoped (User settings = global/cross-project; Workspace settings = per-project) — read with the
+    // .cel resource URI so a workspace/folder override is honored; open panes in that order.
+    paneOrder = normalizePaneOrder(
+      vscode.workspace.getConfiguration("crl.correspondence", ed.document.uri).get("paneOrder"),
+    );
     for (const pane of paneOrder) if (state.paneVisibility[pane]) ensurePane(pane);
     setupWatcher();
     rebuild();
@@ -523,7 +526,8 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     if (!currentCel || !e.affectsConfiguration("crl.correspondence.paneOrder")) return;
     if (orderDebounce) clearTimeout(orderDebounce);
     orderDebounce = setTimeout(() => {
-      paneOrder = normalizePaneOrder(vscode.workspace.getConfiguration("crl.correspondence").get("paneOrder"));
+      const uri = currentCel ? vscode.Uri.file(currentCel) : undefined;
+      paneOrder = normalizePaneOrder(vscode.workspace.getConfiguration("crl.correspondence", uri).get("paneOrder"));
       applyPaneOrder();
     }, 150);
   });
