@@ -218,11 +218,11 @@ export function conceptKeysForNode(nodeKey: string, maps: CrlRevealMaps): string
  * unit also matches a branch condition (a `when`/`otherwise` row), keep only the action rows UNDER a matched branch —
  * collapsing out-of-context matches (disc 117). With no branch context (the unit cites only actions), fall back to all.
  */
-export function rowNodeKeysForUnit(unitId: string, maps: CrlRevealMaps): string[] {
-  const matched = new Set<string>();
-  for (const key of maps.unitToKeys.get(unitId) ?? [])
-    for (const rowKey of maps.keyToRowNodeKeys.get(key) ?? []) matched.add(rowKey);
-
+/** Branch-scope a RAW matched-row set (disc 117): keep branches + decision roots always; keep an action only when one of
+ *  the matched branches is its ancestor; with NO branch context, return the raw set as-is (best effort). The input is the
+ *  un-scoped `matched` set — each caller builds its own (rowNodeKeysForUnit: direct; rowNodeKeysForUnitWithConcepts:
+ *  direct + concept containment) and the scope is applied ONCE over the merged set. References only `matched` + `maps`. */
+function scopeRows(matched: Set<string>, maps: CrlRevealMaps): string[] {
   const rows = [...matched].map((k) => maps.nodeByKey.get(k)).filter((r): r is RowMeta => r !== undefined);
   const branches = rows.filter((r) => r.kind === "when" || r.kind === "otherwise");
   if (branches.length === 0) return [...matched]; // no branch context to disambiguate → best effort
@@ -236,6 +236,41 @@ export function rowNodeKeysForUnit(unitId: string, maps: CrlRevealMaps): string[
     }
   }
   return keep;
+}
+
+export function rowNodeKeysForUnit(unitId: string, maps: CrlRevealMaps): string[] {
+  const matched = new Set<string>();
+  for (const key of maps.unitToKeys.get(unitId) ?? [])
+    for (const rowKey of maps.keyToRowNodeKeys.get(key) ?? []) matched.add(rowKey);
+  return scopeRows(matched, maps);
+}
+
+/** #166 Slice 3b — a source unit → the CRL decision rows it drives, DIRECT *and* via concept containment, branch-scoped
+ *  ONCE. A non-concept key (an activity) resolves to its rows directly; a concept key goes through rowNodeKeysForConcept
+ *  (its own rows + the nested → driving-`when` containment). Both seed ONE `matched` set scoped once — so a containment-
+ *  added `when` becomes branch context and a shared action is NOT re-introduced across branches (the Slice-2 guard case).
+ *  Used for the unit→crl HIGHLIGHT only; the engine SELECTION stays direct (rowNodeKeysForUnit) so it round-trips. */
+export function rowNodeKeysForUnitWithConcepts(unitId: string, maps: CrlRevealMaps): string[] {
+  const matched = new Set<string>();
+  for (const key of maps.unitToKeys.get(unitId) ?? []) {
+    if (maps.conceptByKey.has(key)) {
+      for (const row of rowNodeKeysForConcept(key, maps)) matched.add(row); // concept: direct + containment
+    } else {
+      for (const row of maps.keyToRowNodeKeys.get(key) ?? []) matched.add(row); // non-concept (activity): direct
+    }
+  }
+  return scopeRows(matched, maps);
+}
+
+/** #166 Slice 3b — the CRL anchors a concept PEEK highlights: the concept's OWN row + the decision rows it drives (direct
+ *  rowsForConcept ∪ containment rowNodeKeysForConcept). The direct rowsForConcept term keeps a concept that HAS a CRL row
+ *  but is NOT an inventoried concept-layer node (∉ conceptByKey ⇒ rowNodeKeysForConcept → []) still highlighting its rows.
+ *  Shared by the CEL fact peek (peekConcept) AND the CRL concept-row peek (peekConceptNode) so the two can't drift. */
+export function conceptCrlAnchors(conceptKey: string, maps: CrlRevealMaps): string[] {
+  const out = [conceptKey];
+  for (const row of rowsForConcept(conceptKey, maps)) if (!out.includes(row)) out.push(row);
+  for (const row of rowNodeKeysForConcept(conceptKey, maps)) if (!out.includes(row)) out.push(row);
+  return out;
 }
 
 /**

@@ -13,7 +13,7 @@ async function load(tsFile) {
   await build({ entryPoints: [resolve(here, tsFile)], bundle: true, platform: "node", format: "cjs", target: "node18", outfile: out, logLevel: "silent" });
   return require(out);
 }
-const { buildCrlRevealMaps, rowNodeKeysForUnit, unitsForRow, caseIdsForUnit, unitsForCase, caseIdsForNode, unitsForConcept, rowsForConcept, conceptKeysForUnit, conceptKeysForNode, unitsForRowAll, unitNumbersForRow, unitNumbersForCase, conceptNodesForUnit, unitsForConceptNode, rowNodeKeysForConcept, conceptNodesForRow } = await load("crlRevealMaps.ts");
+const { buildCrlRevealMaps, rowNodeKeysForUnit, rowNodeKeysForUnitWithConcepts, conceptCrlAnchors, unitsForRow, caseIdsForUnit, unitsForCase, caseIdsForNode, unitsForConcept, rowsForConcept, conceptKeysForUnit, conceptKeysForNode, unitsForRowAll, unitNumbersForRow, unitNumbersForCase, conceptNodesForUnit, unitsForConceptNode, rowNodeKeysForConcept, conceptNodesForRow } = await load("crlRevealMaps.ts");
 
 let pass = 0;
 const check = (label, fn) => {
@@ -245,6 +245,64 @@ check("no conceptLayer (default []) → concept maps empty, concept helpers no-o
   const m = buildCrlRevealMaps(cCorr, cStruct);
   assert.equal(m.conceptByKey.size, 0);
   assert.deepEqual(rowNodeKeysForConcept("kSub", m), []);
+});
+
+// #166 Slice 3b: the merged single-scope resolver (rowNodeKeysForUnitWithConcepts) + the shared conceptCrlAnchors.
+// (The DIRECT resolver rowNodeKeysForUnit is unchanged — its behavior is locked by the lines 60-108 tests above, which
+// are also the byte-equivalence guard for the scopeRows extraction.)
+check("rowNodeKeysForUnitWithConcepts: a unit citing a NESTED sub-concept lights up the driving `when`(s) (direct resolver finds none)", () => {
+  const m = buildCrlRevealMaps(cCorr, cStruct, cLayer);
+  assert.deepEqual(rowNodeKeysForUnit("uSub", m), []); // kSub isn't on any row directly → direct path empty
+  assert.deepEqual(rowNodeKeysForUnitWithConcepts("uSub", m).sort(), ["wC", "wC2"]); // via containment → the container's whens
+});
+
+// A unit citing BOTH a nested sub-concept AND a shared activity present in two branches. The containment-supplied `when`
+// gives branch context so ONLY the in-branch action survives — the shared activity is NOT re-introduced (the Slice-2 risk).
+const mixStruct = [{
+  decision: "D", lib: "T", nodeKey: "dD", location: {},
+  children: [
+    { nodeKey: "wA", nodeId: "when[0]", decision: "D", lib: "T", kind: "when", label: "wA", refKeys: ["kContainerA"], location: {},
+      children: [{ nodeKey: "wAa", nodeId: "when[0]/action[0]", decision: "D", lib: "T", kind: "action", label: "Approve", refKeys: ["aApprove"], location: {}, children: [] }] },
+    { nodeKey: "wB", nodeId: "when[1]", decision: "D", lib: "T", kind: "when", label: "wB", refKeys: ["kOther"], location: {},
+      children: [{ nodeKey: "wBa", nodeId: "when[1]/action[0]", decision: "D", lib: "T", kind: "action", label: "Approve", refKeys: ["aApprove"], location: {}, children: [] }] },
+  ],
+}];
+const mixCorr = { units: [{ id: "uMix", source: [{ displayRange: {} }], crl: [{ nodeKey: "kSub" }, { nodeKey: "aApprove" }] }] };
+const mixLayer = [{ nodeKey: "kContainerA", definitionRefs: ["kSub"] }, { nodeKey: "kSub", definitionRefs: [] }, { nodeKey: "kOther", definitionRefs: [] }];
+
+check("rowNodeKeysForUnitWithConcepts: nested sub-concept supplies branch context → shared activity NOT re-introduced across branches (single-scope)", () => {
+  const m = buildCrlRevealMaps(mixCorr, mixStruct, mixLayer);
+  // kSub → kContainerA → wA (only); aApprove is on wAa AND wBa, but only the in-branch (wA) action survives the ONE scope pass
+  assert.deepEqual(rowNodeKeysForUnitWithConcepts("uMix", m).sort(), ["wA", "wAa"]);
+  // contrast: the DIRECT resolver has no branch context (kSub on no row; aApprove with no when) → all actions (best effort)
+  assert.deepEqual(rowNodeKeysForUnit("uMix", m).sort(), ["wAa", "wBa"]);
+});
+
+check("rowNodeKeysForUnitWithConcepts: a unit citing ONLY a non-concept activity → the direct rows (the else-branch in isolation)", () => {
+  // uAct cites only aApprove (an activity, ∉ conceptByKey) → the non-concept/direct path; no branch context → all actions
+  const m = buildCrlRevealMaps({ units: [{ id: "uAct", source: [{ displayRange: {} }], crl: [{ nodeKey: "aApprove" }] }] }, sharedStruct);
+  assert.deepEqual(rowNodeKeysForUnitWithConcepts("uAct", m).sort(), ["w0a0", "w1a0"]);
+});
+
+check("rowNodeKeysForUnitWithConcepts: a directly-cited concept row appears ONCE (dedup across the merged set)", () => {
+  const m = buildCrlRevealMaps({ units: [{ id: "uC", source: [{ displayRange: {} }], crl: [{ nodeKey: "kContainer" }] }] }, cStruct, cLayer);
+  assert.deepEqual(rowNodeKeysForUnitWithConcepts("uC", m).sort(), ["wC", "wC2"]);
+});
+
+check("rowNodeKeysForUnitWithConcepts: no conceptLayer → byte-identical to rowNodeKeysForUnit (back-compat)", () => {
+  const m = buildCrlRevealMaps(correspondence, structure); // no cLayer → keys are non-concept → direct path
+  for (const u of ["u1", "u2", "u5"]) assert.deepEqual(rowNodeKeysForUnitWithConcepts(u, m), rowNodeKeysForUnit(u, m));
+});
+
+check("conceptCrlAnchors: concept's own row + direct rows ∪ containment rows (the shared peek crl arm)", () => {
+  const m = buildCrlRevealMaps(cCorr, cStruct, cLayer);
+  assert.deepEqual(conceptCrlAnchors("kSub", m), ["kSub", "wC", "wC2"]); // own + (no direct) + containment whens
+  assert.deepEqual(conceptCrlAnchors("kContainer", m), ["kContainer", "wC", "wC2"]); // own + direct rows (= containment, deduped)
+});
+
+check("conceptCrlAnchors: a concept on a row but NOT inventoried (∉ conceptByKey) still highlights its direct rows (no fact-peek regression)", () => {
+  const m = buildCrlRevealMaps(correspondence, structure); // no conceptLayer → cA ∉ conceptByKey
+  assert.deepEqual(conceptCrlAnchors("cA", m), ["cA", "when0"]); // rowsForConcept rescues the direct row; rowNodeKeysForConcept→[]
 });
 
 console.log(`\ncrlRevealMaps.test: ${pass} checks passed`);

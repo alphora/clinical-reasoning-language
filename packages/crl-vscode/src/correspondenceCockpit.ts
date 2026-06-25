@@ -39,11 +39,14 @@ import {
   buildCrlRevealMaps,
   caseIdsForNode,
   caseIdsForUnit,
+  conceptCrlAnchors,
   conceptKeysForNode,
   conceptKeysForUnit,
+  conceptNodesForRow,
+  conceptNodesForUnit,
   rowNodeKeysForConcept,
   rowNodeKeysForUnit,
-  rowsForConcept,
+  rowNodeKeysForUnitWithConcepts,
   unitNumbersForCase,
   unitNumbersForRow,
   unitsForCase,
@@ -273,12 +276,15 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     const m = crlMaps;
     if (target.kind === "unit") {
       if (pane === "source") highlightRows(v, [target.id]);
-      else if (pane === "crl") highlightRows(v, rowNodeKeysForUnit(target.id, m)); // unit → its CRL rows (branch-scoped)
+      // #166 3b: unit → its driving decisions (direct + concept containment, scoped ONCE) THEN its applicable concept
+      // rows (direct concepts). Decisions first so highlightRows scrolls to the decision tree (today's behavior).
+      else if (pane === "crl") highlightRows(v, [...rowNodeKeysForUnitWithConcepts(target.id, m), ...conceptNodesForUnit(target.id, m)]);
       // CEL: the unit's artifact cases (block-level) + the fact spans referencing its concepts (C2c-2b reverse, facts first)
       else highlightRows(v, reverseCelAnchors(conceptKeysForUnit(target.id, m), caseIdsForUnit(target.id, m), conceptToFactAnchors));
     } else if (target.kind === "crlNode") {
-      if (pane === "crl") highlightRows(v, [target.id]);
-      else if (pane === "source") highlightRows(v, unitsForRow(target.id, m)); // crl node → its source units
+      // #166 3b: a decision row → itself THEN the concepts it surfaces (direct refKeys + their contained sub-concepts).
+      if (pane === "crl") highlightRows(v, [target.id, ...conceptNodesForRow(target.id, m)]);
+      else if (pane === "source") highlightRows(v, unitsForRow(target.id, m)); // crl node → its source units (direct)
       else highlightRows(v, reverseCelAnchors(conceptKeysForNode(target.id, m), caseIdsForNode(target.id, m), conceptToFactAnchors));
     } else {
       // celCase
@@ -306,7 +312,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     const crl = views.get("crl");
     const cel = views.get("cel");
     if (src) highlightRows(src, unitsForConcept(hit.conceptKey, crlMaps)); // concept → source-bearing units
-    if (crl) highlightRows(crl, rowsForConcept(hit.conceptKey, crlMaps)); // concept → CRL rows that reference it
+    if (crl) highlightRows(crl, conceptCrlAnchors(hit.conceptKey, crlMaps)); // #166 3b: own row + driven decisions (direct + containment)
     if (cel) highlightRows(cel, [hit.factAnchorKey]); // self-highlight the clicked fact span
   }
 
@@ -319,8 +325,8 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     const src = views.get("source");
     const crl = views.get("crl");
     if (src) highlightRows(src, unitsForConcept(conceptKey, crlMaps)); // concept → source-bearing units (only those anchor)
-    // crl: the concept's own row (self) + the decision rows it drives (direct + containment).
-    if (crl) highlightRows(crl, [conceptKey, ...rowNodeKeysForConcept(conceptKey, crlMaps)]);
+    // crl: the concept's own row (self) + the decision rows it drives (direct + containment) — shared with the fact peek.
+    if (crl) highlightRows(crl, conceptCrlAnchors(conceptKey, crlMaps));
   }
 
   function updateNavMessage(): void {
@@ -440,7 +446,10 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   }
 
   /** Map a webview click hit → the candidate ids in the CURRENT primary's space (the 3×3 click matrix; cross arms via maps).
-   *  NOTE: keep the cross-arm maps here in lockstep with postReveal's 3×3 (same helpers, different direction). */
+   *  These produce an engine SELECTION, so they stay DIRECT — deliberately NOT in lockstep with postReveal's #166-3b
+   *  containment ENRICHMENT. The unit→crl arm uses rowNodeKeysForUnit (direct), NOT rowNodeKeysForUnitWithConcepts: a
+   *  selection must round-trip (the reverse crlNode→source arm is direct unitsForRow), and selecting a containment-only
+   *  container `when` would clear the originally-clicked nested-only unit. Containment is a HIGHLIGHT concern (postReveal). */
   function mapHitToPrimary(hit: RevealHit, primary: Pane, m: CrlRevealMaps): string[] {
     if ("unitId" in hit)
       return primary === "source" ? [hit.unitId] : primary === "crl" ? rowNodeKeysForUnit(hit.unitId, m) : caseIdsForUnit(hit.unitId, m);
@@ -545,9 +554,13 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     // independent — has-unit and has-row are separate quadrants). The fact-side kind guard (definedBy.kind==="concept")
     // is applied in renderCelPane; this set just drops concepts with no correspondence to reveal.
     const m = crlMaps;
+    // A concept is fact-peek-clickable if a peek of it wouldn't be blank: it has a source-bearing unit OR a CRL row.
+    // #166 3b adds the THIRD term (purely additive) — nested sub-concepts whose driving `when` is reachable only via
+    // containment (∉ keyToRowNodeKeys directly), so a CEL fact `defined by` a nested concept becomes clickable too.
     revealableConceptKeys = new Set<string>([
       ...[...m.keyToUnitIds].filter(([, units]) => units.some((u) => m.sourceBearingUnits.has(u))).map(([k]) => k),
       ...m.keyToRowNodeKeys.keys(),
+      ...[...m.conceptByKey.keys()].filter((k) => rowNodeKeysForConcept(k, m).length > 0),
     ]);
     // #163 at-rest key: number units by model.steps order (= nav order); precompute the CRL-row + CEL-case number lists
     // (branch-scoped for rows). Cached so the showKeys toggle re-renders without rebuilding. Only non-empty entries stored.
