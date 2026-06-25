@@ -2,7 +2,7 @@
   "name": "crl-language-support",
   "displayName": "Clinical Reasoning Language Support",
   "description": "CRL + CEL keyword highlighting, live validation diagnostics, CRL→CQL + CEL→FHIR-JSON emit, and catalog-driven authoring help (completion + hover) for .crl / .cel Markdown files.",
-  "version": "4.19.0",
+  "version": "4.20.0",
   "publisher": "smiledigitalhealth",
   "engines": {
     "vscode": "^1.85.0"
@@ -266,10 +266,11 @@
           "default": [
             "source",
             "crl",
-            "cel"
+            "cel",
+            "tree"
           ],
           "scope": "window",
-          "description": "Left-to-right column order of the cockpit panes. 'source', 'crl', and 'cel' are always shown; add 'tree' to also open the graphical decision-tree pane. Set it in User settings to persist across all projects, or in Workspace settings for one project. A malformed list is repaired automatically. Changes apply live to open panes."
+          "description": "Left-to-right column order of the cockpit panes. 'source', 'crl', and 'cel' are always shown; 'tree' (the graphical decision-tree flowchart) is shown by default but can be removed from this list to hide it. Set it in User settings to persist across all projects, or in Workspace settings for one project. A malformed list is repaired automatically. Changes apply live to open panes."
         },
         "crl.correspondence.showKeys": {
           "type": "boolean",

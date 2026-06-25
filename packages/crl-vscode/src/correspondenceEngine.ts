@@ -71,9 +71,9 @@ export interface ReduceResult {
 }
 
 export function initialState(): State {
-  // tree starts visible-eligible, but the shell only OPENS panes listed in the user's paneOrder, and tree is not in the
-  // default paneOrder — it stays opt-in until it graduates into CANONICAL_PANE_ORDER + the package default. So this `true`
-  // just means "open it if the user opted in via settings".
+  // tree starts visible-eligible; the shell opens panes listed in the user's paneOrder (tree ships in the package default,
+  // so it opens out-of-box). It stays non-canonical, so removing it from paneOrder hides it — this `true` means "open it
+  // when it's in the order".
   return { primary: "source", paneVisibility: { source: true, crl: true, cel: true, tree: true } };
 }
 

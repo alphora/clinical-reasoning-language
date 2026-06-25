@@ -7,8 +7,9 @@
 //   - VALID_PANES — every pane the cockpit CAN show. Includes the opt-in graphical decision-tree pane ("tree"): if the
 //     user explicitly lists it, it is honored; it just isn't forced on anyone.
 //   - CANONICAL_PANE_ORDER — the panes ALWAYS present, and the order missing ones are appended in. tree is intentionally
-//     NOT canonical, so it is never auto-appended — it stays opt-in until it graduates into this list + the package.json
-//     default. So output is the 3 canonical panes (any user-given order) PLUS tree iff the user opted into it.
+//     NOT canonical, so it is never auto-appended. tree DOES ship in the package.json `paneOrder` default (a fresh cockpit
+//     shows it), but because it's non-canonical a user who sets a tree-less order keeps it — that's the opt-OUT. So output
+//     is the 3 canonical panes (any user-given order) PLUS tree iff the user's list (or the package default) includes it.
 import type { Pane } from "./correspondenceEngine";
 
 export const CANONICAL_PANE_ORDER: readonly Pane[] = ["source", "crl", "cel"];

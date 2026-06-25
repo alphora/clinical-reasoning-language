@@ -122,14 +122,14 @@ check("contributes the crl.correspondence.primary setting (enum source|crl|cel â
   assert.equal(prop.scope, "window");
 });
 
-check("contributes the crl.correspondence.paneOrder setting (enum incl. opt-in tree; default stays 3 panes, window scope)", () => {
+check("contributes the crl.correspondence.paneOrder setting (enum + default incl. tree; tree removable, window scope)", () => {
   const prop = c.configuration?.properties?.["crl.correspondence.paneOrder"];
   assert.ok(prop, "expected crl.correspondence.paneOrder in contributes.configuration.properties");
   assert.equal(prop.type, "array");
-  // tree IS a valid pane id (a user can opt in via settings) ...
   assert.deepEqual(prop.items?.enum, ["source", "crl", "cel", "tree"]);
-  // ... but the DEFAULT stays the 3 always-present panes (tree is opt-in until its renderer ships).
-  assert.deepEqual(prop.default, ["source", "crl", "cel"]);
+  // tree ships in the DEFAULT (shown out-of-box) but is NON-canonical in normalizePaneOrder, so a user who sets a
+  // tree-less order keeps it (opt-out). The 3 source/crl/cel panes are always present.
+  assert.deepEqual(prop.default, ["source", "crl", "cel", "tree"]);
   assert.equal(prop.scope, "window"); // settable in User (global/cross-project) OR Workspace settings
 });
 
