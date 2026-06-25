@@ -10,6 +10,7 @@ import { basename, isAbsolute, relative, sep } from "node:path";
 import {
   buildCockpitModel,
   type CorrespondenceModel,
+  type CrlConceptNode,
   type CrlDecisionStructure,
   type CrlStructureNode,
   type RenderScenarioResult,
@@ -135,6 +136,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   let model: ViewerModel | undefined;
   let correspondence: CorrespondenceModel | undefined;
   let crlStructure: CrlDecisionStructure[] = [];
+  let conceptLayer: CrlConceptNode[] = [];
   let crlMaps: CrlRevealMaps | undefined;
   let scenarios: RenderScenarioResult | undefined;
   let caseIdByName: Record<string, string> = {};
@@ -502,6 +504,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       const cm = buildCockpitModel(d.artifactPath, currentCel, d.anchorPath); // resolve ONCE → corr + structure + scenarios
       correspondence = cm.correspondence;
       crlStructure = cm.crlStructure;
+      conceptLayer = cm.conceptLayer;
       scenarios = cm.scenarios;
       caseIdByName = cm.caseIdByName;
       if (cm.caseNameCollisions.length)
@@ -515,7 +518,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     }
     indexVersion += 1;
     lastClicked = undefined;
-    crlMaps = buildCrlRevealMaps(correspondence, crlStructure);
+    crlMaps = buildCrlRevealMaps(correspondence, crlStructure, conceptLayer);
     // A concept key is fact-clickable iff it has ≥1 source-bearing unit OR ≥1 CRL row (the two map key spaces are
     // independent — has-unit and has-row are separate quadrants). The fact-side kind guard (definedBy.kind==="concept")
     // is applied in renderCelPane; this set just drops concepts with no correspondence to reveal.
@@ -556,6 +559,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     model = undefined;
     correspondence = undefined;
     crlStructure = [];
+    conceptLayer = [];
     crlMaps = undefined;
     scenarios = undefined;
     caseIdByName = {};

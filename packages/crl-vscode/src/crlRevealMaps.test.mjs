@@ -13,7 +13,7 @@ async function load(tsFile) {
   await build({ entryPoints: [resolve(here, tsFile)], bundle: true, platform: "node", format: "cjs", target: "node18", outfile: out, logLevel: "silent" });
   return require(out);
 }
-const { buildCrlRevealMaps, rowNodeKeysForUnit, unitsForRow, caseIdsForUnit, unitsForCase, caseIdsForNode, unitsForConcept, rowsForConcept, conceptKeysForUnit, conceptKeysForNode, unitsForRowAll, unitNumbersForRow, unitNumbersForCase } = await load("crlRevealMaps.ts");
+const { buildCrlRevealMaps, rowNodeKeysForUnit, unitsForRow, caseIdsForUnit, unitsForCase, caseIdsForNode, unitsForConcept, rowsForConcept, conceptKeysForUnit, conceptKeysForNode, unitsForRowAll, unitNumbersForRow, unitNumbersForCase, conceptNodesForUnit, unitsForConceptNode, rowNodeKeysForConcept, conceptNodesForRow } = await load("crlRevealMaps.ts");
 
 let pass = 0;
 const check = (label, fn) => {
@@ -194,6 +194,57 @@ check("unitNumbersForCase: case → its units' numbers (unscoped), sorted + dedu
   assert.deepEqual(unitNumbersForCase("caseX", m, new Map([["u1", 1], ["u2", 2]])), [1, 2]);
   assert.deepEqual(unitNumbersForCase("caseX", m, new Map([["u2", 5]])), [5]); // u1 unnumbered → dropped
   assert.deepEqual(unitNumbersForCase("nope", m, new Map()), []);
+});
+
+// #166 Slice 2: concept-NODE correspondence. `when "Container"` references Container, which is `defined as` Mid, which is
+// `defined as` Sub (a 2-HOP chain). The action under it is guarded by concept Guard. A unit cites the deeply-nested Sub.
+const cStruct = [
+  {
+    decision: "D", lib: "T", nodeKey: "dD", location: {},
+    children: [
+      node("wC", "when", ["kContainer"], [node("wCa", "action", ["aX", "kGuard"])]), // action: activity aX + guard concept
+      node("wC2", "when", ["kContainer"]),
+    ],
+  },
+];
+const cCorr = { units: [{ id: "uSub", source: [{ displayRange: {} }], crl: [{ nodeKey: "kSub" }] }] };
+const cLayer = [
+  { nodeKey: "kContainer", definitionRefs: ["kMid"] },
+  { nodeKey: "kMid", definitionRefs: ["kSub"] },
+  { nodeKey: "kSub", definitionRefs: [] },
+  { nodeKey: "kGuard", definitionRefs: [] },
+];
+
+check("rowNodeKeysForConcept: a deeply-NESTED sub-concept (2 hops) resolves UP to the containing `when` row(s)", () => {
+  const m = buildCrlRevealMaps(cCorr, cStruct, cLayer);
+  assert.deepEqual(rowNodeKeysForConcept("kSub", m).sort(), ["wC", "wC2"]); // Sub → Mid → Container → its whens
+  assert.deepEqual(rowNodeKeysForConcept("kMid", m).sort(), ["wC", "wC2"]); // 1 hop
+  assert.deepEqual(rowNodeKeysForConcept("kContainer", m).sort(), ["wC", "wC2"]); // direct
+  assert.deepEqual(rowNodeKeysForConcept("aX", m), []); // not a concept → []
+});
+
+check("rowNodeKeysForConcept: a GUARD concept resolves to the guarded ACTION row (an applicable decision too)", () => {
+  const m = buildCrlRevealMaps(cCorr, cStruct, cLayer);
+  assert.deepEqual(rowNodeKeysForConcept("kGuard", m), ["wCa"]); // guard concept → its action row
+});
+
+check("conceptNodesForRow: a `when` surfaces its concept + transitively-contained sub-concepts; an action shows its guard, drops the activity", () => {
+  const m = buildCrlRevealMaps(cCorr, cStruct, cLayer);
+  assert.deepEqual(conceptNodesForRow("wC", m), ["kContainer", "kMid", "kSub"]); // direct + 2-hop contained
+  assert.deepEqual(conceptNodesForRow("wCa", m), ["kGuard"]); // guard concept kept; activity aX dropped
+});
+
+check("conceptNodesForUnit / unitsForConceptNode", () => {
+  const m = buildCrlRevealMaps(cCorr, cStruct, cLayer);
+  assert.deepEqual(conceptNodesForUnit("uSub", m), ["kSub"]); // the cited concept node
+  assert.deepEqual(unitsForConceptNode("kSub", m), ["uSub"]);
+  assert.deepEqual(conceptNodesForUnit("nope", m), []);
+});
+
+check("no conceptLayer (default []) → concept maps empty, concept helpers no-op (back-compat)", () => {
+  const m = buildCrlRevealMaps(cCorr, cStruct);
+  assert.equal(m.conceptByKey.size, 0);
+  assert.deepEqual(rowNodeKeysForConcept("kSub", m), []);
 });
 
 console.log(`\ncrlRevealMaps.test: ${pass} checks passed`);

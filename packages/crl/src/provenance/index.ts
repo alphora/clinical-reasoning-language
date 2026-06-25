@@ -30,6 +30,8 @@ export { buildCrlStructure } from "./crlStructure";
 export type { CrlStructureNode, CrlDecisionStructure, CrlNodeKind, CrlActionKind } from "./crlStructure";
 export { buildCrlConceptLayer } from "./crlConceptLayer";
 export type { CrlConceptNode, ConceptDefinitionKind } from "./crlConceptLayer";
+export { buildConceptContainment } from "./conceptContainment";
+export type { ConceptContainment } from "./conceptContainment";
 export { buildCockpitModel } from "./cockpitModel";
 export type { CockpitModel } from "./cockpitModel";
 export { decisionSpine } from "../ast/decisionSpine";

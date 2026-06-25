@@ -9,12 +9,16 @@ import { renderScenario, type RenderScenarioResult } from "../cre";
 import type { ResolvedCelGraph } from "../cel/imports/types";
 
 import { buildCorrespondenceModelFromResolved, type CorrespondenceModel } from "./correspondence";
+import { buildCrlConceptLayer, type CrlConceptNode } from "./crlConceptLayer";
 import { buildCrlStructure, type CrlDecisionStructure } from "./crlStructure";
 import { resolveProvenance } from "./validateFiles";
 
 export interface CockpitModel {
   correspondence: CorrespondenceModel;
   crlStructure: CrlDecisionStructure[];
+  /** ALL concept declarations across the closure as addressable nodes (#166) — the CRL pane renders these alongside the
+   *  decision tree; correspondence joins to them by nodeKey. */
+  conceptLayer: CrlConceptNode[];
   /** The full scenario render (cases + status + the success/errors envelope so the CEL pane can show "why" on failure). */
   scenarios: RenderScenarioResult;
   /** Case NAME → frozen caseId — the join between renderScenario (keyed by name) and the correspondence (keyed by the
@@ -55,6 +59,7 @@ export function buildCockpitModel(
   return {
     correspondence: buildCorrespondenceModelFromResolved(r, { artifactPath, celPath }),
     crlStructure: buildCrlStructure(r.graph),
+    conceptLayer: buildCrlConceptLayer(r.graph),
     scenarios: renderScenario(r.graph),
     caseIdByName: byName,
     caseNameCollisions: collisions,

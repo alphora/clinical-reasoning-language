@@ -3,7 +3,13 @@
 // activity keys) to the CRL-structure rows (the decision tree). A row is reachable by ANY of its keys: its own decision
 // sub-node nodeKey OR a refKey (the concept/activity/decision it references). Clusters are a COVER not a partition, so a
 // key can belong to multiple units → all maps are multi-valued. Pure; the renderer stays simple (gemini's separation).
-import type { CorrespondenceModel, CrlDecisionStructure, CrlStructureNode } from "@smile-digital-health/crl";
+import {
+  buildConceptContainment,
+  type CorrespondenceModel,
+  type CrlConceptNode,
+  type CrlDecisionStructure,
+  type CrlStructureNode,
+} from "@smile-digital-health/crl";
 
 interface RowMeta {
   nodeKey: string;
@@ -29,6 +35,13 @@ export interface CrlRevealMaps {
   unitToCaseIds: Map<string, string[]>;
   /** frozen caseId → the units that cite it (deduped). */
   caseIdToUnits: Map<string, string[]>;
+  // ── concept layer (#166 Slice 2) ──
+  /** concept nodeKey → its node (the addressable concept inventory; first-wins on a duplicate lib/name decl). */
+  conceptByKey: Map<string, CrlConceptNode>;
+  /** concept key → its transitive CONTAINER concept keys (ancestors; resolves a sub-concept UP to the driving `when`). */
+  containersOf: Map<string, string[]>;
+  /** concept key → its transitive contained concept keys (descendants; resolves a `when` concept DOWN to sub-concepts). */
+  containedBy: Map<string, string[]>;
 }
 
 /** Segment-aware descendant test on the `/`-delimited nodeId path (a row IS itself its own context). */
@@ -53,6 +66,7 @@ function walk(nodes: CrlStructureNode[], visit: (n: CrlStructureNode) => void): 
 export function buildCrlRevealMaps(
   correspondence: CorrespondenceModel,
   structure: CrlDecisionStructure[],
+  conceptLayer: CrlConceptNode[] = [],
 ): CrlRevealMaps {
   const unitToKeys = new Map<string, string[]>();
   const keyToUnitIds = new Map<string, string[]>();
@@ -87,7 +101,22 @@ export function buildCrlRevealMaps(
     });
   }
 
-  return { unitToKeys, keyToRowNodeKeys, keyToUnitIds, sourceBearingUnits, nodeByKey, unitToCaseIds, caseIdToUnits };
+  const conceptByKey = new Map<string, CrlConceptNode>();
+  for (const c of conceptLayer) if (!conceptByKey.has(c.nodeKey)) conceptByKey.set(c.nodeKey, c); // first-wins on dup decl
+  const { containersOf, containedBy } = buildConceptContainment(conceptLayer); // precomputed once (closures are pure)
+
+  return {
+    unitToKeys,
+    keyToRowNodeKeys,
+    keyToUnitIds,
+    sourceBearingUnits,
+    nodeByKey,
+    unitToCaseIds,
+    caseIdToUnits,
+    conceptByKey,
+    containersOf,
+    containedBy,
+  };
 }
 
 /** Source-unit reveal → the CEL caseIds to highlight (the unit's cited frozen cases). */
@@ -127,6 +156,47 @@ export function unitsForConcept(conceptKey: string, maps: CrlRevealMaps): string
 
 export function rowsForConcept(conceptKey: string, maps: CrlRevealMaps): string[] {
   return maps.keyToRowNodeKeys.get(conceptKey) ?? [];
+}
+
+// ── concept-NODE correspondence (#166 Slice 2) — concepts are first-class addressable nodes; these resolve the
+// "applicable concept(s) + decision(s)" both ways. Returns RAW (deduped) keys; the cockpit (Slice 3) unions with the
+// direct-row path and applies branch-scoping ONCE. Concept-specific helpers gate on conceptByKey (non-concept → []).
+
+/** A source unit → the concept NODES it cites (its keys that ARE inventoried concepts). The applicable concepts (direct). */
+export function conceptNodesForUnit(unitId: string, maps: CrlRevealMaps): string[] {
+  return (maps.unitToKeys.get(unitId) ?? []).filter((k) => maps.conceptByKey.has(k));
+}
+
+/** A concept node → the units citing it (raw; the caller filters source-bearing for the source pane). */
+export function unitsForConceptNode(conceptKey: string, maps: CrlRevealMaps): string[] {
+  return maps.keyToUnitIds.get(conceptKey) ?? [];
+}
+
+/** A concept → the decision ROW nodeKeys it drives: rows referencing it DIRECTLY (a `when`/guard) UNION rows referencing
+ *  any concept that transitively CONTAINS it (the #166 nested-concept → driving-`when` resolution). Direct first, deduped.
+ *  Returns RAW (un-scoped) rows — the cockpit (Slice 3) unions with the direct-unit path + applies branch-scoping ONCE.
+ *  [] for a non-concept key. */
+export function rowNodeKeysForConcept(conceptKey: string, maps: CrlRevealMaps): string[] {
+  if (!maps.conceptByKey.has(conceptKey)) return [];
+  const out: string[] = [];
+  for (const k of [conceptKey, ...(maps.containersOf.get(conceptKey) ?? [])])
+    for (const row of maps.keyToRowNodeKeys.get(k) ?? []) if (!out.includes(row)) out.push(row);
+  return out;
+}
+
+/** A decision row → the concept NODES it surfaces: the concepts it references directly (its refKeys that are concepts)
+ *  UNION their transitively-contained sub-concepts (the #166 `when` concept → its nested sub-concepts). Two passes (ALL
+ *  direct first, then descendants) → stable direct-first order; deduped; descendants gated on conceptByKey (a closure may
+ *  carry a dangling, non-inventoried key — see conceptContainment). */
+export function conceptNodesForRow(rowNodeKey: string, maps: CrlRevealMaps): string[] {
+  const meta = maps.nodeByKey.get(rowNodeKey);
+  if (!meta) return [];
+  const direct = meta.refKeys.filter((k) => maps.conceptByKey.has(k));
+  const out: string[] = [];
+  for (const k of direct) if (!out.includes(k)) out.push(k);
+  for (const k of direct)
+    for (const sub of maps.containedBy.get(k) ?? []) if (maps.conceptByKey.has(sub) && !out.includes(sub)) out.push(sub);
+  return out;
 }
 
 /** Reverse fact-highlight (C2c-2b): the concept keys a SELECTED source unit cites — to look up the CEL fact spans that
