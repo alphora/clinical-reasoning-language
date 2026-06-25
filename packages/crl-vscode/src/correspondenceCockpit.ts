@@ -43,10 +43,9 @@ import {
   conceptKeysForNode,
   conceptKeysForUnit,
   conceptNodesForRow,
-  conceptNodesForUnit,
+  crlAnchorsForUnits,
   rowNodeKeysForConcept,
   rowNodeKeysForUnit,
-  rowNodeKeysForUnitWithConcepts,
   unitNumbersForCase,
   unitNumbersForRow,
   unitsForCase,
@@ -259,7 +258,11 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     );
   }
 
-  /** Case → the CRL rows of all its units (branch-scoped per unit; a case legitimately spans branches). */
+  /** Case → the CRL rows of all its units, DIRECT + branch-scoped per unit (a case legitimately spans branches). Used by
+   *  mapHitToPrimary (the SELECTION direction — stays direct so it round-trips, like the unit arm). The postReveal
+   *  HIGHLIGHT direction uses crlAnchorsForUnits instead (containment + concept rows). NOTE: a case whose units cite ONLY
+   *  containment-nested concepts (no direct row) maps to [] here → the CRL-primary case-click is an intentional no-op
+   *  (selecting a containment-only container `when` would not round-trip back to the case — same reason the unit arm is direct). */
   function rowsForCase(caseId: string): string[] {
     if (!crlMaps) return [];
     const rows: string[] = [];
@@ -278,7 +281,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       if (pane === "source") highlightRows(v, [target.id]);
       // #166 3b: unit → its driving decisions (direct + concept containment, scoped ONCE) THEN its applicable concept
       // rows (direct concepts). Decisions first so highlightRows scrolls to the decision tree (today's behavior).
-      else if (pane === "crl") highlightRows(v, [...rowNodeKeysForUnitWithConcepts(target.id, m), ...conceptNodesForUnit(target.id, m)]);
+      else if (pane === "crl") highlightRows(v, crlAnchorsForUnits([target.id], m));
       // CEL: the unit's artifact cases (block-level) + the fact spans referencing its concepts (C2c-2b reverse, facts first)
       else highlightRows(v, reverseCelAnchors(conceptKeysForUnit(target.id, m), caseIdsForUnit(target.id, m), conceptToFactAnchors));
     } else if (target.kind === "crlNode") {
@@ -290,7 +293,8 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       // celCase
       if (pane === "cel") highlightRows(v, [target.id]);
       else if (pane === "source") highlightRows(v, unitsForCase(target.id, m).filter((u) => m.sourceBearingUnits.has(u)));
-      else highlightRows(v, rowsForCase(target.id)); // case → its CRL rows
+      // #166 3b-fix: case → its units' driving decisions (direct + containment) AND their applicable concept rows.
+      else highlightRows(v, crlAnchorsForUnits(unitsForCase(target.id, m), m));
     }
   }
 

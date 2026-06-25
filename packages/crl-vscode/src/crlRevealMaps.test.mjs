@@ -13,7 +13,7 @@ async function load(tsFile) {
   await build({ entryPoints: [resolve(here, tsFile)], bundle: true, platform: "node", format: "cjs", target: "node18", outfile: out, logLevel: "silent" });
   return require(out);
 }
-const { buildCrlRevealMaps, rowNodeKeysForUnit, rowNodeKeysForUnitWithConcepts, conceptCrlAnchors, unitsForRow, caseIdsForUnit, unitsForCase, caseIdsForNode, unitsForConcept, rowsForConcept, conceptKeysForUnit, conceptKeysForNode, unitsForRowAll, unitNumbersForRow, unitNumbersForCase, conceptNodesForUnit, unitsForConceptNode, rowNodeKeysForConcept, conceptNodesForRow } = await load("crlRevealMaps.ts");
+const { buildCrlRevealMaps, rowNodeKeysForUnit, rowNodeKeysForUnitWithConcepts, conceptCrlAnchors, crlAnchorsForUnits, unitsForRow, caseIdsForUnit, unitsForCase, caseIdsForNode, unitsForConcept, rowsForConcept, conceptKeysForUnit, conceptKeysForNode, unitsForRowAll, unitNumbersForRow, unitNumbersForCase, conceptNodesForUnit, unitsForConceptNode, rowNodeKeysForConcept, conceptNodesForRow } = await load("crlRevealMaps.ts");
 
 let pass = 0;
 const check = (label, fn) => {
@@ -303,6 +303,21 @@ check("conceptCrlAnchors: concept's own row + direct rows ∪ containment rows (
 check("conceptCrlAnchors: a concept on a row but NOT inventoried (∉ conceptByKey) still highlights its direct rows (no fact-peek regression)", () => {
   const m = buildCrlRevealMaps(correspondence, structure); // no conceptLayer → cA ∉ conceptByKey
   assert.deepEqual(conceptCrlAnchors("cA", m), ["cA", "when0"]); // rowsForConcept rescues the direct row; rowNodeKeysForConcept→[]
+});
+
+check("crlAnchorsForUnits (the unit→crl / case→crl highlight): driving decisions (containment) FIRST, then applicable concept rows; unioned + deduped", () => {
+  const m = buildCrlRevealMaps(cCorr, cStruct, cLayer);
+  // uSub cites nested kSub → decisions [wC, wC2] (via containment) THEN the concept row [kSub]
+  assert.deepEqual(crlAnchorsForUnits(["uSub"], m), ["wC", "wC2", "kSub"]);
+  // unioned over a case's units (here the same unit twice) → deduped, order stable (decisions before concepts)
+  assert.deepEqual(crlAnchorsForUnits(["uSub", "uSub"], m), ["wC", "wC2", "kSub"]);
+  assert.deepEqual(crlAnchorsForUnits([], m), []);
+});
+
+check("crlAnchorsForUnits: a case SPANNING two branches → each unit's rows scoped to ITS branch (no cross-bleed) + both concepts", () => {
+  const m = buildCrlRevealMaps(sharedCorr, sharedStruct, [{ nodeKey: "cCrohn", definitionRefs: [] }, { nodeKey: "cUC", definitionRefs: [] }]);
+  // uCrohn (Crohn branch) + uUC (UC branch), each ALSO citing the shared aApprove → only the in-branch action survives per unit
+  assert.deepEqual(crlAnchorsForUnits(["uCrohn", "uUC"], m).sort(), ["cCrohn", "cUC", "w0", "w0a0", "w1", "w1a0"]);
 });
 
 console.log(`\ncrlRevealMaps.test: ${pass} checks passed`);

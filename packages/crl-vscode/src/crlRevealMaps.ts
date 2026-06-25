@@ -262,6 +262,23 @@ export function rowNodeKeysForUnitWithConcepts(unitId: string, maps: CrlRevealMa
   return scopeRows(matched, maps);
 }
 
+/** #166 — the CRL pane anchors a SET of source units highlight: their driving decisions (direct + concept containment,
+ *  branch-scoped PER UNIT) FIRST, then their applicable concept rows (direct concepts). Shared by the unit→crl and
+ *  celCase→crl reveals (a case = the union over its units; a case legitimately spans branches, so per-unit scoping is
+ *  unioned). Decisions precede concepts so highlightRows scrolls to the decision tree. */
+export function crlAnchorsForUnits(unitIds: string[], maps: CrlRevealMaps): string[] {
+  const decisions: string[] = [];
+  const concepts: string[] = [];
+  for (const u of unitIds) {
+    for (const r of rowNodeKeysForUnitWithConcepts(u, maps)) if (!decisions.includes(r)) decisions.push(r);
+    for (const c of conceptNodesForUnit(u, maps)) if (!concepts.includes(c)) concepts.push(c);
+  }
+  // Decision-row keys and concept-node keys are disjoint by construction; final-dedupe the concat defensively anyway.
+  const out = [...decisions];
+  for (const c of concepts) if (!out.includes(c)) out.push(c);
+  return out;
+}
+
 /** #166 Slice 3b — the CRL anchors a concept PEEK highlights: the concept's OWN row + the decision rows it drives (direct
  *  rowsForConcept ∪ containment rowNodeKeysForConcept). The direct rowsForConcept term keeps a concept that HAS a CRL row
  *  but is NOT an inventoried concept-layer node (∉ conceptByKey ⇒ rowNodeKeysForConcept → []) still highlighting its rows.
