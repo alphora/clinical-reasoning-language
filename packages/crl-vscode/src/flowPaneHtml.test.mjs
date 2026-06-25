@@ -139,6 +139,16 @@ check("forest: two decisions get disjoint vertical bands (no cross-tree overlap 
   assert.ok(roots[1].y >= roots[0].y + roots[0].h, "decision B's root does not overlap A's");
 });
 
+check("INVARIANT: flow anchors cover EVERY structure nodeKey (the cockpit reuses crl anchor-key sets for the tree pane)", () => {
+  // The cockpit highlights the tree by reusing the CRL pane's anchor-key sets; if the flow renderer ever dropped a
+  // structure node from `anchors`, that node would silently stop highlighting with no failing shell test. Lock it here,
+  // fixture-independent (walk the structure rather than a hand-listed set).
+  const keys = [];
+  const walk = (n) => { keys.push(n.nodeKey); n.children.forEach(walk); };
+  for (const d of structure) { keys.push(d.nodeKey); d.children.forEach(walk); }
+  for (const k of keys) assert.ok(r.anchors[k], `flow must anchor structure node ${k}`);
+});
+
 check("GOLDEN coords pin COL/ROW/midpoint/rounding (a uniform shift/scale would pass relative-only checks)", () => {
   // d:D is the first node (flow0): depth 0 → x=14; its 5 branches occupy slots 0..4 → midpoint y=2 → round(14+2*48)=110.
   assert.match(r.html, /<g id="g1_flow0" class="flow-row flow-decision" data-reveal="[^"]*"><title>[^<]*<\/title><rect x="14" y="110"/);

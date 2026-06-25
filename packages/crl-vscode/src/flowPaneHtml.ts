@@ -18,7 +18,10 @@ export interface FlowAnchor {
 export interface RenderedFlow {
   html: string;
   /** structure nodeKey (decision/when/otherwise/action) → its <g> (highlight target). Concepts are NOT keyed here — a
-   *  concept gates many whens; T3 derives concept→node highlight from the structure refKeys, not from these anchors. */
+   *  concept gates many whens; T3 derives concept→node highlight from the structure refKeys, not from these anchors.
+   *  CONTRACT: `anchors` MUST stay structure-only. The cockpit highlights the tree by REUSING the CRL pane's anchor-key
+   *  sets (crlAnchorsForUnits / conceptCrlAnchors), which mix structure-row keys with concept keys; the concept keys rely
+   *  on no-op'ing here (no matching anchor). Keying a concept nodeKey would silently break the crl↔tree highlight lockstep. */
   anchors: Record<string, FlowAnchor>;
   /** opaque key → a node-body select ({nodeKey}, a crlNode) OR a concept/guard peek ({conceptNodeKey}). Same shapes as
    *  RenderedCrl, so the shell needs no new hit kinds. */

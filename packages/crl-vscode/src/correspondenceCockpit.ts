@@ -36,6 +36,7 @@ import {
 import { renderCelPane, reverseCelAnchors } from "./celPaneHtml";
 import { CORR_STYLE } from "./corrKey";
 import { renderCrlPane } from "./crlPaneHtml";
+import { FLOW_STYLE, renderFlowPane } from "./flowPaneHtml";
 import {
   buildCrlRevealMaps,
   caseIdsForNode,
@@ -196,13 +197,20 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
    *  the tree pane can ever be disposed here: normalizePaneOrder always re-adds the 3 canonical panes. */
   const reconcilePaneOrder = (): void => {
     for (const pane of [...views.keys()]) if (!paneOrder.includes(pane)) views.get(pane)?.panel.dispose(); // dispose dropped (tree only)
+    let opened = false;
     for (const pane of paneOrder) {
       if (!state.paneVisibility[pane]) continue;
       const existed = views.has(pane);
       ensurePane(pane);
-      if (!existed) renderPane(pane); // a freshly-opened pane needs its content posted (rebuild won't run on a settings edit)
+      if (!existed) {
+        renderPane(pane); // a freshly-opened pane needs its content posted (rebuild won't run on a settings edit)
+        opened = true;
+      }
     }
     applyPaneOrder();
+    // A pane opened mid-session holds no queued reveal (absent-pane effects were dropped in applyReveal) → re-drive the
+    // current selection so the new pane highlights it on ack, instead of showing a blank/un-highlighted flowchart.
+    if (opened && state.selection) dispatch({ type: "select", selection: state.selection });
   };
 
   // ── navigator TreeView (adapter over the headless navigatorItems model) ──
@@ -295,21 +303,20 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   function postReveal(pane: Pane, target: SemanticTarget): void {
     const v = views.get(pane);
     if (!v || !crlMaps) return;
-    // The tree pane is a "placeholder" capability in T1 (coord.ready never returns it a target), so postReveal is not
-    // called for it yet; the guard is belt-and-suspenders until T3 wires the real tree highlight arm. Returning here also
-    // keeps the `else if (pane === "cel"/"crl")` arms below exhaustive over source/crl/cel (no stray pane falls through).
-    if (pane === "tree") return;
     const m = crlMaps;
+    // The TREE (flowchart) pane highlights in lockstep with the CRL pane: it anchors the SAME structure nodeKeys, so it
+    // reuses the crl anchor-key sets verbatim. (The crl sets also include concept-row keys; the flow pane has no concept
+    // anchors, so those simply no-op in highlightRows — the structure rows light up, which is the intent.)
     if (target.kind === "unit") {
       if (pane === "source") highlightRows(v, [target.id]);
       // #166 3b: unit → its driving decisions (direct + concept containment, scoped ONCE) THEN its applicable concept
       // rows (direct concepts). Decisions first so highlightRows scrolls to the decision tree (today's behavior).
-      else if (pane === "crl") highlightRows(v, crlAnchorsForUnits([target.id], m));
+      else if (pane === "crl" || pane === "tree") highlightRows(v, crlAnchorsForUnits([target.id], m));
       // CEL: the unit's artifact cases (block-level) + the fact spans referencing its concepts (C2c-2b reverse, facts first)
       else if (pane === "cel") highlightRows(v, reverseCelAnchors(conceptKeysForUnit(target.id, m), caseIdsForUnit(target.id, m), conceptToFactAnchors));
     } else if (target.kind === "crlNode") {
       // #166 3b: a decision row → itself THEN the concepts it surfaces (direct refKeys + their contained sub-concepts).
-      if (pane === "crl") highlightRows(v, [target.id, ...conceptNodesForRow(target.id, m)]);
+      if (pane === "crl" || pane === "tree") highlightRows(v, [target.id, ...conceptNodesForRow(target.id, m)]);
       else if (pane === "source") highlightRows(v, unitsForRow(target.id, m)); // crl node → its source units (direct)
       else if (pane === "cel") highlightRows(v, reverseCelAnchors(conceptKeysForNode(target.id, m), caseIdsForNode(target.id, m), conceptToFactAnchors));
     } else {
@@ -317,7 +324,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       if (pane === "cel") highlightRows(v, [target.id]);
       else if (pane === "source") highlightRows(v, unitsForCase(target.id, m).filter((u) => m.sourceBearingUnits.has(u)));
       // #166 3b-fix: case → its units' driving decisions (direct + containment) AND their applicable concept rows.
-      else if (pane === "crl") highlightRows(v, crlAnchorsForUnits(unitsForCase(target.id, m), m));
+      else if (pane === "crl" || pane === "tree") highlightRows(v, crlAnchorsForUnits(unitsForCase(target.id, m), m));
     }
   }
 
@@ -338,8 +345,10 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     const src = views.get("source");
     const crl = views.get("crl");
     const cel = views.get("cel");
+    const tree = views.get("tree");
     if (src) highlightRows(src, unitsForConcept(hit.conceptKey, crlMaps)); // concept → source-bearing units
     if (crl) highlightRows(crl, conceptCrlAnchors(hit.conceptKey, crlMaps)); // #166 3b: own row + driven decisions (direct + containment)
+    if (tree) highlightRows(tree, conceptCrlAnchors(hit.conceptKey, crlMaps)); // T3: the flowchart decisions the concept gates
     if (cel) highlightRows(cel, [hit.factAnchorKey]); // self-highlight the clicked fact span
   }
 
@@ -351,9 +360,11 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     if (!crlMaps) return;
     const src = views.get("source");
     const crl = views.get("crl");
+    const tree = views.get("tree");
     if (src) highlightRows(src, unitsForConcept(conceptKey, crlMaps)); // concept → source-bearing units (only those anchor)
     // crl: the concept's own row (self) + the decision rows it drives (direct + containment) — shared with the fact peek.
     if (crl) highlightRows(crl, conceptCrlAnchors(conceptKey, crlMaps));
+    if (tree) highlightRows(tree, conceptCrlAnchors(conceptKey, crlMaps)); // T3: the flowchart decisions the concept gates
   }
 
   function updateNavMessage(): void {
@@ -424,11 +435,13 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       conceptToFactAnchors = r.conceptToFactAnchors; // captured atomically with this render's anchors (gen-scoped keys)
       void v.panel.webview.postMessage({ type: "render", html: r.html, gen, indexVersion });
     } else {
-      // tree — the graphical decision-tree pane. PLACEHOLDER until the flowchart renderer lands (T2). It already speaks
-      // the render/ready protocol (so T2 swaps only the HTML), but holds no anchors/reveals and is a coord "placeholder"
-      // (no reveal queue), so it stays dark on selections until the T3 highlight arm wires it up.
-      const html = '<p class="placeholder">Decision tree — coming in the next slice.</p>';
-      void v.panel.webview.postMessage({ type: "render", html, gen, indexVersion });
+      // tree — the graphical decision-tree flowchart (T2 renderer). Same structure + concept inputs as the CRL pane; its
+      // reveal shapes are IDENTICAL ({nodeKey} | {conceptNodeKey}), so clicks route through the existing onWebviewMessage
+      // path with no new hit kinds, and it highlights in lockstep with the CRL pane (postReveal's crl|tree arms).
+      const r = renderFlowPane(crlStructure, { revealPrefix: `g${gen}_`, concepts: conceptLayer });
+      v.anchors = r.anchors;
+      v.reveals = r.reveals;
+      void v.panel.webview.postMessage({ type: "render", html: r.html, gen, indexVersion });
     }
   }
 
@@ -544,9 +557,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       { enableScripts: true, retainContextWhenHidden: true },
     );
     panel.webview.html = shellHtml();
-    // tree is a "placeholder" capability in T1 — it renders the placeholder HTML but holds no reveal queue, so the
-    // coordinator never asks postReveal to highlight it. T3 flips it to "renderable" when its highlight arm lands.
-    coord.setPaneCapability(pane, pane === "tree" ? "placeholder" : "renderable");
+    coord.setPaneCapability(pane, "renderable"); // all panes render + receive reveals (the tree flowchart lit up in T3)
     const disposables: vscode.Disposable[] = [
       panel.webview.onDidReceiveMessage((m) => onWebviewMessage(pane, m)),
     ];
@@ -875,7 +886,7 @@ function shellHtml(): string {
 .crl-mark{display:inline-block;font-size:.75em;padding:0 3px;margin-right:3px;border-radius:3px;opacity:.85;border:1px solid var(--vscode-panel-border,#454545)}
 .crl-concept-name{font-weight:bold}
 .crl-concept-def{opacity:.7;font-size:.95em}
-${CORR_STYLE}`;
+${CORR_STYLE}${FLOW_STYLE}`;
   return (
     `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">` +
     `<meta http-equiv="Content-Security-Policy" content="${csp}">` +
