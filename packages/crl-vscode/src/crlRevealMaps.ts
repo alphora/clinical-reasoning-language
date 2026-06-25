@@ -245,21 +245,71 @@ export function rowNodeKeysForUnit(unitId: string, maps: CrlRevealMaps): string[
   return scopeRows(matched, maps);
 }
 
-/** #166 Slice 3b — a source unit → the CRL decision rows it drives, DIRECT *and* via concept containment, branch-scoped
- *  ONCE. A non-concept key (an activity) resolves to its rows directly; a concept key goes through rowNodeKeysForConcept
- *  (its own rows + the nested → driving-`when` containment). Both seed ONE `matched` set scoped once — so a containment-
- *  added `when` becomes branch context and a shared action is NOT re-introduced across branches (the Slice-2 guard case).
- *  Used for the unit→crl HIGHLIGHT only; the engine SELECTION stays direct (rowNodeKeysForUnit) so it round-trips. */
-export function rowNodeKeysForUnitWithConcepts(unitId: string, maps: CrlRevealMaps): string[] {
-  const matched = new Set<string>();
-  for (const key of maps.unitToKeys.get(unitId) ?? []) {
-    if (maps.conceptByKey.has(key)) {
-      for (const row of rowNodeKeysForConcept(key, maps)) matched.add(row); // concept: direct + containment
+/** Scope a matched set to an EXPLICIT branch context (#166 Slice 3b-fix): keep decision roots always; keep a when/otherwise
+ *  ONLY if it is a context branch (drops shared/ambiguous whens an over-reaching sub-concept dragged in); keep an action
+ *  only when a context branch is its ancestor. The context-aware sibling of scopeRows (which treats EVERY matched when as
+ *  context). contextWhens must be non-empty (the caller falls back to scopeRows when it found no confident context). */
+function scopeRowsToContext(matched: Set<string>, maps: CrlRevealMaps, contextWhens: Set<string>): string[] {
+  const rows = [...matched].map((k) => maps.nodeByKey.get(k)).filter((r): r is RowMeta => r !== undefined);
+  const ctx = rows.filter((r) => contextWhens.has(r.nodeKey));
+  const keep: string[] = [];
+  for (const r of rows) {
+    if (r.kind === "when" || r.kind === "otherwise") {
+      if (contextWhens.has(r.nodeKey)) keep.push(r.nodeKey); // confident branches only
+    } else if (r.kind === "action") {
+      if (ctx.some((b) => b.decision === r.decision && b.lib === r.lib && isUnder(b.nodeId, r.nodeId))) keep.push(r.nodeKey);
     } else {
-      for (const row of maps.keyToRowNodeKeys.get(key) ?? []) matched.add(row); // non-concept (activity): direct
+      keep.push(r.nodeKey); // decision roots
     }
   }
-  return scopeRows(matched, maps);
+  return keep;
+}
+
+/** #166 Slice 3b — a source unit → the CRL decision rows it drives, DIRECT *and* via concept containment, branch-scoped
+ *  ONCE. A non-concept key (an activity) resolves to its rows directly; a concept key resolves to its OWN rows plus the
+ *  rows of the concepts that CONTAIN it (the nested → driving-`when` resolution). The subtlety (rx501-147): a SHARED
+ *  sub-concept — e.g. "Adult Age 18 Or Older", `defined as` part of BOTH the Crohn's AND the Ulcerative-Colitis indication
+ *  — containment-resolves to SEVERAL `when`s. Letting it establish branch context would light every sibling branch. So a
+ *  concept contributes a confident branch ONLY when it resolves to a SINGLE `when` (its own direct row, or exactly one
+ *  container `when`); a sub-concept reaching MULTIPLE whens is ambiguous and contributes none. With a confident context we
+ *  scope strictly to it (the ambiguous siblings drop out); with NO confident context (the unit cites only ambiguous /
+ *  container-less concepts) we fall back to best-effort scopeRows (e.g. a concept genuinely on two whens lights both).
+ *  TRADEOFFS (intentional): (a) an ambiguous CONTAINMENT when is pruned ONLY when the unit also carries a confident
+ *  signal; with none, best-effort shows all. (b) a concept used DIRECTLY on several whens is ALWAYS confident (kept) —
+ *  direct usage is trusted over containment. (c) nested whens (a sub-concept whose containers sit on whens in the SAME
+ *  branch path) count as >1 distinct when → conservatively ambiguous → best-effort (acceptable for the flat when/otherwise
+ *  shapes in practice). Used for the unit→crl HIGHLIGHT only; the SELECTION stays direct (rowNodeKeysForUnit, round-trips). */
+export function rowNodeKeysForUnitWithConcepts(unitId: string, maps: CrlRevealMaps): string[] {
+  const matched = new Set<string>();
+  const contextWhens = new Set<string>();
+  const isWhen = (rowKey: string): boolean => {
+    const meta = maps.nodeByKey.get(rowKey);
+    return meta !== undefined && (meta.kind === "when" || meta.kind === "otherwise");
+  };
+  for (const key of maps.unitToKeys.get(unitId) ?? []) {
+    if (maps.conceptByKey.has(key)) {
+      // the concept's OWN rows (it directly on a when/action) → a confident branch signal for any when among them
+      for (const row of maps.keyToRowNodeKeys.get(key) ?? []) {
+        matched.add(row);
+        if (isWhen(row)) contextWhens.add(row);
+      }
+      // CONTAINMENT: the rows of the concepts that contain this one. Confident ONLY if they resolve to exactly ONE when.
+      const containerWhens = new Set<string>();
+      for (const container of maps.containersOf.get(key) ?? [])
+        for (const row of maps.keyToRowNodeKeys.get(container) ?? []) {
+          matched.add(row);
+          if (isWhen(row)) containerWhens.add(row);
+        }
+      if (containerWhens.size === 1) for (const w of containerWhens) contextWhens.add(w);
+    } else {
+      for (const row of maps.keyToRowNodeKeys.get(key) ?? []) {
+        matched.add(row);
+        if (isWhen(row)) contextWhens.add(row); // a non-concept (activity) directly on a when is its own context
+      }
+    }
+  }
+  if (contextWhens.size === 0) return scopeRows(matched, maps); // no confident context → best effort (genuine ambiguity)
+  return scopeRowsToContext(matched, maps, contextWhens);
 }
 
 /** #166 — the CRL pane anchors a SET of source units highlight: their driving decisions (direct + concept containment,

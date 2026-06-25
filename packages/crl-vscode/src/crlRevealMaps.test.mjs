@@ -284,6 +284,68 @@ check("rowNodeKeysForUnitWithConcepts: a unit citing ONLY a non-concept activity
   assert.deepEqual(rowNodeKeysForUnitWithConcepts("uAct", m).sort(), ["w0a0", "w1a0"]);
 });
 
+// rx501-147 regression: a SHARED sub-concept "Adult" is `defined as` part of BOTH indication concepts (Crohn + UC), each
+// on its own `when`. A unit citing Adult + a Crohn-specific concept must light ONLY the Crohn branch (the ambiguous shared
+// Adult must not drag in the UC branch). The containment analog of the disc-117 shared-activity over-match.
+const dualStruct = [{
+  decision: "D", lib: "T", nodeKey: "dD", location: {},
+  children: [
+    { nodeKey: "wCrohn", nodeId: "when[0]", decision: "D", lib: "T", kind: "when", label: "when Crohn IM", refKeys: ["kCrohnIM"], location: {},
+      children: [{ nodeKey: "wCrohnA", nodeId: "when[0]/a0", decision: "D", lib: "T", kind: "action", label: "Approve", refKeys: ["aApprove"], location: {}, children: [] }] },
+    { nodeKey: "wUC", nodeId: "when[1]", decision: "D", lib: "T", kind: "when", label: "when UC IM", refKeys: ["kUCIM"], location: {},
+      children: [{ nodeKey: "wUCA", nodeId: "when[1]/a0", decision: "D", lib: "T", kind: "action", label: "Approve", refKeys: ["aApprove"], location: {}, children: [] }] },
+  ],
+}];
+const dualLayer = [
+  { nodeKey: "kCrohnIM", definitionRefs: ["kAdult", "kModCrohn"] }, // Crohn IM = Adult + ModCrohn
+  { nodeKey: "kUCIM", definitionRefs: ["kAdult", "kModUC"] },       // UC IM = Adult + ModUC  (Adult SHARED)
+  { nodeKey: "kAdult", definitionRefs: [] },
+  { nodeKey: "kModCrohn", definitionRefs: [] },
+  { nodeKey: "kModUC", definitionRefs: [] },
+];
+
+check("rowNodeKeysForUnitWithConcepts: a SHARED sub-concept does NOT drag in the sibling branch when a confident signal exists (rx501-147)", () => {
+  const m = buildCrlRevealMaps({ units: [{ id: "u1", source: [{ displayRange: {} }], crl: [{ nodeKey: "kCrohnIM" }, { nodeKey: "kAdult" }, { nodeKey: "kModCrohn" }, { nodeKey: "aApprove" }] }] }, dualStruct, dualLayer);
+  // confident context = {wCrohn} (kCrohnIM direct on it + kModCrohn → only kCrohnIM); kAdult → BOTH IMs = ambiguous → no
+  // context; the shared aApprove scopes to wCrohn. The UC branch (wUC/wUCA) must NOT appear.
+  assert.deepEqual(rowNodeKeysForUnitWithConcepts("u1", m).sort(), ["wCrohn", "wCrohnA"]);
+});
+
+check("rowNodeKeysForUnitWithConcepts: a unit citing ONLY a shared/ambiguous sub-concept → best-effort BOTH branches (no confident context)", () => {
+  const m = buildCrlRevealMaps({ units: [{ id: "uAdult", source: [{ displayRange: {} }], crl: [{ nodeKey: "kAdult" }] }] }, dualStruct, dualLayer);
+  assert.deepEqual(rowNodeKeysForUnitWithConcepts("uAdult", m).sort(), ["wCrohn", "wUC"]); // genuinely ambiguous → both
+});
+
+check("rowNodeKeysForUnitWithConcepts: TWO confident single-branch signals → BOTH branches kept (not falsely pruned)", () => {
+  // u cites kCrohnIM (direct → wCrohn) + kModUC (→ only kUCIM → wUC, single → confident). Both confident → both kept.
+  const m = buildCrlRevealMaps({ units: [{ id: "uBoth", source: [{ displayRange: {} }], crl: [{ nodeKey: "kCrohnIM" }, { nodeKey: "kModUC" }] }] }, dualStruct, dualLayer);
+  assert.deepEqual(rowNodeKeysForUnitWithConcepts("uBoth", m).sort(), ["wCrohn", "wUC"]);
+});
+
+// guard concept whose OWN row is an action under the DROPPED sibling branch → pruned by the action ancestry scope.
+const guardLayer = [...dualLayer, { nodeKey: "kUcGuard", definitionRefs: [] }];
+const guardStruct = [{
+  decision: "D", lib: "T", nodeKey: "dD", location: {},
+  children: [
+    dualStruct[0].children[0], // wCrohn + wCrohnA
+    { nodeKey: "wUC", nodeId: "when[1]", decision: "D", lib: "T", kind: "when", label: "when UC IM", refKeys: ["kUCIM"], location: {},
+      children: [{ nodeKey: "wUCA", nodeId: "when[1]/a0", decision: "D", lib: "T", kind: "action", label: "Approve", refKeys: ["aApprove", "kUcGuard"], location: {}, children: [] }] },
+  ],
+}];
+
+check("rowNodeKeysForUnitWithConcepts: a guard concept whose action is under the DROPPED sibling branch is pruned (no leak)", () => {
+  // u cites kCrohnIM (confident → wCrohn) + kUcGuard (own row = wUCA, an action under the UC branch). wUCA must be pruned.
+  const m = buildCrlRevealMaps({ units: [{ id: "uG", source: [{ displayRange: {} }], crl: [{ nodeKey: "kCrohnIM" }, { nodeKey: "kUcGuard" }] }] }, guardStruct, guardLayer);
+  assert.deepEqual(rowNodeKeysForUnitWithConcepts("uG", m).sort(), ["wCrohn"]); // wUCA dropped (not under a context branch)
+});
+
+check("rowNodeKeysForUnitWithConcepts: conceptLayer present but ALL signals direct → byte-identical to rowNodeKeysForUnit", () => {
+  // kCrohnIM is inventoried AND directly on wCrohn; aApprove shared. The WithConcepts context path must equal the direct path.
+  const m = buildCrlRevealMaps({ units: [{ id: "uD", source: [{ displayRange: {} }], crl: [{ nodeKey: "kCrohnIM" }, { nodeKey: "aApprove" }] }] }, dualStruct, dualLayer);
+  assert.deepEqual(rowNodeKeysForUnitWithConcepts("uD", m), rowNodeKeysForUnit("uD", m));
+  assert.deepEqual(rowNodeKeysForUnitWithConcepts("uD", m).sort(), ["wCrohn", "wCrohnA"]);
+});
+
 check("rowNodeKeysForUnitWithConcepts: a directly-cited concept row appears ONCE (dedup across the merged set)", () => {
   const m = buildCrlRevealMaps({ units: [{ id: "uC", source: [{ displayRange: {} }], crl: [{ nodeKey: "kContainer" }] }] }, cStruct, cLayer);
   assert.deepEqual(rowNodeKeysForUnitWithConcepts("uC", m).sort(), ["wC", "wC2"]);
