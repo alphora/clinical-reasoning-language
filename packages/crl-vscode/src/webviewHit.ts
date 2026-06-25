@@ -14,10 +14,22 @@ export interface FactHit {
   factAnchorKey: string;
 }
 
-/** Everything a webview click can resolve to. */
-export type WebviewHit = RevealHit | FactHit;
+/** A CRL CONCEPT-row peek hit (#166 Slice 3): the concept node clicked in the CRL pane. Like FactHit it's a PEEK (no
+ *  engine selection) — kept OUT of `RevealHit` so a concept row can never be misrouted as a DECISION selection. */
+export interface ConceptHit {
+  conceptNodeKey: string;
+}
 
-/** True for a fact peek (→ peekConcept), false for an engine-selectable hit (→ mapHitToPrimary). */
+/** Everything a webview click can resolve to. */
+export type WebviewHit = RevealHit | FactHit | ConceptHit;
+
+/** True for a fact peek (→ peekConcept), false otherwise. */
 export function isFactHit(hit: WebviewHit): hit is FactHit {
   return "conceptKey" in hit;
+}
+
+/** True for a CRL concept-row peek (→ peekConceptNode); diverted before mapHitToPrimary (else `{nodeKey}`-like routing
+ *  would treat it as a decision). */
+export function isConceptHit(hit: WebviewHit): hit is ConceptHit {
+  return "conceptNodeKey" in hit;
 }

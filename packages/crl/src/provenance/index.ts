@@ -27,9 +27,19 @@ export type {
   ProvenanceIndexDiagnostic,
 } from "./indexer";
 export { buildCrlStructure } from "./crlStructure";
-export type { CrlStructureNode, CrlDecisionStructure, CrlNodeKind, CrlActionKind } from "./crlStructure";
-export { buildCrlConceptLayer } from "./crlConceptLayer";
-export type { CrlConceptNode, ConceptDefinitionKind } from "./crlConceptLayer";
+export type {
+  CrlStructureNode,
+  CrlDecisionStructure,
+  CrlNodeKind,
+  CrlActionKind,
+} from "./crlStructure";
+export { buildCrlConceptLayer, classifyConcept } from "./crlConceptLayer";
+export type {
+  CrlConceptNode,
+  ConceptDefinitionKind,
+  ConceptLayer,
+  ConceptClassification,
+} from "./crlConceptLayer";
 export { buildConceptContainment } from "./conceptContainment";
 export type { ConceptContainment } from "./conceptContainment";
 export { buildCockpitModel } from "./cockpitModel";

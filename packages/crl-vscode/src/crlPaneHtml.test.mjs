@@ -75,10 +75,68 @@ check("XSS: labels are escaped", () => {
   assert.ok(out.html.includes("&lt;script&gt;") && out.html.includes("&lt;b&gt;"));
 });
 
-check("empty structure → placeholder, no anchors", () => {
+check("empty structure AND no concepts → placeholder, no anchors", () => {
   const out = renderCrlPane([]);
   assert.match(out.html, /class="placeholder"/);
   assert.deepEqual(out.anchors, {});
+});
+
+// #166 Slice 3a — concept layer rendering.
+const concept = (nodeKey, name, lib, extra = {}) => ({ nodeKey, name, lib, label: `concept "${name}"`, location: {}, hasLocalCode: false, hasRepresentations: false, definitionRefs: [], ...extra });
+const concepts = [
+  concept("cA", "Affected Breast", "Policy", { definitionKind: "defined-as", definitionRefs: ["cB"] }),
+  concept("cB", "Implant Or Expander", "Policy", { hasLocalCode: true }),
+  concept("cC", "Mammogram", "Common", { definitionKind: "coded-from", hasRepresentations: true }),
+];
+
+check("concepts render in a CONCEPTS section, grouped by library, after the decisions", () => {
+  const out = renderCrlPane(structure, { concepts });
+  assert.ok(out.html.includes('class="crl-concept-head"'), "concepts head");
+  assert.match(out.html, /class="crl-lib-head">Policy</);
+  assert.match(out.html, /class="crl-lib-head">Common</);
+  // decisions precede concepts; Policy lib head precedes Common lib head (inventory order)
+  assert.ok(out.html.indexOf("crl-decision") < out.html.indexOf("crl-concept-head"));
+  assert.ok(out.html.indexOf(">Policy<") < out.html.indexOf(">Common<"));
+});
+
+check("concept row: ADR layer marker (inferred=defined-as / asserted=else) + orthogonal markers + name", () => {
+  const out = renderCrlPane(structure, { concepts });
+  assert.match(out.html, /<span class="crl-layer crl-layer-inferred">inferred<\/span>.*Affected Breast/);
+  assert.match(out.html, /<span class="crl-layer crl-layer-asserted">asserted<\/span>.*Implant Or Expander/);
+  assert.ok(out.html.includes(">local<"), "hasLocalCode → local marker");
+  assert.ok(out.html.includes(">std<"), "coded-from → std marker");
+  assert.ok(out.html.includes(">ext<"), "hasRepresentations → ext marker");
+  // coded-from concept is asserted (NOT a 'sourced' layer) AND carries BOTH orthogonal markers (std + ext) on the one
+  // asserted row — the axes coexist, never precedence-collapsed into the layer.
+  assert.match(out.html, /crl-layer-asserted">asserted<\/span><span class="crl-mark"[^>]*>std<\/span><span class="crl-mark"[^>]*>ext<\/span><span class="crl-concept-name">Mammogram/);
+});
+
+check("concept rows are addressable: anchor by conceptNodeKey, reveal payload = {conceptNodeKey} (a PEEK, not {nodeKey})", () => {
+  const out = renderCrlPane(structure, { concepts });
+  for (const k of ["cA", "cB", "cC"]) assert.ok(out.anchors[k], `anchor for ${k}`);
+  const conceptReveals = Object.values(out.reveals).filter((r) => "conceptNodeKey" in r).map((r) => r.conceptNodeKey).sort();
+  assert.deepEqual(conceptReveals, ["cA", "cB", "cC"]);
+  // decision rows still reveal {nodeKey}; the two payload shapes never collide
+  assert.ok(Object.values(out.reveals).some((r) => "nodeKey" in r && r.nodeKey === "dD"));
+});
+
+check("defined-as suffix lists the direct definitionRefs by NAME (resolved within the rendered set)", () => {
+  const out = renderCrlPane(structure, { concepts });
+  assert.match(out.html, /Affected Breast<\/span><span class="crl-concept-def"> — defined as: Implant Or Expander<\/span>/);
+  // a concept with no refs gets no suffix
+  assert.ok(!/Mammogram<\/span><span class="crl-concept-def"/.test(out.html));
+});
+
+check("at-rest key on concept rows uses conceptKeyNumbers (NOT rowKeyNumbers)", () => {
+  const out = renderCrlPane(structure, { concepts, conceptKeyNumbers: { cA: [2, 5] }, rowKeyNumbers: { cA: [9] }, showKeys: true });
+  assert.ok(out.html.includes('<span class="corr-num">2,5</span>'), "concept key slot from conceptKeyNumbers");
+  assert.ok(!out.html.includes('<span class="corr-num">9</span>'), "rowKeyNumbers must not leak onto a concept row");
+});
+
+check("concepts-only (no decisions) still renders concepts (not the placeholder)", () => {
+  const out = renderCrlPane([], { concepts });
+  assert.ok(!out.html.includes("placeholder"), "no placeholder when concepts present");
+  assert.ok(out.anchors.cA && out.anchors.cB, "concept anchors present");
 });
 
 check("revealPrefix namespaces ids + reveal keys", () => {

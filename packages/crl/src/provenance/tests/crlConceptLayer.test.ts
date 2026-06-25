@@ -6,7 +6,7 @@ import { parseInput } from "../../ast/tests/parseInput";
 import { buildCEL } from "../../cel";
 import type { ResolvedCelGraph } from "../../cel/imports/types";
 import type { RegistryEntry } from "../../imports/types";
-import { buildCrlConceptLayer, type CrlConceptNode } from "../crlConceptLayer";
+import { buildCrlConceptLayer, classifyConcept, type CrlConceptNode } from "../crlConceptLayer";
 import { buildCrlStructure } from "../crlStructure";
 import { buildProvenanceIndex, conceptDeclRef, nodeKey } from "../indexer";
 
@@ -180,5 +180,42 @@ describe("buildCrlConceptLayer — headless concept layer (#166 Slice 1)", () =>
     const repr = byName.get("T.Repr")!;
     expect([repr.definitionKind, repr.hasRepresentations]).toEqual([undefined, true]);
     expect(byName.get("U.Q")!.hasLocalCode).toBe(true);
+  });
+});
+
+describe("classifyConcept — ADR-0001 layer (#166 Slice 3a)", () => {
+  const mk = (over: Partial<CrlConceptNode>): CrlConceptNode => ({
+    nodeKey: "k",
+    name: "C",
+    lib: "L",
+    label: 'concept "C"',
+    location: { filePath: "", range: { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } } },
+    hasLocalCode: false,
+    hasRepresentations: false,
+    definitionRefs: [],
+    ...over,
+  });
+
+  it("defined-as / definition-is ⇒ inferred (calculated)", () => {
+    expect(classifyConcept(mk({ definitionKind: "defined-as" })).layer).toBe("inferred");
+    expect(classifyConcept(mk({ definitionKind: "definition-is" })).layer).toBe("inferred");
+  });
+
+  it("coded-from ⇒ asserted (a retrieve — NOT a separate 'sourced' layer)", () => {
+    expect(classifyConcept(mk({ definitionKind: "coded-from" })).layer).toBe("asserted");
+  });
+
+  it("no definition (bare code-is leaf / representations-only) ⇒ asserted", () => {
+    expect(classifyConcept(mk({})).layer).toBe("asserted");
+    expect(classifyConcept(mk({ hasLocalCode: true })).layer).toBe("asserted");
+    expect(classifyConcept(mk({ hasRepresentations: true })).layer).toBe("asserted");
+  });
+
+  it("orthogonal axes are independent of the layer (not collapsed/precedence-folded)", () => {
+    // an inferred concept can ALSO be locally assertable + have a source representation simultaneously
+    const c = classifyConcept(mk({ definitionKind: "defined-as", hasLocalCode: true, hasRepresentations: true }));
+    expect(c).toEqual({ layer: "inferred", locallyAssertable: true, standardized: false, external: true });
+    const s = classifyConcept(mk({ definitionKind: "coded-from", hasLocalCode: true }));
+    expect(s).toEqual({ layer: "asserted", locallyAssertable: true, standardized: true, external: false });
   });
 });

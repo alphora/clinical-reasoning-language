@@ -14,7 +14,7 @@ async function load(tsFile) {
   await build({ entryPoints: [resolve(here, tsFile)], bundle: true, platform: "node", format: "cjs", target: "node18", outfile: out, logLevel: "silent" });
   return require(out);
 }
-const { isFactHit } = await load("webviewHit.ts");
+const { isFactHit, isConceptHit } = await load("webviewHit.ts");
 
 let pass = 0;
 const check = (label, fn) => {
@@ -30,6 +30,18 @@ check("the three engine-selectable hits → isFactHit false (→ mapHitToPrimary
   assert.equal(isFactHit({ unitId: "u1", range: {} }), false);
   assert.equal(isFactHit({ nodeKey: "n1" }), false);
   assert.equal(isFactHit({ caseId: "c1" }), false);
+});
+
+check("a concept-row hit (has conceptNodeKey) → isConceptHit true (→ peekConceptNode, NOT engine selection)", () => {
+  assert.equal(isConceptHit({ conceptNodeKey: "cA" }), true);
+});
+
+check("concept hit is NOT a fact hit, and a decision {nodeKey} is NOT a concept hit (the disjointness that keeps routing safe)", () => {
+  assert.equal(isFactHit({ conceptNodeKey: "cA" }), false);
+  assert.equal(isConceptHit({ conceptKey: "k", factAnchorKey: "f" }), false);
+  assert.equal(isConceptHit({ nodeKey: "n1" }), false);
+  assert.equal(isConceptHit({ unitId: "u1", range: {} }), false);
+  assert.equal(isConceptHit({ caseId: "c1" }), false);
 });
 
 console.log(`\nwebviewHit.test: ${pass} checks passed`);

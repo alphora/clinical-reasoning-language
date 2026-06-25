@@ -41,17 +41,19 @@ import {
   caseIdsForUnit,
   conceptKeysForNode,
   conceptKeysForUnit,
+  rowNodeKeysForConcept,
   rowNodeKeysForUnit,
   rowsForConcept,
   unitNumbersForCase,
   unitNumbersForRow,
   unitsForCase,
   unitsForConcept,
+  unitsForConceptNode,
   unitsForRow,
   type CrlRevealMaps,
 } from "./crlRevealMaps";
 import { CANONICAL_PANE_ORDER, normalizePaneOrder } from "./paneOrder";
-import { isFactHit, type RevealHit, type WebviewHit } from "./webviewHit";
+import { isConceptHit, isFactHit, type RevealHit, type WebviewHit } from "./webviewHit";
 import { PaneRevealCoordinator, type SemanticTarget } from "./paneRevealCoordinator";
 import { discoverProvenance, findPolicySrc } from "./provenanceFindings";
 import { buildViewerModel, type ViewerModel } from "./provenanceViewer";
@@ -156,6 +158,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   let unitNumber: Map<string, number> = new Map();
   let rowKeyNumbers: Record<string, number[]> = {};
   let caseKeyNumbers: Record<string, number[]> = {};
+  let conceptKeyNumbers: Record<string, number[]> = {}; // #166 Slice 3a — at-rest key on concept rows
   let showKeys = true;
   let indexVersion = 0;
   let currentCel: string | undefined;
@@ -307,6 +310,19 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     if (cel) highlightRows(cel, [hit.factAnchorKey]); // self-highlight the clicked fact span
   }
 
+  /** Concept-row peek (#166 Slice 3a): clicking a concept in the CRL pane → a transient highlight of its source units +
+   *  the decisions it drives (direct + via containment) + the concept row itself. Shell-side, no engine selection (the
+   *  concept is not a navigator item). Mirrors peekConcept; source arm uses the source-bearing units (only those anchor). */
+  function peekConceptNode(conceptKey: string): void {
+    clearAllHighlights();
+    if (!crlMaps) return;
+    const src = views.get("source");
+    const crl = views.get("crl");
+    if (src) highlightRows(src, unitsForConcept(conceptKey, crlMaps)); // concept → source-bearing units (only those anchor)
+    // crl: the concept's own row (self) + the decision rows it drives (direct + containment).
+    if (crl) highlightRows(crl, [conceptKey, ...rowNodeKeysForConcept(conceptKey, crlMaps)]);
+  }
+
   function updateNavMessage(): void {
     const empty = navigatorItems(state).length === 0;
     navView.message = empty
@@ -359,7 +375,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       v.reveals = r.reveals;
       void v.panel.webview.postMessage({ type: "render", html: r.html, gen, indexVersion });
     } else if (pane === "crl") {
-      const r = renderCrlPane(crlStructure, { revealPrefix: `g${gen}_`, rowKeyNumbers, showKeys });
+      const r = renderCrlPane(crlStructure, { revealPrefix: `g${gen}_`, rowKeyNumbers, showKeys, concepts: conceptLayer, conceptKeyNumbers });
       v.anchors = r.anchors;
       v.reveals = r.reveals;
       void v.panel.webview.postMessage({ type: "render", html: r.html, gen, indexVersion });
@@ -406,6 +422,12 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       // AND before the !crlMaps guard, so a peek always clears prior highlights even if maps are momentarily absent.
       if (isFactHit(hit)) {
         peekConcept(hit);
+        return;
+      }
+      // A CRL concept-row click is likewise a PEEK (#166 Slice 3a) — diverted before the engine-selection path so a
+      // concept node is never routed through mapHitToPrimary as a DECISION.
+      if (isConceptHit(hit)) {
+        peekConceptNode(hit.conceptNodeKey);
         return;
       }
       if (!crlMaps) return;
@@ -548,6 +570,12 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       const nums = unitNumbersForCase(caseId, m, unitNumber);
       if (nums.length) caseKeyNumbers[caseId] = nums;
     }
+    // #166 Slice 3a: at-rest key on concept rows — a concept's citing units' numbers (raw; a concept isn't branch-bound).
+    conceptKeyNumbers = {};
+    for (const c of conceptLayer) {
+      const nums = [...new Set(unitsForConceptNode(c.nodeKey, m).map((u) => unitNumber.get(u)).filter((n): n is number => n !== undefined))].sort((a, b) => a - b);
+      if (nums.length) conceptKeyNumbers[c.nodeKey] = nums;
+    }
     for (const pane of PANES) coord.clearPending(pane);
     dispatch({ type: "setInputs", index: toIndex(model, crlStructure, toCelNav(scenarios, caseIdByName), indexVersion) });
     updateNavMessage();
@@ -568,6 +596,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     unitNumber = new Map();
     rowKeyNumbers = {};
     caseKeyNumbers = {};
+    conceptKeyNumbers = {};
     lastClicked = undefined;
     indexVersion += 1;
     for (const pane of PANES) coord.clearPending(pane);
@@ -785,6 +814,16 @@ function shellHtml(): string {
 .cel-facts,.cel-produced{opacity:.8;padding-left:14px;font-size:.95em}
 .cel-fact{cursor:pointer;text-decoration:underline dotted;text-underline-offset:2px}
 .cel-fact:hover{color:var(--vscode-textLink-activeForeground)}
+.crl-concept-head{margin-top:10px;padding:2px 4px;font-weight:bold;text-transform:uppercase;font-size:.85em;opacity:.7;border-top:1px solid var(--vscode-panel-border,#454545)}
+.crl-lib-head{padding:2px 4px;font-size:.85em;opacity:.6;font-style:italic}
+.crl-concept-row{cursor:pointer}
+.crl-concept-row:hover{background:var(--vscode-list-hoverBackground)}
+.crl-layer{display:inline-block;font-size:.8em;padding:0 4px;margin-right:4px;border-radius:3px;font-weight:bold}
+.crl-layer-asserted{background:var(--vscode-charts-blue,#3794ff);color:var(--vscode-editor-background,#1e1e1e)}
+.crl-layer-inferred{background:var(--vscode-charts-purple,#c586c0);color:var(--vscode-editor-background,#1e1e1e)}
+.crl-mark{display:inline-block;font-size:.75em;padding:0 3px;margin-right:3px;border-radius:3px;opacity:.85;border:1px solid var(--vscode-panel-border,#454545)}
+.crl-concept-name{font-weight:bold}
+.crl-concept-def{opacity:.7;font-size:.95em}
 ${CORR_STYLE}`;
   return (
     `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">` +

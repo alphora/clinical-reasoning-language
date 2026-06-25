@@ -5,8 +5,9 @@
  * unit citing concept X joins X's node exactly like it joins a decision row today. Pure + headless; reveal maps (Slice 2)
  * + rendering (Slice 3) build on this.
  *
- * Slice 1 carries RAW structural signals only (definitionKind / hasLocalCode / hasRepresentations); the layer
- * classification (asserted/inferred/…) is a contested judgment deferred to the renderer (Slice 3). `definitionRefs` are
+ * `buildCrlConceptLayer` carries RAW structural signals only (definitionKind / hasLocalCode / hasRepresentations); the
+ * ADR-0001 layer classification (asserted/inferred + the orthogonal origin/code-domain markers) lives in the pure
+ * `classifyConcept` below (added Slice 3a — kept headless + reusable rather than in the renderer). `definitionRefs` are
  * DIRECT edges only (defined-as operands + definition-is narrative refs); the transitive closure + cycle guard belong to
  * the consumer (Slice 2).
  */
@@ -41,6 +42,34 @@ const DEF_KIND: Record<NonNullable<Concept["definition"]>["type"], ConceptDefini
   DefinitionIsDefinition: "definition-is",
   CodedFromDefinition: "coded-from",
 };
+
+/** The ADR-0001 LAYER (syntactic): `inferred` = `defined as`/`definition is` (calculated); `asserted` = everything else
+ *  (`coded from` + a local `code is` leaf — both retrieves). */
+export type ConceptLayer = "asserted" | "inferred";
+
+/** A concept's ADR-0001 classification. `layer` is the syntactic axis; the rest are the ORTHOGONAL origin/code-domain
+ *  axes (a concept may carry several at once — they are NOT collapsed into the layer). */
+export interface ConceptClassification {
+  layer: ConceptLayer;
+  /** has a local `- code is …` → locally assertable (the local code-domain slot). */
+  locallyAssertable: boolean;
+  /** `coded from` a named terminology/value set → standardized code domain. */
+  standardized: boolean;
+  /** has ≥1 `source representation:` → an external source shape of the same concept. */
+  external: boolean;
+}
+
+export function classifyConcept(c: CrlConceptNode): ConceptClassification {
+  return {
+    layer:
+      c.definitionKind === "defined-as" || c.definitionKind === "definition-is"
+        ? "inferred"
+        : "asserted",
+    locallyAssertable: c.hasLocalCode,
+    standardized: c.definitionKind === "coded-from",
+    external: c.hasRepresentations,
+  };
+}
 
 export function buildCrlConceptLayer(
   graph: ResolvedCelGraph,
