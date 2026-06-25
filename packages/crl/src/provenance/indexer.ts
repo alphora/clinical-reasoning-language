@@ -135,6 +135,68 @@ export const decisionSubNodeRef = (lib: string, name: string, nodeId: string): P
   name,
   nodeId,
 });
+/** Concept decl ref — the SINGLE source of the concept node-key shape, shared with crlStructure + crlConceptLayer so the
+ *  cross-pane join key cannot drift (mirrors decisionDeclRef). */
+export const conceptDeclRef = (lib: string, name: string): ProvNodeRef => ({
+  lib,
+  kind: "concept",
+  name,
+});
+
+/** Flatten a `defined as` composition expression to the leaf/concept refs it DIRECTLY references (pure; no recursion into
+ *  referenced concepts — direct edges only). Shared by the reachability walk + the headless concept layer. */
+export function compositionRefs(expr: CompositionExpression, out: ReferenceName[]): void {
+  switch (expr.type) {
+    case "SemOrExpression":
+    case "SemAndExpression":
+      for (const t of expr.terms) compositionRefs(t, out);
+      break;
+    case "SemNotExpression":
+      compositionRefs(expr.expression, out);
+      break;
+    case "CompositionGroup":
+      compositionRefs(expr.expression, out);
+      break;
+    case "CompositionRef":
+      out.push(expr.ref);
+      break;
+  }
+}
+
+/** Collect concept refs from a narrative stream (pure); non-ref elements (NWord/Quantity) are skipped. */
+export function narrativeRefs(
+  elements: NarrativeElement[] | ArgValue[],
+  out: ReferenceName[],
+): void {
+  for (const el of elements) {
+    switch (el.type) {
+      case "NConceptRef":
+        out.push(el.value);
+        break;
+      case "NDisjunction":
+        narrativeRefs(el.disjuncts, out);
+        break;
+      case "NConjunction":
+        narrativeRefs(el.conjuncts, out);
+        break;
+    }
+  }
+}
+
+/** The concept refs a concept is DIRECTLY defined in terms of — `defined as` composition operands + `definition is`
+ *  narrative concept refs. `coded from` (a valueset bind) contributes none. Direct edges only (the transitive closure +
+ *  cycle guard belong to the consumer). */
+export function definitionConceptRefs(c: Concept): ReferenceName[] {
+  const out: ReferenceName[] = [];
+  const def = c.definition;
+  if (def?.type === "DefinedAsDefinition") {
+    if (def.body.type === "DefinedAsBareRef") out.push(def.body.ref);
+    else compositionRefs(def.body.expression, out);
+  } else if (def?.type === "DefinitionIsDefinition") {
+    narrativeRefs(def.body.elements, out);
+  }
+  return out;
+}
 
 export interface DeclEntry {
   kind: DeclKind;
@@ -291,7 +353,8 @@ export function buildProvenanceIndex(
       for (const { kind, node } of entries) {
         const loc = lsLoc(info.entry.filePath, (node as { location?: Location }).location);
         if (!loc) continue;
-        const ref: ProvNodeRef = { lib: libName, kind, name };
+        const ref: ProvNodeRef =
+          kind === "concept" ? conceptDeclRef(libName, name) : { lib: libName, kind, name };
         const nodeKindV: NodeKind =
           info.ownership === "shared-reference"
             ? "shared-reference"
@@ -350,41 +413,6 @@ export function buildProvenanceIndex(
     info.edges.push(edge);
   };
 
-  const compositionRefs = (expr: CompositionExpression, out: ReferenceName[]): void => {
-    switch (expr.type) {
-      case "SemOrExpression":
-      case "SemAndExpression":
-        for (const t of expr.terms) compositionRefs(t, out);
-        break;
-      case "SemNotExpression":
-        compositionRefs(expr.expression, out);
-        break;
-      case "CompositionGroup":
-        compositionRefs(expr.expression, out);
-        break;
-      case "CompositionRef":
-        out.push(expr.ref);
-        break;
-    }
-  };
-
-  // Collect concept refs from a narrative; non-ref elements (NWord/Quantity) are intentionally skipped (not reachability targets).
-  const narrativeRefs = (elements: NarrativeElement[] | ArgValue[], out: ReferenceName[]): void => {
-    for (const el of elements) {
-      switch (el.type) {
-        case "NConceptRef":
-          out.push(el.value);
-          break;
-        case "NDisjunction":
-          narrativeRefs(el.disjuncts, out);
-          break;
-        case "NConjunction":
-          narrativeRefs(el.conjuncts, out);
-          break;
-      }
-    }
-  };
-
   // Acceptable target kind(s) per slot — so a cross-kind same-name resolves the RIGHT kind (concept-first for narrative).
   const ACCEPTABLE: Record<StructuralRelation, readonly DeclKind[]> = {
     "when-condition": ["concept"],
@@ -408,7 +436,7 @@ export function buildProvenanceIndex(
     fromDecision: string,
     fromNodeId: string,
   ): void => {
-    const key = nodeKey({ lib, kind: "concept", name: c.name });
+    const key = nodeKey(conceptDeclRef(lib, c.name));
     if (seenConcepts.has(key)) return;
     seenConcepts.add(key);
     const def = c.definition;

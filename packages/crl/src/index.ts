@@ -83,6 +83,7 @@ export {
   buildCorrespondenceModel,
   buildCockpitModel,
   buildCrlStructure,
+  buildCrlConceptLayer,
   decisionSpine,
   nodeKey,
 } from "./provenance";
@@ -106,6 +107,8 @@ export type {
   CrlDecisionStructure,
   CrlNodeKind,
   CrlActionKind,
+  CrlConceptNode,
+  ConceptDefinitionKind,
   SpineNode,
   SpineNodeKind,
   ProvNodeRef,

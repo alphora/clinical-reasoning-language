@@ -14,7 +14,7 @@ import { getRefLibrary, getRefName } from "../ast/types";
 import type { ResolvedCelGraph } from "../cel/imports/types";
 import type { LsLocation } from "../language-services/contracts";
 
-import { collectLibs, decisionDeclRef, decisionSubNodeRef, lsLoc, nodeKey } from "./indexer";
+import { collectLibs, conceptDeclRef, decisionDeclRef, decisionSubNodeRef, lsLoc, nodeKey } from "./indexer";
 import { isStrictAncestor } from "./validators";
 
 export type CrlNodeKind = SpineNodeKind; // "when" | "otherwise" | "action"
@@ -58,7 +58,11 @@ function actionKindOf(node: ActionStatement): CrlActionKind {
 /** Build a referenced leaf's nodeKey — same lib/kind/name rule the indexer uses (qualified-ref lib via getRefLibrary,
  *  else the decision's lib). Pure string construction; not resolved against the index. */
 function refKey(ref: ReferenceName, kind: string, decisionLib: string): string {
-  return nodeKey({ lib: getRefLibrary(ref) ?? decisionLib, kind, name: getRefName(ref) });
+  const lib = getRefLibrary(ref) ?? decisionLib;
+  const name = getRefName(ref);
+  // Concept keys route through the shared conceptDeclRef so the cross-pane join key cannot drift from the indexer +
+  // the new concept layer (activity/decision stay inline — they have no separate layer consumer).
+  return nodeKey(kind === "concept" ? conceptDeclRef(lib, name) : { lib, kind, name });
 }
 
 /** The concept/activity/decision keys a row references — the cross-pane bridge. The kind is statically known from the
