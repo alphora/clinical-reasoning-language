@@ -113,19 +113,22 @@ check("contributes the crl.correspondence.showKeys setting (boolean, default tru
   assert.equal(prop.scope, "window");
 });
 
-check("contributes the crl.correspondence.primary setting (enum source|crl|cel, default source, window scope)", () => {
+check("contributes the crl.correspondence.primary setting (enum source|crl|cel — NO tree; default source, window scope)", () => {
   const prop = c.configuration?.properties?.["crl.correspondence.primary"];
   assert.ok(prop, "expected crl.correspondence.primary in contributes.configuration.properties");
+  // tree is render+reveal+peek-only — it must NEVER be a navigable primary, so it is absent from this enum.
   assert.deepEqual(prop.enum, ["source", "crl", "cel"]);
   assert.equal(prop.default, "source");
   assert.equal(prop.scope, "window");
 });
 
-check("contributes the crl.correspondence.paneOrder setting (array of pane enums, default order, window scope)", () => {
+check("contributes the crl.correspondence.paneOrder setting (enum incl. opt-in tree; default stays 3 panes, window scope)", () => {
   const prop = c.configuration?.properties?.["crl.correspondence.paneOrder"];
   assert.ok(prop, "expected crl.correspondence.paneOrder in contributes.configuration.properties");
   assert.equal(prop.type, "array");
-  assert.deepEqual(prop.items?.enum, ["source", "crl", "cel"]);
+  // tree IS a valid pane id (a user can opt in via settings) ...
+  assert.deepEqual(prop.items?.enum, ["source", "crl", "cel", "tree"]);
+  // ... but the DEFAULT stays the 3 always-present panes (tree is opt-in until its renderer ships).
   assert.deepEqual(prop.default, ["source", "crl", "cel"]);
   assert.equal(prop.scope, "window"); // settable in User (global/cross-project) OR Workspace settings
 });

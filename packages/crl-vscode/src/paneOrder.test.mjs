@@ -20,7 +20,13 @@ const check = (label, fn) => {
   try { fn(); pass++; console.log(`  ok  ${label}`); }
   catch (e) { console.error(`FAIL  ${label}\n      ${e.message}`); process.exitCode = 1; }
 };
-const isPermutation = (a) => a.length === 3 && new Set(a).size === 3 && [...a].sort().join() === [...CANONICAL_PANE_ORDER].sort().join();
+// A valid order: no dupes, ALL canonical panes present, and only valid ids (the 3 canonical + the opt-in "tree").
+const VALID_IDS = ["source", "crl", "cel", "tree"];
+const isValidOrder = (a) =>
+  Array.isArray(a) &&
+  new Set(a).size === a.length &&
+  CANONICAL_PANE_ORDER.every((p) => a.includes(p)) &&
+  a.every((x) => VALID_IDS.includes(x));
 
 check("a valid permutation is preserved", () => {
   assert.deepEqual(normalizePaneOrder(["crl", "source", "cel"]), ["crl", "source", "cel"]);
@@ -50,9 +56,23 @@ check("non-array inputs → default", () => {
   for (const bad of [undefined, null, "crl", 42, { 0: "crl" }, true])
     assert.deepEqual(normalizePaneOrder(bad), ["source", "crl", "cel"]);
 });
-check("INVARIANT: every output is a length-3 permutation of the panes", () => {
-  for (const raw of [["crl"], ["x"], [], undefined, ["cel", "cel", "source", "crl", "z"], "junk", { a: 1 }])
-    assert.ok(isPermutation(normalizePaneOrder(raw)), `not a permutation for ${JSON.stringify(raw)}`);
+check("tree is honored when the user explicitly lists it (opt-in) — kept in position, missing canonical appended", () => {
+  assert.deepEqual(normalizePaneOrder(["source", "crl", "cel", "tree"]), ["source", "crl", "cel", "tree"]);
+  assert.deepEqual(normalizePaneOrder(["tree", "crl"]), ["tree", "crl", "source", "cel"]);
+});
+check("tree is NOT auto-appended when absent (stays opt-in until it graduates to canonical)", () => {
+  assert.deepEqual(normalizePaneOrder(["source", "crl", "cel"]), ["source", "crl", "cel"]);
+  assert.ok(!normalizePaneOrder(["cel"]).includes("tree"));
+  assert.ok(!normalizePaneOrder([]).includes("tree"));
+  assert.ok(!normalizePaneOrder(undefined).includes("tree"));
+});
+check("tree dupes dropped (first wins)", () => {
+  assert.deepEqual(normalizePaneOrder(["tree", "tree", "crl"]), ["tree", "crl", "source", "cel"]);
+});
+
+check("INVARIANT: every output keeps the 3 canonical panes (once each) + at most the opt-in tree, no dupes/unknowns", () => {
+  for (const raw of [["crl"], ["x"], [], undefined, ["cel", "cel", "source", "crl", "z"], "junk", { a: 1 }, ["tree", "tree", "x"], ["tree", "source", "crl", "cel"]])
+    assert.ok(isValidOrder(normalizePaneOrder(raw)), `not a valid order for ${JSON.stringify(raw)}`);
 });
 
 console.log(`\npaneOrder.test: ${pass} checks passed`);

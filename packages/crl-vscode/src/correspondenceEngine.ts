@@ -5,7 +5,12 @@
 // Design authority: .vibe-tools/discussions/118-c2a-source-spine.md (CONVERGED, 2 rounds).
 import type { CycleStep } from "./provenanceViewer";
 
-export type Pane = "source" | "crl" | "cel";
+// `Pane` = every pane that can RECEIVE a reveal + has a visibility key. `PrimaryPane` = the NAVIGABLE subset the navigator
+// walks (cycle/select/config-primary). The graphical decision-tree pane ("tree") is render + reveal + peek-only: it is a
+// reveal target (in `Pane`) but is NEVER a navigator primary (not in `PrimaryPane`), so `State.primary`/`Selection.primary`
+// and the next/prev cycle stay 3-valued while reveals fan out to all four panes.
+export type Pane = "source" | "crl" | "cel" | "tree";
+export type PrimaryPane = "source" | "crl" | "cel";
 
 /** Compact engine input — derived by the shell from C1's ViewerModel. No bulky content. */
 export interface CockpitIndex {
@@ -39,7 +44,7 @@ export type Selection =
   | { primary: "cel"; caseId: string };
 
 export interface State {
-  primary: Pane;
+  primary: PrimaryPane;
   selection?: Selection;
   paneVisibility: Record<Pane, boolean>;
   index?: CockpitIndex;
@@ -47,7 +52,7 @@ export interface State {
 
 export type Action =
   | { type: "setInputs"; index: CockpitIndex }
-  | { type: "setPrimary"; primary: Pane }
+  | { type: "setPrimary"; primary: PrimaryPane }
   | { type: "select"; selection: Selection }
   | { type: "next" }
   | { type: "prev" }
@@ -66,7 +71,10 @@ export interface ReduceResult {
 }
 
 export function initialState(): State {
-  return { primary: "source", paneVisibility: { source: true, crl: true, cel: true } };
+  // tree starts visible-eligible, but the shell only OPENS panes listed in the user's paneOrder, and tree is not in the
+  // default paneOrder — it stays opt-in until it graduates into CANONICAL_PANE_ORDER + the package default. So this `true`
+  // just means "open it if the user opted in via settings".
+  return { primary: "source", paneVisibility: { source: true, crl: true, cel: true, tree: true } };
 }
 
 /** Headless navigator model — the items the navigator (a TreeView in C2a; a webview adapter later) renders. */
@@ -104,7 +112,7 @@ export function navigatorItems(state: State): NavigatorItem[] {
   }));
 }
 
-const PANES: Pane[] = ["source", "crl", "cel"];
+const PANES: Pane[] = ["source", "crl", "cel", "tree"]; // reveal fan-out set (tree included); NOT the navigable/cycle set
 
 function selectionTarget(sel: Selection): RevealEffect["target"] {
   if (sel.primary === "source") return { kind: "unit", id: sel.unitId };

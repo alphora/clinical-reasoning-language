@@ -259,7 +259,8 @@
             "enum": [
               "source",
               "crl",
-              "cel"
+              "cel",
+              "tree"
             ]
           },
           "default": [
@@ -268,7 +269,7 @@
             "cel"
           ],
           "scope": "window",
-          "description": "Left-to-right column order of the cockpit panes. Set it in User settings to persist across all projects, or in Workspace settings for one project. A malformed list is repaired automatically. Changes apply live to open panes."
+          "description": "Left-to-right column order of the cockpit panes. 'source', 'crl', and 'cel' are always shown; add 'tree' to also open the graphical decision-tree pane. Set it in User settings to persist across all projects, or in Workspace settings for one project. A malformed list is repaired automatically. Changes apply live to open panes."
         },
         "crl.correspondence.showKeys": {
           "type": "boolean",

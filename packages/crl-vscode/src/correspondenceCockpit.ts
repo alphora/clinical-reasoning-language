@@ -29,6 +29,7 @@ import {
   type Effect,
   type NavigatorItem,
   type Pane,
+  type PrimaryPane,
   type Selection,
   type State,
 } from "./correspondenceEngine";
@@ -61,11 +62,14 @@ import { discoverProvenance, findPolicySrc } from "./provenanceFindings";
 import { buildViewerModel, type ViewerModel } from "./provenanceViewer";
 import { renderSourcePane, type OverlaySpan, type UnitSpan } from "./sourcePaneHtml";
 
-const PANES: Pane[] = ["source", "crl", "cel"];
+const PANES: Pane[] = ["source", "crl", "cel", "tree"]; // all panes (render/clearPending/reveal fan-out); tree is opt-in
+// The panes the navigator can WALK (primary/cycle/config-primary). tree is render+reveal+peek-only, never a primary —
+// so it is absent here. Used to build the setPrimary quickpick + guard config-primary against a stray "tree".
+const PRIMARY_PANES: PrimaryPane[] = ["source", "crl", "cel"];
 // Column slots by position (explicit, not ViewColumn arithmetic). A pane's column = its index among the OPEN panes in
-// the user's paneOrder (so hiding a pane never leaves a column gap).
-const ORDERED_COLUMNS = [vscode.ViewColumn.One, vscode.ViewColumn.Two, vscode.ViewColumn.Three];
-const PANE_TITLE: Record<Pane, string> = { source: "Source", crl: "CRL", cel: "CEL" };
+// the user's paneOrder (so hiding a pane never leaves a column gap). Four slots so the opt-in tree pane gets a column.
+const ORDERED_COLUMNS = [vscode.ViewColumn.One, vscode.ViewColumn.Two, vscode.ViewColumn.Three, vscode.ViewColumn.Four];
+const PANE_TITLE: Record<Pane, string> = { source: "Source", crl: "CRL", cel: "CEL", tree: "Tree" };
 // Perf gate (disc 118): the measured full-render floor. Over → fall back to a navigation-only placeholder, don't freeze.
 const MAX_SOURCE_CHARS = 200_000;
 const MAX_SOURCE_MARKS = 2000;
@@ -186,6 +190,21 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     open.forEach((pane, i) => views.get(pane)?.panel.reveal(ORDERED_COLUMNS[i] ?? vscode.ViewColumn.One, true));
   };
 
+  /** Reconcile OPEN panels to the (normalized) paneOrder, then place columns. Unlike applyPaneOrder (reorder-only), this
+   *  OPENS a now-listed visible pane (rendering it immediately so it isn't blank) and DISPOSES an open pane dropped from
+   *  the order — so toggling the opt-in tree pane in settings takes effect live, without re-running "Show Cockpit". Only
+   *  the tree pane can ever be disposed here: normalizePaneOrder always re-adds the 3 canonical panes. */
+  const reconcilePaneOrder = (): void => {
+    for (const pane of [...views.keys()]) if (!paneOrder.includes(pane)) views.get(pane)?.panel.dispose(); // dispose dropped (tree only)
+    for (const pane of paneOrder) {
+      if (!state.paneVisibility[pane]) continue;
+      const existed = views.has(pane);
+      ensurePane(pane);
+      if (!existed) renderPane(pane); // a freshly-opened pane needs its content posted (rebuild won't run on a settings edit)
+    }
+    applyPaneOrder();
+  };
+
   // ── navigator TreeView (adapter over the headless navigatorItems model) ──
   const onNav = new vscode.EventEmitter<NavigatorItem | undefined>();
   const navProvider: vscode.TreeDataProvider<NavigatorItem> = {
@@ -276,6 +295,10 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   function postReveal(pane: Pane, target: SemanticTarget): void {
     const v = views.get(pane);
     if (!v || !crlMaps) return;
+    // The tree pane is a "placeholder" capability in T1 (coord.ready never returns it a target), so postReveal is not
+    // called for it yet; the guard is belt-and-suspenders until T3 wires the real tree highlight arm. Returning here also
+    // keeps the `else if (pane === "cel"/"crl")` arms below exhaustive over source/crl/cel (no stray pane falls through).
+    if (pane === "tree") return;
     const m = crlMaps;
     if (target.kind === "unit") {
       if (pane === "source") highlightRows(v, [target.id]);
@@ -283,18 +306,18 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       // rows (direct concepts). Decisions first so highlightRows scrolls to the decision tree (today's behavior).
       else if (pane === "crl") highlightRows(v, crlAnchorsForUnits([target.id], m));
       // CEL: the unit's artifact cases (block-level) + the fact spans referencing its concepts (C2c-2b reverse, facts first)
-      else highlightRows(v, reverseCelAnchors(conceptKeysForUnit(target.id, m), caseIdsForUnit(target.id, m), conceptToFactAnchors));
+      else if (pane === "cel") highlightRows(v, reverseCelAnchors(conceptKeysForUnit(target.id, m), caseIdsForUnit(target.id, m), conceptToFactAnchors));
     } else if (target.kind === "crlNode") {
       // #166 3b: a decision row → itself THEN the concepts it surfaces (direct refKeys + their contained sub-concepts).
       if (pane === "crl") highlightRows(v, [target.id, ...conceptNodesForRow(target.id, m)]);
       else if (pane === "source") highlightRows(v, unitsForRow(target.id, m)); // crl node → its source units (direct)
-      else highlightRows(v, reverseCelAnchors(conceptKeysForNode(target.id, m), caseIdsForNode(target.id, m), conceptToFactAnchors));
+      else if (pane === "cel") highlightRows(v, reverseCelAnchors(conceptKeysForNode(target.id, m), caseIdsForNode(target.id, m), conceptToFactAnchors));
     } else {
       // celCase
       if (pane === "cel") highlightRows(v, [target.id]);
       else if (pane === "source") highlightRows(v, unitsForCase(target.id, m).filter((u) => m.sourceBearingUnits.has(u)));
       // #166 3b-fix: case → its units' driving decisions (direct + containment) AND their applicable concept rows.
-      else highlightRows(v, crlAnchorsForUnits(unitsForCase(target.id, m), m));
+      else if (pane === "crl") highlightRows(v, crlAnchorsForUnits(unitsForCase(target.id, m), m));
     }
   }
 
@@ -338,7 +361,9 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     navView.message = empty
       ? state.primary === "crl"
         ? "No CRL decisions in this policy."
-        : "No source-linked units in this policy."
+        : state.primary === "cel"
+          ? "No CEL cases in this policy."
+          : "No source-linked units in this policy."
       : undefined;
   }
 
@@ -389,7 +414,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       v.anchors = r.anchors;
       v.reveals = r.reveals;
       void v.panel.webview.postMessage({ type: "render", html: r.html, gen, indexVersion });
-    } else {
+    } else if (pane === "cel") {
       // CEL pane — condensed scenario cases (C2c-1).
       const r = scenarios
         ? renderCelPane(scenarios, caseIdByName, { revealPrefix: `g${gen}_`, revealableConceptKeys, caseKeyNumbers, showKeys })
@@ -398,12 +423,18 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       v.reveals = r.reveals;
       conceptToFactAnchors = r.conceptToFactAnchors; // captured atomically with this render's anchors (gen-scoped keys)
       void v.panel.webview.postMessage({ type: "render", html: r.html, gen, indexVersion });
+    } else {
+      // tree — the graphical decision-tree pane. PLACEHOLDER until the flowchart renderer lands (T2). It already speaks
+      // the render/ready protocol (so T2 swaps only the HTML), but holds no anchors/reveals and is a coord "placeholder"
+      // (no reveal queue), so it stays dark on selections until the T3 highlight arm wires it up.
+      const html = '<p class="placeholder">Decision tree — coming in the next slice.</p>';
+      void v.panel.webview.postMessage({ type: "render", html, gen, indexVersion });
     }
   }
 
   function renderEmpty(message: string): void {
-    for (const v of views.values()) {
-      const gen = coord.startRender(PANES.find((p) => views.get(p) === v)!);
+    for (const [pane, v] of views) {
+      const gen = coord.startRender(pane);
       v.gen = gen;
       v.indexVersion = indexVersion;
       v.acked = false;
@@ -454,7 +485,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
    *  containment ENRICHMENT. The unit→crl arm uses rowNodeKeysForUnit (direct), NOT rowNodeKeysForUnitWithConcepts: a
    *  selection must round-trip (the reverse crlNode→source arm is direct unitsForRow), and selecting a containment-only
    *  container `when` would clear the originally-clicked nested-only unit. Containment is a HIGHLIGHT concern (postReveal). */
-  function mapHitToPrimary(hit: RevealHit, primary: Pane, m: CrlRevealMaps): string[] {
+  function mapHitToPrimary(hit: RevealHit, primary: PrimaryPane, m: CrlRevealMaps): string[] {
     if ("unitId" in hit)
       return primary === "source" ? [hit.unitId] : primary === "crl" ? rowNodeKeysForUnit(hit.unitId, m) : caseIdsForUnit(hit.unitId, m);
     if ("nodeKey" in hit)
@@ -466,10 +497,10 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
         : rowsForCase(hit.caseId);
   }
 
-  const selOf = (primary: Pane, id: string): Selection =>
+  const selOf = (primary: PrimaryPane, id: string): Selection =>
     primary === "source" ? { primary: "source", unitId: id } : primary === "crl" ? { primary: "crl", nodeKey: id } : { primary: "cel", caseId: id };
 
-  function labelInPrimary(id: string, primary: Pane): { label: string; description?: string } {
+  function labelInPrimary(id: string, primary: PrimaryPane): { label: string; description?: string } {
     if (primary === "source") return { label: correspondence?.units.find((u) => u.id === id)?.label ?? id, description: id };
     if (primary === "crl") {
       const n = state.index?.crlNav.find((x) => x.nodeKey === id);
@@ -490,7 +521,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   }
 
   /** Select the mapped target in `primary`: 1 → select; >1 → quick-pick; 0 → no-op. */
-  function selectInPrimary(ids: string[], primary: Pane): void {
+  function selectInPrimary(ids: string[], primary: PrimaryPane): void {
     if (ids.length === 0) return;
     if (ids.length === 1) {
       dispatch({ type: "select", selection: selOf(primary, ids[0]) });
@@ -513,7 +544,9 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       { enableScripts: true, retainContextWhenHidden: true },
     );
     panel.webview.html = shellHtml();
-    coord.setPaneCapability(pane, "renderable"); // all three panes render (CEL lit up in C2c-1)
+    // tree is a "placeholder" capability in T1 — it renders the placeholder HTML but holds no reveal queue, so the
+    // coordinator never asks postReveal to highlight it. T3 flips it to "renderable" when its highlight arm lands.
+    coord.setPaneCapability(pane, pane === "tree" ? "placeholder" : "renderable");
     const disposables: vscode.Disposable[] = [
       panel.webview.onDidReceiveMessage((m) => onWebviewMessage(pane, m)),
     ];
@@ -664,7 +697,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     rebuild();
   });
 
-  function applyPrimary(next: Pane): void {
+  function applyPrimary(next: PrimaryPane): void {
     for (const pane of PANES) coord.clearPending(pane); // drop reveals queued under the old primary
     dispatch({ type: "setPrimary", primary: next }); // clears selection + refreshes the navigator
     clearAllHighlights(); // setPrimary emits no reveals → drop the now-orphaned highlights
@@ -678,7 +711,8 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
 
   const setPrimaryCmd = vscode.commands.registerCommand("crl.cockpit.setPrimary", () => {
     if (!currentCel || !model) return; // not shown yet → don't switch + persist before the cockpit exists
-    const items: (vscode.QuickPickItem & { value: Pane })[] = PANES.map((p) => ({
+    // Iterate PRIMARY_PANES (not PANES) — tree is not a navigable primary, so it must never appear as a setPrimary choice.
+    const items: (vscode.QuickPickItem & { value: PrimaryPane })[] = PRIMARY_PANES.map((p) => ({
       label: `${PANE_TITLE[p]}${p === state.primary ? "  •" : ""}`,
       description: p === "source" ? "source units" : p === "crl" ? "CRL decision nodes" : "CEL cases",
       value: p,
@@ -770,7 +804,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       orderDebounce = setTimeout(() => {
         const uri = currentCel ? vscode.Uri.file(currentCel) : undefined;
         paneOrder = normalizePaneOrder(vscode.workspace.getConfiguration("crl.correspondence", uri).get("paneOrder"));
-        applyPaneOrder();
+        reconcilePaneOrder(); // open/close opt-in panes (tree) + re-place columns — not just reorder the already-open set
       }, 150);
     }
     // showKeys (#163): re-render with the at-rest key channel on/off. Separate branch — a showKeys edit must re-render
