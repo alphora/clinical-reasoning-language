@@ -129,10 +129,10 @@ export type CrlRelation =
 
 export type CelRelation = "tests-branch" | "tests-otherwise" | "asserts-fact";
 
-/** §5 derived. over-reach EXCLUDES composition, shared-reference, terminology, parameter. */
+/** §5 derived. over-reach EXCLUDES inference, shared-reference, terminology, parameter. */
 export type NodeKind =
   | "leaf"
-  | "composition"
+  | "inference"
   | "decision-node"
   | "shared-reference"
   | "terminology"

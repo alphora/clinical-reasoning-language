@@ -107,7 +107,7 @@ const reached = (idx: ProvenanceIndex, ref: ProvNodeRef): boolean => idx.isDecis
 describe("buildProvenanceIndex — inventory + nodeKind + ownership (§5)", () => {
   it("inventories declarations with intrinsic nodeKind", () => {
     withIndex(true, (idx) => {
-      expect(idx.nodeKindOf(c("Composed"))).toBe("composition"); // defined as
+      expect(idx.nodeKindOf(c("Composed"))).toBe("inference"); // defined as
       expect(idx.nodeKindOf(c("OperA"))).toBe("leaf"); // code is
       expect(idx.nodeKindOf({ lib: "Policy", kind: "activity", name: "LocalAct" })).toBe("leaf");
       expect(idx.nodeKindOf({ lib: "Policy", kind: "decision", name: "PolicyDec" })).toBe(
@@ -160,7 +160,7 @@ describe("buildProvenanceIndex — static reachability (§5)", () => {
     });
   });
 
-  it("transitively reaches `defined as` composition operands", () => {
+  it("transitively reaches `defined as` inference operands", () => {
     withIndex(true, (idx) => {
       expect(reached(idx, c("Composed"))).toBe(true);
       expect(reached(idx, c("OperA"))).toBe(true); // operand of Composed (also a when in SubDec)
@@ -168,7 +168,7 @@ describe("buildProvenanceIndex — static reachability (§5)", () => {
       const edges = idx.decisionReachability.get(
         JSON.stringify(["Policy", "concept", "OperB", null]),
       )!.edges;
-      expect(edges.some((e) => e.relation === "composition-operand")).toBe(true);
+      expect(edges.some((e) => e.relation === "inference-operand")).toBe(true);
     });
   });
 

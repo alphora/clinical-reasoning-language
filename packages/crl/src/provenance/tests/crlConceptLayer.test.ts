@@ -1,6 +1,6 @@
 // Tests for buildCrlConceptLayer (#166 Slice 1) — the headless concept inventory. Verifies the cross-pane JOIN
 // invariant (concept node key === decision-row concept refKey === indexer node key), definitionRefs edges (defined-as
-// composition incl. dedup + cross-lib qualified, definition-is narrative, coded-from → none), the raw layer signals,
+// inference incl. dedup + cross-lib qualified, definition-is narrative, coded-from → none), the raw layer signals,
 // and that an UNREACHED registry concept is still inventoried (denominator — catches reachability misuse).
 import { parseInput } from "../../ast/tests/parseInput";
 import { buildCEL } from "../../cel";
@@ -137,7 +137,7 @@ describe("buildCrlConceptLayer — headless concept layer (#166 Slice 1)", () =>
     expect(index.nodes.has(compKey)).toBe(true);
   });
 
-  it("definitionRefs: defined-as composition operands, DEDUPED in source order", () => {
+  it("definitionRefs: defined-as inference operands, DEDUPED in source order", () => {
     expect(byName.get("T.Comp")!.definitionRefs).toEqual([ck("T", "A"), ck("T", "B")]); // "A" twice → once
   });
 

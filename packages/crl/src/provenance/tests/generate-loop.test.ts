@@ -117,7 +117,7 @@ const countKind = (findings: ProvenanceFinding[], kind: string): number =>
   findings.filter((f) => f.kind === kind).length;
 
 // K = 2 leaf concepts (LeafA, LeafB) + 2 activities (Approve, Deny) + 4 decision sub-nodes (when[0], when[0]/action[0],
-//     otherwise, otherwise/action[0]) — the same baseline T1 pins. The composite "Crit" is composition (over-reach-excluded).
+//     otherwise, otherwise/action[0]) — the same baseline T1 pins. The composite "Crit" is inference (over-reach-excluded).
 const K = 8;
 
 describe("provenance feedback loop — generate → validate baseline", () => {

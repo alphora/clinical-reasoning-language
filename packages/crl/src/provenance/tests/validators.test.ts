@@ -130,7 +130,7 @@ describe("validateProvenance — V1/V2 referential integrity + agreement", () =>
         id: "c1",
         label: "x",
         items: [],
-        crl: [ref("Crit", "concept", "implements-criterion", "linked", undefined, "composition")],
+        crl: [ref("Crit", "concept", "implements-criterion", "linked", undefined, "inference")],
         cel: [],
       },
     ];
@@ -636,13 +636,13 @@ describe("validateProvenance — finding.class + worklist mode (in-progress vs f
   });
 
   // A fixture that produces BOTH an attribution finding (over-reach: Crit/Approve unclustered) AND an integrity finding
-  // (nodekind-mismatch: stored "composition" ≠ index "leaf" on a clustered Crit ref).
+  // (nodekind-mismatch: stored "inference" ≠ index "leaf" on a clustered Crit ref).
   const mismCluster: Cluster[] = [
     {
       id: "c1",
       label: "x",
       items: [],
-      crl: [ref("Crit", "concept", "implements-criterion", "linked", undefined, "composition")],
+      crl: [ref("Crit", "concept", "implements-criterion", "linked", undefined, "inference")],
       cel: [],
     },
   ];

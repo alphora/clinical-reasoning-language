@@ -79,7 +79,7 @@ export function isOverReach(
   const candidate =
     node.nodeKind === "leaf" ||
     (node.nodeKind === "decision-node" && node.ref.nodeId !== undefined);
-  if (!candidate) return false; // bare whole-decision decl + composition/shared/terminology/parameter are not candidates
+  if (!candidate) return false; // bare whole-decision decl + inference/shared/terminology/parameter are not candidates
   const key = nodeKey(node.ref);
   for (const c of artifact.clusters) {
     for (const ref of c.crl) {

@@ -53,7 +53,7 @@ export type StructuralRelation =
   | "guard"
   | "recommend"
   | "use-decision"
-  | "composition-operand"
+  | "inference-operand"
   | "definition-narrative"
   | "activity-dependency"
   | "spine-member"; // a sub-node (or the decl) of a reached decision is itself decision-reached
@@ -77,7 +77,7 @@ export interface ReachEdge {
   fromDecision: string; // NodeKey of the seeding decision declaration
   fromNodeId: string; // the spine sub-node the ref sits on ("" = the decision root, for spine-member)
   relation: StructuralRelation;
-  via?: string; // NodeKey of the intermediate node (e.g. the concept whose composition reached this operand)
+  via?: string; // NodeKey of the intermediate node (e.g. the concept whose inference reached this operand)
 }
 export interface ReachInfo {
   reachedBy: Set<string>; // decision NodeKeys (complete across seeds)
@@ -143,7 +143,7 @@ export const conceptDeclRef = (lib: string, name: string): ProvNodeRef => ({
   name,
 });
 
-/** Flatten a `defined as` composition expression to the leaf/concept refs it DIRECTLY references (pure; no recursion into
+/** Flatten a `defined as` inference expression to the leaf/concept refs it DIRECTLY references (pure; no recursion into
  *  referenced concepts — direct edges only). Shared by the reachability walk + the headless concept layer. */
 export function compositionRefs(expr: CompositionExpression, out: ReferenceName[]): void {
   switch (expr.type) {
@@ -183,7 +183,7 @@ export function narrativeRefs(
   }
 }
 
-/** The concept refs a concept is DIRECTLY defined in terms of — `defined as` composition operands + `definition is`
+/** The concept refs a concept is DIRECTLY defined in terms of — `defined as` inference operands + `definition is`
  *  narrative concept refs. `coded from` (a valueset bind) contributes none. Direct edges only (the transitive closure +
  *  cycle guard belong to the consumer). */
 export function definitionConceptRefs(c: Concept): ReferenceName[] {
@@ -342,7 +342,7 @@ export function buildProvenanceIndex(
         return "decision-node";
       case "concept":
         return (node as Concept).definition?.type === "DefinedAsDefinition"
-          ? "composition"
+          ? "inference"
           : "leaf";
     }
   };
@@ -417,7 +417,7 @@ export function buildProvenanceIndex(
   const ACCEPTABLE: Record<StructuralRelation, readonly DeclKind[]> = {
     "when-condition": ["concept"],
     guard: ["concept"],
-    "composition-operand": ["concept"],
+    "inference-operand": ["concept"],
     "definition-narrative": ["concept", "parameter"],
     recommend: ["activity"],
     "use-decision": ["decision"],
@@ -425,7 +425,7 @@ export function buildProvenanceIndex(
     "spine-member": ["decision"],
   };
 
-  // Per-SEED cycle guards (reset before each seed decision): prevent infinite recursion on composition/decision cycles
+  // Per-SEED cycle guards (reset before each seed decision): prevent infinite recursion on inference/decision cycles
   // WITHIN one decision's walk, while still re-expanding a node shared across seeds so its `reachedBy` is complete.
   const seenConcepts = new Set<string>();
   const seenDecisions = new Set<string>();
@@ -441,11 +441,11 @@ export function buildProvenanceIndex(
     seenConcepts.add(key);
     const def = c.definition;
     const refs: ReferenceName[] = [];
-    let relation: StructuralRelation = "composition-operand";
+    let relation: StructuralRelation = "inference-operand";
     if (def?.type === "DefinedAsDefinition") {
       if (def.body.type === "DefinedAsBareRef") refs.push(def.body.ref);
       else compositionRefs(def.body.expression, refs);
-      relation = "composition-operand";
+      relation = "inference-operand";
     } else if (def?.type === "DefinitionIsDefinition") {
       narrativeRefs(def.body.elements, refs);
       relation = "definition-narrative";

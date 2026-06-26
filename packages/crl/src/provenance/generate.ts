@@ -295,7 +295,7 @@ function buildDecisionCluster(
     if (node.declKind === "concept") {
       const relation: CrlRelation = ctx.gatingConceptKeys.has(key)
         ? "implements-criterion"
-        : node.nodeKind === "composition"
+        : node.nodeKind === "inference"
           ? "composes-criteria"
           : "defines-concept";
       push(node.ref, relation);
