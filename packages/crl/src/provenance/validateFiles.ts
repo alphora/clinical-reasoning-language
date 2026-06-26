@@ -20,7 +20,11 @@ import {
   type ProvenanceIndex,
   type ProvenanceIndexDiagnostic,
 } from "./indexer";
-import { validateProvenance, type ProvenanceFinding } from "./validators";
+import {
+  validateProvenance,
+  type ProvenanceFinding,
+  type ProvenanceValidationMode,
+} from "./validators";
 
 /** Every intermediate of the provenance pipeline — consumed by both the validator projection and the cockpit model. */
 export interface ResolveProvenanceResult {
@@ -44,7 +48,7 @@ export function resolveProvenance(
   artifactPath: string,
   celPath: string,
   anchorPath: string,
-  mode: "worklist" | "final" = "final",
+  mode: ProvenanceValidationMode = "final",
 ): ResolveProvenanceResult {
   const artifact = JSON.parse(readFileSync(artifactPath, "utf8")) as ProvenanceArtifact;
   const anchorText = readFileSync(anchorPath, "utf8");
@@ -109,7 +113,7 @@ export function validateProvenanceFiles(
   artifactPath: string,
   celPath: string,
   anchorPath: string,
-  mode: "worklist" | "final" = "final",
+  mode: ProvenanceValidationMode = "final",
 ): ValidateProvenanceFilesResult {
   const r = resolveProvenance(artifactPath, celPath, anchorPath, mode);
   return {

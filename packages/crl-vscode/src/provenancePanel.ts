@@ -13,6 +13,7 @@ import {
   discoverProvenance,
   findPolicySrc,
   headline,
+  PANEL_VALIDATION_MODE,
   type FindingNode,
   type FindingsGroup,
   type FindingsTree,
@@ -88,7 +89,9 @@ class ProvenanceTreeProvider implements vscode.TreeDataProvider<Node> {
       // would be lost — the finding doesn't expand at targets.length <= 1).
       const unresolvedReason = primary ? undefined : n.targets.find((t) => !t.navigable)?.reason;
       const base = unresolvedReason ? `${n.kind} — ${unresolvedReason}` : n.kind;
-      it.description = n.prominence === "soft" ? `${base} (soft)` : base;
+      // "(soft)" tags ONLY the §9.1 soft-keyword finding — a "remaining attribution" node is also prominence:"soft" (muted
+      // icon) but is backlog, not a soft-keyword review, so it must NOT read "(soft)". Gate on kind, not prominence.
+      it.description = n.kind === "mn-keyword-soft" ? `${base} (soft)` : base;
       it.tooltip = `[${n.prominence}] ${n.kind}\n${n.label}${unresolvedReason ? `\n⚠ ${unresolvedReason}` : ""}`;
       if (primary) it.command = revealCommand(primary);
       return it;
@@ -132,7 +135,7 @@ export function registerProvenancePanel(context: vscode.ExtensionContext): void 
     }
     let model;
     try {
-      model = buildCorrespondenceModel(d.artifactPath, currentCel, d.anchorPath);
+      model = buildCorrespondenceModel(d.artifactPath, currentCel, d.anchorPath, PANEL_VALIDATION_MODE);
     } catch (e) {
       provider.setTree(undefined);
       view.message = `Failed to build provenance for ${basename(currentCel)}: ${e instanceof Error ? e.message : String(e)}`;

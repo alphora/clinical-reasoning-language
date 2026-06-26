@@ -12,6 +12,7 @@ import type {
   Item,
   ProvenanceArtifact,
 } from "../artifact";
+import { buildCockpitModel } from "../cockpitModel";
 import { buildCorrespondenceModel, type CorrespondenceModel } from "../correspondence";
 
 // ── synthetic policy (mirrors provenance/tests/coverage.test.ts) ──────────────
@@ -393,5 +394,43 @@ describe("buildCorrespondenceModel — degenerate input", () => {
     expect(() =>
       buildCorrespondenceModel(path.join(root, "nope.json"), celPath, anchorPath),
     ).toThrow();
+  });
+});
+
+describe("buildCorrespondenceModel — worklist mode (the panel/cockpit lens)", () => {
+  // The unclustered "Orphan" leaf is an over-reach (an attribution-class finding). In worklist mode it re-grades
+  // error→warning and is counted in rollup.worklistCount; in the DEFAULT (final) mode it stays severity:"error".
+  const overReach = (m: CorrespondenceModel) =>
+    m.findings.find((f) => f.finding.kind === "over-reach")!;
+
+  it("worklist mode: rollup.worklistCount > 0 and the over-reach finding is severity:'warning'", () => {
+    const m = buildCorrespondenceModel(
+      writeArtifact(buildArtifact(TEXT_HASH)),
+      celPath,
+      anchorPath,
+      "worklist",
+    );
+    expect(m.rollup.worklistCount).toBeGreaterThan(0);
+    const f = overReach(m);
+    expect(f).toBeDefined();
+    expect(f.finding.severity).toBe("warning");
+    expect(f.finding.class).toBe("attribution");
+  });
+
+  it("DEFAULT (final) mode: the same over-reach stays severity:'error' (regression guard for the default)", () => {
+    // `model` is the module-scoped 3-arg build (no mode) → must remain final-graded.
+    const f = overReach(model);
+    expect(f.finding.severity).toBe("error");
+    expect(f.finding.class).toBe("attribution"); // class is mode-INDEPENDENT
+  });
+
+  it("buildCockpitModel('worklist') threads the mode through to the correspondence rollup", () => {
+    const cm = buildCockpitModel(
+      writeArtifact(buildArtifact(TEXT_HASH)),
+      celPath,
+      anchorPath,
+      "worklist",
+    );
+    expect(cm.correspondence.rollup.worklistCount).toBeGreaterThan(0);
   });
 });

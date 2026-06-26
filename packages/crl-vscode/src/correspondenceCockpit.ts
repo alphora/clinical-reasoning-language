@@ -59,7 +59,7 @@ import {
 import { CANONICAL_PANE_ORDER, normalizePaneOrder } from "./paneOrder";
 import { isConceptHit, isFactHit, type RevealHit, type WebviewHit } from "./webviewHit";
 import { PaneRevealCoordinator, type SemanticTarget } from "./paneRevealCoordinator";
-import { discoverProvenance, findPolicySrc } from "./provenanceFindings";
+import { discoverProvenance, findPolicySrc, PANEL_VALIDATION_MODE } from "./provenanceFindings";
 import { buildViewerModel, type ViewerModel } from "./provenanceViewer";
 import { renderSourcePane, type OverlaySpan, type UnitSpan } from "./sourcePaneHtml";
 
@@ -580,7 +580,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       return;
     }
     try {
-      const cm = buildCockpitModel(d.artifactPath, currentCel, d.anchorPath); // resolve ONCE → corr + structure + scenarios
+      const cm = buildCockpitModel(d.artifactPath, currentCel, d.anchorPath, PANEL_VALIDATION_MODE); // resolve ONCE → corr + structure + scenarios
       correspondence = cm.correspondence;
       crlStructure = cm.crlStructure;
       conceptLayer = cm.conceptLayer;

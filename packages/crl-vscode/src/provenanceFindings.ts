@@ -12,6 +12,14 @@ import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import type { CorrespondenceModel, FindingTarget } from "@smile-digital-health/crl";
 import { canonicalize } from "@smile-digital-health/crl/language-services";
 
+/**
+ * The authoring surfaces (findings panel + correspondence cockpit) validate in WORKLIST mode: an in-progress scaffold's
+ * attribution backlog reads as "remaining work," not a wall of red. FINAL mode is the CLI/MCP gate (deferred judge-lens
+ * slice). Co-located here as the single seam both shells share — the `mode` param stays on the builders so a future
+ * final-mode-in-panel toggle threads through it, rather than inlining the literal at each call.
+ */
+export const PANEL_VALIDATION_MODE: "worklist" = "worklist";
+
 // ── discovery ────────────────────────────────────────────────────────────────
 
 export type ProvenanceDiscovery =
@@ -164,7 +172,7 @@ export interface FindingNode {
   targets: NavTarget[];
 }
 export interface FindingsGroup {
-  id: "notices" | "diagnostics" | "error" | "manual-review" | "warning";
+  id: "notices" | "diagnostics" | "error" | "manual-review" | "warning" | "remaining";
   label: string;
   nodes: FindingNode[];
 }
@@ -180,6 +188,8 @@ export interface FindingsSummary {
   errors: number;
   manualReview: number;
   warnings: number;
+  /** The worklist-graded attribution backlog ("remaining attribution") — in worklist mode these warnings live INSIDE `warnings`; the headline subtracts them. */
+  worklistCount: number;
   mustLinkTotal: number;
   mustLinkImplemented: number;
   clean: boolean;
@@ -231,8 +241,22 @@ export function buildFindingsTree(model: CorrespondenceModel, notices: string[] 
     "manual-review": [],
     warning: [],
   };
+  // The worklist-graded attribution backlog — un-attributed coverage work re-graded error→warning in worklist mode.
+  // Routed out of the warning bucket so it reads as "remaining work," not red. NOT class alone: a FINAL-mode attribution
+  // finding stays severity:"error" and MUST remain a blocker in bySeverity.error.
+  const remaining: FindingNode[] = [];
   for (const af of model.findings) {
     const sev = af.finding.severity;
+    if (af.finding.class === "attribution" && sev === "warning") {
+      remaining.push({
+        id: af.id,
+        label: af.finding.message,
+        kind: af.finding.kind,
+        prominence: "soft", // soft (NOT "info" — info is the notices bucket): present but not alarming
+        targets: af.targets.map((t) => toNav(t, anchorFilePath)),
+      });
+      continue;
+    }
     bySeverity[sev].push({
       id: af.id,
       label: af.finding.message,
@@ -250,6 +274,8 @@ export function buildFindingsTree(model: CorrespondenceModel, notices: string[] 
   if (bySeverity["manual-review"].length)
     groups.push({ id: "manual-review", label: "Manual review", nodes: bySeverity["manual-review"] });
   if (bySeverity.warning.length) groups.push({ id: "warning", label: "Warnings", nodes: bySeverity.warning });
+  // Remaining attribution LAST — it's the backlog, ranked below every integrity signal.
+  if (remaining.length) groups.push({ id: "remaining", label: "Remaining attribution", nodes: remaining });
 
   const { errorCount, manualReviewCount, warningCount, mustLinkDecisionsTotal, mustLinkDecisionsImplemented } =
     model.rollup;
@@ -259,26 +285,49 @@ export function buildFindingsTree(model: CorrespondenceModel, notices: string[] 
       errors: errorCount,
       manualReview: manualReviewCount,
       warnings: warningCount,
+      // The routed count (mode-robust): equals rollup.worklistCount in worklist mode; in final mode nothing routes here
+      // (attribution findings stay error-severity), so this is 0 and the headline doesn't claim a backlog that's red.
+      worklistCount: remaining.length,
       mustLinkTotal: mustLinkDecisionsTotal,
       mustLinkImplemented: mustLinkDecisionsImplemented,
-      clean: errorCount === 0 && manualReviewCount === 0, // NOT rollup.pass (which ignores manual-review)
+      // NOT rollup.pass (which ignores manual-review). NOTE the deliberate divergence from `headline()`'s glyph (~:315):
+      // `clean` ignores warnings entirely (a non-attribution integrity warning is still "clean" of blockers), whereas the
+      // glyph shows ⚠ when otherWarnings>0. Two predicates, two questions ("any blockers?" vs "any signal at all?").
+      clean: errorCount === 0 && manualReviewCount === 0,
       policyVersion: model.policyVersion,
     },
   };
 }
 
 /**
- * The one-line headline for the panel (TreeView.message). Glyph reflects the WORST severity present (✗ errors, ⚠
- * manual-review/warnings, ✓ otherwise); only non-zero counts are shown — so a 0-error policy never reads "✗ 0 error(s)".
+ * The one-line headline for the panel (TreeView.message). Glyph reflects the WORST *blocker* present (✗ errors, ⚠
+ * manual-review/non-attribution-warnings, ✓ otherwise); only non-zero counts are shown — so a 0-error policy never reads
+ * "✗ 0 error(s)". The attribution backlog (`worklistCount`) is graded to "warning" and so is double-counted inside
+ * `warnings`; we subtract it (`otherWarnings`) so a fresh scaffold's backlog reads as "K remaining," NOT K warnings, and
+ * does NOT alone force a ⚠.
  */
 export function headline(s: FindingsSummary, ambiguousVersion?: boolean): string {
   const coverage = `coverage ${s.mustLinkImplemented}/${s.mustLinkTotal}`;
   const v = ambiguousVersion && s.policyVersion ? ` · v${s.policyVersion}` : "";
+  // Non-attribution warnings: the K worklist-graded backlog warnings live INSIDE s.warnings, so subtract them. `remaining`
+  // is a strict subset of `warnings` on the real path (worklistCount = remaining.length, all warning-severity), so this is
+  // ≥ 0 — Math.max guards a future refactor that mis-wires worklistCount from the rollup's mode-independent class count.
+  const otherWarnings = Math.max(0, s.warnings - s.worklistCount);
   const parts: string[] = [];
   if (s.errors) parts.push(`${s.errors} error${s.errors === 1 ? "" : "s"}`);
   if (s.manualReview) parts.push(`${s.manualReview} manual-review`);
-  if (s.warnings) parts.push(`${s.warnings} warning${s.warnings === 1 ? "" : "s"}`);
-  const glyph = s.errors ? "✗" : s.manualReview || s.warnings ? "⚠" : "✓";
-  const lead = parts.length ? parts.join(" · ") : "clean";
+  if (otherWarnings > 0) parts.push(`${otherWarnings} warning${otherWarnings === 1 ? "" : "s"}`);
+  if (s.worklistCount > 0) parts.push(`${s.worklistCount} remaining`);
+  const glyph = s.errors ? "✗" : s.manualReview || otherWarnings ? "⚠" : "✓";
+  // Lead: real blockers join with " · "; a backlog-only summary reads "no blockers · K remaining"; truly empty → "clean".
+  const blockers: string[] = [];
+  if (s.errors) blockers.push(`${s.errors} error${s.errors === 1 ? "" : "s"}`);
+  if (s.manualReview) blockers.push(`${s.manualReview} manual-review`);
+  if (otherWarnings > 0) blockers.push(`${otherWarnings} warning${otherWarnings === 1 ? "" : "s"}`);
+  const lead = blockers.length
+    ? parts.join(" · ")
+    : s.worklistCount > 0
+      ? `no blockers · ${s.worklistCount} remaining`
+      : "clean";
   return `${glyph} ${lead} · ${coverage}${v}`;
 }

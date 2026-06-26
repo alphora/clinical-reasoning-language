@@ -14,6 +14,13 @@ import type { ProvenanceIndex, ProvNodeRef } from "./indexer";
 
 export type Severity = "error" | "warning" | "manual-review";
 
+/**
+ * The provenance-validation lens. "final" (DEFAULT) gates a completed artifact (every finding at native severity);
+ * "worklist" reads an in-progress scaffold's attribution backlog as "remaining work" (error→warning re-grade). Shared
+ * alias so the validator, the file resolvers, and the cockpit/correspondence builders all name the same union once.
+ */
+export type ProvenanceValidationMode = "worklist" | "final";
+
 export type ProvenanceFindingKind =
   | "unresolved-ref"
   | "cel-unresolved"
@@ -78,7 +85,7 @@ export interface ValidateOpts {
    * in-progress authoring: re-grade attribution-class findings from "error" to "warning" (non-blocking) — the KE's
    * coverage backlog is "remaining work," not a wall of red. Integrity-class severity is UNCHANGED in both modes.
    */
-  mode?: "worklist" | "final";
+  mode?: ProvenanceValidationMode;
 }
 
 const DECISION_RELATIONS = new Set([

@@ -284,7 +284,7 @@
   "scripts": {
     "build:crl": "npm --prefix ../crl run build",
     "typecheck": "tsc -p tsconfig.json",
-    "precompile": "node scripts/check-core.cjs",
+    "precompile": "npm run build:crl && node scripts/check-core.cjs",
     "compile": "npm run typecheck && node esbuild.js",
     "selftest": "node dist/mcp-server.js --selftest",
     "selftest:fixture": "node dist/mcp-server.js --selftest --file ../crl/src/tests/regression/testdata/clinical-reasoning-language-example.crl",

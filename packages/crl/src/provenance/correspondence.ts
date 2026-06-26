@@ -44,7 +44,7 @@ import type {
 import { byteRangeToDisplayRange, sliceUtf8Bytes } from "./canonicalize";
 import { nodeKey, type ProvNodeRef } from "./indexer";
 import { resolveProvenance, type ResolveProvenanceResult } from "./validateFiles";
-import type { ProvenanceFinding } from "./validators";
+import type { ProvenanceFinding, ProvenanceValidationMode } from "./validators";
 
 // ── contract ───────────────────────────────────────────────────────────────
 
@@ -162,6 +162,8 @@ export interface Rollup {
   manualReviewCount: number;
   warningCount: number;
   pass: boolean;
+  /** Count of attribution-class findings (the coverage backlog) — the KE's "remaining work" tally; in worklist mode these are warning-graded. */
+  worklistCount: number;
   /** derived — symmetric over ALL finding kinds (the cockpit headline). */
   findingCountsByKind: Record<string, number>;
 }
@@ -200,11 +202,12 @@ export function buildCorrespondenceModel(
   artifactPath: string,
   celPath: string,
   anchorPath: string,
+  mode: ProvenanceValidationMode = "final",
 ): CorrespondenceModel {
-  return buildCorrespondenceModelFromResolved(resolveProvenance(artifactPath, celPath, anchorPath), {
-    artifactPath,
-    celPath,
-  });
+  return buildCorrespondenceModelFromResolved(
+    resolveProvenance(artifactPath, celPath, anchorPath, mode),
+    { artifactPath, celPath },
+  );
 }
 
 /**
@@ -465,6 +468,7 @@ export function buildCorrespondenceModelFromResolved(
     manualReviewCount: r.manualReviewCount,
     warningCount: r.warningCount,
     pass: r.pass,
+    worklistCount: r.worklistCount,
     findingCountsByKind: findings.reduce<Record<string, number>>((m, f) => {
       m[f.kind] = (m[f.kind] ?? 0) + 1;
       return m;

@@ -154,6 +154,9 @@ export function buildViewerModel(model: CorrespondenceModel): ViewerModel {
     if (g.displayRange)
       sourceRaw.push({ filePath: af, range: g.displayRange, kind: "ignored", key: `${af}:${rangeKey(g.displayRange)}`, renderHint: "range" });
   // uncovered: gate on the finding KIND first, then its resolved source target (skip malformed — no displayRange).
+  // DELIBERATELY untinted by validation mode: even in worklist mode (where uncovered-span re-grades to "warning" in the
+  // findings panel) the SOURCE pane keeps the spatial "uncovered" overlay as the worklist indicator — it shows WHERE the
+  // remaining attribution work is, which is exactly what an in-progress KE wants. (Scope-narrow per the panel-worklist slice.)
   for (const f of model.findings)
     if (f.finding.kind === "uncovered-span")
       for (const t of f.targets)

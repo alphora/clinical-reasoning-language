@@ -52,6 +52,7 @@ export { validateProvenance, ATTRIBUTION_KINDS } from "./validators";
 export type {
   ProvenanceFinding,
   ProvenanceFindingKind,
+  ProvenanceValidationMode,
   Severity,
   ValidateOpts,
 } from "./validators";

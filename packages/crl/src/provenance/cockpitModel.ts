@@ -12,6 +12,7 @@ import { buildCorrespondenceModelFromResolved, type CorrespondenceModel } from "
 import { buildCrlConceptLayer, type CrlConceptNode } from "./crlConceptLayer";
 import { buildCrlStructure, type CrlDecisionStructure } from "./crlStructure";
 import { resolveProvenance } from "./validateFiles";
+import type { ProvenanceValidationMode } from "./validators";
 
 export interface CockpitModel {
   correspondence: CorrespondenceModel;
@@ -53,8 +54,9 @@ export function buildCockpitModel(
   artifactPath: string,
   celPath: string,
   anchorPath: string,
+  mode: ProvenanceValidationMode = "final",
 ): CockpitModel {
-  const r = resolveProvenance(artifactPath, celPath, anchorPath);
+  const r = resolveProvenance(artifactPath, celPath, anchorPath, mode);
   const { byName, collisions } = buildCaseIdByName(r.graph);
   return {
     correspondence: buildCorrespondenceModelFromResolved(r, { artifactPath, celPath }),
