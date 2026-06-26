@@ -528,10 +528,13 @@ Validator-side diagnostics (from `ValidationError.kind`):
 | `reference-cycle` | Concept refs form a cycle (within or across libraries). | error |
 | `external-library-not-included` | A qualified ref `"Pkg"."X"` to a package library is missing its `include` line, OR references a library the resolver doesn't know about. | error |
 | `qualified-ref-unresolved` | A qualified ref `"Lib"."X"` to a known/included library but the name `X` isn't declared there for the expected kind. | error |
+| `decision-delegation-cycle` | A decision's `use decision` graph has a cycle. | error |
+| `decision-shape` | A structural decision-shape rule is violated (qualifier-required / otherwise-required / any-over-branches / first-over-actions / guard placement). Carries `rule`. | error |
 
-`unresolved-reference` and `qualified-ref-unresolved` demote to warnings
-under soft mode. Structural diagnostics
-(`external-library-not-included`, cycle, name uniqueness) never demote.
+Only `unresolved-reference` and `qualified-ref-unresolved` demote to warnings
+under soft mode (`SOFT_DEMOTABLE_KINDS`). Every other kind — the structural
+diagnostics (`external-library-not-included`, the cycles, name uniqueness,
+`decision-shape`) — stays an error.
 
 #### CLI
 
@@ -548,8 +551,9 @@ crl-emit --path src/crl/cms22.crl --out-dir ./out/
 `--out-dir` is required for `crl-emit`. The CLI writes one
 `<libraryName>.cql` file per library in the emit closure (root's
 include-walked closure + any local sibling transitively qualified-referenced).
-Library names are preserved verbatim in filenames (so the on-disk file
-matches the CQL `include "Lib Name"` reference).
+The on-disk filename is `<libraryName>.cql` when the library name is
+filesystem-safe (so it matches the CQL `include "Lib Name"` reference); an
+unsafe name (path separators, traversal, etc.) fails emit with an error.
 
 `crl-emit` short-circuits when any error-severity import diagnostic is
 present — it won't emit broken CQL. On success, the CLI writes the files
@@ -605,9 +609,9 @@ g.registry;                 // { byNameLocal, byNamePackage } — full registry 
 g.diagnostics;              // ImportDiagnostic[]
 ```
 
-All entry points return result envelopes — missing `package.json`,
-parse failures, malformed packages, etc. become diagnostics, never
-thrown exceptions.
+These import-aware entry points return result envelopes — missing `package.json`,
+parse failures, malformed packages, etc. become diagnostics (and emitter exceptions
+become `errors`), never thrown exceptions.
 
 #### Worked example: two files referencing each other
 
@@ -736,7 +740,7 @@ generated CQL has a self-contained dependency graph. See
   v2.2.
 - **No fallback.** Missing `package.json` is an error, not "treat the
   root's directory as the project."
-- **Library functions never throw** — all errors return as diagnostics.
+- **Import-aware APIs return result envelopes** — expected resolution/emit failures come back as diagnostics (and `errors`), not thrown exceptions.
 
 ---
 
