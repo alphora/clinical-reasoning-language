@@ -13,7 +13,7 @@ Clinical Reasoning Language (CRL) is a domain-specific language for expressing c
 
 A CRL file (also called a **library**) is structured as:
 
-1. **Header** (required): A markdown line beginning with `#`. Stored in the AST as the `header` field.
+1. **Header** (optional): A markdown line beginning with `#`. Stored in the AST as the `header` field when present (grammar: `HEADER?`).
 2. **Library declaration** (required): One `library "Name".` line declaring this file's identity. v2.1.0 removed the previous anonymous-file mode — every CRL file must declare its library name.
 3. **Include declarations** (optional, repeatable): `include "Name".` lines naming **external** libraries this file depends on. Local sibling libraries in the same project auto-resolve via qualified refs without needing an `include` line. There is no `version` clause — npm packaging IS the version system.
 4. **Statements** (any number): `decision`, `terminology`, `activity`, and `concept`.
@@ -152,7 +152,7 @@ activity "Contraindicated":
 
 #### Activity Types
 
-Must be a custom-defined type conforming to FHIR resource names.
+Must be one of the fixed CPG activity-type allowlist (e.g. `CPGServiceRequest`, `CPGCommunicationRequest`, `CPGImmunizationRequest`, `CPGMedicationRequest`, …) — see the **Activity types (`request`)** list below; an arbitrary FHIR resource name is rejected at parse time (`request` enters the lexer's activity mode with a closed allowlist).
 
 > **Note:** `do not perform` marks the activity as contraindicated or not to be executed.
 
@@ -160,7 +160,7 @@ Must be a custom-defined type conforming to FHIR resource names.
 
 ### 4. Concept Statement
 
-Defines a reusable clinical concept. Its body is one of: `code is` (local-source query), `coded from` (external terminology query), `defined as` (sem-* **inference** over other concepts), or `definition is` (a narrative predicate matched against the catalog).
+Defines a reusable clinical concept. Its body combines: an optional LOCAL `code is` (local-source query); and/or ONE of `coded from` (external terminology query), `defined as` (sem-* **inference** over other concepts), or `definition is` (a narrative predicate matched against the catalog); plus optional trailing `source representation` lines. (`code is` may stand alone or accompany one of the others; the grammar even allows a bare typed concept with no body.)
 
 ```crl
 concept "Most Recent BMI":
@@ -187,7 +187,7 @@ concept "BMI Range as a Condition":
 #### Structure
 
 - `concept "Name":` (colon required)
-- `- type is CONCEPT_TYPE.` — REQUIRED for an asserted (`coded from`) concept (a valueset carries no FHIR type); OPTIONAL for `defined as` / `definition is` inference (deduced from the body's refs if omitted).
+- `- type is CONCEPT_TYPE.` — grammar-optional (`(typeLine)?`); the VALIDATOR requires it for an asserted (`coded from`) concept (a valueset carries no FHIR type) and deduces it for `defined as` / `definition is` inference from the body's refs.
 - `- value type is CONCEPT_VALUE_TYPE.` — OPTIONAL and repeatable (0..*); deduced from the type's default / subject chain when omitted, lazily required when a consumer depends on it.
 - Optional: one or more ``- meta is `Text`.`` lines; one ``- evidence is `Text`.`` line.
 - A body — `- code is ` + a backtick-quoted code (local source); `- coded from "VS".` (external terminology); `- defined as ...` (sem-* inference); or `- definition is <narrative>.` (a catalog narrative predicate). Plus zero or more trailing `- source representation:` lines (the external multi-representation form — see below).
@@ -691,6 +691,13 @@ the resolver:
 
 #### Visibility — global in v0.7
 
+> **⚠ Stale (pending reconciliation):** this subsection and the "flat-inlined CQL"
+> emit/CLI text below describe the older **v0.7** single-library model. The CURRENT
+> cross-library behavior is the **v2.1.0** model documented above (§ *Cross-library
+> imports* — per-library validator scoping + one CQL file per CRL library, not
+> flat-inlined). Where the two conflict, the v2.1.0 section wins; this older block
+> needs a verified emit/resolver-behavior rewrite.
+
 Once a library is included transitively, every declaration anywhere in
 the include closure is visible to every library in that closure. Future
 v0.8 may add direction-aware scoping.
@@ -945,7 +952,7 @@ CRL tokens align with the CPG IG Activity Profiles table's Request column with t
 
 The union of concept value types and concept types. v2.2.0 deliberately omits `Practitioner` from the allowlist; emitter-side support exists as a defensive AST path but author syntax is rejected at parse time.
 
-`AdverseEvent`, `AllergyIntolerance`, `Attachment`, `boolean`, `ClinicalImpression`, `CodeableConcept`, `Communication`, `CommunicationRequest`, `Condition`, `dateTime`, `DetectedIssue`, `Device`, `DiagnosticReport`, `DocumentReference`, `Encounter`, `EpisodeOfCare`, `FamilyMemberHistory`, `Flag`, `Goal`, `Immunization`, `integer`, `MedicationAdministration`, `MedicationDispense`, `MedicationRequest`, `MedicationStatement`, `NutritionIntake`, `NutritionOrder`, `Observation`, `Patient`, `Period`, `Procedure`, `Quantity`, `QuestionnaireResponse`, `Range`, `Ratio`, `RiskAssessment`, `SampledData`, `ServiceRequest`, `string`, `Task`, `time`
+`AdverseEvent`, `AllergyIntolerance`, `Attachment`, `boolean`, `Claim`, `ClinicalImpression`, `CodeableConcept`, `Communication`, `CommunicationRequest`, `Condition`, `dateTime`, `DetectedIssue`, `Device`, `DiagnosticReport`, `DocumentReference`, `Encounter`, `EpisodeOfCare`, `ExplanationOfBenefit`, `FamilyMemberHistory`, `Flag`, `Goal`, `ImagingStudy`, `Immunization`, `integer`, `MedicationAdministration`, `MedicationDispense`, `MedicationRequest`, `MedicationStatement`, `NutritionIntake`, `NutritionOrder`, `Observation`, `Patient`, `Period`, `Procedure`, `Quantity`, `QuestionnaireResponse`, `Range`, `Ratio`, `RiskAssessment`, `SampledData`, `ServiceRequest`, `string`, `Task`, `time`
 
 ---
 
@@ -962,14 +969,14 @@ The union of concept value types and concept types. v2.2.0 deliberately omits `P
 
 - **Case Sensitivity:** CRL is case sensitive
 - **Whitespace/Indentation:** Not significant
-- **Header:** File must start with a markdown header line (`# ...`)
+- **Header:** A file MAY begin with a markdown header line (`# ...`) — it is optional (grammar `HEADER?`)
 - **Quoted Strings:** No escape characters allowed
 - **Meta Lines:** Multiple `meta is` lines allowed per concept
 - **Evidence Line:** Only one `evidence is` line per concept
 - **Inference body:** `defined as` (a `sem-and`/`sem-or`/`sem-not` tree) or `definition is` (a catalog narrative predicate — the form that replaced the removed `apply pattern`)
 - **Terminology Entries:** Can have multiple valuesets and system/code pairs
-- **Activity Types:** Must be selected from valid resource types
-- **Block Qualifiers:** `any:` and `all:` are optional (default is `any:`)
+- **Activity Types:** Must be from the fixed CPG activity-type allowlist (`CPG*Request` etc.), not an arbitrary resource name
+- **Block Qualifiers:** a multi-branch / multi-action block declares `first:`, `any:`, or `all:` (no implicit default); a single-member block takes none
 
 ---
 
