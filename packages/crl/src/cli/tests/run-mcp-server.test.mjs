@@ -31,7 +31,7 @@ const check = async (label, fn) => {
 
 await client.connect(transport);
 try {
-  await check("MCP tools: 11 registered (…, render_scenario, authoring_kit, validate_provenance)", async () => {
+  await check("MCP tools: 12 registered (…, validate_provenance, generate_provenance)", async () => {
     const { tools } = await client.listTools();
     const names = tools.map((t) => t.name).sort();
     assert.deepEqual(names, [
@@ -40,6 +40,7 @@ try {
       "emit_cel",
       "emit_cql",
       "emit_crl_fhir",
+      "generate_provenance",
       "render_scenario",
       "run_decision",
       "tokenize_crl",
@@ -286,6 +287,88 @@ try {
       assert.equal(out.pass, false, "empty artifact must not pass");
       assert.ok(out.findings.some((f) => f.kind === "over-reach"), "expected over-reach findings");
       assert.ok(out.findings.some((f) => f.kind === "uncovered-span"), "expected the unacknowledged anchor text");
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  await check("generate_provenance with nonexistent anchor → isError", async () => {
+    const dme101Cel = resolve(here, "../../../src/tests/fixtures/policies/dme101-030/dme101-030.cel");
+    const r = await client.callTool({
+      name: "generate_provenance",
+      arguments: { cel: dme101Cel, anchor: resolve(here, "no-such-anchor.txt") },
+    });
+    assert.equal(r.isError, true);
+  });
+
+  await check("generate_provenance via paths → dme101-030: SUMMARY envelope (counts, no artifact by default)", async () => {
+    const { writeFileSync, mkdtempSync, rmSync } = await import("node:fs");
+    const os = await import("node:os");
+    const dme101Cel = resolve(here, "../../../src/tests/fixtures/policies/dme101-030/dme101-030.cel");
+    const tmp = mkdtempSync(resolve(os.tmpdir(), "mcp-gen-"));
+    try {
+      const anchorPath = resolve(tmp, "anchor.txt");
+      writeFileSync(anchorPath, "Some policy narrative text.\n");
+      const r = await client.callTool({ name: "generate_provenance", arguments: { cel: dme101Cel, anchor: anchorPath } });
+      assert.ok(!r.isError, "should not be a tool error");
+      const out = JSON.parse(r.content[0].text);
+      assert.equal(out.success, true);
+      assert.equal(typeof out.policyId, "string");
+      assert.equal(out.policyVersion, "1");
+      assert.ok(out.clusterCount > 0, "expected at least one cluster");
+      assert.equal(typeof out.diagnosticCountsByKind, "object", "summary carries diagnostic counts by kind");
+      assert.ok(Object.keys(out.diagnosticCountsByKind).length > 0, "expected worklist diagnostics");
+      assert.equal(out.merged, false);
+      assert.equal(out.artifact, undefined, "summary envelope must NOT include the full artifact by default");
+      assert.equal(out.mergeDiagnosticCountsByKind, undefined, "no merge channel without existingArtifact");
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  await check("generate_provenance with includeArtifact:true → full artifact included (Model A: no items)", async () => {
+    const { writeFileSync, mkdtempSync, rmSync } = await import("node:fs");
+    const os = await import("node:os");
+    const dme101Cel = resolve(here, "../../../src/tests/fixtures/policies/dme101-030/dme101-030.cel");
+    const tmp = mkdtempSync(resolve(os.tmpdir(), "mcp-gen-full-"));
+    try {
+      const anchorPath = resolve(tmp, "anchor.txt");
+      writeFileSync(anchorPath, "Some policy narrative text.\n");
+      const r = await client.callTool({ name: "generate_provenance", arguments: { cel: dme101Cel, anchor: anchorPath, includeArtifact: true } });
+      assert.ok(!r.isError, "should not be a tool error");
+      const out = JSON.parse(r.content[0].text);
+      assert.equal(out.artifact.schemaVersion, "1.0");
+      assert.equal(out.artifact.items.length, 0, "Model A: scaffold emits no items");
+      assert.ok(out.artifact.clusters.length > 0, "expected at least one cluster");
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  await check("generate_provenance with existingArtifact → merge channel + pre-merge baseline note", async () => {
+    const { writeFileSync, mkdtempSync, rmSync } = await import("node:fs");
+    const os = await import("node:os");
+    const dme101Cel = resolve(here, "../../../src/tests/fixtures/policies/dme101-030/dme101-030.cel");
+    const tmp = mkdtempSync(resolve(os.tmpdir(), "mcp-gen-merge-"));
+    try {
+      const anchorPath = resolve(tmp, "anchor.txt");
+      writeFileSync(anchorPath, "Some policy narrative text.\n");
+      // First generate a fresh scaffold WITH the full artifact, persist it, then re-generate merging onto it.
+      const first = JSON.parse(
+        (await client.callTool({ name: "generate_provenance", arguments: { cel: dme101Cel, anchor: anchorPath, includeArtifact: true } })).content[0].text,
+      );
+      const existingPath = resolve(tmp, "existing.json");
+      writeFileSync(existingPath, JSON.stringify(first.artifact));
+      const r = await client.callTool({
+        name: "generate_provenance",
+        arguments: { cel: dme101Cel, anchor: anchorPath, existingArtifact: existingPath },
+      });
+      assert.ok(!r.isError, "should not be a tool error");
+      const out = JSON.parse(r.content[0].text);
+      assert.equal(out.success, true);
+      assert.equal(out.merged, true);
+      assert.equal(typeof out.mergeDiagnosticCountsByKind, "object", "merge channel counts must be present when merging");
+      assert.match(out.note, /pre-merge baseline/, "merged summary must carry the pre-merge baseline note");
     } finally {
       rmSync(tmp, { recursive: true, force: true });
     }

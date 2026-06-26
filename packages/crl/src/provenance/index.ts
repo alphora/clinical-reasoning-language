@@ -57,6 +57,8 @@ export type {
 } from "./validators";
 export { validateProvenanceFiles } from "./validateFiles";
 export type { ValidateProvenanceFilesResult } from "./validateFiles";
+export { generateProvenanceFiles } from "./generateFiles";
+export type { GenerateProvenanceFilesResult } from "./generateFiles";
 export { generateProvenanceScaffold, mergeScaffold } from "./generate";
 export type { GenerateDiagnostic, GenerateResult, MergeDiagnostic, MergeResult } from "./generate";
 // resolveProvenance / ResolveProvenanceResult are intentionally NOT re-exported — they are an internal shared step

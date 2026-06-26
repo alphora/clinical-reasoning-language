@@ -18,7 +18,7 @@ import { emitFhirDefFromPath } from "../fhir-emitter";
 import type { ImportDiagnostic } from "../imports/types";
 import { validateCRLImports } from "../imports/validate";
 import { tokenizeCRL, buildCRL, validateCRL, emitCQL } from "../index";
-import { validateProvenanceFiles } from "../provenance";
+import { validateProvenanceFiles, generateProvenanceFiles } from "../provenance";
 
 // Caps the CRL SOURCE (input) size. Response size scales with this — there is
 // no separate output cap, but bounding input keeps responses bounded enough.
@@ -601,7 +601,156 @@ export function createServer(): McpServer {
     (args) => runValidateProvenance(args as { artifact: string; cel: string; anchor: string }),
   );
 
+  server.registerTool(
+    "generate_provenance",
+    {
+      title: "Generate a provenance scaffold (Model A)",
+      description:
+        "Generate the structurally-derivable MAJORITY of a provenance artifact for a policy from its .cel + its " +
+        "canonical anchor-source .txt, leaving the KE only the source-attribution work. Resolves the .cel's CRL " +
+        "closure, builds one cluster per covered decision with provisional refs (nodeKind/ownership straight from the " +
+        "§5-authoritative index, so they pass V1/V2), and emits NO items — the source-attribution layer is the KE's. " +
+        "The anchor .txt is treated as ALREADY canonical: we hash its bytes (sha256) for anchorSource.textHash; we do " +
+        "NOT re-canonicalize a .docx here. Pass `existingArtifact` to MERGE the fresh scaffold onto a prior artifact " +
+        "(mergeScaffold — preserves the KE's items + linked refs, surfaces every broken link as a merge diagnostic). " +
+        "The anchor .txt is treated as ALREADY canonical: we hash its bytes (sha256) for anchorSource.textHash; we do " +
+        "NOT re-canonicalize a .docx here. Returns a SUMMARY envelope by default to keep tool output small: " +
+        "{ success, policyId, policyVersion, clusterCount, diagnosticCountsByKind, mergeDiagnosticCountsByKind? (only " +
+        "when merging), merged }. The `diagnostics`/`mergeDiagnostics` COUNTS describe the FRESH-scaffold worklist " +
+        "(the attribution + over-reach BASELINE); when `merged` is true they are the PRE-MERGE baseline, NOT the " +
+        "merged artifact's residual — run `validate_provenance` on the output for the residual. Pass " +
+        "`includeArtifact: true` to also receive the full `artifact` (use the `crl-generate-provenance` CLI's --out for " +
+        "the full body in scripts). Bad/missing/unreadable/oversized paths or an unresolved `covers` target → a tool " +
+        "error. NOTE: generate succeeding does NOT mean the artifact is complete — the diagnostics ARE the KE's worklist.",
+      inputSchema: {
+        cel: z
+          .string()
+          .min(1)
+          .describe("Absolute path to the policy .cel (imports walk to nearest package.json)."),
+        anchor: z
+          .string()
+          .min(1)
+          .describe(
+            "Absolute path to the canonical anchor-source .txt (already canonicalized; its bytes are hashed).",
+          ),
+        policyVersion: z
+          .string()
+          .optional()
+          .describe('Policy version stamped into the artifact (default "1").'),
+        existingArtifact: z
+          .string()
+          .optional()
+          .describe(
+            "Absolute path to an existing provenance artifact JSON to MERGE the fresh scaffold onto (mergeScaffold). Omit to emit a fresh scaffold.",
+          ),
+        includeArtifact: z
+          .boolean()
+          .optional()
+          .describe(
+            "Include the full `artifact` JSON in the result. Default false (summary only — use the CLI's --out for the full body).",
+          ),
+      },
+    },
+    (args) =>
+      runGenerateProvenance(
+        args as {
+          cel: string;
+          anchor: string;
+          policyVersion?: string;
+          existingArtifact?: string;
+          includeArtifact?: boolean;
+        },
+      ),
+  );
+
   return server;
+}
+
+/** Tally diagnostics by `kind` into a plain record (sorted-insertion is irrelevant for an object; JSON readers don't rely on key order). */
+function countsByKind(diags: ReadonlyArray<{ kind: string }>): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const d of diags) out[d.kind] = (out[d.kind] ?? 0) + 1;
+  return out;
+}
+
+function runGenerateProvenance(args: {
+  cel: string;
+  anchor: string;
+  policyVersion?: string;
+  existingArtifact?: string;
+  includeArtifact?: boolean;
+}): {
+  content: Array<{ type: "text"; text: string }>;
+  isError?: boolean;
+} {
+  // Required cel + anchor must be readable files (each ≤ MAX_INPUT_BYTES); the optional existingArtifact (when given)
+  // too. Mirrors runValidateProvenance's file checks + the other file-reading tools' size cap.
+  const toCheck: Array<[string, string]> = [
+    ["cel", args.cel],
+    ["anchor", args.anchor],
+  ];
+  if (args.existingArtifact) toCheck.push(["existingArtifact", args.existingArtifact]);
+  for (const [label, p] of toCheck) {
+    let stat;
+    try {
+      stat = statSync(p);
+    } catch {
+      return {
+        content: [{ type: "text", text: `${label} path "${p}" not readable.` }],
+        isError: true,
+      };
+    }
+    if (!stat.isFile()) {
+      return {
+        content: [{ type: "text", text: `${label} path "${p}" is not a file.` }],
+        isError: true,
+      };
+    }
+    if (stat.size > MAX_INPUT_BYTES) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `${label} file too large: ${stat.size} bytes > ${MAX_INPUT_BYTES}.`,
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+  try {
+    const r = generateProvenanceFiles(args.cel, args.anchor, {
+      ...(args.policyVersion !== undefined ? { policyVersion: args.policyVersion } : {}),
+      ...(args.existingArtifact !== undefined
+        ? { existingArtifactPath: args.existingArtifact }
+        : {}),
+    });
+    // SUMMARY by default (matches emit_crl_fhir / emit_cel / render_scenario): counts, not the full artifact. The
+    // diagnostic counts are the FRESH-scaffold BASELINE; when merged they are PRE-MERGE — steer to validate_provenance.
+    const summary = {
+      success: true,
+      policyId: r.policyId,
+      policyVersion: r.policyVersion,
+      clusterCount: r.artifact.clusters.length,
+      diagnosticCountsByKind: countsByKind(r.diagnostics),
+      ...(r.mergeDiagnostics !== undefined
+        ? { mergeDiagnosticCountsByKind: countsByKind(r.mergeDiagnostics) }
+        : {}),
+      merged: r.merged,
+      ...(r.merged
+        ? {
+            note: "diagnostics are the pre-merge baseline; run validate_provenance on the output for the merged residual.",
+          }
+        : {}),
+      ...(args.includeArtifact ? { artifact: r.artifact } : {}),
+    };
+    return { content: [{ type: "text", text: JSON.stringify(summary, null, 2) }] };
+  } catch (e) {
+    return {
+      content: [{ type: "text", text: `generate_provenance failed: ${(e as Error).message}` }],
+      isError: true,
+    };
+  }
 }
 
 function runValidateProvenance(args: { artifact: string; cel: string; anchor: string }): {
