@@ -41,9 +41,9 @@ The structural AST preserves the author's narrative as a token stream
 (`NarrativeClause.elements: NarrativeElement[]`). No pattern semantics
 applied yet; just lexical structure.
 
-- `inference "Foo": - <narrative phrase>.` → `Inference { name, body: NarrativeClause }`
-- `concept "Bar": ... inferred from "X".` → `Concept` with `InferredFromBareRef`
-- `concept "Baz": ... inferred from ( "A" sem-and "B" ).` → `Concept` with `InferredFromComposition` (sem-or/sem-and/sem-not tree over CompositionRef leaves)
+- `concept "Foo": ... definition is <narrative phrase>.` → `Concept` with `DefinitionIsDefinition` (body: `NarrativeClause`)
+- `concept "Bar": ... defined as "X".` → `Concept` with `DefinedAsBareRef`
+- `concept "Baz": ... defined as ( "A" sem-and "B" ).` → `Concept` with `DefinedAsComposition` (sem-or/sem-and/sem-not tree over CompositionRef leaves)
 
 **Why the structural AST stops here.** The narrative `<X> performed` could
 match many patterns until we consult the catalog. Keeping the structural form
@@ -81,10 +81,15 @@ The catalog's `CQL function` field maps each canonical pattern to a function
 in the shared `CRLCommon.cql` library. The emitter generates CQL calls:
 
 - `WasPerformed("BMI Evaluation Encounter")` → `CRLCommon.WasPerformed(<resolved expression for "BMI Evaluation Encounter">)`
-- Sem-composition (`sem-or` / `sem-and` / `sem-not`) emits as boolean CQL
-  combining the operand expressions.
-- Concept references resolve to their declared expression (an Inferred concept's
-  body becomes a CQL `define` block; Asserted concepts become valueset retrievals).
+- A `defined as` inference (`sem-or` / `sem-and` / `sem-not`) emits per the concept's
+  DECLARED `(type, valuetype)` — `union` / `intersect` / `except` for refinement results,
+  `exists(...)` + `and`/`or`/`not` when the result is boolean — NOT always boolean CQL. The
+  emitter bridges the common cases (notably a refinement operand in a boolean result, via
+  `exists(...)`); an unsupported boolean operand in a refinement result surfaces as a FIXME.
+  See `docs/defined-as-is-semantic-composition.md`.
+- Concept references resolve to their declared expression (a `defined as` / `definition is`
+  concept body becomes a CQL `define` block; asserted `coded from` / `code is` concepts become
+  valueset / local retrievals).
 
 ## Why three stages, not two
 

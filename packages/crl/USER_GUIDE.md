@@ -148,28 +148,29 @@ Must be a custom-defined type conforming to FHIR resource names.
 
 ### 4. Concept Statement
 
-Defines a reusable clinical concept. Must be either coded from a terminology or inferred from other concepts.
+Defines a reusable clinical concept. Its body is one of: `code is` (local-source query), `coded from` (external terminology query), `defined as` (sem-* **inference** over other concepts), or `definition is` (a narrative predicate matched against the catalog).
 
 ```crl
 concept "Most Recent BMI":
 - type is Observation.
-- value type is boolean.
+- value type is Quantity.
 - meta is `Some meta information`.
 - meta is `@ke-feedback: confirm the lookback window with the KE`.
 - evidence is `Calculated by Smile`.
-- inferred from "BMI".
-  - apply pattern `Most Recent(this, lookbackMonths)`.
+- definition is most recent "BMI".
 
 concept "BMI":
 - type is Observation.
 - value type is Quantity.
-- inferred from ("BMI Range as a Condition" or "BMI as an Observation" or "Calculated BMI").
+- defined as ( "BMI Range as a Condition" sem-or "BMI as an Observation" sem-or "Calculated BMI" ).
 
 concept "BMI Range as a Condition":
 - type is Condition.
 - value type is CodeableConcept.
 - coded from "BMI Range as a Condition".
 ```
+
+> `most recent "BMI"` selects the most recent BMI **Observation** (the `most recent` catalog selection pattern); `value type is Quantity` is that selected observation's value type. This is the short form — a measure may instead split it into a selection concept (`definition is most recent "BMI"`) plus a typed wrapper (`defined as "<selection>"`); see the corpus fixtures.
 
 #### Structure
 
@@ -180,15 +181,13 @@ concept "BMI Range as a Condition":
 - Optional:
   - One or more ``- meta is `Text`.`` lines
   - One ``- evidence is `Text`.`` line
-- Required: Either `- coded from` or one of the following `inferred from` forms:
-  - `- inferred from "Concept".`
-    - Optional: ``- apply pattern `PatternName`.`` (can repeat)
-  - `- inferred from ( ...logical expression... ).`
+- Required: a body — `- code is ` + a backtick-quoted code (local source); `- coded from "VS".` (external terminology); `- defined as ...` (sem-* inference); or `- definition is <narrative>.` (a catalog narrative predicate). (A concept may also carry trailing `- source representation ...` lines — the external multi-representation form, documented separately.)
 
-#### Inference
-- `inferred from "Concept".` — single concept reference
-- `inferred from ( ... )` — logical expression using `and`, `or`, `not`, parentheses, and concept references
-- `apply pattern` — can follow a single concept reference, and can be repeated
+#### Inference (`defined as`)
+- `defined as "Concept".` — a single concept reference (AST: `DefinedAsBareRef`)
+- `defined as ( ... )` — a parenthesized SEMANTIC expression using `sem-and` / `sem-or` / `sem-not`, parentheses, and concept references (AST: `DefinedAsComposition`)
+
+The `sem-*` operators are semantic-**inference** operators that normalize ONE concept's representations/components into one fact — NOT boolean logic, and NOT decision composition (combining a policy's distinct criteria — that is the decision tree's job). The author declares the result `(type, valuetype)`; operands need not type-check against each other. The narrative-predicate form `definition is <narrative>` (e.g. `most recent "X"`, `has "X"`, `"X" at least N`) covers the catalog patterns that the removed `apply pattern` syntax used to express.
 
 #### Metadata annotations (`@tag` convention)
 
@@ -204,7 +203,7 @@ End the line with a `.` **after** the closing backtick (not inside it): `- meta 
 
 The tag vocabulary, value shapes, and cardinality are defined in the [metadata registry](./spec/metadata-registry.json) and enforced by the Validator; see the [metadata model](./spec/metadata-model.md) for the full set of tags. This model is in design (draft); the convention parses today.
 
-> **Important:** `apply pattern` can **only** follow single concept inference (not logical expressions).
+> **Note:** the catalog narrative patterns (`most recent`, `has`, `at least`, `during`, …) are written with the `- definition is <narrative>.` body form — they replaced the removed `apply pattern` syntax.
 
 #### Documenting status assertions — use `has <X>`, not bare `documented <X>`
 
@@ -239,23 +238,25 @@ CRL's quantity grammar requires a UCUM unit on every numeric literal — this me
 
 See issue [#95](https://github.com/alphora/clinical-reasoning-language/issues/95) for tracking.
 
-#### Logical Expressions
+#### Inference expressions (`sem-*`)
+
+A `defined as` body is a tree of `sem-and` / `sem-or` / `sem-not` over concept references (these are SEMANTIC inference operators, not boolean `and`/`or`/`not`):
 
 ```crl
-- inferred from (
+- defined as (
     (
-        ("a" and "b")
-        or (
-            ("c" and "d")
-            and not ("e" or "f")
+        ("a" sem-and "b")
+        sem-or (
+            ("c" sem-and "d")
+            sem-and sem-not ("e" sem-or "f")
         )
     )
-    or (
-        ("x" or "y")
-        and "z"
+    sem-or (
+        ("x" sem-or "y")
+        sem-and "z"
     )
-    or "k"
-    or "l"
+    sem-or "k"
+    sem-or "l"
 ).
 ```
 
@@ -923,7 +924,7 @@ The union of concept value types and concept types. v2.2.0 deliberately omits `P
 
 ## Keywords and Tokens
 
-- **Keywords:** `library`, `include`, `as`, `decision`, `terminology`, `activity`, `concept`, `parameter`, `when`, `then`, `recommend activity`, `use decision`, `request`, `with`, `because`, `type is`, `value type is`, `param type is`, `evidence is`, `meta is`, `coded from`, `defined as`, `definition is`, `apply pattern`, `system is`, `code is`, `valueset is`, `any:`, `all:`, `do not perform`, `not`, `and`, `or`, `sem-and`, `sem-or`, `sem-not`, `end when`, `:` (colon), `.` (dot), `-` (dash), `(` (left paren), `)` (right paren)
+- **Keywords:** `library`, `include`, `as`, `decision`, `terminology`, `activity`, `concept`, `parameter`, `when`, `then`, `recommend activity`, `use decision`, `request`, `with`, `because`, `type is`, `value type is`, `param type is`, `evidence is`, `meta is`, `coded from`, `defined as`, `definition is`, `system is`, `code is`, `valueset is`, `any:`, `all:`, `do not perform`, `not`, `and`, `or`, `sem-and`, `sem-or`, `sem-not`, `end when`, `:` (colon), `.` (dot), `-` (dash), `(` (left paren), `)` (right paren)
 - **Identifiers:** Double-quoted strings
 - **Free text/markdown:** Backtick-quoted strings
 - **Comments:** `// ...` or `/* ... */`
@@ -938,7 +939,7 @@ The union of concept value types and concept types. v2.2.0 deliberately omits `P
 - **Quoted Strings:** No escape characters allowed
 - **Meta Lines:** Multiple `meta is` lines allowed per concept
 - **Evidence Line:** Only one `evidence is` line per concept
-- **Pattern Application:** Allowed only after single concept references
+- **Inference body:** `defined as` (a `sem-and`/`sem-or`/`sem-not` tree) or `definition is` (a catalog narrative predicate — the form that replaced the removed `apply pattern`)
 - **Terminology Entries:** Can have multiple valuesets and system/code pairs
 - **Activity Types:** Must be selected from valid resource types
 - **Block Qualifiers:** `any:` and `all:` are optional (default is `any:`)
