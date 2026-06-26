@@ -33,6 +33,7 @@ import type {
   Cluster,
   CrlNodeRef,
   CrlRelation,
+  Item,
   ProvenanceArtifact,
 } from "./artifact";
 import { PROVENANCE_SCHEMA_VERSION } from "./artifact";
@@ -601,4 +602,334 @@ function sortCelRefs(refs: CelNodeRef[]): CelNodeRef[] {
     return a.relation < b.relation ? -1 : a.relation > b.relation ? 1 : 0;
   });
   return unique;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// mergeScaffold — re-run a scaffold over an EDITED policy WITHOUT clobbering the KE's hand-attribution.
+//
+// A re-generation (`fresh` = a brand-new scaffold: items:[], every ref status:"provisional") would otherwise overwrite
+// the KE's authored items + edited ref statuses/relations/relink-hints. mergeScaffold overlays `fresh`'s up-to-date
+// STRUCTURE (the cluster set, each ref's identity + nodeKind/ownership/nodeId straight from the §5-authoritative index)
+// onto `previous`'s preserved WORK (items, ignoredRanges, item↔cluster links, KE-edited ref status/relation/relinkHints),
+// and surfaces every place the edit broke a link as a structured diagnostic (never a silent drop). Pure + headless.
+//
+// Two contracts worth stating:
+//  - IMMUTABILITY: the KE-authored layers (items, ignoredRanges, surviving cluster item-lists) are shallow-COPIED into the
+//    result, but ref objects taken from `fresh` are shared by reference. Treat `previous`, `fresh`, AND the returned
+//    artifact as immutable — don't mutate one and expect the others untouched.
+//  - needs-relink + the validator: a KE-linked CRL/CEL ref whose node VANISHED from the regenerated structure is kept as
+//    `status:"needs-relink"` (preserving the KE's relation/relinkHints for an §8 repair) rather than dropped. That ref no
+//    longer resolves in the index, so `validateProvenance` will (correctly) report `unresolved-ref` for it — that finding
+//    IS the "this link needs repair" signal, complementing the merge's `needs-relink` diagnostic. Softening the validator
+//    for needs-relink is a deferred follow-on, not part of T2.
+// ══════════════════════════════════════════════════════════════════════════════
+
+export interface MergeDiagnostic {
+  kind:
+    | "source-changed"
+    | "added-node"
+    | "removed-node"
+    | "needs-relink"
+    | "orphaned-cluster"
+    | "orphaned-link"
+    | "dangling-item-id"
+    | "relation-changed";
+  message: string;
+  cluster?: string; // cluster id
+  surface?: "crl" | "cel";
+  nodeKey?: string; // crl ref key
+  caseId?: string; // cel ref key
+  itemIds?: string[]; // orphaned-cluster / orphaned-link
+}
+
+export interface MergeResult {
+  artifact: ProvenanceArtifact;
+  diagnostics: MergeDiagnostic[];
+}
+
+/** A ref is "KE-touched" iff the KE moved it off the scaffold default — status flipped off "provisional", OR a relink
+ *  hint was attached. A fresh scaffold ref (always status:"provisional", no relinkHints) is never KE-touched. */
+function crlTouched(ref: CrlNodeRef): boolean {
+  return ref.status !== "provisional" || (ref.relinkHints !== undefined && ref.relinkHints.length > 0);
+}
+/** CEL refs carry no relinkHints, so KE-touched is purely "status !== provisional" (a changed relation rides on the same
+ *  ref the KE re-statused; the spec keys cel survival on (file,kind,caseId) and preserves relation when KE-touched). */
+function celTouched(ref: CelNodeRef): boolean {
+  return ref.status !== "provisional";
+}
+
+/** CEL ref identity key — (file, kind, caseId), NOT relation (a KE relation override must survive a fresh re-derivation
+ *  that picks a different relation for the same case). Mirrors the spec's cel survive/add/drop key. */
+const celKey = (r: CelNodeRef): string => JSON.stringify([r.file, r.kind, r.caseId]);
+
+export function mergeScaffold(previous: ProvenanceArtifact, fresh: ProvenanceArtifact): MergeResult {
+  const diagnostics: MergeDiagnostic[] = [];
+
+  // ── Rule 1: envelope from `fresh`; anchorSource kept from `previous` on a hash drift (so the validator keeps emitting
+  //    anchor-hash-drift durably + the existing sourceRefs stay valid against the text they were authored on — the
+  //    re-anchor to the new source is a DEFERRED, separate step). ──
+  let anchorSource = fresh.anchorSource;
+  if (previous.anchorSource.textHash !== fresh.anchorSource.textHash) {
+    anchorSource = previous.anchorSource; // keep the old anchor; do NOT strip sourceRefs
+    diagnostics.push({
+      kind: "source-changed",
+      message: `anchor source changed (previous textHash ${previous.anchorSource.textHash} != fresh ${fresh.anchorSource.textHash}); keeping the previous anchorSource so existing sourceRefs stay valid — re-anchoring is deferred.`,
+    });
+  }
+
+  // ── Rule 2: items + ignoredRanges are pure KE-authored layers — taken from `previous` (shallow-copied so a caller that
+  //    mutates the result can't alias back into `previous`; the per-item objects are still shared — see the header). ──
+  const items: Item[] = [...previous.items];
+  const itemIds = new Set(items.map((it) => it.id));
+
+  // Index previous clusters by id for the per-fresh-cluster overlay below.
+  const prevById = new Map(previous.clusters.map((c) => [c.id, c]));
+  const freshIds = new Set(fresh.clusters.map((c) => c.id));
+
+  // Track, across all SURVIVING output clusters, which item ids end up linked somewhere (for the §3-cover orphan test in
+  // Rule 4: an item that still appears in a surviving cluster is NOT orphaned even if a now-removed cluster also held it).
+  const itemsInSurvivingClusters = new Set<string>();
+
+  // ── Rule 3: one output cluster per FRESH cluster (fresh is the up-to-date decision set). ──
+  const mergedClusters: Cluster[] = fresh.clusters.map((freshC) => {
+    const prevC = prevById.get(freshC.id);
+
+    // items[]: the KE's item↔cluster links from the previous same-id cluster ([] for a brand-new decision), copied.
+    const clusterItems = prevC ? [...prevC.items] : [];
+    for (const id of clusterItems) itemsInSurvivingClusters.add(id);
+
+    // Rule 5: a cluster.items id with no backing item in `previous.items` is dangling (an item was deleted out from under
+    // the link). One diagnostic per offending id, scoped to this cluster.
+    for (const id of clusterItems) {
+      if (!itemIds.has(id)) {
+        diagnostics.push({
+          kind: "dangling-item-id",
+          message: `cluster ${freshC.id} links item "${id}" which is not present in items[] (the item was removed).`,
+          cluster: freshC.id,
+          itemIds: [id],
+        });
+      }
+    }
+
+    const crl = mergeCrlRefs(freshC, prevC, diagnostics);
+    const cel = mergeCelRefs(freshC, prevC, diagnostics);
+
+    return { id: freshC.id, label: freshC.label, items: clusterItems, crl, cel };
+  });
+
+  // ── Rule 4: a PREVIOUS cluster with no fresh match (the decision was removed or renamed) — emit an orphaned-cluster
+  //    diagnostic. We do NOT add a phantom cluster (fresh is authoritative for the decision set). The orphaned itemIds are
+  //    the cluster's items that appear in NO surviving output cluster (clusters are a COVER, so an item that also lives in
+  //    a surviving cluster is not orphaned), PLUS any authored item whose `supports.cluster` named this now-gone cluster
+  //    (its `supports` is now dangling → validator V7). ──
+  for (const prevC of previous.clusters) {
+    if (freshIds.has(prevC.id)) continue;
+    const orphanedIds = new Set<string>();
+    for (const id of prevC.items) {
+      if (!itemsInSurvivingClusters.has(id)) orphanedIds.add(id);
+    }
+    for (const it of items) {
+      if (it.origin === "authored" && it.supports?.cluster === prevC.id) orphanedIds.add(it.id);
+    }
+    diagnostics.push({
+      kind: "orphaned-cluster",
+      message: `cluster ${prevC.id} no longer corresponds to any decision (removed or renamed); its links + any authored \`supports\` on it are dangling.`,
+      cluster: prevC.id,
+      itemIds: [...orphanedIds].sort(),
+    });
+  }
+
+  // ── Rule 6: deterministic cluster order by id. ──
+  mergedClusters.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+
+  const artifact: ProvenanceArtifact = {
+    schemaVersion: fresh.schemaVersion,
+    policyId: fresh.policyId,
+    policyVersion: fresh.policyVersion,
+    anchorSource,
+    items,
+    ignoredRanges: [...previous.ignoredRanges],
+    clusters: mergedClusters,
+  };
+
+  return { artifact, diagnostics };
+}
+
+/** Rule 3 crl[] overlay for one cluster: survive/add/drop by nodeKey, preserving KE work; sorted by nodeKey. */
+function mergeCrlRefs(
+  freshC: Cluster,
+  prevC: Cluster | undefined,
+  diagnostics: MergeDiagnostic[],
+): CrlNodeRef[] {
+  const prevByKey = new Map((prevC?.crl ?? []).map((r) => [nodeKey(r), r]));
+  const freshKeys = new Set(freshC.crl.map((r) => nodeKey(r)));
+  const out: CrlNodeRef[] = [];
+
+  // fresh refs: survivors (with a previous match) + fresh-only additions.
+  for (const f of freshC.crl) {
+    const key = nodeKey(f);
+    const p = prevByKey.get(key);
+    if (!p) {
+      // fresh-only: a node the edit ADDED. Keep the fresh (provisional) ref + surface it for the KE.
+      out.push(f);
+      diagnostics.push({
+        kind: "added-node",
+        message: `cluster ${freshC.id}: new CRL node ${key} appeared (needs attribution).`,
+        cluster: freshC.id,
+        surface: "crl",
+        nodeKey: key,
+      });
+      continue;
+    }
+    // Preserve the previous ref if the KE touched it OR if its relation diverges from fresh's re-derived suggestion (a
+    // relation-only edit leaves status "provisional", so a touched-by-status check alone would SILENTLY lose it). Keeping a
+    // provisional ref's relation is harmless to coverage (only "linked" refs count) and the relation-changed diagnostic
+    // surfaces every divergence so a genuine structural relation change isn't hidden either.
+    const preserve = crlTouched(p) || p.relation !== f.relation;
+    if (preserve) {
+      // Keep the KE's status/relation/relinkHints; refresh identity + structural fields (lib/kind/name/nodeId/nodeKind/
+      // ownership) from `fresh` — NEVER overlay nodeKind/ownership (the index is the §5 authority).
+      out.push({
+        lib: f.lib,
+        kind: f.kind,
+        name: f.name,
+        ...(f.nodeId !== undefined ? { nodeId: f.nodeId } : {}),
+        nodeKind: f.nodeKind,
+        ownership: f.ownership,
+        relation: p.relation,
+        status: p.status,
+        ...(p.relinkHints !== undefined ? { relinkHints: p.relinkHints } : {}),
+      });
+      if (f.relation !== p.relation) {
+        diagnostics.push({
+          kind: "relation-changed",
+          message: `cluster ${freshC.id}: CRL node ${key} relation differs (previous "${p.relation}", fresh suggests "${f.relation}"); kept the previous relation (load-bearing via DECISION_RELATIONS).`,
+          cluster: freshC.id,
+          surface: "crl",
+          nodeKey: key,
+        });
+      }
+    } else {
+      // a stale scaffold suggestion the KE never touched + the same relation → take the fresh ref entirely (refresh it).
+      out.push(f);
+    }
+  }
+
+  // previous-only refs: a node the KE had that the edit REMOVED from this cluster (the CRL node vanished).
+  for (const p of prevC?.crl ?? []) {
+    const key = nodeKey(p);
+    if (freshKeys.has(key)) continue;
+    if (crlTouched(p)) {
+      // KE invested in it → keep it as needs-relink (preserve relation + relinkHints) rather than silently dropping the
+      // KE's work; surface the relink + flag the items linked through this cluster (they may have lost their link).
+      out.push({
+        lib: p.lib,
+        kind: p.kind,
+        name: p.name,
+        ...(p.nodeId !== undefined ? { nodeId: p.nodeId } : {}),
+        nodeKind: p.nodeKind,
+        ownership: p.ownership,
+        relation: p.relation,
+        status: "needs-relink",
+        ...(p.relinkHints !== undefined ? { relinkHints: p.relinkHints } : {}),
+      });
+      diagnostics.push({
+        kind: "needs-relink",
+        message: `cluster ${freshC.id}: CRL node ${key} (KE-linked) no longer exists in the regenerated structure; marked needs-relink.`,
+        cluster: freshC.id,
+        surface: "crl",
+        nodeKey: key,
+      });
+      diagnostics.push({
+        kind: "orphaned-link",
+        // No item↔ref edge exists in the schema (the cluster is the unit), so we can't say WHICH item used the vanished
+        // node — every item in this cluster may need review.
+        message: `cluster ${freshC.id}: CRL node ${key} vanished; all items in this cluster may need review for a lost decision link.`,
+        cluster: freshC.id,
+        itemIds: [...(prevC?.items ?? [])].sort(),
+      });
+    } else {
+      // a stale provisional suggestion the KE never touched → drop it; surface as removed-node.
+      diagnostics.push({
+        kind: "removed-node",
+        message: `cluster ${freshC.id}: provisional CRL node ${key} no longer exists in the regenerated structure; dropped.`,
+        cluster: freshC.id,
+        surface: "crl",
+        nodeKey: key,
+      });
+    }
+  }
+
+  out.sort((a, b) => (nodeKey(a) < nodeKey(b) ? -1 : nodeKey(a) > nodeKey(b) ? 1 : 0));
+  return out;
+}
+
+/** Rule 3 cel[] overlay for one cluster: same survive/add/drop logic, keyed on (file,kind,caseId) — NOT relation; sorted
+ *  by (file,caseId,relation) via the generator's sortCelRefs (reused for byte-identical order). */
+function mergeCelRefs(
+  freshC: Cluster,
+  prevC: Cluster | undefined,
+  diagnostics: MergeDiagnostic[],
+): CelNodeRef[] {
+  const prevByKey = new Map((prevC?.cel ?? []).map((r) => [celKey(r), r]));
+  const freshKeys = new Set(freshC.cel.map((r) => celKey(r)));
+  const out: CelNodeRef[] = [];
+
+  for (const f of freshC.cel) {
+    const key = celKey(f);
+    const p = prevByKey.get(key);
+    if (!p) {
+      out.push(f);
+      diagnostics.push({
+        kind: "added-node",
+        message: `cluster ${freshC.id}: new CEL case ref ${f.caseId} appeared (needs review).`,
+        cluster: freshC.id,
+        surface: "cel",
+        caseId: f.caseId,
+      });
+      continue;
+    }
+    // Preserve on KE-touch OR relation divergence (a relation-only edit leaves status "provisional" — a status-only check
+    // would silently lose it). The key ignores relation, so a fresh re-derivation that picks a different relation for the
+    // same case must not clobber the KE's override. Identity (file/kind/caseId) from fresh.
+    if (celTouched(p) || p.relation !== f.relation) {
+      out.push({ file: f.file, kind: f.kind, caseId: f.caseId, relation: p.relation, status: p.status });
+      if (f.relation !== p.relation) {
+        diagnostics.push({
+          kind: "relation-changed",
+          message: `cluster ${freshC.id}: CEL case ${f.caseId} relation differs (previous "${p.relation}", fresh suggests "${f.relation}"); kept the previous relation.`,
+          cluster: freshC.id,
+          surface: "cel",
+          caseId: f.caseId,
+        });
+      }
+    } else {
+      out.push(f); // stale provisional suggestion + same relation → refresh from fresh.
+    }
+  }
+
+  for (const p of prevC?.cel ?? []) {
+    const key = celKey(p);
+    if (freshKeys.has(key)) continue;
+    if (celTouched(p)) {
+      out.push({ ...p, status: "needs-relink" });
+      diagnostics.push({
+        kind: "needs-relink",
+        message: `cluster ${freshC.id}: CEL case ${p.caseId} (KE-linked) no longer regenerates here; marked needs-relink.`,
+        cluster: freshC.id,
+        surface: "cel",
+        caseId: p.caseId,
+      });
+    } else {
+      diagnostics.push({
+        kind: "removed-node",
+        message: `cluster ${freshC.id}: provisional CEL case ${p.caseId} no longer regenerates here; dropped.`,
+        cluster: freshC.id,
+        surface: "cel",
+        caseId: p.caseId,
+      });
+    }
+  }
+
+  return sortCelRefs(out);
 }

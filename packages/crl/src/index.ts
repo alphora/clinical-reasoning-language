@@ -87,6 +87,7 @@ export {
   classifyConcept,
   buildConceptContainment,
   generateProvenanceScaffold,
+  mergeScaffold,
   decisionSpine,
   nodeKey,
 } from "./provenance";
@@ -121,6 +122,8 @@ export type {
   CockpitModel,
   GenerateDiagnostic,
   GenerateResult,
+  MergeDiagnostic,
+  MergeResult,
 } from "./provenance";
 
 export { validateCEL, validateCELFile } from "./cel/validator";

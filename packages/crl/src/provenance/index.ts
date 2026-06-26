@@ -57,8 +57,8 @@ export type {
 } from "./validators";
 export { validateProvenanceFiles } from "./validateFiles";
 export type { ValidateProvenanceFilesResult } from "./validateFiles";
-export { generateProvenanceScaffold } from "./generate";
-export type { GenerateDiagnostic, GenerateResult } from "./generate";
+export { generateProvenanceScaffold, mergeScaffold } from "./generate";
+export type { GenerateDiagnostic, GenerateResult, MergeDiagnostic, MergeResult } from "./generate";
 // resolveProvenance / ResolveProvenanceResult are intentionally NOT re-exported — they are an internal shared step
 // (consumed by correspondence.ts via a relative import); keeping the large intermediate shape out of the package API.
 export { buildCorrespondenceModel } from "./correspondence";

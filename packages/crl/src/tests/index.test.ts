@@ -36,3 +36,4 @@ import "../provenance/tests/validators.test";
 import "../provenance/tests/correspondence.test";
 import "../provenance/tests/crlStructure.test";
 import "../provenance/tests/generate.test";
+import "../provenance/tests/merge.test";
