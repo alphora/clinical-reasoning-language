@@ -62,8 +62,8 @@ try {
     assert.ok(Array.isArray(kit.typeAllowlist.conceptTypes) && kit.typeAllowlist.conceptTypes.includes("Condition"));
     const refNames = kit.referenceArtifacts.map((a) => a.name).sort();
     assert.deepEqual(refNames, [
-      "composition-reference.cel",
-      "composition-reference.crl",
+      "criteria-decision-reference.cel",
+      "criteria-decision-reference.crl",
       "decision-reference.cel",
       "decision-reference.crl",
       "medical-policy-determination.crl",
@@ -71,7 +71,7 @@ try {
       "pa-determination-reference.crl",
     ]);
     assert.ok(kit.verifyLoop.doesNotProve.length > 0, "verifyLoop must state what a green run does NOT prove");
-    // `defined as` composition is in-scope this stage (#126); predicates/external out.
+    // `defined as` inference is in-scope this stage (#126, #168); predicates/external out.
     const scopeOf = (frag) => kit.conceptLayerModel.find((e) => e.form.includes(frag))?.scope;
     assert.equal(scopeOf("defined as"), "in");
     assert.equal(scopeOf("definition is"), "out");

@@ -14,8 +14,8 @@ import type { DecisionShapeError } from "../../validator/validator";
 import { Validator } from "../../validator/validator";
 
 import {
-  COMPOSITION_REFERENCE_CEL,
-  COMPOSITION_REFERENCE_CRL,
+  CRITERIA_DECISION_REFERENCE_CEL,
+  CRITERIA_DECISION_REFERENCE_CRL,
   DECISION_REFERENCE_CEL,
   DECISION_REFERENCE_CRL,
   MEDICAL_POLICY_DETERMINATION_CRL,
@@ -81,49 +81,60 @@ describe("authoring-kit — reference artifacts", () => {
     expect(crlErrors(MEDICAL_POLICY_DETERMINATION_CRL)).toEqual([]);
   });
 
-  it("composition-reference.crl is shape-clean; only the shared-lib determination refs flag single-file", () => {
+  it("criteria-decision-reference.crl is shape-clean; only the shared-lib determination refs flag single-file", () => {
     // The determination now lives in the shared "Medical Policy Determination" lib (qualified ref). Single-file
     // (no sibling context) the validator flags the two Approve/Deny refs `external-library-not-included` — no
     // shape/parse errors. With the vendored sibling present it validates fully clean (materialized test below).
-    const errs = crlErrors(COMPOSITION_REFERENCE_CRL);
+    const errs = crlErrors(CRITERIA_DECISION_REFERENCE_CRL);
     const ext = errs.filter((e) => e.kind === "external-library-not-included");
-    expect(ext.length).toBe(2); // the two shared-lib determination refs (Approve, Deny)
+    expect(ext.length).toBe(3); // the three shared-lib determination refs (Approve, + Deny at each otherwise)
     expect(errs.length).toBe(ext.length); // ...and NOTHING else — no shape/parse error
     expect(ext.every((e) => (e.message ?? "").includes("Medical Policy Determination"))).toBe(true);
   });
 
-  it("composition-reference.cel + .crl: validate clean and the CRE evaluates the composition (real path, shared determination lib)", () => {
-    const dir = mkdtempSync(join(tmpdir(), "authoring-kit-comp-"));
+  it("criteria-decision-reference.cel + .crl: validates clean; the CRE proves criteria-as-NODES + the `defined as` inference (#168)", () => {
+    const dir = mkdtempSync(join(tmpdir(), "authoring-kit-criteria-"));
     writeFileSync(
       join(dir, "package.json"),
       JSON.stringify({
-        name: "authoring-kit-composition-reference",
+        name: "authoring-kit-criteria-decision-reference",
         version: "1.0.0",
         private: true,
         crl: {
-          canonicalBase: "http://example.org/authoring-kit-composition-reference",
+          canonicalBase: "http://example.org/authoring-kit-criteria-decision-reference",
           status: "draft",
           experimental: true,
         },
       }),
     );
-    writeFileSync(join(dir, "composition-reference.crl"), COMPOSITION_REFERENCE_CRL);
+    writeFileSync(join(dir, "criteria-decision-reference.crl"), CRITERIA_DECISION_REFERENCE_CRL);
     // The determination activities live in the shared lib, resolved as a vendored sibling (no `include`).
     writeFileSync(join(dir, "medical-policy-determination.crl"), MEDICAL_POLICY_DETERMINATION_CRL);
-    const celPath = join(dir, "composition-reference.cel");
-    writeFileSync(celPath, COMPOSITION_REFERENCE_CEL);
+    const celPath = join(dir, "criteria-decision-reference.cel");
+    writeFileSync(celPath, CRITERIA_DECISION_REFERENCE_CEL);
 
     const v = validateCELFile(celPath);
     expect(v.errors).toEqual([]);
 
     const run = runCel(resolveCelImports(celPath));
     expect(run.success).toBe(true);
-    expect(run.runs.length).toBe(4); // both-met→approve; drop-failed-therapy→deny; drop-diagnosis→deny; otherwise→deny
+    expect(run.runs.length).toBe(4); // drug→approve; PT→approve (inference); no-therapy→deny (crit-2 node); no-dx→deny (crit-1 node)
     expect(run.runs.every((r) => r.status === "pass")).toBe(true);
-    // The composite is satisfied via composition (not a direct fact).
-    const canary = run.runs.find((r) => r.case.startsWith("both criteria met"))!;
-    const node = canary.trace.find((n) => n.concept === "Meets Coverage Criteria")!;
-    expect(node.composition?.satisfied).toBe(true);
+    // The `defined as` INFERENCE resolves on EITHER representation: the physical-therapy case satisfies
+    // "Failed Conservative Therapy" through the sem-or (not a direct fact) — proving one criterion, two representations.
+    // criterion-2 is a NESTED `when` node (under criterion-1), so recurse the trace tree to find it.
+    type TNode = { concept?: string; composition?: { satisfied: boolean }; children?: TNode[] };
+    const findByConcept = (nodes: TNode[], c: string): TNode | undefined => {
+      for (const n of nodes) {
+        if (n.concept === c) return n;
+        const hit = n.children && findByConcept(n.children, c);
+        if (hit) return hit;
+      }
+      return undefined;
+    };
+    const canary = run.runs.find((r) => r.case.includes("physical therapy"))!;
+    const node = findByConcept(canary.trace as TNode[], "Failed Conservative Therapy")!;
+    expect(node.composition?.satisfied).toBe(true); // the nested criterion-2 node resolved via the sem-or inference
   });
 
   it("pa-determination-reference.cel + .crl: validate clean and both cases pass via the shared determination lib (real path)", () => {
@@ -186,12 +197,12 @@ describe("authoring-kit — getAuthoringKit", () => {
     }
   });
 
-  it("embeds the reference artifacts inline (decision + composition + shared determination lib + PA)", () => {
+  it("embeds the reference artifacts inline (decision + criteria-decision + shared determination lib + PA)", () => {
     const kit = getAuthoringKit();
     const names = kit.referenceArtifacts.map((a) => a.name).sort();
     expect(names).toEqual([
-      "composition-reference.cel",
-      "composition-reference.crl",
+      "criteria-decision-reference.cel",
+      "criteria-decision-reference.crl",
       "decision-reference.cel",
       "decision-reference.crl",
       "medical-policy-determination.crl",
@@ -201,20 +212,46 @@ describe("authoring-kit — getAuthoringKit", () => {
     const src = (n: string) => kit.referenceArtifacts.find((a) => a.name === n)?.source;
     expect(src("decision-reference.crl")).toBe(DECISION_REFERENCE_CRL);
     expect(src("decision-reference.cel")).toBe(DECISION_REFERENCE_CEL);
-    expect(src("composition-reference.crl")).toBe(COMPOSITION_REFERENCE_CRL);
-    expect(src("composition-reference.cel")).toBe(COMPOSITION_REFERENCE_CEL);
+    expect(src("criteria-decision-reference.crl")).toBe(CRITERIA_DECISION_REFERENCE_CRL);
+    expect(src("criteria-decision-reference.cel")).toBe(CRITERIA_DECISION_REFERENCE_CEL);
     expect(src("medical-policy-determination.crl")).toBe(MEDICAL_POLICY_DETERMINATION_CRL);
     expect(src("pa-determination-reference.crl")).toBe(PA_DETERMINATION_REFERENCE_CRL);
     expect(src("pa-determination-reference.cel")).toBe(PA_DETERMINATION_REFERENCE_CEL);
   });
 
-  it("conceptLayerModel marks `defined as` composition IN scope; predicates/external OUT", () => {
+  it("conceptLayerModel marks `defined as` inference IN scope; predicates/external OUT", () => {
     const kit = getAuthoringKit();
     const byForm = (frag: string) => kit.conceptLayerModel.find((e) => e.form.includes(frag))!;
     expect(byForm("code is").scope).toBe("in");
     expect(byForm("defined as").scope).toBe("in");
     expect(byForm("definition is").scope).toBe("out");
     expect(byForm("source representation").scope).toBe("out");
+    // #168: `defined as` is framed as INFERENCE (one concept), and explicitly disclaims DECISION composition.
+    // Assert the disclaimer is PRESENT (catch the class, not one stale phrasing) + the summary doesn't relapse.
+    expect(byForm("defined as").meaning).toMatch(/inference/i);
+    expect(byForm("defined as").meaning).toMatch(/not.{0,20}composition|never combines distinct/i);
+    expect(getAuthoringKit().summary).not.toMatch(/boolean composition|local composition/i);
+  });
+
+  it("the exemplar models criteria as nested `when` NODES, not a fused `defined as` composite (#168)", () => {
+    // The structural half of #168: a regression that collapsed the two criteria back into one `Criteria Met`
+    // composite would still run 4/pass, so assert the SHAPE — criterion-2 is a real `when` NESTED under criterion-1.
+    const ast = parseInput(CRITERIA_DECISION_REFERENCE_CRL) as any;
+    const decision = ast.statements.find((s: any) => s.type === "Decision");
+    expect(decision).toBeDefined();
+    const whens = (body: any) => (body?.statements ?? []).filter((s: any) => s.type === "WhenBlock");
+    const crit1 = whens(decision.body)[0];
+    expect(crit1).toBeDefined(); // criterion-1 is a top-level `when` node
+    expect(whens(crit1.body).length).toBeGreaterThanOrEqual(1); // criterion-2 is a NESTED `when` node (not a composite)
+  });
+
+  it("the decision-composition rule (#168) teaches: distinct criteria go in the decision TREE, not `defined as`", () => {
+    const rule = getAuthoringKit().rules.find((r) => r.id === "decision-composition");
+    expect(rule).toBeDefined();
+    expect(rule!.rule).toMatch(/nested `when`|decision (STRUCTURE|tree)/i);
+    expect(rule!.rule).toMatch(/use decision/);
+    expect(rule!.rule).toMatch(/never|not a `defined as`|HIDES/i); // the anti-pattern is called out
+    expect(rule!.category).toBe("decision-shape");
   });
 
   it("verifyLoop is honest about what a green run does and does not prove", () => {
@@ -229,9 +266,10 @@ describe("authoring-kit — getAuthoringKit", () => {
     expect(a.contentHash).toMatch(/^[0-9a-f]{64}$/);
     expect(a.contentHash).toBe(b.contentHash);
     // Pinned snapshot — any payload byte change must update this deliberately.
-    // Re-pinned for #167: pa-disposition-set is now purely structural (names no activities) + the kit's two
-    // crl-content references genericized to "content project" (customer/deployment-agnostic). schemaVersion unchanged.
-    expect(a.contentHash).toBe("21b2c59a7ff992f1174fa024a0db3363df72acbd51d345bc865418b613032ab1");
+    // Re-pinned for #168: `defined as` reframed as INFERENCE (not composition); composition-reference exemplar
+    // reworked → criteria-decision-reference (criteria as nested `when` nodes + one real inference); new
+    // decision-composition rule. schemaVersion unchanged (content change, not shape).
+    expect(a.contentHash).toBe("36a2fd5a562ac8163a063556998bb753ae9dbe3eacfa5f7c4a439f0fb53c5b28");
   });
 
   it("STAGES contains exactly the one Stage-1 slice", () => {

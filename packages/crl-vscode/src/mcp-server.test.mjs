@@ -60,8 +60,8 @@ try {
     assert.match(kit.contentHash, /^[0-9a-f]{64}$/);
     // Durable guard that the bundled server carries the full #134 kit (not just a grep) — the 7-artifact set.
     assert.deepEqual(kit.referenceArtifacts.map((a) => a.name).sort(), [
-      "composition-reference.cel",
-      "composition-reference.crl",
+      "criteria-decision-reference.cel",
+      "criteria-decision-reference.crl",
       "decision-reference.cel",
       "decision-reference.crl",
       "medical-policy-determination.crl",

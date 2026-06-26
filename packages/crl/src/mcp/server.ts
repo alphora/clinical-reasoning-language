@@ -498,7 +498,7 @@ export function createServer(): McpServer {
         "`result is` oracle — the CRL Clinical Reasoning Engine (#115), an authoring-time interpreter " +
         "(NOT the FHIR/CQL engine). Pass `path` (an absolute .cel file path); the resolver walks to the " +
         "nearest package.json to load the covered CRL closure. A concept is satisfied when a case fact is " +
-        "`defined by` it (asserted) OR its `defined as` composition (sem-and/sem-or/sem-not, closed-world) " +
+        "`defined by` it (asserted) OR its `defined as` inference (sem-and/sem-or/sem-not over one concept's representations, closed-world) " +
         "evaluates true (#126); it walks the full decision shape (first:/all:/any:/otherwise + " +
         "`unless`/`only when` guards) and a decision-leaf `result is` passes iff the expected branch is " +
         "in the produced recommendation set. Returns { success, caseCount, passCount, failCount, " +
@@ -557,14 +557,14 @@ export function createServer(): McpServer {
         "CRL artifact for a given stage: the concept-layer model, authoring rules (decision shapes, guards, " +
         "dispositions incl. PA Approve/Deny determination handling, CEL cases, the verify loop), the grammar " +
         "type allowlists (full + a stage-recommended subset), seven validated reference artifacts embedded " +
-        "inline (CDS decision-reference.crl/.cel; composition-reference.crl/.cel using `defined as` boolean " +
-        "composition; the shared medical-policy-determination.crl determination library; and the " +
+        "inline (CDS decision-reference.crl/.cel; criteria-decision-reference.crl/.cel — distinct criteria as " +
+        "decision-tree nodes + one `defined as` INFERENCE, #168; the shared medical-policy-determination.crl determination library; and the " +
         "pa-determination-reference.crl/.cel prior-authorization exemplar), do/don't examples, a `judgeLens` " +
         "rubric (how to adjudicate the FINAL-mode provenance waivers validate_provenance surfaces — one rule " +
         "per waiver kind with its weighting axis + checkpoints), and a feedback " +
         "URL. The verify loop states what a green `run_decision` does AND does NOT prove (it is asserted-only " +
         '— it never evaluates `code is`). v1 stage: "local-decision-support" (narrow: local `code is` sources ' +
-        "only; shallow: asserted concepts + `defined as` local composition; no `definition is` predicates or " +
+        "only; shallow: asserted concepts + `defined as` inference over one concept's representations; no `definition is` predicates or " +
         "external sources). Returns the kit JSON incl. `schemaVersion` + a derived `contentHash`. Unknown " +
         "stage → tool error listing valid stages.",
       inputSchema: {

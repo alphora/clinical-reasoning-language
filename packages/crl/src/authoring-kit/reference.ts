@@ -170,51 +170,58 @@ case "hard exclusion -> denied":
 `;
 
 /**
- * Tools-authored composition reference (Stage-1 `defined as`, now in scope per
- * #126). Shows the shape: a coverage criterion modeled as a `defined as` boolean
- * composition over LOCAL `code is` leaves, used directly in a `first:`/`otherwise`
- * decision — and adversarially testable (drop one leaf → the composite fails →
- * deny). The kit's unit test materializes this and drives the real CRE over it.
+ * Tools-authored criteria-decision reference (Stage 1). The CENTERPIECE for #168:
+ * decision composition (combining the policy's DISTINCT criteria) lives in the
+ * DECISION TREE — each criterion is its own nested `when` node (nesting = AND) —
+ * while `defined as` is INFERENCE that normalizes the sub-representations of ONE
+ * criterion into one fact. The kit's unit test materializes this and drives the
+ * real CRE over it (criterion-1 node, criterion-2 node, and the inference operand).
  */
-export const COMPOSITION_REFERENCE_CRL = `# Composition Reference — Coverage Criteria (Stage 1: defined as)
+export const CRITERIA_DECISION_REFERENCE_CRL = `# Criteria Decision Reference — coverage criteria as DECISION NODES (Stage 1)
 library "Coverage Criteria Reference".
 
 /*
-The coverage criterion is a LOCAL composition: two asserted \`code is\` leaves
-combined by \`defined as ( ... sem-and ... )\`. run_decision (#126) evaluates the
-composition, so the criterion is expressed at full granularity AND proven by
-drop-one-leaf cases. The determination uses the SHARED "Medical Policy
-Determination" library (Approve = CPGCommunicationRequest A1 / Deny = A3) —
-imported, never re-authored, so there is no inline approve/deny to drift or go
-asymmetric. (Qualified refs auto-resolve from the vendored sibling lib; no
-\`include\` is needed — an \`include\` would fire \`redundant-local-include\`.)
+Decision composition (combining the policy's DISTINCT criteria -> a determination)
+lives in the DECISION TREE: each criterion is its own \`when\` node (nesting = AND).
+\`defined as\` is INFERENCE: it normalizes the sub-representations of ONE criterion
+into ONE clinical fact (here, "failed conservative therapy" = failed drug OR
+physical therapy). sem-and/or are SEMANTIC/inference operators, NOT composition,
+and never join distinct criteria. The determination uses the SHARED "Medical Policy
+Determination" library (imported, never re-authored).
 */
 
 concept "Has Qualifying Diagnosis":
 - type is Condition.
 - code is \`qualifying-diagnosis\`.
 
-concept "Failed Conservative Therapy":
+concept "Failed Drug Therapy":
 - type is Observation.
-- code is \`failed-conservative-therapy\`.
+- code is \`failed-drug-therapy\`.
+concept "Failed Physical Therapy":
+- type is Observation.
+- code is \`failed-physical-therapy\`.
+concept "Failed Conservative Therapy":            // INFERENCE: one criterion, two representations
+- defined as ( "Failed Drug Therapy" sem-or "Failed Physical Therapy" ).
 
-concept "Meets Coverage Criteria":
-- defined as ( "Has Qualifying Diagnosis" sem-and "Failed Conservative Therapy" ).
-
-decision "Coverage Determination":
+decision "Coverage Determination":                 // criteria are nested \`when\` NODES
 first:
-- when "Meets Coverage Criteria" then recommend activity "Medical Policy Determination"."Approve".
+- when "Has Qualifying Diagnosis" then:
+    first:
+    - when "Failed Conservative Therapy" then recommend activity "Medical Policy Determination"."Approve".
+    - otherwise then recommend activity "Medical Policy Determination"."Deny".
+    end.
 - otherwise then recommend activity "Medical Policy Determination"."Deny".
 `;
 
-export const COMPOSITION_REFERENCE_CEL = `# Composition Reference — Coverage Criteria — cases (Stage 1: defined as)
+export const CRITERIA_DECISION_REFERENCE_CEL = `# Criteria Decision Reference — cases (Stage 1)
 library "Coverage Criteria Reference Cases".
 covers "Coverage Criteria Reference".
 
 /*
-Each criterion leaf is asserted as its own fact; the CRE evaluates the composite.
-The drop-one case proves each leaf is necessary (a missing leaf fails the sem-and
-→ deny).
+Each case exercises a decision NODE or the inference operand: criterion-1 (\`when[0]\`),
+criterion-2 (\`when[0]/when[0]\` — a nested NODE, not a composite), and the
+\`defined as\` inference (failed drug OR physical therapy -> one "Failed Conservative
+Therapy" fact). The two approve cases prove the inference resolves on either operand.
 */
 
 fact "Sample Patient":
@@ -227,28 +234,34 @@ fact "Diagnosis Finding":
 - date is "2026-01-01".
 - defined by "Coverage Criteria Reference"."Has Qualifying Diagnosis".
 
-fact "Failed Therapy Finding":
-- code is "http://example.org/local|failed-conservative-therapy".
+fact "Drug Therapy Failure":
+- code is "http://example.org/local|failed-drug-therapy".
 - date is "2026-01-01".
-- defined by "Coverage Criteria Reference"."Failed Conservative Therapy".
+- defined by "Coverage Criteria Reference"."Failed Drug Therapy".
 
-case "both criteria met -> approve":
+fact "Physical Therapy Failure":
+- code is "http://example.org/local|failed-physical-therapy".
+- date is "2026-01-01".
+- defined by "Coverage Criteria Reference"."Failed Physical Therapy".
+
+case "diagnosis + failed drug therapy -> approve":
 - subject is "Sample Patient".
 - fact is "Diagnosis Finding".
-- fact is "Failed Therapy Finding".
+- fact is "Drug Therapy Failure".
 - result is "Coverage Determination" is "Approve".
 
-case "missing failed-therapy leaf -> deny (drop-one)":
+case "diagnosis + failed physical therapy -> approve (inference: either representation)":
+- subject is "Sample Patient".
+- fact is "Diagnosis Finding".
+- fact is "Physical Therapy Failure".
+- result is "Coverage Determination" is "Approve".
+
+case "diagnosis but no conservative-therapy failure -> deny (criterion-2 node otherwise)":
 - subject is "Sample Patient".
 - fact is "Diagnosis Finding".
 - result is "Coverage Determination" is "Deny".
 
-case "missing diagnosis leaf -> deny (drop-one, other operand)":
-- subject is "Sample Patient".
-- fact is "Failed Therapy Finding".
-- result is "Coverage Determination" is "Deny".
-
-case "no criteria -> deny (otherwise)":
+case "no qualifying diagnosis -> deny (criterion-1 node otherwise)":
 - subject is "Sample Patient".
 - result is "Coverage Determination" is "Deny".
 `;
@@ -297,10 +310,10 @@ activity "Deny":
  * Canonical PRIOR-AUTHORIZATION exemplar (#134) — distinct from the CDS
  * `decision-reference` (which ORDERs a service via `CPGServiceRequest`). Here the
  * payer COMMUNICATES a coverage determination via the SHARED "Medical Policy
- * Determination" library (imported, not re-authored). Approve/Deny are the two
- * FINAL leaves; Pended (A4) is async/workflow, not a leaf. A single local criterion
- * keeps the focus on the determination pattern; compose multi-part criteria with
- * `defined as` (see composition-reference).
+ * Determination" library (imported, not re-authored). This exemplar shows the
+ * Approve/Deny baseline; Pended (A4) is async/workflow, not a leaf. A single local
+ * criterion keeps the focus on the determination pattern; a real policy authors its
+ * DISTINCT criteria as decision-tree nodes (see criteria-decision-reference).
  */
 export const PA_DETERMINATION_REFERENCE_CRL = `# PA Determination Reference — Coverage Determination (Stage 1 PA exemplar)
 library "PA Determination Reference".
@@ -311,8 +324,8 @@ ORDERs a service via CPGServiceRequest). Here the payer COMMUNICATES a coverage 
 Approve (X12 HCR01 A1) / Deny (A3), via the SHARED "Medical Policy Determination" library
 (imported, NOT re-authored per policy). This exemplar uses the Approve/Deny baseline; a deployment's
 shared lib may offer further FINAL flavors. Pended (A4) is an async/workflow state, not a per-policy
-clinical leaf. A single local criterion is shown; compose
-multi-part criteria with \`defined as\` (see composition-reference).
+clinical leaf. A single local criterion is shown; a real policy authors its DISTINCT
+criteria as decision-tree nodes (see criteria-decision-reference).
 */
 
 // (illustrative placeholder criterion — a real policy decomposes its stated criteria;

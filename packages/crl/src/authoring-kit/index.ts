@@ -16,8 +16,8 @@ import { conceptTypes } from "../grammar/conceptTypes";
 import { conceptValueTypes } from "../grammar/conceptValueTypes";
 
 import {
-  COMPOSITION_REFERENCE_CEL,
-  COMPOSITION_REFERENCE_CRL,
+  CRITERIA_DECISION_REFERENCE_CEL,
+  CRITERIA_DECISION_REFERENCE_CRL,
   DECISION_REFERENCE_CEL,
   DECISION_REFERENCE_CRL,
   MEDICAL_POLICY_DETERMINATION_CRL,
@@ -49,7 +49,8 @@ const FEEDBACK_URL = "https://github.com/alphora/clinical-reasoning-language/iss
 const SUMMARY =
   "Stage 1 — local-decision-support. Encode a clinical decision over LOCAL coded " +
   "case-features and prove it with CEL cases + the CRE oracle. Narrow (local `code is` " +
-  "sources only) + shallow (asserted concepts + `defined as` boolean composition; no " +
+  "sources only) + shallow (asserted concepts + `defined as` inference over one concept's " +
+  "representations; no " +
   "`definition is` predicates or external sources).";
 
 const CONCEPT_LAYER_MODEL: ConceptLayerEntry[] = [
@@ -66,7 +67,7 @@ const CONCEPT_LAYER_MODEL: ConceptLayerEntry[] = [
   {
     form: "- defined as ( ... sem-and / sem-or / sem-not ... ).",
     meaning:
-      "Boolean composition over other LOCAL concepts (the only added depth this stage; #126). run_decision evaluates it: sem-and = all, sem-or = any, sem-not = not (closed-world). Bare operands resolve within the defining library; cross-library operands must be qualified.",
+      "INFERENCE / semantic normalization: combines the sub-representations or data-components of ONE concept into ONE clinical fact (the only added depth this stage; #126). It is NOT decision composition and NEVER combines distinct decision criteria — that is the decision tree's job (#168). run_decision evaluates it: sem-and = all, sem-or = any, sem-not = not (closed-world). Bare operands resolve within the defining library; cross-library operands must be qualified.",
     scope: "in",
   },
   {
@@ -80,8 +81,8 @@ const RULES: KitRule[] = [
   {
     id: "concept-form",
     category: "concept-model",
-    rule: "Stage-1 leaf concepts carry `type is` + `code is` (local). Multi-part criteria may be composed with `defined as` boolean composition over those local leaves (run_decision evaluates it) — PREFER decomposing a criterion into named leaves + a `defined as` composite so each part is adversarially testable (drop-one-leaf → the composite fails), rather than one opaque concept. Still OUT this stage: `source representation`/`coded from` (external) and `definition is` predicates (count/temporal/value). The boundary is the concept FORM, not the type vocabulary: any FHIR type may be a local `code is` concept. `meta is` is optional.",
-    why: "Local-source pass proves decision authoring (incl. local composition) before external sources and predicate inference are added.",
+    rule: "Stage-1 leaf concepts carry `type is` + `code is` (local). A SINGLE criterion stated at a finer data-grain — multiple representations/components of ONE clinical fact — is normalized with `defined as` (INFERENCE) over named local leaves, drop-one-leaf testable (e.g. \"failed conservative therapy\" = failed drug OR physical therapy). The conjunction of DISTINCT criteria (a policy's \"ALL of the following are met\") is decision COMPOSITION and belongs in the decision TREE — each criterion a nested `when` node — NOT a `defined as` `Criteria Met` composite (see decision-composition). `defined as`/`sem-and`/`sem-or` NEVER joins distinct criteria. Still OUT this stage: `source representation`/`coded from` (external) and `definition is` predicates (count/temporal/value). The boundary is the concept FORM, not the type vocabulary: any FHIR type may be a local `code is` concept. `meta is` is optional.",
+    why: "Local-source pass proves decision authoring (incl. one-concept `defined as` inference) before external sources and predicate inference are added; conflating inference with decision composition hides criteria from the decision (#168).",
     ref: "concept-layer-model; src/tests/fixtures/representation/mammogram-and-bmi.crl",
   },
   {
@@ -89,6 +90,13 @@ const RULES: KitRule[] = [
     category: "decision-shape",
     rule: "A multi-branch decision must declare a qualifier: `first:` (ordered, first match wins — requires a trailing `otherwise`), `all:` (every matching branch fires), or `any:` (over actions only — offer alternatives). A `then:` body is closed by `end.`. A single-member block takes no qualifier.",
     ref: "docs/decision-shapes.md; validator rules qualifier-required / otherwise-required / any-over-branches / first-over-actions",
+  },
+  {
+    id: "decision-composition",
+    category: "decision-shape",
+    rule: "Decision composition — combining a policy's DISTINCT criteria into a determination — is expressed by the decision STRUCTURE, never by `defined as`: nested `when`s = AND; sibling `when` branches under `first:`, each recommending the same disposition (with `otherwise`), = OR of criteria (first match wins — fine for an exclusive Approve/Deny); `otherwise` = NOT; `first:` = precedence; a reused sub-tree = a referenced sub-`decision` via `use decision`. (`any:` is over ACTIONS only — alternative recommendations WITHIN one matched branch — NEVER an OR over `when` branches; see decision-qualifiers.) A `when` takes a SINGLE concept by design — combining criteria is structural, not a boolean condition and not a `defined as` composite. Putting the criteria conjunction in a `defined as` \"Criteria Met\" concept HIDES which criterion failed from the decision/cockpit and misuses the inference layer; author each criterion as its own (nested or sibling) `when` node — see criteria-decision-reference. `defined as`/`sem-*` is ONLY for normalizing ONE criterion's sub-representations into one fact (see concept-form).",
+    why: "The decision tree is the audit surface — a reviewer/cockpit must see WHICH criterion failed. `defined as`/sem-* is INFERENCE (one concept), not decision composition (the tree's job); conflating them hides criteria and was the #168 black-box failure (a fresh agent copied a `Criteria Met` composite → a decision with zero criterion nodes).",
+    ref: "docs/decision-shapes.md; criteria-decision-reference; #168",
   },
   {
     id: "guards",
@@ -173,12 +181,12 @@ const EXAMPLES: KitExample[] = [
     note: "type is + code is only — the Stage-1 leaf concept form.",
   },
   {
-    title: "Decompose a multi-part criterion with `defined as` composition",
+    title: "`defined as` is INFERENCE — normalize ONE criterion's representations",
     language: "crl",
     snippet:
-      'concept "Has Dx":\n- type is Condition.\n- code is `dx`.\nconcept "Failed Therapy":\n- type is Observation.\n- code is `failed-therapy`.\nconcept "Meets Criteria":\n- defined as ( "Has Dx" sem-and "Failed Therapy" ).',
+      'concept "Failed Drug Therapy":\n- type is Observation.\n- code is `failed-drug`.\nconcept "Failed Physical Therapy":\n- type is Observation.\n- code is `failed-pt`.\nconcept "Failed Conservative Therapy":\n- defined as ( "Failed Drug Therapy" sem-or "Failed Physical Therapy" ).',
     valid: true,
-    note: "Each leaf is a local `code is` concept; the composite ANDs them. run_decision evaluates the composition, so a drop-one-leaf case proves each leaf necessary.",
+    note: "ONE criterion satisfiable by either representation → one fact (drop-one testable). `defined as`/`sem-*` normalizes one concept; it NEVER joins DISTINCT criteria — combining the policy's distinct criteria is the decision tree's job (nested `when` nodes; see decision-composition + criteria-decision-reference). #168.",
   },
   {
     title: "Matched branch with a guarded `any:` menu",
@@ -328,18 +336,18 @@ function buildBase(stage: AuthoringStage): Omit<AuthoringKit, "contentHash"> {
         source: DECISION_REFERENCE_CEL,
       },
       {
-        name: "composition-reference.crl",
+        name: "criteria-decision-reference.crl",
         language: "crl",
         purpose:
-          "A coverage criterion modeled as a `defined as` boolean composition over local `code is` leaves, used in a first:/otherwise decision — the now-in-scope composition shape (#126).",
-        source: COMPOSITION_REFERENCE_CRL,
+          "The model for #168: a policy's DISTINCT criteria as nested `when` decision NODES (each criterion visible/auditable; nesting = AND), PLUS one genuine `defined as` INFERENCE (a single criterion satisfiable by either of two representations). `defined as` normalizes ONE concept; it never joins distinct criteria — that is the decision tree's job.",
+        source: CRITERIA_DECISION_REFERENCE_CRL,
       },
       {
-        name: "composition-reference.cel",
+        name: "criteria-decision-reference.cel",
         language: "cel",
         purpose:
-          "Companion cases: both-criteria-met (composite satisfied → approve), two drop-one-leaf necessity proofs (each → deny), and otherwise.",
-        source: COMPOSITION_REFERENCE_CEL,
+          "Companion cases exercising each decision NODE + the inference operand: criterion-1 node, the nested criterion-2 node (its `otherwise` → deny), the inference resolving on either representation (drug OR physical therapy → approve), and the top-level otherwise.",
+        source: CRITERIA_DECISION_REFERENCE_CEL,
       },
       {
         name: "medical-policy-determination.crl",

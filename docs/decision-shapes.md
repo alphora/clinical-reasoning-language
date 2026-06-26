@@ -156,18 +156,20 @@ first:
   end.
 ```
 
-### "Any one indication qualifies" — compose with `sem-or`, not `any:`-over-branches
-When several independent findings each establish coverage, pre-compose them into
-one concept and branch on that. (`any:` over branches is not allowed.)
+### "Any one indication qualifies" — sibling `when` branches under `first:`
+When several **distinct** criteria each independently establish coverage, give each its
+own `when` branch under `first:`, all recommending the same disposition. First match
+wins (fine for an exclusive Approve/Deny) and each criterion stays an auditable node.
+(`any:` over branches is not allowed; and do NOT fuse distinct criteria with
+`defined as ( A sem-or B )` — that hides which one qualified, #168. `defined as`/`sem-or`
+is only for alternative REPRESENTATIONS of ONE criterion — see "Decision composition is
+the decision TREE" below.)
 ```
-concept "Any Qualifying Indication":
-- type is Condition.
-- defined as ( "Documented Fracture Nonunion" sem-or "Failed Conservative Therapy" ).
-
 decision "Coverage":
 first:
 - when "Has Hard Exclusion" then recommend activity "Deny".
-- when "Any Qualifying Indication" then recommend activity "Approve".
+- when "Documented Fracture Nonunion" then recommend activity "Approve".
+- when "Failed Conservative Therapy" then recommend activity "Approve".
 - otherwise then recommend activity "Deny".
 ```
 
@@ -184,7 +186,49 @@ first:
 - otherwise then recommend activity "Deny".
 ```
 
+### Decision composition is the decision TREE, not `defined as` (#168)
+Combining a policy's **distinct criteria** into a determination is **decision
+composition** — express it with the decision STRUCTURE, never with `defined as`:
+nested `when`s = AND; sibling `when` branches under `first:` (each → the same
+disposition) = OR; `otherwise` = NOT; `first:` = precedence; a reused sub-tree = a
+referenced sub-`decision` (`use decision`). (`any:` is over ACTIONS only, never an OR
+over `when` branches — see decision-qualifiers.) Each criterion is its own `when` node,
+so a reviewer/cockpit can see **which** criterion failed. `defined as` / `sem-*` is **inference** — it normalizes ONE criterion's
+sub-representations into one fact (e.g. "failed conservative therapy" = failed drug OR
+physical therapy); it never joins distinct criteria. (See the
+`criteria-decision-reference` exemplar; the WHO immunization fixtures are
+criteria-as-nested-`when`s with zero composites.)
+```
+concept "Failed Conservative Therapy":          // INFERENCE: one criterion, two representations
+- defined as ( "Failed Drug Therapy" sem-or "Failed Physical Therapy" ).
+
+decision "Coverage Determination":              // DISTINCT criteria = nested `when` NODES (AND)
+first:
+- when "Has Qualifying Diagnosis" then:
+    first:
+    - when "Failed Conservative Therapy" then recommend activity "Medical Policy Determination"."Approve".
+    - otherwise then recommend activity "Medical Policy Determination"."Deny".
+    end.
+- otherwise then recommend activity "Medical Policy Determination"."Deny".
+```
+
 ## Don't-cases (and what to write instead)
+
+### ✗ combine DISTINCT criteria with `defined as` (#168)
+```
+concept "Meets Criteria":
+- defined as ( "Has Qualifying Diagnosis" sem-and "Failed Conservative Therapy" ).
+decision "Coverage":
+first:
+- when "Meets Criteria" then recommend activity "...Approve".
+- otherwise then recommend activity "...Deny".
+```
+"Has Qualifying Diagnosis" and "Failed Conservative Therapy" are **distinct criteria**
+fused by inference — the decision has **zero** criterion nodes, so a reviewer/cockpit
+can't see which one failed. **Do this instead:** author each criterion as its own
+(nested) `when` node so the tree shows the decision logic (see "Decision composition is
+the decision TREE" above). `defined as` is only for normalizing ONE criterion's
+representations into one fact.
 
 ### ✗ `any:` over `when`-branches
 ```
@@ -193,10 +237,11 @@ any:
 - when "Documented Fracture Nonunion" then recommend activity "Approve".
 - when "Failed Conservative Therapy" then recommend activity "Approve".
 ```
-Nondeterministic — if both match, which branch wins? **Do this instead:** compose
-the conditions with `sem-or` into one concept and use a single `first:` branch
-(see "Any one indication qualifies" above), or use `all:` if every matching
-branch should fire.
+Nondeterministic — if both match, which branch wins? **Do this instead:** give each
+condition its own `when` branch under `first:` (each → the same disposition; first
+match wins — see "Any one indication qualifies" above), or use `all:` if every matching
+branch should independently fire. Do NOT fuse the distinct conditions with
+`defined as ( A sem-or B )` — that hides which one matched (#168).
 
 ### ✗ `first:` over actions
 ```

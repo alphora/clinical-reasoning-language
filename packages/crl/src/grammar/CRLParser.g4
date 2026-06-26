@@ -133,7 +133,9 @@ actionItem
 // Per-action guard: conditions a single menu item. `unless "C"` drops the item
 // when C holds; `only when "C"` includes it only when C holds. These are
 // applicability polarities lowered at emit time (unless -> not), NOT sem-*
-// composition operators (which live only in `defined as`). The guard reuses the
+// inference operators (which live only in `defined as`; they normalize one concept's
+// representations into one fact — they do NOT compose decision criteria, which is the
+// `when`/branch structure's job, #168). The guard reuses the
 // same condition resolution path as a `when` branch.
 actionGuard
     : UNLESS conceptReference
@@ -251,11 +253,11 @@ activityBecause
 //
 // v0.7: a concept has one of THREE body kinds (cardinality 1..1):
 //   - asserted:    `coded from "Valueset"` (refs are valueset names)
-//   - composition: `defined as (composition)` (refs are concept names)
+//   - inference:   `defined as (...)` — sem-and/or/not over ONE concept's representations (refs are concept names)
 //   - predicate:   `definition is <narrative>` (refs are concept names; body is a
 //                                               narrative phrase per catalog templates)
 //
-// `type is X` is OPTIONAL for composition/predicate kinds (deduced from body
+// `type is X` is OPTIONAL for inference/predicate kinds (deduced from body
 // refs if omitted); REQUIRED for asserted (valuesets don't carry FHIR-type info).
 // `value type is X` is OPTIONAL and 0..* (lazily required when something
 // depends on it; deduced from type's default).
@@ -402,12 +404,14 @@ definitionIsBody
 // Defined As Body (v0.7)
 // ============================
 //
-// A concept's `defined as` body has two shapes:
+// A concept's `defined as` body is INFERENCE — it normalizes ONE concept's
+// sub-representations into one fact; it does NOT compose decision criteria (that is the
+// decision tree's `when`/branch structure, #168). Two shapes:
 //   1. Bare reference to a named concept
-//   2. Parenthesized composition with sem-or / sem-and / sem-not operators
+//   2. Parenthesized sem-or / sem-and / sem-not over bare refs
 //
-// Composition operates on bare refs only (no narrative inside composition).
-// Narrative belongs in concept bodies with `definition is`.
+// The inference operates on bare refs only (no narrative inside). Narrative belongs in
+// concept bodies with `definition is`.
 //
 // Examples:
 //   - defined as "Underweight Active".
