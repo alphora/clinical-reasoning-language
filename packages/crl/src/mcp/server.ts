@@ -815,6 +815,14 @@ function runValidateProvenance(
         isError: true,
       };
     }
+    if (stat.size > MAX_INPUT_BYTES) {
+      return {
+        content: [
+          { type: "text", text: `${label} file too large: ${stat.size} bytes > ${MAX_INPUT_BYTES}.` },
+        ],
+        isError: true,
+      };
+    }
   }
   try {
     const result = validateProvenanceFiles(args.artifact, args.cel, args.anchor, mode);
