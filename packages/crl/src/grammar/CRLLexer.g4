@@ -45,12 +45,12 @@ UNLESS       : 'unless';
 WHEN         : 'when';
 WITH         : 'with';
 
-// === Composition operators (v0.6) ===
-// sem-or / sem-and / sem-not in concept's `defined as` composition.
-// Uniform `sem-` prefix marks structural composition; distinguishes from
-// in-arg disjunction/conjunction (which use lowercase or/and) and from
-// narrative words. Hard rule: all structural composition operators carry
-// the sem- prefix, no exceptions.
+// === Inference operators (v0.6) ===
+// sem-or / sem-and / sem-not in a concept's `defined as` body. These are SEMANTIC
+// INFERENCE operators — they normalize ONE concept's representations into one fact,
+// NOT boolean logic and NOT decision composition (#168). The uniform `sem-` prefix
+// distinguishes them from in-arg disjunction/conjunction (lowercase or/and) and from
+// narrative words. Hard rule: all sem-* operators carry the sem- prefix, no exceptions.
 // Declared BEFORE NARRATIVE_WORD so 6-char `sem-or` matches SEM_OR not NARRATIVE_WORD.
 SEM_OR       : 'sem-or';
 SEM_AND      : 'sem-and';

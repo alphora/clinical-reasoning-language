@@ -77,6 +77,18 @@ first:
 - `recommend activity "Activity Name".`
 - `use decision "Decision Name".`
 
+**Per-action guards (`unless` / `only when`).** A single menu item may carry a guard that conditions whether it is offered (typically inside an `any:` menu):
+
+```crl
+any:
+- recommend activity "Order MRI".
+- recommend activity "Order CT" unless "Contrast Allergy".
+- recommend activity "Order Ultrasound" only when "Radiation Concern".
+end.
+```
+
+`unless "C"` drops the item when concept `C` holds; `only when "C"` offers it only when `C` holds. A guard conditions ONE menu item — it is applicability polarity (lowered to `not` at emit time), not a `when` branch and not a sem-* operator.
+
 > **See [decision-shapes.md](docs/decision-shapes.md)** for the full set of
 > `first` / `any` / `all` / `otherwise` combinations, with worked examples and
 > the common mistakes to avoid.
@@ -175,19 +187,34 @@ concept "BMI Range as a Condition":
 #### Structure
 
 - `concept "Name":` (colon required)
-- Required:
-  - `- type is CONCEPT_TYPE.`
-  - `- value type is CONCEPT_VALUE_TYPE.`
-- Optional:
-  - One or more ``- meta is `Text`.`` lines
-  - One ``- evidence is `Text`.`` line
-- Required: a body — `- code is ` + a backtick-quoted code (local source); `- coded from "VS".` (external terminology); `- defined as ...` (sem-* inference); or `- definition is <narrative>.` (a catalog narrative predicate). (A concept may also carry trailing `- source representation ...` lines — the external multi-representation form, documented separately.)
+- `- type is CONCEPT_TYPE.` — REQUIRED for an asserted (`coded from`) concept (a valueset carries no FHIR type); OPTIONAL for `defined as` / `definition is` inference (deduced from the body's refs if omitted).
+- `- value type is CONCEPT_VALUE_TYPE.` — OPTIONAL and repeatable (0..*); deduced from the type's default / subject chain when omitted, lazily required when a consumer depends on it.
+- Optional: one or more ``- meta is `Text`.`` lines; one ``- evidence is `Text`.`` line.
+- A body — `- code is ` + a backtick-quoted code (local source); `- coded from "VS".` (external terminology); `- defined as ...` (sem-* inference); or `- definition is <narrative>.` (a catalog narrative predicate). Plus zero or more trailing `- source representation:` lines (the external multi-representation form — see below).
 
 #### Inference (`defined as`)
 - `defined as "Concept".` — a single concept reference (AST: `DefinedAsBareRef`)
 - `defined as ( ... )` — a parenthesized SEMANTIC expression using `sem-and` / `sem-or` / `sem-not`, parentheses, and concept references (AST: `DefinedAsComposition`)
 
 The `sem-*` operators are semantic-**inference** operators that normalize ONE concept's representations/components into one fact — NOT boolean logic, and NOT decision composition (combining a policy's distinct criteria — that is the decision tree's job). The author declares the result `(type, valuetype)`; operands need not type-check against each other. The narrative-predicate form `definition is <narrative>` (e.g. `most recent "X"`, `has "X"`, `"X" at least N`) covers the catalog patterns that the removed `apply pattern` syntax used to express.
+
+#### Source representations (external, multi-representation)
+
+A concept's LOCAL representation is its `code is`. To say the SAME clinical concept ALSO appears in one or more NON-LOCAL (external) sources — a different FHIR shape queried from an external system — add `- source representation:` lines. Each is an anonymous inner concept that INHERITS the enclosing concept's fields and overrides only what differs (dashed concept-body syntax; inherited lines omitted). A representation body may carry `- type is`, `- value type is` (0..*), and its own `- coded from "VS".`:
+
+```crl
+concept "Mammogram":
+- type is Procedure.
+- code is `mammogram-local`.              // the LOCAL representation
+- source representation:                   // an EXTERNAL representation
+  - type is ImagingStudy.
+  - coded from "Mammogram Imaging VS".
+- source representation:                   // another external representation
+  - type is DiagnosticReport.
+  - coded from "Mammogram Report VS".
+```
+
+The local `code is` plus the external `source representation`s form the concept's full **source set** — one author-facing identity per clinical concept. See ADR 0001 (asserted-vs-sourced data model) for the layer / origin / code-domain model and source-set dedup.
 
 #### Metadata annotations (`@tag` convention)
 
@@ -906,7 +933,7 @@ These lists are generated from the grammar (`src/grammar/CRLLexer.g4`); only the
 
 Allowlist covers every base FHIR resource referenced by a CPG IG Request or Event profile, plus subject/contextual resources. See [`docs/cpg-ig-alignment.md`](docs/cpg-ig-alignment.md) for the full CRL↔CPG-IG mapping rationale.
 
-`AdverseEvent`, `AllergyIntolerance`, `ClinicalImpression`, `Communication`, `CommunicationRequest`, `Condition`, `DetectedIssue`, `Device`, `DiagnosticReport`, `DocumentReference`, `Encounter`, `EpisodeOfCare`, `FamilyMemberHistory`, `Flag`, `Goal`, `Immunization`, `MedicationAdministration`, `MedicationDispense`, `MedicationRequest`, `MedicationStatement`, `NutritionIntake`, `NutritionOrder`, `Observation`, `Patient`, `Procedure`, `QuestionnaireResponse`, `RiskAssessment`, `ServiceRequest`, `Task`
+`AdverseEvent`, `AllergyIntolerance`, `Claim`, `ClinicalImpression`, `Communication`, `CommunicationRequest`, `Condition`, `DetectedIssue`, `Device`, `DiagnosticReport`, `DocumentReference`, `Encounter`, `EpisodeOfCare`, `ExplanationOfBenefit`, `FamilyMemberHistory`, `Flag`, `Goal`, `ImagingStudy`, `Immunization`, `MedicationAdministration`, `MedicationDispense`, `MedicationRequest`, `MedicationStatement`, `NutritionIntake`, `NutritionOrder`, `Observation`, `Patient`, `Procedure`, `QuestionnaireResponse`, `RiskAssessment`, `ServiceRequest`, `Task`
 
 ### Activity types (`request`)
 
@@ -924,7 +951,7 @@ The union of concept value types and concept types. v2.2.0 deliberately omits `P
 
 ## Keywords and Tokens
 
-- **Keywords:** `library`, `include`, `as`, `decision`, `terminology`, `activity`, `concept`, `parameter`, `when`, `then`, `recommend activity`, `use decision`, `request`, `with`, `because`, `type is`, `value type is`, `param type is`, `evidence is`, `meta is`, `coded from`, `defined as`, `definition is`, `system is`, `code is`, `valueset is`, `any:`, `all:`, `do not perform`, `not`, `and`, `or`, `sem-and`, `sem-or`, `sem-not`, `end when`, `:` (colon), `.` (dot), `-` (dash), `(` (left paren), `)` (right paren)
+- **Keywords:** `library`, `include`, `as`, `decision`, `terminology`, `activity`, `concept`, `parameter`, `when`, `then`, `otherwise`, `recommend activity`, `use decision`, `request`, `with`, `because`, `unless`, `only when`, `first:`, `any:`, `all:`, `end`, `type is`, `value type is`, `param type is`, `evidence is`, `meta is`, `coded from`, `defined as`, `definition is`, `source representation`, `code is`, `system is`, `valueset is`, `do not perform`, `not`, `and`, `or`, `sem-and`, `sem-or`, `sem-not`, `:` (colon), `.` (dot), `-` (dash), `(` (left paren), `)` (right paren)
 - **Identifiers:** Double-quoted strings
 - **Free text/markdown:** Backtick-quoted strings
 - **Comments:** `// ...` or `/* ... */`
