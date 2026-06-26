@@ -1,7 +1,7 @@
 /**
  * The `authoring_kit` payload contract.
  *
- * This is the stable shape the sibling `crl-content` KE agents bake against
+ * This is the stable shape the sibling content-project KE agents bake against
  * (MCP is the contract — they have no filesystem access to this repo). Keep it
  * structured (objects, not prose blobs) so an agent can consume it without
  * string-parsing. `schemaVersion` is bumped when THIS shape changes;

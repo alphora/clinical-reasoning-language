@@ -229,8 +229,9 @@ describe("authoring-kit — getAuthoringKit", () => {
     expect(a.contentHash).toMatch(/^[0-9a-f]{64}$/);
     expect(a.contentHash).toBe(b.contentHash);
     // Pinned snapshot — any payload byte change must update this deliberately.
-    // Re-pinned for the judgeLens addition (schemaVersion 1.0 → 1.1; the new waiver-adjudication rubric).
-    expect(a.contentHash).toBe("05600f7cf3ccf2233a02cab41993235b1be784b11a3789190af9ce22d1cdc9a9");
+    // Re-pinned for #167: pa-disposition-set is now purely structural (names no activities) + the kit's two
+    // crl-content references genericized to "content project" (customer/deployment-agnostic). schemaVersion unchanged.
+    expect(a.contentHash).toBe("21b2c59a7ff992f1174fa024a0db3363df72acbd51d345bc865418b613032ab1");
   });
 
   it("STAGES contains exactly the one Stage-1 slice", () => {
@@ -272,13 +273,26 @@ describe("authoring-kit — getAuthoringKit", () => {
     expect(byKind("waiver-authored").weightedBy).toMatch(/implementation-artifact/);
   });
 
-  it("the pa-disposition-set rule (#134) states set-equality over the shared Approve/Deny + mutual exclusivity", () => {
+  it("the pa-disposition-set rule (#134/#167) is STRUCTURAL — membership + mutual-exclusivity + no-pend, naming no activities", () => {
     const rule = getAuthoringKit().rules.find((r) => r.id === "pa-disposition-set");
     expect(rule).toBeDefined();
-    expect(rule!.rule).toMatch(/"Medical Policy Determination"\."Approve"/);
-    expect(rule!.rule).toMatch(/"Medical Policy Determination"\."Deny"/);
-    expect(rule!.rule).toMatch(/Pended/);
-    expect(rule!.rule).toMatch(/exactly one|XOR|mutually-exclusive/i);
+    // (1) membership in the shared determination library + the never-CPGServiceRequest guard
+    expect(rule!.rule).toMatch(/Medical Policy Determination/);
+    expect(rule!.rule).toMatch(/CPGServiceRequest/);
+    // (2) exactly one determination per case
+    expect(rule!.rule).toMatch(/exactly one|mutual.{0,3}exclus|first:/i);
+    // (3) no pend leaf
+    expect(rule!.rule).toMatch(/A4|pend/i);
+    // customer-agnostic: the STRUCTURAL gate names NO determination activities — Approve/Deny/flavors are content (#167)
+    expect(rule!.rule).not.toMatch(/\bApprove\b|\bDeny\b/);
+    expect(rule!.why ?? "").not.toMatch(/\bApprove\b|\bDeny\b/);
+  });
+
+  it("the kit PAYLOAD names no content-repo / customer (customer-agnostic — serves any deployment's content project)", () => {
+    // Sweep the WHOLE serialized payload (every field + the embedded reference artifacts), not just rules — the leak this
+    // guards (e.g. a verifyLoop/referenceArtifact note) would slip a rules-only check. contentHash is derived, so drop it.
+    const { contentHash: _hash, ...payload } = getAuthoringKit();
+    expect(JSON.stringify(payload)).not.toMatch(/crl-content|hcsc|iehp|inland empire/i);
   });
 });
 

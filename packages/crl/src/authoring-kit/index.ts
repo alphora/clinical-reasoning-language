@@ -99,16 +99,16 @@ const RULES: KitRule[] = [
   {
     id: "dispositions",
     category: "dispositions",
-    rule: "Model dispositions as plain `activity` declarations. CRL has no approve/deny/pend verbs — do not invent them. Do not author rationale at the decision/recommend site; the reason a branch fired IS its triggering `when` concept, which the emitter can surface (from the concept's `meta is`). DISPOSITION TYPE follows the ACT: a CDS recommendation to ORDER a service uses `request CPGServiceRequest` (see decision-reference). A PA / medical-policy coverage DETERMINATION is COMMUNICATED, never ordered — reference the SHARED `Medical Policy Determination` library's `\"Approve\"` (CPGCommunicationRequest / X12 A1) / `\"Deny\"` (A3) by qualified name; never `CPGServiceRequest`, never a per-policy re-authored Approve/Deny (see pa-determination-reference).",
+    rule: "Model dispositions as plain `activity` declarations. CRL has no approve/deny/pend verbs — do not invent them. Do not author rationale at the decision/recommend site; the reason a branch fired IS its triggering `when` concept, which the emitter can surface (from the concept's `meta is`). DISPOSITION TYPE follows the ACT: a CDS recommendation to ORDER a service uses `request CPGServiceRequest` (see decision-reference). A PA / medical-policy coverage DETERMINATION is COMMUNICATED, never ordered — reference the SHARED, canonical `Medical Policy Determination` library's determination activities by qualified name (every deployment vendors this same library; its baseline membership is `\"Approve\"` = CPGCommunicationRequest / X12 A1 and `\"Deny\"` = A3, and a deployment's content project may add further FINAL flavors). All are `CPGCommunicationRequest`, never `CPGServiceRequest`, and never a per-policy re-authored determination (see pa-determination-reference).",
     why: "CRL is general (cognitive support, CDS, prior-auth, quality measures), not a PA-specific language; keep the core minimal. But a coverage determination is a communicated decision, not a service order — modeling it as CPGServiceRequest is a clinical-safety error (#134).",
     ref: "crl-not-a-pa-language; #134",
   },
   {
     id: "pa-disposition-set",
     category: "dispositions",
-    rule: "For a medical-policy / PA coverage decision, the set of activities the decision can `recommend` MUST equal exactly { \"Medical Policy Determination\".\"Approve\", \"Medical Policy Determination\".\"Deny\" } — no third disposition (no per-policy Approve/Deny, no Order/Refer/Pend leaf). Pended (X12 A4) is an async/workflow state resolved OUTSIDE the per-policy decision, not a clinical leaf. AND each case must produce EXACTLY ONE determination (Approve XOR Deny): author mutually-exclusive branches (`first:` + `otherwise`), never an `all:` / `any:` shape that could emit both Approve and Deny in one run. Set-equality + mutual-exclusivity is the invariant — it prevents modeling a coverage determination as a service order, inventing a phantom branch, AND emitting a contradictory double-determination.",
-    why: "A PA determination communicates exactly Approve (A1) / Deny (A3) from the shared library; any other recommend target on a coverage decision is a modeling error.",
-    ref: "#134",
+    rule: "For a medical-policy / PA coverage decision the disposition set is constrained STRUCTURALLY, naming no activities: (1) MEMBERSHIP — every activity the decision can `recommend` resolves to the shared, canonical `Medical Policy Determination` library (the one library every deployment vendors under that name; a qualified ref into it), never a per-policy re-authored determination and never `CPGServiceRequest`; a determination is COMMUNICATED (all `CPGCommunicationRequest`), not ordered. (2) MUTUAL EXCLUSIVITY — each case fires EXACTLY ONE determination: no reachable branch/action shape may emit more than one determination in a single run (author ordered precedence with `first:` + `otherwise`; do not place two determination recommendations under one `all:` / `any:`). (3) NO PEND — the canonical library holds only FINAL determinations (a deployment extends it only with further final flavors), so a determination cannot recommend a pend; Pended (X12 A4) is an async/workflow state resolved OUTSIDE the per-policy decision, not a determination leaf. WHICH activities the shared library offers and their certify/deny KINDS are content (governed in the deployment's content project); whether a policy uses the RIGHT flavor where it draws a distinction is a reviewer/Judge fidelity call this rule INSTRUCTS but does not mechanically enforce.",
+    why: "The universal kit must be customer-agnostic — it serves every deployment's content project, not one denial taxonomy. The structural invariant (shared-library membership, one determination per case, no pend leaf) catches the real modeling defects #134 targeted — a determination modeled as a service order, a per-policy re-authored determination, a contradictory double-determination — WITHOUT hard-coding any activity set; a distinct third determination flavor is legitimate content, not a defect (#167).",
+    ref: "#134; #167",
   },
   {
     id: "minimalism",
@@ -217,7 +217,7 @@ const VERIFY_LOOP: VerifyLoop = {
   doesNotProve:
     "That a concept's `code is` is the clinically correct code, or that the concept-to-intent mapping is right. The CRE (v1) is asserted-only and never evaluates `code is`: a concept is satisfied purely because a case fact is `defined by` it. A green run means the wiring is right, NOT that the encoding is clinically complete or correct.",
   note:
-    "validate_cel and run_decision require FILES under a project root (a package.json); they do not accept inline code. In the crl-content layout, author <artifact>.crl and <artifact>.cel under the artifact's package and pass absolute paths.",
+    "validate_cel and run_decision require FILES under a project root (a package.json); they do not accept inline code. In a content project's artifact-package layout, author <artifact>.crl and <artifact>.cel under the artifact's package and pass absolute paths.",
 };
 
 /**
@@ -345,14 +345,14 @@ function buildBase(stage: AuthoringStage): Omit<AuthoringKit, "contentHash"> {
         name: "medical-policy-determination.crl",
         language: "crl",
         purpose:
-          "The SHARED, reusable PA determination activities (#134): Approve = CPGCommunicationRequest / X12 A1, Deny = A3 — communicated, never ordered. Imported by every medical-policy artifact via qualified ref; never re-authored. (No companion CEL — a shared activity lib has no decision to run.)",
+          "The SHARED, canonical PA determination library (#134) — communicated (CPGCommunicationRequest), never ordered, imported by every medical-policy artifact via qualified ref, never re-authored. Its baseline membership is Approve (X12 A1) + Deny (A3); a deployment's content project may add further FINAL flavors (e.g. a distinct deny reason). (No companion CEL — a shared activity lib has no decision to run.)",
         source: MEDICAL_POLICY_DETERMINATION_CRL,
       },
       {
         name: "pa-determination-reference.crl",
         language: "crl",
         purpose:
-          "Canonical PRIOR-AUTHORIZATION exemplar (#134) — distinct from the CDS decision-reference (which ORDERs a service). The payer COMMUNICATES Approve/Deny via the shared determination library; two final leaves, Pended (A4) is async/workflow.",
+          "Canonical PRIOR-AUTHORIZATION exemplar (#134) — distinct from the CDS decision-reference (which ORDERs a service). The payer COMMUNICATES the determination via the shared library (this exemplar shows the Approve/Deny baseline; a deployment may add further final flavors); Pended (A4) is async/workflow, never a determination leaf.",
         source: PA_DETERMINATION_REFERENCE_CRL,
       },
       {

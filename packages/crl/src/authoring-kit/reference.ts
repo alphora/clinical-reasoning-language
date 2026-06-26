@@ -309,8 +309,9 @@ library "PA Determination Reference".
 The canonical PRIOR-AUTHORIZATION exemplar — distinct from the CDS decision-reference (which
 ORDERs a service via CPGServiceRequest). Here the payer COMMUNICATES a coverage determination:
 Approve (X12 HCR01 A1) / Deny (A3), via the SHARED "Medical Policy Determination" library
-(imported, NOT re-authored per policy). Approve/Deny are the two FINAL leaves; Pended (A4) is an
-async/workflow state, not a per-policy clinical leaf. A single local criterion is shown; compose
+(imported, NOT re-authored per policy). This exemplar uses the Approve/Deny baseline; a deployment's
+shared lib may offer further FINAL flavors. Pended (A4) is an async/workflow state, not a per-policy
+clinical leaf. A single local criterion is shown; compose
 multi-part criteria with \`defined as\` (see composition-reference).
 */
 
