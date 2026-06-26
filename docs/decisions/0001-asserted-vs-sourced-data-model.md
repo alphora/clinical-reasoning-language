@@ -32,9 +32,9 @@ A concept (e.g. "Mammogram") has a single identity. Whether a value was supplied
 
 ### 2. Three orthogonal axes
 - **Layer** (how a concept is *defined* — syntactic). **`asserted`** = `coded from` (a retrieve; values
-  asserted by *some* authority, queried). **`inferred`** = everything else (`defined as` composition,
+  asserted by *some* authority, queried). **`inferred`** = everything else (`defined as` inference,
   `definition is` predicate/derivation — calculated). Rule: `coded from` ⇒ asserted; else inferred.
-  (`defined as` is the sem-* composition keyword; there is no `inferred from` keyword.)
+  (`defined as` is the sem-* inference keyword — one concept's representations, #168; there is no `inferred from` keyword.)
 - **Origin** (the asserting **authority** — *who* claimed a value). For **asserted** values: an
   **extensible** set of authorities — `clinical`, `payer`, `user`/`application`, `pharmacy`, … For
   **calculated** values: **`System`** ("inferred by content@version + reasoning-engine@version"), with
@@ -69,9 +69,10 @@ overrides** (written in concept-body dashed syntax; inherited fields omitted), a
 
 ### 4. Composition and derivations
 Asserted multi-representation retrieves are grouped by source class (e.g. "Clinical Mammogram",
-"Administrative Mammogram") and are **reusable**. `defined as ( A sem-or B )` composes **distinct**
-concepts ("Mammogram"). Derivations (`most recent`, `count … within …`, predicates, arithmetic) build on
-top. One author-facing identity per clinical concept.
+"Administrative Mammogram") and are **reusable**. `defined as ( A sem-or B )` INFERS one concept
+("Mammogram") from its distinct named **source-representation groupings** (one-concept normalization — it
+never joins distinct decision criteria, which is the decision tree's job, #168). Derivations (`most recent`, `count … within
+…`, predicates, arithmetic) build on top. One author-facing identity per clinical concept.
 
 ### 5. Sources, records, and resolution
 - A concept declares (directly + via composition) a **set of sources** (representations).

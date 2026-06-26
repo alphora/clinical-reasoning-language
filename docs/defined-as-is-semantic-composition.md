@@ -1,4 +1,4 @@
-# `defined as` is SEMANTIC composition, not boolean logic
+# `defined as` is SEMANTIC inference, not boolean logic
 
 **Audience:** humans working on CRL design or transformation; agents asked to generate, audit, or review CRL concepts.
 
@@ -6,11 +6,13 @@
 
 > *"Defined" here means **author-declared semantic intent**, not algorithmic computation. A concept's meaning is what the author SAYS it means; the emitter figures out how to compute it.*
 
+> **Terminology (#168):** the `sem-*` combination this document describes is **INFERENCE** — it normalizes ONE concept's representations, components, or facets into one fact. We retire the word "semantic composition" for it in favor of *inference*, because "composition" collides with **decision composition** — combining a policy's DISTINCT criteria, which is the decision TREE's job (nested `when`s, sibling `first:` branches, `use decision`), never `defined as`. Where this doc still says "composition" below, it means the sem-* **body mechanism** (one concept), never decision composition. `defined as`/`sem-*` is one-concept inference; it never joins distinct criteria. See [decision-shapes.md](decision-shapes.md).
+
 ---
 
 ## The principle, in one paragraph
 
-In CRL, a concept declared with `defined as <composition>` is a NEW concept whose `type` and `valuetype` are declared by the AUTHOR. The composition body — `sem-and`, `sem-or`, `sem-not` — describes HOW the meaning of the new concept is composed from existing concepts (semantic intersection / union / exclusion). It does NOT type-check the operands against each other or against the result. The author owns the semantic claim; the implementation (the CQL emitter, the runtime) is responsible for figuring out HOW to combine the operands' values to produce the declared result.
+In CRL, a concept declared with `defined as ( ... )` is a NEW concept whose `type` and `valuetype` are declared by the AUTHOR. The inference body — `sem-and`, `sem-or`, `sem-not` — describes HOW the meaning of the new concept is inferred from existing concepts (semantic intersection / union / exclusion of ONE concept's representations, components, or facets). It does NOT type-check the operands against each other or against the result. The author owns the semantic claim; the implementation (the CQL emitter, the runtime) is responsible for figuring out HOW to combine the operands' values to produce the declared result.
 
 `sem-and` is NOT boolean `AND` with strict operand-type matching. It is a SEMANTIC operator: "the resulting concept's meaning is the intersection of the operand concepts' meanings, interpreted in the result's type/valuetype." Same for `sem-or` (union of meanings) and `sem-not` (exclusion of meaning).
 
@@ -36,7 +38,7 @@ concept "Has Normal BMI":
 ).
 ```
 
-The composition is composing a Quantity-bearing refinement with a boolean predicate. **This is not a defect.** The author is asserting: "the concept `Has Normal BMI` semantically means: the patient has a normal-BMI-range observation AND has no documented abnormal BMI. The result is a boolean predicate." The CQL emitter will translate this into something like `exists("Normal BMI Range") and "Without Documented Abnormal BMI"`, wrapping the refinement in `exists` to bridge to the boolean.
+The inference combines a Quantity-bearing refinement with a boolean predicate. **This is not a defect.** The author is asserting: "the concept `Has Normal BMI` semantically means: the patient has a normal-BMI-range observation AND has no documented abnormal BMI. The result is a boolean predicate." The CQL emitter will translate this into something like `exists("Normal BMI Range") and "Without Documented Abnormal BMI"`, wrapping the refinement in `exists` to bridge to the boolean.
 
 The author did not have to declare the operands as the same shape. They declared the RESULT's shape. The semantics of the composition follows.
 
@@ -78,10 +80,10 @@ The principle above is about **`defined as`** — the composition body kind that
 
 | Body kind | Surface | Body shape | Examples |
 |---|---|---|---|
-| Composition | `defined as <expression>` | Parenthesized tree of named concepts joined by `sem-or` / `sem-and` / `sem-not` | `defined as ( "A" sem-and sem-not "B" )` |
+| Inference | `defined as <expression>` | Parenthesized tree of named concepts joined by `sem-or` / `sem-and` / `sem-not` | `defined as ( "A" sem-and sem-not "B" )` |
 | Narrative predicate | `definition is <narrative>` | Catalog-pattern narrative phrase whose elements are concept refs, narrative words, in-arg disjunctions/conjunctions | `definition is "BMI Observations" during "Measurement Period"` |
 
-Both body kinds carry the **same principle**: the author declares the result `(type, valuetype)`, and the body describes the meaning. For composition, the meaning is the sem-* combination of named concepts. For predicate, the meaning is the catalog pattern's canonical form applied to its arguments. In both cases, the emitter bridges to CQL — neither body kind asks the author to think about type alignment between operands / arguments and the declared result.
+Both body kinds carry the **same principle**: the author declares the result `(type, valuetype)`, and the body describes the meaning. For inference, the meaning is the sem-* combination of named concepts (one concept's representations, components, or facets). For predicate, the meaning is the catalog pattern's canonical form applied to its arguments. In both cases, the emitter bridges to CQL — neither body kind asks the author to think about type alignment between operands / arguments and the declared result.
 
 The shared `defined` / `definition` stem is intentional — it signals the family. The `as` / `is` preposition distinguishes the body shape: `defined as` introduces an equivalence (the body IS the meaning, written as a sem-* expression), `definition is` introduces an attribute (the body IS the definition, written as a narrative phrase the catalog recognizes). The grammar treats them as parallel body kinds; the author picks the form that fits the concept's natural surface.
 
@@ -124,7 +126,7 @@ Per concept:
    - Boolean predicate: `<Resource>+boolean` if the resource has a native boolean value field (`Observation`, `QuestionnaireResponse`, etc.), else `Observation+boolean`.
    - Refinement: type and valuetype inherited from the subject of the refinement.
    - Value-bearing: type is the source resource; value type is the primitive extracted.
-3. **For composition bodies**: don't worry about whether operands "type-check". The composition is semantic. Declare the result; trust the emitter.
+3. **For inference bodies** (`defined as`): don't worry about whether operands "type-check". The inference is semantic. Declare the result; trust the emitter.
 4. **For source-CQL audits**: read the define for SEMANTIC INTENT, not return-type mechanics. An `exists` in the define means the WHOLE define is a boolean; an `exists` at an OUTER define wrapping a list-shaped concept means the OUTER define is boolean — but the inner concept could be authored as either boolean (predicate-shaped intent) or refinement (list-shaped intent). Author decides.
 
 ---
