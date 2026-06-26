@@ -559,7 +559,9 @@ export function createServer(): McpServer {
         "type allowlists (full + a stage-recommended subset), seven validated reference artifacts embedded " +
         "inline (CDS decision-reference.crl/.cel; composition-reference.crl/.cel using `defined as` boolean " +
         "composition; the shared medical-policy-determination.crl determination library; and the " +
-        "pa-determination-reference.crl/.cel prior-authorization exemplar), do/don't examples, and a feedback " +
+        "pa-determination-reference.crl/.cel prior-authorization exemplar), do/don't examples, a `judgeLens` " +
+        "rubric (how to adjudicate the FINAL-mode provenance waivers validate_provenance surfaces — one rule " +
+        "per waiver kind with its weighting axis + checkpoints), and a feedback " +
         "URL. The verify loop states what a green `run_decision` does AND does NOT prove (it is asserted-only " +
         '— it never evaluates `code is`). v1 stage: "local-decision-support" (narrow: local `code is` sources ' +
         "only; shallow: asserted concepts + `defined as` local composition; no `definition is` predicates or " +
@@ -587,9 +589,13 @@ export function createServer(): McpServer {
         "linkRequirement (Missed₁), drivesDetermination ancestry, authored-item discipline, §9.1 MN-keyword, §9.2 structural " +
         "mis-tag, and over-reach. A CEL ref to a case lacking an explicit (frozen) `- id is` → provenance-references-unfrozen-case " +
         "(§7). This is the FINAL/strict gate on a COMPLETED artifact — over the in-progress check, use validate_provenance_worklist " +
-        "(it re-grades the attribution backlog to remaining-work). Pass three ABSOLUTE paths. Returns { policyId, policyVersion, " +
+        "(it re-grades the attribution backlog to remaining-work). FINAL mode ALSO surfaces judge-lens WAIVERS — every escape hatch " +
+        "that suppresses a finding (authored over-reach support, ignored span, legal intentional-unlink, non-decision dispositionClass) — " +
+        "as uniform manual-review findings (kinds waiver-*) for a Judge to adjudicate; see the authoring_kit `judgeLens` rubric for the " +
+        "earned-ness weighting. Pass three ABSOLUTE paths. Returns { policyId, policyVersion, " +
         "diagnostics[], findings:[{kind, severity (error|manual-review|warning), class (attribution|integrity), message, itemId?, " +
-        "cluster?, ref?, range?}], errorCount, manualReviewCount, warningCount, worklistCount, pass }. pass=true ⇔ zero error-severity findings.",
+        "cluster?, ref?, range?}], errorCount, manualReviewCount, warningCount, worklistCount, waiverCount, pass }. pass=true ⇔ zero error-severity findings " +
+        "(waivers are manual-review — they do NOT fail the gate, but waiverCount>0 means the Judge has adjudication to do).",
       inputSchema: {
         artifact: z.string().min(1).describe("Absolute path to the provenance artifact JSON."),
         cel: z

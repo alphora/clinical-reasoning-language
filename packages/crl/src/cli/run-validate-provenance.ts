@@ -90,6 +90,11 @@ try {
   console.log(
     `\nFindings: ${r.findings.length} — ${r.errorCount} error, ${r.manualReviewCount} manual-review, ${warningText}`,
   );
+  // FINAL mode only: call out the judge-lens waivers (escape hatches suppressing a finding) so a "PASS — no
+  // error-severity findings" line isn't misread as "done" — each is a manual-review the Judge must adjudicate.
+  if (!worklist && r.waiverCount > 0) {
+    console.log(`\nWaivers to adjudicate: ${r.waiverCount} (manual-review)`);
+  }
   const order = { error: 0, "manual-review": 1, warning: 2 } as const;
   for (const f of [...r.findings].sort((a, b) => order[a.severity] - order[b.severity])) {
     console.log(`  [${f.severity}] ${f.kind}: ${f.message}${where(f)}`);

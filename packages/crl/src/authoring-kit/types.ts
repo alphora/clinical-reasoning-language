@@ -69,6 +69,31 @@ export interface VerifyLoop {
   note: string;
 }
 
+/**
+ * One per provenance WAIVER kind (validators.ts `WAIVER_KINDS`). The validator surfaces every waiver as a uniform
+ * manual-review for the Judge; THIS rubric carries the earned-ness weighting the severity deliberately omits — the
+ * weighting axis (`weightedBy`), the adjudication `guidance`, and the `checkpoints` to walk per waiver.
+ */
+export interface JudgeWaiverRule {
+  kind: "waiver-authored" | "waiver-ignored-span" | "waiver-intentional-unlink" | "waiver-disposition-class";
+  /** The signal that ranks this waiver's scrutiny (e.g. authoredKind, MN-keyword/clinical-language, dispositionClass). */
+  weightedBy: string;
+  /** How to judge whether the escape is EARNED vs a finding rubber-stamped away. */
+  guidance: string;
+  /** Concrete questions the Judge walks for this waiver (≥1). */
+  checkpoints: string[];
+}
+
+/**
+ * The judge-lens: how to adjudicate the FINAL-mode waivers `validate_provenance` surfaces (one rule per WAIVER kind).
+ * Severity is uniform manual-review by design — surface-then-adjudicate is auditable — so the earned-ness weighting
+ * lives HERE (+ in each finding's message), never in the severity.
+ */
+export interface JudgeLens {
+  summary: string;
+  waivers: JudgeWaiverRule[];
+}
+
 export interface AuthoringKit {
   /** Contract-shape version; bump when this interface changes. */
   schemaVersion: string;
@@ -82,6 +107,8 @@ export interface AuthoringKit {
   referenceArtifacts: ReferenceArtifact[];
   examples: KitExample[];
   verifyLoop: VerifyLoop;
+  /** The judge-lens rubric for adjudicating the FINAL-mode provenance waivers (validators.ts `WAIVER_KINDS`). */
+  judgeLens: JudgeLens;
   feedbackUrl: string;
   /** What this kit does NOT cover (descriptive boundary, not a roadmap of named future stages). */
   boundary: string[];

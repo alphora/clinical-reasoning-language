@@ -160,7 +160,7 @@ describe("authoring-kit — getAuthoringKit", () => {
   it("returns the local-decision-support kit by default", () => {
     const kit = getAuthoringKit();
     expect(kit.stage).toBe("local-decision-support");
-    expect(kit.schemaVersion).toBe("1.0");
+    expect(kit.schemaVersion).toBe("1.1");
     expect(kit.summary).toMatch(/local-decision-support/);
   });
 
@@ -229,12 +229,47 @@ describe("authoring-kit — getAuthoringKit", () => {
     expect(a.contentHash).toMatch(/^[0-9a-f]{64}$/);
     expect(a.contentHash).toBe(b.contentHash);
     // Pinned snapshot — any payload byte change must update this deliberately.
-    // Re-pinned for #134 (shared Medical Policy Determination lib + PA exemplar + composition rewrite + new rules).
-    expect(a.contentHash).toBe("2b8e1719868769249cac5ad9e810957c75e61df4ba455d1e41ca30b6a3778e31");
+    // Re-pinned for the judgeLens addition (schemaVersion 1.0 → 1.1; the new waiver-adjudication rubric).
+    expect(a.contentHash).toBe("05600f7cf3ccf2233a02cab41993235b1be784b11a3789190af9ce22d1cdc9a9");
   });
 
   it("STAGES contains exactly the one Stage-1 slice", () => {
     expect([...STAGES]).toEqual(["local-decision-support"]);
+  });
+
+  it("judgeLens has one rule per the 4 provenance waiver kinds, each with a weightedBy + ≥1 checkpoint", () => {
+    const kit = getAuthoringKit();
+    expect(kit.judgeLens).toBeDefined();
+    expect(typeof kit.judgeLens.summary).toBe("string");
+    expect(kit.judgeLens.summary.length).toBeGreaterThan(0);
+    const kinds = kit.judgeLens.waivers.map((w) => w.kind).sort();
+    expect(kinds).toEqual(
+      [
+        "waiver-authored",
+        "waiver-disposition-class",
+        "waiver-ignored-span",
+        "waiver-intentional-unlink",
+      ].sort(),
+    );
+    for (const w of kit.judgeLens.waivers) {
+      expect(typeof w.weightedBy).toBe("string");
+      expect(w.weightedBy.length).toBeGreaterThan(0);
+      expect(typeof w.guidance).toBe("string");
+      expect(w.guidance.length).toBeGreaterThan(0);
+      expect(Array.isArray(w.checkpoints)).toBe(true);
+      expect(w.checkpoints.length).toBeGreaterThanOrEqual(1);
+    }
+  });
+
+  it("judgeLens weighting axes name their discriminators (authoredKind, MN-keyword, dispositionClass)", () => {
+    const kit = getAuthoringKit();
+    const byKind = (k: string) => kit.judgeLens.waivers.find((w) => w.kind === k)!;
+    expect(byKind("waiver-authored").weightedBy).toMatch(/authoredKind/);
+    expect(byKind("waiver-ignored-span").weightedBy).toMatch(/MN-keyword|clinical language/i);
+    expect(byKind("waiver-disposition-class").weightedBy).toMatch(/dispositionClass/);
+    // clinical-assumption = scrutinize; implementation-artifact = rubber-stamp
+    expect(byKind("waiver-authored").weightedBy).toMatch(/clinical-assumption/);
+    expect(byKind("waiver-authored").weightedBy).toMatch(/implementation-artifact/);
   });
 
   it("the pa-disposition-set rule (#134) states set-equality over the shared Approve/Deny + mutual exclusivity", () => {

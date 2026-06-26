@@ -17,6 +17,7 @@ import {
   validateProvenance,
   isStrictAncestor,
   ATTRIBUTION_KINDS,
+  WAIVER_KINDS,
   type ProvenanceFinding,
 } from "../validators";
 
@@ -701,5 +702,346 @@ describe("validateProvenance — finding.class + worklist mode (in-progress vs f
   it("default mode is final (no opts.mode) — strict behavior preserved", () => {
     const over = run(art({})).find((f) => f.kind === "over-reach")!;
     expect(over.severity).toBe("error"); // default-final preserved for all current callers
+  });
+});
+
+describe("validateProvenance — judge-lens WAIVERS (FINAL mode only)", () => {
+  const final = (a: ProvenanceArtifact, text = ""): ProvenanceFinding[] =>
+    validateProvenance(a, idx, text, { mode: "final" });
+  const work = (a: ProvenanceArtifact, text = ""): ProvenanceFinding[] =>
+    validateProvenance(a, idx, text, { mode: "worklist" });
+
+  // An authored item (cluster member) supporting a cluster that holds an over-reach CANDIDATE (Crit leaf, provisional →
+  // only escape is this support) → waiver-authored, blast radius = Crit.
+  const authoredArt = (): ProvenanceArtifact => {
+    const items: Item[] = [
+      {
+        id: "auth",
+        origin: "authored",
+        text: "glue",
+        authoredKind: "clinical-assumption",
+        supports: { cluster: "c1", items: [] },
+      },
+    ];
+    const clusters: Cluster[] = [
+      {
+        id: "c1",
+        label: "",
+        items: ["auth"],
+        crl: [ref("Crit", "concept", "implements-criterion", "provisional")],
+        cel: [],
+      },
+    ];
+    return art({ items, clusters });
+  };
+
+  // An ignoredRange suppressing a span — with + without MN-hard language. The anchor text is the two phrases joined; the
+  // ignoredRange covers the MN phrase so its preview carries MN language.
+  const ANCHOR = "Page 12 footer text. not medically necessary here.";
+  const ignoredArt = (start: number, end: number): ProvenanceArtifact => ({
+    schemaVersion: "1.0",
+    policyId: "P",
+    policyVersion: "1",
+    anchorSource: metaFor(ANCHOR),
+    items: [],
+    ignoredRanges: [{ start, end, reason: "chrome" }],
+    clusters: [],
+  });
+  const MN_START = ANCHOR.indexOf("not medically necessary");
+  const MN_END = ANCHOR.length;
+  const CHROME_END = ANCHOR.indexOf(".") + 1;
+
+  // A LEGAL intentionally-unlinked ref naming an over-reach candidate (Crit), in a cluster with NO must-link item →
+  // not illegal-intentional-unlink → waiver-intentional-unlink.
+  const legalUnlinkArt = (): ProvenanceArtifact => {
+    const clusters: Cluster[] = [
+      {
+        id: "c1",
+        label: "",
+        items: [],
+        crl: [ref("Crit", "concept", "implements-criterion", "intentionally-unlinked")],
+        cel: [],
+      },
+    ];
+    return art({ clusters });
+  };
+
+  // A source item carrying a presumed-scope dispositionClass ("not my decision") → waiver-disposition-class.
+  const dispositionArt = (): ProvenanceArtifact => {
+    const items: Item[] = [
+      {
+        id: "n1",
+        origin: "source",
+        text: "out of scope clause",
+        role: "applicability",
+        linkRequirement: "rationale-only",
+        rationale: "r",
+        dispositionClass: "presumed-scope",
+      },
+    ];
+    return art({ items });
+  };
+
+  it("(a) ALL 4 waiver kinds emit in FINAL mode at severity manual-review, class integrity", () => {
+    const sets: [string, ProvenanceFinding[]][] = [
+      ["waiver-authored", final(authoredArt())],
+      ["waiver-ignored-span", final(ignoredArt(0, CHROME_END), ANCHOR)],
+      ["waiver-intentional-unlink", final(legalUnlinkArt())],
+      ["waiver-disposition-class", final(dispositionArt())],
+    ];
+    for (const [kind, fs] of sets) {
+      const w = fs.filter((f) => f.kind === kind);
+      expect(w.length).toBeGreaterThan(0);
+      for (const f of w) {
+        expect(f.severity).toBe("manual-review");
+        expect(f.class).toBe("integrity");
+      }
+    }
+  });
+
+  it("(b) NONE of the waiver kinds emit in WORKLIST mode", () => {
+    const arts = [authoredArt(), ignoredArt(0, CHROME_END), legalUnlinkArt(), dispositionArt()];
+    const texts = ["", ANCHOR, "", ""];
+    for (let i = 0; i < arts.length; i++) {
+      const ws = work(arts[i], texts[i]).filter((f) => WAIVER_KINDS.has(f.kind));
+      expect(ws).toEqual([]);
+    }
+  });
+
+  it("(c) a fresh scaffold (items:[], no ignored/unlink/disposition) emits ZERO waiver findings in both modes", () => {
+    const scaffold = art({});
+    expect(final(scaffold).filter((f) => WAIVER_KINDS.has(f.kind))).toEqual([]);
+    expect(work(scaffold).filter((f) => WAIVER_KINDS.has(f.kind))).toEqual([]);
+  });
+
+  it("(d) ATTRIBUTION_KINDS is unchanged (exactly over-reach/uncovered-span/missed-decision)", () => {
+    expect([...ATTRIBUTION_KINDS].sort()).toEqual(
+      ["missed-decision", "over-reach", "uncovered-span"].sort(),
+    );
+  });
+
+  it("(e) WAIVER_KINDS is exactly the 4 waiver kinds, disjoint from ATTRIBUTION_KINDS", () => {
+    expect([...WAIVER_KINDS].sort()).toEqual(
+      [
+        "waiver-authored",
+        "waiver-disposition-class",
+        "waiver-ignored-span",
+        "waiver-intentional-unlink",
+      ].sort(),
+    );
+    for (const k of WAIVER_KINDS) expect(ATTRIBUTION_KINDS.has(k)).toBe(false);
+  });
+
+  it("(f) pass stays true with only waivers, but manual-review count > 0", () => {
+    // Fully cover the policy nodes (Crit + Approve linked) so there is NO over-reach error, plus a presumed-scope item
+    // whose ONLY surfaced finding is the disposition-class waiver. With zero error-severity findings, pass holds and the
+    // waiver rides the manual-review tally. (mirrors validateFiles' pass = errorCount===0; the waiver does not fail.)
+    const items: Item[] = [
+      {
+        id: "n1",
+        origin: "source",
+        text: "out of scope clause",
+        role: "applicability",
+        linkRequirement: "rationale-only",
+        rationale: "r",
+        dispositionClass: "presumed-scope",
+      },
+    ];
+    // Link every over-reach CANDIDATE the index exposes (Crit + Approve leaves; the Dec/Dec2 decision sub-nodes) so no
+    // over-reach error fires — leaving the disposition-class waiver as the only non-routine finding.
+    const linkCandidates: CrlNodeRef[] = [
+      ref("Crit", "concept", "implements-criterion", "linked"),
+      ref("Approve", "activity", "recommends-disposition", "linked"),
+    ];
+    for (const dec of ["Dec", "Dec2"]) {
+      for (const nodeId of ["when[0]", "when[0]/action[0]", "otherwise", "otherwise/action[0]"]) {
+        linkCandidates.push(
+          ref(dec, "decision", "implements-determination", "linked", nodeId, "decision-node"),
+        );
+      }
+    }
+    const clusters: Cluster[] = [
+      { id: "c1", label: "", items: [], crl: linkCandidates, cel: [] },
+    ];
+    const fs = final(art({ items, clusters }));
+    expect(fs.some((f) => f.severity === "error")).toBe(false); // no over-reach (all candidates covered) → pass holds
+    const manualReview = fs.filter((f) => f.severity === "manual-review");
+    expect(manualReview.length).toBeGreaterThan(0);
+    expect(manualReview.some((f) => f.kind === "waiver-disposition-class")).toBe(true);
+  });
+
+  it("(g) waiver-authored names the suppressed node(s) in its message (blast radius)", () => {
+    const w = final(authoredArt()).find((f) => f.kind === "waiver-authored")!;
+    expect(w).toBeDefined();
+    expect(w.message).toMatch(/"Crit"/);
+    expect(w.cluster).toBe("c1");
+    // clinical-assumption → highest-scrutiny note
+    expect(w.message).toMatch(/HIGHEST-SCRUTINY/);
+  });
+
+  it("waiver-authored is NOT emitted for an authored support over a cluster with no over-reach candidate (linked ref)", () => {
+    // Crit linked in the cluster escapes over-reach on its own → the support suppresses nothing → no waiver.
+    const items: Item[] = [
+      {
+        id: "auth",
+        origin: "authored",
+        text: "g",
+        authoredKind: "derived-glue",
+        supports: { cluster: "c1", items: [] },
+      },
+    ];
+    const clusters: Cluster[] = [
+      {
+        id: "c1",
+        label: "",
+        items: ["auth"],
+        crl: [ref("Crit", "concept", "implements-criterion", "linked")],
+        cel: [],
+      },
+    ];
+    expect(kinds(final(art({ items, clusters })))).not.toContain("waiver-authored");
+  });
+
+  it("(h) waiver-ignored-span with MN language carries the MN note; chrome-only does not", () => {
+    const mn = final(ignoredArt(MN_START, MN_END), ANCHOR).find(
+      (f) => f.kind === "waiver-ignored-span",
+    )!;
+    expect(mn).toBeDefined();
+    expect(mn.message).toMatch(/medical-necessity language/);
+    expect(mn.message).toMatch(/not medically necessary/); // the preview text
+    const chrome = final(ignoredArt(0, CHROME_END), ANCHOR).find(
+      (f) => f.kind === "waiver-ignored-span",
+    )!;
+    expect(chrome).toBeDefined();
+    expect(chrome.message).not.toMatch(/medical-necessity language/);
+  });
+
+  it("(i) waiver-ignored-span is SKIPPED entirely under anchor-hash-drift (stale offsets)", () => {
+    const a: ProvenanceArtifact = {
+      schemaVersion: "1.0",
+      policyId: "P",
+      policyVersion: "1",
+      anchorSource: { ...metaFor(ANCHOR), textHash: "sha256:WRONG" },
+      items: [],
+      ignoredRanges: [{ start: MN_START, end: MN_END, reason: "chrome" }],
+      clusters: [],
+    };
+    const fs = final(a, ANCHOR);
+    expect(kinds(fs)).toContain("anchor-hash-drift");
+    expect(kinds(fs)).not.toContain("waiver-ignored-span");
+  });
+
+  it("(j) waiver-intentional-unlink does NOT stack on illegal-intentional-unlink (must-link case → only the error)", () => {
+    // A must-link-decision item with an intentionally-unlinked decision ref → illegal-intentional-unlink (V5 error);
+    // the waiver must NOT also fire on the same ref.
+    const items: Item[] = [
+      {
+        id: "n1",
+        origin: "source",
+        text: "x",
+        role: "criterion",
+        linkRequirement: "must-link-decision",
+      },
+    ];
+    const clusters: Cluster[] = [
+      {
+        id: "c1",
+        label: "x",
+        items: ["n1"],
+        crl: [ref("Crit", "concept", "implements-criterion", "intentionally-unlinked")],
+        cel: [],
+      },
+    ];
+    const k = kinds(final(art({ items, clusters })));
+    expect(k).toContain("illegal-intentional-unlink");
+    expect(k).not.toContain("waiver-intentional-unlink");
+  });
+
+  it("waiver-intentional-unlink fires for a LEGAL unlink naming an over-reach candidate; says over-reach not Missed₁", () => {
+    const w = final(legalUnlinkArt()).find((f) => f.kind === "waiver-intentional-unlink")!;
+    expect(w).toBeDefined();
+    expect(w.ref?.name).toBe("Crit");
+    expect(w.message).toMatch(/over-reach escape/);
+    expect(w.message).toMatch(/NOT a Missed₁/);
+  });
+
+  it("waiver-ignored-span is NOT emitted for a malformed/zero-length ignored range (it suppresses nothing)", () => {
+    // out-of-range end → coverage flags malformed-range and the range covers nothing → no suppression claim.
+    const oor = final(ignoredArt(0, 9999), ANCHOR);
+    expect(kinds(oor)).toContain("malformed-range");
+    expect(kinds(oor)).not.toContain("waiver-ignored-span");
+    // zero-length → covers nothing → no waiver either.
+    expect(kinds(final(ignoredArt(5, 5), ANCHOR))).not.toContain("waiver-ignored-span");
+  });
+
+  it("a LEGAL intentional-unlink waiver is NOT hidden by an ILLEGAL unlink of the same node in another cluster", () => {
+    // cluster cA: a must-link item intentionally-unlinks Crit → illegal-intentional-unlink (V5 error). cluster cB: NO
+    // must-link item, the same Crit intentionally-unlinked → a LEGAL waiver. Keying the dedup by node ALONE would wrongly
+    // suppress cB's legal waiver; keying by cluster+node keeps it.
+    const items: Item[] = [
+      { id: "n1", origin: "source", text: "x", role: "criterion", linkRequirement: "must-link-decision" },
+    ];
+    const unlinked = (id: string, owns: string[]): Cluster => ({
+      id,
+      label: "",
+      items: owns,
+      crl: [ref("Crit", "concept", "implements-criterion", "intentionally-unlinked")],
+      cel: [],
+    });
+    const fs = final(art({ items, clusters: [unlinked("cA", ["n1"]), unlinked("cB", [])] }));
+    expect(kinds(fs)).toContain("illegal-intentional-unlink");
+    const waivers = fs.filter((f) => f.kind === "waiver-intentional-unlink");
+    expect(waivers.length).toBe(1); // only cB's legal unlink, NOT cA's illegal one
+    expect(waivers[0].cluster).toBe("cB");
+  });
+
+  it("(k) waiver-disposition-class fires on a presumed-scope item with the 'not my decision' framing", () => {
+    const w = final(dispositionArt()).find((f) => f.kind === "waiver-disposition-class")!;
+    expect(w).toBeDefined();
+    expect(w.itemId).toBe("n1");
+    expect(w.message).toMatch(/presumed-scope/);
+    expect(w.message).toMatch(/out-of-decision-scope/);
+  });
+
+  it("waiver-disposition-class also fires for no-operational-disposition, marked routine", () => {
+    const items: Item[] = [
+      {
+        id: "n2",
+        origin: "source",
+        text: "admin note",
+        role: "administrative",
+        linkRequirement: "rationale-only",
+        rationale: "r",
+        dispositionClass: "no-operational-disposition",
+      },
+    ];
+    const w = final(art({ items })).find((f) => f.kind === "waiver-disposition-class")!;
+    expect(w).toBeDefined();
+    expect(w.message).toMatch(/routine admin\/definition/);
+  });
+
+  it("waiver-authored does NOT stack on a V7 authored-supports-malformed error for the same item", () => {
+    // authored item supports a cluster it is NOT a member of → V7 error; the waiver must not also fire.
+    const items: Item[] = [
+      {
+        id: "auth",
+        origin: "authored",
+        text: "g",
+        authoredKind: "derived-glue",
+        supports: { cluster: "c1", items: [] },
+      },
+    ];
+    const clusters: Cluster[] = [
+      {
+        id: "c1",
+        label: "",
+        items: [], // auth NOT a member → V7-malformed
+        crl: [ref("Crit", "concept", "implements-criterion", "provisional")],
+        cel: [],
+      },
+    ];
+    const k = kinds(final(art({ items, clusters })));
+    expect(k).toContain("authored-supports-malformed");
+    expect(k).not.toContain("waiver-authored");
   });
 });

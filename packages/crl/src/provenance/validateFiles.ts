@@ -22,6 +22,7 @@ import {
 } from "./indexer";
 import {
   validateProvenance,
+  WAIVER_KINDS,
   type ProvenanceFinding,
   type ProvenanceValidationMode,
 } from "./validators";
@@ -41,6 +42,8 @@ export interface ResolveProvenanceResult {
   warningCount: number;
   /** Count of attribution-class findings (the coverage backlog). In worklist mode these are graded "warning"; in final mode they are at native severity. */
   worklistCount: number;
+  /** Count of WAIVER-kind findings (the judge-lens escape hatches) — FINAL mode only (worklist skips them); all manual-review. */
+  waiverCount: number;
   pass: boolean;
 }
 
@@ -90,6 +93,7 @@ export function resolveProvenance(
     manualReviewCount: findings.filter((f) => f.severity === "manual-review").length,
     warningCount: findings.filter((f) => f.severity === "warning").length,
     worklistCount: findings.filter((f) => f.class === "attribution").length,
+    waiverCount: findings.filter((f) => WAIVER_KINDS.has(f.kind)).length,
     // pass stays errorCount===0: in worklist mode the attribution backlog is "warning" → doesn't fail.
     pass: errorCount === 0,
   };
@@ -105,6 +109,8 @@ export interface ValidateProvenanceFilesResult {
   warningCount: number;
   /** Count of attribution-class findings (the coverage backlog) — the KE's "remaining work" tally; warning-graded in worklist mode. */
   worklistCount: number;
+  /** Count of WAIVER-kind findings (the judge-lens escape hatches to adjudicate) — FINAL mode only; all manual-review. */
+  waiverCount: number;
   pass: boolean;
 }
 
@@ -125,6 +131,7 @@ export function validateProvenanceFiles(
     manualReviewCount: r.manualReviewCount,
     warningCount: r.warningCount,
     worklistCount: r.worklistCount,
+    waiverCount: r.waiverCount,
     pass: r.pass,
   };
 }

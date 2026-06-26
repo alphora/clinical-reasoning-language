@@ -28,6 +28,7 @@ import type {
   AuthoringKit,
   AuthoringStage,
   ConceptLayerEntry,
+  JudgeLens,
   KitExample,
   KitRule,
   TypeAllowlist,
@@ -36,7 +37,9 @@ import type {
 
 export type { AuthoringKit, AuthoringStage } from "./types";
 
-const SCHEMA_VERSION = "1.0";
+// "1.0" → "1.1": additive shape change — the `judgeLens` field (the waiver-adjudication rubric) joins the kit.
+// Sibling KE agents pin schemaVersion + contentHash and re-sync; the bump signals the new field.
+const SCHEMA_VERSION = "1.1";
 export const DEFAULT_STAGE: AuthoringStage = "local-decision-support";
 export const STAGES: readonly AuthoringStage[] = [DEFAULT_STAGE];
 
@@ -217,6 +220,82 @@ const VERIFY_LOOP: VerifyLoop = {
     "validate_cel and run_decision require FILES under a project root (a package.json); they do not accept inline code. In the crl-content layout, author <artifact>.crl and <artifact>.cel under the artifact's package and pass absolute paths.",
 };
 
+/**
+ * The judge-lens rubric — one rule per provenance WAIVER kind (validators.ts `WAIVER_KINDS`). `validate_provenance`
+ * (FINAL mode) surfaces every escape hatch that suppresses a finding as a UNIFORM manual-review; the severity carries
+ * no weighting by design (surface-then-adjudicate is auditable). This rubric carries the earned-ness weighting: the
+ * axis to rank each waiver's scrutiny, how to judge earned vs rubber-stamped, and the checkpoints to walk.
+ */
+const JUDGE_LENS: JudgeLens = {
+  summary:
+    "In FINAL mode, validate_provenance surfaces every WAIVER — an escape hatch that suppresses a finding — as a " +
+    "uniform manual-review for the Judge to adjudicate. Severity carries no weighting (surface-then-rubber-stamp is " +
+    "auditable); this rubric does. For each waiver, rank scrutiny by its `weightedBy` axis, judge earned-ness with " +
+    "`guidance`, and walk the `checkpoints`. The waiver's finding message names the concrete loci (cluster, blast " +
+    "radius, span preview, dispositionClass).",
+  waivers: [
+    {
+      kind: "waiver-authored",
+      weightedBy:
+        "authoredKind — clinical-assumption / derived-glue (clinical logic with NO source span) = highest scrutiny; " +
+        "implementation-artifact / modeling-rationale = routine (rubber-stamp).",
+      guidance:
+        "An authored item with `supports` suppresses the over-reach of every candidate CRL node in its cluster (the " +
+        "BLAST RADIUS named in the message). Earned when the suppressed logic is genuine glue/implementation the source " +
+        "implies; suspect when it invents a clinical decision the narrative never states.",
+      checkpoints: [
+        "Read the blast radius: is each suppressed node really implied by this cluster's source, or invented?",
+        "Is the authoredKind honest — is a `clinical-assumption` truly assumption, not a dodged criterion?",
+        "Would removing this authored support re-expose a real over-reach the KE should have linked instead?",
+      ],
+    },
+    {
+      kind: "waiver-ignored-span",
+      weightedBy:
+        "MN-keyword / clinical language in the span preview — a ⚠ MN-hard match means the ignored text likely IS a " +
+        "coverage criterion (scrutinize hard); plain chrome (page numbers, headers) is routine.",
+      guidance:
+        "An ignoredRange suppresses an uncovered-span (Missed₂) — the span is deliberately not modeled. Earned for " +
+        "true page chrome / boilerplate; a dodged coverage criterion is the failure mode this waiver exists to catch.",
+      checkpoints: [
+        "Read the span text preview: is it genuinely non-clinical chrome, or a criterion ignored away?",
+        "If the message flags MN language, treat the ignore as suspect until proven boilerplate.",
+        "Does the `reason` actually justify the omission, or is it a placeholder?",
+      ],
+    },
+    {
+      kind: "waiver-intentional-unlink",
+      weightedBy:
+        "the node's decision relation + the cluster's source context — an intentionally-unlinked decision-sub-node in a " +
+        "clinically-loaded cluster is more suspect than one in a clearly out-of-scope branch.",
+      guidance:
+        "A LEGAL intentionally-unlinked ref (not a must-link-decision item's decision ref — that is the illegal-" +
+        "intentional-unlink ERROR) suppresses an over-reach candidate. This is an OVER-REACH escape, NOT a Missed₁ gap. " +
+        "Earned when the node truly is out of scope for this policy; suspect when it silences logic the policy needs.",
+      checkpoints: [
+        "Confirm the omission is deliberate and the node is genuinely out of this policy's decision scope.",
+        "Check the cluster's source context — does the narrative actually exclude this node, or is it being dodged?",
+      ],
+    },
+    {
+      kind: "waiver-disposition-class",
+      weightedBy:
+        "dispositionClass — route-elsewhere / presumed-scope / pend assert 'not my decision' (scrutinize, esp. " +
+        "presumed-scope on clinical language); no-operational-disposition is routine admin/definition.",
+      guidance:
+        "A source item tagged non-decision-role + dispositionClass acknowledges a span out of decision scope — the " +
+        "laundering route a genuine criterion can take to evade missed-decision / V9 / over-reach. Earned for true " +
+        "applicability/admin spans; a presumed-scope on a clinical criterion is the failure mode. If V8 mn-keyword also " +
+        "fired on the item, the coverage language strengthens the concern.",
+      checkpoints: [
+        "Is the span genuinely out-of-decision-scope, or a criterion acknowledged away under a disposition tag?",
+        "Be especially suspicious of presumed-scope / route-elsewhere on clinically-loaded text.",
+        "If mn-keyword also fired here, reconcile the role before accepting the waiver.",
+      ],
+    },
+  ],
+};
+
 const BOUNDARY = [
   "`definition is` predicates (count / most-recent / temporal / value thresholds — compute over a source)",
   "external / value-set sources (`source representation` / `coded from`)",
@@ -286,6 +365,7 @@ function buildBase(stage: AuthoringStage): Omit<AuthoringKit, "contentHash"> {
     ],
     examples: EXAMPLES,
     verifyLoop: VERIFY_LOOP,
+    judgeLens: JUDGE_LENS,
     feedbackUrl: FEEDBACK_URL,
     boundary: BOUNDARY,
   };

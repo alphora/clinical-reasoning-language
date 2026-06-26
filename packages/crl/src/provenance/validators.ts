@@ -7,10 +7,11 @@
  */
 import { createHash } from "node:crypto";
 
-import type { ProvenanceArtifact, Role } from "./artifact";
+import type { AuthoredKind, ProvenanceArtifact, Role } from "./artifact";
 import { sliceUtf8Bytes } from "./canonicalize";
 import { deriveCoverage } from "./coverage";
-import type { ProvenanceIndex, ProvNodeRef } from "./indexer";
+import type { IndexedCrlNode, ProvenanceIndex, ProvNodeRef } from "./indexer";
+import { nodeKey } from "./indexer";
 
 export type Severity = "error" | "warning" | "manual-review";
 
@@ -44,7 +45,14 @@ export type ProvenanceFindingKind =
   | "mn-keyword-hard"
   | "mn-keyword-soft"
   | "structural-mistag"
-  | "over-reach";
+  | "over-reach"
+  // ── judge-lens waivers (FINAL mode only): an escape hatch suppressing a finding, surfaced for the Judge to
+  //    adjudicate its earned-ness. All four are class "integrity" + severity "manual-review" (uniform — the
+  //    weighting lives in the message + the kit rubric, never in the severity). See the WAIVER_KINDS block below.
+  | "waiver-authored"
+  | "waiver-ignored-span"
+  | "waiver-intentional-unlink"
+  | "waiver-disposition-class";
 
 /**
  * The COVERAGE-backlog kinds — un-attributed work the KE has yet to do (a CRL node in no cluster, an unacknowledged
@@ -54,6 +62,20 @@ export type ProvenanceFindingKind =
 export const ATTRIBUTION_KINDS: ReadonlySet<ProvenanceFindingKind> = new Set<ProvenanceFindingKind>(
   ["over-reach", "uncovered-span", "missed-decision"],
 );
+
+/**
+ * The WAIVER kinds — every escape hatch that SUPPRESSES a finding, surfaced ONLY in "final" mode for the Judge to
+ * adjudicate (mirrors ATTRIBUTION_KINDS so the CLI/MCP can count + present them as a distinct bucket). A waiver is the
+ * "judge-lens": surface-then-adjudicate is auditable, so severity is UNIFORM manual-review and the weighting lives in
+ * the finding MESSAGE + the authoring_kit `judgeLens` rubric — never demoted to warning, never skipped. WAIVER_KINDS is
+ * DISJOINT from ATTRIBUTION_KINDS (so the post-pass never softens a waiver) and never error (so it's never re-graded).
+ */
+export const WAIVER_KINDS: ReadonlySet<ProvenanceFindingKind> = new Set<ProvenanceFindingKind>([
+  "waiver-authored",
+  "waiver-ignored-span",
+  "waiver-intentional-unlink",
+  "waiver-disposition-class",
+]);
 
 export interface ProvenanceFinding {
   kind: ProvenanceFindingKind;
@@ -488,11 +510,178 @@ export function validateProvenance(
     });
   }
 
+  const mode = opts?.mode ?? "final";
+
+  // ── judge-lens WAIVERS (FINAL mode only) ── surface every escape hatch that SUPPRESSES a finding so the Judge can
+  // adjudicate its earned-ness (worklist mode is the in-progress backlog view — a waiver there is just noise, so skip
+  // the whole block). All four push at severity "manual-review", class "integrity" (WAIVER_KINDS ∉ ATTRIBUTION_KINDS →
+  // the post-pass never softens them; manual-review is never re-graded). The WEIGHTING is in the message, not severity.
+  if (mode === "final") {
+    // A node is an over-reach CANDIDATE iff it mirrors isOverReach's candidate clause: a policy-owned leaf, or a
+    // decision-SUB-node (decision-node with a nodeId). Shared by waiver-authored + waiver-intentional-unlink.
+    const isCandidate = (node: IndexedCrlNode): boolean =>
+      node.ownership === "policy-owned" &&
+      (node.nodeKind === "leaf" ||
+        (node.nodeKind === "decision-node" && node.ref.nodeId !== undefined));
+    // Candidate index nodes keyed by nodeKey — the over-reach denominator a waiver may be escaping.
+    const candidateByKey = new Map<string, IndexedCrlNode>();
+    for (const node of index.nodes.values()) {
+      if (isCandidate(node)) candidateByKey.set(nodeKey(node.ref), node);
+    }
+    // A candidate's nodeKey is LINKED/INTENTIONALLY-UNLINKED somewhere — those refs escape over-reach on their own
+    // (coverage.ts:88), so an authored support is NOT the suppressor for them. Used to scope waiver-authored's blast
+    // radius to the nodes whose ONLY escape is the authored support.
+    const escapedByRefStatus = new Set<string>();
+    for (const cl of artifact.clusters) {
+      for (const r of cl.crl) {
+        if (r.status === "linked" || r.status === "intentionally-unlinked")
+          escapedByRefStatus.add(nodeKey(toRef(r)));
+      }
+    }
+
+    // V7-malformed authored items (bad cluster / non-member) — don't stack a manual-review waiver on top of an error
+    // for the same broken item (the V7 error is the priority signal).
+    const v7MalformedItems = new Set<string>();
+    for (const item of artifact.items) {
+      if (item.origin !== "authored" || !item.supports) continue;
+      const c = artifact.clusters.find((cl) => cl.id === item.supports!.cluster);
+      if (!c || !c.items.includes(item.id)) v7MalformedItems.add(item.id);
+    }
+
+    // Whether ANY anchor-hash-drift finding fired — the offsets/preview a waiver-ignored-span would show are stale, so
+    // the drift is the priority signal and we SKIP waiver-ignored-span entirely (its suppression is noted at its loop).
+    const driftPresent = findings.some((f) => f.kind === "anchor-hash-drift");
+
+    // ── (1) waiver-authored ── per authored item with a `supports` that ACTUALLY suppresses over-reach (its cluster is
+    //    real AND holds ≥1 over-reach candidate whose only escape is this authored support — the blast radius).
+    const authoredScrutiny = (k: AuthoredKind | undefined): string =>
+      k === "clinical-assumption" || k === "derived-glue"
+        ? "HIGHEST-SCRUTINY: clinical logic with no source span — confirm it is earned, not invented"
+        : "routine: an implementation/modeling note, not clinical logic";
+    for (const item of artifact.items) {
+      if (item.origin !== "authored" || !item.supports) continue;
+      if (v7MalformedItems.has(item.id)) continue; // V7 error already owns this broken item
+      const c = artifact.clusters.find((cl) => cl.id === item.supports!.cluster);
+      if (!c) continue; // unreachable (V7-malformed already filtered), but keep the guard explicit
+      // Blast radius: candidate nodes referenced by this cluster's crl whose only over-reach escape is this support.
+      const suppressed: IndexedCrlNode[] = [];
+      const seenSuppressed = new Set<string>();
+      for (const r of c.crl) {
+        const key = nodeKey(toRef(r));
+        if (escapedByRefStatus.has(key)) continue; // a linked/intentionally-unlinked ref escapes on its own
+        const node = candidateByKey.get(key);
+        if (node && !seenSuppressed.has(key)) {
+          seenSuppressed.add(key);
+          suppressed.push(node);
+        }
+      }
+      if (suppressed.length === 0) continue; // suppresses no real over-reach → not a waiver, nothing to adjudicate
+      const radius = suppressed
+        .map((n) => `"${n.ref.name}"${n.ref.nodeId ? "#" + n.ref.nodeId : ""}`)
+        .join(", ");
+      findings.push({
+        kind: "waiver-authored",
+        severity: "manual-review",
+        message:
+          `authored item "${item.id}" (${item.authoredKind ?? "unspecified"}) supports cluster "${c.id}" and ` +
+          `is an authored escape for the over-reach of ${suppressed.length} candidate node(s): ${radius}. ${authoredScrutiny(item.authoredKind)}.`,
+        itemId: item.id,
+        cluster: c.id,
+      });
+    }
+
+    // ── (2) waiver-ignored-span ── per IgnoredRange (it suppresses an uncovered-span / Missed₂). SKIP the whole loop
+    //    under anchor-hash-drift: the offsets/preview would be stale, and the drift is the priority signal.
+    if (!driftPresent) {
+      // Only a VALID ignored range actually suppresses coverage — a malformed/zero-length one covers nothing (coverage
+      // drops it to malformedRanges), so don't claim "suppresses an uncovered-span" for it: the malformed-range error
+      // already owns it, and we'd otherwise quote garbled/empty text.
+      const malformedKeys = new Set(coverage.malformedRanges.map((m) => `${m.start} ${m.end}`));
+      for (const ig of artifact.ignoredRanges) {
+        if (ig.start >= ig.end) continue; // zero-/negative-length: suppresses nothing
+        if (malformedKeys.has(`${ig.start} ${ig.end}`)) continue; // out-of-range/non-boundary: malformed-range owns it
+        let preview: string;
+        try {
+          preview = sliceUtf8Bytes(anchorText, ig.start, ig.end);
+        } catch {
+          continue; // non-boundary slice → malformed (already flagged); never emit a suppression claim for it
+        }
+        const truncated = preview.length > 80 ? preview.slice(0, 80) + "…" : preview;
+        const mnNote =
+          mnKeyword(preview) === "hard"
+            ? " ⚠ contains medical-necessity language — likely a coverage criterion, scrutinize"
+            : "";
+        findings.push({
+          kind: "waiver-ignored-span",
+          severity: "manual-review",
+          message:
+            `ignoredRange [${ig.start},${ig.end}) ("${ig.reason}") suppresses an uncovered-span (Missed₂). ` +
+            `Text: "${truncated}".${mnNote}`,
+          range: { start: ig.start, end: ig.end },
+        });
+      }
+    }
+
+    // ── (3) waiver-intentional-unlink ── per CrlNodeRef status:"intentionally-unlinked" that is LEGAL (not already an
+    //    illegal-intentional-unlink — i.e. not a must-link-decision item's decision-relation ref) AND actually
+    //    suppresses an over-reach candidate. This is an OVER-REACH escape (coverage.ts:88), NOT Missed₁ — say so.
+    // Key by cluster+node, NOT node alone: an illegal unlink in cluster A must not hide a LEGAL intentionally-unlinked
+    // waiver for the same node in cluster B (illegality is per-item-per-cluster, V5:320-330).
+    const illegalUnlinks = new Set(
+      findings
+        .filter((f) => f.kind === "illegal-intentional-unlink" && f.ref)
+        .map((f) => `${f.cluster ?? ""} ${nodeKey(f.ref!)}`),
+    );
+    for (const c of artifact.clusters) {
+      for (const ref of c.crl) {
+        if (ref.status !== "intentionally-unlinked") continue;
+        const key = nodeKey(toRef(ref));
+        if (illegalUnlinks.has(`${c.id} ${key}`)) continue; // V5 illegal error owns THIS cluster's ref — don't stack
+        const node = candidateByKey.get(key);
+        if (!node) continue; // names no over-reach candidate → suppresses nothing to adjudicate
+        findings.push({
+          kind: "waiver-intentional-unlink",
+          severity: "manual-review",
+          message:
+            `cluster "${c.id}" intentionally-unlinks over-reach candidate "${ref.name}"${ref.nodeId ? "#" + ref.nodeId : ""} ` +
+            `(an over-reach escape, NOT a Missed₁ decision gap). Confirm the omission is deliberate.`,
+          cluster: c.id,
+          ref: toRef(ref),
+        });
+      }
+    }
+
+    // ── (4) waiver-disposition-class ── per origin:"source" item carrying a dispositionClass: the three "not my
+    //    decision" classes assert out-of-scope (scrutinize); no-operational-disposition is routine admin/definition
+    //    (DO emit, marked routine). This is the laundering V9 misses — a genuine criterion tagged non-decision-role +
+    //    dispositionClass can evade missed-decision/V9/over-reach.
+    const mnFired = new Set(
+      findings.filter((f) => f.kind === "mn-keyword-hard").map((f) => f.itemId),
+    );
+    for (const item of artifact.items) {
+      if (item.origin !== "source" || !item.dispositionClass) continue;
+      const routine = item.dispositionClass === "no-operational-disposition";
+      const mnNote = mnFired.has(item.id)
+        ? " (V8 mn-keyword ALSO fired on this item — the coverage language strengthens the concern)"
+        : "";
+      findings.push({
+        kind: "waiver-disposition-class",
+        severity: "manual-review",
+        message:
+          `source item "${item.id}" (role ${item.role ?? "unspecified"}, dispositionClass ${item.dispositionClass}) ` +
+          (routine
+            ? "is acknowledged as routine admin/definition — confirm it carries no decision content"
+            : 'asserts "not my decision" — confirm this span is genuinely out-of-decision-scope, not a criterion acknowledged away') +
+          `.${mnNote}`,
+        itemId: item.id,
+      });
+    }
+  }
+
   // ── post-pass: stamp `class` (mode-INDEPENDENT) + worklist re-grade ──
   // `class` is set on EVERY finding regardless of mode. In "worklist" mode ONLY, attribution-class findings re-grade
   // error→warning (non-blocking); integrity-class severity is untouched in both modes. No 4th Severity is introduced —
-  // "warning" is an existing bucket.
-  const mode = opts?.mode ?? "final";
+  // "warning" is an existing bucket. (Waiver findings are integrity + manual-review → untouched by both passes.)
   return findings.map((f): ProvenanceFinding => {
     const cls: ProvenanceFinding["class"] = ATTRIBUTION_KINDS.has(f.kind)
       ? "attribution"
