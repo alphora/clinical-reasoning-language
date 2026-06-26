@@ -86,6 +86,7 @@ export {
   buildCrlConceptLayer,
   classifyConcept,
   buildConceptContainment,
+  generateProvenanceScaffold,
   decisionSpine,
   nodeKey,
 } from "./provenance";
@@ -118,6 +119,8 @@ export type {
   SpineNodeKind,
   ProvNodeRef,
   CockpitModel,
+  GenerateDiagnostic,
+  GenerateResult,
 } from "./provenance";
 
 export { validateCEL, validateCELFile } from "./cel/validator";
