@@ -23,6 +23,7 @@ import { deriveCoverage } from "../coverage";
 import { generateProvenanceScaffold, mergeScaffold } from "../generate";
 import { generateProvenanceFiles } from "../generateFiles";
 import { buildProvenanceIndex, nodeKey, type ProvenanceIndex } from "../indexer";
+import { validateProvenanceFiles } from "../validateFiles";
 import { validateProvenance, type ProvenanceFinding } from "../validators";
 
 // ── fixture (mirrors generate.test.ts) ────────────────────────────────────────
@@ -128,6 +129,31 @@ describe("provenance feedback loop — generate → validate baseline", () => {
     // the over-reach set equals coverage's over-reach set (the scaffold documents its own baseline).
     const coverage = deriveCoverage(artifact, idx, ANCHOR);
     expect(coverage.overReach.length).toBe(K);
+  });
+});
+
+describe("provenance feedback loop — worklist mode softens a FRESH scaffold (no wall of red)", () => {
+  it("worklist: the K over-reach + 1 uncovered-span re-grade to warnings → no error-severity findings (it would pass)", () => {
+    const { artifact } = gen();
+    const work = validateProvenance(artifact, idx, ANCHOR, { ...VALIDATE_OPTS, mode: "worklist" });
+
+    // the attribution backlog (over-reach × K, uncovered-span × 1) is now "warning", not "error".
+    const attribution = work.filter((f) => f.class === "attribution");
+    expect(attribution.length).toBe(K + 1); // the 8 over-reach + the 1 uncovered-span
+    expect(attribution.every((f) => f.severity === "warning")).toBe(true);
+
+    // no error-severity findings → a fresh scaffold would pass in worklist mode.
+    expect(work.filter((f) => f.severity === "error").length).toBe(0);
+    // and the integrity findings are empty for a clean fresh scaffold.
+    expect(work.filter((f) => f.class === "integrity").length).toBe(0);
+  });
+
+  it("final mode (baseline): the same K over-reach are errors — strict behavior unchanged", () => {
+    const { artifact } = gen();
+    const final = validateProvenance(artifact, idx, ANCHOR, { ...VALIDATE_OPTS, mode: "final" });
+    const over = final.filter((f) => f.kind === "over-reach");
+    expect(over.length).toBe(K);
+    expect(over.every((f) => f.severity === "error" && f.class === "attribution")).toBe(true);
   });
 });
 
@@ -330,6 +356,42 @@ describe("generateProvenanceFiles — file pipeline end-to-end (anchorMetaFor + 
       expect(() => generateProvenanceFiles(noCel, anchorTxt)).toThrow(
         /no covered policy library resolved/,
       );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+// ── validateProvenanceFiles: worklistCount + mode threading on the real file pipeline ──
+describe("validateProvenanceFiles — worklist mode passes a fresh scaffold (worklistCount populated)", () => {
+  it("a fresh scaffold: final → fails (errors); worklist → passes, worklistCount = K+1 (the attribution backlog)", () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), "prov-validate-files-"));
+    try {
+      writeFileSync(
+        path.join(dir, "package.json"),
+        JSON.stringify({ name: "p", version: "0.0.0", private: true }),
+      );
+      writeFileSync(path.join(dir, "policy.crl"), POLICY_CRL);
+      const fCel = path.join(dir, "f.cel");
+      writeFileSync(fCel, CEL);
+      const anchorTxt = path.join(dir, "anchor.txt");
+      writeFileSync(anchorTxt, ANCHOR);
+
+      const g = generateProvenanceFiles(fCel, anchorTxt);
+      const artifactPath = path.join(dir, "artifact.json");
+      writeFileSync(artifactPath, JSON.stringify(g.artifact));
+
+      // final (default): the attribution backlog is error-severity → fails.
+      const final = validateProvenanceFiles(artifactPath, fCel, anchorTxt);
+      expect(final.pass).toBe(false);
+      expect(final.errorCount).toBeGreaterThan(0);
+      expect(final.worklistCount).toBe(K + 1); // K over-reach + 1 uncovered-span
+
+      // worklist: the same backlog is warning-severity → passes; worklistCount unchanged (class is mode-independent).
+      const work = validateProvenanceFiles(artifactPath, fCel, anchorTxt, "worklist");
+      expect(work.pass).toBe(true);
+      expect(work.errorCount).toBe(0);
+      expect(work.worklistCount).toBe(K + 1);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

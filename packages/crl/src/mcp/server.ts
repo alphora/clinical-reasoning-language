@@ -586,9 +586,10 @@ export function createServer(): McpServer {
         "AST index, derive two-sense coverage, and check referential integrity, content-hash drift, source-acknowledgement, " +
         "linkRequirement (Missed₁), drivesDetermination ancestry, authored-item discipline, §9.1 MN-keyword, §9.2 structural " +
         "mis-tag, and over-reach. A CEL ref to a case lacking an explicit (frozen) `- id is` → provenance-references-unfrozen-case " +
-        "(§7). Pass three ABSOLUTE paths. Returns { policyId, policyVersion, diagnostics[], findings:[{kind, severity " +
-        "(error|manual-review|warning), message, itemId?, cluster?, ref?, range?}], errorCount, manualReviewCount, " +
-        "warningCount, pass }. pass=true ⇔ zero error-severity findings.",
+        "(§7). This is the FINAL/strict gate on a COMPLETED artifact — over the in-progress check, use validate_provenance_worklist " +
+        "(it re-grades the attribution backlog to remaining-work). Pass three ABSOLUTE paths. Returns { policyId, policyVersion, " +
+        "diagnostics[], findings:[{kind, severity (error|manual-review|warning), class (attribution|integrity), message, itemId?, " +
+        "cluster?, ref?, range?}], errorCount, manualReviewCount, warningCount, worklistCount, pass }. pass=true ⇔ zero error-severity findings.",
       inputSchema: {
         artifact: z.string().min(1).describe("Absolute path to the provenance artifact JSON."),
         cel: z
@@ -599,6 +600,32 @@ export function createServer(): McpServer {
       },
     },
     (args) => runValidateProvenance(args as { artifact: string; cel: string; anchor: string }),
+  );
+
+  server.registerTool(
+    "validate_provenance_worklist",
+    {
+      title: "Validate a provenance artifact — IN-PROGRESS (worklist mode)",
+      description:
+        "The IN-PROGRESS / authoring counterpart to validate_provenance. Runs the SAME §9 validators, but in worklist " +
+        "mode: attribution-class findings (the COVERAGE backlog — over-reach, uncovered-span, missed-decision) are " +
+        "re-graded from error to \"warning\" and reported as REMAINING WORK, not failures — so a fresh, half-attributed " +
+        "scaffold does not read as a wall of red. Integrity issues (drift, mistag, mn-keyword, malformed, referential, " +
+        "etc.) are STILL surfaced at their native severity and STILL fail. Use this WHILE authoring; use " +
+        "validate_provenance for the final/strict gate on a completed artifact. Pass three ABSOLUTE paths. Returns the " +
+        "same envelope as validate_provenance plus `worklistCount` (the attribution-backlog tally) and a `remaining` " +
+        "note. pass=true ⇔ zero error-severity findings (so a fresh scaffold's attribution backlog passes).",
+      inputSchema: {
+        artifact: z.string().min(1).describe("Absolute path to the provenance artifact JSON."),
+        cel: z
+          .string()
+          .min(1)
+          .describe("Absolute path to the policy .cel (imports walk to nearest package.json)."),
+        anchor: z.string().min(1).describe("Absolute path to the canonical anchor-source .txt."),
+      },
+    },
+    (args) =>
+      runValidateProvenance(args as { artifact: string; cel: string; anchor: string }, "worklist"),
   );
 
   server.registerTool(
@@ -618,7 +645,9 @@ export function createServer(): McpServer {
         "{ success, policyId, policyVersion, clusterCount, diagnosticCountsByKind, mergeDiagnosticCountsByKind? (only " +
         "when merging), merged }. The `diagnostics`/`mergeDiagnostics` COUNTS describe the FRESH-scaffold worklist " +
         "(the attribution + over-reach BASELINE); when `merged` is true they are the PRE-MERGE baseline, NOT the " +
-        "merged artifact's residual — run `validate_provenance` on the output for the residual. Pass " +
+        "merged artifact's residual. While ATTRIBUTING the scaffold, run `validate_provenance_worklist` on the output " +
+        "(the in-progress check — the attribution backlog reads as remaining work, not errors); run the strict " +
+        "`validate_provenance` for the FINAL gate on the completed artifact. Pass " +
         "`includeArtifact: true` to also receive the full `artifact` (use the `crl-generate-provenance` CLI's --out for " +
         "the full body in scripts). Bad/missing/unreadable/oversized paths or an unresolved `covers` target → a tool " +
         "error. NOTE: generate succeeding does NOT mean the artifact is complete — the diagnostics ARE the KE's worklist.",
@@ -739,7 +768,7 @@ function runGenerateProvenance(args: {
       merged: r.merged,
       ...(r.merged
         ? {
-            note: "diagnostics are the pre-merge baseline; run validate_provenance on the output for the merged residual.",
+            note: "diagnostics are the pre-merge baseline; run validate_provenance_worklist on the output for the in-progress residual (or validate_provenance for the final/strict gate).",
           }
         : {}),
       ...(args.includeArtifact ? { artifact: r.artifact } : {}),
@@ -753,7 +782,10 @@ function runGenerateProvenance(args: {
   }
 }
 
-function runValidateProvenance(args: { artifact: string; cel: string; anchor: string }): {
+function runValidateProvenance(
+  args: { artifact: string; cel: string; anchor: string },
+  mode: "worklist" | "final" = "final",
+): {
   content: Array<{ type: "text"; text: string }>;
   isError?: boolean;
 } {
@@ -779,11 +811,28 @@ function runValidateProvenance(args: { artifact: string; cel: string; anchor: st
     }
   }
   try {
-    const result = validateProvenanceFiles(args.artifact, args.cel, args.anchor);
-    return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    const result = validateProvenanceFiles(args.artifact, args.cel, args.anchor, mode);
+    // In worklist mode add a `remaining` note steering the reader: the worklistCount attribution findings are remaining
+    // work (graded "warning"), not errors; integrity findings still surface. The base envelope already carries worklistCount.
+    const payload =
+      mode === "worklist"
+        ? {
+            ...result,
+            remaining:
+              `${result.worklistCount} attribution finding(s) remain as warnings (the coverage backlog — ` +
+              `remaining work, not errors); integrity findings are still reported at native severity. ` +
+              `Use validate_provenance for the final/strict gate.`,
+          }
+        : result;
+    return { content: [{ type: "text", text: JSON.stringify(payload, null, 2) }] };
   } catch (e) {
     return {
-      content: [{ type: "text", text: `validate_provenance failed: ${(e as Error).message}` }],
+      content: [
+        {
+          type: "text",
+          text: `${mode === "worklist" ? "validate_provenance_worklist" : "validate_provenance"} failed: ${(e as Error).message}`,
+        },
+      ],
       isError: true,
     };
   }

@@ -48,7 +48,7 @@ export { decisionSpine } from "../ast/decisionSpine";
 export type { SpineNode, SpineNodeKind } from "../ast/decisionSpine";
 export { deriveCoverage, decisionImplemented, isOverReach } from "./coverage";
 export type { CoverageReport } from "./coverage";
-export { validateProvenance } from "./validators";
+export { validateProvenance, ATTRIBUTION_KINDS } from "./validators";
 export type {
   ProvenanceFinding,
   ProvenanceFindingKind,

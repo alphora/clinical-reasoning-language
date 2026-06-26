@@ -31,7 +31,7 @@ const check = async (label, fn) => {
 
 await client.connect(transport);
 try {
-  await check("MCP tools: 12 registered (…, validate_provenance, generate_provenance)", async () => {
+  await check("MCP tools: 13 registered (…, validate_provenance, validate_provenance_worklist, generate_provenance)", async () => {
     const { tools } = await client.listTools();
     const names = tools.map((t) => t.name).sort();
     assert.deepEqual(names, [
@@ -47,6 +47,7 @@ try {
       "validate_cel",
       "validate_crl",
       "validate_provenance",
+      "validate_provenance_worklist",
     ]);
   });
 
@@ -287,6 +288,17 @@ try {
       assert.equal(out.pass, false, "empty artifact must not pass");
       assert.ok(out.findings.some((f) => f.kind === "over-reach"), "expected over-reach findings");
       assert.ok(out.findings.some((f) => f.kind === "uncovered-span"), "expected the unacknowledged anchor text");
+
+      // validate_provenance_worklist (in-progress) on the SAME fresh scaffold: the attribution backlog re-grades to
+      // "warning" → pass true, while validate_provenance (final) above reported errors. Integrity findings still surface.
+      const w = await client.callTool({ name: "validate_provenance_worklist", arguments: { artifact: artifactPath, cel: dme101Cel, anchor: anchorPath } });
+      assert.ok(!w.isError, "worklist should not be a tool error");
+      const wout = JSON.parse(w.content[0].text);
+      assert.equal(wout.pass, true, "worklist mode: a fresh scaffold's attribution backlog is non-blocking → passes");
+      assert.equal(wout.errorCount, 0, "worklist mode: no error-severity findings on a fresh scaffold");
+      assert.ok(wout.worklistCount > 0, "worklist mode: the attribution backlog is counted");
+      assert.ok(wout.findings.every((f) => f.class !== "attribution" || f.severity === "warning"), "attribution findings graded warning in worklist");
+      assert.match(wout.remaining, /remaining work/, "worklist envelope carries the remaining-work note");
     } finally {
       rmSync(tmp, { recursive: true, force: true });
     }

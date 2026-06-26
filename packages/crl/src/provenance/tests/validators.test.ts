@@ -13,7 +13,12 @@ import type {
   AnchorSourceMeta,
 } from "../artifact";
 import { buildProvenanceIndex, type ProvenanceIndex } from "../indexer";
-import { validateProvenance, isStrictAncestor, type ProvenanceFinding } from "../validators";
+import {
+  validateProvenance,
+  isStrictAncestor,
+  ATTRIBUTION_KINDS,
+  type ProvenanceFinding,
+} from "../validators";
 
 const POLICY_CRL = `# P
 library "Policy".
@@ -610,5 +615,91 @@ describe("validateProvenance — V9 §9.2 structural + over-reach", () => {
   });
   it("a policy-owned leaf in no cluster → over-reach finding", () => {
     expect(kinds(run(art({})))).toContain("over-reach"); // Crit/Approve unclustered
+  });
+});
+
+describe("validateProvenance — finding.class + worklist mode (in-progress vs final grading)", () => {
+  // ATTRIBUTION_KINDS is the coverage-backlog set — the only kinds softened in worklist mode.
+  it("ATTRIBUTION_KINDS membership is exactly the three coverage-backlog kinds", () => {
+    expect([...ATTRIBUTION_KINDS].sort()).toEqual(
+      ["missed-decision", "over-reach", "uncovered-span"].sort(),
+    );
+  });
+
+  it("every finding carries `class`, derived from kind (mode-independent)", () => {
+    const findings = run(art({})); // a bare artifact → over-reach (attribution) findings at minimum
+    expect(findings.length).toBeGreaterThan(0);
+    for (const f of findings) {
+      expect(f.class).toBe(ATTRIBUTION_KINDS.has(f.kind) ? "attribution" : "integrity");
+    }
+  });
+
+  // A fixture that produces BOTH an attribution finding (over-reach: Crit/Approve unclustered) AND an integrity finding
+  // (nodekind-mismatch: stored "composition" ≠ index "leaf" on a clustered Crit ref).
+  const mismCluster: Cluster[] = [
+    {
+      id: "c1",
+      label: "x",
+      items: [],
+      crl: [ref("Crit", "concept", "implements-criterion", "linked", undefined, "composition")],
+      cel: [],
+    },
+  ];
+
+  it("worklist mode re-grades the 3 attribution kinds error→warning; integrity stays error in BOTH modes", () => {
+    const a = art({ clusters: mismCluster });
+    const final = validateProvenance(a, idx, "", { mode: "final" });
+    const work = validateProvenance(a, idx, "", { mode: "worklist" });
+
+    // over-reach (attribution): error in final, warning in worklist.
+    const finalOver = final.filter((f) => f.kind === "over-reach");
+    const workOver = work.filter((f) => f.kind === "over-reach");
+    expect(finalOver.length).toBeGreaterThan(0);
+    expect(finalOver.every((f) => f.severity === "error")).toBe(true);
+    expect(workOver.length).toBe(finalOver.length);
+    expect(workOver.every((f) => f.severity === "warning" && f.class === "attribution")).toBe(true);
+
+    // nodekind-mismatch (integrity): error in BOTH modes — never softened.
+    const finalMism = final.find((f) => f.kind === "nodekind-mismatch")!;
+    const workMism = work.find((f) => f.kind === "nodekind-mismatch")!;
+    expect(finalMism.severity).toBe("error");
+    expect(finalMism.class).toBe("integrity");
+    expect(workMism.severity).toBe("error"); // anchor-hash-drift / nodekind-mismatch unchanged in worklist
+    expect(workMism.class).toBe("integrity");
+  });
+
+  it("anchor-hash-drift (integrity) stays error in worklist mode", () => {
+    const a = art({ anchorMeta: { ...metaFor("abc"), textHash: "sha256:WRONG" } }, "abc");
+    const work = validateProvenance(a, idx, "abc", { mode: "worklist" });
+    const drift = work.find((f) => f.kind === "anchor-hash-drift")!;
+    expect(drift.severity).toBe("error");
+    expect(drift.class).toBe("integrity");
+  });
+
+  it("missed-decision (attribution) re-grades to warning in worklist; error in final", () => {
+    const items: Item[] = [
+      {
+        id: "n1",
+        origin: "source",
+        text: "x",
+        role: "criterion",
+        linkRequirement: "must-link-decision",
+      },
+    ];
+    const a = art({ items });
+    const final = validateProvenance(a, idx, "", { mode: "final" }).find(
+      (f) => f.kind === "missed-decision",
+    )!;
+    const work = validateProvenance(a, idx, "", { mode: "worklist" }).find(
+      (f) => f.kind === "missed-decision",
+    )!;
+    expect(final.severity).toBe("error");
+    expect(work.severity).toBe("warning");
+    expect(work.class).toBe("attribution");
+  });
+
+  it("default mode is final (no opts.mode) — strict behavior preserved", () => {
+    const over = run(art({})).find((f) => f.kind === "over-reach")!;
+    expect(over.severity).toBe("error"); // default-final preserved for all current callers
   });
 });

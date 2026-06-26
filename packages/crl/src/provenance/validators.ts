@@ -39,9 +39,24 @@ export type ProvenanceFindingKind =
   | "structural-mistag"
   | "over-reach";
 
+/**
+ * The COVERAGE-backlog kinds — un-attributed work the KE has yet to do (a CRL node in no cluster, an unacknowledged
+ * anchor span, a must-link source not yet linked to its decision). These are the ONLY kinds softened in worklist mode
+ * (an in-progress scaffold's backlog is "remaining work," not errors). Everything else is integrity (always as-is).
+ */
+export const ATTRIBUTION_KINDS: ReadonlySet<ProvenanceFindingKind> = new Set<ProvenanceFindingKind>(
+  ["over-reach", "uncovered-span", "missed-decision"],
+);
+
 export interface ProvenanceFinding {
   kind: ProvenanceFindingKind;
   severity: Severity;
+  /**
+   * Mode-INDEPENDENT classification (set on EVERY finding). "attribution" = a coverage-backlog kind (see
+   * ATTRIBUTION_KINDS) → softenable in worklist mode. "integrity" is the coarse "not coverage-backlog / always reported
+   * as-is" bucket (drift, mistag, mn-keyword, malformed-item, referential, …) — the judge-lens may sub-classify later.
+   */
+  class: "attribution" | "integrity";
   message: string;
   itemId?: string;
   cluster?: string;
@@ -58,6 +73,12 @@ export interface ValidateOpts {
    * grammar-optional/provenance-mandatory) → `provenance-references-unfrozen-case`.
    */
   frozenCaseIds?: Map<string, Set<string>>;
+  /**
+   * "final" (DEFAULT) = strict: report every finding at its native severity (the completed-artifact gate). "worklist" =
+   * in-progress authoring: re-grade attribution-class findings from "error" to "warning" (non-blocking) — the KE's
+   * coverage backlog is "remaining work," not a wall of red. Integrity-class severity is UNCHANGED in both modes.
+   */
+  mode?: "worklist" | "final";
 }
 
 const DECISION_RELATIONS = new Set([
@@ -134,7 +155,9 @@ export function validateProvenance(
   anchorText: string,
   opts?: ValidateOpts,
 ): ProvenanceFinding[] {
-  const findings: ProvenanceFinding[] = [];
+  // Built without `class` (each push fills kind/severity/loci); a single post-pass fills `class` from the kind and
+  // applies the worklist re-grade. Keeping the push sites class-free avoids repeating the same derivation 20+ times.
+  const findings: Omit<ProvenanceFinding, "class">[] = [];
   const itemsById = new Map(artifact.items.map((it) => [it.id, it]));
   const coverage = deriveCoverage(artifact, index, anchorText);
   const clustersWith = (itemId: string) =>
@@ -458,5 +481,19 @@ export function validateProvenance(
     });
   }
 
-  return findings;
+  // ── post-pass: stamp `class` (mode-INDEPENDENT) + worklist re-grade ──
+  // `class` is set on EVERY finding regardless of mode. In "worklist" mode ONLY, attribution-class findings re-grade
+  // error→warning (non-blocking); integrity-class severity is untouched in both modes. No 4th Severity is introduced —
+  // "warning" is an existing bucket.
+  const mode = opts?.mode ?? "final";
+  return findings.map((f): ProvenanceFinding => {
+    const cls: ProvenanceFinding["class"] = ATTRIBUTION_KINDS.has(f.kind)
+      ? "attribution"
+      : "integrity";
+    // Re-grade ONLY a hard error→warning (the stated invariant); leave a native manual-review/warning attribution finding
+    // untouched, so a future attribution kind that isn't error-severity can't be silently demoted.
+    const severity =
+      mode === "worklist" && cls === "attribution" && f.severity === "error" ? "warning" : f.severity;
+    return { ...f, class: cls, severity };
+  });
 }

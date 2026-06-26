@@ -32,7 +32,7 @@ const check = async (label, fn) => {
 
 await client.connect(transport);
 try {
-  await check("MCP tools: 11 registered (…, render_scenario, authoring_kit, validate_provenance)", async () => {
+  await check("MCP tools: 13 registered (…, generate_provenance, validate_provenance, validate_provenance_worklist)", async () => {
     const { tools } = await client.listTools();
     const names = tools.map((t) => t.name).sort();
     assert.deepEqual(names, [
@@ -41,12 +41,14 @@ try {
       "emit_cel",
       "emit_cql",
       "emit_crl_fhir",
+      "generate_provenance",
       "render_scenario",
       "run_decision",
       "tokenize_crl",
       "validate_cel",
       "validate_crl",
       "validate_provenance",
+      "validate_provenance_worklist",
     ]);
   });
 

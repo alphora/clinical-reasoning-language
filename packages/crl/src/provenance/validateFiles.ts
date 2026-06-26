@@ -35,6 +35,8 @@ export interface ResolveProvenanceResult {
   errorCount: number;
   manualReviewCount: number;
   warningCount: number;
+  /** Count of attribution-class findings (the coverage backlog). In worklist mode these are graded "warning"; in final mode they are at native severity. */
+  worklistCount: number;
   pass: boolean;
 }
 
@@ -42,6 +44,7 @@ export function resolveProvenance(
   artifactPath: string,
   celPath: string,
   anchorPath: string,
+  mode: "worklist" | "final" = "final",
 ): ResolveProvenanceResult {
   const artifact = JSON.parse(readFileSync(artifactPath, "utf8")) as ProvenanceArtifact;
   const anchorText = readFileSync(anchorPath, "utf8");
@@ -64,7 +67,11 @@ export function resolveProvenance(
   ]);
 
   const coverage = deriveCoverage(artifact, index, anchorText);
-  const findings = validateProvenance(artifact, index, anchorText, { celCaseIds, frozenCaseIds });
+  const findings = validateProvenance(artifact, index, anchorText, {
+    celCaseIds,
+    frozenCaseIds,
+    mode,
+  });
   const errorCount = findings.filter((f) => f.severity === "error").length;
   return {
     artifact,
@@ -78,6 +85,8 @@ export function resolveProvenance(
     errorCount,
     manualReviewCount: findings.filter((f) => f.severity === "manual-review").length,
     warningCount: findings.filter((f) => f.severity === "warning").length,
+    worklistCount: findings.filter((f) => f.class === "attribution").length,
+    // pass stays errorCount===0: in worklist mode the attribution backlog is "warning" → doesn't fail.
     pass: errorCount === 0,
   };
 }
@@ -90,6 +99,8 @@ export interface ValidateProvenanceFilesResult {
   errorCount: number;
   manualReviewCount: number;
   warningCount: number;
+  /** Count of attribution-class findings (the coverage backlog) — the KE's "remaining work" tally; warning-graded in worklist mode. */
+  worklistCount: number;
   pass: boolean;
 }
 
@@ -98,8 +109,9 @@ export function validateProvenanceFiles(
   artifactPath: string,
   celPath: string,
   anchorPath: string,
+  mode: "worklist" | "final" = "final",
 ): ValidateProvenanceFilesResult {
-  const r = resolveProvenance(artifactPath, celPath, anchorPath);
+  const r = resolveProvenance(artifactPath, celPath, anchorPath, mode);
   return {
     policyId: r.artifact.policyId,
     policyVersion: r.artifact.policyVersion,
@@ -108,6 +120,7 @@ export function validateProvenanceFiles(
     errorCount: r.errorCount,
     manualReviewCount: r.manualReviewCount,
     warningCount: r.warningCount,
+    worklistCount: r.worklistCount,
     pass: r.pass,
   };
 }

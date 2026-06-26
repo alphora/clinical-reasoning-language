@@ -122,7 +122,7 @@ try {
     // The diagnostics are computed on the FRESH (all-provisional) scaffold, but the written artifact is the MERGED one —
     // so they are the PRE-MERGE baseline, not the merged residual.
     console.error(
-      "  (note: diagnostics are the pre-merge baseline; run validate_provenance on the output for the merged residual.)",
+      "  (note: diagnostics are the pre-merge baseline; run crl-validate-provenance --worklist on the output for the in-progress residual, or without --worklist for the final/strict gate.)",
     );
   }
   for (const [kind, n] of countByKind(r.diagnostics)) console.error(`  ${kind}: ${n}`);
