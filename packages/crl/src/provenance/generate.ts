@@ -285,8 +285,9 @@ function buildDecisionCluster(
 
   // 3) every policy-owned concept + activity in THIS decision's reachability closure (so each policy-owned leaf is
   //    clustered — un-clustered would be undocumented over-reach). Relation by role: a gating concept leaf →
-  //    implements-criterion; a composition concept → composes-criteria; a pure definitional/operand leaf → defines-concept;
-  //    an activity (recommend target) → recommends-disposition.
+  //    implements-criterion; a non-gating concept (a `defined as` inference OR an operand leaf) → defines-concept;
+  //    an activity (recommend target) → recommends-disposition. (#168: a `defined as` concept is INFERENCE — it defines
+  //    a concept, it does NOT "compose criteria"; only `use decision` composes a sub-decision's criteria — see spineRelation.)
   const declKey = nodeKey(ctx.declRef);
   for (const [key, reach] of index.decisionReachability) {
     if (!reach.reachedBy.has(declKey)) continue;
@@ -295,9 +296,7 @@ function buildDecisionCluster(
     if (node.declKind === "concept") {
       const relation: CrlRelation = ctx.gatingConceptKeys.has(key)
         ? "implements-criterion"
-        : node.nodeKind === "inference"
-          ? "composes-criteria"
-          : "defines-concept";
+        : "defines-concept";
       push(node.ref, relation);
     } else if (node.declKind === "activity") {
       push(node.ref, "recommends-disposition");
