@@ -387,11 +387,18 @@ describe("validateProvenanceFiles — worklist mode passes a fresh scaffold (wor
       expect(final.errorCount).toBeGreaterThan(0);
       expect(final.worklistCount).toBe(K + 1); // K over-reach + 1 uncovered-span
 
+      // a fresh scaffold (Model A: items:[], no ignored/disposition/unlink) has NO waivers → both counts zero (final mode).
+      expect(final.waiverCount).toBe(0);
+      expect(final.waiverScrutinizeCount).toBe(0);
+
       // worklist: the same backlog is warning-severity → passes; worklistCount unchanged (class is mode-independent).
       const work = validateProvenanceFiles(artifactPath, fCel, anchorTxt, "worklist");
       expect(work.pass).toBe(true);
       expect(work.errorCount).toBe(0);
       expect(work.worklistCount).toBe(K + 1);
+      // worklist skips the waiver block entirely → both counts zero regardless of artifact content.
+      expect(work.waiverCount).toBe(0);
+      expect(work.waiverScrutinizeCount).toBe(0);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

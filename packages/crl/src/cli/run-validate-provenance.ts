@@ -91,13 +91,26 @@ try {
     `\nFindings: ${r.findings.length} — ${r.errorCount} error, ${r.manualReviewCount} manual-review, ${warningText}`,
   );
   // FINAL mode only: call out the judge-lens waivers (escape hatches suppressing a finding) so a "PASS — no
-  // error-severity findings" line isn't misread as "done" — each is a manual-review the Judge must adjudicate.
+  // error-severity findings" line isn't misread as "done" — each is a manual-review the Judge must adjudicate. Lead with
+  // the SCRUTINIZE count (the few that need real judgment); the routine majority (page chrome, no-operational spans) is a
+  // rubber-stamp tally so it doesn't drown the signal.
   if (!worklist && r.waiverCount > 0) {
-    console.log(`\nWaivers to adjudicate: ${r.waiverCount} (manual-review)`);
+    const routine = r.waiverCount - r.waiverScrutinizeCount;
+    console.log(
+      `\nWaivers to adjudicate: ${r.waiverScrutinizeCount} to scrutinize, ${routine} routine (${r.waiverCount} total, all manual-review)`,
+    );
   }
+  // Sort by severity, then (within manual-review) scrutinize waivers BEFORE routine ones so the few the Judge must
+  // adjudicate float to the top of the stream — and tag each waiver line with its scrutiny so the list is triageable,
+  // not just the headline count.
   const order = { error: 0, "manual-review": 1, warning: 2 } as const;
-  for (const f of [...r.findings].sort((a, b) => order[a.severity] - order[b.severity])) {
-    console.log(`  [${f.severity}] ${f.kind}: ${f.message}${where(f)}`);
+  const scrutinyRank = (f: ProvenanceFinding): number => (f.scrutiny === "scrutinize" ? 0 : 1);
+  const sorted = [...r.findings].sort(
+    (a, b) => order[a.severity] - order[b.severity] || scrutinyRank(a) - scrutinyRank(b),
+  );
+  for (const f of sorted) {
+    const sev = f.scrutiny ? `${f.severity}·${f.scrutiny}` : f.severity;
+    console.log(`  [${sev}] ${f.kind}: ${f.message}${where(f)}`);
   }
   console.log(
     `\n${r.pass ? "PASS — no error-severity findings" : `FAIL — ${r.errorCount} error-severity finding(s)`}`,

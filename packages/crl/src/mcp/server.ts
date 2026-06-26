@@ -594,8 +594,9 @@ export function createServer(): McpServer {
         "as uniform manual-review findings (kinds waiver-*) for a Judge to adjudicate; see the authoring_kit `judgeLens` rubric for the " +
         "earned-ness weighting. Pass three ABSOLUTE paths. Returns { policyId, policyVersion, " +
         "diagnostics[], findings:[{kind, severity (error|manual-review|warning), class (attribution|integrity), message, itemId?, " +
-        "cluster?, ref?, range?}], errorCount, manualReviewCount, warningCount, worklistCount, waiverCount, pass }. pass=true ⇔ zero error-severity findings " +
-        "(waivers are manual-review — they do NOT fail the gate, but waiverCount>0 means the Judge has adjudication to do).",
+        "cluster?, ref?, range?, scrutiny? (routine|scrutinize, on waiver-* only)}], errorCount, manualReviewCount, warningCount, worklistCount, " +
+        "waiverCount, waiverScrutinizeCount, pass }. pass=true ⇔ zero error-severity findings (waivers are manual-review — they do NOT fail the " +
+        "gate, but waiverScrutinizeCount>0 means the Judge has real adjudication to do; the routine remainder is a rubber-stamp).",
       inputSchema: {
         artifact: z.string().min(1).describe("Absolute path to the provenance artifact JSON."),
         cel: z

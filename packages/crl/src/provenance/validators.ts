@@ -86,6 +86,14 @@ export interface ProvenanceFinding {
    * as-is" bucket (drift, mistag, mn-keyword, malformed-item, referential, …) — the judge-lens may sub-classify later.
    */
   class: "attribution" | "integrity";
+  /**
+   * WAIVER findings ONLY (judge-lens, final mode); undefined on every non-waiver finding. "scrutinize" = a waiver the
+   * Judge must actively adjudicate (an authored clinical-assumption/derived-glue, an MN-flagged ignored span, any
+   * intentional-unlink, a "not my decision" disposition); "routine" = an expected rubber-stamp waiver (page chrome, a
+   * no-operational admin/definition span). The weighting already lives in the message + the kit rubric — this just makes
+   * it machine-readable so the count + a future panel can separate the few that matter from the routine majority.
+   */
+  scrutiny?: "routine" | "scrutinize";
   message: string;
   itemId?: string;
   cluster?: string;
@@ -554,8 +562,10 @@ export function validateProvenance(
 
     // ── (1) waiver-authored ── per authored item with a `supports` that ACTUALLY suppresses over-reach (its cluster is
     //    real AND holds ≥1 over-reach candidate whose only escape is this authored support — the blast radius).
-    const authoredScrutiny = (k: AuthoredKind | undefined): string =>
-      k === "clinical-assumption" || k === "derived-glue"
+    const authoredHighScrutiny = (k: AuthoredKind | undefined): boolean =>
+      k === "clinical-assumption" || k === "derived-glue"; // clinical logic with no source span
+    const authoredScrutinyNote = (k: AuthoredKind | undefined): string =>
+      authoredHighScrutiny(k)
         ? "HIGHEST-SCRUTINY: clinical logic with no source span — confirm it is earned, not invented"
         : "routine: an implementation/modeling note, not clinical logic";
     for (const item of artifact.items) {
@@ -582,9 +592,10 @@ export function validateProvenance(
       findings.push({
         kind: "waiver-authored",
         severity: "manual-review",
+        scrutiny: authoredHighScrutiny(item.authoredKind) ? "scrutinize" : "routine",
         message:
           `authored item "${item.id}" (${item.authoredKind ?? "unspecified"}) supports cluster "${c.id}" and ` +
-          `is an authored escape for the over-reach of ${suppressed.length} candidate node(s): ${radius}. ${authoredScrutiny(item.authoredKind)}.`,
+          `is an authored escape for the over-reach of ${suppressed.length} candidate node(s): ${radius}. ${authoredScrutinyNote(item.authoredKind)}.`,
         itemId: item.id,
         cluster: c.id,
       });
@@ -607,13 +618,14 @@ export function validateProvenance(
           continue; // non-boundary slice → malformed (already flagged); never emit a suppression claim for it
         }
         const truncated = preview.length > 80 ? preview.slice(0, 80) + "…" : preview;
-        const mnNote =
-          mnKeyword(preview) === "hard"
-            ? " ⚠ contains medical-necessity language — likely a coverage criterion, scrutinize"
-            : "";
+        const mnHard = mnKeyword(preview) === "hard";
+        const mnNote = mnHard
+          ? " ⚠ contains medical-necessity language — likely a coverage criterion, scrutinize"
+          : "";
         findings.push({
           kind: "waiver-ignored-span",
           severity: "manual-review",
+          scrutiny: mnHard ? "scrutinize" : "routine", // chrome (headers/footers) is routine; MN-language is not
           message:
             `ignoredRange [${ig.start},${ig.end}) ("${ig.reason}") suppresses an uncovered-span (Missed₂). ` +
             `Text: "${truncated}".${mnNote}`,
@@ -642,6 +654,7 @@ export function validateProvenance(
         findings.push({
           kind: "waiver-intentional-unlink",
           severity: "manual-review",
+          scrutiny: "scrutinize", // deliberately leaving a policy-owned node unlinked is always worth confirming
           message:
             `cluster "${c.id}" intentionally-unlinks over-reach candidate "${ref.name}"${ref.nodeId ? "#" + ref.nodeId : ""} ` +
             `(an over-reach escape, NOT a Missed₁ decision gap). Confirm the omission is deliberate.`,
@@ -660,13 +673,17 @@ export function validateProvenance(
     );
     for (const item of artifact.items) {
       if (item.origin !== "source" || !item.dispositionClass) continue;
+      const mnAlsoFired = mnFired.has(item.id);
       const routine = item.dispositionClass === "no-operational-disposition";
-      const mnNote = mnFired.has(item.id)
+      const mnNote = mnAlsoFired
         ? " (V8 mn-keyword ALSO fired on this item — the coverage language strengthens the concern)"
         : "";
       findings.push({
         kind: "waiver-disposition-class",
         severity: "manual-review",
+        // no-operational = routine; the three "not my decision" classes = scrutinize. A no-operational item that ALSO
+        // tripped V8 mn-keyword is NOT routine — the MN language is the laundering smell the message already strengthens.
+        scrutiny: routine && !mnAlsoFired ? "routine" : "scrutinize",
         message:
           `source item "${item.id}" (role ${item.role ?? "unspecified"}, dispositionClass ${item.dispositionClass}) ` +
           (routine

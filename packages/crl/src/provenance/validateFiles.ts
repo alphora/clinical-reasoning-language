@@ -44,6 +44,8 @@ export interface ResolveProvenanceResult {
   worklistCount: number;
   /** Count of WAIVER-kind findings (the judge-lens escape hatches) — FINAL mode only (worklist skips them); all manual-review. */
   waiverCount: number;
+  /** Of `waiverCount`, the ones flagged `scrutiny:"scrutinize"` (the Judge must adjudicate); the rest are routine rubber-stamps. */
+  waiverScrutinizeCount: number;
   pass: boolean;
 }
 
@@ -94,6 +96,10 @@ export function resolveProvenance(
     warningCount: findings.filter((f) => f.severity === "warning").length,
     worklistCount: findings.filter((f) => f.class === "attribution").length,
     waiverCount: findings.filter((f) => WAIVER_KINDS.has(f.kind)).length,
+    // Constrain to WAIVER_KINDS (not just scrutiny==="scrutinize") so a stray non-waiver scrutiny can never push this
+    // above waiverCount and make the CLI's derived routine count (waiverCount - waiverScrutinizeCount) go negative.
+    waiverScrutinizeCount: findings.filter((f) => WAIVER_KINDS.has(f.kind) && f.scrutiny === "scrutinize")
+      .length,
     // pass stays errorCount===0: in worklist mode the attribution backlog is "warning" → doesn't fail.
     pass: errorCount === 0,
   };
@@ -111,6 +117,8 @@ export interface ValidateProvenanceFilesResult {
   worklistCount: number;
   /** Count of WAIVER-kind findings (the judge-lens escape hatches to adjudicate) — FINAL mode only; all manual-review. */
   waiverCount: number;
+  /** Of `waiverCount`, the ones flagged `scrutiny:"scrutinize"` (the Judge must adjudicate); the rest are routine rubber-stamps. */
+  waiverScrutinizeCount: number;
   pass: boolean;
 }
 
@@ -132,6 +140,7 @@ export function validateProvenanceFiles(
     warningCount: r.warningCount,
     worklistCount: r.worklistCount,
     waiverCount: r.waiverCount,
+    waiverScrutinizeCount: r.waiverScrutinizeCount,
     pass: r.pass,
   };
 }

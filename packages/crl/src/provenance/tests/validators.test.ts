@@ -1044,4 +1044,136 @@ describe("validateProvenance — judge-lens WAIVERS (FINAL mode only)", () => {
     expect(k).toContain("authored-supports-malformed");
     expect(k).not.toContain("waiver-authored");
   });
+
+  it("each waiver carries a scrutiny flag: scrutinize for the ones a Judge must adjudicate, routine for rubber-stamps", () => {
+    const scrutinyOf = (fs: ProvenanceFinding[], kind: string): string | undefined =>
+      fs.find((f) => f.kind === kind)?.scrutiny;
+    // authored clinical-assumption / MN-flagged ignored span / any intentional-unlink / "not my decision" disposition → scrutinize
+    expect(scrutinyOf(final(authoredArt()), "waiver-authored")).toBe("scrutinize");
+    expect(scrutinyOf(final(ignoredArt(MN_START, MN_END), ANCHOR), "waiver-ignored-span")).toBe(
+      "scrutinize",
+    );
+    expect(scrutinyOf(final(legalUnlinkArt()), "waiver-intentional-unlink")).toBe("scrutinize");
+    expect(scrutinyOf(final(dispositionArt()), "waiver-disposition-class")).toBe("scrutinize");
+    // chrome ignored span / no-operational disposition / implementation-artifact authored escape → routine
+    expect(scrutinyOf(final(ignoredArt(0, CHROME_END), ANCHOR), "waiver-ignored-span")).toBe(
+      "routine",
+    );
+    const routineDisp: Item[] = [
+      {
+        id: "n2",
+        origin: "source",
+        text: "admin",
+        role: "administrative",
+        linkRequirement: "rationale-only",
+        rationale: "r",
+        dispositionClass: "no-operational-disposition",
+      },
+    ];
+    expect(scrutinyOf(final(art({ items: routineDisp })), "waiver-disposition-class")).toBe(
+      "routine",
+    );
+    const routineAuth = art({
+      items: [
+        {
+          id: "auth",
+          origin: "authored",
+          text: "glue",
+          authoredKind: "implementation-artifact",
+          supports: { cluster: "c1", items: [] },
+        },
+      ],
+      clusters: [
+        {
+          id: "c1",
+          label: "",
+          items: ["auth"],
+          crl: [ref("Crit", "concept", "implements-criterion", "provisional")],
+          cel: [],
+        },
+      ],
+    });
+    expect(scrutinyOf(final(routineAuth), "waiver-authored")).toBe("routine");
+  });
+
+  it("a no-operational disposition that ALSO trips V8 mn-keyword is scrutinize, not routine (the laundering smell)", () => {
+    // admin item with hard MN language → mn-keyword-hard (V8) AND a no-operational disposition waiver; the MN co-fire
+    // must bump scrutiny to "scrutinize" so the message ("strengthens the concern") and the field agree.
+    const items: Item[] = [
+      {
+        id: "n_mn",
+        origin: "source",
+        text: "This is not covered by the plan.",
+        role: "administrative",
+        linkRequirement: "rationale-only",
+        rationale: "r",
+        dispositionClass: "no-operational-disposition",
+      },
+    ];
+    const fs = final(art({ items }));
+    expect(kinds(fs)).toContain("mn-keyword-hard");
+    const w = fs.find((f) => f.kind === "waiver-disposition-class")!;
+    expect(w.scrutiny).toBe("scrutinize");
+    expect(w.message).toMatch(/strengthens the concern/);
+  });
+
+  it("INVARIANT: every waiver carries a scrutiny flag; no non-waiver does", () => {
+    // exercise an artifact with all 4 waiver kinds + non-waiver findings, and assert the contract holds across the stream.
+    const arts = [authoredArt(), ignoredArt(MN_START, MN_END), legalUnlinkArt(), dispositionArt(), art({})];
+    for (const a of arts) {
+      for (const f of final(a, ANCHOR)) {
+        if (WAIVER_KINDS.has(f.kind)) expect(f.scrutiny).toBeDefined();
+        else expect(f.scrutiny).toBeUndefined();
+      }
+    }
+  });
+
+  it("the scrutinize/routine buckets partition the waivers (mirrors validateProvenanceFiles' waiverScrutinizeCount)", () => {
+    // one artifact with a mix: a clinical-assumption authored escape (scrutinize) + a no-operational disposition (routine)
+    // + a chrome ignored span (routine) + an MN-language ignored span (scrutinize). The counts must partition cleanly.
+    const a: ProvenanceArtifact = {
+      schemaVersion: "1.0",
+      policyId: "P",
+      policyVersion: "1",
+      anchorSource: metaFor(ANCHOR),
+      items: [
+        {
+          id: "auth",
+          origin: "authored",
+          text: "glue",
+          authoredKind: "clinical-assumption",
+          supports: { cluster: "c1", items: [] },
+        },
+        {
+          id: "n2",
+          origin: "source",
+          text: "admin",
+          role: "administrative",
+          linkRequirement: "rationale-only",
+          rationale: "r",
+          dispositionClass: "no-operational-disposition",
+        },
+      ],
+      ignoredRanges: [
+        { start: 0, end: CHROME_END, reason: "chrome" },
+        { start: MN_START, end: MN_END, reason: "table label" },
+      ],
+      clusters: [
+        {
+          id: "c1",
+          label: "",
+          items: ["auth"],
+          crl: [ref("Crit", "concept", "implements-criterion", "provisional")],
+          cel: [],
+        },
+      ],
+    };
+    const waivers = final(a, ANCHOR).filter((f) => WAIVER_KINDS.has(f.kind));
+    const scrutinize = waivers.filter((f) => f.scrutiny === "scrutinize").length;
+    const routine = waivers.filter((f) => f.scrutiny === "routine").length;
+    expect(waivers.length).toBe(4); // authored + 2 ignored-span + disposition
+    expect(scrutinize).toBe(2); // clinical-assumption authored + MN ignored span
+    expect(routine).toBe(2); // chrome ignored span + no-operational disposition
+    expect(scrutinize + routine).toBe(waivers.length); // every waiver classified (no gaps)
+  });
 });
