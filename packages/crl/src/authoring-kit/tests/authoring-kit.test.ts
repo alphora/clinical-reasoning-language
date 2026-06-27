@@ -18,9 +18,13 @@ import {
   CRITERIA_DECISION_REFERENCE_CRL,
   DECISION_REFERENCE_CEL,
   DECISION_REFERENCE_CRL,
+  DISPOSITION_ARBITRATION_REFERENCE_CEL,
+  DISPOSITION_ARBITRATION_REFERENCE_CRL,
   MEDICAL_POLICY_DETERMINATION_CRL,
   PA_DETERMINATION_REFERENCE_CEL,
   PA_DETERMINATION_REFERENCE_CRL,
+  SOURCE_DELEGATED_DECISION_REFERENCE_CEL,
+  SOURCE_DELEGATED_DECISION_REFERENCE_CRL,
 } from "../reference";
 import { getAuthoringKit, STAGES } from "../index";
 
@@ -165,13 +169,101 @@ describe("authoring-kit — reference artifacts", () => {
     expect(run.runs.length).toBe(2); // qualifying diagnosis→approve; otherwise→deny
     expect(run.runs.every((r) => r.status === "pass")).toBe(true);
   });
+
+  it("source-delegated-decision-reference (B): 4/4 pass + the delegated PATH bubbles the sub's disposition (§4-req1)", () => {
+    // Exemplar B — source-required bare same-library `use decision`. The sub is recursed in place and its
+    // determination bubbles up (#166), so the oracle names the delegated disposition, not the sub-decision name.
+    const dir = mkdtempSync(join(tmpdir(), "authoring-kit-deleg-"));
+    writeFileSync(
+      join(dir, "package.json"),
+      JSON.stringify({
+        name: "authoring-kit-source-delegated-decision-reference",
+        version: "1.0.0",
+        private: true,
+        crl: {
+          canonicalBase: "http://example.org/authoring-kit-source-delegated-decision-reference",
+          status: "draft",
+          experimental: true,
+        },
+      }),
+    );
+    writeFileSync(
+      join(dir, "source-delegated-decision-reference.crl"),
+      SOURCE_DELEGATED_DECISION_REFERENCE_CRL,
+    );
+    writeFileSync(join(dir, "medical-policy-determination.crl"), MEDICAL_POLICY_DETERMINATION_CRL);
+    const celPath = join(dir, "source-delegated-decision-reference.cel");
+    writeFileSync(celPath, SOURCE_DELEGATED_DECISION_REFERENCE_CEL);
+
+    const v = validateCELFile(celPath);
+    expect(v.errors).toEqual([]);
+
+    const run = runCel(resolveCelImports(celPath));
+    expect(run.success).toBe(true);
+    expect(run.runs.length).toBe(4);
+    expect(run.runs.every((r) => r.status === "pass")).toBe(true);
+
+    // §4-req1: assert the PATH, not just the disposition. The continuation→Deny case must reach the DELEGATED
+    // sub's `otherwise` (Deny via the chained "Continuation of Therapy Determination"), NOT the parent's
+    // `otherwise`. Membership alone (both are "Deny") can't tell them apart — assert via the trace: the
+    // top-level `when "Continuation Request"` branch fired and delegated.
+    const denyViaSub = run.runs.find((r) => r.case.includes("no response"))!;
+    expect(denyViaSub.produced.map((p) => p.recommendation)).toEqual(["Deny"]);
+    // The PATH: the top-level `when "Continuation Request"` branch fired and RECURSED into the delegated sub
+    // ("Continuation of Therapy Determination"), whose own `otherwise` produced Deny — NOT the parent's
+    // `otherwise`. Membership alone ("Deny") can't distinguish these; the trace shape can.
+    type TNode = { concept?: string; node?: string; nodeId?: string; satisfied?: boolean; children?: TNode[] };
+    const top = (denyViaSub.trace as TNode[]).find((n) => n.concept === "Continuation Request")!;
+    expect(top.satisfied).toBe(true); // the delegating branch fired (vs falling through to the parent otherwise)
+    expect((top.children ?? []).length).toBeGreaterThan(0); // it recursed into the delegated sub
+    // The parent `otherwise` did NOT fire — no top-level otherwise node carried the production.
+    const topOtherwise = (denyViaSub.trace as TNode[]).find((n) => n.nodeId === "otherwise");
+    expect(topOtherwise).toBeUndefined();
+  });
+
+  it("disposition-arbitration-reference (C): validates clean + the CRE proves the arbitration 6/6 (incl. both overlap cases)", () => {
+    // Exemplar C — the at-scale sem-not outcome arbitration (verbatim from the KE deliverable, verified 6/6).
+    const dir = mkdtempSync(join(tmpdir(), "authoring-kit-arb-"));
+    writeFileSync(
+      join(dir, "package.json"),
+      JSON.stringify({
+        name: "authoring-kit-disposition-arbitration-reference",
+        version: "1.0.0",
+        private: true,
+        crl: {
+          canonicalBase: "http://example.org/authoring-kit-disposition-arbitration-reference",
+          status: "draft",
+          experimental: true,
+        },
+      }),
+    );
+    writeFileSync(
+      join(dir, "disposition-arbitration-reference.crl"),
+      DISPOSITION_ARBITRATION_REFERENCE_CRL,
+    );
+    writeFileSync(join(dir, "medical-policy-determination.crl"), MEDICAL_POLICY_DETERMINATION_CRL);
+    const celPath = join(dir, "disposition-arbitration-reference.cel");
+    writeFileSync(celPath, DISPOSITION_ARBITRATION_REFERENCE_CEL);
+
+    const v = validateCELFile(celPath);
+    expect(v.errors).toEqual([]);
+
+    const run = runCel(resolveCelImports(celPath));
+    expect(run.success).toBe(true);
+    expect(run.runs.length).toBe(6);
+    expect(run.runs.every((r) => r.status === "pass")).toBe(true);
+    // The two load-bearing overlap cases approve via the OTHER pathway (no overlap-pop) — and Deny EIU is a
+    // distinct activity from Deny so `result is` can tell them apart (§4-req1, same-disposition disambiguation).
+    const eiu = run.runs.find((r) => r.case.includes("off-indication"))!;
+    expect(eiu.produced.map((p) => p.recommendation)).toEqual(["Deny EIU"]);
+  });
 });
 
 describe("authoring-kit — getAuthoringKit", () => {
   it("returns the local-decision-support kit by default", () => {
     const kit = getAuthoringKit();
     expect(kit.stage).toBe("local-decision-support");
-    expect(kit.schemaVersion).toBe("1.1");
+    expect(kit.schemaVersion).toBe("1.2");
     expect(kit.summary).toMatch(/local-decision-support/);
   });
 
@@ -197,7 +289,7 @@ describe("authoring-kit — getAuthoringKit", () => {
     }
   });
 
-  it("embeds the reference artifacts inline (decision + criteria-decision + shared determination lib + PA)", () => {
+  it("embeds the reference artifacts inline (decision + criteria-decision + shared determination lib + PA + B-delegation + C-arbitration)", () => {
     const kit = getAuthoringKit();
     const names = kit.referenceArtifacts.map((a) => a.name).sort();
     expect(names).toEqual([
@@ -205,9 +297,13 @@ describe("authoring-kit — getAuthoringKit", () => {
       "criteria-decision-reference.crl",
       "decision-reference.cel",
       "decision-reference.crl",
+      "disposition-arbitration-reference.cel",
+      "disposition-arbitration-reference.crl",
       "medical-policy-determination.crl",
       "pa-determination-reference.cel",
       "pa-determination-reference.crl",
+      "source-delegated-decision-reference.cel",
+      "source-delegated-decision-reference.crl",
     ]);
     const src = (n: string) => kit.referenceArtifacts.find((a) => a.name === n)?.source;
     expect(src("decision-reference.crl")).toBe(DECISION_REFERENCE_CRL);
@@ -217,6 +313,10 @@ describe("authoring-kit — getAuthoringKit", () => {
     expect(src("medical-policy-determination.crl")).toBe(MEDICAL_POLICY_DETERMINATION_CRL);
     expect(src("pa-determination-reference.crl")).toBe(PA_DETERMINATION_REFERENCE_CRL);
     expect(src("pa-determination-reference.cel")).toBe(PA_DETERMINATION_REFERENCE_CEL);
+    expect(src("source-delegated-decision-reference.crl")).toBe(SOURCE_DELEGATED_DECISION_REFERENCE_CRL);
+    expect(src("source-delegated-decision-reference.cel")).toBe(SOURCE_DELEGATED_DECISION_REFERENCE_CEL);
+    expect(src("disposition-arbitration-reference.crl")).toBe(DISPOSITION_ARBITRATION_REFERENCE_CRL);
+    expect(src("disposition-arbitration-reference.cel")).toBe(DISPOSITION_ARBITRATION_REFERENCE_CEL);
   });
 
   it("conceptLayerModel marks `defined as` inference IN scope; predicates/external OUT", () => {
@@ -260,16 +360,81 @@ describe("authoring-kit — getAuthoringKit", () => {
     expect(kit.verifyLoop.note).toMatch(/project root|package\.json/);
   });
 
+  it("forceModel (§0) carries the three force levels + the governing principle", () => {
+    const kit = getAuthoringKit();
+    expect(kit.forceModel).toBeDefined();
+    expect(kit.forceModel.summary.length).toBeGreaterThan(0);
+    const levels = kit.forceModel.levels.map((l) => l.level).sort();
+    expect(levels).toEqual(["default", "invariant", "validator-enforced"].sort());
+    for (const l of kit.forceModel.levels) expect(l.meaning.length).toBeGreaterThan(0);
+    // The governing principle: faithful-to-source over default, source over human refactor.
+    expect(kit.forceModel.governingPrinciple).toMatch(/faithful/i);
+  });
+
+  it("every invariant clause's `test` RESOLVES to a real check — composition lens or verifyLoop methodology, no dangling anchors (§0 — no fake-green)", () => {
+    const kit = getAuthoringKit();
+    const compositionChecks = new Set(kit.judgeLens.composition.map((c) => c.check));
+    const methodologyIds = new Set(kit.verifyLoop.methodologyRequirements.map((m) => m.id));
+    let invariantClauses = 0;
+    for (const rule of kit.rules) {
+      for (const clause of rule.clauses ?? []) {
+        expect(["validator-enforced", "invariant", "default"]).toContain(clause.force);
+        if (clause.force === "invariant") {
+          invariantClauses++;
+          // §0: every invariant clause's `test` must RESOLVE — a dangling/typo'd anchor IS the K4 fake-green.
+          const ref = clause.test ?? "";
+          const comp = /^judgeLens\.composition:(.+)$/.exec(ref);
+          const meth = /^verifyLoop:(.+)$/.exec(ref);
+          if (comp) expect(compositionChecks.has(comp[1])).toBe(true);
+          else if (meth) expect(methodologyIds.has(meth[1])).toBe(true);
+          else throw new Error(`invariant clause in rule "${rule.id}" has an unresolvable test anchor: "${ref}"`);
+        }
+      }
+    }
+    expect(invariantClauses).toBeGreaterThan(0); // the package is supposed to carry invariant clauses
+  });
+
+  it("judgeLens.composition (§2/§3) carries the three source-fidelity checks, each with a weightedBy + ≥1 checkpoint", () => {
+    const kit = getAuthoringKit();
+    expect(Array.isArray(kit.judgeLens.composition)).toBe(true);
+    const checks = kit.judgeLens.composition.map((c) => c.check).sort();
+    expect(checks).toEqual(
+      ["dropped-or-added-criterion", "hollowed-criteria", "invented-determination-boundary"].sort(),
+    );
+    for (const c of kit.judgeLens.composition) {
+      expect(c.weightedBy.length).toBeGreaterThan(0);
+      expect(c.guidance.length).toBeGreaterThan(0);
+      expect(c.checkpoints.length).toBeGreaterThanOrEqual(1);
+    }
+  });
+
+  it("the chaining-necessity rule (§2) teaches source-required delegation + the duplicate-not-factor invariant", () => {
+    const rule = getAuthoringKit().rules.find((r) => r.id === "chaining-necessity");
+    expect(rule).toBeDefined();
+    expect(rule!.category).toBe("decision-shape");
+    expect(rule!.rule).toMatch(/use decision/);
+    expect(rule!.rule).toMatch(/source/i);
+    expect(rule!.rule).toMatch(/duplicate/i);
+    // the invented-boundary invariant clause anchors to the composition lens
+    const invented = (rule!.clauses ?? []).find(
+      (c) => c.force === "invariant" && c.test === "judgeLens.composition:invented-determination-boundary",
+    );
+    expect(invented).toBeDefined();
+  });
+
   it("contentHash is a stable, deterministic sha256 over the payload", () => {
     const a = getAuthoringKit();
     const b = getAuthoringKit();
     expect(a.contentHash).toMatch(/^[0-9a-f]{64}$/);
     expect(a.contentHash).toBe(b.contentHash);
     // Pinned snapshot — any payload byte change must update this deliberately.
-    // Re-pinned for #168: `defined as` reframed as INFERENCE (not composition); composition-reference exemplar
-    // reworked → criteria-decision-reference (criteria as nested `when` nodes + one real inference); new
-    // decision-composition rule. schemaVersion unchanged (content change, not shape).
-    expect(a.contentHash).toBe("36a2fd5a562ac8163a063556998bb753ae9dbe3eacfa5f7c4a439f0fb53c5b28");
+    // Re-pinned for the KE decision-composition teaching package (§0–§4, schemaVersion 1.1→1.2): added the
+    // `forceModel` (§0 force levels), per-rule `clauses` force breakdowns, the `chaining-necessity` rule, the
+    // §1 ladder + §3 asymmetry into `decision-composition`, the delegated-closure mutual-exclusivity into
+    // `pa-disposition-set`, the `judgeLens.composition` family (§2/§3 source-fidelity checks), the qualified
+    // `use decision` boundary entry (#172), the §4 proof-methodology in verifyLoop, Deny EIU in the shared
+    // determination lib, and two new exemplars (B source-delegated, C disposition-arbitration).
+    expect(a.contentHash).toBe("8f98309b34f6740a4fff1d05f8e74751b8760e785df1463535b5fd1d574be856");
   });
 
   it("STAGES contains exactly the one Stage-1 slice", () => {

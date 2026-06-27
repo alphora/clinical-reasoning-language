@@ -279,20 +279,25 @@ export const MEDICAL_POLICY_DETERMINATION_CRL = `# Medical Policy Determination 
 library "Medical Policy Determination".
 
 /*
-The SHARED, reusable prior-authorization DETERMINATION activities for every medical-policy
-coverage decision. Per Da Vinci PAS (a PA response is a ClaimResponse) and X12 278 HCR01
-"review action code": Approve = A1 (Certified in total); Deny = A3 (Not Certified). Both are
-COMMUNICATED determinations (CPGCommunicationRequest) — the payer communicates a decision; it
-NEVER orders the service (never CPGServiceRequest). Pended (A4) is a NON-FINAL asynchronous
-workflow state (more time/info needed; requester polls for the eventual A1/A3) — NOT a
+The SHARED, reusable prior-authorization DETERMINATION activities for every medical-policy coverage
+decision. The determination is exactly TWO KINDS of outcome — NOT two activities:
+  • APPROVE  — certify (X12 278 HCR01 A1, Certified in total).
+  • DENY     — not-certify (X12 A3, Not Certified). DENY may take multiple ACTIVITY FLAVORS that
+               share the A3 outcome but communicate a DISTINCT reason:
+                 - "Deny"     = not medically necessary / criteria not met / eligibility/business.
+                 - "Deny EIU" = the requested service is Experimental, Investigational and/or Unproven
+                                (a distinct policy category the payer communicates as such).
+Per case the determination is APPROVE xor a DENY-flavor (mutually exclusive). All are COMMUNICATED
+determinations (CPGCommunicationRequest) — the payer communicates a decision; it NEVER orders the
+service (never CPGServiceRequest). Pended (A4) is a NON-FINAL asynchronous workflow state — NOT a
 per-policy clinical determination leaf; handled at the workflow layer, not here.
 
-The \`with\` text states ONLY the neutral X12 outcome (Certified / Not Certified). The REASON a
-determination fired is the triggering \`when\` concept in the policy, NOT baked in here — so this
-Deny is reusable by a medical-necessity denial AND an eligibility/business denial alike.
+The \`with\` text states the X12 outcome + the reason FLAVOR (where Deny is split). The REASON a
+determination fired is the triggering \`when\` concept in the policy; the shared lib offers the flavors,
+the policy picks the right one.
 
 Reuse: a policy references these by qualified name —
-  recommend activity "Medical Policy Determination"."Approve" / ."Deny".
+  recommend activity "Medical Policy Determination"."Approve" / ."Deny" / ."Deny EIU".
 At Stage 1 the X12 outcome is carried in the \`with\` narrative; a coded HCR01 value-set binding
 is a later-stage (external-terminology) concern, out of scope for local-decision-support.
 */
@@ -303,7 +308,11 @@ activity "Approve":
 
 activity "Deny":
 - request CPGCommunicationRequest.
-- with \`Coverage determination: DENY / Not Certified (X12 278 HCR01 A3). A communicated prior-authorization coverage determination denying certification of the requested service; NOT a service order.\`.
+- with \`Coverage determination: DENY / Not Certified (X12 278 HCR01 A3). A communicated prior-authorization coverage determination denying certification of the requested service (not medically necessary / criteria not met); NOT a service order.\`.
+
+activity "Deny EIU":
+- request CPGCommunicationRequest.
+- with \`Coverage determination: DENY — Experimental, Investigational and/or Unproven (X12 278 HCR01 A3). A communicated prior-authorization coverage determination denying certification because the requested service is classified experimental/investigational/unproven — a denial reason distinct from a medical-necessity Deny (both are X12 A3); NOT a service order.\`.
 `;
 
 /**
@@ -362,4 +371,265 @@ case "qualifying diagnosis -> approve":
 case "no qualifying diagnosis -> deny (otherwise)":
 - subject is "Sample Patient".
 - result is "Coverage Determination" is "Deny".
+`;
+
+/**
+ * Worked exemplar B — SOURCE-REQUIRED delegation (kit teaching §2/§5-B). The source NAMES a separate
+ * determination ("per the Continuation-of-Therapy protocol") → the policy CHAINS to it with a bare,
+ * same-library `use decision`. This is NOT DRY/reuse factoring — chaining is faithful ONLY because the
+ * source draws the determination boundary. The chained sub renders its OWN disposition (Approve/Deny
+ * meaningful alone). One parent + one delegated sub.
+ *
+ * Proof note (§4): the bare same-library `use decision` IS evaluated by the CRE — it RECURSES the sub in
+ * place and the sub's determination BUBBLES UP into `produced` (#166); the bare sub-NAME is never produced.
+ * So the `result is` oracle names the DELEGATED disposition (Approve/Deny), not the sub-decision name. The
+ * delegated-path cases assert the PATH via the run trace (the `when "Continuation Request"` action child is
+ * the `use decision` node), not the disposition alone — a sub's `otherwise` Deny and the parent's `otherwise`
+ * Deny are indistinguishable by membership (§4-req1).
+ */
+export const SOURCE_DELEGATED_DECISION_REFERENCE_CRL = `# Source-Delegated Decision Reference — source-required \`use decision\` delegation (Stage 1)
+library "Source Delegated Decision Reference".
+
+/*
+Worked exemplar B: DO chain — because the SOURCE delegates. The policy narrative names a SEPARATE,
+delegated determination ("for a continuation request, apply the Continuation-of-Therapy determination"),
+so the encoding CHAINS to it with a BARE, same-library \`use decision\`. This is the ONLY faithful reason
+to chain: the source draws the determination boundary.
+It is NOT DRY/reuse/readability factoring (that INVENTS a boundary — see the chaining-necessity rule).
+
+The delegated sub renders its OWN disposition (Approve/Deny, each meaningful standalone). The CRE evaluates
+a bare same-library \`use decision\` by RECURSING the sub in place; its determination BUBBLES UP, so the
+\`result is\` oracle names the DELEGATED disposition (Approve / Deny), not the sub-decision NAME. One parent
+determination + one delegated sub.
+*/
+
+concept "Continuation Request":
+- type is Condition.
+- code is \`continuation-request\`.
+concept "Demonstrated Response":
+- type is Observation.
+- code is \`demonstrated-response\`.
+concept "Clinically Indicated":
+- type is Condition.
+- code is \`clinically-indicated\`.
+
+decision "Coverage Determination":
+first:
+- when "Continuation Request" then use decision "Continuation of Therapy Determination".
+- when "Clinically Indicated" then recommend activity "Medical Policy Determination"."Approve".
+- otherwise then recommend activity "Medical Policy Determination"."Deny".
+
+decision "Continuation of Therapy Determination":
+first:
+- when "Demonstrated Response" then recommend activity "Medical Policy Determination"."Approve".
+- otherwise then recommend activity "Medical Policy Determination"."Deny".
+`;
+
+export const SOURCE_DELEGATED_DECISION_REFERENCE_CEL = `# Source-Delegated Decision Reference — cases (Stage 1)
+library "Source Delegated Decision Reference Cases".
+covers "Source Delegated Decision Reference".
+
+/*
+Cases for exemplar B. The first two route through the DELEGATED sub ("Continuation of Therapy
+Determination"): its determination bubbles up so the oracle names Approve/Deny (the delegated disposition),
+not the sub-decision name. The last two resolve in the PARENT. (Per §4-req1 the kit's unit test asserts the
+continuation→Deny case's PATH goes through the delegated sub, not the parent \`otherwise\`.)
+*/
+
+fact "Sample Patient":
+- name is "Sample Patient".
+- birth date is "1970-01-01".
+- defined by "Patient".
+
+fact "Continuation Request Finding":
+- code is "http://example.org/local|continuation-request".
+- date is "2026-01-01".
+- defined by "Source Delegated Decision Reference"."Continuation Request".
+
+fact "Demonstrated Response Finding":
+- code is "http://example.org/local|demonstrated-response".
+- date is "2026-01-01".
+- defined by "Source Delegated Decision Reference"."Demonstrated Response".
+
+fact "Clinically Indicated Finding":
+- code is "http://example.org/local|clinically-indicated".
+- date is "2026-01-01".
+- defined by "Source Delegated Decision Reference"."Clinically Indicated".
+
+case "continuation + demonstrated response -> approve via delegated sub":
+- subject is "Sample Patient".
+- fact is "Continuation Request Finding".
+- fact is "Demonstrated Response Finding".
+- result is "Coverage Determination" is "Approve".
+
+case "continuation, no response -> deny via delegated sub otherwise":
+- subject is "Sample Patient".
+- fact is "Continuation Request Finding".
+- result is "Coverage Determination" is "Deny".
+
+case "clinically indicated (no continuation) -> approve in parent":
+- subject is "Sample Patient".
+- fact is "Clinically Indicated Finding".
+- result is "Coverage Determination" is "Approve".
+
+case "neither -> deny in parent otherwise":
+- subject is "Sample Patient".
+- result is "Coverage Determination" is "Deny".
+`;
+
+/**
+ * Worked exemplar C — DISPOSITION-ARBITRATION (kit teaching §1-refinement / §5-C / §6). VERIFIED GREEN 6/6
+ * including the two load-bearing overlap cases. The TEMPTING-but-DON'T-chain case: ONE determination with
+ * MULTIPLE OVERLAPPING qualifying pathways + a PRECEDENCE among outcome categories + fall-through. A KE is
+ * tempted to factor it into chained sub-decisions, but the source draws NO determination boundary → it is
+ * ONE determination. The faithful, provable refinement (at scale): compute the precedence in the INFERENCE
+ * layer — make the FINAL-* concepts pairwise-disjoint via \`sem-not\` complement-guards, carry them as flat
+ * \`when\` siblings, and RE-EXPOSE the approve criteria as visible nodes (#168-clean). Uses only kit-in-scope
+ * inference; NO \`use decision\`. The two denies use DISTINCT activities (Deny vs Deny EIU) so \`result is\`
+ * can distinguish them (§4-req1). Verbatim from the KE deliverable (green: validate_crl/validate_cel clean,
+ * run_decision 6/6). NOTE: this is an AT-SCALE option — for a few pathways the plain nested tree is simpler.
+ */
+export const DISPOSITION_ARBITRATION_REFERENCE_CRL = `# Disposition-Arbitration Reference — overlapping qualifying pathways with outcome precedence (Stage 1)
+library "Disposition Arbitration Reference".
+
+/*
+WORKED EXAMPLE for the kit. Source structure: ONE determination, with MULTIPLE OVERLAPPING qualifying
+pathways, and a PRECEDENCE among outcome categories (Approve > within-indication Deny > off-indication
+EIU), with fall-through. This is the DISPOSITION-ARBITRATION model.
+
+WHEN this model is faithful: the source presents ONE determination whose outcome categories have a
+precedence over an OVERLAPPING population. It is NOT the model when the source presents SEPARATE
+sub-determinations that compose — that is \`use decision\` (a distinct primitive; provability is a
+separate axis from faithfulness).
+
+HOW it works: the precedence is computed in the INFERENCE layer. The FINAL-* concepts are made
+pairwise-DISJOINT by \`sem-not\` complement-guards (Approve = no guard, highest; Deny carries ¬Approve;
+EIU carries ¬Approve ∧ ¬Deny = the complement). Carried as the top-level \`when\` siblings, the
+disjointness means flat siblings cannot mis-fire — no "overlap pop". The clinical CRITERIA stay
+VISIBLE \`when\` nodes under the Approve branch (#168-clean: the cockpit shows which criterion drove the
+approval); the inference layer only ARBITRATES which outcome category wins, it does not HIDE criteria.
+Provable TODAY: \`defined as\`/\`sem-not\` is CRE-evaluated (#126); no \`use decision\` needed.
+
+OVERLAP ORACLE (load-bearing): a patient who satisfies BOTH indications but fails ONE pathway's
+criteria still APPROVES via the OTHER pathway — the failure does not pop to a deny.
+*/
+
+// ===== Clinical criteria (local case-features; visible decision nodes) =====
+concept "Has Indication X":
+- type is Condition.
+- code is \`indication-x\`.
+concept "Failed Standard Therapy":
+- type is Observation.
+- code is \`failed-standard-therapy\`.
+concept "Has Indication Y":
+- type is Condition.
+- code is \`indication-y\`.
+concept "Has Severe Markers":
+- type is Observation.
+- code is \`severe-markers\`.
+
+// ===== Pathway gates (INFERENCE: each pathway's full conjunction -> one fact; arbitration inputs) =====
+concept "Indication X Pathway Qualifies":
+- defined as ( "Has Indication X" sem-and "Failed Standard Therapy" ).
+concept "Indication Y Pathway Qualifies":
+- defined as ( "Has Indication Y" sem-and "Has Severe Markers" ).
+concept "Any Covered Indication":
+- defined as ( "Has Indication X" sem-or "Has Indication Y" ).
+
+// ===== Outcome arbitration (pairwise-DISJOINT via sem-not; precedence Approve > Deny > EIU) =====
+concept "Final Approve":
+- defined as ( "Indication X Pathway Qualifies" sem-or "Indication Y Pathway Qualifies" ).
+concept "Final Deny":
+- defined as ( "Any Covered Indication" sem-and sem-not "Final Approve" ).
+concept "Final Experimental":
+- defined as ( sem-not "Final Approve" sem-and sem-not "Final Deny" ).
+
+// ===== Decision: flat FINAL-* siblings; APPROVE criteria re-exposed as visible nodes (#168-clean) =====
+decision "Coverage Determination":
+first:
+- when "Final Approve" then:
+  all:
+  - when "Has Indication X" then:
+    - when "Failed Standard Therapy" then recommend activity "Medical Policy Determination"."Approve".
+    end.
+  - when "Has Indication Y" then:
+    - when "Has Severe Markers" then recommend activity "Medical Policy Determination"."Approve".
+    end.
+  end.
+- when "Final Deny" then recommend activity "Medical Policy Determination"."Deny".
+- when "Final Experimental" then recommend activity "Medical Policy Determination"."Deny EIU".
+- otherwise then recommend activity "Medical Policy Determination"."Deny".
+`;
+
+export const DISPOSITION_ARBITRATION_REFERENCE_CEL = `# Disposition-Arbitration Reference — cases (Stage 1)
+library "Disposition Arbitration Reference Cases".
+covers "Disposition Arbitration Reference".
+
+/*
+Exercises the arbitration: each pathway alone (approve), BOTH overlap cases (a both-indication patient
+who fails one pathway still approves via the other — the load-bearing "no overlap-pop" oracle),
+within-indication failure (Deny), and off-indication (Deny EIU). The two overlap cases are what a flat
+sibling tree WITHOUT the sem-not arbitration would get wrong (first-match would deny on the failed
+pathway).
+*/
+
+fact "Sample Patient":
+- name is "Sample Patient".
+- birth date is "1970-01-01".
+- defined by "Patient".
+
+fact "Indication X Finding":
+- code is "http://example.org/local|indication-x".
+- date is "2026-01-01".
+- defined by "Disposition Arbitration Reference"."Has Indication X".
+
+fact "Failed Standard Therapy Finding":
+- code is "http://example.org/local|failed-standard-therapy".
+- date is "2026-01-01".
+- defined by "Disposition Arbitration Reference"."Failed Standard Therapy".
+
+fact "Indication Y Finding":
+- code is "http://example.org/local|indication-y".
+- date is "2026-01-01".
+- defined by "Disposition Arbitration Reference"."Has Indication Y".
+
+fact "Severe Markers Finding":
+- code is "http://example.org/local|severe-markers".
+- date is "2026-01-01".
+- defined by "Disposition Arbitration Reference"."Has Severe Markers".
+
+case "X pathway qualifies -> approve":
+- subject is "Sample Patient".
+- fact is "Indication X Finding".
+- fact is "Failed Standard Therapy Finding".
+- result is "Coverage Determination" is "Approve".
+
+case "Y pathway qualifies -> approve":
+- subject is "Sample Patient".
+- fact is "Indication Y Finding".
+- fact is "Severe Markers Finding".
+- result is "Coverage Determination" is "Approve".
+
+case "OVERLAP: both indications, X-pathway fails (no failed-standard) -> approve via Y":
+- subject is "Sample Patient".
+- fact is "Indication X Finding".
+- fact is "Indication Y Finding".
+- fact is "Severe Markers Finding".
+- result is "Coverage Determination" is "Approve".
+
+case "OVERLAP: both indications, Y-pathway fails (no severe markers) -> approve via X":
+- subject is "Sample Patient".
+- fact is "Indication X Finding".
+- fact is "Failed Standard Therapy Finding".
+- fact is "Indication Y Finding".
+- result is "Coverage Determination" is "Approve".
+
+case "within-indication: X present but pathway fails, no Y -> Deny":
+- subject is "Sample Patient".
+- fact is "Indication X Finding".
+- result is "Coverage Determination" is "Deny".
+
+case "off-indication: neither indication -> Deny EIU":
+- subject is "Sample Patient".
+- result is "Coverage Determination" is "Deny EIU".
 `;

@@ -20,14 +20,19 @@ import {
   CRITERIA_DECISION_REFERENCE_CRL,
   DECISION_REFERENCE_CEL,
   DECISION_REFERENCE_CRL,
+  DISPOSITION_ARBITRATION_REFERENCE_CEL,
+  DISPOSITION_ARBITRATION_REFERENCE_CRL,
   MEDICAL_POLICY_DETERMINATION_CRL,
   PA_DETERMINATION_REFERENCE_CEL,
   PA_DETERMINATION_REFERENCE_CRL,
+  SOURCE_DELEGATED_DECISION_REFERENCE_CEL,
+  SOURCE_DELEGATED_DECISION_REFERENCE_CRL,
 } from "./reference";
 import type {
   AuthoringKit,
   AuthoringStage,
   ConceptLayerEntry,
+  ForceModel,
   JudgeLens,
   KitExample,
   KitRule,
@@ -38,8 +43,15 @@ import type {
 export type { AuthoringKit, AuthoringStage } from "./types";
 
 // "1.0" → "1.1": additive shape change — the `judgeLens` field (the waiver-adjudication rubric) joins the kit.
-// Sibling KE agents pin schemaVersion + contentHash and re-sync; the bump signals the new field.
-const SCHEMA_VERSION = "1.1";
+// "1.1" → "1.2": SHAPE change for the KE decision-composition teaching package (§0–§4) — four additions:
+//   (1) `forceModel` (the §0 force levels — read first); (2) per-rule `clauses` (the machine-readable
+//   default/invariant/validator-enforced force breakdown, each invariant clause carrying a RESOLVABLE `test`);
+//   (3) a SECOND judge-lens family `judgeLens.composition` (the §2/§3 source-fidelity checks with no
+//   mechanical home — invented-determination-boundary / hollowed-criteria / dropped-or-added-criterion); and
+//   (4) `verifyLoop.methodologyRequirements` (the §4 durable per-policy checks an invariant `test` anchors to
+//   via `verifyLoop:<id>`). All four ship together as the single 1.1→1.2 shape change.
+// Sibling KE agents pin schemaVersion + contentHash and re-sync; the bump signals the new shape.
+const SCHEMA_VERSION = "1.2";
 export const DEFAULT_STAGE: AuthoringStage = "local-decision-support";
 export const STAGES: readonly AuthoringStage[] = [DEFAULT_STAGE];
 
@@ -52,6 +64,51 @@ const SUMMARY =
   "sources only) + shallow (asserted concepts + `defined as` inference over one concept's " +
   "representations; no " +
   "`definition is` predicates or external sources).";
+
+/**
+ * The FORCE model — kit teaching §0. How an agent must APPLY the rules. Read first. Every rule carries a
+ * force at CLAUSE granularity because an agent that mechanically enforces an authoring PREFERENCE will revert
+ * a human KE's deliberate, faithful refactor — destroying intent.
+ */
+const FORCE_MODEL: ForceModel = {
+  summary:
+    "A rule whose force VARIES by clause carries explicit `clauses` (a single rule may carry both a default and " +
+    "an invariant clause — do not collapse them); a rule without `clauses` is uniformly its stated force (the " +
+    "validator-enforced grammar/mechanics rules). The force tells the agent how hard to bind. It exists so an " +
+    "agent that mechanically enforces an authoring PREFERENCE does not revert a human KE's deliberate, " +
+    "faithful refactor. The force is operator-governed content, not agent-editable.",
+  levels: [
+    {
+      level: "validator-enforced",
+      meaning:
+        "The grammar/validator rejects it (e.g. qualifier-required, guard-on-single-action). The agent need " +
+        "not police; the tool does.",
+    },
+    {
+      level: "invariant",
+      meaning:
+        "A FIDELITY-TO-SOURCE constraint (an ADD or a HOLLOW vs the policy narrative). Always enforced, on ANY " +
+        "author's output, human or agent. Every invariant carries a `test` that RESOLVES to a real check — never " +
+        '"looks wrong," and never a dangling/typo\'d anchor (a `test` pointing at nothing IS the K4 fake-green ' +
+        "this guards against; the force-model test asserts every invariant's `test` resolves). The anchor names " +
+        "the adjudication MODE: a `judgeLens.composition:<check>` (a §2/§3 source-fidelity judge call with no " +
+        "mechanical home), or a `verifyLoop:<id>` methodology requirement (a structural check the KE applies per policy, §4).",
+    },
+    {
+      level: "default",
+      meaning:
+        "Blank-slate generative guidance. A FAITHFUL override STANDS. The review/judge gate checks " +
+        "faithfulness-to-source, NEVER conformance-to-this-default; so a faithful structure is never reverted " +
+        "toward the default, and the agent need not know whether a human or an agent authored it.",
+    },
+  ],
+  governingPrinciple:
+    "Do not prefer the agent's default over a faithful human structure; do not prefer the human's structure " +
+    "over the source. A human refactor is protected ONLY when faithful — an unfaithful one (invents a " +
+    "determination boundary, hides distinct criteria, drops a criterion, fakes green) is flagged even if " +
+    "deliberate. Authoring agents editing an existing artifact must NOT re-normalize faithful surrounding " +
+    "structure to their defaults.",
+};
 
 const CONCEPT_LAYER_MODEL: ConceptLayerEntry[] = [
   {
@@ -84,6 +141,17 @@ const RULES: KitRule[] = [
     rule: "Stage-1 leaf concepts carry `type is` + `code is` (local). A SINGLE criterion stated at a finer data-grain — multiple representations/components of ONE clinical fact — is normalized with `defined as` (INFERENCE) over named local leaves, drop-one-leaf testable (e.g. \"failed conservative therapy\" = failed drug OR physical therapy). The conjunction of DISTINCT criteria (a policy's \"ALL of the following are met\") is decision COMPOSITION and belongs in the decision TREE — each criterion a nested `when` node — NOT a `defined as` `Criteria Met` composite (see decision-composition). `defined as`/`sem-and`/`sem-or` NEVER joins distinct criteria. Still OUT this stage: `source representation`/`coded from` (external) and `definition is` predicates (count/temporal/value). The boundary is the concept FORM, not the type vocabulary: any FHIR type may be a local `code is` concept. `meta is` is optional.",
     why: "Local-source pass proves decision authoring (incl. one-concept `defined as` inference) before external sources and predicate inference are added; conflating inference with decision composition hides criteria from the decision (#168).",
     ref: "concept-layer-model; src/tests/fixtures/representation/mammogram-and-bmi.crl",
+    clauses: [
+      {
+        text: "A Stage-1 leaf concept carries `type is` + `code is` (local); `source representation`/`coded from` (external) and `definition is` predicates are OUT this stage.",
+        force: "default",
+      },
+      {
+        text: "`defined as` is INFERENCE over the sub-representations/components of ONE concept (the §1 rung-1 unit). It NEVER joins a policy's DISTINCT criteria AS THE DECISION'S AUDIT SURFACE — combining distinct criteria is decision composition (the tree's job, §1 rung-2); collapsing them into a `defined as` composite gated as the SOLE branch (hiding which failed) is the #168 hollowing (see decision-composition). EXCEPTION — the disposition-arbitration refinement (§1, at scale) MAY compute pathway / FINAL-* ARBITRATION inputs in the inference layer over criteria, PROVIDED those criteria are RE-EXPOSED as visible `when` nodes so the audit surface is preserved (#168-clean; see disposition-arbitration-reference). The violation is HIDING criteria as the sole gate, not using inference to arbitrate outcome precedence.",
+        force: "invariant",
+        test: "judgeLens.composition:hollowed-criteria",
+      },
+    ],
   },
   {
     id: "decision-qualifiers",
@@ -94,9 +162,51 @@ const RULES: KitRule[] = [
   {
     id: "decision-composition",
     category: "decision-shape",
-    rule: "Decision composition — combining a policy's DISTINCT criteria into a determination — is expressed by the decision STRUCTURE, never by `defined as`: nested `when`s = AND; sibling `when` branches under `first:`, each recommending the same disposition (with `otherwise`), = OR of criteria (first match wins — fine for an exclusive Approve/Deny); `otherwise` = NOT; `first:` = precedence; a reused sub-tree = a referenced sub-`decision` via `use decision`. (`any:` is over ACTIONS only — alternative recommendations WITHIN one matched branch — NEVER an OR over `when` branches; see decision-qualifiers.) A `when` takes a SINGLE concept by design — combining criteria is structural, not a boolean condition and not a `defined as` composite. Putting the criteria conjunction in a `defined as` \"Criteria Met\" concept HIDES which criterion failed from the decision/cockpit and misuses the inference layer; author each criterion as its own (nested or sibling) `when` node — see criteria-decision-reference. `defined as`/`sem-*` is ONLY for normalizing ONE criterion's sub-representations into one fact (see concept-form).",
-    why: "The decision tree is the audit surface — a reviewer/cockpit must see WHICH criterion failed. `defined as`/sem-* is INFERENCE (one concept), not decision composition (the tree's job); conflating them hides criteria and was the #168 black-box failure (a fresh agent copied a `Criteria Met` composite → a decision with zero criterion nodes).",
-    ref: "docs/decision-shapes.md; criteria-decision-reference; #168",
+    rule: "The COMPOSITION LADDER (§1) — the primitive is decided by the UNIT you are combining: (rung 1) sub-representations of ONE criterion → `defined as` INFERENCE (sem-and/or/not, closed-world; see concept-form); (rung 2) DISTINCT criteria of ONE determination → the decision TREE (nested `when` = AND; sibling `when` under `first:`, each recommending the same disposition with `otherwise`, = OR; `otherwise` = NOT; `first:` = precedence); (rung 3) SEPARATE determinations the SOURCE delegates → chained `use decision` (see chaining-necessity — NOT for reuse). The tree already expresses AND/OR/NOT, so \"I have boolean logic\" is NOT a chaining signal — almost all of it stays in ONE tree. (`any:` is over ACTIONS only — alternatives WITHIN one matched branch — NEVER an OR over `when` branches; see decision-qualifiers.) A `when` takes a SINGLE concept by design. Putting a policy's distinct-criteria conjunction in a `defined as` \"Criteria Met\" composite gated as the sole branch HIDES which criterion failed (#168) — author each criterion as its own (nested or sibling) `when` node (see criteria-decision-reference). The REVERSE — exposing ONE criterion's sub-representations AS `when` nodes (§3) — makes the audit surface MORE visible and is presumed-faithful: do NOT revert it. AT SCALE, when one determination has many OVERLAPPING pathways with outcome precedence + fall-through, the plain nested tree duplicates shared criteria; the disposition-arbitration refinement (compute precedence in the inference layer via pairwise-disjoint `sem-not` FINAL-* concepts carried as flat `when` siblings, approve criteria re-exposed as visible nodes — #168-clean, NO `use decision`) is an option (see disposition-arbitration-reference) — but for a FEW pathways the plain tree is simpler and equally faithful.",
+    why: "The decision tree is the audit surface — a reviewer/cockpit must see WHICH criterion failed. `defined as`/sem-* is INFERENCE (one concept), not decision composition (the tree's job); conflating them hides criteria and was the #168 black-box failure (a fresh agent copied a `Criteria Met` composite → a decision with zero criterion nodes). The asymmetry (§3): hollowing distinct criteria INTO a composite is the violation; exposing one criterion's representations OUT to nodes is faithful.",
+    ref: "docs/decision-shapes.md; criteria-decision-reference; disposition-arbitration-reference; chaining-necessity; #168",
+    clauses: [
+      {
+        text: "Combine by the UNIT (§1 ladder): one criterion's representations → `defined as`; distinct criteria of one determination → the tree; separate source-delegated determinations → `use decision`. Boolean complexity alone is NOT a chaining signal.",
+        force: "default",
+      },
+      {
+        text: "Collapsing a policy's DISTINCT criteria into a `defined as` composite gated as the SOLE branch HIDES which criterion failed (#168) — author each as its own `when` node. Flag and revert even against a human.",
+        force: "invariant",
+        test: "judgeLens.composition:hollowed-criteria",
+      },
+      {
+        text: "Exposing ONE criterion's sub-representations as `when` nodes (§3, inference→decision) is presumed-faithful — it makes the audit surface more visible. Do NOT revert it (caveat: flag only if it mis-casts what the source states as ONE criterion into several independent presented criteria).",
+        force: "default",
+      },
+      {
+        text: "The disposition-arbitration refinement (sem-not FINAL-* arbitration, flat siblings, approve criteria re-exposed) is an AT-SCALE option for many overlapping pathways with precedence + fall-through; for a few pathways the plain nested tree is simpler and equally faithful.",
+        force: "default",
+      },
+    ],
+  },
+  {
+    id: "chaining-necessity",
+    category: "decision-shape",
+    rule: "The chaining necessity overlay (§2) — chain a `use decision` (a bare same-library `use decision \"Sub\"`) IF AND ONLY IF the SOURCE itself presents a SEPARATE / delegated determination: it points to another policy, protocol, or a shared sub-determination BY NAME (\"covered if the member meets the Eligibility Policy,\" \"per the Step-Therapy Protocol\"). One policy's own logic is ONE determination → ONE decision, however complex. Do NOT reach for `use decision` for reuse, scale, or readability. CROSS-POLICY apparent reuse → DUPLICATE, not factor: two policies that independently state the same criteria are two sources; encoding each inline (even duplicated) is faithful — factoring them invents a false coupling (changing one wrongly changes the other). DRY is a software instinct that misfires in KE. (See source-delegated-decision-reference for the source-required form.)",
+    why: "Casting one policy's internal pathways as separate chained \"sub-determinations\" the policy never delegates INVENTS a determination boundary the source does not draw — an ADD that can change the disposition/provenance surface. The boundary is a SOURCE fact, not an authoring convenience.",
+    ref: "§2; source-delegated-decision-reference; #172",
+    clauses: [
+      {
+        text: "When not source-required, do not reach for `use decision` for reuse / scale / readability — one policy's own logic is ONE determination → ONE decision, however complex. A behavior-identical internal-helper chain a human writes (one that does NOT change the disposition/provenance surface) is taste — leave it; but a chain that INVENTS a determination boundary the source does not draw (changing that surface) is the invariant violation below, not taste.",
+        force: "default",
+      },
+      {
+        text: "Do not invent a determination boundary the source does not draw. Every `use decision` boundary must map to a source sentence that NAMES or DELEGATES a separate determination; a chain with no such source sentence is unfaithful — flag it even if a human did it deliberately.",
+        force: "invariant",
+        test: "judgeLens.composition:invented-determination-boundary",
+      },
+      {
+        text: "Cross-policy apparent reuse → DUPLICATE the criteria inline (two sources), do NOT factor into one shared sub-decision — factoring invents a false coupling. Chain only when the source genuinely presents ONE shared determination referenced by both.",
+        force: "invariant",
+        test: "judgeLens.composition:invented-determination-boundary",
+      },
+    ],
   },
   {
     id: "guards",
@@ -107,16 +217,52 @@ const RULES: KitRule[] = [
   {
     id: "dispositions",
     category: "dispositions",
-    rule: "Model dispositions as plain `activity` declarations. CRL has no approve/deny/pend verbs — do not invent them. Do not author rationale at the decision/recommend site; the reason a branch fired IS its triggering `when` concept, which the emitter can surface (from the concept's `meta is`). DISPOSITION TYPE follows the ACT: a CDS recommendation to ORDER a service uses `request CPGServiceRequest` (see decision-reference). A PA / medical-policy coverage DETERMINATION is COMMUNICATED, never ordered — reference the SHARED, canonical `Medical Policy Determination` library's determination activities by qualified name (every deployment vendors this same library; its baseline membership is `\"Approve\"` = CPGCommunicationRequest / X12 A1 and `\"Deny\"` = A3, and a deployment's content project may add further FINAL flavors). All are `CPGCommunicationRequest`, never `CPGServiceRequest`, and never a per-policy re-authored determination (see pa-determination-reference).",
+    rule: "Model dispositions as plain `activity` declarations. CRL has no approve/deny/pend verbs — do not invent them. Do not author rationale at the decision/recommend site; the reason a branch fired IS its triggering `when` concept, which the emitter can surface (from the concept's `meta is`). DISPOSITION TYPE follows the ACT: a CDS recommendation to ORDER a service uses `request CPGServiceRequest` (see decision-reference). A PA / medical-policy coverage DETERMINATION is COMMUNICATED, never ordered — reference the SHARED, canonical `Medical Policy Determination` library's determination activities by qualified name (every deployment vendors this same library; the determination is two KINDS — a CERTIFY (`\"Approve\"` = CPGCommunicationRequest / X12 A1) and a NOT-CERTIFY (X12 A3) — and the not-certify kind may take further FINAL activity FLAVORS for distinct reasons, e.g. `\"Deny\"` and `\"Deny EIU\"`; see pa-disposition-set). All are `CPGCommunicationRequest`, never `CPGServiceRequest`, and never a per-policy re-authored determination (see pa-determination-reference).",
     why: "CRL is general (cognitive support, CDS, prior-auth, quality measures), not a PA-specific language; keep the core minimal. But a coverage determination is a communicated decision, not a service order — modeling it as CPGServiceRequest is a clinical-safety error (#134).",
     ref: "crl-not-a-pa-language; #134",
+    clauses: [
+      {
+        text: "Model dispositions as plain `activity` declarations; CRL has no approve/deny/pend verbs — do not invent them.",
+        force: "default",
+      },
+      {
+        text: "Do not author rationale at the decision/recommend site; the reason a branch fired IS its triggering `when` concept (the emitter surfaces it from the concept's `meta is`).",
+        force: "default",
+      },
+      {
+        text: "A PA / medical-policy coverage DETERMINATION is COMMUNICATED, never ordered — it resolves to the shared `Medical Policy Determination` library (all `CPGCommunicationRequest`, never `CPGServiceRequest`, never a per-policy re-authored determination). Modeling it as a service order is a clinical-safety error (#134).",
+        force: "invariant",
+        test: "verifyLoop:communicated-not-ordered",
+      },
+    ],
   },
   {
     id: "pa-disposition-set",
     category: "dispositions",
-    rule: "For a medical-policy / PA coverage decision the disposition set is constrained STRUCTURALLY, naming no activities: (1) MEMBERSHIP — every activity the decision can `recommend` resolves to the shared, canonical `Medical Policy Determination` library (the one library every deployment vendors under that name; a qualified ref into it), never a per-policy re-authored determination and never `CPGServiceRequest`; a determination is COMMUNICATED (all `CPGCommunicationRequest`), not ordered. (2) MUTUAL EXCLUSIVITY — each case fires EXACTLY ONE determination: no reachable branch/action shape may emit more than one determination in a single run (author ordered precedence with `first:` + `otherwise`; do not place two determination recommendations under one `all:` / `any:`). (3) NO PEND — the canonical library holds only FINAL determinations (a deployment extends it only with further final flavors), so a determination cannot recommend a pend; Pended (X12 A4) is an async/workflow state resolved OUTSIDE the per-policy decision, not a determination leaf. WHICH activities the shared library offers and their certify/deny KINDS are content (governed in the deployment's content project); whether a policy uses the RIGHT flavor where it draws a distinction is a reviewer/Judge fidelity call this rule INSTRUCTS but does not mechanically enforce.",
-    why: "The universal kit must be customer-agnostic — it serves every deployment's content project, not one denial taxonomy. The structural invariant (shared-library membership, one determination per case, no pend leaf) catches the real modeling defects #134 targeted — a determination modeled as a service order, a per-policy re-authored determination, a contradictory double-determination — WITHOUT hard-coding any activity set; a distinct third determination flavor is legitimate content, not a defect (#167).",
-    ref: "#134; #167",
+    rule: "For a medical-policy / PA coverage decision the disposition set is constrained STRUCTURALLY, naming no activities: (1) MEMBERSHIP — the determination is exactly TWO KINDS of outcome (a CERTIFY kind and a NOT-CERTIFY kind), NOT two activities. The not-certify kind may take multiple ACTIVITY FLAVORS that share one X12 A3 outcome but communicate a DISTINCT reason (e.g. a medical-necessity not-certify vs an experimental/investigational/unproven not-certify). Every activity the decision can `recommend` resolves to the shared, canonical `Medical Policy Determination` library (the one library every deployment vendors under that name; a qualified ref into it), never a per-policy re-authored determination and never `CPGServiceRequest`; a determination is COMMUNICATED (all `CPGCommunicationRequest`), not ordered. (2) MUTUAL EXCLUSIVITY — each case fires EXACTLY ONE determination, and the invariant spans the DELEGATED CLOSURE (parent + any chained `use decision` sub TOGETHER, not in-tree branches alone): no reachable path across the closure may emit more than one determination in a single run (author ordered precedence with `first:` + `otherwise`; do not place two determination recommendations under one `all:` / `any:`; a branch that both delegates and `recommend`s emits two determinations a in-tree-only check misses). (3) NO PEND — the canonical library holds only FINAL determinations (a deployment extends it only with further final flavors), so a determination cannot recommend a pend; Pended (X12 A4) is an async/workflow state resolved OUTSIDE the per-policy decision, not a determination leaf. WHICH activity flavors the shared library offers, and their certify/not-certify KINDS, are content (governed in the deployment's content project); whether a policy uses the RIGHT flavor where it draws a distinction is a reviewer/Judge fidelity call this rule INSTRUCTS but does not mechanically enforce.",
+    why: "The universal kit must be customer-agnostic — it serves every deployment's content project, not one denial taxonomy. The structural invariant (shared-library membership, one determination per case ACROSS the delegated closure, no pend leaf) catches the real modeling defects #134 targeted — a determination modeled as a service order, a per-policy re-authored determination, a contradictory double-determination across a parent+sub — WITHOUT hard-coding any activity set; a distinct further not-certify flavor is legitimate content, not a defect (#167).",
+    ref: "#134; #167; §4",
+    clauses: [
+      {
+        text: "MEMBERSHIP: every recommended determination resolves to the shared `Medical Policy Determination` library (a qualified ref), all `CPGCommunicationRequest`, never `CPGServiceRequest`, never a per-policy re-authored determination.",
+        force: "invariant",
+        test: "verifyLoop:shared-lib-membership",
+      },
+      {
+        text: "MUTUAL EXCLUSIVITY spans the DELEGATED CLOSURE: exactly one determination per run over parent + any chained sub together; no path may emit two (a branch that both delegates and `recommend`s is the case an in-tree-only check misses). Author ordered precedence with `first:` + `otherwise`.",
+        force: "invariant",
+        test: "verifyLoop:mutual-exclusivity-spans-closure",
+      },
+      {
+        text: "NO PEND leaf: the canonical library holds only FINAL determinations; Pended (X12 A4) is an async/workflow state resolved outside the per-policy decision, not a determination leaf.",
+        force: "invariant",
+        test: "verifyLoop:no-pend",
+      },
+      {
+        text: "The two KINDS are certify / not-certify; the not-certify kind may carry multiple activity flavors (sharing X12 A3) for distinct reasons — WHICH flavors exist is content, not defect (#167). Whether a policy picks the RIGHT flavor is a reviewer/Judge fidelity call.",
+        force: "default",
+      },
+    ],
   },
   {
     id: "minimalism",
@@ -225,22 +371,98 @@ const VERIFY_LOOP: VerifyLoop = {
   doesNotProve:
     "That a concept's `code is` is the clinically correct code, or that the concept-to-intent mapping is right. The CRE (v1) is asserted-only and never evaluates `code is`: a concept is satisfied purely because a case fact is `defined by` it. A green run means the wiring is right, NOT that the encoding is clinically complete or correct.",
   note:
-    "validate_cel and run_decision require FILES under a project root (a package.json); they do not accept inline code. In a content project's artifact-package layout, author <artifact>.crl and <artifact>.cel under the artifact's package and pass absolute paths.",
+    "validate_cel and run_decision require FILES under a project root (a package.json); they do not accept inline code. In a content project's artifact-package layout, author <artifact>.crl and <artifact>.cel under the artifact's package and pass absolute paths. " +
+    "PROOF STATUS IS ORTHOGONAL TO FAITHFULNESS (§4): faithfulness decides the model, provability decides whether run_decision can prove it yet. Encode the FAITHFUL model and DEFER the proof for any construct the kit `boundary` marks out-of-scope — never substitute a less-faithful provable model, and never assert a composite to fake green (K4). Read the live proof status from `conceptLayerModel` (scope in/out) and `boundary` (e.g. qualified `use decision` is deferred; a bare same-library one is evaluated) — do not hardcode a snapshot. " +
+    "Two DURABLE proof-methodology requirements (independent of which constructs are evaluated): " +
+    "(1) ASSERT THE PATH, not just the disposition. `result is` checks disposition MEMBERSHIP only — two paths ending in the same disposition (a sub-decision's `otherwise` Deny and a parent's `otherwise` Deny) are indistinguishable, so a case short-circuiting to the WRONG `otherwise` still 'passes'. Fall-through / chained proof cases must assert the path via the run trace (`viaWhen` / nodeId) or use DISTINCT disposition activities per path. " +
+    "(2) MUTUAL-EXCLUSIVITY SPANS THE DELEGATED CLOSURE. The PA disposition-set 'exactly one determination per run' invariant is evaluated over parent + sub TOGETHER, not in-tree branches alone — a branch that both delegates and `recommend`s emits two determinations an in-tree-only check misses.",
+  methodologyRequirements: [
+    {
+      id: "assert-path",
+      text: "§4-req1 — ASSERT THE PATH, not just the disposition: `result is` checks disposition membership only, so two paths ending in the same disposition (a sub's `otherwise` Deny vs a parent's `otherwise` Deny) are indistinguishable; a fall-through / chained proof case must assert the path via the run trace (`viaWhen`/nodeId) or use DISTINCT disposition activities per path.",
+    },
+    {
+      id: "mutual-exclusivity-spans-closure",
+      text: "§4-req2 — the PA 'exactly one determination per run' invariant is checked over the DELEGATED CLOSURE (parent + any chained `use decision` sub together): run_decision over the policy's cases must show no run producing >1 determination, INCLUDING a branch that both delegates and `recommend`s.",
+    },
+    {
+      id: "communicated-not-ordered",
+      text: "Every determination a PA/medical-policy decision recommends is `CPGCommunicationRequest` (communicated), never `CPGServiceRequest` (ordered) — inspect the recommended activities' request types per policy (#134).",
+    },
+    {
+      id: "shared-lib-membership",
+      text: "Every recommended determination resolves (a qualified ref) to the shared `Medical Policy Determination` library, never a per-policy re-authored determination — check each recommend target's library per policy (#167).",
+    },
+    {
+      id: "no-pend",
+      text: "No determination leaf is a pend: the canonical library holds only FINAL determinations; Pended (X12 A4) is an async/workflow state outside the per-policy decision — check no recommend target is a pend per policy (#167).",
+    },
+  ],
 };
 
 /**
- * The judge-lens rubric — one rule per provenance WAIVER kind (validators.ts `WAIVER_KINDS`). `validate_provenance`
- * (FINAL mode) surfaces every escape hatch that suppresses a finding as a UNIFORM manual-review; the severity carries
- * no weighting by design (surface-then-adjudicate is auditable). This rubric carries the earned-ness weighting: the
- * axis to rank each waiver's scrutiny, how to judge earned vs rubber-stamped, and the checkpoints to walk.
+ * The judge-lens rubric — TWO families, each carrying the source-fidelity weighting the uniform severity omits.
+ * (1) `waivers` — one rule per provenance WAIVER kind (validators.ts `WAIVER_KINDS`): `validate_provenance`
+ *     (FINAL mode) surfaces every escape hatch that suppresses a finding as a UNIFORM manual-review; this rubric
+ *     carries the earned-ness weighting (axis, earned-vs-rubber-stamped guidance, checkpoints).
+ * (2) `composition` — the decision-composition / chaining source-fidelity checks (§2/§3) with no mechanical home:
+ *     the invented-determination-boundary / hollowed-criteria / dropped-or-added-criterion checks that a rule's
+ *     `invariant` clause anchors its `test` to via `judgeLens.composition:<check>`.
  */
 const JUDGE_LENS: JudgeLens = {
   summary:
-    "In FINAL mode, validate_provenance surfaces every WAIVER — an escape hatch that suppresses a finding — as a " +
-    "uniform manual-review for the Judge to adjudicate. Severity carries no weighting (surface-then-rubber-stamp is " +
-    "auditable); this rubric does. For each waiver, rank scrutiny by its `weightedBy` axis, judge earned-ness with " +
-    "`guidance`, and walk the `checkpoints`. The waiver's finding message names the concrete loci (cluster, blast " +
-    "radius, span preview, dispositionClass).",
+    "Two judge-lens families carry the source-fidelity weighting the uniform severity deliberately omits. " +
+    "(1) `waivers` — in FINAL mode validate_provenance surfaces every WAIVER (an escape hatch that suppresses a " +
+    "finding) as a uniform manual-review; for each, rank scrutiny by its `weightedBy` axis, judge earned-ness " +
+    "with `guidance`, and walk the `checkpoints` (the message names the loci — cluster, blast radius, span " +
+    "preview, dispositionClass). (2) `composition` — the decision-composition / chaining source-fidelity checks " +
+    "(§2/§3) that have NO mechanical (validator) home: whether a `use decision` chain, a `defined as` composite, " +
+    "or a refactor INVENTS / HOLLOWS / DROPS a determination boundary or criterion vs the source. A rule's " +
+    "invariant clause with a source-fidelity force points its `test` at a composition check via " +
+    "`judgeLens.composition:<check>`. A FAITHFUL human refactor STANDS; an unfaithful one is flagged even if deliberate.",
+  composition: [
+    {
+      check: "invented-determination-boundary",
+      weightedBy:
+        "whether a SOURCE sentence names/delegates the sub-determination a `use decision` chains to.",
+      guidance:
+        "A `use decision` is faithful ONLY if the source presents a SEPARATE / delegated determination by name " +
+        "(another policy/protocol/shared sub-determination). Chaining for DRY / reuse / readability, or to factor " +
+        "one policy's internal pathways, INVENTS a boundary the source does not draw (an ADD; it changes the " +
+        "disposition/provenance surface). Cross-policy apparent reuse must be DUPLICATED, not factored.",
+      checkpoints: [
+        "Does a specific source sentence name/delegate the chained sub-determination?",
+        "Does the sub render its OWN disposition (Approve/Deny meaningful alone), vs a true/false condition that should stay a `when`?",
+        "Is this cross-policy reuse that should be duplicated (two sources), not factored (a false coupling)?",
+      ],
+    },
+    {
+      check: "hollowed-criteria",
+      weightedBy:
+        "whether the `defined as` operands are the source's DISTINCT criteria vs sub-representations of ONE criterion.",
+      guidance:
+        "Collapsing DISTINCT criteria into a `defined as` composite gated as the SOLE branch is a #168 violation " +
+        "(it hides which criterion failed). The REVERSE — exposing one criterion's sub-representations as `when` " +
+        "nodes — is presumed-faithful: do NOT revert it.",
+      checkpoints: [
+        "Are the operands distinct criteria the source lists, or representations of one criterion?",
+        "Is the composite gated as the SOLE branch (the black-box shape)?",
+        "Does the cockpit still show which criterion failed?",
+      ],
+    },
+    {
+      check: "dropped-or-added-criterion",
+      weightedBy: "presence/absence of each source criterion in the encoding.",
+      guidance:
+        "The encoding must neither DROP a source criterion (HOLLOW) nor ADD a criterion / boundary the source " +
+        "does not state. A FAITHFUL human refactor STANDS; an unfaithful one (invents / hollows / drops) is " +
+        "flagged even if deliberate.",
+      checkpoints: [
+        "Is every source criterion a visible node/operand?",
+        "Is any criterion or determination boundary present that the source does not state?",
+      ],
+    },
+  ],
   waivers: [
     {
       kind: "waiver-authored",
@@ -305,6 +527,7 @@ const JUDGE_LENS: JudgeLens = {
 };
 
 const BOUNDARY = [
+  'qualified `use decision` (cross-library `"Other"."Sub"` OR self-qualified `"This Library"."Sub"`) is NOT yet evaluated (#172) — only a BARE same-library `use decision "Sub"` is evaluated (recursed in place; the sub determination bubbles up). Same-library bare delegation is fully provable; encode a qualified delegation faithfully and document it as a deferred shape (do not work around).',
   "`definition is` predicates (count / most-recent / temporal / value thresholds — compute over a source)",
   "external / value-set sources (`source representation` / `coded from`)",
   "PA Pended (X12 278 HCR01 A4) — an async/workflow disposition resolved OUTSIDE the per-policy clinical decision; not a determination leaf",
@@ -317,6 +540,7 @@ function buildBase(stage: AuthoringStage): Omit<AuthoringKit, "contentHash"> {
     schemaVersion: SCHEMA_VERSION,
     stage,
     summary: SUMMARY,
+    forceModel: FORCE_MODEL,
     conceptLayerModel: CONCEPT_LAYER_MODEL,
     rules: RULES,
     typeAllowlist: TYPE_ALLOWLIST,
@@ -353,7 +577,7 @@ function buildBase(stage: AuthoringStage): Omit<AuthoringKit, "contentHash"> {
         name: "medical-policy-determination.crl",
         language: "crl",
         purpose:
-          "The SHARED, canonical PA determination library (#134) — communicated (CPGCommunicationRequest), never ordered, imported by every medical-policy artifact via qualified ref, never re-authored. Its baseline membership is Approve (X12 A1) + Deny (A3); a deployment's content project may add further FINAL flavors (e.g. a distinct deny reason). (No companion CEL — a shared activity lib has no decision to run.)",
+          "The SHARED, canonical PA determination library (#134) — communicated (CPGCommunicationRequest), never ordered, imported by every medical-policy artifact via qualified ref, never re-authored. Two KINDS of outcome (certify / not-certify); the not-certify kind takes activity FLAVORS sharing one X12 A3 outcome — here Approve (A1), Deny (A3 medical-necessity), and Deny EIU (A3 experimental/investigational/unproven, a distinct reason); a deployment's content project may add further FINAL flavors. (No companion CEL — a shared activity lib has no decision to run.)",
         source: MEDICAL_POLICY_DETERMINATION_CRL,
       },
       {
@@ -369,6 +593,34 @@ function buildBase(stage: AuthoringStage): Omit<AuthoringKit, "contentHash"> {
         purpose:
           "Companion cases for the PA exemplar: qualifying diagnosis → approve; otherwise → deny. Resolves the shared determination activities via the vendored-sibling library (no `include`).",
         source: PA_DETERMINATION_REFERENCE_CEL,
+      },
+      {
+        name: "source-delegated-decision-reference.crl",
+        language: "crl",
+        purpose:
+          "Exemplar B — SOURCE-REQUIRED delegation (§2/§5-B): the source NAMES a separate determination, so the policy chains to it with a BARE same-library `use decision`. NOT DRY/reuse factoring — chaining is faithful only because the source draws the boundary. The bare same-library delegation IS evaluated (recursed; the sub determination bubbles up), so the oracle names the DELEGATED disposition, not the sub-decision name. One parent + one delegated sub.",
+        source: SOURCE_DELEGATED_DECISION_REFERENCE_CRL,
+      },
+      {
+        name: "source-delegated-decision-reference.cel",
+        language: "cel",
+        purpose:
+          "Companion cases for exemplar B: the two delegated-path cases (continuation → the sub's Approve/Deny bubbles up) + the two parent-resolved cases. The kit's unit test asserts the continuation→Deny case's PATH goes through the delegated sub (not the parent `otherwise`) — §4-req1.",
+        source: SOURCE_DELEGATED_DECISION_REFERENCE_CEL,
+      },
+      {
+        name: "disposition-arbitration-reference.crl",
+        language: "crl",
+        purpose:
+          "Exemplar C — DISPOSITION-ARBITRATION (§1-refinement / §5-C / §6). Applicability GATE: use ONLY when a plain nested tree duplicates shared criteria across MANY overlapping pathways with outcome precedence + fall-through; for a FEW pathways prefer the plain tree (do not over-copy the sem-not arbitration). The TEMPTING-but-DON'T-chain case: ONE determination (source draws no boundary), precedence computed in the inference layer via pairwise-disjoint `sem-not` FINAL-* concepts as flat `when` siblings, approve criteria re-exposed as visible nodes (#168-clean), NO `use decision`. Two denies use DISTINCT activities (Deny vs Deny EIU) so `result is` distinguishes them.",
+        source: DISPOSITION_ARBITRATION_REFERENCE_CRL,
+      },
+      {
+        name: "disposition-arbitration-reference.cel",
+        language: "cel",
+        purpose:
+          "Companion cases for exemplar C (verified 6/6): each pathway alone (approve), BOTH load-bearing overlap cases (a both-indication patient who fails one pathway still approves via the other — no overlap-pop), within-indication failure (Deny), off-indication (Deny EIU).",
+        source: DISPOSITION_ARBITRATION_REFERENCE_CEL,
       },
     ],
     examples: EXAMPLES,

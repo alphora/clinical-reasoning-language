@@ -501,10 +501,13 @@ export function createServer(): McpServer {
         "`defined by` it (asserted) OR its `defined as` inference (sem-and/sem-or/sem-not over one concept's representations, closed-world) " +
         "evaluates true (#126); it walks the full decision shape (first:/all:/any:/otherwise + " +
         "`unless`/`only when` guards) and a decision-leaf `result is` passes iff the expected branch is " +
-        "in the produced recommendation set. Returns { success, caseCount, passCount, failCount, " +
-        "errorCount, runs:[{case, decision, status, expected, produced, trace:[{node, nodeId, source, " +
-        "...}], diagnostics}], errors, importDiagnostics }. NOT yet evaluated (deferred): `definition is` " +
-        "predicates (count/temporal/value), `coded from`/external value sets, transitive `use decision`.",
+        "in the produced recommendation set. A BARE same-library `use decision \"Sub\"` IS evaluated: the sub " +
+        "is recursed in place and its determinations bubble up into the produced set (the bare sub-NAME is not " +
+        "produced) — so the oracle names the delegated disposition. Returns { success, caseCount, passCount, " +
+        "failCount, errorCount, runs:[{case, decision, status, expected, produced, trace:[{node, nodeId, " +
+        "source, ...}], diagnostics}], errors, importDiagnostics }. NOT yet evaluated (deferred): `definition " +
+        "is` predicates (count/temporal/value), `coded from`/external value sets, and QUALIFIED `use decision` " +
+        '(cross-library `"Other"."Sub"` OR self-qualified `"This Library"."Sub"`).',
       inputSchema: {
         path: z
           .string()
@@ -554,14 +557,21 @@ export function createServer(): McpServer {
       title: "CRL authoring kit (stage-sliced)",
       description:
         "Return the self-contained authoring knowledge a Knowledge-Engineering agent needs to encode one " +
-        "CRL artifact for a given stage: the concept-layer model, authoring rules (decision shapes, guards, " +
-        "dispositions incl. PA Approve/Deny determination handling, CEL cases, the verify loop), the grammar " +
-        "type allowlists (full + a stage-recommended subset), seven validated reference artifacts embedded " +
-        "inline (CDS decision-reference.crl/.cel; criteria-decision-reference.crl/.cel — distinct criteria as " +
-        "decision-tree nodes + one `defined as` INFERENCE, #168; the shared medical-policy-determination.crl determination library; and the " +
-        "pa-determination-reference.crl/.cel prior-authorization exemplar), do/don't examples, a `judgeLens` " +
-        "rubric (how to adjudicate the FINAL-mode provenance waivers validate_provenance surfaces — one rule " +
-        "per waiver kind with its weighting axis + checkpoints), and a feedback " +
+        "CRL artifact for a given stage: a `forceModel` (how hard each rule binds — the validator-enforced / " +
+        "invariant / default FORCE levels, read first), the concept-layer model, authoring rules (decision " +
+        "shapes incl. the composition ladder + chaining necessity, guards, dispositions incl. PA determination " +
+        "handling, CEL cases, the verify loop) — each with a machine-readable `clauses` force breakdown, the " +
+        "grammar type allowlists (full + a stage-recommended subset), eleven validated reference artifacts " +
+        "embedded inline (CDS decision-reference.crl/.cel; criteria-decision-reference.crl/.cel — distinct " +
+        "criteria as decision-tree nodes + one `defined as` INFERENCE, #168; the shared " +
+        "medical-policy-determination.crl determination library; the pa-determination-reference.crl/.cel " +
+        "prior-authorization exemplar; source-delegated-decision-reference.crl/.cel — source-required bare " +
+        "same-library `use decision` delegation; and disposition-arbitration-reference.crl/.cel — the " +
+        "at-scale sem-not outcome arbitration for overlapping pathways), do/don't examples, a `judgeLens` " +
+        "rubric with TWO families (waivers — how to adjudicate the FINAL-mode provenance waivers " +
+        "validate_provenance surfaces; and composition — the decision-composition / chaining source-fidelity " +
+        "checks invented-determination-boundary / hollowed-criteria / dropped-or-added-criterion that have no " +
+        "mechanical home), and a feedback " +
         "URL. The verify loop states what a green `run_decision` does AND does NOT prove (it is asserted-only " +
         '— it never evaluates `code is`). v1 stage: "local-decision-support" (narrow: local `code is` sources ' +
         "only; shallow: asserted concepts + `defined as` inference over one concept's representations; no `definition is` predicates or " +
