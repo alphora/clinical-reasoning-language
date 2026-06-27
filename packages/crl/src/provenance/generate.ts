@@ -1,7 +1,10 @@
 /**
- * Provenance SCAFFOLD generator (Model A). Pure + headless: from a policy's resolved CRL+CEL graph, derive the
+ * Provenance SCAFFOLD generator (Model A). Pure + headless (no I/O — it renders the CEL in-process via `renderScenario`
+ * to follow each case's RUN PATH, but reads nothing off disk): from a policy's resolved CRL+CEL graph, derive the
  * structurally-derivable MAJORITY of a `ProvenanceArtifact`, leaving the human/agent KE only the source-attribution
- * work that genuinely needs the policy narrative.
+ * work that genuinely needs the policy narrative. BOTH modes render now (#175): the default per-decision mode routes a
+ * CHAINED branch result `D is X` (X fires in a sub-decision) to the sub's cluster via the run path; a NON-chained case
+ * is byte-unchanged (it never enters the run-path branch).
  *
  * Model A — what we DO and DON'T emit:
  *  - We fill `clusters[].crl` / `clusters[].cel` with refs whose nodeKind/ownership come straight from the §5-authoritative
@@ -27,7 +30,7 @@ import type { ActionStatement, Decision, ReferenceName, WhenBlock } from "../ast
 import { getRefLibrary, getRefName } from "../ast/types";
 import type { CELBranchResult, CELCase, CELResultField } from "../cel/ast/types";
 import type { ResolvedCelGraph } from "../cel/imports/types";
-import { renderScenario } from "../cre";
+import { renderScenario, type ScenarioViewModel } from "../cre";
 
 import type {
   AnchorSourceMeta,
@@ -66,6 +69,10 @@ export interface GenerateDiagnostic {
     | "unfrozen-case"
     | "ambiguous-cel-branch"
     | "unsupported-cel-result"
+    // default mode (clusterBy:"decision"), CHAINED branch result (#175): the case's result field claims `D is X` but the
+    // run produced no terminal whose own-spine target is X (the result field disagrees with the actual run). Genuinely new
+    // — the disposition-path/gate path never reads a CEL result field, so it has no analogue there.
+    | "cel-result-run-mismatch"
     // disposition-path mode (clusterBy:"disposition-path"): a scenario that can't be path-clustered (mirrors the
     // FINAL gate's CorrespondenceUncheckedReason set so the two agree on "not comparable"), or a whole-render failure.
     | "deferred-disposition-path";
@@ -115,6 +122,16 @@ function branchArmSegment(nodeId: string): string {
   return segs.length >= 2 ? segs[segs.length - 2] : "";
 }
 
+/** True iff a decision STRUCTURALLY chains — its spine contains a `use decision` action (#175). Used in default mode to
+ *  decide whether a classify deferral on this decision's case should DEFER (honest, no guessed D-cluster attach) vs. fall
+ *  through to today's leaf-name path: only a chaining decision can have a disposition fire in a sub it delegates to, so a
+ *  genuinely non-chained decision never takes the defer branch → its output stays byte-identical. */
+function decisionChains(spine: SpineNode[]): boolean {
+  return spine.some(
+    (sn) => sn.kind === "action" && (sn.node as ActionStatement).action.type === "UseDecision",
+  );
+}
+
 // ── concept-ref helpers (same lib/kind/name rule as the indexer/crlStructure — keys cannot drift) ──
 
 /** A referenced concept's nodeKey, resolved by the same lib/kind/name rule the indexer + crlStructure use (qualified-ref
@@ -133,9 +150,11 @@ export function generateProvenanceScaffold(
     policyVersion: string;
     anchorSource: AnchorSourceMeta;
     celFileName: string;
-    /** Clustering strategy (#174). "decision" (DEFAULT) = one cluster per covered decision + a per-case CEL pass
-     *  (the original output, byte-unchanged). "disposition-path" = one cluster per distinct RUN PATH (decision-node
-     *  refs only) + one policy-owned-leaf coverage cluster — correspondence-correct BY CONSTRUCTION. */
+    /** Clustering strategy (#174). "decision" (DEFAULT) = one cluster per covered decision + a per-case CEL pass.
+     *  #175: the default CEL pass now renders the CEL and routes a CHAINED branch result (`D is X` where X fires in a
+     *  SUB-decision D delegates to) to the SUB's cluster + arm; a NON-chained case is BYTE-UNCHANGED (it never enters the
+     *  run-path branch). "disposition-path" = one cluster per distinct RUN PATH (decision-node refs only) + one
+     *  policy-owned-leaf coverage cluster — correspondence-correct BY CONSTRUCTION. */
     clusterBy?: "decision" | "disposition-path";
   },
 ): GenerateResult {
@@ -185,12 +204,19 @@ export function generateProvenanceScaffold(
     });
   }
 
+  // ONE render feeding BOTH modes (disc 154 S1, Claude-6 drift-defense): the default mode now also renders — its CEL pass
+  // routes a CHAINED branch result through the run path (the disposition fired in a SUB) — and disposition-path consumes
+  // the SAME render. A wholesale render failure is non-fatal in BOTH modes: the structural scaffold (clusters + over-reach
+  // baseline + attribution worklist) still emits; only the chained attach / disposition clusters fall back.
+  const rendered = renderScenario(graph);
+
   let clusters: Cluster[];
   if (clusterBy === "disposition-path") {
     // disposition-path mode: SKIP the per-decision cluster loop AND the ENTIRE CEL pass (buildConceptToClusterIds +
     // processCelCase + clusterIdFor). Build one cluster per distinct RUN PATH (decision-node refs only) + one
     // policy-owned-leaf coverage cluster instead. The over-reach baseline + attribution diagnostics below are kept.
     clusters = buildDispositionPathClusters(
+      rendered,
       graph,
       policyLib,
       opts.celFileName,
@@ -204,11 +230,39 @@ export function generateProvenanceScaffold(
       buildDecisionCluster(ctxByName.get(decision.name)!, policyLib!, index),
     );
 
+    // ── the default-mode case→scenario JOIN (disc 154 S2): for the CHAINED branch attach, each AST CELCase needs its
+    //    rendered scenario's run path. Key the rendered scenarios by `case.name`; a name in `duplicateScenarioNames`
+    //    (a collision) OR a case with no matching rendered scenario (the renderer dropped it / render-error) leaves the
+    //    map without a usable entry → `handleBranchResult` falls through to today's NON-chained leaf-name path. On a
+    //    WHOLESALE render failure (success false / no scenarios) the map is empty → EVERY case falls through, but the
+    //    structural scaffold still emits (the artifact is NEVER aborted; disc 154 Claude-1b). ──
+    const { caseIdByName, duplicateScenarioNames } = buildCaseIdJoin(graph);
+    const scenarioByName = new Map<string, ScenarioViewModel>();
+    if (rendered.success !== false) {
+      for (const sv of rendered.scenarios) {
+        if (duplicateScenarioNames.has(sv.case.name)) continue; // a colliding name is never a safe join target
+        scenarioByName.set(sv.case.name, sv);
+      }
+    }
+
     // ── CEL pass: per-case result fields → cel refs + cel diagnostics ──
     const celRefsByCluster = new Map<string, CelNodeRef[]>();
     const conceptToClusterIds = buildConceptToClusterIds(decisions, index, policyLib);
     for (const c of clusters) celRefsByCluster.set(c.id, []);
     for (const celCase of enumerateCelCases(graph)) {
+      // The case's classified run path (#175 chain attach): undefined ⇒ no usable join (collision / missing scenario /
+      // render failure) ⇒ handleBranchResult takes today's non-chained path verbatim. handleBooleanResult ignores it.
+      const sv = scenarioByName.get(celCase.name);
+      const runPath =
+        sv !== undefined
+          ? classifyScenarioRunPath(sv, {
+              index,
+              ctxByName,
+              policyLib,
+              caseIdByName,
+              duplicateScenarioNames,
+            })
+          : undefined;
       processCelCase(
         celCase,
         opts.celFileName,
@@ -218,6 +272,8 @@ export function generateProvenanceScaffold(
         clusterIdFor(policyLib),
         celRefsByCluster,
         diagnostics,
+        runPath,
+        policyLib,
       );
     }
     for (const c of clusters) {
@@ -437,11 +493,114 @@ function dispositionPathId(
   return `cluster:${sanitizeIdSeg(lib)}:${sanitizeIdSeg(decision)}:${seg}`;
 }
 
+/** The SHARED per-scenario classify result (#175 disc 154): either a fully-grounded comparable run path, OR a deferral
+ *  with the matching `CorrespondenceUncheckedReason` (+ optional details). The disposition-path classifier AND the
+ *  default-mode chained branch attach BOTH go through `classifyScenarioRunPath`, so the honesty gate (gaps / index-miss /
+ *  `spineNodeForRef`) cannot fork across the consumers. `comparable` carries the same fields a `ComparableCase` needs
+ *  PLUS `producedTerminals` (the grounded produced-action rows), which the default-mode attach matches X against. */
+type ScenarioRunPath =
+  | { kind: "comparable"; case: ComparableCase }
+  | { kind: "deferred"; reason: CorrespondenceUncheckedReason; details?: string[] };
+
+/** Classify ONE rendered scenario into a comparable run path or a deferral — the single source of truth for "is this
+ *  scenario's run path groundable, and if so what are its standalone refs" shared by the disposition-path classifier and
+ *  the default-mode chained branch attach (disc 154, Claude-6: ONE classify so the third consumer can't fork the gate).
+ *  Mirrors correspondenceCheck.ts's order + the `?? ""` lib fallback exactly, so generate + the FINAL gate never skew. */
+function classifyScenarioRunPath(
+  sv: ScenarioViewModel,
+  deps: {
+    index: ProvenanceIndex;
+    ctxByName: Map<string, DispoDecisionCtx>;
+    policyLib: string | null;
+    caseIdByName: Record<string, string>;
+    duplicateScenarioNames: Set<string>;
+  },
+): ScenarioRunPath {
+  const { index, ctxByName, policyLib, caseIdByName, duplicateScenarioNames } = deps;
+  const caseName = sv.case.name;
+
+  // ambiguity dominates run state / decision shape (matches correspondenceCheck's order).
+  if (duplicateScenarioNames.has(caseName)) return { kind: "deferred", reason: "case-name-collision" };
+  if (sv.status === "error") return { kind: "deferred", reason: "run-error" };
+  if (sv.decision === null) return { kind: "deferred", reason: "no-decision" };
+  if (!sv.decision.resolved) return { kind: "deferred", reason: "unresolved-decision" };
+  const caseId = caseIdByName[caseName];
+  if (caseId === undefined) {
+    // A ≥2-frozen-name collision was already routed to case-name-collision by the duplicateScenarioNames first-guard
+    // above, so a missing caseId here can ONLY be an unfrozen case — the unconditional reason is safe.
+    return { kind: "deferred", reason: "unfrozen-case" };
+  }
+  const decision = sv.decision.name;
+  // IDENTICAL lib fallback to correspondenceCheck.ts (`?? ""`, NOT `?? policyLib`): the generator and the FINAL gate
+  // must agree on the run-path key. If libraryName is ever undefined, lib="" makes the index lookup below MISS →
+  // the generator defers the case (unmapped-runtime-node) exactly as the checker marks it unchecked — never a skew
+  // where the generator is more permissive than the validator.
+  const lib = sv.decision.libraryName ?? "";
+
+  // The chain-aware run path (#175, disc 151 Fork B): the SAME `producedRuntimePathRefs` primitive the FINAL gate
+  // (correspondenceCheck.ts) consumes — ONE call site, no drift (disc 151 ref 3), so a generated disposition-path
+  // scaffold round-trips clean through the gate. It re-roots a deep inlined same-lib `use decision` run path into
+  // ordered STANDALONE-local refs (one per delegation frame), reducing to the covered decision's ancestor chain for a
+  // non-chained case.
+  const paths = producedRuntimePathRefs(sv.tree as unknown as MinimalViewNode[], { lib, decision });
+  if (paths.length === 0) return { kind: "deferred", reason: "no-produced-action" };
+
+  // deferred-disposition-path/unmapped (mirror correspondenceCheck's honesty gate, disc 151 ref 5): a path is
+  // un-clusterable (DEFER, never a defaulted/guessed scaffold) iff ANY of —
+  //   (1) non-empty `gaps` (the decomposer could not re-root a node);
+  //   (2) a ref's standalone `decisionSubNodeRef` is NOT in the index (no structure row joins it);
+  //   (3) a ref's relation can't be resolved from its OWN decision's spine (FIX 1 — a cross-lib ref, or a ref whose
+  //       SpineNode is absent): disposition-path mode is relation-honest BY CONSTRUCTION, so an unresolvable relation
+  //       must DEFER, not default to implements-criterion (a silently structurally-wrong scaffold).
+  // The honesty gate is TOTAL: index miss, gap, OR unresolvable relation/lib all defer. Citations are lib-qualified
+  // (FIX 2 — a sub name can repeat across libs) using the exact lookup key shape.
+  const ctx = ctxByName.get(decision);
+  const unmapped: string[] = [];
+  const refsByKey = new Map<string, RuntimePathRef>();
+  // The produced TERMINALS (the last ref of each grounded path = the produced action row) — used to reproduce #174's
+  // display-id derivation for a NON-chained path (FIX 5 byte-stability; see dispositionPathId) AND, in default mode, to
+  // match a chained `D is X` branch result against the SUB-decision its disposition actually fired in (disc 154).
+  const producedTerminals: RuntimePathRef[] = [];
+  for (const p of paths) {
+    if (p.gaps.length > 0) {
+      unmapped.push(...p.gaps);
+      continue;
+    }
+    if (p.refs.length > 0) producedTerminals.push(p.refs[p.refs.length - 1]);
+    for (const ref of p.refs) {
+      const cite = `${ref.lib}::${ref.decision}#${ref.nodeId}`;
+      if (index.nodeKindOf(decisionSubNodeRef(ref.lib, ref.decision, ref.nodeId)) === undefined) {
+        unmapped.push(cite); // (2) no structure row
+      } else if (spineNodeForRef(ref, policyLib, ctxByName) === undefined) {
+        unmapped.push(cite); // (3) no resolvable relation from the ref's own decision spine (or cross-lib)
+      } else {
+        refsByKey.set(refKey(ref), ref);
+      }
+    }
+  }
+  if (!ctx || unmapped.length > 0) {
+    return { kind: "deferred", reason: "unmapped-runtime-node", details: [...new Set(unmapped)] };
+  }
+
+  return {
+    kind: "comparable",
+    case: {
+      caseId,
+      decision,
+      lib,
+      refs: [...refsByKey.values()].sort((a, b) => (refKey(a) < refKey(b) ? -1 : refKey(a) > refKey(b) ? 1 : 0)),
+      producedTerminals,
+    },
+  };
+}
+
 /** Build the disposition-path + coverage clusters (#174). One cluster per distinct run path (decision-node refs ONLY) +
  *  one policy-owned-leaf coverage cluster. Skipped scenarios + a failed render emit `deferred-disposition-path`
  *  diagnostics (the matching CorrespondenceUncheckedReason). The coverage cluster carries ALL policy-owned leaves so the
- *  over-reach baseline is identical to per-decision mode (Claude-2). */
+ *  over-reach baseline is identical to per-decision mode (Claude-2). Consumes the ALREADY-rendered scenarios (the render
+ *  is hoisted above the mode branch — disc 154 S1 — so default + disposition-path share one render). */
 function buildDispositionPathClusters(
+  rendered: ReturnType<typeof renderScenario>,
   graph: ResolvedCelGraph,
   policyLib: string | null,
   celFileName: string,
@@ -451,7 +610,6 @@ function buildDispositionPathClusters(
 ): Cluster[] {
   const dispositionClusters: Cluster[] = [];
 
-  const rendered = renderScenario(graph);
   if (rendered.success === false) {
     // A wholesale failed render → mirror correspondenceCheck's render-failed: ONE diagnostic, NO disposition clusters.
     // The coverage cluster is STILL emitted (below) so the over-reach baseline matches per-decision mode.
@@ -466,105 +624,27 @@ function buildDispositionPathClusters(
 
   const { caseIdByName, duplicateScenarioNames } = buildCaseIdJoin(graph);
 
-  // ── classify each scenario case-FIRST → comparable | skipped (a deferred-disposition-path diagnostic per skip) ──
+  // ── classify each scenario case-FIRST → comparable | skipped (a deferred-disposition-path diagnostic per skip) via the
+  //    SHARED classify helper (so the gate semantics can't fork between this consumer + the default-mode chained attach) ──
   const comparable: ComparableCase[] = [];
   for (const sv of rendered.scenarios) {
-    const caseName = sv.case.name;
-    const skip = (reason: CorrespondenceUncheckedReason, details?: string[]): void => {
+    const classified = classifyScenarioRunPath(sv, {
+      index,
+      ctxByName,
+      policyLib,
+      caseIdByName,
+      duplicateScenarioNames,
+    });
+    if (classified.kind === "deferred") {
       diagnostics.push({
         kind: "deferred-disposition-path",
-        reason,
-        message: `disposition-path: case "${caseName}" is not path-clusterable (${reason}).`,
-        ...(details && details.length ? { details } : {}),
+        reason: classified.reason,
+        message: `disposition-path: case "${sv.case.name}" is not path-clusterable (${classified.reason}).`,
+        ...(classified.details && classified.details.length ? { details: classified.details } : {}),
       });
-    };
-
-    // ambiguity dominates run state / decision shape (matches correspondenceCheck's order).
-    if (duplicateScenarioNames.has(caseName)) {
-      skip("case-name-collision");
       continue;
     }
-    if (sv.status === "error") {
-      skip("run-error");
-      continue;
-    }
-    if (sv.decision === null) {
-      skip("no-decision");
-      continue;
-    }
-    if (!sv.decision.resolved) {
-      skip("unresolved-decision");
-      continue;
-    }
-    const caseId = caseIdByName[caseName];
-    if (caseId === undefined) {
-      // A ≥2-frozen-name collision was already routed to case-name-collision by the duplicateScenarioNames first-guard
-      // above, so a missing caseId here can ONLY be an unfrozen case — the unconditional reason is safe.
-      skip("unfrozen-case");
-      continue;
-    }
-    const decision = sv.decision.name;
-    // IDENTICAL lib fallback to correspondenceCheck.ts (`?? ""`, NOT `?? policyLib`): the generator and the FINAL gate
-    // must agree on the run-path key. If libraryName is ever undefined, lib="" makes the index lookup below MISS →
-    // the generator defers the case (unmapped-runtime-node) exactly as the checker marks it unchecked — never a skew
-    // where the generator is more permissive than the validator.
-    const lib = sv.decision.libraryName ?? "";
-
-    // The chain-aware run path (#175, disc 151 Fork B): the SAME `producedRuntimePathRefs` primitive the FINAL gate
-    // (correspondenceCheck.ts) consumes — ONE call site, no drift (disc 151 ref 3), so a generated disposition-path
-    // scaffold round-trips clean through the gate. It re-roots a deep inlined same-lib `use decision` run path into
-    // ordered STANDALONE-local refs (one per delegation frame), reducing to the covered decision's ancestor chain for a
-    // non-chained case.
-    const paths = producedRuntimePathRefs(sv.tree as unknown as MinimalViewNode[], { lib, decision });
-    if (paths.length === 0) {
-      skip("no-produced-action");
-      continue;
-    }
-
-    // deferred-disposition-path/unmapped (mirror correspondenceCheck's honesty gate, disc 151 ref 5): a path is
-    // un-clusterable (DEFER, never a defaulted/guessed scaffold) iff ANY of —
-    //   (1) non-empty `gaps` (the decomposer could not re-root a node);
-    //   (2) a ref's standalone `decisionSubNodeRef` is NOT in the index (no structure row joins it);
-    //   (3) a ref's relation can't be resolved from its OWN decision's spine (FIX 1 — a cross-lib ref, or a ref whose
-    //       SpineNode is absent): disposition-path mode is relation-honest BY CONSTRUCTION, so an unresolvable relation
-    //       must DEFER, not default to implements-criterion (a silently structurally-wrong scaffold).
-    // The honesty gate is TOTAL: index miss, gap, OR unresolvable relation/lib all defer. Citations are lib-qualified
-    // (FIX 2 — a sub name can repeat across libs) using the exact lookup key shape.
-    const ctx = ctxByName.get(decision);
-    const unmapped: string[] = [];
-    const refsByKey = new Map<string, RuntimePathRef>();
-    // The produced TERMINALS (the last ref of each grounded path = the produced action row) — used only to reproduce
-    // #174's display-id derivation for a NON-chained path (FIX 5 byte-stability; see dispositionPathId).
-    const producedTerminals: RuntimePathRef[] = [];
-    for (const p of paths) {
-      if (p.gaps.length > 0) {
-        unmapped.push(...p.gaps);
-        continue;
-      }
-      if (p.refs.length > 0) producedTerminals.push(p.refs[p.refs.length - 1]);
-      for (const ref of p.refs) {
-        const cite = `${ref.lib}::${ref.decision}#${ref.nodeId}`;
-        if (index.nodeKindOf(decisionSubNodeRef(ref.lib, ref.decision, ref.nodeId)) === undefined) {
-          unmapped.push(cite); // (2) no structure row
-        } else if (spineNodeForRef(ref, policyLib, ctxByName) === undefined) {
-          unmapped.push(cite); // (3) no resolvable relation from the ref's own decision spine (or cross-lib)
-        } else {
-          refsByKey.set(refKey(ref), ref);
-        }
-      }
-    }
-    if (!ctx || unmapped.length > 0) {
-      skip("unmapped-runtime-node", [...new Set(unmapped)]);
-      continue;
-    }
-
-    comparable.push({
-      caseId,
-      decision,
-      lib,
-      refs: [...refsByKey.values()].sort((a, b) => (refKey(a) < refKey(b) ? -1 : refKey(a) > refKey(b) ? 1 : 0)),
-      producedTerminals,
-    });
+    comparable.push(classified.case);
   }
 
   // ── group comparable cases by (lib, decision, sorted produced-action set) → one disposition cluster per distinct path.
@@ -866,11 +946,15 @@ function processCelCase(
   celCase: CELCase,
   celFileName: string,
   policyLib: string,
-  ctxByName: Map<string, { decision: Decision; spine: SpineNode[]; armTargets: Set<string> }>,
+  ctxByName: Map<string, DispoDecisionCtx & { armTargets: Set<string> }>,
   conceptToClusterIds: Map<string, Set<string>>,
   idFor: (decisionName: string) => string,
   celRefsByCluster: Map<string, CelNodeRef[]>,
   diagnostics: GenerateDiagnostic[],
+  // #175 (disc 154 S2/S3): the case's classified run path (undefined ⇒ no usable join: collision / missing scenario /
+  // render failure ⇒ handleBranchResult takes today's non-chained leaf-name path VERBATIM). handleBooleanResult ignores it.
+  runPath: ScenarioRunPath | undefined,
+  coveredLib: string | null,
 ): void {
   const frozen = celCase.caseId !== undefined; // §7: only a frozen case is a durable provenance address
   const caseId = celCase.caseId; // undefined ⇒ we never emit a ref, only an unfrozen-case diagnostic
@@ -889,8 +973,15 @@ function processCelCase(
         idFor,
         celRefsByCluster,
         diagnostics,
+        runPath,
+        coveredLib,
       );
     } else {
+      // handleBooleanResult is UNCHANGED by #175 (disc 154 Claude-3). INTENTIONAL ASYMMETRY: a chained case's BRANCH ref
+      // lands in the ONE sub-decision cluster its disposition actually fired in (handleBranchResult below), but its
+      // BOOLEAN (fact) ref fans to EVERY reachable cluster via conceptToClusterIds (#171 reachability recursion). That is
+      // correct, not a gap: a fact assertion is ABOUT the concept wherever it is reachable, independent of the run PATH
+      // the case took — whereas a disposition is the outcome of one specific firing arm.
       handleBooleanResult(
         rf,
         celCase,
@@ -913,10 +1004,12 @@ function handleBranchResult(
   celFileName: string,
   frozen: boolean,
   caseId: string | undefined,
-  ctxByName: Map<string, { spine: SpineNode[]; armTargets: Set<string> }>,
+  ctxByName: Map<string, DispoDecisionCtx & { armTargets: Set<string> }>,
   idFor: (decisionName: string) => string,
   celRefsByCluster: Map<string, CelNodeRef[]>,
   diagnostics: GenerateDiagnostic[],
+  runPath: ScenarioRunPath | undefined,
+  coveredLib: string | null,
 ): void {
   const decisionName = rf.leafName;
   const ctx = ctxByName.get(decisionName);
@@ -929,6 +1022,71 @@ function handleBranchResult(
     });
     return;
   }
+
+  // #175 (disc 154 S3): is this a CHAINED case whose disposition fired in a SUB-decision? It is iff the run path is a
+  // COMPARABLE classify whose covered decision matches the result leaf AND whose refs span ≥1 inlined sub frame. A
+  // comparable+NON-chained run, or a decision-name mismatch, keeps today's leaf-name + D-spine path VERBATIM. An
+  // unavailable / deferred run path is handled by the honest-defer gate just below (it defers for a CHAINING decision and
+  // otherwise falls through to today's path).
+  const chained =
+    runPath !== undefined &&
+    runPath.kind === "comparable" &&
+    runPath.case.decision === decisionName &&
+    !isNonChained(decisionName, runPath.case.refs);
+  if (chained) {
+    handleChainedBranchResult(
+      branch,
+      celCase,
+      celFileName,
+      frozen,
+      caseId,
+      (runPath as { kind: "comparable"; case: ComparableCase }).case,
+      ctxByName,
+      coveredLib,
+      celRefsByCluster,
+      diagnostics,
+    );
+    return;
+  }
+
+  // HONESTY for a CHAINING decision whose case we CANNOT cluster (disc 154 S3 + disc 155 FIX 2, the critical no-guess
+  // rule): the covered decision STRUCTURALLY chains (a `use decision` in its spine), so a branch result `D is X` can name
+  // a disposition X that fired in a SUB D delegates to — and today's leaf-name + D-spine path would mis-attach a phantom
+  // `tests-branch` ref to D's cluster (X is a SUB's target — it never matches D's own spine; worse when D ALSO recommends
+  // X). So for a chaining decision we DEFER for EITHER —
+  //   (1) a `deferred` classify (the scenario ran but couldn't ground: gaps / index-miss / run-error / unfrozen /
+  //       no-produced-action), OR
+  //   (2) an `undefined` run path (collision / missing scenario / wholesale render-fail) — we have NO run evidence of
+  //       where X fired, so we cannot honestly attach. The over-defer cost (a legit D-own-arm case that happens to be
+  //       unjoinable now defers instead of attaching) is the honest call: without the run we genuinely can't tell.
+  // The defer is NO ref to D + a per-case diagnostic; the structural scaffold (clusters + over-reach baseline +
+  // attribution worklist) is emitted upstream regardless. This block can ONLY fire for a CHAINING decision, so a
+  // genuinely NON-chaining policy (no `use decision`) never reaches it → its output stays byte-identical.
+  if (decisionChains(ctx.spine) && (runPath === undefined || runPath.kind === "deferred")) {
+    if (runPath !== undefined && runPath.kind === "deferred" && runPath.reason === "unfrozen-case") {
+      // an unfrozen chained case → the existing per-case freeze diagnostic, NO ref. (emitCelRef would also emit only this,
+      // but we never call it — we must not let the leaf-name path emit a tests-branch ref to D for a chained case.)
+      diagnostics.push({
+        kind: "unfrozen-case",
+        message: `CEL case ${celCase.name} has no explicit \`- id is "..."\`; freeze it before it can carry a provenance ref (would-be relation tests-branch).`,
+      });
+    } else {
+      const why =
+        runPath === undefined
+          ? "its run path is unavailable (case-name collision, no rendered scenario, or a render failure)"
+          : `its run path is not clusterable (${runPath.reason})`;
+      diagnostics.push({
+        kind: "cel-result-run-mismatch",
+        message: `CEL case ${celCase.name} result "${decisionName} is ${branch.branchName}" runs a chained \`use decision\`, but ${why}; deferring rather than attaching to ${decisionName}.`,
+        caseId: celCase.caseId,
+        ...(runPath !== undefined && runPath.kind === "deferred" && runPath.details && runPath.details.length
+          ? { details: runPath.details }
+          : {}),
+      });
+    }
+    return;
+  }
+
   // branchName is an ARM TARGET name (activity/decision), never literally "otherwise". Resolve it to the spine action
   // node(s) whose target == branchName, then read the arm the action sits under to pick tests-otherwise vs tests-branch.
   const matches = ctx.spine.filter(
@@ -959,6 +1117,87 @@ function handleBranchResult(
   }
   emitCelRef(
     idFor(decisionName),
+    celFileName,
+    frozen,
+    caseId,
+    relation,
+    celCase,
+    celRefsByCluster,
+    diagnostics,
+  );
+}
+
+/** #175 (disc 154 S3) — THE FIX: a CHAINED branch result `D is X` whose disposition X fired in a SUB-decision. Match X to
+ *  the produced TERMINAL(s) whose OWN-spine `actionTargetName === X`, then attach the case to that SUB's cluster + arm:
+ *   - exactly 1 → attach to `idFor(terminal.decision)` (the firing sub's cluster) with the relation read from
+ *     `branchArmSegment(terminal.nodeId)` on the SUB's spine (tests-otherwise / tests-branch). The case lands where its
+ *     disposition actually fired — NOT orphaned on D + sub-clusters starving (the #175 repro).
+ *   - >1 (X fired in ≥2 subs/arms in one run) → DEFER `ambiguous-cel-branch` (never pick first — the chained analogue of
+ *     the existing ambiguous case).
+ *   - 0 (the run produced no X — the result field disagrees with the actual run) → the NEW `cel-result-run-mismatch`.
+ *  An unfrozen chained case still defers via `emitCelRef`'s `unfrozen-case` (NEVER attaches to a guessed cluster). */
+function handleChainedBranchResult(
+  branch: CELBranchResult,
+  celCase: CELCase,
+  celFileName: string,
+  frozen: boolean,
+  caseId: string | undefined,
+  rp: ComparableCase,
+  ctxByName: Map<string, DispoDecisionCtx & { armTargets: Set<string> }>,
+  coveredLib: string | null,
+  celRefsByCluster: Map<string, CelNodeRef[]>,
+  diagnostics: GenerateDiagnostic[],
+): void {
+  const idFor = clusterIdFor(coveredLib);
+  // The produced terminals whose OWN-spine action target is X. A terminal is a grounded produced-action row of SOME
+  // decision in the run path; resolve its SpineNode off ITS decision's spine (NOT the covered decision's) so a sub's
+  // recommend is read from the sub's spine — honest by construction (a terminal that doesn't resolve is skipped, never
+  // guessed). `spineNodeForRef` already requires `ref.lib === coveredLib` + a resolvable nodeId, matching classify.
+  // DEDUPE by refKey (disc 155 FIX 3): an `all:` path that invokes the SAME sub twice can yield two firing entries with
+  // the IDENTICAL `{lib, decision, nodeId}` — ONE cluster/relation target, NOT real ambiguity. Collapse to distinct
+  // terminal refs FIRST so only ≥2 genuinely-distinct firing rows trip the ambiguous branch.
+  const firingByKey = new Map<string, RuntimePathRef>();
+  for (const t of rp.producedTerminals) {
+    const sn = spineNodeForRef(t, coveredLib, ctxByName);
+    if (sn !== undefined && sn.kind === "action" && actionTargetName(sn) === branch.branchName) {
+      firingByKey.set(refKey(t), t);
+    }
+  }
+  const firing = [...firingByKey.values()];
+
+  if (firing.length === 0) {
+    // the run produced no terminal targeting X — the result field disagrees with the run. DEFER (never attach to a guess).
+    const produced = [...new Set(rp.producedTerminals.map((t) => {
+      const sn = spineNodeForRef(t, coveredLib, ctxByName);
+      return sn !== undefined ? (actionTargetName(sn) ?? t.nodeId) : t.nodeId;
+    }))].sort();
+    diagnostics.push({
+      kind: "cel-result-run-mismatch",
+      message: `CEL case ${celCase.name} result "${rp.decision} is ${branch.branchName}" claims a disposition the run did not produce; the run produced: ${produced.join(", ") || "(none)"}.`,
+      caseId: celCase.caseId,
+      ...(produced.length ? { details: produced } : {}),
+    });
+    return;
+  }
+  if (firing.length > 1) {
+    // X fired in ≥2 DISTINCT sub-decision rows in ONE run (two different sub frames / arms each recommending X — NOT the
+    // same terminal counted twice, which the refKey dedup above already collapsed). Genuinely ambiguous; DEFER rather than
+    // pick a cluster. The chained analogue of the existing reused-target ambiguity.
+    diagnostics.push({
+      kind: "ambiguous-cel-branch",
+      message: `CEL case ${celCase.name} branch "${branch.branchName}" fired in ${firing.length} distinct sub-decisions/arms of the run path; deferring (no single firing cluster).`,
+      caseId: celCase.caseId,
+    });
+    return;
+  }
+
+  // exactly one firing terminal → attach to ITS sub-decision's cluster, relation from the arm it sits under on the SUB's
+  // own spine. THIS IS THE FIX: the case lands in the sub-decision cluster its disposition fired in.
+  const terminal = firing[0];
+  const relation: CelRelation =
+    branchArmSegment(terminal.nodeId) === "otherwise" ? "tests-otherwise" : "tests-branch";
+  emitCelRef(
+    idFor(terminal.decision),
     celFileName,
     frozen,
     caseId,

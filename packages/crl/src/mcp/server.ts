@@ -672,13 +672,19 @@ export function createServer(): McpServer {
         "the full body in scripts). Bad/missing/unreadable/oversized paths or an unresolved `covers` target → a tool " +
         "error. NOTE: generate succeeding does NOT mean the artifact is complete — the diagnostics ARE the KE's worklist. " +
         "`clusterBy` (default \"decision\") selects the clustering strategy: \"decision\" emits one cluster per covered " +
-        "decision (the per-case CEL pass attaches frozen cases to each). \"disposition-path\" instead renders the CEL and " +
+        "decision (the per-case CEL pass attaches frozen cases to each). #175: the default mode is now CHAIN-AWARE — a " +
+        "case whose branch result `D is X` fires X in a SUB-decision D delegates to (`use decision`) is attached to that " +
+        "SUB's cluster + arm via the run path, instead of orphaning the sub-clusters; a NON-chained case is unchanged. A " +
+        "chained case that can't be clustered defers with a diagnostic (never a guessed attach): `ambiguous-cel-branch` " +
+        "(X fired in ≥2 distinct subs), or `cel-result-run-mismatch` (the run produced no X, or the chained case's run " +
+        "path is unavailable/ungroundable), or `unfrozen-case`. \"disposition-path\" instead renders the CEL and " +
         "emits one cluster per distinct RUN PATH (decision-node refs ONLY) + one policy-owned-leaf coverage cluster — a " +
         "scaffold that is correspondence-correct BY CONSTRUCTION (it passes validate_provenance's FINAL cockpit gate with " +
-        "zero mismatch before any items are attached). A case that can't be path-clustered (unfrozen, name-collision, no/" +
-        "unresolved decision, no produced action, a run error, or an inlined `use decision`) is surfaced as a " +
-        "deferred-disposition-path diagnostic, never silently dropped. Changing clusterBy is a STRUCTURAL mode switch, not " +
-        "a safe `existingArtifact` regen (a cross-mode merge orphans the prior mode's clusters).",
+        "zero mismatch before any items are attached). A same-lib inlined `use decision` chain RESOLVES (the run path is " +
+        "decomposed into each sub's standalone rows — #175); a case that can't be path-clustered (unfrozen, name-collision, " +
+        "no/unresolved decision, no produced action, a run error, or a cross-lib / genuinely-ungroundable run) is surfaced " +
+        "as a deferred-disposition-path diagnostic, never silently dropped. Changing clusterBy is a STRUCTURAL mode switch, " +
+        "not a safe `existingArtifact` regen (a cross-mode merge orphans the prior mode's clusters).",
       inputSchema: {
         cel: z
           .string()
