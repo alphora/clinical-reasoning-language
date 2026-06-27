@@ -501,15 +501,15 @@ describe("checkCockpitCorrespondence — unchecked reasons (a green gate must me
   });
 });
 
-describe("checkCockpitCorrespondence — same-lib inlined `use decision` → unmapped-runtime-node", () => {
-  // A same-library `use decision` whose target the runtime VM INLINES under the caller (#171/#173). The produced
-  // action's runtime nodeId nests under the caller (e.g. when[0]/action[0]/...), but provenance/structure address the
-  // sub-decision STANDALONE — so the produced action's ancestor ids have no structure row → unchecked, NOT a false
-  // bleed.
+describe("checkCockpitCorrespondence — same-lib inlined `use decision` chain now RESOLVES (#175 todo-2)", () => {
+  // WAS the EXPECTED-TO-GO-RED unmapped-runtime-node test. #175 (disc 151 Fork B) wired the chain-aware decomposer
+  // `producedRuntimePathRefs` into the gate, so a same-library `use decision` the runtime VM INLINES under the caller is
+  // RE-ROOTED into the sub-decision's STANDALONE rows — which the standalone structure index DOES carry (every decision
+  // is inventoried standalone). So the chained case no longer defers to unmapped-runtime-node; it is COMPARED like any
+  // other case: clean against a CORRECT cluster (the full decomposed path), mismatch against a WRONG one.
   //
-  // EXPECTED-TO-GO-RED: when #171/#173 lands the inlined-node JOIN (the runtime VM node ↔ standalone structure row),
-  // these ancestor ids WILL resolve and this test will flip from unchecked→checked. That is the SIGNAL to delete the
-  // unmapped-runtime-node branch (and update this fixture to assert a real path comparison) — NOT a regression to debug.
+  // `D.when[0] --use Sub--> Sub.otherwise/action[0]` (recommend Approve). The decomposed run path is:
+  //   D#when[0] (the use-Sub boundary row, caller-local) + Sub#otherwise + Sub#otherwise/action[0] (re-rooted).
   const DELEG_CRL = `# L
 library "L".
 concept "Drug Requested":
@@ -542,19 +542,34 @@ case "deleg":
 - fact is "fDrug".
 - result is "D" is "Approve".`;
 
-  it("produces unchecked unmapped-runtime-node (citing the delegated nodeId), NOT a bleed", () => {
-    const r2 = mkdtempSync(path.join(os.tmpdir(), "prov-deleg-"));
+  let r2: string;
+  let cel2: string;
+  let anchor2: string;
+  beforeAll(() => {
+    r2 = mkdtempSync(path.join(os.tmpdir(), "prov-deleg-"));
     writeFileSync(
       path.join(r2, "package.json"),
       JSON.stringify({ name: "p", version: "0.0.0", private: true }),
     );
     writeFileSync(path.join(r2, "policy.crl"), DELEG_CRL);
-    const cel2 = path.join(r2, "f.cel");
+    cel2 = path.join(r2, "f.cel");
     writeFileSync(cel2, DELEG_CEL);
-    const anchor2 = path.join(r2, "anchor.txt");
+    anchor2 = path.join(r2, "anchor.txt");
     writeFileSync(anchor2, ANCHOR_TEXT);
+  });
+  afterAll(() => rmSync(r2, { recursive: true, force: true }));
 
-    // Cluster the case onto the caller's when[0] decision row (a plausible authored attribution).
+  const delegRef = (name: string, nodeId: string): CrlNodeRef => ({
+    lib: "L",
+    kind: "decision",
+    name,
+    nodeId,
+    nodeKind: "decision-node",
+    ownership: "policy-owned",
+    relation: "implements-criterion",
+    status: "linked",
+  });
+  const delegArtifact = (crl: CrlNodeRef[]): string => {
     const artifact: ProvenanceArtifact = {
       schemaVersion: "1.0",
       policyId: "L",
@@ -567,46 +582,132 @@ case "deleg":
           id: "deleg",
           label: "deleg",
           items: [],
-          crl: [
-            {
-              lib: "L",
-              kind: "decision",
-              name: "D",
-              nodeId: "when[0]",
-              nodeKind: "decision-node",
-              ownership: "policy-owned",
-              relation: "implements-criterion",
-              status: "linked",
-            },
-          ],
+          crl,
           cel: [{ file: "f.cel", kind: "case", caseId: "case-deleg", relation: "tests-branch", status: "linked" }],
         },
       ],
     };
-    const art2 = path.join(r2, "art.json");
-    writeFileSync(art2, JSON.stringify(artifact));
+    const p = path.join(r2, `art-${Math.random().toString(36).slice(2)}.json`);
+    writeFileSync(p, JSON.stringify(artifact));
+    return p;
+  };
 
-    try {
-      const model = buildCockpitModel(art2, cel2, anchor2, "final");
-      const results = checkCockpitCorrespondence(model);
-      const deleg = results.find((r) => r.caseName === "deleg");
-      expect(deleg).toBeDefined();
-      expect(deleg!.kind).toBe("unchecked");
-      if (deleg!.kind === "unchecked") {
-        expect(deleg!.reason).toBe("unmapped-runtime-node");
-        expect((deleg!.details ?? []).length).toBeGreaterThanOrEqual(1);
+  it("a CORRECT cluster (the full decomposed Main+Sub path) → CLEAN, no cockpit-correspondence finding", () => {
+    // The cluster cites the re-rooted run path across BOTH decisions: D#when[0] (the criterion row) + D#when[0]/action[0]
+    // (the use-Sub boundary's OWN action row, a real standalone row of the CALLING decision — disc 151 ref 2) + the
+    // re-rooted Sub#otherwise + Sub#otherwise/action[0].
+    const art = delegArtifact([
+      delegRef("D", "when[0]"),
+      delegRef("D", "when[0]/action[0]"),
+      delegRef("Sub", "otherwise"),
+      delegRef("Sub", "otherwise/action[0]"),
+    ]);
+    const fs = validateProvenanceFiles(art, cel2, anchor2, "final").findings.filter(
+      (f) => f.kind === "cockpit-correspondence",
+    );
+    expect(fs).toEqual([]);
+  });
+
+  it("a WRONG cluster (only the caller's when[0], MISSING the Sub rows) → mismatch (miss), NOT unmapped", () => {
+    // The same artifact the old baseline used (cluster onto only D#when[0]). It is no longer unchecked — the gate now
+    // grounds the Sub rows, so the cluster genuinely UNDER-lights → a real `miss` finding the KE must fix.
+    const art = delegArtifact([delegRef("D", "when[0]")]);
+    const res = validateProvenanceFiles(art, cel2, anchor2, "final");
+    const f = res.findings.find((x) => x.kind === "cockpit-correspondence")!;
+    expect(f).toBeDefined();
+    expect(f.message).toContain('case "deleg"');
+    expect(f.message).toContain("missing");
+    expect(f.message).toContain("otherwise/action[0]"); // the un-attributed Sub disposition row
+    expect(f.message).not.toContain("unmapped-runtime-node"); // it RESOLVED — no longer a deferred join gap
+  });
+});
+
+describe("checkCockpitCorrespondence — the honesty path (a GENUINE residual still → unmapped-runtime-node)", () => {
+  // #175 preserves the unmapped-runtime-node honesty fallback (disc 151 ref 5): a produced run-path node that does NOT
+  // ground to a standalone structure row (a grounded ref missing `idToKey`, or a decomposer `gaps` entry — the cross-lib
+  // #172 frontier once it lands) is reported UNCHECKED, never a silent green and never a wrong-sub false mismatch.
+  // Same-lib chains all ground (above), so to exercise the residual we inject a structurally-impossible produced node
+  // whose nodeId names no structure row — the gate routes the case to unmapped-runtime-node citing the un-grounded id.
+  it("a produced node with no standalone structure row → unchecked unmapped-runtime-node (the residual is surfaced)", () => {
+    const model = buildCockpitModel(
+      writeArtifact([approveOk, innerDenyOk, outerDenyOk]),
+      celPath,
+      anchorPath,
+      "final",
+    );
+    // Deep-clone one scenario's tree and corrupt the produced node's id to one that has NO structure row → the gate's
+    // idToKey join MISSES → unmapped-runtime-node (the honesty branch). Structurally impossible on a real VM; this is
+    // the only way to reach the residual branch at the gate level for a same-lib policy (mirrors runPath.test.ts).
+    const corrupt = JSON.parse(JSON.stringify(model.scenarios.scenarios)) as typeof model.scenarios.scenarios;
+    let injected = false;
+    const reroot = (ns: { kind: string; nodeId: string; action?: { produced?: boolean }; children?: unknown[] }[]): void => {
+      for (const n of ns) {
+        if (n.kind === "action" && n.action?.produced && !injected) {
+          n.nodeId = "ZZZ/orphan/action[0]"; // no decisionSubNodeRef for this id → no idToKey row → residual
+          injected = true;
+        }
+        if (n.children) reroot(n.children as typeof ns);
       }
+    };
+    for (const sv of corrupt) reroot(sv.tree as unknown as Parameters<typeof reroot>[0]);
+    expect(injected).toBe(true);
 
-      // And through the FINAL gate it surfaces as a cockpit-correspondence finding that cites #171/#173, not a bleed.
-      const res = validateProvenanceFiles(art2, cel2, anchor2, "final");
-      const f = res.findings.find((x) => x.kind === "cockpit-correspondence")!;
-      expect(f).toBeDefined();
-      expect(f.message).toContain("unmapped-runtime-node");
-      expect(f.message).toMatch(/#171|#173/);
-      expect(f.message).not.toContain("bleed");
-    } finally {
-      rmSync(r2, { recursive: true, force: true });
-    }
+    const corruptedModel = { ...model, scenarios: { ...model.scenarios, scenarios: corrupt } };
+    const results = checkCockpitCorrespondence(corruptedModel);
+    const unmapped = results.filter(
+      (r) => r.kind === "unchecked" && r.reason === "unmapped-runtime-node",
+    );
+    // at least the case carrying the corrupted produced node is now unchecked, never silently green.
+    expect(unmapped.length).toBeGreaterThanOrEqual(1);
+    const cited = unmapped.flatMap((r) => (r.kind === "unchecked" ? r.details ?? [] : []));
+    // the un-grounded id is surfaced, LIB-QUALIFIED (FIX 2): `L::D#ZZZ/orphan/action[0]`.
+    expect(cited).toContain("L::D#ZZZ/orphan/action[0]");
+  });
+
+  it("FIX 3b (gate gaps): a produced node under an expanded boundary with absent target.name → gaps → unchecked", () => {
+    const model = buildCockpitModel(
+      writeArtifact([approveOk, innerDenyOk, outerDenyOk]),
+      celPath,
+      anchorPath,
+      "final",
+    );
+    // Replace a produced node in place with an EXPANDED use-decision whose target.name is "" wrapping a recommend child
+    // → the decomposer recurses an UNGROUNDED frame → the child's nodeId enters `gaps` → the gate routes to unmapped
+    // (a DISTINCT honesty trigger from the idToKey-miss above: gaps non-empty short-circuits before the ref join).
+    const corrupt = JSON.parse(JSON.stringify(model.scenarios.scenarios)) as typeof model.scenarios.scenarios;
+    let injected = false;
+    let gapId = "";
+    const inject = (ns: { kind: string; nodeId: string; action?: Record<string, unknown>; children?: unknown[] }[]): void => {
+      for (const n of ns) {
+        if (n.kind === "action" && (n.action as { produced?: boolean })?.produced && !injected) {
+          gapId = `${n.nodeId}/when[0]/action[0]`;
+          n.action = { produced: false, actionKind: "use-decision", expanded: true, target: { name: "" } };
+          n.children = [
+            {
+              kind: "when",
+              nodeId: `${n.nodeId}/when[0]`,
+              children: [
+                { kind: "action", nodeId: gapId, action: { produced: true, actionKind: "recommend-activity" } },
+              ],
+            },
+          ];
+          injected = true;
+        }
+        if (n.children) inject(n.children as typeof ns);
+      }
+    };
+    for (const sv of corrupt) inject(sv.tree as unknown as Parameters<typeof inject>[0]);
+    expect(injected).toBe(true);
+
+    const corruptedModel = { ...model, scenarios: { ...model.scenarios, scenarios: corrupt } };
+    const results = checkCockpitCorrespondence(corruptedModel);
+    const unmapped = results.filter(
+      (r) => r.kind === "unchecked" && r.reason === "unmapped-runtime-node",
+    );
+    expect(unmapped.length).toBeGreaterThanOrEqual(1);
+    // the RAW deep gap nodeId (un-rerootable) is surfaced — NOT a lib::decision form (it never grounded to a frame).
+    const cited = unmapped.flatMap((r) => (r.kind === "unchecked" ? r.details ?? [] : []));
+    expect(cited).toContain(gapId);
   });
 });
 

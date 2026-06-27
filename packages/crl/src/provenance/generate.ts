@@ -53,7 +53,7 @@ import {
   type ProvenanceIndex,
   type ProvNodeRef,
 } from "./indexer";
-import { ancestorChain, collectProduced, type MinimalViewNode } from "./runPath";
+import { producedRuntimePathRefs, type MinimalViewNode, type RuntimePathRef } from "./runPath";
 import { isStrictAncestor } from "./validators";
 
 // ── public shape ──────────────────────────────────────────────────────────────
@@ -368,13 +368,39 @@ interface DispoDecisionCtx {
   gatingConceptKeys: Set<string>;
 }
 
-/** A comparable scenario, classified case-first: its frozen caseId + the sorted unique produced-action nodeIds (the run
- *  path) + the decision it ran + that decision's lib. */
+/** A comparable scenario, classified case-first: its frozen caseId + the decomposed run-path refs (the chain-aware
+ *  STANDALONE-local refs, one per delegation frame — disc 151 Fork B; reduces to the single covered decision's ancestor
+ *  chain for a non-chained case) + the covered decision it ran + that decision's lib. The refs may span MULTIPLE
+ *  decisions (Main + its inlined sub-decisions). Deduped + sorted by canonical key for deterministic grouping. */
 interface ComparableCase {
   caseId: string;
   decision: string;
   lib: string;
-  producedNodeIds: string[]; // sorted, unique
+  /** the decomposed run-path refs, unique + sorted by `${lib}::${decision}::${nodeId}` (multi-decision under a chain). */
+  refs: RuntimePathRef[];
+  /** the produced action terminals (one per produced action) — only for #174-faithful display-id derivation (FIX 5). */
+  producedTerminals: RuntimePathRef[];
+}
+
+/** Canonical, deterministic key for one decomposed run-path ref (the grouping + dedup unit). */
+function refKey(r: RuntimePathRef): string {
+  return `${r.lib}::${r.decision}::${r.nodeId}`;
+}
+
+/** The SpineNode a decomposed run-path ref addresses — resolved from the ref's OWN decision's spine (FIX 1). Returns
+ *  undefined (→ the caller DEFERS, never defaults a relation) when the ref is NOT in the covered (same-lib) scope
+ *  (`ref.lib !== coveredLib` is #172 cross-lib territory), or its decision is not a covered decision, or its nodeId
+ *  names no spine node. So the disposition-path relation is honest by construction: every emitted relation comes from a
+ *  real SpineNode, and anything unresolvable is routed out of the comparable set during classification. */
+function spineNodeForRef(
+  ref: RuntimePathRef,
+  coveredLib: string | null,
+  ctxByName: Map<string, DispoDecisionCtx>,
+): SpineNode | undefined {
+  if (coveredLib === null || ref.lib !== coveredLib) return undefined;
+  const ctx = ctxByName.get(ref.decision);
+  if (!ctx) return undefined;
+  return ctx.spine.find((sn) => sn.nodeId === ref.nodeId);
 }
 
 /** Sanitize a string into a deterministic, JSON-punctuation-free cluster-id segment (mirrors clusterIdFor's cleanliness:
@@ -383,10 +409,30 @@ function sanitizeIdSeg(s: string): string {
   return s.replace(/[^A-Za-z0-9._-]+/g, "_");
 }
 
-/** Deterministic disposition-cluster id = pure function of (lib, decision, sorted produced nodeIds). The nodeIds join
- *  with `+`; when the joined tail is long we hash-cap it (still deterministic) so the id stays bounded for a wide menu. */
-function dispositionPathId(lib: string, decision: string, sortedNodeIds: string[]): string {
-  const tail = sortedNodeIds.map(sanitizeIdSeg).join("+");
+/** True iff a decomposed run path is entirely within the covered decision (no inlined sub-decision frame). */
+function isNonChained(coveredDecision: string, refs: RuntimePathRef[]): boolean {
+  return refs.every((r) => r.decision === coveredDecision);
+}
+
+/** Deterministic disposition-cluster id = pure function of (lib, covered decision, the run path). Two derivations,
+ *  chosen so #175 is PURELY ADDITIVE (FIX 5):
+ *   - NON-chained (every ref in the covered decision): reproduce #174's tail EXACTLY — the sorted PRODUCED-ACTION
+ *     nodeIds (the terminals) joined with `+`. So the existing #174 disposition-path output is byte-identical; only
+ *     newly-RESOLVING chained cases get a new id shape.
+ *   - chained: the sorted full ref set's per-frame display segments (`nodeId` for the covered decision, else
+ *     `decision~nodeId`) joined with `+`, so a chained path's sub-decision frames are distinguished in the id.
+ *  When the joined tail is long it is sha256 hash-capped (still deterministic) so the id stays bounded. */
+function dispositionPathId(
+  lib: string,
+  decision: string,
+  refs: RuntimePathRef[],
+  producedTerminals: RuntimePathRef[],
+): string {
+  const tailParts = isNonChained(decision, refs)
+    ? // #174 form: the sorted produced-action nodeIds (the terminals) — NOT the full ancestor chain.
+      [...new Set(producedTerminals.map((t) => t.nodeId))].sort().map(sanitizeIdSeg)
+    : refs.map((r) => sanitizeIdSeg(r.decision === decision ? r.nodeId : `${r.decision}~${r.nodeId}`));
+  const tail = tailParts.join("+");
   const seg = tail.length > 80 ? createHash("sha256").update(tail).digest("hex").slice(0, 16) : tail;
   return `cluster:${sanitizeIdSeg(lib)}:${sanitizeIdSeg(decision)}:${seg}`;
 }
@@ -464,23 +510,47 @@ function buildDispositionPathClusters(
     // where the generator is more permissive than the validator.
     const lib = sv.decision.libraryName ?? "";
 
-    const produced: MinimalViewNode[] = [];
-    collectProduced(sv.tree as unknown as MinimalViewNode[], produced);
-    if (produced.length === 0) {
+    // The chain-aware run path (#175, disc 151 Fork B): the SAME `producedRuntimePathRefs` primitive the FINAL gate
+    // (correspondenceCheck.ts) consumes — ONE call site, no drift (disc 151 ref 3), so a generated disposition-path
+    // scaffold round-trips clean through the gate. It re-roots a deep inlined same-lib `use decision` run path into
+    // ordered STANDALONE-local refs (one per delegation frame), reducing to the covered decision's ancestor chain for a
+    // non-chained case.
+    const paths = producedRuntimePathRefs(sv.tree as unknown as MinimalViewNode[], { lib, decision });
+    if (paths.length === 0) {
       skip("no-produced-action");
       continue;
     }
 
-    // unmapped-runtime-node (the inlined `use decision` shape): ANY produced / ancestor nodeId whose standalone
-    // decisionSubNodeRef is NOT in the index → no structure row joins it → not clusterable (mirror correspondenceCheck).
+    // deferred-disposition-path/unmapped (mirror correspondenceCheck's honesty gate, disc 151 ref 5): a path is
+    // un-clusterable (DEFER, never a defaulted/guessed scaffold) iff ANY of —
+    //   (1) non-empty `gaps` (the decomposer could not re-root a node);
+    //   (2) a ref's standalone `decisionSubNodeRef` is NOT in the index (no structure row joins it);
+    //   (3) a ref's relation can't be resolved from its OWN decision's spine (FIX 1 — a cross-lib ref, or a ref whose
+    //       SpineNode is absent): disposition-path mode is relation-honest BY CONSTRUCTION, so an unresolvable relation
+    //       must DEFER, not default to implements-criterion (a silently structurally-wrong scaffold).
+    // The honesty gate is TOTAL: index miss, gap, OR unresolvable relation/lib all defer. Citations are lib-qualified
+    // (FIX 2 — a sub name can repeat across libs) using the exact lookup key shape.
     const ctx = ctxByName.get(decision);
     const unmapped: string[] = [];
-    const producedNodeIds = new Set<string>();
-    for (const p of produced) {
-      producedNodeIds.add(p.nodeId);
-      for (const id of ancestorChain(p.nodeId)) {
-        const ref = decisionSubNodeRef(lib, decision, id);
-        if (index.nodeKindOf(ref) === undefined) unmapped.push(id);
+    const refsByKey = new Map<string, RuntimePathRef>();
+    // The produced TERMINALS (the last ref of each grounded path = the produced action row) — used only to reproduce
+    // #174's display-id derivation for a NON-chained path (FIX 5 byte-stability; see dispositionPathId).
+    const producedTerminals: RuntimePathRef[] = [];
+    for (const p of paths) {
+      if (p.gaps.length > 0) {
+        unmapped.push(...p.gaps);
+        continue;
+      }
+      if (p.refs.length > 0) producedTerminals.push(p.refs[p.refs.length - 1]);
+      for (const ref of p.refs) {
+        const cite = `${ref.lib}::${ref.decision}#${ref.nodeId}`;
+        if (index.nodeKindOf(decisionSubNodeRef(ref.lib, ref.decision, ref.nodeId)) === undefined) {
+          unmapped.push(cite); // (2) no structure row
+        } else if (spineNodeForRef(ref, policyLib, ctxByName) === undefined) {
+          unmapped.push(cite); // (3) no resolvable relation from the ref's own decision spine (or cross-lib)
+        } else {
+          refsByKey.set(refKey(ref), ref);
+        }
       }
     }
     if (!ctx || unmapped.length > 0) {
@@ -492,7 +562,8 @@ function buildDispositionPathClusters(
       caseId,
       decision,
       lib,
-      producedNodeIds: [...producedNodeIds].sort(),
+      refs: [...refsByKey.values()].sort((a, b) => (refKey(a) < refKey(b) ? -1 : refKey(a) > refKey(b) ? 1 : 0)),
+      producedTerminals,
     });
   }
 
@@ -505,19 +576,25 @@ function buildDispositionPathClusters(
     canonicalKey: string;
     lib: string;
     decision: string;
-    producedNodeIds: string[];
+    /** the decomposed run-path refs (multi-decision under a chain), the cluster's cited rows. */
+    refs: RuntimePathRef[];
+    /** the produced terminals of the FIRST case in the group — only for the #174-faithful display id (FIX 5). */
+    producedTerminals: RuntimePathRef[];
     caseIds: Set<string>;
   }
   const groups = new Map<string, Group>();
   for (const c of comparable) {
-    const canonicalKey = JSON.stringify([c.lib, c.decision, c.producedNodeIds]);
+    // GROUP on the full decomposed REF SET (canonical, spanning every delegation frame's decision), NOT the covered
+    // decision's deep nodeIds — two cases share a disposition cluster iff their entire re-rooted run path matches.
+    const canonicalKey = JSON.stringify([c.lib, c.decision, c.refs.map(refKey)]);
     let g = groups.get(canonicalKey);
     if (!g) {
       g = {
         canonicalKey,
         lib: c.lib,
         decision: c.decision,
-        producedNodeIds: c.producedNodeIds,
+        refs: c.refs,
+        producedTerminals: c.producedTerminals,
         caseIds: new Set(),
       };
       groups.set(canonicalKey, g);
@@ -533,11 +610,11 @@ function buildDispositionPathClusters(
   );
   const usedIds = new Map<string, number>();
   for (const g of sortedGroups) {
-    const base = dispositionPathId(g.lib, g.decision, g.producedNodeIds);
+    const base = dispositionPathId(g.lib, g.decision, g.refs, g.producedTerminals);
     const n = (usedIds.get(base) ?? 0) + 1;
     usedIds.set(base, n);
     const id = n === 1 ? base : `${base}-${n}`;
-    dispositionClusters.push(buildDispositionCluster(id, g, celFileName, ctxByName, index));
+    dispositionClusters.push(buildDispositionCluster(id, g, celFileName, policyLib, ctxByName, index));
   }
 
   return finishWithCoverage(policyLib, index, ctxByName, dispositionClusters);
@@ -568,38 +645,41 @@ function refToProv(ref: CrlNodeRef): ProvNodeRef {
   };
 }
 
-/** One DISPOSITION cluster for a run-path group: crl = the UNION of each produced action's ancestor chain mapped to a
- *  decisionSubNodeRef (relation via spineRelation off the decision's spine — NEVER a concept ref, structural per
- *  Claude-3); cel = the group's frozen cases. items: []. */
+/** One DISPOSITION cluster for a run-path group: crl = the decomposed run-path refs (#175 chain-aware — each frame's
+ *  WHEN/OTHERWISE/ACTION rows, SPANNING the covered decision + any inlined sub-decisions) mapped to a decisionSubNodeRef
+ *  (relation via spineRelation off THAT ref's OWN decision spine — NEVER a concept ref, structural per Claude-3); cel =
+ *  the group's frozen cases. items: []. The refs already include every ancestor row per frame (the decomposer returns
+ *  the full path), so NO additional ancestorChain expansion is applied. */
 function buildDispositionCluster(
   id: string,
-  g: { lib: string; decision: string; producedNodeIds: string[]; caseIds: Set<string> },
+  g: { lib: string; decision: string; refs: RuntimePathRef[]; caseIds: Set<string> },
   celFileName: string,
+  policyLib: string | null,
   ctxByName: Map<string, DispoDecisionCtx>,
   index: ProvenanceIndex,
 ): Cluster {
-  const ctx = ctxByName.get(g.decision)!; // guaranteed by the unmapped-runtime-node guard (ctx-missing → skipped)
-  const spineByNodeId = new Map<string, SpineNode>();
-  for (const sn of ctx.spine) spineByNodeId.set(sn.nodeId, sn);
-
   const { crl, push } = makeGuardedCrl(index);
-  // Union over each produced action of its inclusive ancestor chain; relation from the SpineNode (Claude-9 — never
-  // hand-rolled from the nodeId string). A nodeId without a SpineNode shouldn't occur (the unmapped guard already
-  // rejected un-indexed ids), but default defensively to implements-criterion if one slips through.
-  for (const produced of g.producedNodeIds) {
-    for (const id of ancestorChain(produced)) {
-      const sn = spineByNodeId.get(id);
-      const relation: CrlRelation = sn ? spineRelation(sn) : "implements-criterion";
-      push(decisionSubNodeRef(g.lib, g.decision, id), relation);
-    }
+  // Each decomposed ref → its standalone decisionSubNodeRef; relation from the SpineNode of the ref's OWN decision
+  // (Claude-9 — never hand-rolled from the nodeId string). Classification already DEFERRED any case with a ref whose
+  // SpineNode is unresolvable (FIX 1), so `spineNodeForRef` is non-undefined here for every ref — we assert that rather
+  // than default a (possibly wrong) relation: a relation-honest-by-construction mode never emits a guessed relation.
+  for (const ref of g.refs) {
+    const sn = spineNodeForRef(ref, policyLib, ctxByName);
+    if (sn === undefined) continue; // unreachable post-classification; skip rather than fabricate a relation
+    push(decisionSubNodeRef(ref.lib, ref.decision, ref.nodeId), spineRelation(sn));
   }
 
-  // label: the decision + the terminal recommend target(s) of this path (human-readable; non-semantic).
-  const targets = g.producedNodeIds
-    .map((id) => {
-      const sn = spineByNodeId.get(id);
-      return sn ? actionTargetName(sn) : undefined;
-    })
+  // label: the covered decision + the terminal recommend ACTIVITY target(s) of this path (human-readable; non-semantic).
+  // Only RecommendActivity action rows contribute — a use-decision boundary row is delegation glue, not a disposition.
+  const targets = g.refs
+    .map((ref) => spineNodeForRef(ref, policyLib, ctxByName))
+    .filter(
+      (sn): sn is SpineNode =>
+        sn !== undefined &&
+        sn.kind === "action" &&
+        (sn.node as ActionStatement).action.type === "RecommendActivity",
+    )
+    .map((sn) => actionTargetName(sn))
     .filter((t): t is string => t !== undefined);
   const label =
     targets.length > 0 ? `${g.decision} → ${[...new Set(targets)].sort().join(" + ")}` : g.decision;

@@ -161,6 +161,24 @@ describe("disposition-path generate → FINAL validate round-trip (multi-branch)
     }
   });
 
+  it("FIX 5 — non-chained disposition-path cluster IDs are BYTE-IDENTICAL to the #174 (produced-terminal) derivation", () => {
+    // #175 derives the ID tail from the decomposed ref set, but for a NON-chained path it must reproduce #174's tail
+    // EXACTLY: the sorted produced-action nodeIds (the terminals), NOT the full ancestor chain. Pin the three #174
+    // disposition cluster IDs so any drift (ancestor segments leaking into the tail, or the >80 hash-cap tripping) fails.
+    const { artifact } = genArtifact(fx, "disposition-path");
+    const ids = artifact.clusters
+      .filter((c) => !c.id.endsWith(":coverage"))
+      .map((c) => c.id)
+      .sort();
+    expect(ids).toEqual(
+      [
+        "cluster:L:D:otherwise_action_0_", // outer-deny: produced otherwise/action[0]
+        "cluster:L:D:when_0_otherwise_action_0_", // inner-deny: produced when[0]/otherwise/action[0]
+        "cluster:L:D:when_0_when_0_action_0_", // approve: produced when[0]/when[0]/action[0]
+      ].sort(),
+    );
+  });
+
   it("the coverage cluster holds all policy-owned leaves (concepts + activities), no cel, no items", () => {
     const { artifact } = genArtifact(fx, "disposition-path");
     const coverage = artifact.clusters.find((c) => c.id.endsWith(":coverage"))!;
@@ -269,6 +287,10 @@ describe("disposition-path generate (all: multi-produced) → union of both ance
       "when[1]/action[0]",
     ]);
 
+    // FIX 5 byte-stability: the `all:` two-produced cluster id is the #174 form — the sorted produced TERMINALS
+    // (when[0]/action[0] + when[1]/action[0]), NOT the full ancestor chain (when[0]/when[1] do NOT appear in the tail).
+    expect(disposition[0].id).toBe("cluster:L3:D:when_0_action_0_+when_1_action_0_");
+
     const res = validateProvenanceFiles(artifactPath, fx.celPath, fx.anchorPath, "final");
     expect(res.findings.filter((f) => f.kind === "cockpit-correspondence")).toEqual([]);
   });
@@ -376,6 +398,135 @@ describe("disposition-path — a failed render emits coverage-only + ONE render-
     expect(deferred[0].details).toEqual(["forced render failure"]);
     // the coverage cluster still carries the over-reach candidates (so the baseline isn't gutted by a render failure).
     expect(r.artifact.clusters[0].crl.length).toBeGreaterThan(0);
+  });
+});
+
+// ── FIX 3 — the GENERATE-side honesty path, end-to-end (was only the gate side + the primitive level) ──────────────
+// A SUCCESSFUL render whose produced node the decomposer cannot ground must DEFER the case (no disposition cluster
+// carrying it) and emit exactly one `deferred-disposition-path` with `reason: "unmapped-runtime-node"`, citing the
+// (lib-qualified, FIX 2) residual. Two un-groundable shapes: (a) an un-indexed produced nodeId (index-miss branch),
+// (b) an `expanded` use-decision with absent `target.name` (the decomposer's `gaps` branch).
+
+/** Spy renderScenario to call THROUGH to the real impl (captured before the spy replaces it) then apply `mutate` to each
+ *  scenario's tree on a deep clone — so the generator sees a SUCCESSFUL render carrying a surgically-corrupted node. */
+function spyRenderWithMutation(
+  mutate: (tree: { kind: string; nodeId: string; action?: Record<string, unknown>; children?: unknown[] }[]) => void,
+): jest.SpyInstance {
+  const realRender = cre.renderScenario; // capture BEFORE installing the spy (avoids requireActual recursion)
+  return jest.spyOn(cre, "renderScenario").mockImplementation((graph) => {
+    const real = realRender(graph);
+    const clone = JSON.parse(JSON.stringify(real)) as typeof real;
+    if (clone.success !== false) {
+      for (const sv of clone.scenarios)
+        mutate(sv.tree as unknown as Parameters<typeof mutate>[0]);
+    }
+    return clone;
+  });
+}
+
+describe("disposition-path — FIX 3a: a successful render with an UN-INDEXED produced node defers (not a wrong scaffold)", () => {
+  let fx: Fixture;
+  let spy: jest.SpyInstance | undefined;
+  beforeAll(() => {
+    fx = mkFixture("gen-dpp-honesty-idmiss-", POLICY_CRL, CEL);
+  });
+  afterAll(() => {
+    spy?.mockRestore();
+    rmSync(fx.root, { recursive: true, force: true });
+  });
+
+  it("the corrupted case carries NO disposition cluster + ONE deferred-disposition-path (unmapped-runtime-node, lib-qualified)", () => {
+    let injected = false;
+    spy = spyRenderWithMutation((tree) => {
+      const walk = (ns: typeof tree): void => {
+        for (const n of ns) {
+          if (n.kind === "action" && (n.action as { produced?: boolean })?.produced && !injected) {
+            n.nodeId = "ZZZ/orphan/action[0]"; // no decisionSubNodeRef for this id → index-miss → DEFER
+            injected = true;
+          }
+          if (n.children) walk(n.children as typeof tree);
+        }
+      };
+      walk(tree);
+    });
+
+    const r = generateProvenanceScaffold(resolveCelImports(fx.celPath), {
+      policyId: "L",
+      policyVersion: "1",
+      anchorSource: ANCHOR_META,
+      celFileName: "f.cel",
+      clusterBy: "disposition-path",
+    });
+    expect(injected).toBe(true);
+
+    const deferred = r.diagnostics.filter(
+      (d) => d.kind === "deferred-disposition-path" && d.reason === "unmapped-runtime-node",
+    );
+    expect(deferred.length).toBeGreaterThanOrEqual(1);
+    // the cited residual is lib-qualified (FIX 2): `L::D#ZZZ/orphan/action[0]`.
+    const cited = deferred.flatMap((d) => d.details ?? []);
+    expect(cited.some((c) => c === "L::D#ZZZ/orphan/action[0]")).toBe(true);
+    // NO disposition cluster carries this corrupted path (the orphan nodeId never appears as a cited crl ref).
+    for (const c of r.artifact.clusters.filter((c) => !c.id.endsWith(":coverage"))) {
+      expect(c.crl.some((ref) => ref.nodeId === "ZZZ/orphan/action[0]")).toBe(false);
+    }
+  });
+});
+
+describe("disposition-path — FIX 3b: a `gaps`-nonempty path (absent target.name expanded boundary) defers", () => {
+  let fx: Fixture;
+  let spy: jest.SpyInstance | undefined;
+  beforeAll(() => {
+    fx = mkFixture("gen-dpp-honesty-gaps-", POLICY_CRL, CEL);
+  });
+  afterAll(() => {
+    spy?.mockRestore();
+    rmSync(fx.root, { recursive: true, force: true });
+  });
+
+  it("a produced node under an expanded boundary with absent target.name → gaps → DEFER (no disposition cluster)", () => {
+    let injected = false;
+    spy = spyRenderWithMutation((tree) => {
+      // Replace the FIRST produced node in place with an EXPANDED use-decision whose target.name is "" (absent) wrapping
+      // a recommend child → the decomposer recurses an UNGROUNDED frame → the child's nodeId enters `gaps`.
+      const walk = (ns: typeof tree): void => {
+        for (const n of ns) {
+          if (n.kind === "action" && (n.action as { produced?: boolean })?.produced && !injected) {
+            const childId = `${n.nodeId}/when[0]/action[0]`;
+            n.action = { produced: false, actionKind: "use-decision", expanded: true, target: { name: "" } };
+            n.children = [
+              {
+                kind: "when",
+                nodeId: `${n.nodeId}/when[0]`,
+                children: [
+                  { kind: "action", nodeId: childId, action: { produced: true, actionKind: "recommend-activity" } },
+                ],
+              },
+            ];
+            injected = true;
+          }
+          if (n.children) walk(n.children as typeof tree);
+        }
+      };
+      walk(tree);
+    });
+
+    const r = generateProvenanceScaffold(resolveCelImports(fx.celPath), {
+      policyId: "L",
+      policyVersion: "1",
+      anchorSource: ANCHOR_META,
+      celFileName: "f.cel",
+      clusterBy: "disposition-path",
+    });
+    expect(injected).toBe(true);
+
+    const deferred = r.diagnostics.filter(
+      (d) => d.kind === "deferred-disposition-path" && d.reason === "unmapped-runtime-node",
+    );
+    expect(deferred.length).toBeGreaterThanOrEqual(1);
+    // the cited residual is the RAW deep gap nodeId the decomposer could not re-root (the ungrounded child).
+    const cited = deferred.flatMap((d) => d.details ?? []);
+    expect(cited.some((c) => c.endsWith("/when[0]/action[0]"))).toBe(true);
   });
 });
 

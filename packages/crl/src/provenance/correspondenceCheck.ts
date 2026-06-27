@@ -18,7 +18,7 @@
 import type { CockpitModel } from "./cockpitModel";
 import type { ProvNodeRef } from "./indexer";
 import { buildCrlRevealMaps, crlAnchorsForUnits, unitsForCase } from "./revealMaps";
-import { ancestorChain, collectProduced, type MinimalViewNode } from "./runPath";
+import { producedRuntimePathRefs, type MinimalViewNode } from "./runPath";
 
 export type CorrespondenceUncheckedReason =
   | "render-failed"
@@ -137,23 +137,38 @@ export function checkCockpitCorrespondence(model: CockpitModel): CorrespondenceC
       continue;
     }
 
-    const produced: MinimalViewNode[] = [];
-    collectProduced(sv.tree as unknown as MinimalViewNode[], produced);
-    if (produced.length === 0) {
+    // The chain-aware run path (#175, disc 151 Fork B): ONE ProducedRunPath per produced action. The decomposer
+    // re-roots a deep inlined same-lib `use decision` run-path (`.../action[0]/when[0]/.../action[0]` spanning
+    // Main→Sub1→…) into ordered STANDALONE-local refs — one per delegation frame — so each grounds against the
+    // standalone structure index (`idToKey`, which inventories EVERY decision standalone, sub-decisions included). For a
+    // non-chained case the decomposition reduces to the old inclusive ancestor chain (back-compat), so those cases are
+    // byte-unchanged. generate.ts derives the SAME path via the SAME primitive (disc 151 ref 3, no drift).
+    const paths = producedRuntimePathRefs(sv.tree as unknown as MinimalViewNode[], {
+      lib,
+      decision: dec,
+    });
+    if (paths.length === 0) {
       results.push({ kind: "unchecked", caseName, reason: "no-produced-action" });
       continue;
     }
 
-    // expected = union over EVERY produced action of its inclusive ancestor-nodeId chain → row nodeKeys. A produced
-    // action or ancestor id that does NOT resolve to a structure row is the #171/#173 inlined-`use decision` deferred
-    // shape: the runtime VM inlines a same-lib delegated sub-node under the caller, but provenance/structure address it
-    // STANDALONE — no join bridges that today. Report it as unchecked (do NOT filter(Boolean) it into a false bleed).
+    // expected = union over EVERY produced action's decomposed standalone refs → row nodeKeys. The honesty invariant
+    // (disc 151 ref 5, MACHINE-CHECKABLE): route to `unmapped-runtime-node` iff a path's `gaps` is non-empty (the
+    // decomposer could not re-root a node — a residual the structure cannot check) OR a grounded ref MISSES `idToKey`
+    // (no standalone structure row — the cross-lib #172 frontier, or a genuine residual). Either way the case is
+    // UNCHECKED, never a silent green and never a wrong-sub false mismatch. A same-lib chain's refs all resolve (every
+    // sub-decision is inventoried standalone), so the chained case now RESOLVES and is compared like any other.
     const expected = new Set<string>();
     const unmapped: string[] = [];
-    for (const p of produced) {
-      for (const id of ancestorChain(p.nodeId)) {
-        const key = idToKey.get(`${lib}::${dec}::${id}`);
-        if (key === undefined) unmapped.push(id);
+    for (const p of paths) {
+      if (p.gaps.length > 0) {
+        unmapped.push(...p.gaps);
+        continue;
+      }
+      for (const ref of p.refs) {
+        const key = idToKey.get(`${ref.lib}::${ref.decision}::${ref.nodeId}`);
+        // FIX 2: lib-qualify the citation (a sub name can repeat across libs) — the exact lookup-key shape.
+        if (key === undefined) unmapped.push(`${ref.lib}::${ref.decision}#${ref.nodeId}`);
         else expected.add(key);
       }
     }
@@ -187,7 +202,7 @@ export function checkCockpitCorrespondence(model: CockpitModel): CorrespondenceC
         lib,
         bleed: bleed.map(decodeRef),
         miss: miss.map(decodeRef),
-        producedCount: produced.length,
+        producedCount: paths.length,
       });
     }
     // else: clean (push nothing) — the cockpit lights exactly this case's path.
