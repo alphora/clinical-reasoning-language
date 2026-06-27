@@ -58,15 +58,20 @@ try {
     const kit = JSON.parse(r.content[0].text);
     assert.equal(kit.stage, "local-decision-support");
     assert.match(kit.contentHash, /^[0-9a-f]{64}$/);
-    // Durable guard that the bundled server carries the full #134 kit (not just a grep) — the 7-artifact set.
+    // Durable guard that the bundled server carries the full kit (not just a grep) — the 11-artifact set
+    // (A criteria-decision + decision + shared determination lib + PA + B source-delegated + C disposition-arbitration).
     assert.deepEqual(kit.referenceArtifacts.map((a) => a.name).sort(), [
       "criteria-decision-reference.cel",
       "criteria-decision-reference.crl",
       "decision-reference.cel",
       "decision-reference.crl",
+      "disposition-arbitration-reference.cel",
+      "disposition-arbitration-reference.crl",
       "medical-policy-determination.crl",
       "pa-determination-reference.cel",
       "pa-determination-reference.crl",
+      "source-delegated-decision-reference.cel",
+      "source-delegated-decision-reference.crl",
     ]);
     const crl = kit.referenceArtifacts.find((a) => a.name === "decision-reference.crl").source;
     const v = JSON.parse((await client.callTool({ name: "validate_crl", arguments: { code: crl } })).content[0].text);
