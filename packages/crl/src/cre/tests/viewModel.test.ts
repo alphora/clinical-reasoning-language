@@ -11,7 +11,8 @@ import { renderScenario, SCENARIO_VIEW_MODEL_SCHEMA_VERSION, type ViewNode } fro
 function graphFrom(crlSrc: string, celSrc: string): ResolvedCelGraph {
   const crl = parseInput(crlSrc);
   const built = buildCEL(celSrc);
-  if (!built.success || !built.result) throw new Error("inline CEL build failed: " + JSON.stringify(built.errors));
+  if (!built.success || !built.result)
+    throw new Error("inline CEL build failed: " + JSON.stringify(built.errors));
   const coversTarget: RegistryEntry = {
     name: crl.library.name,
     filePath: "inline.crl",
@@ -19,7 +20,13 @@ function graphFrom(crlSrc: string, celSrc: string): ResolvedCelGraph {
     isRoot: true,
     origin: "root",
   };
-  return { filePath: "inline.cel", cel: built.result, coversTarget, celParseErrors: [], diagnostics: [] };
+  return {
+    filePath: "inline.cel",
+    cel: built.result,
+    coversTarget,
+    celParseErrors: [],
+    diagnostics: [],
+  };
 }
 
 const byId = (nodes: ViewNode[], id: string): ViewNode | undefined => {
@@ -85,7 +92,11 @@ describe("renderScenario — view-model (#item 2)", () => {
     // Excl's body action did NOT run (condition false) → reached:false, no preempted reason.
     const exclDeny = byId(indic.tree, "when[0]/action[0]")!;
     expect(exclDeny).toMatchObject({ kind: "action", evaluated: false });
-    expect(exclDeny.action).toMatchObject({ actionKind: "recommend-activity", target: { name: "Deny" }, produced: false });
+    expect(exclDeny.action).toMatchObject({
+      actionKind: "recommend-activity",
+      target: { name: "Deny" },
+      produced: false,
+    });
     expect(exclDeny.unreachedReason).toBeUndefined();
 
     const indicNode = byId(indic.tree, "when[1]")!;
@@ -95,22 +106,33 @@ describe("renderScenario — view-model (#item 2)", () => {
 
     // `otherwise` was preempted by the Indic match → unreached + reason.
     const otherwise = byId(indic.tree, "otherwise")!;
-    expect(otherwise).toMatchObject({ kind: "otherwise", evaluated: false, unreachedReason: "preempted" });
+    expect(otherwise).toMatchObject({
+      kind: "otherwise",
+      evaluated: false,
+      unreachedReason: "preempted",
+    });
 
     // produced summary + source span.
-    expect(indic.produced).toEqual([{ recommendation: "Approve", actionKind: "recommend-activity" }]);
+    expect(indic.produced).toEqual([
+      { recommendation: "Approve", actionKind: "recommend-activity" },
+    ]);
     expect(approve.source.filePath).toBe("inline.crl");
   });
 
   it("envelope: multi-case counts + schemaVersion", () => {
     const vm = renderScenario(graphFrom(COVERAGE_CRL, COVERAGE_CEL));
     expect(vm.success).toBe(true);
-    expect({ caseCount: vm.caseCount, passCount: vm.passCount }).toEqual({ caseCount: 2, passCount: 2 });
+    expect({ caseCount: vm.caseCount, passCount: vm.passCount }).toEqual({
+      caseCount: 2,
+      passCount: 2,
+    });
     expect(vm.source.celFilePath).toBe("inline.cel");
   });
 
   it("case filter renders only the named case", () => {
-    const vm = renderScenario(graphFrom(COVERAGE_CRL, COVERAGE_CEL), { case: "neither -> otherwise" });
+    const vm = renderScenario(graphFrom(COVERAGE_CRL, COVERAGE_CEL), {
+      case: "neither -> otherwise",
+    });
     expect(vm.scenarios.map((s) => s.case.name)).toEqual(["neither -> otherwise"]);
     // No facts matched → both whens unsatisfied, otherwise fires (Deny).
     const sc = vm.scenarios[0];
@@ -164,9 +186,18 @@ case "contraindicated":
     const vm = renderScenario(graphFrom(GUARD_CRL, GUARD_CEL));
     const sc = vm.scenarios[0];
     const med = byId(sc.tree, "when[0]/action[1]")!;
-    expect(med.action).toMatchObject({ target: { name: "Med" }, qualifier: "any", produced: false });
+    expect(med.action).toMatchObject({
+      target: { name: "Med" },
+      qualifier: "any",
+      produced: false,
+    });
     expect(med.guardedOut).toBe(true);
-    expect(med.guard).toMatchObject({ polarity: "unless", concept: { name: "Contra" }, evaluated: true, satisfied: true });
+    expect(med.guard).toMatchObject({
+      polarity: "unless",
+      concept: { name: "Contra" },
+      evaluated: true,
+      satisfied: true,
+    });
     const referral = byId(sc.tree, "when[0]/action[0]")!;
     expect(referral.action).toMatchObject({ qualifier: "any", produced: true });
   });
@@ -227,10 +258,19 @@ case "uses sub":
     expect(sc.status).toBe("pass");
     const use = byId(sc.tree, "when[0]/action[0]")!;
     // The use-decision node itself is NOT produced (it delegates); it is expanded with Sub's body inlined under it.
-    expect(use.action).toMatchObject({ actionKind: "use-decision", target: { name: "Sub" }, produced: false, expanded: true });
+    expect(use.action).toMatchObject({
+      actionKind: "use-decision",
+      target: { name: "Sub" },
+      produced: false,
+      expanded: true,
+    });
     // Sub's body recursed UNDER the use-decision action's nodeId.
     const subRec = byId(sc.tree, "when[0]/action[0]/otherwise/action[0]")!;
-    expect(subRec.action).toMatchObject({ actionKind: "recommend-activity", target: { name: "SubRec" }, produced: true });
+    expect(subRec.action).toMatchObject({
+      actionKind: "recommend-activity",
+      target: { name: "SubRec" },
+      produced: true,
+    });
     // The bare sub-name "Sub" is NOT in the produced summary; the delegated determination "SubRec" IS (REPLACE).
     expect(sc.produced).toEqual([{ recommendation: "SubRec", actionKind: "recommend-activity" }]);
   });
@@ -261,14 +301,122 @@ case "uses cross-lib sub":
 - fact is "fIndic".
 - result is "D" is "Sub".`;
 
-  it("a cross-library use-decision stays a leaf: expanded:false, no children, not produced (deferred)", () => {
+  it("an UNRESOLVED cross-library use-decision stays a leaf: expanded:false, no children, not produced", () => {
+    // The target library "Other" is not in this single-lib graph (no registry) → unresolved → leaf (#172: a RESOLVABLE
+    // cross-lib target instead recurses + expands — covered by the multi-lib eval tests + the spine parity golden).
     const vm = renderScenario(graphFrom(XLIB_CRL, XLIB_CEL));
     const sc = vm.scenarios[0];
     const use = byId(sc.tree, "when[0]/action[0]")!;
-    expect(use.action).toMatchObject({ actionKind: "use-decision", target: { name: "Sub" }, produced: false, expanded: false });
+    expect(use.action).toMatchObject({
+      actionKind: "use-decision",
+      target: { name: "Sub" },
+      produced: false,
+      expanded: false,
+    });
     expect(use.children).toBeUndefined();
     expect(sc.produced).toEqual([]);
-    expect(sc.diagnostics.some((d) => /cross-library `use decision`.*deferred/.test(d))).toBe(true);
+    // The distinct unresolved-cross-lib diagnostic — "deferred" is GONE from the cross-lib path (#172 todo-2).
+    expect(
+      sc.diagnostics.some((d) =>
+        /cross-library `use decision`.*not found in the resolved graph/.test(d),
+      ),
+    ).toBe(true);
+    expect(sc.diagnostics.some((d) => /deferred/.test(d))).toBe(false);
+  });
+
+  // #172: a RESOLVABLE cross-library use-decision EXPANDS in the VM — the shared sub's body becomes the node's children,
+  // `expanded:true`, and `target.libraryName` carries the sub's owning lib (so #175's decomposer re-roots into its frame).
+  const X_POLICY_CRL = `# Policy
+library "Policy".
+concept "Indic":
+- type is Condition.
+- code is \`indic\`.
+decision "D":
+- when "Indic" then:
+  - use decision "Shared"."Sub".
+  end.`;
+  const X_SHARED_CRL = `# Shared
+library "Shared".
+concept "Crit":
+- type is Condition.
+- code is \`crit\`.
+activity "Approve":
+- request CPGCommunicationRequest.
+- with \`a\`.
+activity "Deny":
+- request CPGCommunicationRequest.
+- with \`d\`.
+decision "Sub":
+first:
+- when "Crit" then recommend activity "Approve".
+- otherwise then recommend activity "Deny".`;
+  const X_CEL = `# PolicyCases
+library "PolicyCases".
+covers "Policy".
+fact "Pat":
+- name is "Pat".
+- birth date is "1970-01-01".
+- defined by "Patient".
+fact "fIndic":
+- code is "http://example.org|indic".
+- date is "2026-01-01".
+- defined by "Indic".
+fact "fCrit":
+- code is "http://example.org|crit".
+- date is "2026-01-01".
+- defined by "Shared"."Crit".
+case "c":
+- subject is "Pat".
+- fact is "fIndic".
+- fact is "fCrit".
+- result is "D" is "Approve".`;
+
+  it("#172: a RESOLVABLE cross-library use-decision expands; target.libraryName = the sub's lib; spans → sub's file", () => {
+    const policy = parseInput(X_POLICY_CRL);
+    const shared = parseInput(X_SHARED_CRL);
+    const built = buildCEL(X_CEL);
+    if (!built.success || !built.result) throw new Error("CEL build failed");
+    const entry = (
+      ast: ReturnType<typeof parseInput>,
+      fp: string,
+      origin: RegistryEntry["origin"],
+    ): RegistryEntry => ({
+      name: ast.library.name,
+      filePath: fp,
+      ast,
+      isRoot: origin === "root",
+      origin,
+    });
+    const graph: ResolvedCelGraph = {
+      filePath: "policy.cel",
+      cel: built.result,
+      coversTarget: entry(policy, "policy.crl", "root"),
+      crlRegistry: {
+        byNameLocal: new Map([["Shared", entry(shared, "shared.crl", "local")]]),
+        byNamePackage: new Map(),
+      },
+      celParseErrors: [],
+      diagnostics: [],
+    };
+    const sc = renderScenario(graph).scenarios[0];
+    const use = byId(sc.tree, "when[0]/action[0]")!;
+    expect(use.action).toMatchObject({
+      actionKind: "use-decision",
+      produced: false,
+      expanded: true,
+    });
+    // target.libraryName = the resolved sub's owning library (the qualified ref already carries it; #175 re-root anchor).
+    expect(use.action!.target.libraryName).toBe("Shared");
+    // The sub's body is inlined as children; the Approve leaf nests under Sub's when[0], with its span in the SUB'S file.
+    const approve = byId(sc.tree, "when[0]/action[0]/when[0]/action[0]")!;
+    expect(approve.action).toMatchObject({
+      actionKind: "recommend-activity",
+      target: { name: "Approve" },
+      produced: true,
+    });
+    expect(approve.source.filePath).toBe("shared.crl");
+    // REPLACE: the bubbled produced name is the bare activity, not "Sub".
+    expect(sc.produced).toEqual([{ recommendation: "Approve", actionKind: "recommend-activity" }]);
   });
 
   const NESTED_CRL = `# N
@@ -318,7 +466,9 @@ case "nested":
     const inner = byId(sc.tree, "when[0]/when[0]")!;
     expect(inner).toMatchObject({ kind: "when", evaluated: true });
     expect(inner.condition).toMatchObject({ concept: { name: "B" }, satisfied: true });
-    expect(byId(sc.tree, "when[0]/when[0]/action[0]")).toMatchObject({ action: { target: { name: "X" }, produced: true } });
+    expect(byId(sc.tree, "when[0]/when[0]/action[0]")).toMatchObject({
+      action: { target: { name: "X" }, produced: true },
+    });
   });
 
   const COMP_CRL = `# C
@@ -411,7 +561,12 @@ case "indic but not eligible -> treat excluded":
     const sc = vm.scenarios[0];
     const treat = byId(sc.tree, "when[0]/action[0]")!;
     expect(treat.guardedOut).toBe(true);
-    expect(treat.guard).toMatchObject({ polarity: "only-when", concept: { name: "Eligible" }, evaluated: true, satisfied: false });
+    expect(treat.guard).toMatchObject({
+      polarity: "only-when",
+      concept: { name: "Eligible" },
+      evaluated: true,
+      satisfied: false,
+    });
     expect(treat.action?.produced).toBe(false);
     expect(sc.status).toBe("fail"); // Treat not produced → the result-is "Treat" oracle fails
   });
@@ -481,7 +636,14 @@ case "exclusion -> deny, indic preempted":
     const failGraph = {
       filePath: "bad.cel",
       celParseErrors: [{ message: "CEL parse error: unexpected token" }],
-      diagnostics: [{ kind: "unresolved-covers", severity: "error", coversName: "MissingLib", filePath: "bad.cel" }],
+      diagnostics: [
+        {
+          kind: "unresolved-covers",
+          severity: "error",
+          coversName: "MissingLib",
+          filePath: "bad.cel",
+        },
+      ],
     } as unknown as ResolvedCelGraph;
     const vm = renderScenario(failGraph);
     expect(vm.success).toBe(false);

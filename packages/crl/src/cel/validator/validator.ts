@@ -1,4 +1,6 @@
 import { collectDecisionArmsTransitive } from "../../ast/decisionArms";
+import { buildGlobalDecisionMap, makeResolveDecision } from "../../ast/decisionResolver";
+import type { LibAwareDecisionResolver } from "../../ast/decisionSpine";
 import {
   isQualifiedRef,
   getRefName,
@@ -228,16 +230,22 @@ export function validateCEL(
   const leafCandidates = coversTarget
     ? buildLeafCandidates(coversTarget.ast.statements)
     : new Map<string, Statement>();
-  // Same-library resolver for transitive `use decision` arms — a bare sub-decision name → its Decision in the covered
-  // library. (Cross-library, cyclic, and unresolved targets contribute NO arm — collectDecisionArmsTransitive drops
-  // their name, matching the runtime, which produces nothing for them.)
-  const decisionsByName = new Map<string, Decision>();
-  if (coversTarget) {
-    for (const s of coversTarget.ast.statements) {
-      if (s.type === "Decision") decisionsByName.set(s.name, s);
-    }
-  }
-  const resolveDecision = (name: string): Decision | undefined => decisionsByName.get(name);
+  // Lib-aware resolver for transitive `use decision` arms over the WHOLE graph (#172) — IDENTICAL to the CRE's, so the
+  // arms surface spans the same cross-library closure run_decision evaluates (else valid cross-lib cases fail
+  // validate_cel). A BARE target binds in the covered library, a QUALIFIED one in its explicit library. (Cyclic and
+  // unresolved targets contribute NO arm — collectDecisionArmsTransitive drops their name, matching the runtime, which
+  // produces nothing for them.)
+  const coveredDecisions: Decision[] = coversTarget
+    ? coversTarget.ast.statements.filter((s): s is Decision => s.type === "Decision")
+    : [];
+  const globalDecisionMap = buildGlobalDecisionMap({
+    crlRegistry: graph.crlRegistry,
+    coveredLib: coversTarget?.name ?? "",
+    coveredFilePath: coversTarget?.filePath ?? fp,
+    coveredStatements: coveredDecisions,
+  });
+  const resolveDecision = makeResolveDecision(globalDecisionMap);
+  const coveredLibName = coversTarget?.name ?? "";
   for (const c of cel.statements) {
     if (c.type !== "CELCase") continue;
     for (const cb of c.body) {
@@ -264,6 +272,7 @@ export function validateCEL(
           warnings,
           fp,
           resolveDecision,
+          coveredLibName,
         );
       } else if (cb.type === "CELCrossResourceField") {
         validateCrossResource(cb, facts, c.name, errors, fp);
@@ -447,7 +456,8 @@ function validateResult(
   errors: CELValidationError[],
   _warnings: CELValidationError[],
   fp: string,
-  resolveDecision: (name: string) => Decision | undefined,
+  resolveDecision: LibAwareDecisionResolver,
+  coveredLibName: string,
 ): void {
   if (coversName === undefined) return; // resolver flagged unresolved-covers
   const leaf = leafCandidates.get(cb.leafName);
@@ -479,7 +489,7 @@ function validateResult(
       // target, that sub-decision's arms (the bare sub-name is REPLACED, not kept: a delegation isn't a
       // disposition). A QUALIFIED (cross-library), cyclic, or unresolved target contributes NO arm — its name is
       // dropped, matching the runtime (which produces nothing for it), so validate_cel and run_decision reject alike.
-      const arms = collectDecisionArmsTransitive(leaf as Decision, resolveDecision);
+      const arms = collectDecisionArmsTransitive(leaf as Decision, resolveDecision, coveredLibName);
       if (!arms.has(cb.value.branchName)) {
         errors.push(
           err(

@@ -4,10 +4,10 @@ import type {
   BranchBlock,
   Decision,
   OtherwiseBlock,
+  ReferenceName,
   WhenBlock,
   WhenBlockBody,
 } from "./types";
-import { getRefLibrary, getRefName } from "./types";
 
 /**
  * Construct a decision-local child node id: `/`-delimited path (parent "" → bare segment). Single source of the id
@@ -44,12 +44,13 @@ export const nameOf = (id: string): string => (JSON.parse(id) as [string, string
  * counting `otherwise` positions, `action[0]` for an inline action, `action[j]` for a menu, nested branches reusing the
  * parent id.
  *
- * RECURSION (same-library `use decision`): when `resolve` is supplied, a `use decision "Sub"` action whose target is a
- * BARE same-library decision (not already on the delegation path → cycle-guarded) has its target's body recursed UNDER
- * the use-decision action's nodeId — so Sub's branches become `…/action[j]/when[0]`, `…/action[j]/otherwise`, etc. A
- * QUALIFIED (cross-library) target stays a leaf (transitive evaluation deferred). Without `resolve`, no recursion =
- * the original (pre-recursion) behavior. The CRE trace + view-model thread an identical resolver so all three walks
- * stay byte-identical.
+ * RECURSION (`use decision`, #172 todo-2): when a lib-aware `resolve` is supplied, a `use decision` action whose target
+ * RESOLVES (same-library BARE, or cross-library QUALIFIED — not already on the delegation path → cycle-guarded keyed
+ * `(lib,name)`) has its target's body recursed UNDER the use-decision action's nodeId — so Sub's branches become
+ * `…/action[j]/when[0]`, `…/action[j]/otherwise`, etc. A cross-library sub recurses in ITS OWN library (the resolver
+ * returns `resolved.lib`), so a future `A.Sub`/`B.Sub` cannot false-collide in the cycle guard. Without `resolve`, no
+ * recursion = the original (pre-recursion) standalone behavior (the provenance index / crlStructure callers). The CRE
+ * trace + view-model thread an identical resolver so all three walks stay byte-identical (the golden parity invariant).
  */
 
 export type SpineNodeKind = "when" | "otherwise" | "action";
@@ -63,16 +64,52 @@ export interface SpineNode {
 export type DecisionResolver = (name: string) => Decision | undefined;
 
 /**
- * The delegation cycle guard is keyed `idOf(lib, name)` (#172) — not the bare name — so a future cross-library
- * `A.Sub`/`B.Sub` can't false-collide. `rootLib` is the covered/owning library; it stays CONSTANT through this walk
- * because the cross-library guard (`getRefLibrary → leaf`) is UNTOUCHED in todo-1 (only same-library targets recurse).
- * For same-library that makes `idOf(rootLib, name)` a 1:1 rename of the old bare-name key → byte-identical cycle
- * detection. `rootLib` defaults to `""` so existing/non-recursive callers (provenance index, crlStructure) are
- * unaffected — within a single walk the lib prefix is uniform, so detection is identical regardless of its value.
+ * A resolved `use decision` target plus the library + source file it belongs to — the shape the cross-library frame
+ * (#172 todo-2) is built from. Lives HERE in ast/ (not in cre/decisionResolver) so the ast-layer surfaces (decisionArms,
+ * decisionSpine) can recurse cross-library without an ast→cre dependency; `cre/decisionResolver.ts` ResolvedDecision is
+ * structurally identical and assignable to it.
  */
-export function decisionSpine(decision: Decision, resolve?: DecisionResolver, rootLib = ""): SpineNode[] {
+export interface ResolvedDecisionRef {
+  decision: Decision;
+  /** The library that OWNS this decision (the frame `currentLib` when it is recursed). */
+  lib: string;
+  /** Absolute path of the owning library's CRL file (the frame `currentFilePath` — for spans/VM). */
+  filePath: string;
+}
+
+/**
+ * The lib-aware `use decision` resolver shared by all four surfaces (#172 todo-2): a BARE ref resolves against
+ * `callerLib`, a QUALIFIED ref against its explicit library, over the WHOLE resolved graph. Returns `undefined` when the
+ * target library/name is not in the graph (→ an unresolved-cross-lib diagnostic). The structural surfaces (spine, VM)
+ * accept this OPTIONALLY — when absent (provenance index / crlStructure callers) a `use decision` stays a non-recursive
+ * leaf, the original standalone behavior.
+ */
+export type LibAwareDecisionResolver = (
+  callerLib: string,
+  ref: ReferenceName,
+) => ResolvedDecisionRef | undefined;
+
+/**
+ * The delegation cycle guard is keyed `idOf(lib, name)` (#172) — not the bare name — so a cross-library `A.Sub`/`B.Sub`
+ * can't false-collide. `rootLib` is the covered/owning library the walk starts in; a cross-library sub recurses under
+ * `resolved.lib` (the resolver's owning library), so the key tracks the REAL library of each frame. `rootLib` defaults to
+ * `""` so the non-recursive callers (provenance index, crlStructure — no `resolve`) are unaffected; within a single
+ * non-recursive walk the lib prefix is uniform, so the value is immaterial there.
+ */
+export function decisionSpine(
+  decision: Decision,
+  resolve?: LibAwareDecisionResolver,
+  rootLib = "",
+): SpineNode[] {
   const out: SpineNode[] = [];
-  walkBranches(decision.body.statements, "", out, resolve, rootLib, new Set([idOf(rootLib, decision.name)]));
+  walkBranches(
+    decision.body.statements,
+    "",
+    out,
+    resolve,
+    rootLib,
+    new Set([idOf(rootLib, decision.name)]),
+  );
   return out;
 }
 
@@ -80,7 +117,7 @@ function walkBranches(
   branches: BranchBlock[],
   parentId: string,
   out: SpineNode[],
-  resolve: DecisionResolver | undefined,
+  resolve: LibAwareDecisionResolver | undefined,
   currentLib: string,
   stack: Set<string>,
 ): void {
@@ -101,7 +138,7 @@ function walkBody(
   body: WhenBlockBody,
   parentId: string,
   out: SpineNode[],
-  resolve: DecisionResolver | undefined,
+  resolve: LibAwareDecisionResolver | undefined,
   currentLib: string,
   stack: Set<string>,
 ): void {
@@ -122,24 +159,35 @@ function walkBody(
   });
 }
 
-/** Emit the action node, then — for a same-library `use decision` target — recurse the sub-decision's body under it. */
+/**
+ * Emit the action node, then — for a RESOLVABLE `use decision` target (same-library BARE or cross-library QUALIFIED) —
+ * recurse the sub-decision's body under it, IN THE SUB'S OWN LIBRARY (`resolved.lib`). Cycle-guarded keyed `(lib,name)`.
+ * Without a resolver (provenance index / crlStructure) the action stays a leaf.
+ */
 function pushAction(
   stmt: ActionStatement,
   nodeId: string,
   out: SpineNode[],
-  resolve: DecisionResolver | undefined,
+  resolve: LibAwareDecisionResolver | undefined,
   currentLib: string,
   stack: Set<string>,
 ): void {
   out.push({ nodeId, kind: "action", node: stmt });
   if (!resolve || stmt.action.type !== "UseDecision") return;
-  // Recurse ONLY a bare (same-library) target not already on the delegation path. Qualified → cross-library (leaf).
-  // (todo-1: this DEFERRAL GUARD is UNTOUCHED — todo-2 lifts it to recurse cross-library into the sub's lib frame.)
-  if (getRefLibrary(stmt.action.decisionName)) return;
-  const name = getRefName(stmt.action.decisionName);
-  // Cycle key is `(lib,name)` (#172). Same-library → `currentLib` is constant, so this is the old bare-name key renamed.
-  if (stack.has(idOf(currentLib, name))) return;
-  const sub = resolve(name);
-  if (!sub) return;
-  walkBranches(sub.body.statements, nodeId, out, resolve, currentLib, new Set([...stack, idOf(currentLib, name)]));
+  // Resolve via the lib-aware resolver: a BARE target binds in `currentLib`, a QUALIFIED target in its explicit library
+  // (#172 todo-2 — the cross-library deferral guard is GONE). An unresolved target stays a leaf (no body to recurse).
+  const resolved = resolve(currentLib, stmt.action.decisionName);
+  if (!resolved) return;
+  // Cycle key is `(lib,name)` of the RESOLVED owning library — cross-library `A.Sub`/`B.Sub` are distinct keys.
+  const subId = idOf(resolved.lib, resolved.decision.name);
+  if (stack.has(subId)) return;
+  // Recurse in the SUB'S library so its own bare `use decision` targets resolve there.
+  walkBranches(
+    resolved.decision.body.statements,
+    nodeId,
+    out,
+    resolve,
+    resolved.lib,
+    new Set([...stack, subId]),
+  );
 }

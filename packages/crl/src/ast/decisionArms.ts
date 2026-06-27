@@ -3,9 +3,9 @@
 // EXTRACTED from the CEL validator (T03/#86) to this leaf module so the language-services index can reuse
 // it WITHOUT pulling the CEL validator/resolver into the lean `language-services` subpath — single source
 // of truth with `validateResult`.
+import { idOf, type LibAwareDecisionResolver } from "./decisionSpine";
 import type { ActionStatement, BlockBody, BranchBlock, Decision, WhenBlockBody } from "./types";
-import { getRefLibrary, getRefName } from "./types";
-import { idOf } from "./decisionSpine";
+import { getRefName } from "./types";
 
 export function collectDecisionArms(decision: Decision): Set<string> {
   const arms = new Set<string>();
@@ -15,25 +15,26 @@ export function collectDecisionArms(decision: Decision): Set<string> {
   return arms;
 }
 
-export type DecisionResolver = (name: string) => Decision | undefined;
+/** The lib-aware resolver the transitive-arms walk recurses through — shared with the CRE / spine / VM (#172). */
+export type DecisionResolver = LibAwareDecisionResolver;
 
 /**
- * TRANSITIVE arms (option A) — the dispositions a CEL `result is "<D>" is "<X>"` may name once `use decision` recurses.
- * Union of the decision's DIRECT `recommend activity` names PLUS, for each BARE same-library RESOLVABLE non-cyclic
- * `use decision` target, that target's transitive arms — REPLACING the bare sub-name (a delegation is not a disposition).
+ * TRANSITIVE arms — the dispositions a CEL `result is "<D>" is "<X>"` may name once `use decision` recurses.
+ * Union of the decision's DIRECT `recommend activity` names PLUS, for each RESOLVABLE non-cyclic `use decision` target
+ * (same-library bare/self-qualified or cross-library qualified, #172), that target's transitive arms — REPLACING the
+ * sub-name (a delegation is not a disposition). A cross-library sub's arms are collected IN ITS OWN library.
  *
- * A `use decision` target contributes NO arm (its bare name is DROPPED, not kept) in ALL fallback cases — QUALIFIED
- * (cross-library), CYCLIC (`seen.has`), or UNRESOLVED bare. Rationale: the CRE (run.ts) produces NOTHING for any of
- * those (deferred / runtime-error / leaf), so keeping the bare name here would let validate_cel accept a `result is`
- * that run_decision can never satisfy — the exact validator↔runtime divergence #166 fixes. Both surfaces now reject a
- * disposition that can't be determined. Cycle-guarded via `seen` (seeded with the root decision name).
+ * A `use decision` target contributes NO arm (its name is DROPPED, not kept) in the two fallback cases — CYCLIC
+ * (`seen.has`) or UNRESOLVED (target lib/name not in the graph). Rationale: the CRE (run.ts) produces NOTHING for those
+ * (runtime-error / leaf), so keeping the name here would let validate_cel accept a `result is` that run_decision can
+ * never satisfy — the exact validator↔runtime divergence #166 fixes. Both surfaces reject a disposition that can't be
+ * determined. Cycle-guarded via `seen` (seeded with `(callerLib, decision.name)`).
  */
 export function collectDecisionArmsTransitive(
   decision: Decision,
   resolve: DecisionResolver,
-  // `callerLib` BEFORE `seen` so the default seed is correctly `(callerLib, name)`-keyed (#172) — the validator caller
-  // passes neither → "" → byte-identical to the old bare-name seed, but todo-2 threading the real lib makes the arms
-  // surface lib-keyed without touching the seed.
+  // `callerLib` BEFORE `seen` so the default seed is correctly `(callerLib, name)`-keyed (#172). A caller that has no
+  // library context passes "" → a same-library-only walk seeded `("" , name)`.
   callerLib = "",
   seen: Set<string> = new Set([idOf(callerLib, decision.name)]),
 ): Set<string> {
@@ -87,20 +88,22 @@ function walkArmsActionStatementTransitive(
     if (n) arms.add(n);
     return;
   }
-  // UseDecision: ONLY a BARE, same-library, RESOLVABLE, NON-CYCLIC target contributes — it REPLACES its name with its
-  // transitive arms. In every fallback case (QUALIFIED cross-library, CYCLIC, or UNRESOLVED bare) the bare name is
-  // DROPPED, contributing NO arm — because the CRE produces nothing in those cases, so offering the name as a valid
-  // arm here would diverge validate_cel from run_decision (the #166 bug). A disposition that can't be determined is
-  // not a valid arm.
-  // (todo-1: this cross-library DEFERRAL GUARD is UNTOUCHED — todo-2 lifts it to recurse the sub's transitive arms.)
-  const name = getRefName(action.decisionName);
-  if (!name) return;
-  // Cycle key is `(lib,name)` (#172) so a future cross-library `A.Sub`/`B.Sub` can't false-collide. Same-library →
-  // `callerLib` is constant (the guard still defers cross-library), so this is the old bare-name key renamed.
-  if (getRefLibrary(action.decisionName) || seen.has(idOf(callerLib, name))) return;
-  const sub = resolve(name);
-  if (!sub) return;
-  const subArms = collectDecisionArmsTransitive(sub, resolve, callerLib, new Set([...seen, idOf(callerLib, name)]));
+  // UseDecision: a RESOLVABLE, NON-CYCLIC target (same-library bare/self-qualified or cross-library qualified, #172)
+  // REPLACES its name with its transitive arms, collected in the SUB'S library. In the fallback cases (CYCLIC/UNRESOLVED) the
+  // name is DROPPED, contributing NO arm — the CRE produces nothing for those, so offering the name as a valid arm here
+  // would diverge validate_cel from run_decision (the #166 bug). A disposition that can't be determined is not an arm.
+  const resolved = resolve(callerLib, action.decisionName);
+  if (!resolved) return;
+  // Cycle key is `(lib,name)` of the RESOLVED owning library so cross-library `A.Sub`/`B.Sub` are distinct.
+  const subId = idOf(resolved.lib, resolved.decision.name);
+  if (seen.has(subId)) return;
+  // Recurse in the SUB'S library so its own bare `use decision` targets resolve there.
+  const subArms = collectDecisionArmsTransitive(
+    resolved.decision,
+    resolve,
+    resolved.lib,
+    new Set([...seen, subId]),
+  );
   for (const a of subArms) arms.add(a);
 }
 

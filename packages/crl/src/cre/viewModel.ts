@@ -11,6 +11,7 @@
  * trace supplies state. `nodeId`/`recName`/`childId` are imported from `run.ts` so the walk assigns
  * ids IDENTICAL to the CRE's — the alignment key.
  */
+import { idOf, type LibAwareDecisionResolver } from "../ast/decisionSpine";
 import type {
   ActionStatement,
   BlockBody,
@@ -24,14 +25,13 @@ import type {
 import { getRefLibrary, getRefName } from "../ast/types";
 import type { CELCase, CELDefinedByField, CELFact } from "../cel/ast/types";
 import { resolveDefinedByTarget } from "../cel/definedByResolve";
-import type { ResolvedCelGraph } from "../cel/imports/types";
-import type { CelImportDiagnostic } from "../cel/imports/types";
+import type { ResolvedCelGraph, CelImportDiagnostic } from "../cel/imports/types";
 import type { LsLocation } from "../language-services/contracts";
 import { toZeroBasedRange } from "../language-services/contracts";
 import { mapImportDiagnostic } from "../language-services/diagnostics";
 
+import { buildGlobalDecisionMap, makeResolveDecision } from "./decisionResolver";
 import { childId, runCel, type CompositionTrace, type TraceNode } from "./run";
-import { idOf } from "../ast/decisionSpine";
 
 /** Bump on any breaking change to the shapes below (the UI/agent contract). The C2c-2 `facts[].definedBy`
  *  addition is OPTIONAL/additive — existing consumers reading `name`/`conceptRef` are unaffected (no bump). */
@@ -130,9 +130,11 @@ export interface ActionView {
   target: ConceptView;
   qualifier?: "any" | "all";
   produced: boolean;
-  /** `use decision` only: true when a BARE same-library target was recursed in place (its sub-tree inlined as the
-   *  action node's `children`); false when it stays a leaf (a QUALIFIED cross-library target, an unresolved target,
-   *  or one on the delegation path → cycle). Absent for a `recommend activity` action. */
+  /** `use decision` only: true when the target RESOLVED and was recursed in place (its sub-tree inlined as the action
+   *  node's `children`) — a same-library target (bare or self-qualified) OR a resolvable cross-library qualified target
+   *  (#172). false only when it stays a leaf: an UNRESOLVED target (lib/sub not in the graph), one on the delegation
+   *  path (cycle), or when no resolver was supplied. Absent for a `recommend activity` action. For a recursed
+   *  cross-library target, `target.libraryName` carries the sub's owning library. */
   expanded?: boolean;
 }
 
@@ -226,13 +228,27 @@ function buildScenario(
     : null;
 
   const traceIndex = indexTrace(run.trace);
-  // Same-library resolver for `use decision` recursion — mirrors the CRE's. Cycle stack keyed `(lib,name)` (#172),
-  // seeded with the covered decision; `currentLib` (the covered library) stays constant while the cross-library guard
-  // still defers (todo-1), so the key is a 1:1 rename of the old bare-name key → byte-identical nodeId set + parity.
-  const resolve = (name: string): Decision | undefined => decisions.get(name);
+  // Lib-aware `use decision` resolver over the WHOLE graph — IDENTICAL to the CRE's (#172), so the VM recurses the same
+  // cross-library closure the trace did and the nodeId sets stay byte-identical (the golden parity invariant). Cycle
+  // stack keyed `(lib,name)`, seeded with the covered decision in the covered library.
   const rootLib = coveredLib ?? "";
+  const globalDecisionMap = buildGlobalDecisionMap({
+    crlRegistry: graph.crlRegistry,
+    coveredLib: rootLib,
+    coveredFilePath: filePath,
+    coveredStatements: [...decisions.values()],
+  });
+  const resolve = makeResolveDecision(globalDecisionMap);
   const tree = dec
-    ? walkBranchesVM(dec.body.statements, "", traceIndex, filePath, resolve, rootLib, new Set([idOf(rootLib, dec.name)]))
+    ? walkBranchesVM(
+        dec.body.statements,
+        "",
+        traceIndex,
+        filePath,
+        resolve,
+        rootLib,
+        new Set([idOf(rootLib, dec.name)]),
+      )
     : [];
 
   // produced summary derived from the tree's produced action nodes — each carries the correct per-node
@@ -316,7 +332,7 @@ function walkBranchesVM(
   parentId: string,
   traceIndex: Map<string, TraceNode>,
   filePath: string,
-  resolve: (name: string) => Decision | undefined,
+  resolve: LibAwareDecisionResolver,
   currentLib: string,
   stack: Set<string>,
 ): ViewNode[] {
@@ -374,22 +390,50 @@ function walkBodyVM(
   parentId: string,
   traceIndex: Map<string, TraceNode>,
   filePath: string,
-  resolve: (name: string) => Decision | undefined,
+  resolve: LibAwareDecisionResolver,
   currentLib: string,
   stack: Set<string>,
 ): ViewNode[] {
   if (body.type === "ActionStatement") {
-    return [buildActionVM(body, childId(parentId, "action[0]"), undefined, traceIndex, filePath, resolve, currentLib, stack)];
+    return [
+      buildActionVM(
+        body,
+        childId(parentId, "action[0]"),
+        undefined,
+        traceIndex,
+        filePath,
+        resolve,
+        currentLib,
+        stack,
+      ),
+    ];
   }
   const block = body as BlockBody;
   const isBranch = block.statements.some(
     (m) => m.type === "WhenBlock" || m.type === "OtherwiseBlock",
   );
   if (isBranch)
-    return walkBranchesVM(block.statements as BranchBlock[], parentId, traceIndex, filePath, resolve, currentLib, stack);
+    return walkBranchesVM(
+      block.statements as BranchBlock[],
+      parentId,
+      traceIndex,
+      filePath,
+      resolve,
+      currentLib,
+      stack,
+    );
   const qualifier = block.qualifier;
   return (block.statements as ActionStatement[]).map((stmt, j) =>
-    buildActionVM(stmt, childId(parentId, `action[${j}]`), qualifier, traceIndex, filePath, resolve, currentLib, stack),
+    buildActionVM(
+      stmt,
+      childId(parentId, `action[${j}]`),
+      qualifier,
+      traceIndex,
+      filePath,
+      resolve,
+      currentLib,
+      stack,
+    ),
   );
 }
 
@@ -399,7 +443,7 @@ function buildActionVM(
   qualifier: BlockQualifier | undefined,
   traceIndex: Map<string, TraceNode>,
   filePath: string,
-  resolve: (name: string) => Decision | undefined,
+  resolve: LibAwareDecisionResolver,
   currentLib: string,
   stack: Set<string>,
 ): ViewNode {
@@ -411,40 +455,54 @@ function buildActionVM(
     stmt.action.type === "RecommendActivity" ? "recommend-activity" : "use-decision";
   const guardedOut = t?.guardedOut === true;
 
-  // `use decision` recursion: STRUCTURALLY inline a BARE same-library target that resolves and is not on the
-  // delegation path (cycle) — independent of whether this action was reached, because the view-model is the FULL
-  // tree (the static spine: every branch/action, reached or not). This keeps the VM nodeId set byte-identical to
-  // decisionSpine's (the golden parity invariant). Per-node run state (evaluated/produced) is overlaid from the
-  // trace as usual. A use-decision node is NEVER itself `produced` — it delegates; its child RecommendActivity
-  // nodes carry the dispositions (REPLACE). A QUALIFIED (cross-library) or cyclic target stays a leaf (expanded:false).
+  // `use decision` recursion (#166 same-library, #172 cross-library): STRUCTURALLY inline a RESOLVABLE target (BARE in
+  // `currentLib`, or QUALIFIED in its explicit lib) that is not on the delegation path (cycle) — independent of whether
+  // this action was reached, because the view-model is the FULL tree (the static spine: every branch/action, reached or
+  // not). This keeps the VM nodeId set byte-identical to decisionSpine's + the CRE trace's (the golden parity
+  // invariant). A cross-library sub recurses in ITS OWN library + file (`resolved.lib`/`resolved.filePath`) so its
+  // spans point at its file and its own bare targets resolve there. Per-node run state (evaluated/produced) is overlaid
+  // from the trace. A use-decision node is NEVER itself `produced` — it delegates; its child RecommendActivity nodes
+  // carry the dispositions (REPLACE). An UNRESOLVED or cyclic target stays a leaf (expanded:false).
   let children: ViewNode[] | undefined;
   let expanded: boolean | undefined;
+  let expandedLib: string | undefined; // the sub's owning library when expanded — surfaced as target.libraryName (#175).
   if (actionKind === "use-decision") {
     expanded = false;
-    // (todo-1: this cross-library DEFERRAL GUARD is UNTOUCHED — todo-2 lifts it to recurse the sub into its own frame.)
-    if (stmt.action.type === "UseDecision" && !getRefLibrary(stmt.action.decisionName)) {
-      const subName = getRefName(stmt.action.decisionName);
-      // Cycle key is `(lib,name)` (#172). Same-library → `currentLib` is constant, so this is the old bare-name key renamed.
-      const subId = idOf(currentLib, subName);
-      const sub = stack.has(subId) ? undefined : resolve(subName);
-      if (sub) {
-        children = walkBranchesVM(
-          sub.body.statements,
-          nodeId,
-          traceIndex,
-          filePath,
-          resolve,
-          currentLib,
-          new Set([...stack, subId]),
-        );
-        expanded = true;
+    if (stmt.action.type === "UseDecision") {
+      const resolved = resolve(currentLib, stmt.action.decisionName);
+      if (resolved) {
+        // Cycle key is `(lib,name)` of the RESOLVED owning library (#172) — cross-library `A.Sub`/`B.Sub` are distinct.
+        const subId = idOf(resolved.lib, resolved.decision.name);
+        if (!stack.has(subId)) {
+          children = walkBranchesVM(
+            resolved.decision.body.statements,
+            nodeId,
+            traceIndex,
+            resolved.filePath,
+            resolve,
+            resolved.lib,
+            new Set([...stack, subId]),
+          );
+          expanded = true;
+          // Force a libraryName ONLY for a genuinely CROSS-library expansion. A BARE same-lib target keeps no
+          // libraryName (byte-identical to pre-#172). A SELF-qualified same-lib target (`"SQ"."Sub"` inside SQ) keeps
+          // whatever `conceptView` derived from its AST qualifier (here "SQ") — we don't override it; `resolved.lib ===
+          // currentLib` is benign for the #175 decomposer (`target.libraryName ?? frame.lib` → the same lib either way).
+          if (resolved.lib !== currentLib) expandedLib = resolved.lib;
+        }
       }
     }
   }
 
+  // When a cross-library sub is expanded, surface its owning library on `target.libraryName` (= resolved.lib) so the
+  // #175 decomposer re-roots `producedRuntimePathRefs` into the sub's frame. A qualified ref already carries this via
+  // conceptView; setting it from `resolved.lib` also covers the (today impossible, but defensive) bare cross-lib case.
+  const target = conceptView(actionRef);
+  if (expandedLib && !target.libraryName) target.libraryName = expandedLib;
+
   const action: ActionView = {
     actionKind,
-    target: conceptView(actionRef),
+    target,
     ...(qualifier === "any" || qualifier === "all" ? { qualifier } : {}),
     produced: actionKind === "use-decision" ? false : evaluated && !guardedOut,
     ...(actionKind === "use-decision" ? { expanded: expanded! } : {}),

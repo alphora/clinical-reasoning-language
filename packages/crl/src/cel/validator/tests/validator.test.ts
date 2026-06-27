@@ -653,6 +653,60 @@ describe("CEL #166 — transitive `use decision` arm cross-check", () => {
     });
   });
 
+  // #172: when the cross-library target's library IS in the project, its transitive arms become REACHABLE — the arms
+  // surface must span the cross-lib closure (else valid cross-lib cases would fail validate_cel). "Other" is a real
+  // sibling lib here, so "D" → "Other"."Sub" → recommend "B" makes "B" a valid arm of "D"; the "Sub" name still is not.
+  function sharedOtherLib(): string {
+    return [
+      "# Other",
+      "library \"Other\".",
+      "decision \"Sub\":",
+      "",
+      "- when \"P\" then recommend activity \"B\".",
+      "concept \"P\":",
+      "- type is Observation.",
+      "- value type is boolean.",
+      "- defined as \"P\".",
+      "activity \"B\":",
+      "- request CPGServiceRequest.",
+      "- with \"VS\".",
+      "terminology \"VS\":",
+      "- valueset is `urn:example:placeholder`.",
+    ].join("\n");
+  }
+
+  test("a RESOLVABLE cross-library use-decision's transitive arm validates (B reachable via Other.Sub) (#172)", () => {
+    withProject((root) => {
+      write(root, "lib.crl", xlibLib());
+      write(root, "other.crl", sharedOtherLib());
+      const file = write(root, "f.cel", [
+        ...ENC_FACT_HEADER,
+        "case \"C\":",
+        "- subject is \"Subject\".",
+        "- result is \"D\" is \"B\".", // B is the shared sub's disposition — now a reachable cross-lib arm
+      ].join("\n"));
+      const r = validateCELFile(file);
+      expect(r.errors.filter((e) => e.kind === "unresolved-result-branch")).toEqual([]);
+    });
+  });
+
+  test("the cross-library DELEGATION name 'Sub' is NOT an arm even when resolvable — REPLACE (#172)", () => {
+    withProject((root) => {
+      write(root, "lib.crl", xlibLib());
+      write(root, "other.crl", sharedOtherLib());
+      const file = write(root, "f.cel", [
+        ...ENC_FACT_HEADER,
+        "case \"C\":",
+        "- subject is \"Subject\".",
+        "- result is \"D\" is \"Sub\".", // a delegation is not a disposition — Sub's name is replaced by its arm (B)
+      ].join("\n"));
+      const r = validateCELFile(file);
+      const branchErrors = r.errors.filter((e) => e.kind === "unresolved-result-branch");
+      expect(branchErrors).toHaveLength(1);
+      expect(branchErrors[0].message).toContain("\"B\""); // the real cross-lib arm is offered
+    });
+  });
+
   function cyclicLib(): string {
     // D delegates to D2 and D2 back to D (a same-lib delegation cycle). Neither delegation name is a disposition.
     return [

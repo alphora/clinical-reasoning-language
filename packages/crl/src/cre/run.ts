@@ -30,18 +30,24 @@
  *    the per-action guards `unless "C"` / `only when "C"`.
  *  - Oracle: a decision-leaf `result is` passes iff the expected branch is in
  *    the produced set (membership — a case asserts one valid disposition).
- *  - `use decision` is EVALUATED transitively (#166): a BARE same-library target
- *    is recursed in place — the sub-decision's body is walked under the
- *    use-decision action's nodeId and its RecommendActivity determinations bubble
- *    into the SAME produced set (so the oracle sees the delegated disposition).
- *    The bare sub-decision NAME is NOT produced (a delegation is not a
- *    disposition — REPLACE semantics). A QUALIFIED (cross-library) target stays a
- *    leaf with a "deferred" diagnostic (transitive cross-library evaluation is
- *    out of scope). Delegation is cycle-guarded (a target already on the
- *    delegation path → a runtime-error status + a cycle diagnostic, no hang).
+ *  - `use decision` is EVALUATED transitively (#166 same-library; #172 cross-library):
+ *    a RESOLVABLE target is recursed in place — the sub-decision's body is walked
+ *    under the use-decision action's nodeId and its RecommendActivity determinations
+ *    bubble into the SAME produced set (so the oracle sees the delegated disposition).
+ *    A BARE target binds in the CURRENT frame's library; a QUALIFIED (cross-library)
+ *    target binds in its explicit library and recurses in a NEW frame
+ *    `{ currentLib: resolved.lib, currentFilePath: resolved.filePath }` — so the sub's
+ *    OWN bare `when`/guard concepts resolve in ITS library (closed-world; the
+ *    satisfying CEL fact must be `defined by "SubLib"."C"`) and its trace spans point
+ *    at its file. The sub-decision NAME is NOT produced (a delegation is not a
+ *    disposition — REPLACE semantics; the bubbled name is the sub's BARE activity
+ *    name). An UNRESOLVED cross-library target (lib/sub not in the graph) → a distinct
+ *    `unresolved-cross-lib` diagnostic; an unresolved same-library bare target → a
+ *    distinct not-found diagnostic. Delegation is cycle-guarded keyed `(lib,name)` (a
+ *    target already on the delegation path → a runtime-error status + a cycle
+ *    diagnostic, no hang) so cross-library `A.Sub`/`B.Sub` can't false-collide.
  */
-import type { CELCase, CELDefinedByField, CELFact, CELResultField } from "../cel/ast/types";
-import type { ResolvedCelGraph } from "../cel/imports/types";
+import { childId, idOf, nameOf } from "../ast/decisionSpine";
 import type {
   ActionGuard,
   ActionStatement,
@@ -60,13 +66,19 @@ import type {
   WhenBlockBody,
 } from "../ast/types";
 import { getRefLibrary, getRefName } from "../ast/types";
+import type { CELCase, CELDefinedByField, CELFact, CELResultField } from "../cel/ast/types";
+import type { ResolvedCelGraph } from "../cel/imports/types";
 import type { LsLocation } from "../language-services/contracts";
 import { toZeroBasedRange } from "../language-services/contracts";
 // childId + idOf/nameOf are single-sourced in ast/ (natural layer direction); re-exported here for existing consumers
 // (viewModel, etc.). idOf is the shared (lib,name) identity used by the global decision resolver and all 4 cycle keys;
 // nameOf is its tested inverse, used to render the delegation-cycle chain by name (byte-identical to the pre-#172 text).
-import { childId, idOf, nameOf } from "../ast/decisionSpine";
-import { buildGlobalDecisionMap, makeResolveDecision, type ResolvedDecision } from "./decisionResolver";
+
+import {
+  buildGlobalDecisionMap,
+  makeResolveDecision,
+  type ResolvedDecision,
+} from "./decisionResolver";
 export { childId };
 
 type Id = string;
@@ -97,13 +109,18 @@ export interface TraceNode {
   nodeId: string;
   kind: "when" | "otherwise" | "action";
   /** Source span of the originating CRL AST node, in the CURRENT frame's file (the covered/root file for same-library;
-   *  the sub-decision's own file once todo-2 recurses cross-library — sourced from `frame.currentFilePath`). */
+   *  the sub-decision's own file when a cross-library `use decision` recurses — sourced from `frame.currentFilePath`). */
   source: LsLocation;
   concept?: string;
   satisfied?: boolean;
   evaluated: boolean;
   guardedOut?: boolean;
-  guard?: { polarity: "unless" | "only-when"; concept: string; satisfied: boolean; composition?: CompositionTrace };
+  guard?: {
+    polarity: "unless" | "only-when";
+    concept: string;
+    satisfied: boolean;
+    composition?: CompositionTrace;
+  };
   facts?: string[];
   /** Present when the `when`/guard concept is `defined as` a composition. */
   composition?: CompositionTrace;
@@ -155,12 +172,12 @@ interface Ctx {
   produced: ProducedRec[];
   trace: TraceNode[];
   diagnostics: string[];
-  /** The covered library's decisions, by name — resolves a same-library `use decision` target for recursion. */
-  decisions: Map<string, Decision>;
-  /** Shared `(callerLib, ref) → ResolvedDecision` resolver over the WHOLE graph (#172). Same-library lookups return the
-   *  identical Decision `decisions.get(name)` did; the cross-library path is built but not yet recursed (todo-2). */
+  /** Shared `(callerLib, ref) → ResolvedDecision` resolver over the WHOLE graph (#172) — the ONLY decision lookup the
+   *  recursion uses. A same-library lookup returns the identical Decision the old flat covered-library map did; a
+   *  cross-library qualified ref resolves its sub in its own library. (The root-decision lookup in `runCase` reads its
+   *  own `decisions` map BEFORE Ctx is built, so no per-library decision map is stored on Ctx.) */
   resolveDecision: (callerLib: string, ref: ReferenceName) => ResolvedDecision | undefined;
-  /** The ROOT (covered) library — the frame `currentLib` is seeded with it; stays constant while the guards defer. */
+  /** The ROOT (covered) library — the frame `currentLib` is seeded with it; a cross-library sub pushes its OWN lib. */
   rootLib: string;
   /** `(lib,name)` keys on the current delegation path (cycle guard; seeded with `idOf(rootLib, rootDecisionName)`).
    *  Re-keyed from bare names to `(lib,name)` so a future cross-library `A.Sub`/`B.Sub` can't false-collide (#172). */
@@ -171,11 +188,12 @@ interface Ctx {
 
 /**
  * Per-frame recursion state threaded through walkBranches/executeBody/emitAction (like `delegationStack`), NOT stored on
- * the shared `Ctx` singleton — so a cross-library sub-frame (todo-2) can carry its OWN lib/file without leaking across
- * sibling branches. The root frame is `{ currentLib: rootLib, currentFilePath: <covered file> }`. While the 4 deferral
- * guards still defer cross-library (this slice), `currentLib === rootLib` and `currentFilePath === ctx.filePath`
- * throughout → byte-identical. todo-2 pushes `{ currentLib: sub.lib, currentFilePath: sub.filePath }` when it recurses
- * a cross-library sub (a one-line change at the recursion site).
+ * the shared `Ctx` singleton — so a cross-library sub-frame carries its OWN lib/file without leaking across sibling
+ * branches. The root frame is `{ currentLib: rootLib, currentFilePath: <covered file> }`. A same-library recursion keeps
+ * the frame unchanged (`resolved.lib === currentLib`) — the BARE same-lib form is byte-identical to pre-#172; a
+ * SELF-qualified same-lib target (`"SQ"."Sub"` inside SQ) now RESOLVES + evaluates too (a deliberate new evaluation, was
+ * deferred pre-#172), still in the same frame. A cross-library `use decision` pushes `{ currentLib: resolved.lib,
+ * currentFilePath: resolved.filePath }` for the sub's body (#172).
  */
 interface Frame {
   /** Resolves a BARE `when`/guard concept ref (run.ts conceptSatisfied) — the current sub-decision's library. */
@@ -219,8 +237,14 @@ function evalConcept(id: Id, ctx: Ctx): ConceptEval {
   return result;
 }
 
-function walkDefinedAs(body: DefinedAsBareRef | DefinedAsComposition, lib: string, ctx: Ctx): CompositionTrace {
-  return body.type === "DefinedAsBareRef" ? refTrace(body.ref, lib, ctx) : walkExpr(body.expression, lib, ctx);
+function walkDefinedAs(
+  body: DefinedAsBareRef | DefinedAsComposition,
+  lib: string,
+  ctx: Ctx,
+): CompositionTrace {
+  return body.type === "DefinedAsBareRef"
+    ? refTrace(body.ref, lib, ctx)
+    : walkExpr(body.expression, lib, ctx);
 }
 
 /** A composition operand reference resolves against the DEFINING concept's
@@ -234,7 +258,9 @@ function refTrace(ref: ReferenceName, lib: string, ctx: Ctx): CompositionTrace {
     // false under `sem-not` would invert to a spurious `true`. (A bare operand is
     // LOCAL to the defining library; cross-library operands must be qualified.)
     ctx.reportedUnresolved.add(id);
-    ctx.diagnostics.push(`composition operand ${labelOf(refLib, name)} resolves to no concept or fact`);
+    ctx.diagnostics.push(
+      `composition operand ${labelOf(refLib, name)} resolves to no concept or fact`,
+    );
   }
   const ev = evalConcept(id, ctx);
   return {
@@ -272,7 +298,7 @@ function conceptSatisfied(
   frame: Frame,
 ): { sat: boolean; facts: string[]; composition?: CompositionTrace } {
   // A bare `when`/guard ref resolves against the CURRENT decision's library (the frame). Same-library is the degenerate
-  // case `frame.currentLib === ctx.rootLib`; a cross-library sub (todo-2) carries its own lib so its bare refs bind there.
+  // case `frame.currentLib === ctx.rootLib`; a cross-library sub carries its own lib so its bare refs bind there (#172).
   const id = idOf(getRefLibrary(ref) ?? frame.currentLib, getRefName(ref));
   const ev = evalConcept(id, ctx);
   return {
@@ -308,18 +334,25 @@ function evalGuard(
   };
 }
 
-/** Source span of an AST node in the CURRENT frame's library file (the covered file at root; a sub's file when todo-2
- *  recurses cross-library). Carried per-frame, not from the shared Ctx, so a cross-library sub's spans point at ITS file. */
-const spanOf = (loc: Location, frame: Frame): LsLocation => ({ filePath: frame.currentFilePath, range: toZeroBasedRange(loc) });
+/** Source span of an AST node in the CURRENT frame's library file (the covered file at root; the sub's file when a
+ *  cross-library `use decision` recurses). Carried per-frame, not from the shared Ctx, so a sub's spans point at ITS file. */
+const spanOf = (loc: Location, frame: Frame): LsLocation => ({
+  filePath: frame.currentFilePath,
+  range: toZeroBasedRange(loc),
+});
 
 /**
  * Emit one action node (already past its guard) at `nodeId`. A `recommend activity` is a leaf disposition: its name
- * enters `produced`. A `use decision` DELEGATES:
- *  - BARE same-library target, resolvable, not on the delegation path → recurse the sub-decision's body UNDER this
- *    action's nodeId (children) with the name pushed on the delegation stack. The sub's RecommendActivity names bubble
- *    into the SAME `ctx.produced` (so the oracle sees the delegated disposition). The bare sub-name is NOT produced.
- *  - QUALIFIED (cross-library) target → leaf + a "deferred" diagnostic; not recursed, not produced.
+ * enters `produced`. A `use decision` DELEGATES (#166 same-library, #172 cross-library):
+ *  - RESOLVABLE target (BARE in the current frame's lib, or QUALIFIED in its explicit lib), not on the delegation path →
+ *    recurse the sub-decision's body UNDER this action's nodeId (children), pushing a NEW frame
+ *    `{ currentLib: resolved.lib, currentFilePath: resolved.filePath }` so the sub's bare when/guard resolve in ITS
+ *    library and its trace spans point at its file. The `(resolved.lib, name)` key is pushed on the delegation stack.
+ *    The sub's RecommendActivity names bubble into the SAME `ctx.produced` (the oracle sees the delegated disposition).
+ *    The sub-name itself is NOT produced (REPLACE).
  *  - target on the delegation path (cycle) → set `ctx.runtimeError` + a cycle diagnostic; not recursed.
+ *  - UNRESOLVED: a QUALIFIED target whose lib/sub is not in the graph → an `unresolved-cross-lib` diagnostic; a BARE
+ *    target not found in the current library → a distinct not-found diagnostic. Leaf; not produced.
  * Returns whether this action contributed at least one production to `ctx.produced` (for the all-guarded-out diagnostic).
  */
 function emitAction(
@@ -336,7 +369,14 @@ function emitAction(
   if (stmt.action.type === "RecommendActivity") {
     const name = recName(stmt.action);
     ctx.produced.push({ recommendation: name, viaWhen, qualifier });
-    into.push({ node: name, nodeId, kind: "action", source, evaluated: true, ...(guardInfo ? { guard: guardInfo } : {}) });
+    into.push({
+      node: name,
+      nodeId,
+      kind: "action",
+      source,
+      evaluated: true,
+      ...(guardInfo ? { guard: guardInfo } : {}),
+    });
     return true;
   }
   // UseDecision.
@@ -351,40 +391,54 @@ function emitAction(
     children: [],
   };
   into.push(node);
-  if (getRefLibrary(stmt.action.decisionName)) {
-    // Cross-library (qualified) → transitive evaluation deferred. Leaf; do NOT produce (no disposition determined).
-    // (todo-1: this DEFERRAL GUARD is UNTOUCHED — todo-2 lifts it to recurse via ctx.resolveDecision into the sub's frame.)
+  // Resolve via the shared global resolver (#172). A BARE target resolves against `frame.currentLib`; a QUALIFIED one
+  // against its explicit library, over the whole graph. For same-library this returns the byte-identical Decision the
+  // old flat covered-library map did.
+  const refLib = getRefLibrary(stmt.action.decisionName);
+  const resolved = ctx.resolveDecision(frame.currentLib, stmt.action.decisionName);
+  if (!resolved) {
+    // Leaf + diagnostic (don't crash, don't produce a phantom disposition). THREE distinct messages:
+    //  - a QUALIFIED target whose library/sub is not in the resolved graph → unresolved-cross-lib;
+    //  - a BARE target not found in the CURRENT frame's library → not-found-in-current-lib. Naming `frame.currentLib`
+    //    (not "the covered library") is load-bearing: a bare `use decision "Missing"` INSIDE a cross-library sub must
+    //    blame the SUB's library, not the covered policy (FIX 2).
+    if (refLib) {
+      ctx.diagnostics.push(
+        `cross-library \`use decision\` ${labelOf(refLib, name)}: target library or decision not found in the resolved graph`,
+      );
+    } else {
+      ctx.diagnostics.push(`\`use decision "${name}"\` target not found in library \`${frame.currentLib}\``);
+    }
+    return false;
+  }
+  // Cycle guard keyed `(lib,name)` of the RESOLVED owning library (#172) so cross-library `A.Sub`/`B.Sub` can't
+  // false-collide. For same-library `resolved.lib === frame.currentLib`, a 1:1 rename of the old bare-name key.
+  const subId = idOf(resolved.lib, resolved.decision.name);
+  if (ctx.delegationStack.has(subId)) {
+    ctx.runtimeError = true;
+    // Render the chain by NAME (not the (lib,name) key) so the message is byte-identical to the pre-#172 same-lib text.
     ctx.diagnostics.push(
-      `cross-library \`use decision\` ${labelOf(getRefLibrary(stmt.action.decisionName)!, name)}: transitive evaluation deferred`,
+      `decision delegation cycle: ${[...ctx.delegationStack, subId].map(nameOf).join(" → ")}`,
     );
     return false;
   }
-  // Cycle guard keyed `(lib,name)` (#172) so a future cross-library `A.Sub`/`B.Sub` can't false-collide. For the
-  // same-library path (the only recursion today) `frame.currentLib === ctx.rootLib`, so this is a 1:1 rename of the
-  // old bare-name key — cycle detection is byte-identical.
-  const subId = idOf(frame.currentLib, name);
-  if (ctx.delegationStack.has(subId)) {
-    ctx.runtimeError = true;
-    // Render the chain by NAME (not the (lib,name) key) so the message is byte-identical to the pre-#172 text.
-    ctx.diagnostics.push(`decision delegation cycle: ${[...ctx.delegationStack, subId].map(nameOf).join(" → ")}`);
-    return false;
-  }
-  // Resolve via the shared global resolver (#172). A BARE target resolves against `frame.currentLib`; for same-library
-  // this returns the byte-identical Decision the old flat `ctx.decisions.get(name)` did.
-  const resolved = ctx.resolveDecision(frame.currentLib, stmt.action.decisionName);
-  if (!resolved) {
-    // Same-library bare target not found — leaf + diagnostic (don't crash, don't produce a phantom disposition).
-    ctx.diagnostics.push(`\`use decision "${name}"\` target not found in the covered library`);
-    return false;
-  }
   // Recurse the sub-decision under this action's nodeId; its determinations bubble into ctx.produced. REPLACE: the
-  // bare sub-name itself is NOT produced (a delegation is not a disposition). try/finally so a throw in the recursion
-  // can't poison the delegation stack for sibling branches. The sub-frame keeps the SAME lib/file (same-library); todo-2
-  // pushes `{ currentLib: resolved.lib, currentFilePath: resolved.filePath }` here when it recurses cross-library.
+  // sub-name itself is NOT produced (a delegation is not a disposition). Push a NEW frame in the SUB'S library + file so
+  // its own bare when/guard resolve there (closed-world; the satisfying fact must be qualified `defined by "SubLib"."C"`)
+  // and its trace spans point at its file. For same-library the frame is unchanged → byte-identical. try/finally so a
+  // throw in the recursion can't poison the delegation stack for sibling branches.
+  const subFrame: Frame = { currentLib: resolved.lib, currentFilePath: resolved.filePath };
   const beforeCount = ctx.produced.length;
   ctx.delegationStack.add(subId);
   try {
-    walkBranches(resolved.decision.body.qualifier, resolved.decision.body.statements, ctx, frame, node.children!, nodeId);
+    walkBranches(
+      resolved.decision.body.qualifier,
+      resolved.decision.body.statements,
+      ctx,
+      subFrame,
+      node.children!,
+      nodeId,
+    );
   } finally {
     ctx.delegationStack.delete(subId);
   }
@@ -406,7 +460,9 @@ function executeBody(
     return;
   }
   const block: BlockBody = body;
-  const isBranch = block.statements.some((m) => m.type === "WhenBlock" || m.type === "OtherwiseBlock");
+  const isBranch = block.statements.some(
+    (m) => m.type === "WhenBlock" || m.type === "OtherwiseBlock",
+  );
   if (isBranch) {
     walkBranches(block.qualifier, block.statements as BranchBlock[], ctx, frame, into, parentId);
     return;
@@ -434,10 +490,11 @@ function executeBody(
       });
       continue;
     }
-    if (emitAction(stmt, viaWhen, block.qualifier ?? null, ctx, frame, into, nodeId, g.info)) produced++;
+    if (emitAction(stmt, viaWhen, block.qualifier ?? null, ctx, frame, into, nodeId, g.info))
+      produced++;
   }
   // Distinguish "every member was GUARD-EXCLUDED" (a real guarding outcome) from "the menu determined no recommendation"
-  // (e.g. a deferred cross-lib / cyclic / unresolved / empty same-lib `use decision`). Only the former is a guarding claim.
+  // (e.g. a cyclic / unresolved `use decision`, or a sub that itself produced nothing). Only the former is a guarding claim.
   if (block.statements.length > 0 && produced === 0 && !ctx.runtimeError) {
     if (guardExcluded === block.statements.length) {
       ctx.diagnostics.push(
@@ -578,7 +635,6 @@ function runCase(
     produced: [],
     trace: [],
     diagnostics,
-    decisions,
     resolveDecision,
     rootLib: coveredLib,
     // Seed the delegation cycle guard with `(rootLib, rootDecisionName)` — the `(lib,name)` re-key (#172). For the
@@ -586,8 +642,8 @@ function runCase(
     delegationStack: new Set([idOf(coveredLib, decisionName)]),
     runtimeError: false,
   };
-  // Root frame: the covered library + its file. While the 4 deferral guards still defer cross-library (this slice),
-  // `currentLib` stays `rootLib` and `currentFilePath` stays the covered file throughout → byte-identical.
+  // Root frame: the covered library + its file. A same-library recursion keeps this frame; a cross-library `use
+  // decision` pushes the sub's `{ currentLib, currentFilePath }` for its body (#172).
   const rootFrame: Frame = { currentLib: coveredLib, currentFilePath: filePath };
   walkBranches(decision.body.qualifier, decision.body.statements, ctx, rootFrame, ctx.trace, "");
 
@@ -622,7 +678,8 @@ function runCase(
 export function runCel(graph: ResolvedCelGraph): CelRunResult {
   const errors: string[] = [];
   if (!graph.cel) return { success: false, runs: [], errors: ["CEL did not parse"] };
-  if (!graph.coversTarget) return { success: false, runs: [], errors: ["`covers` target unresolved"] };
+  if (!graph.coversTarget)
+    return { success: false, runs: [], errors: ["`covers` target unresolved"] };
 
   const coveredLib = graph.coversTarget.name;
   if (coveredLib === null) {
@@ -636,7 +693,7 @@ export function runCel(graph: ResolvedCelGraph): CelRunResult {
   // Global `(lib,name)` decision map + the shared resolver over the WHOLE graph (#172). LOCAL-FIRST precedence matches
   // the provenance indexer (indexer.ts:11-13). The covered library's own decisions are added last → authoritative for
   // its name (and the only source on the inline-graph path where crlRegistry is absent). For a same-library `use
-  // decision` (the only recursion until todo-2) the resolver returns the byte-identical Decision `decisions` does.
+  // decision` the resolver returns the byte-identical Decision `decisions` does; a cross-library one binds in its lib.
   const globalDecisionMap = buildGlobalDecisionMap({
     crlRegistry: graph.crlRegistry,
     coveredLib,
@@ -658,7 +715,8 @@ export function runCel(graph: ResolvedCelGraph): CelRunResult {
     }
   };
   if (graph.crlRegistry) {
-    for (const e of graph.crlRegistry.byNamePackage.values()) if (e.name) addConcepts(e.name, e.ast);
+    for (const e of graph.crlRegistry.byNamePackage.values())
+      if (e.name) addConcepts(e.name, e.ast);
     for (const e of graph.crlRegistry.byNameLocal.values()) if (e.name) addConcepts(e.name, e.ast);
   }
   addConcepts(coveredLib, graph.coversTarget.ast);
@@ -671,7 +729,8 @@ export function runCel(graph: ResolvedCelGraph): CelRunResult {
   const filePath = graph.coversTarget.filePath;
   const runs: CaseRun[] = [];
   for (const s of graph.cel.statements) {
-    if (s.type === "CELCase") runs.push(runCase(s, decisions, facts, coveredLib, filePath, concepts, resolveDecision));
+    if (s.type === "CELCase")
+      runs.push(runCase(s, decisions, facts, coveredLib, filePath, concepts, resolveDecision));
   }
   return { success: true, runs, errors };
 }

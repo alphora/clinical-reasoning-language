@@ -222,5 +222,31 @@ concept "Y":
       );
       expect(err).toBeDefined();
     });
+
+    // #172 FIX 1 — the include-VISIBILITY gate for a cross-library `use decision` is validate_crl's job (disc 156): the
+    // CRE/validate_cel resolver sweeps the WHOLE registry + EVALUATES a non-included cross-lib target, BUT validate_crl
+    // must REJECT the encoding. A `use decision "Other"."Sub"` to a non-self, non-included library flags
+    // external-library-not-included exactly like a concept ref does (the same `checkRef` path, DECISION_REF_KINDS) — so
+    // the gate is NOT silently lost when run_decision/validate_cel proceed. (Pins referenceResolver.ts:334 + :418.)
+    it("FIX 1: a cross-library `use decision` to a non-included library fires external-library-not-included", () => {
+      const src = `# self-scope cross-lib use decision, not included
+library "Self".
+
+concept "P":
+- type is Observation.
+- value type is boolean.
+- defined as "P".
+
+decision "D":
+- when "P" then:
+  - use decision "Other"."Sub".
+  end.
+`;
+      const result = validateCRL(src);
+      const err = result.errors.find(
+        (e) => e.type === "Validation" && /external-library-not-included|"Other"/.test(e.message),
+      );
+      expect(err).toBeDefined();
+    });
   });
 });
