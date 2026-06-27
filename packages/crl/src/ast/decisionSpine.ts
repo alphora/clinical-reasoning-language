@@ -17,6 +17,23 @@ import { getRefLibrary, getRefName } from "./types";
 export const childId = (parent: string, seg: string): string => (parent ? `${parent}/${seg}` : seg);
 
 /**
+ * Injective key over a (library, name) pair — the shared identity used across the CRE trace, the static spine, the
+ * view-model, the transitive-arms walk, and the global decision resolver (#172). Names contain spaces (e.g. "Documented
+ * Nonunion"), so a space-joined key would collide ("A B"+"C" vs "A"+"B C"); JSON makes it injective. The only consumer
+ * that parses a key back is `nameOf` (below) — kept co-located + tested so the encoding is an explicit contract.
+ * Single-sourced HERE (ast/ layer) so cre/run, decisionArms, viewModel, and the resolver all key identically — a
+ * divergence would let `A.Sub` and `B.Sub` false-collide in a cross-library cycle guard (the #172 hazard).
+ */
+export const idOf = (lib: string, name: string): string => JSON.stringify([lib, name]);
+
+/**
+ * Inverse of `idOf` — recover the NAME from a `(lib, name)` key. The delegation-cycle diagnostic renders its chain by
+ * name; co-locating this TESTED inverse next to `idOf` makes the encoding a pinned contract (`nameOf(idOf(l, n)) === n`)
+ * instead of a fragile JSON-parse far from its origin.
+ */
+export const nameOf = (id: string): string => (JSON.parse(id) as [string, string])[1];
+
+/**
  * Static decision spine (provenance spec §5). Walks a Decision's full AST tree — ALL branches and actions, evaluated
  * or not — and assigns each sub-node the SAME `childId` path the CRE/scenario view-model assigns. Provenance addresses
  * decision sub-nodes (`CrlNodeRef.nodeId`) by these paths, so they MUST stay byte-identical to the view-model; that
@@ -45,9 +62,17 @@ export interface SpineNode {
 
 export type DecisionResolver = (name: string) => Decision | undefined;
 
-export function decisionSpine(decision: Decision, resolve?: DecisionResolver): SpineNode[] {
+/**
+ * The delegation cycle guard is keyed `idOf(lib, name)` (#172) — not the bare name — so a future cross-library
+ * `A.Sub`/`B.Sub` can't false-collide. `rootLib` is the covered/owning library; it stays CONSTANT through this walk
+ * because the cross-library guard (`getRefLibrary → leaf`) is UNTOUCHED in todo-1 (only same-library targets recurse).
+ * For same-library that makes `idOf(rootLib, name)` a 1:1 rename of the old bare-name key → byte-identical cycle
+ * detection. `rootLib` defaults to `""` so existing/non-recursive callers (provenance index, crlStructure) are
+ * unaffected — within a single walk the lib prefix is uniform, so detection is identical regardless of its value.
+ */
+export function decisionSpine(decision: Decision, resolve?: DecisionResolver, rootLib = ""): SpineNode[] {
   const out: SpineNode[] = [];
-  walkBranches(decision.body.statements, "", out, resolve, new Set([decision.name]));
+  walkBranches(decision.body.statements, "", out, resolve, rootLib, new Set([idOf(rootLib, decision.name)]));
   return out;
 }
 
@@ -56,17 +81,18 @@ function walkBranches(
   parentId: string,
   out: SpineNode[],
   resolve: DecisionResolver | undefined,
+  currentLib: string,
   stack: Set<string>,
 ): void {
   branches.forEach((b, i) => {
     if (b.type === "OtherwiseBlock") {
       const nodeId = childId(parentId, "otherwise");
       out.push({ nodeId, kind: "otherwise", node: b });
-      walkBody(b.body, nodeId, out, resolve, stack);
+      walkBody(b.body, nodeId, out, resolve, currentLib, stack);
     } else {
       const nodeId = childId(parentId, `when[${i}]`);
       out.push({ nodeId, kind: "when", node: b });
-      walkBody(b.body, nodeId, out, resolve, stack);
+      walkBody(b.body, nodeId, out, resolve, currentLib, stack);
     }
   });
 }
@@ -76,10 +102,11 @@ function walkBody(
   parentId: string,
   out: SpineNode[],
   resolve: DecisionResolver | undefined,
+  currentLib: string,
   stack: Set<string>,
 ): void {
   if (body.type === "ActionStatement") {
-    pushAction(body, childId(parentId, "action[0]"), out, resolve, stack);
+    pushAction(body, childId(parentId, "action[0]"), out, resolve, currentLib, stack);
     return;
   }
   const block = body as BlockBody;
@@ -87,11 +114,11 @@ function walkBody(
     (m) => m.type === "WhenBlock" || m.type === "OtherwiseBlock",
   );
   if (isBranch) {
-    walkBranches(block.statements as BranchBlock[], parentId, out, resolve, stack);
+    walkBranches(block.statements as BranchBlock[], parentId, out, resolve, currentLib, stack);
     return;
   }
   (block.statements as ActionStatement[]).forEach((stmt, j) => {
-    pushAction(stmt, childId(parentId, `action[${j}]`), out, resolve, stack);
+    pushAction(stmt, childId(parentId, `action[${j}]`), out, resolve, currentLib, stack);
   });
 }
 
@@ -101,15 +128,18 @@ function pushAction(
   nodeId: string,
   out: SpineNode[],
   resolve: DecisionResolver | undefined,
+  currentLib: string,
   stack: Set<string>,
 ): void {
   out.push({ nodeId, kind: "action", node: stmt });
   if (!resolve || stmt.action.type !== "UseDecision") return;
   // Recurse ONLY a bare (same-library) target not already on the delegation path. Qualified → cross-library (leaf).
+  // (todo-1: this DEFERRAL GUARD is UNTOUCHED — todo-2 lifts it to recurse cross-library into the sub's lib frame.)
   if (getRefLibrary(stmt.action.decisionName)) return;
   const name = getRefName(stmt.action.decisionName);
-  if (stack.has(name)) return;
+  // Cycle key is `(lib,name)` (#172). Same-library → `currentLib` is constant, so this is the old bare-name key renamed.
+  if (stack.has(idOf(currentLib, name))) return;
   const sub = resolve(name);
   if (!sub) return;
-  walkBranches(sub.body.statements, nodeId, out, resolve, new Set([...stack, name]));
+  walkBranches(sub.body.statements, nodeId, out, resolve, currentLib, new Set([...stack, idOf(currentLib, name)]));
 }

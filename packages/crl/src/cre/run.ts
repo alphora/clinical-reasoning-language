@@ -62,15 +62,14 @@ import type {
 import { getRefLibrary, getRefName } from "../ast/types";
 import type { LsLocation } from "../language-services/contracts";
 import { toZeroBasedRange } from "../language-services/contracts";
-// childId is single-sourced in ast/ (natural layer direction); re-exported here for existing consumers (viewModel, etc.).
-import { childId } from "../ast/decisionSpine";
+// childId + idOf/nameOf are single-sourced in ast/ (natural layer direction); re-exported here for existing consumers
+// (viewModel, etc.). idOf is the shared (lib,name) identity used by the global decision resolver and all 4 cycle keys;
+// nameOf is its tested inverse, used to render the delegation-cycle chain by name (byte-identical to the pre-#172 text).
+import { childId, idOf, nameOf } from "../ast/decisionSpine";
+import { buildGlobalDecisionMap, makeResolveDecision, type ResolvedDecision } from "./decisionResolver";
 export { childId };
 
 type Id = string;
-// Injective key over (library, name). Names contain spaces (e.g. "Documented
-// Nonunion"), so a space-joined key collides ("A B"+"C" vs "A"+"B C"); JSON makes
-// it injective. We never parse an id back — readable forms use labelOf.
-const idOf = (lib: string, name: string): Id => JSON.stringify([lib, name]);
 const labelOf = (lib: string, name: string): string => `"${lib}"."${name}"`;
 
 export interface ProducedRec {
@@ -97,7 +96,8 @@ export interface TraceNode {
    *  onto the AST by. Single-sourced with the view-model walker via the same index-path scheme. */
   nodeId: string;
   kind: "when" | "otherwise" | "action";
-  /** Source span of the originating CRL AST node, in the covered library's file. */
+  /** Source span of the originating CRL AST node, in the CURRENT frame's file (the covered/root file for same-library;
+   *  the sub-decision's own file once todo-2 recurses cross-library — sourced from `frame.currentFilePath`). */
   source: LsLocation;
   concept?: string;
   satisfied?: boolean;
@@ -142,9 +142,8 @@ interface Ctx {
   factsByConcept: Map<Id, string[]>;
   /** All concept definitions in the closure, by id, with their owning library. */
   concepts: Map<Id, ConceptEntry>;
-  coveredLib: string;
-  /** Absolute path of the covered CRL library — the source file every decision tree node belongs to. */
-  filePath: string;
+  // NOTE: the covered-library identity + file moved off Ctx in the #172 frame migration — the library is now `rootLib`
+  // and the per-node file is `frame.currentFilePath` (the root file for same-lib; the sub's file once todo-2 recurses).
   /** Per-case memo of concept satisfaction (composition can re-reference). */
   cache: Map<Id, ConceptEval>;
   /** Concepts currently on the evaluation stack — cycle guard. */
@@ -158,10 +157,31 @@ interface Ctx {
   diagnostics: string[];
   /** The covered library's decisions, by name — resolves a same-library `use decision` target for recursion. */
   decisions: Map<string, Decision>;
-  /** Decision names on the current delegation path (cycle guard; seeded with the covered decision name). */
-  delegationStack: Set<string>;
+  /** Shared `(callerLib, ref) → ResolvedDecision` resolver over the WHOLE graph (#172). Same-library lookups return the
+   *  identical Decision `decisions.get(name)` did; the cross-library path is built but not yet recursed (todo-2). */
+  resolveDecision: (callerLib: string, ref: ReferenceName) => ResolvedDecision | undefined;
+  /** The ROOT (covered) library — the frame `currentLib` is seeded with it; stays constant while the guards defer. */
+  rootLib: string;
+  /** `(lib,name)` keys on the current delegation path (cycle guard; seeded with `idOf(rootLib, rootDecisionName)`).
+   *  Re-keyed from bare names to `(lib,name)` so a future cross-library `A.Sub`/`B.Sub` can't false-collide (#172). */
+  delegationStack: Set<Id>;
   /** Set when delegation hit a cycle — the case run reports `status: "error"` (no pass/fail) rather than a partial result. */
   runtimeError: boolean;
+}
+
+/**
+ * Per-frame recursion state threaded through walkBranches/executeBody/emitAction (like `delegationStack`), NOT stored on
+ * the shared `Ctx` singleton — so a cross-library sub-frame (todo-2) can carry its OWN lib/file without leaking across
+ * sibling branches. The root frame is `{ currentLib: rootLib, currentFilePath: <covered file> }`. While the 4 deferral
+ * guards still defer cross-library (this slice), `currentLib === rootLib` and `currentFilePath === ctx.filePath`
+ * throughout → byte-identical. todo-2 pushes `{ currentLib: sub.lib, currentFilePath: sub.filePath }` when it recurses
+ * a cross-library sub (a one-line change at the recursion site).
+ */
+interface Frame {
+  /** Resolves a BARE `when`/guard concept ref (run.ts conceptSatisfied) — the current sub-decision's library. */
+  currentLib: string;
+  /** The file a node's source span points at (spanOf) — the current sub-decision's file. */
+  currentFilePath: string;
 }
 
 /**
@@ -249,9 +269,11 @@ function walkExpr(expr: CompositionExpression, lib: string, ctx: Ctx): Compositi
 function conceptSatisfied(
   ref: ReferenceName,
   ctx: Ctx,
+  frame: Frame,
 ): { sat: boolean; facts: string[]; composition?: CompositionTrace } {
-  // A `when`/guard ref resolves against the covered decision's library when bare.
-  const id = idOf(getRefLibrary(ref) ?? ctx.coveredLib, getRefName(ref));
+  // A bare `when`/guard ref resolves against the CURRENT decision's library (the frame). Same-library is the degenerate
+  // case `frame.currentLib === ctx.rootLib`; a cross-library sub (todo-2) carries its own lib so its bare refs bind there.
+  const id = idOf(getRefLibrary(ref) ?? frame.currentLib, getRefName(ref));
   const ev = evalConcept(id, ctx);
   return {
     sat: ev.sat,
@@ -270,9 +292,10 @@ export function recName(action: ActionStatement["action"]): string {
 function evalGuard(
   guard: ActionGuard | undefined,
   ctx: Ctx,
+  frame: Frame,
 ): { excluded: boolean; info?: TraceNode["guard"] } {
   if (!guard) return { excluded: false };
-  const { sat, composition } = conceptSatisfied(guard.conceptName, ctx);
+  const { sat, composition } = conceptSatisfied(guard.conceptName, ctx, frame);
   const excluded = guard.polarity === "unless" ? sat : !sat;
   return {
     excluded,
@@ -285,8 +308,9 @@ function evalGuard(
   };
 }
 
-/** Source span of an AST node in the covered library file. */
-const spanOf = (loc: Location, ctx: Ctx): LsLocation => ({ filePath: ctx.filePath, range: toZeroBasedRange(loc) });
+/** Source span of an AST node in the CURRENT frame's library file (the covered file at root; a sub's file when todo-2
+ *  recurses cross-library). Carried per-frame, not from the shared Ctx, so a cross-library sub's spans point at ITS file. */
+const spanOf = (loc: Location, frame: Frame): LsLocation => ({ filePath: frame.currentFilePath, range: toZeroBasedRange(loc) });
 
 /**
  * Emit one action node (already past its guard) at `nodeId`. A `recommend activity` is a leaf disposition: its name
@@ -303,11 +327,12 @@ function emitAction(
   viaWhen: string | null,
   qualifier: BlockQualifier | null,
   ctx: Ctx,
+  frame: Frame,
   into: TraceNode[],
   nodeId: string,
   guardInfo?: TraceNode["guard"],
 ): boolean {
-  const source = spanOf(stmt.location, ctx);
+  const source = spanOf(stmt.location, frame);
   if (stmt.action.type === "RecommendActivity") {
     const name = recName(stmt.action);
     ctx.produced.push({ recommendation: name, viaWhen, qualifier });
@@ -328,46 +353,62 @@ function emitAction(
   into.push(node);
   if (getRefLibrary(stmt.action.decisionName)) {
     // Cross-library (qualified) → transitive evaluation deferred. Leaf; do NOT produce (no disposition determined).
+    // (todo-1: this DEFERRAL GUARD is UNTOUCHED — todo-2 lifts it to recurse via ctx.resolveDecision into the sub's frame.)
     ctx.diagnostics.push(
       `cross-library \`use decision\` ${labelOf(getRefLibrary(stmt.action.decisionName)!, name)}: transitive evaluation deferred`,
     );
     return false;
   }
-  if (ctx.delegationStack.has(name)) {
+  // Cycle guard keyed `(lib,name)` (#172) so a future cross-library `A.Sub`/`B.Sub` can't false-collide. For the
+  // same-library path (the only recursion today) `frame.currentLib === ctx.rootLib`, so this is a 1:1 rename of the
+  // old bare-name key — cycle detection is byte-identical.
+  const subId = idOf(frame.currentLib, name);
+  if (ctx.delegationStack.has(subId)) {
     ctx.runtimeError = true;
-    ctx.diagnostics.push(`decision delegation cycle: ${[...ctx.delegationStack, name].join(" → ")}`);
+    // Render the chain by NAME (not the (lib,name) key) so the message is byte-identical to the pre-#172 text.
+    ctx.diagnostics.push(`decision delegation cycle: ${[...ctx.delegationStack, subId].map(nameOf).join(" → ")}`);
     return false;
   }
-  const sub = ctx.decisions.get(name);
-  if (!sub) {
+  // Resolve via the shared global resolver (#172). A BARE target resolves against `frame.currentLib`; for same-library
+  // this returns the byte-identical Decision the old flat `ctx.decisions.get(name)` did.
+  const resolved = ctx.resolveDecision(frame.currentLib, stmt.action.decisionName);
+  if (!resolved) {
     // Same-library bare target not found — leaf + diagnostic (don't crash, don't produce a phantom disposition).
     ctx.diagnostics.push(`\`use decision "${name}"\` target not found in the covered library`);
     return false;
   }
   // Recurse the sub-decision under this action's nodeId; its determinations bubble into ctx.produced. REPLACE: the
   // bare sub-name itself is NOT produced (a delegation is not a disposition). try/finally so a throw in the recursion
-  // can't poison the delegation stack for sibling branches.
+  // can't poison the delegation stack for sibling branches. The sub-frame keeps the SAME lib/file (same-library); todo-2
+  // pushes `{ currentLib: resolved.lib, currentFilePath: resolved.filePath }` here when it recurses cross-library.
   const beforeCount = ctx.produced.length;
-  ctx.delegationStack.add(name);
+  ctx.delegationStack.add(subId);
   try {
-    walkBranches(sub.body.qualifier, sub.body.statements, ctx, node.children!, nodeId);
+    walkBranches(resolved.decision.body.qualifier, resolved.decision.body.statements, ctx, frame, node.children!, nodeId);
   } finally {
-    ctx.delegationStack.delete(name);
+    ctx.delegationStack.delete(subId);
   }
   return ctx.produced.length > beforeCount;
 }
 
-function executeBody(body: WhenBlockBody, viaWhen: string | null, ctx: Ctx, into: TraceNode[], parentId: string): void {
+function executeBody(
+  body: WhenBlockBody,
+  viaWhen: string | null,
+  ctx: Ctx,
+  frame: Frame,
+  into: TraceNode[],
+  parentId: string,
+): void {
   if (ctx.runtimeError) return; // a delegation cycle short-circuits the rest of the walk — no further productions/trace
   if (body.type === "ActionStatement") {
     // Inline single action — the grammar forbids a guard here.
-    emitAction(body, viaWhen, null, ctx, into, childId(parentId, "action[0]"));
+    emitAction(body, viaWhen, null, ctx, frame, into, childId(parentId, "action[0]"));
     return;
   }
   const block: BlockBody = body;
   const isBranch = block.statements.some((m) => m.type === "WhenBlock" || m.type === "OtherwiseBlock");
   if (isBranch) {
-    walkBranches(block.qualifier, block.statements as BranchBlock[], ctx, into, parentId);
+    walkBranches(block.qualifier, block.statements as BranchBlock[], ctx, frame, into, parentId);
     return;
   }
   // Action menu (`any:` / `all:` / single).
@@ -379,21 +420,21 @@ function executeBody(body: WhenBlockBody, viaWhen: string | null, ctx: Ctx, into
     const stmt = items[j];
     const name = recName(stmt.action);
     const nodeId = childId(parentId, `action[${j}]`);
-    const g = evalGuard(stmt.guard, ctx);
+    const g = evalGuard(stmt.guard, ctx, frame);
     if (g.excluded) {
       guardExcluded++;
       into.push({
         node: name,
         nodeId,
         kind: "action",
-        source: spanOf(stmt.location, ctx),
+        source: spanOf(stmt.location, frame),
         evaluated: true,
         guardedOut: true,
         guard: g.info,
       });
       continue;
     }
-    if (emitAction(stmt, viaWhen, block.qualifier ?? null, ctx, into, nodeId, g.info)) produced++;
+    if (emitAction(stmt, viaWhen, block.qualifier ?? null, ctx, frame, into, nodeId, g.info)) produced++;
   }
   // Distinguish "every member was GUARD-EXCLUDED" (a real guarding outcome) from "the menu determined no recommendation"
   // (e.g. a deferred cross-lib / cyclic / unresolved / empty same-lib `use decision`). Only the former is a guarding claim.
@@ -414,6 +455,7 @@ function walkBranches(
   qualifier: BlockQualifier | undefined,
   branches: BranchBlock[],
   ctx: Ctx,
+  frame: Frame,
   into: TraceNode[],
   parentId: string,
 ): void {
@@ -428,22 +470,22 @@ function walkBranches(
         node: "otherwise",
         nodeId,
         kind: "otherwise",
-        source: spanOf(b.location, ctx),
+        source: spanOf(b.location, frame),
         evaluated: true,
         children: [],
       };
       into.push(node);
-      executeBody(b.body, null, ctx, node.children!, nodeId);
+      executeBody(b.body, null, ctx, frame, node.children!, nodeId);
       if (ordered) return;
       continue;
     }
-    const { sat, facts, composition } = conceptSatisfied(b.conceptName, ctx);
+    const { sat, facts, composition } = conceptSatisfied(b.conceptName, ctx, frame);
     const nodeId = childId(parentId, `when[${i}]`);
     const node: TraceNode = {
       node: `when ${getRefName(b.conceptName)}`,
       nodeId,
       kind: "when",
-      source: spanOf(b.location, ctx),
+      source: spanOf(b.location, frame),
       concept: getRefName(b.conceptName),
       satisfied: sat,
       evaluated: true,
@@ -453,7 +495,7 @@ function walkBranches(
     };
     into.push(node);
     if (sat) {
-      executeBody(b.body, getRefName(b.conceptName), ctx, node.children!, nodeId);
+      executeBody(b.body, getRefName(b.conceptName), ctx, frame, node.children!, nodeId);
       if (ordered) return; // first match wins — remaining branches are not evaluated.
     }
   }
@@ -466,6 +508,7 @@ function runCase(
   coveredLib: string,
   filePath: string,
   concepts: Map<Id, ConceptEntry>,
+  resolveDecision: (callerLib: string, ref: ReferenceName) => ResolvedDecision | undefined,
 ): CaseRun {
   const diagnostics: string[] = [];
   let subjectFact: string | undefined;
@@ -528,8 +571,6 @@ function runCase(
     directFacts,
     factsByConcept,
     concepts,
-    coveredLib,
-    filePath,
     cache: new Map(),
     stack: new Set(),
     cycleHits: 0,
@@ -538,10 +579,17 @@ function runCase(
     trace: [],
     diagnostics,
     decisions,
-    delegationStack: new Set([decisionName]),
+    resolveDecision,
+    rootLib: coveredLib,
+    // Seed the delegation cycle guard with `(rootLib, rootDecisionName)` — the `(lib,name)` re-key (#172). For the
+    // same-library recursion this is a 1:1 rename of the old bare-name seed.
+    delegationStack: new Set([idOf(coveredLib, decisionName)]),
     runtimeError: false,
   };
-  walkBranches(decision.body.qualifier, decision.body.statements, ctx, ctx.trace, "");
+  // Root frame: the covered library + its file. While the 4 deferral guards still defer cross-library (this slice),
+  // `currentLib` stays `rootLib` and `currentFilePath` stays the covered file throughout → byte-identical.
+  const rootFrame: Frame = { currentLib: coveredLib, currentFilePath: filePath };
+  walkBranches(decision.body.qualifier, decision.body.statements, ctx, rootFrame, ctx.trace, "");
 
   if (ctx.runtimeError) {
     // A delegation cycle (or other runtime fault) makes the produced set unreliable — report `error`, not pass/fail,
@@ -585,6 +633,18 @@ export function runCel(graph: ResolvedCelGraph): CelRunResult {
     if (s.type === "Decision") decisions.set(s.name, s);
   }
 
+  // Global `(lib,name)` decision map + the shared resolver over the WHOLE graph (#172). LOCAL-FIRST precedence matches
+  // the provenance indexer (indexer.ts:11-13). The covered library's own decisions are added last → authoritative for
+  // its name (and the only source on the inline-graph path where crlRegistry is absent). For a same-library `use
+  // decision` (the only recursion until todo-2) the resolver returns the byte-identical Decision `decisions` does.
+  const globalDecisionMap = buildGlobalDecisionMap({
+    crlRegistry: graph.crlRegistry,
+    coveredLib,
+    coveredFilePath: graph.coversTarget.filePath,
+    coveredStatements: [...decisions.values()],
+  });
+  const resolveDecision = makeResolveDecision(globalDecisionMap);
+
   // Concept definitions across the resolved closure — needed to evaluate
   // `defined as` operands (bare = local to the defining library; qualified =
   // an explicit library). Built from the covered library (covers the inline-
@@ -611,7 +671,7 @@ export function runCel(graph: ResolvedCelGraph): CelRunResult {
   const filePath = graph.coversTarget.filePath;
   const runs: CaseRun[] = [];
   for (const s of graph.cel.statements) {
-    if (s.type === "CELCase") runs.push(runCase(s, decisions, facts, coveredLib, filePath, concepts));
+    if (s.type === "CELCase") runs.push(runCase(s, decisions, facts, coveredLib, filePath, concepts, resolveDecision));
   }
   return { success: true, runs, errors };
 }

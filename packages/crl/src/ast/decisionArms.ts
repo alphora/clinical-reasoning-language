@@ -5,6 +5,7 @@
 // of truth with `validateResult`.
 import type { ActionStatement, BlockBody, BranchBlock, Decision, WhenBlockBody } from "./types";
 import { getRefLibrary, getRefName } from "./types";
+import { idOf } from "./decisionSpine";
 
 export function collectDecisionArms(decision: Decision): Set<string> {
   const arms = new Set<string>();
@@ -30,11 +31,15 @@ export type DecisionResolver = (name: string) => Decision | undefined;
 export function collectDecisionArmsTransitive(
   decision: Decision,
   resolve: DecisionResolver,
-  seen: Set<string> = new Set([decision.name]),
+  // `callerLib` BEFORE `seen` so the default seed is correctly `(callerLib, name)`-keyed (#172) — the validator caller
+  // passes neither → "" → byte-identical to the old bare-name seed, but todo-2 threading the real lib makes the arms
+  // surface lib-keyed without touching the seed.
+  callerLib = "",
+  seen: Set<string> = new Set([idOf(callerLib, decision.name)]),
 ): Set<string> {
   const arms = new Set<string>();
   for (const branch of decision.body.statements) {
-    walkArmsBranchTransitive(branch, arms, resolve, seen);
+    walkArmsBranchTransitive(branch, arms, resolve, seen, callerLib);
   }
   return arms;
 }
@@ -44,8 +49,9 @@ function walkArmsBranchTransitive(
   arms: Set<string>,
   resolve: DecisionResolver,
   seen: Set<string>,
+  callerLib: string,
 ): void {
-  walkArmsWhenBlockBodyTransitive(branch.body, arms, resolve, seen);
+  walkArmsWhenBlockBodyTransitive(branch.body, arms, resolve, seen, callerLib);
 }
 
 function walkArmsWhenBlockBodyTransitive(
@@ -53,17 +59,18 @@ function walkArmsWhenBlockBodyTransitive(
   arms: Set<string>,
   resolve: DecisionResolver,
   seen: Set<string>,
+  callerLib: string,
 ): void {
   if (body.type === "BlockBody") {
     for (const stmt of body.statements) {
       if (stmt.type === "WhenBlock" || stmt.type === "OtherwiseBlock") {
-        walkArmsBranchTransitive(stmt, arms, resolve, seen);
+        walkArmsBranchTransitive(stmt, arms, resolve, seen, callerLib);
       } else {
-        walkArmsActionStatementTransitive(stmt as ActionStatement, arms, resolve, seen);
+        walkArmsActionStatementTransitive(stmt as ActionStatement, arms, resolve, seen, callerLib);
       }
     }
   } else {
-    walkArmsActionStatementTransitive(body as ActionStatement, arms, resolve, seen);
+    walkArmsActionStatementTransitive(body as ActionStatement, arms, resolve, seen, callerLib);
   }
 }
 
@@ -72,6 +79,7 @@ function walkArmsActionStatementTransitive(
   arms: Set<string>,
   resolve: DecisionResolver,
   seen: Set<string>,
+  callerLib: string,
 ): void {
   const action = stmt.action;
   if (action.type === "RecommendActivity") {
@@ -84,12 +92,15 @@ function walkArmsActionStatementTransitive(
   // DROPPED, contributing NO arm — because the CRE produces nothing in those cases, so offering the name as a valid
   // arm here would diverge validate_cel from run_decision (the #166 bug). A disposition that can't be determined is
   // not a valid arm.
+  // (todo-1: this cross-library DEFERRAL GUARD is UNTOUCHED — todo-2 lifts it to recurse the sub's transitive arms.)
   const name = getRefName(action.decisionName);
   if (!name) return;
-  if (getRefLibrary(action.decisionName) || seen.has(name)) return;
+  // Cycle key is `(lib,name)` (#172) so a future cross-library `A.Sub`/`B.Sub` can't false-collide. Same-library →
+  // `callerLib` is constant (the guard still defers cross-library), so this is the old bare-name key renamed.
+  if (getRefLibrary(action.decisionName) || seen.has(idOf(callerLib, name))) return;
   const sub = resolve(name);
   if (!sub) return;
-  const subArms = collectDecisionArmsTransitive(sub, resolve, new Set([...seen, name]));
+  const subArms = collectDecisionArmsTransitive(sub, resolve, callerLib, new Set([...seen, idOf(callerLib, name)]));
   for (const a of subArms) arms.add(a);
 }
 

@@ -31,6 +31,7 @@ import { toZeroBasedRange } from "../language-services/contracts";
 import { mapImportDiagnostic } from "../language-services/diagnostics";
 
 import { childId, runCel, type CompositionTrace, type TraceNode } from "./run";
+import { idOf } from "../ast/decisionSpine";
 
 /** Bump on any breaking change to the shapes below (the UI/agent contract). The C2c-2 `facts[].definedBy`
  *  addition is OPTIONAL/additive — existing consumers reading `name`/`conceptRef` are unaffected (no bump). */
@@ -225,10 +226,13 @@ function buildScenario(
     : null;
 
   const traceIndex = indexTrace(run.trace);
-  // Same-library resolver for `use decision` recursion — mirrors the CRE's. Seeded cycle stack = the covered decision.
+  // Same-library resolver for `use decision` recursion — mirrors the CRE's. Cycle stack keyed `(lib,name)` (#172),
+  // seeded with the covered decision; `currentLib` (the covered library) stays constant while the cross-library guard
+  // still defers (todo-1), so the key is a 1:1 rename of the old bare-name key → byte-identical nodeId set + parity.
   const resolve = (name: string): Decision | undefined => decisions.get(name);
+  const rootLib = coveredLib ?? "";
   const tree = dec
-    ? walkBranchesVM(dec.body.statements, "", traceIndex, filePath, resolve, new Set([dec.name]))
+    ? walkBranchesVM(dec.body.statements, "", traceIndex, filePath, resolve, rootLib, new Set([idOf(rootLib, dec.name)]))
     : [];
 
   // produced summary derived from the tree's produced action nodes — each carries the correct per-node
@@ -313,6 +317,7 @@ function walkBranchesVM(
   traceIndex: Map<string, TraceNode>,
   filePath: string,
   resolve: (name: string) => Decision | undefined,
+  currentLib: string,
   stack: Set<string>,
 ): ViewNode[] {
   const out: ViewNode[] = [];
@@ -330,7 +335,7 @@ function walkBranchesVM(
         label: "otherwise",
         source: span(b.location, filePath),
         evaluated: !!t,
-        children: walkBodyVM(b.body, nodeId, traceIndex, filePath, resolve, stack),
+        children: walkBodyVM(b.body, nodeId, traceIndex, filePath, resolve, currentLib, stack),
       };
       if (!t && priorMatch) node.unreachedReason = "preempted";
       if (t) priorMatch = true;
@@ -355,7 +360,7 @@ function walkBranchesVM(
       source: span(b.location, filePath),
       evaluated: !!t,
       condition,
-      children: walkBodyVM(b.body, nodeId, traceIndex, filePath, resolve, stack),
+      children: walkBodyVM(b.body, nodeId, traceIndex, filePath, resolve, currentLib, stack),
     };
     if (!t && priorMatch) node.unreachedReason = "preempted";
     if (t?.satisfied) priorMatch = true;
@@ -370,20 +375,21 @@ function walkBodyVM(
   traceIndex: Map<string, TraceNode>,
   filePath: string,
   resolve: (name: string) => Decision | undefined,
+  currentLib: string,
   stack: Set<string>,
 ): ViewNode[] {
   if (body.type === "ActionStatement") {
-    return [buildActionVM(body, childId(parentId, "action[0]"), undefined, traceIndex, filePath, resolve, stack)];
+    return [buildActionVM(body, childId(parentId, "action[0]"), undefined, traceIndex, filePath, resolve, currentLib, stack)];
   }
   const block = body as BlockBody;
   const isBranch = block.statements.some(
     (m) => m.type === "WhenBlock" || m.type === "OtherwiseBlock",
   );
   if (isBranch)
-    return walkBranchesVM(block.statements as BranchBlock[], parentId, traceIndex, filePath, resolve, stack);
+    return walkBranchesVM(block.statements as BranchBlock[], parentId, traceIndex, filePath, resolve, currentLib, stack);
   const qualifier = block.qualifier;
   return (block.statements as ActionStatement[]).map((stmt, j) =>
-    buildActionVM(stmt, childId(parentId, `action[${j}]`), qualifier, traceIndex, filePath, resolve, stack),
+    buildActionVM(stmt, childId(parentId, `action[${j}]`), qualifier, traceIndex, filePath, resolve, currentLib, stack),
   );
 }
 
@@ -394,6 +400,7 @@ function buildActionVM(
   traceIndex: Map<string, TraceNode>,
   filePath: string,
   resolve: (name: string) => Decision | undefined,
+  currentLib: string,
   stack: Set<string>,
 ): ViewNode {
   const t = traceIndex.get(nodeId);
@@ -414,9 +421,12 @@ function buildActionVM(
   let expanded: boolean | undefined;
   if (actionKind === "use-decision") {
     expanded = false;
+    // (todo-1: this cross-library DEFERRAL GUARD is UNTOUCHED — todo-2 lifts it to recurse the sub into its own frame.)
     if (stmt.action.type === "UseDecision" && !getRefLibrary(stmt.action.decisionName)) {
       const subName = getRefName(stmt.action.decisionName);
-      const sub = stack.has(subName) ? undefined : resolve(subName);
+      // Cycle key is `(lib,name)` (#172). Same-library → `currentLib` is constant, so this is the old bare-name key renamed.
+      const subId = idOf(currentLib, subName);
+      const sub = stack.has(subId) ? undefined : resolve(subName);
       if (sub) {
         children = walkBranchesVM(
           sub.body.statements,
@@ -424,7 +434,8 @@ function buildActionVM(
           traceIndex,
           filePath,
           resolve,
-          new Set([...stack, subName]),
+          currentLib,
+          new Set([...stack, subId]),
         );
         expanded = true;
       }
