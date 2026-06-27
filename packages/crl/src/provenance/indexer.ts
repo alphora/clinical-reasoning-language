@@ -367,10 +367,13 @@ export function buildProvenanceIndex(
           location: loc,
         });
         if (kind === "decision") {
-          // Non-recursive spine: a `use decision` is a LEAF here. Inlining a same-lib sub-decision's nodes under the
-          // parent address would double-count its logic as over-reach candidates (standalone + inlined), shifting the
-          // over-reach denominator — deferred pending the over-reach/coverage reconciliation. (decisionSpine keeps its
-          // optional resolver for the view-model + the golden parity test.)
+          // Non-recursive spine: a `use decision` is a LEAF here (no resolver passed). A delegated sub-decision is
+          // inventoried ONCE as its OWN standalone decl (e.g. `SubDec/when[0]`), never inlined under the delegating
+          // parent's address — inlining would double-count its sub-nodes as over-reach candidates (standalone + inlined),
+          // perturbing the over-reach denominator (#171 Design (c)). Delegated sub-nodes are still marked decision-reached
+          // by PHASE 2b, which recurses a POLICY-OWNED `use decision` target and records edges on the standalone refs (so
+          // `isDecisionReached("SubDec/when[0]")` is true even when SubDec is reached only via delegation). (decisionSpine
+          // keeps its optional resolver for the view-model + the golden parity test.)
           for (const sn of decisionSpine(node as Decision)) {
             const snRef = decisionSubNodeRef(libName, name, sn.nodeId);
             const snLoc = lsLoc(info.entry.filePath, sn.node.location);
@@ -496,7 +499,20 @@ export function buildProvenanceIndex(
     if (t.kind === "concept") expandConcept(t.node as Concept, t.lib, fromDecision, fromNodeId);
     else if (t.kind === "activity")
       expandActivity(t.node as Activity, t.lib, fromDecision, fromNodeId);
-    else if (t.kind === "decision") walkDecision(t.node as Decision, t.lib, fromDecision);
+    else if (t.kind === "decision") {
+      // Recurse a delegated sub-decision iff the RESOLVED target library is POLICY-OWNED; defer (leaf) for a
+      // shared-reference target. Provenance STATIC reachability must cover ALL policy-owned delegated logic — otherwise a
+      // policy-owned sub-node reached only via delegation is left UNREACHED and gets false-flagged as over-reach (it IS an
+      // over-reach candidate by ownership). This is the right frame: provenance reachability is about authored COVERAGE of
+      // policy-owned logic, NOT about whether the CRE evaluates it at runtime (qualified cross-library EVALUATION stays
+      // deferred to #172). The gate is OWNERSHIP, not authored syntax — a policy split across policy-owned files using a
+      // QUALIFIED `use decision "Sibling"."Sub"` (Sibling = a local, non-shared, policy-owned lib) must still recurse.
+      // A SHARED-reference target's sub-nodes are NOT marked decision-reached (they're over-reach-excluded by ownership
+      // anyway). The use-decision EDGE to the decl is recorded above either way (today's leaf relation). Unresolved target
+      // (no LibInfo) → no recurse (graceful), as today.
+      if (libs.get(t.lib)?.ownership === "policy-owned")
+        walkDecision(t.node as Decision, t.lib, fromDecision);
+    }
   }
 
   function walkDecision(decision: Decision, lib: string, fromDecision: string): void {

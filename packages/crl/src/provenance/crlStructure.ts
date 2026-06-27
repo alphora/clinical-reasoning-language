@@ -3,7 +3,10 @@
  * built on the shared `decisionSpine` walker. Each node carries the SAME `nodeKey` the provenance indexer assigns
  * (`indexer.ts` — via the shared `decisionSubNodeRef`/`decisionDeclRef`/`lsLoc` so keys + locations cannot drift), so a
  * shell can join a structure node → its correspondence unit (cross-pane reveal) by `nodeKey`, and → run-state by
- * `nodeId`+decision. Pure + headless; the rendering, engine, and cross-pane wiring are C2b-2/3/4.
+ * `nodeId`+decision. CAVEAT (#171): a DELEGATED runtime node is NOT joinable to its structure row today — the runtime
+ * view-model INLINES a same-lib `use decision` sub-node under the CALLER (`PolicyDec/.../when[0]`), whereas the structure
+ * (mirroring the indexer) addresses it STANDALONE (`SubDec/when[0]`); no runtime-VM-node → structure/provenance ref join
+ * bridges that today (deferred). Pure + headless; the rendering, engine, and cross-pane wiring are C2b-2/3/4.
  *
  * Inventories ALL decisions the indexer inventories (covered policy + every registry library), NOT the reachability
  * closure — a source viewer must not silently drop an authored-but-unreached decision.
@@ -117,8 +120,9 @@ export function buildCrlStructure(
       const declLoc = lsLoc(info.entry.filePath, s.location);
       if (!declLoc) continue; // mirror the indexer: a location-less decl is not inventoried (keeps nodeKey parity)
       const flat: CrlStructureNode[] = [];
-      // Non-recursive spine (mirrors the indexer): a `use decision` is a LEAF in provenance addressing — delegated
-      // sub-node inlining is deferred pending the over-reach/coverage reconciliation. (See indexer.ts.)
+      // Non-recursive spine (mirrors the indexer): a `use decision` is a LEAF in provenance addressing. NOT inlining a
+      // delegated sub-decision under the caller is the SELECTED design (#171 design (c)) — sub-nodes are addressed
+      // standalone (`SubDec/when[0]`), so the over-reach denominator counts each once. (See indexer.ts.)
       for (const sn of decisionSpine(s)) {
         const location = lsLoc(info.entry.filePath, sn.node.location);
         if (!location) continue; // mirror the indexer's per-sub-node skip
