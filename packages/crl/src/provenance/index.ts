@@ -44,6 +44,29 @@ export { buildConceptContainment } from "./conceptContainment";
 export type { ConceptContainment } from "./conceptContainment";
 export { buildCockpitModel } from "./cockpitModel";
 export type { CockpitModel } from "./cockpitModel";
+export {
+  buildCrlRevealMaps,
+  caseIdsForUnit,
+  caseIdsForNode,
+  unitsForCase,
+  unitsForConcept,
+  rowsForConcept,
+  conceptNodesForUnit,
+  unitsForConceptNode,
+  rowNodeKeysForConcept,
+  conceptNodesForRow,
+  conceptKeysForUnit,
+  conceptKeysForNode,
+  rowNodeKeysForUnit,
+  rowNodeKeysForUnitWithConcepts,
+  crlAnchorsForUnits,
+  conceptCrlAnchors,
+  unitsForRow,
+  unitsForRowAll,
+  unitNumbersForRow,
+  unitNumbersForCase,
+} from "./revealMaps";
+export type { CrlRevealMaps } from "./revealMaps";
 export { decisionSpine } from "../ast/decisionSpine";
 export type { SpineNode, SpineNodeKind } from "../ast/decisionSpine";
 export { deriveCoverage, decisionImplemented, isOverReach } from "./coverage";
