@@ -14,9 +14,15 @@ import { resolveCelImports } from "../cel/imports";
 import type { ResolvedCelGraph } from "../cel/imports/types";
 
 import type { AnchorSourceMeta, ProvenanceArtifact } from "./artifact";
+import { buildCockpitModelFromResolved } from "./cockpitModel";
+import {
+  checkCockpitCorrespondence,
+  type CorrespondenceCheckResult,
+} from "./correspondenceCheck";
 import { deriveCoverage, type CoverageReport } from "./coverage";
 import {
   buildProvenanceIndex,
+  type ProvNodeRef,
   type ProvenanceIndex,
   type ProvenanceIndexDiagnostic,
 } from "./indexer";
@@ -122,6 +128,53 @@ export interface ValidateProvenanceFilesResult {
   pass: boolean;
 }
 
+const QUOTE = (s: string): string => `"${s}"`;
+const refList = (refs: ProvNodeRef[]): string =>
+  refs.map((r) => r.nodeId ?? `${r.kind} ${r.name}`).join(", ");
+
+/** Map one cockpit-correspondence result to a ProvenanceFinding. Integrity/error (never softened); the ref navigates
+ *  to the first bleed/miss row where available. The unmapped-runtime-node message names the delegated nodeId and cites
+ *  #171/#173 — it is a tool-deferred join gap, NOT an artifact defect, so it does not blame the artifact. */
+function correspondenceFinding(c: CorrespondenceCheckResult): ProvenanceFinding {
+  if (c.kind === "mismatch") {
+    const phrases: string[] = [];
+    const parts: string[] = [];
+    if (c.bleed.length) {
+      phrases.push("lights rows it doesn't walk");
+      parts.push(`bleed: ${refList(c.bleed)}`);
+    }
+    if (c.miss.length) {
+      phrases.push("misses rows on its path");
+      parts.push(`missing: ${refList(c.miss)}`);
+    }
+    const ref = c.bleed[0] ?? c.miss[0];
+    return {
+      kind: "cockpit-correspondence",
+      severity: "error",
+      class: "integrity",
+      // phrases joined with " / " (no empty branch → no double-space); the parts detail follows in parens.
+      message: `cockpit correspondence: case ${QUOTE(c.caseName)} ${phrases.join(" / ")} (${parts.join("; ")})`,
+      ...(ref ? { ref } : {}),
+    };
+  }
+  let detail: string;
+  if (c.reason === "render-failed") {
+    detail = `scenario render failed — cannot verify the cockpit against the cases${
+      c.details && c.details.length ? ` (${c.details.join("; ")})` : ""
+    }`;
+  } else if (c.reason === "unmapped-runtime-node") {
+    detail = `${c.reason}: delegated node(s) ${(c.details ?? []).join(", ")} have no provenance/structure row — a same-library inlined \`use decision\` the runtime VM nests under the caller but provenance addresses standalone (deferred join, #171/#173); not an artifact defect`;
+  } else {
+    detail = c.reason;
+  }
+  return {
+    kind: "cockpit-correspondence",
+    severity: "error",
+    class: "integrity",
+    message: `cockpit correspondence unchecked for case ${QUOTE(c.caseName)}: ${detail}`,
+  };
+}
+
 /** Thin projection of `resolveProvenance` — the findings + counts surface for the CLI and the `validate_provenance` MCP tool. */
 export function validateProvenanceFiles(
   artifactPath: string,
@@ -130,17 +183,33 @@ export function validateProvenanceFiles(
   mode: ProvenanceValidationMode = "final",
 ): ValidateProvenanceFilesResult {
   const r = resolveProvenance(artifactPath, celPath, anchorPath, mode);
+
+  // FINAL mode ONLY: fold in the provenance↔cockpit correspondence gate. It runs the cockpit's OWN resolution
+  // (crlAnchorsForUnits over the real crlRevealMaps) against each case's run path — green ⇒ the cockpit lights exactly
+  // each case's path. Worklist mode SKIPS it (the in-progress scaffold's correspondence isn't a "remaining-work" item).
+  const correspondenceFindings: ProvenanceFinding[] =
+    mode === "final"
+      ? checkCockpitCorrespondence(
+          buildCockpitModelFromResolved(r, { artifactPath, celPath }),
+        ).map(correspondenceFinding)
+      : [];
+
+  // MERGE (do not mutate r.findings) then RECOMPUTE the severity counts + pass from the merged set — the stale
+  // r.errorCount/r.pass predate the correspondence findings. cockpit-correspondence is neither attribution nor a
+  // waiver, so worklist/waiver counts are unchanged (carried from r).
+  const findings = [...r.findings, ...correspondenceFindings];
+  const errorCount = findings.filter((f) => f.severity === "error").length;
   return {
     policyId: r.artifact.policyId,
     policyVersion: r.artifact.policyVersion,
     diagnostics: r.index.diagnostics,
-    findings: r.findings,
-    errorCount: r.errorCount,
-    manualReviewCount: r.manualReviewCount,
-    warningCount: r.warningCount,
+    findings,
+    errorCount,
+    manualReviewCount: findings.filter((f) => f.severity === "manual-review").length,
+    warningCount: findings.filter((f) => f.severity === "warning").length,
     worklistCount: r.worklistCount,
     waiverCount: r.waiverCount,
     waiverScrutinizeCount: r.waiverScrutinizeCount,
-    pass: r.pass,
+    pass: errorCount === 0,
   };
 }

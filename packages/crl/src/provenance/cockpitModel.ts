@@ -11,7 +11,7 @@ import type { ResolvedCelGraph } from "../cel/imports/types";
 import { buildCorrespondenceModelFromResolved, type CorrespondenceModel } from "./correspondence";
 import { buildCrlConceptLayer, type CrlConceptNode } from "./crlConceptLayer";
 import { buildCrlStructure, type CrlDecisionStructure } from "./crlStructure";
-import { resolveProvenance } from "./validateFiles";
+import { resolveProvenance, type ResolveProvenanceResult } from "./validateFiles";
 import type { ProvenanceValidationMode } from "./validators";
 
 export interface CockpitModel {
@@ -57,6 +57,17 @@ export function buildCockpitModel(
   mode: ProvenanceValidationMode = "final",
 ): CockpitModel {
   const r = resolveProvenance(artifactPath, celPath, anchorPath, mode);
+  return buildCockpitModelFromResolved(r, { artifactPath, celPath });
+}
+
+/** Build the cockpit model from an ALREADY-resolved provenance result — the resolve-ONCE body of `buildCockpitModel`
+ *  minus the `resolveProvenance` call. Folded into `validateProvenanceFiles` (final mode) so the cockpit-correspondence
+ *  gate runs the SAME resolution the shell renders, without a second pipeline pass. */
+export function buildCockpitModelFromResolved(
+  r: ResolveProvenanceResult,
+  opts: { artifactPath: string; celPath: string },
+): CockpitModel {
+  const { artifactPath, celPath } = opts;
   const { byName, collisions } = buildCaseIdByName(r.graph);
   return {
     correspondence: buildCorrespondenceModelFromResolved(r, { artifactPath, celPath }),

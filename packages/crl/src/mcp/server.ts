@@ -602,7 +602,10 @@ export function createServer(): McpServer {
         "(it re-grades the attribution backlog to remaining-work). FINAL mode ALSO surfaces judge-lens WAIVERS — every escape hatch " +
         "that suppresses a finding (authored over-reach support, ignored span, legal intentional-unlink, non-decision dispositionClass) — " +
         "as uniform manual-review findings (kinds waiver-*) for a Judge to adjudicate; see the authoring_kit `judgeLens` rubric for the " +
-        "earned-ness weighting. Pass three ABSOLUTE paths. Returns { policyId, policyVersion, " +
+        "earned-ness weighting. FINAL mode ALSO runs the cockpit-correspondence gate (kind cockpit-correspondence, integrity/error): per CEL " +
+        "case it asserts the cockpit's lit decision-row set (the REAL crlRevealMaps resolution) equals the case's run path — green now " +
+        "GUARANTEES the cockpit lights exactly each case's path, not just referential integrity (a case that cannot be compared is reported " +
+        "as an explicit unchecked finding, never silently skipped). Pass three ABSOLUTE paths. Returns { policyId, policyVersion, " +
         "diagnostics[], findings:[{kind, severity (error|manual-review|warning), class (attribution|integrity), message, itemId?, " +
         "cluster?, ref?, range?, scrutiny? (routine|scrutinize, on waiver-* only)}], errorCount, manualReviewCount, warningCount, worklistCount, " +
         "waiverCount, waiverScrutinizeCount, pass }. pass=true ⇔ zero error-severity findings (waivers are manual-review — they do NOT fail the " +

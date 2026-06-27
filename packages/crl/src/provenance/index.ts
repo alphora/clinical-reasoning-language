@@ -42,8 +42,13 @@ export type {
 } from "./crlConceptLayer";
 export { buildConceptContainment } from "./conceptContainment";
 export type { ConceptContainment } from "./conceptContainment";
-export { buildCockpitModel } from "./cockpitModel";
+export { buildCockpitModel, buildCockpitModelFromResolved } from "./cockpitModel";
 export type { CockpitModel } from "./cockpitModel";
+export { checkCockpitCorrespondence } from "./correspondenceCheck";
+export type {
+  CorrespondenceCheckResult,
+  CorrespondenceUncheckedReason,
+} from "./correspondenceCheck";
 export {
   buildCrlRevealMaps,
   caseIdsForUnit,

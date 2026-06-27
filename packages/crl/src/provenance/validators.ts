@@ -46,6 +46,10 @@ export type ProvenanceFindingKind =
   | "mn-keyword-soft"
   | "structural-mistag"
   | "over-reach"
+  // ── cockpit correspondence (#170): the FINAL-mode gate that the cockpit lights exactly each case's run path. NOT in
+  //    ATTRIBUTION_KINDS → never softened; constructed in validateProvenanceFiles (outside validateProvenance) at
+  //    class "integrity" + severity "error". Green now guarantees a correct cockpit, not just referential integrity.
+  | "cockpit-correspondence"
   // ── judge-lens waivers (FINAL mode only): an escape hatch suppressing a finding, surfaced for the Judge to
   //    adjudicate its earned-ness. All four are class "integrity" + severity "manual-review" (uniform — the
   //    weighting lives in the message + the kit rubric, never in the severity). See the WAIVER_KINDS block below.
