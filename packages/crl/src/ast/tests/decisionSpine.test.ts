@@ -2,7 +2,7 @@ import { buildCEL } from "../../cel";
 import type { ResolvedCelGraph } from "../../cel/imports/types";
 import { renderScenario, type ViewNode } from "../../cre/viewModel";
 import type { RegistryEntry } from "../../imports/types";
-import { decisionSpine } from "../decisionSpine";
+import { decisionSpine, idOf, nameOf } from "../decisionSpine";
 import type { Decision } from "../types";
 
 import { parseInput } from "./parseInput";
@@ -250,5 +250,26 @@ case "c":
     for (const sc of vm.scenarios) collectIds(sc.tree, vmIds);
     const spineIds = new Set(decisionSpine(d, resolverFor(crl)).map((n) => n.nodeId));
     expect([...spineIds].sort()).toEqual([...vmIds].sort());
+  });
+});
+
+describe("idOf / nameOf — (lib,name) key contract (#172)", () => {
+  // nameOf is the only consumer that parses an idOf key back (the delegation-cycle diagnostic). Pin the round-trip so
+  // the encoding is an explicit contract — a future idOf change that breaks this fails HERE, not silently in a message.
+  it("nameOf(idOf(lib, name)) === name — round-trips, including names with spaces/quotes/dots", () => {
+    for (const [lib, name] of [
+      ["Policy", "Sub"],
+      ["Shared Lib", "Documented Nonunion"],
+      ["A", 'has "quotes"'],
+      ["B", "dotted.name"],
+      ["", "Root"],
+    ] as const) {
+      expect(nameOf(idOf(lib, name))).toBe(name);
+    }
+  });
+
+  it("idOf is injective across the (lib,name) split — (A B, C) ≠ (A, B C); A.Sub ≠ B.Sub", () => {
+    expect(idOf("A B", "C")).not.toBe(idOf("A", "B C")); // the space-join collision JSON avoids
+    expect(idOf("A", "Sub")).not.toBe(idOf("B", "Sub")); // the #172 cross-lib false-collision guard
   });
 });

@@ -453,6 +453,14 @@ case "cycle":
     expect(run.diagnostics.some((d) => /delegation cycle/.test(d))).toBe(true);
   });
 
+  // #172: the delegation-cycle chain is keyed `(lib,name)` internally but rendered by NAME via `nameOf` — pin the EXACT
+  // message byte-for-byte through the REAL CRE guard (the run.ts delegationStack + the nameOf/idOf round-trip in the
+  // diagnostic path), so a future idOf encoding change can't silently corrupt it. Same-lib → bare names, no JSON leaks.
+  it("cycle: the diagnostic renders the chain by name byte-identically (D → D2 → D, no (lib,name) keys leak)", () => {
+    const r = runCel(graphFrom(CYCLE_CRL, CYCLE_CEL));
+    expect(r.runs[0].diagnostics).toContain("decision delegation cycle: D → D2 → D");
+  });
+
   const XLIB_CRL = `# XR
 library "XR".
 concept "Indic":
