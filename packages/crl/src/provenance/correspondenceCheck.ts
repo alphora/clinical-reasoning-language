@@ -18,6 +18,7 @@
 import type { CockpitModel } from "./cockpitModel";
 import type { ProvNodeRef } from "./indexer";
 import { buildCrlRevealMaps, crlAnchorsForUnits, unitsForCase } from "./revealMaps";
+import { ancestorChain, collectProduced, type MinimalViewNode } from "./runPath";
 
 export type CorrespondenceUncheckedReason =
   | "render-failed"
@@ -62,28 +63,6 @@ function decodeRef(key: string): ProvNodeRef {
   return { lib: "", kind: "", name: key };
 }
 
-/** The inclusive `/`-prefix ancestor chain of a decision-local nodeId (`a/b/c` → [a, a/b, a/b/c]). */
-function ancestorChain(nodeId: string): string[] {
-  const segs = nodeId.split("/");
-  return segs.map((_, i) => segs.slice(0, i + 1).join("/"));
-}
-
-/** Walk a ViewNode tree (recursing children) collecting the PRODUCED action nodes. ViewNode is duck-typed here (the
- *  scenario VM contract) to keep this module's only `cre` coupling structural. */
-interface MinimalViewNode {
-  nodeId: string;
-  kind: string;
-  action?: { produced?: boolean };
-  children?: MinimalViewNode[];
-}
-
-function collectProduced(nodes: MinimalViewNode[], out: MinimalViewNode[]): void {
-  for (const n of nodes) {
-    if (n.kind === "action" && n.action?.produced === true) out.push(n);
-    if (n.children) collectProduced(n.children, out);
-  }
-}
-
 export function checkCockpitCorrespondence(model: CockpitModel): CorrespondenceCheckResult[] {
   // A wholesale FAILED scenario render (graph/CEL resolution failure) yields an EMPTY scenarios[] — iterating it would
   // silently check nothing and let FINAL green-pass having verified nothing. Report it once as render-failed. (A
@@ -101,12 +80,11 @@ export function checkCockpitCorrespondence(model: CockpitModel): CorrespondenceC
 
   const maps = buildCrlRevealMaps(model.correspondence, model.crlStructure, model.conceptLayer);
 
-  // buildCaseIdByName drops a name shared by ≥2 FROZEN cases, but an unfrozen+frozen same-name pair is NOT caught
-  // there (the frozen one survives) — joining the unfrozen scenario to the frozen case's units would mis-compare it.
-  // So independently flag ANY scenario whose case name is non-unique across the render → unchecked case-name-collision.
-  const nameCounts = new Map<string, number>();
-  for (const sv of model.scenarios.scenarios)
-    nameCounts.set(sv.case.name, (nameCounts.get(sv.case.name) ?? 0) + 1);
+  // buildCaseIdJoin drops a name shared by ≥2 FROZEN cases, but an unfrozen+frozen same-name pair is NOT caught there
+  // (the frozen one survives) — joining the unfrozen scenario to the frozen case's units would mis-compare it. So the
+  // shared helper ALSO computes `duplicateScenarioNames` (any name shared by >1 case, frozen or unfrozen) → we flag
+  // ANY scenario whose case name is non-unique across the render → unchecked case-name-collision.
+  const duplicateScenarioNames = model.duplicateScenarioNames;
 
   // ${lib}::${decision}::${nodeId} → row nodeKey, ONLY for the decision sub-nodes (kind when/otherwise/action) — the
   // decision-ROOT (kind "decision", empty nodeId) is excluded: it is never on a case's run-path ancestor chain.
@@ -123,7 +101,7 @@ export function checkCockpitCorrespondence(model: CockpitModel): CorrespondenceC
 
     // A name shared by ≥2 scenarios in this render is ambiguous to join (the unfrozen-vs-frozen mis-join vector) →
     // unchecked, never mis-compared. Checked first: ambiguity dominates run state / decision shape.
-    if ((nameCounts.get(caseName) ?? 0) > 1) {
+    if (duplicateScenarioNames.has(caseName)) {
       results.push({ kind: "unchecked", caseName, reason: "case-name-collision" });
       continue;
     }

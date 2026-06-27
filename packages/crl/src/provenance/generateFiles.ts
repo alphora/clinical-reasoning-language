@@ -82,11 +82,19 @@ export interface GenerateProvenanceFilesResult {
  * @param opts.policyVersion          policy version stamped into the artifact (default "1").
  * @param opts.existingArtifactPath   when set, the fresh scaffold is merged onto this existing artifact (mergeScaffold);
  *                                    the returned artifact is the MERGED one + `mergeDiagnostics` is populated.
+ * @param opts.clusterBy              clustering strategy (#174): "decision" (DEFAULT) = one cluster per covered decision;
+ *                                    "disposition-path" = one cluster per run path + a policy-owned-leaf coverage cluster.
+ *                                    NOTE: changing clusterBy is a STRUCTURAL mode switch, not a safe regen — a `--merge`
+ *                                    across modes orphans the prior mode's clusters (surfaced as merge diagnostics).
  */
 export function generateProvenanceFiles(
   celPath: string,
   anchorPath: string,
-  opts?: { policyVersion?: string; existingArtifactPath?: string },
+  opts?: {
+    policyVersion?: string;
+    existingArtifactPath?: string;
+    clusterBy?: "decision" | "disposition-path";
+  },
 ): GenerateProvenanceFilesResult {
   const policyVersion = opts?.policyVersion ?? "1";
   const anchorText = readFileSync(anchorPath, "utf8");
@@ -111,6 +119,7 @@ export function generateProvenanceFiles(
     policyVersion,
     anchorSource,
     celFileName,
+    ...(opts?.clusterBy !== undefined ? { clusterBy: opts.clusterBy } : {}),
   });
 
   // No --merge: the fresh scaffold IS the result; only the generate channel is populated.

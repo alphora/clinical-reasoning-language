@@ -670,7 +670,15 @@ export function createServer(): McpServer {
         "`validate_provenance` for the FINAL gate on the completed artifact. Pass " +
         "`includeArtifact: true` to also receive the full `artifact` (use the `crl-generate-provenance` CLI's --out for " +
         "the full body in scripts). Bad/missing/unreadable/oversized paths or an unresolved `covers` target → a tool " +
-        "error. NOTE: generate succeeding does NOT mean the artifact is complete — the diagnostics ARE the KE's worklist.",
+        "error. NOTE: generate succeeding does NOT mean the artifact is complete — the diagnostics ARE the KE's worklist. " +
+        "`clusterBy` (default \"decision\") selects the clustering strategy: \"decision\" emits one cluster per covered " +
+        "decision (the per-case CEL pass attaches frozen cases to each). \"disposition-path\" instead renders the CEL and " +
+        "emits one cluster per distinct RUN PATH (decision-node refs ONLY) + one policy-owned-leaf coverage cluster — a " +
+        "scaffold that is correspondence-correct BY CONSTRUCTION (it passes validate_provenance's FINAL cockpit gate with " +
+        "zero mismatch before any items are attached). A case that can't be path-clustered (unfrozen, name-collision, no/" +
+        "unresolved decision, no produced action, a run error, or an inlined `use decision`) is surfaced as a " +
+        "deferred-disposition-path diagnostic, never silently dropped. Changing clusterBy is a STRUCTURAL mode switch, not " +
+        "a safe `existingArtifact` regen (a cross-mode merge orphans the prior mode's clusters).",
       inputSchema: {
         cel: z
           .string()
@@ -698,6 +706,12 @@ export function createServer(): McpServer {
           .describe(
             "Include the full `artifact` JSON in the result. Default false (summary only — use the CLI's --out for the full body).",
           ),
+        clusterBy: z
+          .enum(["decision", "disposition-path"])
+          .optional()
+          .describe(
+            'Clustering strategy. Default "decision" (one cluster per covered decision). "disposition-path" emits one cluster per distinct run path (decision-node refs only) + a policy-owned-leaf coverage cluster — correspondence-correct by construction. Changing it is a structural mode switch, not a safe regen.',
+          ),
       },
     },
     (args) =>
@@ -708,6 +722,7 @@ export function createServer(): McpServer {
           policyVersion?: string;
           existingArtifact?: string;
           includeArtifact?: boolean;
+          clusterBy?: "decision" | "disposition-path";
         },
       ),
   );
@@ -728,6 +743,7 @@ function runGenerateProvenance(args: {
   policyVersion?: string;
   existingArtifact?: string;
   includeArtifact?: boolean;
+  clusterBy?: "decision" | "disposition-path";
 }): {
   content: Array<{ type: "text"; text: string }>;
   isError?: boolean;
@@ -773,6 +789,7 @@ function runGenerateProvenance(args: {
       ...(args.existingArtifact !== undefined
         ? { existingArtifactPath: args.existingArtifact }
         : {}),
+      ...(args.clusterBy !== undefined ? { clusterBy: args.clusterBy } : {}),
     });
     // SUMMARY by default (matches emit_crl_fhir / emit_cel / render_scenario): counts, not the full artifact. The
     // diagnostic counts are the FRESH-scaffold BASELINE; when merged they are PRE-MERGE — steer to validate_provenance.

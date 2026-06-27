@@ -19,12 +19,15 @@
  * Determinism: clusters are sorted by id; each cluster's `crl[]` by nodeKey and `cel[]` by (file, caseId, relation); the
  * diagnostics are emitted in a fixed structural order. Two runs on the same graph produce byte-identical JSON.
  */
+import { createHash } from "node:crypto";
+
 import { collectDecisionArms } from "../ast/decisionArms";
 import { decisionSpine, type SpineNode } from "../ast/decisionSpine";
 import type { ActionStatement, Decision, ReferenceName, WhenBlock } from "../ast/types";
 import { getRefLibrary, getRefName } from "../ast/types";
 import type { CELBranchResult, CELCase, CELResultField } from "../cel/ast/types";
 import type { ResolvedCelGraph } from "../cel/imports/types";
+import { renderScenario } from "../cre";
 
 import type {
   AnchorSourceMeta,
@@ -37,6 +40,8 @@ import type {
   ProvenanceArtifact,
 } from "./artifact";
 import { PROVENANCE_SCHEMA_VERSION } from "./artifact";
+import { buildCaseIdJoin } from "./caseIdJoin";
+import type { CorrespondenceUncheckedReason } from "./correspondenceCheck";
 import { isOverReach } from "./coverage";
 import {
   buildProvenanceIndex,
@@ -48,6 +53,7 @@ import {
   type ProvenanceIndex,
   type ProvNodeRef,
 } from "./indexer";
+import { ancestorChain, collectProduced, type MinimalViewNode } from "./runPath";
 import { isStrictAncestor } from "./validators";
 
 // ── public shape ──────────────────────────────────────────────────────────────
@@ -59,7 +65,10 @@ export interface GenerateDiagnostic {
     | "overreach-baseline"
     | "unfrozen-case"
     | "ambiguous-cel-branch"
-    | "unsupported-cel-result";
+    | "unsupported-cel-result"
+    // disposition-path mode (clusterBy:"disposition-path"): a scenario that can't be path-clustered (mirrors the
+    // FINAL gate's CorrespondenceUncheckedReason set so the two agree on "not comparable"), or a whole-render failure.
+    | "deferred-disposition-path";
   message: string;
   nodeKey?: string; // for attribution-needed / overreach-baseline
   nodeId?: string; // decision sub-node path
@@ -69,6 +78,10 @@ export interface GenerateDiagnostic {
   polarity?: "present-drives" | "absent-drives";
   // cel diagnostics:
   caseId?: string;
+  // deferred-disposition-path: which CorrespondenceUncheckedReason routed this case out of the comparable set.
+  reason?: CorrespondenceUncheckedReason;
+  // deferred-disposition-path / render-failed: the render errors or the unmapped runtime nodeIds.
+  details?: string[];
 }
 
 export interface GenerateResult {
@@ -120,10 +133,15 @@ export function generateProvenanceScaffold(
     policyVersion: string;
     anchorSource: AnchorSourceMeta;
     celFileName: string;
+    /** Clustering strategy (#174). "decision" (DEFAULT) = one cluster per covered decision + a per-case CEL pass
+     *  (the original output, byte-unchanged). "disposition-path" = one cluster per distinct RUN PATH (decision-node
+     *  refs only) + one policy-owned-leaf coverage cluster — correspondence-correct BY CONSTRUCTION. */
+    clusterBy?: "decision" | "disposition-path";
   },
 ): GenerateResult {
   const index = buildProvenanceIndex(graph);
   const diagnostics: GenerateDiagnostic[] = [];
+  const clusterBy = opts.clusterBy ?? "decision";
 
   // The covered policy lib + its decisions are the scaffold's spine. With no policy anchor there is nothing to generate
   // (collectLibs surfaces the no-policy-anchor diagnostic via the index; we mirror its empty result).
@@ -167,32 +185,47 @@ export function generateProvenanceScaffold(
     });
   }
 
-  // ── build one cluster per covered-policy decision ──
-  const clusters = decisions.map((decision) =>
-    buildDecisionCluster(ctxByName.get(decision.name)!, policyLib!, index),
-  );
-
-  // ── CEL pass: per-case result fields → cel refs + cel diagnostics ──
-  const celRefsByCluster = new Map<string, CelNodeRef[]>();
-  const conceptToClusterIds = buildConceptToClusterIds(decisions, index, policyLib);
-  for (const c of clusters) celRefsByCluster.set(c.id, []);
-  for (const celCase of enumerateCelCases(graph)) {
-    processCelCase(
-      celCase,
+  let clusters: Cluster[];
+  if (clusterBy === "disposition-path") {
+    // disposition-path mode: SKIP the per-decision cluster loop AND the ENTIRE CEL pass (buildConceptToClusterIds +
+    // processCelCase + clusterIdFor). Build one cluster per distinct RUN PATH (decision-node refs only) + one
+    // policy-owned-leaf coverage cluster instead. The over-reach baseline + attribution diagnostics below are kept.
+    clusters = buildDispositionPathClusters(
+      graph,
+      policyLib,
       opts.celFileName,
-      policyLib!,
       ctxByName,
-      conceptToClusterIds,
-      clusterIdFor(policyLib),
-      celRefsByCluster,
+      index,
       diagnostics,
     );
-  }
-  for (const c of clusters) {
-    c.cel = sortCelRefs(celRefsByCluster.get(c.id) ?? []);
+  } else {
+    // ── "decision" (default): one cluster per covered-policy decision ──
+    clusters = decisions.map((decision) =>
+      buildDecisionCluster(ctxByName.get(decision.name)!, policyLib!, index),
+    );
+
+    // ── CEL pass: per-case result fields → cel refs + cel diagnostics ──
+    const celRefsByCluster = new Map<string, CelNodeRef[]>();
+    const conceptToClusterIds = buildConceptToClusterIds(decisions, index, policyLib);
+    for (const c of clusters) celRefsByCluster.set(c.id, []);
+    for (const celCase of enumerateCelCases(graph)) {
+      processCelCase(
+        celCase,
+        opts.celFileName,
+        policyLib!,
+        ctxByName,
+        conceptToClusterIds,
+        clusterIdFor(policyLib),
+        celRefsByCluster,
+        diagnostics,
+      );
+    }
+    for (const c of clusters) {
+      c.cel = sortCelRefs(celRefsByCluster.get(c.id) ?? []);
+    }
   }
 
-  // Sort clusters by id; crl[] is sorted inside buildDecisionCluster, cel[] just above.
+  // Sort clusters by id; crl[] is sorted inside each cluster builder, cel[] inside it too.
   clusters.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 
   const artifact: ProvenanceArtifact = {
@@ -213,7 +246,9 @@ export function generateProvenanceScaffold(
     if (isOverReach(node, artifact, itemsById)) {
       diagnostics.push({
         kind: "overreach-baseline",
-        message: `policy-owned ${node.nodeKind} "${node.ref.name}"${node.ref.nodeId ? "#" + node.ref.nodeId : ""} is provisional-only (KE must attribute it to a source span).`,
+        // Status-neutral wording (gpt55-11): in disposition-path mode an over-reach node may be unclustered (a homeless
+        // leaf), not "provisional-only" — both modes mean the same thing here: the KE must still attribute it.
+        message: `policy-owned ${node.nodeKind} "${node.ref.name}"${node.ref.nodeId ? "#" + node.ref.nodeId : ""} is not yet attributed (KE must attribute it to a source span).`,
         nodeKey: nodeKey(node.ref),
         ...(node.ref.nodeId !== undefined ? { nodeId: node.ref.nodeId } : {}),
       });
@@ -236,31 +271,24 @@ const clusterIdFor =
     // CLEAN id (no JSON punctuation, unlike a nodeKey) so it reads in a UI + a manifest.
     `cluster:${policyLib}:${decisionName}`;
 
-function buildDecisionCluster(
-  ctx: {
-    decision: Decision;
-    declRef: ProvNodeRef;
-    spine: SpineNode[];
-    gatingConceptKeys: Set<string>;
-  },
-  policyLib: string,
-  index: ProvenanceIndex,
-): Cluster {
-  const id = clusterIdFor(policyLib)(ctx.decision.name);
+/** A crl[] accumulator + its push-with-index-guard closure (shared by `buildDecisionCluster` + the disposition-path
+ *  + coverage builders — Claude-12). Push a CrlNodeRef whose nodeKind/ownership are taken from the §5-authoritative
+ *  index (so V1/V2 pass), status provisional (Model A), deduped by nodeKey. The only ref the index fails to resolve is a
+ *  LOCATION-LESS spine sub-node (the indexer skips those at inventory time too — `indexer.ts`), so it is also absent
+ *  from coverage's over-reach denominator: skipping it here keeps the scaffold + the baseline in lockstep (never an
+ *  un-baseline un-clustered node). Reachability-/index-sourced refs come straight from `index.nodes`, so never skip. */
+function makeGuardedCrl(index: ProvenanceIndex): {
+  crl: CrlNodeRef[];
+  push: (ref: ProvNodeRef, relation: CrlRelation) => void;
+} {
   const crl: CrlNodeRef[] = [];
-  const added = new Set<string>(); // dedupe by nodeKey within the cluster (a concept reached twice appears once)
-
-  /** Push a CrlNodeRef whose nodeKind/ownership are taken from the §5-authoritative index (so V1/V2 pass), status
-   *  provisional (Model A), deduped by nodeKey. The only ref the index fails to resolve is a LOCATION-LESS spine sub-node
-   *  (the indexer skips those at inventory time too — `indexer.ts`), so it is also absent from coverage's over-reach
-   *  denominator: skipping it here keeps the scaffold + the baseline in lockstep (never an un-baseline un-clustered node).
-   *  Reachability-sourced refs (the closure loop below) come straight from `index.nodes`, so they never skip. */
+  const added = new Set<string>(); // dedupe by nodeKey within the cluster (a node reached twice appears once)
   const push = (ref: ProvNodeRef, relation: CrlRelation): void => {
     const key = nodeKey(ref);
     if (added.has(key)) return;
     const nodeKind = index.nodeKindOf(ref);
     const ownership = index.ownershipOf(ref);
-    if (nodeKind === undefined || ownership === undefined) return; // location-less sub-node (not indexed) → don't emit a born-broken ref
+    if (nodeKind === undefined || ownership === undefined) return; // location-less / unindexed → don't emit a born-broken ref
     added.add(key);
     crl.push({
       lib: ref.lib,
@@ -273,6 +301,27 @@ function buildDecisionCluster(
       status: "provisional",
     });
   };
+  return { crl, push };
+}
+
+/** Sort a crl[] by nodeKey in place + return it (the deterministic crl order used by every cluster builder). */
+function sortCrl(crl: CrlNodeRef[]): CrlNodeRef[] {
+  crl.sort((a, b) => (nodeKey(a) < nodeKey(b) ? -1 : nodeKey(a) > nodeKey(b) ? 1 : 0));
+  return crl;
+}
+
+function buildDecisionCluster(
+  ctx: {
+    decision: Decision;
+    declRef: ProvNodeRef;
+    spine: SpineNode[];
+    gatingConceptKeys: Set<string>;
+  },
+  policyLib: string,
+  index: ProvenanceIndex,
+): Cluster {
+  const id = clusterIdFor(policyLib)(ctx.decision.name);
+  const { crl, push } = makeGuardedCrl(index);
 
   // NB: we deliberately do NOT emit a ref to the bare decision DECL. It isn't an over-reach candidate (no nodeId), so it
   // needs no cluster for coverage hygiene; and suggesting a counting decision-relation on the WHOLE-decision decl would
@@ -305,8 +354,326 @@ function buildDecisionCluster(
     // terminology/parameter are over-reach-excluded — neither needs a ref here.
   }
 
-  crl.sort((a, b) => (nodeKey(a) < nodeKey(b) ? -1 : nodeKey(a) > nodeKey(b) ? 1 : 0));
-  return { id, label: ctx.decision.name, items: [], crl, cel: [] };
+  return { id, label: ctx.decision.name, items: [], crl: sortCrl(crl), cel: [] };
+}
+
+// ── disposition-path clustering (#174) ─────────────────────────────────────────
+
+/** The per-decision context the disposition-path builder consumes (a structural subset of the local DecisionCtx). */
+interface DispoDecisionCtx {
+  decision: Decision;
+  spine: SpineNode[];
+  /** concept nodeKeys that gate a when/guard criterion in THIS decision — the SAME spine-derived set per-decision mode
+   *  uses (so the coverage cluster's concept relations match `buildDecisionCluster`'s by construction; FIX 6). */
+  gatingConceptKeys: Set<string>;
+}
+
+/** A comparable scenario, classified case-first: its frozen caseId + the sorted unique produced-action nodeIds (the run
+ *  path) + the decision it ran + that decision's lib. */
+interface ComparableCase {
+  caseId: string;
+  decision: string;
+  lib: string;
+  producedNodeIds: string[]; // sorted, unique
+}
+
+/** Sanitize a string into a deterministic, JSON-punctuation-free cluster-id segment (mirrors clusterIdFor's cleanliness:
+ *  no `/`/`:` that would clash with the `cluster:lib:…` shape). */
+function sanitizeIdSeg(s: string): string {
+  return s.replace(/[^A-Za-z0-9._-]+/g, "_");
+}
+
+/** Deterministic disposition-cluster id = pure function of (lib, decision, sorted produced nodeIds). The nodeIds join
+ *  with `+`; when the joined tail is long we hash-cap it (still deterministic) so the id stays bounded for a wide menu. */
+function dispositionPathId(lib: string, decision: string, sortedNodeIds: string[]): string {
+  const tail = sortedNodeIds.map(sanitizeIdSeg).join("+");
+  const seg = tail.length > 80 ? createHash("sha256").update(tail).digest("hex").slice(0, 16) : tail;
+  return `cluster:${sanitizeIdSeg(lib)}:${sanitizeIdSeg(decision)}:${seg}`;
+}
+
+/** Build the disposition-path + coverage clusters (#174). One cluster per distinct run path (decision-node refs ONLY) +
+ *  one policy-owned-leaf coverage cluster. Skipped scenarios + a failed render emit `deferred-disposition-path`
+ *  diagnostics (the matching CorrespondenceUncheckedReason). The coverage cluster carries ALL policy-owned leaves so the
+ *  over-reach baseline is identical to per-decision mode (Claude-2). */
+function buildDispositionPathClusters(
+  graph: ResolvedCelGraph,
+  policyLib: string | null,
+  celFileName: string,
+  ctxByName: Map<string, DispoDecisionCtx>,
+  index: ProvenanceIndex,
+  diagnostics: GenerateDiagnostic[],
+): Cluster[] {
+  const dispositionClusters: Cluster[] = [];
+
+  const rendered = renderScenario(graph);
+  if (rendered.success === false) {
+    // A wholesale failed render → mirror correspondenceCheck's render-failed: ONE diagnostic, NO disposition clusters.
+    // The coverage cluster is STILL emitted (below) so the over-reach baseline matches per-decision mode.
+    diagnostics.push({
+      kind: "deferred-disposition-path",
+      reason: "render-failed",
+      message: `disposition-path: scenario render failed — emitting no disposition clusters (coverage cluster only).`,
+      ...(rendered.errors.length ? { details: rendered.errors } : {}),
+    });
+    return finishWithCoverage(policyLib, index, ctxByName, dispositionClusters);
+  }
+
+  const { caseIdByName, duplicateScenarioNames } = buildCaseIdJoin(graph);
+
+  // ── classify each scenario case-FIRST → comparable | skipped (a deferred-disposition-path diagnostic per skip) ──
+  const comparable: ComparableCase[] = [];
+  for (const sv of rendered.scenarios) {
+    const caseName = sv.case.name;
+    const skip = (reason: CorrespondenceUncheckedReason, details?: string[]): void => {
+      diagnostics.push({
+        kind: "deferred-disposition-path",
+        reason,
+        message: `disposition-path: case "${caseName}" is not path-clusterable (${reason}).`,
+        ...(details && details.length ? { details } : {}),
+      });
+    };
+
+    // ambiguity dominates run state / decision shape (matches correspondenceCheck's order).
+    if (duplicateScenarioNames.has(caseName)) {
+      skip("case-name-collision");
+      continue;
+    }
+    if (sv.status === "error") {
+      skip("run-error");
+      continue;
+    }
+    if (sv.decision === null) {
+      skip("no-decision");
+      continue;
+    }
+    if (!sv.decision.resolved) {
+      skip("unresolved-decision");
+      continue;
+    }
+    const caseId = caseIdByName[caseName];
+    if (caseId === undefined) {
+      // A ≥2-frozen-name collision was already routed to case-name-collision by the duplicateScenarioNames first-guard
+      // above, so a missing caseId here can ONLY be an unfrozen case — the unconditional reason is safe.
+      skip("unfrozen-case");
+      continue;
+    }
+    const decision = sv.decision.name;
+    // IDENTICAL lib fallback to correspondenceCheck.ts (`?? ""`, NOT `?? policyLib`): the generator and the FINAL gate
+    // must agree on the run-path key. If libraryName is ever undefined, lib="" makes the index lookup below MISS →
+    // the generator defers the case (unmapped-runtime-node) exactly as the checker marks it unchecked — never a skew
+    // where the generator is more permissive than the validator.
+    const lib = sv.decision.libraryName ?? "";
+
+    const produced: MinimalViewNode[] = [];
+    collectProduced(sv.tree as unknown as MinimalViewNode[], produced);
+    if (produced.length === 0) {
+      skip("no-produced-action");
+      continue;
+    }
+
+    // unmapped-runtime-node (the inlined `use decision` shape): ANY produced / ancestor nodeId whose standalone
+    // decisionSubNodeRef is NOT in the index → no structure row joins it → not clusterable (mirror correspondenceCheck).
+    const ctx = ctxByName.get(decision);
+    const unmapped: string[] = [];
+    const producedNodeIds = new Set<string>();
+    for (const p of produced) {
+      producedNodeIds.add(p.nodeId);
+      for (const id of ancestorChain(p.nodeId)) {
+        const ref = decisionSubNodeRef(lib, decision, id);
+        if (index.nodeKindOf(ref) === undefined) unmapped.push(id);
+      }
+    }
+    if (!ctx || unmapped.length > 0) {
+      skip("unmapped-runtime-node", [...new Set(unmapped)]);
+      continue;
+    }
+
+    comparable.push({
+      caseId,
+      decision,
+      lib,
+      producedNodeIds: [...producedNodeIds].sort(),
+    });
+  }
+
+  // ── group comparable cases by (lib, decision, sorted produced-action set) → one disposition cluster per distinct path.
+  //    GROUP on an UN-CAPPED canonical key (the full sorted nodeId set), NOT the display pathId (which hash-caps a long
+  //    tail to 16 hex chars): two distinct produced-sets whose capped tails collide must NOT merge into one group (the
+  //    group would keep the FIRST case's nodeIds yet carry the SECOND's cases — a path-A cluster citing path-B cases,
+  //    the exact bleed this mode forbids). The display pathId (de-collided below) is only the EMITTED cluster.id. ──
+  interface Group {
+    canonicalKey: string;
+    lib: string;
+    decision: string;
+    producedNodeIds: string[];
+    caseIds: Set<string>;
+  }
+  const groups = new Map<string, Group>();
+  for (const c of comparable) {
+    const canonicalKey = JSON.stringify([c.lib, c.decision, c.producedNodeIds]);
+    let g = groups.get(canonicalKey);
+    if (!g) {
+      g = {
+        canonicalKey,
+        lib: c.lib,
+        decision: c.decision,
+        producedNodeIds: c.producedNodeIds,
+        caseIds: new Set(),
+      };
+      groups.set(canonicalKey, g);
+    }
+    g.caseIds.add(c.caseId);
+  }
+
+  // Assign each group its emitted cluster.id deterministically: the display pathId, de-collided with a `-2`/`-3`/… suffix
+  // (in sorted-canonical-key order) on the rare hash collision so two DISTINCT groups never share an id (which would let
+  // a downstream consumer merge them). Iterate groups in canonical-key order so the suffixing is deterministic.
+  const sortedGroups = [...groups.values()].sort((a, b) =>
+    a.canonicalKey < b.canonicalKey ? -1 : a.canonicalKey > b.canonicalKey ? 1 : 0,
+  );
+  const usedIds = new Map<string, number>();
+  for (const g of sortedGroups) {
+    const base = dispositionPathId(g.lib, g.decision, g.producedNodeIds);
+    const n = (usedIds.get(base) ?? 0) + 1;
+    usedIds.set(base, n);
+    const id = n === 1 ? base : `${base}-${n}`;
+    dispositionClusters.push(buildDispositionCluster(id, g, celFileName, ctxByName, index));
+  }
+
+  return finishWithCoverage(policyLib, index, ctxByName, dispositionClusters);
+}
+
+/** Append the ONE coverage cluster to the disposition clusters (after them, so coverage covers what they DON'T cite),
+ *  and return the full set. Coverage carries every policy-owned over-reach candidate NOT already in a disposition
+ *  cluster — keeping the over-reach baseline identical to per-decision mode even with untaken branches. */
+function finishWithCoverage(
+  policyLib: string | null,
+  index: ProvenanceIndex,
+  ctxByName: Map<string, DispoDecisionCtx>,
+  dispositionClusters: Cluster[],
+): Cluster[] {
+  if (policyLib === null) return dispositionClusters;
+  const cited = new Set<string>();
+  for (const c of dispositionClusters) for (const ref of c.crl) cited.add(nodeKey(refToProv(ref)));
+  return [...dispositionClusters, buildCoverageCluster(policyLib, index, ctxByName, cited)];
+}
+
+/** A CrlNodeRef → its ProvNodeRef (the nodeKey-bearing subset), for deduping against the index. */
+function refToProv(ref: CrlNodeRef): ProvNodeRef {
+  return {
+    lib: ref.lib,
+    kind: ref.kind,
+    name: ref.name,
+    ...(ref.nodeId !== undefined ? { nodeId: ref.nodeId } : {}),
+  };
+}
+
+/** One DISPOSITION cluster for a run-path group: crl = the UNION of each produced action's ancestor chain mapped to a
+ *  decisionSubNodeRef (relation via spineRelation off the decision's spine — NEVER a concept ref, structural per
+ *  Claude-3); cel = the group's frozen cases. items: []. */
+function buildDispositionCluster(
+  id: string,
+  g: { lib: string; decision: string; producedNodeIds: string[]; caseIds: Set<string> },
+  celFileName: string,
+  ctxByName: Map<string, DispoDecisionCtx>,
+  index: ProvenanceIndex,
+): Cluster {
+  const ctx = ctxByName.get(g.decision)!; // guaranteed by the unmapped-runtime-node guard (ctx-missing → skipped)
+  const spineByNodeId = new Map<string, SpineNode>();
+  for (const sn of ctx.spine) spineByNodeId.set(sn.nodeId, sn);
+
+  const { crl, push } = makeGuardedCrl(index);
+  // Union over each produced action of its inclusive ancestor chain; relation from the SpineNode (Claude-9 — never
+  // hand-rolled from the nodeId string). A nodeId without a SpineNode shouldn't occur (the unmapped guard already
+  // rejected un-indexed ids), but default defensively to implements-criterion if one slips through.
+  for (const produced of g.producedNodeIds) {
+    for (const id of ancestorChain(produced)) {
+      const sn = spineByNodeId.get(id);
+      const relation: CrlRelation = sn ? spineRelation(sn) : "implements-criterion";
+      push(decisionSubNodeRef(g.lib, g.decision, id), relation);
+    }
+  }
+
+  // label: the decision + the terminal recommend target(s) of this path (human-readable; non-semantic).
+  const targets = g.producedNodeIds
+    .map((id) => {
+      const sn = spineByNodeId.get(id);
+      return sn ? actionTargetName(sn) : undefined;
+    })
+    .filter((t): t is string => t !== undefined);
+  const label =
+    targets.length > 0 ? `${g.decision} → ${[...new Set(targets)].sort().join(" + ")}` : g.decision;
+
+  const cel: CelNodeRef[] = sortCelRefs(
+    [...g.caseIds].map((caseId) => ({
+      file: celFileName,
+      kind: "case" as const,
+      caseId,
+      relation: "tests-branch" as CelRelation,
+      status: "provisional" as const,
+    })),
+  );
+
+  return { id, label, items: [], crl: sortCrl(crl), cel };
+}
+
+/** The ONE coverage cluster: every policy-owned OVER-REACH CANDIDATE in the index NOT already cited by a disposition
+ *  cluster — leaves (concept/activity) AND UNTAKEN decision sub-nodes (an on-path sub-node is already in its disposition
+ *  cluster; an untaken-branch sub-node is over-reach too and would be HOMELESS otherwise — diverging from per-decision
+ *  mode the moment a KE links). NO cel, NO items → correspondence-inert (a cluster with no cel is never in
+ *  `unitsForCase`, so it can never light a row → cannot bleed; Claude-7/8). Carrying every candidate keeps the over-reach
+ *  baseline byte-identical to per-decision mode (Claude-2 + FIX 4). Relations mirror buildDecisionCluster's: a concept
+ *  gating ANY decision's when/guard → implements-criterion, else defines-concept; an activity → recommends-disposition;
+ *  a decision sub-node → spineRelation off that decision's spine (the SAME spine source per-decision mode uses; FIX 6). */
+function buildCoverageCluster(
+  policyLib: string,
+  index: ProvenanceIndex,
+  ctxByName: Map<string, DispoDecisionCtx>,
+  cited: Set<string>,
+): Cluster {
+  // The coverage cluster mirrors the per-decision builder's node SELECTION exactly — the union, over every covered
+  // decision, of {its spine sub-nodes} ∪ {its reachability-closure's policy-owned concept/activity leaves} — MINUS what
+  // a disposition cluster already cited. Iterating that SAME source (not a blanket index scan) guarantees the two modes
+  // cite the identical node set with identical relations (an unreachable policy-owned leaf is homed by NEITHER mode →
+  // stays homeless in both, consistent), so the over-reach baseline is byte-identical (FIX 4) and relations agree (FIX 6).
+  const { crl, push } = makeGuardedCrl(index);
+
+  for (const [name, ctx] of ctxByName) {
+    const declKey = nodeKey(decisionDeclRef(policyLib, name));
+
+    // (1) every spine sub-node, relation by spineRelation (the on-path ones are skipped via `cited`).
+    for (const sn of ctx.spine) {
+      const ref = decisionSubNodeRef(policyLib, name, sn.nodeId);
+      if (cited.has(nodeKey(ref))) continue;
+      push(ref, spineRelation(sn));
+    }
+
+    // (2) this decision's reachability-closure policy-owned leaves, relation by role (gating concept → implements-
+    //     criterion; non-gating concept → defines-concept; activity → recommends-disposition) — IDENTICAL to
+    //     buildDecisionCluster, using this decision's own spine-derived gatingConceptKeys (FIX 6).
+    for (const [key, reach] of index.decisionReachability) {
+      if (!reach.reachedBy.has(declKey)) continue;
+      const node = index.nodes.get(key);
+      if (!node || node.ownership !== "policy-owned") continue;
+      if (cited.has(key)) continue;
+      if (node.declKind === "concept") {
+        push(
+          node.ref,
+          ctx.gatingConceptKeys.has(key) ? "implements-criterion" : "defines-concept",
+        );
+      } else if (node.declKind === "activity") {
+        push(node.ref, "recommends-disposition");
+      }
+    }
+  }
+
+  return {
+    id: `cluster:${sanitizeIdSeg(policyLib)}:coverage`,
+    label: "coverage",
+    items: [],
+    crl: sortCrl(crl),
+    cel: [],
+  };
 }
 
 // ── attribution + drives-determination hints ──────────────────────────────────

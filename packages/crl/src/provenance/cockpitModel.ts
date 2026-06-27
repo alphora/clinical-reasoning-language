@@ -4,10 +4,9 @@
  * render (CEL cases), and the name→frozen-caseId join — all from the same resolved graph, so their keys agree by
  * construction. (`renderScenario` runs the full CRE; it's on the debounced rebuild path.)
  */
-import type { CELCase } from "../cel/ast/types";
 import { renderScenario, type RenderScenarioResult } from "../cre";
-import type { ResolvedCelGraph } from "../cel/imports/types";
 
+import { buildCaseIdJoin } from "./caseIdJoin";
 import { buildCorrespondenceModelFromResolved, type CorrespondenceModel } from "./correspondence";
 import { buildCrlConceptLayer, type CrlConceptNode } from "./crlConceptLayer";
 import { buildCrlStructure, type CrlDecisionStructure } from "./crlStructure";
@@ -29,25 +28,10 @@ export interface CockpitModel {
   /** Frozen-case NAMEs shared by ≥2 cases (dropped from caseIdByName → those cases are un-revealable). The shell surfaces
    *  these so a KE knows why some cases aren't navigable — it's a CEL data-quality signal, not a tool bug. */
   caseNameCollisions: string[];
-}
-
-/** Build NAME → frozen caseId from the CEL AST, dropping any name shared by multiple frozen cases. */
-function buildCaseIdByName(graph: ResolvedCelGraph): { byName: Record<string, string>; collisions: string[] } {
-  const byName: Record<string, string> = {};
-  const collided = new Set<string>();
-  for (const s of graph.cel?.statements ?? []) {
-    if (s.type !== "CELCase") continue;
-    const c = s as CELCase;
-    if (c.caseId === undefined) continue;
-    if (collided.has(c.name)) continue;
-    if (c.name in byName) {
-      delete byName[c.name]; // a second frozen case with this name → ambiguous → both un-revealable
-      collided.add(c.name);
-    } else {
-      byName[c.name] = c.caseId;
-    }
-  }
-  return { byName, collisions: [...collided] };
+  /** Names shared by >1 case in the render (FROZEN OR UNFROZEN) — the stronger mis-join guard: an unfrozen+frozen
+   *  same-name pair survives caseIdByName (the frozen one wins) but is unsafe to compare. The correspondence check
+   *  classifies a scenario unchecked (case-name-collision) when its name is in here, BEFORE the caseId lookup. */
+  duplicateScenarioNames: Set<string>;
 }
 
 export function buildCockpitModel(
@@ -68,13 +52,14 @@ export function buildCockpitModelFromResolved(
   opts: { artifactPath: string; celPath: string },
 ): CockpitModel {
   const { artifactPath, celPath } = opts;
-  const { byName, collisions } = buildCaseIdByName(r.graph);
+  const { caseIdByName, frozenCollisions, duplicateScenarioNames } = buildCaseIdJoin(r.graph);
   return {
     correspondence: buildCorrespondenceModelFromResolved(r, { artifactPath, celPath }),
     crlStructure: buildCrlStructure(r.graph),
     conceptLayer: buildCrlConceptLayer(r.graph),
     scenarios: renderScenario(r.graph),
-    caseIdByName: byName,
-    caseNameCollisions: collisions,
+    caseIdByName,
+    caseNameCollisions: frozenCollisions,
+    duplicateScenarioNames,
   };
 }

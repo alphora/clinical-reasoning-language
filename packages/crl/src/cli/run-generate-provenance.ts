@@ -16,6 +16,7 @@ import {
  *
  * Usage: crl-generate-provenance --cel <f.cel> --anchor <anchor-source.txt>
  *          [--out <artifact.json>] [--merge <existing.json>] [--policy-version <v>]
+ *          [--cluster-by decision|disposition-path]
  */
 function parseArgs(argv: string[]): {
   cel?: string;
@@ -23,6 +24,7 @@ function parseArgs(argv: string[]): {
   out?: string;
   merge?: string;
   policyVersion?: string;
+  clusterBy?: string;
 } {
   const out: {
     cel?: string;
@@ -30,6 +32,7 @@ function parseArgs(argv: string[]): {
     out?: string;
     merge?: string;
     policyVersion?: string;
+    clusterBy?: string;
   } = {};
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -39,13 +42,15 @@ function parseArgs(argv: string[]): {
       a === "--anchor" ||
       a === "--out" ||
       a === "--merge" ||
-      a === "--policy-version"
+      a === "--policy-version" ||
+      a === "--cluster-by"
     ) {
       if (!v || v.startsWith("--")) {
         console.error(`${a} requires a value`);
         process.exit(1);
       }
       if (a === "--policy-version") out.policyVersion = v;
+      else if (a === "--cluster-by") out.clusterBy = v;
       else out[a.slice(2) as "cel" | "anchor" | "out" | "merge"] = v;
       i++;
     } else if (a.startsWith("--")) {
@@ -62,10 +67,18 @@ const {
   out: outPath,
   merge: mergePath,
   policyVersion,
+  clusterBy,
 } = parseArgs(process.argv.slice(2));
+
+// --cluster-by, when supplied, must be one of the two modes (changing it is a STRUCTURAL mode switch — a --merge across
+// modes orphans the prior mode's clusters; that shows up as merge diagnostics).
+if (clusterBy !== undefined && clusterBy !== "decision" && clusterBy !== "disposition-path") {
+  console.error(`--cluster-by must be "decision" or "disposition-path" (got "${clusterBy}").`);
+  process.exit(1);
+}
 if (!celPath || !anchorPath) {
   console.error(
-    "Usage: crl-generate-provenance --cel <f.cel> --anchor <anchor-source.txt> [--out <artifact.json>] [--merge <existing.json>] [--policy-version <v>]",
+    "Usage: crl-generate-provenance --cel <f.cel> --anchor <anchor-source.txt> [--out <artifact.json>] [--merge <existing.json>] [--policy-version <v>] [--cluster-by decision|disposition-path]",
   );
   process.exit(1);
 }
@@ -101,6 +114,9 @@ try {
   const r = generateProvenanceFiles(celPath, anchorPath, {
     ...(policyVersion !== undefined ? { policyVersion } : {}),
     ...(mergePath !== undefined ? { existingArtifactPath: mergePath } : {}),
+    ...(clusterBy !== undefined
+      ? { clusterBy: clusterBy as "decision" | "disposition-path" }
+      : {}),
   });
 
   // stdout is reserved for the artifact JSON (clean machine-readable output when --out is omitted); every human-facing
