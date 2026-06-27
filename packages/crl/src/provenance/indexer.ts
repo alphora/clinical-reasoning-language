@@ -367,6 +367,10 @@ export function buildProvenanceIndex(
           location: loc,
         });
         if (kind === "decision") {
+          // Non-recursive spine: a `use decision` is a LEAF here. Inlining a same-lib sub-decision's nodes under the
+          // parent address would double-count its logic as over-reach candidates (standalone + inlined), shifting the
+          // over-reach denominator — deferred pending the over-reach/coverage reconciliation. (decisionSpine keeps its
+          // optional resolver for the view-model + the golden parity test.)
           for (const sn of decisionSpine(node as Decision)) {
             const snRef = decisionSubNodeRef(libName, name, sn.nodeId);
             const snLoc = lsLoc(info.entry.filePath, sn.node.location);

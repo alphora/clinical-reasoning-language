@@ -82,7 +82,28 @@ case "c":
 - result is "D" is "Z".`;
 
 describe("decisionSpine — static spine + view-model id parity (§5)", () => {
-  it("produces the expected decision-local childId paths for D", () => {
+  // Same-library resolver — looks a bare `use decision` target up among the CRL's top-level decisions.
+  const resolverFor = (crl: ReturnType<typeof parseInput>) => (name: string): Decision | undefined =>
+    crl.statements.find((s): s is Decision => s.type === "Decision" && s.name === name);
+
+  it("produces the expected decision-local childId paths for D (use decision recurses Sub's body)", () => {
+    const crl = parseInput(CRL);
+    const d = crl.statements.find((s): s is Decision => s.type === "Decision" && s.name === "D")!;
+    expect(decisionSpine(d, resolverFor(crl)).map((n) => n.nodeId)).toEqual([
+      "when[0]",
+      "when[0]/action[0]",
+      "when[1]",
+      "when[1]/action[0]",
+      "when[1]/action[1]",
+      // Sub's body recursed UNDER the use-decision action `when[1]/action[1]`.
+      "when[1]/action[1]/otherwise",
+      "when[1]/action[1]/otherwise/action[0]",
+      "otherwise",
+      "otherwise/action[0]",
+    ]);
+  });
+
+  it("WITHOUT a resolver, a use decision stays a leaf (no recursion) — back-compat", () => {
     const crl = parseInput(CRL);
     const d = crl.statements.find((s): s is Decision => s.type === "Decision" && s.name === "D")!;
     expect(decisionSpine(d).map((n) => n.nodeId)).toEqual([
@@ -102,7 +123,7 @@ describe("decisionSpine — static spine + view-model id parity (§5)", () => {
     const vm = renderScenario(graphFrom(CRL, CEL));
     const vmIds = new Set<string>();
     for (const sc of vm.scenarios) collectIds(sc.tree, vmIds);
-    const spineIds = new Set(decisionSpine(d).map((n) => n.nodeId));
+    const spineIds = new Set(decisionSpine(d, resolverFor(crl)).map((n) => n.nodeId));
     expect([...spineIds].sort()).toEqual([...vmIds].sort());
   });
 
@@ -119,5 +140,115 @@ describe("decisionSpine — static spine + view-model id parity (§5)", () => {
     }
     const useDec = spine.find((n) => n.nodeId === "when[1]/action[1]")!;
     expect(useDec.node.type === "ActionStatement" && useDec.node.action.type).toBe("UseDecision");
+  });
+
+  // ── FIX 6: DIAMOND delegation — D uses A and B; both A and B `use decision "C"`. C is reached on TWO paths and must
+  //    NOT be flagged a cycle (the cycle guard is per-PATH, not global). Spine == VM parity; C's nodes appear under both.
+  const DIAMOND_CRL = `# DM
+library "DM".
+concept "P":
+- type is Condition.
+- code is \`p\`.
+activity "Final":
+- request CPGCommunicationRequest.
+- with \`f\`.
+decision "C":
+first:
+- otherwise then recommend activity "Final".
+decision "A":
+first:
+- otherwise then use decision "C".
+decision "B":
+first:
+- otherwise then use decision "C".
+decision "D":
+first:
+- when "P" then use decision "A".
+- when "P" then use decision "B".`;
+
+  const DIAMOND_CEL = `# DMC
+library "DMC".
+covers "DM".
+fact "Pat":
+- name is "Pat".
+- birth date is "1970-01-01".
+- defined by "Patient".
+case "c":
+- subject is "Pat".
+- result is "D" is "Final".`;
+
+  it("FIX 6: diamond delegation — C reached on two paths (not a cycle); spine ids cover BOTH action paths", () => {
+    const crl = parseInput(DIAMOND_CRL);
+    const d = crl.statements.find((s): s is Decision => s.type === "Decision" && s.name === "D")!;
+    const ids = decisionSpine(d, resolverFor(crl)).map((n) => n.nodeId);
+    // A recursed under when[0]/action[0]; C recursed under A's otherwise action; same for B under when[1]/action[0].
+    expect(ids).toEqual([
+      "when[0]",
+      "when[0]/action[0]",
+      "when[0]/action[0]/otherwise",
+      "when[0]/action[0]/otherwise/action[0]",
+      "when[0]/action[0]/otherwise/action[0]/otherwise",
+      "when[0]/action[0]/otherwise/action[0]/otherwise/action[0]",
+      "when[1]",
+      "when[1]/action[0]",
+      "when[1]/action[0]/otherwise",
+      "when[1]/action[0]/otherwise/action[0]",
+      "when[1]/action[0]/otherwise/action[0]/otherwise",
+      "when[1]/action[0]/otherwise/action[0]/otherwise/action[0]",
+    ]);
+    // C's leaf "Final" recommend appears under BOTH paths (the diamond's two arms), not deduped.
+    const finals = ids.filter((i) => i.endsWith("/otherwise/action[0]/otherwise/action[0]"));
+    expect(finals).toHaveLength(2);
+  });
+
+  it("FIX 6 GOLDEN: diamond spine ids are byte-identical to the view-model's (no drift, no cycle false-positive)", () => {
+    const crl = parseInput(DIAMOND_CRL);
+    const d = crl.statements.find((s): s is Decision => s.type === "Decision" && s.name === "D")!;
+    const vm = renderScenario(graphFrom(DIAMOND_CRL, DIAMOND_CEL));
+    const vmIds = new Set<string>();
+    for (const sc of vm.scenarios) collectIds(sc.tree, vmIds);
+    const spineIds = new Set(decisionSpine(d, resolverFor(crl)).map((n) => n.nodeId));
+    expect([...spineIds].sort()).toEqual([...vmIds].sort());
+  });
+
+  // ── FIX 6: a CROSS-LIBRARY (qualified) `use decision` stays a LEAF in both spine and VM (parity; no recursion). ──
+  const XLIB_CRL = `# XL
+library "XL".
+concept "P":
+- type is Condition.
+- code is \`p\`.
+decision "D":
+- when "P" then:
+  - use decision "Other"."Sub".
+  end.`;
+
+  const XLIB_CEL = `# XLC
+library "XLC".
+covers "XL".
+fact "Pat":
+- name is "Pat".
+- birth date is "1970-01-01".
+- defined by "Patient".
+case "c":
+- subject is "Pat".
+- result is "D" is "Sub".`;
+
+  it("FIX 6: a cross-library use decision stays a leaf in the spine (no recursion even WITH a resolver)", () => {
+    const crl = parseInput(XLIB_CRL);
+    const d = crl.statements.find((s): s is Decision => s.type === "Decision" && s.name === "D")!;
+    expect(decisionSpine(d, resolverFor(crl)).map((n) => n.nodeId)).toEqual([
+      "when[0]",
+      "when[0]/action[0]",
+    ]);
+  });
+
+  it("FIX 6 GOLDEN: cross-library use-decision spine ids are byte-identical to the view-model's (both leaf)", () => {
+    const crl = parseInput(XLIB_CRL);
+    const d = crl.statements.find((s): s is Decision => s.type === "Decision" && s.name === "D")!;
+    const vm = renderScenario(graphFrom(XLIB_CRL, XLIB_CEL));
+    const vmIds = new Set<string>();
+    for (const sc of vm.scenarios) collectIds(sc.tree, vmIds);
+    const spineIds = new Set(decisionSpine(d, resolverFor(crl)).map((n) => n.nodeId));
+    expect([...spineIds].sort()).toEqual([...vmIds].sort());
   });
 });

@@ -153,14 +153,24 @@ describe("buildCrlStructure — CRL-structure view-model (C2b-1)", () => {
     expect(byId.get("otherwise")!.children.map((c) => c.nodeId)).toEqual(["otherwise/action[0]"]);
   });
 
-  it("label parity: structure labels === the scenario view-model's (run-state stripped)", () => {
+  it("label parity: every structure label matches the scenario view-model's at the same nodeId (run-state stripped)", () => {
+    // #166: provenance addressing is NON-recursive (a `use decision` is a LEAF — delegated-sub-node inlining deferred),
+    // while the view-model recurses bare same-lib `use decision` targets in place. So the VM is a SUPERSET (it carries
+    // the delegated sub-tree nodeIds the structure does not). Parity = structure ⊆ VM with byte-identical labels at
+    // every shared nodeId; the VM's extra recursed nodeIds (e.g. when[1]/action[1]/otherwise) are expected and ignored.
     const graph = graphFrom(CRL, CEL);
     const d = buildCrlStructure(graph).find((x) => x.decision === "D")!;
     const structLabels = new Map<string, string>();
     flatten(d.children, structLabels);
     const vmLabels = new Map<string, string>();
     flatten(renderScenario(graph).scenarios[0].tree, vmLabels);
-    expect(structLabels).toEqual(vmLabels);
+    for (const [nodeId, label] of structLabels) {
+      expect(vmLabels.get(nodeId)).toBe(label);
+    }
+    // And the structure stays a LEAF at the use-decision node (no recursed children) — guards the FIX-5 revert.
+    expect(structLabels.has("when[1]/action[1]")).toBe(true);
+    expect(structLabels.has("when[1]/action[1]/otherwise")).toBe(false);
+    expect(vmLabels.has("when[1]/action[1]/otherwise")).toBe(true); // the VM DID recurse it
   });
 
   it("actionKind: undefined on when/otherwise, normalized on actions", () => {

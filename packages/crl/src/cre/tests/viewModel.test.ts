@@ -194,6 +194,12 @@ library "U".
 concept "Indic":
 - type is Condition.
 - code is \`i\`.
+activity "SubRec":
+- request CPGCommunicationRequest.
+- with \`sr\`.
+decision "Sub":
+first:
+- otherwise then recommend activity "SubRec".
 decision "D":
 - when "Indic" then:
   - use decision "Sub".
@@ -213,14 +219,56 @@ fact "fIndic":
 case "uses sub":
 - subject is "Pat".
 - fact is "fIndic".
-- result is "D" is "Sub".`;
+- result is "D" is "SubRec".`;
 
-  it("distinguishes a use-decision arm (actionKind use-decision, expanded:false, not recursed)", () => {
+  it("recurses a same-library use-decision: expanded:true, sub-tree inlined, sub's determination produced (REPLACE)", () => {
     const vm = renderScenario(graphFrom(USE_CRL, USE_CEL));
     const sc = vm.scenarios[0];
+    expect(sc.status).toBe("pass");
     const use = byId(sc.tree, "when[0]/action[0]")!;
-    expect(use.action).toMatchObject({ actionKind: "use-decision", target: { name: "Sub" }, produced: true, expanded: false });
-    expect(sc.produced).toEqual([{ recommendation: "Sub", actionKind: "use-decision" }]);
+    // The use-decision node itself is NOT produced (it delegates); it is expanded with Sub's body inlined under it.
+    expect(use.action).toMatchObject({ actionKind: "use-decision", target: { name: "Sub" }, produced: false, expanded: true });
+    // Sub's body recursed UNDER the use-decision action's nodeId.
+    const subRec = byId(sc.tree, "when[0]/action[0]/otherwise/action[0]")!;
+    expect(subRec.action).toMatchObject({ actionKind: "recommend-activity", target: { name: "SubRec" }, produced: true });
+    // The bare sub-name "Sub" is NOT in the produced summary; the delegated determination "SubRec" IS (REPLACE).
+    expect(sc.produced).toEqual([{ recommendation: "SubRec", actionKind: "recommend-activity" }]);
+  });
+
+  const XLIB_CRL = `# XU
+library "XU".
+concept "Indic":
+- type is Condition.
+- code is \`i\`.
+decision "D":
+- when "Indic" then:
+  - use decision "Other"."Sub".
+  end.`;
+
+  const XLIB_CEL = `# XUC
+library "XUC".
+covers "XU".
+fact "Pat":
+- name is "Pat".
+- birth date is "1970-01-01".
+- defined by "Patient".
+fact "fIndic":
+- code is "http://example.org|i".
+- date is "2026-01-01".
+- defined by "Indic".
+case "uses cross-lib sub":
+- subject is "Pat".
+- fact is "fIndic".
+- result is "D" is "Sub".`;
+
+  it("a cross-library use-decision stays a leaf: expanded:false, no children, not produced (deferred)", () => {
+    const vm = renderScenario(graphFrom(XLIB_CRL, XLIB_CEL));
+    const sc = vm.scenarios[0];
+    const use = byId(sc.tree, "when[0]/action[0]")!;
+    expect(use.action).toMatchObject({ actionKind: "use-decision", target: { name: "Sub" }, produced: false, expanded: false });
+    expect(use.children).toBeUndefined();
+    expect(sc.produced).toEqual([]);
+    expect(sc.diagnostics.some((d) => /cross-library `use decision`.*deferred/.test(d))).toBe(true);
   });
 
   const NESTED_CRL = `# N

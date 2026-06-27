@@ -7,7 +7,7 @@ import type { ResolvedCelGraph } from "../../cel/imports/types";
 import type { RegistryEntry } from "../../imports/types";
 
 import type { Decision } from "../../ast/types";
-import { collectDecisionArms } from "../../cel/validator/validator";
+import { collectDecisionArmsTransitive } from "../../ast/decisionArms";
 
 import { runCel } from "../run";
 
@@ -36,16 +36,17 @@ function statuses(crlSrc: string, celSrc: string): string[] {
   return runCel(graphFrom(crlSrc, celSrc)).runs.map((r) => `${r.case}:${r.status}`);
 }
 
-/** Structural invariant: every produced recommendation is a DIRECT arm of its decision. */
+/** Structural invariant: every produced recommendation is a TRANSITIVE arm of its decision (the produced set now
+ *  bubbles delegated sub-decision determinations up via `use decision`, so the bound must be the transitive arms). */
 function assertProducedSubsetOfArms(crlSrc: string, celSrc: string): void {
   const crl = parseInput(crlSrc);
   const r = runCel(graphFrom(crlSrc, celSrc));
+  const resolve = (name: string): Decision | undefined =>
+    crl.statements.find((s): s is Decision => s.type === "Decision" && s.name === name);
   for (const run of r.runs) {
     if (!run.decision) continue;
-    const d = crl.statements.find(
-      (s): s is Decision => s.type === "Decision" && s.name === run.decision,
-    );
-    const arms = d ? collectDecisionArms(d) : new Set<string>();
+    const d = resolve(run.decision);
+    const arms = d ? collectDecisionArmsTransitive(d, resolve) : new Set<string>();
     for (const p of run.produced) {
       expect(arms.has(p.recommendation)).toBe(true);
     }
@@ -343,5 +344,154 @@ case "neither eligible -> whole menu guarded out (expected fail)":
     assertProducedSubsetOfArms(GUARD_CRL, GUARD_CEL);
     assertProducedSubsetOfArms(ALL_CRL, ALL_CEL);
     assertProducedSubsetOfArms(ONLYWHEN_CRL, ONLYWHEN_CEL);
+  });
+
+  // ── transitive `use decision` (#166) ──────────────────────────────────────────────────────────────────
+
+  const DELEG_CRL = `# DG
+library "DG".
+concept "Indic":
+- type is Condition.
+- code is \`indic\`.
+concept "Severe":
+- type is Condition.
+- code is \`sev\`.
+activity "Escalate":
+- request CPGCommunicationRequest.
+- with \`e\`.
+activity "Routine":
+- request CPGCommunicationRequest.
+- with \`r\`.
+decision "Sub":
+first:
+- when "Severe" then recommend activity "Escalate".
+- otherwise then recommend activity "Routine".
+decision "D":
+- when "Indic" then:
+  - use decision "Sub".
+  end.`;
+
+  const DELEG_CEL = `# DGC
+library "DGC".
+covers "DG".
+fact "Pat":
+- name is "Pat".
+- birth date is "1970-01-01".
+- defined by "Patient".
+fact "fIndic":
+- code is "http://example.org|indic".
+- date is "2026-01-01".
+- defined by "Indic".
+fact "fSevere":
+- code is "http://example.org|sev".
+- date is "2026-01-01".
+- defined by "Severe".
+case "severe -> sub escalates":
+- subject is "Pat".
+- fact is "fIndic".
+- fact is "fSevere".
+- result is "D" is "Escalate".
+case "not severe -> sub routine":
+- subject is "Pat".
+- fact is "fIndic".
+- result is "D" is "Routine".`;
+
+  it("delegation: a same-library use decision recurses; the sub's determination satisfies the oracle", () => {
+    expect(statuses(DELEG_CRL, DELEG_CEL)).toEqual([
+      "severe -> sub escalates:pass",
+      "not severe -> sub routine:pass",
+    ]);
+  });
+
+  it("REPLACE: the bare sub-decision NAME is NOT in produced — only the sub's determinations bubble up", () => {
+    const r = runCel(graphFrom(DELEG_CRL, DELEG_CEL));
+    const severe = r.runs.find((x) => x.case.startsWith("severe"))!;
+    const names = severe.produced.map((p) => p.recommendation);
+    expect(names).toEqual(["Escalate"]);
+    expect(names).not.toContain("Sub"); // delegation, not a disposition
+    // The use-decision trace node carries the recursed sub-tree as children (Escalate is nested under Sub's when[0]).
+    const useNode = severe.trace[0].children?.find((n) => n.node === "Sub");
+    const hasNode = (ns: typeof severe.trace, name: string): boolean =>
+      ns.some((n) => n.node === name || (n.children ? hasNode(n.children, name) : false));
+    expect(useNode?.children && hasNode(useNode.children, "Escalate")).toBe(true);
+  });
+
+  const CYCLE_CRL = `# CY
+library "CY".
+concept "Indic":
+- type is Condition.
+- code is \`indic\`.
+decision "D2":
+- when "Indic" then:
+  - use decision "D".
+  end.
+decision "D":
+- when "Indic" then:
+  - use decision "D2".
+  end.`;
+
+  const CYCLE_CEL = `# CYC
+library "CYC".
+covers "CY".
+fact "Pat":
+- name is "Pat".
+- birth date is "1970-01-01".
+- defined by "Patient".
+fact "fIndic":
+- code is "http://example.org|indic".
+- date is "2026-01-01".
+- defined by "Indic".
+case "cycle":
+- subject is "Pat".
+- fact is "fIndic".
+- result is "D" is "D2".`;
+
+  it("cycle: D → D2 → D delegation cycle yields status:error + a cycle diagnostic (no hang)", () => {
+    const r = runCel(graphFrom(CYCLE_CRL, CYCLE_CEL));
+    const run = r.runs[0];
+    expect(run.status).toBe("error");
+    expect(run.diagnostics.some((d) => /delegation cycle/.test(d))).toBe(true);
+  });
+
+  const XLIB_CRL = `# XR
+library "XR".
+concept "Indic":
+- type is Condition.
+- code is \`indic\`.
+decision "D":
+- when "Indic" then:
+  - use decision "Shared"."Sub".
+  end.`;
+
+  const XLIB_CEL = `# XRC
+library "XRC".
+covers "XR".
+fact "Pat":
+- name is "Pat".
+- birth date is "1970-01-01".
+- defined by "Patient".
+fact "fIndic":
+- code is "http://example.org|indic".
+- date is "2026-01-01".
+- defined by "Indic".
+case "cross-lib deferred":
+- subject is "Pat".
+- fact is "fIndic".
+- result is "D" is "Sub".`;
+
+  it("cross-library use decision is NOT recursed: leaf + a deferred diagnostic, no production", () => {
+    const r = runCel(graphFrom(XLIB_CRL, XLIB_CEL));
+    const run = r.runs[0];
+    expect(run.produced).toEqual([]); // not produced (REPLACE: a leaf delegation determines nothing here)
+    expect(run.diagnostics.some((d) => /cross-library `use decision`.*deferred/.test(d))).toBe(true);
+    expect(run.status).toBe("fail"); // the "Sub" oracle can't be satisfied (deferred)
+  });
+
+  it("FIX 4: a menu whose only item is a deferred cross-lib use-decision does NOT claim 'guarded out'", () => {
+    const r = runCel(graphFrom(XLIB_CRL, XLIB_CEL));
+    const run = r.runs[0];
+    // No item was guard-excluded — the lone item was a deferred delegation. The diagnostic must not assert guarding.
+    expect(run.diagnostics.some((d) => /guarded out/.test(d))).toBe(false);
+    expect(run.diagnostics.some((d) => /determined a recommendation/.test(d))).toBe(true);
   });
 });

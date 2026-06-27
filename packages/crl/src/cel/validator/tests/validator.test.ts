@@ -359,7 +359,8 @@ describe("CEL Todo 4 — result resolution + value-shape check", () => {
 
 describe("CEL T03 / #86 — result branch arm cross-check", () => {
   function libWithD7(): string {
-    // Reachable arms of D7: A, SubD. Unreachable: Z (only reachable via SubD).
+    // Transitive arms of D7 (#166): A (direct) + SubD's arms (Z) — the bare same-library `use decision "SubD"` is
+    // REPLACED by its arms. "SubD" itself is NO LONGER a valid branch (a delegation isn't a disposition).
     return [
       "# L",
       "library \"L\".",
@@ -399,7 +400,8 @@ describe("CEL T03 / #86 — result branch arm cross-check", () => {
     });
   });
 
-  test("known sub-decision name as arm → clean (use decision target is a valid branch)", () => {
+  test("bare same-library sub-decision NAME is NOT a valid arm → unresolved-result-branch (REPLACE, #166)", () => {
+    // Under transitive arms the bare `use decision "SubD"` is replaced by SubD's arms; "SubD" itself is not a disposition.
     withProject((root) => {
       write(root, "lib.crl", libWithD7());
       const file = write(root, "f.cel", [
@@ -409,7 +411,9 @@ describe("CEL T03 / #86 — result branch arm cross-check", () => {
         "- result is \"D7\" is \"SubD\".",
       ].join("\n"));
       const r = validateCELFile(file);
-      expect(r.errors.filter((e) => e.kind === "unresolved-result-branch")).toEqual([]);
+      const branchErrors = r.errors.filter((e) => e.kind === "unresolved-result-branch");
+      expect(branchErrors).toHaveLength(1);
+      expect(branchErrors[0].message).toContain("SubD");
     });
   });
 
@@ -430,9 +434,8 @@ describe("CEL T03 / #86 — result branch arm cross-check", () => {
     });
   });
 
-  test("real activity reachable only via sub-decision → unresolved-result-branch (no transitive walk)", () => {
-    // Z is an activity in the library and reachable via SubD, but NOT a
-    // direct arm of D7. Per issue #86 this must fail.
+  test("activity reachable transitively via a same-library sub-decision → clean (transitive arms, #166)", () => {
+    // Z is reachable via the bare same-library `use decision "SubD"`; with transitive arms it IS a valid branch of D7.
     withProject((root) => {
       write(root, "lib.crl", libWithD7());
       const file = write(root, "f.cel", [
@@ -442,8 +445,7 @@ describe("CEL T03 / #86 — result branch arm cross-check", () => {
         "- result is \"D7\" is \"Z\".",
       ].join("\n"));
       const r = validateCELFile(file);
-      const branchErrors = r.errors.filter((e) => e.kind === "unresolved-result-branch");
-      expect(branchErrors).toHaveLength(1);
+      expect(r.errors.filter((e) => e.kind === "unresolved-result-branch")).toEqual([]);
     });
   });
 
@@ -537,6 +539,171 @@ describe("CEL T03 / #86 — result branch arm cross-check", () => {
       const branchClean = r.errors.filter((e) => e.kind === "unresolved-result-branch").length === 0;
       const errored = r.errors.length > 0;
       expect(branchClean === false || errored).toBe(true);
+    });
+  });
+});
+
+describe("CEL #166 — transitive `use decision` arm cross-check", () => {
+  // D uses a chain of same-library sub-decisions; valid arms of D are the transitive recommend-activity dispositions.
+  function chainLib(): string {
+    return [
+      "# L",
+      "library \"L\".",
+      "decision \"D\":",
+      "",
+      "- when \"P\" then use decision \"Mid\".",
+      "decision \"Mid\":",
+      "",
+      "- when \"P\" then use decision \"Leaf\".",
+      "decision \"Leaf\":",
+      "",
+      "- when \"P\" then recommend activity \"Final\".",
+      "concept \"P\":",
+      "- type is Observation.",
+      "- value type is boolean.",
+      "- defined as \"P\".",
+      "activity \"Final\":",
+      "- request CPGServiceRequest.",
+      "- with \"VS\".",
+      "terminology \"VS\":",
+      "- valueset is `urn:example:placeholder`.",
+    ].join("\n");
+  }
+
+  test("a disposition reachable only through a same-library use-decision chain VALIDATES", () => {
+    withProject((root) => {
+      write(root, "lib.crl", chainLib());
+      const file = write(root, "f.cel", [
+        ...ENC_FACT_HEADER,
+        "case \"C\":",
+        "- subject is \"Subject\".",
+        "- result is \"D\" is \"Final\".",
+      ].join("\n"));
+      const r = validateCELFile(file);
+      expect(r.errors.filter((e) => e.kind === "unresolved-result-branch")).toEqual([]);
+    });
+  });
+
+  test("an impossible transitive disposition → unresolved-result-branch", () => {
+    withProject((root) => {
+      write(root, "lib.crl", chainLib());
+      const file = write(root, "f.cel", [
+        ...ENC_FACT_HEADER,
+        "case \"C\":",
+        "- subject is \"Subject\".",
+        "- result is \"D\" is \"Mid\".", // an intermediate delegation name is not a disposition (REPLACE)
+      ].join("\n"));
+      const r = validateCELFile(file);
+      const branchErrors = r.errors.filter((e) => e.kind === "unresolved-result-branch");
+      expect(branchErrors).toHaveLength(1);
+      expect(branchErrors[0].message).toContain("Final"); // the reachable-arms list names the real disposition
+    });
+  });
+
+  // FIX 2 — REPLACE consistency: a target the CRE produces NOTHING for (qualified cross-lib, or cyclic) is NOT a valid
+  // arm. Its bare name is DROPPED so validate_cel and run_decision reject identically.
+  function xlibLib(): string {
+    return [
+      "# L",
+      "library \"L\".",
+      "decision \"D\":",
+      "",
+      "- when \"P\" then recommend activity \"A\".",
+      "- when \"P\" then use decision \"Other\".\"Sub\".", // QUALIFIED → cross-library, deferred, not a disposition
+      "concept \"P\":",
+      "- type is Observation.",
+      "- value type is boolean.",
+      "- defined as \"P\".",
+      "activity \"A\":",
+      "- request CPGServiceRequest.",
+      "- with \"VS\".",
+      "terminology \"VS\":",
+      "- valueset is `urn:example:placeholder`.",
+    ].join("\n");
+  }
+
+  test("a cross-library use-decision target name is NOT a valid arm → unresolved-result-branch (FIX 2)", () => {
+    withProject((root) => {
+      write(root, "lib.crl", xlibLib());
+      const file = write(root, "f.cel", [
+        ...ENC_FACT_HEADER,
+        "case \"C\":",
+        "- subject is \"Subject\".",
+        "- result is \"D\" is \"Sub\".", // the deferred cross-lib target's bare name — no longer offered as an arm
+      ].join("\n"));
+      const r = validateCELFile(file);
+      const branchErrors = r.errors.filter((e) => e.kind === "unresolved-result-branch");
+      expect(branchErrors).toHaveLength(1);
+      expect(branchErrors[0].message).toContain("Sub");
+      expect(branchErrors[0].message).toContain("\"A\""); // the real direct arm IS offered
+    });
+  });
+
+  test("the cross-library target's real DIRECT sibling arm still validates", () => {
+    withProject((root) => {
+      write(root, "lib.crl", xlibLib());
+      const file = write(root, "f.cel", [
+        ...ENC_FACT_HEADER,
+        "case \"C\":",
+        "- subject is \"Subject\".",
+        "- result is \"D\" is \"A\".",
+      ].join("\n"));
+      const r = validateCELFile(file);
+      expect(r.errors.filter((e) => e.kind === "unresolved-result-branch")).toEqual([]);
+    });
+  });
+
+  function cyclicLib(): string {
+    // D delegates to D2 and D2 back to D (a same-lib delegation cycle). Neither delegation name is a disposition.
+    return [
+      "# L",
+      "library \"L\".",
+      "decision \"D\":",
+      "",
+      "- when \"P\" then recommend activity \"A\".",
+      "- when \"P\" then use decision \"D2\".",
+      "decision \"D2\":",
+      "",
+      "- when \"P\" then use decision \"D\".",
+      "concept \"P\":",
+      "- type is Observation.",
+      "- value type is boolean.",
+      "- defined as \"P\".",
+      "activity \"A\":",
+      "- request CPGServiceRequest.",
+      "- with \"VS\".",
+      "terminology \"VS\":",
+      "- valueset is `urn:example:placeholder`.",
+    ].join("\n");
+  }
+
+  test("a cyclic delegation name is NOT offered as an arm → unresolved-result-branch (FIX 2; no hang)", () => {
+    withProject((root) => {
+      write(root, "lib.crl", cyclicLib());
+      const file = write(root, "f.cel", [
+        ...ENC_FACT_HEADER,
+        "case \"C\":",
+        "- subject is \"Subject\".",
+        "- result is \"D\" is \"D2\".", // the cyclic delegation name — not a disposition
+      ].join("\n"));
+      const r = validateCELFile(file);
+      const branchErrors = r.errors.filter((e) => e.kind === "unresolved-result-branch");
+      expect(branchErrors).toHaveLength(1);
+      expect(branchErrors[0].message).toContain("D2");
+    });
+  });
+
+  test("the direct disposition of a cyclically-delegating decision still validates", () => {
+    withProject((root) => {
+      write(root, "lib.crl", cyclicLib());
+      const file = write(root, "f.cel", [
+        ...ENC_FACT_HEADER,
+        "case \"C\":",
+        "- subject is \"Subject\".",
+        "- result is \"D\" is \"A\".", // D's own direct recommend activity — valid (the cycle is only on the D2 arm)
+      ].join("\n"));
+      const r = validateCELFile(file);
+      expect(r.errors.filter((e) => e.kind === "unresolved-result-branch")).toEqual([]);
     });
   });
 });

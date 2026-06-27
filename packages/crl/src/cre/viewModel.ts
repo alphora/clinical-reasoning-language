@@ -129,8 +129,10 @@ export interface ActionView {
   target: ConceptView;
   qualifier?: "any" | "all";
   produced: boolean;
-  /** Always false in v1 — `use decision` targets are not recursed (their sub-tree is not inlined). */
-  expanded?: false;
+  /** `use decision` only: true when a BARE same-library target was recursed in place (its sub-tree inlined as the
+   *  action node's `children`); false when it stays a leaf (a QUALIFIED cross-library target, an unresolved target,
+   *  or one on the delegation path → cycle). Absent for a `recommend activity` action. */
+  expanded?: boolean;
 }
 
 /** VM-native projection of the `defined as` composition sub-evaluation. */
@@ -223,7 +225,11 @@ function buildScenario(
     : null;
 
   const traceIndex = indexTrace(run.trace);
-  const tree = dec ? walkBranchesVM(dec.body.statements, "", traceIndex, filePath) : [];
+  // Same-library resolver for `use decision` recursion — mirrors the CRE's. Seeded cycle stack = the covered decision.
+  const resolve = (name: string): Decision | undefined => decisions.get(name);
+  const tree = dec
+    ? walkBranchesVM(dec.body.statements, "", traceIndex, filePath, resolve, new Set([dec.name]))
+    : [];
 
   // produced summary derived from the tree's produced action nodes — each carries the correct per-node
   // actionKind from the AST, so a name shared by an activity and a sub-decision can't be mislabeled
@@ -306,6 +312,8 @@ function walkBranchesVM(
   parentId: string,
   traceIndex: Map<string, TraceNode>,
   filePath: string,
+  resolve: (name: string) => Decision | undefined,
+  stack: Set<string>,
 ): ViewNode[] {
   const out: ViewNode[] = [];
   // A branch absent from the trace is unreached; it's "preempted" iff a prior sibling matched (an
@@ -322,7 +330,7 @@ function walkBranchesVM(
         label: "otherwise",
         source: span(b.location, filePath),
         evaluated: !!t,
-        children: walkBodyVM(b.body, nodeId, traceIndex, filePath),
+        children: walkBodyVM(b.body, nodeId, traceIndex, filePath, resolve, stack),
       };
       if (!t && priorMatch) node.unreachedReason = "preempted";
       if (t) priorMatch = true;
@@ -347,7 +355,7 @@ function walkBranchesVM(
       source: span(b.location, filePath),
       evaluated: !!t,
       condition,
-      children: walkBodyVM(b.body, nodeId, traceIndex, filePath),
+      children: walkBodyVM(b.body, nodeId, traceIndex, filePath, resolve, stack),
     };
     if (!t && priorMatch) node.unreachedReason = "preempted";
     if (t?.satisfied) priorMatch = true;
@@ -361,19 +369,21 @@ function walkBodyVM(
   parentId: string,
   traceIndex: Map<string, TraceNode>,
   filePath: string,
+  resolve: (name: string) => Decision | undefined,
+  stack: Set<string>,
 ): ViewNode[] {
   if (body.type === "ActionStatement") {
-    return [buildActionVM(body, childId(parentId, "action[0]"), undefined, traceIndex, filePath)];
+    return [buildActionVM(body, childId(parentId, "action[0]"), undefined, traceIndex, filePath, resolve, stack)];
   }
   const block = body as BlockBody;
   const isBranch = block.statements.some(
     (m) => m.type === "WhenBlock" || m.type === "OtherwiseBlock",
   );
   if (isBranch)
-    return walkBranchesVM(block.statements as BranchBlock[], parentId, traceIndex, filePath);
+    return walkBranchesVM(block.statements as BranchBlock[], parentId, traceIndex, filePath, resolve, stack);
   const qualifier = block.qualifier;
   return (block.statements as ActionStatement[]).map((stmt, j) =>
-    buildActionVM(stmt, childId(parentId, `action[${j}]`), qualifier, traceIndex, filePath),
+    buildActionVM(stmt, childId(parentId, `action[${j}]`), qualifier, traceIndex, filePath, resolve, stack),
   );
 }
 
@@ -383,6 +393,8 @@ function buildActionVM(
   qualifier: BlockQualifier | undefined,
   traceIndex: Map<string, TraceNode>,
   filePath: string,
+  resolve: (name: string) => Decision | undefined,
+  stack: Set<string>,
 ): ViewNode {
   const t = traceIndex.get(nodeId);
   const evaluated = !!t;
@@ -391,12 +403,40 @@ function buildActionVM(
   const actionKind: ActionKind =
     stmt.action.type === "RecommendActivity" ? "recommend-activity" : "use-decision";
   const guardedOut = t?.guardedOut === true;
+
+  // `use decision` recursion: STRUCTURALLY inline a BARE same-library target that resolves and is not on the
+  // delegation path (cycle) — independent of whether this action was reached, because the view-model is the FULL
+  // tree (the static spine: every branch/action, reached or not). This keeps the VM nodeId set byte-identical to
+  // decisionSpine's (the golden parity invariant). Per-node run state (evaluated/produced) is overlaid from the
+  // trace as usual. A use-decision node is NEVER itself `produced` — it delegates; its child RecommendActivity
+  // nodes carry the dispositions (REPLACE). A QUALIFIED (cross-library) or cyclic target stays a leaf (expanded:false).
+  let children: ViewNode[] | undefined;
+  let expanded: boolean | undefined;
+  if (actionKind === "use-decision") {
+    expanded = false;
+    if (stmt.action.type === "UseDecision" && !getRefLibrary(stmt.action.decisionName)) {
+      const subName = getRefName(stmt.action.decisionName);
+      const sub = stack.has(subName) ? undefined : resolve(subName);
+      if (sub) {
+        children = walkBranchesVM(
+          sub.body.statements,
+          nodeId,
+          traceIndex,
+          filePath,
+          resolve,
+          new Set([...stack, subName]),
+        );
+        expanded = true;
+      }
+    }
+  }
+
   const action: ActionView = {
     actionKind,
     target: conceptView(actionRef),
     ...(qualifier === "any" || qualifier === "all" ? { qualifier } : {}),
-    produced: evaluated && !guardedOut,
-    ...(actionKind === "use-decision" ? { expanded: false as const } : {}),
+    produced: actionKind === "use-decision" ? false : evaluated && !guardedOut,
+    ...(actionKind === "use-decision" ? { expanded: expanded! } : {}),
   };
   const node: ViewNode = {
     nodeId,
@@ -405,6 +445,7 @@ function buildActionVM(
     source: span(stmt.location, filePath),
     evaluated,
     action,
+    ...(children ? { children } : {}),
   };
   if (guardedOut) node.guardedOut = true;
   if (t?.guard) {

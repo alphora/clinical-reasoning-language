@@ -117,6 +117,8 @@ export function buildCrlStructure(
       const declLoc = lsLoc(info.entry.filePath, s.location);
       if (!declLoc) continue; // mirror the indexer: a location-less decl is not inventoried (keeps nodeKey parity)
       const flat: CrlStructureNode[] = [];
+      // Non-recursive spine (mirrors the indexer): a `use decision` is a LEAF in provenance addressing — delegated
+      // sub-node inlining is deferred pending the over-reach/coverage reconciliation. (See indexer.ts.)
       for (const sn of decisionSpine(s)) {
         const location = lsLoc(info.entry.filePath, sn.node.location);
         if (!location) continue; // mirror the indexer's per-sub-node skip

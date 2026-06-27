@@ -1,4 +1,4 @@
-import { collectDecisionArms } from "../../ast/decisionArms";
+import { collectDecisionArmsTransitive } from "../../ast/decisionArms";
 import {
   isQualifiedRef,
   getRefName,
@@ -228,6 +228,16 @@ export function validateCEL(
   const leafCandidates = coversTarget
     ? buildLeafCandidates(coversTarget.ast.statements)
     : new Map<string, Statement>();
+  // Same-library resolver for transitive `use decision` arms — a bare sub-decision name → its Decision in the covered
+  // library. (Cross-library, cyclic, and unresolved targets contribute NO arm — collectDecisionArmsTransitive drops
+  // their name, matching the runtime, which produces nothing for them.)
+  const decisionsByName = new Map<string, Decision>();
+  if (coversTarget) {
+    for (const s of coversTarget.ast.statements) {
+      if (s.type === "Decision") decisionsByName.set(s.name, s);
+    }
+  }
+  const resolveDecision = (name: string): Decision | undefined => decisionsByName.get(name);
   for (const c of cel.statements) {
     if (c.type !== "CELCase") continue;
     for (const cb of c.body) {
@@ -253,6 +263,7 @@ export function validateCEL(
           errors,
           warnings,
           fp,
+          resolveDecision,
         );
       } else if (cb.type === "CELCrossResourceField") {
         validateCrossResource(cb, facts, c.name, errors, fp);
@@ -436,6 +447,7 @@ function validateResult(
   errors: CELValidationError[],
   _warnings: CELValidationError[],
   fp: string,
+  resolveDecision: (name: string) => Decision | undefined,
 ): void {
   if (coversName === undefined) return; // resolver flagged unresolved-covers
   const leaf = leafCandidates.get(cb.leafName);
@@ -462,13 +474,12 @@ function validateResult(
         ),
       );
     } else {
-      // T03 / #86: cross-check the branch string against the decision's
-      // reachable arms (direct RecommendActivity.activityName +
-      // UseDecision.decisionName). No transitive walk — a `use decision "D1"`
-      // arm of D7 makes "D1" a valid branch for D7, but D1's own arms are
-      // NOT valid branches for D7. Per issue #86's "real but unreachable
-      // arm" example.
-      const arms = collectDecisionArms(leaf as Decision);
+      // T03 / #86 + transitive `use decision` (#166): cross-check the branch string against the decision's
+      // TRANSITIVE arms — direct RecommendActivity.activityName PLUS, for a BARE same-library `use decision`
+      // target, that sub-decision's arms (the bare sub-name is REPLACED, not kept: a delegation isn't a
+      // disposition). A QUALIFIED (cross-library), cyclic, or unresolved target contributes NO arm — its name is
+      // dropped, matching the runtime (which produces nothing for it), so validate_cel and run_decision reject alike.
+      const arms = collectDecisionArmsTransitive(leaf as Decision, resolveDecision);
       if (!arms.has(cb.value.branchName)) {
         errors.push(
           err(

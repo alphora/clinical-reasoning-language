@@ -30,9 +30,15 @@
  *    the per-action guards `unless "C"` / `only when "C"`.
  *  - Oracle: a decision-leaf `result is` passes iff the expected branch is in
  *    the produced set (membership — a case asserts one valid disposition).
- *  - `use decision` targets are produced as direct recommendations (their NAME),
- *    NOT recursed — matching the CEL validator's direct-arm model. Transitive
- *    recursion is deferred.
+ *  - `use decision` is EVALUATED transitively (#166): a BARE same-library target
+ *    is recursed in place — the sub-decision's body is walked under the
+ *    use-decision action's nodeId and its RecommendActivity determinations bubble
+ *    into the SAME produced set (so the oracle sees the delegated disposition).
+ *    The bare sub-decision NAME is NOT produced (a delegation is not a
+ *    disposition — REPLACE semantics). A QUALIFIED (cross-library) target stays a
+ *    leaf with a "deferred" diagnostic (transitive cross-library evaluation is
+ *    out of scope). Delegation is cycle-guarded (a target already on the
+ *    delegation path → a runtime-error status + a cycle diagnostic, no hang).
  */
 import type { CELCase, CELDefinedByField, CELFact, CELResultField } from "../cel/ast/types";
 import type { ResolvedCelGraph } from "../cel/imports/types";
@@ -150,6 +156,12 @@ interface Ctx {
   produced: ProducedRec[];
   trace: TraceNode[];
   diagnostics: string[];
+  /** The covered library's decisions, by name — resolves a same-library `use decision` target for recursion. */
+  decisions: Map<string, Decision>;
+  /** Decision names on the current delegation path (cycle guard; seeded with the covered decision name). */
+  delegationStack: Set<string>;
+  /** Set when delegation hit a cycle — the case run reports `status: "error"` (no pass/fail) rather than a partial result. */
+  runtimeError: boolean;
 }
 
 /**
@@ -276,17 +288,80 @@ function evalGuard(
 /** Source span of an AST node in the covered library file. */
 const spanOf = (loc: Location, ctx: Ctx): LsLocation => ({ filePath: ctx.filePath, range: toZeroBasedRange(loc) });
 
+/**
+ * Emit one action node (already past its guard) at `nodeId`. A `recommend activity` is a leaf disposition: its name
+ * enters `produced`. A `use decision` DELEGATES:
+ *  - BARE same-library target, resolvable, not on the delegation path → recurse the sub-decision's body UNDER this
+ *    action's nodeId (children) with the name pushed on the delegation stack. The sub's RecommendActivity names bubble
+ *    into the SAME `ctx.produced` (so the oracle sees the delegated disposition). The bare sub-name is NOT produced.
+ *  - QUALIFIED (cross-library) target → leaf + a "deferred" diagnostic; not recursed, not produced.
+ *  - target on the delegation path (cycle) → set `ctx.runtimeError` + a cycle diagnostic; not recursed.
+ * Returns whether this action contributed at least one production to `ctx.produced` (for the all-guarded-out diagnostic).
+ */
+function emitAction(
+  stmt: ActionStatement,
+  viaWhen: string | null,
+  qualifier: BlockQualifier | null,
+  ctx: Ctx,
+  into: TraceNode[],
+  nodeId: string,
+  guardInfo?: TraceNode["guard"],
+): boolean {
+  const source = spanOf(stmt.location, ctx);
+  if (stmt.action.type === "RecommendActivity") {
+    const name = recName(stmt.action);
+    ctx.produced.push({ recommendation: name, viaWhen, qualifier });
+    into.push({ node: name, nodeId, kind: "action", source, evaluated: true, ...(guardInfo ? { guard: guardInfo } : {}) });
+    return true;
+  }
+  // UseDecision.
+  const name = recName(stmt.action);
+  const node: TraceNode = {
+    node: name,
+    nodeId,
+    kind: "action",
+    source,
+    evaluated: true,
+    ...(guardInfo ? { guard: guardInfo } : {}),
+    children: [],
+  };
+  into.push(node);
+  if (getRefLibrary(stmt.action.decisionName)) {
+    // Cross-library (qualified) → transitive evaluation deferred. Leaf; do NOT produce (no disposition determined).
+    ctx.diagnostics.push(
+      `cross-library \`use decision\` ${labelOf(getRefLibrary(stmt.action.decisionName)!, name)}: transitive evaluation deferred`,
+    );
+    return false;
+  }
+  if (ctx.delegationStack.has(name)) {
+    ctx.runtimeError = true;
+    ctx.diagnostics.push(`decision delegation cycle: ${[...ctx.delegationStack, name].join(" → ")}`);
+    return false;
+  }
+  const sub = ctx.decisions.get(name);
+  if (!sub) {
+    // Same-library bare target not found — leaf + diagnostic (don't crash, don't produce a phantom disposition).
+    ctx.diagnostics.push(`\`use decision "${name}"\` target not found in the covered library`);
+    return false;
+  }
+  // Recurse the sub-decision under this action's nodeId; its determinations bubble into ctx.produced. REPLACE: the
+  // bare sub-name itself is NOT produced (a delegation is not a disposition). try/finally so a throw in the recursion
+  // can't poison the delegation stack for sibling branches.
+  const beforeCount = ctx.produced.length;
+  ctx.delegationStack.add(name);
+  try {
+    walkBranches(sub.body.qualifier, sub.body.statements, ctx, node.children!, nodeId);
+  } finally {
+    ctx.delegationStack.delete(name);
+  }
+  return ctx.produced.length > beforeCount;
+}
+
 function executeBody(body: WhenBlockBody, viaWhen: string | null, ctx: Ctx, into: TraceNode[], parentId: string): void {
+  if (ctx.runtimeError) return; // a delegation cycle short-circuits the rest of the walk — no further productions/trace
   if (body.type === "ActionStatement") {
     // Inline single action — the grammar forbids a guard here.
-    ctx.produced.push({ recommendation: recName(body.action), viaWhen, qualifier: null });
-    into.push({
-      node: recName(body.action),
-      nodeId: childId(parentId, "action[0]"),
-      kind: "action",
-      source: spanOf(body.location, ctx),
-      evaluated: true,
-    });
+    emitAction(body, viaWhen, null, ctx, into, childId(parentId, "action[0]"));
     return;
   }
   const block: BlockBody = body;
@@ -297,23 +372,41 @@ function executeBody(body: WhenBlockBody, viaWhen: string | null, ctx: Ctx, into
   }
   // Action menu (`any:` / `all:` / single).
   let produced = 0;
-  (block.statements as ActionStatement[]).forEach((stmt, j) => {
+  let guardExcluded = 0;
+  const items = block.statements as ActionStatement[];
+  for (let j = 0; j < items.length; j++) {
+    if (ctx.runtimeError) return; // a cycle in an earlier menu item short-circuits the rest (no further trace/diagnostic)
+    const stmt = items[j];
     const name = recName(stmt.action);
     const nodeId = childId(parentId, `action[${j}]`);
-    const source = spanOf(stmt.location, ctx);
     const g = evalGuard(stmt.guard, ctx);
     if (g.excluded) {
-      into.push({ node: name, nodeId, kind: "action", source, evaluated: true, guardedOut: true, guard: g.info });
-      return;
+      guardExcluded++;
+      into.push({
+        node: name,
+        nodeId,
+        kind: "action",
+        source: spanOf(stmt.location, ctx),
+        evaluated: true,
+        guardedOut: true,
+        guard: g.info,
+      });
+      continue;
     }
-    ctx.produced.push({ recommendation: name, viaWhen, qualifier: block.qualifier ?? null });
-    into.push({ node: name, nodeId, kind: "action", source, evaluated: true, ...(g.info ? { guard: g.info } : {}) });
-    produced++;
-  });
-  if (produced === 0 && block.statements.length > 0) {
-    ctx.diagnostics.push(
-      `every option in the menu under "${viaWhen ?? "otherwise"}" was guarded out — branch produced nothing`,
-    );
+    if (emitAction(stmt, viaWhen, block.qualifier ?? null, ctx, into, nodeId, g.info)) produced++;
+  }
+  // Distinguish "every member was GUARD-EXCLUDED" (a real guarding outcome) from "the menu determined no recommendation"
+  // (e.g. a deferred cross-lib / cyclic / unresolved / empty same-lib `use decision`). Only the former is a guarding claim.
+  if (block.statements.length > 0 && produced === 0 && !ctx.runtimeError) {
+    if (guardExcluded === block.statements.length) {
+      ctx.diagnostics.push(
+        `every option in the menu under "${viaWhen ?? "otherwise"}" was guarded out — branch produced nothing`,
+      );
+    } else {
+      ctx.diagnostics.push(
+        `no option in the menu under "${viaWhen ?? "otherwise"}" determined a recommendation`,
+      );
+    }
   }
 }
 
@@ -324,6 +417,7 @@ function walkBranches(
   into: TraceNode[],
   parentId: string,
 ): void {
+  if (ctx.runtimeError) return; // a delegation cycle short-circuits the rest of the walk — no further productions/trace
   // `all:` = every matching branch fires; `first:` (or a single-member block) = ordered, first match wins.
   const ordered = qualifier !== "all";
   for (let i = 0; i < branches.length; i++) {
@@ -443,8 +537,25 @@ function runCase(
     produced: [],
     trace: [],
     diagnostics,
+    decisions,
+    delegationStack: new Set([decisionName]),
+    runtimeError: false,
   };
   walkBranches(decision.body.qualifier, decision.body.statements, ctx, ctx.trace, "");
+
+  if (ctx.runtimeError) {
+    // A delegation cycle (or other runtime fault) makes the produced set unreliable — report `error`, not pass/fail,
+    // and DISCARD produced (a partial set would otherwise leak into the view-model's scenario summary).
+    return {
+      case: c.name,
+      decision: decisionName,
+      status: "error",
+      expected: { leaf: decisionName, branch: expectedBranch },
+      produced: [],
+      trace: ctx.trace,
+      diagnostics: ctx.diagnostics,
+    };
+  }
 
   const producedNames = new Set(ctx.produced.map((p) => p.recommendation));
   const status: CaseRun["status"] = producedNames.has(expectedBranch) ? "pass" : "fail";
