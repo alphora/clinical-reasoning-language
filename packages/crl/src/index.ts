@@ -110,6 +110,7 @@ export {
   mergeScaffold,
   decisionSpine,
   nodeKey,
+  conceptDeclRef,
 } from "./provenance";
 export type {
   CorrespondenceModel,

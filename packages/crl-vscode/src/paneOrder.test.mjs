@@ -85,32 +85,50 @@ check("INVARIANT: every output keeps the 3 canonical panes (once each) + at most
 });
 
 // ── MEDICAL-VALIDATION spec: worklist→cel alias, MV default, internal-pane dedup, mode-distinct valid set ──
-check("MV default resolves to internal [cel, source, tree] (worklist aliases the cel pane)", () => {
-  assert.deepEqual(mv(undefined), ["cel", "source", "tree"]);
-  assert.deepEqual(mv([]), ["cel", "source", "tree"]);
+// #177 slice 3: questionnaire joined the MV canonical default (worklist/source/tree/questionnaire — the operator's
+// 4-panel set), so the MV default now resolves to internal [cel, source, tree, questionnaire].
+check("MV default resolves to internal [cel, source, tree, questionnaire] (worklist aliases the cel pane)", () => {
+  assert.deepEqual(mv(undefined), ["cel", "source", "tree", "questionnaire"]);
+  assert.deepEqual(mv([]), ["cel", "source", "tree", "questionnaire"]);
 });
 check("MV: an explicit worklist→cel in the user order, kept in position", () => {
-  assert.deepEqual(mv(["source", "worklist"]), ["source", "cel", "tree"]);
+  assert.deepEqual(mv(["source", "worklist"]), ["source", "cel", "tree", "questionnaire"]);
 });
 check("MV: listing BOTH worklist and cel dedups to ONE pane (first wins — internal-pane dedup)", () => {
-  assert.deepEqual(mv(["worklist", "cel"]), ["cel", "source", "tree"]);
-  assert.deepEqual(mv(["cel", "worklist"]), ["cel", "source", "tree"]);
+  assert.deepEqual(mv(["worklist", "cel"]), ["cel", "source", "tree", "questionnaire"]);
+  assert.deepEqual(mv(["cel", "worklist"]), ["cel", "source", "tree", "questionnaire"]);
+});
+check("MV: questionnaire is canonical — honored in position, auto-appended when absent", () => {
+  assert.deepEqual(mv(["questionnaire", "worklist"]), ["questionnaire", "cel", "source", "tree"]);
+  assert.ok(mv(["source"]).includes("questionnaire"), "questionnaire is appended (canonical)");
 });
 check("MV: crl is valid-but-non-canonical — honored when listed, never auto-appended", () => {
-  assert.deepEqual(mv(["worklist", "crl"]), ["cel", "crl", "source", "tree"]);
+  assert.deepEqual(mv(["worklist", "crl"]), ["cel", "crl", "source", "tree", "questionnaire"]);
   assert.ok(!mv(["source"]).includes("crl"));
 });
-check("MV: unknown keys dropped; canonical (worklist/source/tree) appended", () => {
-  assert.deepEqual(mv(["worklist", "zzz", "source"]), ["cel", "source", "tree"]);
+check("MV: a 5-pane order (all 4 canonical + crl) is preserved — the shell has a 5th column for it (#177 FIX 1)", () => {
+  // A user explicitly listing every distinct internal pane → 5 panes; the cockpit's ORDERED_COLUMNS now has a 5th slot
+  // so this lays out left-to-right (no overflow onto column One). normalizePaneOrder keeps all 5 (no dedup/append needed).
+  const order = mv(["worklist", "source", "tree", "questionnaire", "crl"]);
+  assert.deepEqual(order, ["cel", "source", "tree", "questionnaire", "crl"]);
+  assert.equal(order.length, 5, "five distinct internal panes survive");
+  assert.equal(new Set(order).size, 5, "no dupes");
+});
+check("MV: unknown keys dropped; canonical (worklist/source/tree/questionnaire) appended", () => {
+  assert.deepEqual(mv(["worklist", "zzz", "source"]), ["cel", "source", "tree", "questionnaire"]);
 });
 check("MV: non-array inputs → the MV default", () => {
   for (const bad of [null, "worklist", 42, { 0: "worklist" }, true])
-    assert.deepEqual(mv(bad), ["cel", "source", "tree"]);
+    assert.deepEqual(mv(bad), ["cel", "source", "tree", "questionnaire"]);
 });
 
 // ── cross-spec isolation: the cockpit spec rejects MV-only keys; the MV spec resolves them ──
 check("cockpit spec does NOT recognize 'worklist' (MV-only public key) → dropped, cockpit default", () => {
   assert.deepEqual(cockpit(["worklist", "crl"]), ["crl", "source", "cel"]);
+});
+check("cockpit spec does NOT recognize 'questionnaire' (MV-only pane) → dropped, cockpit default", () => {
+  assert.deepEqual(cockpit(["questionnaire", "crl"]), ["crl", "source", "cel"]);
+  assert.ok(!cockpit(["source", "crl", "cel", "tree"]).includes("questionnaire"), "questionnaire never appears in a cockpit order");
 });
 
 console.log(`\npaneOrder.test: ${pass} checks passed`);

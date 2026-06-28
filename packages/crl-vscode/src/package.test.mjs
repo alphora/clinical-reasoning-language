@@ -169,12 +169,13 @@ check("contributes the crl.medical-validation.primary setting (enum source|cel; 
   assert.equal(prop.scope, "window");
 });
 
-check("contributes the crl.medical-validation.paneOrder setting (enum incl worklist; default [worklist,source,tree], window scope) (#156 slice 3)", () => {
+check("contributes the crl.medical-validation.paneOrder setting (enum incl worklist+questionnaire; default [worklist,source,tree,questionnaire], window scope) (#156 slice 3 / #177 slice 3)", () => {
   const prop = c.configuration?.properties?.["crl.medical-validation.paneOrder"];
   assert.ok(prop, "expected crl.medical-validation.paneOrder in contributes.configuration.properties");
   assert.equal(prop.type, "array");
-  assert.deepEqual(prop.items?.enum, ["worklist", "source", "tree", "crl", "cel"]);
-  assert.deepEqual(prop.default, ["worklist", "source", "tree"]);
+  // #177 slice 3: questionnaire is now a valid MV pane key + part of the canonical default (the operator's 4-panel set).
+  assert.deepEqual(prop.items?.enum, ["worklist", "source", "tree", "questionnaire", "crl", "cel"]);
+  assert.deepEqual(prop.default, ["worklist", "source", "tree", "questionnaire"]);
   assert.equal(prop.scope, "window");
 });
 

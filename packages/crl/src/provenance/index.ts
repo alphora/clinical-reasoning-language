@@ -15,7 +15,7 @@ export type {
   CanonicalizeWarning,
   CanonicalizeError,
 } from "./canonicalize";
-export { buildProvenanceIndex, nodeKey } from "./indexer";
+export { buildProvenanceIndex, nodeKey, conceptDeclRef } from "./indexer";
 export type {
   ProvenanceIndex,
   IndexedCrlNode,

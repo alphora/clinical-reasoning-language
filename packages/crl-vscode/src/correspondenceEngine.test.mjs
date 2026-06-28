@@ -30,9 +30,10 @@ const seededCrl = (keys) => reduce(reduce(initialState(), { type: "setInputs", i
 const celNav = (...ids) => ids.map((c) => ({ caseId: c, label: c }));
 const seededCel = (ids) => reduce(reduce(initialState(), { type: "setInputs", index: idx([], [], [], celNav(...ids)) }).state, { type: "setPrimary", primary: "cel" }).state;
 
-check("select → a reveal for ALL visible panes (pane-agnostic, incl. crl/cel + the opt-in tree), targeting the unit", () => {
+check("select → a reveal for ALL visible panes (pane-agnostic, incl. crl/cel + the opt-in tree/questionnaire), targeting the unit", () => {
   const r = reduce(seeded(["u1", "u2", "u3"]), { type: "select", selection: sel("u2") });
-  assert.deepEqual(r.effects.map((e) => e.pane).sort(), ["cel", "crl", "source", "tree"]); // tree receives reveals too
+  // #177 slice 3: questionnaire joined the visibility-eligible fan-out set (like tree — the shell gates opening on paneOrder).
+  assert.deepEqual(r.effects.map((e) => e.pane).sort(), ["cel", "crl", "questionnaire", "source", "tree"]);
   assert.ok(r.effects.every((e) => e.type === "reveal" && e.target.kind === "unit" && e.target.id === "u2"));
 });
 
@@ -62,7 +63,7 @@ check("next skips source-less steps (sourceCycleIds drives, not all steps)", () 
 check("setPaneVisible suppresses that pane's reveal; re-showing with a selection reveals it", () => {
   let s = reduce(seeded(["u1", "u2"]), { type: "setPaneVisible", pane: "cel", visible: false }).state;
   const r = reduce(s, { type: "select", selection: sel("u1") });
-  assert.deepEqual(r.effects.map((e) => e.pane).sort(), ["crl", "source", "tree"]); // cel hidden; tree still revealed
+  assert.deepEqual(r.effects.map((e) => e.pane).sort(), ["crl", "questionnaire", "source", "tree"]); // cel hidden; tree + questionnaire still revealed
   const r2 = reduce(r.state, { type: "setPaneVisible", pane: "cel", visible: true });
   assert.deepEqual(r2.effects.map((e) => e.pane), ["cel"]);
   assert.equal(r2.effects[0].target.id, "u1");
@@ -72,7 +73,7 @@ check("setInputs keeps + re-reveals a surviving selection; clears a gone one", (
   const s = reduce(seeded(["u1", "u2", "u3"]), { type: "select", selection: sel("u2") }).state;
   const kept = reduce(s, { type: "setInputs", index: idx(["u2", "u4"], ["u2", "u4"]) });
   assert.deepEqual(kept.state.selection, sel("u2"));
-  assert.equal(kept.effects.length, 4); // re-reveal all 4 visible panes (source/crl/cel/tree)
+  assert.equal(kept.effects.length, 5); // re-reveal all 5 visible panes (source/crl/cel/tree/questionnaire)
   const gone = reduce(s, { type: "setInputs", index: idx(["u5"], ["u5"]) });
   assert.equal(gone.state.selection, undefined);
   assert.deepEqual(gone.effects, []);
@@ -113,7 +114,7 @@ check("crl primary: navigatorItems lists crlNav; next/prev cycles crl nodeKeys +
 
 check("crl primary: select → a crlNode reveal for ALL visible panes", () => {
   const r = reduce(seededCrl(["n1"]), { type: "select", selection: { primary: "crl", nodeKey: "n1" } });
-  assert.deepEqual(r.effects.map((e) => e.pane).sort(), ["cel", "crl", "source", "tree"]);
+  assert.deepEqual(r.effects.map((e) => e.pane).sort(), ["cel", "crl", "questionnaire", "source", "tree"]);
   assert.ok(r.effects.every((e) => e.target.kind === "crlNode" && e.target.id === "n1"));
 });
 
@@ -121,7 +122,7 @@ check("setInputs keeps a surviving crl selection (+re-reveal), clears a vanished
   const s = reduce(seededCrl(["n1", "n2"]), { type: "select", selection: { primary: "crl", nodeKey: "n2" } }).state;
   const kept = reduce(s, { type: "setInputs", index: idx([], [], crlNav("n2", "n3")) });
   assert.deepEqual(kept.state.selection, { primary: "crl", nodeKey: "n2" });
-  assert.equal(kept.effects.length, 4);
+  assert.equal(kept.effects.length, 5);
   const gone = reduce(s, { type: "setInputs", index: idx([], [], crlNav("n9")) });
   assert.equal(gone.state.selection, undefined);
   assert.deepEqual(gone.effects, []);
@@ -139,7 +140,7 @@ check("cel primary: navigatorItems lists celNav; next/prev cycles caseIds + wrap
 
 check("cel primary: select → a celCase reveal for ALL visible panes", () => {
   const r = reduce(seededCel(["c1"]), { type: "select", selection: { primary: "cel", caseId: "c1" } });
-  assert.deepEqual(r.effects.map((e) => e.pane).sort(), ["cel", "crl", "source", "tree"]);
+  assert.deepEqual(r.effects.map((e) => e.pane).sort(), ["cel", "crl", "questionnaire", "source", "tree"]);
   assert.ok(r.effects.every((e) => e.target.kind === "celCase" && e.target.id === "c1"));
 });
 

@@ -9,7 +9,7 @@ import type { CycleStep } from "./provenanceViewer";
 // walks (cycle/select/config-primary). The graphical decision-tree pane ("tree") is render + reveal + peek-only: it is a
 // reveal target (in `Pane`) but is NEVER a navigator primary (not in `PrimaryPane`), so `State.primary`/`Selection.primary`
 // and the next/prev cycle stay 3-valued while reveals fan out to all four panes.
-export type Pane = "source" | "crl" | "cel" | "tree";
+export type Pane = "source" | "crl" | "cel" | "tree" | "questionnaire";
 export type PrimaryPane = "source" | "crl" | "cel";
 
 /** Compact engine input — derived by the shell from C1's ViewerModel. No bulky content. */
@@ -74,7 +74,10 @@ export function initialState(): State {
   // tree starts visible-eligible; the shell opens panes listed in the user's paneOrder (tree ships in the package default,
   // so it opens out-of-box). It stays non-canonical, so removing it from paneOrder hides it — this `true` means "open it
   // when it's in the order".
-  return { primary: "source", paneVisibility: { source: true, crl: true, cel: true, tree: true } };
+  // questionnaire (the MV read-only questionnaire pane, #177) is visibility-eligible like tree: the shell only opens a
+  // pane that appears in the user's paneOrder. It is in the MV spec's canonical default (so it opens in MV) and absent
+  // from the cockpit spec (so it never opens in cockpit) — this `true` just means "open it when it's in the order".
+  return { primary: "source", paneVisibility: { source: true, crl: true, cel: true, tree: true, questionnaire: true } };
 }
 
 /** Headless navigator model — the items the navigator (a TreeView in C2a; a webview adapter later) renders. */
@@ -112,7 +115,7 @@ export function navigatorItems(state: State): NavigatorItem[] {
   }));
 }
 
-const PANES: Pane[] = ["source", "crl", "cel", "tree"]; // reveal fan-out set (tree included); NOT the navigable/cycle set
+const PANES: Pane[] = ["source", "crl", "cel", "tree", "questionnaire"]; // reveal fan-out set (tree + questionnaire included); NOT the navigable/cycle set
 
 function selectionTarget(sel: Selection): RevealEffect["target"] {
   if (sel.primary === "source") return { kind: "unit", id: sel.unitId };

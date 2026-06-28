@@ -9,6 +9,8 @@ import { basename, isAbsolute, relative, sep } from "node:path";
 
 import {
   buildCockpitModel,
+  conceptDeclRef,
+  nodeKey,
   type CorrespondenceModel,
   type CrlConceptNode,
   type CrlDecisionStructure,
@@ -60,6 +62,8 @@ import {
 } from "./medicalValidationStore";
 import { renderCrlPane } from "./crlPaneHtml";
 import { FLOW_STYLE, renderFlowPane } from "./flowPaneHtml";
+import { QUESTIONNAIRE_STYLE, renderQuestionnairePane, shouldRerenderQuestionnaire } from "./questionnairePaneHtml";
+import type { ConceptValueType, ResolveValueTypes } from "./questionnaireModel";
 import {
   buildCrlRevealMaps,
   caseIdsForNode,
@@ -91,14 +95,17 @@ import { discoverProvenance, findPolicySrc, PANEL_VALIDATION_MODE } from "./prov
 import { buildViewerModel, type ViewerModel } from "./provenanceViewer";
 import { renderSourcePane, type OverlaySpan, type UnitSpan } from "./sourcePaneHtml";
 
-const PANES: Pane[] = ["source", "crl", "cel", "tree"]; // all panes (render/clearPending/reveal fan-out); tree is opt-in
+const PANES: Pane[] = ["source", "crl", "cel", "tree", "questionnaire"]; // all panes (render/clearPending/reveal fan-out); tree + questionnaire are opt-in (questionnaire is MV-only)
 // The panes the navigator can WALK (primary/cycle/config-primary). tree is render+reveal+peek-only, never a primary —
 // so it is absent here. Used to build the setPrimary quickpick + guard config-primary against a stray "tree".
 const PRIMARY_PANES: PrimaryPane[] = ["source", "crl", "cel"];
 // Column slots by position (explicit, not ViewColumn arithmetic). A pane's column = its index among the OPEN panes in
-// the user's paneOrder (so hiding a pane never leaves a column gap). Four slots so the opt-in tree pane gets a column.
-const ORDERED_COLUMNS = [vscode.ViewColumn.One, vscode.ViewColumn.Two, vscode.ViewColumn.Three, vscode.ViewColumn.Four];
-const PANE_TITLE: Record<Pane, string> = { source: "Source", crl: "CRL", cel: "CEL", tree: "Tree" };
+// the user's paneOrder (so hiding a pane never leaves a column gap). FIVE slots: the MV spec's valid set is up to 5
+// distinct INTERNAL panes (worklist/cel dedup to one of {source, cel, tree, questionnaire, crl}), so a user MV paneOrder
+// listing crl alongside the 4-pane default must get a 5th column instead of piling onto column One (VS Code supports up
+// to 9). The default MV set stays 4 (worklist/source/tree/questionnaire); this only bounds the overflow case.
+const ORDERED_COLUMNS = [vscode.ViewColumn.One, vscode.ViewColumn.Two, vscode.ViewColumn.Three, vscode.ViewColumn.Four, vscode.ViewColumn.Five];
+const PANE_TITLE: Record<Pane, string> = { source: "Source", crl: "CRL", cel: "CEL", tree: "Tree", questionnaire: "Questionnaire" };
 // Perf gate (disc 118): the measured full-render floor. Over → fall back to a navigation-only placeholder, don't freeze.
 const MAX_SOURCE_CHARS = 200_000;
 const MAX_SOURCE_MARKS = 2000;
@@ -246,6 +253,10 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   let reviewByCaseId: Record<string, PersistedReviewState> = {};
   let mvSidecarPath: string | undefined;
   let worklistActions: Record<string, { caseId: string }> = {};
+  // #177 slice 3 — the questionnaire panel's focused-question index (the prev/next sub-nav cursor). RESET to 0 on a real
+  // cel-case change (the selection-scoped re-render hook in dispatch). Declared HERE so slices 4 (the "this node" marker)
+  // and 5 (the prev/next sub-nav) build on it; this slice only resets it (the static pane doesn't read it yet).
+  let currentQuestionIndex = 0;
   /** The last sidecar (path + warning) we surfaced — so a corrupt/forward-version sidecar warns ONCE, not on every
    *  re-`Show Medical Validation` on the same path within a session. Reset implicitly: a different path or warning re-warns. */
   let lastWarnedSidecar: { path: string; warning: string } | undefined;
@@ -337,8 +348,15 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     treeDataProvider: navProvider,
   });
 
+  /** The currently-focused cel caseId for a state (undefined when the selection is not a cel case). The questionnaire's
+   *  selection key — the re-render hook fires only when THIS changes (a real case switch), not on a same-selection
+   *  redispatch (the highlight-restore re-dispatch toggleWorklist/applyShowKeys fire). */
+  const focusedCaseId = (s: State): string | undefined =>
+    s.selection && s.selection.primary === "cel" ? s.selection.caseId : undefined;
+
   // ── dispatch / effects ──
   function dispatch(action: Action): void {
+    const prevCaseId = focusedCaseId(state); // #177 slice 3: capture the focused case BEFORE reduce (real-change detection)
     const { state: next, effects } = reduce(state, action);
     state = next;
     for (const e of effects) applyReveal(e);
@@ -349,6 +367,23 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     // after it — the next selection's `.current`/clearHighlight then wipes the overlay, but this same-click reveal does
     // not (disc 159, the ordering invariant). The overlay is its own channel, so it coexists with `.current`.
     driveFailedCriteriaPeek();
+    // #177 slice 3: the selection-scoped questionnaire re-render — the genuinely NEW trigger (no pane re-rendered on
+    // selection before this). The decision is the PURE, unit-tested `shouldRerenderQuestionnaire` (FIX 2): MV mode + the
+    // questionnaire pane open + a REAL focused-case change (not a same-selection highlight-restore redispatch). On a true
+    // change we reset the host-held `currentQuestionIndex` to 0 (slices 4/5 build on it) THEN re-render the pane for the
+    // new case. A non-cel / cleared selection (prevCaseId set → undefined) is a real change too: it re-renders to the
+    // placeholder. The pane-open gate also makes cockpit mode inert (questionnaire ∉ cockpit spec → never in `views`).
+    if (
+      shouldRerenderQuestionnaire({
+        prevCaseId,
+        nextCaseId: focusedCaseId(next),
+        mode,
+        paneOpen: views.has("questionnaire"),
+      })
+    ) {
+      currentQuestionIndex = 0;
+      renderPane("questionnaire");
+    }
   }
 
   function applyReveal(e: Effect): void {
@@ -758,7 +793,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       conceptToFactAnchors = r.conceptToFactAnchors; // captured atomically with this render's anchors (gen-scoped keys)
       worklistActions = r.worklistActions ?? {}; // captured atomically with this render's anchors (MV-only; {} in cockpit)
       void v.panel.webview.postMessage({ type: "render", html: r.html, gen, indexVersion });
-    } else {
+    } else if (pane === "tree") {
       // tree — the graphical decision-tree flowchart (T2 renderer). Same structure + concept inputs as the CRL pane; its
       // reveal shapes are IDENTICAL ({nodeKey} | {conceptNodeKey}), so clicks route through the existing onWebviewMessage
       // path with no new hit kinds, and it highlights in lockstep with the CRL pane (postReveal's crl|tree arms).
@@ -766,7 +801,38 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       v.anchors = r.anchors;
       v.reveals = r.reveals;
       void v.panel.webview.postMessage({ type: "render", html: r.html, gen, indexVersion });
+    } else {
+      // questionnaire (#177 slice 3) — a STATIC, read-only projection of the FOCUSED cel case's fired path. Gets the
+      // selected-case `sv` via the SAME `scenarioByCaseId` join `driveFailedCriteriaPeek` uses + a frame-aware
+      // `resolveValueTypes` built off `crlMaps.conceptByKey`. No focused case (no cel selection) → a placeholder. The
+      // renderer's `reveals` are always {} (read-only); `anchors` are per-question (keyed by nodeId) for slice 4/5.
+      const sv = focusedScenario(); // hoisted (FIX 5): one resolve, used for both the VM and its rootLib frame
+      const r = renderQuestionnairePane(sv, buildResolveValueTypes(), sv?.decision?.libraryName, {
+        revealPrefix: `g${gen}_`,
+      });
+      v.anchors = r.anchors;
+      v.reveals = r.reveals;
+      void v.panel.webview.postMessage({ type: "render", html: r.html, gen, indexVersion });
     }
+  }
+
+  /** The FOCUSED cel case's `ScenarioViewModel` — the questionnaire's input. Resolved via the SAME frozen
+   *  `scenarioByCaseId` join the failed-criterion peek uses (caseId → sv; ambiguous/unfrozen cases excluded in
+   *  rebuild). undefined when the selection is not a cel case (or no case is selected) → the pane shows a placeholder. */
+  function focusedScenario(): ScenarioViewModel | undefined {
+    const sel = state.selection;
+    return sel && sel.primary === "cel" ? scenarioByCaseId.get(sel.caseId) : undefined;
+  }
+
+  /** Build the frame-aware concept→value-types resolver `buildQuestionnaire` injects. A bare sub-`when` concept resolves
+   *  to `conceptByKey` via `nodeKey(conceptDeclRef(lib, name))` — the SAME join key the indexer/structure use, so the
+   *  cross-lib same-name frame (the walk supplies the sub's lib) keys the right concept. `[]` when maps absent or the
+   *  concept is location-less (not inventoried). */
+  function buildResolveValueTypes(): ResolveValueTypes {
+    return (lib: string | undefined, name: string): ConceptValueType[] => {
+      if (!crlMaps || lib === undefined) return [];
+      return crlMaps.conceptByKey.get(nodeKey(conceptDeclRef(lib, name)))?.valueTypes ?? [];
+    };
   }
 
   function renderEmpty(message: string): void {
@@ -993,6 +1059,9 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     for (const pane of PANES) coord.clearPending(pane);
     dispatch({ type: "setInputs", index: toIndex(model, crlStructure, toCelNav(scenarios, caseIdByName, duplicateScenarioNames), indexVersion) });
     updateNavMessage();
+    // Iterating GLOBAL PANES is robust (FIX 3 verified): renderPane early-returns on `!views.get(pane)`, so a pane not
+    // currently open — the MV-only questionnaire in cockpit mode, or a pane dropped on a mode switch whose onDidDispose
+    // hasn't pruned `views` yet — is a clean no-op (no render to a stale/disposing webview). Same for applyShowKeys below.
     for (const pane of PANES) renderPane(pane);
     // #156 slice 5: the model/segments just rebuilt (new segment ids) — re-drive the MV done/error overlay so the freshly
     // rendered tree paints its at-rest review state. (The tree render is async; the post here lands gen-stamped and the
@@ -1021,6 +1090,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     reviewByCaseId = {};
     mvSidecarPath = undefined;
     worklistActions = {};
+    currentQuestionIndex = 0; // #177 slice 3: drop the questionnaire sub-nav cursor with the rest of the MV state
     unitNumber = new Map();
     rowKeyNumbers = {};
     caseKeyNumbers = {};
@@ -1457,7 +1527,7 @@ function shellHtml(): string {
 .fc-gap-open{text-decoration:underline;opacity:.85;margin-left:4px}
 .mv-progress{padding:4px 2px 2px;font-size:.85em;opacity:.85}
 .mv-progress-done{color:var(--vscode-testing-iconPassed,var(--vscode-charts-green,#89d185));opacity:1;font-weight:bold}
-${CORR_STYLE}${FLOW_STYLE}`;
+${CORR_STYLE}${FLOW_STYLE}${QUESTIONNAIRE_STYLE}`;
   return (
     `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">` +
     `<meta http-equiv="Content-Security-Policy" content="${csp}">` +

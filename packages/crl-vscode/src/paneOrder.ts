@@ -39,12 +39,12 @@ export const COCKPIT_PANE_SPEC: PaneSpec = {
 /** The medical-validation spec — "worklist" is a PUBLIC key aliasing the internal "cel" pane (rendered in worklist mode,
  *  slice 4). Default resolves to internal [cel, source, tree]. No "crl", no plain "cel" in the default. */
 export const MEDICAL_VALIDATION_PANE_SPEC: PaneSpec = {
-  valid: ["worklist", "source", "tree", "crl", "cel"],
-  canonical: ["worklist", "source", "tree"],
+  valid: ["worklist", "source", "tree", "questionnaire", "crl", "cel"],
+  canonical: ["worklist", "source", "tree", "questionnaire"],
   aliases: { worklist: "cel" },
 };
 
-const VALID_PANES: ReadonlySet<Pane> = new Set<Pane>(["source", "crl", "cel", "tree"]);
+const VALID_PANES: ReadonlySet<Pane> = new Set<Pane>(["source", "crl", "cel", "tree", "questionnaire"]);
 
 /** Resolve a PUBLIC key to an InternalPane via the spec's aliases (identity when unmapped); undefined if the result is
  *  not a real pane (so an alias can never introduce a non-pane). */
