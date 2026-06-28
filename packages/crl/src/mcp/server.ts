@@ -501,13 +501,15 @@ export function createServer(): McpServer {
         "`defined by` it (asserted) OR its `defined as` inference (sem-and/sem-or/sem-not over one concept's representations, closed-world) " +
         "evaluates true (#126); it walks the full decision shape (first:/all:/any:/otherwise + " +
         "`unless`/`only when` guards) and a decision-leaf `result is` passes iff the expected branch is " +
-        "in the produced recommendation set. A BARE same-library `use decision \"Sub\"` IS evaluated: the sub " +
-        "is recursed in place and its determinations bubble up into the produced set (the bare sub-NAME is not " +
-        "produced) — so the oracle names the delegated disposition. Returns { success, caseCount, passCount, " +
+        "in the produced recommendation set. A `use decision` target IS evaluated — bare same-library OR " +
+        "qualified cross-library (`\"Lib\".\"Sub\"`) / self-qualified: the sub is recursed in place and its " +
+        "determinations bubble up into the produced set (the bare sub-NAME is not produced) — so the oracle " +
+        "names the delegated disposition. A cross-library sub's bare criteria resolve in ITS library (qualify a " +
+        "CEL fact `defined by \"Lib\".\"C\"` to satisfy one); an unresolved/cyclic target is non-producing. " +
+        "Returns { success, caseCount, passCount, " +
         "failCount, errorCount, runs:[{case, decision, status, expected, produced, trace:[{node, nodeId, " +
         "source, ...}], diagnostics}], errors, importDiagnostics }. NOT yet evaluated (deferred): `definition " +
-        "is` predicates (count/temporal/value), `coded from`/external value sets, and QUALIFIED `use decision` " +
-        '(cross-library `"Other"."Sub"` OR self-qualified `"This Library"."Sub"`).',
+        "is` predicates (count/temporal/value) and `coded from`/external value sets.",
       inputSchema: {
         path: z
           .string()

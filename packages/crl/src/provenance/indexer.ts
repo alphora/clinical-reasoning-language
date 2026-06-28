@@ -504,8 +504,8 @@ export function buildProvenanceIndex(
       // shared-reference target. Provenance STATIC reachability must cover ALL policy-owned delegated logic — otherwise a
       // policy-owned sub-node reached only via delegation is left UNREACHED and gets false-flagged as over-reach (it IS an
       // over-reach candidate by ownership). This is the right frame: provenance reachability is about authored COVERAGE of
-      // policy-owned logic, NOT about whether the CRE evaluates it at runtime (qualified cross-library EVALUATION stays
-      // deferred to #172). The gate is OWNERSHIP, not authored syntax — a policy split across policy-owned files using a
+      // policy-owned logic, NOT about whether the CRE evaluates it at runtime (the CRE now evaluates qualified
+      // cross-library calls per #172, but THIS reachability gate stays OWNERSHIP-based regardless). A policy split across policy-owned files using a
       // QUALIFIED `use decision "Sibling"."Sub"` (Sibling = a local, non-shared, policy-owned lib) must still recurse.
       // A SHARED-reference target's sub-nodes are NOT marked decision-reached (they're over-reach-excluded by ownership
       // anyway). The use-decision EDGE to the decl is recorded above either way (today's leaf relation). Unresolved target
