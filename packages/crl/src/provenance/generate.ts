@@ -141,7 +141,61 @@ function conceptKeyOf(ref: ReferenceName, decisionLib: string): string {
   return nodeKey(conceptDeclRef(lib, getRefName(ref)));
 }
 
-// ──────────────────────────────────────────────────────────────────────────────
+// ── decision context (re-keyed by (lib, name) for #172 todo-3) ─────────────────
+
+/** The generator's per-decision context. Carries `lib` + `name` EXPLICITLY (disc 157 [critical] re-key) so no consumer
+ *  reads them off the iteration key string — the map is keyed `${lib}::${name}`, so a covered decision and a cross-lib
+ *  sub that share a bare name no longer collide. Used by the cluster + CEL passes for BOTH covered decisions and the
+ *  cross-lib subs the run path reaches. */
+interface DecisionCtx {
+  lib: string;
+  name: string;
+  decision: Decision;
+  declKey: string;
+  declRef: ProvNodeRef;
+  spine: SpineNode[];
+  gatingConceptKeys: Set<string>;
+  armTargets: Set<string>;
+}
+
+/** The (lib, name) composite key for `ctxByName` (and any per-decision map) — injective via JSON-free `::` join is NOT
+ *  safe (a lib/name could contain `::`), so use the same JSON tuple shape the indexer uses for nodeKey injectivity. */
+const ctxKey = (lib: string, name: string): string => JSON.stringify([lib, name]);
+
+/** #172 todo-3 [critical, Claude-7]: harvest the distinct `(lib, decision)` pairs the RUN PATH reaches across every
+ *  rendered scenario — the authority for "what fired", spanning shared chains `decisionReachability` skips at the shared
+ *  boundary (indexer.ts:513 doesn't recurse a declared-shared target). Uses the SAME `producedRuntimePathRefs` primitive
+ *  the gate + classify use (no drift). Only GROUNDED refs contribute (a gapped path carries no usable decision); the
+ *  covered decision's own lib is the root for the decompose. A failed render contributes nothing (the structural scaffold
+ *  still emits). The covered decisions are seeded separately by the caller, so this returns the SUPERSET incl. them — the
+ *  caller dedupes via `ctxByName.has`. */
+function runPathReachedDecisions(
+  rendered: ReturnType<typeof renderScenario>,
+  policyLib: string | null,
+): { lib: string; decision: string }[] {
+  if (policyLib === null || rendered.success === false) return [];
+  const seen = new Set<string>();
+  const out: { lib: string; decision: string }[] = [];
+  for (const sv of rendered.scenarios) {
+    if (sv.decision === null || !sv.decision.resolved) continue;
+    const decision = sv.decision.name;
+    const lib = sv.decision.libraryName ?? "";
+    const paths = producedRuntimePathRefs(sv.tree as unknown as MinimalViewNode[], {
+      lib,
+      decision,
+    });
+    for (const p of paths) {
+      if (p.gaps.length > 0) continue; // a gapped path carries no groundable decision identity
+      for (const ref of p.refs) {
+        const k = ctxKey(ref.lib, ref.decision);
+        if (seen.has(k)) continue;
+        seen.add(k);
+        out.push({ lib: ref.lib, decision: ref.decision });
+      }
+    }
+  }
+  return out;
+}
 
 export function generateProvenanceScaffold(
   graph: ResolvedCelGraph,
@@ -171,37 +225,49 @@ export function generateProvenanceScaffold(
       ? (graph.coversTarget.ast.statements.filter((s) => s.type === "Decision") as Decision[])
       : [];
 
-  // Per-decision context (built once, reused by the cluster + CEL passes): the decision decl key, its spine, the set of
-  // concept keys that GATE a criterion (when/guard), and the spine action nodes keyed by their target name (for CEL).
-  interface DecisionCtx {
-    decision: Decision;
-    declKey: string;
-    declRef: ProvNodeRef;
-    spine: SpineNode[];
-    gatingConceptKeys: Set<string>;
-    armTargets: Set<string>;
-  }
+  // ── Per-decision context, keyed by (lib, name) — #172 todo-3. The map is NO LONGER bare-name keyed (disc 157
+  //    [critical] re-key): a cross-lib sub colliding with a covered decision name would OVERWRITE the covered ctx. Every
+  //    consumer reads `ctx.lib`/`ctx.name`, NEVER the iteration key string (the key is `${lib}::${name}` now, so building
+  //    a decisionDeclRef from it would break). The ctx carries the decl key, its spine, the gating-concept keys, and the
+  //    spine arm targets. Built for (a) every COVERED policy decision, then (b) every cross-lib sub the RUN PATH reaches. ──
   const ctxByName = new Map<string, DecisionCtx>();
-  for (const decision of decisions) {
-    const declRef = decisionDeclRef(policyLib!, decision.name);
+
+  // collectLibs is ALREADY called for the index; reuse its AST + ownership map to source a cross-lib sub's spine. A
+  // cross-lib sub-decision's Decision AST is found via libs.get(lib).decls.get(name) (the `decision`-kind DeclEntry).
+  const { libs } = collectLibs(graph);
+  const decisionAstFor = (lib: string, name: string): Decision | undefined => {
+    const entries = libs.get(lib)?.decls.get(name);
+    const decl = entries?.find((e) => e.kind === "decision");
+    return decl ? (decl.node as Decision) : undefined;
+  };
+
+  const buildCtx = (lib: string, decision: Decision): DecisionCtx => {
+    const declRef = decisionDeclRef(lib, decision.name);
     const spine = decisionSpine(decision);
     const gatingConceptKeys = new Set<string>();
     for (const sn of spine) {
       if (sn.kind === "when") {
-        gatingConceptKeys.add(conceptKeyOf((sn.node as WhenBlock).conceptName, policyLib!));
+        gatingConceptKeys.add(conceptKeyOf((sn.node as WhenBlock).conceptName, lib));
       } else if (sn.kind === "action") {
         const guard = (sn.node as ActionStatement).guard;
-        if (guard) gatingConceptKeys.add(conceptKeyOf(guard.conceptName, policyLib!));
+        if (guard) gatingConceptKeys.add(conceptKeyOf(guard.conceptName, lib));
       }
     }
-    ctxByName.set(decision.name, {
+    return {
+      lib,
+      name: decision.name,
       decision,
       declKey: nodeKey(declRef),
       declRef,
       spine,
       gatingConceptKeys,
       armTargets: collectDecisionArms(decision),
-    });
+    };
+  };
+
+  // (a) the COVERED policy decisions.
+  for (const decision of decisions) {
+    if (policyLib) ctxByName.set(ctxKey(policyLib, decision.name), buildCtx(policyLib, decision));
   }
 
   // ONE render feeding BOTH modes (disc 154 S1, Claude-6 drift-defense): the default mode now also renders — its CEL pass
@@ -209,6 +275,34 @@ export function generateProvenanceScaffold(
   // the SAME render. A wholesale render failure is non-fatal in BOTH modes: the structural scaffold (clusters + over-reach
   // baseline + attribution worklist) still emits; only the chained attach / disposition clusters fall back.
   const rendered = renderScenario(graph);
+
+  // (b) #172 todo-3 [critical, Claude-7]: populate the cross-lib ctx from the produced RUN-PATH refs, NOT
+  //     `decisionReachability`. The indexer does NOT recurse a DECLARED-SHARED target's sub-nodes (indexer.ts:513), and
+  //     it skips a shared sub that ITSELF chains (`Shared.Sub → Shared.Sub2`), so reachability is INCOMPLETE at the
+  //     shared boundary. The run path is the authority for "what actually fired": for every `(lib, decision)` appearing
+  //     in ANY case's `producedRuntimePathRefs` that is NOT already a ctx, build its ctx from the collectLibs AST. A ref
+  //     to a missing/unparsable decision (an unresolved cross-lib target produces no run path, so this is defensive) is
+  //     skipped — classification's index-miss / spineNodeForRef gate then defers it honestly.
+  const reachedDecisions = runPathReachedDecisions(rendered, policyLib);
+  for (const { lib, decision } of reachedDecisions) {
+    if (ctxByName.has(ctxKey(lib, decision))) continue;
+    const ast = decisionAstFor(lib, decision);
+    if (ast) ctxByName.set(ctxKey(lib, decision), buildCtx(lib, ast));
+  }
+
+  // #172 todo-3 FIX 2 [important]: cross-lib concept-LEAF relation attribution. A delegated leaf's reachability is keyed
+  // under the TOP-LEVEL covered decision (indexer.ts recurses with the top-level `fromDecision`), so a POLICY-OWNED
+  // cross-lib sibling's gating concept (e.g. `Sibling.SibCrit`, which gates SubP's `when`) is homed in the COVERED
+  // decision's cluster but with the COVERED decision's gating set — which does NOT contain it → it would be mis-labeled
+  // `defines-concept` instead of `implements-criterion`. The generator-local fix: union the gating-concept keys of the
+  // CROSS-LIB (non-covered) ctxs into a side set consulted alongside the per-ctx gating set. Byte-safe for a single-lib
+  // policy (no cross-lib ctx → the set is EMPTY → identical output); nodeKeys are lib-qualified so a cross-lib gating key
+  // (`Sibling::SibCrit`) can never collide with a same-lib concept. (This stays generator-local — no index/#171 change.)
+  const crossLibGatingConceptKeys = new Set<string>();
+  for (const ctx of ctxByName.values()) {
+    if (ctx.lib === policyLib) continue;
+    for (const k of ctx.gatingConceptKeys) crossLibGatingConceptKeys.add(k);
+  }
 
   let clusters: Cluster[];
   if (clusterBy === "disposition-path") {
@@ -223,11 +317,18 @@ export function generateProvenanceScaffold(
       ctxByName,
       index,
       diagnostics,
+      crossLibGatingConceptKeys,
     );
   } else {
-    // ── "decision" (default): one cluster per covered-policy decision ──
-    clusters = decisions.map((decision) =>
-      buildDecisionCluster(ctxByName.get(decision.name)!, policyLib!, index),
+    // ── "decision" (default): one cluster per covered-policy decision PLUS every run-path-reached cross-lib sub (#172
+    //    todo-3 — widened from generate.ts:229's covered-only `decisions.map(...)`). A shared-reference cross-lib sub
+    //    DOES get a cluster — the FINAL gate forces it (its rows are in the run path's `expected`, so a cluster must cite
+    //    them or `lit` misses). Iterating ctxByName.values() (not just `decisions`) widens the set; a non-chaining
+    //    single-lib policy reaches no cross-lib sub → the set == the covered decisions → byte-identical. Each cluster is
+    //    built via `buildDecisionCluster` over the sub's OWN spine + lib. Sorted by id at the end, so iteration order
+    //    here doesn't perturb output. ──
+    clusters = [...ctxByName.values()].map((ctx) =>
+      buildDecisionCluster(ctx, ctx.lib, index, crossLibGatingConceptKeys),
     );
 
     // ── the default-mode case→scenario JOIN (disc 154 S2): for the CHAINED branch attach, each AST CELCase needs its
@@ -269,7 +370,6 @@ export function generateProvenanceScaffold(
         policyLib!,
         ctxByName,
         conceptToClusterIds,
-        clusterIdFor(policyLib),
         celRefsByCluster,
         diagnostics,
         runPath,
@@ -311,9 +411,12 @@ export function generateProvenanceScaffold(
     }
   }
 
-  // ── attribution-needed + drives-determination-hint (per covered decision, structural) ──
+  // ── attribution-needed + drives-determination-hint (per covered decision, structural — covered-only, NOT cross-lib
+  //    subs: the attribution worklist is the KE's worklist for the POLICY's own logic; a shared/cross-lib sub's
+  //    attribution travels with its own library). ──
   for (const decision of decisions) {
-    emitDecisionHints(ctxByName.get(decision.name)!, policyLib!, diagnostics);
+    if (policyLib)
+      emitDecisionHints(ctxByName.get(ctxKey(policyLib, decision.name))!, policyLib, diagnostics);
   }
 
   return { artifact, diagnostics };
@@ -373,10 +476,17 @@ function buildDecisionCluster(
     spine: SpineNode[];
     gatingConceptKeys: Set<string>;
   },
-  policyLib: string,
+  // The decision's OWN lib (#172 todo-3): a covered decision passes the policy lib; a run-path-reached cross-lib sub
+  // passes ITS lib (so `cluster:Shared:Sub` + `decisionSubNodeRef("Shared", "Sub", …)`). A shared-reference sub's spine
+  // rows come through with ownership `shared-reference` via makeGuardedCrl (LIT, gate passes) but are NOT over-reach
+  // candidates (ownership-gated). For a same-lib-only policy this is always the policy lib → byte-identical.
+  lib: string,
   index: ProvenanceIndex,
+  // FIX 2: gating-concept keys of the CROSS-LIB subs — consulted alongside ctx.gatingConceptKeys so a delegated
+  // criterion leaf (homed here by top-level reachability) gets `implements-criterion`. Empty for a single-lib policy.
+  crossLibGating: Set<string>,
 ): Cluster {
-  const id = clusterIdFor(policyLib)(ctx.decision.name);
+  const id = clusterIdFor(lib)(ctx.decision.name);
   const { crl, push } = makeGuardedCrl(index);
 
   // NB: we deliberately do NOT emit a ref to the bare decision DECL. It isn't an over-reach candidate (no nodeId), so it
@@ -385,7 +495,7 @@ function buildDecisionCluster(
 
   // every spine sub-node, relation by kind.
   for (const sn of ctx.spine) {
-    push(decisionSubNodeRef(policyLib, ctx.decision.name, sn.nodeId), spineRelation(sn));
+    push(decisionSubNodeRef(lib, ctx.decision.name, sn.nodeId), spineRelation(sn));
   }
 
   // 3) every policy-owned concept + activity in THIS decision's reachability closure (so each policy-owned leaf is
@@ -399,9 +509,10 @@ function buildDecisionCluster(
     const node = index.nodes.get(key);
     if (!node || node.ownership !== "policy-owned") continue;
     if (node.declKind === "concept") {
-      const relation: CrlRelation = ctx.gatingConceptKeys.has(key)
-        ? "implements-criterion"
-        : "defines-concept";
+      const relation: CrlRelation =
+        ctx.gatingConceptKeys.has(key) || crossLibGating.has(key)
+          ? "implements-criterion"
+          : "defines-concept";
       push(node.ref, relation);
     } else if (node.declKind === "activity") {
       push(node.ref, "recommends-disposition");
@@ -415,8 +526,12 @@ function buildDecisionCluster(
 
 // ── disposition-path clustering (#174) ─────────────────────────────────────────
 
-/** The per-decision context the disposition-path builder consumes (a structural subset of the local DecisionCtx). */
+/** The per-decision context the disposition-path builder consumes (a structural subset of the module DecisionCtx).
+ *  Carries `lib` + `name` EXPLICITLY (#172 todo-3): the coverage builder + the spine source read them off the ctx, NEVER
+ *  off the iteration key (the map is keyed `(lib, name)` now). */
 interface DispoDecisionCtx {
+  lib: string;
+  name: string;
   decision: Decision;
   spine: SpineNode[];
   /** concept nodeKeys that gate a when/guard criterion in THIS decision — the SAME spine-derived set per-decision mode
@@ -443,18 +558,19 @@ function refKey(r: RuntimePathRef): string {
   return `${r.lib}::${r.decision}::${r.nodeId}`;
 }
 
-/** The SpineNode a decomposed run-path ref addresses — resolved from the ref's OWN decision's spine (FIX 1). Returns
- *  undefined (→ the caller DEFERS, never defaults a relation) when the ref is NOT in the covered (same-lib) scope
- *  (`ref.lib !== coveredLib` is #172 cross-lib territory), or its decision is not a covered decision, or its nodeId
- *  names no spine node. So the disposition-path relation is honest by construction: every emitted relation comes from a
- *  real SpineNode, and anything unresolvable is routed out of the comparable set during classification. */
+/** The SpineNode a decomposed run-path ref addresses — resolved from the ref's OWN decision's spine, in the LIB-QUALIFIED
+ *  ctx (#172 todo-3: the `ref.lib !== coveredLib` cross-lib guard is REMOVED). The ctx map is keyed `(lib, name)`, so a
+ *  cross-lib sub resolves from its OWN lib's spine — the disposition-path can now cite the decomposed cross-lib refs and
+ *  round-trip clean. Returns undefined (→ the caller DEFERS, never defaults a relation) when the ref's `(lib, decision)`
+ *  is not a populated ctx (an unreached / unindexed decision), or its nodeId names no spine node. So the relation stays
+ *  honest by construction: every emitted relation comes from a real SpineNode, and anything unresolvable is routed out of
+ *  the comparable set during classification. (The lib is carried by the ref's (lib, decision) ctx key — no separate
+ *  coveredLib arg, #172 todo-3 FIX 6 nit.) */
 function spineNodeForRef(
   ref: RuntimePathRef,
-  coveredLib: string | null,
   ctxByName: Map<string, DispoDecisionCtx>,
 ): SpineNode | undefined {
-  if (coveredLib === null || ref.lib !== coveredLib) return undefined;
-  const ctx = ctxByName.get(ref.decision);
+  const ctx = ctxByName.get(ctxKey(ref.lib, ref.decision));
   if (!ctx) return undefined;
   return ctx.spine.find((sn) => sn.nodeId === ref.nodeId);
 }
@@ -465,9 +581,17 @@ function sanitizeIdSeg(s: string): string {
   return s.replace(/[^A-Za-z0-9._-]+/g, "_");
 }
 
-/** True iff a decomposed run path is entirely within the covered decision (no inlined sub-decision frame). */
-function isNonChained(coveredDecision: string, refs: RuntimePathRef[]): boolean {
-  return refs.every((r) => r.decision === coveredDecision);
+/** True iff a decomposed run path is entirely within the covered decision (no inlined sub-decision frame). #172 todo-3
+ *  FIX 1 [critical]: compares BOTH lib AND decision — a cross-lib delegation to a SAME-NAMED sub (`Policy.D → use
+ *  decision "Shared"."D"`) has every ref `decision === "D"`, so a name-only test would mis-classify it as non-chained and
+ *  route the disposition to `cluster:Policy:D` instead of `cluster:Shared:D` — reintroducing the exact name-collision
+ *  class the (lib, name) re-key closed everywhere else. The covered FRAME is (coveredLib, coveredDecision). */
+function isNonChained(
+  coveredLib: string,
+  coveredDecision: string,
+  refs: RuntimePathRef[],
+): boolean {
+  return refs.every((r) => r.lib === coveredLib && r.decision === coveredDecision);
 }
 
 /** Deterministic disposition-cluster id = pure function of (lib, covered decision, the run path). Two derivations,
@@ -484,10 +608,17 @@ function dispositionPathId(
   refs: RuntimePathRef[],
   producedTerminals: RuntimePathRef[],
 ): string {
-  const tailParts = isNonChained(decision, refs)
+  // The covered frame for a disposition-path id is (lib, decision) — the decompose root. FIX 1: compare BOTH so a
+  // cross-lib same-name path takes the CHAINED id shape (its sub frames get the `decision~nodeId` segment) rather than
+  // collapsing to the non-chained terminal form.
+  const tailParts = isNonChained(lib, decision, refs)
     ? // #174 form: the sorted produced-action nodeIds (the terminals) — NOT the full ancestor chain.
       [...new Set(producedTerminals.map((t) => t.nodeId))].sort().map(sanitizeIdSeg)
-    : refs.map((r) => sanitizeIdSeg(r.decision === decision ? r.nodeId : `${r.decision}~${r.nodeId}`));
+    : refs.map((r) =>
+        sanitizeIdSeg(
+          r.lib === lib && r.decision === decision ? r.nodeId : `${r.lib}~${r.decision}~${r.nodeId}`,
+        ),
+      );
   const tail = tailParts.join("+");
   const seg = tail.length > 80 ? createHash("sha256").update(tail).digest("hex").slice(0, 16) : tail;
   return `cluster:${sanitizeIdSeg(lib)}:${sanitizeIdSeg(decision)}:${seg}`;
@@ -553,8 +684,9 @@ function classifyScenarioRunPath(
   //       SpineNode is absent): disposition-path mode is relation-honest BY CONSTRUCTION, so an unresolvable relation
   //       must DEFER, not default to implements-criterion (a silently structurally-wrong scaffold).
   // The honesty gate is TOTAL: index miss, gap, OR unresolvable relation/lib all defer. Citations are lib-qualified
-  // (FIX 2 — a sub name can repeat across libs) using the exact lookup key shape.
-  const ctx = ctxByName.get(decision);
+  // (FIX 2 — a sub name can repeat across libs) using the exact lookup key shape. The covered decision's ctx is keyed by
+  // its (lib, name) — `lib` here is the decompose root lib (the covered decision's library), matching how it was seeded.
+  const ctx = ctxByName.get(ctxKey(lib, decision));
   const unmapped: string[] = [];
   const refsByKey = new Map<string, RuntimePathRef>();
   // The produced TERMINALS (the last ref of each grounded path = the produced action row) — used to reproduce #174's
@@ -571,7 +703,7 @@ function classifyScenarioRunPath(
       const cite = `${ref.lib}::${ref.decision}#${ref.nodeId}`;
       if (index.nodeKindOf(decisionSubNodeRef(ref.lib, ref.decision, ref.nodeId)) === undefined) {
         unmapped.push(cite); // (2) no structure row
-      } else if (spineNodeForRef(ref, policyLib, ctxByName) === undefined) {
+      } else if (spineNodeForRef(ref, ctxByName) === undefined) {
         unmapped.push(cite); // (3) no resolvable relation from the ref's own decision spine (or cross-lib)
       } else {
         refsByKey.set(refKey(ref), ref);
@@ -607,6 +739,7 @@ function buildDispositionPathClusters(
   ctxByName: Map<string, DispoDecisionCtx>,
   index: ProvenanceIndex,
   diagnostics: GenerateDiagnostic[],
+  crossLibGating: Set<string>,
 ): Cluster[] {
   const dispositionClusters: Cluster[] = [];
 
@@ -619,7 +752,7 @@ function buildDispositionPathClusters(
       message: `disposition-path: scenario render failed — emitting no disposition clusters (coverage cluster only).`,
       ...(rendered.errors.length ? { details: rendered.errors } : {}),
     });
-    return finishWithCoverage(policyLib, index, ctxByName, dispositionClusters);
+    return finishWithCoverage(policyLib, index, ctxByName, dispositionClusters, crossLibGating);
   }
 
   const { caseIdByName, duplicateScenarioNames } = buildCaseIdJoin(graph);
@@ -697,7 +830,7 @@ function buildDispositionPathClusters(
     dispositionClusters.push(buildDispositionCluster(id, g, celFileName, policyLib, ctxByName, index));
   }
 
-  return finishWithCoverage(policyLib, index, ctxByName, dispositionClusters);
+  return finishWithCoverage(policyLib, index, ctxByName, dispositionClusters, crossLibGating);
 }
 
 /** Append the ONE coverage cluster to the disposition clusters (after them, so coverage covers what they DON'T cite),
@@ -708,11 +841,12 @@ function finishWithCoverage(
   index: ProvenanceIndex,
   ctxByName: Map<string, DispoDecisionCtx>,
   dispositionClusters: Cluster[],
+  crossLibGating: Set<string>,
 ): Cluster[] {
   if (policyLib === null) return dispositionClusters;
   const cited = new Set<string>();
   for (const c of dispositionClusters) for (const ref of c.crl) cited.add(nodeKey(refToProv(ref)));
-  return [...dispositionClusters, buildCoverageCluster(policyLib, index, ctxByName, cited)];
+  return [...dispositionClusters, buildCoverageCluster(policyLib, index, ctxByName, cited, crossLibGating)];
 }
 
 /** A CrlNodeRef → its ProvNodeRef (the nodeKey-bearing subset), for deduping against the index. */
@@ -744,7 +878,7 @@ function buildDispositionCluster(
   // SpineNode is unresolvable (FIX 1), so `spineNodeForRef` is non-undefined here for every ref — we assert that rather
   // than default a (possibly wrong) relation: a relation-honest-by-construction mode never emits a guessed relation.
   for (const ref of g.refs) {
-    const sn = spineNodeForRef(ref, policyLib, ctxByName);
+    const sn = spineNodeForRef(ref, ctxByName);
     if (sn === undefined) continue; // unreachable post-classification; skip rather than fabricate a relation
     push(decisionSubNodeRef(ref.lib, ref.decision, ref.nodeId), spineRelation(sn));
   }
@@ -752,7 +886,7 @@ function buildDispositionCluster(
   // label: the covered decision + the terminal recommend ACTIVITY target(s) of this path (human-readable; non-semantic).
   // Only RecommendActivity action rows contribute — a use-decision boundary row is delegation glue, not a disposition.
   const targets = g.refs
-    .map((ref) => spineNodeForRef(ref, policyLib, ctxByName))
+    .map((ref) => spineNodeForRef(ref, ctxByName))
     .filter(
       (sn): sn is SpineNode =>
         sn !== undefined &&
@@ -790,6 +924,7 @@ function buildCoverageCluster(
   index: ProvenanceIndex,
   ctxByName: Map<string, DispoDecisionCtx>,
   cited: Set<string>,
+  crossLibGating: Set<string>,
 ): Cluster {
   // The coverage cluster mirrors the per-decision builder's node SELECTION exactly — the union, over every covered
   // decision, of {its spine sub-nodes} ∪ {its reachability-closure's policy-owned concept/activity leaves} — MINUS what
@@ -798,13 +933,26 @@ function buildCoverageCluster(
   // stays homeless in both, consistent), so the over-reach baseline is byte-identical (FIX 4) and relations agree (FIX 6).
   const { crl, push } = makeGuardedCrl(index);
 
-  for (const [name, ctx] of ctxByName) {
-    const declKey = nodeKey(decisionDeclRef(policyLib, name));
+  // Iterate the ctx VALUES (each carries its own lib + name — #172 todo-3): the key is `(lib, name)` now, so deriving the
+  // decl ref / sub-node refs from the iteration key would break. A cross-lib ctx (a run-path-reached sub) is included
+  // here too — but its spine push is OWNERSHIP-FILTERED below (step 5).
+  for (const ctx of ctxByName.values()) {
+    const declKey = nodeKey(decisionDeclRef(ctx.lib, ctx.name));
 
-    // (1) every spine sub-node, relation by spineRelation (the on-path ones are skipped via `cited`).
+    // (1) every spine sub-node, relation by spineRelation (the on-path ones are skipped via `cited`). #172 todo-3 step 5:
+    //     ownership-filter the cross-lib push to POLICY-OWNED (mirror the leaf filter in (2)). A DECLARED-SHARED cross-lib
+    //     sub contributes NO coverage rows — its sub-nodes are `shared-reference`, NOT over-reach candidates
+    //     (ownership-gated by `isOverReach`), so homing them in coverage would diverge the baseline AND wrongly imply the
+    //     KE must attribute another library's logic. A POLICY-OWNED cross-lib sibling DOES contribute (its untaken arms
+    //     are genuine over-reach candidates / KE worklist). The covered policy's own rows are policy-owned → unaffected.
+    //     NOTE (do NOT "fix"): a shared-reference sub IS cited `shared-reference` in its DISPOSITION cluster (LIT in the
+    //     cockpit, the gate passes) but is correctly absent from COVERAGE — the two channels are orthogonal by design
+    //     (revealMaps is ownership-blind; over-reach is ownership-gated). Removing the shared ref from the disposition
+    //     cluster to "clean up" coverage would break the FINAL gate (its rows are in the run path's `expected`).
     for (const sn of ctx.spine) {
-      const ref = decisionSubNodeRef(policyLib, name, sn.nodeId);
+      const ref = decisionSubNodeRef(ctx.lib, ctx.name, sn.nodeId);
       if (cited.has(nodeKey(ref))) continue;
+      if (index.ownershipOf(ref) !== "policy-owned") continue; // shared-reference cross-lib sub → no coverage rows
       push(ref, spineRelation(sn));
     }
 
@@ -819,7 +967,9 @@ function buildCoverageCluster(
       if (node.declKind === "concept") {
         push(
           node.ref,
-          ctx.gatingConceptKeys.has(key) ? "implements-criterion" : "defines-concept",
+          ctx.gatingConceptKeys.has(key) || crossLibGating.has(key)
+            ? "implements-criterion"
+            : "defines-concept",
         );
       } else if (node.declKind === "activity") {
         push(node.ref, "recommends-disposition");
@@ -946,9 +1096,8 @@ function processCelCase(
   celCase: CELCase,
   celFileName: string,
   policyLib: string,
-  ctxByName: Map<string, DispoDecisionCtx & { armTargets: Set<string> }>,
+  ctxByName: Map<string, DispoDecisionCtx & { lib: string; armTargets: Set<string> }>,
   conceptToClusterIds: Map<string, Set<string>>,
-  idFor: (decisionName: string) => string,
   celRefsByCluster: Map<string, CelNodeRef[]>,
   diagnostics: GenerateDiagnostic[],
   // #175 (disc 154 S2/S3): the case's classified run path (undefined ⇒ no usable join: collision / missing scenario /
@@ -970,7 +1119,6 @@ function processCelCase(
         frozen,
         caseId,
         ctxByName,
-        idFor,
         celRefsByCluster,
         diagnostics,
         runPath,
@@ -1004,15 +1152,16 @@ function handleBranchResult(
   celFileName: string,
   frozen: boolean,
   caseId: string | undefined,
-  ctxByName: Map<string, DispoDecisionCtx & { armTargets: Set<string> }>,
-  idFor: (decisionName: string) => string,
+  ctxByName: Map<string, DispoDecisionCtx & { lib: string; armTargets: Set<string> }>,
   celRefsByCluster: Map<string, CelNodeRef[]>,
   diagnostics: GenerateDiagnostic[],
   runPath: ScenarioRunPath | undefined,
   coveredLib: string | null,
 ): void {
   const decisionName = rf.leafName;
-  const ctx = ctxByName.get(decisionName);
+  // The result leaf names the COVERED decision (CEL resolves a result leaf against the covered library's decls), so its
+  // ctx is keyed by (coveredLib, decisionName). The non-chained leaf-name attach lands in cluster:coveredLib:decisionName.
+  const ctx = coveredLib !== null ? ctxByName.get(ctxKey(coveredLib, decisionName)) : undefined;
   if (!ctx) {
     // a branch result whose leaf does not name a covered decision — nothing structural to attach it to.
     diagnostics.push({
@@ -1028,11 +1177,14 @@ function handleBranchResult(
   // comparable+NON-chained run, or a decision-name mismatch, keeps today's leaf-name + D-spine path VERBATIM. An
   // unavailable / deferred run path is handled by the honest-defer gate just below (it defers for a CHAINING decision and
   // otherwise falls through to today's path).
+  // FIX 1: the covered frame is (runPath.case.lib, decisionName) — `isNonChained` compares BOTH so a cross-lib SAME-NAME
+  // sub (`Policy.D → Shared.D`) is correctly seen as CHAINED (its firing refs are in Shared, not the covered frame) and
+  // routes to handleChainedBranchResult → cluster:Shared:D, not the leaf attach to cluster:Policy:D.
   const chained =
     runPath !== undefined &&
     runPath.kind === "comparable" &&
     runPath.case.decision === decisionName &&
-    !isNonChained(decisionName, runPath.case.refs);
+    !isNonChained(runPath.case.lib, decisionName, runPath.case.refs);
   if (chained) {
     handleChainedBranchResult(
       branch,
@@ -1116,7 +1268,7 @@ function handleBranchResult(
     });
   }
   emitCelRef(
-    idFor(decisionName),
+    clusterIdFor(coveredLib)(decisionName),
     celFileName,
     frozen,
     caseId,
@@ -1129,9 +1281,10 @@ function handleBranchResult(
 
 /** #175 (disc 154 S3) — THE FIX: a CHAINED branch result `D is X` whose disposition X fired in a SUB-decision. Match X to
  *  the produced TERMINAL(s) whose OWN-spine `actionTargetName === X`, then attach the case to that SUB's cluster + arm:
- *   - exactly 1 → attach to `idFor(terminal.decision)` (the firing sub's cluster) with the relation read from
- *     `branchArmSegment(terminal.nodeId)` on the SUB's spine (tests-otherwise / tests-branch). The case lands where its
- *     disposition actually fired — NOT orphaned on D + sub-clusters starving (the #175 repro).
+ *   - exactly 1 → attach to `clusterIdFor(terminal.lib)(terminal.decision)` (the firing sub's cluster, in the TERMINAL's
+ *     OWN lib — #172 todo-3 cross-lib: a sub that fired in `Shared` → `cluster:Shared:Sub`, NOT the covered lib) with the
+ *     relation read from `branchArmSegment(terminal.nodeId)` on the SUB's spine (tests-otherwise / tests-branch). The case
+ *     lands where its disposition actually fired — NOT orphaned on D + sub-clusters starving (the #175 repro).
  *   - >1 (X fired in ≥2 subs/arms in one run) → DEFER `ambiguous-cel-branch` (never pick first — the chained analogue of
  *     the existing ambiguous case).
  *   - 0 (the run produced no X — the result field disagrees with the actual run) → the NEW `cel-result-run-mismatch`.
@@ -1143,22 +1296,22 @@ function handleChainedBranchResult(
   frozen: boolean,
   caseId: string | undefined,
   rp: ComparableCase,
-  ctxByName: Map<string, DispoDecisionCtx & { armTargets: Set<string> }>,
+  ctxByName: Map<string, DispoDecisionCtx & { lib: string; armTargets: Set<string> }>,
   coveredLib: string | null,
   celRefsByCluster: Map<string, CelNodeRef[]>,
   diagnostics: GenerateDiagnostic[],
 ): void {
-  const idFor = clusterIdFor(coveredLib);
   // The produced terminals whose OWN-spine action target is X. A terminal is a grounded produced-action row of SOME
   // decision in the run path; resolve its SpineNode off ITS decision's spine (NOT the covered decision's) so a sub's
   // recommend is read from the sub's spine — honest by construction (a terminal that doesn't resolve is skipped, never
-  // guessed). `spineNodeForRef` already requires `ref.lib === coveredLib` + a resolvable nodeId, matching classify.
+  // guessed). `spineNodeForRef` resolves the ref in the lib-qualified ctx (#172 todo-3: cross-lib subs ARE populated, so
+  // a cross-lib terminal now resolves), matching classify.
   // DEDUPE by refKey (disc 155 FIX 3): an `all:` path that invokes the SAME sub twice can yield two firing entries with
   // the IDENTICAL `{lib, decision, nodeId}` — ONE cluster/relation target, NOT real ambiguity. Collapse to distinct
   // terminal refs FIRST so only ≥2 genuinely-distinct firing rows trip the ambiguous branch.
   const firingByKey = new Map<string, RuntimePathRef>();
   for (const t of rp.producedTerminals) {
-    const sn = spineNodeForRef(t, coveredLib, ctxByName);
+    const sn = spineNodeForRef(t, ctxByName);
     if (sn !== undefined && sn.kind === "action" && actionTargetName(sn) === branch.branchName) {
       firingByKey.set(refKey(t), t);
     }
@@ -1168,7 +1321,7 @@ function handleChainedBranchResult(
   if (firing.length === 0) {
     // the run produced no terminal targeting X — the result field disagrees with the run. DEFER (never attach to a guess).
     const produced = [...new Set(rp.producedTerminals.map((t) => {
-      const sn = spineNodeForRef(t, coveredLib, ctxByName);
+      const sn = spineNodeForRef(t, ctxByName);
       return sn !== undefined ? (actionTargetName(sn) ?? t.nodeId) : t.nodeId;
     }))].sort();
     diagnostics.push({
@@ -1193,11 +1346,16 @@ function handleChainedBranchResult(
 
   // exactly one firing terminal → attach to ITS sub-decision's cluster, relation from the arm it sits under on the SUB's
   // own spine. THIS IS THE FIX: the case lands in the sub-decision cluster its disposition fired in.
+  // #172 todo-3 [critical]: the cluster id MUST use the TERMINAL's lib (`clusterIdFor(terminal.lib)`), NOT the covered
+  // lib — a cross-lib terminal fired in `Shared.Sub` → `cluster:Shared:Sub`, not `cluster:Policy:Sub`. The widened
+  // default-mode cluster set (ctxByName.values()) created that `cluster:Shared:Sub` bucket, so emitCelRef finds it; using
+  // coveredLib would target a non-existent `cluster:Policy:Sub` → emitCelRef drops the ref (homeless) → silent
+  // under-attribution. (A same-lib chain has terminal.lib === coveredLib, so this is byte-identical there.)
   const terminal = firing[0];
   const relation: CelRelation =
     branchArmSegment(terminal.nodeId) === "otherwise" ? "tests-otherwise" : "tests-branch";
   emitCelRef(
-    idFor(terminal.decision),
+    clusterIdFor(terminal.lib)(terminal.decision),
     celFileName,
     frozen,
     caseId,
