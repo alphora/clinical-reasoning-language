@@ -37,7 +37,7 @@ What already exists: CRL+CEL parsers/validators, all emitters (CQL, FHIR-def, CE
 4. **CEL language services** (completion/hover/nav/diagnostics) — parallelizable from day one.
 5. **Agent authoring playbook** — existing MCP tools + a hand-seeded concept set; **no Reef/classifier yet**.
 6. **Emit-conformance** (Stage 2; #105/#106/#107; #103 is a tracked stand-in — see below).
-7. **Pull-based completeness** — added only as a target policy demands it: grammar gaps (#78/#83/#81/#95/#99/#60), `metric` (#70), data-collection-intent (#80+#81), terminology *authoring*, homeostasis (#76), deploy-unit (#111/#112/#113), lifecycle/provenance (#61).
+7. **Pull-based completeness** — added only as a target policy demands it: grammar gaps (#78/#83/#95/#99/#60), `metric` (#70), terminology *authoring*, homeostasis (#76), deploy-unit (#111/#112/#113), lifecycle/provenance (#61).
 
 **Foundational / start now in parallel:**
 - **Headless analysis/LSP extraction** — CRE + all language services live in one headless package consumed by the editors, MCP, and the future UI (kills the MCP-drift class of bug). Precede any repo split.
@@ -65,7 +65,6 @@ The acceptance fixtures are the curated HCSC medical policies (`kelp/tmp/hcsc-di
 ## Open design questions (resolved into specific items)
 - **`any:`/`all:` default:** CRL default is `any:` (USER_GUIDE §Notes). Open: keep the default or **require explicit** for >1-action blocks. (Substrate-completeness design.)
 - **Derived profiles (homeostasis):** ephemeral, surfaced as a **read-only non-`.crl` artifact** (a `StructureDefinition` view) — never generated `.crl` (it re-enters the resolver scan). No `profile` keyword. CaseFeature is the durable emit (deterministic canonical).
-- **Data-collection intent / questionnaire:** a **new decision-node-level construct** (leaf/branch/policy; merges #80+#81), *not* the activity `with` clause. The renderer previews **intent only**, never engine fidelity.
 - **Repo structure:** monorepo + headless package first; defer any UI-repo split until there's a forcing reason.
 
 ## Issue map
@@ -74,7 +73,6 @@ The acceptance fixtures are the curated HCSC medical policies (`kelp/tmp/hcsc-di
 - **#71** → phase: CEL language services (item 4) + scenario-runner webview (item 3).
 - **#103** → reframed: `crl-logical-switch` is a **deliberate stand-in** (no official CPG selection-behavior extension exists yet); default is `any`; migrate to the CPG extension when it publishes. Downgraded from "critical silent bug."
 - **#74** → deprioritized (mymobiledoc-specific MCP provisioning; migration-gated).
-- **#80 + #81** → merge into the data-collection-intent construct.
 - **Pull-based (item 7):** #60/#78/#83/#95/#99 (grammar), #76, #82, #61, #111/#112/#113, #72.
 - **Inputs to the item-#1 design:** #99 (catalog/matcher reachability), #101 (`defined by` inferred concepts), #110 (clock seam), the cms22 corpus (construct coverage), the chosen HCSC policy.
 - **KELP #553/#554** — downstream (the consuming runtime); coordinate, not blocking.
