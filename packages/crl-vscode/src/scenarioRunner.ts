@@ -11,11 +11,11 @@ import { resolveCelImports, renderScenario } from "@smile-digital-health/crl";
 import { renderScenarioHtml, renderErrorHtml, SCENARIO_STYLE, type RenderedScenario } from "./renderScenarioHtml";
 import { isRelevantSave } from "./scenarioWatch";
 
-/** Read the SHARED All/Blocking failed-criteria mode (#173 T3b) — the SAME `crl.correspondence.failedCriteriaMode` the
+/** Read the SHARED All/Blocking failed-criteria mode (#173 T3b) — the SAME `crl.cockpit.failedCriteriaMode` the
  *  cockpit (T3a) uses, so the two surfaces stay in sync. Default Blocking. Resource-scoped on the active .cel. */
 function readFailedCriteriaMode(celPath: string | undefined): "blocking" | "all" {
   const uri = celPath ? vscode.Uri.file(celPath) : undefined;
-  const raw = vscode.workspace.getConfiguration("crl.correspondence", uri).get<string>("failedCriteriaMode");
+  const raw = vscode.workspace.getConfiguration("crl.cockpit", uri).get<string>("failedCriteriaMode");
   return raw === "all" ? "all" : "blocking";
 }
 
@@ -54,7 +54,7 @@ export function registerScenarioRunner(context: vscode.ExtensionContext): void {
     // Target-less update = most-specific writable scope (Workspace if open, else Global) — IDENTICAL to the cockpit's
     // write (same window/workspace → same target), so the shared-config sync event fires for both surfaces.
     void vscode.workspace
-      .getConfiguration("crl.correspondence", vscode.Uri.file(currentCel))
+      .getConfiguration("crl.cockpit", vscode.Uri.file(currentCel))
       .update("failedCriteriaMode", next)
       .then(undefined, (e) =>
         console.warn(`[crl.scenarioRunner] could not persist failedCriteriaMode: ${e instanceof Error ? e.message : e}`),
@@ -145,7 +145,7 @@ export function registerScenarioRunner(context: vscode.ExtensionContext): void {
   // (the config is window-scoped + shared with the cockpit, so this fires even when the scenario panel was never opened;
   // mirror saveWatch's `!panel` no-op). NO config WRITE here → no feedback loop with persistFailedCriteriaMode.
   const fcModeWatch = vscode.workspace.onDidChangeConfiguration((e) => {
-    if (!panel || !currentCel || !e.affectsConfiguration("crl.correspondence.failedCriteriaMode")) return;
+    if (!panel || !currentCel || !e.affectsConfiguration("crl.cockpit.failedCriteriaMode")) return;
     void panel.webview.postMessage({ type: "fcMode", mode: readFailedCriteriaMode(currentCel) });
   });
 

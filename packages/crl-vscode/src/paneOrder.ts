@@ -1,5 +1,5 @@
 // Pane-order normalization (vscode-free, unit-tested) — three-pane viewer C2b-4 (#156).
-// The `crl.correspondence.paneOrder` setting is user-editable JSON, so it can be malformed (dupes, unknown ids, missing
+// The `crl.cockpit.paneOrder` setting is user-editable JSON, so it can be malformed (dupes, unknown ids, missing
 // panes, not even an array). normalizePaneOrder repairs ANY input so a bad setting can never break the cockpit (a missing
 // canonical pane would leave a column gap; an unknown id would be dropped before it could open a stray column).
 //

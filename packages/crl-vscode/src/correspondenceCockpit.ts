@@ -181,7 +181,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   let runtimeRefIndex: Map<string, string> = new Map();
   let fcGaps: { label: string; source: LsLocation }[] = [];
   let fcGapDisabledMsg: string | undefined;
-  // The All/Blocking toggle (default Blocking). Cached from `crl.correspondence.failedCriteriaMode`; the tree pane's
+  // The All/Blocking toggle (default Blocking). Cached from `crl.cockpit.failedCriteriaMode`; the tree pane's
   // segmented control + a settings edit both route through `applyFailedCriteriaMode`.
   let failedCriteriaMode: "blocking" | "all" = "blocking";
   /** Concept keys that have ≥1 source-bearing unit OR ≥1 CRL row — the gate for a fact being a clickable peek anchor
@@ -207,7 +207,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   /** last span-click locus (trusted, from the renderer) — open-raw uses it when it still matches the selection. */
   let lastClicked: { unitId: string; range: ZeroBasedRange } | undefined;
   const views = new Map<Pane, PaneView>();
-  let paneOrder: Pane[] = [...CANONICAL_PANE_ORDER]; // user layout (crl.correspondence.paneOrder), normalized
+  let paneOrder: Pane[] = [...CANONICAL_PANE_ORDER]; // user layout (crl.cockpit.paneOrder), normalized
   let watcher: vscode.FileSystemWatcher | undefined;
   let debounce: ReturnType<typeof setTimeout> | undefined;
   let orderDebounce: ReturnType<typeof setTimeout> | undefined;
@@ -924,16 +924,16 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     // NOT unconditionally at activation. Ensures the navigator shows even if the gate's one-shot findFiles missed.
     void vscode.commands.executeCommand("setContext", "crl.active", true);
     // Apply the persisted default primary BEFORE the first rebuild's navigator render (else it flips visibly).
-    const pref = vscode.workspace.getConfiguration("crl.correspondence", ed.document.uri).get<string>("primary");
+    const pref = vscode.workspace.getConfiguration("crl.cockpit", ed.document.uri).get<string>("primary");
     if (pref === "crl" || pref === "source" || pref === "cel") state = reduce(state, { type: "setPrimary", primary: pref }).state;
     // paneOrder is window-scoped (User settings = global/cross-project; Workspace settings = per-project) — read with the
     // .cel resource URI so a workspace/folder override is honored; open panes in that order.
     paneOrder = normalizePaneOrder(
-      vscode.workspace.getConfiguration("crl.correspondence", ed.document.uri).get("paneOrder"),
+      vscode.workspace.getConfiguration("crl.cockpit", ed.document.uri).get("paneOrder"),
     );
-    showKeys = vscode.workspace.getConfiguration("crl.correspondence", ed.document.uri).get<boolean>("showKeys") ?? true;
+    showKeys = vscode.workspace.getConfiguration("crl.cockpit", ed.document.uri).get<boolean>("showKeys") ?? true;
     // #173 T3: the persisted All/Blocking failed-criteria mode (default Blocking).
-    const fcm = vscode.workspace.getConfiguration("crl.correspondence", ed.document.uri).get<string>("failedCriteriaMode");
+    const fcm = vscode.workspace.getConfiguration("crl.cockpit", ed.document.uri).get<string>("failedCriteriaMode");
     failedCriteriaMode = fcm === "all" ? "all" : "blocking";
     for (const pane of paneOrder) if (state.paneVisibility[pane]) ensurePane(pane);
     setupWatcher();
@@ -947,7 +947,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     updateNavMessage();
     if (currentCel)
       void vscode.workspace
-        .getConfiguration("crl.correspondence", vscode.Uri.file(currentCel))
+        .getConfiguration("crl.cockpit", vscode.Uri.file(currentCel))
         .update("primary", next) // most-specific writable scope (workspace if open, else global)
         .then(undefined, (e) => console.warn(`[crl.cockpit] could not persist primary: ${e instanceof Error ? e.message : e}`));
   }
@@ -964,7 +964,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     // SAME rule the existing `primary`/`showKeys` writes use, so the cockpit + scenarioRunner (same window, same
     // workspace state) resolve to the SAME target and the shared-sync onDidChangeConfiguration event fires consistently.
     void vscode.workspace
-      .getConfiguration("crl.correspondence", vscode.Uri.file(currentCel))
+      .getConfiguration("crl.cockpit", vscode.Uri.file(currentCel))
       .update("failedCriteriaMode", next)
       .then(undefined, (e) =>
         console.warn(`[crl.cockpit] could not persist failedCriteriaMode: ${e instanceof Error ? e.message : e}`),
@@ -1024,7 +1024,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     // Read the LIVE persisted value (not the cached render-state `showKeys`) and write its inverse, to the most-specific
     // writable scope (resource-aware like primary/paneOrder). The onConfig handler is the single re-render path (so a
     // manual settings.json edit behaves identically to the button).
-    const cfg = vscode.workspace.getConfiguration("crl.correspondence", vscode.Uri.file(currentCel));
+    const cfg = vscode.workspace.getConfiguration("crl.cockpit", vscode.Uri.file(currentCel));
     const cur = cfg.get<boolean>("showKeys") ?? true;
     void cfg
       .update("showKeys", !cur)
@@ -1080,25 +1080,25 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   // affectsConfiguration + currentCel. (application scope: an edit in another window may only take effect on reload — fine.)
   const onConfig = vscode.workspace.onDidChangeConfiguration((e) => {
     if (!currentCel) return;
-    if (e.affectsConfiguration("crl.correspondence.paneOrder")) {
+    if (e.affectsConfiguration("crl.cockpit.paneOrder")) {
       if (orderDebounce) clearTimeout(orderDebounce);
       orderDebounce = setTimeout(() => {
         const uri = currentCel ? vscode.Uri.file(currentCel) : undefined;
-        paneOrder = normalizePaneOrder(vscode.workspace.getConfiguration("crl.correspondence", uri).get("paneOrder"));
+        paneOrder = normalizePaneOrder(vscode.workspace.getConfiguration("crl.cockpit", uri).get("paneOrder"));
         reconcilePaneOrder(); // open/close opt-in panes (tree) + re-place columns — not just reorder the already-open set
       }, 150);
     }
     // showKeys (#163): re-render with the at-rest key channel on/off. Separate branch — a showKeys edit must re-render
     // even when paneOrder didn't change. Re-render only (no rebuild — the number maps are unchanged).
-    if (e.affectsConfiguration("crl.correspondence.showKeys")) {
-      const next = vscode.workspace.getConfiguration("crl.correspondence", vscode.Uri.file(currentCel)).get<boolean>("showKeys") ?? true;
+    if (e.affectsConfiguration("crl.cockpit.showKeys")) {
+      const next = vscode.workspace.getConfiguration("crl.cockpit", vscode.Uri.file(currentCel)).get<boolean>("showKeys") ?? true;
       if (next !== showKeys) applyShowKeys(next);
     }
     // #173 T3: the All/Blocking failed-criteria toggle. The segmented control persists the config; THIS is the single
     // live re-drive path (so a settings.json edit re-peeks identically to the button). No rebuild — just recompute the
     // overlay/gaps for the current selection in the new mode.
-    if (e.affectsConfiguration("crl.correspondence.failedCriteriaMode")) {
-      const raw = vscode.workspace.getConfiguration("crl.correspondence", vscode.Uri.file(currentCel)).get<string>("failedCriteriaMode");
+    if (e.affectsConfiguration("crl.cockpit.failedCriteriaMode")) {
+      const raw = vscode.workspace.getConfiguration("crl.cockpit", vscode.Uri.file(currentCel)).get<string>("failedCriteriaMode");
       const next = raw === "all" ? "all" : "blocking";
       if (next !== failedCriteriaMode) applyFailedCriteriaModeLive(next);
     }

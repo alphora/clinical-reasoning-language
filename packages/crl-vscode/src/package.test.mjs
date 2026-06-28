@@ -105,26 +105,26 @@ check("contributes the crl.cockpit.toggleKeys command + navigator-title button +
   assert.ok(palette.some((m) => m.command === "crl.cockpit.toggleKeys"), "toggleKeys must have a commandPalette entry");
 });
 
-check("contributes the crl.correspondence.showKeys setting (boolean, default true, window scope) (#163)", () => {
-  const prop = c.configuration?.properties?.["crl.correspondence.showKeys"];
-  assert.ok(prop, "expected crl.correspondence.showKeys in contributes.configuration.properties");
+check("contributes the crl.cockpit.showKeys setting (boolean, default true, window scope) (#163)", () => {
+  const prop = c.configuration?.properties?.["crl.cockpit.showKeys"];
+  assert.ok(prop, "expected crl.cockpit.showKeys in contributes.configuration.properties");
   assert.equal(prop.type, "boolean");
   assert.equal(prop.default, true);
   assert.equal(prop.scope, "window");
 });
 
-check("contributes the crl.correspondence.primary setting (enum source|crl|cel — NO tree; default source, window scope)", () => {
-  const prop = c.configuration?.properties?.["crl.correspondence.primary"];
-  assert.ok(prop, "expected crl.correspondence.primary in contributes.configuration.properties");
+check("contributes the crl.cockpit.primary setting (enum source|crl|cel — NO tree; default source, window scope)", () => {
+  const prop = c.configuration?.properties?.["crl.cockpit.primary"];
+  assert.ok(prop, "expected crl.cockpit.primary in contributes.configuration.properties");
   // tree is render+reveal+peek-only — it must NEVER be a navigable primary, so it is absent from this enum.
   assert.deepEqual(prop.enum, ["source", "crl", "cel"]);
   assert.equal(prop.default, "source");
   assert.equal(prop.scope, "window");
 });
 
-check("contributes the crl.correspondence.paneOrder setting (enum + default incl. tree; tree removable, window scope)", () => {
-  const prop = c.configuration?.properties?.["crl.correspondence.paneOrder"];
-  assert.ok(prop, "expected crl.correspondence.paneOrder in contributes.configuration.properties");
+check("contributes the crl.cockpit.paneOrder setting (enum + default incl. tree; tree removable, window scope)", () => {
+  const prop = c.configuration?.properties?.["crl.cockpit.paneOrder"];
+  assert.ok(prop, "expected crl.cockpit.paneOrder in contributes.configuration.properties");
   assert.equal(prop.type, "array");
   assert.deepEqual(prop.items?.enum, ["source", "crl", "cel", "tree"]);
   // tree ships in the DEFAULT (shown out-of-box) but is NON-canonical in normalizePaneOrder, so a user who sets a
