@@ -250,4 +250,14 @@ export const FLOW_STYLE =
   // to error nodes; the two review rules are EQUAL specificity, so `.error-node>rect` sits AFTER `.done-node>rect` — the
   // last-wins tiebreak that makes error beat done if both classes ever co-occur.
   `.flow-row.done-node>rect{fill:var(--vscode-testing-iconPassed,#3fb950);fill-opacity:.18}` +
-  `.flow-row.error-node>rect{fill:var(--vscode-testing-iconFailed,#f14c4c);fill-opacity:.20}`;
+  `.flow-row.error-node>rect{fill:var(--vscode-testing-iconFailed,#f14c4c);fill-opacity:.20}` +
+  // #177 slice 4: the "this node" cross-pane marker — the FOCUSED questionnaire question's tree node. It paints a
+  // distinctive solid `stroke` on the >rect — the SAME proven axis `.current`/`.failed-criterion` use (FIX 1 impl review:
+  // this repo's evidence is that `outline` does NOT paint on the SVG here, which is exactly why those switched to stroke).
+  // It COEXISTS with `.done-node`/`.error-node` (those are `fill` — fill + stroke layer fine: a done node that's the focused
+  // question shows the green fill AND this accent border). Against the OTHER stroke channels (`.current`/`.failed-criterion`/
+  // `-preempt`) it deliberately WINS: it is ordered LAST among the stroke rules (after them in the sheet, equal specificity),
+  // so on a node that is BOTH the focused question and selected/a-criterion the focused-question marker (the primary
+  // indicator) overrides the transient selection/criterion stroke (the right tradeoff). A bright solid focus-colored border,
+  // thicker than `.current` (2.5) so it reads as the marker; `stroke-dasharray:none` clears any inherited dash.
+  `.flow-row.this-node>rect{stroke:var(--vscode-focusBorder,#3794ff);stroke-width:3;stroke-dasharray:none}`;

@@ -48,6 +48,7 @@ import {
   resolveFailedCriteria,
   type ResolvedCriterion,
 } from "./failedCriterionPeek";
+import { resolveThisNode } from "./thisNodeMarker";
 import { failedCriterionLabel } from "./failedCriterionLabel";
 import {
   applyWorklistToggle,
@@ -257,6 +258,11 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   // cel-case change (the selection-scoped re-render hook in dispatch). Declared HERE so slices 4 (the "this node" marker)
   // and 5 (the prev/next sub-nav) build on it; this slice only resets it (the static pane doesn't read it yet).
   let currentQuestionIndex = 0;
+  // #177 slice 4 — the CURRENT questionnaire render's ordered question runtime nodeIds (captured atomically with the
+  // questionnaire pane's anchors, mirroring worklistActions/conceptToFactAnchors). `driveThisNode` resolves the FOCUSED
+  // question's nodeId as `questionNodeIds[currentQuestionIndex]` without re-running the walk. Empty when no case/no
+  // questions (→ driveThisNode clears all panes).
+  let questionNodeIds: string[] = [];
   /** The last sidecar (path + warning) we surfaced — so a corrupt/forward-version sidecar warns ONCE, not on every
    *  re-`Show Medical Validation` on the same path within a session. Reset implicitly: a different path or warning re-warns. */
   let lastWarnedSidecar: { path: string; warning: string } | undefined;
@@ -383,6 +389,14 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     ) {
       currentQuestionIndex = 0;
       renderPane("questionnaire");
+      // #177 slice 4: the questionnaire just re-rendered for the new case (question 0) — re-drive the "this node" marker
+      // across all panes. CORRECTNESS MODEL (mirrors driveDoneOverlay): the PANE-ACK re-drive (onWebviewMessage's `ready` →
+      // driveThisNode, fires on every marker-bearing pane render) is the guarantee — a freshly rendered pane always re-paints
+      // from current state. This immediate post is a LATENCY optimization relying on VS Code webview postMessage being
+      // FIFO-ordered on the single serialized host→webview channel: render → mark arrive in order, gen-stamped so a mark
+      // aimed at a superseded render is dropped — NOT an unguarded race. A non-cel / cleared selection (questionNodeIds
+      // emptied on the placeholder render) → driveThisNode clears all panes.
+      driveThisNode();
     }
   }
 
@@ -723,6 +737,71 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     void tree.panel.webview.postMessage({ type: "markReviewOverlay", gen: tree.gen, done: doneIds, error: errorIds });
   }
 
+  /** Post a gen-stamped `markThisNode` for a set of segment ids in one pane (#177 slice 4), after clearing the prior
+   *  marker (clear-then-mark, like the overlay channels). Empty segs is still a valid mark (clears the pane's marker) —
+   *  but `clearThisNode` is the explicit no-focused-question path; here an empty set means "this pane has no segment for
+   *  the focused node" (e.g. source for a no-source-unit `when`). Gen-carried so a mark aimed at a superseded render is
+   *  dropped by the webview (mirrors markFailedCriteria); the clear leg is ungated. */
+  function markThisNode(v: PaneView, segmentIds: string[]): void {
+    void v.panel.webview.postMessage({ type: "markThisNode", gen: v.gen, segmentIds });
+  }
+
+  /** Clear the "this node" marker across every pane (no focused question / cockpit mode). Ungated — a class-strip is
+   *  always safe (mirrors clearAllFailedCriteria / the review-overlay teardown). */
+  function clearAllThisNode(): void {
+    for (const v of views.values()) void v.panel.webview.postMessage({ type: "clearThisNode" });
+  }
+
+  /**
+   * Drive the "this node" cross-pane MARKER for the CURRENTLY-focused questionnaire question (#177 slice 4, disc 163
+   * §"This node marker"). A SEPARATE, PERSISTENT channel from `.current` (selection), `.failed-criterion` (peek), and the
+   * review overlay: it tracks the FOCUSED QUESTION, not the cockpit selection, so it SURVIVES a cockpit reveal (the
+   * webview mutates `.this-node` ONLY on mark/clearThisNode, never on highlight/clearHighlight — the done-overlay
+   * lifecycle, NOT the failed-criterion-clears-on-reveal one). Re-driven on the questionnaire re-render hook (slice 3),
+   * rebuild (segments changed), and each pane's ack (a fresh render re-gets the mark).
+   *
+   *  - Not MV mode / questionnaire pane closed / no focused question (no case, no questions, or the index is out of
+   *    range) → `clearAllThisNode` (no marker ever in cockpit; nothing to mark with no question).
+   *  - Else re-root the focused runtime nodeId → standalone CRL row nodeKey + its source units (the SAME
+   *    `resolveFailedCriteria` join the peek uses), then per pane:
+   *      · questionnaire — the focused `<li>` via the questionnaire pane's own anchors (keyed by nodeId);
+   *      · tree + crl   — the nodeKey via `segmentsFor` (their anchors are keyed by structure nodeKey);
+   *      · source       — the row's source-bearing units' segments, DEGRADING SILENTLY to an empty mark when the `when`
+   *                       bears no source unit (the fcGaps fallback shape — tree/crl still mark).
+   */
+  function driveThisNode(): void {
+    const qView = views.get("questionnaire");
+    // The marker is MV-only + questionnaire-scoped. In cockpit (or with the pane closed) clear every pane it could have
+    // touched — a leftover marker after a mode switch / pane close must not linger.
+    if (mode !== "medical-validation" || !qView) {
+      clearAllThisNode();
+      return;
+    }
+    const nodeId = questionNodeIds[currentQuestionIndex];
+    const sv = focusedScenario();
+    if (nodeId === undefined || !sv) {
+      clearAllThisNode(); // no focused question (no case / no questions / index out of range) → clear all panes
+      return;
+    }
+
+    // Questionnaire pane: the focused <li> via its OWN anchors (keyed by the runtime nodeId, no re-root needed).
+    markThisNode(qView, segmentsFor(qView, [nodeId]).segmentIds);
+
+    // Tree + crl + source: re-root the runtime nodeId → standalone CRL row + source units (the peek's join), then per-pane
+    // segments. A non-MV-frozen / errored case never reaches here (focusedScenario excludes ambiguous/unfrozen; an errored
+    // case yields no questions, so questionNodeIds is empty). An ungroundable nodeId → resolveThisNode returns no nodeKey
+    // → tree/crl/source all mark with EMPTY segments (clear-then-mark to empty = a clean clear for those panes).
+    const root = { lib: sv.decision?.libraryName ?? "", decision: sv.decision?.name ?? "" };
+    const { nodeKey, sourceUnits } = resolveThisNode(nodeId, root, sv.tree, runtimeRefIndex, crlMaps);
+    const tree = views.get("tree");
+    const crl = views.get("crl");
+    const src = views.get("source");
+    const nodeKeys = nodeKey !== undefined ? [nodeKey] : [];
+    if (tree) markThisNode(tree, segmentsFor(tree, nodeKeys).segmentIds);
+    if (crl) markThisNode(crl, segmentsFor(crl, nodeKeys).segmentIds);
+    if (src) markThisNode(src, segmentsFor(src, sourceUnits).segmentIds); // empty sourceUnits → silent source degrade
+  }
+
   function updateNavMessage(): void {
     const empty = navigatorItems(state).length === 0;
     navView.message = empty
@@ -812,6 +891,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       });
       v.anchors = r.anchors;
       v.reveals = r.reveals;
+      questionNodeIds = r.questionNodeIds; // #177 slice 4: captured atomically with this render's anchors (gen-scoped li ids)
       void v.panel.webview.postMessage({ type: "render", html: r.html, gen, indexVersion });
     }
   }
@@ -869,6 +949,14 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
         // the MV review overlay on ack so the at-rest done/error painting survives a render. (The failed-criterion overlay
         // re-applies via the selection-driven dispatch path; the review overlay is selection-INDEPENDENT, so it re-drives here.)
         driveDoneOverlay();
+      }
+      // #177 slice 4: a freshly-(re)rendered marker-bearing pane (tree/crl/source/questionnaire) loses its `.this-node`
+      // class (innerHTML replaced) — re-drive the marker on its ack so the focused question's node re-paints. Like the
+      // review overlay this is selection-INDEPENDENT (it tracks the focused question), so it re-drives HERE, not via the
+      // selection-dispatch path. driveThisNode is gen-stamped per pane + reads the live questionNodeIds, so an ack from a
+      // stale render posts a mark the webview drops. (cel pane carries no marker → skipped; its ack needs no re-drive.)
+      if (pane === "tree" || pane === "crl" || pane === "source" || pane === "questionnaire") {
+        driveThisNode();
       }
     } else if (msg.type === "fcMode" && (msg.mode === "blocking" || msg.mode === "all")) {
       applyFailedCriteriaMode(msg.mode); // the tree-pane segmented toggle
@@ -1067,6 +1155,10 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     // rendered tree paints its at-rest review state. (The tree render is async; the post here lands gen-stamped and the
     // webview drops it if superseded — but the tree's own ack re-drives via driveDoneOverlay below, so a race self-heals.)
     driveDoneOverlay();
+    // #177 slice 4: the model/segments just rebuilt (new gen-scoped ids; questionNodeIds re-captured by the questionnaire
+    // render above) — re-drive the "this node" marker so the freshly rendered panes paint the focused question's node.
+    // Same self-healing-on-ack contract as driveDoneOverlay (each pane's ack re-drives). Inert in cockpit (clears).
+    driveThisNode();
   }
 
   /** On a discovery/build failure, drop stale provenance so the panes never stay interactive with wrong data. */
@@ -1091,6 +1183,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     mvSidecarPath = undefined;
     worklistActions = {};
     currentQuestionIndex = 0; // #177 slice 3: drop the questionnaire sub-nav cursor with the rest of the MV state
+    questionNodeIds = []; // #177 slice 4 (FIX 5): drop the focused-question id list too (symmetry/defense — renderEmpty leaves a stale list)
     unitNumber = new Map();
     rowKeyNumbers = {};
     caseKeyNumbers = {};
@@ -1512,6 +1605,12 @@ function shellHtml(): string {
 .crl-concept-def{opacity:.7;font-size:.95em}
 .failed-criterion{outline:2px dashed var(--vscode-editorError-foreground,#f14c4c);outline-offset:1px}
 .failed-criterion-preempt{outline:2px dashed var(--vscode-charts-yellow,#d29922);outline-offset:1px}
+/* #177 slice 4: the "this node" cross-pane marker on the HTML panes (crl + source). ONLY a left-edge accent BAR (inset
+   box-shadow) and NO background (FIX 2 impl review): .current also sets a background, so a background here would override
+   .current's find-match wash on a node that is BOTH selected and the focused question (a legal coexistence). box-shadow is
+   an independent axis from .current's outline+background and .failed-criterion's dashed outline, so the bar layers cleanly.
+   Tree leg in FLOW_STYLE (a stroke); questionnaire leg in QUESTIONNAIRE_STYLE (a bar + wash — that pane never gets .current). */
+.this-node{box-shadow:inset 3px 0 0 var(--vscode-focusBorder,#3794ff)}
 .failed-criterion-preempt::after{content:" ◂ diverted here";color:var(--vscode-charts-yellow,#d29922);font-size:.85em;opacity:.9}
 #fcChrome{white-space:normal}
 #fcChrome:empty{display:none}
@@ -1549,6 +1648,10 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   // #156 slice 5: the review-overlay clear. DISTINCT from clrFC — called ONLY by mark/clearReviewOverlay, NEVER by the
   // selection channel (highlight/clearHighlight), so .done-node/.error-node SURVIVE selection (the survives-selection invariant).
   `const clrRO=()=>{for(const el of root.querySelectorAll('.done-node,.error-node')){el.classList.remove('done-node');el.classList.remove('error-node');}};` +
+  // #177 slice 4: the "this node" marker clear. DISTINCT from clrFC/clrRO — called ONLY by mark/clearThisNode, NEVER by the
+  // selection channel (highlight/clearHighlight), so `.this-node` SURVIVES a cockpit reveal (it tracks the focused QUESTION,
+  // not the selection — it moves only when the case or the question changes, the done-overlay lifecycle).
+  `const clrTN=()=>{for(const el of root.querySelectorAll('.this-node'))el.classList.remove('this-node');};` +
   `window.addEventListener('message',(e)=>{const m=e.data;` +
   `if(m.type==='render'){gen=m.gen;root.innerHTML=m.html;fcc.innerHTML='';v.postMessage({type:'ready',gen:m.gen,indexVersion:m.indexVersion});}` +
   // The at-rest selection channel (.current). Clearing/applying it ALSO wipes the failed-criterion overlay — so the
@@ -1578,6 +1681,14 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   `const errSet=new Set(m.error||[]);` +
   `for(const id of errSet){const el=document.getElementById(id);if(el)el.classList.add('error-node');}` +
   `for(const id of (m.done||[])){if(errSet.has(id))continue;const el=document.getElementById(id);if(el)el.classList.add('done-node');}}` +
+  // #177 slice 4: the "this node" cross-pane marker — a SEPARATE channel from .current, .failed-criterion AND the review
+  // overlay. Like the review overlay it is mutated ONLY here (mark/clearThisNode), NEVER by highlight/clearHighlight/clrFC/
+  // clrRO — so it SURVIVES a cockpit reveal (the focused question's node stays marked as the clinician clicks around). mark
+  // replaces the prior marker (clear-then-set, gen-guarded like the others); clear is ungated (a class-strip is always safe).
+  // No scroll on the steady mark — the focused question doesn't yank the panes around (slice-5 nav can revisit scroll).
+  `else if(m.type==='clearThisNode'){clrTN();}` +
+  `else if(m.type==='markThisNode'){if(m.gen!==gen)return;clrTN();` +
+  `for(const id of (m.segmentIds||[])){const el=document.getElementById(id);if(el)el.classList.add('this-node');}}` +
   // The tree-pane chrome (toggle + gap banner) — injected ABOVE #root so it never clobbers the flowchart.
   `else if(m.type==='fcChrome'){fcc.innerHTML=m.html;}});` +
   // #156 slice 4: a worklist checkbox click is intercepted BEFORE the [data-reveal] case-select path — the checkbox

@@ -331,6 +331,67 @@ check("CSP: no inline style=/<style> in the payload; QUESTIONNAIRE_STYLE uses va
   assert.ok(/\.q-item\.this-node\{/.test(QUESTIONNAIRE_STYLE), "the slice-4 .this-node self-highlight class is declared");
 });
 
+// ── #177 slice 4: the .this-node marker is NON-OUTLINE (a bar/wash) so it coexists with .q-opt-answer + any future .current ──
+check("slice 4: .q-item.this-node is NON-OUTLINE (box-shadow bar / background), coexisting with .q-opt-answer's find-match fill", () => {
+  const rule = QUESTIONNAIRE_STYLE.match(/\.q-item\.this-node\{([^}]*)\}/);
+  assert.ok(rule, ".q-item.this-node rule present");
+  assert.ok(!/outline/.test(rule[1]), "this-node does NOT use outline (won't fight a row .current outline)");
+  assert.match(rule[1], /box-shadow:|background/, "this-node marks via a box-shadow bar and/or background wash");
+  // .q-opt-answer (the case's answer highlight) is on a DIFFERENT element (the option span), so the two never collide; sanity-lock it exists.
+  assert.ok(/\.q-opt-answer\{/.test(QUESTIONNAIRE_STYLE), "the case-answer highlight class still exists");
+});
+
+// ── #177 slice 4: renderQuestionnairePane returns the ordered question nodeIds (the host's focused-question key) ──
+check("slice 4: questionNodeIds is the ordered question runtime nodeIds, matching the data-q attrs and the anchors keys", () => {
+  const crl = `# N
+library "FallThrough".
+concept "X":
+- type is Condition.
+- code is \`x\`.
+concept "Y":
+- type is Condition.
+- code is \`y\`.
+activity "Deny":
+- request CPGCommunicationRequest.
+- with \`no\`.
+activity "Approve":
+- request CPGCommunicationRequest.
+- with \`ok\`.
+decision "FallThrough":
+first:
+- when "X" then recommend activity "Deny".
+- when "Y" then recommend activity "Approve".`;
+  const cel = `# C
+library "FallCases".
+covers "FallThrough".
+fact "Pat":
+- name is "Pat".
+- birth date is "1970-01-01".
+- defined by "Patient".
+fact "fY":
+- code is "http://example.org|y".
+- date is "2026-01-01".
+- defined by "Y".
+case "X absent, Y holds → Approve":
+- subject is "Pat".
+- fact is "fY".
+- result is "FallThrough" is "Approve".`;
+  const { sv, rootLib } = renderCase({ "n.crl": crl, "n.cel": cel }, "n.cel", "X absent, Y holds → Approve");
+  const r = renderQuestionnairePane(sv, booleanResolver, rootLib, { revealPrefix: "g1_" });
+  const dataQs = [...r.html.matchAll(/data-q="([^"]+)"/g)].map((m) => m[1]);
+  assert.deepEqual(r.questionNodeIds, dataQs, "questionNodeIds is in display order, 1:1 with the rendered data-q attrs");
+  // The host resolves the FOCUSED question as questionNodeIds[currentQuestionIndex]; index 0 (the slice-4 scope) →
+  // question[0]'s nodeId, whose anchor (keyed by nodeId) yields the <li> segment the marker targets.
+  const focused = r.questionNodeIds[0];
+  assert.ok(r.anchors[focused], "question[0]'s nodeId has an anchor (the marker's questionnaire-pane segment)");
+  assert.deepEqual(r.anchors[focused].segmentIds, [r.anchors[focused].scrollTo], "the focused li id is the segment to mark");
+});
+
+check("slice 4: no focused case → questionNodeIds is empty (driveThisNode clears all panes)", () => {
+  const r = renderQuestionnairePane(undefined, booleanResolver, undefined);
+  assert.deepEqual(r.questionNodeIds, [], "no case → no question nodeIds");
+});
+
 // ── 8. XSS: a malicious concept/case name is escaped ──
 check("XSS: a malicious concept name is escaped in the question", () => {
   const crl = `# E

@@ -28,6 +28,10 @@ export interface RenderedQuestionnaire {
   /** No engine reveals: the questionnaire is read-only and posts no selections. Emitted (always `{}`) so the shell's
    *  per-pane `{html, anchors, reveals}` contract is uniform with the other renderers. */
   reveals: Record<string, never>;
+  /** The fired-path question runtime nodeIds, in walk (display) order (#177 slice 4). The host stores this so
+   *  `driveThisNode(currentQuestionIndex)` can resolve the FOCUSED question's nodeId WITHOUT re-running the walk; the
+   *  i-th id is the question rendered at <li id="<prefix>q<i>">. Empty when no case is focused / no questions. */
+  questionNodeIds: string[];
 }
 
 const ESC: Record<string, string> = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
@@ -105,11 +109,13 @@ export function renderQuestionnairePane(
   const anchors: Record<string, QuestionnaireAnchor> = {};
   const reveals: Record<string, never> = {};
 
-  if (!sv) return { html: PLACEHOLDER, anchors, reveals };
+  if (!sv) return { html: PLACEHOLDER, anchors, reveals, questionNodeIds: [] };
 
   const q = buildQuestionnaire(sv, resolveValueTypes, rootLib);
 
   let items = "";
+  // The ordered question nodeIds — index i is the FOCUSED-question key the host's driveThisNode reads (slice 4).
+  const questionNodeIds = q.questions.map((question) => question.nodeId);
   q.questions.forEach((question, i) => {
     const gid = `${prefix}q${i}`;
     anchors[question.nodeId] = { scrollTo: gid, segmentIds: [gid] };
@@ -123,7 +129,7 @@ export function renderQuestionnairePane(
   const list = q.questions.length ? `<ol class="q-list">${items}</ol>` : "";
   const terminal = renderTerminal(q);
 
-  return { html: `<div class="q-wrap">${header}${list}${terminal}</div>`, anchors, reveals };
+  return { html: `<div class="q-wrap">${header}${list}${terminal}</div>`, anchors, reveals, questionNodeIds };
 }
 
 /**
@@ -169,7 +175,9 @@ export const QUESTIONNAIRE_STYLE =
   `.q-terminal{margin:8px 0 0;padding:4px 6px;font-style:italic}` +
   `.q-blocked{border-left:3px solid var(--vscode-charts-yellow,#d29922);opacity:.9}` +
   `.q-error{border-left:3px solid var(--vscode-editorError-foreground,#f14c4c);opacity:.9}` +
-  // Slice 4 ("this node" marker) self-highlights the focused question in the pane via `.this-node`. Declared here so the
-  // class exists from slice 3 (no live effect yet — slice 4 drives the channel); a subtle outline distinct from the
-  // `.q-opt-answer` find-match fill.
-  `.q-item.this-node{outline:2px solid var(--vscode-focusBorder,#3794ff);outline-offset:1px}`;
+  // Slice 4 ("this node" cross-pane marker) self-highlights the FOCUSED question's <li> via `.this-node`. NON-OUTLINE by
+  // design (a left-edge accent BAR via inset box-shadow + a subtle wash) so it LAYERS with — never fights — any future
+  // `.current` (outline) on the row and the `.q-opt-answer` find-match fill on the option spans: box-shadow/background-color
+  // are independent axes from outline. The same marker channel paints the tree/crl/source panes (the shell posts
+  // markThisNode); this rule is the questionnaire pane's leg of it.
+  `.q-item.this-node{box-shadow:inset 3px 0 0 var(--vscode-focusBorder,#3794ff);background:var(--vscode-list-inactiveSelectionBackground,rgba(120,170,255,.12))}`;

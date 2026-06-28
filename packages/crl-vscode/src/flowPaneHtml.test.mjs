@@ -143,6 +143,30 @@ check("#156 slice 5: review overlay COEXISTS — .current/.failed-criterion/-pre
   );
 });
 
+check("#177 slice 4: .this-node marker uses a PROVEN stroke (NOT outline), wins the stroke axis by order, coexists with the done/error fill", () => {
+  // FIX 1 (impl review): the tree marker must NOT rely on `outline` on an SVG rect — this repo's evidence is outline does
+  // NOT paint here (it's why .current/.failed-criterion switched to stroke). So .this-node>rect paints a `stroke`, NO outline,
+  // NO fill. Against the other STROKE channels (.current/.failed-criterion/-preempt) it intentionally WINS by being ordered
+  // LAST (equal specificity, later-wins); against the FILL channels (.done-node/.error-node) it COEXISTS (stroke + fill layer).
+  const rule = FLOW_STYLE.match(/\.flow-row\.this-node>rect\{([^}]*)\}/);
+  assert.ok(rule, ".flow-row.this-node>rect rule present");
+  assert.match(rule[1], /stroke:/, "this-node marks via stroke (the PROVEN-painting SVG axis, like .current)");
+  assert.ok(!/outline/.test(rule[1]), "this-node does NOT use outline (outline does not paint on the SVG rect here)");
+  assert.ok(!/[^-]fill:/.test(rule[1]), "this-node sets NO fill — coexists with .done-node/.error-node (the fill axis)");
+  // Ordered AFTER the three stroke channels so the focused-question marker wins when a node is also selected / a criterion.
+  for (const sel of [".flow-row.current>rect", ".flow-row.failed-criterion>rect", ".flow-row.failed-criterion-preempt>rect"])
+    assert.ok(
+      FLOW_STYLE.indexOf(sel + "{") < FLOW_STYLE.indexOf(".flow-row.this-node>rect{"),
+      `.this-node>rect comes AFTER ${sel} (later-wins, so the marker overrides the transient ${sel} stroke)`,
+    );
+  // The done/error FILL rules are UNTOUCHED (still fill, no stroke) — stroke + fill layer, so a done+focused node shows both.
+  for (const sel of [".flow-row.done-node>rect", ".flow-row.error-node>rect"]) {
+    const b = FLOW_STYLE.match(new RegExp(`${sel.replace(/[.>]/g, (c) => "\\" + c)}\\{([^}]*)\\}`))[1];
+    assert.match(b, /fill:/, `${sel} still paints via fill (untouched by the slice-4 stroke)`);
+    assert.ok(!/stroke:/.test(b), `${sel} sets no stroke — the this-node stroke layers over its fill`);
+  }
+});
+
 check("XSS: labels are escaped in <text> and <title>", () => {
   const evil = renderFlowPane([{ decision: 'X"><script>alert(1)</script>', lib: "Pol", nodeKey: "d:x", location: {}, children: [] }]);
   assert.ok(!/<script>/.test(evil.html), "no raw <script>");

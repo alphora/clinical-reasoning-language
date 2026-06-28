@@ -7,6 +7,7 @@
 // + const/function definitions (no side effects), so the stub suffices to evaluate COCKPIT_WEBVIEW_SCRIPT (a pure string).
 import { build } from "esbuild";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
@@ -14,6 +15,9 @@ import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
+// The cockpit SHELL source text — for the HOST-side lifecycle wiring that lives outside the bundled webview SCRIPT string
+// (the ack-drive of the marker is host code, not in COCKPIT_WEBVIEW_SCRIPT). A coarse but load-bearing source-grep lock.
+const COCKPIT_SRC = readFileSync(resolve(here, "correspondenceCockpit.ts"), "utf8");
 
 // esbuild plugin: resolve `vscode` to an empty CJS module (the cockpit never touches vscode at import time).
 const stubVscode = {
@@ -115,6 +119,67 @@ check("ERROR-OVER-DONE: markReviewOverlay adds .error-node to the error set, the
 check("GEN-GUARD: markReviewOverlay drops a mark aimed at a superseded render (m.gen!==gen → return)", () => {
   const body = handlerBody("markReviewOverlay");
   assert.ok(/if\(m\.gen!==gen\)return;/.test(body), "mark is gen-guarded like the other channels");
+});
+
+// ── #177 slice 4: the "this node" marker channel + its SURVIVES-REVEAL invariant ──
+check("sanity: the this-node handlers + clrTN exist in the extracted script", () => {
+  assert.match(SCRIPT, /const clrTN=\(\)=>\{/, "clrTN is defined");
+  assert.match(SCRIPT, /if\(m\.type==='markThisNode'\)/, "markThisNode handler");
+  assert.match(SCRIPT, /if\(m\.type==='clearThisNode'\)/, "clearThisNode handler");
+});
+
+check("SURVIVES-REVEAL: clrTN is called ONLY by mark/clearThisNode, NEVER by highlight/clearHighlight (the marker survives a cockpit reveal)", () => {
+  // The central slice-4 invariant (mirrors the slice-5 .done-node survives-selection test): the marker tracks the focused
+  // QUESTION, not the selection, so the selection channel must not touch it. Assert the two selection handlers never call
+  // clrTN nor touch .this-node, and that the ONLY clrTN call sites are the two this-node handlers.
+  for (const type of ["highlight", "clearHighlight"]) {
+    const body = handlerBody(type);
+    assert.ok(!/clrTN\(\)/.test(body), `${type} MUST NOT call clrTN — the this-node marker survives a reveal`);
+    assert.ok(!/this-node/.test(body), `${type} MUST NOT touch the .this-node class at all`);
+  }
+  // The failed-criterion + review-overlay handlers must not touch it either (independent channels).
+  for (const type of ["markFailedCriteria", "clearFailedCriteria", "markReviewOverlay", "clearReviewOverlay"]) {
+    const body = handlerBody(type);
+    assert.ok(!/clrTN\(\)|this-node/.test(body), `${type} MUST NOT touch the this-node marker (independent channel)`);
+  }
+  // Exactly two clrTN() call sites, both inside the this-node handlers (clear-then-mark + the explicit clear).
+  const callSites = (SCRIPT.match(/clrTN\(\)/g) || []).length;
+  assert.equal(callSites, 2, "clrTN is called exactly twice — once in markThisNode (clear-then-set), once in clearThisNode");
+  assert.ok(/clrFC\(\)/.test(handlerBody("markThisNode")) === false, "markThisNode does not touch the failed-criterion channel");
+});
+
+check("the this-node marker clears ONLY the .this-node class, never the selection/failed-criterion/review classes", () => {
+  const m = SCRIPT.match(/const clrTN=\(\)=>\{[^}]*\};/);
+  assert.ok(m, "clrTN body");
+  assert.ok(!/current|failed-criterion|done-node|error-node/.test(m[0]), "clrTN strips only .this-node");
+});
+
+check("GEN-GUARD: markThisNode drops a mark aimed at a superseded render (m.gen!==gen → return); clearThisNode is ungated", () => {
+  const mark = handlerBody("markThisNode");
+  assert.ok(/if\(m\.gen!==gen\)return;/.test(mark), "markThisNode is gen-guarded like the other channels");
+  assert.ok(/clrTN\(\);/.test(mark), "markThisNode clears the prior marker first (clear-then-set)");
+  assert.ok(/add\('this-node'\)/.test(mark), "markThisNode adds .this-node for each segment id");
+  const clear = handlerBody("clearThisNode");
+  assert.ok(!/m\.gen!==gen/.test(clear), "clearThisNode is ungated (a class-strip is always safe)");
+});
+
+// ── #177 slice 4 FIX 3(b): the HOST ack-drive lifecycle (the pane-ack re-drive is the survives-reveal GUARANTEE) ──
+check("HOST: the pane-ack (`ready`) handler drives the marker (driveThisNode), and the marker is NEVER cleared by the selection path", () => {
+  // The marker's correctness rests on a re-drive when a marker-bearing pane re-renders (its `ready` ack). Assert the host
+  // source wires driveThisNode into the ack handler AND does NOT wire any marker-clear into the selection-reveal path
+  // (highlight/clearHighlight/clearAllHighlights), the host counterpart to the script-string survives-reveal lock above.
+  // The `ready`/ack handler is the `msg.type === "ready"` block; it must reference driveThisNode for the marker-bearing panes.
+  assert.ok(/msg\.type === "ready"/.test(COCKPIT_SRC), "the ack handler exists");
+  assert.ok(
+    /pane === "tree" \|\| pane === "crl" \|\| pane === "source" \|\| pane === "questionnaire"\)\s*\{\s*driveThisNode\(\);/.test(COCKPIT_SRC),
+    "the ack handler re-drives driveThisNode for the marker-bearing panes (the survives-reveal guarantee)",
+  );
+  // driveThisNode/clearAllThisNode must NOT be wired into the selection-reveal helpers (host survives-reveal invariant).
+  for (const fn of ["clearHighlight", "clearAllHighlights", "highlightRows"]) {
+    // crude: the helper bodies must not call driveThisNode/clearAllThisNode. We check they aren't adjacent in those defs.
+    const m = COCKPIT_SRC.match(new RegExp(`function ${fn}\\([^)]*\\)[^{]*\\{([\\s\\S]*?)\\n  \\}`));
+    if (m) assert.ok(!/driveThisNode\(|clearAllThisNode\(/.test(m[1]), `${fn} must not drive/clear the this-node marker (survives a reveal)`);
+  }
 });
 
 console.log(`\ncockpitWebviewScript.test: ${pass} checks passed`);
