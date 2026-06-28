@@ -3,11 +3,13 @@
 // §"Architecture", §"Slice order" item 2). The shell glue (the validationMode seam, the webview, the overlay channel)
 // lands in later slices; this module is the pure, testable substrate they call.
 //
-// Three pieces, all fs/path only (NO vscode import — this is the testable core):
+// Pieces, all fs/path only (NO vscode import — this is the testable core; the chrome renderer below interpolates only
+// integers + fixed literals, so it stays vscode-free + HTML-escape-free):
 //   - medicalValidationSidecarPath: from a .cel, locate the ONE policy-scoped sidecar (one per POLICY, not per .cel).
 //   - load/save the sidecar: a corruption-tolerant read + an ATOMIC write (tmp+rename), keyed by frozen caseId.
 //   - deriveReviewOverlay: the TOTAL precedence fold (error > done) over all REVIEWED cases → the {done, error} node sets.
-//   - nextReviewState: the 3-state checkbox cycle (slice 4 wires it to the webview click).
+//   - nextReviewState / applyWorklistToggle: the 3-state checkbox cycle (slice 4 wires it to the webview click).
+//   - reviewProgress / renderProgressChrome: the slice-6 worklist progress READOUT (pure count + its tree-chrome HTML).
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 
@@ -239,4 +241,80 @@ export function applyWorklistToggle(
   if (next === "unreviewed") delete out[caseId];
   else out[caseId] = next as PersistedReviewState;
   return out;
+}
+
+// ── worklist progress readout (#156 slice 6) ──────────────────────────────────────
+
+/**
+ * The worklist progress readout (disc 161 §"Architecture": "Progress chrome (N/M reviewed · pending · stale) in the
+ * existing tree `#fcChrome` region, mode-gated").
+ *
+ * - `total` = `reviewableCaseIds.length` (the frozen, NON-ambiguous cases the host passes — the SAME paintable set the
+ *   done overlay uses, `scenarioByCaseId.keys()`). The host de-dupes upstream, but we normalize defensively (a duplicate
+ *   id must not inflate `total`/`reviewed`/`pending`).
+ * - `reviewed` / `pending` = the count of reviewable ids whose sidecar state is exactly that (absence = unreviewed, not
+ *   counted in either — derive unreviewed as `total - reviewed - pending` if needed).
+ * - `unreviewable` = frozen-but-ambiguous + unfrozen cases (the rows the worklist SHOWS with a disabled checkbox but that
+ *   can never be reviewed — disc 161 §"Architecture": "never hidden — honesty"). The host passes the live case count so
+ *   `unreviewable = totalCaseCount - total` (floored at 0). The readout surfaces this so "Reviewed N/M" can't silently
+ *   drop unreviewable rows from the clinician's mental denominator.
+ * - `stale` = `byCaseId` KEYS not in `reviewableCaseIds` (orphans — a deleted/re-frozen case, OR a now-AMBIGUOUS case
+ *   whose persisted state can no longer round-trip to a reviewable checkbox; disc 161 §2 "Stale entries ... are inert").
+ *   Counted across BOTH persisted states (a stale "pending" is just as orphaned as a stale "reviewed").
+ *
+ * NOT A PARTITION: `reviewed`/`pending`/`stale` count over DIFFERENT universes (reviewed/pending over live-reviewable
+ * ids; stale over sidecar orphans). `reviewed + pending + stale` is deliberately NOT `total` — they answer distinct
+ * questions ("how far through the reviewable worklist" vs. "how many dangling sidecar entries"). Pure, no side effects.
+ */
+export interface ReviewProgress {
+  total: number;
+  reviewed: number;
+  pending: number;
+  unreviewable: number;
+  stale: number;
+}
+
+export function reviewProgress(
+  byCaseId: Record<string, PersistedReviewState>,
+  reviewableCaseIds: readonly string[],
+  totalCaseCount?: number,
+): ReviewProgress {
+  const reviewable = new Set(reviewableCaseIds); // de-dupe defensively (a dup id must not inflate the counts)
+  let reviewed = 0;
+  let pending = 0;
+  for (const id of reviewable) {
+    const s = byCaseId[id];
+    if (s === "reviewed") reviewed++;
+    else if (s === "pending") pending++;
+  }
+  let stale = 0;
+  for (const id of Object.keys(byCaseId)) if (!reviewable.has(id)) stale++;
+  const total = reviewable.size;
+  // Default the total case count to the de-duped reviewable total (→ 0 unreviewable) when the host omits it. Computed
+  // AFTER dedup so a duplicate reviewable id can't make the default exceed `total` and fabricate a phantom unreviewable row.
+  return { total, reviewed, pending, unreviewable: Math.max(0, (totalCaseCount ?? total) - total), stale };
+}
+
+/**
+ * Render the worklist progress readout as the tree-chrome HTML line (disc 161 §"Architecture"). Pure + vscode-free so the
+ * cockpit's `buildTreeChromeHtml` can call it and the test can assert the string WITHOUT bundling vscode. Only integers +
+ * fixed literals are interpolated, so NO HTML escaping is needed (and none is done — keep it that way: never interpolate
+ * a free-text label here without `escapeHtml`).
+ *
+ * - Returns "" only when there is NOTHING to say: `total===0 && stale===0 && unreviewable===0`. A `total===0` panel with
+ *   stale orphans or unreviewable rows STILL renders (those counts are the only useful signal then).
+ * - Fully clean (`total>0 && reviewed===total && pending===0 && stale===0 && unreviewable===0`) → a single
+ *   "✓ All reviewed" DONE indicator (`.mv-progress-done`) INSTEAD of the count (no redundant "Reviewed N/N" beside it).
+ * - Otherwise: `Reviewed N/M`, then `· P pending` (only if P>0), `· U not reviewable` (only if U>0), `· S stale` (only if
+ *   S>0). When `total===0` (but stale/unreviewable>0) the leading clause reads `0 reviewable` instead of `Reviewed 0/0`.
+ */
+export function renderProgressChrome(p: ReviewProgress): string {
+  if (p.total === 0 && p.stale === 0 && p.unreviewable === 0) return "";
+  const clean = p.total > 0 && p.reviewed === p.total && p.pending === 0 && p.stale === 0 && p.unreviewable === 0;
+  if (clean) return `<div class="mv-progress mv-progress-done">✓ All reviewed</div>`;
+  const parts: string[] = [p.total > 0 ? `Reviewed ${p.reviewed}/${p.total}` : `0 reviewable`];
+  if (p.pending > 0) parts.push(`${p.pending} pending`);
+  if (p.unreviewable > 0) parts.push(`${p.unreviewable} not reviewable`);
+  if (p.stale > 0) parts.push(`${p.stale} stale`);
+  return `<div class="mv-progress">${parts.join(" · ")}</div>`;
 }

@@ -26,7 +26,7 @@ async function load(tsFile) {
   return require(out);
 }
 
-const { medicalValidationSidecarPath, loadSidecar, saveSidecar, deriveReviewOverlay, buildReviewPerCase, nextReviewState, applyWorklistToggle } =
+const { medicalValidationSidecarPath, loadSidecar, saveSidecar, deriveReviewOverlay, buildReviewPerCase, nextReviewState, applyWorklistToggle, reviewProgress, renderProgressChrome } =
   await load("medicalValidationStore.ts");
 
 let pass = 0;
@@ -377,6 +377,85 @@ check("buildReviewPerCase passes litNodeKeys verbatim from the join closure", ()
   const perCase = buildReviewPerCase(["c2"], statusOf, litOf);
   assert.deepEqual([...perCase.get("c2").litNodeKeys], ["n:b", "n:c"]);
   assert.equal(perCase.get("c2").status, "fail");
+});
+
+// ── reviewProgress (slice 6 count) ────────────────────────────────────────────
+check("reviewProgress: a mix — reviewed/pending over reviewable, absent=unreviewed, orphan keys=stale", () => {
+  // reviewable = [r1, r2, p1, u1]; sidecar also has two orphans (o1 reviewed, o2 pending) not in reviewable → both stale.
+  const p = reviewProgress(
+    { r1: "reviewed", r2: "reviewed", p1: "pending", o1: "reviewed", o2: "pending" },
+    ["r1", "r2", "p1", "u1"], // u1 absent from sidecar → unreviewed (not counted in reviewed/pending)
+  );
+  assert.deepEqual(p, { total: 4, reviewed: 2, pending: 1, unreviewable: 0, stale: 2 });
+  // NOT a partition: reviewed+pending+stale = 5 ≠ total (4); stale counts a DIFFERENT universe (orphans), incl a pending orphan.
+});
+check("reviewProgress: empty reviewable set → total 0 (and reviewed/pending 0)", () => {
+  assert.deepEqual(reviewProgress({}, []), { total: 0, reviewed: 0, pending: 0, unreviewable: 0, stale: 0 });
+  // a total-0 panel can still have orphans: those surface as stale.
+  assert.deepEqual(reviewProgress({ gone: "reviewed" }, []), { total: 0, reviewed: 0, pending: 0, unreviewable: 0, stale: 1 });
+});
+check("reviewProgress: all-reviewed (reviewed===total, nothing pending/stale/unreviewable)", () => {
+  assert.deepEqual(reviewProgress({ a: "reviewed", b: "reviewed" }, ["a", "b"]), {
+    total: 2, reviewed: 2, pending: 0, unreviewable: 0, stale: 0,
+  });
+});
+check("reviewProgress: unreviewable = totalCaseCount − reviewable (floored at 0)", () => {
+  // 5 worklist rows, 3 reviewable (frozen, non-ambiguous) → 2 unreviewable (unfrozen/ambiguous).
+  const p = reviewProgress({ a: "reviewed" }, ["a", "b", "c"], 5);
+  assert.deepEqual(p, { total: 3, reviewed: 1, pending: 0, unreviewable: 2, stale: 0 });
+  // defensive floor: a totalCaseCount somehow < reviewable never yields a negative unreviewable.
+  assert.equal(reviewProgress({}, ["a", "b"], 1).unreviewable, 0);
+});
+check("reviewProgress: a duplicate reviewable id does NOT inflate the counts (de-duped)", () => {
+  const p = reviewProgress({ a: "reviewed" }, ["a", "a", "b"]);
+  assert.deepEqual(p, { total: 2, reviewed: 1, pending: 0, unreviewable: 0, stale: 0 });
+});
+
+// ── renderProgressChrome (slice 6 chrome HTML) ─────────────────────────────────
+check("renderProgressChrome: a mix renders Reviewed N/M + pending/stale clauses", () => {
+  const html = renderProgressChrome({ total: 4, reviewed: 2, pending: 1, unreviewable: 0, stale: 2 });
+  assert.match(html, /class="mv-progress"/);
+  assert.ok(!/mv-progress-done/.test(html), "not the done state when work remains");
+  assert.match(html, /Reviewed 2\/4/);
+  assert.match(html, /1 pending/);
+  assert.match(html, /2 stale/);
+});
+check("renderProgressChrome: all-reviewed (reviewed===total, clean) → '✓ All reviewed' done indicator INSTEAD of the count", () => {
+  const html = renderProgressChrome({ total: 3, reviewed: 3, pending: 0, unreviewable: 0, stale: 0 });
+  assert.match(html, /mv-progress-done/);
+  assert.match(html, /✓ All reviewed/);
+  assert.ok(!/Reviewed 3\/3/.test(html), "no redundant count beside the done indicator");
+});
+check("renderProgressChrome: pending/unreviewable/stale clauses OMITTED when their count is 0", () => {
+  const html = renderProgressChrome({ total: 5, reviewed: 2, pending: 0, unreviewable: 0, stale: 0 });
+  assert.match(html, /Reviewed 2\/5/);
+  assert.ok(!/pending/.test(html) && !/not reviewable/.test(html) && !/stale/.test(html), "no zero clauses");
+});
+check("renderProgressChrome: unreviewable rows surface as '· U not reviewable' (honesty — they're never hidden)", () => {
+  const html = renderProgressChrome({ total: 3, reviewed: 1, pending: 0, unreviewable: 2, stale: 0 });
+  assert.match(html, /Reviewed 1\/3/);
+  assert.match(html, /2 not reviewable/);
+});
+check("renderProgressChrome: reviewed===total but stale>0 is NOT the done state (a dangling orphan ≠ clean)", () => {
+  const html = renderProgressChrome({ total: 2, reviewed: 2, pending: 0, unreviewable: 0, stale: 1 });
+  assert.ok(!/mv-progress-done/.test(html), "stale orphan blocks the all-reviewed indicator");
+  assert.match(html, /Reviewed 2\/2/);
+  assert.match(html, /1 stale/);
+});
+check("renderProgressChrome: nothing to say (total 0, no stale, no unreviewable) → empty string (chrome:empty hides it)", () => {
+  assert.equal(renderProgressChrome({ total: 0, reviewed: 0, pending: 0, unreviewable: 0, stale: 0 }), "");
+});
+check("renderProgressChrome: total 0 but stale>0 STILL renders (the orphan count is the only useful signal)", () => {
+  const html = renderProgressChrome({ total: 0, reviewed: 0, pending: 0, unreviewable: 0, stale: 3 });
+  assert.notEqual(html, "");
+  assert.match(html, /0 reviewable/);
+  assert.match(html, /3 stale/);
+});
+check("renderProgressChrome: total 0 but unreviewable>0 STILL renders (all rows unfrozen/ambiguous → none reviewable)", () => {
+  const html = renderProgressChrome({ total: 0, reviewed: 0, pending: 0, unreviewable: 2, stale: 0 });
+  assert.notEqual(html, "");
+  assert.match(html, /0 reviewable/);
+  assert.match(html, /2 not reviewable/);
 });
 
 console.log(`\nmedicalValidationStore.test: ${pass} checks passed`);

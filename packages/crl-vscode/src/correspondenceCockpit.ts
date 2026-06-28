@@ -53,6 +53,8 @@ import {
   deriveReviewOverlay,
   loadSidecar,
   medicalValidationSidecarPath,
+  renderProgressChrome,
+  reviewProgress,
   saveSidecar,
   type PersistedReviewState,
 } from "./medicalValidationStore";
@@ -504,6 +506,20 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
    *  buttons carry `data-fc-mode`; each gap row carries `data-fc-gap` (its index into `fcGaps`). Both are handled by the
    *  shell webview script (distinct from the `[data-reveal]` path). */
   function buildTreeChromeHtml(): string {
+    // #156 slice 6: the worklist progress readout, MV mode ONLY (cockpit omits it → its chrome is byte-unchanged). PREPENDED
+    // above the (unconditional) #173 All/Blocking toggle + gap banner. The reviewable denominator is the SAME paintable set
+    // the done overlay uses (`scenarioByCaseId.keys()` — frozen, non-ambiguous); the total case count (`scenarios.length`)
+    // lets the readout surface the unreviewable (unfrozen/ambiguous) rows the worklist shows but can't review (disc 161
+    // §"Architecture": "never hidden — honesty"). Recomputed on every renderTreeChrome() call (tree ack, toggle, mode change).
+    // `unreviewable = scenarios.length − scenarioByCaseId.size` assumes one frozen caseId per scenario row (the cel pane
+    // renders one checkbox per row; scenarioByCaseId, a Map, is the reviewable set slice 5 already paints from). A frozen
+    // caseId is a per-case identity, so two differently-named rows can't collapse to one key — the same invariant the done
+    // overlay's `scenarioByCaseId.keys()` paintable set relies on; this readout is no more fragile than the overlay it pairs with.
+    let progress = "";
+    if (mode === "medical-validation") {
+      const p = reviewProgress(reviewByCaseId, [...scenarioByCaseId.keys()], scenarios?.scenarios.length ?? 0);
+      progress = renderProgressChrome(p);
+    }
     const btn = (mode: "blocking" | "all", label: string): string =>
       `<button class="fc-toggle-btn${failedCriteriaMode === mode ? " fc-active" : ""}" data-fc-mode="${mode}">${label}</button>`;
     const toggle =
@@ -523,7 +539,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       banner =
         `<div class="fc-gaps"><div class="fc-gaps-head">Couldn't locate the CRL row for:</div>${rows}</div>`;
     }
-    return toggle + banner;
+    return progress + toggle + banner;
   }
 
   /** Push the current tree-pane chrome (toggle + gap banner) to the tree webview, if open. Does NOT re-render the
@@ -1154,7 +1170,11 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     }
     reviewByCaseId = next; // commit in-memory only AFTER a successful persist
     renderPane("cel"); // single-pane re-render (the checkbox glyphs); re-drive the selection so its highlight survives
+    // #156 slice 6: the reviewed/pending counts changed → refresh the tree-chrome progress readout (no tree re-render). The
+    // selection-dispatch path below ALSO renders chrome (dispatch → driveFailedCriteriaPeek → renderTreeChrome), so only
+    // call renderTreeChrome here when there's NO selection (else the chrome would post twice for a selected toggle).
     if (state.selection) dispatch({ type: "select", selection: state.selection });
+    else renderTreeChrome();
     driveDoneOverlay(); // #156 slice 5: the reviewed set changed → repaint the tree done/error overlay (no tree re-render)
   }
 
@@ -1435,6 +1455,8 @@ function shellHtml(): string {
 .fc-gap-row{cursor:pointer;padding:1px 2px}
 .fc-gap-row:hover{background:var(--vscode-list-hoverBackground)}
 .fc-gap-open{text-decoration:underline;opacity:.85;margin-left:4px}
+.mv-progress{padding:4px 2px 2px;font-size:.85em;opacity:.85}
+.mv-progress-done{color:var(--vscode-testing-iconPassed,var(--vscode-charts-green,#89d185));opacity:1;font-weight:bold}
 ${CORR_STYLE}${FLOW_STYLE}`;
   return (
     `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">` +
