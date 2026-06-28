@@ -434,7 +434,10 @@ describe("authoring-kit — getAuthoringKit", () => {
     // `pa-disposition-set`, the `judgeLens.composition` family (§2/§3 source-fidelity checks), the qualified
     // `use decision` boundary entry (#172), the §4 proof-methodology in verifyLoop, Deny EIU in the shared
     // determination lib, and two new exemplars (B source-delegated, C disposition-arbitration).
-    expect(a.contentHash).toBe("8f98309b34f6740a4fff1d05f8e74751b8760e785df1463535b5fd1d574be856");
+    // Re-pinned again (#172 COMPLETE): qualified / cross-library `use decision` now EVALUATES end-to-end (run_decision
+    // + validate_cel + provenance + cockpit), so the "NOT yet evaluated" BOUNDARY entry was removed and the proof-status
+    // example updated. KE skills pin this hash — re-sync on the bump.
+    expect(a.contentHash).toBe("d7f950e1a546055ea064be2f9bbd793d9548a12c7573b1acdcaba2325eb88829");
   });
 
   it("STAGES contains exactly the one Stage-1 slice", () => {
