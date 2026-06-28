@@ -68,7 +68,12 @@ import {
   unitsForRow,
   type CrlRevealMaps,
 } from "./crlRevealMaps";
-import { CANONICAL_PANE_ORDER, normalizePaneOrder } from "./paneOrder";
+import {
+  COCKPIT_PANE_SPEC,
+  MEDICAL_VALIDATION_PANE_SPEC,
+  normalizePaneOrder,
+  type PaneSpec,
+} from "./paneOrder";
 import { isConceptHit, isFactHit, type RevealHit, type WebviewHit } from "./webviewHit";
 import { PaneRevealCoordinator, type SemanticTarget } from "./paneRevealCoordinator";
 import { discoverProvenance, findPolicySrc, PANEL_VALIDATION_MODE } from "./provenanceFindings";
@@ -160,6 +165,34 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   // An unconditional setContext at activation would surface both the provenance view and this navigator in EVERY window.
 
   let state: State = initialState();
+  // The panel MODE (#156 medical-validation slice 3). One singleton controller + one parameterized webview: `CRL: Show
+  // Cockpit` runs it in "cockpit" mode; `CRL: Show Medical Validation` RETARGETS the same session into "medical-validation"
+  // mode (no fork, no 2nd webview). In THIS slice the mode changes only (a) which config section is read, (b) the pane
+  // spec / default order, and (c) the panel title. The mode-gated features (the worklist checkbox render = slice 4; the
+  // done/error overlay = slice 5) are threaded but NOT built here.
+  let mode: "cockpit" | "medical-validation" = "cockpit";
+  /** The config section for the current mode. `failedCriteriaMode` is SHARED (always `crl.cockpit`) and read directly. */
+  const configSection = (m: "cockpit" | "medical-validation"): string =>
+    m === "medical-validation" ? "crl.medical-validation" : "crl.cockpit";
+  /** The pane spec for the current mode (valid set / canonical default / aliases). */
+  const paneSpecFor = (m: "cockpit" | "medical-validation"): PaneSpec =>
+    m === "medical-validation" ? MEDICAL_VALIDATION_PANE_SPEC : COCKPIT_PANE_SPEC;
+  /** A pane's webview-panel title, reflecting the MODE (#156 slice 3). In medical-validation mode the panels carry a
+   *  "CRL Medical Validation" prefix; the "cel" pane reads "Worklist" (it IS the worklist pane — the checkbox render is
+   *  slice 4, so here it's only the label that changes). Cockpit titles stay exactly "Source"/"CRL"/"CEL"/"Tree". */
+  const paneTitle = (pane: Pane): string =>
+    mode === "medical-validation"
+      ? `CRL Medical Validation · ${pane === "cel" ? "Worklist" : PANE_TITLE[pane]}`
+      : PANE_TITLE[pane];
+  /** The navigable primary panes for the current mode (#156 slice 3, FIX 2). MV's primary enum is [source, cel] (no crl —
+   *  it has no CRL pane in the default and its config enum excludes crl), so the set-primary quickpick + the persisted
+   *  guard must reject "crl" in MV mode. Cockpit keeps the full [source, crl, cel]. */
+  const primaryPanesForMode = (m: "cockpit" | "medical-validation"): PrimaryPane[] =>
+    m === "medical-validation" ? ["source", "cel"] : PRIMARY_PANES;
+  /** The set-primary quickpick LABEL for a pane in the current mode — in MV the cel pane reads "Worklist" (the worklist
+   *  alias), matching the pane title; cockpit uses the plain pane titles. */
+  const primaryLabel = (p: PrimaryPane): string =>
+    mode === "medical-validation" && p === "cel" ? "Worklist" : PANE_TITLE[p];
   const coord = new PaneRevealCoordinator();
   let model: ViewerModel | undefined;
   let correspondence: CorrespondenceModel | undefined;
@@ -207,7 +240,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   /** last span-click locus (trusted, from the renderer) — open-raw uses it when it still matches the selection. */
   let lastClicked: { unitId: string; range: ZeroBasedRange } | undefined;
   const views = new Map<Pane, PaneView>();
-  let paneOrder: Pane[] = [...CANONICAL_PANE_ORDER]; // user layout (crl.cockpit.paneOrder), normalized
+  let paneOrder: Pane[] = normalizePaneOrder(undefined, COCKPIT_PANE_SPEC); // user layout (configSection(mode).paneOrder), normalized
   let watcher: vscode.FileSystemWatcher | undefined;
   let debounce: ReturnType<typeof setTimeout> | undefined;
   let orderDebounce: ReturnType<typeof setTimeout> | undefined;
@@ -764,7 +797,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     if (v) return v;
     const panel = vscode.window.createWebviewPanel(
       `crlCockpit.${pane}`,
-      PANE_TITLE[pane],
+      paneTitle(pane),
       { viewColumn: columnFor(pane), preserveFocus: true },
       { enableScripts: true, retainContextWhenHidden: true },
     );
@@ -913,32 +946,99 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   }
 
   // ── commands ──
-  const showCmd = vscode.commands.registerCommand("crl.cockpit.show", () => {
+  /** In-flight guard for the async show commands (#156 slice 3, FIX 6). The active-`.cel` fast-path is sync, but the
+   *  `findFiles` quick-pick path awaits — two rapid show invocations (Cockpit then Medical Validation) would otherwise
+   *  interleave two `openPanel` calls mutating the shared `mode`/`views`. While a pick is pending, a second show is
+   *  ignored (first-wins; the active user keeps their in-progress pick). */
+  let pickPending = false;
+
+  /** Resolve the .cel to open a panel on (#156 slice 3, shared by BOTH commands). If the active editor is a `.cel`, use
+   *  it (preserves the long-standing focused-`.cel` behavior). Otherwise scan the workspace for policy-shaped `.cel`
+   *  files (those for which `findPolicySrc` succeeds — a non-policy `.cel` would fail discovery anyway) and quick-pick
+   *  one. Returns the chosen path, or undefined when cancelled / none found. */
+  async function pickCelForPanel(): Promise<string | undefined> {
     const ed = vscode.window.activeTextEditor;
-    if (!ed || ed.document.uri.scheme !== "file" || !ed.document.uri.fsPath.toLowerCase().endsWith(".cel")) {
-      void vscode.window.showInformationMessage("CRL Cockpit: open a .cel scenario file first.");
-      return;
+    if (ed && ed.document.uri.scheme === "file" && ed.document.uri.fsPath.toLowerCase().endsWith(".cel")) {
+      return ed.document.uri.fsPath; // sync fast-path — no re-entrancy window
     }
-    currentCel = ed.document.uri.fsPath;
-    // Safe on-demand reveal (mirrors provenancePanel) — runs only when the user explicitly opens the cockpit on a .cel,
+    // FIX 7 (false-negative boundary): the 500 cap is applied by findFiles BEFORE the policy filter, so in a workspace
+    // with >500 .cel files the cap could fill with non-policy files and miss policy-shaped ones. The content project is
+    // well under 500; no fix now — just the honest note. (findPolicySrc also does sync existsSync ancestor walks per
+    // candidate; fine at 500, a UI-thread concern only if the cap rises.)
+    const uris = await vscode.workspace.findFiles("**/*.cel", "**/node_modules/**", 500);
+    // Policy-shaped only: a .cel under a policy `src/` with a `provenance/` sibling. Sort for a stable list.
+    const policyCels = uris.map((u) => u.fsPath).filter((p) => findPolicySrc(p) !== undefined).sort();
+    if (policyCels.length === 0) {
+      void vscode.window.showInformationMessage("CRL: no policy-shaped .cel files found in this workspace (a .cel under a policy src/ with a provenance/ folder).");
+      return undefined;
+    }
+    const items = policyCels.map((p) => {
+      const rel = vscode.workspace.asRelativePath(p, false);
+      return { label: basename(p), description: rel, value: p };
+    });
+    const pick = await vscode.window.showQuickPick(items, { placeHolder: "Pick a policy .cel to open" });
+    return pick?.value;
+  }
+
+  /** Open (or RETARGET) the single panel session in `targetMode` on `celPath`. One singleton controller + one
+   *  parameterized webview: switching modes on an open session RETITLES the panes in place + reconciles the new mode's
+   *  pane set/order (NO bulk dispose-and-reopen — `ensurePane` returns the still-`views`-tracked view and onDidDispose
+   *  fires async, so reopening against a disposing webview is the race FIX 5 avoids). config reads use
+   *  `configSection(targetMode)` + the matching pane spec; `failedCriteriaMode` stays SHARED under `crl.cockpit`. */
+  function openPanel(targetMode: "cockpit" | "medical-validation", celPath: string): void {
+    mode = targetMode;
+    currentCel = celPath;
+    const uri = vscode.Uri.file(celPath);
+    const section = configSection(mode);
+    // Safe on-demand reveal (mirrors provenancePanel) — runs only when the user explicitly opens a panel on a .cel,
     // NOT unconditionally at activation. Ensures the navigator shows even if the gate's one-shot findFiles missed.
     void vscode.commands.executeCommand("setContext", "crl.active", true);
-    // Apply the persisted default primary BEFORE the first rebuild's navigator render (else it flips visibly).
-    const pref = vscode.workspace.getConfiguration("crl.cockpit", ed.document.uri).get<string>("primary");
-    if (pref === "crl" || pref === "source" || pref === "cel") state = reduce(state, { type: "setPrimary", primary: pref }).state;
+    // Apply the persisted default primary BEFORE the first rebuild's navigator render (else it flips visibly). FIX 2:
+    // reject a primary not navigable in THIS mode (e.g. a hand-edited `crl.medical-validation.primary: "crl"`) → the
+    // mode's default stands.
+    const pref = vscode.workspace.getConfiguration(section, uri).get<string>("primary");
+    if (pref === "source" || (pref === "crl" || pref === "cel") && primaryPanesForMode(mode).includes(pref))
+      state = reduce(state, { type: "setPrimary", primary: pref as PrimaryPane }).state;
     // paneOrder is window-scoped (User settings = global/cross-project; Workspace settings = per-project) — read with the
-    // .cel resource URI so a workspace/folder override is honored; open panes in that order.
+    // .cel resource URI so a workspace/folder override is honored; normalize against the mode's spec; open panes in order.
     paneOrder = normalizePaneOrder(
-      vscode.workspace.getConfiguration("crl.cockpit", ed.document.uri).get("paneOrder"),
+      vscode.workspace.getConfiguration(section, uri).get("paneOrder"),
+      paneSpecFor(mode),
     );
-    showKeys = vscode.workspace.getConfiguration("crl.cockpit", ed.document.uri).get<boolean>("showKeys") ?? true;
-    // #173 T3: the persisted All/Blocking failed-criteria mode (default Blocking).
-    const fcm = vscode.workspace.getConfiguration("crl.cockpit", ed.document.uri).get<string>("failedCriteriaMode");
+    showKeys = vscode.workspace.getConfiguration(section, uri).get<boolean>("showKeys") ?? true;
+    // #173 T3: the persisted All/Blocking failed-criteria mode is SHARED — always read from `crl.cockpit` (the toggle is
+    // cross-surface; the scenarioRunner reads the same key), regardless of panel mode.
+    const fcm = vscode.workspace.getConfiguration("crl.cockpit", uri).get<string>("failedCriteriaMode");
     failedCriteriaMode = fcm === "all" ? "all" : "blocking";
+    // FIX 5: retitle any already-open pane in place for the new mode (settable property), then let reconcilePaneOrder
+    // open/dispose the delta for the new spec's order. ensurePane any not-yet-open visible pane. NO bulk dispose.
+    for (const [pane, v] of views) v.panel.title = paneTitle(pane);
     for (const pane of paneOrder) if (state.paneVisibility[pane]) ensurePane(pane);
+    reconcilePaneOrder(); // drop panes not in the new order (e.g. cockpit's crl when switching to MV) + re-place columns
     setupWatcher();
     rebuild();
-  });
+  }
+
+  /** Run a show command: guard re-entrancy (FIX 6), pick a .cel, open the panel in `targetMode`. */
+  function runShow(targetMode: "cockpit" | "medical-validation"): void {
+    if (pickPending) return; // a pick is already in flight — ignore (first-wins)
+    pickPending = true;
+    void pickCelForPanel().then(
+      (cel) => {
+        pickPending = false;
+        if (cel) openPanel(targetMode, cel);
+      },
+      (e) => {
+        pickPending = false;
+        console.warn(`[crl.cockpit] pick failed: ${e instanceof Error ? e.message : e}`);
+      },
+    );
+  }
+
+  const showCmd = vscode.commands.registerCommand("crl.cockpit.show", () => runShow("cockpit"));
+  const showMedicalValidationCmd = vscode.commands.registerCommand("crl.medicalValidation.show", () =>
+    runShow("medical-validation"),
+  );
 
   function applyPrimary(next: PrimaryPane): void {
     for (const pane of PANES) coord.clearPending(pane); // drop reveals queued under the old primary
@@ -947,7 +1047,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     updateNavMessage();
     if (currentCel)
       void vscode.workspace
-        .getConfiguration("crl.cockpit", vscode.Uri.file(currentCel))
+        .getConfiguration(configSection(mode), vscode.Uri.file(currentCel))
         .update("primary", next) // most-specific writable scope (workspace if open, else global)
         .then(undefined, (e) => console.warn(`[crl.cockpit] could not persist primary: ${e instanceof Error ? e.message : e}`));
   }
@@ -992,10 +1092,12 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
 
   const setPrimaryCmd = vscode.commands.registerCommand("crl.cockpit.setPrimary", () => {
     if (!currentCel || !model) return; // not shown yet → don't switch + persist before the cockpit exists
-    // Iterate PRIMARY_PANES (not PANES) — tree is not a navigable primary, so it must never appear as a setPrimary choice.
-    const items: (vscode.QuickPickItem & { value: PrimaryPane })[] = PRIMARY_PANES.map((p) => ({
-      label: `${PANE_TITLE[p]}${p === state.primary ? "  •" : ""}`,
-      description: p === "source" ? "source units" : p === "crl" ? "CRL decision nodes" : "CEL cases",
+    // FIX 2: iterate the MODE's navigable primaries (tree is never a primary; MV excludes crl) — so MV offers only
+    // Source + the cel pane labeled "Worklist", and cockpit offers Source/CRL/CEL.
+    const items: (vscode.QuickPickItem & { value: PrimaryPane })[] = primaryPanesForMode(mode).map((p) => ({
+      label: `${primaryLabel(p)}${p === state.primary ? "  •" : ""}`,
+      description:
+        p === "source" ? "source units" : p === "crl" ? "CRL decision nodes" : mode === "medical-validation" ? "CEL cases (worklist)" : "CEL cases",
       value: p,
     }));
     void vscode.window.showQuickPick(items, { placeHolder: "Navigator primary pane" }).then((pick) => {
@@ -1024,7 +1126,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     // Read the LIVE persisted value (not the cached render-state `showKeys`) and write its inverse, to the most-specific
     // writable scope (resource-aware like primary/paneOrder). The onConfig handler is the single re-render path (so a
     // manual settings.json edit behaves identically to the button).
-    const cfg = vscode.workspace.getConfiguration("crl.cockpit", vscode.Uri.file(currentCel));
+    const cfg = vscode.workspace.getConfiguration(configSection(mode), vscode.Uri.file(currentCel));
     const cur = cfg.get<boolean>("showKeys") ?? true;
     void cfg
       .update("showKeys", !cur)
@@ -1080,18 +1182,25 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   // affectsConfiguration + currentCel. (application scope: an edit in another window may only take effect on reload — fine.)
   const onConfig = vscode.workspace.onDidChangeConfiguration((e) => {
     if (!currentCel) return;
-    if (e.affectsConfiguration("crl.cockpit.paneOrder")) {
+    const section = configSection(mode); // the ACTIVE mode's config namespace (paneOrder/showKeys live there)
+    if (e.affectsConfiguration(`${section}.paneOrder`)) {
+      // FIX 3: capture the mode at event time; inside the debounce, re-derive BOTH section AND spec from the LIVE mode
+      // (consistent) and abort if mode or currentCel changed within the 150ms window (a switch could otherwise normalize
+      // the new mode's spec against the old section's value, or fire on a closed session).
+      const modeAtEvent = mode;
       if (orderDebounce) clearTimeout(orderDebounce);
       orderDebounce = setTimeout(() => {
-        const uri = currentCel ? vscode.Uri.file(currentCel) : undefined;
-        paneOrder = normalizePaneOrder(vscode.workspace.getConfiguration("crl.cockpit", uri).get("paneOrder"));
+        if (!currentCel || mode !== modeAtEvent) return; // stale — a mode switch / close superseded this edit
+        const liveSection = configSection(mode);
+        const uri = vscode.Uri.file(currentCel);
+        paneOrder = normalizePaneOrder(vscode.workspace.getConfiguration(liveSection, uri).get("paneOrder"), paneSpecFor(mode));
         reconcilePaneOrder(); // open/close opt-in panes (tree) + re-place columns — not just reorder the already-open set
       }, 150);
     }
     // showKeys (#163): re-render with the at-rest key channel on/off. Separate branch — a showKeys edit must re-render
     // even when paneOrder didn't change. Re-render only (no rebuild — the number maps are unchanged).
-    if (e.affectsConfiguration("crl.cockpit.showKeys")) {
-      const next = vscode.workspace.getConfiguration("crl.cockpit", vscode.Uri.file(currentCel)).get<boolean>("showKeys") ?? true;
+    if (e.affectsConfiguration(`${section}.showKeys`)) {
+      const next = vscode.workspace.getConfiguration(section, vscode.Uri.file(currentCel)).get<boolean>("showKeys") ?? true;
       if (next !== showKeys) applyShowKeys(next);
     }
     // #173 T3: the All/Blocking failed-criteria toggle. The segmented control persists the config; THIS is the single
@@ -1108,6 +1217,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   context.subscriptions.push(
     navView,
     showCmd,
+    showMedicalValidationCmd,
     setPrimaryCmd,
     toggleKeysCmd,
     selectItemCmd,

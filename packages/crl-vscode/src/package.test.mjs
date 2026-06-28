@@ -133,6 +133,68 @@ check("contributes the crl.cockpit.paneOrder setting (enum + default incl. tree;
   assert.equal(prop.scope, "window"); // settable in User (global/cross-project) OR Workspace settings
 });
 
+check("contributes the crl.medicalValidation.show command + its .cel-scoped editor/title menu + crl.active palette entry (#156 slice 3)", () => {
+  const cmds = (c.commands ?? []).map((x) => x.command);
+  assert.ok(cmds.includes("crl.medicalValidation.show"), "expected the crl.medicalValidation.show command");
+  const cmd = (c.commands ?? []).find((x) => x.command === "crl.medicalValidation.show");
+  assert.equal(cmd.title, "CRL: Show Medical Validation");
+  const titleMenu = c.menus?.["editor/title"] ?? [];
+  const entry = titleMenu.find((m) => m.command === "crl.medicalValidation.show");
+  assert.ok(entry, "crl.medicalValidation.show must be in menus.editor/title");
+  assert.equal(entry.when, "resourceExtname == .cel", "the Medical Validation tab button stays scoped to .cel files");
+  const palette = c.menus?.commandPalette ?? [];
+  const pEntry = palette.find((m) => m.command === "crl.medicalValidation.show");
+  assert.ok(pEntry, "crl.medicalValidation.show must have a commandPalette entry");
+  // FIX 1: the palette entry must NOT be .cel-scoped — else the quick-pick branch is unreachable (a focused .cel always
+  // wins the sync fast-path). crl.active matches the other cockpit palette entries.
+  assert.equal(pEntry.when, "crl.active", "the palette entry must be crl.active (so the quick-pick is reachable without a focused .cel)");
+});
+
+check("FIX 1: crl.cockpit.show palette entry is crl.active (quick-pick reachable) + keeps its .cel tab button (#156 slice 3)", () => {
+  const palette = c.menus?.commandPalette ?? [];
+  const pEntry = palette.find((m) => m.command === "crl.cockpit.show");
+  assert.ok(pEntry, "crl.cockpit.show must have a commandPalette entry");
+  assert.equal(pEntry.when, "crl.active", "crl.cockpit.show palette entry must be crl.active so its quick-pick is reachable");
+  const titleMenu = c.menus?.["editor/title"] ?? [];
+  const tEntry = titleMenu.find((m) => m.command === "crl.cockpit.show");
+  assert.ok(tEntry, "crl.cockpit.show must keep its editor/title button");
+  assert.equal(tEntry.when, "resourceExtname == .cel", "the cockpit tab button stays scoped to .cel files");
+});
+
+check("contributes the crl.medical-validation.primary setting (enum source|cel; default cel, window scope) (#156 slice 3)", () => {
+  const prop = c.configuration?.properties?.["crl.medical-validation.primary"];
+  assert.ok(prop, "expected crl.medical-validation.primary in contributes.configuration.properties");
+  assert.deepEqual(prop.enum, ["source", "cel"]);
+  assert.equal(prop.default, "cel");
+  assert.equal(prop.scope, "window");
+});
+
+check("contributes the crl.medical-validation.paneOrder setting (enum incl worklist; default [worklist,source,tree], window scope) (#156 slice 3)", () => {
+  const prop = c.configuration?.properties?.["crl.medical-validation.paneOrder"];
+  assert.ok(prop, "expected crl.medical-validation.paneOrder in contributes.configuration.properties");
+  assert.equal(prop.type, "array");
+  assert.deepEqual(prop.items?.enum, ["worklist", "source", "tree", "crl", "cel"]);
+  assert.deepEqual(prop.default, ["worklist", "source", "tree"]);
+  assert.equal(prop.scope, "window");
+});
+
+check("contributes the crl.medical-validation.showKeys setting (boolean, default true, window scope) (#156 slice 3)", () => {
+  const prop = c.configuration?.properties?.["crl.medical-validation.showKeys"];
+  assert.ok(prop, "expected crl.medical-validation.showKeys in contributes.configuration.properties");
+  assert.equal(prop.type, "boolean");
+  assert.equal(prop.default, true);
+  assert.equal(prop.scope, "window");
+});
+
+check("failedCriteriaMode stays SHARED under crl.cockpit ONLY — no crl.medical-validation copy (#156 slice 3)", () => {
+  assert.ok(c.configuration?.properties?.["crl.cockpit.failedCriteriaMode"], "crl.cockpit.failedCriteriaMode must exist (the shared key)");
+  assert.equal(
+    c.configuration?.properties?.["crl.medical-validation.failedCriteriaMode"],
+    undefined,
+    "must NOT add a crl.medical-validation.failedCriteriaMode — the All/Blocking toggle is cross-surface and reads crl.cockpit",
+  );
+});
+
 // Verify the referenced language-configuration files exist on disk so a
 // package.json typo doesn't make it to release.
 check("contributes.languages.configuration paths resolve to real files", () => {

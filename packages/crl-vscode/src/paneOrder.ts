@@ -1,33 +1,82 @@
 // Pane-order normalization (vscode-free, unit-tested) — three-pane viewer C2b-4 (#156).
-// The `crl.cockpit.paneOrder` setting is user-editable JSON, so it can be malformed (dupes, unknown ids, missing
-// panes, not even an array). normalizePaneOrder repairs ANY input so a bad setting can never break the cockpit (a missing
-// canonical pane would leave a column gap; an unknown id would be dropped before it could open a stray column).
+// The `crl.cockpit.paneOrder` / `crl.medical-validation.paneOrder` settings are user-editable JSON, so they can be
+// malformed (dupes, unknown ids, missing panes, not even an array). normalizePaneOrder repairs ANY input so a bad setting
+// can never break a panel (a missing canonical pane would leave a column gap; an unknown id would be dropped before it
+// could open a stray column).
 //
-// Two sets, deliberately distinct:
-//   - VALID_PANES — every pane the cockpit CAN show. Includes the opt-in graphical decision-tree pane ("tree"): if the
-//     user explicitly lists it, it is honored; it just isn't forced on anyone.
-//   - CANONICAL_PANE_ORDER — the panes ALWAYS present, and the order missing ones are appended in. tree is intentionally
-//     NOT canonical, so it is never auto-appended. tree DOES ship in the package.json `paneOrder` default (a fresh cockpit
-//     shows it), but because it's non-canonical a user who sets a tree-less order keeps it — that's the opt-OUT. So output
-//     is the 3 canonical panes (any user-given order) PLUS tree iff the user's list (or the package default) includes it.
+// SPEC-BASED (#156 medical-validation slice 3). The two panel modes (cockpit, medical-validation) share this one
+// normalizer but differ in their valid set, canonical default, AND public→internal aliasing — so the rules are a SPEC
+// parameter, not a hard-coded constant. A spec has:
+//   - valid     — every PUBLIC pane key the mode CAN show (the package.json enum for that mode's paneOrder).
+//   - canonical — the panes ALWAYS present, in the order missing ones are appended. A non-canonical valid key (e.g.
+//                 "tree" for the cockpit) is honored when listed but never auto-appended — that's the opt-OUT.
+//   - aliases   — optional public-key → InternalPane remap (e.g. medical-validation "worklist" → the "cel" pane in
+//                 worklist-render mode). Output is always InternalPanes; dedup is BY INTERNAL pane, so "worklist" and
+//                 "cel" can never both survive (a user listing both keeps the first).
 import type { Pane } from "./correspondenceEngine";
 
-export const CANONICAL_PANE_ORDER: readonly Pane[] = ["source", "crl", "cel"];
+/** An internal pane is what the shell actually renders (the engine's Pane). Public keys may alias onto one of these. */
+export type InternalPane = Pane;
+/** A public pane key is what a user types in settings — a superset of InternalPane (adds aliases like "worklist"). */
+export type PublicPaneKey = string;
+
+export interface PaneSpec {
+  /** Every PUBLIC key this mode accepts (its package.json paneOrder enum). */
+  valid: readonly PublicPaneKey[];
+  /** The always-present panes (PUBLIC keys), in append order. Non-canonical valid keys are honored-but-not-appended. */
+  canonical: readonly PublicPaneKey[];
+  /** Optional public-key → internal-pane remap. Unmapped keys pass through unchanged (must already be an InternalPane). */
+  aliases?: Record<PublicPaneKey, InternalPane>;
+}
+
+/** The cockpit spec — BYTE-IDENTICAL to the pre-spec behavior: valid = the 4 panes, canonical = the 3 always-present
+ *  (tree opt-in), no aliases. Keep this in lockstep with `crl.cockpit.paneOrder`'s enum + default. */
+export const COCKPIT_PANE_SPEC: PaneSpec = {
+  valid: ["source", "crl", "cel", "tree"],
+  canonical: ["source", "crl", "cel"],
+};
+
+/** The medical-validation spec — "worklist" is a PUBLIC key aliasing the internal "cel" pane (rendered in worklist mode,
+ *  slice 4). Default resolves to internal [cel, source, tree]. No "crl", no plain "cel" in the default. */
+export const MEDICAL_VALIDATION_PANE_SPEC: PaneSpec = {
+  valid: ["worklist", "source", "tree", "crl", "cel"],
+  canonical: ["worklist", "source", "tree"],
+  aliases: { worklist: "cel" },
+};
+
 const VALID_PANES: ReadonlySet<Pane> = new Set<Pane>(["source", "crl", "cel", "tree"]);
 
-/** Keeps the user's valid prefix order (dropping unknowns/dupes/non-strings), then appends any missing CANONICAL pane in
- *  canonical order. tree is valid-but-not-canonical: honored if listed, never appended. */
-export function normalizePaneOrder(raw: unknown): Pane[] {
-  const seen = new Set<Pane>();
+/** Resolve a PUBLIC key to an InternalPane via the spec's aliases (identity when unmapped); undefined if the result is
+ *  not a real pane (so an alias can never introduce a non-pane). */
+function toInternal(key: string, spec: PaneSpec): InternalPane | undefined {
+  const resolved = spec.aliases?.[key] ?? key;
+  return VALID_PANES.has(resolved as Pane) ? (resolved as Pane) : undefined;
+}
+
+/** Normalize a user-supplied paneOrder against `spec`: keep the user's valid prefix order (dropping non-strings,
+ *  keys ∉ spec.valid, and dupes), resolving each through aliases to its InternalPane — then append any missing CANONICAL
+ *  pane (also alias-resolved) in canonical order. Dedup is BY INTERNAL pane: if a user lists both a public key and its
+ *  alias target (e.g. "worklist" and "cel"), the first wins and the second is dropped. A non-canonical valid key is
+ *  honored when listed but never appended (the opt-out). Output is always InternalPanes. */
+export function normalizePaneOrder(raw: unknown, spec: PaneSpec): Pane[] {
+  const validKeys = new Set(spec.valid);
+  const seen = new Set<Pane>(); // dedup space is INTERNAL panes (so alias + target can't both survive)
   const out: Pane[] = [];
   if (Array.isArray(raw)) {
     for (const x of raw) {
-      if (typeof x === "string" && VALID_PANES.has(x as Pane) && !seen.has(x as Pane)) {
-        seen.add(x as Pane);
-        out.push(x as Pane);
-      }
+      if (typeof x !== "string" || !validKeys.has(x)) continue;
+      const internal = toInternal(x, spec);
+      if (internal === undefined || seen.has(internal)) continue;
+      seen.add(internal);
+      out.push(internal);
     }
   }
-  for (const p of CANONICAL_PANE_ORDER) if (!seen.has(p)) out.push(p); // always-present panes, appended in canonical order
+  for (const key of spec.canonical) {
+    const internal = toInternal(key, spec);
+    if (internal !== undefined && !seen.has(internal)) {
+      seen.add(internal);
+      out.push(internal);
+    }
+  }
   return out;
 }
