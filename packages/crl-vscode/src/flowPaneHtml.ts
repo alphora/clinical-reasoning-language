@@ -236,4 +236,18 @@ export const FLOW_STYLE =
   // paint on a <g>, so paint the rect (a dashed error-colored stroke, visually distinct from `.current`'s solid focus).
   `.flow-row.failed-criterion>rect{stroke:var(--vscode-editorError-foreground,#f14c4c);stroke-width:2.5;stroke-dasharray:4 2}` +
   // FIX 3 (disc 160): a preemption row (a SATISFIED diverting sibling) gets the DISTINCT amber stroke, not the red.
-  `.flow-row.failed-criterion-preempt>rect{stroke:var(--vscode-charts-yellow,#d29922);stroke-width:2.5;stroke-dasharray:4 2}`;
+  `.flow-row.failed-criterion-preempt>rect{stroke:var(--vscode-charts-yellow,#d29922);stroke-width:2.5;stroke-dasharray:4 2}` +
+  // #156 slice 5: the Medical Validation review overlay — a PERSISTENT done/error channel that survives selection (unlike
+  // failed-criterion, which clears on every reveal). It is a NON-OUTLINE FILL TINT on the rect, an INDEPENDENT SVG axis
+  // from the two stroke-only channels above: `.current` and `.failed-criterion`/`-preempt` set only `stroke`/`stroke-width`,
+  // so a done/error FILL coexists with both WITHOUT fighting (a `.current.done-node` keeps its focus stroke AND reads as
+  // done; a `.failed-criterion.error-node` keeps its dashed red stroke over the error fill). The fill overrides the base
+  // `.flow-row>rect` fill AND the kind-fills (flow-decision/when/activity) by SPECIFICITY, not order: `.flow-row.done-node>rect`
+  // = (0,2,1) outranks `.flow-decision>rect`/`.flow-activity>rect` = (0,1,1) regardless of where they sit in the sheet
+  // (FIX 4, Claude impl review). done = a subdued green wash; error = a subdued red wash, visually distinct from done AND
+  // from the amber/red STROKES of the failed-criterion channel (different axis: a reviewed-case RUN error, not a blocking
+  // criterion). error renders over done (error⊆done by construction): the host adds `.error-node` only (not `.done-node`)
+  // to error nodes; the two review rules are EQUAL specificity, so `.error-node>rect` sits AFTER `.done-node>rect` — the
+  // last-wins tiebreak that makes error beat done if both classes ever co-occur.
+  `.flow-row.done-node>rect{fill:var(--vscode-testing-iconPassed,#3fb950);fill-opacity:.18}` +
+  `.flow-row.error-node>rect{fill:var(--vscode-testing-iconFailed,#f14c4c);fill-opacity:.20}`;

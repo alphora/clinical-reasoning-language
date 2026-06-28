@@ -102,6 +102,47 @@ check("no <style> or style= inside the SVG (CSP); FLOW_STYLE carries var() + fal
   assert.ok(/\.flow-row\.current>rect\{stroke:/.test(FLOW_STYLE), "SVG-friendly .current highlight");
 });
 
+check("#156 slice 5: .done-node/.error-node review overlay CSS exists, is NON-OUTLINE (fill, not stroke/outline)", () => {
+  // The review overlay must be a fill tint, NOT a stroke/outline — so it coexists with .current (stroke) + .failed-criterion
+  // (dashed stroke) on independent SVG axes. Assert both rules exist and set `fill` (and crucially NOT `stroke`/`outline`).
+  const doneRule = FLOW_STYLE.match(/\.flow-row\.done-node>rect\{([^}]*)\}/);
+  const errRule = FLOW_STYLE.match(/\.flow-row\.error-node>rect\{([^}]*)\}/);
+  assert.ok(doneRule, ".done-node>rect rule present");
+  assert.ok(errRule, ".error-node>rect rule present");
+  for (const [, body] of [doneRule, errRule]) {
+    assert.match(body, /fill:/, "review overlay paints via fill");
+    assert.ok(!/stroke:/.test(body), "review overlay does NOT set stroke (independent axis from .current/.failed-criterion)");
+    assert.ok(!/outline/.test(body), "review overlay is non-outline");
+  }
+  // done and error must be visually DISTINCT (different fill colors).
+  assert.notEqual(doneRule[1].match(/fill:([^;]*)/)[1], errRule[1].match(/fill:([^;]*)/)[1], "done fill ≠ error fill");
+});
+
+check("#156 slice 5: review overlay COEXISTS — .current/.failed-criterion/-preempt rules are ALL stroke-only (no fill)", () => {
+  // The coexistence guarantee: the selection + BOTH failed-criterion channels set ONLY stroke, so adding a done/error fill
+  // can never override them. Lock that all three existing highlight channels remain stroke-based (a future fill on any of
+  // them would silently break the review channel). FIX 3: -preempt is the 2nd #173 stroke class the fill must coexist with.
+  const strokeOnly = [
+    [".flow-row.current>rect", "selection"],
+    [".flow-row.failed-criterion>rect", "failed-criterion (blocker)"],
+    [".flow-row.failed-criterion-preempt>rect", "failed-criterion (preempt)"],
+  ];
+  for (const [sel, name] of strokeOnly) {
+    const body = FLOW_STYLE.match(new RegExp(`${sel.replace(/[.>]/g, (c) => "\\" + c)}\\{([^}]*)\\}`))[1];
+    assert.match(body, /stroke:/, `${name} is a stroke highlight`);
+    assert.ok(!/[^-]fill:/.test(body), `${name} sets no fill — the review fill coexists with it`);
+  }
+  // FIX 4: review state wins the rect fill by SPECIFICITY ((0,2,1) > (0,1,1)), not order — but the EQUAL-specificity
+  // error-over-done tiebreak IS order-dependent, so assert .error-node>rect comes AFTER .done-node>rect. Also assert review
+  // sits after EVERY fill-setting kind rule (a defensive lock: if a future kind rule were bumped to (0,2,x), order saves us).
+  for (const kind of [".flow-row>rect", ".flow-decision>rect", ".flow-when>rect", ".flow-activity>rect"])
+    assert.ok(FLOW_STYLE.indexOf(kind) < FLOW_STYLE.indexOf(".flow-row.done-node>rect"), `review fills sit after the ${kind} kind fill`);
+  assert.ok(
+    FLOW_STYLE.indexOf(".flow-row.done-node>rect") < FLOW_STYLE.indexOf(".flow-row.error-node>rect"),
+    "error-over-done: .error-node>rect comes AFTER .done-node>rect (equal-specificity last-wins tiebreak)",
+  );
+});
+
 check("XSS: labels are escaped in <text> and <title>", () => {
   const evil = renderFlowPane([{ decision: 'X"><script>alert(1)</script>', lib: "Pol", nodeKey: "d:x", location: {}, children: [] }]);
   assert.ok(!/<script>/.test(evil.html), "no raw <script>");

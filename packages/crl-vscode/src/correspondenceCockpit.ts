@@ -49,6 +49,8 @@ import {
 import { failedCriterionLabel } from "./failedCriterionLabel";
 import {
   applyWorklistToggle,
+  buildReviewPerCase,
+  deriveReviewOverlay,
   loadSidecar,
   medicalValidationSidecarPath,
   saveSidecar,
@@ -622,6 +624,54 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     }
   }
 
+  /**
+   * Drive the Medical Validation DONE/ERROR tree overlay (#156 slice 5, disc 161 §1 + §"Architecture"). This is a
+   * SEPARATE, PERSISTENT channel from `.current` (selection) and `.failed-criterion` (peek): it is recomputed from the
+   * REVIEWED worklist cases (not the selection) and survives selection changes — the webview mutates `.done-node`/
+   * `.error-node` ONLY on mark/clearReviewOverlay, never on highlight/clearHighlight (so it never blinks off when the
+   * clinician clicks around). Clone of `driveFailedCriteriaPeek`'s shape (host recompute → post), but to the TREE pane
+   * only (the done overlay is the tree's at-rest review state; the cockpit never paints it).
+   *
+   *  - Cockpit mode (or no model) → TEARDOWN: post the ungated `clearReviewOverlay` (no MV mark can race it here, so an
+   *    order-independent class-strip is safe + correct — it wipes a leftover overlay after `Show Cockpit`).
+   *  - MV mode → build `perCase` over the frozen, scenario-bearing cases (status from `scenarioByCaseId`, litNodeKeys via
+   *    the SAME case→tree join the reveal uses: `crlAnchorsForUnits(unitsForCase(caseId), …)`), fold to {done, error} via
+   *    the slice-2 `deriveReviewOverlay`, map both node-key sets to TREE segment ids via the SAME `segmentsFor` the
+   *    failed-criterion channel uses, and ALWAYS post the gen-stamped `markReviewOverlay` — even when the sets are EMPTY
+   *    (FIX 1, gpt55 impl review). The webview's mark handler does clrRO()+add-nothing = a clear-EFFECT, but it is
+   *    gen-stamped + gen-ordered, so an empty mark cannot race a non-empty one out of order (the un-review-to-empty case:
+   *    review a case then un-review it). We deliberately do NOT use the ungated clear in MV mode — that channel is
+   *    teardown-only, where nothing competes with it.
+   *
+   * CORRECTNESS MODEL: the TREE-ACK re-drive (onWebviewMessage's `ready` → driveDoneOverlay, fires on EVERY tree render)
+   * is the correctness guarantee — a freshly rendered tree always re-paints from current state. The immediate post after
+   * rebuild()/toggleWorklist is a LATENCY optimization that relies on VS Code webview `postMessage` being FIFO-ordered on
+   * the single serialized host→webview channel (it is): render → mark arrive in order, and successive marks stay ordered.
+   */
+  function driveDoneOverlay(): void {
+    const tree = views.get("tree");
+    if (!tree) return; // tree pane is opt-in; nothing to paint
+    if (mode !== "medical-validation" || !crlMaps) {
+      void tree.panel.webview.postMessage({ type: "clearReviewOverlay" }); // teardown only (no MV mark races this)
+      return;
+    }
+    const m = crlMaps;
+    // scenarioByCaseId already excludes ambiguous-name + unfrozen cases (rebuild's join), so its keys are exactly the
+    // paintable frozen cases. statusOf returns undefined for any caseId not in it → buildReviewPerCase skips it.
+    const perCase = buildReviewPerCase(
+      scenarioByCaseId.keys(),
+      (caseId) => scenarioByCaseId.get(caseId)?.status,
+      (caseId) => crlAnchorsForUnits(unitsForCase(caseId, m), m), // the case→tree reveal join (postReveal's case|tree arm)
+    );
+    const { done, error } = deriveReviewOverlay(reviewByCaseId, perCase);
+    // error ⊆ done by construction; the webview paints error-over-done. Map both nodeKey sets → tree segment ids via the
+    // SAME segmentsFor the failed-criterion channel uses (no parallel mapping). A nodeKey with no tree anchor no-ops.
+    const doneIds = segmentsFor(tree, [...done]).segmentIds;
+    const errorIds = segmentsFor(tree, [...error]).segmentIds;
+    // ALWAYS a gen-stamped mark in MV mode (even when empty) — gen-ordered, so an empty mark cannot race a live one (FIX 1).
+    void tree.panel.webview.postMessage({ type: "markReviewOverlay", gen: tree.gen, done: doneIds, error: errorIds });
+  }
+
   function updateNavMessage(): void {
     const empty = navigatorItems(state).length === 0;
     navView.message = empty
@@ -731,7 +781,13 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       // survive a re-render (rebuild / showKeys toggle). The failed-criterion OVERLAY itself re-applies via the normal
       // reveal-on-ack path is NOT automatic (it's selection-driven), so a tree opened mid-session re-drives the peek
       // through the `if (opened && state.selection) dispatch(...)` path in reconcilePaneOrder.
-      if (pane === "tree") renderTreeChrome();
+      if (pane === "tree") {
+        renderTreeChrome();
+        // #156 slice 5: a freshly-(re)rendered tree loses its .done-node/.error-node classes (innerHTML replaced) — re-post
+        // the MV review overlay on ack so the at-rest done/error painting survives a render. (The failed-criterion overlay
+        // re-applies via the selection-driven dispatch path; the review overlay is selection-INDEPENDENT, so it re-drives here.)
+        driveDoneOverlay();
+      }
     } else if (msg.type === "fcMode" && (msg.mode === "blocking" || msg.mode === "all")) {
       applyFailedCriteriaMode(msg.mode); // the tree-pane segmented toggle
     } else if (msg.type === "fcOpenSource" && typeof msg.idx === "number") {
@@ -922,6 +978,10 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     dispatch({ type: "setInputs", index: toIndex(model, crlStructure, toCelNav(scenarios, caseIdByName, duplicateScenarioNames), indexVersion) });
     updateNavMessage();
     for (const pane of PANES) renderPane(pane);
+    // #156 slice 5: the model/segments just rebuilt (new segment ids) — re-drive the MV done/error overlay so the freshly
+    // rendered tree paints its at-rest review state. (The tree render is async; the post here lands gen-stamped and the
+    // webview drops it if superseded — but the tree's own ack re-drives via driveDoneOverlay below, so a race self-heals.)
+    driveDoneOverlay();
   }
 
   /** On a discovery/build failure, drop stale provenance so the panes never stay interactive with wrong data. */
@@ -1077,7 +1137,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
    *  computes the next state (the webview is not the authority): advance the cycle, PERSIST it, then re-render ONLY the cel
    *  pane (the checkbox updates) — never a full rebuild (perf). On a save failure we surface a user-visible error AND keep
    *  the in-memory map at its prior value, so disk + memory don't diverge (and the re-render shows the un-changed state).
-   *  The tree DONE/ERROR overlay is slice 5 — deliberately NOT driven here. */
+   *  After a successful toggle the done set changed → re-drive the tree DONE/ERROR overlay (#156 slice 5). */
   function toggleWorklist(key: string): void {
     if (mode !== "medical-validation") return; // defensive: a toggle only exists in MV mode
     const action = worklistActions[key]; // trusted: looked up by opaque key, not a caseId from the webview
@@ -1095,6 +1155,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     reviewByCaseId = next; // commit in-memory only AFTER a successful persist
     renderPane("cel"); // single-pane re-render (the checkbox glyphs); re-drive the selection so its highlight survives
     if (state.selection) dispatch({ type: "select", selection: state.selection });
+    driveDoneOverlay(); // #156 slice 5: the reviewed set changed → repaint the tree done/error overlay (no tree re-render)
   }
 
   /** Run a show command: guard re-entrancy (FIX 6), pick a .cel, open the panel in `targetMode`. */
@@ -1380,48 +1441,69 @@ ${CORR_STYLE}${FLOW_STYLE}`;
     `<meta http-equiv="Content-Security-Policy" content="${csp}">` +
     `<style nonce="${styleNonce}">${style}</style></head><body><div id="fcChrome"></div><div id="root"></div>` +
     `<script nonce="${nonce}">` +
-    `const v=acquireVsCodeApi();const root=document.getElementById('root');const fcc=document.getElementById('fcChrome');let gen=-1;` +
-    `const clrFC=()=>{for(const el of root.querySelectorAll('.failed-criterion,.failed-criterion-preempt')){el.classList.remove('failed-criterion');el.classList.remove('failed-criterion-preempt');}};` +
-    `window.addEventListener('message',(e)=>{const m=e.data;` +
-    `if(m.type==='render'){gen=m.gen;root.innerHTML=m.html;fcc.innerHTML='';v.postMessage({type:'ready',gen:m.gen,indexVersion:m.indexVersion});}` +
-    // The at-rest selection channel (.current). Clearing/applying it ALSO wipes the failed-criterion overlay — so the
-    // NEXT engine reveal (a new selection / clear) drops the overlay; the SAME selection's failed-criteria mark arrives
-    // AFTER this message (a later post) and so survives (#173 overlay lifecycle, disc 159).
-    `else if(m.type==='clearHighlight'){for(const el of root.querySelectorAll('.current'))el.classList.remove('current');clrFC();}` +
-    `else if(m.type==='highlight'){if(m.gen!==gen)return;` + // drop a reveal aimed at a superseded render
-    `for(const el of root.querySelectorAll('.current'))el.classList.remove('current');clrFC();` +
-    `for(const id of m.segmentIds){const el=document.getElementById(id);if(el)el.classList.add('current');}` +
-    `const t=document.getElementById(m.scrollTo);if(t)t.scrollIntoView({block:'center'});}` +
-    // The DISTINCT failed-criterion overlay channel (.failed-criterion). Gen-guarded like .current; replaces the prior
-    // overlay (clear-then-set). Does NOT touch .current — the two channels coexist.
-    `else if(m.type==='clearFailedCriteria'){clrFC();}` +
-    `else if(m.type==='markFailedCriteria'){if(m.gen!==gen)return;clrFC();` +
-    // Two channels: blockerIds → red `.failed-criterion`; preemptIds → amber `.failed-criterion-preempt` (a satisfied
-    // diverting sibling, honestly distinct from a real blocker — disc 160 FIX 3).
-    `for(const id of (m.blockerIds||[])){const el=document.getElementById(id);if(el)el.classList.add('failed-criterion');}` +
-    `for(const id of (m.preemptIds||[])){const el=document.getElementById(id);if(el)el.classList.add('failed-criterion-preempt');}` +
-    `const t=document.getElementById(m.scrollTo);if(t)t.scrollIntoView({block:'center'});}` +
-    // The tree-pane chrome (toggle + gap banner) — injected ABOVE #root so it never clobbers the flowchart.
-    `else if(m.type==='fcChrome'){fcc.innerHTML=m.html;}});` +
-    // #156 slice 4: a worklist checkbox click is intercepted BEFORE the [data-reveal] case-select path — the checkbox
-    // sits INSIDE the .cel-case block (which is itself a data-reveal target), so we must stop the click bubbling to a
-    // reveal/select. closest('[data-worklist-toggle]') wins (the inner checkbox), preventDefault+stopPropagation, post the
-    // opaque key, and return — the host computes the next state. A DISABLED checkbox carries no attribute → falls through.
-    `root.addEventListener('click',(e)=>{const wl=e.target.closest&&e.target.closest('[data-worklist-toggle]');` +
-    `if(wl){e.preventDefault();e.stopPropagation();v.postMessage({type:'worklistToggle',key:wl.getAttribute('data-worklist-toggle')});return;}` +
-    `const t=e.target.closest&&e.target.closest('[data-reveal]');` +
-    `if(t)v.postMessage({type:'reveal',key:t.getAttribute('data-reveal')});});` +
-    // #156 slice 4 (a11y): the interactive worklist checkbox is tabindex=0 + role=checkbox — make it keyboard-operable.
-    // Enter / Space on a focused checkbox posts the SAME worklistToggle as a click (host computes the next state). Disabled
-    // checkboxes carry no data-worklist-toggle (+ no tabindex) so they're unreachable/no-op here.
-    `root.addEventListener('keydown',(e)=>{if(e.key!=='Enter'&&e.key!==' ')return;` +
-    `const wl=e.target.closest&&e.target.closest('[data-worklist-toggle]');` +
-    `if(wl){e.preventDefault();e.stopPropagation();v.postMessage({type:'worklistToggle',key:wl.getAttribute('data-worklist-toggle')});}});` +
-    // Chrome clicks: the All/Blocking toggle (data-fc-mode) + a gap row's Open CRL source (data-fc-gap).
-    `fcc.addEventListener('click',(e)=>{const mode=e.target.closest&&e.target.closest('[data-fc-mode]');` +
-    `if(mode){v.postMessage({type:'fcMode',mode:mode.getAttribute('data-fc-mode')});return;}` +
-    `const gap=e.target.closest&&e.target.closest('[data-fc-gap]');` +
-    `if(gap)v.postMessage({type:'fcOpenSource',idx:Number(gap.getAttribute('data-fc-gap'))});});` +
+    COCKPIT_WEBVIEW_SCRIPT +
     `</script></body></html>`
   );
 }
+
+/** The cockpit/MV webview SCRIPT BODY — extracted as a pure, vscode-free, nonce-free string so the channel invariants are
+ *  string-testable (FIX 2, gpt55 impl review). Nothing here references the nonce/CSP (those live in the shellHtml wrapper),
+ *  so the const is byte-identical to the inlined script that preceded it. The central #156-slice-5 invariant locked by the
+ *  test: the selection handlers (highlight/clearHighlight) never call clrRO() (the review overlay survives selection), and
+ *  the markReviewOverlay handler single-classes error-over-done (skips done-node for ids in the error set). */
+export const COCKPIT_WEBVIEW_SCRIPT =
+  `const v=acquireVsCodeApi();const root=document.getElementById('root');const fcc=document.getElementById('fcChrome');let gen=-1;` +
+  `const clrFC=()=>{for(const el of root.querySelectorAll('.failed-criterion,.failed-criterion-preempt')){el.classList.remove('failed-criterion');el.classList.remove('failed-criterion-preempt');}};` +
+  // #156 slice 5: the review-overlay clear. DISTINCT from clrFC — called ONLY by mark/clearReviewOverlay, NEVER by the
+  // selection channel (highlight/clearHighlight), so .done-node/.error-node SURVIVE selection (the survives-selection invariant).
+  `const clrRO=()=>{for(const el of root.querySelectorAll('.done-node,.error-node')){el.classList.remove('done-node');el.classList.remove('error-node');}};` +
+  `window.addEventListener('message',(e)=>{const m=e.data;` +
+  `if(m.type==='render'){gen=m.gen;root.innerHTML=m.html;fcc.innerHTML='';v.postMessage({type:'ready',gen:m.gen,indexVersion:m.indexVersion});}` +
+  // The at-rest selection channel (.current). Clearing/applying it ALSO wipes the failed-criterion overlay — so the
+  // NEXT engine reveal (a new selection / clear) drops the overlay; the SAME selection's failed-criteria mark arrives
+  // AFTER this message (a later post) and so survives (#173 overlay lifecycle, disc 159). NEVER calls clrRO (#156 slice 5).
+  `else if(m.type==='clearHighlight'){for(const el of root.querySelectorAll('.current'))el.classList.remove('current');clrFC();}` +
+  `else if(m.type==='highlight'){if(m.gen!==gen)return;` + // drop a reveal aimed at a superseded render
+  `for(const el of root.querySelectorAll('.current'))el.classList.remove('current');clrFC();` +
+  `for(const id of m.segmentIds){const el=document.getElementById(id);if(el)el.classList.add('current');}` +
+  `const t=document.getElementById(m.scrollTo);if(t)t.scrollIntoView({block:'center'});}` +
+  // The DISTINCT failed-criterion overlay channel (.failed-criterion). Gen-guarded like .current; replaces the prior
+  // overlay (clear-then-set). Does NOT touch .current — the two channels coexist.
+  `else if(m.type==='clearFailedCriteria'){clrFC();}` +
+  `else if(m.type==='markFailedCriteria'){if(m.gen!==gen)return;clrFC();` +
+  // Two channels: blockerIds → red `.failed-criterion`; preemptIds → amber `.failed-criterion-preempt` (a satisfied
+  // diverting sibling, honestly distinct from a real blocker — disc 160 FIX 3).
+  `for(const id of (m.blockerIds||[])){const el=document.getElementById(id);if(el)el.classList.add('failed-criterion');}` +
+  `for(const id of (m.preemptIds||[])){const el=document.getElementById(id);if(el)el.classList.add('failed-criterion-preempt');}` +
+  `const t=document.getElementById(m.scrollTo);if(t)t.scrollIntoView({block:'center'});}` +
+  // #156 slice 5: the PERSISTENT Medical Validation done/error overlay — a SEPARATE channel from .current and
+  // .failed-criterion. CRITICAL: it is mutated ONLY here (mark/clearReviewOverlay), NEVER by highlight/clearHighlight/
+  // clrFC — so it SURVIVES selection changes (the clinician's done painting never blinks off as they click around).
+  // mark replaces the prior overlay (clear-then-set, gen-guarded like the others): error nodes get .error-node, done
+  // nodes NOT in error get .done-node (error renders over done — error⊆done by construction). No scroll (at-rest paint).
+  `else if(m.type==='clearReviewOverlay'){clrRO();}` +
+  `else if(m.type==='markReviewOverlay'){if(m.gen!==gen)return;clrRO();` +
+  `const errSet=new Set(m.error||[]);` +
+  `for(const id of errSet){const el=document.getElementById(id);if(el)el.classList.add('error-node');}` +
+  `for(const id of (m.done||[])){if(errSet.has(id))continue;const el=document.getElementById(id);if(el)el.classList.add('done-node');}}` +
+  // The tree-pane chrome (toggle + gap banner) — injected ABOVE #root so it never clobbers the flowchart.
+  `else if(m.type==='fcChrome'){fcc.innerHTML=m.html;}});` +
+  // #156 slice 4: a worklist checkbox click is intercepted BEFORE the [data-reveal] case-select path — the checkbox
+  // sits INSIDE the .cel-case block (which is itself a data-reveal target), so we must stop the click bubbling to a
+  // reveal/select. closest('[data-worklist-toggle]') wins (the inner checkbox), preventDefault+stopPropagation, post the
+  // opaque key, and return — the host computes the next state. A DISABLED checkbox carries no attribute → falls through.
+  `root.addEventListener('click',(e)=>{const wl=e.target.closest&&e.target.closest('[data-worklist-toggle]');` +
+  `if(wl){e.preventDefault();e.stopPropagation();v.postMessage({type:'worklistToggle',key:wl.getAttribute('data-worklist-toggle')});return;}` +
+  `const t=e.target.closest&&e.target.closest('[data-reveal]');` +
+  `if(t)v.postMessage({type:'reveal',key:t.getAttribute('data-reveal')});});` +
+  // #156 slice 4 (a11y): the interactive worklist checkbox is tabindex=0 + role=checkbox — make it keyboard-operable.
+  // Enter / Space on a focused checkbox posts the SAME worklistToggle as a click (host computes the next state). Disabled
+  // checkboxes carry no data-worklist-toggle (+ no tabindex) so they're unreachable/no-op here.
+  `root.addEventListener('keydown',(e)=>{if(e.key!=='Enter'&&e.key!==' ')return;` +
+  `const wl=e.target.closest&&e.target.closest('[data-worklist-toggle]');` +
+  `if(wl){e.preventDefault();e.stopPropagation();v.postMessage({type:'worklistToggle',key:wl.getAttribute('data-worklist-toggle')});}});` +
+  // Chrome clicks: the All/Blocking toggle (data-fc-mode) + a gap row's Open CRL source (data-fc-gap).
+  `fcc.addEventListener('click',(e)=>{const mode=e.target.closest&&e.target.closest('[data-fc-mode]');` +
+  `if(mode){v.postMessage({type:'fcMode',mode:mode.getAttribute('data-fc-mode')});return;}` +
+  `const gap=e.target.closest&&e.target.closest('[data-fc-gap]');` +
+  `if(gap)v.postMessage({type:'fcOpenSource',idx:Number(gap.getAttribute('data-fc-gap'))});});`;

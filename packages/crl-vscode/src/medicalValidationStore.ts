@@ -183,6 +183,29 @@ export function deriveReviewOverlay(
   return { done, error };
 }
 
+/**
+ * Build the `perCase` fold input (slice 5) from a set of frozen caseIds + two lookups — pure + testable, so the host's
+ * `driveDoneOverlay` stays a thin glue layer. For each caseId whose `statusOf` resolves (a frozen case with a known run
+ * status), emit a {status, litNodeKeys} row keyed by caseId; a caseId whose status is `undefined` (unfrozen / no
+ * scenario / ambiguous-name collision) is SKIPPED — it can't paint (it never round-trips to a reviewable checkbox).
+ * `litNodeKeysOf` returns the tree nodeKeys the case lights — the SAME join the cockpit reveal uses
+ * (`crlAnchorsForUnits(unitsForCase(caseId), …)`); we pass it as a closure so this stays vscode-/maps-free.
+ * The result feeds `deriveReviewOverlay(byCaseId, perCase)` unchanged (reviewed-only, error⊆done, stale inert).
+ */
+export function buildReviewPerCase(
+  caseIds: Iterable<string>,
+  statusOf: (caseId: string) => CasePaint["status"] | undefined,
+  litNodeKeysOf: (caseId: string) => readonly string[],
+): Map<string, CasePaint> {
+  const perCase = new Map<string, CasePaint>();
+  for (const caseId of caseIds) {
+    const status = statusOf(caseId);
+    if (status === undefined) continue; // unfrozen / no scenario / ambiguous — not a paintable case
+    perCase.set(caseId, { status, litNodeKeys: litNodeKeysOf(caseId) });
+  }
+  return perCase;
+}
+
 // ── checkbox cycle ───────────────────────────────────────────────────────────────
 
 /** The full review state in the UI — `"unreviewed"` is the default (NOT persisted; absence in the sidecar). The two

@@ -26,7 +26,7 @@ async function load(tsFile) {
   return require(out);
 }
 
-const { medicalValidationSidecarPath, loadSidecar, saveSidecar, deriveReviewOverlay, nextReviewState, applyWorklistToggle } =
+const { medicalValidationSidecarPath, loadSidecar, saveSidecar, deriveReviewOverlay, buildReviewPerCase, nextReviewState, applyWorklistToggle } =
   await load("medicalValidationStore.ts");
 
 let pass = 0;
@@ -326,6 +326,57 @@ check("applyWorklistToggle: two toggles in a row on the same case advance two st
   assert.deepEqual(after2, { c1: "reviewed" }, "second (from committed) → reviewed");
   const after3 = applyWorklistToggle(after2, "c1");
   assert.deepEqual(after3, {}, "third wraps to unreviewed (entry deleted)");
+});
+
+// ── buildReviewPerCase → deriveReviewOverlay (slice 5 host join, end-to-end) ──────────────
+// The host's driveDoneOverlay composes buildReviewPerCase (frozen-case join) then deriveReviewOverlay (the slice-2 fold).
+// Test the composition with stub statusOf/litNodeKeysOf closures (the closures stand in for scenarioByCaseId + the
+// crlAnchorsForUnits(unitsForCase(...)) reveal join).
+const lit = { c1: ["n:a", "n:b"], c2: ["n:b", "n:c"], cErr: ["n:c", "n:d"], cClean: ["n:c"] };
+const status = { c1: "pass", c2: "fail", cErr: "error", cClean: "pass" };
+const statusOf = (id) => status[id]; // undefined for an unknown id (unfrozen / ambiguous)
+const litOf = (id) => lit[id] ?? [];
+const overlayFor = (byCaseId, caseIds) =>
+  deriveReviewOverlay(byCaseId, buildReviewPerCase(caseIds, statusOf, litOf));
+
+check("buildReviewPerCase: a frozen reviewed PASS case → its nodes done, none error", () => {
+  const { done, error } = overlayFor({ c1: "reviewed" }, ["c1", "c2"]);
+  assert.deepEqual([...done].sort(), ["n:a", "n:b"]);
+  assert.equal(error.size, 0);
+});
+check("buildReviewPerCase: a frozen reviewed ERROR case → its nodes error AND done (error⊆done)", () => {
+  const { done, error } = overlayFor({ cErr: "reviewed" }, ["cErr", "cClean"]);
+  assert.deepEqual([...done].sort(), ["n:c", "n:d"], "error nodes are also done");
+  assert.deepEqual([...error].sort(), ["n:c", "n:d"]);
+});
+check("error-over-done: a node lit by a clean reviewed case AND an errored reviewed case is error (and done)", () => {
+  // cClean lights n:c (pass), cErr lights n:c + n:d (error) → n:c is in BOTH done and error; the webview paints error over it.
+  const { done, error } = overlayFor({ cClean: "reviewed", cErr: "reviewed" }, ["cClean", "cErr"]);
+  assert.ok(done.has("n:c") && error.has("n:c"), "shared node is error AND done");
+  assert.ok(done.has("n:d") && error.has("n:d"));
+});
+check("PENDING case paints nothing (only reviewed contributes)", () => {
+  const { done, error } = overlayFor({ c1: "pending" }, ["c1", "c2"]);
+  assert.equal(done.size, 0);
+  assert.equal(error.size, 0);
+});
+check("an unfrozen/ambiguous caseId (statusOf → undefined) is skipped — never appears in perCase", () => {
+  // "ghost" is reviewed in the sidecar but not a live/frozen case → buildReviewPerCase skips it → the fold finds no row → inert.
+  const perCase = buildReviewPerCase(["ghost", "c1"], statusOf, litOf);
+  assert.ok(!perCase.has("ghost"), "no perCase row for an unresolved (undefined-status) case");
+  assert.ok(perCase.has("c1"));
+  const { done } = deriveReviewOverlay({ ghost: "reviewed", c1: "reviewed" }, perCase);
+  assert.deepEqual([...done].sort(), ["n:a", "n:b"], "only the live reviewed case painted; the ghost is inert");
+});
+check("empty worklist (nothing reviewed) → empty overlay (host posts a clear)", () => {
+  const { done, error } = overlayFor({}, ["c1", "c2", "cErr"]);
+  assert.equal(done.size, 0);
+  assert.equal(error.size, 0);
+});
+check("buildReviewPerCase passes litNodeKeys verbatim from the join closure", () => {
+  const perCase = buildReviewPerCase(["c2"], statusOf, litOf);
+  assert.deepEqual([...perCase.get("c2").litNodeKeys], ["n:b", "n:c"]);
+  assert.equal(perCase.get("c2").status, "fail");
 });
 
 console.log(`\nmedicalValidationStore.test: ${pass} checks passed`);
