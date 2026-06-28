@@ -97,6 +97,9 @@ export type {
   FcScenario,
   FcViewNode,
 } from "./failedCriteria";
+// #173 T1: the generalized run-path decomposer the cockpit (T3) re-roots a runtime nodeId through.
+export { runtimeNodePathRefs, producedRuntimePathRefs } from "./runPath";
+export type { RuntimePathRef, ProducedRunPath, MinimalViewNode } from "./runPath";
 // resolveProvenance / ResolveProvenanceResult are intentionally NOT re-exported — they are an internal shared step
 // (consumed by correspondence.ts via a relative import); keeping the large intermediate shape out of the package API.
 export { buildCorrespondenceModel } from "./correspondence";

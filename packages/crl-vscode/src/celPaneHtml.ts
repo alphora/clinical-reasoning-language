@@ -61,28 +61,44 @@ export function renderCelPane(
   result: RenderScenarioResult,
   caseIdByName: Record<string, string>,
   // caseKeyNumbers: caseId → its corresponding units' numbers (#163 at-rest key). showKeys gates the slot.
-  opts: { revealPrefix?: string; revealableConceptKeys?: ReadonlySet<string>; caseKeyNumbers?: Record<string, number[]>; showKeys?: boolean } = {},
+  // duplicateScenarioNames: names shared by >1 case (frozen OR unfrozen). #173 FIX 1 (disc 160): such a case is NOT
+  // anchored/clickable — clicking it would mis-attribute to the frozen same-name case's caseId. Rendered with a marker.
+  opts: { revealPrefix?: string; revealableConceptKeys?: ReadonlySet<string>; caseKeyNumbers?: Record<string, number[]>; showKeys?: boolean; duplicateScenarioNames?: ReadonlySet<string> } = {},
 ): RenderedCel {
   const prefix = opts.revealPrefix ?? "";
   const revealable = opts.revealableConceptKeys;
   const caseKeyNumbers = opts.caseKeyNumbers ?? {};
   const showKeys = opts.showKeys ?? false;
+  const duplicateNames = opts.duplicateScenarioNames ?? new Set<string>();
   const anchors: Record<string, CelAnchor> = {};
   const reveals: Record<string, CelReveal> = {};
   const conceptToFactAnchors: Record<string, string[]> = {};
 
-  if (!result.success || result.scenarios.length === 0) {
+  // Render cases whenever there ARE cases — even when `result.success === false` (a sibling case errored, so the
+  // RenderScenarioResult envelope is unsuccessful). Suppressing all cases on any failure hid the FAILING case #173
+  // needs to select (disc 158 §"Cockpit robustness"). Only the no-cases path (e.g. a graph/parse failure → empty
+  // scenarios) falls to the placeholder. Graph-level `errors` ride a banner ABOVE the cases instead of suppressing them.
+  if (result.scenarios.length === 0) {
     const why = result.errors.length ? `: ${escapeHtml(result.errors.join("; "))}` : "";
     const msg = result.errors.length ? `CEL did not render${why}` : "No CEL cases.";
     return { html: `<p class="placeholder">${msg}</p>`, anchors, reveals, conceptToFactAnchors };
   }
 
-  let html = "";
+  // A banner only when there's a graph-level error string to show; errored CASES carry their own ⚠ badge + diagnostics
+  // (the per-case error path leaves `result.errors` empty — no banner, the ⚠ rows tell the story).
+  let html =
+    result.errors.length > 0
+      ? `<p class="placeholder fc-cel-banner">⚠ ${escapeHtml(result.errors.join("; "))}</p>`
+      : "";
   let idx = 0;
   for (const sc of result.scenarios) {
-    const caseId = caseIdByName[sc.case.name]; // undefined → case un-revealable (renders, no case anchor)
+    // FIX 1 (disc 160): an AMBIGUOUS-name case (its name shared by >1 case) must NOT be anchored to the frozen
+    // caseIdByName[name] — clicking EITHER same-name block would otherwise select that ONE frozen caseId and apply
+    // cross-pane `.current` highlights as if it were the frozen case (a mis-attribution). So treat it as un-revealable.
+    const ambiguous = duplicateNames.has(sc.case.name);
+    const caseId = ambiguous ? undefined : caseIdByName[sc.case.name]; // undefined → case un-revealable (no case anchor)
     const id = `${prefix}cel${idx}`;
-    const attrs = [`id="${escapeHtml(id)}"`, `class="cel-case cel-${sc.status}"`];
+    const attrs = [`id="${escapeHtml(id)}"`, `class="cel-case cel-${sc.status}${ambiguous ? " cel-ambiguous" : ""}"`];
     if (caseId !== undefined) {
       anchors[caseId] = { scrollTo: id, segmentIds: [id] };
       const key = `${prefix}k${id}`;
@@ -117,6 +133,7 @@ export function renderCelPane(
       `<span class="cel-status">${BADGE[sc.status] ?? "·"}</span> ` +
       `<span class="cel-name">${escapeHtml(sc.case.name)}</span>` +
       (sc.case.subject ? ` <span class="cel-subject">(${escapeHtml(sc.case.subject)})</span>` : "") +
+      (ambiguous ? ` <span class="cel-ambiguous-marker" title="This case's name is shared by another case — give each a distinct name to make it selectable.">⚠ name shared; not selectable</span>` : "") +
       (factParts.length ? `<div class="cel-facts">facts: ${factParts.join(", ")}</div>` : "") +
       (produced ? `<div class="cel-produced">→ ${produced}</div>` : "") +
       `</div>`;

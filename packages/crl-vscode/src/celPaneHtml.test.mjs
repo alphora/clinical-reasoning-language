@@ -55,6 +55,27 @@ check("a case with NO frozen id renders but is un-revealable (no anchor / no dat
   assert.ok(!out.html.includes("data-reveal"));
 });
 
+// FIX 1 (disc 160): an AMBIGUOUS-name case (name in duplicateScenarioNames) must NOT be anchored to the frozen
+// same-name caseId — clicking it would mis-attribute to the frozen case. It renders with a "not selectable" marker.
+check("an ambiguous-name case is NOT anchored/clickable even though caseIdByName has the frozen id", () => {
+  const out = renderCelPane(
+    result([sc("Dup", "fail")]),
+    { Dup: "cFrozen" }, // the frozen member won caseIdByName, but the name is shared → unsafe to select
+    { duplicateScenarioNames: new Set(["Dup"]) },
+  );
+  assert.ok(out.html.includes("Dup"), "the case still renders");
+  assert.ok(!("cFrozen" in out.anchors), "NOT anchored to the frozen caseId");
+  assert.deepEqual(out.reveals, {}, "no reveal payload → not cross-pane-selectable");
+  assert.ok(!out.html.includes("data-reveal"), "no data-reveal on an ambiguous case block");
+  assert.ok(out.html.includes("name shared; not selectable"), "marked as un-selectable");
+  assert.match(out.html, /cel-case[^"]*cel-ambiguous/);
+});
+
+check("a NON-duplicate case is still anchored normally when duplicateScenarioNames is supplied", () => {
+  const out = renderCelPane(result([sc("Solo", "pass")]), { Solo: "cS" }, { duplicateScenarioNames: new Set(["Other"]) });
+  assert.ok(out.anchors.cS && Object.values(out.reveals).some((r) => r.caseId === "cS"), "unaffected case still selectable");
+});
+
 check("status badges: pass ✓ / fail ✗ / error ⚠", () => {
   const out = renderCelPane(result([sc("a", "pass"), sc("b", "fail"), sc("c", "error")]), { a: "1", b: "2", c: "3" });
   assert.ok(out.html.includes("✓") && out.html.includes("✗") && out.html.includes("⚠"));
@@ -66,11 +87,30 @@ check("XSS: names + facts escaped", () => {
   assert.ok(out.html.includes("&lt;script&gt;"));
 });
 
-check("failure envelope → placeholder with the errors", () => {
+check("failure envelope (NO scenarios) → placeholder with the errors", () => {
   const out = renderCelPane(result([], false, ["CEL did not parse"]));
   assert.match(out.html, /class="placeholder"/);
   assert.ok(out.html.includes("CEL did not parse"));
   assert.deepEqual(out.anchors, {});
+});
+
+// #173 (disc 158 §"Cockpit robustness"): an envelope with success:false BUT non-empty scenarios (a sibling case errored)
+// must still RENDER the cases — so the failing case stays selectable — with the graph-level errors shown as a BANNER, not
+// suppressing every case. Else #173's case-select trigger can't reach the failed case.
+check("success:false WITH cases → renders the cases + an error banner (not the all-suppressing placeholder)", () => {
+  const out = renderCelPane(result([sc("Failing", "fail"), sc("Erroring", "error")], false, ["case Erroring threw"]), { Failing: "cF", Erroring: "cE" });
+  assert.ok(out.html.includes("Failing") && out.html.includes("Erroring"), "both cases render");
+  assert.ok(out.html.includes('class="cel-case'), "case blocks present");
+  assert.ok(out.html.includes("case Erroring threw"), "the error rides a banner");
+  assert.match(out.html, /fc-cel-banner/);
+  assert.ok(out.anchors.cF && out.anchors.cF.segmentIds.length === 1, "the failing case is still a reveal anchor (selectable)");
+});
+
+check("per-case errors with an EMPTY result.errors → no banner, cases still render (the ⚠ badge tells the story)", () => {
+  const out = renderCelPane(result([sc("a", "pass"), sc("b", "error")], false, []), { a: "1", b: "2" });
+  assert.ok(!out.html.includes("fc-cel-banner"), "no banner when there's no graph-level error string");
+  assert.ok(out.html.includes("⚠"), "the errored case still shows its badge");
+  assert.ok(out.html.includes('class="cel-case'));
 });
 
 check("empty (success, no scenarios) → 'No CEL cases.'", () => {

@@ -277,6 +277,16 @@
           "default": true,
           "scope": "window",
           "description": "Show the at-rest correspondence key (a per-unit number + cycled color) on each corresponding element across the cockpit's CRL / CEL panes and the navigator, so 'what links to what' is visible without selecting. Toggle live with 'CRL: Toggle Correspondence Keys'."
+        },
+        "crl.correspondence.failedCriteriaMode": {
+          "type": "string",
+          "enum": [
+            "blocking",
+            "all"
+          ],
+          "default": "blocking",
+          "scope": "window",
+          "description": "Which failed criteria the cockpit highlights when a failing CEL case is selected. 'blocking' (default): only the criteria that blocked the expected disposition (empty for a passing case). 'all': every evaluated-unsatisfied 'when' in the run. Toggle live with the segmented control on the cockpit's Tree pane."
         }
       }
     }
@@ -324,6 +334,10 @@
     "test:flow-pane-html": "node src/flowPaneHtml.test.mjs",
     "pretest:cel-pane-html": "npm run compile",
     "test:cel-pane-html": "node src/celPaneHtml.test.mjs",
+    "pretest:failed-criterion-peek": "npm run compile",
+    "test:failed-criterion-peek": "node src/failedCriterionPeek.test.mjs",
+    "pretest:failed-criterion-label": "npm run compile",
+    "test:failed-criterion-label": "node src/failedCriterionLabel.test.mjs",
     "pretest:corr-key": "npm run compile",
     "test:corr-key": "node src/corrKey.test.mjs",
     "pretest:webview-hit": "npm run compile",
@@ -333,7 +347,7 @@
     "test:grammar": "node src/grammar.test.mjs",
     "test:package": "node src/package.test.mjs",
     "test:language-config": "node src/language-config.test.mjs",
-    "test": "npm run compile && node src/mcp-server.test.mjs && node src/provision.test.mjs && node src/highlight.test.mjs && node src/catalog.test.mjs && node src/embedded-catalog.test.mjs && node src/concepts.test.mjs && node src/crl-patterns-coverage.test.mjs && node src/contextDetect.test.mjs && node src/findDeclaration.test.mjs && node src/projectIndex.test.mjs && node src/completion.test.mjs && node src/grammar.test.mjs && node src/package.test.mjs && node src/language-config.test.mjs && node src/renderScenarioHtml.test.mjs && node src/provenanceFindings.test.mjs && node src/provenanceViewer.test.mjs && node src/correspondenceEngine.test.mjs && node src/paneRevealCoordinator.test.mjs && node src/sourcePaneHtml.test.mjs && node src/crlPaneHtml.test.mjs && node src/flowPaneHtml.test.mjs && node src/celPaneHtml.test.mjs && node src/webviewHit.test.mjs && node src/corrKey.test.mjs && node src/paneOrder.test.mjs && node test/oracle/check.mjs",
+    "test": "npm run compile && node src/mcp-server.test.mjs && node src/provision.test.mjs && node src/highlight.test.mjs && node src/catalog.test.mjs && node src/embedded-catalog.test.mjs && node src/concepts.test.mjs && node src/crl-patterns-coverage.test.mjs && node src/contextDetect.test.mjs && node src/findDeclaration.test.mjs && node src/projectIndex.test.mjs && node src/completion.test.mjs && node src/grammar.test.mjs && node src/package.test.mjs && node src/language-config.test.mjs && node src/renderScenarioHtml.test.mjs && node src/provenanceFindings.test.mjs && node src/provenanceViewer.test.mjs && node src/correspondenceEngine.test.mjs && node src/paneRevealCoordinator.test.mjs && node src/sourcePaneHtml.test.mjs && node src/crlPaneHtml.test.mjs && node src/flowPaneHtml.test.mjs && node src/celPaneHtml.test.mjs && node src/failedCriterionPeek.test.mjs && node src/failedCriterionLabel.test.mjs && node src/webviewHit.test.mjs && node src/corrKey.test.mjs && node src/paneOrder.test.mjs && node test/oracle/check.mjs",
     "vscode:prepublish": "npm run build:crl && npm run compile",
     "package": "vsce package --no-dependencies"
   },

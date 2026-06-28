@@ -29,7 +29,7 @@ async function load(tsFile) {
   return require(out);
 }
 
-const { renderScenarioHtml, renderErrorHtml } = await load("renderScenarioHtml.ts");
+const { renderScenarioHtml, renderErrorHtml, failedCriterionMarks } = await load("renderScenarioHtml.ts");
 const { isRelevantSave } = await load("scenarioWatch.ts");
 
 // --- renderScenarioHtml over the real dme101 view-model ---
@@ -130,4 +130,122 @@ if (process.platform === "win32") {
   assert.equal(isRelevantSave("e:\\proj\\a.cel", "E:\\proj\\a.cel"), true, "Windows drive-case is canonicalized");
 }
 
-console.log(`renderScenarioHtml.test.mjs: ${keys.length} reveal keys; render + XSS + error + isRelevantSave checks passed.`);
+// ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+// #173 T3b — the failed-criterion in-place highlight (failedCriterionMarks + the stamped data-fc-* attributes).
+// ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+let t3bPass = 0;
+const t3b = (label, fn) => {
+  try { fn(); t3bPass++; }
+  catch (e) { console.error(`FAIL  T3b: ${label}\n      ${e.message}`); process.exitCode = 1; }
+};
+
+// VM node builders carrying the run-state fields the T2 selectors read.
+const vmWhen = (nodeId, satisfied, name, children = []) => ({
+  nodeId, kind: "when", label: `when ${name}`, source: { filePath: "p.crl", range: { startLine: 0, startCol: 0, endLine: 0, endCol: 1 } },
+  evaluated: true, condition: { concept: { name }, satisfied, facts: [] }, children,
+});
+const vmAct = (nodeId, label) => ({
+  nodeId, kind: "action", label, source: { filePath: "p.crl", range: { startLine: 0, startCol: 0, endLine: 0, endCol: 1 } },
+  evaluated: true, action: { actionKind: "recommend-activity", produced: false }, children: [],
+});
+const scenario = (status, branch, tree) => ({
+  case: { name: "C", facts: [] }, decision: { name: "Top", libraryName: "Pol", resolved: true },
+  status, expected: branch ? { decision: "Top", branch } : null, produced: [], tree, diagnostics: [],
+});
+const resultOf = (sv) => ({ schemaVersion: 1, success: sv.status === "pass", source: { celFilePath: "x.cel" },
+  caseCount: 1, passCount: sv.status === "pass" ? 1 : 0, failCount: sv.status === "fail" ? 1 : 0,
+  errorCount: sv.status === "error" ? 1 : 0, scenarios: [sv], errors: [] });
+
+t3b("failedCriterionMarks: a failing case marks the blocking unsatisfied-when (inBlocking + inAll)", () => {
+  const sv = scenario("fail", "Approve", [vmWhen("when[0]", false, "Indication", [vmAct("when[0]/action[0]", "Approve")])]);
+  const marks = failedCriterionMarks(sv);
+  const m = marks.get("when[0]");
+  assert.ok(m, "the false when is marked");
+  assert.equal(m.reason, "unsatisfied-when");
+  assert.ok(m.inBlocking && m.inAll, "an unsatisfied-when frontier blocker is in BOTH sets");
+  assert.equal(m.label, "when Indication");
+});
+
+t3b("failedCriterionMarks: preemption marks the MATCHED SATISFIED sibling, BLOCKING-only (not in All)", () => {
+  const matched = vmWhen("when[0]", true, "Early", [vmAct("when[0]/action[0]", "Defer")]);
+  const preempted = { nodeId: "when[1]", kind: "when", label: "when Late", source: { filePath: "p.crl", range: { startLine: 0, startCol: 0, endLine: 0, endCol: 1 } },
+    evaluated: false, unreachedReason: "preempted", children: [vmAct("when[1]/action[0]", "Approve")] };
+  const marks = failedCriterionMarks(scenario("fail", "Approve", [matched, preempted]));
+  const m = marks.get("when[0]");
+  assert.ok(m, "the matched sibling is marked");
+  assert.equal(m.reason, "preemption");
+  assert.ok(m.inBlocking, "preemption is a Blocking-set blocker");
+  assert.ok(!m.inAll, "the SATISFIED matched sibling is NOT an unsatisfied when → NOT in All");
+});
+
+t3b("failedCriterionMarks: All-mode lists every evaluated-unsatisfied when (satisfied excluded)", () => {
+  const sv = scenario("fail", "X", [vmWhen("when[0]", false, "A"), vmWhen("when[1]", false, "B"), vmWhen("when[2]", true, "C")]);
+  const marks = failedCriterionMarks(sv);
+  assert.ok(marks.get("when[0]").inAll && marks.get("when[1]").inAll, "both false whens in All");
+  assert.ok(!marks.has("when[2]"), "the satisfied when is not marked");
+});
+
+t3b("failedCriterionMarks: a PASS with no unsatisfied whens → empty (Blocking self-gates; no frontier)", () => {
+  const sv = scenario("pass", "Approve", [vmAct("action[0]", "Approve")]);
+  assert.equal(failedCriterionMarks(sv).size, 0, "no marks on a pass with no unsatisfied whens");
+});
+
+t3b("failedCriterionMarks: an ERROR case → empty even with an unsatisfied when in the (partial) tree", () => {
+  const sv = scenario("error", "Approve", [vmWhen("when[0]", false, "Indication")]);
+  assert.equal(failedCriterionMarks(sv).size, 0, "error status gated → no marks (partial trace)");
+});
+
+t3b("render: a failing case stamps data-fc-blocking + data-fc-all + reason on the blocking node", () => {
+  const sv = scenario("fail", "Approve", [vmWhen("when[0]", false, "Indication", [vmAct("when[0]/action[0]", "Approve")])]);
+  const out = renderScenarioHtml(resultOf(sv));
+  assert.match(out.html, /<li class="node[^"]*" data-fc-blocking="1" data-fc-all="1" data-fc-reason="unsatisfied-when" data-fc-tip="blocked: when Indication">/);
+});
+
+// FIX 2 (disc 160): the label must be USER-VISIBLE — a row `title` + an inline `.fc-tip` span — not just the inert
+// data-fc-tip attribute (which nothing rendered).
+t3b("render: a blocker's label is VISIBLE — the .row title AND an inline .fc-tip span carry 'blocked: when Indication'", () => {
+  const sv = scenario("fail", "Approve", [vmWhen("when[0]", false, "Indication", [vmAct("when[0]/action[0]", "Approve")])]);
+  const out = renderScenarioHtml(resultOf(sv));
+  assert.match(out.html, /<span class="row" data-reveal="[^"]*" title="blocked: when Indication[^"]*">/, "the row title says WHY");
+  assert.match(out.html, /<span class="fc-tip fc-tip-blk fc-in-blocking fc-in-all">blocked: when Indication<\/span>/, "inline visible label");
+});
+
+t3b("render: a preemption node stamps data-fc-preempt (NOT data-fc-blocking/all) + a VISIBLE 'diverted' label", () => {
+  const matched = vmWhen("when[0]", true, "Early", [vmAct("when[0]/action[0]", "Defer")]);
+  const preempted = { nodeId: "when[1]", kind: "when", label: "when Late", source: { filePath: "p.crl", range: { startLine: 0, startCol: 0, endLine: 0, endCol: 1 } },
+    evaluated: false, unreachedReason: "preempted", children: [vmAct("when[1]/action[0]", "Approve")] };
+  const out = renderScenarioHtml(resultOf(scenario("fail", "Approve", [matched, preempted])));
+  assert.match(out.html, /data-fc-preempt="1" data-fc-reason="preemption" data-fc-tip="matched first and diverted the run/);
+  assert.match(out.html, /<span class="fc-tip fc-tip-preempt fc-only-blocking">matched first and diverted the run/, "visible amber diverted label");
+  // the matched node must NOT carry the red blocker attributes (it's a satisfied diverting sibling)
+  const liMatched = out.html.match(/<li class="node[^>]*data-fc-preempt[^>]*>/)[0];
+  assert.ok(!liMatched.includes("data-fc-blocking"), "preemption node is not a red blocker");
+});
+
+t3b("render: a PASS case stamps NO data-fc-blocking; an ERROR case stamps no marks at all", () => {
+  const passHtml = renderScenarioHtml(resultOf(scenario("pass", "Approve", [vmAct("action[0]", "Approve")]))).html;
+  assert.ok(!passHtml.includes("data-fc-blocking") && !passHtml.includes("data-fc-preempt"), "no blocking marks on a pass");
+  const errHtml = renderScenarioHtml(resultOf(scenario("error", "Approve", [vmWhen("when[0]", false, "Indication")]))).html;
+  assert.ok(!errHtml.includes("data-fc-"), "no marks on an error case");
+});
+
+t3b("render: the VISIBLE tip (row title + inline span) is HTML-escaped (XSS via a concept name)", () => {
+  const sv = scenario("fail", "Approve", [vmWhen("when[0]", false, '"><img src=x>', [vmAct("when[0]/action[0]", "Approve")])]);
+  const out = renderScenarioHtml(resultOf(sv));
+  assert.ok(!out.html.includes('"><img src=x>'), "raw concept name does not break out of the title attr or the span");
+  assert.ok(out.html.includes("&quot;&gt;&lt;img src=x&gt;"), "concept name escaped");
+  // the USER-VISIBLE paths (title + inline span), not just the inert data attribute, must be safe
+  assert.match(out.html, /title="blocked: when &quot;&gt;&lt;img src=x&gt;/, "escaped in the visible row title");
+  assert.match(out.html, /class="fc-tip[^"]*">blocked: when &quot;&gt;&lt;img src=x&gt;/, "escaped in the visible inline label");
+});
+
+t3b("render: All-mode marks survive on a PASS case's untaken-branch unsatisfied whens (the All contract)", () => {
+  // A passing case can still have evaluated-unsatisfied whens on untaken branches → All marks them (Blocking does not).
+  const sv = scenario("pass", "Approve", [vmWhen("when[0]", false, "Other"), vmAct("action[0]", "Approve")]);
+  const marks = failedCriterionMarks(sv);
+  assert.ok(marks.get("when[0]") && marks.get("when[0]").inAll && !marks.get("when[0]").inBlocking,
+    "untaken false when is in All but not Blocking on a pass");
+  assert.ok(renderScenarioHtml(resultOf(sv)).html.includes('data-fc-all="1"'), "stamped for All mode");
+});
+
+console.log(`renderScenarioHtml.test.mjs: ${keys.length} reveal keys; render + XSS + error + isRelevantSave checks passed; T3b: ${t3bPass} failed-criterion checks passed.`);

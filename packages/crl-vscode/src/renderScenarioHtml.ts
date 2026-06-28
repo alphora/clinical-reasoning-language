@@ -10,6 +10,53 @@
 // render so a click on stale DOM (after the host swapped in a new render's `reveals`) resolves to
 // an unknown key and is ignored, rather than mis-resolving to a same-positioned node.
 import type { RenderScenarioResult, ScenarioViewModel, ViewNode } from "@smile-digital-health/crl";
+import { allUnsatisfiedCriteria, failedCriterionFrontier } from "@smile-digital-health/crl/provenance";
+
+import { failedCriterionLabel } from "./failedCriterionLabel";
+
+/** A per-node failed-criterion mark (#173 T3b, disc 158/160): which mode-set(s) the node is in + WHY + its label. The
+ *  run-tree renderer stamps these as data attributes; the webview's All/Blocking toggle shows/hides them CLIENT-SIDE. */
+interface FcMark {
+  /** unsatisfied-when | guarded-out | preemption — drives the DISTINCT marking (preemption = a satisfied diverting
+   *  sibling, NOT a failed criterion → its own amber attribute). */
+  reason: "unsatisfied-when" | "guarded-out" | "preemption";
+  /** Short label for the node's tooltip (failedCriterionLabel). */
+  label: string;
+  /** In the "Blocking" frontier set (the criteria that blocked the expected disposition). */
+  inBlocking: boolean;
+  /** In the "All" set (every evaluated-unsatisfied `when`). A preemption sibling is satisfied → NEVER in All. */
+  inAll: boolean;
+}
+
+/**
+ * Compute the per-node failed-criterion marks for one scenario (#173 T3b) — surface-agnostic reuse of the T2 selectors,
+ * keyed by the node's OWN runtime nodeId (NO re-rooting: the highlight is in-place within this same run tree). Returns a
+ * Map nodeId → FcMark (a node can be in both sets). GATED EMPTY for `status==="error"` (a partial trace; the run tree
+ * shows no highlight) — `allUnsatisfiedCriteria` is NOT status-gated, so the gate MUST live here, since the renderer
+ * invokes this on error cases too (it renders cases even on `success:false`). Pure.
+ */
+export function failedCriterionMarks(sv: ScenarioViewModel): Map<string, FcMark> {
+  const marks = new Map<string, FcMark>();
+  if (sv.status === "error") return marks; // partial trace, expected path undefined → no highlight (disc 158 §Trigger)
+  const get = (nodeId: string, reason: FcMark["reason"], label: string): FcMark => {
+    let m = marks.get(nodeId);
+    if (!m) {
+      m = { reason, label, inBlocking: false, inAll: false };
+      marks.set(nodeId, m);
+    }
+    return m;
+  };
+  // All-mode set: every evaluated-unsatisfied `when` (reason is always "unsatisfied-when" here).
+  for (const c of allUnsatisfiedCriteria(sv)) get(c.nodeId, "unsatisfied-when", failedCriterionLabel(c)).inAll = true;
+  // Blocking-mode set: the frontier (empty for a pass / non-fail). A preemption blocker keeps its own reason so the
+  // renderer marks the SATISFIED matched sibling distinctly (amber "diverted"), not as a red failed criterion.
+  for (const c of failedCriterionFrontier(sv)) {
+    const m = get(c.nodeId, c.reason, failedCriterionLabel(c));
+    m.inBlocking = true;
+    m.reason = c.reason; // the frontier reason wins (a node in both sets is the frontier's unsatisfied-when anyway)
+  }
+  return marks;
+}
 
 export interface RenderedScenario {
   html: string;
@@ -50,10 +97,44 @@ function nodeState(n: ViewNode): { cls: string; badge: string } {
   return { cls: "st-eval", badge: "evaluated" };
 }
 
-function renderNode(n: ViewNode, caseIdx: number, prefix: string, reveals: RenderedScenario["reveals"]): string {
+function renderNode(
+  n: ViewNode,
+  caseIdx: number,
+  prefix: string,
+  reveals: RenderedScenario["reveals"],
+  marks: Map<string, FcMark>,
+): string {
   const { cls, badge } = nodeState(n);
   const key = `${prefix}${caseIdx}.${n.nodeId}`;
   if (n.source) reveals[key] = { filePath: n.source.filePath, range: n.source.range };
+
+  // #173 T3b: failed-criterion data attributes (BOTH mode-sets stamped server-side; the toggle shows/hides client-side
+  // via a body class). A preemption blocker is a SATISFIED diverting sibling → its own `data-fc-preempt` (amber), NOT
+  // the red `data-fc-blocking`/`data-fc-all` of a true failed criterion.
+  const mark = marks.get(n.nodeId);
+  let fcAttrs = "";
+  let fcTip = ""; // the user-VISIBLE explanation (FIX 3 disc 160 — data-fc-tip alone was inert/invisible)
+  let fcTipSpan = ""; // an inline label shown in the active mode (CSS-gated), so the reason is visible without hovering
+  if (mark) {
+    const parts: string[] = [];
+    let tipCls: string;
+    if (mark.reason === "preemption") {
+      parts.push(`data-fc-preempt="1"`);
+      tipCls = "fc-tip-preempt";
+    } else {
+      if (mark.inBlocking) parts.push(`data-fc-blocking="1"`);
+      if (mark.inAll) parts.push(`data-fc-all="1"`);
+      tipCls = "fc-tip-blk";
+    }
+    parts.push(`data-fc-reason="${mark.reason}"`);
+    fcTip = mark.reason === "preemption" ? `matched first and diverted the run — ${mark.label}` : `blocked: ${mark.label}`;
+    parts.push(`data-fc-tip="${esc(fcTip)}"`);
+    fcAttrs = ` ${parts.join(" ")}`;
+    // The inline visible label. Class encodes both the channel (blk/preempt color) and the mode-membership so CSS can
+    // show it only in the active mode (a blocker shows in its set; a preemption is Blocking-only) — mirrors the outline.
+    const modeCls = mark.reason === "preemption" ? "fc-only-blocking" : `${mark.inBlocking ? "fc-in-blocking " : ""}${mark.inAll ? "fc-in-all" : ""}`.trim();
+    fcTipSpan = `<span class="fc-tip ${tipCls} ${modeCls}">${esc(fcTip)}</span>`;
+  }
 
   const facts =
     n.kind !== "action" && n.condition?.facts?.length
@@ -66,14 +147,16 @@ function renderNode(n: ViewNode, caseIdx: number, prefix: string, reveals: Rende
         }]</span>`
       : "";
   const children = n.children?.length
-    ? `<ul>${n.children.map((c) => renderNode(c, caseIdx, prefix, reveals)).join("")}</ul>`
+    ? `<ul>${n.children.map((c) => renderNode(c, caseIdx, prefix, reveals, marks)).join("")}</ul>`
     : "";
 
+  // Title: prefer the fc explanation when marked (so the hover SAYS why the node is highlighted), else the source path.
+  const rowTitle = fcTip ? `${fcTip}${n.source ? ` — ${n.source.filePath}` : ""}` : n.source ? n.source.filePath : "";
   return (
-    `<li class="node ${cls}">` +
-    `<span class="row" data-reveal="${esc(key)}" title="${esc(n.source ? n.source.filePath : "")}">` +
+    `<li class="node ${cls}"${fcAttrs}>` +
+    `<span class="row" data-reveal="${esc(key)}" title="${esc(rowTitle)}">` +
     `<span class="badge">${esc(badge)}</span>` +
-    `<span class="label">${esc(n.label)}</span>${facts}${guard}` +
+    `<span class="label">${esc(n.label)}</span>${facts}${guard}${fcTipSpan}` +
     `</span>${children}</li>`
   );
 }
@@ -88,7 +171,11 @@ function renderCase(s: ScenarioViewModel, caseIdx: number, prefix: string, revea
   const decision = s.decision
     ? esc(s.decision.name) + (s.decision.resolved ? "" : " <span class=\"err\">(unresolved)</span>")
     : "(no decision)";
-  const tree = s.tree.length ? `<ul class="tree">${s.tree.map((n) => renderNode(n, caseIdx, prefix, reveals)).join("")}</ul>` : "";
+  // #173 T3b: compute the failed-criterion marks ONCE per case (not per node), then thread the map down the recursion.
+  const marks = failedCriterionMarks(s);
+  const tree = s.tree.length
+    ? `<ul class="tree">${s.tree.map((n) => renderNode(n, caseIdx, prefix, reveals, marks)).join("")}</ul>`
+    : "";
 
   return (
     `<section class="case">` +
@@ -139,6 +226,31 @@ ul.tree { padding-left: 4px; border-left: none; }
 .st-preempt > .row .badge { color: var(--vscode-charts-yellow, #d29922); border-color: currentColor; }
 .diags { color: var(--vscode-testing-iconFailed, #f85149); }
 .err { color: var(--vscode-testing-iconFailed, #f85149); }
+
+/* #173 T3b — the failed-criterion in-place highlight + the All/Blocking toolbar. Highlights are CLIENT-SIDE: BOTH
+   mode-sets are stamped server-side as data attributes; the body class (set by the toolbar) reveals one set. */
+#fcToolbar { display: flex; align-items: center; gap: 6px; padding: 4px 0 8px; border-bottom: 1px solid var(--vscode-panel-border); margin-bottom: 8px; font-size: .85em; }
+#fcToolbar .fc-label { opacity: .7; }
+#fcToolbar .fc-btn { font: inherit; cursor: pointer; padding: 1px 8px; border: 1px solid var(--vscode-panel-border); background: var(--vscode-editorWidget-background, #252526); color: var(--vscode-foreground); }
+#fcToolbar .fc-btn.fc-active { background: var(--vscode-button-background, #0e639c); color: var(--vscode-button-foreground, #fff); border-color: var(--vscode-button-background, #0e639c); }
+#fcToolbar .fc-legend { opacity: .65; margin-left: 8px; }
+#fcToolbar .fc-legend .fc-swatch-blk { color: var(--vscode-editorError-foreground, #f14c4c); }
+#fcToolbar .fc-legend .fc-swatch-div { color: var(--vscode-charts-yellow, #d29922); }
+/* A true failed criterion (unsatisfied-when / guarded-out): a red dashed outline. Shown per the active mode. */
+body.fc-mode-blocking .node[data-fc-blocking] > .row,
+body.fc-mode-all .node[data-fc-all] > .row { outline: 2px dashed var(--vscode-editorError-foreground, #f14c4c); outline-offset: 1px; }
+/* A preemption: a SATISFIED matched sibling that diverted the run — amber, distinct from the red blockers. It is a
+   Blocking-set blocker (the satisfied sibling is not an unsatisfied when, so it is NOT in All) so it shows in Blocking. */
+body.fc-mode-blocking .node[data-fc-preempt] > .row { outline: 2px dashed var(--vscode-charts-yellow, #d29922); outline-offset: 1px; }
+/* The VISIBLE inline label (FIX 3 disc 160 — the reason, not just an inert data attr). Hidden by default; shown ONLY in
+   the active mode for the channel(s) the node belongs to (a blocker in its set; a preemption in Blocking). */
+.fc-tip { margin-left: 8px; font-size: .85em; opacity: .9; display: none; }
+.fc-tip-blk { color: var(--vscode-editorError-foreground, #f14c4c); }
+.fc-tip-preempt { color: var(--vscode-charts-yellow, #d29922); }
+.fc-tip-preempt::before { content: "◂ "; }
+body.fc-mode-blocking .fc-tip-preempt,
+body.fc-mode-blocking .fc-in-blocking,
+body.fc-mode-all .fc-in-all { display: inline; }
 `;
 
 /** A standalone error view (graph failed to resolve, or the host caught a throw). Pure; no reveals. */
