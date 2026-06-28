@@ -437,7 +437,10 @@ describe("authoring-kit — getAuthoringKit", () => {
     // Re-pinned again (#172 COMPLETE): qualified / cross-library `use decision` now EVALUATES end-to-end (run_decision
     // + validate_cel + provenance + cockpit), so the "NOT yet evaluated" BOUNDARY entry was removed and the proof-status
     // example updated. KE skills pin this hash — re-sync on the bump.
-    expect(a.contentHash).toBe("d7f950e1a546055ea064be2f9bbd793d9548a12c7573b1acdcaba2325eb88829");
+    // Re-pinned (clusterBy kit-proofing, per KE request): the verifyLoop note now names the PROVENANCE/PROMOTION
+    // generate mode — generate_provenance clusterBy:"disposition-path" (correspondence-correct by construction) for
+    // promotion vs the default "decision" concept-attribution view. The kit was silent on a generate mode before.
+    expect(a.contentHash).toBe("6eedd3fe787e5ea7da81cb7eef6d34e1de49c5a3f79cbb8c7215edbedac0a113");
   });
 
   it("STAGES contains exactly the one Stage-1 slice", () => {
