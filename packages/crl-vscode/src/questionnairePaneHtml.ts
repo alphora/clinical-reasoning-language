@@ -40,6 +40,37 @@ const escapeHtml = (s: string): string => s.replace(/[&<>"']/g, (c) => ESC[c]);
 /** The placeholder shown when no case is focused (mirrors the other panes' `.placeholder` convention). */
 const PLACEHOLDER = '<p class="placeholder">Select a scenario in the worklist to see its questionnaire.</p>';
 
+/**
+ * The pure next-index for the panel-local prev/next sub-nav (#177 slice 5). Moves `cur` one step in `dir`, CLAMPED to
+ * `[0, count - 1]`. A 0-question questionnaire (empty/blocked/error terminal) is a no-op (returns 0 — there is no focused
+ * question to move). Extracted so the bounds (clamp at 0, clamp at count-1, the 0-count no-op) are unit-tested rather than
+ * living only in the untested cockpit shell. The host calls this then re-renders + re-drives the `.this-node` marker.
+ */
+export function nextQuestionIndex(cur: number, dir: "prev" | "next", count: number): number {
+  if (count <= 0) return 0;
+  const moved = cur + (dir === "next" ? 1 : -1);
+  return Math.max(0, Math.min(moved, count - 1));
+}
+
+/** Render the prev/next sub-nav chrome (#177 slice 5) — a small region above the question list, styled like the tree's
+ *  `#fcChrome`. A `‹ Prev` button, a `Question X of Y` indicator, a `Next ›` button. Prev is disabled at index 0; Next at
+ *  the last index. The buttons carry an opaque `data-qnav="prev"`/`"next"` action (CSP-safe — no inline handlers). With 0
+ *  questions (terminal-only questionnaire) NO nav is rendered (there is no question to step through). The current index is
+ *  clamped defensively so a stale index can't render "Question 7 of 3" if it ever over-ran a shorter questionnaire. */
+function renderQuestionNav(currentIndex: number, count: number): string {
+  if (count <= 0) return "";
+  const idx = Math.max(0, Math.min(currentIndex, count - 1));
+  const prevDisabled = idx <= 0 ? " disabled" : "";
+  const nextDisabled = idx >= count - 1 ? " disabled" : "";
+  return (
+    `<div class="q-nav" title="Step through this case's questions">` +
+    `<button class="q-nav-btn" data-qnav="prev"${prevDisabled}>‹ Prev</button>` +
+    `<span class="q-nav-pos">Question ${idx + 1} of ${count}</span>` +
+    `<button class="q-nav-btn" data-qnav="next"${nextDisabled}>Next ›</button>` +
+    `</div>`
+  );
+}
+
 /** Render one question <li>: "Is <concept>?" + the two Yes/No options with the case's answer highlighted, plus a subtle
  *  value-type label for a non-boolean concept. `data-q` carries the runtime nodeId (slice-4 anchor); the <li> id is the
  *  highlight target keyed in `anchors`. */
@@ -98,12 +129,14 @@ function renderTerminal(q: ReturnType<typeof buildQuestionnaire>): string {
  * @param resolveValueTypes injected concept→value-types resolver (the shell builds it from `conceptByKey` + nodeKey).
  * @param rootLib          the root decision's library (`sv.decision?.libraryName`) — the builder's starting frame.
  * @param opts.revealPrefix gen-scoped DOM-id prefix (mirrors the other renderers; keeps ids unique across renders).
+ * @param opts.currentIndex the host's `currentQuestionIndex` — drives the sub-nav's "Question X of Y" + the Prev/Next
+ *                          disabled states (#177 slice 5). Defaults to 0. Clamped to the question count internally.
  */
 export function renderQuestionnairePane(
   sv: ScenarioViewModel | undefined,
   resolveValueTypes: ResolveValueTypes,
   rootLib: string | undefined,
-  opts: { revealPrefix?: string } = {},
+  opts: { revealPrefix?: string; currentIndex?: number } = {},
 ): RenderedQuestionnaire {
   const prefix = opts.revealPrefix ?? "";
   const anchors: Record<string, QuestionnaireAnchor> = {};
@@ -126,10 +159,13 @@ export function renderQuestionnairePane(
   const header = caseName
     ? `<p class="q-head">Questionnaire — <span class="q-case">${escapeHtml(caseName)}</span></p>`
     : "";
+  // #177 slice 5: the panel-local prev/next sub-nav, ABOVE the question list. Rendered only when there ARE questions
+  // (a terminal-only questionnaire has no question to step through). "X of Y" + the disabled states read the host's index.
+  const nav = renderQuestionNav(opts.currentIndex ?? 0, q.questions.length);
   const list = q.questions.length ? `<ol class="q-list">${items}</ol>` : "";
   const terminal = renderTerminal(q);
 
-  return { html: `<div class="q-wrap">${header}${list}${terminal}</div>`, anchors, reveals, questionNodeIds };
+  return { html: `<div class="q-wrap">${header}${nav}${list}${terminal}</div>`, anchors, reveals, questionNodeIds };
 }
 
 /**
@@ -160,6 +196,12 @@ export const QUESTIONNAIRE_STYLE =
   `.q-wrap{white-space:normal;line-height:1.5}` +
   `.q-head{margin:0 0 8px;font-weight:bold;opacity:.85}` +
   `.q-case{font-weight:normal;opacity:.9}` +
+  // #177 slice 5: the prev/next sub-nav chrome — mirrors the tree pane's `.fc-toggle` shape (segmented buttons + a label).
+  // A disabled button reads dimmed + non-interactive (the host clamps the index, so a click on a disabled edge is a no-op).
+  `.q-nav{display:flex;align-items:center;gap:8px;padding:2px 2px 8px;font-size:.85em}` +
+  `.q-nav-btn{font:inherit;cursor:pointer;padding:1px 8px;border:1px solid var(--vscode-panel-border,#454545);background:var(--vscode-editorWidget-background,#252526);color:var(--vscode-foreground)}` +
+  `.q-nav-btn:disabled{cursor:default;opacity:.45}` +
+  `.q-nav-pos{opacity:.8}` +
   `.q-list{list-style:decimal;margin:0;padding-left:22px}` +
   `.q-item{padding:2px 4px;border-radius:3px;margin:1px 0}` +
   `.q-prompt{margin-right:6px}` +

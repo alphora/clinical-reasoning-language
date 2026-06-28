@@ -21,7 +21,7 @@ async function load(tsFile) {
   return require(out);
 }
 
-const { renderQuestionnairePane, QUESTIONNAIRE_STYLE, shouldRerenderQuestionnaire } = await load("questionnairePaneHtml.ts");
+const { renderQuestionnairePane, QUESTIONNAIRE_STYLE, shouldRerenderQuestionnaire, nextQuestionIndex } = await load("questionnairePaneHtml.ts");
 
 let pass = 0;
 const check = (label, fn) => {
@@ -489,6 +489,134 @@ check("shouldRerenderQuestionnaire: locks same-selection-no-op / case-change-ren
   assert.equal(f({ prevCaseId: "c1", nextCaseId: undefined, mode: "medical-validation", paneOpen: true }), true, "cleared selection (c1 → undefined) → re-render to placeholder");
   assert.equal(f({ prevCaseId: "c1", nextCaseId: "c2", mode: "cockpit", paneOpen: true }), false, "cockpit mode is inert");
   assert.equal(f({ prevCaseId: "c1", nextCaseId: "c2", mode: "medical-validation", paneOpen: false }), false, "pane closed → no re-render");
+});
+
+// ── #177 slice 5: the pure next-index helper (clamp bounds + the 0-count no-op) ──
+check("slice 5: nextQuestionIndex clamps at [0, count-1] and is a no-op for a 0-question questionnaire", () => {
+  // Mid-range moves.
+  assert.equal(nextQuestionIndex(0, "next", 3), 1, "0 → next → 1");
+  assert.equal(nextQuestionIndex(1, "next", 3), 2, "1 → next → 2");
+  assert.equal(nextQuestionIndex(2, "prev", 3), 1, "2 → prev → 1");
+  // Clamp at the edges.
+  assert.equal(nextQuestionIndex(0, "prev", 3), 0, "prev at index 0 clamps to 0");
+  assert.equal(nextQuestionIndex(2, "next", 3), 2, "next at the last index clamps to count-1");
+  // A single-question questionnaire: both directions stay at 0.
+  assert.equal(nextQuestionIndex(0, "prev", 1), 0, "single question, prev → 0");
+  assert.equal(nextQuestionIndex(0, "next", 1), 0, "single question, next → 0");
+  // 0-count no-op (no focused question to move).
+  assert.equal(nextQuestionIndex(0, "next", 0), 0, "0 questions, next → 0");
+  assert.equal(nextQuestionIndex(0, "prev", 0), 0, "0 questions, prev → 0");
+});
+
+// A small 2-question PASS fixture reused by the nav-chrome tests (X false → no, Y true → yes → Approve).
+const NAV_FILES = {
+  "n.crl": `# N
+library "FallThrough".
+concept "X":
+- type is Condition.
+- code is \`x\`.
+concept "Y":
+- type is Condition.
+- code is \`y\`.
+activity "Deny":
+- request CPGCommunicationRequest.
+- with \`no\`.
+activity "Approve":
+- request CPGCommunicationRequest.
+- with \`ok\`.
+decision "FallThrough":
+first:
+- when "X" then recommend activity "Deny".
+- when "Y" then recommend activity "Approve".`,
+  "n.cel": `# C
+library "FallCases".
+covers "FallThrough".
+fact "Pat":
+- name is "Pat".
+- birth date is "1970-01-01".
+- defined by "Patient".
+fact "fY":
+- code is "http://example.org|y".
+- date is "2026-01-01".
+- defined by "Y".
+case "X absent, Y holds → Approve":
+- subject is "Pat".
+- fact is "fY".
+- result is "FallThrough" is "Approve".`,
+};
+
+// ── #177 slice 5: the sub-nav chrome renders "Question X of Y" + the Prev/Next disabled states for the given index ──
+check("slice 5: nav chrome shows 'Question X of Y' for the current index; Prev disabled at 0, Next enabled", () => {
+  const { sv, rootLib } = renderCase(NAV_FILES, "n.cel", "X absent, Y holds → Approve");
+  const r = renderQuestionnairePane(sv, booleanResolver, rootLib, { revealPrefix: "g1_", currentIndex: 0 });
+  assert.match(r.html, /class="q-nav"/, "the nav chrome is rendered");
+  assert.match(r.html, /Question 1 of 2/, "X of Y reads the current index (1-based) of the 2 questions");
+  const prev = r.html.match(/<button class="q-nav-btn" data-qnav="prev"([^>]*)>/);
+  const next = r.html.match(/<button class="q-nav-btn" data-qnav="next"([^>]*)>/);
+  assert.ok(prev && /disabled/.test(prev[1]), "Prev is disabled at index 0");
+  assert.ok(next && !/disabled/.test(next[1]), "Next is enabled at index 0 (not the last)");
+});
+
+check("slice 5: at the LAST index, Next is disabled + Prev enabled, and 'X of Y' reflects it", () => {
+  const { sv, rootLib } = renderCase(NAV_FILES, "n.cel", "X absent, Y holds → Approve");
+  const r = renderQuestionnairePane(sv, booleanResolver, rootLib, { revealPrefix: "g1_", currentIndex: 1 });
+  assert.match(r.html, /Question 2 of 2/, "X of Y reads the last index");
+  const prev = r.html.match(/<button class="q-nav-btn" data-qnav="prev"([^>]*)>/);
+  const next = r.html.match(/<button class="q-nav-btn" data-qnav="next"([^>]*)>/);
+  assert.ok(prev && !/disabled/.test(prev[1]), "Prev is enabled at the last index");
+  assert.ok(next && /disabled/.test(next[1]), "Next is disabled at the last index");
+});
+
+check("slice 5: a stale over-run index is clamped — never renders 'Question 7 of 2' nor an enabled Next past the end", () => {
+  const { sv, rootLib } = renderCase(NAV_FILES, "n.cel", "X absent, Y holds → Approve");
+  const r = renderQuestionnairePane(sv, booleanResolver, rootLib, { revealPrefix: "g1_", currentIndex: 7 });
+  assert.match(r.html, /Question 2 of 2/, "an over-run index clamps to the last question (count)");
+  const next = r.html.match(/<button class="q-nav-btn" data-qnav="next"([^>]*)>/);
+  assert.ok(next && /disabled/.test(next[1]), "Next stays disabled (clamped to the last index)");
+});
+
+// ── #177 slice 5: a 0-question terminal (no production, no questions) renders NO nav ──
+check("slice 5: a 0-question questionnaire (empty/terminal-only) renders NO nav chrome", () => {
+  // The blocked fixture from check #4 reuse: Dx absent → a single false 'no' question. Use the EMPTY/terminal-only path —
+  // a root `otherwise`-style production with zero `when` questions yields 0 questions. Build a decision that produces with
+  // no when on the fired path.
+  const crl = `# Z
+library "Bare".
+activity "Approve":
+- request CPGCommunicationRequest.
+- with \`ok\`.
+decision "Bare":
+- otherwise then recommend activity "Approve".`;
+  const cel = `# C
+library "BareCases".
+covers "Bare".
+fact "Pat":
+- name is "Pat".
+- birth date is "1970-01-01".
+- defined by "Patient".
+case "no questions → produced":
+- subject is "Pat".
+- result is "Bare" is "Approve".`;
+  const { sv, rootLib } = renderCase({ "z.crl": crl, "z.cel": cel }, "z.cel", "no questions → produced");
+  const r = renderQuestionnairePane(sv, booleanResolver, rootLib, { revealPrefix: "g1_", currentIndex: 0 });
+  assert.equal(r.questionNodeIds.length, 0, "the bare otherwise path has 0 questions");
+  assert.ok(!/class="q-nav"/.test(r.html), "no nav chrome when there are 0 questions");
+  assert.ok(!/data-qnav/.test(r.html), "no data-qnav buttons when there are 0 questions");
+});
+
+// ── #177 slice 5: the data-qnav actions are present + CSP-safe (opaque action, no inline handler) ──
+check("slice 5: data-qnav buttons are CSP-safe (opaque prev/next action, no inline on*=/style=)", () => {
+  const { sv, rootLib } = renderCase(NAV_FILES, "n.cel", "X absent, Y holds → Approve");
+  const r = renderQuestionnairePane(sv, booleanResolver, rootLib, { revealPrefix: "g1_", currentIndex: 0 });
+  const navs = [...r.html.matchAll(/data-qnav="([^"]+)"/g)].map((m) => m[1]);
+  assert.deepEqual(navs, ["prev", "next"], "exactly a prev and a next button, in order");
+  // CSP discipline: no inline handlers / styles anywhere in the nav (mirrors the whole-payload CSP test above).
+  const navHtml = r.html.match(/<div class="q-nav"[\s\S]*?<\/div>/)[0];
+  assert.ok(!/ on\w+=/.test(navHtml), "no inline on*= handlers on the nav buttons");
+  assert.ok(!/ style=/.test(navHtml), "no inline style= on the nav buttons");
+  // The CSS for the nav lives in QUESTIONNAIRE_STYLE (concatenated into the shell's nonced <style>).
+  assert.ok(/\.q-nav\{/.test(QUESTIONNAIRE_STYLE), "the .q-nav chrome style is declared in QUESTIONNAIRE_STYLE");
+  assert.ok(/\.q-nav-btn:disabled\{/.test(QUESTIONNAIRE_STYLE), "the disabled-button style is declared");
 });
 
 console.log(`\nquestionnairePaneHtml.test.mjs: ${pass} checks passed.`);

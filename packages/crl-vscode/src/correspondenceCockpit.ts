@@ -63,7 +63,7 @@ import {
 } from "./medicalValidationStore";
 import { renderCrlPane } from "./crlPaneHtml";
 import { FLOW_STYLE, renderFlowPane } from "./flowPaneHtml";
-import { QUESTIONNAIRE_STYLE, renderQuestionnairePane, shouldRerenderQuestionnaire } from "./questionnairePaneHtml";
+import { QUESTIONNAIRE_STYLE, renderQuestionnairePane, shouldRerenderQuestionnaire, nextQuestionIndex } from "./questionnairePaneHtml";
 import type { ConceptValueType, ResolveValueTypes } from "./questionnaireModel";
 import {
   buildCrlRevealMaps,
@@ -802,6 +802,24 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     if (src) markThisNode(src, segmentsFor(src, sourceUnits).segmentIds); // empty sourceUnits → silent source degrade
   }
 
+  /**
+   * The panel-local prev/next sub-nav (#177 slice 5). Moves `currentQuestionIndex` one step (CLAMPED to the CURRENT
+   * `questionNodeIds.length` — so a stale index can never over-run a shorter questionnaire; the slice-3 case-select reset
+   * already keeps it in range, this clamp is the second guard), then re-renders the questionnaire pane (refreshing the
+   * "Question X of Y" + the Prev/Next disabled states) AND re-drives the `.this-node` marker so the new focused question
+   * lights across panes + self-highlights. A no-op questionnaire (0 questions → nextQuestionIndex returns 0) just re-renders
+   * harmlessly. Render-then-drive mirrors the slice-3/4 case-select hook: the render bumps the pane gen; driveThisNode
+   * re-marks (the immediate post is a FIFO latency optimization, the pane-ack re-drive is the guarantee — gen-stamped so a
+   * mark aimed at a superseded render is dropped).
+   */
+  function navigateQuestion(dir: "prev" | "next"): void {
+    const moved = nextQuestionIndex(currentQuestionIndex, dir, questionNodeIds.length);
+    if (moved === currentQuestionIndex) return; // already at the edge (or 0 questions) — nothing changed
+    currentQuestionIndex = moved;
+    renderPane("questionnaire"); // re-render with the new index → updated "X of Y" + Prev/Next disabled states
+    driveThisNode(); // re-light the now-focused question across the panes + self-highlight (immediate post; ack re-drives)
+  }
+
   function updateNavMessage(): void {
     const empty = navigatorItems(state).length === 0;
     navView.message = empty
@@ -888,10 +906,19 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       const sv = focusedScenario(); // hoisted (FIX 5): one resolve, used for both the VM and its rootLib frame
       const r = renderQuestionnairePane(sv, buildResolveValueTypes(), sv?.decision?.libraryName, {
         revealPrefix: `g${gen}_`,
+        currentIndex: currentQuestionIndex, // #177 slice 5: the sub-nav renders "Question X of Y" + Prev/Next disabled states
       });
       v.anchors = r.anchors;
       v.reveals = r.reveals;
       questionNodeIds = r.questionNodeIds; // #177 slice 4: captured atomically with this render's anchors (gen-scoped li ids)
+      // #177 slice 5 (FIX 1): clamp the cursor into range against THIS render's question list. The case-select reset (→0)
+      // covers a case change, but a SAME-case rebuild that SHRINKS the questionnaire (a .crl/.cel edit dropping questions)
+      // would leave a stale index — and driveThisNode reads the RAW questionNodeIds[currentQuestionIndex] (not the
+      // display-clamped one renderQuestionNav uses), so a stale index → undefined → the marker clears + the disabled
+      // buttons can't recover (and a `next` from beyond-end would step BACKWARD instead of no-op). Clamping at the single
+      // questionNodeIds-reassignment point keeps the cursor valid after ANY render (select, nav, rebuild). The chrome at
+      // line ~907 already display-clamps via renderQuestionNav, so this only corrects the host-held index for driveThisNode.
+      currentQuestionIndex = questionNodeIds.length ? Math.min(currentQuestionIndex, questionNodeIds.length - 1) : 0;
       void v.panel.webview.postMessage({ type: "render", html: r.html, gen, indexVersion });
     }
   }
@@ -929,7 +956,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
 
   function onWebviewMessage(
     pane: Pane,
-    msg: { type?: string; gen?: number; key?: string; mode?: string; idx?: number },
+    msg: { type?: string; gen?: number; key?: string; mode?: string; idx?: number; dir?: string },
   ): void {
     const v = views.get(pane);
     if (!v) return;
@@ -962,6 +989,8 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       applyFailedCriteriaMode(msg.mode); // the tree-pane segmented toggle
     } else if (msg.type === "fcOpenSource" && typeof msg.idx === "number") {
       openFailedCriterionSource(msg.idx); // a gap row's "Open CRL source"
+    } else if (msg.type === "questionNav" && (msg.dir === "prev" || msg.dir === "next")) {
+      navigateQuestion(msg.dir); // #177 slice 5: the questionnaire pane's prev/next sub-nav — moves currentQuestionIndex
     } else if (msg.type === "worklistToggle" && typeof msg.key === "string") {
       toggleWorklist(msg.key); // #156 slice 4: a worklist checkbox click (MV mode) — host computes + persists the next state
     } else if (msg.type === "reveal" && typeof msg.key === "string") {
@@ -1697,6 +1726,12 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   // opaque key, and return — the host computes the next state. A DISABLED checkbox carries no attribute → falls through.
   `root.addEventListener('click',(e)=>{const wl=e.target.closest&&e.target.closest('[data-worklist-toggle]');` +
   `if(wl){e.preventDefault();e.stopPropagation();v.postMessage({type:'worklistToggle',key:wl.getAttribute('data-worklist-toggle')});return;}` +
+  // #177 slice 5: the questionnaire pane's prev/next sub-nav (it renders INTO #root, so it shares this click delegation).
+  // A [data-qnav] button posts the opaque direction; the host moves currentQuestionIndex, re-renders + re-drives the marker.
+  // Intercepted before [data-reveal] (the questionnaire is read-only — its buttons never select). A disabled button still
+  // carries data-qnav, so guard on .disabled to make an edge click a no-op (the host clamps too, but skip the round-trip).
+  `const qn=e.target.closest&&e.target.closest('[data-qnav]');` +
+  `if(qn){e.preventDefault();e.stopPropagation();if(!qn.disabled)v.postMessage({type:'questionNav',dir:qn.getAttribute('data-qnav')});return;}` +
   `const t=e.target.closest&&e.target.closest('[data-reveal]');` +
   `if(t)v.postMessage({type:'reveal',key:t.getAttribute('data-reveal')});});` +
   // #156 slice 4 (a11y): the interactive worklist checkbox is tabindex=0 + role=checkbox — make it keyboard-operable.

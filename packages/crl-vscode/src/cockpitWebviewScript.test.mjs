@@ -182,4 +182,56 @@ check("HOST: the pane-ack (`ready`) handler drives the marker (driveThisNode), a
   }
 });
 
+// ── #177 slice 5: the questionnaire prev/next sub-nav round-trip (webview→host→index→re-render+re-drive) ──
+check("WEBVIEW: a [data-qnav] click posts {type:'questionNav', dir}, guarded on the button NOT being disabled", () => {
+  // The questionnaire nav renders INTO #root, so it shares the root click delegation. Assert the script intercepts a
+  // [data-qnav] button (before the [data-reveal] fall-through), guards on .disabled, and posts the opaque direction.
+  assert.match(SCRIPT, /closest\('\[data-qnav\]'\)/, "the root click handler matches [data-qnav]");
+  assert.match(
+    SCRIPT,
+    /if\(qn\)\{[^}]*if\(!qn\.disabled\)v\.postMessage\(\{type:'questionNav',dir:qn\.getAttribute\('data-qnav'\)\}\)/,
+    "a [data-qnav] click posts {type:'questionNav', dir} only when the button is NOT disabled",
+  );
+  // It must be intercepted BEFORE the generic [data-reveal] post (the questionnaire is read-only — its buttons never select).
+  const qnavIdx = SCRIPT.indexOf("data-qnav");
+  const revealIdx = SCRIPT.indexOf("v.postMessage({type:'reveal'");
+  assert.ok(qnavIdx !== -1 && revealIdx !== -1 && qnavIdx < revealIdx, "the data-qnav handler precedes the [data-reveal] post");
+});
+
+check("HOST: the questionNav handler moves currentQuestionIndex (via navigateQuestion → nextQuestionIndex) then re-renders + re-drives the marker", () => {
+  // The host message handler routes a guarded questionNav (dir prev|next) to navigateQuestion.
+  assert.ok(
+    /msg\.type === "questionNav" && \(msg\.dir === "prev" \|\| msg\.dir === "next"\)/.test(COCKPIT_SRC),
+    "the host handler guards questionNav on a prev|next dir",
+  );
+  assert.ok(/navigateQuestion\(msg\.dir\)/.test(COCKPIT_SRC), "questionNav routes to navigateQuestion(dir)");
+  // navigateQuestion: clamp the index via nextQuestionIndex over the CURRENT questionNodeIds.length, set
+  // currentQuestionIndex, re-render the questionnaire pane, then re-drive the this-node marker.
+  const m = COCKPIT_SRC.match(/function navigateQuestion\([^)]*\)[^{]*\{([\s\S]*?)\n  \}/);
+  assert.ok(m, "navigateQuestion is defined");
+  const body = m[1];
+  assert.ok(/nextQuestionIndex\(currentQuestionIndex, dir, questionNodeIds\.length\)/.test(body), "clamps via nextQuestionIndex over the current questionNodeIds.length");
+  assert.ok(/currentQuestionIndex = moved/.test(body), "sets currentQuestionIndex to the clamped next index");
+  assert.ok(/renderPane\("questionnaire"\)/.test(body), "re-renders the questionnaire pane (refreshes X-of-Y + disabled states)");
+  assert.ok(/driveThisNode\(\)/.test(body), "re-drives the this-node marker for the now-focused question");
+  // Order: render BEFORE drive (the slice-3/4 case-select ordering — render bumps gen, then the marker re-paints).
+  assert.ok(body.indexOf('renderPane("questionnaire")') < body.indexOf("driveThisNode()"), "renders before driving the marker");
+  // The pane render passes the host index so the chrome reflects the move.
+  assert.ok(/currentIndex: currentQuestionIndex/.test(COCKPIT_SRC), "renderQuestionnairePane is passed the host currentQuestionIndex");
+});
+
+check("HOST FIX 1: the questionnaire render-capture clamps currentQuestionIndex into range (a same-case rebuild that SHRINKS the questionnaire can't strand the cursor past the end)", () => {
+  // A same-case .crl/.cel edit that drops questions leaves currentQuestionIndex stale (the case-select reset only fires on
+  // a case CHANGE). driveThisNode reads the RAW questionNodeIds[currentQuestionIndex], so the index must be clamped at the
+  // single point questionNodeIds is reassigned (the renderPane("questionnaire") arm) — right after the capture. Grep-lock
+  // that the clamp exists, references questionNodeIds.length, and sits AFTER the questionNodeIds assignment.
+  assert.ok(
+    /currentQuestionIndex = questionNodeIds\.length \? Math\.min\(currentQuestionIndex, questionNodeIds\.length - 1\) : 0;/.test(COCKPIT_SRC),
+    "the render-capture clamps currentQuestionIndex against questionNodeIds.length (Math.min, 0 when empty)",
+  );
+  const assignIdx = COCKPIT_SRC.indexOf("questionNodeIds = r.questionNodeIds");
+  const clampIdx = COCKPIT_SRC.indexOf("currentQuestionIndex = questionNodeIds.length ? Math.min");
+  assert.ok(assignIdx !== -1 && clampIdx !== -1 && assignIdx < clampIdx, "the clamp runs AFTER questionNodeIds is reassigned (clamps against THIS render's list)");
+});
+
 console.log(`\ncockpitWebviewScript.test: ${pass} checks passed`);
