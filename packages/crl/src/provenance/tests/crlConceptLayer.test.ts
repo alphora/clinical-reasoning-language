@@ -14,6 +14,7 @@ const T = `# T
 library "T".
 concept "A":
 - type is Condition.
+- value type is boolean.
 - code is \`a\`.
 concept "B":
 - type is Condition.
@@ -181,6 +182,11 @@ describe("buildCrlConceptLayer — headless concept layer (#166 Slice 1)", () =>
     expect([repr.definitionKind, repr.hasRepresentations]).toEqual([undefined, true]);
     expect(byName.get("U.Q")!.hasLocalCode).toBe(true);
   });
+
+  it("valueTypes: an authored `value type is X.` is carried; a concept with none is `[]`", () => {
+    expect(byName.get("T.A")!.valueTypes).toContain("boolean"); // `- value type is boolean.`
+    expect(byName.get("T.B")!.valueTypes).toEqual([]); // no value type authored → empty
+  });
 });
 
 describe("classifyConcept — ADR-0001 layer (#166 Slice 3a)", () => {
@@ -190,6 +196,7 @@ describe("classifyConcept — ADR-0001 layer (#166 Slice 3a)", () => {
     lib: "L",
     label: 'concept "C"',
     location: { filePath: "", range: { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } } },
+    valueTypes: [],
     hasLocalCode: false,
     hasRepresentations: false,
     definitionRefs: [],

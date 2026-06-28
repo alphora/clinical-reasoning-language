@@ -11,7 +11,7 @@
  * DIRECT edges only (defined-as operands + definition-is narrative refs); the transitive closure + cycle guard belong to
  * the consumer (Slice 2).
  */
-import type { Concept } from "../ast/types";
+import type { Concept, ConceptValueType } from "../ast/types";
 import { getRefLibrary, getRefName } from "../ast/types";
 import type { ResolvedCelGraph } from "../cel/imports/types";
 import type { ConceptType } from "../grammar/conceptTypes";
@@ -28,6 +28,9 @@ export interface CrlConceptNode {
   label: string;
   location: LsLocation; // location-less concepts are skipped (mirrors the indexer, for nodeKey parity)
   conceptType?: ConceptType;
+  /** The concept's authored value type(s) (`- value type is X.`), 0..* (`[]` when none) — a raw signal the
+   *  questionnaire panel (#177) uses to render answer options (e.g. boolean → Yes/No). */
+  valueTypes: ConceptValueType[];
   /** The concept's definition shape, when present — a raw signal for the renderer's later layer classification. */
   definitionKind?: ConceptDefinitionKind;
   hasLocalCode: boolean; // has a local `- code is …` (locally assertable)
@@ -117,6 +120,7 @@ export function buildCrlConceptLayer(
         label: `concept "${c.name}"`,
         location,
         ...(c.conceptType ? { conceptType: c.conceptType } : {}),
+        valueTypes: c.valueTypes ?? [],
         ...(c.definition ? { definitionKind: DEF_KIND[c.definition.type] } : {}),
         hasLocalCode: c.code !== undefined,
         hasRepresentations: c.representations.length > 0,
