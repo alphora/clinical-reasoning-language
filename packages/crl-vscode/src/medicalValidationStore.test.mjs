@@ -26,7 +26,7 @@ async function load(tsFile) {
   return require(out);
 }
 
-const { medicalValidationSidecarPath, loadSidecar, saveSidecar, deriveReviewOverlay, nextReviewState } =
+const { medicalValidationSidecarPath, loadSidecar, saveSidecar, deriveReviewOverlay, nextReviewState, applyWorklistToggle } =
   await load("medicalValidationStore.ts");
 
 let pass = 0;
@@ -296,6 +296,36 @@ check("nextReviewState: unreviewed → pending → reviewed → unreviewed", () 
   assert.equal(nextReviewState("unreviewed"), "pending");
   assert.equal(nextReviewState("pending"), "reviewed");
   assert.equal(nextReviewState("reviewed"), "unreviewed");
+});
+
+// ── applyWorklistToggle (slice 4 host reducer) ────────────────────────────────
+check("applyWorklistToggle: unreviewed (absent) → pending entry added", () => {
+  assert.deepEqual(applyWorklistToggle({}, "c1"), { c1: "pending" });
+});
+check("applyWorklistToggle: pending → reviewed (in place)", () => {
+  assert.deepEqual(applyWorklistToggle({ c1: "pending" }, "c1"), { c1: "reviewed" });
+});
+check("applyWorklistToggle: reviewed → unreviewed DELETES the entry (absence = unreviewed)", () => {
+  assert.deepEqual(applyWorklistToggle({ c1: "reviewed" }, "c1"), {});
+});
+check("applyWorklistToggle: only the toggled caseId changes; others untouched", () => {
+  assert.deepEqual(applyWorklistToggle({ c1: "pending", c2: "reviewed" }, "c1"), { c1: "reviewed", c2: "reviewed" });
+});
+check("applyWorklistToggle: returns a NEW object (input not mutated)", () => {
+  const input = { c1: "reviewed" };
+  const out = applyWorklistToggle(input, "c1");
+  assert.deepEqual(input, { c1: "reviewed" }, "input untouched");
+  assert.notEqual(out, input, "a fresh object is returned");
+});
+// FIX 1 (impl review): rapid double-toggle. The host advances from the COMMITTED map each time (the stable caseId key
+// resolves even on a pre-re-render DOM), so two toggles in a row on the same case advance TWO states.
+check("applyWorklistToggle: two toggles in a row on the same case advance two states (unreviewed→pending→reviewed)", () => {
+  const after1 = applyWorklistToggle({}, "c1");
+  assert.deepEqual(after1, { c1: "pending" }, "first → pending");
+  const after2 = applyWorklistToggle(after1, "c1");
+  assert.deepEqual(after2, { c1: "reviewed" }, "second (from committed) → reviewed");
+  const after3 = applyWorklistToggle(after2, "c1");
+  assert.deepEqual(after3, {}, "third wraps to unreviewed (entry deleted)");
 });
 
 console.log(`\nmedicalValidationStore.test: ${pass} checks passed`);

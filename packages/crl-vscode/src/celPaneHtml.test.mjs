@@ -216,4 +216,98 @@ check("at-rest key (#163): showKeys + caseKeyNumbers → a key slot in the case 
   assert.ok(!unfrozen.html.includes("corr-key"), "un-frozen case (no caseId) → no key slot");
 });
 
+// --- #156 slice 4: Medical Validation worklist checkbox ---
+
+// The cockpit path (worklist absent / enabled:false) must stay BYTE-IDENTICAL — the checkbox render is mode-gated.
+check("worklist ABSENT → byte-identical to a no-worklist baseline (cockpit unchanged)", () => {
+  const cases = result([sc("A", "pass", ["dx"], ["Approve"]), sc("Unfrozen", "fail")]);
+  const ids = { A: "cA" };
+  const base = renderCelPane(cases, ids);
+  const disabled = renderCelPane(cases, ids, { worklist: { enabled: false, statesByCaseId: { cA: "reviewed" } } });
+  assert.equal(disabled.html, base.html, "enabled:false html === baseline html");
+  assert.ok(!base.html.includes("cel-check"), "no checkbox in the baseline");
+  assert.equal(base.worklistActions, undefined, "no worklistActions field in cockpit mode");
+  assert.equal(disabled.worklistActions, undefined, "enabled:false omits worklistActions too");
+});
+
+check("worklist enabled: a REVIEWABLE case → data-worklist-toggle + state class + a worklistActions entry → caseId", () => {
+  const out = renderCelPane(result([sc("A", "pass")]), { A: "cA" }, { worklist: { enabled: true, statesByCaseId: {} } });
+  assert.match(out.html, /class="cel-check cel-check-unreviewed"[^>]*data-worklist-toggle="[^"]+"/);
+  const keys = Object.keys(out.worklistActions);
+  assert.equal(keys.length, 1, "exactly one worklist action");
+  assert.deepEqual(out.worklistActions[keys[0]], { caseId: "cA" }, "key resolves to the frozen caseId");
+  // the toggle key is present in the html as the data attribute
+  assert.ok(out.html.includes(`data-worklist-toggle="${keys[0]}"`));
+});
+
+// FIX 1 (impl review): the worklist toggle key must be STABLE (caseId-derived), NOT gen/prefix-scoped — so a click on a
+// stale (pre-re-render) DOM still resolves to the caseId instead of being dropped. Independent of the gen-scoped reveal key.
+check("worklist toggle key is STABLE (wl_<caseId>), prefix-independent — unlike the reveal key", () => {
+  const mk = (prefix) => renderCelPane(result([sc("A", "pass")]), { A: "cA" }, { revealPrefix: prefix, worklist: { enabled: true, statesByCaseId: {} } });
+  const a = mk("g1_");
+  const b = mk("g2_");
+  assert.deepEqual(Object.keys(a.worklistActions), ["wl_cA"], "key derived from caseId, not the gen prefix");
+  assert.deepEqual(Object.keys(b.worklistActions), ["wl_cA"], "same key across renders/gens (stable)");
+  // the reveal (case-select) key DOES carry the prefix — the two key spaces are independent.
+  assert.ok(Object.keys(a.reveals).some((k) => k.startsWith("g1_")) && Object.keys(b.reveals).some((k) => k.startsWith("g2_")));
+});
+
+// FIX 4 (impl review, a11y): the interactive checkbox is keyboard-operable + screen-reader-stateful.
+check("worklist (a11y): interactive checkbox carries role + tabindex + aria-checked reflecting state", () => {
+  const mk = (st) => renderCelPane(result([sc("A", "pass")]), { A: "cA" }, { worklist: { enabled: true, statesByCaseId: st } });
+  assert.match(mk({}).html, /class="cel-check cel-check-unreviewed"[^>]*role="checkbox"[^>]*aria-checked="false"[^>]*tabindex="0"/);
+  assert.match(mk({ cA: "pending" }).html, /aria-checked="mixed"/, "pending → aria-checked mixed");
+  assert.match(mk({ cA: "reviewed" }).html, /aria-checked="true"/, "reviewed → aria-checked true");
+  // a DISABLED checkbox: aria-disabled, NO tabindex (unreachable by keyboard)
+  const dis = renderCelPane(result([sc("U", "pass")]), {}, { worklist: { enabled: true, statesByCaseId: {} } });
+  assert.match(dis.html, /cel-check-disabled"[^>]*aria-disabled="true"/);
+  assert.ok(!/cel-check-disabled"[^>]*tabindex/.test(dis.html), "disabled checkbox has no tabindex");
+});
+
+check("worklist state glyphs: unreviewed / pending / reviewed map to the right class", () => {
+  const mk = (st) => renderCelPane(result([sc("A", "pass")]), { A: "cA" }, { worklist: { enabled: true, statesByCaseId: st } });
+  assert.match(mk({}).html, /cel-check-unreviewed/);
+  assert.match(mk({ cA: "pending" }).html, /cel-check-pending/);
+  assert.match(mk({ cA: "reviewed" }).html, /cel-check-reviewed/);
+});
+
+check("worklist state is keyed by caseId, NOT display name", () => {
+  // statesByCaseId carries the NAME "A" as a key (a trap) — it must NOT be picked up; the frozen caseId "cA" has no entry.
+  const out = renderCelPane(result([sc("A", "pass")]), { A: "cA" }, { worklist: { enabled: true, statesByCaseId: { A: "reviewed" } } });
+  assert.match(out.html, /cel-check-unreviewed/, "name-keyed state ignored → renders unreviewed");
+  assert.ok(!out.html.includes("cel-check-reviewed"));
+});
+
+check("worklist: an UNFROZEN case → DISABLED checkbox, NO data-worklist-toggle, the freeze tooltip", () => {
+  const out = renderCelPane(result([sc("Unfrozen", "pass")]), {}, { worklist: { enabled: true, statesByCaseId: {} } });
+  assert.match(out.html, /class="cel-check cel-check-disabled"/);
+  assert.ok(!out.html.includes("data-worklist-toggle"), "unfrozen case carries no toggle key");
+  assert.ok(out.html.includes("freeze this case to review it"), "freeze tooltip present");
+  assert.deepEqual(out.worklistActions, {}, "no action for an unfrozen case");
+});
+
+check("worklist: an AMBIGUOUS-name case → DISABLED checkbox + 'not reviewable', no toggle key", () => {
+  const out = renderCelPane(
+    result([sc("Dup", "fail")]),
+    { Dup: "cFrozen" },
+    { duplicateScenarioNames: new Set(["Dup"]), worklist: { enabled: true, statesByCaseId: { cFrozen: "reviewed" } } },
+  );
+  assert.match(out.html, /class="cel-check cel-check-disabled"/);
+  assert.ok(!out.html.includes("data-worklist-toggle"), "ambiguous case is not toggleable");
+  assert.ok(out.html.includes("name shared; not reviewable"), "ambiguous tooltip present");
+  assert.deepEqual(out.worklistActions, {}, "no action for an ambiguous case");
+  // honesty: it must NOT be silently hidden — the case still renders + still shows the name-shared marker
+  assert.ok(out.html.includes("Dup"));
+});
+
+check("worklist: a mix → reviewable keyed in worklistActions, unfrozen/ambiguous excluded", () => {
+  const out = renderCelPane(
+    result([sc("Good", "pass"), sc("Unfrozen", "pass"), sc("Dup", "fail")]),
+    { Good: "cG", Dup: "cD" },
+    { duplicateScenarioNames: new Set(["Dup"]), worklist: { enabled: true, statesByCaseId: {} } },
+  );
+  const caseIds = Object.values(out.worklistActions).map((a) => a.caseId);
+  assert.deepEqual(caseIds, ["cG"], "only the frozen, non-ambiguous case is a worklist action");
+});
+
 console.log(`\ncelPaneHtml.test: ${pass} checks passed`);

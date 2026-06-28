@@ -201,3 +201,19 @@ export function nextReviewState(s: ReviewState): ReviewState {
       return "unreviewed";
   }
 }
+
+/** The pure worklist-toggle reducer (slice 4, host-as-authority): given the current sidecar map + the caseId being
+ *  toggled, return the NEXT map. Advances that case's state through the 3-state cycle (via nextReviewState); when the next
+ *  state is "unreviewed" the entry is DELETED — absence = unreviewed, we never store the default (the same invariant the
+ *  sidecar holds). Returns a NEW object (the caller swaps it in only AFTER a successful save, so a failed save can keep
+ *  the prior map and disk + memory don't diverge). Pure — no IO, no vscode. */
+export function applyWorklistToggle(
+  byCaseId: Record<string, PersistedReviewState>,
+  caseId: string,
+): Record<string, PersistedReviewState> {
+  const next = nextReviewState(byCaseId[caseId] ?? "unreviewed");
+  const out = { ...byCaseId };
+  if (next === "unreviewed") delete out[caseId];
+  else out[caseId] = next as PersistedReviewState;
+  return out;
+}
