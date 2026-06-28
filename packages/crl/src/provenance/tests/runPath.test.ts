@@ -16,6 +16,7 @@ import {
   ancestorChain,
   collectProduced,
   producedRuntimePathRefs,
+  runtimeNodePathRefs,
   type MinimalViewNode,
   type ProducedRunPath,
   type RuntimePathRef,
@@ -379,6 +380,175 @@ describe("producedRuntimePathRefs — BACK-COMPAT: no-boundary case reduces to a
       ],
       [ref("L", "D", "otherwise"), ref("L", "D", "otherwise/action[0]")],
     ]);
+  });
+});
+
+describe("runtimeNodePathRefs — re-root an ARBITRARY inlined nodeId (not just produced actions) (#173 T1)", () => {
+  // The generalized entrypoint: feed a targetNodeId (a WHEN, not necessarily a produced action) and assert the
+  // re-rooted standalone path TO that node inclusive (the target's own row last). Same frame-stack / honesty machinery
+  // as producedRuntimePathRefs — these tests pin the predicate generalization + the not-found / gap contracts.
+
+  it("(a) a WHEN at depth 1 → its standalone re-rooted refs (path TO the when, the when's own row last)", () => {
+    // Main.when[0] --use Sub--> Sub.when[0] (the target; NOT the produced recommend below it).
+    const tree: MinimalViewNode[] = [
+      when("when[0]", [
+        useExpanded("when[0]/action[0]", "Sub", [
+          when("when[0]/action[0]/when[0]", [recommend("when[0]/action[0]/when[0]/action[0]")]),
+        ]),
+      ]),
+    ];
+    const path = runtimeNodePathRefs(tree, "when[0]/action[0]/when[0]", { lib: "L", decision: "Main" });
+    expect(path).toEqual({
+      refs: [
+        ref("L", "Main", "when[0]"),
+        ref("L", "Main", "when[0]/action[0]"), // the use-Sub boundary row (Main-local)
+        ref("L", "Sub", "when[0]"), // the target when, re-rooted into Sub — STOPS here (does NOT include the recommend)
+      ],
+      gaps: [],
+    });
+  });
+
+  it("(a) a WHEN at depth 2 → re-rooted to the second sub, terminates AT the target (no descent past it)", () => {
+    const tree: MinimalViewNode[] = [
+      otherwise("otherwise", [
+        useExpanded("otherwise/action[0]", "Sub1", [
+          when("otherwise/action[0]/when[0]", [
+            useExpanded("otherwise/action[0]/when[0]/action[0]", "Sub2", [
+              when("otherwise/action[0]/when[0]/action[0]/when[0]", [
+                recommend("otherwise/action[0]/when[0]/action[0]/when[0]/action[0]"),
+              ]),
+            ]),
+          ]),
+        ]),
+      ]),
+    ];
+    const path = runtimeNodePathRefs(
+      tree,
+      "otherwise/action[0]/when[0]/action[0]/when[0]",
+      { lib: "L", decision: "Main" },
+    );
+    expect(path).toEqual({
+      refs: [
+        ref("L", "Main", "otherwise"),
+        ref("L", "Main", "otherwise/action[0]"),
+        ref("L", "Sub1", "when[0]"),
+        ref("L", "Sub1", "when[0]/action[0]"),
+        ref("L", "Sub2", "when[0]"), // the target when, Sub2-local — terminus (the recommend below is NOT included)
+      ],
+      gaps: [],
+    });
+  });
+
+  it("(a) a WHEN at depth 3 (the real-VM CHAIN fixture) → re-rooted to Sub3, stops AT the when", () => {
+    const r = renderScenario(graphFrom(CHAIN_CRL, CHAIN_CEL));
+    const sv = r.scenarios[0];
+    const path = runtimeNodePathRefs(
+      sv.tree as unknown as MinimalViewNode[],
+      "otherwise/action[0]/when[0]/action[0]/when[0]/action[0]/when[0]",
+      CHAIN_ROOT,
+    );
+    expect(path).toEqual({
+      refs: [
+        ref("CHAIN", "Main", "otherwise"),
+        ref("CHAIN", "Main", "otherwise/action[0]"),
+        ref("CHAIN", "Sub1", "when[0]"),
+        ref("CHAIN", "Sub1", "when[0]/action[0]"),
+        ref("CHAIN", "Sub2", "when[0]"),
+        ref("CHAIN", "Sub2", "when[0]/action[0]"),
+        ref("CHAIN", "Sub3", "when[0]"), // the target when, Sub3-local — terminus (the recommend below is excluded)
+      ],
+      gaps: [],
+    });
+  });
+
+  it("(b) a cross-lib inlined when → the sub's lib comes from `target.libraryName`, not the caller's", () => {
+    // Main.when[0] --use OtherLib.Sub (expanded, cross-lib)--> Sub.when[0] (the target). The re-root must record the
+    // sub's rows under `OTHERLIB`, not `L`.
+    const tree: MinimalViewNode[] = [
+      when("when[0]", [
+        useExpanded(
+          "when[0]/action[0]",
+          "Sub",
+          [when("when[0]/action[0]/when[0]", [recommend("when[0]/action[0]/when[0]/action[0]")])],
+          "OTHERLIB",
+        ),
+      ]),
+    ];
+    const path = runtimeNodePathRefs(tree, "when[0]/action[0]/when[0]", { lib: "L", decision: "Main" });
+    expect(path).toEqual({
+      refs: [
+        ref("L", "Main", "when[0]"),
+        ref("L", "Main", "when[0]/action[0]"), // the boundary row stays under the CALLER's lib
+        ref("OTHERLIB", "Sub", "when[0]"), // the target when re-rooted into the cross-lib sub
+      ],
+      gaps: [],
+    });
+  });
+
+  it("(c) targetNodeId NOT present anywhere in the tree → undefined (a clear not-found, not an empty groundable path)", () => {
+    const tree: MinimalViewNode[] = [
+      when("when[0]", [
+        useExpanded("when[0]/action[0]", "Sub", [
+          when("when[0]/action[0]/when[0]", [recommend("when[0]/action[0]/when[0]/action[0]")]),
+        ]),
+      ]),
+    ];
+    const path = runtimeNodePathRefs(tree, "when[7]/does/not/exist", { lib: "L", decision: "Main" });
+    expect(path).toBeUndefined();
+  });
+
+  it("(d) target under a malformed `expanded:true` boundary with absent `target.name` → non-empty gaps, no fabricated ref", () => {
+    // The target when lives in an UNGROUNDED sub-frame (the boundary's target carries no name). The path TO it: Main's
+    // grounded rows + the target's raw nodeId in `gaps` — NEVER a `decision: ""` ref.
+    const tree: MinimalViewNode[] = [
+      when("when[0]", [
+        {
+          nodeId: "when[0]/action[0]",
+          kind: "action",
+          action: {
+            produced: false,
+            actionKind: "use-decision",
+            expanded: true,
+            target: { name: "" }, // ABSENT target name → ungrounded sub-frame
+          },
+          children: [
+            when("when[0]/action[0]/when[0]", [
+              recommend("when[0]/action[0]/when[0]/action[0]"),
+            ]),
+          ],
+        },
+      ]),
+    ];
+    const path = runtimeNodePathRefs(tree, "when[0]/action[0]/when[0]", { lib: "L", decision: "Main" });
+    expect(path).toBeDefined();
+    const p = path!;
+    expect(p.refs).toEqual([
+      ref("L", "Main", "when[0]"),
+      ref("L", "Main", "when[0]/action[0]"), // the boundary's own row stays grounded under Main
+    ]);
+    expect(p.gaps).toEqual(["when[0]/action[0]/when[0]"]); // the ungrounded target when is surfaced, not fabricated
+    expect(p.refs.some((rr) => rr.decision === "" || rr.decision === undefined)).toBe(false);
+  });
+
+  it("(e) a same-lib NON-chained when → reduces to the flat ancestorChain (back-compat shape)", () => {
+    // No expanded boundary anywhere: the path to a when stays in the root frame → exactly its inclusive ancestorChain.
+    const tree: MinimalViewNode[] = [
+      when("when[0]", [
+        when("when[0]/when[0]", [recommend("when[0]/when[0]/action[0]")]),
+        otherwise("when[0]/otherwise", [recommend("when[0]/otherwise/action[0]")]),
+      ]),
+      otherwise("otherwise", [recommend("otherwise/action[0]")]),
+    ];
+    const path = runtimeNodePathRefs(tree, "when[0]/when[0]", { lib: "L", decision: "D" });
+    expect(path).toEqual({
+      refs: ancestorChain("when[0]/when[0]").map((id) => ref("L", "D", id)),
+      gaps: [],
+    });
+    // explicit form
+    expect(path).toEqual({
+      refs: [ref("L", "D", "when[0]"), ref("L", "D", "when[0]/when[0]")],
+      gaps: [],
+    });
   });
 });
 

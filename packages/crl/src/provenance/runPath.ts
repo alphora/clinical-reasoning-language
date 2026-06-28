@@ -146,9 +146,25 @@ function stripPrefix(id: string, prefix: string): string | undefined {
  * `ancestorChain` (each as `{ root.lib, root.decision, id }`) with empty `gaps` — the new primitive reduces to today's
  * flat chain when there are no boundaries (asserted by a back-compat unit test).
  */
-export function producedRuntimePathRefs(
+/**
+ * The predicate-parameterized CORE of the chain-aware decomposer (#173 T1, disc 158 §"Decomposer generalization").
+ *
+ * It is the frame-stack VM walk extracted VERBATIM from the old `producedRuntimePathRefs` body — keyed on TREE POSITION,
+ * never on `produced`. It accumulates frames + grounded refs + gaps top-down, and when it reaches a node satisfying
+ * `stop(node)` it emits the accumulated `{ refs, gaps }` path TO that node INCLUSIVE and STOPS (does NOT recurse the
+ * matched node's children — a stop-node is a path terminus, exactly as a produced action was). Every other mechanism —
+ * the `expanded`-boundary frame push, the `target.libraryName ?? frame.lib` cross-lib re-root, the `stripPrefix`
+ * ungrounded-sentinel + the residual-unmapped (`gaps`) honesty contract — transfers unchanged because all of it is keyed
+ * on the boundary/prefix structure of the tree, not on what makes a node a terminus.
+ *
+ * Returns one `ProducedRunPath` per stop-node found, in DFS order. The two public entrypoints differ ONLY in `stop`:
+ *   - `producedRuntimePathRefs`  → `stop = n.kind === "action" && n.action?.produced === true`.
+ *   - `runtimeNodePathRefs`      → `stop = n.nodeId === targetNodeId`.
+ */
+function decomposePaths(
   tree: MinimalViewNode[],
   root: { lib: string; decision: string },
+  stop: (node: MinimalViewNode) => boolean,
 ): ProducedRunPath[] {
   const results: ProducedRunPath[] = [];
 
@@ -165,7 +181,7 @@ export function producedRuntimePathRefs(
 
     // Ground this node, or record a gap. A row whose id is not under the current frame's prefix — OR any node inside an
     // UNGROUNDED frame (frame.decision === undefined) — cannot be grounded: add its raw nodeId to `gaps` (emit no ref),
-    // never fabricate a mis-rooted/empty-decision ref. Keep walking so a deeper produced action is still recorded.
+    // never fabricate a mis-rooted/empty-decision ref. Keep walking so a deeper stop-node is still recorded.
     let nextPathRefs = pathRefs;
     let nextGaps = gaps;
     if (isRow) {
@@ -174,6 +190,14 @@ export function producedRuntimePathRefs(
       } else {
         nextGaps = [...gaps, node.nodeId];
       }
+    }
+
+    // A node satisfying `stop` is a PATH TERMINUS — record the accumulated refs + gaps TO it inclusive (the row, if any,
+    // was already grounded/gapped above) and STOP. This is checked BEFORE the expanded-boundary push so a stop-node that
+    // happens to be an expanded use-decision boundary still terminates the path AT it (does not descend its sub-tree).
+    if (stop(node)) {
+      results.push({ refs: nextPathRefs, gaps: nextGaps });
+      return;
     }
 
     const a = node.action;
@@ -195,17 +219,53 @@ export function producedRuntimePathRefs(
       return;
     }
 
-    // A produced action is a PATH TERMINUS — record the accumulated refs + gaps (never dropped; gapped ⇒ unmapped).
-    if (node.kind === "action" && a?.produced === true) {
-      results.push({ refs: nextPathRefs, gaps: nextGaps });
-      // A produced action has no produced descendants; don't recurse children, so one produced action = one path.
-      return;
-    }
-
     for (const c of node.children ?? []) visit(c, stack, nextPathRefs, nextGaps);
   };
 
   const rootFrame: Frame = { lib: root.lib, decision: root.decision, prefix: "" };
   for (const n of tree) visit(n, [rootFrame], [], []);
   return results;
+}
+
+/**
+ * The #175 chain-aware decomposer for PRODUCED actions — now a thin wrapper over the predicate-parameterized
+ * `decomposePaths` core (#173 T1). Output is BYTE-IDENTICAL to the prior hand-rolled implementation: the `produced`
+ * predicate selects exactly the same termini, the core's stop-before-push order matches the old code (a produced action
+ * is never an expanded boundary, so the ordering choice is moot for this predicate but harmless), and the frame /
+ * re-root / gaps machinery is the same code. The #170/#174/#175 regression tests pin this byte-for-byte.
+ */
+export function producedRuntimePathRefs(
+  tree: MinimalViewNode[],
+  root: { lib: string; decision: string },
+): ProducedRunPath[] {
+  return decomposePaths(tree, root, (n) => n.kind === "action" && n.action?.produced === true);
+}
+
+/**
+ * GENERALIZED decomposer (#173 T1, disc 158): re-root an ARBITRARY inlined runtime nodeId to its standalone
+ * `(lib, decision, nodeId)` provenance ref(s). Decomposes the root-to-`targetNodeId` path the SAME way
+ * `producedRuntimePathRefs` decomposes a produced path — through the `decomposePaths` core with the predicate
+ * `n.nodeId === targetNodeId` — re-rooting at every `expanded` use-decision boundary into the sub-decision's own frame.
+ * The target's own standalone row is the LAST ref on the returned path (the row was grounded as the walk reached it).
+ *
+ * RETURN CONTRACT (disc 158 §T1 honesty):
+ *   - `targetNodeId` NOT present anywhere in the tree → `undefined`. A clear NOT-FOUND signal the consumer routes like
+ *     `unmapped` — distinct from an empty `{ refs: [], gaps: [] }` (which would look groundable / on-path). The consumer
+ *     MUST treat `undefined` as not-found, never as a clean empty path.
+ *   - FOUND on a fully grounded path → `{ refs, gaps: [] }` (the standalone re-rooted refs, target's own row last).
+ *   - FOUND but on an ungrounded / cross-frame path (a mis-prefixed id, or under an `expanded` boundary with no
+ *     `target.name`) → `{ refs, gaps }` with NON-EMPTY `gaps` and NO fabricated ref — exactly the producedRuntimePathRefs
+ *     honesty contract. The consumer routes a non-empty `gaps` to unmapped, never lights a fabricated row.
+ *
+ * If `targetNodeId` appears more than once in the tree (e.g. the SAME inlined sub reached via two parent branches, where
+ * the deep ids actually differ; or a genuinely repeated id), the FIRST DFS match is returned — the path a single reveal
+ * peeks. (A produced terminus is unique per produced action; an arbitrary node match takes the first occurrence.)
+ */
+export function runtimeNodePathRefs(
+  tree: MinimalViewNode[],
+  targetNodeId: string,
+  root: { lib: string; decision: string },
+): ProducedRunPath | undefined {
+  const paths = decomposePaths(tree, root, (n) => n.nodeId === targetNodeId);
+  return paths.length === 0 ? undefined : paths[0];
 }
