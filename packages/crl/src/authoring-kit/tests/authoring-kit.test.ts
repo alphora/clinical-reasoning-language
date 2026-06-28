@@ -408,14 +408,19 @@ describe("authoring-kit — getAuthoringKit", () => {
     }
   });
 
-  it("the chaining-necessity rule (§2) teaches source-required delegation + the duplicate-not-factor invariant", () => {
+  it("the chaining-necessity rule (§2) teaches `use decision` serves source-delegation OR genuine reuse (genuinely-shared vs fabricated-shared)", () => {
     const rule = getAuthoringKit().rules.find((r) => r.id === "chaining-necessity");
     expect(rule).toBeDefined();
     expect(rule!.category).toBe("decision-shape");
     expect(rule!.rule).toMatch(/use decision/);
     expect(rule!.rule).toMatch(/source/i);
+    // reuse is a FIRST-CLASS driver (not prohibited); the line is genuinely-shared vs fabricated-shared, not reuse-vs-not
+    expect(rule!.rule).toMatch(/reuse/i);
+    expect(rule!.rule).toMatch(/genuinely[ -]shared/i);
+    expect(rule!.rule).toMatch(/fabricat/i);
+    // the false-coupling guard survives: independent lookalikes still duplicate inline
     expect(rule!.rule).toMatch(/duplicate/i);
-    // the invented-boundary invariant clause anchors to the composition lens
+    // the invented-boundary invariant clause still anchors to the composition lens
     const invented = (rule!.clauses ?? []).find(
       (c) => c.force === "invariant" && c.test === "judgeLens.composition:invented-determination-boundary",
     );
@@ -440,7 +445,10 @@ describe("authoring-kit — getAuthoringKit", () => {
     // Re-pinned (clusterBy kit-proofing, per KE request): the verifyLoop note now names the PROVENANCE/PROMOTION
     // generate mode — generate_provenance clusterBy:"disposition-path" (correspondence-correct by construction) for
     // promotion vs the default "decision" concept-attribution view. The kit was silent on a generate mode before.
-    expect(a.contentHash).toBe("6eedd3fe787e5ea7da81cb7eef6d34e1de49c5a3f79cbb8c7215edbedac0a113");
+    // Re-pinned (chaining-necessity reuse fix): `use decision` now serves source-delegation OR genuine REUSE (the SUR
+    // cross-library shared determination IS reuse) — the line is genuinely-shared vs fabricated-shared, not reuse-vs-not.
+    // Reworded the chaining-necessity rule/why/clauses + decision-composition rung 3 to match. KE skills pin this hash — re-sync.
+    expect(a.contentHash).toBe("611c406f68d8cf26af26e70eac015745ef813240595d26cc89915cceab70f260");
   });
 
   it("STAGES contains exactly the one Stage-1 slice", () => {
