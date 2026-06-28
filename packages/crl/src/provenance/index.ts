@@ -90,6 +90,13 @@ export { generateProvenanceFiles } from "./generateFiles";
 export type { GenerateProvenanceFilesResult } from "./generateFiles";
 export { generateProvenanceScaffold, mergeScaffold } from "./generate";
 export type { GenerateDiagnostic, GenerateResult, MergeDiagnostic, MergeResult } from "./generate";
+export { allUnsatisfiedCriteria, failedCriterionFrontier } from "./failedCriteria";
+export type {
+  FailedCriterionNode,
+  FailedCriterionDisplay,
+  FcScenario,
+  FcViewNode,
+} from "./failedCriteria";
 // resolveProvenance / ResolveProvenanceResult are intentionally NOT re-exported — they are an internal shared step
 // (consumed by correspondence.ts via a relative import); keeping the large intermediate shape out of the package API.
 export { buildCorrespondenceModel } from "./correspondence";
