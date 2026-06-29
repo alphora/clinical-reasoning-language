@@ -30,7 +30,7 @@ async function load(tsFile) {
   return require(out);
 }
 
-const { buildQuestionnaire } = await load("questionnaireModel.ts");
+const { buildQuestionnaire, producedPathDiverterIds } = await load("questionnaireModel.ts");
 
 let pass = 0;
 const check = (label, fn) => {
@@ -704,6 +704,49 @@ case "both fire":
   assert.ok(q.outcome && (q.outcome.activity === "Order" || q.outcome.activity === "Document"), "outcome is one of the produced leaves");
   assert.ok(typeof q.note === "string" && /multiple produced/.test(q.note), "a multiplicity note is set");
   assert.deepEqual(q.questions.map((x) => x.conceptName), ["Dx"], "the single when is on the path");
+});
+
+// ── disc 164: producedPathDiverterIds — the gated "no"-question extraction the cockpit's diverter overlay drives ──
+check("producedPathDiverterIds: a PRODUCED terminal returns the evaluated-false 'no' nodeIds (in order), skipping 'yes'/null", () => {
+  const q = {
+    outcome: { activity: "Deny" },
+    terminalKind: "produced",
+    questions: [
+      { answer: "no", nodeId: "when[0]" },
+      { answer: "yes", nodeId: "when[1]" },
+      { answer: "no", nodeId: "when[2]" },
+      { answer: null, nodeId: "when[3]" },
+    ],
+  };
+  assert.deepEqual(producedPathDiverterIds(q), ["when[0]", "when[2]"], "only the produced-path 'no' diverters, in order");
+});
+
+check("producedPathDiverterIds: a BLOCKED / blocked-guard terminal (outcome null) returns [] even with a false question (the guard is the BLOCKER, not a diverter)", () => {
+  // The load-bearing gpt55/Claude impl-review catch: buildQuestionnaire emits a false GUARD/when question for a blocked
+  // terminal, but with NOTHING produced there is no disposition to have diverted TO — that is the failed-criterion peek's
+  // job, not the diverter overlay's. The q.outcome gate must suppress it.
+  for (const terminalKind of ["blocked", "blocked-guard"]) {
+    const q = { outcome: null, terminalKind, questions: [{ answer: "no", nodeId: "when[0]/guard" }] };
+    assert.deepEqual(producedPathDiverterIds(q), [], `${terminalKind} (outcome null) lights NO diverter`);
+  }
+});
+
+check("producedPathDiverterIds: an EMPTY terminal (produced via root otherwise, zero questions) returns []", () => {
+  const q = { outcome: { activity: "Deny" }, terminalKind: "empty", questions: [] };
+  assert.deepEqual(producedPathDiverterIds(q), [], "no questions → no diverters (clears the overlay)");
+});
+
+check("producedPathDiverterIds: a multi-diverter produced case (e.g. adult, neither disease → inner otherwise → Deny) returns ALL the false whens", () => {
+  const q = {
+    outcome: { activity: "Deny" },
+    terminalKind: "produced",
+    questions: [
+      { answer: "yes", nodeId: "when[0]" }, // Adult? yes
+      { answer: "no", nodeId: "when[0]/when[0]" }, // Crohn's? no
+      { answer: "no", nodeId: "when[0]/when[1]" }, // UC? no
+    ],
+  };
+  assert.deepEqual(producedPathDiverterIds(q), ["when[0]/when[0]", "when[0]/when[1]"], "both failed disease whens are diverters");
 });
 
 console.log(`\nquestionnaireModel.test.mjs: ${pass} checks passed.`);

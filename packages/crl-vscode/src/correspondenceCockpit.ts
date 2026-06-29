@@ -64,6 +64,7 @@ import {
 import { renderCrlPane } from "./crlPaneHtml";
 import { FLOW_STYLE, renderFlowPane } from "./flowPaneHtml";
 import { QUESTIONNAIRE_STYLE, renderQuestionnairePane, shouldRerenderQuestionnaire, nextQuestionIndex } from "./questionnairePaneHtml";
+import { buildQuestionnaire, producedPathDiverterIds } from "./questionnaireModel";
 import type { ConceptValueType, ResolveValueTypes } from "./questionnaireModel";
 import {
   buildCrlRevealMaps,
@@ -373,6 +374,10 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     // after it — the next selection's `.current`/clearHighlight then wipes the overlay, but this same-click reveal does
     // not (disc 159, the ordering invariant). The overlay is its own channel, so it coexists with `.current`.
     driveFailedCriteriaPeek();
+    // disc 164: the produced-path diverter overlay — same post-dispatch timing + ordering invariant as the failed-criterion
+    // peek (lands AFTER the selection's `.current`/clrDV, so the SAME-click marks survive; the NEXT reveal's clrDV drops them).
+    // Its own channel, MV-only, selection-coupled. Inert (clears) in cockpit / for a non-cel, errored, or no-diverter case.
+    driveDiverters();
     // #177 slice 3: the selection-scoped questionnaire re-render — the genuinely NEW trigger (no pane re-rendered on
     // selection before this). The decision is the PURE, unit-tested `shouldRerenderQuestionnaire` (FIX 2): MV mode + the
     // questionnaire pane open + a REAL focused-case change (not a same-selection highlight-restore redispatch). On a true
@@ -752,6 +757,17 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     for (const v of views.values()) void v.panel.webview.postMessage({ type: "clearThisNode" });
   }
 
+  /** disc 164: paint the produced-path diverter overlay on one pane (the rows/units already mapped to segment ids). No
+   *  scroll (mirrors markThisNode — the .current reveal owns scroll; the diverter is a secondary rationale highlight). */
+  function markDiverters(v: PaneView, segmentIds: string[]): void {
+    void v.panel.webview.postMessage({ type: "markDiverters", gen: v.gen, segmentIds });
+  }
+
+  /** Clear the diverter overlay across every pane (non-MV / no diverters / errored case). Ungated like the others. */
+  function clearAllDiverters(): void {
+    for (const v of views.values()) void v.panel.webview.postMessage({ type: "clearDiverters" });
+  }
+
   /**
    * Drive the "this node" cross-pane MARKER for the CURRENTLY-focused questionnaire question (#177 slice 4, disc 163
    * §"This node marker"). A SEPARATE, PERSISTENT channel from `.current` (selection), `.failed-criterion` (peek), and the
@@ -800,6 +816,66 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     if (tree) markThisNode(tree, segmentsFor(tree, nodeKeys).segmentIds);
     if (crl) markThisNode(crl, segmentsFor(crl, nodeKeys).segmentIds);
     if (src) markThisNode(src, segmentsFor(src, sourceUnits).segmentIds); // empty sourceUnits → silent source degrade
+  }
+
+  /**
+   * Drive the produced-path DIVERTER overlay for the current selection (disc 164, design round 164). The diverters are the
+   * evaluated-FALSE `when`s on the fired path to the ACTUALLY produced disposition — the criteria that, by being false,
+   * routed the case to its outcome (e.g. the Adult gate for a "Crohn's but not an adult" → outer otherwise → Deny). They
+   * answer "WHY the produced disposition", which the produced provenance cluster (`.current`) does NOT show: the cluster is
+   * the produced node's own span (the experimental clause), not the gate that diverted here. DISTINCT from the failed-
+   * criterion peek ("what blocked the EXPECTED" — empty for a PASS, and these denies PASS) and from `.this-node` (focus).
+   *
+   * Source-of-truth: the diverters ARE the questionnaire's evaluated-false "no" questions — we reuse that ONE fired-path
+   * authority (`buildQuestionnaire`) rather than a second whole-tree scan, so there is no drift (a whole-tree
+   * `allUnsatisfiedCriteria` would over-light OFF-path false `when`s under an `all:` block — design round 164 [critical]).
+   *
+   * Lifecycle (selection-coupled, like the failed-criterion peek, NOT the survives-reveal marker): cleared by the webview's
+   * highlight/clearHighlight (clrDV), re-driven post-dispatch + on each pane ack + on rebuild. MV-only. Cleared (not painted)
+   * for a non-MV mode, no/ambiguous scenario, an errored case, or zero diverters. An ungroundable diverter degrades silently
+   * (no nodeKey → no mark for that row), and a diverter `when` with no source unit degrades the SOURCE leg silently — tree+crl
+   * still mark (mirrors driveThisNode). Reuses `resolveThisNode` (the marker's runtime-id→nodeKey+units join) per diverter.
+   *
+   * PERF (Claude impl review, disc 164): this RECOMPUTES `buildQuestionnaire` on each call (dispatch + each tree/crl/source
+   * ack) — UNLIKE driveThisNode, which reads the cached `questionNodeIds`. It cannot reuse that cache: the diverter overlay
+   * is pane-INDEPENDENT (it paints tree/crl/source even with the questionnaire pane CLOSED, where `questionNodeIds` is
+   * empty), so it must build the fired path itself on selection. The walk is synchronous + cheap (small decision trees); a
+   * per-case memo keyed on the selected caseId is the optimization if policies ever grow large.
+   */
+  function driveDiverters(): void {
+    if (mode !== "medical-validation") {
+      clearAllDiverters();
+      return;
+    }
+    const sv = focusedScenario();
+    if (!sv || sv.status === "error") {
+      clearAllDiverters();
+      return;
+    }
+    // The diverters ARE the questionnaire's evaluated-false "no" questions — but ONLY when a disposition was produced
+    // (producedPathDiverterIds gates on q.outcome): a blocked/blocked-guard terminal emits a false guard/when question
+    // with NO produced disposition, which must NOT light as a "produced-path diverter" (gpt55 impl review, disc 164).
+    const q = buildQuestionnaire(sv, buildResolveValueTypes(), sv.decision?.libraryName);
+    const diverterIds = producedPathDiverterIds(q);
+    if (diverterIds.length === 0) {
+      clearAllDiverters();
+      return;
+    }
+    // Re-root each runtime nodeId → standalone CRL row + its source units (the SAME join the marker uses), deduped.
+    const root = { lib: sv.decision?.libraryName ?? "", decision: sv.decision?.name ?? "" };
+    const nodeKeys: string[] = [];
+    const units: string[] = [];
+    for (const nodeId of diverterIds) {
+      const { nodeKey, sourceUnits } = resolveThisNode(nodeId, root, sv.tree, runtimeRefIndex, crlMaps);
+      if (nodeKey !== undefined && !nodeKeys.includes(nodeKey)) nodeKeys.push(nodeKey);
+      for (const u of sourceUnits) if (!units.includes(u)) units.push(u);
+    }
+    const tree = views.get("tree");
+    const crl = views.get("crl");
+    const src = views.get("source");
+    if (tree) markDiverters(tree, segmentsFor(tree, nodeKeys).segmentIds);
+    if (crl) markDiverters(crl, segmentsFor(crl, nodeKeys).segmentIds);
+    if (src) markDiverters(src, segmentsFor(src, units).segmentIds); // empty units → silent source degrade
   }
 
   /**
@@ -984,6 +1060,13 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       // stale render posts a mark the webview drops. (cel pane carries no marker → skipped; its ack needs no re-drive.)
       if (pane === "tree" || pane === "crl" || pane === "source" || pane === "questionnaire") {
         driveThisNode();
+      }
+      // disc 164: the diverter overlay paints tree/crl/source only (never the questionnaire pane), so re-drive it on JUST
+      // those acks — a fresh render lost its `.diverter` classes (and the ack's postReveal re-posted the highlight, whose
+      // clrDV cleared them). NOT on a questionnaire-only ack (nav): tree/crl/source didn't re-render, their marks survive,
+      // so re-running buildQuestionnaire there would be pure churn (gpt55 impl review, disc 164).
+      if (pane === "tree" || pane === "crl" || pane === "source") {
+        driveDiverters();
       }
     } else if (msg.type === "fcMode" && (msg.mode === "blocking" || msg.mode === "all")) {
       applyFailedCriteriaMode(msg.mode); // the tree-pane segmented toggle
@@ -1188,6 +1271,9 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     // render above) — re-drive the "this node" marker so the freshly rendered panes paint the focused question's node.
     // Same self-healing-on-ack contract as driveDoneOverlay (each pane's ack re-drives). Inert in cockpit (clears).
     driveThisNode();
+    // disc 164: the rebuilt panes lost their `.diverter` classes — re-drive the produced-path diverter overlay too
+    // (same self-healing-on-ack contract; each pane's ack also re-drives). Inert in cockpit / for a no-diverter case.
+    driveDiverters();
   }
 
   /** On a discovery/build failure, drop stale provenance so the panes never stay interactive with wrong data. */
@@ -1632,6 +1718,14 @@ function shellHtml(): string {
 .crl-mark{display:inline-block;font-size:.75em;padding:0 3px;margin-right:3px;border-radius:3px;opacity:.85;border:1px solid var(--vscode-panel-border,#454545)}
 .crl-concept-name{font-weight:bold}
 .crl-concept-def{opacity:.7;font-size:.95em}
+/* disc 164: the produced-path DIVERTER overlay — the evaluated-false when-criteria that routed the case to its PRODUCED
+   disposition (the Adult gate for a not-adult deny). A DISTINCT channel from .current (the produced cluster), the
+   failed-criterion peek (empty for a pass), and .this-node (focus). Selection-coupled like .failed-criterion (cleared
+   by highlight/clearHighlight, re-marked post-dispatch). NEUTRAL teal DOTTED outline — NOT red (these denies are CORRECT,
+   red would read as failure); distinct style (dotted) from the dashed failed-criterion channels. Ordered BEFORE
+   .failed-criterion (same outline property + specificity → source order decides) so a real blocker's red wins over a
+   diverter's teal on the rare overlap — matching the tree precedence in flowPaneHtml (gpt55 impl review, disc 164). */
+.diverter{outline:2px dotted var(--vscode-terminal-ansiCyan,#4ec9b0);outline-offset:1px}
 .failed-criterion{outline:2px dashed var(--vscode-editorError-foreground,#f14c4c);outline-offset:1px}
 .failed-criterion-preempt{outline:2px dashed var(--vscode-charts-yellow,#d29922);outline-offset:1px}
 /* #177 slice 4: the "this node" cross-pane marker on the HTML panes (crl + source). ONLY a left-edge accent BAR (inset
@@ -1681,14 +1775,18 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   // selection channel (highlight/clearHighlight), so `.this-node` SURVIVES a cockpit reveal (it tracks the focused QUESTION,
   // not the selection — it moves only when the case or the question changes, the done-overlay lifecycle).
   `const clrTN=()=>{for(const el of root.querySelectorAll('.this-node'))el.classList.remove('this-node');};` +
+  // disc 164: the produced-path diverter clear. Like clrFC (and UNLIKE clrTN/clrRO) it IS called by the selection channel
+  // (highlight/clearHighlight) — the diverters are per-selected-case, so they clear on a reveal and the same-selection
+  // markDiverters (a later post-dispatch post) re-applies; the NEXT selection's reveal drops them.
+  `const clrDV=()=>{for(const el of root.querySelectorAll('.diverter'))el.classList.remove('diverter');};` +
   `window.addEventListener('message',(e)=>{const m=e.data;` +
   `if(m.type==='render'){gen=m.gen;root.innerHTML=m.html;fcc.innerHTML='';v.postMessage({type:'ready',gen:m.gen,indexVersion:m.indexVersion});}` +
   // The at-rest selection channel (.current). Clearing/applying it ALSO wipes the failed-criterion overlay — so the
   // NEXT engine reveal (a new selection / clear) drops the overlay; the SAME selection's failed-criteria mark arrives
   // AFTER this message (a later post) and so survives (#173 overlay lifecycle, disc 159). NEVER calls clrRO (#156 slice 5).
-  `else if(m.type==='clearHighlight'){for(const el of root.querySelectorAll('.current'))el.classList.remove('current');clrFC();}` +
+  `else if(m.type==='clearHighlight'){for(const el of root.querySelectorAll('.current'))el.classList.remove('current');clrFC();clrDV();}` +
   `else if(m.type==='highlight'){if(m.gen!==gen)return;` + // drop a reveal aimed at a superseded render
-  `for(const el of root.querySelectorAll('.current'))el.classList.remove('current');clrFC();` +
+  `for(const el of root.querySelectorAll('.current'))el.classList.remove('current');clrFC();clrDV();` +
   `for(const id of m.segmentIds){const el=document.getElementById(id);if(el)el.classList.add('current');}` +
   `const t=document.getElementById(m.scrollTo);if(t)t.scrollIntoView({block:'center'});}` +
   // The DISTINCT failed-criterion overlay channel (.failed-criterion). Gen-guarded like .current; replaces the prior
@@ -1718,6 +1816,12 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   `else if(m.type==='clearThisNode'){clrTN();}` +
   `else if(m.type==='markThisNode'){if(m.gen!==gen)return;clrTN();` +
   `for(const id of (m.segmentIds||[])){const el=document.getElementById(id);if(el)el.classList.add('this-node');}}` +
+  // disc 164: the produced-path diverter channel (.diverter). Gen-guarded clear-then-set like the others; coexists with
+  // .current/.failed-criterion/.this-node/the review overlay (independent class). No scroll (the .current reveal already
+  // scrolls to the produced cluster; the diverter is a secondary rationale highlight, must not yank the pane).
+  `else if(m.type==='clearDiverters'){clrDV();}` +
+  `else if(m.type==='markDiverters'){if(m.gen!==gen)return;clrDV();` +
+  `for(const id of (m.segmentIds||[])){const el=document.getElementById(id);if(el)el.classList.add('diverter');}}` +
   // The tree-pane chrome (toggle + gap banner) — injected ABOVE #root so it never clobbers the flowchart.
   `else if(m.type==='fcChrome'){fcc.innerHTML=m.html;}});` +
   // #156 slice 4: a worklist checkbox click is intercepted BEFORE the [data-reveal] case-select path — the checkbox

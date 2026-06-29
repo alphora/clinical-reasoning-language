@@ -167,6 +167,29 @@ check("#177 slice 4: .this-node marker uses a PROVEN stroke (NOT outline), wins 
   }
 });
 
+check("disc 164: .diverter overlay uses a stroke (NOT outline/fill), ordered AFTER .current but BEFORE .failed-criterion, and .this-node still wins", () => {
+  const rule = FLOW_STYLE.match(/\.flow-row\.diverter>rect\{([^}]*)\}/);
+  assert.ok(rule, ".flow-row.diverter>rect rule present");
+  assert.match(rule[1], /stroke:/, "diverter marks via stroke (the proven-painting SVG axis; outline does not paint here)");
+  assert.ok(!/outline/.test(rule[1]), "diverter does NOT use outline on the SVG rect");
+  assert.ok(!/[^-]fill:/.test(rule[1]), "diverter sets NO fill — it is a stroke channel");
+  assert.match(rule[1], /stroke-dasharray:1 3/, "dotted (1 3) — distinct from the dashed (4 2) failed-criterion channels");
+  // Ordered BEFORE .failed-criterion so a real blocker (red) wins over a diverter on the rare fail-overlap; AFTER .current.
+  assert.ok(
+    FLOW_STYLE.indexOf(".flow-row.current>rect{") < FLOW_STYLE.indexOf(".flow-row.diverter>rect{"),
+    ".diverter>rect comes after .current>rect",
+  );
+  assert.ok(
+    FLOW_STYLE.indexOf(".flow-row.diverter>rect{") < FLOW_STYLE.indexOf(".flow-row.failed-criterion>rect{"),
+    ".diverter>rect comes BEFORE .failed-criterion>rect (a blocker stroke wins over a diverter on overlap)",
+  );
+  // And the focus marker still wins over the diverter (this-node is ordered last among strokes).
+  assert.ok(
+    FLOW_STYLE.indexOf(".flow-row.diverter>rect{") < FLOW_STYLE.indexOf(".flow-row.this-node>rect{"),
+    ".this-node>rect comes AFTER .diverter>rect (focus overrides the diverter overlay)",
+  );
+});
+
 check("XSS: labels are escaped in <text> and <title>", () => {
   const evil = renderFlowPane([{ decision: 'X"><script>alert(1)</script>', lib: "Pol", nodeKey: "d:x", location: {}, children: [] }]);
   assert.ok(!/<script>/.test(evil.html), "no raw <script>");

@@ -232,6 +232,11 @@ export const FLOW_STYLE =
   `.flow-peek-asserted>circle{fill:var(--vscode-charts-blue,#3794ff)}` +
   `.flow-peek-inferred>circle{fill:var(--vscode-charts-purple,#c586c0)}` +
   `.flow-row.current>rect{stroke:var(--vscode-focusBorder,#3794ff);stroke-width:2.5}` +
+  // disc 164: the produced-path DIVERTER overlay on the SVG rect (the shell's HTML `.diverter` outline does not paint on
+  // a <g>, same as the channels below). A neutral teal DOTTED stroke for the evaluated-false `when`s that routed the case
+  // to its produced disposition (the Adult gate for a not-adult deny). Ordered BEFORE `.failed-criterion` so a blocker
+  // (red) wins over a diverter on the rare fail-overlap; `.this-node` (last) still wins over both (focus is primary).
+  `.flow-row.diverter>rect{stroke:var(--vscode-terminal-ansiCyan,#4ec9b0);stroke-width:2;stroke-dasharray:1 3}` +
   // #173 T3: the failed-criterion overlay on an SVG <g> — the shell's global `.failed-criterion` HTML outline does not
   // paint on a <g>, so paint the rect (a dashed error-colored stroke, visually distinct from `.current`'s solid focus).
   `.flow-row.failed-criterion>rect{stroke:var(--vscode-editorError-foreground,#f14c4c);stroke-width:2.5;stroke-dasharray:4 2}` +
@@ -256,7 +261,7 @@ export const FLOW_STYLE =
   // this repo's evidence is that `outline` does NOT paint on the SVG here, which is exactly why those switched to stroke).
   // It COEXISTS with `.done-node`/`.error-node` (those are `fill` — fill + stroke layer fine: a done node that's the focused
   // question shows the green fill AND this accent border). Against the OTHER stroke channels (`.current`/`.failed-criterion`/
-  // `-preempt`) it deliberately WINS: it is ordered LAST among the stroke rules (after them in the sheet, equal specificity),
+  // `-preempt`/`.diverter`) it deliberately WINS: it is ordered LAST among the stroke rules (after them in the sheet, equal specificity),
   // so on a node that is BOTH the focused question and selected/a-criterion the focused-question marker (the primary
   // indicator) overrides the transient selection/criterion stroke (the right tradeoff). The color is a DISTINCT accent
   // (`--vscode-charts-orange`), NOT the blue `--vscode-focusBorder` the reveal (`.current`) uses — blue means "selected /

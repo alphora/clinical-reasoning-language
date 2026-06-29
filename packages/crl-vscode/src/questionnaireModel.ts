@@ -67,6 +67,22 @@ export interface Questionnaire {
   note?: string;
 }
 
+/**
+ * disc 164: the produced-path DIVERTERS — the runtime nodeIds of the evaluated-false ("no") questions on the fired path,
+ * IFF a disposition was ACTUALLY produced (`outcome != null`). These are the criteria that, by being false, routed the case
+ * to its produced disposition (the Adult gate for a not-adult deny); the cockpit re-roots them to a distinct source/tree/crl
+ * overlay so the validator sees WHY the case got its outcome. Reuses the ONE fired-path authority (`buildQuestionnaire`) — no
+ * second walk, no drift. EMPTY for a `blocked`/`blocked-guard`/`error` terminal: with NOTHING produced, "why the produced
+ * disposition" is undefined, and a `blocked-guard` emits a false GUARD question (the action node) that must NOT be lit as a
+ * diverter (gpt55 impl review, disc 164). EMPTY for `empty` too (zero questions). Inherits `buildQuestionnaire`'s `all:`
+ * limitation (a non-idiomatic `all:` of sibling whens can surface an off-arm false `when`); the medical-policy model is
+ * nested `first:`, so in practice every "no" is a true on-path diverter.
+ */
+export function producedPathDiverterIds(q: Questionnaire): string[] {
+  if (q.outcome === null) return [];
+  return q.questions.filter((x) => x.answer === "no").map((x) => x.nodeId);
+}
+
 /** Resolve the value types a concept declares. Injected so the builder is decoupled from the shell's
  *  nodeKey/conceptByKey wiring (slice 3 supplies the real one; the test a stub). `lib` is the FRAME lib
  *  (the concept's own `libraryName` when qualified, else the current walk frame). */

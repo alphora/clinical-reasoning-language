@@ -234,4 +234,59 @@ check("HOST FIX 1: the questionnaire render-capture clamps currentQuestionIndex 
   assert.ok(assignIdx !== -1 && clampIdx !== -1 && assignIdx < clampIdx, "the clamp runs AFTER questionNodeIds is reassigned (clamps against THIS render's list)");
 });
 
+// ── disc 164: the produced-path DIVERTER channel (.diverter) — SELECTION-COUPLED (clears on reveal, like .failed-criterion;
+//    UNLIKE the survives-reveal marker/review channels), its own independent class, gen-guarded clear-then-set ──
+check("sanity: the diverter handlers + clrDV exist in the extracted script", () => {
+  assert.match(SCRIPT, /const clrDV=\(\)=>\{/, "clrDV is defined");
+  assert.match(SCRIPT, /if\(m\.type==='markDiverters'\)/, "markDiverters handler");
+  assert.match(SCRIPT, /if\(m\.type==='clearDiverters'\)/, "clearDiverters handler");
+});
+
+check("SELECTION-COUPLED: clrDV IS called by BOTH highlight and clearHighlight (the diverter overlay clears on a reveal, like .failed-criterion)", () => {
+  for (const type of ["highlight", "clearHighlight"]) {
+    const body = handlerBody(type);
+    assert.ok(/clrDV\(\)/.test(body), `${type} clears the diverter channel (selection-coupled — the same-click markDiverters re-applies post-dispatch)`);
+  }
+});
+
+check("clrDV strips ONLY the .diverter class, never the other channels", () => {
+  const m = SCRIPT.match(/const clrDV=\(\)=>\{[^}]*\};/);
+  assert.ok(m, "clrDV body");
+  assert.ok(!/current|failed-criterion|done-node|error-node|this-node/.test(m[0]), "clrDV strips only .diverter");
+});
+
+check("GEN-GUARD: markDiverters drops a mark aimed at a superseded render (clear-then-set); clearDiverters is ungated", () => {
+  const mark = handlerBody("markDiverters");
+  assert.ok(/if\(m\.gen!==gen\)return;/.test(mark), "markDiverters is gen-guarded like the other channels");
+  assert.ok(/clrDV\(\);/.test(mark), "markDiverters clears the prior overlay first (clear-then-set)");
+  assert.ok(/add\('diverter'\)/.test(mark), "markDiverters adds .diverter for each segment id");
+  const clear = handlerBody("clearDiverters");
+  assert.ok(!/m\.gen!==gen/.test(clear), "clearDiverters is ungated (a class-strip is always safe)");
+});
+
+check("the diverter handlers touch ONLY the .diverter class (independent of every other overlay)", () => {
+  for (const type of ["markDiverters", "clearDiverters"]) {
+    const body = handlerBody(type);
+    assert.ok(!/current|failed-criterion|done-node|error-node|this-node/.test(body), `${type} touches only .diverter`);
+  }
+});
+
+check("HOST: driveDiverters is MV-only, fired-path-authority-driven, and wired post-dispatch + on the pane ack", () => {
+  // Post-dispatch: alongside the failed-criterion peek (same selection-coupled timing/ordering invariant).
+  assert.ok(/driveFailedCriteriaPeek\(\);[\s\S]{0,700}?driveDiverters\(\);/.test(COCKPIT_SRC), "driveDiverters runs post-dispatch right after the failed-criterion peek");
+  // Pane-ack: the diverter overlay re-drives when a marker-bearing pane re-renders (its `ready` ack), like driveThisNode.
+  assert.ok(
+    /pane === "tree" \|\| pane === "crl" \|\| pane === "source" \|\| pane === "questionnaire"\)\s*\{\s*driveThisNode\(\);[\s\S]*?driveDiverters\(\);/.test(COCKPIT_SRC),
+    "the ack handler re-drives driveDiverters for the rebuilt panes (alongside driveThisNode)",
+  );
+  const m = COCKPIT_SRC.match(/function driveDiverters\([^)]*\)[^{]*\{([\s\S]*?)\n  \}/);
+  assert.ok(m, "driveDiverters is defined");
+  const body = m[1];
+  assert.ok(/mode !== "medical-validation"[\s\S]*?clearAllDiverters\(\)/.test(body), "MV-only — clears the overlay in cockpit mode");
+  assert.ok(/status === "error"[\s\S]*?clearAllDiverters\(\)/.test(body), "clears for an errored case (no fired path)");
+  assert.ok(/diverterIds\.length === 0[\s\S]*?clearAllDiverters\(\)/.test(body), "clears when there are zero diverters (no stale overlay)");
+  assert.ok(/producedPathDiverterIds\(q\)/.test(body), "diverters via producedPathDiverterIds (the gated fired-path authority — the q.outcome gate keeps blocked terminals from lighting)");
+  assert.ok(/resolveThisNode\(/.test(body), "re-roots each diverter via the marker's runtime-id→nodeKey+units join");
+});
+
 console.log(`\ncockpitWebviewScript.test: ${pass} checks passed`);
