@@ -1,4 +1,4 @@
-library "CMS69 Terminology"
+library "CMS69 Concepts"
 
 using FHIR version '4.0.1'
 

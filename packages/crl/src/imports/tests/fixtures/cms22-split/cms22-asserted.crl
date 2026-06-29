@@ -1,7 +1,7 @@
 # CMS22 asserted concepts (test)
 library "CMS22 Asserted".
-include "CMS22 Terminology".
+include "CMS22 Concepts".
 
 concept "Qualifying Encounter Source":
 - type is Encounter.
-- coded from "CMS22 Terminology"."Qualifying Encounters Valueset".
+- coded from "CMS22 Concepts"."Qualifying Encounters Valueset".

@@ -394,7 +394,7 @@ my-cms22/                              ← project root
 │   ├── cms22.crl                      ← the root file (or any other; CLI takes --path)
 │   ├── cms22-inferred.crl
 │   ├── cms22-asserted.crl
-│   └── cms22-terminology.crl
+│   └── cms22-concepts.crl
 └── tests/...
 ```
 
@@ -718,7 +718,7 @@ node dist/cli/run-emitter.js \
 ```
 
 The emitter produces four CQL files: `CMS22.cql` (the interface),
-`CMS22 Inferred.cql`, `CMS22 Asserted.cql`, `CMS22 Terminology.cql`.
+`CMS22 Inferred.cql`, `CMS22 Asserted.cql`, `CMS22 Concepts.cql`.
 Cross-library refs emit as CQL native `"OtherLib"."Name"` so the
 generated CQL has a self-contained dependency graph. See
 `cms22-split/NOTES.md` for layout details.

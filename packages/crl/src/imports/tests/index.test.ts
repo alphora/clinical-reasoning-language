@@ -20,7 +20,7 @@ describe("resolveImports (end-to-end)", () => {
     const errs = graph.diagnostics.filter((d) => d.severity === "error");
     expect(errs).toHaveLength(0);
     expect(graph.resolvedLibraries.map((e) => e.name)).toEqual([
-      "CMS22 Terminology",
+      "CMS22 Concepts",
       "CMS22 Asserted",
       "CMS22 Inferred",
       "CMS22",

@@ -19,8 +19,8 @@ const METADATA: CpgMetadata = {
 
 const FIXED_CLOCK = () => new Date("2026-06-04T15:30:00.000Z");
 
-const VS_ANTI = "http://hl7.org/fhir/us/cqfmeasures/crl/cms22/ValueSet/cms22-terminology-antihypertensive-medications-vs";
-const VS_BP = "http://hl7.org/fhir/us/cqfmeasures/crl/cms22/ValueSet/cms22-terminology-blood-pressure-panels-vs";
+const VS_ANTI = "http://hl7.org/fhir/us/cqfmeasures/crl/cms22/ValueSet/cms22-concepts-antihypertensive-medications-vs";
+const VS_BP = "http://hl7.org/fhir/us/cqfmeasures/crl/cms22/ValueSet/cms22-concepts-blood-pressure-panels-vs";
 
 describe("library — emitLibrary", () => {
   it("emits a base FHIR R4 Library with correct shape", () => {

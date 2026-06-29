@@ -1,6 +1,6 @@
-# CMS69 Terminology
+# CMS69 Concepts
 
-library "CMS69 Terminology".
+library "CMS69 Concepts".
 
 // Migrated to CRL v0.7: `concept` is the only declaration kind;
 // `definition is` body for narrative predicates; concept `defined as`

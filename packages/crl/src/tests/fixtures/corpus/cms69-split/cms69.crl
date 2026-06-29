@@ -5,7 +5,7 @@ library "CMS69".
 // (IP / Denom / Numerator / Exclusions / Exceptions — what the Measure
 // evaluation engine consumes). Asserted concepts, inferred derivations,
 // and terminology live in cms69-asserted.crl / cms69-inferred.crl /
-// cms69-terminology.crl.
+// cms69-concepts.crl.
 
 // ============ Measure API ============
 

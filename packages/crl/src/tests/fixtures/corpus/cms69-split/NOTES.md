@@ -10,14 +10,14 @@ mirroring the cms22-split layout.
 | `cms69.crl` | `"CMS69"` | interface | Initial Population / Numerator / Denominator / Exclusions / Exceptions — the Quality Measure API (what the Measure evaluation engine consumes) |
 | `cms69-inferred.crl` | `"CMS69 Inferred"` | inferred | `defined as` + `definition is` concepts: lifted property concepts, BMI classifications, intervention bundles, pregnancy logic, age predicate |
 | `cms69-asserted.crl` | `"CMS69 Asserted"` | asserted | `coded from` concepts (asserted FHIR resource-to-valueset bindings) |
-| `cms69-terminology.crl` | `"CMS69 Terminology"` | terminology | terminology declarations (valuesets, codes) + the Measurement Period runtime parameter (declarative since v2.2.0) |
+| `cms69-concepts.crl` | `"CMS69 Concepts"` | terminology | terminology declarations (valuesets, codes) + the Measurement Period runtime parameter (declarative since v2.2.0) |
 
 The unsuffixed file (`cms69.crl`) is the interface layer — this matches
 the CQL convention where `CMS69.cql` is the entry point downstream consumers
 (FHIR Measure resources, registries) reference.
 
 Cross-layer refs use the qualified `"OtherLib"."Name"` syntax (e.g.
-`coded from "CMS69 Terminology"."Body Mass Index Observations"`). Per
+`coded from "CMS69 Concepts"."Body Mass Index Observations"`). Per
 v2.1.0 lock 026, local sibling libraries auto-resolve via qualified refs
 without an `include`, so none of these files carry an `include` line. The
 per-CRL emitter still produces a self-contained CQL dependency graph by
@@ -38,7 +38,7 @@ node dist/cli/run-emitter.js \
 ```
 
 v2.1.0 per-CRL emit produces one `.cql` file per CRL library:
-`CMS69.cql`, `CMS69 Inferred.cql`, `CMS69 Asserted.cql`, `CMS69 Terminology.cql`.
+`CMS69.cql`, `CMS69 Inferred.cql`, `CMS69 Asserted.cql`, `CMS69 Concepts.cql`.
 Cross-library refs emit as CQL native `"OtherLib"."Name"`.
 
 To validate:

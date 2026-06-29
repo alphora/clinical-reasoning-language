@@ -5,7 +5,7 @@ library "CMS22".
 // (IP / Denom / Numerator / Exclusions / Exceptions — what the Measure
 // evaluation engine consumes). Asserted concepts, inferred derivations,
 // and terminology live in cms22-asserted.crl / cms22-inferred.crl /
-// cms22-terminology.crl.
+// cms22-concepts.crl.
 
 // ============ Measure API ============
 

@@ -21,13 +21,13 @@ describe("findProjectRoot", () => {
 });
 
 describe("buildRegistry", () => {
-  it("registers all libraries in cms22-split (4 layers: interface, inferred, asserted, terminology)", () => {
+  it("registers all libraries in cms22-split (4 layers: interface, inferred, asserted, concepts)", () => {
     const projectRoot = path.join(FIXTURES, "cms22-split");
     const { registry, diagnostics } = buildRegistry(projectRoot);
     expect(registry.byNameLocal.has("CMS22")).toBe(true);
     expect(registry.byNameLocal.has("CMS22 Inferred")).toBe(true);
     expect(registry.byNameLocal.has("CMS22 Asserted")).toBe(true);
-    expect(registry.byNameLocal.has("CMS22 Terminology")).toBe(true);
+    expect(registry.byNameLocal.has("CMS22 Concepts")).toBe(true);
     expect(diagnostics.filter((d) => d.severity === "error")).toHaveLength(0);
   });
 

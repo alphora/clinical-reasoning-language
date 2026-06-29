@@ -11,20 +11,20 @@ describe("overlay support (Chunk B prep)", () => {
     const overlays = new Map<string, string>([
       [
         rootPath,
-        `# Overlay-overridden cms22\nlibrary "OverlayCMS22".\n\nconcept "Overlay Concept":\n- type is Encounter.\n- coded from "CMS22 Terminology"."Qualifying Encounters Valueset".\n`,
+        `# Overlay-overridden cms22\nlibrary "OverlayCMS22".\n\nconcept "Overlay Concept":\n- type is Encounter.\n- coded from "CMS22 Concepts"."Qualifying Encounters Valueset".\n`,
       ],
     ]);
     const graph = resolveImports(rootPath, { overlays });
     // Root library name comes from the OVERLAY, not the disk file.
     const root = graph.resolvedLibraries[graph.resolvedLibraries.length - 1];
     expect(root.name).toBe("OverlayCMS22");
-    // Disk siblings are still discovered (CMS22 Terminology lives on disk).
+    // Disk siblings are still discovered (CMS22 Concepts lives on disk).
     // They land in localLibraries when not include-walked from this overlay root.
     const knownLibNames = [
       ...graph.resolvedLibraries.map((e) => e.name),
       ...graph.localLibraries.map((e) => e.name),
     ];
-    expect(knownLibNames).toContain("CMS22 Terminology");
+    expect(knownLibNames).toContain("CMS22 Concepts");
   });
 
   it("validateCRLImports threads overlays through to the resolver", () => {

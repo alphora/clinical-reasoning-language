@@ -93,7 +93,7 @@ include "Bar" version '1.0.0'.
     it("parses library followed by multiple includes", () => {
       const input = `# CMS22
 library "CMS22".
-include "CMS22 Terminology".
+include "CMS22 Concepts".
 include "CMS22 Asserted".
 include "CMS22 Inferred".
 include "CMS22 Interface".

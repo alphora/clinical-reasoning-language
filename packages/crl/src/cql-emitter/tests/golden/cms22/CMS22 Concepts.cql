@@ -1,4 +1,4 @@
-library "CMS22 Terminology"
+library "CMS22 Concepts"
 
 using FHIR version '4.0.1'
 

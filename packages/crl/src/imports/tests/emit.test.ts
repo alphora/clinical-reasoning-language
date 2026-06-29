@@ -18,13 +18,13 @@ describe("emitCQLImports (per-CRL v2.1.0)", () => {
     expect(result.success).toBe(true);
 
     // Every library in the include-walk closure gets its own CQL.
-    // 4 layers: cms22 (interface) → inferred → asserted → terminology.
+    // 4 layers: cms22 (interface) → inferred → asserted → concepts.
     const names = result.cqlByLibrary.map((e) => e.libraryName).sort();
     expect(names).toEqual([
       "CMS22",
       "CMS22 Asserted",
+      "CMS22 Concepts",
       "CMS22 Inferred",
-      "CMS22 Terminology",
     ]);
 
     // The interface library (the unsuffixed file) emits as `library CMS22`
@@ -58,8 +58,8 @@ describe("emitCQLImports (per-CRL v2.1.0)", () => {
       expect(entry.cql).toMatch(/using FHIR version/);
     }
 
-    // Terminology lives in the terminology library only.
-    const term = findLib(result, "CMS22 Terminology") ?? "";
+    // Terminology lives in the concepts library only.
+    const term = findLib(result, "CMS22 Concepts") ?? "";
     expect(term).toMatch(/valueset "Qualifying Encounters Valueset"/);
     // And the interface library does NOT inline the terminology.
     expect(cms22).not.toMatch(/valueset "Qualifying Encounters Valueset"/);

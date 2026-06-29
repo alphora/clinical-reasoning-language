@@ -34,7 +34,7 @@ describe("walkIncludes", () => {
     const { resolvedLibraries, diagnostics } = walkIncludes(root, registry);
     expect(diagnostics.filter((d) => d.severity === "error")).toHaveLength(0);
     expect(resolvedLibraries.map((e) => e.name)).toEqual([
-      "CMS22 Terminology",
+      "CMS22 Concepts",
       "CMS22 Asserted",
       "CMS22 Inferred",
       "CMS22",

@@ -1,6 +1,6 @@
-# CMS22 Terminology
+# CMS22 Concepts
 
-library "CMS22 Terminology".
+library "CMS22 Concepts".
 
 // Migrated to CRL v0.7: `concept` is the only declaration kind; `definition is` body for narrative predicates;
 // concept `defined as` body is bare ref or sem-or/sem-and/sem-not composition.
