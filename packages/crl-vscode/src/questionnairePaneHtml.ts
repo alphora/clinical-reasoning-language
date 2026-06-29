@@ -222,4 +222,4 @@ export const QUESTIONNAIRE_STYLE =
   // `.current` (outline) on the row and the `.q-opt-answer` find-match fill on the option spans: box-shadow/background-color
   // are independent axes from outline. The same marker channel paints the tree/crl/source panes (the shell posts
   // markThisNode); this rule is the questionnaire pane's leg of it.
-  `.q-item.this-node{box-shadow:inset 3px 0 0 var(--vscode-focusBorder,#3794ff);background:var(--vscode-list-inactiveSelectionBackground,rgba(120,170,255,.12))}`;
+  `.q-item.this-node{box-shadow:inset 3px 0 0 var(--vscode-charts-orange,#d18616);background:rgba(209,134,22,.12)}`;

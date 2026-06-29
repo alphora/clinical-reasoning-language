@@ -1639,7 +1639,7 @@ function shellHtml(): string {
    .current's find-match wash on a node that is BOTH selected and the focused question (a legal coexistence). box-shadow is
    an independent axis from .current's outline+background and .failed-criterion's dashed outline, so the bar layers cleanly.
    Tree leg in FLOW_STYLE (a stroke); questionnaire leg in QUESTIONNAIRE_STYLE (a bar + wash — that pane never gets .current). */
-.this-node{box-shadow:inset 3px 0 0 var(--vscode-focusBorder,#3794ff)}
+.this-node{box-shadow:inset 3px 0 0 var(--vscode-charts-orange,#d18616)}
 .failed-criterion-preempt::after{content:" ◂ diverted here";color:var(--vscode-charts-yellow,#d29922);font-size:.85em;opacity:.9}
 #fcChrome{white-space:normal}
 #fcChrome:empty{display:none}

@@ -258,6 +258,8 @@ export const FLOW_STYLE =
   // question shows the green fill AND this accent border). Against the OTHER stroke channels (`.current`/`.failed-criterion`/
   // `-preempt`) it deliberately WINS: it is ordered LAST among the stroke rules (after them in the sheet, equal specificity),
   // so on a node that is BOTH the focused question and selected/a-criterion the focused-question marker (the primary
-  // indicator) overrides the transient selection/criterion stroke (the right tradeoff). A bright solid focus-colored border,
-  // thicker than `.current` (2.5) so it reads as the marker; `stroke-dasharray:none` clears any inherited dash.
-  `.flow-row.this-node>rect{stroke:var(--vscode-focusBorder,#3794ff);stroke-width:3;stroke-dasharray:none}`;
+  // indicator) overrides the transient selection/criterion stroke (the right tradeoff). The color is a DISTINCT accent
+  // (`--vscode-charts-orange`), NOT the blue `--vscode-focusBorder` the reveal (`.current`) uses — blue means "selected /
+  // on the path", so the focus ("the question you're on") must read differently from a path node (it is not on the path,
+  // e.g. a not-adult deny whose Q1 `when` isn't in the reveal cluster). Thicker than `.current` (2.5); `stroke-dasharray:none`.
+  `.flow-row.this-node>rect{stroke:var(--vscode-charts-orange,#d18616);stroke-width:3;stroke-dasharray:none}`;
