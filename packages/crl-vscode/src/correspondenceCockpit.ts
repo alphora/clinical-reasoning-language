@@ -237,6 +237,10 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   // The All/Blocking toggle (default Blocking). Cached from `crl.cockpit.failedCriteriaMode`; the tree pane's
   // segmented control + a settings edit both route through `applyFailedCriteriaMode`.
   let failedCriteriaMode: "blocking" | "all" = "blocking";
+  // disc 164 (operator follow-on): the produced-path diverter overlay is OFF by default — it adds a lot of ink (a not-adult
+  // deny lights both indications), so the validator opts in per session/workspace. Config-backed + live like failedCriteriaMode
+  // (`crl.cockpit.showDiverters`, default false), toggled from the tree chrome (MV mode only — diverters never paint in cockpit).
+  let showDiverters = false;
   /** Concept keys that have ≥1 source-bearing unit OR ≥1 CRL row — the gate for a fact being a clickable peek anchor
    *  (recomputed from crlMaps each rebuild; read at CEL render time, mirroring caseIdByName). */
   let revealableConceptKeys: ReadonlySet<string> = new Set();
@@ -579,6 +583,15 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     const toggle =
       `<div class="fc-toggle" title="Which failed criteria to highlight for the selected case">` +
       `<span class="fc-toggle-label">Failed criteria:</span>${btn("blocking", "Blocking")}${btn("all", "All")}</div>`;
+    // disc 164 (operator follow-on): the produced-path diverter overlay on/off. MV-only (diverters never paint in cockpit
+    // mode); persisted SHARED under crl.cockpit, default OFF. Two buttons mirror the fc toggle's active-state idiom.
+    const dbtn = (on: boolean, label: string): string =>
+      `<button class="fc-toggle-btn${showDiverters === on ? " fc-active" : ""}" data-diverter-toggle="${on ? "1" : "0"}">${label}</button>`;
+    const diverterToggle =
+      mode === "medical-validation"
+        ? `<div class="fc-toggle" title="Highlight the criteria that, by being false, routed each case to its produced outcome (the 'no' answers on the fired path)">` +
+          `<span class="fc-toggle-label">Diverters:</span>${dbtn(false, "Off")}${dbtn(true, "On")}</div>`
+        : "";
     let banner = "";
     if (fcGapDisabledMsg) {
       banner = `<div class="fc-gaps fc-gaps-disabled">${escapeHtml(fcGapDisabledMsg)}</div>`;
@@ -593,7 +606,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       banner =
         `<div class="fc-gaps"><div class="fc-gaps-head">Couldn't locate the CRL row for:</div>${rows}</div>`;
     }
-    return progress + toggle + banner;
+    return progress + toggle + diverterToggle + banner;
   }
 
   /** Push the current tree-pane chrome (toggle + gap banner) to the tree webview, if open. Does NOT re-render the
@@ -843,7 +856,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
    * per-case memo keyed on the selected caseId is the optimization if policies ever grow large.
    */
   function driveDiverters(): void {
-    if (mode !== "medical-validation") {
+    if (mode !== "medical-validation" || !showDiverters) {
       clearAllDiverters();
       return;
     }
@@ -1032,7 +1045,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
 
   function onWebviewMessage(
     pane: Pane,
-    msg: { type?: string; gen?: number; key?: string; mode?: string; idx?: number; dir?: string },
+    msg: { type?: string; gen?: number; key?: string; mode?: string; idx?: number; dir?: string; on?: string },
   ): void {
     const v = views.get(pane);
     if (!v) return;
@@ -1068,6 +1081,8 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       if (pane === "tree" || pane === "crl" || pane === "source") {
         driveDiverters();
       }
+    } else if (msg.type === "diverterToggle" && (msg.on === "1" || msg.on === "0")) {
+      applyShowDiverters(msg.on === "1"); // disc 164: the tree-pane diverter on/off toggle (MV)
     } else if (msg.type === "fcMode" && (msg.mode === "blocking" || msg.mode === "all")) {
       applyFailedCriteriaMode(msg.mode); // the tree-pane segmented toggle
     } else if (msg.type === "fcOpenSource" && typeof msg.idx === "number") {
@@ -1393,6 +1408,8 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     // cross-surface; the scenarioRunner reads the same key), regardless of panel mode.
     const fcm = vscode.workspace.getConfiguration("crl.cockpit", uri).get<string>("failedCriteriaMode");
     failedCriteriaMode = fcm === "all" ? "all" : "blocking";
+    // disc 164: the diverter overlay's persisted on/off (SHARED under crl.cockpit like failedCriteriaMode; default OFF).
+    showDiverters = vscode.workspace.getConfiguration("crl.cockpit", uri).get<boolean>("showDiverters") ?? false;
     // FIX 5: retitle any already-open pane in place for the new mode (settable property), then let reconcilePaneOrder
     // open/dispose the delta for the new spec's order. ensurePane any not-yet-open visible pane. NO bulk dispose.
     for (const [pane, v] of views) v.panel.title = paneTitle(pane);
@@ -1512,6 +1529,28 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   function applyFailedCriteriaModeLive(next: "blocking" | "all"): void {
     failedCriteriaMode = next;
     driveFailedCriteriaPeek(); // recompute the overlay + gaps for the selected case in the new mode (renders chrome)
+  }
+
+  /** disc 164: apply a diverter-overlay on/off change — persist to config; the onDidChangeConfiguration branch is the
+   *  SINGLE live re-drive path (a settings.json edit behaves identically to the tree-chrome toggle). Mirrors applyFailedCriteriaMode. */
+  function applyShowDiverters(next: boolean): void {
+    if (next === showDiverters || !currentCel) {
+      renderTreeChrome(); // unchanged (or no cel) — still refresh the chrome so the active button reflects the click
+      return;
+    }
+    void vscode.workspace
+      .getConfiguration("crl.cockpit", vscode.Uri.file(currentCel))
+      .update("showDiverters", next)
+      .then(undefined, (e) =>
+        console.warn(`[crl.cockpit] could not persist showDiverters: ${e instanceof Error ? e.message : e}`),
+      );
+  }
+
+  /** Re-render the chrome + paint/clear the diverter overlay for the current selection under the new flag (the live path). */
+  function applyShowDivertersLive(next: boolean): void {
+    showDiverters = next;
+    driveDiverters(); // paint (on) or clear (off) the overlay for the current selection
+    renderTreeChrome(); // refresh the toggle's active button
   }
 
   /** Open the .crl source for a gap criterion's own location (disc 158 §Gap — the honest fallback when the exact CRL row
@@ -1647,6 +1686,12 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       const raw = vscode.workspace.getConfiguration("crl.cockpit", vscode.Uri.file(currentCel)).get<string>("failedCriteriaMode");
       const next = raw === "all" ? "all" : "blocking";
       if (next !== failedCriteriaMode) applyFailedCriteriaModeLive(next);
+    }
+    // disc 164: the diverter-overlay on/off toggle — same single live re-drive path (a settings.json edit re-paints
+    // identically to the tree-chrome toggle).
+    if (e.affectsConfiguration("crl.cockpit.showDiverters")) {
+      const raw = vscode.workspace.getConfiguration("crl.cockpit", vscode.Uri.file(currentCel)).get<boolean>("showDiverters") ?? false;
+      if (raw !== showDiverters) applyShowDivertersLive(raw);
     }
   });
 
@@ -1847,5 +1892,8 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   // Chrome clicks: the All/Blocking toggle (data-fc-mode) + a gap row's Open CRL source (data-fc-gap).
   `fcc.addEventListener('click',(e)=>{const mode=e.target.closest&&e.target.closest('[data-fc-mode]');` +
   `if(mode){v.postMessage({type:'fcMode',mode:mode.getAttribute('data-fc-mode')});return;}` +
+  // disc 164: the produced-path diverter overlay on/off toggle (MV chrome).
+  `const dv=e.target.closest&&e.target.closest('[data-diverter-toggle]');` +
+  `if(dv){v.postMessage({type:'diverterToggle',on:dv.getAttribute('data-diverter-toggle')});return;}` +
   `const gap=e.target.closest&&e.target.closest('[data-fc-gap]');` +
   `if(gap)v.postMessage({type:'fcOpenSource',idx:Number(gap.getAttribute('data-fc-gap'))});});`;

@@ -289,4 +289,27 @@ check("HOST: driveDiverters is MV-only, fired-path-authority-driven, and wired p
   assert.ok(/resolveThisNode\(/.test(body), "re-roots each diverter via the marker's runtime-id→nodeKey+units join");
 });
 
+check("disc 164: the diverter overlay is OFF by default, config-backed (crl.cockpit.showDiverters), and gated in driveDiverters", () => {
+  assert.ok(/let showDiverters = false;/.test(COCKPIT_SRC), "showDiverters defaults to false (overlay OFF by default)");
+  assert.ok(/get<boolean>\("showDiverters"\) \?\? false/.test(COCKPIT_SRC), "reads the persisted crl.cockpit.showDiverters (default false)");
+  assert.ok(/\.update\("showDiverters", next\)/.test(COCKPIT_SRC), "the toggle persists showDiverters to config");
+  assert.ok(/affectsConfiguration\("crl\.cockpit\.showDiverters"\)/.test(COCKPIT_SRC), "a settings.json edit re-drives live (config listener)");
+  const m = COCKPIT_SRC.match(/function driveDiverters\([^)]*\)[^{]*\{([\s\S]*?)\n  \}/);
+  assert.ok(m && /mode !== "medical-validation" \|\| !showDiverters/.test(m[1]), "driveDiverters clears unless MV mode AND showDiverters is on");
+});
+
+check("disc 164: the diverter on/off toggle round-trips (webview [data-diverter-toggle] → host applyShowDiverters), MV-only chrome", () => {
+  // Webview: a tree-chrome [data-diverter-toggle] click posts {type:'diverterToggle', on}.
+  assert.match(SCRIPT, /closest\('\[data-diverter-toggle\]'\)/, "the chrome click handler matches [data-diverter-toggle]");
+  assert.match(SCRIPT, /v\.postMessage\(\{type:'diverterToggle',on:dv\.getAttribute\('data-diverter-toggle'\)\}\)/, "posts {type:'diverterToggle', on}");
+  // Host: routes a guarded diverterToggle to applyShowDiverters(on === "1").
+  assert.ok(/msg\.type === "diverterToggle" && \(msg\.on === "1" \|\| msg\.on === "0"\)/.test(COCKPIT_SRC), "host guards diverterToggle on a 1|0 flag");
+  assert.ok(/applyShowDiverters\(msg\.on === "1"\)/.test(COCKPIT_SRC), "routes to applyShowDiverters(on)");
+  // Chrome: the toggle is rendered ONLY in medical-validation mode (diverters never paint in cockpit).
+  assert.ok(
+    /mode === "medical-validation"\s*\?\s*`<div class="fc-toggle"[\s\S]*?data-diverter-toggle/.test(COCKPIT_SRC),
+    "the Diverters toggle renders only in medical-validation mode",
+  );
+});
+
 console.log(`\ncockpitWebviewScript.test: ${pass} checks passed`);
