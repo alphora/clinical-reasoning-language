@@ -33,6 +33,12 @@ const CORPORA: Record<string, string> = {
   // `Layered Basic Inferred`. Lives under the test dir (not the corpus tree)
   // since it's a standalone single-file fixture with no imports.
   "layered-basic": path.join(__dirname, "fixtures", "layered-basic.crl"),
+  // Slice 3 (lowerLocalCodes): a single multi-layer CRL library whose leaves
+  // carry `code is` local source codes. The lowering pass synthesizes a local
+  // codesystem (URN) + per-concept code into the Concepts layer and a retrieve
+  // into the Asserted layer; a `defined as` concept lands in the Inferred layer.
+  // Exercises the full code-is fan-out + cross-layer re-qualification.
+  "code-is-basic": path.join(__dirname, "fixtures", "code-is-basic.crl"),
 };
 
 const norm = (s: string): string => s.replace(/\r\n/g, "\n");

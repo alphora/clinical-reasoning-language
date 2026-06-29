@@ -108,15 +108,21 @@ interface NameLayerMaps {
 export function classifyStatementLayer(stmt: Statement): Layer | null {
   if (stmt.type === "Terminology") return "Concepts";
   if (stmt.type === "Concept") {
-    // A concept carrying a local `code is` (`stmt.code`) OR a non-empty
-    // `possible representation:` list is OUT OF SCOPE for this slice — the
-    // `code is` / external-source-representation lane has not landed yet.
-    // Such a concept is unclassifiable (return null) EVEN IF it also has a
-    // top-level `definition`: a MIXED `code is` + `defined as` concept must
-    // NOT slip onto the layered path, where the split would drop the
-    // `code is` source side. Returning null keeps the whole library on the
-    // unchanged per-CRL path until the `code is` slice. (The cms22/cms69
-    // corpus has no `code is`, so this changes nothing there.)
+    // Slice 3 — concept-level `code is`-ONLY concepts are LOWERED upstream
+    // (`lowerLocalCodes`, run before classification in both `emitCQLImports`
+    // and `emitCQLFromAST`) into a synthetic Terminology + `CodedFromDefinition`
+    // with `stmt.code` CLEARED. So by the time classification runs, an in-scope
+    // local-coded concept already presents as an ordinary `CodedFromDefinition`
+    // (Asserted) and classifies normally — no special case needed here.
+    //
+    // A concept that STILL carries `stmt.code` at this point is out of scope
+    // for the layered split: it is a `code` + `possible representation:` concept
+    // (the external-source-representation lane, NOT YET landed) — lowering
+    // deliberately leaves those untouched so the split can't drop the
+    // representation side. (A MIXED `code` + top-level `definition` concept is a
+    // HARD ERROR raised by `lowerLocalCodes`; it never reaches classification.)
+    // Returning null keeps the whole library on the unchanged per-CRL path.
+    // (The cms22/cms69 corpus has no `code is`, so this changes nothing there.)
     if (stmt.code !== undefined) return null;
     if (stmt.representations && stmt.representations.length > 0) return null;
     // A concept may now be representation/code-only with no top-level

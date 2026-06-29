@@ -1,0 +1,39 @@
+# Code-is Basic — slice 3 lowerLocalCodes fixture
+library "Code Is Basic".
+
+// A single multi-layer library exercising `code is` local-source lowering end
+// to end. Two `code is`-only concepts (lowered to a synthetic local codesystem
+// + per-concept code in the Concepts layer, and a `[Resource: <code>]` retrieve
+// in the Asserted layer) plus a `defined as` concept composing over them (the
+// Inferred layer). The auto-split fans the lowered output across all three
+// layers and re-qualifies the cross-layer refs. Because the synthetic
+// terminology and its concept land in SEPARATE libraries here (Concepts vs
+// Asserted), detectCollisions sees no same-library collision, so NO ` Code`
+// suffix fires — the layered code names are bare "<X>" (the ` Code` suffix is
+// a per-CRL-only artifact, where terminology + concept co-reside):
+//   - the Asserted retrieves' code refs -> "Code Is Basic Concepts"."<X>"
+//   - the Inferred composition's concept refs → "Code Is Basic Asserted"."<X>"
+
+// ============ Locally-coded leaves (`code is`) ============
+
+concept "Adult Patient":
+- type is Observation.
+- value type is boolean.
+- code is `adult-18-or-older`.
+
+concept "Active Crohns Disease":
+- type is Condition.
+- value type is boolean.
+- code is `active-crohns-disease`.
+
+// ============ Inferred (defined as over the coded leaves) ============
+
+concept "Adult With Crohns":
+- type is Observation.
+- value type is boolean.
+- defined as
+(
+   "Adult Patient"
+   sem-and
+   "Active Crohns Disease"
+).

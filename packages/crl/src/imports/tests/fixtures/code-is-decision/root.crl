@@ -1,0 +1,25 @@
+# code-is-decision root — per-CRL `code is` lowering (rx501-147-shaped)
+library "Code Is Decision".
+
+// A single library carrying a `decision` (which disqualifies the layered
+// auto-split — see layeredEmit `isLayerableLibrary`) PLUS two `code is`-only
+// concepts. Because the decision keeps the whole library on the PER-CRL path,
+// the synthetic terminology and its concept co-reside in ONE emitted library,
+// so detectCollisions suffixes the code name to "<X> Code" and the retrieve
+// inlines as `[<Resource>: "<X> Code"]`. This is the motivating per-CRL case.
+
+concept "Adult Patient":
+- type is Observation.
+- value type is boolean.
+- code is `adult-18-or-older`.
+
+concept "Active Crohns Disease":
+- type is Condition.
+- value type is boolean.
+- code is `active-crohns-disease`.
+
+activity "Refer to GI":
+- request CPGServiceRequest.
+
+decision "Triage Crohns":
+- when "Active Crohns Disease" then recommend activity "Refer to GI".

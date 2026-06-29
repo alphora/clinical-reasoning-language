@@ -17,6 +17,7 @@ import {
   layerLibraryNamesFor,
   librariesReferencedBy,
 } from "../cql-emitter/layeredEmit";
+import { lowerLocalCodes, localCodesystemUrn } from "../cql-emitter/lowerLocalCodes";
 import type { CRLError } from "../types/errors";
 
 import { resolveImports } from "./index";
@@ -133,7 +134,74 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
   // (CRL→FHIR-def consumes a strict-superset variant). Scope-aware ref
   // resolution preserves v2.1.0 lookup precedence (local-first for non-
   // explicit-include refs).
-  const emitClosure = computeCqlEmitClosure(graph);
+  const rawEmitClosure = computeCqlEmitClosure(graph);
+
+  // Slice 3 — lower concept-level `code is` local source codes BEFORE any
+  // layer classification / split detection / collision preflight runs below.
+  // `classifyStatementLayer` (layeredEmit.ts) rejects raw `code`-bearing
+  // concepts, so a library would never be eligible for the layered split until
+  // its codes are lowered. Lower ONCE here and thread the lowered AST through
+  // EVERY decision (split detection, collision preflight, layered/per-library
+  // emit) so split-vs-no-split is decided from the SAME representation that is
+  // emitted — no plan-vs-code drift. The pass is pure (the registry AST is left
+  // untouched); we build a new closure with each entry's `ast` replaced.
+  // Direct `emitCQLFromAST` callers (CLI, tests) lower internally; this is the
+  // imports-path counterpart so the layered classification sees lowered ASTs.
+  const lowerErrors: CRLError[] = [];
+  // Track libraries that actually synthesized a local codesystem (lowered at
+  // least one `code is` concept), keyed by the deterministic URN — so the
+  // cross-library URN-collision preflight below can fire when two DISTINCT
+  // library names slug to the SAME `urn:crl:codesystem:<slug>-local`.
+  const localUrnToLibraries = new Map<string, Set<string>>();
+  const emitClosure = rawEmitClosure.map((entry) => {
+    const lowered = lowerLocalCodes(entry.ast);
+    if (lowered.errors.length > 0) lowerErrors.push(...lowered.errors);
+    const didLower = lowered.ast !== entry.ast;
+    if (didLower && entry.name) {
+      const urn = localCodesystemUrn(entry.ast.library.name);
+      const set = localUrnToLibraries.get(urn) ?? new Set<string>();
+      set.add(entry.name);
+      localUrnToLibraries.set(urn, set);
+    }
+    return didLower ? { ...entry, ast: lowered.ast } : entry;
+  });
+  if (lowerErrors.length > 0) {
+    return {
+      success: false,
+      graph,
+      importDiagnostics: graph.diagnostics,
+      cqlByLibrary: [],
+      errors: lowerErrors,
+    };
+  }
+  // Cross-library local-codesystem URN collision. Two distinct libraries in the
+  // emit closure whose names slug to the same local URN would unintentionally
+  // share a local code domain (CQL code identity is system+code), so a local
+  // code in one could collide with one in the other. Fail loudly rather than
+  // emit a silently-shared codesystem.
+  for (const [urn, libs] of localUrnToLibraries) {
+    if (libs.size > 1) {
+      const names = [...libs].sort();
+      return {
+        success: false,
+        graph,
+        importDiagnostics: graph.diagnostics,
+        cqlByLibrary: [],
+        errors: [
+          {
+            type: "Validation",
+            kind: "emit-local-codesystem-urn-collision",
+            message:
+              `Libraries ${names.map((n) => `"${n}"`).join(" and ")} both synthesize the ` +
+              `local codesystem "${urn}" from their \`code is\` concepts — their names ` +
+              `slug to the same local domain, so their local codes would share a ` +
+              `codesystem and could collide. Rename one library so the local ` +
+              `codesystem URNs are distinct.`,
+          },
+        ],
+      };
+    }
+  }
 
   // v2.2 Todo 3 (issue #59) — index every emitted library's AST parameters
   // once so per-library emit can resolve qualified context-parameter refs.

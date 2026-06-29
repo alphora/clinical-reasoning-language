@@ -184,19 +184,62 @@ describe("emitCQLImports (per-CRL v2.1.0)", () => {
     expect(result.errors?.[0]?.message).toMatch(/"X Asserted"/);
   });
 
-  it("a MIXED `code is` + `defined as` library stays per-CRL (NOT split) (fix 2)", () => {
-    // A multi-layer library carrying a concept with BOTH `code is` and
-    // `defined as` is out of scope for the layered split; it stays on the
-    // unchanged per-CRL path and emits as a SINGLE `library "Mixed"` CQL.
+  it("a MIXED `code is` + `defined as` concept is a hard error (slice 3)", () => {
+    // Slice 3 — a concept carrying BOTH a local `code is` and a top-level
+    // `definition` (`defined as`/`definition is`/`coded from`) is out of scope:
+    // `lowerLocalCodes` raises an explicit `emit-mixed-code-and-definition`
+    // hard error rather than silently stubbing/dropping the local-code side.
+    // (Under slice 2 this case fell onto the per-CRL stub path; slice 3 makes
+    // it loud.)
     const root = path.join(FIXTURES, "mixed-code-defined-as", "root.crl");
     const result = emitCQLImports(root);
+    expect(result.success).toBe(false);
+    expect(result.cqlByLibrary).toHaveLength(0);
+    expect(result.errors?.[0]?.kind).toBe("emit-mixed-code-and-definition");
+    expect(result.errors?.[0]?.message).toMatch(/Mixed Concept/);
+  });
+
+  it("per-CRL: a `decision` + `code is` library emits ONE library with inline synthesized codesystem/code/retrieves (slice 3)", () => {
+    // rx501-147-shaped motivating case: a `decision` disqualifies the layered
+    // auto-split, so the whole library stays on the per-CRL path. The synthetic
+    // terminology and its concept co-reside in ONE emitted library, so
+    // detectCollisions suffixes the code name to "<X> Code" and the retrieve
+    // inlines as `[<Resource>: "<X> Code"]` (the per-CRL suffix path).
+    const root = path.join(FIXTURES, "code-is-decision", "root.crl");
+    const result = emitCQLImports(root);
     expect(result.success).toBe(true);
+
+    // ONE emitted library — NO split layer names (`Code Is Decision Concepts`
+    // etc.). The decision disqualifies layering.
     const names = result.cqlByLibrary.map((e) => e.libraryName).sort();
-    // Single library — NOT split into Mixed Concepts/Asserted/Inferred.
-    expect(names).toEqual(["Mixed"]);
-    const cql = findLib(result, "Mixed") ?? "";
-    expect(cql).toMatch(/library Mixed\n/);
-    expect(cql).not.toMatch(/library "Mixed (Concepts|Asserted|Inferred)"/);
+    expect(names).toEqual(["Code Is Decision"]);
+
+    const cql = findLib(result, "Code Is Decision") ?? "";
+    // Synthesized local codesystem (shared URN) + per-concept code, suffixed.
+    expect(cql).toMatch(
+      /codesystem "Adult Patient Code System": 'urn:crl:codesystem:code-is-decision-local'/,
+    );
+    expect(cql).toMatch(
+      /code "Adult Patient Code": 'adult-18-or-older' from "Adult Patient Code System"/,
+    );
+    expect(cql).toMatch(
+      /code "Active Crohns Disease Code": 'active-crohns-disease' from "Active Crohns Disease Code System"/,
+    );
+    // Inline per-CRL retrieves referencing the suffixed code names (same library).
+    expect(cql).toMatch(/\[Observation: "Adult Patient Code"\]/);
+    expect(cql).toMatch(/\[Condition: "Active Crohns Disease Code"\]/);
+  });
+
+  it("cross-library local-codesystem URN collision → emit-local-codesystem-urn-collision (slice 3)", () => {
+    // Two DISTINCT local libraries ("Local One" / "Local-One") whose names slug
+    // to the SAME `urn:crl:codesystem:local-one-local`, both using `code is`.
+    // The preflight must fail loudly rather than emit a silently-shared domain.
+    const root = path.join(FIXTURES, "local-codesystem-urn-collision", "root.crl");
+    const result = emitCQLImports(root);
+    expect(result.success).toBe(false);
+    expect(result.cqlByLibrary).toHaveLength(0);
+    expect(result.errors?.[0]?.kind).toBe("emit-local-codesystem-urn-collision");
+    expect(result.errors?.[0]?.message).toMatch(/local-one-local/);
   });
 
   it("local parse-failure warnings don't block emission", () => {

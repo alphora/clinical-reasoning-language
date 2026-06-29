@@ -51,6 +51,7 @@ import type {
 import { getRefName, getRefLibrary, isQualifiedRef } from "../ast/types";
 import type { ReferenceName } from "../ast/types";
 import type { CRLError } from "../types/errors";
+import { lowerLocalCodes } from "./lowerLocalCodes";
 
 /**
  * v2.2 Todo 3 (issue #59) — classified per-parameter info indexed at emit time.
@@ -404,7 +405,17 @@ export function infoForParameterStatement(stmt: Parameter): AstParameterInfo {
 
 export function emitCQLFromAST(ast: CRL, options: EmitOptions = {}): EmitResult {
   try {
-    const emitter = new Emitter(ast, options);
+    // Slice 3 — lower concept-level `code is` local source codes into synthetic
+    // Terminology + CodedFromDefinition BEFORE any indexing/classification, so
+    // the rest of this emitter handles them as ordinary asserted concepts. The
+    // pass is idempotent (clears `Concept.code`), so a re-entry from the layered
+    // path (`emitLayered` → `emitCQLFromAST`) is a no-op. Hard errors (mixed
+    // code+definition, empty code, missing type, duplicate code) short-circuit.
+    const lowered = lowerLocalCodes(ast);
+    if (lowered.errors.length > 0) {
+      return { success: false, errors: lowered.errors };
+    }
+    const emitter = new Emitter(lowered.ast, options);
     const out = emitter.emit();
     const unmatched = emitter.getUnmatched();
     if (unmatched.length > 0) {

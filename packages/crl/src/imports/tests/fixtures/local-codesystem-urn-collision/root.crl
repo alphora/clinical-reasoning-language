@@ -1,0 +1,12 @@
+# local-codesystem-urn-collision root
+library "Root".
+
+// Two DISTINCT local libraries whose names slug to the SAME local codesystem
+// URN (`urn:crl:codesystem:local-one-local`): "Local One" and "Local-One".
+// Both use `code is`, so both synthesize that shared-URN local codesystem —
+// their local codes would share a code domain and could collide. The
+// cross-library preflight in imports/emit.ts must fail with
+// `emit-local-codesystem-urn-collision`.
+
+include "Local One".
+include "Local-One".

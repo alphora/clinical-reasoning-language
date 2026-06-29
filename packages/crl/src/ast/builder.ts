@@ -649,11 +649,18 @@ export class CRLAstBuilder
 
   // The concept's own local code (`- code is `…`.`); the system is the package's
   // local domain (implicit). Present => the concept is locally assertable.
+  //
+  // Returns `undefined` when there is NO `code is` line at all, and the (possibly
+  // EMPTY) backtick contents when the line IS present. The empty-string case is
+  // preserved deliberately: the CQL emit lowering pass (`lowerLocalCodes`)
+  // diagnoses an empty `code is` as a hard error, which requires the empty value
+  // to survive in the AST rather than be coalesced away to `undefined`.
   private parseCode(
     bodyCtx: import("../grammar/generated/antlr/CRLParser").ConceptBodyContext,
   ): string | undefined {
     const codeLine = bodyCtx.codeIsLine?.();
-    const bt = codeLine?.backtickString?.();
+    if (!codeLine) return undefined;
+    const bt = codeLine.backtickString?.();
     return bt?.text !== undefined ? bt.text.slice(1, -1) : undefined;
   }
 
@@ -761,6 +768,12 @@ export class CRLAstBuilder
     const code = this.parseCode(bodyCtx);
     const definition = this.parseConceptDefinition(bodyCtx, ctx);
     const representations = this.parseRepresentations(bodyCtx);
+    // A concept must carry SOME real body. An EMPTY `code is ``.` is not a real
+    // body (it leaves the concept un-assertable), so a concept whose only body
+    // is an empty code still fails this check — but the empty `code` value is
+    // PRESERVED on the AST below (when the line is present) so the CQL emit's
+    // `lowerLocalCodes` can surface an explicit empty-code diagnostic for the
+    // mixed case (empty code + a real definition).
     if (!definition && representations.length === 0 && !code) {
       this.reportError("AstError", ctx, {
         message:
@@ -773,7 +786,7 @@ export class CRLAstBuilder
       name,
       ...(conceptType ? { conceptType } : {}),
       valueTypes,
-      ...(code ? { code } : {}),
+      ...(code !== undefined ? { code } : {}),
       ...(meta.length > 0 ? { meta } : {}),
       ...(evidence ? { evidence } : {}),
       ...(definition ? { definition } : {}),

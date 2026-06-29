@@ -1,0 +1,7 @@
+# local-codesystem-urn-collision Local-One
+library "Local-One".
+
+concept "Beta":
+- type is Observation.
+- value type is boolean.
+- code is `beta`.
