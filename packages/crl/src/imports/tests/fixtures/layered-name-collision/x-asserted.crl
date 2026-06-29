@@ -1,0 +1,7 @@
+# layered-name-collision sibling — a REAL single-layer library literally named "X Asserted"
+library "X Asserted".
+
+concept "Sibling Concept":
+- type is Observation.
+- value type is boolean.
+- defined as "Sibling Concept".

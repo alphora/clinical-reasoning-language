@@ -11,6 +11,12 @@ import type {
 import { getRefLibrary, isQualifiedRef } from "../ast/types";
 import { emitCQLFromAST, infoForParameterStatement } from "../cql-emitter/emitCQL";
 import type { AstParameterInfo } from "../cql-emitter/emitCQL";
+import {
+  emitLayered,
+  isLayerSplittable,
+  layerLibraryNamesFor,
+  librariesReferencedBy,
+} from "../cql-emitter/layeredEmit";
 import type { CRLError } from "../types/errors";
 
 import { resolveImports } from "./index";
@@ -133,6 +139,98 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
   // once so per-library emit can resolve qualified context-parameter refs.
   const crossLibraryParameters = buildAstParameterIndex(emitClosure);
 
+  // Slice 2 (layeredEmit) — the set of library NAMES that will be auto-split
+  // into layer libraries. A split library's ORIGINAL name no longer exists as
+  // an emitted CQL library, so any OTHER library that qualified-refs it would
+  // dangle. Cross-library referrer-rewriting (rewrite `"X"."Y"` to the layer
+  // Y landed in) is the DEFERRED routing slice; here we detect the situation
+  // and fail loudly rather than emit broken CQL.
+  const splitLibraryNames = new Set<string>();
+  for (const entry of emitClosure) {
+    if (entry.name && isLayerSplittable(entry.ast)) splitLibraryNames.add(entry.name);
+  }
+  if (splitLibraryNames.size > 0) {
+    for (const entry of emitClosure) {
+      if (!entry.name) continue;
+      const refs = librariesReferencedBy(entry.ast, entry.name);
+      for (const ref of refs) {
+        if (splitLibraryNames.has(ref)) {
+          return {
+            success: false,
+            graph,
+            importDiagnostics: graph.diagnostics,
+            cqlByLibrary: [],
+            errors: [
+              {
+                type: "Validation",
+                kind: "emit-cross-library-ref-into-split-library",
+                message:
+                  `Library "${entry.name}" qualified-refs "${ref}", but "${ref}" is a ` +
+                  `multi-layer library that emit auto-splits into layer libraries ` +
+                  `("${ref} Concepts" / "${ref} Asserted" / "${ref} Inferred"). ` +
+                  `Cross-library references into an auto-split library are not yet ` +
+                  `supported (referrer re-qualification is a later slice). Reference ` +
+                  `the specific layer library directly, or keep "${ref}" single-layer.`,
+              },
+            ],
+          };
+        }
+      }
+    }
+  }
+
+  // Slice 2 (layeredEmit) — generated-name collision preflight. The full set
+  // of emitted CQL library names = every UNSPLIT entry's own name PLUS every
+  // SPLIT entry's generated layer names (`<X> Concepts` / `<X> Asserted` /
+  // `<X> Inferred`). If a generated layer name collides with another emitted
+  // name (e.g. a multi-layer `library "X"` whose split yields `X Asserted`,
+  // and a separate real `library "X Asserted"` elsewhere in the closure), we
+  // would otherwise emit two libraries with the same id/filename and silently
+  // clobber one. Detect it and fail loudly BEFORE emitting anything.
+  {
+    const emittedNamesSource = new Map<string, string>();
+    const collisions: { name: string; a: string; b: string }[] = [];
+    const register = (name: string, source: string): void => {
+      const prior = emittedNamesSource.get(name);
+      if (prior !== undefined) {
+        collisions.push({ name, a: prior, b: source });
+      } else {
+        emittedNamesSource.set(name, source);
+      }
+    };
+    for (const entry of emitClosure) {
+      if (entry.name === null || entry.name === "") continue;
+      if (isLayerSplittable(entry.ast)) {
+        for (const layerName of layerLibraryNamesFor(entry.ast, entry.name)) {
+          register(layerName, `auto-split of library "${entry.name}"`);
+        }
+      } else {
+        register(entry.name, `library "${entry.name}"`);
+      }
+    }
+    if (collisions.length > 0) {
+      const c = collisions[0];
+      return {
+        success: false,
+        graph,
+        importDiagnostics: graph.diagnostics,
+        cqlByLibrary: [],
+        errors: [
+          {
+            type: "Validation",
+            kind: "layered-name-collision",
+            message:
+              `Emitted CQL library name "${c.name}" is produced by both ` +
+              `${c.a} and ${c.b}. An auto-split layer library name collides ` +
+              `with another emitted library, which would clobber one CQL file. ` +
+              `Rename the conflicting library (or split it explicitly) so every ` +
+              `emitted CQL library has a unique name.`,
+          },
+        ],
+      };
+    }
+  }
+
   // Emit each library independently.
   const cqlByLibrary: PerLibraryEmit[] = [];
   for (const entry of emitClosure) {
@@ -141,6 +239,50 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
     // the real signal; emitting a library without a name would produce
     // invalid CQL.
     if (entry.name === null || entry.name === "") continue;
+
+    // Slice 2 — layeredEmit gate. A single CRL library whose concepts span
+    // MORE THAN ONE layer (Concepts / Asserted / Inferred), AND whose every
+    // statement is layer-classifiable (Concept / Terminology), emits as
+    // separate dependency-ordered layer libraries (`X Concepts`, `X Asserted`,
+    // `X Inferred`). A SINGLE-layer (or zero-layer) library — or a multi-layer
+    // library that also carries a Decision/Activity/Parameter (out of scope for
+    // this slice; splitting would drop those statements) — takes the unchanged
+    // per-CRL path below. This keeps the hand-split cms22/cms69 goldens (each
+    // source `.crl` is single-layer) a no-op.
+    if (isLayerSplittable(entry.ast)) {
+      const layered = emitLayered(entry.ast, entry.name, { crossLibraryParameters });
+      if (!layered.success) {
+        return {
+          success: false,
+          graph,
+          importDiagnostics: graph.diagnostics,
+          cqlByLibrary: [],
+          errors: layered.entries.flatMap((e) => e.result.errors ?? []),
+        };
+      }
+      for (const layer of layered.entries) {
+        let layerFilename: string;
+        try {
+          layerFilename = safeOutputFilename(layer.libraryName);
+        } catch (e) {
+          return {
+            success: false,
+            graph,
+            importDiagnostics: graph.diagnostics,
+            cqlByLibrary: [],
+            errors: [{ type: "Exception", message: e instanceof Error ? e.message : String(e) }],
+          };
+        }
+        cqlByLibrary.push({
+          libraryName: layer.libraryName,
+          filePath: entry.filePath,
+          outputFilename: layerFilename,
+          cql: layer.result.result ?? "",
+        });
+      }
+      continue;
+    }
+
     const crossLibs = Array.from(collectCrossLibraryRefs(entry)).sort();
     const synthetic: CRL = {
       type: "CRL",

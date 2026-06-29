@@ -1,0 +1,5 @@
+# cross-file-ref leaf vocab
+library "Leaf Vocab".
+
+terminology "Leaf Vs":
+- valueset is `leaf-vs`.

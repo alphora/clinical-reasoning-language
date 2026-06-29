@@ -1,0 +1,11 @@
+# ref-into-split multi
+library "Multi".
+
+// Multi-layer: a terminology (Concepts) AND a coded-from concept (Asserted).
+// emit auto-splits this into "Multi Concepts" + "Multi Asserted".
+terminology "Multi Vs":
+- valueset is `multi-vs`.
+
+concept "Leaf Concept":
+- type is Observation.
+- coded from "Multi Vs".

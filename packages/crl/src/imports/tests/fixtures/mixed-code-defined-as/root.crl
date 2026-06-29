@@ -1,0 +1,19 @@
+# mixed-code-defined-as root
+library "Mixed".
+
+// A multi-layer library where one concept carries BOTH a local `code is` and a
+// `defined as`. The mixed concept is unclassifiable, so the whole library stays
+// on the per-CRL path (NOT auto-split) until the code-is slice.
+
+terminology "VS":
+- valueset is `vs`.
+
+concept "Leaf":
+- type is Observation.
+- coded from "VS".
+
+concept "Mixed Concept":
+- type is Observation.
+- value type is boolean.
+- code is `local-code`.
+- defined as "Leaf".

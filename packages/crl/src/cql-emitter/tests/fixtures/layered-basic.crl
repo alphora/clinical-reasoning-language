@@ -1,0 +1,42 @@
+# Layered Basic — slice 2 layeredEmit fixture
+library "Layered Basic".
+
+// A single multi-layer library: two `terminology` declarations (Concepts
+// layer), two `coded from` concepts (Asserted layer), and one `defined as`
+// concept (Inferred layer) composing over the asserted ones. Emitting this
+// exercises the auto-split: the Inferred layer's bare refs to the asserted
+// concepts MUST be re-qualified to "Layered Basic Asserted"."...", and the
+// Asserted concepts' terminology refs MUST be re-qualified to
+// "Layered Basic Concepts"."...".
+
+// ============ Concepts (terminology) ============
+
+terminology "Example Valueset A":
+- valueset is `http://example.org/fhir/ValueSet/a`.
+
+terminology "Example Valueset B":
+- valueset is `http://example.org/fhir/ValueSet/b`.
+
+// ============ Asserted (coded from) ============
+
+concept "Asserted Concept A":
+- type is Observation.
+- value type is CodeableConcept.
+- coded from "Example Valueset A".
+
+concept "Asserted Concept B":
+- type is Observation.
+- value type is CodeableConcept.
+- coded from "Example Valueset B".
+
+// ============ Inferred (defined as) ============
+
+concept "Inferred Concept":
+- type is Observation.
+- value type is boolean.
+- defined as
+(
+   "Asserted Concept A"
+   sem-or
+   "Asserted Concept B"
+).

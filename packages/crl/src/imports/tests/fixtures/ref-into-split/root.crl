@@ -1,0 +1,12 @@
+# ref-into-split root
+library "Root".
+include "Multi".
+
+// Root qualified-refs into "Multi"."Leaf Concept". But "Multi" is a MULTI-LAYER
+// library that emit auto-splits into "Multi Concepts" / "Multi Asserted", so
+// the original "Multi" library will not exist. This must fail LOUDLY (referrer
+// re-qualification is a later slice), not emit a dangling reference.
+concept "Root Concept":
+- type is Observation.
+- value type is boolean.
+- defined as "Multi"."Leaf Concept".

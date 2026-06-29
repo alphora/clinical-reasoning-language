@@ -1,0 +1,19 @@
+# layered-name-collision root
+library "X".
+
+// A MULTI-LAYER library "X" that auto-splits into "X Concepts" / "X Asserted" /
+// "X Inferred". The generated "X Asserted" name collides with the real sibling
+// library "X Asserted" (x-asserted.crl), which root pulls into the emit closure
+// via a qualified ref. The preflight must error with kind layered-name-collision.
+
+terminology "VS":
+- valueset is `vs`.
+
+concept "Leaf":
+- type is Observation.
+- coded from "VS".
+
+concept "Top":
+- type is Observation.
+- value type is boolean.
+- defined as ( "Leaf" sem-or "X Asserted"."Sibling Concept" ).

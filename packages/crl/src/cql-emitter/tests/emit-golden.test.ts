@@ -28,6 +28,11 @@ const UPDATE = process.env.UPDATE_GOLDEN === "1";
 const CORPORA: Record<string, string> = {
   cms22: path.join(REPO_ROOT, "src/tests/fixtures/corpus/cms22-split/cms22.crl"),
   cms69: path.join(REPO_ROOT, "src/tests/fixtures/corpus/cms69-split/cms69.crl"),
+  // Slice 2 (layeredEmit): a single multi-layer CRL library that auto-splits
+  // into `Layered Basic Concepts` / `Layered Basic Asserted` /
+  // `Layered Basic Inferred`. Lives under the test dir (not the corpus tree)
+  // since it's a standalone single-file fixture with no imports.
+  "layered-basic": path.join(__dirname, "fixtures", "layered-basic.crl"),
 };
 
 const norm = (s: string): string => s.replace(/\r\n/g, "\n");

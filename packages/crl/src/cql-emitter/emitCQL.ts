@@ -899,6 +899,17 @@ class Emitter {
           // Cross-library composition ref: emit `Lib."Name"`. Operand
           // shape is unknown without cross-library scope info; default to
           // "refinement" (the existing fallback for unknown names).
+          //
+          // TRAP FOR THE FUTURE INTERFACE SLICE: a cross-library composition
+          // operand loses its DECLARED-SHAPE info here — we cannot see the
+          // target library's concept declaration, so the operand is forced to
+          // "refinement" regardless of how it was actually declared (boolean
+          // vs refinement). In slice-2 (layered auto-split) this is not
+          // reachable in a SHAPE-significant way: cross-LAYER refs the splitter
+          // produces are requalified leaf refs, not shape-bearing compositions.
+          // When the interface/decision slice introduces genuine cross-library
+          // composition over declared-boolean concepts, this forced "refinement"
+          // will mis-bridge — revisit by threading target-library shape info.
           return this.bridgeOperand(cqlQualifiedRef(crossLib, refName), "refinement", shape);
         }
         const operandShape = this.declaredShape(refName);

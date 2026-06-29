@@ -129,6 +129,76 @@ describe("emitCQLImports (per-CRL v2.1.0)", () => {
     expect(bCql).toMatch(/valueset "BMI"/);
   });
 
+  it("auto-splits a multi-layer library into dependency-ordered layer libraries", () => {
+    // Slice 2 (layeredEmit): a SINGLE multi-layer library emits as separate
+    // `<Lib> Concepts` / `<Lib> Asserted` / `<Lib> Inferred` CQL libraries.
+    const root = path.join(
+      __dirname,
+      "..",
+      "..",
+      "cql-emitter",
+      "tests",
+      "fixtures",
+      "layered-basic.crl",
+    );
+    const result = emitCQLImports(root);
+    expect(result.success).toBe(true);
+    const names = result.cqlByLibrary.map((e) => e.libraryName).sort();
+    expect(names).toEqual([
+      "Layered Basic Asserted",
+      "Layered Basic Concepts",
+      "Layered Basic Inferred",
+    ]);
+    const asserted = findLib(result, "Layered Basic Asserted") ?? "";
+    expect(asserted).toMatch(/include "Layered Basic Concepts"/);
+    expect(asserted).toMatch(/"Layered Basic Concepts"\."Example Valueset A"/);
+    const inferred = findLib(result, "Layered Basic Inferred") ?? "";
+    expect(inferred).toMatch(/include "Layered Basic Asserted"/);
+    expect(inferred).toMatch(/"Layered Basic Asserted"\."Asserted Concept A"/);
+  });
+
+  it("fails loudly when a library qualified-refs an auto-split (multi-layer) library", () => {
+    // Cross-library referrer re-qualification is the DEFERRED routing slice.
+    // Until then, a ref INTO a library that emit splits must error, not dangle.
+    const root = path.join(FIXTURES, "ref-into-split", "root.crl");
+    const result = emitCQLImports(root);
+    expect(result.success).toBe(false);
+    expect(result.cqlByLibrary).toHaveLength(0);
+    expect(result.errors?.[0]?.kind).toBe("emit-cross-library-ref-into-split-library");
+    // Match the real message: the referrer + the split target are both named.
+    expect(result.errors?.[0]?.message).toMatch(
+      /Library "Root" qualified-refs "Multi".*multi-layer library that emit auto-splits/,
+    );
+  });
+
+  it("fails loudly when a generated layer name collides with a real sibling library (fix 3)", () => {
+    // A multi-layer `library "X"` auto-splits into `X Concepts` / `X Asserted`
+    // / `X Inferred`. A separate real `library "X Asserted"` in the closure
+    // would clash with the generated `X Asserted` name (same CQL id/filename).
+    // The preflight must error with kind `layered-name-collision`.
+    const root = path.join(FIXTURES, "layered-name-collision", "root.crl");
+    const result = emitCQLImports(root);
+    expect(result.success).toBe(false);
+    expect(result.cqlByLibrary).toHaveLength(0);
+    expect(result.errors?.[0]?.kind).toBe("layered-name-collision");
+    expect(result.errors?.[0]?.message).toMatch(/"X Asserted"/);
+  });
+
+  it("a MIXED `code is` + `defined as` library stays per-CRL (NOT split) (fix 2)", () => {
+    // A multi-layer library carrying a concept with BOTH `code is` and
+    // `defined as` is out of scope for the layered split; it stays on the
+    // unchanged per-CRL path and emits as a SINGLE `library "Mixed"` CQL.
+    const root = path.join(FIXTURES, "mixed-code-defined-as", "root.crl");
+    const result = emitCQLImports(root);
+    expect(result.success).toBe(true);
+    const names = result.cqlByLibrary.map((e) => e.libraryName).sort();
+    // Single library — NOT split into Mixed Concepts/Asserted/Inferred.
+    expect(names).toEqual(["Mixed"]);
+    const cql = findLib(result, "Mixed") ?? "";
+    expect(cql).toMatch(/library Mixed\n/);
+    expect(cql).not.toMatch(/library "Mixed (Concepts|Asserted|Inferred)"/);
+  });
+
   it("local parse-failure warnings don't block emission", () => {
     const root = path.join(FIXTURES, "source-path-parse-failure", "root.crl");
     const result = emitCQLImports(root);
