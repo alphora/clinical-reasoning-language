@@ -302,11 +302,11 @@
           "scope": "window",
           "description": "Which failed criteria the cockpit highlights when a failing CEL case is selected. 'blocking' (default): only the criteria that blocked the expected disposition (empty for a passing case). 'all': every evaluated-unsatisfied 'when' in the run. Toggle live with the segmented control on the cockpit's Tree pane. SHARED with the Medical Validation panel."
         },
-        "crl.cockpit.showDiverters": {
+        "crl.cockpit.showDetails": {
           "type": "boolean",
           "default": false,
           "scope": "window",
-          "description": "Medical Validation only: highlight the produced-path 'diverters' — the criteria that, by being false, routed the selected case to its produced outcome (e.g. the age gate for a not-adult denial) — across the Source / Tree / CRL panes. Off by default. Toggle live with the Diverters control on the Tree pane."
+          "description": "Medical Validation only: show why the selected case got its outcome — highlight the deciding criteria (the ones that, by being false, routed it there, e.g. the age gate for a not-adult denial) across the Source / Tree / CRL panes. Off by default. Toggle live with the Details control on the Tree pane."
         },
         "crl.medical-validation.primary": {
           "type": "string",

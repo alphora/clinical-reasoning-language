@@ -239,8 +239,8 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   let failedCriteriaMode: "blocking" | "all" = "blocking";
   // disc 164 (operator follow-on): the produced-path diverter overlay is OFF by default — it adds a lot of ink (a not-adult
   // deny lights both indications), so the validator opts in per session/workspace. Config-backed + live like failedCriteriaMode
-  // (`crl.cockpit.showDiverters`, default false), toggled from the tree chrome (MV mode only — diverters never paint in cockpit).
-  let showDiverters = false;
+  // (`crl.cockpit.showDetails`, default false), toggled from the tree chrome (MV mode only — diverters never paint in cockpit).
+  let showDetails = false;
   /** Concept keys that have ≥1 source-bearing unit OR ≥1 CRL row — the gate for a fact being a clickable peek anchor
    *  (recomputed from crlMaps each rebuild; read at CEL render time, mirroring caseIdByName). */
   let revealableConceptKeys: ReadonlySet<string> = new Set();
@@ -586,11 +586,11 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     // disc 164 (operator follow-on): the produced-path diverter overlay on/off. MV-only (diverters never paint in cockpit
     // mode); persisted SHARED under crl.cockpit, default OFF. Two buttons mirror the fc toggle's active-state idiom.
     const dbtn = (on: boolean, label: string): string =>
-      `<button class="fc-toggle-btn${showDiverters === on ? " fc-active" : ""}" data-diverter-toggle="${on ? "1" : "0"}">${label}</button>`;
+      `<button class="fc-toggle-btn${showDetails === on ? " fc-active" : ""}" data-diverter-toggle="${on ? "1" : "0"}">${label}</button>`;
     const diverterToggle =
       mode === "medical-validation"
-        ? `<div class="fc-toggle" title="Highlight the criteria that, by being false, routed each case to its produced outcome (the 'no' answers on the fired path)">` +
-          `<span class="fc-toggle-label">Diverters:</span>${dbtn(false, "Off")}${dbtn(true, "On")}</div>`
+        ? `<div class="fc-toggle" title="Show why the selected case got its outcome — highlight the deciding criteria (the ones that, by being false, routed it there, e.g. the age gate for a not-adult denial) across the Source, Tree and CRL panes">` +
+          `<span class="fc-toggle-label">Details:</span>${dbtn(false, "Off")}${dbtn(true, "On")}</div>`
         : "";
     let banner = "";
     if (fcGapDisabledMsg) {
@@ -856,7 +856,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
    * per-case memo keyed on the selected caseId is the optimization if policies ever grow large.
    */
   function driveDiverters(): void {
-    if (mode !== "medical-validation" || !showDiverters) {
+    if (mode !== "medical-validation" || !showDetails) {
       clearAllDiverters();
       return;
     }
@@ -1082,7 +1082,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
         driveDiverters();
       }
     } else if (msg.type === "diverterToggle" && (msg.on === "1" || msg.on === "0")) {
-      applyShowDiverters(msg.on === "1"); // disc 164: the tree-pane diverter on/off toggle (MV)
+      applyShowDetails(msg.on === "1"); // disc 164: the tree-pane diverter on/off toggle (MV)
     } else if (msg.type === "fcMode" && (msg.mode === "blocking" || msg.mode === "all")) {
       applyFailedCriteriaMode(msg.mode); // the tree-pane segmented toggle
     } else if (msg.type === "fcOpenSource" && typeof msg.idx === "number") {
@@ -1409,7 +1409,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     const fcm = vscode.workspace.getConfiguration("crl.cockpit", uri).get<string>("failedCriteriaMode");
     failedCriteriaMode = fcm === "all" ? "all" : "blocking";
     // disc 164: the diverter overlay's persisted on/off (SHARED under crl.cockpit like failedCriteriaMode; default OFF).
-    showDiverters = vscode.workspace.getConfiguration("crl.cockpit", uri).get<boolean>("showDiverters") ?? false;
+    showDetails = vscode.workspace.getConfiguration("crl.cockpit", uri).get<boolean>("showDetails") ?? false;
     // FIX 5: retitle any already-open pane in place for the new mode (settable property), then let reconcilePaneOrder
     // open/dispose the delta for the new spec's order. ensurePane any not-yet-open visible pane. NO bulk dispose.
     for (const [pane, v] of views) v.panel.title = paneTitle(pane);
@@ -1533,22 +1533,22 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
 
   /** disc 164: apply a diverter-overlay on/off change — persist to config; the onDidChangeConfiguration branch is the
    *  SINGLE live re-drive path (a settings.json edit behaves identically to the tree-chrome toggle). Mirrors applyFailedCriteriaMode. */
-  function applyShowDiverters(next: boolean): void {
-    if (next === showDiverters || !currentCel) {
+  function applyShowDetails(next: boolean): void {
+    if (next === showDetails || !currentCel) {
       renderTreeChrome(); // unchanged (or no cel) — still refresh the chrome so the active button reflects the click
       return;
     }
     void vscode.workspace
       .getConfiguration("crl.cockpit", vscode.Uri.file(currentCel))
-      .update("showDiverters", next)
+      .update("showDetails", next)
       .then(undefined, (e) =>
-        console.warn(`[crl.cockpit] could not persist showDiverters: ${e instanceof Error ? e.message : e}`),
+        console.warn(`[crl.cockpit] could not persist showDetails: ${e instanceof Error ? e.message : e}`),
       );
   }
 
   /** Re-render the chrome + paint/clear the diverter overlay for the current selection under the new flag (the live path). */
-  function applyShowDivertersLive(next: boolean): void {
-    showDiverters = next;
+  function applyShowDetailsLive(next: boolean): void {
+    showDetails = next;
     driveDiverters(); // paint (on) or clear (off) the overlay for the current selection
     renderTreeChrome(); // refresh the toggle's active button
   }
@@ -1689,9 +1689,9 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     }
     // disc 164: the diverter-overlay on/off toggle — same single live re-drive path (a settings.json edit re-paints
     // identically to the tree-chrome toggle).
-    if (e.affectsConfiguration("crl.cockpit.showDiverters")) {
-      const raw = vscode.workspace.getConfiguration("crl.cockpit", vscode.Uri.file(currentCel)).get<boolean>("showDiverters") ?? false;
-      if (raw !== showDiverters) applyShowDivertersLive(raw);
+    if (e.affectsConfiguration("crl.cockpit.showDetails")) {
+      const raw = vscode.workspace.getConfiguration("crl.cockpit", vscode.Uri.file(currentCel)).get<boolean>("showDetails") ?? false;
+      if (raw !== showDetails) applyShowDetailsLive(raw);
     }
   });
 
