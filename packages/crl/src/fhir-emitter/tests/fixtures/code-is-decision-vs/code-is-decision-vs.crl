@@ -24,5 +24,16 @@ concept "Referral Reason":
 activity "Refer to GI":
 - request CPGServiceRequest.
 
+// MIXED decision surface — pins BOTH case-feature behaviors in ONE closure. The
+// decision nests two `when` concepts of DIFFERENT source layers:
+//   - "Adult Patient" — a LocalSource boolean `code is` concept → EXACTLY ONE
+//     `...-adult-patient-casefeature` StructureDefinition is emitted.
+//   - "Referral Reason" — a RecordSource `coded from` concept → a valid Interface
+//     re-export but NOT a submittable local case-feature → NO StructureDefinition
+//     (gated out).
+// The golden set-equality test then pins emit (Adult Patient) AND skip (Referral
+// Reason) together.
 decision "Triage Crohns":
-- when "Adult Patient" then recommend activity "Refer to GI".
+- when "Adult Patient" then:
+  - when "Referral Reason" then recommend activity "Refer to GI".
+  end.

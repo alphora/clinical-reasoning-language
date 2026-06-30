@@ -44,8 +44,11 @@ import type { CRLError } from "../types/errors";
  *   unresolved-library-reference                   error    An emitted resource's `library[]` URL doesn't resolve to an emitted Library. (Todo 4)
  *   unresolved-related-artifact                    error    An emitted Library's `relatedArtifact[depends-on]` URL is under canonicalBase but doesn't resolve to an emitted resource. (Todo 4)
  *   unresolved-definition-target                   error    An emitted PlanDef's `action.definitionCanonical` doesn't resolve to an emitted PlanDef/ActivityDef. (Todo 4)
+ *   unresolved-feature-expression-reference        error    An emitted StructureDefinition's `extension[cpg-featureExpression].valueExpression.reference` (the case-feature's Interface-Library pointer) doesn't resolve to an emitted Library. (case-feature emit)
  *   library-content-url-unresolved                 error    An emitted Library's `content[0].attachment.url` is not the shipped `../../cql/<file>.cql` reference to the SPECIFIC CQL `outputFilename` the split-manifest paired with that Library — points at an unwritten file, a cross-wired sibling, or outside the sibling `cql/` dir (manifest drift). Also fires when a single-entry source's lone manifest entry is not its name-keeping Root. (Slice 4c / E)
  *   decision-root-library-missing                  error    A decision-bearing source has no manifest entry keeping the source name as its Root, so its Decision/Activity `library[]` would dangle (a decision-bearing library must never full-split). The source's decision emit is skipped. (Slice 4c / E)
+ *   emit-casefeature-non-boolean                   error    A decision-interface LocalSource concept whose value type does NOT resolve to boolean — only a boolean local-source determination is a submittable case-feature Observation profile, so no StructureDefinition is emitted. (case-feature emit)
+ *   emit-casefeature-missing-code                  error    A LocalSource interface concept has no lowered local code to fix in the case-feature Observation profile (the lowered local-code domain and the interface surface disagree — a contradiction guard, never emits an empty `code`). (case-feature emit)
  *   cli-cel-fhir-def-incompatible                  error    CLI: `.cel` input + `--target fhir-def` flag. (Todo 4)
  *   missing-package-version                         error    package.json has no `version`. CRMI requires `version` 1..1 at the shareable floor.
  *   missing-package-name                            error    package.json has no `name`. R1: `name` is the policy id and the SINGLE source of every emitted FHIR resource-id/url base (`policyIdBase`).
@@ -214,6 +217,64 @@ export function knowledgeExtensions(
   return ext;
 }
 
+// --- CPG IG extension URLs (the `cpg-` variants, distinct from the `cqf-` ones
+//     above). The CPG publishable-case-feature profile binds the CPG `cpg-`
+//     knowledgeCapability / knowledgeRepresentationLevel / featureExpression
+//     extension slices — NOT the FHIR-core `cqf-` URLs. Used ONLY by the
+//     case-feature StructureDefinition emit (`structureDefinition.ts`); do NOT
+//     reuse `knowledgeExtensions` there (its `cqf-` URLs are wrong for a CPG
+//     case-feature profile).
+//     These URLs (+ the case-feature profile shape in structureDefinition.ts)
+//     were VERIFIED against the DTR `aslp-paa-comorbid-screening-casefeature.json`
+//     reference example.
+const CPG_EXT_BASE = "http://hl7.org/fhir/uv/cpg/StructureDefinition";
+export const CPG_KNOWLEDGE_CAPABILITY_EXT = `${CPG_EXT_BASE}/cpg-knowledgeCapability`;
+export const CPG_KNOWLEDGE_REPRESENTATION_EXT = `${CPG_EXT_BASE}/cpg-knowledgeRepresentationLevel`;
+export const CPG_FEATURE_EXPRESSION_EXT = `${CPG_EXT_BASE}/cpg-featureExpression`;
+
+/**
+ * A `cpg-featureExpression` extension `valueExpression` payload.
+ */
+export interface CpgFeatureExpression {
+  language: string;
+  expression: string;
+  reference: string;
+}
+
+/**
+ * The CPG case-feature extension array: the `cpg-knowledgeCapability` codes
+ * (cumulative, up to `level`) + `cpg-knowledgeRepresentationLevel` `structured`
+ * + the `cpg-featureExpression` pointing at the Interface library expression.
+ *
+ * Like `knowledgeExtensions`, the `executable` capability code is NEVER claimed:
+ * the emitter produces design-time forms only (no run-time CQL evaluation), so a
+ * case-feature profile is shareable/computable/publishable but NOT executable —
+ * even though the ASLP reference profile lists all four. (Lifted by #113 when
+ * run-time forms are produced.)
+ *
+ * Returns a heterogeneous array (valueCode entries + one valueExpression entry).
+ */
+export function cpgCaseFeatureExtensions(
+  level: Capability,
+  featureExpression: CpgFeatureExpression,
+): Array<Record<string, unknown>> {
+  const codes = capabilitiesUpTo(level).filter((c) => c !== "executable");
+  const ext: Array<Record<string, unknown>> = codes.map((c) => ({
+    url: CPG_KNOWLEDGE_CAPABILITY_EXT,
+    valueCode: c,
+  }));
+  ext.push({ url: CPG_KNOWLEDGE_REPRESENTATION_EXT, valueCode: "structured" });
+  ext.push({
+    url: CPG_FEATURE_EXPRESSION_EXT,
+    valueExpression: {
+      language: featureExpression.language,
+      expression: featureExpression.expression,
+      reference: featureExpression.reference,
+    },
+  });
+  return ext;
+}
+
 export interface ContactPoint {
   system: "url" | "email" | "phone";
   value: string;
@@ -234,7 +295,7 @@ export interface UsageContext {
  * caller-provided `outDir` by the writer.
  */
 export interface EmittedResource {
-  resourceType: "ValueSet" | "ActivityDefinition" | "PlanDefinition" | "Library" | "CodeSystem";
+  resourceType: "ValueSet" | "ActivityDefinition" | "PlanDefinition" | "Library" | "CodeSystem" | "StructureDefinition";
   relativePath: string;
   resource: Record<string, unknown>;
   /**
@@ -247,7 +308,7 @@ export interface EmittedResource {
    * sourceKind = "Recommendation" and sourceName = the activity's CRL name
    * (NOT a synthesized "<name> Recommendation" string).
    */
-  sourceKind?: "Terminology" | "Library" | "Activity" | "Recommendation" | "Decision" | "LocalCodeSystem";
+  sourceKind?: "Terminology" | "Library" | "Activity" | "Recommendation" | "Decision" | "LocalCodeSystem" | "CaseFeature";
   sourceName?: string;
   location?: Location;
 }

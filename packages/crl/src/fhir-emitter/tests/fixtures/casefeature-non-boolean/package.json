@@ -1,0 +1,12 @@
+{
+  "name": "casefeature-non-boolean-fixture",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Case-feature eligibility fixture — a LocalSource NON-boolean decision-surface concept fires emit-casefeature-non-boolean",
+  "crl": {
+    "canonicalBase": "http://example.org/crl/casefeature-non-boolean",
+    "status": "draft",
+    "experimental": true,
+    "date": "2020-01-01T00:00:00.000Z"
+  }
+}

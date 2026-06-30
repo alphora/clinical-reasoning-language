@@ -1,0 +1,112 @@
+{
+  "resourceType": "StructureDefinition",
+  "id": "code-is-decision-vs-fixture-adult-patient-casefeature",
+  "meta": {
+    "profile": [
+      "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-publishablecasefeature"
+    ]
+  },
+  "extension": [
+    {
+      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-knowledgeCapability",
+      "valueCode": "shareable"
+    },
+    {
+      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-knowledgeCapability",
+      "valueCode": "computable"
+    },
+    {
+      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-knowledgeCapability",
+      "valueCode": "publishable"
+    },
+    {
+      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-knowledgeRepresentationLevel",
+      "valueCode": "structured"
+    },
+    {
+      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-featureExpression",
+      "valueExpression": {
+        "language": "text/cql-identifier",
+        "expression": "Adult Patient",
+        "reference": "http://example.org/crl/code-is-decision-vs/Library/code-is-decision-vs-fixture-interface"
+      }
+    }
+  ],
+  "url": "http://example.org/crl/code-is-decision-vs/StructureDefinition/code-is-decision-vs-fixture-adult-patient-casefeature",
+  "version": "1.0.0",
+  "name": "AdultPatient",
+  "title": "Adult Patient",
+  "status": "draft",
+  "experimental": true,
+  "date": "2020-01-01T00:00:00.000Z",
+  "publisher": "unknown",
+  "description": "Adult Patient case feature determination",
+  "kind": "resource",
+  "abstract": false,
+  "type": "Observation",
+  "baseDefinition": "http://hl7.org/fhir/StructureDefinition/Observation",
+  "derivation": "constraint",
+  "differential": {
+    "element": [
+      {
+        "id": "Observation",
+        "path": "Observation"
+      },
+      {
+        "id": "Observation.code",
+        "path": "Observation.code",
+        "min": 1,
+        "max": "1",
+        "mustSupport": true,
+        "patternCodeableConcept": {
+          "coding": [
+            {
+              "system": "http://example.org/crl/code-is-decision-vs/CodeSystem/code-is-decision-vs-fixture-local",
+              "code": "adult-18-or-older",
+              "display": "Adult Patient"
+            }
+          ]
+        }
+      },
+      {
+        "id": "Observation.value[x]",
+        "path": "Observation.value[x]",
+        "min": 1,
+        "max": "1",
+        "mustSupport": true,
+        "type": [
+          {
+            "code": "boolean"
+          }
+        ]
+      },
+      {
+        "id": "Observation.subject",
+        "path": "Observation.subject",
+        "min": 1,
+        "max": "1",
+        "mustSupport": true,
+        "type": [
+          {
+            "code": "Reference",
+            "targetProfile": [
+              "http://hl7.org/fhir/StructureDefinition/Patient"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "Observation.effective[x]",
+        "path": "Observation.effective[x]",
+        "min": 1,
+        "max": "1",
+        "mustSupport": true,
+        "type": [
+          {
+            "code": "dateTime"
+          }
+        ]
+      }
+    ]
+  }
+}

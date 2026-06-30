@@ -47,6 +47,10 @@
     {
       "type": "depends-on",
       "resource": "http://example.org/crl/code-is-decision-vs/Library/code-is-decision-vs-fixture-localsource"
+    },
+    {
+      "type": "depends-on",
+      "resource": "http://example.org/crl/code-is-decision-vs/Library/code-is-decision-vs-fixture-recordsource"
     }
   ],
   "content": [

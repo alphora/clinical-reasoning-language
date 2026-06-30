@@ -1,0 +1,20 @@
+# casefeature-non-boolean — case-feature eligibility boundary fixture.
+library "Case Feature Non Boolean".
+
+// "Coded Determination" is a LocalSource concept (`code is`, lowered to a local
+// CodeSystem) but its value type is CodeableConcept, NOT boolean. It is driven
+// onto the decision surface, so the case-feature emit reaches it — but only a
+// boolean local-source determination can become a submittable case-feature
+// Observation profile. The emit must surface `emit-casefeature-non-boolean` and
+// sink success (no StructureDefinition emitted).
+
+concept "Coded Determination":
+- type is Observation.
+- value type is CodeableConcept.
+- code is `coded-det`.
+
+activity "Refer":
+- request CPGServiceRequest.
+
+decision "Coded Decision":
+- when "Coded Determination" then recommend activity "Refer".

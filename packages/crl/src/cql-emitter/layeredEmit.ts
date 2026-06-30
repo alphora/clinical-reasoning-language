@@ -860,7 +860,33 @@ function buildLayerAst(
  * error makes a missing re-export a clear failure, never a silent decision drop.
  */
 export function interfaceConceptNames(ast: CRL): string[] {
-  const names: string[] = [];
+  return interfaceSurface(ast).map((e) => e.name);
+}
+
+/**
+ * One entry of the INTERFACE SURFACE — a decision/action-guard-referenced concept
+ * paired with the SOURCE layer it classifies into (LocalSource / RecordSource /
+ * Inferred), or `undefined` when the name does not classify into any source layer
+ * (unknown name, or out of the source-layer set). The `sourceLayer` is read from
+ * `buildNameLayerMaps(ast, FULL_PARTITION).concept` — the SAME map that drives the
+ * Interface re-export synthesis (`buildInterfaceReexports`) — so a downstream
+ * consumer (e.g. the FHIR case-feature StructureDefinition emit) can never drift
+ * from which concepts the Interface actually re-exports.
+ *
+ * Names are deduped in stable first-seen order; a QUALIFIED ref (`"OtherLib"."X"`)
+ * is SKIPPED (F5 — v0-unsupported cross-library concept ref), matching the
+ * re-export synthesis. This is the SINGLE source of truth for "which decision
+ * concepts exist, and what source layer each is"; `interfaceConceptNames`
+ * delegates to it (names only).
+ *
+ * NOTE: pass the LOWERED ast (post-`lowerLocalCodes`). A raw `code is` concept
+ * still carries `stmt.code`, so `classifyStatementLayer` returns `null` (out of
+ * scope) and its `sourceLayer` would be `undefined`; the lowered form presents as
+ * a `CodedFromDefinition` → `LocalSource`.
+ */
+export function interfaceSurface(ast: CRL): { name: string; sourceLayer: Layer | undefined }[] {
+  const maps = buildNameLayerMaps(ast, FULL_PARTITION);
+  const out: { name: string; sourceLayer: Layer | undefined }[] = [];
   const seen = new Set<string>();
   const add = (ref: ReferenceName): void => {
     // F5 — SKIP a qualified ref (`"OtherLib"."X"`). Cross-library concept refs in
@@ -872,7 +898,7 @@ export function interfaceConceptNames(ast: CRL): string[] {
     const name = getRefName(ref);
     if (!seen.has(name)) {
       seen.add(name);
-      names.push(name);
+      out.push({ name, sourceLayer: maps.concept.get(name) });
     }
   };
   const walkBlock = (body: WhenBlockBody | BlockBody): void => {
@@ -899,7 +925,7 @@ export function interfaceConceptNames(ast: CRL): string[] {
     if (stmt.type !== "Decision") continue;
     for (const branch of stmt.body.statements) walkMember(branch);
   }
-  return names;
+  return out;
 }
 
 /**

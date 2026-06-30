@@ -46,15 +46,17 @@ import type { ImportDiagnostic, ResolvedGraph } from "../imports/types";
 import type { CRLError } from "../types/errors";
 
 import { lowerLocalCodes } from "../cql-emitter/lowerLocalCodes";
+import { interfaceSurface } from "../cql-emitter/layeredEmit";
 
 import { emitActivityDefinitionsForLibrary, type TerminologyResolver } from "./activity";
+import { emitCaseFeatureStructureDefinition } from "./structureDefinition";
 import { emitLocalCodeSystem } from "./codeSystem";
 import { emitDecisionPlanDefinition, type ActivityResolver, type ConceptResolver, type DecisionResolver } from "./decision";
 import { emitLibrary, libraryCanonicalUrl } from "./library";
 import { readPackageMetadata } from "./metadata";
 import { resolveEmitClock } from "./reproDate";
 import { emitRecommendationDefinitionsForLibrary } from "./recommendation";
-import { isFhirDefError } from "./types";
+import { CPG_FEATURE_EXPRESSION_EXT, isFhirDefError } from "./types";
 import type { CpgMetadata, EmitOptions, EmittedResource, UnmatchedReference } from "./types";
 import { emitValueSetsForLibrary } from "./valueSet";
 
@@ -348,6 +350,29 @@ function classifyClosureDecisions(
 // (decision.ts) and closure-level (this file) cycle detection — v2.4.0
 // round-5 Gemini disposition.
 
+/**
+ * Case-feature boolean rule (case-feature StructureDefinition emit).
+ *
+ * A concept's value type RESOLVES TO BOOLEAN — i.e. it is a true/false
+ * determination submittable as an `Observation.value[x]: boolean` case feature —
+ * iff its `valueTypes` is EXACTLY `["boolean"]` (single-valued, boolean).
+ *
+ * Decisions / non-resolutions, with rationale grounded in the existing codebase:
+ *   - EMPTY `valueTypes` → NOT boolean. `valueTypes` is 0..* optional; NOTHING in
+ *     the codebase deduces a default boolean for an empty list (emitCQL.ts's
+ *     `declaredShapeOfConcept` keys on `includes("boolean")`, and the CEL
+ *     validator treats an absent value type as non-boolean). The deliverable
+ *     `code is` decision concepts explicitly declare `value type is boolean`, so
+ *     empty is a real omission → diagnostic, not a silent default.
+ *   - MULTI-VALUED (even if it includes "boolean") → NOT boolean. A case feature
+ *     Observation fixes a single `value[x]: boolean`; a concept that also carries
+ *     a non-boolean value type is not a clean boolean determination → diagnostic.
+ *   - Single `["boolean"]` → boolean (the only resolving case).
+ */
+function resolvesToBoolean(concept: Concept | undefined): boolean {
+  return concept !== undefined && concept.valueTypes.length === 1 && concept.valueTypes[0] === "boolean";
+}
+
 /* ─── Closure invariants ────────────────────────────────────────────── */
 
 function isUnderCanonicalBase(url: string, base: string): boolean {
@@ -434,7 +459,7 @@ export function applyUrlUniquenessInvariant(resources: ReadonlyArray<EmittedReso
 /**
  * Inv 2 — Library-existence guarantee + Library.relatedArtifact integrity.
  */
-function applyInvariant2(
+export function applyInvariant2(
   resources: ReadonlyArray<EmittedResource>,
   droppedPaths: Set<string>,
   metadata: CpgMetadata,
@@ -480,6 +505,32 @@ function applyInvariant2(
           type: "Validation",
           kind: "unresolved-related-artifact",
           message: `Library "${r.sourceName ?? r.relativePath}" depends-on "${url}" which was not emitted${context}.`,
+        });
+      }
+    }
+  }
+
+  // (c) StructureDefinition cpg-featureExpression reference integrity. Each
+  // emitted case-feature StructureDefinition carries a
+  // `extension[cpg-featureExpression].valueExpression.reference` pointing at the
+  // policy's `<policyId>-Interface` Library canonical. That reference must
+  // resolve to an emitted Library — a dangling case-feature reference (e.g. a
+  // malformed manifest with LocalSource concepts but no Interface entry) is a
+  // closure-integrity failure, the same class as a dangling `library[]`.
+  for (const r of resources) {
+    if (r.resourceType !== "StructureDefinition") continue;
+    const ext = (r.resource as { extension?: Array<{ url?: string; valueExpression?: { reference?: unknown } }> }).extension;
+    if (!Array.isArray(ext)) continue;
+    for (const e of ext) {
+      if (e.url !== CPG_FEATURE_EXPRESSION_EXT) continue;
+      const ref = e.valueExpression?.reference;
+      if (typeof ref !== "string") continue;
+      if (!emittedUrls.has(ref)) {
+        const context = downstreamContext(ref, droppedPaths);
+        errors.push({
+          type: "Validation",
+          kind: "unresolved-feature-expression-reference",
+          message: `StructureDefinition "${r.sourceName ?? r.relativePath}" cpg-featureExpression references "${ref}" which was not emitted${context}.`,
         });
       }
     }
@@ -1044,6 +1095,101 @@ export function emitFhirDefClosure(
       if (decResult.resource) resources.push(decResult.resource);
       errors.push(...decResult.errors);
       unmatched.push(...decResult.unmatched);
+    }
+
+    // (6) Case-feature StructureDefinitions — one per eligible interface concept.
+    //
+    // STRUCTURAL gate FIRST: only a decision-bearing source has an Interface
+    // surface to publish (cms22/cms69 carry NO decisions → this is a structural
+    // no-op, keeping their goldens byte-identical). When lowering errored we have
+    // no reliable local-code domain, so skip (the lowering error already sank
+    // success above).
+    //
+    // F1 — ALSO gate on the SAME `interfaceEntry` target the Decision PlanDef
+    // emit uses. The case-feature `cpg-featureExpression.reference` resolves to
+    // the `<policyId>-Interface` re-export Library via `libraryReferenceSuffix`;
+    // if there is no `role:"interface"` entry that suffix is "" (root-pointing),
+    // so the reference would DANGLE. For a decision-bearing interface-kind policy
+    // the interface entry always exists; gating here closes the malformed-manifest
+    // edge consistently with the decision skip above (no dangling reference).
+    if (lib.decisions.length > 0 && lowered.errors.length === 0 && interfaceEntry !== undefined) {
+      // The eligible set + each concept's source layer come from the SAME
+      // single source of truth the Interface re-export synthesis uses
+      // (`interfaceSurface`), so a case-feature profile can never address a
+      // concept the Interface does not re-export. Pass the LOWERED ast — a raw
+      // `code is` concept still carries `stmt.code` and would classify as null.
+      const surface = interfaceSurface(lowered.ast);
+
+      // `code` per concept name from the SAME `localCodes` that drives the local
+      // CodeSystem `concept[].code` (NOT the raw AST — lowering cleared `code`).
+      const codeByConcept = new Map<string, string>();
+      for (const lc of lowered.localCodes) codeByConcept.set(lc.concept, lc.code);
+
+      // `valueTypes` for the boolean check comes from the LOWERED ast Concept —
+      // lowering preserves `valueTypes` (`{ ...c, definition }`), so reading from
+      // `lowered.ast` (the SAME ast `interfaceSurface` classifies) drops the raw-
+      // vs-lowered seam: one ast, not two. Build a name→Concept map.
+      const conceptByName = new Map<string, Concept>();
+      for (const stmt of lowered.ast.statements) {
+        if (stmt.type === "Concept" && stmt.name) conceptByName.set(stmt.name, stmt);
+      }
+
+      for (const entry of surface) {
+        // SKIP RecordSource / Inferred (valid re-exports, just not locally
+        // submittable case-features) and any non-source-typed entry silently.
+        if (entry.sourceLayer !== "LocalSource") continue;
+        const concept = conceptByName.get(entry.name);
+        // A LocalSource interface concept whose value type does NOT resolve to
+        // boolean → a structured diagnostic, no profile.
+        if (!resolvesToBoolean(concept)) {
+          errors.push({
+            type: "Validation",
+            kind: "emit-casefeature-non-boolean",
+            message:
+              `Decision interface concept "${entry.name}" is a LocalSource determination but its value ` +
+              `type does not resolve to boolean (got ${
+                concept && concept.valueTypes.length > 0
+                  ? concept.valueTypes.map((v) => `"${v}"`).join("/")
+                  : "absent"
+              }). Only a boolean local-source determination can be emitted as a submittable case-feature ` +
+              `Observation profile.`,
+            ...(concept?.location
+              ? { line: concept.location.start.line, column: concept.location.start.column }
+              : {}),
+          });
+          continue;
+        }
+        const code = codeByConcept.get(entry.name);
+        if (code === undefined) {
+          // A LocalSource concept with no lowered local code is a contradiction
+          // (LocalSource ⟺ a lowered `code is`). Surface rather than emit a
+          // profile with an empty `code`.
+          errors.push({
+            type: "Validation",
+            kind: "emit-casefeature-missing-code",
+            message:
+              `LocalSource interface concept "${entry.name}" has no lowered local code to fix in the ` +
+              `case-feature Observation profile. The lowered local-code domain and the interface surface disagree.`,
+            // Mirror the non-boolean branch — the concept is in scope, so carry its
+            // location into the diagnostic when present.
+            ...(concept?.location
+              ? { line: concept.location.start.line, column: concept.location.start.column }
+              : {}),
+          });
+          continue;
+        }
+        const cfResult = emitCaseFeatureStructureDefinition(
+          entry.name,
+          code,
+          metadata,
+          resolvedOpts,
+          // The featureExpression references the Interface re-export library —
+          // the SAME suffix the decision/activity `library[]` resolve to.
+          libraryReferenceSuffix,
+        );
+        if (cfResult.resource) resources.push(cfResult.resource);
+        errors.push(...cfResult.errors);
+      }
     }
   }
 

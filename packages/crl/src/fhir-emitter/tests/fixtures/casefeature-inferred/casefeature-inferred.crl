@@ -1,0 +1,26 @@
+# casefeature-inferred — case-feature eligibility boundary fixture.
+library "Case Feature Inferred".
+
+// The decision surface references an INFERRED concept ("Derived", `defined as`).
+// An Inferred interface concept is a valid Interface re-export but is NOT a
+// submittable local-source case-feature → it is SKIPPED (no StructureDefinition).
+//
+// "Base" is a LocalSource boolean `code is` concept, but it is NOT on the
+// decision surface, so it is NOT emitted either — only the surface drives the
+// case-feature set. The net result: ZERO case-feature StructureDefinitions.
+
+concept "Base":
+- type is Observation.
+- value type is boolean.
+- code is `base-code`.
+
+concept "Derived":
+- type is Observation.
+- value type is boolean.
+- defined as "Base".
+
+activity "Refer":
+- request CPGServiceRequest.
+
+decision "Infer Decision":
+- when "Derived" then recommend activity "Refer".

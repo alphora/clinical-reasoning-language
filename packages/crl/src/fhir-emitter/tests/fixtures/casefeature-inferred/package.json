@@ -1,0 +1,12 @@
+{
+  "name": "casefeature-inferred-fixture",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Case-feature eligibility fixture — an Inferred decision-surface concept is skipped (no StructureDefinition)",
+  "crl": {
+    "canonicalBase": "http://example.org/crl/casefeature-inferred",
+    "status": "draft",
+    "experimental": true,
+    "date": "2020-01-01T00:00:00.000Z"
+  }
+}
