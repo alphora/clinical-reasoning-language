@@ -448,7 +448,11 @@ describe("authoring-kit — getAuthoringKit", () => {
     // Re-pinned (chaining-necessity reuse fix): `use decision` now serves source-delegation OR genuine REUSE (the SUR
     // cross-library shared determination IS reuse) — the line is genuinely-shared vs fabricated-shared, not reuse-vs-not.
     // Reworded the chaining-necessity rule/why/clauses + decision-composition rung 3 to match. KE skills pin this hash — re-sync.
-    expect(a.contentHash).toBe("611c406f68d8cf26af26e70eac015745ef813240595d26cc89915cceab70f260");
+    // Re-pinned (interface-concept-naming rule, #180): added the `interface-concept-naming` concept-model rule — name a
+    // decision's `when` (interface) concepts askably (the FHIR emit forms the case-feature input prompt as `<name>?`); the
+    // case-feature StructureDefinition + PlanDefinition action.input emit is TOP-LAYER directly-asserted only (recursive
+    // inferred-condition inputs deferred, #180). KE skills pin this hash — re-sync.
+    expect(a.contentHash).toBe("112d4e2319334bf6820b1d558de678d88aeff069c84ff7a9bcc5157ba38162ae");
   });
 
   it("STAGES contains exactly the one Stage-1 slice", () => {
