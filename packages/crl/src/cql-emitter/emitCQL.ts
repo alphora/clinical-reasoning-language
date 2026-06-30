@@ -1224,12 +1224,13 @@ class Emitter {
     const name = getRefName(ref);
     const lib = getRefLibrary(ref);
     if (lib === null) {
-      // Bare ref → only a SAME-LAYER Inferred sibling self-qualifies (Fix 3). A
-      // bare name that is NOT an Inferred concept is NOT a truth-set leaf this
-      // lane models — return null so the caller surfaces it via legacy handling
-      // instead of fabricating a dangling `<inferredLib>."name"`.
+      // Bare ref → a SAME-LAYER Inferred sibling (the requalifier drops the
+      // qualifier for same-layer targets). A bare name that is NOT an Inferred
+      // concept is NOT a truth-set leaf this lane models — return null so the
+      // caller surfaces it via legacy handling instead of fabricating a dangling
+      // `<inferredLib>."name"`.
       if (this.conceptNames.has(name)) {
-        return cqlQualifiedRef(inferredLibrary, name);
+        return this.inferredSiblingRef(name);
       }
       return null;
     }
@@ -1237,7 +1238,7 @@ class Emitter {
       return `${cqlQualifiedRef(localSourceLibrary, name)}.asTruths()`;
     }
     if (lib === inferredLibrary) {
-      return cqlQualifiedRef(inferredLibrary, name);
+      return this.inferredSiblingRef(name);
     }
     // Fix 2 [important] — a RecordSource (`coded from`) operand woven into a
     // truth-set (LocalSource/Inferred) `defined as` composition. This is the
@@ -1265,6 +1266,24 @@ class Emitter {
     }
     // Foreign / unrecognized qualifier → not a truth-set leaf this lane models.
     return null;
+  }
+
+  /**
+   * Render an Inferred→Inferred truth-set sibling ref. When the Inferred sibling
+   * lives in the CURRENT emitting library (the common same-library case — a
+   * `defined as` define referencing another `defined as` define in the same
+   * `<policyId>-Inferred` layer), emit it BARE (`"A And B"`): a library cannot
+   * reference its own define by its own library name — the CQL translator rejects
+   * `"<lib>-Inferred"."A And B"` with `Could not resolve identifier
+   * <lib>-Inferred`. Only a genuinely cross-library Inferred operand is qualified.
+   * Mirrors the measure lane's same-library-bare behavior.
+   */
+  private inferredSiblingRef(name: string): string {
+    const { inferredLibrary } = this.caseFeature as { inferredLibrary: string };
+    if (inferredLibrary === this.options.libraryName) {
+      return cqlIdent(name);
+    }
+    return cqlQualifiedRef(inferredLibrary, name);
   }
 
   /** Truth-set bare-ref `defined as` (used by the fold-in helper). */

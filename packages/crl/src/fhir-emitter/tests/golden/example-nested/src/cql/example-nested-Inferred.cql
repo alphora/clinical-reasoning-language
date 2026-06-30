@@ -14,5 +14,5 @@ define "A And B":
     intersect "example-nested-LocalSource"."Diagnosis B".asTruths()
 
 define "Top":
-  "example-nested-Inferred"."A And B"
+  "A And B"
     union "example-nested-LocalSource"."Diagnosis C".asTruths()

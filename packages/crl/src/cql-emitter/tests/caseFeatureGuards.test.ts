@@ -133,9 +133,13 @@ concept "Top":
     expect(cql).toContain("Ghost");
   });
 
-  it("a VALID same-layer Inferred sibling bare ref STILL self-qualifies (happy path intact)", () => {
-    // Regression guard for Fix 3: `Top` bare-refs `A And B`, a real Inferred
-    // sibling, which MUST still resolve to `"Pol-Inferred"."A And B"`.
+  it("a VALID same-library Inferred sibling bare ref stays BARE (a library cannot qualify its own define)", () => {
+    // `Top` bare-refs `A And B`, a real Inferred sibling in the SAME emitted
+    // `Pol-Inferred` library. A define MUST NOT be referenced via its own library
+    // name (`"Pol-Inferred"."A And B"` makes the CQL translator reject
+    // `Could not resolve identifier Pol-Inferred`); the same-library ref stays
+    // BARE (`"A And B"`), matching the measure lane. Only genuinely cross-library
+    // Inferred operands are qualified.
     const a = ast(`library "Pol".
 
 concept "Diagnosis A":
@@ -163,6 +167,9 @@ concept "Top":
     const result = emitPartitioned(lowered.ast, "Pol", "Pol", FULL_PARTITION);
     expect(result.success).toBe(true);
     const inferred = result.entries.find((e) => e.layer === "Inferred");
-    expect(inferred?.result.result).toContain('"Pol-Inferred"."A And B"');
+    const cql = inferred?.result.result ?? "";
+    // BARE same-library ref, NOT the self-qualified form.
+    expect(cql).toContain('"A And B"');
+    expect(cql).not.toContain('"Pol-Inferred"."A And B"');
   });
 });
