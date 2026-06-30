@@ -487,7 +487,7 @@ describe("decision — emitDecisionPlanDefinitionsForLibrary", () => {
     );
     const rootR = (resources.find((r) => (r.resource as { id: string }).id === "lib-root")!.resource as Record<string, unknown>);
     const action = (rootR.action as Array<Record<string, unknown>>)[0]!;
-    expect(action.definitionCanonical).toBe(planDefinitionCanonicalUrl(METADATA.canonicalBase, "Lib", "Sub"));
+    expect(action.definitionCanonical).toBe(planDefinitionCanonicalUrl(METADATA, "Sub"));
   });
 
   it("Recommend activity in decision → definitionCanonical = recommendationDefinitionCanonicalUrl", () => {
@@ -497,7 +497,7 @@ describe("decision — emitDecisionPlanDefinitionsForLibrary", () => {
     );
     const r = resources[0]!.resource as Record<string, unknown>;
     const action = (r.action as Array<Record<string, unknown>>)[0]!;
-    expect(action.definitionCanonical).toBe(recommendationDefinitionCanonicalUrl(METADATA.canonicalBase, "Lib", "A"));
+    expect(action.definitionCanonical).toBe(recommendationDefinitionCanonicalUrl(METADATA, "A"));
   });
 
   it("library[0] byte-equals libraryCanonicalUrl", () => {
@@ -506,7 +506,7 @@ describe("decision — emitDecisionPlanDefinitionsForLibrary", () => {
       [d], [activity("A")], [concept("C")], "Lib", METADATA, { clock: FIXED_CLOCK },
     );
     const r = resources[0]!.resource as Record<string, unknown>;
-    expect((r.library as string[])[0]).toBe(libraryCanonicalUrl(METADATA.canonicalBase, "Lib"));
+    expect((r.library as string[])[0]).toBe(libraryCanonicalUrl(METADATA));
   });
 
   it("cycle: A → B → A → circular-decision-reference + skip both", () => {

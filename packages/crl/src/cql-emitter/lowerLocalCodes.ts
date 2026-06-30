@@ -11,9 +11,11 @@
  *
  *   - A synthetic local `Terminology` named after the concept, carrying ONE
  *     `code` entry (the `code is` literal) from a deterministic local
- *     codesystem URN `urn:crl:codesystem:<slug>-local` (slug = lowercase-hyphen
- *     of the LIBRARY name — the single implicit local domain; every local code
- *     shares it). The CQL emitter stays FHIR-free: no canonicalBase, just a URN.
+ *     codesystem URN `urn:crl:codesystem:<slug>-local` (R1 — slug = lowercase-
+ *     hyphen of the POLICY ID `localDomainId`/`metadata.name` when the FHIR/
+ *     imports lane threads it; the single implicit per-policy local domain, every
+ *     local code shares it. Falls back to the source LIBRARY name only for direct
+ *     metadata-less callers). The CQL emitter stays FHIR-free: no canonicalBase, just a URN.
  *     `detectCollisions` (emitCQL.ts) sees the synthetic terminology collide
  *     with the same-named concept and suffixes its emit name to `"<Concept>
  *     Code"` (per-CRL path only — see the EMITTED IDENTIFIER NOTE below for why
@@ -126,6 +128,16 @@ export interface LowerLocalCodesOptions {
    * stay byte-equal.
    */
   canonicalBase?: string;
+  /**
+   * R1 — the POLICY ID (`metadata.name` / package.json `name`) that slugs the
+   * local-domain CodeSystem URL. The FHIR lane derives its `CodeSystem.url` (and
+   * every other resource id) from the policy id, so the CQL lane's synthetic
+   * `codesystem '<url>'` MUST slug from the SAME policy id to stay byte-equal.
+   * When undefined (direct CLI/single-file callers without package.json metadata),
+   * the url falls back to slugging the source library name — the pre-R1 behavior —
+   * so those callers (which have no FHIR lane to diverge from) are unaffected.
+   */
+  localDomainId?: string;
 }
 
 /**
@@ -142,12 +154,18 @@ export interface LowerLocalCodesOptions {
  * without a package.json — it falls back to the plain URN
  * `urn:crl:codesystem:<slug>-local`. The CQL and FHIR identities MUST stay
  * byte-equal, so BOTH lanes call THIS helper.
+ *
+ * R1 — `localDomainId` is the slug SOURCE: the FHIR/imports lanes pass the POLICY
+ * ID (`metadata.name`) so the local-domain url shares the policy-id base with
+ * every other emitted FHIR resource id; direct callers without metadata pass the
+ * source LIBRARY NAME (pre-R1 behavior). The function just slugs whatever it is
+ * given — the CALLER decides which identity is authoritative for the domain.
  */
 export function localCodeSystemUrl(
   canonicalBase: string | undefined,
-  libraryName: string,
+  localDomainId: string,
 ): string {
-  const slug = localSlug(libraryName);
+  const slug = localSlug(localDomainId);
   if (canonicalBase) {
     // Normalize a trailing slash so the url is stable regardless of whether the
     // caller's canonicalBase ends in `/`. The FHIR-metadata loader already
@@ -272,13 +290,15 @@ export function lowerLocalCodes(
   const loweredConcepts: Concept[] = [];
   const localCodes: Array<{ concept: string; code: string; conceptType: string }> = [];
   const syntheticTerminologies: Terminology[] = [];
-  // The local-domain URN follows the SOURCE policy library identity
-  // (`ast.library.name`), NOT the emitted-layer library name. `emitCQLFromAST`
-  // may emit under a different `options.libraryName` (e.g. the layered
-  // "<Lib> Concepts"), but the local domain belongs to the source CRL, so the
-  // URN won't follow `options.libraryName` — a direct caller passing it should
-  // expect the URN to slug from `ast.library.name`.
-  const urn = localCodeSystemUrl(opts.canonicalBase, ast.library.name);
+  // The local-domain URN slug source: R1 — the POLICY ID (`opts.localDomainId`,
+  // from package.json `name`) when the imports/FHIR lane provides it, so the CQL
+  // `codesystem '<url>'` byte-equals the FHIR `CodeSystem.url` (both policy-id
+  // based). Falls back to the SOURCE policy library identity (`ast.library.name`)
+  // for direct callers without metadata (CLI / single-file) — pre-R1 behavior.
+  // It NEVER follows the emitted-layer library name (`emitCQLFromAST`'s
+  // `options.libraryName` may be the layered "<Lib> Concepts"); the local domain
+  // belongs to the source policy, not the layer.
+  const urn = localCodeSystemUrl(opts.canonicalBase, opts.localDomainId ?? ast.library.name);
 
   // Slice 4b — the ONE shared domain `codesystem` DECLARATION name, derived from
   // the SOURCE policy library identity (`ast.library.name`), NOT the emitted-layer

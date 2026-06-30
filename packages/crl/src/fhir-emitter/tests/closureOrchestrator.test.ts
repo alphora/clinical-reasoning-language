@@ -173,7 +173,7 @@ describe("closureOrchestrator — FHIR closure code-is coverage (T2)", () => {
     expect(codeSystems).toHaveLength(1);
     const cs = codeSystems[0]!.resource as Record<string, unknown>;
     expect(cs.url).toBe(
-      "http://example.org/crl/code-is-basic/CodeSystem/code-is-basic-local",
+      "http://example.org/crl/code-is-basic/CodeSystem/code-is-basic-fixture-local",
     );
     // The two `code is`-only concepts → concept[] (the `defined as` concept is NOT a local code).
     expect(cs.concept).toEqual([
@@ -209,7 +209,7 @@ describe("closureOrchestrator — FHIR closure code-is coverage (T2)", () => {
     const asserted = byTitle.get("Code Is Basic Asserted")!;
     const assertedDeps = ((asserted.relatedArtifact as Array<{ resource?: string }>) ?? []).map((e) => e.resource);
     expect(assertedDeps).toContain(
-      "http://example.org/crl/code-is-basic/Library/code-is-basic-concepts",
+      "http://example.org/crl/code-is-basic/Library/code-is-basic-fixture-concepts",
     );
     // D1: the FULL-split Concepts LAYER is now `role:"concepts"`, so it owns the
     // local CodeSystem depends-on edge (restoring the pre-4c terminology edge that
@@ -218,7 +218,7 @@ describe("closureOrchestrator — FHIR closure code-is coverage (T2)", () => {
     const concepts = byTitle.get("Code Is Basic Concepts")!;
     const conceptsDeps = ((concepts.relatedArtifact as Array<{ resource?: string }>) ?? []).map((e) => e.resource);
     expect(conceptsDeps).toContain(
-      "http://example.org/crl/code-is-basic/CodeSystem/code-is-basic-local",
+      "http://example.org/crl/code-is-basic/CodeSystem/code-is-basic-fixture-local",
     );
   });
 
@@ -229,7 +229,9 @@ describe("closureOrchestrator — FHIR closure code-is coverage (T2)", () => {
       .resource as { url: string }).url;
 
     // The shared helper must agree with both lanes for the same library entry.
-    expect(csUrl).toBe(localCodeSystemUrl("http://example.org/crl/code-is-basic", "Code Is Basic"));
+    // R1 — the local-domain slug is the fixture's POLICY ID (package name
+    // "code-is-basic-fixture"), not the library name "Code Is Basic".
+    expect(csUrl).toBe(localCodeSystemUrl("http://example.org/crl/code-is-basic", "code-is-basic-fixture"));
 
     // CQL lane — the emitted CQL must carry a `codesystem '<csUrl>'` literal
     // byte-equal with the FHIR CodeSystem.url.

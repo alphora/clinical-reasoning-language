@@ -1,0 +1,62 @@
+{
+  "resourceType": "ActivityDefinition",
+  "id": "cms69-split-order-weight-assessment-referral",
+  "meta": {
+    "profile": [
+      "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-servicerequestactivity",
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareableactivitydefinition",
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-publishableactivitydefinition"
+    ]
+  },
+  "extension": [
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "shareable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "computable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "publishable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeRepresentationLevel",
+      "valueCode": "structured"
+    }
+  ],
+  "url": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/ActivityDefinition/cms69-split-order-weight-assessment-referral",
+  "version": "1.0.0",
+  "name": "Cms69BmiScreeningGpgStrategyExampleOrderWeightAssessmentReferral",
+  "title": "Order Weight Assessment Referral",
+  "status": "draft",
+  "experimental": true,
+  "date": "2020-01-01T00:00:00.000Z",
+  "publisher": "Smile Digital Health",
+  "description": "Patient has documented high BMI without a current referral",
+  "library": [
+    "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/Library/cms69-split"
+  ],
+  "kind": "ServiceRequest",
+  "profile": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-servicerequest",
+  "intent": "proposal",
+  "doNotPerform": false,
+  "code": {
+    "coding": [
+      {
+        "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-activity-type-cs",
+        "code": "order-service"
+      }
+    ]
+  },
+  "dynamicValue": [
+    {
+      "path": "code",
+      "expression": {
+        "language": "text/cql-identifier",
+        "expression": "Weight Assessment Referrals VS"
+      }
+    }
+  ]
+}

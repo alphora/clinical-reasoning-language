@@ -180,8 +180,8 @@ function makeResolversForSourceLibrary(
     if (isQualifiedRef(normalized)) return null; // cross-library v0: unsupported
     const name = getRefName(normalized);
     if (!index.activities.get(sourceLibraryName)?.has(name)) return null;
-    // Recommendation canonical URL for source library's activity
-    return `${metadata.canonicalBase}/PlanDefinition/${recommendationIdForLib(sourceLibraryName, name)}`;
+    // Recommendation canonical URL for source library's activity (R1 — policy-id base)
+    return `${metadata.canonicalBase}/PlanDefinition/${recommendationIdForLib(metadata, name)}`;
   };
 
   const decisionResolver: DecisionResolver = (ref) => {
@@ -193,13 +193,15 @@ function makeResolversForSourceLibrary(
       const key = qualifiedKey([targetLib, targetName]);
       if (cycleMemberKeys.has(key)) return null;
       if (!index.decisions.get(targetLib)?.has(targetName)) return null;
-      return `${metadata.canonicalBase}/PlanDefinition/${decisionIdForLib(targetLib, targetName)}`;
+      // R1 — policy-id base (single per-closure policy id; cross-library decision
+      // targets share it, matching the emitter's `decisionId`).
+      return `${metadata.canonicalBase}/PlanDefinition/${decisionIdForLib(metadata, targetName)}`;
     }
     const name = getRefName(normalized);
     const key = qualifiedKey([sourceLibraryName, name]);
     if (cycleMemberKeys.has(key)) return null;
     if (!index.decisions.get(sourceLibraryName)?.has(name)) return null;
-    return `${metadata.canonicalBase}/PlanDefinition/${decisionIdForLib(sourceLibraryName, name)}`;
+    return `${metadata.canonicalBase}/PlanDefinition/${decisionIdForLib(metadata, name)}`;
   };
 
   const terminologyResolver: TerminologyResolver = (ref) => {
@@ -216,15 +218,19 @@ function makeResolversForSourceLibrary(
 
 /* ─── slug helpers (mirror per-emit-module slug rules) ──────────────── */
 
-import { capSlug, capSlugForSuffix, slugify } from "./slug";
+import { capSlug, capSlugForSuffix, policyIdBase, slugify } from "./slug";
 import { tarjanSCC } from "./tarjan";
 
-function decisionIdForLib(libraryName: string, decisionName: string): string {
-  return capSlug(`${slugify(libraryName)}-${slugify(decisionName)}`);
+// R1 — id BASE is the policy id (`policyIdBase(metadata)`), shared across the
+// whole closure; the declaration-name slug is the per-resource suffix. These
+// mirror the per-emit-module slug rules (decision.ts / recommendation.ts) so the
+// resolver-produced `definitionCanonical` byte-equals the emitter-produced `url`.
+function decisionIdForLib(metadata: CpgMetadata, decisionName: string): string {
+  return capSlug(`${policyIdBase(metadata)}-${slugify(decisionName)}`);
 }
 
-function recommendationIdForLib(libraryName: string, activityName: string): string {
-  return capSlugForSuffix(`${slugify(libraryName)}-${slugify(activityName)}`, "-recommendation");
+function recommendationIdForLib(metadata: CpgMetadata, activityName: string): string {
+  return capSlugForSuffix(`${policyIdBase(metadata)}-${slugify(activityName)}`, "-recommendation");
 }
 
 /* ─── Closure-level Decision classification + cycle detection ───────── */
@@ -765,7 +771,13 @@ export function emitFhirDefClosure(
     // moves: in the multi-entry branch it is owned by the `<source> Concepts`
     // Library (where the local codes now live), not the source-wide Root.
     let csUrl: string | undefined;
-    const lowered = lowerLocalCodes(lib.ast, { canonicalBase: metadata.canonicalBase });
+    // R1 — thread the POLICY ID (`metadata.name`) as the local-domain slug source
+    // so the lowering's synthetic `codesystem '<url>'` byte-equals the
+    // policy-id-based FHIR `CodeSystem.url` emitted at the CodeSystem step below.
+    const lowered = lowerLocalCodes(lib.ast, {
+      canonicalBase: metadata.canonicalBase,
+      localDomainId: metadata.name,
+    });
     if (lowered.errors.length > 0) {
       errors.push(...lowered.errors);
     } else {
@@ -802,12 +814,24 @@ export function emitFhirDefClosure(
     //                       Concepts layer owns the CodeSystem/VS edges. See the
     //                       FOLLOW-UP below re: cms inter-layer deps.
     const manifestEntries = manifestBySource.get(lib.libraryName) ?? [];
+    // R1 — the policy-id Library id SUFFIX for an emitted CQL library. The Root
+    // (cqlLibraryName === the source name) keeps the bare `<policyIdBase>` id
+    // (suffix ""); every split sibling `<source> <Layer>` contributes the layer
+    // token (e.g. "Concepts" → "concepts", "Asserted" → "asserted") as the suffix
+    // so its id is `<policyIdBase>-<layer>`. Uniform derivation over the
+    // cqlLibraryName covers BOTH the partial Concepts entry and full-split
+    // Asserted/Inferred layers without consulting `role`.
+    const idSuffixFor = (cqlLibraryName: string): string =>
+      cqlLibraryName === lib.libraryName
+        ? ""
+        : slugify(cqlLibraryName.slice(lib.libraryName.length).trim());
     const emitOneLibrary = (
       libraryName: string,
       dependsOn: ReadonlyArray<string>,
       cqlFileName: string,
     ): void => {
-      const libResult = emitLibrary(libraryName, metadata, dependsOn, cqlFileName, resolvedOpts);
+      const idSuffix = idSuffixFor(libraryName);
+      const libResult = emitLibrary(libraryName, metadata, dependsOn, cqlFileName, resolvedOpts, idSuffix);
       if (libResult.resource) {
         // Plan v3.2 §"emitLibrary post-decorate"
         libResult.resource.sourceKind = "Library";
@@ -852,7 +876,10 @@ export function emitFhirDefClosure(
       // source count — a foreign `include` is an external dep, not threaded here).
       const siblingCanonicals = new Map<string, string>();
       for (const e of manifestEntries) {
-        siblingCanonicals.set(e.libraryName, libraryCanonicalUrl(metadata.canonicalBase, e.libraryName));
+        // R1 — each sibling's Library canonical is keyed on the policy id + the
+        // sibling's id suffix (Root → "", Concepts/layer → its layer token), so a
+        // Root→Concepts depends-on edge byte-equals the Concepts Library's `url`.
+        siblingCanonicals.set(e.libraryName, libraryCanonicalUrl(metadata, idSuffixFor(e.libraryName)));
       }
       for (const entry of manifestEntries) {
         const cqlFileName = `../../cql/${entry.outputFilename}`;

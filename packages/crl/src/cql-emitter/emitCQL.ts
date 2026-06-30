@@ -107,6 +107,14 @@ export interface EmitOptions {
    * a package.json (CLI / single-file `emitCQL`), which fall back to the URN.
    */
   canonicalBase?: string;
+  /**
+   * R1 — the POLICY ID (`metadata.name`) that slugs the synthetic local-domain
+   * CodeSystem URL, threaded to `lowerLocalCodes` so the CQL `codesystem '<url>'`
+   * byte-equals the policy-id-based FHIR `CodeSystem.url`. Undefined for direct
+   * callers without package.json metadata → falls back to the source library name
+   * (pre-R1 behavior).
+   */
+  localDomainId?: string;
 }
 
 /**
@@ -420,7 +428,10 @@ export function emitCQLFromAST(ast: CRL, options: EmitOptions = {}): EmitResult 
     // pass is idempotent (clears `Concept.code`), so a re-entry from the layered
     // path (`emitLayered` → `emitCQLFromAST`) is a no-op. Hard errors (mixed
     // code+definition, empty code, missing type, duplicate code) short-circuit.
-    const lowered = lowerLocalCodes(ast, { canonicalBase: options.canonicalBase });
+    const lowered = lowerLocalCodes(ast, {
+      canonicalBase: options.canonicalBase,
+      localDomainId: options.localDomainId,
+    });
     if (lowered.errors.length > 0) {
       return { success: false, errors: lowered.errors };
     }
@@ -568,6 +579,9 @@ class Emitter {
       // (before the Emitter is constructed); the Emitter itself never reads it.
       // Kept on the Required<EmitOptions> shape for type completeness.
       canonicalBase: options.canonicalBase ?? "",
+      // `localDomainId` (R1) is likewise consumed by `lowerLocalCodes` before
+      // construction; kept here only for the Required<EmitOptions> shape.
+      localDomainId: options.localDomainId ?? "",
     };
     this.indexNames();
     this.detectCollisions();

@@ -45,7 +45,7 @@ import {
   lookupCpgActivityProfile,
 } from "./cpgActivityProfiles";
 import { libraryCanonicalUrl } from "./library";
-import { capSlug, pascalCaseName, slugify } from "./slug";
+import { capSlug, pascalCaseName, policyIdBase, slugify } from "./slug";
 import { crmiCapabilityProfiles, isPublishablePlus, knowledgeExtensions } from "./types";
 import type {
   CpgMetadata,
@@ -75,17 +75,18 @@ export type TerminologyResolver = (termName: ReferenceName) => string | null;
  * is the single source of truth, preventing the same class of bug that
  * round-2 caught for Library URLs.
  *
- * Slug rule is `capSlug(<librarySlug>-<activitySlug>)`, identical to
- * what `emitActivityDefinition` uses for the resource id. canonicalBase
- * is assumed pre-normalized by the metadata loader (no trailing slash).
+ * R1 — slug rule is `capSlug(<policyIdBase>-<activitySlug>)`: the id BASE is the
+ * policy id (`metadata.name`), the SUFFIX is the activity declaration-name slug.
+ * Identical to what `emitActivityDefinition` uses for the resource id.
+ * canonicalBase is assumed pre-normalized by the metadata loader (no trailing
+ * slash).
  */
 export function activityDefinitionCanonicalUrl(
-  canonicalBase: string,
-  libraryName: string,
+  metadata: CpgMetadata,
   activityName: string,
 ): string {
-  const id = capSlug(`${slugify(libraryName)}-${slugify(activityName)}`);
-  return `${canonicalBase}/ActivityDefinition/${id}`;
+  const id = capSlug(`${policyIdBase(metadata)}-${slugify(activityName)}`);
+  return `${metadata.canonicalBase}/ActivityDefinition/${id}`;
 }
 
 /**
@@ -131,7 +132,8 @@ export function emitActivityDefinition(
     });
   }
 
-  const id = capSlug(`${librarySlug}-${activitySlug}`);
+  // R1 — id BASE is the policy id; the activity-name slug is the SUFFIX.
+  const id = capSlug(`${policyIdBase(metadata)}-${activitySlug}`);
   const computableName = pascalCaseName(`${librarySlug} ${activitySlug}`);
 
   const title = activity.name;
@@ -149,8 +151,10 @@ export function emitActivityDefinition(
 
   const level = opts.capability ?? "publishable";
   const publishable = isPublishablePlus(level);
-  const url = activityDefinitionCanonicalUrl(metadata.canonicalBase, libraryName, activity.name);
-  const libraryUrl = libraryCanonicalUrl(metadata.canonicalBase, libraryName);
+  const url = activityDefinitionCanonicalUrl(metadata, activity.name);
+  // R1 — `library[]` points at the source-name-keeping Root Library (empty
+  // idSuffix), now keyed on the policy id.
+  const libraryUrl = libraryCanonicalUrl(metadata);
 
   const doNotPerform = activity.body.request.doNotPerform === true;
 
@@ -336,10 +340,10 @@ export function emitActivityDefinitionsForLibrary(
   const errors: CRLError[] = [];
   const unmatched: UnmatchedReference[] = [];
 
-  const librarySlug = slugify(libraryName);
+  const base = policyIdBase(metadata);
   const slugMap = new Map<string, Activity[]>();
   for (const a of activities) {
-    const id = capSlug(`${librarySlug}-${slugify(a.name)}`);
+    const id = capSlug(`${base}-${slugify(a.name)}`);
     const existing = slugMap.get(id) ?? [];
     existing.push(a);
     slugMap.set(id, existing);
@@ -358,7 +362,7 @@ export function emitActivityDefinitionsForLibrary(
   }
 
   for (const a of activities) {
-    const id = capSlug(`${librarySlug}-${slugify(a.name)}`);
+    const id = capSlug(`${base}-${slugify(a.name)}`);
     if ((slugMap.get(id)?.length ?? 0) > 1) continue;
     const { resource, errors: rErrors, unmatched: rUnmatched } =
       emitActivityDefinition(a, libraryName, metadata, terminologyResolver, opts);

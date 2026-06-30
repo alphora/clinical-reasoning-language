@@ -239,8 +239,11 @@ describe("emitCQLImports (per-CRL v2.1.0)", () => {
     // Concepts library: ONE shared codesystem decl + BARE code names (NO ` Code`
     // suffix — codes live alone here, no co-resident concept to collide with).
     const concepts = conceptsEntry?.cql ?? "";
+    // R1 — the local-domain URL now slugs from the project POLICY ID (package.json
+    // `name`, "crl-test-fixture"), NOT the library name; the codesystem DECL name
+    // ("Code Is Decision Local Codes") still derives from the library name.
     expect(concepts).toMatch(
-      /codesystem "Code Is Decision Local Codes": 'urn:crl:codesystem:code-is-decision-local'/,
+      /codesystem "Code Is Decision Local Codes": 'urn:crl:codesystem:crl-test-fixture-local'/,
     );
     expect(concepts.match(/^codesystem /gm)).toHaveLength(1);
     expect(concepts).toMatch(
@@ -269,15 +272,18 @@ describe("emitCQLImports (per-CRL v2.1.0)", () => {
   });
 
   it("cross-library local-codesystem URN collision → emit-local-codesystem-urn-collision (slice 3)", () => {
-    // Two DISTINCT local libraries ("Local One" / "Local-One") whose names slug
-    // to the SAME `urn:crl:codesystem:local-one-local`, both using `code is`.
-    // The preflight must fail loudly rather than emit a silently-shared domain.
+    // Two DISTINCT local libraries ("Local One" / "Local-One"), both using
+    // `code is`, in ONE project. R1 — the local-domain URN now slugs from the
+    // PROJECT POLICY ID (package.json `name`, "crl-test-fixture"), so BOTH
+    // libraries synthesize the SAME `urn:crl:codesystem:crl-test-fixture-local`
+    // and genuinely share the policy's local domain. The preflight must still fail
+    // loudly rather than emit a silently-shared domain.
     const root = path.join(FIXTURES, "local-codesystem-urn-collision", "root.crl");
     const result = emitCQLImports(root);
     expect(result.success).toBe(false);
     expect(result.cqlByLibrary).toHaveLength(0);
     expect(result.errors?.[0]?.kind).toBe("emit-local-codesystem-urn-collision");
-    expect(result.errors?.[0]?.message).toMatch(/local-one-local/);
+    expect(result.errors?.[0]?.message).toMatch(/crl-test-fixture-local/);
   });
 
   it("local parse-failure warnings don't block emission", () => {

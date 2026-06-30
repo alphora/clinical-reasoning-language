@@ -64,33 +64,52 @@ describe("CRL → FHIR partial-split golden (code-is-decision)", () => {
     expect(result.success).toBe(true);
   });
 
+  it("R1 byte-equality: the FHIR CodeSystem.url == the CQL `codesystem '<url>'` literal, both POLICY-ID slugged", () => {
+    const { emitCQLImports } = require("../../imports/emit") as typeof import("../../imports/emit");
+
+    // FHIR lane — the local CodeSystem url is policy-id based.
+    const cs = result.resources.find((r) => r.resourceType === "CodeSystem")!;
+    const csUrl = (cs.resource as { url: string }).url;
+    // Policy id is the fixture package name "code-is-decision-fixture", NOT the
+    // library-name slug "code-is-decision".
+    expect(csUrl).toBe("http://example.org/crl/code-is-decision/CodeSystem/code-is-decision-fixture-local");
+
+    // CQL lane — the emitted CQL carries a byte-equal `codesystem '<csUrl>'`.
+    const cql = emitCQLImports(FIXTURE);
+    expect(cql.success).toBe(true);
+    const allCql = cql.cqlByLibrary.map((e) => e.cql).join("\n");
+    expect(allCql).toContain(`'${csUrl}'`);
+  });
+
   it("emits exactly TWO Libraries (Root + Concepts) with the partial-split dep routing", () => {
     const libs = result.resources.filter((r) => r.resourceType === "Library");
     expect(libs).toHaveLength(2);
 
+    // R1 — ids derive from the fixture POLICY ID ("code-is-decision-fixture"),
+    // not the library-name slug ("code-is-decision").
     const byId = new Map(libs.map((l) => [l.resource.id as string, l.resource as Record<string, unknown>]));
-    const root = byId.get("code-is-decision")!;
-    const concepts = byId.get("code-is-decision-concepts")!;
+    const root = byId.get("code-is-decision-fixture")!;
+    const concepts = byId.get("code-is-decision-fixture-concepts")!;
     expect(root).toBeDefined();
     expect(concepts).toBeDefined();
 
     // Root keeps the SOURCE canonical (so PlanDef/ActivityDef library[] resolve).
-    expect(root.url).toBe("http://example.org/crl/code-is-decision/Library/code-is-decision");
+    expect(root.url).toBe("http://example.org/crl/code-is-decision/Library/code-is-decision-fixture");
     // Root content url + depends-on Concepts.
     expect((root.content as Array<{ url?: string }>)[0]?.url).toBe("../../cql/Code Is Decision.cql");
     expect((root.relatedArtifact as Array<{ type?: string; resource?: string }>).map((e) => e.resource)).toEqual([
-      "http://example.org/crl/code-is-decision/Library/code-is-decision-concepts",
+      "http://example.org/crl/code-is-decision/Library/code-is-decision-fixture-concepts",
     ]);
 
     // Concepts content url + depends-on the local CodeSystem.
     expect((concepts.content as Array<{ url?: string }>)[0]?.url).toBe("../../cql/Code Is Decision Concepts.cql");
     expect((concepts.relatedArtifact as Array<{ type?: string; resource?: string }>).map((e) => e.resource)).toEqual([
-      "http://example.org/crl/code-is-decision/CodeSystem/code-is-decision-local",
+      "http://example.org/crl/code-is-decision/CodeSystem/code-is-decision-fixture-local",
     ]);
   });
 
   it("the PlanDefinition + ActivityDefinition library[] resolve to the Root Library canonical", () => {
-    const rootUrl = "http://example.org/crl/code-is-decision/Library/code-is-decision";
+    const rootUrl = "http://example.org/crl/code-is-decision/Library/code-is-decision-fixture";
     for (const r of result.resources) {
       if (r.resourceType !== "PlanDefinition" && r.resourceType !== "ActivityDefinition") continue;
       const lib = (r.resource as { library?: unknown }).library;
@@ -291,7 +310,7 @@ describe("emitFhirDefClosure — structured-error guards on a malformed manifest
     const result = emitFhirDefClosure(graph, METADATA, FIXED, manifest);
     expect(result.errors.some((e) => e.kind === "decision-root-library-missing")).toBe(true);
     // The source's decisions are skipped → NO Decision PlanDefinition emitted for
-    // "Triage Crohns" (its capped id is `code-is-decision-triage-crohns`).
+    // "Triage Crohns" (its R1 capped id is `code-is-decision-fixture-triage-crohns`).
     const decisionPlanDefs = result.resources.filter(
       (r) => r.resourceType === "PlanDefinition" && r.sourceKind === "Decision",
     );

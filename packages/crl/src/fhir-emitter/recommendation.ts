@@ -39,7 +39,7 @@ import type { Activity } from "../ast/types";
 import type { CRLError } from "../types/errors";
 import { libraryCanonicalUrl } from "./library";
 import { activityDefinitionCanonicalUrl } from "./activity";
-import { capSlugForSuffix, pascalCaseName, slugify } from "./slug";
+import { capSlugForSuffix, pascalCaseName, policyIdBase, slugify } from "./slug";
 import type {
   CpgMetadata,
   EmitOptions,
@@ -67,15 +67,16 @@ const REC_SUFFIX = "-recommendation";
  * canonical-URL helper scoping).
  */
 export function recommendationDefinitionCanonicalUrl(
-  canonicalBase: string,
-  libraryName: string,
+  metadata: CpgMetadata,
   activityName: string,
 ): string {
-  return `${canonicalBase}/PlanDefinition/${recommendationId(libraryName, activityName)}`;
+  return `${metadata.canonicalBase}/PlanDefinition/${recommendationId(metadata, activityName)}`;
 }
 
-function recommendationId(libraryName: string, activityName: string): string {
-  const base = `${slugify(libraryName)}-${slugify(activityName)}`;
+// R1 — id BASE is the policy id (`policyIdBase(metadata)`); the activity-name
+// slug + `-recommendation` are the suffix.
+function recommendationId(metadata: CpgMetadata, activityName: string): string {
+  const base = `${policyIdBase(metadata)}-${slugify(activityName)}`;
   return capSlugForSuffix(base, REC_SUFFIX);
 }
 
@@ -107,7 +108,7 @@ export function emitRecommendationDefinition(
     });
   }
 
-  const id = recommendationId(libraryName, activity.name);
+  const id = recommendationId(metadata, activity.name);
   const computableName = pascalCaseName(
     `${slugify(libraryName)} ${slugify(activity.name)}${REC_SUFFIX}`,
   );
@@ -127,13 +128,10 @@ export function emitRecommendationDefinition(
 
   const level = opts.capability ?? "publishable";
   const publishable = isPublishablePlus(level);
-  const url = recommendationDefinitionCanonicalUrl(metadata.canonicalBase, libraryName, activity.name);
-  const libraryUrl = libraryCanonicalUrl(metadata.canonicalBase, libraryName);
-  const activityUrl = activityDefinitionCanonicalUrl(
-    metadata.canonicalBase,
-    libraryName,
-    activity.name,
-  );
+  const url = recommendationDefinitionCanonicalUrl(metadata, activity.name);
+  // R1 — `library[]` → source-name-keeping Root Library, keyed on the policy id.
+  const libraryUrl = libraryCanonicalUrl(metadata);
+  const activityUrl = activityDefinitionCanonicalUrl(metadata, activity.name);
 
   const resource: Record<string, unknown> = {
     resourceType: "PlanDefinition",
@@ -227,7 +225,7 @@ export function emitRecommendationDefinitionsForLibrary(
 
   const slugMap = new Map<string, Activity[]>();
   for (const activity of activities) {
-    const id = recommendationId(libraryName, activity.name);
+    const id = recommendationId(metadata, activity.name);
     const existing = slugMap.get(id) ?? [];
     existing.push(activity);
     slugMap.set(id, existing);
@@ -246,7 +244,7 @@ export function emitRecommendationDefinitionsForLibrary(
   }
 
   for (const activity of activities) {
-    const id = recommendationId(libraryName, activity.name);
+    const id = recommendationId(metadata, activity.name);
     if ((slugMap.get(id)?.length ?? 0) > 1) continue;
     const { resource, errors: rErrors, unmatched: rUnmatched } = emitRecommendationDefinition(
       activity,

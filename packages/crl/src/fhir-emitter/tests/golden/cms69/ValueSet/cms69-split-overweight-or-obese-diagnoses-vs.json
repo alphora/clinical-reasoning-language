@@ -1,0 +1,43 @@
+{
+  "resourceType": "ValueSet",
+  "id": "cms69-split-overweight-or-obese-diagnoses-vs",
+  "meta": {
+    "profile": [
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareablevalueset",
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-computablevalueset",
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-publishablevalueset"
+    ]
+  },
+  "extension": [
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "shareable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "computable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "publishable"
+    }
+  ],
+  "url": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/ValueSet/cms69-split-overweight-or-obese-diagnoses-vs",
+  "version": "1.0.0",
+  "name": "Cms69BmiScreeningGpgStrategyExampleOverweightOrObeseDiagnosesVs",
+  "title": "CMS69 BMI Screening demonstration corpus",
+  "status": "draft",
+  "experimental": true,
+  "date": "2020-01-01T00:00:00.000Z",
+  "publisher": "Smile Digital Health",
+  "description": "CMS69 BMI Screening demonstration corpus",
+  "compose": {
+    "include": [
+      {
+        "valueSet": [
+          "http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113762.1.4.1047.502"
+        ]
+      }
+    ]
+  }
+}

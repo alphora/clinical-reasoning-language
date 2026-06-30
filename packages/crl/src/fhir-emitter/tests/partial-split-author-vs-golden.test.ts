@@ -40,9 +40,11 @@ const UPDATE = process.env.UPDATE_GOLDEN === "1";
 const FIXED_DATE = new Date("2020-01-01T00:00:00.000Z");
 const ser = (body: unknown): string => JSON.stringify(body, null, 2) + "\n";
 
-const VS_CANONICAL = "http://example.org/crl/code-is-decision-vs/ValueSet/code-is-decision-vs-gi-referral-reasons";
-const CS_CANONICAL = "http://example.org/crl/code-is-decision-vs/CodeSystem/code-is-decision-vs-local";
-const CONCEPTS_CANONICAL = "http://example.org/crl/code-is-decision-vs/Library/code-is-decision-vs-concepts";
+// R1 — ids derive from the fixture POLICY ID ("code-is-decision-vs-fixture"),
+// not the library-name slug ("code-is-decision-vs").
+const VS_CANONICAL = "http://example.org/crl/code-is-decision-vs/ValueSet/code-is-decision-vs-fixture-gi-referral-reasons";
+const CS_CANONICAL = "http://example.org/crl/code-is-decision-vs/CodeSystem/code-is-decision-vs-fixture-local";
+const CONCEPTS_CANONICAL = "http://example.org/crl/code-is-decision-vs/Library/code-is-decision-vs-fixture-concepts";
 
 function listGolden(dir: string): string[] {
   if (!existsSync(dir)) return [];
@@ -71,8 +73,8 @@ describe("CRL → FHIR partial-split AUTHOR-VS golden (code-is-decision-vs)", ()
     const libs = result.resources.filter((r) => r.resourceType === "Library");
     expect(libs).toHaveLength(2);
     const byId = new Map(libs.map((l) => [l.resource.id as string, l.resource as Record<string, unknown>]));
-    const root = byId.get("code-is-decision-vs")!;
-    const concepts = byId.get("code-is-decision-vs-concepts")!;
+    const root = byId.get("code-is-decision-vs-fixture")!;
+    const concepts = byId.get("code-is-decision-vs-fixture-concepts")!;
     expect(root).toBeDefined();
     expect(concepts).toBeDefined();
 

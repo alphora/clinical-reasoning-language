@@ -48,6 +48,8 @@ import type { CRLError } from "../types/errors";
  *   decision-root-library-missing                  error    A decision-bearing source has no manifest entry keeping the source name as its Root, so its Decision/Activity `library[]` would dangle (a decision-bearing library must never full-split). The source's decision emit is skipped. (Slice 4c / E)
  *   cli-cel-fhir-def-incompatible                  error    CLI: `.cel` input + `--target fhir-def` flag. (Todo 4)
  *   missing-package-version                         error    package.json has no `version`. CRMI requires `version` 1..1 at the shareable floor.
+ *   missing-package-name                            error    package.json has no `name`. R1: `name` is the policy id and the SINGLE source of every emitted FHIR resource-id/url base (`policyIdBase`).
+ *   lossy-package-name-slug                         error    package.json `name` is non-ASCII-only or not slug-clean, so the emitted FHIR resource-id base would silently differ from the policy id. (R1)
  *   invalid-emit-date                              error    `--date`/`opts.date`/`crl.date` is not a parseable date.
  *   invalid-source-date-epoch                      error    `SOURCE_DATE_EPOCH` env is not a non-negative integer of epoch seconds (rejects ms-shaped values).
  *   missing-publishable-date                       error    Publishable+ emit with no resolvable date (no --date/SOURCE_DATE_EPOCH/crl.date). Reproducibility is not opt-in.

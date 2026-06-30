@@ -45,8 +45,9 @@ describe("fhir-emitter codeSystem.emitLocalCodeSystem", () => {
     expect(r.resourceType).toBe("CodeSystem");
     // id: capped, `-local` suffix preserved.
     expect(r.id).toBe("code-is-basic-local");
-    // url: the SHARED helper → byte-equal with the CQL lane.
-    expect(r.url).toBe(localCodeSystemUrl(METADATA.canonicalBase, "Code Is Basic"));
+    // url: the SHARED helper → byte-equal with the CQL lane. R1 — the local-domain
+    // slug is the POLICY ID (`metadata.name`), not the library name.
+    expect(r.url).toBe(localCodeSystemUrl(METADATA.canonicalBase, METADATA.name));
     expect(r.url).toBe("http://example.org/crl/code-is-basic/CodeSystem/code-is-basic-local");
     // CRMI codesystem profiles: shareable + publishable (NO computable).
     expect((r.meta as { profile: string[] }).profile).toEqual([

@@ -43,7 +43,8 @@ describe("fhir-emitter valueSet.emitValueSet", () => {
     expect(resource).not.toBeNull();
     const r = resource!.resource as Record<string, unknown>;
     expect(r.resourceType).toBe("ValueSet");
-    expect(r.id).toBe("cms22-concepts-bp-screening-encounter-codes");
+    // R1 — id BASE is the policy id ("cms22"), not the library-name slug.
+    expect(r.id).toBe("cms22-bp-screening-encounter-codes");
     // default capability = publishable → additive CRMI profiles (shareable→publishable).
     expect((r.meta as { profile: string[] }).profile).toEqual([
       "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareablevalueset",
@@ -51,7 +52,7 @@ describe("fhir-emitter valueSet.emitValueSet", () => {
       "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-publishablevalueset",
     ]);
     expect(r.url).toBe(
-      "http://hl7.org/fhir/us/cqfmeasures/crl/cms22/ValueSet/cms22-concepts-bp-screening-encounter-codes",
+      "http://hl7.org/fhir/us/cqfmeasures/crl/cms22/ValueSet/cms22-bp-screening-encounter-codes",
     );
     expect(r.name).toBe("Cms22ConceptsBpScreeningEncounterCodes");
     expect(r.title).toBe("CMS22 Demo");
@@ -64,7 +65,7 @@ describe("fhir-emitter valueSet.emitValueSet", () => {
       include: [{ valueSet: ["http://example.org/vs/bp-screening-encounter"] }],
     });
     expect(resource!.relativePath).toBe(
-      "ValueSet/cms22-concepts-bp-screening-encounter-codes.json",
+      "ValueSet/cms22-bp-screening-encounter-codes.json",
     );
   });
 

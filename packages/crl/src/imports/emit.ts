@@ -21,7 +21,7 @@ import {
 } from "../cql-emitter/layeredEmit";
 import type { Partition } from "../cql-emitter/layeredEmit";
 import { lowerLocalCodes, localCodeSystemUrl } from "../cql-emitter/lowerLocalCodes";
-import { readCanonicalBase } from "../fhir-emitter/metadata";
+import { readCanonicalBase, readPolicyId } from "../fhir-emitter/metadata";
 import type { CRLError } from "../types/errors";
 
 import { resolveImports } from "./index";
@@ -247,14 +247,25 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
   // absent/unreadable, canonicalBase stays undefined and the lowering falls back
   // to the URN.
   let canonicalBase: string | undefined;
+  // R1 — also read the POLICY ID (`name`) so the synthetic local codesystem URL
+  // slugs from the policy id, byte-equal with the FHIR lane's `CodeSystem.url`.
+  // Like `readCanonicalBase`, this swallows unrelated FHIR-metadata errors (a
+  // missing `version` etc. is the FHIR lane's concern). When absent, the lowering
+  // falls back to the source library name (pre-R1) — but a FHIR-emitting project
+  // always has a `name` (the FHIR lane hard-fails without it), so both lanes agree.
+  let localDomainId: string | undefined;
   if (graph.projectRoot) {
     canonicalBase = readCanonicalBase(graph.projectRoot);
+    localDomainId = readPolicyId(graph.projectRoot);
   }
   // Track libraries that actually synthesized a local codesystem (lowered at
   // least one `code is` concept), keyed by the deterministic codesystem URL — so
-  // the cross-library collision preflight below can fire when two DISTINCT
-  // library names slug to the SAME local codesystem URL. The collision is on the
-  // slug, so it is scheme-independent (URN vs canonicalBase both collide).
+  // the per-policy collision preflight below can fire when 2+ libraries declare
+  // `code is`. R1 — the URL keys on the POLICY ID (`localDomainId`/package.json
+  // `name`), so EVERY `code is` library in the package maps to the SAME url; two
+  // such libraries collide because they share the policy's single local domain
+  // (not because their names slug alike). Scheme-independent (URN vs canonicalBase
+  // both collide).
   const localUrnToLibraries = new Map<string, Set<string>>();
   // Slice 4c — the count of concept-level `code is` codes each library lowered,
   // keyed by emitted library name. Threaded into `computeSplitPlan` so the split
@@ -263,11 +274,14 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
   // that builds the synthetic terminologies — one source of truth.)
   const localCodesCountByName = new Map<string, number>();
   const emitClosure = rawEmitClosure.map((entry) => {
-    const lowered = lowerLocalCodes(entry.ast, { canonicalBase });
+    const lowered = lowerLocalCodes(entry.ast, { canonicalBase, localDomainId });
     if (lowered.errors.length > 0) lowerErrors.push(...lowered.errors);
     const didLower = lowered.ast !== entry.ast;
     if (didLower && entry.name) {
-      const urn = localCodeSystemUrl(canonicalBase, entry.ast.library.name);
+      // R1 — the collision key is the policy-id-slugged local-domain url (the same
+      // slug source the lowering uses), so the cross-library collision preflight
+      // stays consistent with the emitted url.
+      const urn = localCodeSystemUrl(canonicalBase, localDomainId ?? entry.ast.library.name);
       const set = localUrnToLibraries.get(urn) ?? new Set<string>();
       set.add(entry.name);
       localUrnToLibraries.set(urn, set);
@@ -287,11 +301,16 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
       errors: lowerErrors,
     };
   }
-  // Cross-library local-codesystem URN collision. Two distinct libraries in the
-  // emit closure whose names slug to the same local URN would unintentionally
-  // share a local code domain (CQL code identity is system+code), so a local
-  // code in one could collide with one in the other. Fail loudly rather than
-  // emit a silently-shared codesystem.
+  // Per-policy local-domain collision. R1 — the local-domain URN keys on the
+  // POLICY ID (`metadata.name`), so it is IDENTICAL for every library in the
+  // package. Two distinct libraries that BOTH declare concept-level `code is`
+  // therefore share the policy's single implicit local CodeSystem domain (CQL
+  // code identity is system+code), so a local code in one could collide with one
+  // in the other — and they would emit two FHIR CodeSystem resources sharing one
+  // canonical url (invalid FHIR, per Inv-0 url-uniqueness). This guards the
+  // unsupported "2+ `code is` libraries in one package" case. Fail loudly rather
+  // than emit a silently-shared domain. (Renaming a library no longer changes a
+  // policy-id-keyed URN, so the fix is to consolidate or split — see message.)
   for (const [urn, libs] of localUrnToLibraries) {
     if (libs.size > 1) {
       const names = [...libs].sort();
@@ -305,11 +324,12 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
             type: "Validation",
             kind: "emit-local-codesystem-urn-collision",
             message:
-              `Libraries ${names.map((n) => `"${n}"`).join(" and ")} both synthesize the ` +
-              `local codesystem "${urn}" from their \`code is\` concepts — their names ` +
-              `slug to the same local domain, so their local codes would share a ` +
-              `codesystem and could collide. Rename one library so the local ` +
-              `codesystem URNs are distinct.`,
+              `Libraries ${names.map((n) => `"${n}"`).join(" and ")} both declare ` +
+              `concept-level \`code is\`, which share this policy's single local ` +
+              `CodeSystem domain '${urn}'. The per-policy local domain (keyed on the ` +
+              `policy id, not the library name) supports concept-level \`code is\` in ` +
+              `ONE library only — consolidate the local \`code is\` declarations into a ` +
+              `single library, or split into separate packages (one policy id each).`,
           },
         ],
       };
@@ -448,6 +468,7 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
       const partitioned = emitPartitioned(entry.ast, entry.name, plan.partition!, {
         crossLibraryParameters,
         canonicalBase,
+        localDomainId,
       });
       if (!partitioned.success) {
         return {
@@ -534,6 +555,7 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
       crossLibraryIncludes: crossLibs,
       crossLibraryParameters,
       canonicalBase,
+      localDomainId,
     });
     if (!emit.success || !emit.result) {
       return {

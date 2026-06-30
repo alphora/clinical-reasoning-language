@@ -115,7 +115,7 @@ describe("recommendation — emitRecommendationDefinition", () => {
     });
     const r = resource!.resource as Record<string, unknown>;
     const wrap = (r.action as Array<Record<string, unknown>>)[0]!;
-    expect(wrap.definitionCanonical).toBe(activityDefinitionCanonicalUrl(METADATA.canonicalBase, "Lib", "X"));
+    expect(wrap.definitionCanonical).toBe(activityDefinitionCanonicalUrl(METADATA, "X"));
   });
 
   it("library[] byte-equals libraryCanonicalUrl", () => {
@@ -123,7 +123,7 @@ describe("recommendation — emitRecommendationDefinition", () => {
       clock: FIXED_CLOCK,
     });
     const r = resource!.resource as Record<string, unknown>;
-    expect((r.library as string[])[0]).toBe(libraryCanonicalUrl(METADATA.canonicalBase, "Lib"));
+    expect((r.library as string[])[0]).toBe(libraryCanonicalUrl(METADATA));
   });
 
   it("recommendationDefinitionCanonicalUrl byte-equals emitted url", () => {
@@ -131,7 +131,7 @@ describe("recommendation — emitRecommendationDefinition", () => {
       clock: FIXED_CLOCK,
     });
     const r = resource!.resource as Record<string, unknown>;
-    expect(r.url).toBe(recommendationDefinitionCanonicalUrl(METADATA.canonicalBase, "Lib", "X"));
+    expect(r.url).toBe(recommendationDefinitionCanonicalUrl(METADATA, "X"));
   });
 
   it("slug rule: pre-cap base then append `-recommendation`; id ≤ 64", () => {

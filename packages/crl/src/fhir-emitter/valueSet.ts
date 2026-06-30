@@ -24,7 +24,7 @@
 import type { Terminology, TerminologyBodyLine } from "../ast/types";
 import type { CRLError } from "../types/errors";
 
-import { capSlug, pascalCaseName, slugify } from "./slug";
+import { capSlug, pascalCaseName, policyIdBase, slugify } from "./slug";
 import { crmiCapabilityProfiles, isPublishablePlus, knowledgeExtensions } from "./types";
 import type {
   CpgMetadata,
@@ -58,6 +58,9 @@ export function emitValueSet(
   const errors: CRLError[] = [];
   const unmatched: UnmatchedReference[] = [];
 
+  // R1 — id/url BASE is the policy id (`policyIdBase(metadata)`); the human
+  // library-name slug remains the source of the computable `name`/`title` only.
+  const idBase = policyIdBase(metadata);
   const librarySlug = slugify(libraryName);
   const terminologySlug = slugify(terminology.name);
 
@@ -78,7 +81,7 @@ export function emitValueSet(
   // Round-2 (gpt55 C1): cap the COMBINED slug at 64 — slugify already
   // caps each component, but the concatenation can still exceed the
   // FHIR id limit.
-  const id = capSlug(`${librarySlug}-${terminologySlug}`);
+  const id = capSlug(`${idBase}-${terminologySlug}`);
   const computableName = pascalCaseName(`${librarySlug} ${terminologySlug}`);
 
   const title = metadata.title || libraryName;
@@ -225,10 +228,11 @@ export function emitValueSetsForLibrary(
   // long library/terminology names that differ only past char 64 would
   // otherwise emit non-conformant non-unique ids.
   const slugMap = new Map<string, Terminology[]>();
-  const librarySlug = slugify(libraryName);
+  // R1 — id BASE is the policy id; the terminology-name slug is the suffix.
+  const idBase = policyIdBase(metadata);
   for (const t of terminologies) {
     const tSlug = slugify(t.name);
-    const id = capSlug(`${librarySlug}-${tSlug}`);
+    const id = capSlug(`${idBase}-${tSlug}`);
     const existing = slugMap.get(id) ?? [];
     existing.push(t);
     slugMap.set(id, existing);
@@ -251,7 +255,7 @@ export function emitValueSetsForLibrary(
   // inspection. Caller's `success: false` already gates on errors.
   for (const t of terminologies) {
     const tSlug = slugify(t.name);
-    const id = capSlug(`${librarySlug}-${tSlug}`);
+    const id = capSlug(`${idBase}-${tSlug}`);
     if ((slugMap.get(id)?.length ?? 0) > 1) continue;
     const { resource, errors: rErrors, unmatched: rUnmatched } = emitValueSet(t, libraryName, metadata, opts);
     if (resource) resources.push(resource);

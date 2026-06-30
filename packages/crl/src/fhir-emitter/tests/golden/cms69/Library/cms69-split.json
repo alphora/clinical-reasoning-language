@@ -1,0 +1,110 @@
+{
+  "resourceType": "Library",
+  "id": "cms69-split",
+  "meta": {
+    "profile": [
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareablelibrary",
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-computablelibrary",
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-publishablelibrary"
+    ]
+  },
+  "extension": [
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "shareable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "computable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "publishable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeRepresentationLevel",
+      "valueCode": "structured"
+    }
+  ],
+  "url": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/Library/cms69-split",
+  "version": "1.0.0",
+  "name": "Cms69BmiScreeningGpgStrategyExample",
+  "title": "CMS69 BMI Screening GPG Strategy example",
+  "status": "draft",
+  "experimental": true,
+  "date": "2020-01-01T00:00:00.000Z",
+  "publisher": "Smile Digital Health",
+  "description": "CMS69 BMI Screening demonstration corpus",
+  "type": {
+    "coding": [
+      {
+        "system": "http://terminology.hl7.org/CodeSystem/library-type",
+        "code": "logic-library"
+      }
+    ]
+  },
+  "relatedArtifact": [
+    {
+      "type": "depends-on",
+      "resource": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/ValueSet/cms69-split-bmi-range-as-a-condition"
+    },
+    {
+      "type": "depends-on",
+      "resource": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/ValueSet/cms69-split-bmi-as-an-observation"
+    },
+    {
+      "type": "depends-on",
+      "resource": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/ValueSet/cms69-split-height-valueset"
+    },
+    {
+      "type": "depends-on",
+      "resource": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/ValueSet/cms69-split-weight-valueset"
+    },
+    {
+      "type": "depends-on",
+      "resource": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/ValueSet/cms69-split-overweight-or-obese-diagnoses-vs"
+    },
+    {
+      "type": "depends-on",
+      "resource": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/ValueSet/cms69-split-underweight-diagnoses-vs"
+    },
+    {
+      "type": "depends-on",
+      "resource": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/ValueSet/cms69-split-pregnancy-diagnoses-vs"
+    },
+    {
+      "type": "depends-on",
+      "resource": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/ValueSet/cms69-split-weight-assessment-referrals-vs"
+    },
+    {
+      "type": "depends-on",
+      "resource": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/ValueSet/cms69-split-anti-obesity-medications-vs"
+    },
+    {
+      "type": "depends-on",
+      "resource": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/ValueSet/cms69-split-low-bmi-follow-up-service-requests-vs"
+    },
+    {
+      "type": "depends-on",
+      "resource": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/ValueSet/cms69-split-medical-reason-vs"
+    },
+    {
+      "type": "depends-on",
+      "resource": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/ValueSet/cms69-split-patient-declined-vs"
+    },
+    {
+      "type": "depends-on",
+      "resource": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/ValueSet/cms69-split-anti-obesity-contraindication-vs"
+    },
+    {
+      "type": "depends-on",
+      "resource": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/ValueSet/cms69-split-colonoscopy"
+    }
+  ],
+  "content": [
+    {
+      "contentType": "text/cql",
+      "url": "../../cql/CMS69 BMI Screening GPG Strategy example.cql"
+    }
+  ]
+}

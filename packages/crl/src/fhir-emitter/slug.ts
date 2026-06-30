@@ -91,3 +91,28 @@ export function pascalCaseName(name: string): string {
   if (!/^[A-Z]/.test(pascal)) pascal = "X" + pascal;
   return pascal.length > PASCAL_MAX_LEN ? pascal.slice(0, PASCAL_MAX_LEN) : pascal;
 }
+
+/**
+ * R1 (foundation reshape) — the policy-id BASE for every emitted FHIR resource
+ * id/url. The package.json `name` (the policy id, e.g. `rx501-145-medical-policy`)
+ * is the SINGLE source of the resource-id base, replacing the human CRL
+ * `library "…"` name slug. The per-resource SUFFIX (the declaration-name slug)
+ * is unchanged — only the BASE switches.
+ *
+ * Returns `capSlug(slugify(name))`. `name` is hard-validated as non-empty +
+ * slug-clean by `normalizePackageMetadata`, so on the emit path this is always a
+ * well-formed, lossless slug; the slugify fallback (`"unnamed"`) is unreachable
+ * there but kept for defensive callers.
+ *
+ * CONSEQUENCE (R1): because the id base is the policy id (package-WIDE), the
+ * per-resource suffix (the declaration-name slug) is the ONLY thing that
+ * distinguishes two resources of the same kind across the whole package. So
+ * declaration names (decision / activity / recommendation / valueset / concept)
+ * must be unique PACKAGE-WIDE for the emitted FHIR resources — two libraries in
+ * one package both naming a decision "Approve" would collide on the canonical
+ * url (Inv-1 catches it). The deliverable is one-library-per-policy, so this is
+ * latent today; it bites only a multi-library package.
+ */
+export function policyIdBase(metadata: { name: string }): string {
+  return capSlug(slugify(metadata.name));
+}

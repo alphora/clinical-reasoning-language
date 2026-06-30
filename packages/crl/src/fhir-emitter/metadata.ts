@@ -25,6 +25,7 @@ import { join } from "node:path";
 
 import type { CRLError } from "../types/errors";
 
+import { slugify } from "./slug";
 import type {
   CpgMetadata,
   CodeableConcept,
@@ -110,6 +111,34 @@ export function readCanonicalBase(projectRoot: string): string | undefined {
 }
 
 /**
+ * R1 — lightweight reader for ONLY the policy id (`name`) from a project's
+ * package.json. The CQL lane (imports/emit.ts) needs the policy id to slug the
+ * synthetic local-codesystem URL byte-equal with the FHIR lane, but — like
+ * `readCanonicalBase` — must NOT hard-fail on UNRELATED FHIR-metadata problems
+ * (missing `version`, malformed `crl.date`, etc.). `readPackageMetadata` returns
+ * `metadata: null` for any such failure, which would silently drop a valid policy
+ * id and diverge from the FHIR lane.
+ *
+ * Returns the trimmed `name` when present and non-empty; returns undefined for an
+ * absent/empty value or ANY read/parse error (swallowed — the FHIR lane reports
+ * those). When undefined, the CQL lowering falls back to the source library name
+ * (pre-R1 behavior); but since the FHIR lane HARD-fails on a missing `name`, a
+ * project that emits FHIR will always have one, so the lanes stay byte-equal.
+ */
+export function readPolicyId(projectRoot: string): string | undefined {
+  try {
+    const text = readFileSync(join(projectRoot, "package.json"), "utf8");
+    const raw = JSON.parse(text) as unknown;
+    if (raw === null || typeof raw !== "object") return undefined;
+    const name = (raw as Record<string, unknown>).name;
+    if (typeof name !== "string") return undefined;
+    return name.trim() || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * Pure normalizer — accepts a parsed package.json object and produces
  * CpgMetadata + diagnostics. Never throws. Single source of truth for
  * the package.json → CpgMetadata field-by-field mapping.
@@ -160,7 +189,43 @@ export function normalizePackageMetadata(raw: unknown): MetadataResult {
         "package.json `version` is required — CRMI requires `version` (1..1) at the shareable level on emitted FHIR, and the npm package is the authoritative source of truth.",
     });
   }
+  // R1 (foundation reshape): `name` (the npm package name = the POLICY ID) is the
+  // SINGLE source of the FHIR resource-id/url base (`policyIdBase`). Previously it
+  // was silently `""` when absent — now a HARD error, mirroring the
+  // version/canonicalBase pattern, because an empty base would produce
+  // `<base>/Library/-…` style ids. Slug-validate too: a `name` that slugifies to
+  // empty (pure non-ASCII) or LOSES characters (`@`, `/`, uppercase, etc.) would
+  // make the FHIR id silently diverge from the policy id, so flag it. The
+  // deliverable policy names are slug-clean (lowercase ascii + hyphen).
   const name = typeof obj.name === "string" && obj.name.trim() ? obj.name.trim() : "";
+  if (!name) {
+    errors.push({
+      type: "Validation",
+      kind: "missing-package-name",
+      message:
+        "package.json `name` is required — it is the policy id and the SINGLE source of every emitted FHIR resource id/url base. " +
+        'Add e.g. `"name": "my-medical-policy"` to your project root\'s package.json.',
+    });
+  } else {
+    const slug = slugify(name);
+    if (slug === "unnamed" || slug === "") {
+      errors.push({
+        type: "Validation",
+        kind: "lossy-package-name-slug",
+        message:
+          `package.json \`name\` "${name}" slugifies to an empty FHIR id base (it is non-ASCII-only or all-punctuation). ` +
+          "Use a slug-clean policy id (lowercase ASCII letters, digits, and hyphens) so it can serve as the FHIR resource-id base.",
+      });
+    } else if (slug !== name) {
+      errors.push({
+        type: "Validation",
+        kind: "lossy-package-name-slug",
+        message:
+          `package.json \`name\` "${name}" is not slug-clean — it slugifies to "${slug}", so the emitted FHIR resource-id base would ` +
+          "silently differ from the policy id. Use a slug-clean policy id (lowercase ASCII letters, digits, and hyphens; no `@`, `/`, uppercase, or other characters).",
+      });
+    }
+  }
 
   // Reproducible-emit managed publication date (`crl.date`, ISO). Optional here;
   // the date-resolution chain (env / clock) covers the rest. Validate parseability
@@ -202,6 +267,8 @@ export function normalizePackageMetadata(raw: unknown): MetadataResult {
       (e) =>
         e.kind === "malformed-crl-metadata" ||
         e.kind === "missing-package-version" ||
+        e.kind === "missing-package-name" ||
+        e.kind === "lossy-package-name-slug" ||
         e.kind === "invalid-emit-date",
     )
   ) {

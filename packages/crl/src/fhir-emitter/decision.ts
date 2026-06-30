@@ -76,7 +76,7 @@ import {
 import type { CRLError } from "../types/errors";
 import { libraryCanonicalUrl } from "./library";
 import { recommendationDefinitionCanonicalUrl } from "./recommendation";
-import { capSlug, pascalCaseName, slugify } from "./slug";
+import { capSlug, pascalCaseName, policyIdBase, slugify } from "./slug";
 import { tarjanSCC } from "./tarjan";
 import { crmiCapabilityProfiles, isPublishablePlus, knowledgeExtensions } from "./types";
 import type {
@@ -118,16 +118,16 @@ export type DecisionResolver = (decisionName: ReferenceName) => string | null;
 /* ─── Canonical URL helper (exported; not re-exported at root) ───── */
 
 export function planDefinitionCanonicalUrl(
-  canonicalBase: string,
-  libraryName: string,
+  metadata: CpgMetadata,
   decisionName: string,
 ): string {
-  const id = capSlug(`${slugify(libraryName)}-${slugify(decisionName)}`);
-  return `${canonicalBase}/PlanDefinition/${id}`;
+  return `${metadata.canonicalBase}/PlanDefinition/${decisionId(metadata, decisionName)}`;
 }
 
-function decisionId(libraryName: string, decisionName: string): string {
-  return capSlug(`${slugify(libraryName)}-${slugify(decisionName)}`);
+// R1 — id BASE is the policy id (`policyIdBase(metadata)`); the decision-name
+// slug is the suffix.
+function decisionId(metadata: CpgMetadata, decisionName: string): string {
+  return capSlug(`${policyIdBase(metadata)}-${slugify(decisionName)}`);
 }
 
 /* ─── Module-internal helpers ────────────────────────────────────── */
@@ -154,7 +154,7 @@ function normalizeLocalRef(ref: ReferenceName, libraryName: string): ReferenceNa
  */
 function makeResolversFromClosure(
   libraryName: string,
-  canonicalBase: string,
+  metadata: CpgMetadata,
   concepts: ReadonlyArray<Concept>,
   activities: ReadonlyArray<Activity>,
   decisions: ReadonlyArray<Decision>,
@@ -179,7 +179,7 @@ function makeResolversFromClosure(
     if (isQualifiedRef(normalized)) return null;
     const name = getRefName(normalized);
     if (!activityByName.has(name)) return null;
-    return recommendationDefinitionCanonicalUrl(canonicalBase, libraryName, name);
+    return recommendationDefinitionCanonicalUrl(metadata, name);
   };
 
   const decisionResolver: DecisionResolver = (ref) => {
@@ -187,7 +187,7 @@ function makeResolversFromClosure(
     if (isQualifiedRef(normalized)) return null;
     const name = getRefName(normalized);
     if (!decisionByName.has(name) || skippedDecisionNames.has(name)) return null;
-    return planDefinitionCanonicalUrl(canonicalBase, libraryName, name);
+    return planDefinitionCanonicalUrl(metadata, name);
   };
 
   return { conceptResolver, activityResolver, decisionResolver };
@@ -243,7 +243,7 @@ export function emitDecisionPlanDefinition(
     });
   }
 
-  const id = decisionId(libraryName, decision.name);
+  const id = decisionId(metadata, decision.name);
   const computableName = pascalCaseName(`${slugify(libraryName)} ${slugify(decision.name)}`);
   const title = decision.name;
   const description = decision.name;
@@ -301,8 +301,9 @@ export function emitDecisionPlanDefinition(
 
   const level = opts.capability ?? "publishable";
   const publishable = isPublishablePlus(level);
-  const url = planDefinitionCanonicalUrl(metadata.canonicalBase, libraryName, decision.name);
-  const libraryUrl = libraryCanonicalUrl(metadata.canonicalBase, libraryName);
+  const url = planDefinitionCanonicalUrl(metadata, decision.name);
+  // R1 — `library[]` → source-name-keeping Root Library, keyed on the policy id.
+  const libraryUrl = libraryCanonicalUrl(metadata);
   const planTypeCode = isRoot ? "workflow-definition" : "eca-rule";
 
   const resource: Record<string, unknown> = {
@@ -728,7 +729,7 @@ export function emitDecisionPlanDefinitionsForLibrary(
   //    them (cascade rule 2 then suppresses the referring WhenBlock).
   const { conceptResolver, activityResolver, decisionResolver } = makeResolversFromClosure(
     libraryName,
-    metadata.canonicalBase,
+    metadata,
     concepts,
     activities,
     decisions,
@@ -738,7 +739,7 @@ export function emitDecisionPlanDefinitionsForLibrary(
   // 4. Intra-Decision slug collision detection.
   const slugMap = new Map<string, Decision[]>();
   for (const d of liveDecisions) {
-    const id = decisionId(libraryName, d.name);
+    const id = decisionId(metadata, d.name);
     const existing = slugMap.get(id) ?? [];
     existing.push(d);
     slugMap.set(id, existing);
@@ -757,7 +758,7 @@ export function emitDecisionPlanDefinitionsForLibrary(
 
   // 5. Emit one PlanDef per non-skipped, non-colliding decision.
   for (const d of liveDecisions) {
-    const id = decisionId(libraryName, d.name);
+    const id = decisionId(metadata, d.name);
     if ((slugMap.get(id)?.length ?? 0) > 1) continue;
     const isRoot = classification.rootNames.has(d.name);
     const r = emitDecisionPlanDefinition(

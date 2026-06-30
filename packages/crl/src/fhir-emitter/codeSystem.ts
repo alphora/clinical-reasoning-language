@@ -3,11 +3,15 @@
  * (slice 4 of the CRL→FHIR-def deliverable).
  *
  * A concept may carry its OWN local source code (`- code is \`X\`.`) — the
- * single implicit local domain of its library. The CQL lane lowers every such
+ * single implicit local domain of its POLICY. The CQL lane lowers every such
  * `code is`-only concept into a synthetic CQL `codesystem`/`code` pair sharing
  * ONE local codesystem URL (`lowerLocalCodes` → `localCodeSystemUrl`). This lane
  * materializes that shared local domain as ONE FHIR `CodeSystem` resource per
- * library that has local codes, carrying the N codes as `concept[]` entries.
+ * POLICY (R1 — the url + id slug from the POLICY ID, `metadata.name`, not the
+ * library name), carrying the N codes as `concept[]` entries. The per-policy
+ * local domain supports concept-level `code is` in one library per package; the
+ * imports preflight rejects 2+ `code is` libraries in one package
+ * (`emit-local-codesystem-urn-collision`).
  *
  * Operator decision (slice 4): emit ONLY a CodeSystem — NO local ValueSet. The
  * generated CQL retrieves bind individual codes, and the future case-feature
@@ -16,8 +20,9 @@
  *
  * Anti-drift contracts:
  *   - The CodeSystem `url` is `localCodeSystemUrl(metadata.canonicalBase,
- *     libraryName)` — the SAME helper the CQL lane uses, so the FHIR `url` and
- *     the emitted CQL `codesystem '<url>'` are byte-equal.
+ *     metadata.name)` — R1, slug from the POLICY ID — the SAME helper the CQL
+ *     lane uses (threaded the same policy id), so the FHIR `url` and the emitted
+ *     CQL `codesystem '<url>'` are byte-equal.
  *   - The selection of which codes to materialize is `lowerLocalCodes(ast)
  *     .localCodes` (consumed by the orchestrator) — the SAME code path that
  *     synthesizes the CQL terminology, so the CodeSystem carries EXACTLY the
@@ -32,7 +37,7 @@
 
 import type { CRLError } from "../types/errors";
 
-import { capSlugForSuffix, pascalCaseName, slugify } from "./slug";
+import { capSlugForSuffix, pascalCaseName, policyIdBase, slugify } from "./slug";
 import { localCodeSystemUrl } from "../cql-emitter/lowerLocalCodes";
 import { crmiCapabilityProfiles, isPublishablePlus, knowledgeExtensions } from "./types";
 import type {
@@ -85,11 +90,12 @@ export function emitLocalCodeSystem(
     });
   }
 
-  // id: `capSlugForSuffix` caps the base to `64 - len("-local")` and appends the
-  // suffix, so the `-local` suffix always survives truncation (mirrors
-  // recommendation.ts' suffix-aware capping). `slugify` already applied the base
-  // 64-cap to `librarySlug`, so no extra `capSlug` is needed here.
-  const id = capSlugForSuffix(librarySlug, LOCAL_SUFFIX);
+  // id: R1 — BASE is the policy id (`policyIdBase(metadata)`); `capSlugForSuffix`
+  // caps it to `64 - len("-local")` and appends the suffix, so the `-local` suffix
+  // always survives truncation (mirrors recommendation.ts' suffix-aware capping).
+  // The computable `name` still derives from the human library name (per-library
+  // identity, not the resource id).
+  const id = capSlugForSuffix(policyIdBase(metadata), LOCAL_SUFFIX);
   const computableName = pascalCaseName(`${librarySlug}${LOCAL_SUFFIX}`);
 
   // Title falls back to the CRL library name when package.json has none,
@@ -127,7 +133,11 @@ export function emitLocalCodeSystem(
   const level = opts.capability ?? "publishable";
   const publishable = isPublishablePlus(level);
   // url: the SHARED helper → byte-equal with the CQL lane's `codesystem '<url>'`.
-  const url = localCodeSystemUrl(metadata.canonicalBase, libraryName);
+  // R1 — the local-domain slug is the POLICY ID (`metadata.name`), NOT the human
+  // library name, so the CodeSystem `url` and the policy-id FHIR resource ids
+  // share one base. The CQL lane threads the same policy id (see emitCQLImports /
+  // lowerLocalCodes), keeping `codesystem '<url>'` == `CodeSystem.url`.
+  const url = localCodeSystemUrl(metadata.canonicalBase, metadata.name);
 
   const resource: Record<string, unknown> = {
     resourceType: "CodeSystem",

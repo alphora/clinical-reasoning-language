@@ -1,0 +1,62 @@
+{
+  "resourceType": "ActivityDefinition",
+  "id": "cms22-split-antihypertensive-medication",
+  "meta": {
+    "profile": [
+      "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-medicationrequestactivity",
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareableactivitydefinition",
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-publishableactivitydefinition"
+    ]
+  },
+  "extension": [
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "shareable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "computable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "publishable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeRepresentationLevel",
+      "valueCode": "structured"
+    }
+  ],
+  "url": "http://hl7.org/fhir/us/cqfmeasures/crl/cms22/ActivityDefinition/cms22-split-antihypertensive-medication",
+  "version": "1.0.0",
+  "name": "Cms22BpControlCognitiveSupportExampleAntihypertensiveMedication",
+  "title": "Antihypertensive Medication",
+  "status": "draft",
+  "experimental": true,
+  "date": "2020-01-01T00:00:00.000Z",
+  "publisher": "Smile Digital Health",
+  "description": "Patient has confirmed hypertension and an in-range encounter",
+  "library": [
+    "http://hl7.org/fhir/us/cqfmeasures/crl/cms22/Library/cms22-split"
+  ],
+  "kind": "MedicationRequest",
+  "profile": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-medicationrequest",
+  "intent": "proposal",
+  "doNotPerform": false,
+  "code": {
+    "coding": [
+      {
+        "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-activity-type-cs",
+        "code": "order-medication"
+      }
+    ]
+  },
+  "dynamicValue": [
+    {
+      "path": "medicationCodeableConcept",
+      "expression": {
+        "language": "text/cql-identifier",
+        "expression": "Antihypertensive Medications VS"
+      }
+    }
+  ]
+}

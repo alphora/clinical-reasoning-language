@@ -79,7 +79,8 @@ describe("activity — emitActivityDefinition", () => {
     expect(resource).not.toBeNull();
     const r = resource!.resource as Record<string, unknown>;
     expect(r.resourceType).toBe("ActivityDefinition");
-    expect(r.id).toBe("cms22-bp-control-cognitive-support-example-order-antihypertensiv");
+    // R1 — id BASE is the policy id ("cms22"), not the library-name slug.
+    expect(r.id).toBe("cms22-order-antihypertensive-medication");
     // CPG activity profile + additive CRMI activitydefinition profiles (default publishable).
     expect((r.meta as { profile: string[] }).profile).toEqual([
       "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-medicationrequestactivity",
@@ -100,7 +101,7 @@ describe("activity — emitActivityDefinition", () => {
       ],
     });
     expect((r.library as string[])[0]).toBe(
-      "http://hl7.org/fhir/us/cqfmeasures/crl/cms22/Library/cms22-bp-control-cognitive-support-example",
+      "http://hl7.org/fhir/us/cqfmeasures/crl/cms22/Library/cms22",
     );
     expect(r.dynamicValue).toEqual([
       {

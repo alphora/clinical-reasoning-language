@@ -24,12 +24,15 @@ const VS_BP = "http://hl7.org/fhir/us/cqfmeasures/crl/cms22/ValueSet/cms22-conce
 
 describe("library — emitLibrary", () => {
   it("emits a base FHIR R4 Library with correct shape", () => {
+    // R1 — the id BASE is the policy id ("cms22"); the layer token ("asserted")
+    // is passed as the explicit idSuffix.
     const { resource, errors, unmatched } = emitLibrary(
       "CMS22 Asserted",
       METADATA,
       [VS_ANTI, VS_BP],
       "cms22-asserted.cql",
       { clock: FIXED_CLOCK },
+      "asserted",
     );
     expect(errors).toEqual([]);
     expect(unmatched).toEqual([]);
@@ -148,11 +151,12 @@ describe("library — emitLibrary", () => {
 });
 
 describe("library — emitLibrariesForClosure (Δ5 collision)", () => {
-  it("emits all libraries when slugs are distinct", () => {
+  it("emits all libraries when id suffixes are distinct", () => {
+    // R1 — under one policy id, distinct layer suffixes keep the ids distinct.
     const { resources, errors } = emitLibrariesForClosure(
       [
-        { libraryName: "CMS22 Asserted", dependsOnCanonicals: [], cqlFileName: "cms22-asserted.cql" },
-        { libraryName: "CMS22 Inferred", dependsOnCanonicals: [VS_ANTI], cqlFileName: "cms22-inferred.cql" },
+        { libraryName: "CMS22 Asserted", dependsOnCanonicals: [], cqlFileName: "cms22-asserted.cql", idSuffix: "asserted" },
+        { libraryName: "CMS22 Inferred", dependsOnCanonicals: [VS_ANTI], cqlFileName: "cms22-inferred.cql", idSuffix: "inferred" },
       ],
       METADATA,
       { clock: FIXED_CLOCK },
@@ -162,10 +166,11 @@ describe("library — emitLibrariesForClosure (Δ5 collision)", () => {
   });
 
   it("errors on slug collision and skips colliding entries", () => {
+    // Two entries resolving to the SAME policy-id Library id (same suffix) collide.
     const { resources, errors } = emitLibrariesForClosure(
       [
-        { libraryName: "CMS22 Asserted", dependsOnCanonicals: [], cqlFileName: "cms22-asserted.cql" },
-        { libraryName: "cms22 asserted", dependsOnCanonicals: [], cqlFileName: "cms22-asserted-2.cql" },
+        { libraryName: "CMS22 Asserted", dependsOnCanonicals: [], cqlFileName: "cms22-asserted.cql", idSuffix: "asserted" },
+        { libraryName: "cms22 asserted", dependsOnCanonicals: [], cqlFileName: "cms22-asserted-2.cql", idSuffix: "asserted" },
       ],
       METADATA,
       { clock: FIXED_CLOCK },

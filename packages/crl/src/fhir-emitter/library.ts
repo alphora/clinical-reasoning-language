@@ -29,7 +29,7 @@
  */
 
 import type { CRLError } from "../types/errors";
-import { capSlug, pascalCaseName, slugify } from "./slug";
+import { capSlug, capSlugForSuffix, pascalCaseName, policyIdBase, slugify } from "./slug";
 import { crmiCapabilityProfiles, isPublishablePlus, knowledgeExtensions } from "./types";
 import type {
   CpgMetadata,
@@ -42,13 +42,35 @@ const LIBRARY_TYPE_CS = "http://terminology.hl7.org/CodeSystem/library-type";
 const LIBRARY_TYPE_CODE = "logic-library";
 
 /**
+ * R1 — the FHIR Library `id` from the policy-id base + an optional id suffix
+ * (the layer slug for split entries; empty for the source-name-keeping Root).
+ * Single source of truth so the Library id, its `url`, and every referrer's
+ * `library[]` agree byte-for-byte.
+ *
+ * `idSuffix` is the already-slugified layer token (e.g. `"concepts"`,
+ * `"asserted"`, `"inferred"`), or `""`/undefined for the Root. For a non-empty
+ * suffix the combined id uses `capSlugForSuffix` (caps the base to
+ * `64 - len("-<suffix>")`, then appends), so a long policy id can never truncate
+ * the layer suffix away — mirroring codeSystem.ts (`-local`) and
+ * recommendation.ts (`-recommendation`). The Root (empty suffix) is the bare
+ * `capSlug(policyIdBase)`.
+ */
+export function libraryId(metadata: CpgMetadata, idSuffix = ""): string {
+  const base = policyIdBase(metadata);
+  return idSuffix ? capSlugForSuffix(base, `-${idSuffix}`) : base;
+}
+
+/**
  * Canonical URL the emitted Library claims (`Library.url`) AND the URL
  * an ActivityDefinition's `library[0]` references for that CRL library.
  * Both sides MUST byte-equal — this helper is the single source of truth.
- * Slug rule is `capSlug(slugify(libraryName))` (post-cap, FHIR id-safe).
+ *
+ * R1 — the id BASE is the policy id (`policyIdBase(metadata)`), NOT the human
+ * library-name slug. `idSuffix` selects the split entry (Concepts/Asserted/…)
+ * via the manifest role; empty = the source-name-keeping Root.
  */
-export function libraryCanonicalUrl(canonicalBase: string, libraryName: string): string {
-  return `${canonicalBase}/Library/${capSlug(slugify(libraryName))}`;
+export function libraryCanonicalUrl(metadata: CpgMetadata, idSuffix = ""): string {
+  return `${metadata.canonicalBase}/Library/${libraryId(metadata, idSuffix)}`;
 }
 
 /**
@@ -70,6 +92,9 @@ export function emitLibrary(
   dependsOnCanonicals: ReadonlyArray<string>,
   cqlFileName: string,
   opts: EmitOptions = {},
+  // R1 — the policy-id id suffix for split entries (e.g. "concepts"); empty for
+  // the source-name-keeping Root. Selects which Library id/url this entry claims.
+  idSuffix = "",
 ): {
   resource: EmittedResource | null;
   errors: CRLError[];
@@ -84,11 +109,13 @@ export function emitLibrary(
     errors.push({
       type: "Validation",
       kind: "non-ascii-slug-fallback",
-      message: `Library "${libraryName}" contains non-ASCII characters which are stripped from the FHIR id (slug: "${librarySlug}"). Rename or transliterate for a meaningful id.`,
+      message: `Library "${libraryName}" contains non-ASCII characters which are stripped from the FHIR computable name (slug: "${librarySlug}"). Rename or transliterate for a meaningful id.`,
     });
   }
 
-  const id = capSlug(librarySlug);
+  // R1 — id/url BASE is the policy id; `librarySlug` remains the source of the
+  // human-facing `name`/`title` (per-library identity, not the resource id).
+  const id = libraryId(metadata, idSuffix);
   const computableName = pascalCaseName(librarySlug);
 
   // Title defaults to the CRL library name (per-library identity), NOT the
@@ -108,7 +135,7 @@ export function emitLibrary(
 
   const level = opts.capability ?? "publishable";
   const publishable = isPublishablePlus(level);
-  const url = libraryCanonicalUrl(metadata.canonicalBase, libraryName);
+  const url = libraryCanonicalUrl(metadata, idSuffix);
 
   const resource: Record<string, unknown> = {
     resourceType: "Library",
@@ -189,6 +216,10 @@ export function emitLibrariesForClosure(
     libraryName: string;
     dependsOnCanonicals: ReadonlyArray<string>;
     cqlFileName: string;
+    // R1 — the policy-id id suffix for this entry (e.g. "asserted"); empty for
+    // the source-name-keeping Root. Distinct suffixes keep the per-policy Library
+    // ids distinct under a single policyIdBase.
+    idSuffix?: string;
   }>,
   metadata: CpgMetadata,
   opts: EmitOptions = {},
@@ -201,10 +232,10 @@ export function emitLibrariesForClosure(
   const errors: CRLError[] = [];
   const unmatched: UnmatchedReference[] = [];
 
-  // Collision detection on the capped library slug.
+  // R1 — collision detection on the policy-id-derived Library id (base + suffix).
   const slugMap = new Map<string, string[]>();
   for (const lib of libraries) {
-    const id = capSlug(slugify(lib.libraryName));
+    const id = libraryId(metadata, lib.idSuffix ?? "");
     const existing = slugMap.get(id) ?? [];
     existing.push(lib.libraryName);
     slugMap.set(id, existing);
@@ -221,7 +252,7 @@ export function emitLibrariesForClosure(
   }
 
   for (const lib of libraries) {
-    const id = capSlug(slugify(lib.libraryName));
+    const id = libraryId(metadata, lib.idSuffix ?? "");
     if ((slugMap.get(id)?.length ?? 0) > 1) continue;
     const { resource, errors: rErrors, unmatched: rUnmatched } = emitLibrary(
       lib.libraryName,
@@ -229,6 +260,7 @@ export function emitLibrariesForClosure(
       lib.dependsOnCanonicals,
       lib.cqlFileName,
       opts,
+      lib.idSuffix ?? "",
     );
     if (resource) resources.push(resource);
     errors.push(...rErrors);

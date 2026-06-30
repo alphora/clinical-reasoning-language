@@ -43,6 +43,63 @@ describe("fhir-emitter metadata.normalizePackageMetadata", () => {
     expect(r.errors.some((e) => e.kind === "missing-package-version")).toBe(true);
   });
 
+  it("R1 — missing `name` is a hard error (name is the policy id / FHIR id base)", () => {
+    const r = normalizePackageMetadata({
+      version: "1.0.0",
+      crl: { canonicalBase: "http://example.org/x" },
+    });
+    expect(r.metadata).toBeNull();
+    expect(r.errors.some((e) => e.kind === "missing-package-name")).toBe(true);
+  });
+
+  it("R1 — empty/whitespace `name` is a hard error", () => {
+    const r = normalizePackageMetadata({
+      name: "   ",
+      version: "1.0.0",
+      crl: { canonicalBase: "http://example.org/x" },
+    });
+    expect(r.metadata).toBeNull();
+    expect(r.errors.some((e) => e.kind === "missing-package-name")).toBe(true);
+  });
+
+  it("R1 — a non-slug-clean `name` (uppercase) is a hard error (lossy slug)", () => {
+    const r = normalizePackageMetadata({
+      name: "My_Policy@scope",
+      version: "1.0.0",
+      crl: { canonicalBase: "http://example.org/x" },
+    });
+    expect(r.metadata).toBeNull();
+    expect(r.errors.some((e) => e.kind === "lossy-package-name-slug")).toBe(true);
+  });
+
+  it.each([
+    ["@acme/policy", "scoped npm name (@ + /)"],
+    ["foo.bar", "dotted name"],
+    ["MyPolicy", "pure-uppercase camelCase"],
+  ])(
+    "R1 — a lossy-slug `name` %p (%s) is a hard error (lossy-package-name-slug)",
+    (name) => {
+      const r = normalizePackageMetadata({
+        name,
+        version: "1.0.0",
+        crl: { canonicalBase: "http://example.org/x" },
+      });
+      expect(r.metadata).toBeNull();
+      expect(r.errors.some((e) => e.kind === "lossy-package-name-slug")).toBe(true);
+    },
+  );
+
+  it("R1 — a slug-clean `name` is accepted and flows to metadata.name", () => {
+    const r = normalizePackageMetadata({
+      name: "rx501-145-medical-policy",
+      version: "1.0.0",
+      crl: { canonicalBase: "http://example.org/x" },
+    });
+    expect(r.metadata).not.toBeNull();
+    expect(r.metadata!.name).toBe("rx501-145-medical-policy");
+    expect(r.errors).toEqual([]);
+  });
+
   it("defaults missing author, status, experimental, jurisdiction, useContext", () => {
     const r = normalizePackageMetadata({
       name: "foo",
@@ -61,6 +118,7 @@ describe("fhir-emitter metadata.normalizePackageMetadata", () => {
 
   it("title is empty when description is empty (emitter defaults to library name)", () => {
     const r = normalizePackageMetadata({
+      name: "foo",
       version: "1.0.0",
       crl: { canonicalBase: "http://example.org/x" },
     });
@@ -70,6 +128,7 @@ describe("fhir-emitter metadata.normalizePackageMetadata", () => {
 
   it("title is the first line of description when description is multiline", () => {
     const r = normalizePackageMetadata({
+      name: "foo",
       version: "1.0.0",
       description: "Short title\n\nLonger description on a separate line.",
       crl: { canonicalBase: "http://example.org/x" },
@@ -87,6 +146,7 @@ describe("fhir-emitter metadata.normalizePackageMetadata", () => {
 
   it("author-as-object form", () => {
     const r = normalizePackageMetadata({
+      name: "foo",
       version: "1.0.0",
       author: { name: "Smile", email: "a@b.com", url: "https://b.com" },
       crl: { canonicalBase: "http://example.org/x" },
@@ -144,6 +204,7 @@ describe("fhir-emitter metadata.normalizePackageMetadata", () => {
 
   it("round-2 (gpt55 important #4) strips trailing slash from canonicalBase", () => {
     const r = normalizePackageMetadata({
+      name: "foo",
       version: "1.0.0",
       crl: { canonicalBase: "http://example.org/base/" },
     });
@@ -152,6 +213,7 @@ describe("fhir-emitter metadata.normalizePackageMetadata", () => {
 
   it("round-2 (gpt55 important #4) collapses multiple trailing slashes", () => {
     const r = normalizePackageMetadata({
+      name: "foo",
       version: "1.0.0",
       crl: { canonicalBase: "http://example.org/base///" },
     });
@@ -160,6 +222,7 @@ describe("fhir-emitter metadata.normalizePackageMetadata", () => {
 
   it("round-2 (gpt55 important #6) parses email-only author '<email>'", () => {
     const r = normalizePackageMetadata({
+      name: "foo",
       version: "1.0.0",
       author: "<ops@example.org>",
       crl: { canonicalBase: "http://example.org/x" },
