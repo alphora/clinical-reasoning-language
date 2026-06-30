@@ -151,8 +151,8 @@ describe("library — emitLibrariesForClosure (Δ5 collision)", () => {
   it("emits all libraries when slugs are distinct", () => {
     const { resources, errors } = emitLibrariesForClosure(
       [
-        { libraryName: "CMS22 Asserted", valueSetCanonicals: [], cqlFileName: "cms22-asserted.cql" },
-        { libraryName: "CMS22 Inferred", valueSetCanonicals: [VS_ANTI], cqlFileName: "cms22-inferred.cql" },
+        { libraryName: "CMS22 Asserted", dependsOnCanonicals: [], cqlFileName: "cms22-asserted.cql" },
+        { libraryName: "CMS22 Inferred", dependsOnCanonicals: [VS_ANTI], cqlFileName: "cms22-inferred.cql" },
       ],
       METADATA,
       { clock: FIXED_CLOCK },
@@ -164,8 +164,8 @@ describe("library — emitLibrariesForClosure (Δ5 collision)", () => {
   it("errors on slug collision and skips colliding entries", () => {
     const { resources, errors } = emitLibrariesForClosure(
       [
-        { libraryName: "CMS22 Asserted", valueSetCanonicals: [], cqlFileName: "cms22-asserted.cql" },
-        { libraryName: "cms22 asserted", valueSetCanonicals: [], cqlFileName: "cms22-asserted-2.cql" },
+        { libraryName: "CMS22 Asserted", dependsOnCanonicals: [], cqlFileName: "cms22-asserted.cql" },
+        { libraryName: "cms22 asserted", dependsOnCanonicals: [], cqlFileName: "cms22-asserted-2.cql" },
       ],
       METADATA,
       { clock: FIXED_CLOCK },

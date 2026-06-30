@@ -78,6 +78,38 @@ export function readPackageMetadata(projectRoot: string): MetadataResult {
 }
 
 /**
+ * Lightweight reader for ONLY `crl.canonicalBase` from a project's package.json.
+ *
+ * The CQL lane (imports/emit.ts) needs the canonicalBase to publish the synthetic
+ * local-codesystem URL, but must NOT hard-fail on UNRELATED FHIR-metadata problems
+ * (missing `version`, malformed `crl.date`, etc.) — those are the FHIR lane's
+ * concern. `readPackageMetadata` returns `metadata: null` for any such failure,
+ * which would silently drop a perfectly valid `crl.canonicalBase` and send the CQL
+ * lane back to the URN scheme while the FHIR lane hard-fails — a divergence.
+ *
+ * This helper reads `crl.canonicalBase` directly and ignores every other field.
+ * Returns the trimmed, trailing-slash-stripped string when present and non-empty
+ * (matching `normalizePackageMetadata`'s normalization, so both lanes produce the
+ * SAME canonicalBase when metadata is clean); returns undefined for absent/empty
+ * value or ANY read/parse error (swallowed — the FHIR lane reports those).
+ */
+export function readCanonicalBase(projectRoot: string): string | undefined {
+  try {
+    const text = readFileSync(join(projectRoot, "package.json"), "utf8");
+    const raw = JSON.parse(text) as unknown;
+    if (raw === null || typeof raw !== "object") return undefined;
+    const crl = (raw as Record<string, unknown>).crl;
+    if (crl === null || typeof crl !== "object") return undefined;
+    const base = (crl as Record<string, unknown>).canonicalBase;
+    if (typeof base !== "string") return undefined;
+    const trimmed = base.trim().replace(/\/+$/, "");
+    return trimmed || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * Pure normalizer — accepts a parsed package.json object and produces
  * CpgMetadata + diagnostics. Never throws. Single source of truth for
  * the package.json → CpgMetadata field-by-field mapping.

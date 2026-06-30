@@ -17,7 +17,8 @@ import {
   layerLibraryNamesFor,
   librariesReferencedBy,
 } from "../cql-emitter/layeredEmit";
-import { lowerLocalCodes, localCodesystemUrn } from "../cql-emitter/lowerLocalCodes";
+import { lowerLocalCodes, localCodeSystemUrl } from "../cql-emitter/lowerLocalCodes";
+import { readCanonicalBase } from "../fhir-emitter/metadata";
 import type { CRLError } from "../types/errors";
 
 import { resolveImports } from "./index";
@@ -148,17 +149,32 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
   // Direct `emitCQLFromAST` callers (CLI, tests) lower internally; this is the
   // imports-path counterpart so the layered classification sees lowered ASTs.
   const lowerErrors: CRLError[] = [];
+  // Slice 4 — load the project's `crl.canonicalBase` (best-effort) so the
+  // synthetic local codesystem's CQL `codesystem` URL is published under it,
+  // byte-equal with the FHIR lane. CQL emit must NOT hard-fail on missing/broken
+  // FHIR metadata (that's the FHIR lane's concern), so we use the lightweight
+  // `readCanonicalBase` reader — it reads ONLY `crl.canonicalBase` and swallows
+  // errors. (The full `readPackageMetadata` returns `metadata: null` for any
+  // UNRELATED FHIR-metadata failure — e.g. a missing `version` — which would
+  // silently drop a VALID canonicalBase and diverge from the FHIR lane.) When
+  // absent/unreadable, canonicalBase stays undefined and the lowering falls back
+  // to the URN.
+  let canonicalBase: string | undefined;
+  if (graph.projectRoot) {
+    canonicalBase = readCanonicalBase(graph.projectRoot);
+  }
   // Track libraries that actually synthesized a local codesystem (lowered at
-  // least one `code is` concept), keyed by the deterministic URN — so the
-  // cross-library URN-collision preflight below can fire when two DISTINCT
-  // library names slug to the SAME `urn:crl:codesystem:<slug>-local`.
+  // least one `code is` concept), keyed by the deterministic codesystem URL — so
+  // the cross-library collision preflight below can fire when two DISTINCT
+  // library names slug to the SAME local codesystem URL. The collision is on the
+  // slug, so it is scheme-independent (URN vs canonicalBase both collide).
   const localUrnToLibraries = new Map<string, Set<string>>();
   const emitClosure = rawEmitClosure.map((entry) => {
-    const lowered = lowerLocalCodes(entry.ast);
+    const lowered = lowerLocalCodes(entry.ast, { canonicalBase });
     if (lowered.errors.length > 0) lowerErrors.push(...lowered.errors);
     const didLower = lowered.ast !== entry.ast;
     if (didLower && entry.name) {
-      const urn = localCodesystemUrn(entry.ast.library.name);
+      const urn = localCodeSystemUrl(canonicalBase, entry.ast.library.name);
       const set = localUrnToLibraries.get(urn) ?? new Set<string>();
       set.add(entry.name);
       localUrnToLibraries.set(urn, set);
@@ -318,7 +334,7 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
     // per-CRL path below. This keeps the hand-split cms22/cms69 goldens (each
     // source `.crl` is single-layer) a no-op.
     if (isLayerSplittable(entry.ast)) {
-      const layered = emitLayered(entry.ast, entry.name, { crossLibraryParameters });
+      const layered = emitLayered(entry.ast, entry.name, { crossLibraryParameters, canonicalBase });
       if (!layered.success) {
         return {
           success: false,
@@ -380,6 +396,7 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
       libraryName: entry.name,
       crossLibraryIncludes: crossLibs,
       crossLibraryParameters,
+      canonicalBase,
     });
     if (!emit.success || !emit.result) {
       return {

@@ -53,11 +53,12 @@ export function libraryCanonicalUrl(canonicalBase: string, libraryName: string):
 
 /**
  * Emit one FHIR Library wrapping the CRL library's CQL output. The
- * `valueSetCanonicals` argument is the closure of ValueSet canonical
- * URLs the library references (concept `coded from` + activity `with`
- * resolved); caller threads it from the import-graph walk. Order is
- * preserved as-given; dedup happens at this layer so the caller can
- * pass through raw walk output.
+ * `dependsOnCanonicals` argument is the closure of canonical URLs the
+ * library depends-on — author ValueSet canonicals (concept `coded from` +
+ * activity `with` resolved) PLUS, since slice 4, the library's emitted local
+ * CodeSystem url (the `code is` local domain). Caller threads it from the
+ * import-graph walk. Order is preserved as-given; dedup happens at this layer
+ * so the caller can pass through raw walk output.
  *
  * `cqlFileName` is the relative path the `content[0].attachment.url`
  * references — typically `<library-slug>.cql` for a sibling-file
@@ -66,7 +67,7 @@ export function libraryCanonicalUrl(canonicalBase: string, libraryName: string):
 export function emitLibrary(
   libraryName: string,
   metadata: CpgMetadata,
-  valueSetCanonicals: ReadonlyArray<string>,
+  dependsOnCanonicals: ReadonlyArray<string>,
   cqlFileName: string,
   opts: EmitOptions = {},
 ): {
@@ -144,11 +145,12 @@ export function emitLibrary(
   if (metadata.jurisdiction.length > 0) resource.jurisdiction = metadata.jurisdiction;
   if (metadata.useContext.length > 0) resource.useContext = metadata.useContext;
 
-  // relatedArtifact: depends-on per unique ValueSet canonical, preserving
-  // first-seen order so output is deterministic.
+  // relatedArtifact: depends-on per unique dependency canonical (author
+  // ValueSets + the local CodeSystem), preserving first-seen order so output is
+  // deterministic.
   const seen = new Set<string>();
   const relatedArtifact: Array<Record<string, unknown>> = [];
-  for (const canonical of valueSetCanonicals) {
+  for (const canonical of dependsOnCanonicals) {
     if (seen.has(canonical)) continue;
     seen.add(canonical);
     relatedArtifact.push({ type: "depends-on", resource: canonical });
@@ -185,7 +187,7 @@ function defaultClock(): Date {
 export function emitLibrariesForClosure(
   libraries: ReadonlyArray<{
     libraryName: string;
-    valueSetCanonicals: ReadonlyArray<string>;
+    dependsOnCanonicals: ReadonlyArray<string>;
     cqlFileName: string;
   }>,
   metadata: CpgMetadata,
@@ -224,7 +226,7 @@ export function emitLibrariesForClosure(
     const { resource, errors: rErrors, unmatched: rUnmatched } = emitLibrary(
       lib.libraryName,
       metadata,
-      lib.valueSetCanonicals,
+      lib.dependsOnCanonicals,
       lib.cqlFileName,
       opts,
     );

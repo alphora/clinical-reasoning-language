@@ -87,17 +87,58 @@ import type { CRLError } from "../types/errors";
 export interface LowerLocalCodesResult {
   ast: CRL;
   errors: CRLError[];
+  /**
+   * Slice 4 — the EXACT concepts this pass lowered into the shared local
+   * codesystem, surfaced for the FHIR lane so it materializes precisely the
+   * codes the CQL emits (one source of truth, no second predicate to drift).
+   * Populated inside the synthesis loop at the point each valid concept is
+   * lowered, so it cannot diverge from the synthetic terminology. Empty on the
+   * fast-path early return (nothing to lower) and on the error/skip-only path.
+   */
+  localCodes: Array<{ concept: string; code: string; conceptType: string }>;
+}
+
+/** Options for the lowering pass. */
+export interface LowerLocalCodesOptions {
+  /**
+   * Slice 4 — the project's `crl.canonicalBase`. When set, the synthetic local
+   * codesystem's URL is published under it (`<base>/CodeSystem/<slug>-local`);
+   * when undefined (direct callers without a package.json), the URN fallback is
+   * used. Threaded through to `localCodeSystemUrl` so the CQL and FHIR identities
+   * stay byte-equal.
+   */
+  canonicalBase?: string;
 }
 
 /**
- * Deterministic local-domain codesystem URN for a library. Slug = lowercase,
- * non-alphanumeric → hyphen, collapse/trim hyphens. Empty (e.g. a pure
- * non-ASCII library name) falls back to `unnamed` so the URN is always
- * well-formed. Kept FHIR-free (no canonicalBase) — this is a plain URN, the
- * single implicit local domain shared by every `code is` code in the library.
+ * Deterministic local-domain codesystem URL for a library — the single implicit
+ * local domain shared by every `code is` code in the library. Slug = lowercase,
+ * non-alphanumeric → hyphen, collapse/trim hyphens; empty (e.g. a pure non-ASCII
+ * library name) falls back to `unnamed` so the URL is always well-formed.
+ *
+ * Slice 4 — when `canonicalBase` is provided (the imports/FHIR lane loads it from
+ * `crl.canonicalBase`), the local codesystem URL is published UNDER canonicalBase
+ * (`<base>/CodeSystem/<slug>-local`) for FHIR closure integrity + publishability;
+ * the future case-feature profile fixes a code from this system. When canonicalBase
+ * is undefined — the fallback for direct callers (CLI / single-file `emitCQL`)
+ * without a package.json — it falls back to the plain URN
+ * `urn:crl:codesystem:<slug>-local`. The CQL and FHIR identities MUST stay
+ * byte-equal, so BOTH lanes call THIS helper.
  */
-export function localCodesystemUrn(libraryName: string): string {
-  return `urn:crl:codesystem:${localSlug(libraryName)}-local`;
+export function localCodeSystemUrl(
+  canonicalBase: string | undefined,
+  libraryName: string,
+): string {
+  const slug = localSlug(libraryName);
+  if (canonicalBase) {
+    // Normalize a trailing slash so the url is stable regardless of whether the
+    // caller's canonicalBase ends in `/`. The FHIR-metadata loader already
+    // strips it, but a direct `emitCQLFromAST({ canonicalBase })` caller may
+    // not — and both lanes MUST produce a byte-equal url.
+    const base = canonicalBase.replace(/\/+$/, "");
+    return `${base}/CodeSystem/${slug}-local`;
+  }
+  return `urn:crl:codesystem:${slug}-local`;
 }
 
 /** Lowercase-hyphen slug of a name; `unnamed` when empty after stripping. */
@@ -153,12 +194,15 @@ function isLowerableConcept(stmt: Statement): stmt is Concept {
  * collision checks + lower. The representation lane is checked AFTER empty +
  * mixed so a malformed representation-bearing concept still gets its hard error.
  */
-export function lowerLocalCodes(ast: CRL): LowerLocalCodesResult {
+export function lowerLocalCodes(
+  ast: CRL,
+  opts: LowerLocalCodesOptions = {},
+): LowerLocalCodesResult {
   const errors: CRLError[] = [];
 
   // Fast path: nothing to lower → return the input untouched (no clone churn).
   if (!ast.statements.some(isLowerableConcept)) {
-    return { ast, errors };
+    return { ast, errors, localCodes: [] };
   }
 
   // Existing terminology names (so a synthetic name can't silently collide with
@@ -183,6 +227,7 @@ export function lowerLocalCodes(ast: CRL): LowerLocalCodesResult {
   const seenSyntheticNames = new Set<string>();
 
   const loweredConcepts: Concept[] = [];
+  const localCodes: Array<{ concept: string; code: string; conceptType: string }> = [];
   const syntheticTerminologies: Terminology[] = [];
   // The local-domain URN follows the SOURCE policy library identity
   // (`ast.library.name`), NOT the emitted-layer library name. `emitCQLFromAST`
@@ -190,7 +235,7 @@ export function lowerLocalCodes(ast: CRL): LowerLocalCodesResult {
   // "<Lib> Concepts"), but the local domain belongs to the source CRL, so the
   // URN won't follow `options.libraryName` — a direct caller passing it should
   // expect the URN to slug from `ast.library.name`.
-  const urn = localCodesystemUrn(ast.library.name);
+  const urn = localCodeSystemUrl(opts.canonicalBase, ast.library.name);
 
   for (const stmt of ast.statements) {
     if (!isLowerableConcept(stmt)) continue;
@@ -291,6 +336,11 @@ export function lowerLocalCodes(ast: CRL): LowerLocalCodesResult {
     codeValueToConcept.set(codeValue, c.name);
     seenSyntheticNames.add(c.name);
 
+    // Record the lowered code from the SAME code path that synthesizes its
+    // terminology (below), so the FHIR lane's selection cannot drift from what
+    // the CQL lane emits. `conceptType` is defined here — checked at (4).
+    localCodes.push({ concept: c.name, code: codeValue, conceptType: c.conceptType! });
+
     // Build the synthetic local Terminology (codesystem + single code) named
     // after the concept. On the PER-CRL path detectCollisions in the emitter
     // suffixes its emit name to "<Concept> Code" (concept of the same name
@@ -327,7 +377,7 @@ export function lowerLocalCodes(ast: CRL): LowerLocalCodesResult {
   // local codesystem?" (e.g. `imports/emit.ts`'s `didLower = lowered.ast !==
   // entry.ast`) don't get a false positive from a same-content clone.
   if (loweredConcepts.length === 0) {
-    return { ast, errors };
+    return { ast, errors, localCodes };
   }
 
   const rewritten: Statement[] = ast.statements.map((stmt) => {
@@ -342,7 +392,7 @@ export function lowerLocalCodes(ast: CRL): LowerLocalCodesResult {
     statements: [...syntheticTerminologies, ...rewritten],
   };
 
-  return { ast: outAst, errors };
+  return { ast: outAst, errors, localCodes };
 }
 
 /** Build a synthetic Terminology node: one codesystem (URN) + one code line. */

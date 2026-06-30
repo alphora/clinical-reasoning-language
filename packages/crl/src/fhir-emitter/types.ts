@@ -39,6 +39,8 @@ import type { CRLError } from "../types/errors";
  *   decision-cascade-suppressed                    error    A decision (root or sub) would emit with zero surviving top-level actions due to cascade suppression. (Todo 3 — round-6 renamed from strategy-root-cascade-suppressed for accuracy: same disposition fires for sub-decisions, not just strategies)
  *   unresolved-reference-cascade-suppression       warning  Non-root parent action suppressed because all children were suppressed. (Todo 3)
  *   closure-resource-collision                     error    Two emitted resources within the closure produce the same `<resourceType>/<id>.json` relative path. (Todo 4)
+ *   closure-resource-url-collision                 error    Two emitted resources within the closure carry the same non-empty canonical `url` (e.g. a cross-library canonicalBase-slug collision producing two local CodeSystems with one url). (Slice 4)
+ *   emit-*-local-code* (lowering kinds)            error    The slice-3 `lowerLocalCodes` hard errors (emit-empty-local-code, emit-mixed-code-and-definition, emit-local-code-missing-type, emit-duplicate-local-code, emit-duplicate-local-concept, emit-local-code-terminology-collision) pass through the FHIR lane unchanged (NOT in FHIR_DEF_WARNING_KINDS → hard errors). The FHIR-only path (MCP `emit_crl_fhir`) runs the lowering for its diagnostics so these surface even though it skips the CQL lane. (Slice 4)
  *   unresolved-library-reference                   error    An emitted resource's `library[]` URL doesn't resolve to an emitted Library. (Todo 4)
  *   unresolved-related-artifact                    error    An emitted Library's `relatedArtifact[depends-on]` URL is under canonicalBase but doesn't resolve to an emitted resource. (Todo 4)
  *   unresolved-definition-target                   error    An emitted PlanDef's `action.definitionCanonical` doesn't resolve to an emitted PlanDef/ActivityDef. (Todo 4)
@@ -127,7 +129,12 @@ export function isPublishablePlus(level: Capability): boolean {
   return CAPABILITY_ORDER.indexOf(level) >= CAPABILITY_ORDER.indexOf("publishable");
 }
 
-export type CrmiProfileResource = "valueset" | "library" | "activitydefinition" | "plandefinition";
+export type CrmiProfileResource =
+  | "valueset"
+  | "library"
+  | "activitydefinition"
+  | "plandefinition"
+  | "codesystem";
 
 const CRMI_SD_BASE = "http://hl7.org/fhir/uv/crmi/StructureDefinition";
 
@@ -142,6 +149,12 @@ const CRMI_PROFILE_LEVELS: Record<CrmiProfileResource, readonly Capability[]> = 
   library: ["shareable", "computable", "publishable"],
   activitydefinition: ["shareable", "publishable"],
   plandefinition: ["shareable", "publishable"],
+  // CRMI 2.0.0-ballot ships ONLY crmi-shareablecodesystem + crmi-
+  // publishablecodesystem (verified — no crmi-computablecodesystem; see
+  // https://build.fhir.org/ig/HL7/crmi-ig/StructureDefinition-crmi-shareablecodesystem.html),
+  // so the local CodeSystem claims shareable + publishable, skipping computable
+  // like ActivityDefinition/PlanDefinition do. (Slice 4.)
+  codesystem: ["shareable", "publishable"],
 };
 
 /**
@@ -217,7 +230,7 @@ export interface UsageContext {
  * caller-provided `outDir` by the writer.
  */
 export interface EmittedResource {
-  resourceType: "ValueSet" | "ActivityDefinition" | "PlanDefinition" | "Library";
+  resourceType: "ValueSet" | "ActivityDefinition" | "PlanDefinition" | "Library" | "CodeSystem";
   relativePath: string;
   resource: Record<string, unknown>;
   /**
@@ -230,7 +243,7 @@ export interface EmittedResource {
    * sourceKind = "Recommendation" and sourceName = the activity's CRL name
    * (NOT a synthesized "<name> Recommendation" string).
    */
-  sourceKind?: "Terminology" | "Library" | "Activity" | "Recommendation" | "Decision";
+  sourceKind?: "Terminology" | "Library" | "Activity" | "Recommendation" | "Decision" | "LocalCodeSystem";
   sourceName?: string;
   location?: Location;
 }

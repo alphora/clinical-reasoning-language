@@ -3,7 +3,7 @@ import { describe, expect, it } from "@jest/globals";
 import { buildCRL } from "../../index";
 import type { CRL, Concept, Terminology } from "../../ast/types";
 import { emitCQL } from "../emitCQL";
-import { lowerLocalCodes, localCodesystemUrn } from "../lowerLocalCodes";
+import { lowerLocalCodes, localCodeSystemUrl } from "../lowerLocalCodes";
 
 // Slice 3 — concept-level `code is` local-source lowering. Covers the
 // `lowerLocalCodes` transform shape + each hard-error diagnostic, plus the
@@ -111,12 +111,72 @@ concept "Height":
     expect(concept!.definition).toBeUndefined();
   });
 
-  it("localCodesystemUrn slugs the library name (and falls back to `unnamed`)", () => {
-    expect(localCodesystemUrn("Risankizumab Coverage")).toBe(
+  it("localCodeSystemUrl falls back to a URN when canonicalBase is undefined (and slugs the library name)", () => {
+    expect(localCodeSystemUrl(undefined, "Risankizumab Coverage")).toBe(
       "urn:crl:codesystem:risankizumab-coverage-local",
     );
-    expect(localCodesystemUrn("  Weird--Name!! ")).toBe("urn:crl:codesystem:weird-name-local");
-    expect(localCodesystemUrn("日本語")).toBe("urn:crl:codesystem:unnamed-local");
+    expect(localCodeSystemUrl(undefined, "  Weird--Name!! ")).toBe(
+      "urn:crl:codesystem:weird-name-local",
+    );
+    expect(localCodeSystemUrl(undefined, "日本語")).toBe("urn:crl:codesystem:unnamed-local");
+  });
+
+  it("localCodeSystemUrl publishes under canonicalBase when set (byte-equal with the FHIR lane)", () => {
+    expect(localCodeSystemUrl("http://example.org/crl/x", "Risankizumab Coverage")).toBe(
+      "http://example.org/crl/x/CodeSystem/risankizumab-coverage-local",
+    );
+    expect(localCodeSystemUrl("http://example.org/crl/x", "日本語")).toBe(
+      "http://example.org/crl/x/CodeSystem/unnamed-local",
+    );
+  });
+
+  it("canonicalBase threads into the synthetic codesystem URL when passed to lowerLocalCodes", () => {
+    const ast = parse(
+      lib(`
+concept "Adult Patient":
+- type is Observation.
+- code is \`adult-18-or-older\`.
+`),
+    );
+    const { ast: out } = lowerLocalCodes(ast, { canonicalBase: "http://example.org/crl/x" });
+    const term = out.statements.find(
+      (s): s is Terminology => s.type === "Terminology" && s.name === "Adult Patient",
+    );
+    expect(term!.body).toEqual([
+      expect.objectContaining({
+        type: "TerminologySystem",
+        system: "http://example.org/crl/x/CodeSystem/t-local",
+      }),
+      expect.objectContaining({ type: "TerminologyCode", code: "adult-18-or-older" }),
+    ]);
+  });
+
+  it("lowerLocalCodes().localCodes returns EXACTLY the lowered code-is concepts (the FHIR lane's selector)", () => {
+    const ast = parse(
+      lib(`
+terminology "Height VS":
+- valueset is \`http://example.org/height\`.
+
+concept "Adult Patient":
+- type is Observation.
+- code is \`adult-18-or-older\`.
+
+concept "Active Crohns Disease":
+- type is Condition.
+- code is \`active-crohns-disease\`.
+
+concept "Height":
+- type is Observation.
+- value type is Quantity.
+- code is \`height\`.
+- source representation: - coded from "Height VS".
+`),
+    );
+    // `Height` is representation-bearing → out of scope (NOT lowered, NOT selected).
+    expect(lowerLocalCodes(ast).localCodes).toEqual([
+      { concept: "Adult Patient", code: "adult-18-or-older", conceptType: "Observation" },
+      { concept: "Active Crohns Disease", code: "active-crohns-disease", conceptType: "Condition" },
+    ]);
   });
 });
 

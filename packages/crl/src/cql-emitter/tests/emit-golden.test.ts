@@ -38,7 +38,7 @@ const CORPORA: Record<string, string> = {
   // codesystem (URN) + per-concept code into the Concepts layer and a retrieve
   // into the Asserted layer; a `defined as` concept lands in the Inferred layer.
   // Exercises the full code-is fan-out + cross-layer re-qualification.
-  "code-is-basic": path.join(__dirname, "fixtures", "code-is-basic.crl"),
+  "code-is-basic": path.join(__dirname, "fixtures", "code-is-basic", "code-is-basic.crl"),
 };
 
 const norm = (s: string): string => s.replace(/\r\n/g, "\n");

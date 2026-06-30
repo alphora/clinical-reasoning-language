@@ -3,8 +3,16 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "@jest/globals";
 
-import { emitFhirDefClosure, emitFhirDefFromPath } from "../closureOrchestrator";
-import type { CpgMetadata } from "../types";
+import {
+  applyInvariant1,
+  applyUrlUniquenessInvariant,
+  emitFhirDefClosure,
+  emitFhirDefFromPath,
+} from "../closureOrchestrator";
+import { emitCQLImports } from "../../imports/emit";
+import { localCodeSystemUrl } from "../../cql-emitter/lowerLocalCodes";
+import { capSlugForSuffix, slugify } from "../slug";
+import type { CpgMetadata, EmittedResource } from "../types";
 
 const ROOT = join(__dirname, "..", "..", "..");
 const FIXED_CLOCK = () => new Date("2026-06-05T15:30:00.000Z");
@@ -148,5 +156,122 @@ describe("closureOrchestrator — direct API (emitFhirDefClosure)", () => {
     );
     expect(result.resources).toEqual([]);
     expect(result.errors).toEqual([]);
+  });
+});
+
+/* ─── Slice 4 — concept-level `code is` → FHIR CodeSystem coverage ───── */
+
+const CODE_IS_BASIC = join(
+  ROOT,
+  "src/cql-emitter/tests/fixtures/code-is-basic/code-is-basic.crl",
+);
+
+describe("closureOrchestrator — FHIR closure code-is coverage (T2)", () => {
+  it("emits EXACTLY ONE local CodeSystem under canonicalBase carrying the fixture's codes", () => {
+    const result = emitFhirDefFromPath(CODE_IS_BASIC, { clock: FIXED_CLOCK });
+    const codeSystems = result.resources.filter((r) => r.resourceType === "CodeSystem");
+    expect(codeSystems).toHaveLength(1);
+    const cs = codeSystems[0]!.resource as Record<string, unknown>;
+    expect(cs.url).toBe(
+      "http://example.org/crl/code-is-basic/CodeSystem/code-is-basic-local",
+    );
+    // The two `code is`-only concepts → concept[] (the `defined as` concept is NOT a local code).
+    expect(cs.concept).toEqual([
+      { code: "adult-18-or-older", display: "Adult Patient" },
+      { code: "active-crohns-disease", display: "Active Crohns Disease" },
+    ]);
+  });
+
+  it("the emitted Library relatedArtifact depends-on the local CodeSystem url", () => {
+    const result = emitFhirDefFromPath(CODE_IS_BASIC, { clock: FIXED_CLOCK });
+    const csUrl = (result.resources.find((r) => r.resourceType === "CodeSystem")!
+      .resource as { url: string }).url;
+    const lib = result.resources.find((r) => r.resourceType === "Library");
+    expect(lib).toBeDefined();
+    const ra = (lib!.resource as {
+      relatedArtifact?: Array<{ type?: string; resource?: string }>;
+    }).relatedArtifact;
+    expect(ra).toBeDefined();
+    expect(
+      ra!.some((e) => e.type === "depends-on" && e.resource === csUrl),
+    ).toBe(true);
+  });
+
+  it("byte-equality: the FHIR CodeSystem.url == the CQL `codesystem '<url>'` literal (anti-drift before slice A)", () => {
+    // FHIR lane.
+    const fhir = emitFhirDefFromPath(CODE_IS_BASIC, { clock: FIXED_CLOCK });
+    const csUrl = (fhir.resources.find((r) => r.resourceType === "CodeSystem")!
+      .resource as { url: string }).url;
+
+    // The shared helper must agree with both lanes for the same library entry.
+    expect(csUrl).toBe(localCodeSystemUrl("http://example.org/crl/code-is-basic", "Code Is Basic"));
+
+    // CQL lane — the emitted CQL must carry a `codesystem '<csUrl>'` literal
+    // byte-equal with the FHIR CodeSystem.url.
+    const cql = emitCQLImports(CODE_IS_BASIC);
+    expect(cql.success).toBe(true);
+    const allCql = cql.cqlByLibrary.map((e) => e.cql).join("\n");
+    expect(allCql).toContain(`'${csUrl}'`);
+    expect(allCql).toContain(`codesystem "Adult Patient System": '${csUrl}'`);
+  });
+});
+
+describe("applyUrlUniquenessInvariant — Inv 0 (T3)", () => {
+  function res(url: string, relativePath: string): EmittedResource {
+    return {
+      resourceType: "CodeSystem",
+      relativePath,
+      resource: { resourceType: "CodeSystem", url },
+      sourceKind: "LocalCodeSystem",
+      sourceName: relativePath,
+    };
+  }
+
+  it("two resources sharing a url but with DISTINCT relativePaths → closure-resource-url-collision (Inv 1 won't catch this)", () => {
+    const errors = applyUrlUniquenessInvariant([
+      res("http://example.org/crl/x/CodeSystem/shared-local", "CodeSystem/a.json"),
+      res("http://example.org/crl/x/CodeSystem/shared-local", "CodeSystem/b.json"),
+    ]);
+    expect(errors).toHaveLength(1);
+    expect(errors[0]!.kind).toBe("closure-resource-url-collision");
+    expect(errors[0]!.message).toContain("shared-local");
+  });
+
+  it("distinct urls → no error", () => {
+    const errors = applyUrlUniquenessInvariant([
+      res("http://example.org/crl/x/CodeSystem/a-local", "CodeSystem/a.json"),
+      res("http://example.org/crl/x/CodeSystem/b-local", "CodeSystem/b.json"),
+    ]);
+    expect(errors).toEqual([]);
+  });
+});
+
+describe("closureOrchestrator — truncation id-collision boundary (T4)", () => {
+  // Mirror codeSystem.ts' id derivation: capSlugForSuffix(slugify(name), "-local").
+  const idFor = (name: string): string => capSlugForSuffix(slugify(name), "-local");
+
+  it("two library names differing only past the slug cap collide on the capped CodeSystem id", () => {
+    // capSlugForSuffix caps the base to 64 - len("-local") = 58 chars, so two
+    // names that diverge only after ~58 slug chars produce the SAME capped id.
+    const prefix = "a".repeat(60);
+    expect(idFor(prefix + "xxxxx")).toBe(idFor(prefix + "yyyyy"));
+  });
+
+  it("CodeSystems whose ids collide share a relativePath → Inv 1 closure-resource-collision", () => {
+    const prefix = "a".repeat(60);
+    const id = idFor(prefix + "xxxxx");
+    const relativePath = `CodeSystem/${id}.json`;
+    const make = (sourceName: string): EmittedResource => ({
+      resourceType: "CodeSystem",
+      relativePath,
+      resource: { resourceType: "CodeSystem", url: `http://example.org/x/${sourceName}` },
+      sourceKind: "LocalCodeSystem",
+      sourceName,
+    });
+    const inv1 = applyInvariant1([make("LibA"), make("LibB")]);
+    // both colliders dropped
+    expect(inv1.surviving).toHaveLength(0);
+    expect(inv1.errors).toHaveLength(1);
+    expect(inv1.errors[0]!.kind).toBe("closure-resource-collision");
   });
 });

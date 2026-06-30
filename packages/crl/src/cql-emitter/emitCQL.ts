@@ -98,6 +98,14 @@ export interface EmitOptions {
    * scope-resolved identity per R4-Δ1.
    */
   crossLibraryParameters?: Map<string, Map<string, AstParameterInfo>>;
+  /**
+   * Slice 4 — the project's `crl.canonicalBase`. Threaded to `lowerLocalCodes`
+   * so the synthetic local codesystem's CQL `codesystem` URL is published under
+   * canonicalBase (`<base>/CodeSystem/<slug>-local`) — byte-equal with the FHIR
+   * lane's emitted local CodeSystem `url`. Undefined for direct callers without
+   * a package.json (CLI / single-file `emitCQL`), which fall back to the URN.
+   */
+  canonicalBase?: string;
 }
 
 /**
@@ -411,7 +419,7 @@ export function emitCQLFromAST(ast: CRL, options: EmitOptions = {}): EmitResult 
     // pass is idempotent (clears `Concept.code`), so a re-entry from the layered
     // path (`emitLayered` → `emitCQLFromAST`) is a no-op. Hard errors (mixed
     // code+definition, empty code, missing type, duplicate code) short-circuit.
-    const lowered = lowerLocalCodes(ast);
+    const lowered = lowerLocalCodes(ast, { canonicalBase: options.canonicalBase });
     if (lowered.errors.length > 0) {
       return { success: false, errors: lowered.errors };
     }
@@ -525,6 +533,10 @@ class Emitter {
       fhirHelpersVersion: options.fhirHelpersVersion ?? "4.0.1",
       crossLibraryIncludes: options.crossLibraryIncludes ?? [],
       crossLibraryParameters: options.crossLibraryParameters ?? new Map(),
+      // `canonicalBase` is consumed by `lowerLocalCodes` in `emitCQLFromAST`
+      // (before the Emitter is constructed); the Emitter itself never reads it.
+      // Kept on the Required<EmitOptions> shape for type completeness.
+      canonicalBase: options.canonicalBase ?? "",
     };
     this.indexNames();
     this.detectCollisions();

@@ -1,0 +1,12 @@
+{
+  "name": "code-is-basic-fixture",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Slice 4 code-is fixture — exercises canonicalBase-published local CodeSystem",
+  "crl": {
+    "canonicalBase": "http://example.org/crl/code-is-basic",
+    "status": "draft",
+    "experimental": true,
+    "date": "2020-01-01T00:00:00.000Z"
+  }
+}

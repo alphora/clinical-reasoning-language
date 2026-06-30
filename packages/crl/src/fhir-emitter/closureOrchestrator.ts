@@ -43,7 +43,10 @@ import { resolveImports } from "../imports/index";
 import type { ImportDiagnostic, ResolvedGraph } from "../imports/types";
 import type { CRLError } from "../types/errors";
 
+import { lowerLocalCodes } from "../cql-emitter/lowerLocalCodes";
+
 import { emitActivityDefinitionsForLibrary, type TerminologyResolver } from "./activity";
+import { emitLocalCodeSystem } from "./codeSystem";
 import { emitDecisionPlanDefinition, type ActivityResolver, type ConceptResolver, type DecisionResolver } from "./decision";
 import { emitLibrary } from "./library";
 import { readPackageMetadata } from "./metadata";
@@ -315,7 +318,7 @@ function isUnderCanonicalBase(url: string, base: string): boolean {
  * Inv 1 — relativePath uniqueness across the closure. Skip both colliders.
  * Returns the post-Inv-1 surviving resources + errors emitted.
  */
-function applyInvariant1(resources: ReadonlyArray<EmittedResource>): {
+export function applyInvariant1(resources: ReadonlyArray<EmittedResource>): {
   surviving: EmittedResource[];
   errors: CRLError[];
   /** map of dropped relativePaths for "(downstream of collision on X)" annotations */
@@ -350,6 +353,42 @@ function applyInvariant1(resources: ReadonlyArray<EmittedResource>): {
     });
   }
   return { surviving, errors, droppedPaths };
+}
+
+/**
+ * Inv 0 (slice 4) — canonical `url` uniqueness across the closure. A cross-
+ * library canonicalBase-slug collision would otherwise produce two resources
+ * (e.g. two local CodeSystems) sharing the same canonical `url`, which is
+ * invalid FHIR (a canonical url must resolve to ONE resource). The CQL lane's
+ * slug-collision preflight catches the codesystem-slug case on its side; this is
+ * the FHIR-side guard, and it covers ANY resource kind with a duplicated url.
+ *
+ * This only ERRORS — it does not drop. Inv 1 (relativePath uniqueness) handles
+ * dropping the colliders when their ids also collide (the common case); when two
+ * distinct relativePaths somehow carry the same url, this is the only signal.
+ */
+export function applyUrlUniquenessInvariant(resources: ReadonlyArray<EmittedResource>): CRLError[] {
+  const byUrl = new Map<string, EmittedResource[]>();
+  for (const r of resources) {
+    const url = (r.resource as { url?: string }).url;
+    if (typeof url !== "string" || url === "") continue;
+    const list = byUrl.get(url) ?? [];
+    list.push(r);
+    byUrl.set(url, list);
+  }
+  const errors: CRLError[] = [];
+  for (const [url, list] of byUrl) {
+    if (list.length < 2) continue;
+    const desc = list
+      .map((r) => `${r.sourceKind ?? "?"} "${r.sourceName ?? "?"}" (${r.relativePath})`)
+      .join(" vs ");
+    errors.push({
+      type: "Validation",
+      kind: "closure-resource-url-collision",
+      message: `Two or more emitted resources share the canonical url "${url}": ${desc}. A canonical url must resolve to a single resource — rename one of the colliding CRL libraries/declarations.`,
+    });
+  }
+  return errors;
 }
 
 /**
@@ -562,15 +601,43 @@ export function emitFhirDefClosure(
     resources.push(...vsResult.resources);
     errors.push(...vsResult.errors);
     unmatched.push(...vsResult.unmatched);
-    const emittedValueSetCanonicals: string[] = vsResult.resources
+    const emittedDependsOnCanonicals: string[] = vsResult.resources
       .map((r) => (r.resource as { url?: string }).url)
       .filter((u): u is string => typeof u === "string");
+
+    // (1b) Local CodeSystem for concept-level `code is` codes (slice 4).
+    //
+    // FIRST run `lowerLocalCodes` for its DIAGNOSTICS — the slice-3 hard errors
+    // (mixed code+definition, empty code, missing type, duplicate code) would
+    // otherwise be skipped on the FHIR-only path (MCP `emit_crl_fhir`), which
+    // never goes through the CQL lane. We use the SAME pass's `localCodes` to
+    // select which codes to materialize, so the CodeSystem carries EXACTLY the
+    // codes the CQL emits (one source of truth, no second predicate to drift).
+    // The lowering kinds are already hard errors (not in FHIR_DEF_WARNING_KINDS),
+    // so push them as-is — re-keying would only lose the actionable subtype. On
+    // a lowering error, surface it and emit NO CodeSystem for this library.
+    const lowered = lowerLocalCodes(lib.ast, { canonicalBase: metadata.canonicalBase });
+    if (lowered.errors.length > 0) {
+      errors.push(...lowered.errors);
+    } else {
+      const codeConcepts = lowered.localCodes;
+      if (codeConcepts.length > 0) {
+        const csResult = emitLocalCodeSystem(lib.libraryName, codeConcepts, metadata, resolvedOpts);
+        if (csResult.resource) {
+          resources.push(csResult.resource);
+          const csUrl = (csResult.resource.resource as { url?: string }).url;
+          if (typeof csUrl === "string") emittedDependsOnCanonicals.push(csUrl);
+        }
+        errors.push(...csResult.errors);
+        unmatched.push(...csResult.unmatched);
+      }
+    }
 
     // (2) Library — post-decorate with sourceKind/sourceName/location after emit
     const libResult = emitLibrary(
       lib.libraryName,
       metadata,
-      emittedValueSetCanonicals,
+      emittedDependsOnCanonicals,
       lib.cqlFileName,
       resolvedOpts,
     );
@@ -623,7 +690,11 @@ export function emitFhirDefClosure(
     }
   }
 
-  // Closure invariants — locked sequence per plan v3.2.
+  // Closure invariants — locked sequence per plan v3.2 (+ slice 4 Inv 0).
+  // Inv 0: url uniqueness across the FULL emitted set (before Inv 1 drops on
+  // relativePath) so a same-url collision is reported even if the two colliders'
+  // relativePaths somehow differ.
+  errors.push(...applyUrlUniquenessInvariant(resources));
   const inv1 = applyInvariant1(resources);
   errors.push(...inv1.errors);
   const inv2errors = applyInvariant2(inv1.surviving, inv1.droppedPaths, metadata);
