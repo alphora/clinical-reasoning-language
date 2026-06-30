@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "@jest/globals";
 
 import {
+  applyActionInputProfileInvariant,
   applyInvariant1,
   applyUrlUniquenessInvariant,
   emitFhirDefClosure,
@@ -166,6 +167,14 @@ const CODE_IS_BASIC = join(
   "src/cql-emitter/tests/fixtures/code-is-basic/code-is-basic.crl",
 );
 
+// F4 — a decision-bearing fixture that `when`s on TWO eligible LocalSource-boolean
+// concepts, so BOTH case-feature StructureDefinitions are emitted AND each
+// when-action must carry the corresponding input.profile.
+const CODE_IS_DECISION_TWO = join(
+  ROOT,
+  "src/fhir-emitter/tests/fixtures/code-is-decision-two/code-is-decision-two.crl",
+);
+
 describe("closureOrchestrator — FHIR closure code-is coverage (T2)", () => {
   it("emits EXACTLY ONE local CodeSystem under canonicalBase carrying the fixture's codes", () => {
     const result = emitFhirDefFromPath(CODE_IS_BASIC, { clock: FIXED_CLOCK });
@@ -243,6 +252,38 @@ describe("closureOrchestrator — FHIR closure code-is coverage (T2)", () => {
     // into ONE shared domain decl "<Lib> Local Codes" carrying the same URL.
     expect(allCql).toContain(`codesystem "Code Is Basic Local Codes": '${csUrl}'`);
   });
+
+  it("F4 — two eligible LocalSource-boolean concepts → BOTH case-feature SDs emitted AND each when-action carries its input.profile (silent-omission guard)", () => {
+    const result = emitFhirDefFromPath(CODE_IS_DECISION_TWO, { clock: FIXED_CLOCK });
+    expect(result.success).toBe(true);
+
+    // (a) BOTH case-feature StructureDefinitions are emitted.
+    const sds = result.resources.filter((r) => r.resourceType === "StructureDefinition");
+    const sdUrlByConcept = new Map<string, string>();
+    for (const r of sds) {
+      sdUrlByConcept.set(r.sourceName!, (r.resource as { url: string }).url);
+    }
+    expect([...sdUrlByConcept.keys()].sort()).toEqual(["Active Crohns Disease", "Adult Patient"]);
+
+    // (b) Each concept's when-action carries the corresponding input.profile. The
+    // outer `when "Adult Patient"` action and the nested `when "Active Crohns
+    // Disease"` action each get their own input pointing at their own SD.
+    const planDef = result.resources.find(
+      (r) => r.resourceType === "PlanDefinition" && r.sourceKind === "Decision",
+    )!;
+    const topActions = (planDef.resource as { action: Array<Record<string, unknown>> }).action;
+    const adultAction = topActions[0]!;
+    const adultInput = (adultAction.input as Array<{ profile: string[] }>)[0]!;
+    expect(adultInput.profile).toEqual([sdUrlByConcept.get("Adult Patient")]);
+
+    const crohnsAction = (adultAction.action as Array<Record<string, unknown>>)[0]!;
+    const crohnsInput = (crohnsAction.input as Array<{ profile: string[] }>)[0]!;
+    expect(crohnsInput.profile).toEqual([sdUrlByConcept.get("Active Crohns Disease")]);
+
+    // And Inv 5 sees both input profiles resolve to an emitted SD → no
+    // unresolved-action-input-profile error.
+    expect(result.errors.some((e) => e.kind === "unresolved-action-input-profile")).toBe(false);
+  });
 });
 
 describe("applyUrlUniquenessInvariant — Inv 0 (T3)", () => {
@@ -302,5 +343,73 @@ describe("closureOrchestrator — truncation id-collision boundary (T4)", () => 
     expect(inv1.surviving).toHaveLength(0);
     expect(inv1.errors).toHaveLength(1);
     expect(inv1.errors[0]!.kind).toBe("closure-resource-collision");
+  });
+});
+
+/* ─── Inv 5 — action-input-profile referential integrity (DTR `input`) ─ */
+
+describe("applyActionInputProfileInvariant — Inv 5", () => {
+  const SD_URL = "http://example.org/x/StructureDefinition/foo-casefeature";
+
+  function planDefWithInput(profile: string, nested = false): EmittedResource {
+    const input = [{ type: "Observation", profile: [profile] }];
+    const action = nested
+      ? [{ title: "outer", action: [{ title: "inner", input }] }]
+      : [{ title: "outer", input }];
+    return {
+      resourceType: "PlanDefinition",
+      relativePath: "PlanDefinition/triage.json",
+      resource: { resourceType: "PlanDefinition", url: "http://example.org/x/PlanDefinition/triage", action },
+      sourceKind: "Decision",
+      sourceName: "Triage",
+    };
+  }
+
+  function sd(url: string): EmittedResource {
+    return {
+      resourceType: "StructureDefinition",
+      relativePath: "StructureDefinition/foo.json",
+      resource: { resourceType: "StructureDefinition", url },
+      sourceKind: "CaseFeature",
+      sourceName: "Foo",
+    };
+  }
+
+  it("an input profile that resolves to an emitted StructureDefinition → no error", () => {
+    const errors = applyActionInputProfileInvariant([planDefWithInput(SD_URL), sd(SD_URL)], new Set());
+    expect(errors).toEqual([]);
+  });
+
+  it("an input profile pointing at a NON-emitted SD → unresolved-action-input-profile", () => {
+    const errors = applyActionInputProfileInvariant([planDefWithInput(SD_URL)], new Set());
+    expect(errors).toHaveLength(1);
+    expect(errors[0]!.kind).toBe("unresolved-action-input-profile");
+  });
+
+  it("an input profile whose url IS emitted but is NOT a StructureDefinition → still fires (SD-specific)", () => {
+    // A PlanDefinition exists at the same url, but an input profile MUST address a
+    // StructureDefinition specifically — confirm the non-SD url does not satisfy it.
+    const planDef = planDefWithInput("http://example.org/x/PlanDefinition/triage");
+    const errors = applyActionInputProfileInvariant([planDef], new Set());
+    expect(errors).toHaveLength(1);
+    expect(errors[0]!.kind).toBe("unresolved-action-input-profile");
+  });
+
+  it("walks NESTED action inputs too", () => {
+    const errors = applyActionInputProfileInvariant([planDefWithInput(SD_URL, true)], new Set());
+    expect(errors).toHaveLength(1);
+    expect(errors[0]!.kind).toBe("unresolved-action-input-profile");
+  });
+
+  it("an input profile pointing at an Inv-1-DROPPED SD is flagged with the downstream-collision annotation", () => {
+    // Simulate the SD having been dropped by Inv 1: it is absent from the surviving
+    // set but its relativePath is in droppedPaths.
+    const errors = applyActionInputProfileInvariant(
+      [planDefWithInput(SD_URL)],
+      new Set(["StructureDefinition/foo-casefeature.json"]),
+    );
+    expect(errors).toHaveLength(1);
+    expect(errors[0]!.kind).toBe("unresolved-action-input-profile");
+    expect(errors[0]!.message).toContain("downstream of collision");
   });
 });

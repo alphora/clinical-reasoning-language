@@ -69,6 +69,20 @@
           }
         }
       ],
+      "input": [
+        {
+          "extension": [
+            {
+              "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+              "valueString": "Active Crohns Disease?"
+            }
+          ],
+          "type": "Observation",
+          "profile": [
+            "http://example.org/crl/code-is-decision/StructureDefinition/code-is-decision-fixture-active-crohns-disease-casefeature"
+          ]
+        }
+      ],
       "definitionCanonical": "http://example.org/crl/code-is-decision/PlanDefinition/code-is-decision-fixture-refer-to-gi-recommendation"
     }
   ]

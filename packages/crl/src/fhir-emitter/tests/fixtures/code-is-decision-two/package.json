@@ -1,0 +1,12 @@
+{
+  "name": "code-is-decision-two-fixture",
+  "version": "1.0.0",
+  "private": true,
+  "description": "F4 silent-omission fixture — a decision when-ing on TWO eligible LocalSource-boolean concepts (both SDs emitted AND both inputs attached)",
+  "crl": {
+    "canonicalBase": "http://example.org/crl/code-is-decision-two",
+    "status": "draft",
+    "experimental": true,
+    "date": "2020-01-01T00:00:00.000Z"
+  }
+}

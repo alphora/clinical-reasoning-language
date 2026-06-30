@@ -1,0 +1,27 @@
+# code-is-decision-two — F4 silent-omission coverage fixture.
+library "Code Is Decision Two".
+
+// A decision-bearing library that `when`s on TWO `code is` boolean concepts, so
+// the case-feature emit produces TWO StructureDefinitions AND the decision emit
+// must attach TWO action-level `input` profiles (one per when-action). This
+// covers the "SD emitted but input dropped" direction Inv 5 does not — Inv 5
+// validates that any emitted input.profile resolves to an SD, not that every
+// emitted SD's concept also got an input.
+
+concept "Adult Patient":
+- type is Observation.
+- value type is boolean.
+- code is `adult-18-or-older`.
+
+concept "Active Crohns Disease":
+- type is Condition.
+- value type is boolean.
+- code is `active-crohns-disease`.
+
+activity "Refer to GI":
+- request CPGServiceRequest.
+
+decision "Triage Crohns":
+- when "Adult Patient" then:
+  - when "Active Crohns Disease" then recommend activity "Refer to GI".
+  end.

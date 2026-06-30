@@ -69,6 +69,20 @@
           }
         }
       ],
+      "input": [
+        {
+          "extension": [
+            {
+              "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+              "valueString": "Adult Patient?"
+            }
+          ],
+          "type": "Observation",
+          "profile": [
+            "http://example.org/crl/code-is-decision-vs/StructureDefinition/code-is-decision-vs-fixture-adult-patient-casefeature"
+          ]
+        }
+      ],
       "action": [
         {
           "title": "Referral Reason",

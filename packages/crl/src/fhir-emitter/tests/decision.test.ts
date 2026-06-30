@@ -672,3 +672,148 @@ describe("decision — otherwise and first emit", () => {
     expect(action.extension).toBeUndefined();
   });
 });
+
+/* ─── action-level `input` (DTR case-feature, FIRST-CASE scope) ──── */
+
+describe("decision — action-level case-feature `input` (DTR pattern)", () => {
+  // A resolver that returns a case-feature SD canonical for a single eligible
+  // (LocalSource boolean) concept name, null otherwise — the orchestrator builds
+  // exactly this shape.
+  const CF_URL = `${METADATA.canonicalBase}/StructureDefinition/lib-active-crohns-disease-casefeature`;
+  const CF_URL_2 = `${METADATA.canonicalBase}/StructureDefinition/lib-severe-flare-casefeature`;
+  const cfResolver = (name: string): string | null =>
+    name === "Active Crohns Disease" ? CF_URL : name === "Severe Flare" ? CF_URL_2 : null;
+
+  function whenQualified(libraryName: string, name: string, body: WhenBlockBody): WhenBlock {
+    return {
+      type: "WhenBlock",
+      conceptName: { type: "QualifiedReference", libraryName, name, location: LOC },
+      body,
+      location: LOC,
+    };
+  }
+
+  it("a `when` LocalSource-boolean concept gets one action.input with the right profile + cpg-input-text \"<name>?\"", () => {
+    const d = decision("Triage", [when("Active Crohns Disease", leaf(recommend("Refer to GI")))]);
+    const { resource } = emitDecisionPlanDefinition(
+      d, "Lib", METADATA, RESOLVE_ALL, RESOLVE_ACT_OK, RESOLVE_DEC_OK, true, { clock: FIXED_CLOCK }, "", cfResolver,
+    );
+    const action = (resource!.resource as { action: Array<Record<string, unknown>> }).action[0]!;
+    expect(action.input).toEqual([
+      {
+        extension: [
+          {
+            url: "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+            valueString: "Active Crohns Disease?",
+          },
+        ],
+        type: "Observation",
+        profile: [CF_URL],
+      },
+    ]);
+  });
+
+  it("a `when` condition the resolver returns null for (RecordSource/Inferred — no case-feature SD) gets NO input", () => {
+    const d = decision("Triage", [when("Referral Reason", leaf(recommend("Refer to GI")))]);
+    const { resource } = emitDecisionPlanDefinition(
+      d, "Lib", METADATA, RESOLVE_ALL, RESOLVE_ACT_OK, RESOLVE_DEC_OK, true, { clock: FIXED_CLOCK }, "", cfResolver,
+    );
+    const action = (resource!.resource as { action: Array<Record<string, unknown>> }).action[0]!;
+    expect(action.input).toBeUndefined();
+  });
+
+  it("a QUALIFIED (cross-library) `when` ref is skipped — never queries the resolver → no input", () => {
+    // Even if the resolver WOULD match the bare name, a qualified ref must NOT
+    // produce an input (mirror interfaceSurface's qualified-ref skip).
+    const d = decision("Triage", [
+      whenQualified("OtherLib", "Active Crohns Disease", leaf(recommend("Refer to GI"))),
+    ]);
+    const { resource } = emitDecisionPlanDefinition(
+      d, "Lib", METADATA, RESOLVE_ALL, RESOLVE_ACT_OK, RESOLVE_DEC_OK, true, { clock: FIXED_CLOCK }, "", cfResolver,
+    );
+    const action = (resource!.resource as { action: Array<Record<string, unknown>> }).action[0]!;
+    expect(action.input).toBeUndefined();
+  });
+
+  it("the default resolver (omitted arg) attaches NO input — keeps cms / per-library callers unchanged", () => {
+    const d = decision("Triage", [when("Active Crohns Disease", leaf(recommend("Refer to GI")))]);
+    const { resource } = emitDecisionPlanDefinition(
+      d, "Lib", METADATA, RESOLVE_ALL, RESOLVE_ACT_OK, RESOLVE_DEC_OK, true, { clock: FIXED_CLOCK },
+    );
+    const action = (resource!.resource as { action: Array<Record<string, unknown>> }).action[0]!;
+    expect(action.input).toBeUndefined();
+  });
+
+  it("a NESTED `when` on an eligible LocalSource-boolean concept gets its OWN action.input (no aggregation, any depth)", () => {
+    // Both the top `when` AND the nested `when` reference eligible concepts. Each
+    // when-action carries its OWN condition's input — the nested one is NOT skipped
+    // for being nested, and the top one carries only ITS own input (no descendant
+    // aggregation).
+    const d = decision("Triage", [
+      when(
+        "Active Crohns Disease",
+        block(undefined, [when("Severe Flare", leaf(recommend("Refer to GI")))]),
+      ),
+    ]);
+    const { resource } = emitDecisionPlanDefinition(
+      d, "Lib", METADATA, RESOLVE_ALL, RESOLVE_ACT_OK, RESOLVE_DEC_OK, true, { clock: FIXED_CLOCK }, "", cfResolver,
+    );
+    const top = (resource!.resource as { action: Array<Record<string, unknown>> }).action[0]!;
+    // Top carries ONLY its own input (Active Crohns Disease), not the descendant's.
+    expect(top.input).toEqual([
+      {
+        extension: [{ url: "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text", valueString: "Active Crohns Disease?" }],
+        type: "Observation",
+        profile: [CF_URL],
+      },
+    ]);
+    const child = (top.action as Array<Record<string, unknown>>)[0]!;
+    // Nested when-action carries its OWN condition's input.
+    expect(child.input).toEqual([
+      {
+        extension: [{ url: "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text", valueString: "Severe Flare?" }],
+        type: "Observation",
+        profile: [CF_URL_2],
+      },
+    ]);
+  });
+
+  it("a nested `when` the resolver returns null for gets NO input (its OWN condition is not case-feature-eligible)", () => {
+    // Top `when` LocalSource (gets input) nesting a `when` the resolver returns
+    // null for. The child's lack of input is because ITS condition is ineligible,
+    // NOT because it is nested.
+    const d = decision("Triage", [
+      when(
+        "Active Crohns Disease",
+        block(undefined, [when("Referral Reason", leaf(recommend("Refer to GI")))]),
+      ),
+    ]);
+    const { resource } = emitDecisionPlanDefinition(
+      d, "Lib", METADATA, RESOLVE_ALL, RESOLVE_ACT_OK, RESOLVE_DEC_OK, true, { clock: FIXED_CLOCK }, "", cfResolver,
+    );
+    const top = (resource!.resource as { action: Array<Record<string, unknown>> }).action[0]!;
+    expect(top.input).toBeDefined();
+    const child = (top.action as Array<Record<string, unknown>>)[0]!;
+    expect(child.input).toBeUndefined();
+  });
+
+  it("a SAME-library qualified `when` ref (self-qualified) gets its input — consistent with its condition (F2)", () => {
+    // `Lib."Active Crohns Disease"` inside library "Lib" is normalized to bare
+    // `Active Crohns Disease` for BOTH the condition and the input — so the input
+    // attaches, unlike a genuinely cross-library ref.
+    const d = decision("Triage", [
+      whenQualified("Lib", "Active Crohns Disease", leaf(recommend("Refer to GI"))),
+    ]);
+    const { resource } = emitDecisionPlanDefinition(
+      d, "Lib", METADATA, RESOLVE_ALL, RESOLVE_ACT_OK, RESOLVE_DEC_OK, true, { clock: FIXED_CLOCK }, "", cfResolver,
+    );
+    const action = (resource!.resource as { action: Array<Record<string, unknown>> }).action[0]!;
+    expect(action.input).toEqual([
+      {
+        extension: [{ url: "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text", valueString: "Active Crohns Disease?" }],
+        type: "Observation",
+        profile: [CF_URL],
+      },
+    ]);
+  });
+});

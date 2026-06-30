@@ -115,6 +115,29 @@ export type ConceptResolver = (conceptName: ReferenceName) => string | null;
 export type ActivityResolver = (activityName: ReferenceName) => string | null;
 export type DecisionResolver = (decisionName: ReferenceName) => string | null;
 
+/**
+ * Case-feature input resolver (action-level PlanDefinition `input`, DTR pattern).
+ *
+ * Maps a normalized (self-qualifier-stripped) `when`-condition concept name → the
+ * canonical url of its emitted case-feature StructureDefinition, or `null` for a
+ * concept with no emitted case-feature SD (non-LocalSource, non-boolean,
+ * genuinely cross-library, or a source whose case-feature emit was gated off).
+ * Built ONCE per source in `closureOrchestrator` from the shared
+ * `eligibleCaseFeatureConcepts` classification the case-feature SD emit also
+ * consumes, so an `action.input` profile can never address an SD that was not
+ * emitted.
+ *
+ * Queried at EVERY when-condition action, at ANY depth — each when-action carries
+ * its OWN condition's input (the local-input model); there is no
+ * ancestor/descendant aggregation. A nested `when` on an eligible LocalSource
+ * boolean concept gets its own `action.input` exactly like a top-level one.
+ */
+export type CaseFeatureInputResolver = (conceptName: string) => string | null;
+
+// The CPG `cpg-input-text` extension stamps a human-askable label onto an
+// action input (DTR pattern). Verified URL against the CPG IG.
+const CPG_INPUT_TEXT_EXT = "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text";
+
 /* ─── Canonical URL helper (exported; not re-exported at root) ───── */
 
 export function planDefinitionCanonicalUrl(
@@ -215,6 +238,15 @@ type EmitActionResult =
  * `isRoot=false` emits Sub-decision (publishable-only + eca-rule).
  * Caller (`emitDecisionPlanDefinitionsForLibrary`) determines isRoot
  * via dependency-graph classification.
+ *
+ * INVARIANT SCOPE: the action-level `input` this emits (when a non-default
+ * `caseFeatureInputResolver` is threaded) is validated against the surviving
+ * emitted StructureDefinition set ONLY by the closure-level Inv 5
+ * (`applyActionInputProfileInvariant`), which runs inside `emitFhirDefClosure`.
+ * A low-level caller invoking this directly with a non-null resolver emits inputs
+ * that are NOT closure-checked — the orchestrator builds the resolver from the
+ * SAME `eligibleCaseFeatureConcepts` set the SDs come from, so it cannot dangle on
+ * that path; an arbitrary direct caller is responsible for its own profiles.
  */
 export function emitDecisionPlanDefinition(
   decision: Decision,
@@ -231,6 +263,15 @@ export function emitDecisionPlanDefinition(
   // UNCHANGED). The orchestrator computes it once per source and threads it here
   // so the `library[]` target stays a single source of truth.
   libraryReferenceSuffix = "",
+  // Action-level `input` (DTR pattern): maps a normalized `when` concept name →
+  // its emitted case-feature SD canonical (or null). Built ONCE per source by the
+  // orchestrator from the shared `eligibleCaseFeatureConcepts` classification the
+  // case-feature SD emit also consumes (so an input can only point at an emitted
+  // SD). Queried at every when-condition action at any depth — each its own
+  // condition's input, no ancestor/descendant aggregation; the inferred-condition
+  // recursive input is deferred (#180). Defaults to a null-returning resolver → no
+  // input (keeps cms / unit-test callers unchanged).
+  caseFeatureInputResolver: CaseFeatureInputResolver = () => null,
 ): {
   resource: EmittedResource | null;
   errors: CRLError[];
@@ -261,6 +302,7 @@ export function emitDecisionPlanDefinition(
     conceptResolver,
     activityResolver,
     decisionResolver,
+    caseFeatureInputResolver,
     isStrategy: isRoot,
     errors,
     unmatched,
@@ -360,6 +402,7 @@ interface EmitCtx {
   conceptResolver: ConceptResolver;
   activityResolver: ActivityResolver;
   decisionResolver: DecisionResolver;
+  caseFeatureInputResolver: CaseFeatureInputResolver;
   isStrategy: boolean;
   errors: CRLError[];
   unmatched: UnmatchedReference[];
@@ -375,8 +418,17 @@ function emitBranch(branch: BranchBlock, ctx: EmitCtx): EmitActionResult {
  * Cascade rules per plan v3.2 §"Cascade-suppression behavior".
  */
 function emitWhenBlock(wb: WhenBlock, ctx: EmitCtx): EmitActionResult {
+  // Normalize the condition ref ONCE (F5 — single computation): a SAME-library
+  // qualified ref (`MyLib."X"` inside `MyLib`) is stripped to bare `X`; a genuine
+  // cross-library ref (`OtherLib."X"`) is left qualified. This normalized ref + its
+  // bare name (`refName`) drive the condition resolver, the action-level input
+  // lookup, AND the displays, so the input path treats a self-qualified ref the
+  // SAME way the condition path does (F2 — no self-qualified asymmetry).
+  const normalizedRef = normalizeLocalRef(wb.conceptName, ctx.libraryName);
+  const refName = getRefName(normalizedRef);
+
   // 1. Resolve the condition concept. Suppressed when unresolved.
-  const conceptCqlId = ctx.conceptResolver(normalizeLocalRef(wb.conceptName, ctx.libraryName));
+  const conceptCqlId = ctx.conceptResolver(normalizedRef);
   if (conceptCqlId === null) {
     ctx.unmatched.push({
       kind: "unresolved-concept",
@@ -387,10 +439,13 @@ function emitWhenBlock(wb: WhenBlock, ctx: EmitCtx): EmitActionResult {
     return { kind: "suppressed", reason: "unresolved-ref" };
   }
 
-  // 2. Build action skeleton (with applicability condition).
+  // 2. Build action skeleton (with applicability condition). Title/description use
+  // the NORMALIZED bare name — byte-identical to the raw `getRefName(wb.conceptName)`
+  // for an unqualified ref, and consistent with the condition/input for a
+  // self-qualified one.
   const action: Record<string, unknown> = {
-    title: getRefName(wb.conceptName),
-    description: getRefName(wb.conceptName),
+    title: refName,
+    description: refName,
     code: [
       {
         coding: [{ system: CPG_COMMON_PROCESS_CS, code: "guideline-based-care" }],
@@ -403,6 +458,29 @@ function emitWhenBlock(wb: WhenBlock, ctx: EmitCtx): EmitActionResult {
       },
     ],
   };
+
+  // Action-level `input` (DTR pattern, FIRST-CASE scope). The `when` condition
+  // references a SINGLE concept. F2 — normalize the ref the SAME way the condition
+  // path does, THEN skip ONLY if the NORMALIZED ref is still qualified (a genuine
+  // cross-library ref); a self-qualified eligible `when` (`MyLib."X"` inside
+  // `MyLib`) gets its input, consistent with the condition it already got. When the
+  // concept has an emitted case-feature StructureDefinition (the resolver returns
+  // its canonical) request its submission as one `Observation` input profiled to
+  // that SD, keyed + displayed by the normalized bare name. The SECOND case (a
+  // `defined as`/Inferred condition → transitive-leaf inputs) is DEFERRED: the
+  // resolver returns null for a non-LocalSource condition → no input.
+  if (!isQualifiedRef(normalizedRef)) {
+    const inputProfile = ctx.caseFeatureInputResolver(refName);
+    if (inputProfile !== null) {
+      action.input = [
+        {
+          extension: [{ url: CPG_INPUT_TEXT_EXT, valueString: `${refName}?` }],
+          type: "Observation",
+          profile: [inputProfile],
+        },
+      ];
+    }
+  }
 
   return fillBranchBody(action, wb.body, ctx);
 }
