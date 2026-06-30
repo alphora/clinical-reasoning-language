@@ -115,28 +115,40 @@ export type ConceptResolver = (conceptName: ReferenceName) => string | null;
 export type ActivityResolver = (activityName: ReferenceName) => string | null;
 export type DecisionResolver = (decisionName: ReferenceName) => string | null;
 
+/** One action-level case-feature input (DTR pattern). */
+export interface CaseFeatureInput {
+  /** the concept name (drives the `cpg-input-text`/`cpg-input-description` labels). */
+  name: string;
+  /** the canonical url of the concept's emitted case-feature StructureDefinition. */
+  canonical: string;
+}
+
 /**
  * Case-feature input resolver (action-level PlanDefinition `input`, DTR pattern).
  *
  * Maps a normalized (self-qualifier-stripped) `when`-condition concept name → the
- * canonical url of its emitted case-feature StructureDefinition, or `null` for a
- * concept with no emitted case-feature SD (non-LocalSource, non-boolean,
+ * ORDERED list of case-feature inputs for that condition — the recursive `code is`
+ * closure of the condition in INFERENCE ORDER (the condition's own `code is` first,
+ * then its `defined as` operands left-to-right; see `caseFeatureCollection.ts`).
+ * Returns `[]` for a condition with no reachable `code is` concept (non-LocalSource,
  * genuinely cross-library, or a source whose case-feature emit was gated off).
- * Built ONCE per source in `closureOrchestrator` from the shared
- * `eligibleCaseFeatureConcepts` classification the case-feature SD emit also
- * consumes, so an `action.input` profile can never address an SD that was not
- * emitted.
+ * Built ONCE per source in `closureOrchestrator` from the SAME per-condition
+ * collection the case-feature SD emit consumes, so an `action.input` profile can
+ * never address an SD that was not emitted.
  *
  * Queried at EVERY when-condition action, at ANY depth — each when-action carries
- * its OWN condition's input (the local-input model); there is no
- * ancestor/descendant aggregation. A nested `when` on an eligible LocalSource
- * boolean concept gets its own `action.input` exactly like a top-level one.
+ * its OWN condition's inputs (the local-input model); there is no
+ * ancestor/descendant aggregation. A nested `when` on an inferred condition gets
+ * its own recursive inputs exactly like a top-level one.
  */
-export type CaseFeatureInputResolver = (conceptName: string) => string | null;
+export type CaseFeatureInputResolver = (conceptName: string) => readonly CaseFeatureInput[];
 
-// The CPG `cpg-input-text` extension stamps a human-askable label onto an
-// action input (DTR pattern). Verified URL against the CPG IG.
+// The CPG `cpg-input-text` / `cpg-input-description` extensions stamp a
+// human-askable label + description onto an action input (DTR pattern). Verified
+// URLs against the CPG IG + the truth-set example goldens.
 const CPG_INPUT_TEXT_EXT = "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text";
+const CPG_INPUT_DESCRIPTION_EXT =
+  "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description";
 
 /* ─── Canonical URL helper (exported; not re-exported at root) ───── */
 
@@ -245,8 +257,9 @@ type EmitActionResult =
  * (`applyActionInputProfileInvariant`), which runs inside `emitFhirDefClosure`.
  * A low-level caller invoking this directly with a non-null resolver emits inputs
  * that are NOT closure-checked — the orchestrator builds the resolver from the
- * SAME `eligibleCaseFeatureConcepts` set the SDs come from, so it cannot dangle on
- * that path; an arbitrary direct caller is responsible for its own profiles.
+ * SAME `collectCaseFeatures` recursive `code is` collection the case-feature SDs
+ * come from, so it cannot dangle on that path; an arbitrary direct caller is
+ * responsible for its own profiles.
  */
 export function emitDecisionPlanDefinition(
   decision: Decision,
@@ -264,14 +277,13 @@ export function emitDecisionPlanDefinition(
   // so the `library[]` target stays a single source of truth.
   libraryReferenceSuffix = "",
   // Action-level `input` (DTR pattern): maps a normalized `when` concept name →
-  // its emitted case-feature SD canonical (or null). Built ONCE per source by the
-  // orchestrator from the shared `eligibleCaseFeatureConcepts` classification the
-  // case-feature SD emit also consumes (so an input can only point at an emitted
-  // SD). Queried at every when-condition action at any depth — each its own
-  // condition's input, no ancestor/descendant aggregation; the inferred-condition
-  // recursive input is deferred (#180). Defaults to a null-returning resolver → no
-  // input (keeps cms / unit-test callers unchanged).
-  caseFeatureInputResolver: CaseFeatureInputResolver = () => null,
+  // the ORDERED recursive `code is` closure of that condition (inference order).
+  // Built ONCE per source by the orchestrator from the SAME per-condition
+  // collection the case-feature SD emit consumes (so an input can only point at an
+  // emitted SD). Queried at every when-condition action at any depth — each its own
+  // condition's inputs, no ancestor/descendant aggregation. Defaults to an
+  // empty-returning resolver → no input (keeps cms / unit-test callers unchanged).
+  caseFeatureInputResolver: CaseFeatureInputResolver = () => [],
 ): {
   resource: EmittedResource | null;
   errors: CRLError[];
@@ -459,26 +471,36 @@ function emitWhenBlock(wb: WhenBlock, ctx: EmitCtx): EmitActionResult {
     ],
   };
 
-  // Action-level `input` (DTR pattern, FIRST-CASE scope). The `when` condition
-  // references a SINGLE concept. F2 — normalize the ref the SAME way the condition
-  // path does, THEN skip ONLY if the NORMALIZED ref is still qualified (a genuine
-  // cross-library ref); a self-qualified eligible `when` (`MyLib."X"` inside
-  // `MyLib`) gets its input, consistent with the condition it already got. When the
-  // concept has an emitted case-feature StructureDefinition (the resolver returns
-  // its canonical) request its submission as one `Observation` input profiled to
-  // that SD, keyed + displayed by the normalized bare name. The SECOND case (a
-  // `defined as`/Inferred condition → transitive-leaf inputs) is DEFERRED: the
-  // resolver returns null for a non-LocalSource condition → no input.
+  // Action-level `input[]` (DTR pattern). The `when` condition references a SINGLE
+  // concept, but its case-feature inputs are the RECURSIVE `code is` closure of
+  // that condition in INFERENCE ORDER (the condition's own `code is` first, then
+  // its `defined as` operands left-to-right — see `caseFeatureCollection.ts`). F2 —
+  // normalize the ref the SAME way the condition path does, THEN skip ONLY if the
+  // NORMALIZED ref is still qualified (a genuine cross-library ref); a
+  // self-qualified eligible `when` (`MyLib."X"` inside `MyLib`) gets its inputs,
+  // consistent with the condition it already got. Each collected concept becomes
+  // one `Observation` input profiled to that concept's case-feature SD, labelled +
+  // described by the concept name. Dedup by canonical within THIS action (the
+  // collection already dedups by name; canonical-dedup is a belt-and-suspenders
+  // guard against two names slugging to the same SD).
   if (!isQualifiedRef(normalizedRef)) {
-    const inputProfile = ctx.caseFeatureInputResolver(refName);
-    if (inputProfile !== null) {
-      action.input = [
-        {
-          extension: [{ url: CPG_INPUT_TEXT_EXT, valueString: `${refName}?` }],
+    const collected = ctx.caseFeatureInputResolver(refName);
+    if (collected.length > 0) {
+      const seenCanonicals = new Set<string>();
+      const inputs: Array<Record<string, unknown>> = [];
+      for (const { name, canonical } of collected) {
+        if (seenCanonicals.has(canonical)) continue;
+        seenCanonicals.add(canonical);
+        inputs.push({
+          extension: [
+            { url: CPG_INPUT_TEXT_EXT, valueString: `${name}?` },
+            { url: CPG_INPUT_DESCRIPTION_EXT, valueMarkdown: name },
+          ],
           type: "Observation",
-          profile: [inputProfile],
-        },
-      ];
+          profile: [canonical],
+        });
+      }
+      if (inputs.length > 0) action.input = inputs;
     }
   }
 

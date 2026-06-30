@@ -1,12 +1,14 @@
 /**
- * CRL decision interface concept → FHIR `StructureDefinition` (case-feature
+ * CRL decision case-feature concept → FHIR `StructureDefinition` (case-feature
  * profile) emit.
  *
- * Per eligible interface concept (a decision/action-guard-referenced concept that
- * is a LocalSource determination whose value type resolves to boolean), emit ONE
- * `StructureDefinition` constraining `Observation` — a CPG publishable case
- * feature. The PA app's questionnaire submits an instance of this profile to
- * assert the local-source boolean determination.
+ * Per collected case-feature concept (a `code is` / LocalSource concept reached by
+ * the recursive `code is` closure of a decision `when` condition — the
+ * LocalSource-always-boolean rule: every `code is` concept is a boolean case
+ * feature regardless of declared value type), emit ONE `StructureDefinition`
+ * constraining `Observation` — a CPG publishable case feature. The PA app's
+ * questionnaire submits an instance of this profile to assert the local-source
+ * boolean determination.
  *
  * Reference shape verified against the DTR
  * `aslp-paa-comorbid-screening-casefeature.json` example. Deviations from that
@@ -14,10 +16,13 @@
  * DROPPED — we emit no run-time forms).
  *
  * Anti-drift contracts:
- *   - The eligible set + each concept's source layer come from
- *     `interfaceSurface(loweredAst)` (cql-emitter) — the SAME single source of
- *     truth the Interface re-export synthesis uses. A case-feature profile can
- *     therefore never address a concept the Interface does not re-export.
+ *   - The collected set comes from the per-decision-condition recursive `code is`
+ *     closure (`caseFeatureCollection.collectCodeIsConceptsInInferenceOrder`,
+ *     unioned per source in `closureOrchestrator.collectCaseFeatures`) — the SAME
+ *     single source the action-level `input[]` resolver consumes, so an emitted SD
+ *     and the `action.input` that addresses it are the same set by construction.
+ *     The `cpg-featureExpression` then points at the policy's `-LocalSource`
+ *     Library (where the `code is` define lives), NOT the Interface re-export.
  *   - The `patternCodeableConcept` `code` comes from `lowerLocalCodes().localCodes`
  *     (keyed by concept name) — the SAME `localCodes` that drives the local
  *     CodeSystem `concept[].code`. `lowerLocalCodes` CLEARS `Concept.code`, so the
@@ -34,14 +39,13 @@ import type { CRLError } from "../types/errors";
 
 import { localCodeSystemUrl } from "../cql-emitter/lowerLocalCodes";
 import { libraryCanonicalUrl } from "./library";
-import { capSlugForSuffix, pascalCaseName, policyIdBase, slugify } from "./slug";
+import { pascalCaseName, policyIdBase, slugify } from "./slug";
 import {
   cpgCaseFeatureExtensions,
   isPublishablePlus,
 } from "./types";
 import type { CpgMetadata, EmitOptions, EmittedResource } from "./types";
 
-const CASEFEATURE_SUFFIX = "-casefeature";
 // These CPG extension URLs (in types.ts) + this profile canonical + the
 // Observation differential shape below were VERIFIED against the DTR reference
 // `aslp-paa-comorbid-screening-casefeature.json` (the external verification
@@ -53,16 +57,18 @@ const PATIENT_SD = "http://hl7.org/fhir/StructureDefinition/Patient";
 
 /**
  * The case-feature StructureDefinition `id` for an interface concept name.
- * `capSlugForSuffix(slugify(<policyIdBase>-<conceptName>), "-casefeature")` —
- * the base (policy id + concept name) is capped to `64 - len("-casefeature")`,
- * then the suffix appended, so a long policy id / concept name can never truncate
- * the `-casefeature` suffix away (matching codeSystem.ts `-local`,
- * recommendation.ts `-recommendation`). Exported so the next slice's PlanDef
- * action `input` can reference the same canonical SHAPE.
+ * `capSlug(slugify(<policyIdBase>-<conceptName>))` — the policy id + concept-name
+ * slug, capped to the FHIR id 64-char limit. NO `-casefeature` suffix: the locked
+ * truth-set example goldens (example-{direct,bothrep,nested,semand,for-emit}) fix
+ * the case-feature SD id as exactly `<policyId>-<conceptSlug>` (e.g.
+ * `example-bothrep-implanted-estrogen-pellets`). The case-feature lives in its own
+ * `StructureDefinition/` resource bucket, so dropping the suffix cannot collide
+ * with a decision/activity/recommendation id (those are PlanDefinition/
+ * ActivityDefinition resources). Exported so the PlanDef action `input` can
+ * reference the same canonical SHAPE.
  */
 export function caseFeatureId(metadata: CpgMetadata, conceptName: string): string {
-  const base = slugify(`${policyIdBase(metadata)}-${conceptName}`);
-  return capSlugForSuffix(base, CASEFEATURE_SUFFIX);
+  return slugify(`${policyIdBase(metadata)}-${conceptName}`);
 }
 
 /** The case-feature StructureDefinition canonical url for an interface concept. */
@@ -72,32 +78,53 @@ export function caseFeatureCanonicalUrl(metadata: CpgMetadata, conceptName: stri
 
 /**
  * Emit ONE case-feature StructureDefinition for a LocalSource boolean interface
- * concept. The caller (closureOrchestrator) gates eligibility (LocalSource +
- * boolean) and supplies the resolved `code` (from `lowerLocalCodes().localCodes`).
+ * concept. The caller (closureOrchestrator) collects the eligible concept (a
+ * `code is` concept reachable from a decision `when` condition, the LocalSource-
+ * always-boolean rule) and supplies the resolved `code` (from
+ * `lowerLocalCodes().localCodes`).
  *
- * `interfaceLibrarySuffix` is the layer token of the Interface re-export library
- * (`"interface"`), used to build the `cpg-featureExpression.reference` canonical.
- * REQUIRED + non-empty: the caller (closureOrchestrator) only invokes this once it
- * has confirmed a `role:"interface"` manifest entry, so the suffix always resolves
- * to the `<policyId>-Interface` Library. An empty suffix would build a ROOT-pointing
- * reference (a silent dangling/wrong target) — fail fast instead.
+ * `featureExpressionLibrarySuffix` is the layer token of the LocalSource library
+ * (`"localsource"`) — where the concept's `code is` define lives — used to build
+ * the `cpg-featureExpression.reference` canonical. The truth-set lane points the
+ * featureExpression at the LocalSource Library (NOT the Interface re-export), so
+ * the case-feature submission resolves the bare `code is` boolean retrieve.
+ * REQUIRED + non-empty: the caller only invokes this once it has confirmed the
+ * `<policyId>-LocalSource` Library is in the manifest. An empty suffix would build
+ * a ROOT-pointing reference (a silent dangling/wrong target) — fail fast instead.
  */
 export function emitCaseFeatureStructureDefinition(
   conceptName: string,
   code: string,
   metadata: CpgMetadata,
   opts: EmitOptions,
-  interfaceLibrarySuffix: string,
+  featureExpressionLibrarySuffix: string,
 ): { resource: EmittedResource | null; errors: CRLError[] } {
-  if (interfaceLibrarySuffix === "") {
+  if (featureExpressionLibrarySuffix === "") {
     throw new Error(
       `internal invariant violated: emitCaseFeatureStructureDefinition for "${conceptName}" was ` +
-        `called with an empty interfaceLibrarySuffix. The case-feature featureExpression reference ` +
-        `must resolve to the policy's Interface re-export Library; the caller must gate on a ` +
-        `\`role:"interface"\` manifest entry before emitting any case-feature profile.`,
+        `called with an empty featureExpressionLibrarySuffix. The case-feature featureExpression ` +
+        `reference must resolve to the policy's LocalSource Library (where the \`code is\` define ` +
+        `lives); the caller must confirm a \`localsource\` manifest entry before emitting any ` +
+        `case-feature profile.`,
     );
   }
   const errors: CRLError[] = [];
+
+  // F1 (impl-review) — defensive missing-code guard. The orchestrated path only
+  // ever supplies a concept that HAS a lowered local `code is` (the collector
+  // appends iff a code exists), so the orchestrator can never hit this. But this
+  // function is exported + unit-tested, so a direct caller passing an empty/
+  // undefined code must NOT silently emit an empty-code `patternCodeableConcept`
+  // (a CodeableConcept with `code: ""` is a malformed, never-matching profile).
+  // Raise a structured hard error and emit NO StructureDefinition instead.
+  if (code === undefined || code === "") {
+    errors.push({
+      type: "Validation",
+      kind: "emit-casefeature-missing-code",
+      message: `Case-feature concept "${conceptName}" has no local \`code is\` code; a case-feature StructureDefinition requires a non-empty patternCodeableConcept code. (This is unreachable from the orchestrated recursive-collection path, which only collects concepts that have a lowered local code.)`,
+    });
+    return { resource: null, errors };
+  }
 
   if (/[^\x00-\x7F]/.test(conceptName)) {
     errors.push({
@@ -123,9 +150,10 @@ export function emitCaseFeatureStructureDefinition(
   // `codesystem '<url>'` (one source of truth — the policy-id-slugged local domain).
   const system = localCodeSystemSystemUrl(metadata);
 
-  // The featureExpression references the Interface re-export library by canonical;
-  // its `expression` is the bare concept name (a `text/cql-identifier`).
-  const interfaceCanonical = libraryCanonicalUrl(metadata, interfaceLibrarySuffix);
+  // The featureExpression references the LocalSource library by canonical (where
+  // the `code is` define lives); its `expression` is the bare concept name (a
+  // `text/cql-identifier`).
+  const featureExpressionCanonical = libraryCanonicalUrl(metadata, featureExpressionLibrarySuffix);
 
   const resource: Record<string, unknown> = {
     resourceType: "StructureDefinition",
@@ -133,11 +161,12 @@ export function emitCaseFeatureStructureDefinition(
     meta: { profile: [CPG_CASEFEATURE_PROFILE] },
     // CPG IG extensions (cpg-, NOT cqf-): knowledgeCapability (DROP `executable` —
     // no run-time forms), knowledgeRepresentationLevel `structured`, and the
-    // featureExpression pointing at the Interface library's CQL identifier.
+    // featureExpression pointing at the LocalSource library's CQL identifier (the
+    // bare `code is` define).
     extension: cpgCaseFeatureExtensions(level, {
       language: "text/cql-identifier",
       expression: conceptName,
-      reference: interfaceCanonical,
+      reference: featureExpressionCanonical,
     }),
     url,
     version: metadata.version,

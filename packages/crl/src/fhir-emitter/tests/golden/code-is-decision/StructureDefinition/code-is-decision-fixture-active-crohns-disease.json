@@ -1,6 +1,6 @@
 {
   "resourceType": "StructureDefinition",
-  "id": "code-is-decision-fixture-active-crohns-disease-casefeature",
+  "id": "code-is-decision-fixture-active-crohns-disease",
   "meta": {
     "profile": [
       "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-publishablecasefeature"
@@ -28,11 +28,11 @@
       "valueExpression": {
         "language": "text/cql-identifier",
         "expression": "Active Crohns Disease",
-        "reference": "http://example.org/crl/code-is-decision/Library/code-is-decision-fixture-interface"
+        "reference": "http://example.org/crl/code-is-decision/Library/code-is-decision-fixture-localsource"
       }
     }
   ],
-  "url": "http://example.org/crl/code-is-decision/StructureDefinition/code-is-decision-fixture-active-crohns-disease-casefeature",
+  "url": "http://example.org/crl/code-is-decision/StructureDefinition/code-is-decision-fixture-active-crohns-disease",
   "version": "1.0.0",
   "name": "ActiveCrohnsDisease",
   "title": "Active Crohns Disease",

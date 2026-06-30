@@ -24,9 +24,10 @@
  * + `ActivityWith.activityTypeValue?`):
  *   - terminologyReference present: emit dynamicValue with the resolved
  *     CQL identifier (the quoted local name from the CQL library).
- *   - activityTypeValue present (free-text): emit
- *     `unsupported-with-text` UnmatchedReference for v0 across all
- *     profiles. Per plan v2.1 C2 disposition.
+ *   - activityTypeValue present (free-text): IGNORED (#181) — emit the
+ *     ActivityDefinition without a dynamicValue and WITHOUT any
+ *     `unmatched` entry (a free-text `with` carries no machine signal;
+ *     routing it to `unmatched` would silently pin `success:false`).
  *   - both present: emit `malformed-activity-with` error (defensive —
  *     grammar shouldn't allow this but AST contract permits it).
  *   - neither present: emit without dynamicValue + no diagnostic.
@@ -287,14 +288,14 @@ function buildDynamicValue(
     return { entry: null, errors, unmatched };
   }
 
-  // Free-text branch — v0 deferral per plan v2.1.
+  // Free-text branch — IGNORED (#181). A free-text `with` on an ActivityDefinition
+  // carries no machine-bound terminology, so there is nothing to lower into a
+  // `dynamicValue`. It is NOT routed to `unmatched` (which would silently pin the
+  // whole emit's `success:false`) and NOT emitted: emit the ActivityDefinition
+  // without a dynamicValue and move on. The disposition narrative lives in the CRL
+  // source; the emitter derives the machine signal from the surrounding structure.
+  // Track: alphora/clinical-reasoning-language#181.
   if (hasFreeText) {
-    unmatched.push({
-      kind: "unsupported-with-text",
-      text: `${activity.body.request.activityType}: ${withClause.activityTypeValue}`,
-      line: withClause.location?.start.line,
-      column: withClause.location?.start.column,
-    });
     return { entry: null, errors, unmatched };
   }
 

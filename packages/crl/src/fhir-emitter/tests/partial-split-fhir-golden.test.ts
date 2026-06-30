@@ -362,6 +362,26 @@ describe("emitFhirDefClosure — structured-error guards on a malformed manifest
     ).toBe(true);
     expect(result.success).toBe(false);
   });
+
+  // F3 (impl-review) — direct-caller trap. A decision-bearing source with valid
+  // `code is` decision conditions, passed DIRECTLY with NO manifest (the graph-
+  // only / unit-test path), has no LocalSource layer → the case-feature gate
+  // stays closed and the lane would be SILENTLY skipped (no SDs, no inputs) while
+  // success stays true. The guard must hard-error so the missing lane cannot pass
+  // unnoticed.
+  it("a decision-bearing code-is source passed with NO manifest → decision-root-library-missing (case-feature lane can't silently skip)", () => {
+    const graph = resolveImports(FIXTURE);
+    // No manifest (cqlByLibrary defaults to []) — the direct-caller path.
+    const result = emitFhirDefClosure(graph, METADATA, FIXED);
+    const err = result.errors.find((e) => e.kind === "decision-root-library-missing");
+    expect(err).toBeDefined();
+    // The message names the would-be case-feature(s) the lane would have skipped.
+    expect(err!.message).toMatch(/would emit case-features/);
+    expect(err!.message).toMatch(/no LocalSource layer/);
+    // No case-feature StructureDefinition was emitted on this path.
+    expect(result.resources.filter((r) => r.resourceType === "StructureDefinition")).toHaveLength(0);
+    expect(result.success).toBe(false);
+  });
 });
 
 /* ─── CQL-lane structural split failure surfaced through the FHIR public path ─ */

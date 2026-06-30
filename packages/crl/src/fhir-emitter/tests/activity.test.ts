@@ -222,14 +222,17 @@ describe("activity — emitActivityDefinition", () => {
     expect(r.dynamicValue).toBeUndefined();
   });
 
-  it("`with` free-text → unsupported-with-text UnmatchedReference; resource emits without dynamicValue", () => {
+  it("`with` free-text is IGNORED (#181) — NO unmatched, resource emits without dynamicValue, success not pinned", () => {
     const a = activity("With Text", "CPGCommunicationRequest" as ActivityType, {
       withText: "Confirm BP control remains adequate.",
     });
-    const { resource, unmatched } = emitActivityDefinition(a, "Lib", METADATA, RESOLVE_ALL, {
+    const { resource, unmatched, errors } = emitActivityDefinition(a, "Lib", METADATA, RESOLVE_ALL, {
       clock: FIXED_CLOCK,
     });
-    expect(unmatched.some((u) => u.kind === "unsupported-with-text")).toBe(true);
+    // A free-text `with` carries no machine signal — it is NOT routed to
+    // `unmatched` (which would silently pin success:false) and NOT emitted.
+    expect(unmatched).toEqual([]);
+    expect(errors).toEqual([]);
     const r = resource!.resource as Record<string, unknown>;
     expect(r.dynamicValue).toBeUndefined();
   });

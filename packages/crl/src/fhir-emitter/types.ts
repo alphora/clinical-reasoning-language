@@ -48,8 +48,8 @@ import type { CRLError } from "../types/errors";
  *   unresolved-action-input-profile                error    An emitted PlanDef's `action.input[].profile[]` (the action-level DTR case-feature input) doesn't resolve to an emitted StructureDefinition. (case-feature input, Inv 5)
  *   library-content-url-unresolved                 error    An emitted Library's `content[0].attachment.url` is not the shipped `../../cql/<file>.cql` reference to the SPECIFIC CQL `outputFilename` the split-manifest paired with that Library — points at an unwritten file, a cross-wired sibling, or outside the sibling `cql/` dir (manifest drift). Also fires when a single-entry source's lone manifest entry is not its name-keeping Root. (Slice 4c / E)
  *   decision-root-library-missing                  error    A decision-bearing source has no manifest entry keeping the source name as its Root, so its Decision/Activity `library[]` would dangle (a decision-bearing library must never full-split). The source's decision emit is skipped. (Slice 4c / E)
- *   emit-casefeature-non-boolean                   error    A decision-interface LocalSource concept whose value type does NOT resolve to boolean — only a boolean local-source determination is a submittable case-feature Observation profile, so no StructureDefinition is emitted. (case-feature emit)
- *   emit-casefeature-missing-code                  error    A LocalSource interface concept has no lowered local code to fix in the case-feature Observation profile (the lowered local-code domain and the interface surface disagree — a contradiction guard, never emits an empty `code`). (case-feature emit)
+ *   (emit-casefeature-non-boolean was REMOVED — the LocalSource-always-boolean rule: every `code is` concept is a boolean Observation case-feature regardless of declared value type, so there is no value-type gate.)
+ *   emit-casefeature-missing-code                  error    A case-feature StructureDefinition was requested for a concept with an empty/undefined `code is` code. STRUCTURALLY UNREACHABLE from the orchestrated recursive `code is` collection (the collector only appends concepts that HAVE a lowered local code), but `emitCaseFeatureStructureDefinition` is exported + unit-tested, so a direct caller passing an empty code hard-errors here (F1 defensive guard) instead of emitting a malformed empty-code patternCodeableConcept.
  *   cli-cel-fhir-def-incompatible                  error    CLI: `.cel` input + `--target fhir-def` flag. (Todo 4)
  *   missing-package-version                         error    package.json has no `version`. CRMI requires `version` 1..1 at the shareable floor.
  *   missing-package-name                            error    package.json has no `name`. R1: `name` is the policy id and the SINGLE source of every emitted FHIR resource-id/url base (`policyIdBase`).
@@ -341,7 +341,10 @@ export interface UnmatchedReference {
     | "unresolved-concept"
     | "unresolved-decision"
     | "unresolved-terminology"
-    | "unsupported-with-text"
+    // NOTE: a free-text `with` on an ActivityDefinition is IGNORED (#181) — it no
+    // longer produces an `unsupported-with-text` UnmatchedReference (that kind was
+    // removed). It carries no machine signal, so routing it to `unmatched` would
+    // wrongly pin `success:false`.
     | "unsupported-communication-with-terminology"
     | "unsupported-questionnaire-with";
   text: string;

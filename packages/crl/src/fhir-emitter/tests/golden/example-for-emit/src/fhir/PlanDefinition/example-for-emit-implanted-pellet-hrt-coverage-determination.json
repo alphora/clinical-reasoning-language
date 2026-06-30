@@ -74,22 +74,6 @@
           "extension": [
             {
               "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
-              "valueString": "Implanted Estradiol Pellets?"
-            },
-            {
-              "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
-              "valueMarkdown": "Implanted Estradiol Pellets"
-            }
-          ],
-          "type": "Observation",
-          "profile": [
-            "http://example.org/hcsc/rx501-007/StructureDefinition/example-for-emit-implanted-estradiol-pellets"
-          ]
-        },
-        {
-          "extension": [
-            {
-              "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
               "valueString": "Implanted Estrogen Pellets?"
             },
             {
@@ -100,6 +84,22 @@
           "type": "Observation",
           "profile": [
             "http://example.org/hcsc/rx501-007/StructureDefinition/example-for-emit-implanted-estrogen-pellets"
+          ]
+        },
+        {
+          "extension": [
+            {
+              "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+              "valueString": "Implanted Estradiol Pellets?"
+            },
+            {
+              "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+              "valueMarkdown": "Implanted Estradiol Pellets"
+            }
+          ],
+          "type": "Observation",
+          "profile": [
+            "http://example.org/hcsc/rx501-007/StructureDefinition/example-for-emit-implanted-estradiol-pellets"
           ]
         }
       ],

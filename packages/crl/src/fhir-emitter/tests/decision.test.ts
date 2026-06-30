@@ -679,10 +679,28 @@ describe("decision — action-level case-feature `input` (DTR pattern)", () => {
   // A resolver that returns a case-feature SD canonical for a single eligible
   // (LocalSource boolean) concept name, null otherwise — the orchestrator builds
   // exactly this shape.
-  const CF_URL = `${METADATA.canonicalBase}/StructureDefinition/lib-active-crohns-disease-casefeature`;
-  const CF_URL_2 = `${METADATA.canonicalBase}/StructureDefinition/lib-severe-flare-casefeature`;
-  const cfResolver = (name: string): string | null =>
-    name === "Active Crohns Disease" ? CF_URL : name === "Severe Flare" ? CF_URL_2 : null;
+  const CF_URL = `${METADATA.canonicalBase}/StructureDefinition/lib-active-crohns-disease`;
+  const CF_URL_2 = `${METADATA.canonicalBase}/StructureDefinition/lib-severe-flare`;
+  // New array contract: each condition resolves to its ORDERED recursive `code is`
+  // closure (here each test condition is a single direct `code is` concept → one
+  // entry). Returns [] for an ineligible condition.
+  const cfResolver = (name: string): ReadonlyArray<{ name: string; canonical: string }> =>
+    name === "Active Crohns Disease"
+      ? [{ name: "Active Crohns Disease", canonical: CF_URL }]
+      : name === "Severe Flare"
+        ? [{ name: "Severe Flare", canonical: CF_URL_2 }]
+        : [];
+
+  // A case-feature input carries BOTH the cpg-input-text label and the
+  // cpg-input-description (valueMarkdown), per the truth-set example goldens.
+  const cfInput = (name: string, canonical: string): Record<string, unknown> => ({
+    extension: [
+      { url: "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text", valueString: `${name}?` },
+      { url: "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description", valueMarkdown: name },
+    ],
+    type: "Observation",
+    profile: [canonical],
+  });
 
   function whenQualified(libraryName: string, name: string, body: WhenBlockBody): WhenBlock {
     return {
@@ -699,18 +717,7 @@ describe("decision — action-level case-feature `input` (DTR pattern)", () => {
       d, "Lib", METADATA, RESOLVE_ALL, RESOLVE_ACT_OK, RESOLVE_DEC_OK, true, { clock: FIXED_CLOCK }, "", cfResolver,
     );
     const action = (resource!.resource as { action: Array<Record<string, unknown>> }).action[0]!;
-    expect(action.input).toEqual([
-      {
-        extension: [
-          {
-            url: "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
-            valueString: "Active Crohns Disease?",
-          },
-        ],
-        type: "Observation",
-        profile: [CF_URL],
-      },
-    ]);
+    expect(action.input).toEqual([cfInput("Active Crohns Disease", CF_URL)]);
   });
 
   it("a `when` condition the resolver returns null for (RecordSource/Inferred — no case-feature SD) gets NO input", () => {
@@ -760,22 +767,10 @@ describe("decision — action-level case-feature `input` (DTR pattern)", () => {
     );
     const top = (resource!.resource as { action: Array<Record<string, unknown>> }).action[0]!;
     // Top carries ONLY its own input (Active Crohns Disease), not the descendant's.
-    expect(top.input).toEqual([
-      {
-        extension: [{ url: "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text", valueString: "Active Crohns Disease?" }],
-        type: "Observation",
-        profile: [CF_URL],
-      },
-    ]);
+    expect(top.input).toEqual([cfInput("Active Crohns Disease", CF_URL)]);
     const child = (top.action as Array<Record<string, unknown>>)[0]!;
     // Nested when-action carries its OWN condition's input.
-    expect(child.input).toEqual([
-      {
-        extension: [{ url: "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text", valueString: "Severe Flare?" }],
-        type: "Observation",
-        profile: [CF_URL_2],
-      },
-    ]);
+    expect(child.input).toEqual([cfInput("Severe Flare", CF_URL_2)]);
   });
 
   it("a nested `when` the resolver returns null for gets NO input (its OWN condition is not case-feature-eligible)", () => {
@@ -808,12 +803,6 @@ describe("decision — action-level case-feature `input` (DTR pattern)", () => {
       d, "Lib", METADATA, RESOLVE_ALL, RESOLVE_ACT_OK, RESOLVE_DEC_OK, true, { clock: FIXED_CLOCK }, "", cfResolver,
     );
     const action = (resource!.resource as { action: Array<Record<string, unknown>> }).action[0]!;
-    expect(action.input).toEqual([
-      {
-        extension: [{ url: "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text", valueString: "Active Crohns Disease?" }],
-        type: "Observation",
-        profile: [CF_URL],
-      },
-    ]);
+    expect(action.input).toEqual([cfInput("Active Crohns Disease", CF_URL)]);
   });
 });

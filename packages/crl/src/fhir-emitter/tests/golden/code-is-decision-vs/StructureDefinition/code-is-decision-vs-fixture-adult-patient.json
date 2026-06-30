@@ -1,6 +1,6 @@
 {
   "resourceType": "StructureDefinition",
-  "id": "code-is-decision-vs-fixture-adult-patient-casefeature",
+  "id": "code-is-decision-vs-fixture-adult-patient",
   "meta": {
     "profile": [
       "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-publishablecasefeature"
@@ -28,11 +28,11 @@
       "valueExpression": {
         "language": "text/cql-identifier",
         "expression": "Adult Patient",
-        "reference": "http://example.org/crl/code-is-decision-vs/Library/code-is-decision-vs-fixture-interface"
+        "reference": "http://example.org/crl/code-is-decision-vs/Library/code-is-decision-vs-fixture-localsource"
       }
     }
   ],
-  "url": "http://example.org/crl/code-is-decision-vs/StructureDefinition/code-is-decision-vs-fixture-adult-patient-casefeature",
+  "url": "http://example.org/crl/code-is-decision-vs/StructureDefinition/code-is-decision-vs-fixture-adult-patient",
   "version": "1.0.0",
   "name": "AdultPatient",
   "title": "Adult Patient",

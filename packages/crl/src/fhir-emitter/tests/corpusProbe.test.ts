@@ -84,7 +84,6 @@ describe("corpus probe — cms22-strategy.crl", () => {
     expect(activities.length).toBeGreaterThan(0);
 
     let resourceCount = 0;
-    let unmatchedWithTextCount = 0;
     let unmatchedOther = 0;
     let doNotPerformCount = 0;
     let errors = 0;
@@ -103,8 +102,7 @@ describe("corpus probe — cms22-strategy.crl", () => {
         if (r.doNotPerform === true) doNotPerformCount++;
       }
       for (const u of unmatched) {
-        if (u.kind === "unsupported-with-text") unmatchedWithTextCount++;
-        else unmatchedOther++;
+        unmatchedOther++;
       }
       errors += errs.length;
     }
@@ -120,10 +118,10 @@ describe("corpus probe — cms22-strategy.crl", () => {
     // TODO: restore do-not-perform emit coverage with a dedicated example in a
     // context where suppression is genuinely the recommendation.
     expect(doNotPerformCount).toBe(0);
-    // Corpus has free-text `with` cases (CPGCommunicationRequest activities
-    // "Confirm Continued Control" + "Document Provisional Hypertension").
-    expect(unmatchedWithTextCount).toBeGreaterThanOrEqual(2);
-    // No OTHER unmatched references in the clean post-`8295898` corpus.
+    // #181 — the corpus's free-text `with` cases (CPGCommunicationRequest
+    // activities "Confirm Continued Control" + "Document Provisional
+    // Hypertension") are IGNORED: they produce NO unmatched reference (a free-text
+    // `with` carries no machine signal), so the clean corpus has ZERO unmatched.
     expect(unmatchedOther).toBe(0);
   });
 });
@@ -136,7 +134,6 @@ describe("corpus probe — cms69-strategy.crl", () => {
     expect(activities.length).toBeGreaterThan(0);
 
     let resourceCount = 0;
-    let unmatchedWithTextCount = 0;
     let unmatchedOther = 0;
     let errors = 0;
 
@@ -150,20 +147,16 @@ describe("corpus probe — cms69-strategy.crl", () => {
       );
       if (resource) resourceCount++;
       for (const u of unmatched) {
-        if (u.kind === "unsupported-with-text") unmatchedWithTextCount++;
-        else unmatchedOther++;
+        unmatchedOther++;
       }
       errors += errs.length;
     }
 
     expect(resourceCount).toBe(activities.length);
     expect(errors).toBe(0);
-    // Exact count (toBe, not toBeGreaterThanOrEqual): the cms69 strategy
-    // is a semantic regression lock — a new free-text `with` is a
-    // modeling change that should make this test fail loudly so the
-    // operator decides whether to accept it. Contrast cms22 above, where
-    // the floor-style assertion tolerates the corpus growing in shape.
-    expect(unmatchedWithTextCount).toBe(1);
+    // #181 — the cms69 strategy's free-text `with` ("Document a follow-up care
+    // plan for low BMI") is IGNORED: it produces NO unmatched reference. The
+    // clean corpus now has ZERO unmatched.
     expect(unmatchedOther).toBe(0);
   });
 });

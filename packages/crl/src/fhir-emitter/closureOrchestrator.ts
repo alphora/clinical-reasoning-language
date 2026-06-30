@@ -47,9 +47,12 @@ import type { CRLError } from "../types/errors";
 
 import { lowerLocalCodes } from "../cql-emitter/lowerLocalCodes";
 import type { LowerLocalCodesResult } from "../cql-emitter/lowerLocalCodes";
-import { interfaceSurface } from "../cql-emitter/layeredEmit";
 
 import { emitActivityDefinitionsForLibrary, type TerminologyResolver } from "./activity";
+import {
+  collectCodeIsConceptsInInferenceOrder,
+  type CollectedCodeIsConcept,
+} from "./caseFeatureCollection";
 import { caseFeatureCanonicalUrl, emitCaseFeatureStructureDefinition } from "./structureDefinition";
 import { emitLocalCodeSystem } from "./codeSystem";
 import {
@@ -358,109 +361,106 @@ function classifyClosureDecisions(
 // round-5 Gemini disposition.
 
 /**
- * Case-feature boolean rule (case-feature StructureDefinition emit).
+ * Truth-set case-feature collection (the recursive `code is` lane).
  *
- * A concept's value type RESOLVES TO BOOLEAN — i.e. it is a true/false
- * determination submittable as an `Observation.value[x]: boolean` case feature —
- * iff its `valueTypes` is EXACTLY `["boolean"]` (single-valued, boolean).
+ * For each decision `when` condition C in a source's decisions, the case-feature
+ * inputs + StructureDefinitions are the RECURSIVE `code is` (LocalSource) closure
+ * of C in INFERENCE ORDER — C's own `code is` first (if any), then C's `defined as`
+ * operands left-to-right, recursing into nested inferences (see
+ * `caseFeatureCollection.ts`). This REPLACES the prior library-wide
+ * `interfaceSurface(lowered.ast)` LocalSource scan: the SD set is now exactly the
+ * union (deduped by name) over all decision conditions of their recursive
+ * collections, and the per-condition ordered list drives the `action.input[]`.
  *
- * Decisions / non-resolutions, with rationale grounded in the existing codebase:
- *   - EMPTY `valueTypes` → NOT boolean. `valueTypes` is 0..* optional; NOTHING in
- *     the codebase deduces a default boolean for an empty list (emitCQL.ts's
- *     `declaredShapeOfConcept` keys on `includes("boolean")`, and the CEL
- *     validator treats an absent value type as non-boolean). The deliverable
- *     `code is` decision concepts explicitly declare `value type is boolean`, so
- *     empty is a real omission → diagnostic, not a silent default.
- *   - MULTI-VALUED (even if it includes "boolean") → NOT boolean. A case feature
- *     Observation fixes a single `value[x]: boolean`; a concept that also carries
- *     a non-boolean value type is not a clean boolean determination → diagnostic.
- *   - Single `["boolean"]` → boolean (the only resolving case).
+ * LOCALSOURCE-ALWAYS-BOOLEAN RULE (locked): a concept is a boolean case-feature iff
+ * it has a lowered local `code is` — REGARDLESS of its declared `value type is`.
+ * There is no value-type gate (the old `resolvesToBoolean` /
+ * `emit-casefeature-non-boolean` diagnostic is gone); `code is` ⟹ boolean
+ * Observation case-feature. This unblocks coded-presence concepts that carry no
+ * `value type is`.
+ *
+ * Both consumers (the action-level `input` resolver in step 5a and the
+ * case-feature SD emit in step 6) run off the SAME `CaseFeatureCollection`, so the
+ * input set and the SD set are the SAME set by construction — an `action.input`
+ * profile can never address an SD that was not emitted.
+ *
+ * `definedAsByName` prefers the `DefinedAsDefinition`-bearing concept when a name
+ * resolves to two lowered statements (a both-representation concept that
+ * `lowerLocalCodes` split into a LocalSource retrieve twin + an Inferred fold-in
+ * twin — the Inferred twin carries the `defined as` to recurse).
  */
-function resolvesToBoolean(concept: Concept | undefined): boolean {
-  return concept !== undefined && concept.valueTypes.length === 1 && concept.valueTypes[0] === "boolean";
+export interface CaseFeatureCollection {
+  /** condition name → ordered recursive `code is` inputs (inference order). */
+  inputsByCondition: Map<string, CollectedCodeIsConcept[]>;
+  /** union of all collected concepts (deduped by name, first-seen order). */
+  unionConcepts: CollectedCodeIsConcept[];
 }
 
-/**
- * F1 — SINGLE source of truth for "which LocalSource interface concepts are
- * case-feature eligible", consumed by BOTH the action-level `input` resolver
- * (step 5a) and the case-feature StructureDefinition emit (step 6). Classifying
- * the `interfaceSurface(lowered.ast)` LocalSource entries ONCE — instead of
- * repeating the same `sourceLayer === "LocalSource"` + `resolvesToBoolean` +
- * lowered-code predicate in two places — guarantees the input set and the SD set
- * are the SAME set BY CONSTRUCTION, not two predicates that agree only by
- * discipline.
- *
- * Both consumers run under the SAME structural gate (`lib.decisions.length > 0 &&
- * lowered.errors.length === 0 && interfaceEntry !== undefined`); this helper is
- * the per-concept classification called inside that gate.
- *
- * The returned categories mirror the case-feature SD emit's branch order over the
- * LocalSource surface, so step 6 can reproduce its existing behavior exactly:
- *   - `eligible`  — LocalSource ∧ boolean ∧ has a lowered local code: the only
- *     case that emits an SD AND an input. `canonical` is `caseFeatureCanonicalUrl`
- *     (the exported helper — NOT re-derived), so the `action.input` profile
- *     byte-equals the emitted SD `url`.
- *   - `nonBoolean` — LocalSource whose value type does NOT resolve to boolean:
- *     the `emit-casefeature-non-boolean` diagnostic case (no SD, no input).
- *   - `missingCode` — LocalSource ∧ boolean but with NO lowered local code (a
- *     contradiction: LocalSource ⟺ a lowered `code is`): the
- *     `emit-casefeature-missing-code` diagnostic case (no SD, no input).
- *
- * `concept` is the LOWERED-ast Concept (or `undefined` when the interface name
- * has no Concept statement), carried so the SD emit can stamp its diagnostic
- * location.
- */
-interface EligibleCaseFeatureConcept {
-  name: string;
-  code: string;
-  canonical: string;
-  concept: Concept | undefined;
-}
-
-interface CaseFeatureClassification {
-  eligible: EligibleCaseFeatureConcept[];
-  nonBoolean: Array<{ name: string; concept: Concept | undefined }>;
-  missingCode: Array<{ name: string; concept: Concept | undefined }>;
-}
-
-function eligibleCaseFeatureConcepts(
+// Exported for the F2 unit test (foreign-qualified-condition clobber). Not part
+// of the public emit API — internal helper surfaced for targeted coverage.
+export function collectCaseFeatures(
   lowered: LowerLocalCodesResult,
-  metadata: CpgMetadata,
-): CaseFeatureClassification {
+  decisions: ReadonlyArray<Decision>,
+  libraryName: string,
+): CaseFeatureCollection {
   const codeByConcept = new Map<string, string>();
   for (const lc of lowered.localCodes) codeByConcept.set(lc.concept, lc.code);
-  const conceptByName = new Map<string, Concept>();
+  // Prefer the `DefinedAsDefinition`-bearing twin (the Inferred fold-in twin of a
+  // both-rep concept is appended LAST by lowerLocalCodes, but select explicitly
+  // rather than relying on last-wins).
+  const definedAsByName = new Map<string, Concept>();
   for (const stmt of lowered.ast.statements) {
-    if (stmt.type === "Concept" && stmt.name) conceptByName.set(stmt.name, stmt);
+    if (stmt.type !== "Concept" || !stmt.name) continue;
+    const existing = definedAsByName.get(stmt.name);
+    const isDefinedAs = stmt.definition?.type === "DefinedAsDefinition";
+    if (existing === undefined || isDefinedAs) definedAsByName.set(stmt.name, stmt);
   }
 
-  const eligible: EligibleCaseFeatureConcept[] = [];
-  const nonBoolean: Array<{ name: string; concept: Concept | undefined }> = [];
-  const missingCode: Array<{ name: string; concept: Concept | undefined }> = [];
+  // Collect every `when` condition ref across the source's decisions (any depth).
+  const conditionRefs: ReferenceName[] = [];
+  const visitBranch = (branch: BranchBlock): void => {
+    if (branch.type === "WhenBlock") conditionRefs.push(branch.conceptName);
+    const body = branch.body;
+    if (body.type === "ActionStatement") return;
+    for (const stmt of body.statements) {
+      if (stmt.type === "WhenBlock" || stmt.type === "OtherwiseBlock") visitBranch(stmt);
+    }
+  };
+  for (const dec of decisions) for (const branch of dec.body.statements) visitBranch(branch);
 
-  for (const entry of interfaceSurface(lowered.ast)) {
-    // SKIP RecordSource / Inferred (valid re-exports, just not locally submittable
-    // case-features) and any non-source-typed entry silently.
-    if (entry.sourceLayer !== "LocalSource") continue;
-    const concept = conceptByName.get(entry.name);
-    if (!resolvesToBoolean(concept)) {
-      nonBoolean.push({ name: entry.name, concept });
-      continue;
+  const inputsByCondition = new Map<string, CollectedCodeIsConcept[]>();
+  const unionConcepts: CollectedCodeIsConcept[] = [];
+  const unionSeen = new Set<string>();
+  for (const ref of conditionRefs) {
+    // Key the per-condition list by the NORMALIZED bare name (the same name
+    // emitWhenBlock looks up).
+    const normalized = normalizeLocalRef(ref, libraryName);
+    // F2 (impl-review) — a genuinely FOREIGN condition (still qualified AFTER
+    // same-library normalization, e.g. `OtherLib."X"`) must NOT insert an
+    // `inputsByCondition` entry. `emitWhenBlock` only ever queries the resolver
+    // with UNQUALIFIED (local) condition names, so a foreign entry is never
+    // read — but keying it by its bare name (`getRefName`) would CLOBBER the
+    // local condition of the same name: a decision with `when "X"` AND
+    // `when OtherLib."X"` would overwrite the local `"X"`'s collected inputs with
+    // the foreign `[]`. Skip foreign refs entirely (they get no case-features in
+    // v0 anyway — the collector skips qualified leaves).
+    if (isQualifiedRef(normalized)) continue;
+    const condName = getRefName(normalized);
+    const collected = collectCodeIsConceptsInInferenceOrder(
+      ref,
+      libraryName,
+      definedAsByName,
+      codeByConcept,
+    );
+    inputsByCondition.set(condName, collected);
+    for (const c of collected) {
+      if (unionSeen.has(c.name)) continue;
+      unionSeen.add(c.name);
+      unionConcepts.push(c);
     }
-    const code = codeByConcept.get(entry.name);
-    if (code === undefined) {
-      missingCode.push({ name: entry.name, concept });
-      continue;
-    }
-    eligible.push({
-      name: entry.name,
-      code,
-      canonical: caseFeatureCanonicalUrl(metadata, entry.name),
-      concept,
-    });
   }
 
-  return { eligible, nonBoolean, missingCode };
+  return { inputsByCondition, unionConcepts };
 }
 
 /* ─── Closure invariants ────────────────────────────────────────────── */
@@ -603,10 +603,11 @@ export function applyInvariant2(
   // (c) StructureDefinition cpg-featureExpression reference integrity. Each
   // emitted case-feature StructureDefinition carries a
   // `extension[cpg-featureExpression].valueExpression.reference` pointing at the
-  // policy's `<policyId>-Interface` Library canonical. That reference must
-  // resolve to an emitted Library — a dangling case-feature reference (e.g. a
-  // malformed manifest with LocalSource concepts but no Interface entry) is a
-  // closure-integrity failure, the same class as a dangling `library[]`.
+  // policy's `<policyId>-LocalSource` Library canonical (where the `code is`
+  // define lives). That reference must resolve to an emitted Library — a dangling
+  // case-feature reference (e.g. a malformed manifest with collected `code is`
+  // concepts but no LocalSource entry) is a closure-integrity failure, the same
+  // class as a dangling `library[]`.
   for (const r of resources) {
     if (r.resourceType !== "StructureDefinition") continue;
     const ext = (r.resource as { extension?: Array<{ url?: string; valueExpression?: { reference?: unknown } }> }).extension;
@@ -1173,6 +1174,17 @@ export function emitFhirDefClosure(
     const interfaceEntry = manifestEntries.find((e) => e.role === "interface");
     const libraryReferenceSuffix = interfaceEntry ? idSuffixFor(interfaceEntry.libraryName) : "";
 
+    // The LocalSource Library suffix — where each `code is` define lives, the
+    // target of the case-feature `cpg-featureExpression.reference`. `LocalSource`
+    // is a `role:"layer"` manifest entry (imports/emit.ts maps LocalSource →
+    // "layer", NOT a distinct role), so it is identified by its LAYER TOKEN
+    // (`idSuffixFor(...) === "localsource"`), not by role. A decision-bearing
+    // code-is policy ALWAYS emits a LocalSource layer under the full source-typed
+    // split; absence here means the case-feature emit is gated off below (no
+    // dangling featureExpression).
+    const localSourceEntry = manifestEntries.find((e) => idSuffixFor(e.libraryName) === "localsource");
+    const localSourceReferenceSuffix = localSourceEntry ? idSuffixFor(localSourceEntry.libraryName) : "";
+
     // (3) ActivityDefinitions
     const actResult = emitActivityDefinitionsForLibrary(
       lib.activities,
@@ -1229,26 +1241,54 @@ export function emitFhirDefClosure(
           `Skipping this source's decision emit.`,
       });
     }
-    // (5a) Case-feature input resolver (action-level PlanDefinition `input`, DTR
-    // pattern). Build a `Map<conceptName, caseFeatureCanonical>`
-    // populated ONLY for the case-feature-eligible concepts. F1 — the eligible set
-    // comes from the SHARED `eligibleCaseFeatureConcepts` helper, the SAME
-    // classification the case-feature SD emit consumes below (step 6), under the
-    // SAME structural gate (`lib.decisions.length > 0 && lowered.errors.length ===
-    // 0 && interfaceEntry !== undefined`). The helper's `canonical` is
-    // `caseFeatureCanonicalUrl`, so the `action.input` profile byte-equals the
-    // emitted SD `url`, and — because both consumers iterate the SAME eligible set
-    // — an input is produced for EXACTLY the concepts whose SD is emitted (the
-    // input set and the SD set are the same set by construction). Threaded into
-    // emitDecisionPlanDefinition as a `(name) => canonical | null` resolver.
-    const caseFeatureInputByName = new Map<string, string>();
-    if (lib.decisions.length > 0 && lowered.errors.length === 0 && interfaceEntry !== undefined) {
-      for (const e of eligibleCaseFeatureConcepts(lowered, metadata).eligible) {
-        caseFeatureInputByName.set(e.name, e.canonical);
+    // (5a) Case-feature collection (action-level PlanDefinition `input` + the SD
+    // emit below, step 6). The recursive `code is` closure per `when` condition in
+    // INFERENCE ORDER drives BOTH consumers off ONE `CaseFeatureCollection`, so the
+    // input set and the SD set are the SAME set by construction. Gated on the SAME
+    // structural condition as step 6: a decision-bearing source with clean lowering
+    // AND a LocalSource layer (the featureExpression target). The resolver maps a
+    // normalized condition name → its ordered recursive inputs (each entry's
+    // canonical is `caseFeatureCanonicalUrl`, so the `action.input` profile
+    // byte-equals the emitted SD `url`).
+    const caseFeatureGateOpen =
+      lib.decisions.length > 0 && lowered.errors.length === 0 && localSourceEntry !== undefined;
+    const caseFeatures: CaseFeatureCollection = caseFeatureGateOpen
+      ? collectCaseFeatures(lowered, lib.decisions, lib.libraryName)
+      : { inputsByCondition: new Map(), unionConcepts: [] };
+
+    // F3 (impl-review) — direct-caller trap. The deliverable always threads a
+    // manifest (`emitFhirDefFromPath`), so a decision-bearing code-is policy
+    // ALWAYS carries a LocalSource layer and the gate opens. But a direct caller
+    // (e.g. the closure unit test) can synthesize a graph with `cqlByLibrary: []`
+    // → no `localSourceEntry`, so the gate stays CLOSED even when the source has
+    // would-be case-features (decision `when` conditions over valid `code is`
+    // concepts). Without this guard that caller would SUCCEED while silently
+    // emitting ZERO inputs/SDs — a missing-lane that the closure invariants can't
+    // catch (there is nothing to dangle). Detect it: clean lowering + decisions +
+    // NO LocalSource entry, yet the recursive collection WOULD have produced
+    // case-features → hard-error rather than silently skip the case-feature lane.
+    if (lib.decisions.length > 0 && lowered.errors.length === 0 && localSourceEntry === undefined) {
+      const wouldCollect = collectCaseFeatures(lowered, lib.decisions, lib.libraryName);
+      if (wouldCollect.unionConcepts.length > 0) {
+        errors.push({
+          type: "Validation",
+          kind: "decision-root-library-missing",
+          message:
+            `Decision-bearing source "${lib.libraryName}" has decision conditions whose recursive ` +
+            `\`code is\` closure would emit case-features (${wouldCollect.unionConcepts
+              .map((c) => `"${c.name}"`)
+              .join(", ")}), but the manifest has no LocalSource layer entry (the case-feature ` +
+            `\`cpg-featureExpression\` target). The case-feature lane would be silently skipped. A ` +
+            `decision-bearing code-is policy must emit a LocalSource layer; thread the split-manifest ` +
+            `(\`emitFhirDefFromPath\`) instead of a bare graph.`,
+        });
       }
     }
     const caseFeatureInputResolver: CaseFeatureInputResolver = (name) =>
-      caseFeatureInputByName.get(name) ?? null;
+      (caseFeatures.inputsByCondition.get(name) ?? []).map((c) => ({
+        name: c.name,
+        canonical: caseFeatureCanonicalUrl(metadata, c.name),
+      }));
 
     // When the contract is violated we skip THIS source's decision emit (handled by
     // the loop guard below); there are no later per-lib steps, so a plain guarded
@@ -1274,79 +1314,34 @@ export function emitFhirDefClosure(
       unmatched.push(...decResult.unmatched);
     }
 
-    // (6) Case-feature StructureDefinitions — one per eligible interface concept.
+    // (6) Case-feature StructureDefinitions — one per recursively-collected
+    // `code is` concept (the union over the source's decision conditions, deduped
+    // by name — the SAME `caseFeatures.unionConcepts` the input resolver above
+    // consumes, so an SD is emitted for EXACTLY the concepts an input addresses).
     //
-    // STRUCTURAL gate FIRST: only a decision-bearing source has an Interface
-    // surface to publish (cms22/cms69 carry NO decisions → this is a structural
-    // no-op, keeping their goldens byte-identical). When lowering errored we have
-    // no reliable local-code domain, so skip (the lowering error already sank
-    // success above).
+    // STRUCTURAL gate: only a decision-bearing source with clean lowering AND a
+    // LocalSource layer (the featureExpression target) emits case-features. cms22/
+    // cms69 carry NO decisions → structural no-op, keeping their goldens
+    // byte-identical. (`caseFeatureGateOpen` is the SAME gate used for step 5a.)
     //
-    // F1 — ALSO gate on the SAME `interfaceEntry` target the Decision PlanDef
-    // emit uses. The case-feature `cpg-featureExpression.reference` resolves to
-    // the `<policyId>-Interface` re-export Library via `libraryReferenceSuffix`;
-    // if there is no `role:"interface"` entry that suffix is "" (root-pointing),
-    // so the reference would DANGLE. For a decision-bearing interface-kind policy
-    // the interface entry always exists; gating here closes the malformed-manifest
-    // edge consistently with the decision skip above (no dangling reference).
-    if (lib.decisions.length > 0 && lowered.errors.length === 0 && interfaceEntry !== undefined) {
-      // F1 — the eligible set + the diagnostic sets come from the SHARED
-      // `eligibleCaseFeatureConcepts` helper, the SAME classification the
-      // action-level `input` resolver consumes above (step 5a). The eligible set
-      // and the input set are therefore the SAME set by construction (not two
-      // predicates that agree by discipline). The helper classifies the
-      // `interfaceSurface(lowered.ast)` LocalSource entries — the single source of
-      // truth the Interface re-export synthesis uses — so a case-feature profile
-      // can never address a concept the Interface does not re-export. The
-      // non-boolean / missing-code diagnostics are UNCHANGED (same kinds, same
-      // messages, same locations).
-      const classification = eligibleCaseFeatureConcepts(lowered, metadata);
-
-      // A LocalSource interface concept whose value type does NOT resolve to
-      // boolean → a structured diagnostic, no profile.
-      for (const { name, concept } of classification.nonBoolean) {
-        errors.push({
-          type: "Validation",
-          kind: "emit-casefeature-non-boolean",
-          message:
-            `Decision interface concept "${name}" is a LocalSource determination but its value ` +
-            `type does not resolve to boolean (got ${
-              concept && concept.valueTypes.length > 0
-                ? concept.valueTypes.map((v) => `"${v}"`).join("/")
-                : "absent"
-            }). Only a boolean local-source determination can be emitted as a submittable case-feature ` +
-            `Observation profile.`,
-          ...(concept?.location
-            ? { line: concept.location.start.line, column: concept.location.start.column }
-            : {}),
-        });
-      }
-
-      // A LocalSource boolean concept with no lowered local code is a contradiction
-      // (LocalSource ⟺ a lowered `code is`). Surface rather than emit a profile
-      // with an empty `code`.
-      for (const { name, concept } of classification.missingCode) {
-        errors.push({
-          type: "Validation",
-          kind: "emit-casefeature-missing-code",
-          message:
-            `LocalSource interface concept "${name}" has no lowered local code to fix in the ` +
-            `case-feature Observation profile. The lowered local-code domain and the interface surface disagree.`,
-          ...(concept?.location
-            ? { line: concept.location.start.line, column: concept.location.start.column }
-            : {}),
-        });
-      }
-
-      for (const { name, code } of classification.eligible) {
+    // LOCALSOURCE-ALWAYS-BOOLEAN: every collected concept has a lowered `code is`
+    // (the collector appends iff a local code exists), so each emits a boolean
+    // Observation case-feature regardless of declared value type — there is no
+    // value-type gate and no `emit-casefeature-non-boolean` diagnostic. The
+    // `emit-casefeature-missing-code` contradiction guard is structurally
+    // unreachable from the collection (the collector never appends a code-less
+    // concept), so it is dropped here too.
+    //
+    // The `cpg-featureExpression.reference` resolves to the `<policyId>-LocalSource`
+    // Library (where the `code is` define lives) via `localSourceReferenceSuffix`.
+    if (caseFeatureGateOpen) {
+      for (const { name, code } of caseFeatures.unionConcepts) {
         const cfResult = emitCaseFeatureStructureDefinition(
           name,
           code,
           metadata,
           resolvedOpts,
-          // The featureExpression references the Interface re-export library —
-          // the SAME suffix the decision/activity `library[]` resolve to.
-          libraryReferenceSuffix,
+          localSourceReferenceSuffix,
         );
         if (cfResult.resource) resources.push(cfResult.resource);
         errors.push(...cfResult.errors);
