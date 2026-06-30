@@ -258,8 +258,11 @@ describe("emitCQLImports (per-CRL v2.1.0)", () => {
     expect(rootCql).toMatch(
       /\[Observation: "Code Is Decision Concepts"\."Adult Patient"\]/,
     );
+    // Local-source `code is` retrieves are ALWAYS `[Observation: …]` regardless
+    // of the concept's `type is Condition` (the `type is` is retained on the AST
+    // for the Phase-2/3 inferred transform, not on the local-source retrieve).
     expect(rootCql).toMatch(
-      /\[Condition: "Code Is Decision Concepts"\."Active Crohns Disease"\]/,
+      /\[Observation: "Code Is Decision Concepts"\."Active Crohns Disease"\]/,
     );
     // No codesystem/code declarations leaked into the root.
     expect(rootCql).not.toMatch(/^codesystem /m);

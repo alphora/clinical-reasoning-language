@@ -54,6 +54,36 @@ concept "Adult Patient":
     );
   });
 
+  it("forces `retrieveResourceType: \"Observation\"` on the synthetic CodedFromDefinition while keeping the concept's `type is` (conceptType)", () => {
+    // Every local `code is` query is an Observation/boolean determination, so the
+    // LOWERED retrieve must be `[Observation: …]` regardless of `type is`. The
+    // author's `type is Condition` must survive on `Concept.conceptType` (the
+    // Phase-2/3 inferred transform still needs it).
+    const ast = parse(
+      lib(`
+concept "Active Crohns Disease":
+- type is Condition.
+- code is \`active-crohns-disease\`.
+`),
+    );
+    const { ast: out, errors } = lowerLocalCodes(ast);
+    expect(errors).toHaveLength(0);
+
+    const concept = out.statements.find(
+      (s): s is Concept => s.type === "Concept" && s.name === "Active Crohns Disease",
+    );
+    // The synthetic CodedFromDefinition forces Observation for the retrieve.
+    expect(concept!.definition).toEqual(
+      expect.objectContaining({
+        type: "CodedFromDefinition",
+        terminologyName: "Active Crohns Disease",
+        retrieveResourceType: "Observation",
+      }),
+    );
+    // ...but the author's `type is` is UNTOUCHED on the concept.
+    expect(concept!.conceptType).toBe("Condition");
+  });
+
   it("slice 4b — all synthetic terminologies carry the SAME shared codesystem decl name (the domain), URL unchanged", () => {
     const ast = parse(
       lib(
@@ -516,6 +546,50 @@ concept "Adult Patient":
     expect(cql).toContain('define "Adult Patient":');
     expect(cql).toContain('[Observation: "Adult Patient Code"]');
     expect(cql).not.toContain("TODO");
+  });
+
+  it("emits `[Observation: …]` for a synthetic CodedFromDefinition with `retrieveResourceType:\"Observation\"` even when conceptType is Condition", () => {
+    // Build the lowered AST shape directly (the parser never sets
+    // `retrieveResourceType`): a `type is Condition` concept whose synthetic
+    // local-source definition forces the retrieve resource to Observation. The
+    // emitted retrieve must be `[Observation: …]`, NOT `[Condition: …]`.
+    const LOC: Location = { start: { line: 3, column: 0 }, end: { line: 3, column: 0 } };
+    const term: Terminology = {
+      type: "Terminology",
+      name: "Active Crohns Disease",
+      body: [
+        { type: "TerminologySystem", system: "urn:crl:codesystem:t-local", name: "T Local Codes", location: LOC },
+        { type: "TerminologyCode", code: "active-crohns-disease", location: LOC },
+      ],
+      location: LOC,
+    };
+    const concept: Concept = {
+      type: "Concept",
+      name: "Active Crohns Disease",
+      conceptType: "Condition",
+      valueTypes: [],
+      representations: [],
+      definition: {
+        type: "CodedFromDefinition",
+        terminologyName: "Active Crohns Disease",
+        retrieveResourceType: "Observation",
+        location: LOC,
+      },
+      location: LOC,
+    };
+    const ast: CRL = {
+      type: "CRL",
+      library: { type: "LibraryDeclaration", name: "T", location: LOC },
+      includes: [],
+      statements: [term, concept],
+      location: LOC,
+    };
+    const r = emitCQLFromAST(ast, { libraryName: "T" });
+    expect(r.success).toBe(true);
+    const cql = r.result ?? "";
+    expect(cql).toContain('define "Active Crohns Disease":');
+    expect(cql).toContain('[Observation: "Active Crohns Disease Code"]');
+    expect(cql).not.toContain("[Condition:");
   });
 
   it("surfaces a missing-type `code is` concept as a hard error in EmitResult.errors", () => {

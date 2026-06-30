@@ -12,4 +12,4 @@ define "Adult Patient":
   [Observation: "Code Is Decision Concepts"."Adult Patient"]
 
 define "Active Crohns Disease":
-  [Condition: "Code Is Decision Concepts"."Active Crohns Disease"]
+  [Observation: "Code Is Decision Concepts"."Active Crohns Disease"]

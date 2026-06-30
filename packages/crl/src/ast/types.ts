@@ -334,6 +334,19 @@ export type ConceptDefinition =
 export interface CodedFromDefinition extends ASTNode {
   type: "CodedFromDefinition";
   terminologyName: ReferenceName;
+  /**
+   * SYNTHETIC-EMITTER-ONLY. Overrides the FHIR resource type of the EMITTED
+   * retrieve (`[<resource>: <ref>]`). The CRL parser/builder NEVER set this —
+   * hand-authored `coded from` always leaves it `undefined`. It is set ONLY by
+   * the `lowerLocalCodes` pass, which forces `"Observation"` for the synthetic
+   * local-source retrieve (every `code is` query is an Observation/boolean
+   * determination) WITHOUT disturbing the concept's author-declared `type is`
+   * (`Concept.conceptType`), which the Phase-2/3 Provider/Payer inferred
+   * transform still needs. When absent, the emitter keeps the historical
+   * `conceptType ?? "Observation"` behavior, so hand-authored `coded from`
+   * emit is byte-identical.
+   */
+  retrieveResourceType?: string;
   location: Location;
 }
 

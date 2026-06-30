@@ -430,9 +430,15 @@ export function lowerLocalCodes(
 
     // Replace the concept's `code` with a CodedFromDefinition bare-ref'ing the
     // synthetic code's NAME. Clearing `code` makes the transform idempotent.
+    // Force the LOCAL-SOURCE retrieve to `[Observation: …]`: every `code is`
+    // query is an Observation/boolean determination, regardless of the author's
+    // `type is`. `retrieveResourceType` overrides ONLY the emitted retrieve
+    // resource; the concept keeps its `conceptType` (and the `localCodes` entry
+    // keeps the author's source type) for the Phase-2/3 inferred transform.
     const codedFrom: CodedFromDefinition = {
       type: "CodedFromDefinition",
       terminologyName: c.name,
+      retrieveResourceType: "Observation",
       location: loc,
     };
     const lowered: Concept = { ...c, definition: codedFrom };

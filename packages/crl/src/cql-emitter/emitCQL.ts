@@ -918,7 +918,12 @@ class Emitter {
   }
 
   private emitCodedFrom(c: Concept, def: CodedFromDefinition): string {
-    const resource = c.conceptType ?? "Observation";
+    // A synthetic local-source CodedFromDefinition (from `lowerLocalCodes`)
+    // supplies `retrieveResourceType: "Observation"` to force the local-source
+    // retrieve to `[Observation: …]` regardless of the concept's `type is`.
+    // Hand-authored `coded from` has no `retrieveResourceType` → keeps the
+    // historical `conceptType ?? "Observation"` (byte-identical emit).
+    const resource = def.retrieveResourceType ?? c.conceptType ?? "Observation";
     const crossLib = this.crossLibraryOf(def.terminologyName);
     const termName = getRefName(def.terminologyName);
     if (crossLib !== null) {
