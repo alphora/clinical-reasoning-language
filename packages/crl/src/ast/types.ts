@@ -216,6 +216,21 @@ export interface TerminologySystem extends ASTNode {
   type: "TerminologySystem";
   system: string;
   location: Location;
+  /**
+   * SYNTHETIC-EMITTER-ONLY (the CRL parser/builder NEVER sets this; do not
+   * touch the parser). Carries the shared `codesystem` DECLARATION name to use
+   * for lowered concept-level local codes (`code is`). The slice-4b lowering
+   * pass (`lowerLocalCodes`) sets ONE shared domain name (e.g. "<Library> Local
+   * Codes") on EVERY synthetic terminology's system line so the emitter can
+   * collapse the N otherwise-distinct "<Concept> System" codesystem decls (all
+   * sharing one URL) into ONE shared `codesystem <name>: '<url>'` + N codes.
+   *
+   * When ABSENT (the normal hand-authored case) the emitter falls back to its
+   * historical `"<emitName> System"` codesystem decl name — current behavior.
+   * `name` is only the codesystem DECLARATION identifier; the per-concept
+   * terminology `name` (used for code identifiers / retrieve refs) is unchanged.
+   */
+  name?: string;
 }
 
 // Terminology code line (can be multiple per system)

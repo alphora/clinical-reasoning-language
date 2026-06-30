@@ -1,8 +1,8 @@
 import { describe, expect, it } from "@jest/globals";
 
 import { buildCRL } from "../../index";
-import type { CRL, Concept, Terminology } from "../../ast/types";
-import { emitCQL } from "../emitCQL";
+import type { CRL, Concept, Terminology, Location } from "../../ast/types";
+import { emitCQL, emitCQLFromAST } from "../emitCQL";
 import { lowerLocalCodes, localCodeSystemUrl } from "../lowerLocalCodes";
 
 // Slice 3 — concept-level `code is` local-source lowering. Covers the
@@ -52,6 +52,52 @@ concept "Adult Patient":
     expect(concept!.definition).toEqual(
       expect.objectContaining({ type: "CodedFromDefinition", terminologyName: "Adult Patient" }),
     );
+  });
+
+  it("slice 4b — all synthetic terminologies carry the SAME shared codesystem decl name (the domain), URL unchanged", () => {
+    const ast = parse(
+      lib(
+        `
+concept "Adult Patient":
+- type is Observation.
+- code is \`adult-18-or-older\`.
+
+concept "Active Crohns Disease":
+- type is Condition.
+- code is \`active-crohns-disease\`.
+`,
+        "Code Is Basic",
+      ),
+    );
+    const { ast: out, errors } = lowerLocalCodes(ast);
+    expect(errors).toHaveLength(0);
+
+    const terms = out.statements.filter(
+      (s): s is Terminology => s.type === "Terminology",
+    );
+    expect(terms).toHaveLength(2);
+
+    const systemLines = terms.map(
+      (t) =>
+        t.body.find(
+          (l): l is import("../../ast/types").TerminologySystem =>
+            l.type === "TerminologySystem",
+        )!,
+    );
+    // Every synthetic terminology's system line carries the SAME shared domain
+    // codesystem decl name, derived from the SOURCE library name.
+    for (const sl of systemLines) {
+      expect(sl.name).toBe("Code Is Basic Local Codes");
+    }
+    // ...and the URL is unchanged (the single implicit local domain URN).
+    for (const sl of systemLines) {
+      expect(sl.system).toBe("urn:crl:codesystem:code-is-basic-local");
+    }
+    // The per-concept terminology NAMES are still the concept names (unchanged).
+    expect(terms.map((t) => t.name).sort()).toEqual([
+      "Active Crohns Disease",
+      "Adult Patient",
+    ]);
   });
 
   it("is idempotent — a second pass over already-lowered output is a no-op", () => {
@@ -394,6 +440,41 @@ concept "Dup":
     expect(errors.find((e) => e.kind === "emit-duplicate-local-concept")!.message).toMatch(/Dup/);
   });
 
+  it("D2 — shared local codesystem decl name collides with a top-level concept → emit-local-codesystem-name-collision", () => {
+    // Library "T" → shared local codesystem decl name "T Local Codes". A concept
+    // literally named "T Local Codes" would emit a duplicate top-level CQL
+    // identifier (codesystem vs define share the namespace). Diagnose instead.
+    const ast = parse(
+      lib(`
+concept "Adult Patient":
+- type is Observation.
+- code is \`adult\`.
+
+concept "T Local Codes":
+- type is Observation.
+- value type is boolean.
+- definition is most recent "Adult Patient".
+`),
+    );
+    const { errors } = lowerLocalCodes(ast);
+    expect(errors.some((e) => e.kind === "emit-local-codesystem-name-collision")).toBe(true);
+    expect(
+      errors.find((e) => e.kind === "emit-local-codesystem-name-collision")!.message,
+    ).toMatch(/T Local Codes/);
+  });
+
+  it("D2 — no collision when no top-level identifier matches the shared decl name", () => {
+    const ast = parse(
+      lib(`
+concept "Adult Patient":
+- type is Observation.
+- code is \`adult\`.
+`),
+    );
+    const { errors } = lowerLocalCodes(ast);
+    expect(errors.some((e) => e.kind === "emit-local-codesystem-name-collision")).toBe(false);
+  });
+
   it("synthetic terminology name collides with an existing terminology → emit-local-code-terminology-collision", () => {
     const ast = parse(
       lib(`
@@ -422,12 +503,15 @@ concept "Adult Patient":
     );
     expect(r.success).toBe(true);
     const cql = r.result ?? "";
-    // detectCollisions suffixes the same-named terminology to "<Concept> Code".
+    // Slice 4b — ONE shared local codesystem decl ("<Lib> Local Codes"); the
+    // per-concept code NAME still gets the per-CRL "<Concept> Code" suffix
+    // (detectCollisions, same-named concept co-resides) and references the
+    // shared decl via `from`.
     expect(cql).toContain(
-      "codesystem \"Adult Patient Code System\": 'urn:crl:codesystem:t-local'",
+      "codesystem \"T Local Codes\": 'urn:crl:codesystem:t-local'",
     );
     expect(cql).toContain(
-      "code \"Adult Patient Code\": 'adult-18-or-older' from \"Adult Patient Code System\"",
+      "code \"Adult Patient Code\": 'adult-18-or-older' from \"T Local Codes\"",
     );
     expect(cql).toContain('define "Adult Patient":');
     expect(cql).toContain('[Observation: "Adult Patient Code"]');
@@ -444,5 +528,80 @@ concept "No Type":
     );
     expect(r.success).toBe(false);
     expect(r.errors?.[0]?.kind).toBe("emit-local-code-missing-type");
+  });
+});
+
+describe("emitCQLFromAST — D1 codesystem url-conflict guard", () => {
+  const LOC: Location = { start: { line: 3, column: 0 }, end: { line: 3, column: 0 } };
+
+  // A terminology body with TWO `TerminologySystem` lines sharing one decl name
+  // (`.name`) but DIFFERENT urls. The grammar allows multiple system lines; the
+  // emitter resolves ONE codesystem decl name from the body, so the second line
+  // maps to the same decl name with a conflicting url. (`.name` on a system line
+  // is the synthetic-emitter field; the parser never sets it, so this AST is
+  // built directly.)
+  function astWithConflictingCodesystem(): CRL {
+    const term: Terminology = {
+      type: "Terminology",
+      name: "Local",
+      body: [
+        { type: "TerminologySystem", system: "urn:crl:codesystem:a", name: "Shared", location: LOC },
+        { type: "TerminologySystem", system: "urn:crl:codesystem:b", name: "Shared", location: LOC },
+        { type: "TerminologyCode", code: "x", location: LOC },
+      ],
+      location: LOC,
+    };
+    return {
+      type: "CRL",
+      library: { type: "LibraryDeclaration", name: "T", location: LOC },
+      includes: [],
+      statements: [term],
+      location: LOC,
+    };
+  }
+
+  it("two system lines, same decl name, different urls → emit-codesystem-url-conflict + success:false", () => {
+    const r = emitCQLFromAST(astWithConflictingCodesystem(), { libraryName: "T" });
+    expect(r.success).toBe(false);
+    expect(r.errors).toBeDefined();
+    const conflict = r.errors!.find((e) => e.kind === "emit-codesystem-url-conflict");
+    expect(conflict).toBeDefined();
+    expect(conflict!.message).toMatch(/urn:crl:codesystem:a/);
+    expect(conflict!.message).toMatch(/urn:crl:codesystem:b/);
+  });
+
+  it("clean-error-channel path: BOTH conflicting codesystem decls are still emitted (no silent drop)", () => {
+    const r = emitCQLFromAST(astWithConflictingCodesystem(), { libraryName: "T" });
+    const cql = r.result ?? "";
+    // Both urls appear — the second decl is NOT silently dropped + mis-bound to
+    // the first url; the conflict is visible in the emitted (invalid) CQL.
+    expect(cql).toContain("codesystem \"Shared\": 'urn:crl:codesystem:a'");
+    expect(cql).toContain("codesystem \"Shared\": 'urn:crl:codesystem:b'");
+  });
+
+  it("same decl name + SAME url is the legitimate dedup (no conflict, decl emitted once)", () => {
+    const term: Terminology = {
+      type: "Terminology",
+      name: "Local",
+      body: [
+        { type: "TerminologySystem", system: "urn:crl:codesystem:a", name: "Shared", location: LOC },
+        { type: "TerminologySystem", system: "urn:crl:codesystem:a", name: "Shared", location: LOC },
+        { type: "TerminologyCode", code: "x", location: LOC },
+      ],
+      location: LOC,
+    };
+    const ast: CRL = {
+      type: "CRL",
+      library: { type: "LibraryDeclaration", name: "T", location: LOC },
+      includes: [],
+      statements: [term],
+      location: LOC,
+    };
+    const r = emitCQLFromAST(ast, { libraryName: "T" });
+    expect(r.success).toBe(true);
+    const cql = r.result ?? "";
+    // Exactly one codesystem decl line for "Shared".
+    const occurrences = cql.split("codesystem \"Shared\":").length - 1;
+    expect(occurrences).toBe(1);
   });
 });

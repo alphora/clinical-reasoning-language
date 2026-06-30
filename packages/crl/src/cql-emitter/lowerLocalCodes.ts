@@ -60,16 +60,34 @@
  * consumers must reference the generated CONCEPT `define`s, never the synthetic
  * code declarations.
  *
- * SLICE-4 DEDUP CONSTRAINT. This pass emits N synthetic CQL `codesystem`
- * declarations (one per `code is` concept) that ALL SHARE ONE URN —
- * `urn:crl:codesystem:<slug>-local`, the single implicit local domain. When
- * slice 4 (FHIR `CodeSystem` emit) materializes these as FHIR resources it MUST
- * dedup them by URL into ONE FHIR `CodeSystem` resource (the shared URN)
- * carrying N `concept` entries — emitting N separate `CodeSystem` resources that
- * share the same canonical `url` is INVALID FHIR. This shared-URN shape is a
- * DELIBERATE choice (it lets us reuse `emitTerminologyLine` / `detectCollisions`
- * unchanged for the CQL side), not an accident; slice 4 owns the FHIR-side
- * collapse.
+ * SLICE-4 DEDUP CONSTRAINT. This pass keeps N synthetic terminologies (one per
+ * `code is` concept), each still NAMED AFTER ITS CONCEPT so resolution / layered
+ * maps / collision suffix / re-qualification are all unchanged. They ALL SHARE
+ * ONE URN — `urn:crl:codesystem:<slug>-local`, the single implicit local domain.
+ *
+ *   - CQL side (slice 4b): every synthetic terminology's `TerminologySystem`
+ *     line carries a SHARED `name` — the domain codesystem decl name
+ *     `<sourceLibraryName> Local Codes` (e.g. library "Code Is Basic" →
+ *     "Code Is Basic Local Codes"). The emitter (`emitTerminologyLine` /
+ *     `emitOneTerminology` / `emitTerminologies`) emits that ONE shared
+ *     `codesystem "<domain>": '<urn>'` declaration ONCE (name-keyed dedup) and
+ *     N `code "<Concept>[ Code]": '<value>' from "<domain>"` lines — instead of
+ *     N distinct `"<Concept> System"` codesystem decls all sharing one URN.
+ *     D2 — the shared domain decl name is now collision-CHECKED against the
+ *     library's other top-level CQL identifiers (concept / parameter / valueset /
+ *     codesystem / terminology names): a library that already declares an
+ *     identifier literally named "<Lib> Local Codes" raises
+ *     `emit-local-codesystem-name-collision` rather than emitting a duplicate
+ *     top-level identifier (invalid CQL).
+ *
+ *   - FHIR side (slice 4): when the FHIR `CodeSystem` emit materializes these it
+ *     MUST dedup them by URL into ONE FHIR `CodeSystem` resource (the shared
+ *     URN) carrying N `concept` entries — emitting N separate `CodeSystem`
+ *     resources that share the same canonical `url` is INVALID FHIR.
+ *
+ * This shared-domain shape is a DELIBERATE choice; the FHIR lane (URL-keyed
+ * dedup over `localCodes[]`) and the CQL lane (name-keyed dedup over the shared
+ * `TerminologySystem.name`) collapse the same domain along their own keys.
  */
 
 import type {
@@ -209,9 +227,34 @@ export function lowerLocalCodes(
   // a hand-authored terminology — a legal cross-kind same-name, since name
   // uniqueness is per-kind). If the names match the emitter's two terminologies
   // would collapse in its name-keyed maps; diagnose instead of emit broken CQL.
+  //
+  // D2 — the SAME pass also collects every other top-level CQL identifier name
+  // the library will emit (Concept names, Parameter names, and the valueset /
+  // codesystem decl names declared inside terminology bodies). In CQL,
+  // `codesystem` decls share the top-level identifier namespace with `define` /
+  // `code` / `valueset` / `parameter` / other terminologies, so the synthetic
+  // shared `localCodesystemName` must be checked against ALL of them — a library
+  // that happens to contain a concept/parameter/terminology literally named
+  // "<Lib> Local Codes" would otherwise emit a duplicate top-level identifier
+  // (invalid CQL). The check fires below, once `localCodesystemName` is derived.
   const existingTerminologyNames = new Set<string>();
+  const topLevelIdentifierNames = new Set<string>();
   for (const stmt of ast.statements) {
-    if (stmt.type === "Terminology" && stmt.name) existingTerminologyNames.add(stmt.name);
+    if (stmt.type === "Terminology" && stmt.name) {
+      existingTerminologyNames.add(stmt.name);
+      topLevelIdentifierNames.add(stmt.name);
+      // Valueset / codesystem decl names declared inside this terminology body
+      // (cheap to collect here — the body is already in hand).
+      for (const bodyLine of stmt.body) {
+        if (bodyLine.type === "TerminologySystem" && bodyLine.name) {
+          topLevelIdentifierNames.add(bodyLine.name);
+        }
+      }
+    } else if (stmt.type === "Concept" && stmt.name) {
+      topLevelIdentifierNames.add(stmt.name);
+    } else if (stmt.type === "Parameter" && stmt.name) {
+      topLevelIdentifierNames.add(stmt.name);
+    }
   }
 
   // De-dup local code VALUES across all lowered concepts (a duplicate local code
@@ -236,6 +279,36 @@ export function lowerLocalCodes(
   // URN won't follow `options.libraryName` — a direct caller passing it should
   // expect the URN to slug from `ast.library.name`.
   const urn = localCodeSystemUrl(opts.canonicalBase, ast.library.name);
+
+  // Slice 4b — the ONE shared domain `codesystem` DECLARATION name, derived from
+  // the SOURCE policy library identity (`ast.library.name`), NOT the emitted-layer
+  // library name (`options.libraryName` may be "<Lib> Concepts"). Every synthetic
+  // terminology's system line carries THIS name so the emitter emits a single
+  // shared `codesystem "<domain>": '<urn>'` (deduped) instead of N "<Concept>
+  // System" decls all sharing one URN. The per-concept terminology `name` is
+  // unchanged — only the codesystem DECL name is shared.
+  const localCodesystemName = `${ast.library.name} Local Codes`;
+
+  // D2 — the shared decl name is injected as a top-level CQL `codesystem`
+  // identifier. If the library ALREADY declares a top-level identifier of that
+  // exact name (a concept, parameter, terminology, or a valueset/codesystem decl
+  // name inside a terminology body), the emit would produce a duplicate top-level
+  // identifier — invalid CQL. Diagnose rather than emit broken CQL. (The
+  // synthetic terminologies that carry `localCodesystemName` on their system line
+  // are built below, AFTER this scan, so they can't false-match here.)
+  if (topLevelIdentifierNames.has(localCodesystemName)) {
+    errors.push(mkError(
+      "emit-local-codesystem-name-collision",
+      `The synthetic shared local codesystem decl "${localCodesystemName}" collides ` +
+        `with an existing top-level identifier of the same name in library ` +
+        `"${ast.library.name}". CQL codesystem declarations share the top-level ` +
+        `identifier namespace with concepts, parameters, valuesets, and other ` +
+        `terminologies, so this would emit a duplicate identifier (invalid CQL). ` +
+        `Rename the conflicting declaration (or the library) so the synthesized ` +
+        `local codesystem name "${localCodesystemName}" is unique.`,
+      ast.library.location,
+    ));
+  }
 
   for (const stmt of ast.statements) {
     if (!isLowerableConcept(stmt)) continue;
@@ -342,14 +415,18 @@ export function lowerLocalCodes(
     localCodes.push({ concept: c.name, code: codeValue, conceptType: c.conceptType! });
 
     // Build the synthetic local Terminology (codesystem + single code) named
-    // after the concept. On the PER-CRL path detectCollisions in the emitter
-    // suffixes its emit name to "<Concept> Code" (concept of the same name
-    // co-resides), so the emitted CQL is `codesystem "<Concept> Code System":
-    // '<urn>'` + `code "<Concept> Code": '<value>' from "<Concept> Code
-    // System"`. On the LAYERED path the terminology and concept split into
-    // separate libraries, so no collision fires and the code is named bare
-    // "<Concept>" (see the EMITTED IDENTIFIER NOTE in the file header).
-    syntheticTerminologies.push(buildSyntheticTerminology(c.name, codeValue, urn, loc));
+    // after the concept. Its system line carries the SHARED domain codesystem
+    // decl name (`localCodesystemName`); the emitter emits ONE shared
+    // `codesystem "<domain>": '<urn>'` (deduped across all synthetic
+    // terminologies) and per-concept `code` lines `from "<domain>"`. The code
+    // NAME still follows the concept: on the PER-CRL path detectCollisions
+    // suffixes it to "<Concept> Code" (concept of the same name co-resides),
+    // emitting `code "<Concept> Code": '<value>' from "<domain>"`; on the
+    // LAYERED path no collision fires and the code is named bare "<Concept>"
+    // (see the EMITTED IDENTIFIER NOTE in the file header).
+    syntheticTerminologies.push(
+      buildSyntheticTerminology(c.name, codeValue, localCodesystemName, urn, loc),
+    );
 
     // Replace the concept's `code` with a CodedFromDefinition bare-ref'ing the
     // synthetic code's NAME. Clearing `code` makes the transform idempotent.
@@ -395,16 +472,27 @@ export function lowerLocalCodes(
   return { ast: outAst, errors, localCodes };
 }
 
-/** Build a synthetic Terminology node: one codesystem (URN) + one code line. */
+/**
+ * Build a synthetic Terminology node: one codesystem (URN) + one code line.
+ *
+ * The Terminology is named after the concept (`name`) — this drives the code
+ * identifier and the retrieve ref, unchanged. The `domainName` is set on the
+ * `TerminologySystem` line as its SHARED codesystem DECLARATION name (slice 4b);
+ * every synthetic terminology in the library passes the SAME `domainName`, so
+ * the emitter emits that one codesystem decl once and references it from every
+ * code line.
+ */
 function buildSyntheticTerminology(
   name: string,
   codeValue: string,
+  domainName: string,
   urn: string,
   loc: Location,
 ): Terminology {
   const systemLine: TerminologyBodyLine = {
     type: "TerminologySystem",
     system: urn,
+    name: domainName,
     location: loc,
   };
   const codeLine: TerminologyBodyLine = {

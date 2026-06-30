@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, readdirSync, writeFileSync } from "fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "fs";
 import * as path from "path";
 
 import { emitCQLImports } from "../../imports/emit";
@@ -39,6 +39,19 @@ const CORPORA: Record<string, string> = {
   // into the Asserted layer; a `defined as` concept lands in the Inferred layer.
   // Exercises the full code-is fan-out + cross-layer re-qualification.
   "code-is-basic": path.join(__dirname, "fixtures", "code-is-basic", "code-is-basic.crl"),
+  // Slice 4b (shared-codesystem-dedup) — the PER-CRL local-code path. A single
+  // library carrying a `decision` (which disqualifies the layered auto-split)
+  // PLUS two `code is`-only concepts. The decision keeps the whole library on
+  // the per-CRL path, so the synthetic terminologies and their concepts
+  // co-reside in ONE emitted library: detectCollisions suffixes the code names
+  // to "<Concept> Code" and the retrieves inline as `[<Resource>: "<Concept>
+  // Code"]`. The golden asserts ONE shared `codesystem "<Lib> Local Codes"` +
+  // N suffixed `code "<Concept> Code": ... from "<Lib> Local Codes"` (the
+  // per-CRL suffix + shared-domain dedup interaction this slice is about).
+  "code-is-decision": path.join(
+    REPO_ROOT,
+    "src/imports/tests/fixtures/code-is-decision/root.crl",
+  ),
 };
 
 const norm = (s: string): string => s.replace(/\r\n/g, "\n");
@@ -65,6 +78,11 @@ describe("CQL emit golden regression (worked corpus)", () => {
           const goldenPath = path.join(goldenDir, entry.outputFilename);
           const emitted = norm(entry.cql);
           if (UPDATE) {
+            // Bootstrap a NEW corpus's golden dir — without this, the first
+            // `UPDATE_GOLDEN=1` run for a corpus whose `golden/<corpus>/` dir
+            // doesn't yet exist throws ENOENT (which is why early slices had to
+            // hand-create the dir). `recursive` makes it a no-op when present.
+            mkdirSync(path.dirname(goldenPath), { recursive: true });
             writeFileSync(goldenPath, emitted);
             return;
           }

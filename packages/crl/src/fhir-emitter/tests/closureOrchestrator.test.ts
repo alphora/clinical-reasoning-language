@@ -212,7 +212,9 @@ describe("closureOrchestrator — FHIR closure code-is coverage (T2)", () => {
     expect(cql.success).toBe(true);
     const allCql = cql.cqlByLibrary.map((e) => e.cql).join("\n");
     expect(allCql).toContain(`'${csUrl}'`);
-    expect(allCql).toContain(`codesystem "Adult Patient System": '${csUrl}'`);
+    // Slice 4b — the N per-concept "<Concept> System" codesystem decls collapsed
+    // into ONE shared domain decl "<Lib> Local Codes" carrying the same URL.
+    expect(allCql).toContain(`codesystem "Code Is Basic Local Codes": '${csUrl}'`);
   });
 });
 

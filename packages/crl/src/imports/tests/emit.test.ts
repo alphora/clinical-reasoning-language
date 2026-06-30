@@ -215,15 +215,19 @@ describe("emitCQLImports (per-CRL v2.1.0)", () => {
     expect(names).toEqual(["Code Is Decision"]);
 
     const cql = findLib(result, "Code Is Decision") ?? "";
-    // Synthesized local codesystem (shared URN) + per-concept code, suffixed.
+    // Slice 4b — ONE shared local codesystem decl ("<Lib> Local Codes", shared
+    // URN), emitted once; N per-concept codes (suffixed "<Concept> Code" on the
+    // per-CRL path) all reference it via `from`.
     expect(cql).toMatch(
-      /codesystem "Adult Patient Code System": 'urn:crl:codesystem:code-is-decision-local'/,
+      /codesystem "Code Is Decision Local Codes": 'urn:crl:codesystem:code-is-decision-local'/,
+    );
+    // The shared codesystem decl appears EXACTLY ONCE (deduped), not per-concept.
+    expect(cql.match(/^codesystem /gm)).toHaveLength(1);
+    expect(cql).toMatch(
+      /code "Adult Patient Code": 'adult-18-or-older' from "Code Is Decision Local Codes"/,
     );
     expect(cql).toMatch(
-      /code "Adult Patient Code": 'adult-18-or-older' from "Adult Patient Code System"/,
-    );
-    expect(cql).toMatch(
-      /code "Active Crohns Disease Code": 'active-crohns-disease' from "Active Crohns Disease Code System"/,
+      /code "Active Crohns Disease Code": 'active-crohns-disease' from "Code Is Decision Local Codes"/,
     );
     // Inline per-CRL retrieves referencing the suffixed code names (same library).
     expect(cql).toMatch(/\[Observation: "Adult Patient Code"\]/);

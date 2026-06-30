@@ -47,6 +47,7 @@ import type {
   Parameter,
   Terminology,
   TerminologyBodyLine,
+  TerminologySystem,
 } from "../ast/types";
 import { getRefName, getRefLibrary, isQualifiedRef } from "../ast/types";
 import type { ReferenceName } from "../ast/types";
@@ -426,6 +427,12 @@ export function emitCQLFromAST(ast: CRL, options: EmitOptions = {}): EmitResult 
     const emitter = new Emitter(lowered.ast, options);
     const out = emitter.emit();
     const unmatched = emitter.getUnmatched();
+    // Slice 4b D1 — emit-time diagnostics accumulated through the Emitter's
+    // clean error channel (`getEmitErrors`), e.g. a codesystem decl name bound
+    // to two conflicting urls. These do NOT carry a compile-failing sentinel
+    // (the emitted CQL is otherwise well-formed), so they force `success: false`
+    // and surface in `errors[]` but leave `result` populated for inspection.
+    const emitErrors = emitter.getEmitErrors();
     if (unmatched.length > 0) {
       // Issue #79 — at least one `- definition is …` body fell through the
       // template matcher. The emitted `result` is still populated (with a
@@ -443,8 +450,21 @@ export function emitCQLFromAST(ast: CRL, options: EmitOptions = {}): EmitResult 
       return {
         success: false,
         result: out,
-        errors,
+        errors: [...emitErrors, ...errors],
         unmatched,
+        ...(emitter.getFutureExpressions().length > 0
+          ? { futureExpressions: emitter.getFutureExpressions() }
+          : {}),
+      };
+    }
+    if (emitErrors.length > 0) {
+      // Slice 4b D1 — no unmatched narratives, but an emit-time diagnostic
+      // (e.g. conflicting codesystem urls) fired. Surface it and fail the emit
+      // while keeping the otherwise well-formed `result` for inspection.
+      return {
+        success: false,
+        result: out,
+        errors: emitErrors,
         ...(emitter.getFutureExpressions().length > 0
           ? { futureExpressions: emitter.getFutureExpressions() }
           : {}),
@@ -519,6 +539,17 @@ class Emitter {
    * contains a compile-failing sentinel call at each spot.
    */
   private readonly unmatchedNarratives: UnmatchedNarrative[] = [];
+
+  /**
+   * Slice 4b D1 — emit-time diagnostics that aren't narrative mismatches.
+   * The clean error channel reachable from deep in the emit walk (e.g.
+   * `emitTerminologyLine` discovering a codesystem decl name bound to two
+   * conflicting urls). `emitCQLFromAST` drains this via `getEmitErrors()`
+   * and folds it into `EmitResult.errors`, forcing `success: false`. Unlike
+   * unmatched narratives these carry NO compile-failing sentinel — the
+   * emitted CQL is otherwise well-formed.
+   */
+  private readonly emitErrors: CRLError[] = [];
 
   // #108 — concepts carrying `@crl-future-expression: …` annotations;
   // surfaced via the EmitResult.futureExpressions envelope so tooling
@@ -626,6 +657,11 @@ class Emitter {
   /** Issue #79 — unmatched narratives accumulated during this emit. */
   getUnmatched(): UnmatchedNarrative[] {
     return this.unmatchedNarratives;
+  }
+
+  /** Slice 4b D1 — emit-time diagnostics accumulated during this emit. */
+  getEmitErrors(): CRLError[] {
+    return this.emitErrors;
   }
 
   /** #108 — `@crl-future-expression` annotations seen during this emit. */
@@ -740,24 +776,97 @@ class Emitter {
   }
 
   private emitTerminologies(terms: Terminology[]): string {
-    return terms.map((t) => this.emitOneTerminology(t)).join("\n");
-  }
-
-  private emitOneTerminology(t: Terminology): string {
-    const emitName = this.terminologyEmitName.get(t.name) ?? t.name;
-    return t.body
-      .map((line) => this.emitTerminologyLine(emitName, line))
+    // Slice 4b — dedup shared `codesystem` declarations across terminologies.
+    // Lowered concept-level local codes (`code is`) carry a SHARED codesystem
+    // decl name on their `TerminologySystem.name` (the per-library domain, e.g.
+    // "<Lib> Local Codes"), all sharing one URL. Emit that decl ONCE; later
+    // terminologies referencing the same decl name skip the codesystem line but
+    // still emit their own `code` line `from "<domain>"`. Hand-authored
+    // terminologies (no `.name`) fall back to the historical per-terminology
+    // "<emitName> System" decl, which is unique per terminology, so they never
+    // collide in this map.
+    //
+    // D1 — keyed `decl name → emitted url` (not a bare name-Set) so a SECOND
+    // decl reusing the name with a DIFFERENT url is detected as a conflict
+    // rather than silently dropped and bound to the first url. Same-name +
+    // same-url is the legitimate synthetic-local dedup (returns ""); same-name +
+    // different-url pushes an `emit-codesystem-url-conflict` diagnostic through
+    // the Emitter's clean error channel and the decl is still emitted.
+    const emittedCodesystems = new Map<string, string>();
+    return terms
+      .map((t) => this.emitOneTerminology(t, emittedCodesystems))
+      // Future-proofing: drops a terminology whose every line vanished. Today
+      // the `code` line always survives (only the deduped `codesystem` line can
+      // return ""), so no terminology fully vanishes — but the guard keeps the
+      // join clean if that ever changes.
+      .filter((s) => s.length > 0)
       .join("\n");
   }
 
-  private emitTerminologyLine(emitName: string, line: TerminologyBodyLine): string {
+  private emitOneTerminology(t: Terminology, emittedCodesystems: Map<string, string>): string {
+    const emitName = this.terminologyEmitName.get(t.name) ?? t.name;
+    // Resolve the codesystem DECL name from the body's single TerminologySystem
+    // line: its synthetic shared `name` when present (slice 4b), else the
+    // historical "<emitName> System". This is the name the `codesystem` decl
+    // declares AND the name every `code` line in this terminology references via
+    // `from`, so a code can resolve the shared decl even when its own
+    // codesystem line was deduped away. Single `system` line per terminology is
+    // assumed for the `from` binding; a multi-`system` body (hand-authored —
+    // the grammar allows multiple `TerminologySystem` lines) is handled by the
+    // D1 url-conflict guard in `emitTerminologyLine`.
+    const systemLine = t.body.find(
+      (l): l is TerminologySystem => l.type === "TerminologySystem",
+    );
+    const codesystemName =
+      systemLine?.name ?? emitName + " System";
+    return t.body
+      .map((line) =>
+        this.emitTerminologyLine(emitName, codesystemName, line, emittedCodesystems),
+      )
+      .filter((s) => s.length > 0)
+      .join("\n");
+  }
+
+  private emitTerminologyLine(
+    emitName: string,
+    codesystemName: string,
+    line: TerminologyBodyLine,
+    emittedCodesystems: Map<string, string>,
+  ): string {
     switch (line.type) {
       case "TerminologyValueset":
         return `valueset ${cqlIdent(emitName)}: ${cqlString(line.valuesetName)}`;
-      case "TerminologySystem":
-        return `codesystem ${cqlIdent(emitName + " System")}: ${cqlString(line.system)}`;
+      case "TerminologySystem": {
+        // Dedup by codesystem decl name, keyed name → emitted url (D1). For
+        // synthetic locals the (name,url) pair is uniform across the library, so
+        // the first occurrence emits and every later occurrence with the SAME
+        // url is the legitimate dedup (returns ""). A later occurrence reusing
+        // the name with a DIFFERENT url is invalid CQL (one decl name cannot
+        // bind two urls): surface it on the clean error channel and still emit
+        // the conflicting decl (so the divergence is visible, not silently
+        // dropped + mis-bound to the first url).
+        const recordedUrl = emittedCodesystems.get(codesystemName);
+        if (recordedUrl !== undefined) {
+          if (recordedUrl === line.system) return "";
+          this.emitErrors.push({
+            type: "Validation",
+            kind: "emit-codesystem-url-conflict",
+            line: line.location?.start.line,
+            column: line.location?.start.column,
+            message:
+              `codesystem ${cqlIdent(codesystemName)} is declared with conflicting ` +
+              `urls: '${recordedUrl}' and '${line.system}'. A CQL codesystem ` +
+              `identifier must bind exactly one url; both declarations are emitted ` +
+              `so the conflict is visible, but the resulting CQL is invalid until ` +
+              `one declaration is renamed or its url corrected.`,
+          });
+          return `codesystem ${cqlIdent(codesystemName)}: ${cqlString(line.system)}`;
+        }
+        emittedCodesystems.set(codesystemName, line.system);
+        return `codesystem ${cqlIdent(codesystemName)}: ${cqlString(line.system)}`;
+      }
       case "TerminologyCode":
-        return `code ${cqlIdent(emitName)}: ${cqlString(line.code)} from ${cqlIdent(emitName + " System")}`;
+        return `code ${cqlIdent(emitName)}: ${cqlString(line.code)} from ${cqlIdent(codesystemName)}`;
     }
   }
 
