@@ -32,7 +32,7 @@ const CORPORA: Record<string, string> = {
   // into `Layered Basic Concepts` / `Layered Basic Asserted` /
   // `Layered Basic Inferred`. Lives under the test dir (not the corpus tree)
   // since it's a standalone single-file fixture with no imports.
-  "layered-basic": path.join(__dirname, "fixtures", "layered-basic.crl"),
+  "layered-basic": path.join(__dirname, "fixtures", "layered-basic", "layered-basic.crl"),
   // Slice 3 (lowerLocalCodes): a single multi-layer CRL library whose leaves
   // carry `code is` local source codes. The lowering pass synthesizes a local
   // codesystem (URN) + per-concept code into the Concepts layer and a retrieve

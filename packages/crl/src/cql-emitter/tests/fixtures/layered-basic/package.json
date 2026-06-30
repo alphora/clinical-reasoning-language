@@ -1,0 +1,12 @@
+{
+  "name": "layered-basic-fixture",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Slice 2 layeredEmit fixture — source-typed auto-split (RecordConcepts/RecordSource/Inferred)",
+  "crl": {
+    "canonicalBase": "http://example.org/crl/layered-basic",
+    "status": "draft",
+    "experimental": true,
+    "date": "2020-01-01T00:00:00.000Z"
+  }
+}

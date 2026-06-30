@@ -225,6 +225,12 @@ export function emitDecisionPlanDefinition(
   decisionResolver: DecisionResolver,
   isRoot: boolean,
   opts: EmitOptions = {},
+  // R2 — the `library[]` Library id SUFFIX (the conditional Interface rewiring):
+  // `"interface"` when the decision-bearing source emitted a `role:"interface"`
+  // re-export library, else `""` (the source-name-keeping Root / cms `none` path,
+  // UNCHANGED). The orchestrator computes it once per source and threads it here
+  // so the `library[]` target stays a single source of truth.
+  libraryReferenceSuffix = "",
 ): {
   resource: EmittedResource | null;
   errors: CRLError[];
@@ -302,8 +308,9 @@ export function emitDecisionPlanDefinition(
   const level = opts.capability ?? "publishable";
   const publishable = isPublishablePlus(level);
   const url = planDefinitionCanonicalUrl(metadata, decision.name);
-  // R1 — `library[]` → source-name-keeping Root Library, keyed on the policy id.
-  const libraryUrl = libraryCanonicalUrl(metadata);
+  // R2 — `library[]` → the Interface re-export Library (suffix "interface") for a
+  // decision-bearing split source, else the source-name-keeping Root (suffix "").
+  const libraryUrl = libraryCanonicalUrl(metadata, libraryReferenceSuffix);
   const planTypeCode = isRoot ? "workflow-definition" : "eca-rule";
 
   const resource: Record<string, unknown> = {

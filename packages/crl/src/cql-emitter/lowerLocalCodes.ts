@@ -444,9 +444,14 @@ export function lowerLocalCodes(
     // emitting `code "<Concept> Code": '<value>' from "<domain>"`; on the
     // LAYERED path no collision fires and the code is named bare "<Concept>"
     // (see the EMITTED IDENTIFIER NOTE in the file header).
-    syntheticTerminologies.push(
-      buildSyntheticTerminology(c.name, codeValue, localCodesystemName, urn, loc),
+    const syntheticTerminology = buildSyntheticTerminology(
+      c.name,
+      codeValue,
+      localCodesystemName,
+      urn,
+      loc,
     );
+    syntheticTerminologies.push(syntheticTerminology);
 
     // Replace the concept's `code` with a CodedFromDefinition bare-ref'ing the
     // synthetic code's NAME. Clearing `code` makes the transform idempotent.
@@ -461,6 +466,29 @@ export function lowerLocalCodes(
       retrieveResourceType: "Observation",
       location: loc,
     };
+
+    // R2 CO-INVARIANT ASSERT (F7) — the two synthetic-only discriminators
+    // `classifyStatementLayer` keys on (LocalConcepts vs RecordConcepts; LocalSource
+    // vs RecordSource) MUST be set TOGETHER for one lowered `code is` concept. The
+    // synthetic Terminology's `TerminologySystem.name` marks LocalConcepts; the
+    // synthetic `CodedFromDefinition.retrieveResourceType` marks LocalSource. A
+    // future edit that sets one without the other would silently desync the two
+    // source families (a LocalConcepts code with a RecordSource retrieve, or the
+    // inverse) → a cross-family include downstream. Fail loudly here, matching the
+    // loudness bar of the cross-family throw in `collectLayerIncludes`.
+    const hasSyntheticDomainName = syntheticTerminology.body.some(
+      (line) => line.type === "TerminologySystem" && line.name !== undefined,
+    );
+    if (!hasSyntheticDomainName || codedFrom.retrieveResourceType === undefined) {
+      throw new Error(
+        `internal invariant violated: lowered local-code concept "${c.name}" has a ` +
+          `desynced source-family discriminator — synthetic TerminologySystem.name ` +
+          `${hasSyntheticDomainName ? "set" : "UNSET"}, CodedFromDefinition.retrieveResourceType ` +
+          `${codedFrom.retrieveResourceType === undefined ? "UNSET" : "set"}. Both must be set ` +
+          `together (LocalConcepts ⟺ LocalSource) or the layered split would emit a cross-family include.`,
+      );
+    }
+
     const lowered: Concept = { ...c, definition: codedFrom };
     delete lowered.code;
     loweredConcepts.push(lowered);

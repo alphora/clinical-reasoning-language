@@ -1,11 +1,15 @@
 import { buildCRL } from "../../index";
 import {
   emitLayered,
+  emitPartitioned,
+  FULL_PARTITION,
+  interfaceConceptNames,
   isLayerSplittable,
   layersPresent,
   librariesReferencedBy,
 } from "../layeredEmit";
 import type { Layer } from "../layeredEmit";
+import { lowerLocalCodes } from "../lowerLocalCodes";
 import type { CRL } from "../../ast/types";
 
 /**
@@ -142,19 +146,22 @@ concept "Top":
 `);
     const r = emitLayered(a, "Basic");
     expect(r.success).toBe(true);
+    // R2 source-typed layers: hand-authored terminology → RecordConcepts,
+    // `coded from` → RecordSource, `defined as` → Inferred. Names are
+    // `<policyId>-<PascalLayer>` (policyId === source name for direct callers).
     expect(r.entries.map((e) => e.libraryName)).toEqual([
-      "Basic Concepts",
-      "Basic Asserted",
-      "Basic Inferred",
+      "Basic-RecordConcepts",
+      "Basic-RecordSource",
+      "Basic-Inferred",
     ]);
-    // Asserted retrieves the Concepts-layer valueset + includes it.
-    const asserted = layer(r, "Asserted")!;
-    expect(asserted.crossLibraryIncludes).toEqual(["Basic Concepts"]);
-    expect(asserted.result.result).toContain(`[Observation: "Basic Concepts"."VS"]`);
-    // Inferred refs the Asserted leaf + includes it.
+    // RecordSource retrieves the RecordConcepts-layer valueset + includes it.
+    const asserted = layer(r, "RecordSource")!;
+    expect(asserted.crossLibraryIncludes).toEqual(["Basic-RecordConcepts"]);
+    expect(asserted.result.result).toContain(`[Observation: "Basic-RecordConcepts"."VS"]`);
+    // Inferred refs the RecordSource leaf + includes it.
     const inferred = layer(r, "Inferred")!;
-    expect(inferred.crossLibraryIncludes).toEqual(["Basic Asserted"]);
-    expect(inferred.result.result).toContain(`"Basic Asserted"."Leaf"`);
+    expect(inferred.crossLibraryIncludes).toEqual(["Basic-RecordSource"]);
+    expect(inferred.result.result).toContain(`"Basic-RecordSource"."Leaf"`);
   });
 
   it("re-qualifies SELF-qualified refs (qualifier === original library) to the layer", () => {
@@ -174,15 +181,16 @@ concept "Top":
 `);
     const r = emitLayered(a, "Self");
     expect(r.success).toBe(true);
-    // The source self-qualified `"Self"."VS"` must become `"Self Concepts"."VS"`,
-    // NOT a dangling `Self."VS"` (library `Self` no longer exists after split).
-    const asserted = layer(r, "Asserted")!;
-    expect(asserted.crossLibraryIncludes).toEqual(["Self Concepts"]);
-    expect(asserted.result.result).toContain(`"Self Concepts"."VS"`);
+    // The source self-qualified `"Self"."VS"` must become
+    // `"Self-RecordConcepts"."VS"`, NOT a dangling `Self."VS"` (library `Self`
+    // no longer exists after split).
+    const asserted = layer(r, "RecordSource")!;
+    expect(asserted.crossLibraryIncludes).toEqual(["Self-RecordConcepts"]);
+    expect(asserted.result.result).toContain(`"Self-RecordConcepts"."VS"`);
     expect(asserted.result.result).not.toMatch(/\bSelf\."VS"/);
     const inferred = layer(r, "Inferred")!;
-    expect(inferred.crossLibraryIncludes).toEqual(["Self Asserted"]);
-    expect(inferred.result.result).toContain(`"Self Asserted"."Leaf"`);
+    expect(inferred.crossLibraryIncludes).toEqual(["Self-RecordSource"]);
+    expect(inferred.result.result).toContain(`"Self-RecordSource"."Leaf"`);
   });
 
   it("keeps genuinely-foreign qualified refs AND their include", () => {
@@ -205,7 +213,7 @@ concept "Top":
     const inferred = layer(r, "Inferred")!;
     // Foreign `"Shared"."External"` survives untouched + earns an include.
     // "Shared" is a simple CQL identifier so it emits unquoted: `Shared."External"`.
-    expect(inferred.crossLibraryIncludes).toEqual(["Mix Asserted", "Shared"]);
+    expect(inferred.crossLibraryIncludes).toEqual(["Mix-RecordSource", "Shared"]);
     expect(inferred.result.result).toContain(`Shared."External"`);
   });
 
@@ -222,14 +230,14 @@ concept "BMI":
     expect(isLayerSplittable(a)).toBe(true);
     const r = emitLayered(a, "Ck");
     expect(r.success).toBe(true);
-    // The terminology BMI lands in Concepts; the concept BMI in Asserted, and
-    // the concept's `coded from "BMI"` resolves (via the terminology slot) to
-    // the Concepts-layer valueset.
-    const concepts = layer(r, "Concepts")!;
+    // The terminology BMI lands in RecordConcepts; the concept BMI in
+    // RecordSource, and the concept's `coded from "BMI"` resolves (via the
+    // terminology slot) to the RecordConcepts-layer valueset.
+    const concepts = layer(r, "RecordConcepts")!;
     expect(concepts.result.result).toContain(`valueset "BMI"`);
-    const asserted = layer(r, "Asserted")!;
-    expect(asserted.crossLibraryIncludes).toEqual(["Ck Concepts"]);
-    expect(asserted.result.result).toContain(`"Ck Concepts"."BMI"`);
+    const asserted = layer(r, "RecordSource")!;
+    expect(asserted.crossLibraryIncludes).toEqual(["Ck-RecordConcepts"]);
+    expect(asserted.result.result).toContain(`"Ck-RecordConcepts"."BMI"`);
   });
 
   it("re-qualifies cross-layer narrative `definition is` refs + includes the target layer (fix 1)", () => {
@@ -260,10 +268,10 @@ concept "Top":
     const r = emitLayered(a, "Nar");
     expect(r.success).toBe(true);
     const inferred = layer(r, "Inferred")!;
-    expect(inferred.crossLibraryIncludes).toEqual(["Nar Asserted"]);
-    expect(inferred.result.result).toContain(`"Nar Asserted"."Asserted Leaf"`);
-    expect(inferred.result.result).toContain(`"Nar Asserted"."Other Asserted"`);
-    expect(inferred.result.result).toMatch(/include "Nar Asserted"/);
+    expect(inferred.crossLibraryIncludes).toEqual(["Nar-RecordSource"]);
+    expect(inferred.result.result).toContain(`"Nar-RecordSource"."Asserted Leaf"`);
+    expect(inferred.result.result).toContain(`"Nar-RecordSource"."Other Asserted"`);
+    expect(inferred.result.result).toMatch(/include "Nar-RecordSource"/);
   });
 
   it("re-qualifies a standalone `sem-not` cross-layer ref (fix 1)", () => {
@@ -284,8 +292,8 @@ concept "NotLeaf":
     const r = emitLayered(a, "Sn");
     expect(r.success).toBe(true);
     const inferred = layer(r, "Inferred")!;
-    expect(inferred.crossLibraryIncludes).toEqual(["Sn Asserted"]);
-    expect(inferred.result.result).toContain(`"Sn Asserted"."Leaf"`);
+    expect(inferred.crossLibraryIncludes).toEqual(["Sn-RecordSource"]);
+    expect(inferred.result.result).toContain(`"Sn-RecordSource"."Leaf"`);
   });
 
   it("same-layer self-qualified ref emits BARE, not `X.\"...\"` (fix 4)", () => {
@@ -321,7 +329,7 @@ concept "Top Inferred":
     expect(inferred.result.result).not.toMatch(/\bSl\."Other Inferred"/);
     // It does NOT earn a self-include (same layer).
     expect(inferred.crossLibraryIncludes).not.toContain("Sl");
-    expect(inferred.crossLibraryIncludes).not.toContain("Sl Inferred");
+    expect(inferred.crossLibraryIncludes).not.toContain("Sl-Inferred");
   });
 });
 
@@ -346,5 +354,76 @@ concept "Self":
 `);
     const refs = librariesReferencedBy(a, "Root");
     expect([...refs]).toEqual(["Other"]); // not "Root" (self), not bare locals
+  });
+});
+
+describe("layeredEmit — F3 non-source-typed decision concept hard error", () => {
+  it("emitPartitioned hard-errors when a decision when-concept is not source-typed", () => {
+    // A `code is` concept makes the library `interface`-eligible (LocalSource), but
+    // the decision references a SECOND concept "Ghost" that is representation-bearing
+    // → `classifyStatementLayer` returns null (out of scope) → NOT a re-exportable
+    // source layer. Pre-F3 it was silently skipped (emptying the Interface → silent
+    // decision demote). F3 surfaces a structured `emit-decision-concept-not-source-typed`
+    // error and emits nothing.
+    const a = ast(`library "Pol".
+
+terminology "GhostVS":
+- valueset is \`ghost-vs\`.
+
+concept "Adult Patient":
+- type is Observation.
+- value type is boolean.
+- code is \`adult\`.
+
+concept "Ghost":
+- type is Observation.
+- value type is boolean.
+- defined as "Adult Patient".
+- source representation: - type is Condition. - coded from "GhostVS".
+
+activity "Refer":
+- request CPGServiceRequest.
+
+decision "Triage":
+- when "Ghost" then recommend activity "Refer".
+`);
+    const lowered = lowerLocalCodes(a);
+    expect(lowered.errors).toEqual([]);
+    const result = emitPartitioned(lowered.ast, "Pol", "Pol", FULL_PARTITION);
+    expect(result.success).toBe(false);
+    expect(result.entries).toEqual([]);
+    expect(result.errors?.map((e) => e.kind)).toContain("emit-decision-concept-not-source-typed");
+    expect(result.errors?.[0]?.message).toContain('"Ghost"');
+  });
+});
+
+describe("layeredEmit — F5 qualified when/guard refs are skipped (not strip-and-mislookup)", () => {
+  it("interfaceConceptNames skips a qualified when-concept ref", () => {
+    // A decision `when "Other"."Flag"` carries a cross-library qualifier. Pre-F5
+    // `getRefName` stripped it to bare `Flag`, which would mis-look-up a same-named
+    // LOCAL concept. F5 skips the qualified ref entirely (v0-unsupported), so it
+    // never appears in the interface concept set. The bare `when "Local"` still does.
+    const a = ast(`library "Pol".
+
+concept "Local":
+- type is Observation.
+- value type is boolean.
+- defined as "A".
+
+concept "A":
+- type is Observation.
+- value type is boolean.
+- defined as "Local".
+
+activity "Refer":
+- request CPGServiceRequest.
+
+decision "Triage":
+- when "Other"."Flag" then recommend activity "Refer".
+- when "Local" then recommend activity "Refer".
+`);
+    const names = interfaceConceptNames(a);
+    expect(names).toContain("Local");
+    expect(names).not.toContain("Flag");
   });
 });

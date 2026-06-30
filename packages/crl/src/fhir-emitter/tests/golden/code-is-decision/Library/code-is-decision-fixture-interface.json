@@ -1,6 +1,6 @@
 {
   "resourceType": "Library",
-  "id": "code-is-decision-vs-fixture-concepts",
+  "id": "code-is-decision-fixture-interface",
   "meta": {
     "profile": [
       "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareablelibrary",
@@ -26,15 +26,15 @@
       "valueCode": "structured"
     }
   ],
-  "url": "http://example.org/crl/code-is-decision-vs/Library/code-is-decision-vs-fixture-concepts",
+  "url": "http://example.org/crl/code-is-decision/Library/code-is-decision-fixture-interface",
   "version": "1.0.0",
-  "name": "CodeIsDecisionVsConcepts",
-  "title": "Code Is Decision VS Concepts",
+  "name": "CodeIsDecisionFixtureInterface",
+  "title": "code-is-decision-fixture-Interface",
   "status": "draft",
   "experimental": true,
   "date": "2020-01-01T00:00:00.000Z",
   "publisher": "unknown",
-  "description": "D4 — partial-split author-ValueSet depends-on routing onto Concepts",
+  "description": "R2 code-is-decision fixture — source-typed split + Interface re-export FHIR closure",
   "type": {
     "coding": [
       {
@@ -46,17 +46,13 @@
   "relatedArtifact": [
     {
       "type": "depends-on",
-      "resource": "http://example.org/crl/code-is-decision-vs/ValueSet/code-is-decision-vs-fixture-gi-referral-reasons"
-    },
-    {
-      "type": "depends-on",
-      "resource": "http://example.org/crl/code-is-decision-vs/CodeSystem/code-is-decision-vs-fixture-local"
+      "resource": "http://example.org/crl/code-is-decision/Library/code-is-decision-fixture-localsource"
     }
   ],
   "content": [
     {
       "contentType": "text/cql",
-      "url": "../../cql/Code Is Decision VS Concepts.cql"
+      "url": "../../cql/code-is-decision-fixture-Interface.cql"
     }
   ]
 }

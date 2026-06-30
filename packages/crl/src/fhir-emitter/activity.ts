@@ -99,6 +99,11 @@ export function emitActivityDefinition(
   metadata: CpgMetadata,
   terminologyResolver: TerminologyResolver,
   opts: EmitOptions = {},
+  // R2 — the `library[]` Library id SUFFIX: `"interface"` when the source emitted
+  // a `role:"interface"` re-export library, else `""` (Root / cms `none` path,
+  // UNCHANGED). Threaded by the orchestrator so the `library[]` target is one
+  // source of truth across decision/activity/recommendation.
+  libraryReferenceSuffix = "",
 ): {
   resource: EmittedResource | null;
   errors: CRLError[];
@@ -152,9 +157,9 @@ export function emitActivityDefinition(
   const level = opts.capability ?? "publishable";
   const publishable = isPublishablePlus(level);
   const url = activityDefinitionCanonicalUrl(metadata, activity.name);
-  // R1 — `library[]` points at the source-name-keeping Root Library (empty
-  // idSuffix), now keyed on the policy id.
-  const libraryUrl = libraryCanonicalUrl(metadata);
+  // R2 — `library[]` → the Interface re-export Library (suffix "interface") for a
+  // decision-bearing split source, else the source-name-keeping Root (suffix "").
+  const libraryUrl = libraryCanonicalUrl(metadata, libraryReferenceSuffix);
 
   const doNotPerform = activity.body.request.doNotPerform === true;
 
@@ -195,9 +200,34 @@ export function emitActivityDefinition(
   if (metadata.jurisdiction.length > 0) resource.jurisdiction = metadata.jurisdiction;
   if (metadata.useContext.length > 0) resource.useContext = metadata.useContext;
 
+  // F4 (impl-review) — guard the activity-`with`-terminology → Interface edge.
+  // When this activity's `library[]` is rewired to the Interface re-export
+  // (`libraryReferenceSuffix === "interface"`, the decision-bearing split path)
+  // AND its `with` clause references a TERMINOLOGY, the dynamicValue's CQL
+  // identifier would resolve against the Interface library — but the Interface
+  // re-exports CONCEPTS, not terminologies, so the reference dangles. This is a
+  // deferred edge (the deliverable's activities are text dispositions with no
+  // `with` terminology); guard it loudly rather than emit a dangling reference.
+  // Do NOT solve the general case here.
+  const withClause = activity.body.withClause;
+  if (
+    libraryReferenceSuffix === "interface" &&
+    withClause?.terminologyReference !== undefined
+  ) {
+    errors.push({
+      type: "Validation",
+      kind: "emit-activity-terminology-interface-unsupported",
+      message:
+        `activity "${activity.name}" references terminology "${refDisplay(withClause.terminologyReference)}" ` +
+        "via `with`; terminology references from an Interface-scoped activity are not yet supported.",
+      line: withClause.location?.start.line,
+      column: withClause.location?.start.column,
+    });
+    return { resource: null, errors, unmatched };
+  }
+
   // dynamicValue handling — only emit when the `with` clause has a
   // terminology reference AND the profile has a non-null dynamicValuePath.
-  const withClause = activity.body.withClause;
   if (withClause) {
     const dvResult = buildDynamicValue(activity, withClause, profile, terminologyResolver);
     errors.push(...dvResult.errors);
@@ -331,6 +361,8 @@ export function emitActivityDefinitionsForLibrary(
   metadata: CpgMetadata,
   terminologyResolver: TerminologyResolver,
   opts: EmitOptions = {},
+  // R2 — the conditional `library[]` Interface suffix (see emitActivityDefinition).
+  libraryReferenceSuffix = "",
 ): {
   resources: EmittedResource[];
   errors: CRLError[];
@@ -365,7 +397,7 @@ export function emitActivityDefinitionsForLibrary(
     const id = capSlug(`${base}-${slugify(a.name)}`);
     if ((slugMap.get(id)?.length ?? 0) > 1) continue;
     const { resource, errors: rErrors, unmatched: rUnmatched } =
-      emitActivityDefinition(a, libraryName, metadata, terminologyResolver, opts);
+      emitActivityDefinition(a, libraryName, metadata, terminologyResolver, opts, libraryReferenceSuffix);
     if (resource) resources.push(resource);
     errors.push(...rErrors);
     unmatched.push(...rUnmatched);

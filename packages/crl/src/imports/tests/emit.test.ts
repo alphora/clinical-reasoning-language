@@ -138,9 +138,12 @@ describe("emitCQLImports (per-CRL v2.1.0)", () => {
     expect(bCql).toMatch(/valueset "BMI"/);
   });
 
-  it("auto-splits a multi-layer library into dependency-ordered layer libraries", () => {
-    // Slice 2 (layeredEmit): a SINGLE multi-layer library emits as separate
-    // `<Lib> Concepts` / `<Lib> Asserted` / `<Lib> Inferred` CQL libraries.
+  it("auto-splits a multi-layer library into dependency-ordered source-typed layer libraries", () => {
+    // R2 (layeredEmit): a SINGLE multi-layer library emits as separate
+    // source-typed `<policyId>-RecordConcepts` / `-RecordSource` / `-Inferred`
+    // CQL libraries (the fixture is hand-authored terminology + `coded from` +
+    // `defined as`, i.e. the RECORD source family). Names use the policy id
+    // (package.json `name`, "layered-basic-fixture").
     const root = path.join(
       __dirname,
       "..",
@@ -148,22 +151,23 @@ describe("emitCQLImports (per-CRL v2.1.0)", () => {
       "cql-emitter",
       "tests",
       "fixtures",
+      "layered-basic",
       "layered-basic.crl",
     );
     const result = emitCQLImports(root);
     expect(result.success).toBe(true);
     const names = result.cqlByLibrary.map((e) => e.libraryName).sort();
     expect(names).toEqual([
-      "Layered Basic Asserted",
-      "Layered Basic Concepts",
-      "Layered Basic Inferred",
+      "layered-basic-fixture-Inferred",
+      "layered-basic-fixture-RecordConcepts",
+      "layered-basic-fixture-RecordSource",
     ]);
-    const asserted = findLib(result, "Layered Basic Asserted") ?? "";
-    expect(asserted).toMatch(/include "Layered Basic Concepts"/);
-    expect(asserted).toMatch(/"Layered Basic Concepts"\."Example Valueset A"/);
-    const inferred = findLib(result, "Layered Basic Inferred") ?? "";
-    expect(inferred).toMatch(/include "Layered Basic Asserted"/);
-    expect(inferred).toMatch(/"Layered Basic Asserted"\."Asserted Concept A"/);
+    const asserted = findLib(result, "layered-basic-fixture-RecordSource") ?? "";
+    expect(asserted).toMatch(/include "layered-basic-fixture-RecordConcepts"/);
+    expect(asserted).toMatch(/"layered-basic-fixture-RecordConcepts"\."Example Valueset A"/);
+    const inferred = findLib(result, "layered-basic-fixture-Inferred") ?? "";
+    expect(inferred).toMatch(/include "layered-basic-fixture-RecordSource"/);
+    expect(inferred).toMatch(/"layered-basic-fixture-RecordSource"\."Asserted Concept A"/);
   });
 
   it("fails loudly when a library qualified-refs an auto-split (multi-layer) library", () => {
@@ -176,21 +180,33 @@ describe("emitCQLImports (per-CRL v2.1.0)", () => {
     expect(result.errors?.[0]?.kind).toBe("emit-cross-library-ref-into-split-library");
     // Match the real message: the referrer + the split target are both named.
     expect(result.errors?.[0]?.message).toMatch(
-      /Library "Root" qualified-refs "Multi".*multi-layer library that emit auto-splits/,
+      /Library "Root" qualified-refs "Multi".*library that emit auto-splits/,
     );
   });
 
-  it("fails loudly when a generated layer name collides with a real sibling library (fix 3)", () => {
-    // A multi-layer `library "X"` auto-splits into `X Concepts` / `X Asserted`
-    // / `X Inferred`. A separate real `library "X Asserted"` in the closure
-    // would clash with the generated `X Asserted` name (same CQL id/filename).
-    // The preflight must error with kind `layered-name-collision`.
+  it("R2: source-name layer collision class is eliminated by policy-id naming (real `X Asserted` sibling no longer clashes)", () => {
+    // PRE-R2 this fixture FAILED with `layered-name-collision`: the multi-layer
+    // `library "X"` auto-split into `X Concepts` / `X Asserted` / `X Inferred`,
+    // and the generated `X Asserted` clashed with the real sibling `library
+    // "X Asserted"`. Under R2 the layer libraries are named from the POLICY ID
+    // (`crl-test-fixture-RecordConcepts/-RecordSource/-Inferred`), so they can
+    // NEVER collide with a source-derived sibling name — the whole collision
+    // class is gone. The closure now emits cleanly; `Top`'s foreign ref to
+    // "X Asserted" survives as a cross-library include on the Inferred layer.
+    // (The `layered-name-collision` preflight remains correct for a genuine
+    // policy-id-based clash; this fixture simply no longer triggers it.)
     const root = path.join(FIXTURES, "layered-name-collision", "root.crl");
     const result = emitCQLImports(root);
-    expect(result.success).toBe(false);
-    expect(result.cqlByLibrary).toHaveLength(0);
-    expect(result.errors?.[0]?.kind).toBe("layered-name-collision");
-    expect(result.errors?.[0]?.message).toMatch(/"X Asserted"/);
+    expect(result.success).toBe(true);
+    const names = result.cqlByLibrary.map((e) => e.libraryName).sort();
+    expect(names).toEqual([
+      "X Asserted",
+      "crl-test-fixture-Inferred",
+      "crl-test-fixture-RecordConcepts",
+      "crl-test-fixture-RecordSource",
+    ]);
+    const inferred = findLib(result, "crl-test-fixture-Inferred") ?? "";
+    expect(inferred).toMatch(/include "X Asserted"/);
   });
 
   it("a MIXED `code is` + `defined as` concept is a hard error (slice 3)", () => {
@@ -208,40 +224,48 @@ describe("emitCQLImports (per-CRL v2.1.0)", () => {
     expect(result.errors?.[0]?.message).toMatch(/Mixed Concept/);
   });
 
-  it("slice 4c: a `decision` + `code is` library PARTIAL-splits into `<Lib> Concepts` + `<Lib>` (root)", () => {
+  it("R2: a `decision` + `code is` library INTERFACE-splits into source-typed layers + an Interface re-export library", () => {
     // rx501-147-shaped motivating case. A `decision` disqualifies the FULL
-    // 3-way layered auto-split, but the library carries concept-level `code is`,
-    // so slice 4c PARTIAL-splits it: the terminology/codes move to a sibling
-    // `<Lib> Concepts` library, and the retrieves/context stay in the ROOT
-    // library which KEEPS the source name `<Lib>` (so PlanDef `library[]` refs
-    // still resolve). With the codes now in a separate library, detectCollisions
-    // sees no same-library collision → the ` Code` suffix DROPS (bare code names).
+    // source-typed auto-split, but the library carries concept-level `code is`,
+    // so R2 takes the `interface` split: the lowered local codes/codesystem land
+    // in `<policyId>-LocalConcepts`, the retrieves in `<policyId>-LocalSource`,
+    // and the decision/action-guard surface is re-published in a synthesized
+    // `<policyId>-Interface` library (pre-qualified to each concept's OWN source
+    // layer). The FHIR lane (next half) rewires PlanDef `library[]` onto the
+    // Interface canonical. Names use the policy id (package.json "crl-test-fixture").
     const root = path.join(FIXTURES, "code-is-decision", "root.crl");
     const result = emitCQLImports(root);
     expect(result.success).toBe(true);
 
-    // TWO emitted libraries — the Concepts sibling + the Root (source-named).
     const names = result.cqlByLibrary.map((e) => e.libraryName).sort();
-    expect(names).toEqual(["Code Is Decision", "Code Is Decision Concepts"]);
+    expect(names).toEqual([
+      "crl-test-fixture-Interface",
+      "crl-test-fixture-LocalConcepts",
+      "crl-test-fixture-LocalSource",
+    ]);
 
     // Manifest (A→E contract): role + sourceLibraryName + includes.
     const conceptsEntry = result.cqlByLibrary.find(
-      (e) => e.libraryName === "Code Is Decision Concepts",
+      (e) => e.libraryName === "crl-test-fixture-LocalConcepts",
     );
-    const rootEntry = result.cqlByLibrary.find((e) => e.libraryName === "Code Is Decision");
+    const sourceEntry = result.cqlByLibrary.find(
+      (e) => e.libraryName === "crl-test-fixture-LocalSource",
+    );
+    const interfaceEntry = result.cqlByLibrary.find(
+      (e) => e.libraryName === "crl-test-fixture-Interface",
+    );
     expect(conceptsEntry?.role).toBe("concepts");
     expect(conceptsEntry?.sourceLibraryName).toBe("Code Is Decision");
     expect(conceptsEntry?.includes).toEqual([]);
-    expect(rootEntry?.role).toBe("root");
-    expect(rootEntry?.sourceLibraryName).toBe("Code Is Decision");
-    expect(rootEntry?.includes).toEqual(["Code Is Decision Concepts"]);
+    expect(sourceEntry?.role).toBe("layer");
+    expect(sourceEntry?.includes).toEqual(["crl-test-fixture-LocalConcepts"]);
+    expect(interfaceEntry?.role).toBe("interface");
+    expect(interfaceEntry?.sourceLibraryName).toBe("Code Is Decision");
+    expect(interfaceEntry?.includes).toEqual(["crl-test-fixture-LocalSource"]);
 
-    // Concepts library: ONE shared codesystem decl + BARE code names (NO ` Code`
-    // suffix — codes live alone here, no co-resident concept to collide with).
+    // LocalConcepts library: ONE shared codesystem decl + BARE code names (NO
+    // ` Code` suffix — codes live alone here, no co-resident concept to collide).
     const concepts = conceptsEntry?.cql ?? "";
-    // R1 — the local-domain URL now slugs from the project POLICY ID (package.json
-    // `name`, "crl-test-fixture"), NOT the library name; the codesystem DECL name
-    // ("Code Is Decision Local Codes") still derives from the library name.
     expect(concepts).toMatch(
       /codesystem "Code Is Decision Local Codes": 'urn:crl:codesystem:crl-test-fixture-local'/,
     );
@@ -254,21 +278,29 @@ describe("emitCQLImports (per-CRL v2.1.0)", () => {
     );
     expect(concepts).not.toMatch(/ Code"/);
 
-    // Root library: include of the Concepts sibling + cross-library-qualified
-    // retrieves (NOT inline same-library refs).
-    const rootCql = rootEntry?.cql ?? "";
-    expect(rootCql).toMatch(/include "Code Is Decision Concepts"/);
-    expect(rootCql).toMatch(
-      /\[Observation: "Code Is Decision Concepts"\."Adult Patient"\]/,
+    // LocalSource library: include of the LocalConcepts sibling + cross-library-
+    // qualified retrieves, always `[Observation: …]` (local-source rule).
+    const sourceCql = sourceEntry?.cql ?? "";
+    expect(sourceCql).toMatch(/include "crl-test-fixture-LocalConcepts"/);
+    expect(sourceCql).toMatch(
+      /\[Observation: "crl-test-fixture-LocalConcepts"\."Adult Patient"\]/,
     );
-    // Local-source `code is` retrieves are ALWAYS `[Observation: …]` regardless
-    // of the concept's `type is Condition` (the `type is` is retained on the AST
-    // for the Phase-2/3 inferred transform, not on the local-source retrieve).
-    expect(rootCql).toMatch(
-      /\[Observation: "Code Is Decision Concepts"\."Active Crohns Disease"\]/,
+    expect(sourceCql).toMatch(
+      /\[Observation: "crl-test-fixture-LocalConcepts"\."Active Crohns Disease"\]/,
     );
-    // No codesystem/code declarations leaked into the root.
-    expect(rootCql).not.toMatch(/^codesystem /m);
+    expect(sourceCql).not.toMatch(/^codesystem /m);
+
+    // Interface library: ONE re-export — the decision `when` concept only
+    // ("Active Crohns Disease"), pre-qualified to its OWN source layer
+    // (LocalSource). "Adult Patient" is NOT referenced by the decision, so it is
+    // NOT re-exported.
+    const interfaceCql = interfaceEntry?.cql ?? "";
+    expect(interfaceCql).toMatch(/include "crl-test-fixture-LocalSource"/);
+    expect(interfaceCql).toMatch(
+      /define "Active Crohns Disease":\s*"crl-test-fixture-LocalSource"\."Active Crohns Disease"/,
+    );
+    expect(interfaceCql).not.toMatch(/define "Adult Patient"/);
+    expect(interfaceCql).not.toMatch(/^codesystem /m);
   });
 
   it("cross-library local-codesystem URN collision → emit-local-codesystem-urn-collision (slice 3)", () => {
@@ -336,9 +368,11 @@ describe("emitCQLImports (per-CRL v2.1.0)", () => {
 
   // ── Slice 4c — the shared split-plan ────────────────────────────────────────
 
-  it("computeSplitPlan: decision-bearing + `code is` library → `partial` with [lib, `<lib> Concepts`]", () => {
-    // A decision disqualifies the FULL split (isLayerSplittable=false), but the
-    // concept-level `code is` (localCodesCount > 0) triggers the PARTIAL split.
+  it("computeSplitPlan: decision-bearing + `code is` library → `interface` (source-typed split + Interface)", () => {
+    // R2 — a decision disqualifies the FULL split (isLayerSplittable=false), but
+    // the concept-level `code is` (localCodesCount > 0) triggers the `interface`
+    // split: the source-typed layers (LocalConcepts + LocalSource) PLUS the
+    // synthesized `<policyId>-Interface` library (the decision `when` surface).
     const src = parse(`library "Pol".
 
 concept "Adult Patient":
@@ -356,24 +390,83 @@ decision "Triage":
     expect(lowered.errors).toEqual([]);
     expect(lowered.localCodes.length).toBe(1);
 
-    const plan = computeSplitPlan(lowered.ast, "Pol", lowered.localCodes.length);
-    expect(plan.kind).toBe("partial");
-    expect(plan.emittedLibraryNames).toEqual(["Pol", "Pol Concepts"]);
+    // policyId === "Pol" (passed explicitly; a direct caller uses the source name).
+    const plan = computeSplitPlan(lowered.ast, "Pol", "Pol", lowered.localCodes.length);
+    expect(plan.kind).toBe("interface");
+    expect(plan.emittedLibraryNames).toEqual([
+      "Pol-LocalConcepts",
+      "Pol-LocalSource",
+      "Pol-Interface",
+    ]);
     expect(plan.partition).toBeDefined();
+    expect(plan.policyId).toBe("Pol");
   });
 
-  it("the collision preflight registers BOTH `<lib>` and `<lib> Concepts` for a partial split (sibling-name clash → fail)", () => {
-    // A partial-split library "Pol" PLUS a REAL sibling `library "Pol Concepts"`
-    // in the same closure: the preflight now registers the generated `Pol
-    // Concepts` name, so it collides with the real one and fails loudly (before,
-    // only `Pol` was registered for the non-splittable entry and the real
-    // sibling silently clobbered the generated one).
+  it("F1: a NON-decision local-code, non-splittable library routes to `none` (statements preserved, not full-split)", () => {
+    // F1 — a library with concept-level `code is` BUT no Decision, that also
+    // carries an Activity (so it is NOT layer-splittable: the Activity is
+    // unclassifiable). Pre-F1 the `interface` branch fired on `localCodesCount > 0`
+    // alone and the FULL partition would SILENTLY DROP the Activity. F1 gates the
+    // `interface` kind on `hasDecision`, so this must route to `none` (per-CRL),
+    // which preserves ALL statements as one library.
+    const src = parse(`library "Pol".
+
+concept "Adult Patient":
+- type is Observation.
+- value type is boolean.
+- code is \`adult\`.
+
+activity "Refer":
+- request CPGServiceRequest.
+`);
+    const lowered = lowerLocalCodes(src);
+    expect(lowered.errors).toEqual([]);
+    expect(lowered.localCodes.length).toBe(1);
+
+    const plan = computeSplitPlan(lowered.ast, "Pol", "Pol", lowered.localCodes.length);
+    expect(plan.kind).toBe("none");
+    expect(plan.emittedLibraryNames).toEqual(["Pol"]);
+    // F7 — `none` carries policyId so callers don't lean on a kind-load-bearing `!`.
+    expect(plan.policyId).toBe("Pol");
+  });
+
+  it("F1 end-to-end: a non-decision local-code + Activity library emits ONE library keeping every statement", () => {
+    // The per-CRL (`none`) emit must keep the Activity-bearing local-code library
+    // as a single CQL library named after the source (no source-typed fan-out,
+    // no dropped Activity).
+    const root = path.join(FIXTURES, "non-decision-localcode-activity", "root.crl");
+    const result = emitCQLImports(root);
+    expect(result.success).toBe(true);
+    const names = result.cqlByLibrary.map((e) => e.libraryName).sort();
+    expect(names).toEqual(["Pol"]);
+    const cql = findLib(result, "Pol") ?? "";
+    // The lowered local code is present (the `code is` lowering still ran) AND the
+    // concept define is present — both in the ONE per-CRL library.
+    expect(cql).toMatch(/define "Adult Patient"/);
+  });
+
+  it("R2: source-name `<lib> Concepts` collision class is eliminated by policy-id naming (interface-split + real `Pol Concepts` sibling no longer clash)", () => {
+    // PRE-R2 this fixture FAILED: the partial-split of "Pol" generated a `Pol
+    // Concepts` sibling that clashed with the REAL `library "Pol Concepts"`.
+    // Under R2 "Pol" takes the `interface` split and its layers are named from
+    // the POLICY ID (`crl-test-fixture-LocalConcepts/-LocalSource/-Inferred/
+    // -Interface`), so they can never collide with the source-derived `Pol
+    // Concepts` sibling — the collision class is gone. The closure emits cleanly;
+    // `From Sibling`'s foreign ref to "Pol Concepts" survives as a cross-library
+    // include on the Inferred layer.
     const root = path.join(FIXTURES, "partial-concepts-name-collision", "root.crl");
     const result = emitCQLImports(root);
-    expect(result.success).toBe(false);
-    expect(result.cqlByLibrary).toHaveLength(0);
-    expect(result.errors?.[0]?.kind).toBe("layered-name-collision");
-    expect(result.errors?.[0]?.message).toMatch(/Pol Concepts/);
+    expect(result.success).toBe(true);
+    const names = result.cqlByLibrary.map((e) => e.libraryName).sort();
+    expect(names).toEqual([
+      "Pol Concepts",
+      "crl-test-fixture-Inferred",
+      "crl-test-fixture-Interface",
+      "crl-test-fixture-LocalConcepts",
+      "crl-test-fixture-LocalSource",
+    ]);
+    const inferred = result.cqlByLibrary.find((e) => e.libraryName === "crl-test-fixture-Inferred");
+    expect(inferred?.includes).toContain("Pol Concepts");
   });
 
   it("idempotency: re-lowering an already-lowered synthetic Concepts AST is a no-op", () => {

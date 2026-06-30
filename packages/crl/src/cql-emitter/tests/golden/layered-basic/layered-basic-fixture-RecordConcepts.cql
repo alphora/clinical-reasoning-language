@@ -1,4 +1,4 @@
-library "Layered Basic Concepts"
+library "layered-basic-fixture-RecordConcepts"
 
 using FHIR version '4.0.1'
 

@@ -16,8 +16,8 @@ import {
   isLayerSplittable,
   layerLibraryNamesFor,
   librariesReferencedBy,
+  interfaceConceptNames,
   FULL_PARTITION,
-  PARTIAL_PARTITION,
 } from "../cql-emitter/layeredEmit";
 import type { Partition } from "../cql-emitter/layeredEmit";
 import { lowerLocalCodes, localCodeSystemUrl } from "../cql-emitter/lowerLocalCodes";
@@ -65,7 +65,20 @@ export interface PerLibraryEmit {
   // result, empty for the per-CRL path). The FHIR orchestrator (NOT this lane)
   // reads these to materialize the matching FHIR resources.
   sourceLibraryName: string;
-  role: "root" | "concepts" | "layer";
+  // R2-mechanism — the manifest role the FHIR orchestrator routes on:
+  //   - `root`     : the per-CRL (`none`) emit OR the partial-split Root (keeps
+  //                  the source name).
+  //   - `concepts` : the terminology-owning entry (partial Concepts sibling OR
+  //                  full-split LocalConcepts/RecordConcepts — owns the
+  //                  CodeSystem/author-ValueSet depends-on edges).
+  //   - `layer`    : a full-split source/inference layer (LocalSource /
+  //                  RecordSource / Inferred) that consumes lower layers.
+  //   - `interface`: the synthesized `<policyId>-Interface` re-export library
+  //                  (decision/action-guard surface). The FHIR lane rewires
+  //                  decision/activity/recommendation `library[]` onto it and
+  //                  re-keys the `decision-root-library-missing` guard to this
+  //                  role — that wiring is the FHIR half; here we just expose it.
+  role: "root" | "concepts" | "layer" | "interface";
   includes: string[];
 }
 
@@ -123,77 +136,110 @@ function buildAstParameterIndex(emitClosure: RegistryEntry[]): Map<string, Map<s
 }
 
 /**
- * Slice 4c — the ONE shared split-plan classifier consumed by BOTH the
- * preflights (collision registration) AND the emit loop, so split-vs-no-split is
- * decided in exactly one place (no gate-in-two-places drift).
+ * The ONE shared split-plan classifier consumed by BOTH the preflights (collision
+ * registration) AND the emit loop, so split-vs-no-split is decided in exactly one
+ * place (no gate-in-two-places drift).
  *
- *   - `full`    : a layer-splittable multi-layer library (NO Decision — see the
- *                 invariant below) → FULL 3-way split. `emittedLibraryNames` =
- *                 `layerLibraryNamesFor(...)`.
- *   - `partial` : NOT layer-splittable (e.g. decision-bearing) but carries
- *                 concept-level `code is` (`localCodesCount > 0`) → 2-way
- *                 Concepts/Root split. `emittedLibraryNames` = `[lib, "<lib>
- *                 Concepts"]`.
- *   - `none`    : neither → the unchanged per-CRL path. `emittedLibraryNames` =
- *                 `[lib]`.
+ * R2-mechanism — the split kinds:
+ *   - `full`      : a layer-splittable multi-layer library (NO Decision) → FULL
+ *                   source-typed split. `emittedLibraryNames` =
+ *                   `layerLibraryNamesFor(ast, policyId)`.
+ *   - `interface` : a DECISION-bearing library WITH concept-level `code is`
+ *                   (`hasDecision && localCodesCount > 0`, AND not
+ *                   layer-splittable) → FULL source-typed split PLUS a
+ *                   synthesized `<policyId>-Interface` library (the decision/
+ *                   action-guard re-export surface). This REPLACES the pre-R2
+ *                   `partial` (Concepts/Root) path for the deliverable.
+ *                   `emittedLibraryNames` = the source-typed layer names + the
+ *                   Interface name (when interface concepts exist). The Decision
+ *                   gate (F1) is load-bearing: the FULL partition drops Activity/
+ *                   Parameter statements, so a NON-decision local-code library
+ *                   must route to `none`, not `interface`.
+ *   - `none`      : neither — a decision-bearing library with NO local code
+ *                   (cms), OR a non-decision local-code library (Activity/
+ *                   Parameter present) → the unchanged per-CRL path, which
+ *                   preserves ALL statements. `emittedLibraryNames` = `[lib]`.
+ *
+ * `policyId` is the EMITTED-name base (package.json `name`, threaded R1); the
+ * emitted layer/interface names are `<policyId>-<PascalLayer>`. `lib` (the source
+ * CRL library name) stays the self-ref identity inside the partition. When the
+ * policy id is absent (direct callers), the caller passes `lib` as the policyId.
  *
  * `localCodesCount` is the count of concept-level `code is` codes the library
  * lowered (from `lowerLocalCodes`), threaded by the caller from the SAME lowered
  * AST that is emitted — so the plan can't drift from the emit.
  *
- * INVARIANT (slice 4c [critical]): a decision-bearing library is NEVER `full`.
- * `isLayerSplittable` returns false the moment it hits a Decision (its
- * `classifyStatementLayer === null` → return false), so `full` implies
- * NO-Decision. This is load-bearing: the partial Root keeps the SOURCE library
- * name `<lib>`, and that contract is only safe because `full` (which renames
- * EVERYTHING to `<lib> <layer>`) can never fire on a decision-bearing library.
+ * NOTE — the pre-R2 `partial` split kind / `PARTIAL_PARTITION` is GONE (deleted
+ * in F1, no caller produced it under R2; no-legacy stance). The pre-R2 critical
+ * invariant ("a decision-bearing library is NEVER `full`") still holds: a
+ * decision-bearing library is `interface` or `none`, never `full` — `full` is
+ * reached only via `isLayerSplittable`, which is false the moment it sees a
+ * Decision. The D5 throw below guards a FUTURE `isLayerSplittable` regression.
  */
-export type SplitKind = "full" | "partial" | "none";
+export type SplitKind = "full" | "interface" | "none";
 
 export interface SplitPlan {
   kind: SplitKind;
   emittedLibraryNames: string[];
   partition?: Partition;
+  /** The EMITTED-name base for the partition (policy id, or `lib` fallback). */
+  policyId?: string;
 }
 
 export function computeSplitPlan(
   ast: CRL,
   lib: string,
+  policyId: string,
   localCodesCount: number,
 ): SplitPlan {
   if (isLayerSplittable(ast)) {
     // D5 — UNREACHABLE: `isLayerSplittable` returns false at the first Decision
     // (its `classifyStatementLayer` is null for a Decision → the splittability
     // loop bails), so reaching this branch with a Decision present is impossible
-    // by construction. This is NOT a structured emit error (it can't fire on any
-    // real input); it is an impossible-assert that guards a FUTURE refactor of
-    // `isLayerSplittable` from silently violating the partial-Root-keeps-source-
-    // name contract. We keep the throw (rather than a structured CRLError) BECAUSE
-    // it is truly unreachable — over-engineering a soft-error channel for a
-    // branch no input can hit would be the wrong shape. The MCP path has no
-    // try/catch here, but that is fine: this throw cannot fire on valid emit input.
+    // by construction. Truly-unreachable invariant-throw guarding a FUTURE
+    // `isLayerSplittable` refactor; not a structured emit error (no input hits it).
     if (ast.statements.some((s) => s.type === "Decision")) {
       throw new Error(
         `internal invariant violated: library "${lib}" is both isLayerSplittable ` +
           `and decision-bearing — a decision-bearing library must never take the ` +
-          `FULL split (its Root keeps the source name "${lib}", which the full ` +
-          `split would rename away).`,
+          `FULL split.`,
       );
     }
     return {
       kind: "full",
-      emittedLibraryNames: layerLibraryNamesFor(ast, lib),
+      emittedLibraryNames: layerLibraryNamesFor(ast, policyId),
       partition: FULL_PARTITION,
+      policyId,
     };
   }
-  if (localCodesCount > 0) {
+  // R2 — a DECISION-bearing library WITH concept-level `code is` takes the FULL
+  // source-typed split PLUS the synthesized Interface library. The interface
+  // concepts are the decision `when`/action-guard surface; when present they add
+  // the `<policyId>-Interface` library to the emitted-name set.
+  //
+  // F1 (impl-review) — the `interface` kind requires BOTH a Decision AND local
+  // code (and, by reaching here, NOT layer-splittable). The FULL source-typed
+  // split partition's `classify` returns null for Activity / Parameter
+  // statements, so `emitPartitioned` would SILENTLY DROP them. A non-decision
+  // local-code, non-splittable library (e.g. a `code is` concept alongside an
+  // Activity or Parameter) therefore MUST stay on the per-CRL (`none`) path,
+  // which preserves ALL statements as one library. Only a decision-bearing
+  // library is safe to fan into source-typed layers + Interface, because its
+  // decision surface IS the thing the Interface re-exports — and the per-CRL
+  // path is the fallback that keeps every statement.
+  const hasDecision = ast.statements.some((s) => s.type === "Decision");
+  if (hasDecision && localCodesCount > 0) {
+    const interfaceConcepts = interfaceConceptNames(ast);
     return {
-      kind: "partial",
-      emittedLibraryNames: [lib, `${lib} Concepts`],
-      partition: PARTIAL_PARTITION,
+      kind: "interface",
+      emittedLibraryNames: layerLibraryNamesFor(ast, policyId, interfaceConcepts),
+      partition: FULL_PARTITION,
+      policyId,
     };
   }
-  return { kind: "none", emittedLibraryNames: [lib] };
+  // `none` — the unchanged per-CRL path. Carry the policyId so callers don't lean
+  // on `plan.policyId!` being load-bearing-by-kind (F7 cleanup).
+  return { kind: "none", emittedLibraryNames: [lib], policyId };
 }
 
 export function emitCQLImports(rootPath: string): EmitImportsResult {
@@ -341,22 +387,32 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
   const crossLibraryParameters = buildAstParameterIndex(emitClosure);
 
   // Slice 2 (layeredEmit) — the set of library NAMES that will be auto-split
-  // into layer libraries. A FULL-split library's ORIGINAL name no longer exists
+  // into layer libraries. A split library's ORIGINAL name no longer exists
   // as an emitted CQL library, so any OTHER library that qualified-refs it would
   // dangle. Cross-library referrer-rewriting (rewrite `"X"."Y"` to the layer
   // Y landed in) is the DEFERRED routing slice; here we detect the situation
   // and fail loudly rather than emit broken CQL.
   //
-  // Slice 4c — PARTIAL-split libraries are deliberately NOT added here: the
-  // partial Root KEEPS the source name `<lib>` (its whole point — PlanDef/
-  // ActivityDef `library[]` refs slug from the source name), so a foreign ref to
-  // `"<lib>"."X"` still resolves to the Root library. (KNOWN LIMITATION: a
-  // foreign ref into the MOVED terminology — `"<lib>"."<aTerminology>"` — would
-  // now dangle, since terminologies relocated to `<lib> Concepts`. That edge is
-  // out of deliverable scope; do NOT break valid root refs to guard it.)
+  // F2 (impl-review) — register a source name whose emit makes the SOURCE-NAMED
+  // library DISAPPEAR. Route through the shared `computeSplitPlan`: BOTH `full`
+  // (layer-splittable, no decision) AND `interface` (decision-bearing + local
+  // code) fan the source into policy-id-named layer libraries — the source name
+  // `<lib>` is NO LONGER an emitted CQL library under either. A sibling that
+  // qualified-refs `"<lib>"."X"` would then dangle, so both must be registered
+  // here so the `emit-cross-library-ref-into-split-library` guard below fires.
+  // (`none` keeps the source name, so it is NOT registered.) Pre-F2 only `full`
+  // (via `isLayerSplittable`) was registered, leaving an interface-split source's
+  // foreign referrers dangling silently.
   const splitLibraryNames = new Set<string>();
   for (const entry of emitClosure) {
-    if (entry.name && isLayerSplittable(entry.ast)) splitLibraryNames.add(entry.name);
+    if (!entry.name) continue;
+    const plan = computeSplitPlan(
+      entry.ast,
+      entry.name,
+      localDomainId ?? entry.name,
+      localCodesCountFor(entry.name),
+    );
+    if (plan.kind === "full" || plan.kind === "interface") splitLibraryNames.add(entry.name);
   }
   if (splitLibraryNames.size > 0) {
     for (const entry of emitClosure) {
@@ -375,11 +431,12 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
                 kind: "emit-cross-library-ref-into-split-library",
                 message:
                   `Library "${entry.name}" qualified-refs "${ref}", but "${ref}" is a ` +
-                  `multi-layer library that emit auto-splits into layer libraries ` +
-                  `("${ref} Concepts" / "${ref} Asserted" / "${ref} Inferred"). ` +
+                  `library that emit auto-splits into policy-id-named layer libraries ` +
+                  `(its source name no longer exists as an emitted CQL library). ` +
                   `Cross-library references into an auto-split library are not yet ` +
                   `supported (referrer re-qualification is a later slice). Reference ` +
-                  `the specific layer library directly, or keep "${ref}" single-layer.`,
+                  `the specific layer library directly, or keep "${ref}" single-layer ` +
+                  `(no decision + no concept-level \`code is\`).`,
               },
             ],
           };
@@ -409,13 +466,17 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
     };
     for (const entry of emitClosure) {
       if (entry.name === null || entry.name === "") continue;
-      // Slice 4c — register the FULL emitted-name set for this entry via the
-      // shared split-plan. A `partial` entry now registers BOTH `<lib>` AND
-      // `<lib> Concepts` (previously only `<lib>` was registered for non-
-      // splittable entries, letting a real sibling `<lib> Concepts` clobber the
-      // generated one silently). `full` registers the layer names; `none`
-      // registers just `<lib>` — same as before for those kinds.
-      const plan = computeSplitPlan(entry.ast, entry.name, localCodesCountFor(entry.name));
+      // R2 — register the FULL emitted-name set for this entry via the shared
+      // split-plan. `full`/`interface` register the source-typed layer names (+
+      // the Interface name for `interface`); `none` registers just `<lib>`. The
+      // emitted-name base is the policy id (`localDomainId`), falling back to the
+      // source library name for metadata-less callers.
+      const plan = computeSplitPlan(
+        entry.ast,
+        entry.name,
+        localDomainId ?? entry.name,
+        localCodesCountFor(entry.name),
+      );
       const source =
         plan.kind === "none"
           ? `library "${entry.name}"`
@@ -456,16 +517,16 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
     // invalid CQL.
     if (entry.name === null || entry.name === "") continue;
 
-    // Slice 4c — ONE shared split-plan drives BOTH the preflight (above) and
-    // this emit loop. `full` (a multi-layer, all-classifiable library) emits the
-    // 3-way FULL split; `partial` (a NON-splittable library — e.g. decision-
-    // bearing — carrying concept-level `code is`) emits the 2-way Concepts/Root
-    // split (Root keeps the source name `<lib>`); `none` takes the unchanged
-    // per-CRL path. The cms22/cms69 goldens (each source `.crl` is single-layer)
-    // and the FULL-split goldens stay byte-identical.
-    const plan = computeSplitPlan(entry.ast, entry.name, localCodesCountFor(entry.name));
+    // R2 — ONE shared split-plan drives BOTH the preflight (above) and this emit
+    // loop. `full` (decision-less, multi-layer) emits the source-typed split;
+    // `interface` (decision-bearing WITH concept-level `code is`) emits the
+    // source-typed split PLUS the synthesized `<policyId>-Interface` library;
+    // `none` takes the unchanged per-CRL path. cms22/cms69 (each source `.crl` is
+    // single-layer, no `code is`) stay `none` → byte-identical.
+    const entryPolicyId = localDomainId ?? entry.name;
+    const plan = computeSplitPlan(entry.ast, entry.name, entryPolicyId, localCodesCountFor(entry.name));
     if (plan.kind !== "none") {
-      const partitioned = emitPartitioned(entry.ast, entry.name, plan.partition!, {
+      const partitioned = emitPartitioned(entry.ast, entry.name, plan.policyId!, plan.partition!, {
         crossLibraryParameters,
         canonicalBase,
         localDomainId,
@@ -476,7 +537,13 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
           graph,
           importDiagnostics: graph.diagnostics,
           cqlByLibrary: [],
-          errors: partitioned.entries.flatMap((e) => e.result.errors ?? []),
+          // F3 — include the synthesis-level `errors` (e.g.
+          // `emit-decision-concept-not-source-typed`, raised before any layer
+          // emits) alongside the per-entry emit errors.
+          errors: [
+            ...(partitioned.errors ?? []),
+            ...partitioned.entries.flatMap((e) => e.result.errors ?? []),
+          ],
         };
       }
       for (const part of partitioned.entries) {
@@ -492,25 +559,20 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
             errors: [{ type: "Exception", message: e instanceof Error ? e.message : String(e) }],
           };
         }
-        // Manifest role (D1) — the entry that OWNS the terminology declarations
-        // (the Concepts-classified layer, partition value "Concepts") is ALWAYS
-        // `role:"concepts"`, under BOTH the partial AND the full split. The FHIR
-        // dep-routing assigns the CodeSystem/author-ValueSet depends-on edges to
-        // the `role:"concepts"` entry; before D1 the full-split Concepts LAYER was
-        // marked `"layer"`, so under full split the local CodeSystem was orphaned
-        // (zero inbound depends-on) — a regression vs the pre-4c single Library.
-        // Routing it onto the Concepts entry restores the pre-4c edge.
-        //
-        // The partition VALUE (`part.layer`) is `"Concepts"` for the Concepts
-        // entry in BOTH FULL_PARTITION and PARTIAL_PARTITION, so it is the one
-        // source of truth here. Under `partial` the entry whose emitted name ===
-        // the source `<lib>` is the Root (partition value "Root"); under `full`
-        // the Asserted/Inferred entries stay `"layer"`.
+        // Manifest role (R2) — keyed off the source-typed partition VALUE
+        // (`part.layer`), the one source of truth:
+        //   - LocalConcepts / RecordConcepts → "concepts": OWNS the terminology
+        //     declarations (the FHIR lane routes the CodeSystem / author-ValueSet
+        //     depends-on edges onto this entry).
+        //   - Interface → "interface": the synthesized re-export library (the
+        //     FHIR lane rewires decision/activity `library[]` onto it).
+        //   - LocalSource / RecordSource / Inferred → "layer": a consuming
+        //     source/inference layer (depends-on its lower siblings via `includes`).
         const role: PerLibraryEmit["role"] =
-          part.layer === "Concepts"
+          part.layer === "LocalConcepts" || part.layer === "RecordConcepts"
             ? "concepts"
-            : plan.kind === "partial" && part.libraryName === entry.name
-              ? "root"
+            : part.layer === "Interface"
+              ? "interface"
               : "layer";
         cqlByLibrary.push({
           libraryName: part.libraryName,

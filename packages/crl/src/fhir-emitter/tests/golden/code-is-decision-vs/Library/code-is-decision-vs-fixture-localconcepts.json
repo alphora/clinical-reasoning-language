@@ -1,6 +1,6 @@
 {
   "resourceType": "Library",
-  "id": "code-is-decision-vs-fixture",
+  "id": "code-is-decision-vs-fixture-localconcepts",
   "meta": {
     "profile": [
       "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareablelibrary",
@@ -26,15 +26,15 @@
       "valueCode": "structured"
     }
   ],
-  "url": "http://example.org/crl/code-is-decision-vs/Library/code-is-decision-vs-fixture",
+  "url": "http://example.org/crl/code-is-decision-vs/Library/code-is-decision-vs-fixture-localconcepts",
   "version": "1.0.0",
-  "name": "CodeIsDecisionVs",
-  "title": "Code Is Decision VS",
+  "name": "CodeIsDecisionVsFixtureLocalconcepts",
+  "title": "code-is-decision-vs-fixture-LocalConcepts",
   "status": "draft",
   "experimental": true,
   "date": "2020-01-01T00:00:00.000Z",
   "publisher": "unknown",
-  "description": "D4 — partial-split author-ValueSet depends-on routing onto Concepts",
+  "description": "D4 — source-typed split author-ValueSet depends-on routing onto LocalConcepts",
   "type": {
     "coding": [
       {
@@ -46,13 +46,13 @@
   "relatedArtifact": [
     {
       "type": "depends-on",
-      "resource": "http://example.org/crl/code-is-decision-vs/Library/code-is-decision-vs-fixture-concepts"
+      "resource": "http://example.org/crl/code-is-decision-vs/CodeSystem/code-is-decision-vs-fixture-local"
     }
   ],
   "content": [
     {
       "contentType": "text/cql",
-      "url": "../../cql/Code Is Decision VS.cql"
+      "url": "../../cql/code-is-decision-vs-fixture-LocalConcepts.cql"
     }
   ]
 }

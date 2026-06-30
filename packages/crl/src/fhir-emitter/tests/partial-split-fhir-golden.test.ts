@@ -81,39 +81,58 @@ describe("CRL → FHIR partial-split golden (code-is-decision)", () => {
     expect(allCql).toContain(`'${csUrl}'`);
   });
 
-  it("emits exactly TWO Libraries (Root + Concepts) with the partial-split dep routing", () => {
+  it("emits the R2 source-typed split Libraries (LocalConcepts + LocalSource + Interface) with the layered dep routing", () => {
+    // R2 — `code-is-decision` (a DECISION-bearing library WITH local `code is`)
+    // now routes to the `interface` split kind: a FULL source-typed split
+    // (LocalConcepts → LocalSource) PLUS a synthesized `<policyId>-Interface`
+    // re-export library (the decision/action-guard surface). It NO LONGER takes
+    // the pre-R2 partial (Root + Concepts) path.
     const libs = result.resources.filter((r) => r.resourceType === "Library");
-    expect(libs).toHaveLength(2);
+    expect(libs).toHaveLength(3);
 
-    // R1 — ids derive from the fixture POLICY ID ("code-is-decision-fixture"),
-    // not the library-name slug ("code-is-decision").
+    // R2 — ids derive from the fixture POLICY ID ("code-is-decision-fixture") +
+    // the lowercase LAYER token (NOT the source library-name slug).
     const byId = new Map(libs.map((l) => [l.resource.id as string, l.resource as Record<string, unknown>]));
-    const root = byId.get("code-is-decision-fixture")!;
-    const concepts = byId.get("code-is-decision-fixture-concepts")!;
-    expect(root).toBeDefined();
-    expect(concepts).toBeDefined();
+    const localConcepts = byId.get("code-is-decision-fixture-localconcepts")!;
+    const localSource = byId.get("code-is-decision-fixture-localsource")!;
+    const iface = byId.get("code-is-decision-fixture-interface")!;
+    expect(localConcepts).toBeDefined();
+    expect(localSource).toBeDefined();
+    expect(iface).toBeDefined();
 
-    // Root keeps the SOURCE canonical (so PlanDef/ActivityDef library[] resolve).
-    expect(root.url).toBe("http://example.org/crl/code-is-decision/Library/code-is-decision-fixture");
-    // Root content url + depends-on Concepts.
-    expect((root.content as Array<{ url?: string }>)[0]?.url).toBe("../../cql/Code Is Decision.cql");
-    expect((root.relatedArtifact as Array<{ type?: string; resource?: string }>).map((e) => e.resource)).toEqual([
-      "http://example.org/crl/code-is-decision/Library/code-is-decision-fixture-concepts",
+    // LocalConcepts owns the local CodeSystem (the lowered `code is` domain).
+    expect((localConcepts.content as Array<{ url?: string }>)[0]?.url).toBe(
+      "../../cql/code-is-decision-fixture-LocalConcepts.cql",
+    );
+    expect((localConcepts.relatedArtifact as Array<{ type?: string; resource?: string }>).map((e) => e.resource)).toEqual([
+      "http://example.org/crl/code-is-decision/CodeSystem/code-is-decision-fixture-local",
     ]);
 
-    // Concepts content url + depends-on the local CodeSystem.
-    expect((concepts.content as Array<{ url?: string }>)[0]?.url).toBe("../../cql/Code Is Decision Concepts.cql");
-    expect((concepts.relatedArtifact as Array<{ type?: string; resource?: string }>).map((e) => e.resource)).toEqual([
-      "http://example.org/crl/code-is-decision/CodeSystem/code-is-decision-fixture-local",
+    // LocalSource depends-on its LocalConcepts sibling.
+    expect((localSource.content as Array<{ url?: string }>)[0]?.url).toBe(
+      "../../cql/code-is-decision-fixture-LocalSource.cql",
+    );
+    expect((localSource.relatedArtifact as Array<{ type?: string; resource?: string }>).map((e) => e.resource)).toEqual([
+      "http://example.org/crl/code-is-decision/Library/code-is-decision-fixture-localconcepts",
+    ]);
+
+    // Interface re-exports the decision surface; depends-on LocalSource.
+    expect((iface.content as Array<{ url?: string }>)[0]?.url).toBe(
+      "../../cql/code-is-decision-fixture-Interface.cql",
+    );
+    expect((iface.relatedArtifact as Array<{ type?: string; resource?: string }>).map((e) => e.resource)).toEqual([
+      "http://example.org/crl/code-is-decision/Library/code-is-decision-fixture-localsource",
     ]);
   });
 
-  it("the PlanDefinition + ActivityDefinition library[] resolve to the Root Library canonical", () => {
-    const rootUrl = "http://example.org/crl/code-is-decision/Library/code-is-decision-fixture";
+  it("the PlanDefinition + ActivityDefinition library[] resolve to the Interface Library canonical", () => {
+    // R2 — the decision/activity/recommendation `library[]` now rewire onto the
+    // synthesized Interface re-export library (NOT the source-name Root).
+    const interfaceUrl = "http://example.org/crl/code-is-decision/Library/code-is-decision-fixture-interface";
     for (const r of result.resources) {
       if (r.resourceType !== "PlanDefinition" && r.resourceType !== "ActivityDefinition") continue;
       const lib = (r.resource as { library?: unknown }).library;
-      if (Array.isArray(lib)) expect(lib).toContain(rootUrl);
+      if (Array.isArray(lib)) expect(lib).toContain(interfaceUrl);
     }
   });
 
@@ -223,7 +242,7 @@ describe("emitFhirDefClosure — content-url invariant is wired into the pipelin
     version: "1.0.0",
     name: "code-is-decision-fixture",
     title: "Code Is Decision",
-    description: "Slice 4c partial-split fixture",
+    description: "R2 source-typed split fixture",
     publisher: "unknown",
     contact: [],
     canonicalBase: "http://example.org/crl/code-is-decision",
@@ -285,7 +304,7 @@ describe("emitFhirDefClosure — structured-error guards on a malformed manifest
     version: "1.0.0",
     name: "code-is-decision-fixture",
     title: "Code Is Decision",
-    description: "Slice 4c partial-split fixture",
+    description: "R2 source-typed split fixture",
     publisher: "unknown",
     contact: [],
     canonicalBase: "http://example.org/crl/code-is-decision",
@@ -295,17 +314,19 @@ describe("emitFhirDefClosure — structured-error guards on a malformed manifest
     useContext: [],
   };
 
-  it("a decision-bearing source with a multi-entry manifest but NO role:\"root\" entry → decision-root-library-missing + decisions skipped (not thrown)", () => {
+  it("a decision-bearing source with a multi-entry manifest but NO role:\"interface\"/\"root\" entry → decision-root-library-missing + decisions skipped (not thrown)", () => {
     const graph = resolveImports(FIXTURE);
     const cql = emitCQLImports(FIXTURE);
     expect(cql.success).toBe(true);
-    // Real partial-split manifest is [Root (role:"root", name="Code Is Decision"),
-    // Concepts]. Flip the Root's role to "layer" so the manifest still has 2
-    // entries (multi-entry branch) but NO entry keeps the source name as Root.
+    // R2 — the real `interface`-kind manifest is [LocalConcepts, LocalSource,
+    // Interface]; the Decision/Activity `library[]` resolves to the Interface
+    // entry. Demote the Interface entry's role to "layer" so the manifest still
+    // has 3 entries (multi-entry branch) but NO entry the decision surface can
+    // reference (no `role:"interface"` and no source-name-keeping `role:"root"`).
     // The orchestrator must surface `decision-root-library-missing` and SKIP the
     // source's Decision PlanDefs rather than throw (no try/catch on the MCP path).
     const manifest = cql.cqlByLibrary.map((e) =>
-      e.role === "root" && e.libraryName === "Code Is Decision" ? { ...e, role: "layer" as const } : e,
+      e.role === "interface" ? { ...e, role: "layer" as const } : e,
     );
     const result = emitFhirDefClosure(graph, METADATA, FIXED, manifest);
     expect(result.errors.some((e) => e.kind === "decision-root-library-missing")).toBe(true);

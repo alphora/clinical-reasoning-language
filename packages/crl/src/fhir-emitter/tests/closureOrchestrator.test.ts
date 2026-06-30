@@ -182,21 +182,22 @@ describe("closureOrchestrator — FHIR closure code-is coverage (T2)", () => {
     ]);
   });
 
-  it("emits one FHIR Library PER emitted CQL layer, content urls resolving to the split files (slice 4c / E)", () => {
-    // `code-is-basic` is the FULL-split case (decision-LESS, multi-layer, `code
-    // is`): the CQL lane emits 3 layer files, so the FHIR lane now emits 3
-    // Libraries matching them (slice 4c — one FHIR Library per manifest entry),
-    // NOT one un-split "Code Is Basic" Library pointing at a CQL file the split
-    // never wrote.
+  it("emits one FHIR Library PER emitted CQL layer, content urls resolving to the split files (R2 source-typed)", () => {
+    // R2 — `code-is-basic` is the FULL-split case (decision-LESS, multi-layer,
+    // `code is`): the CQL lane now emits 3 SOURCE-TYPED layer files
+    // (LocalConcepts → LocalSource → Inferred), so the FHIR lane emits 3 Libraries
+    // matching them (one FHIR Library per manifest entry), NOT one un-split "Code
+    // Is Basic" Library pointing at a CQL file the split never wrote.
     const result = emitFhirDefFromPath(CODE_IS_BASIC, { clock: FIXED_CLOCK });
     const libs = result.resources.filter((r) => r.resourceType === "Library");
     const byTitle = new Map(
       libs.map((l) => [(l.resource as { title?: string }).title, l.resource as Record<string, unknown>]),
     );
+    // R2 — the Library title is the policy-id-based CQL library name.
     expect([...byTitle.keys()].sort()).toEqual([
-      "Code Is Basic Asserted",
-      "Code Is Basic Concepts",
-      "Code Is Basic Inferred",
+      "code-is-basic-fixture-Inferred",
+      "code-is-basic-fixture-LocalConcepts",
+      "code-is-basic-fixture-LocalSource",
     ]);
     // Every content url resolves to its split CQL file (Inv 4 passes → no
     // library-content-url-unresolved error).
@@ -205,19 +206,18 @@ describe("closureOrchestrator — FHIR closure code-is coverage (T2)", () => {
       expect(content?.[0]?.url).toBe(`../../cql/${title}.cql`);
     }
     expect(result.errors.some((e) => e.kind === "library-content-url-unresolved")).toBe(false);
-    // The Asserted layer depends-on the Concepts layer it `include`s.
-    const asserted = byTitle.get("Code Is Basic Asserted")!;
-    const assertedDeps = ((asserted.relatedArtifact as Array<{ resource?: string }>) ?? []).map((e) => e.resource);
-    expect(assertedDeps).toContain(
-      "http://example.org/crl/code-is-basic/Library/code-is-basic-fixture-concepts",
+    // The LocalSource layer depends-on the LocalConcepts layer it `include`s.
+    const localSource = byTitle.get("code-is-basic-fixture-LocalSource")!;
+    const localSourceDeps = ((localSource.relatedArtifact as Array<{ resource?: string }>) ?? []).map((e) => e.resource);
+    expect(localSourceDeps).toContain(
+      "http://example.org/crl/code-is-basic/Library/code-is-basic-fixture-localconcepts",
     );
-    // D1: the FULL-split Concepts LAYER is now `role:"concepts"`, so it owns the
-    // local CodeSystem depends-on edge (restoring the pre-4c terminology edge that
-    // the single un-split Library carried). The Asserted/Inferred consuming layers
-    // reach it transitively via their Concepts-sibling dep above.
-    const concepts = byTitle.get("Code Is Basic Concepts")!;
-    const conceptsDeps = ((concepts.relatedArtifact as Array<{ resource?: string }>) ?? []).map((e) => e.resource);
-    expect(conceptsDeps).toContain(
+    // R2: the LocalConcepts LAYER is `role:"concepts"` (Local family), so it owns
+    // the local CodeSystem depends-on edge. The LocalSource/Inferred consuming
+    // layers reach it transitively via their LocalConcepts-sibling dep above.
+    const localConcepts = byTitle.get("code-is-basic-fixture-LocalConcepts")!;
+    const localConceptsDeps = ((localConcepts.relatedArtifact as Array<{ resource?: string }>) ?? []).map((e) => e.resource);
+    expect(localConceptsDeps).toContain(
       "http://example.org/crl/code-is-basic/CodeSystem/code-is-basic-fixture-local",
     );
   });

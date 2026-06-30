@@ -318,6 +318,18 @@ export interface Concept extends ASTNode {
   meta?: string[];
   evidence?: string;
   location: Location;
+  /**
+   * SYNTHETIC-EMITTER-ONLY (the CRL parser/builder NEVER sets this; do not touch
+   * the parser). Marks a concept synthesized by the layered CQL emit's Interface
+   * synthesis (`layeredEmit.ts`) — a re-export `define "X": <policyId>-<srcLayer>."X"`
+   * that lives in the `<policyId>-Interface` library and re-publishes a
+   * decision/action-guard concept from its OWN source layer. `classifyStatementLayer`
+   * returns `"Interface"` for a concept carrying this marker; `buildNameLayerMaps`
+   * EXCLUDES it (its body is PRE-QUALIFIED so the re-qualifier is never consulted,
+   * and registering it would self-collide with the source-layer concept of the
+   * same name). Absent on every hand-authored concept.
+   */
+  __interfaceReexport?: boolean;
 }
 
 // Concept definition has 3 kinds per v0.7:

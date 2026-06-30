@@ -44,7 +44,7 @@
     ]
   },
   "library": [
-    "http://example.org/crl/code-is-decision-vs/Library/code-is-decision-vs-fixture"
+    "http://example.org/crl/code-is-decision-vs/Library/code-is-decision-vs-fixture-interface"
   ],
   "action": [
     {

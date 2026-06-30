@@ -1,0 +1,17 @@
+# non-decision-localcode-activity root
+library "Pol".
+
+// F1 — a library with a concept-level `code is` (so localCodesCount > 0) BUT no
+// Decision, that ALSO carries an Activity. The Activity is unclassifiable, so
+// the library is NOT layer-splittable. Pre-F1 the `interface` split kind fired on
+// localCodesCount alone and the FULL partition silently DROPPED the Activity. F1
+// gates `interface` on a Decision being present, so this must route to `none`
+// (per-CRL) which preserves ALL statements as one library.
+
+concept "Adult Patient":
+- type is Observation.
+- value type is boolean.
+- code is `adult-18-or-older`.
+
+activity "Refer to GI":
+- request CPGServiceRequest.

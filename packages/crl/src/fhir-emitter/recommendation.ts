@@ -90,6 +90,10 @@ export function emitRecommendationDefinition(
   libraryName: string,
   metadata: CpgMetadata,
   opts: EmitOptions = {},
+  // R2 — the `library[]` Library id SUFFIX: `"interface"` when the source emitted
+  // a `role:"interface"` re-export library, else `""` (Root / cms `none` path,
+  // UNCHANGED). Threaded by the orchestrator (single `library[]` source of truth).
+  libraryReferenceSuffix = "",
 ): {
   resource: EmittedResource | null;
   errors: CRLError[];
@@ -129,8 +133,9 @@ export function emitRecommendationDefinition(
   const level = opts.capability ?? "publishable";
   const publishable = isPublishablePlus(level);
   const url = recommendationDefinitionCanonicalUrl(metadata, activity.name);
-  // R1 — `library[]` → source-name-keeping Root Library, keyed on the policy id.
-  const libraryUrl = libraryCanonicalUrl(metadata);
+  // R2 — `library[]` → the Interface re-export Library (suffix "interface") for a
+  // decision-bearing split source, else the source-name-keeping Root (suffix "").
+  const libraryUrl = libraryCanonicalUrl(metadata, libraryReferenceSuffix);
   const activityUrl = activityDefinitionCanonicalUrl(metadata, activity.name);
 
   const resource: Record<string, unknown> = {
@@ -214,6 +219,8 @@ export function emitRecommendationDefinitionsForLibrary(
   libraryName: string,
   metadata: CpgMetadata,
   opts: EmitOptions = {},
+  // R2 — the conditional `library[]` Interface suffix (see emitRecommendationDefinition).
+  libraryReferenceSuffix = "",
 ): {
   resources: EmittedResource[];
   errors: CRLError[];
@@ -251,6 +258,7 @@ export function emitRecommendationDefinitionsForLibrary(
       libraryName,
       metadata,
       opts,
+      libraryReferenceSuffix,
     );
     if (resource) resources.push(resource);
     errors.push(...rErrors);

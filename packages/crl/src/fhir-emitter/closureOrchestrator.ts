@@ -814,17 +814,29 @@ export function emitFhirDefClosure(
     //                       Concepts layer owns the CodeSystem/VS edges. See the
     //                       FOLLOW-UP below re: cms inter-layer deps.
     const manifestEntries = manifestBySource.get(lib.libraryName) ?? [];
-    // R1 — the policy-id Library id SUFFIX for an emitted CQL library. The Root
-    // (cqlLibraryName === the source name) keeps the bare `<policyIdBase>` id
-    // (suffix ""); every split sibling `<source> <Layer>` contributes the layer
-    // token (e.g. "Concepts" → "concepts", "Asserted" → "asserted") as the suffix
-    // so its id is `<policyIdBase>-<layer>`. Uniform derivation over the
-    // cqlLibraryName covers BOTH the partial Concepts entry and full-split
-    // Asserted/Inferred layers without consulting `role`.
-    const idSuffixFor = (cqlLibraryName: string): string =>
-      cqlLibraryName === lib.libraryName
-        ? ""
-        : slugify(cqlLibraryName.slice(lib.libraryName.length).trim());
+    // R2 — the policy-id Library id SUFFIX for an emitted CQL library, DERIVED
+    // FROM THE LAYER (not by slicing the source CRL library name). Under R2 the
+    // CQL library name is `<policyIdBase>-<PascalLayer>` (e.g.
+    // `code-is-decision-fixture-LocalConcepts`) while the SOURCE library name is
+    // the human name ("Code Is Decision"). The pre-R2 slice
+    // (`cqlLibraryName.slice(lib.libraryName.length)`) is WRONG when the CQL base
+    // (policy id) differs from the source name, so derive the suffix as the
+    // lowercase layer token: strip the policy-id base prefix from the CQL name and
+    // slugify the remainder. A CQL name that equals the source name (the `none`/
+    // per-CRL Root) keeps the bare `<policyIdBase>` id (suffix "").
+    const policyBase = policyIdBase(metadata);
+    const idSuffixFor = (cqlLibraryName: string): string => {
+      if (cqlLibraryName === lib.libraryName) return ""; // per-CRL Root keeps the source name
+      // `<policyIdBase>-<PascalLayer>` → the lowercase `<PascalLayer>` token
+      // (LocalConcepts → localconcepts, Interface → interface, etc.). Falls back
+      // to the post-base remainder; for a well-formed manifest the CQL name always
+      // carries the `<policyBase>-` prefix.
+      const prefix = `${policyBase}-`;
+      const layerToken = cqlLibraryName.startsWith(prefix)
+        ? cqlLibraryName.slice(prefix.length)
+        : cqlLibraryName.slice(lib.libraryName.length);
+      return slugify(layerToken.trim());
+    };
     const emitOneLibrary = (
       libraryName: string,
       dependsOn: ReadonlyArray<string>,
@@ -885,8 +897,25 @@ export function emitFhirDefClosure(
         const cqlFileName = `../../cql/${entry.outputFilename}`;
         let dependsOn: string[];
         if (entry.role === "concepts") {
-          // Concepts owns the terminology that relocated into it.
-          dependsOn = [...vsCanonicals, ...(csUrl ? [csUrl] : [])];
+          // R2 — the terminology that relocated into the concepts layer is routed
+          // by SOURCE FAMILY: the local CodeSystem (synthetic, from `code is`)
+          // lives in `LocalConcepts`; the hand-authored author ValueSets (from
+          // `coded from "<valueset>"`) live in `RecordConcepts`. Under R2 there can
+          // be TWO concepts-role entries (LocalConcepts + RecordConcepts); routing
+          // both edges onto BOTH would duplicate/cross-wire them. The layer token
+          // (idSuffixFor) discriminates: `localconcepts` owns the CodeSystem,
+          // `recordconcepts` owns the author ValueSets.
+          const layerToken = idSuffixFor(entry.libraryName);
+          if (layerToken === "localconcepts") {
+            dependsOn = [...(csUrl ? [csUrl] : [])];
+          } else if (layerToken === "recordconcepts") {
+            dependsOn = [...vsCanonicals];
+          } else {
+            // The pre-R2 partial `Concepts` sibling (single concepts entry, layer
+            // token "concepts") still owns BOTH — correct-but-unreached on the
+            // deliverable path now, kept so a partial-partition caller stays sound.
+            dependsOn = [...vsCanonicals, ...(csUrl ? [csUrl] : [])];
+          }
         } else {
           // root / layer: depend on the emitted-CQL-library siblings it includes.
           dependsOn = entry.includes
@@ -926,6 +955,18 @@ export function emitFhirDefClosure(
       }
     }
 
+    // R2 — the `library[]` SUFFIX the decision/activity/recommendation emitters
+    // reference. Decision-bearing sources now FULL source-typed split (the
+    // `interface` kind), so their decision surface no longer resolves to a
+    // source-name-keeping Root — it resolves to the synthesized `<policyId>-Interface`
+    // re-export library. The CONDITIONAL: if this source emitted a non-empty
+    // `role:"interface"` manifest entry, `library[]`/`definitionCanonical` route to
+    // the Interface canonical (its layer token, "interface"); ELSE (cms `none`/
+    // per-CRL, no Interface) they stay at the source/root canonical (suffix "" —
+    // UNCHANGED, keeping cms byte-identical).
+    const interfaceEntry = manifestEntries.find((e) => e.role === "interface");
+    const libraryReferenceSuffix = interfaceEntry ? idSuffixFor(interfaceEntry.libraryName) : "";
+
     // (3) ActivityDefinitions
     const actResult = emitActivityDefinitionsForLibrary(
       lib.activities,
@@ -933,55 +974,59 @@ export function emitFhirDefClosure(
       metadata,
       sourceLibResolvers.terminologyResolver,
       resolvedOpts,
+      libraryReferenceSuffix,
     );
     resources.push(...actResult.resources);
     errors.push(...actResult.errors);
     unmatched.push(...actResult.unmatched);
 
     // (4) Recommendation PlanDefs
-    const recResult = emitRecommendationDefinitionsForLibrary(lib.activities, lib.libraryName, metadata, resolvedOpts);
+    const recResult = emitRecommendationDefinitionsForLibrary(
+      lib.activities,
+      lib.libraryName,
+      metadata,
+      resolvedOpts,
+      libraryReferenceSuffix,
+    );
     resources.push(...recResult.resources);
     errors.push(...recResult.errors);
     unmatched.push(...recResult.unmatched);
 
     // (5) Decision PlanDefs — closure-aware via low-level emitDecisionPlanDefinition.
     //
-    // Decision PlanDefs (and ActivityDefs above) stay keyed on the SOURCE name —
-    // their `library[]` = `libraryCanonicalUrl(base, <source>)`, which must
-    // resolve to the ROOT Library (the entry whose cqlLibraryName === source).
-    // A decision-bearing source is NEVER full-split (A's `computeSplitPlan`
-    // guards this: `isLayerSplittable` is false the moment it sees a Decision),
-    // so when it is split at all it is PARTIAL, whose Root keeps the source name.
-    // Assert that contract so a future split-gate regression that renamed the
-    // Root away fails loudly here instead of dangling Inv-2 `library[]` later.
-    // Reuse the `manifestEntries` computed for the Library section above (same
-    // source) — gpt55/Claude [nit]: don't re-fetch + re-default, so the two can't
-    // drift if the keying ever changes.
+    // R2 — re-keyed Decision `library[]` contract. The Decision/Activity/
+    // Recommendation `library[]` (= `libraryCanonicalUrl(base, libraryReferenceSuffix)`)
+    // must resolve to an EMITTED Library. Two cases:
+    //   - INTERFACE-KIND (decision-bearing WITH local code → full source-typed
+    //     split + Interface): require EXACTLY ONE `role:"interface"` entry. Its
+    //     canonical IS the `library[]` target (Inv-2(a) then confirms it resolves).
+    //   - NONE-KIND (cms / per-CRL, decision-bearing with NO local code): the old
+    //     source/root contract holds — a `role:"root"` entry keeping the source name
+    //     (or the no-manifest unit-test path).
+    // If a decision-bearing source has NEITHER (a malformed/regressed manifest), the
+    // `library[]` would dangle — surface a structured error (NOT a throw; no
+    // try/catch on the MCP path) and SKIP this source's decision emit.
+    const hasInterfaceEntry = interfaceEntry !== undefined;
     const hasRootKeepingSourceName =
       manifestEntries.length === 0 ||
       manifestEntries.some((e) => e.role === "root" && e.libraryName === lib.libraryName);
-    if (lib.decisions.length > 0 && !hasRootKeepingSourceName) {
-      // Slice-4c review (gpt55 [important] #3 / Claude [critical]): structured
-      // error, NOT a raw `throw`. `emitFhirDefFromPath` + MCP `emit_crl_fhir` have
-      // no try/catch around this boundary, so a throw would surface as a server
-      // crash instead of a `{success:false, errors:[...]}` response — mirroring
-      // the `safeOutputFilename` boundary that was deliberately de-thrown above.
-      // SKIP this source's Decision PlanDefs (their `library[]` would dangle
-      // anyway) and surface the contract violation as an error.
+    const hasDecisionLibraryTarget = hasInterfaceEntry || hasRootKeepingSourceName;
+    if (lib.decisions.length > 0 && !hasDecisionLibraryTarget) {
       errors.push({
         type: "Validation",
         kind: "decision-root-library-missing",
         message:
-          `Decision-bearing source "${lib.libraryName}" has no manifest entry keeping the source ` +
-          `name as its Root, so its Decision/Activity \`library[]\` reference would dangle. A ` +
-          `decision-bearing library must never full-split (guarded in computeSplitPlan) — this ` +
-          `manifest is malformed. Skipping this source's decision emit.`,
+          `Decision-bearing source "${lib.libraryName}" has no manifest entry its Decision/Activity ` +
+          `\`library[]\` can reference: neither a \`role:"interface"\` entry (the full source-typed ` +
+          `split's re-export surface) nor a \`role:"root"\` entry keeping the source name (the ` +
+          `per-CRL/cms path). Its \`library[]\` reference would dangle — this manifest is malformed. ` +
+          `Skipping this source's decision emit.`,
       });
     }
-    // When the Root contract is violated we skip THIS source's decision emit
-    // (handled by the loop guard below); there are no later per-lib steps, so a
-    // plain guarded loop suffices.
-    for (const decision of hasRootKeepingSourceName ? lib.decisions : []) {
+    // When the contract is violated we skip THIS source's decision emit (handled by
+    // the loop guard below); there are no later per-lib steps, so a plain guarded
+    // loop suffices.
+    for (const decision of hasDecisionLibraryTarget ? lib.decisions : []) {
       const decKey = qualifiedKey([lib.libraryName, decision.name]);
       if (classification.cycleMemberKeys.has(decKey)) continue;
       const isRoot = classification.rootKeys.has(decKey);
@@ -994,6 +1039,7 @@ export function emitFhirDefClosure(
         sourceLibResolvers.decisionResolver,
         isRoot,
         resolvedOpts,
+        libraryReferenceSuffix,
       );
       if (decResult.resource) resources.push(decResult.resource);
       errors.push(...decResult.errors);

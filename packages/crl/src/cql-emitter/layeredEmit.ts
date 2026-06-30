@@ -58,75 +58,93 @@ import type {
   ReferenceName,
   QualifiedReference,
   Statement,
+  WhenBlockBody,
+  BlockBody,
+  BlockMember,
+  ActionStatement,
 } from "../ast/types";
-import { getRefName, getRefLibrary } from "../ast/types";
+import { getRefName, getRefLibrary, isQualifiedRef } from "../ast/types";
+
+import type { CRLError } from "../types/errors";
 
 import { emitCQLFromAST } from "./emitCQL";
 import type { EmitResult, EmitOptions } from "./emitCQL";
 
 /**
  * A partition VALUE — the bucket a statement is assigned to for emit. The FULL
- * partition produces the three canonical layers ("Concepts" / "Asserted" /
- * "Inferred"); a PARTIAL partition (slice 4c) produces other values ("Concepts"
- * / "Root"). The type is therefore a bare `string`: `classifyStatementLayer`
- * (the FULL classifier) still returns one of the three canonical values, but a
- * partition's own `classify` may map those onto a different value set.
+ * partition produces the six SOURCE-TYPED layers (R2-mechanism): two concept
+ * layers (LocalConcepts / RecordConcepts), two source layers (LocalSource /
+ * RecordSource), the Inferred layer, and the synthesized Interface layer. The
+ * type is a bare `string`: `classifyStatementLayer` (the FULL classifier)
+ * returns one of these (or null), but a partition's own `classify` may map them
+ * onto a different value set.
  */
 export type Layer = string;
 
 /**
- * The three canonical layers the FULL split fans into, in dependency order
+ * The SIX source-typed layers the FULL split fans into, in dependency order
  * (low → high). Each layer may only reference layers EARLIER in this list.
  * `classifyStatementLayer` returns one of these (or null); the FULL_PARTITION's
  * `order` is exactly this list.
+ *
+ * R2-mechanism source-typing — the layer set is split by SOURCE FAMILY:
+ *   - `LocalConcepts`  : a SYNTHETIC local terminology (lowered `code is`) — its
+ *                        `TerminologySystem.name` is set by `lowerLocalCodes`.
+ *   - `RecordConcepts` : a hand-authored terminology (no synthetic name).
+ *   - `LocalSource`    : a concept whose retrieve is the SYNTHETIC local-source
+ *                        retrieve (`CodedFromDefinition.retrieveResourceType` set).
+ *   - `RecordSource`   : a hand-authored `coded from` concept (retrieve type unset).
+ *   - `Inferred`       : a top-level `defined as` / `definition is` concept.
+ *   - `Interface`      : the SYNTHESIZED re-export concepts (decision/action-guard
+ *                        surface), pre-qualified to each concept's OWN source layer.
+ *
+ * CROSS-FAMILY INVARIANT: a `Local*` library never `include`s a `Record*` one
+ * (asserted by `collectLayerIncludes`). For the deliverable this can't arise —
+ * a lowered concept's `coded from` bare-refs its OWN synthetic local terminology
+ * (same family) — but the assertion catches the deferred both-representation
+ * case loudly instead of emitting a silent cross-family include.
  */
-export const LAYER_ORDER: readonly Layer[] = ["Concepts", "Asserted", "Inferred"] as const;
+export const LAYER_ORDER: readonly Layer[] = [
+  "LocalConcepts",
+  "RecordConcepts",
+  "LocalSource",
+  "RecordSource",
+  "Inferred",
+  "Interface",
+] as const;
 
 /**
- * A PARTITION generalizes the hardcoded 3-layer machinery into a pluggable
+ * A PARTITION generalizes the hardcoded layer machinery into a pluggable
  * "how do I bucket statements, in what dependency order, under what emitted
  * library names" policy. `emitPartitioned` (the generalized emit loop) consumes
- * a partition; `emitLayered` is now a thin wrapper over `emitPartitioned(...,
- * FULL_PARTITION, ...)` and stays byte-identical.
+ * a partition; `emitLayered` is a thin wrapper over `emitPartitioned(...,
+ * FULL_PARTITION, ...)`.
  *
  *   - `classify(stmt)` → the partition VALUE for a statement, or `null` for an
  *     out-of-scope statement (Decision/Activity/Parameter — same exclusions as
  *     `classifyStatementLayer`). The FULL partition delegates straight to
- *     `classifyStatementLayer`; the PARTIAL partition collapses the three
- *     canonical values onto `"Concepts"` vs `"Root"`.
+ *     `classifyStatementLayer`.
  *   - `order` — the partition values in dependency order (low → high). Drives
  *     emit ordering and the sibling-include ordering in `collectLayerIncludes`.
- *   - `libraryNameFor(lib, value)` — the emitted CQL library name for a given
- *     partition value of source library `lib`. FULL: `"<lib> <value>"`. PARTIAL:
- *     `"<lib>"` for the Root value (keeps the source name addressable) and
- *     `"<lib> Concepts"` for the Concepts value.
+ *   - `libraryNameFor(policyId, value)` — the emitted CQL library name for a
+ *     given partition value. R2-mechanism: the FULL split names libraries
+ *     `<policyId>-<PascalLayer>` (e.g. `rx501-145-medical-policy-LocalConcepts`).
+ *     The base is the POLICY ID (threaded R1 from package.json `name`), NOT the
+ *     source CRL library name — the source name stays the addressable identity
+ *     for self-ref detection in `requalifyRef` (`lib`), while emitted names key
+ *     off the policy id so they byte-match the FHIR lane's policy-id-based ids.
  */
 export interface Partition {
   classify: (stmt: Statement) => Layer | null;
   order: readonly Layer[];
-  libraryNameFor: (lib: string, value: Layer) => string;
+  libraryNameFor: (policyId: string, value: Layer) => string;
 }
 
-/** The canonical 3-way full split (byte-identical to the pre-partition path). */
+/** The source-typed FULL split (R2-mechanism). */
 export const FULL_PARTITION: Partition = {
   classify: classifyStatementLayer,
   order: LAYER_ORDER,
   libraryNameFor: layerLibraryName,
-};
-
-/**
- * Slice 4c partial split — for a decision-bearing library with concept-level
- * `code is`. Everything that the FULL classifier calls "Concepts" (the
- * terminology / lowered local-code declarations) goes to the `"Concepts"`
- * sibling; EVERYTHING ELSE (asserted retrieves, inference, the decision/activity
- * statements that disqualify the FULL split) goes to the `"Root"` library, which
- * KEEPS THE SOURCE NAME `<lib>` so PlanDef/ActivityDef `library[]` refs (which
- * slug from the source name) still resolve.
- */
-export const PARTIAL_PARTITION: Partition = {
-  classify: (stmt) => (classifyStatementLayer(stmt) === "Concepts" ? "Concepts" : "Root"),
-  order: ["Concepts", "Root"],
-  libraryNameFor: (lib, v) => (v === "Root" ? lib : `${lib} Concepts`),
 };
 
 /** Which declaration slot a reference resolves against. */
@@ -145,10 +163,17 @@ export interface LayeredEmitEntry {
 }
 
 export interface LayeredEmitResult {
-  /** True when EVERY emitted layer succeeded. */
+  /** True when EVERY emitted layer succeeded AND no synthesis-level error fired. */
   success: boolean;
   /** One entry per NON-EMPTY layer, in dependency order (Concepts → Inferred). */
   entries: LayeredEmitEntry[];
+  /**
+   * Synthesis-level errors NOT attached to any single emitted layer entry — e.g.
+   * F3's `emit-decision-concept-not-source-typed` (raised while building the
+   * Interface re-exports, before any layer emits). When non-empty, `success` is
+   * false; the caller surfaces these alongside the per-entry `result.errors`.
+   */
+  errors?: CRLError[];
 }
 
 /** Slot-aware name→layer maps. A name may appear in BOTH (cross-kind same-name). */
@@ -158,46 +183,94 @@ interface NameLayerMaps {
 }
 
 /**
- * Classify a single library statement into its primary layer, or `null` for
- * statement kinds out of scope for this slice (Decision / Activity / Parameter).
+ * Classify a single library statement into its SOURCE-TYPED primary layer
+ * (R2-mechanism), or `null` for statement kinds out of scope for the split
+ * (Decision / Activity / Parameter).
+ *
+ * This is the SINGLE source of truth for the 6-way split: `layersPresent`,
+ * `isLayerSplittable`, and `layerLibraryNamesFor` call it directly (the FULL
+ * partition delegates to it), so the layer set shifts with it in one place.
+ *
+ * DISCRIMINATORS — these REUSE the synthetic-emitter-only signals that
+ * `lowerLocalCodes` already sets; there is NO separate `__local` flag (the
+ * signals have no hand-authored lookalikes — verified firsthand in
+ * `lowerLocalCodes` + the `ast/builder.ts` terminology constructor + the
+ * `code-is-decision-vs` hand-authored coded-from fixture):
+ *
+ *   - `Terminology` whose `TerminologySystem.name` is SET → `LocalConcepts`;
+ *     absent → `RecordConcepts`. `TerminologySystem.name` is set ONLY by
+ *     `lowerLocalCodes` (the shared local-domain codesystem decl name); the CRL
+ *     builder never sets it (`ast/builder.ts` constructs `TerminologySystem`
+ *     with no `name`).
+ *   - `Concept` whose `CodedFromDefinition.retrieveResourceType !== undefined`
+ *     → `LocalSource`; `=== undefined` → `RecordSource`. `retrieveResourceType`
+ *     is set ONLY by `lowerLocalCodes` (forced `"Observation"`); hand-authored
+ *     `coded from` always leaves it undefined — EVEN WHEN `type is Observation`
+ *     — so we do NOT key off `conceptType === "Observation"`.
+ *   - top-level `defined as` / `definition is` → `Inferred`.
+ *   - a SYNTHESIZED Interface re-export (`Concept.__interfaceReexport`) →
+ *     `Interface`.
+ *
+ * CO-INVARIANT (R2): `lowerLocalCodes` sets `TerminologySystem.name` (on the
+ * synthetic terminology) AND `retrieveResourceType` (on the synthetic
+ * `CodedFromDefinition`) in the SAME loop iteration for one `code is` concept —
+ * they CANNOT diverge per-concept. A future edit to lowering MUST keep both or
+ * neither: keeping only the terminology name would yield a LocalConcepts code
+ * with a RecordSource retrieve (a cross-family include); keeping only the
+ * retrieve type the inverse. This co-invariant is NOT left implicit — the
+ * synthesis site in `lowerLocalCodes` (F7) asserts both signals are set together
+ * and THROWS if they desync, so a future one-sided edit fails loudly there.
  *
  * Operates on the AST `Statement` shape directly — NOT on provenance nodes.
  * (`provenance/crlConceptLayer.ts` runs on provenance, a different input.)
  */
 export function classifyStatementLayer(stmt: Statement): Layer | null {
-  if (stmt.type === "Terminology") return "Concepts";
+  if (stmt.type === "Terminology") {
+    // A synthetic local-domain codesystem decl name on the system line marks a
+    // lowered `code is` terminology (LocalConcepts); a hand-authored terminology
+    // has no such name (RecordConcepts).
+    const hasSyntheticDomainName = stmt.body.some(
+      (line) => line.type === "TerminologySystem" && line.name !== undefined,
+    );
+    return hasSyntheticDomainName ? "LocalConcepts" : "RecordConcepts";
+  }
   if (stmt.type === "Concept") {
-    // Slice 3 — concept-level `code is`-ONLY concepts are LOWERED upstream
+    // A SYNTHESIZED Interface re-export (decision/action-guard surface) is its
+    // own layer. Its body is pre-qualified; classify it before the code/
+    // definition checks (it carries a synthetic `defined as` bare-ref).
+    if (stmt.__interfaceReexport) return "Interface";
+    // Concept-level `code is`-ONLY concepts are LOWERED upstream
     // (`lowerLocalCodes`, run before classification in both `emitCQLImports`
     // and `emitCQLFromAST`) into a synthetic Terminology + `CodedFromDefinition`
-    // with `stmt.code` CLEARED. So by the time classification runs, an in-scope
-    // local-coded concept already presents as an ordinary `CodedFromDefinition`
-    // (Asserted) and classifies normally — no special case needed here.
+    // with `stmt.code` CLEARED. So by classification time an in-scope
+    // local-coded concept presents as an ordinary `CodedFromDefinition` whose
+    // `retrieveResourceType` is set → LocalSource.
     //
-    // A concept that STILL carries `stmt.code` at this point is out of scope
-    // for the layered split: it is a `code` + `possible representation:` concept
-    // (the external-source-representation lane, NOT YET landed) — lowering
-    // deliberately leaves those untouched so the split can't drop the
-    // representation side. (A MIXED `code` + top-level `definition` concept is a
-    // HARD ERROR raised by `lowerLocalCodes`; it never reaches classification.)
-    // Returning null keeps the whole library on the unchanged per-CRL path.
-    // (The cms22/cms69 corpus has no `code is`, so this changes nothing there.)
+    // A concept that STILL carries `stmt.code` is out of scope (a `code` +
+    // `possible representation:` concept — the external-source-representation
+    // lane, NOT YET landed; lowering deliberately leaves those untouched so the
+    // split can't drop the representation side). A MIXED `code` + top-level
+    // `definition` concept is a HARD ERROR in `lowerLocalCodes`; it never reaches
+    // classification. Returning null keeps the whole library on the per-CRL path.
     if (stmt.code !== undefined) return null;
     if (stmt.representations && stmt.representations.length > 0) return null;
-    // A concept may now be representation/code-only with no top-level
-    // `definition` (ADR 0001 `code is`). Such a concept is not classifiable
-    // into a slice-2 layer (out of scope, like Decision/Activity) — the
+    // A representation/code-only concept with no top-level `definition` (ADR
+    // 0001) is unclassifiable (out of scope, like Decision/Activity) — the
     // `isLayerSplittable` gate then keeps the library on the per-CRL path.
     if (!stmt.definition) return null;
     switch (stmt.definition.type) {
       case "CodedFromDefinition":
-        return "Asserted";
+        // SOURCE-TYPED: synthetic local-source retrieve (lowered `code is`) vs a
+        // hand-authored `coded from` (external record source).
+        return stmt.definition.retrieveResourceType !== undefined
+          ? "LocalSource"
+          : "RecordSource";
       case "DefinedAsDefinition":
       case "DefinitionIsDefinition":
         return "Inferred";
     }
   }
-  // Decision / Activity / Parameter: not layer-classified in this slice.
+  // Decision / Activity / Parameter: not layer-classified.
   return null;
 }
 
@@ -212,13 +285,18 @@ function buildNameLayerMaps(ast: CRL, partition: Partition): NameLayerMaps {
   const concept = new Map<string, Layer>();
   const terminology = new Map<string, Layer>();
   for (const stmt of ast.statements) {
+    // R2 — EXCLUDE the synthesized Interface re-exports from the name maps. An
+    // Interface re-export is a `define "X"` whose body is PRE-QUALIFIED to X's
+    // OWN source layer (`<policyId>-LocalSource."X"` etc.), so the re-qualifier
+    // is never consulted for it. Registering it would map name "X" to layer
+    // "Interface" and SELF-COLLIDE with the source-layer concept "X" it
+    // re-exports (the maps key on name), corrupting cross-layer resolution.
+    if (stmt.type === "Concept" && stmt.__interfaceReexport) continue;
     // CRITICAL (slice 4c): classify via the PARTITION, not the bare
-    // `classifyStatementLayer`. Under the partial split a concept that the FULL
-    // classifier calls "Asserted"/"Inferred" is partition-value "Root"; the maps
-    // must hold "Root" so a Root→Root ref compares equal in `requalifyRef` and
-    // stays BARE. Using the FULL classifier here would leave "Asserted"/"Inferred"
-    // in the maps, mismatch the current partition value "Root", and rewrite the
-    // ref to a nonexistent `"<lib> Inferred"."X"` library.
+    // `classifyStatementLayer`. Under a non-FULL partition a concept that the
+    // FULL classifier calls "Inferred" may be a different partition value; the
+    // maps must hold the PARTITION value so a same-value ref compares equal in
+    // `requalifyRef` and stays BARE.
     const layer = partition.classify(stmt);
     if (layer === null) continue;
     if (stmt.type === "Concept" && stmt.name) concept.set(stmt.name, layer);
@@ -260,21 +338,32 @@ export function isLayerSplittable(ast: CRL): boolean {
   return layersPresent(ast).size > 1;
 }
 
-/** The qualified library identity for a layer of library `lib`, e.g. `"CMS22 Asserted"`. */
-function layerLibraryName(lib: string, layer: Layer): string {
-  return `${lib} ${layer}`;
+/**
+ * The emitted CQL library identity for a source-typed layer (R2-mechanism):
+ * `<policyId>-<PascalLayer>` (e.g. `rx501-145-medical-policy-LocalConcepts`).
+ * The layer VALUES are already PascalCase, so `<PascalLayer>` is the layer value
+ * verbatim. The base is the POLICY ID, hyphen-joined to the layer.
+ */
+function layerLibraryName(policyId: string, layer: Layer): string {
+  return `${policyId}-${layer}`;
 }
 
 /**
- * The generated layer-library names a multi-layer library `lib` (AST `ast`)
- * will emit — one per NON-EMPTY layer, in dependency order. The caller's
- * collision preflight (`imports/emit.ts`) compares these against the full
- * emitted-name set to catch a generated name clashing with a real sibling
- * library (e.g. a multi-layer `library "X"` plus a real `library "X Asserted"`).
+ * The generated layer-library names a multi-layer library will emit — one per
+ * NON-EMPTY layer, in dependency order — based on the POLICY ID (R2). The
+ * caller's collision preflight (`imports/emit.ts`) compares these against the
+ * full emitted-name set to catch a generated name clashing with a real sibling
+ * library. Interface re-exports are SYNTHESIZED at emit time (not in `ast`), so
+ * the caller passes the interface concept names to include the Interface layer.
  */
-export function layerLibraryNamesFor(ast: CRL, lib: string): string[] {
+export function layerLibraryNamesFor(
+  ast: CRL,
+  policyId: string,
+  interfaceConcepts: readonly string[] = [],
+): string[] {
   const present = layersPresent(ast);
-  return LAYER_ORDER.filter((l) => present.has(l)).map((l) => layerLibraryName(lib, l));
+  if (interfaceConcepts.length > 0) present.add("Interface");
+  return LAYER_ORDER.filter((l) => present.has(l)).map((l) => layerLibraryName(policyId, l));
 }
 
 /* ───────────────────────── shared ref-walker ─────────────────────────── */
@@ -416,10 +505,12 @@ function requalifyRef(
   currentLayer: Layer,
   maps: NameLayerMaps,
   lib: string,
+  policyId: string,
   partition: Partition,
 ): ReferenceName {
   const refLib = getRefLibrary(ref);
-  // Genuinely-foreign qualifier → leave untouched.
+  // Genuinely-foreign qualifier → leave untouched. (`lib` is the SOURCE library
+  // name — the self-ref identity; `policyId` is the emitted-name base.)
   if (refLib !== null && refLib !== lib) return ref;
   const name = getRefName(ref);
   const slotMap = slot === "terminology" ? maps.terminology : maps.concept;
@@ -448,7 +539,7 @@ function requalifyRef(
   }
   const qualified: QualifiedReference = {
     type: "QualifiedReference",
-    libraryName: partition.libraryNameFor(lib, targetLayer),
+    libraryName: partition.libraryNameFor(policyId, targetLayer),
     name,
     // Reuse the original ref's location when available; refs carried as bare
     // strings have no location, so synthesize a zero span. emitCQL never reads
@@ -472,26 +563,27 @@ function requalifyComposition(
   currentLayer: Layer,
   maps: NameLayerMaps,
   lib: string,
+  policyId: string,
   partition: Partition,
 ): CompositionExpression {
   switch (expr.type) {
     case "CompositionRef":
-      return { ...expr, ref: requalifyRef(expr.ref, "concept", currentLayer, maps, lib, partition) };
+      return { ...expr, ref: requalifyRef(expr.ref, "concept", currentLayer, maps, lib, policyId, partition) };
     case "CompositionGroup":
       return {
         ...expr,
-        expression: requalifyComposition(expr.expression, currentLayer, maps, lib, partition),
+        expression: requalifyComposition(expr.expression, currentLayer, maps, lib, policyId, partition),
       };
     case "SemNotExpression":
       return {
         ...expr,
-        expression: requalifyComposition(expr.expression, currentLayer, maps, lib, partition),
+        expression: requalifyComposition(expr.expression, currentLayer, maps, lib, policyId, partition),
       };
     case "SemAndExpression":
     case "SemOrExpression":
       return {
         ...expr,
-        terms: expr.terms.map((t) => requalifyComposition(t, currentLayer, maps, lib, partition)),
+        terms: expr.terms.map((t) => requalifyComposition(t, currentLayer, maps, lib, policyId, partition)),
       };
   }
 }
@@ -502,20 +594,21 @@ function requalifyArgValue(
   currentLayer: Layer,
   maps: NameLayerMaps,
   lib: string,
+  policyId: string,
   partition: Partition,
 ): ArgValue {
   switch (arg.type) {
     case "NConceptRef":
-      return { ...arg, value: requalifyRef(arg.value, "concept", currentLayer, maps, lib, partition) };
+      return { ...arg, value: requalifyRef(arg.value, "concept", currentLayer, maps, lib, policyId, partition) };
     case "NDisjunction":
       return {
         ...arg,
-        disjuncts: arg.disjuncts.map((d) => requalifyArgValue(d, currentLayer, maps, lib, partition)),
+        disjuncts: arg.disjuncts.map((d) => requalifyArgValue(d, currentLayer, maps, lib, policyId, partition)),
       };
     case "NConjunction":
       return {
         ...arg,
-        conjuncts: arg.conjuncts.map((c) => requalifyArgValue(c, currentLayer, maps, lib, partition)),
+        conjuncts: arg.conjuncts.map((c) => requalifyArgValue(c, currentLayer, maps, lib, policyId, partition)),
       };
     case "Quantity":
       return arg;
@@ -528,20 +621,21 @@ function requalifyNarrativeElement(
   currentLayer: Layer,
   maps: NameLayerMaps,
   lib: string,
+  policyId: string,
   partition: Partition,
 ): NarrativeElement {
   switch (el.type) {
     case "NConceptRef":
-      return { ...el, value: requalifyRef(el.value, "concept", currentLayer, maps, lib, partition) };
+      return { ...el, value: requalifyRef(el.value, "concept", currentLayer, maps, lib, policyId, partition) };
     case "NDisjunction":
       return {
         ...el,
-        disjuncts: el.disjuncts.map((d) => requalifyArgValue(d, currentLayer, maps, lib, partition)),
+        disjuncts: el.disjuncts.map((d) => requalifyArgValue(d, currentLayer, maps, lib, policyId, partition)),
       };
     case "NConjunction":
       return {
         ...el,
-        conjuncts: el.conjuncts.map((c) => requalifyArgValue(c, currentLayer, maps, lib, partition)),
+        conjuncts: el.conjuncts.map((c) => requalifyArgValue(c, currentLayer, maps, lib, policyId, partition)),
       };
     case "NWord":
     case "Quantity":
@@ -554,11 +648,14 @@ function requalifyNarrative(
   currentLayer: Layer,
   maps: NameLayerMaps,
   lib: string,
+  policyId: string,
   partition: Partition,
 ): NarrativeClause {
   return {
     ...body,
-    elements: body.elements.map((el) => requalifyNarrativeElement(el, currentLayer, maps, lib, partition)),
+    elements: body.elements.map((el) =>
+      requalifyNarrativeElement(el, currentLayer, maps, lib, policyId, partition),
+    ),
   };
 }
 
@@ -575,25 +672,26 @@ function requalifyDefinition(
   currentLayer: Layer,
   maps: NameLayerMaps,
   lib: string,
+  policyId: string,
   partition: Partition,
 ): ConceptDefinition {
   switch (def.type) {
     case "CodedFromDefinition":
       return {
         ...def,
-        terminologyName: requalifyRef(def.terminologyName, "terminology", currentLayer, maps, lib, partition),
+        terminologyName: requalifyRef(def.terminologyName, "terminology", currentLayer, maps, lib, policyId, partition),
       };
     case "DefinedAsDefinition": {
       const out: DefinedAsDefinition = { ...def };
       if (def.body.type === "DefinedAsBareRef") {
         out.body = {
           ...def.body,
-          ref: requalifyRef(def.body.ref, "concept", currentLayer, maps, lib, partition),
+          ref: requalifyRef(def.body.ref, "concept", currentLayer, maps, lib, policyId, partition),
         };
       } else {
         out.body = {
           ...def.body,
-          expression: requalifyComposition(def.body.expression, currentLayer, maps, lib, partition),
+          expression: requalifyComposition(def.body.expression, currentLayer, maps, lib, policyId, partition),
         };
       }
       return out;
@@ -601,7 +699,7 @@ function requalifyDefinition(
     case "DefinitionIsDefinition": {
       const out: DefinitionIsDefinition = {
         ...def,
-        body: requalifyNarrative(def.body, currentLayer, maps, lib, partition),
+        body: requalifyNarrative(def.body, currentLayer, maps, lib, policyId, partition),
       };
       return out;
     }
@@ -614,13 +712,17 @@ function requalifyConcept(
   currentLayer: Layer,
   maps: NameLayerMaps,
   lib: string,
+  policyId: string,
   partition: Partition,
 ): Concept {
   // A concept reaching here was layer-classified, which requires a definition;
   // the guard keeps the now-optional `definition` field type-safe (a
   // representation/code-only concept has none and is never requalified).
+  // (A synthesized Interface re-export carries a PRE-QUALIFIED `defined as`
+  // bare-ref; `requalifyRef` leaves its genuinely-foreign `<policyId>-<layer>`
+  // qualifier untouched, so re-qualifying it here is a safe no-op.)
   if (!c.definition) return { ...c };
-  return { ...c, definition: requalifyDefinition(c.definition, currentLayer, maps, lib, partition) };
+  return { ...c, definition: requalifyDefinition(c.definition, currentLayer, maps, lib, policyId, partition) };
 }
 
 /**
@@ -635,7 +737,8 @@ function requalifyConcept(
 function collectLayerIncludes(
   requalifiedStatements: Statement[],
   currentLibraryName: string,
-  lib: string,
+  currentLayer: Layer,
+  policyId: string,
   partition: Partition,
 ): string[] {
   const referenced = new Set<string>();
@@ -645,9 +748,46 @@ function collectLayerIncludes(
   });
   // Dependency-order the sibling partition libraries (partition `order`, low →
   // high); append any genuinely-foreign libraries sorted for stability.
-  const siblingOrder = partition.order.map((v) => partition.libraryNameFor(lib, v));
+  const siblingOrder = partition.order.map((v) => partition.libraryNameFor(policyId, v));
   const siblings = siblingOrder.filter((name) => referenced.has(name));
   const foreign = [...referenced].filter((name) => !siblingOrder.includes(name)).sort();
+
+  // R2 cross-family include assertion (Claude's catch): a `Local*` library must
+  // NEVER `include` a `Record*` library (and vice-versa). The two source families
+  // are independent emit closures; a cross-family include would mean a lowered
+  // `code is` concept's retrieve pointing at a hand-authored terminology (or the
+  // inverse) — the DEFERRED both-representation case. For the deliverable this
+  // cannot arise (a lowered concept's `coded from` bare-refs its OWN synthetic
+  // local terminology — same family, LocalSource→LocalConcepts), so this guards a
+  // future both-representation regression LOUDLY instead of emitting a silent
+  // cross-family CQL `include`. Mirrors the `computeSplitPlan` D5 invariant-throw:
+  // truly-unreachable on valid deliverable input, so a structured soft-error
+  // channel would be the wrong shape.
+  const familyOf = (layer: Layer): "local" | "record" | "neutral" =>
+    layer.startsWith("Local") ? "local" : layer.startsWith("Record") ? "record" : "neutral";
+  const currentFamily = familyOf(currentLayer);
+  if (currentFamily !== "neutral") {
+    // Reverse-map each SIBLING include name back to its partition value to read
+    // its family. Only siblings (this source's own layer libraries) can be
+    // cross-family-checked; genuinely-foreign libraries are external closures.
+    const siblingNameToLayer = new Map<string, Layer>(
+      partition.order.map((v) => [partition.libraryNameFor(policyId, v), v]),
+    );
+    for (const name of siblings) {
+      const sibLayer = siblingNameToLayer.get(name);
+      if (sibLayer === undefined) continue;
+      const sibFamily = familyOf(sibLayer);
+      if (sibFamily !== "neutral" && sibFamily !== currentFamily) {
+        throw new Error(
+          `internal invariant violated: layer library "${currentLibraryName}" ` +
+            `(${currentFamily} family) would \`include\` cross-family sibling ` +
+            `"${name}" (${sibFamily} family). A Local* library must never include a ` +
+            `Record* library (or vice-versa) — this signals the deferred ` +
+            `both-representation case reached the layered emit path.`,
+        );
+      }
+    }
+  }
   return [...siblings, ...foreign];
 }
 
@@ -661,6 +801,7 @@ function buildLayerAst(
   layer: Layer,
   maps: NameLayerMaps,
   lib: string,
+  policyId: string,
   partition: Partition,
 ): { synthetic: CRL; requalified: Statement[] } {
   const requalified: Statement[] = [];
@@ -669,7 +810,7 @@ function buildLayerAst(
     // Decision/Activity/Parameter statements `classifyStatementLayer` calls null).
     if (partition.classify(stmt) !== layer) continue;
     if (stmt.type === "Concept") {
-      requalified.push(requalifyConcept(stmt, layer, maps, lib, partition));
+      requalified.push(requalifyConcept(stmt, layer, maps, lib, policyId, partition));
     } else {
       // Terminology / Decision / Activity / Parameter — no concept-definition
       // refs the re-qualifier rewrites; carry through as-is. (Decision/Activity
@@ -690,6 +831,145 @@ function buildLayerAst(
 }
 
 /**
+ * R2 Interface synthesis — the decision/action-guard surface re-published as a
+ * dedicated `<policyId>-Interface` library.
+ *
+ * The INTERFACE CONCEPTS are exactly the concepts a decision's branches/actions
+ * reference: `WhenBlock.conceptName` + `ActionGuard.conceptName` across every
+ * `Decision` in the source. For each (deduped, in stable first-seen order) the
+ * synthesis emits ONE re-export `Concept` whose body is a `defined as` bare-ref
+ * PRE-QUALIFIED to the concept's OWN source layer:
+ *   - `code is` concept  → `<policyId>-LocalSource."X"`
+ *   - `coded from`       → `<policyId>-RecordSource."X"`
+ *   - `defined as`       → `<policyId>-Inferred."X"`
+ *
+ * "Pre-qualified" means the re-qualifier is never consulted for the body: the
+ * `<policyId>-<layer>` qualifier is genuinely-foreign vs the SOURCE library name
+ * (`lib`), so `requalifyRef` leaves it untouched. The synthetic concepts carry
+ * `__interfaceReexport` so `classifyStatementLayer` files them under `Interface`
+ * and `buildNameLayerMaps` EXCLUDES them (no self-collision with the source-layer
+ * concept of the same name).
+ *
+ * A WhenBlock/ActionGuard ref to a concept NOT classifiable into a source layer
+ * (an unknown name, or one not in {LocalSource, RecordSource, Inferred}) is a
+ * HARD ERROR (F3): it cannot be source-typed, so no re-export is synthesizable.
+ * Pre-F3 it was SILENTLY SKIPPED — but if EVERY interface concept is skipped the
+ * Interface layer is empty, no `role:"interface"` manifest entry is produced, and
+ * the FHIR `decision-root-library-missing` guard silently DEMOTES the whole
+ * decision. Surfacing it as a structured `emit-decision-concept-not-source-typed`
+ * error makes a missing re-export a clear failure, never a silent decision drop.
+ */
+export function interfaceConceptNames(ast: CRL): string[] {
+  const names: string[] = [];
+  const seen = new Set<string>();
+  const add = (ref: ReferenceName): void => {
+    // F5 — SKIP a qualified ref (`"OtherLib"."X"`). Cross-library concept refs in
+    // a decision when/guard are v0-unsupported; stripping the qualifier to bare
+    // `X` (the pre-F5 `getRefName` behavior) would mis-look-up a same-named LOCAL
+    // concept and synthesize a wrong Interface re-export. Leave it for the normal
+    // cross-library resolution path instead of fabricating a same-name re-export.
+    if (isQualifiedRef(ref)) return;
+    const name = getRefName(ref);
+    if (!seen.has(name)) {
+      seen.add(name);
+      names.push(name);
+    }
+  };
+  const walkBlock = (body: WhenBlockBody | BlockBody): void => {
+    if (body.type === "BlockBody") {
+      for (const member of body.statements) walkMember(member);
+    } else {
+      walkAction(body);
+    }
+  };
+  const walkMember = (member: BlockMember): void => {
+    if (member.type === "WhenBlock") {
+      add(member.conceptName);
+      walkBlock(member.body);
+    } else if (member.type === "OtherwiseBlock") {
+      walkBlock(member.body);
+    } else {
+      walkAction(member);
+    }
+  };
+  const walkAction = (action: ActionStatement): void => {
+    if (action.guard) add(action.guard.conceptName);
+  };
+  for (const stmt of ast.statements) {
+    if (stmt.type !== "Decision") continue;
+    for (const branch of stmt.body.statements) walkMember(branch);
+  }
+  return names;
+}
+
+/**
+ * Synthesize the Interface re-export `Concept`s for the interface concept names.
+ * Each is marked `__interfaceReexport` and pre-qualified to its source layer.
+ * Names whose source layer is not a re-exportable source layer are skipped.
+ */
+function buildInterfaceReexports(
+  ast: CRL,
+  policyId: string,
+  maps: NameLayerMaps,
+): { reexports: Concept[]; errors: CRLError[] } {
+  const reexports: Concept[] = [];
+  const errors: CRLError[] = [];
+  const sourceConceptByName = new Map<string, Concept>();
+  for (const stmt of ast.statements) {
+    if (stmt.type === "Concept" && stmt.name) sourceConceptByName.set(stmt.name, stmt);
+  }
+  for (const name of interfaceConceptNames(ast)) {
+    const sourceLayer = maps.concept.get(name);
+    // Only a concept that classified into a re-exportable SOURCE layer can be
+    // re-exported (its target library is `<policyId>-<sourceLayer>`). F3 — a
+    // decision concept that is NOT source-typed (unknown, or out of {LocalSource,
+    // RecordSource, Inferred}) is a HARD ERROR, not a silent skip: skipping it
+    // could empty the Interface and silently demote the decision downstream.
+    if (
+      sourceLayer !== "LocalSource" &&
+      sourceLayer !== "RecordSource" &&
+      sourceLayer !== "Inferred"
+    ) {
+      const src = sourceConceptByName.get(name);
+      errors.push({
+        type: "Validation",
+        kind: "emit-decision-concept-not-source-typed",
+        message:
+          `decision references concept "${name}" which is not a source-typed ` +
+          `determination (LocalSource/RecordSource/Inferred) and cannot be ` +
+          `re-exported into the Interface layer.`,
+        ...(src?.location ? { line: src.location.start.line, column: src.location.start.column } : {}),
+      });
+      continue;
+    }
+    const src = sourceConceptByName.get(name);
+    const targetLib = layerLibraryName(policyId, sourceLayer);
+    const qualified: QualifiedReference = {
+      type: "QualifiedReference",
+      libraryName: targetLib,
+      name,
+      location: src?.location ?? ast.location,
+    };
+    const reexport: Concept = {
+      type: "Concept",
+      name,
+      ...(src?.conceptType !== undefined ? { conceptType: src.conceptType } : {}),
+      valueTypes: src?.valueTypes ?? [],
+      definition: {
+        type: "DefinedAsDefinition",
+        body: { type: "DefinedAsBareRef", ref: qualified, location: qualified.location },
+        location: qualified.location,
+      },
+      representations: [],
+      location: src?.location ?? ast.location,
+      __interfaceReexport: true,
+    };
+    reexports.push(reexport);
+  }
+  return { reexports, errors };
+}
+
+/**
  * Emit a multi-layer CRL library as separate dependency-ordered layer CQL
  * libraries. The CALLER (imports/emit.ts) has already determined the library
  * is layer-splittable (via `isLayerSplittable`); this function does the split
@@ -707,28 +987,53 @@ export function emitLayered(
   lib: string,
   baseOptions: Omit<EmitOptions, "libraryName" | "crossLibraryIncludes"> = {},
 ): LayeredEmitResult {
-  return emitPartitioned(ast, lib, FULL_PARTITION, baseOptions);
+  // Direct callers (CLI/tests without a policy id) emit under the SOURCE name.
+  return emitPartitioned(ast, lib, lib, FULL_PARTITION, baseOptions);
 }
 
 /**
  * The generalized partition-driven emit. `emitLayered` is the thin FULL_PARTITION
- * wrapper (byte-identical output); the slice-4c partial split passes
- * PARTIAL_PARTITION. For each NON-EMPTY partition value (in dependency `order`),
- * build a synthetic per-value CRL AST with cross-value refs requalified, then
- * emit it under `partition.libraryNameFor(lib, value)` with the includes the
+ * wrapper. For each NON-EMPTY partition value (in dependency `order`), build a
+ * synthetic per-value CRL AST with cross-value refs requalified, then emit it
+ * under `partition.libraryNameFor(policyId, value)` with the includes the
  * requalified statements imply.
+ *
+ * R2: `lib` is the SOURCE library name (the self-ref identity used to detect
+ * local vs genuinely-foreign refs); `policyId` is the EMITTED-name base (the
+ * policy id threaded from package.json `name`). For the FULL partition the
+ * Interface re-exports are synthesized here and injected into the working AST so
+ * the `Interface` layer materializes them; the source AST is never mutated.
  */
 export function emitPartitioned(
   ast: CRL,
   lib: string,
+  policyId: string,
   partition: Partition,
   baseOptions: Omit<EmitOptions, "libraryName" | "crossLibraryIncludes"> = {},
 ): LayeredEmitResult {
   const maps = buildNameLayerMaps(ast, partition);
-  // The DISTINCT partition values actually present (order-independent; the Set
-  // mirrors the old `layersPresent` semantics but through `partition.classify`).
+  // R2 — synthesize the Interface re-exports (FULL split only). They are appended
+  // to a WORKING AST so the existing classify/sweep/emit loop materializes the
+  // `Interface` layer with no special casing. `buildNameLayerMaps` already
+  // EXCLUDES `__interfaceReexport` concepts, and it was computed from the ORIGINAL
+  // `ast` above, so the synthetics never pollute the name maps.
+  const reexportResult =
+    partition === FULL_PARTITION
+      ? buildInterfaceReexports(ast, policyId, maps)
+      : { reexports: [] as Concept[], errors: [] as CRLError[] };
+  // F3 — a non-source-typed decision concept is a hard error; abort BEFORE
+  // emitting any layer (a partial emit with a silently-empty Interface is exactly
+  // what this guards). Surface via the result-level `errors`.
+  if (reexportResult.errors.length > 0) {
+    return { success: false, entries: [], errors: reexportResult.errors };
+  }
+  const reexports = reexportResult.reexports;
+  const workingAst: CRL =
+    reexports.length > 0 ? { ...ast, statements: [...ast.statements, ...reexports] } : ast;
+
+  // The DISTINCT partition values actually present (order-independent).
   const present = new Set<Layer>();
-  for (const stmt of ast.statements) {
+  for (const stmt of workingAst.statements) {
     const v = partition.classify(stmt);
     if (v !== null) present.add(v);
   }
@@ -736,9 +1041,9 @@ export function emitPartitioned(
   let success = true;
   for (const value of partition.order) {
     if (!present.has(value)) continue;
-    const libraryName = partition.libraryNameFor(lib, value);
-    const { synthetic, requalified } = buildLayerAst(ast, value, maps, lib, partition);
-    const crossLibraryIncludes = collectLayerIncludes(requalified, libraryName, lib, partition);
+    const libraryName = partition.libraryNameFor(policyId, value);
+    const { synthetic, requalified } = buildLayerAst(workingAst, value, maps, lib, policyId, partition);
+    const crossLibraryIncludes = collectLayerIncludes(requalified, libraryName, value, policyId, partition);
     const result = emitCQLFromAST(synthetic, {
       ...baseOptions,
       libraryName,

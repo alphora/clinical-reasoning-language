@@ -1,4 +1,4 @@
-library "Code Is Basic Concepts"
+library "code-is-basic-fixture-LocalConcepts"
 
 using FHIR version '4.0.1'
 

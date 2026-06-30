@@ -44,7 +44,8 @@ const ser = (body: unknown): string => JSON.stringify(body, null, 2) + "\n";
 // not the library-name slug ("code-is-decision-vs").
 const VS_CANONICAL = "http://example.org/crl/code-is-decision-vs/ValueSet/code-is-decision-vs-fixture-gi-referral-reasons";
 const CS_CANONICAL = "http://example.org/crl/code-is-decision-vs/CodeSystem/code-is-decision-vs-fixture-local";
-const CONCEPTS_CANONICAL = "http://example.org/crl/code-is-decision-vs/Library/code-is-decision-vs-fixture-concepts";
+const LOCALCONCEPTS_CANONICAL = "http://example.org/crl/code-is-decision-vs/Library/code-is-decision-vs-fixture-localconcepts";
+const RECORDCONCEPTS_CANONICAL = "http://example.org/crl/code-is-decision-vs/Library/code-is-decision-vs-fixture-recordconcepts";
 
 function listGolden(dir: string): string[] {
   if (!existsSync(dir)) return [];
@@ -69,31 +70,42 @@ describe("CRL → FHIR partial-split AUTHOR-VS golden (code-is-decision-vs)", ()
     expect(result.success).toBe(true);
   });
 
-  it("the author ValueSet's canonical routes onto the CONCEPTS Library depends-on (NOT the Root)", () => {
+  it("the relocated terminology routes by SOURCE FAMILY: local CodeSystem → LocalConcepts, author ValueSet → RecordConcepts", () => {
+    // R2 — the source-typed split fans the relocated terminology into TWO concept
+    // layers by family: the synthetic local CodeSystem (from `code is`) lives in
+    // `LocalConcepts`; the hand-authored author ValueSet (from `coded from`) lives
+    // in `RecordConcepts`. NEITHER leaks onto the consuming source layers or the
+    // Interface re-export.
     const libs = result.resources.filter((r) => r.resourceType === "Library");
-    expect(libs).toHaveLength(2);
+    // 5 layer Libraries: LocalConcepts, RecordConcepts, LocalSource, RecordSource,
+    // Interface (no Inferred — this fixture has no `defined as`).
+    expect(libs).toHaveLength(5);
     const byId = new Map(libs.map((l) => [l.resource.id as string, l.resource as Record<string, unknown>]));
-    const root = byId.get("code-is-decision-vs-fixture")!;
-    const concepts = byId.get("code-is-decision-vs-fixture-concepts")!;
-    expect(root).toBeDefined();
-    expect(concepts).toBeDefined();
+    const localConcepts = byId.get("code-is-decision-vs-fixture-localconcepts")!;
+    const recordConcepts = byId.get("code-is-decision-vs-fixture-recordconcepts")!;
+    const localSource = byId.get("code-is-decision-vs-fixture-localsource")!;
+    const recordSource = byId.get("code-is-decision-vs-fixture-recordsource")!;
+    expect(localConcepts).toBeDefined();
+    expect(recordConcepts).toBeDefined();
 
     const depsOf = (r: Record<string, unknown>): string[] =>
-      (r.relatedArtifact as Array<{ type?: string; resource?: string }>)
+      ((r.relatedArtifact as Array<{ type?: string; resource?: string }>) ?? [])
         .filter((e) => e.type === "depends-on")
         .map((e) => e.resource as string);
 
-    // Concepts owns BOTH the author ValueSet AND the local CodeSystem.
-    const conceptsDeps = depsOf(concepts);
-    expect(conceptsDeps).toContain(VS_CANONICAL);
-    expect(conceptsDeps).toContain(CS_CANONICAL);
+    // LocalConcepts owns the local CodeSystem (only) — NOT the author ValueSet.
+    expect(depsOf(localConcepts)).toEqual([CS_CANONICAL]);
+    // RecordConcepts owns the author ValueSet (only) — NOT the local CodeSystem.
+    expect(depsOf(recordConcepts)).toEqual([VS_CANONICAL]);
 
-    // Root depends-on ONLY the Concepts sibling — the ValueSet/CodeSystem do NOT
-    // leak onto the Root.
-    const rootDeps = depsOf(root);
-    expect(rootDeps).toEqual([CONCEPTS_CANONICAL]);
-    expect(rootDeps).not.toContain(VS_CANONICAL);
-    expect(rootDeps).not.toContain(CS_CANONICAL);
+    // The source layers depend-on their OWN-family concepts sibling; the terminology
+    // resources do NOT leak onto them.
+    expect(depsOf(localSource)).toEqual([LOCALCONCEPTS_CANONICAL]);
+    expect(depsOf(recordSource)).toEqual([RECORDCONCEPTS_CANONICAL]);
+    for (const layer of [localSource, recordSource]) {
+      expect(depsOf(layer)).not.toContain(VS_CANONICAL);
+      expect(depsOf(layer)).not.toContain(CS_CANONICAL);
+    }
   });
 
   it("emits exactly one author ValueSet for the relocated terminology", () => {

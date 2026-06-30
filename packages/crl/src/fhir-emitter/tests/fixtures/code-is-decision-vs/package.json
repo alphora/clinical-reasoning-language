@@ -2,7 +2,7 @@
   "name": "code-is-decision-vs-fixture",
   "version": "1.0.0",
   "private": true,
-  "description": "D4 — partial-split author-ValueSet depends-on routing onto Concepts",
+  "description": "D4 — source-typed split author-ValueSet depends-on routing onto LocalConcepts",
   "crl": {
     "canonicalBase": "http://example.org/crl/code-is-decision-vs",
     "status": "draft",

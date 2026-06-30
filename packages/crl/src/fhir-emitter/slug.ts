@@ -25,14 +25,26 @@ const PASCAL_MAX_LEN = 255;
  * `non-ascii-slug-fallback` warning.
  */
 export function slugify(name: string): string {
-  const slug =
+  return capSlug(rawSlug(name));
+}
+
+/**
+ * The UNCAPPED slug — the same character normalization `slugify` applies, but
+ * WITHOUT the 64-char `capSlug` truncation. F6: `normalizePackageMetadata` uses
+ * the uncapped length to reject an over-long policy-id `name`, because the CQL
+ * lane names layer libraries from the raw (uncapped) `metadata.name` while the
+ * FHIR lane caps `policyIdBase` to 64 — a >64 slug would make `idSuffixFor`'s
+ * prefix-strip miss and the emitted ids / `library[]` drift between the lanes.
+ */
+export function rawSlug(name: string): string {
+  return (
     name
       .toLowerCase()
       .replace(/[^a-z0-9\s-]/g, "")
       .replace(/\s+/g, "-")
       .replace(/-+/g, "-")
-      .replace(/(^-|-$)/g, "") || "unnamed";
-  return capSlug(slug);
+      .replace(/(^-|-$)/g, "") || "unnamed"
+  );
 }
 
 /**

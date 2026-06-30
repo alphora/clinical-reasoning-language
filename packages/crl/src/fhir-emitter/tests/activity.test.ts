@@ -114,6 +114,51 @@ describe("activity — emitActivityDefinition", () => {
     ]);
   });
 
+  it("F4: an activity `with` a terminology under an Interface-scoped library[] is a hard error", () => {
+    // F4 — when the activity's `library[]` is rewired to the Interface re-export
+    // (libraryReferenceSuffix === "interface", the decision-bearing split path) AND
+    // it references a TERMINOLOGY via `with`, the dynamicValue would resolve against
+    // the Interface library, which re-exports CONCEPTS not terminologies → dangling.
+    // Guard it loudly rather than emit the dangling reference.
+    const a = activity("Order Antihypertensive Medication", "CPGMedicationRequest" as ActivityType, {
+      withTerm: "Antihypertensive Medications VS",
+      because: "Patient has confirmed hypertension",
+    });
+    const { resource, errors } = emitActivityDefinition(
+      a,
+      "CMS22 BP Control Cognitive Support Example",
+      METADATA,
+      RESOLVE_ALL,
+      { clock: FIXED_CLOCK },
+      "interface",
+    );
+    expect(resource).toBeNull();
+    expect(errors.map((e) => e.kind)).toContain("emit-activity-terminology-interface-unsupported");
+    expect(errors[0]?.message).toContain("Antihypertensive Medications VS");
+  });
+
+  it("F4: an activity with NO `with` terminology under an Interface-scoped library[] emits cleanly (guard is targeted)", () => {
+    // The guard fires ONLY on a terminology `with`. A plain text-disposition
+    // activity (the deliverable shape) under the Interface suffix is unaffected.
+    const a = activity("Refer To GI", "CPGServiceRequest" as ActivityType, {
+      because: "Suspected Crohn's disease",
+    });
+    const { resource, errors } = emitActivityDefinition(
+      a,
+      "Code Is Decision",
+      METADATA,
+      RESOLVE_ALL,
+      { clock: FIXED_CLOCK },
+      "interface",
+    );
+    expect(errors).toEqual([]);
+    expect(resource).not.toBeNull();
+    // library[] resolves to the Interface-suffixed Library.
+    expect((resource!.resource as { library: string[] }).library[0]).toBe(
+      "http://hl7.org/fhir/us/cqfmeasures/crl/cms22/Library/cms22-interface",
+    );
+  });
+
   it("all 14 CRL CPG tokens round-trip the lookup-table fixed fields", () => {
     for (const { token, profile } of ALL_CPG_ACTIVITY_PROFILES) {
       const a = activity(`Test ${token}`, token as ActivityType);

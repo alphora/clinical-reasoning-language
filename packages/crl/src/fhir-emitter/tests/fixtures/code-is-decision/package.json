@@ -2,7 +2,7 @@
   "name": "code-is-decision-fixture",
   "version": "1.0.0",
   "private": true,
-  "description": "Slice 4c code-is-decision fixture — partial-split FHIR closure (Root + Concepts)",
+  "description": "R2 code-is-decision fixture — source-typed split + Interface re-export FHIR closure",
   "crl": {
     "canonicalBase": "http://example.org/crl/code-is-decision",
     "status": "draft",

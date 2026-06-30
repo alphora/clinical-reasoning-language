@@ -89,6 +89,31 @@ describe("fhir-emitter metadata.normalizePackageMetadata", () => {
     },
   );
 
+  it("F6 — an over-long policy-id slug (> 64 chars) is a hard error (oversized-package-name-slug)", () => {
+    // The CQL lane names layer libraries from the RAW name while the FHIR lane
+    // caps policyIdBase to 64; a slug-clean name whose slug exceeds 64 chars would
+    // drift the two lanes' ids. 65 slug-clean chars → rejected.
+    const longName = "a".repeat(65); // slug-clean (lowercase ascii), 65 chars
+    const r = normalizePackageMetadata({
+      name: longName,
+      version: "1.0.0",
+      crl: { canonicalBase: "http://example.org/x" },
+    });
+    expect(r.metadata).toBeNull();
+    expect(r.errors.some((e) => e.kind === "oversized-package-name-slug")).toBe(true);
+  });
+
+  it("F6 — a slug-clean name at exactly 64 chars is accepted (boundary)", () => {
+    const name64 = "a".repeat(64); // exactly the FHIR id limit
+    const r = normalizePackageMetadata({
+      name: name64,
+      version: "1.0.0",
+      crl: { canonicalBase: "http://example.org/x" },
+    });
+    expect(r.metadata).not.toBeNull();
+    expect(r.errors.some((e) => e.kind === "oversized-package-name-slug")).toBe(false);
+  });
+
   it("R1 — a slug-clean `name` is accepted and flows to metadata.name", () => {
     const r = normalizePackageMetadata({
       name: "rx501-145-medical-policy",
