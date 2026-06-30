@@ -1,0 +1,25 @@
+library "Both Representation".
+
+concept "Implanted Estrogen Pellets":
+- type is MedicationRequest.
+- code is `a`.
+concept "Implanted Estradiol Pellets":
+- type is MedicationRequest.
+- code is `b`.
+concept "Implanted Estrogen Or Estradiol Pellets":
+- type is Condition.
+- code is `c`.
+- defined as ( "Implanted Estrogen Pellets" sem-or "Implanted Estradiol Pellets" ).
+
+
+decision "Implanted Pellet HRT Coverage Determination":
+first:
+- when "Implanted Estrogen Or Estradiol Pellets" then recommend activity "Deny".
+- otherwise then recommend activity "Approve".
+
+activity "Approve":
+- request CPGCommunicationRequest.
+- with `Coverage determination: APPROVE / Certified.`.
+activity "Deny":
+- request CPGCommunicationRequest.
+- with `Coverage determination: DENY / Not Certified.`.

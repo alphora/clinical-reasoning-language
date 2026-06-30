@@ -341,7 +341,31 @@ concept "EmptyMixed":
     expect(errors.some((e) => e.kind === "emit-mixed-code-and-definition")).toBe(false);
   });
 
-  it("`code is` + top-level `definition` (mixed) → emit-mixed-code-and-definition", () => {
+  it("`code is` + `coded from` (mixed, NON-`defined as`) → emit-mixed-code-and-definition", () => {
+    // `code is` + `defined as` is now SUPPORTED (both-representation, see the
+    // split tests below). A NON-`defined as` definition mixed with `code is`
+    // (`coded from` here; `definition is` likewise) remains a hard error.
+    const ast = parse(
+      lib(`
+terminology "VS":
+- valueset is \`vs\`.
+
+terminology "Other VS":
+- valueset is \`other\`.
+
+concept "Mixed":
+- type is Observation.
+- value type is boolean.
+- code is \`mixed\`.
+- coded from "Other VS".
+`),
+    );
+    const { errors } = lowerLocalCodes(ast);
+    expect(errors.some((e) => e.kind === "emit-mixed-code-and-definition")).toBe(true);
+    expect(errors.find((e) => e.kind === "emit-mixed-code-and-definition")!.message).toMatch(/Mixed/);
+  });
+
+  it("`code is` + `defined as` (both-representation) is NOT a mixed error — it SPLITS", () => {
     const ast = parse(
       lib(`
 concept "Leaf":
@@ -351,16 +375,31 @@ concept "Leaf":
 terminology "VS":
 - valueset is \`vs\`.
 
-concept "Mixed":
+concept "Both":
 - type is Observation.
 - value type is boolean.
-- code is \`mixed\`.
+- code is \`both\`.
 - defined as "Leaf".
 `),
     );
-    const { errors } = lowerLocalCodes(ast);
-    expect(errors.some((e) => e.kind === "emit-mixed-code-and-definition")).toBe(true);
-    expect(errors.find((e) => e.kind === "emit-mixed-code-and-definition")!.message).toMatch(/Mixed/);
+    const { ast: out, errors } = lowerLocalCodes(ast);
+    expect(errors.some((e) => e.kind === "emit-mixed-code-and-definition")).toBe(false);
+    // The both-rep concept SPLITS into a LocalSource retrieve twin (CodedFromDefinition,
+    // forced Observation) + an Inferred fold-in twin (its `defined as`, marked).
+    const both = out.statements.filter(
+      (s): s is Concept => s.type === "Concept" && s.name === "Both",
+    );
+    expect(both.length).toBe(2);
+    const localTwin = both.find((c) => c.definition?.type === "CodedFromDefinition");
+    const inferredTwin = both.find((c) => c.definition?.type === "DefinedAsDefinition");
+    expect(localTwin).toBeDefined();
+    expect((localTwin!.definition as { retrieveResourceType?: string }).retrieveResourceType).toBe(
+      "Observation",
+    );
+    expect(inferredTwin).toBeDefined();
+    expect(inferredTwin!.__bothRepFoldInLocalSource).toBe("Both");
+    expect(localTwin!.code).toBeUndefined();
+    expect(inferredTwin!.code).toBeUndefined();
   });
 
   it("empty `code is` + representation → emit-empty-local-code (empty checked BEFORE representation skip)", () => {
@@ -388,16 +427,12 @@ concept "Height":
     expect(errors.some((e) => e.kind === "emit-empty-local-code")).toBe(true);
   });
 
-  it("`code is` + `defined as` + representation → emit-mixed-code-and-definition (mixed checked BEFORE representation skip)", () => {
-    // A mixed code+definition concept that ALSO bears a representation must STILL
-    // raise the mixed hard error (not be silently skipped via the representation
-    // lane and emit only the definition, dropping the code-source side).
+  it("`code is` + `coded from` + representation → emit-mixed-code-and-definition (mixed checked BEFORE representation skip)", () => {
+    // A NON-`defined as` mixed code+definition concept that ALSO bears a
+    // representation must STILL raise the mixed hard error (not be silently
+    // skipped via the representation lane and drop the code-source side).
     const ast = parse(
       lib(`
-concept "Leaf":
-- type is Observation.
-- coded from "VS".
-
 terminology "VS":
 - valueset is \`vs\`.
 
@@ -408,7 +443,7 @@ concept "MixedRep":
 - type is Observation.
 - value type is boolean.
 - code is \`mixed-rep\`.
-- defined as "Leaf".
+- coded from "VS".
 - source representation: - coded from "Height VS".
 `),
     );

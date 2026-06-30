@@ -115,6 +115,41 @@ export interface EmitOptions {
    * (pre-R1 behavior).
    */
   localDomainId?: string;
+  /**
+   * Case-feature truth-set emit (the LOCKED case-feature model). When set, this
+   * EMITTED LAYER produces the truth-set shape: a `defined as` composition emits
+   * `union`/`intersect`/`except` over operands where a LocalSource leaf renders
+   * `<LocalSource>."L".asTruths()` and an Inferred operand renders `<Inferred>."N"`
+   * (already a truth-set), and the header gains `include CaseFeatureHelpers called
+   * CFH`. Set PER EMITTED LAYER by `emitPartitioned` — only for the `Inferred` and
+   * `Interface` layers of a `code is`/LocalSource family split — so the
+   * LocalConcepts/LocalSource layers, the measure (`coded from`/RecordSource) lane,
+   * the per-CRL path, and direct single-file callers stay byte-unchanged.
+   *   - `kind: "inferred"`  : `defined as` concepts emit the set-op truth-set body.
+   *   - `kind: "interface"` : `__interfaceReexport` concepts emit `…satisfied()`.
+   * `localSourceLibrary` / `inferredLibrary` are the emitted CQL library names of
+   * the sibling LocalSource / Inferred layers (`partition.libraryNameFor(...)`), so
+   * the Emitter classifies a requalified composition ref's TARGET layer EXACTLY (a
+   * LocalSource leaf → `.asTruths()`; an Inferred operand → bare) instead of
+   * string-suffix-matching a library name.
+   */
+  caseFeature?: {
+    kind: "inferred" | "interface";
+    localSourceLibrary: string;
+    inferredLibrary: string;
+    /**
+     * Fix 2 [important] — the emitted RecordSource sibling-layer library name
+     * (`partition.libraryNameFor(policyId, "RecordSource")`), present when the
+     * split has a RecordSource layer. The truth-set Inferred emit uses it to
+     * DETECT a RecordSource (`coded from`) operand woven into a truth-set
+     * (LocalSource/Inferred) `defined as` — the FUTURE `code is` + `coded from`
+     * weave — and hard-error (`emit-mixed-source-inference-unsupported`) instead
+     * of unioning a truth-set with a record retrieve-list (invalid). Optional:
+     * absent when the split has no RecordSource layer (the deliverable, `code is`
+     * only → never triggers).
+     */
+    recordSourceLibrary?: string;
+  };
 }
 
 /**
@@ -509,9 +544,36 @@ export function emitCQL(input: string, options: EmitOptions = {}): EmitResult {
   return emitCQLFromAST(parsed.result, options);
 }
 
+/**
+ * Internal NORMALIZED case-feature emit mode. The `"off"` arm is the default
+ * (per-CRL path, direct single-file callers, the measure/RecordSource lane, and
+ * the lower LocalConcepts/LocalSource layers): no truth-set shape, no CFH include
+ * — byte-unchanged. The two truth-set arms carry the sibling layer library names
+ * so the Emitter classifies a requalified composition ref's target layer exactly.
+ */
+type CaseFeatureMode =
+  | { kind: "off" }
+  | {
+      kind: "inferred";
+      localSourceLibrary: string;
+      inferredLibrary: string;
+      // Fix 2 — the RecordSource sibling library, when present, so the inferred
+      // emit can detect (and hard-error on) a RecordSource operand woven into a
+      // truth-set composition. Undefined when the split has no RecordSource layer.
+      recordSourceLibrary?: string;
+    }
+  | {
+      kind: "interface";
+      localSourceLibrary: string;
+      inferredLibrary: string;
+      recordSourceLibrary?: string;
+    };
+
 class Emitter {
   private readonly ast: CRL;
   private readonly options: Required<EmitOptions>;
+  /** Normalized case-feature truth-set emit mode (see `CaseFeatureMode`). */
+  private readonly caseFeature: CaseFeatureMode;
   /** Names declared as terminologies (separate set since a name can be BOTH a terminology and a concept in the corpus). */
   private readonly terminologyNames: Set<string> = new Set();
   /** Names declared as concepts. */
@@ -582,9 +644,67 @@ class Emitter {
       // `localDomainId` (R1) is likewise consumed by `lowerLocalCodes` before
       // construction; kept here only for the Required<EmitOptions> shape.
       localDomainId: options.localDomainId ?? "",
+      // `caseFeature` is normalized into `this.caseFeature` below; the
+      // Required-shape sentinel here is never read (absence === off).
+      caseFeature: options.caseFeature ?? {
+        kind: "inferred",
+        localSourceLibrary: "",
+        inferredLibrary: "",
+      },
     };
+    // Normalize the case-feature emit mode. The public option has no `"off"` arm
+    // (absence === off); map it onto the internal discriminated union so the
+    // truth-set code paths read one field.
+    this.caseFeature = options.caseFeature ? { ...options.caseFeature } : { kind: "off" };
     this.indexNames();
     this.detectCollisions();
+    this.guardBothRepLane();
+  }
+
+  /**
+   * Fix 1 [critical] — GATE the both-representation (`code is` + `defined as`)
+   * split to the truth-set/case-feature lane.
+   *
+   * `lowerLocalCodes` splits such a concept UNCONDITIONALLY into a LocalSource
+   * retrieve twin + an Inferred fold-in twin (the Inferred twin carries
+   * `__bothRepFoldInLocalSource`). But the fold-in
+   * (`LocalSource."X".asTruths() union (<inference>)`) is only emitted by
+   * `emitDefinedAs` when `caseFeature.kind === "inferred"`. So a both-rep concept
+   * reached via a NON-truth-set path — a DIRECT `emitCQL`/`emitCQLFromAST` (both
+   * twins land in ONE library → a duplicate `define "X"`), or a layered split with
+   * NO LocalSource layer (`none`-routed / non-decision → `isCaseFeatureSplit`
+   * false → the Inferred twin emits with the mode OFF → a fold-in-LESS, invalid
+   * Inferred define) — would silently emit invalid CQL.
+   *
+   * The Inferred twin is the WITNESS: it is the only statement carrying
+   * `__bothRepFoldInLocalSource`. In the VALID truth-set Inferred emit the twin is
+   * present AND `caseFeature.kind === "inferred"` (no error). The LocalSource twin
+   * does NOT carry the marker, so the LocalSource sub-AST (mode off) never trips
+   * this. Any other arrival of the marker → a path that won't fold it in → hard
+   * error rather than mis-emit. (For the deliverable — decision-bearing local-code
+   * policies — the twin always lands in the Inferred layer in truth-set mode.)
+   */
+  private guardBothRepLane(): void {
+    if (this.caseFeature.kind === "inferred") return;
+    for (const stmt of this.ast.statements) {
+      if (stmt.type === "Concept" && stmt.__bothRepFoldInLocalSource !== undefined) {
+        this.emitErrors.push({
+          type: "Validation",
+          kind: "emit-both-rep-requires-case-feature-lane",
+          line: stmt.location.start.line,
+          column: stmt.location.start.column,
+          message:
+            `Both-representation concept "${stmt.name}" (\`code is\` + \`defined as\`) ` +
+            `reached a non-truth-set emit path (mode "${this.caseFeature.kind}"). The ` +
+            `LocalSource-retrieve / Inferred-fold-in split is only valid in the ` +
+            `case-feature truth-set lane (a layered split with a LocalSource layer ` +
+            `present, emitting the Inferred layer in "inferred" mode). On a direct ` +
+            `emit the two twins collide into a duplicate \`define "${stmt.name}"\`; in ` +
+            `a LocalSource-less split the fold-in is dropped — either way the CQL is ` +
+            `invalid. Emit this policy through the decision/case-feature lane.`,
+        });
+      }
+    }
   }
 
   /**
@@ -697,6 +817,25 @@ class Emitter {
       `include FHIRHelpers version '${this.options.fhirHelpersVersion}' called FHIRHelpers`,
       "include CRLCommon called CRLCommon",
     ];
+    // Case-feature truth-set lane (Inferred / Interface layers only): the
+    // emitted bodies call the fluent `asTruths()` / `satisfied()` helpers, so the
+    // layer `include`s CaseFeatureHelpers. Ordered immediately after CRLCommon,
+    // BEFORE the cross-library layer includes — matching the goldens.
+    //
+    // FLUENT-RESOLUTION RISK (verified-by-spec, not by an in-repo compiler). The
+    // emitted bodies invoke `asTruths()` / `satisfied()` METHOD-STYLE on an
+    // `include`d library with NO `CFH.` qualifier (e.g. `LocalSource."X".asTruths()`).
+    // The CQL spec (§ fluent functions) resolves a fluent function invoked
+    // method-style across `include`d libraries, and the ASLP `ASLPPolicyCaseFeatures.cql`
+    // precedent relies on exactly this. There is NO CQL→ELM translator in this repo
+    // (the "compiler-proof" stage is explicitly post-deadline — docs/mvp-roadmap.md),
+    // so the byte-goldens do NOT prove the translator resolves these refs. RESIDUAL
+    // RISK: verify on a real CQL engine downstream; if fluent method-style resolution
+    // across an `include` does NOT hold, the model + goldens must switch to qualified
+    // `CFH.asTruths(...)` calls.
+    if (this.caseFeature.kind !== "off") {
+      lines.push("include CaseFeatureHelpers called CFH");
+    }
     // Cross-library includes for per-CRL emit: every other CRL library this
     // file qualified-refs gets its own `include` line. Simple include (no
     // `called` alias) so qualified refs can use the natural `Lib."X"` form.
@@ -921,6 +1060,28 @@ class Emitter {
   }
 
   private emitConceptBody(c: Concept, def: ConceptDefinition): string {
+    // Case-feature INTERFACE re-export: collapse the re-exported source-layer
+    // truth-set to a boolean for the decision/action-guard surface.
+    //   - Inferred source    → `Inferred."X".satisfied()`
+    //   - LocalSource source → `LocalSource."X".asTruths().satisfied()` (a DIRECT
+    //     `code is` condition with no `defined as`: lift the retrieve, then collapse)
+    //   - RecordSource source→ plain re-export (legacy lane; truth-set is local-only)
+    if (
+      this.caseFeature.kind === "interface" &&
+      c.__interfaceReexport &&
+      def.type === "DefinedAsDefinition" &&
+      def.body.type === "DefinedAsBareRef"
+    ) {
+      const name = getRefName(def.body.ref);
+      const qref = cqlQualifiedRef(getRefLibrary(def.body.ref) ?? "", name);
+      switch (c.__interfaceSourceLayer) {
+        case "Inferred":
+          return `${qref}.satisfied()`;
+        case "LocalSource":
+          return `${qref}.asTruths().satisfied()`;
+        // RecordSource (and any other) → fall through to the legacy re-export.
+      }
+    }
     switch (def.type) {
       case "CodedFromDefinition":
         return this.emitCodedFrom(c, def);
@@ -1005,6 +1166,32 @@ class Emitter {
     c: Concept,
     body: DefinedAsBareRef | DefinedAsComposition
   ): string {
+    // Case-feature truth-set INFERRED emit: a `defined as` concept is a normalized
+    // truth-set. The operators stay set-ops (`union`/`intersect`/`except`) and the
+    // operand-shape/`exists(...)` bridge is suppressed (every operand IS a
+    // truth-set), so we force the parent shape to "refinement" and let
+    // `emitComposition`'s truth-set leaf rendering add `.asTruths()` per LocalSource
+    // leaf. (A bare-ref `defined as` to another Inferred concept is a truth-set
+    // alias — emit the qualified ref with NO `.asTruths()`.)
+    if (this.caseFeature.kind === "inferred") {
+      // Both-representation fold-in: the Inferred twin of a `code is` + `defined
+      // as` concept must UNION the direct local-source retrieve with its inferred
+      // composition: `LocalSource."X".asTruths() union (<composition>)`. The
+      // LocalSource leaf is an EXPLICIT qualified ref (not a bare same-name ref —
+      // that would resolve to this very Inferred twin and self-recurse).
+      const foldIn = c.__bothRepFoldInLocalSource;
+      const inner =
+        body.type === "DefinedAsBareRef"
+          ? this.emitTruthSetBareRef(body.ref)
+          : this.emitComposition(body.expression, "refinement");
+      if (foldIn !== undefined) {
+        const direct = `${cqlQualifiedRef(this.caseFeature.localSourceLibrary, foldIn)}.asTruths()`;
+        // Multi-line parenthesized group around the inferred composition, matching
+        // the both-rep golden's layout. `indent(inner, 2)` adds the 4-space inset.
+        return `${direct}\n  union (\n${indent(inner, 2)}\n  )`;
+      }
+      return inner;
+    }
     if (body.type === "DefinedAsBareRef") {
       const crossLib = this.crossLibraryOf(body.ref);
       const refName = getRefName(body.ref);
@@ -1015,6 +1202,79 @@ class Emitter {
     }
     const shape = this.shapeForComposition(c, body.expression);
     return this.emitComposition(body.expression, shape);
+  }
+
+  /**
+   * Case-feature truth-set leaf rendering for a composition `CompositionRef` (or a
+   * truth-set bare-ref `defined as`). The requalifier (`layeredEmit.ts`) has
+   * already qualified cross-LAYER refs and left same-layer refs bare:
+   *   - cross-lib ref whose target is the LocalSource layer → a `code is` LEAF:
+   *     `<LocalSource>."L".asTruths()` (lift the Observation retrieve to a truth-set).
+   *   - cross-lib ref whose target is the Inferred layer → a NESTED `defined as`
+   *     operand (already a truth-set): `<Inferred>."N"` (NO `.asTruths()`).
+   *   - BARE ref → a SAME-LAYER Inferred sibling (the requalifier drops the
+   *     qualifier for same-layer targets): SELF-QUALIFY to `<Inferred>."N"` (a
+   *     truth-set), matching the nested golden's `"…-Inferred"."A And B"`.
+   * Returns null for a ref the truth-set classifier doesn't recognize (a foreign
+   * library, or an unknown bare name) so the caller falls back to legacy rendering.
+   */
+  private emitTruthSetRef(ref: ReferenceName): string | null {
+    if (this.caseFeature.kind === "off") return null;
+    const { localSourceLibrary, inferredLibrary, recordSourceLibrary } = this.caseFeature;
+    const name = getRefName(ref);
+    const lib = getRefLibrary(ref);
+    if (lib === null) {
+      // Bare ref → only a SAME-LAYER Inferred sibling self-qualifies (Fix 3). A
+      // bare name that is NOT an Inferred concept is NOT a truth-set leaf this
+      // lane models — return null so the caller surfaces it via legacy handling
+      // instead of fabricating a dangling `<inferredLib>."name"`.
+      if (this.conceptNames.has(name)) {
+        return cqlQualifiedRef(inferredLibrary, name);
+      }
+      return null;
+    }
+    if (lib === localSourceLibrary) {
+      return `${cqlQualifiedRef(localSourceLibrary, name)}.asTruths()`;
+    }
+    if (lib === inferredLibrary) {
+      return cqlQualifiedRef(inferredLibrary, name);
+    }
+    // Fix 2 [important] — a RecordSource (`coded from`) operand woven into a
+    // truth-set (LocalSource/Inferred) `defined as` composition. This is the
+    // FUTURE `code is` + `coded from` weave: unioning/intersecting a truth-set
+    // with a record retrieve-LIST is invalid. Hard-error rather than mis-emit a
+    // bare `RecordLib."X"` into the set-op. (The deliverable is `code is` only →
+    // no RecordSource layer → `recordSourceLibrary` undefined → never triggers.)
+    if (recordSourceLibrary !== undefined && lib === recordSourceLibrary) {
+      this.emitErrors.push({
+        type: "Validation",
+        kind: "emit-mixed-source-inference-unsupported",
+        line: typeof ref === "string" ? 0 : ref.location.start.line,
+        column: typeof ref === "string" ? 0 : ref.location.start.column,
+        message:
+          `A \`defined as\` truth-set composition references RecordSource concept ` +
+          `"${name}" (\`coded from\`/record retrieve) alongside LocalSource/Inferred ` +
+          `truth-set operands. Mixing a record retrieve-list into a truth-set ` +
+          `set-op (union/intersect/except) is invalid, and the \`code is\` + ` +
+          `\`coded from\` weave is a future feature. Keep a \`defined as\` over a ` +
+          `single source family.`,
+      });
+      // Return null so the caller falls through; the emit already fails via the
+      // structured error above.
+      return null;
+    }
+    // Foreign / unrecognized qualifier → not a truth-set leaf this lane models.
+    return null;
+  }
+
+  /** Truth-set bare-ref `defined as` (used by the fold-in helper). */
+  private emitTruthSetBareRef(ref: ReferenceName): string {
+    const ts = this.emitTruthSetRef(ref);
+    if (ts !== null) return ts;
+    // Fallback (foreign qualifier): plain qualified/bare ref, no truth-set lift.
+    const crossLib = this.crossLibraryOf(ref);
+    const refName = getRefName(ref);
+    return crossLib !== null ? cqlQualifiedRef(crossLib, refName) : cqlIdent(refName);
   }
 
   /**
@@ -1044,6 +1304,11 @@ class Emitter {
   ): string {
     switch (expr.type) {
       case "CompositionRef": {
+        // Case-feature truth-set leaf: `.asTruths()` on LocalSource leaves,
+        // self-qualified bare truth-set on same-layer Inferred siblings. Bypasses
+        // the operand-shape `bridgeOperand` path entirely (no `exists(...)`).
+        const truthSet = this.emitTruthSetRef(expr.ref);
+        if (truthSet !== null) return truthSet;
         const crossLib = this.crossLibraryOf(expr.ref);
         const refName = getRefName(expr.ref);
         if (crossLib !== null) {

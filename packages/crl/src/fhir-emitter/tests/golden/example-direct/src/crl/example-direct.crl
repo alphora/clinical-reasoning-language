@@ -1,0 +1,18 @@
+library "Direct Code Is".
+
+concept "Qualifying Diagnosis":
+- type is Condition.
+- code is `qualifying-diagnosis`.
+
+
+decision "Qualifying Diagnosis Coverage Determination":
+first:
+- when "Qualifying Diagnosis" then recommend activity "Approve".
+- otherwise then recommend activity "Deny".
+
+activity "Approve":
+- request CPGCommunicationRequest.
+- with `Coverage determination: APPROVE / Certified.`.
+activity "Deny":
+- request CPGCommunicationRequest.
+- with `Coverage determination: DENY / Not Certified.`.

@@ -1,0 +1,124 @@
+{
+  "resourceType": "PlanDefinition",
+  "id": "example-for-emit-implanted-pellet-hrt-coverage-determination",
+  "meta": {
+    "profile": [
+      "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-strategydefinition",
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareableplandefinition",
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-publishableplandefinition"
+    ]
+  },
+  "extension": [
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "shareable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "computable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "publishable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeRepresentationLevel",
+      "valueCode": "structured"
+    }
+  ],
+  "url": "http://example.org/hcsc/rx501-007/PlanDefinition/example-for-emit-implanted-pellet-hrt-coverage-determination",
+  "version": "0.0.0",
+  "name": "ExampleForEmitImplantedPelletHrtCoverageDetermination",
+  "title": "Example For Emit Pellet HRT Coverage Determination",
+  "status": "draft",
+  "experimental": true,
+  "date": "2026-01-01T00:00:00.000Z",
+  "publisher": "unknown",
+  "description": "Implanted Pellet HRT Coverage Determination",
+  "type": {
+    "coding": [
+      {
+        "system": "http://terminology.hl7.org/CodeSystem/plan-definition-type",
+        "code": "workflow-definition"
+      }
+    ]
+  },
+  "library": [
+    "http://example.org/hcsc/rx501-007/Library/example-for-emit-interface"
+  ],
+  "action": [
+    {
+      "title": "Implanted Estrogen Or Estradiol Pellets",
+      "description": "Implanted Estrogen Or Estradiol Pellets",
+      "code": [
+        {
+          "coding": [
+            {
+              "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+              "code": "guideline-based-care"
+            }
+          ]
+        }
+      ],
+      "condition": [
+        {
+          "kind": "applicability",
+          "expression": {
+            "language": "text/cql-identifier",
+            "expression": "Implanted Estrogen Or Estradiol Pellets"
+          }
+        }
+      ],
+      "input": [
+        {
+          "extension": [
+            {
+              "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+              "valueString": "Implanted Estradiol Pellets?"
+            },
+            {
+              "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+              "valueMarkdown": "Implanted Estradiol Pellets"
+            }
+          ],
+          "type": "Observation",
+          "profile": [
+            "http://example.org/hcsc/rx501-007/StructureDefinition/example-for-emit-implanted-estradiol-pellets"
+          ]
+        },
+        {
+          "extension": [
+            {
+              "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+              "valueString": "Implanted Estrogen Pellets?"
+            },
+            {
+              "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+              "valueMarkdown": "Implanted Estrogen Pellets"
+            }
+          ],
+          "type": "Observation",
+          "profile": [
+            "http://example.org/hcsc/rx501-007/StructureDefinition/example-for-emit-implanted-estrogen-pellets"
+          ]
+        }
+      ],
+      "definitionCanonical": "http://example.org/hcsc/rx501-007/PlanDefinition/example-for-emit-deny-eiu-recommendation"
+    },
+    {
+      "title": "otherwise",
+      "description": "otherwise",
+      "code": [
+        {
+          "coding": [
+            {
+              "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+              "code": "guideline-based-care"
+            }
+          ]
+        }
+      ],
+      "definitionCanonical": "http://example.org/hcsc/rx501-007/PlanDefinition/example-for-emit-deny-recommendation"
+    }
+  ]
+}

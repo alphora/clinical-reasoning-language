@@ -62,6 +62,7 @@ import type {
   BlockBody,
   BlockMember,
   ActionStatement,
+  InterfaceSourceLayer,
 } from "../ast/types";
 import { getRefName, getRefLibrary, isQualifiedRef } from "../ast/types";
 
@@ -299,8 +300,20 @@ function buildNameLayerMaps(ast: CRL, partition: Partition): NameLayerMaps {
     // `requalifyRef` and stays BARE.
     const layer = partition.classify(stmt);
     if (layer === null) continue;
-    if (stmt.type === "Concept" && stmt.name) concept.set(stmt.name, layer);
-    else if (stmt.type === "Terminology" && stmt.name) terminology.set(stmt.name, layer);
+    if (stmt.type === "Concept" && stmt.name) {
+      // BOTH-REPRESENTATION (`code is` + `defined as`): `lowerLocalCodes` splits
+      // the concept into a LocalSource retrieve twin + an Inferred fold-in twin,
+      // BOTH carrying the same name. The single concept→layer map would otherwise
+      // be order-dependent. The PUBLIC meaning of the name is the Inferred
+      // determination (its define folds in the LocalSource retrieve), so a ref to
+      // the name (an Interface re-export, or a nested `defined as` operand) must
+      // resolve to Inferred — make Inferred win deterministically over its twin.
+      const prior = concept.get(stmt.name);
+      if (prior === "Inferred" && layer !== "Inferred") continue;
+      concept.set(stmt.name, layer);
+    } else if (stmt.type === "Terminology" && stmt.name) {
+      terminology.set(stmt.name, layer);
+    }
   }
   return { concept, terminology };
 }
@@ -945,17 +958,23 @@ function buildInterfaceReexports(
     if (stmt.type === "Concept" && stmt.name) sourceConceptByName.set(stmt.name, stmt);
   }
   for (const name of interfaceConceptNames(ast)) {
-    const sourceLayer = maps.concept.get(name);
+    const rawSourceLayer = maps.concept.get(name);
     // Only a concept that classified into a re-exportable SOURCE layer can be
     // re-exported (its target library is `<policyId>-<sourceLayer>`). F3 — a
     // decision concept that is NOT source-typed (unknown, or out of {LocalSource,
     // RecordSource, Inferred}) is a HARD ERROR, not a silent skip: skipping it
     // could empty the Interface and silently demote the decision downstream.
-    if (
-      sourceLayer !== "LocalSource" &&
-      sourceLayer !== "RecordSource" &&
-      sourceLayer !== "Inferred"
-    ) {
+    // Fix 4 — narrow to the closed `InterfaceSourceLayer` union here (the `Layer`
+    // alias is bare `string`, so the negative guard below would NOT narrow it);
+    // the positive membership test gives the typed `sourceLayer` the assignment
+    // to `__interfaceSourceLayer` requires.
+    const sourceLayer: InterfaceSourceLayer | undefined =
+      rawSourceLayer === "LocalSource" ||
+      rawSourceLayer === "RecordSource" ||
+      rawSourceLayer === "Inferred"
+        ? rawSourceLayer
+        : undefined;
+    if (sourceLayer === undefined) {
       const src = sourceConceptByName.get(name);
       errors.push({
         type: "Validation",
@@ -989,6 +1008,10 @@ function buildInterfaceReexports(
       representations: [],
       location: src?.location ?? ast.location,
       __interfaceReexport: true,
+      // The source layer this re-export re-publishes from — read by the
+      // case-feature Interface emit to pick the define body (`…satisfied()` /
+      // `…asTruths().satisfied()` / legacy plain re-export). See emitCQL.ts.
+      __interfaceSourceLayer: sourceLayer,
     };
     reexports.push(reexport);
   }
@@ -1063,6 +1086,26 @@ export function emitPartitioned(
     const v = partition.classify(stmt);
     if (v !== null) present.add(v);
   }
+  // Case-feature truth-set gate (the LOCKED case-feature model). The truth-set
+  // shape (`.asTruths()`/`.satisfied()`/CFH) is the LocalSource/`code is` family's
+  // CQL realization; a measure split (`coded from`/RecordSource, NO LocalSource
+  // layer — e.g. cms22/cms69) keeps its LEGACY CQL byte-for-byte. So enable
+  // truth-set mode for the Inferred/Interface layers ONLY when a LocalSource layer
+  // is present in this split. The sibling layer library names are passed so the
+  // Inferred/Interface Emitter classifies a requalified composition ref's target
+  // layer exactly (LocalSource leaf → `.asTruths()`; Inferred operand → bare).
+  const isCaseFeatureSplit = present.has("LocalSource");
+  const localSourceLibrary = partition.libraryNameFor(policyId, "LocalSource");
+  const inferredLibrary = partition.libraryNameFor(policyId, "Inferred");
+  // Fix 2 — the RecordSource sibling library name, threaded ONLY when a
+  // RecordSource layer is actually present, so the Inferred/Interface emit can
+  // detect a RecordSource operand woven into a truth-set composition (the future
+  // `code is` + `coded from` weave) and hard-error. Undefined for the deliverable
+  // (`code is` only → no RecordSource layer).
+  const recordSourceLibrary = present.has("RecordSource")
+    ? partition.libraryNameFor(policyId, "RecordSource")
+    : undefined;
+
   const entries: LayeredEmitEntry[] = [];
   let success = true;
   for (const value of partition.order) {
@@ -1070,10 +1113,23 @@ export function emitPartitioned(
     const libraryName = partition.libraryNameFor(policyId, value);
     const { synthetic, requalified } = buildLayerAst(workingAst, value, maps, lib, policyId, partition);
     const crossLibraryIncludes = collectLayerIncludes(requalified, libraryName, value, policyId, partition);
+    // Per-layer case-feature mode: ONLY the Inferred + Interface layers emit the
+    // truth-set shape (NOT LocalConcepts/LocalSource). `kind` keys the emit:
+    // `"inferred"` (set-op truth-sets) vs `"interface"` (`…satisfied()`).
+    const caseFeature =
+      isCaseFeatureSplit && (value === "Inferred" || value === "Interface")
+        ? {
+            kind: (value === "Inferred" ? "inferred" : "interface") as "inferred" | "interface",
+            localSourceLibrary,
+            inferredLibrary,
+            ...(recordSourceLibrary !== undefined ? { recordSourceLibrary } : {}),
+          }
+        : undefined;
     const result = emitCQLFromAST(synthetic, {
       ...baseOptions,
       libraryName,
       crossLibraryIncludes,
+      ...(caseFeature ? { caseFeature } : {}),
     });
     if (!result.success) success = false;
     entries.push({ layer: value, libraryName, crossLibraryIncludes, result });

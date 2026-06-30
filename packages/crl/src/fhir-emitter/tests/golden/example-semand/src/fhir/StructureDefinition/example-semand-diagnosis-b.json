@@ -1,0 +1,112 @@
+{
+  "resourceType": "StructureDefinition",
+  "id": "example-semand-diagnosis-b",
+  "meta": {
+    "profile": [
+      "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-publishablecasefeature"
+    ]
+  },
+  "extension": [
+    {
+      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-knowledgeCapability",
+      "valueCode": "shareable"
+    },
+    {
+      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-knowledgeCapability",
+      "valueCode": "computable"
+    },
+    {
+      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-knowledgeCapability",
+      "valueCode": "publishable"
+    },
+    {
+      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-knowledgeRepresentationLevel",
+      "valueCode": "structured"
+    },
+    {
+      "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-featureExpression",
+      "valueExpression": {
+        "language": "text/cql-identifier",
+        "expression": "Diagnosis B",
+        "reference": "http://example.org/hcsc/rx501-007/Library/example-semand-localsource"
+      }
+    }
+  ],
+  "url": "http://example.org/hcsc/rx501-007/StructureDefinition/example-semand-diagnosis-b",
+  "version": "0.0.0",
+  "name": "DiagnosisB",
+  "title": "Diagnosis B",
+  "status": "draft",
+  "experimental": true,
+  "date": "2026-01-01T00:00:00.000Z",
+  "publisher": "unknown",
+  "description": "Diagnosis B case feature determination",
+  "kind": "resource",
+  "abstract": false,
+  "type": "Observation",
+  "baseDefinition": "http://hl7.org/fhir/StructureDefinition/Observation",
+  "derivation": "constraint",
+  "differential": {
+    "element": [
+      {
+        "id": "Observation",
+        "path": "Observation"
+      },
+      {
+        "id": "Observation.code",
+        "path": "Observation.code",
+        "min": 1,
+        "max": "1",
+        "mustSupport": true,
+        "patternCodeableConcept": {
+          "coding": [
+            {
+              "system": "http://example.org/hcsc/rx501-007/CodeSystem/example-semand-local",
+              "code": "b",
+              "display": "Diagnosis B"
+            }
+          ]
+        }
+      },
+      {
+        "id": "Observation.value[x]",
+        "path": "Observation.value[x]",
+        "min": 1,
+        "max": "1",
+        "mustSupport": true,
+        "type": [
+          {
+            "code": "boolean"
+          }
+        ]
+      },
+      {
+        "id": "Observation.subject",
+        "path": "Observation.subject",
+        "min": 1,
+        "max": "1",
+        "mustSupport": true,
+        "type": [
+          {
+            "code": "Reference",
+            "targetProfile": [
+              "http://hl7.org/fhir/StructureDefinition/Patient"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "Observation.effective[x]",
+        "path": "Observation.effective[x]",
+        "min": 1,
+        "max": "1",
+        "mustSupport": true,
+        "type": [
+          {
+            "code": "dateTime"
+          }
+        ]
+      }
+    ]
+  }
+}

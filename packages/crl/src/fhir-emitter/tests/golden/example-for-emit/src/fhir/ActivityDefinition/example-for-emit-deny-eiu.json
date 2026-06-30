@@ -1,0 +1,53 @@
+{
+  "resourceType": "ActivityDefinition",
+  "id": "example-for-emit-deny-eiu",
+  "meta": {
+    "profile": [
+      "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-communicationactivity",
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareableactivitydefinition",
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-publishableactivitydefinition"
+    ]
+  },
+  "extension": [
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "shareable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "computable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "publishable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeRepresentationLevel",
+      "valueCode": "structured"
+    }
+  ],
+  "url": "http://example.org/hcsc/rx501-007/ActivityDefinition/example-for-emit-deny-eiu",
+  "version": "0.0.0",
+  "name": "ExampleForEmitDenyEiu",
+  "title": "Deny EIU",
+  "status": "draft",
+  "experimental": true,
+  "date": "2026-01-01T00:00:00.000Z",
+  "publisher": "unknown",
+  "description": "Deny EIU",
+  "library": [
+    "http://example.org/hcsc/rx501-007/Library/example-for-emit-interface"
+  ],
+  "kind": "CommunicationRequest",
+  "profile": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-communicationrequest",
+  "intent": "proposal",
+  "doNotPerform": false,
+  "code": {
+    "coding": [
+      {
+        "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-activity-type-cs",
+        "code": "send-message"
+      }
+    ]
+  }
+}

@@ -177,6 +177,21 @@ export function localCodeSystemUrl(
   return `urn:crl:codesystem:${slug}-local`;
 }
 
+/**
+ * Title-case a policy-id slug for the human-readable local codesystem DECL name:
+ * lowercase-hyphen-slug the id, then split on `-` and capitalize each token —
+ * `example-direct` → "Example Direct", `example-for-emit` → "Example For Emit".
+ * Keyed off the SAME slug source as the local-domain URL so the decl name and the
+ * URL share one identity.
+ */
+function titleCaseSlug(id: string): string {
+  return localSlug(id)
+    .split("-")
+    .filter((w) => w.length > 0)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
+}
+
 /** Lowercase-hyphen slug of a name; `unnamed` when empty after stripping. */
 function localSlug(name: string): string {
   return (
@@ -288,6 +303,11 @@ export function lowerLocalCodes(
   const seenSyntheticNames = new Set<string>();
 
   const loweredConcepts: Concept[] = [];
+  // Both-representation INFERRED twins (`code is` + `defined as`): the inference
+  // half of a split, appended to the statement list AFTER the rewrite. Each keeps
+  // the original `defined as` and carries `__bothRepFoldInLocalSource` so the emit
+  // unions in the direct LocalSource retrieve. Keyed in declaration order.
+  const bothRepInferredTwins: Concept[] = [];
   const localCodes: Array<{ concept: string; code: string; conceptType: string }> = [];
   const syntheticTerminologies: Terminology[] = [];
   // The local-domain URN slug source: R1 — the POLICY ID (`opts.localDomainId`,
@@ -300,14 +320,27 @@ export function lowerLocalCodes(
   // belongs to the source policy, not the layer.
   const urn = localCodeSystemUrl(opts.canonicalBase, opts.localDomainId ?? ast.library.name);
 
-  // Slice 4b — the ONE shared domain `codesystem` DECLARATION name, derived from
-  // the SOURCE policy library identity (`ast.library.name`), NOT the emitted-layer
-  // library name (`options.libraryName` may be "<Lib> Concepts"). Every synthetic
-  // terminology's system line carries THIS name so the emitter emits a single
-  // shared `codesystem "<domain>": '<urn>'` (deduped) instead of N "<Concept>
-  // System" decls all sharing one URN. The per-concept terminology `name` is
-  // unchanged — only the codesystem DECL name is shared.
-  const localCodesystemName = `${ast.library.name} Local Codes`;
+  // Slice 4b — the ONE shared domain `codesystem` DECLARATION name. R1/case-feature:
+  // derived from the POLICY ID (`opts.localDomainId`, the package.json `name`) so the
+  // human-readable decl name keys off the SAME identity as the local-domain URL slug
+  // (`<base>/CodeSystem/<policy-id>-local`) and the FHIR lane — title-cased from the
+  // policy-id slug (e.g. `example-direct` → "Example Direct Local Codes"). Falls back
+  // to the SOURCE library name for direct callers without metadata (CLI/single-file),
+  // preserving the pre-R1 emit for those. NOT the emitted-layer library name
+  // (`options.libraryName` may be the layered "<Lib>-LocalConcepts"); the local domain
+  // belongs to the source policy, not the layer. Every synthetic terminology's system
+  // line carries THIS name so the emitter emits a single shared
+  // `codesystem "<domain>": '<urn>'` (deduped) instead of N "<Concept> System" decls.
+  // Fix 4 [nit] — the no-`localDomainId` fallback derives the decl name from the
+  // SOURCE LIBRARY NAME, while the URL fallback (line ~321, `urn` above) slugs the
+  // SAME `ast.library.name`. The shared-identity guarantee (decl name ↔ url share
+  // one source) therefore holds for direct callers ONLY because both fall back to
+  // `ast.library.name`; when `localDomainId` IS set, both key off the policy id
+  // (`titleCaseSlug(opts.localDomainId)` here, `localSlug(opts.localDomainId)` in
+  // the url) — same source, byte-aligned. Keep these two fallbacks in lock-step.
+  const localCodesystemName = opts.localDomainId
+    ? `${titleCaseSlug(opts.localDomainId)} Local Codes`
+    : `${ast.library.name} Local Codes`;
 
   // D2 — the shared decl name is injected as a top-level CQL `codesystem`
   // identifier. If the library ALREADY declares a top-level identifier of that
@@ -349,18 +382,28 @@ export function lowerLocalCodes(
       continue;
     }
 
-    // (2) MIXED `code` + top-level `definition` — out of scope this slice.
-    if (c.definition !== undefined) {
+    // (2) MIXED `code` + top-level `definition`. BOTH-REPRESENTATION (`code is` +
+    //     `defined as`) is now SUPPORTED (the case-feature model): the concept is
+    //     SPLIT into a LocalSource retrieve twin (the direct local code) + an
+    //     Inferred fold-in twin (the inference, unioned with the direct retrieve).
+    //     `code is` + `coded from` or `code is` + `definition is` remain hard
+    //     errors (only `defined as` folds cleanly into the truth-set union).
+    if (c.definition !== undefined && c.definition.type !== "DefinedAsDefinition") {
       errors.push(mkError(
         "emit-mixed-code-and-definition",
         `Concept "${c.name}" carries BOTH a local \`code is\` and a top-level ` +
-          `definition (\`${c.definition.type}\`). Mixed local-code + definition ` +
-          `concepts are out of scope for this emit slice; emit nothing rather than ` +
-          `silently drop the local-code source side.`,
+          `definition (\`${c.definition.type}\`). Only \`code is\` + \`defined as\` ` +
+          `(both-representation) is supported; \`code is\` + \`${c.definition.type}\` ` +
+          `is out of scope — emit nothing rather than silently drop the local-code ` +
+          `source side.`,
         loc,
       ));
       continue;
     }
+    const bothRepDefinedAs =
+      c.definition !== undefined && c.definition.type === "DefinedAsDefinition"
+        ? c.definition
+        : undefined;
 
     // (3) REPRESENTATION-bearing (`code` + representation, no top-level
     //     definition, non-empty code) — out of scope this slice. SKIP: leave
@@ -489,9 +532,28 @@ export function lowerLocalCodes(
       );
     }
 
+    // The LocalSource retrieve twin (or, for a pure `code is` concept, THE
+    // lowered concept). `definition` is replaced with the synthetic retrieve and
+    // `code` cleared (idempotent). For a both-rep concept this is the direct
+    // local-source half; its `defined as` lives on the Inferred twin below.
     const lowered: Concept = { ...c, definition: codedFrom };
     delete lowered.code;
     loweredConcepts.push(lowered);
+
+    // BOTH-REPRESENTATION: also synthesize the INFERRED twin carrying the original
+    // `defined as`, marked so the emit folds in the direct LocalSource retrieve
+    // (`LocalSource."X".asTruths() union (<inference>)`). Same name as the
+    // LocalSource twin — they land in different layer libraries; `buildNameLayerMaps`
+    // resolves the name to Inferred (the public determination).
+    if (bothRepDefinedAs !== undefined) {
+      const inferredTwin: Concept = {
+        ...c,
+        definition: bothRepDefinedAs,
+        __bothRepFoldInLocalSource: c.name,
+      };
+      delete inferredTwin.code;
+      bothRepInferredTwins.push(inferredTwin);
+    }
   }
 
   // Re-thread statements: replace each lowered concept in place, and append the
@@ -520,7 +582,13 @@ export function lowerLocalCodes(
 
   const outAst: CRL = {
     ...ast,
-    statements: [...syntheticTerminologies, ...rewritten],
+    // Synthetic local terminologies at the FRONT (Concepts layer); the
+    // both-representation INFERRED twins APPENDED at the end (Inferred layer) —
+    // they share a name with their LocalSource twin already present in
+    // `rewritten`, so they cannot be the in-place replacement and must be added
+    // as additional statements. The emitter sections by kind/layer, so absolute
+    // position is immaterial beyond stable intra-layer ordering.
+    statements: [...syntheticTerminologies, ...rewritten, ...bothRepInferredTwins],
   };
 
   return { ast: outAst, errors, localCodes };

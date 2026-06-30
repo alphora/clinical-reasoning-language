@@ -1,0 +1,23 @@
+library "Example For Emit".
+
+concept "Implanted Estrogen Pellets":
+- type is MedicationRequest.
+- code is `implanted-estrogen-pellets`.
+concept "Implanted Estradiol Pellets":
+- type is MedicationRequest.
+- code is `implanted-estradiol-pellets`.
+concept "Implanted Estrogen Or Estradiol Pellets":
+- defined as ( "Implanted Estrogen Pellets" sem-or "Implanted Estradiol Pellets" ).
+
+
+decision "Implanted Pellet HRT Coverage Determination":
+first:
+- when "Implanted Estrogen Or Estradiol Pellets" then recommend activity "Deny EIU".
+- otherwise then recommend activity "Deny".
+
+activity "Deny":
+- request CPGCommunicationRequest.
+- with `Coverage determination: DENY / Not Certified (X12 278 HCR01 A3). A communicated prior-authorization coverage determination denying certification of the requested service (not medically necessary / criteria not met); NOT a service order.`.
+activity "Deny EIU":
+- request CPGCommunicationRequest.
+- with `Coverage determination: DENY — Experimental, Investigational and/or Unproven (X12 278 HCR01 A3). A communicated prior-authorization coverage determination denying certification because the requested service is classified experimental/investigational/unproven — a denial reason distinct from a medical-necessity Deny (both are X12 A3); NOT a service order.`.

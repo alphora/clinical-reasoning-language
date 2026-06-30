@@ -1,0 +1,140 @@
+{
+  "resourceType": "PlanDefinition",
+  "id": "example-nested-top-coverage-determination",
+  "meta": {
+    "profile": [
+      "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-strategydefinition",
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareableplandefinition",
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-publishableplandefinition"
+    ]
+  },
+  "extension": [
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "shareable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "computable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "publishable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeRepresentationLevel",
+      "valueCode": "structured"
+    }
+  ],
+  "url": "http://example.org/hcsc/rx501-007/PlanDefinition/example-nested-top-coverage-determination",
+  "version": "0.0.0",
+  "name": "TopCoverageDetermination",
+  "title": "Top Coverage Determination",
+  "status": "draft",
+  "experimental": true,
+  "date": "2026-01-01T00:00:00.000Z",
+  "publisher": "unknown",
+  "description": "Top Coverage Determination",
+  "type": {
+    "coding": [
+      {
+        "system": "http://terminology.hl7.org/CodeSystem/plan-definition-type",
+        "code": "workflow-definition"
+      }
+    ]
+  },
+  "library": [
+    "http://example.org/hcsc/rx501-007/Library/example-nested-interface"
+  ],
+  "action": [
+    {
+      "title": "Top",
+      "description": "Top",
+      "code": [
+        {
+          "coding": [
+            {
+              "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+              "code": "guideline-based-care"
+            }
+          ]
+        }
+      ],
+      "condition": [
+        {
+          "kind": "applicability",
+          "expression": {
+            "language": "text/cql-identifier",
+            "expression": "Top"
+          }
+        }
+      ],
+      "input": [
+        {
+          "extension": [
+            {
+              "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+              "valueString": "Diagnosis A?"
+            },
+            {
+              "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+              "valueMarkdown": "Diagnosis A"
+            }
+          ],
+          "type": "Observation",
+          "profile": [
+            "http://example.org/hcsc/rx501-007/StructureDefinition/example-nested-diagnosis-a"
+          ]
+        },
+        {
+          "extension": [
+            {
+              "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+              "valueString": "Diagnosis B?"
+            },
+            {
+              "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+              "valueMarkdown": "Diagnosis B"
+            }
+          ],
+          "type": "Observation",
+          "profile": [
+            "http://example.org/hcsc/rx501-007/StructureDefinition/example-nested-diagnosis-b"
+          ]
+        },
+        {
+          "extension": [
+            {
+              "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+              "valueString": "Diagnosis C?"
+            },
+            {
+              "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+              "valueMarkdown": "Diagnosis C"
+            }
+          ],
+          "type": "Observation",
+          "profile": [
+            "http://example.org/hcsc/rx501-007/StructureDefinition/example-nested-diagnosis-c"
+          ]
+        }
+      ],
+      "definitionCanonical": "http://example.org/hcsc/rx501-007/PlanDefinition/example-nested-approve-recommendation"
+    },
+    {
+      "title": "otherwise",
+      "description": "otherwise",
+      "code": [
+        {
+          "coding": [
+            {
+              "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+              "code": "guideline-based-care"
+            }
+          ]
+        }
+      ],
+      "definitionCanonical": "http://example.org/hcsc/rx501-007/PlanDefinition/example-nested-deny-recommendation"
+    }
+  ]
+}

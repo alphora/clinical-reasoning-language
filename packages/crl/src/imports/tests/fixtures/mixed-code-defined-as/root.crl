@@ -1,19 +1,17 @@
-# mixed-code-defined-as root
+# mixed-code-and-coded-from root
 library "Mixed".
 
-// A multi-layer library where one concept carries BOTH a local `code is` and a
-// `defined as`. The mixed concept is unclassifiable, so the whole library stays
-// on the per-CRL path (NOT auto-split) until the code-is slice.
+// A library where one concept carries BOTH a local `code is` and a NON-`defined
+// as` top-level definition (`coded from` here). `code is` + `defined as` is now
+// SUPPORTED (both-representation); `code is` + `coded from` (or `definition is`)
+// remains a hard error — `lowerLocalCodes` raises `emit-mixed-code-and-definition`
+// rather than silently dropping the local-code source side.
 
 terminology "VS":
 - valueset is `vs`.
-
-concept "Leaf":
-- type is Observation.
-- coded from "VS".
 
 concept "Mixed Concept":
 - type is Observation.
 - value type is boolean.
 - code is `local-code`.
-- defined as "Leaf".
+- coded from "VS".

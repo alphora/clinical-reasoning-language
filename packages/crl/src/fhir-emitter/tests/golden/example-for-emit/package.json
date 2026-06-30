@@ -1,0 +1,7 @@
+{
+  "name": "example-for-emit",
+  "version": "0.0.0",
+  "crl": {
+    "canonicalBase": "http://example.org/hcsc/rx501-007"
+  }
+}

@@ -249,8 +249,10 @@ describe("closureOrchestrator — FHIR closure code-is coverage (T2)", () => {
     const allCql = cql.cqlByLibrary.map((e) => e.cql).join("\n");
     expect(allCql).toContain(`'${csUrl}'`);
     // Slice 4b — the N per-concept "<Concept> System" codesystem decls collapsed
-    // into ONE shared domain decl "<Lib> Local Codes" carrying the same URL.
-    expect(allCql).toContain(`codesystem "Code Is Basic Local Codes": '${csUrl}'`);
+    // into ONE shared domain decl carrying the same URL. R1/case-feature — the
+    // decl name is derived from the POLICY ID ("code-is-basic-fixture"),
+    // title-cased: "Code Is Basic Fixture Local Codes".
+    expect(allCql).toContain(`codesystem "Code Is Basic Fixture Local Codes": '${csUrl}'`);
   });
 
   it("F4 — two eligible LocalSource-boolean concepts → BOTH case-feature SDs emitted AND each when-action carries its input.profile (silent-omission guard)", () => {

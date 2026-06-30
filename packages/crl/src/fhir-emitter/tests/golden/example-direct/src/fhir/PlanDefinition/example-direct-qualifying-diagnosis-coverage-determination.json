@@ -1,0 +1,108 @@
+{
+  "resourceType": "PlanDefinition",
+  "id": "example-direct-qualifying-diagnosis-coverage-determination",
+  "meta": {
+    "profile": [
+      "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-strategydefinition",
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareableplandefinition",
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-publishableplandefinition"
+    ]
+  },
+  "extension": [
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "shareable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "computable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "publishable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeRepresentationLevel",
+      "valueCode": "structured"
+    }
+  ],
+  "url": "http://example.org/hcsc/rx501-007/PlanDefinition/example-direct-qualifying-diagnosis-coverage-determination",
+  "version": "0.0.0",
+  "name": "QualifyingDiagnosisCoverageDetermination",
+  "title": "Qualifying Diagnosis Coverage Determination",
+  "status": "draft",
+  "experimental": true,
+  "date": "2026-01-01T00:00:00.000Z",
+  "publisher": "unknown",
+  "description": "Qualifying Diagnosis Coverage Determination",
+  "type": {
+    "coding": [
+      {
+        "system": "http://terminology.hl7.org/CodeSystem/plan-definition-type",
+        "code": "workflow-definition"
+      }
+    ]
+  },
+  "library": [
+    "http://example.org/hcsc/rx501-007/Library/example-direct-interface"
+  ],
+  "action": [
+    {
+      "title": "Qualifying Diagnosis",
+      "description": "Qualifying Diagnosis",
+      "code": [
+        {
+          "coding": [
+            {
+              "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+              "code": "guideline-based-care"
+            }
+          ]
+        }
+      ],
+      "condition": [
+        {
+          "kind": "applicability",
+          "expression": {
+            "language": "text/cql-identifier",
+            "expression": "Qualifying Diagnosis"
+          }
+        }
+      ],
+      "input": [
+        {
+          "extension": [
+            {
+              "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+              "valueString": "Qualifying Diagnosis?"
+            },
+            {
+              "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+              "valueMarkdown": "Qualifying Diagnosis"
+            }
+          ],
+          "type": "Observation",
+          "profile": [
+            "http://example.org/hcsc/rx501-007/StructureDefinition/example-direct-qualifying-diagnosis"
+          ]
+        }
+      ],
+      "definitionCanonical": "http://example.org/hcsc/rx501-007/PlanDefinition/example-direct-approve-recommendation"
+    },
+    {
+      "title": "otherwise",
+      "description": "otherwise",
+      "code": [
+        {
+          "coding": [
+            {
+              "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+              "code": "guideline-based-care"
+            }
+          ]
+        }
+      ],
+      "definitionCanonical": "http://example.org/hcsc/rx501-007/PlanDefinition/example-direct-deny-recommendation"
+    }
+  ]
+}

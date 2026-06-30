@@ -1,0 +1,28 @@
+library "Nested Defined As".
+
+concept "Diagnosis A":
+- type is Condition.
+- code is `a`.
+concept "Diagnosis B":
+- type is Condition.
+- code is `b`.
+concept "Diagnosis C":
+- type is Condition.
+- code is `c`.
+concept "A And B":
+- defined as ( "Diagnosis A" sem-and "Diagnosis B" ).
+concept "Top":
+- defined as ( "A And B" sem-or "Diagnosis C" ).
+
+
+decision "Top Coverage Determination":
+first:
+- when "Top" then recommend activity "Approve".
+- otherwise then recommend activity "Deny".
+
+activity "Approve":
+- request CPGCommunicationRequest.
+- with `Coverage determination: APPROVE / Certified.`.
+activity "Deny":
+- request CPGCommunicationRequest.
+- with `Coverage determination: DENY / Not Certified.`.

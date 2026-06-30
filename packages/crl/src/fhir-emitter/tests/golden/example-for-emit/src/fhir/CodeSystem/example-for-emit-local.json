@@ -1,0 +1,45 @@
+{
+  "resourceType": "CodeSystem",
+  "id": "example-for-emit-local",
+  "meta": {
+    "profile": [
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareablecodesystem",
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-publishablecodesystem"
+    ]
+  },
+  "extension": [
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "shareable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "computable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "publishable"
+    }
+  ],
+  "url": "http://example.org/hcsc/rx501-007/CodeSystem/example-for-emit-local",
+  "version": "0.0.0",
+  "name": "ExampleForEmitLocal",
+  "title": "Example For Emit local codes",
+  "status": "draft",
+  "experimental": true,
+  "date": "2026-01-01T00:00:00.000Z",
+  "publisher": "unknown",
+  "description": "Example For Emit local codes",
+  "caseSensitive": true,
+  "content": "complete",
+  "concept": [
+    {
+      "code": "implanted-estrogen-pellets",
+      "display": "Implanted Estrogen Pellets"
+    },
+    {
+      "code": "implanted-estradiol-pellets",
+      "display": "Implanted Estradiol Pellets"
+    }
+  ]
+}

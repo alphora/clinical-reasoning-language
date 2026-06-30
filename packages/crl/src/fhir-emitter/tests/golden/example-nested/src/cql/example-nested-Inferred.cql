@@ -1,0 +1,18 @@
+library "example-nested-Inferred"
+
+using FHIR version '4.0.1'
+
+include FHIRHelpers version '4.0.1' called FHIRHelpers
+include CRLCommon called CRLCommon
+include CaseFeatureHelpers called CFH
+include "example-nested-LocalSource"
+
+context Patient
+
+define "A And B":
+  "example-nested-LocalSource"."Diagnosis A".asTruths()
+    intersect "example-nested-LocalSource"."Diagnosis B".asTruths()
+
+define "Top":
+  "example-nested-Inferred"."A And B"
+    union "example-nested-LocalSource"."Diagnosis C".asTruths()

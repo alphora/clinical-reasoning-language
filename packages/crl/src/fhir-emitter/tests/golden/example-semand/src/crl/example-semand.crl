@@ -1,0 +1,23 @@
+library "Sem And Intersect".
+
+concept "Diagnosis A":
+- type is Condition.
+- code is `a`.
+concept "Diagnosis B":
+- type is Condition.
+- code is `b`.
+concept "A And B":
+- defined as ( "Diagnosis A" sem-and "Diagnosis B" ).
+
+
+decision "A And B Coverage Determination":
+first:
+- when "A And B" then recommend activity "Approve".
+- otherwise then recommend activity "Deny".
+
+activity "Approve":
+- request CPGCommunicationRequest.
+- with `Coverage determination: APPROVE / Certified.`.
+activity "Deny":
+- request CPGCommunicationRequest.
+- with `Coverage determination: DENY / Not Certified.`.

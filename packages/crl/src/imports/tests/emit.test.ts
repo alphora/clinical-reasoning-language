@@ -209,13 +209,12 @@ describe("emitCQLImports (per-CRL v2.1.0)", () => {
     expect(inferred).toMatch(/include "X Asserted"/);
   });
 
-  it("a MIXED `code is` + `defined as` concept is a hard error (slice 3)", () => {
-    // Slice 3 — a concept carrying BOTH a local `code is` and a top-level
-    // `definition` (`defined as`/`definition is`/`coded from`) is out of scope:
-    // `lowerLocalCodes` raises an explicit `emit-mixed-code-and-definition`
-    // hard error rather than silently stubbing/dropping the local-code side.
-    // (Under slice 2 this case fell onto the per-CRL stub path; slice 3 makes
-    // it loud.)
+  it("a MIXED `code is` + NON-`defined as` definition (`coded from`) is a hard error", () => {
+    // `code is` + `defined as` is now SUPPORTED (both-representation). A concept
+    // carrying `code is` + a NON-`defined as` top-level definition (`coded from`
+    // here; `definition is` likewise) is still out of scope: `lowerLocalCodes`
+    // raises an explicit `emit-mixed-code-and-definition` hard error rather than
+    // silently stubbing/dropping the local-code side.
     const root = path.join(FIXTURES, "mixed-code-defined-as", "root.crl");
     const result = emitCQLImports(root);
     expect(result.success).toBe(false);
@@ -266,15 +265,17 @@ describe("emitCQLImports (per-CRL v2.1.0)", () => {
     // LocalConcepts library: ONE shared codesystem decl + BARE code names (NO
     // ` Code` suffix — codes live alone here, no co-resident concept to collide).
     const concepts = conceptsEntry?.cql ?? "";
+    // R1/case-feature — the shared local codesystem DECL name is derived from the
+    // POLICY ID (`crl-test-fixture`), title-cased: "Crl Test Fixture Local Codes".
     expect(concepts).toMatch(
-      /codesystem "Code Is Decision Local Codes": 'urn:crl:codesystem:crl-test-fixture-local'/,
+      /codesystem "Crl Test Fixture Local Codes": 'urn:crl:codesystem:crl-test-fixture-local'/,
     );
     expect(concepts.match(/^codesystem /gm)).toHaveLength(1);
     expect(concepts).toMatch(
-      /code "Adult Patient": 'adult-18-or-older' from "Code Is Decision Local Codes"/,
+      /code "Adult Patient": 'adult-18-or-older' from "Crl Test Fixture Local Codes"/,
     );
     expect(concepts).toMatch(
-      /code "Active Crohns Disease": 'active-crohns-disease' from "Code Is Decision Local Codes"/,
+      /code "Active Crohns Disease": 'active-crohns-disease' from "Crl Test Fixture Local Codes"/,
     );
     expect(concepts).not.toMatch(/ Code"/);
 
@@ -293,11 +294,14 @@ describe("emitCQLImports (per-CRL v2.1.0)", () => {
     // Interface library: ONE re-export — the decision `when` concept only
     // ("Active Crohns Disease"), pre-qualified to its OWN source layer
     // (LocalSource). "Adult Patient" is NOT referenced by the decision, so it is
-    // NOT re-exported.
+    // NOT re-exported. Case-feature truth-set: a DIRECT `code is` condition (no
+    // `defined as`) collapses the LocalSource retrieve to a boolean via
+    // `…asTruths().satisfied()`, and the Interface layer includes CFH.
     const interfaceCql = interfaceEntry?.cql ?? "";
     expect(interfaceCql).toMatch(/include "crl-test-fixture-LocalSource"/);
+    expect(interfaceCql).toMatch(/include CaseFeatureHelpers called CFH/);
     expect(interfaceCql).toMatch(
-      /define "Active Crohns Disease":\s*"crl-test-fixture-LocalSource"\."Active Crohns Disease"/,
+      /define "Active Crohns Disease":\s*"crl-test-fixture-LocalSource"\."Active Crohns Disease"\.asTruths\(\)\.satisfied\(\)/,
     );
     expect(interfaceCql).not.toMatch(/define "Adult Patient"/);
     expect(interfaceCql).not.toMatch(/^codesystem /m);

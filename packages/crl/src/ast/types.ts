@@ -297,6 +297,16 @@ export interface ActivityBecause extends ASTNode {
 
 // ---------------------------- CONCEPT STATEMENT ---------------------------
 
+/**
+ * The re-exportable SOURCE layers an Interface re-export concept can republish
+ * from — the closed value set of `Concept.__interfaceSourceLayer`. A subset of
+ * the layered-emit `Layer` values (only the source-typed determinations are
+ * re-exportable). Declared here (not in `cql-emitter/layeredEmit.ts`) to avoid an
+ * `ast → cql-emitter` import cycle; `buildInterfaceReexports` only ever assigns
+ * one of these (its F3 guard rejects every other layer).
+ */
+export type InterfaceSourceLayer = "LocalSource" | "RecordSource" | "Inferred";
+
 // Concept node (v0.7)
 // - conceptType (`type is X.`) is OPTIONAL for composition/predicate body
 //   kinds (deduced from body refs when omitted); REQUIRED for asserted body
@@ -330,6 +340,34 @@ export interface Concept extends ASTNode {
    * same name). Absent on every hand-authored concept.
    */
   __interfaceReexport?: boolean;
+  /**
+   * SYNTHETIC-EMITTER-ONLY (the CRL parser/builder NEVER sets this). The SOURCE
+   * layer (`"LocalSource"` / `"RecordSource"` / `"Inferred"`) an Interface
+   * re-export concept (`__interfaceReexport`) re-publishes from. The case-feature
+   * CQL emit reads it to pick the Interface define body:
+   *   - `"Inferred"`     → `Inferred."X".satisfied()`
+   *   - `"LocalSource"`  → `LocalSource."X".asTruths().satisfied()`
+   *   - `"RecordSource"` → plain re-export `RecordSource."X"` (legacy, non-truth-set lane).
+   * Set by `buildInterfaceReexports`. Absent on every other concept.
+   *
+   * Fix 4 [nit] — typed as the closed `InterfaceSourceLayer` union (not bare
+   * `string`) so the `emitConceptBody` switch arms and the
+   * `buildInterfaceReexports` producer are compiler-checked for typos (a stray
+   * `"LocalSouce"` would no longer slip through).
+   */
+  __interfaceSourceLayer?: InterfaceSourceLayer;
+  /**
+   * SYNTHETIC-EMITTER-ONLY (the CRL parser/builder NEVER sets this). Marks the
+   * INFERRED half of a both-representation (`code is` + `defined as`) concept that
+   * `lowerLocalCodes` SPLIT into a LocalSource retrieve twin + this Inferred twin.
+   * The case-feature Inferred emit must FOLD IN the direct local-source retrieve,
+   * emitting `LocalSource."X".asTruths() union (<the original defined-as inference>)`.
+   * The string value is the concept's own name; the emit synthesizes the explicit
+   * `<localSourceLibrary>."X"` qualified leaf (NOT a bare same-name ref, which would
+   * be ambiguous against — or self-recurse into — the Inferred twin). Absent on
+   * every other concept.
+   */
+  __bothRepFoldInLocalSource?: string;
 }
 
 // Concept definition has 3 kinds per v0.7:
