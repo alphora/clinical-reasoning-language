@@ -1,0 +1,7 @@
+# partial-concepts-name-collision sibling — a REAL library literally named "Pol Concepts"
+library "Pol Concepts".
+
+concept "Sibling Concept":
+- type is Observation.
+- value type is boolean.
+- defined as "Sibling Concept".

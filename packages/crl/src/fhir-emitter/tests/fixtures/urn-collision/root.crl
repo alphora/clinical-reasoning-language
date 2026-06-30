@@ -1,0 +1,12 @@
+# urn-collision root
+library "Root".
+
+// Two DISTINCT local libraries whose names slug to the SAME local codesystem
+// id ("Local One" and "Local-One"). Both use `code is`, so both synthesize that
+// shared local codesystem — the cross-library preflight in imports/emit.ts fails
+// with `emit-local-codesystem-urn-collision` and returns an EMPTY manifest with a
+// CLEAN graph (no import diagnostics). The FHIR public path must FOLD that
+// structural error so `emit_crl_fhir`/MCP does not report a misleading success.
+
+include "Local One".
+include "Local-One".

@@ -64,11 +64,70 @@ import { getRefName, getRefLibrary } from "../ast/types";
 import { emitCQLFromAST } from "./emitCQL";
 import type { EmitResult, EmitOptions } from "./emitCQL";
 
-/** The three layers this slice splits into, in dependency order (low → high). */
-export type Layer = "Concepts" | "Asserted" | "Inferred";
+/**
+ * A partition VALUE — the bucket a statement is assigned to for emit. The FULL
+ * partition produces the three canonical layers ("Concepts" / "Asserted" /
+ * "Inferred"); a PARTIAL partition (slice 4c) produces other values ("Concepts"
+ * / "Root"). The type is therefore a bare `string`: `classifyStatementLayer`
+ * (the FULL classifier) still returns one of the three canonical values, but a
+ * partition's own `classify` may map those onto a different value set.
+ */
+export type Layer = string;
 
-/** Dependency order: each layer may only reference layers EARLIER in this list. */
+/**
+ * The three canonical layers the FULL split fans into, in dependency order
+ * (low → high). Each layer may only reference layers EARLIER in this list.
+ * `classifyStatementLayer` returns one of these (or null); the FULL_PARTITION's
+ * `order` is exactly this list.
+ */
 export const LAYER_ORDER: readonly Layer[] = ["Concepts", "Asserted", "Inferred"] as const;
+
+/**
+ * A PARTITION generalizes the hardcoded 3-layer machinery into a pluggable
+ * "how do I bucket statements, in what dependency order, under what emitted
+ * library names" policy. `emitPartitioned` (the generalized emit loop) consumes
+ * a partition; `emitLayered` is now a thin wrapper over `emitPartitioned(...,
+ * FULL_PARTITION, ...)` and stays byte-identical.
+ *
+ *   - `classify(stmt)` → the partition VALUE for a statement, or `null` for an
+ *     out-of-scope statement (Decision/Activity/Parameter — same exclusions as
+ *     `classifyStatementLayer`). The FULL partition delegates straight to
+ *     `classifyStatementLayer`; the PARTIAL partition collapses the three
+ *     canonical values onto `"Concepts"` vs `"Root"`.
+ *   - `order` — the partition values in dependency order (low → high). Drives
+ *     emit ordering and the sibling-include ordering in `collectLayerIncludes`.
+ *   - `libraryNameFor(lib, value)` — the emitted CQL library name for a given
+ *     partition value of source library `lib`. FULL: `"<lib> <value>"`. PARTIAL:
+ *     `"<lib>"` for the Root value (keeps the source name addressable) and
+ *     `"<lib> Concepts"` for the Concepts value.
+ */
+export interface Partition {
+  classify: (stmt: Statement) => Layer | null;
+  order: readonly Layer[];
+  libraryNameFor: (lib: string, value: Layer) => string;
+}
+
+/** The canonical 3-way full split (byte-identical to the pre-partition path). */
+export const FULL_PARTITION: Partition = {
+  classify: classifyStatementLayer,
+  order: LAYER_ORDER,
+  libraryNameFor: layerLibraryName,
+};
+
+/**
+ * Slice 4c partial split — for a decision-bearing library with concept-level
+ * `code is`. Everything that the FULL classifier calls "Concepts" (the
+ * terminology / lowered local-code declarations) goes to the `"Concepts"`
+ * sibling; EVERYTHING ELSE (asserted retrieves, inference, the decision/activity
+ * statements that disqualify the FULL split) goes to the `"Root"` library, which
+ * KEEPS THE SOURCE NAME `<lib>` so PlanDef/ActivityDef `library[]` refs (which
+ * slug from the source name) still resolve.
+ */
+export const PARTIAL_PARTITION: Partition = {
+  classify: (stmt) => (classifyStatementLayer(stmt) === "Concepts" ? "Concepts" : "Root"),
+  order: ["Concepts", "Root"],
+  libraryNameFor: (lib, v) => (v === "Root" ? lib : `${lib} Concepts`),
+};
 
 /** Which declaration slot a reference resolves against. */
 type RefSlot = "concept" | "terminology";
@@ -149,11 +208,18 @@ export function classifyStatementLayer(stmt: Statement): Layer | null {
  * separate means a legal `terminology "X"` + `concept "X"` in one library does
  * NOT collapse into a single ambiguous entry.
  */
-function buildNameLayerMaps(ast: CRL): NameLayerMaps {
+function buildNameLayerMaps(ast: CRL, partition: Partition): NameLayerMaps {
   const concept = new Map<string, Layer>();
   const terminology = new Map<string, Layer>();
   for (const stmt of ast.statements) {
-    const layer = classifyStatementLayer(stmt);
+    // CRITICAL (slice 4c): classify via the PARTITION, not the bare
+    // `classifyStatementLayer`. Under the partial split a concept that the FULL
+    // classifier calls "Asserted"/"Inferred" is partition-value "Root"; the maps
+    // must hold "Root" so a Root→Root ref compares equal in `requalifyRef` and
+    // stays BARE. Using the FULL classifier here would leave "Asserted"/"Inferred"
+    // in the maps, mismatch the current partition value "Root", and rewrite the
+    // ref to a nonexistent `"<lib> Inferred"."X"` library.
+    const layer = partition.classify(stmt);
     if (layer === null) continue;
     if (stmt.type === "Concept" && stmt.name) concept.set(stmt.name, layer);
     else if (stmt.type === "Terminology" && stmt.name) terminology.set(stmt.name, layer);
@@ -350,6 +416,7 @@ function requalifyRef(
   currentLayer: Layer,
   maps: NameLayerMaps,
   lib: string,
+  partition: Partition,
 ): ReferenceName {
   const refLib = getRefLibrary(ref);
   // Genuinely-foreign qualifier → leave untouched.
@@ -357,11 +424,17 @@ function requalifyRef(
   const name = getRefName(ref);
   const slotMap = slot === "terminology" ? maps.terminology : maps.concept;
   const targetLayer = slotMap.get(name);
-  // KNOWN same-layer target → emit bare (drop any self-qualifier).
+  // KNOWN same-PARTITION-VALUE target → emit bare (drop any self-qualifier).
+  // CRITICAL (slice 4c): compare partition VALUES (`targetLayer === currentLayer`),
+  // NOT emitted library names. Under the partial split Root maps to `<lib>` and
+  // Concepts to `<lib> Concepts`; a Root→Root ref must compare equal on the value
+  // `"Root"` and stay bare. Comparing `libraryNameFor(...)` names would be wrong
+  // (and pointless) here.
   if (targetLayer === currentLayer) {
-    // A self-qualified ref to a SAME-LAYER target must still drop its (now
-    // wrong) "<lib>" qualifier — the emitted library is "<lib> <layer>", so a
-    // `"<lib>"."Name"` qualifier would dangle. Return the bare name.
+    // A self-qualified ref to a SAME-VALUE target must still drop its (now
+    // wrong) "<lib>" qualifier — the emitted library is `libraryNameFor(lib,
+    // value)`, so a `"<lib>"."Name"` qualifier would dangle (full split) or be
+    // redundant (partial Root, where the emitted name IS `<lib>`). Return bare.
     if (refLib === lib) return name;
     return ref;
   }
@@ -375,7 +448,7 @@ function requalifyRef(
   }
   const qualified: QualifiedReference = {
     type: "QualifiedReference",
-    libraryName: layerLibraryName(lib, targetLayer),
+    libraryName: partition.libraryNameFor(lib, targetLayer),
     name,
     // Reuse the original ref's location when available; refs carried as bare
     // strings have no location, so synthesize a zero span. emitCQL never reads
@@ -399,25 +472,26 @@ function requalifyComposition(
   currentLayer: Layer,
   maps: NameLayerMaps,
   lib: string,
+  partition: Partition,
 ): CompositionExpression {
   switch (expr.type) {
     case "CompositionRef":
-      return { ...expr, ref: requalifyRef(expr.ref, "concept", currentLayer, maps, lib) };
+      return { ...expr, ref: requalifyRef(expr.ref, "concept", currentLayer, maps, lib, partition) };
     case "CompositionGroup":
       return {
         ...expr,
-        expression: requalifyComposition(expr.expression, currentLayer, maps, lib),
+        expression: requalifyComposition(expr.expression, currentLayer, maps, lib, partition),
       };
     case "SemNotExpression":
       return {
         ...expr,
-        expression: requalifyComposition(expr.expression, currentLayer, maps, lib),
+        expression: requalifyComposition(expr.expression, currentLayer, maps, lib, partition),
       };
     case "SemAndExpression":
     case "SemOrExpression":
       return {
         ...expr,
-        terms: expr.terms.map((t) => requalifyComposition(t, currentLayer, maps, lib)),
+        terms: expr.terms.map((t) => requalifyComposition(t, currentLayer, maps, lib, partition)),
       };
   }
 }
@@ -428,19 +502,20 @@ function requalifyArgValue(
   currentLayer: Layer,
   maps: NameLayerMaps,
   lib: string,
+  partition: Partition,
 ): ArgValue {
   switch (arg.type) {
     case "NConceptRef":
-      return { ...arg, value: requalifyRef(arg.value, "concept", currentLayer, maps, lib) };
+      return { ...arg, value: requalifyRef(arg.value, "concept", currentLayer, maps, lib, partition) };
     case "NDisjunction":
       return {
         ...arg,
-        disjuncts: arg.disjuncts.map((d) => requalifyArgValue(d, currentLayer, maps, lib)),
+        disjuncts: arg.disjuncts.map((d) => requalifyArgValue(d, currentLayer, maps, lib, partition)),
       };
     case "NConjunction":
       return {
         ...arg,
-        conjuncts: arg.conjuncts.map((c) => requalifyArgValue(c, currentLayer, maps, lib)),
+        conjuncts: arg.conjuncts.map((c) => requalifyArgValue(c, currentLayer, maps, lib, partition)),
       };
     case "Quantity":
       return arg;
@@ -453,19 +528,20 @@ function requalifyNarrativeElement(
   currentLayer: Layer,
   maps: NameLayerMaps,
   lib: string,
+  partition: Partition,
 ): NarrativeElement {
   switch (el.type) {
     case "NConceptRef":
-      return { ...el, value: requalifyRef(el.value, "concept", currentLayer, maps, lib) };
+      return { ...el, value: requalifyRef(el.value, "concept", currentLayer, maps, lib, partition) };
     case "NDisjunction":
       return {
         ...el,
-        disjuncts: el.disjuncts.map((d) => requalifyArgValue(d, currentLayer, maps, lib)),
+        disjuncts: el.disjuncts.map((d) => requalifyArgValue(d, currentLayer, maps, lib, partition)),
       };
     case "NConjunction":
       return {
         ...el,
-        conjuncts: el.conjuncts.map((c) => requalifyArgValue(c, currentLayer, maps, lib)),
+        conjuncts: el.conjuncts.map((c) => requalifyArgValue(c, currentLayer, maps, lib, partition)),
       };
     case "NWord":
     case "Quantity":
@@ -478,10 +554,11 @@ function requalifyNarrative(
   currentLayer: Layer,
   maps: NameLayerMaps,
   lib: string,
+  partition: Partition,
 ): NarrativeClause {
   return {
     ...body,
-    elements: body.elements.map((el) => requalifyNarrativeElement(el, currentLayer, maps, lib)),
+    elements: body.elements.map((el) => requalifyNarrativeElement(el, currentLayer, maps, lib, partition)),
   };
 }
 
@@ -498,24 +575,25 @@ function requalifyDefinition(
   currentLayer: Layer,
   maps: NameLayerMaps,
   lib: string,
+  partition: Partition,
 ): ConceptDefinition {
   switch (def.type) {
     case "CodedFromDefinition":
       return {
         ...def,
-        terminologyName: requalifyRef(def.terminologyName, "terminology", currentLayer, maps, lib),
+        terminologyName: requalifyRef(def.terminologyName, "terminology", currentLayer, maps, lib, partition),
       };
     case "DefinedAsDefinition": {
       const out: DefinedAsDefinition = { ...def };
       if (def.body.type === "DefinedAsBareRef") {
         out.body = {
           ...def.body,
-          ref: requalifyRef(def.body.ref, "concept", currentLayer, maps, lib),
+          ref: requalifyRef(def.body.ref, "concept", currentLayer, maps, lib, partition),
         };
       } else {
         out.body = {
           ...def.body,
-          expression: requalifyComposition(def.body.expression, currentLayer, maps, lib),
+          expression: requalifyComposition(def.body.expression, currentLayer, maps, lib, partition),
         };
       }
       return out;
@@ -523,7 +601,7 @@ function requalifyDefinition(
     case "DefinitionIsDefinition": {
       const out: DefinitionIsDefinition = {
         ...def,
-        body: requalifyNarrative(def.body, currentLayer, maps, lib),
+        body: requalifyNarrative(def.body, currentLayer, maps, lib, partition),
       };
       return out;
     }
@@ -536,12 +614,13 @@ function requalifyConcept(
   currentLayer: Layer,
   maps: NameLayerMaps,
   lib: string,
+  partition: Partition,
 ): Concept {
   // A concept reaching here was layer-classified, which requires a definition;
   // the guard keeps the now-optional `definition` field type-safe (a
   // representation/code-only concept has none and is never requalified).
   if (!c.definition) return { ...c };
-  return { ...c, definition: requalifyDefinition(c.definition, currentLayer, maps, lib) };
+  return { ...c, definition: requalifyDefinition(c.definition, currentLayer, maps, lib, partition) };
 }
 
 /**
@@ -557,16 +636,16 @@ function collectLayerIncludes(
   requalifiedStatements: Statement[],
   currentLibraryName: string,
   lib: string,
+  partition: Partition,
 ): string[] {
   const referenced = new Set<string>();
   visitAllDefinitionRefs(requalifiedStatements, (ref) => {
     const refLib = getRefLibrary(ref);
     if (refLib !== null && refLib !== currentLibraryName) referenced.add(refLib);
   });
-  // Dependency-order the sibling layer libraries (Concepts before Asserted
-  // before Inferred); append any genuinely-foreign libraries sorted for
-  // stability.
-  const siblingOrder = LAYER_ORDER.map((l) => layerLibraryName(lib, l));
+  // Dependency-order the sibling partition libraries (partition `order`, low →
+  // high); append any genuinely-foreign libraries sorted for stability.
+  const siblingOrder = partition.order.map((v) => partition.libraryNameFor(lib, v));
   const siblings = siblingOrder.filter((name) => referenced.has(name));
   const foreign = [...referenced].filter((name) => !siblingOrder.includes(name)).sort();
   return [...siblings, ...foreign];
@@ -582,14 +661,20 @@ function buildLayerAst(
   layer: Layer,
   maps: NameLayerMaps,
   lib: string,
+  partition: Partition,
 ): { synthetic: CRL; requalified: Statement[] } {
   const requalified: Statement[] = [];
   for (const stmt of ast.statements) {
-    if (classifyStatementLayer(stmt) !== layer) continue;
+    // Classify via the PARTITION (so a Root bucket sweeps up Concept AND the
+    // Decision/Activity/Parameter statements `classifyStatementLayer` calls null).
+    if (partition.classify(stmt) !== layer) continue;
     if (stmt.type === "Concept") {
-      requalified.push(requalifyConcept(stmt, layer, maps, lib));
+      requalified.push(requalifyConcept(stmt, layer, maps, lib, partition));
     } else {
-      // Terminology — no concept refs to re-qualify; carry through as-is.
+      // Terminology / Decision / Activity / Parameter — no concept-definition
+      // refs the re-qualifier rewrites; carry through as-is. (Decision/Activity
+      // refs are handled by the emitter's own cross-library resolution, which
+      // sees the Root library still named `<lib>` and resolves bare/self refs.)
       requalified.push(stmt);
     }
   }
@@ -622,22 +707,45 @@ export function emitLayered(
   lib: string,
   baseOptions: Omit<EmitOptions, "libraryName" | "crossLibraryIncludes"> = {},
 ): LayeredEmitResult {
-  const maps = buildNameLayerMaps(ast);
-  const present = layersPresent(ast);
+  return emitPartitioned(ast, lib, FULL_PARTITION, baseOptions);
+}
+
+/**
+ * The generalized partition-driven emit. `emitLayered` is the thin FULL_PARTITION
+ * wrapper (byte-identical output); the slice-4c partial split passes
+ * PARTIAL_PARTITION. For each NON-EMPTY partition value (in dependency `order`),
+ * build a synthetic per-value CRL AST with cross-value refs requalified, then
+ * emit it under `partition.libraryNameFor(lib, value)` with the includes the
+ * requalified statements imply.
+ */
+export function emitPartitioned(
+  ast: CRL,
+  lib: string,
+  partition: Partition,
+  baseOptions: Omit<EmitOptions, "libraryName" | "crossLibraryIncludes"> = {},
+): LayeredEmitResult {
+  const maps = buildNameLayerMaps(ast, partition);
+  // The DISTINCT partition values actually present (order-independent; the Set
+  // mirrors the old `layersPresent` semantics but through `partition.classify`).
+  const present = new Set<Layer>();
+  for (const stmt of ast.statements) {
+    const v = partition.classify(stmt);
+    if (v !== null) present.add(v);
+  }
   const entries: LayeredEmitEntry[] = [];
   let success = true;
-  for (const layer of LAYER_ORDER) {
-    if (!present.has(layer)) continue;
-    const libraryName = layerLibraryName(lib, layer);
-    const { synthetic, requalified } = buildLayerAst(ast, layer, maps, lib);
-    const crossLibraryIncludes = collectLayerIncludes(requalified, libraryName, lib);
+  for (const value of partition.order) {
+    if (!present.has(value)) continue;
+    const libraryName = partition.libraryNameFor(lib, value);
+    const { synthetic, requalified } = buildLayerAst(ast, value, maps, lib, partition);
+    const crossLibraryIncludes = collectLayerIncludes(requalified, libraryName, lib, partition);
     const result = emitCQLFromAST(synthetic, {
       ...baseOptions,
       libraryName,
       crossLibraryIncludes,
     });
     if (!result.success) success = false;
-    entries.push({ layer, libraryName, crossLibraryIncludes, result });
+    entries.push({ layer: value, libraryName, crossLibraryIncludes, result });
   }
   return { success, entries };
 }

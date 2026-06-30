@@ -44,6 +44,8 @@ import type { CRLError } from "../types/errors";
  *   unresolved-library-reference                   error    An emitted resource's `library[]` URL doesn't resolve to an emitted Library. (Todo 4)
  *   unresolved-related-artifact                    error    An emitted Library's `relatedArtifact[depends-on]` URL is under canonicalBase but doesn't resolve to an emitted resource. (Todo 4)
  *   unresolved-definition-target                   error    An emitted PlanDef's `action.definitionCanonical` doesn't resolve to an emitted PlanDef/ActivityDef. (Todo 4)
+ *   library-content-url-unresolved                 error    An emitted Library's `content[0].attachment.url` is not the shipped `../../cql/<file>.cql` reference to the SPECIFIC CQL `outputFilename` the split-manifest paired with that Library — points at an unwritten file, a cross-wired sibling, or outside the sibling `cql/` dir (manifest drift). Also fires when a single-entry source's lone manifest entry is not its name-keeping Root. (Slice 4c / E)
+ *   decision-root-library-missing                  error    A decision-bearing source has no manifest entry keeping the source name as its Root, so its Decision/Activity `library[]` would dangle (a decision-bearing library must never full-split). The source's decision emit is skipped. (Slice 4c / E)
  *   cli-cel-fhir-def-incompatible                  error    CLI: `.cel` input + `--target fhir-def` flag. (Todo 4)
  *   missing-package-version                         error    package.json has no `version`. CRMI requires `version` 1..1 at the shareable floor.
  *   invalid-emit-date                              error    `--date`/`opts.date`/`crl.date` is not a parseable date.

@@ -415,7 +415,7 @@ export function createServer(): McpServer {
       title: "Emit FHIR Definition Resources from CRL",
       description:
         "Emit cpg-conformant FHIR Definition resources (ValueSet, CodeSystem, Library, ActivityDefinition, PlanDefinition) from a CRL document. " +
-        "A library whose concepts carry local `code is` codes also emits ONE local CodeSystem (url under canonicalBase), depends-on'd by that library's Library resource. " +
+        "A library whose concepts carry local `code is` codes also emits ONE local CodeSystem (url under canonicalBase). When a decision-bearing library is partial-split into a `<lib>` Root + `<lib> Concepts` sibling, that CodeSystem is depends-on'd by the CONCEPTS Library (the codes relocate there) and the Root Library depends-on the Concepts Library; otherwise (single-library emit) it is depends-on'd by that library's own Library resource. One FHIR Library is emitted PER emitted CQL library. " +
         "Closure walks from the file's nearest package.json. Returns a SUMMARY envelope by default to keep tool output small: " +
         "`{ success, resourceCount, resourceManifest:[{resourceType, id, relativePath, sourceKind, sourceName}], errors, unmatched, importDiagnostics, metadataErrors }`. " +
         "Pass `includeResources: true` to also receive the full `resources[]` array (each with the full FHIR JSON). " +

@@ -1,8 +1,17 @@
 import * as path from "path";
 
-import { emitCQLImports } from "../emit";
+import { emitCQLImports, computeSplitPlan } from "../emit";
+import { buildCRL } from "../../index";
+import { lowerLocalCodes } from "../../cql-emitter/lowerLocalCodes";
+import type { CRL } from "../../ast/types";
 
 const FIXTURES = path.resolve(__dirname, "fixtures");
+
+function parse(body: string): CRL {
+  const r = buildCRL("# fixture\n" + body);
+  if (!r.success || !r.result) throw new Error("parse failed: " + JSON.stringify(r.errors));
+  return r.result;
+}
 
 function findLib(
   result: ReturnType<typeof emitCQLImports>,
@@ -199,39 +208,61 @@ describe("emitCQLImports (per-CRL v2.1.0)", () => {
     expect(result.errors?.[0]?.message).toMatch(/Mixed Concept/);
   });
 
-  it("per-CRL: a `decision` + `code is` library emits ONE library with inline synthesized codesystem/code/retrieves (slice 3)", () => {
-    // rx501-147-shaped motivating case: a `decision` disqualifies the layered
-    // auto-split, so the whole library stays on the per-CRL path. The synthetic
-    // terminology and its concept co-reside in ONE emitted library, so
-    // detectCollisions suffixes the code name to "<X> Code" and the retrieve
-    // inlines as `[<Resource>: "<X> Code"]` (the per-CRL suffix path).
+  it("slice 4c: a `decision` + `code is` library PARTIAL-splits into `<Lib> Concepts` + `<Lib>` (root)", () => {
+    // rx501-147-shaped motivating case. A `decision` disqualifies the FULL
+    // 3-way layered auto-split, but the library carries concept-level `code is`,
+    // so slice 4c PARTIAL-splits it: the terminology/codes move to a sibling
+    // `<Lib> Concepts` library, and the retrieves/context stay in the ROOT
+    // library which KEEPS the source name `<Lib>` (so PlanDef `library[]` refs
+    // still resolve). With the codes now in a separate library, detectCollisions
+    // sees no same-library collision → the ` Code` suffix DROPS (bare code names).
     const root = path.join(FIXTURES, "code-is-decision", "root.crl");
     const result = emitCQLImports(root);
     expect(result.success).toBe(true);
 
-    // ONE emitted library — NO split layer names (`Code Is Decision Concepts`
-    // etc.). The decision disqualifies layering.
+    // TWO emitted libraries — the Concepts sibling + the Root (source-named).
     const names = result.cqlByLibrary.map((e) => e.libraryName).sort();
-    expect(names).toEqual(["Code Is Decision"]);
+    expect(names).toEqual(["Code Is Decision", "Code Is Decision Concepts"]);
 
-    const cql = findLib(result, "Code Is Decision") ?? "";
-    // Slice 4b — ONE shared local codesystem decl ("<Lib> Local Codes", shared
-    // URN), emitted once; N per-concept codes (suffixed "<Concept> Code" on the
-    // per-CRL path) all reference it via `from`.
-    expect(cql).toMatch(
+    // Manifest (A→E contract): role + sourceLibraryName + includes.
+    const conceptsEntry = result.cqlByLibrary.find(
+      (e) => e.libraryName === "Code Is Decision Concepts",
+    );
+    const rootEntry = result.cqlByLibrary.find((e) => e.libraryName === "Code Is Decision");
+    expect(conceptsEntry?.role).toBe("concepts");
+    expect(conceptsEntry?.sourceLibraryName).toBe("Code Is Decision");
+    expect(conceptsEntry?.includes).toEqual([]);
+    expect(rootEntry?.role).toBe("root");
+    expect(rootEntry?.sourceLibraryName).toBe("Code Is Decision");
+    expect(rootEntry?.includes).toEqual(["Code Is Decision Concepts"]);
+
+    // Concepts library: ONE shared codesystem decl + BARE code names (NO ` Code`
+    // suffix — codes live alone here, no co-resident concept to collide with).
+    const concepts = conceptsEntry?.cql ?? "";
+    expect(concepts).toMatch(
       /codesystem "Code Is Decision Local Codes": 'urn:crl:codesystem:code-is-decision-local'/,
     );
-    // The shared codesystem decl appears EXACTLY ONCE (deduped), not per-concept.
-    expect(cql.match(/^codesystem /gm)).toHaveLength(1);
-    expect(cql).toMatch(
-      /code "Adult Patient Code": 'adult-18-or-older' from "Code Is Decision Local Codes"/,
+    expect(concepts.match(/^codesystem /gm)).toHaveLength(1);
+    expect(concepts).toMatch(
+      /code "Adult Patient": 'adult-18-or-older' from "Code Is Decision Local Codes"/,
     );
-    expect(cql).toMatch(
-      /code "Active Crohns Disease Code": 'active-crohns-disease' from "Code Is Decision Local Codes"/,
+    expect(concepts).toMatch(
+      /code "Active Crohns Disease": 'active-crohns-disease' from "Code Is Decision Local Codes"/,
     );
-    // Inline per-CRL retrieves referencing the suffixed code names (same library).
-    expect(cql).toMatch(/\[Observation: "Adult Patient Code"\]/);
-    expect(cql).toMatch(/\[Condition: "Active Crohns Disease Code"\]/);
+    expect(concepts).not.toMatch(/ Code"/);
+
+    // Root library: include of the Concepts sibling + cross-library-qualified
+    // retrieves (NOT inline same-library refs).
+    const rootCql = rootEntry?.cql ?? "";
+    expect(rootCql).toMatch(/include "Code Is Decision Concepts"/);
+    expect(rootCql).toMatch(
+      /\[Observation: "Code Is Decision Concepts"\."Adult Patient"\]/,
+    );
+    expect(rootCql).toMatch(
+      /\[Condition: "Code Is Decision Concepts"\."Active Crohns Disease"\]/,
+    );
+    // No codesystem/code declarations leaked into the root.
+    expect(rootCql).not.toMatch(/^codesystem /m);
   });
 
   it("cross-library local-codesystem URN collision → emit-local-codesystem-urn-collision (slice 3)", () => {
@@ -292,5 +323,79 @@ describe("emitCQLImports (per-CRL v2.1.0)", () => {
     // identifier in emitted CQL per operator's rule + CQL spec.
     expect(rootCql).toMatch(/CRLCommon\.WasPerformed\([^)]*Patient\)/);
     expect(rootCql).not.toMatch(/Sib\."Index Patient"/);
+  });
+
+  // ── Slice 4c — the shared split-plan ────────────────────────────────────────
+
+  it("computeSplitPlan: decision-bearing + `code is` library → `partial` with [lib, `<lib> Concepts`]", () => {
+    // A decision disqualifies the FULL split (isLayerSplittable=false), but the
+    // concept-level `code is` (localCodesCount > 0) triggers the PARTIAL split.
+    const src = parse(`library "Pol".
+
+concept "Adult Patient":
+- type is Observation.
+- value type is boolean.
+- code is \`adult\`.
+
+activity "Refer":
+- request CPGServiceRequest.
+
+decision "Triage":
+- when "Adult Patient" then recommend activity "Refer".
+`);
+    const lowered = lowerLocalCodes(src);
+    expect(lowered.errors).toEqual([]);
+    expect(lowered.localCodes.length).toBe(1);
+
+    const plan = computeSplitPlan(lowered.ast, "Pol", lowered.localCodes.length);
+    expect(plan.kind).toBe("partial");
+    expect(plan.emittedLibraryNames).toEqual(["Pol", "Pol Concepts"]);
+    expect(plan.partition).toBeDefined();
+  });
+
+  it("the collision preflight registers BOTH `<lib>` and `<lib> Concepts` for a partial split (sibling-name clash → fail)", () => {
+    // A partial-split library "Pol" PLUS a REAL sibling `library "Pol Concepts"`
+    // in the same closure: the preflight now registers the generated `Pol
+    // Concepts` name, so it collides with the real one and fails loudly (before,
+    // only `Pol` was registered for the non-splittable entry and the real
+    // sibling silently clobbered the generated one).
+    const root = path.join(FIXTURES, "partial-concepts-name-collision", "root.crl");
+    const result = emitCQLImports(root);
+    expect(result.success).toBe(false);
+    expect(result.cqlByLibrary).toHaveLength(0);
+    expect(result.errors?.[0]?.kind).toBe("layered-name-collision");
+    expect(result.errors?.[0]?.message).toMatch(/Pol Concepts/);
+  });
+
+  it("idempotency: re-lowering an already-lowered synthetic Concepts AST is a no-op", () => {
+    // `emitPartitioned` builds a synthetic per-value AST and calls
+    // `emitCQLFromAST`, which re-runs `lowerLocalCodes`. The synthetic Concepts
+    // AST holds the lowered SYNTHETIC TERMINOLOGIES (no `Concept.code` left to
+    // lower), so a second lowering pass must be a no-op (=== the input, empty
+    // localCodes). Confirm by lowering twice and checking the second is inert.
+    const src = parse(`library "Pol".
+
+concept "Adult Patient":
+- type is Observation.
+- value type is boolean.
+- code is \`adult\`.
+
+activity "Refer":
+- request CPGServiceRequest.
+
+decision "Triage":
+- when "Adult Patient" then recommend activity "Refer".
+`);
+    const first = lowerLocalCodes(src);
+    expect(first.localCodes.length).toBe(1);
+    expect(first.ast).not.toBe(src); // first pass DID lower
+
+    // Re-lower the already-lowered AST: the lowered concept now carries a
+    // CodedFromDefinition (no `code`), and the synthetic terminology has no
+    // `Concept.code` — so nothing is lowerable.
+    const second = lowerLocalCodes(first.ast);
+    expect(second.errors).toEqual([]);
+    expect(second.localCodes).toEqual([]);
+    expect(second.ast).toBe(first.ast); // identity-preserved no-op
   });
 });

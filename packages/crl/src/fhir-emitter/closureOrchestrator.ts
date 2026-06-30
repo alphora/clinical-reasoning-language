@@ -39,6 +39,8 @@ import type { Activity, BranchBlock, Concept, Decision, ReferenceName, Terminolo
 import { getRefLibrary, getRefName, isQualifiedRef } from "../ast/types";
 import { computeFhirEmitClosure } from "../imports/computeEmitClosure";
 import { safeOutputFilename } from "../imports/safeOutputFilename";
+import { emitCQLImports } from "../imports/emit";
+import type { PerLibraryEmit } from "../imports/emit";
 import { resolveImports } from "../imports/index";
 import type { ImportDiagnostic, ResolvedGraph } from "../imports/types";
 import type { CRLError } from "../types/errors";
@@ -48,13 +50,45 @@ import { lowerLocalCodes } from "../cql-emitter/lowerLocalCodes";
 import { emitActivityDefinitionsForLibrary, type TerminologyResolver } from "./activity";
 import { emitLocalCodeSystem } from "./codeSystem";
 import { emitDecisionPlanDefinition, type ActivityResolver, type ConceptResolver, type DecisionResolver } from "./decision";
-import { emitLibrary } from "./library";
+import { emitLibrary, libraryCanonicalUrl } from "./library";
 import { readPackageMetadata } from "./metadata";
 import { resolveEmitClock } from "./reproDate";
 import { emitRecommendationDefinitionsForLibrary } from "./recommendation";
 import { isFhirDefError } from "./types";
 import type { CpgMetadata, EmitOptions, EmittedResource, UnmatchedReference } from "./types";
 import { emitValueSetsForLibrary } from "./valueSet";
+
+/**
+ * D2 (slice-4c review gpt55 [important] / Claude [critical]) — the CQL-lane hard
+ * error kinds the FHIR lane must NOT fold (a DENYLIST). Previously an ALLOWLIST
+ * of 3 structural split kinds was folded, which silently DROPPED any other CQL
+ * hard error — notably `emit-codesystem-url-conflict` (a real `success:false`
+ * from emitCQL.ts) — so MCP `emit_crl_fhir` (FHIR lane only) could report success
+ * while the CQL lane failed. Inverting to a denylist folds EVERY CQL hard error
+ * EXCEPT the two categories below, which would otherwise be mis-handled.
+ *
+ * Deliberately EXCLUDED (do NOT fold):
+ *   - `emit-unmatched-narrative` (#79 sentinel) — tolerated by design; the FHIR
+ *     lane DELIBERATELY emits its design-time forms regardless (cc-screening/cms
+ *     rely on it). Folding it would block the FHIR corpus.
+ *   - the `lowerLocalCodes` hard kinds — the FHIR orchestrator ALREADY runs
+ *     `lowerLocalCodes` itself at the CodeSystem step and surfaces these, so
+ *     folding them from the CQL lane too would DOUBLE-count.
+ */
+const CQL_FOLD_EXCLUDED_KINDS: ReadonlySet<string> = new Set([
+  // #79 tolerated sentinel.
+  "emit-unmatched-narrative",
+  // lowerLocalCodes hard kinds — already surfaced by the FHIR lane's own
+  // lowerLocalCodes pass (closureOrchestrator step 1b), so folding here too
+  // would double-count.
+  "emit-empty-local-code",
+  "emit-mixed-code-and-definition",
+  "emit-local-code-missing-type",
+  "emit-duplicate-local-code",
+  "emit-duplicate-local-concept",
+  "emit-local-code-terminology-collision",
+  "emit-local-codesystem-name-collision",
+]);
 
 export interface FhirDefClosureEmitResult {
   success: boolean;
@@ -489,6 +523,81 @@ function applyInvariant3(resources: ReadonlyArray<EmittedResource>, droppedPaths
   return errors;
 }
 
+/**
+ * Inv 4 (slice 4c / E) — Library content-url ↔ emitted-CQL-file integrity.
+ *
+ * Every emitted `Library.content[0].attachment.url` is a `../../cql/<file>.cql`
+ * reference into the sibling CQL closure. The CQL split-manifest's
+ * `outputFilename` set is the exact list of CQL files the split actually wrote.
+ * This invariant asserts every Library content url is EXACTLY the shipped
+ * `../../cql/<file>.cql` reference where `<file>.cql` is the SPECIFIC
+ * `outputFilename` the manifest paired with THAT Library's identity — the
+ * forcing function that (a) makes the manifest mandatory to the FHIR lane and
+ * (b) catches latent drift where a Library points at a CQL file the split never
+ * emitted (e.g. the not-yet-exercised full-split layer case), points at a
+ * DIFFERENT source's CQL file, or points outside the shipped `../../cql/`
+ * sibling layout (slice-4c review gpt55 [important] #4/#5 + Claude [important]:
+ * a bare-basename match against a GLOBAL set would accept both a wrong directory
+ * like `../wrong/Real.cql` AND a cross-wired url pointing at another source's
+ * emitted file).
+ *
+ * Keying: `expectedFilenameByLibrary` maps each emitted CQL library's identity
+ * (its `cqlLibraryName`, which the FHIR lane stamps as the Library's
+ * `sourceName`) → that entry's `outputFilename`. A Library whose `sourceName`
+ * isn't in the map (shouldn't happen once the manifest is non-empty) is flagged.
+ *
+ * No-op when the map is empty (the graph-only unit-test path), since there is no
+ * authoritative manifest to check against — the single-entry fallback then
+ * synthesizes its own source-derived content url.
+ */
+const CQL_SIBLING_PREFIX = "../../cql/";
+
+export function applyContentUrlInvariant(
+  resources: ReadonlyArray<EmittedResource>,
+  expectedFilenameByLibrary: ReadonlyMap<string, string>,
+): CRLError[] {
+  if (expectedFilenameByLibrary.size === 0) return [];
+  const errors: CRLError[] = [];
+  for (const r of resources) {
+    if (r.resourceType !== "Library") continue;
+    const content = (r.resource as { content?: Array<{ url?: string }> }).content;
+    if (!Array.isArray(content)) continue;
+    // Each Library's identity is the cqlLibraryName the FHIR lane stamped as
+    // sourceName; the manifest pairs that identity with the ONE filename it must
+    // reference.
+    const expected = r.sourceName !== undefined ? expectedFilenameByLibrary.get(r.sourceName) : undefined;
+    for (const item of content) {
+      const url = item.url;
+      // A non-string/empty url is itself a broken content reference — fall through
+      // to the error branch (slice-4c review Claude [nit]: don't silently skip a
+      // hole in an integrity invariant). Coerce to "" so the prefix/expected
+      // checks below fail and the error names the offending value.
+      const urlStr = typeof url === "string" ? url : "";
+      // The shipped layout is exactly `../../cql/<that library's outputFilename>`.
+      // Require the sibling prefix AND an exact match to the per-identity
+      // expected filename — a wrong directory, a cross-wired sibling, or a file
+      // no source emitted all fail.
+      const inSiblingLayout = urlStr.startsWith(CQL_SIBLING_PREFIX);
+      const filename = urlStr.slice(CQL_SIBLING_PREFIX.length);
+      if (!inSiblingLayout || expected === undefined || filename !== expected) {
+        errors.push({
+          type: "Validation",
+          kind: "library-content-url-unresolved",
+          message:
+            `Library "${r.sourceName ?? r.relativePath}" content url "${urlStr}" does not resolve to the ` +
+            `CQL file the split-manifest paired with it` +
+            (expected !== undefined ? ` ("${CQL_SIBLING_PREFIX}${expected}")` : "") +
+            `. Every emitted Library must reference its OWN sibling CQL file under the shipped ` +
+            `\`${CQL_SIBLING_PREFIX}<file>.cql\` layout. This usually means the FHIR lane materialized a ` +
+            `Library for a CQL library the split plan did not produce, cross-wired it to another source's ` +
+            `CQL file, or pointed it outside the sibling \`cql/\` directory (manifest drift).`,
+        });
+      }
+    }
+  }
+  return errors;
+}
+
 function downstreamContext(url: string, droppedPaths: Set<string>): string {
   // Tightened per round-5 Claude nit: require BOTH the resource-type
   // prefix AND the id stem to match, so a dropped `ValueSet/foo.json`
@@ -516,10 +625,40 @@ export function emitFhirDefClosure(
   graph: ResolvedGraph,
   metadata: CpgMetadata,
   opts: EmitOptions = {},
+  // Slice 4c (E) — the A→E split-manifest (`emitCQLImports(path).cqlByLibrary`).
+  // The CQL lane is the SINGLE source of the split decision; the FHIR lane
+  // CONSUMES it (it does NOT re-run the split gate). Each `PerLibraryEmit` is
+  // annotated with `sourceLibraryName` / `role` / `includes` / `outputFilename`
+  // so this lane can materialize one FHIR Library per emitted CQL library and
+  // route the per-entry depends-on edges. `emitFhirDefFromPath` always threads
+  // it; callers that synthesize a graph directly (the closure unit test) pass
+  // `[]` → every source falls back to the single-entry (per-CRL) path, which is
+  // byte-identical to pre-slice-4c behavior.
+  cqlByLibrary: ReadonlyArray<PerLibraryEmit> = [],
 ): FhirDefClosureEmitResult {
   const errors: CRLError[] = [];
   const unmatched: UnmatchedReference[] = [];
   const resources: EmittedResource[] = [];
+
+  // Group the manifest by SOURCE library name so each source can emit one FHIR
+  // Library per manifest entry. A source absent from the manifest (e.g. the
+  // graph-only unit-test path with `cqlByLibrary: []`) takes the single-entry
+  // fallback below.
+  const manifestBySource = new Map<string, PerLibraryEmit[]>();
+  for (const entry of cqlByLibrary) {
+    const list = manifestBySource.get(entry.sourceLibraryName) ?? [];
+    list.push(entry);
+    manifestBySource.set(entry.sourceLibraryName, list);
+  }
+  // Per-Library expected CQL filename — input to the content-url closure
+  // invariant (Inv 4). Keyed by each emitted CQL library's identity
+  // (`cqlLibraryName`, which the FHIR lane stamps as the Library `sourceName`) so
+  // the invariant checks each Library against ITS OWN file, not a global set
+  // (slice-4c review: a global set would accept a Library cross-wired to another
+  // source's emitted CQL file). Empty manifest → invariant is a no-op.
+  const expectedFilenameByLibrary = new Map<string, string>(
+    cqlByLibrary.map((e) => [e.libraryName, e.outputFilename] as const),
+  );
 
   // `executable` is not supported: emit produces design-time forms (text/cql
   // Library content, value-set `compose`), not the run-time forms `executable`
@@ -596,12 +735,16 @@ export function emitFhirDefClosure(
       metadata,
     );
 
-    // (1) ValueSets
+    // (1) ValueSets. The author ValueSets are emitted ONCE per source (their
+    // slug + url are keyed on the SOURCE name, unchanged). They are the
+    // terminology that, under a partial split, RELOCATES into the `<source>
+    // Concepts` CQL library — so in the multi-entry branch their depends-on edge
+    // is routed onto the Concepts FHIR Library (alongside the CodeSystem).
     const vsResult = emitValueSetsForLibrary(lib.terminologies, lib.libraryName, metadata, resolvedOpts);
     resources.push(...vsResult.resources);
     errors.push(...vsResult.errors);
     unmatched.push(...vsResult.unmatched);
-    const emittedDependsOnCanonicals: string[] = vsResult.resources
+    const vsCanonicals: string[] = vsResult.resources
       .map((r) => (r.resource as { url?: string }).url)
       .filter((u): u is string => typeof u === "string");
 
@@ -616,6 +759,12 @@ export function emitFhirDefClosure(
     // The lowering kinds are already hard errors (not in FHIR_DEF_WARNING_KINDS),
     // so push them as-is — re-keying would only lose the actionable subtype. On
     // a lowering error, surface it and emit NO CodeSystem for this library.
+    //
+    // The CodeSystem url + slug stay keyed on the SOURCE name (4a byte-equality
+    // pin) — ONE CodeSystem per source as today. Only its depends-FROM edge
+    // moves: in the multi-entry branch it is owned by the `<source> Concepts`
+    // Library (where the local codes now live), not the source-wide Root.
+    let csUrl: string | undefined;
     const lowered = lowerLocalCodes(lib.ast, { canonicalBase: metadata.canonicalBase });
     if (lowered.errors.length > 0) {
       errors.push(...lowered.errors);
@@ -625,31 +774,130 @@ export function emitFhirDefClosure(
         const csResult = emitLocalCodeSystem(lib.libraryName, codeConcepts, metadata, resolvedOpts);
         if (csResult.resource) {
           resources.push(csResult.resource);
-          const csUrl = (csResult.resource.resource as { url?: string }).url;
-          if (typeof csUrl === "string") emittedDependsOnCanonicals.push(csUrl);
+          const u = (csResult.resource.resource as { url?: string }).url;
+          if (typeof u === "string") csUrl = u;
         }
         errors.push(...csResult.errors);
         unmatched.push(...csResult.unmatched);
       }
     }
 
-    // (2) Library — post-decorate with sourceKind/sourceName/location after emit
-    const libResult = emitLibrary(
-      lib.libraryName,
-      metadata,
-      emittedDependsOnCanonicals,
-      lib.cqlFileName,
-      resolvedOpts,
-    );
-    if (libResult.resource) {
-      // Plan v3.2 §"emitLibrary post-decorate"
-      libResult.resource.sourceKind = "Library";
-      libResult.resource.sourceName = lib.libraryName;
-      if (lib.ast.library?.location) libResult.resource.location = lib.ast.library.location;
-      resources.push(libResult.resource);
+    // (2) Library — one FHIR Library per MANIFEST ENTRY for this source.
+    //
+    // Single-entry / no-manifest sources (cms22/cms69, per-CRL, hand-split) take
+    // the UNCHANGED path: ONE Library named `<source>`, source-wide depends-on
+    // (author ValueSets + the local CodeSystem), content url = `lib.cqlFileName`.
+    // This keeps every committed FHIR golden byte-identical.
+    //
+    // Multi-entry sources (partial/full split) emit one Library per entry with
+    // PER-ENTRY derived depends-on:
+    //   - role:"root"     → depends-on the canonicals of its `includes` that are
+    //                       themselves emitted CQL libraries in this source's
+    //                       manifest (e.g. `<source> Concepts`). NO CodeSystem /
+    //                       author-VS edge here — those moved to Concepts.
+    //   - role:"concepts" → depends-on the local CodeSystem + the author
+    //                       ValueSets (the relocated terminology).
+    //   - role:"layer"    → (full split, no committed golden) depends-on the
+    //                       Concepts-layer canonical when it `include`s it; the
+    //                       Concepts layer owns the CodeSystem/VS edges. See the
+    //                       FOLLOW-UP below re: cms inter-layer deps.
+    const manifestEntries = manifestBySource.get(lib.libraryName) ?? [];
+    const emitOneLibrary = (
+      libraryName: string,
+      dependsOn: ReadonlyArray<string>,
+      cqlFileName: string,
+    ): void => {
+      const libResult = emitLibrary(libraryName, metadata, dependsOn, cqlFileName, resolvedOpts);
+      if (libResult.resource) {
+        // Plan v3.2 §"emitLibrary post-decorate"
+        libResult.resource.sourceKind = "Library";
+        libResult.resource.sourceName = libraryName;
+        if (lib.ast.library?.location) libResult.resource.location = lib.ast.library.location;
+        resources.push(libResult.resource);
+      }
+      errors.push(...libResult.errors);
+      unmatched.push(...libResult.unmatched);
+    };
+
+    if (manifestEntries.length <= 1) {
+      // Single-entry / no-manifest fallback (byte-identical to pre-slice-4c). Use
+      // the manifest entry's outputFilename when present (it equals the source
+      // filename for a single-entry source) so a split that wrote a differently-
+      // named file still resolves; otherwise the source-derived `lib.cqlFileName`.
+      const only = manifestEntries[0];
+      // Single-entry sanity (slice-4c review gpt55 [important] #6): a one-entry
+      // source from a well-formed manifest is the `none`/per-CRL Root keeping the
+      // source name. A malformed/hand-built manifest with a single `concepts`
+      // entry, or one whose `libraryName !== sourceLibraryName`, would emit a
+      // source-named Library inconsistent with the manifest while Inv 4 (which
+      // matches by filename) still passed. Surface that as a structured error
+      // rather than silently emitting the inconsistent resource.
+      if (only && (only.role !== "root" || only.libraryName !== lib.libraryName)) {
+        errors.push({
+          type: "Validation",
+          kind: "library-content-url-unresolved",
+          message:
+            `Source library "${lib.libraryName}" has a single manifest entry that is not its Root ` +
+            `(role="${only.role}", cqlLibraryName="${only.libraryName}"). A single-entry source must be ` +
+            `the per-CRL Root keeping the source name; this manifest is malformed.`,
+        });
+      }
+      const cqlFileName = only ? `../../cql/${only.outputFilename}` : lib.cqlFileName;
+      const dependsOn = [...vsCanonicals, ...(csUrl ? [csUrl] : [])];
+      emitOneLibrary(lib.libraryName, dependsOn, cqlFileName);
+    } else {
+      // Multi-entry (split). The canonicals of THIS source's emitted CQL
+      // libraries, keyed by cqlLibraryName, so a root's `includes` can be
+      // resolved to a sibling Library canonical (only siblings emitted by THIS
+      // source count — a foreign `include` is an external dep, not threaded here).
+      const siblingCanonicals = new Map<string, string>();
+      for (const e of manifestEntries) {
+        siblingCanonicals.set(e.libraryName, libraryCanonicalUrl(metadata.canonicalBase, e.libraryName));
+      }
+      for (const entry of manifestEntries) {
+        const cqlFileName = `../../cql/${entry.outputFilename}`;
+        let dependsOn: string[];
+        if (entry.role === "concepts") {
+          // Concepts owns the terminology that relocated into it.
+          dependsOn = [...vsCanonicals, ...(csUrl ? [csUrl] : [])];
+        } else {
+          // root / layer: depend on the emitted-CQL-library siblings it includes.
+          dependsOn = entry.includes
+            .map((inc) => siblingCanonicals.get(inc))
+            .filter((u): u is string => typeof u === "string");
+          // Partial-split Root must pick up its Concepts sibling (slice-4c review
+          // Claude [important]): a partial Root that has `includes` (it always
+          // includes its `<lib> Concepts`) yet resolved ZERO sibling canonicals
+          // means the manifest/closure disagree and the Root→Concepts depends-on
+          // would silently vanish (empty relatedArtifact omitted by emitLibrary).
+          // Flag it rather than ship a Root with no Concepts edge. (Full-split
+          // `layer` entries legitimately may have foreign-only includes; this
+          // guard targets the partial Root, which by construction has a sibling.)
+          if (entry.role === "root" && entry.includes.length > 0 && dependsOn.length === 0) {
+            errors.push({
+              type: "Validation",
+              kind: "library-content-url-unresolved",
+              message:
+                `Partial-split Root Library "${entry.libraryName}" includes ${entry.includes
+                  .map((i) => `"${i}"`)
+                  .join(", ")} but none resolved to an emitted sibling CQL library in this source's ` +
+                `manifest — its Root→Concepts depends-on edge would be lost. The manifest's split entries ` +
+                `disagree with the Root's includes.`,
+            });
+          }
+          // D1: under the FULL split the Concepts LAYER is now `role:"concepts"`
+          // (it owns the CodeSystem/author-VS depends-on edge, restoring the
+          // pre-4c terminology edge that was orphaned when the Concepts layer was
+          // mis-classified as a plain `"layer"`). The Asserted/Inferred consuming
+          // `layer` entries reach that terminology TRANSITIVELY by depending-on
+          // their Concepts sibling here (via `includes`), exactly as the CQL
+          // include chain does — no direct CodeSystem edge on the consuming layers
+          // is needed. The content-url invariant below still flags any Library
+          // pointing at an unwritten CQL file.
+        }
+        emitOneLibrary(entry.libraryName, dependsOn, cqlFileName);
+      }
     }
-    errors.push(...libResult.errors);
-    unmatched.push(...libResult.unmatched);
 
     // (3) ActivityDefinitions
     const actResult = emitActivityDefinitionsForLibrary(
@@ -669,8 +917,44 @@ export function emitFhirDefClosure(
     errors.push(...recResult.errors);
     unmatched.push(...recResult.unmatched);
 
-    // (5) Decision PlanDefs — closure-aware via low-level emitDecisionPlanDefinition
-    for (const decision of lib.decisions) {
+    // (5) Decision PlanDefs — closure-aware via low-level emitDecisionPlanDefinition.
+    //
+    // Decision PlanDefs (and ActivityDefs above) stay keyed on the SOURCE name —
+    // their `library[]` = `libraryCanonicalUrl(base, <source>)`, which must
+    // resolve to the ROOT Library (the entry whose cqlLibraryName === source).
+    // A decision-bearing source is NEVER full-split (A's `computeSplitPlan`
+    // guards this: `isLayerSplittable` is false the moment it sees a Decision),
+    // so when it is split at all it is PARTIAL, whose Root keeps the source name.
+    // Assert that contract so a future split-gate regression that renamed the
+    // Root away fails loudly here instead of dangling Inv-2 `library[]` later.
+    // Reuse the `manifestEntries` computed for the Library section above (same
+    // source) — gpt55/Claude [nit]: don't re-fetch + re-default, so the two can't
+    // drift if the keying ever changes.
+    const hasRootKeepingSourceName =
+      manifestEntries.length === 0 ||
+      manifestEntries.some((e) => e.role === "root" && e.libraryName === lib.libraryName);
+    if (lib.decisions.length > 0 && !hasRootKeepingSourceName) {
+      // Slice-4c review (gpt55 [important] #3 / Claude [critical]): structured
+      // error, NOT a raw `throw`. `emitFhirDefFromPath` + MCP `emit_crl_fhir` have
+      // no try/catch around this boundary, so a throw would surface as a server
+      // crash instead of a `{success:false, errors:[...]}` response — mirroring
+      // the `safeOutputFilename` boundary that was deliberately de-thrown above.
+      // SKIP this source's Decision PlanDefs (their `library[]` would dangle
+      // anyway) and surface the contract violation as an error.
+      errors.push({
+        type: "Validation",
+        kind: "decision-root-library-missing",
+        message:
+          `Decision-bearing source "${lib.libraryName}" has no manifest entry keeping the source ` +
+          `name as its Root, so its Decision/Activity \`library[]\` reference would dangle. A ` +
+          `decision-bearing library must never full-split (guarded in computeSplitPlan) — this ` +
+          `manifest is malformed. Skipping this source's decision emit.`,
+      });
+    }
+    // When the Root contract is violated we skip THIS source's decision emit
+    // (handled by the loop guard below); there are no later per-lib steps, so a
+    // plain guarded loop suffices.
+    for (const decision of hasRootKeepingSourceName ? lib.decisions : []) {
       const decKey = qualifiedKey([lib.libraryName, decision.name]);
       if (classification.cycleMemberKeys.has(decKey)) continue;
       const isRoot = classification.rootKeys.has(decKey);
@@ -699,7 +983,11 @@ export function emitFhirDefClosure(
   errors.push(...inv1.errors);
   const inv2errors = applyInvariant2(inv1.surviving, inv1.droppedPaths, metadata);
   const inv3errors = applyInvariant3(inv1.surviving, inv1.droppedPaths);
-  errors.push(...inv2errors, ...inv3errors);
+  // Inv 4 (slice 4c) — Library content-url ↔ emitted-CQL-file integrity. Runs
+  // over the post-Inv-1 surviving set, consuming the manifest's outputFilename
+  // set (no-op when the manifest is empty).
+  const inv4errors = applyContentUrlInvariant(inv1.surviving, expectedFilenameByLibrary);
+  errors.push(...inv2errors, ...inv3errors, ...inv4errors);
 
   // Round-5 gpt55 [important]: severity-aware success (warnings don't sink
   // success). Hard errors (non-warning CRLErrors) + any unmatched still flip
@@ -722,6 +1010,15 @@ export function emitFhirDefFromPath(
   rootPath: string,
   opts: EmitOptions = {},
 ): FhirDefFromPathResult {
+  // D6 — DOUBLE resolveImports coupling (deferred). This resolves the graph ONCE
+  // here for the FHIR closure (which keys the FHIR Library identities), and the
+  // `emitCQLImports(rootPath)` call below resolves the SAME path AGAIN internally
+  // to produce the split-manifest. Resolution is filesystem-deterministic, so the
+  // two resolutions agree today — but the FHIR Library keying (resolution #1) and
+  // the manifest (resolution #2) are coupled through that determinism rather than
+  // a shared graph. Threading the single resolved graph into emitCQLImports would
+  // remove the coupling; that refactor is DEFERRED (it would change the
+  // emitCQLImports signature and is out of slice-4c scope).
   const graph = resolveImports(rootPath);
 
   // Try to load metadata; metadataErrors surface separately for CLI/MCP exit code computation.
@@ -746,14 +1043,49 @@ export function emitFhirDefFromPath(
     };
   }
 
-  const closureResult = emitFhirDefClosure(graph, metadata, opts);
+  // Slice 4c (E) — run the CQL lane FIRST to obtain the split-manifest, then
+  // thread it into the FHIR closure so the FHIR lane materializes one Library
+  // per emitted CQL library (consuming the split decision, never re-deriving the
+  // gate).
+  //
+  // CQL-lane hard failures (D2, slice-4c review gpt55 [important] / Claude
+  // [critical]): the CQL split/structural errors fire AFTER import resolution and
+  // return an EMPTY manifest (`cqlByLibrary: []`) with a clean `graph.diagnostics`
+  // — `emit-local-codesystem-urn-collision`, `layered-name-collision`,
+  // `emit-cross-library-ref-into-split-library`, `emit-codesystem-url-conflict`,
+  // and the `lowerLocalCodes` hard errors. If we only threaded the (empty)
+  // manifest the FHIR lane would silently fall back to the single-entry path, Inv
+  // 4 would no-op, and MCP/`emit_crl_fhir` could report a misleading FHIR success.
+  // So fold EVERY CQL hard error into the FHIR result and sink `success`.
+  //
+  // D2 — this is a DENYLIST, not an allowlist: fold every CQL hard error EXCEPT
+  // the `CQL_FOLD_EXCLUDED_KINDS` set (the #79 `emit-unmatched-narrative` sentinel
+  // — which empties the manifest but where the FHIR lane DELIBERATELY emits its
+  // design-time forms, the cc-screening + cms corpus relies on this — and the
+  // `lowerLocalCodes` hard kinds the FHIR lane already surfaces itself). The prior
+  // allowlist of 3 split kinds silently DROPPED `emit-codesystem-url-conflict`, so
+  // MCP `emit_crl_fhir` could report success while the CQL lane failed.
+  // (The CLI re-runs `emitCQLImports` for the CQL-write side; this is the
+  // public/MCP path's guard.)
+  const cqlImports = emitCQLImports(rootPath);
+  const cqlErrors = (cqlImports.success ? [] : cqlImports.errors ?? []).filter(
+    (e) => e.kind !== undefined && !CQL_FOLD_EXCLUDED_KINDS.has(e.kind),
+  );
+  const cqlManifestFailed = cqlErrors.length > 0;
+  const closureResult = emitFhirDefClosure(graph, metadata, opts, cqlImports.cqlByLibrary);
   // Round-5 gpt55 [important]: fold importDiagnostics + metadataErrors
   // into success. Otherwise MCP can return success:true with fatal
   // import-time errors.
   const importErrors = graph.diagnostics.filter((d) => d.severity === "error");
-  const success = closureResult.success && metadataErrors.length === 0 && importErrors.length === 0;
+  const errors = [...closureResult.errors, ...cqlErrors];
+  const success =
+    closureResult.success &&
+    !cqlManifestFailed &&
+    metadataErrors.length === 0 &&
+    importErrors.length === 0;
   return {
     ...closureResult,
+    errors,
     success,
     importDiagnostics: graph.diagnostics,
     metadataErrors,

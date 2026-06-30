@@ -12,11 +12,14 @@ import { getRefLibrary, isQualifiedRef } from "../ast/types";
 import { emitCQLFromAST, infoForParameterStatement } from "../cql-emitter/emitCQL";
 import type { AstParameterInfo } from "../cql-emitter/emitCQL";
 import {
-  emitLayered,
+  emitPartitioned,
   isLayerSplittable,
   layerLibraryNamesFor,
   librariesReferencedBy,
+  FULL_PARTITION,
+  PARTIAL_PARTITION,
 } from "../cql-emitter/layeredEmit";
+import type { Partition } from "../cql-emitter/layeredEmit";
 import { lowerLocalCodes, localCodeSystemUrl } from "../cql-emitter/lowerLocalCodes";
 import { readCanonicalBase } from "../fhir-emitter/metadata";
 import type { CRLError } from "../types/errors";
@@ -54,6 +57,16 @@ export interface PerLibraryEmit {
   // `safeOutputFilename`.
   outputFilename: string;
   cql: string;
+  // Slice 4c — the A→E manifest the FHIR follow-up consumes. `sourceLibraryName`
+  // is the ORIGINAL CRL `library "<name>"` this CQL entry was emitted from (the
+  // same value for every entry produced by one split source); `role` distinguishes
+  // the root/concepts/layer entries of a split from a plain per-CRL emit; `includes`
+  // is the CQL library names this entry `include`s (its `collectLayerIncludes`
+  // result, empty for the per-CRL path). The FHIR orchestrator (NOT this lane)
+  // reads these to materialize the matching FHIR resources.
+  sourceLibraryName: string;
+  role: "root" | "concepts" | "layer";
+  includes: string[];
 }
 
 export interface EmitImportsResult {
@@ -107,6 +120,80 @@ function buildAstParameterIndex(emitClosure: RegistryEntry[]): Map<string, Map<s
     if (map.size > 0) out.set(entry.name, map);
   }
   return out;
+}
+
+/**
+ * Slice 4c — the ONE shared split-plan classifier consumed by BOTH the
+ * preflights (collision registration) AND the emit loop, so split-vs-no-split is
+ * decided in exactly one place (no gate-in-two-places drift).
+ *
+ *   - `full`    : a layer-splittable multi-layer library (NO Decision — see the
+ *                 invariant below) → FULL 3-way split. `emittedLibraryNames` =
+ *                 `layerLibraryNamesFor(...)`.
+ *   - `partial` : NOT layer-splittable (e.g. decision-bearing) but carries
+ *                 concept-level `code is` (`localCodesCount > 0`) → 2-way
+ *                 Concepts/Root split. `emittedLibraryNames` = `[lib, "<lib>
+ *                 Concepts"]`.
+ *   - `none`    : neither → the unchanged per-CRL path. `emittedLibraryNames` =
+ *                 `[lib]`.
+ *
+ * `localCodesCount` is the count of concept-level `code is` codes the library
+ * lowered (from `lowerLocalCodes`), threaded by the caller from the SAME lowered
+ * AST that is emitted — so the plan can't drift from the emit.
+ *
+ * INVARIANT (slice 4c [critical]): a decision-bearing library is NEVER `full`.
+ * `isLayerSplittable` returns false the moment it hits a Decision (its
+ * `classifyStatementLayer === null` → return false), so `full` implies
+ * NO-Decision. This is load-bearing: the partial Root keeps the SOURCE library
+ * name `<lib>`, and that contract is only safe because `full` (which renames
+ * EVERYTHING to `<lib> <layer>`) can never fire on a decision-bearing library.
+ */
+export type SplitKind = "full" | "partial" | "none";
+
+export interface SplitPlan {
+  kind: SplitKind;
+  emittedLibraryNames: string[];
+  partition?: Partition;
+}
+
+export function computeSplitPlan(
+  ast: CRL,
+  lib: string,
+  localCodesCount: number,
+): SplitPlan {
+  if (isLayerSplittable(ast)) {
+    // D5 — UNREACHABLE: `isLayerSplittable` returns false at the first Decision
+    // (its `classifyStatementLayer` is null for a Decision → the splittability
+    // loop bails), so reaching this branch with a Decision present is impossible
+    // by construction. This is NOT a structured emit error (it can't fire on any
+    // real input); it is an impossible-assert that guards a FUTURE refactor of
+    // `isLayerSplittable` from silently violating the partial-Root-keeps-source-
+    // name contract. We keep the throw (rather than a structured CRLError) BECAUSE
+    // it is truly unreachable — over-engineering a soft-error channel for a
+    // branch no input can hit would be the wrong shape. The MCP path has no
+    // try/catch here, but that is fine: this throw cannot fire on valid emit input.
+    if (ast.statements.some((s) => s.type === "Decision")) {
+      throw new Error(
+        `internal invariant violated: library "${lib}" is both isLayerSplittable ` +
+          `and decision-bearing — a decision-bearing library must never take the ` +
+          `FULL split (its Root keeps the source name "${lib}", which the full ` +
+          `split would rename away).`,
+      );
+    }
+    return {
+      kind: "full",
+      emittedLibraryNames: layerLibraryNamesFor(ast, lib),
+      partition: FULL_PARTITION,
+    };
+  }
+  if (localCodesCount > 0) {
+    return {
+      kind: "partial",
+      emittedLibraryNames: [lib, `${lib} Concepts`],
+      partition: PARTIAL_PARTITION,
+    };
+  }
+  return { kind: "none", emittedLibraryNames: [lib] };
 }
 
 export function emitCQLImports(rootPath: string): EmitImportsResult {
@@ -169,6 +256,12 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
   // library names slug to the SAME local codesystem URL. The collision is on the
   // slug, so it is scheme-independent (URN vs canonicalBase both collide).
   const localUrnToLibraries = new Map<string, Set<string>>();
+  // Slice 4c — the count of concept-level `code is` codes each library lowered,
+  // keyed by emitted library name. Threaded into `computeSplitPlan` so the split
+  // decision (partial vs none) is made from the SAME lowered representation that
+  // is emitted. (`lowered.localCodes` is populated from the exact synthesis loop
+  // that builds the synthetic terminologies — one source of truth.)
+  const localCodesCountByName = new Map<string, number>();
   const emitClosure = rawEmitClosure.map((entry) => {
     const lowered = lowerLocalCodes(entry.ast, { canonicalBase });
     if (lowered.errors.length > 0) lowerErrors.push(...lowered.errors);
@@ -179,8 +272,12 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
       set.add(entry.name);
       localUrnToLibraries.set(urn, set);
     }
+    if (entry.name) localCodesCountByName.set(entry.name, lowered.localCodes.length);
     return didLower ? { ...entry, ast: lowered.ast } : entry;
   });
+  // Helper: the lowered `code is` count for an entry (0 when none / unnamed).
+  const localCodesCountFor = (name: string | null): number =>
+    name ? localCodesCountByName.get(name) ?? 0 : 0;
   if (lowerErrors.length > 0) {
     return {
       success: false,
@@ -224,11 +321,19 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
   const crossLibraryParameters = buildAstParameterIndex(emitClosure);
 
   // Slice 2 (layeredEmit) — the set of library NAMES that will be auto-split
-  // into layer libraries. A split library's ORIGINAL name no longer exists as
-  // an emitted CQL library, so any OTHER library that qualified-refs it would
+  // into layer libraries. A FULL-split library's ORIGINAL name no longer exists
+  // as an emitted CQL library, so any OTHER library that qualified-refs it would
   // dangle. Cross-library referrer-rewriting (rewrite `"X"."Y"` to the layer
   // Y landed in) is the DEFERRED routing slice; here we detect the situation
   // and fail loudly rather than emit broken CQL.
+  //
+  // Slice 4c — PARTIAL-split libraries are deliberately NOT added here: the
+  // partial Root KEEPS the source name `<lib>` (its whole point — PlanDef/
+  // ActivityDef `library[]` refs slug from the source name), so a foreign ref to
+  // `"<lib>"."X"` still resolves to the Root library. (KNOWN LIMITATION: a
+  // foreign ref into the MOVED terminology — `"<lib>"."<aTerminology>"` — would
+  // now dangle, since terminologies relocated to `<lib> Concepts`. That edge is
+  // out of deliverable scope; do NOT break valid root refs to guard it.)
   const splitLibraryNames = new Set<string>();
   for (const entry of emitClosure) {
     if (entry.name && isLayerSplittable(entry.ast)) splitLibraryNames.add(entry.name);
@@ -284,12 +389,19 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
     };
     for (const entry of emitClosure) {
       if (entry.name === null || entry.name === "") continue;
-      if (isLayerSplittable(entry.ast)) {
-        for (const layerName of layerLibraryNamesFor(entry.ast, entry.name)) {
-          register(layerName, `auto-split of library "${entry.name}"`);
-        }
-      } else {
-        register(entry.name, `library "${entry.name}"`);
+      // Slice 4c — register the FULL emitted-name set for this entry via the
+      // shared split-plan. A `partial` entry now registers BOTH `<lib>` AND
+      // `<lib> Concepts` (previously only `<lib>` was registered for non-
+      // splittable entries, letting a real sibling `<lib> Concepts` clobber the
+      // generated one silently). `full` registers the layer names; `none`
+      // registers just `<lib>` — same as before for those kinds.
+      const plan = computeSplitPlan(entry.ast, entry.name, localCodesCountFor(entry.name));
+      const source =
+        plan.kind === "none"
+          ? `library "${entry.name}"`
+          : `auto-split of library "${entry.name}"`;
+      for (const emittedName of plan.emittedLibraryNames) {
+        register(emittedName, source);
       }
     }
     if (collisions.length > 0) {
@@ -324,30 +436,32 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
     // invalid CQL.
     if (entry.name === null || entry.name === "") continue;
 
-    // Slice 2 — layeredEmit gate. A single CRL library whose concepts span
-    // MORE THAN ONE layer (Concepts / Asserted / Inferred), AND whose every
-    // statement is layer-classifiable (Concept / Terminology), emits as
-    // separate dependency-ordered layer libraries (`X Concepts`, `X Asserted`,
-    // `X Inferred`). A SINGLE-layer (or zero-layer) library — or a multi-layer
-    // library that also carries a Decision/Activity/Parameter (out of scope for
-    // this slice; splitting would drop those statements) — takes the unchanged
-    // per-CRL path below. This keeps the hand-split cms22/cms69 goldens (each
-    // source `.crl` is single-layer) a no-op.
-    if (isLayerSplittable(entry.ast)) {
-      const layered = emitLayered(entry.ast, entry.name, { crossLibraryParameters, canonicalBase });
-      if (!layered.success) {
+    // Slice 4c — ONE shared split-plan drives BOTH the preflight (above) and
+    // this emit loop. `full` (a multi-layer, all-classifiable library) emits the
+    // 3-way FULL split; `partial` (a NON-splittable library — e.g. decision-
+    // bearing — carrying concept-level `code is`) emits the 2-way Concepts/Root
+    // split (Root keeps the source name `<lib>`); `none` takes the unchanged
+    // per-CRL path. The cms22/cms69 goldens (each source `.crl` is single-layer)
+    // and the FULL-split goldens stay byte-identical.
+    const plan = computeSplitPlan(entry.ast, entry.name, localCodesCountFor(entry.name));
+    if (plan.kind !== "none") {
+      const partitioned = emitPartitioned(entry.ast, entry.name, plan.partition!, {
+        crossLibraryParameters,
+        canonicalBase,
+      });
+      if (!partitioned.success) {
         return {
           success: false,
           graph,
           importDiagnostics: graph.diagnostics,
           cqlByLibrary: [],
-          errors: layered.entries.flatMap((e) => e.result.errors ?? []),
+          errors: partitioned.entries.flatMap((e) => e.result.errors ?? []),
         };
       }
-      for (const layer of layered.entries) {
-        let layerFilename: string;
+      for (const part of partitioned.entries) {
+        let partFilename: string;
         try {
-          layerFilename = safeOutputFilename(layer.libraryName);
+          partFilename = safeOutputFilename(part.libraryName);
         } catch (e) {
           return {
             success: false,
@@ -357,11 +471,34 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
             errors: [{ type: "Exception", message: e instanceof Error ? e.message : String(e) }],
           };
         }
+        // Manifest role (D1) — the entry that OWNS the terminology declarations
+        // (the Concepts-classified layer, partition value "Concepts") is ALWAYS
+        // `role:"concepts"`, under BOTH the partial AND the full split. The FHIR
+        // dep-routing assigns the CodeSystem/author-ValueSet depends-on edges to
+        // the `role:"concepts"` entry; before D1 the full-split Concepts LAYER was
+        // marked `"layer"`, so under full split the local CodeSystem was orphaned
+        // (zero inbound depends-on) — a regression vs the pre-4c single Library.
+        // Routing it onto the Concepts entry restores the pre-4c edge.
+        //
+        // The partition VALUE (`part.layer`) is `"Concepts"` for the Concepts
+        // entry in BOTH FULL_PARTITION and PARTIAL_PARTITION, so it is the one
+        // source of truth here. Under `partial` the entry whose emitted name ===
+        // the source `<lib>` is the Root (partition value "Root"); under `full`
+        // the Asserted/Inferred entries stay `"layer"`.
+        const role: PerLibraryEmit["role"] =
+          part.layer === "Concepts"
+            ? "concepts"
+            : plan.kind === "partial" && part.libraryName === entry.name
+              ? "root"
+              : "layer";
         cqlByLibrary.push({
-          libraryName: layer.libraryName,
+          libraryName: part.libraryName,
           filePath: entry.filePath,
-          outputFilename: layerFilename,
-          cql: layer.result.result ?? "",
+          outputFilename: partFilename,
+          cql: part.result.result ?? "",
+          sourceLibraryName: entry.name,
+          role,
+          includes: part.crossLibraryIncludes,
         });
       }
       continue;
@@ -412,6 +549,12 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
       filePath: entry.filePath,
       outputFilename,
       cql: emit.result,
+      // Slice 4c manifest — the per-CRL (`none`) path: this CQL IS the source
+      // library (role "root"), and its `include`s are the discovered cross-
+      // library refs. `crossLibs` are the native CQL `include OtherLib` deps.
+      sourceLibraryName: entry.name,
+      role: "root",
+      includes: crossLibs,
     });
   }
 

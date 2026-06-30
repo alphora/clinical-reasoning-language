@@ -1,0 +1,12 @@
+{
+  "name": "urn-collision-fixture",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Slice 4c — CQL-lane structural split failure surfaced through the FHIR public path",
+  "crl": {
+    "canonicalBase": "http://example.org/crl/urn-collision",
+    "status": "draft",
+    "experimental": true,
+    "date": "2020-01-01T00:00:00.000Z"
+  }
+}

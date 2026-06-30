@@ -1,0 +1,12 @@
+{
+  "name": "codesystem-url-conflict-fixture",
+  "version": "1.0.0",
+  "private": true,
+  "description": "D2 — emit-codesystem-url-conflict surfaced through the FHIR public path",
+  "crl": {
+    "canonicalBase": "http://example.org/crl/codesystem-url-conflict",
+    "status": "draft",
+    "experimental": true,
+    "date": "2020-01-01T00:00:00.000Z"
+  }
+}

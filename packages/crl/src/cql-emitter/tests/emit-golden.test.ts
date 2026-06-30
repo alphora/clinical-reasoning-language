@@ -39,15 +39,16 @@ const CORPORA: Record<string, string> = {
   // into the Asserted layer; a `defined as` concept lands in the Inferred layer.
   // Exercises the full code-is fan-out + cross-layer re-qualification.
   "code-is-basic": path.join(__dirname, "fixtures", "code-is-basic", "code-is-basic.crl"),
-  // Slice 4b (shared-codesystem-dedup) — the PER-CRL local-code path. A single
-  // library carrying a `decision` (which disqualifies the layered auto-split)
-  // PLUS two `code is`-only concepts. The decision keeps the whole library on
-  // the per-CRL path, so the synthetic terminologies and their concepts
-  // co-reside in ONE emitted library: detectCollisions suffixes the code names
-  // to "<Concept> Code" and the retrieves inline as `[<Resource>: "<Concept>
-  // Code"]`. The golden asserts ONE shared `codesystem "<Lib> Local Codes"` +
-  // N suffixed `code "<Concept> Code": ... from "<Lib> Local Codes"` (the
-  // per-CRL suffix + shared-domain dedup interaction this slice is about).
+  // Slice 4c (always-extract-Concepts PARTIAL split) — a single library
+  // carrying a `decision` (which disqualifies the FULL 3-way layered auto-split)
+  // PLUS two `code is`-only concepts. The decision keeps the library OFF the full
+  // split, but the concept-level `code is` triggers the PARTIAL split: the
+  // terminology/codes move to a sibling `Code Is Decision Concepts` library, and
+  // the retrieves/context stay in the ROOT library `Code Is Decision` (which keeps
+  // the source name so PlanDef `library[]` refs resolve). With codes now alone in
+  // the Concepts library, detectCollisions sees no same-library collision → the
+  // ` Code` suffix DROPS (bare `code "<Concept>"`), and the root retrieves
+  // cross-qualify to `[<Resource>: "Code Is Decision Concepts"."<Concept>"]`.
   "code-is-decision": path.join(
     REPO_ROOT,
     "src/imports/tests/fixtures/code-is-decision/root.crl",

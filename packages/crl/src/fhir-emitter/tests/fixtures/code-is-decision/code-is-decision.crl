@@ -1,0 +1,26 @@
+# code-is-decision — slice 4c PARTIAL-split FHIR golden fixture.
+library "Code Is Decision".
+
+// A decision-bearing library (which disqualifies the FULL layered auto-split)
+// that ALSO carries concept-level `code is` codes. The CQL lane partial-splits
+// it into `Code Is Decision Concepts` (the lowered local codes) + `Code Is
+// Decision` (the Root, which keeps the source name so the Decision/Activity
+// `library[]` refs resolve). The FHIR lane (slice 4c / E) therefore emits TWO
+// Libraries: the Root depends-on the Concepts Library; the Concepts Library
+// depends-on the local CodeSystem.
+
+concept "Adult Patient":
+- type is Observation.
+- value type is boolean.
+- code is `adult-18-or-older`.
+
+concept "Active Crohns Disease":
+- type is Condition.
+- value type is boolean.
+- code is `active-crohns-disease`.
+
+activity "Refer to GI":
+- request CPGServiceRequest.
+
+decision "Triage Crohns":
+- when "Active Crohns Disease" then recommend activity "Refer to GI".

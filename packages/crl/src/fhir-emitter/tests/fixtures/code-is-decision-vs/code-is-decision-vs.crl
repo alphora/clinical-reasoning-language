@@ -1,0 +1,28 @@
+# code-is-decision-vs — D4 PARTIAL-split author-ValueSet routing fixture.
+library "Code Is Decision VS".
+
+// Like `code-is-decision` (a DECISION-bearing library that partial-splits), but
+// it ALSO carries an EXTERNAL author terminology (`valueset is`) consumed by a
+// `coded from` concept — NOT just local `code is`. D4 pins that BOTH the local
+// CodeSystem AND the author ValueSet's canonical route onto the `<source>
+// Concepts` Library's depends-on (the terminology relocates into Concepts under
+// the partial split), and that NEITHER lands on the Root.
+
+terminology "GI Referral Reasons":
+- valueset is `http://example.org/crl/code-is-decision-vs/ValueSet/gi-referral-reasons`.
+
+concept "Adult Patient":
+- type is Observation.
+- value type is boolean.
+- code is `adult-18-or-older`.
+
+concept "Referral Reason":
+- type is Observation.
+- value type is CodeableConcept.
+- coded from "GI Referral Reasons".
+
+activity "Refer to GI":
+- request CPGServiceRequest.
+
+decision "Triage Crohns":
+- when "Adult Patient" then recommend activity "Refer to GI".

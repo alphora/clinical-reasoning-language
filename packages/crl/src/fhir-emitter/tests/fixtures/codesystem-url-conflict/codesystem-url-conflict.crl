@@ -1,0 +1,23 @@
+# codesystem-url-conflict — D2 regression fixture.
+library "CS Conflict".
+
+// A hand-authored terminology whose body binds ONE codesystem decl name (the
+// historical "<emitName> System") to TWO DIFFERENT urls via two `system is`
+// lines. emitCQL.ts surfaces this as `emit-codesystem-url-conflict`
+// (success:false) — a CQL hard error that is NOT one of the 3 structural-split
+// kinds the pre-D2 allowlist folded, so the FHIR public path (emit_crl_fhir /
+// MCP) used to report a misleading success. D2 inverts the fold to a denylist so
+// every CQL hard error EXCEPT the #79 sentinel + the lowerLocalCodes kinds (which
+// the FHIR lane already surfaces) is folded into the FHIR result and sinks
+// `success`.
+
+terminology "Dual System":
+- system is `http://example.org/cs/alpha`.
+- code is `x`.
+- system is `http://example.org/cs/beta`.
+- code is `y`.
+
+concept "Has X":
+- type is Observation.
+- value type is CodeableConcept.
+- coded from "Dual System".

@@ -1,0 +1,25 @@
+# partial-concepts-name-collision root
+library "Pol".
+
+// A decision-bearing library "Pol" carrying a concept-level `code is`. The
+// decision disqualifies the FULL 3-way split, but the `code is` triggers the
+// PARTIAL split: emit registers BOTH "Pol" (root) AND the generated "Pol
+// Concepts" sibling. A separate REAL library "Pol Concepts" (pol-concepts.crl)
+// is pulled into the closure via the qualified ref below, so the generated
+// "Pol Concepts" name collides with the real one → kind layered-name-collision.
+
+concept "Adult Patient":
+- type is Observation.
+- value type is boolean.
+- code is `adult-18-or-older`.
+
+concept "From Sibling":
+- type is Observation.
+- value type is boolean.
+- defined as "Pol Concepts"."Sibling Concept".
+
+activity "Refer to GI":
+- request CPGServiceRequest.
+
+decision "Triage":
+- when "Adult Patient" then recommend activity "Refer to GI".

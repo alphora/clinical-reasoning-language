@@ -1,0 +1,7 @@
+# urn-collision Local One
+library "Local One".
+
+concept "Alpha":
+- type is Observation.
+- value type is boolean.
+- code is `alpha`.

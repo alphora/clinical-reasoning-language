@@ -4,15 +4,12 @@ using FHIR version '4.0.1'
 
 include FHIRHelpers version '4.0.1' called FHIRHelpers
 include CRLCommon called CRLCommon
-
-codesystem "Code Is Decision Local Codes": 'urn:crl:codesystem:code-is-decision-local'
-code "Adult Patient Code": 'adult-18-or-older' from "Code Is Decision Local Codes"
-code "Active Crohns Disease Code": 'active-crohns-disease' from "Code Is Decision Local Codes"
+include "Code Is Decision Concepts"
 
 context Patient
 
 define "Adult Patient":
-  [Observation: "Adult Patient Code"]
+  [Observation: "Code Is Decision Concepts"."Adult Patient"]
 
 define "Active Crohns Disease":
-  [Condition: "Active Crohns Disease Code"]
+  [Condition: "Code Is Decision Concepts"."Active Crohns Disease"]

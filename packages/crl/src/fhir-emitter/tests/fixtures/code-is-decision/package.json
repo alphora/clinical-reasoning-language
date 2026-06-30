@@ -1,0 +1,12 @@
+{
+  "name": "code-is-decision-fixture",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Slice 4c code-is-decision fixture — partial-split FHIR closure (Root + Concepts)",
+  "crl": {
+    "canonicalBase": "http://example.org/crl/code-is-decision",
+    "status": "draft",
+    "experimental": true,
+    "date": "2020-01-01T00:00:00.000Z"
+  }
+}
