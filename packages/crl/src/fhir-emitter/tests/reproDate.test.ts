@@ -82,7 +82,7 @@ describe("resolveEmitClock — reproducible date precedence", () => {
 });
 
 describe("capability gate — version always, date only at publishable+", () => {
-  const STRATEGY = path.join(REPO_ROOT, "src/tests/fixtures/corpus/cms22-split/cms22-strategy.crl");
+  const STRATEGY = path.join(REPO_ROOT, "src/tests/fixtures/corpus/cms22/cms22-strategy.crl");
   const FIXED = new Date("2020-01-01T00:00:00.000Z");
 
   it("publishable (default): version present, date present, publishable profile + 3 knowledgeCapability codes", () => {
@@ -139,7 +139,7 @@ describe("capability gate — version always, date only at publishable+", () => 
 });
 
 describe("capability profile matrix — additive CRMI lifecycle profiles per resource", () => {
-  const STRATEGY = path.join(REPO_ROOT, "src/tests/fixtures/corpus/cms22-split/cms22-strategy.crl");
+  const STRATEGY = path.join(REPO_ROOT, "src/tests/fixtures/corpus/cms22/cms22-strategy.crl");
   const FIXED = new Date("2020-01-01T00:00:00.000Z");
   const C = "http://hl7.org/fhir/uv/crmi/StructureDefinition";
 
@@ -214,7 +214,7 @@ describe("capability profile matrix — additive CRMI lifecycle profiles per res
 });
 
 describe("knowledge extensions per artifact (cqf-knowledgeCapability + representationLevel)", () => {
-  const STRATEGY = path.join(REPO_ROOT, "src/tests/fixtures/corpus/cms22-split/cms22-strategy.crl");
+  const STRATEGY = path.join(REPO_ROOT, "src/tests/fixtures/corpus/cms22/cms22-strategy.crl");
   const FIXED = new Date("2020-01-01T00:00:00.000Z");
   const KC = "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability";
   const KRL = "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeRepresentationLevel";

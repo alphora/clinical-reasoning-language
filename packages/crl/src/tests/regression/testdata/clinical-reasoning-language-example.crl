@@ -11,7 +11,7 @@ care, using a small set of BMI-related concepts and activities.
 
 The full quality-measure encoding (Initial Population / Numerator /
 Denominator / Exclusions / Exceptions) lives in
-features/cql-pattern-mining/results/models/cms69-split/. This file shows
+packages/crl/src/tests/fixtures/corpus/cms69/. This file shows
 the cognitive-support facet: at an encounter, what should the clinician
 do so the visit ends up in CMS69's numerator?
 
@@ -378,5 +378,5 @@ concept "Has Anti-Obesity Medication Contraindication":
 // in-arg disjunctions inside narrative bodies, and the full
 // Initial Population / Numerator / Denominator structure), see the
 // modeled measures:
-//   features/cql-pattern-mining/results/models/cms22-split/
-//   features/cql-pattern-mining/results/models/cms69-split/
+//   packages/crl/src/tests/fixtures/corpus/cms22/
+//   packages/crl/src/tests/fixtures/corpus/cms69/

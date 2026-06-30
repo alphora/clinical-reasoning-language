@@ -26,8 +26,8 @@ const GOLDEN_ROOT = path.join(__dirname, "golden");
 const UPDATE = process.env.UPDATE_GOLDEN === "1";
 
 const CORPORA: Record<string, string> = {
-  cms22: path.join(REPO_ROOT, "src/tests/fixtures/corpus/cms22-split/cms22.crl"),
-  cms69: path.join(REPO_ROOT, "src/tests/fixtures/corpus/cms69-split/cms69.crl"),
+  cms22: path.join(REPO_ROOT, "src/tests/fixtures/corpus/cms22/cms22.crl"),
+  cms69: path.join(REPO_ROOT, "src/tests/fixtures/corpus/cms69/cms69.crl"),
   // Slice 2 (layeredEmit): a single multi-layer CRL library that auto-splits
   // into `Layered Basic Concepts` / `Layered Basic Asserted` /
   // `Layered Basic Inferred`. Lives under the test dir (not the corpus tree)

@@ -1,0 +1,68 @@
+# CMS69 Concepts
+
+library "cms69-RecordConcepts".
+
+// Migrated to CRL v0.7: `concept` is the only declaration kind;
+// `definition is` body for narrative predicates; concept `defined as`
+// body is bare ref or sem-or/sem-and/sem-not composition.
+
+
+// ============ Terminologies (valuesets) ============
+// Real valuesets from the source CMS69 CQL library with VSAC URLs.
+
+terminology "Encounter to Evaluate BMI":
+- valueset is `http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.600.1.1751`.
+
+terminology "Follow Up for Above Normal BMI":
+- valueset is `http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.600.1.1525`.
+
+terminology "Follow Up for Below Normal BMI":
+- valueset is `http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.600.1.1528`.
+
+terminology "Medical Reason":
+- valueset is `http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.526.3.1007`.
+
+terminology "Medications for Above Normal BMI":
+- valueset is `http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.526.3.1561`.
+
+terminology "Medications for Below Normal BMI":
+- valueset is `http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.526.3.1562`.
+
+terminology "Overweight or Obese":
+- valueset is `http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113762.1.4.1047.502`.
+
+terminology "Patient Declined":
+- valueset is `http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.526.3.1582`.
+
+terminology "Pregnancy or Other Related Diagnoses":
+- valueset is `http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.600.1.1623`.
+
+terminology "Referrals Where Weight Assessment May Occur":
+- valueset is `http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.600.1.1527`.
+
+terminology "Underweight":
+- valueset is `http://cts.nlm.nih.gov/fhir/ValueSet/2.16.840.1.113883.3.526.3.1563`.
+
+// Stub valuesets — referenced by the CRL but not in source CQL.
+// Some are codes-wrapped-as-1-element-valuesets (CRL convention since
+// `coded from` requires a valueset); others are author-added composites
+// the source CQL hadn't formalized. Empty URL = placeholder until proper
+// VSAC mapping is added.
+
+terminology "Body Mass Index Observations":
+- valueset is ``.
+
+// "Virtual Encounter Class" — source CQL uses the ActCode 'VR' code directly
+// (not a valueset). Declared here as system+code terminology.
+terminology "Virtual Encounter Class":
+- system is `http://terminology.hl7.org/CodeSystem/v3-ActCode`.
+- code is `VR`.
+
+terminology "Pregnancy Status":
+- valueset is ``.
+
+terminology "Follow Up for Above Normal BMI Procedures":
+- valueset is ``.
+
+terminology "Follow Up for Below Normal BMI Procedures":
+- valueset is ``.

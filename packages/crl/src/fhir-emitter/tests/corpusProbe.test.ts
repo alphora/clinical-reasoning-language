@@ -79,7 +79,7 @@ function loadFixtureActivities(relPath: string): { libraryName: string; activiti
 describe("corpus probe — cms22-strategy.crl", () => {
   it("emits every activity in cms22-strategy.crl with the expected diagnostic mix", () => {
     const { libraryName, activities } = loadFixtureActivities(
-      "src/tests/fixtures/corpus/cms22-split/cms22-strategy.crl",
+      "src/tests/fixtures/corpus/cms22/cms22-strategy.crl",
     );
     expect(activities.length).toBeGreaterThan(0);
 
@@ -131,7 +131,7 @@ describe("corpus probe — cms22-strategy.crl", () => {
 describe("corpus probe — cms69-strategy.crl", () => {
   it("emits every activity in cms69-strategy.crl with the expected diagnostic mix", () => {
     const { libraryName, activities } = loadFixtureActivities(
-      "src/tests/fixtures/corpus/cms69-split/cms69-strategy.crl",
+      "src/tests/fixtures/corpus/cms69/cms69-strategy.crl",
     );
     expect(activities.length).toBeGreaterThan(0);
 
@@ -173,7 +173,7 @@ describe("corpus probe — cms69-strategy.crl", () => {
 describe("corpus probe — cms22-strategy Recommendation + Decision emit", () => {
   it("emits one Recommendation PlanDef per activity + Strategy + Sub-decision PlanDefs", () => {
     const fixture = loadCorpusFixture(
-      "src/tests/fixtures/corpus/cms22-split/cms22-strategy.crl",
+      "src/tests/fixtures/corpus/cms22/cms22-strategy.crl",
     );
 
     // Recommendations: one per activity.
@@ -207,7 +207,7 @@ describe("corpus probe — cms22-strategy Recommendation + Decision emit", () =>
 describe("corpus probe — cms69-strategy Recommendation + Decision emit", () => {
   it("emits Recommendations + 1 Strategy + N-1 Sub-decisions for cms69", () => {
     const fixture = loadCorpusFixture(
-      "src/tests/fixtures/corpus/cms69-split/cms69-strategy.crl",
+      "src/tests/fixtures/corpus/cms69/cms69-strategy.crl",
     );
 
     const rec = emitRecommendationDefinitionsForLibrary(

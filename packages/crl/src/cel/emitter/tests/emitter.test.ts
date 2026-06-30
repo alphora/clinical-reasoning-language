@@ -6,10 +6,10 @@ import { emitCelToFhir } from "../emitFhir";
 const REPO_ROOT = path.resolve(__dirname, "..", "..", "..", "..");
 
 const CORPUS = {
-  cms22: path.join(REPO_ROOT, "src/tests/fixtures/corpus/cms22-split/cms22.cel"),
-  cms22Strategy: path.join(REPO_ROOT, "src/tests/fixtures/corpus/cms22-split/cms22-strategy.cel"),
-  cms69: path.join(REPO_ROOT, "src/tests/fixtures/corpus/cms69-split/cms69.cel"),
-  cms69Strategy: path.join(REPO_ROOT, "src/tests/fixtures/corpus/cms69-split/cms69-strategy.cel"),
+  cms22: path.join(REPO_ROOT, "src/tests/fixtures/corpus/cms22/cms22.cel"),
+  cms22Strategy: path.join(REPO_ROOT, "src/tests/fixtures/corpus/cms22/cms22-strategy.cel"),
+  cms69: path.join(REPO_ROOT, "src/tests/fixtures/corpus/cms69/cms69.cel"),
+  cms69Strategy: path.join(REPO_ROOT, "src/tests/fixtures/corpus/cms69/cms69-strategy.cel"),
 };
 
 function emit(filePath: string) {

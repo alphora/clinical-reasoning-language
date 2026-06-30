@@ -23,8 +23,8 @@ const CC_SCREENING = join(
   REPO_ROOT,
   "src/tests/fixtures/cpg-roundtrip/cc-screening-cognitive-support/cc-screening.crl",
 );
-const CMS22 = join(REPO_ROOT, "src/tests/fixtures/corpus/cms22-split/cms22-strategy.crl");
-const CMS22_CEL = join(REPO_ROOT, "src/tests/fixtures/corpus/cms22-split/cms22-strategy.cel");
+const CMS22 = join(REPO_ROOT, "src/tests/fixtures/corpus/cms22/cms22-strategy.crl");
+const CMS22_CEL = join(REPO_ROOT, "src/tests/fixtures/corpus/cms22/cms22-strategy.cel");
 
 function runCli(args: string[]): { exitCode: number; stdout: string; stderr: string } {
   // Use npx tsx via shell — tsx isn't a direct dep so we can't import its

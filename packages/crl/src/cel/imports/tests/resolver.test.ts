@@ -5,45 +5,45 @@ import { resolveCelImports } from "../resolver";
 const REPO_ROOT = path.resolve(__dirname, "..", "..", "..", "..");
 
 const CORPUS = {
-  cms22: path.join(REPO_ROOT, "src/tests/fixtures/corpus/cms22-split/cms22.cel"),
-  cms22Strategy: path.join(REPO_ROOT, "src/tests/fixtures/corpus/cms22-split/cms22-strategy.cel"),
-  cms69: path.join(REPO_ROOT, "src/tests/fixtures/corpus/cms69-split/cms69.cel"),
-  cms69Strategy: path.join(REPO_ROOT, "src/tests/fixtures/corpus/cms69-split/cms69-strategy.cel"),
+  cms22: path.join(REPO_ROOT, "src/tests/fixtures/corpus/cms22/cms22.cel"),
+  cms22Strategy: path.join(REPO_ROOT, "src/tests/fixtures/corpus/cms22/cms22-strategy.cel"),
+  cms69: path.join(REPO_ROOT, "src/tests/fixtures/corpus/cms69/cms69.cel"),
+  cms69Strategy: path.join(REPO_ROOT, "src/tests/fixtures/corpus/cms69/cms69-strategy.cel"),
   syntaxRef: path.join(__dirname, "../../tests/fixtures/cel-syntax-reference.cel"),
 };
 
 describe("CEL Todo 3 — resolveCelImports against the worked corpus", () => {
-  test("cms22.cel → covers resolves to CRL library CMS22 in cms22-split", () => {
+  test("cms22.cel → covers resolves to CRL library cms22 in cms22", () => {
     const g = resolveCelImports(CORPUS.cms22);
     expect(g.celParseErrors).toHaveLength(0);
-    expect(g.cel?.covers?.name).toBe("CMS22");
-    expect(g.projectRoot).toMatch(/cms22-split$/);
+    expect(g.cel?.covers?.name).toBe("cms22");
+    expect(g.projectRoot).toMatch(/cms22$/);
     expect(g.coversTarget).toBeDefined();
-    expect(g.coversTarget?.name).toBe("CMS22");
+    expect(g.coversTarget?.name).toBe("cms22");
     const errs = g.diagnostics.filter((d) => d.severity === "error");
     expect(errs).toHaveLength(0);
   });
 
-  test("cms22-strategy.cel → covers resolves to CMS22 BP Control Cognitive Support Example (now in same split package)", () => {
+  test("cms22-strategy.cel → covers resolves to cms22-strategy (now in same split package)", () => {
     const g = resolveCelImports(CORPUS.cms22Strategy);
     expect(g.celParseErrors).toHaveLength(0);
-    expect(g.coversTarget?.name).toBe("CMS22 BP Control Cognitive Support Example");
+    expect(g.coversTarget?.name).toBe("cms22-strategy");
     const errs = g.diagnostics.filter((d) => d.severity === "error");
     expect(errs).toHaveLength(0);
   });
 
-  test("cms69.cel → covers resolves to CMS69", () => {
+  test("cms69.cel → covers resolves to cms69", () => {
     const g = resolveCelImports(CORPUS.cms69);
     expect(g.celParseErrors).toHaveLength(0);
-    expect(g.coversTarget?.name).toBe("CMS69");
+    expect(g.coversTarget?.name).toBe("cms69");
     const errs = g.diagnostics.filter((d) => d.severity === "error");
     expect(errs).toHaveLength(0);
   });
 
-  test("cms69-strategy.cel → covers resolves to CMS69 BMI Screening GPG Strategy example", () => {
+  test("cms69-strategy.cel → covers resolves to cms69-strategy", () => {
     const g = resolveCelImports(CORPUS.cms69Strategy);
     expect(g.celParseErrors).toHaveLength(0);
-    expect(g.coversTarget?.name).toBe("CMS69 BMI Screening GPG Strategy example");
+    expect(g.coversTarget?.name).toBe("cms69-strategy");
     const errs = g.diagnostics.filter((d) => d.severity === "error");
     expect(errs).toHaveLength(0);
   });
@@ -66,7 +66,7 @@ describe("CEL Todo 3 — boundary diagnostics", () => {
       [require("path").resolve(canonical).replace(/\//g, require("path").sep), [
         "# Overlay",
         "library \"Overlayed\".",
-        "covers \"CMS22\".",
+        "covers \"cms22\".",
         "fact \"X\":",
         "- name is \"X\".",
         "- defined by \"Patient\".",
@@ -74,6 +74,6 @@ describe("CEL Todo 3 — boundary diagnostics", () => {
     ]);
     const g = resolveCelImports(canonical, { overlays: overlay });
     expect(g.cel?.library.name).toBe("Overlayed");
-    expect(g.coversTarget?.name).toBe("CMS22");
+    expect(g.coversTarget?.name).toBe("cms22");
   });
 });

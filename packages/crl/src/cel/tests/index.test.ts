@@ -7,10 +7,10 @@ import type { CEL, CELCase, CELFact, CELFactRefField, CELDefinedByField } from "
 const REPO_ROOT = path.resolve(__dirname, "..", "..", "..");
 
 const CORPUS = {
-  cms22: path.join(REPO_ROOT, "src/tests/fixtures/corpus/cms22-split/cms22.cel"),
-  cms22Strategy: path.join(REPO_ROOT, "src/tests/fixtures/corpus/cms22-split/cms22-strategy.cel"),
-  cms69: path.join(REPO_ROOT, "src/tests/fixtures/corpus/cms69-split/cms69.cel"),
-  cms69Strategy: path.join(REPO_ROOT, "src/tests/fixtures/corpus/cms69-split/cms69-strategy.cel"),
+  cms22: path.join(REPO_ROOT, "src/tests/fixtures/corpus/cms22/cms22.cel"),
+  cms22Strategy: path.join(REPO_ROOT, "src/tests/fixtures/corpus/cms22/cms22-strategy.cel"),
+  cms69: path.join(REPO_ROOT, "src/tests/fixtures/corpus/cms69/cms69.cel"),
+  cms69Strategy: path.join(REPO_ROOT, "src/tests/fixtures/corpus/cms69/cms69-strategy.cel"),
   syntaxRef: path.join(__dirname, "fixtures/cel-syntax-reference.cel"),
 };
 
@@ -24,7 +24,7 @@ describe("CEL Todo 2 — buildCEL regression on worked corpus", () => {
     expect(r.errors).toBeUndefined();
     expect(r.success).toBe(true);
     expect(r.result?.library.name).toBe("CMS22 Blood Pressure Screening");
-    expect(r.result?.covers?.name).toBe("CMS22");
+    expect(r.result?.covers?.name).toBe("cms22");
     expect(r.result?.statements.length).toBeGreaterThan(0);
   });
 
@@ -33,7 +33,7 @@ describe("CEL Todo 2 — buildCEL regression on worked corpus", () => {
     expect(r.errors).toBeUndefined();
     expect(r.success).toBe(true);
     expect(r.result?.library.name).toBe("CMS22 BP Cognitive Support — Hypertensive Reading");
-    expect(r.result?.covers?.name).toBe("CMS22 BP Control Cognitive Support Example");
+    expect(r.result?.covers?.name).toBe("cms22-strategy");
   });
 
   test("cms69.cel parses cleanly + Recommend Counseling repurposing landed", () => {
@@ -53,7 +53,7 @@ describe("CEL Todo 2 — buildCEL regression on worked corpus", () => {
     // Order Weight Assessment Referral activity per Todo 1's corpus repair.
     expect(definedBy!.ref).not.toBe("string");
     if (typeof definedBy!.ref === "string") throw new Error("Expected qualified ref");
-    expect(definedBy!.ref.libraryName).toBe("CMS69 BMI Screening GPG Strategy example");
+    expect(definedBy!.ref.libraryName).toBe("cms69-strategy");
     expect(definedBy!.ref.name).toBe("Order Weight Assessment Referral");
   });
 

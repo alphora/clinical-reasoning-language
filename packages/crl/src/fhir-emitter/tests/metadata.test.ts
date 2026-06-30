@@ -275,7 +275,7 @@ describe("fhir-emitter metadata.readPackageMetadata (filesystem)", () => {
     expect(r.errors[0]!.kind).toBe("unreadable-package-json");
   });
 
-  it("reads the cms22-split corpus package.json end-to-end", () => {
+  it("reads the cms22 corpus package.json end-to-end", () => {
     const corpus = require("path").resolve(
       __dirname,
       "..",
@@ -283,7 +283,7 @@ describe("fhir-emitter metadata.readPackageMetadata (filesystem)", () => {
       "tests",
       "fixtures",
       "corpus",
-      "cms22-split",
+      "cms22",
     );
     const r = readPackageMetadata(corpus);
     expect(r.metadata).not.toBeNull();

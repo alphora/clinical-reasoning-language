@@ -1,0 +1,110 @@
+{
+  "resourceType": "Library",
+  "id": "cms69",
+  "meta": {
+    "profile": [
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareablelibrary",
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-computablelibrary",
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-publishablelibrary"
+    ]
+  },
+  "extension": [
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "shareable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "computable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "publishable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeRepresentationLevel",
+      "valueCode": "structured"
+    }
+  ],
+  "url": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/Library/cms69",
+  "version": "1.0.0",
+  "name": "Cms69Strategy",
+  "title": "cms69-strategy",
+  "status": "draft",
+  "experimental": true,
+  "date": "2020-01-01T00:00:00.000Z",
+  "publisher": "Smile Digital Health",
+  "description": "CMS69 BMI Screening demonstration corpus",
+  "type": {
+    "coding": [
+      {
+        "system": "http://terminology.hl7.org/CodeSystem/library-type",
+        "code": "logic-library"
+      }
+    ]
+  },
+  "relatedArtifact": [
+    {
+      "type": "depends-on",
+      "resource": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/ValueSet/cms69-bmi-range-as-a-condition"
+    },
+    {
+      "type": "depends-on",
+      "resource": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/ValueSet/cms69-bmi-as-an-observation"
+    },
+    {
+      "type": "depends-on",
+      "resource": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/ValueSet/cms69-height-valueset"
+    },
+    {
+      "type": "depends-on",
+      "resource": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/ValueSet/cms69-weight-valueset"
+    },
+    {
+      "type": "depends-on",
+      "resource": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/ValueSet/cms69-overweight-or-obese-diagnoses-vs"
+    },
+    {
+      "type": "depends-on",
+      "resource": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/ValueSet/cms69-underweight-diagnoses-vs"
+    },
+    {
+      "type": "depends-on",
+      "resource": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/ValueSet/cms69-pregnancy-diagnoses-vs"
+    },
+    {
+      "type": "depends-on",
+      "resource": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/ValueSet/cms69-weight-assessment-referrals-vs"
+    },
+    {
+      "type": "depends-on",
+      "resource": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/ValueSet/cms69-anti-obesity-medications-vs"
+    },
+    {
+      "type": "depends-on",
+      "resource": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/ValueSet/cms69-low-bmi-follow-up-service-requests-vs"
+    },
+    {
+      "type": "depends-on",
+      "resource": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/ValueSet/cms69-medical-reason-vs"
+    },
+    {
+      "type": "depends-on",
+      "resource": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/ValueSet/cms69-patient-declined-vs"
+    },
+    {
+      "type": "depends-on",
+      "resource": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/ValueSet/cms69-anti-obesity-contraindication-vs"
+    },
+    {
+      "type": "depends-on",
+      "resource": "http://hl7.org/fhir/us/cqfmeasures/crl/cms69/ValueSet/cms69-colonoscopy"
+    }
+  ],
+  "content": [
+    {
+      "contentType": "text/cql",
+      "url": "../../cql/cms69-strategy.cql"
+    }
+  ]
+}

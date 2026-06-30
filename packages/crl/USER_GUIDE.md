@@ -309,7 +309,7 @@ parameter "Index Patient":
 
 #### Library-local rule
 
-Every library that references a parameter declares it locally. Do NOT use qualified refs (`"OtherLib"."Param"`) to reach parameters declared in other libraries. In a split project, the parameter declaration lives in the library that uses it — typically the inferred / measure-logic layer where the timing-window narrative refs live. See the [cms22-split corpus](./features/cql-pattern-mining/results/models/cms22-split/) for the canonical pattern.
+Every library that references a parameter declares it locally. Do NOT use qualified refs (`"OtherLib"."Param"`) to reach parameters declared in other libraries. In a split project, the parameter declaration lives in the library that uses it — typically the inferred / measure-logic layer where the timing-window narrative refs live. See the [cms22 corpus](./src/tests/fixtures/corpus/cms22/) for the canonical pattern.
 
 #### Reference resolution
 
@@ -393,8 +393,8 @@ my-cms22/                              ← project root
 ├── src/crl/                           ← author's .crl files (convention)
 │   ├── cms22.crl                      ← the root file (or any other; CLI takes --path)
 │   ├── cms22-inferred.crl
-│   ├── cms22-asserted.crl
-│   └── cms22-concepts.crl
+│   ├── cms22-recordsource.crl
+│   └── cms22-recordconcepts.crl
 └── tests/...
 ```
 
@@ -700,28 +700,31 @@ sibling. The qualified ref form is the same: `"Shared Vocabulary"."BMI Observati
 
 #### Worked example: cms22 4-layer split
 
-A 4-file split lives at `features/cql-pattern-mining/results/models/cms22-split/`
-(split from the original 1010-line `cms22.crl`). The layers are
-interface (`cms22.crl`, the public Measure API), inferred, asserted,
-and terminology. To exercise it:
+A 4-file split lives at `src/tests/fixtures/corpus/cms22/`
+(split from the original 1010-line `cms22.crl`). Folder, filename prefix,
+and package `name` are all the measure id (`cms22`); the CQL library
+declarations use the policy-id source-typed form (`cms22`,
+`cms22-RecordConcepts`, `cms22-RecordSource`, `cms22-Inferred`). The
+layers are interface (`cms22.crl`, the public Measure API), inferred,
+record-source, and terminology. To exercise it:
 
 ```bash
 # From repo root, after `npm run build`:
 
 node dist/cli/run-validator.js \
-  --path features/cql-pattern-mining/results/models/cms22-split/cms22.crl \
+  --path packages/crl/src/tests/fixtures/corpus/cms22/cms22.crl \
   --pretty
 
 node dist/cli/run-emitter.js \
-  --path features/cql-pattern-mining/results/models/cms22-split/cms22.crl \
+  --path packages/crl/src/tests/fixtures/corpus/cms22/cms22.crl \
   --out-dir /tmp/cms22-out/
 ```
 
-The emitter produces four CQL files: `CMS22.cql` (the interface),
-`CMS22 Inferred.cql`, `CMS22 Asserted.cql`, `CMS22 Concepts.cql`.
+The emitter produces four CQL files: `cms22.cql` (the interface),
+`cms22-Inferred.cql`, `cms22-RecordSource.cql`, `cms22-RecordConcepts.cql`.
 Cross-library refs emit as CQL native `"OtherLib"."Name"` so the
 generated CQL has a self-contained dependency graph. See
-`cms22-split/NOTES.md` for layout details.
+`cms22/NOTES.md` for layout details.
 
 #### v2.1.0 scope summary
 
@@ -876,7 +879,7 @@ A reference round-trip fixture lives at `features/cpg-roundtrip/cc-screening-cog
 
 ## Full Example
 
-See [features/cql-pattern-mining/results/models/cms69-split/cms69-strategy.crl](`https://github.com/alphora/clinical-reasoning-language/blob/main/features/cql-pattern-mining/results/models/cms69-split/cms69-strategy.crl`) for a comprehensive example covering all features and options. A second canonical example built on CMS22 ships at [features/cql-pattern-mining/results/models/cms22-split/cms22-strategy.crl](`https://github.com/alphora/clinical-reasoning-language/blob/main/features/cql-pattern-mining/results/models/cms22-split/cms22-strategy.crl`).
+See [packages/crl/src/tests/fixtures/corpus/cms69/cms69-strategy.crl](`https://github.com/alphora/clinical-reasoning-language/blob/main/packages/crl/src/tests/fixtures/corpus/cms69/cms69-strategy.crl`) for a comprehensive example covering all features and options. A second canonical example built on CMS22 ships at [packages/crl/src/tests/fixtures/corpus/cms22/cms22-strategy.crl](`https://github.com/alphora/clinical-reasoning-language/blob/main/packages/crl/src/tests/fixtures/corpus/cms22/cms22-strategy.crl`).
 
 ---
 

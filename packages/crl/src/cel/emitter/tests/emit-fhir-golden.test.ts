@@ -25,8 +25,8 @@ const UPDATE = process.env.UPDATE_GOLDEN === "1";
 
 // Same source family as the CRL→CQL / CRL→FHIR goldens: cms22 and cms69.
 const CORPORA: Record<string, string[]> = {
-  cms22: ["cms22-split/cms22.cel", "cms22-split/cms22-strategy.cel"],
-  cms69: ["cms69-split/cms69.cel", "cms69-split/cms69-strategy.cel"],
+  cms22: ["cms22/cms22.cel", "cms22/cms22-strategy.cel"],
+  cms69: ["cms69/cms69.cel", "cms69/cms69-strategy.cel"],
 };
 
 const ser = (body: unknown): string => JSON.stringify(body, null, 2) + "\n";

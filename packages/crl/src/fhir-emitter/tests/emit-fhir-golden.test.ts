@@ -29,8 +29,8 @@ const GOLDEN_ROOT = path.join(__dirname, "golden");
 const UPDATE = process.env.UPDATE_GOLDEN === "1";
 
 const CORPORA: Record<string, string> = {
-  cms22: "cms22-split/cms22-strategy.crl",
-  cms69: "cms69-split/cms69-strategy.crl",
+  cms22: "cms22/cms22-strategy.crl",
+  cms69: "cms69/cms69-strategy.crl",
 };
 
 // Hermetic, reproducible emit: pass an explicit `date` override (highest

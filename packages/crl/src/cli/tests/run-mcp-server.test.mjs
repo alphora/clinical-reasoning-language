@@ -10,9 +10,9 @@ import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const serverPath = resolve(here, "../../../dist/cli/run-mcp-server.js");
-const cms22SplitInferred = resolve(
+const cms22Inferred = resolve(
   here,
-  "../../../src/tests/fixtures/corpus/cms22-split/cms22-inferred.crl"
+  "../../../src/tests/fixtures/corpus/cms22/cms22-inferred.crl"
 );
 
 const transport = new StdioClientTransport({ command: process.execPath, args: [serverPath] });
@@ -185,7 +185,7 @@ try {
   });
 
   await check("emit_cel via path → cms22.cel returns summary envelope with cases", async () => {
-    const cms22Cel = resolve(here, "../../../src/tests/fixtures/corpus/cms22-split/cms22.cel");
+    const cms22Cel = resolve(here, "../../../src/tests/fixtures/corpus/cms22/cms22.cel");
     const r = await client.callTool({ name: "emit_cel", arguments: { path: cms22Cel } });
     assert.ok(!r.isError, "should not be a tool error");
     const out = JSON.parse(r.content[0].text);
@@ -199,7 +199,7 @@ try {
   });
 
   await check("emit_cel with includeResources:true → full emittedCases included", async () => {
-    const cms22Cel = resolve(here, "../../../src/tests/fixtures/corpus/cms22-split/cms22.cel");
+    const cms22Cel = resolve(here, "../../../src/tests/fixtures/corpus/cms22/cms22.cel");
     const r = await client.callTool({
       name: "emit_cel",
       arguments: { path: cms22Cel, includeResources: true },
@@ -220,7 +220,7 @@ try {
   });
 
   await check("validate_cel via path → 4 CMS corpus files validate clean", async () => {
-    const cms22Cel = resolve(here, "../../../src/tests/fixtures/corpus/cms22-split/cms22.cel");
+    const cms22Cel = resolve(here, "../../../src/tests/fixtures/corpus/cms22/cms22.cel");
     const r = await client.callTool({ name: "validate_cel", arguments: { path: cms22Cel } });
     assert.ok(!r.isError, "should not be a tool error");
     const out = JSON.parse(r.content[0].text);
@@ -241,7 +241,7 @@ try {
   await check("validate_crl via path → project mode resolves sibling libraries (cross-file)", async () => {
     const r = await client.callTool({
       name: "validate_crl",
-      arguments: { path: cms22SplitInferred },
+      arguments: { path: cms22Inferred },
     });
     assert.ok(!r.isError, "should not be a tool error");
     const out = JSON.parse(r.content[0].text);
@@ -254,7 +254,7 @@ try {
 
   await check("validate_crl via inline code → single-file mode flags cross-library refs", async () => {
     const { readFileSync } = await import("node:fs");
-    const code = readFileSync(cms22SplitInferred, "utf8");
+    const code = readFileSync(cms22Inferred, "utf8");
     const r = await client.callTool({ name: "validate_crl", arguments: { code } });
     assert.ok(!r.isError);
     const out = JSON.parse(r.content[0].text);
