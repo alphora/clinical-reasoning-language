@@ -632,6 +632,123 @@ export function applyInvariant2(
 }
 
 /**
+ * Inv 6 (#186) — LIBRARY IDENTITY AGREEMENT. cqf resolves a layered library by
+ * matching `Library.name` to the id `VersionedIdentifiers.forUrl` derives from a
+ * referrer's canonical url-TAIL (or the CQL `include` name). So for EVERY emitted
+ * Library and every reference-to-a-library the following must hold as ONE
+ * identical string `S`:
+ *
+ *   (a) SELF-agreement — each Library's `id` == `name` == its own url-tail.
+ *       (Pre-#186 these were three disagreeing forms — the root defect.)
+ *   (b) REFERENT-agreement — for every `PlanDefinition.library` /
+ *       `ActivityDefinition.library` / `Library.relatedArtifact[depends-on]` /
+ *       StructureDefinition `cpg-featureExpression.reference` whose url is under
+ *       the policy canonicalBase, the referenced Library's `name` == that url's
+ *       tail. (Inv 2 already checks the url RESOLVES to some emitted resource;
+ *       this additionally checks the resolved Library's NAME matches the tail, so
+ *       a name/url-tail drift that would still "resolve by url" but FAIL cqf's
+ *       name-based `RepositoryFhirLibrarySourceProvider.getLibrary` is caught.)
+ *
+ * External refs (not under canonicalBase) are exempt — their target Library is
+ * not in this closure. FHIRHelpers / CRLCommon / CaseFeatureCommon are simple
+ * hyphen-free names already; they pass (a) trivially.
+ */
+function urlTail(url: string): string {
+  const i = url.lastIndexOf("/");
+  return i >= 0 ? url.slice(i + 1) : url;
+}
+
+export function applyLibraryIdentityInvariant(
+  resources: ReadonlyArray<EmittedResource>,
+  metadata: CpgMetadata,
+  // #186 — the set of LAYERED library identities `S` this closure emitted (from
+  // the split manifest). The identity agreement is enforced ONLY for these — the
+  // non-layered Root / cms single-library case intentionally keeps `name =
+  // pascalCaseName(slug)` ≠ id (its execution-resolution is a SEPARATE, deferred
+  // concern per #186's scope: cms measures are out of scope, don't reshape). An
+  // EMPTY set (graph-only / non-layered) makes the invariant a no-op.
+  layeredIdentities: ReadonlySet<string>,
+): CRLError[] {
+  if (layeredIdentities.size === 0) return [];
+  const errors: CRLError[] = [];
+  // Map every emitted Library's url → its `name` (for referent-agreement).
+  const libNameByUrl = new Map<string, string>();
+  for (const r of resources) {
+    if (r.resourceType !== "Library") continue;
+    const res = r.resource as { id?: string; name?: string; url?: string };
+    if (typeof res.url === "string" && typeof res.name === "string") {
+      libNameByUrl.set(res.url, res.name);
+    }
+    // (a) self-agreement: id == name == url-tail — ONLY for a LAYERED library
+    // (its id is one of the emitted `S`). The non-layered Root is skipped.
+    const id = res.id;
+    if (id === undefined || !layeredIdentities.has(id)) continue;
+    const name = res.name;
+    const tail = typeof res.url === "string" ? urlTail(res.url) : undefined;
+    if (id !== name || id !== tail || name !== tail) {
+      errors.push({
+        type: "Validation",
+        kind: "library-identity-disagreement",
+        message:
+          `Library "${r.sourceName ?? r.relativePath}" has disagreeing identifiers — ` +
+          `id="${id}", name="${name}", url-tail="${tail}". cqf resolves a layered library by ` +
+          `matching Library.name to the url-tail id, so all three MUST be one identical string.`,
+      });
+    }
+  }
+
+  // (b) referent-agreement: each in-closure reference to a LAYERED library must
+  // have url-tail == the referenced Library's name. A reference to the non-layered
+  // Root (its tail is not a layered `S`) is exempt (the deferred cms/Root case).
+  const checkRef = (
+    referrer: string,
+    url: unknown,
+    refKind: string,
+  ): void => {
+    if (typeof url !== "string") return;
+    if (!isUnderCanonicalBase(url, metadata.canonicalBase)) return; // external — exempt
+    if (!layeredIdentities.has(urlTail(url))) return; // non-layered Root ref — exempt
+    const targetName = libNameByUrl.get(url);
+    if (targetName === undefined) return; // Inv 2 reports the unresolved url; not our concern
+    if (targetName !== urlTail(url)) {
+      errors.push({
+        type: "Validation",
+        kind: "library-identity-disagreement",
+        message:
+          `${refKind} "${referrer}" references "${url}", whose target Library.name is ` +
+          `"${targetName}" — it must equal the url-tail "${urlTail(url)}" for cqf to resolve it.`,
+      });
+    }
+  };
+  for (const r of resources) {
+    const res = r.resource as {
+      library?: unknown;
+      relatedArtifact?: Array<{ type?: string; resource?: string }>;
+      extension?: Array<{ url?: string; valueExpression?: { reference?: unknown } }>;
+    };
+    const referrer = r.sourceName ?? r.relativePath;
+    if (r.resourceType === "PlanDefinition" || r.resourceType === "ActivityDefinition") {
+      if (Array.isArray(res.library)) {
+        for (const u of res.library) checkRef(referrer, u, `${r.resourceType} library[]`);
+      }
+    }
+    if (r.resourceType === "Library" && Array.isArray(res.relatedArtifact)) {
+      for (const e of res.relatedArtifact) {
+        if (e.type === "depends-on") checkRef(referrer, e.resource, "Library depends-on");
+      }
+    }
+    if (r.resourceType === "StructureDefinition" && Array.isArray(res.extension)) {
+      for (const e of res.extension) {
+        if (e.url === CPG_FEATURE_EXPRESSION_EXT) {
+          checkRef(referrer, e.valueExpression?.reference, "StructureDefinition featureExpression");
+        }
+      }
+    }
+  }
+  return errors;
+}
+
+/**
  * Inv 3 — definition-target existence for PlanDef.action.definitionCanonical.
  */
 function applyInvariant3(resources: ReadonlyArray<EmittedResource>, droppedPaths: Set<string>): CRLError[] {
@@ -1022,36 +1139,43 @@ export function emitFhirDefClosure(
     //                       Concepts layer owns the CodeSystem/VS edges. See the
     //                       FOLLOW-UP below re: cms inter-layer deps.
     const manifestEntries = manifestBySource.get(lib.libraryName) ?? [];
-    // R2 — the policy-id Library id SUFFIX for an emitted CQL library, DERIVED
-    // FROM THE LAYER (not by slicing the source CRL library name). Under R2 the
-    // CQL library name is `<policyIdBase>-<PascalLayer>` (e.g.
-    // `code-is-decision-fixture-LocalConcepts`) while the SOURCE library name is
-    // the human name ("Code Is Decision"). The pre-R2 slice
-    // (`cqlLibraryName.slice(lib.libraryName.length)`) is WRONG when the CQL base
-    // (policy id) differs from the source name, so derive the suffix as the
-    // lowercase layer token: strip the policy-id base prefix from the CQL name and
-    // slugify the remainder. A CQL name that equals the source name (the `none`/
-    // per-CRL Root) keeps the bare `<policyIdBase>` id (suffix "").
-    const policyBase = policyIdBase(metadata);
-    const idSuffixFor = (cqlLibraryName: string): string => {
-      if (cqlLibraryName === lib.libraryName) return ""; // per-CRL Root keeps the source name
-      // `<policyIdBase>-<PascalLayer>` → the lowercase `<PascalLayer>` token
-      // (LocalConcepts → localconcepts, Interface → interface, etc.). Falls back
-      // to the post-base remainder; for a well-formed manifest the CQL name always
-      // carries the `<policyBase>-` prefix.
-      const prefix = `${policyBase}-`;
-      const layerToken = cqlLibraryName.startsWith(prefix)
-        ? cqlLibraryName.slice(prefix.length)
-        : cqlLibraryName.slice(lib.libraryName.length);
-      return slugify(layerToken.trim());
-    };
+    // #186 — the UNIFIED FHIR Library identity `S` for an emitted CQL library,
+    // taken DIRECTLY from the manifest (NOT by string-parsing the CQL name).
+    //
+    // The CQL lane already produced the hyphen-free `S` as the split library's
+    // name (`layerLibraryName(policyId, layer)`, e.g. `ExampleSemandInterface`)
+    // and stamped it as the manifest entry's `libraryName`. The FHIR lane uses
+    // that string VERBATIM as the Library id == url-tail == `name`, so cqf's
+    // `Library.name`/url-tail/`include` resolution all agree. The pre-#186
+    // `idSuffixFor` string-stripped the policy-id prefix and re-slugified to a
+    // lowercase layer token — that BROKE once `S` went hyphen-free (no
+    // `<policyBase>-` prefix to strip), which is exactly the #186 defect.
+    //
+    // A `root` entry that keeps the SOURCE name (the cms / per-CRL non-layered
+    // library) has NO layer identity → `undefined`, so `emitLibrary` falls back to
+    // the pre-#186 `policyIdBase` id (keeps those goldens byte-identical).
+    const isNameKeepingRoot = (entry: PerLibraryEmit): boolean =>
+      entry.role === "root" && entry.libraryName === entry.sourceLibraryName;
+    const identityForEntry = (entry: PerLibraryEmit): string | undefined =>
+      isNameKeepingRoot(entry) ? undefined : entry.libraryName;
+    // Reference targets are found by the RAW partition value (`entry.layer`), the
+    // one source of truth the CQL split stamps alongside `S` — never by slugging.
+    const entryByLayer = (layer: string): PerLibraryEmit | undefined =>
+      manifestEntries.find((e) => e.layer === layer);
     const emitOneLibrary = (
       libraryName: string,
+      libraryIdentity: string | undefined,
       dependsOn: ReadonlyArray<string>,
       cqlFileName: string,
     ): void => {
-      const idSuffix = idSuffixFor(libraryName);
-      const libResult = emitLibrary(libraryName, metadata, dependsOn, cqlFileName, resolvedOpts, idSuffix);
+      const libResult = emitLibrary(
+        libraryName,
+        metadata,
+        dependsOn,
+        cqlFileName,
+        resolvedOpts,
+        libraryIdentity,
+      );
       if (libResult.resource) {
         // Plan v3.2 §"emitLibrary post-decorate"
         libResult.resource.sourceKind = "Library";
@@ -1088,7 +1212,9 @@ export function emitFhirDefClosure(
       }
       const cqlFileName = only ? `../../cql/${only.outputFilename}` : lib.cqlFileName;
       const dependsOn = [...vsCanonicals, ...(csUrl ? [csUrl] : [])];
-      emitOneLibrary(lib.libraryName, dependsOn, cqlFileName);
+      // Single-entry / no-manifest source = the non-layered name-keeping Root
+      // (cms / per-CRL) → no layered identity, id falls back to `policyIdBase`.
+      emitOneLibrary(lib.libraryName, undefined, dependsOn, cqlFileName);
     } else {
       // Multi-entry (split). The canonicals of THIS source's emitted CQL
       // libraries, keyed by cqlLibraryName, so a root's `includes` can be
@@ -1096,10 +1222,15 @@ export function emitFhirDefClosure(
       // source count — a foreign `include` is an external dep, not threaded here).
       const siblingCanonicals = new Map<string, string>();
       for (const e of manifestEntries) {
-        // R1 — each sibling's Library canonical is keyed on the policy id + the
-        // sibling's id suffix (Root → "", Concepts/layer → its layer token), so a
-        // Root→Concepts depends-on edge byte-equals the Concepts Library's `url`.
-        siblingCanonicals.set(e.libraryName, libraryCanonicalUrl(metadata, idSuffixFor(e.libraryName)));
+        // #186 — each sibling's Library canonical is keyed on its unified identity
+        // `S` (`identityForEntry` → the manifest `libraryName`), so a
+        // depends-on/include edge byte-equals that sibling Library's `url` (which
+        // is `libraryCanonicalUrl(metadata, S)`). The include key is the CQL
+        // library name `e.libraryName` (what `entry.includes` carries).
+        siblingCanonicals.set(
+          e.libraryName,
+          libraryCanonicalUrl(metadata, identityForEntry(e)),
+        );
       }
       for (const entry of manifestEntries) {
         const cqlFileName = `../../cql/${entry.outputFilename}`;
@@ -1110,13 +1241,12 @@ export function emitFhirDefClosure(
           // lives in `LocalConcepts`; the hand-authored author ValueSets (from
           // `coded from "<valueset>"`) live in `RecordConcepts`. Under R2 there can
           // be TWO concepts-role entries (LocalConcepts + RecordConcepts); routing
-          // both edges onto BOTH would duplicate/cross-wire them. The layer token
-          // (idSuffixFor) discriminates: `localconcepts` owns the CodeSystem,
-          // `recordconcepts` owns the author ValueSets.
-          const layerToken = idSuffixFor(entry.libraryName);
-          if (layerToken === "localconcepts") {
+          // both edges onto BOTH would duplicate/cross-wire them. The RAW partition
+          // value (`entry.layer`) discriminates: `LocalConcepts` owns the
+          // CodeSystem, `RecordConcepts` owns the author ValueSets.
+          if (entry.layer === "LocalConcepts") {
             dependsOn = [...(csUrl ? [csUrl] : [])];
-          } else if (layerToken === "recordconcepts") {
+          } else if (entry.layer === "RecordConcepts") {
             dependsOn = [...vsCanonicals];
           } else {
             // The pre-R2 partial `Concepts` sibling (single concepts entry, layer
@@ -1159,32 +1289,33 @@ export function emitFhirDefClosure(
           // is needed. The content-url invariant below still flags any Library
           // pointing at an unwritten CQL file.
         }
-        emitOneLibrary(entry.libraryName, dependsOn, cqlFileName);
+        emitOneLibrary(entry.libraryName, identityForEntry(entry), dependsOn, cqlFileName);
       }
     }
 
-    // R2 — the `library[]` SUFFIX the decision/activity/recommendation emitters
-    // reference. Decision-bearing sources now FULL source-typed split (the
-    // `interface` kind), so their decision surface no longer resolves to a
-    // source-name-keeping Root — it resolves to the synthesized `<policyId>-Interface`
-    // re-export library. The CONDITIONAL: if this source emitted a non-empty
-    // `role:"interface"` manifest entry, `library[]`/`definitionCanonical` route to
-    // the Interface canonical (its layer token, "interface"); ELSE (cms `none`/
-    // per-CRL, no Interface) they stay at the source/root canonical (suffix "" —
-    // UNCHANGED, keeping cms byte-identical).
+    // #186 — the `library[]` IDENTITY the decision/activity/recommendation
+    // emitters reference (they resolve it via `libraryCanonicalUrl(metadata,
+    // identity)`). Decision-bearing sources FULL source-typed split (the
+    // `interface` kind), so their decision surface resolves to the synthesized
+    // `<policyId>-Interface` re-export library — the unified `S` of the
+    // `role:"interface"` manifest entry (`identityForEntry` → its `libraryName`).
+    // ELSE (cms `none`/per-CRL, no Interface) it stays `undefined` → the
+    // source/root canonical (`policyIdBase` — UNCHANGED, keeps cms byte-identical).
     const interfaceEntry = manifestEntries.find((e) => e.role === "interface");
-    const libraryReferenceSuffix = interfaceEntry ? idSuffixFor(interfaceEntry.libraryName) : "";
+    const libraryReferenceSuffix = interfaceEntry ? identityForEntry(interfaceEntry) : undefined;
 
-    // The LocalSource Library suffix — where each `code is` define lives, the
+    // The LocalSource Library identity — where each `code is` define lives, the
     // target of the case-feature `cpg-featureExpression.reference`. `LocalSource`
     // is a `role:"layer"` manifest entry (imports/emit.ts maps LocalSource →
-    // "layer", NOT a distinct role), so it is identified by its LAYER TOKEN
-    // (`idSuffixFor(...) === "localsource"`), not by role. A decision-bearing
+    // "layer", NOT a distinct role), so it is identified by its RAW partition
+    // value (`entry.layer === "LocalSource"`), not by role. A decision-bearing
     // code-is policy ALWAYS emits a LocalSource layer under the full source-typed
-    // split; absence here means the case-feature emit is gated off below (no
-    // dangling featureExpression).
-    const localSourceEntry = manifestEntries.find((e) => idSuffixFor(e.libraryName) === "localsource");
-    const localSourceReferenceSuffix = localSourceEntry ? idSuffixFor(localSourceEntry.libraryName) : "";
+    // split; absence here gates the case-feature emit off below (no dangling
+    // featureExpression).
+    const localSourceEntry = entryByLayer("LocalSource");
+    const localSourceReferenceSuffix = localSourceEntry
+      ? identityForEntry(localSourceEntry)
+      : undefined;
 
     // (3) ActivityDefinitions
     const actResult = emitActivityDefinitionsForLibrary(
@@ -1194,6 +1325,7 @@ export function emitFhirDefClosure(
       sourceLibResolvers.terminologyResolver,
       resolvedOpts,
       libraryReferenceSuffix,
+      interfaceEntry !== undefined,
     );
     resources.push(...actResult.resources);
     errors.push(...actResult.errors);
@@ -1342,7 +1474,9 @@ export function emitFhirDefClosure(
           code,
           metadata,
           resolvedOpts,
-          localSourceReferenceSuffix,
+          // Non-undefined here (the gate requires a LocalSource entry); the `?? ""`
+          // preserves the emitter's own empty-suffix throw-guard as a backstop.
+          localSourceReferenceSuffix ?? "",
         );
         if (cfResult.resource) resources.push(cfResult.resource);
         errors.push(...cfResult.errors);
@@ -1392,7 +1526,17 @@ export function emitFhirDefClosure(
   // Inv 5 — action-level `input[].profile[]` referential integrity (DTR pattern).
   // Runs over the post-Inv-1 surviving set like Inv 2/3.
   const inv5errors = applyActionInputProfileInvariant(inv1.surviving, inv1.droppedPaths);
-  errors.push(...inv2errors, ...inv3errors, ...inv4errors, ...inv5errors);
+  // Inv 6 (#186) — Library identity agreement (id == name == url-tail; referent
+  // url-tail == target Library.name), enforced ONLY for the LAYERED library
+  // identities `S` this closure emitted (from the manifest). A layered entry is
+  // one whose emitted CQL `libraryName` (= S) is NOT the source-name-keeping Root.
+  const layeredIdentities = new Set<string>(
+    cqlByLibrary
+      .filter((e) => !(e.role === "root" && e.libraryName === e.sourceLibraryName))
+      .map((e) => e.libraryName),
+  );
+  const inv6errors = applyLibraryIdentityInvariant(inv1.surviving, metadata, layeredIdentities);
+  errors.push(...inv2errors, ...inv3errors, ...inv4errors, ...inv5errors, ...inv6errors);
 
   // Round-5 gpt55 [important]: severity-aware success (warnings don't sink
   // success). Hard errors (non-warning CRLErrors) + any unmatched still flip

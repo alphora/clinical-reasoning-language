@@ -156,12 +156,73 @@ export function capSlugForSuffix(base: string, suffix: string): string {
  *   "" or pure non-ASCII          → "Unnamed"
  */
 export function pascalCaseName(name: string): string {
+  const pascal = pascalCaseNameUncapped(name);
+  return pascal.length > PASCAL_MAX_LEN ? pascal.slice(0, PASCAL_MAX_LEN) : pascal;
+}
+
+/**
+ * The UNCAPPED PascalCase normalization — the same lower→strip→split→capitalize
+ * →leading-`[A-Z]` logic as `pascalCaseName` but WITHOUT the 255-char cap.
+ * `pascalCaseName` = this capped to 255. `pascalCaseNameForId` hashes THIS
+ * (uncapped) form so two inputs that differ only PAST char 255 still separate
+ * (the pre-hardening bug hashed the already-255-capped `pascalCaseName`, so such
+ * inputs produced the same pascal → same stem → same hash → collision).
+ */
+export function pascalCaseNameUncapped(name: string): string {
   const cleaned = name.toLowerCase().replace(/[^a-z0-9\s_-]/g, "");
   const tokens = cleaned.split(/[-_\s]+/).filter(Boolean);
   if (tokens.length === 0) return "Unnamed";
   let pascal = tokens.map((t) => t.charAt(0).toUpperCase() + t.slice(1)).join("");
   if (!/^[A-Z]/.test(pascal)) pascal = "X" + pascal;
-  return pascal.length > PASCAL_MAX_LEN ? pascal.slice(0, PASCAL_MAX_LEN) : pascal;
+  return pascal;
+}
+
+/**
+ * #186 — cap-safe, hyphen-free PascalCase identifier for a LAYERED CQL/FHIR
+ * Library. This is the single `S` used EVERYWHERE the engine correlates a
+ * layered library: the CQL `library` header, every `include`, every qualified
+ * ref, the FHIR `Library` id + canonical url-tail + `name`, and every
+ * reference-to-a-library (`PlanDefinition.library`, `relatedArtifact[depends-on]`,
+ * `featureExpression.reference`). cqf `RepositoryFhirLibrarySourceProvider`
+ * resolves `include`/url-tail against `Library.name`, whose FHIR regex
+ * `[A-Z]([A-Za-z0-9_]){0,254}` FORBIDS hyphens — so the one identifier must be a
+ * hyphen-free PascalCase form (`pascalCaseName` shape), NOT the lowercase-hyphen
+ * `capSlug` form.
+ *
+ * S is the hyphen-free PascalCase form (`pascalCaseName` shape), capped to the
+ * FHIR `id` 64-char limit in a TRUNCATION-collision-safe way — the PascalCase
+ * analogue of `uniqueCapSlug` (which lowercases/hyphenates and cannot be reused
+ * here). It works on the UNCAPPED PascalCase (`pascalCaseNameUncapped`):
+ *   - length <= 64 → returned UNCHANGED (no churn for the deliverable's short
+ *     ids). This equals `pascalCaseName(raw)` for any input whose pascal is <=64
+ *     (both are the uncapped pascal in that range).
+ *   - length  > 64 → `<stem><hash>`: `<hash>` is the first `UNIQUE_HASH_LEN` hex
+ *     chars of sha256 over the FULL UNCAPPED pascal (NOT `pascalCaseName`, which
+ *     is 255-capped — hashing that would collide two inputs differing only past
+ *     char 255); `<stem>` is the uncapped pascal sliced to `64 - UNIQUE_HASH_LEN`.
+ *
+ * SEPARATOR — the disambiguator is a BARE hex slice with NO separator
+ * (`<stem><hash>`). The FHIR `id` charset is `[A-Za-z0-9-.]` and the (hyphen-free)
+ * FHIR `name` charset is `[A-Za-z0-9_]`; the ONLY chars legal in both are
+ * `[A-Za-z0-9.]`. A bare alphanumeric hex slice is legal in both, so `id == name
+ * == url-tail` stays ONE identical string on the overflow branch. (`uniqueCapSlug`
+ * uses a `-` separator, legal in an `id` but NOT a hyphen-free `name`, so it
+ * cannot be reused.) The no-separator join means the hash abuts the stem's last
+ * char — a marginally wider collision class than `uniqueCapSlug`'s separated form,
+ * but hex is `[0-9a-f]` while a PascalCase stem's boundary chars are alphanumeric,
+ * and the closure-level `applyUrlUniquenessInvariant` (Inv 0) is the atomic
+ * backstop for any residual same-id collision regardless.
+ */
+export function pascalCaseNameForId(raw: string): string {
+  const pascal = pascalCaseNameUncapped(raw);
+  if (pascal.length <= SLUG_MAX_LEN) return pascal;
+  // Hash the FULL uncapped pascal so inputs differing only past the cap (incl.
+  // past char 255, which `pascalCaseName` would have collapsed) still separate.
+  const hash = createHash("sha256").update(pascal, "utf8").digest("hex").slice(0, UNIQUE_HASH_LEN);
+  // Cap the stem to leave room for the bare hex disambiguator (no separator —
+  // see the SEPARATOR note: keeps the result legal as BOTH a FHIR id and name).
+  const stem = pascal.slice(0, SLUG_MAX_LEN - UNIQUE_HASH_LEN);
+  return `${stem}${hash}`;
 }
 
 /**

@@ -95,14 +95,16 @@ export function caseFeatureCanonicalUrl(metadata: CpgMetadata, conceptName: stri
  * always-boolean rule) and supplies the resolved `code` (from
  * `lowerLocalCodes().localCodes`).
  *
- * `featureExpressionLibrarySuffix` is the layer token of the LocalSource library
- * (`"localsource"`) — where the concept's `code is` define lives — used to build
- * the `cpg-featureExpression.reference` canonical. The truth-set lane points the
+ * `featureExpressionLibrarySuffix` is the #186 unified IDENTITY `S` of the
+ * LocalSource library (the opaque hyphen-free PascalCase name, e.g.
+ * `ExampleSemandLocalsource`) — where the concept's `code is` define lives — used
+ * to build the `cpg-featureExpression.reference` canonical
+ * (`libraryCanonicalUrl(metadata, S)`). The truth-set lane points the
  * featureExpression at the LocalSource Library (NOT the Interface re-export), so
  * the case-feature submission resolves the bare `code is` boolean retrieve.
  * REQUIRED + non-empty: the caller only invokes this once it has confirmed the
- * `<policyId>-LocalSource` Library is in the manifest. An empty suffix would build
- * a ROOT-pointing reference (a silent dangling/wrong target) — fail fast instead.
+ * LocalSource Library is in the manifest. An empty identity would build a
+ * ROOT-pointing reference (a silent dangling/wrong target) — fail fast instead.
  */
 export function emitCaseFeatureStructureDefinition(
   conceptName: string,

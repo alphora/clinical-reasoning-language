@@ -24,29 +24,31 @@ const VS_BP = "http://hl7.org/fhir/us/cqfmeasures/crl/cms22/ValueSet/cms22-conce
 
 describe("library — emitLibrary", () => {
   it("emits a base FHIR R4 Library with correct shape", () => {
-    // R1 — the id BASE is the policy id ("cms22"); the layer token ("asserted")
-    // is passed as the explicit idSuffix.
+    // #186 — a LAYERED library passes the unified hyphen-free identity `S`
+    // (`Cms22Asserted`) as the 6th arg; id == url-tail == name == that S (verbatim,
+    // NOT re-slugified), so cqf's Library.name / url-tail / include all agree.
     const { resource, errors, unmatched } = emitLibrary(
-      "CMS22 Asserted",
+      "Cms22Asserted",
       METADATA,
       [VS_ANTI, VS_BP],
-      "cms22-asserted.cql",
+      "Cms22Asserted.cql",
       { clock: FIXED_CLOCK },
-      "asserted",
+      "Cms22Asserted",
     );
     expect(errors).toEqual([]);
     expect(unmatched).toEqual([]);
     expect(resource).not.toBeNull();
     const r = resource!.resource as Record<string, unknown>;
     expect(r.resourceType).toBe("Library");
-    expect(r.id).toBe("cms22-asserted");
-    expect(r.url).toBe("http://hl7.org/fhir/us/cqfmeasures/crl/cms22/Library/cms22-asserted");
+    expect(r.id).toBe("Cms22Asserted");
+    expect(r.url).toBe("http://hl7.org/fhir/us/cqfmeasures/crl/cms22/Library/Cms22Asserted");
     // version sourced from package.json (CRMI requires `version` 1..1 at the
     // shareable floor on emitted FHIR; npm package is authoritative).
     expect(r.version).toBe("1.0.0");
+    // #186 — name == id == the unified S (used verbatim, not pascalCaseName(slug)).
     expect(r.name).toBe("Cms22Asserted");
-    // v2.1 round-2: title is the per-Library name, not the package-level metadata.title.
-    expect(r.title).toBe("CMS22 Asserted");
+    // #186 — title is the passed library name (= S for a layered library).
+    expect(r.title).toBe("Cms22Asserted");
     expect(r.status).toBe("draft");
     expect(r.experimental).toBe(true);
     expect(r.date).toBe("2026-06-04T15:30:00.000Z");
@@ -55,7 +57,7 @@ describe("library — emitLibrary", () => {
     expect(r.type).toEqual({
       coding: [{ system: "http://terminology.hl7.org/CodeSystem/library-type", code: "logic-library" }],
     });
-    expect(resource!.relativePath).toBe("Library/cms22-asserted.json");
+    expect(resource!.relativePath).toBe("Library/Cms22Asserted.json");
   });
 
   it("Library claims additive CRMI library profiles (default publishable)", () => {
@@ -151,12 +153,13 @@ describe("library — emitLibrary", () => {
 });
 
 describe("library — emitLibrariesForClosure (Δ5 collision)", () => {
-  it("emits all libraries when id suffixes are distinct", () => {
-    // R1 — under one policy id, distinct layer suffixes keep the ids distinct.
+  it("emits all libraries when id identities are distinct", () => {
+    // #186 — under one policy id, distinct layered identities `S` keep the ids
+    // distinct (id == the passed identity, verbatim hyphen-free PascalCase).
     const { resources, errors } = emitLibrariesForClosure(
       [
-        { libraryName: "CMS22 Asserted", dependsOnCanonicals: [], cqlFileName: "cms22-asserted.cql", idSuffix: "asserted" },
-        { libraryName: "CMS22 Inferred", dependsOnCanonicals: [VS_ANTI], cqlFileName: "cms22-inferred.cql", idSuffix: "inferred" },
+        { libraryName: "Cms22Asserted", dependsOnCanonicals: [], cqlFileName: "Cms22Asserted.cql", libraryIdentity: "Cms22Asserted" },
+        { libraryName: "Cms22Inferred", dependsOnCanonicals: [VS_ANTI], cqlFileName: "Cms22Inferred.cql", libraryIdentity: "Cms22Inferred" },
       ],
       METADATA,
       { clock: FIXED_CLOCK },
@@ -166,11 +169,11 @@ describe("library — emitLibrariesForClosure (Δ5 collision)", () => {
   });
 
   it("errors on slug collision and skips colliding entries", () => {
-    // Two entries resolving to the SAME policy-id Library id (same suffix) collide.
+    // Two entries resolving to the SAME Library id (same identity) collide.
     const { resources, errors } = emitLibrariesForClosure(
       [
-        { libraryName: "CMS22 Asserted", dependsOnCanonicals: [], cqlFileName: "cms22-asserted.cql", idSuffix: "asserted" },
-        { libraryName: "cms22 asserted", dependsOnCanonicals: [], cqlFileName: "cms22-asserted-2.cql", idSuffix: "asserted" },
+        { libraryName: "Cms22Asserted", dependsOnCanonicals: [], cqlFileName: "Cms22Asserted.cql", libraryIdentity: "Cms22Asserted" },
+        { libraryName: "Cms22 Asserted Alt", dependsOnCanonicals: [], cqlFileName: "cms22-asserted-2.cql", libraryIdentity: "Cms22Asserted" },
       ],
       METADATA,
       { clock: FIXED_CLOCK },

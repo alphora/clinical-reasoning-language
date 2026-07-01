@@ -28,7 +28,7 @@
       "valueExpression": {
         "language": "text/cql-identifier",
         "expression": "Qualifying Diagnosis",
-        "reference": "http://example.org/hcsc/rx501-007/Library/example-direct-localsource"
+        "reference": "http://example.org/hcsc/rx501-007/Library/ExampleDirectLocalsource"
       }
     }
   ],

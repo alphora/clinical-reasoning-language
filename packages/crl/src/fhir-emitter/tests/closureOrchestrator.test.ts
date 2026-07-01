@@ -6,6 +6,7 @@ import { describe, expect, it } from "@jest/globals";
 import {
   applyActionInputProfileInvariant,
   applyInvariant1,
+  applyLibraryIdentityInvariant,
   applyUrlUniquenessInvariant,
   emitFhirDefClosure,
   emitFhirDefFromPath,
@@ -13,6 +14,7 @@ import {
 import { emitCQLImports } from "../../imports/emit";
 import { localCodeSystemUrl } from "../../cql-emitter/lowerLocalCodes";
 import { capSlugForSuffix, slugify } from "../slug";
+import { CPG_FEATURE_EXPRESSION_EXT } from "../types";
 import type { CpgMetadata, EmittedResource } from "../types";
 
 const ROOT = join(__dirname, "..", "..", "..");
@@ -255,11 +257,12 @@ describe("closureOrchestrator — FHIR closure code-is coverage (T2)", () => {
         l.resource as Record<string, unknown>,
       ]),
     );
-    // R2 — the Library title is the policy-id-based CQL library name.
+    // #186 — the Library title is the unified hyphen-free `S` (== id == name ==
+    // url-tail == the CQL library name), the cap-safe PascalCase of `<policyId>-<layer>`.
     expect([...byTitle.keys()].sort()).toEqual([
-      "code-is-basic-fixture-Inferred",
-      "code-is-basic-fixture-LocalConcepts",
-      "code-is-basic-fixture-LocalSource",
+      "CodeIsBasicFixtureInferred",
+      "CodeIsBasicFixtureLocalconcepts",
+      "CodeIsBasicFixtureLocalsource",
     ]);
     // Every content url resolves to its split CQL file (Inv 4 passes → no
     // library-content-url-unresolved error).
@@ -269,17 +272,17 @@ describe("closureOrchestrator — FHIR closure code-is coverage (T2)", () => {
     }
     expect(result.errors.some((e) => e.kind === "library-content-url-unresolved")).toBe(false);
     // The LocalSource layer depends-on the LocalConcepts layer it `include`s.
-    const localSource = byTitle.get("code-is-basic-fixture-LocalSource")!;
+    const localSource = byTitle.get("CodeIsBasicFixtureLocalsource")!;
     const localSourceDeps = (
       (localSource.relatedArtifact as Array<{ resource?: string }>) ?? []
     ).map((e) => e.resource);
     expect(localSourceDeps).toContain(
-      "http://example.org/crl/code-is-basic/Library/code-is-basic-fixture-localconcepts",
+      "http://example.org/crl/code-is-basic/Library/CodeIsBasicFixtureLocalconcepts",
     );
     // R2: the LocalConcepts LAYER is `role:"concepts"` (Local family), so it owns
     // the local CodeSystem depends-on edge. The LocalSource/Inferred consuming
     // layers reach it transitively via their LocalConcepts-sibling dep above.
-    const localConcepts = byTitle.get("code-is-basic-fixture-LocalConcepts")!;
+    const localConcepts = byTitle.get("CodeIsBasicFixtureLocalconcepts")!;
     const localConceptsDeps = (
       (localConcepts.relatedArtifact as Array<{ resource?: string }>) ?? []
     ).map((e) => e.resource);
@@ -480,5 +483,129 @@ describe("applyActionInputProfileInvariant — Inv 5", () => {
     expect(errors).toHaveLength(1);
     expect(errors[0]!.kind).toBe("unresolved-action-input-profile");
     expect(errors[0]!.message).toContain("downstream of collision");
+  });
+});
+
+/* ─── Inv 6 — Library identity agreement (#186) ──────────────────────────── */
+
+describe("applyLibraryIdentityInvariant (Inv 6 — #186 identity agreement)", () => {
+  const BASE = "http://example.org/crl/pol";
+  const METADATA = { canonicalBase: BASE } as CpgMetadata;
+
+  const lib = (id: string, name: string, url: string): EmittedResource => ({
+    resourceType: "Library",
+    relativePath: `Library/${id}.json`,
+    resource: { resourceType: "Library", id, name, url },
+    sourceKind: "Library",
+    sourceName: id,
+  });
+  const S = "PolInterface";
+  const goodLib = lib(S, S, `${BASE}/Library/${S}`);
+
+  const planDefWithLibrary = (libUrl: string): EmittedResource => ({
+    resourceType: "PlanDefinition",
+    relativePath: "PlanDefinition/pol-cover.json",
+    resource: { resourceType: "PlanDefinition", id: "pol-cover", library: [libUrl] },
+    sourceKind: "Decision",
+    sourceName: "Cover",
+  });
+  const libWithDependsOn = (id: string, depUrl: string): EmittedResource => ({
+    resourceType: "Library",
+    relativePath: `Library/${id}.json`,
+    resource: {
+      resourceType: "Library",
+      id,
+      name: id,
+      url: `${BASE}/Library/${id}`,
+      relatedArtifact: [{ type: "depends-on", resource: depUrl }],
+    },
+    sourceKind: "Library",
+    sourceName: id,
+  });
+  const sdWithFeatureExpr = (refUrl: string): EmittedResource => ({
+    resourceType: "StructureDefinition",
+    relativePath: "StructureDefinition/pol-cf.json",
+    resource: {
+      resourceType: "StructureDefinition",
+      id: "pol-cf",
+      extension: [
+        { url: CPG_FEATURE_EXPRESSION_EXT, valueExpression: { reference: refUrl } },
+      ],
+    },
+    sourceKind: "StructureDefinition",
+    sourceName: "pol-cf",
+  });
+
+  it("(a) a layered Library whose id != name → identity-disagreement error", () => {
+    // id=S but name drifted (e.g. a regressed emitter reverting to pascalCaseName(slug)).
+    const bad = lib(S, "PolInterfaceDrift", `${BASE}/Library/${S}`);
+    const errors = applyLibraryIdentityInvariant([bad], METADATA, new Set([S]));
+    expect(errors).toHaveLength(1);
+    expect(errors[0]!.kind).toBe("library-identity-disagreement");
+    expect(errors[0]!.message).toContain("disagreeing identifiers");
+  });
+
+  it("(a') a layered Library whose url-tail != id/name → identity-disagreement error", () => {
+    const bad = lib(S, S, `${BASE}/Library/pol-interface`); // url-tail drifted
+    const errors = applyLibraryIdentityInvariant([bad], METADATA, new Set([S]));
+    expect(errors.some((e) => e.kind === "library-identity-disagreement")).toBe(true);
+  });
+
+  it("(b) a library[] referent whose url-tail != the target layered Library.name → error", () => {
+    // The layered Library self-agrees (id==name==tail==S); the PlanDefinition
+    // points at it by url, but its Library.name would NOT equal the url-tail if a
+    // mismatch existed. Build the mismatch directly: a target Library whose name
+    // drifts from its url-tail, referenced by a PlanDefinition.
+    const driftedTarget = lib(S, "PolInterfaceDrift", `${BASE}/Library/${S}`);
+    const errors = applyLibraryIdentityInvariant(
+      [driftedTarget, planDefWithLibrary(`${BASE}/Library/${S}`)],
+      METADATA,
+      new Set([S]),
+    );
+    // Both the self-check (a) AND the referent-check (b) fire on the drift.
+    expect(errors.filter((e) => e.kind === "library-identity-disagreement").length).toBeGreaterThanOrEqual(2);
+    expect(errors.some((e) => /library\[\]/.test(e.message ?? ""))).toBe(true);
+  });
+
+  it("(b') a depends-on referent to a drifted layered Library → error", () => {
+    const driftedTarget = lib(S, "Drift", `${BASE}/Library/${S}`);
+    const referrer = libWithDependsOn("PolInferred", `${BASE}/Library/${S}`);
+    const errors = applyLibraryIdentityInvariant(
+      [driftedTarget, referrer],
+      METADATA,
+      new Set([S, "PolInferred"]),
+    );
+    expect(errors.some((e) => /depends-on/.test(e.message ?? ""))).toBe(true);
+  });
+
+  it("(b'') a featureExpression referent to a drifted layered Library → error", () => {
+    const driftedTarget = lib(S, "Drift", `${BASE}/Library/${S}`);
+    const errors = applyLibraryIdentityInvariant(
+      [driftedTarget, sdWithFeatureExpr(`${BASE}/Library/${S}`)],
+      METADATA,
+      new Set([S]),
+    );
+    expect(errors.some((e) => /featureExpression/.test(e.message ?? ""))).toBe(true);
+  });
+
+  it("all-agreeing layered resources → NO error", () => {
+    const errors = applyLibraryIdentityInvariant(
+      [goodLib, planDefWithLibrary(`${BASE}/Library/${S}`)],
+      METADATA,
+      new Set([S]),
+    );
+    expect(errors).toEqual([]);
+  });
+
+  it("(c) empty layeredIdentities → no-op even on a drifted Library (the cms/Root exemption)", () => {
+    const bad = lib("cms22", "Cms22Strategy", `${BASE}/Library/cms22`); // pre-existing cms drift
+    const errors = applyLibraryIdentityInvariant([bad], METADATA, new Set());
+    expect(errors).toEqual([]);
+  });
+
+  it("a Library NOT in layeredIdentities is exempt (non-layered Root name intentionally differs)", () => {
+    const root = lib("cms22", "Cms22Strategy", `${BASE}/Library/cms22`);
+    const errors = applyLibraryIdentityInvariant([root, goodLib], METADATA, new Set([S]));
+    expect(errors).toEqual([]); // only S is enforced; the Root is skipped
   });
 });

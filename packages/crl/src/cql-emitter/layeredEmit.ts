@@ -65,6 +65,7 @@ import type {
   InterfaceSourceLayer,
 } from "../ast/types";
 import { getRefName, getRefLibrary, isQualifiedRef } from "../ast/types";
+import { pascalCaseNameForId } from "../fhir-emitter/slug";
 
 import type { CRLError } from "../types/errors";
 
@@ -352,13 +353,26 @@ export function isLayerSplittable(ast: CRL): boolean {
 }
 
 /**
- * The emitted CQL library identity for a source-typed layer (R2-mechanism):
- * `<policyId>-<PascalLayer>` (e.g. `rx501-145-medical-policy-LocalConcepts`).
- * The layer VALUES are already PascalCase, so `<PascalLayer>` is the layer value
- * verbatim. The base is the POLICY ID, hyphen-joined to the layer.
+ * The emitted layered-library identity `S` for a source-typed layer (#186).
+ *
+ * S is the SINGLE hyphen-free identifier used EVERYWHERE the clinical-reasoning
+ * engine correlates the layered library: this is the CQL `library` header, so it
+ * cascades (via `requalifyRef` / the emitter's `include` / `cqlQualifiedRef`
+ * machinery) to every `include` target and every qualified ref
+ * (`S."X".asTruths()` / `S."N"`). The FHIR lane derives the SAME S from
+ * `(policyId, layer)` by calling THIS function, so the FHIR `Library` id /
+ * url-tail / `name` and every reference-to-a-library byte-match the CQL side.
+ *
+ * Pre-#186 this returned the hyphenated `<policyId>-<PascalLayer>` (e.g.
+ * `example-semand-Interface`), which disagreed with the FHIR lowercase id
+ * (`example-semand-interface`) and the FHIR PascalCase `name`
+ * (`ExampleSemandInterface`) — three forms cqf's `Library.name` resolution could
+ * not reconcile (`Could not load source`). Now it returns the cap-safe PascalCase
+ * form `pascalCaseNameForId("<policyId>-<layer>")` (e.g. `ExampleSemandInterface`)
+ * — one string, FHIR-`id`- AND FHIR-`name`-valid, hyphen-free.
  */
-function layerLibraryName(policyId: string, layer: Layer): string {
-  return `${policyId}-${layer}`;
+export function layerLibraryName(policyId: string, layer: Layer): string {
+  return pascalCaseNameForId(`${policyId}-${layer}`);
 }
 
 /**

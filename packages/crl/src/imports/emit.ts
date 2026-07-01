@@ -80,6 +80,15 @@ export interface PerLibraryEmit {
   //                  re-keys the `decision-root-library-missing` guard to this
   //                  role — that wiring is the FHIR half; here we just expose it.
   role: "root" | "concepts" | "layer" | "interface";
+  // #186 — the RAW source-typed partition value this entry was emitted under
+  // (`LocalConcepts` / `RecordConcepts` / `LocalSource` / `RecordSource` /
+  // `Inferred` / `Interface`), or `undefined` for the per-CRL/`none` Root (no
+  // layer). The FHIR lane derives the layered Library identity `S` DIRECTLY from
+  // `layerLibraryName(policyId, layer)` off this field — it does NOT parse `S`
+  // back out of the CQL `libraryName` string (that string-strip broke once S went
+  // hyphen-free). `layer` and `libraryName` (= S) are produced together by the
+  // CQL split, so they cannot drift.
+  layer?: string;
   includes: string[];
 }
 
@@ -582,6 +591,7 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
           cql: part.result.result ?? "",
           sourceLibraryName: entry.name,
           role,
+          layer: part.layer,
           includes: part.crossLibraryIncludes,
         });
       }

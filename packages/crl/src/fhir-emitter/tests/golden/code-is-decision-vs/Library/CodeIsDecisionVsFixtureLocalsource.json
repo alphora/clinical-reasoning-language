@@ -1,6 +1,6 @@
 {
   "resourceType": "Library",
-  "id": "example-for-emit-inferred",
+  "id": "CodeIsDecisionVsFixtureLocalsource",
   "meta": {
     "profile": [
       "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareablelibrary",
@@ -26,15 +26,15 @@
       "valueCode": "structured"
     }
   ],
-  "url": "http://example.org/hcsc/rx501-007/Library/example-for-emit-inferred",
-  "version": "0.0.0",
-  "name": "ExampleForEmitInferred",
-  "title": "example-for-emit-Inferred",
+  "url": "http://example.org/crl/code-is-decision-vs/Library/CodeIsDecisionVsFixtureLocalsource",
+  "version": "1.0.0",
+  "name": "CodeIsDecisionVsFixtureLocalsource",
+  "title": "CodeIsDecisionVsFixtureLocalsource",
   "status": "draft",
   "experimental": true,
-  "date": "2026-01-01T00:00:00.000Z",
+  "date": "2020-01-01T00:00:00.000Z",
   "publisher": "unknown",
-  "description": "Example For Emit",
+  "description": "D4 — source-typed split author-ValueSet depends-on routing onto LocalConcepts",
   "type": {
     "coding": [
       {
@@ -46,13 +46,13 @@
   "relatedArtifact": [
     {
       "type": "depends-on",
-      "resource": "http://example.org/hcsc/rx501-007/Library/example-for-emit-localsource"
+      "resource": "http://example.org/crl/code-is-decision-vs/Library/CodeIsDecisionVsFixtureLocalconcepts"
     }
   ],
   "content": [
     {
       "contentType": "text/cql",
-      "url": "../../cql/example-for-emit-Inferred.cql"
+      "url": "../../cql/CodeIsDecisionVsFixtureLocalsource.cql"
     }
   ]
 }

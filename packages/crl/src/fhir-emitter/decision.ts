@@ -303,12 +303,14 @@ export function emitDecisionPlanDefinition(
   decisionResolver: DecisionResolver,
   isRoot: boolean,
   opts: EmitOptions = {},
-  // R2 — the `library[]` Library id SUFFIX (the conditional Interface rewiring):
-  // `"interface"` when the decision-bearing source emitted a `role:"interface"`
-  // re-export library, else `""` (the source-name-keeping Root / cms `none` path,
-  // UNCHANGED). The orchestrator computes it once per source and threads it here
-  // so the `library[]` target stays a single source of truth.
-  libraryReferenceSuffix = "",
+  // #186 — the `library[]` Library IDENTITY `S` (the conditional Interface
+  // rewiring): the Interface re-export library's opaque hyphen-free PascalCase `S`
+  // when the decision-bearing source emitted a `role:"interface"` library, else
+  // `undefined` (the source-name-keeping Root / cms `none` path → resolves to
+  // `policyIdBase`). The orchestrator computes it once per source and threads it
+  // here so the `library[]` target stays a single source of truth. Passed straight
+  // to `libraryCanonicalUrl`, which builds `<canonicalBase>/Library/<S>`.
+  libraryReferenceSuffix: string | undefined = undefined,
   // Action-level `input` (DTR pattern): maps a normalized `when` concept name →
   // the ORDERED recursive `code is` closure of that condition (inference order).
   // Built ONCE per source by the orchestrator from the SAME per-condition
@@ -418,8 +420,8 @@ export function emitDecisionPlanDefinition(
   const level = opts.capability ?? "publishable";
   const publishable = isPublishablePlus(level);
   const url = planDefinitionCanonicalUrl(metadata, decision.name);
-  // R2 — `library[]` → the Interface re-export Library (suffix "interface") for a
-  // decision-bearing split source, else the source-name-keeping Root (suffix "").
+  // #186 — `library[]` → the Interface re-export Library (its identity `S`) for a
+  // decision-bearing split source, else the source-name-keeping Root (`undefined`).
   const libraryUrl = libraryCanonicalUrl(metadata, libraryReferenceSuffix);
   const planTypeCode = isRoot ? "workflow-definition" : "eca-rule";
 

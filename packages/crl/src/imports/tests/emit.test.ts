@@ -165,16 +165,17 @@ describe("emitCQLImports (per-CRL v2.1.0)", () => {
     expect(result.success).toBe(true);
     const names = policyLibNames(result);
     expect(names).toEqual([
-      "layered-basic-fixture-Inferred",
-      "layered-basic-fixture-RecordConcepts",
-      "layered-basic-fixture-RecordSource",
+      "LayeredBasicFixtureInferred",
+      "LayeredBasicFixtureRecordconcepts",
+      "LayeredBasicFixtureRecordsource",
     ]);
-    const asserted = findLib(result, "layered-basic-fixture-RecordSource") ?? "";
-    expect(asserted).toMatch(/include "layered-basic-fixture-RecordConcepts"/);
-    expect(asserted).toMatch(/"layered-basic-fixture-RecordConcepts"\."Example Valueset A"/);
-    const inferred = findLib(result, "layered-basic-fixture-Inferred") ?? "";
-    expect(inferred).toMatch(/include "layered-basic-fixture-RecordSource"/);
-    expect(inferred).toMatch(/"layered-basic-fixture-RecordSource"\."Asserted Concept A"/);
+    const asserted = findLib(result, "LayeredBasicFixtureRecordsource") ?? "";
+    // #186 — S is a simple identifier, emitted UNQUOTED in include + qualified refs.
+    expect(asserted).toMatch(/include LayeredBasicFixtureRecordconcepts\b/);
+    expect(asserted).toMatch(/LayeredBasicFixtureRecordconcepts\."Example Valueset A"/);
+    const inferred = findLib(result, "LayeredBasicFixtureInferred") ?? "";
+    expect(inferred).toMatch(/include LayeredBasicFixtureRecordsource\b/);
+    expect(inferred).toMatch(/LayeredBasicFixtureRecordsource\."Asserted Concept A"/);
   });
 
   it("fails loudly when a library qualified-refs an auto-split (multi-layer) library", () => {
@@ -207,12 +208,12 @@ describe("emitCQLImports (per-CRL v2.1.0)", () => {
     expect(result.success).toBe(true);
     const names = policyLibNames(result);
     expect(names).toEqual([
+      "CrlTestFixtureInferred",
+      "CrlTestFixtureRecordconcepts",
+      "CrlTestFixtureRecordsource",
       "X Asserted",
-      "crl-test-fixture-Inferred",
-      "crl-test-fixture-RecordConcepts",
-      "crl-test-fixture-RecordSource",
     ]);
-    const inferred = findLib(result, "crl-test-fixture-Inferred") ?? "";
+    const inferred = findLib(result, "CrlTestFixtureInferred") ?? "";
     expect(inferred).toMatch(/include "X Asserted"/);
   });
 
@@ -245,29 +246,29 @@ describe("emitCQLImports (per-CRL v2.1.0)", () => {
 
     const names = policyLibNames(result);
     expect(names).toEqual([
-      "crl-test-fixture-Interface",
-      "crl-test-fixture-LocalConcepts",
-      "crl-test-fixture-LocalSource",
+      "CrlTestFixtureInterface",
+      "CrlTestFixtureLocalconcepts",
+      "CrlTestFixtureLocalsource",
     ]);
 
     // Manifest (A→E contract): role + sourceLibraryName + includes.
     const conceptsEntry = result.cqlByLibrary.find(
-      (e) => e.libraryName === "crl-test-fixture-LocalConcepts",
+      (e) => e.libraryName === "CrlTestFixtureLocalconcepts",
     );
     const sourceEntry = result.cqlByLibrary.find(
-      (e) => e.libraryName === "crl-test-fixture-LocalSource",
+      (e) => e.libraryName === "CrlTestFixtureLocalsource",
     );
     const interfaceEntry = result.cqlByLibrary.find(
-      (e) => e.libraryName === "crl-test-fixture-Interface",
+      (e) => e.libraryName === "CrlTestFixtureInterface",
     );
     expect(conceptsEntry?.role).toBe("concepts");
     expect(conceptsEntry?.sourceLibraryName).toBe("Code Is Decision");
     expect(conceptsEntry?.includes).toEqual([]);
     expect(sourceEntry?.role).toBe("layer");
-    expect(sourceEntry?.includes).toEqual(["crl-test-fixture-LocalConcepts"]);
+    expect(sourceEntry?.includes).toEqual(["CrlTestFixtureLocalconcepts"]);
     expect(interfaceEntry?.role).toBe("interface");
     expect(interfaceEntry?.sourceLibraryName).toBe("Code Is Decision");
-    expect(interfaceEntry?.includes).toEqual(["crl-test-fixture-LocalSource"]);
+    expect(interfaceEntry?.includes).toEqual(["CrlTestFixtureLocalsource"]);
 
     // LocalConcepts library: ONE shared codesystem decl + BARE code names (NO
     // ` Code` suffix — codes live alone here, no co-resident concept to collide).
@@ -289,10 +290,11 @@ describe("emitCQLImports (per-CRL v2.1.0)", () => {
     // LocalSource library: include of the LocalConcepts sibling + cross-library-
     // qualified retrieves, always `[Observation: …]` (local-source rule).
     const sourceCql = sourceEntry?.cql ?? "";
-    expect(sourceCql).toMatch(/include "crl-test-fixture-LocalConcepts"/);
-    expect(sourceCql).toMatch(/\[Observation: "crl-test-fixture-LocalConcepts"\."Adult Patient"\]/);
+    // #186 — S emits UNQUOTED (simple identifier) in include + qualified refs.
+    expect(sourceCql).toMatch(/include CrlTestFixtureLocalconcepts\b/);
+    expect(sourceCql).toMatch(/\[Observation: CrlTestFixtureLocalconcepts\."Adult Patient"\]/);
     expect(sourceCql).toMatch(
-      /\[Observation: "crl-test-fixture-LocalConcepts"\."Active Crohns Disease"\]/,
+      /\[Observation: CrlTestFixtureLocalconcepts\."Active Crohns Disease"\]/,
     );
     expect(sourceCql).not.toMatch(/^codesystem /m);
 
@@ -303,10 +305,10 @@ describe("emitCQLImports (per-CRL v2.1.0)", () => {
     // `defined as`) collapses the LocalSource retrieve to a boolean via
     // `…asTruths().satisfied()`, and the Interface layer includes CFH.
     const interfaceCql = interfaceEntry?.cql ?? "";
-    expect(interfaceCql).toMatch(/include "crl-test-fixture-LocalSource"/);
+    expect(interfaceCql).toMatch(/include CrlTestFixtureLocalsource\b/);
     expect(interfaceCql).toMatch(/include CaseFeatureCommon called CFH/);
     expect(interfaceCql).toMatch(
-      /define "Active Crohns Disease":\s*"crl-test-fixture-LocalSource"\."Active Crohns Disease"\.asTruths\(\)\.satisfied\(\)/,
+      /define "Active Crohns Disease":\s*CrlTestFixtureLocalsource\."Active Crohns Disease"\.asTruths\(\)\.satisfied\(\)/,
     );
     expect(interfaceCql).not.toMatch(/define "Adult Patient"/);
     expect(interfaceCql).not.toMatch(/^codesystem /m);
@@ -403,9 +405,9 @@ decision "Triage":
     const plan = computeSplitPlan(lowered.ast, "Pol", "Pol", lowered.localCodes.length);
     expect(plan.kind).toBe("interface");
     expect(plan.emittedLibraryNames).toEqual([
-      "Pol-LocalConcepts",
-      "Pol-LocalSource",
-      "Pol-Interface",
+      "PolLocalconcepts",
+      "PolLocalsource",
+      "PolInterface",
     ]);
     expect(plan.partition).toBeDefined();
     expect(plan.policyId).toBe("Pol");
@@ -468,13 +470,13 @@ activity "Refer":
     expect(result.success).toBe(true);
     const names = policyLibNames(result);
     expect(names).toEqual([
+      "CrlTestFixtureInferred",
+      "CrlTestFixtureInterface",
+      "CrlTestFixtureLocalconcepts",
+      "CrlTestFixtureLocalsource",
       "Pol Concepts",
-      "crl-test-fixture-Inferred",
-      "crl-test-fixture-Interface",
-      "crl-test-fixture-LocalConcepts",
-      "crl-test-fixture-LocalSource",
     ]);
-    const inferred = result.cqlByLibrary.find((e) => e.libraryName === "crl-test-fixture-Inferred");
+    const inferred = result.cqlByLibrary.find((e) => e.libraryName === "CrlTestFixtureInferred");
     expect(inferred?.includes).toContain("Pol Concepts");
   });
 

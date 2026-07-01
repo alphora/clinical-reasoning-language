@@ -28,7 +28,7 @@
       "valueExpression": {
         "language": "text/cql-identifier",
         "expression": "Diagnosis A",
-        "reference": "http://example.org/hcsc/rx501-007/Library/example-semand-localsource"
+        "reference": "http://example.org/hcsc/rx501-007/Library/ExampleSemandLocalsource"
       }
     }
   ],

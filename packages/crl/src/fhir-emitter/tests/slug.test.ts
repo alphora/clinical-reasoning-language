@@ -2,7 +2,14 @@ import { describe, expect, it } from "@jest/globals";
 
 import { createHash } from "node:crypto";
 
-import { capSlug, pascalCaseName, rawSlug, slugify, uniqueCapSlug } from "../slug";
+import {
+  capSlug,
+  pascalCaseName,
+  pascalCaseNameForId,
+  rawSlug,
+  slugify,
+  uniqueCapSlug,
+} from "../slug";
 
 describe("fhir-emitter slug helpers", () => {
   describe("slugify", () => {
@@ -151,6 +158,68 @@ describe("fhir-emitter slug helpers", () => {
       // Two DISTINCT names collapsing to the same <=64 raw slug never hit the >64
       // hash branch, so uniqueCapSlug returns the same id — by design.
       expect(uniqueCapSlug(rawSlug("A/B"))).toBe(uniqueCapSlug(rawSlug("AB")));
+    });
+  });
+
+  describe("pascalCaseNameForId (#186 — cap-safe PascalCase layered identity S)", () => {
+    // FHIR id regex (subset used here) and FHIR name regex (hyphen-free) — S must
+    // satisfy BOTH as ONE identical string.
+    const ID_CHARS = /^[A-Za-z0-9.]+$/; // no hyphen/underscore on the S path
+    const NAME_RE = /^[A-Z][A-Za-z0-9]{0,63}$/; // leading [A-Z], hyphen/underscore-free, <=64
+
+    it("(a) a <=64 pascal is returned UNCHANGED and equals pascalCaseName (no churn)", () => {
+      for (const raw of ["cms22-asserted", "example-semand-Interface", "BP Codes"]) {
+        const out = pascalCaseNameForId(raw);
+        expect(out).toBe(pascalCaseName(raw));
+        expect(out.length).toBeLessThanOrEqual(64);
+        expect(out).toMatch(NAME_RE);
+        expect(out).toMatch(ID_CHARS);
+        expect(out).not.toContain("-");
+        expect(out).not.toContain("_");
+      }
+    });
+
+    it("(b) a 65+-char pascal → exactly-64 result matching BOTH the FHIR id AND name regex", () => {
+      // 70 word-chars → pascal length 70 (> 64) → hash branch.
+      const raw = "a".repeat(70);
+      const out = pascalCaseNameForId(raw);
+      expect(out.length).toBe(64);
+      expect(out).toMatch(ID_CHARS); // legal FHIR id (no hyphen/underscore)
+      expect(out).toMatch(NAME_RE); // legal FHIR name (leading [A-Z], hyphen-free)
+      // <stem(52)><hash(12)> = the bare-hex, no-separator join.
+      const expectedHash = createHash("sha256")
+        .update("A" + "a".repeat(69), "utf8") // pascalCaseNameUncapped: leading upper + rest
+        .digest("hex")
+        .slice(0, 12);
+      expect(out.endsWith(expectedHash)).toBe(true);
+      expect(out.slice(52)).toBe(expectedHash); // hash abuts the 52-char stem (no separator)
+    });
+
+    it("(c) two inputs sharing the first ~52 pascal chars but diverging after → DISTINCT", () => {
+      // 60 shared leading chars (> 52 stem) + divergent tails past the cap.
+      const base = "z".repeat(60);
+      const idX = pascalCaseNameForId(base + " alpha");
+      const idY = pascalCaseNameForId(base + " betaa");
+      expect(idX).not.toBe(idY);
+      // Their 52-char stems are identical; only the hash distinguishes them.
+      expect(idX.slice(0, 52)).toBe(idY.slice(0, 52));
+      expect(idX.slice(52)).not.toBe(idY.slice(52));
+    });
+
+    it("(d) two inputs identical through 255 normalized chars but divergent after → DISTINCT (uncapped-hash fix)", () => {
+      // The hardening bug: hashing pascalCaseName (255-capped) collides these.
+      // pascalCaseNameForId hashes the UNCAPPED pascal → they separate.
+      const shared = "q".repeat(300); // pascal length 300 (> 255)
+      const a = pascalCaseNameForId(shared + " x1");
+      const b = pascalCaseNameForId(shared + " x2");
+      expect(a).not.toBe(b);
+      // Sanity: pascalCaseName DOES collapse them (proves the fix is load-bearing).
+      expect(pascalCaseName(shared + " x1")).toBe(pascalCaseName(shared + " x2"));
+    });
+
+    it("is pure — same input → same output", () => {
+      const raw = "Some Very Long Layer Name " + "y".repeat(60);
+      expect(pascalCaseNameForId(raw)).toBe(pascalCaseNameForId(raw));
     });
   });
 });

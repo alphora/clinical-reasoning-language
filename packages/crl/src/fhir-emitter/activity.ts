@@ -100,11 +100,18 @@ export function emitActivityDefinition(
   metadata: CpgMetadata,
   terminologyResolver: TerminologyResolver,
   opts: EmitOptions = {},
-  // R2 — the `library[]` Library id SUFFIX: `"interface"` when the source emitted
-  // a `role:"interface"` re-export library, else `""` (Root / cms `none` path,
-  // UNCHANGED). Threaded by the orchestrator so the `library[]` target is one
-  // source of truth across decision/activity/recommendation.
-  libraryReferenceSuffix = "",
+  // #186 — the `library[]` Library IDENTITY `S`: the Interface re-export library's
+  // unified `S` when the source emitted a `role:"interface"` re-export library,
+  // else `undefined` (Root / cms `none` path — resolves to `policyIdBase`).
+  // Threaded by the orchestrator so the `library[]` target is one source of truth
+  // across decision/activity/recommendation.
+  libraryReferenceSuffix: string | undefined = undefined,
+  // #186 — whether this activity's `library[]` is the Interface re-export (the
+  // decision-bearing split path). Was previously inferred by string-matching the
+  // suffix `=== "interface"`; now the identity is an opaque `S`, so the
+  // orchestrator passes the boolean directly. Drives the F4 terminology-`with`
+  // guard below.
+  isInterfaceScoped = false,
 ): {
   resource: EmittedResource | null;
   errors: CRLError[];
@@ -158,8 +165,8 @@ export function emitActivityDefinition(
   const level = opts.capability ?? "publishable";
   const publishable = isPublishablePlus(level);
   const url = activityDefinitionCanonicalUrl(metadata, activity.name);
-  // R2 — `library[]` → the Interface re-export Library (suffix "interface") for a
-  // decision-bearing split source, else the source-name-keeping Root (suffix "").
+  // #186 — `library[]` → the Interface re-export Library (its identity `S`) for a
+  // decision-bearing split source, else the source-name-keeping Root (`undefined`).
   const libraryUrl = libraryCanonicalUrl(metadata, libraryReferenceSuffix);
 
   const doNotPerform = activity.body.request.doNotPerform === true;
@@ -203,7 +210,7 @@ export function emitActivityDefinition(
 
   // F4 (impl-review) — guard the activity-`with`-terminology → Interface edge.
   // When this activity's `library[]` is rewired to the Interface re-export
-  // (`libraryReferenceSuffix === "interface"`, the decision-bearing split path)
+  // (`isInterfaceScoped`, the decision-bearing split path)
   // AND its `with` clause references a TERMINOLOGY, the dynamicValue's CQL
   // identifier would resolve against the Interface library — but the Interface
   // re-exports CONCEPTS, not terminologies, so the reference dangles. This is a
@@ -211,10 +218,7 @@ export function emitActivityDefinition(
   // `with` terminology); guard it loudly rather than emit a dangling reference.
   // Do NOT solve the general case here.
   const withClause = activity.body.withClause;
-  if (
-    libraryReferenceSuffix === "interface" &&
-    withClause?.terminologyReference !== undefined
-  ) {
+  if (isInterfaceScoped && withClause?.terminologyReference !== undefined) {
     errors.push({
       type: "Validation",
       kind: "emit-activity-terminology-interface-unsupported",
@@ -362,8 +366,11 @@ export function emitActivityDefinitionsForLibrary(
   metadata: CpgMetadata,
   terminologyResolver: TerminologyResolver,
   opts: EmitOptions = {},
-  // R2 — the conditional `library[]` Interface suffix (see emitActivityDefinition).
-  libraryReferenceSuffix = "",
+  // #186 — the conditional `library[]` Interface IDENTITY `S` (see
+  // emitActivityDefinition). `undefined` = Root / cms path.
+  libraryReferenceSuffix: string | undefined = undefined,
+  // #186 — whether `library[]` is the Interface re-export (drives the F4 guard).
+  isInterfaceScoped = false,
 ): {
   resources: EmittedResource[];
   errors: CRLError[];
@@ -398,7 +405,15 @@ export function emitActivityDefinitionsForLibrary(
     const id = capSlug(`${base}-${slugify(a.name)}`);
     if ((slugMap.get(id)?.length ?? 0) > 1) continue;
     const { resource, errors: rErrors, unmatched: rUnmatched } =
-      emitActivityDefinition(a, libraryName, metadata, terminologyResolver, opts, libraryReferenceSuffix);
+      emitActivityDefinition(
+        a,
+        libraryName,
+        metadata,
+        terminologyResolver,
+        opts,
+        libraryReferenceSuffix,
+        isInterfaceScoped,
+      );
     if (resource) resources.push(resource);
     errors.push(...rErrors);
     unmatched.push(...rUnmatched);

@@ -225,21 +225,23 @@ export function normalizePackageMetadata(raw: unknown): MetadataResult {
           "silently differ from the policy id. Use a slug-clean policy id (lowercase ASCII letters, digits, and hyphens; no `@`, `/`, uppercase, or other characters).",
       });
     }
-    // F6 — reject an over-long policy-id slug. The CQL lane names layer libraries
-    // from the RAW (uncapped) `name`, while the FHIR lane caps `policyIdBase` to
-    // 64 (the FHIR `id` regex limit). When the UNCAPPED slug exceeds 64, the FHIR
-    // prefix-strip in `idSuffixFor` (which strips the capped `<policyBase>-`
-    // prefix from the CQL layer name) fails and the emitted ids / `library[]`
-    // silently drift between the lanes. Fail loudly at metadata load instead.
-    // (`rawSlug` length, NOT `slug` — `slug`/`slugify` is already capped to 64.)
+    // Reject an over-long policy-id slug. Post-#186 the layered Library identity
+    // `S` is `pascalCaseNameForId("<policyId>-<layer>")`, which is cap-safe
+    // (truncates + hashes) and byte-identical across BOTH lanes — so the specific
+    // `idSuffixFor` prefix-strip drift the F6 guard originally targeted no longer
+    // exists. The guard is KEPT as a general well-formedness bound: a policy id
+    // whose slug exceeds the 64-char FHIR `id` limit still yields a `policyIdBase`
+    // (the non-layered Root / CodeSystem / PlanDefinition id base) that must be
+    // silently capped — surfacing that at metadata load is clearer than shipping a
+    // truncated resource-id base. (`rawSlug` length, NOT `slug` — `slugify` caps.)
     if (rawSlug(name).length > 64) {
       errors.push({
         type: "Validation",
         kind: "oversized-package-name-slug",
         message:
           `package.json \`name\` "${name}" slugifies to ${rawSlug(name).length} characters, exceeding the 64-char FHIR ` +
-          "`id` limit. The CQL lane names layer libraries from the full policy id while the FHIR lane caps it to 64, so " +
-          "the emitted resource ids and `library[]` references would drift. Use a policy id whose slug is at most 64 characters.",
+          "`id` limit. It is the base of every non-layered FHIR resource id (Root Library / CodeSystem / PlanDefinition), " +
+          "which would be silently capped. Use a policy id whose slug is at most 64 characters.",
       });
     }
   }

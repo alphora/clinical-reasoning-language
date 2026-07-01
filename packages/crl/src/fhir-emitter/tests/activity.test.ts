@@ -130,7 +130,8 @@ describe("activity — emitActivityDefinition", () => {
       METADATA,
       RESOLVE_ALL,
       { clock: FIXED_CLOCK },
-      "interface",
+      "Cms22Interface",
+      true,
     );
     expect(resource).toBeNull();
     expect(errors.map((e) => e.kind)).toContain("emit-activity-terminology-interface-unsupported");
@@ -149,13 +150,14 @@ describe("activity — emitActivityDefinition", () => {
       METADATA,
       RESOLVE_ALL,
       { clock: FIXED_CLOCK },
-      "interface",
+      "Cms22Interface",
+      true,
     );
     expect(errors).toEqual([]);
     expect(resource).not.toBeNull();
-    // library[] resolves to the Interface-suffixed Library.
+    // #186 — library[] resolves to the Interface Library by its unified `S`.
     expect((resource!.resource as { library: string[] }).library[0]).toBe(
-      "http://hl7.org/fhir/us/cqfmeasures/crl/cms22/Library/cms22-interface",
+      "http://hl7.org/fhir/us/cqfmeasures/crl/cms22/Library/Cms22Interface",
     );
   });
 

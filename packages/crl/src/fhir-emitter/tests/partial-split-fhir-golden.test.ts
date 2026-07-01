@@ -101,21 +101,32 @@ describe("CRL → FHIR partial-split golden (code-is-decision)", () => {
     );
     expect(libs).toHaveLength(3);
 
-    // R2 — ids derive from the fixture POLICY ID ("code-is-decision-fixture") +
-    // the lowercase LAYER token (NOT the source library-name slug).
+    // #186 — ids are the UNIFIED hyphen-free `S` (id == url-tail == name), the
+    // cap-safe PascalCase of `<policyId>-<layer>` the CQL lane stamps as the
+    // library name (NOT a lowercase layer-token suffix). cqf resolves the
+    // `include`/url-tail against `Library.name`, so all three must be this one S.
     const byId = new Map(
       libs.map((l) => [l.resource.id as string, l.resource as Record<string, unknown>]),
     );
-    const localConcepts = byId.get("code-is-decision-fixture-localconcepts")!;
-    const localSource = byId.get("code-is-decision-fixture-localsource")!;
-    const iface = byId.get("code-is-decision-fixture-interface")!;
+    const localConcepts = byId.get("CodeIsDecisionFixtureLocalconcepts")!;
+    const localSource = byId.get("CodeIsDecisionFixtureLocalsource")!;
+    const iface = byId.get("CodeIsDecisionFixtureInterface")!;
     expect(localConcepts).toBeDefined();
     expect(localSource).toBeDefined();
     expect(iface).toBeDefined();
+    // id == name == url-tail (the #186 identity agreement).
+    for (const [id, res] of [
+      ["CodeIsDecisionFixtureLocalconcepts", localConcepts],
+      ["CodeIsDecisionFixtureLocalsource", localSource],
+      ["CodeIsDecisionFixtureInterface", iface],
+    ] as const) {
+      expect(res.name).toBe(id);
+      expect((res.url as string).endsWith(`/Library/${id}`)).toBe(true);
+    }
 
     // LocalConcepts owns the local CodeSystem (the lowered `code is` domain).
     expect((localConcepts.content as Array<{ url?: string }>)[0]?.url).toBe(
-      "../../cql/code-is-decision-fixture-LocalConcepts.cql",
+      "../../cql/CodeIsDecisionFixtureLocalconcepts.cql",
     );
     expect(
       (localConcepts.relatedArtifact as Array<{ type?: string; resource?: string }>).map(
@@ -127,24 +138,24 @@ describe("CRL → FHIR partial-split golden (code-is-decision)", () => {
 
     // LocalSource depends-on its LocalConcepts sibling.
     expect((localSource.content as Array<{ url?: string }>)[0]?.url).toBe(
-      "../../cql/code-is-decision-fixture-LocalSource.cql",
+      "../../cql/CodeIsDecisionFixtureLocalsource.cql",
     );
     expect(
       (localSource.relatedArtifact as Array<{ type?: string; resource?: string }>).map(
         (e) => e.resource,
       ),
     ).toEqual([
-      "http://example.org/crl/code-is-decision/Library/code-is-decision-fixture-localconcepts",
+      "http://example.org/crl/code-is-decision/Library/CodeIsDecisionFixtureLocalconcepts",
     ]);
 
     // Interface re-exports the decision surface; depends-on LocalSource.
     expect((iface.content as Array<{ url?: string }>)[0]?.url).toBe(
-      "../../cql/code-is-decision-fixture-Interface.cql",
+      "../../cql/CodeIsDecisionFixtureInterface.cql",
     );
     expect(
       (iface.relatedArtifact as Array<{ type?: string; resource?: string }>).map((e) => e.resource),
     ).toEqual([
-      "http://example.org/crl/code-is-decision/Library/code-is-decision-fixture-localsource",
+      "http://example.org/crl/code-is-decision/Library/CodeIsDecisionFixtureLocalsource",
     ]);
   });
 
@@ -152,7 +163,7 @@ describe("CRL → FHIR partial-split golden (code-is-decision)", () => {
     // R2 — the decision/activity/recommendation `library[]` now rewire onto the
     // synthesized Interface re-export library (NOT the source-name Root).
     const interfaceUrl =
-      "http://example.org/crl/code-is-decision/Library/code-is-decision-fixture-interface";
+      "http://example.org/crl/code-is-decision/Library/CodeIsDecisionFixtureInterface";
     for (const r of result.resources) {
       if (r.resourceType !== "PlanDefinition" && r.resourceType !== "ActivityDefinition") continue;
       const lib = (r.resource as { library?: unknown }).library;

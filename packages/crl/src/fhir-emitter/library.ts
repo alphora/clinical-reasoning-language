@@ -29,7 +29,7 @@
  */
 
 import type { CRLError } from "../types/errors";
-import { capSlug, capSlugForSuffix, pascalCaseName, policyIdBase, slugify } from "./slug";
+import { capSlug, pascalCaseName, policyIdBase, slugify } from "./slug";
 import { crmiCapabilityProfiles, isPublishablePlus, knowledgeExtensions } from "./types";
 import type {
   CpgMetadata,
@@ -42,35 +42,44 @@ const LIBRARY_TYPE_CS = "http://terminology.hl7.org/CodeSystem/library-type";
 const LIBRARY_TYPE_CODE = "logic-library";
 
 /**
- * R1 — the FHIR Library `id` from the policy-id base + an optional id suffix
- * (the layer slug for split entries; empty for the source-name-keeping Root).
- * Single source of truth so the Library id, its `url`, and every referrer's
- * `library[]` agree byte-for-byte.
+ * #186 — the FHIR Library `id` for a library whose UNIFIED identity is `S`.
  *
- * `idSuffix` is the already-slugified layer token (e.g. `"concepts"`,
- * `"asserted"`, `"inferred"`), or `""`/undefined for the Root. For a non-empty
- * suffix the combined id uses `capSlugForSuffix` (caps the base to
- * `64 - len("-<suffix>")`, then appends), so a long policy id can never truncate
- * the layer suffix away — mirroring codeSystem.ts (`-local`) and
- * recommendation.ts (`-recommendation`). The Root (empty suffix) is the bare
- * `capSlug(policyIdBase)`.
+ * `S` is the single hyphen-free identifier the CQL lane already stamped as the
+ * layered library's name (the manifest `libraryName`), used VERBATIM as the FHIR
+ * `id` == url-tail == `name` so cqf's `Library.name` resolution matches the CQL
+ * `include`/url-tail. Two shapes reach here:
+ *   - a LAYERED library → `S` is the cap-safe PascalCase `layerLibraryName(...)`
+ *     (e.g. `ExampleSemandInterface`), already <= 64 chars and FHIR-`id`-valid;
+ *     passed explicitly by the caller (from the manifest).
+ *   - the per-CRL / non-layered Root (cms, single-library sources) → the caller
+ *     passes `undefined`, and the id is the bare `policyIdBase(metadata)` (the
+ *     unchanged pre-#186 Root id — keeps cms/per-CRL goldens byte-identical).
+ *
+ * The layered `S` is NOT re-slugified here: it is ALREADY the final identifier
+ * and re-slugifying (lowercasing / hyphenating) would reintroduce exactly the
+ * id/name disagreement #186 removes. The Root path keeps `policyIdBase` (a
+ * lowercase-hyphen slug) because no layer identity applies.
  */
-export function libraryId(metadata: CpgMetadata, idSuffix = ""): string {
-  const base = policyIdBase(metadata);
-  return idSuffix ? capSlugForSuffix(base, `-${idSuffix}`) : base;
+export function libraryId(metadata: CpgMetadata, libraryIdentity?: string): string {
+  // An empty string is treated identically to `undefined` (the non-layered Root):
+  // reference emitters default their identity arg to `""`, and `?? ` would NOT
+  // coalesce `""`. So normalize falsy → the `policyIdBase` Root fallback.
+  return libraryIdentity ? libraryIdentity : policyIdBase(metadata);
 }
 
 /**
- * Canonical URL the emitted Library claims (`Library.url`) AND the URL
- * an ActivityDefinition's `library[0]` references for that CRL library.
- * Both sides MUST byte-equal — this helper is the single source of truth.
+ * Canonical URL the emitted Library claims (`Library.url`) AND the URL a
+ * referrer (`PlanDefinition.library` / `ActivityDefinition.library` /
+ * `relatedArtifact[depends-on]` / `featureExpression.reference`) uses for that
+ * library. All sides MUST byte-equal — this helper is the single source of truth.
  *
- * R1 — the id BASE is the policy id (`policyIdBase(metadata)`), NOT the human
- * library-name slug. `idSuffix` selects the split entry (Concepts/Asserted/…)
- * via the manifest role; empty = the source-name-keeping Root.
+ * #186 — `libraryIdentity` is the unified `S` for a layered library (the manifest
+ * `libraryName`), or `undefined` for the non-layered Root (falls back to
+ * `policyIdBase`). The url-tail == the FHIR `id` == `Library.name` == the CQL
+ * `include`/header, so cqf `forUrl`/`byNameAndVersion` resolves it.
  */
-export function libraryCanonicalUrl(metadata: CpgMetadata, idSuffix = ""): string {
-  return `${metadata.canonicalBase}/Library/${libraryId(metadata, idSuffix)}`;
+export function libraryCanonicalUrl(metadata: CpgMetadata, libraryIdentity?: string): string {
+  return `${metadata.canonicalBase}/Library/${libraryId(metadata, libraryIdentity)}`;
 }
 
 /**
@@ -92,9 +101,12 @@ export function emitLibrary(
   dependsOnCanonicals: ReadonlyArray<string>,
   cqlFileName: string,
   opts: EmitOptions = {},
-  // R1 — the policy-id id suffix for split entries (e.g. "concepts"); empty for
-  // the source-name-keeping Root. Selects which Library id/url this entry claims.
-  idSuffix = "",
+  // #186 — the UNIFIED layered library identity `S` (the manifest `libraryName`,
+  // a cap-safe hyphen-free PascalCase id), used VERBATIM as `id` == url-tail ==
+  // `name`. `undefined` for the non-layered Root (cms / per-CRL single library):
+  // the id falls back to `policyIdBase` and `name` to `pascalCaseName(slug)` —
+  // the unchanged pre-#186 behavior that keeps those goldens byte-identical.
+  libraryIdentity?: string,
 ): {
   resource: EmittedResource | null;
   errors: CRLError[];
@@ -113,10 +125,14 @@ export function emitLibrary(
     });
   }
 
-  // R1 — id/url BASE is the policy id; `librarySlug` remains the source of the
-  // human-facing `name`/`title` (per-library identity, not the resource id).
-  const id = libraryId(metadata, idSuffix);
-  const computableName = pascalCaseName(librarySlug);
+  // #186 — for a LAYERED library the id / url-tail / `name` are ALL the unified
+  // `S` (`libraryIdentity`), so cqf resolves `include S` / `forUrl(url-tail)` /
+  // `byNameAndVersion(name)` to the SAME resource. `S` is already a valid FHIR
+  // `id` AND `name` (hyphen-free PascalCase, <= 64), so it is used verbatim — NOT
+  // re-slugified (that would re-lowercase and reintroduce the disagreement). For
+  // the non-layered Root, `name` stays the pre-#186 `pascalCaseName(slug)`.
+  const id = libraryId(metadata, libraryIdentity);
+  const computableName = libraryIdentity ?? pascalCaseName(librarySlug);
 
   // Title defaults to the CRL library name (per-library identity), NOT the
   // package-level metadata.title — round-2 gpt55 I1: a single closure with
@@ -135,7 +151,7 @@ export function emitLibrary(
 
   const level = opts.capability ?? "publishable";
   const publishable = isPublishablePlus(level);
-  const url = libraryCanonicalUrl(metadata, idSuffix);
+  const url = libraryCanonicalUrl(metadata, libraryIdentity);
 
   const resource: Record<string, unknown> = {
     resourceType: "Library",
@@ -306,10 +322,10 @@ export function emitLibrariesForClosure(
     libraryName: string;
     dependsOnCanonicals: ReadonlyArray<string>;
     cqlFileName: string;
-    // R1 — the policy-id id suffix for this entry (e.g. "asserted"); empty for
-    // the source-name-keeping Root. Distinct suffixes keep the per-policy Library
-    // ids distinct under a single policyIdBase.
-    idSuffix?: string;
+    // #186 — the unified layered library identity `S` for this entry (the manifest
+    // `libraryName`), used as the FHIR id/url-tail/name. `undefined` for the
+    // non-layered Root (falls back to `policyIdBase`).
+    libraryIdentity?: string;
   }>,
   metadata: CpgMetadata,
   opts: EmitOptions = {},
@@ -322,10 +338,11 @@ export function emitLibrariesForClosure(
   const errors: CRLError[] = [];
   const unmatched: UnmatchedReference[] = [];
 
-  // R1 — collision detection on the policy-id-derived Library id (base + suffix).
+  // #186 — collision detection on the emitted Library id (the layered `S` or the
+  // policy-id Root fallback).
   const slugMap = new Map<string, string[]>();
   for (const lib of libraries) {
-    const id = libraryId(metadata, lib.idSuffix ?? "");
+    const id = libraryId(metadata, lib.libraryIdentity);
     const existing = slugMap.get(id) ?? [];
     existing.push(lib.libraryName);
     slugMap.set(id, existing);
@@ -342,7 +359,7 @@ export function emitLibrariesForClosure(
   }
 
   for (const lib of libraries) {
-    const id = libraryId(metadata, lib.idSuffix ?? "");
+    const id = libraryId(metadata, lib.libraryIdentity);
     if ((slugMap.get(id)?.length ?? 0) > 1) continue;
     const { resource, errors: rErrors, unmatched: rUnmatched } = emitLibrary(
       lib.libraryName,
@@ -350,7 +367,7 @@ export function emitLibrariesForClosure(
       lib.dependsOnCanonicals,
       lib.cqlFileName,
       opts,
-      lib.idSuffix ?? "",
+      lib.libraryIdentity,
     );
     if (resource) resources.push(resource);
     errors.push(...rErrors);

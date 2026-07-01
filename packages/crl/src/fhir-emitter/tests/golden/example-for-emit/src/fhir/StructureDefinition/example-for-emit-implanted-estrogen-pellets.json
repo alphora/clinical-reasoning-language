@@ -28,7 +28,7 @@
       "valueExpression": {
         "language": "text/cql-identifier",
         "expression": "Implanted Estrogen Pellets",
-        "reference": "http://example.org/hcsc/rx501-007/Library/example-for-emit-localsource"
+        "reference": "http://example.org/hcsc/rx501-007/Library/ExampleForEmitLocalsource"
       }
     }
   ],

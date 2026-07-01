@@ -162,7 +162,7 @@ describe("emitCaseFeatureStructureDefinition — direct unit", () => {
       "adult-18-or-older",
       METADATA,
       FIXED,
-      "localsource",
+      "CasefeatureFixtureLocalsource",
     );
     expect(errors).toEqual([]);
     const r = resource!.resource as Record<string, unknown>;
@@ -178,7 +178,7 @@ describe("emitCaseFeatureStructureDefinition — direct unit", () => {
       (e) => e.url === CPG_FEATURE_EXPRESSION_EXT,
     )!;
     expect((fe.valueExpression as { reference: string }).reference).toBe(
-      "http://example.org/crl/casefeature/Library/casefeature-fixture-localsource",
+      "http://example.org/crl/casefeature/Library/CasefeatureFixtureLocalsource",
     );
   });
 
@@ -199,7 +199,7 @@ describe("emitCaseFeatureStructureDefinition — direct unit", () => {
       "",
       METADATA,
       FIXED,
-      "localsource",
+      "CasefeatureFixtureLocalsource",
     );
     expect(resource).toBeNull();
     expect(errors.some((e) => e.kind === "emit-casefeature-missing-code")).toBe(true);
@@ -211,7 +211,7 @@ describe("emitCaseFeatureStructureDefinition — direct unit", () => {
       undefined as unknown as string,
       METADATA,
       FIXED,
-      "localsource",
+      "CasefeatureFixtureLocalsource",
     );
     expect(resource).toBeNull();
     expect(errors.some((e) => e.kind === "emit-casefeature-missing-code")).toBe(true);

@@ -1,6 +1,6 @@
 {
   "resourceType": "Library",
-  "id": "code-is-decision-fixture-interface",
+  "id": "CodeIsDecisionFixtureInterface",
   "meta": {
     "profile": [
       "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareablelibrary",
@@ -26,10 +26,10 @@
       "valueCode": "structured"
     }
   ],
-  "url": "http://example.org/crl/code-is-decision/Library/code-is-decision-fixture-interface",
+  "url": "http://example.org/crl/code-is-decision/Library/CodeIsDecisionFixtureInterface",
   "version": "1.0.0",
   "name": "CodeIsDecisionFixtureInterface",
-  "title": "code-is-decision-fixture-Interface",
+  "title": "CodeIsDecisionFixtureInterface",
   "status": "draft",
   "experimental": true,
   "date": "2020-01-01T00:00:00.000Z",
@@ -46,13 +46,13 @@
   "relatedArtifact": [
     {
       "type": "depends-on",
-      "resource": "http://example.org/crl/code-is-decision/Library/code-is-decision-fixture-localsource"
+      "resource": "http://example.org/crl/code-is-decision/Library/CodeIsDecisionFixtureLocalsource"
     }
   ],
   "content": [
     {
       "contentType": "text/cql",
-      "url": "../../cql/code-is-decision-fixture-Interface.cql"
+      "url": "../../cql/CodeIsDecisionFixtureInterface.cql"
     }
   ]
 }

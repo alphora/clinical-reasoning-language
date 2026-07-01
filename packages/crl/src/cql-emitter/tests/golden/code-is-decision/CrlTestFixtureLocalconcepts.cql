@@ -1,4 +1,4 @@
-library "crl-test-fixture-LocalConcepts"
+library CrlTestFixtureLocalconcepts
 
 using FHIR version '4.0.1'
 

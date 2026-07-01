@@ -90,10 +90,12 @@ export function emitRecommendationDefinition(
   libraryName: string,
   metadata: CpgMetadata,
   opts: EmitOptions = {},
-  // R2 — the `library[]` Library id SUFFIX: `"interface"` when the source emitted
-  // a `role:"interface"` re-export library, else `""` (Root / cms `none` path,
-  // UNCHANGED). Threaded by the orchestrator (single `library[]` source of truth).
-  libraryReferenceSuffix = "",
+  // #186 — the `library[]` Library IDENTITY `S`: the Interface re-export library's
+  // opaque hyphen-free PascalCase `S` when the source emitted a `role:"interface"`
+  // library, else `undefined` (Root / cms `none` path → `policyIdBase`). Threaded
+  // by the orchestrator (single `library[]` source of truth); passed straight to
+  // `libraryCanonicalUrl`.
+  libraryReferenceSuffix: string | undefined = undefined,
 ): {
   resource: EmittedResource | null;
   errors: CRLError[];
@@ -133,8 +135,8 @@ export function emitRecommendationDefinition(
   const level = opts.capability ?? "publishable";
   const publishable = isPublishablePlus(level);
   const url = recommendationDefinitionCanonicalUrl(metadata, activity.name);
-  // R2 — `library[]` → the Interface re-export Library (suffix "interface") for a
-  // decision-bearing split source, else the source-name-keeping Root (suffix "").
+  // #186 — `library[]` → the Interface re-export Library (its identity `S`) for a
+  // decision-bearing split source, else the source-name-keeping Root (`undefined`).
   const libraryUrl = libraryCanonicalUrl(metadata, libraryReferenceSuffix);
   const activityUrl = activityDefinitionCanonicalUrl(metadata, activity.name);
 
@@ -219,8 +221,9 @@ export function emitRecommendationDefinitionsForLibrary(
   libraryName: string,
   metadata: CpgMetadata,
   opts: EmitOptions = {},
-  // R2 — the conditional `library[]` Interface suffix (see emitRecommendationDefinition).
-  libraryReferenceSuffix = "",
+  // #186 — the conditional `library[]` Interface IDENTITY `S` (see
+  // emitRecommendationDefinition); `undefined` = Root / cms path.
+  libraryReferenceSuffix: string | undefined = undefined,
 ): {
   resources: EmittedResource[];
   errors: CRLError[];

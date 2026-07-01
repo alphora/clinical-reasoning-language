@@ -36,7 +36,7 @@
   "publisher": "unknown",
   "description": "Refer to GI",
   "library": [
-    "http://example.org/crl/code-is-decision-vs/Library/code-is-decision-vs-fixture-interface"
+    "http://example.org/crl/code-is-decision-vs/Library/CodeIsDecisionVsFixtureInterface"
   ],
   "kind": "ServiceRequest",
   "profile": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-servicerequest",

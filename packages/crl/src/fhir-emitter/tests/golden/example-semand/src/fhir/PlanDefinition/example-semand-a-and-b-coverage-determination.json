@@ -44,7 +44,7 @@
     ]
   },
   "library": [
-    "http://example.org/hcsc/rx501-007/Library/example-semand-interface"
+    "http://example.org/hcsc/rx501-007/Library/ExampleSemandInterface"
   ],
   "action": [
     {

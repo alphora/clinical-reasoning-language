@@ -36,7 +36,7 @@
   "publisher": "unknown",
   "description": "Deny EIU",
   "library": [
-    "http://example.org/hcsc/rx501-007/Library/example-for-emit-interface"
+    "http://example.org/hcsc/rx501-007/Library/ExampleForEmitInterface"
   ],
   "kind": "CommunicationRequest",
   "profile": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-communicationrequest",
