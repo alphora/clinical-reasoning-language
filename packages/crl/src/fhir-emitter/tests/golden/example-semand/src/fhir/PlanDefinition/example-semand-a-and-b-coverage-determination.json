@@ -28,7 +28,7 @@
   ],
   "url": "http://example.org/hcsc/rx501-007/PlanDefinition/example-semand-a-and-b-coverage-determination",
   "version": "0.0.0",
-  "name": "AAndBCoverageDetermination",
+  "name": "SemAndIntersectAAndBCoverageDetermination",
   "title": "A And B Coverage Determination",
   "status": "draft",
   "experimental": true,
@@ -48,8 +48,8 @@
   ],
   "action": [
     {
-      "title": "A And B",
-      "description": "A And B",
+      "title": "A And B Coverage Determination",
+      "description": "A And B Coverage Determination",
       "code": [
         {
           "coding": [
@@ -60,65 +60,87 @@
           ]
         }
       ],
-      "condition": [
+      "extension": [
         {
-          "kind": "applicability",
-          "expression": {
-            "language": "text/cql-identifier",
-            "expression": "A And B"
-          }
+          "url": "http://hl7.org/fhir/StructureDefinition/cqf-applicabilityBehavior",
+          "valueString": "any"
         }
       ],
-      "input": [
+      "action": [
         {
-          "extension": [
+          "title": "A And B",
+          "description": "A And B",
+          "code": [
             {
-              "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
-              "valueString": "Diagnosis A?"
-            },
-            {
-              "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
-              "valueMarkdown": "Diagnosis A"
+              "coding": [
+                {
+                  "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+                  "code": "guideline-based-care"
+                }
+              ]
             }
           ],
-          "type": "Observation",
-          "profile": [
-            "http://example.org/hcsc/rx501-007/StructureDefinition/example-semand-diagnosis-a"
-          ]
+          "condition": [
+            {
+              "kind": "applicability",
+              "expression": {
+                "language": "text/cql-identifier",
+                "expression": "A And B"
+              }
+            }
+          ],
+          "input": [
+            {
+              "extension": [
+                {
+                  "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                  "valueString": "Diagnosis A?"
+                },
+                {
+                  "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                  "valueMarkdown": "Diagnosis A"
+                }
+              ],
+              "type": "Observation",
+              "profile": [
+                "http://example.org/hcsc/rx501-007/StructureDefinition/example-semand-diagnosis-a"
+              ]
+            },
+            {
+              "extension": [
+                {
+                  "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                  "valueString": "Diagnosis B?"
+                },
+                {
+                  "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                  "valueMarkdown": "Diagnosis B"
+                }
+              ],
+              "type": "Observation",
+              "profile": [
+                "http://example.org/hcsc/rx501-007/StructureDefinition/example-semand-diagnosis-b"
+              ]
+            }
+          ],
+          "definitionCanonical": "http://example.org/hcsc/rx501-007/PlanDefinition/example-semand-approve-recommendation"
         },
         {
-          "extension": [
+          "title": "otherwise",
+          "description": "otherwise",
+          "code": [
             {
-              "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
-              "valueString": "Diagnosis B?"
-            },
-            {
-              "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
-              "valueMarkdown": "Diagnosis B"
+              "coding": [
+                {
+                  "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+                  "code": "guideline-based-care"
+                }
+              ]
             }
           ],
-          "type": "Observation",
-          "profile": [
-            "http://example.org/hcsc/rx501-007/StructureDefinition/example-semand-diagnosis-b"
-          ]
+          "definitionCanonical": "http://example.org/hcsc/rx501-007/PlanDefinition/example-semand-deny-recommendation"
         }
-      ],
-      "definitionCanonical": "http://example.org/hcsc/rx501-007/PlanDefinition/example-semand-approve-recommendation"
-    },
-    {
-      "title": "otherwise",
-      "description": "otherwise",
-      "code": [
-        {
-          "coding": [
-            {
-              "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
-              "code": "guideline-based-care"
-            }
-          ]
-        }
-      ],
-      "definitionCanonical": "http://example.org/hcsc/rx501-007/PlanDefinition/example-semand-deny-recommendation"
+      ]
     }
   ]
 }

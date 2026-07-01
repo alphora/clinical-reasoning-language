@@ -848,7 +848,8 @@ Exit codes: `0` = clean; `1` = hard errors (CRLError of error severity, or impor
 - `when "C" then recommend activity "A"` → an `action` whose `condition` references concept `C` (CQL identifier expression) and whose `definitionCanonical` points at the Recommendation PlanDefinition wrapping activity `A`.
 - `when "C" then use decision "D"` → an `action` whose `definitionCanonical` points at sub-decision `D`.
 - Nested `when ... then:` produces nested `action.action[]` until a leaf adds `definitionCanonical`.
-- `any:` qualifier → custom `crl-logical-switch` extension URL on the parent action. The corresponding StructureDefinition is NOT shipped (pending CPG ballot). Strict validators may need an ignore-list for the extension URL until the ballot publishes.
+- `first:` decision (ordered/first-match, top-level or nested) → the standard `cqf-applicabilityBehavior` "any" extension on a grouping action, so a FHIR engine applies the FIRST applicable branch (true if-elif-else) rather than firing every branch. `all:`/no qualifier → no extension (FHIR default: every applicable sibling fires).
+- Menu `any:` qualifier → custom `crl-logical-switch` extension URL on the parent action. The corresponding StructureDefinition is NOT shipped and its FHIR selection semantics are still pending (GitHub #184). Strict validators may need an ignore-list for the extension URL until then.
 
 ### Deliberate deviations from the published CPG IG
 

@@ -28,7 +28,7 @@
   ],
   "url": "http://example.org/hcsc/rx501-007/PlanDefinition/example-bothrep-implanted-pellet-hrt-coverage-determination",
   "version": "0.0.0",
-  "name": "ImplantedPelletHrtCoverageDetermination",
+  "name": "BothRepresentationImplantedPelletHrtCoverageDetermination",
   "title": "Implanted Pellet HRT Coverage Determination",
   "status": "draft",
   "experimental": true,
@@ -48,8 +48,8 @@
   ],
   "action": [
     {
-      "title": "Implanted Estrogen Or Estradiol Pellets",
-      "description": "Implanted Estrogen Or Estradiol Pellets",
+      "title": "Implanted Pellet HRT Coverage Determination",
+      "description": "Implanted Pellet HRT Coverage Determination",
       "code": [
         {
           "coding": [
@@ -60,81 +60,103 @@
           ]
         }
       ],
-      "condition": [
+      "extension": [
         {
-          "kind": "applicability",
-          "expression": {
-            "language": "text/cql-identifier",
-            "expression": "Implanted Estrogen Or Estradiol Pellets"
-          }
+          "url": "http://hl7.org/fhir/StructureDefinition/cqf-applicabilityBehavior",
+          "valueString": "any"
         }
       ],
-      "input": [
+      "action": [
         {
-          "extension": [
+          "title": "Implanted Estrogen Or Estradiol Pellets",
+          "description": "Implanted Estrogen Or Estradiol Pellets",
+          "code": [
             {
-              "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
-              "valueString": "Implanted Estrogen Or Estradiol Pellets?"
-            },
-            {
-              "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
-              "valueMarkdown": "Implanted Estrogen Or Estradiol Pellets"
+              "coding": [
+                {
+                  "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+                  "code": "guideline-based-care"
+                }
+              ]
             }
           ],
-          "type": "Observation",
-          "profile": [
-            "http://example.org/hcsc/rx501-007/StructureDefinition/example-bothrep-implanted-estrogen-or-estradiol-pellets"
-          ]
+          "condition": [
+            {
+              "kind": "applicability",
+              "expression": {
+                "language": "text/cql-identifier",
+                "expression": "Implanted Estrogen Or Estradiol Pellets"
+              }
+            }
+          ],
+          "input": [
+            {
+              "extension": [
+                {
+                  "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                  "valueString": "Implanted Estrogen Or Estradiol Pellets?"
+                },
+                {
+                  "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                  "valueMarkdown": "Implanted Estrogen Or Estradiol Pellets"
+                }
+              ],
+              "type": "Observation",
+              "profile": [
+                "http://example.org/hcsc/rx501-007/StructureDefinition/example-bothrep-implanted-estrogen-or-estradiol-pellets"
+              ]
+            },
+            {
+              "extension": [
+                {
+                  "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                  "valueString": "Implanted Estrogen Pellets?"
+                },
+                {
+                  "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                  "valueMarkdown": "Implanted Estrogen Pellets"
+                }
+              ],
+              "type": "Observation",
+              "profile": [
+                "http://example.org/hcsc/rx501-007/StructureDefinition/example-bothrep-implanted-estrogen-pellets"
+              ]
+            },
+            {
+              "extension": [
+                {
+                  "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                  "valueString": "Implanted Estradiol Pellets?"
+                },
+                {
+                  "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                  "valueMarkdown": "Implanted Estradiol Pellets"
+                }
+              ],
+              "type": "Observation",
+              "profile": [
+                "http://example.org/hcsc/rx501-007/StructureDefinition/example-bothrep-implanted-estradiol-pellets"
+              ]
+            }
+          ],
+          "definitionCanonical": "http://example.org/hcsc/rx501-007/PlanDefinition/example-bothrep-deny-recommendation"
         },
         {
-          "extension": [
+          "title": "otherwise",
+          "description": "otherwise",
+          "code": [
             {
-              "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
-              "valueString": "Implanted Estrogen Pellets?"
-            },
-            {
-              "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
-              "valueMarkdown": "Implanted Estrogen Pellets"
+              "coding": [
+                {
+                  "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+                  "code": "guideline-based-care"
+                }
+              ]
             }
           ],
-          "type": "Observation",
-          "profile": [
-            "http://example.org/hcsc/rx501-007/StructureDefinition/example-bothrep-implanted-estrogen-pellets"
-          ]
-        },
-        {
-          "extension": [
-            {
-              "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
-              "valueString": "Implanted Estradiol Pellets?"
-            },
-            {
-              "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
-              "valueMarkdown": "Implanted Estradiol Pellets"
-            }
-          ],
-          "type": "Observation",
-          "profile": [
-            "http://example.org/hcsc/rx501-007/StructureDefinition/example-bothrep-implanted-estradiol-pellets"
-          ]
+          "definitionCanonical": "http://example.org/hcsc/rx501-007/PlanDefinition/example-bothrep-approve-recommendation"
         }
-      ],
-      "definitionCanonical": "http://example.org/hcsc/rx501-007/PlanDefinition/example-bothrep-deny-recommendation"
-    },
-    {
-      "title": "otherwise",
-      "description": "otherwise",
-      "code": [
-        {
-          "coding": [
-            {
-              "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
-              "code": "guideline-based-care"
-            }
-          ]
-        }
-      ],
-      "definitionCanonical": "http://example.org/hcsc/rx501-007/PlanDefinition/example-bothrep-approve-recommendation"
+      ]
     }
   ]
 }

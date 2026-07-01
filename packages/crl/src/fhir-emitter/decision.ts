@@ -34,9 +34,12 @@
  * `action.definitionCanonical`: `recommend activity X` →
  * Recommendation PlanDef wrapping X; `use decision Y` → sub-decision Y.
  *
- * `any:` qualifier on a block body → custom `crl-logical-switch`
- * extension (operator-stubbed for CPG ballot; URL derives from
- * canonicalBase) on the parent action with valueBoolean=true.
+ * `first:` (an ordered branch-switch, top-level or nested) → the standard
+ * `cqf-applicabilityBehavior` "any" extension on the grouping action (a synthetic
+ * wrapper at the top level; the parent `when` action when nested). Menu `any:` (a
+ * "pick one of these actions" selection) keeps the phase-1 `crl-logical-switch`
+ * stand-in (URL derives from canonicalBase, valueBoolean=true) until its FHIR
+ * selection semantics are settled (GitHub #184). `all:`/no qualifier → no extension.
  *
  * Cascade-suppression contract: a branch (when/otherwise) whose condition concept
  * (or whose leaf activity/decision) is unresolved suppresses the
@@ -150,6 +153,17 @@ const CPG_INPUT_TEXT_EXT = "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-i
 const CPG_INPUT_DESCRIPTION_EXT =
   "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description";
 
+// The standard HL7 `cqf-applicabilityBehavior` extension. Placed on a grouping
+// action, `valueString "any"` means: evaluate the ordered child actions and apply
+// the FIRST applicable one (child order is significant — the trailing unconditional
+// `otherwise` is a true fallthrough). Omitting it is the FHIR default: every
+// applicable sibling fires. This is the correct lowering of a CRL `first:` decision
+// switch — it REPLACES the phase-1 `crl-logical-switch` stand-in for the branch case.
+// Value type is `valueString "any"` to byte-match the reference DTR content
+// (alphora/dtr-content-r4); the extension also accepts valueCode. See FHIR-50150.
+const CQF_APPLICABILITY_BEHAVIOR_EXT =
+  "http://hl7.org/fhir/StructureDefinition/cqf-applicabilityBehavior";
+
 /* ─── Canonical URL helper (exported; not re-exported at root) ───── */
 
 export function planDefinitionCanonicalUrl(
@@ -232,6 +246,18 @@ function crlLogicalSwitchExtensionUrl(canonicalBase: string): string {
   return `${canonicalBase}/StructureDefinition/crl-logical-switch`;
 }
 
+/**
+ * Append (never clobber) the standard `cqf-applicabilityBehavior` "any" extension to
+ * a grouping action so a FHIR engine applies the FIRST applicable child. Used for
+ * both the top-level `first:` switch wrapper and a nested `first:` block's parent
+ * action.
+ */
+function addApplicabilityBehaviorExtension(action: Record<string, unknown>): void {
+  const ext = (action.extension as Array<Record<string, unknown>> | undefined) ?? [];
+  ext.push({ url: CQF_APPLICABILITY_BEHAVIOR_EXT, valueString: "any" });
+  action.extension = ext;
+}
+
 function defaultClock(): Date {
   return new Date();
 }
@@ -260,6 +286,13 @@ type EmitActionResult =
  * SAME `collectCaseFeatures` recursive `code is` collection the case-feature SDs
  * come from, so it cannot dangle on that path; an arbitrary direct caller is
  * responsible for its own profiles.
+ *
+ * EXPECTS A SHAPE-VALIDATED AST: the qualifier lowering trusts the decision-shape
+ * validator to have run — `first:` is treated as an ordered branch-switch
+ * (`cqf-applicabilityBehavior`) and `any:` as a menu (`crl-logical-switch`), which
+ * is only sound because the validator rejects `any:`-over-branches and
+ * `first:`-over-actions. A direct caller feeding an unvalidated AST (e.g. `first:`
+ * over an action menu) would stamp the wrong extension; run the validator first.
  */
 export function emitDecisionPlanDefinition(
   decision: Decision,
@@ -359,6 +392,29 @@ export function emitDecisionPlanDefinition(
     }
   }
 
+  // Top-level `first:` → wrap the ordered surviving branches in a single grouping
+  // action carrying `cqf-applicabilityBehavior` "any", so a FHIR engine applies the
+  // FIRST applicable branch (true if-elif-else) instead of firing every branch
+  // (which is what happens today: the unconditional `otherwise` fires alongside the
+  // matched branch). The extension's context is `PlanDefinition.action`, and the root
+  // branches have no parent action to hang it on — hence the wrapper. It carries the
+  // same `title`/`description`/`code` skeleton every action needs (the Strategy
+  // property invariant requires them at all depths). `all:`/no-qualifier stay flat
+  // sibling root actions (the FHIR default: every applicable sibling fires). Wrap
+  // whenever the source said `first:`, even if cascade suppression left a single
+  // survivor — preserves source intent and keeps the emitted shape predictable.
+  let rootActions = topLevelActions;
+  if (decision.body.qualifier === "first") {
+    const switchGroup: Record<string, unknown> = {
+      title,
+      description,
+      code: [{ coding: [{ system: CPG_COMMON_PROCESS_CS, code: "guideline-based-care" }] }],
+    };
+    addApplicabilityBehaviorExtension(switchGroup);
+    switchGroup.action = topLevelActions;
+    rootActions = [switchGroup];
+  }
+
   const level = opts.capability ?? "publishable";
   const publishable = isPublishablePlus(level);
   const url = planDefinitionCanonicalUrl(metadata, decision.name);
@@ -387,7 +443,7 @@ export function emitDecisionPlanDefinition(
       coding: [{ system: PLAN_DEFINITION_TYPE_CS, code: planTypeCode }],
     },
     library: [libraryUrl],
-    action: topLevelActions,
+    action: rootActions,
   };
 
   if (metadata.contact.length > 0) resource.contact = metadata.contact;
@@ -510,10 +566,11 @@ function emitWhenBlock(wb: WhenBlock, ctx: EmitCtx): EmitActionResult {
 /**
  * `otherwise` (catch-all) → action emit.
  *
- * TODO(phase-2): proper FHIR lowering of the `otherwise` fallback and `first:`
- * selection semantics. Phase-1 emits a no-condition action (the catch-all is
- * unconditional) so the build, cascade handling, and emit closure stay correct;
- * `first:` reuses the `any:` crl-logical-switch stand-in (see fillBranchBody).
+ * The catch-all emits a no-condition action; its LAST position under a `first:`
+ * switch group is what makes it a true fallthrough (child order is significant
+ * under `cqf-applicabilityBehavior` "any" — apply the first applicable child).
+ * The `first:` selection semantics are now emitted (see the top-level wrapper in
+ * `emitDecisionPlanDefinition` and the nested case in `fillBranchBody`).
  */
 function emitOtherwiseBlock(ob: OtherwiseBlock, ctx: EmitCtx): EmitActionResult {
   const action: Record<string, unknown> = {
@@ -593,8 +650,17 @@ function fillBranchBody(
   }
   action.action = survivingChildren;
 
-  // `any:`/`first:` qualifier → crl-logical-switch extension (phase-1 stand-in).
-  if (body.qualifier === "any" || body.qualifier === "first") {
+  // Nested `first:` (an ordered branch-switch nested under a matched `when`) → the
+  // standard `cqf-applicabilityBehavior` "any": apply the first applicable child.
+  // The parent when/otherwise action is the grouping action, so no extra wrapper is
+  // needed here (unlike the top-level case). Menu `any:` (a "pick one of these
+  // actions" selection, NOT ordered evaluation) is a DIFFERENT construct — stamping
+  // the applicability extension on it would assert the wrong operational meaning, so
+  // it keeps the phase-1 `crl-logical-switch` stand-in until its FHIR selection
+  // semantics are settled (GitHub #184). `all:`/no-qualifier → no extension.
+  if (body.qualifier === "first") {
+    addApplicabilityBehaviorExtension(action);
+  } else if (body.qualifier === "any") {
     action.extension = [
       {
         url: crlLogicalSwitchExtensionUrl(ctx.canonicalBase),

@@ -256,7 +256,7 @@ Tools that need project context (the validators, FHIR-def emit, CEL emit) requir
 - Emitted FHIR definitional resources carry `version` (from `package.json`; CRMI Shareable requires it 1..1) and, at publishable+ capability, a reproducible `date` (resolved from `--date`/`date` → `SOURCE_DATE_EPOCH` env → `crl.date` → wall clock). Emitted CQL stays version-less. Optional inputs: `date` (ISO) and `capability` (`shareable|computable|publishable`, default `publishable`; `executable` is rejected — needs ELM/expansion, #113).
 - `meta.profile` canonicals: `cpg-strategydefinition`, `cpg-recommendationdefinition` (CPG IG); at publishable+ `crmi-publishableplandefinition`/`crmi-publishablevalueset`, at shareable `crmi-shareableplandefinition`/`crmi-shareablevalueset` (CRMI IG); `cqf-knowledgeCapability`, `cqf-knowledgeRepresentationLevel` (FHIR-core).
 - Cross-library concept/terminology refs are unsupported in v0; same-library qualified refs `"CurrentLib"."X"` resolve as bare locals.
-- `any:` qualifier emits a `crl-logical-switch` extension URL (StructureDefinition not yet shipped — pending CPG ballot).
+- `first:` decision (ordered/first-match) emits the standard `cqf-applicabilityBehavior` "any" extension on a grouping action (apply the first applicable branch). Menu `any:` still emits a `crl-logical-switch` extension URL (StructureDefinition not yet shipped; its FHIR selection semantics are pending — GitHub #184).
 
 <a id="emit_cel"></a>**`emit_cel`** — CEL → FHIR instance resources.
 - Input: `{ path: string, includeResources?: boolean }` (path required + absolute)

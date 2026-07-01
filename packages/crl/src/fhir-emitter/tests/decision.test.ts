@@ -182,9 +182,14 @@ describe("decision — emitDecisionPlanDefinition Strategy (isRoot=true)", () =>
       "action", "extension", "input", "output", "relatedAction", "selectionBehavior",
     ]);
     const STRATEGY_REQUIRED = new Set(["title", "description", "code"]);
-    const d = decision("Top", [
-      when("C1", block(undefined, [when("C2", leaf(recommend("A")))])),
-    ]);
+    // Use a `first:` decision so the walk also covers the synthetic top-level switch
+    // WRAPPER (the one new action shape this lane introduces at the root) — its key
+    // set must stay ⊆ allowed with the required trio present, at every depth.
+    const d = decision(
+      "Top",
+      [when("C1", block(undefined, [when("C2", leaf(recommend("A")))])), otherwise(leaf(recommend("B")))],
+      "first",
+    );
     const { resource } = emitDecisionPlanDefinition(
       d, "Lib", METADATA, RESOLVE_ALL, RESOLVE_ACT_OK, RESOLVE_DEC_OK, true, { clock: FIXED_CLOCK },
     );
@@ -271,7 +276,11 @@ describe("decision — action tree mapping", () => {
     expect(inner.definitionCanonical).toBe(RESOLVE_ACT_OK("A"));
   });
 
-  it("any: qualifier emits crl-logical-switch extension on parent action with URL from canonicalBase", () => {
+  // Menu `any:` (a "pick one of these" selection, NOT ordered first-applicable) keeps
+  // the phase-1 crl-logical-switch stand-in until its FHIR selection semantics are
+  // settled (GitHub #184) — deliberately NOT migrated to cqf-applicabilityBehavior,
+  // which would assert the wrong operational meaning on a selection group.
+  it("any: qualifier keeps the crl-logical-switch stand-in (deferred to #184)", () => {
     const d = decision("D", [
       when("Outer", block("any", [
         when("InnerA", leaf(recommend("A"))),
@@ -604,7 +613,7 @@ describe("decision — emitDecisionPlanDefinitionsForLibrary", () => {
 /* ─── otherwise / first emit paths (phase-1 stand-in) ──────────────── */
 
 describe("decision — otherwise and first emit", () => {
-  it("otherwise branch emits an action with NO condition[]", () => {
+  it("first: top-level wraps branches in a cqf-applicabilityBehavior switch group; otherwise is conditionless + LAST", () => {
     const d = decision(
       "Cov",
       [when("Excl", leaf(recommend("Deny"))), otherwise(leaf(recommend("Approve")))],
@@ -613,9 +622,21 @@ describe("decision — otherwise and first emit", () => {
     const { resource } = emitDecisionPlanDefinition(
       d, "Lib", METADATA, RESOLVE_ALL, RESOLVE_ACT_OK, RESOLVE_DEC_OK, true, { clock: FIXED_CLOCK },
     );
-    const actions = (resource!.resource as { action: Array<Record<string, unknown>> }).action;
+    const root = (resource!.resource as { action: Array<Record<string, unknown>> }).action;
+    // first: → ONE grouping action carrying the standard switch extension. It has the
+    // title/description/code every action needs (Strategy property invariant).
+    expect(root).toHaveLength(1);
+    const group = root[0]!;
+    expect(group).toHaveProperty("title");
+    expect(group).toHaveProperty("description");
+    expect(group).toHaveProperty("code");
+    expect(group.extension).toEqual([
+      { url: "http://hl7.org/fhir/StructureDefinition/cqf-applicabilityBehavior", valueString: "any" },
+    ]);
+    const actions = group.action as Array<Record<string, unknown>>;
     expect(actions).toHaveLength(2);
-    // First branch carries an applicability condition; the otherwise does not.
+    // Child ORDER is load-bearing under applicabilityBehavior "any" (first-applicable):
+    // the conditioned branch first, the unconditional `otherwise` LAST (true fallthrough).
     expect(actions[0]!.condition).toBeDefined();
     expect(actions[1]!.condition).toBeUndefined();
     expect(actions[1]!.definitionCanonical).toBeDefined();
@@ -632,12 +653,14 @@ describe("decision — otherwise and first emit", () => {
     const { resource, unmatched } = emitDecisionPlanDefinition(
       d, "Lib", METADATA, RESOLVE_ALL, onlyDeny, RESOLVE_DEC_OK, true, { clock: FIXED_CLOCK },
     );
-    const actions = (resource!.resource as { action: Array<Record<string, unknown>> }).action;
+    const root = (resource!.resource as { action: Array<Record<string, unknown>> }).action;
+    expect(root).toHaveLength(1); // first: wraps even a single survivor (predictable shape)
+    const actions = root[0]!.action as Array<Record<string, unknown>>;
     expect(actions).toHaveLength(1); // otherwise suppressed, when survives
     expect(unmatched.some((u) => u.kind === "unresolved-activity")).toBe(true);
   });
 
-  it("first: nested block carries the crl-logical-switch extension (phase-1 stand-in)", () => {
+  it("first: nested block carries the cqf-applicabilityBehavior extension (branch-switch)", () => {
     const d = decision("Cov", [
       when(
         "C",
@@ -650,9 +673,11 @@ describe("decision — otherwise and first emit", () => {
     const { resource } = emitDecisionPlanDefinition(
       d, "Lib", METADATA, RESOLVE_ALL, RESOLVE_ACT_OK, RESOLVE_DEC_OK, true, { clock: FIXED_CLOCK },
     );
+    // No top-level qualifier → no wrapper; the nested first: block's parent (the
+    // `when C` action) IS the grouping action, so it carries the switch extension.
     const action = (resource!.resource as { action: Array<Record<string, unknown>> }).action[0]!;
-    const ext = action.extension as Array<{ url: string; valueBoolean?: boolean }> | undefined;
-    expect(ext?.some((e) => e.url.endsWith("/crl-logical-switch") && e.valueBoolean === true)).toBe(true);
+    const ext = action.extension as Array<{ url: string; valueString?: string }> | undefined;
+    expect(ext?.some((e) => e.url.endsWith("/cqf-applicabilityBehavior") && e.valueString === "any")).toBe(true);
   });
 
   it("all: nested block carries NO extension (emit-neutral)", () => {

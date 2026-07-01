@@ -28,7 +28,7 @@
   ],
   "url": "http://example.org/hcsc/rx501-007/PlanDefinition/example-direct-qualifying-diagnosis-coverage-determination",
   "version": "0.0.0",
-  "name": "QualifyingDiagnosisCoverageDetermination",
+  "name": "DirectCodeIsQualifyingDiagnosisCoverageDetermination",
   "title": "Qualifying Diagnosis Coverage Determination",
   "status": "draft",
   "experimental": true,
@@ -48,8 +48,8 @@
   ],
   "action": [
     {
-      "title": "Qualifying Diagnosis",
-      "description": "Qualifying Diagnosis",
+      "title": "Qualifying Diagnosis Coverage Determination",
+      "description": "Qualifying Diagnosis Coverage Determination",
       "code": [
         {
           "coding": [
@@ -60,49 +60,71 @@
           ]
         }
       ],
-      "condition": [
+      "extension": [
         {
-          "kind": "applicability",
-          "expression": {
-            "language": "text/cql-identifier",
-            "expression": "Qualifying Diagnosis"
-          }
+          "url": "http://hl7.org/fhir/StructureDefinition/cqf-applicabilityBehavior",
+          "valueString": "any"
         }
       ],
-      "input": [
+      "action": [
         {
-          "extension": [
+          "title": "Qualifying Diagnosis",
+          "description": "Qualifying Diagnosis",
+          "code": [
             {
-              "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
-              "valueString": "Qualifying Diagnosis?"
-            },
-            {
-              "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
-              "valueMarkdown": "Qualifying Diagnosis"
+              "coding": [
+                {
+                  "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+                  "code": "guideline-based-care"
+                }
+              ]
             }
           ],
-          "type": "Observation",
-          "profile": [
-            "http://example.org/hcsc/rx501-007/StructureDefinition/example-direct-qualifying-diagnosis"
-          ]
-        }
-      ],
-      "definitionCanonical": "http://example.org/hcsc/rx501-007/PlanDefinition/example-direct-approve-recommendation"
-    },
-    {
-      "title": "otherwise",
-      "description": "otherwise",
-      "code": [
-        {
-          "coding": [
+          "condition": [
             {
-              "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
-              "code": "guideline-based-care"
+              "kind": "applicability",
+              "expression": {
+                "language": "text/cql-identifier",
+                "expression": "Qualifying Diagnosis"
+              }
             }
-          ]
+          ],
+          "input": [
+            {
+              "extension": [
+                {
+                  "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                  "valueString": "Qualifying Diagnosis?"
+                },
+                {
+                  "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                  "valueMarkdown": "Qualifying Diagnosis"
+                }
+              ],
+              "type": "Observation",
+              "profile": [
+                "http://example.org/hcsc/rx501-007/StructureDefinition/example-direct-qualifying-diagnosis"
+              ]
+            }
+          ],
+          "definitionCanonical": "http://example.org/hcsc/rx501-007/PlanDefinition/example-direct-approve-recommendation"
+        },
+        {
+          "title": "otherwise",
+          "description": "otherwise",
+          "code": [
+            {
+              "coding": [
+                {
+                  "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+                  "code": "guideline-based-care"
+                }
+              ]
+            }
+          ],
+          "definitionCanonical": "http://example.org/hcsc/rx501-007/PlanDefinition/example-direct-deny-recommendation"
         }
-      ],
-      "definitionCanonical": "http://example.org/hcsc/rx501-007/PlanDefinition/example-direct-deny-recommendation"
+      ]
     }
   ]
 }

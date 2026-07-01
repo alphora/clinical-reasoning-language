@@ -101,6 +101,25 @@ describe("CRL → FHIR golden regression (locked truth-set examples)", () => {
           collectInputs(goldenPd),
         );
       });
+
+      // The examples are all `first:` decisions: the closure emit must wrap the
+      // ordered branches in ONE grouping action carrying cqf-applicabilityBehavior
+      // "any", and the recursive case-feature inputs must still resolve on the branch
+      // children one level deeper (no unresolved-action-input-profile).
+      it("first: coverage PlanDefinition wraps branches in a cqf-applicabilityBehavior switch group", () => {
+        const emitted = emittedByPath.get(`PlanDefinition/${coverageFile}`);
+        const pd = emitted!.resource as { action: Array<Record<string, unknown>> };
+        expect(pd.action).toHaveLength(1);
+        const group = pd.action[0]!;
+        expect(group.extension).toEqual([
+          { url: "http://hl7.org/fhir/StructureDefinition/cqf-applicabilityBehavior", valueString: "any" },
+        ]);
+        // The branches (incl. otherwise) are the group's ordered children.
+        expect((group.action as unknown[]).length).toBeGreaterThanOrEqual(1);
+        // Inputs live on the children now — the emit-with-no-errors test already
+        // asserts r.errors === [] (so no unresolved-action-input-profile).
+        expect(collectInputs(pd)).toEqual(collectInputs({ action: group.action }));
+      });
     });
   }
 });

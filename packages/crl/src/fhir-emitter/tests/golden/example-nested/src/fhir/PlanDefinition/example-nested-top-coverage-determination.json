@@ -28,7 +28,7 @@
   ],
   "url": "http://example.org/hcsc/rx501-007/PlanDefinition/example-nested-top-coverage-determination",
   "version": "0.0.0",
-  "name": "TopCoverageDetermination",
+  "name": "NestedDefinedAsTopCoverageDetermination",
   "title": "Top Coverage Determination",
   "status": "draft",
   "experimental": true,
@@ -48,8 +48,8 @@
   ],
   "action": [
     {
-      "title": "Top",
-      "description": "Top",
+      "title": "Top Coverage Determination",
+      "description": "Top Coverage Determination",
       "code": [
         {
           "coding": [
@@ -60,81 +60,103 @@
           ]
         }
       ],
-      "condition": [
+      "extension": [
         {
-          "kind": "applicability",
-          "expression": {
-            "language": "text/cql-identifier",
-            "expression": "Top"
-          }
+          "url": "http://hl7.org/fhir/StructureDefinition/cqf-applicabilityBehavior",
+          "valueString": "any"
         }
       ],
-      "input": [
+      "action": [
         {
-          "extension": [
+          "title": "Top",
+          "description": "Top",
+          "code": [
             {
-              "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
-              "valueString": "Diagnosis A?"
-            },
-            {
-              "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
-              "valueMarkdown": "Diagnosis A"
+              "coding": [
+                {
+                  "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+                  "code": "guideline-based-care"
+                }
+              ]
             }
           ],
-          "type": "Observation",
-          "profile": [
-            "http://example.org/hcsc/rx501-007/StructureDefinition/example-nested-diagnosis-a"
-          ]
+          "condition": [
+            {
+              "kind": "applicability",
+              "expression": {
+                "language": "text/cql-identifier",
+                "expression": "Top"
+              }
+            }
+          ],
+          "input": [
+            {
+              "extension": [
+                {
+                  "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                  "valueString": "Diagnosis A?"
+                },
+                {
+                  "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                  "valueMarkdown": "Diagnosis A"
+                }
+              ],
+              "type": "Observation",
+              "profile": [
+                "http://example.org/hcsc/rx501-007/StructureDefinition/example-nested-diagnosis-a"
+              ]
+            },
+            {
+              "extension": [
+                {
+                  "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                  "valueString": "Diagnosis B?"
+                },
+                {
+                  "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                  "valueMarkdown": "Diagnosis B"
+                }
+              ],
+              "type": "Observation",
+              "profile": [
+                "http://example.org/hcsc/rx501-007/StructureDefinition/example-nested-diagnosis-b"
+              ]
+            },
+            {
+              "extension": [
+                {
+                  "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
+                  "valueString": "Diagnosis C?"
+                },
+                {
+                  "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
+                  "valueMarkdown": "Diagnosis C"
+                }
+              ],
+              "type": "Observation",
+              "profile": [
+                "http://example.org/hcsc/rx501-007/StructureDefinition/example-nested-diagnosis-c"
+              ]
+            }
+          ],
+          "definitionCanonical": "http://example.org/hcsc/rx501-007/PlanDefinition/example-nested-approve-recommendation"
         },
         {
-          "extension": [
+          "title": "otherwise",
+          "description": "otherwise",
+          "code": [
             {
-              "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
-              "valueString": "Diagnosis B?"
-            },
-            {
-              "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
-              "valueMarkdown": "Diagnosis B"
+              "coding": [
+                {
+                  "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
+                  "code": "guideline-based-care"
+                }
+              ]
             }
           ],
-          "type": "Observation",
-          "profile": [
-            "http://example.org/hcsc/rx501-007/StructureDefinition/example-nested-diagnosis-b"
-          ]
-        },
-        {
-          "extension": [
-            {
-              "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-text",
-              "valueString": "Diagnosis C?"
-            },
-            {
-              "url": "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-input-description",
-              "valueMarkdown": "Diagnosis C"
-            }
-          ],
-          "type": "Observation",
-          "profile": [
-            "http://example.org/hcsc/rx501-007/StructureDefinition/example-nested-diagnosis-c"
-          ]
+          "definitionCanonical": "http://example.org/hcsc/rx501-007/PlanDefinition/example-nested-deny-recommendation"
         }
-      ],
-      "definitionCanonical": "http://example.org/hcsc/rx501-007/PlanDefinition/example-nested-approve-recommendation"
-    },
-    {
-      "title": "otherwise",
-      "description": "otherwise",
-      "code": [
-        {
-          "coding": [
-            {
-              "system": "http://hl7.org/fhir/uv/cpg/CodeSystem/cpg-common-process-cs",
-              "code": "guideline-based-care"
-            }
-          ]
-        }
-      ],
-      "definitionCanonical": "http://example.org/hcsc/rx501-007/PlanDefinition/example-nested-deny-recommendation"
+      ]
     }
   ]
 }
