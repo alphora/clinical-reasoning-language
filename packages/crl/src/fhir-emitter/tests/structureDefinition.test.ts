@@ -112,6 +112,45 @@ describe("case-feature emit — eligibility boundary (end-to-end)", () => {
     const valueEl = sd.differential.element.find((e) => e.id === "Observation.value[x]")!;
     expect(valueEl.type).toEqual([{ code: "boolean" }]);
   });
+
+  it("two overlength divergent `code is` leaves → distinct hashed SD ids/urls that byte-equal their recursive action.input profiles (truncation-collision regression)", () => {
+    // Regression for uniqueCapSlug (design review gpt55 Gi2): pre-fix both concepts'
+    // composites bare-truncated to the SAME 64-char id → closure-resource-collision →
+    // emit hard-failed. Assert the FULL closure path: distinct hashed SD urls, no
+    // unresolved-action-input-profile, and each action.input.profile byte-equals its SD url.
+    const fixture = path.join(HERE, "fixtures", "casefeature-truncation", "casefeature-truncation.crl");
+    const result = emitFhirDefFromPath(fixture, FIXED);
+    expect(result.errors).toEqual([]);
+    expect(result.success).toBe(true);
+
+    const sds = result.resources.filter((r) => r.resourceType === "StructureDefinition");
+    expect(sds).toHaveLength(2);
+    const sdUrls = sds.map((r) => (r.resource as { url: string }).url);
+    const sdIds = sds.map((r) => (r.resource as { id: string }).id);
+    // Distinct + each is a valid <=64 FHIR id ending in a 12-hex hash suffix.
+    expect(new Set(sdUrls).size).toBe(2);
+    for (const id of sdIds) {
+      expect(id.length).toBeLessThanOrEqual(64);
+      expect(id).toMatch(/-[0-9a-f]{12}$/);
+    }
+
+    // Every case-feature action.input.profile resolves to an emitted SD url, byte-equal.
+    // Inputs sit on the when-action (any depth), so walk all PlanDefinition action trees.
+    type Action = { input?: Array<{ profile?: string[] }>; action?: Action[] };
+    const inputProfiles: string[] = [];
+    const walk = (actions: Action[] | undefined): void => {
+      for (const a of actions ?? []) {
+        for (const i of a.input ?? []) inputProfiles.push(...(i.profile ?? []));
+        walk(a.action);
+      }
+    };
+    for (const r of result.resources.filter((r) => r.resourceType === "PlanDefinition")) {
+      walk((r.resource as { action?: Action[] }).action);
+    }
+    expect(inputProfiles).toHaveLength(2);
+    expect(new Set(inputProfiles)).toEqual(new Set(sdUrls));
+    expect(result.errors.some((e) => e.kind === "unresolved-action-input-profile")).toBe(false);
+  });
 });
 
 /* ─── Direct emit unit — happy path + empty-suffix fail-fast ───────────── */
@@ -179,12 +218,10 @@ describe("emitCaseFeatureStructureDefinition — direct unit", () => {
   });
 });
 
-/* ─── Inv 1 — capped-id collision between two case-feature profiles ─────── */
+/* ─── Truncation-collision safety + the Inv 1 backstop ─────────────────── */
 
-describe("case-feature emit — capped-id collision is caught by Inv 1", () => {
+describe("case-feature emit — truncation-collision safety", () => {
   function sd(conceptName: string): EmittedResource {
-    // Two distinct long concept names that cap to the SAME id under the
-    // 64-char FHIR id cap → a relativePath collision Inv 1 must catch.
     const id = caseFeatureId(METADATA, conceptName);
     return {
       resourceType: "StructureDefinition",
@@ -195,13 +232,44 @@ describe("case-feature emit — capped-id collision is caught by Inv 1", () => {
     };
   }
 
-  it("two concepts whose capped ids collide → closure-resource-collision, both dropped", () => {
+  it("two long concepts differing only PAST the 64-char cap get DISTINCT ids + survive Inv 1", () => {
+    // Pre-fix these two capped to the SAME id (the discriminating word — Alpha/Beta
+    // — sits past the truncation boundary); uniqueCapSlug now hash-disambiguates.
     const longA = "Adult Patient With A Very Long Determination Name That Exceeds The Cap Alpha";
     const longB = "Adult Patient With A Very Long Determination Name That Exceeds The Cap Beta";
-    // Sanity: the two cap to the same id (the precondition for the collision).
-    expect(caseFeatureId(METADATA, longA)).toBe(caseFeatureId(METADATA, longB));
-
+    const idA = caseFeatureId(METADATA, longA);
+    const idB = caseFeatureId(METADATA, longB);
+    // The whole point: distinct concepts → distinct ids AND distinct urls.
+    expect(idA).not.toBe(idB);
+    expect(caseFeatureCanonicalUrl(METADATA, longA)).not.toBe(caseFeatureCanonicalUrl(METADATA, longB));
+    // Both still fit the FHIR id 64-char limit and end on the hash (no trailing hyphen).
+    expect(idA.length).toBeLessThanOrEqual(64);
+    expect(idB.length).toBeLessThanOrEqual(64);
+    expect(idA.endsWith("-")).toBe(false);
+    // No relativePath collision → Inv 1 emits both, no error.
     const inv1 = applyInvariant1([sd(longA), sd(longB)]);
+    expect(inv1.errors).toHaveLength(0);
+    expect(inv1.surviving.filter((r) => r.resourceType === "StructureDefinition")).toHaveLength(2);
+  });
+
+  it("the same concept name emits a stable id across calls (pure, order-independent)", () => {
+    const name = "Adult Patient With A Very Long Determination Name That Exceeds The Cap Gamma";
+    expect(caseFeatureId(METADATA, name)).toBe(caseFeatureId(METADATA, name));
+  });
+
+  // The Inv 1 backstop still guards the atomic-refuse path — and uniqueCapSlug
+  // does NOT make caseFeatureId collision-proof: two DISTINCT names that already
+  // slug to the same <=64 `raw` (lossy-NORMALIZATION, e.g. `"A/B"` vs `"AB"` — the
+  // `/` is stripped) never reach the >64 hash branch, so they still derive the
+  // SAME id. This is the exact class uniqueCapSlug deliberately leaves to Inv 1.
+  // Drive the collision through the REAL caseFeatureId via `sd()` (design review
+  // gpt55 Gi3/Gi5) — NOT a hand-built relativePath — so the test proves the actual
+  // derivation path collides AND the backstop catches it.
+  it("two concepts that lossy-normalize to the same id → closure-resource-collision, both dropped (backstop)", () => {
+    // Precondition: the two DISTINCT names derive the SAME id through caseFeatureId.
+    expect(caseFeatureId(METADATA, "A/B")).toBe(caseFeatureId(METADATA, "AB"));
+
+    const inv1 = applyInvariant1([sd("A/B"), sd("AB")]);
     expect(inv1.errors.some((e) => e.kind === "closure-resource-collision")).toBe(true);
     expect(inv1.surviving.filter((r) => r.resourceType === "StructureDefinition")).toHaveLength(0);
   });

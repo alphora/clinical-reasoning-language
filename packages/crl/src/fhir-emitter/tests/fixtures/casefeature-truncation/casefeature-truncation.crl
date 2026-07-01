@@ -1,0 +1,30 @@
+# casefeature-truncation — regression fixture for uniqueCapSlug (truncation-collision safety).
+library "Case Feature Truncation".
+
+// Two DISTINCT `code is` concepts whose names share a long prefix and differ only
+// past the FHIR id 64-char boundary. With policyId base `casefeature-truncation-fixture`
+// (30 chars), each composite `<policyId>-<concept>` is ~91 chars — pre-fix both bare-
+// truncated to the SAME 64-char id/url (a closure collision that hard-failed emit).
+// `uniqueCapSlug` now appends a deterministic `-<sha256[0:12]>` so the two derive
+// distinct ids/urls, and — because the decision condition is an inferred `sem-or`
+// over both leaves — each leaf becomes a recursive `action.input` whose profile must
+// byte-equal its emitted case-feature StructureDefinition url.
+
+concept "History Of Recurrent Skin Maceration With Bacterial Infection":
+- type is Condition.
+- value type is boolean.
+- code is `skin-maceration-bacterial`.
+
+concept "History Of Recurrent Skin Maceration With Fungal Infection":
+- type is Condition.
+- value type is boolean.
+- code is `skin-maceration-fungal`.
+
+concept "Recurrent Skin Maceration Infection":
+- defined as ( "History Of Recurrent Skin Maceration With Bacterial Infection" sem-or "History Of Recurrent Skin Maceration With Fungal Infection" ).
+
+activity "Refer to Wound Care":
+- request CPGServiceRequest.
+
+decision "Triage Maceration":
+- when "Recurrent Skin Maceration Infection" then recommend activity "Refer to Wound Care".

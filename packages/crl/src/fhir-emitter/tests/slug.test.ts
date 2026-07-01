@@ -1,6 +1,8 @@
 import { describe, expect, it } from "@jest/globals";
 
-import { capSlug, pascalCaseName, slugify } from "../slug";
+import { createHash } from "node:crypto";
+
+import { capSlug, pascalCaseName, rawSlug, slugify, uniqueCapSlug } from "../slug";
 
 describe("fhir-emitter slug helpers", () => {
   describe("slugify", () => {
@@ -80,6 +82,75 @@ describe("fhir-emitter slug helpers", () => {
       const terminologySlug = "b".repeat(64);
       const combined = capSlug(librarySlug + "-" + terminologySlug);
       expect(combined.length).toBeLessThanOrEqual(64);
+    });
+  });
+
+  describe("uniqueCapSlug (truncation-collision safety)", () => {
+    it("returns an at-or-under-64 raw slug UNCHANGED (no churn)", () => {
+      expect(uniqueCapSlug("foo-bar")).toBe("foo-bar");
+      const exactly64 = "a".repeat(64);
+      expect(uniqueCapSlug(exactly64)).toBe(exactly64);
+    });
+
+    it("trips the hash branch at the exact 65-char threshold → 64-char hashed id", () => {
+      const raw65 = "a".repeat(65); // smallest input that exceeds the 64 cap
+      const out = uniqueCapSlug(raw65);
+      const expectedHash = createHash("sha256").update(raw65, "utf8").digest("hex").slice(0, 12);
+      expect(out.length).toBe(64);
+      expect(out.endsWith(`-${expectedHash}`)).toBe(true);
+    });
+
+    it("is self-defensive against a mis-fed (non-rawSlug) input: no leading hyphen, no '--', never empty", () => {
+      // A hyphen-leading over-length input a caller should never pass (violates the
+      // rawSlug contract) — the internal trim keeps the id well-formed anyway.
+      const hyphenLead = "-".repeat(10) + "x".repeat(70);
+      const outLead = uniqueCapSlug(hyphenLead);
+      expect(outLead.startsWith("-")).toBe(false);
+      expect(outLead).not.toContain("--");
+      expect(outLead).toMatch(/^[a-z0-9.-]{1,64}$/);
+
+      // Pathological all-hyphen 51-char prefix → the stem trims to empty → bare hash.
+      const allHyphenPrefix = "-".repeat(60) + "x".repeat(20);
+      const outHash = uniqueCapSlug(allHyphenPrefix);
+      const expectedHash = createHash("sha256").update(allHyphenPrefix, "utf8").digest("hex").slice(0, 12);
+      expect(outHash).toBe(expectedHash);
+      expect(outHash.startsWith("-")).toBe(false);
+    });
+
+    it("two raw slugs sharing the first 51 chars but differing after → DISTINCT ids", () => {
+      const prefix = "a".repeat(60); // > 64 once each tail is added
+      const idX = uniqueCapSlug(prefix + "-xxxxx");
+      const idY = uniqueCapSlug(prefix + "-yyyyy");
+      expect(idX).not.toBe(idY);
+    });
+
+    it("appends the deterministic sha256[0:12] suffix over the FULL raw string", () => {
+      const raw = "casefeature-fixture-" + "z".repeat(80);
+      const expectedHash = createHash("sha256").update(raw, "utf8").digest("hex").slice(0, 12);
+      const out = uniqueCapSlug(raw);
+      // <stem(51)>-<hash(12)> = 64 chars exactly; ends on the hash.
+      expect(out.length).toBe(64);
+      expect(out.endsWith(`-${expectedHash}`)).toBe(true);
+      expect(out).toMatch(/^[a-z0-9.-]{1,64}$/);
+      expect(out.slice(0, out.length - 13).endsWith("-")).toBe(false); // no `--` at the stem/hash boundary
+    });
+
+    it("hash is over the FULL raw, not the truncated stem (tail-only difference still separates)", () => {
+      // Identical first 60 chars, differ only at char 70 — past the 51-char stem.
+      const a = "b".repeat(69) + "-alpha";
+      const b = "b".repeat(69) + "-betaa";
+      expect(uniqueCapSlug(a)).not.toBe(uniqueCapSlug(b));
+    });
+
+    it("is pure — same input → same output", () => {
+      const raw = rawSlug("Some Very Long Concept Name " + "x".repeat(60));
+      expect(uniqueCapSlug(raw)).toBe(uniqueCapSlug(raw));
+    });
+
+    it("does NOT separate lossy-normalization collisions at <=64 (left to the closure backstop)", () => {
+      // Two DISTINCT names collapsing to the same <=64 raw slug never hit the >64
+      // hash branch, so uniqueCapSlug returns the same id — by design.
+      expect(uniqueCapSlug(rawSlug("A/B"))).toBe(uniqueCapSlug(rawSlug("AB")));
     });
   });
 });

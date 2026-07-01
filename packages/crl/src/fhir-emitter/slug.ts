@@ -13,8 +13,21 @@
  * leading-uppercase identifier up to 255 chars.
  */
 
+import { createHash } from "node:crypto";
+
 const SLUG_MAX_LEN = 64;
 const PASCAL_MAX_LEN = 255;
+
+/**
+ * The deterministic disambiguator width for `uniqueCapSlug`. 12 lowercase hex
+ * chars of sha256 = 48 bits. The in-repo precedent for the "over-length segment
+ * → deterministic hex slice" idiom (provenance/generate.ts `sha256…slice(0,16)`,
+ * provenance/correspondence.ts `sha1…slice(0,10)`) uses WIDER slices; we pick 12
+ * — wider than strictly needed for a handful of case-features per policy, but
+ * these ids are a PUBLISHED canonical surface, so the extra margin is cheap
+ * insurance and the closure-collision invariants remain a backstop regardless.
+ */
+const UNIQUE_HASH_LEN = 12;
 
 /**
  * Slugify a CRL name for a FHIR `id`. Lowercase → strip non-alphanumeric
@@ -57,6 +70,53 @@ export function rawSlug(name: string): string {
 export function capSlug(slug: string): string {
   if (slug.length <= SLUG_MAX_LEN) return slug;
   return slug.slice(0, SLUG_MAX_LEN).replace(/-+$/, "");
+}
+
+/**
+ * TRUNCATION-collision-safe cap for a composite FHIR `id` slug. Distinct inputs
+ * that share a long common prefix would, under the bare `capSlug` truncation,
+ * collapse to the SAME 64-char id (and — because callers reuse the id for the
+ * canonical `url` — the same url), which the closure invariants then have to
+ * atomically refuse. This helper instead preserves uniqueness by reserving a
+ * deterministic hash suffix when (and only when) truncation would occur.
+ *
+ * INPUT CONTRACT (load-bearing — design review gpt55 G1/G2, Claude C4): `raw`
+ * MUST be an UNCAPPED `rawSlug` of the FULL composite, e.g.
+ * `rawSlug(`${policyIdBase}-${conceptName}`)`. Do NOT pass a value already
+ * through `capSlug`/`slugify` — the discriminating tail would already be gone
+ * before we hash, defeating the whole point.
+ *
+ * - `raw.length <= 64` → returned UNCHANGED (no churn for any id that already
+ *   fits; the 3 currently-clean deliverable policies keep byte-identical ids).
+ * - `raw.length > 64`  → `<stem>-<h>` where `<h>` is the first 12 hex chars of
+ *   sha256 over the FULL `raw` string (NOT the truncated stem — so two names
+ *   differing only past the cap still hash differently), and `<stem>` is `raw`
+ *   capped to `64 - 12 - 1 = 51` chars with leading/trailing hyphens trimmed. The
+ *   result is always `<= 64` and matches the FHIR id regex `[A-Za-z0-9-.]{1,64}`.
+ *
+ * Under the input contract above the result is byte-for-byte the composite for
+ * `<= 64` inputs and a clean `<stem>-<hash>` otherwise. The function is ALSO
+ * self-defensive for a mis-fed input: it trims leading hyphens on the stem and
+ * falls back to the bare `<hash>` when the 51-char prefix is all-hyphen, so it
+ * can never emit a leading-hyphen id, a `--` run, or an empty id even if a future
+ * caller violates the "pass a rawSlug" contract.
+ *
+ * Order-independent: the hash is over the NAME's normalized bytes, never a
+ * position/index, so adding, removing, or reordering sibling concepts never
+ * perturbs another's id — these published canonical ids are stable across emits
+ * and platforms (`rawSlug`'s `toLowerCase` is locale-independent per ECMAScript).
+ *
+ * NOT addressed (left to the closure invariants by design): lossy-NORMALIZATION
+ * collisions where two DISTINCT names already collapse to the same `raw` slug at
+ * <= 64 chars — e.g. `"A/B"` vs `"AB"`, or two all-non-ASCII names both becoming
+ * `"unnamed"`. Those never reach the `> 64` branch, so the hash can't separate
+ * them; the `closure-resource-*-collision` backstop catches them instead.
+ */
+export function uniqueCapSlug(raw: string): string {
+  if (raw.length <= SLUG_MAX_LEN) return raw;
+  const hash = createHash("sha256").update(raw, "utf8").digest("hex").slice(0, UNIQUE_HASH_LEN);
+  const stem = raw.slice(0, SLUG_MAX_LEN - UNIQUE_HASH_LEN - 1).replace(/^-+|-+$/g, "");
+  return stem ? `${stem}-${hash}` : hash;
 }
 
 /**

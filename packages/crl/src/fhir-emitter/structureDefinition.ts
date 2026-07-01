@@ -39,7 +39,7 @@ import type { CRLError } from "../types/errors";
 
 import { localCodeSystemUrl } from "../cql-emitter/lowerLocalCodes";
 import { libraryCanonicalUrl } from "./library";
-import { pascalCaseName, policyIdBase, slugify } from "./slug";
+import { pascalCaseName, policyIdBase, rawSlug, uniqueCapSlug } from "./slug";
 import {
   cpgCaseFeatureExtensions,
   isPublishablePlus,
@@ -57,18 +57,30 @@ const PATIENT_SD = "http://hl7.org/fhir/StructureDefinition/Patient";
 
 /**
  * The case-feature StructureDefinition `id` for an interface concept name.
- * `capSlug(slugify(<policyIdBase>-<conceptName>))` — the policy id + concept-name
- * slug, capped to the FHIR id 64-char limit. NO `-casefeature` suffix: the locked
- * truth-set example goldens (example-{direct,bothrep,nested,semand,for-emit}) fix
- * the case-feature SD id as exactly `<policyId>-<conceptSlug>` (e.g.
- * `example-bothrep-implanted-estrogen-pellets`). The case-feature lives in its own
- * `StructureDefinition/` resource bucket, so dropping the suffix cannot collide
- * with a decision/activity/recommendation id (those are PlanDefinition/
- * ActivityDefinition resources). Exported so the PlanDef action `input` can
- * reference the same canonical SHAPE.
+ * `uniqueCapSlug(rawSlug(<policyIdBase>-<conceptName>))` — the policy id +
+ * concept-name slug, made TRUNCATION-collision-safe against the FHIR id 64-char
+ * limit. NO `-casefeature` suffix: the locked truth-set example goldens
+ * (example-{direct,bothrep,nested,semand,for-emit}) fix the case-feature SD id as
+ * exactly `<policyId>-<conceptSlug>` (e.g. `example-bothrep-implanted-estrogen-pellets`).
+ * The case-feature lives in its own `StructureDefinition/` resource bucket, so
+ * dropping the suffix cannot collide with a decision/activity/recommendation id
+ * (those are PlanDefinition/ActivityDefinition resources). Exported so the PlanDef
+ * action `input` can reference the same canonical SHAPE.
+ *
+ * Uses `uniqueCapSlug` (not the bare-capping `slugify`) because case-feature
+ * concept names are the LONGEST declaration names in the corpus: two distinct
+ * concepts whose names agree past the ~64-char truncation boundary would collapse
+ * to the same id AND (since `caseFeatureCanonicalUrl` reuses this id) the same
+ * canonical url. `uniqueCapSlug` is a PURE function of the concept name, so the
+ * two independent derivation sites — the SD's own `url` (line ~138) and the
+ * PlanDefinition `action.input.profile` re-derivation in the closure orchestrator
+ * — stay byte-equal by construction (design review Claude C1: a collision-only
+ * scheme can't, because the input resolver sees one concept at a time and never
+ * has the colliding set). Note we feed `rawSlug` (UNcapped) — feeding `slugify`
+ * would truncate the discriminating tail before the hash could see it.
  */
 export function caseFeatureId(metadata: CpgMetadata, conceptName: string): string {
-  return slugify(`${policyIdBase(metadata)}-${conceptName}`);
+  return uniqueCapSlug(rawSlug(`${policyIdBase(metadata)}-${conceptName}`));
 }
 
 /** The case-feature StructureDefinition canonical url for an interface concept. */

@@ -1,0 +1,12 @@
+{
+  "name": "casefeature-truncation-fixture",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Regression fixture — two overlength divergent `code is` case-feature concepts whose composite ids exceed the FHIR 64-char cap. Pre-fix they truncated to the SAME id/url (closure collision); uniqueCapSlug hash-disambiguates them and the recursive action.input profiles must byte-equal the emitted SD urls.",
+  "crl": {
+    "canonicalBase": "http://example.org/crl/casefeature-truncation",
+    "status": "draft",
+    "experimental": true,
+    "date": "2020-01-01T00:00:00.000Z"
+  }
+}
