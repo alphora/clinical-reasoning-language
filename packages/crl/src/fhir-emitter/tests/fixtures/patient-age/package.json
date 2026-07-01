@@ -1,0 +1,7 @@
+{
+  "name": "patient-age",
+  "version": "0.0.0",
+  "crl": {
+    "canonicalBase": "http://example.org/crl/patient-age"
+  }
+}

@@ -96,12 +96,52 @@ import type {
   CRL,
   Concept,
   CodedFromDefinition,
+  DefinitionIsDefinition,
   Statement,
   Terminology,
   TerminologyBodyLine,
   Location,
 } from "../ast/types";
+import { matchNarrative } from "../template-match";
+import type { CanonicalArg } from "../template-match/canonicalTypes";
 import type { CRLError } from "../types/errors";
+
+/**
+ * Detect the patient-age RECENCY both-rep computed arm: a `definition is` whose
+ * narrative template-matches `age today at least <Q>` → `AtLeast(AgeAt(), Q)`
+ * (the no-arg `AgeAt()`). Returns the year-threshold rendered as a CQL quantity
+ * literal (e.g. `18 'years'`) when it matches, else null.
+ *
+ * Detecting at LOWERING time (not in the emitter) keeps the emitter free of
+ * pattern-sniffing: the merge policy is fixed on the twin's `__bothRepMerge`
+ * marker here and the emitter merely branches on it.
+ */
+function ageTodayRecencyThreshold(def: DefinitionIsDefinition): string | null {
+  const matched = matchNarrative(def.body);
+  if (!matched.known || matched.pattern !== "AtLeast") return null;
+  if (matched.args.length !== 2) return null;
+  const [ageArg, qArg] = matched.args;
+  // arg[0] must be the NO-ARG AgeAt() nested call (the live-today overload).
+  if (
+    ageArg.type !== "NestedPatternArg" ||
+    ageArg.pattern.pattern !== "AgeAt" ||
+    ageArg.pattern.args.length !== 0
+  ) {
+    return null;
+  }
+  if (qArg.type !== "QuantityArg") return null;
+  // UNIT GUARD — `AgeAt()` returns AGE IN YEARS, and `AtLeast(Integer, Quantity)`
+  // (CRLCommon.cql) compares `.value` ONLY (unit-blind). So `age today at least
+  // 18 months` would silently mean `ageYears >= 18`. Require a year unit; any
+  // other unit → null → the caller falls to the hard error (only `age today at
+  // least <n> years` is supported).
+  if (qArg.unit !== "year" && qArg.unit !== "years") return null;
+  return renderQuantityArg(qArg);
+}
+
+function renderQuantityArg(arg: Extract<CanonicalArg, { type: "QuantityArg" }>): string {
+  return arg.unit ? `${arg.value} '${arg.unit}'` : `${arg.value}`;
+}
 
 /** The result of a lowering pass: the (possibly transformed) AST + any hard errors. */
 export interface LowerLocalCodesResult {
@@ -382,30 +422,94 @@ export function lowerLocalCodes(
       continue;
     }
 
-    // (2) MIXED `code` + top-level `definition`. BOTH-REPRESENTATION (`code is` +
-    //     `defined as`) is now SUPPORTED (the case-feature model): the concept is
-    //     SPLIT into a LocalSource retrieve twin (the direct local code) + an
-    //     Inferred fold-in twin (the inference, unioned with the direct retrieve).
-    //     `code is` + `coded from` or `code is` + `definition is` remain hard
-    //     errors (only `defined as` folds cleanly into the truth-set union).
+    // (2) MIXED `code` + top-level `definition`. BOTH-REPRESENTATION is now
+    //     SUPPORTED (the case-feature model): the concept is SPLIT into a
+    //     LocalSource retrieve twin (the direct local code) + an Inferred twin.
+    //     Two both-rep flavors are allowed:
+    //       - `code is` + `defined as`  → UNION fold-in (historical; unchanged).
+    //       - `code is` + `definition is age today at least <Q>` → RECENCY merge
+    //         (patient-age: the newest valid local Observation vs the live
+    //         computed age). ONLY the age-today `definition is` narrative is
+    //         allowed; any OTHER `definition is` body stays a hard error.
+    //     `code is` + `coded from` and any non-age `definition is` remain hard
+    //     errors (they don't fold cleanly into the truth-set lane this round).
+    let bothRepRecencyThreshold: string | null = null;
     if (c.definition !== undefined && c.definition.type !== "DefinedAsDefinition") {
-      errors.push(mkError(
-        "emit-mixed-code-and-definition",
-        `Concept "${c.name}" carries BOTH a local \`code is\` and a top-level ` +
-          `definition (\`${c.definition.type}\`). Only \`code is\` + \`defined as\` ` +
-          `(both-representation) is supported; \`code is\` + \`${c.definition.type}\` ` +
-          `is out of scope — emit nothing rather than silently drop the local-code ` +
-          `source side.`,
-        loc,
-      ));
-      continue;
+      if (c.definition.type === "DefinitionIsDefinition") {
+        bothRepRecencyThreshold = ageTodayRecencyThreshold(c.definition);
+      }
+      if (bothRepRecencyThreshold === null) {
+        errors.push(mkError(
+          "emit-mixed-code-and-definition",
+          `Concept "${c.name}" carries BOTH a local \`code is\` and a top-level ` +
+            `definition (\`${c.definition.type}\`). Only \`code is\` + \`defined as\` ` +
+            `or \`code is\` + \`definition is age today at least <n> years\` ` +
+            `(both-representation) is supported; \`code is\` + \`${c.definition.type}\` ` +
+            `is out of scope — emit nothing rather than silently drop the local-code ` +
+            `source side.`,
+          loc,
+        ));
+        continue;
+      }
     }
     const bothRepDefinedAs =
       c.definition !== undefined && c.definition.type === "DefinedAsDefinition"
         ? c.definition
         : undefined;
+    const bothRepDefinitionIs =
+      bothRepRecencyThreshold !== null && c.definition?.type === "DefinitionIsDefinition"
+        ? c.definition
+        : undefined;
 
-    // (3) REPRESENTATION-bearing (`code` + representation, no top-level
+    // (2b) RECENCY SHAPE GUARD. The age recency merge emits an Observation-boolean
+    //      retrieve (`emitRecencyMerge` forces `[Observation: …]` + filters
+    //      `O.value is FHIR.boolean`). The gate above marked ANY `code is` +
+    //      age-today concept `recency` regardless of `type is`, so a non-Observation
+    //      `type is` (e.g. `Condition`) would silently mis-emit against an
+    //      Observation retrieve. Require `type is Observation`. (A `conceptType`
+    //      that is UNDEFINED flows to the missing-type error at (4); only a
+    //      DEFINED non-Observation type is caught here.)
+    if (
+      bothRepDefinitionIs !== undefined &&
+      c.conceptType !== undefined &&
+      c.conceptType !== "Observation"
+    ) {
+      errors.push(mkError(
+        "emit-mixed-code-and-definition",
+        `Concept "${c.name}" is a patient-age recency both-representation ` +
+          `(\`code is\` + \`definition is age today at least <n> years\`) but its ` +
+          `\`type is ${c.conceptType}\`. The recency merge emits an Observation-boolean ` +
+          `retrieve, so patient-age recency requires \`type is Observation\`.`,
+        loc,
+      ));
+      continue;
+    }
+
+    // (3a) BOTH-REP + `source representation` 3-way — out of scope this round.
+    //      An ACCEPTED both-rep (`code is` + `defined as`, OR `code is` + the age
+    //      `definition is`) that ALSO carries a `source representation` would fall
+    //      through to the representation skip below and pass un-split — SILENTLY
+    //      DROPPING the local-code side (violating "emit nothing rather than
+    //      silently drop"). Diagnose loudly instead. Checked BEFORE the plain
+    //      representation skip so the both-rep case is caught, not swallowed.
+    if (
+      (bothRepDefinedAs !== undefined || bothRepDefinitionIs !== undefined) &&
+      c.representations &&
+      c.representations.length > 0
+    ) {
+      errors.push(mkError(
+        "emit-mixed-code-and-definition",
+        `Concept "${c.name}" carries a local \`code is\`, a both-representation ` +
+          `definition (\`${c.definition!.type}\`), AND a \`source representation\`. ` +
+          `The \`code is\` + definition + \`source representation\` 3-way is out of ` +
+          `scope this round — emit nothing rather than silently drop the local-code ` +
+          `source side.`,
+        loc,
+      ));
+      continue;
+    }
+
+    // (3b) REPRESENTATION-bearing (`code` + representation, no top-level
     //     definition, non-empty code) — out of scope this slice. SKIP: leave
     //     `code` intact, do NOT lower, no error. Checked AFTER empty + mixed so
     //     a malformed representation-bearing concept still gets its hard error;
@@ -541,15 +645,28 @@ export function lowerLocalCodes(
     loweredConcepts.push(lowered);
 
     // BOTH-REPRESENTATION: also synthesize the INFERRED twin carrying the original
-    // `defined as`, marked so the emit folds in the direct LocalSource retrieve
-    // (`LocalSource."X".asTruths() union (<inference>)`). Same name as the
-    // LocalSource twin — they land in different layer libraries; `buildNameLayerMaps`
-    // resolves the name to Inferred (the public determination).
+    // definition, marked so the emit merges in the direct LocalSource retrieve.
+    // Same name as the LocalSource twin — they land in different layer libraries;
+    // `buildNameLayerMaps` resolves the name to Inferred (the public determination).
+    //   - `defined as` twin → `__bothRepMerge: "union"` (asTruths() union inference).
+    //   - age `definition is` twin → `__bothRepMerge: "recency"` (raw-Observation
+    //     recency vs live computed age); the twin also carries the year threshold.
     if (bothRepDefinedAs !== undefined) {
       const inferredTwin: Concept = {
         ...c,
         definition: bothRepDefinedAs,
         __bothRepFoldInLocalSource: c.name,
+        __bothRepMerge: "union",
+      };
+      delete inferredTwin.code;
+      bothRepInferredTwins.push(inferredTwin);
+    } else if (bothRepDefinitionIs !== undefined && bothRepRecencyThreshold !== null) {
+      const inferredTwin: Concept = {
+        ...c,
+        definition: bothRepDefinitionIs,
+        __bothRepFoldInLocalSource: c.name,
+        __bothRepMerge: "recency",
+        __bothRepRecencyThreshold: bothRepRecencyThreshold,
       };
       delete inferredTwin.code;
       bothRepInferredTwins.push(inferredTwin);

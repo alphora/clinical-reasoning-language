@@ -31,3 +31,78 @@ define fluent function asTruths(obs List<FHIR.Observation>):
 
 define fluent function satisfied(truths List<System.Boolean>):
   exists truths
+
+/*
+ * recencyAgeTruths — the patient-age both-representation RECENCY merge.
+ *
+ * Selects between a locally-asserted age boolean (the newest valid
+ * `age-…` Observation) and a live computed age boolean (`AtLeast(AgeAt(), n)`),
+ * then LIFTS the selection back to a truth-set so it composes in the
+ * Inferred/Interface truth-set lane. This does NOT use `asTruths` — that reads
+ * only `value.value is true`, discarding the Observation and ERASING an explicit
+ * `false`. The recency select must see the raw asserted boolean (incl. false).
+ *
+ * Precedence lattice (total function):
+ *   1. local-source WINS (`recencyAgeAssertedWins`) → the ASSERTED boolean (incl. false).
+ *   2. else if a COMPUTED age is available (`computed is not null`) → the COMPUTED boolean.
+ *   3. else if assertion present → the ASSERTED boolean (fallback, no computed age).
+ *   4. else → NOT DETERMINED (empty truth-set).
+ *
+ * RESOLVED null-lastUpdated / null-issued behavior (operator decision 2026-07-01):
+ *   - Local-source Observations are GUARANTEED an `issued` timestamp; the call
+ *     site already takes the MOST RECENT (`Last(... sort by issued, id)`).
+ *   - When recency is INDETERMINATE — `Patient.meta.lastUpdated` absent (we can't
+ *     prove the computed/live state is fresher), OR (defensively) `issued` null —
+ *     the LOCAL-SOURCE WINS. This KEEPS the prior null-lastUpdated behavior and
+ *     REJECTS the reviewers' proposed flip to computed. It is safe because the
+ *     case-3 local-source answer is SESSION-FRESH (not persisted beyond the client
+ *     session — see the `@business-logic-deferred:` marker on the authoring
+ *     concept and backlog #190). The reviewers' stale-assertion concern is
+ *     mitigated by that do-not-persist-beyond-session marker.
+ *
+ * Params:
+ *   local    — the newest valid local age Observation (or null). The call site
+ *              pre-filters status ∈ {final,amended,corrected} and boolean value.
+ *   computed — the live computed age boolean (`AtLeast(AgeAt(), n years)`).
+ */
+// The selected age BOOLEAN (or null when NOT determined). Split from the
+// truth-set lift below so the precedence lattice is one flat nested-if over
+// small boolean-returning helpers (translator-safe: no query `let` in a
+// function body). `local` may be null (no valid local Observation).
+//
+// `recencyAgeAssertedWins` is TRUE when the local-source assertion should win:
+// there IS a local Observation AND we CANNOT prove the computed/live age is
+// fresher — i.e. `Patient.meta.lastUpdated` absent, OR `issued` null (defensive;
+// local-source is guaranteed a timestamp), OR `issued after lastUpdated`.
+// Per operator decision 2026-07-01 (see the docblock): indeterminate recency →
+// the (session-fresh) local-source wins.
+define function recencyAgeAssertedWins(local FHIR.Observation):
+  local is not null
+    and (
+      Patient.meta.lastUpdated.value is null
+      or local.issued.value is null
+      or local.issued.value after Patient.meta.lastUpdated.value
+    )
+
+// The recency-selected age boolean, or null when nothing determines it.
+// LOCK-STEP: the `local.value as FHIR.boolean` cast here mirrors the emit
+// subquery's `O.value is FHIR.boolean` filter (emitCQL.ts `emitRecencyMerge`) —
+// the call site only passes boolean-valued Observations, so this cast is always
+// safe. If you change the boolean-value contract in one place, change the other.
+// Cell 2 gates on the COMPUTED value being non-null (not on birthDate presence),
+// so a null computed (malformed/absent birthDate) falls through to the
+// local-source fallback (cell 3) rather than collapsing to {} (gpt55 refinement E).
+define function recencyAgeSelected(local FHIR.Observation, computed Boolean):
+  if recencyAgeAssertedWins(local) then
+    FHIRHelpers.ToBoolean(local.value as FHIR.boolean)
+  else if computed is not null then
+    computed
+  else if local is not null then
+    FHIRHelpers.ToBoolean(local.value as FHIR.boolean)
+  else
+    null
+
+// Public entry: lift the recency-selected boolean back to the truth-set lane.
+// `null` (not determined) → empty truth-set; `false` → empty; `true` → { true }.
+define function recencyAgeTruths(local FHIR.Observation, computed Boolean):
+  if recencyAgeSelected(local, computed) is true then { true } else {} as List<System.Boolean>

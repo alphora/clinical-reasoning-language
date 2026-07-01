@@ -466,6 +466,12 @@ define function "AgeAt"(anchor DateTime):
   AgeInYearsAt(anchor)
 define function "AgeAt"(anchor List<Encounter>):
   AgeInYearsAt(start of (First(anchor)).period)
+// No-arg overload — the patient's age (in years) as of the ENGINE evaluation
+// date (`Today()`, a Date). Keeps CQL's `Today()` off the author surface and off
+// the `AgeAt(DateTime)` overload (which would type-error on a Date). `Today()`
+// resolves to the `AgeInYearsAt(Date)` overload.
+define function "AgeAt"():
+  AgeInYearsAt(Today())
 
 /**
  * Calculate(X) — pass-through that surfaces a derived Quantity.

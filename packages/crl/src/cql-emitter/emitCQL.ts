@@ -703,7 +703,8 @@ class Emitter {
           line: stmt.location.start.line,
           column: stmt.location.start.column,
           message:
-            `Both-representation concept "${stmt.name}" (\`code is\` + \`defined as\`) ` +
+            `Both-representation concept "${stmt.name}" (\`code is\` + ` +
+            `\`${stmt.definition?.type ?? "?"}\`, merge "${stmt.__bothRepMerge ?? "union"}") ` +
             `reached a non-truth-set emit path (mode "${this.caseFeature.kind}"). The ` +
             `LocalSource-retrieve / Inferred-fold-in split is only valid in the ` +
             `case-feature truth-set lane (a layered split with a LocalSource layer ` +
@@ -1091,6 +1092,17 @@ class Emitter {
         // RecordSource (and any other) → fall through to the legacy re-export.
       }
     }
+    // Both-representation RECENCY merge (`code is` + `definition is age today at
+    // least <Q>`): the Inferred twin recency-selects between the newest valid
+    // local Observation and the live computed age, then lifts back to a truth-set.
+    // Only valid in the truth-set Inferred lane; the marker is set at lowering.
+    if (
+      c.__bothRepMerge === "recency" &&
+      this.caseFeature.kind === "inferred" &&
+      c.__bothRepFoldInLocalSource !== undefined
+    ) {
+      return this.emitRecencyMerge(c);
+    }
     switch (def.type) {
       case "CodedFromDefinition":
         return this.emitCodedFrom(c, def);
@@ -1099,6 +1111,62 @@ class Emitter {
       case "DefinitionIsDefinition":
         return this.emitDefinitionIs(c, def);
     }
+  }
+
+  /**
+   * Emit the patient-age RECENCY both-rep merge (Inferred twin). Emits a
+   * truth-set (`{ true }` / `{}`) so it composes in the Inferred/Interface lane.
+   *
+   * The merge CANNOT use `asTruths()` — that reads only `value.value is true`,
+   * discarding the Observation and erasing an explicit `false`. Instead the
+   * newest VALID local Observation is selected from the LocalSource retrieve
+   * (status in final/amended/corrected, boolean value, sorted by `issued`), and
+   * the CaseFeatureCommon `recencyAgeTruths` helper does the precedence select
+   * (asserted-if-newer vs computed) and lifts to a truth-set.
+   */
+  private emitRecencyMerge(c: Concept): string {
+    const foldIn = c.__bothRepFoldInLocalSource!;
+    // INTERNAL-INVARIANT: a `"recency"` twin MUST carry its threshold (set in
+    // lock-step at lowerLocalCodes ~575). A missing threshold here is a compiler
+    // bug, not a defaultable case — fail loudly (matching the co-invariant assert
+    // in lowerLocalCodes), never silently emit a fabricated `18 'years'`.
+    if (c.__bothRepRecencyThreshold === undefined) {
+      throw new Error(
+        `internal invariant violated: recency both-rep twin "${c.name}" has ` +
+          `__bothRepMerge === "recency" but no __bothRepRecencyThreshold. The marker and ` +
+          `threshold are set together in lowerLocalCodes; a recency twin without a ` +
+          `threshold is a compiler bug.`,
+      );
+    }
+    const threshold = c.__bothRepRecencyThreshold;
+    const localLib =
+      this.caseFeature.kind === "inferred" ? this.caseFeature.localSourceLibrary : "";
+    // The newest valid local boolean Observation (or null). `.value is FHIR.boolean`
+    // keeps only boolean-valued rows (LOCK-STEP with `recencyAgeSelected`'s
+    // `local.value as FHIR.boolean` cast in CaseFeatureCommon.cql — if you change
+    // one filter/cast, change the other). `sort by issued, id` picks the newest with
+    // a DETERMINISTIC tie-break (equal or tied `issued` → order by `id`); FHIR sorts
+    // null low, so a dated assertion is preferred over a null-`issued` one and an
+    // all-null-`issued` set is still deterministic (by `id`). `Last(...)` takes the
+    // newest.
+    const newestLocal =
+      `Last(\n` +
+      `    (${cqlQualifiedRef(localLib, foldIn)}) O\n` +
+      `      where O.status in { 'final', 'amended', 'corrected' }\n` +
+      `        and O.value is FHIR.boolean\n` +
+      `      sort by issued, id\n` +
+      `  )`;
+    const computed = `CRLCommon.AtLeast(CRLCommon.AgeAt(), ${threshold})`;
+    // `CFH.recencyAgeTruths(newestLocalObservation, computedBoolean)` returns the
+    // recency-selected truth-set. It reads `Patient.birthDate` / `Patient.meta.lastUpdated`
+    // internally (Patient context), so the call site passes only the two arms.
+    // `CFH` is the include alias for CaseFeatureCommon (see the layered header).
+    return (
+      `CFH.recencyAgeTruths(\n` +
+      `  ${newestLocal},\n` +
+      `  ${computed}\n` +
+      `)`
+    );
   }
 
   private emitCodedFrom(c: Concept, def: CodedFromDefinition): string {

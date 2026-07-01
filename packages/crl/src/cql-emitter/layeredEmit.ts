@@ -773,6 +773,30 @@ function collectLayerIncludes(
     const refLib = getRefLibrary(ref);
     if (refLib !== null && refLib !== currentLibraryName) referenced.add(refLib);
   });
+
+  // Both-representation SELF fold-in include. An Inferred twin folds in its OWN
+  // LocalSource retrieve (`LocalSource."X"…`) via the `__bothRepFoldInLocalSource`
+  // marker — a synthetic emit-string reference, NOT an AST `DefinitionRef`, so the
+  // ref-walk above cannot see it. When the twin's inference references OTHER
+  // LocalSource operands (the `union` case) the include rides in on those; but a
+  // `recency` twin (patient-age) has a narrative body with NO concept operands, so
+  // the self fold-in is the ONLY LocalSource reference. Add the LocalSource sibling
+  // explicitly whenever a fold-in marker is present in this layer.
+  //
+  // Guard on `partition.order.includes("LocalSource")`: a custom/partial partition
+  // WITHOUT a LocalSource value must not get a bogus `libraryNameFor(...,"LocalSource")`
+  // include (the fold-in only arises in a split that HAS a LocalSource layer).
+  if (partition.order.includes("LocalSource")) {
+    const localSourceLib = partition.libraryNameFor(policyId, "LocalSource");
+    if (localSourceLib !== currentLibraryName) {
+      for (const stmt of requalifiedStatements) {
+        if (stmt.type === "Concept" && stmt.__bothRepFoldInLocalSource !== undefined) {
+          referenced.add(localSourceLib);
+          break;
+        }
+      }
+    }
+  }
   // Dependency-order the sibling partition libraries (partition `order`, low →
   // high); append any genuinely-foreign libraries sorted for stability.
   const siblingOrder = partition.order.map((v) => partition.libraryNameFor(policyId, v));

@@ -310,6 +310,7 @@ A parameterized umbrella for windowed-from-anchor temporal scopes. Used as the `
 | Pattern | Narrative form | Canonical | CQL function |
 |---|---|---|---|
 | `AgeAt(anchor)` | `age at <anchor>` | `AgeAt(anchor: AnchorExpr)` | `CRLCommon.AgeAt` |
+| `AtLeast(AgeAt(), n)` | `age today at least <n> years` | `AtLeast(AgeAt(), n: Quantity<year>)` | `CRLCommon.AtLeast` + `CRLCommon.AgeAt()` |
 | `Calculate(X)` | `calculated <X>` | `Calculate(X: ConceptRef<Quantity<U>>)` (input-list shape thin; see card) | `CRLCommon.Calculate` |
 | `Lowest(X[, scope])` | `lowest <X>` (optionally `<scope>`) | `Lowest(X: ConceptRef<Quantity<U>>[, scope: ScopeSpec])` | `CRLCommon.Lowest` |
 | `Highest(X[, scope])` | `highest <X>` (optionally `<scope>`) | `Highest(X: ConceptRef<Quantity<U>>[, scope: ScopeSpec])` | `CRLCommon.Highest` |
@@ -786,6 +787,16 @@ A parameterized umbrella for windowed-from-anchor temporal scopes. Used as the `
 - **evidence** — L1: `Patient Age N or Older at Start of Measurement Period` (4), `Aged 35 to 70 at Start of Measurement Period`.
 - **examples** — `CMS2 :: Patient Age 12 Years or Older at Start of Measurement Period` (`age at start of "Measurement Period" at least 12 years`), `CMS1154 :: Aged 35 to 70 at Start of Measurement Period`
 - **anti-example** — for the predicate form (`age at <anchor> at least <n> years`), compose with `AtLeast(...)` — the `AgeAt(...)` call returns a `Quantity<year>` value that feeds the comparator.
+
+### `age today at least <n> years`
+- **intent** — the patient's age (in years) as of TODAY is at or above `n` — a live, engine-evaluated age predicate (no clinical anchor concept). Used to author a patient-age criterion as the computed arm of a both-representation concept (`code is` local assertion + this `definition is`), recency-merged in the Inferred layer.
+- **narrative** — `age today at least <n> years` (5 elements: `age` / `today` / `at` / `least` / `<Quantity>`).
+- **canonical** — `AtLeast(AgeAt(), n: Quantity<year>)` — the no-arg `AgeAt()` computes age at `Today()`; `AtLeast` compares it to the year threshold.
+- **`today`** — the CQL `Today()` value: the ENGINE evaluation date. `AgeAt()` (no-arg overload) computes `AgeInYearsAt(Today())`. This keeps `Today()` off the author surface (`today` is a bare narrative word, not a concept).
+- **category** — Calculation (predicate form)
+- **maturity** — moderate (new; drives the patient-age both-rep recency merge)
+- **examples** — `Age 18 Or Older` (`age today at least 18 years`), authored alongside `code is` age-18-or-older` as a both-representation concept.
+- **anti-example** — for an age at a specific clinical anchor (e.g. start of the measurement period), use `age at start of <ref> at least <n> years` (`AgeAt(anchor)`), not the live `today` form.
 
 ### `Calculate(X)`
 - **intent** — derive a named clinical feature value from raw data (gestational age, boarded time, BMI, score from components)

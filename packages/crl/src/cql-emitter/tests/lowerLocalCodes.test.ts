@@ -402,6 +402,160 @@ concept "Both":
     expect(inferredTwin!.code).toBeUndefined();
   });
 
+  it("`code is` + `definition is age today at least <n> years` (patient-age both-rep) SPLITS with merge:recency", () => {
+    const ast = parse(
+      lib(`
+concept "Age 18 Or Older":
+- type is Observation.
+- value type is boolean.
+- code is \`age-18-or-older\`.
+- definition is age today at least 18 years.
+`),
+    );
+    const { ast: out, errors } = lowerLocalCodes(ast);
+    expect(errors.some((e) => e.kind === "emit-mixed-code-and-definition")).toBe(false);
+    const twins = out.statements.filter(
+      (s): s is Concept => s.type === "Concept" && s.name === "Age 18 Or Older",
+    );
+    expect(twins.length).toBe(2);
+    const localTwin = twins.find((c) => c.definition?.type === "CodedFromDefinition");
+    const inferredTwin = twins.find((c) => c.definition?.type === "DefinitionIsDefinition");
+    expect(localTwin).toBeDefined();
+    expect(inferredTwin).toBeDefined();
+    expect(inferredTwin!.__bothRepFoldInLocalSource).toBe("Age 18 Or Older");
+    expect(inferredTwin!.__bothRepMerge).toBe("recency");
+    expect(inferredTwin!.__bothRepRecencyThreshold).toBe("18 'years'");
+    expect(localTwin!.code).toBeUndefined();
+    expect(inferredTwin!.code).toBeUndefined();
+  });
+
+  it("`code is` + a NON-age `definition is` is STILL emit-mixed-code-and-definition (only age-today allowed)", () => {
+    const ast = parse(
+      lib(`
+concept "Adult Patient":
+- type is Observation.
+- code is \`adult\`.
+
+concept "Mixed Def":
+- type is Observation.
+- value type is boolean.
+- code is \`mixed-def\`.
+- definition is most recent "Adult Patient".
+`),
+    );
+    const { errors } = lowerLocalCodes(ast);
+    expect(errors.some((e) => e.kind === "emit-mixed-code-and-definition")).toBe(true);
+    expect(errors.find((e) => e.kind === "emit-mixed-code-and-definition")!.message).toMatch(/Mixed Def/);
+  });
+
+  it("`code is` + `definition is age today at least 18 months` (NON-year unit) → emit-mixed-code-and-definition (unit guard)", () => {
+    // AgeAt() is age-in-YEARS and AtLeast is unit-blind; a non-year threshold
+    // would silently mean `ageYears >= 18`. The unit guard rejects it → the
+    // narrative is not the accepted age-today pattern → hard error.
+    const ast = parse(
+      lib(`
+concept "Age Months":
+- type is Observation.
+- value type is boolean.
+- code is \`age-months\`.
+- definition is age today at least 18 months.
+`),
+    );
+    const { errors } = lowerLocalCodes(ast);
+    expect(errors.some((e) => e.kind === "emit-mixed-code-and-definition")).toBe(true);
+    expect(errors.find((e) => e.kind === "emit-mixed-code-and-definition")!.message).toMatch(/Age Months/);
+  });
+
+  it("`code is` + age `definition is` on a NON-Observation `type is` → emit-mixed-code-and-definition (recency shape guard)", () => {
+    // The recency merge emits an Observation-boolean retrieve; a `type is Condition`
+    // recency concept would mis-emit against it. Require `type is Observation`.
+    const ast = parse(
+      lib(`
+concept "Age Cond":
+- type is Condition.
+- value type is boolean.
+- code is \`age-cond\`.
+- definition is age today at least 18 years.
+`),
+    );
+    const { errors } = lowerLocalCodes(ast);
+    expect(errors.some((e) => e.kind === "emit-mixed-code-and-definition")).toBe(true);
+    const msg = errors.find((e) => e.kind === "emit-mixed-code-and-definition")!.message;
+    expect(msg).toMatch(/Age Cond/);
+    expect(msg).toMatch(/type is Observation/);
+  });
+
+  it("`code is` + age `definition is` + `source representation` (3-way) → emit-mixed-code-and-definition, NOT a silent pass-through", () => {
+    // A both-rep age concept that ALSO carries a `source representation` must NOT
+    // fall through the representation skip un-split (which would drop the local
+    // code side). Diagnose loudly.
+    const ast = parse(
+      lib(`
+terminology "Ext VS":
+- valueset is \`http://example.org/ext\`.
+
+concept "Age Rep":
+- type is Observation.
+- value type is boolean.
+- code is \`age-rep\`.
+- definition is age today at least 18 years.
+- source representation: - coded from "Ext VS".
+`),
+    );
+    const { ast: out, errors } = lowerLocalCodes(ast);
+    expect(errors.some((e) => e.kind === "emit-mixed-code-and-definition")).toBe(true);
+    expect(errors.find((e) => e.kind === "emit-mixed-code-and-definition")!.message).toMatch(/Age Rep/);
+    // NOT silently split/passed: no recency Inferred twin was synthesized.
+    const recencyTwin = out.statements.find(
+      (s): s is Concept => s.type === "Concept" && s.__bothRepMerge === "recency",
+    );
+    expect(recencyTwin).toBeUndefined();
+  });
+
+  it("emits the recency merge in the Inferred lane (CFH.recencyAgeTruths + newest-Observation filter + computed AtLeast(AgeAt(), Q)), carrying the @business-logic-deferred block comment", () => {
+    const ast = parse(
+      lib(`
+concept "Age 18 Or Older":
+- type is Observation.
+- value type is boolean.
+- meta is \`@business-logic-deferred: answer resource must not persist beyond the session (#190)\`.
+- code is \`age-18-or-older\`.
+- definition is age today at least 18 years.
+`),
+    );
+    const { ast: lowered, errors } = lowerLocalCodes(ast);
+    expect(errors).toHaveLength(0);
+    // Emit only the Inferred twin in the inferred truth-set lane.
+    const inferredTwin = lowered.statements.find(
+      (s): s is Concept =>
+        s.type === "Concept" &&
+        s.name === "Age 18 Or Older" &&
+        s.__bothRepMerge === "recency",
+    );
+    expect(inferredTwin).toBeDefined();
+    const syntheticInferred: CRL = { ...lowered, statements: [inferredTwin!] };
+    const r = emitCQLFromAST(syntheticInferred, {
+      libraryName: "T Inferred",
+      caseFeature: {
+        kind: "inferred",
+        localSourceLibrary: "T LocalSource",
+        inferredLibrary: "T Inferred",
+      },
+    });
+    expect(r.success).toBe(true);
+    expect(r.result).toContain("CFH.recencyAgeTruths(");
+    expect(r.result).toContain('"T LocalSource"."Age 18 Or Older"');
+    expect(r.result).toMatch(/O\.status in \{ 'final', 'amended', 'corrected' \}/);
+    expect(r.result).toContain("O.value is FHIR.boolean");
+    // Deterministic tie-break (fix 3): `sort by issued, id`.
+    expect(r.result).toContain("sort by issued, id");
+    expect(r.result).toContain("CRLCommon.AtLeast(CRLCommon.AgeAt(), 18 'years')");
+    // The @business-logic-deferred marker lands as a block comment above the Inferred define.
+    expect(r.result).toMatch(
+      /\/\*[\s\S]*@business-logic-deferred:[\s\S]*\*\/\ndefine "Age 18 Or Older":/,
+    );
+  });
+
   it("empty `code is` + representation → emit-empty-local-code (empty checked BEFORE representation skip)", () => {
     // A representation-bearing concept is normally skipped (out of scope), but
     // an EMPTY code is malformed regardless — the empty check runs first, so the

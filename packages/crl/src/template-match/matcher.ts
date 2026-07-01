@@ -756,6 +756,28 @@ const ageAtStartOfAtLeast: PatternMatcher = (els, loc) => {
   return makeCall("AtLeast", [nestedArg(ageAt), quantityArg(els[after + 3] as Quantity)], loc);
 };
 
+/**
+ * `age today at least <Q>` → AtLeast(AgeAt(), Q).
+ *
+ * `today` is the ENGINE evaluation date (CQL `Today()`); `AgeAt()` (no-arg
+ * overload in CRLCommon) computes the patient's age at that date. The 5-element
+ * template is distinct from the 3-element `age at <ConceptRef>` (`ageAt`) — that
+ * form has `at` at els[1] and a ConceptRef at els[2], so `age today …` (bare
+ * word at els[1]) cannot be mis-consumed by it, and the lengths differ anyway.
+ * The resulting `Quantity`-returning `AgeAt()` feeds the `AtLeast(Integer, …)`
+ * comparator (mirrors `ageAtStartOfAtLeast`, but AgeAt takes NO args).
+ */
+const ageTodayAtLeast: PatternMatcher = (els, loc) => {
+  if (els.length !== 5) return null;
+  if (!isWord(els[0], "age")) return null;
+  if (!isWord(els[1], "today")) return null;
+  if (!isWord(els[2], "at")) return null;
+  if (!isWord(els[3], "least")) return null;
+  if (!isQuantity(els[4])) return null;
+  const ageAt = makeCall("AgeAt", [], loc);
+  return makeCall("AtLeast", [nestedArg(ageAt), quantityArg(els[4] as Quantity)], loc);
+};
+
 /** Bare ref alone: `<X>` → degenerate; treated as a 1-arg identity wrap. Not registered (single bare ref isn't a pattern call). */
 
 // === Registration (order matters) ===
@@ -763,6 +785,7 @@ const ageAtStartOfAtLeast: PatternMatcher = (els, loc) => {
 const PATTERNS: PatternMatcher[] = [
   // Longest / most specific first
   ageAtStartOfAtLeast,             // 8 elements
+  ageTodayAtLeast,                 // 5 (age today at least <Q>; BEFORE 3-element ageAt)
   lastWithinBeforeStartOf,         // 8
   lastWithinAfterEndOf,            // 8 (T08 / #98)
   lastWithinAfterStartOf,          // 8 (T08 / #98)

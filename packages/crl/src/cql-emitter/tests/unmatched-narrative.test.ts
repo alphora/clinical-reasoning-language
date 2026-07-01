@@ -301,4 +301,16 @@ describe("issue #77 — catalog↔matcher drift fix (plus audit additions)", () 
     expect(r.success).toBe(true);
     expect(r.result).toMatch(/CRLCommon\.AgeAt\(/);
   });
+
+  it("age today at least <n> years → AtLeast(AgeAt(), n) with the NO-arg AgeAt()", () => {
+    const src = lib(
+      "T",
+      `concept "Adult Today":\n- type is Observation.\n- value type is boolean.\n- definition is age today at least 18 years.\n`,
+    );
+    const r = emitCQL(src, { libraryName: "T" });
+    expect(r.success).toBe(true);
+    expect(r.unmatched).toBeUndefined();
+    // The no-arg AgeAt() (live Today() overload) inside AtLeast.
+    expect(r.result).toContain("CRLCommon.AtLeast(CRLCommon.AgeAt(), 18 'years')");
+  });
 });

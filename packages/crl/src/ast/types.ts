@@ -368,6 +368,28 @@ export interface Concept extends ASTNode {
    * every other concept.
    */
   __bothRepFoldInLocalSource?: string;
+  /**
+   * SYNTHETIC-EMITTER-ONLY (the CRL parser/builder NEVER sets this). The
+   * MERGE POLICY for a both-representation split (set on the Inferred twin
+   * ALONGSIDE `__bothRepFoldInLocalSource`). Decided at lowering/match time so
+   * the emitter branches on the marker rather than pattern-sniffing the body:
+   *   - `"union"`   — the historical `code is` + `defined as` fold-in
+   *     (`LocalSource."X".asTruths() union (<inference>)`). Every existing
+   *     both-rep is "union"; behavior is unchanged.
+   *   - `"recency"` — the `code is` + `definition is age today at least <Q>`
+   *     patient-age merge: RECENCY-SELECT between the newest valid local
+   *     Observation and the live computed age, then lift back to a truth-set.
+   * Absent on non-both-rep concepts.
+   */
+  __bothRepMerge?: "union" | "recency";
+  /**
+   * SYNTHETIC-EMITTER-ONLY. For a `"recency"` both-rep Inferred twin, the
+   * year threshold of the `age today at least <Q>` computed arm, as an already-
+   * emitted CQL quantity literal (e.g. `18 'years'`). Carried so the recency
+   * emit renders `CRLCommon.AtLeast(CRLCommon.AgeAt(), <this>)` without
+   * re-matching the narrative. Absent unless `__bothRepMerge === "recency"`.
+   */
+  __bothRepRecencyThreshold?: string;
 }
 
 // Concept definition has 3 kinds per v0.7:
