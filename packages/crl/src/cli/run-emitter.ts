@@ -4,15 +4,10 @@ import * as path from "path";
 
 import { emitCelToFhir, writeEmitResult } from "../cel/emitter";
 import { resolveCelImports } from "../cel/imports";
-import {
-  CAPABILITY_ORDER,
-  emitFhirDefFromPath,
-  isFhirDefError,
-  isFhirDefWarning,
-  writeFhirResources,
-} from "../fhir-emitter";
+import { CAPABILITY_ORDER, writeFhirResources } from "../fhir-emitter";
 import type { Capability } from "../fhir-emitter";
 import { emitCQLImports } from "../imports/emit";
+import { emitCrlTwoLane } from "../emit-two-lane";
 
 type TargetMode = "cql" | "fhir-def" | undefined;
 
@@ -190,54 +185,45 @@ if (filePath.toLowerCase().endsWith(".cel") && target !== undefined) {
 // at `../../cql/<name>.cql` — emitting one without the other ships
 // broken Library references (round-5 gpt55 [critical]).
 if (filePath.toLowerCase().endsWith(".crl") && target === "fhir-def") {
-  const result = emitFhirDefFromPath(filePath, {
+  // Two-lane emit (SHARED with the `emit_crl` MCP tool via emitCrlTwoLane): the
+  // FHIR Definition resources AND the CQL closure they reference. The Library
+  // content URLs point at the sibling ../../cql/<name>.cql, so both must ship.
+  const two = emitCrlTwoLane(filePath, {
     ...(date !== undefined ? { date } : {}),
     ...(capability !== undefined ? { capability } : {}),
   });
 
-  const hardErrors = [
-    ...result.errors.filter(isFhirDefError),
-    ...result.metadataErrors,
-    ...result.importDiagnostics.filter((d) => d.severity === "error"),
-  ];
-  const warnings = [
-    ...result.errors.filter(isFhirDefWarning),
-    ...result.importDiagnostics.filter((d) => d.severity === "warning"),
-  ];
-
-  if (hardErrors.length > 0) {
+  // Per-lane error attribution (unchanged from the pre-extraction CLI): FHIR
+  // hard errors first, then the CQL lane, then filename collisions.
+  if (two.fhirHardErrors.length > 0) {
     process.stderr.write(
       JSON.stringify(
-        { errors: hardErrors, importDiagnostics: result.importDiagnostics, metadataErrors: result.metadataErrors },
+        {
+          errors: two.fhirHardErrors,
+          importDiagnostics: two.fhir.importDiagnostics,
+          metadataErrors: two.fhir.metadataErrors,
+        },
         null,
         2,
       ) + "\n",
     );
     process.exit(1);
   }
-
-  // ── CQL side ──
-  const cqlResult = emitCQLImports(filePath);
-  if (!cqlResult.success) {
+  if (!two.cql.success) {
     process.stderr.write(
       JSON.stringify(
-        { stage: "cql-emit", importDiagnostics: cqlResult.importDiagnostics, errors: cqlResult.errors },
+        { stage: "cql-emit", importDiagnostics: two.cql.importDiagnostics, errors: two.cql.errors },
         null,
         2,
       ) + "\n",
     );
     process.exit(1);
   }
-  // Pre-check filename collisions before writing anything.
-  const seenCqlFilenames = new Set<string>();
-  for (const entry of cqlResult.cqlByLibrary) {
-    if (seenCqlFilenames.has(entry.outputFilename)) {
-      process.stderr.write(
-        `Filename collision: multiple CQL libraries would write to "${entry.outputFilename}"\n`,
-      );
-      process.exit(1);
-    }
-    seenCqlFilenames.add(entry.outputFilename);
+  if (two.filenameCollisions.length > 0) {
+    process.stderr.write(
+      `Filename collision: multiple CQL libraries would write to "${two.filenameCollisions[0]}"\n`,
+    );
+    process.exit(1);
   }
 
   const cqlOutDir = path.join(outDir, "cql");
@@ -251,7 +237,7 @@ if (filePath.toLowerCase().endsWith(".crl") && target === "fhir-def") {
   }
 
   const writtenCql: string[] = [];
-  for (const entry of cqlResult.cqlByLibrary) {
+  for (const entry of two.cqlLibraries) {
     const outPath = path.join(cqlOutDir, entry.outputFilename);
     try {
       writeFileSync(outPath, entry.cql, "utf-8");
@@ -265,7 +251,7 @@ if (filePath.toLowerCase().endsWith(".crl") && target === "fhir-def") {
   // ── FHIR side ──
   let writtenFhir: string[];
   try {
-    writtenFhir = writeFhirResources({ success: true, resources: result.resources }, fhirOutDir);
+    writtenFhir = writeFhirResources({ success: true, resources: two.fhir.resources }, fhirOutDir);
   } catch (e) {
     process.stderr.write(`Failed to write FHIR resources: ${(e as Error).message}\n`);
     process.exit(1);
@@ -280,9 +266,9 @@ if (filePath.toLowerCase().endsWith(".crl") && target === "fhir-def") {
     );
   }
 
-  if (warnings.length > 0 || result.unmatched.length > 0) {
+  if (two.warnings.length > 0 || two.fhir.unmatched.length > 0) {
     process.stderr.write(
-      JSON.stringify({ warnings, unmatched: result.unmatched }, null, 2) + "\n",
+      JSON.stringify({ warnings: two.warnings, unmatched: two.fhir.unmatched }, null, 2) + "\n",
     );
     process.exit(2);
   }

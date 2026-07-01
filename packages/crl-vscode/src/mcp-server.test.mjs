@@ -32,7 +32,7 @@ const check = async (label, fn) => {
 
 await client.connect(transport);
 try {
-  await check("MCP tools: 13 registered (…, generate_provenance, validate_provenance, validate_provenance_worklist)", async () => {
+  await check("MCP tools: 14 registered (…, generate_provenance, validate_provenance, validate_provenance_worklist)", async () => {
     const { tools } = await client.listTools();
     const names = tools.map((t) => t.name).sort();
     assert.deepEqual(names, [
@@ -40,6 +40,7 @@ try {
       "build_crl_ast",
       "emit_cel",
       "emit_cql",
+      "emit_crl",
       "emit_crl_fhir",
       "generate_provenance",
       "render_scenario",
@@ -256,6 +257,33 @@ try {
       libNames.includes("CaseFeatureCommon"),
       `expected CaseFeatureCommon Library; got ${JSON.stringify(libNames)}`
     );
+  });
+
+  // emit_crl (two-lane) returns BOTH the CQL closure AND the FHIR resources in one
+  // call, through the SAME shared emitCrlTwoLane the CLI uses. Exercised on the
+  // patient-age BOTH-REPRESENTATION fixture — the case emit_cql "direct" mode
+  // rejects — proving the layered lane lowers it and both lanes come back.
+  await check("emit_crl via path → both-rep patient-age emits BOTH cql.libraries AND fhir resources", async () => {
+    const patientAgeCrl = resolve(
+      here,
+      "../../crl/src/fhir-emitter/tests/fixtures/patient-age/src/crl/patient-age.crl"
+    );
+    const r = await client.callTool({
+      name: "emit_crl",
+      arguments: { path: patientAgeCrl, date: "2026-01-01T00:00:00.000Z" },
+    });
+    assert.ok(!r.isError, `emit_crl should not be a tool error: ${r.content?.[0]?.text?.slice(0, 300)}`);
+    const out = JSON.parse(r.content[0].text);
+    assert.equal(out.success, true, `emit_crl should succeed; hardErrors: ${JSON.stringify(out.hardErrors).slice(0, 400)}`);
+    // CQL lane: the closure the FHIR Libraries reference (with full source to write to disk).
+    assert.ok(Array.isArray(out.cql?.libraries) && out.cql.libraries.length > 0, "cql.libraries must be non-empty");
+    assert.ok(
+      out.cql.libraries.every((l) => typeof l.outputFilename === "string" && typeof l.cql === "string"),
+      "each cql library carries { outputFilename, cql }"
+    );
+    // FHIR lane: resources emitted alongside, in the same call.
+    assert.ok(out.fhir?.resourceCount > 0, "fhir.resourceCount must be > 0");
+    assert.equal(out.filenameCollisions.length, 0, "no CQL filename collisions");
   });
 
   await check("validate_crl via inline code → single-file mode (no cross-file context)", async () => {

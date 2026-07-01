@@ -15,6 +15,7 @@ import { resolveCelImports } from "../cel/imports";
 import { validateCELFile } from "../cel/validator";
 import { runCel, renderScenario } from "../cre";
 import { emitFhirDefFromPath } from "../fhir-emitter";
+import { emitCrlTwoLane } from "../emit-two-lane";
 import type { ImportDiagnostic } from "../imports/types";
 import { validateCRLImports } from "../imports/validate";
 import { tokenizeCRL, buildCRL, validateCRL, emitCQL } from "../index";
@@ -451,6 +452,48 @@ export function createServer(): McpServer {
     },
     (args) =>
       runEmitCrlFhir(
+        args as {
+          path: string;
+          includeResources?: boolean;
+          date?: string;
+          capability?: "shareable" | "computable" | "publishable" | "executable";
+        },
+      ),
+  );
+
+  server.registerTool(
+    "emit_crl",
+    {
+      title: "Emit CRL (two-lane: CQL + FHIR)",
+      description:
+        "Emit BOTH lanes from one .crl in a single call: the layered CQL closure AND the cpg-conformant FHIR Definition resources that reference it — the SAME two-lane composition as the CLI `crl-emit --target fhir-def` (shared `emitCrlTwoLane`, so the two cannot drift). " +
+        "USE THIS (not `emit_cql`) for layered / both-representation policies: `emit_cql` is the single-library DIRECT lane and rejects both-representation with a duplicate `define`; `emit_crl` lowers it correctly via the decision/case-feature lane. The FHIR `Library.content` URLs point at the sibling `cql/<name>.cql`, so emitting one lane without the other ships broken references — this returns both together. " +
+        "Returns `{ success, cql: { libraries: [{ outputFilename, cql }] }, fhir: { resourceCount, resourceManifest: [{ resourceType, id, relativePath, sourceKind, sourceName }], errors, unmatched }, hardErrors, warnings, filenameCollisions, importDiagnostics, metadataErrors }`. `success` is true iff BOTH lanes are clean AND no CQL filename collides. `cql.libraries` carry the full CQL source (write each to `<out>/cql/<outputFilename>`); pass `includeResources: true` to also get the full FHIR `resources[]` (write each to `<out>/fhir/<ResourceType>/<id>.json`). " +
+        "Publishable+ emit needs a publication date — pass `date` (ISO) or set `crl.date` in the artifact package.json.",
+      inputSchema: {
+        path: z
+          .string()
+          .min(1)
+          .describe("Absolute path to a .crl file. Imports walk to the nearest package.json."),
+        includeResources: z
+          .boolean()
+          .optional()
+          .describe("Include the full FHIR resources[] array (default false: manifest only)."),
+        date: z
+          .string()
+          .min(1)
+          .optional()
+          .describe(
+            "Publication date (ISO) for reproducible FHIR emit (publishable+). Over SOURCE_DATE_EPOCH / package.json crl.date.",
+          ),
+        capability: z
+          .enum(["shareable", "computable", "publishable", "executable"])
+          .optional()
+          .describe("CRMI capability level (default publishable). `executable` unsupported (#113)."),
+      },
+    },
+    (args) =>
+      runEmitCrl(
         args as {
           path: string;
           includeResources?: boolean;
@@ -1011,6 +1054,67 @@ function runEmitCrlFhir(args: {
 
   return {
     content: [{ type: "text", text: JSON.stringify(summary, null, 2) }],
+  };
+}
+
+function runEmitCrl(args: {
+  path: string;
+  includeResources?: boolean;
+  date?: string;
+  capability?: "shareable" | "computable" | "publishable" | "executable";
+}): {
+  content: Array<{ type: "text"; text: string }>;
+  isError?: boolean;
+} {
+  let stat;
+  try {
+    stat = statSync(args.path);
+  } catch {
+    return {
+      content: [{ type: "text", text: `Path "${args.path}" not readable.` }],
+      isError: true,
+    };
+  }
+  if (!stat.isFile()) {
+    return {
+      content: [{ type: "text", text: `Path "${args.path}" is not a file.` }],
+      isError: true,
+    };
+  }
+
+  // Same shared two-lane composition as the CLI `--target fhir-def`.
+  const two = emitCrlTwoLane(args.path, {
+    ...(args.date !== undefined ? { date: args.date } : {}),
+    ...(args.capability !== undefined ? { capability: args.capability } : {}),
+  });
+
+  const payload = {
+    success: two.success,
+    cql: {
+      libraries: two.cqlLibraries,
+    },
+    fhir: {
+      resourceCount: two.fhir.resources.length,
+      resourceManifest: two.fhir.resources.map((r) => ({
+        resourceType: r.resourceType,
+        id: (r.resource as { id?: string }).id ?? null,
+        relativePath: r.relativePath,
+        sourceKind: r.sourceKind,
+        sourceName: r.sourceName,
+      })),
+      errors: two.fhir.errors,
+      unmatched: two.fhir.unmatched,
+      ...(args.includeResources ? { resources: two.fhir.resources } : {}),
+    },
+    hardErrors: two.hardErrors,
+    warnings: two.warnings,
+    filenameCollisions: two.filenameCollisions,
+    importDiagnostics: two.fhir.importDiagnostics,
+    metadataErrors: two.fhir.metadataErrors,
+  };
+
+  return {
+    content: [{ type: "text", text: JSON.stringify(payload, null, 2) }],
   };
 }
 
