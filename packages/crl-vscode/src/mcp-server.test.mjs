@@ -71,6 +71,7 @@ try {
       "medical-policy-determination.crl",
       "pa-determination-reference.cel",
       "pa-determination-reference.crl",
+      "patient-age-both-rep-reference.crl",
       "source-delegated-decision-reference.cel",
       "source-delegated-decision-reference.crl",
     ]);

@@ -23,6 +23,7 @@ import {
   MEDICAL_POLICY_DETERMINATION_CRL,
   PA_DETERMINATION_REFERENCE_CEL,
   PA_DETERMINATION_REFERENCE_CRL,
+  PATIENT_AGE_BOTH_REP_REFERENCE_CRL,
   SOURCE_DELEGATED_DECISION_REFERENCE_CEL,
   SOURCE_DELEGATED_DECISION_REFERENCE_CRL,
 } from "../reference";
@@ -83,6 +84,16 @@ describe("authoring-kit — reference artifacts", () => {
 
   it("medical-policy-determination.crl (shared lib) validates clean (self-contained)", () => {
     expect(crlErrors(MEDICAL_POLICY_DETERMINATION_CRL)).toEqual([]);
+  });
+
+  it("patient-age-both-rep-reference.crl (the SOLE `definition is` carve-out) validates clean (self-contained)", () => {
+    // The both-rep age concept carries BOTH `code is` (local) and `definition is age today at least <N> years`
+    // (compute over Patient.birthDate) — the one sanctioned `definition is`. It must validate CLEAN embedded.
+    expect(crlErrors(PATIENT_AGE_BOTH_REP_REFERENCE_CRL)).toEqual([]);
+    // Guard the both-rep SHAPE: BOTH arms present on the one concept (a regression dropping the compute arm
+    // would silently revert it to a plain local boolean).
+    expect(PATIENT_AGE_BOTH_REP_REFERENCE_CRL).toMatch(/- code is `age-18-or-older`\./);
+    expect(PATIENT_AGE_BOTH_REP_REFERENCE_CRL).toMatch(/- definition is age today at least 18 years\./);
   });
 
   it("criteria-decision-reference.crl is shape-clean; only the shared-lib determination refs flag single-file", () => {
@@ -263,7 +274,7 @@ describe("authoring-kit — getAuthoringKit", () => {
   it("returns the local-decision-support kit by default", () => {
     const kit = getAuthoringKit();
     expect(kit.stage).toBe("local-decision-support");
-    expect(kit.schemaVersion).toBe("1.2");
+    expect(kit.schemaVersion).toBe("1.3");
     expect(kit.summary).toMatch(/local-decision-support/);
   });
 
@@ -302,6 +313,7 @@ describe("authoring-kit — getAuthoringKit", () => {
       "medical-policy-determination.crl",
       "pa-determination-reference.cel",
       "pa-determination-reference.crl",
+      "patient-age-both-rep-reference.crl",
       "source-delegated-decision-reference.cel",
       "source-delegated-decision-reference.crl",
     ]);
@@ -313,6 +325,7 @@ describe("authoring-kit — getAuthoringKit", () => {
     expect(src("medical-policy-determination.crl")).toBe(MEDICAL_POLICY_DETERMINATION_CRL);
     expect(src("pa-determination-reference.crl")).toBe(PA_DETERMINATION_REFERENCE_CRL);
     expect(src("pa-determination-reference.cel")).toBe(PA_DETERMINATION_REFERENCE_CEL);
+    expect(src("patient-age-both-rep-reference.crl")).toBe(PATIENT_AGE_BOTH_REP_REFERENCE_CRL);
     expect(src("source-delegated-decision-reference.crl")).toBe(SOURCE_DELEGATED_DECISION_REFERENCE_CRL);
     expect(src("source-delegated-decision-reference.cel")).toBe(SOURCE_DELEGATED_DECISION_REFERENCE_CEL);
     expect(src("disposition-arbitration-reference.crl")).toBe(DISPOSITION_ARBITRATION_REFERENCE_CRL);
@@ -452,7 +465,11 @@ describe("authoring-kit — getAuthoringKit", () => {
     // decision's `when` (interface) concepts askably (the FHIR emit forms the case-feature input prompt as `<name>?`); the
     // case-feature StructureDefinition + PlanDefinition action.input emit is TOP-LAYER directly-asserted only (recursive
     // inferred-condition inputs deferred, #180). KE skills pin this hash — re-sync.
-    expect(a.contentHash).toBe("112d4e2319334bf6820b1d558de678d88aeff069c84ff7a9bcc5157ba38162ae");
+    // Re-pinned (schemaVersion 1.2→1.3, patient-age both-rep carve-out): added the CONCEPT_LAYER_MODEL both-rep entry,
+    // the `patient-age-both-rep` rule + its verifyLoop methodology anchor, the concept-form/boundary carve-out wording,
+    // the recency-execution `doesNotProve` note, and the `patient-age-both-rep-reference.crl` exemplar. KE skills pin
+    // this hash — re-sync on the bump.
+    expect(a.contentHash).toBe("f8f52281ff2e78729d30374409ac2ba4d11ac5554fd8e651171b454beba165f1");
   });
 
   it("STAGES contains exactly the one Stage-1 slice", () => {

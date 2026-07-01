@@ -72,14 +72,16 @@ try {
       "medical-policy-determination.crl",
       "pa-determination-reference.cel",
       "pa-determination-reference.crl",
+      "patient-age-both-rep-reference.crl",
       "source-delegated-decision-reference.cel",
       "source-delegated-decision-reference.crl",
     ]);
     assert.ok(kit.verifyLoop.doesNotProve.length > 0, "verifyLoop must state what a green run does NOT prove");
     // 1.2 shape additions: the force model (§0) + the composition judge-lens family (§2/§3).
-    assert.equal(kit.schemaVersion, "1.2");
+    // 1.3: the tightly-scoped patient-age both-representation exception (the one `definition is` carve-out).
+    assert.equal(kit.schemaVersion, "1.3");
     // Sibling KE agents pin BOTH schemaVersion + contentHash via MCP — pin the served hash so a bundle drift is caught here too.
-    assert.equal(kit.contentHash, "112d4e2319334bf6820b1d558de678d88aeff069c84ff7a9bcc5157ba38162ae");
+    assert.equal(kit.contentHash, "f8f52281ff2e78729d30374409ac2ba4d11ac5554fd8e651171b454beba165f1");
     assert.ok(Array.isArray(kit.forceModel.levels) && kit.forceModel.levels.length === 3, "forceModel must carry the 3 force levels");
     assert.ok(Array.isArray(kit.judgeLens.composition) && kit.judgeLens.composition.length > 0, "judgeLens.composition must be present");
     // `defined as` inference is in-scope this stage (#126, #168); predicates/external out.

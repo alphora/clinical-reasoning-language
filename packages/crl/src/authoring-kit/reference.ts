@@ -633,3 +633,38 @@ case "off-indication: neither indication -> Deny EIU":
 - subject is "Sample Patient".
 - result is "Coverage Determination" is "Deny EIU".
 `;
+
+export const PATIENT_AGE_BOTH_REP_REFERENCE_CRL = `# Patient-Age Both-Representation Reference — the SOLE \`definition is\` exception (Stage 1)
+library "Patient Age Reference".
+
+/*
+Patient-age BOTH-REPRESENTATION exemplar — the ONE sanctioned \`definition is\`
+exception to Stage-1 "local \`code is\` only". The concept carries BOTH a \`code is\`
+LOCAL age Observation AND a \`definition is age today at least <N> years\` live
+compute over \`Patient.birthDate\`. The Inferred layer RECENCY-MERGES them: newest
+of the local age Observation (\`Observation.issued\`) vs \`Patient.meta.lastUpdated\`
+wins; indeterminate (\`lastUpdated\` absent) -> the session-fresh local-source wins.
+\`Patient.birthDate\` is a genuine clinical record that can COMPUTE the age, which is
+what earns the carve-out. AGE ONLY — do NOT generalize to other \`definition is\`
+predicates. The \`at least <N>\` unit MUST be \`years\` (AgeAt() is in years).
+*/
+
+concept "Age 18 Or Older":
+- type is Observation.
+- value type is boolean.
+- meta is \`@business-logic-deferred: the human-assert answer Observation for this age criterion must NOT persist beyond the client session (mechanism deferred — #190); the recency lattice treats it as session-fresh\`.
+- code is \`age-18-or-older\`.
+- definition is age today at least 18 years.
+
+decision "Adult Eligibility Determination":
+first:
+- when "Age 18 Or Older" then recommend activity "Approve".
+- otherwise then recommend activity "Deny".
+
+activity "Approve":
+- request CPGCommunicationRequest.
+- with \`Eligibility: APPROVE / adult.\`.
+activity "Deny":
+- request CPGCommunicationRequest.
+- with \`Eligibility: DENY / not an adult.\`.
+`;
