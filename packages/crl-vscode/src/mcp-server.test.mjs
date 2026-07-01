@@ -112,7 +112,7 @@ try {
   });
 
   await check("validate_cel via path → cms22.cel validates clean", async () => {
-    const cms22Cel = resolve(here, "../../crl/src/tests/fixtures/corpus/cms22-split/cms22.cel");
+    const cms22Cel = resolve(here, "../../crl/src/tests/fixtures/corpus/cms22/cms22.cel");
     const r = await client.callTool({ name: "validate_cel", arguments: { path: cms22Cel } });
     assert.ok(!r.isError);
     const out = JSON.parse(r.content[0].text);
@@ -196,19 +196,19 @@ try {
 
   // --- Cross-file validation (issue #66) ---
   //
-  // The cms22-split corpus has sibling libraries that reference each other
-  // via qualified refs. Single-file validation can't see across files and
-  // would flag every cross-library ref as missing-include; project-mode
-  // validation resolves them through the resolved-imports graph.
-  const cms22SplitInferred = resolve(
+  // The cms22 corpus has sibling libraries that reference each other via
+  // qualified refs. Single-file validation can't see across files and would
+  // flag every cross-library ref as missing-include; project-mode validation
+  // resolves them through the resolved-imports graph.
+  const cms22Inferred = resolve(
     here,
-    "../../crl/src/tests/fixtures/corpus/cms22-split/cms22-inferred.crl"
+    "../../crl/src/tests/fixtures/corpus/cms22/cms22-inferred.crl"
   );
 
   await check("validate_crl via path → project mode resolves sibling libraries", async () => {
     const r = await client.callTool({
       name: "validate_crl",
-      arguments: { path: cms22SplitInferred },
+      arguments: { path: cms22Inferred },
     });
     assert.ok(!r.isError, "should not be a tool error");
     const out = JSON.parse(r.content[0].text);
@@ -262,7 +262,7 @@ try {
     // A file that uses qualified refs into a sibling library will be flagged
     // when validated as inline code — there's no project context to resolve
     // against. This is the documented inline-code behavior.
-    const code = readFileSync(cms22SplitInferred, "utf8");
+    const code = readFileSync(cms22Inferred, "utf8");
     const r = await client.callTool({ name: "validate_crl", arguments: { code } });
     assert.ok(!r.isError);
     const out = JSON.parse(r.content[0].text);
