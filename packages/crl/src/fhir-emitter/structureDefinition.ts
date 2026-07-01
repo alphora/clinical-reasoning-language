@@ -54,6 +54,26 @@ const CPG_CASEFEATURE_PROFILE =
   "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-publishablecasefeature";
 const OBSERVATION_SD = "http://hl7.org/fhir/StructureDefinition/Observation";
 const PATIENT_SD = "http://hl7.org/fhir/StructureDefinition/Patient";
+const SDC_DEFINITION_EXTRACT_VALUE =
+  "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-definitionExtractValue";
+
+// Build an sdc-questionnaire-definitionExtractValue extension. On DTR/SDC
+// QuestionnaireResponse extraction, it populates `<profileUrl>#<elementId>` from
+// the fhirpath `expression` (evaluated with `%resource` = the QuestionnaireResponse).
+// Without it the extracted Observation's subject/effective are unset → an orphan
+// out-of-context resource that downstream evaluation does not pick up.
+function sdcExtractValue(profileUrl: string, elementId: string, expression: string) {
+  return {
+    url: SDC_DEFINITION_EXTRACT_VALUE,
+    extension: [
+      { url: "definition", valueCanonical: `${profileUrl}#${elementId}` },
+      {
+        url: "expression",
+        valueExpression: { language: "text/fhirpath", expression },
+      },
+    ],
+  };
+}
 
 /**
  * The case-feature StructureDefinition `id` for an interface concept name.
@@ -218,6 +238,10 @@ export function emitCaseFeatureStructureDefinition(
           type: [{ code: "boolean" }],
         },
         {
+          // sdc-questionnaire-definitionExtractValue: populate the EXTRACTED
+          // Observation's subject from the QuestionnaireResponse (`%resource`)
+          // so it is in-context (not an orphan) for downstream evaluation.
+          extension: [sdcExtractValue(url, "Observation.subject", "%resource.subject")],
           id: "Observation.subject",
           path: "Observation.subject",
           min: 1,
@@ -226,6 +250,9 @@ export function emitCaseFeatureStructureDefinition(
           type: [{ code: "Reference", targetProfile: [PATIENT_SD] }],
         },
         {
+          // Effective time extracted from the QuestionnaireResponse.authored so
+          // the extracted Observation carries a clinically-meaningful timestamp.
+          extension: [sdcExtractValue(url, "Observation.effective[x]", "%resource.authored")],
           id: "Observation.effective[x]",
           path: "Observation.effective[x]",
           min: 1,

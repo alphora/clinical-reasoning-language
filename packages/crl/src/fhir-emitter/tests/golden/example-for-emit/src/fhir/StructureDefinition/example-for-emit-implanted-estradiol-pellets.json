@@ -81,6 +81,24 @@
         ]
       },
       {
+        "extension": [
+          {
+            "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-definitionExtractValue",
+            "extension": [
+              {
+                "url": "definition",
+                "valueCanonical": "http://example.org/hcsc/rx501-007/StructureDefinition/example-for-emit-implanted-estradiol-pellets#Observation.subject"
+              },
+              {
+                "url": "expression",
+                "valueExpression": {
+                  "language": "text/fhirpath",
+                  "expression": "%resource.subject"
+                }
+              }
+            ]
+          }
+        ],
         "id": "Observation.subject",
         "path": "Observation.subject",
         "min": 1,
@@ -96,6 +114,24 @@
         ]
       },
       {
+        "extension": [
+          {
+            "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-definitionExtractValue",
+            "extension": [
+              {
+                "url": "definition",
+                "valueCanonical": "http://example.org/hcsc/rx501-007/StructureDefinition/example-for-emit-implanted-estradiol-pellets#Observation.effective[x]"
+              },
+              {
+                "url": "expression",
+                "valueExpression": {
+                  "language": "text/fhirpath",
+                  "expression": "%resource.authored"
+                }
+              }
+            ]
+          }
+        ],
         "id": "Observation.effective[x]",
         "path": "Observation.effective[x]",
         "min": 1,
