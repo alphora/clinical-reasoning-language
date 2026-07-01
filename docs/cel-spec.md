@@ -229,10 +229,10 @@ Exit codes:
 
 ## Worked examples in the repo
 
-- [`features/cql-pattern-mining/results/models/cms22-split/cms22.cel`](../features/cql-pattern-mining/results/models/cms22-split/cms22.cel) — CMS22 BP screening measure case (Normal-BP path).
-- [`features/cql-pattern-mining/results/models/cms22-split/cms22-strategy.cel`](../features/cql-pattern-mining/results/models/cms22-split/cms22-strategy.cel) — CMS22 cognitive support strategy case (hypertensive-reading path).
-- [`features/cql-pattern-mining/results/models/cms69-split/cms69.cel`](../features/cql-pattern-mining/results/models/cms69-split/cms69.cel) — CMS69 BMI screening measure case (high-BMI + follow-up path).
-- [`features/cql-pattern-mining/results/models/cms69-split/cms69-strategy.cel`](../features/cql-pattern-mining/results/models/cms69-split/cms69-strategy.cel) — CMS69 cognitive support strategy case (high-BMI intervention path).
+- [`packages/crl/src/tests/fixtures/corpus/cms22/cms22.cel`](../packages/crl/src/tests/fixtures/corpus/cms22/cms22.cel) — CMS22 BP screening measure case (Normal-BP path).
+- [`packages/crl/src/tests/fixtures/corpus/cms22/cms22-strategy.cel`](../packages/crl/src/tests/fixtures/corpus/cms22/cms22-strategy.cel) — CMS22 cognitive support strategy case (hypertensive-reading path).
+- [`packages/crl/src/tests/fixtures/corpus/cms69/cms69.cel`](../packages/crl/src/tests/fixtures/corpus/cms69/cms69.cel) — CMS69 BMI screening measure case (high-BMI + follow-up path).
+- [`packages/crl/src/tests/fixtures/corpus/cms69/cms69-strategy.cel`](../packages/crl/src/tests/fixtures/corpus/cms69/cms69-strategy.cel) — CMS69 cognitive support strategy case (high-BMI intervention path).
 - [`docs/cel-syntax-reference.cel`](./cel-syntax-reference.cel) — normative coverage artifact. Four cases exercising every locked CEL syntax feature: dynamic `now` anchor; fixed-date + absolute `on` escape + intent modifiers; multi-anchor (named admission/discharge); all six cross-resource wiring relations.
 
 ## Required: each CRL/CEL project needs its own `package.json`
