@@ -108,16 +108,16 @@ describe("CRL → FHIR partial-split golden (code-is-decision)", () => {
     const byId = new Map(
       libs.map((l) => [l.resource.id as string, l.resource as Record<string, unknown>]),
     );
-    const localConcepts = byId.get("CodeIsDecisionFixtureLocalconcepts")!;
-    const localSource = byId.get("CodeIsDecisionFixtureLocalsource")!;
+    const localConcepts = byId.get("CodeIsDecisionFixtureLocalConcepts")!;
+    const localSource = byId.get("CodeIsDecisionFixtureLocalSource")!;
     const iface = byId.get("CodeIsDecisionFixtureInterface")!;
     expect(localConcepts).toBeDefined();
     expect(localSource).toBeDefined();
     expect(iface).toBeDefined();
     // id == name == url-tail (the #186 identity agreement).
     for (const [id, res] of [
-      ["CodeIsDecisionFixtureLocalconcepts", localConcepts],
-      ["CodeIsDecisionFixtureLocalsource", localSource],
+      ["CodeIsDecisionFixtureLocalConcepts", localConcepts],
+      ["CodeIsDecisionFixtureLocalSource", localSource],
       ["CodeIsDecisionFixtureInterface", iface],
     ] as const) {
       expect(res.name).toBe(id);
@@ -126,7 +126,7 @@ describe("CRL → FHIR partial-split golden (code-is-decision)", () => {
 
     // LocalConcepts owns the local CodeSystem (the lowered `code is` domain).
     expect((localConcepts.content as Array<{ url?: string }>)[0]?.url).toBe(
-      "../../cql/CodeIsDecisionFixtureLocalconcepts.cql",
+      "../../cql/CodeIsDecisionFixtureLocalConcepts.cql",
     );
     expect(
       (localConcepts.relatedArtifact as Array<{ type?: string; resource?: string }>).map(
@@ -138,14 +138,14 @@ describe("CRL → FHIR partial-split golden (code-is-decision)", () => {
 
     // LocalSource depends-on its LocalConcepts sibling.
     expect((localSource.content as Array<{ url?: string }>)[0]?.url).toBe(
-      "../../cql/CodeIsDecisionFixtureLocalsource.cql",
+      "../../cql/CodeIsDecisionFixtureLocalSource.cql",
     );
     expect(
       (localSource.relatedArtifact as Array<{ type?: string; resource?: string }>).map(
         (e) => e.resource,
       ),
     ).toEqual([
-      "http://example.org/crl/code-is-decision/Library/CodeIsDecisionFixtureLocalconcepts",
+      "http://example.org/crl/code-is-decision/Library/CodeIsDecisionFixtureLocalConcepts",
     ]);
 
     // Interface re-exports the decision surface; depends-on LocalSource.
@@ -155,7 +155,7 @@ describe("CRL → FHIR partial-split golden (code-is-decision)", () => {
     expect(
       (iface.relatedArtifact as Array<{ type?: string; resource?: string }>).map((e) => e.resource),
     ).toEqual([
-      "http://example.org/crl/code-is-decision/Library/CodeIsDecisionFixtureLocalsource",
+      "http://example.org/crl/code-is-decision/Library/CodeIsDecisionFixtureLocalSource",
     ]);
   });
 

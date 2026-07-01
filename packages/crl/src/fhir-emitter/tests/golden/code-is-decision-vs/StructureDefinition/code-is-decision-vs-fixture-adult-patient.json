@@ -28,7 +28,7 @@
       "valueExpression": {
         "language": "text/cql-identifier",
         "expression": "Adult Patient",
-        "reference": "http://example.org/crl/code-is-decision-vs/Library/CodeIsDecisionVsFixtureLocalsource"
+        "reference": "http://example.org/crl/code-is-decision-vs/Library/CodeIsDecisionVsFixtureLocalSource"
       }
     }
   ],

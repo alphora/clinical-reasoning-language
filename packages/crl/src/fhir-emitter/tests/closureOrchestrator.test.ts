@@ -261,8 +261,8 @@ describe("closureOrchestrator — FHIR closure code-is coverage (T2)", () => {
     // url-tail == the CQL library name), the cap-safe PascalCase of `<policyId>-<layer>`.
     expect([...byTitle.keys()].sort()).toEqual([
       "CodeIsBasicFixtureInferred",
-      "CodeIsBasicFixtureLocalconcepts",
-      "CodeIsBasicFixtureLocalsource",
+      "CodeIsBasicFixtureLocalConcepts",
+      "CodeIsBasicFixtureLocalSource",
     ]);
     // Every content url resolves to its split CQL file (Inv 4 passes → no
     // library-content-url-unresolved error).
@@ -272,17 +272,17 @@ describe("closureOrchestrator — FHIR closure code-is coverage (T2)", () => {
     }
     expect(result.errors.some((e) => e.kind === "library-content-url-unresolved")).toBe(false);
     // The LocalSource layer depends-on the LocalConcepts layer it `include`s.
-    const localSource = byTitle.get("CodeIsBasicFixtureLocalsource")!;
+    const localSource = byTitle.get("CodeIsBasicFixtureLocalSource")!;
     const localSourceDeps = (
       (localSource.relatedArtifact as Array<{ resource?: string }>) ?? []
     ).map((e) => e.resource);
     expect(localSourceDeps).toContain(
-      "http://example.org/crl/code-is-basic/Library/CodeIsBasicFixtureLocalconcepts",
+      "http://example.org/crl/code-is-basic/Library/CodeIsBasicFixtureLocalConcepts",
     );
     // R2: the LocalConcepts LAYER is `role:"concepts"` (Local family), so it owns
     // the local CodeSystem depends-on edge. The LocalSource/Inferred consuming
     // layers reach it transitively via their LocalConcepts-sibling dep above.
-    const localConcepts = byTitle.get("CodeIsBasicFixtureLocalconcepts")!;
+    const localConcepts = byTitle.get("CodeIsBasicFixtureLocalConcepts")!;
     const localConceptsDeps = (
       (localConcepts.relatedArtifact as Array<{ resource?: string }>) ?? []
     ).map((e) => e.resource);

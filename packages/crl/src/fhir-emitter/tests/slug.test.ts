@@ -45,7 +45,7 @@ describe("fhir-emitter slug helpers", () => {
 
   describe("pascalCaseName", () => {
     it("basic ASCII names", () => {
-      expect(pascalCaseName("BP Codes")).toBe("BpCodes");
+      expect(pascalCaseName("BP Codes")).toBe("BPCodes"); // preserves the already-uppercase "BP" token
       expect(pascalCaseName("cms22-asserted")).toBe("Cms22Asserted");
       expect(pascalCaseName("has history of")).toBe("HasHistoryOf");
     });

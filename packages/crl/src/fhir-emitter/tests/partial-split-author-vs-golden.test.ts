@@ -49,9 +49,9 @@ const CS_CANONICAL =
 // #186 — Library canonicals are keyed on the unified hyphen-free `S`
 // (id == url-tail == name), NOT the lowercase layer-token suffix.
 const LOCALCONCEPTS_CANONICAL =
-  "http://example.org/crl/code-is-decision-vs/Library/CodeIsDecisionVsFixtureLocalconcepts";
+  "http://example.org/crl/code-is-decision-vs/Library/CodeIsDecisionVsFixtureLocalConcepts";
 const RECORDCONCEPTS_CANONICAL =
-  "http://example.org/crl/code-is-decision-vs/Library/CodeIsDecisionVsFixtureRecordconcepts";
+  "http://example.org/crl/code-is-decision-vs/Library/CodeIsDecisionVsFixtureRecordConcepts";
 
 function listGolden(dir: string): string[] {
   if (!existsSync(dir)) return [];
@@ -94,10 +94,10 @@ describe("CRL → FHIR partial-split AUTHOR-VS golden (code-is-decision-vs)", ()
     const byId = new Map(
       libs.map((l) => [l.resource.id as string, l.resource as Record<string, unknown>]),
     );
-    const localConcepts = byId.get("CodeIsDecisionVsFixtureLocalconcepts")!;
-    const recordConcepts = byId.get("CodeIsDecisionVsFixtureRecordconcepts")!;
-    const localSource = byId.get("CodeIsDecisionVsFixtureLocalsource")!;
-    const recordSource = byId.get("CodeIsDecisionVsFixtureRecordsource")!;
+    const localConcepts = byId.get("CodeIsDecisionVsFixtureLocalConcepts")!;
+    const recordConcepts = byId.get("CodeIsDecisionVsFixtureRecordConcepts")!;
+    const localSource = byId.get("CodeIsDecisionVsFixtureLocalSource")!;
+    const recordSource = byId.get("CodeIsDecisionVsFixtureRecordSource")!;
     expect(localConcepts).toBeDefined();
     expect(recordConcepts).toBeDefined();
 

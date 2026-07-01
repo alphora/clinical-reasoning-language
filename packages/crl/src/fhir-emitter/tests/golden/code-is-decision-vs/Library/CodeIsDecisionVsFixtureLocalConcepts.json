@@ -1,6 +1,6 @@
 {
   "resourceType": "Library",
-  "id": "CodeIsDecisionVsFixtureLocalconcepts",
+  "id": "CodeIsDecisionVsFixtureLocalConcepts",
   "meta": {
     "profile": [
       "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareablelibrary",
@@ -26,10 +26,10 @@
       "valueCode": "structured"
     }
   ],
-  "url": "http://example.org/crl/code-is-decision-vs/Library/CodeIsDecisionVsFixtureLocalconcepts",
+  "url": "http://example.org/crl/code-is-decision-vs/Library/CodeIsDecisionVsFixtureLocalConcepts",
   "version": "1.0.0",
-  "name": "CodeIsDecisionVsFixtureLocalconcepts",
-  "title": "CodeIsDecisionVsFixtureLocalconcepts",
+  "name": "CodeIsDecisionVsFixtureLocalConcepts",
+  "title": "CodeIsDecisionVsFixtureLocalConcepts",
   "status": "draft",
   "experimental": true,
   "date": "2020-01-01T00:00:00.000Z",
@@ -52,7 +52,7 @@
   "content": [
     {
       "contentType": "text/cql",
-      "url": "../../cql/CodeIsDecisionVsFixtureLocalconcepts.cql"
+      "url": "../../cql/CodeIsDecisionVsFixtureLocalConcepts.cql"
     }
   ]
 }

@@ -161,15 +161,25 @@ export function pascalCaseName(name: string): string {
 }
 
 /**
- * The UNCAPPED PascalCase normalization — the same lower→strip→split→capitalize
- * →leading-`[A-Z]` logic as `pascalCaseName` but WITHOUT the 255-char cap.
- * `pascalCaseName` = this capped to 255. `pascalCaseNameForId` hashes THIS
- * (uncapped) form so two inputs that differ only PAST char 255 still separate
- * (the pre-hardening bug hashed the already-255-capped `pascalCaseName`, so such
- * inputs produced the same pascal → same stem → same hash → collision).
+ * The UNCAPPED PascalCase normalization — strip→split→uppercase-first-per-token
+ * →leading-`[A-Z]` logic, WITHOUT the 255-char cap. `pascalCaseName` = this capped
+ * to 255. `pascalCaseNameForId` hashes THIS (uncapped) form so two inputs that
+ * differ only PAST char 255 still separate (the pre-hardening bug hashed the
+ * already-255-capped `pascalCaseName`, so such inputs produced the same pascal →
+ * same stem → same hash → collision).
+ *
+ * PRESERVES each token's internal casing — it uppercases only the FIRST character
+ * and keeps the rest verbatim, so a token that is ALREADY PascalCase stays intact:
+ * `LocalSource` → `LocalSource` (NOT `Localsource`), `RecordConcepts`,
+ * `Interface`, an abbreviation like `BP` → `BP`. (A leading `.toLowerCase()` used
+ * to flatten these — #186 layer tokens LocalSource/LocalConcepts/RecordSource/
+ * RecordConcepts came out `Localsource`/…). In real emit `pascalCaseName` only ever
+ * receives a lowercased `slugify` output EXCEPT the layered `S` input
+ * (`layerLibraryName`'s raw `<policyId>-<Layer>`), so this preservation changes
+ * ONLY the layer identifiers, nothing else.
  */
 export function pascalCaseNameUncapped(name: string): string {
-  const cleaned = name.toLowerCase().replace(/[^a-z0-9\s_-]/g, "");
+  const cleaned = name.replace(/[^a-zA-Z0-9\s_-]/g, "");
   const tokens = cleaned.split(/[-_\s]+/).filter(Boolean);
   if (tokens.length === 0) return "Unnamed";
   let pascal = tokens.map((t) => t.charAt(0).toUpperCase() + t.slice(1)).join("");
