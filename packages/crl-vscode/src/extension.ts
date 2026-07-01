@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import * as path from "node:path";
 import * as fs from "node:fs";
 import { claudeCodeTarget, type ProvisionContext } from "./provision";
+import { stageStableServer } from "./stableServer";
 import {
   applyHighlight,
   clearStaleCrlAssociations,
@@ -296,27 +297,30 @@ function ctxFor(context: vscode.ExtensionContext, root: string): ProvisionContex
  */
 function resolveStableMcpServerScript(context: vscode.ExtensionContext): string {
   const stableDir = context.globalStorageUri.fsPath;
-  const stablePath = path.join(stableDir, "mcp-server.js");
-  const bundledPath = path.join(context.extensionPath, "dist", "mcp-server.js");
+  const bundledDir = path.join(context.extensionPath, "dist");
+  const bundledPath = path.join(bundledDir, "mcp-server.js");
   const log = getOutputChannel();
   try {
-    fs.mkdirSync(stableDir, { recursive: true });
-    fs.copyFileSync(bundledPath, stablePath);
+    // Copies mcp-server.js AND the runtime catalog `.cql` next to it — the server
+    // runs from here, and the emitter reads the `.cql` via join(__dirname, name).
+    const stablePath = stageStableServer(bundledDir, stableDir);
+    const version = context.extension?.packageJSON?.version ?? "0.0.0";
+    log.appendLine(`[mcp] resolved server (v${version}) → ${stablePath}`);
+    log.appendLine(`[mcp] bundled source → ${bundledPath}`);
+    return stablePath;
   } catch (e) {
     log.appendLine(
-      `[mcp] WARN refresh failed at ${stablePath}: ${messageOf(e)} — falling back to bundled path`,
+      `[mcp] WARN stable refresh failed in ${stableDir}: ${messageOf(e)} — falling back to bundled path`,
     );
     vscode.window.showWarningMessage(
-      `CRL: could not refresh MCP server at ${stablePath}: ${messageOf(e)}. ` +
+      `CRL: could not refresh the MCP server in ${stableDir}: ${messageOf(e)}. ` +
         `Falling back to the bundled path; the MCP server may stop tracking ` +
         `extension updates until the storage directory becomes writable.`,
     );
+    // The bundled dir has the `.cql` as esbuild-copied siblings, so the catalog
+    // still resolves from here.
     return bundledPath;
   }
-  const version = context.extension?.packageJSON?.version ?? "0.0.0";
-  log.appendLine(`[mcp] resolved server (v${version}) → ${stablePath}`);
-  log.appendLine(`[mcp] bundled source → ${bundledPath}`);
-  return stablePath;
 }
 
 let outputChannel: vscode.OutputChannel | undefined;

@@ -2,7 +2,7 @@
   "name": "crl-language-support",
   "displayName": "Clinical Reasoning Language Support",
   "description": "CRL + CEL keyword highlighting, live validation diagnostics, CRL→CQL + CEL→FHIR-JSON emit, and catalog-driven authoring help (completion + hover) for .crl / .cel Markdown files.",
-  "version": "4.37.1",
+  "version": "4.37.2",
   "publisher": "smiledigitalhealth",
   "engines": {
     "vscode": "^1.85.0"
@@ -360,6 +360,8 @@
     "test:mcp": "node src/mcp-server.test.mjs",
     "pretest:provision": "npm run compile",
     "test:provision": "node src/provision.test.mjs",
+    "pretest:stable": "npm run compile",
+    "test:stable": "node src/stableServer.test.mjs",
     "pretest:highlight": "npm run compile",
     "test:highlight": "node src/highlight.test.mjs",
     "pretest:catalog": "npm run compile",
@@ -411,7 +413,7 @@
     "test:grammar": "node src/grammar.test.mjs",
     "test:package": "node src/package.test.mjs",
     "test:language-config": "node src/language-config.test.mjs",
-    "test": "npm run compile && node src/mcp-server.test.mjs && node src/provision.test.mjs && node src/highlight.test.mjs && node src/catalog.test.mjs && node src/embedded-catalog.test.mjs && node src/concepts.test.mjs && node src/crl-patterns-coverage.test.mjs && node src/contextDetect.test.mjs && node src/findDeclaration.test.mjs && node src/projectIndex.test.mjs && node src/completion.test.mjs && node src/grammar.test.mjs && node src/package.test.mjs && node src/language-config.test.mjs && node src/renderScenarioHtml.test.mjs && node src/provenanceFindings.test.mjs && node src/provenanceViewer.test.mjs && node src/medicalValidationStore.test.mjs && node src/questionnaireModel.test.mjs && node src/correspondenceEngine.test.mjs && node src/paneRevealCoordinator.test.mjs && node src/sourcePaneHtml.test.mjs && node src/crlPaneHtml.test.mjs && node src/flowPaneHtml.test.mjs && node src/questionnairePaneHtml.test.mjs && node src/cockpitWebviewScript.test.mjs && node src/celPaneHtml.test.mjs && node src/failedCriterionPeek.test.mjs && node src/thisNodeMarker.test.mjs && node src/failedCriterionLabel.test.mjs && node src/webviewHit.test.mjs && node src/corrKey.test.mjs && node src/paneOrder.test.mjs && node test/oracle/check.mjs",
+    "test": "npm run compile && node src/mcp-server.test.mjs && node src/provision.test.mjs && node src/stableServer.test.mjs && node src/highlight.test.mjs && node src/catalog.test.mjs && node src/embedded-catalog.test.mjs && node src/concepts.test.mjs && node src/crl-patterns-coverage.test.mjs && node src/contextDetect.test.mjs && node src/findDeclaration.test.mjs && node src/projectIndex.test.mjs && node src/completion.test.mjs && node src/grammar.test.mjs && node src/package.test.mjs && node src/language-config.test.mjs && node src/renderScenarioHtml.test.mjs && node src/provenanceFindings.test.mjs && node src/provenanceViewer.test.mjs && node src/medicalValidationStore.test.mjs && node src/questionnaireModel.test.mjs && node src/correspondenceEngine.test.mjs && node src/paneRevealCoordinator.test.mjs && node src/sourcePaneHtml.test.mjs && node src/crlPaneHtml.test.mjs && node src/flowPaneHtml.test.mjs && node src/questionnairePaneHtml.test.mjs && node src/cockpitWebviewScript.test.mjs && node src/celPaneHtml.test.mjs && node src/failedCriterionPeek.test.mjs && node src/thisNodeMarker.test.mjs && node src/failedCriterionLabel.test.mjs && node src/webviewHit.test.mjs && node src/corrKey.test.mjs && node src/paneOrder.test.mjs && node test/oracle/check.mjs",
     "vscode:prepublish": "npm run build:crl && npm run compile",
     "package": "vsce package --no-dependencies"
   },

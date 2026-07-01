@@ -113,11 +113,12 @@ async function build() {
     );
   }
 
-  // provision: a pure node module bundled separately so its unit tests can import it
-  // directly. (The language-services modules — concepts, completionHelpers, contextDetect,
-  // findDeclaration, projectIndex, highlight, and as of #132 step 3 the catalog — live in
-  // core; their tests import them from @smile-digital-health/crl/language-services.)
-  for (const name of ["provision"]) {
+  // provision + stableServer: pure node modules bundled separately so their unit
+  // tests can import them directly. (The language-services modules — concepts,
+  // completionHelpers, contextDetect, findDeclaration, projectIndex, highlight, and
+  // as of #132 step 3 the catalog — live in core; their tests import them from
+  // @smile-digital-health/crl/language-services.)
+  for (const name of ["provision", "stableServer"]) {
     await esbuild.build({
       entryPoints: [path.resolve(__dirname, `src/${name}.ts`)],
       outfile: path.resolve(__dirname, `dist/${name}.js`),
