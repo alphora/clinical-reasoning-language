@@ -45,6 +45,7 @@ import { resolveImports } from "../imports/index";
 import type { ImportDiagnostic, ResolvedGraph } from "../imports/types";
 import type { CRLError } from "../types/errors";
 
+import { catalogFhirLibraries } from "../cql-emitter/catalog/loadCatalog";
 import { lowerLocalCodes } from "../cql-emitter/lowerLocalCodes";
 import type { LowerLocalCodesResult } from "../cql-emitter/lowerLocalCodes";
 
@@ -62,7 +63,7 @@ import {
   type ConceptResolver,
   type DecisionResolver,
 } from "./decision";
-import { emitLibrary, libraryCanonicalUrl } from "./library";
+import { emitCatalogLibrary, emitLibrary, libraryCanonicalUrl } from "./library";
 import { readPackageMetadata } from "./metadata";
 import { resolveEmitClock } from "./reproDate";
 import { emitRecommendationDefinitionsForLibrary } from "./recommendation";
@@ -1347,6 +1348,32 @@ export function emitFhirDefClosure(
         errors.push(...cfResult.errors);
       }
     }
+  }
+
+  // #187 — ALWAYS emit the shared catalog Library resources (CRLCommon +
+  // CaseFeatureCommon) ONCE per policy package. The engine resolves the policy
+  // layers' `include CRLCommon` / `include CaseFeatureCommon` by these fixed
+  // `Library.name`s (it auto-provides FHIRHelpers, so NO FHIRHelpers Library is
+  // emitted — see `catalogFhirLibraries`). Their content urls point at the
+  // sibling `../../cql/<name>.cql` the CQL lane always writes. Skip a catalog
+  // Library whose canonical url a REAL emitted resource already claims (an author
+  // library literally named `CRLCommon`) — Inv 0 would otherwise flag the
+  // duplicate url; skipping defers to the policy's own resource.
+  //
+  // Gated on a NON-EMPTY closure: an empty closure is not a policy package, so it
+  // ships nothing (preserves the "0-resources gracefully" contract and avoids
+  // orphan catalog Libraries pointing at CQL files no policy emits).
+  const emittedUrlsSoFar = new Set<string>();
+  for (const r of resources) {
+    const u = (r.resource as { url?: string }).url;
+    if (typeof u === "string") emittedUrlsSoFar.add(u);
+  }
+  for (const cat of libraries.length === 0 ? [] : catalogFhirLibraries()) {
+    const catResource = emitCatalogLibrary(cat.libraryName, cat.version, metadata, resolvedOpts);
+    const catUrl = (catResource.resource as { url?: string }).url;
+    if (typeof catUrl === "string" && emittedUrlsSoFar.has(catUrl)) continue;
+    if (typeof catUrl === "string") emittedUrlsSoFar.add(catUrl);
+    resources.push(catResource);
   }
 
   // Closure invariants — locked sequence per plan v3.2 (+ slice 4 Inv 0).

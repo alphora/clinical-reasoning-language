@@ -84,6 +84,9 @@ describe("resolveEmitClock — reproducible date precedence", () => {
 describe("capability gate — version always, date only at publishable+", () => {
   const STRATEGY = path.join(REPO_ROOT, "src/tests/fixtures/corpus/cms22/cms22-strategy.crl");
   const FIXED = new Date("2020-01-01T00:00:00.000Z");
+  // #187 — always-emitted shared catalog Library ids; they carry fixed catalog
+  // versions, not the package version.
+  const CATALOG_LIB_IDS = new Set(["CRLCommon", "CaseFeatureCommon"]);
 
   it("publishable (default): version present, date present, publishable profile + 3 knowledgeCapability codes", () => {
     const r = emitFhirDefFromPath(STRATEGY, { date: FIXED, capability: "publishable" });
@@ -112,7 +115,13 @@ describe("capability gate — version always, date only at publishable+", () => 
     expect(r.errors.length).toBe(0);
     for (const res of r.resources) {
       const body = res.resource as Record<string, unknown>;
-      expect(body.version).toBe("1.0.0");
+      // #187 — the shared catalog Libraries (CRLCommon/CaseFeatureCommon) carry
+      // their FIXED catalog CQL-header version (0.2.0 / 1.0.0), NOT the package
+      // version, since they are fixed emitter assets independent of the policy.
+      // They still respect the capability date gate (no date at shareable).
+      if (res.resourceType !== "Library" || !CATALOG_LIB_IDS.has(body.id as string)) {
+        expect(body.version).toBe("1.0.0");
+      }
       expect(body.date).toBeUndefined();
     }
     const pd = r.resources.find((x) => x.relativePath.startsWith("PlanDefinition/"))!

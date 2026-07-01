@@ -207,6 +207,96 @@ function defaultClock(): Date {
 }
 
 /**
+ * #187 — emit a FHIR Library for a SHARED CATALOG library (CRLCommon /
+ * CaseFeatureCommon). Unlike `emitLibrary`, the id / `name` / url-tail are the
+ * catalog library's OWN identifier (`CRLCommon` / `CaseFeatureCommon`), NOT the
+ * policy id — the engine resolves the policy layers' `include CRLCommon` /
+ * `include CaseFeatureCommon` by that fixed `Library.name`. `name == url-tail ==
+ * CQL header` (all already simple hyphen-free identifiers), satisfying cqf
+ * resolution. Content is the sibling `../../cql/<name>.cql` (`text/cql`), matching
+ * the layered-Library content convention. No `relatedArtifact` (catalog libraries
+ * have no author-ValueSet / local-CodeSystem depends-on edges). FHIRHelpers gets
+ * NO Library (the engine auto-provides it) — the caller emits only CRLCommon +
+ * CaseFeatureCommon.
+ *
+ * `libraryName` is the catalog identifier (used as the id/name/url-tail);
+ * `version` is the catalog CQL header version pin. `metadata` supplies the
+ * canonicalBase + publisher/status/etc. (shared across the policy package).
+ *
+ * VERSION BY DESIGN (#187): a catalog Library carries the CATALOG CQL-HEADER
+ * version (CRLCommon 0.2.0 / CaseFeatureCommon 1.0.0), NOT the policy's package
+ * version — these are fixed emitter assets independent of any policy, so their
+ * FHIR Library version matches their own CQL content. Every OTHER emitted Library
+ * (the policy layers) carries the package version via `emitLibrary`. A focused
+ * test in closureOrchestrator.test.ts pins this split so a future catalog helper
+ * can't silently drift onto the package version (or vice-versa).
+ *
+ * CANONICAL URL BY DESIGN (#187): the url is per-policy
+ * (`<canonicalBase>/Library/CRLCommon`), so each emitted policy package is
+ * self-contained (it ships its own catalog Library copy). A combined-IG consumer
+ * that loads MANY policies at once would see N same-name / different-url copies of
+ * CRLCommon/CaseFeatureCommon; cqf resolves `include` by NAME so execution is
+ * unaffected, but canonical-url uniqueness across a merged bundle is a known
+ * constraint tracked for the #72 companion-package distribution model (a shared
+ * catalog canonical would live there, not in the per-policy emit).
+ */
+export function emitCatalogLibrary(
+  libraryName: string,
+  version: string,
+  metadata: CpgMetadata,
+  opts: EmitOptions = {},
+): EmittedResource {
+  const level = opts.capability ?? "publishable";
+  const publishable = isPublishablePlus(level);
+  const id = libraryName;
+  const url = `${metadata.canonicalBase}/Library/${libraryName}`;
+  const description = `Shared CRL catalog library ${libraryName}.`;
+
+  const resource: Record<string, unknown> = {
+    resourceType: "Library",
+    id,
+    meta: { profile: crmiCapabilityProfiles("library", level) },
+    extension: knowledgeExtensions(level, "structured"),
+    url,
+    version,
+    name: libraryName,
+    title: libraryName,
+    status: metadata.status,
+    experimental: metadata.experimental,
+    ...(publishable ? { date: (opts.clock ?? defaultClock)().toISOString() } : {}),
+    publisher: metadata.publisher,
+    description,
+    type: {
+      coding: [
+        {
+          system: LIBRARY_TYPE_CS,
+          code: LIBRARY_TYPE_CODE,
+        },
+      ],
+    },
+  };
+
+  if (metadata.contact.length > 0) resource.contact = metadata.contact;
+  if (metadata.jurisdiction.length > 0) resource.jurisdiction = metadata.jurisdiction;
+  if (metadata.useContext.length > 0) resource.useContext = metadata.useContext;
+
+  resource.content = [
+    {
+      contentType: "text/cql",
+      url: `../../cql/${libraryName}.cql`,
+    },
+  ];
+
+  return {
+    resourceType: "Library",
+    relativePath: `Library/${id}.json`,
+    resource,
+    sourceKind: "Library",
+    sourceName: libraryName,
+  };
+}
+
+/**
  * Closure-level wrapper. Emits one Library per CRL library in the
  * closure. Slug collision detection mirrors Todo 1's `emitValueSets-
  * ForLibrary` (skip both colliding entries; emit error).

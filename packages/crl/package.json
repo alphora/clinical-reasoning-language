@@ -44,6 +44,7 @@
     "dist/**/*.json",
     "dist/**/*.d.ts",
     "dist/**/*.js.map",
+    "dist/**/*.cql",
     "README.md"
   ],
   "publishConfig": {
@@ -57,7 +58,7 @@
     "pretest:mcp": "npm run build",
     "test:mcp": "node src/cli/tests/run-mcp-server.test.mjs",
     "prebuild": "rimraf dist && shx mkdir -p dist && npm run generate && cpx \"src/grammar/generated/types/*.json\" dist/grammar/generated/types/ && node scripts/checkGrammarJsonFiles.js",
-    "build": "tsc",
+    "build": "tsc && node scripts/copy-catalog.mjs",
     "clean": "rimraf dist",
     "watch": "onchange -i \"src/**/*.ts\" -- npm run build",
     "start": "npm run build && node dist/index.js",

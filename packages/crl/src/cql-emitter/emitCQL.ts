@@ -55,6 +55,15 @@ import type { CRLError } from "../types/errors";
 import { lowerLocalCodes } from "./lowerLocalCodes";
 
 /**
+ * #187 — the FHIRHelpers version the emitted CQL pins in
+ * `include FHIRHelpers version '<v>'`. This MUST equal the engine's bundled
+ * FHIRHelpers version AND the header version of the shipped `catalog/FHIRHelpers.cql`
+ * (== `loadFHIRHelpers().version`), so emitted == engine == include == catalog
+ * source. A drift-guard test in imports/tests/emit.test.ts asserts all three agree.
+ */
+export const DEFAULT_FHIRHELPERS_VERSION = "4.0.1";
+
+/**
  * v2.2 Todo 3 (issue #59) — classified per-parameter info indexed at emit time.
  * Discriminated union so context-only fields (`contextType`) and parameter-only
  * fields (`cqlType`) can't be confused at the call site.
@@ -120,7 +129,7 @@ export interface EmitOptions {
    * EMITTED LAYER produces the truth-set shape: a `defined as` composition emits
    * `union`/`intersect`/`except` over operands where a LocalSource leaf renders
    * `<LocalSource>."L".asTruths()` and an Inferred operand renders `<Inferred>."N"`
-   * (already a truth-set), and the header gains `include CaseFeatureHelpers called
+   * (already a truth-set), and the header gains `include CaseFeatureCommon called
    * CFH`. Set PER EMITTED LAYER by `emitPartitioned` — only for the `Inferred` and
    * `Interface` layers of a `code is`/LocalSource family split — so the
    * LocalConcepts/LocalSource layers, the measure (`coded from`/RecordSource) lane,
@@ -634,7 +643,7 @@ class Emitter {
     this.ast = ast;
     this.options = {
       libraryName: options.libraryName ?? ast.library.name,
-      fhirHelpersVersion: options.fhirHelpersVersion ?? "4.0.1",
+      fhirHelpersVersion: options.fhirHelpersVersion ?? DEFAULT_FHIRHELPERS_VERSION,
       crossLibraryIncludes: options.crossLibraryIncludes ?? [],
       crossLibraryParameters: options.crossLibraryParameters ?? new Map(),
       // `canonicalBase` is consumed by `lowerLocalCodes` in `emitCQLFromAST`
@@ -819,7 +828,7 @@ class Emitter {
     ];
     // Case-feature truth-set lane (Inferred / Interface layers only): the
     // emitted bodies call the fluent `asTruths()` / `satisfied()` helpers, so the
-    // layer `include`s CaseFeatureHelpers. Ordered immediately after CRLCommon,
+    // layer `include`s CaseFeatureCommon. Ordered immediately after CRLCommon,
     // BEFORE the cross-library layer includes — matching the goldens.
     //
     // FLUENT-RESOLUTION RISK (verified-by-spec, not by an in-repo compiler). The
@@ -834,7 +843,7 @@ class Emitter {
     // across an `include` does NOT hold, the model + goldens must switch to qualified
     // `CFH.asTruths(...)` calls.
     if (this.caseFeature.kind !== "off") {
-      lines.push("include CaseFeatureHelpers called CFH");
+      lines.push("include CaseFeatureCommon called CFH");
     }
     // Cross-library includes for per-CRL emit: every other CRL library this
     // file qualified-refs gets its own `include` line. Simple include (no

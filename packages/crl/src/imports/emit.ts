@@ -20,6 +20,7 @@ import {
   FULL_PARTITION,
 } from "../cql-emitter/layeredEmit";
 import type { Partition } from "../cql-emitter/layeredEmit";
+import { loadCatalogLibraries } from "../cql-emitter/catalog/loadCatalog";
 import { lowerLocalCodes, localCodeSystemUrl } from "../cql-emitter/lowerLocalCodes";
 import { readCanonicalBase, readPolicyId } from "../fhir-emitter/metadata";
 import type { CRLError } from "../types/errors";
@@ -639,6 +640,43 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
       sourceLibraryName: entry.name,
       role: "root",
       includes: crossLibs,
+    });
+  }
+
+  // #187 — ALWAYS append the three SHARED catalog libraries so every policy's
+  // `cql/` folder ships `CRLCommon.cql`, `CaseFeatureCommon.cql`, and
+  // `FHIRHelpers.cql` (4.0.1). Two distinct consumers need them: human CQL
+  // tooling resolves `include`s from the `.cql` SOURCE files in the folder (it
+  // auto-provides NONE of the three), and the cqf engine resolves by FHIR
+  // `Library.name` (auto-provides FHIRHelpers but NOT CRLCommon/CaseFeatureCommon
+  // — those get FHIR Library resources in the FHIR lane). Their names are already
+  // simple hyphen-free identifiers, so `outputFilename == "<name>.cql"` and
+  // `libraryName == the CQL header == FHIR url-tail`.
+  //
+  // Role/routing: the catalog entries carry `sourceLibraryName` = their own
+  // library name, which is NOT a source in the emit closure, so the FHIR
+  // orchestrator (which iterates the closure and pulls
+  // `manifestBySource.get(<source>)`) never mis-routes them as a policy layer.
+  // The FHIR lane emits their Library resources (CRLCommon + CaseFeatureCommon)
+  // independently. `role: "root"` + empty `includes` keeps the manifest
+  // well-formed.
+  //
+  // Idempotence: skip a catalog library whose outputFilename a REAL emitted
+  // library already occupies (e.g. an author library literally named
+  // `CRLCommon`) — never clobber a policy library with a catalog copy.
+  const existingFilenames = new Set(cqlByLibrary.map((e) => e.outputFilename));
+  for (const cat of loadCatalogLibraries()) {
+    if (existingFilenames.has(cat.outputFilename)) continue;
+    existingFilenames.add(cat.outputFilename);
+    cqlByLibrary.push({
+      libraryName: cat.libraryName,
+      // No source `.crl` file — the catalog CQL is a fixed emitter asset.
+      filePath: "",
+      outputFilename: cat.outputFilename,
+      cql: cat.cql,
+      sourceLibraryName: cat.libraryName,
+      role: "root",
+      includes: [],
     });
   }
 

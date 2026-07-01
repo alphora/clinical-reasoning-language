@@ -1,4 +1,5 @@
 import { CRL } from "../ast/types";
+import type { LibraryDeclaration } from "../ast/types";
 import type { SourceContext } from "../imports/scopes";
 
 import { CycleDetector } from "./cycleDetector";
@@ -35,7 +36,24 @@ export type ValidationErrorKind =
   | "decision-delegation-cycle"
   | "external-library-not-included"
   | "qualified-ref-unresolved"
-  | "decision-shape";
+  | "decision-shape"
+  | "reserved-library-name";
+
+/**
+ * #187 — the SHARED catalog library names the emitter ALWAYS materializes into
+ * every policy package (`CRLCommon.cql` + `CaseFeatureCommon.cql` + `FHIRHelpers.cql`
+ * plus the CRLCommon/CaseFeatureCommon FHIR Libraries). An author `library "…"`
+ * declared with any of these would collide with the emitted catalog copy — the
+ * CQL-lane filename-skip catches the `.cql` clash, but a root library's FHIR
+ * Library url is policy-id-based (not name-based), so the FHIR-lane url-skip can
+ * miss it. Make the collision impossible at authoring time (hard error) rather
+ * than relying on downstream skip heuristics.
+ */
+export const RESERVED_CATALOG_LIBRARY_NAMES: ReadonlySet<string> = new Set([
+  "CRLCommon",
+  "CaseFeatureCommon",
+  "FHIRHelpers",
+]);
 
 /**
  * The specific decision-shape rule a `decision-shape` error violates. Lets
@@ -102,6 +120,13 @@ export interface DecisionShapeError extends ValidationErrorBase {
   kind: "decision-shape";
   rule: DecisionShapeRule;
 }
+// #187 — an author library declared with a name reserved for the emitter's
+// shared catalog libraries (CRLCommon / CaseFeatureCommon / FHIRHelpers).
+export interface ReservedLibraryNameError extends ValidationErrorBase {
+  kind: "reserved-library-name";
+  // The reserved name the author used.
+  reservedName: string;
+}
 
 export type ValidationError =
   | EmptyNameError
@@ -111,7 +136,8 @@ export type ValidationError =
   | DecisionDelegationCycleError
   | ExternalLibraryNotIncludedError
   | QualifiedRefUnresolvedError
-  | DecisionShapeError;
+  | DecisionShapeError
+  | ReservedLibraryNameError;
 
 export interface ValidationResult {
   isValid: boolean;
@@ -205,10 +231,67 @@ export class Validator {
     const shapeResult = this.decisionShapeValidator.validate(ast, sources);
     errors.push(...shapeResult);
 
+    // #187 — reserved catalog library names — always an error (never demoted).
+    errors.push(...this.validateReservedLibraryNames(ast, sources));
+
     return {
       isValid: errors.length === 0,
       errors,
       warnings,
     };
+  }
+
+  /**
+   * #187 — reject an author `library "<name>"` declared with a name reserved for
+   * the emitter's shared catalog libraries. In multi-file mode each distinct
+   * source library is checked (deduped by name+file so one library isn't flagged
+   * once per statement); in single-file mode the lone `ast.library` is checked.
+   */
+  private validateReservedLibraryNames(
+    ast: CRL,
+    sources?: SourceContext[],
+  ): ReservedLibraryNameError[] {
+    const out: ReservedLibraryNameError[] = [];
+    const make = (
+      name: string,
+      location: LibraryDeclaration["location"],
+      attrib?: { libraryName: string; filePath: string },
+    ): ReservedLibraryNameError => ({
+      kind: "reserved-library-name",
+      reservedName: name,
+      message:
+        `Library name "${name}" is reserved for the CRL emitter's shared catalog ` +
+        `library (CRLCommon / CaseFeatureCommon / FHIRHelpers), which every emitted ` +
+        `policy always ships. Rename this library so it cannot collide with the ` +
+        `emitted catalog copy.`,
+      location: {
+        start: { line: location.start.line, column: location.start.column },
+        end: { line: location.end.line, column: location.end.column },
+      },
+      severity: "error",
+      ...(attrib ? { libraryName: attrib.libraryName, filePath: attrib.filePath } : {}),
+    });
+
+    if (sources && sources.length > 0) {
+      const seen = new Set<string>();
+      for (const src of sources) {
+        const lib = src.entry.ast.library;
+        const name = lib?.name;
+        if (!name || !RESERVED_CATALOG_LIBRARY_NAMES.has(name)) continue;
+        const dedupeKey = `${src.entry.filePath} ${name}`;
+        if (seen.has(dedupeKey)) continue;
+        seen.add(dedupeKey);
+        out.push(
+          make(name, lib.location, { libraryName: name, filePath: src.entry.filePath }),
+        );
+      }
+      return out;
+    }
+
+    const name = ast.library?.name;
+    if (name && RESERVED_CATALOG_LIBRARY_NAMES.has(name)) {
+      out.push(make(name, ast.library.location));
+    }
+    return out;
   }
 }

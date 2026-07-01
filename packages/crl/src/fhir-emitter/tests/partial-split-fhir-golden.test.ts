@@ -3,7 +3,11 @@ import * as path from "path";
 
 import { describe, expect, it } from "@jest/globals";
 
-import { applyContentUrlInvariant, emitFhirDefClosure, emitFhirDefFromPath } from "../closureOrchestrator";
+import {
+  applyContentUrlInvariant,
+  emitFhirDefClosure,
+  emitFhirDefFromPath,
+} from "../closureOrchestrator";
 import type { CpgMetadata, EmittedResource } from "../types";
 
 /**
@@ -72,7 +76,9 @@ describe("CRL → FHIR partial-split golden (code-is-decision)", () => {
     const csUrl = (cs.resource as { url: string }).url;
     // Policy id is the fixture package name "code-is-decision-fixture", NOT the
     // library-name slug "code-is-decision".
-    expect(csUrl).toBe("http://example.org/crl/code-is-decision/CodeSystem/code-is-decision-fixture-local");
+    expect(csUrl).toBe(
+      "http://example.org/crl/code-is-decision/CodeSystem/code-is-decision-fixture-local",
+    );
 
     // CQL lane — the emitted CQL carries a byte-equal `codesystem '<csUrl>'`.
     const cql = emitCQLImports(FIXTURE);
@@ -87,12 +93,19 @@ describe("CRL → FHIR partial-split golden (code-is-decision)", () => {
     // (LocalConcepts → LocalSource) PLUS a synthesized `<policyId>-Interface`
     // re-export library (the decision/action-guard surface). It NO LONGER takes
     // the pre-R2 partial (Root + Concepts) path.
-    const libs = result.resources.filter((r) => r.resourceType === "Library");
+    // #187 — exclude the always-emitted shared catalog Libraries
+    // (CRLCommon/CaseFeatureCommon); this asserts the 3 POLICY layer Libraries.
+    const CATALOG_LIB_IDS = new Set(["CRLCommon", "CaseFeatureCommon"]);
+    const libs = result.resources.filter(
+      (r) => r.resourceType === "Library" && !CATALOG_LIB_IDS.has(r.resource.id as string),
+    );
     expect(libs).toHaveLength(3);
 
     // R2 — ids derive from the fixture POLICY ID ("code-is-decision-fixture") +
     // the lowercase LAYER token (NOT the source library-name slug).
-    const byId = new Map(libs.map((l) => [l.resource.id as string, l.resource as Record<string, unknown>]));
+    const byId = new Map(
+      libs.map((l) => [l.resource.id as string, l.resource as Record<string, unknown>]),
+    );
     const localConcepts = byId.get("code-is-decision-fixture-localconcepts")!;
     const localSource = byId.get("code-is-decision-fixture-localsource")!;
     const iface = byId.get("code-is-decision-fixture-interface")!;
@@ -104,7 +117,11 @@ describe("CRL → FHIR partial-split golden (code-is-decision)", () => {
     expect((localConcepts.content as Array<{ url?: string }>)[0]?.url).toBe(
       "../../cql/code-is-decision-fixture-LocalConcepts.cql",
     );
-    expect((localConcepts.relatedArtifact as Array<{ type?: string; resource?: string }>).map((e) => e.resource)).toEqual([
+    expect(
+      (localConcepts.relatedArtifact as Array<{ type?: string; resource?: string }>).map(
+        (e) => e.resource,
+      ),
+    ).toEqual([
       "http://example.org/crl/code-is-decision/CodeSystem/code-is-decision-fixture-local",
     ]);
 
@@ -112,7 +129,11 @@ describe("CRL → FHIR partial-split golden (code-is-decision)", () => {
     expect((localSource.content as Array<{ url?: string }>)[0]?.url).toBe(
       "../../cql/code-is-decision-fixture-LocalSource.cql",
     );
-    expect((localSource.relatedArtifact as Array<{ type?: string; resource?: string }>).map((e) => e.resource)).toEqual([
+    expect(
+      (localSource.relatedArtifact as Array<{ type?: string; resource?: string }>).map(
+        (e) => e.resource,
+      ),
+    ).toEqual([
       "http://example.org/crl/code-is-decision/Library/code-is-decision-fixture-localconcepts",
     ]);
 
@@ -120,7 +141,9 @@ describe("CRL → FHIR partial-split golden (code-is-decision)", () => {
     expect((iface.content as Array<{ url?: string }>)[0]?.url).toBe(
       "../../cql/code-is-decision-fixture-Interface.cql",
     );
-    expect((iface.relatedArtifact as Array<{ type?: string; resource?: string }>).map((e) => e.resource)).toEqual([
+    expect(
+      (iface.relatedArtifact as Array<{ type?: string; resource?: string }>).map((e) => e.resource),
+    ).toEqual([
       "http://example.org/crl/code-is-decision/Library/code-is-decision-fixture-localsource",
     ]);
   });
@@ -128,7 +151,8 @@ describe("CRL → FHIR partial-split golden (code-is-decision)", () => {
   it("the PlanDefinition + ActivityDefinition library[] resolve to the Interface Library canonical", () => {
     // R2 — the decision/activity/recommendation `library[]` now rewire onto the
     // synthesized Interface re-export library (NOT the source-name Root).
-    const interfaceUrl = "http://example.org/crl/code-is-decision/Library/code-is-decision-fixture-interface";
+    const interfaceUrl =
+      "http://example.org/crl/code-is-decision/Library/code-is-decision-fixture-interface";
     for (const r of result.resources) {
       if (r.resourceType !== "PlanDefinition" && r.resourceType !== "ActivityDefinition") continue;
       const lib = (r.resource as { library?: unknown }).library;
@@ -288,7 +312,12 @@ describe("emitFhirDefClosure — content-url invariant is wired into the pipelin
   it("the unmodified manifest passes the closure with no content-url error", () => {
     const graph = resolveImports(FIXTURE);
     const cql = emitCQLImports(FIXTURE);
-    const result = emitFhirDefClosure(graph, METADATA, { date: new Date("2020-01-01T00:00:00.000Z") }, cql.cqlByLibrary);
+    const result = emitFhirDefClosure(
+      graph,
+      METADATA,
+      { date: new Date("2020-01-01T00:00:00.000Z") },
+      cql.cqlByLibrary,
+    );
     expect(result.errors.some((e) => e.kind === "library-content-url-unresolved")).toBe(false);
   });
 });
@@ -314,7 +343,7 @@ describe("emitFhirDefClosure — structured-error guards on a malformed manifest
     useContext: [],
   };
 
-  it("a decision-bearing source with a multi-entry manifest but NO role:\"interface\"/\"root\" entry → decision-root-library-missing + decisions skipped (not thrown)", () => {
+  it('a decision-bearing source with a multi-entry manifest but NO role:"interface"/"root" entry → decision-root-library-missing + decisions skipped (not thrown)', () => {
     const graph = resolveImports(FIXTURE);
     const cql = emitCQLImports(FIXTURE);
     expect(cql.success).toBe(true);
@@ -379,7 +408,9 @@ describe("emitFhirDefClosure — structured-error guards on a malformed manifest
     expect(err!.message).toMatch(/would emit case-features/);
     expect(err!.message).toMatch(/no LocalSource layer/);
     // No case-feature StructureDefinition was emitted on this path.
-    expect(result.resources.filter((r) => r.resourceType === "StructureDefinition")).toHaveLength(0);
+    expect(result.resources.filter((r) => r.resourceType === "StructureDefinition")).toHaveLength(
+      0,
+    );
     expect(result.success).toBe(false);
   });
 });

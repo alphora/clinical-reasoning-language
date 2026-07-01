@@ -18,6 +18,13 @@ import type { CpgMetadata, EmittedResource } from "../types";
 const ROOT = join(__dirname, "..", "..", "..");
 const FIXED_CLOCK = () => new Date("2026-06-05T15:30:00.000Z");
 
+// #187 — the two shared catalog Library resources (CRLCommon + CaseFeatureCommon)
+// are ALWAYS emitted alongside a non-empty policy package. Tests that assert
+// POLICY resource sets/counts/versions filter them out; a dedicated test asserts
+// the catalog Library emit itself.
+const CATALOG_LIB_TITLES = new Set(["CRLCommon", "CaseFeatureCommon"]);
+const CATALOG_LIB_IDS = new Set(["CRLCommon", "CaseFeatureCommon"]);
+
 const METADATA: CpgMetadata = {
   version: "1.0.0",
   name: "cc-screening-cognitive-support",
@@ -32,7 +39,10 @@ const METADATA: CpgMetadata = {
   useContext: [],
 };
 
-const FIXTURE = join(ROOT, "src/tests/fixtures/cpg-roundtrip/cc-screening-cognitive-support/cc-screening.crl");
+const FIXTURE = join(
+  ROOT,
+  "src/tests/fixtures/cpg-roundtrip/cc-screening-cognitive-support/cc-screening.crl",
+);
 
 describe("closureOrchestrator — emitFhirDefFromPath (cc-screening end-to-end)", () => {
   it("emits the expected resource set for the cc-screening fixture", () => {
@@ -49,7 +59,8 @@ describe("closureOrchestrator — emitFhirDefFromPath (cc-screening end-to-end)"
     // 2 decisions: 1 Strategy + 1 Sub-decision
     // Plus 4 Recommendation PlanDefs (1 per activity)
     expect(byType.get("PlanDefinition")).toBe(2 + 4);
-    expect(byType.get("Library")).toBe(1);
+    // 1 policy Library + 2 always-emitted shared catalog Libraries (#187).
+    expect(byType.get("Library")).toBe(1 + 2);
     // 1 terminology = 1 ValueSet (after the v3.2 fixture extension)
     expect(byType.get("ValueSet")).toBe(1);
   });
@@ -59,9 +70,7 @@ describe("closureOrchestrator — emitFhirDefFromPath (cc-screening end-to-end)"
     const lib = result.resources.find((r) => r.resourceType === "Library");
     expect(lib).toBeDefined();
     const content = (lib!.resource as { content?: Array<{ url?: string }> }).content;
-    expect(content?.[0]?.url).toBe(
-      "../../cql/CRC Recommendation.cql",
-    );
+    expect(content?.[0]?.url).toBe("../../cql/CRC Recommendation.cql");
   });
 
   it("populates sourceKind + sourceName on every emitted resource (attribution for Inv 1)", () => {
@@ -75,19 +84,57 @@ describe("closureOrchestrator — emitFhirDefFromPath (cc-screening end-to-end)"
   it("every emitted resource carries `version` from package.json (CRMI shareable floor)", () => {
     const result = emitFhirDefFromPath(FIXTURE, { clock: FIXED_CLOCK });
     for (const r of result.resources) {
+      // #187 — catalog Libraries carry their fixed catalog CQL-header version, not
+      // the package version.
+      if (
+        r.resourceType === "Library" &&
+        CATALOG_LIB_IDS.has((r.resource as { id?: string }).id ?? "")
+      ) {
+        continue;
+      }
       expect((r.resource as Record<string, unknown>).version).toBe("0.0.0");
     }
+  });
+
+  it("#187: ONLY the catalog Libraries carry the catalog CQL-header version; all other Libraries carry the package version", () => {
+    // Version-exemption guard: CRLCommon → 0.2.0 and CaseFeatureCommon → 1.0.0
+    // (their fixed CQL-header versions), while EVERY other emitted Library carries
+    // the package version (cc-screening package.json version = 0.0.0). A future
+    // helper accidentally taking the package version — or a policy layer
+    // accidentally taking a catalog version — flips this test.
+    const result = emitFhirDefFromPath(FIXTURE, { clock: FIXED_CLOCK });
+    const EXPECTED_CATALOG_VERSION: Record<string, string> = {
+      CRLCommon: "0.2.0",
+      CaseFeatureCommon: "1.0.0",
+    };
+    let sawCRLCommon = false;
+    let sawCaseFeatureCommon = false;
+    for (const r of result.resources) {
+      if (r.resourceType !== "Library") continue;
+      const id = (r.resource as { id?: string }).id ?? "";
+      const version = (r.resource as { version?: string }).version;
+      if (id in EXPECTED_CATALOG_VERSION) {
+        expect(version).toBe(EXPECTED_CATALOG_VERSION[id]);
+        if (id === "CRLCommon") sawCRLCommon = true;
+        if (id === "CaseFeatureCommon") sawCaseFeatureCommon = true;
+      } else {
+        // policy layer Library → package version
+        expect(version).toBe("0.0.0");
+      }
+    }
+    // Both catalog Libraries were actually present (not a vacuous pass).
+    expect(sawCRLCommon).toBe(true);
+    expect(sawCaseFeatureCommon).toBe(true);
   });
 
   it("Library.relatedArtifact[depends-on] includes the ValueSet canonical URL (Inv 2(b) coverage)", () => {
     const result = emitFhirDefFromPath(FIXTURE, { clock: FIXED_CLOCK });
     const lib = result.resources.find((r) => r.resourceType === "Library");
-    const ra = (lib!.resource as { relatedArtifact?: Array<{ type?: string; resource?: string }> }).relatedArtifact;
+    const ra = (lib!.resource as { relatedArtifact?: Array<{ type?: string; resource?: string }> })
+      .relatedArtifact;
     const dependsOnUrls = ra!.filter((e) => e.type === "depends-on").map((e) => e.resource);
     // The Coverage Concern VS canonical URL should be there
-    expect(
-      dependsOnUrls.some((u) => typeof u === "string" && u.includes("ValueSet/")),
-    ).toBe(true);
+    expect(dependsOnUrls.some((u) => typeof u === "string" && u.includes("ValueSet/"))).toBe(true);
   });
 
   it("every PlanDef.action.definitionCanonical resolves to an emitted resource (Inv 3)", () => {
@@ -162,10 +209,7 @@ describe("closureOrchestrator — direct API (emitFhirDefClosure)", () => {
 
 /* ─── Slice 4 — concept-level `code is` → FHIR CodeSystem coverage ───── */
 
-const CODE_IS_BASIC = join(
-  ROOT,
-  "src/cql-emitter/tests/fixtures/code-is-basic/code-is-basic.crl",
-);
+const CODE_IS_BASIC = join(ROOT, "src/cql-emitter/tests/fixtures/code-is-basic/code-is-basic.crl");
 
 // F4 — a decision-bearing fixture that `when`s on TWO eligible LocalSource-boolean
 // concepts, so BOTH case-feature StructureDefinitions are emitted AND each
@@ -198,9 +242,18 @@ describe("closureOrchestrator — FHIR closure code-is coverage (T2)", () => {
     // matching them (one FHIR Library per manifest entry), NOT one un-split "Code
     // Is Basic" Library pointing at a CQL file the split never wrote.
     const result = emitFhirDefFromPath(CODE_IS_BASIC, { clock: FIXED_CLOCK });
-    const libs = result.resources.filter((r) => r.resourceType === "Library");
+    // #187 — exclude the always-emitted shared catalog Libraries
+    // (CRLCommon/CaseFeatureCommon); this test asserts the POLICY layer Libraries.
+    const libs = result.resources.filter(
+      (r) =>
+        r.resourceType === "Library" &&
+        !CATALOG_LIB_TITLES.has((r.resource as { title?: string }).title ?? ""),
+    );
     const byTitle = new Map(
-      libs.map((l) => [(l.resource as { title?: string }).title, l.resource as Record<string, unknown>]),
+      libs.map((l) => [
+        (l.resource as { title?: string }).title,
+        l.resource as Record<string, unknown>,
+      ]),
     );
     // R2 — the Library title is the policy-id-based CQL library name.
     expect([...byTitle.keys()].sort()).toEqual([
@@ -217,7 +270,9 @@ describe("closureOrchestrator — FHIR closure code-is coverage (T2)", () => {
     expect(result.errors.some((e) => e.kind === "library-content-url-unresolved")).toBe(false);
     // The LocalSource layer depends-on the LocalConcepts layer it `include`s.
     const localSource = byTitle.get("code-is-basic-fixture-LocalSource")!;
-    const localSourceDeps = ((localSource.relatedArtifact as Array<{ resource?: string }>) ?? []).map((e) => e.resource);
+    const localSourceDeps = (
+      (localSource.relatedArtifact as Array<{ resource?: string }>) ?? []
+    ).map((e) => e.resource);
     expect(localSourceDeps).toContain(
       "http://example.org/crl/code-is-basic/Library/code-is-basic-fixture-localconcepts",
     );
@@ -225,7 +280,9 @@ describe("closureOrchestrator — FHIR closure code-is coverage (T2)", () => {
     // the local CodeSystem depends-on edge. The LocalSource/Inferred consuming
     // layers reach it transitively via their LocalConcepts-sibling dep above.
     const localConcepts = byTitle.get("code-is-basic-fixture-LocalConcepts")!;
-    const localConceptsDeps = ((localConcepts.relatedArtifact as Array<{ resource?: string }>) ?? []).map((e) => e.resource);
+    const localConceptsDeps = (
+      (localConcepts.relatedArtifact as Array<{ resource?: string }>) ?? []
+    ).map((e) => e.resource);
     expect(localConceptsDeps).toContain(
       "http://example.org/crl/code-is-basic/CodeSystem/code-is-basic-fixture-local",
     );
@@ -234,13 +291,16 @@ describe("closureOrchestrator — FHIR closure code-is coverage (T2)", () => {
   it("byte-equality: the FHIR CodeSystem.url == the CQL `codesystem '<url>'` literal (anti-drift before slice A)", () => {
     // FHIR lane.
     const fhir = emitFhirDefFromPath(CODE_IS_BASIC, { clock: FIXED_CLOCK });
-    const csUrl = (fhir.resources.find((r) => r.resourceType === "CodeSystem")!
-      .resource as { url: string }).url;
+    const csUrl = (
+      fhir.resources.find((r) => r.resourceType === "CodeSystem")!.resource as { url: string }
+    ).url;
 
     // The shared helper must agree with both lanes for the same library entry.
     // R1 — the local-domain slug is the fixture's POLICY ID (package name
     // "code-is-basic-fixture"), not the library name "Code Is Basic".
-    expect(csUrl).toBe(localCodeSystemUrl("http://example.org/crl/code-is-basic", "code-is-basic-fixture"));
+    expect(csUrl).toBe(
+      localCodeSystemUrl("http://example.org/crl/code-is-basic", "code-is-basic-fixture"),
+    );
 
     // CQL lane — the emitted CQL must carry a `codesystem '<csUrl>'` literal
     // byte-equal with the FHIR CodeSystem.url.
@@ -361,7 +421,11 @@ describe("applyActionInputProfileInvariant — Inv 5", () => {
     return {
       resourceType: "PlanDefinition",
       relativePath: "PlanDefinition/triage.json",
-      resource: { resourceType: "PlanDefinition", url: "http://example.org/x/PlanDefinition/triage", action },
+      resource: {
+        resourceType: "PlanDefinition",
+        url: "http://example.org/x/PlanDefinition/triage",
+        action,
+      },
       sourceKind: "Decision",
       sourceName: "Triage",
     };
@@ -378,7 +442,10 @@ describe("applyActionInputProfileInvariant — Inv 5", () => {
   }
 
   it("an input profile that resolves to an emitted StructureDefinition → no error", () => {
-    const errors = applyActionInputProfileInvariant([planDefWithInput(SD_URL), sd(SD_URL)], new Set());
+    const errors = applyActionInputProfileInvariant(
+      [planDefWithInput(SD_URL), sd(SD_URL)],
+      new Set(),
+    );
     expect(errors).toEqual([]);
   });
 

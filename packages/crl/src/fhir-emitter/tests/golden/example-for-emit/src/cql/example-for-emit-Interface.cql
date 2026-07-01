@@ -4,7 +4,7 @@ using FHIR version '4.0.1'
 
 include FHIRHelpers version '4.0.1' called FHIRHelpers
 include CRLCommon called CRLCommon
-include CaseFeatureHelpers called CFH
+include CaseFeatureCommon called CFH
 include "example-for-emit-Inferred"
 
 context Patient

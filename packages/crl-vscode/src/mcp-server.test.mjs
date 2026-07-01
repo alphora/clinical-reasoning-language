@@ -220,6 +220,44 @@ try {
     assert.equal(out.errors.length, 0);
   });
 
+  // --- #187: catalog CQL must be resolvable in the BUNDLED server ---
+  //
+  // emit_crl_fhir routes through emitFhirDefFromPath → emitCQLImports +
+  // emitFhirDefClosure, which read the three shared catalog `.cql`
+  // (CRLCommon/CaseFeatureCommon/FHIRHelpers) via core's loadCatalog. In the
+  // esbuild bundle `__dirname` is crl-vscode/dist with no catalog siblings, so
+  // without the esbuild catalog-copy step this would ENOENT. Registration-only
+  // tests miss it — this INVOKES the tool through the built bundle end-to-end and
+  // asserts success + the two emitted catalog Libraries are present.
+  await check("emit_crl_fhir via path → emits successfully + catalog Libraries resolve (bundle catalog-copy guard)", async () => {
+    const semandCrl = resolve(
+      here,
+      "../../crl/src/fhir-emitter/tests/golden/example-semand/src/crl/example-semand.crl"
+    );
+    const r = await client.callTool({
+      name: "emit_crl_fhir",
+      arguments: { path: semandCrl, date: "2026-01-01T00:00:00.000Z" },
+    });
+    assert.ok(!r.isError, `emit_crl_fhir should not be a tool error: ${r.content?.[0]?.text?.slice(0, 300)}`);
+    const out = JSON.parse(r.content[0].text);
+    assert.equal(
+      out.success,
+      true,
+      `example-semand should emit cleanly; errors: ${JSON.stringify(out.errors).slice(0, 400)}`
+    );
+    // The two always-emitted catalog Libraries prove loadCatalog read the .cql
+    // through the bundle (an ENOENT would have flipped success to false with an
+    // Exception error before any Library was produced).
+    const libNames = out.resourceManifest
+      .filter((m) => m.resourceType === "Library")
+      .map((m) => m.id);
+    assert.ok(libNames.includes("CRLCommon"), `expected CRLCommon Library; got ${JSON.stringify(libNames)}`);
+    assert.ok(
+      libNames.includes("CaseFeatureCommon"),
+      `expected CaseFeatureCommon Library; got ${JSON.stringify(libNames)}`
+    );
+  });
+
   await check("validate_crl via inline code → single-file mode (no cross-file context)", async () => {
     // A file that uses qualified refs into a sibling library will be flagged
     // when validated as inline code — there's no project context to resolve

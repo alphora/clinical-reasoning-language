@@ -1,7 +1,7 @@
-library CaseFeatureHelpers version '1.0.0'
+library CaseFeatureCommon version '1.0.0'
 
 /*
- * CaseFeatureHelpers (CFH) — shared truth-set helpers for the case-feature
+ * CaseFeatureCommon (CFH) — shared truth-set helpers for the case-feature
  * model. Like CRLCommon, this is a FIXED shared helper library that the
  * emitted policy libraries `include` (one shared file, not a per-policy copy).
  *

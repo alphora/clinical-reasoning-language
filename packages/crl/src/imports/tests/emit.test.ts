@@ -3,6 +3,8 @@ import * as path from "path";
 import { emitCQLImports, computeSplitPlan } from "../emit";
 import { buildCRL } from "../../index";
 import { lowerLocalCodes } from "../../cql-emitter/lowerLocalCodes";
+import { DEFAULT_FHIRHELPERS_VERSION } from "../../cql-emitter/emitCQL";
+import { loadFHIRHelpers } from "../../cql-emitter/catalog/loadCatalog";
 import type { CRL } from "../../ast/types";
 
 const FIXTURES = path.resolve(__dirname, "fixtures");
@@ -13,11 +15,20 @@ function parse(body: string): CRL {
   return r.result;
 }
 
-function findLib(
-  result: ReturnType<typeof emitCQLImports>,
-  name: string,
-): string | undefined {
+function findLib(result: ReturnType<typeof emitCQLImports>, name: string): string | undefined {
   return result.cqlByLibrary.find((e) => e.libraryName === name)?.cql;
+}
+
+// #187 — the three shared catalog libraries are now ALWAYS appended to every
+// policy's cqlByLibrary. The set-shape assertions below exercise the POLICY
+// library split, so filter the fixed catalog names out; a dedicated test asserts
+// the catalog injection itself.
+const CATALOG_LIB_NAMES = new Set(["CRLCommon", "CaseFeatureCommon", "FHIRHelpers"]);
+function policyLibNames(result: ReturnType<typeof emitCQLImports>): string[] {
+  return result.cqlByLibrary
+    .map((e) => e.libraryName)
+    .filter((n) => !CATALOG_LIB_NAMES.has(n))
+    .sort();
 }
 
 describe("emitCQLImports (per-CRL v2.1.0)", () => {
@@ -28,13 +39,8 @@ describe("emitCQLImports (per-CRL v2.1.0)", () => {
 
     // Every library in the include-walk closure gets its own CQL.
     // 4 layers: cms22 (interface) → inferred → asserted → concepts.
-    const names = result.cqlByLibrary.map((e) => e.libraryName).sort();
-    expect(names).toEqual([
-      "CMS22",
-      "CMS22 Asserted",
-      "CMS22 Concepts",
-      "CMS22 Inferred",
-    ]);
+    const names = policyLibNames(result);
+    expect(names).toEqual(["CMS22", "CMS22 Asserted", "CMS22 Concepts", "CMS22 Inferred"]);
 
     // The interface library (the unsuffixed file) emits as `library CMS22`
     // — simple identifier, unquoted (CQL convention for the public entry
@@ -54,14 +60,15 @@ describe("emitCQLImports (per-CRL v2.1.0)", () => {
 
     // Cross-library qualified ref `"CMS22 Asserted"."Qualifying Encounter Source"`
     // emits as native CQL `"CMS22 Asserted"."Qualifying Encounter Source"`.
-    expect(inferred).toMatch(
-      /"CMS22 Asserted"\."Qualifying Encounter Source"/,
-    );
+    expect(inferred).toMatch(/"CMS22 Asserted"\."Qualifying Encounter Source"/);
     // And the includes header carries the dep.
     expect(inferred).toMatch(/include "CMS22 Asserted"/);
 
-    // Each emitted CQL declares its own FHIRHelpers + CRLCommon includes.
+    // Each emitted POLICY CQL declares its own FHIRHelpers + CRLCommon includes.
+    // (The appended catalog libraries — CRLCommon/CaseFeatureCommon/FHIRHelpers —
+    // are the include TARGETS, not includers, so exclude them here.)
     for (const entry of result.cqlByLibrary) {
+      if (CATALOG_LIB_NAMES.has(entry.libraryName)) continue;
       expect(entry.cql).toMatch(/include FHIRHelpers/);
       expect(entry.cql).toMatch(/include CRLCommon/);
       expect(entry.cql).toMatch(/using FHIR version/);
@@ -156,7 +163,7 @@ describe("emitCQLImports (per-CRL v2.1.0)", () => {
     );
     const result = emitCQLImports(root);
     expect(result.success).toBe(true);
-    const names = result.cqlByLibrary.map((e) => e.libraryName).sort();
+    const names = policyLibNames(result);
     expect(names).toEqual([
       "layered-basic-fixture-Inferred",
       "layered-basic-fixture-RecordConcepts",
@@ -198,7 +205,7 @@ describe("emitCQLImports (per-CRL v2.1.0)", () => {
     const root = path.join(FIXTURES, "layered-name-collision", "root.crl");
     const result = emitCQLImports(root);
     expect(result.success).toBe(true);
-    const names = result.cqlByLibrary.map((e) => e.libraryName).sort();
+    const names = policyLibNames(result);
     expect(names).toEqual([
       "X Asserted",
       "crl-test-fixture-Inferred",
@@ -236,7 +243,7 @@ describe("emitCQLImports (per-CRL v2.1.0)", () => {
     const result = emitCQLImports(root);
     expect(result.success).toBe(true);
 
-    const names = result.cqlByLibrary.map((e) => e.libraryName).sort();
+    const names = policyLibNames(result);
     expect(names).toEqual([
       "crl-test-fixture-Interface",
       "crl-test-fixture-LocalConcepts",
@@ -283,9 +290,7 @@ describe("emitCQLImports (per-CRL v2.1.0)", () => {
     // qualified retrieves, always `[Observation: …]` (local-source rule).
     const sourceCql = sourceEntry?.cql ?? "";
     expect(sourceCql).toMatch(/include "crl-test-fixture-LocalConcepts"/);
-    expect(sourceCql).toMatch(
-      /\[Observation: "crl-test-fixture-LocalConcepts"\."Adult Patient"\]/,
-    );
+    expect(sourceCql).toMatch(/\[Observation: "crl-test-fixture-LocalConcepts"\."Adult Patient"\]/);
     expect(sourceCql).toMatch(
       /\[Observation: "crl-test-fixture-LocalConcepts"\."Active Crohns Disease"\]/,
     );
@@ -299,7 +304,7 @@ describe("emitCQLImports (per-CRL v2.1.0)", () => {
     // `…asTruths().satisfied()`, and the Interface layer includes CFH.
     const interfaceCql = interfaceEntry?.cql ?? "";
     expect(interfaceCql).toMatch(/include "crl-test-fixture-LocalSource"/);
-    expect(interfaceCql).toMatch(/include CaseFeatureHelpers called CFH/);
+    expect(interfaceCql).toMatch(/include CaseFeatureCommon called CFH/);
     expect(interfaceCql).toMatch(
       /define "Active Crohns Disease":\s*"crl-test-fixture-LocalSource"\."Active Crohns Disease"\.asTruths\(\)\.satisfied\(\)/,
     );
@@ -355,7 +360,7 @@ describe("emitCQLImports (per-CRL v2.1.0)", () => {
     expect(rootCql).toMatch(/Sib\."Measurement Period"/);
   });
 
-  it("cross-library qualified Patient parameter ref REWRITES to bare `Patient` (NOT `Sib.\"Index Patient\"`)", () => {
+  it('cross-library qualified Patient parameter ref REWRITES to bare `Patient` (NOT `Sib."Index Patient"`)', () => {
     const root = path.join(FIXTURES, "cross-lib-parameter-patient", "root.crl");
     const result = emitCQLImports(root);
     expect(result.success).toBe(true);
@@ -441,7 +446,7 @@ activity "Refer":
     const root = path.join(FIXTURES, "non-decision-localcode-activity", "root.crl");
     const result = emitCQLImports(root);
     expect(result.success).toBe(true);
-    const names = result.cqlByLibrary.map((e) => e.libraryName).sort();
+    const names = policyLibNames(result);
     expect(names).toEqual(["Pol"]);
     const cql = findLib(result, "Pol") ?? "";
     // The lowered local code is present (the `code is` lowering still ran) AND the
@@ -461,7 +466,7 @@ activity "Refer":
     const root = path.join(FIXTURES, "partial-concepts-name-collision", "root.crl");
     const result = emitCQLImports(root);
     expect(result.success).toBe(true);
-    const names = result.cqlByLibrary.map((e) => e.libraryName).sort();
+    const names = policyLibNames(result);
     expect(names).toEqual([
       "Pol Concepts",
       "crl-test-fixture-Inferred",
@@ -503,5 +508,60 @@ decision "Triage":
     expect(second.errors).toEqual([]);
     expect(second.localCodes).toEqual([]);
     expect(second.ast).toBe(first.ast); // identity-preserved no-op
+  });
+
+  it("#187: ALWAYS appends the three shared catalog libraries to cqlByLibrary", () => {
+    // Every successful emit ships CRLCommon.cql + CaseFeatureCommon.cql +
+    // FHIRHelpers.cql (4.0.1) regardless of the policy's shape.
+    const root = path.join(FIXTURES, "cms22-split", "cms22.crl");
+    const result = emitCQLImports(root);
+    expect(result.success).toBe(true);
+
+    const byName = new Map(result.cqlByLibrary.map((e) => [e.libraryName, e]));
+    for (const [name, file] of [
+      ["CRLCommon", "CRLCommon.cql"],
+      ["CaseFeatureCommon", "CaseFeatureCommon.cql"],
+      ["FHIRHelpers", "FHIRHelpers.cql"],
+    ] as const) {
+      const entry = byName.get(name);
+      expect(entry).toBeDefined();
+      expect(entry!.outputFilename).toBe(file);
+      // Non-empty catalog source with the expected header identity.
+      expect(entry!.cql.length).toBeGreaterThan(0);
+      expect(entry!.cql).toMatch(new RegExp(`library ${name}`));
+      // Well-formed manifest shape so the FHIR orchestrator never mis-routes them.
+      expect(entry!.role).toBe("root");
+      expect(entry!.sourceLibraryName).toBe(name);
+      expect(entry!.includes).toEqual([]);
+    }
+
+    // FHIRHelpers is pinned to 4.0.1 (engine-bundled version).
+    expect(byName.get("FHIRHelpers")!.cql).toMatch(/library FHIRHelpers version '4\.0\.1'/);
+    // CaseFeatureCommon carries the truth-set helpers (renamed from CaseFeatureHelpers).
+    expect(byName.get("CaseFeatureCommon")!.cql).toMatch(/define fluent function asTruths/);
+  });
+
+  it("#187: FHIRHelpers version does not drift across catalog header, loader, and emitted include pin", () => {
+    // Single red test if ANY of the three FHIRHelpers version sources diverge:
+    //   (1) the shipped catalog `FHIRHelpers.cql` header `library ... version '<v>'`,
+    //   (2) the loader's declared `loadFHIRHelpers().version`,
+    //   (3) the emitter's `include FHIRHelpers version '<v>'` pin
+    //       (DEFAULT_FHIRHELPERS_VERSION, also stamped in every emitted layer).
+    // All three must equal the engine's bundled FHIRHelpers version (4.0.1) so
+    // emitted == engine == include == catalog source.
+    const fh = loadFHIRHelpers();
+    const headerMatch = fh.cql.match(/library FHIRHelpers version '([^']+)'/);
+    expect(headerMatch).not.toBeNull();
+    const catalogHeaderVersion = headerMatch![1];
+
+    expect(catalogHeaderVersion).toBe("4.0.1");
+    expect(fh.version).toBe(catalogHeaderVersion);
+    expect(DEFAULT_FHIRHELPERS_VERSION).toBe(catalogHeaderVersion);
+
+    // The emitted layer CQL pins the SAME version in its include line.
+    const root = path.join(FIXTURES, "cms22-split", "cms22.crl");
+    const result = emitCQLImports(root);
+    const policyCql = result.cqlByLibrary.find((e) => e.libraryName === "CMS22")!.cql;
+    expect(policyCql).toContain(`include FHIRHelpers version '${DEFAULT_FHIRHELPERS_VERSION}'`);
   });
 });

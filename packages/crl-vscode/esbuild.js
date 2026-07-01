@@ -159,10 +159,34 @@ async function build() {
     JSON.stringify(patterns, null, 2)
   );
 
+  // #187: the bundled MCP server (dist/mcp-server.js) reaches core's catalog
+  // loader (loadCatalog.ts, inlined by esbuild) which reads the three shared
+  // catalog `.cql` via readFileSync(join(__dirname, name)). In the bundle
+  // `__dirname` is THIS dist/ dir — with no catalog siblings — so `emit_cql` /
+  // `emit_crl_fhir` would ENOENT. Copy the three `.cql` NEXT TO the bundle so the
+  // loader's `join(__dirname, name)` candidate resolves (mirrors the plain-dist
+  // copy-catalog.mjs step). Source them from core's BUILT dist (assertCrlBuilt
+  // guarantees core is built + copy-catalog ran); fail loud if any is missing.
+  const CATALOG_CQL = ["CRLCommon.cql", "CaseFeatureCommon.cql", "FHIRHelpers.cql"];
+  const coreCatalogDist = path.resolve(
+    __dirname,
+    "../crl/dist/cql-emitter/catalog"
+  );
+  for (const name of CATALOG_CQL) {
+    const src = path.join(coreCatalogDist, name);
+    if (!fs.existsSync(src)) {
+      throw new Error(
+        `Catalog CQL ${name} missing at ${src} — core's copy-catalog build step did not run. ` +
+          "Rebuild core (`npm run build -w @smile-digital-health/crl`), which runs `tsc && node scripts/copy-catalog.mjs`."
+      );
+    }
+    fs.copyFileSync(src, path.resolve(__dirname, "dist", name));
+  }
+
   console.log(
     "esbuild: built extension.js + mcp-server.js + provision.js; " +
-      `embedded ${patterns.length} catalog patterns; gates passed ` +
-      `(externals: ${[...new Set(externalImports)].join(", ") || "none"}).`
+      `embedded ${patterns.length} catalog patterns; copied ${CATALOG_CQL.length} catalog .cql next to the bundle; ` +
+      `gates passed (externals: ${[...new Set(externalImports)].join(", ") || "none"}).`
   );
 }
 
