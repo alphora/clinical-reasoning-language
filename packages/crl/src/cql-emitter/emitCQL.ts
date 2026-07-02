@@ -1147,15 +1147,20 @@ class Emitter {
     // one filter/cast, change the other). NO status filter: a DTR-extracted answer
     // (sdc `definitionExtractValue`, ProcessDefinitionItem) is NOT stamped `final`,
     // so restricting status would silently drop it (operator decision 2026-07-01).
-    // `sort by effective, id` picks the newest with a DETERMINISTIC tie-break —
-    // the extraction populates `effective` (from QuestionnaireResponse.authored),
+    // Sort by the COMPARABLE effective value, NOT the raw `effective[x]` choice.
+    // `sort by effective` translates but THROWS at runtime with 2+ rows —
+    // `DateTimeType is not comparable` — because it orders the polymorphic choice
+    // element. Casting to the System.DateTime (`(effective as FHIR.dateTime).value`)
+    // matches the comparable value the lattice reads in `recencyAgeAssertedWins`.
+    // The extraction populates `effective` (from QuestionnaireResponse.authored),
     // NOT `issued`, so recency keys on `effective`; FHIR sorts null low, so a dated
-    // answer is preferred and an all-null set is deterministic (by `id`).
+    // answer is preferred and an all-null set is deterministic (by `id`). NO status
+    // filter (extracted answers aren't stamped `final`; operator decision 2026-07-01).
     const newestLocal =
       `Last(\n` +
       `    (${cqlQualifiedRef(localLib, foldIn)}) O\n` +
       `      where O.value is FHIR.boolean\n` +
-      `      sort by effective, id\n` +
+      `      sort by (effective as FHIR.dateTime).value, id\n` +
       `  )`;
     const computed = `CRLCommon.AtLeast(CRLCommon.AgeAt(), ${threshold})`;
     // `CFH.recencyAgeTruths(newestLocalObservation, computedBoolean)` returns the

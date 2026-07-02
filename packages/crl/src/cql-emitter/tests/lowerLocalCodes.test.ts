@@ -549,7 +549,7 @@ concept "Age 18 Or Older":
     // `effective` (what DTR extraction populates), with a deterministic `id` tie-break.
     expect(r.result).not.toContain("O.status in");
     expect(r.result).toContain("O.value is FHIR.boolean");
-    expect(r.result).toContain("sort by effective, id");
+    expect(r.result).toContain("sort by (effective as FHIR.dateTime).value, id");
     expect(r.result).toContain("CRLCommon.AtLeast(CRLCommon.AgeAt(), 18 'years')");
     // The @business-logic-deferred marker lands as a block comment above the Inferred define.
     expect(r.result).toMatch(
