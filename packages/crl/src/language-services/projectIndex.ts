@@ -824,7 +824,8 @@ function addRef(
  * Ranges returned are zero-based, exclusive-end, and target the INSIDE
  * of the quotes (so rename edits don't have to touch the `"` chars).
  */
-function findRefRangesInSource(
+// Exported for unit tests (multi-line when-condition ref-range regression).
+export function findRefRangesInSource(
   source: string,
   location: Loc,
   targetName: string,
@@ -835,23 +836,26 @@ function findRefRangesInSource(
   const startLine = location.start.line - 1;
   const endLine = location.end.line - 1;
   if (startLine < 0 || endLine >= lines.length) return null;
-  if (startLine !== endLine) {
-    // Multi-line refs: anchor at the start of the location range.
-    return {
-      nameRange: { startLine, startCol: location.start.column, endLine: startLine, endCol: location.start.column + 1 },
-      qualifierRange: null,
-    };
-  }
   const line = lines[startLine];
   const startCol = location.start.column;
-  const endCol = location.end.column;
+  // The ref NAME lives on the START line of the location. For a MULTI-LINE
+  // location — e.g. a `when "<concept>" then: <body>` block whose location spans
+  // its nested `then:` body — bound the search at the END OF THE START LINE, not
+  // `location.end.column` (which is on a later line). The old multi-line branch
+  // returned a degenerate 1-char range at the block start, so go-to-definition /
+  // hover missed the concept name on every multi-line `when … then:` condition.
+  const endCol = startLine === endLine ? location.end.column : line.length;
   const segment = line.slice(startCol, endCol);
-  // Prefer an exact match on `"<targetName>"` (handles parent locations
-  // that cover MORE than the ref — e.g. when-clause locations including
-  // the keyword + concept ref). Last-occurrence wins so qualified refs
-  // pick the trailing name segment.
+  // Prefer an exact match on `"<targetName>"` (handles parent locations that
+  // cover MORE than the ref — e.g. a when-clause location including the keyword
+  // + a nested `then:` body). QUALIFIED refs carry a TIGHT own-location and want
+  // the TRAILING name (so `"Lib"."Name"`, even `"X"."X"`, resolves to the name,
+  // not the qualifier) → last-occurrence. BARE refs can have a WIDE parent
+  // location where the SAME name recurs (e.g. `when "X" then recommend activity
+  // "X"`); the ref is the FIRST occurrence (the `when` condition), not the last
+  // → first-occurrence.
   const exactNeedle = `"${targetName}"`;
-  const exactIdx = segment.lastIndexOf(exactNeedle);
+  const exactIdx = qualified ? segment.lastIndexOf(exactNeedle) : segment.indexOf(exactNeedle);
   if (exactIdx >= 0) {
     const nameStart = startCol + exactIdx + 1;
     const nameRange: ZeroBasedRange = {
@@ -880,7 +884,9 @@ function findRefRangesInSource(
     }
     return { nameRange, qualifierRange };
   }
-  // Fallback: find all quoted spans and pick the LAST as the name.
+  // Fallback (no exact `"<targetName>"` match): pick a quoted span — LAST for a
+  // qualified ref (trailing name), FIRST for a bare ref (the `when` condition
+  // when the same name recurs later on the line). Mirrors the disambiguation above.
   const spans: { start: number; end: number }[] = [];
   for (let i = 0; i < segment.length; i++) {
     if (segment[i] !== '"') continue;
@@ -890,7 +896,7 @@ function findRefRangesInSource(
     i = close;
   }
   if (spans.length === 0) return null;
-  const nameSpan = spans[spans.length - 1];
+  const nameSpan = qualified ? spans[spans.length - 1] : spans[0];
   const nameRange: ZeroBasedRange = {
     startLine,
     startCol: startCol + nameSpan.start,
