@@ -11,9 +11,10 @@
 import { nodeKey, type RenderScenarioResult } from "@smile-digital-health/crl";
 
 import { corrKeyHtml } from "./corrKey";
-// Type-only import (erased at compile — no runtime/bundle coupling to the store's node:fs deps): the review-state union is
-// OWNED by medicalValidationStore, imported here so the dropdown's option set + the opts type can't drift from it.
-import type { PersistedReviewState, ReviewState } from "./medicalValidationStore";
+// Type-only import (erased at compile — no runtime/bundle coupling to the store's node:fs deps): the review-state union +
+// the Note shape are OWNED by medicalValidationStore, imported here so the dropdown option set + the opts type + the note
+// render can't drift from them.
+import type { Note, PersistedReviewState, ReviewState } from "./medicalValidationStore";
 
 export interface CelAnchor {
   scrollTo: string;
@@ -69,16 +70,38 @@ const BADGE: Record<string, string> = { pass: "✓", fail: "✗", error: "⚠" }
 const REVIEW_LABEL: Record<ReviewState, string> = { unreviewed: "To do", pending: "Pending", pass: "Pass", fail: "Fail" };
 const REVIEW_ORDER: readonly ReviewState[] = ["unreviewed", "pending", "pass", "fail"];
 
+/** Format a note's epoch-ms timestamp DETERMINISTICALLY in UTC (`YYYY-MM-DD HH:MM UTC`) — no locale/timezone, so this pure
+ *  renderer stays machine-independent + unit-testable. (Local-time display, if ever wanted, would be a host-formatted string
+ *  passed in — deferred; it would break the renderer's escaped-values-only purity.) Lives here (the only consumer) rather
+ *  than in the store, so celPaneHtml keeps its fs-free, value-import-free footprint. */
+export function formatNoteTimestamp(ms: number): string {
+  const d = new Date(ms);
+  const p = (n: number, w = 2): string => String(n).padStart(w, "0");
+  return `${p(d.getUTCFullYear(), 4)}-${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())} ${p(d.getUTCHours())}:${p(d.getUTCMinutes())} UTC`;
+}
+
+/** Medical-Validation worklist render options (mode-gated; ABSENT or `enabled:false` ⇒ the cockpit render is byte-
+ *  unchanged). `statesByCaseId` (verdicts) + `notesByCaseId` (threads) are keyed by frozen caseId ONLY (never by name).
+ *  `openNotesCaseId`/`editingNoteId` are HOST UI-state threaded in so the drawer + edit-in-place survive the pane's
+ *  innerHTML re-renders (the webview is not the authority). */
+export interface WorklistOpts {
+  enabled: boolean;
+  statesByCaseId: Record<string, PersistedReviewState>;
+  policyLabel?: string;
+  notesByCaseId?: Record<string, Note[]>;
+  openNotesCaseId?: string;
+  editingNoteId?: string;
+}
+
 export function renderCelPane(
   result: RenderScenarioResult,
   caseIdByName: Record<string, string>,
   // caseKeyNumbers: caseId → its corresponding units' numbers (#163 at-rest key). showKeys gates the slot.
   // duplicateScenarioNames: names shared by >1 case (frozen OR unfrozen). #173 FIX 1 (disc 160): such a case is NOT
   // anchored/clickable — clicking it would mis-attribute to the frozen same-name case's caseId. Rendered with a marker.
-  // worklist (#156 slice 4, mode-gated): when `enabled`, render a 3-state review checkbox per case + (for reviewable
-  // cases) emit a `data-worklist-toggle` key into `worklistActions`. ABSENT or `enabled:false` → byte-identical to the
-  // cockpit render (no checkbox, no worklistActions). `statesByCaseId` is keyed by frozen caseId only (never by name).
-  opts: { revealPrefix?: string; revealableConceptKeys?: ReadonlySet<string>; caseKeyNumbers?: Record<string, number[]>; showKeys?: boolean; duplicateScenarioNames?: ReadonlySet<string>; worklist?: { enabled: boolean; statesByCaseId: Record<string, PersistedReviewState>; policyLabel?: string } } = {},
+  // worklist (#156, mode-gated): when `enabled`, render a review-verdict <select> + a notes glyph per reviewable case +
+  // (for the open case) a right-side notes drawer. ABSENT or `enabled:false` → byte-identical to the cockpit render.
+  opts: { revealPrefix?: string; revealableConceptKeys?: ReadonlySet<string>; caseKeyNumbers?: Record<string, number[]>; showKeys?: boolean; duplicateScenarioNames?: ReadonlySet<string>; worklist?: WorklistOpts } = {},
 ): RenderedCel {
   const prefix = opts.revealPrefix ?? "";
   const revealable = opts.revealableConceptKeys;
@@ -116,6 +139,9 @@ export function renderCelPane(
     (result.errors.length > 0
       ? `<p class="placeholder fc-cel-banner">⚠ ${escapeHtml(result.errors.join("; "))}</p>`
       : "");
+  // The notes drawer (#156 notes) is a PANE-LEVEL right panel (only one case's drawer is open at a time — openNotesCaseId),
+  // so it's captured during the loop and appended ONCE after all case blocks, not nested inside a row's div.
+  let drawerHtml = "";
   let idx = 0;
   for (const sc of result.scenarios) {
     // FIX 1 (disc 160): an AMBIGUOUS-name case (its name shared by >1 case) must NOT be anchored to the frozen
@@ -186,6 +212,23 @@ export function renderCelPane(
           `<select class="cel-review cel-review-disabled" disabled aria-label="Not reviewable" title="${escapeHtml(why)}"><option>${REVIEW_LABEL.unreviewed}</option></select> `;
       }
     }
+    // Notes glyph + drawer (#156 notes, worklist mode, REVIEWABLE cases only — a stable caseId to key the thread; unfrozen/
+    // ambiguous get no glyph, consistent with the verdict select's no-trustworthy-caseId rule). The glyph reuses the SAME
+    // opaque `wl_<caseId>` key as the verdict select (both resolve to the caseId host-side). has-notes → 💬 + count; none →
+    // 🗨 outline. When this case is the OPEN drawer, capture the pane-level drawer to append after the loop.
+    let notesGlyph = "";
+    if (worklist && worklistActions && caseId !== undefined) {
+      const wlKey = `wl_${caseId}`;
+      worklistActions[wlKey] = { caseId }; // idempotent with the verdict branch — ensure present regardless
+      const notes = worklist.notesByCaseId?.[caseId] ?? [];
+      const count = notes.length;
+      const isOpen = worklist.openNotesCaseId === caseId;
+      notesGlyph =
+        `<span class="cel-notes-glyph${count ? " cel-notes-has" : ""}${isOpen ? " cel-notes-open" : ""}" role="button" tabindex="0" ` +
+        `data-notes-toggle="${escapeHtml(wlKey)}" title="${count ? `${count} note${count === 1 ? "" : "s"}` : "No notes"} — click to open/close" ` +
+        `aria-label="Notes (${count})">${count ? `💬 ${count}` : "🗨"}</span>`;
+      if (isOpen) drawerHtml = renderNotesDrawer(wlKey, sc.case.name, notes, worklist.editingNoteId);
+    }
     html +=
       `<div ${attrs.join(" ")}>` +
       reviewControl +
@@ -193,11 +236,57 @@ export function renderCelPane(
       `<span class="cel-status">${BADGE[sc.status] ?? "·"}</span> ` +
       `<span class="cel-name">${escapeHtml(sc.case.name)}</span>` +
       (sc.case.subject ? ` <span class="cel-subject">(${escapeHtml(sc.case.subject)})</span>` : "") +
+      (notesGlyph ? ` ${notesGlyph}` : "") +
       (ambiguous ? ` <span class="cel-ambiguous-marker" title="This case's name is shared by another case — give each a distinct name to make it selectable.">⚠ name shared; not selectable</span>` : "") +
       (factParts.length ? `<div class="cel-facts">facts: ${factParts.join(", ")}</div>` : "") +
       (produced ? `<div class="cel-produced">→ ${produced}</div>` : "") +
       `</div>`;
     idx++;
   }
+  html += drawerHtml; // pane-level right drawer (empty unless a case's notes drawer is open)
   return worklistActions ? { html, anchors, reveals, conceptToFactAnchors, worklistActions } : { html, anchors, reveals, conceptToFactAnchors };
+}
+
+/** Render the pane-level right notes drawer for the OPEN case: header (case name + ✕ close), the note thread (each note
+ *  text + timestamp + Edit/Delete, OR — for the note whose id === `editingNoteId` — a prefilled textarea + Save/Cancel), and
+ *  an add-row (a textarea + explicit Send). ALL user text (`text`, `name`) is `escapeHtml`-d, INCLUDING the textarea prefill
+ *  (a raw `</textarea>` would otherwise break out of the element). The `data-note-draft` keys (`add:<wlKey>` / `edit:<id>`)
+ *  let the webview preserve a half-typed draft across an unrelated re-render (a verdict change on another row). `wlKey` is
+ *  the case's opaque `wl_<caseId>` — the trusted key the host resolves; the webview never sees a caseId. Pure. */
+function renderNotesDrawer(wlKey: string, caseName: string, notes: readonly Note[], editingNoteId: string | undefined): string {
+  const items = notes
+    .map((n) => {
+      const stamp = formatNoteTimestamp(n.created) + (n.edited !== undefined ? ` · edited ${formatNoteTimestamp(n.edited)}` : "");
+      if (n.id === editingNoteId) {
+        return (
+          `<li class="cel-note cel-note-editing">` +
+          `<textarea class="cel-note-input" data-note-draft="edit:${escapeHtml(n.id)}" aria-label="Edit note">${escapeHtml(n.text)}</textarea>` +
+          `<div class="cel-note-actions">` +
+          `<button type="button" class="cel-note-btn" data-note-save="${escapeHtml(n.id)}">Save</button>` +
+          `<button type="button" class="cel-note-btn" data-note-cancel="1">Cancel</button>` +
+          `</div></li>`
+        );
+      }
+      return (
+        `<li class="cel-note">` +
+        `<div class="cel-note-text">${escapeHtml(n.text)}</div>` +
+        `<div class="cel-note-meta"><span class="cel-note-ts">${escapeHtml(stamp)}</span>` +
+        `<span class="cel-note-actions">` +
+        `<button type="button" class="cel-note-btn" data-note-edit="${escapeHtml(n.id)}">Edit</button>` +
+        `<button type="button" class="cel-note-btn" data-note-delete="${escapeHtml(n.id)}">Delete</button>` +
+        `</span></div></li>`
+      );
+    })
+    .join("");
+  const thread = notes.length ? `<ul class="cel-note-list">${items}</ul>` : `<p class="cel-note-empty">No notes yet.</p>`;
+  return (
+    `<div class="cel-notes-drawer" data-notes-drawer>` +
+    `<div class="cel-notes-head"><span class="cel-notes-title">Notes — ${escapeHtml(caseName)}</span>` +
+    `<button type="button" class="cel-notes-close" data-notes-close="1" aria-label="Close notes">✕</button></div>` +
+    thread +
+    `<div class="cel-note-add">` +
+    `<textarea class="cel-note-input" data-note-draft="add:${escapeHtml(wlKey)}" placeholder="Add a note…" aria-label="Add a note"></textarea>` +
+    `<button type="button" class="cel-note-send" data-note-add="${escapeHtml(wlKey)}">Send</button>` +
+    `</div></div>`
+  );
 }

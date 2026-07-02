@@ -26,7 +26,7 @@ async function load(tsFile) {
   return require(out);
 }
 
-const { medicalValidationSidecarPath, loadSidecar, saveSidecar, deriveReviewOverlay, buildReviewPerCase, isReviewState, setReviewState, REVIEW_STATES, reviewProgress, renderProgressChrome } =
+const { medicalValidationSidecarPath, loadSidecar, saveSidecar, deriveReviewOverlay, buildReviewPerCase, isReviewState, setReviewState, REVIEW_STATES, reviewProgress, renderProgressChrome, composeSidecar, addNote, editNote, deleteNote } =
   await load("medicalValidationStore.ts");
 
 let pass = 0;
@@ -505,6 +505,109 @@ check("renderProgressChrome: total 0 but unreviewable>0 STILL renders (all rows 
   assert.notEqual(html, "");
   assert.match(html, /0 reviewable/);
   assert.match(html, /2 not reviewable/);
+});
+
+// ── notes: composeSidecar + reducers + coerce/round-trip ─────────────────────────
+const NOTE = (id, text, created = 1700000000000, edited) => (edited !== undefined ? { id, text, created, edited } : { id, text, created });
+
+check("composeSidecar: omits notesByCaseId when empty (verdict-only sidecar stays byte-identical to before)", () => {
+  assert.deepEqual(composeSidecar({ c1: "pass" }, {}), { schemaVersion: 2, byCaseId: { c1: "pass" } });
+});
+check("composeSidecar: includes notesByCaseId when non-empty (both maps married in one object)", () => {
+  const notes = { c1: [NOTE("n1", "hi")] };
+  assert.deepEqual(composeSidecar({ c1: "pass" }, notes), { schemaVersion: 2, byCaseId: { c1: "pass" }, notesByCaseId: notes });
+});
+
+check("addNote: appends to a case thread (creating it if absent); returns a NEW map; input untouched", () => {
+  const input = {};
+  const out = addNote(input, "c1", NOTE("n1", "first"));
+  assert.deepEqual(out, { c1: [NOTE("n1", "first")] });
+  assert.deepEqual(input, {}, "input not mutated");
+  assert.deepEqual(addNote(out, "c1", NOTE("n2", "second")), { c1: [NOTE("n1", "first"), NOTE("n2", "second")] });
+});
+check("editNote: replaces text + sets edited; no-op on a missing case or id", () => {
+  const m = { c1: [NOTE("n1", "old")] };
+  assert.deepEqual(editNote(m, "c1", "n1", "new", 1700000009999), { c1: [NOTE("n1", "new", 1700000000000, 1700000009999)] });
+  assert.deepEqual(editNote(m, "c1", "nope", "x", 1), { c1: [NOTE("n1", "old")] }, "missing id → no-op (equivalent map)");
+  assert.deepEqual(editNote(m, "cX", "n1", "x", 1), { c1: [NOTE("n1", "old")] }, "missing case → no-op");
+  assert.notEqual(editNote(m, "c1", "n1", "new", 1), m, "returns a new object");
+});
+check("deleteNote: removes the note; empties→DELETE the case key (absence = no notes)", () => {
+  assert.deepEqual(deleteNote({ c1: [NOTE("n1", "a"), NOTE("n2", "b")] }, "c1", "n1"), { c1: [NOTE("n2", "b")] });
+  assert.deepEqual(deleteNote({ c1: [NOTE("n1", "a")] }, "c1", "n1"), {}, "last note removed → case key dropped");
+  assert.deepEqual(deleteNote({ c1: [NOTE("n1", "a")] }, "c1", "nope"), { c1: [NOTE("n1", "a")] }, "missing id → no-op");
+});
+
+check("load: a v2 sidecar with notesByCaseId round-trips the threads (coerce carries them through — no drop)", () => {
+  const root = mkdtempSync(join(tmpdir(), "mv-notes-"));
+  try {
+    const p = join(root, "s.json");
+    const notes = { c1: [NOTE("n1", "hello"), NOTE("n2", "world", 1700000005000, 1700000006000)] };
+    writeFileSync(p, JSON.stringify({ schemaVersion: 2, byCaseId: { c1: "pass" }, notesByCaseId: notes }));
+    const r = loadSidecar(p);
+    assert.deepEqual(r.sidecar.byCaseId, { c1: "pass" });
+    assert.deepEqual(r.sidecar.notesByCaseId, notes, "notes survive load");
+    assert.equal(r.warning, undefined);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+check("save→load: composeSidecar round-trips BOTH maps (a verdict + notes persist together)", () => {
+  const root = mkdtempSync(join(tmpdir(), "mv-notes-"));
+  try {
+    const p = join(root, "medical-validation", "p.json");
+    const sc = composeSidecar({ c1: "fail" }, { c1: [NOTE("n1", "why it failed")] });
+    saveSidecar(p, sc);
+    const r = loadSidecar(p);
+    assert.deepEqual(r.sidecar, sc, "verdict AND notes both round-trip");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+check("load: malformed notes dropped, valid kept; a bad notesByCaseId container drops notes but KEEPS verdicts", () => {
+  const root = mkdtempSync(join(tmpdir(), "mv-notes-"));
+  try {
+    const p = join(root, "s.json");
+    // c1: one valid + one bad (blank text) + one bad (no id) → keep the valid; c2: non-array → dropped; c3: empty array → dropped
+    writeFileSync(p, JSON.stringify({
+      schemaVersion: 2,
+      byCaseId: { c1: "pass" },
+      notesByCaseId: {
+        c1: [NOTE("n1", "keep"), { id: "n2", text: "   ", created: 1 }, { text: "no id", created: 1 }],
+        c2: "not-an-array",
+        c3: [],
+      },
+    }));
+    const r = loadSidecar(p);
+    assert.deepEqual(r.sidecar.notesByCaseId, { c1: [NOTE("n1", "keep")] }, "only the valid note under c1 survives");
+    assert.deepEqual(r.sidecar.byCaseId, { c1: "pass" }, "verdicts untouched by a partly-bad notes blob");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+check("load: a non-object notesByCaseId (e.g. an array) drops notes entirely, keeps verdicts, no whole-sidecar reject", () => {
+  const root = mkdtempSync(join(tmpdir(), "mv-notes-"));
+  try {
+    const p = join(root, "s.json");
+    writeFileSync(p, JSON.stringify({ schemaVersion: 2, byCaseId: { c1: "pass" }, notesByCaseId: ["nope"] }));
+    const r = loadSidecar(p);
+    assert.equal(r.sidecar.notesByCaseId, undefined, "bad notes container → omitted");
+    assert.deepEqual(r.sidecar.byCaseId, { c1: "pass" }, "verdicts survive");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+check("load: STALE/orphan note caseIds are PRESERVED (coerce has no model to prune against; re-frozen case keeps history)", () => {
+  const root = mkdtempSync(join(tmpdir(), "mv-notes-"));
+  try {
+    const p = join(root, "s.json");
+    const notes = { ghost: [NOTE("n1", "orphaned history")] };
+    writeFileSync(p, JSON.stringify({ schemaVersion: 2, byCaseId: {}, notesByCaseId: notes }));
+    const r = loadSidecar(p);
+    assert.deepEqual(r.sidecar.notesByCaseId, notes, "an orphan caseId's notes are not pruned on load");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 
 console.log(`\nmedicalValidationStore.test: ${pass} checks passed`);

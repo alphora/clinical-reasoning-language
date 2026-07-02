@@ -72,6 +72,19 @@ function handlerBody(type) {
   return SCRIPT.slice(start, i - 1);
 }
 
+// Extract the root 'click' listener body (brace-matched) — the delegated handler where the note controls live.
+function handlerClick() {
+  const marker = "root.addEventListener('click',(e)=>{";
+  const start = SCRIPT.indexOf(marker);
+  assert.ok(start > -1, "root click listener exists");
+  let depth = 1, i = start + marker.length;
+  for (; i < SCRIPT.length && depth > 0; i++) {
+    if (SCRIPT[i] === "{") depth++;
+    else if (SCRIPT[i] === "}") depth--;
+  }
+  return SCRIPT.slice(start + marker.length, i - 1);
+}
+
 check("sanity: the review-overlay handlers + clrRO exist in the extracted script", () => {
   assert.match(SCRIPT, /const clrRO=\(\)=>\{/, "clrRO is defined");
   assert.match(SCRIPT, /if\(m\.type==='markReviewOverlay'\)/, "markReviewOverlay handler");
@@ -310,6 +323,44 @@ check("disc 164: the diverter on/off toggle round-trips (webview [data-diverter-
     /mode === "medical-validation"\s*\?\s*`<div class="fc-toggle"[\s\S]*?data-diverter-toggle/.test(COCKPIT_SRC),
     "the Diverters toggle renders only in medical-validation mode",
   );
+});
+
+// ── #156 notes: the drawer control delegation + draft preserve/restore ──
+check("notes controls post their messages (toggle/close/add/editStart/editSave/editCancel/delete)", () => {
+  assert.match(SCRIPT, /type:'notesToggle',key:/, "glyph → notesToggle{key}");
+  assert.match(SCRIPT, /type:'notesClose'/, "close → notesClose");
+  assert.match(SCRIPT, /type:'noteAdd',key:[^}]*value:/, "Send → noteAdd{key,value}");
+  assert.match(SCRIPT, /type:'noteEditStart',noteId:/, "Edit → noteEditStart{noteId}");
+  assert.match(SCRIPT, /type:'noteEditSave',noteId:[^}]*value:/, "Save → noteEditSave{noteId,value}");
+  assert.match(SCRIPT, /type:'noteEditCancel'/, "Cancel → noteEditCancel");
+  assert.match(SCRIPT, /type:'noteDelete',noteId:/, "Delete → noteDelete{noteId}");
+});
+
+check("notes controls are intercepted BEFORE [data-reveal] (the glyph sits in a reveal target → must not select the case)", () => {
+  const clickBody = handlerClick();
+  const iNotes = clickBody.indexOf("data-notes-toggle");
+  const iReveal = clickBody.indexOf("data-reveal");
+  assert.ok(iNotes > -1 && iReveal > -1 && iNotes < iReveal, "the notes-toggle guard precedes the reveal fallthrough");
+  // every note control stops propagation (blocks the case-select) — count the stopPropagation on the note branch
+  assert.ok(/data-notes-toggle[\s\S]*?stopPropagation/.test(clickBody), "notes-toggle stops propagation");
+  assert.ok(/data-note-draft[\s\S]*?stopPropagation/.test(clickBody), "a click on the textarea stops propagation (no reveal)");
+});
+
+check("Send/Save read the textarea SCOPED to the clicked control's container (not a global querySelector)", () => {
+  const clickBody = handlerClick();
+  assert.ok(/data-note-add[\s\S]*?closest\('\.cel-note-add'\)[\s\S]*?querySelector\('\[data-note-draft\]'\)/.test(clickBody), "add reads its own .cel-note-add textarea");
+  assert.ok(/data-note-save[\s\S]*?closest\('\.cel-note-editing'\)[\s\S]*?querySelector\('\[data-note-draft\]'\)/.test(clickBody), "save reads its own .cel-note-editing textarea");
+  assert.ok(/type:'noteAdd'[\s\S]*?ta\.value=''/.test(clickBody), "the add textarea is CLEARED after posting (so a sent note doesn't restore)");
+});
+
+check("render handler PRESERVES note drafts across the innerHTML swap (snapshot [data-note-draft], restore after)", () => {
+  const body = handlerBody("render");
+  assert.ok(/querySelectorAll\('textarea\[data-note-draft\]'\)/.test(body), "snapshots the draft textareas");
+  const iSnap = body.indexOf("_d[k]=ta.value");
+  const iSwap = body.indexOf("root.innerHTML=m.html");
+  const iRestore = body.indexOf("ta.value=_d[k]");
+  assert.ok(iSnap > -1 && iSwap > -1 && iRestore > -1, "snapshot + swap + restore all present");
+  assert.ok(iSnap < iSwap && iSwap < iRestore, "order: snapshot BEFORE the swap, restore AFTER");
 });
 
 console.log(`\ncockpitWebviewScript.test: ${pass} checks passed`);

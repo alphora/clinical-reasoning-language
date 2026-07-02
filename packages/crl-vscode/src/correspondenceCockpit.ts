@@ -4,7 +4,7 @@
 // CockpitIndex; routes the engine's SEMANTIC reveal effects through the PaneRevealCoordinator → each pane's webview.
 // The pure logic lives in correspondenceEngine / paneRevealCoordinator / sourcePaneHtml (all unit-tested);
 // this file is the untested integration per the established split. Design: .vibe-tools/discussions/118-c2a-source-spine.md.
-import { randomBytes } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { basename, isAbsolute, relative, sep } from "node:path";
 
 import {
@@ -52,8 +52,12 @@ import {
 import { resolveThisNode } from "./thisNodeMarker";
 import { failedCriterionLabel } from "./failedCriterionLabel";
 import {
+  addNote,
   buildReviewPerCase,
+  composeSidecar,
+  deleteNote,
   deriveReviewOverlay,
+  editNote,
   isReviewState,
   loadSidecar,
   medicalValidationSidecarPath,
@@ -61,6 +65,7 @@ import {
   reviewProgress,
   saveSidecar,
   setReviewState,
+  type Note,
   type PersistedReviewState,
 } from "./medicalValidationStore";
 import { renderCrlPane } from "./crlPaneHtml";
@@ -259,6 +264,14 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   // alongside the load) — the toggle's save target. `worklistActions` is the CURRENT cel render's opaque-key → caseId map
   // (render-scoped, captured atomically with the cel pane's anchors, like conceptToFactAnchors).
   let reviewByCaseId: Record<string, PersistedReviewState> = {};
+  // #156 notes — the per-case conversation threads (caseId → Note[]; ABSENCE = no notes). Loaded alongside reviewByCaseId
+  // from the SAME sidecar. `persistMv()` is the SINGLE save path that marries both maps (composeSidecar) so a verdict change
+  // can never wipe notes nor vice-versa. `openNotesCaseId` = which case's right-drawer is open (host UI-state, survives the
+  // cel pane's innerHTML re-renders); `editingNoteId` = which note (if any) is in edit-in-place mode. Both are cleared in
+  // every MV-state reset path (load / rebuild-reset / retarget) so a stale drawer can't post against a prior policy's case.
+  let notesByCaseId: Record<string, Note[]> = {};
+  let openNotesCaseId: string | undefined;
+  let editingNoteId: string | undefined;
   let mvSidecarPath: string | undefined;
   let worklistActions: Record<string, { caseId: string }> = {};
   // #177 slice 3 — the questionnaire panel's focused-question index (the prev/next sub-nav cursor). RESET to 0 on a real
@@ -991,7 +1004,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       // per case (#156 slice 4); cockpit passes enabled:false → byte-identical to before. `worklistActions` is captured
       // atomically with this render's anchors (gen-scoped keys), mirroring conceptToFactAnchors.
       const r = scenarios
-        ? renderCelPane(scenarios, caseIdByName, { revealPrefix: `g${gen}_`, revealableConceptKeys, caseKeyNumbers, showKeys, duplicateScenarioNames, worklist: { enabled: mode === "medical-validation", statesByCaseId: reviewByCaseId, policyLabel: currentCel ? basename(currentCel).replace(/\.(cel|crl)$/i, "") : undefined } })
+        ? renderCelPane(scenarios, caseIdByName, { revealPrefix: `g${gen}_`, revealableConceptKeys, caseKeyNumbers, showKeys, duplicateScenarioNames, worklist: { enabled: mode === "medical-validation", statesByCaseId: reviewByCaseId, policyLabel: currentCel ? basename(currentCel).replace(/\.(cel|crl)$/i, "") : undefined, notesByCaseId, openNotesCaseId, editingNoteId } })
         : { html: '<p class="placeholder">No CEL.</p>', anchors: {}, reveals: {}, conceptToFactAnchors: {} }; // worklistActions omitted (cockpit discipline; `r.worklistActions ?? {}` below absorbs it)
       v.anchors = r.anchors;
       v.reveals = r.reveals;
@@ -1064,7 +1077,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
 
   function onWebviewMessage(
     pane: Pane,
-    msg: { type?: string; gen?: number; key?: string; value?: string; mode?: string; idx?: number; dir?: string; on?: string },
+    msg: { type?: string; gen?: number; key?: string; value?: string; noteId?: string; mode?: string; idx?: number; dir?: string; on?: string },
   ): void {
     const v = views.get(pane);
     if (!v) return;
@@ -1110,6 +1123,20 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       navigateQuestion(msg.dir); // #177 slice 5: the questionnaire pane's prev/next sub-nav — moves currentQuestionIndex
     } else if (msg.type === "worklistSet" && typeof msg.key === "string") {
       setWorklist(msg.key, msg.value); // #156 slice 4: a worklist dropdown change (MV mode) — host validates + persists it
+    } else if (msg.type === "notesToggle" && typeof msg.key === "string") {
+      toggleNotes(msg.key); // #156 notes: open/close a case's right drawer
+    } else if (msg.type === "notesClose") {
+      closeNotes();
+    } else if (msg.type === "noteAdd" && typeof msg.key === "string") {
+      addNoteFromWebview(msg.key, msg.value); // host stamps id + created, validates the open drawer, persists
+    } else if (msg.type === "noteEditStart" && typeof msg.noteId === "string") {
+      startEditNote(msg.noteId);
+    } else if (msg.type === "noteEditSave" && typeof msg.noteId === "string") {
+      saveEditNote(msg.noteId, msg.value);
+    } else if (msg.type === "noteEditCancel") {
+      cancelEditNote();
+    } else if (msg.type === "noteDelete" && typeof msg.noteId === "string") {
+      deleteNoteFromWebview(msg.noteId);
     } else if (msg.type === "reveal" && typeof msg.key === "string") {
       const hit = v.reveals[msg.key]; // trusted: looked up by opaque key, not a path/range from the webview
       if (!hit) return;
@@ -1329,6 +1356,9 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     // #156 slice 4: drop the worklist state too (mirror loadReviewSidecar's clearing) — else a click on the not-yet-
     // replaced old CEL DOM would resolve a stale worklistActions key + persist against the stale mvSidecarPath.
     reviewByCaseId = {};
+    notesByCaseId = {}; // #156 notes: drop the threads + drawer UI-state too (mirror loadReviewSidecar's clearing)
+    openNotesCaseId = undefined;
+    editingNoteId = undefined;
     mvSidecarPath = undefined;
     worklistActions = {};
     currentQuestionIndex = 0; // #177 slice 3: drop the questionnaire sub-nav cursor with the rest of the MV state
@@ -1446,6 +1476,9 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
    *  (a deleted/re-frozen case) are inert — the renderer keys by live caseId, so an orphan row simply never matches. */
   function loadReviewSidecar(): void {
     reviewByCaseId = {};
+    notesByCaseId = {}; // #156 notes: reset the threads + drawer UI-state with the rest of the MV state
+    openNotesCaseId = undefined;
+    editingNoteId = undefined;
     mvSidecarPath = undefined;
     worklistActions = {};
     if (mode !== "medical-validation" || !currentCel) return;
@@ -1454,6 +1487,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     mvSidecarPath = path;
     const { sidecar, warning } = loadSidecar(path);
     reviewByCaseId = sidecar.byCaseId;
+    notesByCaseId = sidecar.notesByCaseId ?? {}; // loaded from the SAME sidecar (coerce carried them through)
     // Warn ONCE per (path, warning): re-opening the SAME corrupt/forward-version sidecar in the same session shouldn't
     // re-nag. A changed path OR a changed warning string (the file was edited) re-warns.
     if (warning && (lastWarnedSidecar?.path !== path || lastWarnedSidecar?.warning !== warning)) {
@@ -1469,22 +1503,33 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
    *  user-visible error AND keep the in-memory map at its prior value, so disk + memory don't diverge (and the re-render
    *  shows the un-changed state). After a successful set the pass set may have changed → re-drive the tree DONE/ERROR
    *  overlay (#156 slice 5). */
+  /** The SINGLE Medical Validation save path. Composes the WHOLE sidecar from BOTH maps (`composeSidecar`) so no save can
+   *  ever write one map and forget the other — the verdict-eraser / note-eraser bug the reviewers flagged. Atomically
+   *  persists, and on success COMMITS both maps in memory (so a failed save leaves disk + memory both untouched — the
+   *  caller's re-render then shows the un-changed state). Returns false on failure (after surfacing it). Callers pass the
+   *  NEXT value of the map they changed + the CURRENT value of the other. */
+  function persistMv(nextByCaseId: Record<string, PersistedReviewState>, nextNotes: Record<string, Note[]>): boolean {
+    if (!mvSidecarPath) return false;
+    try {
+      saveSidecar(mvSidecarPath, composeSidecar(nextByCaseId, nextNotes));
+    } catch (e) {
+      void vscode.window.showErrorMessage(
+        `Medical Validation: could not save: ${e instanceof Error ? e.message : String(e)}`,
+      );
+      return false;
+    }
+    reviewByCaseId = nextByCaseId; // commit in-memory only AFTER a successful persist
+    notesByCaseId = nextNotes;
+    return true;
+  }
+
   function setWorklist(key: string, value: unknown): void {
     if (mode !== "medical-validation") return; // defensive: the dropdown only exists in MV mode
     const action = worklistActions[key]; // trusted: looked up by opaque key, not a caseId from the webview
     if (!action || !mvSidecarPath) return;
     if (!isReviewState(value)) return; // trusted-input guard: drop any value not in the known state set
     const next = setReviewState(reviewByCaseId, action.caseId, value);
-    try {
-      saveSidecar(mvSidecarPath, { schemaVersion: 2, byCaseId: next });
-    } catch (e) {
-      // Save failed — do NOT mutate the in-memory map (keep disk + memory in sync) + tell the user.
-      void vscode.window.showErrorMessage(
-        `Medical Validation: could not save review state: ${e instanceof Error ? e.message : String(e)}`,
-      );
-      return;
-    }
-    reviewByCaseId = next; // commit in-memory only AFTER a successful persist
+    if (!persistMv(next, notesByCaseId)) return; // save (both maps) failed → memory + disk untouched
     renderPane("cel"); // single-pane re-render (the dropdown selection); re-drive the selection so its highlight survives
     // #156 slice 6: the reviewed/pending counts changed → refresh the tree-chrome progress readout (no tree re-render). The
     // selection-dispatch path below ALSO renders chrome (dispatch → driveFailedCriteriaPeek → renderTreeChrome), so only
@@ -1492,6 +1537,75 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     if (state.selection) dispatch({ type: "select", selection: state.selection });
     else renderTreeChrome();
     driveDoneOverlay(); // #156 slice 5: the reviewed set changed → repaint the tree done/error overlay (no tree re-render)
+  }
+
+  // ── notes drawer (#156) — the per-case conversation. All mutations go through persistMv (never a bare saveSidecar), so a
+  // note change writes the verdicts too. A note change re-renders ONLY the cel pane (the glyph + the drawer); it does NOT
+  // touch the tree overlay/progress (notes don't affect the verdict counts). Trusted-input discipline: mutations resolve the
+  // case via the OPEN drawer (openNotesCaseId) and validate the posted noteId exists in that case's thread.
+
+  /** Toggle a case's notes drawer (open, or close if it's already the open one). Resolves the opaque worklist key → caseId
+   *  (reusing worklistActions — a notes glyph carries the SAME `wl_<caseId>` key as the row's verdict select). Opening a
+   *  different case drops any in-progress edit from the prior drawer. */
+  function toggleNotes(key: string): void {
+    if (mode !== "medical-validation") return;
+    const action = worklistActions[key];
+    if (!action) return;
+    openNotesCaseId = openNotesCaseId === action.caseId ? undefined : action.caseId;
+    editingNoteId = undefined;
+    renderPane("cel");
+  }
+
+  function closeNotes(): void {
+    if (openNotesCaseId === undefined && editingNoteId === undefined) return; // nothing open → no-op (skip a wasted render)
+    openNotesCaseId = undefined;
+    editingNoteId = undefined;
+    renderPane("cel");
+  }
+
+  /** True iff the posted noteId is a live note in the OPEN drawer's case — the trusted-input gate for edit/save/delete. */
+  function openNoteExists(noteId: unknown): noteId is string {
+    if (typeof noteId !== "string" || openNotesCaseId === undefined) return false;
+    return (notesByCaseId[openNotesCaseId] ?? []).some((n) => n.id === noteId);
+  }
+
+  function addNoteFromWebview(key: string, value: unknown): void {
+    if (mode !== "medical-validation" || !mvSidecarPath) return;
+    const action = worklistActions[key];
+    if (!action || action.caseId !== openNotesCaseId) return; // must target the OPEN drawer's case (not a stale row)
+    const text = typeof value === "string" ? value.trim() : "";
+    if (!text) return; // empty/blank → no-op (never create an invisible note that inflates the glyph count)
+    const note: Note = { id: randomUUID(), text, created: Date.now() };
+    if (!persistMv(reviewByCaseId, addNote(notesByCaseId, action.caseId, note))) return;
+    renderPane("cel"); // glyph count + thread update; verdict counts unchanged → no overlay/progress re-drive
+  }
+
+  function startEditNote(noteId: unknown): void {
+    if (mode !== "medical-validation" || !openNoteExists(noteId)) return;
+    editingNoteId = noteId;
+    renderPane("cel"); // re-render so the note becomes a prefilled textarea (host-state-driven edit-in-place)
+  }
+
+  function saveEditNote(noteId: unknown, value: unknown): void {
+    if (mode !== "medical-validation" || !mvSidecarPath || openNotesCaseId === undefined || !openNoteExists(noteId)) return;
+    const text = typeof value === "string" ? value.trim() : "";
+    if (!text) return; // an emptied edit is a no-op — Delete is the explicit removal path; keep the original text
+    if (!persistMv(reviewByCaseId, editNote(notesByCaseId, openNotesCaseId, noteId, text, Date.now()))) return;
+    editingNoteId = undefined;
+    renderPane("cel");
+  }
+
+  function cancelEditNote(): void {
+    if (editingNoteId === undefined) return;
+    editingNoteId = undefined;
+    renderPane("cel");
+  }
+
+  function deleteNoteFromWebview(noteId: unknown): void {
+    if (mode !== "medical-validation" || !mvSidecarPath || openNotesCaseId === undefined || !openNoteExists(noteId)) return;
+    if (!persistMv(reviewByCaseId, deleteNote(notesByCaseId, openNotesCaseId, noteId))) return;
+    if (editingNoteId === noteId) editingNoteId = undefined; // deleted the note that was being edited
+    renderPane("cel"); // the drawer stays OPEN even if the thread is now empty (glyph flips to outline)
   }
 
   /** Run a show command: guard re-entrancy (FIX 6), pick a .cel, open the panel in `targetMode`. */
@@ -1771,6 +1885,25 @@ function shellHtml(): string {
 .cel-review-fail{color:var(--vscode-testing-iconFailed,#f14c4c)}
 .cel-review-pending{color:var(--vscode-charts-yellow,#d29922)}
 .cel-review-disabled{opacity:.4}
+.cel-notes-glyph{cursor:pointer;user-select:none;opacity:.55;margin-left:2px;font-size:.9em}
+.cel-notes-glyph.cel-notes-has{opacity:1;color:var(--vscode-textLink-foreground,#3794ff)}
+.cel-notes-glyph.cel-notes-open{text-decoration:underline;text-underline-offset:2px}
+.cel-notes-glyph:focus-visible{outline:1px solid var(--vscode-focusBorder,#3794ff);outline-offset:1px}
+.cel-notes-drawer{position:fixed;top:0;right:0;bottom:0;width:min(340px,66%);z-index:5;display:flex;flex-direction:column;padding:8px;box-sizing:border-box;background:var(--vscode-editorWidget-background,var(--vscode-editor-background));border-left:1px solid var(--vscode-panel-border,#454545);box-shadow:-2px 0 6px rgba(0,0,0,.25);overflow:hidden}
+.cel-notes-head{display:flex;align-items:center;justify-content:space-between;font-weight:bold;padding-bottom:6px;border-bottom:1px solid var(--vscode-panel-border,#454545);margin-bottom:6px}
+.cel-notes-title{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cel-notes-close{cursor:pointer;background:none;border:none;color:inherit;font-size:1.1em;padding:0 4px}
+.cel-note-list{list-style:none;margin:0;padding:0;overflow-y:auto;flex:1}
+.cel-note{padding:5px 0;border-bottom:1px solid var(--vscode-panel-border,#3c3c3c33)}
+.cel-note-text{white-space:pre-wrap;word-break:break-word}
+.cel-note-meta{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:2px;font-size:.85em;opacity:.75}
+.cel-note-actions{display:flex;gap:4px}
+.cel-note-btn,.cel-note-send{cursor:pointer;background:var(--vscode-button-secondaryBackground,#3a3d41);color:var(--vscode-button-secondaryForeground,#fff);border:none;border-radius:2px;padding:1px 8px;font-size:.85em}
+.cel-note-send{background:var(--vscode-button-background,#0e639c);color:var(--vscode-button-foreground,#fff);align-self:flex-end;margin-top:4px}
+.cel-note-empty{opacity:.6;flex:1}
+.cel-note-add{display:flex;flex-direction:column;padding-top:6px;border-top:1px solid var(--vscode-panel-border,#454545);margin-top:6px}
+.cel-note-input{width:100%;box-sizing:border-box;min-height:48px;resize:vertical;background:var(--vscode-input-background);color:var(--vscode-input-foreground);border:1px solid var(--vscode-input-border,#3c3c3c);font-family:inherit;font-size:.95em}
+.cel-note-editing{display:flex;flex-direction:column;gap:4px}
 .cel-case.cel-ambiguous{opacity:.7;cursor:default}
 .cel-ambiguous-marker{color:var(--vscode-charts-yellow,#d29922);font-size:.85em;font-style:italic}
 .cel-facts,.cel-produced{opacity:.8;padding-left:14px;font-size:.95em}
@@ -1848,7 +1981,15 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   // markDiverters (a later post-dispatch post) re-applies; the NEXT selection's reveal drops them.
   `const clrDV=()=>{for(const el of root.querySelectorAll('.diverter'))el.classList.remove('diverter');};` +
   `window.addEventListener('message',(e)=>{const m=e.data;` +
-  `if(m.type==='render'){gen=m.gen;root.innerHTML=m.html;fcc.innerHTML='';v.postMessage({type:'ready',gen:m.gen,indexVersion:m.indexVersion});}` +
+  // #156 notes: PRESERVE in-progress note drafts across the innerHTML swap. An unrelated re-render (a verdict change on
+  // another row re-renders the whole cel pane) would otherwise wipe a half-typed note/edit. Snapshot every [data-note-draft]
+  // textarea by its key (+ the focused one's caret), swap, then restore matching textareas. A SENT note doesn't reappear
+  // because the click handler cleared its textarea BEFORE this render arrived (snapshot already empty).
+  `if(m.type==='render'){var _d={},_a=null,_s=0,_e=0;` +
+  `for(const ta of root.querySelectorAll('textarea[data-note-draft]')){const k=ta.getAttribute('data-note-draft');_d[k]=ta.value;if(ta===document.activeElement){_a=k;_s=ta.selectionStart;_e=ta.selectionEnd;}}` +
+  `gen=m.gen;root.innerHTML=m.html;fcc.innerHTML='';` +
+  `for(const ta of root.querySelectorAll('textarea[data-note-draft]')){const k=ta.getAttribute('data-note-draft');if(Object.prototype.hasOwnProperty.call(_d,k)){ta.value=_d[k];if(k===_a){ta.focus();try{ta.setSelectionRange(_s,_e);}catch(_x){}}}}` +
+  `v.postMessage({type:'ready',gen:m.gen,indexVersion:m.indexVersion});}` +
   // The at-rest selection channel (.current). Clearing/applying it ALSO wipes the failed-criterion overlay — so the
   // NEXT engine reveal (a new selection / clear) drops the overlay; the SAME selection's failed-criteria mark arrives
   // AFTER this message (a later post) and so survives (#173 overlay lifecycle, disc 159). NEVER calls clrRO (#156 slice 5).
@@ -1898,6 +2039,27 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   // carries no data-worklist-select → falls through to the reveal path harmlessly (its parent case isn't a reveal target).
   `root.addEventListener('click',(e)=>{const ws=e.target.closest&&e.target.closest('[data-worklist-select]');` +
   `if(ws){e.stopPropagation();return;}` +
+  // #156 notes: the glyph + drawer controls. ALL intercepted BEFORE [data-reveal] (the glyph sits inside a .cel-case, a
+  // reveal target — stopPropagation blocks the case-select; the drawer is pane-level so it has no reveal ancestor anyway).
+  // Send/Save read the associated textarea SCOPED to the clicked control's container (never a global querySelector), then
+  // CLEAR the add textarea so the post-render draft-restore sees it empty (a sent note doesn't reappear; an interrupted
+  // draft, never cleared, survives). Clicking the textarea itself just stops the reveal (no message; typing is local).
+  `const ng=e.target.closest&&e.target.closest('[data-notes-toggle]');` +
+  `if(ng){e.preventDefault();e.stopPropagation();v.postMessage({type:'notesToggle',key:ng.getAttribute('data-notes-toggle')});return;}` +
+  `const nc=e.target.closest&&e.target.closest('[data-notes-close]');` +
+  `if(nc){e.preventDefault();e.stopPropagation();v.postMessage({type:'notesClose'});return;}` +
+  `const na=e.target.closest&&e.target.closest('[data-note-add]');` +
+  `if(na){e.preventDefault();e.stopPropagation();const box=na.closest('.cel-note-add');const ta=box&&box.querySelector('[data-note-draft]');const val=ta?ta.value:'';v.postMessage({type:'noteAdd',key:na.getAttribute('data-note-add'),value:val});if(ta)ta.value='';return;}` +
+  `const nsv=e.target.closest&&e.target.closest('[data-note-save]');` +
+  `if(nsv){e.preventDefault();e.stopPropagation();const box=nsv.closest('.cel-note-editing');const ta=box&&box.querySelector('[data-note-draft]');v.postMessage({type:'noteEditSave',noteId:nsv.getAttribute('data-note-save'),value:ta?ta.value:''});return;}` +
+  `const ne=e.target.closest&&e.target.closest('[data-note-edit]');` +
+  `if(ne){e.preventDefault();e.stopPropagation();v.postMessage({type:'noteEditStart',noteId:ne.getAttribute('data-note-edit')});return;}` +
+  `const ncan=e.target.closest&&e.target.closest('[data-note-cancel]');` +
+  `if(ncan){e.preventDefault();e.stopPropagation();v.postMessage({type:'noteEditCancel'});return;}` +
+  `const nd=e.target.closest&&e.target.closest('[data-note-delete]');` +
+  `if(nd){e.preventDefault();e.stopPropagation();v.postMessage({type:'noteDelete',noteId:nd.getAttribute('data-note-delete')});return;}` +
+  `const nt=e.target.closest&&e.target.closest('[data-note-draft]');` +
+  `if(nt){e.stopPropagation();return;}` +
   // #177 slice 5: the questionnaire pane's prev/next sub-nav (it renders INTO #root, so it shares this click delegation).
   // A [data-qnav] button posts the opaque direction; the host moves currentQuestionIndex, re-renders + re-drives the marker.
   // Intercepted before [data-reveal] (the questionnaire is read-only — its buttons never select). A disabled button still

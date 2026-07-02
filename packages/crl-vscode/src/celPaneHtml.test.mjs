@@ -13,7 +13,7 @@ async function load(tsFile) {
   await build({ entryPoints: [resolve(here, tsFile)], bundle: true, platform: "node", format: "cjs", target: "node18", outfile: out, logLevel: "silent" });
   return require(out);
 }
-const { renderCelPane, reverseCelAnchors } = await load("celPaneHtml.ts");
+const { renderCelPane, reverseCelAnchors, formatNoteTimestamp } = await load("celPaneHtml.ts");
 // Use the REAL nodeKey (the same fn celPaneHtml + crlStructure call) so the gate-key format is proven, not assumed.
 const { nodeKey } = await import("@smile-digital-health/crl");
 
@@ -336,6 +336,68 @@ check("worklist: a mix → reviewable keyed in worklistActions, unfrozen/ambiguo
   );
   const caseIds = Object.values(out.worklistActions).map((a) => a.caseId);
   assert.deepEqual(caseIds, ["cG"], "only the frozen, non-ambiguous case is a worklist action");
+});
+
+// ── notes: glyph + drawer (#156 notes) ──────────────────────────────────────────
+const NOTE = (id, text, created = 1700000000000, edited) => (edited !== undefined ? { id, text, created, edited } : { id, text, created });
+const wl = (extra) => ({ enabled: true, statesByCaseId: {}, ...extra });
+
+check("formatNoteTimestamp: deterministic UTC YYYY-MM-DD HH:MM (no locale/timezone flakiness)", () => {
+  assert.equal(formatNoteTimestamp(Date.UTC(2026, 6, 2, 9, 5)), "2026-07-02 09:05 UTC"); // month is 0-based → 6 = July
+});
+
+check("notes glyph: reviewable case with notes → 💬 + count + data-notes-toggle; none → 🗨 outline", () => {
+  const withNotes = renderCelPane(result([sc("A", "pass")]), { A: "cA" }, { worklist: wl({ notesByCaseId: { cA: [NOTE("n1", "x"), NOTE("n2", "y")] } }) });
+  assert.match(withNotes.html, /class="cel-notes-glyph cel-notes-has"[^>]*data-notes-toggle="wl_cA"[^>]*>💬 2</);
+  const none = renderCelPane(result([sc("A", "pass")]), { A: "cA" }, { worklist: wl({}) });
+  assert.match(none.html, /class="cel-notes-glyph"[^>]*data-notes-toggle="wl_cA"[^>]*>🗨</);
+  assert.ok(!none.html.includes("cel-notes-has"));
+});
+check("notes glyph: an UNFROZEN case gets NO glyph (no stable caseId to key the thread)", () => {
+  const out = renderCelPane(result([sc("Unfrozen", "pass")]), {}, { worklist: wl({}) });
+  assert.ok(!out.html.includes("cel-notes-glyph"), "unfrozen row has no notes glyph");
+});
+check("notes drawer: absent unless openNotesCaseId matches a case", () => {
+  const closed = renderCelPane(result([sc("A", "pass")]), { A: "cA" }, { worklist: wl({ notesByCaseId: { cA: [NOTE("n1", "x")] } }) });
+  assert.ok(!closed.html.includes("cel-notes-drawer"), "no drawer when nothing is open");
+  const open = renderCelPane(result([sc("A", "pass")]), { A: "cA" }, { worklist: wl({ openNotesCaseId: "cA", notesByCaseId: { cA: [NOTE("n1", "x")] } }) });
+  assert.match(open.html, /class="cel-notes-drawer" data-notes-drawer/);
+});
+check("notes drawer: renders the thread (text + timestamp) + Edit/Delete + an add row with Send", () => {
+  const out = renderCelPane(result([sc("A", "pass")]), { A: "cA" }, { worklist: wl({ openNotesCaseId: "cA", notesByCaseId: { cA: [NOTE("n1", "first note", Date.UTC(2026, 0, 3, 8, 30))] } }) });
+  assert.match(out.html, /<div class="cel-note-text">first note<\/div>/);
+  assert.match(out.html, /2026-01-03 08:30 UTC/);
+  assert.match(out.html, /data-note-edit="n1">Edit</);
+  assert.match(out.html, /data-note-delete="n1">Delete</);
+  assert.match(out.html, /data-note-add="wl_cA">Send</);
+  assert.match(out.html, /data-note-draft="add:wl_cA"/);
+});
+check("notes drawer: an edited note shows the edited stamp", () => {
+  const out = renderCelPane(result([sc("A", "pass")]), { A: "cA" }, { worklist: wl({ openNotesCaseId: "cA", notesByCaseId: { cA: [NOTE("n1", "t", Date.UTC(2026, 0, 1, 0, 0), Date.UTC(2026, 0, 2, 0, 0))] } }) });
+  assert.match(out.html, /edited 2026-01-02 00:00 UTC/);
+});
+check("notes drawer: editingNoteId renders THAT note as a prefilled textarea + Save/Cancel (edit-in-place)", () => {
+  const out = renderCelPane(result([sc("A", "pass")]), { A: "cA" }, { worklist: wl({ openNotesCaseId: "cA", editingNoteId: "n1", notesByCaseId: { cA: [NOTE("n1", "editable"), NOTE("n2", "plain")] } }) });
+  assert.match(out.html, /class="cel-note cel-note-editing"[\s\S]*data-note-draft="edit:n1"[^>]*>editable<\/textarea>/);
+  assert.match(out.html, /data-note-save="n1">Save</);
+  assert.match(out.html, /data-note-cancel="1">Cancel</);
+  assert.match(out.html, /<div class="cel-note-text">plain<\/div>/, "the OTHER note stays in read mode");
+});
+check("notes drawer: open with NO notes → 'No notes yet.' + the add row (glyph flips to outline)", () => {
+  const out = renderCelPane(result([sc("A", "pass")]), { A: "cA" }, { worklist: wl({ openNotesCaseId: "cA" }) });
+  assert.match(out.html, /class="cel-note-empty">No notes yet\./);
+  assert.match(out.html, /data-note-add="wl_cA"/);
+  assert.match(out.html, /class="cel-notes-glyph cel-notes-open"/, "glyph shows open (outline, no count)");
+});
+check("notes drawer XSS: note text, the edit-textarea prefill, and the case name are all escaped", () => {
+  const out = renderCelPane(result([sc("<img src=x>", "pass")]), { "<img src=x>": "cA" }, { worklist: wl({ openNotesCaseId: "cA", editingNoteId: "n1", notesByCaseId: { cA: [NOTE("n1", "</textarea><script>alert(1)</script>")] } }) });
+  assert.ok(out.html.includes("&lt;/textarea&gt;&lt;script&gt;"), "textarea prefill escaped (no breakout)");
+  assert.ok(!out.html.includes("</textarea><script>"), "no raw script breakout");
+  assert.ok(out.html.includes("Notes — &lt;img src=x&gt;"), "case name escaped in the drawer header");
+});
+check("notes: worklist ABSENT (cockpit) → no glyph, no drawer even if notes passed", () => {
+  const out = renderCelPane(result([sc("A", "pass")]), { A: "cA" }, { worklist: { enabled: false, statesByCaseId: {}, openNotesCaseId: "cA", notesByCaseId: { cA: [NOTE("n1", "x")] } } });
+  assert.ok(!out.html.includes("cel-notes-glyph") && !out.html.includes("cel-notes-drawer"), "cockpit render unaffected");
 });
 
 console.log(`\ncelPaneHtml.test: ${pass} checks passed`);

@@ -50,16 +50,42 @@ export function medicalValidationSidecarPath(celPath: string): string | undefine
  *  tree (see `deriveReviewOverlay`). Legacy schemaVersion-1 sidecars stored `"reviewed"`, migrated to `"pass"` on load. */
 export type PersistedReviewState = "pending" | "pass" | "fail";
 
+/** A single reviewer note on a case (the "conversation" thread). `id` addresses it for edit/delete (host-generated —
+ *  `crypto.randomUUID()`); `created`/`edited` are epoch-ms (host-stamped). Single-author, so no attribution field. */
+export interface Note {
+  id: string;
+  text: string;
+  created: number;
+  edited?: number;
+}
+
 /** The on-disk sidecar — one per POLICY, keyed by frozen caseId. schemaVersion 2 (v1 stored `"pending"|"reviewed"`; the
- *  load path migrates a v1 `"reviewed"` → `"pass"` and normalizes to v2). Stale entries (a deleted/re-frozen case whose
- *  caseId no longer appears in the model) are inert: the fold simply finds no `perCase` row for them. */
+ *  load path migrates a v1 `"reviewed"` → `"pass"` and normalizes to v2). `notesByCaseId` (additive, still v2 — an older
+ *  reader that predates notes simply ignores it, and THIS reader tolerates its absence) holds the per-case note thread,
+ *  INDEPENDENT of the verdict (a case may have notes with no verdict and vice-versa). Stale entries (a deleted/re-frozen
+ *  case whose caseId no longer appears in the model) are inert on BOTH maps: the fold finds no `perCase` row, and the notes
+ *  simply round-trip untouched (never pruned — a re-frozen case must not lose its note history). */
 export interface MedicalValidationSidecar {
   schemaVersion: 2;
   byCaseId: Record<string, PersistedReviewState>;
+  /** Omitted when there are no notes anywhere (keeps a verdict-only sidecar byte-identical to before this feature). */
+  notesByCaseId?: Record<string, Note[]>;
 }
 
 function emptySidecar(): MedicalValidationSidecar {
   return { schemaVersion: 2, byCaseId: {} };
+}
+
+/** Compose the on-disk sidecar object from the host's two in-memory maps — the SINGLE place both are married, so no save
+ *  path can write one map and forget the other (the note-eraser / verdict-eraser bug). `notesByCaseId` is omitted when
+ *  empty so a verdict-only policy's sidecar stays free of an empty `{}`. Every host `saveSidecar` call goes through this. */
+export function composeSidecar(
+  byCaseId: Record<string, PersistedReviewState>,
+  notesByCaseId: Record<string, Note[]>,
+): MedicalValidationSidecar {
+  const sidecar: MedicalValidationSidecar = { schemaVersion: 2, byCaseId };
+  if (Object.keys(notesByCaseId).length > 0) sidecar.notesByCaseId = notesByCaseId;
+  return sidecar;
 }
 
 /** A load that survived a corrupt/malformed/forward-version sidecar carries a soft `warning` (the caller may surface it).
@@ -89,6 +115,37 @@ interface CoerceResult {
   warning?: string;
 }
 
+/** Coerce one parsed note, dropping it (→ undefined) if any field is the wrong type: `id`/`text` non-empty-tolerant
+ *  strings (empty text is dropped — an invisible note must not make the glyph count it), `created` a finite epoch-ms ≥ 0,
+ *  `edited` (optional) likewise. Preserves the note's internal whitespace; only a wholly-empty/blank `text` is rejected. */
+function coerceNote(v: unknown): Note | undefined {
+  if (typeof v !== "object" || v === null) return undefined;
+  const o = v as Record<string, unknown>;
+  if (typeof o.id !== "string" || o.id === "") return undefined;
+  if (typeof o.text !== "string" || o.text.trim() === "") return undefined;
+  if (typeof o.created !== "number" || !Number.isFinite(o.created) || o.created < 0) return undefined;
+  const note: Note = { id: o.id, text: o.text, created: o.created };
+  if (typeof o.edited === "number" && Number.isFinite(o.edited) && o.edited >= 0) note.edited = o.edited;
+  return note;
+}
+
+/** Sanitize a parsed `notesByCaseId` map (mirrors `coerceSidecar`'s container discipline): absent → undefined (no notes);
+ *  present-but-not-a-plain-object (incl. an array) → dropped entirely (notes gone, verdicts kept — never nuke the whole
+ *  sidecar for a bad notes blob); a per-case value that isn't an array → that case dropped; within a case, malformed notes
+ *  are dropped and a case whose list ends up empty is dropped (absence = no notes, mirroring the reducer invariant). Stale
+ *  (orphan) caseIds are PRESERVED — coerce has no model to prune against, and a re-frozen case must keep its history. */
+function coerceNotes(raw: unknown): Record<string, Note[]> | undefined {
+  if (raw === undefined) return undefined;
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return undefined;
+  const out: Record<string, Note[]> = {};
+  for (const [caseId, arr] of Object.entries(raw as Record<string, unknown>)) {
+    if (!Array.isArray(arr)) continue;
+    const notes = arr.map(coerceNote).filter((n): n is Note => n !== undefined);
+    if (notes.length > 0) out[caseId] = notes;
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
 /** Sanitize a parsed JSON value into a MedicalValidationSidecar, dropping any caseId whose value isn't a known state (so
  *  a partially-corrupt map keeps its valid entries rather than nuking the whole review). `sidecar: undefined` on a shape
  *  that isn't a sidecar at all: not an object, byCaseId missing / non-object / an ARRAY (`["reviewed"]` would otherwise
@@ -104,11 +161,14 @@ function coerceSidecar(parsed: unknown): CoerceResult {
     const migrated = migratePersistedState(v);
     if (migrated) byCaseId[caseId] = migrated;
   }
+  const notesByCaseId = coerceNotes(obj.notesByCaseId); // carried THROUGH the load (else a load→save round-trip loses notes)
   const warning =
     obj.schemaVersion !== 1 && obj.schemaVersion !== 2
       ? `sidecar schemaVersion ${JSON.stringify(obj.schemaVersion)} is not 1 or 2; loaded the known states best-effort`
       : undefined;
-  return { sidecar: { schemaVersion: 2, byCaseId }, warning };
+  const sidecar: MedicalValidationSidecar = { schemaVersion: 2, byCaseId };
+  if (notesByCaseId) sidecar.notesByCaseId = notesByCaseId;
+  return { sidecar, warning };
 }
 
 /** Load the sidecar. Missing file → empty (a fresh policy, no review yet). Malformed JSON / wrong shape → empty + a soft
@@ -256,6 +316,55 @@ export function setReviewState(
   const out = { ...byCaseId };
   if (state === "unreviewed") delete out[caseId];
   else out[caseId] = state;
+  return out;
+}
+
+// ── notes CRUD (pure reducers) ──────────────────────────────────────────────────────
+// Host-as-authority: the host generates the note `id` (crypto.randomUUID) + stamps `created`/`edited` (Date.now) and passes
+// them in, so these stay deterministic + unit-testable (the clock/RNG never enters the pure layer). Each returns a NEW map
+// (structural copy of the touched case's array); the caller swaps it in only AFTER a successful save. Absence of a caseId =
+// no notes — an emptied case's key is DELETED (mirrors the verdict invariant), so a note-free case never lingers as `[]`.
+
+/** Append a note to a case's thread (creating the case entry if absent). `note` carries its host-supplied id + created. */
+export function addNote(
+  notesByCaseId: Record<string, Note[]>,
+  caseId: string,
+  note: Note,
+): Record<string, Note[]> {
+  const out = { ...notesByCaseId };
+  out[caseId] = [...(out[caseId] ?? []), note];
+  return out;
+}
+
+/** Replace the text of the note `noteId` in `caseId`'s thread and set its `edited` stamp. No-op (returns an equivalent new
+ *  map) if the case or the note id isn't found — a stale edit against a deleted note simply does nothing. */
+export function editNote(
+  notesByCaseId: Record<string, Note[]>,
+  caseId: string,
+  noteId: string,
+  text: string,
+  edited: number,
+): Record<string, Note[]> {
+  const list = notesByCaseId[caseId];
+  if (!list || !list.some((n) => n.id === noteId)) return { ...notesByCaseId };
+  const out = { ...notesByCaseId };
+  out[caseId] = list.map((n) => (n.id === noteId ? { ...n, text, edited } : n));
+  return out;
+}
+
+/** Remove the note `noteId` from `caseId`'s thread; if that empties the thread, DELETE the case key (absence = no notes).
+ *  No-op (equivalent new map) if the case/id isn't found. */
+export function deleteNote(
+  notesByCaseId: Record<string, Note[]>,
+  caseId: string,
+  noteId: string,
+): Record<string, Note[]> {
+  const list = notesByCaseId[caseId];
+  if (!list) return { ...notesByCaseId };
+  const remaining = list.filter((n) => n.id !== noteId);
+  const out = { ...notesByCaseId };
+  if (remaining.length > 0) out[caseId] = remaining;
+  else delete out[caseId];
   return out;
 }
 
