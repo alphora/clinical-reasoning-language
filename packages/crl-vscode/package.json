@@ -414,6 +414,7 @@
     "test:package": "node src/package.test.mjs",
     "test:language-config": "node src/language-config.test.mjs",
     "test": "npm run compile && node src/mcp-server.test.mjs && node src/provision.test.mjs && node src/stableServer.test.mjs && node src/highlight.test.mjs && node src/catalog.test.mjs && node src/embedded-catalog.test.mjs && node src/concepts.test.mjs && node src/crl-patterns-coverage.test.mjs && node src/contextDetect.test.mjs && node src/findDeclaration.test.mjs && node src/projectIndex.test.mjs && node src/completion.test.mjs && node src/grammar.test.mjs && node src/package.test.mjs && node src/language-config.test.mjs && node src/renderScenarioHtml.test.mjs && node src/provenanceFindings.test.mjs && node src/provenanceViewer.test.mjs && node src/medicalValidationStore.test.mjs && node src/questionnaireModel.test.mjs && node src/correspondenceEngine.test.mjs && node src/paneRevealCoordinator.test.mjs && node src/sourcePaneHtml.test.mjs && node src/crlPaneHtml.test.mjs && node src/flowPaneHtml.test.mjs && node src/questionnairePaneHtml.test.mjs && node src/cockpitWebviewScript.test.mjs && node src/celPaneHtml.test.mjs && node src/failedCriterionPeek.test.mjs && node src/thisNodeMarker.test.mjs && node src/failedCriterionLabel.test.mjs && node src/webviewHit.test.mjs && node src/corrKey.test.mjs && node src/paneOrder.test.mjs && node test/oracle/check.mjs",
+    "oracle:update": "node test/oracle/update.mjs",
     "vscode:prepublish": "npm run build:crl && npm run compile",
     "package": "vsce package --no-dependencies"
   },

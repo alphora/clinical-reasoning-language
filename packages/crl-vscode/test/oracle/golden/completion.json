@@ -426,6 +426,20 @@
       },
       {
         "kind": "completion",
+        "label": "age today at least <n> years",
+        "itemKind": 14,
+        "insertText": {
+          "snippet": "age today at least \"${1:n}\" years"
+        },
+        "sortText": "age today at least",
+        "detail": "AtLeast(AgeAt(), n: Quantity<year>)",
+        "documentation": {
+          "markdown": "**AtLeast(AgeAt(), n)** — *Calculation*\n\nNarrative: `age today at least <n> years`\n\nSignature: `AtLeast(AgeAt(), n: Quantity<year>)`\n\nCQL: `CRLCommon.AtLeast`"
+        },
+        "range": null
+      },
+      {
+        "kind": "completion",
         "label": "calculated <X>",
         "itemKind": 14,
         "insertText": {
