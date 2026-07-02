@@ -240,6 +240,25 @@ check("worklist enabled: a REVIEWABLE case → data-worklist-toggle + state clas
   assert.ok(out.html.includes(`data-worklist-toggle="${keys[0]}"`));
 });
 
+check("worklist policyLabel → a sticky header at the TOP; escaped; absent without a label / in cockpit", () => {
+  const withLabel = renderCelPane(result([sc("A", "pass")]), { A: "cA" }, { worklist: { enabled: true, statesByCaseId: {}, policyLabel: "MED201.014" } });
+  assert.match(withLabel.html, /^<div class="cel-worklist-header"[^>]*>MED201\.014<\/div>/, "header pinned first");
+  // XSS: the label is escaped
+  const xss = renderCelPane(result([sc("A", "pass")]), { A: "cA" }, { worklist: { enabled: true, statesByCaseId: {}, policyLabel: "<script>" } });
+  assert.ok(xss.html.startsWith("<div class=\"cel-worklist-header\"") && xss.html.includes("&lt;script&gt;") && !xss.html.includes("<script>"));
+  // no label → no header
+  const noLabel = renderCelPane(result([sc("A", "pass")]), { A: "cA" }, { worklist: { enabled: true, statesByCaseId: {} } });
+  assert.ok(!noLabel.html.includes("cel-worklist-header"));
+  // cockpit mode ignores policyLabel entirely
+  const cockpit = renderCelPane(result([sc("A", "pass")]), { A: "cA" }, { worklist: { enabled: false, statesByCaseId: {}, policyLabel: "MED201.014" } });
+  assert.ok(!cockpit.html.includes("cel-worklist-header") && !cockpit.html.includes("MED201.014"));
+});
+
+check("worklist policyLabel: header shows even with NO cases (empty worklist still names its policy)", () => {
+  const empty = renderCelPane({ success: true, scenarios: [], errors: [] }, {}, { worklist: { enabled: true, statesByCaseId: {}, policyLabel: "RX501.105" } });
+  assert.match(empty.html, /^<div class="cel-worklist-header"[^>]*>RX501\.105<\/div>/);
+});
+
 // FIX 1 (impl review): the worklist toggle key must be STABLE (caseId-derived), NOT gen/prefix-scoped — so a click on a
 // stale (pre-re-render) DOM still resolves to the caseId instead of being dropped. Independent of the gen-scoped reveal key.
 check("worklist toggle key is STABLE (wl_<caseId>), prefix-independent — unlike the reveal key", () => {

@@ -990,7 +990,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       // per case (#156 slice 4); cockpit passes enabled:false → byte-identical to before. `worklistActions` is captured
       // atomically with this render's anchors (gen-scoped keys), mirroring conceptToFactAnchors.
       const r = scenarios
-        ? renderCelPane(scenarios, caseIdByName, { revealPrefix: `g${gen}_`, revealableConceptKeys, caseKeyNumbers, showKeys, duplicateScenarioNames, worklist: { enabled: mode === "medical-validation", statesByCaseId: reviewByCaseId } })
+        ? renderCelPane(scenarios, caseIdByName, { revealPrefix: `g${gen}_`, revealableConceptKeys, caseKeyNumbers, showKeys, duplicateScenarioNames, worklist: { enabled: mode === "medical-validation", statesByCaseId: reviewByCaseId, policyLabel: currentCel ? basename(currentCel).replace(/\.(cel|crl)$/i, "") : undefined } })
         : { html: '<p class="placeholder">No CEL.</p>', anchors: {}, reveals: {}, conceptToFactAnchors: {} }; // worklistActions omitted (cockpit discipline; `r.worklistActions ?? {}` below absorbs it)
       v.anchors = r.anchors;
       v.reveals = r.reveals;
@@ -1760,6 +1760,7 @@ function shellHtml(): string {
 .cel-case.cel-pass{border-left-color:var(--vscode-testing-iconPassed,#73c991)}
 .cel-case.cel-fail{border-left-color:var(--vscode-testing-iconFailed,#f14c4c)}
 .cel-case.cel-error{border-left-color:var(--vscode-testing-iconErrored,#e2b33e)}
+.cel-worklist-header{font-weight:bold;font-size:1.05em;padding:2px 0 6px;margin-bottom:6px;border-bottom:1px solid var(--vscode-panel-border,#454545);position:sticky;top:0;background:var(--vscode-editor-background);z-index:1}
 .cel-name{font-weight:bold}.cel-subject{opacity:.7}
 .cel-check{cursor:pointer;user-select:none;margin-right:2px}
 .cel-check:focus-visible{outline:1px solid var(--vscode-focusBorder,#3794ff);outline-offset:1px}

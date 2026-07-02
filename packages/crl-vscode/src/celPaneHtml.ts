@@ -73,7 +73,7 @@ export function renderCelPane(
   // worklist (#156 slice 4, mode-gated): when `enabled`, render a 3-state review checkbox per case + (for reviewable
   // cases) emit a `data-worklist-toggle` key into `worklistActions`. ABSENT or `enabled:false` → byte-identical to the
   // cockpit render (no checkbox, no worklistActions). `statesByCaseId` is keyed by frozen caseId only (never by name).
-  opts: { revealPrefix?: string; revealableConceptKeys?: ReadonlySet<string>; caseKeyNumbers?: Record<string, number[]>; showKeys?: boolean; duplicateScenarioNames?: ReadonlySet<string>; worklist?: { enabled: boolean; statesByCaseId: Record<string, "pending" | "reviewed"> } } = {},
+  opts: { revealPrefix?: string; revealableConceptKeys?: ReadonlySet<string>; caseKeyNumbers?: Record<string, number[]>; showKeys?: boolean; duplicateScenarioNames?: ReadonlySet<string>; worklist?: { enabled: boolean; statesByCaseId: Record<string, "pending" | "reviewed">; policyLabel?: string } } = {},
 ): RenderedCel {
   const prefix = opts.revealPrefix ?? "";
   const revealable = opts.revealableConceptKeys;
@@ -81,6 +81,12 @@ export function renderCelPane(
   const showKeys = opts.showKeys ?? false;
   const duplicateNames = opts.duplicateScenarioNames ?? new Set<string>();
   const worklist = opts.worklist?.enabled ? opts.worklist : undefined; // undefined ⇒ cockpit path (byte-unchanged)
+  // Worklist header: the policy under validation, pinned at the top of the pane so the reviewer always knows WHICH
+  // policy this worklist belongs to. Worklist mode only (empty in cockpit) and only when a label was supplied.
+  const worklistHeader =
+    worklist && worklist.policyLabel
+      ? `<div class="cel-worklist-header" title="Policy under validation">${escapeHtml(worklist.policyLabel)}</div>`
+      : "";
   const anchors: Record<string, CelAnchor> = {};
   const reveals: Record<string, CelReveal> = {};
   const conceptToFactAnchors: Record<string, string[]> = {};
@@ -94,15 +100,17 @@ export function renderCelPane(
   if (result.scenarios.length === 0) {
     const why = result.errors.length ? `: ${escapeHtml(result.errors.join("; "))}` : "";
     const msg = result.errors.length ? `CEL did not render${why}` : "No CEL cases.";
-    return worklistActions ? { html: `<p class="placeholder">${msg}</p>`, anchors, reveals, conceptToFactAnchors, worklistActions } : { html: `<p class="placeholder">${msg}</p>`, anchors, reveals, conceptToFactAnchors };
+    const emptyHtml = `${worklistHeader}<p class="placeholder">${msg}</p>`;
+    return worklistActions ? { html: emptyHtml, anchors, reveals, conceptToFactAnchors, worklistActions } : { html: emptyHtml, anchors, reveals, conceptToFactAnchors };
   }
 
   // A banner only when there's a graph-level error string to show; errored CASES carry their own ⚠ badge + diagnostics
   // (the per-case error path leaves `result.errors` empty — no banner, the ⚠ rows tell the story).
   let html =
-    result.errors.length > 0
+    worklistHeader +
+    (result.errors.length > 0
       ? `<p class="placeholder fc-cel-banner">⚠ ${escapeHtml(result.errors.join("; "))}</p>`
-      : "";
+      : "");
   let idx = 0;
   for (const sc of result.scenarios) {
     // FIX 1 (disc 160): an AMBIGUOUS-name case (its name shared by >1 case) must NOT be anchored to the frozen
