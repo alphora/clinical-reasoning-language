@@ -26,7 +26,7 @@ async function load(tsFile) {
   return require(out);
 }
 
-const { medicalValidationSidecarPath, loadSidecar, saveSidecar, deriveReviewOverlay, buildReviewPerCase, nextReviewState, applyWorklistToggle, reviewProgress, renderProgressChrome } =
+const { medicalValidationSidecarPath, loadSidecar, saveSidecar, deriveReviewOverlay, buildReviewPerCase, isReviewState, setReviewState, REVIEW_STATES, reviewProgress, renderProgressChrome } =
   await load("medicalValidationStore.ts");
 
 let pass = 0;
@@ -105,12 +105,12 @@ check("sidecar path: a .cel NOT inside a policy src/ (no provenance/ ancestor) �
 });
 
 // ── load ─────────────────────────────────────────────────────────────────────
-check("load: missing file → empty {schemaVersion:1, byCaseId:{}}, no warning", () => {
+check("load: missing file → empty {schemaVersion:2, byCaseId:{}}, no warning", () => {
   const root = mkdtempSync(join(tmpdir(), "mv-load-"));
   try {
     const p = join(root, "medical-validation", "p.json");
     const r = loadSidecar(p);
-    assert.deepEqual(r.sidecar, { schemaVersion: 1, byCaseId: {} });
+    assert.deepEqual(r.sidecar, { schemaVersion: 2, byCaseId: {} });
     assert.equal(r.warning, undefined);
   } finally {
     rmSync(root, { recursive: true, force: true });
@@ -156,28 +156,55 @@ check("load: an ARRAY byCaseId is wrong shape → empty + warning (NOT coerced t
   }
 });
 
-check("load: a FORWARD schemaVersion (2) → loads the known states best-effort + carries a warning (not silent)", () => {
+check("load: a legacy v1 sidecar migrates 'reviewed' → 'pass', normalizes to v2, NO warning (v1 is understood)", () => {
   const root = mkdtempSync(join(tmpdir(), "mv-load-"));
   try {
     const p = join(root, "s.json");
-    writeFileSync(p, JSON.stringify({ schemaVersion: 2, byCaseId: { c1: "reviewed", c2: "pending" } }));
+    writeFileSync(p, JSON.stringify({ schemaVersion: 1, byCaseId: { c1: "reviewed", c2: "pending" } }));
     const r = loadSidecar(p);
-    assert.deepEqual(r.sidecar.byCaseId, { c1: "reviewed", c2: "pending" }, "known states loaded best-effort");
-    assert.equal(r.sidecar.schemaVersion, 1, "normalized to the version this build understands");
+    assert.deepEqual(r.sidecar.byCaseId, { c1: "pass", c2: "pending" }, "v1 'reviewed' → v2 'pass'");
+    assert.equal(r.sidecar.schemaVersion, 2, "normalized to v2");
+    assert.equal(r.warning, undefined, "v1 is a KNOWN legacy version — a clean, warning-free migration");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+check("load: a v2 sidecar loads the pass/fail/pending verdicts natively (no migration, no warning)", () => {
+  const root = mkdtempSync(join(tmpdir(), "mv-load-"));
+  try {
+    const p = join(root, "s.json");
+    writeFileSync(p, JSON.stringify({ schemaVersion: 2, byCaseId: { c1: "pass", c2: "fail", c3: "pending" } }));
+    const r = loadSidecar(p);
+    assert.deepEqual(r.sidecar.byCaseId, { c1: "pass", c2: "fail", c3: "pending" });
+    assert.equal(r.warning, undefined);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+check("load: a genuinely FORWARD schemaVersion (3) → best-effort over current states + a warning (not silent)", () => {
+  const root = mkdtempSync(join(tmpdir(), "mv-load-"));
+  try {
+    const p = join(root, "s.json");
+    writeFileSync(p, JSON.stringify({ schemaVersion: 3, byCaseId: { c1: "pass", c2: "pending" } }));
+    const r = loadSidecar(p);
+    assert.deepEqual(r.sidecar.byCaseId, { c1: "pass", c2: "pending" }, "known states loaded best-effort");
+    assert.equal(r.sidecar.schemaVersion, 2, "normalized to the version this build understands");
     assert.ok(r.warning && r.warning.includes("schemaVersion"), `expected a forward-version warning, got: ${r.warning}`);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
 });
 
-check("load: valid → parsed; an unknown state value for a caseId is dropped (valid entries kept)", () => {
+check("load: valid → parsed; an unknown state value for a caseId is dropped (valid entries kept, 'reviewed' migrated)", () => {
   const root = mkdtempSync(join(tmpdir(), "mv-load-"));
   try {
     const p = join(root, "s.json");
     writeFileSync(p, JSON.stringify({ schemaVersion: 1, byCaseId: { c1: "reviewed", c2: "pending", c3: "bogus", c4: "unreviewed" } }));
     const r = loadSidecar(p);
-    assert.equal(r.warning, undefined, "a present-but-coercible file is a clean load");
-    assert.deepEqual(r.sidecar.byCaseId, { c1: "reviewed", c2: "pending" }, "c3(bogus)+c4(unreviewed) dropped");
+    assert.equal(r.warning, undefined, "a present-but-coercible v1 file is a clean load");
+    assert.deepEqual(r.sidecar.byCaseId, { c1: "pass", c2: "pending" }, "c1 migrated; c3(bogus)+c4(unreviewed) dropped");
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -189,7 +216,7 @@ check("save: tear-free round-trip (save → load === input), creates the parent 
   try {
     const dir = join(root, "medical-validation"); // parent dir does NOT exist yet
     const p = join(dir, "p.json");
-    const sidecar = { schemaVersion: 1, byCaseId: { c1: "reviewed", c2: "pending" } };
+    const sidecar = { schemaVersion: 2, byCaseId: { c1: "pass", c2: "pending" } };
     saveSidecar(p, sidecar);
     assert.ok(existsSync(p), "the final file exists");
     assert.ok(existsSync(dir), "the medical-validation/ parent dir was created");
@@ -210,7 +237,7 @@ check("save: a real IO failure THROWS (parent path component is a FILE → mkdir
     const blocker = join(root, "blocker"); // an existing FILE where a dir is expected
     writeFileSync(blocker, "x");
     const p = join(blocker, "medical-validation", "p.json"); // mkdirSync(dirname(p)) must fail — `blocker` is a file
-    assert.throws(() => saveSidecar(p, { schemaVersion: 1, byCaseId: {} }), "a failed save is surfaced, not swallowed");
+    assert.throws(() => saveSidecar(p, { schemaVersion: 2, byCaseId: {} }), "a failed save is surfaced, not swallowed");
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -219,18 +246,36 @@ check("save: a real IO failure THROWS (parent path component is a FILE → mkdir
 // ── the precedence fold ────────────────────────────────────────────────────────
 const M = (entries) => new Map(entries);
 
-check("fold: a reviewed case → its lit rows in done (status pass → not in error)", () => {
+check("fold: a PASS-verdict case → its lit rows in done (run status pass → not in error)", () => {
   const { done, error } = deriveReviewOverlay(
-    { c1: "reviewed" },
+    { c1: "pass" },
     M([["c1", { status: "pass", litNodeKeys: ["n1", "n2"] }]]),
   );
   assert.deepEqual([...done].sort(), ["n1", "n2"]);
   assert.equal(error.size, 0);
 });
 
-check("fold: a reviewed status:error case → its rows in error AND done (error wins over a done from another case)", () => {
+check("fold: a FAIL-verdict case paints NOTHING (only pass paints — no green, and no red)", () => {
   const { done, error } = deriveReviewOverlay(
-    { good: "reviewed", bad: "reviewed" },
+    { c1: "fail" },
+    M([["c1", { status: "pass", litNodeKeys: ["n1", "n2"] }]]), // even a run-PASS case, if the human verdict is fail, is unpainted
+  );
+  assert.equal(done.size, 0, "fail verdict does not paint green");
+  assert.equal(error.size, 0, "fail verdict does not paint red either");
+});
+
+check("fold: a PASS-verdict case whose RUN status is 'fail' STILL paints green (human override, not error)", () => {
+  const { done, error } = deriveReviewOverlay(
+    { c1: "pass" },
+    M([["c1", { status: "fail", litNodeKeys: ["n1"] }]]),
+  );
+  assert.deepEqual([...done], ["n1"], "the human pass verdict paints green over the automated fail");
+  assert.equal(error.size, 0, "run-status 'fail' does NOT redden — only run-status 'error' does");
+});
+
+check("fold: a PASS-verdict but run-status:error case → its rows in error AND done (error wins over a done from another case)", () => {
+  const { done, error } = deriveReviewOverlay(
+    { good: "pass", bad: "pass" },
     M([
       ["good", { status: "pass", litNodeKeys: ["shared", "g1"] }],
       ["bad", { status: "error", litNodeKeys: ["shared", "b1"] }],
@@ -240,7 +285,7 @@ check("fold: a reviewed status:error case → its rows in error AND done (error 
   assert.ok(error.has("shared"), "the errored case marks the shared node error");
   assert.ok(error.has("b1"));
   assert.ok(!error.has("g1"), "a node lit only by the clean case is not error");
-  assert.ok(done.has("shared") && done.has("g1") && done.has("b1"), "done is the union over all reviewed cases");
+  assert.ok(done.has("shared") && done.has("g1") && done.has("b1"), "done is the union over all pass cases");
 });
 
 check("fold: a PENDING case contributes NOTHING (pending does not paint)", () => {
@@ -252,18 +297,18 @@ check("fold: a PENDING case contributes NOTHING (pending does not paint)", () =>
   assert.equal(error.size, 0);
 });
 
-check("fold: a stale reviewed caseId (not in perCase) → inert (contributes nothing)", () => {
+check("fold: a stale pass caseId (not in perCase) → inert (contributes nothing)", () => {
   const { done, error } = deriveReviewOverlay(
-    { gone: "reviewed", live: "reviewed" },
+    { gone: "pass", live: "pass" },
     M([["live", { status: "pass", litNodeKeys: ["n1"] }]]),
   );
   assert.deepEqual([...done], ["n1"], "only the live case paints; the stale id is skipped");
   assert.equal(error.size, 0);
 });
 
-check("fold: multiple reviewed cases lighting the same node → done (union, idempotent)", () => {
+check("fold: multiple pass cases lighting the same node → done (union, idempotent)", () => {
   const { done, error } = deriveReviewOverlay(
-    { a: "reviewed", b: "reviewed" },
+    { a: "pass", b: "pass" },
     M([
       ["a", { status: "pass", litNodeKeys: ["n1"] }],
       ["b", { status: "pass", litNodeKeys: ["n1"] }],
@@ -273,9 +318,9 @@ check("fold: multiple reviewed cases lighting the same node → done (union, ide
   assert.equal(error.size, 0);
 });
 
-check("fold: a reviewed case with litNodeKeys:[] contributes nothing (no crash, empty sets)", () => {
+check("fold: a pass case with litNodeKeys:[] contributes nothing (no crash, empty sets)", () => {
   const { done, error } = deriveReviewOverlay(
-    { c1: "reviewed" },
+    { c1: "pass" },
     M([["c1", { status: "error", litNodeKeys: [] }]]),
   );
   assert.equal(done.size, 0);
@@ -284,48 +329,41 @@ check("fold: a reviewed case with litNodeKeys:[] contributes nothing (no crash, 
 
 check("fold: an unreviewed (absent) caseId never paints even when present in perCase", () => {
   const { done, error } = deriveReviewOverlay(
-    {}, // nothing reviewed
+    {}, // nothing has a verdict
     M([["c1", { status: "error", litNodeKeys: ["n1"] }]]),
   );
   assert.equal(done.size, 0);
   assert.equal(error.size, 0);
 });
 
-// ── nextReviewState cycle ────────────────────────────────────────────────────
-check("nextReviewState: unreviewed → pending → reviewed → unreviewed", () => {
-  assert.equal(nextReviewState("unreviewed"), "pending");
-  assert.equal(nextReviewState("pending"), "reviewed");
-  assert.equal(nextReviewState("reviewed"), "unreviewed");
+// ── isReviewState (trusted-input guard) ───────────────────────────────────────
+check("isReviewState: accepts the four states, rejects everything else (incl legacy 'reviewed')", () => {
+  for (const s of ["unreviewed", "pending", "pass", "fail"]) assert.ok(isReviewState(s), `${s} is valid`);
+  for (const s of ["reviewed", "bogus", "", undefined, null, 1, {}]) assert.ok(!isReviewState(s), `${JSON.stringify(s)} rejected`);
+  assert.deepEqual([...REVIEW_STATES], ["unreviewed", "pending", "pass", "fail"], "dropdown order");
 });
 
-// ── applyWorklistToggle (slice 4 host reducer) ────────────────────────────────
-check("applyWorklistToggle: unreviewed (absent) → pending entry added", () => {
-  assert.deepEqual(applyWorklistToggle({}, "c1"), { c1: "pending" });
+// ── setReviewState (slice 4 host reducer — direct dropdown set, no cycle) ──────
+check("setReviewState: set 'pass' on an absent case → entry added", () => {
+  assert.deepEqual(setReviewState({}, "c1", "pass"), { c1: "pass" });
 });
-check("applyWorklistToggle: pending → reviewed (in place)", () => {
-  assert.deepEqual(applyWorklistToggle({ c1: "pending" }, "c1"), { c1: "reviewed" });
+check("setReviewState: set 'fail' overwrites a prior verdict in place", () => {
+  assert.deepEqual(setReviewState({ c1: "pass" }, "c1", "fail"), { c1: "fail" });
 });
-check("applyWorklistToggle: reviewed → unreviewed DELETES the entry (absence = unreviewed)", () => {
-  assert.deepEqual(applyWorklistToggle({ c1: "reviewed" }, "c1"), {});
+check("setReviewState: set 'unreviewed' DELETES the entry (absence = To do, never stored)", () => {
+  assert.deepEqual(setReviewState({ c1: "fail" }, "c1", "unreviewed"), {});
 });
-check("applyWorklistToggle: only the toggled caseId changes; others untouched", () => {
-  assert.deepEqual(applyWorklistToggle({ c1: "pending", c2: "reviewed" }, "c1"), { c1: "reviewed", c2: "reviewed" });
+check("setReviewState: only the target caseId changes; others untouched", () => {
+  assert.deepEqual(setReviewState({ c1: "pending", c2: "pass" }, "c1", "fail"), { c1: "fail", c2: "pass" });
 });
-check("applyWorklistToggle: returns a NEW object (input not mutated)", () => {
-  const input = { c1: "reviewed" };
-  const out = applyWorklistToggle(input, "c1");
-  assert.deepEqual(input, { c1: "reviewed" }, "input untouched");
+check("setReviewState: returns a NEW object (input not mutated)", () => {
+  const input = { c1: "pass" };
+  const out = setReviewState(input, "c1", "fail");
+  assert.deepEqual(input, { c1: "pass" }, "input untouched");
   assert.notEqual(out, input, "a fresh object is returned");
 });
-// FIX 1 (impl review): rapid double-toggle. The host advances from the COMMITTED map each time (the stable caseId key
-// resolves even on a pre-re-render DOM), so two toggles in a row on the same case advance TWO states.
-check("applyWorklistToggle: two toggles in a row on the same case advance two states (unreviewed→pending→reviewed)", () => {
-  const after1 = applyWorklistToggle({}, "c1");
-  assert.deepEqual(after1, { c1: "pending" }, "first → pending");
-  const after2 = applyWorklistToggle(after1, "c1");
-  assert.deepEqual(after2, { c1: "reviewed" }, "second (from committed) → reviewed");
-  const after3 = applyWorklistToggle(after2, "c1");
-  assert.deepEqual(after3, {}, "third wraps to unreviewed (entry deleted)");
+check("setReviewState: any-to-any is one step (no cycling) — fail → pass directly", () => {
+  assert.deepEqual(setReviewState({ c1: "fail" }, "c1", "pass"), { c1: "pass" }, "a mis-marked fail corrects in ONE set");
 });
 
 // ── buildReviewPerCase → deriveReviewOverlay (slice 5 host join, end-to-end) ──────────────
@@ -339,36 +377,36 @@ const litOf = (id) => lit[id] ?? [];
 const overlayFor = (byCaseId, caseIds) =>
   deriveReviewOverlay(byCaseId, buildReviewPerCase(caseIds, statusOf, litOf));
 
-check("buildReviewPerCase: a frozen reviewed PASS case → its nodes done, none error", () => {
-  const { done, error } = overlayFor({ c1: "reviewed" }, ["c1", "c2"]);
+check("buildReviewPerCase: a frozen PASS-verdict, run-pass case → its nodes done, none error", () => {
+  const { done, error } = overlayFor({ c1: "pass" }, ["c1", "c2"]);
   assert.deepEqual([...done].sort(), ["n:a", "n:b"]);
   assert.equal(error.size, 0);
 });
-check("buildReviewPerCase: a frozen reviewed ERROR case → its nodes error AND done (error⊆done)", () => {
-  const { done, error } = overlayFor({ cErr: "reviewed" }, ["cErr", "cClean"]);
+check("buildReviewPerCase: a frozen PASS-verdict, run-ERROR case → its nodes error AND done (error⊆done)", () => {
+  const { done, error } = overlayFor({ cErr: "pass" }, ["cErr", "cClean"]);
   assert.deepEqual([...done].sort(), ["n:c", "n:d"], "error nodes are also done");
   assert.deepEqual([...error].sort(), ["n:c", "n:d"]);
 });
-check("error-over-done: a node lit by a clean reviewed case AND an errored reviewed case is error (and done)", () => {
-  // cClean lights n:c (pass), cErr lights n:c + n:d (error) → n:c is in BOTH done and error; the webview paints error over it.
-  const { done, error } = overlayFor({ cClean: "reviewed", cErr: "reviewed" }, ["cClean", "cErr"]);
+check("error-over-done: a node lit by a clean pass case AND a run-errored pass case is error (and done)", () => {
+  // cClean lights n:c (run-pass), cErr lights n:c + n:d (run-error) → n:c is in BOTH done and error; webview paints error over it.
+  const { done, error } = overlayFor({ cClean: "pass", cErr: "pass" }, ["cClean", "cErr"]);
   assert.ok(done.has("n:c") && error.has("n:c"), "shared node is error AND done");
   assert.ok(done.has("n:d") && error.has("n:d"));
 });
-check("PENDING case paints nothing (only reviewed contributes)", () => {
+check("PENDING case paints nothing (only pass contributes)", () => {
   const { done, error } = overlayFor({ c1: "pending" }, ["c1", "c2"]);
   assert.equal(done.size, 0);
   assert.equal(error.size, 0);
 });
 check("an unfrozen/ambiguous caseId (statusOf → undefined) is skipped — never appears in perCase", () => {
-  // "ghost" is reviewed in the sidecar but not a live/frozen case → buildReviewPerCase skips it → the fold finds no row → inert.
+  // "ghost" is pass in the sidecar but not a live/frozen case → buildReviewPerCase skips it → the fold finds no row → inert.
   const perCase = buildReviewPerCase(["ghost", "c1"], statusOf, litOf);
   assert.ok(!perCase.has("ghost"), "no perCase row for an unresolved (undefined-status) case");
   assert.ok(perCase.has("c1"));
-  const { done } = deriveReviewOverlay({ ghost: "reviewed", c1: "reviewed" }, perCase);
-  assert.deepEqual([...done].sort(), ["n:a", "n:b"], "only the live reviewed case painted; the ghost is inert");
+  const { done } = deriveReviewOverlay({ ghost: "pass", c1: "pass" }, perCase);
+  assert.deepEqual([...done].sort(), ["n:a", "n:b"], "only the live pass case painted; the ghost is inert");
 });
-check("empty worklist (nothing reviewed) → empty overlay (host posts a clear)", () => {
+check("empty worklist (no verdicts) → empty overlay (host posts a clear)", () => {
   const { done, error } = overlayFor({}, ["c1", "c2", "cErr"]);
   assert.equal(done.size, 0);
   assert.equal(error.size, 0);
@@ -380,79 +418,90 @@ check("buildReviewPerCase passes litNodeKeys verbatim from the join closure", ()
 });
 
 // ── reviewProgress (slice 6 count) ────────────────────────────────────────────
-check("reviewProgress: a mix — reviewed/pending over reviewable, absent=unreviewed, orphan keys=stale", () => {
-  // reviewable = [r1, r2, p1, u1]; sidecar also has two orphans (o1 reviewed, o2 pending) not in reviewable → both stale.
+const PROG = (o) => ({ total: 0, reviewed: 0, passed: 0, failed: 0, pending: 0, unreviewable: 0, stale: 0, ...o });
+check("reviewProgress: a mix — passed/failed/pending over reviewable, absent=To do, orphan keys=stale", () => {
+  // reviewable = [r1, r2, p1, u1]; sidecar also has two orphans (o1 pass, o2 pending) not in reviewable → both stale.
   const p = reviewProgress(
-    { r1: "reviewed", r2: "reviewed", p1: "pending", o1: "reviewed", o2: "pending" },
-    ["r1", "r2", "p1", "u1"], // u1 absent from sidecar → unreviewed (not counted in reviewed/pending)
+    { r1: "pass", r2: "pass", p1: "pending", o1: "pass", o2: "pending" },
+    ["r1", "r2", "p1", "u1"], // u1 absent from sidecar → To do (not counted in passed/failed/pending)
   );
-  assert.deepEqual(p, { total: 4, reviewed: 2, pending: 1, unreviewable: 0, stale: 2 });
-  // NOT a partition: reviewed+pending+stale = 5 ≠ total (4); stale counts a DIFFERENT universe (orphans), incl a pending orphan.
+  assert.deepEqual(p, PROG({ total: 4, reviewed: 2, passed: 2, failed: 0, pending: 1, stale: 2 }));
+  // NOT a partition: passed+pending+stale = 5 ≠ total (4); stale counts a DIFFERENT universe (orphans), incl a pending orphan.
 });
-check("reviewProgress: empty reviewable set → total 0 (and reviewed/pending 0)", () => {
-  assert.deepEqual(reviewProgress({}, []), { total: 0, reviewed: 0, pending: 0, unreviewable: 0, stale: 0 });
+check("reviewProgress: passed + failed split (reviewed = passed + failed = adjudicated)", () => {
+  const p = reviewProgress({ a: "pass", b: "fail", c: "pending" }, ["a", "b", "c", "d"]);
+  assert.deepEqual(p, PROG({ total: 4, reviewed: 2, passed: 1, failed: 1, pending: 1, stale: 0 }));
+});
+check("reviewProgress: empty reviewable set → total 0 (everything 0)", () => {
+  assert.deepEqual(reviewProgress({}, []), PROG({}));
   // a total-0 panel can still have orphans: those surface as stale.
-  assert.deepEqual(reviewProgress({ gone: "reviewed" }, []), { total: 0, reviewed: 0, pending: 0, unreviewable: 0, stale: 1 });
+  assert.deepEqual(reviewProgress({ gone: "pass" }, []), PROG({ stale: 1 }));
 });
-check("reviewProgress: all-reviewed (reviewed===total, nothing pending/stale/unreviewable)", () => {
-  assert.deepEqual(reviewProgress({ a: "reviewed", b: "reviewed" }, ["a", "b"]), {
-    total: 2, reviewed: 2, pending: 0, unreviewable: 0, stale: 0,
-  });
+check("reviewProgress: all-passed (passed===total, nothing failed/pending/stale/unreviewable)", () => {
+  assert.deepEqual(reviewProgress({ a: "pass", b: "pass" }, ["a", "b"]), PROG({ total: 2, reviewed: 2, passed: 2 }));
 });
 check("reviewProgress: unreviewable = totalCaseCount − reviewable (floored at 0)", () => {
   // 5 worklist rows, 3 reviewable (frozen, non-ambiguous) → 2 unreviewable (unfrozen/ambiguous).
-  const p = reviewProgress({ a: "reviewed" }, ["a", "b", "c"], 5);
-  assert.deepEqual(p, { total: 3, reviewed: 1, pending: 0, unreviewable: 2, stale: 0 });
+  const p = reviewProgress({ a: "pass" }, ["a", "b", "c"], 5);
+  assert.deepEqual(p, PROG({ total: 3, reviewed: 1, passed: 1, unreviewable: 2 }));
   // defensive floor: a totalCaseCount somehow < reviewable never yields a negative unreviewable.
   assert.equal(reviewProgress({}, ["a", "b"], 1).unreviewable, 0);
 });
 check("reviewProgress: a duplicate reviewable id does NOT inflate the counts (de-duped)", () => {
-  const p = reviewProgress({ a: "reviewed" }, ["a", "a", "b"]);
-  assert.deepEqual(p, { total: 2, reviewed: 1, pending: 0, unreviewable: 0, stale: 0 });
+  const p = reviewProgress({ a: "pass" }, ["a", "a", "b"]);
+  assert.deepEqual(p, PROG({ total: 2, reviewed: 1, passed: 1 }));
 });
 
 // ── renderProgressChrome (slice 6 chrome HTML) ─────────────────────────────────
-check("renderProgressChrome: a mix renders Reviewed N/M + pending/stale clauses", () => {
-  const html = renderProgressChrome({ total: 4, reviewed: 2, pending: 1, unreviewable: 0, stale: 2 });
+check("renderProgressChrome: a mix renders Reviewed N/M + pending/failed/stale clauses", () => {
+  const html = renderProgressChrome(PROG({ total: 5, reviewed: 3, passed: 2, failed: 1, pending: 1, stale: 2 }));
   assert.match(html, /class="mv-progress"/);
   assert.ok(!/mv-progress-done/.test(html), "not the done state when work remains");
-  assert.match(html, /Reviewed 2\/4/);
+  assert.match(html, /Reviewed 3\/5/);
   assert.match(html, /1 pending/);
+  assert.match(html, /1 failed/);
   assert.match(html, /2 stale/);
 });
-check("renderProgressChrome: all-reviewed (reviewed===total, clean) → '✓ All reviewed' done indicator INSTEAD of the count", () => {
-  const html = renderProgressChrome({ total: 3, reviewed: 3, pending: 0, unreviewable: 0, stale: 0 });
+check("renderProgressChrome: all-PASSED (passed===total, clean) → '✓ All passed' done indicator INSTEAD of the count", () => {
+  const html = renderProgressChrome(PROG({ total: 3, reviewed: 3, passed: 3 }));
   assert.match(html, /mv-progress-done/);
-  assert.match(html, /✓ All reviewed/);
+  assert.match(html, /✓ All passed/);
   assert.ok(!/Reviewed 3\/3/.test(html), "no redundant count beside the done indicator");
 });
-check("renderProgressChrome: pending/unreviewable/stale clauses OMITTED when their count is 0", () => {
-  const html = renderProgressChrome({ total: 5, reviewed: 2, pending: 0, unreviewable: 0, stale: 0 });
+check("renderProgressChrome: all ADJUDICATED but some FAILED is NOT clean — shows the failed tally, no green all-clear", () => {
+  const html = renderProgressChrome(PROG({ total: 3, reviewed: 3, passed: 2, failed: 1 }));
+  assert.ok(!/mv-progress-done/.test(html), "a failure blocks the '✓ All passed' badge");
+  assert.ok(!/All passed/.test(html));
+  assert.match(html, /Reviewed 3\/3/, "completion is still visible");
+  assert.match(html, /1 failed/, "and so is the failure");
+});
+check("renderProgressChrome: pending/failed/unreviewable/stale clauses OMITTED when their count is 0", () => {
+  const html = renderProgressChrome(PROG({ total: 5, reviewed: 2, passed: 2 }));
   assert.match(html, /Reviewed 2\/5/);
-  assert.ok(!/pending/.test(html) && !/not reviewable/.test(html) && !/stale/.test(html), "no zero clauses");
+  assert.ok(!/pending/.test(html) && !/failed/.test(html) && !/not reviewable/.test(html) && !/stale/.test(html), "no zero clauses");
 });
 check("renderProgressChrome: unreviewable rows surface as '· U not reviewable' (honesty — they're never hidden)", () => {
-  const html = renderProgressChrome({ total: 3, reviewed: 1, pending: 0, unreviewable: 2, stale: 0 });
+  const html = renderProgressChrome(PROG({ total: 3, reviewed: 1, passed: 1, unreviewable: 2 }));
   assert.match(html, /Reviewed 1\/3/);
   assert.match(html, /2 not reviewable/);
 });
-check("renderProgressChrome: reviewed===total but stale>0 is NOT the done state (a dangling orphan ≠ clean)", () => {
-  const html = renderProgressChrome({ total: 2, reviewed: 2, pending: 0, unreviewable: 0, stale: 1 });
-  assert.ok(!/mv-progress-done/.test(html), "stale orphan blocks the all-reviewed indicator");
+check("renderProgressChrome: passed===total but stale>0 is NOT the done state (a dangling orphan ≠ clean)", () => {
+  const html = renderProgressChrome(PROG({ total: 2, reviewed: 2, passed: 2, stale: 1 }));
+  assert.ok(!/mv-progress-done/.test(html), "stale orphan blocks the all-passed indicator");
   assert.match(html, /Reviewed 2\/2/);
   assert.match(html, /1 stale/);
 });
 check("renderProgressChrome: nothing to say (total 0, no stale, no unreviewable) → empty string (chrome:empty hides it)", () => {
-  assert.equal(renderProgressChrome({ total: 0, reviewed: 0, pending: 0, unreviewable: 0, stale: 0 }), "");
+  assert.equal(renderProgressChrome(PROG({})), "");
 });
 check("renderProgressChrome: total 0 but stale>0 STILL renders (the orphan count is the only useful signal)", () => {
-  const html = renderProgressChrome({ total: 0, reviewed: 0, pending: 0, unreviewable: 0, stale: 3 });
+  const html = renderProgressChrome(PROG({ stale: 3 }));
   assert.notEqual(html, "");
   assert.match(html, /0 reviewable/);
   assert.match(html, /3 stale/);
 });
 check("renderProgressChrome: total 0 but unreviewable>0 STILL renders (all rows unfrozen/ambiguous → none reviewable)", () => {
-  const html = renderProgressChrome({ total: 0, reviewed: 0, pending: 0, unreviewable: 2, stale: 0 });
+  const html = renderProgressChrome(PROG({ unreviewable: 2 }));
   assert.notEqual(html, "");
   assert.match(html, /0 reviewable/);
   assert.match(html, /2 not reviewable/);

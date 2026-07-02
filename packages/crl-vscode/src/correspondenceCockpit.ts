@@ -52,14 +52,15 @@ import {
 import { resolveThisNode } from "./thisNodeMarker";
 import { failedCriterionLabel } from "./failedCriterionLabel";
 import {
-  applyWorklistToggle,
   buildReviewPerCase,
   deriveReviewOverlay,
+  isReviewState,
   loadSidecar,
   medicalValidationSidecarPath,
   renderProgressChrome,
   reviewProgress,
   saveSidecar,
+  setReviewState,
   type PersistedReviewState,
 } from "./medicalValidationStore";
 import { renderCrlPane } from "./crlPaneHtml";
@@ -252,8 +253,8 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
    *  revisit if panes ever re-render independently. */
   let conceptToFactAnchors: Record<string, string[]> = {};
   // Medical Validation (#156 slice 4) — the worklist review state, mode-scoped. `reviewByCaseId` is the persisted sidecar
-  // map (caseId → "pending" | "reviewed"; ABSENCE = unreviewed, never stored). Loaded BEFORE the first rebuild in MV mode
-  // (so the checkboxes paint correctly on first show, no flash); empty in cockpit mode (worklist disabled). HOST is the
+  // map (caseId → "pending" | "pass" | "fail"; ABSENCE = "To do", never stored). Loaded BEFORE the first rebuild in MV mode
+  // (so the dropdowns paint correctly on first show, no flash); empty in cockpit mode (worklist disabled). HOST is the
   // authority for the next state (the webview is not). `mvSidecarPath` is the resolved sidecar path for `currentCel` (set
   // alongside the load) — the toggle's save target. `worklistActions` is the CURRENT cel render's opaque-key → caseId map
   // (render-scoped, captured atomically with the cel pane's anchors, like conceptToFactAnchors).
@@ -372,7 +373,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
 
   /** The currently-focused cel caseId for a state (undefined when the selection is not a cel case). The questionnaire's
    *  selection key — the re-render hook fires only when THIS changes (a real case switch), not on a same-selection
-   *  redispatch (the highlight-restore re-dispatch toggleWorklist/applyShowKeys fire). */
+   *  redispatch (the highlight-restore re-dispatch setWorklist/applyShowKeys fire). */
   const focusedCaseId = (s: State): string | undefined =>
     s.selection && s.selection.primary === "cel" ? s.selection.caseId : undefined;
 
@@ -739,7 +740,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
    *
    * CORRECTNESS MODEL: the TREE-ACK re-drive (onWebviewMessage's `ready` → driveDoneOverlay, fires on EVERY tree render)
    * is the correctness guarantee — a freshly rendered tree always re-paints from current state. The immediate post after
-   * rebuild()/toggleWorklist is a LATENCY optimization that relies on VS Code webview `postMessage` being FIFO-ordered on
+   * rebuild()/setWorklist is a LATENCY optimization that relies on VS Code webview `postMessage` being FIFO-ordered on
    * the single serialized host→webview channel (it is): render → mark arrive in order, and successive marks stay ordered.
    */
   function driveDoneOverlay(): void {
@@ -1063,7 +1064,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
 
   function onWebviewMessage(
     pane: Pane,
-    msg: { type?: string; gen?: number; key?: string; mode?: string; idx?: number; dir?: string; on?: string },
+    msg: { type?: string; gen?: number; key?: string; value?: string; mode?: string; idx?: number; dir?: string; on?: string },
   ): void {
     const v = views.get(pane);
     if (!v) return;
@@ -1107,8 +1108,8 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       openFailedCriterionSource(msg.idx); // a gap row's "Open CRL source"
     } else if (msg.type === "questionNav" && (msg.dir === "prev" || msg.dir === "next")) {
       navigateQuestion(msg.dir); // #177 slice 5: the questionnaire pane's prev/next sub-nav — moves currentQuestionIndex
-    } else if (msg.type === "worklistToggle" && typeof msg.key === "string") {
-      toggleWorklist(msg.key); // #156 slice 4: a worklist checkbox click (MV mode) — host computes + persists the next state
+    } else if (msg.type === "worklistSet" && typeof msg.key === "string") {
+      setWorklist(msg.key, msg.value); // #156 slice 4: a worklist dropdown change (MV mode) — host validates + persists it
     } else if (msg.type === "reveal" && typeof msg.key === "string") {
       const hit = v.reveals[msg.key]; // trusted: looked up by opaque key, not a path/range from the webview
       if (!hit) return;
@@ -1461,19 +1462,21 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     }
   }
 
-  /** Handle a worklist checkbox click (#156 slice 4). The webview posts only the opaque `data-worklist-toggle` key; we
-   *  resolve it to a caseId via THIS render's `worklistActions` (trusted-opaque-key discipline, like `reveals`). The HOST
-   *  computes the next state (the webview is not the authority): advance the cycle, PERSIST it, then re-render ONLY the cel
-   *  pane (the checkbox updates) — never a full rebuild (perf). On a save failure we surface a user-visible error AND keep
-   *  the in-memory map at its prior value, so disk + memory don't diverge (and the re-render shows the un-changed state).
-   *  After a successful toggle the done set changed → re-drive the tree DONE/ERROR overlay (#156 slice 5). */
-  function toggleWorklist(key: string): void {
-    if (mode !== "medical-validation") return; // defensive: a toggle only exists in MV mode
+  /** Handle a worklist dropdown change (#156 slice 4). The webview posts the opaque `data-worklist-select` key + the
+   *  SELECTED value; we resolve the key to a caseId via THIS render's `worklistActions` (trusted-opaque-key discipline, like
+   *  `reveals`) AND validate the value is a known ReviewState (never write an arbitrary webview string). The HOST persists,
+   *  then re-renders ONLY the cel pane (the dropdown updates) — never a full rebuild (perf). On a save failure we surface a
+   *  user-visible error AND keep the in-memory map at its prior value, so disk + memory don't diverge (and the re-render
+   *  shows the un-changed state). After a successful set the pass set may have changed → re-drive the tree DONE/ERROR
+   *  overlay (#156 slice 5). */
+  function setWorklist(key: string, value: unknown): void {
+    if (mode !== "medical-validation") return; // defensive: the dropdown only exists in MV mode
     const action = worklistActions[key]; // trusted: looked up by opaque key, not a caseId from the webview
     if (!action || !mvSidecarPath) return;
-    const next = applyWorklistToggle(reviewByCaseId, action.caseId);
+    if (!isReviewState(value)) return; // trusted-input guard: drop any value not in the known state set
+    const next = setReviewState(reviewByCaseId, action.caseId, value);
     try {
-      saveSidecar(mvSidecarPath, { schemaVersion: 1, byCaseId: next });
+      saveSidecar(mvSidecarPath, { schemaVersion: 2, byCaseId: next });
     } catch (e) {
       // Save failed — do NOT mutate the in-memory map (keep disk + memory in sync) + tell the user.
       void vscode.window.showErrorMessage(
@@ -1482,7 +1485,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       return;
     }
     reviewByCaseId = next; // commit in-memory only AFTER a successful persist
-    renderPane("cel"); // single-pane re-render (the checkbox glyphs); re-drive the selection so its highlight survives
+    renderPane("cel"); // single-pane re-render (the dropdown selection); re-drive the selection so its highlight survives
     // #156 slice 6: the reviewed/pending counts changed → refresh the tree-chrome progress readout (no tree re-render). The
     // selection-dispatch path below ALSO renders chrome (dispatch → driveFailedCriteriaPeek → renderTreeChrome), so only
     // call renderTreeChrome here when there's NO selection (else the chrome would post twice for a selected toggle).
@@ -1762,11 +1765,12 @@ function shellHtml(): string {
 .cel-case.cel-error{border-left-color:var(--vscode-testing-iconErrored,#e2b33e)}
 .cel-worklist-header{font-weight:bold;font-size:1.05em;padding:2px 0 6px;margin-bottom:6px;border-bottom:1px solid var(--vscode-panel-border,#454545);position:sticky;top:0;background:var(--vscode-editor-background);z-index:1}
 .cel-name{font-weight:bold}.cel-subject{opacity:.7}
-.cel-check{cursor:pointer;user-select:none;margin-right:2px}
-.cel-check:focus-visible{outline:1px solid var(--vscode-focusBorder,#3794ff);outline-offset:1px}
-.cel-check-reviewed{color:var(--vscode-testing-iconPassed,#73c991)}
-.cel-check-pending{color:var(--vscode-charts-yellow,#d29922)}
-.cel-check-disabled{cursor:default;opacity:.4}
+.cel-review{margin-right:4px;font-size:.9em;vertical-align:middle;background:var(--vscode-dropdown-background);border:1px solid var(--vscode-dropdown-border,#3c3c3c);color:var(--vscode-dropdown-foreground)}
+.cel-review:focus-visible{outline:1px solid var(--vscode-focusBorder,#3794ff);outline-offset:1px}
+.cel-review-pass{color:var(--vscode-testing-iconPassed,#73c991)}
+.cel-review-fail{color:var(--vscode-testing-iconFailed,#f14c4c)}
+.cel-review-pending{color:var(--vscode-charts-yellow,#d29922)}
+.cel-review-disabled{opacity:.4}
 .cel-case.cel-ambiguous{opacity:.7;cursor:default}
 .cel-ambiguous-marker{color:var(--vscode-charts-yellow,#d29922);font-size:.85em;font-style:italic}
 .cel-facts,.cel-produced{opacity:.8;padding-left:14px;font-size:.95em}
@@ -1888,12 +1892,12 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   `for(const id of (m.segmentIds||[])){const el=document.getElementById(id);if(el)el.classList.add('diverter');}}` +
   // The tree-pane chrome (toggle + gap banner) — injected ABOVE #root so it never clobbers the flowchart.
   `else if(m.type==='fcChrome'){fcc.innerHTML=m.html;}});` +
-  // #156 slice 4: a worklist checkbox click is intercepted BEFORE the [data-reveal] case-select path — the checkbox
-  // sits INSIDE the .cel-case block (which is itself a data-reveal target), so we must stop the click bubbling to a
-  // reveal/select. closest('[data-worklist-toggle]') wins (the inner checkbox), preventDefault+stopPropagation, post the
-  // opaque key, and return — the host computes the next state. A DISABLED checkbox carries no attribute → falls through.
-  `root.addEventListener('click',(e)=>{const wl=e.target.closest&&e.target.closest('[data-worklist-toggle]');` +
-  `if(wl){e.preventDefault();e.stopPropagation();v.postMessage({type:'worklistToggle',key:wl.getAttribute('data-worklist-toggle')});return;}` +
+  // #156 slice 4: a worklist review <select> sits INSIDE the .cel-case block (itself a data-reveal target). A CLICK on the
+  // select must open the native dropdown WITHOUT selecting the case, so we stopPropagation (block the reveal) but do NOT
+  // preventDefault (let the dropdown open). The state change rides the separate 'change' listener below. A DISABLED select
+  // carries no data-worklist-select → falls through to the reveal path harmlessly (its parent case isn't a reveal target).
+  `root.addEventListener('click',(e)=>{const ws=e.target.closest&&e.target.closest('[data-worklist-select]');` +
+  `if(ws){e.stopPropagation();return;}` +
   // #177 slice 5: the questionnaire pane's prev/next sub-nav (it renders INTO #root, so it shares this click delegation).
   // A [data-qnav] button posts the opaque direction; the host moves currentQuestionIndex, re-renders + re-drives the marker.
   // Intercepted before [data-reveal] (the questionnaire is read-only — its buttons never select). A disabled button still
@@ -1902,12 +1906,11 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   `if(qn){e.preventDefault();e.stopPropagation();if(!qn.disabled)v.postMessage({type:'questionNav',dir:qn.getAttribute('data-qnav')});return;}` +
   `const t=e.target.closest&&e.target.closest('[data-reveal]');` +
   `if(t)v.postMessage({type:'reveal',key:t.getAttribute('data-reveal')});});` +
-  // #156 slice 4 (a11y): the interactive worklist checkbox is tabindex=0 + role=checkbox — make it keyboard-operable.
-  // Enter / Space on a focused checkbox posts the SAME worklistToggle as a click (host computes the next state). Disabled
-  // checkboxes carry no data-worklist-toggle (+ no tabindex) so they're unreachable/no-op here.
-  `root.addEventListener('keydown',(e)=>{if(e.key!=='Enter'&&e.key!==' ')return;` +
-  `const wl=e.target.closest&&e.target.closest('[data-worklist-toggle]');` +
-  `if(wl){e.preventDefault();e.stopPropagation();v.postMessage({type:'worklistToggle',key:wl.getAttribute('data-worklist-toggle')});}});` +
+  // #156 slice 4: the worklist dropdown's 'change' posts the opaque key + the chosen value; the host validates the value
+  // is a known ReviewState and persists it. A native <select> is keyboard- + screen-reader-operable, so no hand-rolled
+  // keydown handling is needed. stopPropagation keeps the change from bubbling into any ancestor listener.
+  `root.addEventListener('change',(e)=>{const ws=e.target.closest&&e.target.closest('[data-worklist-select]');` +
+  `if(ws){e.stopPropagation();v.postMessage({type:'worklistSet',key:ws.getAttribute('data-worklist-select'),value:ws.value});}});` +
   // Chrome clicks: the All/Blocking toggle (data-fc-mode) + a gap row's Open CRL source (data-fc-gap).
   `fcc.addEventListener('click',(e)=>{const mode=e.target.closest&&e.target.closest('[data-fc-mode]');` +
   `if(mode){v.postMessage({type:'fcMode',mode:mode.getAttribute('data-fc-mode')});return;}` +

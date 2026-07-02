@@ -8,7 +8,7 @@
 //   - medicalValidationSidecarPath: from a .cel, locate the ONE policy-scoped sidecar (one per POLICY, not per .cel).
 //   - load/save the sidecar: a corruption-tolerant read + an ATOMIC write (tmp+rename), keyed by frozen caseId.
 //   - deriveReviewOverlay: the TOTAL precedence fold (error > done) over all REVIEWED cases → the {done, error} node sets.
-//   - nextReviewState / applyWorklistToggle: the 3-state checkbox cycle (slice 4 wires it to the webview click).
+//   - isReviewState / setReviewState: the review-state dropdown (slice 4 wires it to the webview <select> change).
 //   - reviewProgress / renderProgressChrome: the slice-6 worklist progress READOUT (pure count + its tree-chrome HTML).
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
@@ -44,19 +44,22 @@ export function medicalValidationSidecarPath(celPath: string): string | undefine
 
 // ── sidecar shape + IO ───────────────────────────────────────────────────────────
 
-/** A persisted review state for a frozen case. ABSENCE of a caseId from `byCaseId` means UNREVIEWED — we never store
- *  "unreviewed" (the sidecar holds only the two non-default states). DONE/ERROR are DERIVED on load, never stored. */
-export type PersistedReviewState = "pending" | "reviewed";
+/** A persisted review state for a frozen case (the reviewer's VERDICT — distinct from the automated CEL run status in
+ *  `CasePaint.status`, which shares the words "pass"/"fail"). ABSENCE of a caseId from `byCaseId` means "To do" — we never
+ *  store the default. The four UI states are To do (unreviewed, unstored) · Pending · Pass · Fail; only `"pass"` paints the
+ *  tree (see `deriveReviewOverlay`). Legacy schemaVersion-1 sidecars stored `"reviewed"`, migrated to `"pass"` on load. */
+export type PersistedReviewState = "pending" | "pass" | "fail";
 
-/** The on-disk sidecar — one per POLICY, keyed by frozen caseId. Stale entries (a deleted/re-frozen case whose caseId no
- *  longer appears in the model) are inert: the fold simply finds no `perCase` row for them. */
+/** The on-disk sidecar — one per POLICY, keyed by frozen caseId. schemaVersion 2 (v1 stored `"pending"|"reviewed"`; the
+ *  load path migrates a v1 `"reviewed"` → `"pass"` and normalizes to v2). Stale entries (a deleted/re-frozen case whose
+ *  caseId no longer appears in the model) are inert: the fold simply finds no `perCase` row for them. */
 export interface MedicalValidationSidecar {
-  schemaVersion: 1;
+  schemaVersion: 2;
   byCaseId: Record<string, PersistedReviewState>;
 }
 
 function emptySidecar(): MedicalValidationSidecar {
-  return { schemaVersion: 1, byCaseId: {} };
+  return { schemaVersion: 2, byCaseId: {} };
 }
 
 /** A load that survived a corrupt/malformed/forward-version sidecar carries a soft `warning` (the caller may surface it).
@@ -68,7 +71,15 @@ export interface SidecarLoad {
 }
 
 function isPersistedState(v: unknown): v is PersistedReviewState {
-  return v === "pending" || v === "reviewed";
+  return v === "pending" || v === "pass" || v === "fail";
+}
+
+/** Coerce one stored value to a current persisted state, MIGRATING the legacy schemaVersion-1 `"reviewed"` → `"pass"`
+ *  (v1 "reviewed" meant approved / painted-green ≡ the v2 "pass" verdict). An unknown value returns undefined (dropped on
+ *  load — a partially-corrupt map keeps its valid entries). We never WRITE "reviewed" again; this is a read-path remap. */
+function migratePersistedState(v: unknown): PersistedReviewState | undefined {
+  if (v === "reviewed") return "pass"; // legacy v1 → v2
+  return isPersistedState(v) ? v : undefined;
 }
 
 /** The two-outcome result of coercing parsed JSON. `sidecar: undefined` = not a sidecar shape at all (caller → empty +
@@ -81,20 +92,23 @@ interface CoerceResult {
 /** Sanitize a parsed JSON value into a MedicalValidationSidecar, dropping any caseId whose value isn't a known state (so
  *  a partially-corrupt map keeps its valid entries rather than nuking the whole review). `sidecar: undefined` on a shape
  *  that isn't a sidecar at all: not an object, byCaseId missing / non-object / an ARRAY (`["reviewed"]` would otherwise
- *  coerce to `{"0":"reviewed"}` — FIX 1). A FORWARD schemaVersion (≠1) is loaded BEST-EFFORT over the known states but
- *  carries a warning — a future v2 may redefine "reviewed"/"pending", so we surface rather than silently treat it as v1. */
+ *  coerce to `{"0":"reviewed"}` — FIX 1). schemaVersion 1 (legacy) and 2 (current) both load natively — a v1 `"reviewed"`
+ *  migrates to `"pass"` (`migratePersistedState`); any OTHER version loads BEST-EFFORT over the current states with a
+ *  warning (a future v3 may redefine the set). The result normalizes to v2. */
 function coerceSidecar(parsed: unknown): CoerceResult {
   if (typeof parsed !== "object" || parsed === null) return {};
   const obj = parsed as Record<string, unknown>;
   if (typeof obj.byCaseId !== "object" || obj.byCaseId === null || Array.isArray(obj.byCaseId)) return {};
   const byCaseId: Record<string, PersistedReviewState> = {};
-  for (const [caseId, v] of Object.entries(obj.byCaseId as Record<string, unknown>))
-    if (isPersistedState(v)) byCaseId[caseId] = v;
+  for (const [caseId, v] of Object.entries(obj.byCaseId as Record<string, unknown>)) {
+    const migrated = migratePersistedState(v);
+    if (migrated) byCaseId[caseId] = migrated;
+  }
   const warning =
-    obj.schemaVersion !== 1
-      ? `sidecar schemaVersion ${JSON.stringify(obj.schemaVersion)} is not 1; loaded the known states best-effort`
+    obj.schemaVersion !== 1 && obj.schemaVersion !== 2
+      ? `sidecar schemaVersion ${JSON.stringify(obj.schemaVersion)} is not 1 or 2; loaded the known states best-effort`
       : undefined;
-  return { sidecar: { schemaVersion: 1, byCaseId }, warning };
+  return { sidecar: { schemaVersion: 2, byCaseId }, warning };
 }
 
 /** Load the sidecar. Missing file → empty (a fresh policy, no review yet). Malformed JSON / wrong shape → empty + a soft
@@ -159,13 +173,18 @@ export interface ReviewOverlay {
 
 /**
  * The TOTAL precedence fold (disc 161 §1) — recomputed in full each time, NOT first-write-wins:
- *   - For each caseId with `byCaseId[caseId] === "reviewed"` (PENDING does NOT paint — skipped): union its `litNodeKeys`
- *     into `done`; if its `status === "error"`, ALSO union into `error`.
- *   - A reviewed caseId absent from `perCase` (stale — case deleted or re-frozen under a new id) contributes nothing.
- *   - error > done: a nodeKey lit by ANY reviewed-error case is in `error` (and remains in `done`); the caller renders
- *     error on top. `done` is the union over ALL reviewed cases, so a node lit by both a clean and an errored reviewed
- *     case shows error (and is done).
- * Idempotent under Set union: multiple reviewed cases lighting the same node yield one entry.
+ *   - For each caseId whose REVIEW VERDICT is `"pass"` (only pass paints — `pending`/`fail` are skipped, per the
+ *     operator's "only pass paints the tree green"): union its `litNodeKeys` into `done`; if its automated run
+ *     `status === "error"`, ALSO union into `error`.
+ *   - The verdict and the run `status` are ORTHOGONAL axes that both use the words pass/fail: a verdict-`"pass"` case may
+ *     have run `status === "fail"` — it STILL paints green (a deliberate human override of the automated result). Only run
+ *     `status === "error"` (execution broke — nothing to trust) reddens a pass-verdict node. `fail`-VERDICT cases paint
+ *     NOTHING (no green, and no red — a second red would collide with this run-error overlay; fail surfaces in the worklist
+ *     dropdown + progress tally instead).
+ *   - A pass caseId absent from `perCase` (stale — case deleted or re-frozen under a new id) contributes nothing.
+ *   - error > done: a nodeKey lit by ANY pass-verdict-but-run-errored case is in `error` (and remains in `done`); the
+ *     caller renders error on top. `done` is the union over ALL pass cases.
+ * Idempotent under Set union: multiple pass cases lighting the same node yield one entry.
  */
 export function deriveReviewOverlay(
   byCaseId: Record<string, PersistedReviewState>,
@@ -174,12 +193,12 @@ export function deriveReviewOverlay(
   const done = new Set<string>();
   const error = new Set<string>();
   for (const [caseId, state] of Object.entries(byCaseId)) {
-    if (state !== "reviewed") continue; // pending does not paint
+    if (state !== "pass") continue; // only the pass VERDICT paints; pending + fail do not
     const paint = perCase.get(caseId);
     if (!paint) continue; // stale entry (no live case) → inert
     for (const key of paint.litNodeKeys) {
       done.add(key);
-      if (paint.status === "error") error.add(key);
+      if (paint.status === "error") error.add(key); // run-status error reddens even a pass verdict
     }
   }
   return { done, error };
@@ -208,38 +227,35 @@ export function buildReviewPerCase(
   return perCase;
 }
 
-// ── checkbox cycle ───────────────────────────────────────────────────────────────
+// ── review-state dropdown ──────────────────────────────────────────────────────────
 
-/** The full review state in the UI — `"unreviewed"` is the default (NOT persisted; absence in the sidecar). The two
- *  persisted states are the tail of this union (assignable to `PersistedReviewState`). */
+/** The full review state in the UI — `"unreviewed"` ("To do") is the default (NOT persisted; absence in the sidecar). The
+ *  three persisted states are the tail of this union (assignable to `PersistedReviewState`). */
 export type ReviewState = "unreviewed" | PersistedReviewState;
 
-/** The checkbox cycle (slice 4 wires it to the webview click): unreviewed → pending → reviewed → unreviewed. Host is the
- *  authority for the next state (the webview is not — disc 161 §"Architecture"). */
-export function nextReviewState(s: ReviewState): ReviewState {
-  switch (s) {
-    case "unreviewed":
-      return "pending";
-    case "pending":
-      return "reviewed";
-    case "reviewed":
-      return "unreviewed";
-  }
+/** The ordered set of review states as the worklist dropdown offers them (To do → Pending → Pass → Fail). The render + the
+ *  host both key off this so the option list and the validated set never drift. */
+export const REVIEW_STATES: readonly ReviewState[] = ["unreviewed", "pending", "pass", "fail"];
+
+/** Validate a value posted from the webview dropdown is a known review state — the trusted-input guard (the host must
+ *  never write an arbitrary string the webview sends). */
+export function isReviewState(v: unknown): v is ReviewState {
+  return v === "unreviewed" || isPersistedState(v);
 }
 
-/** The pure worklist-toggle reducer (slice 4, host-as-authority): given the current sidecar map + the caseId being
- *  toggled, return the NEXT map. Advances that case's state through the 3-state cycle (via nextReviewState); when the next
- *  state is "unreviewed" the entry is DELETED — absence = unreviewed, we never store the default (the same invariant the
- *  sidecar holds). Returns a NEW object (the caller swaps it in only AFTER a successful save, so a failed save can keep
- *  the prior map and disk + memory don't diverge). Pure — no IO, no vscode. */
-export function applyWorklistToggle(
+/** The pure worklist-set reducer (host-as-authority — disc 161 §"Architecture"): given the current sidecar map, the caseId,
+ *  and the DROPDOWN-SELECTED state, return the NEXT map. The dropdown sets a state DIRECTLY (no cycle) — `"unreviewed"`
+ *  DELETES the entry (absence = To do, we never store the default), the three verdicts are stored. Returns a NEW object
+ *  (the caller swaps it in only AFTER a successful save, so a failed save keeps the prior map and disk + memory don't
+ *  diverge). Pure — no IO, no vscode. Caller must pre-validate `state` with `isReviewState`. */
+export function setReviewState(
   byCaseId: Record<string, PersistedReviewState>,
   caseId: string,
+  state: ReviewState,
 ): Record<string, PersistedReviewState> {
-  const next = nextReviewState(byCaseId[caseId] ?? "unreviewed");
   const out = { ...byCaseId };
-  if (next === "unreviewed") delete out[caseId];
-  else out[caseId] = next as PersistedReviewState;
+  if (state === "unreviewed") delete out[caseId];
+  else out[caseId] = state;
   return out;
 }
 
@@ -268,7 +284,11 @@ export function applyWorklistToggle(
  */
 export interface ReviewProgress {
   total: number;
+  /** adjudicated = passed + failed (a case is "reviewed" once it has a verdict, pass OR fail). Kept for the "Reviewed N/M"
+   *  readout; the split matters because only `passed` clears the "✓ All passed" badge. */
   reviewed: number;
+  passed: number;
+  failed: number;
   pending: number;
   unreviewable: number;
   stale: number;
@@ -280,11 +300,13 @@ export function reviewProgress(
   totalCaseCount?: number,
 ): ReviewProgress {
   const reviewable = new Set(reviewableCaseIds); // de-dupe defensively (a dup id must not inflate the counts)
-  let reviewed = 0;
+  let passed = 0;
+  let failed = 0;
   let pending = 0;
   for (const id of reviewable) {
     const s = byCaseId[id];
-    if (s === "reviewed") reviewed++;
+    if (s === "pass") passed++;
+    else if (s === "fail") failed++;
     else if (s === "pending") pending++;
   }
   let stale = 0;
@@ -292,7 +314,7 @@ export function reviewProgress(
   const total = reviewable.size;
   // Default the total case count to the de-duped reviewable total (→ 0 unreviewable) when the host omits it. Computed
   // AFTER dedup so a duplicate reviewable id can't make the default exceed `total` and fabricate a phantom unreviewable row.
-  return { total, reviewed, pending, unreviewable: Math.max(0, (totalCaseCount ?? total) - total), stale };
+  return { total, reviewed: passed + failed, passed, failed, pending, unreviewable: Math.max(0, (totalCaseCount ?? total) - total), stale };
 }
 
 /**
@@ -303,17 +325,20 @@ export function reviewProgress(
  *
  * - Returns "" only when there is NOTHING to say: `total===0 && stale===0 && unreviewable===0`. A `total===0` panel with
  *   stale orphans or unreviewable rows STILL renders (those counts are the only useful signal then).
- * - Fully clean (`total>0 && reviewed===total && pending===0 && stale===0 && unreviewable===0`) → a single
- *   "✓ All reviewed" DONE indicator (`.mv-progress-done`) INSTEAD of the count (no redundant "Reviewed N/N" beside it).
- * - Otherwise: `Reviewed N/M`, then `· P pending` (only if P>0), `· U not reviewable` (only if U>0), `· S stale` (only if
- *   S>0). When `total===0` (but stale/unreviewable>0) the leading clause reads `0 reviewable` instead of `Reviewed 0/0`.
+ * - Fully clean (`total>0 && passed===total && pending===0 && stale===0 && unreviewable===0` — i.e. EVERY case PASSED,
+ *   nothing failed/pending/stale/unreviewable) → a single "✓ All passed" DONE indicator (`.mv-progress-done`) INSTEAD of
+ *   the count. Note the gate is `passed===total`, NOT `reviewed===total`: a worklist where every case is adjudicated but
+ *   some FAILED is NOT "clean" — it must show the failed tally, never a green all-clear that hides failures.
+ * - Otherwise: `Reviewed N/M` (N = passed+failed), then `· P pending` (P>0), `· F failed` (F>0), `· U not reviewable`
+ *   (U>0), `· S stale` (S>0). When `total===0` (but stale/unreviewable>0) the leading clause reads `0 reviewable`.
  */
 export function renderProgressChrome(p: ReviewProgress): string {
   if (p.total === 0 && p.stale === 0 && p.unreviewable === 0) return "";
-  const clean = p.total > 0 && p.reviewed === p.total && p.pending === 0 && p.stale === 0 && p.unreviewable === 0;
-  if (clean) return `<div class="mv-progress mv-progress-done">✓ All reviewed</div>`;
+  const clean = p.total > 0 && p.passed === p.total && p.pending === 0 && p.stale === 0 && p.unreviewable === 0;
+  if (clean) return `<div class="mv-progress mv-progress-done">✓ All passed</div>`;
   const parts: string[] = [p.total > 0 ? `Reviewed ${p.reviewed}/${p.total}` : `0 reviewable`];
   if (p.pending > 0) parts.push(`${p.pending} pending`);
+  if (p.failed > 0) parts.push(`${p.failed} failed`);
   if (p.unreviewable > 0) parts.push(`${p.unreviewable} not reviewable`);
   if (p.stale > 0) parts.push(`${p.stale} stale`);
   return `<div class="mv-progress">${parts.join(" · ")}</div>`;

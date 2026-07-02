@@ -11,6 +11,9 @@
 import { nodeKey, type RenderScenarioResult } from "@smile-digital-health/crl";
 
 import { corrKeyHtml } from "./corrKey";
+// Type-only import (erased at compile — no runtime/bundle coupling to the store's node:fs deps): the review-state union is
+// OWNED by medicalValidationStore, imported here so the dropdown's option set + the opts type can't drift from it.
+import type { PersistedReviewState, ReviewState } from "./medicalValidationStore";
 
 export interface CelAnchor {
   scrollTo: string;
@@ -61,8 +64,10 @@ export function reverseCelAnchors(
 const ESC: Record<string, string> = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
 const escapeHtml = (s: string): string => s.replace(/[&<>"']/g, (c) => ESC[c]);
 const BADGE: Record<string, string> = { pass: "✓", fail: "✗", error: "⚠" };
-// The 3-state review checkbox glyphs (#156 slice 4). unreviewed = empty box, pending = dashed/partial, reviewed = check.
-const WORKLIST_GLYPH: Record<"unreviewed" | "pending" | "reviewed", string> = { unreviewed: "☐", pending: "◐", reviewed: "☑" };
+// The four review-verdict labels the worklist dropdown offers (#156 slice 4, extended). "To do" is the unstored default
+// (absence in the sidecar); Pending / Pass / Fail are the persisted verdicts. Only Pass paints the tree (deriveReviewOverlay).
+const REVIEW_LABEL: Record<ReviewState, string> = { unreviewed: "To do", pending: "Pending", pass: "Pass", fail: "Fail" };
+const REVIEW_ORDER: readonly ReviewState[] = ["unreviewed", "pending", "pass", "fail"];
 
 export function renderCelPane(
   result: RenderScenarioResult,
@@ -73,7 +78,7 @@ export function renderCelPane(
   // worklist (#156 slice 4, mode-gated): when `enabled`, render a 3-state review checkbox per case + (for reviewable
   // cases) emit a `data-worklist-toggle` key into `worklistActions`. ABSENT or `enabled:false` → byte-identical to the
   // cockpit render (no checkbox, no worklistActions). `statesByCaseId` is keyed by frozen caseId only (never by name).
-  opts: { revealPrefix?: string; revealableConceptKeys?: ReadonlySet<string>; caseKeyNumbers?: Record<string, number[]>; showKeys?: boolean; duplicateScenarioNames?: ReadonlySet<string>; worklist?: { enabled: boolean; statesByCaseId: Record<string, "pending" | "reviewed">; policyLabel?: string } } = {},
+  opts: { revealPrefix?: string; revealableConceptKeys?: ReadonlySet<string>; caseKeyNumbers?: Record<string, number[]>; showKeys?: boolean; duplicateScenarioNames?: ReadonlySet<string>; worklist?: { enabled: boolean; statesByCaseId: Record<string, PersistedReviewState>; policyLabel?: string } } = {},
 ): RenderedCel {
   const prefix = opts.revealPrefix ?? "";
   const revealable = opts.revealableConceptKeys;
@@ -148,41 +153,42 @@ export function renderCelPane(
     const produced = sc.produced.map((p) => escapeHtml(p.recommendation)).join(", ");
     // At-rest key slot (#163): the units this case corresponds to. Only when the case is frozen (caseId-keyed) + showKeys.
     const keySlot = showKeys && caseId !== undefined ? corrKeyHtml(caseKeyNumbers[caseId] ?? []) : "";
-    // Worklist checkbox (#156 slice 4, mode-gated). REVIEWABLE = a frozen, non-ambiguous case (caseId !== undefined,
-    // which already excludes the ambiguous branch above) → an interactive `data-worklist-toggle` carrying an opaque key
-    // (resolved host-side to the caseId). NON-reviewable = unfrozen (no caseId) OR ambiguous-name → a DISABLED checkbox
-    // (no key, a title explaining why), never hidden. State is read from statesByCaseId by caseId only (never by name);
-    // an unfrozen/ambiguous case has no caseId so it has no persisted state → always renders "unreviewed".
-    let checkbox = "";
+    // Worklist review-state DROPDOWN (#156 slice 4, mode-gated; a <select>, no longer a cycling checkbox). REVIEWABLE = a
+    // frozen, non-ambiguous case (caseId !== undefined, which already excludes the ambiguous branch above) → an interactive
+    // <select data-worklist-select> carrying an opaque STABLE key (resolved host-side to the caseId — the webview never
+    // sees a caseId). NON-reviewable = unfrozen (no caseId) OR ambiguous-name → a DISABLED select (no key, a title
+    // explaining why), never hidden. State is read from statesByCaseId by caseId only (never by name); an unfrozen/
+    // ambiguous case has no caseId so it has no persisted state → always "To do". A native <select> is inherently keyboard-
+    // + screen-reader-operable (no hand-rolled aria-checked/tabindex), and the host validates the posted value.
+    let reviewControl = "";
     if (worklist && worklistActions) {
       if (caseId !== undefined) {
-        const wstate = worklist.statesByCaseId[caseId] ?? "unreviewed";
-        // STABLE key, derived from the caseId — NOT gen-scoped (unlike the reveal keys). The worklist toggle does NOT go
-        // through the reveal coordinator, so it needn't be gen-fresh; a stable key means a click on a STALE (pre-re-render)
-        // DOM still resolves to the caseId, instead of being silently dropped when renderPane bumps the gen. The host then
-        // advances nextReviewState from the COMMITTED reviewByCaseId[caseId] (not the stale visual), so rapid double-clicks
-        // advance correctly. caseId is unique per frozen case, so `wl_<caseId>` is collision-free across cases.
+        const wstate: ReviewState = worklist.statesByCaseId[caseId] ?? "unreviewed";
+        // STABLE key, derived from the caseId — NOT gen-scoped (unlike the reveal keys). The dropdown change does NOT go
+        // through the reveal coordinator, so it needn't be gen-fresh; a stable key means a change on a STALE (pre-re-render)
+        // DOM still resolves to the caseId, instead of being silently dropped when renderPane bumps the gen. caseId is
+        // unique per frozen case, so `wl_<caseId>` is collision-free across cases.
         const wlKey = `wl_${caseId}`;
         worklistActions[wlKey] = { caseId };
-        const ariaChecked = wstate === "reviewed" ? "true" : wstate === "pending" ? "mixed" : "false";
-        checkbox =
-          `<span class="cel-check cel-check-${wstate}" role="checkbox" aria-checked="${ariaChecked}" tabindex="0" ` +
-          `data-worklist-toggle="${escapeHtml(wlKey)}" ` +
-          `title="Mark this case reviewed (unreviewed → pending → reviewed)">${WORKLIST_GLYPH[wstate]}</span> `;
+        const options = REVIEW_ORDER.map(
+          (st) => `<option value="${st}"${st === wstate ? " selected" : ""}>${REVIEW_LABEL[st]}</option>`,
+        ).join("");
+        reviewControl =
+          `<select class="cel-review cel-review-${wstate}" data-worklist-select="${escapeHtml(wlKey)}" ` +
+          `aria-label="Review state: ${REVIEW_LABEL[wstate]}" title="Set review state">${options}</select> `;
       } else {
-        // DISABLED checkbox (unfrozen / ambiguous). It carries NO data-worklist-toggle AND no tabindex, so a click/keydown
-        // on it is a no-op. INVARIANT: a disabled checkbox safely falls through (does NOT select) only because an unfrozen/
+        // DISABLED select (unfrozen / ambiguous). It carries NO data-worklist-select, so a change can't fire and the host
+        // never resolves it. INVARIANT: it safely falls through (does NOT select the case) only because an unfrozen/
         // ambiguous case ALSO renders without a parent `data-reveal` (see above) — so the shell's reveal handler finds no
-        // target either. If a future state ever made a disabled-checkbox case revealable, a disabled-checkbox click would
-        // start selecting the case; guard the checkbox explicitly then.
+        // target either. If a future state ever made such a case revealable, guard the select-click fall-through explicitly.
         const why = ambiguous ? "name shared; not reviewable" : "freeze this case to review it";
-        checkbox =
-          `<span class="cel-check cel-check-disabled" role="checkbox" aria-disabled="true" aria-checked="false" title="${escapeHtml(why)}">${WORKLIST_GLYPH.unreviewed}</span> `;
+        reviewControl =
+          `<select class="cel-review cel-review-disabled" disabled aria-label="Not reviewable" title="${escapeHtml(why)}"><option>${REVIEW_LABEL.unreviewed}</option></select> `;
       }
     }
     html +=
       `<div ${attrs.join(" ")}>` +
-      checkbox +
+      reviewControl +
       keySlot +
       `<span class="cel-status">${BADGE[sc.status] ?? "·"}</span> ` +
       `<span class="cel-name">${escapeHtml(sc.case.name)}</span>` +

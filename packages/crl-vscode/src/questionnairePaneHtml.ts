@@ -175,8 +175,8 @@ export function renderQuestionnairePane(
  *   - mode is "medical-validation" (the pane is cockpit-inert — it's not in the cockpit spec); AND
  *   - the questionnaire pane is OPEN; AND
  *   - the focused cel caseId genuinely CHANGED (`nextCaseId !== prevCaseId`).
- * A same-selection redispatch (the highlight-restore re-dispatch toggleWorklist/applyShowKeys fire, same caseId) is a
- * no-op — so the index is NOT reset on a checkbox toggle. A clear (prev set → next undefined) IS a real change (the pane
+ * A same-selection redispatch (the highlight-restore re-dispatch setWorklist/applyShowKeys fire, same caseId) is a
+ * no-op — so the index is NOT reset on a dropdown change. A clear (prev set → next undefined) IS a real change (the pane
  * re-renders to its placeholder). caseId is undefined when the selection is not a cel case.
  */
 export function shouldRerenderQuestionnaire(args: {
