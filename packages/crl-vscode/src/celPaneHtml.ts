@@ -232,11 +232,11 @@ export function renderCelPane(
     html +=
       `<div ${attrs.join(" ")}>` +
       reviewControl +
+      (notesGlyph ? `${notesGlyph} ` : "") + // sits immediately after the verdict dropdown
       keySlot +
       `<span class="cel-status">${BADGE[sc.status] ?? "·"}</span> ` +
       `<span class="cel-name">${escapeHtml(sc.case.name)}</span>` +
       (sc.case.subject ? ` <span class="cel-subject">(${escapeHtml(sc.case.subject)})</span>` : "") +
-      (notesGlyph ? ` ${notesGlyph}` : "") +
       (ambiguous ? ` <span class="cel-ambiguous-marker" title="This case's name is shared by another case — give each a distinct name to make it selectable.">⚠ name shared; not selectable</span>` : "") +
       (factParts.length ? `<div class="cel-facts">facts: ${factParts.join(", ")}</div>` : "") +
       (produced ? `<div class="cel-produced">→ ${produced}</div>` : "") +

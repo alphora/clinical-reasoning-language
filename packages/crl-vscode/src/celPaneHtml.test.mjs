@@ -341,6 +341,8 @@ check("notes glyph: reviewable case with notes → 💬 + count + data-notes-tog
   const none = renderCelPane(result([sc("A", "pass")]), { A: "cA" }, { worklist: wl({}) });
   assert.match(none.html, /class="cel-notes-glyph"[^>]*data-notes-toggle="wl_cA"[^>]*>🗨</);
   assert.ok(!none.html.includes("cel-notes-has"));
+  // placement: the glyph sits immediately after the verdict <select>, before the status badge + name
+  assert.match(withNotes.html, /<\/select>\s*<span class="cel-notes-glyph[^"]*"[^>]*>[^<]*<\/span>\s*<span class="cel-status"/);
 });
 check("notes glyph: an UNFROZEN case gets NO glyph (no stable caseId to key the thread)", () => {
   const out = renderCelPane(result([sc("Unfrozen", "pass")]), {}, { worklist: wl({}) });
