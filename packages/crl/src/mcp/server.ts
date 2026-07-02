@@ -1081,6 +1081,14 @@ function runEmitCrl(args: {
       isError: true,
     };
   }
+  // Bound the entry file like resolveSource does — `emit_crl` returns full CQL
+  // libraries (+ optional full FHIR), so guard the input to keep the response sane.
+  if (stat.size > MAX_INPUT_BYTES) {
+    return {
+      content: [{ type: "text", text: `File too large: ${stat.size} bytes > ${MAX_INPUT_BYTES}.` }],
+      isError: true,
+    };
+  }
 
   // Same shared two-lane composition as the CLI `--target fhir-def`.
   const two = emitCrlTwoLane(args.path, {

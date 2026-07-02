@@ -79,6 +79,14 @@ export function emitCrlTwoLane(
     cql: e.cql,
   }));
 
-  const success = hardErrors.length === 0 && cql.success && filenameCollisions.length === 0;
+  // `success` requires BOTH lanes CLEAN — including no FHIR `unmatched` refs.
+  // The FHIR orchestrator treats unmatched as failure (its own `success` is
+  // false), and a caller gating on this flag must not accept a deliverable with
+  // unresolved references, so fold `fhir.unmatched` into the predicate.
+  const success =
+    hardErrors.length === 0 &&
+    cql.success &&
+    filenameCollisions.length === 0 &&
+    fhir.unmatched.length === 0;
   return { success, fhir, cql, cqlLibraries, fhirHardErrors, hardErrors, warnings, filenameCollisions };
 }
