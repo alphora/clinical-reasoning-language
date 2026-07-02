@@ -1144,17 +1144,18 @@ class Emitter {
     // The newest valid local boolean Observation (or null). `.value is FHIR.boolean`
     // keeps only boolean-valued rows (LOCK-STEP with `recencyAgeSelected`'s
     // `local.value as FHIR.boolean` cast in CaseFeatureCommon.cql — if you change
-    // one filter/cast, change the other). `sort by issued, id` picks the newest with
-    // a DETERMINISTIC tie-break (equal or tied `issued` → order by `id`); FHIR sorts
-    // null low, so a dated assertion is preferred over a null-`issued` one and an
-    // all-null-`issued` set is still deterministic (by `id`). `Last(...)` takes the
-    // newest.
+    // one filter/cast, change the other). NO status filter: a DTR-extracted answer
+    // (sdc `definitionExtractValue`, ProcessDefinitionItem) is NOT stamped `final`,
+    // so restricting status would silently drop it (operator decision 2026-07-01).
+    // `sort by effective, id` picks the newest with a DETERMINISTIC tie-break —
+    // the extraction populates `effective` (from QuestionnaireResponse.authored),
+    // NOT `issued`, so recency keys on `effective`; FHIR sorts null low, so a dated
+    // answer is preferred and an all-null set is deterministic (by `id`).
     const newestLocal =
       `Last(\n` +
       `    (${cqlQualifiedRef(localLib, foldIn)}) O\n` +
-      `      where O.status in { 'final', 'amended', 'corrected' }\n` +
-      `        and O.value is FHIR.boolean\n` +
-      `      sort by issued, id\n` +
+      `      where O.value is FHIR.boolean\n` +
+      `      sort by effective, id\n` +
       `  )`;
     const computed = `CRLCommon.AtLeast(CRLCommon.AgeAt(), ${threshold})`;
     // `CFH.recencyAgeTruths(newestLocalObservation, computedBoolean)` returns the

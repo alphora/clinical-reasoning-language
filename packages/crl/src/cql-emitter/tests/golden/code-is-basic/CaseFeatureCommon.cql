@@ -48,21 +48,25 @@ define fluent function satisfied(truths List<System.Boolean>):
  *   3. else if assertion present → the ASSERTED boolean (fallback, no computed age).
  *   4. else → NOT DETERMINED (empty truth-set).
  *
- * RESOLVED null-lastUpdated / null-issued behavior (operator decision 2026-07-01):
- *   - Local-source Observations are GUARANTEED an `issued` timestamp; the call
- *     site already takes the MOST RECENT (`Last(... sort by issued, id)`).
+ * RESOLVED recency clock + null-lastUpdated behavior (operator decision 2026-07-01):
+ *   - Recency keys on `Observation.effective`: a DTR/SDC `definitionExtractValue`
+ *     extraction (ProcessDefinitionItem) populates `effective` from
+ *     QuestionnaireResponse.authored, NOT `issued` — so the merge reads `effective`
+ *     and the call site takes the MOST RECENT (`Last(... sort by effective, id)`).
  *   - When recency is INDETERMINATE — `Patient.meta.lastUpdated` absent (we can't
- *     prove the computed/live state is fresher), OR (defensively) `issued` null —
- *     the LOCAL-SOURCE WINS. This KEEPS the prior null-lastUpdated behavior and
- *     REJECTS the reviewers' proposed flip to computed. It is safe because the
- *     case-3 local-source answer is SESSION-FRESH (not persisted beyond the client
- *     session — see the `@business-logic-deferred:` marker on the authoring
- *     concept and backlog #190). The reviewers' stale-assertion concern is
- *     mitigated by that do-not-persist-beyond-session marker.
+ *     prove the computed/live state is fresher), OR `effective` null — the
+ *     LOCAL-SOURCE WINS. This KEEPS the prior null-lastUpdated behavior and REJECTS
+ *     the reviewers' proposed flip to computed. It is safe because the case-3
+ *     local-source answer is SESSION-FRESH (not persisted beyond the client session
+ *     — see the `@business-logic-deferred:` marker on the authoring concept and
+ *     backlog #190). The reviewers' stale-assertion concern is mitigated by that
+ *     do-not-persist-beyond-session marker.
  *
  * Params:
  *   local    — the newest valid local age Observation (or null). The call site
- *              pre-filters status ∈ {final,amended,corrected} and boolean value.
+ *              pre-filters boolean value ONLY — NO status filter, because a
+ *              DTR-extracted answer is not stamped `final` and restricting status
+ *              would silently drop it.
  *   computed — the live computed age boolean (`AtLeast(AgeAt(), n years)`).
  */
 // The selected age BOOLEAN (or null when NOT determined). Split from the
@@ -72,16 +76,16 @@ define fluent function satisfied(truths List<System.Boolean>):
 //
 // `recencyAgeAssertedWins` is TRUE when the local-source assertion should win:
 // there IS a local Observation AND we CANNOT prove the computed/live age is
-// fresher — i.e. `Patient.meta.lastUpdated` absent, OR `issued` null (defensive;
-// local-source is guaranteed a timestamp), OR `issued after lastUpdated`.
-// Per operator decision 2026-07-01 (see the docblock): indeterminate recency →
-// the (session-fresh) local-source wins.
+// fresher — i.e. `Patient.meta.lastUpdated` absent, OR `effective` null, OR
+// `effective after lastUpdated` (effective read as FHIR.dateTime — extraction
+// yields effectiveDateTime). Per operator decision 2026-07-01 (see the docblock):
+// indeterminate recency → the (session-fresh) local-source wins.
 define function recencyAgeAssertedWins(local FHIR.Observation):
   local is not null
     and (
       Patient.meta.lastUpdated.value is null
-      or local.issued.value is null
-      or local.issued.value after Patient.meta.lastUpdated.value
+      or (local.effective as FHIR.dateTime).value is null
+      or (local.effective as FHIR.dateTime).value after Patient.meta.lastUpdated.value
     )
 
 // The recency-selected age boolean, or null when nothing determines it.

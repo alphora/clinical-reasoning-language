@@ -545,10 +545,11 @@ concept "Age 18 Or Older":
     expect(r.success).toBe(true);
     expect(r.result).toContain("CFH.recencyAgeTruths(");
     expect(r.result).toContain('"T LocalSource"."Age 18 Or Older"');
-    expect(r.result).toMatch(/O\.status in \{ 'final', 'amended', 'corrected' \}/);
+    // NO status filter (extracted answers aren't stamped `final`); recency keys on
+    // `effective` (what DTR extraction populates), with a deterministic `id` tie-break.
+    expect(r.result).not.toContain("O.status in");
     expect(r.result).toContain("O.value is FHIR.boolean");
-    // Deterministic tie-break (fix 3): `sort by issued, id`.
-    expect(r.result).toContain("sort by issued, id");
+    expect(r.result).toContain("sort by effective, id");
     expect(r.result).toContain("CRLCommon.AtLeast(CRLCommon.AgeAt(), 18 'years')");
     // The @business-logic-deferred marker lands as a block comment above the Inferred define.
     expect(r.result).toMatch(
