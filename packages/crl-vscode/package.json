@@ -87,7 +87,7 @@
       },
       {
         "command": "crl.cockpit.show",
-        "title": "CRL: Show Cockpit",
+        "title": "CRL: Show Knowledge Engineering",
         "icon": "$(layout)"
       },
       {
@@ -97,7 +97,7 @@
       },
       {
         "command": "crl.cockpit.selectItem",
-        "title": "CRL: Select Cockpit Item"
+        "title": "CRL: Select Knowledge Engineering Item"
       },
       {
         "command": "crl.cockpit.next",
@@ -145,7 +145,7 @@
       "crlCockpit": [
         {
           "id": "crlCockpitNavigator",
-          "name": "Correspondence",
+          "name": "Knowledge Development",
           "when": "crl.active"
         }
       ]
@@ -264,7 +264,7 @@
           ],
           "default": "source",
           "scope": "window",
-          "description": "The cockpit's default primary pane — which pane the Correspondence navigator walks. 'source' lists source units; 'crl' lists CRL decision nodes; 'cel' lists CEL cases. Set per-window; switch live with 'CRL: Set Navigator Primary Pane'."
+          "description": "The Knowledge Engineering default primary pane — which pane the navigator walks. 'source' lists source units; 'crl' lists CRL decision nodes; 'cel' lists CEL cases. Set per-window; switch live with 'CRL: Set Navigator Primary Pane'."
         },
         "crl.cockpit.paneOrder": {
           "type": "array",
@@ -284,13 +284,13 @@
             "tree"
           ],
           "scope": "window",
-          "description": "Left-to-right column order of the cockpit panes. 'source', 'crl', and 'cel' are always shown; 'tree' (the graphical decision-tree flowchart) is shown by default but can be removed from this list to hide it. Set it in User settings to persist across all projects, or in Workspace settings for one project. A malformed list is repaired automatically. Changes apply live to open panes."
+          "description": "Left-to-right column order of the Knowledge Engineering panes. 'source', 'crl', and 'cel' are always shown; 'tree' (the graphical decision-tree flowchart) is shown by default but can be removed from this list to hide it. Set it in User settings to persist across all projects, or in Workspace settings for one project. A malformed list is repaired automatically. Changes apply live to open panes."
         },
         "crl.cockpit.showKeys": {
           "type": "boolean",
           "default": true,
           "scope": "window",
-          "description": "Show the at-rest correspondence key (a per-unit number + cycled color) on each corresponding element across the cockpit's CRL / CEL panes and the navigator, so 'what links to what' is visible without selecting. Toggle live with 'CRL: Toggle Correspondence Keys'."
+          "description": "Show the at-rest correspondence key (a per-unit number + cycled color) on each corresponding element across the Knowledge Engineering CRL / CEL panes and the navigator, so 'what links to what' is visible without selecting. Toggle live with 'CRL: Toggle Correspondence Keys'."
         },
         "crl.cockpit.failedCriteriaMode": {
           "type": "string",
@@ -300,7 +300,7 @@
           ],
           "default": "blocking",
           "scope": "window",
-          "description": "Which failed criteria the cockpit highlights when a failing CEL case is selected. 'blocking' (default): only the criteria that blocked the expected disposition (empty for a passing case). 'all': every evaluated-unsatisfied 'when' in the run. Toggle live with the segmented control on the cockpit's Tree pane. SHARED with the Medical Validation panel."
+          "description": "Which failed criteria Knowledge Engineering highlights when a failing CEL case is selected. 'blocking' (default): only the criteria that blocked the expected disposition (empty for a passing case). 'all': every evaluated-unsatisfied 'when' in the run. Toggle live with the segmented control on the Knowledge Engineering Tree pane. SHARED with the Medical Validation panel."
         },
         "crl.cockpit.showDetails": {
           "type": "boolean",

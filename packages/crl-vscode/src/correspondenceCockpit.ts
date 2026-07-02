@@ -1621,14 +1621,14 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     // Open the anchor .txt at the clicked span's range when it still matches the selection, else the unit's earliest
     // source range. Locus is always from the trusted model / renderer, never a webview payload.
     if (!model || state.selection?.primary !== "source") {
-      void vscode.window.showInformationMessage("CRL Cockpit: select a source unit first.");
+      void vscode.window.showInformationMessage("CRL: select a source unit first.");
       return;
     }
     const unitId = state.selection.unitId;
     const step = model.steps.find((s) => s.unitId === unitId);
     const range = lastClicked?.unitId === unitId ? lastClicked.range : step?.source[0]?.range;
     if (!range) {
-      void vscode.window.showInformationMessage("CRL Cockpit: this unit has no source span.");
+      void vscode.window.showInformationMessage("CRL: this unit has no source span.");
       return;
     }
     void vscode.window.showTextDocument(vscode.Uri.file(model.anchor.filePath), {
@@ -1695,7 +1695,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     }
   });
 
-  navView.message = "Open a .cel and run “CRL: Show Cockpit”.";
+  navView.message = "Open a .cel and run “CRL: Show Knowledge Engineering” or “CRL: Show Medical Validation”.";
   context.subscriptions.push(
     navView,
     showCmd,
