@@ -1,0 +1,7 @@
+lib/
+out/
+work/*
+!work/.gitkeep
+*.class
+__pycache__/
+*.txt

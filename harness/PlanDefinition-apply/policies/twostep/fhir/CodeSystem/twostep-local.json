@@ -1,0 +1,45 @@
+{
+  "resourceType": "CodeSystem",
+  "id": "twostep-local",
+  "meta": {
+    "profile": [
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-shareablecodesystem",
+      "http://hl7.org/fhir/uv/crmi/StructureDefinition/crmi-publishablecodesystem"
+    ]
+  },
+  "extension": [
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "shareable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "computable"
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/cqf-knowledgeCapability",
+      "valueCode": "publishable"
+    }
+  ],
+  "url": "http://example.org/crl/twostep/CodeSystem/twostep-local",
+  "version": "0.0.0",
+  "name": "TwoStepLocal",
+  "title": "Two Step",
+  "status": "draft",
+  "experimental": true,
+  "date": "2026-01-01T00:00:00.000Z",
+  "publisher": "unknown",
+  "description": "Two Step",
+  "caseSensitive": true,
+  "content": "complete",
+  "concept": [
+    {
+      "code": "q1",
+      "display": "Q1"
+    },
+    {
+      "code": "q2",
+      "display": "Q2"
+    }
+  ]
+}
