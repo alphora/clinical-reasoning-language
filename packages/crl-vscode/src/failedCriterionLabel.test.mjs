@@ -1,20 +1,13 @@
 // Unit test for the SHARED failed-criterion labeler (#173 T3, disc 160 FIX 6) — pins the exact rendered string for each
 // `display` variant. This is the "labels can't drift across the cockpit + run-tree surfaces" hinge, so the strings are
 // asserted directly here (both surfaces consume this one fn). vscode-free → esbuild-bundle-then-import.
-import { build } from "esbuild";
 import assert from "node:assert/strict";
-import { createRequire } from "node:module";
-import { tmpdir } from "node:os";
-import { dirname, resolve } from "node:path";
+import { load } from "./test-harness.mjs";
+import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const require = createRequire(import.meta.url);
-async function load(tsFile) {
-  const out = resolve(tmpdir(), `crl-${tsFile.replace(/\W/g, "_")}-${process.pid}.cjs`);
-  await build({ entryPoints: [resolve(here, tsFile)], bundle: true, platform: "node", format: "cjs", target: "node18", outfile: out, logLevel: "silent" });
-  return require(out);
-}
+
 const { failedCriterionLabel } = await load("failedCriterionLabel.ts");
 
 let pass = 0;

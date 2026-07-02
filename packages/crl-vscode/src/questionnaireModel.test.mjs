@@ -4,31 +4,12 @@
 // (resolveCelImports → renderScenario) in-process to get a genuine `ScenarioViewModel`, then assert the
 // `buildQuestionnaire` projection. Design authority: .vibe-tools/discussions/163-questionnaire-panel-design.md
 // + the slice-2 impl-review re-axis (the path follows the ACTUAL produced disposition, not expected/pass-fail).
-import { build } from "esbuild";
 import assert from "node:assert/strict";
+import { load } from "./test-harness.mjs";
 import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
-import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
 import { resolveCelImports, renderScenario } from "@smile-digital-health/crl";
-
-const here = dirname(fileURLToPath(import.meta.url));
-const require = createRequire(import.meta.url);
-
-async function load(tsFile) {
-  const out = resolve(tmpdir(), `crl-${tsFile.replace(/\W/g, "_")}-${process.pid}.cjs`);
-  await build({
-    entryPoints: [resolve(here, tsFile)],
-    bundle: true,
-    platform: "node",
-    format: "cjs",
-    target: "node18",
-    outfile: out,
-    logLevel: "silent",
-  });
-  return require(out);
-}
 
 const { buildQuestionnaire, producedPathDiverterIds } = await load("questionnaireModel.ts");
 

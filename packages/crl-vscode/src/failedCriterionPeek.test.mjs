@@ -2,20 +2,10 @@
 // esbuild-bundle-then-import (mirrors celPaneHtml.test.mjs). Covers buildRuntimeRefIndex (the runtime-ref → row-nodeKey
 // join, incl. a deep cross-lib chain) + resolveFailedCriteria (frontier re-root → standalone nodeKey; the gap fallback;
 // whole-path validation; dedup).
-import { build } from "esbuild";
 import assert from "node:assert/strict";
-import { createRequire } from "node:module";
-import { tmpdir } from "node:os";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { load } from "./test-harness.mjs";
+import { resolve } from "node:path";
 
-const here = dirname(fileURLToPath(import.meta.url));
-const require = createRequire(import.meta.url);
-async function load(tsFile) {
-  const out = resolve(tmpdir(), `crl-${tsFile.replace(/\W/g, "_")}-${process.pid}.cjs`);
-  await build({ entryPoints: [resolve(here, tsFile)], bundle: true, platform: "node", format: "cjs", target: "node18", outfile: out, logLevel: "silent" });
-  return require(out);
-}
 const { buildRuntimeRefIndex, resolveFailedCriteria, runtimeRefKey } = await load("failedCriterionPeek.ts");
 // The REAL T2 selectors, to prove the end-to-end frontier→re-root chain (not just the re-root in isolation).
 const { failedCriterionFrontier, allUnsatisfiedCriteria } = await import("@smile-digital-health/crl/provenance");

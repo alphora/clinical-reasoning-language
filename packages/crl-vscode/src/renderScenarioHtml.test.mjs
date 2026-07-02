@@ -2,32 +2,13 @@
 // (the webview body + reveals map) and isRelevantSave (the live-re-run filter). These are extension TS but
 // vscode-free, so — like the golden oracle — esbuild bundles them to ESM and we import them under node. The
 // happy-path fixture is a REAL RenderScenarioResult from the core (renderScenario on dme101-030).
-import { build } from "esbuild";
 import assert from "node:assert/strict";
+import { load } from "./test-harness.mjs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
-import { tmpdir } from "node:os";
-import { createRequire } from "node:module";
 import { resolveCelImports, renderScenario } from "@smile-digital-health/crl";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const require = createRequire(import.meta.url);
-
-async function load(tsFile) {
-  // CJS output: the bundle pulls in the (CommonJS) core for `canonicalize`, whose require("node:path")
-  // needs CJS — an ESM bundle would turn it into an unsupported dynamic require.
-  const out = resolve(tmpdir(), `crl-${tsFile.replace(/\W/g, "_")}-${process.pid}.cjs`);
-  await build({
-    entryPoints: [resolve(here, tsFile)],
-    bundle: true,
-    platform: "node",
-    format: "cjs",
-    target: "node18",
-    outfile: out,
-    logLevel: "silent",
-  });
-  return require(out);
-}
 
 const { renderScenarioHtml, renderErrorHtml, failedCriterionMarks } = await load("renderScenarioHtml.ts");
 const { isRelevantSave } = await load("scenarioWatch.ts");

@@ -1,20 +1,9 @@
 // Unit tests for normalizePaneOrder (#156 C2b-4 + medical-validation slice 3) — a malformed setting must never break a
 // panel. vscode-free. The cockpit checks below assert the BYTE-IDENTICAL pre-spec behavior (COCKPIT_PANE_SPEC); the
 // medical-validation block exercises the worklist→cel alias + the MV default + internal-pane dedup.
-import { build } from "esbuild";
 import assert from "node:assert/strict";
-import { createRequire } from "node:module";
-import { tmpdir } from "node:os";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { load } from "./test-harness.mjs";
 
-const here = dirname(fileURLToPath(import.meta.url));
-const require = createRequire(import.meta.url);
-async function load(tsFile) {
-  const out = resolve(tmpdir(), `crl-${tsFile.replace(/\W/g, "_")}-${process.pid}.cjs`);
-  await build({ entryPoints: [resolve(here, tsFile)], bundle: true, platform: "node", format: "cjs", target: "node18", outfile: out, logLevel: "silent" });
-  return require(out);
-}
 const { normalizePaneOrder, COCKPIT_PANE_SPEC, MEDICAL_VALIDATION_PANE_SPEC } = await load("paneOrder.ts");
 
 // The cockpit canonical set (for the invariant) — derived from the spec so the test stays in lockstep with it.

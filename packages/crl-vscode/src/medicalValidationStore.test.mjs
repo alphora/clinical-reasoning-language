@@ -1,30 +1,11 @@
 // Unit tests for the Medical Validation persistence + derivation CORE (#156 slice 2): medicalValidationSidecarPath,
 // load/saveSidecar, deriveReviewOverlay, nextReviewState. vscode-free, so — like provenanceFindings.test.mjs — esbuild
 // bundles the TS to CJS and we import it under node. Design authority: .vibe-tools/discussions/161-...
-import { build } from "esbuild";
 import assert from "node:assert/strict";
+import { load } from "./test-harness.mjs";
 import { existsSync, mkdtempSync, mkdirSync, readdirSync, readFileSync, writeFileSync, rmSync } from "node:fs";
-import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
-
-const here = dirname(fileURLToPath(import.meta.url));
-const require = createRequire(import.meta.url);
-
-async function load(tsFile) {
-  const out = resolve(tmpdir(), `crl-${tsFile.replace(/\W/g, "_")}-${process.pid}.cjs`);
-  await build({
-    entryPoints: [resolve(here, tsFile)],
-    bundle: true,
-    platform: "node",
-    format: "cjs",
-    target: "node18",
-    outfile: out,
-    logLevel: "silent",
-  });
-  return require(out);
-}
+import { dirname, join } from "node:path";
 
 const { medicalValidationSidecarPath, loadSidecar, saveSidecar, deriveReviewOverlay, buildReviewPerCase, isReviewState, setReviewState, REVIEW_STATES, reviewProgress, renderProgressChrome, composeSidecar, addNote, editNote, deleteNote } =
   await load("medicalValidationStore.ts");

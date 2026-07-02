@@ -1,18 +1,7 @@
 // Unit tests for the PaneRevealCoordinator (#156 C2a) — the reveal state machine. vscode-free → esbuild-bundle-then-import.
-import { build } from "esbuild";
 import assert from "node:assert/strict";
-import { createRequire } from "node:module";
-import { tmpdir } from "node:os";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { load } from "./test-harness.mjs";
 
-const here = dirname(fileURLToPath(import.meta.url));
-const require = createRequire(import.meta.url);
-async function load(tsFile) {
-  const out = resolve(tmpdir(), `crl-${tsFile.replace(/\W/g, "_")}-${process.pid}.cjs`);
-  await build({ entryPoints: [resolve(here, tsFile)], bundle: true, platform: "node", format: "cjs", target: "node18", outfile: out, logLevel: "silent" });
-  return require(out);
-}
 const { PaneRevealCoordinator } = await load("paneRevealCoordinator.ts");
 
 let pass = 0;
