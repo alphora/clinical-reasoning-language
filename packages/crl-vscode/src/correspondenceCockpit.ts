@@ -30,6 +30,7 @@ import {
   initialState,
   navigatorItems,
   reduce,
+  shouldReflectNavigatorSelection,
   type Action,
   type CelNavItem,
   type CockpitIndex,
@@ -358,6 +359,16 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   const navView = vscode.window.createTreeView<NavigatorItem>("crlCockpitNavigator", {
     treeDataProvider: navProvider,
   });
+  // Re-sync the navigator to the current selection on the visible→true edge. In MV mode
+  // reflectSelectionToTree skips while the flyout is hidden (so worklist clicks don't re-open
+  // it) — which leaves the navigator stale; opening the flyout later must show the CURRENT
+  // selection, not the last one synced before it was hidden. (reflectSelectionToTree is a
+  // hoisted function declaration, so referencing it here is fine.)
+  context.subscriptions.push(
+    navView.onDidChangeVisibility((e) => {
+      if (e.visible) reflectSelectionToTree();
+    }),
+  );
 
   /** The currently-focused cel caseId for a state (undefined when the selection is not a cel case). The questionnaire's
    *  selection key — the re-render hook fires only when THIS changes (a real case switch), not on a same-selection
@@ -924,6 +935,13 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     const sel = state.selection;
     // only reflect when the selection is in the CURRENT primary's space (the navigator shows that space)
     if (!sel || sel.primary !== state.primary) return;
+    // MV mode: the WORKLIST pane is the navigation, so a selection must NOT re-open a
+    // closed navigator flyout — `TreeView.reveal` shows a hidden view, which is the
+    // duplicative fly-out the worklist replaces. Sync only when the navigator is ALREADY
+    // visible; never bring a hidden one back. Cockpit mode (where the flyout IS the nav)
+    // keeps the always-reveal behavior. Re-sync on the visible→true edge below covers the
+    // stale-navigator case (worklist clicks skipped while hidden, then the flyout opened).
+    if (!shouldReflectNavigatorSelection(mode, navView.visible)) return;
     const id = sel.primary === "source" ? sel.unitId : sel.primary === "crl" ? sel.nodeKey : sel.caseId;
     const item = navigatorItems(state).find((i) => i.id === id);
     if (item) void navView.reveal(item, { select: true, focus: false }).then(undefined, () => undefined);

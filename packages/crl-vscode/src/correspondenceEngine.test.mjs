@@ -13,7 +13,7 @@ async function load(tsFile) {
   await build({ entryPoints: [resolve(here, tsFile)], bundle: true, platform: "node", format: "cjs", target: "node18", outfile: out, logLevel: "silent" });
   return require(out);
 }
-const { reduce, initialState, navigatorItems } = await load("correspondenceEngine.ts");
+const { reduce, initialState, navigatorItems, shouldReflectNavigatorSelection } = await load("correspondenceEngine.ts");
 
 let pass = 0;
 const check = (label, fn) => {
@@ -164,6 +164,16 @@ check("source selection survives setInputs only if still source-BEARING (not jus
   const s = reduce(seeded(["u1", "u2"]), { type: "select", selection: sel("u1") }).state;
   const r = reduce(s, { type: "setInputs", index: idx(["u1", "u2"], ["u2"]) }); // u1 in steps but dropped from cycle
   assert.equal(r.state.selection, undefined);
+});
+
+check("shouldReflectNavigatorSelection: cockpit always reveals; MV only when navigator visible", () => {
+  // cockpit mode: the flyout IS the navigation → always reveal, hidden or not.
+  assert.equal(shouldReflectNavigatorSelection("cockpit", true), true);
+  assert.equal(shouldReflectNavigatorSelection("cockpit", false), true);
+  // MV mode: the worklist is the navigation → reveal ONLY when the flyout is already open,
+  // so a worklist click never re-opens a hidden navigator. Re-sync on visible→true covers stale.
+  assert.equal(shouldReflectNavigatorSelection("medical-validation", true), true);
+  assert.equal(shouldReflectNavigatorSelection("medical-validation", false), false);
 });
 
 console.log(`\ncorrespondenceEngine.test: ${pass} checks passed`);

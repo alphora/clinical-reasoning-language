@@ -115,6 +115,19 @@ export function navigatorItems(state: State): NavigatorItem[] {
   }));
 }
 
+/** Whether a selection should REVEAL the navigator TreeView. In medical-validation mode the
+ *  WORKLIST pane IS the navigation, so a selection must NOT reopen a hidden navigator flyout
+ *  (`TreeView.reveal` shows a hidden view) — reveal only when it is ALREADY visible; the shell
+ *  re-syncs on the visible→true edge (`onDidChangeVisibility`) so an opened flyout is never
+ *  stale. Cockpit mode (the flyout IS the nav) always reveals. Pure so it is unit-tested — the
+ *  live `navView.reveal` in the shell is the untested-integration layer. */
+export function shouldReflectNavigatorSelection(
+  mode: "cockpit" | "medical-validation",
+  navVisible: boolean,
+): boolean {
+  return mode !== "medical-validation" || navVisible;
+}
+
 const PANES: Pane[] = ["source", "crl", "cel", "tree", "questionnaire"]; // reveal fan-out set (tree + questionnaire included); NOT the navigable/cycle set
 
 function selectionTarget(sel: Selection): RevealEffect["target"] {
