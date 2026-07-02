@@ -344,6 +344,14 @@ check("notes glyph: reviewable case with notes → 💬 + count + data-notes-tog
   // placement: the glyph sits immediately after the verdict <select>, before the status badge + name
   assert.match(withNotes.html, /<\/select>\s*<span class="cel-notes-glyph[^"]*"[^>]*>[^<]*<\/span>\s*<span class="cel-status"/);
 });
+check("worklist rows are numbered 1-based in order (every row); cockpit has no numbers", () => {
+  const wlOut = renderCelPane(result([sc("A", "pass"), sc("Unfrozen", "fail"), sc("C", "pass")]), { A: "cA", C: "cC" }, { worklist: wl({}) });
+  assert.match(wlOut.html, /<span class="cel-rownum">1\.<\/span>/);
+  assert.match(wlOut.html, /<span class="cel-rownum">2\.<\/span>/, "unfrozen row is still numbered");
+  assert.match(wlOut.html, /<span class="cel-rownum">3\.<\/span>/);
+  const cockpit = renderCelPane(result([sc("A", "pass")]), { A: "cA" });
+  assert.ok(!cockpit.html.includes("cel-rownum"), "cockpit render is unnumbered (byte-identical to before)");
+});
 check("notes glyph: an UNFROZEN case gets NO glyph (no stable caseId to key the thread)", () => {
   const out = renderCelPane(result([sc("Unfrozen", "pass")]), {}, { worklist: wl({}) });
   assert.ok(!out.html.includes("cel-notes-glyph"), "unfrozen row has no notes glyph");

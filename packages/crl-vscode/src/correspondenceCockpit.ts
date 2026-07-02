@@ -1885,6 +1885,7 @@ function shellHtml(): string {
 .cel-review-fail{color:var(--vscode-testing-iconFailed,#f14c4c)}
 .cel-review-pending{color:var(--vscode-charts-yellow,#d29922)}
 .cel-review-disabled{opacity:.4}
+.cel-rownum{opacity:.5;font-variant-numeric:tabular-nums;user-select:none}
 .cel-notes-glyph{cursor:pointer;user-select:none;opacity:.55;margin-left:2px;font-size:.9em}
 .cel-notes-glyph.cel-notes-has{opacity:1;color:var(--vscode-textLink-foreground,#3794ff)}
 .cel-notes-glyph.cel-notes-open{text-decoration:underline;text-underline-offset:2px}

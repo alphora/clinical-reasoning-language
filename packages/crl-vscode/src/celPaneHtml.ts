@@ -229,8 +229,12 @@ export function renderCelPane(
         `aria-label="Notes (${count})">${count ? `💬 ${count}` : "🗨"}</span>`;
       if (isOpen) drawerHtml = renderNotesDrawer(wlKey, sc.case.name, notes, worklist.editingNoteId);
     }
+    // Worklist rows are numbered (1-based, in scenario order) so a reviewer can refer to "row 7". Worklist mode only —
+    // cockpit stays byte-identical. Numbers EVERY row (incl. unfrozen/ambiguous), so the count matches the visible list.
+    const rowNum = worklist ? `<span class="cel-rownum">${idx + 1}.</span> ` : "";
     html +=
       `<div ${attrs.join(" ")}>` +
+      rowNum +
       reviewControl +
       (notesGlyph ? `${notesGlyph} ` : "") + // sits immediately after the verdict dropdown
       keySlot +
