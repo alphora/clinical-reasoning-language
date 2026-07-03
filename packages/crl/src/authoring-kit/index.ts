@@ -30,18 +30,22 @@ import {
   SOURCE_DELEGATED_DECISION_REFERENCE_CRL,
 } from "./reference";
 import type {
+  AuthoringEdge,
   AuthoringKit,
   AuthoringStage,
+  AuthoringUseCase,
   ConceptLayerEntry,
   ForceModel,
   JudgeLens,
   KitExample,
+  KitFacet,
   KitRule,
+  ReferenceArtifact,
   TypeAllowlist,
   VerifyLoop,
 } from "./types";
 
-export type { AuthoringKit, AuthoringStage } from "./types";
+export type { AuthoringEdge, AuthoringKit, AuthoringStage, AuthoringUseCase, KitFacet } from "./types";
 
 // "1.0" → "1.1": additive shape change — the `judgeLens` field (the waiver-adjudication rubric) joins the kit.
 // "1.1" → "1.2": SHAPE change for the KE decision-composition teaching package (§0–§4) — four additions:
@@ -58,10 +62,33 @@ export type { AuthoringKit, AuthoringStage } from "./types";
 //   both-rep entry, the `patient-age-both-rep` rule, the carve-out wording in concept-form / boundary, the
 //   verifyLoop `doesNotProve` recency-execution note, and the `patient-age-both-rep-reference.crl` exemplar.
 //   AGE ONLY — the SOLE sanctioned `definition is` exception; do NOT generalize.
+// "1.3" → "1.4": SHAPE + CONTENT change — the `useCase` specialization axis (#191 lattice). Additions:
+//   (1) `useCase` + `chain` on the payload (the resolved edge chain, name-order); (2) every `KitRule`,
+//   `ReferenceArtifact`, and `verifyLoop.methodologyRequirement` carries an `edge` (`cpg` | `prior-auth`);
+//   (3) an advisory `facets?` channel present only on the `prior-auth` chain (non-selector, home-TBD).
+//   The PA/CPG-FUSED `dispositions` rule is UN-FUSED: its CPG-base prose stands alone (plain activity / no
+//   invented verbs / no rationale-at-site / disposition-type-follows-act) and its PA `communicated-not-ordered`
+//   invariant RELOCATES to the `prior-auth` `pa-disposition-set` rule (it is NOT a dup of that rule's
+//   shared-lib-membership clause — the two anchor DIFFERENT verifyLoop checks). PA boundary items + PA reference
+//   artifacts move to the `prior-auth` edge. BEHAVIOR CHANGE: `getAuthoringKit(stage)` with no `useCase` now
+//   returns the neutral `cpg` base, NOT PA — pass `useCase:"prior-auth"` for the PA kit (fail-loud, never
+//   silent-PA). TWO distinct contentHashes now (one per useCase); the PA seat re-syncs on the bump.
 // Sibling KE agents pin schemaVersion + contentHash and re-sync; the bump signals the new shape.
-const SCHEMA_VERSION = "1.3";
+const SCHEMA_VERSION = "1.4";
 export const DEFAULT_STAGE: AuthoringStage = "local-decision-support";
 export const STAGES: readonly AuthoringStage[] = [DEFAULT_STAGE];
+
+/**
+ * The selectable use cases (#191 lattice). Each resolves — BY NAME, never by index — to an ordered edge chain;
+ * a `prior-auth` kit inherits all `cpg` content plus the PA narrowings. Measure is a RESERVED sibling edge:
+ * documented here, deliberately NOT a shipped chain (so an unknown-useCase throw stays honest).
+ */
+export const DEFAULT_USE_CASE: AuthoringUseCase = "cpg";
+export const USE_CASES: Record<AuthoringUseCase, { label: string; chain: readonly AuthoringEdge[] }> = {
+  cpg: { label: "CPG — base framework (FHIR CPG IG; ≈ full CRL). A stub edge, fleshed out with the CPG build.", chain: ["cpg"] },
+  "prior-auth": { label: "Prior authorization / medical policy — the coverage-determination narrowing.", chain: ["cpg", "prior-auth"] },
+};
+export const USE_CASE_NAMES: readonly AuthoringUseCase[] = ["cpg", "prior-auth"];
 
 /** Where KE agents file gap-issues — the repo where the kit + tools are maintained. */
 const FEEDBACK_URL = "https://github.com/alphora/clinical-reasoning-language/issues/new";
@@ -156,6 +183,7 @@ const CONCEPT_LAYER_MODEL: ConceptLayerEntry[] = [
 const RULES: KitRule[] = [
   {
     id: "concept-form",
+    edge: "cpg",
     category: "concept-model",
     rule: "Stage-1 leaf concepts carry `type is` + `code is` (local). A SINGLE criterion stated at a finer data-grain — multiple representations/components of ONE clinical fact — is normalized with `defined as` (INFERENCE) over named local leaves, drop-one-leaf testable (e.g. \"failed conservative therapy\" = failed drug OR physical therapy). The conjunction of DISTINCT criteria (a policy's \"ALL of the following are met\") is decision COMPOSITION and belongs in the decision TREE — each criterion a nested `when` node — NOT a `defined as` `Criteria Met` composite (see decision-composition). `defined as`/`sem-and`/`sem-or` NEVER joins distinct criteria. Still OUT this stage: `source representation`/`coded from` (external) and `definition is` predicates (count/temporal/value) — the SOLE exception: the patient-age both-rep `definition is age today at least <N> years` (see rule patient-age-both-rep). The boundary is the concept FORM, not the type vocabulary: any FHIR type may be a local `code is` concept. `meta is` is optional.",
     why: "Local-source pass proves decision authoring (incl. one-concept `defined as` inference) before external sources and predicate inference are added; conflating inference with decision composition hides criteria from the decision (#168).",
@@ -174,6 +202,7 @@ const RULES: KitRule[] = [
   },
   {
     id: "patient-age-both-rep",
+    edge: "cpg",
     category: "concept-model",
     rule: "PATIENT AGE is the SOLE sanctioned `definition is` exception to Stage-1 'local `code is` only'. A both-representation age concept carries BOTH arms on ONE concept: `- code is `<age-code>`.` (the LOCAL age Observation) AND `- definition is age today at least <N> years.` (a live compute over `Patient.birthDate`). The Inferred layer RECENCY-MERGES the two: newest of the local age Observation (`Observation.issued`) vs `Patient.meta.lastUpdated` wins; indeterminate (`lastUpdated` absent) → the session-fresh local-source wins. Four constraints are engine-enforced (verified at `$r5.apply`, 6 cases incl. the indeterminate-recency cell): the concept is `type is Observation`; `value type is boolean`; the `at least <N>` unit MUST be `years` (`months`/`days` are a hard error — AgeAt() is in years); and the arm combination is semantic — `code is` + `definition is age…` = recency-merge, `code is` alone = local-only, `definition is` alone = compute-only. AGE-ONLY guardrail: this is the ONE `definition is` construct sanctioned this stage — do NOT generalize the carve-out to any other `definition is` predicate. The do-not-persist of a session-asserted age answer is a documentation marker (`@business-logic-deferred` in `meta is`) today; the persistence mechanism is #190 (deferred).",
     why: "`Patient.birthDate` is a real clinical record that can COMPUTE the age, so a both-rep age concept has two genuine sources for the same fact; the recency merge lets EITHER the local age assertion OR the live compute answer — newest wins — which is why age (and age alone) earns the `definition is` carve-out the rest of the stage defers.",
@@ -207,6 +236,7 @@ const RULES: KitRule[] = [
   },
   {
     id: "interface-concept-naming",
+    edge: "cpg",
     category: "concept-model",
     rule: "Name a concept a decision's `when` references (an INTERFACE concept — the case-feature the determination consumes) as an ASKABLE phrase: the FHIR emit forms the case-feature input PROMPT by appending '?' to the concept name (\"Patient Has Active Crohns Disease\" -> \"Patient Has Active Crohns Disease?\"), so a name that reads as a yes/no question yields a sensible DTR questionnaire prompt with no separate author field. SCOPE: the emit generates a case-feature StructureDefinition + a PlanDefinition `action.input` for a TOP-LAYER directly-asserted local concept only (a single `code is` LocalSource/boolean concept the `when` asserts directly). A `when` on a `defined as`/INFERRED condition does NOT yet generate the recursive leaf inputs — deferred (#180).",
     why: "The interface concept's NAME is the human prompt the DTR questionnaire renders; an askable name produces the prompt by emit convention (+'?') with no extra grammar. Top-layer-only is the current emit reality: a directly-asserted condition maps 1:1 to one case-feature input; an inferred condition needs a recursive input over its leaves (open design — #180).",
@@ -214,12 +244,14 @@ const RULES: KitRule[] = [
   },
   {
     id: "decision-qualifiers",
+    edge: "cpg",
     category: "decision-shape",
     rule: "A multi-branch decision must declare a qualifier: `first:` (ordered, first match wins — requires a trailing `otherwise`), `all:` (every matching branch fires), or `any:` (over actions only — offer alternatives). A `then:` body is closed by `end.`. A single-member block takes no qualifier.",
     ref: "docs/decision-shapes.md; validator rules qualifier-required / otherwise-required / any-over-branches / first-over-actions",
   },
   {
     id: "decision-composition",
+    edge: "cpg",
     category: "decision-shape",
     rule: "The COMPOSITION LADDER (§1) — the primitive is decided by the UNIT you are combining: (rung 1) sub-representations of ONE criterion → `defined as` INFERENCE (sem-and/or/not, closed-world; see concept-form); (rung 2) DISTINCT criteria of ONE determination → the decision TREE (nested `when` = AND; sibling `when` under `first:`, each recommending the same disposition with `otherwise`, = OR; `otherwise` = NOT; `first:` = precedence); (rung 3) SEPARATE determinations the SOURCE delegates, OR a GENUINELY-SHARED determination reused across policies/pathways → chained `use decision` (see chaining-necessity — source-delegation OR genuine reuse, NOT fabricated coupling). The tree already expresses AND/OR/NOT, so \"I have boolean logic\" is NOT a chaining signal — almost all of it stays in ONE tree. (`any:` is over ACTIONS only — alternatives WITHIN one matched branch — NEVER an OR over `when` branches; see decision-qualifiers.) A `when` takes a SINGLE concept by design. Putting a policy's distinct-criteria conjunction in a `defined as` \"Criteria Met\" composite gated as the sole branch HIDES which criterion failed (#168) — author each criterion as its own (nested or sibling) `when` node (see criteria-decision-reference). The REVERSE — exposing ONE criterion's sub-representations AS `when` nodes (§3) — makes the audit surface MORE visible and is presumed-faithful: do NOT revert it. AT SCALE, when one determination has many OVERLAPPING pathways with outcome precedence + fall-through, the plain nested tree duplicates shared criteria; the disposition-arbitration refinement (compute precedence in the inference layer via pairwise-disjoint `sem-not` FINAL-* concepts carried as flat `when` siblings, approve criteria re-exposed as visible nodes — #168-clean, NO `use decision`) is an option (see disposition-arbitration-reference) — but for a FEW pathways the plain tree is simpler and equally faithful.",
     why: "The decision tree is the audit surface — a reviewer/cockpit must see WHICH criterion failed. `defined as`/sem-* is INFERENCE (one concept), not decision composition (the tree's job); conflating them hides criteria and was the #168 black-box failure (a fresh agent copied a `Criteria Met` composite → a decision with zero criterion nodes). The asymmetry (§3): hollowing distinct criteria INTO a composite is the violation; exposing one criterion's representations OUT to nodes is faithful.",
@@ -246,6 +278,7 @@ const RULES: KitRule[] = [
   },
   {
     id: "chaining-necessity",
+    edge: "cpg",
     category: "decision-shape",
     rule: "The chaining overlay (§2) — a `use decision` (bare same-library `use decision \"Sub\"`, or a QUALIFIED cross-library chain, #172) is the right primitive for TWO overlapping reasons: (a) the SOURCE delegates a SEPARATE determination BY NAME (\"covered if the member meets the Eligibility Policy,\" \"per the Step-Therapy Protocol\"); and/or (b) REUSE of a GENUINELY SHARED determination — one determination that multiple policies or pathways genuinely reference, factored into a shared decision/library and chained. The SUR mandate-determination is exactly (b): one shared determination chained cross-library, which IS reuse. Reuse is a FIRST-CLASS reason to chain, not merely tolerated taste. One policy's own internal AND/OR/NOT logic still stays in ONE tree, however complex — the tree already expresses boolean composition, so \"I have boolean logic\" is not a chaining signal (see decision-composition). THE LINE IS NOT reuse-vs-no-reuse; it is GENUINELY-SHARED vs FABRICATED-SHARED: factor + reuse + chain a determination that is genuinely ONE shared thing; do NOT fabricate a shared sub-decision across INDEPENDENT policies whose criteria merely look alike — those are two sources that may diverge, so duplicate them inline (factoring lookalikes invents a false coupling that changes one when you change the other). (See source-delegated-decision-reference and disposition-arbitration-reference.)",
     why: "Two failure modes, opposite directions. (1) FABRICATING a determination boundary the structure does not genuinely share — casting one policy's internal pathways as separate sub-determinations, or coupling two independent lookalike policies — INVENTS structure the sources do not support and can change the disposition/provenance surface. (2) DUPLICATING a genuinely-shared determination instead of reusing it (a misapplied no-DRY instinct) loses the single source of truth the share represents (e.g. SUR's mandate determination). The boundary is a fact about what is genuinely shared — not an authoring convenience in either direction.",
@@ -269,16 +302,18 @@ const RULES: KitRule[] = [
   },
   {
     id: "guards",
+    edge: "cpg",
     category: "guards",
     rule: "A menu item in an `any:`/`all:` action block may carry `unless \"C\"` (drop when C holds) or `only when \"C\"` (include only when C holds). Guards are legal ONLY on multi-action menu members — not on inline `when … then recommend`, not on `otherwise`, not on a single menu-less action. Keep at least one ALWAYS-offered (unguarded) item so a matched branch can never produce nothing.",
     ref: "docs/decision-shapes.md; validator rule guard-on-single-action",
   },
   {
     id: "dispositions",
+    edge: "cpg",
     category: "dispositions",
-    rule: "Model dispositions as plain `activity` declarations. CRL has no approve/deny/pend verbs — do not invent them. Do not author rationale at the decision/recommend site; the reason a branch fired IS its triggering `when` concept, which the emitter can surface (from the concept's `meta is`). DISPOSITION TYPE follows the ACT: a CDS recommendation to ORDER a service uses `request CPGServiceRequest` (see decision-reference). A PA / medical-policy coverage DETERMINATION is COMMUNICATED, never ordered — reference the SHARED, canonical `Medical Policy Determination` library's determination activities by qualified name (every deployment vendors this same library; the determination is two KINDS — a CERTIFY (`\"Approve\"` = CPGCommunicationRequest / X12 A1) and a NOT-CERTIFY (X12 A3) — and the not-certify kind may take further FINAL activity FLAVORS for distinct reasons, e.g. `\"Deny\"` and `\"Deny EIU\"`; see pa-disposition-set). All are `CPGCommunicationRequest`, never `CPGServiceRequest`, and never a per-policy re-authored determination (see pa-determination-reference).",
-    why: "CRL is general (cognitive support, CDS, prior-auth, quality measures), not a PA-specific language; keep the core minimal. But a coverage determination is a communicated decision, not a service order — modeling it as CPGServiceRequest is a clinical-safety error (#134).",
-    ref: "crl-not-a-pa-language; #134",
+    rule: "Model dispositions as plain `activity` declarations. CRL has no approve/deny/pend verbs — do not invent them. Do not author rationale at the decision/recommend site; the reason a branch fired IS its triggering `when` concept, which the emitter can surface (from the concept's `meta is`). DISPOSITION TYPE follows the ACT: a CDS recommendation to ORDER a service uses `request CPGServiceRequest` (see decision-reference); a disposition that is COMMUNICATED rather than ordered uses `request CPGCommunicationRequest`. The emitter derives the request type from the act — do not over-specify it.",
+    why: "CRL is general (cognitive support, CDS, prior-auth, quality measures), not tied to any one disposition vocabulary; keep the core minimal. The disposition's request type follows what the ACT is — an ORDER vs a COMMUNICATION — which the emitter derives; inventing approve/deny/pend verbs bakes one domain's taxonomy into the language.",
+    ref: "crl-not-a-pa-language",
     clauses: [
       {
         text: "Model dispositions as plain `activity` declarations; CRL has no approve/deny/pend verbs — do not invent them.",
@@ -288,20 +323,21 @@ const RULES: KitRule[] = [
         text: "Do not author rationale at the decision/recommend site; the reason a branch fired IS its triggering `when` concept (the emitter surfaces it from the concept's `meta is`).",
         force: "default",
       },
-      {
-        text: "A PA / medical-policy coverage DETERMINATION is COMMUNICATED, never ordered — it resolves to the shared `Medical Policy Determination` library (all `CPGCommunicationRequest`, never `CPGServiceRequest`, never a per-policy re-authored determination). Modeling it as a service order is a clinical-safety error (#134).",
-        force: "invariant",
-        test: "verifyLoop:communicated-not-ordered",
-      },
     ],
   },
   {
     id: "pa-disposition-set",
+    edge: "prior-auth",
     category: "dispositions",
     rule: "For a medical-policy / PA coverage decision the disposition set is constrained STRUCTURALLY, naming no activities: (1) MEMBERSHIP — the determination is exactly TWO KINDS of outcome (a CERTIFY kind and a NOT-CERTIFY kind), NOT two activities. The not-certify kind may take multiple ACTIVITY FLAVORS that share one X12 A3 outcome but communicate a DISTINCT reason (e.g. a medical-necessity not-certify vs an experimental/investigational/unproven not-certify). Every activity the decision can `recommend` resolves to the shared, canonical `Medical Policy Determination` library (the one library every deployment vendors under that name; a qualified ref into it), never a per-policy re-authored determination and never `CPGServiceRequest`; a determination is COMMUNICATED (all `CPGCommunicationRequest`), not ordered. (2) MUTUAL EXCLUSIVITY — each case fires EXACTLY ONE determination, and the invariant spans the DELEGATED CLOSURE (parent + any chained `use decision` sub TOGETHER, not in-tree branches alone): no reachable path across the closure may emit more than one determination in a single run (author ordered precedence with `first:` + `otherwise`; do not place two determination recommendations under one `all:` / `any:`; a branch that both delegates and `recommend`s emits two determinations a in-tree-only check misses). (3) NO PEND — the canonical library holds only FINAL determinations (a deployment extends it only with further final flavors), so a determination cannot recommend a pend; Pended (X12 A4) is an async/workflow state resolved OUTSIDE the per-policy decision, not a determination leaf. WHICH activity flavors the shared library offers, and their certify/not-certify KINDS, are content (governed in the deployment's content project); whether a policy uses the RIGHT flavor where it draws a distinction is a reviewer/Judge fidelity call this rule INSTRUCTS but does not mechanically enforce.",
     why: "The universal kit must be customer-agnostic — it serves every deployment's content project, not one denial taxonomy. The structural invariant (shared-library membership, one determination per case ACROSS the delegated closure, no pend leaf) catches the real modeling defects #134 targeted — a determination modeled as a service order, a per-policy re-authored determination, a contradictory double-determination across a parent+sub — WITHOUT hard-coding any activity set; a distinct further not-certify flavor is legitimate content, not a defect (#167).",
     ref: "#134; #167; §4",
     clauses: [
+      {
+        text: "COMMUNICATED, not ordered: a coverage determination is COMMUNICATED (all `CPGCommunicationRequest`), never a `CPGServiceRequest` service order — modeling a determination as a service order is a clinical-safety error (#134). (This is the request-TYPE invariant; the shared-library MEMBERSHIP invariant below is a distinct check.)",
+        force: "invariant",
+        test: "verifyLoop:communicated-not-ordered",
+      },
       {
         text: "MEMBERSHIP: every recommended determination resolves to the shared `Medical Policy Determination` library (a qualified ref), all `CPGCommunicationRequest`, never `CPGServiceRequest`, never a per-policy re-authored determination.",
         force: "invariant",
@@ -325,18 +361,21 @@ const RULES: KitRule[] = [
   },
   {
     id: "minimalism",
+    edge: "cpg",
     category: "minimalism",
     rule: "Declare the MINIMAL set that captures the clinical intent and let the emitter do the heavy lifting. Do not over-specify properties the emitter can derive.",
     ref: "declarative-not-implementation",
   },
   {
     id: "cel-cases",
+    edge: "cpg",
     category: "cel",
     rule: "Author a companion `.cel`: `covers \"<CRL library>\"`; a Patient subject `fact` (`- defined by \"Patient\".`); one clinical `fact` per case-feature linked to its concept via `- defined by \"<library>\".\"<concept>\".`; and one `case` per path with `- subject is …`, the relevant `- fact is …`, and a `- result is \"<decision>\" is \"<branch>\".` oracle. The CRE satisfies a concept iff a case fact is `defined by` it.",
     ref: "decision-reference.cel; src/cre/run.ts",
   },
   {
     id: "verify-loop",
+    edge: "cpg",
     category: "process",
     rule: "Verify with the MCP tools in order: validate_crl(path) clean → validate_cel(path) clean → run_decision(path) with every case's `result is` passing. validate_cel and run_decision need FILES under a project root (a package.json) — they do not accept inline code.",
     ref: "verifyLoop",
@@ -419,7 +458,22 @@ const EXAMPLES: KitExample[] = [
   },
 ];
 
-const VERIFY_LOOP: VerifyLoop = {
+/** The verify-loop `note`, base (edge-invariant) segment. The PA closure paragraph is appended for prior-auth. */
+const VERIFY_LOOP_NOTE_BASE =
+  "validate_cel and run_decision require FILES under a project root (a package.json); they do not accept inline code. In a content project's artifact-package layout, author <artifact>.crl and <artifact>.cel under the artifact's package and pass absolute paths. " +
+  "PROVENANCE / PROMOTION (beyond the run_decision proof): generate the scaffold with `generate_provenance` " +
+  "clusterBy:\"disposition-path\" — it clusters per RUN PATH (decision-node refs only) so it is correspondence-correct " +
+  "BY CONSTRUCTION, clearing the FINAL `validate_provenance` cockpit-correspondence gate AS GENERATED (before any " +
+  "source attribution). The default clusterBy:\"decision\" is the per-decision concept-attribution VIEW (it cites " +
+  "concept refs that fan out / over-light the gate) — inspect with it, do NOT promote with it. " +
+  "PROOF STATUS IS ORTHOGONAL TO FAITHFULNESS (§4): faithfulness decides the model, provability decides whether run_decision can prove it yet. Encode the FAITHFUL model and DEFER the proof for any construct the kit `boundary` marks out-of-scope — never substitute a less-faithful provable model, and never assert a composite to fake green (K4). Read the live proof status from `conceptLayerModel` (scope in/out) and `boundary` (e.g. a `definition is` predicate is deferred; a `use decision` delegation — bare same-library OR qualified cross-library — is evaluated) — do not hardcode a snapshot. " +
+  "DURABLE proof-methodology (independent of which constructs are evaluated): ASSERT THE PATH, not just the disposition. `result is` checks disposition MEMBERSHIP only — two paths ending in the same disposition (a sub-decision's `otherwise` Deny and a parent's `otherwise` Deny) are indistinguishable, so a case short-circuiting to the WRONG `otherwise` still 'passes'. Fall-through / chained proof cases must assert the path via the run trace (`viaWhen` / nodeId) or use DISTINCT disposition activities per path.";
+
+/** The prior-auth-only closure paragraph appended to the verify-loop `note` (the coverage cardinality invariant). */
+const VERIFY_LOOP_NOTE_PRIOR_AUTH =
+  " MUTUAL-EXCLUSIVITY SPANS ALL EMISSION PATHS (coverage / PA — the consumer of this invariant). The 'exactly one determination per run' invariant is evaluated over EVERY emission path — the DELEGATED CLOSURE (parent + any chained `use decision` sub together) AND `all:`/`any:` sibling FAN-OUT — not in-tree branches or delegation alone: a branch that both delegates and `recommend`s, or two determinations placed under one `all:`, each emit two determinations an in-tree-only check misses. Note BOTH `first:` and `all:` are legal branch qualifiers (validator: `first:` or `all:` over when-branches; `any:` is over ACTIONS only) — a determination authored `all:` fans out multiple outcomes and so HITS this invariant; author a determination's precedence with `first:` + `otherwise` so exactly one fires.";
+
+const VERIFY_LOOP_BASE: Omit<VerifyLoop, "note" | "methodologyRequirements"> = {
   steps: [
     "validate_crl(path) — clean (no errors)",
     "validate_cel(path) — clean (no errors)",
@@ -430,44 +484,63 @@ const VERIFY_LOOP: VerifyLoop = {
   doesNotProve:
     "That a concept's `code is` is the clinically correct code, or that the concept-to-intent mapping is right. The CRE (v1) is asserted-only and never evaluates `code is`: a concept is satisfied purely because a case fact is `defined by` it. A green run means the wiring is right, NOT that the encoding is clinically complete or correct. " +
     "For a PATIENT-AGE BOTH-REP concept specifically: run_decision proves the both-rep concept integrates into the decision SHAPE (a satisfied case flows to the right branch), NOT the recency EXECUTION — which representation (the local age Observation vs the age computed over `Patient.birthDate`) actually wins the merge. That recency arbitration (newest wins; indeterminate → session-fresh local-source wins) is verified at the engine level via `PlanDefinition/<id>/$r5.apply` (6 cases incl. the indeterminate-recency cell), not by the asserted-only run_decision.",
-  note:
-    "validate_cel and run_decision require FILES under a project root (a package.json); they do not accept inline code. In a content project's artifact-package layout, author <artifact>.crl and <artifact>.cel under the artifact's package and pass absolute paths. " +
-    "PROVENANCE / PROMOTION (beyond the run_decision proof): generate the scaffold with `generate_provenance` " +
-    "clusterBy:\"disposition-path\" — it clusters per RUN PATH (decision-node refs only) so it is correspondence-correct " +
-    "BY CONSTRUCTION, clearing the FINAL `validate_provenance` cockpit-correspondence gate AS GENERATED (before any " +
-    "source attribution). The default clusterBy:\"decision\" is the per-decision concept-attribution VIEW (it cites " +
-    "concept refs that fan out / over-light the gate) — inspect with it, do NOT promote with it. " +
-    "PROOF STATUS IS ORTHOGONAL TO FAITHFULNESS (§4): faithfulness decides the model, provability decides whether run_decision can prove it yet. Encode the FAITHFUL model and DEFER the proof for any construct the kit `boundary` marks out-of-scope — never substitute a less-faithful provable model, and never assert a composite to fake green (K4). Read the live proof status from `conceptLayerModel` (scope in/out) and `boundary` (e.g. a `definition is` predicate is deferred; a `use decision` delegation — bare same-library OR qualified cross-library — is evaluated) — do not hardcode a snapshot. " +
-    "Two DURABLE proof-methodology requirements (independent of which constructs are evaluated): " +
-    "(1) ASSERT THE PATH, not just the disposition. `result is` checks disposition MEMBERSHIP only — two paths ending in the same disposition (a sub-decision's `otherwise` Deny and a parent's `otherwise` Deny) are indistinguishable, so a case short-circuiting to the WRONG `otherwise` still 'passes'. Fall-through / chained proof cases must assert the path via the run trace (`viaWhen` / nodeId) or use DISTINCT disposition activities per path. " +
-    "(2) MUTUAL-EXCLUSIVITY SPANS THE DELEGATED CLOSURE. The PA disposition-set 'exactly one determination per run' invariant is evaluated over parent + sub TOGETHER, not in-tree branches alone — a branch that both delegates and `recommend`s emits two determinations an in-tree-only check misses.",
-  methodologyRequirements: [
-    {
-      id: "assert-path",
-      text: "§4-req1 — ASSERT THE PATH, not just the disposition: `result is` checks disposition membership only, so two paths ending in the same disposition (a sub's `otherwise` Deny vs a parent's `otherwise` Deny) are indistinguishable; a fall-through / chained proof case must assert the path via the run trace (`viaWhen`/nodeId) or use DISTINCT disposition activities per path.",
-    },
-    {
-      id: "mutual-exclusivity-spans-closure",
-      text: "§4-req2 — the PA 'exactly one determination per run' invariant is checked over the DELEGATED CLOSURE (parent + any chained `use decision` sub together): run_decision over the policy's cases must show no run producing >1 determination, INCLUDING a branch that both delegates and `recommend`s.",
-    },
-    {
-      id: "communicated-not-ordered",
-      text: "Every determination a PA/medical-policy decision recommends is `CPGCommunicationRequest` (communicated), never `CPGServiceRequest` (ordered) — inspect the recommended activities' request types per policy (#134).",
-    },
-    {
-      id: "shared-lib-membership",
-      text: "Every recommended determination resolves (a qualified ref) to the shared `Medical Policy Determination` library, never a per-policy re-authored determination — check each recommend target's library per policy (#167).",
-    },
-    {
-      id: "no-pend",
-      text: "No determination leaf is a pend: the canonical library holds only FINAL determinations; Pended (X12 A4) is an async/workflow state outside the per-policy decision — check no recommend target is a pend per policy (#167).",
-    },
-    {
-      id: "patient-age-both-rep",
-      text: "PATIENT-AGE both-rep structural checks (the SOLE `definition is` carve-out): the both-rep age concept is `type is Observation` + `value type is boolean`; its `definition is age today at least <N> years` unit is `years` (months/days are a hard error); and the carve-out is NOT generalized to any other `definition is` predicate. The recency-merge EXECUTION (newest of `Observation.issued` vs `Patient.meta.lastUpdated` wins; indeterminate → session-fresh local-source wins) is engine-verified at `$r5.apply` (6 cases incl. the indeterminate-recency cell), not by asserted-only run_decision (#190; disc 173).",
-    },
-  ],
 };
+
+/** The methodology requirements, edge-tagged. Assembled by chain in buildBase; a prior-auth requirement is present exactly when its anchoring prior-auth clause is. */
+const METHODOLOGY_REQUIREMENTS: VerifyLoop["methodologyRequirements"] = [
+  {
+    id: "assert-path",
+    edge: "cpg",
+    text: "§4-req1 — ASSERT THE PATH, not just the disposition: `result is` checks disposition membership only, so two paths ending in the same disposition (a sub's `otherwise` Deny vs a parent's `otherwise` Deny) are indistinguishable; a fall-through / chained proof case must assert the path via the run trace (`viaWhen`/nodeId) or use DISTINCT disposition activities per path.",
+  },
+  {
+    id: "patient-age-both-rep",
+    edge: "cpg",
+    text: "PATIENT-AGE both-rep structural checks (the SOLE `definition is` carve-out): the both-rep age concept is `type is Observation` + `value type is boolean`; its `definition is age today at least <N> years` unit is `years` (months/days are a hard error); and the carve-out is NOT generalized to any other `definition is` predicate. The recency-merge EXECUTION (newest of `Observation.issued` vs `Patient.meta.lastUpdated` wins; indeterminate → session-fresh local-source wins) is engine-verified at `$r5.apply` (6 cases incl. the indeterminate-recency cell), not by asserted-only run_decision (#190; disc 173).",
+  },
+  {
+    id: "mutual-exclusivity-spans-closure",
+    edge: "prior-auth",
+    text: "§4-req2 — the coverage 'exactly one determination per run' invariant is checked over ALL emission paths (the DELEGATED CLOSURE — parent + any chained `use decision` sub together — AND `all:`/`any:` sibling FAN-OUT): run_decision over the policy's cases must show no run producing >1 determination, INCLUDING a branch that both delegates and `recommend`s, or two determinations placed under one `all:`. (PA is a consumer of this coverage invariant.)",
+  },
+  {
+    id: "communicated-not-ordered",
+    edge: "prior-auth",
+    text: "Every determination a PA/medical-policy decision recommends is `CPGCommunicationRequest` (communicated), never `CPGServiceRequest` (ordered) — inspect the recommended activities' request types per policy (#134).",
+  },
+  {
+    id: "shared-lib-membership",
+    edge: "prior-auth",
+    text: "Every recommended determination resolves (a qualified ref) to the shared `Medical Policy Determination` library, never a per-policy re-authored determination — check each recommend target's library per policy (#167).",
+  },
+  {
+    id: "no-pend",
+    edge: "prior-auth",
+    text: "No determination leaf is a pend: the canonical library holds only FINAL determinations; Pended (X12 A4) is an async/workflow state outside the per-policy decision — check no recommend target is a pend per policy (#167).",
+  },
+];
+
+/** ADVISORY above-edge coverage facets (#191) — present only when the chain includes prior-auth. Non-selector, home-TBD. */
+const PRIOR_AUTH_FACETS: KitFacet[] = [
+  {
+    id: "act-modality",
+    name: "act modality — communicated vs ordered",
+    status: "home-TBD",
+    note: "A coverage determination is COMMUNICATED, not ordered. Reserved dimension; level pending the second domain edge — advisory ONLY, do NOT anchor selection or inheritance here.",
+  },
+  {
+    id: "determination-cardinality",
+    name: "determination cardinality — ≤1 determination per run",
+    status: "home-TBD",
+    note: "At most one determination across ALL emission paths (`all:`-fanout AND the delegated closure). Reserved dimension; level pending the second domain edge — advisory ONLY, do NOT anchor selection or inheritance here.",
+  },
+  {
+    id: "outcome-finality",
+    name: "outcome finality — no non-final (pend) leaf",
+    status: "home-TBD",
+    note: "No determination leaf is a pend (X12 A4 is an async/workflow state outside the decision). Reserved dimension; level pending the second domain edge — advisory ONLY, do NOT anchor selection or inheritance here.",
+  },
+];
 
 /**
  * The judge-lens rubric — TWO families, each carrying the source-fidelity weighting the uniform severity omits.
@@ -595,130 +668,209 @@ const JUDGE_LENS: JudgeLens = {
   ],
 };
 
-const BOUNDARY = [
-  "`definition is` predicates (count / most-recent / temporal / value thresholds — compute over a source); the SOLE exception is the patient-age both-rep `definition is age today at least <N> years` recency merge (see rule patient-age-both-rep)",
-  "external / value-set sources (`source representation` / `coded from`)",
-  "PA Pended (X12 278 HCR01 A4) — an async/workflow disposition resolved OUTSIDE the per-policy clinical decision; not a determination leaf",
-  "coded HCR01 outcome value-set binding for PA determinations — Stage 1 carries the A1/A3 outcome in the `with` narrative; coding it is a later external-terminology stage",
-  "emit to FHIR / CQL",
+const BOUNDARY_ENTRIES: { text: string; edge: AuthoringEdge }[] = [
+  {
+    text: "`definition is` predicates (count / most-recent / temporal / value thresholds — compute over a source); the SOLE exception is the patient-age both-rep `definition is age today at least <N> years` recency merge (see rule patient-age-both-rep)",
+    edge: "cpg",
+  },
+  {
+    text: "external / value-set sources (`source representation` / `coded from`)",
+    edge: "cpg",
+  },
+  {
+    text: "PA Pended (X12 278 HCR01 A4) — an async/workflow disposition resolved OUTSIDE the per-policy clinical decision; not a determination leaf",
+    edge: "prior-auth",
+  },
+  {
+    text: "coded HCR01 outcome value-set binding for PA determinations — Stage 1 carries the A1/A3 outcome in the `with` narrative; coding it is a later external-terminology stage",
+    edge: "prior-auth",
+  },
+  {
+    text: "emit to FHIR / CQL",
+    edge: "cpg",
+  },
 ];
 
-function buildBase(stage: AuthoringStage): Omit<AuthoringKit, "contentHash"> {
-  return {
+/**
+ * The reference artifacts, edge-tagged and CLOSURE-CORRECT (#191): the shared `Medical Policy Determination`
+ * library recommends Approve/Deny (X12 A1/A3) — PA vocabulary, not general infrastructure — so it rides the
+ * `prior-auth` edge, and every exemplar that recommends INTO it rides `prior-auth` with it. The `cpg` base keeps
+ * only the pure-CDS `decision-reference` (service ORDERS) + the `patient-age` carve-out, which reference nothing
+ * PA. A `cpg` kit therefore never ships a determination ref it cannot resolve. (A cpg-general criteria/delegation
+ * exemplar is deferred to the CPG-edge build; the `cpg` decision RULES still teach the composition surface.)
+ *
+ * KNOWN GAP (deferred to the CPG-edge build): a few `cpg` RULES point by name at exemplars that ride the
+ * `prior-auth` edge — `decision-composition`/`concept-form` → `criteria-decision-reference` +
+ * `disposition-arbitration-reference`, `chaining-necessity` → `source-delegated-decision-reference`. For a
+ * `prior-auth` author these resolve (the artifacts are in their chain); for a PURE-`cpg` author they are dead
+ * prose pointers (soft doc-refs only — NOT resolvable activity refs, so closure + the hash are unaffected). The
+ * fix is to author cpg-general (plain-activity) versions of those exemplars when the CPG seat is built; until
+ * then the sole real consumer is the PA seat (`prior-auth`), for whom the refs resolve.
+ */
+const REFERENCE_ARTIFACTS: ReferenceArtifact[] = [
+  {
+    name: "decision-reference.crl",
+    language: "crl",
+    edge: "cpg",
+    purpose:
+      "Canonical Stage-1 decision: first:/otherwise ordered precedence + a matched branch opening an `any:` menu with `unless`/`only when` guards and an always-offered item; local `code is` concepts; plain activity dispositions.",
+    source: DECISION_REFERENCE_CRL,
+  },
+  {
+    name: "decision-reference.cel",
+    language: "cel",
+    edge: "cpg",
+    purpose:
+      "Companion cases for decision-reference.crl: Patient subject, concept-linked facts, and one `result is` oracle per path (the unless drop, the only-when enable, ordered exclusion, a plain offer).",
+    source: DECISION_REFERENCE_CEL,
+  },
+  {
+    name: "criteria-decision-reference.crl",
+    language: "crl",
+    edge: "prior-auth",
+    purpose:
+      "The model for #168: a policy's DISTINCT criteria as nested `when` decision NODES (each criterion visible/auditable; nesting = AND), PLUS one genuine `defined as` INFERENCE (a single criterion satisfiable by either of two representations). `defined as` normalizes ONE concept; it never joins distinct criteria — that is the decision tree's job.",
+    source: CRITERIA_DECISION_REFERENCE_CRL,
+  },
+  {
+    name: "criteria-decision-reference.cel",
+    language: "cel",
+    edge: "prior-auth",
+    purpose:
+      "Companion cases exercising each decision NODE + the inference operand: criterion-1 node, the nested criterion-2 node (its `otherwise` → deny), the inference resolving on either representation (drug OR physical therapy → approve), and the top-level otherwise.",
+    source: CRITERIA_DECISION_REFERENCE_CEL,
+  },
+  {
+    name: "medical-policy-determination.crl",
+    language: "crl",
+    edge: "prior-auth",
+    purpose:
+      "The SHARED, canonical PA determination library (#134) — communicated (CPGCommunicationRequest), never ordered, imported by every medical-policy artifact via qualified ref, never re-authored. Two KINDS of outcome (certify / not-certify); the not-certify kind takes activity FLAVORS sharing one X12 A3 outcome — here Approve (A1), Deny (A3 medical-necessity), and Deny EIU (A3 experimental/investigational/unproven, a distinct reason); a deployment's content project may add further FINAL flavors. (No companion CEL — a shared activity lib has no decision to run.)",
+    source: MEDICAL_POLICY_DETERMINATION_CRL,
+  },
+  {
+    name: "pa-determination-reference.crl",
+    language: "crl",
+    edge: "prior-auth",
+    purpose:
+      "Canonical PRIOR-AUTHORIZATION exemplar (#134) — distinct from the CDS decision-reference (which ORDERs a service). The payer COMMUNICATES the determination via the shared library (this exemplar shows the Approve/Deny baseline; a deployment may add further final flavors); Pended (A4) is async/workflow, never a determination leaf.",
+    source: PA_DETERMINATION_REFERENCE_CRL,
+  },
+  {
+    name: "pa-determination-reference.cel",
+    language: "cel",
+    edge: "prior-auth",
+    purpose:
+      "Companion cases for the PA exemplar: qualifying diagnosis → approve; otherwise → deny. Resolves the shared determination activities via the vendored-sibling library (no `include`).",
+    source: PA_DETERMINATION_REFERENCE_CEL,
+  },
+  {
+    name: "source-delegated-decision-reference.crl",
+    language: "crl",
+    edge: "prior-auth",
+    purpose:
+      "Exemplar B — SOURCE-REQUIRED delegation (§2/§5-B): the source NAMES a separate determination, so the policy chains to it with a BARE same-library `use decision`. NOT DRY/reuse factoring — chaining is faithful only because the source draws the boundary. The bare same-library delegation IS evaluated (recursed; the sub determination bubbles up), so the oracle names the DELEGATED disposition, not the sub-decision name. One parent + one delegated sub.",
+    source: SOURCE_DELEGATED_DECISION_REFERENCE_CRL,
+  },
+  {
+    name: "source-delegated-decision-reference.cel",
+    language: "cel",
+    edge: "prior-auth",
+    purpose:
+      "Companion cases for exemplar B: the two delegated-path cases (continuation → the sub's Approve/Deny bubbles up) + the two parent-resolved cases. The kit's unit test asserts the continuation→Deny case's PATH goes through the delegated sub (not the parent `otherwise`) — §4-req1.",
+    source: SOURCE_DELEGATED_DECISION_REFERENCE_CEL,
+  },
+  {
+    name: "disposition-arbitration-reference.crl",
+    language: "crl",
+    edge: "prior-auth",
+    purpose:
+      "Exemplar C — DISPOSITION-ARBITRATION (§1-refinement / §5-C / §6). Applicability GATE: use ONLY when a plain nested tree duplicates shared criteria across MANY overlapping pathways with outcome precedence + fall-through; for a FEW pathways prefer the plain tree (do not over-copy the sem-not arbitration). The TEMPTING-but-DON'T-chain case: ONE determination (source draws no boundary), precedence computed in the inference layer via pairwise-disjoint `sem-not` FINAL-* concepts as flat `when` siblings, approve criteria re-exposed as visible nodes (#168-clean), NO `use decision`. Two denies use DISTINCT activities (Deny vs Deny EIU) so `result is` distinguishes them.",
+    source: DISPOSITION_ARBITRATION_REFERENCE_CRL,
+  },
+  {
+    name: "disposition-arbitration-reference.cel",
+    language: "cel",
+    edge: "prior-auth",
+    purpose:
+      "Companion cases for exemplar C (verified 6/6): each pathway alone (approve), BOTH load-bearing overlap cases (a both-indication patient who fails one pathway still approves via the other — no overlap-pop), within-indication failure (Deny), off-indication (Deny EIU).",
+    source: DISPOSITION_ARBITRATION_REFERENCE_CEL,
+  },
+  {
+    name: "patient-age-both-rep-reference.crl",
+    language: "crl",
+    edge: "cpg",
+    purpose:
+      "The patient-age BOTH-REPRESENTATION exemplar — the SOLE `definition is` exception to Stage-1 'local `code is` only' (see rule patient-age-both-rep). ONE concept carries BOTH arms: `code is` (the LOCAL age Observation) + `definition is age today at least <N> years` (a live compute over `Patient.birthDate`). The Inferred layer recency-merges them (newest of the local `Observation.issued` vs `Patient.meta.lastUpdated` wins; indeterminate → session-fresh local-source wins); `Patient.birthDate` being a genuine clinical record that COMPUTES the age is what earns the carve-out. Engine-verified at `$r5.apply` (6 cases incl. the indeterminate-recency cell); the recency EXECUTION is not something asserted-only run_decision proves, so no companion CEL. AGE ONLY — do NOT generalize.",
+    source: PATIENT_AGE_BOTH_REP_REFERENCE_CRL,
+  },
+];
+
+/**
+ * Assemble the fully edge-FILTERED kit payload for a (stage, useCase). Filtering happens HERE, before the hash
+ * is taken in getAuthoringKit — so each useCase yields a distinct, stable `contentHash` over its own content.
+ * `useCase` resolves to an edge chain by NAME; a unit of content is included iff its `edge` is in the chain.
+ */
+function buildBase(stage: AuthoringStage, useCase: AuthoringUseCase): Omit<AuthoringKit, "contentHash"> {
+  const chain = USE_CASES[useCase].chain;
+  const inChain = (edge: AuthoringEdge): boolean => chain.includes(edge);
+  const includesPriorAuth = inChain("prior-auth");
+
+  const verifyLoop: VerifyLoop = {
+    ...VERIFY_LOOP_BASE,
+    note: VERIFY_LOOP_NOTE_BASE + (includesPriorAuth ? VERIFY_LOOP_NOTE_PRIOR_AUTH : ""),
+    methodologyRequirements: METHODOLOGY_REQUIREMENTS.filter((m) => inChain(m.edge)),
+  };
+
+  const base: Omit<AuthoringKit, "contentHash"> = {
     schemaVersion: SCHEMA_VERSION,
     stage,
+    useCase,
+    chain: [...chain],
     summary: SUMMARY,
     forceModel: FORCE_MODEL,
     conceptLayerModel: CONCEPT_LAYER_MODEL,
-    rules: RULES,
+    rules: RULES.filter((r) => inChain(r.edge)),
     typeAllowlist: TYPE_ALLOWLIST,
-    referenceArtifacts: [
-      {
-        name: "decision-reference.crl",
-        language: "crl",
-        purpose:
-          "Canonical Stage-1 decision: first:/otherwise ordered precedence + a matched branch opening an `any:` menu with `unless`/`only when` guards and an always-offered item; local `code is` concepts; plain activity dispositions.",
-        source: DECISION_REFERENCE_CRL,
-      },
-      {
-        name: "decision-reference.cel",
-        language: "cel",
-        purpose:
-          "Companion cases for decision-reference.crl: Patient subject, concept-linked facts, and one `result is` oracle per path (the unless drop, the only-when enable, ordered exclusion, a plain offer).",
-        source: DECISION_REFERENCE_CEL,
-      },
-      {
-        name: "criteria-decision-reference.crl",
-        language: "crl",
-        purpose:
-          "The model for #168: a policy's DISTINCT criteria as nested `when` decision NODES (each criterion visible/auditable; nesting = AND), PLUS one genuine `defined as` INFERENCE (a single criterion satisfiable by either of two representations). `defined as` normalizes ONE concept; it never joins distinct criteria — that is the decision tree's job.",
-        source: CRITERIA_DECISION_REFERENCE_CRL,
-      },
-      {
-        name: "criteria-decision-reference.cel",
-        language: "cel",
-        purpose:
-          "Companion cases exercising each decision NODE + the inference operand: criterion-1 node, the nested criterion-2 node (its `otherwise` → deny), the inference resolving on either representation (drug OR physical therapy → approve), and the top-level otherwise.",
-        source: CRITERIA_DECISION_REFERENCE_CEL,
-      },
-      {
-        name: "medical-policy-determination.crl",
-        language: "crl",
-        purpose:
-          "The SHARED, canonical PA determination library (#134) — communicated (CPGCommunicationRequest), never ordered, imported by every medical-policy artifact via qualified ref, never re-authored. Two KINDS of outcome (certify / not-certify); the not-certify kind takes activity FLAVORS sharing one X12 A3 outcome — here Approve (A1), Deny (A3 medical-necessity), and Deny EIU (A3 experimental/investigational/unproven, a distinct reason); a deployment's content project may add further FINAL flavors. (No companion CEL — a shared activity lib has no decision to run.)",
-        source: MEDICAL_POLICY_DETERMINATION_CRL,
-      },
-      {
-        name: "pa-determination-reference.crl",
-        language: "crl",
-        purpose:
-          "Canonical PRIOR-AUTHORIZATION exemplar (#134) — distinct from the CDS decision-reference (which ORDERs a service). The payer COMMUNICATES the determination via the shared library (this exemplar shows the Approve/Deny baseline; a deployment may add further final flavors); Pended (A4) is async/workflow, never a determination leaf.",
-        source: PA_DETERMINATION_REFERENCE_CRL,
-      },
-      {
-        name: "pa-determination-reference.cel",
-        language: "cel",
-        purpose:
-          "Companion cases for the PA exemplar: qualifying diagnosis → approve; otherwise → deny. Resolves the shared determination activities via the vendored-sibling library (no `include`).",
-        source: PA_DETERMINATION_REFERENCE_CEL,
-      },
-      {
-        name: "source-delegated-decision-reference.crl",
-        language: "crl",
-        purpose:
-          "Exemplar B — SOURCE-REQUIRED delegation (§2/§5-B): the source NAMES a separate determination, so the policy chains to it with a BARE same-library `use decision`. NOT DRY/reuse factoring — chaining is faithful only because the source draws the boundary. The bare same-library delegation IS evaluated (recursed; the sub determination bubbles up), so the oracle names the DELEGATED disposition, not the sub-decision name. One parent + one delegated sub.",
-        source: SOURCE_DELEGATED_DECISION_REFERENCE_CRL,
-      },
-      {
-        name: "source-delegated-decision-reference.cel",
-        language: "cel",
-        purpose:
-          "Companion cases for exemplar B: the two delegated-path cases (continuation → the sub's Approve/Deny bubbles up) + the two parent-resolved cases. The kit's unit test asserts the continuation→Deny case's PATH goes through the delegated sub (not the parent `otherwise`) — §4-req1.",
-        source: SOURCE_DELEGATED_DECISION_REFERENCE_CEL,
-      },
-      {
-        name: "disposition-arbitration-reference.crl",
-        language: "crl",
-        purpose:
-          "Exemplar C — DISPOSITION-ARBITRATION (§1-refinement / §5-C / §6). Applicability GATE: use ONLY when a plain nested tree duplicates shared criteria across MANY overlapping pathways with outcome precedence + fall-through; for a FEW pathways prefer the plain tree (do not over-copy the sem-not arbitration). The TEMPTING-but-DON'T-chain case: ONE determination (source draws no boundary), precedence computed in the inference layer via pairwise-disjoint `sem-not` FINAL-* concepts as flat `when` siblings, approve criteria re-exposed as visible nodes (#168-clean), NO `use decision`. Two denies use DISTINCT activities (Deny vs Deny EIU) so `result is` distinguishes them.",
-        source: DISPOSITION_ARBITRATION_REFERENCE_CRL,
-      },
-      {
-        name: "disposition-arbitration-reference.cel",
-        language: "cel",
-        purpose:
-          "Companion cases for exemplar C (verified 6/6): each pathway alone (approve), BOTH load-bearing overlap cases (a both-indication patient who fails one pathway still approves via the other — no overlap-pop), within-indication failure (Deny), off-indication (Deny EIU).",
-        source: DISPOSITION_ARBITRATION_REFERENCE_CEL,
-      },
-      {
-        name: "patient-age-both-rep-reference.crl",
-        language: "crl",
-        purpose:
-          "The patient-age BOTH-REPRESENTATION exemplar — the SOLE `definition is` exception to Stage-1 'local `code is` only' (see rule patient-age-both-rep). ONE concept carries BOTH arms: `code is` (the LOCAL age Observation) + `definition is age today at least <N> years` (a live compute over `Patient.birthDate`). The Inferred layer recency-merges them (newest of the local `Observation.issued` vs `Patient.meta.lastUpdated` wins; indeterminate → session-fresh local-source wins); `Patient.birthDate` being a genuine clinical record that COMPUTES the age is what earns the carve-out. Engine-verified at `$r5.apply` (6 cases incl. the indeterminate-recency cell); the recency EXECUTION is not something asserted-only run_decision proves, so no companion CEL. AGE ONLY — do NOT generalize.",
-        source: PATIENT_AGE_BOTH_REP_REFERENCE_CRL,
-      },
-    ],
+    referenceArtifacts: REFERENCE_ARTIFACTS.filter((a) => inChain(a.edge)),
     examples: EXAMPLES,
-    verifyLoop: VERIFY_LOOP,
+    verifyLoop,
     judgeLens: JUDGE_LENS,
     feedbackUrl: FEEDBACK_URL,
-    boundary: BOUNDARY,
+    boundary: BOUNDARY_ENTRIES.filter((b) => inChain(b.edge)).map((b) => b.text),
   };
+  if (includesPriorAuth) {
+    base.facets = PRIOR_AUTH_FACETS;
+  }
+  return base;
 }
 
 function isStage(stage: string): stage is AuthoringStage {
   return (STAGES as readonly string[]).includes(stage);
 }
 
+function isUseCase(useCase: string): useCase is AuthoringUseCase {
+  return (USE_CASE_NAMES as readonly string[]).includes(useCase);
+}
+
 /**
- * Assemble the authoring kit for a stage. Throws on an unknown stage (the MCP
- * tool catches it and returns a tool error listing the valid stages).
+ * Assemble the authoring kit for a (stage, useCase). Throws on an unknown stage or useCase (the MCP tool catches
+ * it and returns a tool error listing the valid values). An OMITTED `useCase` resolves to the neutral `cpg` base
+ * — NOT PA. A PA author must pass `useCase:"prior-auth"` explicitly (fail-loud; never silent-PA). Omitted and
+ * explicit `"cpg"` return the byte-identical payload and the same `contentHash` (the default-note is out-of-band,
+ * in the MCP tool description — never a hashed payload delta).
  */
-export function getAuthoringKit(stage: string = DEFAULT_STAGE): AuthoringKit {
+export function getAuthoringKit(
+  stage: string = DEFAULT_STAGE,
+  useCase: string = DEFAULT_USE_CASE,
+): AuthoringKit {
   if (!isStage(stage)) {
     throw new Error(`Unknown authoring stage "${stage}". Valid stages: ${STAGES.join(", ")}.`);
   }
-  const base = buildBase(stage);
+  if (!isUseCase(useCase)) {
+    throw new Error(`Unknown authoring useCase "${useCase}". Valid useCases: ${USE_CASE_NAMES.join(", ")}.`);
+  }
+  const base = buildBase(stage, useCase);
   const contentHash = createHash("sha256").update(JSON.stringify(base)).digest("hex");
   return { ...base, contentHash };
 }

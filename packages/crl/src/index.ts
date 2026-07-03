@@ -67,11 +67,21 @@ export type {
   ActionView,
   ExplanationView,
 } from "./cre";
-export { getAuthoringKit, STAGES, DEFAULT_STAGE } from "./authoring-kit";
+export {
+  getAuthoringKit,
+  STAGES,
+  DEFAULT_STAGE,
+  USE_CASES,
+  USE_CASE_NAMES,
+  DEFAULT_USE_CASE,
+} from "./authoring-kit";
 export type {
+  AuthoringEdge,
   AuthoringKit,
   AuthoringStage,
+  AuthoringUseCase,
   ConceptLayerEntry,
+  KitFacet,
   KitRule,
   KitExample,
   ReferenceArtifact,

@@ -9,7 +9,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 
-import { getAuthoringKit, DEFAULT_STAGE } from "../authoring-kit";
+import { getAuthoringKit, DEFAULT_STAGE, DEFAULT_USE_CASE } from "../authoring-kit";
 import { emitCelToFhir } from "../cel/emitter";
 import { resolveCelImports } from "../cel/imports";
 import { validateCELFile } from "../cel/validator";
@@ -600,29 +600,32 @@ export function createServer(): McpServer {
   server.registerTool(
     "authoring_kit",
     {
-      title: "CRL authoring kit (stage-sliced)",
+      title: "CRL authoring kit (stage + useCase sliced)",
       description:
         "Return the self-contained authoring knowledge a Knowledge-Engineering agent needs to encode one " +
-        "CRL artifact for a given stage: a `forceModel` (how hard each rule binds — the validator-enforced / " +
-        "invariant / default FORCE levels, read first), the concept-layer model, authoring rules (decision " +
-        "shapes incl. the composition ladder + chaining necessity, guards, dispositions incl. PA determination " +
-        "handling, CEL cases, the verify loop) — each with a machine-readable `clauses` force breakdown, the " +
-        "grammar type allowlists (full + a stage-recommended subset), eleven validated reference artifacts " +
-        "embedded inline (CDS decision-reference.crl/.cel; criteria-decision-reference.crl/.cel — distinct " +
-        "criteria as decision-tree nodes + one `defined as` INFERENCE, #168; the shared " +
-        "medical-policy-determination.crl determination library; the pa-determination-reference.crl/.cel " +
-        "prior-authorization exemplar; source-delegated-decision-reference.crl/.cel — source-required bare " +
-        "same-library `use decision` delegation; and disposition-arbitration-reference.crl/.cel — the " +
-        "at-scale sem-not outcome arbitration for overlapping pathways), do/don't examples, a `judgeLens` " +
-        "rubric with TWO families (waivers — how to adjudicate the FINAL-mode provenance waivers " +
-        "validate_provenance surfaces; and composition — the decision-composition / chaining source-fidelity " +
-        "checks invented-determination-boundary / hollowed-criteria / dropped-or-added-criterion that have no " +
-        "mechanical home), and a feedback " +
-        "URL. The verify loop states what a green `run_decision` does AND does NOT prove (it is asserted-only " +
-        '— it never evaluates `code is`). v1 stage: "local-decision-support" (narrow: local `code is` sources ' +
-        "only; shallow: asserted concepts + `defined as` inference over one concept's representations; no `definition is` predicates or " +
-        "external sources). Returns the kit JSON incl. `schemaVersion` + a derived `contentHash`. Unknown " +
-        "stage → tool error listing valid stages.",
+        "CRL artifact for a given stage and USE CASE: a `forceModel` (how hard each rule binds — the " +
+        "validator-enforced / invariant / default FORCE levels, read first), the concept-layer model, " +
+        "authoring rules (decision shapes incl. the composition ladder + chaining necessity, guards, " +
+        "dispositions, CEL cases, the verify loop) — each with a machine-readable `clauses` force breakdown " +
+        "and an `edge` tag, the grammar type allowlists (full + a stage-recommended subset), validated " +
+        "reference artifacts embedded inline, do/don't examples, a `judgeLens` rubric with TWO families " +
+        "(waivers — how to adjudicate the FINAL-mode provenance waivers validate_provenance surfaces; and " +
+        "composition — the decision-composition / chaining source-fidelity checks invented-determination-" +
+        "boundary / hollowed-criteria / dropped-or-added-criterion that have no mechanical home), and a " +
+        "feedback URL. The verify loop states what a green `run_decision` does AND does NOT prove (it is " +
+        'asserted-only — it never evaluates `code is`). v1 stage: "local-decision-support" (narrow: local ' +
+        "`code is` sources only; shallow: asserted concepts + `defined as` inference over one concept's " +
+        "representations; no `definition is` predicates EXCEPT the sanctioned patient-age both-rep carve-out, " +
+        "and no external sources). " +
+        'USE CASE (#191 lattice): "cpg" (default) is the neutral base framework (≈ full CRL); "prior-auth" ' +
+        "adds the PA / medical-policy narrowings — the shared `Medical Policy Determination` library + its " +
+        "exemplars (criteria / pa-determination / source-delegated / disposition-arbitration), the " +
+        "pa-disposition-set rule (communicated-not-ordered / shared-lib membership / mutual-exclusivity / " +
+        "no-pend), the PA boundary items, and the advisory coverage `facets`. PA content is present ONLY with " +
+        '`useCase:"prior-auth"` — an omitted `useCase` returns the base cpg kit (NOT PA). Each useCase has its ' +
+        "own distinct, stable `contentHash`. Returns the kit JSON incl. `schemaVersion`, the resolved " +
+        "`useCase` + edge `chain`, and the derived `contentHash`. Unknown stage or useCase → tool error " +
+        "listing valid values.",
       inputSchema: {
         stage: z
           .string()
@@ -630,9 +633,15 @@ export function createServer(): McpServer {
           .describe(
             'Authoring stage. Default "local-decision-support". Unknown → error listing valid stages.',
           ),
+        useCase: z
+          .string()
+          .optional()
+          .describe(
+            'Specialization use case (#191). Default "cpg" (base framework). "prior-auth" adds the PA/medical-policy narrowings. Unknown → error listing valid useCases.',
+          ),
       },
     },
-    (args) => runAuthoringKit(args as { stage?: string }),
+    (args) => runAuthoringKit(args as { stage?: string; useCase?: string }),
   );
 
   server.registerTool(
@@ -935,12 +944,12 @@ function runValidateProvenance(
   }
 }
 
-function runAuthoringKit(args: { stage?: string }): {
+function runAuthoringKit(args: { stage?: string; useCase?: string }): {
   content: Array<{ type: "text"; text: string }>;
   isError?: boolean;
 } {
   try {
-    const kit = getAuthoringKit(args.stage ?? DEFAULT_STAGE);
+    const kit = getAuthoringKit(args.stage ?? DEFAULT_STAGE, args.useCase ?? DEFAULT_USE_CASE);
     return { content: [{ type: "text", text: JSON.stringify(kit, null, 2) }] };
   } catch (e) {
     return { content: [{ type: "text", text: (e as Error).message }], isError: true };

@@ -53,14 +53,35 @@ try {
     ]);
   });
 
-  await check("authoring_kit (default stage) → payload + embedded reference validates clean", async () => {
+  await check("authoring_kit (default = cpg base) → PA-free payload + embedded reference validates clean", async () => {
     const r = await client.callTool({ name: "authoring_kit", arguments: {} });
     assert.ok(!r.isError, "should not be a tool error");
     const kit = JSON.parse(r.content[0].text);
     assert.equal(kit.stage, "local-decision-support");
+    assert.equal(kit.useCase, "cpg"); // omitted useCase → the neutral base, NOT PA (#191, fail-loud)
+    assert.deepEqual(kit.chain, ["cpg"]);
     assert.match(kit.contentHash, /^[0-9a-f]{64}$/);
-    // Durable guard that the bundled server carries the full kit (not just a grep) — the 11-artifact set
-    // (A criteria-decision + decision + shared determination lib + PA + B source-delegated + C disposition-arbitration).
+    // The bundled server ships the un-fused cpg base — the PA-FREE artifact set (pure-CDS decision + patient-age).
+    assert.deepEqual(kit.referenceArtifacts.map((a) => a.name).sort(), [
+      "decision-reference.cel",
+      "decision-reference.crl",
+      "patient-age-both-rep-reference.crl",
+    ]);
+    // No PA content leaked into the base bundle.
+    assert.ok(!JSON.stringify(kit).match(/Medical Policy Determination|Pended|HCR01/), "cpg base must be PA-free");
+    const crl = kit.referenceArtifacts.find((a) => a.name === "decision-reference.crl").source;
+    const v = JSON.parse((await client.callTool({ name: "validate_crl", arguments: { code: crl } })).content[0].text);
+    assert.equal(v.success, true, "embedded reference CRL must validate clean through the bundled server");
+  });
+
+  await check("authoring_kit useCase:'prior-auth' → the full inherited 12-artifact set + advisory facets", async () => {
+    const r = await client.callTool({ name: "authoring_kit", arguments: { useCase: "prior-auth" } });
+    assert.ok(!r.isError, "should not be a tool error");
+    const kit = JSON.parse(r.content[0].text);
+    assert.equal(kit.useCase, "prior-auth");
+    assert.deepEqual(kit.chain, ["cpg", "prior-auth"]);
+    // Durable guard that the bundled server carries the full PA kit — the 12-artifact set
+    // (A criteria-decision + decision + shared determination lib + PA + B source-delegated + C disposition-arbitration + patient-age).
     assert.deepEqual(kit.referenceArtifacts.map((a) => a.name).sort(), [
       "criteria-decision-reference.cel",
       "criteria-decision-reference.crl",
@@ -75,15 +96,21 @@ try {
       "source-delegated-decision-reference.cel",
       "source-delegated-decision-reference.crl",
     ]);
-    const crl = kit.referenceArtifacts.find((a) => a.name === "decision-reference.crl").source;
-    const v = JSON.parse((await client.callTool({ name: "validate_crl", arguments: { code: crl } })).content[0].text);
-    assert.equal(v.success, true, "embedded reference CRL must validate clean through the bundled server");
+    // The PA edge carries the shared determination lib + the advisory coverage facets.
+    assert.ok(kit.referenceArtifacts.some((a) => a.name === "medical-policy-determination.crl"));
+    assert.ok(Array.isArray(kit.facets) && kit.facets.length === 3, "prior-auth carries the 3 advisory facets");
   });
 
   await check("authoring_kit unknown stage → isError listing valid stages", async () => {
     const r = await client.callTool({ name: "authoring_kit", arguments: { stage: "emit" } });
     assert.equal(r.isError, true);
     assert.match(r.content[0].text, /local-decision-support/);
+  });
+
+  await check("authoring_kit unknown useCase → isError listing valid useCases", async () => {
+    const r = await client.callTool({ name: "authoring_kit", arguments: { useCase: "measure" } });
+    assert.equal(r.isError, true);
+    assert.match(r.content[0].text, /Unknown authoring useCase|cpg|prior-auth/);
   });
 
   await check("run_decision via path → dme101-030.cel: 3 cases pass the result-is oracle", async () => {

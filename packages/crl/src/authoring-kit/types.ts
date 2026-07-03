@@ -11,6 +11,35 @@
 /** Authoring slices. v1 ships exactly one; the param exists for forward-compat. */
 export type AuthoringStage = "local-decision-support";
 
+/**
+ * A specialization EDGE — the tag on a unit of kit content (#191 lattice). `cpg` is the base framework
+ * (≈ full CRL, the FHIR CPG IG); `prior-auth` is the PA/medical-policy narrowing that inherits down from it.
+ * Enforcement inherits down the chain: a `prior-auth` kit carries all `cpg` content plus the `prior-auth`
+ * narrowings. Measure is a RESERVED sibling edge (documented, not shipped) — do NOT read the two-value union
+ * as the closed set of future edges.
+ */
+export type AuthoringEdge = "cpg" | "prior-auth";
+
+/**
+ * A selectable USE CASE — resolves (by NAME, never by index) to an ordered chain of edges. `cpg` → `["cpg"]`;
+ * `prior-auth` → `["cpg", "prior-auth"]`. Consumers traverse the chain by name so inserting a reserved edge
+ * later is a non-breaking length change.
+ */
+export type AuthoringUseCase = "cpg" | "prior-auth";
+
+/**
+ * An ADVISORY, above-edge coverage FACET (#191). A named dimension the PA edge surfaces but whose taxonomy
+ * LEVEL is not yet frozen (pending the second domain edge). Explicitly a distinct channel from `rules`/`clauses`:
+ * it carries NO resolvable `test` anchor and NO force — a consumer must NOT anchor selection or inheritance to it.
+ */
+export interface KitFacet {
+  id: string;
+  name: string;
+  /** Reserved — the facet's home level is TBD until the second edge forces it. */
+  status: "home-TBD";
+  note: string;
+}
+
 /** One concept-body form and whether it is in scope for the stage. */
 export interface ConceptLayerEntry {
   /** The CRL surface form, e.g. "- code is `code`.". */
@@ -54,6 +83,12 @@ export interface KitRuleClause {
 export interface KitRule {
   id: string;
   category: "decision-shape" | "guards" | "concept-model" | "dispositions" | "minimalism" | "cel" | "process";
+  /**
+   * The specialization edge this rule belongs to (#191). EXPLICIT on every rule — a `prior-auth` rule is
+   * assembled only into a chain that includes `prior-auth`; a `cpg` rule is in every chain. No implicit default
+   * (an omitted edge would let a PA rule silently ship in the neutral base).
+   */
+  edge: AuthoringEdge;
   rule: string;
   why?: string;
   /** Doc path and/or validator rule-name this derives from (not a paraphrase to trust blindly). */
@@ -88,6 +123,12 @@ export interface KitExample {
 export interface ReferenceArtifact {
   name: string;
   language: "crl" | "cel";
+  /**
+   * The specialization edge this artifact belongs to (#191), CLOSURE-CORRECT: an artifact's edge is ≥ the edge
+   * of every artifact it references (an exemplar that recommends into the shared `Medical Policy Determination`
+   * library rides `prior-auth` with that library, so a `cpg` kit never ships a determination ref it cannot resolve).
+   */
+  edge: AuthoringEdge;
   purpose: string;
   /** The complete artifact text. */
   source: string;
@@ -114,8 +155,12 @@ export interface VerifyLoop {
    * methodology check the KE applies per policy (not a static kit test and not a source-fidelity judge call).
    * Pairs with the `judgeLens.composition:<check>` anchor for source-fidelity invariants; together they make
    * EVERY invariant clause's `test` resolve to a real check (the anti-fake-green guarantee).
+   *
+   * Each requirement carries an `edge` (#191): a `prior-auth` requirement is assembled only into a chain that
+   * includes `prior-auth`, so it is present exactly when the `prior-auth` clause that anchors it is — the
+   * per-useCase resolve check never dangles.
    */
-  methodologyRequirements: { id: string; text: string }[];
+  methodologyRequirements: { id: string; edge: AuthoringEdge; text: string }[];
 }
 
 /**
@@ -166,9 +211,13 @@ export interface JudgeLens {
 export interface AuthoringKit {
   /** Contract-shape version; bump when this interface changes. */
   schemaVersion: string;
-  /** sha256 of the rest of the payload — the unforgeable drift identity. */
+  /** sha256 of the rest of the payload — the unforgeable drift identity (distinct + stable per useCase). */
   contentHash: string;
   stage: AuthoringStage;
+  /** The resolved use case this payload was assembled for (#191). Omitted `useCase` resolves to `cpg` (the base). */
+  useCase: AuthoringUseCase;
+  /** The resolved edge chain, name-order (`cpg` → `["cpg"]`; `prior-auth` → `["cpg", "prior-auth"]`). */
+  chain: AuthoringEdge[];
   summary: string;
   /** How an agent must apply the rules — the FORCE levels (§0). Read first. */
   forceModel: ForceModel;
@@ -187,4 +236,10 @@ export interface AuthoringKit {
   feedbackUrl: string;
   /** What this kit does NOT cover (descriptive boundary, not a roadmap of named future stages). */
   boundary: string[];
+  /**
+   * ADVISORY above-edge coverage facets (#191) — present only when the chain includes `prior-auth`. A distinct
+   * channel from `rules`: no `test`, no force. Reserved dimensions whose taxonomy level is not frozen until the
+   * second domain edge — do NOT anchor selection or inheritance to them.
+   */
+  facets?: KitFacet[];
 }

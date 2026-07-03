@@ -31,9 +31,9 @@ always offered, so a matched branch can never produce nothing.
 
 SIGNPOST — this is a CDS exemplar: "Order MRI"/"Order CT" are CPGServiceRequest
 service ORDERS, correct here because CDS recommends the clinician ORDER a service.
-A PA / medical-policy DETERMINATION is different: it COMMUNICATES Approve/Deny via
-the shared "Medical Policy Determination" library — do NOT copy this order pattern
-into coverage content; see pa-determination-reference.
+DISPOSITION TYPE follows the ACT: an act that is COMMUNICATED rather than ordered
+uses CPGCommunicationRequest instead — do NOT copy this order pattern where the act
+is a communicated decision (see the dispositions rule).
 */
 
 // ============ Concepts (local case-features: type is + code is only) ============

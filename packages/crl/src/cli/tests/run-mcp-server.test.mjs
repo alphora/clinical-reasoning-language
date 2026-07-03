@@ -52,42 +52,50 @@ try {
     ]);
   });
 
-  await check("authoring_kit (default stage) → local-decision-support payload with embedded reference artifacts", async () => {
+  await check("authoring_kit (default = cpg base) → PA-free local-decision-support payload", async () => {
     const r = await client.callTool({ name: "authoring_kit", arguments: {} });
     assert.ok(!r.isError, "should not be a tool error");
     const kit = JSON.parse(r.content[0].text);
     assert.equal(kit.stage, "local-decision-support");
+    assert.equal(kit.useCase, "cpg"); // omitted useCase → the neutral base, NOT PA (#191)
+    assert.deepEqual(kit.chain, ["cpg"]);
     assert.equal(typeof kit.schemaVersion, "string");
     assert.match(kit.contentHash, /^[0-9a-f]{64}$/);
     assert.ok(Array.isArray(kit.rules) && kit.rules.length > 0);
     assert.ok(Array.isArray(kit.typeAllowlist.conceptTypes) && kit.typeAllowlist.conceptTypes.includes("Condition"));
+    // The un-fused cpg base carries only the PA-FREE artifacts (pure-CDS decision + patient-age).
     const refNames = kit.referenceArtifacts.map((a) => a.name).sort();
     assert.deepEqual(refNames, [
-      "criteria-decision-reference.cel",
-      "criteria-decision-reference.crl",
       "decision-reference.cel",
       "decision-reference.crl",
-      "disposition-arbitration-reference.cel",
-      "disposition-arbitration-reference.crl",
-      "medical-policy-determination.crl",
-      "pa-determination-reference.cel",
-      "pa-determination-reference.crl",
       "patient-age-both-rep-reference.crl",
-      "source-delegated-decision-reference.cel",
-      "source-delegated-decision-reference.crl",
     ]);
+    assert.ok(!JSON.stringify(kit).match(/Medical Policy Determination|Pended|HCR01/), "cpg base must be PA-free");
     assert.ok(kit.verifyLoop.doesNotProve.length > 0, "verifyLoop must state what a green run does NOT prove");
-    // 1.2 shape additions: the force model (§0) + the composition judge-lens family (§2/§3).
-    // 1.3: the tightly-scoped patient-age both-representation exception (the one `definition is` carve-out).
-    assert.equal(kit.schemaVersion, "1.3");
-    // Sibling KE agents pin BOTH schemaVersion + contentHash via MCP — pin the served hash so a bundle drift is caught here too.
-    assert.equal(kit.contentHash, "f8f52281ff2e78729d30374409ac2ba4d11ac5554fd8e651171b454beba165f1");
+    // 1.4: the `useCase` specialization axis (#191). Pin the SCHEMA + the cpg-base hash — a bundle drift is caught here too.
+    assert.equal(kit.schemaVersion, "1.4");
+    assert.equal(kit.contentHash, "af8dc593e0a7ddcb811dd5f265cdcd342cb5cd6a011cbc8510ff6d026846ed2d");
     assert.ok(Array.isArray(kit.forceModel.levels) && kit.forceModel.levels.length === 3, "forceModel must carry the 3 force levels");
     assert.ok(Array.isArray(kit.judgeLens.composition) && kit.judgeLens.composition.length > 0, "judgeLens.composition must be present");
     // `defined as` inference is in-scope this stage (#126, #168); predicates/external out.
     const scopeOf = (frag) => kit.conceptLayerModel.find((e) => e.form.includes(frag))?.scope;
     assert.equal(scopeOf("defined as"), "in");
     assert.equal(scopeOf("definition is"), "out");
+  });
+
+  await check("authoring_kit useCase:'prior-auth' → the full inherited PA kit + pinned hash", async () => {
+    const r = await client.callTool({ name: "authoring_kit", arguments: { useCase: "prior-auth" } });
+    assert.ok(!r.isError, "should not be a tool error");
+    const kit = JSON.parse(r.content[0].text);
+    assert.equal(kit.useCase, "prior-auth");
+    assert.deepEqual(kit.chain, ["cpg", "prior-auth"]);
+    assert.equal(kit.schemaVersion, "1.4");
+    // Sibling KE (PA) agents pin BOTH schemaVersion + the prior-auth contentHash via MCP — pin it here too.
+    assert.equal(kit.contentHash, "574220918008614250d0477602f34fedde1df3d56755c7c6b7a1a323d7ad1ac1");
+    const refNames = kit.referenceArtifacts.map((a) => a.name).sort();
+    assert.equal(refNames.length, 12);
+    assert.ok(refNames.includes("medical-policy-determination.crl"));
+    assert.ok(Array.isArray(kit.facets) && kit.facets.length === 3, "prior-auth carries the 3 advisory facets");
   });
 
   await check("authoring_kit embedded decision-reference.crl validates clean via validate_crl", async () => {
