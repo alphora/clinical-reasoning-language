@@ -18,6 +18,7 @@ const require = createRequire(import.meta.url);
 // The cockpit SHELL source text — for the HOST-side lifecycle wiring that lives outside the bundled webview SCRIPT string
 // (the ack-drive of the marker is host code, not in COCKPIT_WEBVIEW_SCRIPT). A coarse but load-bearing source-grep lock.
 const COCKPIT_SRC = readFileSync(resolve(here, "correspondenceCockpit.ts"), "utf8");
+const ENGINE_SRC = readFileSync(resolve(here, "correspondenceEngine.ts"), "utf8");
 
 // esbuild plugin: resolve `vscode` to an empty CJS module (the cockpit never touches vscode at import time).
 const stubVscode = {
@@ -84,6 +85,20 @@ function handlerClick() {
   }
   return SCRIPT.slice(start + marker.length, i - 1);
 }
+
+// disc 179: the shell-local `PANES` array (correspondenceCockpit.ts) is a SILENT-FAILURE list — a bare `Pane[]`, NOT
+// compiler-forced to be exhaustive. Omitting a pane (as happened for `worklist` in the split) leaves that pane un-rendered
+// with no error. Lock it to the engine's `Pane` union so the two can't drift.
+check("DRIFT GUARD: the shell PANES list contains every engine `Pane` union member", () => {
+  const uni = ENGINE_SRC.match(/export type Pane =([^;]+);/);
+  assert.ok(uni, "engine Pane union found");
+  const enginePanes = [...uni[1].matchAll(/"([a-z]+)"/g)].map((m) => m[1]);
+  assert.ok(enginePanes.length >= 6 && enginePanes.includes("worklist"), `parsed engine panes: ${enginePanes}`);
+  const shell = COCKPIT_SRC.match(/const PANES: Pane\[\] = \[([^\]]+)\]/);
+  assert.ok(shell, "shell PANES array found");
+  const shellPanes = [...shell[1].matchAll(/"([a-z]+)"/g)].map((m) => m[1]);
+  for (const p of enginePanes) assert.ok(shellPanes.includes(p), `shell PANES is missing engine pane "${p}" (silent-render bug)`);
+});
 
 check("sanity: the review-overlay handlers + clrRO exist in the extracted script", () => {
   assert.match(SCRIPT, /const clrRO=\(\)=>\{/, "clrRO is defined");

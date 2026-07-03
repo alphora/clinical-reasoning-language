@@ -104,17 +104,17 @@ import { discoverProvenance, findPolicySrc, PANEL_VALIDATION_MODE } from "./prov
 import { buildViewerModel, type ViewerModel } from "./provenanceViewer";
 import { renderSourcePane, type OverlaySpan, type UnitSpan } from "./sourcePaneHtml";
 
-const PANES: Pane[] = ["source", "crl", "cel", "tree", "questionnaire"]; // all panes (render/clearPending/reveal fan-out); tree + questionnaire are opt-in (questionnaire is MV-only)
+const PANES: Pane[] = ["source", "crl", "cel", "tree", "questionnaire", "worklist"]; // all panes (render/clearPending/reveal fan-out); tree/questionnaire/worklist opt-in; MUST stay in lockstep with engine `Pane` (silent-failure list — not compiler-checked; disc 179)
 // The panes the navigator can WALK (primary/cycle/config-primary). tree is render+reveal+peek-only, never a primary —
 // so it is absent here. Used to build the setPrimary quickpick + guard config-primary against a stray "tree".
 const PRIMARY_PANES: PrimaryPane[] = ["source", "crl", "cel"];
 // Column slots by position (explicit, not ViewColumn arithmetic). A pane's column = its index among the OPEN panes in
-// the user's paneOrder (so hiding a pane never leaves a column gap). FIVE slots: the MV spec's valid set is up to 5
-// distinct INTERNAL panes (worklist/cel dedup to one of {source, cel, tree, questionnaire, crl}), so a user MV paneOrder
-// listing crl alongside the 4-pane default must get a 5th column instead of piling onto column One (VS Code supports up
-// to 9). The default MV set stays 4 (worklist/source/tree/questionnaire); this only bounds the overflow case.
-const ORDERED_COLUMNS = [vscode.ViewColumn.One, vscode.ViewColumn.Two, vscode.ViewColumn.Three, vscode.ViewColumn.Four, vscode.ViewColumn.Five];
-const PANE_TITLE: Record<Pane, string> = { source: "Source", crl: "CRL", cel: "CEL", tree: "Tree", questionnaire: "Questionnaire" };
+// the user's paneOrder (so hiding a pane never leaves a column gap). SIX slots: since the pane split (disc 179) worklist +
+// cel are DISTINCT internal panes, so MV's valid set is up to 6 (worklist, cel, source, tree, questionnaire, crl) — a user
+// paneOrder listing all six must get a 6th column instead of piling onto column One via the `?? One` fallback (VS Code
+// supports up to 9). The default MV set stays 4 (worklist/source/tree/questionnaire); this only bounds the overflow case.
+const ORDERED_COLUMNS = [vscode.ViewColumn.One, vscode.ViewColumn.Two, vscode.ViewColumn.Three, vscode.ViewColumn.Four, vscode.ViewColumn.Five, vscode.ViewColumn.Six];
+const PANE_TITLE: Record<Pane, string> = { source: "Source", crl: "CRL", cel: "CEL", tree: "Tree", questionnaire: "Questionnaire", worklist: "Worklist" };
 // Perf gate (disc 118): the measured full-render floor. Over → fall back to a navigation-only placeholder, don't freeze.
 const MAX_SOURCE_CHARS = 200_000;
 const MAX_SOURCE_MARKS = 2000;
@@ -205,21 +205,20 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   const paneSpecFor = (m: "cockpit" | "medical-validation"): PaneSpec =>
     m === "medical-validation" ? MEDICAL_VALIDATION_PANE_SPEC : COCKPIT_PANE_SPEC;
   /** A pane's webview-panel title, reflecting the MODE (#156 slice 3). In medical-validation mode the panels carry a
-   *  "CRL Medical Validation" prefix; the "cel" pane reads "Worklist" (it IS the worklist pane — the checkbox render is
-   *  slice 4, so here it's only the label that changes). Cockpit titles stay exactly "Source"/"CRL"/"CEL"/"Tree". */
+   *  "CRL Medical Validation" prefix. Since the pane split (disc 179) the `worklist` pane carries its own title ("Worklist")
+   *  and the `cel` pane reads "CEL" in BOTH modes (it's the read-only case-list now, not the worklist). */
   const paneTitle = (pane: Pane): string =>
-    mode === "medical-validation"
-      ? `CRL Medical Validation · ${pane === "cel" ? "Worklist" : PANE_TITLE[pane]}`
-      : PANE_TITLE[pane];
+    mode === "medical-validation" ? `CRL Medical Validation · ${PANE_TITLE[pane]}` : PANE_TITLE[pane];
   /** The navigable primary panes for the current mode (#156 slice 3, FIX 2). MV's primary enum is [source, cel] (no crl —
    *  it has no CRL pane in the default and its config enum excludes crl), so the set-primary quickpick + the persisted
    *  guard must reject "crl" in MV mode. Cockpit keeps the full [source, crl, cel]. */
   const primaryPanesForMode = (m: "cockpit" | "medical-validation"): PrimaryPane[] =>
     m === "medical-validation" ? ["source", "cel"] : PRIMARY_PANES;
-  /** The set-primary quickpick LABEL for a pane in the current mode — in MV the cel pane reads "Worklist" (the worklist
-   *  alias), matching the pane title; cockpit uses the plain pane titles. */
+  /** The set-primary quickpick LABEL for a pane in the current mode. The `cel` PRIMARY is the case-navigation kind (a case
+   *  selection is `{primary:"cel"}` regardless of whether it's surfaced in the Worklist or the read-only CEL pane), so in
+   *  MV it reads the pane-neutral "Cases" — NOT "Worklist" (which is now a distinct pane, disc 179). Cockpit uses "CEL". */
   const primaryLabel = (p: PrimaryPane): string =>
-    mode === "medical-validation" && p === "cel" ? "Worklist" : PANE_TITLE[p];
+    mode === "medical-validation" && p === "cel" ? "Cases" : PANE_TITLE[p];
   const coord = new PaneRevealCoordinator();
   let model: ViewerModel | undefined;
   let correspondence: CorrespondenceModel | undefined;
@@ -493,14 +492,17 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       else if (pane === "crl" || pane === "tree") highlightRows(v, crlAnchorsForUnits([target.id], m));
       // CEL: the unit's artifact cases (block-level) + the fact spans referencing its concepts (C2c-2b reverse, facts first)
       else if (pane === "cel") highlightRows(v, reverseCelAnchors(conceptKeysForUnit(target.id, m), caseIdsForUnit(target.id, m), conceptToFactAnchors));
+      // WORKLIST (disc 179): the same case rows, but NO fact-peek spans (the worklist render omits them), so just the case blocks.
+      else if (pane === "worklist") highlightRows(v, caseIdsForUnit(target.id, m));
     } else if (target.kind === "crlNode") {
       // #166 3b: a decision row → itself THEN the concepts it surfaces (direct refKeys + their contained sub-concepts).
       if (pane === "crl" || pane === "tree") highlightRows(v, [target.id, ...conceptNodesForRow(target.id, m)]);
       else if (pane === "source") highlightRows(v, unitsForRow(target.id, m)); // crl node → its source units (direct)
       else if (pane === "cel") highlightRows(v, reverseCelAnchors(conceptKeysForNode(target.id, m), caseIdsForNode(target.id, m), conceptToFactAnchors));
+      else if (pane === "worklist") highlightRows(v, caseIdsForNode(target.id, m)); // case blocks only (no fact spans)
     } else {
-      // celCase
-      if (pane === "cel") highlightRows(v, [target.id]);
+      // celCase — both case-display panes light the same case block/row (fanned to each; each paints its own DOM).
+      if (pane === "cel" || pane === "worklist") highlightRows(v, [target.id]);
       else if (pane === "source") highlightRows(v, unitsForCase(target.id, m).filter((u) => m.sourceBearingUnits.has(u)));
       // #166 3b-fix: case → its units' driving decisions (direct + containment) AND their applicable concept rows.
       else if (pane === "crl" || pane === "tree") highlightRows(v, crlAnchorsForUnits(unitsForCase(target.id, m), m));
@@ -1000,16 +1002,28 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       v.reveals = r.reveals;
       void v.panel.webview.postMessage({ type: "render", html: r.html, gen, indexVersion });
     } else if (pane === "cel") {
-      // CEL pane — condensed scenario cases (C2c-1). In MV mode the worklist option turns on the 3-state review checkbox
-      // per case (#156 slice 4); cockpit passes enabled:false → byte-identical to before. `worklistActions` is captured
-      // atomically with this render's anchors (gen-scoped keys), mirroring conceptToFactAnchors.
+      // CEL pane — the READ-ONLY condensed scenario cases (C2c-1). Since the pane split (disc 179) this pane NEVER renders
+      // the worklist UI (that's the separate `worklist` pane); it's the case-list slated to become the typed-hole editor.
+      // It OWNS `conceptToFactAnchors` (the fact-peek reverse map) — the worklist render omits fact spans, so this global is
+      // set ONLY here (no clobber between the two case-display panes). It does NOT touch `worklistActions`.
       const r = scenarios
-        ? renderCelPane(scenarios, caseIdByName, { revealPrefix: `g${gen}_`, revealableConceptKeys, caseKeyNumbers, showKeys, duplicateScenarioNames, worklist: { enabled: mode === "medical-validation", statesByCaseId: reviewByCaseId, policyLabel: currentCel ? basename(currentCel).replace(/\.(cel|crl)$/i, "") : undefined, notesByCaseId, openNotesCaseId, editingNoteId } })
-        : { html: '<p class="placeholder">No CEL.</p>', anchors: {}, reveals: {}, conceptToFactAnchors: {} }; // worklistActions omitted (cockpit discipline; `r.worklistActions ?? {}` below absorbs it)
+        ? renderCelPane(scenarios, caseIdByName, { revealPrefix: `g${gen}_`, revealableConceptKeys, caseKeyNumbers, showKeys, duplicateScenarioNames })
+        : { html: '<p class="placeholder">No CEL.</p>', anchors: {}, reveals: {}, conceptToFactAnchors: {} };
       v.anchors = r.anchors;
       v.reveals = r.reveals;
-      conceptToFactAnchors = r.conceptToFactAnchors; // captured atomically with this render's anchors (gen-scoped keys)
-      worklistActions = r.worklistActions ?? {}; // captured atomically with this render's anchors (MV-only; {} in cockpit)
+      conceptToFactAnchors = r.conceptToFactAnchors; // fact-peek reverse map — cel-pane-owned (captured atomically w/ anchors)
+      void v.panel.webview.postMessage({ type: "render", html: r.html, gen, indexVersion });
+    } else if (pane === "worklist") {
+      // WORKLIST pane (disc 179) — the MV review surface: renderCelPane WITH worklist opts (verdict dropdowns, notes, row
+      // numbers). Fact-peek is OFF here (revealableConceptKeys OMITTED → no fact spans, empty conceptToFactAnchors), so it
+      // never touches the cel-pane-owned fact map. It OWNS `worklistActions` (the opaque-key → caseId map the verdict/notes
+      // handlers resolve) — set ONLY here, so a read-only `cel` render can't clobber it.
+      const r = scenarios
+        ? renderCelPane(scenarios, caseIdByName, { revealPrefix: `g${gen}_`, caseKeyNumbers, showKeys, duplicateScenarioNames, worklist: { enabled: true, statesByCaseId: reviewByCaseId, policyLabel: currentCel ? basename(currentCel).replace(/\.(cel|crl)$/i, "") : undefined, notesByCaseId, openNotesCaseId, editingNoteId } })
+        : { html: '<p class="placeholder">No CEL.</p>', anchors: {}, reveals: {}, conceptToFactAnchors: {}, worklistActions: {} };
+      v.anchors = r.anchors;
+      v.reveals = r.reveals;
+      worklistActions = r.worklistActions ?? {}; // worklist-pane-owned (captured atomically with this render's anchors)
       void v.panel.webview.postMessage({ type: "render", html: r.html, gen, indexVersion });
     } else if (pane === "tree") {
       // tree — the graphical decision-tree flowchart (T2 renderer). Same structure + concept inputs as the CRL pane; its
@@ -1530,7 +1544,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     if (!isReviewState(value)) return; // trusted-input guard: drop any value not in the known state set
     const next = setReviewState(reviewByCaseId, action.caseId, value);
     if (!persistMv(next, notesByCaseId)) return; // save (both maps) failed → memory + disk untouched
-    renderPane("cel"); // single-pane re-render (the dropdown selection); re-drive the selection so its highlight survives
+    renderPane("worklist"); // single-pane re-render (the dropdown selection); re-drive the selection so its highlight survives
     // #156 slice 6: the reviewed/pending counts changed → refresh the tree-chrome progress readout (no tree re-render). The
     // selection-dispatch path below ALSO renders chrome (dispatch → driveFailedCriteriaPeek → renderTreeChrome), so only
     // call renderTreeChrome here when there's NO selection (else the chrome would post twice for a selected toggle).
@@ -1553,14 +1567,14 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     if (!action) return;
     openNotesCaseId = openNotesCaseId === action.caseId ? undefined : action.caseId;
     editingNoteId = undefined;
-    renderPane("cel");
+    renderPane("worklist");
   }
 
   function closeNotes(): void {
     if (openNotesCaseId === undefined && editingNoteId === undefined) return; // nothing open → no-op (skip a wasted render)
     openNotesCaseId = undefined;
     editingNoteId = undefined;
-    renderPane("cel");
+    renderPane("worklist");
   }
 
   /** True iff the posted noteId is a live note in the OPEN drawer's case — the trusted-input gate for edit/save/delete. */
@@ -1577,13 +1591,13 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     if (!text) return; // empty/blank → no-op (never create an invisible note that inflates the glyph count)
     const note: Note = { id: randomUUID(), text, created: Date.now() };
     if (!persistMv(reviewByCaseId, addNote(notesByCaseId, action.caseId, note))) return;
-    renderPane("cel"); // glyph count + thread update; verdict counts unchanged → no overlay/progress re-drive
+    renderPane("worklist"); // glyph count + thread update; verdict counts unchanged → no overlay/progress re-drive
   }
 
   function startEditNote(noteId: unknown): void {
     if (mode !== "medical-validation" || !openNoteExists(noteId)) return;
     editingNoteId = noteId;
-    renderPane("cel"); // re-render so the note becomes a prefilled textarea (host-state-driven edit-in-place)
+    renderPane("worklist"); // re-render so the note becomes a prefilled textarea (host-state-driven edit-in-place)
   }
 
   function saveEditNote(noteId: unknown, value: unknown): void {
@@ -1592,20 +1606,20 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     if (!text) return; // an emptied edit is a no-op — Delete is the explicit removal path; keep the original text
     if (!persistMv(reviewByCaseId, editNote(notesByCaseId, openNotesCaseId, noteId, text, Date.now()))) return;
     editingNoteId = undefined;
-    renderPane("cel");
+    renderPane("worklist");
   }
 
   function cancelEditNote(): void {
     if (editingNoteId === undefined) return;
     editingNoteId = undefined;
-    renderPane("cel");
+    renderPane("worklist");
   }
 
   function deleteNoteFromWebview(noteId: unknown): void {
     if (mode !== "medical-validation" || !mvSidecarPath || openNotesCaseId === undefined || !openNoteExists(noteId)) return;
     if (!persistMv(reviewByCaseId, deleteNote(notesByCaseId, openNotesCaseId, noteId))) return;
     if (editingNoteId === noteId) editingNoteId = undefined; // deleted the note that was being edited
-    renderPane("cel"); // the drawer stays OPEN even if the thread is now empty (glyph flips to outline)
+    renderPane("worklist"); // the drawer stays OPEN even if the thread is now empty (glyph flips to outline)
   }
 
   /** Run a show command: guard re-entrancy (FIX 6), pick a .cel, open the panel in `targetMode`. */
@@ -1704,11 +1718,10 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   const setPrimaryCmd = vscode.commands.registerCommand("crl.cockpit.setPrimary", () => {
     if (!currentCel || !model) return; // not shown yet → don't switch + persist before the cockpit exists
     // FIX 2: iterate the MODE's navigable primaries (tree is never a primary; MV excludes crl) — so MV offers only
-    // Source + the cel pane labeled "Worklist", and cockpit offers Source/CRL/CEL.
+    // Source + the case primary (labeled "Cases", surfaced in the Worklist + read-only CEL panes), cockpit offers Source/CRL/CEL.
     const items: (vscode.QuickPickItem & { value: PrimaryPane })[] = primaryPanesForMode(mode).map((p) => ({
       label: `${primaryLabel(p)}${p === state.primary ? "  •" : ""}`,
-      description:
-        p === "source" ? "source units" : p === "crl" ? "CRL decision nodes" : mode === "medical-validation" ? "CEL cases (worklist)" : "CEL cases",
+      description: p === "source" ? "source units" : p === "crl" ? "CRL decision nodes" : "CEL cases",
       value: p,
     }));
     void vscode.window.showQuickPick(items, { placeHolder: "Navigator primary pane" }).then((pick) => {

@@ -316,7 +316,7 @@
           ],
           "default": "cel",
           "scope": "window",
-          "description": "The Medical Validation panel's default primary pane — which pane the navigator walks. 'cel' (default) lists CEL cases (the worklist); 'source' lists source units. Set per-window; switch live with 'CRL: Set Navigator Primary Pane'."
+          "description": "The Medical Validation panel's default primary pane — which list the navigator walks. 'cel' (default) navigates the scenario cases (surfaced in the Worklist, and in the read-only CEL pane if opened); 'source' lists source units. Set per-window; switch live with 'CRL: Set Navigator Primary Pane'."
         },
         "crl.medical-validation.paneOrder": {
           "type": "array",
@@ -338,7 +338,7 @@
             "questionnaire"
           ],
           "scope": "window",
-          "description": "Left-to-right column order of the Medical Validation panel's panes. 'worklist' (the CEL pane in worklist mode), 'source', 'tree', and 'questionnaire' (the read-only path questionnaire for the selected case) are shown by default; 'crl' and 'cel' can be added. ('worklist' and 'cel' are the same underlying pane, so listing both keeps the first.) Set it in User settings to persist across all projects, or in Workspace settings for one project. A malformed list is repaired automatically. Changes apply live to open panes."
+          "description": "Left-to-right column order of the Medical Validation panel's panes. 'worklist' (the review surface — verdicts + notes), 'source', 'tree', and 'questionnaire' (the read-only path questionnaire for the selected case) are shown by default; 'crl' and 'cel' (the read-only case list) can be added. 'worklist' and 'cel' are now SEPARATE panes, so listing both opens both. Set it in User settings to persist across all projects, or in Workspace settings for one project. A malformed list is repaired automatically. Changes apply live to open panes."
         },
         "crl.medical-validation.showKeys": {
           "type": "boolean",

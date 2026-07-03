@@ -9,7 +9,11 @@ import type { CycleStep } from "./provenanceViewer";
 // walks (cycle/select/config-primary). The graphical decision-tree pane ("tree") is render + reveal + peek-only: it is a
 // reveal target (in `Pane`) but is NEVER a navigator primary (not in `PrimaryPane`), so `State.primary`/`Selection.primary`
 // and the next/prev cycle stay 3-valued while reveals fan out to all four panes.
-export type Pane = "source" | "crl" | "cel" | "tree" | "questionnaire";
+// `worklist` is the MV review surface (verdicts/notes) — a SEPARATE pane from `cel` (the read-only case-list, slated to
+// become the typed-hole editor, #71/#156). Like `tree`/`questionnaire` it is a reveal target but NOT a navigable primary:
+// a case selection stays `{primary:"cel", caseId}` and its `celCase` reveal fans out to the worklist too, so clicking a
+// worklist row and selecting a case highlight in lockstep across both case-display panes without a new selection kind.
+export type Pane = "source" | "crl" | "cel" | "tree" | "questionnaire" | "worklist";
 export type PrimaryPane = "source" | "crl" | "cel";
 
 /** Compact engine input — derived by the shell from C1's ViewerModel. No bulky content. */
@@ -77,7 +81,7 @@ export function initialState(): State {
   // questionnaire (the MV read-only questionnaire pane, #177) is visibility-eligible like tree: the shell only opens a
   // pane that appears in the user's paneOrder. It is in the MV spec's canonical default (so it opens in MV) and absent
   // from the cockpit spec (so it never opens in cockpit) — this `true` just means "open it when it's in the order".
-  return { primary: "source", paneVisibility: { source: true, crl: true, cel: true, tree: true, questionnaire: true } };
+  return { primary: "source", paneVisibility: { source: true, crl: true, cel: true, tree: true, questionnaire: true, worklist: true } };
 }
 
 /** Headless navigator model — the items the navigator (a TreeView in C2a; a webview adapter later) renders. */
@@ -128,7 +132,7 @@ export function shouldReflectNavigatorSelection(
   return mode !== "medical-validation" || navVisible;
 }
 
-const PANES: Pane[] = ["source", "crl", "cel", "tree", "questionnaire"]; // reveal fan-out set (tree + questionnaire included); NOT the navigable/cycle set
+const PANES: Pane[] = ["source", "crl", "cel", "tree", "questionnaire", "worklist"]; // reveal fan-out set (tree/questionnaire/worklist included); NOT the navigable/cycle set
 
 function selectionTarget(sel: Selection): RevealEffect["target"] {
   if (sel.primary === "source") return { kind: "unit", id: sel.unitId };

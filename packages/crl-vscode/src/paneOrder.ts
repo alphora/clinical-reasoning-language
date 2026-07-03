@@ -10,9 +10,10 @@
 //   - valid     — every PUBLIC pane key the mode CAN show (the package.json enum for that mode's paneOrder).
 //   - canonical — the panes ALWAYS present, in the order missing ones are appended. A non-canonical valid key (e.g.
 //                 "tree" for the cockpit) is honored when listed but never auto-appended — that's the opt-OUT.
-//   - aliases   — optional public-key → InternalPane remap (e.g. medical-validation "worklist" → the "cel" pane in
-//                 worklist-render mode). Output is always InternalPanes; dedup is BY INTERNAL pane, so "worklist" and
-//                 "cel" can never both survive (a user listing both keeps the first).
+//   - aliases   — optional public-key → InternalPane remap (a public key that renders as a DIFFERENT internal pane).
+//                 Currently UNUSED (the MV `worklist → cel` alias was dropped when worklist became its own pane, disc 179);
+//                 the mechanism stays for future public-key remaps. Output is always InternalPanes; dedup is BY INTERNAL
+//                 pane, so two public keys aliasing the same internal pane collapse to one (the first wins).
 import type { Pane } from "./correspondenceEngine";
 
 /** An internal pane is what the shell actually renders (the engine's Pane). Public keys may alias onto one of these. */
@@ -36,15 +37,16 @@ export const COCKPIT_PANE_SPEC: PaneSpec = {
   canonical: ["source", "crl", "cel"],
 };
 
-/** The medical-validation spec — "worklist" is a PUBLIC key aliasing the internal "cel" pane (rendered in worklist mode,
- *  slice 4). Default resolves to internal [cel, source, tree]. No "crl", no plain "cel" in the default. */
+/** The medical-validation spec — `worklist` is now a FIRST-CLASS internal pane (the review surface), DISTINCT from `cel`
+ *  (the read-only case-list). Default = [worklist, source, tree, questionnaire]. `cel` (read-only) + `crl` are valid-but-
+ *  not-canonical, so a MV user can open the read-only CEL alongside the worklist. No alias (dropped when worklist split
+ *  from cel — pane split, disc 179): listing both `worklist` and `cel` now opens BOTH (they're different internal panes). */
 export const MEDICAL_VALIDATION_PANE_SPEC: PaneSpec = {
   valid: ["worklist", "source", "tree", "questionnaire", "crl", "cel"],
   canonical: ["worklist", "source", "tree", "questionnaire"],
-  aliases: { worklist: "cel" },
 };
 
-const VALID_PANES: ReadonlySet<Pane> = new Set<Pane>(["source", "crl", "cel", "tree", "questionnaire"]);
+const VALID_PANES: ReadonlySet<Pane> = new Set<Pane>(["source", "crl", "cel", "tree", "questionnaire", "worklist"]);
 
 /** Resolve a PUBLIC key to an InternalPane via the spec's aliases (identity when unmapped); undefined if the result is
  *  not a real pane (so an alias can never introduce a non-pane). */

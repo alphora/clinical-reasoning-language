@@ -1,6 +1,6 @@
 // Unit tests for normalizePaneOrder (#156 C2b-4 + medical-validation slice 3) — a malformed setting must never break a
 // panel. vscode-free. The cockpit checks below assert the BYTE-IDENTICAL pre-spec behavior (COCKPIT_PANE_SPEC); the
-// medical-validation block exercises the worklist→cel alias + the MV default + internal-pane dedup.
+// medical-validation block exercises `worklist` as a first-class pane (pane split, disc 179) + the MV default + valid set.
 import assert from "node:assert/strict";
 import { load } from "./test-harness.mjs";
 
@@ -73,42 +73,42 @@ check("INVARIANT: every output keeps the 3 canonical panes (once each) + at most
     assert.ok(isValidOrder(cockpit(raw)), `not a valid order for ${JSON.stringify(raw)}`);
 });
 
-// ── MEDICAL-VALIDATION spec: worklist→cel alias, MV default, internal-pane dedup, mode-distinct valid set ──
+// ── MEDICAL-VALIDATION spec: worklist is a FIRST-CLASS pane (pane split, disc 179), MV default, mode-distinct valid set ──
 // #177 slice 3: questionnaire joined the MV canonical default (worklist/source/tree/questionnaire — the operator's
-// 4-panel set), so the MV default now resolves to internal [cel, source, tree, questionnaire].
-check("MV default resolves to internal [cel, source, tree, questionnaire] (worklist aliases the cel pane)", () => {
-  assert.deepEqual(mv(undefined), ["cel", "source", "tree", "questionnaire"]);
-  assert.deepEqual(mv([]), ["cel", "source", "tree", "questionnaire"]);
+// 4-panel set). Since the pane split, `worklist` resolves to its OWN internal pane (no longer aliased to `cel`).
+check("MV default resolves to internal [worklist, source, tree, questionnaire] (worklist is its own pane)", () => {
+  assert.deepEqual(mv(undefined), ["worklist", "source", "tree", "questionnaire"]);
+  assert.deepEqual(mv([]), ["worklist", "source", "tree", "questionnaire"]);
 });
-check("MV: an explicit worklist→cel in the user order, kept in position", () => {
-  assert.deepEqual(mv(["source", "worklist"]), ["source", "cel", "tree", "questionnaire"]);
+check("MV: an explicit worklist in the user order, kept in position (a real pane, not aliased)", () => {
+  assert.deepEqual(mv(["source", "worklist"]), ["source", "worklist", "tree", "questionnaire"]);
 });
-check("MV: listing BOTH worklist and cel dedups to ONE pane (first wins — internal-pane dedup)", () => {
-  assert.deepEqual(mv(["worklist", "cel"]), ["cel", "source", "tree", "questionnaire"]);
-  assert.deepEqual(mv(["cel", "worklist"]), ["cel", "source", "tree", "questionnaire"]);
+check("MV: listing BOTH worklist and cel opens BOTH (distinct internal panes — no alias dedup, disc 179)", () => {
+  assert.deepEqual(mv(["worklist", "cel"]), ["worklist", "cel", "source", "tree", "questionnaire"]);
+  assert.deepEqual(mv(["cel", "worklist"]), ["cel", "worklist", "source", "tree", "questionnaire"]);
 });
 check("MV: questionnaire is canonical — honored in position, auto-appended when absent", () => {
-  assert.deepEqual(mv(["questionnaire", "worklist"]), ["questionnaire", "cel", "source", "tree"]);
+  assert.deepEqual(mv(["questionnaire", "worklist"]), ["questionnaire", "worklist", "source", "tree"]);
   assert.ok(mv(["source"]).includes("questionnaire"), "questionnaire is appended (canonical)");
 });
 check("MV: crl is valid-but-non-canonical — honored when listed, never auto-appended", () => {
-  assert.deepEqual(mv(["worklist", "crl"]), ["cel", "crl", "source", "tree", "questionnaire"]);
+  assert.deepEqual(mv(["worklist", "crl"]), ["worklist", "crl", "source", "tree", "questionnaire"]);
   assert.ok(!mv(["source"]).includes("crl"));
 });
-check("MV: a 5-pane order (all 4 canonical + crl) is preserved — the shell has a 5th column for it (#177 FIX 1)", () => {
-  // A user explicitly listing every distinct internal pane → 5 panes; the cockpit's ORDERED_COLUMNS now has a 5th slot
-  // so this lays out left-to-right (no overflow onto column One). normalizePaneOrder keeps all 5 (no dedup/append needed).
-  const order = mv(["worklist", "source", "tree", "questionnaire", "crl"]);
-  assert.deepEqual(order, ["cel", "source", "tree", "questionnaire", "crl"]);
-  assert.equal(order.length, 5, "five distinct internal panes survive");
-  assert.equal(new Set(order).size, 5, "no dupes");
+check("MV: a 6-pane order (all 4 canonical + crl + read-only cel) is preserved — the shell has a 6th column (disc 179)", () => {
+  // A user explicitly listing every distinct internal pane → 6 panes (worklist + cel are now separate); the cockpit's
+  // ORDERED_COLUMNS has a 6th slot so this lays out left-to-right (no overflow onto column One). All 6 survive.
+  const order = mv(["worklist", "cel", "source", "tree", "questionnaire", "crl"]);
+  assert.deepEqual(order, ["worklist", "cel", "source", "tree", "questionnaire", "crl"]);
+  assert.equal(order.length, 6, "six distinct internal panes survive");
+  assert.equal(new Set(order).size, 6, "no dupes");
 });
 check("MV: unknown keys dropped; canonical (worklist/source/tree/questionnaire) appended", () => {
-  assert.deepEqual(mv(["worklist", "zzz", "source"]), ["cel", "source", "tree", "questionnaire"]);
+  assert.deepEqual(mv(["worklist", "zzz", "source"]), ["worklist", "source", "tree", "questionnaire"]);
 });
 check("MV: non-array inputs → the MV default", () => {
   for (const bad of [null, "worklist", 42, { 0: "worklist" }, true])
-    assert.deepEqual(mv(bad), ["cel", "source", "tree", "questionnaire"]);
+    assert.deepEqual(mv(bad), ["worklist", "source", "tree", "questionnaire"]);
 });
 
 // ── cross-spec isolation: the cockpit spec rejects MV-only keys; the MV spec resolves them ──
