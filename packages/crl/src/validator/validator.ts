@@ -1,9 +1,11 @@
 import { CRL } from "../ast/types";
 import type { LibraryDeclaration } from "../ast/types";
+import type { ResolvedDispositionConfig } from "../dispositions/types";
 import type { SourceContext } from "../imports/scopes";
 
 import { CycleDetector } from "./cycleDetector";
 import { DecisionShapeValidator } from "./decisionShapeValidator";
+import { DispositionValidator } from "./dispositionValidator";
 import { NameUniquenessValidator } from "./nameUniquenessValidator";
 import { ReferenceResolver } from "./referenceResolver";
 
@@ -37,7 +39,11 @@ export type ValidationErrorKind =
   | "external-library-not-included"
   | "qualified-ref-unresolved"
   | "decision-shape"
-  | "reserved-library-name";
+  | "reserved-library-name"
+  // Configurable PA determinations (feature: configurable PA leaves). Only enforced when the project EXPLICITLY
+  // configures `crl.dispositions.options` (the closed-set trigger); absent config = today's behavior.
+  | "disposition-not-configured"
+  | "disposition-request-type";
 
 /**
  * #187 — the SHARED catalog library names the emitter ALWAYS materializes into
@@ -127,6 +133,18 @@ export interface ReservedLibraryNameError extends ValidationErrorBase {
   // The reserved name the author used.
   reservedName: string;
 }
+// A recommended activity that is NOT in the configured disposition set (the closed set — see the kind comment).
+export interface DispositionNotConfiguredError extends ValidationErrorBase {
+  kind: "disposition-not-configured";
+  activityName: string;
+}
+// A configured determination activity whose `request` type is not `CPGCommunicationRequest` (a determination is
+// COMMUNICATED, not ordered — meaning enforced by validation, not grammar).
+export interface DispositionRequestTypeError extends ValidationErrorBase {
+  kind: "disposition-request-type";
+  activityName: string;
+  actualRequestType: string;
+}
 
 export type ValidationError =
   | EmptyNameError
@@ -137,7 +155,9 @@ export type ValidationError =
   | ExternalLibraryNotIncludedError
   | QualifiedRefUnresolvedError
   | DecisionShapeError
-  | ReservedLibraryNameError;
+  | ReservedLibraryNameError
+  | DispositionNotConfiguredError
+  | DispositionRequestTypeError;
 
 export interface ValidationResult {
   isValid: boolean;
@@ -155,6 +175,13 @@ export interface ValidationResult {
  */
 export interface ValidatorOptions {
   soft?: boolean;
+  /**
+   * The resolved PA disposition config (feature: configurable PA leaves). Threaded in by the project-aware caller
+   * (`validateCRLImports`) — the Validator is filesystem-free, so the caller resolves it. Absent in single-file /
+   * inline mode → the disposition rules don't run. Even when present, the closed-set enforcement fires only if the
+   * deployment EXPLICITLY configured `options` (`config.configured`).
+   */
+  dispositionConfig?: ResolvedDispositionConfig;
 }
 
 /**
@@ -165,6 +192,10 @@ export interface ValidatorOptions {
 const SOFT_DEMOTABLE_KINDS: ReadonlySet<ValidationErrorKind> = new Set([
   "unresolved-reference",
   "qualified-ref-unresolved",
+  // Mid-authoring, recommending a determination before wiring it into the config is incomplete-but-fixable state
+  // (parallels unresolved-reference) — demote under soft. `disposition-request-type` is a STRUCTURAL defect
+  // (a determination modeled as an order) and stays a hard error (like decision-shape), so it is NOT listed.
+  "disposition-not-configured",
 ]);
 
 function demote(e: ValidationError): ValidationError {
@@ -176,12 +207,14 @@ export class Validator {
   private readonly referenceResolver: ReferenceResolver;
   private readonly cycleDetector: CycleDetector;
   private readonly decisionShapeValidator: DecisionShapeValidator;
+  private readonly dispositionValidator: DispositionValidator;
 
   constructor() {
     this.nameUniquenessValidator = new NameUniquenessValidator();
     this.referenceResolver = new ReferenceResolver();
     this.cycleDetector = new CycleDetector();
     this.decisionShapeValidator = new DecisionShapeValidator();
+    this.dispositionValidator = new DispositionValidator();
   }
 
   /**
@@ -233,6 +266,12 @@ export class Validator {
 
     // #187 — reserved catalog library names — always an error (never demoted).
     errors.push(...this.validateReservedLibraryNames(ast, sources));
+
+    // Configurable PA determinations — only when the project supplied a config; the closed-set enforcement is
+    // further gated on `config.configured` inside the validator. Always an error (a structural config violation).
+    if (options.dispositionConfig) {
+      errors.push(...this.dispositionValidator.validate(ast, options.dispositionConfig, sources));
+    }
 
     return {
       isValid: errors.length === 0,

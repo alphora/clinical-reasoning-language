@@ -153,6 +153,10 @@ function importDiagnosticToError(d: ImportDiagnostic): Record<string, unknown> {
       base.column = d.include.location?.start.column;
       base.message = `Redundant local include "${d.include.name}" (sibling libraries auto-resolve via qualified refs)`;
       return base;
+    case "disposition-config":
+      base.filePath = d.filePath;
+      base.message = d.message;
+      return base;
   }
 }
 

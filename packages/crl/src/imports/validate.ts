@@ -1,7 +1,11 @@
+import { join } from "node:path";
+
 import type { CRL, Statement } from "../ast/types";
+import { resolveDispositionConfig } from "../dispositions";
 import { Validator, ValidationError } from "../validator/validator";
 
 import { resolveImports } from "./index";
+import { findProjectRoot } from "./registry";
 import { buildLibraryScopes, SourceContext } from "./scopes";
 import { ImportDiagnostic, ResolvedGraph } from "./types";
 
@@ -88,16 +92,39 @@ export function validateCRLImports(
     location: rootEntry.ast.location,
   };
 
-  const validator = new Validator();
-  const result = validator.validate(synthetic, { soft: options.soft }, sources);
+  // Resolve the project's PA disposition config (feature: configurable PA leaves) and thread it in — the Validator
+  // is filesystem-free, so the project-aware caller supplies it. No project root / no config → the disposition
+  // rules don't run; the closed-set enforcement is further gated on an EXPLICIT `options` block inside the resolver.
+  const projectRoot = findProjectRoot(rootPath);
+  const dispositionResolution = projectRoot ? resolveDispositionConfig(projectRoot) : undefined;
+  const configHasErrors = (dispositionResolution?.errors ?? []).some((e) => e.severity === "error");
+  // Enforce the closed set ONLY on a clean config — a broken config is surfaced below as a blocking diagnostic;
+  // don't also pile closed-set errors on top of it (avoids a flood against a partial/empty set).
+  const dispositionConfig = configHasErrors ? undefined : dispositionResolution?.config;
 
-  const importErrorSeverity = graph.diagnostics.filter((d) => d.severity === "error");
+  const validator = new Validator();
+  const result = validator.validate(synthetic, { soft: options.soft, dispositionConfig }, sources);
+
+  // Surface disposition-config problems as (package.json-anchored) import diagnostics — a malformed config MUST NOT
+  // silently disable the guardrail. Error-severity ones block validation via the success check below.
+  const pkgPath = projectRoot ? join(projectRoot, "package.json") : "";
+  const configDiagnostics: ImportDiagnostic[] = (dispositionResolution?.errors ?? []).map((e) => ({
+    kind: "disposition-config",
+    severity: e.severity,
+    filePath: pkgPath,
+    configKind: e.kind,
+    path: e.path,
+    message: `crl.dispositions${e.path.length ? "." + e.path.join(".") : ""}: ${e.message}`,
+  }));
+  const allDiagnostics: ImportDiagnostic[] = [...graph.diagnostics, ...configDiagnostics];
+
+  const importErrorSeverity = allDiagnostics.filter((d) => d.severity === "error");
   const success = result.errors.length === 0 && importErrorSeverity.length === 0;
 
   return {
     success,
     graph,
-    importDiagnostics: graph.diagnostics,
+    importDiagnostics: allDiagnostics,
     validationErrors: result.errors,
     validationWarnings: result.warnings,
   };

@@ -87,6 +87,12 @@ export interface ResolvedOption {
 export interface ResolvedDispositionConfig {
   version: number;
   mode: DispositionMode;
+  /**
+   * Whether the deployment EXPLICITLY declared `crl.dispositions.options` (vs the built-in defaults). This is the
+   * CLOSED-SET trigger: when `true`, the config set is the only valid set of recommendation activities (the
+   * validator enforces it); when `false` (defaults), nothing is enforced — today's behavior.
+   */
+  configured: boolean;
   /** The flattened resolved leaves, in a stable order: framework category order, then ECMAScript key-enumeration order. */
   options: ResolvedOption[];
   /** Lookup by the `"category/key"` leaf id (e.g. "not-certify/experimental"). */

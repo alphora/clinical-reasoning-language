@@ -86,6 +86,23 @@ export interface RedundantLocalIncludeDiagnostic {
   from: { filePath: string; libraryName: string };
 }
 
+/**
+ * A problem in the project's `crl.dispositions` config block (feature: configurable PA leaves). Surfaced as an
+ * import diagnostic so a malformed disposition config BLOCKS validation with a clear cause, rather than silently
+ * disabling / half-enforcing the closed set. Producer: `imports/validate.ts` (maps `DispositionConfigError`).
+ */
+export interface DispositionConfigDiagnostic {
+  kind: "disposition-config";
+  severity: "warning" | "error";
+  /** The package.json carrying the offending `crl.dispositions` block. */
+  filePath: string;
+  /** The underlying `DispositionConfigError.kind` (unknown-category / empty-label / empty-vocabulary / …). */
+  configKind: string;
+  /** The config key path relative to `crl.dispositions` (e.g. ["options","certify","Approve","code"]). */
+  path: string[];
+  message: string;
+}
+
 export type ImportDiagnostic =
   | ParseFailureDiagnostic
   | ProjectRootNotFoundDiagnostic
@@ -94,7 +111,8 @@ export type ImportDiagnostic =
   | UnresolvedIncludeDiagnostic
   | CycleDiagnostic
   | AliasNotYetSupportedDiagnostic
-  | RedundantLocalIncludeDiagnostic;
+  | RedundantLocalIncludeDiagnostic
+  | DispositionConfigDiagnostic;
 
 // === Registry ===
 

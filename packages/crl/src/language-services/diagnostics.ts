@@ -249,6 +249,18 @@ export function mapImportDiagnostic(diag: ImportDiagnostic): LsDiagnostic[] {
           source: "crl",
         },
       ];
+
+    case "disposition-config":
+      return [
+        {
+          filePath: diag.filePath,
+          range: ZERO_RANGE,
+          severity: sev,
+          message: diag.message,
+          code: diag.kind,
+          source: "crl",
+        },
+      ];
   }
 }
 

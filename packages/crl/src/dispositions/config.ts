@@ -52,6 +52,7 @@ function buildResolution(
   version: number,
   mode: DispositionMode,
   options: Record<string, Record<string, NormalizedOption>>,
+  configured: boolean,
   errors: DispositionConfigError[],
 ): DispositionResolution {
   const leaves: ResolvedOption[] = [];
@@ -78,7 +79,7 @@ function buildResolution(
   // but null-proto keeps byLeaf free of inherited members regardless.
   const byLeaf: Record<string, ResolvedOption> = Object.create(null);
   for (const leaf of leaves) byLeaf[leafId(leaf.category, leaf.key)] = leaf;
-  return { config: { version, mode, options: leaves, byLeaf }, errors };
+  return { config: { version, mode, configured, options: leaves, byLeaf }, errors };
 }
 
 /**
@@ -92,7 +93,7 @@ export function normalizeDispositionConfig(raw: unknown): DispositionResolution 
   const errors: DispositionConfigError[] = [];
 
   if (raw === undefined || raw === null) {
-    return buildResolution(DISPOSITION_CONFIG_VERSION, DEFAULT_MODE, DEFAULT_OPTIONS, errors);
+    return buildResolution(DISPOSITION_CONFIG_VERSION, DEFAULT_MODE, DEFAULT_OPTIONS, false, errors);
   }
   if (!isPlainObject(raw)) {
     errors.push({
@@ -101,7 +102,7 @@ export function normalizeDispositionConfig(raw: unknown): DispositionResolution 
       path: [],
       message: "`crl.dispositions` must be an object; falling back to the default Approve/Deny vocabulary.",
     });
-    return buildResolution(DISPOSITION_CONFIG_VERSION, DEFAULT_MODE, DEFAULT_OPTIONS, errors);
+    return buildResolution(DISPOSITION_CONFIG_VERSION, DEFAULT_MODE, DEFAULT_OPTIONS, false, errors);
   }
 
   // version
@@ -143,7 +144,10 @@ export function normalizeDispositionConfig(raw: unknown): DispositionResolution 
   }
 
   // options — present → fully defines the vocabulary (no merge with defaults); absent → defaults.
+  // `configured` is true only when options were EXPLICITLY declared AND validly parsed (a malformed-options
+  // fallback to defaults is NOT "configured" — we won't enforce a closed set against a vocabulary they didn't specify).
   let options: Record<string, Record<string, NormalizedOption>>;
+  let configured = false;
   const declaredOptions = raw.options !== undefined;
   if (!declaredOptions) {
     options = DEFAULT_OPTIONS;
@@ -156,6 +160,7 @@ export function normalizeDispositionConfig(raw: unknown): DispositionResolution 
     });
     options = DEFAULT_OPTIONS;
   } else {
+    configured = true;
     options = Object.create(null);
     for (const [categoryName, keyed] of Object.entries(raw.options)) {
       if (!CATEGORY_BY_NAME.has(categoryName)) {
@@ -185,12 +190,14 @@ export function normalizeDispositionConfig(raw: unknown): DispositionResolution 
           errors.push({ kind: "empty-key", severity: "error", path: keyPath, message: `Empty option key under "${categoryName}".` });
           continue;
         }
-        if (key.includes("/") || RESERVED_KEYS.has(key)) {
+        // Reject "/" (leaf-id separator) and "." (the `<category>.<key>` activity-name separator — a dotted key
+        // would make the determination name ambiguous) and prototype-polluting names.
+        if (key.includes("/") || key.includes(".") || RESERVED_KEYS.has(key)) {
           errors.push({
             kind: "malformed-key",
             severity: "error",
             path: keyPath,
-            message: `Invalid option key "${key}" under "${categoryName}" (must not contain "/" or be a reserved name).`,
+            message: `Invalid option key "${key}" under "${categoryName}" (must not contain "/" or "." or be a reserved name).`,
           });
           continue;
         }
@@ -230,7 +237,7 @@ export function normalizeDispositionConfig(raw: unknown): DispositionResolution 
     }
   }
 
-  const resolution = buildResolution(version, mode, options, errors);
+  const resolution = buildResolution(version, mode, options, configured, errors);
   // A declared-but-degenerate vocabulary (empty / all options invalid) is structurally usable but almost certainly
   // a mistake — flag it (a WARNING, since an embedded deployment could legitimately be mid-setup).
   if (declaredOptions && resolution.config.options.length === 0) {

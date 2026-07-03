@@ -11,17 +11,18 @@ describe("dispositions/config — normalizeDispositionConfig (pure)", () => {
     expect(errors).toEqual([]);
     expect(config.version).toBe(1);
     expect(config.mode).toBe("standalone");
-    expect(config.options.map((o) => leafId(o.category, o.key))).toEqual(["certify/approve", "not-certify/deny"]);
-    expect(config.byLeaf["certify/approve"].label).toBe("Approve");
-    expect(config.byLeaf["not-certify/deny"].label).toBe("Deny");
+    expect(config.configured).toBe(false); // defaults → NOT the closed-set trigger
+    expect(config.options.map((o) => leafId(o.category, o.key))).toEqual(["certify/Approve", "not-certify/Deny"]);
+    expect(config.byLeaf["certify/Approve"].label).toBe("Approve");
+    expect(config.byLeaf["not-certify/Deny"].label).toBe("Deny");
   });
 
   it("resolves the PAS review-action code + finality onto each leaf from the framework category", () => {
     const { config } = normalizeDispositionConfig(undefined);
-    expect(config.byLeaf["certify/approve"].reviewActionCode).toBe("A1");
-    expect(config.byLeaf["certify/approve"].finality).toBe("final");
-    expect(config.byLeaf["not-certify/deny"].reviewActionCode).toBe("A3");
-    expect(config.byLeaf["not-certify/deny"].finality).toBe("final");
+    expect(config.byLeaf["certify/Approve"].reviewActionCode).toBe("A1");
+    expect(config.byLeaf["certify/Approve"].finality).toBe("final");
+    expect(config.byLeaf["not-certify/Deny"].reviewActionCode).toBe("A3");
+    expect(config.byLeaf["not-certify/Deny"].finality).toBe("final");
   });
 
   it("declared options FULLY define the vocabulary (no merge with defaults) + carry narrative + a PAS reason code", () => {
@@ -39,7 +40,8 @@ describe("dispositions/config — normalizeDispositionConfig (pure)", () => {
     });
     expect(errors).toEqual([]);
     expect(config.mode).toBe("embedded");
-    // certify/approve default is GONE — options replace, not merge.
+    expect(config.configured).toBe(true); // explicit options → the closed-set trigger
+    // certify/Approve default is GONE — options replace, not merge.
     expect(Object.keys(config.byLeaf).sort()).toEqual(["not-certify/experimental", "not-certify/medical-necessity"]);
     expect(config.byLeaf["not-certify/experimental"].label).toBe("Deny EIU");
     expect(config.byLeaf["not-certify/experimental"].code).toEqual({
@@ -63,11 +65,11 @@ describe("dispositions/config — normalizeDispositionConfig (pure)", () => {
 
   it("malformed option code (missing system/code) → error, code dropped, option kept", () => {
     const { config, errors } = normalizeDispositionConfig({
-      options: { certify: { approve: { label: "Approve", code: { code: "A1" } } } },
+      options: { certify: { Approve: { label: "Approve", code: { code: "A1" } } } },
     });
     expect(errors.some((e) => e.kind === "malformed-code")).toBe(true);
-    expect(config.byLeaf["certify/approve"].label).toBe("Approve");
-    expect(config.byLeaf["certify/approve"].code).toBeUndefined();
+    expect(config.byLeaf["certify/Approve"].label).toBe("Approve");
+    expect(config.byLeaf["certify/Approve"].code).toBeUndefined();
   });
 
   it("configures a non-final pended leaf (opt-in) — resolves to A4 / non-final", () => {
@@ -89,12 +91,12 @@ describe("dispositions/config — normalizeDispositionConfig (pure)", () => {
   it("unknown category → error, that category skipped (others resolve)", () => {
     const { config, errors } = normalizeDispositionConfig({
       options: {
-        certify: { approve: { label: "OK" } },
+        certify: { Approve: { label: "OK" } },
         "made-up": { x: { label: "X" } },
       },
     });
     expect(errors.some((e) => e.kind === "unknown-category")).toBe(true);
-    expect(config.byLeaf["certify/approve"].label).toBe("OK");
+    expect(config.byLeaf["certify/Approve"].label).toBe("OK");
     expect(Object.keys(config.byLeaf)).not.toContain("made-up/x");
   });
 
@@ -110,7 +112,7 @@ describe("dispositions/config — normalizeDispositionConfig (pure)", () => {
   it("malformed config (not an object) → error + defaults", () => {
     const { config, errors } = normalizeDispositionConfig("nope");
     expect(errors.some((e) => e.kind === "malformed-config")).toBe(true);
-    expect(config.byLeaf["certify/approve"].label).toBe("Approve");
+    expect(config.byLeaf["certify/Approve"].label).toBe("Approve");
   });
 
   it("unknown version → WARNING (graceful forward-compat), declared version preserved, rest still parsed", () => {
@@ -140,10 +142,11 @@ describe("dispositions/config — normalizeDispositionConfig (pure)", () => {
     expect(errors.some((e) => e.kind === "empty-vocabulary")).toBe(true);
   });
 
-  it("options as an ARRAY → malformed-options + defaults", () => {
+  it("options as an ARRAY → malformed-options + defaults, NOT configured (won't close the set)", () => {
     const { config, errors } = normalizeDispositionConfig({ options: [] });
     expect(errors.some((e) => e.kind === "malformed-options")).toBe(true);
-    expect(config.byLeaf["certify/approve"].label).toBe("Approve");
+    expect(config.byLeaf["certify/Approve"].label).toBe("Approve");
+    expect(config.configured).toBe(false); // fell back to defaults → do not enforce a closed set
   });
 
   it("mode a non-string → unknown-mode + standalone", () => {
@@ -152,14 +155,20 @@ describe("dispositions/config — normalizeDispositionConfig (pure)", () => {
     expect(config.mode).toBe("standalone");
   });
 
-  it("empty / slash / prototype-polluting option keys are rejected (no prototype pollution)", () => {
+  it("empty / slash / dot / prototype-polluting option keys are rejected (no prototype pollution)", () => {
     const { config, errors } = normalizeDispositionConfig({
       options: {
-        certify: { "": { label: "X" }, "a/b": { label: "Y" }, __proto__: { label: "Z" }, ok: { label: "OK" } },
+        certify: {
+          "": { label: "X" },
+          "a/b": { label: "Y" },
+          "a.b": { label: "D" }, // "." is the <category>.<key> activity-name separator — reject it
+          __proto__: { label: "Z" },
+          ok: { label: "OK" },
+        },
       },
     });
     expect(errors.some((e) => e.kind === "empty-key")).toBe(true);
-    expect(errors.some((e) => e.kind === "malformed-key")).toBe(true);
+    expect(errors.filter((e) => e.kind === "malformed-key").length).toBeGreaterThanOrEqual(2); // "a/b" and "a.b"
     // Only the valid key survives; the prototype was NOT polluted.
     expect(Object.keys(config.byLeaf)).toEqual(["certify/ok"]);
     expect(({} as Record<string, unknown>).label).toBeUndefined();
@@ -229,26 +238,26 @@ describe("dispositions/config — resolveDispositionConfig (file-reading)", () =
     const root = projectWith({ name: "p", version: "1.0.0", crl: { canonicalBase: "http://x" } });
     const { config, errors } = resolveDispositionConfig(root);
     expect(errors).toEqual([]);
-    expect(config.byLeaf["certify/approve"].label).toBe("Approve");
+    expect(config.byLeaf["certify/Approve"].label).toBe("Approve");
   });
 
   it("unreadable package.json → error + defaults (never throws)", () => {
     const { config, errors } = resolveDispositionConfig(join(tmpdir(), "does-not-exist-disp-xyz"));
     expect(errors.some((e) => e.kind === "unreadable-package-json")).toBe(true);
-    expect(config.byLeaf["certify/approve"].label).toBe("Approve");
+    expect(config.byLeaf["certify/Approve"].label).toBe("Approve");
   });
 
   it("a malformed crl block (crl not an object) → defaults, no crash", () => {
     const root = projectWith({ name: "p", version: "1.0.0", crl: "oops" });
     const { config } = resolveDispositionConfig(root);
-    expect(config.byLeaf["certify/approve"].label).toBe("Approve");
+    expect(config.byLeaf["certify/Approve"].label).toBe("Approve");
   });
 
   it("package.json that parses to a non-object (e.g. an array) → defaults, no crash", () => {
     const dir = mkdtempSync(join(tmpdir(), "disp-config-arr-"));
     writeFileSync(join(dir, "package.json"), "[1,2,3]");
     const { config } = resolveDispositionConfig(dir);
-    expect(config.byLeaf["certify/approve"].label).toBe("Approve");
+    expect(config.byLeaf["certify/Approve"].label).toBe("Approve");
   });
 
   it("invalid JSON in package.json → unreadable-package-json error + defaults (never throws)", () => {
@@ -256,6 +265,6 @@ describe("dispositions/config — resolveDispositionConfig (file-reading)", () =
     writeFileSync(join(dir, "package.json"), "{ not valid json");
     const { config, errors } = resolveDispositionConfig(dir);
     expect(errors.some((e) => e.kind === "unreadable-package-json")).toBe(true);
-    expect(config.byLeaf["certify/approve"].label).toBe("Approve");
+    expect(config.byLeaf["certify/Approve"].label).toBe("Approve");
   });
 });
