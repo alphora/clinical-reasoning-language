@@ -622,10 +622,11 @@ export function createServer(): McpServer {
         "representations; no `definition is` predicates EXCEPT the sanctioned patient-age both-rep carve-out, " +
         "and no external sources). " +
         'USE CASE (#191 lattice): "cpg" (default) is the neutral base framework (≈ full CRL); "prior-auth" ' +
-        "adds the PA / medical-policy narrowings — the shared `Medical Policy Determination` library + its " +
-        "exemplars (criteria / pa-determination / source-delegated / disposition-arbitration), the " +
-        "pa-disposition-set rule (communicated-not-ordered / shared-lib membership / mutual-exclusivity / " +
-        "no-pend), the PA boundary items, and the advisory coverage `facets`. PA content is present ONLY with " +
+        "adds the PA / medical-policy narrowings — the CONFIG-DRIVEN determination model (`configure-dispositions` " +
+        "+ `disposition-mode` rules + the `dispositionModel` field: a determination is a plain local activity named " +
+        "`<category>.<key>` [certify/not-certify/pended PAS review-actions] drawn from the deployment's " +
+        "`crl.dispositions` config), the pa-disposition-set rule (communicated-not-ordered / configured-membership / " +
+        "mutual-exclusivity / finality-by-mode), the PA determination exemplars, and the PA boundary items. PA content is present ONLY with " +
         '`useCase:"prior-auth"` — an omitted `useCase` returns the base cpg kit (NOT PA). Each useCase has its ' +
         "own distinct, stable `contentHash`. Returns the kit JSON incl. `schemaVersion`, the resolved " +
         "`useCase` + edge `chain`, and the derived `contentHash`. Unknown stage or useCase → tool error " +

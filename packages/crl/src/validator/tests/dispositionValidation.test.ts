@@ -16,7 +16,7 @@ const DEFAULTS: ResolvedDispositionConfig = normalizeDispositionConfig(undefined
 function dispErrors(src: string, config: ResolvedDispositionConfig = CONFIGURED) {
   return new Validator()
     .validate(parseInput(src), { dispositionConfig: config })
-    .errors.filter((e) => e.kind === "disposition-not-configured" || e.kind === "disposition-request-type");
+    .errors.filter((e) => e.kind.startsWith("disposition-"));
 }
 
 const HEADER = `library "T".\nconcept "Q":\n- type is Condition.\n- code is \`q\`.\n`;
@@ -95,6 +95,26 @@ describe("DispositionValidator — closed-set (config-gated)", () => {
     const src = HEADER + `decision "D":\nfirst:\n- when "Q" then recommend activity "certify.Approve".\n- otherwise then recommend activity "not-certify.Deny".\n` +
       activity("certify.Approve") + activity("not-certify.Deny");
     expect(dispErrors(src, empty)).toEqual([]); // the empty-vocabulary warning is the signal, not a flood here
+  });
+
+  it("standalone mode: a non-final (pended) recommend → disposition-non-final-leaf", () => {
+    const standalonePend = normalizeDispositionConfig({
+      mode: "standalone",
+      options: { certify: { Approve: { label: "Approve" } }, pended: { NeedInfo: { label: "Pend" } } },
+    }).config;
+    const src = HEADER + `decision "D":\nfirst:\n- when "Q" then recommend activity "pended.NeedInfo".\n- otherwise then recommend activity "certify.Approve".\n` +
+      activity("pended.NeedInfo") + activity("certify.Approve");
+    expect(dispErrors(src, standalonePend).some((e) => e.kind === "disposition-non-final-leaf" && (e as any).activityName === "pended.NeedInfo")).toBe(true);
+  });
+
+  it("embedded mode: the SAME non-final (pended) recommend is allowed (mode gates finality)", () => {
+    const embeddedPend = normalizeDispositionConfig({
+      mode: "embedded",
+      options: { certify: { Approve: { label: "Approve" } }, pended: { NeedInfo: { label: "Pend" } } },
+    }).config;
+    const src = HEADER + `decision "D":\nfirst:\n- when "Q" then recommend activity "pended.NeedInfo".\n- otherwise then recommend activity "certify.Approve".\n` +
+      activity("pended.NeedInfo") + activity("certify.Approve");
+    expect(dispErrors(src, embeddedPend).some((e) => e.kind === "disposition-non-final-leaf")).toBe(false);
   });
 
   it("NOT configured (defaults) → nothing enforced, even for an arbitrary recommend", () => {

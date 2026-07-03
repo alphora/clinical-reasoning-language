@@ -73,8 +73,8 @@ try {
     assert.ok(!JSON.stringify(kit).match(/Medical Policy Determination|Pended|HCR01/), "cpg base must be PA-free");
     assert.ok(kit.verifyLoop.doesNotProve.length > 0, "verifyLoop must state what a green run does NOT prove");
     // 1.4: the `useCase` specialization axis (#191). Pin the SCHEMA + the cpg-base hash — a bundle drift is caught here too.
-    assert.equal(kit.schemaVersion, "1.4");
-    assert.equal(kit.contentHash, "af8dc593e0a7ddcb811dd5f265cdcd342cb5cd6a011cbc8510ff6d026846ed2d");
+    assert.equal(kit.schemaVersion, "1.5");
+    assert.equal(kit.contentHash, "746b84a0a2f546f8081aab1173dfbaa4e4b81480b622f211585d6a6f9cd79924");
     assert.ok(Array.isArray(kit.forceModel.levels) && kit.forceModel.levels.length === 3, "forceModel must carry the 3 force levels");
     assert.ok(Array.isArray(kit.judgeLens.composition) && kit.judgeLens.composition.length > 0, "judgeLens.composition must be present");
     // `defined as` inference is in-scope this stage (#126, #168); predicates/external out.
@@ -89,13 +89,14 @@ try {
     const kit = JSON.parse(r.content[0].text);
     assert.equal(kit.useCase, "prior-auth");
     assert.deepEqual(kit.chain, ["cpg", "prior-auth"]);
-    assert.equal(kit.schemaVersion, "1.4");
+    assert.equal(kit.schemaVersion, "1.5");
     // Sibling KE (PA) agents pin BOTH schemaVersion + the prior-auth contentHash via MCP — pin it here too.
-    assert.equal(kit.contentHash, "574220918008614250d0477602f34fedde1df3d56755c7c6b7a1a323d7ad1ac1");
+    assert.equal(kit.contentHash, "84672b95b3e791857aa844bb0386887e0787906020e1845f4096c99bf3049d48");
     const refNames = kit.referenceArtifacts.map((a) => a.name).sort();
     assert.equal(refNames.length, 12);
     assert.ok(refNames.includes("medical-policy-determination.crl"));
-    assert.ok(Array.isArray(kit.facets) && kit.facets.length === 3, "prior-auth carries the 3 advisory facets");
+    assert.ok(!kit.facets, "advisory facets are retired");
+    assert.ok(kit.dispositionModel && kit.dispositionModel.categories.length === 3, "prior-auth surfaces the dispositionModel (3 categories)");
   });
 
   await check("authoring_kit embedded decision-reference.crl validates clean via validate_crl", async () => {

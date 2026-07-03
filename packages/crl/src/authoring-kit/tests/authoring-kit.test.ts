@@ -274,7 +274,7 @@ describe("authoring-kit — getAuthoringKit", () => {
   it("returns the local-decision-support kit by default", () => {
     const kit = getAuthoringKit();
     expect(kit.stage).toBe("local-decision-support");
-    expect(kit.schemaVersion).toBe("1.4");
+    expect(kit.schemaVersion).toBe("1.5");
     expect(kit.summary).toMatch(/local-decision-support/);
   });
 
@@ -511,32 +511,34 @@ describe("authoring-kit — getAuthoringKit", () => {
     expect(disp.rule).not.toMatch(/Medical Policy Determination/);
   });
 
-  it("the relocated `communicated-not-ordered` invariant lives on pa-disposition-set (prior-auth) and resolves there", () => {
+  it("pa-disposition-set carries the config-driven invariants — communicated-not-ordered + configured-membership + finality-by-mode, each a DISTINCT check", () => {
     const paRule = getAuthoringKit(undefined, "prior-auth").rules.find((r) => r.id === "pa-disposition-set")!;
-    const relocated = (paRule.clauses ?? []).find((c) => c.test === "verifyLoop:communicated-not-ordered");
-    expect(relocated).toBeDefined();
-    expect(relocated!.force).toBe("invariant");
-    // It is a DISTINCT check from shared-lib-membership (the two are not a dup).
-    const membership = (paRule.clauses ?? []).find((c) => c.test === "verifyLoop:shared-lib-membership");
-    expect(membership).toBeDefined();
-    expect(relocated).not.toBe(membership);
+    const anchors = (paRule.clauses ?? []).filter((c) => c.force === "invariant").map((c) => c.test);
+    expect(anchors).toEqual(
+      expect.arrayContaining([
+        "verifyLoop:communicated-not-ordered",
+        "verifyLoop:configured-membership",
+        "verifyLoop:mutual-exclusivity-spans-closure",
+        "verifyLoop:finality-by-mode",
+      ]),
+    );
+    // shared-lib-membership / no-pend were renamed to configured-membership / finality-by-mode (config-driven model).
+    expect(anchors).not.toContain("verifyLoop:shared-lib-membership");
+    expect(anchors).not.toContain("verifyLoop:no-pend");
+    expect(new Set(anchors).size).toBe(anchors.length); // all distinct
   });
 
-  it("advisory coverage facets: present ONLY on prior-auth, non-selector (no `test`), home-TBD", () => {
+  it("the 3 advisory facets are RETIRED (became concrete rules); the prior-auth dispositionModel replaces them", () => {
     expect(getAuthoringKit(undefined, "cpg").facets).toBeUndefined();
-    const facets = getAuthoringKit(undefined, "prior-auth").facets!;
-    expect(facets.map((f) => f.id).sort()).toEqual([
-      "act-modality",
-      "determination-cardinality",
-      "outcome-finality",
-    ]);
-    for (const f of facets) {
-      expect(f.status).toBe("home-TBD");
-      expect(f.note).toMatch(/advisory|do NOT anchor/i);
-      // Provably non-selector: a facet carries NO field the invariant-resolve loop reads (`test`/`force`).
-      expect((f as Record<string, unknown>).test).toBeUndefined();
-      expect((f as Record<string, unknown>).force).toBeUndefined();
-    }
+    expect(getAuthoringKit(undefined, "prior-auth").facets).toBeUndefined();
+    // The prior-auth edge now surfaces the framework category model + config contract (customer-agnostic).
+    expect(getAuthoringKit(undefined, "cpg").dispositionModel).toBeUndefined();
+    const dm = getAuthoringKit(undefined, "prior-auth").dispositionModel!;
+    expect(dm.categories.map((c) => c.name).sort()).toEqual(["certify", "not-certify", "pended"]);
+    expect(dm.categories.find((c) => c.name === "pended")!.finality).toBe("non-final");
+    expect(dm.localActivityRequired).toBe(true);
+    expect(dm.config.modes.standalone).toMatch(/final/i);
+    expect(dm.config.modes.embedded).toMatch(/pended|non-final/i);
   });
 
   it("judgeLens.composition (§2/§3) carries the three source-fidelity checks, each with a weightedBy + ≥1 checkpoint", () => {
@@ -624,8 +626,12 @@ describe("authoring-kit — getAuthoringKit", () => {
     // out, clause[2] `communicated-not-ordered` RELOCATED to pa-disposition-set); PA boundary items + PA artifacts moved
     // to the prior-auth edge; advisory `facets` added on prior-auth. TWO hashes now — cpg (the default) and prior-auth.
     // KE seats pin these — re-sync on the bump.
-    expect(cpg.contentHash).toBe("af8dc593e0a7ddcb811dd5f265cdcd342cb5cd6a011cbc8510ff6d026846ed2d");
-    expect(priorAuth.contentHash).toBe("574220918008614250d0477602f34fedde1df3d56755c7c6b7a1a323d7ad1ac1");
+    // Re-pinned (schemaVersion 1.4→1.5, configurable-PA-leaves T3a): pa-disposition-set rewritten config-driven,
+    // configure-dispositions + disposition-mode rules added, verifyLoop shared-lib-membership→configured-membership +
+    // no-pend→finality-by-mode, facets retired, prior-auth `dispositionModel` field added. schemaVersion is hashed on
+    // BOTH payloads so both pins move. KE seats re-sync on the bump.
+    expect(cpg.contentHash).toBe("746b84a0a2f546f8081aab1173dfbaa4e4b81480b622f211585d6a6f9cd79924");
+    expect(priorAuth.contentHash).toBe("84672b95b3e791857aa844bb0386887e0787906020e1845f4096c99bf3049d48");
   });
 
   it("STAGES contains exactly the one Stage-1 slice", () => {
@@ -667,18 +673,19 @@ describe("authoring-kit — getAuthoringKit", () => {
     expect(byKind("waiver-authored").weightedBy).toMatch(/implementation-artifact/);
   });
 
-  it("the pa-disposition-set rule (#134/#167) is STRUCTURAL — membership + mutual-exclusivity + no-pend, naming no activities", () => {
+  it("the pa-disposition-set rule (#134/#167) is STRUCTURAL + config-driven — membership/mutual-exclusivity/finality, naming no activities", () => {
     const rule = getAuthoringKit(undefined, "prior-auth").rules.find((r) => r.id === "pa-disposition-set");
     expect(rule).toBeDefined();
     expect(rule!.edge).toBe("prior-auth");
-    // (1) membership in the shared determination library + the never-CPGServiceRequest guard
-    expect(rule!.rule).toMatch(/Medical Policy Determination/);
+    // config-driven membership (no shared library) + the never-CPGServiceRequest guard
+    expect(rule!.rule).toMatch(/configured|crl\.dispositions/i);
+    expect(rule!.rule).not.toMatch(/Medical Policy Determination/); // the shared-lib model is gone
     expect(rule!.rule).toMatch(/CPGServiceRequest/);
-    // (2) exactly one determination per case
+    // exactly one determination per case
     expect(rule!.rule).toMatch(/exactly one|mutual.{0,3}exclus|first:/i);
-    // (3) no pend leaf
-    expect(rule!.rule).toMatch(/A4|pend/i);
-    // customer-agnostic: the STRUCTURAL gate names NO determination activities — Approve/Deny/flavors are content (#167)
+    // finality-by-mode (pended non-final)
+    expect(rule!.rule).toMatch(/A4|pend|final/i);
+    // customer-agnostic: the STRUCTURAL gate names NO determination labels — Approve/Deny/flavors are config (#167)
     expect(rule!.rule).not.toMatch(/\bApprove\b|\bDeny\b/);
     expect(rule!.why ?? "").not.toMatch(/\bApprove\b|\bDeny\b/);
   });

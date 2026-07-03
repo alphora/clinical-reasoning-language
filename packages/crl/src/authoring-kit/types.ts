@@ -239,7 +239,32 @@ export interface AuthoringKit {
   /**
    * ADVISORY above-edge coverage facets (#191) — present only when the chain includes `prior-auth`. A distinct
    * channel from `rules`: no `test`, no force. Reserved dimensions whose taxonomy level is not frozen until the
-   * second domain edge — do NOT anchor selection or inheritance to them.
+   * second domain edge — do NOT anchor selection or inheritance to them. (Retired for the configurable-PA-leaves
+   * work — the once-abstract facets became concrete rules; the field remains for a future genuine facet.)
    */
   facets?: KitFacet[];
+  /**
+   * The PA determination MODEL (feature: configurable PA leaves) — present only on the `prior-auth` chain,
+   * customer-agnostic. Tells the KE the framework category vocabulary (certify/not-certify/pended = PAS
+   * review-actions) + the `crl.dispositions` config SHAPE the deployment fills. NOT a deployment's option labels.
+   */
+  dispositionModel?: DispositionModel;
+}
+
+/** The PA determination model surfaced on the prior-auth kit edge — framework categories + the config contract. */
+export interface DispositionModel {
+  /** The determination-leaf naming convention (a plain local activity). */
+  activityNamePattern: string;
+  /** The local `activity` block is required (a determination may live in a separate library; config does not generate it). */
+  localActivityRequired: boolean;
+  /** The framework categories (spec-anchored PAS review-actions) — the deployment configures options UNDER these. */
+  categories: { name: string; reviewActionCode: string; finality: "final" | "non-final"; meaning: string }[];
+  /** The `crl.dispositions` config contract the deployment fills. */
+  config: {
+    location: string;
+    shape: string;
+    modes: { standalone: string; embedded: string };
+    closedSet: string;
+    optionCode: string;
+  };
 }

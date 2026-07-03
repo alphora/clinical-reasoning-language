@@ -43,7 +43,8 @@ export type ValidationErrorKind =
   // Configurable PA determinations (feature: configurable PA leaves). Only enforced when the project EXPLICITLY
   // configures `crl.dispositions.options` (the closed-set trigger); absent config = today's behavior.
   | "disposition-not-configured"
-  | "disposition-request-type";
+  | "disposition-request-type"
+  | "disposition-non-final-leaf";
 
 /**
  * #187 — the SHARED catalog library names the emitter ALWAYS materializes into
@@ -145,6 +146,12 @@ export interface DispositionRequestTypeError extends ValidationErrorBase {
   activityName: string;
   actualRequestType: string;
 }
+// A non-final determination (e.g. `pended`) recommended under `standalone` mode, where our tree IS the whole
+// adjudication and every leaf must be FINAL. Legitimate only in `embedded` mode (our tree feeds a larger one).
+export interface DispositionNonFinalLeafError extends ValidationErrorBase {
+  kind: "disposition-non-final-leaf";
+  activityName: string;
+}
 
 export type ValidationError =
   | EmptyNameError
@@ -157,7 +164,8 @@ export type ValidationError =
   | DecisionShapeError
   | ReservedLibraryNameError
   | DispositionNotConfiguredError
-  | DispositionRequestTypeError;
+  | DispositionRequestTypeError
+  | DispositionNonFinalLeafError;
 
 export interface ValidationResult {
   isValid: boolean;

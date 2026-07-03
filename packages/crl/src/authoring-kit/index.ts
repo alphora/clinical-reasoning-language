@@ -11,6 +11,7 @@
  */
 import { createHash } from "node:crypto";
 
+import { DISPOSITION_CATEGORIES } from "../dispositions/categories";
 import { activityTypes } from "../grammar/activityTypes";
 import { conceptTypes } from "../grammar/conceptTypes";
 import { conceptValueTypes } from "../grammar/conceptValueTypes";
@@ -35,10 +36,10 @@ import type {
   AuthoringStage,
   AuthoringUseCase,
   ConceptLayerEntry,
+  DispositionModel,
   ForceModel,
   JudgeLens,
   KitExample,
-  KitFacet,
   KitRule,
   ReferenceArtifact,
   TypeAllowlist,
@@ -73,8 +74,16 @@ export type { AuthoringEdge, AuthoringKit, AuthoringStage, AuthoringUseCase, Kit
 //   artifacts move to the `prior-auth` edge. BEHAVIOR CHANGE: `getAuthoringKit(stage)` with no `useCase` now
 //   returns the neutral `cpg` base, NOT PA — pass `useCase:"prior-auth"` for the PA kit (fail-loud, never
 //   silent-PA). TWO distinct contentHashes now (one per useCase); the PA seat re-syncs on the bump.
+// "1.4" → "1.5": SHAPE + CONTENT change — the configurable-PA-leaves determination model (T3a). The prior-auth
+//   `pa-disposition-set` rule is rewritten config-driven (determinations are configured `<category>.<key>` plain
+//   activities; certify/not-certify/pended = PAS review-actions; membership/communicated-not-ordered/finality-by-mode
+//   are always-on invariants that are ALSO validator-enforced when the project configures `crl.dispositions`). Two
+//   new prior-auth rules (`configure-dispositions`, `disposition-mode`). The verifyLoop `shared-lib-membership` →
+//   `configured-membership` and `no-pend` → `finality-by-mode`. The three advisory `facets` are RETIRED (they became
+//   concrete rules); a new prior-auth `dispositionModel` field surfaces the framework categories + config contract.
+//   (Reference artifacts still teach the shared-lib model — migrated in T3b.)
 // Sibling KE agents pin schemaVersion + contentHash and re-sync; the bump signals the new shape.
-const SCHEMA_VERSION = "1.4";
+const SCHEMA_VERSION = "1.5";
 export const DEFAULT_STAGE: AuthoringStage = "local-decision-support";
 export const STAGES: readonly AuthoringStage[] = [DEFAULT_STAGE];
 
@@ -329,19 +338,19 @@ const RULES: KitRule[] = [
     id: "pa-disposition-set",
     edge: "prior-auth",
     category: "dispositions",
-    rule: "For a medical-policy / PA coverage decision the disposition set is constrained STRUCTURALLY, naming no activities: (1) MEMBERSHIP — the determination is exactly TWO KINDS of outcome (a CERTIFY kind and a NOT-CERTIFY kind), NOT two activities. The not-certify kind may take multiple ACTIVITY FLAVORS that share one X12 A3 outcome but communicate a DISTINCT reason (e.g. a medical-necessity not-certify vs an experimental/investigational/unproven not-certify). Every activity the decision can `recommend` resolves to the shared, canonical `Medical Policy Determination` library (the one library every deployment vendors under that name; a qualified ref into it), never a per-policy re-authored determination and never `CPGServiceRequest`; a determination is COMMUNICATED (all `CPGCommunicationRequest`), not ordered. (2) MUTUAL EXCLUSIVITY — each case fires EXACTLY ONE determination, and the invariant spans the DELEGATED CLOSURE (parent + any chained `use decision` sub TOGETHER, not in-tree branches alone): no reachable path across the closure may emit more than one determination in a single run (author ordered precedence with `first:` + `otherwise`; do not place two determination recommendations under one `all:` / `any:`; a branch that both delegates and `recommend`s emits two determinations a in-tree-only check misses). (3) NO PEND — the canonical library holds only FINAL determinations (a deployment extends it only with further final flavors), so a determination cannot recommend a pend; Pended (X12 A4) is an async/workflow state resolved OUTSIDE the per-policy decision, not a determination leaf. WHICH activity flavors the shared library offers, and their certify/not-certify KINDS, are content (governed in the deployment's content project); whether a policy uses the RIGHT flavor where it draws a distinction is a reviewer/Judge fidelity call this rule INSTRUCTS but does not mechanically enforce.",
-    why: "The universal kit must be customer-agnostic — it serves every deployment's content project, not one denial taxonomy. The structural invariant (shared-library membership, one determination per case ACROSS the delegated closure, no pend leaf) catches the real modeling defects #134 targeted — a determination modeled as a service order, a per-policy re-authored determination, a contradictory double-determination across a parent+sub — WITHOUT hard-coding any activity set; a distinct further not-certify flavor is legitimate content, not a defect (#167).",
-    ref: "#134; #167; §4",
+    rule: "A PA / medical-policy coverage DETERMINATION is a CONFIGURED disposition (see `configure-dispositions`): a plain local `activity` named `\"<category>.<key>\"`, where the CATEGORY is a PAS review-action — `certify`, `not-certify`, or `pended` — and the KEY is a reason/flavor the deployment declares in `crl.dispositions` (e.g. two `not-certify` reasons — a medical-necessity vs an experimental/investigational/unproven — as distinct keyed leaves). The determination is constrained STRUCTURALLY (naming no deployment activities): (1) MEMBERSHIP — every recommended determination is a CONFIGURED `<category>.<key>` (or a bare single-option `<category>`); a determination not in the deployment's configured set is invalid. (2) COMMUNICATED, not ordered — a determination is `CPGCommunicationRequest`, never a `CPGServiceRequest` service order. (3) MUTUAL EXCLUSIVITY — each case fires EXACTLY ONE determination, spanning the DELEGATED CLOSURE (parent + any chained `use decision` sub together): no reachable path may emit two in a single run (author ordered precedence with `first:` + `otherwise`; do not place two determinations under one `all:`/`any:`; a branch that both delegates and `recommend`s is the case an in-tree-only check misses). (4) FINALITY BY MODE — `standalone` (our decision IS the whole adjudication) requires FINAL leaves (certify/not-certify); a non-final `pended` (PAS A4) leaf is legitimate only in `embedded` mode (our decision feeds a larger cross-company adjudication). WHICH keyed flavors exist, and their labels/codes, are the deployment's config; whether a policy uses the RIGHT flavor where it draws a distinction is a reviewer/Judge fidelity call this rule INSTRUCTS but does not mechanically enforce. (Membership + communicated-not-ordered + finality-by-mode are ALSO validator-enforced when the project configures `crl.dispositions.options` — see `configure-dispositions`; they remain always-on per-policy invariants for unconfigured content.)",
+    why: "The universal kit is customer-agnostic — it serves every deployment's content project, not one denial taxonomy. The determination vocabulary is per-deployment CONFIG (the closed set), so the kit constrains SHAPE (a communicated, mutually-exclusive, mode-appropriate-finality determination drawn from the configured set) without hard-coding any activity set; a distinct further not-certify flavor is legitimate content, not a defect (#167). The structural invariants catch the modeling defects #134 targeted — a determination modeled as a service order, an unconfigured/ad-hoc determination, a contradictory double-determination across a parent+sub.",
+    ref: "#134; #167; §4; crl.dispositions",
     clauses: [
       {
-        text: "COMMUNICATED, not ordered: a coverage determination is COMMUNICATED (all `CPGCommunicationRequest`), never a `CPGServiceRequest` service order — modeling a determination as a service order is a clinical-safety error (#134). (This is the request-TYPE invariant; the shared-library MEMBERSHIP invariant below is a distinct check.)",
+        text: "COMMUNICATED, not ordered: a coverage determination is `CPGCommunicationRequest`, never a `CPGServiceRequest` service order — modeling a determination as a service order is a clinical-safety error (#134). ALSO validator-enforced (`disposition-request-type`) when `crl.dispositions.options` is configured; always-on per-policy check otherwise.",
         force: "invariant",
         test: "verifyLoop:communicated-not-ordered",
       },
       {
-        text: "MEMBERSHIP: every recommended determination resolves to the shared `Medical Policy Determination` library (a qualified ref), all `CPGCommunicationRequest`, never `CPGServiceRequest`, never a per-policy re-authored determination.",
+        text: "MEMBERSHIP: every recommended determination is a CONFIGURED `<category>.<key>` disposition (or a bare single-option `<category>`) from the deployment's `crl.dispositions` set — never an unconfigured/ad-hoc determination. ALSO validator-enforced (`disposition-not-configured`) when configured; always-on per-policy check otherwise.",
         force: "invariant",
-        test: "verifyLoop:shared-lib-membership",
+        test: "verifyLoop:configured-membership",
       },
       {
         text: "MUTUAL EXCLUSIVITY spans the DELEGATED CLOSURE: exactly one determination per run over parent + any chained sub together; no path may emit two (a branch that both delegates and `recommend`s is the case an in-tree-only check misses). Author ordered precedence with `first:` + `otherwise`.",
@@ -349,15 +358,31 @@ const RULES: KitRule[] = [
         test: "verifyLoop:mutual-exclusivity-spans-closure",
       },
       {
-        text: "NO PEND leaf: the canonical library holds only FINAL determinations; Pended (X12 A4) is an async/workflow state resolved outside the per-policy decision, not a determination leaf.",
+        text: "FINALITY BY MODE: `standalone` requires FINAL determination leaves (certify/not-certify); a non-final `pended` (PAS A4) leaf is legitimate ONLY in `embedded` mode. ALSO validator-enforced (`disposition-non-final-leaf`) when configured; always-on per-policy check otherwise.",
         force: "invariant",
-        test: "verifyLoop:no-pend",
+        test: "verifyLoop:finality-by-mode",
       },
       {
-        text: "The two KINDS are certify / not-certify; the not-certify kind may carry multiple activity flavors (sharing X12 A3) for distinct reasons — WHICH flavors exist is content, not defect (#167). Whether a policy picks the RIGHT flavor is a reviewer/Judge fidelity call.",
+        text: "The categories are certify / not-certify / pended (PAS review-actions). A category may carry multiple keyed flavors (e.g. two `not-certify` reasons) — WHICH keys exist, and their labels/codes, are the deployment's config, not a defect (#167). Whether a policy picks the RIGHT flavor is a reviewer/Judge fidelity call.",
         force: "default",
       },
     ],
+  },
+  {
+    id: "configure-dispositions",
+    edge: "prior-auth",
+    category: "dispositions",
+    rule: "A medical-policy deployment MUST configure its disposition vocabulary in the content project's `package.json` under `crl.dispositions`: a `mode` (`standalone` | `embedded`) and `options` mapping each PAS category (`certify` / `not-certify` / `pended`) to keyed reasons/flavors — `{ label, narrative?, code? }`. The activity name a policy recommends is `\"<category>.<key>\"` (e.g. `recommend activity \"not-certify.EIU\"`), authored as a plain local `activity` block (`request CPGCommunicationRequest`); the `code` on an option is a PAS review-decision-reason code in full-PAS (Approve/Deny) intent, or the larger system's own code in embedded (Met/Unmet) intent. Once `options` is configured it is the CLOSED valid set: the validator rejects any recommended activity not in it, any determination not `CPGCommunicationRequest`, and (per `disposition-mode`) a non-final leaf under `standalone`. Default vocabulary (if unconfigured): `certify.Approve` / `not-certify.Deny`.",
+    why: "The determination vocabulary is per-deployment (one payer per content project) — Approve/Deny for a standalone full-PA deployment, Met/Unmet for one that is part of a larger adjudication. Making it CONFIG (not hard-coded in the language or the kit) is what lets a deployment relabel or add a flavor without re-authoring policies, and keeps the universal kit customer-agnostic. This rule is GUIDANCE — the validator does NOT error on a MISSING config (an unconfigured project keeps today's behavior); it is the nudge to configure so the closed-set + request-type + finality checks turn on.",
+    ref: "crl.dispositions; #134",
+  },
+  {
+    id: "disposition-mode",
+    edge: "prior-auth",
+    category: "dispositions",
+    rule: "`crl.dispositions.mode` is first-class and gates FINALITY only. `standalone` — our decision IS the whole coverage adjudication; every determination leaf must be FINAL (certify / not-certify). `embedded` — our decision is a SUB-determination feeding a larger cross-company adjudication; a non-final `pended` (PAS A4) leaf is legitimate (a refer-up / need-info contribution). In BOTH modes our decision still issues EXACTLY ONE determination per run (mutual-exclusivity is not relaxed by mode — do NOT read `embedded` as permission to emit two determinations across a parent + sub).",
+    why: "The customer described two operating modes: Smile as the whole PA (Approve/Deny final) vs Smile as part of a larger system (Met/Unmet contributions that the larger tree finalizes). Only finality differs — a contribution may be non-final; it is still one contribution per run. Making mode explicit lets the same policy CRL run either way per deployment, and lets the validator enforce standalone-finality without guessing.",
+    ref: "crl.dispositions.mode",
   },
   {
     id: "minimalism",
@@ -506,41 +531,46 @@ const METHODOLOGY_REQUIREMENTS: VerifyLoop["methodologyRequirements"] = [
   {
     id: "communicated-not-ordered",
     edge: "prior-auth",
-    text: "Every determination a PA/medical-policy decision recommends is `CPGCommunicationRequest` (communicated), never `CPGServiceRequest` (ordered) — inspect the recommended activities' request types per policy (#134).",
+    text: "Every determination a PA/medical-policy decision recommends is `CPGCommunicationRequest` (communicated), never `CPGServiceRequest` (ordered) — inspect the recommended activities' request types per policy (#134). AUTO when the project configures `crl.dispositions.options` (validator `disposition-request-type`); a manual per-policy check otherwise.",
   },
   {
-    id: "shared-lib-membership",
+    id: "configured-membership",
     edge: "prior-auth",
-    text: "Every recommended determination resolves (a qualified ref) to the shared `Medical Policy Determination` library, never a per-policy re-authored determination — check each recommend target's library per policy (#167).",
+    text: "Every recommended determination is a CONFIGURED `<category>.<key>` disposition (or a bare single-option `<category>`) from the deployment's `crl.dispositions` set — never an unconfigured/ad-hoc determination (#167). AUTO when configured (validator `disposition-not-configured`); a manual per-policy check otherwise.",
   },
   {
-    id: "no-pend",
+    id: "finality-by-mode",
     edge: "prior-auth",
-    text: "No determination leaf is a pend: the canonical library holds only FINAL determinations; Pended (X12 A4) is an async/workflow state outside the per-policy decision — check no recommend target is a pend per policy (#167).",
+    text: "FINALITY BY MODE: under `standalone` mode every determination leaf must be FINAL (certify/not-certify) — a non-final `pended` (PAS A4) leaf is legitimate ONLY under `embedded` mode. run_decision has no notion of mode/finality, so this is a MANUAL per-policy check UNLESS the project configures `crl.dispositions` (then the validator enforces it: `disposition-non-final-leaf`).",
   },
 ];
 
-/** ADVISORY above-edge coverage facets (#191) — present only when the chain includes prior-auth. Non-selector, home-TBD. */
-const PRIOR_AUTH_FACETS: KitFacet[] = [
-  {
-    id: "act-modality",
-    name: "act modality — communicated vs ordered",
-    status: "home-TBD",
-    note: "A coverage determination is COMMUNICATED, not ordered. Reserved dimension; level pending the second domain edge — advisory ONLY, do NOT anchor selection or inheritance here.",
+/**
+ * The PA determination MODEL surfaced on the prior-auth edge (feature: configurable PA leaves) — customer-agnostic:
+ * the framework category vocabulary + the `crl.dispositions` config contract. Replaces the retired advisory facets
+ * (act-modality / determination-cardinality / outcome-finality), which became concrete rules (see pa-disposition-set,
+ * configure-dispositions, disposition-mode). NOT a deployment's option labels — only the spec-anchored framework.
+ */
+const DISPOSITION_MODEL: DispositionModel = {
+  activityNamePattern: '"<category>.<key>" — a plain local `activity` (the KEY elides for a single-option category)',
+  localActivityRequired: true,
+  categories: DISPOSITION_CATEGORIES.map((c) => ({
+    name: c.name,
+    reviewActionCode: c.reviewActionCode,
+    finality: c.finality,
+    meaning: c.meaning,
+  })),
+  config: {
+    location: "the content project's package.json, under `crl.dispositions`",
+    shape: "{ version, mode: standalone|embedded, options: { <category>: { <key>: { label, narrative?, code? } } } }",
+    modes: {
+      standalone: "our decision IS the whole adjudication; determination leaves must be FINAL (certify/not-certify)",
+      embedded: "our decision feeds a larger adjudication; a non-final (pended) leaf is legitimate; still ONE determination per run",
+    },
+    closedSet: "once `options` is configured it is the CLOSED valid set (validator-enforced); an unconfigured project keeps today's behavior (no enforcement)",
+    optionCode: "an option's `code` is a PAS review-decision-reason code in full-PAS (Approve/Deny) intent, or the larger system's own code in embedded (Met/Unmet) intent",
   },
-  {
-    id: "determination-cardinality",
-    name: "determination cardinality — ≤1 determination per run",
-    status: "home-TBD",
-    note: "At most one determination across ALL emission paths (`all:`-fanout AND the delegated closure). Reserved dimension; level pending the second domain edge — advisory ONLY, do NOT anchor selection or inheritance here.",
-  },
-  {
-    id: "outcome-finality",
-    name: "outcome finality — no non-final (pend) leaf",
-    status: "home-TBD",
-    note: "No determination leaf is a pend (X12 A4 is an async/workflow state outside the decision). Reserved dimension; level pending the second domain edge — advisory ONLY, do NOT anchor selection or inheritance here.",
-  },
-];
+};
 
 /**
  * The judge-lens rubric — TWO families, each carrying the source-fidelity weighting the uniform severity omits.
@@ -840,7 +870,7 @@ function buildBase(stage: AuthoringStage, useCase: AuthoringUseCase): Omit<Autho
     boundary: BOUNDARY_ENTRIES.filter((b) => inChain(b.edge)).map((b) => b.text),
   };
   if (includesPriorAuth) {
-    base.facets = PRIOR_AUTH_FACETS;
+    base.dispositionModel = DISPOSITION_MODEL;
   }
   return base;
 }

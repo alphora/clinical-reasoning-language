@@ -96,9 +96,10 @@ try {
       "source-delegated-decision-reference.cel",
       "source-delegated-decision-reference.crl",
     ]);
-    // The PA edge carries the shared determination lib + the advisory coverage facets.
+    // The PA edge carries the shared determination lib (until T3b) + the dispositionModel (facets retired).
     assert.ok(kit.referenceArtifacts.some((a) => a.name === "medical-policy-determination.crl"));
-    assert.ok(Array.isArray(kit.facets) && kit.facets.length === 3, "prior-auth carries the 3 advisory facets");
+    assert.ok(!kit.facets, "advisory facets are retired");
+    assert.ok(kit.dispositionModel && kit.dispositionModel.categories.length === 3, "prior-auth surfaces the dispositionModel (3 categories)");
   });
 
   await check("authoring_kit unknown stage → isError listing valid stages", async () => {
