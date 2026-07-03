@@ -17,6 +17,37 @@
  *  - local case-feature concepts (`type is` + `code is` only),
  *  - plain `activity` dispositions (CRL has no approve/deny verbs).
  */
+
+/**
+ * The local DETERMINATION ACTIVITIES appended to each PA reference artifact (configurable-PA-leaves). A
+ * determination is a plain LOCAL `activity` named `<category>.<key>` — certify/not-certify/pended are PAS
+ * review-actions — validated against the deployment's `crl.dispositions` config (NOT a shared vendored library,
+ * which the model retired: a determination may live in a separate library, so config can't generate it). Every
+ * determination is COMMUNICATED (`CPGCommunicationRequest`), never ordered. `certify.Approve` + `not-certify.Deny`
+ * are the baseline; `not-certify.EIU` is a second not-certify flavor (experimental/investigational/unproven) that
+ * shares the A3 outcome but communicates a distinct reason.
+ */
+const DETERMINATION_ACTIVITIES = `
+
+// ===== Determination activities (local; validated against crl.dispositions) =====
+
+activity "certify.Approve":
+- request CPGCommunicationRequest.
+- with \`Certified in total (X12 278 HCR01 A1) — a communicated coverage determination, not a service order.\`.
+
+activity "not-certify.Deny":
+- request CPGCommunicationRequest.
+- with \`Not certified (X12 278 HCR01 A3) — a communicated coverage determination, not a service order.\`.
+`;
+
+const DETERMINATION_ACTIVITIES_WITH_EIU =
+  DETERMINATION_ACTIVITIES +
+  `
+activity "not-certify.EIU":
+- request CPGCommunicationRequest.
+- with \`Not certified — experimental/investigational/unproven (X12 278 HCR01 A3); a denial reason distinct from a medical-necessity not-certify (both are X12 A3), not a service order.\`.
+`;
+
 export const DECISION_REFERENCE_CRL = `# Decision Reference — Imaging Coverage (Stage 1 authoring exemplar)
 library "Imaging Coverage Reference".
 
@@ -186,8 +217,8 @@ lives in the DECISION TREE: each criterion is its own \`when\` node (nesting = A
 \`defined as\` is INFERENCE: it normalizes the sub-representations of ONE criterion
 into ONE clinical fact (here, "failed conservative therapy" = failed drug OR
 physical therapy). sem-and/or are SEMANTIC/inference operators, NOT composition,
-and never join distinct criteria. The determination uses the SHARED "Medical Policy
-Determination" library (imported, never re-authored).
+and never join distinct criteria. The determination is a configured category.key
+local activity (certify.Approve / not-certify.Deny), validated against crl.dispositions.
 */
 
 concept "Has Qualifying Diagnosis":
@@ -207,11 +238,11 @@ decision "Coverage Determination":                 // criteria are nested \`when
 first:
 - when "Has Qualifying Diagnosis" then:
     first:
-    - when "Failed Conservative Therapy" then recommend activity "Medical Policy Determination"."Approve".
-    - otherwise then recommend activity "Medical Policy Determination"."Deny".
+    - when "Failed Conservative Therapy" then recommend activity "certify.Approve".
+    - otherwise then recommend activity "not-certify.Deny".
     end.
-- otherwise then recommend activity "Medical Policy Determination"."Deny".
-`;
+- otherwise then recommend activity "not-certify.Deny".
+` + DETERMINATION_ACTIVITIES;
 
 export const CRITERIA_DECISION_REFERENCE_CEL = `# Criteria Decision Reference — cases (Stage 1)
 library "Coverage Criteria Reference Cases".
@@ -248,81 +279,33 @@ case "diagnosis + failed drug therapy -> approve":
 - subject is "Sample Patient".
 - fact is "Diagnosis Finding".
 - fact is "Drug Therapy Failure".
-- result is "Coverage Determination" is "Approve".
+- result is "Coverage Determination" is "certify.Approve".
 
 case "diagnosis + failed physical therapy -> approve (inference: either representation)":
 - subject is "Sample Patient".
 - fact is "Diagnosis Finding".
 - fact is "Physical Therapy Failure".
-- result is "Coverage Determination" is "Approve".
+- result is "Coverage Determination" is "certify.Approve".
 
 case "diagnosis but no conservative-therapy failure -> deny (criterion-2 node otherwise)":
 - subject is "Sample Patient".
 - fact is "Diagnosis Finding".
-- result is "Coverage Determination" is "Deny".
+- result is "Coverage Determination" is "not-certify.Deny".
 
 case "no qualifying diagnosis -> deny (criterion-1 node otherwise)":
 - subject is "Sample Patient".
-- result is "Coverage Determination" is "Deny".
+- result is "Coverage Determination" is "not-certify.Deny".
 `;
 
-/**
- * Shared PA determination activities (#134). The CANONICAL, reusable
- * prior-authorization Approve/Deny — `CPGCommunicationRequest` carrying the X12 278
- * HCR01 outcome (Approve = A1 Certified / Deny = A3 Not Certified). A PA
- * determination is COMMUNICATED, never ORDERed (never `CPGServiceRequest`). Pended
- * (A4) is an async/workflow state, not a per-policy clinical leaf. Imported by every
- * medical-policy artifact via qualified ref (`"Medical Policy Determination"."Approve"`),
- * never re-authored — so the determination can't drift or go asymmetric per policy.
- */
-export const MEDICAL_POLICY_DETERMINATION_CRL = `# Medical Policy Determination — shared PA determination activities (CANONICAL)
-library "Medical Policy Determination".
-
-/*
-The SHARED, reusable prior-authorization DETERMINATION activities for every medical-policy coverage
-decision. The determination is exactly TWO KINDS of outcome — NOT two activities:
-  • APPROVE  — certify (X12 278 HCR01 A1, Certified in total).
-  • DENY     — not-certify (X12 A3, Not Certified). DENY may take multiple ACTIVITY FLAVORS that
-               share the A3 outcome but communicate a DISTINCT reason:
-                 - "Deny"     = not medically necessary / criteria not met / eligibility/business.
-                 - "Deny EIU" = the requested service is Experimental, Investigational and/or Unproven
-                                (a distinct policy category the payer communicates as such).
-Per case the determination is APPROVE xor a DENY-flavor (mutually exclusive). All are COMMUNICATED
-determinations (CPGCommunicationRequest) — the payer communicates a decision; it NEVER orders the
-service (never CPGServiceRequest). Pended (A4) is a NON-FINAL asynchronous workflow state — NOT a
-per-policy clinical determination leaf; handled at the workflow layer, not here.
-
-The \`with\` text states the X12 outcome + the reason FLAVOR (where Deny is split). The REASON a
-determination fired is the triggering \`when\` concept in the policy; the shared lib offers the flavors,
-the policy picks the right one.
-
-Reuse: a policy references these by qualified name —
-  recommend activity "Medical Policy Determination"."Approve" / ."Deny" / ."Deny EIU".
-At Stage 1 the X12 outcome is carried in the \`with\` narrative; a coded HCR01 value-set binding
-is a later-stage (external-terminology) concern, out of scope for local-decision-support.
-*/
-
-activity "Approve":
-- request CPGCommunicationRequest.
-- with \`Coverage determination: APPROVE / Certified in total (X12 278 HCR01 A1). A communicated prior-authorization coverage determination certifying the requested service; NOT a service order.\`.
-
-activity "Deny":
-- request CPGCommunicationRequest.
-- with \`Coverage determination: DENY / Not Certified (X12 278 HCR01 A3). A communicated prior-authorization coverage determination denying certification of the requested service (not medically necessary / criteria not met); NOT a service order.\`.
-
-activity "Deny EIU":
-- request CPGCommunicationRequest.
-- with \`Coverage determination: DENY — Experimental, Investigational and/or Unproven (X12 278 HCR01 A3). A communicated prior-authorization coverage determination denying certification because the requested service is classified experimental/investigational/unproven — a denial reason distinct from a medical-necessity Deny (both are X12 A3); NOT a service order.\`.
-`;
 
 /**
  * Canonical PRIOR-AUTHORIZATION exemplar (#134) — distinct from the CDS
  * `decision-reference` (which ORDERs a service via `CPGServiceRequest`). Here the
- * payer COMMUNICATES a coverage determination via the SHARED "Medical Policy
- * Determination" library (imported, not re-authored). This exemplar shows the
- * Approve/Deny baseline; Pended (A4) is async/workflow, not a leaf. A single local
- * criterion keeps the focus on the determination pattern; a real policy authors its
- * DISTINCT criteria as decision-tree nodes (see criteria-decision-reference).
+ * payer COMMUNICATES a coverage determination via configured `<category>.<key>` local
+ * activities (validated against `crl.dispositions`). This exemplar shows the
+ * certify/not-certify baseline; a non-final `pended` leaf is legitimate only in embedded
+ * mode. A single local criterion keeps the focus on the determination pattern; a real
+ * policy authors its DISTINCT criteria as decision-tree nodes (see criteria-decision-reference).
  */
 export const PA_DETERMINATION_REFERENCE_CRL = `# PA Determination Reference — Coverage Determination (Stage 1 PA exemplar)
 library "PA Determination Reference".
@@ -330,10 +313,10 @@ library "PA Determination Reference".
 /*
 The canonical PRIOR-AUTHORIZATION exemplar — distinct from the CDS decision-reference (which
 ORDERs a service via CPGServiceRequest). Here the payer COMMUNICATES a coverage determination:
-Approve (X12 HCR01 A1) / Deny (A3), via the SHARED "Medical Policy Determination" library
-(imported, NOT re-authored per policy). This exemplar uses the Approve/Deny baseline; a deployment's
-shared lib may offer further FINAL flavors. Pended (A4) is an async/workflow state, not a per-policy
-clinical leaf. A single local criterion is shown; a real policy authors its DISTINCT
+certify (X12 HCR01 A1) / not-certify (A3), via configured \`<category>.<key>\` local activities
+(validated against crl.dispositions — no shared library). This exemplar uses the certify/not-certify
+baseline; a deployment configures further keyed flavors. A non-final pended (A4) leaf is legitimate
+only in embedded mode. A single local criterion is shown; a real policy authors its DISTINCT
 criteria as decision-tree nodes (see criteria-decision-reference).
 */
 
@@ -345,9 +328,9 @@ concept "Has Qualifying Diagnosis":
 
 decision "Coverage Determination":
 first:
-- when "Has Qualifying Diagnosis" then recommend activity "Medical Policy Determination"."Approve".
-- otherwise then recommend activity "Medical Policy Determination"."Deny".
-`;
+- when "Has Qualifying Diagnosis" then recommend activity "certify.Approve".
+- otherwise then recommend activity "not-certify.Deny".
+` + DETERMINATION_ACTIVITIES;
 
 export const PA_DETERMINATION_REFERENCE_CEL = `# PA Determination Reference — cases (Stage 1 PA exemplar)
 library "PA Determination Reference Cases".
@@ -366,11 +349,11 @@ fact "Diagnosis Finding":
 case "qualifying diagnosis -> approve":
 - subject is "Sample Patient".
 - fact is "Diagnosis Finding".
-- result is "Coverage Determination" is "Approve".
+- result is "Coverage Determination" is "certify.Approve".
 
 case "no qualifying diagnosis -> deny (otherwise)":
 - subject is "Sample Patient".
-- result is "Coverage Determination" is "Deny".
+- result is "Coverage Determination" is "not-certify.Deny".
 `;
 
 /**
@@ -416,14 +399,14 @@ concept "Clinically Indicated":
 decision "Coverage Determination":
 first:
 - when "Continuation Request" then use decision "Continuation of Therapy Determination".
-- when "Clinically Indicated" then recommend activity "Medical Policy Determination"."Approve".
-- otherwise then recommend activity "Medical Policy Determination"."Deny".
+- when "Clinically Indicated" then recommend activity "certify.Approve".
+- otherwise then recommend activity "not-certify.Deny".
 
 decision "Continuation of Therapy Determination":
 first:
-- when "Demonstrated Response" then recommend activity "Medical Policy Determination"."Approve".
-- otherwise then recommend activity "Medical Policy Determination"."Deny".
-`;
+- when "Demonstrated Response" then recommend activity "certify.Approve".
+- otherwise then recommend activity "not-certify.Deny".
+` + DETERMINATION_ACTIVITIES;
 
 export const SOURCE_DELEGATED_DECISION_REFERENCE_CEL = `# Source-Delegated Decision Reference — cases (Stage 1)
 library "Source Delegated Decision Reference Cases".
@@ -460,21 +443,21 @@ case "continuation + demonstrated response -> approve via delegated sub":
 - subject is "Sample Patient".
 - fact is "Continuation Request Finding".
 - fact is "Demonstrated Response Finding".
-- result is "Coverage Determination" is "Approve".
+- result is "Coverage Determination" is "certify.Approve".
 
 case "continuation, no response -> deny via delegated sub otherwise":
 - subject is "Sample Patient".
 - fact is "Continuation Request Finding".
-- result is "Coverage Determination" is "Deny".
+- result is "Coverage Determination" is "not-certify.Deny".
 
 case "clinically indicated (no continuation) -> approve in parent":
 - subject is "Sample Patient".
 - fact is "Clinically Indicated Finding".
-- result is "Coverage Determination" is "Approve".
+- result is "Coverage Determination" is "certify.Approve".
 
 case "neither -> deny in parent otherwise":
 - subject is "Sample Patient".
-- result is "Coverage Determination" is "Deny".
+- result is "Coverage Determination" is "not-certify.Deny".
 `;
 
 /**
@@ -485,7 +468,7 @@ case "neither -> deny in parent otherwise":
  * ONE determination. The faithful, provable refinement (at scale): compute the precedence in the INFERENCE
  * layer — make the FINAL-* concepts pairwise-disjoint via \`sem-not\` complement-guards, carry them as flat
  * \`when\` siblings, and RE-EXPOSE the approve criteria as visible nodes (#168-clean). Uses only kit-in-scope
- * inference; NO \`use decision\`. The two denies use DISTINCT activities (Deny vs Deny EIU) so \`result is\`
+ * inference; NO \`use decision\`. The two denies use DISTINCT activities (not-certify.Deny vs not-certify.EIU) so \`result is\`
  * can distinguish them (§4-req1). Verbatim from the KE deliverable (green: validate_crl/validate_cel clean,
  * run_decision 6/6). NOTE: this is an AT-SCALE option — for a few pathways the plain nested tree is simpler.
  */
@@ -550,16 +533,16 @@ first:
 - when "Final Approve" then:
   all:
   - when "Has Indication X" then:
-    - when "Failed Standard Therapy" then recommend activity "Medical Policy Determination"."Approve".
+    - when "Failed Standard Therapy" then recommend activity "certify.Approve".
     end.
   - when "Has Indication Y" then:
-    - when "Has Severe Markers" then recommend activity "Medical Policy Determination"."Approve".
+    - when "Has Severe Markers" then recommend activity "certify.Approve".
     end.
   end.
-- when "Final Deny" then recommend activity "Medical Policy Determination"."Deny".
-- when "Final Experimental" then recommend activity "Medical Policy Determination"."Deny EIU".
-- otherwise then recommend activity "Medical Policy Determination"."Deny".
-`;
+- when "Final Deny" then recommend activity "not-certify.Deny".
+- when "Final Experimental" then recommend activity "not-certify.EIU".
+- otherwise then recommend activity "not-certify.Deny".
+` + DETERMINATION_ACTIVITIES_WITH_EIU;
 
 export const DISPOSITION_ARBITRATION_REFERENCE_CEL = `# Disposition-Arbitration Reference — cases (Stage 1)
 library "Disposition Arbitration Reference Cases".
@@ -602,36 +585,36 @@ case "X pathway qualifies -> approve":
 - subject is "Sample Patient".
 - fact is "Indication X Finding".
 - fact is "Failed Standard Therapy Finding".
-- result is "Coverage Determination" is "Approve".
+- result is "Coverage Determination" is "certify.Approve".
 
 case "Y pathway qualifies -> approve":
 - subject is "Sample Patient".
 - fact is "Indication Y Finding".
 - fact is "Severe Markers Finding".
-- result is "Coverage Determination" is "Approve".
+- result is "Coverage Determination" is "certify.Approve".
 
 case "OVERLAP: both indications, X-pathway fails (no failed-standard) -> approve via Y":
 - subject is "Sample Patient".
 - fact is "Indication X Finding".
 - fact is "Indication Y Finding".
 - fact is "Severe Markers Finding".
-- result is "Coverage Determination" is "Approve".
+- result is "Coverage Determination" is "certify.Approve".
 
 case "OVERLAP: both indications, Y-pathway fails (no severe markers) -> approve via X":
 - subject is "Sample Patient".
 - fact is "Indication X Finding".
 - fact is "Failed Standard Therapy Finding".
 - fact is "Indication Y Finding".
-- result is "Coverage Determination" is "Approve".
+- result is "Coverage Determination" is "certify.Approve".
 
 case "within-indication: X present but pathway fails, no Y -> Deny":
 - subject is "Sample Patient".
 - fact is "Indication X Finding".
-- result is "Coverage Determination" is "Deny".
+- result is "Coverage Determination" is "not-certify.Deny".
 
 case "off-indication: neither indication -> Deny EIU":
 - subject is "Sample Patient".
-- result is "Coverage Determination" is "Deny EIU".
+- result is "Coverage Determination" is "not-certify.EIU".
 `;
 
 export const PATIENT_AGE_BOTH_REP_REFERENCE_CRL = `# Patient-Age Both-Representation Reference — the SOLE \`definition is\` exception (Stage 1)

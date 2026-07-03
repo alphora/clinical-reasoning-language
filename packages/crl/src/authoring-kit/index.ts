@@ -23,7 +23,6 @@ import {
   DECISION_REFERENCE_CRL,
   DISPOSITION_ARBITRATION_REFERENCE_CEL,
   DISPOSITION_ARBITRATION_REFERENCE_CRL,
-  MEDICAL_POLICY_DETERMINATION_CRL,
   PA_DETERMINATION_REFERENCE_CEL,
   PA_DETERMINATION_REFERENCE_CRL,
   PATIENT_AGE_BOTH_REP_REFERENCE_CRL,
@@ -81,7 +80,8 @@ export type { AuthoringEdge, AuthoringKit, AuthoringStage, AuthoringUseCase, Kit
 //   new prior-auth rules (`configure-dispositions`, `disposition-mode`). The verifyLoop `shared-lib-membership` →
 //   `configured-membership` and `no-pend` → `finality-by-mode`. The three advisory `facets` are RETIRED (they became
 //   concrete rules); a new prior-auth `dispositionModel` field surfaces the framework categories + config contract.
-//   (Reference artifacts still teach the shared-lib model — migrated in T3b.)
+//   T3b (same schemaVersion, hash re-pinned): migrated the PA reference artifacts to the config-driven model
+//   (local `<category>.<key>` activities; removed the shared `medical-policy-determination.crl`, 12→11 artifacts).
 // Sibling KE agents pin schemaVersion + contentHash and re-sync; the bump signals the new shape.
 const SCHEMA_VERSION = "1.5";
 export const DEFAULT_STAGE: AuthoringStage = "local-decision-support";
@@ -722,12 +722,13 @@ const BOUNDARY_ENTRIES: { text: string; edge: AuthoringEdge }[] = [
 ];
 
 /**
- * The reference artifacts, edge-tagged and CLOSURE-CORRECT (#191): the shared `Medical Policy Determination`
- * library recommends Approve/Deny (X12 A1/A3) — PA vocabulary, not general infrastructure — so it rides the
- * `prior-auth` edge, and every exemplar that recommends INTO it rides `prior-auth` with it. The `cpg` base keeps
- * only the pure-CDS `decision-reference` (service ORDERS) + the `patient-age` carve-out, which reference nothing
- * PA. A `cpg` kit therefore never ships a determination ref it cannot resolve. (A cpg-general criteria/delegation
- * exemplar is deferred to the CPG-edge build; the `cpg` decision RULES still teach the composition surface.)
+ * The reference artifacts, edge-tagged (#191): the PA determination exemplars (criteria / pa-determination /
+ * source-delegated / disposition-arbitration) ride the `prior-auth` edge because they ARE PA coverage-determination
+ * content — they recommend configured `<category>.<key>` determinations (certify/not-certify/pended) and carry their
+ * own local determination `activity` blocks (validated against `crl.dispositions`; the shared vendored library was
+ * retired in the configurable-PA-leaves work). The `cpg` base keeps only the pure-CDS `decision-reference` (service
+ * ORDERS) + the `patient-age` carve-out. (A cpg-general criteria/delegation exemplar is deferred to the CPG-edge
+ * build; the `cpg` decision RULES still teach the composition surface.)
  *
  * KNOWN GAP (deferred to the CPG-edge build): a few `cpg` RULES point by name at exemplars that ride the
  * `prior-auth` edge — `decision-composition`/`concept-form` → `criteria-decision-reference` +
@@ -771,19 +772,11 @@ const REFERENCE_ARTIFACTS: ReferenceArtifact[] = [
     source: CRITERIA_DECISION_REFERENCE_CEL,
   },
   {
-    name: "medical-policy-determination.crl",
-    language: "crl",
-    edge: "prior-auth",
-    purpose:
-      "The SHARED, canonical PA determination library (#134) — communicated (CPGCommunicationRequest), never ordered, imported by every medical-policy artifact via qualified ref, never re-authored. Two KINDS of outcome (certify / not-certify); the not-certify kind takes activity FLAVORS sharing one X12 A3 outcome — here Approve (A1), Deny (A3 medical-necessity), and Deny EIU (A3 experimental/investigational/unproven, a distinct reason); a deployment's content project may add further FINAL flavors. (No companion CEL — a shared activity lib has no decision to run.)",
-    source: MEDICAL_POLICY_DETERMINATION_CRL,
-  },
-  {
     name: "pa-determination-reference.crl",
     language: "crl",
     edge: "prior-auth",
     purpose:
-      "Canonical PRIOR-AUTHORIZATION exemplar (#134) — distinct from the CDS decision-reference (which ORDERs a service). The payer COMMUNICATES the determination via the shared library (this exemplar shows the Approve/Deny baseline; a deployment may add further final flavors); Pended (A4) is async/workflow, never a determination leaf.",
+      "Canonical PRIOR-AUTHORIZATION exemplar (#134) — distinct from the CDS decision-reference (which ORDERs a service). The payer COMMUNICATES the determination via configured `<category>.<key>` local activities (certify.Approve / not-certify.Deny), validated against crl.dispositions; Pended (A4) is a non-final leaf, legitimate only in embedded mode.",
     source: PA_DETERMINATION_REFERENCE_CRL,
   },
   {
@@ -791,7 +784,7 @@ const REFERENCE_ARTIFACTS: ReferenceArtifact[] = [
     language: "cel",
     edge: "prior-auth",
     purpose:
-      "Companion cases for the PA exemplar: qualifying diagnosis → approve; otherwise → deny. Resolves the shared determination activities via the vendored-sibling library (no `include`).",
+      "Companion cases for the PA exemplar: qualifying diagnosis → certify.Approve; otherwise → not-certify.Deny. The determination activities are local (config-driven, no shared library).",
     source: PA_DETERMINATION_REFERENCE_CEL,
   },
   {

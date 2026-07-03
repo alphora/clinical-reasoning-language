@@ -74,14 +74,14 @@ try {
     assert.equal(v.success, true, "embedded reference CRL must validate clean through the bundled server");
   });
 
-  await check("authoring_kit useCase:'prior-auth' → the full inherited 12-artifact set + advisory facets", async () => {
+  await check("authoring_kit useCase:'prior-auth' → the full inherited 11-artifact set + dispositionModel", async () => {
     const r = await client.callTool({ name: "authoring_kit", arguments: { useCase: "prior-auth" } });
     assert.ok(!r.isError, "should not be a tool error");
     const kit = JSON.parse(r.content[0].text);
     assert.equal(kit.useCase, "prior-auth");
     assert.deepEqual(kit.chain, ["cpg", "prior-auth"]);
-    // Durable guard that the bundled server carries the full PA kit — the 12-artifact set
-    // (A criteria-decision + decision + shared determination lib + PA + B source-delegated + C disposition-arbitration + patient-age).
+    // Durable guard that the bundled server carries the full PA kit — the 11-artifact set (config-driven; the shared
+    // medical-policy-determination.crl was removed — determinations are now local `<category>.<key>` activities).
     assert.deepEqual(kit.referenceArtifacts.map((a) => a.name).sort(), [
       "criteria-decision-reference.cel",
       "criteria-decision-reference.crl",
@@ -89,15 +89,13 @@ try {
       "decision-reference.crl",
       "disposition-arbitration-reference.cel",
       "disposition-arbitration-reference.crl",
-      "medical-policy-determination.crl",
       "pa-determination-reference.cel",
       "pa-determination-reference.crl",
       "patient-age-both-rep-reference.crl",
       "source-delegated-decision-reference.cel",
       "source-delegated-decision-reference.crl",
     ]);
-    // The PA edge carries the shared determination lib (until T3b) + the dispositionModel (facets retired).
-    assert.ok(kit.referenceArtifacts.some((a) => a.name === "medical-policy-determination.crl"));
+    assert.ok(!kit.referenceArtifacts.some((a) => a.name === "medical-policy-determination.crl"));
     assert.ok(!kit.facets, "advisory facets are retired");
     assert.ok(kit.dispositionModel && kit.dispositionModel.categories.length === 3, "prior-auth surfaces the dispositionModel (3 categories)");
   });

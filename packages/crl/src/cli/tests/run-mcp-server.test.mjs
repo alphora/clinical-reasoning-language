@@ -91,10 +91,10 @@ try {
     assert.deepEqual(kit.chain, ["cpg", "prior-auth"]);
     assert.equal(kit.schemaVersion, "1.5");
     // Sibling KE (PA) agents pin BOTH schemaVersion + the prior-auth contentHash via MCP — pin it here too.
-    assert.equal(kit.contentHash, "84672b95b3e791857aa844bb0386887e0787906020e1845f4096c99bf3049d48");
+    assert.equal(kit.contentHash, "553fe657de061491ce857870b641e980caf0c91059d8dd1f2192ccdd3b646abd");
     const refNames = kit.referenceArtifacts.map((a) => a.name).sort();
-    assert.equal(refNames.length, 12);
-    assert.ok(refNames.includes("medical-policy-determination.crl"));
+    assert.equal(refNames.length, 11); // shared medical-policy-determination.crl removed (config-driven local activities)
+    assert.ok(!refNames.includes("medical-policy-determination.crl"));
     assert.ok(!kit.facets, "advisory facets are retired");
     assert.ok(kit.dispositionModel && kit.dispositionModel.categories.length === 3, "prior-auth surfaces the dispositionModel (3 categories)");
   });

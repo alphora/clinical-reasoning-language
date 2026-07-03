@@ -7,6 +7,7 @@ import { buildCEL } from "../../cel";
 import { resolveCelImports } from "../../cel/imports";
 import { validateCELFile } from "../../cel/validator";
 import { runCel } from "../../cre";
+import { validateCRLImports } from "../../imports/validate";
 import { activityTypes } from "../../grammar/activityTypes";
 import { conceptTypes } from "../../grammar/conceptTypes";
 import { conceptValueTypes } from "../../grammar/conceptValueTypes";
@@ -20,7 +21,6 @@ import {
   DECISION_REFERENCE_CRL,
   DISPOSITION_ARBITRATION_REFERENCE_CEL,
   DISPOSITION_ARBITRATION_REFERENCE_CRL,
-  MEDICAL_POLICY_DETERMINATION_CRL,
   PA_DETERMINATION_REFERENCE_CEL,
   PA_DETERMINATION_REFERENCE_CRL,
   PATIENT_AGE_BOTH_REP_REFERENCE_CRL,
@@ -82,10 +82,6 @@ describe("authoring-kit — reference artifacts", () => {
     expect(built.success).toBe(true);
   });
 
-  it("medical-policy-determination.crl (shared lib) validates clean (self-contained)", () => {
-    expect(crlErrors(MEDICAL_POLICY_DETERMINATION_CRL)).toEqual([]);
-  });
-
   it("patient-age-both-rep-reference.crl (the SOLE `definition is` carve-out) validates clean (self-contained)", () => {
     // The both-rep age concept carries BOTH `code is` (local) and `definition is age today at least <N> years`
     // (compute over Patient.birthDate) — the one sanctioned `definition is`. It must validate CLEAN embedded.
@@ -96,15 +92,53 @@ describe("authoring-kit — reference artifacts", () => {
     expect(PATIENT_AGE_BOTH_REP_REFERENCE_CRL).toMatch(/- definition is age today at least 18 years\./);
   });
 
-  it("criteria-decision-reference.crl is shape-clean; only the shared-lib determination refs flag single-file", () => {
-    // The determination now lives in the shared "Medical Policy Determination" lib (qualified ref). Single-file
-    // (no sibling context) the validator flags the two Approve/Deny refs `external-library-not-included` — no
-    // shape/parse errors. With the vendored sibling present it validates fully clean (materialized test below).
-    const errs = crlErrors(CRITERIA_DECISION_REFERENCE_CRL);
-    const ext = errs.filter((e) => e.kind === "external-library-not-included");
-    expect(ext.length).toBe(3); // the three shared-lib determination refs (Approve, + Deny at each otherwise)
-    expect(errs.length).toBe(ext.length); // ...and NOTHING else — no shape/parse error
-    expect(ext.every((e) => (e.message ?? "").includes("Medical Policy Determination"))).toBe(true);
+  it("a migrated PA artifact validates through the PROJECT path (the config validator IS on the path) with a matching crl.dispositions — and a bogus determination is REJECTED (not a K4 fake-green)", () => {
+    // The other kit tests use `new Validator().validate` / `validateCELFile`, which do NOT read `crl.dispositions`.
+    // This one uses `validateCRLImports` — the project-aware path that resolves the config + runs DispositionValidator —
+    // so it actually PROVES the config-driven closed set, positively AND negatively.
+    const dir = mkdtempSync(join(tmpdir(), "authoring-kit-pa-config-"));
+    const write = (crl: string) => {
+      writeFileSync(
+        join(dir, "package.json"),
+        JSON.stringify({
+          name: "pa-config-test",
+          version: "1.0.0",
+          private: true,
+          crl: {
+            canonicalBase: "http://example.org/pa-config-test",
+            status: "draft",
+            experimental: true,
+            dispositions: {
+              options: { certify: { Approve: { label: "Approve" } }, "not-certify": { Deny: { label: "Deny" } } },
+            },
+          },
+        }),
+      );
+      const p = join(dir, "pa-determination-reference.crl");
+      writeFileSync(p, crl);
+      return p;
+    };
+
+    // POSITIVE: the artifact's configured certify.Approve / not-certify.Deny determinations pass the closed set.
+    const okPath = write(PA_DETERMINATION_REFERENCE_CRL);
+    const ok = validateCRLImports(okPath);
+    expect(ok.validationErrors.filter((e) => e.kind.startsWith("disposition-"))).toEqual([]);
+
+    // NEGATIVE: swap a recommend to an UNCONFIGURED determination — enforcement is LIVE, so it must flag it.
+    const badCrl = PA_DETERMINATION_REFERENCE_CRL.replace(
+      'then recommend activity "certify.Approve"',
+      'then recommend activity "certify.NotAConfiguredKey"',
+    );
+    const bad = validateCRLImports(write(badCrl));
+    expect(bad.validationErrors.some((e) => e.kind === "disposition-not-configured")).toBe(true);
+  });
+
+  it("criteria-decision-reference.crl validates CLEAN self-contained (determinations are now LOCAL activities)", () => {
+    // Post-migration the determinations are local `certify.Approve` / `not-certify.Deny` activities declared IN the
+    // artifact — no shared-lib qualified ref — so single-file validation is fully clean (no external-library errors).
+    expect(crlErrors(CRITERIA_DECISION_REFERENCE_CRL)).toEqual([]);
+    expect(CRITERIA_DECISION_REFERENCE_CRL).toMatch(/activity "certify\.Approve":/);
+    expect(CRITERIA_DECISION_REFERENCE_CRL).toMatch(/recommend activity "certify\.Approve"/);
   });
 
   it("criteria-decision-reference.cel + .crl: validates clean; the CRE proves criteria-as-NODES + the `defined as` inference (#168)", () => {
@@ -123,8 +157,6 @@ describe("authoring-kit — reference artifacts", () => {
       }),
     );
     writeFileSync(join(dir, "criteria-decision-reference.crl"), CRITERIA_DECISION_REFERENCE_CRL);
-    // The determination activities live in the shared lib, resolved as a vendored sibling (no `include`).
-    writeFileSync(join(dir, "medical-policy-determination.crl"), MEDICAL_POLICY_DETERMINATION_CRL);
     const celPath = join(dir, "criteria-decision-reference.cel");
     writeFileSync(celPath, CRITERIA_DECISION_REFERENCE_CEL);
 
@@ -168,7 +200,6 @@ describe("authoring-kit — reference artifacts", () => {
       }),
     );
     writeFileSync(join(dir, "pa-determination-reference.crl"), PA_DETERMINATION_REFERENCE_CRL);
-    writeFileSync(join(dir, "medical-policy-determination.crl"), MEDICAL_POLICY_DETERMINATION_CRL);
     const celPath = join(dir, "pa-determination-reference.cel");
     writeFileSync(celPath, PA_DETERMINATION_REFERENCE_CEL);
 
@@ -202,7 +233,6 @@ describe("authoring-kit — reference artifacts", () => {
       join(dir, "source-delegated-decision-reference.crl"),
       SOURCE_DELEGATED_DECISION_REFERENCE_CRL,
     );
-    writeFileSync(join(dir, "medical-policy-determination.crl"), MEDICAL_POLICY_DETERMINATION_CRL);
     const celPath = join(dir, "source-delegated-decision-reference.cel");
     writeFileSync(celPath, SOURCE_DELEGATED_DECISION_REFERENCE_CEL);
 
@@ -219,7 +249,7 @@ describe("authoring-kit — reference artifacts", () => {
     // `otherwise`. Membership alone (both are "Deny") can't tell them apart — assert via the trace: the
     // top-level `when "Continuation Request"` branch fired and delegated.
     const denyViaSub = run.runs.find((r) => r.case.includes("no response"))!;
-    expect(denyViaSub.produced.map((p) => p.recommendation)).toEqual(["Deny"]);
+    expect(denyViaSub.produced.map((p) => p.recommendation)).toEqual(["not-certify.Deny"]);
     // The PATH: the top-level `when "Continuation Request"` branch fired and RECURSED into the delegated sub
     // ("Continuation of Therapy Determination"), whose own `otherwise` produced Deny — NOT the parent's
     // `otherwise`. Membership alone ("Deny") can't distinguish these; the trace shape can.
@@ -252,7 +282,6 @@ describe("authoring-kit — reference artifacts", () => {
       join(dir, "disposition-arbitration-reference.crl"),
       DISPOSITION_ARBITRATION_REFERENCE_CRL,
     );
-    writeFileSync(join(dir, "medical-policy-determination.crl"), MEDICAL_POLICY_DETERMINATION_CRL);
     const celPath = join(dir, "disposition-arbitration-reference.cel");
     writeFileSync(celPath, DISPOSITION_ARBITRATION_REFERENCE_CEL);
 
@@ -266,7 +295,7 @@ describe("authoring-kit — reference artifacts", () => {
     // The two load-bearing overlap cases approve via the OTHER pathway (no overlap-pop) — and Deny EIU is a
     // distinct activity from Deny so `result is` can tell them apart (§4-req1, same-disposition disambiguation).
     const eiu = run.runs.find((r) => r.case.includes("off-indication"))!;
-    expect(eiu.produced.map((p) => p.recommendation)).toEqual(["Deny EIU"]);
+    expect(eiu.produced.map((p) => p.recommendation)).toEqual(["not-certify.EIU"]);
   });
 });
 
@@ -334,7 +363,7 @@ describe("authoring-kit — getAuthoringKit", () => {
     }
   });
 
-  it("the prior-auth chain embeds the full 12-artifact set (cpg base + the PA edge, inheritance)", () => {
+  it("the prior-auth chain embeds the full 11-artifact set (cpg base + the PA edge, inheritance; shared lib removed)", () => {
     const kit = getAuthoringKit(undefined, "prior-auth");
     const names = kit.referenceArtifacts.map((a) => a.name).sort();
     expect(names).toEqual([
@@ -344,7 +373,6 @@ describe("authoring-kit — getAuthoringKit", () => {
       "decision-reference.crl",
       "disposition-arbitration-reference.cel",
       "disposition-arbitration-reference.crl",
-      "medical-policy-determination.crl",
       "pa-determination-reference.cel",
       "pa-determination-reference.crl",
       "patient-age-both-rep-reference.crl",
@@ -356,7 +384,6 @@ describe("authoring-kit — getAuthoringKit", () => {
     expect(src("decision-reference.cel")).toBe(DECISION_REFERENCE_CEL);
     expect(src("criteria-decision-reference.crl")).toBe(CRITERIA_DECISION_REFERENCE_CRL);
     expect(src("criteria-decision-reference.cel")).toBe(CRITERIA_DECISION_REFERENCE_CEL);
-    expect(src("medical-policy-determination.crl")).toBe(MEDICAL_POLICY_DETERMINATION_CRL);
     expect(src("pa-determination-reference.crl")).toBe(PA_DETERMINATION_REFERENCE_CRL);
     expect(src("pa-determination-reference.cel")).toBe(PA_DETERMINATION_REFERENCE_CEL);
     expect(src("patient-age-both-rep-reference.crl")).toBe(PATIENT_AGE_BOTH_REP_REFERENCE_CRL);
@@ -367,10 +394,10 @@ describe("authoring-kit — getAuthoringKit", () => {
   });
 
   it("artifact edges are CLOSURE-CORRECT: no cpg artifact references ANY prior-auth artifact's library by qualified ref", () => {
-    // The shared `Medical Policy Determination` library is prior-auth; every exemplar recommending into it must
-    // ride prior-auth too, or a cpg kit would ship a determination ref it cannot resolve. Generalize: derive the
-    // LIBRARY name declared by every prior-auth artifact, then assert no cpg artifact quotes any of them — so a
-    // FUTURE prior-auth library referenced from a cpg artifact fails here too (not just the known shared lib).
+    // Post-migration the PA determination exemplars are self-contained (local `<category>.<key>` activities) — no
+    // shared library. Generalize the closure guard anyway: derive the LIBRARY name declared by every prior-auth
+    // artifact, then assert no cpg artifact quotes any of them — so a FUTURE prior-auth library referenced from a
+    // cpg artifact fails here too.
     const kit = getAuthoringKit(undefined, "prior-auth");
     const libNameOf = (src: string): string | undefined => /(?:^|\n)\s*library\s+"([^"]+)"/.exec(src)?.[1];
     const priorAuthLibs = new Set(
@@ -379,7 +406,7 @@ describe("authoring-kit — getAuthoringKit", () => {
         .map((a) => libNameOf(a.source))
         .filter((n): n is string => !!n),
     );
-    expect(priorAuthLibs.has("Medical Policy Determination")).toBe(true); // the derivation actually found libs
+    expect(priorAuthLibs.has("PA Determination Reference")).toBe(true); // the derivation actually found libs
     const cpgArtifacts = kit.referenceArtifacts.filter((a) => a.edge === "cpg");
     for (const a of cpgArtifacts) {
       for (const lib of priorAuthLibs) {
@@ -630,8 +657,11 @@ describe("authoring-kit — getAuthoringKit", () => {
     // configure-dispositions + disposition-mode rules added, verifyLoop shared-lib-membership→configured-membership +
     // no-pend→finality-by-mode, facets retired, prior-auth `dispositionModel` field added. schemaVersion is hashed on
     // BOTH payloads so both pins move. KE seats re-sync on the bump.
+    // T3b (same schemaVersion 1.5, prior-auth hash re-pinned): reference artifacts migrated to the config-driven
+    // model (local `<category>.<key>` activities), shared medical-policy-determination.crl removed (12→11). Only the
+    // prior-auth content changed → cpg hash holds, prior-auth hash moves.
     expect(cpg.contentHash).toBe("746b84a0a2f546f8081aab1173dfbaa4e4b81480b622f211585d6a6f9cd79924");
-    expect(priorAuth.contentHash).toBe("84672b95b3e791857aa844bb0386887e0787906020e1845f4096c99bf3049d48");
+    expect(priorAuth.contentHash).toBe("553fe657de061491ce857870b641e980caf0c91059d8dd1f2192ccdd3b646abd");
   });
 
   it("STAGES contains exactly the one Stage-1 slice", () => {
