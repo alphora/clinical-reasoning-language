@@ -38,6 +38,7 @@
 import type { Activity, ActivityWith } from "../ast/types";
 import type { ReferenceName } from "../ast/types";
 import { refDisplay } from "../ast/types";
+import { cqlStringLiteral, escapeCqlString } from "../cql-emitter/cqlStrings";
 import { REVIEW_ACTION_SYSTEM } from "../dispositions/categories";
 import { resolveDeterminationLeaf } from "../dispositions/config";
 import type { ResolvedOption } from "../dispositions/types";
@@ -302,15 +303,15 @@ export function emitActivityDefinition(
     // human message (`payload.contentString`); the `with` narrative is a supplementary `note.text`; and the
     // machine-readable PAS review-action Coding (+ the option's config reason Coding) is the `reasonCode`.
     // Retires the coded-HCR01 boundary — the X12 278 HCR01 outcome is now coded on the produced resource.
-    dynamicValues.push(cqlDynamicValue("payload.contentString", cqlLiteral(determination.label)));
+    dynamicValues.push(cqlDynamicValue("payload.contentString", cqlStringLiteral(determination.label)));
     if (withNarrative !== undefined) {
-      dynamicValues.push(cqlDynamicValue("note.text", cqlLiteral(withNarrative)));
+      dynamicValues.push(cqlDynamicValue("note.text", cqlStringLiteral(withNarrative)));
     }
     dynamicValues.push(cqlDynamicValue("reasonCode", reviewActionCql(determination)));
   } else if (isCommunication && withNarrative !== undefined) {
     // A plain (non-determination) CommunicationRequest activity: the `with` narrative IS the message body
     // (per the cqf sendmessage ActivityDefinition example; resolves #181 for CommunicationRequest).
-    dynamicValues.push(cqlDynamicValue("payload.contentString", cqlLiteral(withNarrative)));
+    dynamicValues.push(cqlDynamicValue("payload.contentString", cqlStringLiteral(withNarrative)));
   }
 
   if (dynamicValues.length > 0) resource.dynamicValue = dynamicValues;
@@ -333,26 +334,6 @@ function defaultClock(): Date {
   return new Date();
 }
 
-/**
- * Escape a string for a CQL single-quoted literal: backslash + single-quote (so the content can't break out of
- * the literal), and the whitespace control chars to their CQL escape sequences (a raw newline/tab/CR in a config
- * label or `with` narrative would otherwise land literally inside the single-quoted literal). Backslash is escaped
- * FIRST so the sequences added afterward aren't double-escaped.
- */
-function cqlString(s: string): string {
-  return s
-    .replace(/\\/g, "\\\\")
-    .replace(/'/g, "\\'")
-    .replace(/\n/g, "\\n")
-    .replace(/\r/g, "\\r")
-    .replace(/\t/g, "\\t");
-}
-
-/** A CQL single-quoted string literal for `s` (e.g. `Deny` → `'Deny'`). */
-function cqlLiteral(s: string): string {
-  return `'${cqlString(s)}'`;
-}
-
 /** A `dynamicValue` entry setting `path` from the static CQL `expression`. */
 function cqlDynamicValue(path: string, expression: string): Record<string, unknown> {
   return { path, expression: { language: "text/cql-expression", expression } };
@@ -365,8 +346,11 @@ function cqlDynamicValue(path: string, expression: string): Record<string, unkno
  * cc-screening reference idiom (`Extension { url: uri { value: … } }`).
  */
 function codingCql(system: string, code: string, display?: string): string {
-  const parts = [`system: uri { value: '${cqlString(system)}' }`, `code: code { value: '${cqlString(code)}' }`];
-  if (display !== undefined) parts.push(`display: string { value: '${cqlString(display)}' }`);
+  const parts = [
+    `system: uri { value: '${escapeCqlString(system)}' }`,
+    `code: code { value: '${escapeCqlString(code)}' }`,
+  ];
+  if (display !== undefined) parts.push(`display: string { value: '${escapeCqlString(display)}' }`);
   return `Coding { ${parts.join(", ")} }`;
 }
 

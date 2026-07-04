@@ -31,6 +31,7 @@
 
 import { buildCRL } from "../index";
 import { matchNarrative } from "../template-match";
+import { cqlStringLiteral } from "./cqlStrings";
 import type {
   CanonicalArg,
   CanonicalPatternCall,
@@ -221,9 +222,9 @@ function functionNameFor(canonical: string): string {
   return FUNCTION_NAME_OVERRIDES[canonical] ?? canonical;
 }
 
-function cqlString(s: string): string {
-  return "'" + s.replace(/\\/g, "\\\\").replace(/'/g, "\\'") + "'";
-}
+// Shared with the FHIR-lane inline-CQL escaping (fhir-emitter/activity.ts) via cqlStrings — one source of truth
+// so the two lanes can't drift (they previously did: this helper escaped only `\`/`'`, missing control chars).
+const cqlString = cqlStringLiteral;
 
 function cqlIdent(s: string): string {
   return '"' + s.replace(/"/g, '\\"') + '"';
