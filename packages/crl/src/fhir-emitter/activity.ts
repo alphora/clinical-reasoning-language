@@ -38,6 +38,8 @@
 import type { Activity, ActivityWith } from "../ast/types";
 import type { ReferenceName } from "../ast/types";
 import { refDisplay } from "../ast/types";
+import { REVIEW_ACTION_SYSTEM } from "../dispositions/categories";
+import type { ResolvedDispositionConfig, ResolvedOption } from "../dispositions/types";
 import type { CRLError } from "../types/errors";
 
 import {
@@ -240,6 +242,23 @@ export function emitActivityDefinition(
     if (dvResult.entry) resource.dynamicValue = [dvResult.entry];
   }
 
+  // Configurable PA determinations (feature: configurable PA leaves) — if this activity is a CONFIGURED
+  // determination (its name is a `<category>.<key>` in `crl.dispositions`), emit a dynamicValue that sets the
+  // produced resource's `reasonCode` to the PAS review-action Coding (+ the option's config reason code) via an
+  // INLINE static CQL expression. The category is COMMUNICATED (CPGCommunicationRequest → CommunicationRequest,
+  // which carries `reasonCode`); no coded outcome when unconfigured (today's behavior). Retires the coded-HCR01
+  // boundary — the X12 278 HCR01 outcome is now coded on the produced resource, not just the `with` narrative.
+  const determination = opts.dispositionConfig?.configured
+    ? resolveDeterminationLeaf(opts.dispositionConfig, activity.name)
+    : undefined;
+  if (determination) {
+    const entry = {
+      path: "reasonCode",
+      expression: { language: "text/cql", expression: reviewActionCql(determination) },
+    };
+    resource.dynamicValue = [...((resource.dynamicValue as unknown[] | undefined) ?? []), entry];
+  }
+
   return {
     resource: {
       resourceType: "ActivityDefinition",
@@ -256,6 +275,42 @@ export function emitActivityDefinition(
 
 function defaultClock(): Date {
   return new Date();
+}
+
+/**
+ * Resolve a determination activity NAME (`<category>.<key>`, or a bare single-option `<category>`) to its
+ * configured leaf, or undefined if the name is not a configured determination.
+ */
+function resolveDeterminationLeaf(
+  config: ResolvedDispositionConfig,
+  activityName: string,
+): ResolvedOption | undefined {
+  for (const leaf of config.options) {
+    if (`${leaf.category}.${leaf.key}` === activityName) return leaf;
+  }
+  // Bare single-option category (the key elides): the name is the category, and it has exactly one option.
+  const inCategory = config.options.filter((o) => o.category === activityName);
+  return inCategory.length === 1 ? inCategory[0] : undefined;
+}
+
+/** Escape a CQL single-quoted string literal (backslash-escape `'`). */
+function cqlString(s: string): string {
+  return s.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+}
+
+/**
+ * The INLINE static CQL expression that constructs the reasonCode CodeableConcept for a determination: the PAS
+ * review-action Coding (X12 278 HCR01, `REVIEW_ACTION_SYSTEM`) + the option's config reason Coding when present.
+ * Inline FHIR-instance construction needs no `codesystem` declaration (self-contained on the ActivityDefinition).
+ */
+function reviewActionCql(leaf: ResolvedOption): string {
+  const codings = [
+    `Coding { system: '${cqlString(REVIEW_ACTION_SYSTEM)}', code: '${cqlString(leaf.reviewActionCode)}', display: '${cqlString(leaf.reviewActionDisplay)}' }`,
+  ];
+  if (leaf.code) {
+    codings.push(`Coding { system: '${cqlString(leaf.code.system)}', code: '${cqlString(leaf.code.code)}' }`);
+  }
+  return `CodeableConcept { coding: { ${codings.join(", ")} } }`;
 }
 
 /**

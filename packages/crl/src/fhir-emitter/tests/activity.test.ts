@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 
 import type { Activity, ActivityType } from "../../ast/types";
+import { normalizeDispositionConfig } from "../../dispositions";
 import { emitActivityDefinition, emitActivityDefinitionsForLibrary, type TerminologyResolver } from "../activity";
 import { ALL_CPG_ACTIVITY_PROFILES, lookupCpgActivityProfile } from "../cpgActivityProfiles";
 import type { CpgMetadata } from "../types";
@@ -203,6 +204,69 @@ describe("activity — emitActivityDefinition", () => {
     const r = resource!.resource as Record<string, unknown>;
     expect(r.description).toBe("Title Only Activity");
     expect(r.title).toBe("Title Only Activity");
+  });
+
+  it("a CONFIGURED determination `certify.Approve` emits a reasonCode dynamicValue with the PAS review-action CQL (+ the option reason code)", () => {
+    const a = activity("certify.Approve", "CPGCommunicationRequest" as ActivityType);
+    const config = normalizeDispositionConfig({
+      options: {
+        certify: {
+          Approve: { label: "Approve", code: { system: "https://codesystem.x12.org/external/886", code: "R1" } },
+        },
+      },
+    }).config;
+    const { resource, errors } = emitActivityDefinition(a, "Lib", METADATA, RESOLVE_NONE, {
+      clock: FIXED_CLOCK,
+      dispositionConfig: config,
+    });
+    expect(errors).toEqual([]);
+    const r = resource!.resource as Record<string, unknown>;
+    expect(r.dynamicValue).toEqual([
+      {
+        path: "reasonCode",
+        expression: {
+          language: "text/cql",
+          expression:
+            "CodeableConcept { coding: { Coding { system: 'https://codesystem.x12.org/005010/306', code: 'A1', display: 'Certified in total' }, Coding { system: 'https://codesystem.x12.org/external/886', code: 'R1' } } }",
+        },
+      },
+    ]);
+  });
+
+  it("a determination with NO option reason code emits just the review-action Coding", () => {
+    const a = activity("not-certify.Deny", "CPGCommunicationRequest" as ActivityType);
+    const config = normalizeDispositionConfig({ options: { "not-certify": { Deny: { label: "Deny" } } } }).config;
+    const { resource } = emitActivityDefinition(a, "Lib", METADATA, RESOLVE_NONE, {
+      clock: FIXED_CLOCK,
+      dispositionConfig: config,
+    });
+    const r = resource!.resource as Record<string, unknown>;
+    expect(r.dynamicValue).toEqual([
+      {
+        path: "reasonCode",
+        expression: {
+          language: "text/cql",
+          expression:
+            "CodeableConcept { coding: { Coding { system: 'https://codesystem.x12.org/005010/306', code: 'A3', display: 'Not certified' } } }",
+        },
+      },
+    ]);
+  });
+
+  it("an UNCONFIGURED activity (no dispositionConfig) emits NO reasonCode dynamicValue (today's behavior)", () => {
+    const a = activity("certify.Approve", "CPGCommunicationRequest" as ActivityType);
+    const { resource } = emitActivityDefinition(a, "Lib", METADATA, RESOLVE_NONE, { clock: FIXED_CLOCK });
+    expect((resource!.resource as Record<string, unknown>).dynamicValue).toBeUndefined();
+  });
+
+  it("a NON-determination activity (name not a configured leaf) emits NO reasonCode dynamicValue even when a config is present", () => {
+    const a = activity("Order MRI", "CPGServiceRequest" as ActivityType);
+    const config = normalizeDispositionConfig({ options: { certify: { Approve: { label: "Approve" } } } }).config;
+    const { resource } = emitActivityDefinition(a, "Lib", METADATA, RESOLVE_NONE, {
+      clock: FIXED_CLOCK,
+      dispositionConfig: config,
+    });
+    expect((resource!.resource as Record<string, unknown>).dynamicValue).toBeUndefined();
   });
 
   it("no `with` clause → no dynamicValue field on the resource", () => {
