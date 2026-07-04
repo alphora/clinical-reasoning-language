@@ -27,15 +27,32 @@ import type {
   DispositionConfigError,
   DispositionMode,
   DispositionResolution,
+  ResolvedDispositionConfig,
   ResolvedOption,
 } from "./types";
 
 /** The internal (validated) option shape carried between normalize and buildResolution. */
-type NormalizedOption = { label: string; narrative?: string; code?: DispositionCode };
+type NormalizedOption = { label: string; code?: DispositionCode };
 
 /** The stable id of a `(category, key)` determination leaf. */
 export function leafId(category: string, key: string): string {
   return `${category}/${key}`;
+}
+
+/**
+ * Resolve a determination activity NAME to its configured leaf, or `undefined` if the name is not a configured
+ * determination. The name is either the dotted `<category>.<key>` form, or a bare `<category>` when that category
+ * has exactly one option (the key elides). Shared by every emit site that needs the leaf's label / codes.
+ */
+export function resolveDeterminationLeaf(
+  config: ResolvedDispositionConfig,
+  activityName: string,
+): ResolvedOption | undefined {
+  for (const leaf of config.options) {
+    if (`${leaf.category}.${leaf.key}` === activityName) return leaf;
+  }
+  const inCategory = config.options.filter((o) => o.category === activityName);
+  return inCategory.length === 1 ? inCategory[0] : undefined;
 }
 
 function isPlainObject(v: unknown): v is Record<string, unknown> {
@@ -68,7 +85,6 @@ function buildResolution(
         category: category.name,
         key,
         label: opt.label,
-        narrative: opt.narrative,
         code: opt.code,
         reviewActionCode: category.reviewActionCode,
         reviewActionDisplay: category.reviewActionDisplay,
@@ -230,9 +246,7 @@ export function normalizeDispositionConfig(raw: unknown): DispositionResolution 
             });
           }
         }
-        const narrative =
-          typeof opt.narrative === "string" && opt.narrative.trim() !== "" ? opt.narrative.trim() : undefined;
-        resolvedKeyed[key] = { label: opt.label.trim(), narrative, code };
+        resolvedKeyed[key] = { label: opt.label.trim(), code };
       }
       options[categoryName] = resolvedKeyed;
     }

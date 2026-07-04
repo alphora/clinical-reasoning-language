@@ -2,6 +2,13 @@
   "name": "example-bothrep",
   "version": "0.0.0",
   "crl": {
-    "canonicalBase": "http://example.org/hcsc/rx501-007"
+    "canonicalBase": "http://example.org/hcsc/rx501-007",
+    "dispositions": {
+      "mode": "standalone",
+      "options": {
+        "certify": { "Approve": { "label": "Approve" } },
+        "not-certify": { "Deny": { "label": "Deny" } }
+      }
+    }
   }
 }

@@ -29,6 +29,10 @@ describe("fhir-emitter slug helpers", () => {
       expect(slugify("HBA1c (Diabetes)")).toBe("hba1c-diabetes");
     });
 
+    it("treats a dot as a word separator (configurable PA leaf names)", () => {
+      expect(slugify("certify.Approve")).toBe("certify-approve");
+    });
+
     it("Δ6 caps at 64 chars and trims trailing hyphens after truncation", () => {
       const long = "a".repeat(50) + " " + "b".repeat(50);
       const s = slugify(long);
@@ -52,6 +56,10 @@ describe("fhir-emitter slug helpers", () => {
 
     it("handles mixed separators (hyphen, underscore, whitespace)", () => {
       expect(pascalCaseName("foo_bar-baz qux")).toBe("FooBarBazQux");
+    });
+
+    it("treats a dot as a word separator (configurable PA leaf names)", () => {
+      expect(pascalCaseName("certify.Approve")).toBe("CertifyApprove");
     });
 
     it("Δ15 caps at 255 chars", () => {

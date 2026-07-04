@@ -17,12 +17,12 @@ concept "Top":
 
 decision "Top Coverage Determination":
 first:
-- when "Top" then recommend activity "Approve".
-- otherwise then recommend activity "Deny".
+- when "Top" then recommend activity "certify.Approve".
+- otherwise then recommend activity "not-certify.Deny".
 
-activity "Approve":
+activity "certify.Approve":
 - request CPGCommunicationRequest.
 - with `Coverage determination: APPROVE / Certified.`.
-activity "Deny":
+activity "not-certify.Deny":
 - request CPGCommunicationRequest.
 - with `Coverage determination: DENY / Not Certified.`.

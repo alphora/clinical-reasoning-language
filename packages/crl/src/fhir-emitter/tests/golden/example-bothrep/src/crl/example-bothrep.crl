@@ -14,12 +14,12 @@ concept "Implanted Estrogen Or Estradiol Pellets":
 
 decision "Implanted Pellet HRT Coverage Determination":
 first:
-- when "Implanted Estrogen Or Estradiol Pellets" then recommend activity "Deny".
-- otherwise then recommend activity "Approve".
+- when "Implanted Estrogen Or Estradiol Pellets" then recommend activity "not-certify.Deny".
+- otherwise then recommend activity "certify.Approve".
 
-activity "Approve":
+activity "certify.Approve":
 - request CPGCommunicationRequest.
 - with `Coverage determination: APPROVE / Certified.`.
-activity "Deny":
+activity "not-certify.Deny":
 - request CPGCommunicationRequest.
 - with `Coverage determination: DENY / Not Certified.`.

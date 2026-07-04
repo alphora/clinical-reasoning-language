@@ -2,6 +2,12 @@
   "name": "example-for-emit",
   "version": "0.0.0",
   "crl": {
-    "canonicalBase": "http://example.org/hcsc/rx501-007"
+    "canonicalBase": "http://example.org/hcsc/rx501-007",
+    "dispositions": {
+      "mode": "standalone",
+      "options": {
+        "not-certify": { "Deny": { "label": "Deny" }, "EIU": { "label": "Deny EIU" } }
+      }
+    }
   }
 }

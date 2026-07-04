@@ -13,12 +13,12 @@ concept "Age 18 Or Older":
 
 decision "Adult Eligibility Determination":
 first:
-- when "Age 18 Or Older" then recommend activity "Approve".
-- otherwise then recommend activity "Deny".
+- when "Age 18 Or Older" then recommend activity "certify.Approve".
+- otherwise then recommend activity "not-certify.Deny".
 
-activity "Approve":
+activity "certify.Approve":
 - request CPGCommunicationRequest.
 - with `Eligibility: APPROVE / adult.`.
-activity "Deny":
+activity "not-certify.Deny":
 - request CPGCommunicationRequest.
 - with `Eligibility: DENY / not an adult.`.

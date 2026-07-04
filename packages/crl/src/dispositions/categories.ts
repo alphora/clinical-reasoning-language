@@ -62,8 +62,8 @@ export const CATEGORY_BY_NAME: ReadonlyMap<string, DispositionCategory> = new Ma
  * fully owns its vocabulary — no merge). Defaults are the two final outcomes with the conventional labels; no pend.
  */
 export const DEFAULT_OPTIONS: Record<string, Record<string, DispositionOption>> = {
-  certify: { Approve: { label: "Approve", narrative: "Prior authorization request approved." } },
-  "not-certify": { Deny: { label: "Deny", narrative: "Prior authorization request denied." } },
+  certify: { Approve: { label: "Approve" } },
+  "not-certify": { Deny: { label: "Deny" } },
 };
 
 /** The current config schema version (the `crl.dispositions.version` discriminator). */

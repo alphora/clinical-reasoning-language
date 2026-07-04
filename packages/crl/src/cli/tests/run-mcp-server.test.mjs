@@ -91,7 +91,7 @@ try {
     assert.deepEqual(kit.chain, ["cpg", "prior-auth"]);
     assert.equal(kit.schemaVersion, "1.5");
     // Sibling KE (PA) agents pin BOTH schemaVersion + the prior-auth contentHash via MCP — pin it here too.
-    assert.equal(kit.contentHash, "553fe657de061491ce857870b641e980caf0c91059d8dd1f2192ccdd3b646abd");
+    assert.equal(kit.contentHash, "3dd25589a5467070182dd7f8d1fa8927e8a441a77fc2b920983b045775a3e744");
     const refNames = kit.referenceArtifacts.map((a) => a.name).sort();
     assert.equal(refNames.length, 11); // shared medical-policy-determination.crl removed (config-driven local activities)
     assert.ok(!refNames.includes("medical-policy-determination.crl"));

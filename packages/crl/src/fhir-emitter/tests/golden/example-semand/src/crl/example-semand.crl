@@ -12,12 +12,12 @@ concept "A And B":
 
 decision "A And B Coverage Determination":
 first:
-- when "A And B" then recommend activity "Approve".
-- otherwise then recommend activity "Deny".
+- when "A And B" then recommend activity "certify.Approve".
+- otherwise then recommend activity "not-certify.Deny".
 
-activity "Approve":
+activity "certify.Approve":
 - request CPGCommunicationRequest.
 - with `Coverage determination: APPROVE / Certified.`.
-activity "Deny":
+activity "not-certify.Deny":
 - request CPGCommunicationRequest.
 - with `Coverage determination: DENY / Not Certified.`.

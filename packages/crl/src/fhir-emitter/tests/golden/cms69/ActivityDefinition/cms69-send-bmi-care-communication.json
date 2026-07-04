@@ -49,5 +49,14 @@
         "code": "send-message"
       }
     ]
-  }
+  },
+  "dynamicValue": [
+    {
+      "path": "payload.contentString",
+      "expression": {
+        "language": "text/cql-expression",
+        "expression": "'Document a follow-up care plan for low BMI'"
+      }
+    }
+  ]
 }

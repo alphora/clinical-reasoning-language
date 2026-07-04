@@ -1,6 +1,6 @@
 {
   "resourceType": "ActivityDefinition",
-  "id": "example-for-emit-deny",
+  "id": "example-for-emit-not-certify-deny",
   "meta": {
     "profile": [
       "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-communicationactivity",
@@ -26,15 +26,15 @@
       "valueCode": "structured"
     }
   ],
-  "url": "http://example.org/hcsc/rx501-007/ActivityDefinition/example-for-emit-deny",
+  "url": "http://example.org/hcsc/rx501-007/ActivityDefinition/example-for-emit-not-certify-deny",
   "version": "0.0.0",
-  "name": "ExampleForEmitDeny",
-  "title": "Deny",
+  "name": "ExampleForEmitNotCertifyDeny",
+  "title": "not-certify.Deny",
   "status": "draft",
   "experimental": true,
   "date": "2026-01-01T00:00:00.000Z",
   "publisher": "unknown",
-  "description": "Deny",
+  "description": "not-certify.Deny",
   "library": [
     "http://example.org/hcsc/rx501-007/Library/ExampleForEmitInterface"
   ],
@@ -49,5 +49,28 @@
         "code": "send-message"
       }
     ]
-  }
+  },
+  "dynamicValue": [
+    {
+      "path": "payload.contentString",
+      "expression": {
+        "language": "text/cql-expression",
+        "expression": "'Deny'"
+      }
+    },
+    {
+      "path": "note.text",
+      "expression": {
+        "language": "text/cql-expression",
+        "expression": "'Coverage determination: DENY / Not Certified (X12 278 HCR01 A3). A communicated prior-authorization coverage determination denying certification of the requested service (not medically necessary / criteria not met); NOT a service order.'"
+      }
+    },
+    {
+      "path": "reasonCode",
+      "expression": {
+        "language": "text/cql-expression",
+        "expression": "CodeableConcept { coding: { Coding { system: uri { value: 'https://codesystem.x12.org/005010/306' }, code: code { value: 'A3' }, display: string { value: 'Not certified' } } } }"
+      }
+    }
+  ]
 }

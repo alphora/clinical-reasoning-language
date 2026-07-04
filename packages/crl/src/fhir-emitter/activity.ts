@@ -39,7 +39,8 @@ import type { Activity, ActivityWith } from "../ast/types";
 import type { ReferenceName } from "../ast/types";
 import { refDisplay } from "../ast/types";
 import { REVIEW_ACTION_SYSTEM } from "../dispositions/categories";
-import type { ResolvedDispositionConfig, ResolvedOption } from "../dispositions/types";
+import { resolveDeterminationLeaf } from "../dispositions/config";
+import type { ResolvedOption } from "../dispositions/types";
 import type { CRLError } from "../types/errors";
 
 import {
@@ -151,8 +152,33 @@ export function emitActivityDefinition(
   const id = capSlug(`${policyIdBase(metadata)}-${activitySlug}`);
   const computableName = pascalCaseName(`${librarySlug} ${activitySlug}`);
 
+  // A configured PA determination (`<category>.<key>` in `crl.dispositions`) is customized ONLY on its
+  // `dynamicValue` (below). Its `title`/`description`/`code` follow the SAME path as any other activity —
+  // the stable activity name drives the id/name/url/title; the config LABEL surfaces at runtime on the
+  // produced CommunicationRequest (`payload`), NOT on the artifact's title.
+  const determination = opts.dispositionConfig?.configured
+    ? resolveDeterminationLeaf(opts.dispositionConfig, activity.name)
+    : undefined;
+
+  // Impl-review I3: a bare `<category>` activity name is a determination ONLY when that category has exactly one
+  // option; with ≠1 it silently falls through to a non-determination emit. Flag the ambiguous case so an author
+  // who meant a determination (but whose category has multiple options) isn't silently mis-emitted with no coded
+  // outcome — they must disambiguate with `<category>.<key>`.
+  if (!determination && opts.dispositionConfig?.configured) {
+    const sameCategory = opts.dispositionConfig.options.filter((o) => o.category === activity.name);
+    if (sameCategory.length > 1) {
+      errors.push({
+        type: "Validation",
+        kind: "disposition-ambiguous-category",
+        message: `Activity "${activity.name}" names disposition category "${activity.name}", which has ${sameCategory.length} configured options — a bare category name resolves to a determination only when its category has exactly one option. Use "${activity.name}.<key>".`,
+        line: activity.location?.start.line,
+        column: activity.location?.start.column,
+      });
+    }
+  }
+
   const title = activity.name;
-  const description = activity.body.becauseClause?.rationale.trim() || title;
+  const description = activity.body.becauseClause?.rationale.trim() || activity.name;
   if (!description) {
     errors.push({
       type: "Validation",
@@ -219,8 +245,12 @@ export function emitActivityDefinition(
   // deferred edge (the deliverable's activities are text dispositions with no
   // `with` terminology); guard it loudly rather than emit a dangling reference.
   // Do NOT solve the general case here.
+  // Round-2 I1: exclude determinations here too — a determination never binds a terminology (its `with` is a
+  // free-text narrative), so on the Interface split path it must fall through to the determination handling
+  // below (which ignores a non-free-text `with`), NOT hard-error via this Interface-edge guard. Keeps the
+  // determination's terminology-`with` behavior consistent between the direct and Interface-scoped paths.
   const withClause = activity.body.withClause;
-  if (isInterfaceScoped && withClause?.terminologyReference !== undefined) {
+  if (isInterfaceScoped && !determination && withClause?.terminologyReference !== undefined) {
     errors.push({
       type: "Validation",
       kind: "emit-activity-terminology-interface-unsupported",
@@ -233,31 +263,57 @@ export function emitActivityDefinition(
     return { resource: null, errors, unmatched };
   }
 
-  // dynamicValue handling — only emit when the `with` clause has a
-  // terminology reference AND the profile has a non-null dynamicValuePath.
-  if (withClause) {
+  // dynamicValue handling — assemble in emit order. A `with` clause lowers to EITHER a terminology-bound
+  // dynamicValue (path per profile, via buildDynamicValue) OR a free-text narrative routed below. All
+  // dynamicValue expressions the emitter authors are static CQL (`text/cql-expression`).
+  const dynamicValues: Record<string, unknown>[] = [];
+  // Impl-review I1: a determination's `with` is always a free-text narrative (→ `note.text` below); a
+  // determination never binds a terminology, so SKIP the terminology-lowering path for it — otherwise a
+  // determination whose `with` were a terminology ref would push a spurious
+  // `unsupported-communication-with-terminology` (pinning success:false) AND still emit the determination, a
+  // confusing half-state. For non-determinations, buildDynamicValue handles terminology (free-text → null).
+  if (withClause && !determination) {
     const dvResult = buildDynamicValue(activity, withClause, profile, terminologyResolver);
     errors.push(...dvResult.errors);
     unmatched.push(...dvResult.unmatched);
-    if (dvResult.entry) resource.dynamicValue = [dvResult.entry];
+    if (dvResult.entry) dynamicValues.push(dvResult.entry);
   }
 
-  // Configurable PA determinations (feature: configurable PA leaves) — if this activity is a CONFIGURED
-  // determination (its name is a `<category>.<key>` in `crl.dispositions`), emit a dynamicValue that sets the
-  // produced resource's `reasonCode` to the PAS review-action Coding (+ the option's config reason code) via an
-  // INLINE static CQL expression. The category is COMMUNICATED (CPGCommunicationRequest → CommunicationRequest,
-  // which carries `reasonCode`); no coded outcome when unconfigured (today's behavior). Retires the coded-HCR01
-  // boundary — the X12 278 HCR01 outcome is now coded on the produced resource, not just the `with` narrative.
-  const determination = opts.dispositionConfig?.configured
-    ? resolveDeterminationLeaf(opts.dispositionConfig, activity.name)
-    : undefined;
-  if (determination) {
-    const entry = {
-      path: "reasonCode",
-      expression: { language: "text/cql", expression: reviewActionCql(determination) },
-    };
-    resource.dynamicValue = [...((resource.dynamicValue as unknown[] | undefined) ?? []), entry];
+  // A free-text `with` narrative (backtick text, not a terminology reference).
+  const withNarrative =
+    withClause && withClause.terminologyReference === undefined ? withClause.activityTypeValue : undefined;
+  const isCommunication = activity.body.request.activityType === "CPGCommunicationRequest";
+
+  if (determination && !isCommunication) {
+    // Impl-review I2: a configured determination MUST be a CPGCommunicationRequest (also validated as
+    // `disposition-request-type`). Defend the emit path so a leaf mis-authored as e.g. CPGServiceRequest never
+    // gets CommunicationRequest dynamicValues (payload/note/reasonCode) written onto a non-CR ActivityDefinition
+    // — fail loudly instead of emitting an invalid resource.
+    errors.push({
+      type: "Validation",
+      kind: "disposition-request-type",
+      message: `Configured determination "${activity.name}" must be a CPGCommunicationRequest, not ${activity.body.request.activityType}; no determination dynamicValue emitted.`,
+      line: activity.location?.start.line,
+      column: activity.location?.start.column,
+    });
+  } else if (determination) {
+    // Configurable PA determinations (feature: configurable PA leaves) — the produced CommunicationRequest
+    // (derived by the service from `kind`) carries the outcome three ways (R4 shape): the config LABEL is the
+    // human message (`payload.contentString`); the `with` narrative is a supplementary `note.text`; and the
+    // machine-readable PAS review-action Coding (+ the option's config reason Coding) is the `reasonCode`.
+    // Retires the coded-HCR01 boundary — the X12 278 HCR01 outcome is now coded on the produced resource.
+    dynamicValues.push(cqlDynamicValue("payload.contentString", cqlLiteral(determination.label)));
+    if (withNarrative !== undefined) {
+      dynamicValues.push(cqlDynamicValue("note.text", cqlLiteral(withNarrative)));
+    }
+    dynamicValues.push(cqlDynamicValue("reasonCode", reviewActionCql(determination)));
+  } else if (isCommunication && withNarrative !== undefined) {
+    // A plain (non-determination) CommunicationRequest activity: the `with` narrative IS the message body
+    // (per the cqf sendmessage ActivityDefinition example; resolves #181 for CommunicationRequest).
+    dynamicValues.push(cqlDynamicValue("payload.contentString", cqlLiteral(withNarrative)));
   }
+
+  if (dynamicValues.length > 0) resource.dynamicValue = dynamicValues;
 
   return {
     resource: {
@@ -277,25 +333,31 @@ function defaultClock(): Date {
   return new Date();
 }
 
-/**
- * Resolve a determination activity NAME (`<category>.<key>`, or a bare single-option `<category>`) to its
- * configured leaf, or undefined if the name is not a configured determination.
- */
-function resolveDeterminationLeaf(
-  config: ResolvedDispositionConfig,
-  activityName: string,
-): ResolvedOption | undefined {
-  for (const leaf of config.options) {
-    if (`${leaf.category}.${leaf.key}` === activityName) return leaf;
-  }
-  // Bare single-option category (the key elides): the name is the category, and it has exactly one option.
-  const inCategory = config.options.filter((o) => o.category === activityName);
-  return inCategory.length === 1 ? inCategory[0] : undefined;
-}
-
 /** Escape a CQL single-quoted string literal (backslash-escape `'`). */
 function cqlString(s: string): string {
   return s.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+}
+
+/** A CQL single-quoted string literal for `s` (e.g. `Deny` → `'Deny'`). */
+function cqlLiteral(s: string): string {
+  return `'${cqlString(s)}'`;
+}
+
+/** A `dynamicValue` entry setting `path` from the static CQL `expression`. */
+function cqlDynamicValue(path: string, expression: string): Record<string, unknown> {
+  return { path, expression: { language: "text/cql-expression", expression } };
+}
+
+/**
+ * A CQL `FHIR.Coding` instance selector. Each FHIR primitive field MUST be constructed with its wrapper type
+ * (`system: uri { value: '…' }`, NOT a bare `System.String`) — verified against cqf-fhir-cr's CQL engine (the bare
+ * form fails translation: "Expected an expression of type 'uri', but found 'System.String'"). Matches the proven
+ * cc-screening reference idiom (`Extension { url: uri { value: … } }`).
+ */
+function codingCql(system: string, code: string, display?: string): string {
+  const parts = [`system: uri { value: '${cqlString(system)}' }`, `code: code { value: '${cqlString(code)}' }`];
+  if (display !== undefined) parts.push(`display: string { value: '${cqlString(display)}' }`);
+  return `Coding { ${parts.join(", ")} }`;
 }
 
 /**
@@ -304,11 +366,9 @@ function cqlString(s: string): string {
  * Inline FHIR-instance construction needs no `codesystem` declaration (self-contained on the ActivityDefinition).
  */
 function reviewActionCql(leaf: ResolvedOption): string {
-  const codings = [
-    `Coding { system: '${cqlString(REVIEW_ACTION_SYSTEM)}', code: '${cqlString(leaf.reviewActionCode)}', display: '${cqlString(leaf.reviewActionDisplay)}' }`,
-  ];
+  const codings = [codingCql(REVIEW_ACTION_SYSTEM, leaf.reviewActionCode, leaf.reviewActionDisplay)];
   if (leaf.code) {
-    codings.push(`Coding { system: '${cqlString(leaf.code.system)}', code: '${cqlString(leaf.code.code)}' }`);
+    codings.push(codingCql(leaf.code.system, leaf.code.code));
   }
   return `CodeableConcept { coding: { ${codings.join(", ")} } }`;
 }
@@ -347,13 +407,10 @@ function buildDynamicValue(
     return { entry: null, errors, unmatched };
   }
 
-  // Free-text branch — IGNORED (#181). A free-text `with` on an ActivityDefinition
-  // carries no machine-bound terminology, so there is nothing to lower into a
-  // `dynamicValue`. It is NOT routed to `unmatched` (which would silently pin the
-  // whole emit's `success:false`) and NOT emitted: emit the ActivityDefinition
-  // without a dynamicValue and move on. The disposition narrative lives in the CRL
-  // source; the emitter derives the machine signal from the surrounding structure.
-  // Track: alphora/clinical-reasoning-language#181.
+  // Free-text branch — handled by the caller (emitActivityDefinition), which has the disposition context to
+  // route it: a CommunicationRequest `with` narrative becomes `payload.contentString` (plain) or `note.text`
+  // (determination); any other kind's free-text `with` is dropped (#181). Nothing to lower here; NOT routed to
+  // `unmatched` (which would silently pin the whole emit's `success:false`).
   if (hasFreeText) {
     return { entry: null, errors, unmatched };
   }

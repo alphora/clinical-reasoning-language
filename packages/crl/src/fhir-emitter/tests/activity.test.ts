@@ -206,7 +206,7 @@ describe("activity — emitActivityDefinition", () => {
     expect(r.title).toBe("Title Only Activity");
   });
 
-  it("a CONFIGURED determination `certify.Approve` emits a reasonCode dynamicValue with the PAS review-action CQL (+ the option reason code)", () => {
+  it("a CONFIGURED determination `certify.Approve` emits payload(label) + reasonCode(PAS review action + option reason)", () => {
     const a = activity("certify.Approve", "CPGCommunicationRequest" as ActivityType);
     const config = normalizeDispositionConfig({
       options: {
@@ -221,20 +221,27 @@ describe("activity — emitActivityDefinition", () => {
     });
     expect(errors).toEqual([]);
     const r = resource!.resource as Record<string, unknown>;
+    // No `with` on this activity → no `note.text`; label → payload, coded outcome → reasonCode.
     expect(r.dynamicValue).toEqual([
+      {
+        path: "payload.contentString",
+        expression: { language: "text/cql-expression", expression: "'Approve'" },
+      },
       {
         path: "reasonCode",
         expression: {
-          language: "text/cql",
+          language: "text/cql-expression",
           expression:
-            "CodeableConcept { coding: { Coding { system: 'https://codesystem.x12.org/005010/306', code: 'A1', display: 'Certified in total' }, Coding { system: 'https://codesystem.x12.org/external/886', code: 'R1' } } }",
+            "CodeableConcept { coding: { Coding { system: uri { value: 'https://codesystem.x12.org/005010/306' }, code: code { value: 'A1' }, display: string { value: 'Certified in total' } }, Coding { system: uri { value: 'https://codesystem.x12.org/external/886' }, code: code { value: 'R1' } } } }",
         },
       },
     ]);
   });
 
-  it("a determination with NO option reason code emits just the review-action Coding", () => {
-    const a = activity("not-certify.Deny", "CPGCommunicationRequest" as ActivityType);
+  it("a determination with a `with` narrative emits payload(label) + note(with) + reasonCode; no option code → just the review-action Coding", () => {
+    const a = activity("not-certify.Deny", "CPGCommunicationRequest" as ActivityType, {
+      withText: "Prior authorization request denied.",
+    });
     const config = normalizeDispositionConfig({ options: { "not-certify": { Deny: { label: "Deny" } } } }).config;
     const { resource } = emitActivityDefinition(a, "Lib", METADATA, RESOLVE_NONE, {
       clock: FIXED_CLOCK,
@@ -243,14 +250,68 @@ describe("activity — emitActivityDefinition", () => {
     const r = resource!.resource as Record<string, unknown>;
     expect(r.dynamicValue).toEqual([
       {
+        path: "payload.contentString",
+        expression: { language: "text/cql-expression", expression: "'Deny'" },
+      },
+      {
+        path: "note.text",
+        expression: { language: "text/cql-expression", expression: "'Prior authorization request denied.'" },
+      },
+      {
         path: "reasonCode",
         expression: {
-          language: "text/cql",
+          language: "text/cql-expression",
           expression:
-            "CodeableConcept { coding: { Coding { system: 'https://codesystem.x12.org/005010/306', code: 'A3', display: 'Not certified' } } }",
+            "CodeableConcept { coding: { Coding { system: uri { value: 'https://codesystem.x12.org/005010/306' }, code: code { value: 'A3' }, display: string { value: 'Not certified' } } } }",
         },
       },
     ]);
+  });
+
+  it("determination label + `with` narrative are CQL-escaped in payload/note (single-quote, backslash)", () => {
+    const a = activity("not-certify.Deny", "CPGCommunicationRequest" as ActivityType, {
+      withText: "See the payer's policy at C:\\rules.",
+    });
+    const config = normalizeDispositionConfig({
+      options: { "not-certify": { Deny: { label: "Deny — physician's call" } } },
+    }).config;
+    const { resource } = emitActivityDefinition(a, "Lib", METADATA, RESOLVE_NONE, {
+      clock: FIXED_CLOCK,
+      dispositionConfig: config,
+    });
+    const dv = (resource!.resource as Record<string, unknown>).dynamicValue as Array<{
+      path: string;
+      expression: { expression: string };
+    }>;
+    expect(dv.find((e) => e.path === "payload.contentString")!.expression.expression).toBe(
+      "'Deny — physician\\'s call'",
+    );
+    expect(dv.find((e) => e.path === "note.text")!.expression.expression).toBe(
+      "'See the payer\\'s policy at C:\\\\rules.'",
+    );
+  });
+
+  it("I2: a determination authored as a NON-CommunicationRequest → disposition-request-type error, no CR dynamicValues", () => {
+    const a = activity("not-certify.Deny", "CPGServiceRequest" as ActivityType);
+    const config = normalizeDispositionConfig({ options: { "not-certify": { Deny: { label: "Deny" } } } }).config;
+    const { resource, errors } = emitActivityDefinition(a, "Lib", METADATA, RESOLVE_NONE, {
+      clock: FIXED_CLOCK,
+      dispositionConfig: config,
+    });
+    expect(errors.some((e) => e.kind === "disposition-request-type")).toBe(true);
+    expect((resource!.resource as Record<string, unknown>).dynamicValue).toBeUndefined();
+  });
+
+  it("I3: a non-determination activity named exactly like a multi-option category → disposition-ambiguous-category error", () => {
+    const a = activity("not-certify", "CPGCommunicationRequest" as ActivityType);
+    const config = normalizeDispositionConfig({
+      options: { "not-certify": { Deny: { label: "Deny" }, EIU: { label: "Deny EIU" } } },
+    }).config;
+    const { errors } = emitActivityDefinition(a, "Lib", METADATA, RESOLVE_NONE, {
+      clock: FIXED_CLOCK,
+      dispositionConfig: config,
+    });
+    expect(errors.some((e) => e.kind === "disposition-ambiguous-category")).toBe(true);
   });
 
   it("an UNCONFIGURED activity (no dispositionConfig) emits NO reasonCode dynamicValue (today's behavior)", () => {
@@ -288,14 +349,35 @@ describe("activity — emitActivityDefinition", () => {
     expect(r.dynamicValue).toBeUndefined();
   });
 
-  it("`with` free-text is IGNORED (#181) — NO unmatched, resource emits without dynamicValue, success not pinned", () => {
+  it("plain CommunicationRequest free-text `with` → `payload.contentString` dynamicValue (message body; resolves #181)", () => {
     const a = activity("With Text", "CPGCommunicationRequest" as ActivityType, {
       withText: "Confirm BP control remains adequate.",
     });
     const { resource, unmatched, errors } = emitActivityDefinition(a, "Lib", METADATA, RESOLVE_ALL, {
       clock: FIXED_CLOCK,
     });
-    // A free-text `with` carries no machine signal — it is NOT routed to
+    expect(unmatched).toEqual([]);
+    expect(errors).toEqual([]);
+    const r = resource!.resource as Record<string, unknown>;
+    expect(r.dynamicValue).toEqual([
+      {
+        path: "payload.contentString",
+        expression: {
+          language: "text/cql-expression",
+          expression: "'Confirm BP control remains adequate.'",
+        },
+      },
+    ]);
+  });
+
+  it("NON-communication free-text `with` is still IGNORED (#181) — no unmatched, no dynamicValue", () => {
+    const a = activity("With Text SR", "CPGServiceRequest" as ActivityType, {
+      withText: "Some free text with no machine binding.",
+    });
+    const { resource, unmatched, errors } = emitActivityDefinition(a, "Lib", METADATA, RESOLVE_ALL, {
+      clock: FIXED_CLOCK,
+    });
+    // A free-text `with` on a non-CommunicationRequest kind has nowhere conformant to go: NOT routed to
     // `unmatched` (which would silently pin success:false) and NOT emitted.
     expect(unmatched).toEqual([]);
     expect(errors).toEqual([]);

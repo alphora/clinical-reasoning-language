@@ -25,12 +25,12 @@ describe("dispositions/config — normalizeDispositionConfig (pure)", () => {
     expect(config.byLeaf["not-certify/Deny"].finality).toBe("final");
   });
 
-  it("declared options FULLY define the vocabulary (no merge with defaults) + carry narrative + a PAS reason code", () => {
+  it("declared options FULLY define the vocabulary (no merge with defaults) + carry a PAS reason code", () => {
     const { config, errors } = normalizeDispositionConfig({
       mode: "embedded",
       options: {
         "not-certify": {
-          "medical-necessity": { label: "Deny", narrative: "Not medically necessary." },
+          "medical-necessity": { label: "Deny" },
           experimental: {
             label: "Deny EIU",
             code: { system: "https://codesystem.x12.org/external/886", code: "T1" },
@@ -48,7 +48,7 @@ describe("dispositions/config — normalizeDispositionConfig (pure)", () => {
       system: "https://codesystem.x12.org/external/886",
       code: "T1",
     });
-    expect(config.byLeaf["not-certify/medical-necessity"].narrative).toBe("Not medically necessary.");
+    expect(config.byLeaf["not-certify/medical-necessity"].label).toBe("Deny");
     // Two keys under one category both carry the category's A3 action code — distinguishable by key.
     expect(config.byLeaf["not-certify/experimental"].reviewActionCode).toBe("A3");
     expect(config.byLeaf["not-certify/medical-necessity"].reviewActionCode).toBe("A3");
@@ -174,17 +174,16 @@ describe("dispositions/config — normalizeDispositionConfig (pure)", () => {
     expect(({} as Record<string, unknown>).label).toBeUndefined();
   });
 
-  it("trims label / narrative / code.system / code.code on store; blank narrative → undefined", () => {
+  it("trims label / code.system / code.code on store", () => {
     const { config } = normalizeDispositionConfig({
       options: {
         certify: {
-          ok: { label: "  Approve  ", narrative: "   ", code: { system: " http://x ", code: " A1 " } },
+          ok: { label: "  Approve  ", code: { system: " http://x ", code: " A1 " } },
         },
       },
     });
     const leaf = config.byLeaf["certify/ok"];
     expect(leaf.label).toBe("Approve");
-    expect(leaf.narrative).toBeUndefined();
     expect(leaf.code).toEqual({ system: "http://x", code: "A1" });
   });
 

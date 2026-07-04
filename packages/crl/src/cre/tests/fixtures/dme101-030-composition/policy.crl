@@ -97,18 +97,18 @@ concept "Documented Nonunion":
 
 decision "Ultrasonic Osteogenesis Stimulator Coverage Determination":
 first:
-- when "Concurrent Noninvasive Stimulator" then recommend activity "Deny".
-- when "Skull Or Vertebral Fracture" then recommend activity "Deny".
-- when "Tumor Related Fracture" then recommend activity "Deny".
-- when "Documented Nonunion" then recommend activity "Approve".
-- otherwise then recommend activity "Deny".
+- when "Concurrent Noninvasive Stimulator" then recommend activity "not-certify.Deny".
+- when "Skull Or Vertebral Fracture" then recommend activity "not-certify.Deny".
+- when "Tumor Related Fracture" then recommend activity "not-certify.Deny".
+- when "Documented Nonunion" then recommend activity "certify.Approve".
+- otherwise then recommend activity "not-certify.Deny".
 
 // ============ Activities (plain dispositions; shareable) ============
 
-activity "Approve":
+activity "certify.Approve":
 - request CPGServiceRequest.
 - with `Authorize coverage of the ultrasonic osteogenesis stimulator as medically necessary.`.
 
-activity "Deny":
+activity "not-certify.Deny":
 - request CPGCommunicationRequest.
 - with `Ultrasonic osteogenesis stimulator is not medically necessary for this presentation.`.

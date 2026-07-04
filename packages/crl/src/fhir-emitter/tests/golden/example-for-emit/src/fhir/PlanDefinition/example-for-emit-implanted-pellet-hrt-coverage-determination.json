@@ -123,7 +123,7 @@
               ]
             }
           ],
-          "definitionCanonical": "http://example.org/hcsc/rx501-007/PlanDefinition/example-for-emit-deny-eiu-recommendation"
+          "definitionCanonical": "http://example.org/hcsc/rx501-007/PlanDefinition/example-for-emit-not-certify-eiu-recommendation"
         },
         {
           "title": "otherwise",
@@ -138,7 +138,7 @@
               ]
             }
           ],
-          "definitionCanonical": "http://example.org/hcsc/rx501-007/PlanDefinition/example-for-emit-deny-recommendation"
+          "definitionCanonical": "http://example.org/hcsc/rx501-007/PlanDefinition/example-for-emit-not-certify-deny-recommendation"
         }
       ]
     }

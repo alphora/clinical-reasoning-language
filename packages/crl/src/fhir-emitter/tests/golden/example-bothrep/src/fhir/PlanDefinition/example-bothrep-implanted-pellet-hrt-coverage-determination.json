@@ -139,7 +139,7 @@
               ]
             }
           ],
-          "definitionCanonical": "http://example.org/hcsc/rx501-007/PlanDefinition/example-bothrep-deny-recommendation"
+          "definitionCanonical": "http://example.org/hcsc/rx501-007/PlanDefinition/example-bothrep-not-certify-deny-recommendation"
         },
         {
           "title": "otherwise",
@@ -154,7 +154,7 @@
               ]
             }
           ],
-          "definitionCanonical": "http://example.org/hcsc/rx501-007/PlanDefinition/example-bothrep-approve-recommendation"
+          "definitionCanonical": "http://example.org/hcsc/rx501-007/PlanDefinition/example-bothrep-certify-approve-recommendation"
         }
       ]
     }

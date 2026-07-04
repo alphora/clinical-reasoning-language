@@ -5,7 +5,7 @@
  *  - the CATEGORY is spec-anchored (an X12 278 HCR01 outcome, framework-owned, customer-agnostic) and carries the
  *    X12 code + a finality class;
  *  - the option KEY is a distinguishable REASON/FLAVOR within a category (e.g. `not-certify."experimental"`), and a
- *    deployment binds it to a human LABEL (+ optional narrative) in its config.
+ *    deployment binds it to a human LABEL (+ an optional code) in its config.
  *
  * A determination is exactly ONE `(category, key)` leaf; mutual-exclusivity/single-outcome is over that leaf, in
  * BOTH modes. `mode` gates ONLY finality: `standalone` leaves must be final; `embedded` leaves may be non-final
@@ -46,8 +46,6 @@ export interface DispositionCode {
 export interface DispositionOption {
   /** The human label (Mode-1 relabels this without touching CRL). Required, non-empty. */
   label: string;
-  /** Optional human narrative (was the local `activity … with \`…\``). */
-  narrative?: string;
   /**
    * The option's config-specified CODE, `{ system, code }` — its source depends on the deployment's intent:
    *  - full-PAS / Approve-Deny (Smile is the whole PA): a Da Vinci PAS review-decision-REASON code
@@ -65,7 +63,7 @@ export interface RawDispositionConfig {
   /** Schema discriminator (reversibility). Absent → treated as the current version. */
   version?: number;
   mode?: string;
-  /** category-name → { optionKey → { label, narrative? } }. Present → fully defines the vocabulary (no merge with defaults). */
+  /** category-name → { optionKey → { label, code? } }. Present → fully defines the vocabulary (no merge with defaults). */
   options?: Record<string, Record<string, DispositionOption>>;
 }
 
@@ -74,7 +72,6 @@ export interface ResolvedOption {
   category: string;
   key: string;
   label: string;
-  narrative?: string;
   /** The option's config-specified code, if any (a PAS reason code in full-PAS, or the larger system's code). */
   code?: DispositionCode;
   /** From the category (framework), never authored: the PAS review-action code + its display + finality. */

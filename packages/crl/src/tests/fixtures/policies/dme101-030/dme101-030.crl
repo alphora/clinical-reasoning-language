@@ -36,18 +36,18 @@ concept "Documented Fracture Nonunion":
 
 decision "Ultrasonic Osteogenesis Stimulator Coverage":
 first:
-- when "Fracture Of Skull Or Vertebrae" then recommend activity "Deny".
-- when "Tumor-Related Fracture" then recommend activity "Deny".
-- when "Concurrent Noninvasive Stimulator In Use" then recommend activity "Deny".
-- when "Documented Fracture Nonunion" then recommend activity "Approve".
-- otherwise then recommend activity "Deny".
+- when "Fracture Of Skull Or Vertebrae" then recommend activity "not-certify.Deny".
+- when "Tumor-Related Fracture" then recommend activity "not-certify.Deny".
+- when "Concurrent Noninvasive Stimulator In Use" then recommend activity "not-certify.Deny".
+- when "Documented Fracture Nonunion" then recommend activity "certify.Approve".
+- otherwise then recommend activity "not-certify.Deny".
 
 // ============ Activities (shareable PA determinations) ============
 
-activity "Approve":
+activity "certify.Approve":
 - request CPGCommunicationRequest.
 - with `Prior authorization request approved.`.
 
-activity "Deny":
+activity "not-certify.Deny":
 - request CPGCommunicationRequest.
 - with `Prior authorization request denied.`.

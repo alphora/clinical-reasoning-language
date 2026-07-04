@@ -16,4 +16,9 @@ export {
   REVIEW_ACTION_VALUESET,
   REVIEW_DECISION_REASON_SYSTEM,
 } from "./categories";
-export { normalizeDispositionConfig, resolveDispositionConfig, leafId } from "./config";
+export {
+  normalizeDispositionConfig,
+  resolveDispositionConfig,
+  resolveDeterminationLeaf,
+  leafId,
+} from "./config";

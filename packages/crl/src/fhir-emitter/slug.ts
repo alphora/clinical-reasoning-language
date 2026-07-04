@@ -53,6 +53,10 @@ export function rawSlug(name: string): string {
   return (
     name
       .toLowerCase()
+      // A dot is a SEPARATOR, not noise: a dotted name (e.g. a `<category>.<key>`
+      // PA determination activity `certify.Approve`) must slug to `certify-approve`,
+      // NOT the token-fusing `certifyapprove` a bare strip would produce.
+      .replace(/\./g, " ")
       .replace(/[^a-z0-9\s-]/g, "")
       .replace(/\s+/g, "-")
       .replace(/-+/g, "-")
@@ -179,8 +183,8 @@ export function pascalCaseName(name: string): string {
  * ONLY the layer identifiers, nothing else.
  */
 export function pascalCaseNameUncapped(name: string): string {
-  const cleaned = name.replace(/[^a-zA-Z0-9\s_-]/g, "");
-  const tokens = cleaned.split(/[-_\s]+/).filter(Boolean);
+  const cleaned = name.replace(/[^a-zA-Z0-9\s_.-]/g, "");
+  const tokens = cleaned.split(/[-_.\s]+/).filter(Boolean);
   if (tokens.length === 0) return "Unnamed";
   let pascal = tokens.map((t) => t.charAt(0).toUpperCase() + t.slice(1)).join("");
   if (!/^[A-Z]/.test(pascal)) pascal = "X" + pascal;

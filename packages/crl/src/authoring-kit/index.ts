@@ -562,7 +562,7 @@ const DISPOSITION_MODEL: DispositionModel = {
   })),
   config: {
     location: "the content project's package.json, under `crl.dispositions`",
-    shape: "{ version, mode: standalone|embedded, options: { <category>: { <key>: { label, narrative?, code? } } } }",
+    shape: "{ version, mode: standalone|embedded, options: { <category>: { <key>: { label, code? } } } }",
     modes: {
       standalone: "our decision IS the whole adjudication; determination leaves must be FINAL (certify/not-certify)",
       embedded: "our decision feeds a larger adjudication; a non-final (pended) leaf is legitimate; still ONE determination per run",
@@ -709,10 +709,6 @@ const BOUNDARY_ENTRIES: { text: string; edge: AuthoringEdge }[] = [
   },
   {
     text: "PA Pended (X12 278 HCR01 A4) — an async/workflow disposition resolved OUTSIDE the per-policy clinical decision; not a determination leaf",
-    edge: "prior-auth",
-  },
-  {
-    text: "coded HCR01 outcome value-set binding for PA determinations — Stage 1 carries the A1/A3 outcome in the `with` narrative; coding it is a later external-terminology stage",
     edge: "prior-auth",
   },
   {

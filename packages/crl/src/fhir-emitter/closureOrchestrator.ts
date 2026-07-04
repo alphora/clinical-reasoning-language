@@ -1624,9 +1624,12 @@ export function emitFhirDefFromPath(
   const cqlManifestFailed = cqlErrors.length > 0;
   // Feature: configurable PA leaves — resolve the project's disposition config (emit is project-aware) and thread
   // it via opts so a determination activity emits the coded PAS reviewAction outcome. Absent config → no change.
-  const dispositionConfig = graph.projectRoot
-    ? resolveDispositionConfig(graph.projectRoot).config
-    : undefined;
+  // Impl-review C2: a MALFORMED config must NOT silently degrade to configured:false (which would drop all PA emit
+  // while reporting success). Mirror validateCRLImports: on any error-severity config problem, WITHHOLD the config
+  // and fold the errors into the emit result so `success` sinks (handled in the errors/success assembly below).
+  const dispositionResolution = graph.projectRoot ? resolveDispositionConfig(graph.projectRoot) : undefined;
+  const dispositionConfigErrors = (dispositionResolution?.errors ?? []).filter((e) => e.severity === "error");
+  const dispositionConfig = dispositionConfigErrors.length > 0 ? undefined : dispositionResolution?.config;
   const closureResult = emitFhirDefClosure(
     graph,
     metadata,
@@ -1637,12 +1640,19 @@ export function emitFhirDefFromPath(
   // into success. Otherwise MCP can return success:true with fatal
   // import-time errors.
   const importErrors = graph.diagnostics.filter((d) => d.severity === "error");
-  const errors = [...closureResult.errors, ...cqlErrors];
+  // Impl-review C2: error-severity disposition-config problems become blocking emit errors (package.json-anchored).
+  const dispositionEmitErrors: CRLError[] = dispositionConfigErrors.map((e) => ({
+    type: "Validation",
+    kind: "disposition-config",
+    message: `crl.dispositions${e.path.length ? "." + e.path.join(".") : ""}: ${e.message}`,
+  }));
+  const errors = [...closureResult.errors, ...cqlErrors, ...dispositionEmitErrors];
   const success =
     closureResult.success &&
     !cqlManifestFailed &&
     metadataErrors.length === 0 &&
-    importErrors.length === 0;
+    importErrors.length === 0 &&
+    dispositionEmitErrors.length === 0;
   return {
     ...closureResult,
     errors,

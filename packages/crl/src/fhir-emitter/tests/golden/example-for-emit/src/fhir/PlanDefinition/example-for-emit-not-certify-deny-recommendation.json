@@ -1,6 +1,6 @@
 {
   "resourceType": "PlanDefinition",
-  "id": "example-for-emit-deny-recommendation",
+  "id": "example-for-emit-not-certify-deny-recommendation",
   "meta": {
     "profile": [
       "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-recommendationdefinition",
@@ -26,15 +26,15 @@
       "valueCode": "structured"
     }
   ],
-  "url": "http://example.org/hcsc/rx501-007/PlanDefinition/example-for-emit-deny-recommendation",
+  "url": "http://example.org/hcsc/rx501-007/PlanDefinition/example-for-emit-not-certify-deny-recommendation",
   "version": "0.0.0",
-  "name": "ExampleForEmitDenyRecommendation",
-  "title": "Deny",
+  "name": "ExampleForEmitNotCertifyDenyRecommendation",
+  "title": "not-certify.Deny",
   "status": "draft",
   "experimental": true,
   "date": "2026-01-01T00:00:00.000Z",
   "publisher": "unknown",
-  "description": "Deny",
+  "description": "not-certify.Deny",
   "type": {
     "coding": [
       {
@@ -48,8 +48,8 @@
   ],
   "action": [
     {
-      "title": "Deny",
-      "description": "Deny",
+      "title": "not-certify.Deny",
+      "description": "not-certify.Deny",
       "code": [
         {
           "coding": [
@@ -69,7 +69,7 @@
         ]
       },
       "groupingBehavior": "logical-group",
-      "definitionCanonical": "http://example.org/hcsc/rx501-007/ActivityDefinition/example-for-emit-deny"
+      "definitionCanonical": "http://example.org/hcsc/rx501-007/ActivityDefinition/example-for-emit-not-certify-deny"
     }
   ]
 }

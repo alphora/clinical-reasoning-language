@@ -385,6 +385,12 @@ export interface EmitOptions {
    * (which has the project root → `resolveDispositionConfig`). When present + `configured`, a determination
    * activity named `<category>.<key>` emits a `dynamicValue` setting the produced `CommunicationRequest.reasonCode`
    * to the PAS review-action Coding (+ the option's reason code). Absent → today's behavior (no coded outcome).
+   *
+   * ⚠ CONTRACT (round-2 C2): pass ONLY a config from a resolution with NO error-severity errors. `emitFhirDefFromPath`
+   * enforces this (it withholds the config + fails the emit when `resolveDispositionConfig` reports errors). A direct
+   * caller of the lower-level `emitFhirDefClosure` MUST do the same — passing the degraded `.config` from an errored
+   * resolution here would silently emit determinations with no PA outcome. This is a naked config by design (the
+   * emitter is terminology/FS-free); the error-gating lives at the resolution boundary, not here.
    */
   dispositionConfig?: ResolvedDispositionConfig;
 }

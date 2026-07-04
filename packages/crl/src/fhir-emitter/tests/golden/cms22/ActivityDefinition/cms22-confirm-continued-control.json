@@ -49,5 +49,14 @@
         "code": "send-message"
       }
     ]
-  }
+  },
+  "dynamicValue": [
+    {
+      "path": "payload.contentString",
+      "expression": {
+        "language": "text/cql-expression",
+        "expression": "'Confirm BP control remains adequate; no escalation needed this visit'"
+      }
+    }
+  ]
 }

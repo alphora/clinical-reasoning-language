@@ -107,7 +107,7 @@
               ]
             }
           ],
-          "definitionCanonical": "http://example.org/hcsc/rx501-007/PlanDefinition/example-direct-approve-recommendation"
+          "definitionCanonical": "http://example.org/hcsc/rx501-007/PlanDefinition/example-direct-certify-approve-recommendation"
         },
         {
           "title": "otherwise",
@@ -122,7 +122,7 @@
               ]
             }
           ],
-          "definitionCanonical": "http://example.org/hcsc/rx501-007/PlanDefinition/example-direct-deny-recommendation"
+          "definitionCanonical": "http://example.org/hcsc/rx501-007/PlanDefinition/example-direct-not-certify-deny-recommendation"
         }
       ]
     }

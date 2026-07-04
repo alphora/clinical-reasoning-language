@@ -26,7 +26,7 @@ describe("celSymbolsIndex (#4) — CRL symbols from the covered closure", () => 
     expect(concept?.libraryName).toBe("Ultrasonic Osteogenesis Stimulator Coverage");
     expect(concept?.filePath).toBe(path.join(fixtureDir, "dme101-030.crl"));
     expect(concept?.nameRange).toBeDefined(); // the go-to-definition target
-    expect(decision?.arms).toEqual(["Approve", "Deny"]); // arms drive result-value completion
+    expect(decision?.arms).toEqual(["certify.Approve", "not-certify.Deny"]); // arms drive result-value completion
     expect(src.getAllProjectLibraries([]).map((l) => l.libraryName)).toContain("Ultrasonic Osteogenesis Stimulator Coverage");
   });
 

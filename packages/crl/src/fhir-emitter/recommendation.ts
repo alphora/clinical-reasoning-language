@@ -120,7 +120,7 @@ export function emitRecommendationDefinition(
   );
 
   const title = activity.name;
-  const description = activity.body.becauseClause?.rationale.trim() || title;
+  const description = activity.body.becauseClause?.rationale.trim() || activity.name;
   if (!description) {
     errors.push({
       type: "Validation",

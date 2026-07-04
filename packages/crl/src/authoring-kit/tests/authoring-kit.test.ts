@@ -657,11 +657,12 @@ describe("authoring-kit — getAuthoringKit", () => {
     // configure-dispositions + disposition-mode rules added, verifyLoop shared-lib-membership→configured-membership +
     // no-pend→finality-by-mode, facets retired, prior-auth `dispositionModel` field added. schemaVersion is hashed on
     // BOTH payloads so both pins move. KE seats re-sync on the bump.
-    // T3b (same schemaVersion 1.5, prior-auth hash re-pinned): reference artifacts migrated to the config-driven
-    // model (local `<category>.<key>` activities), shared medical-policy-determination.crl removed (12→11). Only the
-    // prior-auth content changed → cpg hash holds, prior-auth hash moves.
+    // Todo 4 (same schemaVersion 1.5, prior-auth hash re-pinned): the emit half now CODES the A1/A3 outcome on the
+    // determination ActivityDefinition (`reasonCode` + `payload`/`note`), so the "coded-HCR01 outcome is a later
+    // stage" boundary is RETIRED and the config `narrative` field dropped from the shape doc. Prior-auth content
+    // changed → cpg hash holds, prior-auth hash moves.
     expect(cpg.contentHash).toBe("746b84a0a2f546f8081aab1173dfbaa4e4b81480b622f211585d6a6f9cd79924");
-    expect(priorAuth.contentHash).toBe("553fe657de061491ce857870b641e980caf0c91059d8dd1f2192ccdd3b646abd");
+    expect(priorAuth.contentHash).toBe("3dd25589a5467070182dd7f8d1fa8927e8a441a77fc2b920983b045775a3e744");
   });
 
   it("STAGES contains exactly the one Stage-1 slice", () => {

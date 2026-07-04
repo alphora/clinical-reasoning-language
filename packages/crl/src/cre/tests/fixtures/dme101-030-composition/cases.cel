@@ -87,7 +87,7 @@ case "documented nonunion (all six NOTE-1 elements), no exclusion -> approved":
 - fact is "Ninety Days Apart Finding".
 - fact is "Multiple Views Finding".
 - fact is "No Healing Finding".
-- result is "Ultrasonic Osteogenesis Stimulator Coverage Determination" is "Approve".
+- result is "Ultrasonic Osteogenesis Stimulator Coverage Determination" is "certify.Approve".
 
 // ============ Drop-one-leaf necessity proofs (meaningful post-#126) ============
 
@@ -100,7 +100,7 @@ case "missing: nonunion exists -> denied":
 - fact is "Ninety Days Apart Finding".
 - fact is "Multiple Views Finding".
 - fact is "No Healing Finding".
-- result is "Ultrasonic Osteogenesis Stimulator Coverage Determination" is "Deny".
+- result is "Ultrasonic Osteogenesis Stimulator Coverage Determination" is "not-certify.Deny".
 
 case "missing: at least two radiograph sets -> denied":
 - description is `"At Least Two Radiograph Sets" absent; the documentation
@@ -111,7 +111,7 @@ case "missing: at least two radiograph sets -> denied":
 - fact is "Ninety Days Apart Finding".
 - fact is "Multiple Views Finding".
 - fact is "No Healing Finding".
-- result is "Ultrasonic Osteogenesis Stimulator Coverage Determination" is "Deny".
+- result is "Ultrasonic Osteogenesis Stimulator Coverage Determination" is "not-certify.Deny".
 
 case "missing: radiographs prior to treatment -> denied":
 - description is `"Radiographs Obtained Prior To Treatment" absent; denies.`.
@@ -121,7 +121,7 @@ case "missing: radiographs prior to treatment -> denied":
 - fact is "Ninety Days Apart Finding".
 - fact is "Multiple Views Finding".
 - fact is "No Healing Finding".
-- result is "Ultrasonic Osteogenesis Stimulator Coverage Determination" is "Deny".
+- result is "Ultrasonic Osteogenesis Stimulator Coverage Determination" is "not-certify.Deny".
 
 case "missing: ninety days apart -> denied":
 - description is `"Radiograph Sets At Least Ninety Days Apart" absent; denies.`.
@@ -131,7 +131,7 @@ case "missing: ninety days apart -> denied":
 - fact is "Prior To Treatment Finding".
 - fact is "Multiple Views Finding".
 - fact is "No Healing Finding".
-- result is "Ultrasonic Osteogenesis Stimulator Coverage Determination" is "Deny".
+- result is "Ultrasonic Osteogenesis Stimulator Coverage Determination" is "not-certify.Deny".
 
 case "missing: multiple views per set -> denied":
 - description is `"Multiple Views Per Radiograph Set" absent; denies.`.
@@ -141,7 +141,7 @@ case "missing: multiple views per set -> denied":
 - fact is "Prior To Treatment Finding".
 - fact is "Ninety Days Apart Finding".
 - fact is "No Healing Finding".
-- result is "Ultrasonic Osteogenesis Stimulator Coverage Determination" is "Deny".
+- result is "Ultrasonic Osteogenesis Stimulator Coverage Determination" is "not-certify.Deny".
 
 case "missing: no interval healing attestation -> denied":
 - description is `"No Clinically Significant Interval Healing" absent; denies.`.
@@ -151,7 +151,7 @@ case "missing: no interval healing attestation -> denied":
 - fact is "Prior To Treatment Finding".
 - fact is "Ninety Days Apart Finding".
 - fact is "Multiple Views Finding".
-- result is "Ultrasonic Osteogenesis Stimulator Coverage Determination" is "Deny".
+- result is "Ultrasonic Osteogenesis Stimulator Coverage Determination" is "not-certify.Deny".
 
 // ============ Exclusion + precedence + otherwise leaves ============
 
@@ -166,19 +166,19 @@ case "concurrent noninvasive stimulator -> denied":
 - fact is "Multiple Views Finding".
 - fact is "No Healing Finding".
 - fact is "Concurrent Stimulator Device".
-- result is "Ultrasonic Osteogenesis Stimulator Coverage Determination" is "Deny".
+- result is "Ultrasonic Osteogenesis Stimulator Coverage Determination" is "not-certify.Deny".
 
 case "skull or vertebral fracture -> denied":
 - description is `A fracture of the skull or vertebrae is excluded; denies.`.
 - subject is "Sample Patient".
 - fact is "Skull Or Vertebral Fracture Finding".
-- result is "Ultrasonic Osteogenesis Stimulator Coverage Determination" is "Deny".
+- result is "Ultrasonic Osteogenesis Stimulator Coverage Determination" is "not-certify.Deny".
 
 case "tumor related fracture -> denied":
 - description is `A tumor-related fracture is excluded; denies.`.
 - subject is "Sample Patient".
 - fact is "Tumor Related Fracture Finding".
-- result is "Ultrasonic Osteogenesis Stimulator Coverage Determination" is "Deny".
+- result is "Ultrasonic Osteogenesis Stimulator Coverage Determination" is "not-certify.Deny".
 
 case "exclusion overrides full documentation -> denied (ordered precedence)":
 - description is `A tumor-related fracture co-occurs with full NOTE-1
@@ -192,11 +192,11 @@ case "exclusion overrides full documentation -> denied (ordered precedence)":
 - fact is "Multiple Views Finding".
 - fact is "No Healing Finding".
 - fact is "Tumor Related Fracture Finding".
-- result is "Ultrasonic Osteogenesis Stimulator Coverage Determination" is "Deny".
+- result is "Ultrasonic Osteogenesis Stimulator Coverage Determination" is "not-certify.Deny".
 
 case "no qualifying criteria asserted -> denied (otherwise)":
 - description is `No documentation element and no exclusion is asserted; the
   otherwise leaf denies (e.g. a fresh fracture / delayed union — absence of a
   documented nonunion).`.
 - subject is "Sample Patient".
-- result is "Ultrasonic Osteogenesis Stimulator Coverage Determination" is "Deny".
+- result is "Ultrasonic Osteogenesis Stimulator Coverage Determination" is "not-certify.Deny".

@@ -1,6 +1,6 @@
 {
   "resourceType": "PlanDefinition",
-  "id": "example-for-emit-deny-eiu-recommendation",
+  "id": "example-for-emit-not-certify-eiu-recommendation",
   "meta": {
     "profile": [
       "http://hl7.org/fhir/uv/cpg/StructureDefinition/cpg-recommendationdefinition",
@@ -26,15 +26,15 @@
       "valueCode": "structured"
     }
   ],
-  "url": "http://example.org/hcsc/rx501-007/PlanDefinition/example-for-emit-deny-eiu-recommendation",
+  "url": "http://example.org/hcsc/rx501-007/PlanDefinition/example-for-emit-not-certify-eiu-recommendation",
   "version": "0.0.0",
-  "name": "ExampleForEmitDenyEiuRecommendation",
-  "title": "Deny EIU",
+  "name": "ExampleForEmitNotCertifyEiuRecommendation",
+  "title": "not-certify.EIU",
   "status": "draft",
   "experimental": true,
   "date": "2026-01-01T00:00:00.000Z",
   "publisher": "unknown",
-  "description": "Deny EIU",
+  "description": "not-certify.EIU",
   "type": {
     "coding": [
       {
@@ -48,8 +48,8 @@
   ],
   "action": [
     {
-      "title": "Deny EIU",
-      "description": "Deny EIU",
+      "title": "not-certify.EIU",
+      "description": "not-certify.EIU",
       "code": [
         {
           "coding": [
@@ -69,7 +69,7 @@
         ]
       },
       "groupingBehavior": "logical-group",
-      "definitionCanonical": "http://example.org/hcsc/rx501-007/ActivityDefinition/example-for-emit-deny-eiu"
+      "definitionCanonical": "http://example.org/hcsc/rx501-007/ActivityDefinition/example-for-emit-not-certify-eiu"
     }
   ]
 }

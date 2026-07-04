@@ -2,6 +2,13 @@
   "name": "patient-age",
   "version": "0.0.0",
   "crl": {
-    "canonicalBase": "http://example.org/crl/patient-age"
+    "canonicalBase": "http://example.org/crl/patient-age",
+    "dispositions": {
+      "mode": "standalone",
+      "options": {
+        "certify": { "Approve": { "label": "Approve" } },
+        "not-certify": { "Deny": { "label": "Deny" } }
+      }
+    }
   }
 }

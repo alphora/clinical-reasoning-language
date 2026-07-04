@@ -139,7 +139,7 @@
               ]
             }
           ],
-          "definitionCanonical": "http://example.org/hcsc/rx501-007/PlanDefinition/example-nested-approve-recommendation"
+          "definitionCanonical": "http://example.org/hcsc/rx501-007/PlanDefinition/example-nested-certify-approve-recommendation"
         },
         {
           "title": "otherwise",
@@ -154,7 +154,7 @@
               ]
             }
           ],
-          "definitionCanonical": "http://example.org/hcsc/rx501-007/PlanDefinition/example-nested-deny-recommendation"
+          "definitionCanonical": "http://example.org/hcsc/rx501-007/PlanDefinition/example-nested-not-certify-deny-recommendation"
         }
       ]
     }

@@ -49,5 +49,14 @@
         "code": "send-message"
       }
     ]
-  }
+  },
+  "dynamicValue": [
+    {
+      "path": "payload.contentString",
+      "expression": {
+        "language": "text/cql-expression",
+        "expression": "'Single hypertensive reading without prior diagnosis — document provisional status and rescreen'"
+      }
+    }
+  ]
 }
