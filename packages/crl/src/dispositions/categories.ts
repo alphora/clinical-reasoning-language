@@ -20,6 +20,9 @@ import type { DispositionCategory, DispositionOption } from "./types";
 export const REVIEW_ACTION_VALUESET =
   "https://valueset.x12.org/x217/005010/response/2000F/HCR/1/01/00/306";
 
+/** The X12 HCR01 review-action CODE SYSTEM (the codes A1/A3/A4 live here) — emitted in the reviewActionCode Coding. */
+export const REVIEW_ACTION_SYSTEM = "https://codesystem.x12.org/005010/306";
+
 /** The PAS review-decision-REASON code system (X12278ReviewDecisionReasonCode) — for an option's `reasonCode`. */
 export const REVIEW_DECISION_REASON_SYSTEM = "https://codesystem.x12.org/external/886";
 
@@ -27,18 +30,21 @@ export const DISPOSITION_CATEGORIES: readonly DispositionCategory[] = [
   {
     name: "certify",
     reviewActionCode: "A1",
+    reviewActionDisplay: "Certified in total",
     finality: "final",
     meaning: "Certified in total (PAS reviewActionCode A1) — the requested service is authorized. A FINAL outcome.",
   },
   {
     name: "not-certify",
     reviewActionCode: "A3",
+    reviewActionDisplay: "Not certified",
     finality: "final",
     meaning: "Not certified (PAS reviewActionCode A3) — the requested service is not authorized. A FINAL outcome.",
   },
   {
     name: "pended",
     reviewActionCode: "A4",
+    reviewActionDisplay: "Pended",
     finality: "non-final",
     meaning:
       "Pended (PAS reviewActionCode A4) — an async/workflow state; the review is NOT final. Disallowed as a " +

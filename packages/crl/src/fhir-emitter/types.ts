@@ -18,6 +18,7 @@
  */
 
 import type { Location } from "../ast/types";
+import type { ResolvedDispositionConfig } from "../dispositions/types";
 import type { CRLError } from "../types/errors";
 
 /**
@@ -379,4 +380,11 @@ export interface EmitOptions {
   date?: string | Date;
   /** CRMI capability level. Default `publishable`. */
   capability?: Capability;
+  /**
+   * The resolved PA disposition config (feature: configurable PA leaves). Threaded in by `emitFhirDefFromPath`
+   * (which has the project root → `resolveDispositionConfig`). When present + `configured`, a determination
+   * activity named `<category>.<key>` emits a `dynamicValue` setting the produced `CommunicationRequest.reasonCode`
+   * to the PAS review-action Coding (+ the option's reason code). Absent → today's behavior (no coded outcome).
+   */
+  dispositionConfig?: ResolvedDispositionConfig;
 }

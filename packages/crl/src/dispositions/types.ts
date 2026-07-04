@@ -30,6 +30,8 @@ export interface DispositionCategory {
   name: string;
   /** The Da Vinci PAS review-action code (X12 278 HCR01), e.g. "A1" / "A3" / "A4". Bound to `REVIEW_ACTION_VALUESET`. */
   reviewActionCode: string;
+  /** The review-action code's display, e.g. "Certified in total" (A1). Emitted in the reviewActionCode Coding. */
+  reviewActionDisplay: string;
   finality: Finality;
   meaning: string;
 }
@@ -75,8 +77,9 @@ export interface ResolvedOption {
   narrative?: string;
   /** The option's config-specified code, if any (a PAS reason code in full-PAS, or the larger system's code). */
   code?: DispositionCode;
-  /** From the category (framework), never authored: the PAS review-action code + finality. */
+  /** From the category (framework), never authored: the PAS review-action code + its display + finality. */
   reviewActionCode: string;
+  reviewActionDisplay: string;
   finality: Finality;
 }
 

@@ -37,6 +37,7 @@
 
 import type { Activity, BranchBlock, Concept, Decision, ReferenceName, Terminology } from "../ast/types";
 import { getRefLibrary, getRefName, isQualifiedRef } from "../ast/types";
+import { resolveDispositionConfig } from "../dispositions";
 import { computeFhirEmitClosure } from "../imports/computeEmitClosure";
 import { safeOutputFilename } from "../imports/safeOutputFilename";
 import { emitCQLImports } from "../imports/emit";
@@ -1621,7 +1622,17 @@ export function emitFhirDefFromPath(
     (e) => e.kind !== undefined && !CQL_FOLD_EXCLUDED_KINDS.has(e.kind),
   );
   const cqlManifestFailed = cqlErrors.length > 0;
-  const closureResult = emitFhirDefClosure(graph, metadata, opts, cqlImports.cqlByLibrary);
+  // Feature: configurable PA leaves — resolve the project's disposition config (emit is project-aware) and thread
+  // it via opts so a determination activity emits the coded PAS reviewAction outcome. Absent config → no change.
+  const dispositionConfig = graph.projectRoot
+    ? resolveDispositionConfig(graph.projectRoot).config
+    : undefined;
+  const closureResult = emitFhirDefClosure(
+    graph,
+    metadata,
+    { ...opts, dispositionConfig },
+    cqlImports.cqlByLibrary,
+  );
   // Round-5 gpt55 [important]: fold importDiagnostics + metadataErrors
   // into success. Otherwise MCP can return success:true with fatal
   // import-time errors.

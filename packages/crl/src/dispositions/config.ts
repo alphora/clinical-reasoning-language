@@ -71,6 +71,7 @@ function buildResolution(
         narrative: opt.narrative,
         code: opt.code,
         reviewActionCode: category.reviewActionCode,
+        reviewActionDisplay: category.reviewActionDisplay,
         finality: category.finality,
       });
     }
