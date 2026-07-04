@@ -1,0 +1,12 @@
+{
+  "name": "cross-lib-activity-fixture",
+  "version": "1.0.0",
+  "private": true,
+  "description": "#196 — cross-library ACTIVITY resolution at FHIR emit: a decision in Root recommends an activity in a sibling Shared library (via a qualified cross-library ref).",
+  "crl": {
+    "canonicalBase": "http://example.org/crl/cross-lib-activity",
+    "status": "draft",
+    "experimental": true,
+    "date": "2020-01-01T00:00:00.000Z"
+  }
+}

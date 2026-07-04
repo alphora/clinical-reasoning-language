@@ -1,0 +1,13 @@
+# include-into-split root
+library "Root".
+include "Shared".
+
+// Root does NOT reference Shared in any concept definition or representation.
+// The ONLY link is the source `include "Shared"` line above. Pre-fix the guard
+// (which walked concept-definition refs only) stayed silent, and Root.cql
+// emitted a DANGLING `include Shared` that no "Shared.cql" satisfies (Shared
+// auto-splits). The guard must now fail-closed over the source-include set too.
+concept "Root Local":
+- type is Observation.
+- value type is boolean.
+- code is `root-local`.

@@ -1,0 +1,8 @@
+# cross-lib-activity-collision — Lib B2 (second shared disposition library).
+library "SharedB".
+
+// Defines an activity named `Deny` — SAME name as SharedA's. Because
+// `recommendationIdForLib` is policy-id-scoped, both collapse onto one id/url.
+activity "Deny":
+- request CPGCommunicationRequest.
+- with `Denied by B.`.

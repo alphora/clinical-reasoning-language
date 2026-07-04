@@ -1,0 +1,24 @@
+# cross-lib-activity-collision — Lib A (the referring policy library).
+library "Root".
+
+// Root's decision recommends BOTH sibling libraries' `Deny` activities. Since
+// `recommendationIdForLib(metadata, "Deny")` is scoped to the POLICY id (not the
+// library), SharedA."Deny" and SharedB."Deny" both emit an ActivityDefinition and
+// Recommendation PlanDefinition at the SAME canonical URL / id. Whole-closure
+// activity-name uniqueness is therefore REQUIRED; the duplicate must trip a
+// closure collision invariant (Inv 0 closure-resource-url-collision / Inv 1
+// closure-resource-collision) and sink success — never silently pick a winner.
+
+concept "Condition A":
+- type is Condition.
+- value type is boolean.
+- code is `condition-a`.
+
+concept "Condition B":
+- type is Condition.
+- value type is boolean.
+- code is `condition-b`.
+
+decision "Triage":
+- when "Condition A" then recommend activity "SharedA"."Deny".
+- when "Condition B" then recommend activity "SharedB"."Deny".

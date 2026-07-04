@@ -1,0 +1,12 @@
+{
+  "name": "cross-lib-decision-split-fixture",
+  "version": "1.0.0",
+  "private": true,
+  "description": "#196 boundary — cross-library USE DECISION into an AUTO-SPLIT (interface) library: Shared has concept-level `code is` + a decision, so emit auto-splits it into policy-id-named layer libraries. Root delegates via `use decision \"Shared\".\"Sub Triage\"`.",
+  "crl": {
+    "canonicalBase": "http://example.org/crl/cross-lib-decision-split",
+    "status": "draft",
+    "experimental": true,
+    "date": "2020-01-01T00:00:00.000Z"
+  }
+}

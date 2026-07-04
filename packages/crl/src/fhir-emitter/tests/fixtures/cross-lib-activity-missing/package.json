@@ -1,0 +1,12 @@
+{
+  "name": "cross-lib-activity-missing-fixture",
+  "version": "1.0.0",
+  "private": true,
+  "description": "#196 negative — a decision recommends a cross-library activity whose NAME does not exist in the (real, in-closure) Shared library; the activityResolver must return null (fail-closed) → unresolved-activity, NOT a silent resolve.",
+  "crl": {
+    "canonicalBase": "http://example.org/crl/cross-lib-activity-missing",
+    "status": "draft",
+    "experimental": true,
+    "date": "2020-01-01T00:00:00.000Z"
+  }
+}

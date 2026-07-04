@@ -12,11 +12,13 @@
  * callback. Two collectors live alongside:
  *
  *   - `collectCqlEmitRefs` — Concept body refs + source-level `include`
- *     lines. Used by the CQL emit lane (`imports/emit.ts`).
- *   - `collectFhirDefEmitRefs` — strict SUPERSET: Concept refs + includes
- *     + Decision refs (when/then condition concepts, recommend-activity,
- *     use-decision) + Activity refs (with-terminology). Used by the
- *     FHIR-def closure orchestrator (Todo 4 of #73).
+ *     lines + Decision refs (when/then condition concepts, recommend-activity,
+ *     use-decision — #196, so cross-lib `recommend`/`use decision` pull the
+ *     target into the CQL closure without a redundant `include`). Used by the
+ *     CQL emit lane (`imports/emit.ts`).
+ *   - `collectFhirDefEmitRefs` — strict SUPERSET: everything the CQL collector
+ *     walks + Activity refs (with-terminology). Used by the FHIR-def closure
+ *     orchestrator (Todo 4 of #73).
  *
  * Both collectors receive the entry's `LibraryScope` so they can resolve
  * qualified library names via `lookupKnownLibrary` — preserves the
@@ -108,8 +110,28 @@ export function expandClosureViaRefs(
   return emitClosure;
 }
 
-/** CQL emit collector — preserves the pre-factor behavior of `imports/emit.ts`. */
-export function collectCqlEmitRefs(entry: RegistryEntry, _scope: LibraryScope): Set<string> {
+/**
+ * CQL INCLUDE collector — the libraries the entry's emitted CQL literally `include`s in its header:
+ *   - (1) source-level `include`s,
+ *   - (2) qualified Concept-DEFINITION refs (`coded from` / `defined as` / `definition is` — a concept
+ *     definition ref lowers to a CQL call INTO the other library, so its CQL header must `include` that library).
+ *
+ * ⚠ It deliberately does NOT walk Decision-body refs. A cross-library `recommend activity` / `use decision`
+ * resolves at the FHIR PlanDefinition level (a policy-id-scoped canonical URL), NOT via a CQL call — so the
+ * referrer's CQL must NOT `include` the target. Walking them here emitted a DANGLING `include Shared` in the
+ * referrer whenever the target auto-splits and its source-name CQL library dissolves into layers (there is no
+ * `Shared.cql`). Those targets still enter the emit CLOSURE via `collectCqlEmitRefs` (so their own CQL is emitted
+ * for their FHIR Library) — closure membership and per-library `include`s are DIFFERENT concerns.
+ *
+ * ⚠ It ALSO deliberately does NOT walk `concept.representations[].terminologyName` (possible-representation
+ * groupings). EMPIRICALLY (verified 2026-07-04): a representation-only / `code is`+representation concept lowers
+ * to a `// TODO: representations-only concept` placeholder in the emitted CQL — the representation's terminology
+ * is NEVER referenced in the CQL body. Walking it here emitted a DANGLING `include <Other>` (and, when `<Other>`
+ * auto-splits, an include with no matching `.cql`) for a ref the CQL never uses. Representation refs still enter
+ * the emit CLOSURE via `collectCqlEmitRefs` (their FHIR Library / terminology may be a depends-on) — again,
+ * closure membership ≠ per-library `include`s.
+ */
+export function collectCqlIncludeRefs(entry: RegistryEntry, _scope: LibraryScope): Set<string> {
   const refs = new Set<string>();
   const selfName = entry.name;
   const addIfCross = (lib: string | null): void => {
@@ -121,14 +143,58 @@ export function collectCqlEmitRefs(entry: RegistryEntry, _scope: LibraryScope): 
   for (const inc of entry.ast.includes) {
     addIfCross(inc.name);
   }
-  // (2) concept-body refs.
+  // (2) concept-DEFINITION refs (CQL-level). Representations are NOT walked here (see doc above).
   const visit = (ref: ReferenceName): void => {
     if (!isQualifiedRef(ref)) return;
     addIfCross(getRefLibrary(ref));
   };
   for (const stmt of entry.ast.statements) {
     if (stmt.type === "Concept") {
-      visitConceptRefs(stmt as Concept, visit);
+      visitConceptDefinitionRefs(stmt as Concept, visit);
+    }
+  }
+  return refs;
+}
+
+/**
+ * CQL emit-CLOSURE collector — which libraries must have their CQL EMITTED. A superset of
+ * `collectCqlIncludeRefs`: it ADDS
+ *   - qualified Decision-body refs (`recommend activity` / `use decision` / `when`-concept / guards, recursive
+ *     over nested branches), and
+ *   - qualified Concept-REPRESENTATION refs (`source representation … coded from "Other"."VS"`).
+ *
+ * #196 — a cross-library `recommend activity "Shared"."Deny"` (or `use decision`) resolves at the FHIR level, but
+ * the target's OWN CQL must still be emitted because its FHIR Library's `content` url points at it (Inv 4). So
+ * the target enters the CQL emit CLOSURE here — WITHOUT the referrer needing an explicit `include "Shared"`
+ * (which the language's `redundant-local-include` warning tells authors to delete), and WITHOUT the referrer
+ * emitting a `include` for it (see `collectCqlIncludeRefs`).
+ *
+ * Representation refs live HERE (closure), not in `collectCqlIncludeRefs` (per-library includes): they do NOT
+ * lower to a CQL call (a representation-only concept emits a TODO placeholder), so the referrer must NOT `include`
+ * the target — but the target's terminology may still be a FHIR depends-on, so it stays in the emit closure.
+ * Keeping them here holds the closure BYTE-IDENTICAL to the pre-fix behavior (when they lived in the include set).
+ *
+ * IDEMPOTENCE — for content that already `include`s its cross-lib targets, they are in the set via (1), so the
+ * decision/representation walks are Set no-ops → zero closure change.
+ */
+export function collectCqlEmitRefs(entry: RegistryEntry, scope: LibraryScope): Set<string> {
+  const refs = collectCqlIncludeRefs(entry, scope);
+  const selfName = entry.name;
+  const addIfCross = (lib: string | null): void => {
+    if (lib === null || lib === "") return;
+    if (lib === selfName) return;
+    refs.add(lib);
+  };
+  const visit = (ref: ReferenceName): void => {
+    if (!isQualifiedRef(ref)) return;
+    addIfCross(getRefLibrary(ref));
+  };
+  for (const stmt of entry.ast.statements) {
+    if (stmt.type === "Decision") {
+      visitDecisionRefs(stmt as Decision, visit);
+    } else if (stmt.type === "Concept") {
+      // Representation terminology refs: closure-only (see doc above / `collectCqlIncludeRefs`).
+      visitConceptRepresentationRefs(stmt as Concept, visit);
     }
   }
   return refs;
@@ -137,11 +203,8 @@ export function collectCqlEmitRefs(entry: RegistryEntry, _scope: LibraryScope): 
 /**
  * FHIR-def emit collector — STRICT SUPERSET of `collectCqlEmitRefs`.
  *
- * Adds:
- *   - Decision body refs: every `WhenBlock.conceptName` (qualified),
- *     `RecommendActivity.activityName` (qualified),
- *     `UseDecision.decisionName` (qualified). Recursive over nested
- *     `BlockBody`.
+ * `collectCqlEmitRefs` already covers includes + Concept refs + Decision refs
+ * (#196). This adds ONLY the remaining FHIR-def-specific walk:
  *   - Activity body refs: `ActivityWith.terminologyReference` (qualified).
  *
  * Same self-exclusion rule (refs to the entry's own library are dropped).
@@ -160,9 +223,7 @@ export function collectFhirDefEmitRefs(entry: RegistryEntry, scope: LibraryScope
   };
 
   for (const stmt of entry.ast.statements) {
-    if (stmt.type === "Decision") {
-      visitDecisionRefs(stmt as Decision, visit);
-    } else if (stmt.type === "Activity") {
+    if (stmt.type === "Activity") {
       visitActivityRefs(stmt as Activity, visit);
     }
   }
@@ -182,28 +243,39 @@ export function computeFhirEmitClosure(graph: ResolvedGraph): RegistryEntry[] {
 
 /* ─── ref-walker helpers (Concept / Decision / Activity) ─────────── */
 
-function visitConceptRefs(concept: Concept, visit: (ref: ReferenceName) => void): void {
+/**
+ * Concept-DEFINITION refs ONLY (`coded from` / `defined as` / `definition is`). These lower to CQL calls, so
+ * they belong in BOTH the per-library `include` set and the closure. Representations are walked SEPARATELY by
+ * `visitConceptRepresentationRefs` — they do NOT lower to CQL, so they are closure-only.
+ */
+function visitConceptDefinitionRefs(concept: Concept, visit: (ref: ReferenceName) => void): void {
   const def = concept.definition;
-  if (def) {
-    switch (def.type) {
-      case "CodedFromDefinition":
-        if (def.terminologyName) visit(def.terminologyName);
-        break;
-      case "DefinedAsDefinition": {
-        const body = def.body;
-        if (body.type === "DefinedAsBareRef") {
-          visit(body.ref);
-        } else if (body.type === "DefinedAsComposition") {
-          visitComposition((body as DefinedAsComposition).expression, visit);
-        }
-        break;
+  if (!def) return;
+  switch (def.type) {
+    case "CodedFromDefinition":
+      if (def.terminologyName) visit(def.terminologyName);
+      break;
+    case "DefinedAsDefinition": {
+      const body = def.body;
+      if (body.type === "DefinedAsBareRef") {
+        visit(body.ref);
+      } else if (body.type === "DefinedAsComposition") {
+        visitComposition((body as DefinedAsComposition).expression, visit);
       }
-      case "DefinitionIsDefinition":
-        visitNarrative(def.body, visit);
-        break;
+      break;
     }
+    case "DefinitionIsDefinition":
+      visitNarrative(def.body, visit);
+      break;
   }
-  // possible-representation named terminologies are part of the emit closure.
+}
+
+/**
+ * Concept-REPRESENTATION refs ONLY (`source representation … coded from`). Closure-only: they do NOT lower to a
+ * CQL call (a representation-only concept emits a `// TODO: representations-only` placeholder), so they must NOT
+ * drive a per-library `include`, but the target terminology may be a FHIR depends-on.
+ */
+function visitConceptRepresentationRefs(concept: Concept, visit: (ref: ReferenceName) => void): void {
   for (const rep of concept.representations ?? []) {
     if (rep.terminologyName) visit(rep.terminologyName);
   }

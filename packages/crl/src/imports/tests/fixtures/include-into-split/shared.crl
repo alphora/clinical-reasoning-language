@@ -1,0 +1,12 @@
+# include-into-split shared
+library "Shared".
+
+// Multi-layer: a terminology (Concepts) AND a coded-from concept (Asserted),
+// so emit auto-splits "Shared" into policy-id-named layer libraries. No
+// "Shared.cql" exists after the split.
+terminology "Shared Vs":
+- valueset is `shared-vs`.
+
+concept "Shared Leaf":
+- type is Observation.
+- coded from "Shared Vs".

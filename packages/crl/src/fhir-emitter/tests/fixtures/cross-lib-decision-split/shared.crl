@@ -1,0 +1,21 @@
+# cross-lib-decision-split — Lib B (the SHARED, AUTO-SPLIT decision library).
+library "Shared".
+
+// Shared has concept-level `code is` (LocalSource) AND a decision, so
+// `computeSplitPlan` returns `interface`: emit fans it into policy-id-named
+// layer libraries (`<policyId>-LocalSource`, `<policyId>-Interface`, ...) and
+// the SOURCE name `Shared` no longer exists as an emitted CQL library.
+//
+// Root delegates to this decision via `use decision "Shared"."Sub Triage"`.
+
+concept "Active Severe Crohns":
+- type is Condition.
+- value type is boolean.
+- code is `active-severe-crohns`.
+
+activity "Shared Deny":
+- request CPGCommunicationRequest.
+- with `Denied.`.
+
+decision "Sub Triage":
+- when "Active Severe Crohns" then recommend activity "Shared Deny".

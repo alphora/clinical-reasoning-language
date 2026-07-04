@@ -1,0 +1,9 @@
+# cross-lib-activity-missing — Lib B (the SHARED disposition library).
+library "Shared".
+
+// The Shared library is REAL and enters the closure (Root's decision references
+// it), and it DOES define an activity — but NOT the one Root asks for. So the
+// library resolves while the qualified ACTIVITY name does not.
+activity "Shared Deny":
+- request CPGCommunicationRequest.
+- with `Denied.`.

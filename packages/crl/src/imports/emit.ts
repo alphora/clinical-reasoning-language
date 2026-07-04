@@ -15,7 +15,6 @@ import {
   emitPartitioned,
   isLayerSplittable,
   layerLibraryNamesFor,
-  librariesReferencedBy,
   interfaceConceptNames,
   FULL_PARTITION,
 } from "../cql-emitter/layeredEmit";
@@ -108,12 +107,15 @@ export interface EmitImportsResult {
 import { safeOutputFilename } from "./safeOutputFilename";
 // Ref-walking + closure expansion factored to ./computeEmitClosure so the
 // CRL→FHIR-def lane can compute its own strict-superset closure (Todo 4 of #73).
-import { collectCqlEmitRefs, computeCqlEmitClosure } from "./computeEmitClosure";
+import { collectCqlIncludeRefs, computeCqlEmitClosure } from "./computeEmitClosure";
 import type { LibraryScope } from "./scopes";
 
 function collectCrossLibraryRefs(entry: RegistryEntry): Set<string> {
-  // 2nd arg unused by the CQL collector but required by the shared signature
-  return collectCqlEmitRefs(entry, undefined as unknown as LibraryScope);
+  // The referrer's CQL `include`s ONLY its CQL-level cross-lib refs (source includes + concept refs) — NOT
+  // decision/activity refs, which resolve at the FHIR level and would otherwise emit a DANGLING `include` when the
+  // target auto-splits (its source-name CQL library dissolves into layers). Closure MEMBERSHIP (which libs emit
+  // CQL) uses the wider `collectCqlEmitRefs`; per-library `include`s use this narrow one. 2nd arg unused here.
+  return collectCqlIncludeRefs(entry, undefined as unknown as LibraryScope);
 }
 
 /**
@@ -425,11 +427,29 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
     if (plan.kind === "full" || plan.kind === "interface") splitLibraryNames.add(entry.name);
   }
   if (splitLibraryNames.size > 0) {
+    // The guard MUST fail-closed over the SAME ref set that becomes the referrer's CQL `include`s
+    // (`collectCqlIncludeRefs` = source `include`s + concept-DEFINITION refs), NOT the narrower concept-definition-
+    // only `librariesReferencedBy`. Otherwise an explicit `include "Shared"` (or, pre-(B), a representation ref)
+    // into an auto-split local library emits a DANGLING `include Shared` that no `Shared.cql` satisfies while the
+    // guard stays silent. SCOPE-AWARE: an `include`/ref name may resolve to a PACKAGE library (fine — it is emitted
+    // under its own name, never split) OR to a LOCAL split source (dangles). Resolve each name against the
+    // referrer's scope and fire ONLY when it resolves to a LOCAL library this emit auto-splits — never blanket-error
+    // every name that merely string-matches a split source.
+    const guardScopes = buildLibraryScopes(
+      graph.resolvedLibraries,
+      graph.localLibraries,
+      graph.registry ?? { byNameLocal: new Map(), byNamePackage: new Map() },
+    );
     for (const entry of emitClosure) {
       if (!entry.name) continue;
-      const refs = librariesReferencedBy(entry.ast, entry.name);
+      const scope = guardScopes.get(entry.filePath);
+      if (!scope) continue;
+      const refs = collectCqlIncludeRefs(entry, scope);
       for (const ref of refs) {
-        if (splitLibraryNames.has(ref)) {
+        const target = lookupKnownLibrary(scope, ref);
+        // Unknown (e.g. catalog FHIRHelpers/CRLCommon) or package-origin target → cannot dangle: skip.
+        if (!target || target.origin === "package") continue;
+        if (splitLibraryNames.has(target.libraryName)) {
           return {
             success: false,
             graph,

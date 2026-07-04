@@ -1,0 +1,10 @@
+# cross-lib-activity — Lib B (the SHARED disposition library).
+library "Shared".
+
+// A plain CommunicationRequest activity that a decision in ANOTHER library
+// (Root) recommends via a cross-library qualified ref `"Shared"."Shared Deny"`.
+// Lib B is single-layer (no `code is`, no decision), so it stays one `Shared`
+// CQL library and emits its own ActivityDefinition + Recommendation PlanDefinition.
+activity "Shared Deny":
+- request CPGCommunicationRequest.
+- with `Denied.`.

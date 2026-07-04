@@ -284,6 +284,59 @@ const CODE_IS_DECISION_TWO = join(
   "src/fhir-emitter/tests/fixtures/code-is-decision-two/code-is-decision-two.crl",
 );
 
+// #196 — a two-library fixture: Root's decision `recommend`s an activity that
+// lives in a SIBLING "Shared" disposition library via the cross-library qualified
+// ref `"Shared"."Shared Deny"`. Proves the FHIR activityResolver resolves ACROSS
+// the library boundary (previously it returned null for any qualified cross-lib
+// activity ref, cascading the decision to decision-cascade-suppressed).
+const CROSS_LIB_ACTIVITY_ROOT = join(
+  ROOT,
+  "src/fhir-emitter/tests/fixtures/cross-lib-activity/root.crl",
+);
+
+// #196 negative — Root recommends `"Shared"."Nonexistent Activity"`: the Shared
+// library is real and in the closure, but has NO activity by that name, so the
+// resolver's `index.activities` guard misses → returns null (fail-closed).
+const CROSS_LIB_ACTIVITY_MISSING = join(
+  ROOT,
+  "src/fhir-emitter/tests/fixtures/cross-lib-activity-missing/root.crl",
+);
+
+// #196 collision — two sibling libraries each define an activity `Deny`, both
+// recommended. `recommendationIdForLib` is policy-id-scoped, so they collapse onto
+// one AD/Recommendation URL → a closure collision invariant must fire (fail-closed).
+const CROSS_LIB_ACTIVITY_COLLISION = join(
+  ROOT,
+  "src/fhir-emitter/tests/fixtures/cross-lib-activity-collision/root.crl",
+);
+
+// #196 — the `use decision` cross-library edge (the mirror of the `recommend
+// activity` edge above). Root's decision DELEGATES to a decision in a sibling
+// `Shared` library via `use decision "Shared"."Sub Triage"` with NO explicit
+// `include "Shared"`. `Shared` is NON-split (a decision-bearing library with no
+// concept-level `code is`), so it stays one `Shared` CQL library. Proves the
+// decisionResolver resolves ACROSS the library boundary to Shared's Decision
+// PlanDefinition, and the CQL-closure walk (`collectCqlEmitRefs` walking Decision
+// refs) pulls Shared's CQL in so its FHIR Library does not dangle at Inv 4.
+const CROSS_LIB_DECISION_ROOT = join(
+  ROOT,
+  "src/fhir-emitter/tests/fixtures/cross-lib-decision/root.crl",
+);
+
+// #196 boundary — the split-library case for the `use decision` edge. Here the
+// SHARED library is AUTO-SPLIT (concept-level `code is` + a decision → `interface`
+// split), so `Shared`'s SOURCE name no longer exists as an emitted CQL library.
+// A cross-lib `use decision` into it RESOLVES anyway, because the reference is a
+// POLICY-ID-scoped Decision PlanDefinition canonical URL — it does not depend on
+// the dissolved CQL library name. The split-library guard
+// (`emit-cross-library-ref-into-split-library`) must therefore NOT fire on this
+// decision edge (it walks concept-definition refs only, which is correct — only
+// concept/terminology refs emit as literal CQL `"X"."Y"` that a split dissolves).
+const CROSS_LIB_DECISION_SPLIT_ROOT = join(
+  ROOT,
+  "src/fhir-emitter/tests/fixtures/cross-lib-decision-split/root.crl",
+);
+
 describe("closureOrchestrator — FHIR closure code-is coverage (T2)", () => {
   it("emits EXACTLY ONE local CodeSystem under canonicalBase carrying the fixture's codes", () => {
     const result = emitFhirDefFromPath(CODE_IS_BASIC, { clock: FIXED_CLOCK });
@@ -411,6 +464,351 @@ describe("closureOrchestrator — FHIR closure code-is coverage (T2)", () => {
     // And Inv 5 sees both input profiles resolve to an emitted SD → no
     // unresolved-action-input-profile error.
     expect(result.errors.some((e) => e.kind === "unresolved-action-input-profile")).toBe(false);
+  });
+});
+
+/* ─── #196 — cross-library ACTIVITY resolution at FHIR emit ──────────── */
+
+describe("closureOrchestrator — cross-library activity recommend (#196)", () => {
+  // The canonical recommendation URL the resolver must produce for Shared's
+  // `Shared Deny` activity: `<canonicalBase>/PlanDefinition/<policyId>-shared-deny-recommendation`.
+  // `recommendationIdForLib` is POLICY-id-scoped (package name = policy id), so the
+  // referrer (Root's decision) and the target library's own Recommendation emit
+  // land on byte-identical URLs.
+  const EXPECTED_SHARED_DENY_REC_URL =
+    "http://example.org/crl/cross-lib-activity/PlanDefinition/cross-lib-activity-fixture-shared-deny-recommendation";
+
+  function collectCanonicals(actions: Array<Record<string, unknown>>): string[] {
+    const out: string[] = [];
+    for (const a of actions) {
+      if (typeof a.definitionCanonical === "string") out.push(a.definitionCanonical);
+      if (Array.isArray(a.action)) {
+        out.push(...collectCanonicals(a.action as Array<Record<string, unknown>>));
+      }
+    }
+    return out;
+  }
+
+  it("a decision's cross-library `recommend activity \"Shared\".\"Shared Deny\"` resolves to Shared's Recommendation PD — no unresolved/cascade error", () => {
+    const result = emitFhirDefFromPath(CROSS_LIB_ACTIVITY_ROOT, { clock: FIXED_CLOCK });
+
+    // (0) The cross-boundary ref is RESOLVED: pre-#196 it surfaced as an
+    // `unresolved-activity` UnmatchedReference which then cascaded the decision to
+    // `decision-cascade-suppressed`. Both must now be absent.
+    expect(result.unmatched.some((u) => u.kind === "unresolved-activity")).toBe(false);
+    expect(result.errors.some((e) => e.kind === "decision-cascade-suppressed")).toBe(false);
+    expect(result.errors.some((e) => e.kind === "unresolved-definition-target")).toBe(false);
+    // The whole two-library emit succeeds. The fixture carries NO `include "Shared"`
+    // (the cross-lib `recommend` pulls Shared into both closures on its own), so
+    // there must be NO `redundant-local-include` import warning either — de-masking
+    // the pre-#196 crutch that told authors to add the very include they'd be warned
+    // to delete.
+    expect(
+      result.importDiagnostics.some((d) => d.kind === "redundant-local-include"),
+    ).toBe(false);
+    expect(result.success).toBe(true);
+
+    // (1) Shared's ActivityDefinition IS in the emitted closure (the target of the
+    // cross-library recommend).
+    const sharedAd = result.resources.find(
+      (r) => r.resourceType === "ActivityDefinition" && r.sourceName === "Shared Deny",
+    );
+    expect(sharedAd).toBeDefined();
+
+    // (2) Shared's Recommendation PlanDefinition IS emitted, at the expected
+    // policy-id-scoped canonical URL.
+    const sharedRec = result.resources.find(
+      (r) => r.resourceType === "PlanDefinition" && r.sourceKind === "Recommendation" && r.sourceName === "Shared Deny",
+    );
+    expect(sharedRec).toBeDefined();
+    expect((sharedRec!.resource as { url?: string }).url).toBe(EXPECTED_SHARED_DENY_REC_URL);
+
+    // (3) Root's Decision PlanDefinition emitted (NOT suppressed) and its
+    // action.definitionCanonical points ACROSS the boundary at Shared's
+    // Recommendation PD URL.
+    const decisionPd = result.resources.find(
+      (r) => r.resourceType === "PlanDefinition" && r.sourceKind === "Decision" && r.sourceName === "Triage Crohns",
+    );
+    expect(decisionPd).toBeDefined();
+    const actions = (decisionPd!.resource as { action?: Array<Record<string, unknown>> }).action ?? [];
+    const canonicals = collectCanonicals(actions);
+    expect(canonicals).toContain(EXPECTED_SHARED_DENY_REC_URL);
+    // And it byte-equals the URL the TARGET library's own Recommendation PD carries
+    // (the cross-boundary agreement the resolver guarantees).
+    expect(canonicals).toContain((sharedRec!.resource as { url?: string }).url);
+
+    // (4) Inv 3 sees that definitionCanonical resolve to an emitted resource — no
+    // dangling definition-target across the library boundary.
+    const emittedUrls = new Set(
+      result.resources
+        .map((r) => (r.resource as { url?: string }).url)
+        .filter((u): u is string => typeof u === "string"),
+    );
+    expect(emittedUrls.has(EXPECTED_SHARED_DENY_REC_URL)).toBe(true);
+
+    // (5) THE CQL-CLOSURE FIX (Task A): the cross-lib `recommend` alone must pull
+    // Shared into the CQL emit closure (`collectCqlEmitRefs` now walks Decision
+    // refs) so Shared's CQL is emitted. Proof: Shared's FHIR Library is emitted with
+    // a content url pointing at Shared.cql, AND Inv 4 does NOT fire — the content url
+    // resolves to an emitted CQL manifest entry. Pre-fix, Shared was in the FHIR
+    // closure but NOT the CQL manifest, so this Library dangled at Inv 4
+    // (`library-content-url-unresolved`).
+    const sharedLib = result.resources.find(
+      (r) => r.resourceType === "Library" && (r.resource as { title?: string }).title === "Shared",
+    );
+    expect(sharedLib).toBeDefined();
+    const sharedContent = (sharedLib!.resource as { content?: Array<{ url?: string }> }).content;
+    expect(sharedContent?.[0]?.url).toBe("../../cql/Shared.cql");
+    expect(result.errors.some((e) => e.kind === "library-content-url-unresolved")).toBe(false);
+  });
+
+  it("de-mask (Task A CQL closure): Shared's CQL is in the CQL manifest via the cross-lib recommend ALONE — no `include \"Shared\"`", () => {
+    // Direct proof at the CQL lane: `emitCQLImports` walks the SAME emit closure and
+    // must list a `Shared` library in `cqlByLibrary` even though root.crl carries no
+    // `include "Shared"`. Before Task A, `collectCqlEmitRefs` walked only includes +
+    // Concept refs, so a cross-lib `recommend activity` left Shared out of the CQL
+    // manifest entirely.
+    const cql = emitCQLImports(CROSS_LIB_ACTIVITY_ROOT);
+    expect(cql.success).toBe(true);
+    expect(cql.cqlByLibrary.some((e) => e.libraryName === "Shared")).toBe(true);
+  });
+
+  it("NEGATIVE — a qualified `recommend activity \"Shared\".\"Nonexistent Activity\"` fails CLOSED (unresolved-activity, no silent resolve)", () => {
+    // The Shared library resolves and enters the closure, but has no activity by
+    // that name, so the activityResolver's `index.activities.get("Shared")?.has(...)`
+    // guard misses and it returns null rather than fabricating a recommendation URL.
+    const result = emitFhirDefFromPath(CROSS_LIB_ACTIVITY_MISSING, { clock: FIXED_CLOCK });
+
+    // Fail-closed: the missing activity surfaces as an `unresolved-activity`
+    // UnmatchedReference which cascades the decision to `decision-cascade-suppressed`.
+    expect(result.unmatched.some((u) => u.kind === "unresolved-activity")).toBe(true);
+    expect(result.errors.some((e) => e.kind === "decision-cascade-suppressed")).toBe(true);
+    expect(result.success).toBe(false);
+
+    // Non-fabrication guard: NO Recommendation PlanDefinition was minted for the
+    // non-existent `Nonexistent Activity` (the resolver did not invent a URL).
+    const fabricated = result.resources.some(
+      (r) => r.resourceType === "PlanDefinition" && r.sourceName === "Nonexistent Activity",
+    );
+    expect(fabricated).toBe(false);
+  });
+
+  it("COLLISION — two libraries each defining an activity of the SAME name, both recommended → closure collision fires (policy-id-scoped uniqueness)", () => {
+    // `recommendationIdForLib(metadata, "Deny")` is scoped to the POLICY id (not the
+    // library name), so SharedA."Deny" and SharedB."Deny" both emit an
+    // ActivityDefinition + Recommendation PlanDefinition at the SAME url/id. This
+    // documents that whole-closure activity-name uniqueness is REQUIRED: the
+    // duplicate must trip a closure collision invariant (Inv 0 url-collision / Inv 1
+    // id/path-collision) and sink success — never silently pick a winner.
+    const result = emitFhirDefFromPath(CROSS_LIB_ACTIVITY_COLLISION, { clock: FIXED_CLOCK });
+
+    expect(result.success).toBe(false);
+    const collisionKinds = new Set(result.errors.map((e) => e.kind));
+    expect(
+      collisionKinds.has("closure-resource-url-collision") ||
+        collisionKinds.has("closure-resource-collision"),
+    ).toBe(true);
+
+    // HARDENING — the collision must specifically concern the duplicated `Deny`
+    // activity's Recommendation PlanDefinition URL (the policy-id-scoped
+    // `<base>/PlanDefinition/<policyId>-deny-recommendation` both libraries
+    // collapse onto), NOT merely "some collision" elsewhere in the closure. Assert
+    // a url-collision error whose message names that exact recommendation URL and
+    // attributes it to the `Deny` recommendation from BOTH shared libraries.
+    const DENY_REC_URL =
+      "http://example.org/crl/cross-lib-activity-collision/PlanDefinition/cross-lib-activity-collision-fixture-deny-recommendation";
+    const denyRecCollision = result.errors.find(
+      (e) =>
+        e.kind === "closure-resource-url-collision" &&
+        e.message.includes(DENY_REC_URL),
+    );
+    expect(denyRecCollision).toBeDefined();
+    // Both colliders are the `Deny` recommendation (the ONE duplicated name), so
+    // the message names `Recommendation "Deny"` on both sides of the `vs`.
+    expect(denyRecCollision!.message.match(/Recommendation "Deny"/g)?.length).toBe(2);
+
+    // The duplicated `Deny` ActivityDefinition URL likewise collides.
+    const DENY_AD_URL =
+      "http://example.org/crl/cross-lib-activity-collision/ActivityDefinition/cross-lib-activity-collision-fixture-deny";
+    expect(
+      result.errors.some(
+        (e) => e.kind === "closure-resource-url-collision" && e.message.includes(DENY_AD_URL),
+      ),
+    ).toBe(true);
+  });
+});
+
+/* ─── #196 — cross-library USE DECISION resolution at FHIR emit ──────── */
+
+describe("closureOrchestrator — cross-library use decision (#196)", () => {
+  // Shared's `Sub Triage` decision emits a Decision PlanDefinition at this
+  // policy-id-scoped canonical URL; Root's `use decision "Shared"."Sub Triage"`
+  // must resolve to the byte-identical URL.
+  const EXPECTED_SUB_TRIAGE_PD_URL =
+    "http://example.org/crl/cross-lib-decision/PlanDefinition/cross-lib-decision-fixture-sub-triage";
+
+  function collectCanonicals(actions: Array<Record<string, unknown>>): string[] {
+    const out: string[] = [];
+    for (const a of actions) {
+      if (typeof a.definitionCanonical === "string") out.push(a.definitionCanonical);
+      if (Array.isArray(a.action)) {
+        out.push(...collectCanonicals(a.action as Array<Record<string, unknown>>));
+      }
+    }
+    return out;
+  }
+
+  it("a decision's cross-library `use decision \"Shared\".\"Sub Triage\"` resolves to Shared's Decision PD — separate files, NO include, no dangle", () => {
+    const result = emitFhirDefFromPath(CROSS_LIB_DECISION_ROOT, { clock: FIXED_CLOCK });
+
+    // (0) The whole two-library emit succeeds with the cross-boundary delegation
+    // resolved: no unresolved-decision, no cascade suppression, no dangling
+    // definition-target across the library boundary.
+    expect(result.unmatched.some((u) => u.kind === "unresolved-decision")).toBe(false);
+    expect(result.errors.some((e) => e.kind === "decision-cascade-suppressed")).toBe(false);
+    expect(result.errors.some((e) => e.kind === "unresolved-definition-target")).toBe(false);
+    // The split-library guard must NOT fire — Root refs Shared via a DECISION edge,
+    // not a concept ref, so there is no dangling CQL `"Shared"."X"` to guard.
+    expect(
+      result.errors.some((e) => e.kind === "emit-cross-library-ref-into-split-library"),
+    ).toBe(false);
+    // No `include "Shared"` in root.crl → NO `redundant-local-include` warning: the
+    // cross-lib `use decision` pulls Shared into both closures on its own.
+    expect(
+      result.importDiagnostics.some((d) => d.kind === "redundant-local-include"),
+    ).toBe(false);
+    expect(result.success).toBe(true);
+
+    // (1) Shared's Decision PlanDefinition IS emitted, at the policy-id-scoped URL.
+    const subPd = result.resources.find(
+      (r) =>
+        r.resourceType === "PlanDefinition" &&
+        r.sourceKind === "Decision" &&
+        r.sourceName === "Sub Triage",
+    );
+    expect(subPd).toBeDefined();
+    expect((subPd!.resource as { url?: string }).url).toBe(EXPECTED_SUB_TRIAGE_PD_URL);
+
+    // (2) Root's Decision PlanDefinition emitted (NOT suppressed) and its
+    // action.definitionCanonical points ACROSS the boundary at Shared's Decision PD.
+    const rootPd = result.resources.find(
+      (r) =>
+        r.resourceType === "PlanDefinition" &&
+        r.sourceKind === "Decision" &&
+        r.sourceName === "Triage Crohns",
+    );
+    expect(rootPd).toBeDefined();
+    const canonicals = collectCanonicals(
+      (rootPd!.resource as { action?: Array<Record<string, unknown>> }).action ?? [],
+    );
+    expect(canonicals).toContain(EXPECTED_SUB_TRIAGE_PD_URL);
+    // And it byte-equals the URL the target library's own Decision PD carries.
+    expect(canonicals).toContain((subPd!.resource as { url?: string }).url);
+
+    // (3) Inv 3 sees that definitionCanonical resolve to an emitted resource.
+    const emittedUrls = new Set(
+      result.resources
+        .map((r) => (r.resource as { url?: string }).url)
+        .filter((u): u is string => typeof u === "string"),
+    );
+    expect(emittedUrls.has(EXPECTED_SUB_TRIAGE_PD_URL)).toBe(true);
+
+    // (4) THE CQL-CLOSURE FIX: the cross-lib `use decision` alone pulls Shared into
+    // the CQL emit closure, so Shared's FHIR Library is emitted with a content url
+    // pointing at Shared.cql AND Inv 4 does NOT fire (the content url resolves to an
+    // emitted CQL manifest entry — pre-fix Shared was in the FHIR closure but not
+    // the CQL manifest, dangling at `library-content-url-unresolved`).
+    const sharedLib = result.resources.find(
+      (r) => r.resourceType === "Library" && (r.resource as { title?: string }).title === "Shared",
+    );
+    expect(sharedLib).toBeDefined();
+    const sharedContent = (sharedLib!.resource as { content?: Array<{ url?: string }> }).content;
+    expect(sharedContent?.[0]?.url).toBe("../../cql/Shared.cql");
+    expect(result.errors.some((e) => e.kind === "library-content-url-unresolved")).toBe(false);
+  });
+
+  it("de-mask (CQL closure): Shared's CQL is in the CQL manifest via the cross-lib `use decision` ALONE — no `include \"Shared\"`", () => {
+    const cql = emitCQLImports(CROSS_LIB_DECISION_ROOT);
+    expect(cql.success).toBe(true);
+    expect(cql.cqlByLibrary.some((e) => e.libraryName === "Shared")).toBe(true);
+  });
+
+  it("BOUNDARY — cross-library `use decision` INTO an AUTO-SPLIT library resolves via the policy-id-scoped Decision PD (guard does NOT wrongly fire)", () => {
+    // Shared is auto-split (`interface`: concept-level `code is` + a decision), so
+    // its SOURCE name dissolves into policy-id-named layer libraries. The cross-lib
+    // `use decision "Shared"."Sub Triage"` still resolves — the reference is a
+    // policy-id-scoped Decision PlanDefinition canonical, independent of the
+    // dissolved CQL library name. INVESTIGATION VERDICT: decision/activity edges
+    // into a split library RESOLVE (they never emit as a literal CQL `"X"."Y"`), so
+    // the split-library guard MUST NOT fire on them — only concept/terminology refs
+    // (which `librariesReferencedBy` correctly walks) dangle across a split.
+    const result = emitFhirDefFromPath(CROSS_LIB_DECISION_SPLIT_ROOT, { clock: FIXED_CLOCK });
+
+    // The guard did NOT wrongly fire on the decision edge.
+    expect(
+      result.errors.some((e) => e.kind === "emit-cross-library-ref-into-split-library"),
+    ).toBe(false);
+    // Clean resolution: success, no unresolved/cascade/dangle.
+    expect(result.unmatched.some((u) => u.kind === "unresolved-decision")).toBe(false);
+    expect(result.errors.some((e) => e.kind === "decision-cascade-suppressed")).toBe(false);
+    expect(result.errors.some((e) => e.kind === "unresolved-definition-target")).toBe(false);
+    expect(result.errors.some((e) => e.kind === "library-content-url-unresolved")).toBe(false);
+    expect(result.success).toBe(true);
+
+    // THE CQL-LANE LANDMINE (an FHIR-only check misses it): the referrer's emitted CQL must NOT carry a dangling
+    // `include Shared` for the cross-lib `use decision`. Shared dissolved into split layers, so `Shared` is not an
+    // emitted CQL library — a decision/activity edge is FHIR-level and must not add a CQL `include` (the
+    // per-library `include` walker excludes decision refs; only the emit CLOSURE walks them). Shared's CQL is
+    // still emitted, as its split layers, so its FHIR Library resolves.
+    const cqlImports = emitCQLImports(CROSS_LIB_DECISION_SPLIT_ROOT);
+    expect(cqlImports.success).toBe(true);
+    const rootCql = cqlImports.cqlByLibrary.find((e) => e.libraryName === "Root");
+    expect(rootCql).toBeDefined();
+    expect(rootCql!.cql).not.toContain("include Shared");
+    expect(
+      cqlImports.cqlByLibrary.some((e) => e.libraryName.startsWith("CrossLibDecisionSplitFixture")),
+    ).toBe(true);
+
+    const EXPECTED_SPLIT_SUB_PD_URL =
+      "http://example.org/crl/cross-lib-decision-split/PlanDefinition/cross-lib-decision-split-fixture-sub-triage";
+
+    // Shared IS split: its source-name CQL library `Shared` no longer exists — the
+    // policy-id-named layer libraries do (proof the split actually happened).
+    const layerLibs = result.resources.filter(
+      (r) =>
+        r.resourceType === "Library" &&
+        typeof (r.resource as { name?: string }).name === "string" &&
+        (r.resource as { name: string }).name.startsWith("CrossLibDecisionSplitFixture"),
+    );
+    expect(layerLibs.length).toBeGreaterThan(0);
+    expect(
+      result.resources.some(
+        (r) => r.resourceType === "Library" && (r.resource as { title?: string }).title === "Shared",
+      ),
+    ).toBe(false);
+
+    // The split library's `Sub Triage` decision still emits its Decision PD, and
+    // Root's action.definitionCanonical points across the boundary at it.
+    const subPd = result.resources.find(
+      (r) =>
+        r.resourceType === "PlanDefinition" &&
+        r.sourceKind === "Decision" &&
+        r.sourceName === "Sub Triage",
+    );
+    expect(subPd).toBeDefined();
+    expect((subPd!.resource as { url?: string }).url).toBe(EXPECTED_SPLIT_SUB_PD_URL);
+
+    const rootPd = result.resources.find(
+      (r) =>
+        r.resourceType === "PlanDefinition" &&
+        r.sourceKind === "Decision" &&
+        r.sourceName === "Triage Crohns",
+    );
+    expect(rootPd).toBeDefined();
+    const canonicals = collectCanonicals(
+      (rootPd!.resource as { action?: Array<Record<string, unknown>> }).action ?? [],
+    );
+    expect(canonicals).toContain(EXPECTED_SPLIT_SUB_PD_URL);
   });
 });
 

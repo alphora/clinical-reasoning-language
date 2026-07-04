@@ -1,0 +1,23 @@
+# cross-lib-decision-split — Lib A (the referring policy library).
+library "Root".
+
+// Root delegates to the sibling Shared library's decision via
+// `use decision "Shared"."Sub Triage"`. Shared is AUTO-SPLIT (it has
+// concept-level `code is` + a decision → interface split), so Shared's SOURCE
+// name no longer exists as an emitted CQL library. The question this fixture
+// pins: does a cross-lib `use decision` into a split library resolve (via the
+// policy-id-scoped Decision PlanDefinition) or fail the split-library guard?
+//
+// Root itself has NO concept-level `code is` (only ONE library per policy may),
+// so its condition is a RecordSource `coded from` concept.
+
+terminology "Mild Crohns VS":
+- valueset is `http://example.org/vs/mild-crohns`.
+
+concept "Mild Crohns":
+- type is Condition.
+- value type is boolean.
+- coded from "Mild Crohns VS".
+
+decision "Triage Crohns":
+- when "Mild Crohns" then use decision "Shared"."Sub Triage".

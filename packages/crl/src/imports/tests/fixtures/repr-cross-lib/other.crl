@@ -1,0 +1,10 @@
+# repr-cross-lib other
+library "Other".
+
+// Multi-layer sibling that auto-splits (terminology + coded-from).
+terminology "VS":
+- valueset is `http://example.org/ValueSet/vs`.
+
+concept "Other Concept":
+- type is Observation.
+- coded from "VS".

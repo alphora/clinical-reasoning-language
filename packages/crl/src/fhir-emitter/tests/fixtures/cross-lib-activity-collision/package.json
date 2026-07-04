@@ -1,0 +1,12 @@
+{
+  "name": "cross-lib-activity-collision-fixture",
+  "version": "1.0.0",
+  "private": true,
+  "description": "#196 collision — two sibling libraries each define an activity named `Deny`, both recommended from one decision. `recommendationIdForLib` is POLICY-id-scoped (not library-scoped), so both emit the SAME ActivityDefinition/Recommendation URL → a closure URL/id collision must fire (fail-closed), NOT silent success.",
+  "crl": {
+    "canonicalBase": "http://example.org/crl/cross-lib-activity-collision",
+    "status": "draft",
+    "experimental": true,
+    "date": "2020-01-01T00:00:00.000Z"
+  }
+}

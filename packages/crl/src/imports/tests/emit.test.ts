@@ -192,6 +192,67 @@ describe("emitCQLImports (per-CRL v2.1.0)", () => {
     );
   });
 
+  it("fails loudly when an EXPLICIT `include` (no concept ref) targets an auto-split local library", () => {
+    // Landmine (A): the split-library guard must fail-closed over the SAME ref
+    // set that becomes the referrer's CQL `include`s (source `include`s +
+    // concept-definition refs), NOT the narrower concept-definition-only set.
+    // Root here `include "Shared"` but NEVER references Shared in a concept
+    // definition or representation — the ONLY link is the source include line.
+    // Pre-fix the guard walked concept-definition refs only, stayed silent, and
+    // Root.cql emitted a DANGLING `include Shared` (Shared auto-splits; no
+    // "Shared.cql" exists). The guard must now fire.
+    const root = path.join(FIXTURES, "include-into-split", "root.crl");
+    const result = emitCQLImports(root);
+    expect(result.success).toBe(false);
+    expect(result.cqlByLibrary).toHaveLength(0);
+    expect(result.errors?.[0]?.kind).toBe("emit-cross-library-ref-into-split-library");
+    expect(result.errors?.[0]?.message).toMatch(
+      /Library "Root" qualified-refs "Shared".*library that emit auto-splits/,
+    );
+  });
+
+  it("scope-aware negative: an explicit include of a multi-layer PACKAGE does NOT trip the split guard", () => {
+    // Landmine (A) SCOPE-AWARENESS: the guard resolves each include/ref name
+    // against the referrer's scope and fires ONLY when it resolves to a LOCAL
+    // split source. "SomePkg" is a multi-layer PACKAGE (it WOULD split if it
+    // were a local sibling), but a package is emitted under its own name and is
+    // never split in this consumer, so the ref must NOT fire. `include SomePkg`
+    // in Root.cql legitimately resolves to the package's own CQL (not dangling).
+    const root = path.join(FIXTURES, "include-package-ref", "root.crl");
+    const result = emitCQLImports(root);
+    expect(result.success).toBe(true);
+    const rootCql = findLib(result, "Root") ?? "";
+    expect(rootCql).toMatch(/include SomePkg\b/);
+    expect(rootCql).toMatch(/SomePkg\."Pkg C"/);
+  });
+
+  it("a cross-lib possible-representation ref does NOT emit a dangling `include` (representations don't lower to CQL)", () => {
+    // Landmine (B), resolved EMPIRICALLY: a representation-only / `code is` +
+    // `source representation … coded from "Other"."VS"` concept lowers to a
+    // `// TODO: representations-only concept` placeholder — the representation's
+    // terminology is NEVER referenced in the emitted CQL body. So a cross-lib
+    // representation ref must NOT drive a per-library `include` (that emitted a
+    // DANGLING `include Other`, and Other auto-splits so no "Other.cql" exists).
+    // Representation refs stay in the emit CLOSURE (Other's layers still emit for
+    // FHIR), just NOT in the include set.
+    const root = path.join(FIXTURES, "repr-cross-lib", "root.crl");
+    const result = emitCQLImports(root);
+    expect(result.success).toBe(true);
+    const rootCql = findLib(result, "Root") ?? "";
+    // The representation-only concept lowers to the TODO placeholder.
+    expect(rootCql).toMatch(/define "Foo"/);
+    expect(rootCql).toMatch(/representations-only concept/);
+    // CRITICAL: NO dangling `include Other` (nor an include of any Other-derived
+    // split layer) in the referrer's CQL.
+    expect(rootCql).not.toMatch(/include Other\b/);
+    expect(rootCql).not.toMatch(/include "Other/);
+    // Closure PRESERVED: "Other" is still emitted (auto-split into policy-id
+    // layer libraries) even though the referrer does not `include` it.
+    const names = policyLibNames(result);
+    expect(names).toContain("CrlReprFixtureRecordConcepts");
+    expect(names).toContain("CrlReprFixtureRecordSource");
+  });
+
   it("R2: source-name layer collision class is eliminated by policy-id naming (real `X Asserted` sibling no longer clashes)", () => {
     // PRE-R2 this fixture FAILED with `layered-name-collision`: the multi-layer
     // `library "X"` auto-split into `X Concepts` / `X Asserted` / `X Inferred`,

@@ -1,0 +1,21 @@
+# cross-lib-activity — Lib A (the referring policy library).
+library "Root".
+
+// Root's decision recommends the sibling Shared library's activity via the
+// cross-library qualified ref `"Shared"."Shared Deny"` — with NO explicit
+// `include "Shared"`. The cross-lib `recommend activity` alone must pull Shared
+// into BOTH the CQL emit closure (`cqlByLibrary`) AND the FHIR emit closure
+// (#196 / this fix). Pre-#196 the FHIR activityResolver returned null for any
+// qualified cross-library activity ref, so this surfaced directly as an
+// `unresolved-activity` UnmatchedReference, which then cascaded the decision to
+// `decision-cascade-suppressed`. It now resolves to Shared's Recommendation
+// PlanDefinition, and the CQL-closure fix emits Shared's CQL so its FHIR Library
+// no longer dangles at Inv 4 — WITHOUT the author needing a `redundant-local-include`.
+
+concept "Active Crohns Disease":
+- type is Condition.
+- value type is boolean.
+- code is `active-crohns-disease`.
+
+decision "Triage Crohns":
+- when "Active Crohns Disease" then recommend activity "Shared"."Shared Deny".

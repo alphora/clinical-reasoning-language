@@ -1,0 +1,10 @@
+# include-package-ref root
+library "Root".
+include "SomePkg".
+
+// Explicit include of a multi-layer PACKAGE + a cross-lib ref into it. The
+// package is never split in this consumer, so the guard must NOT fire and
+// `include SomePkg` in Root.cql resolves to the package's own CQL (not dangling).
+concept "Root C":
+- type is Observation.
+- defined as "SomePkg"."Pkg C".

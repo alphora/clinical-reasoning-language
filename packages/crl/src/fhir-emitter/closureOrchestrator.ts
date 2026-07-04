@@ -191,7 +191,17 @@ function makeResolversForSourceLibrary(
 
   const activityResolver: ActivityResolver = (ref) => {
     const normalized = normalizeLocalRef(ref, sourceLibraryName);
-    if (isQualifiedRef(normalized)) return null; // cross-library v0: unsupported
+    if (isQualifiedRef(normalized)) {
+      // #196 — cross-library activity: a decision may `recommend activity "OtherLib"."name"` (e.g. a shared
+      // disposition library). Mirror the decision resolver: emit the recommendation URL only when the target
+      // activity is in the closure. `recommendationIdForLib` is policy-id-scoped (not library-scoped), so this
+      // matches the AD + recommendation PlanDefinition the TARGET library's closure pass emits. No cycle check —
+      // activities don't recurse (unlike `use decision`).
+      const targetLib = getRefLibrary(normalized)!;
+      const targetName = getRefName(normalized);
+      if (!index.activities.get(targetLib)?.has(targetName)) return null;
+      return `${metadata.canonicalBase}/PlanDefinition/${recommendationIdForLib(metadata, targetName)}`;
+    }
     const name = getRefName(normalized);
     if (!index.activities.get(sourceLibraryName)?.has(name)) return null;
     // Recommendation canonical URL for source library's activity (R1 — policy-id base)

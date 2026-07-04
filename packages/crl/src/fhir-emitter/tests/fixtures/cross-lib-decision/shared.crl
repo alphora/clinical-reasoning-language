@@ -1,0 +1,23 @@
+# cross-lib-decision — Lib B (the SHARED decision library).
+library "Shared".
+
+// A reusable sub-decision that a decision in ANOTHER library (Root) delegates to
+// via `use decision "Shared"."Sub Triage"`. Lib B is a decision-bearing library
+// with NO concept-level `code is` (its condition is `coded from`, a RecordSource
+// concept), so it stays a SINGLE `Shared` CQL library (NOT auto-split) and emits
+// its own Decision + Recommendation + ActivityDefinition PlanDefinitions.
+
+terminology "Severe Crohns VS":
+- valueset is `http://example.org/vs/severe-crohns`.
+
+concept "Severe Crohns":
+- type is Condition.
+- value type is boolean.
+- coded from "Severe Crohns VS".
+
+activity "Shared Deny":
+- request CPGCommunicationRequest.
+- with `Denied.`.
+
+decision "Sub Triage":
+- when "Severe Crohns" then recommend activity "Shared Deny".

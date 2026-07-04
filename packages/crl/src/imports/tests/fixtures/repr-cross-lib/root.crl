@@ -1,0 +1,12 @@
+# repr-cross-lib root
+library "Root".
+
+// The ONLY cross-lib link to "Other" is a possible-representation
+// (`source representation … coded from "Other"."VS"`). It does NOT lower to a
+// CQL call (representation-only concept → TODO placeholder), so Root.cql must
+// NOT `include Other` (which would dangle: Other auto-splits). The guard must
+// NOT fire. "Other" still enters the emit CLOSURE (its layers emit for FHIR).
+concept "Foo":
+- type is Observation.
+- code is `foo`.
+- source representation: - coded from "Other"."VS".

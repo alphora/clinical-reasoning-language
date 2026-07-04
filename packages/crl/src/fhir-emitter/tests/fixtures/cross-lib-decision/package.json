@@ -1,0 +1,12 @@
+{
+  "name": "cross-lib-decision-fixture",
+  "version": "1.0.0",
+  "private": true,
+  "description": "#196 — cross-library USE DECISION resolution at FHIR emit: a decision in Root delegates to a decision in a sibling Shared library (via a qualified cross-library ref `\"Shared\".\"Sub Triage\"`) with NO explicit `include \"Shared\"`.",
+  "crl": {
+    "canonicalBase": "http://example.org/crl/cross-lib-decision",
+    "status": "draft",
+    "experimental": true,
+    "date": "2020-01-01T00:00:00.000Z"
+  }
+}
