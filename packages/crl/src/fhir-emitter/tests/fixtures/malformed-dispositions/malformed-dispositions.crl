@@ -1,0 +1,14 @@
+# C2 regression fixture: package.json crl.dispositions is malformed (invalid mode) but its options validly define a not-certify.Deny leaf.
+library "Malformed Dispositions".
+
+concept "Requested Service":
+- type is Observation.
+- value type is boolean.
+- code is `requested-service`.
+
+activity "not-certify.Deny":
+- request CPGCommunicationRequest.
+- with `Denied.`.
+
+decision "Coverage Determination":
+- when "Requested Service" then recommend activity "not-certify.Deny".

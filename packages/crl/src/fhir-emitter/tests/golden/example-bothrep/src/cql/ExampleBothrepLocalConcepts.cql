@@ -1,4 +1,4 @@
-library "example-bothrep-LocalConcepts"
+library ExampleBothrepLocalConcepts
 
 using FHIR version '4.0.1'
 

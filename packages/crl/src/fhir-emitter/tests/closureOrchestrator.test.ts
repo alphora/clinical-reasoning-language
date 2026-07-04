@@ -190,6 +190,69 @@ describe("closureOrchestrator — emitFhirDefFromPath (cc-screening end-to-end)"
   });
 });
 
+/* ─── C2 — malformed crl.dispositions must SINK success (not silently degrade) ─ */
+
+const MALFORMED_DISPOSITIONS = join(
+  ROOT,
+  "src/fhir-emitter/tests/fixtures/malformed-dispositions/malformed-dispositions.crl",
+);
+
+describe("closureOrchestrator — malformed crl.dispositions (C2 regression)", () => {
+  // The critical bug (now fixed): an error-severity `crl.dispositions` problem
+  // used to silently degrade the emit to `configured:false` — dropping every PA
+  // determination dynamicValue — while STILL reporting `success:true`. The fix
+  // (emitFhirDefFromPath) withholds the config on any error-severity
+  // DispositionConfigError, folds those into `disposition-config` CRLErrors, and
+  // sinks `success`. This fixture's config is malformed ONLY by an invalid `mode`
+  // ("bogus" → unknown-mode, severity:"error"); its `options` are otherwise valid
+  // and DEFINE a `not-certify.Deny` leaf — so a regression that failed to withhold
+  // would emit a determination reasonCode/label contentString (assertion c).
+  it("sinks success:false, folds a disposition-config error, and emits NO determination outcome", () => {
+    const result = emitFhirDefFromPath(MALFORMED_DISPOSITIONS, { clock: FIXED_CLOCK });
+
+    // (a) success is sunk by the error-severity config problem.
+    expect(result.success).toBe(false);
+
+    // (b) the error surfaces as a `disposition-config` CRLError anchored at package.json.
+    const dispErrors = result.errors.filter((e) => e.kind === "disposition-config");
+    expect(dispErrors.length).toBeGreaterThanOrEqual(1);
+    expect(dispErrors.some((e) => (e.message ?? "").includes("crl.dispositions.mode"))).toBe(true);
+
+    // (c) NO emitted ActivityDefinition carries a determination outcome: the config
+    // was withheld, so there is no `reasonCode` dynamicValue and no
+    // `payload.contentString` carrying the disposition LABEL ("Deny"). (A plain
+    // CommunicationRequest activity may still route its `with` narrative to
+    // `payload.contentString` — that narrative is "Denied.", NOT the "Deny" label —
+    // so we assert against the determination markers specifically.)
+    const activityDefs = result.resources.filter((r) => r.resourceType === "ActivityDefinition");
+    // Non-vacuity: the determination activity IS emitted (as a plain
+    // CommunicationRequest, config withheld) — so the loop below actually runs.
+    expect(activityDefs.length).toBeGreaterThanOrEqual(1);
+    for (const ad of activityDefs) {
+      const dvs =
+        (ad.resource as { dynamicValue?: Array<{ path?: string; expression?: { expression?: string } }> })
+          .dynamicValue ?? [];
+      // No determination markers at all: no reasonCode, no note, and no payload carrying the WITHHELD label.
+      expect(dvs.some((dv) => dv.path === "reasonCode")).toBe(false);
+      expect(dvs.some((dv) => dv.path === "note.text")).toBe(false);
+      expect(
+        dvs.some((dv) => dv.path === "payload.contentString" && dv.expression?.expression === "'Deny'"),
+      ).toBe(false);
+    }
+    // Round-2 (gpt55) hardening: pin the EXACT plain-CommunicationRequest shape of the withheld determination —
+    // its ONLY dynamicValue is the `with` narrative → `payload.contentString = 'Denied.'` (NOT the label, no
+    // note, no reasonCode). Had the malformed config NOT been withheld, this AD would instead carry
+    // payload='Deny' (label) + note.text + reasonCode.
+    const denyAd = activityDefs.find(
+      (r) => (r.resource as { id?: string }).id?.endsWith("not-certify-deny") ?? false,
+    );
+    expect(denyAd).toBeDefined();
+    expect((denyAd!.resource as { dynamicValue?: unknown }).dynamicValue).toEqual([
+      { path: "payload.contentString", expression: { language: "text/cql-expression", expression: "'Denied.'" } },
+    ]);
+  });
+});
+
 describe("closureOrchestrator — direct API (emitFhirDefClosure)", () => {
   it("returns 0-resources gracefully when the closure is empty", () => {
     // Synthesize an empty ResolvedGraph

@@ -1,4 +1,4 @@
-library "example-semand-LocalConcepts"
+library ExampleSemandLocalConcepts
 
 using FHIR version '4.0.1'
 

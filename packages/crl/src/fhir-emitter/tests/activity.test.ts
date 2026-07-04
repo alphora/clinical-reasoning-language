@@ -268,9 +268,9 @@ describe("activity — emitActivityDefinition", () => {
     ]);
   });
 
-  it("determination label + `with` narrative are CQL-escaped in payload/note (single-quote, backslash)", () => {
+  it("determination label + `with` narrative are CQL-escaped in payload/note (single-quote, backslash, newline)", () => {
     const a = activity("not-certify.Deny", "CPGCommunicationRequest" as ActivityType, {
-      withText: "See the payer's policy at C:\\rules.",
+      withText: "See the payer's policy\nat C:\\rules.",
     });
     const config = normalizeDispositionConfig({
       options: { "not-certify": { Deny: { label: "Deny — physician's call" } } },
@@ -286,8 +286,9 @@ describe("activity — emitActivityDefinition", () => {
     expect(dv.find((e) => e.path === "payload.contentString")!.expression.expression).toBe(
       "'Deny — physician\\'s call'",
     );
+    // single-quote → \', backslash → \\, raw newline → \n
     expect(dv.find((e) => e.path === "note.text")!.expression.expression).toBe(
-      "'See the payer\\'s policy at C:\\\\rules.'",
+      "'See the payer\\'s policy\\nat C:\\\\rules.'",
     );
   });
 

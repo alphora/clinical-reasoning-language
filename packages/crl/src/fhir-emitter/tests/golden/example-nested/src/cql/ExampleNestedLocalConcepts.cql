@@ -1,4 +1,4 @@
-library "example-nested-LocalConcepts"
+library ExampleNestedLocalConcepts
 
 using FHIR version '4.0.1'
 

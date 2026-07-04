@@ -1,4 +1,4 @@
-library "example-direct-LocalConcepts"
+library ExampleDirectLocalConcepts
 
 using FHIR version '4.0.1'
 

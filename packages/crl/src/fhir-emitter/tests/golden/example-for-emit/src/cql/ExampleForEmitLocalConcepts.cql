@@ -1,4 +1,4 @@
-library "example-for-emit-LocalConcepts"
+library ExampleForEmitLocalConcepts
 
 using FHIR version '4.0.1'
 

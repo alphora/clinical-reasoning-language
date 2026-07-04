@@ -333,9 +333,19 @@ function defaultClock(): Date {
   return new Date();
 }
 
-/** Escape a CQL single-quoted string literal (backslash-escape `'`). */
+/**
+ * Escape a string for a CQL single-quoted literal: backslash + single-quote (so the content can't break out of
+ * the literal), and the whitespace control chars to their CQL escape sequences (a raw newline/tab/CR in a config
+ * label or `with` narrative would otherwise land literally inside the single-quoted literal). Backslash is escaped
+ * FIRST so the sequences added afterward aren't double-escaped.
+ */
 function cqlString(s: string): string {
-  return s.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+  return s
+    .replace(/\\/g, "\\\\")
+    .replace(/'/g, "\\'")
+    .replace(/\n/g, "\\n")
+    .replace(/\r/g, "\\r")
+    .replace(/\t/g, "\\t");
 }
 
 /** A CQL single-quoted string literal for `s` (e.g. `Deny` → `'Deny'`). */
