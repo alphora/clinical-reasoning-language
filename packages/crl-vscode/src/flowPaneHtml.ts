@@ -9,7 +9,7 @@
 // nodeKey is a JSON string (quotes/brackets) and cannot be a DOM id; `anchors` is keyed BY nodeKey → the generated id (the
 // cross-pane join, mirroring crlPaneHtml). `id` + `data-reveal` ride the SAME <g> so highlight (getElementById) and click
 // (closest('[data-reveal]')) resolve to one element.
-import { classifyConcept, type CrlConceptNode, type CrlDecisionStructure, type CrlStructureNode } from "@smile-digital-health/crl";
+import { classifyConcept, displayDetermination, type CrlConceptNode, type CrlDecisionStructure, type CrlStructureNode } from "@smile-digital-health/crl";
 
 export interface FlowAnchor {
   scrollTo: string;
@@ -99,7 +99,7 @@ function buildLaid(
         ? cf.conceptName ?? n.label.replace(/^when\s+/, "") // concept name (resolved) else strip "when " from the label
         : useDecision
           ? `use decision ${n.label}` // distinct from a decision ROOT box so it doesn't read as the target's declaration
-          : n.label; // otherwise → "otherwise"; recommend → the activity name
+          : displayDetermination(n.label); // otherwise → "otherwise" (unchanged); recommend → the determination KEY (Met/Unmet), not the dotted <category>.<key> — MV Tree users are non-technical
     // A when node IS its concept → title it with the CONCEPT's own lib (cross-lib concepts share a bare name). Other nodes
     // title with the owning decision row's lib. (Action TARGET lib isn't resolved here — the target's lib lives in its
     // nodeKey, not parsed in v1; the guard concept's lib rides its peek <title> via conceptName/conceptLib below.)

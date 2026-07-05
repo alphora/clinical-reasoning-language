@@ -82,6 +82,26 @@ check("node shapes by kind (class counts)", () => {
   assert.equal(count("flow-otherwise"), 1);
 });
 
+check("determination recommend leaf shows the KEY, not the dotted <category>.<key> (MV Tree is non-technical)", () => {
+  const struct = [
+    {
+      decision: "Cov",
+      lib: "Pol",
+      nodeKey: "d:c",
+      location: {},
+      children: [
+        node("o2", "otherwise", "otherwise", [], [
+          node("a:u", "action", "not-certify.Unmet", ["act:u"], [], { actionKind: "recommend-activity" }),
+        ]),
+      ],
+    },
+  ];
+  const rr = renderFlowPane(struct, {});
+  assert.match(rr.html, />Unmet</, "leaf renders the key 'Unmet'");
+  assert.doesNotMatch(rr.html, /not-certify\.Unmet/, "no dotted <category>.<key> anywhere");
+  assert.match(rr.html, />otherwise</, "non-determination 'otherwise' label is left unchanged");
+});
+
 check("emits a sized <svg> with numeric intrinsic width/height (scrolls, not 100%)", () => {
   const m = r.html.match(/<svg class="flow-svg" width="(\d+)" height="(\d+)" viewBox="0 0 \1 \2"/);
   assert.ok(m, "svg with matching width/height/viewBox");
