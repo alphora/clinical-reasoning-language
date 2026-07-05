@@ -1,0 +1,12 @@
+{
+  "name": "none-sibling-fixture",
+  "version": "1.0.0",
+  "private": true,
+  "description": "#198 C1 — a `none` cross-lib `code is` SIBLING. main.crl (code is + decision) chains `recommend activity \"Sib\".\"Approve\"` into sib.crl, which has `code is` + an activity but NO decision → the per-CRL `none` path. Pre-C1 its base Library kept the bare `<policyId>` id while its CodeSystem was disambiguated (`<policyId>-sib-local`) — inconsistent + latently colliding. Option B C1 gives the base Library the disambiguated unified identity.",
+  "crl": {
+    "canonicalBase": "http://example.org/crl/none-sibling",
+    "status": "draft",
+    "experimental": true,
+    "date": "2020-01-01T00:00:00.000Z"
+  }
+}

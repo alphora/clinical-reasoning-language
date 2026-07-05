@@ -284,6 +284,17 @@ const CODE_IS_DECISION_TWO = join(
   "src/fhir-emitter/tests/fixtures/code-is-decision-two/code-is-decision-two.crl",
 );
 
+// #198 — a TWO-`code is`-library fixture (mirror of the repro-198 oracle): the
+// entry library `main.crl` chains `use decision "Two Lib Sub"."Sub Determination"`
+// into a vendored sibling `sub.crl` that ALSO declares concept-level `code is`.
+// Pre-#198 both minted a per-policy local CodeSystem at `<policyId>-local` +
+// `Library/<policyId>` → a canonical-url collision (`closure-resource-*-collision`).
+// Option B disambiguates ONLY the cross-lib sibling.
+const CODE_IS_TWO_LIBRARIES = join(
+  ROOT,
+  "src/fhir-emitter/tests/fixtures/code-is-two-libraries/main.crl",
+);
+
 // #196 — a two-library fixture: Root's decision `recommend`s an activity that
 // lives in a SIBLING "Shared" disposition library via the cross-library qualified
 // ref `"Shared"."Shared Deny"`. Proves the FHIR activityResolver resolves ACROSS
@@ -464,6 +475,207 @@ describe("closureOrchestrator — FHIR closure code-is coverage (T2)", () => {
     // And Inv 5 sees both input profiles resolve to an emitted SD → no
     // unresolved-action-input-profile error.
     expect(result.errors.some((e) => e.kind === "unresolved-action-input-profile")).toBe(false);
+  });
+});
+
+/* ─── #198 — two `code is` libraries under one policy id (Option B) ──── */
+
+describe("closureOrchestrator — two `code is` libraries disambiguate their local domains (#198)", () => {
+  // policyId = package name "code-is-two-lib-fixture"; canonicalBase from crl.canonicalBase.
+  const BASE = "http://example.org/crl/code-is-two-lib";
+  // PRIMARY (the entry / closure-seed library "Two Lib Main") keeps the clean
+  // `<policyId>-local`; the cross-lib SIBLING ("Two Lib Sub", slug "two-lib-sub")
+  // is disambiguated to `<policyId>-<librarySlug>-local`.
+  const PRIMARY_CS_URL = `${BASE}/CodeSystem/code-is-two-lib-fixture-local`;
+  const SIBLING_CS_URL = `${BASE}/CodeSystem/code-is-two-lib-fixture-two-lib-sub-local`;
+
+  it("emits TWO distinct local CodeSystems (primary clean, sibling suffixed), each carrying ITS OWN code, with no collision/unresolved errors", () => {
+    const result = emitFhirDefFromPath(CODE_IS_TWO_LIBRARIES, { clock: FIXED_CLOCK });
+
+    // The whole two-`code is`-library emit SUCCEEDS (pre-#198 this failed with
+    // closure-resource-collision on the shared `<policyId>-local` / `Library/<policyId>`).
+    expect(result.success).toBe(true);
+    for (const kind of [
+      "emit-local-codesystem-urn-collision",
+      "closure-resource-collision",
+      "closure-resource-url-collision",
+      "unresolved-library-reference",
+      "decision-root-library-missing",
+    ]) {
+      expect(result.errors.some((e) => e.kind === kind)).toBe(false);
+    }
+
+    // TWO local CodeSystems, at the primary + disambiguated-sibling urls, each
+    // carrying EXACTLY its own library's local code.
+    const codeSystems = result.resources.filter((r) => r.resourceType === "CodeSystem");
+    const csByUrl = new Map(
+      codeSystems.map((r) => [(r.resource as { url: string }).url, r.resource as Record<string, unknown>]),
+    );
+    expect([...csByUrl.keys()].sort()).toEqual([PRIMARY_CS_URL, SIBLING_CS_URL].sort());
+    // id == url-tail for each (the FHIR `id` is the disambiguated local-domain slug).
+    expect((csByUrl.get(PRIMARY_CS_URL)!.id as string)).toBe("code-is-two-lib-fixture-local");
+    expect((csByUrl.get(SIBLING_CS_URL)!.id as string)).toBe(
+      "code-is-two-lib-fixture-two-lib-sub-local",
+    );
+    expect(csByUrl.get(PRIMARY_CS_URL)!.concept).toEqual([
+      { code: "feature-main", display: "Feature Main" },
+    ]);
+    expect(csByUrl.get(SIBLING_CS_URL)!.concept).toEqual([
+      { code: "feature-sub", display: "Feature Sub" },
+    ]);
+  });
+
+  it("the sibling's case-feature SD `system`, its CodeSystem.url, and the CQL `codesystem '<url>'` decl all byte-equal the DISAMBIGUATED sibling url", () => {
+    const result = emitFhirDefFromPath(CODE_IS_TWO_LIBRARIES, { clock: FIXED_CLOCK });
+
+    // (a) Each concept's case-feature SD `patternCodeableConcept.coding.system`
+    // points at ITS OWN library's local CodeSystem — Feature Sub → the sibling url,
+    // Feature Main → the primary url (no cross-wiring to the shared policy domain).
+    const systemByConcept = new Map<string, string>();
+    for (const r of result.resources.filter((x) => x.resourceType === "StructureDefinition")) {
+      const diff = (r.resource as { differential: { element: Array<Record<string, unknown>> } })
+        .differential.element;
+      const codeEl = diff.find((e) => e.id === "Observation.code")!;
+      const system = (
+        codeEl.patternCodeableConcept as { coding: Array<{ system: string }> }
+      ).coding[0]!.system;
+      systemByConcept.set(r.sourceName!, system);
+    }
+    expect(systemByConcept.get("Feature Main")).toBe(PRIMARY_CS_URL);
+    expect(systemByConcept.get("Feature Sub")).toBe(SIBLING_CS_URL);
+
+    // (b) The CQL lane emits the sibling's `codesystem '<url>'` decl with the SAME
+    // disambiguated url — cross-lane byte-equality (#186 "one identity everywhere").
+    const cql = emitCQLImports(CODE_IS_TWO_LIBRARIES);
+    expect(cql.success).toBe(true);
+    // The sibling's terminology-owning CQL library (its LocalConcepts layer) carries
+    // the disambiguated codesystem literal; the primary's carries the clean one.
+    const subConcepts = cql.cqlByLibrary.find(
+      (e) => e.sourceLibraryName === "Two Lib Sub" && e.layer === "LocalConcepts",
+    )!;
+    const mainConcepts = cql.cqlByLibrary.find(
+      (e) => e.sourceLibraryName === "Two Lib Main" && e.layer === "LocalConcepts",
+    )!;
+    expect(subConcepts.cql).toContain(`'${SIBLING_CS_URL}'`);
+    expect(subConcepts.cql).not.toContain(`'${PRIMARY_CS_URL}'`);
+    expect(mainConcepts.cql).toContain(`'${PRIMARY_CS_URL}'`);
+  });
+
+  it("the primary keeps clean `<policyId>-<Layer>` Library identities; the sibling's layer Libraries are `<policyId>-<librarySlug>-<Layer>` and their content/depends-on all resolve", () => {
+    const result = emitFhirDefFromPath(CODE_IS_TWO_LIBRARIES, { clock: FIXED_CLOCK });
+
+    const policyLibIds = result.resources
+      .filter(
+        (r) =>
+          r.resourceType === "Library" && !CATALOG_LIB_IDS.has((r.resource as { id: string }).id),
+      )
+      .map((r) => (r.resource as { id: string }).id)
+      .sort();
+    // Primary (Two Lib Main) → clean `CodeIsTwoLibFixture<Layer>`; sibling
+    // (Two Lib Sub) → disambiguated `CodeIsTwoLibFixtureTwoLibSub<Layer>`.
+    expect(policyLibIds).toEqual([
+      "CodeIsTwoLibFixtureInterface",
+      "CodeIsTwoLibFixtureLocalConcepts",
+      "CodeIsTwoLibFixtureLocalSource",
+      "CodeIsTwoLibFixtureTwoLibSubInterface",
+      "CodeIsTwoLibFixtureTwoLibSubLocalConcepts",
+      "CodeIsTwoLibFixtureTwoLibSubLocalSource",
+    ]);
+
+    // The sibling's LocalConcepts Library depends-on ITS OWN (disambiguated) local
+    // CodeSystem — no dangling reference (Inv 0/1/4 all pass → success above).
+    const subLocalConcepts = result.resources.find(
+      (r) =>
+        r.resourceType === "Library" &&
+        (r.resource as { id: string }).id === "CodeIsTwoLibFixtureTwoLibSubLocalConcepts",
+    )!;
+    const deps = ((subLocalConcepts.resource as { relatedArtifact?: Array<{ resource?: string }> })
+      .relatedArtifact ?? []).map((a) => a.resource);
+    expect(deps).toContain(SIBLING_CS_URL);
+    expect(result.errors.some((e) => e.kind === "library-content-url-unresolved")).toBe(false);
+  });
+});
+
+/* ─── #198 C1 — a `none` cross-lib `code is` sibling's base Library ──── */
+
+// C1 — the main policy (`code is` + a decision that cross-lib `recommend`s an
+// activity in the sibling) pulls in `sib.crl`, a `code is` + activity library with
+// NO decision → `computeSplitPlan === "none"`. Pre-C1 its base Library kept the bare
+// `<policyId>` id while its CodeSystem was already disambiguated
+// (`<policyId>-sib-local`) — inconsistent + latently colliding. Option B C1 gives the
+// `none` sibling's base Library the disambiguated unified identity.
+const NONE_CODE_IS_SIBLING = join(
+  ROOT,
+  "src/fhir-emitter/tests/fixtures/none-code-is-sibling/main.crl",
+);
+
+describe("closureOrchestrator — a `none` cross-lib `code is` sibling's base Library is disambiguated (#198 C1)", () => {
+  const BASE = "http://example.org/crl/none-sibling";
+  // policyId = package name "none-sibling-fixture"; the sibling library "Sib" (slug
+  // "sib") disambiguates to `<policyId>-sib`. Its base Library gets the unified
+  // PascalCase identity `pascalCaseNameForId(none-sibling-fixture-sib)`.
+  const SIB_BASE_LIB_ID = "NoneSiblingFixtureSib";
+  const SIB_BASE_LIB_URL = `${BASE}/Library/${SIB_BASE_LIB_ID}`;
+  const SIB_CS_URL = `${BASE}/CodeSystem/none-sibling-fixture-sib-local`;
+  const BARE_LIB_URL = `${BASE}/Library/none-sibling-fixture`;
+
+  it("emits the sibling's base Library at the DISAMBIGUATED unified identity (id==name==url-tail), never the bare `<policyId>`", () => {
+    const result = emitFhirDefFromPath(NONE_CODE_IS_SIBLING, { clock: FIXED_CLOCK });
+    expect(result.success).toBe(true);
+    // No collision / dangling errors.
+    for (const kind of [
+      "closure-resource-collision",
+      "closure-resource-url-collision",
+      "unresolved-library-reference",
+      "library-content-url-unresolved",
+      "library-identity-disagreement",
+    ]) {
+      expect(result.errors.some((e) => e.kind === kind)).toBe(false);
+    }
+
+    // The sibling's base Library exists at the disambiguated id, with id==name==url-tail.
+    const sibLib = result.resources.find(
+      (r) => r.resourceType === "Library" && (r.resource as { id?: string }).id === SIB_BASE_LIB_ID,
+    );
+    expect(sibLib).toBeDefined();
+    const res = sibLib!.resource as { id: string; name: string; url: string; content?: Array<{ url?: string }> };
+    expect(res.id).toBe(SIB_BASE_LIB_ID);
+    expect(res.name).toBe(SIB_BASE_LIB_ID);
+    expect(res.url).toBe(SIB_BASE_LIB_URL);
+    // Its content still points at the source-named CQL file (unchanged: `Sib.cql`).
+    expect(res.content?.[0]?.url).toBe("../../cql/Sib.cql");
+
+    // The bare `<policyId>` Library id is NEVER emitted (the pre-C1 collision surface).
+    expect(
+      result.resources.some(
+        (r) => r.resourceType === "Library" && (r.resource as { url?: string }).url === BARE_LIB_URL,
+      ),
+    ).toBe(false);
+  });
+
+  it("the sibling's base Library depends-on ITS OWN disambiguated CodeSystem, and every reference to the base Library agrees", () => {
+    const result = emitFhirDefFromPath(NONE_CODE_IS_SIBLING, { clock: FIXED_CLOCK });
+
+    // (a) The base Library depends-on the disambiguated sibling CodeSystem.
+    const sibLib = result.resources.find(
+      (r) => r.resourceType === "Library" && (r.resource as { id?: string }).id === SIB_BASE_LIB_ID,
+    )!;
+    const deps = ((sibLib.resource as { relatedArtifact?: Array<{ resource?: string }> }).relatedArtifact ?? []).map(
+      (a) => a.resource,
+    );
+    expect(deps).toContain(SIB_CS_URL);
+
+    // (b) The sibling's ActivityDefinition + Recommendation PlanDefinition `library[]`
+    // both reference the DISAMBIGUATED base Library url (referent-agreement) — pre-C1
+    // they pointed at the bare `<policyId>` url.
+    const ad = result.resources.find(
+      (r) => r.resourceType === "ActivityDefinition" && r.sourceName === "Approve",
+    )!;
+    expect((ad.resource as { library?: string[] }).library).toEqual([SIB_BASE_LIB_URL]);
+    const rec = result.resources.find(
+      (r) => r.resourceType === "PlanDefinition" && r.sourceKind === "Recommendation" && r.sourceName === "Approve",
+    )!;
+    expect((rec.resource as { library?: string[] }).library).toEqual([SIB_BASE_LIB_URL]);
   });
 });
 

@@ -1,0 +1,15 @@
+# none-code-is-sibling SIB — the `none` sibling: code is + an activity, NO decision.
+library "Sib".
+
+// Reached ONLY via the cross-lib `recommend activity "Sib"."Approve"` (no explicit
+// `include`), so it is a closure SIBLING → Option B disambiguates its local domain.
+// It routes to `computeSplitPlan === "none"` (decision-less), so its base Library is
+// the per-CRL name-keeping root — the C1 gap this fixture pins.
+
+concept "Feature B":
+- type is Observation.
+- code is `feature-b`.
+
+activity "Approve":
+- request CPGCommunicationRequest.
+- with `approve`.

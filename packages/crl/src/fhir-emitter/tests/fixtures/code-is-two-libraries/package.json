@@ -1,0 +1,12 @@
+{
+  "name": "code-is-two-lib-fixture",
+  "version": "1.0.0",
+  "private": true,
+  "description": "#198 — two `code is` libraries under ONE policy id. The entry library (`main.crl`) chains `use decision \"Two Lib Sub\".\"Sub Determination\"` into a vendored sibling (`sub.crl`) that ALSO declares concept-level `code is`. Under Option B the PRIMARY (closure seed) keeps the clean `<policyId>-local` local CodeSystem + base identity; the cross-lib SIBLING is disambiguated to `<policyId>-<librarySlug>-local`, so the two libraries emit to TWO distinct local CodeSystems + base/layered Libraries instead of colliding on one canonical url.",
+  "crl": {
+    "canonicalBase": "http://example.org/crl/code-is-two-lib",
+    "status": "draft",
+    "experimental": true,
+    "date": "2020-01-01T00:00:00.000Z"
+  }
+}

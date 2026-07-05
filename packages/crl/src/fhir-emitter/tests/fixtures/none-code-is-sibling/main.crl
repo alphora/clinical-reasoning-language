@@ -1,0 +1,11 @@
+# none-code-is-sibling MAIN — PRIMARY seed: code is + a decision that cross-lib recommends a none-sibling activity.
+library "Main Policy".
+
+concept "Feature A":
+- type is Observation.
+- code is `feature-a`.
+
+decision "Main Determination":
+first:
+- when "Feature A" then recommend activity "Sib"."Approve".
+- otherwise then recommend activity "Sib"."Approve".

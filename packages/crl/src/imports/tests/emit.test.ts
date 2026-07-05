@@ -375,19 +375,61 @@ describe("emitCQLImports (per-CRL v2.1.0)", () => {
     expect(interfaceCql).not.toMatch(/^codesystem /m);
   });
 
-  it("cross-library local-codesystem URN collision → emit-local-codesystem-urn-collision (slice 3)", () => {
-    // Two DISTINCT local libraries ("Local One" / "Local-One"), both using
-    // `code is`, in ONE project. R1 — the local-domain URN now slugs from the
-    // PROJECT POLICY ID (package.json `name`, "crl-test-fixture"), so BOTH
-    // libraries synthesize the SAME `urn:crl:codesystem:crl-test-fixture-local`
-    // and genuinely share the policy's local domain. The preflight must still fail
-    // loudly rather than emit a silently-shared domain.
+  it("case (a) — two SEED `code is` libraries (both `include`d) → emit-local-codesystem-urn-collision with the SEED-libraries message", () => {
+    // Two DISTINCT local libraries ("Local One" / "Local-One"), both `code is`, both
+    // EXPLICITLY `include`d from root → both SEED libraries reached by include-walking.
+    // #198 (Option B) — Option B disambiguates only a cross-lib SIBLING, so two seeds
+    // both keep the bare `<policyId>-local` domain and genuinely collide. The guard
+    // must fail loudly with the SEED-specific message (message a), NOT the sibling-slug
+    // wording.
     const root = path.join(FIXTURES, "local-codesystem-urn-collision", "root.crl");
     const result = emitCQLImports(root);
     expect(result.success).toBe(false);
     expect(result.cqlByLibrary).toHaveLength(0);
     expect(result.errors?.[0]?.kind).toBe("emit-local-codesystem-urn-collision");
-    expect(result.errors?.[0]?.message).toMatch(/crl-test-fixture-local/);
+    const msg = result.errors?.[0]?.message ?? "";
+    expect(msg).toMatch(/crl-test-fixture-local/);
+    // Message (a) markers: names the SEED nature + the seed-specific remedies. It must
+    // NOT use the sibling-slug wording (that would be the misleading pre-fix message).
+    expect(msg).toMatch(/SEED libraries/);
+    expect(msg).toMatch(/cannot be auto-disambiguated/);
+    expect(msg).not.toMatch(/slugify to the same value/);
+  });
+
+  it("case (b) — two cross-lib SIBLINGS whose names slugify identically → emit-local-codesystem-urn-collision with the sibling-slug message", () => {
+    // "Sib One" and "Sib-One" are BOTH cross-lib siblings (pulled in via the root
+    // decision's `recommend activity`, NO `include`). Option B disambiguates each to
+    // `<policyId>-<slug>`, but both slug to "sib-one" → the disambiguator itself
+    // collides. This is the OTHER genuine collision case, and it gets its own tailored
+    // message (rename one library so its slug differs) — NOT the SEED-libraries wording.
+    const root = path.join(FIXTURES, "sibling-slug-collision", "root.crl");
+    const result = emitCQLImports(root);
+    expect(result.success).toBe(false);
+    expect(result.cqlByLibrary).toHaveLength(0);
+    expect(result.errors?.[0]?.kind).toBe("emit-local-codesystem-urn-collision");
+    const msg = result.errors?.[0]?.message ?? "";
+    expect(msg).toMatch(/"Sib One" and "Sib-One"/);
+    // Message (b) markers: names the slug collision + the rename remedy. It must NOT use
+    // the SEED-libraries wording (they are siblings, not seeds).
+    expect(msg).toMatch(/slugify to the same value/);
+    expect(msg).toMatch(/Rename one library so its slug differs/);
+    expect(msg).not.toMatch(/SEED libraries/);
+  });
+
+  it("author boundary — a cross-lib-REF `code is` sibling SUCCEEDS, but an explicit-INCLUDE second `code is` library FAILS", () => {
+    // The refuse path is scoped to what Option B genuinely cannot disambiguate. A
+    // second `code is` library reached via a cross-library reference (recommend/use
+    // decision) is a disambiguable SIBLING → SUCCEEDS. The SAME two-`code is`-library
+    // shape reached via an explicit `include` makes both SEED libraries → FAILS. Pin
+    // both sides so the boundary can't silently drift.
+    const sibling = emitCQLImports(
+      path.resolve(__dirname, "..", "..", "fhir-emitter", "tests", "fixtures", "none-code-is-sibling", "main.crl"),
+    );
+    expect(sibling.success).toBe(true);
+
+    const included = emitCQLImports(path.join(FIXTURES, "local-codesystem-urn-collision", "root.crl"));
+    expect(included.success).toBe(false);
+    expect(included.errors?.[0]?.kind).toBe("emit-local-codesystem-urn-collision");
   });
 
   it("local parse-failure warnings don't block emission", () => {

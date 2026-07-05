@@ -1,0 +1,22 @@
+# code-is-two-libraries — the SIBLING `code is` library (a vendored sibling) (#198).
+library "Two Lib Sub".
+
+// Reached ONLY via `use decision "Two Lib Sub"."Sub Determination"` from main.crl
+// (NO explicit `include`), so it is a closure SIBLING, not a seed. Because it ALSO
+// declares concept-level `code is` ("Feature Sub"), Option B disambiguates its
+// local domain to `<policyId>-<librarySlug>` (`code-is-two-lib-fixture-two-lib-sub`),
+// so its local CodeSystem + layered Library identities no longer collide with the
+// primary's.
+
+concept "Feature Sub":
+- type is Observation.
+- code is `feature-sub`.
+
+activity "Refer":
+- request CPGCommunicationRequest.
+- with `refer`.
+
+decision "Sub Determination":
+first:
+- when "Feature Sub" then recommend activity "Refer".
+- otherwise then recommend activity "Refer".

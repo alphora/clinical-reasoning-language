@@ -3,15 +3,19 @@
  * (slice 4 of the CRL→FHIR-def deliverable).
  *
  * A concept may carry its OWN local source code (`- code is \`X\`.`) — the
- * single implicit local domain of its POLICY. The CQL lane lowers every such
+ * implicit local domain of its SOURCE LIBRARY. The CQL lane lowers every such
  * `code is`-only concept into a synthetic CQL `codesystem`/`code` pair sharing
- * ONE local codesystem URL (`lowerLocalCodes` → `localCodeSystemUrl`). This lane
- * materializes that shared local domain as ONE FHIR `CodeSystem` resource per
- * POLICY (R1 — the url + id slug from the POLICY ID, `metadata.name`, not the
- * library name), carrying the N codes as `concept[]` entries. The per-policy
- * local domain supports concept-level `code is` in one library per package; the
- * imports preflight rejects 2+ `code is` libraries in one package
- * (`emit-local-codesystem-urn-collision`).
+ * ONE local codesystem URL per source library (`lowerLocalCodes` →
+ * `localCodeSystemUrl`). This lane materializes that local domain as ONE FHIR
+ * `CodeSystem` resource per `code is` LIBRARY, carrying that library's codes as
+ * `concept[]` entries. #198 (Option B) — the url + id slug from the per-library
+ * local-domain base (`localDomainId`): the PRIMARY (closure-seed) library keeps the
+ * bare policy id (`metadata.name`), and each cross-library `code is` SIBLING is
+ * disambiguated to `<policyId>-<librarySlug>`, so MULTIPLE `code is` libraries under
+ * one policy id emit DISTINCT local CodeSystems instead of colliding on one canonical
+ * url. The imports preflight (`emit-local-codesystem-urn-collision`) now rejects only
+ * the two residual collision cases: two SEED `code is` libraries, or two cross-lib
+ * siblings whose names slugify identically.
  *
  * Operator decision (slice 4): emit ONLY a CodeSystem — NO local ValueSet. The
  * generated CQL retrieves bind individual codes, and the future case-feature
@@ -37,7 +41,7 @@
 
 import type { CRLError } from "../types/errors";
 
-import { capSlugForSuffix, pascalCaseName, policyIdBase, slugify } from "./slug";
+import { capSlugForSuffix, pascalCaseName, slugify } from "./slug";
 import { localCodeSystemUrl } from "../cql-emitter/lowerLocalCodes";
 import { crmiCapabilityProfiles, isPublishablePlus, knowledgeExtensions } from "./types";
 import type {
@@ -68,6 +72,14 @@ export function emitLocalCodeSystem(
   codeConcepts: ReadonlyArray<LocalCodeConcept>,
   metadata: CpgMetadata,
   opts: EmitOptions = {},
+  // #198 (Option B) — the local-domain BASE for this library's CodeSystem `id` +
+  // `url`. Defaults to the policy id (`metadata.name`) — byte-identical to pre-#198
+  // for the PRIMARY (closure-seed) library. A SIBLING `code is` library passes its
+  // disambiguated `<policyId>-<librarySlug>` so its CodeSystem no longer collides
+  // with the primary's on the per-policy `<policyId>-local` canonical url. The CQL
+  // lane threads the SAME base to `localCodeSystemUrl`, keeping `codesystem '<url>'`
+  // == `CodeSystem.url`.
+  localDomainId: string = metadata.name,
 ): {
   resource: EmittedResource | null;
   errors: CRLError[];
@@ -90,12 +102,14 @@ export function emitLocalCodeSystem(
     });
   }
 
-  // id: R1 — BASE is the policy id (`policyIdBase(metadata)`); `capSlugForSuffix`
-  // caps it to `64 - len("-local")` and appends the suffix, so the `-local` suffix
-  // always survives truncation (mirrors recommendation.ts' suffix-aware capping).
-  // The computable `name` still derives from the human library name (per-library
-  // identity, not the resource id).
-  const id = capSlugForSuffix(policyIdBase(metadata), LOCAL_SUFFIX);
+  // id: BASE is the per-library local domain (#198: `localDomainId`, defaulting to
+  // the policy id `metadata.name` for the primary). `capSlug(slugify(...))` mirrors
+  // `policyIdBase` so a primary's id is byte-identical; `capSlugForSuffix` caps to
+  // `64 - len("-local")` and appends the suffix so `-local` always survives
+  // truncation (mirrors recommendation.ts' suffix-aware capping). The computable
+  // `name` still derives from the human library name (per-library identity, not the
+  // resource id).
+  const id = capSlugForSuffix(slugify(localDomainId), LOCAL_SUFFIX);
   const computableName = pascalCaseName(`${librarySlug}${LOCAL_SUFFIX}`);
 
   // Title falls back to the CRL library name when package.json has none,
@@ -133,11 +147,12 @@ export function emitLocalCodeSystem(
   const level = opts.capability ?? "publishable";
   const publishable = isPublishablePlus(level);
   // url: the SHARED helper → byte-equal with the CQL lane's `codesystem '<url>'`.
-  // R1 — the local-domain slug is the POLICY ID (`metadata.name`), NOT the human
-  // library name, so the CodeSystem `url` and the policy-id FHIR resource ids
-  // share one base. The CQL lane threads the same policy id (see emitCQLImports /
+  // #198 — the local-domain slug is the per-library base (`localDomainId`, = the
+  // POLICY ID `metadata.name` for the primary; `<policyId>-<librarySlug>` for a
+  // disambiguated sibling), so the CodeSystem `url` and the policy-id FHIR resource
+  // ids share one base. The CQL lane threads the same base (see emitCQLImports /
   // lowerLocalCodes), keeping `codesystem '<url>'` == `CodeSystem.url`.
-  const url = localCodeSystemUrl(metadata.canonicalBase, metadata.name);
+  const url = localCodeSystemUrl(metadata.canonicalBase, localDomainId);
 
   const resource: Record<string, unknown> = {
     resourceType: "CodeSystem",

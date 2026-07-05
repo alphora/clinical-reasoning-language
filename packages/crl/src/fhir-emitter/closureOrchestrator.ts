@@ -47,7 +47,7 @@ import type { ImportDiagnostic, ResolvedGraph } from "../imports/types";
 import type { CRLError } from "../types/errors";
 
 import { catalogFhirLibraries } from "../cql-emitter/catalog/loadCatalog";
-import { lowerLocalCodes } from "../cql-emitter/lowerLocalCodes";
+import { lowerLocalCodes, astHasConceptLocalCode } from "../cql-emitter/lowerLocalCodes";
 import type { LowerLocalCodesResult } from "../cql-emitter/lowerLocalCodes";
 
 import { emitActivityDefinitionsForLibrary, type TerminologyResolver } from "./activity";
@@ -242,7 +242,7 @@ function makeResolversForSourceLibrary(
 
 /* ─── slug helpers (mirror per-emit-module slug rules) ──────────────── */
 
-import { capSlug, capSlugForSuffix, policyIdBase, slugify } from "./slug";
+import { capSlug, capSlugForSuffix, localDomainIdFor, pascalCaseNameForId, policyIdBase, slugify } from "./slug";
 import { tarjanSCC } from "./tarjan";
 
 // R1 — id BASE is the policy id (`policyIdBase(metadata)`), shared across the
@@ -1032,12 +1032,21 @@ export function emitFhirDefClosure(
 
   const expandedClosure = computeFhirEmitClosure(graph);
 
+  // #198 (Option B) — the PRIMARY (closure-seed) source libraries are those reached
+  // by include-walking from the entry `.crl` (`graph.resolvedLibraries`); any source
+  // pulled in via a cross-library ref (from `graph.localLibraries`) is a SIBLING.
+  // A sibling `code is` library is disambiguated to `<policyId>-<librarySlug>` for
+  // its local CodeSystem + case-feature system url — matching the CQL lane, which
+  // makes the SAME determination from the SAME graph, so the two lanes' urls agree.
+  const primarySeedPaths = new Set(graph.resolvedLibraries.map((e) => e.filePath));
+
   // Filter out parse-error placeholders (null/empty names — parse-failure
   // diagnostic is the real signal).
   const libraries = expandedClosure
     .filter((entry) => entry.name !== null && entry.name !== "")
     .map((entry) => {
       const libraryName = entry.name as string;
+      const isPrimarySeed = primarySeedPaths.has(entry.filePath);
       const statements = entry.ast.statements;
       const activities = statements.filter((s): s is Activity => s.type === "Activity");
       const concepts = statements.filter((s): s is Concept => s.type === "Concept");
@@ -1057,7 +1066,7 @@ export function emitFhirDefClosure(
         });
         cqlFileName = `../../cql/${libraryName}.cql`; // best-effort placeholder; the error already flagged
       }
-      return { libraryName, ast: entry.ast, activities, concepts, decisions, terminologies, cqlFileName };
+      return { libraryName, isPrimarySeed, ast: entry.ast, activities, concepts, decisions, terminologies, cqlFileName };
     });
 
   // Build the index ONCE (O(N) over closure).
@@ -1107,19 +1116,32 @@ export function emitFhirDefClosure(
     // moves: in the multi-entry branch it is owned by the `<source> Concepts`
     // Library (where the local codes now live), not the source-wide Root.
     let csUrl: string | undefined;
-    // R1 — thread the POLICY ID (`metadata.name`) as the local-domain slug source
-    // so the lowering's synthetic `codesystem '<url>'` byte-equals the
-    // policy-id-based FHIR `CodeSystem.url` emitted at the CodeSystem step below.
+    // #198 (Option B) — the per-source-library local-domain base. Primary (seed)
+    // keeps the bare policy id (`metadata.name`, byte-identical to pre-#198); a
+    // SIBLING that ALSO declares concept-level `code is` is disambiguated to
+    // `<policyId>-<librarySlug>` (a non-`code is` sibling synthesizes no CodeSystem,
+    // so it keeps the bare base). Both lanes compute this from the SAME (policyId,
+    // libraryName, isPrimary, hasCodeIs) inputs, so the lowering's synthetic
+    // `codesystem '<url>'`, this FHIR `CodeSystem.url/id`, and the case-feature
+    // `patternCodeableConcept.coding.system` all byte-agree.
+    const disambiguateDomain = !lib.isPrimarySeed && astHasConceptLocalCode(lib.ast);
+    const entryLocalDomainId = localDomainIdFor(metadata.name, lib.libraryName, !disambiguateDomain);
     const lowered = lowerLocalCodes(lib.ast, {
       canonicalBase: metadata.canonicalBase,
-      localDomainId: metadata.name,
+      localDomainId: entryLocalDomainId,
     });
     if (lowered.errors.length > 0) {
       errors.push(...lowered.errors);
     } else {
       const codeConcepts = lowered.localCodes;
       if (codeConcepts.length > 0) {
-        const csResult = emitLocalCodeSystem(lib.libraryName, codeConcepts, metadata, resolvedOpts);
+        const csResult = emitLocalCodeSystem(
+          lib.libraryName,
+          codeConcepts,
+          metadata,
+          resolvedOpts,
+          entryLocalDomainId,
+        );
         if (csResult.resource) {
           resources.push(csResult.resource);
           const u = (csResult.resource.resource as { url?: string }).url;
@@ -1167,8 +1189,21 @@ export function emitFhirDefClosure(
     // the pre-#186 `policyIdBase` id (keeps those goldens byte-identical).
     const isNameKeepingRoot = (entry: PerLibraryEmit): boolean =>
       entry.role === "root" && entry.libraryName === entry.sourceLibraryName;
-    const identityForEntry = (entry: PerLibraryEmit): string | undefined =>
-      isNameKeepingRoot(entry) ? undefined : entry.libraryName;
+    const identityForEntry = (entry: PerLibraryEmit): string | undefined => {
+      if (!isNameKeepingRoot(entry)) return entry.libraryName;
+      // #198 C1 — a name-keeping ROOT (the per-CRL/`none` path) normally has NO
+      // layered identity → `undefined` (its id falls back to the bare `policyIdBase`,
+      // keeping cms/per-CRL goldens byte-identical). But a cross-lib `code is` SIBLING
+      // on the `none` path carries a DISAMBIGUATED local-domain base
+      // (`entry.localDomainId` = `<policyId>-<librarySlug>`, threaded from the CQL
+      // manifest). Its CodeSystem is already disambiguated; give its base Library the
+      // matching unified identity `pascalCaseNameForId(<policyId>-<slug>)` (id == name
+      // == url-tail, the layered convention) so it no longer collides with the bare
+      // `<policyId>` and every reference to it (its ActivityDefinition/Recommendation
+      // `library[]`) agrees. The PRIMARY `none` root has no `localDomainId` → stays
+      // `undefined` → byte-identical.
+      return entry.localDomainId ? pascalCaseNameForId(entry.localDomainId) : undefined;
+    };
     // Reference targets are found by the RAW partition value (`entry.layer`), the
     // one source of truth the CQL split stamps alongside `S` — never by slugging.
     const entryByLayer = (layer: string): PerLibraryEmit | undefined =>
@@ -1225,7 +1260,12 @@ export function emitFhirDefClosure(
       const dependsOn = [...vsCanonicals, ...(csUrl ? [csUrl] : [])];
       // Single-entry / no-manifest source = the non-layered name-keeping Root
       // (cms / per-CRL) → no layered identity, id falls back to `policyIdBase`.
-      emitOneLibrary(lib.libraryName, undefined, dependsOn, cqlFileName);
+      // #198 C1 — EXCEPT a `none` cross-lib `code is` SIBLING, whose manifest entry
+      // carries a disambiguated `localDomainId`; `identityForEntry` then returns its
+      // unified `<policyId>-<slug>` PascalCase identity so its base Library id/url/name
+      // is disambiguated (matching its already-disambiguated CodeSystem) instead of the
+      // bare `<policyId>`. No-manifest callers (`only` undefined) keep the fallback.
+      emitOneLibrary(lib.libraryName, only ? identityForEntry(only) : undefined, dependsOn, cqlFileName);
     } else {
       // Multi-entry (split). The canonicals of THIS source's emitted CQL
       // libraries, keyed by cqlLibraryName, so a root's `includes` can be
@@ -1313,7 +1353,20 @@ export function emitFhirDefClosure(
     // ELSE (cms `none`/per-CRL, no Interface) it stays `undefined` → the
     // source/root canonical (`policyIdBase` — UNCHANGED, keeps cms byte-identical).
     const interfaceEntry = manifestEntries.find((e) => e.role === "interface");
-    const libraryReferenceSuffix = interfaceEntry ? identityForEntry(interfaceEntry) : undefined;
+    // #198 C1 — for a NONE-kind source (no Interface entry) the decision/activity/
+    // recommendation `library[]` must resolve to the source's base Library. That base
+    // is normally the bare-`policyIdBase` name-keeping Root (`undefined` suffix), but a
+    // disambiguated `code is` SIBLING's base Library id is now its unified
+    // `<policyId>-<slug>` identity (via `identityForEntry`) — so the references must use
+    // the SAME suffix or they would dangle at the bare `<policyId>` url. Route through
+    // the name-keeping Root entry so primary (undefined) and sibling (disambiguated)
+    // both agree with their emitted base Library.
+    const nameKeepingRootEntry = manifestEntries.find(isNameKeepingRoot);
+    const libraryReferenceSuffix = interfaceEntry
+      ? identityForEntry(interfaceEntry)
+      : nameKeepingRootEntry
+        ? identityForEntry(nameKeepingRootEntry)
+        : undefined;
 
     // The LocalSource Library identity — where each `code is` define lives, the
     // target of the case-feature `cpg-featureExpression.reference`. `LocalSource`
@@ -1488,6 +1541,9 @@ export function emitFhirDefClosure(
           // Non-undefined here (the gate requires a LocalSource entry); the `?? ""`
           // preserves the emitter's own empty-suffix throw-guard as a backstop.
           localSourceReferenceSuffix ?? "",
+          // #198 — the sibling's disambiguated local domain, so the case-feature
+          // `patternCodeableConcept.coding.system` matches THIS library's CodeSystem.
+          entryLocalDomainId,
         );
         if (cfResult.resource) resources.push(cfResult.resource);
         errors.push(...cfResult.errors);
@@ -1546,6 +1602,17 @@ export function emitFhirDefClosure(
       .filter((e) => !(e.role === "root" && e.libraryName === e.sourceLibraryName))
       .map((e) => e.libraryName),
   );
+  // #198 C1 — a disambiguated `none` cross-lib `code is` SIBLING's base Library now
+  // carries a unified `<policyId>-<slug>` PascalCase identity (id == name == url-tail).
+  // Enroll it in the enforced set so Inv 6 checks its self-agreement AND that every
+  // reference (its ActivityDefinition/Recommendation `library[]`) resolves to a
+  // Library whose name equals the url-tail. The PRIMARY `none` root (no `localDomainId`)
+  // stays exempt, unchanged.
+  for (const e of cqlByLibrary) {
+    if (e.role === "root" && e.libraryName === e.sourceLibraryName && e.localDomainId) {
+      layeredIdentities.add(pascalCaseNameForId(e.localDomainId));
+    }
+  }
   const inv6errors = applyLibraryIdentityInvariant(inv1.surviving, metadata, layeredIdentities);
   errors.push(...inv2errors, ...inv3errors, ...inv4errors, ...inv5errors, ...inv6errors);
 

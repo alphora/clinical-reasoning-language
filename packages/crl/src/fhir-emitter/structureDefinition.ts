@@ -132,6 +132,13 @@ export function emitCaseFeatureStructureDefinition(
   metadata: CpgMetadata,
   opts: EmitOptions,
   featureExpressionLibrarySuffix: string,
+  // #198 (Option B) — the per-library local-domain BASE whose CodeSystem this
+  // case-feature's code lives in. Defaults to the policy id (`metadata.name`) —
+  // byte-identical to pre-#198 for a PRIMARY library. A SIBLING `code is` library
+  // passes its disambiguated `<policyId>-<librarySlug>` so the emitted
+  // `patternCodeableConcept.coding.system` byte-equals THAT sibling's local
+  // CodeSystem url (not the primary's), matching the code the CQL lane lowered.
+  localDomainId: string = metadata.name,
 ): { resource: EmittedResource | null; errors: CRLError[] } {
   if (featureExpressionLibrarySuffix === "") {
     throw new Error(
@@ -181,8 +188,8 @@ export function emitCaseFeatureStructureDefinition(
   const publishable = isPublishablePlus(level);
 
   // The `code` system byte-equals the local CodeSystem url + the CQL
-  // `codesystem '<url>'` (one source of truth — the policy-id-slugged local domain).
-  const system = localCodeSystemSystemUrl(metadata);
+  // `codesystem '<url>'` (one source of truth — the per-library local domain, #198).
+  const system = localCodeSystemSystemUrl(metadata, localDomainId);
 
   // The featureExpression references the LocalSource library by canonical (where
   // the `code is` define lives); its `expression` is the bare concept name (a
@@ -287,8 +294,8 @@ export function emitCaseFeatureStructureDefinition(
  * `localCodeSystemUrl` so the case-feature `patternCodeableConcept.coding.system`
  * byte-equals the emitted CodeSystem `url`.
  */
-function localCodeSystemSystemUrl(metadata: CpgMetadata): string {
-  return localCodeSystemUrl(metadata.canonicalBase, metadata.name);
+function localCodeSystemSystemUrl(metadata: CpgMetadata, localDomainId: string = metadata.name): string {
+  return localCodeSystemUrl(metadata.canonicalBase, localDomainId);
 }
 
 function defaultClock(): Date {

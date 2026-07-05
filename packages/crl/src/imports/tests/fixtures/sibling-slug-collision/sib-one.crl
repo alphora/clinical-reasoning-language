@@ -1,0 +1,10 @@
+# sibling-slug-collision Sibling A — slug "sib-one".
+library "Sib One".
+
+concept "Alpha":
+- type is Observation.
+- code is `alpha`.
+
+activity "Approve":
+- request CPGCommunicationRequest.
+- with `approve`.

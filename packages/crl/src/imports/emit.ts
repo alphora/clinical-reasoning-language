@@ -20,8 +20,9 @@ import {
 } from "../cql-emitter/layeredEmit";
 import type { Partition } from "../cql-emitter/layeredEmit";
 import { loadCatalogLibraries } from "../cql-emitter/catalog/loadCatalog";
-import { lowerLocalCodes, localCodeSystemUrl } from "../cql-emitter/lowerLocalCodes";
+import { lowerLocalCodes, localCodeSystemUrl, astHasConceptLocalCode } from "../cql-emitter/lowerLocalCodes";
 import { readCanonicalBase, readPolicyId } from "../fhir-emitter/metadata";
+import { localDomainIdFor } from "../fhir-emitter/slug";
 import type { CRLError } from "../types/errors";
 
 import { resolveImports } from "./index";
@@ -89,6 +90,19 @@ export interface PerLibraryEmit {
   // CQL split, so they cannot drift.
   layer?: string;
   includes: string[];
+  // #198 C1 — the per-source DISAMBIGUATED local-domain base (`<policyId>-<librarySlug>`)
+  // when this entry's source is a cross-lib `code is` SIBLING, else `undefined` (the
+  // PRIMARY seed, a non-`code is` sibling, or a metadata-less caller). This is the
+  // EXPLICIT identity the FHIR lane threads onto a `none` sibling's base Library
+  // (`id`/`url`/`name` + every reference to it), instead of INFERRING `undefined`
+  // from `libraryName === sourceLibraryName` and falling back to the bare policy id —
+  // which left a `none` sibling's base Library at the bare `<policyId>` while its
+  // CodeSystem was already disambiguated (an inconsistent, latently-colliding pair).
+  // For a SPLIT sibling the disambiguation already lives in `libraryName` (the CQL
+  // split plan bakes the disambiguated base into every layer name), so the FHIR lane
+  // reads it there; this field is what makes the `none`/name-keeping-root path
+  // self-describing rather than needing a re-derivation from `libraryName`.
+  localDomainId?: string;
 }
 
 export interface EmitImportsResult {
@@ -316,15 +330,62 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
     canonicalBase = readCanonicalBase(graph.projectRoot);
     localDomainId = readPolicyId(graph.projectRoot);
   }
+  // #198 (Option B) — the per-entry local-domain / layered-identity base. The
+  // PRIMARY (closure-seed) library keeps the bare policy id; a SIBLING library
+  // (pulled into the closure via a cross-lib ref, i.e. NOT in the include-walked
+  // seed `graph.resolvedLibraries`) that ALSO declares concept-level `code is` gets
+  // a `-<librarySlug>` disambiguator so its local CodeSystem url AND its layered
+  // Library identities `S` (both derived from this base) no longer collide with the
+  // primary's. Only `code is` siblings are disambiguated: a non-`code is` sibling
+  // synthesizes NO local CodeSystem, so it keeps the bare policy-id base and its
+  // (unaffected) layer names stay byte-identical — no golden drift for existing
+  // multi-library `coded from`/decision-only fixtures. `undefined` policyId (direct
+  // single-file callers, no package.json) → no metadata, so no disambiguation is
+  // needed (single library); fall back to the source library name downstream. The
+  // FHIR lane (closureOrchestrator) computes the SAME base from the same
+  // (policyId, libraryName, isPrimary, hasCodeIs) inputs, so every site agrees.
+  const primarySeedPaths = new Set(graph.resolvedLibraries.map((e) => e.filePath));
+  // Capture the `code is` predicate from the RAW (un-lowered) closure: `emitClosure`
+  // below replaces each entry's `ast` with its LOWERED form, and lowering CLEARS
+  // `Concept.code`, so `astHasConceptLocalCode` on a lowered ast reads false. Keying
+  // the disambiguation off this stable per-path set keeps `domainIdFor` consistent
+  // across the raw-map AND every later lowered-closure loop.
+  const codeIsSeedPaths = new Set(
+    rawEmitClosure.filter((e) => astHasConceptLocalCode(e.ast)).map((e) => e.filePath),
+  );
+  const domainIdFor = (entry: RegistryEntry): string | undefined => {
+    if (localDomainId === undefined) return undefined;
+    const isPrimarySeed = primarySeedPaths.has(entry.filePath);
+    const disambiguate = !isPrimarySeed && codeIsSeedPaths.has(entry.filePath);
+    return localDomainIdFor(localDomainId, entry.name ?? "", !disambiguate);
+  };
+  // #198 C1 — the disambiguated base ONLY when the entry is actually disambiguated (a
+  // cross-lib `code is` sibling); `undefined` otherwise (primary seed, non-`code is`,
+  // or metadata-less). `domainIdFor` returns the BARE policy id for a non-disambiguated
+  // entry; this returns `undefined` there so the manifest field cleanly signals "no
+  // disambiguation" and the FHIR lane keeps the byte-identical `policyIdBase` fallback.
+  const disambiguatedBaseFor = (entry: RegistryEntry): string | undefined => {
+    if (localDomainId === undefined) return undefined;
+    const isPrimarySeed = primarySeedPaths.has(entry.filePath);
+    const disambiguate = !isPrimarySeed && codeIsSeedPaths.has(entry.filePath);
+    return disambiguate ? localDomainIdFor(localDomainId, entry.name ?? "", false) : undefined;
+  };
   // Track libraries that actually synthesized a local codesystem (lowered at
   // least one `code is` concept), keyed by the deterministic codesystem URL — so
-  // the per-policy collision preflight below can fire when 2+ libraries declare
-  // `code is`. R1 — the URL keys on the POLICY ID (`localDomainId`/package.json
-  // `name`), so EVERY `code is` library in the package maps to the SAME url; two
-  // such libraries collide because they share the policy's single local domain
-  // (not because their names slug alike). Scheme-independent (URN vs canonicalBase
-  // both collide).
+  // the per-policy collision preflight below can fire when 2+ libraries resolve to
+  // ONE local-domain url. #198 (Option B) — the url keys on the PER-ENTRY
+  // disambiguated base, so a primary + sibling map to DISTINCT urls and coexist. A
+  // collision now means one of exactly TWO genuine cases, distinguished by
+  // `localUrnDisambiguated`: (a) two SEED/primary `code is` libraries share the bare
+  // `<policyId>-local` domain, or (b) two cross-lib SIBLINGS whose names slugify to
+  // the same value share one `<policyId>-<slug>-local` domain. The collision set is
+  // homogeneous (a seed url `<policyId>-local` can never equal a sibling url
+  // `<policyId>-<slug>-local`), so one flag per url suffices. Scheme-independent (URN
+  // vs canonicalBase both collide).
   const localUrnToLibraries = new Map<string, Set<string>>();
+  // #198 — per colliding url, whether its contributing entries were DISAMBIGUATED
+  // (cross-lib siblings, case b) vs bare seeds (case a) — selects the guard message.
+  const localUrnDisambiguated = new Map<string, boolean>();
   // Slice 4c — the count of concept-level `code is` codes each library lowered,
   // keyed by emitted library name. Threaded into `computeSplitPlan` so the split
   // decision (partial vs none) is made from the SAME lowered representation that
@@ -332,17 +393,27 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
   // that builds the synthetic terminologies — one source of truth.)
   const localCodesCountByName = new Map<string, number>();
   const emitClosure = rawEmitClosure.map((entry) => {
-    const lowered = lowerLocalCodes(entry.ast, { canonicalBase, localDomainId });
+    // #198 — per-entry local domain (primary keeps the bare policy id; siblings
+    // are disambiguated). Threaded into the lowering so the synthetic `codesystem
+    // '<url>'` decl carries the disambiguated url for a sibling `code is` library.
+    const entryLocalDomainId = domainIdFor(entry);
+    const lowered = lowerLocalCodes(entry.ast, { canonicalBase, localDomainId: entryLocalDomainId });
     if (lowered.errors.length > 0) lowerErrors.push(...lowered.errors);
     const didLower = lowered.ast !== entry.ast;
     if (didLower && entry.name) {
-      // R1 — the collision key is the policy-id-slugged local-domain url (the same
-      // slug source the lowering uses), so the cross-library collision preflight
-      // stays consistent with the emitted url.
-      const urn = localCodeSystemUrl(canonicalBase, localDomainId ?? entry.ast.library.name);
+      // #198 — the collision key is the PER-ENTRY policy-id-slugged local-domain url
+      // (the same disambiguated slug source the lowering uses), so the cross-library
+      // collision preflight stays consistent with the emitted url. Under Option B a
+      // primary + sibling map to DISTINCT urls (no collision → allowed); the guard
+      // now fires ONLY when two libraries share one base (two seed/primary `code is`
+      // libraries), which Option B genuinely cannot disambiguate.
+      const urn = localCodeSystemUrl(canonicalBase, entryLocalDomainId ?? entry.ast.library.name);
       const set = localUrnToLibraries.get(urn) ?? new Set<string>();
       set.add(entry.name);
       localUrnToLibraries.set(urn, set);
+      // Record whether this entry's url is a DISAMBIGUATED sibling domain (case b) or
+      // a bare seed domain (case a). Homogeneous per url, so a plain set is fine.
+      localUrnDisambiguated.set(urn, disambiguatedBaseFor(entry) !== undefined);
     }
     if (entry.name) localCodesCountByName.set(entry.name, lowered.localCodes.length);
     return didLower ? { ...entry, ast: lowered.ast } : entry;
@@ -359,19 +430,42 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
       errors: lowerErrors,
     };
   }
-  // Per-policy local-domain collision. R1 — the local-domain URN keys on the
-  // POLICY ID (`metadata.name`), so it is IDENTICAL for every library in the
-  // package. Two distinct libraries that BOTH declare concept-level `code is`
-  // therefore share the policy's single implicit local CodeSystem domain (CQL
-  // code identity is system+code), so a local code in one could collide with one
-  // in the other — and they would emit two FHIR CodeSystem resources sharing one
-  // canonical url (invalid FHIR, per Inv-0 url-uniqueness). This guards the
-  // unsupported "2+ `code is` libraries in one package" case. Fail loudly rather
-  // than emit a silently-shared domain. (Renaming a library no longer changes a
-  // policy-id-keyed URN, so the fix is to consolidate or split — see message.)
+  // Per-policy local-domain collision. #198 (Option B) — the local-domain url keys on
+  // the PER-ENTRY disambiguated base (`domainIdFor`): the primary keeps the bare policy
+  // id, each cross-lib SIBLING `code is` library gets `<policyId>-<librarySlug>`. So a
+  // primary + sibling (or two DISTINCTLY-slugging siblings) map to DISTINCT urls and
+  // coexist. A collision therefore means one of exactly TWO genuine cases, and each
+  // gets a DIFFERENT, actionable message:
+  //   (a) two SEED/PRIMARY `code is` libraries (both include-walked from the entry
+  //       `.crl`) both keep the bare `<policyId>-local` domain — Option B can't
+  //       disambiguate two seeds. Fix: consolidate, make one a cross-lib sibling, or
+  //       split packages.
+  //   (b) two cross-lib SIBLINGS whose names SLUGIFY to the same value collapse onto
+  //       one `<policyId>-<slug>-local` domain — the disambiguator itself collided.
+  //       Fix: rename one library so its slug differs.
+  // Either way two FHIR CodeSystem resources would share one canonical url (invalid
+  // FHIR, Inv-0), so fail loudly rather than emit a silently-shared domain.
   for (const [urn, libs] of localUrnToLibraries) {
     if (libs.size > 1) {
       const names = [...libs].sort();
+      const quoted = names.map((n) => `"${n}"`).join(" and ");
+      const isSiblingSlugCollision = localUrnDisambiguated.get(urn) === true;
+      const message = isSiblingSlugCollision
+        ? // (b) two disambiguated SIBLINGS whose slugs collide.
+          `Libraries ${quoted} are both cross-library \`code is\` SIBLINGS whose names ` +
+          `slugify to the same value, so their auto-disambiguated local CodeSystem domains ` +
+          `both resolve to '${urn}'. The disambiguator is \`<policyId>-<slugify(libraryName)>\`, ` +
+          `and these two library names produce an identical slug. Rename one library so its ` +
+          `slug differs.`
+        : // (a) two SEED/primary `code is` libraries sharing the bare policy domain.
+          `Libraries ${quoted} both declare concept-level \`code is\` and are both SEED ` +
+          `libraries (reached by include-walking from the entry \`.crl\`), so both keep the ` +
+          `bare policy-id local CodeSystem domain '${urn}'. Two seed \`code is\` libraries ` +
+          `cannot be auto-disambiguated (Option B disambiguates only a cross-library SIBLING). ` +
+          `Consolidate the local \`code is\` declarations into a single library, reach one via a ` +
+          `cross-library reference (e.g. \`use decision\` / \`recommend activity\`) instead of an ` +
+          `\`include\` so it becomes a disambiguable sibling, or split into separate packages ` +
+          `(one policy id each).`;
       return {
         success: false,
         graph,
@@ -381,13 +475,7 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
           {
             type: "Validation",
             kind: "emit-local-codesystem-urn-collision",
-            message:
-              `Libraries ${names.map((n) => `"${n}"`).join(" and ")} both declare ` +
-              `concept-level \`code is\`, which share this policy's single local ` +
-              `CodeSystem domain '${urn}'. The per-policy local domain (keyed on the ` +
-              `policy id, not the library name) supports concept-level \`code is\` in ` +
-              `ONE library only — consolidate the local \`code is\` declarations into a ` +
-              `single library, or split into separate packages (one policy id each).`,
+            message,
           },
         ],
       };
@@ -421,7 +509,10 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
     const plan = computeSplitPlan(
       entry.ast,
       entry.name,
-      localDomainId ?? entry.name,
+      // #198 — per-entry disambiguated policy-id base (primary unchanged; sibling
+      // suffixed). `plan.kind` is policy-id-independent, but pass the per-entry base
+      // so this preflight decides from the SAME identity the emit loop uses.
+      domainIdFor(entry) ?? entry.name,
       localCodesCountFor(entry.name),
     );
     if (plan.kind === "full" || plan.kind === "interface") splitLibraryNames.add(entry.name);
@@ -499,12 +590,15 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
       // R2 — register the FULL emitted-name set for this entry via the shared
       // split-plan. `full`/`interface` register the source-typed layer names (+
       // the Interface name for `interface`); `none` registers just `<lib>`. The
-      // emitted-name base is the policy id (`localDomainId`), falling back to the
-      // source library name for metadata-less callers.
+      // emitted-name base is the PER-ENTRY disambiguated policy id (#198:
+      // `domainIdFor` — primary unchanged, sibling `<policyId>-<slug>`), falling back
+      // to the source library name for metadata-less callers, so the collision
+      // preflight registers the EXACT layer names the emit loop below produces (a
+      // primary + sibling now register DISTINCT names rather than colliding).
       const plan = computeSplitPlan(
         entry.ast,
         entry.name,
-        localDomainId ?? entry.name,
+        domainIdFor(entry) ?? entry.name,
         localCodesCountFor(entry.name),
       );
       const source =
@@ -553,13 +647,22 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
     // source-typed split PLUS the synthesized `<policyId>-Interface` library;
     // `none` takes the unchanged per-CRL path. cms22/cms69 (each source `.crl` is
     // single-layer, no `code is`) stay `none` → byte-identical.
-    const entryPolicyId = localDomainId ?? entry.name;
+    // #198 — the per-entry disambiguated policy-id base: the primary keeps the bare
+    // policy id (byte-identical to pre-#198), a sibling `code is` library gets
+    // `<policyId>-<slug>` so its layered library identities `S` + local CodeSystem
+    // url no longer collide with the primary's.
+    const entryLocalDomainId = domainIdFor(entry);
+    // #198 C1 — the disambiguated base (or `undefined`) carried onto every manifest
+    // entry this source produces, so the FHIR lane can identify a `none` sibling's
+    // base Library explicitly.
+    const entryDisambiguatedBase = disambiguatedBaseFor(entry);
+    const entryPolicyId = entryLocalDomainId ?? entry.name;
     const plan = computeSplitPlan(entry.ast, entry.name, entryPolicyId, localCodesCountFor(entry.name));
     if (plan.kind !== "none") {
       const partitioned = emitPartitioned(entry.ast, entry.name, plan.policyId!, plan.partition!, {
         crossLibraryParameters,
         canonicalBase,
-        localDomainId,
+        localDomainId: entryLocalDomainId,
       });
       if (!partitioned.success) {
         return {
@@ -613,6 +716,7 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
           role,
           layer: part.layer,
           includes: part.crossLibraryIncludes,
+          localDomainId: entryDisambiguatedBase,
         });
       }
       continue;
@@ -648,7 +752,9 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
       crossLibraryIncludes: crossLibs,
       crossLibraryParameters,
       canonicalBase,
-      localDomainId,
+      // #198 — per-entry local domain: a `none`/per-CRL sibling `code is` library
+      // still gets its disambiguated `codesystem '<url>'` decl (primary unchanged).
+      localDomainId: entryLocalDomainId,
     });
     if (!emit.success || !emit.result) {
       return {
@@ -670,6 +776,7 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
       sourceLibraryName: entry.name,
       role: "root",
       includes: crossLibs,
+      localDomainId: entryDisambiguatedBase,
     });
   }
 

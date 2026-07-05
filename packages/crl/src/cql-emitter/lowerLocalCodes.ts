@@ -12,10 +12,12 @@
  *   - A synthetic local `Terminology` named after the concept, carrying ONE
  *     `code` entry (the `code is` literal) from a deterministic local
  *     codesystem URN `urn:crl:codesystem:<slug>-local` (R1 — slug = lowercase-
- *     hyphen of the POLICY ID `localDomainId`/`metadata.name` when the FHIR/
- *     imports lane threads it; the single implicit per-policy local domain, every
- *     local code shares it. Falls back to the source LIBRARY name only for direct
- *     metadata-less callers). The CQL emitter stays FHIR-free: no canonicalBase, just a URN.
+ *     hyphen of the per-library local-domain base `localDomainId` when the FHIR/
+ *     imports lane threads it: the POLICY ID for the primary seed, or #198 Option B's
+ *     disambiguated `<policyId>-<librarySlug>` for a cross-lib `code is` sibling. Every
+ *     local code IN ONE SOURCE LIBRARY shares that library's domain. Falls back to the
+ *     source LIBRARY name only for direct metadata-less callers). The CQL emitter stays
+ *     FHIR-free: no canonicalBase, just a URN.
  *     `detectCollisions` (emitCQL.ts) sees the synthetic terminology collide
  *     with the same-named concept and suffixes its emit name to `"<Concept>
  *     Code"` (per-CRL path only — see the EMITTED IDENTIFIER NOTE below for why
@@ -258,6 +260,19 @@ function localSlug(name: string): string {
  */
 function isLowerableConcept(stmt: Statement): stmt is Concept {
   return stmt.type === "Concept" && stmt.code !== undefined;
+}
+
+/**
+ * #198 — true iff `ast` declares at least one concept-level `code is` (the SOLE
+ * trigger for a synthetic per-policy local CodeSystem + the policy-id-keyed layered
+ * identities that collide across two such libraries). Mirrors `lowerLocalCodes`'
+ * own fast-path predicate, so "would lower a local code" and "gets an Option-B
+ * disambiguated local domain" are decided by ONE source of truth. A library WITHOUT
+ * a `code is` keeps the bare policy-id base (no local CodeSystem to collide, so no
+ * disambiguation — keeps its emit byte-identical).
+ */
+export function astHasConceptLocalCode(ast: CRL): boolean {
+  return ast.statements.some(isLowerableConcept);
 }
 
 /**

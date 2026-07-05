@@ -1,0 +1,10 @@
+# sibling-slug-collision Sibling B — DISTINCT name "Sib-One" that ALSO slugs to "sib-one".
+library "Sib-One".
+
+concept "Beta":
+- type is Observation.
+- code is `beta`.
+
+activity "Refer":
+- request CPGCommunicationRequest.
+- with `refer`.

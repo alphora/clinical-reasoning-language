@@ -8,8 +8,9 @@ library "Root".
 // pins: does a cross-lib `use decision` into a split library resolve (via the
 // policy-id-scoped Decision PlanDefinition) or fail the split-library guard?
 //
-// Root itself has NO concept-level `code is` (only ONE library per policy may),
-// so its condition is a RecordSource `coded from` concept.
+// Root itself has NO concept-level `code is` here (this fixture keeps the local
+// domain on the split sibling), so its condition is a RecordSource `coded from`
+// concept.
 
 terminology "Mild Crohns VS":
 - valueset is `http://example.org/vs/mild-crohns`.

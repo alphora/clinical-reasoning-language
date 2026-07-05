@@ -1,0 +1,22 @@
+# code-is-two-libraries — the PRIMARY (entry / closure-seed) policy library (#198).
+library "Two Lib Main".
+
+// This library declares a concept-level `code is` case feature AND chains
+// cross-library to a SECOND library that ALSO declares `code is`. Both mint a
+// per-policy local CodeSystem; pre-#198 they collided on one canonical url. Under
+// Option B this PRIMARY (reached directly from the entry `.crl`) keeps the clean
+// `<policyId>-local` CodeSystem + `<policyId>-<Layer>` identities, and the sibling
+// pulled in via `use decision` is auto-disambiguated.
+
+concept "Feature Main":
+- type is Observation.
+- code is `feature-main`.
+
+decision "Main Determination":
+first:
+- when "Feature Main" then recommend activity "Approve".
+- otherwise then use decision "Two Lib Sub"."Sub Determination".
+
+activity "Approve":
+- request CPGCommunicationRequest.
+- with `approve`.

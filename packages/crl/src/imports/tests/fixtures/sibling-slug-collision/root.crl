@@ -1,0 +1,17 @@
+# sibling-slug-collision — case (b): two cross-lib code-is siblings whose names slugify identically.
+library "Root".
+
+// Root's decision `recommend`s an activity from EACH sibling (NO explicit
+// `include`), so both enter the closure as SIBLINGS. "Sib One" and "Sib-One" both
+// slugify to "sib-one", so Option B's disambiguator `<policyId>-sib-one` collapses
+// them onto ONE local CodeSystem domain → the tailored sibling-slug-collision
+// message + fail-closed.
+
+concept "Trigger":
+- type is Observation.
+- code is `trigger`.
+
+decision "Route":
+first:
+- when "Trigger" then recommend activity "Sib One"."Approve".
+- otherwise then recommend activity "Sib-One"."Refer".

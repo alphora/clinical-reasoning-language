@@ -263,3 +263,34 @@ export function pascalCaseNameForId(raw: string): string {
 export function policyIdBase(metadata: { name: string }): string {
   return capSlug(slugify(metadata.name));
 }
+
+/**
+ * #198 — Option B per-library local-domain / layered-identity BASE.
+ *
+ * The local CodeSystem url (`<policyId>-local`) AND the base/layered Library
+ * identity are BOTH keyed on the policy id, so two `code is` libraries under one
+ * policy id would mint the SAME CodeSystem url + Library identity → a canonical-url
+ * collision the closure invariants must refuse. Option B disambiguates ONLY the
+ * SIBLING libraries (those pulled into the emit closure via cross-lib refs), leaving
+ * the PRIMARY (closure-seed / `--path` root) library on the clean `<policyId>` base
+ * so every existing single-`code is`-library golden stays byte-identical.
+ *
+ * Returns the per-library base used as `localDomainId` (both lanes):
+ *   - primary (seed) → the bare policy id, UNCHANGED.
+ *   - sibling        → `<policyId>-<slugify(libraryName)>` (e.g. `repro-198-repro-sub`).
+ *
+ * This is the SINGLE lever both emit lanes thread: the CQL lane feeds it to
+ * `lowerLocalCodes` (the `codesystem '<url>'` decl) AND as the split plan's policy
+ * id (→ every layered `<policyId>-<Layer>` Library identity `S`); the FHIR lane
+ * feeds it to `emitLocalCodeSystem` (CodeSystem id/url), the case-feature
+ * `patternCodeableConcept.coding.system`, and — via the manifest layer names — the
+ * base/layered Library id/url/name. Because BOTH lanes compute it from the same
+ * (policyId, libraryName, isPrimary) triple, every reference site byte-agrees.
+ */
+export function localDomainIdFor(
+  policyId: string,
+  libraryName: string,
+  isPrimary: boolean,
+): string {
+  return isPrimary ? policyId : `${policyId}-${slugify(libraryName)}`;
+}
