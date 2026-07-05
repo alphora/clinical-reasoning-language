@@ -55,6 +55,9 @@ export type {
 export { runCel } from "./cre";
 export type { CaseRun, CelRunResult, ProducedRec, TraceNode, CompositionTrace } from "./cre";
 export { renderScenario, SCENARIO_VIEW_MODEL_SCHEMA_VERSION } from "./cre";
+// DISPLAY-only projection of a PA determination outcome name (`"certify.Met"` → `"Met"`); the cockpit renderers in
+// crl-vscode import this so the outcome shows only the human `<key>`. See dispositions/displayName.ts.
+export { displayDetermination } from "./dispositions";
 export type {
   RenderScenarioResult,
   ScenarioViewModel,

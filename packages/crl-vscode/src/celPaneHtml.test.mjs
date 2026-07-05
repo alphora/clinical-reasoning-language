@@ -30,6 +30,15 @@ check("a block per case: status badge + facts + produced + reveal", () => {
   assert.ok(out.html.includes("Pat A") && out.html.includes("facts: dx") && out.html.includes("→ Approve") && out.html.includes("✓"));
 });
 
+check("a determination outcome renders as the human key, not the dotted `<category>.<key>` name", () => {
+  const out = renderCelPane(
+    result([sc("Pat B", "pass", ["dx"], ["certify.Met", "not-certify.Unmet EIU"])]),
+    { "Pat B": "cB" },
+  );
+  assert.ok(out.html.includes("→ Met, Unmet EIU"), "the worklist row shows the keys only");
+  assert.ok(!out.html.includes("certify."), "no `certify.` / `not-certify.` dotted prefix leaks into the worklist row");
+});
+
 check("anchors keyed by frozen caseId; reveal key → caseId", () => {
   const out = renderCelPane(result([sc("A", "fail")]), { A: "cA" });
   assert.ok(out.anchors.cA && out.anchors.cA.segmentIds.length === 1);

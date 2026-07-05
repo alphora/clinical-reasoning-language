@@ -8,7 +8,7 @@
 // targets aren't concepts) AND whose concept key is revealable (in `revealableConceptKeys`) renders as a clickable span
 // with its OWN `fact:`-namespaced anchor. A click "peeks" that concept across panes (shell-side, no engine selection).
 // Fact peek is independent of the case's frozen id — the concept's correspondence doesn't depend on the case anchor.
-import { nodeKey, type RenderScenarioResult } from "@smile-digital-health/crl";
+import { displayDetermination, nodeKey, type RenderScenarioResult } from "@smile-digital-health/crl";
 
 import { corrKeyHtml } from "./corrKey";
 // Type-only import (erased at compile — no runtime/bundle coupling to the store's node:fs deps): the review-state union +
@@ -176,7 +176,9 @@ export function renderCelPane(
       }
       return escapeHtml(f.name);
     });
-    const produced = sc.produced.map((p) => escapeHtml(p.recommendation)).join(", ");
+    // DISPLAY-only: a determination outcome (`certify.Met`) shows as its human key (`Met`); a no-op for ordinary
+    // activity names. The raw `recommendation` is untouched — matching/oracle checks run off the CRE's raw names.
+    const produced = sc.produced.map((p) => escapeHtml(displayDetermination(p.recommendation))).join(", ");
     // At-rest key slot (#163): the units this case corresponds to. Only when the case is frozen (caseId-keyed) + showKeys.
     const keySlot = showKeys && caseId !== undefined ? corrKeyHtml(caseKeyNumbers[caseId] ?? []) : "";
     // Worklist review-state DROPDOWN (#156 slice 4, mode-gated; a <select>, no longer a cycling checkbox). REVIEWABLE = a

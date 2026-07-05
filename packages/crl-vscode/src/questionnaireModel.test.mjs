@@ -96,6 +96,43 @@ case "both hold":
   assert.ok(q.questions.every((x) => x.nodeId && x.source), "each question carries a nodeId + source");
 });
 
+// ── 1b. DISPLAY-only: a determination outcome `<category>.<key>` shows as its human KEY on the Outcome line,
+//      while MATCHING (the `result is` oracle) still uses the RAW dotted name — a keyed flavor WITH a space. ──
+check("determination outcome: `Outcome:` shows the key only; matching stays on the raw dotted name", () => {
+  const crl = `# P
+library "Det".
+concept "A":
+- type is Condition.
+- code is \`a\`.
+activity "not-certify.Unmet EIU":
+- request CPGCommunicationRequest.
+- with \`ok\`.
+decision "Det":
+- when "A" then recommend activity "not-certify.Unmet EIU".`;
+  const cel = `# C
+library "DetCases".
+covers "Det".
+fact "Pat":
+- name is "Pat".
+- birth date is "1970-01-01".
+- defined by "Patient".
+fact "fA":
+- code is "http://example.org|a".
+- date is "2026-01-01".
+- defined by "A".
+case "A holds → the keyed determination fires":
+- subject is "Pat".
+- fact is "fA".
+- result is "Det" is "not-certify.Unmet EIU".`;
+  const { sv, rootLib } = renderCase({ "d.crl": crl, "d.cel": cel }, "d.cel", "A holds → the keyed determination fires");
+  // The oracle matched on the RAW dotted name → pass. (Display never touches the matched value.)
+  assert.equal(sv.status, "pass", "the raw `not-certify.Unmet EIU` name matched the oracle → pass (matching unchanged)");
+  const q = buildQuestionnaire(sv, booleanResolver, rootLib);
+  assert.equal(q.terminalKind, "produced");
+  assert.deepEqual(q.outcome, { activity: "Unmet EIU" }, "the Outcome shows only the human key, space preserved");
+  assert.ok(!JSON.stringify(q.outcome).includes("not-certify."), "the dotted category prefix is stripped from the display");
+});
+
 // ── 2. THE KEY MODEL-FIX TEST: a FAIL where a DIFFERENT disposition is produced. The case has an exclusion
 //      → fires Deny; `result is` says Approve (so status==="fail"). The questionnaire shows the path to the
 //      ACTUAL produced disposition (Deny), terminalKind "produced" — NOT "blocked". expected/pass-fail are

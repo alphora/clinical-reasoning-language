@@ -22,3 +22,4 @@ export {
   resolveDeterminationLeaf,
   leafId,
 } from "./config";
+export { displayDetermination } from "./displayName";

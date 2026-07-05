@@ -40,6 +40,27 @@ const failHtml = renderScenarioHtml(failVm).html;
 assert.ok(failHtml.includes('<span class="mark">✗</span>'), "a failing case uses the ✗ mark");
 assert.ok(failHtml.includes('class="actual fail"'), "a failing case tags actual with the fail status");
 
+// --- determination outcomes render as the human key, not the dotted `<category>.<key>` name ---
+// dme101-030 produces `certify.Approve` / `not-certify.Deny`; the tree leaf + the actual meta row must show the KEY only.
+assert.ok(!html.includes("certify."), "no `certify.` / `not-certify.` dotted prefix appears anywhere in the tree/meta");
+assert.ok(/>Approve</.test(html) || html.includes("Approve"), "the certify leaf shows the human key `Approve`");
+assert.ok(html.includes("Deny"), "the not-certify leaf shows the human key `Deny`");
+// a keyed flavor WITH a space is preserved end-to-end (tree label + actual row), and stays un-dotted.
+const detVm = JSON.parse(JSON.stringify(result));
+const detCase = detVm.scenarios[0];
+detCase.produced = [{ recommendation: "not-certify.Unmet EIU", actionKind: "recommend-activity" }];
+detCase.expected = { decision: detCase.decision?.name ?? "D", branch: "not-certify.Unmet EIU" };
+// give the tree a produced determination leaf so the arm/leaf label path is exercised too
+detCase.tree = [{
+  nodeId: "when[0].action[0]", kind: "action", label: "not-certify.Unmet EIU",
+  source: { filePath: "/x.crl", range: { startLine: 0, startCol: 0, endLine: 0, endCol: 1 } },
+  evaluated: true, action: { actionKind: "recommend-activity", produced: true }, children: [],
+}];
+const detHtml = renderScenarioHtml(detVm).html;
+assert.ok(detHtml.includes("Unmet EIU"), "a keyed determination with a space renders its full key");
+assert.ok(!detHtml.includes("not-certify.Unmet EIU"), "the dotted determination name is NOT rendered (display strips it)");
+assert.ok(detHtml.includes('<span class="label">Unmet EIU</span>'), "the tree arm/leaf label shows just the key");
+
 const keys = Object.keys(reveals);
 assert.ok(keys.length > 0, "reveals map is populated");
 for (const k of keys) {

@@ -9,7 +9,7 @@
 // via innerHTML) carries no styles of its own. `opts.revealPrefix` namespaces reveal keys per
 // render so a click on stale DOM (after the host swapped in a new render's `reveals`) resolves to
 // an unknown key and is ignored, rather than mis-resolving to a same-positioned node.
-import type { RenderScenarioResult, ScenarioViewModel, ViewNode } from "@smile-digital-health/crl";
+import { displayDetermination, type RenderScenarioResult, type ScenarioViewModel, type ViewNode } from "@smile-digital-health/crl";
 import { allUnsatisfiedCriteria, failedCriterionFrontier } from "@smile-digital-health/crl/provenance";
 
 import { failedCriterionLabel } from "./failedCriterionLabel";
@@ -156,7 +156,7 @@ function renderNode(
     `<li class="node ${cls}"${fcAttrs}>` +
     `<span class="row" data-reveal="${esc(key)}" title="${esc(rowTitle)}">` +
     `<span class="badge">${esc(badge)}</span>` +
-    `<span class="label">${esc(n.label)}</span>${facts}${guard}${fcTipSpan}` +
+    `<span class="label">${esc(displayDetermination(n.label))}</span>${facts}${guard}${fcTipSpan}` +
     `</span>${children}</li>`
   );
 }
@@ -166,8 +166,10 @@ function renderCase(s: ScenarioViewModel, caseIdx: number, prefix: string, revea
   const mark = s.status === "pass" ? "✓" : "✗"; // green check on a match, red X otherwise (unit-test style)
   const facts = s.case.facts.map((f) => esc(f.name) + (f.conceptRef ? ` <em>(${esc(f.conceptRef)})</em>` : "")).join(", ");
   // expected = just the branch (the decision name is already on the `decision` row above).
-  const expected = s.expected ? esc(s.expected.branch) : "—";
-  const actual = s.produced.length ? s.produced.map((p) => esc(p.recommendation)).join(", ") : "(none)";
+  // DISPLAY-only: a determination outcome (`certify.Met`) shows as its human key (`Met`). No-op for ordinary branch /
+  // activity names. The pass/fail verdict is computed in the CRE from the RAW names — this only touches the strings shown.
+  const expected = s.expected ? esc(displayDetermination(s.expected.branch)) : "—";
+  const actual = s.produced.length ? s.produced.map((p) => esc(displayDetermination(p.recommendation))).join(", ") : "(none)";
   const decision = s.decision
     ? esc(s.decision.name) + (s.decision.resolved ? "" : " <span class=\"err\">(unresolved)</span>")
     : "(no decision)";

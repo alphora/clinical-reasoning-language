@@ -29,6 +29,9 @@
 // as the walk descends, but a terminal deep in one arm does not reorder across arms. The medical-policy model
 // is nested `first:` (a single chain), so this is fine in practice.
 import type { ScenarioViewModel, ViewNode, GuardView, ConditionView } from "@smile-digital-health/crl";
+// The one runtime import: a pure, vscode-free DISPLAY helper — projects a determination outcome name
+// (`certify.Met`) to its human key (`Met`) for the `Outcome:` line. Matching still uses the RAW `label`.
+import { displayDetermination } from "@smile-digital-health/crl";
 
 // `ConceptValueType` is a string union in the core grammar (grammar/conceptValueTypes.ts), but the barrel
 // does not re-export the type. The builder treats a value type as an opaque string token (it only does
@@ -218,12 +221,14 @@ export function buildQuestionnaire(
     let activity: string;
     let note: string | undefined;
     if (produced.length === 1) {
-      activity = produced[0].label;
+      // DISPLAY-only: show the determination's human key (`certify.Met` → `Met`); a no-op for ordinary activities.
+      activity = displayDetermination(produced[0].label);
     } else {
       // >1 produced (a rare CDS `all:`). Prefer the expected branch's if the oracle named one (purely for a
-      // human-friendly "which" label — it does NOT change the path or the terminal), else the first.
+      // human-friendly "which" label — it does NOT change the path or the terminal), else the first. The MATCH
+      // is on the RAW `label` (expected.branch is the raw name); only the shown string is display-projected.
       const picked = produced.find((p) => p.label === sv.expected?.branch) ?? produced[0];
-      activity = picked.label;
+      activity = displayDetermination(picked.label);
       note = `multiple produced; showing ${activity}`;
     }
     // A produced path with ZERO `when` questions (root `otherwise` → leaf) is "empty" — distinct from a chain
