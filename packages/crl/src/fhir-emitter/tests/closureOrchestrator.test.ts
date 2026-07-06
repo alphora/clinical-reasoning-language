@@ -305,20 +305,29 @@ const CROSS_LIB_ACTIVITY_ROOT = join(
   "src/fhir-emitter/tests/fixtures/cross-lib-activity/root.crl",
 );
 
-// #186 follow-up NEGATIVE — a STANDALONE activities-only library (no decision
-// sibling). Suppression is keyed on exactly-one decision-bearing sibling; with zero,
-// the library is NOT suppressed and keeps its own CQL + FHIR Library (self-bound).
+// #186 follow-up NEGATIVE — a STANDALONE activities-only library (the emit entry IS
+// the activities-only lib, so there is no decision root to rebind onto). NOT
+// suppressed — keeps its own CQL + FHIR Library (self-bound).
 const ACTIVITIES_ONLY_STANDALONE = join(
   ROOT,
   "src/fhir-emitter/tests/fixtures/activities-only-standalone/dispositions.crl",
 );
 
-// #186 follow-up NEGATIVE — an activities-only 'Shared' lib in a closure with TWO
-// decision-bearing libs (Main delegates to Other; Other recommends Shared). The
-// consumer is ambiguous (>1), so Shared is NOT suppressed — pins the exactly-one gate.
+// #201 — an activities-only 'Shared' lib in a closure with TWO decision libs (Main =
+// root recommends Shared AND delegates to Other; Other ALSO recommends Shared).
+// Suppression keys on the graph-root (Main), so Shared binds to Main's Interface.
 const ACTIVITIES_ONLY_TWO_DECISIONS = join(
   ROOT,
   "src/fhir-emitter/tests/fixtures/activities-only-two-decisions/main.crl",
+);
+
+// #201 — the harder shape: Main (graph-root) ONLY delegates (`use decision`) to Other
+// and NEVER recommends Shared; the delegated Other is the sole recommender. Shared must
+// still bind to the GRAPH-ROOT (Main) Interface — the rebind-onto-a-non-recommender-root
+// path. Distinguishes graph-root keying from any recommender-based rule.
+const ACTIVITIES_ONLY_SUB_ONLY = join(
+  ROOT,
+  "src/fhir-emitter/tests/fixtures/activities-only-sub-only-recommend/main.crl",
 );
 
 // #186 follow-up — a suppressed activities-only 'Shared' lib whose sole consumer
@@ -821,9 +830,9 @@ describe("closureOrchestrator — cross-library activity recommend (#196)", () =
   });
 
   it("NEGATIVE (#186 fallback): a STANDALONE activities-only library (no decision sibling) is NOT suppressed — keeps its own CQL + FHIR Library, self-bound", () => {
-    // Suppression requires EXACTLY ONE decision-bearing sibling as the rebind consumer.
-    // With zero (a disposition library emitted alone), the pre-#186 behavior is
-    // preserved: the library keeps its own (defines-free) CQL + a FHIR Library, and its
+    // Suppression requires a decision-bearing ROOT to rebind onto. When the emit entry
+    // IS the activities-only library (no decision root), the pre-#186 behavior is
+    // preserved: it keeps its own (defines-free) CQL + a FHIR Library, and its
     // ActivityDefinition binds to that own Library — an activities-only library used
     // alone still needs a policy-scoped `library[]` scope for its inline dynamicValues.
     const cql = emitCQLImports(ACTIVITIES_ONLY_STANDALONE);
@@ -846,14 +855,19 @@ describe("closureOrchestrator — cross-library activity recommend (#196)", () =
     ]);
   });
 
-  it("NEGATIVE (#186 exactly-one gate): an activities-only lib with TWO decision-bearing siblings is NOT suppressed (ambiguous consumer)", () => {
-    // Suppression requires EXACTLY ONE decision sibling. With two (Main + Other), the
-    // consumer is ambiguous, so Shared keeps its own CQL + Library. This pins the
-    // `=== 1` gate — a regression to `>= 1` (pick-first) would fail here.
+  it("#201 chained/multi-decision: an activities-only lib recommended by the root AND a delegated sub-decision binds to the ROOT decision's Interface", () => {
+    // The #201 repro shape: Main (the entry/root) recommends "Shared" AND delegates via
+    // `use decision` to Other, which ALSO recommends "Shared" — two recommender
+    // libraries. Suppression keys on the ROOT decision (not a recommender count), so
+    // Shared is suppressed and its AD binds to the SAME Interface the root decision PD
+    // uses (Main's), NOT the delegated Other's. A regression to the old exactly-one-
+    // decision gate would leave Shared un-suppressed (the original #201 bug).
     const cql = emitCQLImports(ACTIVITIES_ONLY_TWO_DECISIONS);
     expect(cql.success).toBe(true);
-    expect(cql.suppressedActivityBindings).toEqual([]);
-    expect(cql.cqlByLibrary.some((e) => e.libraryName === "Shared")).toBe(true);
+    expect(cql.suppressedActivityBindings).toEqual([
+      { suppressedLibraryName: "Shared", consumerLibraryName: "Main" },
+    ]);
+    expect(cql.cqlByLibrary.some((e) => e.libraryName === "Shared")).toBe(false);
 
     const result = emitFhirDefFromPath(ACTIVITIES_ONLY_TWO_DECISIONS, { clock: FIXED_CLOCK });
     expect(result.success).toBe(true);
@@ -861,7 +875,50 @@ describe("closureOrchestrator — cross-library activity recommend (#196)", () =
       result.resources.some(
         (r) => r.resourceType === "Library" && (r.resource as { title?: string }).title === "Shared",
       ),
-    ).toBe(true);
+    ).toBe(false);
+    // The shared Deny AD binds to the ROOT (Main) decision's Interface — the same
+    // library[] the root decision PlanDefinition resolves to.
+    const mainDecisionPd = result.resources.find(
+      (r) => r.resourceType === "PlanDefinition" && r.sourceKind === "Decision" && r.sourceName === "Main Decision",
+    );
+    expect(mainDecisionPd).toBeDefined();
+    const rootInterface = (mainDecisionPd!.resource as { library?: string[] }).library;
+    const denyAd = result.resources.find(
+      (r) => r.resourceType === "ActivityDefinition" && r.sourceName === "Deny",
+    );
+    expect(denyAd).toBeDefined();
+    expect((denyAd!.resource as { library?: string[] }).library).toEqual(rootInterface);
+  });
+
+  it("#201 graph-root (sub-only recommender): Shared is recommended ONLY by a delegated sub-decision, yet binds to the graph-root (Main) Interface", () => {
+    // Main is the graph-root (zero incoming `use decision` edges) but never recommends
+    // Shared — only the delegated Other does. Suppression keys on the graph root, so
+    // Shared still rebinds onto Main's Interface (the same library[] the root decision PD
+    // resolves to). A recommender-based rule would have bound it to Other instead.
+    const cql = emitCQLImports(ACTIVITIES_ONLY_SUB_ONLY);
+    expect(cql.success).toBe(true);
+    expect(cql.suppressedActivityBindings).toEqual([
+      { suppressedLibraryName: "Shared", consumerLibraryName: "Main" },
+    ]);
+
+    const result = emitFhirDefFromPath(ACTIVITIES_ONLY_SUB_ONLY, { clock: FIXED_CLOCK });
+    expect(result.success).toBe(true);
+    expect(
+      result.resources.some(
+        (r) => r.resourceType === "Library" && (r.resource as { title?: string }).title === "Shared",
+      ),
+    ).toBe(false);
+    const mainDecisionPd = result.resources.find(
+      (r) => r.resourceType === "PlanDefinition" && r.sourceKind === "Decision" && r.sourceName === "Main Decision",
+    );
+    expect(mainDecisionPd).toBeDefined();
+    const denyAd = result.resources.find(
+      (r) => r.resourceType === "ActivityDefinition" && r.sourceName === "Deny",
+    );
+    expect(denyAd).toBeDefined();
+    expect((denyAd!.resource as { library?: string[] }).library).toEqual(
+      (mainDecisionPd!.resource as { library?: string[] }).library,
+    );
   });
 
   it("#186 suppression onto a NONE-KIND consumer: Shared rebinds to the consumer's name-keeping Root Library (suffixForSource fallback, no throw)", () => {

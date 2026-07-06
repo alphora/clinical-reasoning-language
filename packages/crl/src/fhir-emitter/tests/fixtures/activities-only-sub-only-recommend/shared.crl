@@ -1,0 +1,6 @@
+# sub-only — Shared (ACTIVITIES-ONLY), recommended only by Other, binds to root Main.
+library "Shared".
+
+activity "Deny":
+- request CPGCommunicationRequest.
+- with `Denied.`.

@@ -105,16 +105,16 @@ export interface PerLibraryEmit {
   localDomainId?: string;
 }
 
-// #186 follow-up — a shared, activities-only library (only `activity` blocks; no
+// #186/#201 — a shared, activities-only library (only `activity` blocks; no
 // decision/concept/terminology) emits an EMPTY CQL file (header + includes +
-// `context Patient`, zero defines) plus a hollow FHIR Library. When such a library
-// is consumed by exactly one decision-bearing library in the same closure, the CQL
-// lane SUPPRESSES its empty CQL and records this binding so the FHIR lane can (a)
-// skip the hollow Library and (b) rebind the library's ActivityDefinitions /
-// recommendation PlanDefinitions onto the consumer decision library's Interface.
-// The CQL lane is the SINGLE decision-maker (it never happens in the FHIR lane,
-// whose closure is a strict superset and could disagree — see closureOrchestrator
-// contract at :970). The FHIR lane CONSUMES this, it does not recompute.
+// `context Patient`, zero defines) plus a hollow FHIR Library. When the closure has a
+// GRAPH-ROOT decision library (see `willSuppress`), the CQL lane SUPPRESSES the empty
+// CQL and records this binding (consumer = the graph-root decision) so the FHIR lane
+// can (a) skip the hollow Library and (b) rebind the library's ActivityDefinitions /
+// recommendation PlanDefinitions onto the consumer's Interface. The CQL lane is the
+// SINGLE decision-maker (it never happens in the FHIR lane, whose closure is a strict
+// superset and could disagree — see closureOrchestrator contract at :970). The FHIR
+// lane CONSUMES this, it does not recompute.
 export interface SuppressedActivityBinding {
   suppressedLibraryName: string;
   consumerLibraryName: string;
@@ -157,7 +157,7 @@ export function isActivitiesOnlyLibrary(ast: CRL): boolean {
 import { safeOutputFilename } from "./safeOutputFilename";
 // Ref-walking + closure expansion factored to ./computeEmitClosure so the
 // CRL→FHIR-def lane can compute its own strict-superset closure (Todo 4 of #73).
-import { collectCqlIncludeRefs, computeCqlEmitClosure } from "./computeEmitClosure";
+import { collectCqlIncludeRefs, computeCqlEmitClosure, usedDecisionLibraries } from "./computeEmitClosure";
 import type { LibraryScope } from "./scopes";
 
 function collectCrossLibraryRefs(entry: RegistryEntry): Set<string> {
@@ -466,6 +466,43 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
       errors: lowerErrors,
     };
   }
+
+  // #186/#201 — the suppression consumer is the closure's GRAPH-ROOT decision library:
+  // the decision-bearing library that is never a cross-library `use decision` TARGET
+  // (zero incoming delegation edges). That is the entry policy's top-level decision (it
+  // delegates OUT to sub-decisions, e.g. State-Mandates, but nothing delegates INTO it).
+  // A suppressed activities-only determination library rebinds its ADs/recommendation-PDs
+  // onto THIS root's Interface — regardless of how many sub-decisions recommend its
+  // activities. This is the #201 fix: the shared "Medical Policy Determination" is
+  // recommended by the main decision AND every delegated State-Mandates sub-decision, yet
+  // belongs to the main policy's interface. Keying on the graph root (not the file-entry
+  // library, and not a recommender count) also handles a facade/aggregator entry `.crl`
+  // whose own library carries no decision. SAFETY: determination dynamicValues are
+  // self-contained literals (a `with` is a backtick literal or a terminology ref — there
+  // is NO grammar path for a dynamicValue to reference a sibling library's CQL define, and
+  // a terminology `with` on an interface-scoped library fails closed at
+  // `emit-activity-terminology-interface-unsupported`), so the root's Interface is always
+  // a valid `library[]` scope. When there is not EXACTLY ONE graph root (none → no
+  // decision / standalone activities-only entry; >1 → independent decision trees), no
+  // activities-only library is suppressed (unchanged pre-#186 behavior). Computed BEFORE
+  // the split-library + collision preflights so a suppressed library (which emits NO CQL)
+  // is excluded from BOTH — a false dangling-include or name-collision for a file never
+  // written would otherwise fail the emit.
+  const decisionLibNames = new Set(
+    emitClosure
+      .filter((e) => e.name !== null && e.name !== "" && e.ast.statements.some((s) => s.type === "Decision"))
+      .map((e) => e.name as string),
+  );
+  const usedDecisionLibNames = new Set<string>();
+  for (const e of emitClosure) {
+    if (e.name === null || e.name === "") continue;
+    for (const used of usedDecisionLibraries(e.ast)) usedDecisionLibNames.add(used);
+  }
+  const graphRootDecisionLibs = [...decisionLibNames].filter((n) => !usedDecisionLibNames.has(n));
+  const rootConsumer = graphRootDecisionLibs.length === 1 ? graphRootDecisionLibs[0] : undefined;
+  const willSuppress = (entry: RegistryEntry): boolean =>
+    isActivitiesOnlyLibrary(entry.ast) && rootConsumer !== undefined && entry.name !== rootConsumer;
+
   // Per-policy local-domain collision. #198 (Option B) — the local-domain url keys on
   // the PER-ENTRY disambiguated base (`domainIdFor`): the primary keeps the bare policy
   // id, each cross-lib SIBLING `code is` library gets `<policyId>-<librarySlug>`. So a
@@ -569,6 +606,10 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
     );
     for (const entry of emitClosure) {
       if (!entry.name) continue;
+      // A suppressed activities-only library emits NO CQL, so its `include`s cannot
+      // dangle — exclude it from the split-library ref guard (a false positive for a
+      // file never written), mirroring the collision-preflight + emit-loop skips.
+      if (willSuppress(entry)) continue;
       const scope = guardScopes.get(entry.filePath);
       if (!scope) continue;
       const refs = collectCqlIncludeRefs(entry, scope);
@@ -602,19 +643,6 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
     }
   }
 
-  // #186 follow-up — decision-bearing libraries in THIS closure (the CQL closure,
-  // the single source of truth for the suppression decision). An activities-only
-  // library is suppressed only when EXACTLY ONE exists (its unambiguous consumer);
-  // 0 (standalone) or >1 (ambiguous) → unchanged (the library keeps its own empty
-  // Root, matching pre-#186 behavior). Computed BEFORE the collision preflight so a
-  // suppressed library (which emits NO CQL) is excluded from emitted-name collision
-  // registration — otherwise an activities-only source whose name happens to match a
-  // layer name would raise a false `layered-name-collision` for a file never written.
-  const decisionBearingNames = emitClosure
-    .filter((e) => e.name !== null && e.name !== "" && e.ast.statements.some((s) => s.type === "Decision"))
-    .map((e) => e.name as string);
-  const willSuppress = (entry: RegistryEntry): boolean =>
-    isActivitiesOnlyLibrary(entry.ast) && decisionBearingNames.length === 1;
 
   // Slice 2 (layeredEmit) — generated-name collision preflight. The full set
   // of emitted CQL library names = every UNSPLIT entry's own name PLUS every
@@ -695,16 +723,16 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
     // invalid CQL.
     if (entry.name === null || entry.name === "") continue;
 
-    // #186 follow-up — SUPPRESS an activities-only library's empty CQL when it is
-    // consumed by exactly one decision-bearing library. Skip ALL emit for it (no
-    // `.cql`, no manifest entry) and record the rebind so the FHIR lane drops its
-    // hollow Library and points its ADs/recommendation-PDs at the consumer's
-    // Interface. This is the ONLY place the gate runs (same `willSuppress` predicate
-    // the collision preflight above consults, so the two never disagree).
+    // #186/#201 — SUPPRESS an activities-only library's empty CQL, rebinding its
+    // ADs/recommendation-PDs onto the ROOT decision library's Interface. Skip ALL emit
+    // for it (no `.cql`, no manifest entry) and record the rebind so the FHIR lane
+    // drops its hollow Library. This is the ONLY place the gate runs (same
+    // `willSuppress` predicate the collision preflight above consults — never disagree).
     if (willSuppress(entry)) {
       suppressedActivityBindings.push({
         suppressedLibraryName: entry.name,
-        consumerLibraryName: decisionBearingNames[0],
+        // `willSuppress` is true ⇒ `rootConsumer` is a defined string.
+        consumerLibraryName: rootConsumer as string,
       });
       continue;
     }

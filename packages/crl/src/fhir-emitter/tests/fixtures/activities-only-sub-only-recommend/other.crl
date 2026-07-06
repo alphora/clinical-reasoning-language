@@ -1,4 +1,4 @@
-# two-decisions — Other (a delegated sub-decision); ALSO recommends the shared Shared lib.
+# sub-only — Other, a delegated sub-decision; the ONLY lib that recommends Shared.
 library "Other".
 
 concept "C2":

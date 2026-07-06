@@ -1,9 +1,9 @@
 # activities-only-standalone — a shared disposition library used with NO decision library
 library "Dispositions".
 
-// Used with NO decision library in the closure. Suppression is keyed on exactly-one
-// decision-bearing sibling; with zero, the library is NOT suppressed (unchanged
-// pre-#186 behavior) — no rebind is recorded.
+// The emit entry IS this activities-only library — the closure has NO graph-root
+// decision library to rebind onto, so it is NOT suppressed (unchanged pre-#186
+// behavior): it keeps its own CQL + FHIR Library, self-bound. No rebind is recorded.
 
 activity "Deny":
 - request CPGCommunicationRequest.

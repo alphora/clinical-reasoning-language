@@ -2,6 +2,6 @@
   "name": "two-decisions-fixture",
   "version": "1.0.0",
   "private": true,
-  "description": "#186 follow-up — an activities-only 'Shared' library pulled into a closure with TWO decision-bearing libraries (Main + Other). Suppression requires EXACTLY ONE decision sibling; with two the consumer is ambiguous, so Shared is NOT suppressed (keeps its own CQL + Library).",
+  "description": "#201 — chained/multi-decision: Main (root) recommends the shared activities-only 'Shared' lib AND delegates via `use decision` to Other, which ALSO recommends Shared. Shared has two recommender libraries but binds to the ROOT (Main) Interface — proving the fix keys on the entry/root decision, not a recommender count.",
   "crl": { "canonicalBase": "http://example.org/crl/two-decisions", "status": "draft", "experimental": true, "date": "2020-01-01T00:00:00.000Z" }
 }

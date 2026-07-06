@@ -360,3 +360,39 @@ function visitActivityRefs(activity: Activity, visit: (ref: ReferenceName) => vo
   const wc = activity.body.withClause;
   if (wc?.terminologyReference !== undefined) visit(wc.terminologyReference);
 }
+
+// #201 — visit ONLY the `use decision` refs of a decision (the `decisionName` of a
+// non-`RecommendActivity` action), so callers can build the use-decision edge set.
+function visitUseDecisionRefs(decision: Decision, visit: (ref: ReferenceName) => void): void {
+  function visitBranch(branch: BranchBlock): void {
+    const body = branch.body;
+    if (body.type === "ActionStatement") {
+      if (body.action.type !== "RecommendActivity") visit(body.action.decisionName);
+      return;
+    }
+    for (const stmt of body.statements) {
+      if (stmt.type === "WhenBlock" || stmt.type === "OtherwiseBlock") visitBranch(stmt);
+      else if (stmt.action.type !== "RecommendActivity") visit(stmt.action.decisionName);
+    }
+  }
+  for (const branch of decision.body.statements) visitBranch(branch);
+}
+
+/**
+ * #201 — the set of library qualifiers a library's decisions `use decision` INTO
+ * (cross-library delegation targets). Used to find the closure's GRAPH-ROOT decision
+ * library (a decision library that is never a `use decision` target — zero incoming
+ * edges): the shared activities-only determination library rebinds onto that root's
+ * Interface, regardless of which/how many sub-decisions recommend its activities.
+ */
+export function usedDecisionLibraries(ast: { statements: ReadonlyArray<{ type: string }> }): Set<string> {
+  const libs = new Set<string>();
+  for (const stmt of ast.statements) {
+    if (stmt.type !== "Decision") continue;
+    visitUseDecisionRefs(stmt as Decision, (ref) => {
+      const lib = getRefLibrary(ref);
+      if (lib !== null) libs.add(lib);
+    });
+  }
+  return libs;
+}

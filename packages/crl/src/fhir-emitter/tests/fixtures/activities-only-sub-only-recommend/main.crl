@@ -1,4 +1,4 @@
-# two-decisions — Main (the ROOT/entry decision); recommends Shared AND delegates to Other.
+# sub-only — Main is the GRAPH-ROOT (delegates OUT to Other; does NOT recommend Shared).
 library "Main".
 
 concept "C1":
@@ -8,5 +8,5 @@ concept "C1":
 
 decision "Main Decision":
 first:
-- when "C1" then recommend activity "Shared"."Deny".
+- when "C1" then use decision "Other"."Other Decision".
 - otherwise then use decision "Other"."Other Decision".

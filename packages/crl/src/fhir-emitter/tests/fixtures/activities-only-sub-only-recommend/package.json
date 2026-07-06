@@ -1,0 +1,7 @@
+{
+  "name": "sub-only-recommend-fixture",
+  "version": "1.0.0",
+  "private": true,
+  "description": "#201 — the shared activities-only 'Shared' lib is recommended ONLY by a delegated sub-decision (Other), NOT by the root (Main, which only delegates via `use decision`). Shared must still bind to the GRAPH-ROOT (Main) Interface — proving the rule keys on the graph root, not a recommender.",
+  "crl": { "canonicalBase": "http://example.org/crl/sub-only", "status": "draft", "experimental": true, "date": "2020-01-01T00:00:00.000Z" }
+}
