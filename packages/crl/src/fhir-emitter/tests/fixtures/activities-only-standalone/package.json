@@ -1,0 +1,12 @@
+{
+  "name": "activities-only-standalone",
+  "version": "1.0.0",
+  "private": true,
+  "description": "#186 follow-up — a STANDALONE activities-only library (no decision sibling). Suppression must NOT trigger: the library keeps its own CQL + FHIR Library (an activities-only lib used alone still needs a policy-scoped library[] scope for its inline dynamicValues).",
+  "crl": {
+    "canonicalBase": "http://example.org/crl/activities-only-standalone",
+    "status": "draft",
+    "experimental": true,
+    "date": "2020-01-01T00:00:00.000Z"
+  }
+}

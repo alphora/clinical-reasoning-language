@@ -305,6 +305,30 @@ const CROSS_LIB_ACTIVITY_ROOT = join(
   "src/fhir-emitter/tests/fixtures/cross-lib-activity/root.crl",
 );
 
+// #186 follow-up NEGATIVE — a STANDALONE activities-only library (no decision
+// sibling). Suppression is keyed on exactly-one decision-bearing sibling; with zero,
+// the library is NOT suppressed and keeps its own CQL + FHIR Library (self-bound).
+const ACTIVITIES_ONLY_STANDALONE = join(
+  ROOT,
+  "src/fhir-emitter/tests/fixtures/activities-only-standalone/dispositions.crl",
+);
+
+// #186 follow-up NEGATIVE — an activities-only 'Shared' lib in a closure with TWO
+// decision-bearing libs (Main delegates to Other; Other recommends Shared). The
+// consumer is ambiguous (>1), so Shared is NOT suppressed — pins the exactly-one gate.
+const ACTIVITIES_ONLY_TWO_DECISIONS = join(
+  ROOT,
+  "src/fhir-emitter/tests/fixtures/activities-only-two-decisions/main.crl",
+);
+
+// #186 follow-up — a suppressed activities-only 'Shared' lib whose sole consumer
+// (Root) is NONE-KIND (coded from, no `code is`, no Interface). Exercises
+// suffixForSource's name-keeping-Root fallback (critical (c) — no throw).
+const ACTIVITIES_ONLY_NONEKIND_CONSUMER = join(
+  ROOT,
+  "src/fhir-emitter/tests/fixtures/activities-only-nonekind-consumer/root.crl",
+);
+
 // #196 negative — Root recommends `"Shared"."Nonexistent Activity"`: the Shared
 // library is real and in the closure, but has NO activity by that name, so the
 // resolver's `index.activities` guard misses → returns null (fail-closed).
@@ -758,31 +782,119 @@ describe("closureOrchestrator — cross-library activity recommend (#196)", () =
     );
     expect(emittedUrls.has(EXPECTED_SHARED_DENY_REC_URL)).toBe(true);
 
-    // (5) THE CQL-CLOSURE FIX (Task A): the cross-lib `recommend` alone must pull
-    // Shared into the CQL emit closure (`collectCqlEmitRefs` now walks Decision
-    // refs) so Shared's CQL is emitted. Proof: Shared's FHIR Library is emitted with
-    // a content url pointing at Shared.cql, AND Inv 4 does NOT fire — the content url
-    // resolves to an emitted CQL manifest entry. Pre-fix, Shared was in the FHIR
-    // closure but NOT the CQL manifest, so this Library dangled at Inv 4
-    // (`library-content-url-unresolved`).
+    // (5) #186 follow-up — Shared is an ACTIVITIES-ONLY library (only `activity`
+    // blocks → its CQL would be a defines-free shell). Consumed by exactly one
+    // decision library (Root), its empty CQL + hollow Library are SUPPRESSED; instead
+    // its AD + recommendation PD REBIND onto the consumer's Interface Library. This
+    // SUPERSEDES the #196 approach of emitting an empty Shared.cql to satisfy a
+    // dangling Library — there is no longer a Shared Library to dangle. Proof:
+    //   - NO `Shared` FHIR Library is emitted;
+    //   - Shared's AD + recommendation PD `library[]` point at Root's Interface Library
+    //     (read off the emitted resource, not a hardcoded URL — the bind target must be
+    //     an ACTUALLY-emitted Library); and
+    //   - Inv 4 still does not fire (no Library referencing a missing Shared.cql).
     const sharedLib = result.resources.find(
       (r) => r.resourceType === "Library" && (r.resource as { title?: string }).title === "Shared",
     );
-    expect(sharedLib).toBeDefined();
-    const sharedContent = (sharedLib!.resource as { content?: Array<{ url?: string }> }).content;
-    expect(sharedContent?.[0]?.url).toBe("../../cql/Shared.cql");
+    expect(sharedLib).toBeUndefined();
+    const rootInterfaceLib = result.resources.find(
+      (r) => r.resourceType === "Library" && ((r.resource as { name?: string }).name ?? "").endsWith("Interface"),
+    );
+    expect(rootInterfaceLib).toBeDefined();
+    const rootInterfaceUrl = (rootInterfaceLib!.resource as { url?: string }).url;
+    expect((sharedAd!.resource as { library?: string[] }).library).toEqual([rootInterfaceUrl]);
+    expect((sharedRec!.resource as { library?: string[] }).library).toEqual([rootInterfaceUrl]);
     expect(result.errors.some((e) => e.kind === "library-content-url-unresolved")).toBe(false);
   });
 
-  it("de-mask (Task A CQL closure): Shared's CQL is in the CQL manifest via the cross-lib recommend ALONE — no `include \"Shared\"`", () => {
-    // Direct proof at the CQL lane: `emitCQLImports` walks the SAME emit closure and
-    // must list a `Shared` library in `cqlByLibrary` even though root.crl carries no
-    // `include "Shared"`. Before Task A, `collectCqlEmitRefs` walked only includes +
-    // Concept refs, so a cross-lib `recommend activity` left Shared out of the CQL
-    // manifest entirely.
+  it("de-mask (#186 suppression): Shared is an activities-only lib consumed by ONE decision lib — its empty CQL is SUPPRESSED (absent from the manifest) and a rebind is recorded", () => {
+    // Direct proof at the CQL lane (the SINGLE source of the suppression decision):
+    // `emitCQLImports` drops Shared from `cqlByLibrary` (no empty shell CQL) and
+    // records the rebind the FHIR lane consumes verbatim. Under #196 this asserted
+    // Shared WAS in the manifest (to back a dangling Library); #186 removes both.
     const cql = emitCQLImports(CROSS_LIB_ACTIVITY_ROOT);
     expect(cql.success).toBe(true);
+    expect(cql.cqlByLibrary.some((e) => e.libraryName === "Shared")).toBe(false);
+    expect(cql.suppressedActivityBindings).toEqual([
+      { suppressedLibraryName: "Shared", consumerLibraryName: "Root" },
+    ]);
+  });
+
+  it("NEGATIVE (#186 fallback): a STANDALONE activities-only library (no decision sibling) is NOT suppressed — keeps its own CQL + FHIR Library, self-bound", () => {
+    // Suppression requires EXACTLY ONE decision-bearing sibling as the rebind consumer.
+    // With zero (a disposition library emitted alone), the pre-#186 behavior is
+    // preserved: the library keeps its own (defines-free) CQL + a FHIR Library, and its
+    // ActivityDefinition binds to that own Library — an activities-only library used
+    // alone still needs a policy-scoped `library[]` scope for its inline dynamicValues.
+    const cql = emitCQLImports(ACTIVITIES_ONLY_STANDALONE);
+    expect(cql.success).toBe(true);
+    expect(cql.suppressedActivityBindings).toEqual([]);
+    expect(cql.cqlByLibrary.some((e) => e.libraryName === "Dispositions")).toBe(true);
+
+    const result = emitFhirDefFromPath(ACTIVITIES_ONLY_STANDALONE, { clock: FIXED_CLOCK });
+    expect(result.success).toBe(true);
+    const ownLib = result.resources.find(
+      (r) => r.resourceType === "Library" && (r.resource as { title?: string }).title === "Dispositions",
+    );
+    expect(ownLib).toBeDefined();
+    const denyAd = result.resources.find(
+      (r) => r.resourceType === "ActivityDefinition" && r.sourceName === "Deny",
+    );
+    expect(denyAd).toBeDefined();
+    expect((denyAd!.resource as { library?: string[] }).library).toEqual([
+      (ownLib!.resource as { url?: string }).url,
+    ]);
+  });
+
+  it("NEGATIVE (#186 exactly-one gate): an activities-only lib with TWO decision-bearing siblings is NOT suppressed (ambiguous consumer)", () => {
+    // Suppression requires EXACTLY ONE decision sibling. With two (Main + Other), the
+    // consumer is ambiguous, so Shared keeps its own CQL + Library. This pins the
+    // `=== 1` gate — a regression to `>= 1` (pick-first) would fail here.
+    const cql = emitCQLImports(ACTIVITIES_ONLY_TWO_DECISIONS);
+    expect(cql.success).toBe(true);
+    expect(cql.suppressedActivityBindings).toEqual([]);
     expect(cql.cqlByLibrary.some((e) => e.libraryName === "Shared")).toBe(true);
+
+    const result = emitFhirDefFromPath(ACTIVITIES_ONLY_TWO_DECISIONS, { clock: FIXED_CLOCK });
+    expect(result.success).toBe(true);
+    expect(
+      result.resources.some(
+        (r) => r.resourceType === "Library" && (r.resource as { title?: string }).title === "Shared",
+      ),
+    ).toBe(true);
+  });
+
+  it("#186 suppression onto a NONE-KIND consumer: Shared rebinds to the consumer's name-keeping Root Library (suffixForSource fallback, no throw)", () => {
+    // Critical (c) coverage: the sole consumer (Root) is none-kind (coded from, no
+    // `code is`, so no Interface). suffixForSource falls through interface → name-
+    // keeping-Root → binds the suppressed Shared AD onto Root's base Library. No throw
+    // (the round-1 hazard was a bare `.find(interface)` deref), and the bind target is
+    // an actually-emitted Library.
+    const cql = emitCQLImports(ACTIVITIES_ONLY_NONEKIND_CONSUMER);
+    expect(cql.success).toBe(true);
+    expect(cql.suppressedActivityBindings).toEqual([
+      { suppressedLibraryName: "Shared", consumerLibraryName: "Root" },
+    ]);
+
+    const result = emitFhirDefFromPath(ACTIVITIES_ONLY_NONEKIND_CONSUMER, { clock: FIXED_CLOCK });
+    expect(result.success).toBe(true);
+    expect(
+      result.resources.some(
+        (r) => r.resourceType === "Library" && (r.resource as { title?: string }).title === "Shared",
+      ),
+    ).toBe(false);
+    // Root is none-kind → ONE name-keeping base Library (no Interface).
+    const rootLib = result.resources.find(
+      (r) => r.resourceType === "Library" && (r.resource as { name?: string }).name === "Root",
+    );
+    expect(rootLib).toBeDefined();
+    const denyAd = result.resources.find(
+      (r) => r.resourceType === "ActivityDefinition" && r.sourceName === "Deny",
+    );
+    expect(denyAd).toBeDefined();
+    expect((denyAd!.resource as { library?: string[] }).library).toEqual([
+      (rootLib!.resource as { url?: string }).url,
+    ]);
   });
 
   it("NEGATIVE — a qualified `recommend activity \"Shared\".\"Nonexistent Activity\"` fails CLOSED (unresolved-activity, no silent resolve)", () => {

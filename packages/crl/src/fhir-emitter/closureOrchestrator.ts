@@ -40,7 +40,7 @@ import { getRefLibrary, getRefName, isQualifiedRef } from "../ast/types";
 import { resolveDispositionConfig } from "../dispositions";
 import { computeFhirEmitClosure } from "../imports/computeEmitClosure";
 import { safeOutputFilename } from "../imports/safeOutputFilename";
-import { emitCQLImports } from "../imports/emit";
+import { emitCQLImports, type SuppressedActivityBinding } from "../imports/emit";
 import type { PerLibraryEmit } from "../imports/emit";
 import { resolveImports } from "../imports/index";
 import type { ImportDiagnostic, ResolvedGraph } from "../imports/types";
@@ -977,6 +977,12 @@ export function emitFhirDefClosure(
   // `[]` → every source falls back to the single-entry (per-CRL) path, which is
   // byte-identical to pre-slice-4c behavior.
   cqlByLibrary: ReadonlyArray<PerLibraryEmit> = [],
+  // #186 follow-up — the CQL lane's suppression decisions (activities-only libraries
+  // whose empty CQL was dropped, each paired with its consumer decision library).
+  // CONSUMED verbatim: the FHIR lane skips the hollow Library for a suppressed source
+  // and rebinds its ADs/recommendation-PDs onto the consumer's Interface. NEVER
+  // recomputed here (the FHIR closure is a strict superset and could disagree).
+  suppressedActivityBindings: ReadonlyArray<SuppressedActivityBinding> = [],
 ): FhirDefClosureEmitResult {
   const errors: CRLError[] = [];
   const unmatched: UnmatchedReference[] = [];
@@ -992,6 +998,12 @@ export function emitFhirDefClosure(
     list.push(entry);
     manifestBySource.set(entry.sourceLibraryName, list);
   }
+  // #186 follow-up — suppressed activities-only source → its consumer decision
+  // library (the CQL lane's decision, consumed verbatim). A source named here emits
+  // NO Library and rebinds its ADs/recommendation-PDs onto the consumer's Interface.
+  const suppressedConsumerByLib = new Map<string, string>(
+    suppressedActivityBindings.map((b) => [b.suppressedLibraryName, b.consumerLibraryName] as const),
+  );
   // Per-Library expected CQL filename — input to the content-url closure
   // invariant (Inv 4). Keyed by each emitted CQL library's identity
   // (`cqlLibraryName`, which the FHIR lane stamps as the Library `sourceName`) so
@@ -1208,6 +1220,50 @@ export function emitFhirDefClosure(
     // one source of truth the CQL split stamps alongside `S` — never by slugging.
     const entryByLayer = (layer: string): PerLibraryEmit | undefined =>
       manifestEntries.find((e) => e.layer === layer);
+    // #186 follow-up — the `library[]` identity ANY source's decision/activity/
+    // recommendation surface resolves to: its Interface re-export if it split, else
+    // its name-keeping Root base (#198-disambiguated when a `none` sibling), else
+    // `undefined` (bare `policyIdBase`). Factored so the SAME ladder serves both a
+    // library binding to ITSELF and a suppressed activities-only library binding to
+    // its consumer decision library — no drift between the two paths.
+    const suffixForSource = (sourceName: string): string | undefined => {
+      const entries = manifestBySource.get(sourceName) ?? [];
+      const iface = entries.find((e) => e.role === "interface");
+      if (iface) return identityForEntry(iface);
+      const nameRoot = entries.find(isNameKeepingRoot);
+      return nameRoot ? identityForEntry(nameRoot) : undefined;
+    };
+    const sourceHasInterface = (sourceName: string): boolean =>
+      (manifestBySource.get(sourceName) ?? []).some((e) => e.role === "interface");
+    // #186 follow-up — is THIS source a suppressed activities-only library? If so it
+    // emits NO Library, and its ADs/recommendation-PDs rebind onto `suppressConsumer`
+    // (the CQL lane's chosen decision library), NOT its own (empty) manifest.
+    const suppressConsumer = suppressedConsumerByLib.get(lib.libraryName);
+    const isSuppressed = suppressConsumer !== undefined;
+    // Defensive (belt-and-suspenders): a healthy decision library always emits a
+    // rebind target — an `interface` entry OR a name-keeping Root. Check the ACTUAL
+    // ladder `suffixForSource` resolves (not merely a non-empty manifest): a
+    // malformed manifest with entries but neither an interface nor a name-keeping
+    // root would leave `suffixForSource` → undefined and bind the AD to a bare policy
+    // root that may not be emitted. Surface a structured error so a would-be silent
+    // dangling `library[]` becomes a fail-closed emit. Unreachable on the integrated
+    // `emitFhirDefFromPath` path (the same `emitCQLImports` result feeds both the
+    // manifest and the bindings, so they cannot disagree); it guards the exported
+    // `emitFhirDefClosure` against a hand-built mismatched (manifest, bindings) pair.
+    if (isSuppressed) {
+      const consumerEntries = manifestBySource.get(suppressConsumer) ?? [];
+      const hasRebindTarget = consumerEntries.some((e) => e.role === "interface" || isNameKeepingRoot(e));
+      if (!hasRebindTarget) {
+        errors.push({
+          type: "Validation",
+          kind: "emit-activities-suppress-target-unresolved",
+          message:
+            `Activities-only library "${lib.libraryName}" was suppressed to rebind onto consumer ` +
+            `"${suppressConsumer}", but that decision library emitted no Interface or name-keeping Root ` +
+            `Library, so the rebound ActivityDefinition/Recommendation library[] would dangle.`,
+        });
+      }
+    }
     const emitOneLibrary = (
       libraryName: string,
       libraryIdentity: string | undefined,
@@ -1233,7 +1289,12 @@ export function emitFhirDefClosure(
       unmatched.push(...libResult.unmatched);
     };
 
-    if (manifestEntries.length <= 1) {
+    if (isSuppressed) {
+      // #186 follow-up — a suppressed activities-only library emits NO FHIR Library.
+      // Its ADs/recommendation-PDs rebind onto the consumer decision library's
+      // Interface (below). Its manifest is empty and its `.cql` was never written, so
+      // emitting a Library here would dangle at Inv 4 (content-url-unresolved).
+    } else if (manifestEntries.length <= 1) {
       // Single-entry / no-manifest fallback (byte-identical to pre-slice-4c). Use
       // the manifest entry's outputFilename when present (it equals the source
       // filename for a single-entry source) so a split that wrote a differently-
@@ -1368,6 +1429,18 @@ export function emitFhirDefClosure(
         ? identityForEntry(nameKeepingRootEntry)
         : undefined;
 
+    // #186 follow-up — the `library[]` + interface-scope the ActivityDefinitions and
+    // recommendation PlanDefinitions bind to. A SUPPRESSED activities-only library
+    // rebinds onto the CONSUMER decision library (its own manifest is empty); a normal
+    // library binds to itself (byte-identical to before). `interfaceScoped` MUST track
+    // the SAME target — otherwise the activity.ts terminology-interface guard fires
+    // (or fails to fire) against the wrong scope, letting a terminology-bound `with`
+    // emit a `text/cql-identifier` dynamicValue that dangles in the consumer Interface.
+    const activityLibrarySuffix =
+      suppressConsumer !== undefined ? suffixForSource(suppressConsumer) : libraryReferenceSuffix;
+    const activityInterfaceScoped =
+      suppressConsumer !== undefined ? sourceHasInterface(suppressConsumer) : interfaceEntry !== undefined;
+
     // The LocalSource Library identity — where each `code is` define lives, the
     // target of the case-feature `cpg-featureExpression.reference`. `LocalSource`
     // is a `role:"layer"` manifest entry (imports/emit.ts maps LocalSource →
@@ -1388,8 +1461,8 @@ export function emitFhirDefClosure(
       metadata,
       sourceLibResolvers.terminologyResolver,
       resolvedOpts,
-      libraryReferenceSuffix,
-      interfaceEntry !== undefined,
+      activityLibrarySuffix,
+      activityInterfaceScoped,
     );
     resources.push(...actResult.resources);
     errors.push(...actResult.errors);
@@ -1401,7 +1474,7 @@ export function emitFhirDefClosure(
       lib.libraryName,
       metadata,
       resolvedOpts,
-      libraryReferenceSuffix,
+      activityLibrarySuffix,
     );
     resources.push(...recResult.resources);
     errors.push(...recResult.errors);
@@ -1712,6 +1785,7 @@ export function emitFhirDefFromPath(
     metadata,
     { ...opts, dispositionConfig },
     cqlImports.cqlByLibrary,
+    cqlImports.suppressedActivityBindings ?? [],
   );
   // Round-5 gpt55 [important]: fold importDiagnostics + metadataErrors
   // into success. Otherwise MCP can return success:true with fatal

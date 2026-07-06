@@ -3,8 +3,10 @@ library "Shared".
 
 // A plain CommunicationRequest activity that a decision in ANOTHER library
 // (Root) recommends via a cross-library qualified ref `"Shared"."Shared Deny"`.
-// Lib B is single-layer (no `code is`, no decision), so it stays one `Shared`
-// CQL library and emits its own ActivityDefinition + Recommendation PlanDefinition.
+// Lib B is ACTIVITIES-ONLY (no `code is`, no decision). Post-#186, consumed by the
+// single decision library Root, its empty CQL + hollow Library are SUPPRESSED: no
+// `Shared` CQL/Library is emitted, and its ActivityDefinition + Recommendation
+// PlanDefinition rebind their `library[]` onto Root's Interface library.
 activity "Shared Deny":
 - request CPGCommunicationRequest.
 - with `Denied.`.

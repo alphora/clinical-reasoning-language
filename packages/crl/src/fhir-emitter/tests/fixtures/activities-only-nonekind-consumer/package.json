@@ -1,0 +1,7 @@
+{
+  "name": "nonekind-consumer-fixture",
+  "version": "1.0.0",
+  "private": true,
+  "description": "#186 follow-up — a suppressed activities-only 'Shared' library whose sole consumer decision library (Root) is NONE-KIND (coded from, no `code is`, no Interface). Exercises suffixForSource's name-keeping-Root fallback (critical (c) — no throw, binds to the consumer's base Library).",
+  "crl": { "canonicalBase": "http://example.org/crl/nonekind-consumer", "status": "draft", "experimental": true, "date": "2020-01-01T00:00:00.000Z" }
+}

@@ -105,6 +105,21 @@ export interface PerLibraryEmit {
   localDomainId?: string;
 }
 
+// #186 follow-up — a shared, activities-only library (only `activity` blocks; no
+// decision/concept/terminology) emits an EMPTY CQL file (header + includes +
+// `context Patient`, zero defines) plus a hollow FHIR Library. When such a library
+// is consumed by exactly one decision-bearing library in the same closure, the CQL
+// lane SUPPRESSES its empty CQL and records this binding so the FHIR lane can (a)
+// skip the hollow Library and (b) rebind the library's ActivityDefinitions /
+// recommendation PlanDefinitions onto the consumer decision library's Interface.
+// The CQL lane is the SINGLE decision-maker (it never happens in the FHIR lane,
+// whose closure is a strict superset and could disagree — see closureOrchestrator
+// contract at :970). The FHIR lane CONSUMES this, it does not recompute.
+export interface SuppressedActivityBinding {
+  suppressedLibraryName: string;
+  consumerLibraryName: string;
+}
+
 export interface EmitImportsResult {
   success: boolean;
   graph: ResolvedGraph;
@@ -112,7 +127,28 @@ export interface EmitImportsResult {
   // One emit per library in the per-CRL closure. Each entry is a complete
   // CQL library file. Empty on failure.
   cqlByLibrary: PerLibraryEmit[];
+  // #186 follow-up — activities-only libraries whose empty CQL was suppressed,
+  // each paired with the decision library its ADs/recommendation-PDs rebind to.
+  suppressedActivityBindings?: SuppressedActivityBinding[];
   errors?: CRLError[];
+}
+
+/**
+ * #186 follow-up — a library is "activities-only" iff every statement is an
+ * `activity` (and there is at least one). Such a library produces NO CQL defines,
+ * so its emitted `.cql` is a bare header shell. The predicate is deliberately
+ * strict: ANY non-Activity statement (Decision / Concept / Terminology / Parameter
+ * / …) disqualifies it — so a library that declares its OWN `terminology` (whose
+ * ValueSets would be orphaned by suppression) never qualifies. Note this does NOT
+ * exclude an activity carrying a terminology-bound `with` (that lives INSIDE an
+ * Activity statement): such a library still qualifies, but the rebind onto the
+ * consumer Interface is fail-closed by the `emit-activity-terminology-interface-
+ * unsupported` guard (activity.ts) because the FHIR lane passes the CONSUMER's
+ * interface-scope. Pure AST predicate → identical in both lanes, no closure drift.
+ */
+export function isActivitiesOnlyLibrary(ast: CRL): boolean {
+  const stmts = ast.statements;
+  return stmts.length > 0 && stmts.every((s) => s.type === "Activity");
 }
 
 // safeOutputFilename factored to ./safeOutputFilename so the CRL→FHIR-def
@@ -566,6 +602,20 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
     }
   }
 
+  // #186 follow-up — decision-bearing libraries in THIS closure (the CQL closure,
+  // the single source of truth for the suppression decision). An activities-only
+  // library is suppressed only when EXACTLY ONE exists (its unambiguous consumer);
+  // 0 (standalone) or >1 (ambiguous) → unchanged (the library keeps its own empty
+  // Root, matching pre-#186 behavior). Computed BEFORE the collision preflight so a
+  // suppressed library (which emits NO CQL) is excluded from emitted-name collision
+  // registration — otherwise an activities-only source whose name happens to match a
+  // layer name would raise a false `layered-name-collision` for a file never written.
+  const decisionBearingNames = emitClosure
+    .filter((e) => e.name !== null && e.name !== "" && e.ast.statements.some((s) => s.type === "Decision"))
+    .map((e) => e.name as string);
+  const willSuppress = (entry: RegistryEntry): boolean =>
+    isActivitiesOnlyLibrary(entry.ast) && decisionBearingNames.length === 1;
+
   // Slice 2 (layeredEmit) — generated-name collision preflight. The full set
   // of emitted CQL library names = every UNSPLIT entry's own name PLUS every
   // SPLIT entry's generated layer names (`<X> Concepts` / `<X> Asserted` /
@@ -587,6 +637,9 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
     };
     for (const entry of emitClosure) {
       if (entry.name === null || entry.name === "") continue;
+      // A suppressed activities-only library emits NO CQL — exclude it from the
+      // emitted-name set so it can never trigger a collision for an unwritten file.
+      if (willSuppress(entry)) continue;
       // R2 — register the FULL emitted-name set for this entry via the shared
       // split-plan. `full`/`interface` register the source-typed layer names (+
       // the Interface name for `interface`); `none` registers just `<lib>`. The
@@ -634,12 +687,27 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
 
   // Emit each library independently.
   const cqlByLibrary: PerLibraryEmit[] = [];
+  const suppressedActivityBindings: SuppressedActivityBinding[] = [];
   for (const entry of emitClosure) {
     // Skip parse-error placeholders (`null` name or empty-string library
     // synthesized after a parse error). The parse-failure diagnostic is
     // the real signal; emitting a library without a name would produce
     // invalid CQL.
     if (entry.name === null || entry.name === "") continue;
+
+    // #186 follow-up — SUPPRESS an activities-only library's empty CQL when it is
+    // consumed by exactly one decision-bearing library. Skip ALL emit for it (no
+    // `.cql`, no manifest entry) and record the rebind so the FHIR lane drops its
+    // hollow Library and points its ADs/recommendation-PDs at the consumer's
+    // Interface. This is the ONLY place the gate runs (same `willSuppress` predicate
+    // the collision preflight above consults, so the two never disagree).
+    if (willSuppress(entry)) {
+      suppressedActivityBindings.push({
+        suppressedLibraryName: entry.name,
+        consumerLibraryName: decisionBearingNames[0],
+      });
+      continue;
+    }
 
     // R2 — ONE shared split-plan drives BOTH the preflight (above) and this emit
     // loop. `full` (decision-less, multi-layer) emits the source-typed split;
@@ -822,5 +890,6 @@ export function emitCQLImports(rootPath: string): EmitImportsResult {
     graph,
     importDiagnostics: graph.diagnostics,
     cqlByLibrary,
+    suppressedActivityBindings,
   };
 }

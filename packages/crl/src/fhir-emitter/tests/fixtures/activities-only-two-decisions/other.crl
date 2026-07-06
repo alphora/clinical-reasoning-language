@@ -1,0 +1,10 @@
+# two-decisions — Other (decision lib #2); recommends the activities-only Shared lib.
+library "Other".
+
+concept "C2":
+- type is Condition.
+- value type is boolean.
+- code is `c2`.
+
+decision "Other Decision":
+- when "C2" then recommend activity "Shared"."Deny".

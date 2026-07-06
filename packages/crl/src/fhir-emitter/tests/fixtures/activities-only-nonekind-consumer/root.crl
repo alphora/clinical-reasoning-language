@@ -1,0 +1,12 @@
+# nonekind-consumer — Root: a NONE-KIND decision lib (coded from, no `code is`).
+library "Root".
+
+concept "Trigger":
+- type is Encounter.
+- coded from "Trigger Valueset".
+
+terminology "Trigger Valueset":
+- valueset is `urn:trigger-vs`.
+
+decision "Triage":
+- when "Trigger" then recommend activity "Shared"."Deny".

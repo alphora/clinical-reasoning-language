@@ -1,0 +1,10 @@
+# two-decisions — Main (decision lib #1); delegates to Other's decision.
+library "Main".
+
+concept "C1":
+- type is Condition.
+- value type is boolean.
+- code is `c1`.
+
+decision "Main Decision":
+- when "C1" then use decision "Other"."Other Decision".

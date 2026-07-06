@@ -1,0 +1,6 @@
+# nonekind-consumer — Shared (ACTIVITIES-ONLY), consumed by the none-kind Root.
+library "Shared".
+
+activity "Deny":
+- request CPGCommunicationRequest.
+- with `Denied.`.

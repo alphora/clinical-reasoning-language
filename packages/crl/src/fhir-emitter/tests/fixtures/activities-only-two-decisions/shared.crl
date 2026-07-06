@@ -1,0 +1,6 @@
+# two-decisions — Shared (ACTIVITIES-ONLY). Two decision siblings => NOT suppressed.
+library "Shared".
+
+activity "Deny":
+- request CPGCommunicationRequest.
+- with `Denied.`.
