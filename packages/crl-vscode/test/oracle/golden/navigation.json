@@ -4,7 +4,7 @@
     "result": {
       "kind": "location",
       "uri": {
-        "fsPath": "$TMP\\root.crl"
+        "fsPath": "$TMP/root.crl"
       },
       "range": {
         "start": {
@@ -23,7 +23,7 @@
     "result": {
       "kind": "location",
       "uri": {
-        "fsPath": "$TMP\\root.crl"
+        "fsPath": "$TMP/root.crl"
       },
       "range": {
         "start": {
@@ -55,7 +55,7 @@
       {
         "kind": "location",
         "uri": {
-          "fsPath": "$TMP\\root.crl"
+          "fsPath": "$TMP/root.crl"
         },
         "range": {
           "start": {
@@ -71,7 +71,7 @@
       {
         "kind": "location",
         "uri": {
-          "fsPath": "$TMP\\root.crl"
+          "fsPath": "$TMP/root.crl"
         },
         "range": {
           "start": {
@@ -92,7 +92,7 @@
       {
         "kind": "location",
         "uri": {
-          "fsPath": "$TMP\\root.crl"
+          "fsPath": "$TMP/root.crl"
         },
         "range": {
           "start": {
@@ -259,7 +259,7 @@
         "location": {
           "kind": "location",
           "uri": {
-            "fsPath": "$TMP\\root.crl"
+            "fsPath": "$TMP/root.crl"
           },
           "range": {
             "start": {
@@ -281,7 +281,7 @@
         "location": {
           "kind": "location",
           "uri": {
-            "fsPath": "$TMP\\root.crl"
+            "fsPath": "$TMP/root.crl"
           },
           "range": {
             "start": {
@@ -303,7 +303,7 @@
         "location": {
           "kind": "location",
           "uri": {
-            "fsPath": "$TMP\\root.crl"
+            "fsPath": "$TMP/root.crl"
           },
           "range": {
             "start": {
@@ -325,7 +325,7 @@
         "location": {
           "kind": "location",
           "uri": {
-            "fsPath": "$TMP\\root.crl"
+            "fsPath": "$TMP/root.crl"
           },
           "range": {
             "start": {
@@ -352,7 +352,7 @@
         "location": {
           "kind": "location",
           "uri": {
-            "fsPath": "$TMP\\root.crl"
+            "fsPath": "$TMP/root.crl"
           },
           "range": {
             "start": {
@@ -374,7 +374,7 @@
         "location": {
           "kind": "location",
           "uri": {
-            "fsPath": "$TMP\\root.crl"
+            "fsPath": "$TMP/root.crl"
           },
           "range": {
             "start": {
@@ -396,7 +396,7 @@
         "location": {
           "kind": "location",
           "uri": {
-            "fsPath": "$TMP\\root.crl"
+            "fsPath": "$TMP/root.crl"
           },
           "range": {
             "start": {
@@ -418,7 +418,7 @@
         "location": {
           "kind": "location",
           "uri": {
-            "fsPath": "$TMP\\root.crl"
+            "fsPath": "$TMP/root.crl"
           },
           "range": {
             "start": {
@@ -473,7 +473,7 @@
       "edits": [
         {
           "uri": {
-            "fsPath": "$TMP\\root.crl"
+            "fsPath": "$TMP/root.crl"
           },
           "range": {
             "start": {
@@ -489,7 +489,7 @@
         },
         {
           "uri": {
-            "fsPath": "$TMP\\root.crl"
+            "fsPath": "$TMP/root.crl"
           },
           "range": {
             "start": {
@@ -513,7 +513,7 @@
       "edits": [
         {
           "uri": {
-            "fsPath": "$TMP\\root.crl"
+            "fsPath": "$TMP/root.crl"
           },
           "range": {
             "start": {

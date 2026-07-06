@@ -46,6 +46,11 @@ function normalizePaths(v: unknown, roots: string[]): unknown {
   if (typeof v === "string") {
     let s = v;
     for (const r of roots) s = s.split(r).join("$TMP");
+    // Cross-platform: an `fsPath` is `$TMP\root.crl` on Windows but `$TMP/root.crl` on
+    // Linux (CI) — the temp-dir prefix is tokenized but the trailing separator is not.
+    // POSIX-normalize the separator in tokenized strings so the committed golden is
+    // OS-agnostic (else the golden passes only on the OS it was generated on).
+    if (s.includes("$TMP")) s = s.split("\\").join("/");
     return s;
   }
   if (Array.isArray(v)) return v.map((x) => normalizePaths(x, roots));
