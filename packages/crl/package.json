@@ -48,7 +48,7 @@
     "README.md"
   ],
   "publishConfig": {
-    "access": "restricted"
+    "access": "public"
   },
   "scripts": {
     "lint": "eslint 'src/**/*.ts' --quiet",
