@@ -6,7 +6,7 @@
     "entries": [
       {
         "uri": {
-          "fsPath": "$TMP\\solo.crl"
+          "fsPath": "$TMP/solo.crl"
         },
         "diagnostics": [
           {
@@ -37,7 +37,7 @@
     "entries": [
       {
         "uri": {
-          "fsPath": "$TMP\\a.crl"
+          "fsPath": "$TMP/a.crl"
         },
         "diagnostics": [
           {
@@ -61,7 +61,7 @@
       },
       {
         "uri": {
-          "fsPath": "$TMP\\b.crl"
+          "fsPath": "$TMP/b.crl"
         },
         "diagnostics": [
           {

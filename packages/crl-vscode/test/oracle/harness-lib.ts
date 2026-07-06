@@ -95,3 +95,29 @@ export function toPlain(v: unknown): unknown {
 export async function resolveResult<T>(r: T | Promise<T> | null | undefined): Promise<T | null> {
   return (await Promise.resolve(r)) ?? null;
 }
+
+/**
+ * Normalize path-bearing golden output so it is BOTH run-deterministic AND cross-platform:
+ *  1. replace the absolute temp `roots` with the token `$TMP` (the temp dir changes every run);
+ *  2. POSIX-normalize the separator in tokenized strings — an `fsPath` is `$TMP\file.crl` on
+ *     Windows but `$TMP/file.crl` on the Linux CI runner, so a golden generated on one OS
+ *     fails on the other (this silently broke the release CI's test gate → npm publish skipped).
+ * Scoped to strings containing `$TMP` so it never rewrites legitimately-escaped content
+ * (regex/quotes/newlines) elsewhere in the golden. Shared by ALL path-emitting generators
+ * (navigation, diagnostics) so the fix can't drift back into a per-file copy.
+ */
+export function normalizePaths(v: unknown, roots: string[]): unknown {
+  if (typeof v === "string") {
+    let s = v;
+    for (const r of roots) s = s.split(r).join("$TMP");
+    if (s.includes("$TMP")) s = s.split("\\").join("/");
+    return s;
+  }
+  if (Array.isArray(v)) return v.map((x) => normalizePaths(x, roots));
+  if (v && typeof v === "object") {
+    const o: Record<string, unknown> = {};
+    for (const k of Object.keys(v as object)) o[k] = normalizePaths((v as Record<string, unknown>)[k], roots);
+    return o;
+  }
+  return v;
+}

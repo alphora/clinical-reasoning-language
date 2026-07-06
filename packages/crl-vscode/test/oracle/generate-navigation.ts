@@ -17,7 +17,7 @@ import {
 } from "../../src/navigation";
 import { ProjectIndex, canonicalize } from "@smile-digital-health/crl/language-services";
 import { Position, Uri, workspace } from "./vscode-stub";
-import { makeDoc, toPlain } from "./harness-lib";
+import { makeDoc, toPlain, normalizePaths } from "./harness-lib";
 
 const ROOT_SRC = [
   "# Root", //                              0
@@ -41,26 +41,6 @@ const ROOT_SRC = [
 ].join("\n");
 
 const SIB_SRC = ["# Sib", 'library "Sib".', "", 'concept "Sib Concept":', "- type is Observation."].join("\n");
-
-function normalizePaths(v: unknown, roots: string[]): unknown {
-  if (typeof v === "string") {
-    let s = v;
-    for (const r of roots) s = s.split(r).join("$TMP");
-    // Cross-platform: an `fsPath` is `$TMP\root.crl` on Windows but `$TMP/root.crl` on
-    // Linux (CI) — the temp-dir prefix is tokenized but the trailing separator is not.
-    // POSIX-normalize the separator in tokenized strings so the committed golden is
-    // OS-agnostic (else the golden passes only on the OS it was generated on).
-    if (s.includes("$TMP")) s = s.split("\\").join("/");
-    return s;
-  }
-  if (Array.isArray(v)) return v.map((x) => normalizePaths(x, roots));
-  if (v && typeof v === "object") {
-    const o: Record<string, unknown> = {};
-    for (const k of Object.keys(v as object)) o[k] = normalizePaths((v as Record<string, unknown>)[k], roots);
-    return o;
-  }
-  return v;
-}
 
 async function main() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "crl-nav-oracle-"));

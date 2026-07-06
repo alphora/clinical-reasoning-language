@@ -9,22 +9,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { produceDiagnostics } from "../../src/diagnostics";
 import { ProjectIndex, canonicalize } from "@smile-digital-health/crl/language-services";
-import { makeDoc, toPlain } from "./harness-lib";
-
-function normalizePaths(v: unknown, roots: string[]): unknown {
-  if (typeof v === "string") {
-    let s = v;
-    for (const r of roots) s = s.split(r).join("$TMP");
-    return s;
-  }
-  if (Array.isArray(v)) return v.map((x) => normalizePaths(x, roots));
-  if (v && typeof v === "object") {
-    const o: Record<string, unknown> = {};
-    for (const k of Object.keys(v as object)) o[k] = normalizePaths((v as Record<string, unknown>)[k], roots);
-    return o;
-  }
-  return v;
-}
+import { makeDoc, toPlain, normalizePaths } from "./harness-lib";
 
 function serialize(p: ReturnType<typeof produceDiagnostics>) {
   return {
