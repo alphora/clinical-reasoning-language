@@ -1,8 +1,8 @@
-// QUESTIONNAIRE pane RENDERER (vscode-free, unit-tested) — the read-only Medical Validation questionnaire panel
-// (#177 slice 3). For the FOCUSED CEL case it projects the pure `buildQuestionnaire` result (slice 2) into a static,
-// read-only ordered list of "Is <concept>?" questions (each with the case's answer highlighted) ending in the produced
-// activity outcome or a terminal message. Design authority: .vibe-tools/discussions/163-questionnaire-panel-design.md
-// ("Pane registration surface", "Selection-scoped render", produced-leaf "Path"/"Terminals" decisions).
+// QUESTIONNAIRE pane RENDERER (vscode-free, unit-tested) — the read-only Medical Validation questionnaire panel.
+// #187 Todo 3: it projects the pure `buildQuestionnaire` full-surface result into an INDENTED, read-only list of
+// "<concept>?" questions (each with the case's answer highlighted) — on-path rows normal, `first:`-preempted rows dimmed,
+// non-Source concepts greyed, inferred composites expanded into their leaves — ending in the produced outcome or a
+// terminal message. Design authority: .vibe-tools/discussions/193-mv-panes-todo3-questionnaire-render-plan.md.
 //
 // SCOPE: a STATIC pane. The "this node" cross-pane marker is slice 4; the prev/next sub-nav is slice 5. This renderer
 // emits a STABLE per-question anchor + `data-q="<nodeId>"` attribute NOW so slices 4/5 can target a question without a
@@ -14,7 +14,16 @@
 // CORR_STYLE/FLOW_STYLE). It imports ONLY types from `@smile-digital-health/crl` + the pure builder — NO `vscode`.
 import type { ScenarioViewModel } from "@smile-digital-health/crl";
 
-import { buildQuestionnaire, type ResolveValueTypes, type Question } from "./questionnaireModel";
+import {
+  buildQuestionnaire,
+  type ResolveValueTypes,
+  type ResolveConceptShape,
+  type ResolveConceptInfo,
+  type Question,
+} from "./questionnaireModel";
+
+/** Max indent depth with a dedicated padding class; deeper rows clamp (a questionnaire never nests this far). */
+const MAX_DEPTH = 12;
 
 export interface QuestionnaireAnchor {
   scrollTo: string;
@@ -28,9 +37,11 @@ export interface RenderedQuestionnaire {
   /** No engine reveals: the questionnaire is read-only and posts no selections. Emitted (always `{}`) so the shell's
    *  per-pane `{html, anchors, reveals}` contract is uniform with the other renderers. */
   reveals: Record<string, never>;
-  /** The fired-path question runtime nodeIds, in walk (display) order (#177 slice 4). The host stores this so
-   *  `driveThisNode(currentQuestionIndex)` can resolve the FOCUSED question's nodeId WITHOUT re-running the walk; the
-   *  i-th id is the question rendered at <li id="<prefix>q<i>">. Empty when no case is focused / no questions. */
+  /** The NAV-STOP question runtime nodeIds, in display order (#177 slice 4; #187 Todo 3: runtime whens/guards only —
+   *  NOT expanded leaves, which can't ground the cross-pane marker). The host stores this so `driveThisNode(index)` can
+   *  resolve the FOCUSED question's nodeId without re-running the walk, then reach its DOM `<li>` via
+   *  `anchors[questionNodeIds[i]].scrollTo` (NOT by a `q<i>` id — leaves interleave, so the render-index ≠ the nav-stop
+   *  index). Empty when no case is focused / no questions. */
   questionNodeIds: string[];
 }
 
@@ -71,29 +82,43 @@ function renderQuestionNav(currentIndex: number, count: number): string {
   );
 }
 
-/** Render one question <li>: "Is <concept>?" + the two Yes/No options with the case's answer highlighted, plus a subtle
- *  value-type label for a non-boolean concept. `data-q` carries the runtime nodeId (slice-4 anchor); the <li> id is the
- *  highlight target keyed in `anchors`. */
+/** Render one question <li>: "<concept>?" + the two Yes/No options with the case's answer highlighted, plus a subtle
+ *  value-type label for a non-boolean concept. #187 Todo 3: INDENT by `depth` (a `q-d<n>` class); DIM `first:`-preempted
+ *  rows; mark non-Source (no `code is`) on an inner channel that does NOT fight the `.this-node` wash; render an "unknown"
+ *  off-path answer as blank + a marker (NEVER "No" — the Todo-2 contract). `data-q` carries the (runtime or synthetic
+ *  leaf) nodeId; the <li> id is the highlight target keyed in `anchors`. */
 function renderQuestion(q: Question, gid: string): string {
   const opts = q.options
     .map((o) => {
-      // The case's answer: "Yes" highlights when answer==="yes", "No" when answer==="no". A null answer (unevaluated)
-      // highlights neither. Compare case-insensitively against the canonical "yes"/"no" tokens.
-      const isAnswer = q.answer !== null && o.toLowerCase() === q.answer;
-      const cls = isAnswer ? "q-opt q-opt-answer" : "q-opt";
-      return `<span class="${cls}">${escapeHtml(o)}</span>`;
+      // Highlight only a definite "yes"/"no". "unknown" (off-path, no case answer) + null highlight NEITHER.
+      const isAnswer = (q.answer === "yes" || q.answer === "no") && o.toLowerCase() === q.answer;
+      return `<span class="${isAnswer ? "q-opt q-opt-answer" : "q-opt"}">${escapeHtml(o)}</span>`;
     })
     .join("");
-  // A non-boolean question keeps Yes/No options but flags its value type subtly (richer options are deferred — slice 2).
   const typeLabel =
     !q.isBoolean && q.valueType
       ? `<span class="q-type" title="answer value type (richer options deferred)">${escapeHtml(q.valueType)}</span>`
       : "";
+  const unknown =
+    q.answer === "unknown"
+      ? `<span class="q-unknown" title="no case answer — a question this path never asked">n/a</span>`
+      : "";
+  const cls = ["q-item", `q-d${Math.min(q.depth, MAX_DEPTH)}`];
+  if (q.reach === "preempted") cls.push("q-preempted");
+  if (!q.isSource) cls.push("q-nonsource");
+  if (q.isInferred) cls.push("q-inferred");
+  if (q.rowKind === "leaf") cls.push("q-leaf");
+  // Non-color affordance (VS Code high-contrast can collapse opacity/tint) — reach AND source state as a tooltip (a row
+  // that is BOTH preempted and non-Source shows both hints, so neither affordance is lost).
+  const titleParts: string[] = [];
+  if (q.reach === "preempted") titleParts.push("skipped by an earlier first: match");
+  if (!q.isSource) titleParts.push("inferred / non-source concept (no local code)");
+  const titleAttr = titleParts.length ? ` title="${escapeHtml(titleParts.join(" · "))}"` : "";
   return (
-    `<li class="q-item" id="${escapeHtml(gid)}" data-q="${escapeHtml(q.nodeId)}">` +
-    `<span class="q-prompt">Is <span class="q-concept">${escapeHtml(q.conceptName)}</span>?</span>` +
+    `<li class="${cls.join(" ")}" id="${escapeHtml(gid)}" data-q="${escapeHtml(q.nodeId)}"${titleAttr}>` +
+    `<span class="q-prompt"><span class="q-concept">${escapeHtml(q.conceptName)}</span>?</span>` +
     typeLabel +
-    `<span class="q-opts">${opts}</span>` +
+    `<span class="q-opts">${opts}${unknown}</span>` +
     `</li>`
   );
 }
@@ -136,7 +161,12 @@ export function renderQuestionnairePane(
   sv: ScenarioViewModel | undefined,
   resolveValueTypes: ResolveValueTypes,
   rootLib: string | undefined,
-  opts: { revealPrefix?: string; currentIndex?: number } = {},
+  opts: {
+    revealPrefix?: string;
+    currentIndex?: number;
+    conceptShape?: ResolveConceptShape;
+    resolveConceptInfo?: ResolveConceptInfo;
+  } = {},
 ): RenderedQuestionnaire {
   const prefix = opts.revealPrefix ?? "";
   const anchors: Record<string, QuestionnaireAnchor> = {};
@@ -144,14 +174,19 @@ export function renderQuestionnairePane(
 
   if (!sv) return { html: PLACEHOLDER, anchors, reveals, questionNodeIds: [] };
 
-  const q = buildQuestionnaire(sv, resolveValueTypes, rootLib);
+  const q = buildQuestionnaire(sv, resolveValueTypes, rootLib, {
+    conceptShape: opts.conceptShape,
+    resolveConceptInfo: opts.resolveConceptInfo,
+  });
 
   let items = "";
-  // The ordered question nodeIds — index i is the FOCUSED-question key the host's driveThisNode reads (slice 4).
-  const questionNodeIds = q.questions.map((question) => question.nodeId);
+  // #187 Todo 3: NAV-STOPS only (runtime whens/guards) — a synthetic LEAF id can't ground driveThisNode, so leaves
+  // render (with a self-highlight anchor) but are skipped by prev/next + the cross-pane marker (that is Todo 5).
+  const questionNodeIds: string[] = [];
   q.questions.forEach((question, i) => {
     const gid = `${prefix}q${i}`;
     anchors[question.nodeId] = { scrollTo: gid, segmentIds: [gid] };
+    if (question.isNavStop) questionNodeIds.push(question.nodeId);
     items += renderQuestion(question, gid);
   });
 
@@ -159,10 +194,9 @@ export function renderQuestionnairePane(
   const header = caseName
     ? `<p class="q-head">Questionnaire — <span class="q-case">${escapeHtml(caseName)}</span></p>`
     : "";
-  // #177 slice 5: the panel-local prev/next sub-nav, ABOVE the question list. Rendered only when there ARE questions
-  // (a terminal-only questionnaire has no question to step through). "X of Y" + the disabled states read the host's index.
-  const nav = renderQuestionNav(opts.currentIndex ?? 0, q.questions.length);
-  const list = q.questions.length ? `<ol class="q-list">${items}</ol>` : "";
+  // The prev/next sub-nav steps through the NAV-STOPS (runtime whens), not every rendered row — "X of Y" counts those.
+  const nav = renderQuestionNav(opts.currentIndex ?? 0, questionNodeIds.length);
+  const list = q.questions.length ? `<ul class="q-list">${items}</ul>` : "";
   const terminal = renderTerminal(q);
 
   return { html: `<div class="q-wrap">${header}${nav}${list}${terminal}</div>`, anchors, reveals, questionNodeIds };
@@ -202,8 +236,21 @@ export const QUESTIONNAIRE_STYLE =
   `.q-nav-btn{font:inherit;cursor:pointer;padding:1px 8px;border:1px solid var(--vscode-panel-border,#454545);background:var(--vscode-editorWidget-background,#252526);color:var(--vscode-foreground)}` +
   `.q-nav-btn:disabled{cursor:default;opacity:.45}` +
   `.q-nav-pos{opacity:.8}` +
-  `.q-list{list-style:decimal;margin:0;padding-left:22px}` +
-  `.q-item{padding:2px 4px;border-radius:3px;margin:1px 0}` +
+  `.q-list{list-style:none;margin:0;padding-left:0}` +
+  `.q-item{padding:2px 4px 2px 6px;border-radius:3px;margin:1px 0}` +
+  // #187 Todo 3 — INDENT by decision/expansion depth via a fixed set of padding classes (CSP-safe: no inline style).
+  Array.from({ length: MAX_DEPTH + 1 }, (_, d) => `.q-d${d}{padding-left:${6 + d * 20}px}`).join("") +
+  // DIM a first:-preempted (skipped-by-an-earlier-match) row.
+  `.q-preempted{opacity:.5}` +
+  // NON-SOURCE (no local `code is`): a grey wash on the INNER `.q-prompt` span — a channel DISTINCT from the `.q-item`
+  // background, so it never fights the `.this-node` li wash (disc 193, Claude). Reads as "▒grey▒" behind the concept.
+  `.q-nonsource .q-prompt{background:var(--vscode-editorWidget-background,#2b2b2e);border-radius:3px;padding:0 5px}` +
+  // Inferred (`defined as`/`definition is`) — a small purple dot after the concept, echoing the Tree pane's purple peek.
+  `.q-inferred .q-concept::after{content:" ●";font-size:.5em;color:var(--vscode-charts-purple,#c586c0);vertical-align:middle}` +
+  // A leaf (composite operand) is a sub-question — lighter weight than a decision `when`.
+  `.q-leaf .q-concept{font-weight:normal;opacity:.92}` +
+  // An "unknown" off-path answer (no conceptTruth) — a subtle marker; NEITHER Yes/No option is highlighted.
+  `.q-unknown{font-size:.75em;opacity:.6;font-style:italic;margin-left:6px}` +
   `.q-prompt{margin-right:6px}` +
   `.q-concept{font-weight:bold;color:var(--vscode-symbolIcon-keywordForeground,#c586c0)}` +
   `.q-type{display:inline-block;font-size:.8em;opacity:.7;font-style:italic;margin-right:6px;padding:0 4px;border:1px solid var(--vscode-panel-border,#454545);border-radius:3px}` +

@@ -86,10 +86,10 @@ case "X absent, Y holds → Approve":
   const { sv, rootLib } = renderCase({ "n.crl": crl, "n.cel": cel }, "n.cel", "X absent, Y holds → Approve");
   const r = renderQuestionnairePane(sv, booleanResolver, rootLib, { revealPrefix: "g1_" });
   // Two questions, in order, each "Is <concept>?".
-  const items = [...r.html.matchAll(/<li class="q-item"[^>]*>(.*?)<\/li>/g)].map((m) => m[1]);
+  const items = [...r.html.matchAll(/<li class="q-item[^"]*"[^>]*>(.*?)<\/li>/g)].map((m) => m[1]);
   assert.equal(items.length, 2, "two questions");
-  assert.match(items[0], /Is <span class="q-concept">X<\/span>\?/, "first question is Is X?");
-  assert.match(items[1], /Is <span class="q-concept">Y<\/span>\?/, "second question is Is Y?");
+  assert.match(items[0], /<span class="q-concept">X<\/span>\?/, "first question is Is X?");
+  assert.match(items[1], /<span class="q-concept">Y<\/span>\?/, "second question is Is Y?");
   // X answered No → the "No" option is the q-opt-answer; Y answered Yes → the "Yes" option is.
   assert.match(items[0], /<span class="q-opt q-opt-answer">No<\/span>/, "X's answer No is highlighted");
   assert.match(items[0], /<span class="q-opt">Yes<\/span>/, "X's Yes shown un-highlighted");
@@ -214,7 +214,7 @@ case "Dx absent → nothing produced":
   assert.match(r.html, /Blocked \(no determination\)/, "blocked message");
   assert.ok(!/class="q-outcome"/.test(r.html), "no outcome line when blocked");
   // The false Dx when is still rendered as a 'no' question above the blocked message.
-  assert.match(r.html, /Is <span class="q-concept">Dx<\/span>\?/, "the false Dx when is on the path");
+  assert.match(r.html, /<span class="q-concept">Dx<\/span>\?/, "the false Dx when is on the path");
 });
 
 // ── 5. blocked-guard terminal → the guard question is the last item + a blocked note ──
@@ -261,9 +261,9 @@ case "whole menu guarded out → blocked":
 - result is "Block" is "Med".`;
   const { sv, rootLib } = renderCase({ "b.crl": crl, "b.cel": cel }, "b.cel", "whole menu guarded out → blocked");
   const r = renderQuestionnairePane(sv, booleanResolver, rootLib, { revealPrefix: "g1_" });
-  const items = [...r.html.matchAll(/<li class="q-item"[^>]*>(.*?)<\/li>/g)].map((m) => m[1]);
+  const items = [...r.html.matchAll(/<li class="q-item[^"]*"[^>]*>(.*?)<\/li>/g)].map((m) => m[1]);
   assert.ok(items.length >= 2, "Dx then the guard terminal");
-  assert.match(items[items.length - 1], /Is <span class="q-concept">Contra<\/span>\?/, "the last question is the guard Contra");
+  assert.match(items[items.length - 1], /<span class="q-concept">Contra<\/span>\?/, "the last question is the guard Contra");
   assert.match(r.html, /Blocked \(no determination\)/, "a blocked note accompanies the guard terminal");
 });
 
@@ -609,6 +609,73 @@ check("slice 5: data-qnav buttons are CSP-safe (opaque prev/next action, no inli
   // The CSS for the nav lives in QUESTIONNAIRE_STYLE (concatenated into the shell's nonced <style>).
   assert.ok(/\.q-nav\{/.test(QUESTIONNAIRE_STYLE), "the .q-nav chrome style is declared in QUESTIONNAIRE_STYLE");
   assert.ok(/\.q-nav-btn:disabled\{/.test(QUESTIONNAIRE_STYLE), "the disabled-button style is declared");
+});
+
+// ── #187 Todo 3: the new visual branches — dim (preempted), grey (non-Source), leaf indent, and the "unknown never No" contract ──
+check("Todo 3 render: preempted DIMMED + non-Source GREY + composite LEAF indented; an unknown answer highlights NEITHER option (never No)", () => {
+  const crl = `# P
+library "V".
+concept "Covered":
+- type is Condition.
+- code is \`cov\`.
+concept "Comp":
+- type is Condition.
+- code is \`c\`.
+concept "Other":
+- type is Condition.
+- code is \`o\`.
+activity "Approve":
+- request CPGCommunicationRequest.
+- with \`ok\`.
+activity "Deny":
+- request CPGCommunicationRequest.
+- with \`no\`.
+decision "V":
+first:
+- when "Covered" then:
+  - when "Comp" then recommend activity "Approve".
+  end.
+- when "Other" then recommend activity "Deny".`;
+  const cel = `# C
+library "VCases".
+covers "V".
+fact "Pat":
+- name is "Pat".
+- birth date is "1970-01-01".
+- defined by "Patient".
+fact "fCov":
+- code is "http://x|cov".
+- defined by "Covered".
+fact "fComp":
+- code is "http://x|c".
+- defined by "Comp".
+case "cov+comp; Other preempted":
+- subject is "Pat".
+- fact is "fCov".
+- fact is "fComp".
+- result is "V" is "Approve".`;
+  const { sv, rootLib } = renderCase({ "v.crl": crl, "v.cel": cel }, "v.cel", "cov+comp; Other preempted");
+  // Stub Comp as a non-Source inferred composite with one leaf ABSENT from conceptTruth (→ unknown answer).
+  const conceptShape = (_lib, name) =>
+    name === "Comp"
+      ? {
+          nodeKey: "k:Comp", hasCodeIs: false, leafEligible: false, isInferred: true, hasDefinedAs: true,
+          children: [{ nodeKey: "k:L", hasCodeIs: true, leafEligible: true, isInferred: false, hasDefinedAs: false, children: [] }],
+        }
+      : undefined;
+  const resolveConceptInfo = (nk) => (nk === "k:L" ? { lib: "V", name: "SomeLeaf", valueTypes: ["boolean"] } : undefined);
+  const r = renderQuestionnairePane(sv, booleanResolver, rootLib, { revealPrefix: "g1_", conceptShape, resolveConceptInfo });
+  const items = [...r.html.matchAll(/<li class="([^"]*)"[^>]*>(.*?)<\/li>/g)].map((m) => ({ cls: m[1], inner: m[2] }));
+  const row = (n) => items.find((it) => it.inner.includes(`q-concept">${n}<`));
+  assert.ok(row("Comp").cls.includes("q-nonsource"), "Comp (no code-is) gets the non-Source grey channel");
+  assert.ok(row("Comp").cls.includes("q-inferred"), "Comp is marked inferred");
+  assert.ok(row("Other").cls.includes("q-preempted"), "Other (first:-preempted) is dimmed");
+  const leaf = row("SomeLeaf");
+  assert.ok(leaf, "the composite's leaf is rendered (expanded)");
+  assert.ok(leaf.cls.includes("q-leaf"), "the leaf is a q-leaf row");
+  assert.ok(leaf.cls.includes("q-d2"), "the leaf is indented at depth 2 (Covered → Comp → leaf)");
+  assert.ok(!leaf.inner.includes("q-opt-answer"), "an UNKNOWN leaf highlights NEITHER Yes nor No — never renders 'No' (Todo-2 contract)");
+  assert.ok(leaf.inner.includes("q-unknown"), "an unknown leaf shows the n/a marker");
 });
 
 console.log(`\nquestionnairePaneHtml.test.mjs: ${pass} checks passed.`);

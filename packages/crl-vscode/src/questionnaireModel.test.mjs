@@ -177,9 +177,11 @@ case "exclusion present, but result claims Approve":
   const q = buildQuestionnaire(sv, booleanResolver, rootLib);
   assert.equal(q.terminalKind, "produced", "the questionnaire shows the ACTUAL produced path, not blocked");
   assert.deepEqual(q.outcome, { activity: "Deny" }, "outcome is the ACTUALLY produced disposition (Deny), NOT expected Approve");
-  // The first when (Exclusion) satisfied → fires Deny; the rest are preempted (first:) → not on the path.
-  assert.deepEqual(q.questions.map((x) => x.conceptName), ["Exclusion"], "only the satisfied exclusion is on the fired path");
+  // Exclusion satisfied → fires Deny; Covered is first:-preempted. #187 Todo 3: the FULL surface now SHOWS the preempted
+  // Covered sibling (DIMMED, terminal), where the old pruned path hid it.
+  assert.deepEqual(q.questions.map((x) => x.conceptName), ["Exclusion", "Covered"], "the fired exclusion + the preempted Covered sibling");
   assert.equal(q.questions[0].answer, "yes", "the exclusion held");
+  assert.equal(q.questions[1].reach, "preempted", "Covered is first:-preempted → dimmed terminal");
 });
 
 // ── 3. A "no" question on the path: "Is X? No → (first: fall through) → Is Y? Yes → Approve" → questions
@@ -274,8 +276,12 @@ case "both hold; Excl preempts → Deny":
   const q = buildQuestionnaire(sv, booleanResolver, rootLib);
   assert.equal(q.terminalKind, "produced", "the preempting branch produced Deny → not blocked");
   assert.deepEqual(q.outcome, { activity: "Deny" });
-  assert.deepEqual(q.questions.map((x) => x.conceptName), ["Excl"], "the preempted Covered when is NOT on the fired path");
+  // #187 Todo 3: the preempted Covered sibling is STILL shown (dimmed). It IS asserted, so its conceptTruth answer is
+  // "yes" even though `first:` never evaluated it — the corpus-faithful "preempted but present" case.
+  assert.deepEqual(q.questions.map((x) => x.conceptName), ["Excl", "Covered"], "the fired Excl + the preempted-but-present Covered");
   assert.equal(q.questions[0].answer, "yes");
+  assert.equal(q.questions[1].reach, "preempted", "Covered is first:-preempted (dimmed)");
+  assert.equal(q.questions[1].answer, "yes", "Covered's case answer is YES (asserted) despite being preempted — from conceptTruth");
 });
 
 // ── 5. Guard-on-PASS must NOT terminate: a PASS where an unrelated `any:`-menu sibling is guarded out → still
@@ -726,17 +732,21 @@ case "both fire":
 
 // ── disc 164: producedPathDiverterIds — the gated "no"-question extraction the cockpit's diverter overlay drives ──
 check("producedPathDiverterIds: a PRODUCED terminal returns the evaluated-false 'no' nodeIds (in order), skipping 'yes'/null", () => {
+  // #187 Todo 3: a diverter is an EVALUATED on-path `when` (`diverterEligible`), NOT any "no" row — a composite LEAF or a
+  // first:-preempted sibling answered "no" is NOT a diverter and must be excluded.
   const q = {
     outcome: { activity: "Deny" },
     terminalKind: "produced",
     questions: [
-      { answer: "no", nodeId: "when[0]" },
-      { answer: "yes", nodeId: "when[1]" },
-      { answer: "no", nodeId: "when[2]" },
-      { answer: null, nodeId: "when[3]" },
+      { answer: "no", nodeId: "when[0]", diverterEligible: true },
+      { answer: "yes", nodeId: "when[1]", diverterEligible: true },
+      { answer: "no", nodeId: "when[2]", diverterEligible: true },
+      { answer: null, nodeId: "when[3]", diverterEligible: true },
+      { answer: "no", nodeId: "when[0]|leaf", diverterEligible: false }, // a composite leaf answered No — NOT a diverter
+      { answer: "no", nodeId: "when[4]", diverterEligible: false }, // a preempted sibling answered No — NOT a diverter
     ],
   };
-  assert.deepEqual(producedPathDiverterIds(q), ["when[0]", "when[2]"], "only the produced-path 'no' diverters, in order");
+  assert.deepEqual(producedPathDiverterIds(q), ["when[0]", "when[2]"], "only diverter-eligible 'no' whens; leaves/preempted excluded");
 });
 
 check("producedPathDiverterIds: a BLOCKED / blocked-guard terminal (outcome null) returns [] even with a false question (the guard is the BLOCKER, not a diverter)", () => {
@@ -759,12 +769,114 @@ check("producedPathDiverterIds: a multi-diverter produced case (e.g. adult, neit
     outcome: { activity: "Deny" },
     terminalKind: "produced",
     questions: [
-      { answer: "yes", nodeId: "when[0]" }, // Adult? yes
-      { answer: "no", nodeId: "when[0]/when[0]" }, // Crohn's? no
-      { answer: "no", nodeId: "when[0]/when[1]" }, // UC? no
+      { answer: "yes", nodeId: "when[0]", diverterEligible: true }, // Adult? yes
+      { answer: "no", nodeId: "when[0]/when[0]", diverterEligible: true }, // Crohn's? no
+      { answer: "no", nodeId: "when[0]/when[1]", diverterEligible: true }, // UC? no
     ],
   };
   assert.deepEqual(producedPathDiverterIds(q), ["when[0]/when[0]", "when[0]/when[1]"], "both failed disease whens are diverters");
+});
+
+// ── #187 Todo 3: the FULL first:-chain surface — preempted siblings + composite leaf expansion ──
+check("Todo 3: a first:-preempted sibling is STILL shown (dimmed) with its conceptTruth answer, not recursed", () => {
+  const crl = `# P
+library "FS".
+concept "Covered":
+- type is Condition.
+- code is \`cov\`.
+concept "Other":
+- type is Condition.
+- code is \`oth\`.
+activity "Approve":
+- request CPGCommunicationRequest.
+- with \`ok\`.
+activity "Deny":
+- request CPGCommunicationRequest.
+- with \`no\`.
+decision "FS":
+first:
+- when "Covered" then recommend activity "Approve".
+- when "Other" then recommend activity "Deny".`;
+  const cel = `# C
+library "FSCases".
+covers "FS".
+fact "Pat":
+- name is "Pat".
+- birth date is "1970-01-01".
+- defined by "Patient".
+fact "fCov":
+- code is "http://x|cov".
+- defined by "Covered".
+case "covered wins; Other preempted":
+- subject is "Pat".
+- fact is "fCov".
+- result is "FS" is "Approve".`;
+  const { sv, rootLib } = renderCase({ "fs.crl": crl, "fs.cel": cel }, "fs.cel", "covered wins; Other preempted");
+  const q = buildQuestionnaire(sv, booleanResolver, rootLib);
+  const covered = q.questions.find((x) => x.conceptName === "Covered");
+  const other = q.questions.find((x) => x.conceptName === "Other");
+  assert.ok(covered && covered.answer === "yes" && covered.reach === "evaluated", "Covered: evaluated, fired yes");
+  assert.ok(other, "the preempted Other sibling is STILL rendered (full surface, not pruned)");
+  assert.equal(other.reach, "preempted", "Other is dimmed (first:-preempted)");
+  assert.equal(other.rowKind, "when-preempted");
+  assert.equal(other.answer, "no", "Other's case answer comes from conceptTruth (not asserted → no)");
+  assert.equal(other.isNavStop, true, "a preempted runtime when is a nav-stop");
+  assert.equal(other.diverterEligible, false, "a preempted row is NEVER a produced-path diverter");
+});
+
+check("Todo 3: an on-path inferred composite `when` EXPANDS its shape leaves (nested, non-nav-stop, unknown when absent from conceptTruth)", () => {
+  const crl = `# P
+library "CX".
+concept "Comp":
+- type is Condition.
+- code is \`c\`.
+activity "Approve":
+- request CPGCommunicationRequest.
+- with \`ok\`.
+decision "CX":
+- when "Comp" then recommend activity "Approve".`;
+  const cel = `# C
+library "CXCases".
+covers "CX".
+fact "Pat":
+- name is "Pat".
+- birth date is "1970-01-01".
+- defined by "Patient".
+fact "fC":
+- code is "http://x|c".
+- defined by "Comp".
+case "comp holds":
+- subject is "Pat".
+- fact is "fC".
+- result is "CX" is "Approve".`;
+  const { sv, rootLib } = renderCase({ "cx.crl": crl, "cx.cel": cel }, "cx.cel", "comp holds");
+  // Stub the shape: Comp is an inferred composite with two operand leaves (Leaf2 non-Source). resolveConceptInfo names them.
+  const shapeByName = {
+    Comp: {
+      nodeKey: "k:Comp", hasCodeIs: true, leafEligible: true, isInferred: true, hasDefinedAs: true,
+      children: [
+        { nodeKey: "k:Leaf1", hasCodeIs: true, leafEligible: true, isInferred: false, hasDefinedAs: false, children: [] },
+        { nodeKey: "k:Leaf2", hasCodeIs: false, leafEligible: false, isInferred: false, hasDefinedAs: false, children: [] },
+      ],
+    },
+  };
+  const info = {
+    "k:Leaf1": { lib: "CX", name: "Leaf1", valueTypes: ["boolean"] },
+    "k:Leaf2": { lib: "CX", name: "Leaf2", valueTypes: ["boolean"] },
+  };
+  const q = buildQuestionnaire(sv, booleanResolver, rootLib, {
+    conceptShape: (_lib, name) => shapeByName[name],
+    resolveConceptInfo: (nk) => info[nk],
+  });
+  assert.deepEqual(q.questions.map((x) => x.conceptName), ["Comp", "Leaf1", "Leaf2"], "the composite when + its two expanded leaves");
+  const [comp, l1, l2] = q.questions;
+  assert.equal(comp.answer, "yes", "Comp fired (evaluated)");
+  assert.equal(comp.isInferred, true, "Comp is an inferred composite (from the shape)");
+  assert.equal(l1.depth, 1, "leaves nested one level under the composite");
+  assert.equal(l1.rowKind, "leaf");
+  assert.equal(l1.isNavStop, false, "a composite LEAF is NOT a nav-stop (Todo 5 owns leaf highlighting)");
+  assert.equal(l1.answer, "unknown", "a leaf absent from conceptTruth is UNKNOWN — render blank, never 'no'");
+  assert.equal(l2.isSource, false, "Leaf2 (no code-is) is non-Source → the grey channel");
 });
 
 console.log(`\nquestionnaireModel.test.mjs: ${pass} checks passed.`);

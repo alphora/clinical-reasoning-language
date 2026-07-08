@@ -13,6 +13,7 @@ import {
   nodeKey,
   type CorrespondenceModel,
   type CrlConceptNode,
+  type ConceptShapeIndex,
   type CrlDecisionStructure,
   type CrlStructureNode,
   type RenderScenarioResult,
@@ -72,7 +73,7 @@ import { renderCrlPane } from "./crlPaneHtml";
 import { FLOW_STYLE, renderFlowPane } from "./flowPaneHtml";
 import { QUESTIONNAIRE_STYLE, renderQuestionnairePane, shouldRerenderQuestionnaire, nextQuestionIndex } from "./questionnairePaneHtml";
 import { buildQuestionnaire, producedPathDiverterIds } from "./questionnaireModel";
-import type { ConceptValueType, ResolveValueTypes } from "./questionnaireModel";
+import type { ConceptValueType, ResolveValueTypes, ResolveConceptShape, ResolveConceptInfo } from "./questionnaireModel";
 import {
   buildCrlRevealMaps,
   caseIdsForNode,
@@ -224,6 +225,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   let correspondence: CorrespondenceModel | undefined;
   let crlStructure: CrlDecisionStructure[] = [];
   let conceptLayer: CrlConceptNode[] = [];
+  let conceptShape: ConceptShapeIndex = new Map(); // #187 Todo 3: per-concept `defined as` shape subtrees (leaf expansion)
   let crlMaps: CrlRevealMaps | undefined;
   let scenarios: RenderScenarioResult | undefined;
   let caseIdByName: Record<string, string> = {};
@@ -895,7 +897,12 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     // The diverters ARE the questionnaire's evaluated-false "no" questions — but ONLY when a disposition was produced
     // (producedPathDiverterIds gates on q.outcome): a blocked/blocked-guard terminal emits a false guard/when question
     // with NO produced disposition, which must NOT light as a "produced-path diverter" (gpt55 impl review, disc 164).
-    const q = buildQuestionnaire(sv, buildResolveValueTypes(), sv.decision?.libraryName);
+    // #187 Todo 3: `producedPathDiverterIds` filters `diverterEligible` (evaluated on-path whens) — leaves/preempted rows
+    // never light. The resolvers are passed for surface consistency, though diverter eligibility is set on whens regardless.
+    const q = buildQuestionnaire(sv, buildResolveValueTypes(), sv.decision?.libraryName, {
+      conceptShape: buildConceptShapeResolver(),
+      resolveConceptInfo: buildResolveConceptInfo(),
+    });
     const diverterIds = producedPathDiverterIds(q);
     if (diverterIds.length === 0) {
       clearAllDiverters();
@@ -1042,6 +1049,8 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       const r = renderQuestionnairePane(sv, buildResolveValueTypes(), sv?.decision?.libraryName, {
         revealPrefix: `g${gen}_`,
         currentIndex: currentQuestionIndex, // #177 slice 5: the sub-nav renders "Question X of Y" + Prev/Next disabled states
+        conceptShape: buildConceptShapeResolver(), // #187 Todo 3: composite-leaf expansion
+        resolveConceptInfo: buildResolveConceptInfo(),
       });
       v.anchors = r.anchors;
       v.reveals = r.reveals;
@@ -1074,6 +1083,20 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     return (lib: string | undefined, name: string): ConceptValueType[] => {
       if (!crlMaps || lib === undefined) return [];
       return crlMaps.conceptByKey.get(nodeKey(conceptDeclRef(lib, name)))?.valueTypes ?? [];
+    };
+  }
+
+  /** #187 Todo 3 — the injected resolvers `buildQuestionnaire` uses to EXPAND an inferred composite `when` into its
+   *  `defined as` leaves. `conceptShape(lib,name)` fetches the concept's shape subtree (keyed by the SAME nodeKey as
+   *  `conceptByKey`); `resolveConceptInfo(nodeKey)` gives a shape LEAF (which carries only its nodeKey) its concept
+   *  identity + value types for the leaf row. Both return undefined when maps are absent (→ no expansion). */
+  function buildConceptShapeResolver(): ResolveConceptShape {
+    return (lib, name) => (lib === undefined ? undefined : conceptShape.get(nodeKey(conceptDeclRef(lib, name))));
+  }
+  function buildResolveConceptInfo(): ResolveConceptInfo {
+    return (nk) => {
+      const c = crlMaps?.conceptByKey.get(nk);
+      return c ? { lib: c.lib, name: c.name, valueTypes: c.valueTypes } : undefined;
     };
   }
 
@@ -1266,6 +1289,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       correspondence = cm.correspondence;
       crlStructure = cm.crlStructure;
       conceptLayer = cm.conceptLayer;
+      conceptShape = cm.conceptShape; // #187 Todo 3
       scenarios = cm.scenarios;
       caseIdByName = cm.caseIdByName;
       duplicateScenarioNames = cm.duplicateScenarioNames;
@@ -1357,6 +1381,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     correspondence = undefined;
     crlStructure = [];
     conceptLayer = [];
+    conceptShape = new Map();
     crlMaps = undefined;
     scenarios = undefined;
     caseIdByName = {};
