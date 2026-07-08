@@ -405,17 +405,19 @@ export function lowerLocalCodes(
   // synthetic terminologies that carry `localCodesystemName` on their system line
   // are built below, AFTER this scan, so they can't false-match here.)
   if (topLevelIdentifierNames.has(localCodesystemName)) {
-    errors.push(mkError(
-      "emit-local-codesystem-name-collision",
-      `The synthetic shared local codesystem decl "${localCodesystemName}" collides ` +
-        `with an existing top-level identifier of the same name in library ` +
-        `"${ast.library.name}". CQL codesystem declarations share the top-level ` +
-        `identifier namespace with concepts, parameters, valuesets, and other ` +
-        `terminologies, so this would emit a duplicate identifier (invalid CQL). ` +
-        `Rename the conflicting declaration (or the library) so the synthesized ` +
-        `local codesystem name "${localCodesystemName}" is unique.`,
-      ast.library.location,
-    ));
+    errors.push(
+      mkError(
+        "emit-local-codesystem-name-collision",
+        `The synthetic shared local codesystem decl "${localCodesystemName}" collides ` +
+          `with an existing top-level identifier of the same name in library ` +
+          `"${ast.library.name}". CQL codesystem declarations share the top-level ` +
+          `identifier namespace with concepts, parameters, valuesets, and other ` +
+          `terminologies, so this would emit a duplicate identifier (invalid CQL). ` +
+          `Rename the conflicting declaration (or the library) so the synthesized ` +
+          `local codesystem name "${localCodesystemName}" is unique.`,
+        ast.library.location,
+      ),
+    );
   }
 
   for (const stmt of ast.statements) {
@@ -428,12 +430,14 @@ export function lowerLocalCodes(
     //     regardless of whatever else the concept carries (so an empty code +
     //     definition reports the empty-code error, not the mixed error).
     if (codeValue === "") {
-      errors.push(mkError(
-        "emit-empty-local-code",
-        `Concept "${c.name}" has an empty \`code is\` value. A local source code ` +
-          `must be a non-empty literal.`,
-        loc,
-      ));
+      errors.push(
+        mkError(
+          "emit-empty-local-code",
+          `Concept "${c.name}" has an empty \`code is\` value. A local source code ` +
+            `must be a non-empty literal.`,
+          loc,
+        ),
+      );
       continue;
     }
 
@@ -454,16 +458,18 @@ export function lowerLocalCodes(
         bothRepRecencyThreshold = ageTodayRecencyThreshold(c.definition);
       }
       if (bothRepRecencyThreshold === null) {
-        errors.push(mkError(
-          "emit-mixed-code-and-definition",
-          `Concept "${c.name}" carries BOTH a local \`code is\` and a top-level ` +
-            `definition (\`${c.definition.type}\`). Only \`code is\` + \`defined as\` ` +
-            `or \`code is\` + \`definition is age today at least <n> years\` ` +
-            `(both-representation) is supported; \`code is\` + \`${c.definition.type}\` ` +
-            `is out of scope — emit nothing rather than silently drop the local-code ` +
-            `source side.`,
-          loc,
-        ));
+        errors.push(
+          mkError(
+            "emit-mixed-code-and-definition",
+            `Concept "${c.name}" carries BOTH a local \`code is\` and a top-level ` +
+              `definition (\`${c.definition.type}\`). Only \`code is\` + \`defined as\` ` +
+              `or \`code is\` + \`definition is age today at least <n> years\` ` +
+              `(both-representation) is supported; \`code is\` + \`${c.definition.type}\` ` +
+              `is out of scope — emit nothing rather than silently drop the local-code ` +
+              `source side.`,
+            loc,
+          ),
+        );
         continue;
       }
     }
@@ -489,14 +495,16 @@ export function lowerLocalCodes(
       c.conceptType !== undefined &&
       c.conceptType !== "Observation"
     ) {
-      errors.push(mkError(
-        "emit-mixed-code-and-definition",
-        `Concept "${c.name}" is a patient-age recency both-representation ` +
-          `(\`code is\` + \`definition is age today at least <n> years\`) but its ` +
-          `\`type is ${c.conceptType}\`. The recency merge emits an Observation-boolean ` +
-          `retrieve, so patient-age recency requires \`type is Observation\`.`,
-        loc,
-      ));
+      errors.push(
+        mkError(
+          "emit-mixed-code-and-definition",
+          `Concept "${c.name}" is a patient-age recency both-representation ` +
+            `(\`code is\` + \`definition is age today at least <n> years\`) but its ` +
+            `\`type is ${c.conceptType}\`. The recency merge emits an Observation-boolean ` +
+            `retrieve, so patient-age recency requires \`type is Observation\`.`,
+          loc,
+        ),
+      );
       continue;
     }
 
@@ -512,15 +520,17 @@ export function lowerLocalCodes(
       c.representations &&
       c.representations.length > 0
     ) {
-      errors.push(mkError(
-        "emit-mixed-code-and-definition",
-        `Concept "${c.name}" carries a local \`code is\`, a both-representation ` +
-          `definition (\`${c.definition!.type}\`), AND a \`source representation\`. ` +
-          `The \`code is\` + definition + \`source representation\` 3-way is out of ` +
-          `scope this round — emit nothing rather than silently drop the local-code ` +
-          `source side.`,
-        loc,
-      ));
+      errors.push(
+        mkError(
+          "emit-mixed-code-and-definition",
+          `Concept "${c.name}" carries a local \`code is\`, a both-representation ` +
+            `definition (\`${c.definition!.type}\`), AND a \`source representation\`. ` +
+            `The \`code is\` + definition + \`source representation\` 3-way is out of ` +
+            `scope this round — emit nothing rather than silently drop the local-code ` +
+            `source side.`,
+          loc,
+        ),
+      );
       continue;
     }
 
@@ -537,13 +547,15 @@ export function lowerLocalCodes(
     // (4) Missing `type is` (no FHIR resource for the retrieve). Do NOT default
     //     to Observation — the resource must be explicit.
     if (c.conceptType === undefined) {
-      errors.push(mkError(
-        "emit-local-code-missing-type",
-        `Concept "${c.name}" has a local \`code is\` but no \`type is\`. A locally ` +
-          `coded concept needs an explicit FHIR resource type for its retrieve ` +
-          `(it is NOT defaulted to Observation).`,
-        loc,
-      ));
+      errors.push(
+        mkError(
+          "emit-local-code-missing-type",
+          `Concept "${c.name}" has a local \`code is\` but no \`type is\`. A locally ` +
+            `coded concept needs an explicit FHIR resource type for its retrieve ` +
+            `(it is NOT defaulted to Observation).`,
+          loc,
+        ),
+      );
       continue;
     }
 
@@ -552,12 +564,14 @@ export function lowerLocalCodes(
     //     compares two valid concepts asserting the same local domain code.
     const prior = codeValueToConcept.get(codeValue);
     if (prior !== undefined) {
-      errors.push(mkError(
-        "emit-duplicate-local-code",
-        `Local code \`${codeValue}\` is declared by both "${prior}" and "${c.name}". ` +
-          `Each local source code must be unique within the library.`,
-        loc,
-      ));
+      errors.push(
+        mkError(
+          "emit-duplicate-local-code",
+          `Local code \`${codeValue}\` is declared by both "${prior}" and "${c.name}". ` +
+            `Each local source code must be unique within the library.`,
+          loc,
+        ),
+      );
       continue;
     }
 
@@ -566,25 +580,29 @@ export function lowerLocalCodes(
     //     same-named terminologies that collapse in the emitter's name-keyed
     //     maps (and in `loweredByName` below), silently dropping one. Diagnose.
     if (seenSyntheticNames.has(c.name)) {
-      errors.push(mkError(
-        "emit-duplicate-local-concept",
-        `Two local-coded concepts named "${c.name}" would each synthesize a ` +
-          `terminology of that name, colliding in the emitted CQL. Concept names ` +
-          `must be unique within the library.`,
-        loc,
-      ));
+      errors.push(
+        mkError(
+          "emit-duplicate-local-concept",
+          `Two local-coded concepts named "${c.name}" would each synthesize a ` +
+            `terminology of that name, colliding in the emitted CQL. Concept names ` +
+            `must be unique within the library.`,
+          loc,
+        ),
+      );
       continue;
     }
 
     // (7) Synthetic-terminology name collides with a hand-authored terminology.
     if (existingTerminologyNames.has(c.name)) {
-      errors.push(mkError(
-        "emit-local-code-terminology-collision",
-        `Lowering local-coded concept "${c.name}" would synthesize a terminology ` +
-          `of the same name, but a terminology "${c.name}" already exists in this ` +
-          `library. Rename one so the synthesized local code does not collide.`,
-        loc,
-      ));
+      errors.push(
+        mkError(
+          "emit-local-code-terminology-collision",
+          `Lowering local-coded concept "${c.name}" would synthesize a terminology ` +
+            `of the same name, but a terminology "${c.name}" already exists in this ` +
+            `library. Rename one so the synthesized local code does not collide.`,
+          loc,
+        ),
+      );
       continue;
     }
 
@@ -770,4 +788,37 @@ function mkError(kind: string, message: string, loc: Location): CRLError {
     column: loc.start.column,
     message,
   };
+}
+
+/**
+ * The concept NAMES that lower into the shared local codesystem for `ast` — i.e. the exact FHIR
+ * case-feature `action.input` domain (`lowerLocalCodes().localCodes`). This is the ONE eligibility
+ * authority the emitter and the Medical-Validation concept-shape model (disc 189) share, so the MV
+ * panes' leaf questions cannot drift from what the emitted PlanDefinition asks under `$apply`.
+ *
+ * FAIL-CLOSED: a library whose lowering has ANY hard error emits NO case-features at all — the emitter's
+ * `caseFeatureGateOpen` (`fhir-emitter/closureOrchestrator.ts`) requires `errors.length === 0`. Since
+ * `lowerLocalCodes` can push a valid concept to `localCodes` BEFORE a later concept errors (e.g. a
+ * duplicate code value), returning the partial pre-error set would over-claim leaves the emitter never
+ * emits. So on any error this returns ∅. The internal-invariant `throw` (which never fires on valid
+ * input) is likewise caught → ∅, so running this over a non-emittable policy during VALIDATION cannot
+ * crash the cockpit build. Membership is independent of `opts` (they only shape the emitted URL/name),
+ * so the bare call suffices.
+ *
+ * KNOWN EDGE (opts): membership is opts-independent EXCEPT one pathological collision. `lowerLocalCodes`
+ * derives the synthetic local-codesystem DECL NAME from `opts.localDomainId ?? ast.library.name` and hard-errors
+ * if it collides with a top-level identifier. A library that literally declares an identifier named
+ * "<LibraryName> Local Codes" would error here (→ ∅) while the real emit — which passes the POLICY-ID
+ * `localDomainId` — may not collide and DOES emit. That under-claims (never mis-claims) and requires absurd
+ * naming, so it is accepted; a precise fix would thread the emit's `localDomainId` in. The broad `catch` is
+ * deliberate — this runs during VALIDATION and must degrade (∅) rather than crash the cockpit build.
+ */
+export function leafEligibleConcepts(ast: CRL): Set<string> {
+  try {
+    const lowered = lowerLocalCodes(ast);
+    if (lowered.errors.length > 0) return new Set();
+    return new Set(lowered.localCodes.map((lc) => lc.concept));
+  } catch {
+    return new Set();
+  }
 }

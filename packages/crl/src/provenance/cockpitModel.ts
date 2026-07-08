@@ -4,12 +4,15 @@
  * render (CEL cases), and the name→frozen-caseId join — all from the same resolved graph, so their keys agree by
  * construction. (`renderScenario` runs the full CRE; it's on the debounced rebuild path.)
  */
+import { leafEligibleConcepts } from "../cql-emitter/lowerLocalCodes";
 import { renderScenario, type RenderScenarioResult } from "../cre";
 
 import { buildCaseIdJoin } from "./caseIdJoin";
+import { buildConceptShapeIndex, type ConceptShapeIndex } from "./conceptShape";
 import { buildCorrespondenceModelFromResolved, type CorrespondenceModel } from "./correspondence";
 import { buildCrlConceptLayer, type CrlConceptNode } from "./crlConceptLayer";
 import { buildCrlStructure, type CrlDecisionStructure } from "./crlStructure";
+import { collectLibs } from "./indexer";
 import { resolveProvenance, type ResolveProvenanceResult } from "./validateFiles";
 import type { ProvenanceValidationMode } from "./validators";
 
@@ -19,6 +22,10 @@ export interface CockpitModel {
   /** ALL concept declarations across the closure as addressable nodes (#166) — the CRL pane renders these alongside the
    *  decision tree; correspondence joins to them by nodeKey. */
   conceptLayer: CrlConceptNode[];
+  /** Per-concept `defined as` SHAPE subtree (#187 Todo 1b), keyed by nodeKey — drives the Medical-Validation panes'
+   *  faithful question/tree surface (leaf-eligibility ≡ the emitted PlanDefinition's `action.input`). Built on the
+   *  shared inference walk; `leafEligible` sourced from the emitter's lowering (fail-closed on lowering errors). */
+  conceptShape: ConceptShapeIndex;
   /** The full scenario render (cases + status + the success/errors envelope so the CEL pane can show "why" on failure). */
   scenarios: RenderScenarioResult;
   /** Case NAME → frozen caseId — the join between renderScenario (keyed by name) and the correspondence (keyed by the
@@ -53,10 +60,22 @@ export function buildCockpitModelFromResolved(
 ): CockpitModel {
   const { artifactPath, celPath } = opts;
   const { caseIdByName, frozenCollisions, duplicateScenarioNames } = buildCaseIdJoin(r.graph);
+
+  // #187 Todo 1b: the per-concept shape index. Leaf-eligibility is the emitter's own lowering
+  // (`leafEligibleConcepts`, fail-closed on lowering errors) computed per source library HERE — the impure
+  // step — and passed into the PURE `buildConceptShapeIndex` (keeps `cql-emitter` out of the shape builder).
+  const conceptLayer = buildCrlConceptLayer(r.graph);
+  const { libs } = collectLibs(r.graph);
+  const leafEligibleByLib = new Map<string, Set<string>>();
+  for (const [lib, info] of libs) leafEligibleByLib.set(lib, leafEligibleConcepts(info.entry.ast));
+  // Pass the SAME collected `libs` (no re-collect) so the shape builder's lib set matches `conceptLayer`'s.
+  const conceptShape = buildConceptShapeIndex(libs, conceptLayer, leafEligibleByLib);
+
   return {
     correspondence: buildCorrespondenceModelFromResolved(r, { artifactPath, celPath }),
     crlStructure: buildCrlStructure(r.graph),
-    conceptLayer: buildCrlConceptLayer(r.graph),
+    conceptLayer,
+    conceptShape,
     scenarios: renderScenario(r.graph),
     caseIdByName,
     caseNameCollisions: frozenCollisions,

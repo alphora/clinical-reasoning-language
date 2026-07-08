@@ -42,6 +42,8 @@ export type {
 } from "./crlConceptLayer";
 export { buildConceptContainment } from "./conceptContainment";
 export type { ConceptContainment } from "./conceptContainment";
+export { buildConceptShapeIndex, codeIsLeavesPreorder } from "./conceptShape";
+export type { ConceptShapeNode, ConceptShapeIndex } from "./conceptShape";
 export { buildCockpitModel, buildCockpitModelFromResolved } from "./cockpitModel";
 export type { CockpitModel } from "./cockpitModel";
 export { checkCockpitCorrespondence } from "./correspondenceCheck";
