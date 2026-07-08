@@ -1036,7 +1036,12 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       // tree — the graphical decision-tree flowchart (T2 renderer). Same structure + concept inputs as the CRL pane; its
       // reveal shapes are IDENTICAL ({nodeKey} | {conceptNodeKey}), so clicks route through the existing onWebviewMessage
       // path with no new hit kinds, and it highlights in lockstep with the CRL pane (postReveal's crl|tree arms).
-      const r = renderFlowPane(crlStructure, { revealPrefix: `g${gen}_`, concepts: conceptLayer });
+      const r = renderFlowPane(crlStructure, {
+        revealPrefix: `g${gen}_`,
+        concepts: conceptLayer,
+        conceptShape: buildConceptShapeResolver(), // #187 Todo 4: composite → def-leaf sub-nodes
+        resolveConceptInfo: buildResolveConceptInfo(),
+      });
       v.anchors = r.anchors;
       v.reveals = r.reveals;
       void v.panel.webview.postMessage({ type: "render", html: r.html, gen, indexVersion });

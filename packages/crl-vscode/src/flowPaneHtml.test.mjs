@@ -74,7 +74,7 @@ check("guarded recommend exposes the guard concept as a peek", () => {
 });
 
 check("node shapes by kind (class counts)", () => {
-  const count = (cls) => (r.html.match(new RegExp(`class="flow-row ${cls}"`, "g")) || []).length;
+  const count = (cls) => (r.html.match(new RegExp(`class="flow-row ${cls}[ "]`, "g")) || []).length; // allow trailing classes (e.g. flow-nonsource)
   assert.equal(count("flow-decision"), 1);
   assert.equal(count("flow-when"), 3); // A, B, Z
   assert.equal(count("flow-activity"), 3); // X, Y, Q (recommend)
@@ -261,7 +261,7 @@ check("peek glyph is NESTED inside the row <g> (closest() routes glyph→peek, b
   // a resolved when row: <g id=… class="flow-row flow-when" data-reveal=…><title>…</title><rect/><text>…</text><g class="flow-peek…" data-reveal=…><circle/><title/></g></g>
   assert.match(
     r.html,
-    /<g id="g1_flow\d+" class="flow-row flow-when" data-reveal="g1_kg1_flow\d+"><title>[^<]*<\/title><rect [^>]*\/><text [^>]*>[^<]*<\/text><g class="flow-peek [^"]*" data-reveal="g1_pg1_flow\d+"><circle [^>]*\/><title>[^<]*<\/title><\/g><\/g>/,
+    /<g id="g1_flow\d+" class="flow-row flow-when[^"]*" data-reveal="g1_kg1_flow\d+"><title>[^<]*<\/title><rect [^>]*\/><text [^>]*>[^<]*<\/text><g class="flow-peek [^"]*" data-reveal="g1_pg1_flow\d+"><circle [^>]*\/><title>[^<]*<\/title><\/g><\/g>/,
     "peek <g> sits between the row's <rect>/<text> and the row's closing </g> (nested, not a sibling)",
   );
 });
@@ -294,6 +294,65 @@ check("guarded use-decision: flow-use node + a guard peek on it", () => {
   }], { concepts });
   assert.ok(/class="flow-row flow-use"/.test(g.html), "use-decision renders as a flow-use node");
   assert.ok(Object.values(g.reveals).some((v) => v.conceptNodeKey === "c:G"), "the use-decision's guard G is a concept peek");
+});
+
+// ── #187 Todo 4: composite `defined as` leaves as def-leaf sub-nodes + non-Source grey fill ──
+check("Todo 4: a composite when expands its defined-as leaves as flow-leaf nodes (distinct def-edge, non-Source greyed, peek-not-select, synthetic anchor)", () => {
+  // when B's concept c:B is a composite; expand it to leaves L1 (code-is) + L2 (non-Source).
+  const shape = {
+    B: {
+      nodeKey: "c:B", hasCodeIs: false, leafEligible: false, isInferred: true, hasDefinedAs: true,
+      children: [
+        { nodeKey: "c:L1", hasCodeIs: true, leafEligible: true, isInferred: false, hasDefinedAs: false, children: [] },
+        { nodeKey: "c:L2", hasCodeIs: false, leafEligible: false, isInferred: false, hasDefinedAs: false, children: [] },
+      ],
+    },
+  };
+  const info = { "c:L1": { lib: "Pol", name: "L1", valueTypes: [] }, "c:L2": { lib: "Pol", name: "L2", valueTypes: [] } };
+  const rr = renderFlowPane(structure, { concepts, revealPrefix: "g2_", conceptShape: (_l, n) => shape[n], resolveConceptInfo: (nk) => info[nk] });
+  const leafRows = [...rr.html.matchAll(/<g id="[^"]*" class="([^"]*flow-leaf[^"]*)"[^>]*>.*?<text[^>]*>([^<]*)<\/text>/g)].map((m) => ({ cls: m[1], label: m[2] }));
+  assert.deepEqual(leafRows.map((l) => l.label).sort(), ["L1", "L2"], "two def-leaf nodes (L1, L2)");
+  assert.ok(/class="flow-def-edge"/.test(rr.html), "def-leaf edges use the distinct flow-def-edge, not flow-edge");
+  assert.ok(leafRows.find((l) => l.label === "L2").cls.includes("flow-nonsource"), "L2 (no code-is) is greyed");
+  assert.ok(!leafRows.find((l) => l.label === "L1").cls.includes("flow-nonsource"), "L1 (code-is) is NOT greyed");
+  const leafPeeks = Object.values(rr.reveals).filter((v) => v.conceptNodeKey === "c:L1" || v.conceptNodeKey === "c:L2");
+  assert.equal(leafPeeks.length, 2, "a leaf body reveals its OWN concept (peek), never a {nodeKey} select");
+  assert.equal(Object.keys(rr.anchors).filter((k) => k.startsWith("leaf::")).length, 2, "leaf anchors under the reserved leaf:: prefix (safe no-op)");
+  assert.ok(!Object.values(rr.reveals).some((v) => v.nodeKey && v.nodeKey.startsWith("leaf::")), "no {nodeKey} select for a synthetic leaf");
+});
+
+check("Todo 4: a composite with more than the cap collapses the remainder into a '+N more' stub", () => {
+  const kids = Array.from({ length: 13 }, (_, i) => ({ nodeKey: `c:K${i}`, hasCodeIs: true, leafEligible: true, isInferred: false, hasDefinedAs: false, children: [] }));
+  const shape = { B: { nodeKey: "c:B", hasCodeIs: false, leafEligible: false, isInferred: true, hasDefinedAs: true, children: kids } };
+  const info = (nk) => (nk.startsWith("c:K") ? { lib: "Pol", name: nk.slice(2), valueTypes: [] } : undefined);
+  const rr = renderFlowPane(structure, { concepts, revealPrefix: "g3_", conceptShape: (_l, n) => shape[n], resolveConceptInfo: info });
+  const labels = [...rr.html.matchAll(/<g id="[^"]*" class="[^"]*flow-leaf[^"]*"[^>]*>.*?<text[^>]*>([^<]*)<\/text>/g)].map((m) => m[1]);
+  assert.equal(labels.filter((l) => !l.startsWith("+")).length, 10, "at most LEAF_CAP (10) leaves shown");
+  assert.ok(labels.some((l) => l === "+3 more"), "the remaining 3 collapse into a '+3 more' stub");
+  // the stub is NON-CLICKABLE: its <g> carries no data-reveal (a leaf <g> whose class attr is immediately followed by
+  // `>` — real leaves have ` data-reveal=…`; only the concept-less stub does not).
+  assert.match(rr.html, /<g id="[^"]*" class="[^"]*flow-leaf[^"]*"><title>[^<]*<\/title><rect[^>]*\/><text[^>]*>\+\d+ more<\/text><\/g>/, "the '+N more' stub is non-clickable (no data-reveal)");
+});
+
+check("Todo 4: leaves keep the disjoint-band layout (no overlap with a following sibling) + a nested composite leaf recurses deeper", () => {
+  const struct = [{ decision: "D", lib: "Pol", nodeKey: "d:D", location: {}, children: [
+    node("w:C", "when", "when C", ["c:C"], [node("a:C", "action", "X", ["act:X"], [], { actionKind: "recommend-activity" })]),
+    node("w:C2", "when", "when C2", ["c:C2"], [node("a:C2", "action", "Y", ["act:Y"], [], { actionKind: "recommend-activity" })]),
+  ] }];
+  const cs = [concept("c:C", "C", { definitionKind: "defined-as" }), concept("c:C2", "C2")];
+  const shape = { C: { nodeKey: "c:C", hasCodeIs: false, leafEligible: false, isInferred: true, hasDefinedAs: true, children: [
+    { nodeKey: "c:L", hasCodeIs: false, leafEligible: false, isInferred: true, hasDefinedAs: true, children: [
+      { nodeKey: "c:La", hasCodeIs: true, leafEligible: true, isInferred: false, hasDefinedAs: false, children: [] },
+    ] },
+  ] } };
+  const info = { "c:L": { lib: "Pol", name: "L", valueTypes: [] }, "c:La": { lib: "Pol", name: "La", valueTypes: [] } };
+  const rr = renderFlowPane(struct, { concepts: cs, revealPrefix: "g4_", conceptShape: (_l, n) => shape[n], resolveConceptInfo: (nk) => info[nk] });
+  const leaf = (name) => rr.html.match(new RegExp(`class="[^"]*flow-leaf[^"]*"[^>]*><title>[^<]*</title><rect x="(\\d+)"[^>]*/><text[^>]*>${name}</text>`));
+  assert.ok(+leaf("La")[1] > +leaf("L")[1], "a nested composite leaf La renders one column DEEPER than its parent leaf L");
+  const rects = [...rr.html.matchAll(/<rect x="(\d+)" y="(\d+)" width="(\d+)" height="(\d+)"/g)].map((m) => ({ x: +m[1], y: +m[2], h: +m[4] }));
+  const byX = new Map();
+  for (const rc of rects) (byX.get(rc.x) ?? byX.set(rc.x, []).get(rc.x)).push(rc);
+  for (const [, col] of byX) { col.sort((a, b) => a.y - b.y); for (let i = 1; i < col.length; i++) assert.ok(col[i].y >= col[i - 1].y + col[i - 1].h, `overlap at x=${col[i].x}`); }
 });
 
 console.log(`\nflowPaneHtml.test: ${pass} checks passed`);
