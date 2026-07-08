@@ -55,6 +55,16 @@ function definedAsBare(name: string, ref: string): Concept {
   return { type: "Concept", name, valueTypes: [], representations: [], definition, location: LOC };
 }
 
+/** A concept carrying a NON-`defined as` definition (`coded from`) — the `definedAsByName` fallback twin. */
+function codedFrom(name: string): Concept {
+  const definition: ConceptDefinition = {
+    type: "CodedFromDefinition",
+    terminologyName: `${name} VS`,
+    location: LOC,
+  };
+  return { type: "Concept", name, valueTypes: [], representations: [], definition, location: LOC };
+}
+
 const LIB = "Lib";
 
 describe("collectCodeIsConceptsInInferenceOrder", () => {
@@ -70,12 +80,19 @@ describe("collectCodeIsConceptsInInferenceOrder", () => {
   });
 
   it("sem-and — `A And B` (no code) over two leaves → [A, B] left-to-right", () => {
-    const definedAsByName = new Map([["A And B", definedAs("A And B", semAnd(compRef("A"), compRef("B")))]]);
+    const definedAsByName = new Map([
+      ["A And B", definedAs("A And B", semAnd(compRef("A"), compRef("B")))],
+    ]);
     const codeByConcept = new Map([
       ["A", "a"],
       ["B", "b"],
     ]);
-    const out = collectCodeIsConceptsInInferenceOrder(bareRef("A And B"), LIB, definedAsByName, codeByConcept);
+    const out = collectCodeIsConceptsInInferenceOrder(
+      bareRef("A And B"),
+      LIB,
+      definedAsByName,
+      codeByConcept,
+    );
     expect(out.map((c) => c.name)).toEqual(["A", "B"]);
   });
 
@@ -89,7 +106,12 @@ describe("collectCodeIsConceptsInInferenceOrder", () => {
       ["B", "b"],
       ["C", "c"],
     ]);
-    const out = collectCodeIsConceptsInInferenceOrder(bareRef("Top"), LIB, definedAsByName, codeByConcept);
+    const out = collectCodeIsConceptsInInferenceOrder(
+      bareRef("Top"),
+      LIB,
+      definedAsByName,
+      codeByConcept,
+    );
     expect(out.map((c) => c.name)).toEqual(["A", "B", "C"]);
   });
 
@@ -101,14 +123,24 @@ describe("collectCodeIsConceptsInInferenceOrder", () => {
       ["Estrogen", "a"],
       ["Estradiol", "b"],
     ]);
-    const out = collectCodeIsConceptsInInferenceOrder(bareRef("C"), LIB, definedAsByName, codeByConcept);
+    const out = collectCodeIsConceptsInInferenceOrder(
+      bareRef("C"),
+      LIB,
+      definedAsByName,
+      codeByConcept,
+    );
     expect(out.map((c) => c.name)).toEqual(["C", "Estrogen", "Estradiol"]);
   });
 
   it("dedup by name within a condition — a leaf referenced via two operands appears ONCE", () => {
     const definedAsByName = new Map([["Top", definedAs("Top", semOr(compRef("A"), compRef("A")))]]);
     const codeByConcept = new Map([["A", "a"]]);
-    const out = collectCodeIsConceptsInInferenceOrder(bareRef("Top"), LIB, definedAsByName, codeByConcept);
+    const out = collectCodeIsConceptsInInferenceOrder(
+      bareRef("Top"),
+      LIB,
+      definedAsByName,
+      codeByConcept,
+    );
     expect(out.map((c) => c.name)).toEqual(["A"]);
   });
 
@@ -118,7 +150,12 @@ describe("collectCodeIsConceptsInInferenceOrder", () => {
       ["B", definedAsBare("B", "A")],
     ]);
     // Neither has a code → empty result, but crucially the call RETURNS.
-    const out = collectCodeIsConceptsInInferenceOrder(bareRef("A"), LIB, definedAsByName, new Map());
+    const out = collectCodeIsConceptsInInferenceOrder(
+      bareRef("A"),
+      LIB,
+      definedAsByName,
+      new Map(),
+    );
     expect(out).toEqual([]);
   });
 
@@ -136,24 +173,73 @@ describe("collectCodeIsConceptsInInferenceOrder", () => {
   it("cross-library operand ref is SKIPPED (unsupported in v0)", () => {
     // `Top` (no code) = OtherLib."A" sem-or B. The foreign operand is skipped; the
     // same-library B is collected.
-    const foreign: ReferenceName = { type: "QualifiedReference", libraryName: "OtherLib", name: "A", location: LOC };
+    const foreign: ReferenceName = {
+      type: "QualifiedReference",
+      libraryName: "OtherLib",
+      name: "A",
+      location: LOC,
+    };
     const definedAsByName = new Map([
       [
         "Top",
-        definedAs("Top", semOr({ type: "CompositionRef", ref: foreign, location: LOC }, compRef("B"))),
+        definedAs(
+          "Top",
+          semOr({ type: "CompositionRef", ref: foreign, location: LOC }, compRef("B")),
+        ),
       ],
     ]);
     const codeByConcept = new Map([
       ["A", "a"],
       ["B", "b"],
     ]);
-    const out = collectCodeIsConceptsInInferenceOrder(bareRef("Top"), LIB, definedAsByName, codeByConcept);
+    const out = collectCodeIsConceptsInInferenceOrder(
+      bareRef("Top"),
+      LIB,
+      definedAsByName,
+      codeByConcept,
+    );
     expect(out.map((c) => c.name)).toEqual(["B"]);
   });
 
-  it("self-qualified condition ref (`Lib.\"C\"` inside Lib) is normalized and collected", () => {
-    const selfQual: ReferenceName = { type: "QualifiedReference", libraryName: LIB, name: "C", location: LOC };
-    const out = collectCodeIsConceptsInInferenceOrder(selfQual, LIB, new Map(), new Map([["C", "c"]]));
+  it('self-qualified condition ref (`Lib."C"` inside Lib) is normalized and collected', () => {
+    const selfQual: ReferenceName = {
+      type: "QualifiedReference",
+      libraryName: LIB,
+      name: "C",
+      location: LOC,
+    };
+    const out = collectCodeIsConceptsInInferenceOrder(
+      selfQual,
+      LIB,
+      new Map(),
+      new Map([["C", "c"]]),
+    );
     expect(out).toEqual([{ name: "C", code: "c" }]);
+  });
+
+  it("a NON-`defined as` concept (coded from) does not recurse — [self] with a code, [] without", () => {
+    const defByName = new Map([
+      ["Dx", codedFrom("Dx")],
+      ["Other", codedFrom("Other")],
+    ]);
+    // Present code → [self]; the coded-from definition contributes no operands to walk.
+    expect(
+      collectCodeIsConceptsInInferenceOrder(
+        bareRef("Dx"),
+        LIB,
+        defByName,
+        new Map([["Dx", "dx"]]),
+      ).map((c) => c.name),
+    ).toEqual(["Dx"]);
+    // No code → nothing (a coded-from concept is not itself a lowered local code).
+    expect(collectCodeIsConceptsInInferenceOrder(bareRef("Dx"), LIB, defByName, new Map())).toEqual(
+      [],
+    );
+  });
+
+  it("a condition with no code and no defined as → [] (walked-through, nothing collected)", () => {
+    expect(
+      collectCodeIsConceptsInInferenceOrder(bareRef("Bare"), LIB, new Map(), new Map()),
+    ).toEqual([]);
   });
 });

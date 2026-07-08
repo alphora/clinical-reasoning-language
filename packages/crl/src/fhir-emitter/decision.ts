@@ -70,12 +70,7 @@ import type {
   WhenBlock,
   WhenBlockBody,
 } from "../ast/types";
-import {
-  getRefLibrary,
-  getRefName,
-  isQualifiedRef,
-  refDisplay,
-} from "../ast/types";
+import { getRefName, isQualifiedRef, normalizeLocalRef, refDisplay } from "../ast/types";
 import type { CRLError } from "../types/errors";
 import { libraryCanonicalUrl } from "./library";
 import { recommendationDefinitionCanonicalUrl } from "./recommendation";
@@ -177,23 +172,6 @@ export function planDefinitionCanonicalUrl(
 // slug is the suffix.
 function decisionId(metadata: CpgMetadata, decisionName: string): string {
   return capSlug(`${policyIdBase(metadata)}-${slugify(decisionName)}`);
-}
-
-/* ─── Module-internal helpers ────────────────────────────────────── */
-
-/**
- * Idempotent: bare ref → bare ref; qualified ref whose library
- * matches `libraryName` byte-for-byte → bare ref; qualified ref with
- * different library → unchanged.
- *
- * `libraryName` MUST be `ast.library.name` (the declared CRL library
- * name), not the slug. Matches validator semantics at
- * `src/validator/referenceResolver.ts:362–369`.
- */
-function normalizeLocalRef(ref: ReferenceName, libraryName: string): ReferenceName {
-  if (!isQualifiedRef(ref)) return ref;
-  if (getRefLibrary(ref) === libraryName) return getRefName(ref);
-  return ref;
 }
 
 /**

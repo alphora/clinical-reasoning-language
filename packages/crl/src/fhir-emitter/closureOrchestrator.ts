@@ -36,7 +36,7 @@
  */
 
 import type { Activity, BranchBlock, Concept, Decision, ReferenceName, Terminology } from "../ast/types";
-import { getRefLibrary, getRefName, isQualifiedRef } from "../ast/types";
+import { getRefLibrary, getRefName, isQualifiedRef, normalizeLocalRef } from "../ast/types";
 import { resolveDispositionConfig } from "../dispositions";
 import { computeFhirEmitClosure } from "../imports/computeEmitClosure";
 import { safeOutputFilename } from "../imports/safeOutputFilename";
@@ -159,14 +159,6 @@ function buildAllLibrariesIndex(
     terminologies.set(lib.libraryName, terminologyMap);
   }
   return { concepts, activities, decisions, terminologies };
-}
-
-/* ─── normalizeLocalRef (re-used; same semantics as decision.ts) ───── */
-
-function normalizeLocalRef(ref: ReferenceName, libraryName: string): ReferenceName {
-  if (!isQualifiedRef(ref)) return ref;
-  if (getRefLibrary(ref) === libraryName) return getRefName(ref);
-  return ref;
 }
 
 /* ─── per-source-library resolvers ─────────────────────────────────── */

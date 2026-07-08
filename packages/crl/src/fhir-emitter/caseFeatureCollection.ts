@@ -35,8 +35,8 @@
  * case-features are unsupported in v0 (mirrors the decision/concept resolvers).
  */
 
-import type { CompositionExpression, Concept, ReferenceName } from "../ast/types";
-import { getRefLibrary, getRefName, isQualifiedRef } from "../ast/types";
+import { flattenDefinedAsBody, walkInferenceOrder } from "../ast/inferenceWalk";
+import type { Concept, ReferenceName } from "../ast/types";
 
 /** One collected `code is` concept, in inference order. */
 export interface CollectedCodeIsConcept {
@@ -45,20 +45,14 @@ export interface CollectedCodeIsConcept {
 }
 
 /**
- * Same-library qualified-ref normalization (mirrors closureOrchestrator /
- * decision.ts `normalizeLocalRef`): a `ThisLib."X"` ref inside `ThisLib` becomes
- * bare `X`; a genuine `OtherLib."X"` stays qualified (and is then skipped as a
- * cross-library ref).
- */
-function normalizeLocalRef(ref: ReferenceName, libraryName: string): ReferenceName {
-  if (!isQualifiedRef(ref)) return ref;
-  if (getRefLibrary(ref) === libraryName) return getRefName(ref);
-  return ref;
-}
-
-/**
  * Collect the `code is` concepts reachable from a decision condition `conditionRef`
  * in inference order (pre-order, operands left-to-right), deduped by name.
+ *
+ * A thin adapter over the neutral single-authority walk (`ast/inferenceWalk`): the ordering,
+ * cycle/diamond guards, same-library normalization, and cross-library skip live there (SHARED with
+ * the MV concept-shape model so the panes cannot drift from `$apply`). This lane supplies the FHIR
+ * adjacency — `codeByConcept` presence = leaf-eligibility, `definedAsByName` = the operand edges —
+ * and accumulates the flat leaf list. Dedup-by-name is inherent: the walk enters each name once.
  *
  * @param conditionRef   the (raw) `when` condition concept ref.
  * @param libraryName    the source library (for same-library normalization).
@@ -78,67 +72,19 @@ export function collectCodeIsConceptsInInferenceOrder(
   codeByConcept: ReadonlyMap<string, string>,
 ): CollectedCodeIsConcept[] {
   const ordered: CollectedCodeIsConcept[] = [];
-  const appended = new Set<string>(); // dedup by name (first wins)
-  const visiting = new Set<string>(); // cycle guard for the current traversal
-  const visited = new Set<string>(); // F4 — memo: a fully-walked subtree is never re-walked
-
-  const visitName = (name: string): void => {
-    if (visiting.has(name)) return; // cycle — stop, do not re-traverse
-    // F4 (impl-review) — diamond memoization. A concept reachable by two paths
-    // (e.g. `Top defined as (A And B) sem-or A`, where A is shared) would
-    // otherwise re-walk A's whole subtree on the second visit. The `appended`
-    // dedup keeps the OUTPUT correct, but the walk was superlinear on diamond-
-    // shaped inference graphs. Memoizing fully-completed names makes it linear.
-    if (visited.has(name)) return;
-    visiting.add(name);
-
-    // PRE-ORDER: the concept's OWN code first (a both-rep concept lists itself
-    // before its operands).
-    const code = codeByConcept.get(name);
-    if (code !== undefined && !appended.has(name)) {
-      appended.add(name);
-      ordered.push({ name, code });
-    }
-
-    // Then recurse this concept's `defined as` operands, left-to-right.
-    const defined = definedAsByName.get(name);
-    if (defined?.definition?.type === "DefinedAsDefinition") {
-      const body = defined.definition.body;
-      if (body.type === "DefinedAsBareRef") {
-        visitRef(body.ref);
-      } else {
-        visitComposition(body.expression);
-      }
-    }
-
-    visiting.delete(name);
-    visited.add(name); // F4 — fully walked; memoize so a later path skips it
-  };
-
-  const visitRef = (ref: ReferenceName): void => {
-    const normalized = normalizeLocalRef(ref, libraryName);
-    if (isQualifiedRef(normalized)) return; // cross-library — unsupported in v0
-    visitName(getRefName(normalized));
-  };
-
-  const visitComposition = (expr: CompositionExpression): void => {
-    switch (expr.type) {
-      case "SemOrExpression":
-      case "SemAndExpression":
-        for (const term of expr.terms) visitComposition(term);
-        return;
-      case "SemNotExpression":
-        visitComposition(expr.expression);
-        return;
-      case "CompositionGroup":
-        visitComposition(expr.expression);
-        return;
-      case "CompositionRef":
-        visitRef(expr.ref);
-        return;
-    }
-  };
-
-  visitRef(conditionRef);
+  walkInferenceOrder(conditionRef, libraryName, {
+    codeOf: (name) => codeByConcept.get(name),
+    operandsOf: (name) => {
+      const defined = definedAsByName.get(name);
+      return defined?.definition?.type === "DefinedAsDefinition"
+        ? flattenDefinedAsBody(defined.definition.body)
+        : [];
+    },
+    // PRE-ORDER: a both-rep concept's own code is pushed before its operands. The walk enters each
+    // name once (cycle/diamond guards), so a leaf referenced twice yields ONE entry.
+    onEnter: (name, code) => {
+      if (code !== undefined) ordered.push({ name, code });
+    },
+  });
   return ordered;
 }

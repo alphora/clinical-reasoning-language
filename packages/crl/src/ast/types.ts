@@ -97,6 +97,21 @@ export function refDisplay(ref: ReferenceName): string {
   return typeof ref === "string" ? `"${ref}"` : `"${ref.libraryName}"."${ref.name}"`;
 }
 
+/**
+ * Same-library qualified-ref normalization — the SINGLE authority (was duplicated across the FHIR
+ * emitter's closureOrchestrator/decision lanes and the inference walk). Idempotent: a bare ref → bare
+ * ref; a qualified ref whose library matches `libraryName` byte-for-byte → its bare name; a qualified
+ * ref with a different library → unchanged (a genuine cross-library ref).
+ *
+ * `libraryName` MUST be `ast.library.name` (the declared CRL library name), not the slug — matches the
+ * validator's referenceResolver semantics.
+ */
+export function normalizeLocalRef(ref: ReferenceName, libraryName: string): ReferenceName {
+  if (!isQualifiedRef(ref)) return ref;
+  if (getRefLibrary(ref) === libraryName) return getRefName(ref);
+  return ref;
+}
+
 // --------------------------- DECISION STATEMENT ----------------------------
 
 // Decision node
