@@ -49,7 +49,7 @@ async function loadCockpit() {
   return require(out);
 }
 
-const { COCKPIT_WEBVIEW_SCRIPT: SCRIPT } = await loadCockpit();
+const { COCKPIT_WEBVIEW_SCRIPT: SCRIPT, leafMarkBuckets } = await loadCockpit();
 
 let pass = 0;
 const check = (label, fn) => {
@@ -376,6 +376,92 @@ check("render handler PRESERVES note drafts across the innerHTML swap (snapshot 
   const iRestore = body.indexOf("ta.value=_d[k]");
   assert.ok(iSnap > -1 && iSwap > -1 && iRestore > -1, "snapshot + swap + restore all present");
   assert.ok(iSnap < iSwap && iSwap < iRestore, "order: snapshot BEFORE the swap, restore AFTER");
+});
+
+// ── #187 Todo 5: the per-case leaf VERDICT channel + its SURVIVES-REVEAL invariant ──
+check("sanity: the leaf-verdict handlers + clrLeaf exist in the extracted script", () => {
+  assert.match(SCRIPT, /const clrLeaf=\(\)=>\{/, "clrLeaf is defined");
+  assert.match(SCRIPT, /if\(m\.type==='markLeaves'\)/, "markLeaves handler");
+  assert.match(SCRIPT, /if\(m\.type==='clearLeaves'\)/, "clearLeaves handler");
+});
+
+check("SURVIVES-REVEAL: clrLeaf is called ONLY by mark/clearLeaves, NEVER by the selection channel (leaf answers survive a cockpit reveal)", () => {
+  // The leaf verdict is per-CASE truth (like .done-node/.this-node), so the selection channel must not touch it.
+  for (const type of ["highlight", "clearHighlight"]) {
+    const body = handlerBody(type);
+    assert.ok(!/clrLeaf\(\)/.test(body), `${type} MUST NOT call clrLeaf — the leaf verdict survives a reveal`);
+    assert.ok(!/flow-leaf-yes|flow-leaf-no/.test(body), `${type} MUST NOT touch the leaf-verdict classes at all`);
+  }
+  // The other independent channels must not touch it either.
+  for (const type of ["markFailedCriteria", "clearFailedCriteria", "markReviewOverlay", "markThisNode", "markDiverters"]) {
+    const body = handlerBody(type);
+    assert.ok(!/clrLeaf\(\)|flow-leaf-yes|flow-leaf-no/.test(body), `${type} MUST NOT touch the leaf-verdict channel (independent)`);
+  }
+  // Exactly two clrLeaf() call sites, both inside the leaf handlers (clear-then-mark + the explicit clear).
+  const callSites = (SCRIPT.match(/clrLeaf\(\)/g) || []).length;
+  assert.equal(callSites, 2, "clrLeaf is called exactly twice — markLeaves (clear-then-set) + clearLeaves");
+});
+
+check("clrLeaf strips ONLY the leaf-verdict classes, never the selection/review/marker classes", () => {
+  const m = SCRIPT.match(/const clrLeaf=\(\)=>\{[\s\S]*?\};/);
+  assert.ok(m, "clrLeaf body");
+  assert.ok(!/current|failed-criterion|done-node|error-node|this-node|diverter/.test(m[0]), "clrLeaf strips only .flow-leaf-yes/.flow-leaf-no");
+});
+
+check("CLEAR-THEN-SET + GEN-GUARD + MUTUAL EXCLUSION: markLeaves clears both classes first, is gen-guarded, and yes/no are exclusive per leaf", () => {
+  const body = handlerBody("markLeaves");
+  assert.ok(/if\(m\.gen!==gen\)return;/.test(body), "markLeaves is gen-guarded (drops a mark for a superseded render)");
+  // clrLeaf() BEFORE any add — the load-bearing fix (a stale `yes` under a case that doesn't answer the leaf must clear).
+  const iClr = body.indexOf("clrLeaf()");
+  const iYes = body.indexOf("flow-leaf-yes");
+  assert.ok(iClr > -1 && iYes > -1 && iClr < iYes, "clrLeaf() runs BEFORE adding any leaf class (clear-then-set)");
+  assert.ok(/m\.yesIds\|\|\[\][\s\S]*add\('flow-leaf-yes'\)/.test(body), "yesIds → .flow-leaf-yes");
+  assert.ok(/m\.noIds\|\|\[\][\s\S]*add\('flow-leaf-no'\)/.test(body), "noIds → .flow-leaf-no");
+  const clear = handlerBody("clearLeaves");
+  assert.ok(!/m\.gen!==gen/.test(clear), "clearLeaves is ungated (a class-strip is always safe)");
+});
+
+check("HOST: driveLeafMarks re-drives on tree-ack + rebuild, and is NEVER wired into the selection-reveal helpers", () => {
+  // The tree-only leaf overlay's survives-reveal guarantee = a re-drive when the tree re-renders (ack) + on rebuild.
+  assert.ok(/if \(pane === "tree"\) \{[\s\S]*?driveLeafMarks\(\);[\s\S]*?\}/.test(COCKPIT_SRC), "the tree-ack (`ready`) handler re-drives driveLeafMarks");
+  // rebuild tail re-drives all persistent tree channels including driveLeafMarks.
+  assert.ok(/driveDoneOverlay\(\);[\s\S]*?driveLeafMarks\(\);/.test(COCKPIT_SRC), "the rebuild tail re-drives driveLeafMarks");
+  // Must NOT be wired into the selection-reveal helpers (host survives-reveal invariant).
+  for (const fn of ["clearHighlight", "clearAllHighlights", "highlightRows"]) {
+    const m = COCKPIT_SRC.match(new RegExp(`function ${fn}\\([^)]*\\)[^{]*\\{([\\s\\S]*?)\\n  \\}`));
+    if (m) assert.ok(!/driveLeafMarks\(/.test(m[1]), `${fn} must not drive the leaf-verdict channel (survives a reveal)`);
+  }
+});
+
+check("HOST: driveLeafMarks is FOCUSED-CASE-coupled via focusedScenario (clears with the case, like this-node/diverters — NOT the all-cases done overlay)", () => {
+  // gpt55 impl review: the intended lifecycle is per-focused-case (a leaf verdict is THIS case's answers), so on a non-cel
+  // selection it MUST clear — exactly like driveThisNode/driveDiverters, which read the same focusedScenario(). Lock that
+  // driveLeafMarks resolves the case via focusedScenario() (so it clears when there is no focused case) and does NOT walk
+  // all cases like driveDoneOverlay (scenarioByCaseId.keys()).
+  const body = COCKPIT_SRC.match(/function driveLeafMarks\(\): void \{([\s\S]*?)\n  \}/);
+  assert.ok(body, "driveLeafMarks body found");
+  assert.ok(/focusedScenario\(\)/.test(body[1]), "driveLeafMarks resolves the case via focusedScenario (focused-case-coupled)");
+  assert.ok(!/scenarioByCaseId\.keys\(\)/.test(body[1]), "driveLeafMarks does NOT iterate all cases (it is per-focused-case, not the done overlay)");
+  // The empty/errored-case arm posts an EMPTY gen-stamped markLeaves (steady-state clear-effect), NOT an ungated clearLeaves.
+  assert.ok(/markLeaves\(tree, \[\], \[\]\)/.test(body[1]), "no/errored focused case → an EMPTY gen-stamped mark (gen-ordered, mirrors driveDoneOverlay FIX 1)");
+});
+
+// ── #187 Todo 5: the PURE leaf-verdict bucketing (the on-path gate + absent-is-unknown rule, in isolation) ──
+check("BUCKETING: leafMarkBuckets gates on the on-path composite + maps conceptTruth to yes/no; off-path + absent get NO mark", () => {
+  const tk = (lib, name) => JSON.stringify([lib, name]);
+  const leafConcepts = {
+    "leaf::w:On|c:yes": { lib: "Pol", name: "Yes", topWhenKey: "w:On" }, // on-path + satisfied → yes
+    "leaf::w:On|c:no": { lib: "Pol", name: "No", topWhenKey: "w:On" }, //  on-path + false     → no
+    "leaf::w:On|c:unk": { lib: "Pol", name: "Unk", topWhenKey: "w:On" }, // on-path + ABSENT    → neither (unknown)
+    "leaf::w:Off|c:yes": { lib: "Pol", name: "Yes", topWhenKey: "w:Off" }, // OFF-path (same concept, satisfied) → neither
+  };
+  const satisfiedWhenKeys = new Set(["w:On"]); // w:Off is NOT on the fired-satisfied path
+  const truthByKey = new Map([[tk("Pol", "Yes"), true], [tk("Pol", "No"), false]]); // "Unk" absent
+  const { yesKeys, noKeys } = leafMarkBuckets(leafConcepts, satisfiedWhenKeys, truthByKey);
+  assert.deepEqual(yesKeys, ["leaf::w:On|c:yes"], "only the on-path satisfied leaf is yes (the off-path 'Yes' is NOT lit — parity)");
+  assert.deepEqual(noKeys, ["leaf::w:On|c:no"], "the on-path false leaf is no");
+  // absent concept ('Unk') and the off-path leaf appear in NEITHER bucket.
+  assert.ok(!yesKeys.concat(noKeys).some((k) => k.includes("c:unk") || k === "leaf::w:Off|c:yes"), "unknown + off-path leaves get NO mark");
 });
 
 console.log(`\ncockpitWebviewScript.test: ${pass} checks passed`);

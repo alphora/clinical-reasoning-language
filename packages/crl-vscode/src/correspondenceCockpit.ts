@@ -72,7 +72,7 @@ import {
 import { renderCrlPane } from "./crlPaneHtml";
 import { FLOW_STYLE, renderFlowPane } from "./flowPaneHtml";
 import { QUESTIONNAIRE_STYLE, renderQuestionnairePane, shouldRerenderQuestionnaire, nextQuestionIndex } from "./questionnairePaneHtml";
-import { buildQuestionnaire, producedPathDiverterIds } from "./questionnaireModel";
+import { buildQuestionnaire, producedPathDiverterIds, type Questionnaire } from "./questionnaireModel";
 import type { ConceptValueType, ResolveValueTypes, ResolveConceptShape, ResolveConceptInfo } from "./questionnaireModel";
 import {
   buildCrlRevealMaps,
@@ -134,6 +134,10 @@ interface PaneView {
   /** Per-pane click payload (a WebviewHit): source spans → {unitId,range}; CRL rows → {nodeKey}; CEL cases → {caseId};
    *  CEL facts → {conceptKey,factAnchorKey} (a peek, NOT an engine selection — routed before mapHitToPrimary). */
   reveals: Record<string, WebviewHit>;
+  /** #187 Todo 5 (TREE pane only): synthetic def-leaf anchor key → its leaf concept identity + owning composite `when`,
+   *  from the flow render. `driveLeafMarks` joins `{lib,name}` to a case's conceptTruth for the yes/no verdict and gates on
+   *  `topWhenKey` being an on-path-satisfied composite. Empty on every non-tree pane (and reset each render, like anchors). */
+  leafConcepts: Record<string, { lib: string; name: string; topWhenKey: string }>;
   disposables: vscode.Disposable[];
 }
 
@@ -186,6 +190,27 @@ function toIndex(
     crlNav: toCrlNav(structure),
     celNav,
   };
+}
+
+/** #187 Todo 5 (PURE, unit-tested): bucket the tree's def-leaves into yes/no verdict keys for a case. A leaf lights ONLY
+ *  when (a) its owning composite `when` is on-path-SATISFIED — `topWhenKey ∈ satisfiedWhenKeys` (parity with the
+ *  questionnaire, which expands leaves only there) — AND (b) its concept has a conceptTruth answer. An ABSENT concept is
+ *  UNKNOWN → neither bucket (Todo-2 contract, render blank). `truthByKey` is keyed by `JSON.stringify([lib,name])`
+ *  (collision-proof, matches the questionnaire's truthKey). Returns leaf ANCHOR keys (the caller maps → segment ids). */
+export function leafMarkBuckets(
+  leafConcepts: Record<string, { lib: string; name: string; topWhenKey: string }>,
+  satisfiedWhenKeys: Set<string>,
+  truthByKey: Map<string, boolean>,
+): { yesKeys: string[]; noKeys: string[] } {
+  const yesKeys: string[] = [];
+  const noKeys: string[] = [];
+  for (const [leafKey, info] of Object.entries(leafConcepts)) {
+    if (!satisfiedWhenKeys.has(info.topWhenKey)) continue; // off-path composite → no mark
+    const sat = truthByKey.get(JSON.stringify([info.lib, info.name]));
+    if (sat === true) yesKeys.push(leafKey);
+    else if (sat === false) noKeys.push(leafKey); // undefined ⇒ UNKNOWN ⇒ neither
+  }
+  return { yesKeys, noKeys };
 }
 
 export function registerCorrespondenceCockpit(context: vscode.ExtensionContext): void {
@@ -408,6 +433,9 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     // peek (lands AFTER the selection's `.current`/clrDV, so the SAME-click marks survive; the NEXT reveal's clrDV drops them).
     // Its own channel, MV-only, selection-coupled. Inert (clears) in cockpit / for a non-cel, errored, or no-diverter case.
     driveDiverters();
+    // #187 Todo 5: the per-case def-leaf verdict overlay (tree-only). PERSISTENT (survives a cockpit reveal, re-driven on
+    // tree-ack + rebuild) — but re-driven here too so a selection change repaints immediately (latency opt; the ack self-heals).
+    driveLeafMarks();
     // #177 slice 3: the selection-scoped questionnaire re-render — the genuinely NEW trigger (no pane re-rendered on
     // selection before this). The decision is the PURE, unit-tested `shouldRerenderQuestionnaire` (FIX 2): MV mode + the
     // questionnaire pane open + a REAL focused-case change (not a same-selection highlight-restore redispatch). On a true
@@ -898,11 +926,8 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     // (producedPathDiverterIds gates on q.outcome): a blocked/blocked-guard terminal emits a false guard/when question
     // with NO produced disposition, which must NOT light as a "produced-path diverter" (gpt55 impl review, disc 164).
     // #187 Todo 3: `producedPathDiverterIds` filters `diverterEligible` (evaluated on-path whens) — leaves/preempted rows
-    // never light. The resolvers are passed for surface consistency, though diverter eligibility is set on whens regardless.
-    const q = buildQuestionnaire(sv, buildResolveValueTypes(), sv.decision?.libraryName, {
-      conceptShape: buildConceptShapeResolver(),
-      resolveConceptInfo: buildResolveConceptInfo(),
-    });
+    // never light. #187 Todo 5: shared single-slot memo (driveLeafMarks walks the same q on the same dispatch/ack).
+    const q = buildFocusedQuestionnaire(sv);
     const diverterIds = producedPathDiverterIds(q);
     if (diverterIds.length === 0) {
       clearAllDiverters();
@@ -923,6 +948,64 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     if (tree) markDiverters(tree, segmentsFor(tree, nodeKeys).segmentIds);
     if (crl) markDiverters(crl, segmentsFor(crl, nodeKeys).segmentIds);
     if (src) markDiverters(src, segmentsFor(src, units).segmentIds); // empty units → silent source degrade
+  }
+
+  /** Post a gen-stamped `markLeaves` (the per-case def-leaf verdict) to the TREE. Gen-carried so a mark aimed at a
+   *  superseded render is dropped by the webview (mirrors markReviewOverlay); the webview branch clears both leaf classes
+   *  before applying, so an EMPTY mark is a valid clear-effect (used in MV steady state, gen-ordered — never an ungated race). */
+  function markLeaves(v: PaneView, yesIds: string[], noIds: string[]): void {
+    void v.panel.webview.postMessage({ type: "markLeaves", gen: v.gen, yesIds, noIds });
+  }
+
+  /**
+   * #187 Todo 5: drive the per-case leaf VERDICT overlay on the TREE — a green check / muted X on each `defined as` leaf
+   * the emitted PlanDefinition ASKS for this case. Its own channel, mutated ONLY by markLeaves/clearLeaves — so a leaf's
+   * tick survives the REVEAL channel (highlight/clearHighlight never touch it, like the review + this-node overlays). But
+   * it is FOCUSED-CASE-coupled, EXACTLY like `driveThisNode`/`driveDiverters` (all three read `focusedScenario()`): when
+   * the focused case is lost (a non-cel selection / cleared selection) it clears via the empty gen-stamped mark below, in
+   * lockstep with the questionnaire emptying to its placeholder. (It is NOT the case-INDEPENDENT `driveDoneOverlay`, which
+   * paints EVERY reviewed case — the leaf verdict is THIS case's answers, so it must clear when there is no focused case.)
+   * PARITY with the questionnaire over the RENDERED (Todo-4-capped) leaf set: a leaf lights ONLY when its owning composite
+   * `when` is on-path-SATISFIED — the exact set the questionnaire expands leaves under (`rowKind:"when-evaluated"` +
+   * `answer:"yes"`; a preempted → `when-preempted`, a reached-false → `answer:"no"`, neither expands). Every tick shown is
+   * correct; a composite deeper than MAX_LEAF_DEPTH / wider than LEAF_CAP simply ticks fewer leaves than the (unbounded)
+   * questionnaire expands — a Todo-4 display cap, not a verdict error. Verdict = the leaf concept's own conceptTruth (the
+   * SAME source the questionnaire's leaf rows use); an ABSENT concept is UNKNOWN → no mark (Todo-2 contract).
+   *
+   *  - Cockpit / no model → TEARDOWN: ungated `clearLeaves` (no MV mark races it — safe class-strip after Show Cockpit).
+   *  - MV mode, no / errored focused case → an EMPTY gen-stamped mark (NOT the ungated clear — gen-ordered so the
+   *    un-select-to-empty case can't race a live mark out of order, mirroring driveDoneOverlay's FIX 1).
+   */
+  function driveLeafMarks(): void {
+    const tree = views.get("tree");
+    if (!tree) return; // tree pane is opt-in
+    if (mode !== "medical-validation" || !crlMaps) {
+      void tree.panel.webview.postMessage({ type: "clearLeaves" }); // teardown only (no MV mark races this)
+      return;
+    }
+    const sv = focusedScenario();
+    if (!sv || sv.status === "error") {
+      markLeaves(tree, [], []); // empty gen-stamped (steady-state clear-effect)
+      return;
+    }
+    // The on-path-SATISFIED composite `when`s = the questionnaire's leaf-expanding rows. Resolve each runtime nodeId → its
+    // structure `when` nodeKey via `resolveThisNode` — the IDENTICAL join `driveDiverters`/`driveThisNode` use to light the
+    // tree's when-anchors (keyed by structure nodeKey), which is exactly the string the flow render tags as `topWhenKey`
+    // (`buildDefLeaves(..., n.nodeKey)`); those two channels demonstrably hit the right whens, so the gate coincides.
+    const q = buildFocusedQuestionnaire(sv); // shared single-slot memo (driveDiverters already walked it this dispatch/ack)
+    const root = { lib: sv.decision?.libraryName ?? "", decision: sv.decision?.name ?? "" };
+    const satisfiedWhenKeys = new Set<string>();
+    for (const x of q.questions) {
+      if (x.rowKind !== "when-evaluated" || x.answer !== "yes") continue;
+      const { nodeKey } = resolveThisNode(x.nodeId, root, sv.tree, runtimeRefIndex, crlMaps);
+      if (nodeKey !== undefined) satisfiedWhenKeys.add(nodeKey);
+    }
+    // Verdict map (lib,name) → satisfied, collision-proof key (matches the questionnaire's truthKey). The pure
+    // `leafMarkBuckets` applies the on-path gate + the absent-is-unknown rule (unit-tested in isolation).
+    const truthByKey = new Map<string, boolean>();
+    for (const r of sv.conceptTruth ?? []) truthByKey.set(JSON.stringify([r.libraryName, r.name]), r.satisfied);
+    const { yesKeys, noKeys } = leafMarkBuckets(tree.leafConcepts, satisfiedWhenKeys, truthByKey);
+    markLeaves(tree, segmentsFor(tree, yesKeys).segmentIds, segmentsFor(tree, noKeys).segmentIds);
   }
 
   /**
@@ -980,6 +1063,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     v.acked = false;
     v.anchors = {};
     v.reveals = {};
+    v.leafConcepts = {}; // #187 Todo 5 (tree-only); reset each render, re-set below in the tree branch
     if (pane === "source") {
       const units: UnitSpan[] = model.steps.flatMap((s) =>
         s.source.map((loc) => ({ unitId: s.unitId, range: loc.range })),
@@ -1044,6 +1128,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       });
       v.anchors = r.anchors;
       v.reveals = r.reveals;
+      v.leafConcepts = r.leafConcepts; // #187 Todo 5: the def-leaf verdict-join map (captured atomically with the anchors)
       void v.panel.webview.postMessage({ type: "render", html: r.html, gen, indexVersion });
     } else {
       // questionnaire (#177 slice 3) — a STATIC, read-only projection of the FOCUSED cel case's fired path. Gets the
@@ -1080,6 +1165,22 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     return sel && sel.primary === "cel" ? scenarioByCaseId.get(sel.caseId) : undefined;
   }
 
+  // #187 Todo 5 (Claude impl review): a SINGLE-SLOT memo for the focused case's questionnaire. Both `driveDiverters` and
+  // `driveLeafMarks` run buildQuestionnaire on the SAME (sv) back-to-back per dispatch/ack — the walk is deterministic in
+  // (focused caseId, indexVersion) (sv, crlMaps + all resolvers are rebuilt together, bumping indexVersion), so a slot
+  // keyed on that pair serves both without a second walk. Auto-invalidates on any case/model change (no explicit clear).
+  let focusedQMemo: { caseId: string; iv: number; q: Questionnaire } | undefined;
+  function buildFocusedQuestionnaire(sv: ScenarioViewModel): Questionnaire {
+    const caseId = state.selection?.primary === "cel" ? state.selection.caseId : "";
+    if (focusedQMemo && focusedQMemo.caseId === caseId && focusedQMemo.iv === indexVersion) return focusedQMemo.q;
+    const q = buildQuestionnaire(sv, buildResolveValueTypes(), sv.decision?.libraryName, {
+      conceptShape: buildConceptShapeResolver(),
+      resolveConceptInfo: buildResolveConceptInfo(),
+    });
+    focusedQMemo = { caseId, iv: indexVersion, q };
+    return q;
+  }
+
   /** Build the frame-aware concept→value-types resolver `buildQuestionnaire` injects. A bare sub-`when` concept resolves
    *  to `conceptByKey` via `nodeKey(conceptDeclRef(lib, name))` — the SAME join key the indexer/structure use, so the
    *  cross-lib same-name frame (the walk supplies the sub's lib) keys the right concept. `[]` when maps absent or the
@@ -1113,6 +1214,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       v.acked = false;
       v.anchors = {};
       v.reveals = {};
+      v.leafConcepts = {}; // #187 Todo 5
       void v.panel.webview.postMessage({ type: "render", html: `<p class="placeholder">${escapeHtml(message)}</p>`, gen, indexVersion });
     }
   }
@@ -1139,6 +1241,10 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
         // the MV review overlay on ack so the at-rest done/error painting survives a render. (The failed-criterion overlay
         // re-applies via the selection-driven dispatch path; the review overlay is selection-INDEPENDENT, so it re-drives here.)
         driveDoneOverlay();
+        // #187 Todo 5: a fresh tree render dropped its `.flow-leaf-yes/no` classes (innerHTML replaced) — re-drive the
+        // per-case leaf verdict overlay (tree-only, selection-INDEPENDENT like the review overlay) so a tree opened /
+        // re-rendered mid-session repaints the focused case's leaf answers.
+        driveLeafMarks();
       }
       // #177 slice 4: a freshly-(re)rendered marker-bearing pane (tree/crl/source/questionnaire) loses its `.this-node`
       // class (innerHTML replaced) — re-drive the marker on its ack so the focused question's node re-paints. Like the
@@ -1271,7 +1377,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     const disposables: vscode.Disposable[] = [
       panel.webview.onDidReceiveMessage((m) => onWebviewMessage(pane, m)),
     ];
-    v = { panel, gen: 0, indexVersion: 0, acked: false, anchors: {}, reveals: {}, disposables };
+    v = { panel, gen: 0, indexVersion: 0, acked: false, anchors: {}, reveals: {}, leafConcepts: {}, disposables };
     views.set(pane, v);
     panel.onDidDispose(() => {
       for (const d of disposables) d.dispose();
@@ -1378,6 +1484,9 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     // disc 164: the rebuilt panes lost their `.diverter` classes — re-drive the produced-path diverter overlay too
     // (same self-healing-on-ack contract; each pane's ack also re-drives). Inert in cockpit / for a no-diverter case.
     driveDiverters();
+    // #187 Todo 5: the rebuilt tree lost its `.flow-leaf-yes/no` classes — re-drive the leaf verdict overlay too (same
+    // self-healing-on-ack contract; the tree's ack also re-drives). Inert in cockpit / for a no/errored focused case.
+    driveLeafMarks();
   }
 
   /** On a discovery/build failure, drop stale provenance so the panes never stay interactive with wrong data. */
@@ -2024,6 +2133,11 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   // (highlight/clearHighlight) — the diverters are per-selected-case, so they clear on a reveal and the same-selection
   // markDiverters (a later post-dispatch post) re-applies; the NEXT selection's reveal drops them.
   `const clrDV=()=>{for(const el of root.querySelectorAll('.diverter'))el.classList.remove('diverter');};` +
+  // #187 Todo 5: the per-case leaf VERDICT clear. Like clrRO/clrTN (and UNLIKE clrFC/clrDV) it is called ONLY by
+  // mark/clearLeaves, NEVER by the selection REVEAL (highlight/clearHighlight) — so a leaf's tick survives a reveal within
+  // the focused case. (The host re-drives per focused case: it clears in lockstep with the questionnaire when no case is
+  // focused — the this-node/diverter lifecycle, driven by focusedScenario — NOT the case-independent done-overlay one.)
+  `const clrLeaf=()=>{for(const el of root.querySelectorAll('.flow-leaf-yes,.flow-leaf-no')){el.classList.remove('flow-leaf-yes');el.classList.remove('flow-leaf-no');}};` +
   `window.addEventListener('message',(e)=>{const m=e.data;` +
   // #156 notes: PRESERVE in-progress note drafts across the innerHTML swap. An unrelated re-render (a verdict change on
   // another row re-renders the whole cel pane) would otherwise wipe a half-typed note/edit. Snapshot every [data-note-draft]
@@ -2075,6 +2189,15 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   `else if(m.type==='clearDiverters'){clrDV();}` +
   `else if(m.type==='markDiverters'){if(m.gen!==gen)return;clrDV();` +
   `for(const id of (m.segmentIds||[])){const el=document.getElementById(id);if(el)el.classList.add('diverter');}}` +
+  // #187 Todo 5: the PERSISTENT per-case leaf verdict channel (.flow-leaf-yes/.flow-leaf-no on a leaf <g>; CSS reveals its
+  // matching hidden tick). A SEPARATE channel from all above. Like the review overlay + this-node it is mutated ONLY here
+  // (mark/clearLeaves), NEVER by highlight/clearHighlight/clrFC/clrDV — so the leaf answers SURVIVE a cockpit reveal.
+  // CRITICAL: clrLeaf() FIRST (clear-then-set, gen-guarded) — else a leaf answered `yes` for case A keeps its tick under
+  // case B when B has no conceptTruth row for it (absent ⇒ no mark). yes/no are mutually exclusive per leaf. No scroll.
+  `else if(m.type==='clearLeaves'){clrLeaf();}` +
+  `else if(m.type==='markLeaves'){if(m.gen!==gen)return;clrLeaf();` +
+  `for(const id of (m.yesIds||[])){const el=document.getElementById(id);if(el)el.classList.add('flow-leaf-yes');}` +
+  `for(const id of (m.noIds||[])){const el=document.getElementById(id);if(el)el.classList.add('flow-leaf-no');}}` +
   // The tree-pane chrome (toggle + gap banner) — injected ABOVE #root so it never clobbers the flowchart.
   `else if(m.type==='fcChrome'){fcc.innerHTML=m.html;}});` +
   // #156 slice 4: a worklist review <select> sits INSIDE the .cel-case block (itself a data-reveal target). A CLICK on the

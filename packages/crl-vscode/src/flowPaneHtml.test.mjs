@@ -332,6 +332,9 @@ check("Todo 4: a composite with more than the cap collapses the remainder into a
   // the stub is NON-CLICKABLE: its <g> carries no data-reveal (a leaf <g> whose class attr is immediately followed by
   // `>` — real leaves have ` data-reveal=…`; only the concept-less stub does not).
   assert.match(rr.html, /<g id="[^"]*" class="[^"]*flow-leaf[^"]*"><title>[^<]*<\/title><rect[^>]*\/><text[^>]*>\+\d+ more<\/text><\/g>/, "the '+N more' stub is non-clickable (no data-reveal)");
+  // #187 Todo 5: the stub has NO concept → NO leafConcepts entry (it carries no verdict), and the 10 shown leaves each do.
+  assert.ok(!Object.keys(rr.leafConcepts).some((k) => k.includes("+more")), "the '+N more' stub gets NO leafConcepts entry");
+  assert.equal(Object.keys(rr.leafConcepts).length, 10, "exactly the 10 shown leaves have leafConcepts entries");
 });
 
 check("Todo 4: leaves keep the disjoint-band layout (no overlap with a following sibling) + a nested composite leaf recurses deeper", () => {
@@ -353,6 +356,30 @@ check("Todo 4: leaves keep the disjoint-band layout (no overlap with a following
   const byX = new Map();
   for (const rc of rects) (byX.get(rc.x) ?? byX.set(rc.x, []).get(rc.x)).push(rc);
   for (const [, col] of byX) { col.sort((a, b) => a.y - b.y); for (let i = 1; i < col.length; i++) assert.ok(col[i].y >= col[i - 1].y + col[i - 1].h, `overlap at x=${col[i].x}`); }
+});
+
+check("Todo 5: renderFlowPane exposes leafConcepts (key → {lib,name,topWhenKey}); nested leaves inherit the top composite when; cross-lib omitted; keys match anchors", () => {
+  const struct = [{ decision: "D", lib: "Pol", nodeKey: "d:D", location: {}, children: [
+    node("w:C", "when", "when C", ["c:C"], [node("a:C", "action", "X", ["act:X"], [], { actionKind: "recommend-activity" })]),
+  ] }];
+  const cs = [concept("c:C", "C", { definitionKind: "defined-as" })];
+  const shape = { C: { nodeKey: "c:C", hasCodeIs: false, leafEligible: false, isInferred: true, hasDefinedAs: true, children: [
+    { nodeKey: "c:L", hasCodeIs: false, leafEligible: false, isInferred: true, hasDefinedAs: true, children: [
+      { nodeKey: "c:La", hasCodeIs: true, leafEligible: true, isInferred: false, hasDefinedAs: false, children: [] },
+    ] },
+    { nodeKey: "c:X", hasCodeIs: true, leafEligible: true, isInferred: false, hasDefinedAs: false, children: [] }, // cross-lib (no info) → omitted
+  ] } };
+  const info = { "c:L": { lib: "Pol", name: "L", valueTypes: [] }, "c:La": { lib: "Pol", name: "La", valueTypes: [] } }; // c:X absent
+  const rr = renderFlowPane(struct, { concepts: cs, conceptShape: (_l, n) => shape[n], resolveConceptInfo: (nk) => info[nk] });
+  const entries = Object.entries(rr.leafConcepts);
+  assert.ok(!entries.some(([, v]) => v.name === "X"), "a cross-lib / unaddressable operand gets NO leafConcepts entry");
+  const L = entries.find(([, v]) => v.name === "L");
+  const La = entries.find(([, v]) => v.name === "La");
+  assert.ok(L && La, "L and La both have leafConcepts entries");
+  assert.equal(L[1].lib, "Pol");
+  assert.equal(L[1].topWhenKey, "w:C", "L's owning composite when is the structure when w:C");
+  assert.equal(La[1].topWhenKey, "w:C", "the NESTED leaf La inherits the SAME top composite when (w:C), NOT its immediate parent leaf");
+  for (const [k] of entries) assert.ok(rr.anchors[k], `leafConcepts key ${k} has a matching anchor (the cockpit's leafKey→segmentIds join)`);
 });
 
 console.log(`\nflowPaneHtml.test: ${pass} checks passed`);

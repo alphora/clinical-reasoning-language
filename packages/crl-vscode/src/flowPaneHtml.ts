@@ -41,6 +41,10 @@ export interface RenderedFlow {
   /** opaque key → a node-body select ({nodeKey}, a crlNode) OR a concept/guard peek ({conceptNodeKey}). Same shapes as
    *  RenderedCrl, so the shell needs no new hit kinds. */
   reveals: Record<string, { nodeKey: string } | { conceptNodeKey: string }>;
+  /** #187 Todo 5: def-leaf anchor key (the same `leaf::` key used in `anchors`) → its leaf concept identity + the OWNING
+   *  composite `when` structure key. The cockpit joins `{lib,name}` to a case's `conceptTruth` for the yes/no verdict and
+   *  gates on `topWhenKey` being on the fired-satisfied path. The `+N more` stub + cross-lib/omitted leaves get NO entry. */
+  leafConcepts: Record<string, { lib: string; name: string; topWhenKey: string }>;
 }
 
 const ESC: Record<string, string> = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
@@ -78,6 +82,10 @@ interface LaidNode {
   /** #187 Todo 4: a synthetic `defined as` operand leaf (kind "leaf") appended under a composite `when` — NOT a decision
    *  structure row. Rendered with a distinct `.flow-def-edge`; excluded from `{nodeKey}` select + the per-case overlays. */
   isDefLeaf?: boolean;
+  /** #187 Todo 5: on a def-leaf, the structure nodeKey of the OWNING composite `when` (the leaf's top ancestor, threaded
+   *  unchanged through nested operands). The per-case leaf-verdict overlay gates on THIS when being on the fired-satisfied
+   *  path — so an off-path composite's leaves stay un-answered (parity with the questionnaire's on-path-only expansion). */
+  topWhenKey?: string;
   depth: number;
   y: number; // slot units — leaves take the next integer slot; internal nodes take their children's midpoint
   children: LaidNode[];
@@ -109,7 +117,7 @@ function buildLaid(
   // Slots are allocated HERE (inside layoutNode's recursion) so they stay DFS-in-order + bands disjoint. Capped at
   // LEAF_CAP per level (a "+N more" stub beyond it). A cross-lib / location-less operand is OMITTED (matches the shape
   // builder + questionnaire). `depth` is the child depth; `parentKey` seeds the collision-free synthetic nodeKey.
-  const buildDefLeaves = (children: readonly ConceptShapeNode[], parentKey: string, depth: number, leafDepth: number): LaidNode[] => {
+  const buildDefLeaves = (children: readonly ConceptShapeNode[], parentKey: string, depth: number, leafDepth: number, topWhenKey: string): LaidNode[] => {
     if (!opts.resolveConceptInfo) return [];
     const out: LaidNode[] = [];
     let shown = 0;
@@ -119,6 +127,7 @@ function buildLaid(
       maxDepth = Math.max(maxDepth, depth); // bump ONLY when a leaf/stub is actually emitted (an all-cross-lib composite adds no column)
       if (shown >= LEAF_CAP) {
         const remaining = children.filter((c) => opts.resolveConceptInfo?.(c.nodeKey)).length - shown;
+        // The "+N more" stub carries NO concept (no topWhenKey either) → no leafConcepts entry, no verdict, non-clickable.
         out.push({ nodeKey: `${LEAF_KEY}${parentKey}|+more`, kind: "leaf", useDecision: false, isDefLeaf: true, label: `+${remaining} more`, full: `${remaining} more operand(s)`, depth, y: slot++, children: [] });
         break;
       }
@@ -126,7 +135,7 @@ function buildLaid(
       const leafKey = `${LEAF_KEY}${parentKey}|${child.nodeKey}`;
       // Bound the recursion depth (cap^depth blowup guard). A truncated node (has children but we stop) gets a "…" suffix.
       const canRecurse = child.children.length > 0 && leafDepth < MAX_LEAF_DEPTH;
-      const grand = canRecurse ? buildDefLeaves(child.children, leafKey, depth + 1, leafDepth + 1) : [];
+      const grand = canRecurse ? buildDefLeaves(child.children, leafKey, depth + 1, leafDepth + 1, topWhenKey) : [];
       const truncated = child.children.length > 0 && leafDepth >= MAX_LEAF_DEPTH;
       const ly = grand.length ? (grand[0].y + grand[grand.length - 1].y) / 2 : slot++;
       out.push({
@@ -134,7 +143,7 @@ function buildLaid(
         label: truncated ? `${info.name} …` : info.name, full: `${info.name} — concept "${info.lib}"`,
         conceptKey: child.nodeKey, conceptName: info.name, conceptLib: info.lib,
         conceptLayer: child.isInferred ? "inferred" : "asserted", isSource: child.hasCodeIs,
-        depth, y: ly, children: grand,
+        topWhenKey, depth, y: ly, children: grand,
       });
     }
     return out;
@@ -166,7 +175,7 @@ function buildLaid(
       n.kind === "when" && cf.conceptName !== undefined && opts.conceptShape
         ? (() => {
             const shape = opts.conceptShape(cf.conceptLib, cf.conceptName);
-            return shape?.hasDefinedAs ? buildDefLeaves(shape.children, n.nodeKey, depth + 1, 1) : [];
+            return shape?.hasDefinedAs ? buildDefLeaves(shape.children, n.nodeKey, depth + 1, 1, n.nodeKey) : [];
           })()
         : [];
     const children = [...structureChildren, ...defLeaves];
@@ -210,9 +219,10 @@ export function renderFlowPane(
   const concepts = opts.concepts ?? [];
   const anchors: Record<string, FlowAnchor> = {};
   const reveals: Record<string, { nodeKey: string } | { conceptNodeKey: string }> = {};
+  const leafConcepts: Record<string, { lib: string; name: string; topWhenKey: string }> = {};
 
   if (structure.length === 0) {
-    return { html: '<p class="placeholder">No CRL decisions to chart.</p>', anchors, reveals };
+    return { html: '<p class="placeholder">No CRL decisions to chart.</p>', anchors, reveals, leafConcepts };
   }
 
   const conceptMap = new Map(concepts.map((c) => [c.nodeKey, c]));
@@ -281,6 +291,11 @@ export function renderFlowPane(
       if (n.conceptKey !== undefined) {
         reveals[key] = { conceptNodeKey: n.conceptKey };
         dataReveal = ` data-reveal="${escapeHtml(key)}"`;
+        // #187 Todo 5: expose this leaf's concept identity + owning composite `when` so the cockpit can join a case's
+        // conceptTruth verdict + gate on-path. Keyed by the SAME synthetic anchor key `anchors` uses (v.anchors[leafKey]
+        // → segmentIds). The stub (no conceptKey) never reaches here → no entry.
+        if (n.conceptName !== undefined && n.conceptLib !== undefined && n.topWhenKey !== undefined)
+          leafConcepts[n.nodeKey] = { lib: n.conceptLib, name: n.conceptName, topWhenKey: n.topWhenKey };
       }
     } else {
       reveals[key] = { nodeKey: n.nodeKey };
@@ -299,12 +314,24 @@ export function renderFlowPane(
         `<g class="flow-peek ${cls}" data-reveal="${escapeHtml(pk)}">` +
         `<circle cx="${x + NODE_W - 13}" cy="${y + 13}" r="5"/><title>${peekTitle}</title></g>`;
     }
+    // #187 Todo 5: a concept-bearing def-leaf carries BOTH per-case verdict glyphs, HIDDEN. The `markLeaves` overlay
+    // toggles `.flow-leaf-yes` / `.flow-leaf-no` on the leaf `<g>` (a pure class-toggle like the other overlays); CSS then
+    // reveals the matching tick. A right-edge tick glyph (not a rect fill) so it composes with the non-Source wash + border.
+    let ticks = "";
+    if (n.isDefLeaf && n.conceptKey !== undefined) {
+      const cx = x + NODE_W - 11;
+      const cy = y + NODE_H / 2;
+      ticks =
+        `<path class="leaf-tick leaf-tick-yes" d="M${cx - 4} ${cy} l3 3 l5 -6"/>` +
+        `<path class="leaf-tick leaf-tick-no" d="M${cx - 4} ${cy - 4} l8 8 M${cx + 4} ${cy - 4} l-8 8"/>`;
+    }
     body +=
       `<g id="${escapeHtml(gid)}" class="${classes.join(" ")}"${dataReveal}>` +
       `<title>${escapeHtml(n.full)}</title>` +
       `<rect x="${x}" y="${y}" width="${NODE_W}" height="${NODE_H}" rx="6"/>` +
       `<text x="${x + 10}" y="${y + NODE_H / 2 + 4}">${escapeHtml(truncate(n.label, LABEL_MAX))}</text>` +
       peek +
+      ticks +
       `</g>`;
   }
 
@@ -312,7 +339,7 @@ export function renderFlowPane(
     `<svg class="flow-svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">` +
     body +
     `</svg>`;
-  return { html: `<div class="flow-wrap">${svg}</div>`, anchors, reveals };
+  return { html: `<div class="flow-wrap">${svg}</div>`, anchors, reveals, leafConcepts };
 }
 
 /** Flow-pane CSS — concatenated into the cockpit's nonced <style> (CSP-safe: no inline styles / no SVG <style>). Every
@@ -380,4 +407,12 @@ export const FLOW_STYLE =
   // (`--vscode-charts-orange`), NOT the blue `--vscode-focusBorder` the reveal (`.current`) uses — blue means "selected /
   // on the path", so the focus ("the question you're on") must read differently from a path node (it is not on the path,
   // e.g. a not-adult deny whose Q1 `when` isn't in the reveal cluster). Thicker than `.current` (2.5); `stroke-dasharray:none`.
-  `.flow-row.this-node>rect{stroke:var(--vscode-charts-orange,#d18616);stroke-width:3;stroke-dasharray:none}`;
+  `.flow-row.this-node>rect{stroke:var(--vscode-charts-orange,#d18616);stroke-width:3;stroke-dasharray:none}` +
+  // #187 Todo 5: the per-case leaf VERDICT tick. Both glyphs render HIDDEN in every concept-bearing def-leaf; the
+  // `markLeaves` overlay toggles `.flow-leaf-yes`/`.flow-leaf-no` on the leaf <g> (a class-toggle, like the channels above)
+  // and CSS reveals the matching tick. A corner GLYPH (not a rect fill) so it composes with the non-Source wash + the
+  // dashed leaf border. yes = a green check (the testing-pass green, reused from `.done-node`); no = a MUTED grey X —
+  // deliberately NOT error-red, so an unsatisfied ANSWER never reads as the red `.failed-criterion` blocker channel.
+  `.leaf-tick{display:none;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}` +
+  `.flow-row.flow-leaf-yes .leaf-tick-yes{display:inline;stroke:var(--vscode-testing-iconPassed,#3fb950)}` +
+  `.flow-row.flow-leaf-no .leaf-tick-no{display:inline;stroke:var(--vscode-descriptionForeground,#8c8c8c)}`;
