@@ -14,8 +14,8 @@ import { emitCelToFhir } from "../cel/emitter";
 import { resolveCelImports } from "../cel/imports";
 import { validateCELFile } from "../cel/validator";
 import { runCel, renderScenario } from "../cre";
-import { emitFhirDefFromPath } from "../fhir-emitter";
 import { emitCrlTwoLane } from "../emit-two-lane";
+import { emitFhirDefFromPath } from "../fhir-emitter";
 import type { ImportDiagnostic } from "../imports/types";
 import { validateCRLImports } from "../imports/validate";
 import { tokenizeCRL, buildCRL, validateCRL, emitCQL } from "../index";
@@ -425,7 +425,7 @@ export function createServer(): McpServer {
         "`{ success, resourceCount, resourceManifest:[{resourceType, id, relativePath, sourceKind, sourceName}], errors, unmatched, importDiagnostics, metadataErrors }`. " +
         "Pass `includeResources: true` to also receive the full `resources[]` array (each with the full FHIR JSON). " +
         "Emitted FHIR definitional resources carry `version` (sourced from the npm package.json — CRMI Shareable requires version 1..1) and, at publishable+ capability, a reproducible `date` (resolved from SOURCE_DATE_EPOCH env or package.json `crl.date`, else wall clock). Emitted CQL stays version-less. Default capability is publishable. " +
-        "A CRL `first:` decision (ordered/first-match) emits the standard `cqf-applicabilityBehavior` \"any\" extension on a grouping action so a FHIR engine applies the first applicable branch. The menu `any:` qualifier still emits a `crl-logical-switch` extension URL whose StructureDefinition is not yet shipped (its FHIR selection semantics are pending — GitHub #184); strict validators may require an ignore-list for that URL until then. " +
+        'A CRL `first:` decision (ordered/first-match) emits the standard `cqf-applicabilityBehavior` "any" extension on a grouping action so a FHIR engine applies the first applicable branch. The menu `any:` qualifier still emits a `crl-logical-switch` extension URL whose StructureDefinition is not yet shipped (its FHIR selection semantics are pending — GitHub #184); strict validators may require an ignore-list for that URL until then. ' +
         'Cross-library concept/terminology refs are unsupported in v0 (cascade-suppression surfaces via unresolved-* UnmatchedReference). Same-library qualified refs `"CurrentLib"."X"` still resolve. ' +
         "Deliberate spec deviation: PlanDefinitions reference publishable-only sub-decisions via action.definitionCanonical (the published cpg-strategydefinition target-profile constraint is wrong; operator is amending the spec).",
       inputSchema: {
@@ -493,7 +493,9 @@ export function createServer(): McpServer {
         capability: z
           .enum(["shareable", "computable", "publishable", "executable"])
           .optional()
-          .describe("CRMI capability level (default publishable). `executable` unsupported (#113)."),
+          .describe(
+            "CRMI capability level (default publishable). `executable` unsupported (#113).",
+          ),
       },
     },
     (args) =>
@@ -550,13 +552,15 @@ export function createServer(): McpServer {
         "evaluates true (#126); it walks the full decision shape (first:/all:/any:/otherwise + " +
         "`unless`/`only when` guards) and a decision-leaf `result is` passes iff the expected branch is " +
         "in the produced recommendation set. A `use decision` target IS evaluated — bare same-library OR " +
-        "qualified cross-library (`\"Lib\".\"Sub\"`) / self-qualified: the sub is recursed in place and its " +
+        'qualified cross-library (`"Lib"."Sub"`) / self-qualified: the sub is recursed in place and its ' +
         "determinations bubble up into the produced set (the bare sub-NAME is not produced) — so the oracle " +
         "names the delegated disposition. A cross-library sub's bare criteria resolve in ITS library (qualify a " +
-        "CEL fact `defined by \"Lib\".\"C\"` to satisfy one); an unresolved/cyclic target is non-producing. " +
+        'CEL fact `defined by "Lib"."C"` to satisfy one); an unresolved/cyclic target is non-producing. ' +
         "Returns { success, caseCount, passCount, " +
         "failCount, errorCount, runs:[{case, decision, status, expected, produced, trace:[{node, nodeId, " +
-        "source, ...}], diagnostics}], errors, importDiagnostics }. NOT yet evaluated (deferred): `definition " +
+        "source, ...}], diagnostics, conceptTruth:[{lib, name, satisfied}]}], errors, importDiagnostics }. " +
+        "`conceptTruth` is the case's per-concept answer over the whole closure — including OFF-path concepts " +
+        "`first:` never evaluated; an ABSENT (lib,name) is UNKNOWN, never `false`. NOT yet evaluated (deferred): `definition " +
         "is` predicates (count/temporal/value) and `coded from`/external value sets.",
       inputSchema: {
         path: z
@@ -586,7 +590,9 @@ export function createServer(): McpServer {
         'produced), `unreachedReason:"preempted"` for first:-short-circuited branches, and a `source` ' +
         "span (filePath + 0-based range) per node for navigation. Pass `path` (absolute .cel); `case` " +
         "renders only one case. Returns { schemaVersion, success, source, caseCount, passCount, failCount, " +
-        "errorCount, scenarios:[{case, decision, status, expected, produced, tree, diagnostics}], errors }.",
+        "errorCount, scenarios:[{case, decision, status, expected, produced, tree, diagnostics, " +
+        "conceptTruth:[{name, libraryName, satisfied}]}], errors }. `conceptTruth` is the case's per-concept " +
+        "answer over the whole closure (incl. OFF-path concepts); an ABSENT (libraryName,name) is UNKNOWN, never `false`.",
       inputSchema: {
         path: z
           .string()
@@ -689,7 +695,7 @@ export function createServer(): McpServer {
       description:
         "The IN-PROGRESS / authoring counterpart to validate_provenance. Runs the SAME §9 validators, but in worklist " +
         "mode: attribution-class findings (the COVERAGE backlog — over-reach, uncovered-span, missed-decision) are " +
-        "re-graded from error to \"warning\" and reported as REMAINING WORK, not failures — so a fresh, half-attributed " +
+        're-graded from error to "warning" and reported as REMAINING WORK, not failures — so a fresh, half-attributed ' +
         "scaffold does not read as a wall of red. Integrity issues (drift, mistag, mn-keyword, malformed, referential, " +
         "etc.) are STILL surfaced at their native severity and STILL fail. Use this WHILE authoring; use " +
         "validate_provenance for the final/strict gate on a completed artifact. Pass three ABSOLUTE paths. Returns the " +
@@ -731,13 +737,13 @@ export function createServer(): McpServer {
         "`includeArtifact: true` to also receive the full `artifact` (use the `crl-generate-provenance` CLI's --out for " +
         "the full body in scripts). Bad/missing/unreadable/oversized paths or an unresolved `covers` target → a tool " +
         "error. NOTE: generate succeeding does NOT mean the artifact is complete — the diagnostics ARE the KE's worklist. " +
-        "`clusterBy` (default \"decision\") selects the clustering strategy: \"decision\" emits one cluster per covered " +
+        '`clusterBy` (default "decision") selects the clustering strategy: "decision" emits one cluster per covered ' +
         "decision (the per-case CEL pass attaches frozen cases to each). #175: the default mode is now CHAIN-AWARE — a " +
         "case whose branch result `D is X` fires X in a SUB-decision D delegates to (`use decision`) is attached to that " +
         "SUB's cluster + arm via the run path, instead of orphaning the sub-clusters; a NON-chained case is unchanged. A " +
         "chained case that can't be clustered defers with a diagnostic (never a guessed attach): `ambiguous-cel-branch` " +
         "(X fired in ≥2 distinct subs), or `cel-result-run-mismatch` (the run produced no X, or the chained case's run " +
-        "path is unavailable/ungroundable), or `unfrozen-case`. \"disposition-path\" instead renders the CEL and " +
+        'path is unavailable/ungroundable), or `unfrozen-case`. "disposition-path" instead renders the CEL and ' +
         "emits one cluster per distinct RUN PATH (decision-node refs ONLY) + one policy-owned-leaf coverage cluster — a " +
         "scaffold that is correspondence-correct BY CONSTRUCTION (it passes validate_provenance's FINAL cockpit gate with " +
         "zero mismatch before any items are attached). A same-lib inlined `use decision` chain RESOLVES (the run path is " +
@@ -915,7 +921,10 @@ function runValidateProvenance(
     if (stat.size > MAX_INPUT_BYTES) {
       return {
         content: [
-          { type: "text", text: `${label} file too large: ${stat.size} bytes > ${MAX_INPUT_BYTES}.` },
+          {
+            type: "text",
+            text: `${label} file too large: ${stat.size} bytes > ${MAX_INPUT_BYTES}.`,
+          },
         ],
         isError: true,
       };

@@ -39,6 +39,10 @@ export const SCENARIO_VIEW_MODEL_SCHEMA_VERSION = 1;
 
 type ActionKind = "recommend-activity" | "use-decision";
 type ConceptView = { name: string; libraryName?: string };
+/** A per-concept case answer (#187 Todo 2), projected from `CaseRun.conceptTruth`. `libraryName` is CONCRETE (never
+ *  bare) so same-name concepts across libraries are distinct rows; a pane joins a displayed concept via
+ *  `(concept.libraryName ?? currentFrameLib, name)`. An ABSENT concept is UNKNOWN — render blank, never `false`. */
+type ConceptTruthView = { name: string; libraryName: string; satisfied: boolean };
 
 /** Envelope: one render of a CEL file. Graph-level failures (parse / unresolved `covers`) surface in
  *  `errors` with an empty `scenarios` — the per-case array alone can't carry them. */
@@ -66,6 +70,9 @@ export interface ScenarioViewModel {
   tree: ViewNode[];
   /** Case-specific runtime diagnostics (no source position in v1) — for the scenario header. */
   diagnostics: string[];
+  /** The case's per-concept case-derived answer over the whole closure (#187 Todo 2) — feeds the panes' OFF-path
+   *  (dimmed) rendering. Empty on an error run. Additive/optional-in-spirit (no schema bump). */
+  conceptTruth: ConceptTruthView[];
 }
 
 export interface CaseView {
@@ -273,6 +280,12 @@ function buildScenario(
     produced,
     tree,
     diagnostics: run.diagnostics,
+    // #187 Todo 2: project the CRE's per-concept truth (lib → the VM's concrete libraryName). Serialization-safe array.
+    conceptTruth: run.conceptTruth.map((r) => ({
+      name: r.name,
+      libraryName: r.lib,
+      satisfied: r.satisfied,
+    })),
   };
 }
 

@@ -127,6 +127,15 @@ export interface TraceNode {
   children?: TraceNode[];
 }
 
+/** A per-concept case answer (#187 Todo 2) — the case's truth for concept `(lib,name)`. `satisfied` is the concept's
+ *  OVERALL evaluation (a direct fact OR its `defined as` composition), the SAME value whether the concept was on- or
+ *  off-path. Fully qualified: same-name concepts in different libraries are distinct rows. Read-only + additive. */
+export interface ConceptTruthRow {
+  lib: string;
+  name: string;
+  satisfied: boolean;
+}
+
 export interface CaseRun {
   case: string;
   decision: string | null;
@@ -135,6 +144,10 @@ export interface CaseRun {
   produced: ProducedRec[];
   trace: TraceNode[];
   diagnostics: string[];
+  /** The case's per-concept truth over the whole closure (#187 Todo 2). Lets the Medical-Validation panes show a
+   *  case-derived answer for an OFF-path (preempted) concept that `:first` never evaluated. Empty on an error run.
+   *  CONTRACT: an ABSENT `(lib,name)` (a concept outside this list) is UNKNOWN — render blank, never as `false`. */
+  conceptTruth: ConceptTruthRow[];
 }
 
 export interface CelRunResult {
@@ -245,6 +258,56 @@ function walkDefinedAs(
   return body.type === "DefinedAsBareRef"
     ? refTrace(body.ref, lib, ctx)
     : walkExpr(body.expression, lib, ctx);
+}
+
+/**
+ * Off-path case truth for a concept (#187 Todo 2). Evaluates `id` through the SAME `evalConcept` the run uses, but in
+ * an ISOLATED scratch ctx — fresh `diagnostics`/`stack`/`cycleHits` and a COPIED `reportedUnresolved` — so computing a
+ * preempted concept's answer cannot change the case's status/produced/trace/diagnostics. ONLY `cache` is intentionally
+ * shared, and that is safe: `evalConcept` is MONOTONIC (early-returns on any existing entry; only ever ADDS a cycle-free
+ * result; never overwrites) and the main run already completed, so added cache entries cannot alter produced/trace.
+ * LOAD-BEARING INVARIANT: this routes ONLY through `evalConcept` (never `walkBranches`/`emitAction`/`executeBody`, which
+ * are the ONLY writers of `produced`/`trace`/`delegationStack`/`runtimeError`). Keep it that way.
+ */
+function truthOf(id: Id, ctx: Ctx): ConceptEval {
+  return evalConcept(id, {
+    ...ctx,
+    diagnostics: [],
+    stack: new Set(),
+    cycleHits: 0,
+    reportedUnresolved: new Set(ctx.reportedUnresolved),
+  });
+}
+
+/**
+ * The case's per-concept truth over the WHOLE closure (#187 Todo 2) — eval-all-closure. Every DECLARED concept in
+ * `ctx.concepts` (root + local + package libs; the whole cross-lib closure) gets its overall satisfaction, so a
+ * preempted/off-path concept that `:first` never evaluated still has a case answer for the panes — no frame-aware
+ * structure walk needed (`ctx.concepts` already spans delegated sub-decisions). Records the RETURNED `sat` (NOT a cache
+ * snapshot: a cycle-tainted eval is deliberately not memoized, so a snapshot would omit exactly the abnormal false cases).
+ *
+ * COVERAGE = declared Concepts. This is exactly the set the panes can DISPLAY (their `ConceptShapeIndex` is built from
+ * the same `Concept` declarations), so a fact-only name asserted via `defined by` but with NO `Concept` declaration —
+ * satisfiable-true but absent from `ctx.concepts` — is intentionally absent here AND never a displayed concept, so the
+ * "absent ⇒ unknown" contract cannot mislead a pane. PRECEDENCE: `ctx.concepts` is keyed by `(lib,name)`, and a same-name
+ * local+package collision resolves to the local/covered concept (added last in `runCel`) — the shape model resolves the
+ * same way, so the row matches what the pane shows.
+ *
+ * BOUND: O(all declared concepts in the closure) rows, per case, and this array is JSON-serialized by `run_decision`. At
+ * authoring scale (a policy + a few shared libs) that is small; a covered lib importing a very large shared package
+ * library is the pathological case — if it ever bites, scope collection to the covered decision's reachable concept set
+ * (deferred; the frame-aware reachability walk was the option disc 191 rejected in favor of this simpler closure form).
+ *
+ * Rows are sorted by `(lib, name)` for deterministic output (so a future `run_decision` golden can't accidentally encode
+ * the registry iteration order). Order is NOT part of the contract — consumers join by `(lib,name)`, never by position.
+ */
+function collectConceptTruth(ctx: Ctx): ConceptTruthRow[] {
+  const rows: ConceptTruthRow[] = [];
+  for (const [id, entry] of ctx.concepts) {
+    rows.push({ lib: entry.lib, name: entry.node.name, satisfied: truthOf(id, ctx).sat });
+  }
+  rows.sort((a, b) => a.lib.localeCompare(b.lib) || a.name.localeCompare(b.name));
+  return rows;
 }
 
 /** A composition operand reference resolves against the DEFINING concept's
@@ -407,7 +470,9 @@ function emitAction(
         `cross-library \`use decision\` ${labelOf(refLib, name)}: target library or decision not found in the resolved graph`,
       );
     } else {
-      ctx.diagnostics.push(`\`use decision "${name}"\` target not found in library \`${frame.currentLib}\``);
+      ctx.diagnostics.push(
+        `\`use decision "${name}"\` target not found in library \`${frame.currentLib}\``,
+      );
     }
     return false;
   }
@@ -607,6 +672,7 @@ function runCase(
       produced: [],
       trace: [],
       diagnostics: [...diagnostics, "v1 CRE supports only a decision-branch `result is`"],
+      conceptTruth: [],
     };
   }
   const decisionName = result.leafName;
@@ -621,6 +687,7 @@ function runCase(
       produced: [],
       trace: [],
       diagnostics: [...diagnostics, `decision "${decisionName}" not found in the covered library`],
+      conceptTruth: [],
     };
   }
 
@@ -658,11 +725,14 @@ function runCase(
       produced: [],
       trace: ctx.trace,
       diagnostics: ctx.diagnostics,
+      conceptTruth: [], // a partial/unreliable state — a truth map off it would mislead
     };
   }
 
   const producedNames = new Set(ctx.produced.map((p) => p.recommendation));
   const status: CaseRun["status"] = producedNames.has(expectedBranch) ? "pass" : "fail";
+  // #187 Todo 2: per-concept case truth. Computed AFTER the runtimeError check (produced/trace are complete + status
+  // reads only ctx.produced) and via the isolated `truthOf`, so it cannot change any existing output.
   return {
     case: c.name,
     decision: decisionName,
@@ -671,6 +741,7 @@ function runCase(
     produced: ctx.produced,
     trace: ctx.trace,
     diagnostics: ctx.diagnostics,
+    conceptTruth: collectConceptTruth(ctx),
   };
 }
 
