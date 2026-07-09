@@ -22,4 +22,5 @@ export {
   resolveDeterminationLeaf,
   leafId,
 } from "./config";
-export { displayDetermination } from "./displayName";
+export { displayDetermination, determinationCategory, parseDeterminationName } from "./displayName";
+export type { DeterminationName } from "./displayName";

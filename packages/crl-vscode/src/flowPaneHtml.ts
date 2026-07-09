@@ -1,6 +1,9 @@
 // CRL FLOW pane RENDERER (vscode-free, unit-tested) — the graphical decision-tree flowchart (T2, disc 132).
 // Renders CrlDecisionStructure[] as an SVG forest: each decision root branches through its when/otherwise/action sub-nodes;
-// the gating `when` concept and any action guard appear as concept PEEK glyphs, and recommend targets are activity boxes.
+// a composite `when` hangs its `defined as` operator OUTLINE below it, and recommend targets are determination boxes.
+// #187 Todo 2 BORDER SEMANTICS: a node's border carries meaning — a `when` is grey (Source) or purple (inferred, no
+// `code is`); a determination target is green (certify) / gold (not-certify + pended); ordinary activity / use-decision /
+// decision are neutral grey. Nothing is blue (blue is the on-path ring). The old asserted/inferred peek DOTS are gone.
 //
 // CSP-safe by construction: geometry is SVG PRESENTATION attributes (x/y/width/d/…) — never a `style=` attribute and never
 // a `<style>` element inside the SVG; all color/font lives in FLOW_STYLE (a CSS string the shell concatenates into its
@@ -9,7 +12,7 @@
 // nodeKey is a JSON string (quotes/brackets) and cannot be a DOM id; `anchors` is keyed BY nodeKey → the generated id (the
 // cross-pane join, mirroring crlPaneHtml). `id` + `data-reveal` ride the SAME <g> so highlight (getElementById) and click
 // (closest('[data-reveal]')) resolve to one element.
-import { buildDefStruct, classifyConcept, displayDetermination, type CrlConceptNode, type CrlDecisionStructure, type CrlStructureNode, type DefStructExpr, type ResolveDefExprEntry } from "@smile-digital-health/crl";
+import { buildDefStruct, determinationCategory, displayDetermination, type CrlConceptNode, type CrlDecisionStructure, type CrlStructureNode, type DefStructExpr, type ResolveDefExprEntry } from "@smile-digital-health/crl";
 
 /** Reserved prefix marking a synthetic outline-row nodeKey — provably disjoint from every structure/concept nodeKey
  *  (those are JSON arrays), so a leaf anchor no-ops against every existing keyset. A concept-operand leaf's key carries
@@ -80,13 +83,16 @@ interface LaidNode {
   useDecision: boolean; // an action with actionKind "use-decision"
   label: string; // display label (NOT yet escaped/truncated)
   full: string; // untruncated label + lib, for the <title>
-  conceptKey?: string; // resolved concept nodeKey for a peek (when concept / action guard / a def-leaf's own concept)
-  conceptLayer?: "asserted" | "inferred"; // for the peek glyph color, when a concept resolved
+  conceptKey?: string; // resolved concept nodeKey — a `when`'s gating concept or an outline leaf's own concept (peek target)
   conceptName?: string; // resolved concept's own name (disambiguates a when label + the peek <title>)
   conceptLib?: string; // resolved concept's OWN library (cross-lib concepts share a bare name — the lib disambiguates)
-  /** Concept-bearing node whose concept has NO local `code is` → non-Source (grey fill). `undefined` for a concept-less
-   *  node (otherwise / unguarded action / decision root) — those are NEVER greyed (#187 Todo 4). */
+  /** Concept-bearing node's Source flag: `true` = has a local `code is` (grey border); `false` = inferred / no `code is`
+   *  (purple border); `undefined` = concept-less OR an unresolved concept ref → neutral (Todo 2 border scheme). */
   isSource?: boolean;
+  /** #187 Todo 2: a recommend-activity's PAS determination category (`certify` / `not-certify` / `pended`), parsed from
+   *  its raw `<category>.<key>` name — drives the leaf border (certify → green, not-certify + pended → gold). `undefined`
+   *  for an ordinary (non-determination) activity or a use-decision (those stay neutral). */
+  dispositionCategory?: string;
   /** #187 Todo 4: a synthetic `defined as` operand leaf (a concept-operand row) hanging under a composite `when` — NOT a
    *  decision structure row. Rendered with a distinct `.flow-def-edge`; excluded from `{nodeKey}` select + the per-case
    *  overlays. Set ONLY on `outlineRow === "leaf"` rows (the addressable operands). */
@@ -123,11 +129,11 @@ function buildLaid(
   let maxDepth = 0;
   const outlineX = (whenLeft: number, indent: number): number => whenLeft + OUTLINE_BASE + indent * OUTLINE_INDENT;
 
-  const conceptFields = (refKey: string | undefined): Pick<LaidNode, "conceptKey" | "conceptLayer" | "conceptName" | "conceptLib" | "isSource"> => {
+  const conceptFields = (refKey: string | undefined): Pick<LaidNode, "conceptKey" | "conceptName" | "conceptLib" | "isSource"> => {
     if (refKey === undefined) return {};
     const c = conceptMap.get(refKey);
-    if (!c) return {}; // unresolved concept ref → no peek (the node stays selectable via its OWN nodeKey)
-    return { conceptKey: c.nodeKey, conceptLayer: classifyConcept(c).layer, conceptName: c.name, conceptLib: c.lib, isSource: c.hasLocalCode };
+    if (!c) return {}; // unresolved concept ref → the node stays selectable via its OWN nodeKey, border stays neutral
+    return { conceptKey: c.nodeKey, conceptName: c.name, conceptLib: c.lib, isSource: c.hasLocalCode };
   };
 
   // #187 Option-C: lay out a composite's `defined as` structure (`DefStructExpr`, the SAME shared builder the
@@ -170,8 +176,7 @@ function buildLaid(
         return {
           ...base, nodeKey: outlineKey(topWhenKey, opPath, s.nodeKey), kind: "leaf", outlineRow: "leaf", isDefLeaf: true,
           label: s.name, full: `${s.name} — concept "${s.lib}"`,
-          conceptKey: s.nodeKey, conceptName: s.name, conceptLib: s.lib,
-          conceptLayer: s.isInferred ? "inferred" : "asserted", isSource: s.isSource,
+          conceptKey: s.nodeKey, conceptName: s.name, conceptLib: s.lib, isSource: s.isSource,
           y, children,
         };
       }
@@ -185,9 +190,15 @@ function buildLaid(
     // [target] or [target, guardConcept] for an action, so the guard is at index 1 (NOT "the last" — reading [1] makes an
     // unexpected 3-element array fail loudly rather than silently mis-peeking). Either ref may be unresolved (refKeys are
     // string-constructed, not index-resolved) → conceptFields drops the peek but keeps the node.
-    const conceptRef = n.kind === "when" ? n.refKeys[0] : n.kind === "action" && n.refKeys.length > 1 ? n.refKeys[1] : undefined;
+    // Only a `when` IS its concept (the box carries its border). An action's guard concept is no longer resolved here —
+    // Todo 2 removed the guard peek + colors an action by its DETERMINATION target, not its guard — so resolving it would
+    // be dead work (the guard stays visible in the crl pane).
+    const conceptRef = n.kind === "when" ? n.refKeys[0] : undefined;
     const cf = conceptFields(conceptRef);
     const useDecision = n.kind === "action" && n.actionKind === "use-decision";
+    // #187 Todo 2: a recommend-activity's determination category, from its RAW `<category>.<key>` name (before display
+    // stripping). An ordinary activity / use-decision / non-action → undefined → neutral (no green/gold).
+    const dispositionCategory = n.kind === "action" && n.actionKind === "recommend-activity" ? determinationCategory(n.label) : undefined;
     const display =
       n.kind === "when"
         ? cf.conceptName ?? n.label.replace(/^when\s+/, "") // concept name (resolved) else strip "when " from the label
@@ -228,7 +239,7 @@ function buildLaid(
       }
     }
     const children = [...structureChildren, ...outlineRoots];
-    return { nodeKey: n.nodeKey, kind: n.kind, useDecision, label: display, full, depth, y: nodeY, children, ...cf };
+    return { nodeKey: n.nodeKey, kind: n.kind, useDecision, dispositionCategory, label: display, full, depth, y: nodeY, children, ...cf };
   };
 
   const roots: LaidNode[] = [];
@@ -356,8 +367,10 @@ export function renderFlowPane(
       reveals[key] = { conceptNodeKey: conceptKey };
       if (n.conceptName !== undefined && n.conceptLib !== undefined && n.topWhenKey !== undefined)
         leafConcepts[n.nodeKey] = { lib: n.conceptLib, name: n.conceptName, topWhenKey: n.topWhenKey };
+      // #187 Todo 2: border by Source — inferred (no `code is`) → purple, Source → grey — kept DASHED (an operand chip,
+      // not a decision box). `isSource === false` is inferred; `true`/`undefined` stay grey (never mis-purple).
       const classes = ["flow-row", "flow-leaf"];
-      if (n.isSource === false) classes.push("flow-nonsource");
+      if (n.isSource === false) classes.push("flow-inferred");
       const cx = x + OUTLINE_NODE_W - 11;
       const cy = y + OUTLINE_H / 2;
       const ticks =
@@ -370,32 +383,26 @@ export function renderFlowPane(
       continue;
     }
 
-    // A regular STRUCTURE node (decision / when / otherwise / action).
+    // A regular STRUCTURE node (decision / when / otherwise / action). #187 Todo 2 border semantics:
+    //  - a `when` IS its gating concept → inferred (no `code is`) PURPLE / Source or unresolved GREY;
+    //  - a recommend-activity is a determination TARGET → certify GREEN / not-certify+pended GOLD / ordinary neutral;
+    //  - a use-decision, otherwise, decision → neutral grey (never blue — blue is reserved for the on-path ring, Todo 3).
     const classes = ["flow-row"];
-    classes.push(n.kind === "action" ? (n.useDecision ? "flow-use" : "flow-activity") : `flow-${n.kind}`);
-    // Non-Source grey fill — ONLY where the BOX IS the concept: a `when` (its gating concept). NOT an action (its box is
-    // the recommendation TARGET), and NEVER a concept-less node.
-    if (n.kind === "when" && n.conceptKey !== undefined && n.isSource === false) classes.push("flow-nonsource");
-    reveals[key] = { nodeKey: n.nodeKey };
-
-    // Concept/guard PEEK glyph — a STRUCTURE node with a resolved concept. The nested data-reveal lets closest() resolve
-    // a glyph click to the peek.
-    let peek = "";
-    if (n.conceptKey !== undefined) {
-      const pk = `${prefix}p${gid}`;
-      reveals[pk] = { conceptNodeKey: n.conceptKey };
-      const cls = n.conceptLayer === "inferred" ? "flow-peek-inferred" : "flow-peek-asserted";
-      const peekTitle = n.conceptName ? escapeHtml(`${n.conceptName} — concept "${n.conceptLib}"`) : "peek concept";
-      peek =
-        `<g class="flow-peek ${cls}" data-reveal="${escapeHtml(pk)}">` +
-        `<circle cx="${x + NODE_W - 13}" cy="${y + 13}" r="5"/><title>${peekTitle}</title></g>`;
+    if (n.kind === "action") {
+      if (n.useDecision) classes.push("flow-use");
+      else if (n.dispositionCategory === "certify") classes.push("flow-certify");
+      else if (n.dispositionCategory === "not-certify" || n.dispositionCategory === "pended") classes.push("flow-notcertify");
+      else classes.push("flow-activity"); // ordinary (non-determination) activity → neutral
+    } else {
+      classes.push(`flow-${n.kind}`);
+      if (n.kind === "when" && n.isSource === false) classes.push("flow-inferred"); // inferred gating concept → purple border
     }
+    reveals[key] = { nodeKey: n.nodeKey };
     body +=
       `<g id="${escapeHtml(gid)}" class="${classes.join(" ")}" data-reveal="${escapeHtml(key)}">` +
       `<title>${escapeHtml(n.full)}</title>` +
       `<rect x="${x}" y="${y}" width="${NODE_W}" height="${NODE_H}" rx="6"/>` +
       `<text x="${x + 10}" y="${y + NODE_H / 2 + 4}">${escapeHtml(truncate(n.label, LABEL_MAX))}</text>` +
-      peek +
       `</g>`;
   }
 
@@ -416,20 +423,28 @@ export const FLOW_STYLE =
   `.flow-row{cursor:pointer}` +
   `.flow-row>rect{fill:var(--vscode-editorWidget-background,#252526);stroke:var(--vscode-panel-border,#454545);stroke-width:1}` +
   `.flow-row>text{fill:var(--vscode-foreground,#cccccc)}` +
-  `.flow-decision>rect{fill:var(--vscode-editor-background,#1e1e1e);stroke:var(--vscode-focusBorder,#3794ff);stroke-width:1.5}` +
+  // #187 Todo 2 BORDER SEMANTICS. NOTHING here is blue — blue is reserved for the on-path ring (Todo 3). Decision + a
+  // Source `when` + an ordinary activity + a use-decision all read NEUTRAL GREY; meaning is carried by the exceptions
+  // below (inferred → purple, certify → green, not-certify/pended → gold).
+  `.flow-decision>rect{fill:var(--vscode-editor-background,#1e1e1e);stroke:var(--vscode-descriptionForeground,#8c8c8c);stroke-width:1.5}` +
   `.flow-decision>text{font-weight:bold}` +
-  `.flow-when>rect{fill:var(--vscode-editorHoverWidget-background,#2c2c2d);stroke:var(--vscode-symbolIcon-keywordForeground,#c586c0)}` +
+  // A `when` IS its gating concept: Source (has local `code is`) OR unresolved → grey; inferred (no `code is`) → PURPLE.
+  `.flow-when>rect{fill:var(--vscode-editorHoverWidget-background,#2c2c2d);stroke:var(--vscode-descriptionForeground,#8c8c8c)}` +
+  `.flow-when.flow-inferred>rect{stroke:var(--vscode-charts-purple,#c586c0)}` +
   `.flow-otherwise>rect{stroke-dasharray:3 2;opacity:.85}` +
-  `.flow-activity>rect{fill:var(--vscode-editorWidget-background,#252526);stroke:var(--vscode-symbolIcon-functionForeground,#dcdcaa);stroke-width:1.5}` +
-  `.flow-use>rect{stroke:var(--vscode-textLink-foreground,#3794ff);stroke-dasharray:5 2}` +
+  // A recommend TARGET. A DETERMINATION colors by PAS category: certify → GREEN, not-certify + pended → GOLD (solid — the
+  // preempt overlay's amber is DASHED, so the two are distinct even at a shared hue). An ordinary (non-determination)
+  // activity → neutral grey; a use-decision → neutral grey with its dashed delegation shape.
+  `.flow-activity>rect{fill:var(--vscode-editorWidget-background,#252526);stroke:var(--vscode-descriptionForeground,#8c8c8c);stroke-width:1.5}` +
+  `.flow-certify>rect{fill:var(--vscode-editorWidget-background,#252526);stroke:var(--vscode-charts-green,#3fb950);stroke-width:1.5}` +
+  `.flow-notcertify>rect{fill:var(--vscode-editorWidget-background,#252526);stroke:var(--vscode-editorWarning-foreground,#cca700);stroke-width:1.5}` +
+  `.flow-use>rect{fill:var(--vscode-editorWidget-background,#252526);stroke:var(--vscode-descriptionForeground,#8c8c8c);stroke-dasharray:5 2}` +
   `.flow-edge{fill:none;stroke:var(--vscode-panel-border,#454545);stroke-width:1.2}` +
-  `.flow-peek{cursor:pointer}` +
-  `.flow-peek-asserted>circle{fill:var(--vscode-charts-blue,#3794ff)}` +
-  `.flow-peek-inferred>circle{fill:var(--vscode-charts-purple,#c586c0)}` +
   // #187 Todo 4: a DEF-LEAF edge — a distinct dashed grey line (definition decomposition, NOT a control-flow branch).
   `.flow-def-edge{fill:none;stroke:var(--vscode-panel-border,#454545);stroke-width:1;stroke-dasharray:2 2;opacity:.6}` +
-  // a def-leaf box — lighter, dashed border, so it reads as a subordinate operand chip, not a decision row.
+  // an outline operand chip — kept DASHED so it never reads as a decision box. Source → grey; inferred (no `code is`) → purple.
   `.flow-leaf>rect{fill:var(--vscode-editor-background,#1e1e1e);stroke:var(--vscode-descriptionForeground,#8c8c8c);stroke-width:1;stroke-dasharray:2 1.5}` +
+  `.flow-leaf.flow-inferred>rect{stroke:var(--vscode-charts-purple,#c586c0)}` +
   `.flow-leaf>text{fill:var(--vscode-descriptionForeground,#bfbfbf);font-size:11px}` +
   // #187 Option-C OUTLINE rows. An OPERATOR / TOP-OR label — a bare uppercase caption (no box), like the questionnaire's
   // ANY OF / ALL OF tab; render-only (not clickable). An EXTERNAL / MORE stub — a faint dashed box (unaddressable operand).
@@ -437,10 +452,6 @@ export const FLOW_STYLE =
   `.flow-op>text,.flow-topor>text{fill:var(--vscode-descriptionForeground,#8c8c8c);font:700 9px/1 var(--vscode-editor-font-family,monospace);letter-spacing:.12em}` +
   `.flow-ext>rect,.flow-more>rect{fill:var(--vscode-editor-background,#1e1e1e);stroke:var(--vscode-descriptionForeground,#6a6a72);stroke-width:1;stroke-dasharray:2 2;opacity:.7}` +
   `.flow-ext>text,.flow-more>text{fill:var(--vscode-descriptionForeground,#8c8c8c);font-size:11px;font-style:italic}` +
-  // NON-SOURCE (a concept-bearing node whose concept has no `code is`) → a grey FILL, NOT the kind-carrying stroke. Placed
-  // BEFORE the per-case overlays below (they set `stroke`, or a later same-specificity `fill` for done/error) so an active
-  // overlay still wins on the node.
-  `.flow-row.flow-nonsource>rect{fill:var(--vscode-editorWidget-background,#2b2b2e)}` +
   `.flow-row.current>rect{stroke:var(--vscode-focusBorder,#3794ff);stroke-width:2.5}` +
   // disc 164: the produced-path DIVERTER overlay on the SVG rect (the shell's HTML `.diverter` outline does not paint on
   // a <g>, same as the channels below). A neutral teal DOTTED stroke for the evaluated-false `when`s that routed the case

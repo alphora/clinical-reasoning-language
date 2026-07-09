@@ -56,25 +56,35 @@ check("anchors keyed by EVERY structure nodeKey → a generated (non-nodeKey) id
   }
 });
 
-check("reveals: one {nodeKey} per structure node + one {conceptNodeKey} per RESOLVED concept (when/guard)", () => {
+check("reveals: one {nodeKey} per structure node; NO concept peeks (Todo 2 removed the dots — a concept peek now comes ONLY from an outline leaf)", () => {
   const nodeKeys = revVals.filter((v) => "nodeKey" in v).map((v) => v.nodeKey).sort();
   assert.deepEqual(nodeKeys, [...STRUCT_KEYS].sort());
-  const conceptKeys = revVals.filter((v) => "conceptNodeKey" in v).map((v) => v.conceptNodeKey).sort();
-  assert.deepEqual(conceptKeys, ["c:A", "c:B", "c:G"]); // w:A, w:B, and the a:Y guard — NOT the unresolved c:Z
+  // With the peek dots gone (Todo 2) and no `defExpr` outline in this fixture, there are NO {conceptNodeKey} reveals.
+  assert.equal(revVals.filter((v) => "conceptNodeKey" in v).length, 0, "no concept-peek reveals from a bare (no-outline) render");
 });
 
-check("unresolved concept (when Z → c:Z absent from map): node still selectable, NO peek", () => {
+check("unresolved concept (when Z → c:Z absent from map): node still selectable", () => {
   assert.ok(r.anchors["w:Z"], "w:Z still anchored");
   assert.ok(revVals.some((v) => v.nodeKey === "w:Z"), "w:Z still has a {nodeKey} reveal");
   assert.ok(!revVals.some((v) => v.conceptNodeKey === "c:Z"), "no dangling {conceptNodeKey} for the unresolved ref");
 });
 
-check("guarded recommend exposes the guard concept as a peek", () => {
-  assert.ok(revVals.some((v) => v.conceptNodeKey === "c:G"), "action guard G is a {conceptNodeKey} peek");
+check("Todo 2: an unresolved `when` concept is NEUTRAL grey (isSource undefined ≠ false → NOT purple-inferred)", () => {
+  // w:Z's concept c:Z is absent → isSource undefined → the base grey `.flow-when`, never `.flow-inferred` (purple).
+  // An unresolved when's label falls back to the stripped structure label ("Z"); its <text> is "Z".
+  const zRow = r.html.match(/class="(flow-row flow-when[^"]*)"[^>]*><title>[^<]*<\/title><rect[^>]*\/><text[^>]*>Z<\/text>/);
+  assert.ok(zRow, "the unresolved when Z renders");
+  assert.ok(!zRow[1].includes("flow-inferred"), "an unresolved when is NOT flow-inferred (stays neutral grey)");
+});
+
+check("Todo 2: the peek dots are REMOVED — a guarded recommend no longer exposes its guard concept as a peek", () => {
+  // The guard concept navigation moved off the tree (still visible in the crl pane); the tree has no `.flow-peek` glyph.
+  assert.ok(!/flow-peek/.test(r.html), "no `.flow-peek` glyph anywhere in the tree");
+  assert.ok(!revVals.some((v) => v.conceptNodeKey === "c:G"), "the action guard G is no longer a {conceptNodeKey} peek");
 });
 
 check("node shapes by kind (class counts)", () => {
-  const count = (cls) => (r.html.match(new RegExp(`class="flow-row ${cls}[ "]`, "g")) || []).length; // allow trailing classes (e.g. flow-nonsource)
+  const count = (cls) => (r.html.match(new RegExp(`class="flow-row ${cls}[ "]`, "g")) || []).length; // allow trailing classes (e.g. flow-inferred)
   assert.equal(count("flow-decision"), 1);
   assert.equal(count("flow-when"), 3); // A, B, Z
   assert.equal(count("flow-activity"), 3); // X, Y, Q (recommend)
@@ -148,7 +158,7 @@ check("#156 slice 5: review overlay COEXISTS — .current/.failed-criterion/-pre
   // FIX 4: review state wins the rect fill by SPECIFICITY ((0,2,1) > (0,1,1)), not order — but the EQUAL-specificity
   // error-over-done tiebreak IS order-dependent, so assert .error-node>rect comes AFTER .done-node>rect. Also assert review
   // sits after EVERY fill-setting kind rule (a defensive lock: if a future kind rule were bumped to (0,2,x), order saves us).
-  for (const kind of [".flow-row>rect", ".flow-decision>rect", ".flow-when>rect", ".flow-activity>rect"])
+  for (const kind of [".flow-row>rect", ".flow-decision>rect", ".flow-when>rect", ".flow-activity>rect", ".flow-certify>rect", ".flow-notcertify>rect"])
     assert.ok(FLOW_STYLE.indexOf(kind) < FLOW_STYLE.indexOf(".flow-row.done-node>rect"), `review fills sit after the ${kind} kind fill`);
   assert.ok(
     FLOW_STYLE.indexOf(".flow-row.done-node>rect") < FLOW_STYLE.indexOf(".flow-row.error-node>rect"),
@@ -257,15 +267,6 @@ check("GOLDEN coords pin COL/ROW/midpoint/rounding (a uniform shift/scale would 
   assert.ok(r.html.includes('<rect x="454" y="14" width="168" height="34"'), "depth-2 leaf at the expected column/row");
 });
 
-check("peek glyph is NESTED inside the row <g> (closest() routes glyph→peek, body→select); row carries id + data-reveal", () => {
-  // a resolved when row: <g id=… class="flow-row flow-when" data-reveal=…><title>…</title><rect/><text>…</text><g class="flow-peek…" data-reveal=…><circle/><title/></g></g>
-  assert.match(
-    r.html,
-    /<g id="g1_flow\d+" class="flow-row flow-when[^"]*" data-reveal="g1_kg1_flow\d+"><title>[^<]*<\/title><rect [^>]*\/><text [^>]*>[^<]*<\/text><g class="flow-peek [^"]*" data-reveal="g1_pg1_flow\d+"><circle [^>]*\/><title>[^<]*<\/title><\/g><\/g>/,
-    "peek <g> sits between the row's <rect>/<text> and the row's closing </g> (nested, not a sibling)",
-  );
-});
-
 check("nested when-children (when → when → action) lay out without same-depth overlap", () => {
   const nested = renderFlowPane([{
     decision: "N", lib: "Pol", nodeKey: "d:N", location: {},
@@ -287,13 +288,14 @@ check("nested when-children (when → when → action) lay out without same-dept
   }
 });
 
-check("guarded use-decision: flow-use node + a guard peek on it", () => {
+check("Todo 2: a use-decision renders flow-use (NEUTRAL grey + dashed, NOT blue) and no longer peeks its guard", () => {
   const g = renderFlowPane([{
     decision: "G", lib: "Pol", nodeKey: "d:G", location: {},
     children: [node("guse", "action", "Target", ["d:Target", "c:G"], [], { actionKind: "use-decision" })],
   }], { concepts });
   assert.ok(/class="flow-row flow-use"/.test(g.html), "use-decision renders as a flow-use node");
-  assert.ok(Object.values(g.reveals).some((v) => v.conceptNodeKey === "c:G"), "the use-decision's guard G is a concept peek");
+  assert.match(FLOW_STYLE, /\.flow-use>rect\{[^}]*stroke:var\(--vscode-descriptionForeground/, "flow-use border is NEUTRAL grey (not blue textLink)");
+  assert.ok(!/flow-peek/.test(g.html), "no peek glyph — the guard concept is no longer peeked from the tree");
 });
 
 // ── #187 Option-C: composite `defined as` → an indented operator OUTLINE (ANY OF / ALL OF / NOT rows + leaf boxes) ──
@@ -318,8 +320,8 @@ check("Option-C: an INFERRED composite when renders an ANY OF outline of leaf ro
   assert.ok(/class="flow-outline flow-op"><text[^>]*>ANY OF</.test(rr.html), "an ANY OF operator label row (or → any of)");
   assert.ok(!/flow-topor/.test(rr.html), "an INFERRED composite (no code is) has NO top-OR row");
   assert.ok(/class="flow-def-edge"/.test(rr.html), "outline connectors use the distinct flow-def-edge, not flow-edge");
-  assert.ok(leafRows.find((l) => l.label === "L2").cls.includes("flow-nonsource"), "L2 (no code-is) is greyed");
-  assert.ok(!leafRows.find((l) => l.label === "L1").cls.includes("flow-nonsource"), "L1 (code-is) is NOT greyed");
+  assert.ok(leafRows.find((l) => l.label === "L2").cls.includes("flow-inferred"), "L2 (no code-is) → inferred (purple-dashed border)");
+  assert.ok(!leafRows.find((l) => l.label === "L1").cls.includes("flow-inferred"), "L1 (code-is) → NOT inferred (grey-dashed)");
   const leafPeeks = Object.values(rr.reveals).filter((v) => v.conceptNodeKey === "c:L1" || v.conceptNodeKey === "c:L2");
   assert.equal(leafPeeks.length, 2, "each leaf reveals its OWN concept (peek), never a {nodeKey} select");
   assert.equal(Object.keys(rr.anchors).filter((k) => k.startsWith("leaf::")).length, 2, "ONLY the 2 leaf rows anchor (op rows are render-only)");
@@ -441,6 +443,46 @@ check("Option-C: a SOURCE composite (has code is) gets a top-OR row; a NOT rende
   assert.ok(/class="flow-outline flow-op"><text[^>]*>ANY OF</.test(rr.html), "with the ANY OF body below it");
   assert.ok(/class="flow-outline flow-op"><text[^>]*>NOT</.test(rr.html), "a NOT operator row");
   assert.ok(leafRowsOf(rr.html).some((l) => l.label === "L2"), "the NOT's operand L2 is still rendered (never dropped)");
+});
+
+// ── #187 Todo 2: border semantics (inferred purple / source grey, determinations green+gold, dots gone) ──
+check("Todo 2: `when` border — inferred (no code is) → flow-inferred (purple); Source (has code is) → neutral grey", () => {
+  const cs = [concept("c:S", "S", { hasLocalCode: true }), concept("c:I", "I", { definitionKind: "defined-as" })];
+  const st = [{ decision: "D", lib: "Pol", nodeKey: "d:D", location: {}, children: [
+    node("w:S", "when", "when S", ["c:S"], [node("a:s", "action", "certify.Approve", ["act:s"], [], { actionKind: "recommend-activity" })]),
+    node("w:I", "when", "when I", ["c:I"], [node("a:i", "action", "certify.Approve", ["act:i"], [], { actionKind: "recommend-activity" })]),
+  ] }];
+  const rr = renderFlowPane(st, { concepts: cs });
+  const whenCls = (name) => rr.html.match(new RegExp(`class="(flow-row flow-when[^"]*)"[^>]*><title>[^<]*</title><rect[^>]*/><text[^>]*>${name}</text>`))[1];
+  assert.ok(!whenCls("S").includes("flow-inferred"), "a Source when (has code is) → neutral grey (no flow-inferred)");
+  assert.ok(whenCls("I").includes("flow-inferred"), "an inferred when (no code is) → flow-inferred (purple)");
+});
+
+check("Todo 2: determination leaf border by PAS category — certify GREEN, not-certify + pended GOLD, ordinary NEUTRAL", () => {
+  const st = [{ decision: "D", lib: "Pol", nodeKey: "d:D", location: {}, children: [
+    node("w1", "when", "when A", ["c:A"], [node("aC", "action", "certify.Approve", ["act:c"], [], { actionKind: "recommend-activity" })]),
+    node("w2", "when", "when B", ["c:B"], [node("aN", "action", "not-certify.Deny", ["act:n"], [], { actionKind: "recommend-activity" })]),
+    node("w3", "when", "when G", ["c:G"], [node("aP", "action", "pended.Info", ["act:p"], [], { actionKind: "recommend-activity" })]),
+    node("o", "otherwise", "otherwise", [], [node("aO", "action", "Order MRI", ["act:o"], [], { actionKind: "recommend-activity" })]),
+  ] }];
+  const rr = renderFlowPane(st, { concepts });
+  const actCls = (label) => rr.html.match(new RegExp(`class="(flow-row flow-[a-z]+)"[^>]*><title>[^<]*</title><rect[^>]*/><text[^>]*>${label}</text>`))[1];
+  assert.equal(actCls("Approve"), "flow-row flow-certify", "certify.* → green");
+  assert.equal(actCls("Deny"), "flow-row flow-notcertify", "not-certify.* → gold");
+  assert.equal(actCls("Info"), "flow-row flow-notcertify", "pended.* → gold (same bucket as not-certify)");
+  assert.equal(actCls("Order MRI"), "flow-row flow-activity", "an ordinary (non-determination) activity → neutral flow-activity");
+});
+
+check("Todo 2: FLOW_STYLE — decision grey (not blue), certify green, not-certify gold, inferred purple; NO peek / non-source / textLink-blue", () => {
+  assert.match(FLOW_STYLE, /\.flow-decision>rect\{[^}]*stroke:var\(--vscode-descriptionForeground/, "decision border is neutral grey (not focusBorder blue)");
+  assert.match(FLOW_STYLE, /\.flow-certify>rect\{[^}]*charts-green/, "certify → green");
+  assert.match(FLOW_STYLE, /\.flow-notcertify>rect\{[^}]*editorWarning-foreground/, "not-certify + pended → gold (distinct token from the preempt amber)");
+  assert.match(FLOW_STYLE, /\.flow-when\.flow-inferred>rect\{[^}]*charts-purple/, "inferred when → purple");
+  assert.match(FLOW_STYLE, /\.flow-leaf\.flow-inferred>rect\{[^}]*charts-purple/, "inferred outline leaf → purple (still dashed via .flow-leaf)");
+  assert.ok(!/flow-peek/.test(FLOW_STYLE), "no peek-dot CSS");
+  assert.ok(!/flow-nonsource/.test(FLOW_STYLE), "no non-source FILL CSS (border carries the signal now)");
+  assert.ok(!/textLink-foreground/.test(FLOW_STYLE), "use-decision is no longer blue (textLink)");
+  assert.equal((FLOW_STYLE.match(/focusBorder/g) || []).length, 1, "focusBorder (blue) appears ONLY in the on-path .current ring");
 });
 
 console.log(`\nflowPaneHtml.test: ${pass} checks passed`);

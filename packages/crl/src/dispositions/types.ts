@@ -12,6 +12,9 @@
  * (the sub-tree still issues exactly one contribution per run — the parent adjudication combines nothing extra).
  */
 
+/** The framework PAS category names — the closed 3-set (certify/not-certify/pended, `DISPOSITION_CATEGORIES`). */
+export type DispositionCategoryName = "certify" | "not-certify" | "pended";
+
 /** Whether our decision tree IS the adjudication (standalone) or feeds a larger one (embedded). Gates finality only. */
 export type DispositionMode = "standalone" | "embedded";
 

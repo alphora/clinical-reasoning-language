@@ -1,4 +1,4 @@
-import { displayDetermination } from "../displayName";
+import { determinationCategory, displayDetermination, parseDeterminationName } from "../displayName";
 
 describe("dispositions/displayName — displayDetermination (DISPLAY-only)", () => {
   it("strips the `<category>.` prefix, returning just the human key", () => {
@@ -29,5 +29,36 @@ describe("dispositions/displayName — displayDetermination (DISPLAY-only)", () 
     expect(displayDetermination("not-certify")).toBe("not-certify");
     // empty key after the dot does not match `(.+)` → unchanged
     expect(displayDetermination("certify.")).toBe("certify.");
+  });
+});
+
+describe("dispositions/displayName — parseDeterminationName + determinationCategory (the MV Tree color join)", () => {
+  it("parses a dotted determination into { category, key }", () => {
+    expect(parseDeterminationName("certify.Met")).toEqual({ category: "certify", key: "Met" });
+    expect(parseDeterminationName("not-certify.Unmet EIU")).toEqual({ category: "not-certify", key: "Unmet EIU" });
+    expect(parseDeterminationName("pended.Info Needed")).toEqual({ category: "pended", key: "Info Needed" });
+    // only the FIRST `.` separates → a multi-dot key is preserved whole
+    expect(parseDeterminationName("not-certify.a.b")).toEqual({ category: "not-certify", key: "a.b" });
+  });
+
+  it("parses a BARE single-option category (no key)", () => {
+    expect(parseDeterminationName("certify")).toEqual({ category: "certify" });
+    expect(parseDeterminationName("pended")).toEqual({ category: "pended" });
+  });
+
+  it("returns undefined for a non-determination, a non-category prefix, and an empty key", () => {
+    expect(parseDeterminationName("Order MRI")).toBeUndefined();
+    expect(parseDeterminationName("recommend.something")).toBeUndefined(); // prefix is not a PAS category
+    expect(parseDeterminationName("certifyX.y")).toBeUndefined(); // "certifyX" is not a category
+    expect(parseDeterminationName("certify.")).toBeUndefined(); // empty key → malformed
+  });
+
+  it("determinationCategory returns just the category (or undefined)", () => {
+    expect(determinationCategory("certify.Approve")).toBe("certify");
+    expect(determinationCategory("not-certify.Deny")).toBe("not-certify");
+    expect(determinationCategory("pended.Info")).toBe("pended");
+    expect(determinationCategory("certify")).toBe("certify"); // bare
+    expect(determinationCategory("Order MRI")).toBeUndefined();
+    expect(determinationCategory("certify.")).toBeUndefined();
   });
 });
