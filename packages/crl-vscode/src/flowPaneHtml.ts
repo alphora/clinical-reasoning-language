@@ -9,19 +9,27 @@
 // nodeKey is a JSON string (quotes/brackets) and cannot be a DOM id; `anchors` is keyed BY nodeKey → the generated id (the
 // cross-pane join, mirroring crlPaneHtml). `id` + `data-reveal` ride the SAME <g> so highlight (getElementById) and click
 // (closest('[data-reveal]')) resolve to one element.
-import { classifyConcept, displayDetermination, type ConceptShapeNode, type CrlConceptNode, type CrlDecisionStructure, type CrlStructureNode } from "@smile-digital-health/crl";
+import { buildDefStruct, classifyConcept, displayDetermination, type CrlConceptNode, type CrlDecisionStructure, type CrlStructureNode, type DefStructExpr, type ResolveDefExprEntry } from "@smile-digital-health/crl";
 
-import type { ResolveConceptShape, ResolveConceptInfo } from "./questionnaireModel";
-
-/** #187 Todo 4: at most this many operand leaves shown per composite level; the rest collapse into a "+N more" stub. */
-const LEAF_CAP = 10;
-/** Max `defined as` operand nesting expanded (relative to the composite root). Bounds the otherwise-exponential
- *  (cap^depth) node count on a pathological deep agent-authored composite; a node truncated here gets a "…" suffix.
- *  Realistic composites are 2–3 levels, so this never truncates real content. */
-const MAX_LEAF_DEPTH = 4;
-/** Reserved prefix marking a synthetic definition-leaf nodeKey (`leaf::<whenKey>|<leafKey>`) — provably disjoint from
- *  every structure/concept nodeKey (those are JSON arrays), so a leaf anchor no-ops against every existing keyset. */
+/** Reserved prefix marking a synthetic outline-row nodeKey — provably disjoint from every structure/concept nodeKey
+ *  (those are JSON arrays), so a leaf anchor no-ops against every existing keyset. A concept-operand leaf's key carries
+ *  the OPERAND-INDEX PATH (`leaf::<whenKey>|<opPath>|<conceptNodeKey>`) so two positional occurrences of the SAME concept
+ *  under one composite get DISTINCT keys (else `anchors`/`leafConcepts` overwrite — corrupting highlight + the verdict
+ *  join). Operator / top-OR / external / more rows carry a render-only synthetic key (never anchored). */
 const LEAF_KEY = "leaf::";
+/** Collision-proof synthetic outline-row key: `leaf::` + a JSON tuple (NOT raw `|` concat — a nodeKey is itself a JSON
+ *  array that can contain any delimiter, so `${when}|${path}|${nodeKey}` could collide across different tuples, the same
+ *  class of bug `truthKey` avoids in the questionnaire). `tag` is the concept nodeKey (a leaf) or "op"/"ext"/"more"/"or". */
+const outlineKey = (topWhenKey: string, opPath: string, tag: string): string => `${LEAF_KEY}${JSON.stringify([topWhenKey, opPath, tag])}`;
+
+// #187 Option-C: the operator OUTLINE that hangs BELOW a composite `when` (indented rows, not right-columns). X is
+// INDENT-based (`when.left + BASE + indent*INDENT`), independent of the depth grid, so the outline never widens columns.
+const OUTLINE_BASE = 16; // x offset of an indent-0 outline row from its `when`'s left edge
+const OUTLINE_INDENT = 15; // x added per indent level
+const OUTLINE_ADVANCE = 0.64; // slot units an outline row advances the global cursor (compact vs a 1.0 tree slot)
+const OUTLINE_NODE_W = 150; // a leaf box in the outline (narrower than a decision NODE_W, since it indents)
+const OUTLINE_H = 24; // a leaf box height in the outline (shorter than NODE_H)
+const OUTLINE_LABEL_MAX = 18; // chars before truncation in an outline box (narrower than a decision box)
 
 export interface FlowAnchor {
   scrollTo: string;
@@ -79,13 +87,21 @@ interface LaidNode {
   /** Concept-bearing node whose concept has NO local `code is` → non-Source (grey fill). `undefined` for a concept-less
    *  node (otherwise / unguarded action / decision root) — those are NEVER greyed (#187 Todo 4). */
   isSource?: boolean;
-  /** #187 Todo 4: a synthetic `defined as` operand leaf (kind "leaf") appended under a composite `when` — NOT a decision
-   *  structure row. Rendered with a distinct `.flow-def-edge`; excluded from `{nodeKey}` select + the per-case overlays. */
+  /** #187 Todo 4: a synthetic `defined as` operand leaf (a concept-operand row) hanging under a composite `when` — NOT a
+   *  decision structure row. Rendered with a distinct `.flow-def-edge`; excluded from `{nodeKey}` select + the per-case
+   *  overlays. Set ONLY on `outlineRow === "leaf"` rows (the addressable operands). */
   isDefLeaf?: boolean;
   /** #187 Todo 5: on a def-leaf, the structure nodeKey of the OWNING composite `when` (the leaf's top ancestor, threaded
    *  unchanged through nested operands). The per-case leaf-verdict overlay gates on THIS when being on the fired-satisfied
    *  path — so an off-path composite's leaves stay un-answered (parity with the questionnaire's on-path-only expansion). */
   topWhenKey?: string;
+  /** #187 Option-C: an OUTLINE row (hangs below its `when`; x is indent-based, edges are the dashed spine). `outlineRow`
+   *  is the row CATEGORY — only `"leaf"` rows are addressable (anchor + peek + verdict); `topor`/`op`/`external`/`more`
+   *  are RENDER-ONLY (no anchor, no reveal). `indent` drives x; `absX` is the precomputed left (indent-based). */
+  outline?: boolean;
+  outlineRow?: "topor" | "op" | "leaf" | "external" | "more";
+  indent?: number;
+  absX?: number;
   depth: number;
   y: number; // slot units — leaves take the next integer slot; internal nodes take their children's midpoint
   children: LaidNode[];
@@ -101,10 +117,11 @@ interface LaidNode {
 function buildLaid(
   structure: CrlDecisionStructure[],
   conceptMap: Map<string, CrlConceptNode>,
-  opts: { conceptShape?: ResolveConceptShape; resolveConceptInfo?: ResolveConceptInfo } = {},
+  opts: { defExpr?: ResolveDefExprEntry } = {},
 ): { roots: LaidNode[]; maxDepth: number } {
   let slot = 0;
   let maxDepth = 0;
+  const outlineX = (whenLeft: number, indent: number): number => whenLeft + OUTLINE_BASE + indent * OUTLINE_INDENT;
 
   const conceptFields = (refKey: string | undefined): Pick<LaidNode, "conceptKey" | "conceptLayer" | "conceptName" | "conceptLib" | "isSource"> => {
     if (refKey === undefined) return {};
@@ -113,40 +130,52 @@ function buildLaid(
     return { conceptKey: c.nodeKey, conceptLayer: classifyConcept(c).layer, conceptName: c.name, conceptLib: c.lib, isSource: c.hasLocalCode };
   };
 
-  // #187 Todo 4: lay out a composite's `defined as` operand subtree as synthetic def-leaf nodes (kind "leaf"), recursive.
-  // Slots are allocated HERE (inside layoutNode's recursion) so they stay DFS-in-order + bands disjoint. Capped at
-  // LEAF_CAP per level (a "+N more" stub beyond it). A cross-lib / location-less operand is OMITTED (matches the shape
-  // builder + questionnaire). `depth` is the child depth; `parentKey` seeds the collision-free synthetic nodeKey.
-  const buildDefLeaves = (children: readonly ConceptShapeNode[], parentKey: string, depth: number, leafDepth: number, topWhenKey: string): LaidNode[] => {
-    if (!opts.resolveConceptInfo) return [];
-    const out: LaidNode[] = [];
-    let shown = 0;
-    for (const child of children) {
-      const info = opts.resolveConceptInfo(child.nodeKey);
-      if (!info) continue; // cross-lib / not addressable → omit
-      maxDepth = Math.max(maxDepth, depth); // bump ONLY when a leaf/stub is actually emitted (an all-cross-lib composite adds no column)
-      if (shown >= LEAF_CAP) {
-        const remaining = children.filter((c) => opts.resolveConceptInfo?.(c.nodeKey)).length - shown;
-        // The "+N more" stub carries NO concept (no topWhenKey either) → no leafConcepts entry, no verdict, non-clickable.
-        out.push({ nodeKey: `${LEAF_KEY}${parentKey}|+more`, kind: "leaf", useDecision: false, isDefLeaf: true, label: `+${remaining} more`, full: `${remaining} more operand(s)`, depth, y: slot++, children: [] });
-        break;
+  // #187 Option-C: lay out a composite's `defined as` structure (`DefStructExpr`, the SAME shared builder the
+  // Questionnaire consumes) as an INDENTED OUTLINE hanging below the `when`. Each visible row (op label / leaf / external
+  // / more) takes ONE compact slot (DFS pre-order: a header row before its children) and gets an INDENT-based `absX`, so
+  // the outline reflows below the node without widening the depth grid. `opPath` is the positional index path — it makes
+  // the same concept at two positions produce DISTINCT `leaf::` keys (no anchor/verdict collision). Render-only rows
+  // (op/external/more) carry a synthetic key that never anchors. `topWhenKey` threads unchanged to every leaf.
+  const buildOutline = (s: DefStructExpr, whenLeft: number, topWhenKey: string, indent: number, opPath: string): LaidNode => {
+    const base = { useDecision: false, outline: true as const, indent, absX: outlineX(whenLeft, indent), depth: 0, topWhenKey };
+    const take = (): number => {
+      const y = slot;
+      slot += OUTLINE_ADVANCE;
+      return y;
+    };
+    switch (s.kind) {
+      case "or":
+      case "and": {
+        const y = take();
+        const children = s.operands.map((o, i) => buildOutline(o, whenLeft, topWhenKey, indent + 1, `${opPath}.${i}`));
+        return { ...base, nodeKey: outlineKey(topWhenKey, opPath, "op"), kind: "leaf", outlineRow: "op", label: s.kind === "or" ? "any of" : "all of", full: s.kind === "or" ? "any of" : "all of", y, children };
       }
-      shown++;
-      const leafKey = `${LEAF_KEY}${parentKey}|${child.nodeKey}`;
-      // Bound the recursion depth (cap^depth blowup guard). A truncated node (has children but we stop) gets a "…" suffix.
-      const canRecurse = child.children.length > 0 && leafDepth < MAX_LEAF_DEPTH;
-      const grand = canRecurse ? buildDefLeaves(child.children, leafKey, depth + 1, leafDepth + 1, topWhenKey) : [];
-      const truncated = child.children.length > 0 && leafDepth >= MAX_LEAF_DEPTH;
-      const ly = grand.length ? (grand[0].y + grand[grand.length - 1].y) / 2 : slot++;
-      out.push({
-        nodeKey: leafKey, kind: "leaf", useDecision: false, isDefLeaf: true,
-        label: truncated ? `${info.name} …` : info.name, full: `${info.name} — concept "${info.lib}"`,
-        conceptKey: child.nodeKey, conceptName: info.name, conceptLib: info.lib,
-        conceptLayer: child.isInferred ? "inferred" : "asserted", isSource: child.hasCodeIs,
-        topWhenKey, depth, y: ly, children: grand,
-      });
+      case "not": {
+        const y = take();
+        const child = buildOutline(s.operand, whenLeft, topWhenKey, indent + 1, `${opPath}.0`);
+        return { ...base, nodeKey: outlineKey(topWhenKey, opPath, "op"), kind: "leaf", outlineRow: "op", label: "not", full: "not", y, children: [child] };
+      }
+      case "external": {
+        const y = take();
+        return { ...base, nodeKey: outlineKey(topWhenKey, opPath, "ext"), kind: "leaf", outlineRow: "external", label: s.name, full: `${s.name} — external (unresolved here)`, conceptName: s.name, conceptLib: s.lib, y, children: [] };
+      }
+      case "more": {
+        const y = take();
+        const label = s.count > 0 ? `+${s.count} more` : "…";
+        return { ...base, nodeKey: outlineKey(topWhenKey, opPath, "more"), kind: "leaf", outlineRow: "more", label, full: s.count > 0 ? `${s.count} more operand(s)` : "deeper operands elided", y, children: [] };
+      }
+      case "leaf": {
+        const y = take();
+        const children = s.composite ? [buildOutline(s.composite, whenLeft, topWhenKey, indent + 1, `${opPath}.c`)] : [];
+        return {
+          ...base, nodeKey: outlineKey(topWhenKey, opPath, s.nodeKey), kind: "leaf", outlineRow: "leaf", isDefLeaf: true,
+          label: s.name, full: `${s.name} — concept "${s.lib}"`,
+          conceptKey: s.nodeKey, conceptName: s.name, conceptLib: s.lib,
+          conceptLayer: s.isInferred ? "inferred" : "asserted", isSource: s.isSource,
+          y, children,
+        };
+      }
     }
-    return out;
   };
 
   const layoutNode = (n: CrlStructureNode, depth: number): LaidNode => {
@@ -169,21 +198,36 @@ function buildLaid(
     // title with the owning decision row's lib. (Action TARGET lib isn't resolved here — the target's lib lives in its
     // nodeKey, not parsed in v1; the guard concept's lib rides its peek <title> via conceptName/conceptLib below.)
     const full = n.kind === "when" && cf.conceptName ? `${cf.conceptName} — concept "${cf.conceptLib}"` : `${display} — ${n.lib}`;
-    // #187 Todo 4: a `when` gating an inferred composite appends its `defined as` operand leaves as def-leaf children
-    // (AFTER the branch body, so they slot below it). Slots are allocated inside `buildDefLeaves` to stay DFS-in-order.
-    const defLeaves =
-      n.kind === "when" && cf.conceptName !== undefined && opts.conceptShape
-        ? (() => {
-            const shape = opts.conceptShape(cf.conceptLib, cf.conceptName);
-            return shape?.hasDefinedAs ? buildDefLeaves(shape.children, n.nodeKey, depth + 1, 1, n.nodeKey) : [];
-          })()
-        : [];
-    const children = [...structureChildren, ...defLeaves];
-    // Center a `when` on its CONTROL-FLOW spine (its branch body) when it has one, so the decision spine stays vertically
-    // centered and the operand leaves hang BELOW it (they took later slots) — the def-edges fan down. A node with only
-    // leaves (or only body) centers on whatever it has; a true leaf takes the next slot.
-    const spine = structureChildren.length ? structureChildren : children;
-    const y = spine.length ? (spine[0].y + spine[spine.length - 1].y) / 2 : slot++;
+    // A BODY-LESS node (no branch body) reserves its OWN slot NOW, BEFORE any outline rows — so a (practically unreachable)
+    // body-less composite `when` sits ATOP its outline instead of overlapping the first row. A node WITH a branch body
+    // centers on that body (below) and its outline slots after it. A true leaf just consumes this slot.
+    const selfSlot = structureChildren.length === 0 ? slot++ : undefined;
+    // #187 Option-C: a `when` gating a `defined as` composite hangs its operator OUTLINE below the node (AFTER the branch
+    // body, so it slots below). A top `or` row precedes the body iff the concept is Source (has a local `code is`) —
+    // mirroring the Questionnaire's forced top-`or` for an answerable both-rep vs no top-`or` for an inferred concept.
+    const outlineRoots: LaidNode[] = [];
+    if (n.kind === "when" && cf.conceptName !== undefined && opts.defExpr) {
+      const entry = opts.defExpr(cf.conceptLib ?? "", cf.conceptName);
+      if (entry?.hasDefinedAs && entry.body) {
+        const whenLeft = PAD + depth * COL;
+        if (cf.isSource) {
+          const y = slot;
+          slot += OUTLINE_ADVANCE;
+          outlineRoots.push({ nodeKey: outlineKey(n.nodeKey, "top", "or"), kind: "leaf", useDecision: false, outline: true, outlineRow: "topor", indent: 0, absX: outlineX(whenLeft, 0), label: "or", full: "or", depth: 0, topWhenKey: n.nodeKey, y, children: [] });
+        }
+        // Parity with the questionnaire's `renderInferredWhen`: an INFERRED (non-Source) composite whose body is a single
+        // operand (a bare-ref alias / a top-level `not` / an `external`) is wrapped in an `ANY OF` box — so `X defined as Y`
+        // reads identically in both panes. A Source composite instead gets the top-`or` row above (renderExpansion), and an
+        // `or`/`and` body already carries its own box, so neither is wrapped.
+        const struct = buildDefStruct(entry.body, opts.defExpr, new Set([entry.nodeKey]), 1);
+        const wrapped: DefStructExpr = !cf.isSource && struct.kind !== "or" && struct.kind !== "and" ? { kind: "or", operands: [struct] } : struct;
+        outlineRoots.push(buildOutline(wrapped, whenLeft, n.nodeKey, 0, "0"));
+      }
+    }
+    const children = [...structureChildren, ...outlineRoots];
+    // Center a `when` on its CONTROL-FLOW spine (its branch body) so the decision spine stays vertically centered and the
+    // operator outline hangs BELOW it. Body-less nodes took their own `selfSlot` above (so an outline hangs strictly below).
+    const y = structureChildren.length ? (structureChildren[0].y + structureChildren[structureChildren.length - 1].y) / 2 : (selfSlot as number);
     return { nodeKey: n.nodeKey, kind: n.kind, useDecision, label: display, full, depth, y, children, ...cf };
   };
 
@@ -211,8 +255,8 @@ export function renderFlowPane(
   opts: {
     revealPrefix?: string;
     concepts?: CrlConceptNode[];
-    conceptShape?: ResolveConceptShape;
-    resolveConceptInfo?: ResolveConceptInfo;
+    /** #187 Option-C: a composite `when`'s `defined as` OPERATOR tree — the SAME shared builder the Questionnaire uses. */
+    defExpr?: ResolveDefExprEntry;
   } = {},
 ): RenderedFlow {
   const prefix = opts.revealPrefix ?? "";
@@ -226,10 +270,7 @@ export function renderFlowPane(
   }
 
   const conceptMap = new Map(concepts.map((c) => [c.nodeKey, c]));
-  const { roots, maxDepth } = buildLaid(structure, conceptMap, {
-    conceptShape: opts.conceptShape,
-    resolveConceptInfo: opts.resolveConceptInfo,
-  });
+  const { roots, maxDepth } = buildLaid(structure, conceptMap, { defExpr: opts.defExpr });
 
   const all: LaidNode[] = [];
   const collect = (n: LaidNode): void => {
@@ -238,30 +279,43 @@ export function renderFlowPane(
   };
   roots.forEach(collect);
 
-  const maxY = all.reduce((m, n) => Math.max(m, n.y), 0);
-  const width = PAD * 2 + maxDepth * COL + NODE_W;
-  const height = Math.ceil(PAD * 2 + maxY * ROW + NODE_H);
-
-  // Coordinates are ROUNDED to integers: midpoint averaging + FOREST_GAP yield fractional slots, and sub-pixel SVG coords
-  // blur + make tests brittle. Distinct same-depth nodes are ≥1 slot apart (ROW=48px center-to-center) leaving ≥V_GAP=14px
-  // box clearance — far more than the ≤1px rounding error can erode, so rounding never reintroduces overlap.
-  const left = (n: LaidNode): number => PAD + n.depth * COL; // node left x (already integer: depth*COL + PAD)
+  // An OUTLINE row is shorter (OUTLINE_H) than a decision box (NODE_H); an op/top-OR row is a bare label (no box).
+  const nodeH = (n: LaidNode): number => (n.outline ? OUTLINE_H : NODE_H);
+  // An op/top-OR row is a bare ~60px caption; a leaf/external/more is OUTLINE_NODE_W. The 60 never determines `rightEdge`
+  // (an op row always has an operand at indent+1 that extends ≥OUTLINE_NODE_W further right; a top-OR sits above the body
+  // root) — but it keeps the extent honest if the outline shape ever changed.
+  const nodeW = (n: LaidNode): number =>
+    n.outline ? (n.outlineRow === "op" || n.outlineRow === "topor" ? 60 : OUTLINE_NODE_W) : NODE_W;
+  // left x: an OUTLINE row uses its precomputed INDENT-based `absX`; a structure node uses its depth column.
+  const left = (n: LaidNode): number => n.absX ?? PAD + n.depth * COL;
   const top = (n: LaidNode): number => Math.round(PAD + n.y * ROW); // node top y (rounded)
-  const midY = (n: LaidNode): number => top(n) + NODE_H / 2; // node vertical center (integer: NODE_H even)
+  const midY = (n: LaidNode): number => top(n) + nodeH(n) / 2; // node vertical center
+
+  const maxY = all.reduce((m, n) => Math.max(m, n.y), 0);
+  // EXTENT-based width — the outline's indent-based x is decoupled from the depth grid (`maxDepth` is NOT bumped for
+  // outline rows), so width MUST come from the actual right edge of EVERY node (boxes + labels + stubs), not `maxDepth*COL`.
+  const rightEdge = all.reduce((m, n) => Math.max(m, left(n) + nodeW(n)), PAD + maxDepth * COL + NODE_W);
+  const width = Math.ceil(rightEdge + PAD);
+  const height = Math.ceil(PAD * 2 + maxY * ROW + NODE_H);
 
   // Edges first (so node boxes paint over them). Edges are pure <path> — NEVER reveal targets.
   let body = "";
   for (const n of all) {
-    const px = left(n) + NODE_W;
+    const px = left(n) + nodeW(n);
     const py = midY(n);
     for (const c of n.children) {
-      const ex = left(c);
-      const ey = midY(c);
-      const mx = Math.round((px + ex) / 2);
-      // #187 Todo 4: a def-leaf edge is a DISTINCT dashed grey `.flow-def-edge` (definition decomposition), never a
-      // control-flow `.flow-edge` — so operands can't read as fired branches.
-      const edgeClass = c.isDefLeaf ? "flow-def-edge" : "flow-edge";
-      body += `<path class="${edgeClass}" d="M${px} ${py} C${mx} ${py} ${mx} ${ey} ${ex} ${ey}"/>`;
+      if (c.outline) {
+        // #187 Option-C: an OUTLINE connector is a dashed grey `.flow-def-edge` ELBOW (a vertical spine down from the
+        // parent + a horizontal run to the child's left) — NOT the horizontal control-flow Bézier. The spine sits just
+        // inside the parent's left so nested rows fan down like a file tree, never reading as a fired branch.
+        const sx = left(n) + (n.outline ? 8 : 10);
+        body += `<path class="flow-def-edge" d="M${sx} ${py} V${midY(c)} H${left(c)}"/>`;
+      } else {
+        const ex = left(c);
+        const ey = midY(c);
+        const mx = Math.round((px + ex) / 2);
+        body += `<path class="flow-edge" d="M${px} ${py} C${mx} ${py} ${mx} ${ey} ${ex} ${ey}"/>`;
+      }
     }
   }
 
@@ -270,42 +324,64 @@ export function renderFlowPane(
   for (const n of all) {
     const gid = `${prefix}flow${idx++}`;
     const key = `${prefix}k${gid}`;
-    // A structure node anchors under its real nodeKey; a def-leaf under its synthetic `leaf::` key (a safe no-op against
-    // every existing keyset — the Todo-5 highlight target). Either way the anchor id is the gen-scoped counter.
-    anchors[n.nodeKey] = { scrollTo: gid, segmentIds: [gid] };
     const x = left(n);
     const y = top(n);
-    const classes = ["flow-row"];
-    if (n.isDefLeaf) classes.push("flow-leaf");
-    else classes.push(n.kind === "action" ? (n.useDecision ? "flow-use" : "flow-activity") : `flow-${n.kind}`);
-    // Non-Source grey fill — ONLY where the BOX IS the concept: a `when` (its gating concept) or a def-leaf. NOT an
-    // action (its box is the recommendation TARGET; its guard concept is a peek, so greying the box would misread as the
-    // activity being non-Source), and NEVER a concept-less node.
-    if ((n.kind === "when" || n.isDefLeaf) && n.conceptKey !== undefined && n.isSource === false) classes.push("flow-nonsource");
+    // ROW CATEGORY gates the anchor/reveal surface: a structure node and an OUTLINE LEAF are addressable (anchor + reveal);
+    // an operator / top-OR / external / more row is RENDER-ONLY (no anchor, no reveal — a click resolves to nothing).
+    const addressable = !n.outline || n.outlineRow === "leaf";
+    if (addressable) anchors[n.nodeKey] = { scrollTo: gid, segmentIds: [gid] };
 
-    // Body reveal: a structure node SELECTs itself (`{nodeKey}`); a def-LEAF peeks its OWN concept (`{conceptNodeKey}`)
-    // — its synthetic nodeKey is not a real structure row, so a `{nodeKey}` select would resolve to nothing. The "+N more"
-    // stub (no concept) is non-clickable (no reveal at all).
-    let dataReveal = "";
-    if (n.isDefLeaf) {
-      if (n.conceptKey !== undefined) {
-        reveals[key] = { conceptNodeKey: n.conceptKey };
-        dataReveal = ` data-reveal="${escapeHtml(key)}"`;
-        // #187 Todo 5: expose this leaf's concept identity + owning composite `when` so the cockpit can join a case's
-        // conceptTruth verdict + gate on-path. Keyed by the SAME synthetic anchor key `anchors` uses (v.anchors[leafKey]
-        // → segmentIds). The stub (no conceptKey) never reaches here → no entry.
-        if (n.conceptName !== undefined && n.conceptLib !== undefined && n.topWhenKey !== undefined)
-          leafConcepts[n.nodeKey] = { lib: n.conceptLib, name: n.conceptName, topWhenKey: n.topWhenKey };
+    // #187 Option-C: OUTLINE render-only rows — an operator/top-OR LABEL (no box) or an external/more STUB box.
+    if (n.outline && n.outlineRow !== "leaf") {
+      if (n.outlineRow === "op" || n.outlineRow === "topor") {
+        const cls = n.outlineRow === "topor" ? "flow-topor" : "flow-op";
+        body +=
+          `<g id="${escapeHtml(gid)}" class="flow-outline ${cls}">` +
+          `<text x="${x}" y="${y + OUTLINE_H / 2 + 3}">${escapeHtml(n.label.toUpperCase())}</text></g>`;
+      } else {
+        const cls = n.outlineRow === "external" ? "flow-ext" : "flow-more";
+        body +=
+          `<g id="${escapeHtml(gid)}" class="flow-outline ${cls}"><title>${escapeHtml(n.full)}</title>` +
+          `<rect x="${x}" y="${y}" width="${OUTLINE_NODE_W}" height="${OUTLINE_H}" rx="6"/>` +
+          `<text x="${x + 9}" y="${y + OUTLINE_H / 2 + 4}">${escapeHtml(truncate(n.label, OUTLINE_LABEL_MAX))}</text></g>`;
       }
-    } else {
-      reveals[key] = { nodeKey: n.nodeKey };
-      dataReveal = ` data-reveal="${escapeHtml(key)}"`;
+      continue;
     }
 
-    // Concept/guard PEEK glyph — only on a STRUCTURE node with a resolved concept (a def-leaf's whole body IS its concept
-    // peek, so a second dot is redundant). The nested data-reveal lets closest() resolve a glyph click to the peek.
+    // #187 Option-C: an OUTLINE LEAF row (a `defined as` concept operand). Peeks its OWN concept (`{conceptNodeKey}`); its
+    // synthetic `leaf::` key (path-bearing → collision-free) anchors it + joins the Todo-5 verdict overlay. No peek dot
+    // (the whole row IS the concept). Carries BOTH verdict ticks HIDDEN — `markLeaves` toggles `.flow-leaf-yes/-no`.
+    if (n.outline) {
+      const conceptKey = n.conceptKey as string; // an outline leaf always resolves a concept (else it's `external`)
+      reveals[key] = { conceptNodeKey: conceptKey };
+      if (n.conceptName !== undefined && n.conceptLib !== undefined && n.topWhenKey !== undefined)
+        leafConcepts[n.nodeKey] = { lib: n.conceptLib, name: n.conceptName, topWhenKey: n.topWhenKey };
+      const classes = ["flow-row", "flow-leaf"];
+      if (n.isSource === false) classes.push("flow-nonsource");
+      const cx = x + OUTLINE_NODE_W - 11;
+      const cy = y + OUTLINE_H / 2;
+      const ticks =
+        `<path class="leaf-tick leaf-tick-yes" d="M${cx - 4} ${cy} l3 3 l5 -6"/>` +
+        `<path class="leaf-tick leaf-tick-no" d="M${cx - 4} ${cy - 4} l8 8 M${cx + 4} ${cy - 4} l-8 8"/>`;
+      body +=
+        `<g id="${escapeHtml(gid)}" class="${classes.join(" ")}" data-reveal="${escapeHtml(key)}"><title>${escapeHtml(n.full)}</title>` +
+        `<rect x="${x}" y="${y}" width="${OUTLINE_NODE_W}" height="${OUTLINE_H}" rx="6"/>` +
+        `<text x="${x + 9}" y="${y + OUTLINE_H / 2 + 4}">${escapeHtml(truncate(n.label, OUTLINE_LABEL_MAX))}</text>${ticks}</g>`;
+      continue;
+    }
+
+    // A regular STRUCTURE node (decision / when / otherwise / action).
+    const classes = ["flow-row"];
+    classes.push(n.kind === "action" ? (n.useDecision ? "flow-use" : "flow-activity") : `flow-${n.kind}`);
+    // Non-Source grey fill — ONLY where the BOX IS the concept: a `when` (its gating concept). NOT an action (its box is
+    // the recommendation TARGET), and NEVER a concept-less node.
+    if (n.kind === "when" && n.conceptKey !== undefined && n.isSource === false) classes.push("flow-nonsource");
+    reveals[key] = { nodeKey: n.nodeKey };
+
+    // Concept/guard PEEK glyph — a STRUCTURE node with a resolved concept. The nested data-reveal lets closest() resolve
+    // a glyph click to the peek.
     let peek = "";
-    if (!n.isDefLeaf && n.conceptKey !== undefined) {
+    if (n.conceptKey !== undefined) {
       const pk = `${prefix}p${gid}`;
       reveals[pk] = { conceptNodeKey: n.conceptKey };
       const cls = n.conceptLayer === "inferred" ? "flow-peek-inferred" : "flow-peek-asserted";
@@ -314,24 +390,12 @@ export function renderFlowPane(
         `<g class="flow-peek ${cls}" data-reveal="${escapeHtml(pk)}">` +
         `<circle cx="${x + NODE_W - 13}" cy="${y + 13}" r="5"/><title>${peekTitle}</title></g>`;
     }
-    // #187 Todo 5: a concept-bearing def-leaf carries BOTH per-case verdict glyphs, HIDDEN. The `markLeaves` overlay
-    // toggles `.flow-leaf-yes` / `.flow-leaf-no` on the leaf `<g>` (a pure class-toggle like the other overlays); CSS then
-    // reveals the matching tick. A right-edge tick glyph (not a rect fill) so it composes with the non-Source wash + border.
-    let ticks = "";
-    if (n.isDefLeaf && n.conceptKey !== undefined) {
-      const cx = x + NODE_W - 11;
-      const cy = y + NODE_H / 2;
-      ticks =
-        `<path class="leaf-tick leaf-tick-yes" d="M${cx - 4} ${cy} l3 3 l5 -6"/>` +
-        `<path class="leaf-tick leaf-tick-no" d="M${cx - 4} ${cy - 4} l8 8 M${cx + 4} ${cy - 4} l-8 8"/>`;
-    }
     body +=
-      `<g id="${escapeHtml(gid)}" class="${classes.join(" ")}"${dataReveal}>` +
+      `<g id="${escapeHtml(gid)}" class="${classes.join(" ")}" data-reveal="${escapeHtml(key)}">` +
       `<title>${escapeHtml(n.full)}</title>` +
       `<rect x="${x}" y="${y}" width="${NODE_W}" height="${NODE_H}" rx="6"/>` +
       `<text x="${x + 10}" y="${y + NODE_H / 2 + 4}">${escapeHtml(truncate(n.label, LABEL_MAX))}</text>` +
       peek +
-      ticks +
       `</g>`;
   }
 
@@ -367,6 +431,12 @@ export const FLOW_STYLE =
   // a def-leaf box — lighter, dashed border, so it reads as a subordinate operand chip, not a decision row.
   `.flow-leaf>rect{fill:var(--vscode-editor-background,#1e1e1e);stroke:var(--vscode-descriptionForeground,#8c8c8c);stroke-width:1;stroke-dasharray:2 1.5}` +
   `.flow-leaf>text{fill:var(--vscode-descriptionForeground,#bfbfbf);font-size:11px}` +
+  // #187 Option-C OUTLINE rows. An OPERATOR / TOP-OR label — a bare uppercase caption (no box), like the questionnaire's
+  // ANY OF / ALL OF tab; render-only (not clickable). An EXTERNAL / MORE stub — a faint dashed box (unaddressable operand).
+  `.flow-outline{cursor:default}` +
+  `.flow-op>text,.flow-topor>text{fill:var(--vscode-descriptionForeground,#8c8c8c);font:700 9px/1 var(--vscode-editor-font-family,monospace);letter-spacing:.12em}` +
+  `.flow-ext>rect,.flow-more>rect{fill:var(--vscode-editor-background,#1e1e1e);stroke:var(--vscode-descriptionForeground,#6a6a72);stroke-width:1;stroke-dasharray:2 2;opacity:.7}` +
+  `.flow-ext>text,.flow-more>text{fill:var(--vscode-descriptionForeground,#8c8c8c);font-size:11px;font-style:italic}` +
   // NON-SOURCE (a concept-bearing node whose concept has no `code is`) → a grey FILL, NOT the kind-carrying stroke. Placed
   // BEFORE the per-case overlays below (they set `stroke`, or a later same-specificity `fill` for done/error) so an active
   // overlay still wins on the node.

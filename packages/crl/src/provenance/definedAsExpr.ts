@@ -66,6 +66,88 @@ export type DefExpr =
   | { kind: "not"; operand: DefExpr } // sem-not (unary)
   | { kind: "ref"; ref: DefRef };
 
+/** Render caps for the operator-tree expansion — SHARED by both projections (the MV Questionnaire's `buildQExpr` and
+ *  the MV Tree's outline) so they stay in lockstep. The DAG-blowup vector is NAMED-COMPOSITE HOPS (a shared/cyclic
+ *  composite re-expanded positionally at each reference), so `DEF_MAX_EXPR_DEPTH` counts those hops — NOT inline
+ *  `or`/`and`/`not` nesting (a finite authoring-scale tree; deep inline degrades to a wide scrolling chart, never a
+ *  clip, because the Tree computes width from actual node extents). */
+export const DEF_EXPR_CAP = 10; // operands per box/level before a `+N more` stub
+export const DEF_MAX_EXPR_DEPTH = 4; // named-composite expansion HOPS before a `…` stub
+
+/** The POSITIONAL render structure of a `defined as` body — the shared, ANSWER-FREE projection both MV panes build on
+ *  (the Questionnaire enriches leaves with a case answer + value-type; the Tree lays them out as an outline). Positional
+ *  (a shared concept appears at each written position — only a `visiting` cycle-guard, NOT the leaf collector's
+ *  `visited` diamond dedup) is the WHOLE POINT: it preserves the authored boolean structure. */
+export type DefStructExpr =
+  | { kind: "or" | "and"; operands: DefStructExpr[] }
+  | { kind: "not"; operand: DefStructExpr } // operand ALWAYS present — dropping it would vanish a `$apply`-asked criterion
+  | {
+      kind: "leaf";
+      name: string;
+      lib: string;
+      /** The concept-declaration nodeKey (peek + cross-pane join; always present — a location-less ref is `external`). */
+      nodeKey: string;
+      isSource: boolean; // has a local `code is`. Stub `hasCodeIs === undefined` ⇒ default true (don't spuriously grey).
+      isInferred: boolean;
+      /** A named-composite / both-rep operand's OWN `defined as` body, nested (the operand is a leaf AND expandable). */
+      composite?: DefStructExpr;
+    }
+  | { kind: "external"; name: string; lib: string } // cross-lib OR location-less local ref — unaddressable, not evaluated
+  | { kind: "more"; count: number }; // count>0 ⇒ width truncation (`+N more`); count 0 ⇒ a depth-cap `…` stub
+
+/** Resolve a concept's operator-tree entry by (lib, name) — the frame-aware edge-follow used to expand a named composite. */
+export type ResolveDefExprEntry = (lib: string, name: string) => DefExprEntry | undefined;
+
+/**
+ * Build the shared POSITIONAL render structure of a `defined as` body. Identical structure logic to the Questionnaire's
+ * former inline `buildQExpr` MINUS the answer/value-type binding — so ONE builder feeds BOTH panes (lockstep by
+ * construction, no drift test needed). Width-capped by `DEF_EXPR_CAP`, hop-capped by `DEF_MAX_EXPR_DEPTH`; positional
+ * (only a `visiting` cycle-guard). A cross-lib / location-less ref → an `external` stub; a named-composite operand →
+ * its own body nested as `composite` (depth cap → a `…` `more` stub).
+ */
+export function buildDefStruct(
+  e: DefExpr,
+  resolve: ResolveDefExprEntry,
+  visiting: ReadonlySet<string>,
+  depth: number,
+): DefStructExpr {
+  switch (e.kind) {
+    case "or":
+    case "and": {
+      const operands = e.operands.slice(0, DEF_EXPR_CAP).map((o) => buildDefStruct(o, resolve, visiting, depth));
+      if (e.operands.length > DEF_EXPR_CAP) operands.push({ kind: "more", count: e.operands.length - DEF_EXPR_CAP });
+      return { kind: e.kind, operands };
+    }
+    case "not":
+      return { kind: "not", operand: buildDefStruct(e.operand, resolve, visiting, depth) };
+    case "ref": {
+      const r = e.ref;
+      // Cross-lib OR location-less local stub (no nodeKey) → unaddressable → an `external` stub (never an answerable leaf).
+      if (r.crossLib || r.nodeKey === undefined) return { kind: "external", name: r.name, lib: r.lib };
+      const leaf: Extract<DefStructExpr, { kind: "leaf" }> = {
+        kind: "leaf",
+        name: r.name,
+        lib: r.lib,
+        nodeKey: r.nodeKey,
+        isSource: r.hasCodeIs ?? true, // stub flags undefined ⇒ UNKNOWN; default Source (don't spuriously grey)
+        isInferred: r.isInferred ?? false,
+      };
+      // A named-composite (or both-rep) operand is ALSO expandable → nest its OWN body. Positional: cycle-guard only;
+      // a diamond re-expands. Depth cap → a `…` stub.
+      if (r.hasDefinedAs && !visiting.has(r.nodeKey)) {
+        const entry = resolve(r.lib, r.name);
+        if (entry?.body) {
+          leaf.composite =
+            depth >= DEF_MAX_EXPR_DEPTH
+              ? { kind: "more", count: 0 }
+              : buildDefStruct(entry.body, resolve, new Set(visiting).add(r.nodeKey), depth + 1);
+        }
+      }
+      return leaf;
+    }
+  }
+}
+
 /** A concept's own identity/flags + its `defined as` body operator structure (`body` undefined ⇒ not `defined as`). */
 export interface DefExprEntry {
   nodeKey: string;

@@ -296,90 +296,135 @@ check("guarded use-decision: flow-use node + a guard peek on it", () => {
   assert.ok(Object.values(g.reveals).some((v) => v.conceptNodeKey === "c:G"), "the use-decision's guard G is a concept peek");
 });
 
-// ── #187 Todo 4: composite `defined as` leaves as def-leaf sub-nodes + non-Source grey fill ──
-check("Todo 4: a composite when expands its defined-as leaves as flow-leaf nodes (distinct def-edge, non-Source greyed, peek-not-select, synthetic anchor)", () => {
-  // when B's concept c:B is a composite; expand it to leaves L1 (code-is) + L2 (non-Source).
-  const shape = {
-    B: {
-      nodeKey: "c:B", hasCodeIs: false, leafEligible: false, isInferred: true, hasDefinedAs: true,
-      children: [
-        { nodeKey: "c:L1", hasCodeIs: true, leafEligible: true, isInferred: false, hasDefinedAs: false, children: [] },
-        { nodeKey: "c:L2", hasCodeIs: false, leafEligible: false, isInferred: false, hasDefinedAs: false, children: [] },
-      ],
-    },
-  };
-  const info = { "c:L1": { lib: "Pol", name: "L1", valueTypes: [] }, "c:L2": { lib: "Pol", name: "L2", valueTypes: [] } };
-  const rr = renderFlowPane(structure, { concepts, revealPrefix: "g2_", conceptShape: (_l, n) => shape[n], resolveConceptInfo: (nk) => info[nk] });
-  const leafRows = [...rr.html.matchAll(/<g id="[^"]*" class="([^"]*flow-leaf[^"]*)"[^>]*>.*?<text[^>]*>([^<]*)<\/text>/g)].map((m) => ({ cls: m[1], label: m[2] }));
-  assert.deepEqual(leafRows.map((l) => l.label).sort(), ["L1", "L2"], "two def-leaf nodes (L1, L2)");
-  assert.ok(/class="flow-def-edge"/.test(rr.html), "def-leaf edges use the distinct flow-def-edge, not flow-edge");
+// ── #187 Option-C: composite `defined as` → an indented operator OUTLINE (ANY OF / ALL OF / NOT rows + leaf boxes) ──
+// DefExpr fixtures: a `ref` edge carries the operand's static flags; a `dentry` is a concept's operator-tree entry.
+const dref = (name, nodeKey, { hasCodeIs = true, isInferred = false, hasDefinedAs = false } = {}) => ({
+  kind: "ref", ref: { name, lib: "Pol", crossLib: false, nodeKey, hasCodeIs, leafEligible: !hasDefinedAs, isInferred, hasDefinedAs },
+});
+const dext = (name) => ({ kind: "ref", ref: { name, lib: "Other", crossLib: true, leafEligible: false } });
+const dor = (...operands) => ({ kind: "or", operands });
+const dand = (...operands) => ({ kind: "and", operands });
+const dnot = (operand) => ({ kind: "not", operand });
+const dentry = (nodeKey, name, body, { hasCodeIs = false, isInferred = true } = {}) => ({ nodeKey, lib: "Pol", name, hasCodeIs, leafEligible: false, isInferred, hasDefinedAs: true, body });
+const defExprOf = (map) => (_lib, name) => map[name];
+const leafRowsOf = (html) => [...html.matchAll(/<g id="[^"]*" class="(flow-row flow-leaf[^"]*)"[^>]*>.*?<text[^>]*>([^<]*)<\/text>/g)].map((m) => ({ cls: m[1], label: m[2] }));
+
+check("Option-C: an INFERRED composite when renders an ANY OF outline of leaf rows (def-edge, non-Source grey, peek-not-select, path-keyed anchor, NO top OR)", () => {
+  // when B (c:B, inferred — no code is) `defined as` (L1 or L2); L2 has no code is.
+  const map = { B: dentry("c:B", "B", dor(dref("L1", "c:L1"), dref("L2", "c:L2", { hasCodeIs: false }))) };
+  const rr = renderFlowPane(structure, { concepts, revealPrefix: "g2_", defExpr: defExprOf(map) });
+  const leafRows = leafRowsOf(rr.html);
+  assert.deepEqual(leafRows.map((l) => l.label).sort(), ["L1", "L2"], "two leaf rows (L1, L2)");
+  assert.ok(/class="flow-outline flow-op"><text[^>]*>ANY OF</.test(rr.html), "an ANY OF operator label row (or → any of)");
+  assert.ok(!/flow-topor/.test(rr.html), "an INFERRED composite (no code is) has NO top-OR row");
+  assert.ok(/class="flow-def-edge"/.test(rr.html), "outline connectors use the distinct flow-def-edge, not flow-edge");
   assert.ok(leafRows.find((l) => l.label === "L2").cls.includes("flow-nonsource"), "L2 (no code-is) is greyed");
   assert.ok(!leafRows.find((l) => l.label === "L1").cls.includes("flow-nonsource"), "L1 (code-is) is NOT greyed");
   const leafPeeks = Object.values(rr.reveals).filter((v) => v.conceptNodeKey === "c:L1" || v.conceptNodeKey === "c:L2");
-  assert.equal(leafPeeks.length, 2, "a leaf body reveals its OWN concept (peek), never a {nodeKey} select");
-  assert.equal(Object.keys(rr.anchors).filter((k) => k.startsWith("leaf::")).length, 2, "leaf anchors under the reserved leaf:: prefix (safe no-op)");
+  assert.equal(leafPeeks.length, 2, "each leaf reveals its OWN concept (peek), never a {nodeKey} select");
+  assert.equal(Object.keys(rr.anchors).filter((k) => k.startsWith("leaf::")).length, 2, "ONLY the 2 leaf rows anchor (op rows are render-only)");
   assert.ok(!Object.values(rr.reveals).some((v) => v.nodeKey && v.nodeKey.startsWith("leaf::")), "no {nodeKey} select for a synthetic leaf");
 });
 
-check("Todo 4: a composite with more than the cap collapses the remainder into a '+N more' stub", () => {
-  const kids = Array.from({ length: 13 }, (_, i) => ({ nodeKey: `c:K${i}`, hasCodeIs: true, leafEligible: true, isInferred: false, hasDefinedAs: false, children: [] }));
-  const shape = { B: { nodeKey: "c:B", hasCodeIs: false, leafEligible: false, isInferred: true, hasDefinedAs: true, children: kids } };
-  const info = (nk) => (nk.startsWith("c:K") ? { lib: "Pol", name: nk.slice(2), valueTypes: [] } : undefined);
-  const rr = renderFlowPane(structure, { concepts, revealPrefix: "g3_", conceptShape: (_l, n) => shape[n], resolveConceptInfo: info });
-  const labels = [...rr.html.matchAll(/<g id="[^"]*" class="[^"]*flow-leaf[^"]*"[^>]*>.*?<text[^>]*>([^<]*)<\/text>/g)].map((m) => m[1]);
-  assert.equal(labels.filter((l) => !l.startsWith("+")).length, 10, "at most LEAF_CAP (10) leaves shown");
-  assert.ok(labels.some((l) => l === "+3 more"), "the remaining 3 collapse into a '+3 more' stub");
-  // the stub is NON-CLICKABLE: its <g> carries no data-reveal (a leaf <g> whose class attr is immediately followed by
-  // `>` — real leaves have ` data-reveal=…`; only the concept-less stub does not).
-  assert.match(rr.html, /<g id="[^"]*" class="[^"]*flow-leaf[^"]*"><title>[^<]*<\/title><rect[^>]*\/><text[^>]*>\+\d+ more<\/text><\/g>/, "the '+N more' stub is non-clickable (no data-reveal)");
-  // #187 Todo 5: the stub has NO concept → NO leafConcepts entry (it carries no verdict), and the 10 shown leaves each do.
-  assert.ok(!Object.keys(rr.leafConcepts).some((k) => k.includes("+more")), "the '+N more' stub gets NO leafConcepts entry");
+check("Option-C: a level with more than the cap collapses the remainder into a '+N more' render-only stub", () => {
+  const ops = Array.from({ length: 13 }, (_, i) => dref(`K${i}`, `c:K${i}`));
+  const map = { B: dentry("c:B", "B", { kind: "or", operands: ops }) };
+  const rr = renderFlowPane(structure, { concepts, revealPrefix: "g3_", defExpr: defExprOf(map) });
+  const leafLabels = leafRowsOf(rr.html).map((l) => l.label);
+  assert.equal(leafLabels.filter((l) => l.startsWith("K")).length, 10, "at most DEF_EXPR_CAP (10) leaves shown");
+  assert.match(rr.html, /<g id="[^"]*" class="flow-outline flow-more"><title>[^<]*<\/title><rect[^>]*\/><text[^>]*>\+3 more<\/text><\/g>/, "the remaining 3 → a '+3 more' render-only stub (no data-reveal)");
+  assert.ok(!Object.keys(rr.leafConcepts).some((k) => k.endsWith('"more"]')), "the '+N more' stub gets NO leafConcepts entry");
   assert.equal(Object.keys(rr.leafConcepts).length, 10, "exactly the 10 shown leaves have leafConcepts entries");
 });
 
-check("Todo 4: leaves keep the disjoint-band layout (no overlap with a following sibling) + a nested composite leaf recurses deeper", () => {
+check("Option-C: a nested composite operand indents DEEPER + rows never overlap in a column", () => {
   const struct = [{ decision: "D", lib: "Pol", nodeKey: "d:D", location: {}, children: [
     node("w:C", "when", "when C", ["c:C"], [node("a:C", "action", "X", ["act:X"], [], { actionKind: "recommend-activity" })]),
     node("w:C2", "when", "when C2", ["c:C2"], [node("a:C2", "action", "Y", ["act:Y"], [], { actionKind: "recommend-activity" })]),
   ] }];
   const cs = [concept("c:C", "C", { definitionKind: "defined-as" }), concept("c:C2", "C2")];
-  const shape = { C: { nodeKey: "c:C", hasCodeIs: false, leafEligible: false, isInferred: true, hasDefinedAs: true, children: [
-    { nodeKey: "c:L", hasCodeIs: false, leafEligible: false, isInferred: true, hasDefinedAs: true, children: [
-      { nodeKey: "c:La", hasCodeIs: true, leafEligible: true, isInferred: false, hasDefinedAs: false, children: [] },
-    ] },
-  ] } };
-  const info = { "c:L": { lib: "Pol", name: "L", valueTypes: [] }, "c:La": { lib: "Pol", name: "La", valueTypes: [] } };
-  const rr = renderFlowPane(struct, { concepts: cs, revealPrefix: "g4_", conceptShape: (_l, n) => shape[n], resolveConceptInfo: (nk) => info[nk] });
-  const leaf = (name) => rr.html.match(new RegExp(`class="[^"]*flow-leaf[^"]*"[^>]*><title>[^<]*</title><rect x="(\\d+)"[^>]*/><text[^>]*>${name}</text>`));
-  assert.ok(+leaf("La")[1] > +leaf("L")[1], "a nested composite leaf La renders one column DEEPER than its parent leaf L");
+  // C `defined as` L; L is ITSELF a composite `defined as` La → La nests one indent under L.
+  const map = {
+    C: dentry("c:C", "C", dref("L", "c:L", { hasCodeIs: false, isInferred: true, hasDefinedAs: true })),
+    L: dentry("c:L", "L", dref("La", "c:La")),
+  };
+  const rr = renderFlowPane(struct, { concepts: cs, revealPrefix: "g4_", defExpr: defExprOf(map) });
+  const leafX = (name) => +rr.html.match(new RegExp(`<rect x="(\\d+)"[^>]*/><text[^>]*>${name}</text>`))[1];
+  assert.ok(leafX("La") > leafX("L"), "the nested operand La indents DEEPER than its parent leaf L");
   const rects = [...rr.html.matchAll(/<rect x="(\d+)" y="(\d+)" width="(\d+)" height="(\d+)"/g)].map((m) => ({ x: +m[1], y: +m[2], h: +m[4] }));
   const byX = new Map();
   for (const rc of rects) (byX.get(rc.x) ?? byX.set(rc.x, []).get(rc.x)).push(rc);
   for (const [, col] of byX) { col.sort((a, b) => a.y - b.y); for (let i = 1; i < col.length; i++) assert.ok(col[i].y >= col[i - 1].y + col[i - 1].h, `overlap at x=${col[i].x}`); }
 });
 
-check("Todo 5: renderFlowPane exposes leafConcepts (key → {lib,name,topWhenKey}); nested leaves inherit the top composite when; cross-lib omitted; keys match anchors", () => {
+check("Option-C: leafConcepts join — path-keyed, nested leaves inherit the TOP when, external operand omitted, keys match anchors", () => {
   const struct = [{ decision: "D", lib: "Pol", nodeKey: "d:D", location: {}, children: [
     node("w:C", "when", "when C", ["c:C"], [node("a:C", "action", "X", ["act:X"], [], { actionKind: "recommend-activity" })]),
   ] }];
   const cs = [concept("c:C", "C", { definitionKind: "defined-as" })];
-  const shape = { C: { nodeKey: "c:C", hasCodeIs: false, leafEligible: false, isInferred: true, hasDefinedAs: true, children: [
-    { nodeKey: "c:L", hasCodeIs: false, leafEligible: false, isInferred: true, hasDefinedAs: true, children: [
-      { nodeKey: "c:La", hasCodeIs: true, leafEligible: true, isInferred: false, hasDefinedAs: false, children: [] },
-    ] },
-    { nodeKey: "c:X", hasCodeIs: true, leafEligible: true, isInferred: false, hasDefinedAs: false, children: [] }, // cross-lib (no info) → omitted
-  ] } };
-  const info = { "c:L": { lib: "Pol", name: "L", valueTypes: [] }, "c:La": { lib: "Pol", name: "La", valueTypes: [] } }; // c:X absent
-  const rr = renderFlowPane(struct, { concepts: cs, conceptShape: (_l, n) => shape[n], resolveConceptInfo: (nk) => info[nk] });
+  const map = {
+    C: dentry("c:C", "C", dor(dref("L", "c:L", { hasCodeIs: false, isInferred: true, hasDefinedAs: true }), dext("X"))),
+    L: dentry("c:L", "L", dref("La", "c:La")),
+  };
+  const rr = renderFlowPane(struct, { concepts: cs, defExpr: defExprOf(map) });
   const entries = Object.entries(rr.leafConcepts);
-  assert.ok(!entries.some(([, v]) => v.name === "X"), "a cross-lib / unaddressable operand gets NO leafConcepts entry");
+  assert.ok(!entries.some(([, v]) => v.name === "X"), "a cross-lib operand is an external stub → NO leafConcepts entry");
+  assert.ok(/class="flow-outline flow-ext"/.test(rr.html), "the cross-lib operand renders as an external stub row");
   const L = entries.find(([, v]) => v.name === "L");
   const La = entries.find(([, v]) => v.name === "La");
   assert.ok(L && La, "L and La both have leafConcepts entries");
   assert.equal(L[1].lib, "Pol");
-  assert.equal(L[1].topWhenKey, "w:C", "L's owning composite when is the structure when w:C");
-  assert.equal(La[1].topWhenKey, "w:C", "the NESTED leaf La inherits the SAME top composite when (w:C), NOT its immediate parent leaf");
-  for (const [k] of entries) assert.ok(rr.anchors[k], `leafConcepts key ${k} has a matching anchor (the cockpit's leafKey→segmentIds join)`);
+  assert.equal(L[1].topWhenKey, "w:C", "L's owning composite when is w:C");
+  assert.equal(La[1].topWhenKey, "w:C", "the NESTED leaf La inherits the SAME top when (w:C), not its parent leaf");
+  for (const [k] of entries) assert.ok(rr.anchors[k], `leafConcepts key ${k} has a matching anchor`);
+});
+
+check("Option-C: the SAME concept at two positions gets DISTINCT path-keyed anchors + leafConcepts (no collision)", () => {
+  // when B `defined as` ((A or Bx) and (A or D)) — concept A appears at TWO positions.
+  const map = { B: dentry("c:B", "B", dand(dor(dref("A", "c:A"), dref("Bx", "c:Bx")), dor(dref("A", "c:A"), dref("D", "c:D")))) };
+  const rr = renderFlowPane(structure, { concepts, revealPrefix: "g5_", defExpr: defExprOf(map) });
+  const aAnchors = Object.keys(rr.anchors).filter((k) => k.startsWith("leaf::") && k.endsWith('"c:A"]'));
+  assert.equal(aAnchors.length, 2, "concept A at two positions → TWO distinct anchors (positional key, not one overwritten)");
+  assert.ok(new Set(aAnchors).size === 2, "the two A anchors are DISTINCT keys (JSON-structured, collision-proof)");
+  assert.equal(Object.entries(rr.leafConcepts).filter(([, v]) => v.name === "A").length, 2, "A gets TWO leafConcepts entries (the Todo-5 verdict join is not corrupted)");
+});
+
+check("Option-C: an INFERRED single-operand body (bare-ref alias) is wrapped in ANY OF (parity with the questionnaire's renderInferredWhen)", () => {
+  const cs = [concept("c:C", "C", { definitionKind: "defined-as" })];
+  const struct2 = [{ decision: "D", lib: "Pol", nodeKey: "d:D", location: {}, children: [
+    node("w:C", "when", "when C", ["c:C"], [node("a:C", "action", "X", ["act:X"], [], { actionKind: "recommend-activity" })]),
+  ] }];
+  const map = { C: dentry("c:C", "C", dref("L", "c:L")) }; // C `defined as` L — a single bare ref
+  const rr = renderFlowPane(struct2, { concepts: cs, defExpr: defExprOf(map) });
+  assert.ok(/class="flow-outline flow-op"><text[^>]*>ANY OF</.test(rr.html), "a single-operand inferred body gets a synthetic ANY OF wrapper");
+  assert.ok(leafRowsOf(rr.html).some((l) => l.label === "L"), "the wrapped leaf L renders under it");
+  assert.ok(!/flow-topor/.test(rr.html), "still no top-OR (it's inferred)");
+});
+
+check("Option-C: a body-less composite when (no branch body) sits ATOP its outline, no overlap", () => {
+  const cs = [concept("c:C", "C", { definitionKind: "defined-as" })];
+  const struct2 = [{ decision: "D", lib: "Pol", nodeKey: "d:D", location: {}, children: [
+    node("w:C", "when", "when C", ["c:C"], []), // NO branch body (unreachable in practice, but the layout must not overlap)
+  ] }];
+  const map = { C: dentry("c:C", "C", dor(dref("L1", "c:L1"), dref("L2", "c:L2"))) };
+  const rr = renderFlowPane(struct2, { concepts: cs, defExpr: defExprOf(map) });
+  assert.equal(leafRowsOf(rr.html).map((l) => l.label).sort().join(), "L1,L2", "the outline leaves still render");
+  const whenY = +rr.html.match(/<rect x="\d+" y="(\d+)" width="168"/)[1]; // the when box (NODE_W=168)
+  const leafYs = [...rr.html.matchAll(/<rect x="\d+" y="(\d+)" width="150"/g)].map((m) => +m[1]); // outline leaf boxes
+  assert.ok(whenY < Math.min(...leafYs), "the body-less composite sits ABOVE its outline rows (not centered within them)");
+});
+
+check("Option-C: a SOURCE composite (has code is) gets a top-OR row; a NOT renders a NOT row + its operand", () => {
+  const cs = [concept("c:S", "S", { definitionKind: "defined-as", hasLocalCode: true })];
+  const struct = [{ decision: "D", lib: "Pol", nodeKey: "d:D", location: {}, children: [
+    node("w:S", "when", "when S", ["c:S"], [node("a:S", "action", "X", ["act:X"], [], { actionKind: "recommend-activity" })]),
+  ] }];
+  const map = { S: { nodeKey: "c:S", lib: "Pol", name: "S", hasCodeIs: true, leafEligible: false, isInferred: false, hasDefinedAs: true, body: dor(dref("L1", "c:L1"), dnot(dref("L2", "c:L2"))) } };
+  const rr = renderFlowPane(struct, { concepts: cs, defExpr: defExprOf(map) });
+  assert.ok(/class="flow-outline flow-topor"><text[^>]*>OR</.test(rr.html), "a SOURCE (both-rep) composite shows a top-OR row");
+  assert.ok(/class="flow-outline flow-op"><text[^>]*>ANY OF</.test(rr.html), "with the ANY OF body below it");
+  assert.ok(/class="flow-outline flow-op"><text[^>]*>NOT</.test(rr.html), "a NOT operator row");
+  assert.ok(leafRowsOf(rr.html).some((l) => l.label === "L2"), "the NOT's operand L2 is still rendered (never dropped)");
 });
 
 console.log(`\nflowPaneHtml.test: ${pass} checks passed`);

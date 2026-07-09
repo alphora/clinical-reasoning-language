@@ -74,7 +74,7 @@ import { renderCrlPane } from "./crlPaneHtml";
 import { FLOW_STYLE, renderFlowPane } from "./flowPaneHtml";
 import { QUESTIONNAIRE_STYLE, renderQuestionnairePane, shouldRerenderQuestionnaire, nextQuestionIndex } from "./questionnairePaneHtml";
 import { buildQuestionnaire, producedPathDiverterIds, type Questionnaire } from "./questionnaireModel";
-import type { ConceptValueType, ResolveValueTypes, ResolveConceptShape, ResolveConceptInfo, ResolveDefExpr } from "./questionnaireModel";
+import type { ConceptValueType, ResolveValueTypes, ResolveConceptShape, ResolveDefExpr } from "./questionnaireModel";
 import {
   buildCrlRevealMaps,
   caseIdsForNode,
@@ -1125,8 +1125,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       const r = renderFlowPane(crlStructure, {
         revealPrefix: `g${gen}_`,
         concepts: conceptLayer,
-        conceptShape: buildConceptShapeResolver(), // #187 Todo 4: composite → def-leaf sub-nodes
-        resolveConceptInfo: buildResolveConceptInfo(),
+        defExpr: buildDefExprResolver(), // #187 Option-C: composite → the ANY OF / ALL OF operator OUTLINE (shared builder)
       });
       v.anchors = r.anchors;
       v.reveals = r.reveals;
@@ -1194,10 +1193,9 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     };
   }
 
-  /** #187 Todo 3 — the injected resolvers `buildQuestionnaire` uses to EXPAND an inferred composite `when` into its
-   *  `defined as` leaves. `conceptShape(lib,name)` fetches the concept's shape subtree (keyed by the SAME nodeKey as
-   *  `conceptByKey`); `resolveConceptInfo(nodeKey)` gives a shape LEAF (which carries only its nodeKey) its concept
-   *  identity + value types for the leaf row. Both return undefined when maps are absent (→ no expansion). */
+  /** #187 Todo 3 — the injected resolver `buildQuestionnaire` uses for a composite `when`'s own Source/inferred flags.
+   *  `conceptShape(lib,name)` fetches the concept's shape subtree (keyed by the SAME nodeKey as `conceptByKey`); returns
+   *  undefined when maps are absent. (The `defined as` OPERATOR structure comes from `buildDefExprResolver`, below.) */
   function buildConceptShapeResolver(): ResolveConceptShape {
     return (lib, name) => (lib === undefined ? undefined : conceptShape.get(nodeKey(conceptDeclRef(lib, name))));
   }
@@ -1205,12 +1203,6 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
    *  OPERATOR tree (ANY OF / ALL OF boxes). Keyed by the SAME nodeKey as `conceptByKey`; undefined when maps absent. */
   function buildDefExprResolver(): ResolveDefExpr {
     return (lib, name) => (lib === undefined ? undefined : defExpr.get(nodeKey(conceptDeclRef(lib, name))));
-  }
-  function buildResolveConceptInfo(): ResolveConceptInfo {
-    return (nk) => {
-      const c = crlMaps?.conceptByKey.get(nk);
-      return c ? { lib: c.lib, name: c.name, valueTypes: c.valueTypes } : undefined;
-    };
   }
 
   function renderEmpty(message: string): void {

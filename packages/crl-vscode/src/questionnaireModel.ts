@@ -15,8 +15,8 @@
 // NAV/GROUNDING (disc 193 Q4/Q5): only RUNTIME rows (whens + the blocked guard) are nav-stops + cross-pane markable
 // (their `nodeId` grounds in `sv.tree` via `resolveThisNode`). Expanded LEAF rows render but are NOT nav-stops — a
 // synthetic leaf id can't ground `driveThisNode` (that's Todo 5). This module imports ONLY types from the core.
-import type { ConceptShapeNode, DefExpr, DefExprEntry, ScenarioViewModel, ViewNode, GuardView, ConditionView } from "@smile-digital-health/crl";
-import { displayDetermination } from "@smile-digital-health/crl";
+import type { ConceptShapeNode, DefExprEntry, DefStructExpr, ScenarioViewModel, ViewNode, GuardView, ConditionView } from "@smile-digital-health/crl";
+import { buildDefStruct, displayDetermination } from "@smile-digital-health/crl";
 
 export type ConceptValueType = string;
 
@@ -99,16 +99,8 @@ export function producedPathDiverterIds(q: Questionnaire): string[] {
 export type ResolveValueTypes = (lib: string | undefined, name: string) => ConceptValueType[];
 /** Resolve a concept's `defined as` SHAPE subtree (frame-aware) — for expanding a composite `when`'s leaves (#187). */
 export type ResolveConceptShape = (lib: string | undefined, name: string) => ConceptShapeNode | undefined;
-/** Resolve a shape node's concept identity by its nodeKey — a `ConceptShapeNode` carries only `nodeKey` (#187). */
-export type ResolveConceptInfo = (nodeKey: string) => { lib: string; name: string; valueTypes: ConceptValueType[] } | undefined;
 /** Resolve a concept's `defined as` OPERATOR-tree entry (frame-aware) — for the Option-3 ANY OF / ALL OF box render. */
 export type ResolveDefExpr = (lib: string | undefined, name: string) => DefExprEntry | undefined;
-
-/** Render caps for the operator-tree expansion — mirror the Tree pane (flowPaneHtml LEAF_CAP / MAX_LEAF_DEPTH). The
- *  DAG-blowup vector is NAMED-COMPOSITE HOPS (a shared/cyclic composite re-expanded positionally at each reference), so
- *  `MAX_EXPR_DEPTH` counts those hops (not inline `or`/`and`/`not` nesting, which is a finite authoring-scale tree). */
-const EXPR_CAP = 10; // operands per box before a `+N more` stub
-const MAX_EXPR_DEPTH = 4; // named-composite expansion HOPS before a `…` stub
 
 /**
  * Reconstruct the FULL first:-chain question surface of a rendered scenario.
@@ -182,47 +174,32 @@ export function buildQuestionnaire(
     return q;
   };
 
-  // Build the RENDER operator tree for a `defined as` body — POSITIONAL (a shared concept appears at each written
-  // position; only a path `visiting` cycle-guard, NOT the leaf collector's `visited` dedup — the whole point is the
-  // authored boolean STRUCTURE). Capped by width (EXPR_CAP) + depth (MAX_EXPR_DEPTH). Answers from conceptTruth.
-  const buildQExpr = (e: DefExpr, visiting: ReadonlySet<string>, depth: number): QExpr => {
-    switch (e.kind) {
+  // ENRICH the shared POSITIONAL structure (`buildDefStruct`, crl core — the SAME builder the Tree pane consumes, so the
+  // two panes stay in lockstep BY CONSTRUCTION) with the case's per-leaf answer + value-type. Structure/caps/positional
+  // semantics all live in the core builder; this pass only layers on `answer` (conceptTruth) + `valueType`.
+  const enrich = (s: DefStructExpr): QExpr => {
+    switch (s.kind) {
       case "or":
-      case "and": {
-        const operands = e.operands.slice(0, EXPR_CAP).map((o) => buildQExpr(o, visiting, depth));
-        if (e.operands.length > EXPR_CAP) operands.push({ kind: "more", count: e.operands.length - EXPR_CAP });
-        return { kind: e.kind, operands };
-      }
+      case "and":
+        return { kind: s.kind, operands: s.operands.map(enrich) };
       case "not":
-        // The operand is ALWAYS rendered — a dropped `not` operand would vanish a criterion `$apply` still asks.
-        return { kind: "not", operand: buildQExpr(e.operand, visiting, depth) };
-      case "ref": {
-        const r = e.ref;
-        // A cross-lib operand OR a location-less local stub (no nodeKey) is UNADDRESSABLE here → a non-answerable stub,
-        // NOT an answerable leaf (rendering it with an answer would surface a row `$apply` never asks). Synthetic-only
-        // for the location-less case (the parser always assigns a location) — kept total.
-        if (r.crossLib || r.nodeKey === undefined) return { kind: "external", name: r.name, lib: r.lib };
-        const valueTypes = resolveValueTypes(r.lib, r.name);
+        return { kind: "not", operand: enrich(s.operand) };
+      case "external":
+        return { kind: "external", name: s.name, lib: s.lib };
+      case "more":
+        return { kind: "more", count: s.count };
+      case "leaf": {
+        const valueTypes = resolveValueTypes(s.lib, s.name);
         const leaf: Extract<QExpr, { kind: "leaf" }> = {
           kind: "leaf",
-          name: r.name,
-          lib: r.lib,
-          answer: truthAnswer(r.lib, r.name),
-          isSource: r.hasCodeIs ?? true, // stub flags are `undefined` ⇒ UNKNOWN; default to Source (don't spuriously grey)
-          isInferred: r.isInferred ?? false,
+          name: s.name,
+          lib: s.lib,
+          answer: truthAnswer(s.lib, s.name),
+          isSource: s.isSource,
+          isInferred: s.isInferred,
           valueType: valueTypes[0] ?? null,
         };
-        // A named-composite (or both-rep) operand is ALSO expandable → attach its OWN body as a nested box. Positional:
-        // guard only against a true cycle (the concept on the current path); a diamond re-expands. Depth cap → a `…` stub.
-        if (r.hasDefinedAs && r.nodeKey !== undefined && !visiting.has(r.nodeKey)) {
-          const entry = opts.defExpr?.(r.lib, r.name);
-          if (entry?.body) {
-            leaf.composite =
-              depth >= MAX_EXPR_DEPTH
-                ? { kind: "more", count: 0 } // depth cap → `…`
-                : buildQExpr(entry.body, new Set(visiting).add(r.nodeKey), depth + 1);
-          }
-        }
+        if (s.composite) leaf.composite = enrich(s.composite);
         return leaf;
       }
     }
@@ -237,7 +214,7 @@ export function buildQuestionnaire(
     // The `expansion` is the RAW operator tree (the ALL OF / ANY OF structure is unchanged). `defined as` is a disjunction
     // of alternative representations, but that top-level `or` is a RENDER annotation (a forced `or` chip above the body —
     // see renderExpansion), NOT an extra box — so a top-level `and` shows `or` then its ALL OF, one compound alternative.
-    if (entry?.hasDefinedAs && entry.body) q.expansion = buildQExpr(entry.body, new Set([entry.nodeKey]), 1);
+    if (entry?.hasDefinedAs && entry.body) q.expansion = enrich(buildDefStruct(entry.body, opts.defExpr, new Set([entry.nodeKey]), 1));
   };
 
   type GuardTerminal = { node: ViewNode; guard: GuardView; frameLib: string | undefined; depth: number };
