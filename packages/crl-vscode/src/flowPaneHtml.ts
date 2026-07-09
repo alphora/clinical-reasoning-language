@@ -479,11 +479,14 @@ export const FLOW_STYLE =
   `.flow-guard-tab.flow-inferred>rect{stroke:var(--vscode-charts-purple,#c586c0)}` +
   `.flow-guard-tab>text{fill:var(--vscode-descriptionForeground,#cccccc);font:600 9px/1 var(--vscode-editor-font-family,monospace);letter-spacing:.02em}` +
   `.flow-guard-tab:hover>rect{fill:var(--vscode-toolbar-hoverBackground,#2a2d2e)}` +
-  `.flow-edge{fill:none;stroke:var(--vscode-panel-border,#454545);stroke-width:1.2}` +
+  `.flow-edge{fill:none;stroke:var(--vscode-panel-border,#454545);stroke-width:1.6}` + // slightly thicker — hard to see on Mac (operator feedback)
   // #187 Todo 4: a DEF-LEAF edge — a distinct dashed grey line (definition decomposition, NOT a control-flow branch).
-  `.flow-def-edge{fill:none;stroke:var(--vscode-panel-border,#454545);stroke-width:1;stroke-dasharray:2 2;opacity:.6}` +
-  // an outline operand chip — kept DASHED so it never reads as a decision box. Source → grey; inferred (no `code is`) → purple.
-  `.flow-leaf>rect{fill:var(--vscode-editor-background,#1e1e1e);stroke:var(--vscode-descriptionForeground,#8c8c8c);stroke-width:1;stroke-dasharray:2 1.5}` +
+  // Slightly THICKER + less faint so the connector reads on Mac (operator feedback).
+  `.flow-def-edge{fill:none;stroke:var(--vscode-panel-border,#454545);stroke-width:1.5;stroke-dasharray:2 2;opacity:.8}` +
+  // an outline operand = a "real" evaluable SUB-QUESTION → a SOLID border: BLUE (has a local `code is`, directly
+  // answerable) / PURPLE (inferred — it decomposes into its OWN sub-questions, recursively). (Overrides the Todo-2 dashed
+  // "operand chip" look per operator feedback — the indent + smaller box + dashed spine already distinguish it from a decision box.)
+  `.flow-leaf>rect{fill:var(--vscode-editor-background,#1e1e1e);stroke:var(--vscode-charts-blue,#3794ff);stroke-width:1}` +
   `.flow-leaf.flow-inferred>rect{stroke:var(--vscode-charts-purple,#c586c0)}` +
   `.flow-leaf>text{fill:var(--vscode-descriptionForeground,#bfbfbf);font-size:11px}` +
   // #187 Option-C OUTLINE rows. An OPERATOR / TOP-OR label — a bare uppercase caption (no box), like the questionnaire's
@@ -505,6 +508,11 @@ export const FLOW_STYLE =
   `.flow-ring>rect{fill:none;stroke:var(--vscode-focusBorder,#3794ff);stroke-width:2.5;stroke-dasharray:none}` +
   `.flow-leaf .flow-ring>rect{stroke-width:1.5}` +
   `.flow-row.current .flow-ring,.flow-row.flow-leaf-yes .flow-ring{display:inline}` +
+  // #187 Todo 3b: when the ring is shown, THICKEN the node's own (identity) border so its colour still reads clearly
+  // INSIDE the ring (operator feedback). Placed BEFORE the overlay stroke channels so `.this-node`/`.failed-criterion`/etc.
+  // still win the stroke on a node that is both on-path AND an overlay. Sets only stroke-WIDTH — the identity colour stays.
+  `.flow-row.current>rect{stroke-width:2.5}` +
+  `.flow-row.flow-leaf-yes>rect{stroke-width:2}` +
   // disc 164: the produced-path DIVERTER overlay on the SVG rect (the shell's HTML `.diverter` outline does not paint on
   // a <g>, same as the channels below). A neutral teal DOTTED stroke for the evaluated-false `when`s that routed the case
   // to its produced disposition (the Adult gate for a not-adult deny). Ordered BEFORE `.failed-criterion` so a blocker

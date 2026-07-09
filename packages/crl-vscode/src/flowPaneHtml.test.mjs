@@ -128,7 +128,7 @@ check("no <style> or style= inside the SVG (CSP); FLOW_STYLE carries var() + fal
   assert.ok(/var\(--vscode-[\w-]+,#/.test(FLOW_STYLE), "FLOW_STYLE uses var(--vscode-*, fallback) pairs");
   // #187 Todo 3: the on-path highlight is the SVG-friendly RING (a rect stroke on `.flow-ring>rect`), NOT a CSS outline.
   assert.ok(/\.flow-ring>rect\{[^}]*stroke:/.test(FLOW_STYLE), "SVG-friendly on-path ring (rect stroke)");
-  assert.ok(!/\.flow-row\.current>rect\{stroke/.test(FLOW_STYLE), "Todo 3: .current no longer recolors the base rect stroke");
+  assert.ok(!/\.flow-row\.current>rect\{stroke:/.test(FLOW_STYLE), "Todo 3: .current no longer recolors the base rect stroke COLOUR (a stroke-WIDTH thicken is fine)");
 });
 
 check("#156 slice 5: .done-node/.error-node review overlay CSS exists, is NON-OUTLINE (fill, not stroke/outline)", () => {
@@ -327,8 +327,8 @@ check("Option-C: an INFERRED composite when renders an ANY OF outline of leaf ro
   assert.ok(/class="flow-outline flow-op"><text[^>]*>ANY OF</.test(rr.html), "an ANY OF operator label row (or → any of)");
   assert.ok(!/flow-topor/.test(rr.html), "an INFERRED composite (no code is) has NO top-OR row");
   assert.ok(/class="flow-def-edge"/.test(rr.html), "outline connectors use the distinct flow-def-edge, not flow-edge");
-  assert.ok(leafRows.find((l) => l.label === "L2").cls.includes("flow-inferred"), "L2 (no code-is) → inferred (purple-dashed border)");
-  assert.ok(!leafRows.find((l) => l.label === "L1").cls.includes("flow-inferred"), "L1 (code-is) → NOT inferred (grey-dashed)");
+  assert.ok(leafRows.find((l) => l.label === "L2").cls.includes("flow-inferred"), "L2 (no code-is) → inferred (purple solid border)");
+  assert.ok(!leafRows.find((l) => l.label === "L1").cls.includes("flow-inferred"), "L1 (code-is) → NOT inferred (blue solid border — a 'real' sub-question)");
   const leafPeeks = Object.values(rr.reveals).filter((v) => v.conceptNodeKey === "c:L1" || v.conceptNodeKey === "c:L2");
   assert.equal(leafPeeks.length, 2, "each leaf reveals its OWN concept (peek), never a {nodeKey} select");
   assert.equal(Object.keys(rr.anchors).filter((k) => k.startsWith("leaf::")).length, 2, "ONLY the 2 leaf rows anchor (op rows are render-only)");
@@ -509,6 +509,21 @@ check("Todo 3: a hidden .flow-ring <rect> on every structure node + outline leaf
   assert.match(FLOW_STYLE, /\.flow-row\.current \.flow-ring,\.flow-row\.flow-leaf-yes \.flow-ring\{display:inline\}/, "revealed by .current (main path) OR .flow-leaf-yes (true operand)");
   assert.match(FLOW_STYLE, /\.flow-leaf \.flow-ring>rect\{stroke-width:1\.5\}/, "the leaf ring is thinner (clears the compact outline row pitch)");
   assert.match(FLOW_STYLE, /\.flow-row\.current,[^{]*\{outline:none\}/, "the shell's outline overlays (current + diverter/failed-criterion/-preempt) are neutralized on flow nodes (no double ring)");
+});
+
+check("Todo 3b: a sub-question is a SOLID blue (source) / purple (inferred) border; the native border thickens under the ring; connectors are thicker", () => {
+  // outline leaves are "real" questions → SOLID coloured borders (no dashed operand-chip look).
+  assert.match(FLOW_STYLE, /\.flow-leaf>rect\{[^}]*stroke:var\(--vscode-charts-blue[^}]*\}/, "a source sub-question → blue border");
+  assert.ok(!/\.flow-leaf>rect\{[^}]*stroke-dasharray/.test(FLOW_STYLE), "the sub-question border is SOLID (no dashed operand-chip)");
+  assert.match(FLOW_STYLE, /\.flow-leaf\.flow-inferred>rect\{stroke:var\(--vscode-charts-purple/, "an inferred sub-question → purple border (recurses into its own subs)");
+  // the native border thickens when the on-path ring is shown (so the identity colour reads inside the ring).
+  assert.match(FLOW_STYLE, /\.flow-row\.current>rect\{stroke-width:2\.5\}/, "a structure node's border thickens when on-path");
+  assert.match(FLOW_STYLE, /\.flow-row\.flow-leaf-yes>rect\{stroke-width:2\}/, "a leaf's border thickens when on-path");
+  // the thicken rules sit BEFORE the overlay stroke channels (so this-node/failed-criterion still win the stroke).
+  assert.ok(FLOW_STYLE.indexOf(".flow-row.current>rect{stroke-width") < FLOW_STYLE.indexOf(".flow-row.this-node>rect{"), "the current-thicken is ordered before .this-node (overlay wins)");
+  // connectors thicker (hard to see on Mac).
+  assert.match(FLOW_STYLE, /\.flow-edge\{[^}]*stroke-width:1\.6\}/, "control-flow edge thicker");
+  assert.match(FLOW_STYLE, /\.flow-def-edge\{[^}]*stroke-width:1\.5[^}]*opacity:\.8\}/, "def-edge (outline spine) thicker + less faint");
 });
 
 console.log(`\nflowPaneHtml.test: ${pass} checks passed`);
