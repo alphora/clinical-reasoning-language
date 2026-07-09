@@ -676,7 +676,7 @@ case "cov+comp; Other preempted":
   const items = [...r.html.matchAll(/<li class="([^"]*)"[^>]*>(.*?)<\/li>/g)].map((m) => ({ cls: m[1], inner: m[2] }));
   const row = (n) => items.find((it) => it.cls.includes("q-item") && it.inner.includes(`q-concept">${n}<`));
   // Comp has no code-is → INFERRED → its concept moves onto the box title (a q-inferred-when), not a separate answerable row.
-  assert.match(r.html, /<li class="q-item q-inferred-when"[^>]*>[\s\S]*?<span class="q-box-title"><span class="q-prompt"><span class="q-concept">Comp<\/span>/, "Comp (no code-is) renders as an inferred-when with its concept on the box title");
+  assert.match(r.html, /<li class="q-item q-inferred-when"[^>]*>[\s\S]*?<span class="q-inferred-title">\(<span class="q-prompt"><span class="q-concept">Comp<\/span>/, "Comp (no code-is) renders as an inferred-when with its concept (in parens) above the box");
   assert.ok(row("Other").cls.includes("q-preempted"), "Other (first:-preempted) is dimmed");
   // Comp = (SomeLeaf or Extra) → an ANY OF box with an infix 'or'; NO top OR (inferred).
   assert.match(r.html, /class="q-box q-box-or"/, "Comp = (…or…) → an ANY OF box");
@@ -775,14 +775,14 @@ case "bmi holds":
   assert.match(r.html, /<li class="q-item q-inferred-when"[^>]*>/, "an inferred composite renders as a q-inferred-when li (no separate answerable row)");
   const li = r.html.match(/<li class="q-item q-inferred-when"[^>]*>([\s\S]*?)<\/li>/)[1];
   assert.match(li, /^<span class="q-layer"[^>]*>1<\/span>/, "the inferred when carries its 1-based layer number");
-  assert.match(li, /<span class="q-box-title"><span class="q-prompt"><span class="q-concept">BMI Qualifies<\/span>\?<\/span>/, "BMI Qualifies + its derived answer move onto the box title");
+  assert.match(li, /<span class="q-inferred-title">\(<span class="q-prompt"><span class="q-concept">BMI Qualifies<\/span>\?<\/span>/, "BMI Qualifies + its derived answer render (in parens) above the box");
   assert.ok(!li.includes("q-conn-top"), "an INFERRED composite has NO forced top OR chip (that is only for code-is both-rep)");
   assert.match(li, /q-box-tab">any of</, "the sem-or body renders an ANY OF box");
   assert.match(li, /q-box q-box-and"><span class="q-box-tab">all of</, "the nested sem-and renders an ALL OF box");
   const body = li.match(/q-box-body">([\s\S]*)$/)[1];
   assert.ok(!body.includes("q-layer"), "sub-questions inside the boxes have NO layer-number badge");
   // the DERIVED answer (in the title) is PURPLE-bordered — vs the blue of a directly-answered `code is` concept.
-  assert.match(QUESTIONNAIRE_STYLE, /\.q-box-title \.q-opt-answer[^{]*\{[^}]*c586c0/, "the inferred (derived) answer gets a purple border");
+  assert.match(QUESTIONNAIRE_STYLE, /\.q-inferred-title \.q-opt-answer[^{]*\{[^}]*c586c0/, "the inferred (derived) answer gets a purple border");
 });
 
 check("Option-3 nav: default (currentIndex -1) shows 'Question 0 of N' — no question auto-focused; Prev disabled, Next enabled", () => {
