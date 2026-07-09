@@ -387,7 +387,8 @@ export function renderFlowPane(
       // #187 Todo 2: border by Source — inferred (no `code is`) → purple, Source → grey — kept DASHED (an operand chip,
       // not a decision box). `isSource === false` is inferred; `true`/`undefined` stay grey (never mis-purple).
       const classes = ["flow-row", "flow-leaf"];
-      if (n.isSource === false) classes.push("flow-inferred");
+      if (n.isSource === false) classes.push("flow-inferred"); // inferred sub-question → purple (kept under the ring)
+      else classes.push("flow-greyborder"); // a source sub-question's grey border hides under the on-path ring (Todo 3b)
       body +=
         `<g id="${escapeHtml(gid)}" class="${classes.join(" ")}" data-reveal="${escapeHtml(key)}"><title>${escapeHtml(n.full)}</title>` +
         `<rect x="${x}" y="${y}" width="${OUTLINE_NODE_W}" height="${OUTLINE_H}" rx="6"/>` +
@@ -411,6 +412,11 @@ export function renderFlowPane(
       classes.push(`flow-${n.kind}`);
       if (n.kind === "when" && n.isSource === false) classes.push("flow-inferred"); // inferred gating concept → purple border
     }
+    // #187 Todo 3b: a plain GREY SOLID identity border (decision / non-inferred when / ordinary activity) muddies the blue
+    // on-path ring → mark it so CSS can HIDE it when ringed. A COLOURED border (inferred/certify/not-certify) or a DASHED
+    // one (use-decision/otherwise) is NOT marked — it stays visible (it carries meaning the ring doesn't).
+    if (classes.includes("flow-decision") || classes.includes("flow-activity") || (classes.includes("flow-when") && !classes.includes("flow-inferred")))
+      classes.push("flow-greyborder");
     reveals[key] = { nodeKey: n.nodeKey };
     // #187 Todo 2b: a guarded recommend's "when <guard>" TAB — a clickable, labeled pill on the box (the discoverable
     // replacement for the removed peek dot). NESTED inside the row <g> so closest() routes a tab click → the guard peek
@@ -508,11 +514,14 @@ export const FLOW_STYLE =
   `.flow-ring>rect{fill:none;stroke:var(--vscode-focusBorder,#3794ff);stroke-width:2.5;stroke-dasharray:none}` +
   `.flow-leaf .flow-ring>rect{stroke-width:1.5}` +
   `.flow-row.current .flow-ring,.flow-row.flow-leaf-yes .flow-ring{display:inline}` +
-  // #187 Todo 3b: when the ring is shown, THICKEN the node's own (identity) border so its colour still reads clearly
-  // INSIDE the ring (operator feedback). Placed BEFORE the overlay stroke channels so `.this-node`/`.failed-criterion`/etc.
-  // still win the stroke on a node that is both on-path AND an overlay. Sets only stroke-WIDTH — the identity colour stays.
+  // #187 Todo 3b: when the ring is shown — HIDE a plain GREY SOLID border (`.flow-greyborder`): a faint grey line just
+  // inside the blue ring only muddies it (the ring is the border). A COLOURED identity border (inferred/certify/not-certify)
+  // instead THICKENS so its meaning still reads inside the ring. Both are EQUAL-specificity ((0,2,1)) to the overlay stroke
+  // channels and placed BEFORE them, so `.this-node`/`.failed-criterion`/`.diverter` still win on a node that is on-path AND
+  // an overlay (the thicken sets only stroke-WIDTH; the hide sets `stroke:transparent`, which a later overlay's stroke beats).
   `.flow-row.current>rect{stroke-width:2.5}` +
   `.flow-row.flow-leaf-yes>rect{stroke-width:2}` +
+  `.flow-greyborder.current>rect,.flow-greyborder.flow-leaf-yes>rect{stroke:transparent}` +
   // disc 164: the produced-path DIVERTER overlay on the SVG rect (the shell's HTML `.diverter` outline does not paint on
   // a <g>, same as the channels below). A neutral teal DOTTED stroke for the evaluated-false `when`s that routed the case
   // to its produced disposition (the Adult gate for a not-adult deny). Ordered BEFORE `.failed-criterion` so a blocker

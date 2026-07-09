@@ -267,7 +267,7 @@ check("INVARIANT: flow anchors cover EVERY structure nodeKey (the cockpit reuses
 
 check("GOLDEN coords pin COL/ROW/midpoint/rounding (a uniform shift/scale would pass relative-only checks)", () => {
   // d:D is the first node (flow0): depth 0 → x=14; its 5 branches occupy slots 0..4 → midpoint y=2 → round(14+2*48)=110.
-  assert.match(r.html, /<g id="g1_flow0" class="flow-row flow-decision" data-reveal="[^"]*"><title>[^<]*<\/title><rect x="14" y="110"/);
+  assert.match(r.html, /<g id="g1_flow0" class="flow-row flow-decision[^"]*" data-reveal="[^"]*"><title>[^<]*<\/title><rect x="14" y="110"/);
   // a:X is depth 2 (decision→when→action), slot 0 → x=14+2*220=454, y=round(14+0)=14.
   assert.ok(r.html.includes('<rect x="454" y="14" width="168" height="34"'), "depth-2 leaf at the expected column/row");
 });
@@ -473,7 +473,7 @@ check("Todo 2: determination leaf border by PAS category — certify GREEN, not-
     node("o", "otherwise", "otherwise", [], [node("aO", "action", "Order MRI", ["act:o"], [], { actionKind: "recommend-activity" })]),
   ] }];
   const rr = renderFlowPane(st, { concepts });
-  const actCls = (label) => rr.html.match(new RegExp(`class="(flow-row flow-[a-z]+)"[^>]*><title>[^<]*</title><rect[^>]*/><text[^>]*>${label}</text>`))[1];
+  const actCls = (label) => rr.html.match(new RegExp(`class="(flow-row flow-[a-z]+)[^"]*"[^>]*><title>[^<]*</title><rect[^>]*/><text[^>]*>${label}</text>`))[1];
   assert.equal(actCls("Approve"), "flow-row flow-certify", "certify.* → green");
   assert.equal(actCls("Deny"), "flow-row flow-notcertify", "not-certify.* → gold");
   assert.equal(actCls("Info"), "flow-row flow-notcertify", "pended.* → gold (same bucket as not-certify)");
@@ -516,11 +516,14 @@ check("Todo 3b: a sub-question looks like a main question — SOLID grey (source
   assert.match(FLOW_STYLE, /\.flow-leaf>rect\{[^}]*stroke:var\(--vscode-descriptionForeground[^}]*\}/, "a source sub-question → grey border, like a main question");
   assert.ok(!/\.flow-leaf>rect\{[^}]*stroke-dasharray/.test(FLOW_STYLE), "the sub-question border is SOLID (no dashed operand-chip)");
   assert.match(FLOW_STYLE, /\.flow-leaf\.flow-inferred>rect\{stroke:var\(--vscode-charts-purple/, "an inferred sub-question → purple border (recurses into its own subs)");
-  // the native border thickens when the on-path ring is shown (so the identity colour reads inside the ring).
-  assert.match(FLOW_STYLE, /\.flow-row\.current>rect\{stroke-width:2\.5\}/, "a structure node's border thickens when on-path");
-  assert.match(FLOW_STYLE, /\.flow-row\.flow-leaf-yes>rect\{stroke-width:2\}/, "a leaf's border thickens when on-path");
-  // the thicken rules sit BEFORE the overlay stroke channels (so this-node/failed-criterion still win the stroke).
-  assert.ok(FLOW_STYLE.indexOf(".flow-row.current>rect{stroke-width") < FLOW_STYLE.indexOf(".flow-row.this-node>rect{"), "the current-thicken is ordered before .this-node (overlay wins)");
+  // a COLOURED border thickens when the ring is shown; a plain GREY SOLID border (flow-greyborder) HIDES under the ring.
+  assert.match(FLOW_STYLE, /\.flow-row\.current>rect\{stroke-width:2\.5\}/, "a node's border thickens when on-path (colour reads inside the ring)");
+  assert.match(FLOW_STYLE, /\.flow-greyborder\.current>rect,\.flow-greyborder\.flow-leaf-yes>rect\{stroke:transparent\}/, "a plain grey solid border hides under the ring");
+  // a plain grey structure node + a source leaf get flow-greyborder; a coloured/inferred one does NOT.
+  assert.match(r.html, /class="flow-row flow-when flow-greyborder"/, "a non-inferred when is grey → flow-greyborder");
+  assert.ok(!/flow-inferred[^"]*flow-greyborder|flow-greyborder[^"]*flow-inferred/.test(r.html), "an inferred (purple) node is NOT flow-greyborder");
+  // the grey-hide + thicken sit BEFORE the overlay stroke channels (so this-node/failed-criterion still win the stroke).
+  assert.ok(FLOW_STYLE.indexOf(".flow-greyborder.current>rect") < FLOW_STYLE.indexOf(".flow-row.this-node>rect{"), "the grey-hide is ordered before .this-node (overlay wins on a grey on-path node that's also the focused question)");
   // connectors thicker (hard to see on Mac).
   assert.match(FLOW_STYLE, /\.flow-edge\{[^}]*stroke-width:1\.6\}/, "control-flow edge thicker");
   assert.match(FLOW_STYLE, /\.flow-def-edge\{[^}]*stroke-width:1\.5[^}]*opacity:\.8\}/, "def-edge (outline spine) thicker + less faint");
