@@ -29,10 +29,10 @@ const outlineKey = (topWhenKey: string, opPath: string, tag: string): string => 
 // INDENT-based (`when.left + BASE + indent*INDENT`), independent of the depth grid, so the outline never widens columns.
 const OUTLINE_BASE = 16; // x offset of an indent-0 outline row from its `when`'s left edge
 const OUTLINE_INDENT = 15; // x added per indent level
-const OUTLINE_ADVANCE = 0.64; // slot units an outline row advances the global cursor (compact vs a 1.0 tree slot)
+const OUTLINE_ADVANCE = 0.7; // slot units an outline row advances the global cursor (compact; sized for OUTLINE_H + ~6.7px gap over ROW)
 const OUTLINE_NODE_W = 150; // a leaf box in the outline (narrower than a decision NODE_W, since it indents)
-const OUTLINE_H = 24; // a leaf box height in the outline (shorter than NODE_H)
-const OUTLINE_LABEL_MAX = 18; // chars before truncation in an outline box (narrower than a decision box)
+const OUTLINE_H = 34; // a leaf box height in the outline — sized for up to TWO wrapped lines (#208)
+const OUTLINE_LABEL_MAX = 20; // chars PER LINE before wrapping/truncation (the min that de-collides the screenshot's outline leaves + box-fit margin)
 
 export interface FlowAnchor {
   scrollTo: string;
@@ -70,17 +70,48 @@ const truncate = (s: string, n: number): string => (s.length > n ? `${s.slice(0,
 const flowRing = (x: number, y: number, w: number, h: number, off: number, rx: number): string =>
   `<g class="flow-ring"><rect x="${x - off}" y="${y - off}" width="${w + 2 * off}" height="${h + 2 * off}" rx="${rx}"/></g>`;
 
+/** #208: wrap a label to ≤2 lines for a FIXED-width box (we wrap, never widen — the operator rejected horizontal sprawl).
+ *  `maxChars` is the per-line char budget (the old single-line limit). Line 1 is GUARANTEED ≤ maxChars — the LONGEST
+ *  whitespace-bounded prefix that fits — so it never overflows horizontally. Line 2 is the remainder (trailing-trimmed,
+ *  `…`-truncated only if it STILL overflows). A single word longer than maxChars is CHAR-split across both lines (keeps
+ *  2× the distinguishing characters — the point is de-collision) rather than collapsing to one ellipsized line.
+ *  Precondition: `maxChars >= 2` (real callers pass the box-fit constants). Labels are canonical CRL names (single ASCII
+ *  spaces); the leading/trailing `trim` guards stray whitespace but internal tabs/nbsp are not treated as break points. */
+export function wrapLabel(label: string, maxChars: number): string[] {
+  const s = label.trim();
+  if (s.length <= maxChars) return [s];
+  let brk = -1; // the LAST space at/before maxChars → the longest fitting line 1
+  for (let i = 0; i <= maxChars && i < s.length; i++) if (s[i] === " ") brk = i;
+  if (brk <= 0) {
+    const rest = s.slice(maxChars); // no fitting whitespace break → char-split
+    return [s.slice(0, maxChars), rest.length > maxChars ? `${rest.slice(0, maxChars - 1)}…` : rest];
+  }
+  const line1 = s.slice(0, brk).trimEnd();
+  const rest = s.slice(brk + 1).replace(/^\s+/, "");
+  if (rest === "") return [line1]; // all-trailing-space remainder → one line, not an empty second tspan
+  return [line1, rest.length > maxChars ? `${rest.slice(0, maxChars - 1).trimEnd()}…` : rest];
+}
+
+/** A centered node label — one `<text>` (short) or two vertically-centered `<tspan>`s (wrapped), inside a box of height `h`. */
+const labelMarkup = (label: string, x: number, y: number, h: number, maxChars: number, dx: number): string => {
+  const lines = wrapLabel(label, maxChars);
+  const tx = x + dx;
+  return lines.length === 1
+    ? `<text x="${tx}" y="${y + h / 2 + 4}">${escapeHtml(lines[0])}</text>`
+    : `<text x="${tx}"><tspan x="${tx}" y="${y + h / 2 - 4}">${escapeHtml(lines[0])}</tspan><tspan x="${tx}" y="${y + h / 2 + 11}">${escapeHtml(lines[1])}</tspan></text>`;
+};
+
 // Layout constants (px). Fixed node width → deterministic + unit-testable coords. The SVG carries INTRINSIC width/height
 // (not 100%) so an oversized chart scrolls/pans inside a narrow pane column rather than squashing.
 const NODE_W = 168;
-const NODE_H = 34;
+const NODE_H = 44; // #208: sized for up to TWO wrapped lines (uniform → exact centering + a mechanical golden scale)
 const H_GAP = 52; // horizontal gap between depth columns
 const V_GAP = 14; // vertical gap between slot rows
 const PAD = 14; // outer padding
 const FOREST_GAP = 1.4; // extra slot rows between successive decision trees
 const ROW = NODE_H + V_GAP; // one slot's pixel height
 const COL = NODE_W + H_GAP; // one depth's pixel width
-const LABEL_MAX = 22; // chars before truncation
+const LABEL_MAX = 22; // chars PER LINE before wrapping/truncation (the proven ~168px-box fit; already de-collides main labels)
 
 type FlowKind = "decision" | "when" | "otherwise" | "action" | "leaf";
 
@@ -323,7 +354,10 @@ export function renderFlowPane(
   // outline rows), so width MUST come from the actual right edge of EVERY node (boxes + labels + stubs), not `maxDepth*COL`.
   const rightEdge = all.reduce((m, n) => Math.max(m, left(n) + nodeW(n)), PAD + maxDepth * COL + NODE_W);
   const width = Math.ceil(rightEdge + PAD);
-  const height = Math.ceil(PAD * 2 + maxY * ROW + NODE_H);
+  // EXTENT-based height (#208) — the bottommost box may be a taller NODE_H or a shorter outline OUTLINE_H at a fractional
+  // `y`, and the on-path RING extends ~3px beyond the box, so take the true max bottom + a ring margin, not `maxY*ROW+NODE_H`.
+  const bottomEdge = all.reduce((m, n) => Math.max(m, top(n) + nodeH(n)), PAD + NODE_H);
+  const height = Math.ceil(bottomEdge + 4 + PAD);
 
   // Edges first (so node boxes paint over them). Edges are pure <path> — NEVER reveal targets.
   let body = "";
@@ -370,7 +404,8 @@ export function renderFlowPane(
         body +=
           `<g id="${escapeHtml(gid)}" class="flow-outline ${cls}"><title>${escapeHtml(n.full)}</title>` +
           `<rect x="${x}" y="${y}" width="${OUTLINE_NODE_W}" height="${OUTLINE_H}" rx="6"/>` +
-          `<text x="${x + 9}" y="${y + OUTLINE_H / 2 + 4}">${escapeHtml(truncate(n.label, OUTLINE_LABEL_MAX))}</text></g>`;
+          labelMarkup(n.label, x, y, OUTLINE_H, OUTLINE_LABEL_MAX, 9) +
+          `</g>`;
       }
       continue;
     }
@@ -392,7 +427,7 @@ export function renderFlowPane(
       body +=
         `<g id="${escapeHtml(gid)}" class="${classes.join(" ")}" data-reveal="${escapeHtml(key)}"><title>${escapeHtml(n.full)}</title>` +
         `<rect x="${x}" y="${y}" width="${OUTLINE_NODE_W}" height="${OUTLINE_H}" rx="6"/>` +
-        `<text x="${x + 9}" y="${y + OUTLINE_H / 2 + 4}">${escapeHtml(truncate(n.label, OUTLINE_LABEL_MAX))}</text>` +
+        labelMarkup(n.label, x, y, OUTLINE_H, OUTLINE_LABEL_MAX, 9) +
         flowRing(x, y, OUTLINE_NODE_W, OUTLINE_H, 1.5, 7) +
         `</g>`;
       continue;
@@ -437,7 +472,7 @@ export function renderFlowPane(
       `<g id="${escapeHtml(gid)}" class="${classes.join(" ")}" data-reveal="${escapeHtml(key)}">` +
       `<title>${escapeHtml(n.full)}</title>` +
       `<rect x="${x}" y="${y}" width="${NODE_W}" height="${NODE_H}" rx="6"/>` +
-      `<text x="${x + 10}" y="${y + NODE_H / 2 + 4}">${escapeHtml(truncate(n.label, LABEL_MAX))}</text>` +
+      labelMarkup(n.label, x, y, NODE_H, LABEL_MAX, 10) +
       flowRing(x, y, NODE_W, NODE_H, 2.5, 8) + // #187 Todo 3: on-path ring — BEFORE the guard tab so the tab's opaque fill occludes the ring's top crossing segment
       guardTab +
       `</g>`;

@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
-const { renderFlowPane, FLOW_STYLE } = await load("flowPaneHtml.ts");
+const { renderFlowPane, FLOW_STYLE, wrapLabel } = await load("flowPaneHtml.ts");
 
 let pass = 0;
 const check = (label, fn) => {
@@ -232,7 +232,7 @@ check("LAYOUT INVARIANT: no two nodes at the same depth (x) have overlapping y-b
   const rects = [...r.html.matchAll(/<rect x="(\d+)" y="(\d+)" width="(\d+)" height="(\d+)"/g)].map((m) => ({
     x: +m[1], y: +m[2], h: +m[4],
   }));
-  assert.ok(rects.filter((rc) => rc.h === 34).length === STRUCT_KEYS.length, "one node rect (h=34) per structure node (a guard tab adds a shorter pill, excluded here)");
+  assert.ok(rects.filter((rc) => rc.h === 44).length === STRUCT_KEYS.length, "one node rect (h=NODE_H=44) per structure node (a guard tab adds a shorter pill, excluded here)");
   const byX = new Map();
   for (const rc of rects) (byX.get(rc.x) ?? byX.set(rc.x, []).get(rc.x)).push(rc);
   for (const [, col] of byX) {
@@ -266,10 +266,10 @@ check("INVARIANT: flow anchors cover EVERY structure nodeKey (the cockpit reuses
 });
 
 check("GOLDEN coords pin COL/ROW/midpoint/rounding (a uniform shift/scale would pass relative-only checks)", () => {
-  // d:D is the first node (flow0): depth 0 → x=14; its 5 branches occupy slots 0..4 → midpoint y=2 → round(14+2*48)=110.
-  assert.match(r.html, /<g id="g1_flow0" class="flow-row flow-decision[^"]*" data-reveal="[^"]*"><title>[^<]*<\/title><rect x="14" y="110"/);
-  // a:X is depth 2 (decision→when→action), slot 0 → x=14+2*220=454, y=round(14+0)=14.
-  assert.ok(r.html.includes('<rect x="454" y="14" width="168" height="34"'), "depth-2 leaf at the expected column/row");
+  // d:D is the first node (flow0): depth 0 → x=14; its 5 branches occupy slots 0..4 → midpoint y=2 → round(14+2*58)=130 (ROW=58).
+  assert.match(r.html, /<g id="g1_flow0" class="flow-row flow-decision[^"]*" data-reveal="[^"]*"><title>[^<]*<\/title><rect x="14" y="130"/);
+  // a:X is depth 2 (decision→when→action), slot 0 → x=14+2*220=454, y=round(14+0)=14; box height NODE_H=44 (#208).
+  assert.ok(r.html.includes('<rect x="454" y="14" width="168" height="44"'), "depth-2 leaf at the expected column/row");
 });
 
 check("nested when-children (when → when → action) lay out without same-depth overlap", () => {
@@ -527,6 +527,53 @@ check("Todo 3b: a sub-question looks like a main question — SOLID grey (source
   // connectors thicker (hard to see on Mac).
   assert.match(FLOW_STYLE, /\.flow-edge\{[^}]*stroke-width:1\.6\}/, "control-flow edge thicker");
   assert.match(FLOW_STYLE, /\.flow-def-edge\{[^}]*stroke-width:1\.5[^}]*opacity:\.8\}/, "def-edge (outline spine) thicker + less faint");
+});
+
+// ── #208: 2-line label wrapping (fixes truncation collisions) ──
+check("wrapLabel: fits → 1 line; wraps → 2 lines (line-1 = longest fitting prefix ≤ maxChars); overflow → … on line 2; the screenshot's outline leaves de-collide at OUTLINE_LABEL_MAX=20", () => {
+  assert.deepEqual(wrapLabel("Short", 20), ["Short"], "≤ maxChars → one line unchanged");
+  assert.deepEqual(wrapLabel("x".repeat(20), 20), ["x".repeat(20)], "exactly maxChars → one line");
+  const w = wrapLabel("Realistic Understanding Of Alternatives", 20);
+  assert.equal(w.length, 2, "long label → two lines");
+  assert.equal(w[0], "Realistic", "line 1 = the longest whitespace-bounded prefix ≤ 20 ('Understanding' would push it to 23)");
+  assert.ok(w.every((l) => l.length <= 20), "no line exceeds maxChars (no horizontal overflow)");
+  // the two colliding outline leaves from the operator's screenshot now render DISTINCT text — the whole point.
+  const a = wrapLabel("Realistic Understanding Of Alternatives", 20);
+  const b = wrapLabel("Realistic Understanding Of Post-Surgical Life Change", 20);
+  assert.notDeepEqual(a, b, "two 'Realistic Understanding Of …' concepts no longer collide (line 2: '…Of Al…' vs '…Of Po…')");
+  assert.ok(b[1].endsWith("…"), "the longer remainder is …-truncated on line 2");
+});
+
+check("wrapLabel: whitespace hygiene — trim, no empty second line, char-split doesn't lead with a space", () => {
+  assert.deepEqual(wrapLabel("  Padded Name  ", 22), ["Padded Name"], "leading/trailing spaces trimmed → one line");
+  assert.deepEqual(wrapLabel(`${"x".repeat(20)}   `, 20), ["x".repeat(20)], "a label that fits after trim → one line, NOT ['xxx','']");
+  assert.deepEqual(wrapLabel("word " + "y".repeat(30), 20), ["word", `${"y".repeat(19)}…`], "word-break then …-truncate the long remainder");
+  const c = wrapLabel("y".repeat(34), 20); // single word > maxChars → char-split, keeps 2× chars
+  assert.equal(c.length, 2);
+  assert.ok(!c[0].startsWith(" ") && c[0].length === 20 && !c[0].endsWith("…"), "char-split line 1 = first 20 real chars");
+  assert.deepEqual(wrapLabel("   ", 20), [""], "all-space → a single (empty) line, never a stray tspan");
+});
+
+check("wrapLabel: a single word longer than maxChars is CHAR-split across both lines (keeps 2× the chars), not 1-line ellipsized", () => {
+  const w = wrapLabel("Supercalifragilisticexpialidocious", 18); // 34 chars, no spaces
+  assert.equal(w.length, 2, "char-split into two lines");
+  assert.equal(w[0], "Supercalifragilist", "line 1 = the first maxChars (18) characters of the word");
+  assert.ok(!w[0].endsWith("…"), "line 1 is real characters, not an ellipsis");
+  assert.ok(w.join("").replace("…", "").length >= 30, "keeps ~2× the distinguishing characters");
+});
+
+check("#208 render: a long label emits two <tspan>s in a NODE_H=44 box; a short one stays one <text>; the ring rect matches", () => {
+  const cs = [concept("c:LongName", "Realistic Understanding Of Alternatives", { definitionKind: "defined-as" })];
+  const st = [{ decision: "D", lib: "Pol", nodeKey: "d:D", location: {}, children: [
+    node("w:L", "when", "when L", ["c:LongName"], [node("a:s", "action", "Unmet", ["act:s"], [], { actionKind: "recommend-activity" })]),
+  ] }];
+  const rr = renderFlowPane(st, { concepts: cs });
+  // the long when concept wraps → two tspans inside its <g>; the short "Unmet"/"otherwise"/decision may be one <text>.
+  assert.match(rr.html, /<text x="\d+"><tspan x="\d+" y="\d+">[^<]+<\/tspan><tspan x="\d+" y="\d+">[^<]+<\/tspan><\/text>/, "a wrapped label renders two tspans");
+  assert.match(rr.html, /<text x="\d+" y="\d+">Unmet<\/text>/, "a short label stays a single <text>");
+  // every structure box is NODE_H=44 and its on-path ring rect is 44+2*2.5=49 tall (box height + 2*off).
+  assert.ok(rr.html.includes('height="44"'), "structure boxes are NODE_H=44");
+  assert.ok(rr.html.includes('height="49"'), "the on-path ring rect = box height + 2*off (44 + 5)");
 });
 
 console.log(`\nflowPaneHtml.test: ${pass} checks passed`);
