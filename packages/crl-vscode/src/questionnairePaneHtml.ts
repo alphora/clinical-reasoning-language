@@ -115,6 +115,28 @@ function renderExpansion(body: QExpr): string {
   return connDiv("or", true) + renderQExpr(body);
 }
 
+/** An INFERRED composite `when` (no `code is`) can't be answered directly — it is DERIVED from its representations. So its
+ *  concept + its derived Yes/No move ONTO the box's top border (a title sharing the border), keeping the derived answer
+ *  visible (purple-bordered → derived, not a direct answer); there is NO top `or`. The `ANY OF`/`ALL OF` tab stays top-left. */
+function renderInferredWhen(q: Question, gid: string, body: QExpr): string {
+  const layer = `<span class="q-layer" title="nesting layer ${q.depth + 1}">${q.depth + 1}</span>`;
+  const title = `<span class="q-box-title"><span class="q-prompt"><span class="q-concept">${escapeHtml(q.conceptName)}</span>?</span>${renderExpOpts(q.answer === "no" ? "no" : q.answer === "unknown" ? "unknown" : "yes")}</span>`;
+  let box: string;
+  if (body.kind === "or" || body.kind === "and") {
+    const op = body.kind === "or" ? "or" : "and";
+    const label = body.kind === "or" ? "any of" : "all of";
+    let inner = "";
+    body.operands.forEach((o, i) => {
+      if (i > 0) inner += connDiv(op, false);
+      inner += renderQExpr(o);
+    });
+    box = `<div class="q-box q-box-${op}"><span class="q-box-tab">${label}</span>${title}<div class="q-box-body">${inner}</div></div>`;
+  } else {
+    box = `<div class="q-box q-box-or"><span class="q-box-tab">any of</span>${title}<div class="q-box-body">${renderQExpr(body)}</div></div>`;
+  }
+  return `<li class="q-item q-inferred-when" id="${escapeHtml(gid)}" data-q="${escapeHtml(q.nodeId)}">${layer}${box}</li>`;
+}
+
 function renderQExpr(e: QExpr): string {
   switch (e.kind) {
     case "or":
@@ -255,8 +277,14 @@ export function renderQuestionnairePane(
     const gid = `${prefix}q${i}`;
     anchors[question.nodeId] = { scrollTo: gid, segmentIds: [gid] };
     if (question.isNavStop) questionNodeIds.push(question.nodeId);
-    items += renderQuestion(question, gid);
-    if (question.expansion) items += `<li class="q-exp">${renderExpansion(question.expansion)}</li>`;
+    // A composite WITH a `code is` (both-rep) is answerable directly OR via its sub-questions → a normal row + top `or` +
+    // box. A composite WITHOUT a `code is` is INFERRED (derived) → its concept + derived answer render ON the box border.
+    if (question.expansion && !question.isSource) {
+      items += renderInferredWhen(question, gid, question.expansion);
+    } else {
+      items += renderQuestion(question, gid);
+      if (question.expansion) items += `<li class="q-exp">${renderExpansion(question.expansion)}</li>`;
+    }
   });
 
   const caseName = caseDisplayName(sv.case?.name ?? ""); // strip the authored `-> outcome` suffix (redundant w/ the Outcome line)
@@ -313,8 +341,6 @@ export const QUESTIONNAIRE_STYLE =
   // NON-SOURCE (no local `code is`): a grey wash on the INNER `.q-prompt` span — a channel DISTINCT from the `.q-item`
   // background, so it never fights the `.this-node` li wash (disc 193, Claude). Reads as "▒grey▒" behind the concept.
   `.q-nonsource .q-prompt{background:var(--vscode-editorWidget-background,#2b2b2e);border-radius:3px;padding:0 5px}` +
-  // Inferred (`defined as`/`definition is`) — a small purple dot after the concept, echoing the Tree pane's purple peek.
-  `.q-inferred .q-concept::after{content:" ●";font-size:.5em;color:var(--vscode-charts-purple,#c586c0);vertical-align:middle}` +
   // A composite-operand leaf is lighter weight than a decision `when`.
   `.q-exp-leaf .q-concept{font-weight:normal;opacity:.92}` +
   // An "unknown" off-path answer (no conceptTruth) — a subtle marker; NEITHER Yes/No option is highlighted.
@@ -353,7 +379,11 @@ export const QUESTIONNAIRE_STYLE =
   `.q-box{position:relative;margin:4px 0 8px 20px;border:1px solid var(--vscode-panel-border,#454545);border-left:2px solid var(--vscode-charts-blue,#3794ff);border-radius:0 6px 6px 6px;background:var(--vscode-editor-background,#1e1e1e);padding:13px 8px 6px 8px}` +
   `.q-box .q-box{margin-left:0}` +
   `.q-box-tab{position:absolute;top:-9px;left:-2px;font:700 10px/1 var(--vscode-editor-font-family,monospace);letter-spacing:.12em;text-transform:uppercase;padding:2px 7px;border-radius:5px 5px 5px 0;color:var(--vscode-charts-blue,#3794ff);border:1px solid var(--vscode-charts-blue,#3794ff);background:var(--vscode-editor-background,#1e1e1e)}` +
-  // a leaf row inside a box (the concept + its Yes/No answer). Reuses .q-nonsource/.q-inferred/.q-opt.
+  // An INFERRED composite when's concept + DERIVED answer, centered ON the box's top border (sharing it). The bg cuts the
+  // border so the title sits on the line. Its answer option is PURPLE-bordered (derived, not a direct `code is` answer).
+  `.q-box-title{position:absolute;top:-11px;left:50%;transform:translateX(-50%);display:inline-flex;align-items:center;gap:2px;white-space:nowrap;background:var(--vscode-editor-background,#1e1e1e);padding:0 8px}` +
+  `.q-box-title .q-opt-answer,.q-exp-leaf.q-nonsource .q-opt-answer{background:rgba(197,134,192,.22);border-color:var(--vscode-charts-purple,#c586c0)}` +
+  // a leaf row inside a box (the concept + its Yes/No answer). Reuses .q-nonsource/.q-opt.
   `.q-exp-leaf{padding:2px 0;margin:1px 0}` +
   `.q-layer{display:inline-block;min-width:13px;text-align:center;font:700 9px/1 var(--vscode-editor-font-family,monospace);color:var(--vscode-descriptionForeground,#8c8c8c);background:var(--vscode-editorWidget-background,#2b2b2e);border:1px solid var(--vscode-panel-border,#454545);border-radius:3px;padding:1px 3px;margin-right:7px;vertical-align:middle}` +
   `.q-external{opacity:.75;font-style:italic}` +

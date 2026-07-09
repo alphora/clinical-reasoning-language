@@ -675,14 +675,14 @@ case "cov+comp; Other preempted":
   const r = renderQuestionnairePane(sv, booleanResolver, rootLib, { revealPrefix: "g1_", conceptShape, defExpr: (_l, n) => (n === "Comp" ? compEntry : undefined) });
   const items = [...r.html.matchAll(/<li class="([^"]*)"[^>]*>(.*?)<\/li>/g)].map((m) => ({ cls: m[1], inner: m[2] }));
   const row = (n) => items.find((it) => it.cls.includes("q-item") && it.inner.includes(`q-concept">${n}<`));
-  assert.ok(row("Comp").cls.includes("q-nonsource"), "Comp (no code-is) gets the non-Source grey channel");
-  assert.ok(row("Comp").cls.includes("q-inferred"), "Comp is marked inferred");
+  // Comp has no code-is → INFERRED → its concept moves onto the box title (a q-inferred-when), not a separate answerable row.
+  assert.match(r.html, /<li class="q-item q-inferred-when"[^>]*>[\s\S]*?<span class="q-box-title"><span class="q-prompt"><span class="q-concept">Comp<\/span>/, "Comp (no code-is) renders as an inferred-when with its concept on the box title");
   assert.ok(row("Other").cls.includes("q-preempted"), "Other (first:-preempted) is dimmed");
-  // The expansion: an ANY OF box with an `or` operator chip, in its own q-exp <li> (all divs — no nested <li>).
-  assert.match(r.html, /<li class="q-exp">/, "the composite's operator tree renders in a q-exp <li>");
+  // Comp = (SomeLeaf or Extra) → an ANY OF box with an infix 'or'; NO top OR (inferred).
   assert.match(r.html, /class="q-box q-box-or"/, "Comp = (…or…) → an ANY OF box");
   assert.match(r.html, /class="q-box-tab">any of</, "the box is labelled 'any of'");
-  assert.match(r.html, /class="q-conn q-conn-or[^"]*">or</, "the boolean operator 'or' shows outside the box");
+  assert.match(r.html, /class="q-conn q-conn-or[^"]*">or</, "the 'or' operator shows between the operands");
+  assert.ok(!r.html.includes("q-conn-top"), "an inferred composite has NO top OR chip");
   // SomeLeaf: a non-Source expansion leaf, UNKNOWN (absent from conceptTruth) → NEITHER option highlighted + an n/a marker.
   const leaf = r.html.match(/<div class="q-exp-leaf q-nonsource">((?:(?!<\/div>).)*)<\/div>/);
   assert.ok(leaf && leaf[0].includes('q-concept">SomeLeaf<'), "SomeLeaf renders as a non-Source expansion leaf");
@@ -731,9 +731,13 @@ case "root holds":
   // the external stub carries NO Yes/No options.
   const ext = r.html.match(/<div class="q-exp-leaf q-external"[^>]*>((?:(?!<\/div>).)*)<\/div>/);
   assert.ok(ext && !ext[1].includes("q-opt"), "an external stub has NO Yes/No options (not evaluated here)");
+  // Root HAS a code is (both-rep) → it stays an ANSWERABLE row + a FORCED top OR before the box (NOT an inferred-when).
+  assert.ok(!/q-inferred-when/.test(r.html), "a code-is composite is NOT an inferred-when");
+  const exp = r.html.match(/<li class="q-exp">([\s\S]*?)<\/li>/)[1];
+  assert.ok(exp.indexOf("q-conn q-conn-or") >= 0 && exp.indexOf("q-conn q-conn-or") < exp.indexOf("q-box q-box-or"), "a forced top OR precedes the ANY OF box for a code-is composite");
 });
 
-check("Option-3 render: `defined as` adds a FORCED top OR; the body's ANY OF / ALL OF boxes stay; sub-questions carry NO layer number (the confirmed BMI Qualifies shape)", () => {
+check("Option-3 render: an INFERRED composite (no code is) moves its concept + DERIVED answer onto the box border; NO top OR; purple answer (the confirmed BMI Qualifies shape)", () => {
   const crl = `# P
 library "V".
 concept "BMI Qualifies":
@@ -766,15 +770,19 @@ case "bmi holds":
     body: { kind: "or", operands: [lref("BMI Over 40"), { kind: "and", operands: [lref("BMI Over 35"), lref("Substantial Co-Morbidity")] }] },
   };
   const r = renderQuestionnairePane(sv, booleanResolver, rootLib, { revealPrefix: "g1_", currentIndex: -1, conceptShape: (_l, n) => (n === "BMI Qualifies" ? { nodeKey: "k:BMIQ", hasCodeIs: false, leafEligible: false, isInferred: true, hasDefinedAs: true, children: [] } : undefined), defExpr: (_l, n) => (n === "BMI Qualifies" ? entry : undefined) });
-  // FORCED top OR chip, THEN the body's ANY OF box (the sem-or) — the top OR precedes the box in the HTML.
-  const exp = r.html.match(/<li class="q-exp[^"]*">([\s\S]*?)<\/li>/)[1];
-  assert.ok(exp.indexOf('q-conn-or') < exp.indexOf('q-box q-box-or'), "a forced top OR chip precedes the body's ANY OF box");
-  assert.match(exp, /q-box-tab">any of</, "the sem-or body renders an ANY OF box");
-  assert.match(exp, /q-box q-box-and"><span class="q-box-tab">all of</, "the nested sem-and renders an ALL OF box");
-  // The SUB-questions (expansion leaves) carry NO layer number — nesting is shown by the box borders. The layer number
-  // is a MAIN-question affordance: the "BMI Qualifies" when row carries one (decision depth 1), the sub-questions don't.
-  assert.ok(!exp.includes("q-layer"), "sub-questions inside the boxes have NO layer-number badge");
-  assert.match(r.html, /<li class="q-item[^"]*"[^>]*><span class="q-layer"[^>]*>1<\/span><span class="q-prompt"><span class="q-concept">BMI Qualifies</, "the MAIN question 'BMI Qualifies' (a top-level when) carries a 1-based layer number (1)");
+  // BMI Qualifies has NO code is (the hasCodeIs:false shape stub) → INFERRED → it renders as a `q-inferred-when` li:
+  // the concept + its DERIVED answer move onto the box's title, NO top OR, purple derived-answer border.
+  assert.match(r.html, /<li class="q-item q-inferred-when"[^>]*>/, "an inferred composite renders as a q-inferred-when li (no separate answerable row)");
+  const li = r.html.match(/<li class="q-item q-inferred-when"[^>]*>([\s\S]*?)<\/li>/)[1];
+  assert.match(li, /^<span class="q-layer"[^>]*>1<\/span>/, "the inferred when carries its 1-based layer number");
+  assert.match(li, /<span class="q-box-title"><span class="q-prompt"><span class="q-concept">BMI Qualifies<\/span>\?<\/span>/, "BMI Qualifies + its derived answer move onto the box title");
+  assert.ok(!li.includes("q-conn-top"), "an INFERRED composite has NO forced top OR chip (that is only for code-is both-rep)");
+  assert.match(li, /q-box-tab">any of</, "the sem-or body renders an ANY OF box");
+  assert.match(li, /q-box q-box-and"><span class="q-box-tab">all of</, "the nested sem-and renders an ALL OF box");
+  const body = li.match(/q-box-body">([\s\S]*)$/)[1];
+  assert.ok(!body.includes("q-layer"), "sub-questions inside the boxes have NO layer-number badge");
+  // the DERIVED answer (in the title) is PURPLE-bordered — vs the blue of a directly-answered `code is` concept.
+  assert.match(QUESTIONNAIRE_STYLE, /\.q-box-title \.q-opt-answer[^{]*\{[^}]*c586c0/, "the inferred (derived) answer gets a purple border");
 });
 
 check("Option-3 nav: default (currentIndex -1) shows 'Question 0 of N' — no question auto-focused; Prev disabled, Next enabled", () => {
