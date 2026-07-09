@@ -131,28 +131,28 @@ function buildLaid(
   };
 
   // #187 Option-C: lay out a composite's `defined as` structure (`DefStructExpr`, the SAME shared builder the
-  // Questionnaire consumes) as an INDENTED OUTLINE hanging below the `when`. Each visible row (op label / leaf / external
-  // / more) takes ONE compact slot (DFS pre-order: a header row before its children) and gets an INDENT-based `absX`, so
-  // the outline reflows below the node without widening the depth grid. `opPath` is the positional index path — it makes
-  // the same concept at two positions produce DISTINCT `leaf::` keys (no anchor/verdict collision). Render-only rows
-  // (op/external/more) carry a synthetic key that never anchors. `topWhenKey` threads unchanged to every leaf.
-  const buildOutline = (s: DefStructExpr, whenLeft: number, topWhenKey: string, indent: number, opPath: string): LaidNode => {
+  // Questionnaire consumes) as an INDENTED OUTLINE hanging below the `when`. Rows advance a LOCAL `cursor` (NOT the global
+  // slot) so the outline is positioned relative to its OWN `when` (top-aligned, just below the node) instead of sinking to
+  // the bottom of the branch-body band. Each visible row (op label / leaf / external / more) takes ONE compact row (DFS
+  // pre-order: a header before its children) at an INDENT-based `absX`. `opPath` is the positional index path — the same
+  // concept at two positions gets DISTINCT `leaf::` keys (no anchor/verdict collision). `topWhenKey` threads to every leaf.
+  const buildOutline = (s: DefStructExpr, whenLeft: number, topWhenKey: string, indent: number, opPath: string, cursor: { y: number }): LaidNode => {
     const base = { useDecision: false, outline: true as const, indent, absX: outlineX(whenLeft, indent), depth: 0, topWhenKey };
     const take = (): number => {
-      const y = slot;
-      slot += OUTLINE_ADVANCE;
+      const y = cursor.y;
+      cursor.y += OUTLINE_ADVANCE;
       return y;
     };
     switch (s.kind) {
       case "or":
       case "and": {
         const y = take();
-        const children = s.operands.map((o, i) => buildOutline(o, whenLeft, topWhenKey, indent + 1, `${opPath}.${i}`));
+        const children = s.operands.map((o, i) => buildOutline(o, whenLeft, topWhenKey, indent + 1, `${opPath}.${i}`, cursor));
         return { ...base, nodeKey: outlineKey(topWhenKey, opPath, "op"), kind: "leaf", outlineRow: "op", label: s.kind === "or" ? "any of" : "all of", full: s.kind === "or" ? "any of" : "all of", y, children };
       }
       case "not": {
         const y = take();
-        const child = buildOutline(s.operand, whenLeft, topWhenKey, indent + 1, `${opPath}.0`);
+        const child = buildOutline(s.operand, whenLeft, topWhenKey, indent + 1, `${opPath}.0`, cursor);
         return { ...base, nodeKey: outlineKey(topWhenKey, opPath, "op"), kind: "leaf", outlineRow: "op", label: "not", full: "not", y, children: [child] };
       }
       case "external": {
@@ -166,7 +166,7 @@ function buildLaid(
       }
       case "leaf": {
         const y = take();
-        const children = s.composite ? [buildOutline(s.composite, whenLeft, topWhenKey, indent + 1, `${opPath}.c`)] : [];
+        const children = s.composite ? [buildOutline(s.composite, whenLeft, topWhenKey, indent + 1, `${opPath}.c`, cursor)] : [];
         return {
           ...base, nodeKey: outlineKey(topWhenKey, opPath, s.nodeKey), kind: "leaf", outlineRow: "leaf", isDefLeaf: true,
           label: s.name, full: `${s.name} — concept "${s.lib}"`,
@@ -198,37 +198,37 @@ function buildLaid(
     // title with the owning decision row's lib. (Action TARGET lib isn't resolved here — the target's lib lives in its
     // nodeKey, not parsed in v1; the guard concept's lib rides its peek <title> via conceptName/conceptLib below.)
     const full = n.kind === "when" && cf.conceptName ? `${cf.conceptName} — concept "${cf.conceptLib}"` : `${display} — ${n.lib}`;
-    // A BODY-LESS node (no branch body) reserves its OWN slot NOW, BEFORE any outline rows — so a (practically unreachable)
-    // body-less composite `when` sits ATOP its outline instead of overlapping the first row. A node WITH a branch body
-    // centers on that body (below) and its outline slots after it. A true leaf just consumes this slot.
+    // A BODY-LESS node (no branch body) reserves its OWN slot NOW, so its `y` is fixed before any outline hangs below it.
     const selfSlot = structureChildren.length === 0 ? slot++ : undefined;
-    // #187 Option-C: a `when` gating a `defined as` composite hangs its operator OUTLINE below the node (AFTER the branch
-    // body, so it slots below). A top `or` row precedes the body iff the concept is Source (has a local `code is`) —
-    // mirroring the Questionnaire's forced top-`or` for an answerable both-rep vs no top-`or` for an inferred concept.
+    // Center a `when` on its CONTROL-FLOW spine (its branch body); a body-less node sits at its own reserved slot.
+    const nodeY = structureChildren.length ? (structureChildren[0].y + structureChildren[structureChildren.length - 1].y) / 2 : (selfSlot as number);
+    // #187 Option-C: a `when` gating a `defined as` composite hangs its operator OUTLINE below the node, TOP-ALIGNED to the
+    // node itself — the outline's local `cursor` starts one-and-a-half node-heights below `nodeY` (half a node of padding
+    // under the box), NOT at the bottom of the branch-body band. A top `or` row precedes the body iff the concept is Source
+    // (mirroring the Questionnaire's forced top-`or`). After the outline, the global `slot` is advanced past its bottom so a
+    // following sibling clears it (the outline vertically overlaps the branch body but sits in the node's OWN indented column).
     const outlineRoots: LaidNode[] = [];
     if (n.kind === "when" && cf.conceptName !== undefined && opts.defExpr) {
       const entry = opts.defExpr(cf.conceptLib ?? "", cf.conceptName);
       if (entry?.hasDefinedAs && entry.body) {
         const whenLeft = PAD + depth * COL;
+        const cursor = { y: nodeY + (NODE_H * 1.5) / ROW }; // top-aligned: half a node of padding below the box
         if (cf.isSource) {
-          const y = slot;
-          slot += OUTLINE_ADVANCE;
+          const y = cursor.y;
+          cursor.y += OUTLINE_ADVANCE;
           outlineRoots.push({ nodeKey: outlineKey(n.nodeKey, "top", "or"), kind: "leaf", useDecision: false, outline: true, outlineRow: "topor", indent: 0, absX: outlineX(whenLeft, 0), label: "or", full: "or", depth: 0, topWhenKey: n.nodeKey, y, children: [] });
         }
         // Parity with the questionnaire's `renderInferredWhen`: an INFERRED (non-Source) composite whose body is a single
         // operand (a bare-ref alias / a top-level `not` / an `external`) is wrapped in an `ANY OF` box — so `X defined as Y`
-        // reads identically in both panes. A Source composite instead gets the top-`or` row above (renderExpansion), and an
-        // `or`/`and` body already carries its own box, so neither is wrapped.
+        // reads identically in both panes. An `or`/`and` body already carries its own box, so it is not wrapped.
         const struct = buildDefStruct(entry.body, opts.defExpr, new Set([entry.nodeKey]), 1);
         const wrapped: DefStructExpr = !cf.isSource && struct.kind !== "or" && struct.kind !== "and" ? { kind: "or", operands: [struct] } : struct;
-        outlineRoots.push(buildOutline(wrapped, whenLeft, n.nodeKey, 0, "0"));
+        outlineRoots.push(buildOutline(wrapped, whenLeft, n.nodeKey, 0, "0", cursor));
+        slot = Math.max(slot, cursor.y); // reserve the outline's vertical extent so the next sibling doesn't overlap it
       }
     }
     const children = [...structureChildren, ...outlineRoots];
-    // Center a `when` on its CONTROL-FLOW spine (its branch body) so the decision spine stays vertically centered and the
-    // operator outline hangs BELOW it. Body-less nodes took their own `selfSlot` above (so an outline hangs strictly below).
-    const y = structureChildren.length ? (structureChildren[0].y + structureChildren[structureChildren.length - 1].y) / 2 : (selfSlot as number);
-    return { nodeKey: n.nodeKey, kind: n.kind, useDecision, label: display, full, depth, y, children, ...cf };
+    return { nodeKey: n.nodeKey, kind: n.kind, useDecision, label: display, full, depth, y: nodeY, children, ...cf };
   };
 
   const roots: LaidNode[] = [];

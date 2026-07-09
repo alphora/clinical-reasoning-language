@@ -414,6 +414,22 @@ check("Option-C: a body-less composite when (no branch body) sits ATOP its outli
   assert.ok(whenY < Math.min(...leafYs), "the body-less composite sits ABOVE its outline rows (not centered within them)");
 });
 
+check("Option-C: the outline is TOP-aligned to its when (just below it), NOT sunk to the bottom of a tall branch body", () => {
+  // when C has a TALL branch body (6 sibling whens → a deep band) AND a composite `defined as` outline. Before the
+  // top-align fix the outline was appended AFTER the band (sunk to the bottom); now it hangs just below the node.
+  const kids = Array.from({ length: 6 }, (_, i) => node(`w:C${i}`, "when", `when C${i}`, [`c:C${i}`], [node(`a:${i}`, "action", `X${i}`, [`act:${i}`], [], { actionKind: "recommend-activity" })]));
+  const struct2 = [{ decision: "D", lib: "Pol", nodeKey: "d:D", location: {}, children: [node("w:C", "when", "when C", ["c:C"], kids)] }];
+  const cs = [concept("c:C", "C", { definitionKind: "defined-as" }), ...Array.from({ length: 6 }, (_, i) => concept(`c:C${i}`, `C${i}`))];
+  const map = { C: dentry("c:C", "C", dor(dref("L1", "c:L1"), dref("L2", "c:L2"))) };
+  const rr = renderFlowPane(struct2, { concepts: cs, defExpr: defExprOf(map) });
+  const cY = +rr.html.match(/<rect x="\d+" y="(\d+)" width="168"[^>]*\/><text[^>]*>C<\/text>/)[1];
+  const l1Y = +rr.html.match(/<rect x="\d+" y="(\d+)" width="150"[^>]*\/><text[^>]*>L1<\/text>/)[1];
+  const maxBranchY = Math.max(...[...rr.html.matchAll(/<rect x="\d+" y="(\d+)" width="168"/g)].map((m) => +m[1]));
+  assert.ok(l1Y > cY, "the outline hangs BELOW the when");
+  assert.ok(l1Y < maxBranchY, "the outline is TOP-aligned — it starts before the branch body's bottom, not sunk beneath it");
+  assert.ok(l1Y - cY < 4 * (34 + 14), "the first outline leaf is within a few rows of the when (top-aligned), not the full branch-body height below");
+});
+
 check("Option-C: a SOURCE composite (has code is) gets a top-OR row; a NOT renders a NOT row + its operand", () => {
   const cs = [concept("c:S", "S", { definitionKind: "defined-as", hasLocalCode: true })];
   const struct = [{ decision: "D", lib: "Pol", nodeKey: "d:D", location: {}, children: [
