@@ -56,11 +56,12 @@ check("anchors keyed by EVERY structure nodeKey → a generated (non-nodeKey) id
   }
 });
 
-check("reveals: one {nodeKey} per structure node; NO concept peeks (Todo 2 removed the dots — a concept peek now comes ONLY from an outline leaf)", () => {
+check("reveals: one {nodeKey} per structure node; the ONLY concept peek here is the guarded recommend's guard tab (c:G)", () => {
   const nodeKeys = revVals.filter((v) => "nodeKey" in v).map((v) => v.nodeKey).sort();
   assert.deepEqual(nodeKeys, [...STRUCT_KEYS].sort());
-  // With the peek dots gone (Todo 2) and no `defExpr` outline in this fixture, there are NO {conceptNodeKey} reveals.
-  assert.equal(revVals.filter((v) => "conceptNodeKey" in v).length, 0, "no concept-peek reveals from a bare (no-outline) render");
+  // Dots gone (Todo 2); the a:Y recommend is guarded (guard c:G) → its "when …" TAB peeks c:G. No outline in this fixture.
+  const conceptKeys = revVals.filter((v) => "conceptNodeKey" in v).map((v) => v.conceptNodeKey).sort();
+  assert.deepEqual(conceptKeys, ["c:G"], "only the guard-tab peek (a:Y's guard G)");
 });
 
 check("unresolved concept (when Z → c:Z absent from map): node still selectable", () => {
@@ -77,10 +78,13 @@ check("Todo 2: an unresolved `when` concept is NEUTRAL grey (isSource undefined 
   assert.ok(!zRow[1].includes("flow-inferred"), "an unresolved when is NOT flow-inferred (stays neutral grey)");
 });
 
-check("Todo 2: the peek dots are REMOVED — a guarded recommend no longer exposes its guard concept as a peek", () => {
-  // The guard concept navigation moved off the tree (still visible in the crl pane); the tree has no `.flow-peek` glyph.
-  assert.ok(!/flow-peek/.test(r.html), "no `.flow-peek` glyph anywhere in the tree");
-  assert.ok(!revVals.some((v) => v.conceptNodeKey === "c:G"), "the action guard G is no longer a {conceptNodeKey} peek");
+check("Todo 2b: the peek DOT is gone; a guarded recommend now exposes its guard via a labeled, clickable 'when …' TAB", () => {
+  assert.ok(!/flow-peek/.test(r.html), "no `.flow-peek` DOT glyph (the dot is removed)");
+  // the a:Y recommend (guard c:G) renders a `.flow-guard-tab` labeled "when G" that peeks the guard concept.
+  assert.match(r.html, /<g class="flow-guard-tab[^"]*" data-reveal="[^"]*"><title>guard: G[^<]*<\/title><rect[^>]*\/><text[^>]*>when G<\/text><\/g>/, "a labeled clickable 'when G' guard tab");
+  assert.ok(revVals.some((v) => v.conceptNodeKey === "c:G"), "the guard tab peeks the guard concept G");
+  // c:G has no local code is → the tab reads inferred (purple).
+  assert.match(r.html, /class="flow-guard-tab flow-inferred"/, "the guard tab is bordered by the guard's Source (c:G inferred → purple)");
 });
 
 check("node shapes by kind (class counts)", () => {
@@ -227,7 +231,7 @@ check("LAYOUT INVARIANT: no two nodes at the same depth (x) have overlapping y-b
   const rects = [...r.html.matchAll(/<rect x="(\d+)" y="(\d+)" width="(\d+)" height="(\d+)"/g)].map((m) => ({
     x: +m[1], y: +m[2], h: +m[4],
   }));
-  assert.ok(rects.length === STRUCT_KEYS.length, "one rect per node");
+  assert.ok(rects.filter((rc) => rc.h === 34).length === STRUCT_KEYS.length, "one node rect (h=34) per structure node (a guard tab adds a shorter pill, excluded here)");
   const byX = new Map();
   for (const rc of rects) (byX.get(rc.x) ?? byX.set(rc.x, []).get(rc.x)).push(rc);
   for (const [, col] of byX) {
@@ -288,14 +292,16 @@ check("nested when-children (when → when → action) lay out without same-dept
   }
 });
 
-check("Todo 2: a use-decision renders flow-use (NEUTRAL grey + dashed, NOT blue) and no longer peeks its guard", () => {
+check("Todo 2: a use-decision renders flow-use (NEUTRAL grey + dashed, NOT blue); its guard shows via the same 'when …' tab", () => {
   const g = renderFlowPane([{
     decision: "G", lib: "Pol", nodeKey: "d:G", location: {},
     children: [node("guse", "action", "Target", ["d:Target", "c:G"], [], { actionKind: "use-decision" })],
   }], { concepts });
   assert.ok(/class="flow-row flow-use"/.test(g.html), "use-decision renders as a flow-use node");
   assert.match(FLOW_STYLE, /\.flow-use>rect\{[^}]*stroke:var\(--vscode-descriptionForeground/, "flow-use border is NEUTRAL grey (not blue textLink)");
-  assert.ok(!/flow-peek/.test(g.html), "no peek glyph — the guard concept is no longer peeked from the tree");
+  assert.ok(!/flow-peek/.test(g.html), "no peek DOT glyph");
+  assert.match(g.html, /class="flow-guard-tab[^"]*"[^>]*><title>guard: G/, "a guarded use-decision shows its guard via the 'when …' tab too");
+  assert.ok(Object.values(g.reveals).some((v) => v.conceptNodeKey === "c:G"), "the guard tab peeks G");
 });
 
 // ── #187 Option-C: composite `defined as` → an indented operator OUTLINE (ANY OF / ALL OF / NOT rows + leaf boxes) ──

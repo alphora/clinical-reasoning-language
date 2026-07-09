@@ -93,6 +93,9 @@ interface LaidNode {
    *  its raw `<category>.<key>` name — drives the leaf border (certify → green, not-certify + pended → gold). `undefined`
    *  for an ordinary (non-determination) activity or a use-decision (those stay neutral). */
   dispositionCategory?: string;
+  /** #187 Todo 2b: a guarded `recommend X when <guard>`'s resolved guard concept — rendered as a clickable "when …" TAB
+   *  on the action box (a discoverable replacement for the removed peek dot). Absent for an unguarded recommend. */
+  guard?: { conceptKey: string; conceptName: string; conceptLib: string; isSource: boolean };
   /** #187 Todo 4: a synthetic `defined as` operand leaf (a concept-operand row) hanging under a composite `when` — NOT a
    *  decision structure row. Rendered with a distinct `.flow-def-edge`; excluded from `{nodeKey}` select + the per-case
    *  overlays. Set ONLY on `outlineRow === "leaf"` rows (the addressable operands). */
@@ -199,6 +202,12 @@ function buildLaid(
     // #187 Todo 2: a recommend-activity's determination category, from its RAW `<category>.<key>` name (before display
     // stripping). An ordinary activity / use-decision / non-action → undefined → neutral (no green/gold).
     const dispositionCategory = n.kind === "action" && n.actionKind === "recommend-activity" ? determinationCategory(n.label) : undefined;
+    // #187 Todo 2b: a guarded action (`recommend X when <guard>` OR `use decision D when <guard>`) — resolve the guard
+    // concept (refKeys[1], present on ANY guarded action) for its "when …" tab.
+    const guardRef = n.kind === "action" && n.refKeys.length > 1 ? n.refKeys[1] : undefined;
+    const gcf = guardRef !== undefined ? conceptFields(guardRef) : {};
+    const guard =
+      gcf.conceptKey !== undefined ? { conceptKey: gcf.conceptKey, conceptName: gcf.conceptName ?? "?", conceptLib: gcf.conceptLib ?? "", isSource: gcf.isSource ?? true } : undefined;
     const display =
       n.kind === "when"
         ? cf.conceptName ?? n.label.replace(/^when\s+/, "") // concept name (resolved) else strip "when " from the label
@@ -239,7 +248,7 @@ function buildLaid(
       }
     }
     const children = [...structureChildren, ...outlineRoots];
-    return { nodeKey: n.nodeKey, kind: n.kind, useDecision, dispositionCategory, label: display, full, depth, y: nodeY, children, ...cf };
+    return { nodeKey: n.nodeKey, kind: n.kind, useDecision, dispositionCategory, guard, label: display, full, depth, y: nodeY, children, ...cf };
   };
 
   const roots: LaidNode[] = [];
@@ -398,11 +407,27 @@ export function renderFlowPane(
       if (n.kind === "when" && n.isSource === false) classes.push("flow-inferred"); // inferred gating concept → purple border
     }
     reveals[key] = { nodeKey: n.nodeKey };
+    // #187 Todo 2b: a guarded recommend's "when <guard>" TAB — a clickable, labeled pill on the box (the discoverable
+    // replacement for the removed peek dot). NESTED inside the row <g> so closest() routes a tab click → the guard peek
+    // ({conceptNodeKey}) and a body click → the action select ({nodeKey}). Bordered grey / purple by the guard's Source.
+    let guardTab = "";
+    if (n.kind === "action" && n.guard !== undefined) {
+      const pk = `${prefix}p${gid}`;
+      reveals[pk] = { conceptNodeKey: n.guard.conceptKey };
+      const label = truncate(`when ${n.guard.conceptName}`, 22);
+      const tw = Math.round(label.length * 5.9 + 14);
+      const tabCls = n.guard.isSource === false ? "flow-guard-tab flow-inferred" : "flow-guard-tab";
+      guardTab =
+        `<g class="${tabCls}" data-reveal="${escapeHtml(pk)}"><title>${escapeHtml(`guard: ${n.guard.conceptName} — concept "${n.guard.conceptLib}"`)}</title>` +
+        `<rect x="${x + 8}" y="${y - 9}" width="${tw}" height="15" rx="4"/>` +
+        `<text x="${x + 14}" y="${y + 2}">${escapeHtml(label)}</text></g>`;
+    }
     body +=
       `<g id="${escapeHtml(gid)}" class="${classes.join(" ")}" data-reveal="${escapeHtml(key)}">` +
       `<title>${escapeHtml(n.full)}</title>` +
       `<rect x="${x}" y="${y}" width="${NODE_W}" height="${NODE_H}" rx="6"/>` +
       `<text x="${x + 10}" y="${y + NODE_H / 2 + 4}">${escapeHtml(truncate(n.label, LABEL_MAX))}</text>` +
+      guardTab +
       `</g>`;
   }
 
@@ -439,6 +464,13 @@ export const FLOW_STYLE =
   `.flow-certify>rect{fill:var(--vscode-editorWidget-background,#252526);stroke:var(--vscode-charts-green,#3fb950);stroke-width:1.5}` +
   `.flow-notcertify>rect{fill:var(--vscode-editorWidget-background,#252526);stroke:var(--vscode-editorWarning-foreground,#cca700);stroke-width:1.5}` +
   `.flow-use>rect{fill:var(--vscode-editorWidget-background,#252526);stroke:var(--vscode-descriptionForeground,#8c8c8c);stroke-dasharray:5 2}` +
+  // #187 Todo 2b: a guarded recommend's "when <guard>" TAB — a labeled, clickable pill on the box top (the discoverable
+  // replacement for the peek dot). Grey / purple by the guard's Source; a hover highlight signals it's interactive.
+  `.flow-guard-tab{cursor:pointer}` +
+  `.flow-guard-tab>rect{fill:var(--vscode-editor-background,#1e1e1e);stroke:var(--vscode-descriptionForeground,#8c8c8c);stroke-width:1}` +
+  `.flow-guard-tab.flow-inferred>rect{stroke:var(--vscode-charts-purple,#c586c0)}` +
+  `.flow-guard-tab>text{fill:var(--vscode-descriptionForeground,#cccccc);font:600 9px/1 var(--vscode-editor-font-family,monospace);letter-spacing:.02em}` +
+  `.flow-guard-tab:hover>rect{fill:var(--vscode-toolbar-hoverBackground,#2a2d2e)}` +
   `.flow-edge{fill:none;stroke:var(--vscode-panel-border,#454545);stroke-width:1.2}` +
   // #187 Todo 4: a DEF-LEAF edge — a distinct dashed grey line (definition decomposition, NOT a control-flow branch).
   `.flow-def-edge{fill:none;stroke:var(--vscode-panel-border,#454545);stroke-width:1;stroke-dasharray:2 2;opacity:.6}` +
