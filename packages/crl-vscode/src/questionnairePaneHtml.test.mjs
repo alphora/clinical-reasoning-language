@@ -85,6 +85,11 @@ case "X absent, Y holds → Approve":
 - result is "FallThrough" is "Approve".`;
   const { sv, rootLib } = renderCase({ "n.crl": crl, "n.cel": cel }, "n.cel", "X absent, Y holds → Approve");
   const r = renderQuestionnairePane(sv, booleanResolver, rootLib, { revealPrefix: "g1_" });
+  // UX fix: the header reads "Case: <name>" (not "Questionnaire — …") and the authored `→ Approve` outcome suffix is
+  // stripped (redundant with the Outcome line below), leaving just the descriptive case name.
+  assert.match(r.html, /<p class="q-head">Case: <span class="q-case">X absent, Y holds<\/span><\/p>/, "header reads 'Case: <stripped name>'");
+  assert.ok(!/Questionnaire —/.test(r.html), "the old 'Questionnaire —' prefix is gone");
+  assert.ok(!/→ Approve/.test(r.html), "the authored '→ Approve' outcome suffix is stripped from the header");
   // Two questions, in order, each "Is <concept>?".
   const items = [...r.html.matchAll(/<li class="q-item[^"]*"[^>]*>(.*?)<\/li>/g)].map((m) => m[1]);
   assert.equal(items.length, 2, "two questions");
@@ -602,6 +607,11 @@ check("slice 5: data-qnav buttons are CSP-safe (opaque prev/next action, no inli
   const r = renderQuestionnairePane(sv, booleanResolver, rootLib, { revealPrefix: "g1_", currentIndex: 0 });
   const navs = [...r.html.matchAll(/data-qnav="([^"]+)"/g)].map((m) => m[1]);
   assert.deepEqual(navs, ["prev", "next"], "exactly a prev and a next button, in order");
+  // UX fix: Prev + Next sit together on the LEFT; the "Question X of Y" indicator follows them (pushed right via CSS).
+  const posIdx = r.html.indexOf('class="q-nav-pos"');
+  const nextIdx = r.html.indexOf('data-qnav="next"');
+  assert.ok(nextIdx > -1 && posIdx > nextIdx, "the position indicator comes AFTER the Next button (Prev/Next left, position right)");
+  assert.ok(/\.q-nav-pos\{[^}]*margin-left:auto/.test(QUESTIONNAIRE_STYLE), "the position indicator is pushed to the right (margin-left:auto)");
   // CSP discipline: no inline handlers / styles anywhere in the nav (mirrors the whole-payload CSP test above).
   const navHtml = r.html.match(/<div class="q-nav"[\s\S]*?<\/div>/)[0];
   assert.ok(!/ on\w+=/.test(navHtml), "no inline on*= handlers on the nav buttons");

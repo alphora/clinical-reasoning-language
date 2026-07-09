@@ -10,6 +10,8 @@
 // Fact peek is independent of the case's frozen id — the concept's correspondence doesn't depend on the case anchor.
 import { displayDetermination, nodeKey, type RenderScenarioResult } from "@smile-digital-health/crl";
 
+import { caseDisplayName } from "./caseDisplayName";
+
 import { corrKeyHtml } from "./corrKey";
 // Type-only import (erased at compile — no runtime/bundle coupling to the store's node:fs deps): the review-state union +
 // the Note shape are OWNED by medicalValidationStore, imported here so the dropdown option set + the opts type + the note
@@ -241,7 +243,7 @@ export function renderCelPane(
       (notesGlyph ? `${notesGlyph} ` : "") + // sits immediately after the verdict dropdown
       keySlot +
       `<span class="cel-status">${BADGE[sc.status] ?? "·"}</span> ` +
-      `<span class="cel-name">${escapeHtml(sc.case.name)}</span>` +
+      `<span class="cel-name">${escapeHtml(caseDisplayName(sc.case.name))}</span>` +
       (sc.case.subject ? ` <span class="cel-subject">(${escapeHtml(sc.case.subject)})</span>` : "") +
       (ambiguous ? ` <span class="cel-ambiguous-marker" title="This case's name is shared by another case — give each a distinct name to make it selectable.">⚠ name shared; not selectable</span>` : "") +
       (factParts.length ? `<div class="cel-facts">facts: ${factParts.join(", ")}</div>` : "") +

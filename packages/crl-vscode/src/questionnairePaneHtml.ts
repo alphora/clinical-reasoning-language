@@ -14,6 +14,7 @@
 // CORR_STYLE/FLOW_STYLE). It imports ONLY types from `@smile-digital-health/crl` + the pure builder — NO `vscode`.
 import type { ScenarioViewModel } from "@smile-digital-health/crl";
 
+import { caseDisplayName } from "./caseDisplayName";
 import {
   buildQuestionnaire,
   type ResolveValueTypes,
@@ -73,11 +74,12 @@ function renderQuestionNav(currentIndex: number, count: number): string {
   const idx = Math.max(0, Math.min(currentIndex, count - 1));
   const prevDisabled = idx <= 0 ? " disabled" : "";
   const nextDisabled = idx >= count - 1 ? " disabled" : "";
+  // Prev + Next sit together on the LEFT; the position indicator is pushed to the RIGHT (via `.q-nav-pos` margin-left:auto).
   return (
     `<div class="q-nav" title="Step through this case's questions">` +
     `<button class="q-nav-btn" data-qnav="prev"${prevDisabled}>‹ Prev</button>` +
-    `<span class="q-nav-pos">Question ${idx + 1} of ${count}</span>` +
     `<button class="q-nav-btn" data-qnav="next"${nextDisabled}>Next ›</button>` +
+    `<span class="q-nav-pos">Question ${idx + 1} of ${count}</span>` +
     `</div>`
   );
 }
@@ -190,9 +192,9 @@ export function renderQuestionnairePane(
     items += renderQuestion(question, gid);
   });
 
-  const caseName = sv.case?.name ?? "";
+  const caseName = caseDisplayName(sv.case?.name ?? ""); // strip the authored `-> outcome` suffix (redundant w/ the Outcome line)
   const header = caseName
-    ? `<p class="q-head">Questionnaire — <span class="q-case">${escapeHtml(caseName)}</span></p>`
+    ? `<p class="q-head">Case: <span class="q-case">${escapeHtml(caseName)}</span></p>`
     : "";
   // The prev/next sub-nav steps through the NAV-STOPS (runtime whens), not every rendered row — "X of Y" counts those.
   const nav = renderQuestionNav(opts.currentIndex ?? 0, questionNodeIds.length);
@@ -235,7 +237,7 @@ export const QUESTIONNAIRE_STYLE =
   `.q-nav{display:flex;align-items:center;gap:8px;padding:2px 2px 8px;font-size:.85em}` +
   `.q-nav-btn{font:inherit;cursor:pointer;padding:1px 8px;border:1px solid var(--vscode-panel-border,#454545);background:var(--vscode-editorWidget-background,#252526);color:var(--vscode-foreground)}` +
   `.q-nav-btn:disabled{cursor:default;opacity:.45}` +
-  `.q-nav-pos{opacity:.8}` +
+  `.q-nav-pos{opacity:.8;margin-left:auto}` +
   `.q-list{list-style:none;margin:0;padding-left:0}` +
   `.q-item{padding:2px 4px 2px 6px;border-radius:3px;margin:1px 0}` +
   // #187 Todo 3 — INDENT by decision/expansion depth via a fixed set of padding classes (CSP-safe: no inline style).

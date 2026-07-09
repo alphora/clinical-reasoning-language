@@ -30,6 +30,13 @@ check("a block per case: status badge + facts + produced + reveal", () => {
   assert.ok(out.html.includes("Pat A") && out.html.includes("facts: dx") && out.html.includes("→ Approve") && out.html.includes("✓"));
 });
 
+check("UX fix: the authored `-> outcome` suffix is stripped from the worklist case NAME (but the computed `→ produced` badge stays)", () => {
+  const out = renderCelPane(result([sc("Contraindication present (guard fails) -> Unmet", "fail", [], ["Unmet"])]), { "Contraindication present (guard fails) -> Unmet": "cX" });
+  assert.ok(out.html.includes("Contraindication present (guard fails)"), "the descriptive name shows");
+  assert.ok(!/-&gt; Unmet<\/span>/.test(out.html) && !out.html.includes("-> Unmet"), "the authored '-> Unmet' name suffix is stripped");
+  assert.ok(out.html.includes("→ Unmet"), "the SEPARATE computed produced badge (→ Unmet) is untouched");
+});
+
 check("a determination outcome renders as the human key, not the dotted `<category>.<key>` name", () => {
   const out = renderCelPane(
     result([sc("Pat B", "pass", ["dx"], ["certify.Met", "not-certify.Unmet EIU"])]),
