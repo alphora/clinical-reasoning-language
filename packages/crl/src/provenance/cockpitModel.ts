@@ -9,6 +9,7 @@ import { renderScenario, type RenderScenarioResult } from "../cre";
 
 import { buildCaseIdJoin } from "./caseIdJoin";
 import { buildConceptShapeIndex, type ConceptShapeIndex } from "./conceptShape";
+import { buildDefExprIndex, type DefExprIndex } from "./definedAsExpr";
 import { buildCorrespondenceModelFromResolved, type CorrespondenceModel } from "./correspondence";
 import { buildCrlConceptLayer, type CrlConceptNode } from "./crlConceptLayer";
 import { buildCrlStructure, type CrlDecisionStructure } from "./crlStructure";
@@ -26,6 +27,10 @@ export interface CockpitModel {
    *  faithful question/tree surface (leaf-eligibility ≡ the emitted PlanDefinition's `action.input`). Built on the
    *  shared inference walk; `leafEligible` sourced from the emitter's lowering (fail-closed on lowering errors). */
   conceptShape: ConceptShapeIndex;
+  /** #187 Option-3: the operator-PRESERVING projection of the same `defined as` bodies (keyed by nodeKey) — the
+   *  sem-or/and/not tree the MV Questionnaire renders as ANY OF / ALL OF boxes. Its leafEligible leaves are
+   *  drift-guarded equal to `conceptShape`'s (`collectDefExprLeafKeys` == `codeIsLeavesPreorder`). */
+  defExpr: DefExprIndex;
   /** The full scenario render (cases + status + the success/errors envelope so the CEL pane can show "why" on failure). */
   scenarios: RenderScenarioResult;
   /** Case NAME → frozen caseId — the join between renderScenario (keyed by name) and the correspondence (keyed by the
@@ -70,12 +75,16 @@ export function buildCockpitModelFromResolved(
   for (const [lib, info] of libs) leafEligibleByLib.set(lib, leafEligibleConcepts(info.entry.ast));
   // Pass the SAME collected `libs` (no re-collect) so the shape builder's lib set matches `conceptLayer`'s.
   const conceptShape = buildConceptShapeIndex(libs, conceptLayer, leafEligibleByLib);
+  // #187 Option-3: the operator-PRESERVING projection of the same `defined as` bodies (same inputs), for the MV
+  // Questionnaire's ANY OF / ALL OF box render. Its leafEligible leaves are drift-guarded == conceptShape's.
+  const defExpr = buildDefExprIndex(libs, conceptLayer, leafEligibleByLib);
 
   return {
     correspondence: buildCorrespondenceModelFromResolved(r, { artifactPath, celPath }),
     crlStructure: buildCrlStructure(r.graph),
     conceptLayer,
     conceptShape,
+    defExpr,
     scenarios: renderScenario(r.graph),
     caseIdByName,
     caseNameCollisions: frozenCollisions,

@@ -14,6 +14,7 @@ import {
   type CorrespondenceModel,
   type CrlConceptNode,
   type ConceptShapeIndex,
+  type DefExprIndex,
   type CrlDecisionStructure,
   type CrlStructureNode,
   type RenderScenarioResult,
@@ -73,7 +74,7 @@ import { renderCrlPane } from "./crlPaneHtml";
 import { FLOW_STYLE, renderFlowPane } from "./flowPaneHtml";
 import { QUESTIONNAIRE_STYLE, renderQuestionnairePane, shouldRerenderQuestionnaire, nextQuestionIndex } from "./questionnairePaneHtml";
 import { buildQuestionnaire, producedPathDiverterIds, type Questionnaire } from "./questionnaireModel";
-import type { ConceptValueType, ResolveValueTypes, ResolveConceptShape, ResolveConceptInfo } from "./questionnaireModel";
+import type { ConceptValueType, ResolveValueTypes, ResolveConceptShape, ResolveConceptInfo, ResolveDefExpr } from "./questionnaireModel";
 import {
   buildCrlRevealMaps,
   caseIdsForNode,
@@ -251,6 +252,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   let crlStructure: CrlDecisionStructure[] = [];
   let conceptLayer: CrlConceptNode[] = [];
   let conceptShape: ConceptShapeIndex = new Map(); // #187 Todo 3: per-concept `defined as` shape subtrees (leaf expansion)
+  let defExpr: DefExprIndex = new Map(); // #187 Option-3: per-concept `defined as` OPERATOR tree (questionnaire box render)
   let crlMaps: CrlRevealMaps | undefined;
   let scenarios: RenderScenarioResult | undefined;
   let caseIdByName: Record<string, string> = {};
@@ -1139,8 +1141,8 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       const r = renderQuestionnairePane(sv, buildResolveValueTypes(), sv?.decision?.libraryName, {
         revealPrefix: `g${gen}_`,
         currentIndex: currentQuestionIndex, // #177 slice 5: the sub-nav renders "Question X of Y" + Prev/Next disabled states
-        conceptShape: buildConceptShapeResolver(), // #187 Todo 3: composite-leaf expansion
-        resolveConceptInfo: buildResolveConceptInfo(),
+        conceptShape: buildConceptShapeResolver(), // #187 Todo 3: the composite when's own Source/inferred flags
+        defExpr: buildDefExprResolver(), // #187 Option-3: composite → ANY OF / ALL OF operator boxes
       });
       v.anchors = r.anchors;
       v.reveals = r.reveals;
@@ -1175,7 +1177,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     if (focusedQMemo && focusedQMemo.caseId === caseId && focusedQMemo.iv === indexVersion) return focusedQMemo.q;
     const q = buildQuestionnaire(sv, buildResolveValueTypes(), sv.decision?.libraryName, {
       conceptShape: buildConceptShapeResolver(),
-      resolveConceptInfo: buildResolveConceptInfo(),
+      defExpr: buildDefExprResolver(),
     });
     focusedQMemo = { caseId, iv: indexVersion, q };
     return q;
@@ -1198,6 +1200,11 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
    *  identity + value types for the leaf row. Both return undefined when maps are absent (→ no expansion). */
   function buildConceptShapeResolver(): ResolveConceptShape {
     return (lib, name) => (lib === undefined ? undefined : conceptShape.get(nodeKey(conceptDeclRef(lib, name))));
+  }
+  /** #187 Option-3 — the injected resolver `buildQuestionnaire` uses to render an on-path composite `when`'s `defined as`
+   *  OPERATOR tree (ANY OF / ALL OF boxes). Keyed by the SAME nodeKey as `conceptByKey`; undefined when maps absent. */
+  function buildDefExprResolver(): ResolveDefExpr {
+    return (lib, name) => (lib === undefined ? undefined : defExpr.get(nodeKey(conceptDeclRef(lib, name))));
   }
   function buildResolveConceptInfo(): ResolveConceptInfo {
     return (nk) => {
@@ -1401,6 +1408,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       crlStructure = cm.crlStructure;
       conceptLayer = cm.conceptLayer;
       conceptShape = cm.conceptShape; // #187 Todo 3
+      defExpr = cm.defExpr; // #187 Option-3
       scenarios = cm.scenarios;
       caseIdByName = cm.caseIdByName;
       duplicateScenarioNames = cm.duplicateScenarioNames;
@@ -1496,6 +1504,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     crlStructure = [];
     conceptLayer = [];
     conceptShape = new Map();
+    defExpr = new Map();
     crlMaps = undefined;
     scenarios = undefined;
     caseIdByName = {};

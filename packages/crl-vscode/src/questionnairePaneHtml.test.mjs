@@ -622,7 +622,7 @@ check("slice 5: data-qnav buttons are CSP-safe (opaque prev/next action, no inli
 });
 
 // ── #187 Todo 3: the new visual branches — dim (preempted), grey (non-Source), leaf indent, and the "unknown never No" contract ──
-check("Todo 3 render: preempted DIMMED + non-Source GREY + composite LEAF indented; an unknown answer highlights NEITHER option (never No)", () => {
+check("Option-3 render: preempted DIMMED + non-Source GREY when; a composite expands into an ANY OF box; an unknown leaf highlights NEITHER option", () => {
   const crl = `# P
 library "V".
 concept "Covered":
@@ -665,27 +665,72 @@ case "cov+comp; Other preempted":
 - fact is "fComp".
 - result is "V" is "Approve".`;
   const { sv, rootLib } = renderCase({ "v.crl": crl, "v.cel": cel }, "v.cel", "cov+comp; Other preempted");
-  // Stub Comp as a non-Source inferred composite with one leaf ABSENT from conceptTruth (→ unknown answer).
+  // Comp is a non-Source inferred composite `defined as (SomeLeaf or Extra)`; conceptShape gives the WHEN's flags,
+  // defExpr gives the OPERATOR tree (rendered as an ANY OF box). SomeLeaf is non-Source + absent from conceptTruth (unknown).
   const conceptShape = (_lib, name) =>
-    name === "Comp"
-      ? {
-          nodeKey: "k:Comp", hasCodeIs: false, leafEligible: false, isInferred: true, hasDefinedAs: true,
-          children: [{ nodeKey: "k:L", hasCodeIs: true, leafEligible: true, isInferred: false, hasDefinedAs: false, children: [] }],
-        }
-      : undefined;
-  const resolveConceptInfo = (nk) => (nk === "k:L" ? { lib: "V", name: "SomeLeaf", valueTypes: ["boolean"] } : undefined);
-  const r = renderQuestionnairePane(sv, booleanResolver, rootLib, { revealPrefix: "g1_", conceptShape, resolveConceptInfo });
+    name === "Comp" ? { nodeKey: "k:Comp", hasCodeIs: false, leafEligible: false, isInferred: true, hasDefinedAs: true, children: [] } : undefined;
+  const lref = (name, hasCodeIs) => ({ kind: "ref", ref: { name, lib: "V", crossLib: false, nodeKey: `k:${name}`, hasCodeIs, leafEligible: true, isInferred: false, hasDefinedAs: false } });
+  const compEntry = { nodeKey: "k:Comp", lib: "V", name: "Comp", hasCodeIs: false, leafEligible: false, isInferred: true, hasDefinedAs: true,
+    body: { kind: "or", operands: [lref("SomeLeaf", false), lref("Extra", true)] } };
+  const r = renderQuestionnairePane(sv, booleanResolver, rootLib, { revealPrefix: "g1_", conceptShape, defExpr: (_l, n) => (n === "Comp" ? compEntry : undefined) });
   const items = [...r.html.matchAll(/<li class="([^"]*)"[^>]*>(.*?)<\/li>/g)].map((m) => ({ cls: m[1], inner: m[2] }));
-  const row = (n) => items.find((it) => it.inner.includes(`q-concept">${n}<`));
+  const row = (n) => items.find((it) => it.cls.includes("q-item") && it.inner.includes(`q-concept">${n}<`));
   assert.ok(row("Comp").cls.includes("q-nonsource"), "Comp (no code-is) gets the non-Source grey channel");
   assert.ok(row("Comp").cls.includes("q-inferred"), "Comp is marked inferred");
   assert.ok(row("Other").cls.includes("q-preempted"), "Other (first:-preempted) is dimmed");
-  const leaf = row("SomeLeaf");
-  assert.ok(leaf, "the composite's leaf is rendered (expanded)");
-  assert.ok(leaf.cls.includes("q-leaf"), "the leaf is a q-leaf row");
-  assert.ok(leaf.cls.includes("q-d2"), "the leaf is indented at depth 2 (Covered → Comp → leaf)");
-  assert.ok(!leaf.inner.includes("q-opt-answer"), "an UNKNOWN leaf highlights NEITHER Yes nor No — never renders 'No' (Todo-2 contract)");
-  assert.ok(leaf.inner.includes("q-unknown"), "an unknown leaf shows the n/a marker");
+  // The expansion: an ANY OF box with an `or` operator chip, in its own q-exp <li> (all divs — no nested <li>).
+  assert.match(r.html, /<li class="q-exp q-d\d+">/, "the composite's operator tree renders in a q-exp <li>");
+  assert.match(r.html, /class="q-box q-box-or"/, "Comp = (…or…) → an ANY OF box");
+  assert.match(r.html, /class="q-box-tab">any of</, "the box is labelled 'any of'");
+  assert.match(r.html, /class="q-conn q-conn-or[^"]*">or</, "the boolean operator 'or' shows outside the box");
+  // SomeLeaf: a non-Source expansion leaf, UNKNOWN (absent from conceptTruth) → NEITHER option highlighted + an n/a marker.
+  const leaf = r.html.match(/<div class="q-exp-leaf q-nonsource">((?:(?!<\/div>).)*)<\/div>/);
+  assert.ok(leaf && leaf[0].includes('q-concept">SomeLeaf<'), "SomeLeaf renders as a non-Source expansion leaf");
+  assert.ok(!leaf[1].includes("q-opt-answer"), "an UNKNOWN leaf highlights NEITHER Yes nor No — never 'No' (Todo-2 contract)");
+  assert.ok(leaf[1].includes("q-unknown"), "an unknown leaf shows the n/a marker");
+});
+
+check("Option-3 render: a `not` renders a NOT chip AND its operand; a cross-lib operand renders as an (external) stub with NO Yes/No", () => {
+  const crl = `# P
+library "V".
+concept "Root":
+- type is Condition.
+- code is \`c\`.
+activity "Approve":
+- request CPGCommunicationRequest.
+- with \`ok\`.
+decision "V":
+- when "Root" then recommend activity "Approve".`;
+  const cel = `# C
+library "VCases".
+covers "V".
+fact "Pat":
+- name is "Pat".
+- birth date is "1970-01-01".
+- defined by "Patient".
+fact "fC":
+- code is "http://x|c".
+- defined by "Root".
+case "root holds":
+- subject is "Pat".
+- fact is "fC".
+- result is "V" is "Approve".`;
+  const { sv, rootLib } = renderCase({ "v.crl": crl, "v.cel": cel }, "v.cel", "root holds");
+  // Root = ( not "A" ) or "U"."Q"  → a NOT chip + operand A, and an external stub for the cross-lib Q.
+  const entry = {
+    nodeKey: "k:Root", lib: "V", name: "Root", hasCodeIs: true, leafEligible: true, isInferred: true, hasDefinedAs: true,
+    body: { kind: "or", operands: [
+      { kind: "not", operand: { kind: "ref", ref: { name: "A", lib: "V", crossLib: false, nodeKey: "k:A", hasCodeIs: true, leafEligible: true, isInferred: false, hasDefinedAs: false } } },
+      { kind: "ref", ref: { name: "Q", lib: "U", crossLib: true, leafEligible: false } },
+    ] },
+  };
+  const r = renderQuestionnairePane(sv, booleanResolver, rootLib, { revealPrefix: "g1_", conceptShape: (_l, n) => (n === "Root" ? { nodeKey: "k:Root", hasCodeIs: true, leafEligible: true, isInferred: true, hasDefinedAs: true, children: [] } : undefined), defExpr: (_l, n) => (n === "Root" ? entry : undefined) });
+  assert.match(r.html, /class="q-conn q-conn-not[^"]*">not</, "a NOT chip is shown");
+  assert.match(r.html, /q-concept">A</, "the not's OPERAND is still rendered (never dropped)");
+  assert.match(r.html, /class="q-exp-leaf q-external"[^>]*>.*?q-concept">Q<.*?q-ext-mark">\(external\)/, "the cross-lib Q is an (external) stub");
+  // the external stub carries NO Yes/No options.
+  const ext = r.html.match(/<div class="q-exp-leaf q-external"[^>]*>((?:(?!<\/div>).)*)<\/div>/);
+  assert.ok(ext && !ext[1].includes("q-opt"), "an external stub has NO Yes/No options (not evaluated here)");
 });
 
 console.log(`\nquestionnairePaneHtml.test.mjs: ${pass} checks passed.`);

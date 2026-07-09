@@ -19,8 +19,9 @@ import {
   buildQuestionnaire,
   type ResolveValueTypes,
   type ResolveConceptShape,
-  type ResolveConceptInfo,
+  type ResolveDefExpr,
   type Question,
+  type QExpr,
 } from "./questionnaireModel";
 
 /** Max indent depth with a dedicated padding class; deeper rows clamp (a questionnaire never nests this far). */
@@ -84,6 +85,62 @@ function renderQuestionNav(currentIndex: number, count: number): string {
   );
 }
 
+/** #187 Option-3: render a leaf's Yes/No options with the case's answer highlighted (an "unknown" off-path answer
+ *  highlights NEITHER + shows an n/a marker — the Todo-2 contract). Shared shape with `renderQuestion`'s opts. */
+function renderExpOpts(answer: "yes" | "no" | "unknown"): string {
+  const opts = ["Yes", "No"]
+    .map((o) => `<span class="${(answer === "yes" || answer === "no") && o.toLowerCase() === answer ? "q-opt q-opt-answer" : "q-opt"}">${o}</span>`)
+    .join("");
+  const unknown = answer === "unknown" ? `<span class="q-unknown" title="no case answer — a question this path never asked">n/a</span>` : "";
+  return `<span class="q-opts">${opts}${unknown}</span>`;
+}
+
+/** The operator connective chip (OUTSIDE the box): `or` / `and` (tinted amber / teal) or `not`. `top` marks a
+ *  composite's own operator above its box (vs an infix operator between two operands). */
+function connDiv(op: "or" | "and" | "not", top: boolean): string {
+  return `<div class="q-conn q-conn-${op}${top ? " q-conn-top" : ""}">${op}</div>`;
+}
+
+/**
+ * Render a `defined as` operator-tree node (Option-3): `or`/`and` → an ANY OF / ALL OF box with its operands (the
+ * operator shown OUTSIDE the box at top + BETWEEN operands); a leaf → the concept + its answer (+ a nested box for a
+ * named-composite / both-rep operand); an external (cross-lib) stub; a `+N more` / `…` truncation. ALL `<div>`s (no
+ * `<li>` — the whole expansion lives in ONE `<li class="q-exp">`, so the flat `q-item` regex can't mis-slice it).
+ * The `not` operand is ALWAYS rendered (a dropped operand would vanish a criterion `$apply` still asks).
+ */
+function renderQExpr(e: QExpr, top: boolean): string {
+  switch (e.kind) {
+    case "or":
+    case "and": {
+      const op = e.kind === "or" ? "or" : "and";
+      const label = e.kind === "or" ? "any of" : "all of";
+      let inner = "";
+      e.operands.forEach((o, i) => {
+        if (i > 0) inner += connDiv(op, false); // infix operator between operands
+        inner += renderQExpr(o, false);
+      });
+      return (
+        (top ? connDiv(op, true) : "") +
+        `<div class="q-box q-box-${op}"><span class="q-box-tab">${label}</span><div class="q-box-body">${inner}</div></div>`
+      );
+    }
+    case "not":
+      return connDiv("not", top) + renderQExpr(e.operand, false);
+    case "leaf": {
+      const cls = ["q-exp-leaf"];
+      if (!e.isSource) cls.push("q-nonsource");
+      if (e.isInferred) cls.push("q-inferred");
+      const row = `<div class="${cls.join(" ")}"><span class="q-prompt"><span class="q-concept">${escapeHtml(e.name)}</span>?</span>${renderExpOpts(e.answer)}</div>`;
+      // A named-composite / both-rep operand is answerable AND expandable → its own body renders as a nested box below.
+      return e.composite ? row + renderQExpr(e.composite, true) : row;
+    }
+    case "external":
+      return `<div class="q-exp-leaf q-external" title="a cross-library concept — not evaluated here"><span class="q-prompt"><span class="q-concept">${escapeHtml(e.name)}</span>?</span><span class="q-ext-mark">(external)</span></div>`;
+    case "more":
+      return `<div class="q-more">${e.count > 0 ? `+${e.count} more` : "…"}</div>`;
+  }
+}
+
 /** Render one question <li>: "<concept>?" + the two Yes/No options with the case's answer highlighted, plus a subtle
  *  value-type label for a non-boolean concept. #187 Todo 3: INDENT by `depth` (a `q-d<n>` class); DIM `first:`-preempted
  *  rows; mark non-Source (no `code is`) on an inner channel that does NOT fight the `.this-node` wash; render an "unknown"
@@ -109,7 +166,6 @@ function renderQuestion(q: Question, gid: string): string {
   if (q.reach === "preempted") cls.push("q-preempted");
   if (!q.isSource) cls.push("q-nonsource");
   if (q.isInferred) cls.push("q-inferred");
-  if (q.rowKind === "leaf") cls.push("q-leaf");
   // Non-color affordance (VS Code high-contrast can collapse opacity/tint) — reach AND source state as a tooltip (a row
   // that is BOTH preempted and non-Source shows both hints, so neither affordance is lost).
   const titleParts: string[] = [];
@@ -167,7 +223,7 @@ export function renderQuestionnairePane(
     revealPrefix?: string;
     currentIndex?: number;
     conceptShape?: ResolveConceptShape;
-    resolveConceptInfo?: ResolveConceptInfo;
+    defExpr?: ResolveDefExpr;
   } = {},
 ): RenderedQuestionnaire {
   const prefix = opts.revealPrefix ?? "";
@@ -178,18 +234,20 @@ export function renderQuestionnairePane(
 
   const q = buildQuestionnaire(sv, resolveValueTypes, rootLib, {
     conceptShape: opts.conceptShape,
-    resolveConceptInfo: opts.resolveConceptInfo,
+    defExpr: opts.defExpr,
   });
 
   let items = "";
-  // #187 Todo 3: NAV-STOPS only (runtime whens/guards) — a synthetic LEAF id can't ground driveThisNode, so leaves
-  // render (with a self-highlight anchor) but are skipped by prev/next + the cross-pane marker (that is Todo 5).
+  // NAV-STOPS = runtime whens/guards ONLY (their `nodeId` grounds in `sv.tree`). #187 Option-3: an on-path composite
+  // when's `defined as` operator tree renders as a SEPARATE `<li class="q-exp">` box tree (all `<div>`s inside — no
+  // nested `<li>`, so the flat `q-item` slicing can't reach into it); its operand leaves are NOT questions/nav-stops.
   const questionNodeIds: string[] = [];
   q.questions.forEach((question, i) => {
     const gid = `${prefix}q${i}`;
     anchors[question.nodeId] = { scrollTo: gid, segmentIds: [gid] };
     if (question.isNavStop) questionNodeIds.push(question.nodeId);
     items += renderQuestion(question, gid);
+    if (question.expansion) items += `<li class="q-exp q-d${Math.min(question.depth, MAX_DEPTH)}">${renderQExpr(question.expansion, true)}</li>`;
   });
 
   const caseName = caseDisplayName(sv.case?.name ?? ""); // strip the authored `-> outcome` suffix (redundant w/ the Outcome line)
@@ -249,8 +307,8 @@ export const QUESTIONNAIRE_STYLE =
   `.q-nonsource .q-prompt{background:var(--vscode-editorWidget-background,#2b2b2e);border-radius:3px;padding:0 5px}` +
   // Inferred (`defined as`/`definition is`) — a small purple dot after the concept, echoing the Tree pane's purple peek.
   `.q-inferred .q-concept::after{content:" ●";font-size:.5em;color:var(--vscode-charts-purple,#c586c0);vertical-align:middle}` +
-  // A leaf (composite operand) is a sub-question — lighter weight than a decision `when`.
-  `.q-leaf .q-concept{font-weight:normal;opacity:.92}` +
+  // A composite-operand leaf is lighter weight than a decision `when`.
+  `.q-exp-leaf .q-concept{font-weight:normal;opacity:.92}` +
   // An "unknown" off-path answer (no conceptTruth) — a subtle marker; NEITHER Yes/No option is highlighted.
   `.q-unknown{font-size:.75em;opacity:.6;font-style:italic;margin-left:6px}` +
   `.q-prompt{margin-right:6px}` +
@@ -271,4 +329,26 @@ export const QUESTIONNAIRE_STYLE =
   // `.current` (outline) on the row and the `.q-opt-answer` find-match fill on the option spans: box-shadow/background-color
   // are independent axes from outline. The same marker channel paints the tree/crl/source panes (the shell posts
   // markThisNode); this rule is the questionnaire pane's leg of it.
-  `.q-item.this-node{box-shadow:inset 3px 0 0 var(--vscode-charts-orange,#d18616);background:rgba(209,134,22,.12)}`;
+  `.q-item.this-node{box-shadow:inset 3px 0 0 var(--vscode-charts-orange,#d18616);background:rgba(209,134,22,.12)}` +
+  // #187 Option-3: the `defined as` operator-tree expansion under an on-path composite when — ANY OF / ALL OF boxes
+  // with the boolean operator shown OUTSIDE each box (amber = OR / any-of, teal = AND / all-of, grey = not). All `<div>`s.
+  `.q-exp{list-style:none;margin:1px 0 7px}` +
+  // the operator connective chip (outside the box; above the top box + between operands).
+  `.q-conn{display:inline-block;font:700 10px/1 var(--vscode-editor-font-family,monospace);letter-spacing:.14em;text-transform:uppercase;padding:2px 7px;border-radius:4px;margin:4px 0 2px}` +
+  `.q-conn-top{margin-left:30px}` +
+  `.q-conn-or{color:var(--vscode-charts-orange,#d18616);background:rgba(209,134,22,.12);border:1px solid var(--vscode-charts-orange,#d18616)}` +
+  `.q-conn-and{color:var(--vscode-terminal-ansiCyan,#4ec9b0);background:rgba(78,201,176,.12);border:1px solid var(--vscode-terminal-ansiCyan,#4ec9b0)}` +
+  `.q-conn-not{color:var(--vscode-descriptionForeground,#8c8c8c);background:var(--vscode-editorWidget-background,#2b2b2e);border:1px solid var(--vscode-panel-border,#454545)}` +
+  // the grouping box (indented past its parent; a left accent rail tinted by the operator; a corner tab for ANY OF / ALL OF).
+  `.q-box{position:relative;margin:2px 0 8px 30px;border:1px solid var(--vscode-panel-border,#454545);border-left:2px solid var(--vscode-charts-purple,#c586c0);border-radius:0 6px 6px 6px;background:var(--vscode-editor-background,#1e1e1e);padding:13px 8px 6px 10px}` +
+  `.q-box .q-box{margin-left:22px}` +
+  `.q-box-or{border-left-color:var(--vscode-charts-orange,#d18616)}` +
+  `.q-box-and{border-left-color:var(--vscode-terminal-ansiCyan,#4ec9b0)}` +
+  `.q-box-tab{position:absolute;top:-9px;left:-2px;font:700 10px/1 var(--vscode-editor-font-family,monospace);letter-spacing:.12em;text-transform:uppercase;padding:2px 7px;border-radius:5px 5px 5px 0;background:var(--vscode-editor-background,#1e1e1e)}` +
+  `.q-box-or>.q-box-tab{color:var(--vscode-charts-orange,#d18616);border:1px solid var(--vscode-charts-orange,#d18616)}` +
+  `.q-box-and>.q-box-tab{color:var(--vscode-terminal-ansiCyan,#4ec9b0);border:1px solid var(--vscode-terminal-ansiCyan,#4ec9b0)}` +
+  // a leaf row inside a box (concept + its Yes/No answer). Reuses .q-nonsource/.q-inferred/.q-opt(-answer)/.q-unknown.
+  `.q-exp-leaf{padding:2px 0;margin:1px 0}` +
+  `.q-external{opacity:.75;font-style:italic}` +
+  `.q-ext-mark{font-size:.75em;opacity:.7;margin-left:6px}` +
+  `.q-more{font-size:.8em;opacity:.6;font-style:italic;padding:2px 0 2px 2px}`;

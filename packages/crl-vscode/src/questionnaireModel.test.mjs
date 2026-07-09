@@ -824,7 +824,7 @@ case "covered wins; Other preempted":
   assert.equal(other.diverterEligible, false, "a preempted row is NEVER a produced-path diverter");
 });
 
-check("Todo 3: an on-path inferred composite `when` EXPANDS its shape leaves (nested, non-nav-stop, unknown when absent from conceptTruth)", () => {
+check("Option-3: an on-path composite `when` carries its `defined as` operator tree as `expansion` (leaves are NOT flat questions)", () => {
   const crl = `# P
 library "CX".
 concept "Comp":
@@ -850,33 +850,149 @@ case "comp holds":
 - fact is "fC".
 - result is "CX" is "Approve".`;
   const { sv, rootLib } = renderCase({ "cx.crl": crl, "cx.cel": cel }, "cx.cel", "comp holds");
-  // Stub the shape: Comp is an inferred composite with two operand leaves (Leaf2 non-Source). resolveConceptInfo names them.
-  const shapeByName = {
-    Comp: {
-      nodeKey: "k:Comp", hasCodeIs: true, leafEligible: true, isInferred: true, hasDefinedAs: true,
-      children: [
-        { nodeKey: "k:Leaf1", hasCodeIs: true, leafEligible: true, isInferred: false, hasDefinedAs: false, children: [] },
-        { nodeKey: "k:Leaf2", hasCodeIs: false, leafEligible: false, isInferred: false, hasDefinedAs: false, children: [] },
-      ],
-    },
-  };
-  const info = {
-    "k:Leaf1": { lib: "CX", name: "Leaf1", valueTypes: ["boolean"] },
-    "k:Leaf2": { lib: "CX", name: "Leaf2", valueTypes: ["boolean"] },
+  // Option-3: Comp is an on-path composite `defined as (Leaf1 or Leaf2)`. conceptShape supplies the WHEN's own flags;
+  // defExpr supplies the OPERATOR tree the questionnaire renders as an `expansion` (leaves are NOT flat questions).
+  const shapeByName = { Comp: { nodeKey: "k:Comp", hasCodeIs: true, leafEligible: true, isInferred: true, hasDefinedAs: true, children: [] } };
+  const ref = (name, o = {}) => ({ kind: "ref", ref: { name, lib: "CX", crossLib: false, nodeKey: `k:${name}`, hasCodeIs: true, leafEligible: true, isInferred: false, hasDefinedAs: false, ...o } });
+  const compEntry = {
+    nodeKey: "k:Comp", lib: "CX", name: "Comp", hasCodeIs: true, leafEligible: true, isInferred: true, hasDefinedAs: true,
+    body: { kind: "or", operands: [ref("Leaf1"), ref("Leaf2", { hasCodeIs: false })] },
   };
   const q = buildQuestionnaire(sv, booleanResolver, rootLib, {
     conceptShape: (_lib, name) => shapeByName[name],
-    resolveConceptInfo: (nk) => info[nk],
+    defExpr: (lib, name) => (lib === "CX" && name === "Comp" ? compEntry : undefined),
   });
-  assert.deepEqual(q.questions.map((x) => x.conceptName), ["Comp", "Leaf1", "Leaf2"], "the composite when + its two expanded leaves");
-  const [comp, l1, l2] = q.questions;
+  // Only the WHEN is a flat Question now (leaves live inside its `expansion`, not the flat list / nav-stops).
+  assert.deepEqual(q.questions.map((x) => x.conceptName), ["Comp"], "just the composite when — leaves are in its expansion");
+  const [comp] = q.questions;
   assert.equal(comp.answer, "yes", "Comp fired (evaluated)");
   assert.equal(comp.isInferred, true, "Comp is an inferred composite (from the shape)");
-  assert.equal(l1.depth, 1, "leaves nested one level under the composite");
-  assert.equal(l1.rowKind, "leaf");
-  assert.equal(l1.isNavStop, false, "a composite LEAF is NOT a nav-stop (Todo 5 owns leaf highlighting)");
-  assert.equal(l1.answer, "unknown", "a leaf absent from conceptTruth is UNKNOWN — render blank, never 'no'");
-  assert.equal(l2.isSource, false, "Leaf2 (no code-is) is non-Source → the grey channel");
+  assert.ok(comp.expansion, "the composite when carries an operator-tree expansion");
+  assert.equal(comp.expansion.kind, "or", "Comp = (Leaf1 or Leaf2) → an ANY OF box");
+  assert.deepEqual(comp.expansion.operands.map((o) => o.kind), ["leaf", "leaf"]);
+  const [e1, e2] = comp.expansion.operands;
+  assert.equal(e1.name, "Leaf1");
+  assert.equal(e1.answer, "unknown", "a leaf absent from conceptTruth is UNKNOWN — render blank, never 'no'");
+  assert.equal(e2.isSource, false, "Leaf2 (no code-is) is non-Source → the grey channel");
+});
+
+check("Option-3 QExpr build: not/and nesting, a named-composite sub-box, a cross-lib external stub, and answers from conceptTruth", () => {
+  const crl = `# P
+library "CX".
+concept "Root":
+- type is Condition.
+- code is \`c\`.
+activity "Approve":
+- request CPGCommunicationRequest.
+- with \`ok\`.
+decision "CX":
+- when "Root" then recommend activity "Approve".`;
+  const cel = `# C
+library "CXCases".
+covers "CX".
+fact "Pat":
+- name is "Pat".
+- birth date is "1970-01-01".
+- defined by "Patient".
+fact "fC":
+- code is "http://x|c".
+- defined by "Root".
+case "root holds":
+- subject is "Pat".
+- fact is "fC".
+- result is "CX" is "Approve".`;
+  const { sv, rootLib } = renderCase({ "cx.crl": crl, "cx.cel": cel }, "cx.cel", "root holds");
+  // Root = not( A and Named ) or U."Q"  ; Named = (B) ; conceptTruth stubbed via a value-types resolver is not enough —
+  // answers come from sv.conceptTruth which we can't set here, so every leaf resolves "unknown" (blank) — that's the point.
+  const ref = (name, o = {}) => ({ kind: "ref", ref: { name, lib: "CX", crossLib: false, nodeKey: `k:${name}`, hasCodeIs: true, leafEligible: true, isInferred: false, hasDefinedAs: false, ...o } });
+  const entries = {
+    Root: { nodeKey: "k:Root", lib: "CX", name: "Root", hasCodeIs: true, leafEligible: true, isInferred: true, hasDefinedAs: true,
+      body: { kind: "or", operands: [
+        { kind: "not", operand: { kind: "and", operands: [ref("A"), ref("Named", { hasDefinedAs: true })] } },
+        { kind: "ref", ref: { name: "Q", lib: "U", crossLib: true, leafEligible: false } },
+      ] } },
+    Named: { nodeKey: "k:Named", lib: "CX", name: "Named", hasCodeIs: false, leafEligible: false, isInferred: true, hasDefinedAs: true,
+      body: { kind: "ref", ...ref("B") } },
+  };
+  const q = buildQuestionnaire(sv, booleanResolver, rootLib, {
+    conceptShape: (_l, n) => (n === "Root" ? { nodeKey: "k:Root", hasCodeIs: true, leafEligible: true, isInferred: true, hasDefinedAs: true, children: [] } : undefined),
+    defExpr: (_l, n) => entries[n],
+  });
+  const exp = q.questions[0].expansion;
+  assert.equal(exp.kind, "or");
+  assert.equal(exp.operands[0].kind, "not", "not(...) preserved (operand always rendered)");
+  assert.equal(exp.operands[0].operand.kind, "and", "the not wraps an ALL OF");
+  assert.deepEqual(exp.operands[0].operand.operands.map((o) => o.name), ["A", "Named"]);
+  const named = exp.operands[0].operand.operands[1];
+  assert.ok(named.composite, "a named-composite operand carries its OWN body as a nested box");
+  assert.equal(named.composite.kind, "leaf"); // Named = (B) → a single leaf
+  assert.equal(named.composite.name, "B");
+  assert.equal(exp.operands[1].kind, "external", "a cross-lib operand is an external stub, not a leaf");
+  assert.equal(exp.operands[1].name, "Q");
+});
+
+// A minimal scenario whose single `when "Root"` fires — reused by the Option-3 build tests (they supply defExpr).
+function renderRootScenario() {
+  const crl = `# P
+library "CX".
+concept "Root":
+- type is Condition.
+- code is \`c\`.
+activity "Approve":
+- request CPGCommunicationRequest.
+- with \`ok\`.
+decision "CX":
+- when "Root" then recommend activity "Approve".`;
+  const cel = `# C
+library "CXCases".
+covers "CX".
+fact "Pat":
+- name is "Pat".
+- birth date is "1970-01-01".
+- defined by "Patient".
+fact "fC":
+- code is "http://x|c".
+- defined by "Root".
+case "root holds":
+- subject is "Pat".
+- fact is "fC".
+- result is "CX" is "Approve".`;
+  return renderCase({ "cx.crl": crl, "cx.cel": cel }, "cx.cel", "root holds");
+}
+const rootShape = (_l, n) => (n === "Root" ? { nodeKey: "k:Root", hasCodeIs: true, leafEligible: true, isInferred: true, hasDefinedAs: true, children: [] } : undefined);
+const rootEntry = (body) => ({ nodeKey: "k:Root", lib: "CX", name: "Root", hasCodeIs: true, leafEligible: true, isInferred: true, hasDefinedAs: true, body });
+const dref = (name, o = {}) => ({ kind: "ref", ref: { name, lib: "CX", crossLib: false, nodeKey: `k:${name}`, hasCodeIs: true, leafEligible: true, isInferred: false, hasDefinedAs: false, ...o } });
+const expansionOf = (entries) => {
+  const { sv, rootLib } = renderRootScenario();
+  return buildQuestionnaire(sv, booleanResolver, rootLib, { conceptShape: rootShape, defExpr: (_l, n) => entries[n] }).questions[0].expansion;
+};
+
+check("Option-3 POSITIONAL: a shared named-composite at TWO positions expands at BOTH (no `visited` dedup — guards a critical)", () => {
+  const exp = expansionOf({
+    Root: rootEntry({ kind: "and", operands: [dref("Shared", { hasDefinedAs: true }), dref("Shared", { hasDefinedAs: true })] }),
+    Shared: { nodeKey: "k:Shared", lib: "CX", name: "Shared", hasCodeIs: false, leafEligible: false, isInferred: true, hasDefinedAs: true, body: dref("X") },
+  });
+  assert.equal(exp.kind, "and");
+  assert.equal(exp.operands.length, 2, "both positions present (positional)");
+  assert.ok(exp.operands[0].composite && exp.operands[1].composite, "a shared composite expands at BOTH positions — NOT collapsed by a visited memo");
+  assert.equal(exp.operands[0].composite.name, "X");
+});
+
+check("Option-3 WIDTH cap: an `or` over > EXPR_CAP(10) operands shows 10 + a '+3 more' stub", () => {
+  const exp = expansionOf({ Root: rootEntry({ kind: "or", operands: Array.from({ length: 13 }, (_, i) => dref(`K${i}`)) }) });
+  assert.equal(exp.operands.filter((o) => o.kind === "leaf").length, 10, "at most EXPR_CAP(10) leaves shown");
+  assert.equal(exp.operands[10].kind, "more");
+  assert.equal(exp.operands[10].count, 3, "the remaining 3 collapse into a '+3 more' stub (no silent drop)");
+});
+
+check("Option-3 DEPTH cap: a named-composite chain deeper than MAX_EXPR_DEPTH(4) truncates its nested box to a '…' stub", () => {
+  const entries = { Root: rootEntry(dref("C1", { hasDefinedAs: true })) };
+  for (let i = 1; i <= 5; i++)
+    entries[`C${i}`] = { nodeKey: `k:C${i}`, lib: "CX", name: `C${i}`, hasCodeIs: false, leafEligible: false, isInferred: true, hasDefinedAs: true, body: dref(i < 5 ? `C${i + 1}` : "Leaf", i < 5 ? { hasDefinedAs: true } : {}) };
+  let node = expansionOf(entries); // Root.expansion = leaf C1, .composite = leaf C2, … capped at hop 4.
+  while (node.kind === "leaf" && node.composite && node.composite.kind === "leaf") node = node.composite;
+  assert.equal(node.composite.kind, "more", "the chain truncates to a depth stub at MAX_EXPR_DEPTH");
+  assert.equal(node.composite.count, 0, "count 0 → a '…' (depth) stub, not a '+N more' (width) stub");
 });
 
 console.log(`\nquestionnaireModel.test.mjs: ${pass} checks passed.`);

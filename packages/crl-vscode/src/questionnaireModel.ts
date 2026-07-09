@@ -15,15 +15,36 @@
 // NAV/GROUNDING (disc 193 Q4/Q5): only RUNTIME rows (whens + the blocked guard) are nav-stops + cross-pane markable
 // (their `nodeId` grounds in `sv.tree` via `resolveThisNode`). Expanded LEAF rows render but are NOT nav-stops — a
 // synthetic leaf id can't ground `driveThisNode` (that's Todo 5). This module imports ONLY types from the core.
-import type { ConceptShapeNode, ScenarioViewModel, ViewNode, GuardView, ConditionView } from "@smile-digital-health/crl";
+import type { ConceptShapeNode, DefExpr, DefExprEntry, ScenarioViewModel, ViewNode, GuardView, ConditionView } from "@smile-digital-health/crl";
 import { displayDetermination } from "@smile-digital-health/crl";
 
 export type ConceptValueType = string;
 
+/** The `defined as` OPERATOR tree projected for RENDER — the boolean structure the questionnaire draws as ANY OF /
+ *  ALL OF boxes with `or`/`and` connectives, each leaf carrying the case's answer. Built POSITIONALLY (a shared
+ *  concept appears at each written position; only a path cycle-guard, NOT the leaf collector's diamond dedup) +
+ *  capped by depth/width. Distinct from `ConceptShapeNode` (the flat, operator-free `$apply` projection). */
+export type QExpr =
+  | { kind: "or" | "and"; operands: QExpr[] }
+  | { kind: "not"; operand: QExpr } // operand ALWAYS rendered — a dropped `not` operand would vanish a $apply-asked criterion
+  | {
+      kind: "leaf";
+      name: string;
+      lib: string;
+      answer: "yes" | "no" | "unknown";
+      isSource: boolean;
+      isInferred: boolean;
+      valueType: ConceptValueType | null;
+      /** A named-composite / both-rep operand's OWN `defined as` body, as a nested box (the operand is answerable AND expandable). */
+      composite?: QExpr;
+    }
+  | { kind: "external"; name: string; lib: string } // a cross-library operand — NOT evaluated here (distinct from local "unknown")
+  | { kind: "more"; count: number }; // width truncation (`+N more`) or, count 0, a depth-cap `…` stub
+
 /** How a row was reached — drives dimming (`preempted` ⇒ dim) and is future-proof for unreached rows. */
 export type Reach = "evaluated" | "preempted";
 /** What KIND of row this is — drives nav-stop + diverter eligibility + the leaf/guard render. */
-export type RowKind = "when-evaluated" | "when-preempted" | "guard" | "leaf";
+export type RowKind = "when-evaluated" | "when-preempted" | "guard";
 
 /** A single question row on the FULL surface. */
 export interface Question {
@@ -38,7 +59,7 @@ export interface Question {
   /** "yes"/"no" — the case's answer; "unknown" — no conceptTruth for an off-path row (render blank); null — n/a. */
   answer: "yes" | "no" | "unknown" | null;
   isBoolean: boolean;
-  /** Indent level (decision nesting + composite-expansion depth). */
+  /** Indent level — DECISION nesting / guard depth only (composite operands render inside `expansion`, not as flat rows). */
   depth: number;
   rowKind: RowKind;
   reach: Reach;
@@ -50,6 +71,9 @@ export interface Question {
   isNavStop: boolean;
   /** An evaluated on-path `when` — the ONLY rows `producedPathDiverterIds` may light (never a leaf/preempted row). */
   diverterEligible: boolean;
+  /** #187 Option-3: on an ON-PATH-SATISFIED composite `when`, its `defined as` operator tree (ANY OF / ALL OF boxes).
+   *  Absent for a non-composite / preempted / reached-false / off-path when (those stay flat rows). */
+  expansion?: QExpr;
   source?: ViewNode["source"];
 }
 
@@ -77,6 +101,14 @@ export type ResolveValueTypes = (lib: string | undefined, name: string) => Conce
 export type ResolveConceptShape = (lib: string | undefined, name: string) => ConceptShapeNode | undefined;
 /** Resolve a shape node's concept identity by its nodeKey — a `ConceptShapeNode` carries only `nodeKey` (#187). */
 export type ResolveConceptInfo = (nodeKey: string) => { lib: string; name: string; valueTypes: ConceptValueType[] } | undefined;
+/** Resolve a concept's `defined as` OPERATOR-tree entry (frame-aware) — for the Option-3 ANY OF / ALL OF box render. */
+export type ResolveDefExpr = (lib: string | undefined, name: string) => DefExprEntry | undefined;
+
+/** Render caps for the operator-tree expansion — mirror the Tree pane (flowPaneHtml LEAF_CAP / MAX_LEAF_DEPTH). The
+ *  DAG-blowup vector is NAMED-COMPOSITE HOPS (a shared/cyclic composite re-expanded positionally at each reference), so
+ *  `MAX_EXPR_DEPTH` counts those hops (not inline `or`/`and`/`not` nesting, which is a finite authoring-scale tree). */
+const EXPR_CAP = 10; // operands per box before a `+N more` stub
+const MAX_EXPR_DEPTH = 4; // named-composite expansion HOPS before a `…` stub
 
 /**
  * Reconstruct the FULL first:-chain question surface of a rendered scenario.
@@ -84,14 +116,14 @@ export type ResolveConceptInfo = (nodeKey: string) => { lib: string; name: strin
  * @param sv               the rendered scenario (a real `ScenarioViewModel`; carries `conceptTruth`).
  * @param resolveValueTypes injected concept→value-types resolver (frame-aware).
  * @param rootLib          the root decision's library (the starting frame).
- * @param opts.conceptShape       injected concept→shape-subtree resolver (leaf expansion). Absent ⇒ no expansion.
- * @param opts.resolveConceptInfo injected nodeKey→{lib,name,valueTypes} resolver (leaf identity). Absent ⇒ no expansion.
+ * @param opts.conceptShape injected concept→shape-subtree resolver — the composite when's own Source/inferred flags.
+ * @param opts.defExpr      injected concept→operator-tree resolver — an on-path composite when's ANY OF / ALL OF `expansion`.
  */
 export function buildQuestionnaire(
   sv: ScenarioViewModel,
   resolveValueTypes: ResolveValueTypes,
   rootLib: string | undefined,
-  opts: { conceptShape?: ResolveConceptShape; resolveConceptInfo?: ResolveConceptInfo } = {},
+  opts: { conceptShape?: ResolveConceptShape; defExpr?: ResolveDefExpr } = {},
 ): Questionnaire {
   if (sv.status === "error") {
     return { questions: [], outcome: null, terminalKind: "error", note: sv.diagnostics[0] ?? "evaluation error" };
@@ -114,6 +146,7 @@ export function buildQuestionnaire(
   const shapeOf = (lib: string, name: string): ConceptShapeNode | undefined => opts.conceptShape?.(lib, name);
 
   // Emit a runtime `when` (or guard) row. `evaluatedSat` present ⇒ show what FIRED; absent ⇒ off-path `conceptTruth`.
+  // Returns the pushed Question so an on-path composite can attach its `expansion` (the ANY OF / ALL OF box tree).
   const emitWhen = (
     concept: ConditionView["concept"] | GuardView["concept"],
     node: ViewNode,
@@ -122,13 +155,13 @@ export function buildQuestionnaire(
     rowKind: RowKind,
     reach: Reach,
     evaluatedSat: boolean | undefined,
-  ): void => {
+  ): Question => {
     const lib = concept.libraryName ?? frameLib ?? "";
     const valueTypes = resolveValueTypes(lib, concept.name);
     const shape = shapeOf(lib, concept.name);
     const answer: Question["answer"] =
       evaluatedSat !== undefined ? (evaluatedSat ? "yes" : "no") : truthAnswer(lib, concept.name);
-    questions.push({
+    const q: Question = {
       nodeId: node.nodeId,
       conceptName: concept.name,
       libraryName: lib,
@@ -144,44 +177,64 @@ export function buildQuestionnaire(
       isNavStop: true, // every runtime when/guard grounds in sv.tree → nav-stop + cross-pane markable
       diverterEligible: rowKind === "when-evaluated",
       ...(node.source ? { source: node.source } : {}),
-    });
+    };
+    questions.push(q);
+    return q;
   };
 
-  // Expand an ON-PATH composite `when`'s `defined as` operand subtree into nested LEAF rows (recursive, pre-order).
-  // Leaves are NOT nav-stops (a synthetic id can't ground driveThisNode — Todo 5). Answer always from conceptTruth.
-  const expandLeaves = (children: readonly ConceptShapeNode[], parentId: string, depth: number): void => {
-    if (!opts.resolveConceptInfo) return;
-    for (const child of children) {
-      const info = opts.resolveConceptInfo(child.nodeKey);
-      // A miss is impossible by construction (every `child.nodeKey` is a concept-layer node, and `conceptByKey` — the
-      // resolver's source — derives from that same layer). Swallow (not throw) anyway: a RENDER must not crash the pane.
-      if (!info) continue;
-      const leafId = `${parentId}|${child.nodeKey}`;
-      questions.push({
-        nodeId: leafId,
-        conceptName: info.name,
-        libraryName: info.lib,
-        valueType: info.valueTypes[0] ?? null,
-        options: ["Yes", "No"],
-        answer: truthAnswer(info.lib, info.name),
-        isBoolean: info.valueTypes.includes("boolean"),
-        depth,
-        rowKind: "leaf",
-        reach: "evaluated",
-        isSource: child.hasCodeIs,
-        isInferred: child.isInferred,
-        isNavStop: false,
-        diverterEligible: false,
-      });
-      expandLeaves(child.children, leafId, depth + 1);
+  // Build the RENDER operator tree for a `defined as` body — POSITIONAL (a shared concept appears at each written
+  // position; only a path `visiting` cycle-guard, NOT the leaf collector's `visited` dedup — the whole point is the
+  // authored boolean STRUCTURE). Capped by width (EXPR_CAP) + depth (MAX_EXPR_DEPTH). Answers from conceptTruth.
+  const buildQExpr = (e: DefExpr, visiting: ReadonlySet<string>, depth: number): QExpr => {
+    switch (e.kind) {
+      case "or":
+      case "and": {
+        const operands = e.operands.slice(0, EXPR_CAP).map((o) => buildQExpr(o, visiting, depth));
+        if (e.operands.length > EXPR_CAP) operands.push({ kind: "more", count: e.operands.length - EXPR_CAP });
+        return { kind: e.kind, operands };
+      }
+      case "not":
+        // The operand is ALWAYS rendered — a dropped `not` operand would vanish a criterion `$apply` still asks.
+        return { kind: "not", operand: buildQExpr(e.operand, visiting, depth) };
+      case "ref": {
+        const r = e.ref;
+        // A cross-lib operand OR a location-less local stub (no nodeKey) is UNADDRESSABLE here → a non-answerable stub,
+        // NOT an answerable leaf (rendering it with an answer would surface a row `$apply` never asks). Synthetic-only
+        // for the location-less case (the parser always assigns a location) — kept total.
+        if (r.crossLib || r.nodeKey === undefined) return { kind: "external", name: r.name, lib: r.lib };
+        const valueTypes = resolveValueTypes(r.lib, r.name);
+        const leaf: Extract<QExpr, { kind: "leaf" }> = {
+          kind: "leaf",
+          name: r.name,
+          lib: r.lib,
+          answer: truthAnswer(r.lib, r.name),
+          isSource: r.hasCodeIs ?? true, // stub flags are `undefined` ⇒ UNKNOWN; default to Source (don't spuriously grey)
+          isInferred: r.isInferred ?? false,
+          valueType: valueTypes[0] ?? null,
+        };
+        // A named-composite (or both-rep) operand is ALSO expandable → attach its OWN body as a nested box. Positional:
+        // guard only against a true cycle (the concept on the current path); a diamond re-expands. Depth cap → a `…` stub.
+        if (r.hasDefinedAs && r.nodeKey !== undefined && !visiting.has(r.nodeKey)) {
+          const entry = opts.defExpr?.(r.lib, r.name);
+          if (entry?.body) {
+            leaf.composite =
+              depth >= MAX_EXPR_DEPTH
+                ? { kind: "more", count: 0 } // depth cap → `…`
+                : buildQExpr(entry.body, new Set(visiting).add(r.nodeKey), depth + 1);
+          }
+        }
+        return leaf;
+      }
     }
   };
 
-  // If a `when`'s concept is an on-path inferred composite, expand its leaves one level deeper.
-  const expandCompositeIfAny = (concept: ConditionView["concept"], node: ViewNode, frameLib: string | undefined, depth: number): void => {
+  // Attach the operator-tree `expansion` to an ON-PATH composite `when`'s Question (the box render). The when ROW itself
+  // carries the composite's own answer (emitWhen); the expansion is its `defined as` BODY (operands only — no own-leaf).
+  const attachExpansion = (q: Question, concept: ConditionView["concept"], frameLib: string | undefined): void => {
+    if (!opts.defExpr) return;
     const lib = concept.libraryName ?? frameLib ?? "";
-    const shape = shapeOf(lib, concept.name);
-    if (shape?.hasDefinedAs) expandLeaves(shape.children, node.nodeId, depth);
+    const entry = opts.defExpr(lib, concept.name);
+    if (entry?.hasDefinedAs && entry.body) q.expansion = buildQExpr(entry.body, new Set([entry.nodeKey]), 1);
   };
 
   type GuardTerminal = { node: ViewNode; guard: GuardView; frameLib: string | undefined; depth: number };
@@ -201,9 +254,9 @@ export function buildQuestionnaire(
           continue;
         }
         if (cond.satisfied === true) {
-          emitWhen(cond.concept, node, frameLib, depth, "when-evaluated", "evaluated", true);
-          // ON-PATH composite → leaves FIRST (the concept's operands), then the decision-body children.
-          expandCompositeIfAny(cond.concept, node, frameLib, depth + 1);
+          const wq = emitWhen(cond.concept, node, frameLib, depth, "when-evaluated", "evaluated", true);
+          // ON-PATH composite → attach its `defined as` operator tree as the when's `expansion` (ANY OF / ALL OF box).
+          attachExpansion(wq, cond.concept, frameLib);
           walk(node.children ?? [], frameLib, depth + 1);
           continue;
         }
