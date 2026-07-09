@@ -126,7 +126,9 @@ check("no <style> or style= inside the SVG (CSP); FLOW_STYLE carries var() + fal
   assert.ok(!/<style/.test(r.html), "no <style> element in the SVG payload");
   assert.ok(!/ style=/.test(r.html), "no inline style= attribute");
   assert.ok(/var\(--vscode-[\w-]+,#/.test(FLOW_STYLE), "FLOW_STYLE uses var(--vscode-*, fallback) pairs");
-  assert.ok(/\.flow-row\.current>rect\{stroke:/.test(FLOW_STYLE), "SVG-friendly .current highlight");
+  // #187 Todo 3: the on-path highlight is the SVG-friendly RING (a rect stroke on `.flow-ring>rect`), NOT a CSS outline.
+  assert.ok(/\.flow-ring>rect\{[^}]*stroke:/.test(FLOW_STYLE), "SVG-friendly on-path ring (rect stroke)");
+  assert.ok(!/\.flow-row\.current>rect\{stroke/.test(FLOW_STYLE), "Todo 3: .current no longer recolors the base rect stroke");
 });
 
 check("#156 slice 5: .done-node/.error-node review overlay CSS exists, is NON-OUTLINE (fill, not stroke/outline)", () => {
@@ -149,8 +151,9 @@ check("#156 slice 5: review overlay COEXISTS — .current/.failed-criterion/-pre
   // The coexistence guarantee: the selection + BOTH failed-criterion channels set ONLY stroke, so adding a done/error fill
   // can never override them. Lock that all three existing highlight channels remain stroke-based (a future fill on any of
   // them would silently break the review channel). FIX 3: -preempt is the 2nd #173 stroke class the fill must coexist with.
+  // #187 Todo 3: `.current` left the stroke axis (it's now the `.flow-ring` on-path ring), so it's no longer here — the
+  // failed-criterion channels remain stroke-only so the done/error FILL still coexists with them.
   const strokeOnly = [
-    [".flow-row.current>rect", "selection"],
     [".flow-row.failed-criterion>rect", "failed-criterion (blocker)"],
     [".flow-row.failed-criterion-preempt>rect", "failed-criterion (preempt)"],
   ];
@@ -180,8 +183,9 @@ check("#177 slice 4: .this-node marker uses a PROVEN stroke (NOT outline), wins 
   assert.match(rule[1], /stroke:/, "this-node marks via stroke (the PROVEN-painting SVG axis, like .current)");
   assert.ok(!/outline/.test(rule[1]), "this-node does NOT use outline (outline does not paint on the SVG rect here)");
   assert.ok(!/[^-]fill:/.test(rule[1]), "this-node sets NO fill — coexists with .done-node/.error-node (the fill axis)");
-  // Ordered AFTER the three stroke channels so the focused-question marker wins when a node is also selected / a criterion.
-  for (const sel of [".flow-row.current>rect", ".flow-row.failed-criterion>rect", ".flow-row.failed-criterion-preempt>rect"])
+  // Ordered AFTER the stroke channels so the focused-question marker wins when a node is also a criterion. (#187 Todo 3:
+  // `.current` is no longer a rect-stroke channel — it's the ring — so it's dropped from this ordering list.)
+  for (const sel of [".flow-row.failed-criterion>rect", ".flow-row.failed-criterion-preempt>rect"])
     assert.ok(
       FLOW_STYLE.indexOf(sel + "{") < FLOW_STYLE.indexOf(".flow-row.this-node>rect{"),
       `.this-node>rect comes AFTER ${sel} (later-wins, so the marker overrides the transient ${sel} stroke)`,
@@ -201,11 +205,8 @@ check("disc 164: .diverter overlay uses a stroke (NOT outline/fill), ordered AFT
   assert.ok(!/outline/.test(rule[1]), "diverter does NOT use outline on the SVG rect");
   assert.ok(!/[^-]fill:/.test(rule[1]), "diverter sets NO fill — it is a stroke channel");
   assert.match(rule[1], /stroke-dasharray:1 3/, "dotted (1 3) — distinct from the dashed (4 2) failed-criterion channels");
-  // Ordered BEFORE .failed-criterion so a real blocker (red) wins over a diverter on the rare fail-overlap; AFTER .current.
-  assert.ok(
-    FLOW_STYLE.indexOf(".flow-row.current>rect{") < FLOW_STYLE.indexOf(".flow-row.diverter>rect{"),
-    ".diverter>rect comes after .current>rect",
-  );
+  // Ordered BEFORE .failed-criterion so a real blocker (red) wins over a diverter on the rare fail-overlap. (#187 Todo 3:
+  // the old "after .current" ordering is moot — `.current` is no longer a rect-stroke channel.)
   assert.ok(
     FLOW_STYLE.indexOf(".flow-row.diverter>rect{") < FLOW_STYLE.indexOf(".flow-row.failed-criterion>rect{"),
     ".diverter>rect comes BEFORE .failed-criterion>rect (a blocker stroke wins over a diverter on overlap)",
@@ -489,6 +490,25 @@ check("Todo 2: FLOW_STYLE — decision grey (not blue), certify green, not-certi
   assert.ok(!/flow-nonsource/.test(FLOW_STYLE), "no non-source FILL CSS (border carries the signal now)");
   assert.ok(!/textLink-foreground/.test(FLOW_STYLE), "use-decision is no longer blue (textLink)");
   assert.equal((FLOW_STYLE.match(/focusBorder/g) || []).length, 1, "focusBorder (blue) appears ONLY in the on-path .current ring");
+});
+
+// ── #187 Todo 3: the on-path RING (a deterministic hidden <rect>, revealed by .current / .flow-leaf-yes) replaces ✓/✗ ──
+check("Todo 3: a hidden .flow-ring <rect> on every structure node + outline leaf (none on op/ext/more rows); NO tick paths", () => {
+  const cs = [concept("c:C", "C", { definitionKind: "defined-as" })];
+  const st = [{ decision: "D", lib: "Pol", nodeKey: "d:D", location: {}, children: [
+    node("w:C", "when", "when C", ["c:C"], [node("a:C", "action", "certify.Approve", ["act:c"], [], { actionKind: "recommend-activity" })]),
+  ] }];
+  const map = { C: dentry("c:C", "C", dor(dref("L1", "c:L1"), dref("L2", "c:L2"))) };
+  const rr = renderFlowPane(st, { concepts: cs, defExpr: defExprOf(map) });
+  assert.ok(!/leaf-tick/.test(rr.html), "the ✓/✗ tick paths are gone from the render");
+  assert.ok(!/leaf-tick/.test(FLOW_STYLE), "the .leaf-tick CSS is gone");
+  // rings: d:D (decision) + w:C (when) + a:C (activity) = 3 structure nodes, + L1 + L2 = 2 leaves → 5. The ANY OF op row: none.
+  assert.equal((rr.html.match(/<g class="flow-ring">/g) || []).length, 5, "a ring on every structure node + outline leaf, none on op/topor/ext/more rows");
+  assert.match(FLOW_STYLE, /\.flow-ring\{display:none\}/, "the ring is hidden by default");
+  assert.match(FLOW_STYLE, /\.flow-ring>rect\{[^}]*fill:none[^}]*stroke:var\(--vscode-focusBorder/, "the ring is a blue rect stroke, no fill (deterministic — not a CSS outline)");
+  assert.match(FLOW_STYLE, /\.flow-row\.current \.flow-ring,\.flow-row\.flow-leaf-yes \.flow-ring\{display:inline\}/, "revealed by .current (main path) OR .flow-leaf-yes (true operand)");
+  assert.match(FLOW_STYLE, /\.flow-leaf \.flow-ring>rect\{stroke-width:1\.5\}/, "the leaf ring is thinner (clears the compact outline row pitch)");
+  assert.match(FLOW_STYLE, /\.flow-row\.current,[^{]*\{outline:none\}/, "the shell's outline overlays (current + diverter/failed-criterion/-preempt) are neutralized on flow nodes (no double ring)");
 });
 
 console.log(`\nflowPaneHtml.test: ${pass} checks passed`);

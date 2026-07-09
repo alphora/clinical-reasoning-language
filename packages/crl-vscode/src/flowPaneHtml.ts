@@ -62,6 +62,13 @@ const ESC: Record<string, string> = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"
 const escapeHtml = (s: string): string => s.replace(/[&<>"']/g, (c) => ESC[c]);
 // SVG <text> has no CSS ellipsis — truncate the visible label here; the full text rides the <title> element for hover.
 const truncate = (s: string, n: number): string => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
+// #187 Todo 3: the on-path RING — a hidden, stroked `<rect>` `off` px larger than the body box on every side, nested in a
+// `<g class="flow-ring">` (a GRANDCHILD, so the `.flow-row>rect` / kind / overlay selectors never style it) and revealed
+// by CSS when the row is `.current` (main path) or `.flow-leaf-yes` (a true operand). Deterministic rect-stroke (the proven
+// SVG axis) — NOT a CSS `outline` (which is env-fragile on `<g>` and would ring box∪guard-tab). Composes with the node's
+// own identity border (a separate axis). `pointer-events:none` (CSS) so a click falls through to the row's data-reveal.
+const flowRing = (x: number, y: number, w: number, h: number, off: number, rx: number): string =>
+  `<g class="flow-ring"><rect x="${x - off}" y="${y - off}" width="${w + 2 * off}" height="${h + 2 * off}" rx="${rx}"/></g>`;
 
 // Layout constants (px). Fixed node width → deterministic + unit-testable coords. The SVG carries INTRINSIC width/height
 // (not 100%) so an oversized chart scrolls/pans inside a narrow pane column rather than squashing.
@@ -370,7 +377,8 @@ export function renderFlowPane(
 
     // #187 Option-C: an OUTLINE LEAF row (a `defined as` concept operand). Peeks its OWN concept (`{conceptNodeKey}`); its
     // synthetic `leaf::` key (path-bearing → collision-free) anchors it + joins the Todo-5 verdict overlay. No peek dot
-    // (the whole row IS the concept). Carries BOTH verdict ticks HIDDEN — `markLeaves` toggles `.flow-leaf-yes/-no`.
+    // (the whole row IS the concept). #187 Todo 3: carries a hidden on-path RING revealed when the operand is TRUE
+    // (`markLeaves` toggles `.flow-leaf-yes`); a false / unknown operand shows nothing (ring = on-path, not a verdict tick).
     if (n.outline) {
       const conceptKey = n.conceptKey as string; // an outline leaf always resolves a concept (else it's `external`)
       reveals[key] = { conceptNodeKey: conceptKey };
@@ -380,15 +388,12 @@ export function renderFlowPane(
       // not a decision box). `isSource === false` is inferred; `true`/`undefined` stay grey (never mis-purple).
       const classes = ["flow-row", "flow-leaf"];
       if (n.isSource === false) classes.push("flow-inferred");
-      const cx = x + OUTLINE_NODE_W - 11;
-      const cy = y + OUTLINE_H / 2;
-      const ticks =
-        `<path class="leaf-tick leaf-tick-yes" d="M${cx - 4} ${cy} l3 3 l5 -6"/>` +
-        `<path class="leaf-tick leaf-tick-no" d="M${cx - 4} ${cy - 4} l8 8 M${cx + 4} ${cy - 4} l-8 8"/>`;
       body +=
         `<g id="${escapeHtml(gid)}" class="${classes.join(" ")}" data-reveal="${escapeHtml(key)}"><title>${escapeHtml(n.full)}</title>` +
         `<rect x="${x}" y="${y}" width="${OUTLINE_NODE_W}" height="${OUTLINE_H}" rx="6"/>` +
-        `<text x="${x + 9}" y="${y + OUTLINE_H / 2 + 4}">${escapeHtml(truncate(n.label, OUTLINE_LABEL_MAX))}</text>${ticks}</g>`;
+        `<text x="${x + 9}" y="${y + OUTLINE_H / 2 + 4}">${escapeHtml(truncate(n.label, OUTLINE_LABEL_MAX))}</text>` +
+        flowRing(x, y, OUTLINE_NODE_W, OUTLINE_H, 1.5, 7) +
+        `</g>`;
       continue;
     }
 
@@ -427,6 +432,7 @@ export function renderFlowPane(
       `<title>${escapeHtml(n.full)}</title>` +
       `<rect x="${x}" y="${y}" width="${NODE_W}" height="${NODE_H}" rx="6"/>` +
       `<text x="${x + 10}" y="${y + NODE_H / 2 + 4}">${escapeHtml(truncate(n.label, LABEL_MAX))}</text>` +
+      flowRing(x, y, NODE_W, NODE_H, 2.5, 8) + // #187 Todo 3: on-path ring — BEFORE the guard tab so the tab's opaque fill occludes the ring's top crossing segment
       guardTab +
       `</g>`;
   }
@@ -440,8 +446,10 @@ export function renderFlowPane(
 
 /** Flow-pane CSS — concatenated into the cockpit's nonced <style> (CSP-safe: no inline styles / no SVG <style>). Every
  *  var(--vscode-*) carries a hex fallback (the chart renders in tests / high-contrast with no live theme), matching
- *  CORR_STYLE + shellHtml. `.flow-row.current rect` is the SVG-friendly highlight (the shell's global `.current` outline
- *  does not paint on a <g>). */
+ *  CORR_STYLE + shellHtml. #187 Todo 3: the on-path highlight is the `.flow-ring` rect (a deterministic SVG rect-stroke);
+ *  the shell's global `.current`/`.diverter`/`.failed-criterion` OUTLINE overlays ARE neutralized on flow `<g>`s (they
+ *  paint a lumpy square there — the flow uses the ring + rect strokes instead). The per-case CHANNELS still paint rect
+ *  strokes/fills: `.this-node` (orange), `.failed-criterion`/`-preempt` (dashed), `.diverter` (dotted), `.done/.error` (fill). */
 export const FLOW_STYLE =
   `.flow-wrap{display:inline-block;min-width:100%}` +
   `.flow-svg{display:block;font:12px var(--vscode-editor-font-family,sans-serif)}` +
@@ -484,7 +492,19 @@ export const FLOW_STYLE =
   `.flow-op>text,.flow-topor>text{fill:var(--vscode-descriptionForeground,#8c8c8c);font:700 9px/1 var(--vscode-editor-font-family,monospace);letter-spacing:.12em}` +
   `.flow-ext>rect,.flow-more>rect{fill:var(--vscode-editor-background,#1e1e1e);stroke:var(--vscode-descriptionForeground,#6a6a72);stroke-width:1;stroke-dasharray:2 2;opacity:.7}` +
   `.flow-ext>text,.flow-more>text{fill:var(--vscode-descriptionForeground,#8c8c8c);font-size:11px;font-style:italic}` +
-  `.flow-row.current>rect{stroke:var(--vscode-focusBorder,#3794ff);stroke-width:2.5}` +
+  // #187 Todo 3: the on-path RING — a hidden `<rect>` in `.flow-ring`, revealed by `.current` (main path) or
+  // `.flow-leaf-yes` (a TRUE operand). Deterministic rect-stroke (NOT a CSS outline), composes with the node's own
+  // identity border (a separate axis) — `.current` no longer recolors the base border. NEUTRALIZE every shell `outline`
+  // overlay on flow nodes (`.current`/`.diverter`/`.failed-criterion`/`-preempt` — those DO paint a lumpy square outline
+  // on the SVG `<g>`; the flow uses the rect ring + rect strokes instead). GEOMETRY: `off` (render, per node) + `stroke-width`
+  // (here) are coupled — outer extent = off + stroke/2; keep them in lockstep (leaf ≈2.25px/side < the ~3.36px half-gap;
+  // struct ≈3.75px/side < the 7px half-gap). The leaf ring is THINNER to clear the compact outline row pitch. No
+  // `pointer-events:none` — the ring is nested in the row `<g data-reveal>`, so a click on the ring band routes to the row.
+  `.flow-row.current,.flow-row.diverter,.flow-row.failed-criterion,.flow-row.failed-criterion-preempt{outline:none}` +
+  `.flow-ring{display:none}` +
+  `.flow-ring>rect{fill:none;stroke:var(--vscode-focusBorder,#3794ff);stroke-width:2.5;stroke-dasharray:none}` +
+  `.flow-leaf .flow-ring>rect{stroke-width:1.5}` +
+  `.flow-row.current .flow-ring,.flow-row.flow-leaf-yes .flow-ring{display:inline}` +
   // disc 164: the produced-path DIVERTER overlay on the SVG rect (the shell's HTML `.diverter` outline does not paint on
   // a <g>, same as the channels below). A neutral teal DOTTED stroke for the evaluated-false `when`s that routed the case
   // to its produced disposition (the Adult gate for a not-adult deny). Ordered BEFORE `.failed-criterion` so a blocker
@@ -521,11 +541,7 @@ export const FLOW_STYLE =
   // on the path", so the focus ("the question you're on") must read differently from a path node (it is not on the path,
   // e.g. a not-adult deny whose Q1 `when` isn't in the reveal cluster). Thicker than `.current` (2.5); `stroke-dasharray:none`.
   `.flow-row.this-node>rect{stroke:var(--vscode-charts-orange,#d18616);stroke-width:3;stroke-dasharray:none}` +
-  // #187 Todo 5: the per-case leaf VERDICT tick. Both glyphs render HIDDEN in every concept-bearing def-leaf; the
-  // `markLeaves` overlay toggles `.flow-leaf-yes`/`.flow-leaf-no` on the leaf <g> (a class-toggle, like the channels above)
-  // and CSS reveals the matching tick. A corner GLYPH (not a rect fill) so it composes with the non-Source wash + the
-  // dashed leaf border. yes = a green check (the testing-pass green, reused from `.done-node`); no = a MUTED grey X —
-  // deliberately NOT error-red, so an unsatisfied ANSWER never reads as the red `.failed-criterion` blocker channel.
-  `.leaf-tick{display:none;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}` +
-  `.flow-row.flow-leaf-yes .leaf-tick-yes{display:inline;stroke:var(--vscode-testing-iconPassed,#3fb950)}` +
-  `.flow-row.flow-leaf-no .leaf-tick-no{display:inline;stroke:var(--vscode-descriptionForeground,#8c8c8c)}`;
+  // #187 Todo 3: the per-case leaf verdict is now the on-path RING (above) — `markLeaves` toggles `.flow-leaf-yes` (TRUE
+  // → ring) / `.flow-leaf-no` (false → NOTHING; `.flow-leaf-no` is a RESERVED no-op class, kept so a muted false marker is
+  // a cheap re-add if the audit ever needs false≠unevaluated). The old green ✓ / grey ✗ tick glyphs are removed.
+  `.flow-row.flow-leaf-no{}`;

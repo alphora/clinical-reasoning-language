@@ -960,9 +960,10 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   }
 
   /**
-   * #187 Todo 5: drive the per-case leaf VERDICT overlay on the TREE — a green check / muted X on each `defined as` leaf
-   * the emitted PlanDefinition ASKS for this case. Its own channel, mutated ONLY by markLeaves/clearLeaves — so a leaf's
-   * tick survives the REVEAL channel (highlight/clearHighlight never touch it, like the review + this-node overlays). But
+   * #187 Todo 5/Todo 3: drive the per-case leaf overlay on the TREE — the on-path RING on each TRUE `defined as` operand
+   * (`.flow-leaf-yes`); a false / unknown operand shows nothing (`.flow-leaf-no` is a reserved no-op class — see FLOW_STYLE).
+   * Its own channel, mutated ONLY by markLeaves/clearLeaves — so a leaf's ring survives the REVEAL channel
+   * (highlight/clearHighlight never touch it, like the review + this-node overlays). But
    * it is FOCUSED-CASE-coupled, EXACTLY like `driveThisNode`/`driveDiverters` (all three read `focusedScenario()`): when
    * the focused case is lost (a non-cel selection / cleared selection) it clears via the empty gen-stamped mark below, in
    * lockstep with the questionnaire emptying to its placeholder. (It is NOT the case-INDEPENDENT `driveDoneOverlay`, which
@@ -2190,10 +2191,10 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   `else if(m.type==='clearDiverters'){clrDV();}` +
   `else if(m.type==='markDiverters'){if(m.gen!==gen)return;clrDV();` +
   `for(const id of (m.segmentIds||[])){const el=document.getElementById(id);if(el)el.classList.add('diverter');}}` +
-  // #187 Todo 5: the PERSISTENT per-case leaf verdict channel (.flow-leaf-yes/.flow-leaf-no on a leaf <g>; CSS reveals its
-  // matching hidden tick). A SEPARATE channel from all above. Like the review overlay + this-node it is mutated ONLY here
-  // (mark/clearLeaves), NEVER by highlight/clearHighlight/clrFC/clrDV — so the leaf answers SURVIVE a cockpit reveal.
-  // CRITICAL: clrLeaf() FIRST (clear-then-set, gen-guarded) — else a leaf answered `yes` for case A keeps its tick under
+  // #187 Todo 5/Todo 3: the PERSISTENT per-case leaf channel (.flow-leaf-yes/.flow-leaf-no on a leaf <g>; CSS reveals the
+  // on-path RING on `-yes`, nothing on `-no`). A SEPARATE channel from all above. Like the review overlay + this-node it is
+  // mutated ONLY here (mark/clearLeaves), NEVER by highlight/clearHighlight/clrFC/clrDV — so the leaf marks SURVIVE a reveal.
+  // CRITICAL: clrLeaf() FIRST (clear-then-set, gen-guarded) — else a leaf answered `yes` for case A keeps its ring under
   // case B when B has no conceptTruth row for it (absent ⇒ no mark). yes/no are mutually exclusive per leaf. No scroll.
   `else if(m.type==='clearLeaves'){clrLeaf();}` +
   `else if(m.type==='markLeaves'){if(m.gen!==gen)return;clrLeaf();` +
