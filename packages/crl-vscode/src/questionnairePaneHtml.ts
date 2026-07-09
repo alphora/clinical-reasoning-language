@@ -381,8 +381,10 @@ export const QUESTIONNAIRE_STYLE =
   `.q-box .q-box{margin-left:0}` +
   `.q-box-tab{position:absolute;top:-9px;left:-2px;font:700 10px/1 var(--vscode-editor-font-family,monospace);letter-spacing:.12em;text-transform:uppercase;padding:2px 7px;border-radius:5px 5px 5px 0;color:var(--vscode-charts-blue,#3794ff);border:1px solid var(--vscode-charts-blue,#3794ff);background:var(--vscode-editor-background,#1e1e1e)}` +
   // An INFERRED composite when's concept + DERIVED answer, in PARENS just above the box — NORMAL FLOW (reflows/wraps as the
-  // pane narrows, unlike an absolute title). Its answer option is PURPLE-bordered (derived, not a direct `code is` answer).
-  `.q-inferred-title{display:inline-flex;align-items:center;gap:2px;flex-wrap:wrap}` +
+  // pane narrows, unlike an absolute title) but CENTERED over the box's width (as close to the old on-the-border look as a
+  // reflowing element gets — "just above" instead of on the border is the only concession). The number badge stays in flow
+  // on its OWN row above the title (as it was on the border impl), so the centered title keeps its own line.
+  `.q-inferred-title{display:block;text-align:center;margin:1px 0 0 20px}` +
   `.q-inferred-when .q-box{margin-top:9px}` + // room for the ANY OF/ALL OF tab to pop just below the title
   `.q-inferred-title .q-opt-answer,.q-exp-leaf.q-nonsource .q-opt-answer{background:rgba(197,134,192,.22);border-color:var(--vscode-charts-purple,#c586c0)}` +
   // a leaf row inside a box (the concept + its Yes/No answer). Reuses .q-nonsource/.q-opt.
