@@ -178,7 +178,8 @@ function renderQuestion(q: Question, gid: string): string {
   if (q.reach === "preempted") titleParts.push("skipped by an earlier first: match");
   if (!q.isSource) titleParts.push("inferred / non-source concept (no local code)");
   const titleAttr = titleParts.length ? ` title="${escapeHtml(titleParts.join(" · "))}"` : "";
-  const layer = `<span class="q-layer" title="nesting layer ${q.depth}">${q.depth}</span>`;
+  // 1-based for readability (a top-level when reads "1", not the raw 0-based decision depth).
+  const layer = `<span class="q-layer" title="nesting layer ${q.depth + 1}">${q.depth + 1}</span>`;
   return (
     `<li class="${cls.join(" ")}" id="${escapeHtml(gid)}" data-q="${escapeHtml(q.nodeId)}"${titleAttr}>` +
     layer +
@@ -346,10 +347,10 @@ export const QUESTIONNAIRE_STYLE =
   `.q-conn-top{margin-left:20px}` +
   `.q-conn-or,.q-conn-and{color:var(--vscode-charts-blue,#3794ff);background:rgba(55,148,255,.13);border:1px solid var(--vscode-charts-blue,#3794ff)}` +
   `.q-conn-not{color:var(--vscode-descriptionForeground,#8c8c8c);background:var(--vscode-editorWidget-background,#2b2b2e);border:1px solid var(--vscode-panel-border,#454545)}` +
-  // the grouping box. The ANY OF / ALL OF tab pops onto the box's top-left border (as before). The box's top margin is
-  // TIGHT (7px = the tab's -9px pop) so the operator chip's BOTTOM border meets the tab's TOP border — no gap between the
-  // `OR` chip and the `ANY OF`/`ALL OF` tab. A NESTED box does NOT indent further.
-  `.q-box{position:relative;margin:7px 0 8px 20px;border:1px solid var(--vscode-panel-border,#454545);border-left:2px solid var(--vscode-charts-blue,#3794ff);border-radius:0 6px 6px 6px;background:var(--vscode-editor-background,#1e1e1e);padding:13px 8px 6px 8px}` +
+  // the grouping box. The ANY OF / ALL OF tab pops onto the box's top-left border (as before). The box's top margin (4px)
+  // is LESS than the tab's -9px pop, so the operator chip's BOTTOM border OVERLAPS the tab's TOP border. A NESTED box does
+  // NOT indent further.
+  `.q-box{position:relative;margin:4px 0 8px 20px;border:1px solid var(--vscode-panel-border,#454545);border-left:2px solid var(--vscode-charts-blue,#3794ff);border-radius:0 6px 6px 6px;background:var(--vscode-editor-background,#1e1e1e);padding:13px 8px 6px 8px}` +
   `.q-box .q-box{margin-left:0}` +
   `.q-box-tab{position:absolute;top:-9px;left:-2px;font:700 10px/1 var(--vscode-editor-font-family,monospace);letter-spacing:.12em;text-transform:uppercase;padding:2px 7px;border-radius:5px 5px 5px 0;color:var(--vscode-charts-blue,#3794ff);border:1px solid var(--vscode-charts-blue,#3794ff);background:var(--vscode-editor-background,#1e1e1e)}` +
   // a leaf row inside a box (the concept + its Yes/No answer). Reuses .q-nonsource/.q-inferred/.q-opt.

@@ -774,7 +774,7 @@ case "bmi holds":
   // The SUB-questions (expansion leaves) carry NO layer number — nesting is shown by the box borders. The layer number
   // is a MAIN-question affordance: the "BMI Qualifies" when row carries one (decision depth 1), the sub-questions don't.
   assert.ok(!exp.includes("q-layer"), "sub-questions inside the boxes have NO layer-number badge");
-  assert.match(r.html, /<li class="q-item[^"]*"[^>]*><span class="q-layer"[^>]*>0<\/span><span class="q-prompt"><span class="q-concept">BMI Qualifies</, "the MAIN question 'BMI Qualifies' (a top-level when) carries its decision-depth layer number (0)");
+  assert.match(r.html, /<li class="q-item[^"]*"[^>]*><span class="q-layer"[^>]*>1<\/span><span class="q-prompt"><span class="q-concept">BMI Qualifies</, "the MAIN question 'BMI Qualifies' (a top-level when) carries a 1-based layer number (1)");
 });
 
 check("Option-3 nav: default (currentIndex -1) shows 'Question 0 of N' — no question auto-focused; Prev disabled, Next enabled", () => {
