@@ -302,10 +302,10 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   let editingNoteId: string | undefined;
   let mvSidecarPath: string | undefined;
   let worklistActions: Record<string, { caseId: string }> = {};
-  // #177 slice 3 — the questionnaire panel's focused-question index (the prev/next sub-nav cursor). RESET to 0 on a real
-  // cel-case change (the selection-scoped re-render hook in dispatch). Declared HERE so slices 4 (the "this node" marker)
-  // and 5 (the prev/next sub-nav) build on it; this slice only resets it (the static pane doesn't read it yet).
-  let currentQuestionIndex = 0;
+  // #177 slice 3 — the questionnaire panel's focused-question cursor. DEFAULT `-1` = "no question focused" (the pane
+  // shows "Question 0 of Y"; Next moves to question 1) — a case does NOT auto-focus its first question. RESET to -1 on a
+  // real cel-case change. Declared HERE so slices 4 (the "this node" marker) + 5 (the prev/next sub-nav) build on it.
+  let currentQuestionIndex = -1;
   // #177 slice 4 — the CURRENT questionnaire render's ordered question runtime nodeIds (captured atomically with the
   // questionnaire pane's anchors, mirroring worklistActions/conceptToFactAnchors). `driveThisNode` resolves the FOCUSED
   // question's nodeId as `questionNodeIds[currentQuestionIndex]` without re-running the walk. Empty when no case/no
@@ -452,9 +452,9 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
         paneOpen: views.has("questionnaire"),
       })
     ) {
-      currentQuestionIndex = 0;
+      currentQuestionIndex = -1; // a new case starts with NO question focused
       renderPane("questionnaire");
-      // #177 slice 4: the questionnaire just re-rendered for the new case (question 0) — re-drive the "this node" marker
+      // #177 slice 4: the questionnaire just re-rendered for the new case (no focused question) — re-drive the "this node" marker
       // across all panes. CORRECTNESS MODEL (mirrors driveDoneOverlay): the PANE-ACK re-drive (onWebviewMessage's `ready` →
       // driveThisNode, fires on every marker-bearing pane render) is the guarantee — a freshly rendered pane always re-paints
       // from current state. This immediate post is a LATENCY optimization relying on VS Code webview postMessage being
@@ -1523,7 +1523,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     editingNoteId = undefined;
     mvSidecarPath = undefined;
     worklistActions = {};
-    currentQuestionIndex = 0; // #177 slice 3: drop the questionnaire sub-nav cursor with the rest of the MV state
+    currentQuestionIndex = -1; // #177 slice 3: drop the questionnaire sub-nav cursor (no question focused) with the MV state
     questionNodeIds = []; // #177 slice 4 (FIX 5): drop the focused-question id list too (symmetry/defense — renderEmpty leaves a stale list)
     unitNumber = new Map();
     rowKeyNumbers = {};

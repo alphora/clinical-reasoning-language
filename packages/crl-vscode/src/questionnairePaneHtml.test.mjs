@@ -87,7 +87,7 @@ case "X absent, Y holds → Approve":
   const r = renderQuestionnairePane(sv, booleanResolver, rootLib, { revealPrefix: "g1_" });
   // UX fix: the header reads "Case: <name>" (not "Questionnaire — …") and the authored `→ Approve` outcome suffix is
   // stripped (redundant with the Outcome line below), leaving just the descriptive case name.
-  assert.match(r.html, /<p class="q-head">Case: <span class="q-case">X absent, Y holds<\/span><\/p>/, "header reads 'Case: <stripped name>'");
+  assert.match(r.html, /<p class="q-head">Case - <span class="q-case">X absent, Y holds<\/span><\/p>/, "header reads 'Case - <stripped name>'");
   assert.ok(!/Questionnaire —/.test(r.html), "the old 'Questionnaire —' prefix is gone");
   assert.ok(!/→ Approve/.test(r.html), "the authored '→ Approve' outcome suffix is stripped from the header");
   // Two questions, in order, each "Is <concept>?".
@@ -731,6 +731,91 @@ case "root holds":
   // the external stub carries NO Yes/No options.
   const ext = r.html.match(/<div class="q-exp-leaf q-external"[^>]*>((?:(?!<\/div>).)*)<\/div>/);
   assert.ok(ext && !ext[1].includes("q-opt"), "an external stub has NO Yes/No options (not evaluated here)");
+});
+
+check("Option-3 render: `defined as` adds a FORCED top OR; the body's boxes stay; leaves carry LAYER NUMBERS (the confirmed BMI Qualifies shape)", () => {
+  const crl = `# P
+library "V".
+concept "BMI Qualifies":
+- type is Condition.
+- code is \`bmi\`.
+activity "Approve":
+- request CPGCommunicationRequest.
+- with \`ok\`.
+decision "V":
+- when "BMI Qualifies" then recommend activity "Approve".`;
+  const cel = `# C
+library "VCases".
+covers "V".
+fact "Pat":
+- name is "Pat".
+- birth date is "1970-01-01".
+- defined by "Patient".
+fact "fB":
+- code is "http://x|bmi".
+- defined by "BMI Qualifies".
+case "bmi holds":
+- subject is "Pat".
+- fact is "fB".
+- result is "V" is "Approve".`;
+  const { sv, rootLib } = renderCase({ "v.crl": crl, "v.cel": cel }, "v.cel", "bmi holds");
+  // BMI Qualifies defined as ( BMI Over 40  sem-or  ( BMI Over 35  sem-and  Substantial Co-Morbidity ) ).
+  const lref = (name) => ({ kind: "ref", ref: { name, lib: "V", crossLib: false, nodeKey: `k:${name}`, hasCodeIs: true, leafEligible: true, isInferred: false, hasDefinedAs: false } });
+  const entry = {
+    nodeKey: "k:BMIQ", lib: "V", name: "BMI Qualifies", hasCodeIs: false, leafEligible: false, isInferred: true, hasDefinedAs: true,
+    body: { kind: "or", operands: [lref("BMI Over 40"), { kind: "and", operands: [lref("BMI Over 35"), lref("Substantial Co-Morbidity")] }] },
+  };
+  const r = renderQuestionnairePane(sv, booleanResolver, rootLib, { revealPrefix: "g1_", currentIndex: -1, conceptShape: (_l, n) => (n === "BMI Qualifies" ? { nodeKey: "k:BMIQ", hasCodeIs: false, leafEligible: false, isInferred: true, hasDefinedAs: true, children: [] } : undefined), defExpr: (_l, n) => (n === "BMI Qualifies" ? entry : undefined) });
+  // FORCED top OR chip, THEN the body's ANY OF box (the sem-or) — the top OR precedes the box in the HTML.
+  const exp = r.html.match(/<li class="q-exp[^"]*">([\s\S]*?)<\/li>/)[1];
+  assert.ok(exp.indexOf('q-conn-or') < exp.indexOf('q-box q-box-or'), "a forced top OR chip precedes the body's ANY OF box");
+  assert.match(exp, /q-box-tab">any of</, "the sem-or body renders an ANY OF box");
+  assert.match(exp, /q-box q-box-and"><span class="q-box-tab">all of</, "the nested sem-and renders an ALL OF box");
+  // Layer numbers: BMI Over 40 = layer 1 (top box); BMI Over 35 / Co-Morbidity = layer 2 (nested box).
+  assert.match(exp, /q-layer[^>]*>1<\/span><span class="q-prompt"><span class="q-concept">BMI Over 40</, "BMI Over 40 is layer 1");
+  assert.match(exp, /q-layer[^>]*>2<\/span><span class="q-prompt"><span class="q-concept">BMI Over 35</, "the nested BMI Over 35 is layer 2");
+});
+
+check("Option-3 nav: default (currentIndex -1) shows 'Question 0 of N' — no question auto-focused; Prev disabled, Next enabled", () => {
+  const crl = `# P
+library "V".
+concept "A":
+- type is Condition.
+- code is \`a\`.
+concept "B":
+- type is Condition.
+- code is \`b\`.
+activity "Approve":
+- request CPGCommunicationRequest.
+- with \`ok\`.
+decision "V":
+first:
+- when "A" then:
+  - when "B" then recommend activity "Approve".
+  end.`;
+  const cel = `# C
+library "VCases".
+covers "V".
+fact "Pat":
+- name is "Pat".
+- birth date is "1970-01-01".
+- defined by "Patient".
+fact "fA":
+- code is "http://x|a".
+- defined by "A".
+fact "fB":
+- code is "http://x|b".
+- defined by "B".
+case "a+b":
+- subject is "Pat".
+- fact is "fA".
+- fact is "fB".
+- result is "V" is "Approve".`;
+  const { sv, rootLib } = renderCase({ "v.crl": crl, "v.cel": cel }, "v.cel", "a+b");
+  const r = renderQuestionnairePane(sv, booleanResolver, rootLib, { revealPrefix: "g1_", currentIndex: -1 });
+  assert.match(r.html, /Question 0 of 2/, "defaults to 'Question 0' — no question focused");
+  assert.match(r.html, /data-qnav="prev" disabled/, "Prev is disabled at the no-question default");
+  assert.ok(!/data-qnav="next" disabled/.test(r.html), "Next is enabled → the user navigates to question 1");
 });
 
 console.log(`\nquestionnairePaneHtml.test.mjs: ${pass} checks passed.`);

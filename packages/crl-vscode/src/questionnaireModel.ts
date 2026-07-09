@@ -234,6 +234,9 @@ export function buildQuestionnaire(
     if (!opts.defExpr) return;
     const lib = concept.libraryName ?? frameLib ?? "";
     const entry = opts.defExpr(lib, concept.name);
+    // The `expansion` is the RAW operator tree (the ALL OF / ANY OF structure is unchanged). `defined as` is a disjunction
+    // of alternative representations, but that top-level `or` is a RENDER annotation (a forced `or` chip above the body —
+    // see renderExpansion), NOT an extra box — so a top-level `and` shows `or` then its ALL OF, one compound alternative.
     if (entry?.hasDefinedAs && entry.body) q.expansion = buildQExpr(entry.body, new Set([entry.nodeKey]), 1);
   };
 
