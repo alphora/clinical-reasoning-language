@@ -24,8 +24,6 @@ import {
   type QExpr,
 } from "./questionnaireModel";
 
-/** Max indent depth with a dedicated padding class; deeper rows clamp (a questionnaire never nests this far). */
-const MAX_DEPTH = 12;
 
 export interface QuestionnaireAnchor {
   scrollTo: string;
@@ -112,12 +110,12 @@ function connDiv(op: "or" | "and" | "not", top: boolean): string {
 /** Render a `defined as` body: a FORCED top `or` chip — every `defined as` is a disjunction of alternative
  *  representations, so its top is always `or` (a top-level `and` reads `or` then its single ALL OF compound) — then the
  *  body's own structure (its ALL OF / ANY OF box, unchanged). Used at each `defined as` boundary (the when's expansion +
- *  each named-composite operand's body). */
-function renderExpansion(body: QExpr, depth: number): string {
-  return connDiv("or", true) + renderQExpr(body, depth);
+ *  each named-composite operand's body). Sub-question nesting is shown by the BOX borders (no per-leaf number/indent). */
+function renderExpansion(body: QExpr): string {
+  return connDiv("or", true) + renderQExpr(body);
 }
 
-function renderQExpr(e: QExpr, depth: number): string {
+function renderQExpr(e: QExpr): string {
   switch (e.kind) {
     case "or":
     case "and": {
@@ -126,25 +124,23 @@ function renderQExpr(e: QExpr, depth: number): string {
       let inner = "";
       e.operands.forEach((o, i) => {
         if (i > 0) inner += connDiv(op, false); // infix operator between operands
-        inner += renderQExpr(o, depth + 1); // operands sit one nesting LAYER deeper
+        inner += renderQExpr(o);
       });
       return `<div class="q-box q-box-${op}"><span class="q-box-tab">${label}</span><div class="q-box-body">${inner}</div></div>`;
     }
     case "not":
-      return connDiv("not", false) + renderQExpr(e.operand, depth); // transparent to layer
+      return connDiv("not", false) + renderQExpr(e.operand);
     case "leaf": {
       const cls = ["q-exp-leaf"];
       if (!e.isSource) cls.push("q-nonsource");
       if (e.isInferred) cls.push("q-inferred");
-      // Depth is shown as a LAYER NUMBER badge instead of indentation (so nesting reads without runaway indent).
-      const layer = `<span class="q-layer" title="nesting layer ${depth}">${depth}</span>`;
-      const row = `<div class="${cls.join(" ")}">${layer}<span class="q-prompt"><span class="q-concept">${escapeHtml(e.name)}</span>?</span>${renderExpOpts(e.answer)}</div>`;
+      const row = `<div class="${cls.join(" ")}"><span class="q-prompt"><span class="q-concept">${escapeHtml(e.name)}</span>?</span>${renderExpOpts(e.answer)}</div>`;
       // A named-composite / both-rep operand is answerable AND expandable → its OWN `defined as` body renders below (with
       // its own forced top `or`, since it too is a disjunction of alternatives).
-      return e.composite ? row + renderExpansion(e.composite, depth) : row;
+      return e.composite ? row + renderExpansion(e.composite) : row;
     }
     case "external":
-      return `<div class="q-exp-leaf q-external" title="a cross-library concept — not evaluated here"><span class="q-layer">${depth}</span><span class="q-prompt"><span class="q-concept">${escapeHtml(e.name)}</span>?</span><span class="q-ext-mark">(external)</span></div>`;
+      return `<div class="q-exp-leaf q-external" title="a cross-library concept — not evaluated here"><span class="q-prompt"><span class="q-concept">${escapeHtml(e.name)}</span>?</span><span class="q-ext-mark">(external)</span></div>`;
     case "more":
       return `<div class="q-more">${e.count > 0 ? `+${e.count} more` : "…"}</div>`;
   }
@@ -171,7 +167,8 @@ function renderQuestion(q: Question, gid: string): string {
     q.answer === "unknown"
       ? `<span class="q-unknown" title="no case answer — a question this path never asked">n/a</span>`
       : "";
-  const cls = ["q-item", `q-d${Math.min(q.depth, MAX_DEPTH)}`];
+  // A MAIN question carries its decision-nesting DEPTH as a LAYER NUMBER badge instead of indentation (flat left edge).
+  const cls = ["q-item"];
   if (q.reach === "preempted") cls.push("q-preempted");
   if (!q.isSource) cls.push("q-nonsource");
   if (q.isInferred) cls.push("q-inferred");
@@ -181,8 +178,10 @@ function renderQuestion(q: Question, gid: string): string {
   if (q.reach === "preempted") titleParts.push("skipped by an earlier first: match");
   if (!q.isSource) titleParts.push("inferred / non-source concept (no local code)");
   const titleAttr = titleParts.length ? ` title="${escapeHtml(titleParts.join(" · "))}"` : "";
+  const layer = `<span class="q-layer" title="nesting layer ${q.depth}">${q.depth}</span>`;
   return (
     `<li class="${cls.join(" ")}" id="${escapeHtml(gid)}" data-q="${escapeHtml(q.nodeId)}"${titleAttr}>` +
+    layer +
     `<span class="q-prompt"><span class="q-concept">${escapeHtml(q.conceptName)}</span>?</span>` +
     typeLabel +
     `<span class="q-opts">${opts}${unknown}</span>` +
@@ -256,7 +255,7 @@ export function renderQuestionnairePane(
     anchors[question.nodeId] = { scrollTo: gid, segmentIds: [gid] };
     if (question.isNavStop) questionNodeIds.push(question.nodeId);
     items += renderQuestion(question, gid);
-    if (question.expansion) items += `<li class="q-exp q-d${Math.min(question.depth, MAX_DEPTH)}">${renderExpansion(question.expansion, 0)}</li>`;
+    if (question.expansion) items += `<li class="q-exp">${renderExpansion(question.expansion)}</li>`;
   });
 
   const caseName = caseDisplayName(sv.case?.name ?? ""); // strip the authored `-> outcome` suffix (redundant w/ the Outcome line)
@@ -307,8 +306,7 @@ export const QUESTIONNAIRE_STYLE =
   `.q-nav-pos{opacity:.8;margin-left:auto}` +
   `.q-list{list-style:none;margin:0;padding-left:0}` +
   `.q-item{padding:2px 4px 2px 6px;border-radius:3px;margin:1px 0}` +
-  // #187 Todo 3 — INDENT by decision/expansion depth via a fixed set of padding classes (CSP-safe: no inline style).
-  Array.from({ length: MAX_DEPTH + 1 }, (_, d) => `.q-d${d}{padding-left:${6 + d * 20}px}`).join("") +
+  // #187 Option-3: main questions are FLAT (no decision-depth indent) — their nesting shows as a `.q-layer` number badge.
   // DIM a first:-preempted (skipped-by-an-earlier-match) row.
   `.q-preempted{opacity:.5}` +
   // NON-SOURCE (no local `code is`): a grey wash on the INNER `.q-prompt` span — a channel DISTINCT from the `.q-item`
@@ -344,17 +342,17 @@ export const QUESTIONNAIRE_STYLE =
   `.q-exp{list-style:none;margin:1px 0 7px}` +
   // the operator connective chip (outside the box; above the top box + between operands). ONE accent (blue) for every
   // grouping operator — the ANY OF / ALL OF text carries the or/and distinction, no per-operator/per-nesting colour.
-  `.q-conn{display:inline-block;font:700 10px/1 var(--vscode-editor-font-family,monospace);letter-spacing:.14em;text-transform:uppercase;padding:2px 7px;border-radius:4px;margin:4px 0 2px}` +
+  `.q-conn{display:inline-block;font:700 10px/1 var(--vscode-editor-font-family,monospace);letter-spacing:.14em;text-transform:uppercase;padding:2px 7px;border-radius:4px;margin:4px 0 0}` +
   `.q-conn-top{margin-left:20px}` +
   `.q-conn-or,.q-conn-and{color:var(--vscode-charts-blue,#3794ff);background:rgba(55,148,255,.13);border:1px solid var(--vscode-charts-blue,#3794ff)}` +
   `.q-conn-not{color:var(--vscode-descriptionForeground,#8c8c8c);background:var(--vscode-editorWidget-background,#2b2b2e);border:1px solid var(--vscode-panel-border,#454545)}` +
-  // the grouping box. The TOP box indents one step under its `when`; a NESTED box does NOT indent further (it aligns with
-  // the operator chip above it) — depth is carried by the leaf LAYER NUMBER, not runaway indentation. Extra top margin so
-  // the ANY OF / ALL OF tab sits cleanly ON the box's top border (shares it) instead of overlapping the chip above.
-  `.q-box{position:relative;margin:12px 0 8px 20px;border:1px solid var(--vscode-panel-border,#454545);border-left:2px solid var(--vscode-charts-blue,#3794ff);border-radius:0 6px 6px 6px;background:var(--vscode-editor-background,#1e1e1e);padding:13px 8px 6px 8px}` +
+  // the grouping box. It sits DIRECTLY under its operator chip (0 top margin → the chip's border and the box's top border
+  // touch/overlap, no gap). A NESTED box does NOT indent further. The ANY OF / ALL OF tab is an INLINE chip at the top of
+  // the box (its own first line) — a clean top border, no pop-up overlapping the chip above.
+  `.q-box{margin:0 0 8px 20px;border:1px solid var(--vscode-panel-border,#454545);border-left:2px solid var(--vscode-charts-blue,#3794ff);border-radius:0 5px 5px 5px;background:var(--vscode-editor-background,#1e1e1e);padding:6px 8px 6px 8px}` +
   `.q-box .q-box{margin-left:0}` +
-  `.q-box-tab{position:absolute;top:-9px;left:-2px;font:700 10px/1 var(--vscode-editor-font-family,monospace);letter-spacing:.12em;text-transform:uppercase;padding:2px 7px;border-radius:5px 5px 5px 0;color:var(--vscode-charts-blue,#3794ff);border:1px solid var(--vscode-charts-blue,#3794ff);background:var(--vscode-editor-background,#1e1e1e)}` +
-  // a leaf row inside a box (a LAYER NUMBER badge + the concept + its Yes/No answer). Reuses .q-nonsource/.q-inferred/.q-opt.
+  `.q-box-tab{display:inline-block;font:700 10px/1 var(--vscode-editor-font-family,monospace);letter-spacing:.12em;text-transform:uppercase;padding:2px 7px;border-radius:4px;color:var(--vscode-charts-blue,#3794ff);border:1px solid var(--vscode-charts-blue,#3794ff);background:var(--vscode-editorWidget-background,#2b2b2e);margin:0 0 5px}` +
+  // a leaf row inside a box (the concept + its Yes/No answer). Reuses .q-nonsource/.q-inferred/.q-opt.
   `.q-exp-leaf{padding:2px 0;margin:1px 0}` +
   `.q-layer{display:inline-block;min-width:13px;text-align:center;font:700 9px/1 var(--vscode-editor-font-family,monospace);color:var(--vscode-descriptionForeground,#8c8c8c);background:var(--vscode-editorWidget-background,#2b2b2e);border:1px solid var(--vscode-panel-border,#454545);border-radius:3px;padding:1px 3px;margin-right:7px;vertical-align:middle}` +
   `.q-external{opacity:.75;font-style:italic}` +

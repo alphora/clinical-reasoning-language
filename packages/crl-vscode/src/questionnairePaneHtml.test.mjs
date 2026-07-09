@@ -679,7 +679,7 @@ case "cov+comp; Other preempted":
   assert.ok(row("Comp").cls.includes("q-inferred"), "Comp is marked inferred");
   assert.ok(row("Other").cls.includes("q-preempted"), "Other (first:-preempted) is dimmed");
   // The expansion: an ANY OF box with an `or` operator chip, in its own q-exp <li> (all divs — no nested <li>).
-  assert.match(r.html, /<li class="q-exp q-d\d+">/, "the composite's operator tree renders in a q-exp <li>");
+  assert.match(r.html, /<li class="q-exp">/, "the composite's operator tree renders in a q-exp <li>");
   assert.match(r.html, /class="q-box q-box-or"/, "Comp = (…or…) → an ANY OF box");
   assert.match(r.html, /class="q-box-tab">any of</, "the box is labelled 'any of'");
   assert.match(r.html, /class="q-conn q-conn-or[^"]*">or</, "the boolean operator 'or' shows outside the box");
@@ -733,7 +733,7 @@ case "root holds":
   assert.ok(ext && !ext[1].includes("q-opt"), "an external stub has NO Yes/No options (not evaluated here)");
 });
 
-check("Option-3 render: `defined as` adds a FORCED top OR; the body's boxes stay; leaves carry LAYER NUMBERS (the confirmed BMI Qualifies shape)", () => {
+check("Option-3 render: `defined as` adds a FORCED top OR; the body's ANY OF / ALL OF boxes stay; sub-questions carry NO layer number (the confirmed BMI Qualifies shape)", () => {
   const crl = `# P
 library "V".
 concept "BMI Qualifies":
@@ -771,9 +771,10 @@ case "bmi holds":
   assert.ok(exp.indexOf('q-conn-or') < exp.indexOf('q-box q-box-or'), "a forced top OR chip precedes the body's ANY OF box");
   assert.match(exp, /q-box-tab">any of</, "the sem-or body renders an ANY OF box");
   assert.match(exp, /q-box q-box-and"><span class="q-box-tab">all of</, "the nested sem-and renders an ALL OF box");
-  // Layer numbers: BMI Over 40 = layer 1 (top box); BMI Over 35 / Co-Morbidity = layer 2 (nested box).
-  assert.match(exp, /q-layer[^>]*>1<\/span><span class="q-prompt"><span class="q-concept">BMI Over 40</, "BMI Over 40 is layer 1");
-  assert.match(exp, /q-layer[^>]*>2<\/span><span class="q-prompt"><span class="q-concept">BMI Over 35</, "the nested BMI Over 35 is layer 2");
+  // The SUB-questions (expansion leaves) carry NO layer number — nesting is shown by the box borders. The layer number
+  // is a MAIN-question affordance: the "BMI Qualifies" when row carries one (decision depth 1), the sub-questions don't.
+  assert.ok(!exp.includes("q-layer"), "sub-questions inside the boxes have NO layer-number badge");
+  assert.match(r.html, /<li class="q-item[^"]*"[^>]*><span class="q-layer"[^>]*>0<\/span><span class="q-prompt"><span class="q-concept">BMI Qualifies</, "the MAIN question 'BMI Qualifies' (a top-level when) carries its decision-depth layer number (0)");
 });
 
 check("Option-3 nav: default (currentIndex -1) shows 'Question 0 of N' — no question auto-focused; Prev disabled, Next enabled", () => {
