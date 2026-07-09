@@ -328,7 +328,7 @@ check("Option-C: an INFERRED composite when renders an ANY OF outline of leaf ro
   assert.ok(!/flow-topor/.test(rr.html), "an INFERRED composite (no code is) has NO top-OR row");
   assert.ok(/class="flow-def-edge"/.test(rr.html), "outline connectors use the distinct flow-def-edge, not flow-edge");
   assert.ok(leafRows.find((l) => l.label === "L2").cls.includes("flow-inferred"), "L2 (no code-is) → inferred (purple solid border)");
-  assert.ok(!leafRows.find((l) => l.label === "L1").cls.includes("flow-inferred"), "L1 (code-is) → NOT inferred (blue solid border — a 'real' sub-question)");
+  assert.ok(!leafRows.find((l) => l.label === "L1").cls.includes("flow-inferred"), "L1 (code-is) → NOT inferred (grey solid border — like a main question)");
   const leafPeeks = Object.values(rr.reveals).filter((v) => v.conceptNodeKey === "c:L1" || v.conceptNodeKey === "c:L2");
   assert.equal(leafPeeks.length, 2, "each leaf reveals its OWN concept (peek), never a {nodeKey} select");
   assert.equal(Object.keys(rr.anchors).filter((k) => k.startsWith("leaf::")).length, 2, "ONLY the 2 leaf rows anchor (op rows are render-only)");
@@ -511,9 +511,9 @@ check("Todo 3: a hidden .flow-ring <rect> on every structure node + outline leaf
   assert.match(FLOW_STYLE, /\.flow-row\.current,[^{]*\{outline:none\}/, "the shell's outline overlays (current + diverter/failed-criterion/-preempt) are neutralized on flow nodes (no double ring)");
 });
 
-check("Todo 3b: a sub-question is a SOLID blue (source) / purple (inferred) border; the native border thickens under the ring; connectors are thicker", () => {
-  // outline leaves are "real" questions → SOLID coloured borders (no dashed operand-chip look).
-  assert.match(FLOW_STYLE, /\.flow-leaf>rect\{[^}]*stroke:var\(--vscode-charts-blue[^}]*\}/, "a source sub-question → blue border");
+check("Todo 3b: a sub-question looks like a main question — SOLID grey (source) / purple (inferred); native border thickens under the ring; connectors thicker", () => {
+  // outline leaves match main `when` questions → SOLID borders (no dashed operand-chip look).
+  assert.match(FLOW_STYLE, /\.flow-leaf>rect\{[^}]*stroke:var\(--vscode-descriptionForeground[^}]*\}/, "a source sub-question → grey border, like a main question");
   assert.ok(!/\.flow-leaf>rect\{[^}]*stroke-dasharray/.test(FLOW_STYLE), "the sub-question border is SOLID (no dashed operand-chip)");
   assert.match(FLOW_STYLE, /\.flow-leaf\.flow-inferred>rect\{stroke:var\(--vscode-charts-purple/, "an inferred sub-question → purple border (recurses into its own subs)");
   // the native border thickens when the on-path ring is shown (so the identity colour reads inside the ring).

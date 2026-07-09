@@ -483,10 +483,10 @@ export const FLOW_STYLE =
   // #187 Todo 4: a DEF-LEAF edge — a distinct dashed grey line (definition decomposition, NOT a control-flow branch).
   // Slightly THICKER + less faint so the connector reads on Mac (operator feedback).
   `.flow-def-edge{fill:none;stroke:var(--vscode-panel-border,#454545);stroke-width:1.5;stroke-dasharray:2 2;opacity:.8}` +
-  // an outline operand = a "real" evaluable SUB-QUESTION → a SOLID border: BLUE (has a local `code is`, directly
-  // answerable) / PURPLE (inferred — it decomposes into its OWN sub-questions, recursively). (Overrides the Todo-2 dashed
-  // "operand chip" look per operator feedback — the indent + smaller box + dashed spine already distinguish it from a decision box.)
-  `.flow-leaf>rect{fill:var(--vscode-editor-background,#1e1e1e);stroke:var(--vscode-charts-blue,#3794ff);stroke-width:1}` +
+  // an outline operand SUB-QUESTION looks EXACTLY like a main `when` question: a SOLID border — GREY (has a local `code is`)
+  // / PURPLE (inferred, decomposes into its own sub-questions recursively). On-path → the blue ring, same as a main node.
+  // (Solid, not the Todo-2 dashed chip: the indent + smaller box + dashed spine already distinguish it from a decision box.)
+  `.flow-leaf>rect{fill:var(--vscode-editor-background,#1e1e1e);stroke:var(--vscode-descriptionForeground,#8c8c8c);stroke-width:1}` +
   `.flow-leaf.flow-inferred>rect{stroke:var(--vscode-charts-purple,#c586c0)}` +
   `.flow-leaf>text{fill:var(--vscode-descriptionForeground,#bfbfbf);font-size:11px}` +
   // #187 Option-C OUTLINE rows. An OPERATOR / TOP-OR label — a bare uppercase caption (no box), like the questionnaire's
