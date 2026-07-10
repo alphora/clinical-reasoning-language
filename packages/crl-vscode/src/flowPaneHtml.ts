@@ -155,6 +155,26 @@ interface LaidNode {
 }
 
 /**
+ * #210: the DISPOSITION-LEAF nodeKeys in a structure forest — a recommend-activity `action` (a certify / not-certify /
+ * ordinary-recommend outcome tip). Used by the MV verdict fold's leaf-aware precedence (green wins on interior nodes, RED
+ * wins on a leaf). Deliberately EXCLUDES `use-decision` actions (interior delegation glue — the real disposition is the
+ * sub-decision's own recommend) and every `when`/`otherwise`/`decision` node. A branch with MULTIPLE recommends yields
+ * MULTIPLE leaves (any outcome tip reddens); an `otherwise → Unmet` recommend IS a leaf (walks all children regardless of
+ * parent kind). Pure + vscode-free so the host's `driveDoneOverlay` and the unit test share ONE definition.
+ */
+export function collectDispositionLeafKeys(structure: CrlDecisionStructure[]): Set<string> {
+  const leaves = new Set<string>();
+  const walk = (nodes: readonly CrlStructureNode[]): void => {
+    for (const n of nodes) {
+      if (n.kind === "action" && n.actionKind === "recommend-activity") leaves.add(n.nodeKey);
+      walk(n.children);
+    }
+  };
+  for (const d of structure) walk(d.children);
+  return leaves;
+}
+
+/**
  * Tidy-tree layout (vscode-free, pure). Leaves take globally-sequential integer slots in DFS in-order, so every subtree
  * occupies a CONTIGUOUS disjoint slot band; an internal node sits at the midpoint of its children. Because x is fixed by
  * depth and sibling subtrees own disjoint bands, no two same-depth nodes overlap — no Reingold-Tilford contour pass is
@@ -490,7 +510,7 @@ export function renderFlowPane(
  *  CORR_STYLE + shellHtml. #187 Todo 3: the on-path highlight is the `.flow-ring` rect (a deterministic SVG rect-stroke);
  *  the shell's global `.current`/`.diverter`/`.failed-criterion` OUTLINE overlays ARE neutralized on flow `<g>`s (they
  *  paint a lumpy square there — the flow uses the ring + rect strokes instead). The per-case CHANNELS still paint rect
- *  strokes/fills: `.this-node` (orange), `.failed-criterion`/`-preempt` (dashed), `.diverter` (dotted), `.done/.error` (fill). */
+ *  strokes/fills: `.this-node` (orange), `.failed-criterion`/`-preempt` (dashed), `.diverter` (dotted), `.review-green/-red/-grey`/`.error-node` (fill). */
 export const FLOW_STYLE =
   `.flow-wrap{display:inline-block;min-width:100%}` +
   `.flow-svg{display:block;font:12px var(--vscode-editor-font-family,sans-serif)}` +
@@ -504,7 +524,10 @@ export const FLOW_STYLE =
   `.flow-decision>text{font-weight:bold}` +
   // A `when` IS its gating concept: Source (has local `code is`) OR unresolved → grey; inferred (no `code is`) → PURPLE.
   `.flow-when>rect{fill:var(--vscode-editorHoverWidget-background,#2c2c2d);stroke:var(--vscode-descriptionForeground,#8c8c8c)}` +
-  `.flow-when.flow-inferred>rect{stroke:var(--vscode-charts-purple,#c586c0)}` +
+  // #210: the inferred (purple) OFF-PATH border reads slightly THICKER than the grey Source border (operator: make the
+  // off-path purple a touch heavier). On-path still wins — the `.flow-row.current/flow-leaf-yes>rect` thicken rules (2.5/2)
+  // are EQUAL specificity ((0,2,1)) but sit LATER in the sheet, so a ringed inferred node overrides this 1.4.
+  `.flow-when.flow-inferred>rect{stroke:var(--vscode-charts-purple,#c586c0);stroke-width:1.4}` +
   `.flow-otherwise>rect{stroke-dasharray:3 2;opacity:.85}` +
   // A recommend TARGET. A DETERMINATION colors by PAS category: certify → GREEN, not-certify + pended → GOLD (solid — the
   // preempt overlay's amber is DASHED, so the two are distinct even at a shared hue). An ordinary (non-determination)
@@ -528,7 +551,7 @@ export const FLOW_STYLE =
   // / PURPLE (inferred, decomposes into its own sub-questions recursively). On-path → the blue ring, same as a main node.
   // (Solid, not the Todo-2 dashed chip: the indent + smaller box + dashed spine already distinguish it from a decision box.)
   `.flow-leaf>rect{fill:var(--vscode-editor-background,#1e1e1e);stroke:var(--vscode-descriptionForeground,#8c8c8c);stroke-width:1}` +
-  `.flow-leaf.flow-inferred>rect{stroke:var(--vscode-charts-purple,#c586c0)}` +
+  `.flow-leaf.flow-inferred>rect{stroke:var(--vscode-charts-purple,#c586c0);stroke-width:1.4}` + // #210: off-path purple slightly heavier (on-path 2 wins, later)
   `.flow-leaf>text{fill:var(--vscode-descriptionForeground,#bfbfbf);font-size:11px}` +
   // #187 Option-C OUTLINE rows. An OPERATOR / TOP-OR label — a bare uppercase caption (no box), like the questionnaire's
   // ANY OF / ALL OF tab; render-only (not clickable). An EXTERNAL / MORE stub — a faint dashed box (unaddressable operand).
@@ -567,25 +590,27 @@ export const FLOW_STYLE =
   `.flow-row.failed-criterion>rect{stroke:var(--vscode-editorError-foreground,#f14c4c);stroke-width:2.5;stroke-dasharray:4 2}` +
   // FIX 3 (disc 160): a preemption row (a SATISFIED diverting sibling) gets the DISTINCT amber stroke, not the red.
   `.flow-row.failed-criterion-preempt>rect{stroke:var(--vscode-charts-yellow,#d29922);stroke-width:2.5;stroke-dasharray:4 2}` +
-  // #156 slice 5: the Medical Validation review overlay — a PERSISTENT done/error channel that survives selection (unlike
-  // failed-criterion, which clears on every reveal). It is a NON-OUTLINE FILL TINT on the rect, an INDEPENDENT SVG axis
-  // from the two stroke-only channels above: `.current` and `.failed-criterion`/`-preempt` set only `stroke`/`stroke-width`,
-  // so a done/error FILL coexists with both WITHOUT fighting (a `.current.done-node` keeps its focus stroke AND reads as
-  // done; a `.failed-criterion.error-node` keeps its dashed red stroke over the error fill). The fill overrides the base
-  // `.flow-row>rect` fill AND the kind-fills (flow-decision/when/activity) by SPECIFICITY, not order: `.flow-row.done-node>rect`
-  // = (0,2,1) outranks `.flow-decision>rect`/`.flow-activity>rect` = (0,1,1) regardless of where they sit in the sheet
-  // (FIX 4, Claude impl review). done = a subdued green wash; error = a subdued red wash, visually distinct from done AND
-  // from the amber/red STROKES of the failed-criterion channel (different axis: a reviewed-case RUN error, not a blocking
-  // criterion). error renders over done (error⊆done by construction): the host adds `.error-node` only (not `.done-node`)
-  // to error nodes; the two review rules are EQUAL specificity, so `.error-node>rect` sits AFTER `.done-node>rect` — the
-  // last-wins tiebreak that makes error beat done if both classes ever co-occur.
-  `.flow-row.done-node>rect{fill:var(--vscode-testing-iconPassed,#3fb950);fill-opacity:.18}` +
+  // #156 slice 5 / #210 VERDICT PAINTING: the Medical Validation review overlay — a PERSISTENT channel that survives
+  // selection (unlike failed-criterion, which clears on every reveal). It is a NON-OUTLINE FILL TINT on the rect, an
+  // INDEPENDENT SVG axis from the two stroke-only channels above: `.current` and `.failed-criterion`/`-preempt` set only
+  // `stroke`/`stroke-width`, so a verdict FILL coexists with both WITHOUT fighting (a `.current.review-green` keeps its
+  // focus stroke AND reads green; a `.failed-criterion.error-node` keeps its dashed red stroke over the error fill). The
+  // fill overrides the base `.flow-row>rect` fill AND the kind-fills (flow-decision/when/activity) by SPECIFICITY, not
+  // order: `.flow-row.review-green>rect` = (0,2,1) outranks `.flow-decision>rect`/`.flow-activity>rect` = (0,1,1) regardless
+  // of sheet position (FIX 4, Claude impl review). Each RINGED reviewed node paints its case's VERDICT: pass→green wash,
+  // fail→red wash, pending→grey wash (grey subdued — it "loses" precedence, so a faint context tint). The host resolves the
+  // per-node verdict (green/red/grey are DISJOINT — exactly one class per node), so these three never co-occur and need no
+  // tiebreak among themselves. `.error-node` (a green node whose pass case's RUN errored — the host filters error ⊆ green) is
+  // painted INSTEAD of `.review-green` (error-over-green), a subdued red wash distinct from the failed-criterion STROKE channel.
+  `.flow-row.review-green>rect{fill:var(--vscode-testing-iconPassed,#3fb950);fill-opacity:.18}` +
+  `.flow-row.review-red>rect{fill:var(--vscode-testing-iconFailed,#f14c4c);fill-opacity:.18}` +
+  `.flow-row.review-grey>rect{fill:var(--vscode-descriptionForeground,#8c8c8c);fill-opacity:.14}` +
   `.flow-row.error-node>rect{fill:var(--vscode-testing-iconFailed,#f14c4c);fill-opacity:.20}` +
   // #177 slice 4: the "this node" cross-pane marker — the FOCUSED questionnaire question's tree node. It paints a
   // distinctive solid `stroke` on the >rect — the SAME proven axis `.current`/`.failed-criterion` use (FIX 1 impl review:
   // this repo's evidence is that `outline` does NOT paint on the SVG here, which is exactly why those switched to stroke).
-  // It COEXISTS with `.done-node`/`.error-node` (those are `fill` — fill + stroke layer fine: a done node that's the focused
-  // question shows the green fill AND this accent border). Against the OTHER stroke channels (`.current`/`.failed-criterion`/
+  // It COEXISTS with the verdict fills (`.review-green/-red/-grey`/`.error-node` are `fill` — fill + stroke layer fine: a
+  // green node that's the focused question shows the green fill AND this accent border). Against the OTHER stroke channels (`.current`/`.failed-criterion`/
   // `-preempt`/`.diverter`) it deliberately WINS: it is ordered LAST among the stroke rules (after them in the sheet, equal specificity),
   // so on a node that is BOTH the focused question and selected/a-criterion the focused-question marker (the primary
   // indicator) overrides the transient selection/criterion stroke (the right tradeoff). The color is a DISTINCT accent

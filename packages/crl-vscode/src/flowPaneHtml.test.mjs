@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
-const { renderFlowPane, FLOW_STYLE, wrapLabel } = await load("flowPaneHtml.ts");
+const { renderFlowPane, FLOW_STYLE, wrapLabel, collectDispositionLeafKeys } = await load("flowPaneHtml.ts");
 
 let pass = 0;
 const check = (label, fn) => {
@@ -131,28 +131,33 @@ check("no <style> or style= inside the SVG (CSP); FLOW_STYLE carries var() + fal
   assert.ok(!/\.flow-row\.current>rect\{stroke:/.test(FLOW_STYLE), "Todo 3: .current no longer recolors the base rect stroke COLOUR (a stroke-WIDTH thicken is fine)");
 });
 
-check("#156 slice 5: .done-node/.error-node review overlay CSS exists, is NON-OUTLINE (fill, not stroke/outline)", () => {
-  // The review overlay must be a fill tint, NOT a stroke/outline — so it coexists with .current (stroke) + .failed-criterion
-  // (dashed stroke) on independent SVG axes. Assert both rules exist and set `fill` (and crucially NOT `stroke`/`outline`).
-  const doneRule = FLOW_STYLE.match(/\.flow-row\.done-node>rect\{([^}]*)\}/);
-  const errRule = FLOW_STYLE.match(/\.flow-row\.error-node>rect\{([^}]*)\}/);
-  assert.ok(doneRule, ".done-node>rect rule present");
-  assert.ok(errRule, ".error-node>rect rule present");
-  for (const [, body] of [doneRule, errRule]) {
-    assert.match(body, /fill:/, "review overlay paints via fill");
-    assert.ok(!/stroke:/.test(body), "review overlay does NOT set stroke (independent axis from .current/.failed-criterion)");
-    assert.ok(!/outline/.test(body), "review overlay is non-outline");
+check("#210 verdict painting: .review-green/-red/-grey + .error-node overlay CSS exists, is NON-OUTLINE (fill, not stroke/outline)", () => {
+  // The verdict overlay must be a fill tint, NOT a stroke/outline — so it coexists with .current (ring) + .failed-criterion
+  // (dashed stroke) on independent SVG axes. Assert all four rules exist and set `fill` (and crucially NOT `stroke`/`outline`).
+  const rules = {
+    green: FLOW_STYLE.match(/\.flow-row\.review-green>rect\{([^}]*)\}/),
+    red: FLOW_STYLE.match(/\.flow-row\.review-red>rect\{([^}]*)\}/),
+    grey: FLOW_STYLE.match(/\.flow-row\.review-grey>rect\{([^}]*)\}/),
+    error: FLOW_STYLE.match(/\.flow-row\.error-node>rect\{([^}]*)\}/),
+  };
+  for (const [name, rule] of Object.entries(rules)) {
+    assert.ok(rule, `.${name} rule present`);
+    assert.match(rule[1], /fill:/, `${name} overlay paints via fill`);
+    assert.ok(!/stroke:/.test(rule[1]), `${name} overlay does NOT set stroke (independent axis from .current/.failed-criterion)`);
+    assert.ok(!/outline/.test(rule[1]), `${name} overlay is non-outline`);
   }
-  // done and error must be visually DISTINCT (different fill colors).
-  assert.notEqual(doneRule[1].match(/fill:([^;]*)/)[1], errRule[1].match(/fill:([^;]*)/)[1], "done fill ≠ error fill");
+  // green / red / grey must be visually DISTINCT (different fill colors — the three verdicts).
+  const fillOf = (r) => r[1].match(/fill:([^;]*)/)[1];
+  assert.notEqual(fillOf(rules.green), fillOf(rules.red), "green fill ≠ red fill");
+  assert.notEqual(fillOf(rules.green), fillOf(rules.grey), "green fill ≠ grey fill");
+  assert.notEqual(fillOf(rules.red), fillOf(rules.grey), "red fill ≠ grey fill");
 });
 
-check("#156 slice 5: review overlay COEXISTS — .current/.failed-criterion/-preempt rules are ALL stroke-only (no fill)", () => {
-  // The coexistence guarantee: the selection + BOTH failed-criterion channels set ONLY stroke, so adding a done/error fill
-  // can never override them. Lock that all three existing highlight channels remain stroke-based (a future fill on any of
-  // them would silently break the review channel). FIX 3: -preempt is the 2nd #173 stroke class the fill must coexist with.
-  // #187 Todo 3: `.current` left the stroke axis (it's now the `.flow-ring` on-path ring), so it's no longer here — the
-  // failed-criterion channels remain stroke-only so the done/error FILL still coexists with them.
+check("#210: verdict overlay COEXISTS — .failed-criterion/-preempt rules are ALL stroke-only (no fill)", () => {
+  // The coexistence guarantee: BOTH failed-criterion channels set ONLY stroke, so adding a verdict fill can never override
+  // them. Lock that they remain stroke-based (a future fill on either would silently break the review channel). FIX 3:
+  // -preempt is the 2nd #173 stroke class the fill must coexist with. #187 Todo 3: `.current` left the stroke axis (it's now
+  // the `.flow-ring` on-path ring), so it's no longer here — the failed-criterion channels remain stroke-only.
   const strokeOnly = [
     [".flow-row.failed-criterion>rect", "failed-criterion (blocker)"],
     [".flow-row.failed-criterion-preempt>rect", "failed-criterion (preempt)"],
@@ -162,14 +167,15 @@ check("#156 slice 5: review overlay COEXISTS — .current/.failed-criterion/-pre
     assert.match(body, /stroke:/, `${name} is a stroke highlight`);
     assert.ok(!/[^-]fill:/.test(body), `${name} sets no fill — the review fill coexists with it`);
   }
-  // FIX 4: review state wins the rect fill by SPECIFICITY ((0,2,1) > (0,1,1)), not order — but the EQUAL-specificity
-  // error-over-done tiebreak IS order-dependent, so assert .error-node>rect comes AFTER .done-node>rect. Also assert review
-  // sits after EVERY fill-setting kind rule (a defensive lock: if a future kind rule were bumped to (0,2,x), order saves us).
+  // FIX 4: verdict fills win the rect fill by SPECIFICITY ((0,2,1) > (0,1,1)), not order — but the EQUAL-specificity
+  // error-over-green tiebreak IS order-dependent, so assert .error-node>rect comes AFTER .review-green>rect. Also assert the
+  // verdict fills sit after EVERY fill-setting kind rule (a defensive lock: if a future kind rule were bumped to (0,2,x)).
   for (const kind of [".flow-row>rect", ".flow-decision>rect", ".flow-when>rect", ".flow-activity>rect", ".flow-certify>rect", ".flow-notcertify>rect"])
-    assert.ok(FLOW_STYLE.indexOf(kind) < FLOW_STYLE.indexOf(".flow-row.done-node>rect"), `review fills sit after the ${kind} kind fill`);
+    for (const verdict of [".flow-row.review-green>rect", ".flow-row.review-red>rect", ".flow-row.review-grey>rect", ".flow-row.error-node>rect"])
+      assert.ok(FLOW_STYLE.indexOf(kind) < FLOW_STYLE.indexOf(verdict), `${verdict} sits after the ${kind} kind fill`);
   assert.ok(
-    FLOW_STYLE.indexOf(".flow-row.done-node>rect") < FLOW_STYLE.indexOf(".flow-row.error-node>rect"),
-    "error-over-done: .error-node>rect comes AFTER .done-node>rect (equal-specificity last-wins tiebreak)",
+    FLOW_STYLE.indexOf(".flow-row.review-green>rect") < FLOW_STYLE.indexOf(".flow-row.error-node>rect"),
+    "error-over-green: .error-node>rect comes AFTER .review-green>rect (equal-specificity last-wins tiebreak)",
   );
 });
 
@@ -177,12 +183,12 @@ check("#177 slice 4: .this-node marker uses a PROVEN stroke (NOT outline), wins 
   // FIX 1 (impl review): the tree marker must NOT rely on `outline` on an SVG rect — this repo's evidence is outline does
   // NOT paint here (it's why .current/.failed-criterion switched to stroke). So .this-node>rect paints a `stroke`, NO outline,
   // NO fill. Against the other STROKE channels (.current/.failed-criterion/-preempt) it intentionally WINS by being ordered
-  // LAST (equal specificity, later-wins); against the FILL channels (.done-node/.error-node) it COEXISTS (stroke + fill layer).
+  // LAST (equal specificity, later-wins); against the FILL channels (.review-green/-red/-grey/.error-node) it COEXISTS (stroke + fill layer).
   const rule = FLOW_STYLE.match(/\.flow-row\.this-node>rect\{([^}]*)\}/);
   assert.ok(rule, ".flow-row.this-node>rect rule present");
   assert.match(rule[1], /stroke:/, "this-node marks via stroke (the PROVEN-painting SVG axis, like .current)");
   assert.ok(!/outline/.test(rule[1]), "this-node does NOT use outline (outline does not paint on the SVG rect here)");
-  assert.ok(!/[^-]fill:/.test(rule[1]), "this-node sets NO fill — coexists with .done-node/.error-node (the fill axis)");
+  assert.ok(!/[^-]fill:/.test(rule[1]), "this-node sets NO fill — coexists with the verdict fills (the fill axis)");
   // Ordered AFTER the stroke channels so the focused-question marker wins when a node is also a criterion. (#187 Todo 3:
   // `.current` is no longer a rect-stroke channel — it's the ring — so it's dropped from this ordering list.)
   for (const sel of [".flow-row.failed-criterion>rect", ".flow-row.failed-criterion-preempt>rect"])
@@ -190,12 +196,36 @@ check("#177 slice 4: .this-node marker uses a PROVEN stroke (NOT outline), wins 
       FLOW_STYLE.indexOf(sel + "{") < FLOW_STYLE.indexOf(".flow-row.this-node>rect{"),
       `.this-node>rect comes AFTER ${sel} (later-wins, so the marker overrides the transient ${sel} stroke)`,
     );
-  // The done/error FILL rules are UNTOUCHED (still fill, no stroke) — stroke + fill layer, so a done+focused node shows both.
-  for (const sel of [".flow-row.done-node>rect", ".flow-row.error-node>rect"]) {
+  // The verdict FILL rules are UNTOUCHED (still fill, no stroke) — stroke + fill layer, so a green+focused node shows both.
+  for (const sel of [".flow-row.review-green>rect", ".flow-row.review-red>rect", ".flow-row.review-grey>rect", ".flow-row.error-node>rect"]) {
     const b = FLOW_STYLE.match(new RegExp(`${sel.replace(/[.>]/g, (c) => "\\" + c)}\\{([^}]*)\\}`))[1];
     assert.match(b, /fill:/, `${sel} still paints via fill (untouched by the slice-4 stroke)`);
     assert.ok(!/stroke:/.test(b), `${sel} sets no stroke — the this-node stroke layers over its fill`);
   }
+});
+
+// ── #210: collectDispositionLeafKeys (the host leaf set for the verdict fold's leaf-red precedence) ──
+check("#210 collectDispositionLeafKeys: recommend-activity actions ARE leaves; use-decision + when/otherwise/decision are NOT", () => {
+  // `structure` (top of file): w:A→a:X (recommend), w:B→a:D2 (use-decision), a:Y (guarded recommend), otherwise→a:Q (recommend).
+  const leaves = collectDispositionLeafKeys(structure);
+  assert.deepEqual([...leaves].sort(), ["a:Q", "a:X", "a:Y"], "the three recommend-activity tips (incl the otherwise → recommend)");
+  assert.ok(!leaves.has("a:D2"), "a use-decision action is interior delegation glue — NOT a leaf");
+  assert.ok(!leaves.has("w:A") && !leaves.has("o") && !leaves.has("d:D"), "when/otherwise/decision are never leaves");
+});
+check("#210 collectDispositionLeafKeys: a branch with MULTIPLE recommends → ALL are leaves; forest-wide; empty → empty", () => {
+  const multi = [
+    { decision: "M", lib: "Pol", nodeKey: "d:M", location: {}, children: [
+      node("mw", "when", "when", ["c:A"], [
+        node("m1", "action", "R1", ["act:1"], [], { actionKind: "recommend-activity" }),
+        node("m2", "action", "R2", ["act:2"], [], { actionKind: "recommend-activity" }),
+      ]),
+    ] },
+    { decision: "N", lib: "Pol", nodeKey: "d:N", location: {}, children: [
+      node("n1", "action", "R3", ["act:3"], [], { actionKind: "recommend-activity" }),
+    ] },
+  ];
+  assert.deepEqual([...collectDispositionLeafKeys(multi)].sort(), ["m1", "m2", "n1"], "all recommends across the whole forest");
+  assert.equal(collectDispositionLeafKeys([]).size, 0, "empty forest → empty leaf set");
 });
 
 check("disc 164: .diverter overlay uses a stroke (NOT outline/fill), ordered AFTER .current but BEFORE .failed-criterion, and .this-node still wins", () => {
@@ -486,6 +516,10 @@ check("Todo 2: FLOW_STYLE — decision grey (not blue), certify green, not-certi
   assert.match(FLOW_STYLE, /\.flow-notcertify>rect\{[^}]*editorWarning-foreground/, "not-certify + pended → gold (distinct token from the preempt amber)");
   assert.match(FLOW_STYLE, /\.flow-when\.flow-inferred>rect\{[^}]*charts-purple/, "inferred when → purple");
   assert.match(FLOW_STYLE, /\.flow-leaf\.flow-inferred>rect\{[^}]*charts-purple/, "inferred outline leaf → purple (still dashed via .flow-leaf)");
+  // #210: the inferred (purple) OFF-PATH border is slightly heavier (1.4) than the grey Source border (operator ask). The
+  // on-path thicken (.current/.flow-leaf-yes>rect 2.5/2) is equal-specificity but later in the sheet, so a ringed node still wins.
+  assert.match(FLOW_STYLE, /\.flow-when\.flow-inferred>rect\{[^}]*stroke-width:1\.4/, "inferred when off-path border thickened to 1.4");
+  assert.match(FLOW_STYLE, /\.flow-leaf\.flow-inferred>rect\{[^}]*stroke-width:1\.4/, "inferred leaf off-path border thickened to 1.4");
   assert.ok(!/flow-peek/.test(FLOW_STYLE), "no peek-dot CSS");
   assert.ok(!/flow-nonsource/.test(FLOW_STYLE), "no non-source FILL CSS (border carries the signal now)");
   assert.ok(!/textLink-foreground/.test(FLOW_STYLE), "use-decision is no longer blue (textLink)");

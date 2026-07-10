@@ -224,97 +224,225 @@ check("save: a real IO failure THROWS (parent path component is a FILE → mkdir
   }
 });
 
-// ── the precedence fold ────────────────────────────────────────────────────────
+// ── the VERDICT-painting fold (#210) ─────────────────────────────────────────────
+// Each reviewed case lights its fired-path nodes with its VERDICT color: pass→green, fail→red, pending→grey; a node lit by
+// several cases resolves to ONE color (grey always loses; green-vs-red flips on isLeaf — interior green wins, leaf red wins).
+// error (⊆ green — a pass verdict whose RUN errored) is UNCHANGED from the prior slice.
 const M = (entries) => new Map(entries);
+const noLeaf = () => false; // default: every node is INTERIOR (green-wins)
+const leafIs = (...keys) => (k) => keys.includes(k);
 
-check("fold: a PASS-verdict case → its lit rows in done (run status pass → not in error)", () => {
-  const { done, error } = deriveReviewOverlay(
+check("fold: a PASS-verdict case → its lit rows in green (run status pass → not in error)", () => {
+  const { green, red, grey, error } = deriveReviewOverlay(
     { c1: "pass" },
     M([["c1", { status: "pass", litNodeKeys: ["n1", "n2"] }]]),
+    noLeaf,
   );
-  assert.deepEqual([...done].sort(), ["n1", "n2"]);
+  assert.deepEqual([...green].sort(), ["n1", "n2"]);
+  assert.equal(red.size, 0);
+  assert.equal(grey.size, 0);
   assert.equal(error.size, 0);
 });
 
-check("fold: a FAIL-verdict case paints NOTHING (only pass paints — no green, and no red)", () => {
-  const { done, error } = deriveReviewOverlay(
+check("fold: a FAIL-verdict case → its lit rows in red (#210: fail now paints red)", () => {
+  const { green, red, grey } = deriveReviewOverlay(
     { c1: "fail" },
-    M([["c1", { status: "pass", litNodeKeys: ["n1", "n2"] }]]), // even a run-PASS case, if the human verdict is fail, is unpainted
+    M([["c1", { status: "pass", litNodeKeys: ["n1", "n2"] }]]), // a run-PASS case with a human FAIL verdict paints RED
+    noLeaf,
   );
-  assert.equal(done.size, 0, "fail verdict does not paint green");
-  assert.equal(error.size, 0, "fail verdict does not paint red either");
+  assert.equal(green.size, 0, "fail verdict does not paint green");
+  assert.deepEqual([...red].sort(), ["n1", "n2"], "fail paints red");
+  assert.equal(grey.size, 0);
 });
 
-check("fold: a PASS-verdict case whose RUN status is 'fail' STILL paints green (human override, not error)", () => {
-  const { done, error } = deriveReviewOverlay(
-    { c1: "pass" },
-    M([["c1", { status: "fail", litNodeKeys: ["n1"] }]]),
+check("fold: a PENDING-verdict case → its lit rows in grey (#210: pending now paints grey)", () => {
+  const { green, red, grey } = deriveReviewOverlay(
+    { c1: "pending" },
+    M([["c1", { status: "pass", litNodeKeys: ["n1"] }]]),
+    noLeaf,
   );
-  assert.deepEqual([...done], ["n1"], "the human pass verdict paints green over the automated fail");
-  assert.equal(error.size, 0, "run-status 'fail' does NOT redden — only run-status 'error' does");
+  assert.equal(green.size, 0);
+  assert.equal(red.size, 0);
+  assert.deepEqual([...grey], ["n1"], "pending paints grey");
 });
 
-check("fold: a PASS-verdict but run-status:error case → its rows in error AND done (error wins over a done from another case)", () => {
-  const { done, error } = deriveReviewOverlay(
+check("fold: an unreviewed (absent) caseId paints nothing even when present in perCase", () => {
+  const { green, red, grey, error } = deriveReviewOverlay(
+    {}, // nothing has a verdict
+    M([["c1", { status: "error", litNodeKeys: ["n1"] }]]),
+    noLeaf,
+  );
+  assert.equal(green.size + red.size + grey.size + error.size, 0);
+});
+
+// ── precedence: grey always loses; green-vs-red flips on isLeaf ─────────────────
+check("precedence: grey + green on the same node → GREEN (grey loses)", () => {
+  const { green, grey } = deriveReviewOverlay(
+    { p: "pending", g: "pass" },
+    M([
+      ["p", { status: "pass", litNodeKeys: ["shared"] }],
+      ["g", { status: "pass", litNodeKeys: ["shared"] }],
+    ]),
+    noLeaf,
+  );
+  assert.deepEqual([...green], ["shared"], "green beats grey");
+  assert.equal(grey.size, 0, "grey lost — not in the grey set");
+});
+
+check("precedence: grey + red on the same node → RED (grey loses)", () => {
+  const { red, grey } = deriveReviewOverlay(
+    { p: "pending", f: "fail" },
+    M([
+      ["p", { status: "pass", litNodeKeys: ["shared"] }],
+      ["f", { status: "pass", litNodeKeys: ["shared"] }],
+    ]),
+    noLeaf,
+  );
+  assert.deepEqual([...red], ["shared"], "red beats grey");
+  assert.equal(grey.size, 0);
+});
+
+check("precedence: green + red on an INTERIOR node → GREEN (interior: green wins)", () => {
+  const { green, red } = deriveReviewOverlay(
+    { g: "pass", f: "fail" },
+    M([
+      ["g", { status: "pass", litNodeKeys: ["interior"] }],
+      ["f", { status: "pass", litNodeKeys: ["interior"] }],
+    ]),
+    noLeaf, // "interior" is not a leaf
+  );
+  assert.deepEqual([...green], ["interior"], "green wins on an interior node");
+  assert.equal(red.size, 0);
+});
+
+check("precedence: green + red on a LEAF node → RED (leaf: red wins)", () => {
+  const { green, red } = deriveReviewOverlay(
+    { g: "pass", f: "fail" },
+    M([
+      ["g", { status: "pass", litNodeKeys: ["leaf"] }],
+      ["f", { status: "pass", litNodeKeys: ["leaf"] }],
+    ]),
+    leafIs("leaf"),
+  );
+  assert.deepEqual([...red], ["leaf"], "red wins on a leaf (a failed outcome shows red even if a pass path reaches it)");
+  assert.equal(green.size, 0);
+});
+
+check("precedence: green+red+grey — interior→green, leaf→red, both drop grey (mixed tree)", () => {
+  const per = M([
+    ["g", { status: "pass", litNodeKeys: ["mid", "tip"] }],
+    ["f", { status: "pass", litNodeKeys: ["mid", "tip"] }],
+    ["p", { status: "pass", litNodeKeys: ["mid", "tip"] }],
+  ]);
+  const { green, red, grey } = deriveReviewOverlay(
+    { g: "pass", f: "fail", p: "pending" },
+    per,
+    leafIs("tip"), // "tip" is the disposition leaf; "mid" is interior
+  );
+  assert.deepEqual([...green], ["mid"], "interior node → green (green beats red beats grey)");
+  assert.deepEqual([...red], ["tip"], "leaf node → red (red beats green beats grey)");
+  assert.equal(grey.size, 0, "grey lost on every contested node");
+});
+
+check("fold: the three verdict sets are DISJOINT (exactly one color per node)", () => {
+  const { green, red, grey } = deriveReviewOverlay(
+    { g: "pass", f: "fail", p: "pending" },
+    M([
+      ["g", { status: "pass", litNodeKeys: ["a"] }],
+      ["f", { status: "pass", litNodeKeys: ["b"] }],
+      ["p", { status: "pass", litNodeKeys: ["c"] }],
+    ]),
+    noLeaf,
+  );
+  const all = [...green, ...red, ...grey];
+  assert.equal(new Set(all).size, all.length, "no nodeKey appears in more than one set");
+  assert.deepEqual([...green], ["a"]);
+  assert.deepEqual([...red], ["b"]);
+  assert.deepEqual([...grey], ["c"]);
+});
+
+// ── error (⊆ green): a pass-verdict node whose RUN errored (Slice-1 unchanged) ──
+check("fold: a PASS-verdict, run-status:error case → its rows in error AND green (error ⊆ green)", () => {
+  const { green, error } = deriveReviewOverlay(
     { good: "pass", bad: "pass" },
     M([
       ["good", { status: "pass", litNodeKeys: ["shared", "g1"] }],
       ["bad", { status: "error", litNodeKeys: ["shared", "b1"] }],
     ]),
+    noLeaf,
   );
-  // shared is lit by both → in error (error > done) AND still in the done union; b1 error; g1 done-only.
   assert.ok(error.has("shared"), "the errored case marks the shared node error");
   assert.ok(error.has("b1"));
   assert.ok(!error.has("g1"), "a node lit only by the clean case is not error");
-  assert.ok(done.has("shared") && done.has("g1") && done.has("b1"), "done is the union over all pass cases");
+  assert.ok(green.has("shared") && green.has("g1") && green.has("b1"), "green is the union over all pass cases");
 });
 
-check("fold: a PENDING case contributes NOTHING (pending does not paint)", () => {
-  const { done, error } = deriveReviewOverlay(
-    { c1: "pending" },
-    M([["c1", { status: "error", litNodeKeys: ["n1"] }]]),
+check("fold: error ⊆ green — a LEAF lit by a pass-run-error case AND a fail case resolves to RED, drops out of error (no double class)", () => {
+  const { green, red, error } = deriveReviewOverlay(
+    { e: "pass", f: "fail" },
+    M([
+      ["e", { status: "error", litNodeKeys: ["leaf"] }], // pass verdict, run errored → would be error…
+      ["f", { status: "pass", litNodeKeys: ["leaf"] }], // …but a fail case reaches the same LEAF
+    ]),
+    leafIs("leaf"),
   );
-  assert.equal(done.size, 0);
-  assert.equal(error.size, 0);
+  assert.deepEqual([...red], ["leaf"], "leaf red-wins (a failed outcome tip)");
+  assert.equal(green.size, 0, "not green — red won");
+  assert.equal(error.size, 0, "error ⊆ green: a red-resolved node is NOT in error (already red, no double class)");
+});
+
+check("fold: error ⊆ green — an INTERIOR pass-run-error node shared with a fail case stays GREEN and IN error (error-over-green)", () => {
+  const { green, red, error } = deriveReviewOverlay(
+    { e: "pass", f: "fail" },
+    M([
+      ["e", { status: "error", litNodeKeys: ["mid"] }],
+      ["f", { status: "pass", litNodeKeys: ["mid"] }],
+    ]),
+    noLeaf, // interior → green wins
+  );
+  assert.deepEqual([...green], ["mid"], "interior green-wins");
+  assert.equal(red.size, 0);
+  assert.deepEqual([...error], ["mid"], "the green node's run errored → in error (painted error-over-green)");
+});
+
+check("fold: a PASS-verdict case whose RUN status is 'fail' STILL paints green (human override, not error)", () => {
+  const { green, error } = deriveReviewOverlay(
+    { c1: "pass" },
+    M([["c1", { status: "fail", litNodeKeys: ["n1"] }]]),
+    noLeaf,
+  );
+  assert.deepEqual([...green], ["n1"], "the human pass verdict paints green over the automated fail");
+  assert.equal(error.size, 0, "run-status 'fail' does NOT redden — only run-status 'error' does");
 });
 
 check("fold: a stale pass caseId (not in perCase) → inert (contributes nothing)", () => {
-  const { done, error } = deriveReviewOverlay(
+  const { green } = deriveReviewOverlay(
     { gone: "pass", live: "pass" },
     M([["live", { status: "pass", litNodeKeys: ["n1"] }]]),
+    noLeaf,
   );
-  assert.deepEqual([...done], ["n1"], "only the live case paints; the stale id is skipped");
-  assert.equal(error.size, 0);
+  assert.deepEqual([...green], ["n1"], "only the live case paints; the stale id is skipped");
 });
 
-check("fold: multiple pass cases lighting the same node → done (union, idempotent)", () => {
-  const { done, error } = deriveReviewOverlay(
+check("fold: multiple pass cases lighting the same node → green (union, idempotent)", () => {
+  const { green } = deriveReviewOverlay(
     { a: "pass", b: "pass" },
     M([
       ["a", { status: "pass", litNodeKeys: ["n1"] }],
       ["b", { status: "pass", litNodeKeys: ["n1"] }],
     ]),
+    noLeaf,
   );
-  assert.deepEqual([...done], ["n1"], "deduped to a single entry");
-  assert.equal(error.size, 0);
+  assert.deepEqual([...green], ["n1"], "deduped to a single entry");
 });
 
-check("fold: a pass case with litNodeKeys:[] contributes nothing (no crash, empty sets)", () => {
-  const { done, error } = deriveReviewOverlay(
+check("fold: a case with litNodeKeys:[] contributes nothing (no crash, empty sets)", () => {
+  const { green, red, grey, error } = deriveReviewOverlay(
     { c1: "pass" },
     M([["c1", { status: "error", litNodeKeys: [] }]]),
+    noLeaf,
   );
-  assert.equal(done.size, 0);
-  assert.equal(error.size, 0);
-});
-
-check("fold: an unreviewed (absent) caseId never paints even when present in perCase", () => {
-  const { done, error } = deriveReviewOverlay(
-    {}, // nothing has a verdict
-    M([["c1", { status: "error", litNodeKeys: ["n1"] }]]),
-  );
-  assert.equal(done.size, 0);
-  assert.equal(error.size, 0);
+  assert.equal(green.size + red.size + grey.size + error.size, 0);
 });
 
 // ── isReviewState (trusted-input guard) ───────────────────────────────────────
@@ -347,50 +475,67 @@ check("setReviewState: any-to-any is one step (no cycling) — fail → pass dir
   assert.deepEqual(setReviewState({ c1: "fail" }, "c1", "pass"), { c1: "pass" }, "a mis-marked fail corrects in ONE set");
 });
 
-// ── buildReviewPerCase → deriveReviewOverlay (slice 5 host join, end-to-end) ──────────────
-// The host's driveDoneOverlay composes buildReviewPerCase (frozen-case join) then deriveReviewOverlay (the slice-2 fold).
+// ── buildReviewPerCase → deriveReviewOverlay (host join, end-to-end) ──────────────
+// The host's driveDoneOverlay composes buildReviewPerCase (frozen-case join) then deriveReviewOverlay (the verdict fold).
 // Test the composition with stub statusOf/litNodeKeysOf closures (the closures stand in for scenarioByCaseId + the
-// crlAnchorsForUnits(unitsForCase(...)) reveal join).
+// crlAnchorsForUnits(unitsForCase(...)) reveal join). The 3rd fold arg is isLeaf — noLeaf here (structure interior).
 const lit = { c1: ["n:a", "n:b"], c2: ["n:b", "n:c"], cErr: ["n:c", "n:d"], cClean: ["n:c"] };
 const status = { c1: "pass", c2: "fail", cErr: "error", cClean: "pass" };
 const statusOf = (id) => status[id]; // undefined for an unknown id (unfrozen / ambiguous)
 const litOf = (id) => lit[id] ?? [];
-const overlayFor = (byCaseId, caseIds) =>
-  deriveReviewOverlay(byCaseId, buildReviewPerCase(caseIds, statusOf, litOf));
+const overlayFor = (byCaseId, caseIds, isLeaf = noLeaf) =>
+  deriveReviewOverlay(byCaseId, buildReviewPerCase(caseIds, statusOf, litOf), isLeaf);
 
-check("buildReviewPerCase: a frozen PASS-verdict, run-pass case → its nodes done, none error", () => {
-  const { done, error } = overlayFor({ c1: "pass" }, ["c1", "c2"]);
-  assert.deepEqual([...done].sort(), ["n:a", "n:b"]);
+check("buildReviewPerCase: a frozen PASS-verdict, run-pass case → its nodes green, none error", () => {
+  const { green, error } = overlayFor({ c1: "pass" }, ["c1", "c2"]);
+  assert.deepEqual([...green].sort(), ["n:a", "n:b"]);
   assert.equal(error.size, 0);
 });
-check("buildReviewPerCase: a frozen PASS-verdict, run-ERROR case → its nodes error AND done (error⊆done)", () => {
-  const { done, error } = overlayFor({ cErr: "pass" }, ["cErr", "cClean"]);
-  assert.deepEqual([...done].sort(), ["n:c", "n:d"], "error nodes are also done");
+check("buildReviewPerCase: a frozen FAIL-verdict case → its nodes red (#210)", () => {
+  const { red, green } = overlayFor({ c2: "fail" }, ["c1", "c2"]);
+  assert.deepEqual([...red].sort(), ["n:b", "n:c"], "fail paints red");
+  assert.equal(green.size, 0);
+});
+check("buildReviewPerCase: a frozen PASS-verdict, run-ERROR case → its nodes error AND green (error⊆green)", () => {
+  const { green, error } = overlayFor({ cErr: "pass" }, ["cErr", "cClean"]);
+  assert.deepEqual([...green].sort(), ["n:c", "n:d"], "error nodes are also green");
   assert.deepEqual([...error].sort(), ["n:c", "n:d"]);
 });
-check("error-over-done: a node lit by a clean pass case AND a run-errored pass case is error (and done)", () => {
-  // cClean lights n:c (run-pass), cErr lights n:c + n:d (run-error) → n:c is in BOTH done and error; webview paints error over it.
-  const { done, error } = overlayFor({ cClean: "pass", cErr: "pass" }, ["cClean", "cErr"]);
-  assert.ok(done.has("n:c") && error.has("n:c"), "shared node is error AND done");
-  assert.ok(done.has("n:d") && error.has("n:d"));
+check("error-over-green: a node lit by a clean pass case AND a run-errored pass case is error (and green)", () => {
+  // cClean lights n:c (run-pass), cErr lights n:c + n:d (run-error) → n:c is in BOTH green and error; webview paints error over it.
+  const { green, error } = overlayFor({ cClean: "pass", cErr: "pass" }, ["cClean", "cErr"]);
+  assert.ok(green.has("n:c") && error.has("n:c"), "shared node is error AND green");
+  assert.ok(green.has("n:d") && error.has("n:d"));
 });
-check("PENDING case paints nothing (only pass contributes)", () => {
-  const { done, error } = overlayFor({ c1: "pending" }, ["c1", "c2"]);
-  assert.equal(done.size, 0);
-  assert.equal(error.size, 0);
+check("interior precedence end-to-end: a pass case + a fail case share n:b (interior) → green", () => {
+  const { green, red } = overlayFor({ c1: "pass", c2: "fail" }, ["c1", "c2"]); // c1 lights n:a,n:b; c2 lights n:b,n:c
+  assert.ok(green.has("n:b"), "shared interior node → green (interior green-wins)");
+  assert.ok(green.has("n:a"));
+  assert.ok(red.has("n:c") && !green.has("n:c"), "c2-only node is red");
+  assert.ok(!red.has("n:b"), "the shared node is not also red (disjoint)");
+});
+check("leaf precedence end-to-end: the same shared node as a LEAF → red-wins", () => {
+  const { green, red } = overlayFor({ c1: "pass", c2: "fail" }, ["c1", "c2"], leafIs("n:b"));
+  assert.ok(red.has("n:b"), "shared leaf node → red (leaf red-wins)");
+  assert.ok(!green.has("n:b"));
+});
+check("PENDING case paints grey (#210)", () => {
+  const { grey, green, red } = overlayFor({ c1: "pending" }, ["c1", "c2"]);
+  assert.deepEqual([...grey].sort(), ["n:a", "n:b"], "pending paints grey");
+  assert.equal(green.size, 0);
+  assert.equal(red.size, 0);
 });
 check("an unfrozen/ambiguous caseId (statusOf → undefined) is skipped — never appears in perCase", () => {
   // "ghost" is pass in the sidecar but not a live/frozen case → buildReviewPerCase skips it → the fold finds no row → inert.
   const perCase = buildReviewPerCase(["ghost", "c1"], statusOf, litOf);
   assert.ok(!perCase.has("ghost"), "no perCase row for an unresolved (undefined-status) case");
   assert.ok(perCase.has("c1"));
-  const { done } = deriveReviewOverlay({ ghost: "pass", c1: "pass" }, perCase);
-  assert.deepEqual([...done].sort(), ["n:a", "n:b"], "only the live pass case painted; the ghost is inert");
+  const { green } = deriveReviewOverlay({ ghost: "pass", c1: "pass" }, perCase, noLeaf);
+  assert.deepEqual([...green].sort(), ["n:a", "n:b"], "only the live pass case painted; the ghost is inert");
 });
 check("empty worklist (no verdicts) → empty overlay (host posts a clear)", () => {
-  const { done, error } = overlayFor({}, ["c1", "c2", "cErr"]);
-  assert.equal(done.size, 0);
-  assert.equal(error.size, 0);
+  const { green, red, grey, error } = overlayFor({}, ["c1", "c2", "cErr"]);
+  assert.equal(green.size + red.size + grey.size + error.size, 0);
 });
 check("buildReviewPerCase passes litNodeKeys verbatim from the join closure", () => {
   const perCase = buildReviewPerCase(["c2"], statusOf, litOf);

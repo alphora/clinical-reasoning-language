@@ -68,7 +68,8 @@ const ESC: Record<string, string> = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"
 const escapeHtml = (s: string): string => s.replace(/[&<>"']/g, (c) => ESC[c]);
 const BADGE: Record<string, string> = { pass: "✓", fail: "✗", error: "⚠" };
 // The four review-verdict labels the worklist dropdown offers (#156 slice 4, extended). "To do" is the unstored default
-// (absence in the sidecar); Pending / Pass / Fail are the persisted verdicts. Only Pass paints the tree (deriveReviewOverlay).
+// (absence in the sidecar); Pending / Pass / Fail are the persisted verdicts. Each verdict paints its fired path on the tree
+// (#210: Pass→green, Fail→red, Pending→grey; To do→none — deriveReviewOverlay).
 const REVIEW_LABEL: Record<ReviewState, string> = { unreviewed: "To do", pending: "Pending", pass: "Pass", fail: "Fail" };
 const REVIEW_ORDER: readonly ReviewState[] = ["unreviewed", "pending", "pass", "fail"];
 
