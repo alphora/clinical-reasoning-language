@@ -297,6 +297,31 @@ export function deriveReviewOverlay(
 }
 
 /**
+ * The all-pass LEAF ✓ fold (#210, PURE + unit-tested). A disposition leaf earns the green ✓ iff ≥1 scenario PRODUCED it
+ * AND EVERY producing scenario's verdict is `pass`. Fail-safe → SUPPRESS: a single producing scenario that is `fail`,
+ * `pending`, OR `unreviewed` kills the badge (operator: "any single pending or unreviewed route or failing on any of the
+ * paths to it → no checkmark"). "Produced" is the EXECUTION reach (`collectProducedActions` re-rooted to structure
+ * nodeKeys) — NOT the reveal/correspondence reach, which under-reaches. An errored/blocked scenario produces NOTHING, so
+ * it never appears here → the run-error disqualifier is handled by construction. CONTRACT NUANCE (Claude R2): because an
+ * errored scenario produces nothing, the ✓ precisely reads "every NON-ERRORED producing route is pass". A run-errored case
+ * that a clinician nonetheless marked `pass` would (had it run) reach some leaf, but contributes to none here — so it does
+ * NOT suppress. This is deliberate: run-error is a SEPARATE axis (surfaced as the red `.error-node` wash), and Slice 2
+ * CLOSES this edge by force-pending an errored case (→ its verdict is no longer `pass`) + a ✗ on its EXPECTED leaf.
+ * `verdict` is `unreviewed` for a to-do OR an ambiguous (duplicate-name, unreviewable) case → both correctly suppress.
+ * An unreached leaf (no producing scenario) is never added.
+ */
+export function deriveAllPassLeaves(
+  scenarios: Iterable<{ producedLeafKeys: readonly string[]; verdict: ReviewState }>,
+): Set<string> {
+  const perLeaf = new Map<string, boolean>(); // leafKey → still-all-pass (present ⇒ ≥1 producing scenario)
+  for (const sc of scenarios)
+    for (const key of sc.producedLeafKeys) perLeaf.set(key, (perLeaf.get(key) ?? true) && sc.verdict === "pass");
+  const out = new Set<string>();
+  for (const [key, allPass] of perLeaf) if (allPass) out.add(key);
+  return out;
+}
+
+/**
  * Build the `perCase` fold input (slice 5) from a set of frozen caseIds + two lookups — pure + testable, so the host's
  * `driveDoneOverlay` stays a thin glue layer. For each caseId whose `statusOf` resolves (a frozen case with a known run
  * status), emit a {status, litNodeKeys} row keyed by caseId; a caseId whose status is `undefined` (unfrozen / no

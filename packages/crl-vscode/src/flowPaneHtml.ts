@@ -485,8 +485,17 @@ export function renderFlowPane(
     // #210 FLOWCHART SHAPE: the decision ROOT (start) and a recommend-activity outcome LEAF (end) are STADIUMS (fully
     // rounded pills, rx = half-height); every INTERIOR node (when / use-decision / otherwise) stays a rounded rectangle
     // (rx 6). The on-path ring matches — a stadium node rings as a pill (rx = half the ring-rect height, off 2.5 → NODE_H+5).
-    const stadium = n.kind === "decision" || (n.kind === "action" && !n.useDecision);
+    const isLeafEnd = n.kind === "action" && !n.useDecision; // a recommend-activity outcome tip (disposition leaf)
+    const stadium = n.kind === "decision" || isLeafEnd;
     const rx = stadium ? NODE_H / 2 : 6;
+    // #210 ALL-PASS ✓ BADGE — a HIDDEN theme-aware (green circle + white check) grandchild on every disposition leaf,
+    // revealed by the host-toggled `.leaf-allpass` when EVERY route producing this outcome is pass. Right-CENTER interior
+    // (clears the top guard-tab band + the stadium's rounded corners + the left-aligned label). `pointer-events:none` (CSS).
+    const badgeCx = x + NODE_W - 13;
+    const badgeCy = y + NODE_H / 2;
+    const allPassBadge = isLeafEnd
+      ? `<g class="flow-allpass-badge"><circle cx="${badgeCx}" cy="${badgeCy}" r="8"/><path d="M${badgeCx - 4} ${badgeCy} l2.6 2.9 l5 -5.6"/></g>`
+      : "";
     body +=
       `<g id="${escapeHtml(gid)}" class="${classes.join(" ")}" data-reveal="${escapeHtml(key)}">` +
       `<title>${escapeHtml(n.full)}</title>` +
@@ -494,6 +503,7 @@ export function renderFlowPane(
       labelMarkup(n.label, x, y, NODE_H, LABEL_MAX, 10) +
       flowRing(x, y, NODE_W, NODE_H, 2.5, stadium ? (NODE_H + 5) / 2 : 8) + // #187 Todo 3: on-path ring — BEFORE the guard tab so the tab's opaque fill occludes the ring's top crossing segment
       guardTab +
+      allPassBadge +
       `</g>`;
   }
 
@@ -604,6 +614,15 @@ export const FLOW_STYLE =
   `.flow-row.review-fail>rect{fill:var(--vscode-testing-iconFailed,#f14c4c);fill-opacity:.2}` +
   `.flow-row.review-pending>rect{fill:var(--vscode-charts-yellow,#d29922);fill-opacity:.16}` +
   `.flow-row.error-node>rect{fill:var(--vscode-testing-iconFailed,#f14c4c);fill-opacity:.22}` +
+  // #210 ALL-PASS ✓ BADGE — a green circle + white check, HIDDEN until the host toggles `.leaf-allpass` (every route producing
+  // this outcome is pass). Theme-aware WITHOUT a media query: solid green + white read on light AND dark. A thin separation
+  // ring (`--vscode-editorWidget-background`, the node's own fill) keeps the badge green legible over the `.review-pass` green
+  // wash. `pointer-events:none` so the glyph never intercepts a click (the row's `data-reveal` still routes). Grandchild `<g>`,
+  // so `.flow-row>rect`/`>text` selectors don't touch it.
+  `.flow-allpass-badge{display:none;pointer-events:none}` +
+  `.flow-row.leaf-allpass .flow-allpass-badge{display:inline}` +
+  `.flow-allpass-badge>circle{fill:var(--vscode-testing-iconPassed,#3fb950);stroke:var(--vscode-editorWidget-background,#252526);stroke-width:1.2}` +
+  `.flow-allpass-badge>path{fill:none;stroke:#ffffff;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}` +
   // #177 slice 4: the "this node" cross-pane marker — the FOCUSED questionnaire question's tree node. It paints a
   // distinctive solid `stroke` on the >rect — the SAME proven axis `.current`/`.failed-criterion` use (FIX 1 impl review:
   // this repo's evidence is that `outline` does NOT paint on the SVG here, which is exactly why those switched to stroke).

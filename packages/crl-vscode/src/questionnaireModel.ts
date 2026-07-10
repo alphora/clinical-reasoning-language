@@ -299,8 +299,11 @@ export function buildQuestionnaire(
   return { questions, outcome: null, terminalKind: "blocked" };
 }
 
-/** Collect produced recommend-activity leaves (label + nodeId) in fired-tree order (unchanged). */
-function collectProducedActions(nodes: ViewNode[]): { label: string; nodeId: string }[] {
+/** Collect produced recommend-activity leaves (label + nodeId) in fired-tree order (unchanged). EXPORTED (#210 all-pass
+ *  badge): the SOUND execution reach — the disposition leaves a case actually PRODUCED (`n.action?.produced`), for
+ *  re-rooting → structure nodeKeys. Distinct from the reveal/correspondence reach (`crlAnchorsForUnits`), which under-
+ *  reaches a leaf when the case's units cite only the gating concept. */
+export function collectProducedActions(nodes: ViewNode[]): { label: string; nodeId: string }[] {
   const out: { label: string; nodeId: string }[] = [];
   const visit = (ns: ViewNode[]): void => {
     for (const n of ns) {

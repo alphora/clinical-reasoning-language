@@ -49,7 +49,7 @@ async function loadCockpit() {
   return require(out);
 }
 
-const { COCKPIT_WEBVIEW_SCRIPT: SCRIPT, leafMarkBuckets, leafBucketsFromQuestionnaire } = await loadCockpit();
+const { COCKPIT_WEBVIEW_SCRIPT: SCRIPT, leafMarkBuckets, leafBucketsFromQuestionnaire, resolveProducedLeafKeys } = await loadCockpit();
 
 let pass = 0;
 const check = (label, fn) => {
@@ -111,26 +111,26 @@ check("SURVIVES-SELECTION: the highlight handler does NOT call clrRO (selection 
   const body = handlerBody("highlight");
   assert.ok(/clrFC\(\)/.test(body), "highlight DOES clear the failed-criterion channel (sanity — clrFC present)");
   assert.ok(!/clrRO\(\)/.test(body), "highlight MUST NOT call clrRO — the review overlay survives a new selection");
-  assert.ok(!/review-pass|review-fail|review-pending|error-node/.test(body), "highlight MUST NOT touch the review classes at all");
+  assert.ok(!/review-pass|review-fail|review-pending|error-node|leaf-allpass/.test(body), "highlight MUST NOT touch the review classes at all");
 });
 
 check("SURVIVES-SELECTION: the clearHighlight handler does NOT call clrRO (clearing the selection keeps the review overlay)", () => {
   const body = handlerBody("clearHighlight");
   assert.ok(/clrFC\(\)/.test(body), "clearHighlight DOES clear the failed-criterion channel (sanity)");
   assert.ok(!/clrRO\(\)/.test(body), "clearHighlight MUST NOT call clrRO — review overlay survives a selection clear");
-  assert.ok(!/review-pass|review-fail|review-pending|error-node/.test(body), "clearHighlight MUST NOT touch the review classes");
+  assert.ok(!/review-pass|review-fail|review-pending|error-node|leaf-allpass/.test(body), "clearHighlight MUST NOT touch the review classes");
 });
 
 check("SURVIVES-SELECTION: clrFC strips ONLY the failed-criterion classes, never the review classes", () => {
   const m = SCRIPT.match(/const clrFC=\(\)=>\{[^}]*\}[^;]*\};/);
   assert.ok(m, "clrFC body");
-  assert.ok(!/review-pass|review-fail|review-pending|error-node/.test(m[0]), "clrFC never removes the review classes");
+  assert.ok(!/review-pass|review-fail|review-pending|error-node|leaf-allpass/.test(m[0]), "clrFC never removes the review classes");
 });
 
 check("the failed-criterion handlers (markFailedCriteria/clearFailedCriteria) do NOT touch the review classes either", () => {
   for (const type of ["markFailedCriteria", "clearFailedCriteria"]) {
     const body = handlerBody(type);
-    assert.ok(!/clrRO\(\)|review-pass|review-fail|review-pending|error-node/.test(body), `${type} MUST NOT touch the review overlay (independent channel)`);
+    assert.ok(!/clrRO\(\)|review-pass|review-fail|review-pending|error-node|leaf-allpass/.test(body), `${type} MUST NOT touch the review overlay (independent channel)`);
   }
 });
 
@@ -145,6 +145,9 @@ check("VERDICT-PAINTING: markReviewOverlay applies ONE class per disjoint verdic
   // fail + pending are painted unconditionally from their own (disjoint) sets — no cross-set skipping needed.
   assert.ok(/m\.fail\|\|\[\][\s\S]*add\('review-fail'\)/.test(body), "fail ids → .review-fail");
   assert.ok(/m\.pending\|\|\[\][\s\S]*add\('review-pending'\)/.test(body), "pending ids → .review-pending");
+  // #210 all-pass ✓ badge: the 5th set toggles .leaf-allpass; clrRO strips it (gen-guarded clear-then-set like the rest).
+  assert.ok(/m\.allPassLeaves\|\|\[\][\s\S]*add\('leaf-allpass'\)/.test(body), "allPassLeaves ids → .leaf-allpass");
+  assert.ok(/const clrRO=\(\)=>\{[^}]*leaf-allpass/.test(SCRIPT), "clrRO strips .leaf-allpass too (no stale badge after a verdict change)");
 });
 
 check("#210 recolor: the worklist verdict dropdown (.cel-review-*) uses the SAME tokens the tree paint locks to (no drift)", () => {
@@ -190,7 +193,7 @@ check("SURVIVES-REVEAL: clrTN is called ONLY by mark/clearThisNode, NEVER by hig
 check("the this-node marker clears ONLY the .this-node class, never the selection/failed-criterion/review classes", () => {
   const m = SCRIPT.match(/const clrTN=\(\)=>\{[^}]*\};/);
   assert.ok(m, "clrTN body");
-  assert.ok(!/current|failed-criterion|review-pass|review-fail|review-pending|error-node/.test(m[0]), "clrTN strips only .this-node");
+  assert.ok(!/current|failed-criterion|review-pass|review-fail|review-pending|error-node|leaf-allpass/.test(m[0]), "clrTN strips only .this-node");
 });
 
 check("GEN-GUARD: markThisNode drops a mark aimed at a superseded render (m.gen!==gen → return); clearThisNode is ungated", () => {
@@ -291,7 +294,7 @@ check("SELECTION-COUPLED: clrDV IS called by BOTH highlight and clearHighlight (
 check("clrDV strips ONLY the .diverter class, never the other channels", () => {
   const m = SCRIPT.match(/const clrDV=\(\)=>\{[^}]*\};/);
   assert.ok(m, "clrDV body");
-  assert.ok(!/current|failed-criterion|review-pass|review-fail|review-pending|error-node|this-node/.test(m[0]), "clrDV strips only .diverter");
+  assert.ok(!/current|failed-criterion|review-pass|review-fail|review-pending|error-node|leaf-allpass|this-node/.test(m[0]), "clrDV strips only .diverter");
 });
 
 check("GEN-GUARD: markDiverters drops a mark aimed at a superseded render (clear-then-set); clearDiverters is ungated", () => {
@@ -306,7 +309,7 @@ check("GEN-GUARD: markDiverters drops a mark aimed at a superseded render (clear
 check("the diverter handlers touch ONLY the .diverter class (independent of every other overlay)", () => {
   for (const type of ["markDiverters", "clearDiverters"]) {
     const body = handlerBody(type);
-    assert.ok(!/current|failed-criterion|review-pass|review-fail|review-pending|error-node|this-node/.test(body), `${type} touches only .diverter`);
+    assert.ok(!/current|failed-criterion|review-pass|review-fail|review-pending|error-node|leaf-allpass|this-node/.test(body), `${type} touches only .diverter`);
   }
 });
 
@@ -416,7 +419,7 @@ check("SURVIVES-REVEAL: clrLeaf is called ONLY by mark/clearLeaves, NEVER by the
 check("clrLeaf strips ONLY the leaf-verdict classes, never the selection/review/marker classes", () => {
   const m = SCRIPT.match(/const clrLeaf=\(\)=>\{[\s\S]*?\};/);
   assert.ok(m, "clrLeaf body");
-  assert.ok(!/current|failed-criterion|review-pass|review-fail|review-pending|error-node|this-node|diverter/.test(m[0]), "clrLeaf strips only .flow-leaf-yes/.flow-leaf-no");
+  assert.ok(!/current|failed-criterion|review-pass|review-fail|review-pending|error-node|leaf-allpass|this-node|diverter/.test(m[0]), "clrLeaf strips only .flow-leaf-yes/.flow-leaf-no");
 });
 
 check("CLEAR-THEN-SET + GEN-GUARD + MUTUAL EXCLUSION: markLeaves clears both classes first, is gen-guarded, and yes/no are exclusive per leaf", () => {
@@ -506,17 +509,45 @@ check("BUCKETING: leafBucketsFromQuestionnaire — empty questions / undefined c
   assert.deepEqual(leafBucketsFromQuestionnaire(oneYes, () => "w:On", undefined, leafConcepts), { yesKeys: [], noKeys: [] }, "satisfied when but undefined truth → unknown → empty");
 });
 
+// ── #210: the pure produced→leaf composition (the badge/paint EXECUTION reach), with an injected resolveKey ──
+check("resolveProducedLeafKeys: produced actions → their disposition-leaf nodeKeys; non-leaf/unresolved dropped; deduped", () => {
+  const leaves = new Set(["a:R1", "a:R2"]);
+  // resolveKey stub: rt:1→a:R1 (leaf), rt:2→a:R2 (leaf), rt:use→d:Sub (NOT a leaf — a use-decision), rt:dangle→undefined.
+  const resolveKey = (id) => ({ "rt:1": "a:R1", "rt:2": "a:R2", "rt:use": "d:Sub", "rt:dangle": undefined })[id];
+  const got = resolveProducedLeafKeys(
+    [{ nodeId: "rt:1" }, { nodeId: "rt:use" }, { nodeId: "rt:dangle" }, { nodeId: "rt:2" }, { nodeId: "rt:1" }],
+    resolveKey,
+    leaves,
+  );
+  assert.deepEqual(got, ["a:R1", "a:R2"], "only the produced actions that resolve to a DISPOSITION LEAF, deduped");
+  assert.ok(!got.includes("d:Sub"), "a produced action resolving to a non-leaf (use-decision) is dropped");
+});
+check("resolveProducedLeafKeys: no produced actions → empty (a blocked/errored case reaches no leaf)", () => {
+  assert.deepEqual(resolveProducedLeafKeys([], () => "a:R1", new Set(["a:R1"])), []);
+});
+
 // ── #210 Slice 1b: HOST-side wiring source-grep locks (driveDoneOverlay + the memo routing live outside the webview SCRIPT) ──
-check("Slice 1b: driveDoneOverlay iterates REVIEWED ids only + unions the case's on-path yes-leaf keys into litNodeKeys", () => {
-  // reviewed-only input: unreviewed cases can't vote, so we don't pay their structure join / questionnaire build.
+check("Slice 1b/#210: driveDoneOverlay reviewed-only painting; litNodeKeys = interior ∪ PRODUCED leaves ∪ yes sub-questions", () => {
+  // reviewed-only painting input: unreviewed cases can't vote.
   assert.ok(/buildReviewPerCase\(\s*Object\.keys\(reviewByCaseId\)/.test(COCKPIT_SRC), "buildReviewPerCase is fed Object.keys(reviewByCaseId), not scenarioByCaseId.keys()");
-  // litNodeKeysOf unions the sub-question yes-leaves onto the structure base.
-  assert.ok(/leafBucketsFromQuestionnaire\(\s*questionnaireFor\(caseId, sv\)\.questions/.test(COCKPIT_SRC), "litNodeKeysOf builds the case's questionnaire via questionnaireFor + buckets it");
-  assert.ok(/yesKeys\.length \? \[\.\.\.base, \.\.\.yesKeys\] : base/.test(COCKPIT_SRC), "the case's yes-leaf keys are appended to the structure base");
-  // the errored/absent sv guard: no leaf keys for an errored case (buildReviewPerCase still calls litNodeKeysOf for status 'error').
-  assert.ok(/if \(!sv \|\| sv\.status === "error"\) return base;/.test(COCKPIT_SRC), "an errored/absent sv unions NO leaf keys (base only)");
-  // the fold's isLeaf is unchanged → a `leaf::` key (disjoint from dispositionLeafKeys) is INTERIOR (green-wins).
-  assert.ok(/deriveReviewOverlay\(reviewByCaseId, perCase, \(k\) => dispositionLeafKeys\.has\(k\)\)/.test(COCKPIT_SRC), "the leaf-aware fold call is unchanged (leaf:: keys fold as interior)");
+  // INTERIOR structure = crlAnchors MINUS disposition leaves (reveal reach); leaves come from the EXECUTION reach instead.
+  assert.ok(/crlAnchorsForUnits\(unitsForCase\(caseId, m\), m\)\.filter\(\(k\) => !dispositionLeafKeys\.has\(k\)\)/.test(COCKPIT_SRC), "interior = crlAnchors minus disposition leaves");
+  assert.ok(/const produced = producedByCaseId\.get\(caseId\)/.test(COCKPIT_SRC), "the case's PRODUCED disposition leaves (execution reach) are unioned in");
+  assert.ok(/leafBucketsFromQuestionnaire\(questionnaireFor\(caseId, sv\)\.questions/.test(COCKPIT_SRC), "on-path sub-question yes-leaves via questionnaireFor");
+  assert.ok(/return \[\.\.\.interior, \.\.\.produced, \.\.\.yes\];/.test(COCKPIT_SRC), "litNodeKeys = interior ∪ produced ∪ yes");
+  // the fold's isLeaf is unchanged.
+  assert.ok(/deriveReviewOverlay\(reviewByCaseId, perCase, \(k\) => dispositionLeafKeys\.has\(k\)\)/.test(COCKPIT_SRC), "the leaf-aware fold call is unchanged");
+});
+check("#210 all-pass badge: reach is EXECUTION (collectProducedActions), over the FULL scenario list, ambiguous → unreviewed → suppress", () => {
+  // the sound reach — produced disposition, NOT the crlAnchors reveal heuristic.
+  assert.ok(/function producedDispositionLeafKeys\([^)]*\)/.test(COCKPIT_SRC), "a producedDispositionLeafKeys helper exists");
+  assert.ok(/collectProducedActions\(sv\.tree\)/.test(COCKPIT_SRC), "reach walks the PRODUCED actions of the scenario tree (execution), not crlAnchors");
+  // iterate the FULL frozen list (scenarioByCaseId drops ambiguous); ambiguous/duplicate-name → unreviewed → suppress.
+  assert.ok(/for \(const sc of scenarios\?\.scenarios \?\? \[\]\)/.test(COCKPIT_SRC), "iterate the FULL scenarios.scenarios (not scenarioByCaseId, which drops ambiguous)");
+  assert.ok(/duplicateScenarioNames\.has\(sc\.case\.name\) \? undefined : caseIdByName\[sc\.case\.name\]/.test(COCKPIT_SRC), "ambiguous duplicate-name case → no caseId");
+  assert.ok(/\?\? "unreviewed"/.test(COCKPIT_SRC), "an ambiguous/absent verdict defaults to unreviewed (suppresses the badge)");
+  assert.ok(/deriveAllPassLeaves\(badgeEntries\)/.test(COCKPIT_SRC), "the all-pass fold decides the badge set");
+  assert.ok(/allPassLeaves: segmentsFor\(tree, \[\.\.\.allPassLeaves\]\)\.segmentIds/.test(COCKPIT_SRC), "allPassLeaves posted as the 5th markReviewOverlay set");
 });
 check("Slice 1b: questionnaireFor routes the FOCUSED case to the memo, a NON-focused case to buildQuestionnaireRaw (no memo poisoning)", () => {
   const m = COCKPIT_SRC.match(/function questionnaireFor\([^)]*\)[^{]*\{([\s\S]*?)\n  \}/);

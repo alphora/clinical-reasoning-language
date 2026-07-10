@@ -11,7 +11,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { resolveCelImports, renderScenario } from "@smile-digital-health/crl";
 
-const { buildQuestionnaire, producedPathDiverterIds } = await load("questionnaireModel.ts");
+const { buildQuestionnaire, producedPathDiverterIds, collectProducedActions } = await load("questionnaireModel.ts");
 
 let pass = 0;
 const check = (label, fn) => {
@@ -131,6 +131,11 @@ case "A holds → the keyed determination fires":
   assert.equal(q.terminalKind, "produced");
   assert.deepEqual(q.outcome, { activity: "Unmet EIU" }, "the Outcome shows only the human key, space preserved");
   assert.ok(!JSON.stringify(q.outcome).includes("not-certify."), "the dotted category prefix is stripped from the display");
+  // #210: collectProducedActions is the EXECUTION reach — the ACTUAL produced disposition leaf(s) from the fired tree
+  // (`n.action?.produced`), the sound source the all-pass badge + leaf paint re-root to structure nodeKeys.
+  const produced = collectProducedActions(sv.tree);
+  assert.equal(produced.length, 1, "exactly one disposition produced");
+  assert.ok(produced[0].nodeId && produced[0].label.includes("Unmet EIU"), "the produced action carries its runtime nodeId + label");
 });
 
 // ── 2. THE KEY MODEL-FIX TEST: a FAIL where a DIFFERENT disposition is produced. The case has an exclusion
@@ -390,6 +395,8 @@ case "contraindicated, whole menu guarded out → nothing produced":
   assert.equal(guardQ.conceptName, "Contra", "the guard concept is the terminal question");
   assert.equal(guardQ.answer, "yes", "the contraindication held (satisfied) → answer yes");
   assert.deepEqual(q.questions.map((x) => x.conceptName), ["Dx", "Contra"], "Dx then the guard terminal");
+  // #210: a blocked case PRODUCES nothing → the all-pass badge / leaf-paint execution reach is empty (it reaches no leaf).
+  assert.equal(collectProducedActions(sv.tree).length, 0, "collectProducedActions is [] when nothing is produced (blocked)");
 });
 
 // ── 6b. Blocked (0 produced) via a no-otherwise decision where the only when is false → blocked. ──

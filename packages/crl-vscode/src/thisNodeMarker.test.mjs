@@ -48,6 +48,17 @@ check("a grounded runtime nodeId → its standalone nodeKey + the row's source-b
   assert.deepEqual(r.sourceUnits, ["u1"], "source marks via the row's source-bearing unit");
 });
 
+// ── #210 REACH (load-bearing): a PRODUCED recommend-action runtime nodeId re-roots to its disposition-leaf STRUCTURE
+//    nodeKey. If this returned undefined for actions (only whens/guards grounding), the all-pass badge + leaf paint would
+//    be silently ALWAYS EMPTY. `buildRuntimeRefIndex` indexes action rows, so the action grounds like any spine node. ──
+check("#210 REACH: a produced recommend-ACTION nodeId grounds to its structure leaf nodeKey (badge/paint reach is real)", () => {
+  const structure = [sDec([sNode("Pol", "Top", "when[0]", "KEY_when0", [sNode("Pol", "Top", "when[0]/action[0]", "KEY_act0")])])];
+  const idx = buildRuntimeRefIndex(structure);
+  const tree = [when("when[0]", [action("when[0]/action[0]")])]; // the action carries produced:true
+  const r = resolveThisNode("when[0]/action[0]", ROOT, tree, idx, mapsWith("KEY_act0", ["u1"], ["u1"]));
+  assert.equal(r.nodeKey, "KEY_act0", "the produced action grounds to its leaf nodeKey — NOT undefined (else badges/leaf-paint never fire)");
+});
+
 // ── no-source-unit node: nodeKey present, EMPTY source units (silent source degrade) ──
 check("a grounded node with NO source-bearing unit → nodeKey present, EMPTY sourceUnits (tree/crl mark; source degrades)", () => {
   const structure = [sDec([sNode("Pol", "Top", "when[0]", "KEY_when0")])];

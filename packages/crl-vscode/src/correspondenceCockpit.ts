@@ -58,6 +58,7 @@ import {
   buildReviewPerCase,
   composeSidecar,
   deleteNote,
+  deriveAllPassLeaves,
   deriveReviewOverlay,
   editNote,
   isReviewState,
@@ -69,11 +70,12 @@ import {
   setReviewState,
   type Note,
   type PersistedReviewState,
+  type ReviewState,
 } from "./medicalValidationStore";
 import { renderCrlPane } from "./crlPaneHtml";
 import { collectDispositionLeafKeys, FLOW_STYLE, renderFlowPane } from "./flowPaneHtml";
 import { QUESTIONNAIRE_STYLE, renderQuestionnairePane, shouldRerenderQuestionnaire, nextQuestionIndex } from "./questionnairePaneHtml";
-import { buildQuestionnaire, producedPathDiverterIds, type Questionnaire } from "./questionnaireModel";
+import { buildQuestionnaire, collectProducedActions, producedPathDiverterIds, type Questionnaire } from "./questionnaireModel";
 import type { ConceptValueType, ResolveValueTypes, ResolveConceptShape, ResolveDefExpr } from "./questionnaireModel";
 import {
   buildCrlRevealMaps,
@@ -236,6 +238,25 @@ export function leafBucketsFromQuestionnaire(
   const truthByKey = new Map<string, boolean>();
   for (const r of conceptTruth ?? []) truthByKey.set(JSON.stringify([r.libraryName, r.name]), r.satisfied);
   return leafMarkBuckets(leafConcepts, satisfiedWhenKeys, truthByKey);
+}
+
+/** #210 (PURE, unit-tested): the composition at the heart of the all-pass badge + leaf-paint execution reach. Given a
+ *  scenario's PRODUCED actions (`collectProducedActions` → `{nodeId}`), an INJECTED `resolveKey` (runtime nodeId →
+ *  structure nodeKey, via `resolveThisNode`), and the `dispositionLeafKeys` set: re-root each produced action → its
+ *  structure nodeKey, keep only those that ARE disposition leaves, deduped. An action that doesn't resolve, or resolves to
+ *  a non-leaf (a use-decision boundary), is dropped. Injecting `resolveKey` keeps this vscode-free + lets the test prove
+ *  the produced→leaf composition directly (the load-bearing seam). */
+export function resolveProducedLeafKeys(
+  producedActions: readonly { nodeId: string }[],
+  resolveKey: (nodeId: string) => string | undefined,
+  dispositionLeafKeys: Set<string>,
+): string[] {
+  const out: string[] = [];
+  for (const p of producedActions) {
+    const k = resolveKey(p.nodeId);
+    if (k !== undefined && dispositionLeafKeys.has(k) && !out.includes(k)) out.push(k);
+  }
+  return out;
 }
 
 export function registerCorrespondenceCockpit(context: vscode.ExtensionContext): void {
@@ -794,16 +815,17 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
    * Drive the Medical Validation VERDICT tree overlay (#156 slice 5 / #210, disc 161 §1 + §"Architecture"). This is a
    * SEPARATE, PERSISTENT channel from `.current` (selection) and `.failed-criterion` (peek): it is recomputed from the
    * REVIEWED worklist cases (not the selection) and survives selection changes — the webview mutates the verdict fills
-   * (`.review-pass/-fail/-pending`/`.error-node`) ONLY on mark/clearReviewOverlay, never on highlight/clearHighlight (so they
-   * never blink off when the clinician clicks around). Clone of `driveFailedCriteriaPeek`'s shape (host recompute → post),
-   * but to the TREE pane only (the verdict overlay is the tree's at-rest review state; the cockpit never paints it).
+   * (`.review-pass/-fail/-pending`/`.error-node`) + the all-pass `.leaf-allpass` badge ONLY on mark/clearReviewOverlay, never
+   * on highlight/clearHighlight (so they never blink off when the clinician clicks around). Clone of `driveFailedCriteriaPeek`'s
+   * shape (host recompute → post), but to the TREE pane only (the verdict overlay is the tree's at-rest review state).
    *
    *  - Cockpit mode (or no model) → TEARDOWN: post the ungated `clearReviewOverlay` (no MV mark can race it here, so an
    *    order-independent class-strip is safe + correct — it wipes a leftover overlay after `Show Cockpit`).
-   *  - MV mode → build `perCase` over the frozen, scenario-bearing cases (status from `scenarioByCaseId`, litNodeKeys via
-   *    the SAME case→tree join the reveal uses: `crlAnchorsForUnits(unitsForCase(caseId), …)`), fold to the disjoint
-   *    `{pass, fail, pending}` + `error` sets (via `deriveReviewOverlay` + the `collectDispositionLeafKeys` leaf set), map each
-   *    node-key set to TREE segment ids via the SAME `segmentsFor` the
+   *  - MV mode → PAINTING folds the REVIEWED cases: each `litNodeKeys` = INTERIOR structure (`crlAnchorsForUnits` MINUS
+   *    disposition leaves, the reveal reach) ∪ its PRODUCED disposition leaves (the EXECUTION reach, `#210` align-both) ∪ its
+   *    on-path sub-question yes-leaves; `deriveReviewOverlay` → the disjoint `{pass, fail, pending}` + `error` sets. The ✓
+   *    BADGE folds ALL frozen scenarios (`deriveAllPassLeaves` over `producedDispositionLeafKeys` — the sound reach) → the
+   *    `allPassLeaves` set. Map every set to TREE segment ids via the SAME `segmentsFor` the
    *    failed-criterion channel uses, and ALWAYS post the gen-stamped `markReviewOverlay` — even when the sets are EMPTY
    *    (FIX 1, gpt55 impl review). The webview's mark handler does clrRO()+add-nothing = a clear-EFFECT, but it is
    *    gen-stamped + gen-ordered, so an empty mark cannot race a non-empty one out of order (the un-review-to-empty case:
@@ -825,44 +847,49 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       return;
     }
     const m = crlMaps;
-    // #210 Slice 1b: iterate REVIEWED case ids only (`Object.keys(reviewByCaseId)`), NOT all frozen cases — an unreviewed
-    // case can't vote (the fold iterates `byCaseId` = reviewByCaseId), so building its perCase row (the structure join AND
-    // the per-case questionnaire below) is pure waste. A stale reviewed id (not in scenarioByCaseId) → statusOf undefined →
-    // buildReviewPerCase skips it. litNodeKeysOf is thus only called for reviewed cases → it unconditionally unions the
-    // on-path sub-question leaves (guarding an errored/absent sv → base only). Sub-question `leaf::` keys are INTERIOR to the
-    // fold (disjoint from `dispositionLeafKeys` by the `leaf::` prefix → isLeaf false → pass-wins) and map via segmentsFor.
+    // #210: disposition LEAVES (recommend-activity tips) — the fold's `isLeaf` set AND the anchor for the execution reach.
+    const dispositionLeafKeys = collectDispositionLeafKeys(crlStructure);
+    // #210 EXECUTION REACH ("align both"): for EVERY frozen scenario (the FULL `scenarios.scenarios` list — `scenarioByCaseId`
+    // DROPS ambiguous duplicate-name cases), the disposition leaves it actually PRODUCED (sound reach; `crlAnchorsForUnits`
+    // under-reaches a produced leaf whose case cites only the gate). Shared by the badge (all frozen) AND the leaf painting
+    // (reviewed subset). An ambiguous/unreviewable case → verdict `unreviewed` → correctly SUPPRESSES its produced leaf's ✓.
+    // PERF (deferred, Claude R2): this walks `collectProducedActions` + `resolveThisNode` for EVERY frozen scenario each
+    // repaint (a NEW cost — previously only reviewed cases were traversed). Bounded + OFF the click/selection hot path
+    // (driveDoneOverlay fires on tree re-render / verdict change / model refresh). If a large worklist janks, memoize
+    // `producedByCaseId` per `indexVersion` (with the non-focused questionnaire memo — same deferral).
+    const badgeEntries: { producedLeafKeys: readonly string[]; verdict: ReviewState }[] = [];
+    const producedByCaseId = new Map<string, readonly string[]>();
+    for (const sc of scenarios?.scenarios ?? []) {
+      const produced = producedDispositionLeafKeys(sc, dispositionLeafKeys);
+      const caseId = duplicateScenarioNames.has(sc.case.name) ? undefined : caseIdByName[sc.case.name];
+      const verdict: ReviewState = (caseId !== undefined ? reviewByCaseId[caseId] : undefined) ?? "unreviewed";
+      badgeEntries.push({ producedLeafKeys: produced, verdict });
+      if (caseId !== undefined) producedByCaseId.set(caseId, produced);
+    }
+    const allPassLeaves = deriveAllPassLeaves(badgeEntries);
+    // PAINTING — iterate REVIEWED cases only (`Object.keys(reviewByCaseId)`; an unreviewed case can't vote). Each reviewed
+    // case's `litNodeKeys` = INTERIOR structure (`crlAnchorsForUnits` MINUS disposition leaves — reveal reach, UNCHANGED) ∪
+    // its PRODUCED disposition leaves (execution reach — #210 align-both: leaves paint by the verdict of the case that
+    // produced them, reliably) ∪ its on-path sub-question yes-leaves (Slice 1b). A stale reviewed id → statusOf undefined →
+    // skipped. (Perf note unchanged: a non-focused reviewed case rebuilds its questionnaire here; focused shares `focusedQMemo`.)
     const perCase = buildReviewPerCase(
       Object.keys(reviewByCaseId),
       (caseId) => scenarioByCaseId.get(caseId)?.status,
       (caseId) => {
-        const base = crlAnchorsForUnits(unitsForCase(caseId, m), m); // the case→tree reveal join (postReveal's case|tree arm)
+        const interior = crlAnchorsForUnits(unitsForCase(caseId, m), m).filter((k) => !dispositionLeafKeys.has(k));
+        const produced = producedByCaseId.get(caseId) ?? [];
         const sv = scenarioByCaseId.get(caseId);
-        if (!sv || sv.status === "error") return base; // no on-path sub-questions for an errored/absent case
-        // ONLY the yes-leaves paint (a satisfied on-path sub-question) — the same set that RINGS (`.flow-leaf-yes`); a false
-        // operand isn't on the fired path so it neither rings nor paints (do NOT union `noKeys`). KNOWN inherited gap: under
-        // `not X` with X false, X is the decisive operand yet a false leaf → no ring, no paint (a Todo-3 ring-semantics
-        // question, not a paint bug). PERF (deferred, both impl reviewers): a non-focused reviewed case rebuilds its
-        // questionnaire here on every tree repaint (bounded by the reviewed subset; the focused case shares `focusedQMemo`).
-        // If a large worklist ever janks, memoize non-focused raw builds on `(caseId, indexVersion)` like the focused slot.
-        const { yesKeys } = leafBucketsFromQuestionnaire(
-          questionnaireFor(caseId, sv).questions,
-          whenKeyResolver(sv),
-          sv.conceptTruth,
-          tree.leafConcepts,
-        );
-        return yesKeys.length ? [...base, ...yesKeys] : base;
+        const yes =
+          !sv || sv.status === "error"
+            ? []
+            : leafBucketsFromQuestionnaire(questionnaireFor(caseId, sv).questions, whenKeyResolver(sv), sv.conceptTruth, tree.leafConcepts).yesKeys;
+        return [...interior, ...produced, ...yes];
       },
     );
-    // #210 verdict painting: leaf-aware precedence lives in the pure fold, so it needs an `isLeaf` closure. A disposition
-    // LEAF = a recommend-activity `action` nodeKey (use-decision is interior delegation glue — NOT a leaf), collected from
-    // the current structure by the shared `collectDispositionLeafKeys` (unit-tested in flowPaneHtml.test.mjs). The fold flips
-    // PASS-vs-FAIL on it (interior→pass wins, leaf→fail wins).
-    const dispositionLeafKeys = collectDispositionLeafKeys(crlStructure);
+    // #210 verdict painting: the leaf-aware precedence (interior→pass wins, leaf→fail wins) lives in the pure fold via `isLeaf`.
     const { pass, fail, pending, error } = deriveReviewOverlay(reviewByCaseId, perCase, (k) => dispositionLeafKeys.has(k));
-    // The fold already resolved each node to ONE verdict (disjoint sets); error is the pass+run-error subset painted over
-    // pass. Map each nodeKey set → tree segment ids via the SAME segmentsFor the failed-criterion channel uses (no parallel
-    // mapping). A nodeKey with no tree anchor no-ops.
-    // ALWAYS a gen-stamped mark in MV mode (even when empty) — gen-ordered, so an empty mark cannot race a live one (FIX 1).
+    // Map each nodeKey set → tree segment ids via the SAME segmentsFor the failed-criterion channel uses. `allPassLeaves` rides
+    // the same gen-stamped channel (a 5th set); ALWAYS a mark in MV mode (even when empty) — gen-ordered, no race (FIX 1).
     void tree.panel.webview.postMessage({
       type: "markReviewOverlay",
       gen: tree.gen,
@@ -870,6 +897,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       fail: segmentsFor(tree, [...fail]).segmentIds,
       pending: segmentsFor(tree, [...pending]).segmentIds,
       error: segmentsFor(tree, [...error]).segmentIds,
+      allPassLeaves: segmentsFor(tree, [...allPassLeaves]).segmentIds,
     });
   }
 
@@ -1253,6 +1281,15 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   function whenKeyResolver(sv: ScenarioViewModel): (nodeId: string) => string | undefined {
     const root = { lib: sv.decision?.libraryName ?? "", decision: sv.decision?.name ?? "" };
     return (nodeId) => (crlMaps ? resolveThisNode(nodeId, root, sv.tree, runtimeRefIndex, crlMaps).nodeKey : undefined);
+  }
+  /** #210 (all-pass badge + leaf-paint align): the SOUND execution reach — the disposition-leaf structure nodeKeys a
+   *  scenario actually PRODUCED. `collectProducedActions(sv.tree)` (the fired `n.action?.produced` leaves) re-rooted via
+   *  `resolveThisNode` (the same runtime→structure join the marker uses; `buildRuntimeRefIndex` indexes action rows too) and
+   *  ∩ `dispositionLeafKeys`. Distinct from `crlAnchorsForUnits` (reveal reach), which under-reaches a produced leaf when the
+   *  case's units cite only the gating concept. An errored/blocked case produced nothing → `[]`. Dedups. */
+  function producedDispositionLeafKeys(sv: ScenarioViewModel, dispositionLeafKeys: Set<string>): string[] {
+    if (!crlMaps || sv.status === "error") return [];
+    return resolveProducedLeafKeys(collectProducedActions(sv.tree), whenKeyResolver(sv), dispositionLeafKeys);
   }
 
   /** Build the frame-aware concept→value-types resolver `buildQuestionnaire` injects. A bare sub-`when` concept resolves
@@ -2193,13 +2230,13 @@ ${CORR_STYLE}${FLOW_STYLE}${QUESTIONNAIRE_STYLE}`;
  *  so the const is byte-identical to the inlined script that preceded it. The central #156-slice-5 invariant locked by the
  *  test: the selection handlers (highlight/clearHighlight) never call clrRO() (the review overlay survives selection), and
  *  the markReviewOverlay handler paints error-over-pass (skips .review-pass for ids in the error set) + the disjoint
- *  .review-fail/.review-pending sets (#210). */
+ *  .review-fail/.review-pending sets + the all-pass .leaf-allpass badge (#210). */
 export const COCKPIT_WEBVIEW_SCRIPT =
   `const v=acquireVsCodeApi();const root=document.getElementById('root');const fcc=document.getElementById('fcChrome');let gen=-1;` +
   `const clrFC=()=>{for(const el of root.querySelectorAll('.failed-criterion,.failed-criterion-preempt')){el.classList.remove('failed-criterion');el.classList.remove('failed-criterion-preempt');}};` +
   // #156 slice 5 / #210: the review-overlay clear. DISTINCT from clrFC — called ONLY by mark/clearReviewOverlay, NEVER by the
   // selection channel (highlight/clearHighlight), so the verdict fills SURVIVE selection (the survives-selection invariant).
-  `const clrRO=()=>{for(const el of root.querySelectorAll('.review-pass,.review-fail,.review-pending,.error-node')){el.classList.remove('review-pass');el.classList.remove('review-fail');el.classList.remove('review-pending');el.classList.remove('error-node');}};` +
+  `const clrRO=()=>{for(const el of root.querySelectorAll('.review-pass,.review-fail,.review-pending,.error-node,.leaf-allpass')){el.classList.remove('review-pass');el.classList.remove('review-fail');el.classList.remove('review-pending');el.classList.remove('error-node');el.classList.remove('leaf-allpass');}};` +
   // #177 slice 4: the "this node" marker clear. DISTINCT from clrFC/clrRO — called ONLY by mark/clearThisNode, NEVER by the
   // selection channel (highlight/clearHighlight), so `.this-node` SURVIVES a cockpit reveal (it tracks the focused QUESTION,
   // not the selection — it moves only when the case or the question changes, the done-overlay lifecycle).
@@ -2252,7 +2289,10 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   `for(const id of errSet){const el=document.getElementById(id);if(el)el.classList.add('error-node');}` +
   `for(const id of (m.pass||[])){if(errSet.has(id))continue;const el=document.getElementById(id);if(el)el.classList.add('review-pass');}` +
   `for(const id of (m.fail||[])){const el=document.getElementById(id);if(el)el.classList.add('review-fail');}` +
-  `for(const id of (m.pending||[])){const el=document.getElementById(id);if(el)el.classList.add('review-pending');}}` +
+  `for(const id of (m.pending||[])){const el=document.getElementById(id);if(el)el.classList.add('review-pending');}` +
+  // #210 all-pass ✓ badge: a 5th DISJOINT-purpose set on the same channel — the disposition leaves whose EVERY producing
+  // route is pass. `.leaf-allpass` reveals a hidden green+white ✓ grandchild (CSS). Persistent + survives selection like the rest.
+  `for(const id of (m.allPassLeaves||[])){const el=document.getElementById(id);if(el)el.classList.add('leaf-allpass');}}` +
   // #177 slice 4: the "this node" cross-pane marker — a SEPARATE channel from .current, .failed-criterion AND the review
   // overlay. Like the review overlay it is mutated ONLY here (mark/clearThisNode), NEVER by highlight/clearHighlight/clrFC/
   // clrRO — so it SURVIVES a cockpit reveal (the focused question's node stays marked as the clinician clicks around). mark

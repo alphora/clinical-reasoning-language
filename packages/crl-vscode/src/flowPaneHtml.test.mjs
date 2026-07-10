@@ -553,6 +553,25 @@ check("#210 flowchart shape: the decision ROOT (start) + a recommend LEAF (end) 
   assert.match(rr.html, /rx="24\.5"/, "a stadium node's on-path ring is a pill (rx 24.5)");
 });
 
+check("#210 all-pass ✓ badge: a HIDDEN green+white ✓ grandchild on every disposition LEAF only; .leaf-allpass reveals it", () => {
+  const st = [{ decision: "D", lib: "Pol", nodeKey: "d:D", location: {}, children: [
+    node("w1", "when", "when A", ["c:A"], [node("aR", "action", "Approve", ["act:r"], [], { actionKind: "recommend-activity" })]),
+    node("aU", "action", "Sub", ["d:Sub", "c:A"], [], { actionKind: "use-decision" }),
+  ] }];
+  const rr = renderFlowPane(st, { concepts });
+  // exactly ONE badge — the single recommend leaf (NOT the decision root, the when, or the use-decision).
+  assert.equal((rr.html.match(/flow-allpass-badge/g) || []).length, 1, "exactly one badge (only the recommend-activity leaf)");
+  assert.match(rr.html, /<g class="flow-allpass-badge"><circle [^>]*\/><path [^>]*\/><\/g>/, "badge = a circle + check-path grandchild");
+  // the badge <g> sits INSIDE the recommend leaf's row group, NOT the decision/when/use rows.
+  const leafGroup = rr.html.match(/<g id="[^"]*" class="flow-row flow-activity[^"]*"[^>]*>[\s\S]*?<\/g>\s*<\/g>/);
+  assert.ok(leafGroup && /flow-allpass-badge/.test(leafGroup[0]), "the badge is nested in the recommend leaf's <g>");
+  // hidden + non-interactive by default; .leaf-allpass reveals it; green circle + separation ring + white check.
+  assert.match(FLOW_STYLE, /\.flow-allpass-badge\{display:none;pointer-events:none\}/, "hidden + pointer-events:none by default");
+  assert.match(FLOW_STYLE, /\.flow-row\.leaf-allpass \.flow-allpass-badge\{display:inline\}/, ".leaf-allpass reveals the badge");
+  assert.match(FLOW_STYLE, /\.flow-allpass-badge>circle\{[^}]*testing-iconPassed[^}]*stroke:var\(--vscode-editorWidget-background/, "green circle + a separation ring (reads over the green fill)");
+  assert.match(FLOW_STYLE, /\.flow-allpass-badge>path\{[^}]*stroke:#ffffff/, "white check (theme-aware: green + white on any bg)");
+});
+
 // ── #187 Todo 3: the on-path RING (a deterministic hidden <rect>, revealed by .current / .flow-leaf-yes) replaces ✓/✗ ──
 check("Todo 3: a hidden .flow-ring <rect> on every structure node + outline leaf (none on op/ext/more rows); NO tick paths", () => {
   const cs = [concept("c:C", "C", { definitionKind: "defined-as" })];

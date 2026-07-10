@@ -7,7 +7,7 @@ import { existsSync, mkdtempSync, mkdirSync, readdirSync, readFileSync, writeFil
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-const { medicalValidationSidecarPath, loadSidecar, saveSidecar, deriveReviewOverlay, buildReviewPerCase, isReviewState, setReviewState, REVIEW_STATES, reviewProgress, renderProgressChrome, composeSidecar, addNote, editNote, deleteNote } =
+const { medicalValidationSidecarPath, loadSidecar, saveSidecar, deriveReviewOverlay, deriveAllPassLeaves, buildReviewPerCase, isReviewState, setReviewState, REVIEW_STATES, reviewProgress, renderProgressChrome, composeSidecar, addNote, editNote, deleteNote } =
   await load("medicalValidationStore.ts");
 
 let pass = 0;
@@ -443,6 +443,55 @@ check("fold: a case with litNodeKeys:[] contributes nothing (no crash, empty set
     noLeaf,
   );
   assert.equal(pass.size + fail.size + pending.size + error.size, 0);
+});
+
+// ── the all-pass LEAF ✓ fold (#210) — strictly every PRODUCING scenario must be pass ──
+check("allpass: a leaf produced ONLY by pass scenarios → badge", () => {
+  const s = deriveAllPassLeaves([
+    { producedLeafKeys: ["L1"], verdict: "pass" },
+    { producedLeafKeys: ["L1"], verdict: "pass" },
+  ]);
+  assert.deepEqual([...s], ["L1"], "all producing scenarios pass → ✓");
+});
+check("allpass: a single PENDING producing scenario → NO badge", () => {
+  const s = deriveAllPassLeaves([
+    { producedLeafKeys: ["L1"], verdict: "pass" },
+    { producedLeafKeys: ["L1"], verdict: "pending" },
+  ]);
+  assert.equal(s.size, 0, "a pending route suppresses");
+});
+check("allpass: a single FAIL producing scenario → NO badge (via VERDICT, independent of run status)", () => {
+  const s = deriveAllPassLeaves([
+    { producedLeafKeys: ["L1"], verdict: "pass" },
+    { producedLeafKeys: ["L1"], verdict: "fail" },
+  ]);
+  assert.equal(s.size, 0, "a fail route suppresses");
+});
+check("allpass: a single UNREVIEWED (to-do / ambiguous) producing scenario → NO badge", () => {
+  const s = deriveAllPassLeaves([
+    { producedLeafKeys: ["L1"], verdict: "pass" },
+    { producedLeafKeys: ["L1"], verdict: "unreviewed" },
+  ]);
+  assert.equal(s.size, 0, "an unreviewed route suppresses (strict all-pass)");
+});
+check("allpass: per-leaf independence — L1 all-pass badges, L2 has a fail → only L1", () => {
+  const s = deriveAllPassLeaves([
+    { producedLeafKeys: ["L1", "L2"], verdict: "pass" },
+    { producedLeafKeys: ["L2"], verdict: "fail" },
+    { producedLeafKeys: ["L1"], verdict: "pass" },
+  ]);
+  assert.deepEqual([...s].sort(), ["L1"], "L1 all-pass → ✓; L2 has a fail route → no ✓");
+});
+check("allpass: an UNREACHED leaf (no producing scenario) is never in the set; empty produced → no contribution", () => {
+  const s = deriveAllPassLeaves([
+    { producedLeafKeys: [], verdict: "pass" }, // a blocked/errored case produces nothing
+    { producedLeafKeys: ["L1"], verdict: "pass" },
+  ]);
+  assert.deepEqual([...s], ["L1"], "only the produced leaf; the empty-produced scenario contributes nothing");
+  assert.ok(!s.has("Lx"), "a leaf no scenario produced is absent");
+});
+check("allpass: no scenarios → empty set", () => {
+  assert.equal(deriveAllPassLeaves([]).size, 0);
 });
 
 // ── isReviewState (trusted-input guard) ───────────────────────────────────────
