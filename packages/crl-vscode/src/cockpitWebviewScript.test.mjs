@@ -668,4 +668,33 @@ check("#217 host: the verdict pick is stale-guarded (indexVersion + sidecar + sc
   assert.ok(/if \(!pick\) return; \/\/ Esc/.test(m[1]), "an Esc cancel returns without a note");
 });
 
+// ── #219 same-pane click must NOT scroll the pane you clicked in (respect the user's viewport) ──
+check("#219 host: a click sets scrollSuppressPane to the origin pane around the selection dispatch, cleared in finally", () => {
+  assert.ok(/scrollSuppressPane = pane;\s*try \{/.test(COCKPIT_SRC), "the reveal handler marks the origin pane before dispatching the selection");
+  assert.ok(/\} finally \{\s*scrollSuppressPane = undefined;\s*\}/.test(COCKPIT_SRC), "and clears it in finally (the flag is live only for the synchronous dispatch)");
+});
+check("#219 host: postReveal suppresses scroll for the origin pane; highlightRows omits scrollTo when suppressed", () => {
+  assert.ok(/const noScroll = pane === scrollSuppressPane;/.test(COCKPIT_SRC), "postReveal computes noScroll = pane is the click origin");
+  // every highlightRows call in postReveal threads noScroll (cross-pane targets still scroll; the origin pane does not).
+  assert.ok(!/highlightRows\(v, crlAnchorsForUnits\(unitsForCase\(target\.id, m\), m\)\);/.test(COCKPIT_SRC), "the case→tree highlight passes noScroll (no bare call left)");
+  assert.ok(/highlightRows\(v, crlAnchorsForUnits\(unitsForCase\(target\.id, m\), m\), noScroll\)/.test(COCKPIT_SRC), "case→tree/crl highlight threads noScroll");
+  assert.ok(/scrollTo: suppressScroll \? undefined : scrollTo, segmentIds/.test(COCKPIT_SRC), "highlightRows omits scrollTo when suppressScroll (paints .current, no scroll)");
+});
+check("#219 host: the OTHER scroll path — markFailedCriteria — is ALSO suppressed for the origin pane (it runs in the same dispatch)", () => {
+  assert.ok(/markFailedCriteria\(tree, blockerKeys, preemptKeys, scrollSuppressPane === "tree"\)/.test(COCKPIT_SRC), "the failed-criteria overlay suppresses scroll for the origin tree pane");
+  assert.ok(/markFailedCriteria\(crl, blockerKeys, preemptKeys, scrollSuppressPane === "crl"\)/.test(COCKPIT_SRC), "…and for crl origin");
+  assert.ok(/markFailedCriteria\(src, unitsOf\(blockerKeys\), unitsOf\(preemptKeys\), scrollSuppressPane === "source"\)/.test(COCKPIT_SRC), "…and for source origin");
+  // the mark poster omits scrollTo when suppressed (mirrors highlightRows).
+  assert.ok(/type: "markFailedCriteria", gen: v\.gen, scrollTo: suppressScroll \? undefined : scrollTo/.test(COCKPIT_SRC), "markFailedCriteria omits scrollTo when suppressed");
+});
+check("#219 host: a multi-case click threads the origin through pickThenSelect and re-arms it around the DEFERRED dispatch", () => {
+  assert.ok(/pickThenSelect\([\s\S]*?\(id\) => selOf\(primary, id\),\s*origin,\s*\)/.test(COCKPIT_SRC), "selectInPrimary passes the click origin into pickThenSelect");
+  const m = COCKPIT_SRC.match(/function pickThenSelect[^{]*\{([\s\S]*?)\n  \}/);
+  assert.ok(m, "pickThenSelect body");
+  assert.ok(/scrollSuppressPane = origin;\s*try \{\s*dispatch\(\{ type: "select"[\s\S]*\} finally \{\s*scrollSuppressPane = undefined;/.test(m[1]), "re-arms the origin flag around the deferred dispatch (so the post-pick selection holds the viewport)");
+});
+check("#219 webview: BOTH scroll handlers (highlight + markFailedCriteria) scroll ONLY when scrollTo is present", () => {
+  assert.equal((SCRIPT.match(/if\(m\.scrollTo\)\{const t=document\.getElementById\(m\.scrollTo\);if\(t\)t\.scrollIntoView\(\{block:'center'\}\);\}/g) || []).length, 2, "both scroll paths are guarded on m.scrollTo (a suppressed reveal paints without scrolling)");
+});
+
 console.log(`\ncockpitWebviewScript.test: ${pass} checks passed`);

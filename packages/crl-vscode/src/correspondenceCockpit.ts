@@ -409,6 +409,14 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   let currentCel: string | undefined;
   /** last span-click locus (trusted, from the renderer) — open-raw uses it when it still matches the selection. */
   let lastClicked: { unitId: string; range: ZeroBasedRange } | undefined;
+  // #219: the pane a CLICK-driven reveal ORIGINATED in — its own highlight/overlay must NOT scroll (the user positioned this
+  // pane; a same-pane reveal must respect that). Set in the reveal handler (covering peeks + selection) + re-armed around the
+  // async multi-case dispatch; consumed by postReveal→highlightRows AND driveFailedCriteriaPeek→markFailedCriteria (both the
+  // scroll channels). Undefined for every non-click re-drive (restore / keyboard-nav / ack) → they keep the scroll-to-anchor
+  // behavior (desired: you asked to navigate, not to hold position). Cross-pane targets (pane ≠ origin) still scroll to bring
+  // the match into view. CAVEAT: an ack-DEFERRED origin reveal (the pane was mid-render at click time, so applyReveal queued
+  // and postReveal runs in a later turn with the flag cleared) will scroll — rare (a click implies an acked DOM); accepted.
+  let scrollSuppressPane: Pane | undefined;
   const views = new Map<Pane, PaneView>();
   let paneOrder: Pane[] = normalizePaneOrder(undefined, COCKPIT_PANE_SPEC); // user layout (configSection(mode).paneOrder), normalized
   let watcher: vscode.FileSystemWatcher | undefined;
@@ -576,7 +584,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
 
   /** Post a highlight for a set of anchor keys (source anchors keyed by unitId; CRL anchors by nodeKey). Accumulates
    *  segmentIds across all keys + scrolls to the first found — so a target spanning N units/rows highlights them all. */
-  function highlightRows(v: PaneView, anchorKeys: string[]): void {
+  function highlightRows(v: PaneView, anchorKeys: string[], suppressScroll = false): void {
     const segmentIds: string[] = [];
     let scrollTo: string | undefined;
     for (const k of anchorKeys) {
@@ -586,8 +594,11 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       for (const id of a.segmentIds) if (!segmentIds.includes(id)) segmentIds.push(id);
     }
     // No anchor for this selection in this pane → CLEAR its prior highlight rather than leave it stale.
+    // #219: `suppressScroll` (a same-pane click) → paint the `.current` highlight but OMIT scrollTo, so the pane the user
+    // clicked in keeps its scroll position (the reveal's first anchor is the decision ROOT — scrolling there yanked the
+    // viewport away from the clicked node). The webview's highlight handler no-ops the scroll when scrollTo is absent.
     void v.panel.webview.postMessage(
-      scrollTo ? { type: "highlight", gen: v.gen, scrollTo, segmentIds } : { type: "clearHighlight" },
+      scrollTo ? { type: "highlight", gen: v.gen, scrollTo: suppressScroll ? undefined : scrollTo, segmentIds } : { type: "clearHighlight" },
     );
   }
 
@@ -613,27 +624,30 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     // The TREE (flowchart) pane highlights in lockstep with the CRL pane: it anchors the SAME structure nodeKeys, so it
     // reuses the crl anchor-key sets verbatim. (The crl sets also include concept-row keys; the flow pane has no concept
     // anchors, so those simply no-op in highlightRows — the structure rows light up, which is the intent.)
+    // #219: a reveal targeting the pane the click originated in must NOT scroll (respect the user's viewport). Cross-pane
+    // targets (pane ≠ origin) still scroll to bring the corresponding row into view.
+    const noScroll = pane === scrollSuppressPane;
     if (target.kind === "unit") {
-      if (pane === "source") highlightRows(v, [target.id]);
+      if (pane === "source") highlightRows(v, [target.id], noScroll);
       // #166 3b: unit → its driving decisions (direct + concept containment, scoped ONCE) THEN its applicable concept
       // rows (direct concepts). Decisions first so highlightRows scrolls to the decision tree (today's behavior).
-      else if (pane === "crl" || pane === "tree") highlightRows(v, crlAnchorsForUnits([target.id], m));
+      else if (pane === "crl" || pane === "tree") highlightRows(v, crlAnchorsForUnits([target.id], m), noScroll);
       // CEL: the unit's artifact cases (block-level) + the fact spans referencing its concepts (C2c-2b reverse, facts first)
-      else if (pane === "cel") highlightRows(v, reverseCelAnchors(conceptKeysForUnit(target.id, m), caseIdsForUnit(target.id, m), conceptToFactAnchors));
+      else if (pane === "cel") highlightRows(v, reverseCelAnchors(conceptKeysForUnit(target.id, m), caseIdsForUnit(target.id, m), conceptToFactAnchors), noScroll);
       // WORKLIST (disc 179): the same case rows, but NO fact-peek spans (the worklist render omits them), so just the case blocks.
-      else if (pane === "worklist") highlightRows(v, caseIdsForUnit(target.id, m));
+      else if (pane === "worklist") highlightRows(v, caseIdsForUnit(target.id, m), noScroll);
     } else if (target.kind === "crlNode") {
       // #166 3b: a decision row → itself THEN the concepts it surfaces (direct refKeys + their contained sub-concepts).
-      if (pane === "crl" || pane === "tree") highlightRows(v, [target.id, ...conceptNodesForRow(target.id, m)]);
-      else if (pane === "source") highlightRows(v, unitsForRow(target.id, m)); // crl node → its source units (direct)
-      else if (pane === "cel") highlightRows(v, reverseCelAnchors(conceptKeysForNode(target.id, m), caseIdsForNode(target.id, m), conceptToFactAnchors));
-      else if (pane === "worklist") highlightRows(v, caseIdsForNode(target.id, m)); // case blocks only (no fact spans)
+      if (pane === "crl" || pane === "tree") highlightRows(v, [target.id, ...conceptNodesForRow(target.id, m)], noScroll);
+      else if (pane === "source") highlightRows(v, unitsForRow(target.id, m), noScroll); // crl node → its source units (direct)
+      else if (pane === "cel") highlightRows(v, reverseCelAnchors(conceptKeysForNode(target.id, m), caseIdsForNode(target.id, m), conceptToFactAnchors), noScroll);
+      else if (pane === "worklist") highlightRows(v, caseIdsForNode(target.id, m), noScroll); // case blocks only (no fact spans)
     } else {
       // celCase — both case-display panes light the same case block/row (fanned to each; each paints its own DOM).
-      if (pane === "cel" || pane === "worklist") highlightRows(v, [target.id]);
-      else if (pane === "source") highlightRows(v, unitsForCase(target.id, m).filter((u) => m.sourceBearingUnits.has(u)));
+      if (pane === "cel" || pane === "worklist") highlightRows(v, [target.id], noScroll);
+      else if (pane === "source") highlightRows(v, unitsForCase(target.id, m).filter((u) => m.sourceBearingUnits.has(u)), noScroll);
       // #166 3b-fix: case → its units' driving decisions (direct + containment) AND their applicable concept rows.
-      else if (pane === "crl" || pane === "tree") highlightRows(v, crlAnchorsForUnits(unitsForCase(target.id, m), m));
+      else if (pane === "crl" || pane === "tree") highlightRows(v, crlAnchorsForUnits(unitsForCase(target.id, m), m), noScroll);
     }
   }
 
@@ -660,16 +674,19 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     return { segmentIds, scrollTo };
   }
 
-  function markFailedCriteria(v: PaneView, blockerKeys: string[], preemptKeys: string[]): void {
+  function markFailedCriteria(v: PaneView, blockerKeys: string[], preemptKeys: string[], suppressScroll = false): void {
     // #173 T3 FIX 3 (disc 160): TWO honesty channels in one message — a real blocker (unsatisfied-when / guarded-out)
     // paints `.failed-criterion` (red); a `preemption` row is the SATISFIED matched sibling that DIVERTED the run, so it
     // paints the DISTINCT `.failed-criterion-preempt` (amber "diverted"), never red — consistent with the run-tree.
     const blocker = segmentsFor(v, blockerKeys);
     const preempt = segmentsFor(v, preemptKeys);
     const scrollTo = blocker.scrollTo ?? preempt.scrollTo;
+    // #219: this overlay ALSO scrolls (its own scroll path, distinct from highlightRows). It runs AFTER the selection's
+    // highlight in the SAME dispatch, so for a same-pane click it would re-scroll the pane the click's highlight just left
+    // in place — suppress it too (omit scrollTo; the mark still paints the `.failed-criterion` channel).
     void v.panel.webview.postMessage(
       scrollTo
-        ? { type: "markFailedCriteria", gen: v.gen, scrollTo, blockerIds: blocker.segmentIds, preemptIds: preempt.segmentIds }
+        ? { type: "markFailedCriteria", gen: v.gen, scrollTo: suppressScroll ? undefined : scrollTo, blockerIds: blocker.segmentIds, preemptIds: preempt.segmentIds }
         : { type: "clearFailedCriteria" },
     );
   }
@@ -837,10 +854,11 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       const crl = views.get("crl");
       const tree = views.get("tree");
       const src = views.get("source");
-      if (crl) markFailedCriteria(crl, blockerKeys, preemptKeys); // CRL pane: the standalone rows
-      if (tree) markFailedCriteria(tree, blockerKeys, preemptKeys); // tree flowchart: same structure nodeKeys (FLOW_STYLE paints the rect)
+      // #219: suppress the overlay's scroll for the pane the click originated in (each pane checks the shared origin flag).
+      if (crl) markFailedCriteria(crl, blockerKeys, preemptKeys, scrollSuppressPane === "crl"); // CRL pane: the standalone rows
+      if (tree) markFailedCriteria(tree, blockerKeys, preemptKeys, scrollSuppressPane === "tree"); // tree flowchart: same structure nodeKeys (FLOW_STYLE paints the rect)
       // Source: the grounded rows' source-bearing units, split into the two channels. A gap row gets NO source mark.
-      if (src) markFailedCriteria(src, unitsOf(blockerKeys), unitsOf(preemptKeys));
+      if (src) markFailedCriteria(src, unitsOf(blockerKeys), unitsOf(preemptKeys), scrollSuppressPane === "source");
     }
 
     // Gap list: the ungroundable criteria → the "Open CRL source at criterion" fallback (the node's own source).
@@ -1467,30 +1485,40 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     } else if (msg.type === "reveal" && typeof msg.key === "string") {
       const hit = v.reveals[msg.key]; // trusted: looked up by opaque key, not a path/range from the webview
       if (!hit) return;
-      // A fact peek is transient + shell-only — divert it BEFORE the engine-selection path (no lastClicked, no dispatch)
-      // AND before the !crlMaps guard, so a peek always clears prior highlights even if maps are momentarily absent.
-      if (isFactHit(hit)) {
-        peekConcept(hit);
-        return;
+      // #219: this is a CLICK in `pane` → its OWN reveal (peek or selection) must not scroll (respect the user's viewport;
+      // cross-pane targets still scroll). Set at the TOP so it covers the peek paths too. Live for the SYNCHRONOUS work below
+      // (a single-case selection dispatches inline → postReveal + the same-dispatch failed-criteria mark both see it) and
+      // cleared in `finally`. A multi-case pick is async: the origin is threaded into `selectInPrimary`/`pickThenSelect`,
+      // which re-arm the flag around the DEFERRED dispatch — so the post-quick-pick selection also holds the viewport.
+      scrollSuppressPane = pane;
+      try {
+        // A fact peek is transient + shell-only — divert it BEFORE the engine-selection path (no lastClicked, no dispatch)
+        // AND before the !crlMaps guard, so a peek always clears prior highlights even if maps are momentarily absent.
+        if (isFactHit(hit)) {
+          peekConcept(hit);
+          return;
+        }
+        // A CRL concept-row click is likewise a PEEK (#166 Slice 3a) — diverted before the engine-selection path so a
+        // concept node is never routed through mapHitToPrimary as a DECISION.
+        if (isConceptHit(hit)) {
+          peekConceptNode(hit.conceptNodeKey);
+          return;
+        }
+        if (!crlMaps) return;
+        // #216: a tree SUB-QUESTION click → select the case(s) where THIS operand is TRUE on-path (dynamic), NOT via
+        // `mapHitToPrimary` (the leaf key isn't a unit/nodeKey/caseId). Diverted here (needs crlMaps + the per-case run truth).
+        if (isSubQuestionHit(hit)) {
+          selectSubQuestionCases(hit.subQuestionLeafKey, crlMaps);
+          return;
+        }
+        // Otherwise the click sets the selection in the CURRENT primary's space (mapping cross-pane as needed).
+        const p = state.primary;
+        // record the open-raw locus only for a source-span click while source-primary
+        lastClicked = "unitId" in hit && p === "source" ? { unitId: hit.unitId, range: hit.range } : undefined;
+        selectInPrimary(mapHitToPrimary(hit, p, crlMaps), p);
+      } finally {
+        scrollSuppressPane = undefined;
       }
-      // A CRL concept-row click is likewise a PEEK (#166 Slice 3a) — diverted before the engine-selection path so a
-      // concept node is never routed through mapHitToPrimary as a DECISION.
-      if (isConceptHit(hit)) {
-        peekConceptNode(hit.conceptNodeKey);
-        return;
-      }
-      if (!crlMaps) return;
-      // #216: a tree SUB-QUESTION click → select the case(s) where THIS operand is TRUE on-path (dynamic), NOT via
-      // `mapHitToPrimary` (the leaf key isn't a unit/nodeKey/caseId). Diverted here (needs crlMaps + the per-case run truth).
-      if (isSubQuestionHit(hit)) {
-        selectSubQuestionCases(hit.subQuestionLeafKey, crlMaps);
-        return;
-      }
-      // Otherwise the click sets the selection in the CURRENT primary's space (mapping cross-pane as needed).
-      const p = state.primary;
-      // record the open-raw locus only for a source-span click while source-primary
-      lastClicked = "unitId" in hit && p === "source" ? { unitId: hit.unitId, range: hit.range } : undefined;
-      selectInPrimary(mapHitToPrimary(hit, p, crlMaps), p);
     }
   }
 
@@ -1548,25 +1576,37 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
 
   /** Async-safe pick-then-select: drops a stale pick after a rebuild OR a primary switch (the engine select-guard is the
    *  backstop, but guarding here avoids dispatching a known-stale selection). */
-  function pickThenSelect<T>(items: (vscode.QuickPickItem & { value: T })[], placeHolder: string, toSel: (v: T) => Selection): void {
+  function pickThenSelect<T>(items: (vscode.QuickPickItem & { value: T })[], placeHolder: string, toSel: (v: T) => Selection, origin?: Pane): void {
     const ver = indexVersion;
     const pri = state.primary;
     void vscode.window.showQuickPick(items, { placeHolder }).then((pick) => {
-      if (pick && indexVersion === ver && state.primary === pri) dispatch({ type: "select", selection: toSel(pick.value) });
+      if (pick && indexVersion === ver && state.primary === pri) {
+        // #219: re-arm the click origin around the DEFERRED dispatch (the reveal handler's finally already cleared it) so
+        // the pane the click came from still holds its viewport. The dispatch is synchronous, so the flag is scoped to it.
+        scrollSuppressPane = origin;
+        try {
+          dispatch({ type: "select", selection: toSel(pick.value) });
+        } finally {
+          scrollSuppressPane = undefined;
+        }
+      }
     });
   }
 
   /** Select the mapped target in `primary`: 1 → select; >1 → quick-pick; 0 → no-op. */
-  function selectInPrimary(ids: string[], primary: PrimaryPane): void {
+  function selectInPrimary(ids: string[], primary: PrimaryPane, origin: Pane | undefined = scrollSuppressPane): void {
     if (ids.length === 0) return;
     if (ids.length === 1) {
-      dispatch({ type: "select", selection: selOf(primary, ids[0]) });
+      dispatch({ type: "select", selection: selOf(primary, ids[0]) }); // #219: origin flag is already live (set by the caller)
       return;
     }
+    // #219: the multi-case dispatch is DEFERRED behind the quick-pick — capture the click origin (default: the live flag)
+    // and re-arm it around that later dispatch so the origin pane still holds its viewport.
     pickThenSelect(
       ids.map((id) => ({ ...labelInPrimary(id, primary), value: id })),
       `Maps to multiple ${PANE_TITLE[primary]} targets`,
       (id) => selOf(primary, id),
+      origin,
     );
   }
 
@@ -2469,7 +2509,8 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   `else if(m.type==='highlight'){if(m.gen!==gen)return;` + // drop a reveal aimed at a superseded render
   `for(const el of root.querySelectorAll('.current'))el.classList.remove('current');clrFC();clrDV();` +
   `for(const id of m.segmentIds){const el=document.getElementById(id);if(el)el.classList.add('current');}` +
-  `const t=document.getElementById(m.scrollTo);if(t)t.scrollIntoView({block:'center'});}` +
+  // #219: scroll ONLY when scrollTo is present — a same-pane click omits it so the clicked pane keeps its viewport.
+  `if(m.scrollTo){const t=document.getElementById(m.scrollTo);if(t)t.scrollIntoView({block:'center'});}}` +
   // The DISTINCT failed-criterion overlay channel (.failed-criterion). Gen-guarded like .current; replaces the prior
   // overlay (clear-then-set). Does NOT touch .current — the two channels coexist.
   `else if(m.type==='clearFailedCriteria'){clrFC();}` +
@@ -2478,7 +2519,8 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   // diverting sibling, honestly distinct from a real blocker — disc 160 FIX 3).
   `for(const id of (m.blockerIds||[])){const el=document.getElementById(id);if(el)el.classList.add('failed-criterion');}` +
   `for(const id of (m.preemptIds||[])){const el=document.getElementById(id);if(el)el.classList.add('failed-criterion-preempt');}` +
-  `const t=document.getElementById(m.scrollTo);if(t)t.scrollIntoView({block:'center'});}` +
+  // #219: scroll ONLY when scrollTo is present — a same-pane click suppresses it so the clicked pane keeps its viewport.
+  `if(m.scrollTo){const t=document.getElementById(m.scrollTo);if(t)t.scrollIntoView({block:'center'});}}` +
   // #156 slice 5 / #210: the PERSISTENT Medical Validation VERDICT overlay — a SEPARATE channel from .current and
   // .failed-criterion. CRITICAL: it is mutated ONLY here (mark/clearReviewOverlay), NEVER by highlight/clearHighlight/
   // clrFC — so it SURVIVES selection changes (the clinician's verdict painting never blinks off as they click around).
