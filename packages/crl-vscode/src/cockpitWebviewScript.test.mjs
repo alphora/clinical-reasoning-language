@@ -111,40 +111,48 @@ check("SURVIVES-SELECTION: the highlight handler does NOT call clrRO (selection 
   const body = handlerBody("highlight");
   assert.ok(/clrFC\(\)/.test(body), "highlight DOES clear the failed-criterion channel (sanity — clrFC present)");
   assert.ok(!/clrRO\(\)/.test(body), "highlight MUST NOT call clrRO — the review overlay survives a new selection");
-  assert.ok(!/review-green|review-red|review-grey|error-node/.test(body), "highlight MUST NOT touch the review classes at all");
+  assert.ok(!/review-pass|review-fail|review-pending|error-node/.test(body), "highlight MUST NOT touch the review classes at all");
 });
 
 check("SURVIVES-SELECTION: the clearHighlight handler does NOT call clrRO (clearing the selection keeps the review overlay)", () => {
   const body = handlerBody("clearHighlight");
   assert.ok(/clrFC\(\)/.test(body), "clearHighlight DOES clear the failed-criterion channel (sanity)");
   assert.ok(!/clrRO\(\)/.test(body), "clearHighlight MUST NOT call clrRO — review overlay survives a selection clear");
-  assert.ok(!/review-green|review-red|review-grey|error-node/.test(body), "clearHighlight MUST NOT touch the review classes");
+  assert.ok(!/review-pass|review-fail|review-pending|error-node/.test(body), "clearHighlight MUST NOT touch the review classes");
 });
 
 check("SURVIVES-SELECTION: clrFC strips ONLY the failed-criterion classes, never the review classes", () => {
   const m = SCRIPT.match(/const clrFC=\(\)=>\{[^}]*\}[^;]*\};/);
   assert.ok(m, "clrFC body");
-  assert.ok(!/review-green|review-red|review-grey|error-node/.test(m[0]), "clrFC never removes the review classes");
+  assert.ok(!/review-pass|review-fail|review-pending|error-node/.test(m[0]), "clrFC never removes the review classes");
 });
 
 check("the failed-criterion handlers (markFailedCriteria/clearFailedCriteria) do NOT touch the review classes either", () => {
   for (const type of ["markFailedCriteria", "clearFailedCriteria"]) {
     const body = handlerBody(type);
-    assert.ok(!/clrRO\(\)|review-green|review-red|review-grey|error-node/.test(body), `${type} MUST NOT touch the review overlay (independent channel)`);
+    assert.ok(!/clrRO\(\)|review-pass|review-fail|review-pending|error-node/.test(body), `${type} MUST NOT touch the review overlay (independent channel)`);
   }
 });
 
-// ── #210 verdict painting: disjoint per-color sets + error-over-green ──
-check("VERDICT-PAINTING: markReviewOverlay applies ONE class per disjoint verdict set (green/red/grey), error-over-green", () => {
+// ── #210 verdict painting: disjoint per-color sets + error-over-pass ──
+check("VERDICT-PAINTING: markReviewOverlay applies ONE class per disjoint verdict set (pass/fail/pending), error-over-pass", () => {
   const body = handlerBody("markReviewOverlay");
   assert.ok(/clrRO\(\)/.test(body), "mark clears the prior overlay first (clear-then-set)");
   assert.ok(/const errSet=new Set\(m\.error\|\|\[\]\)/.test(body), "builds the error id set");
   assert.ok(/errSet[\s\S]*add\('error-node'\)/.test(body), "error ids → .error-node");
-  // error-over-green: in the green loop, ids present in errSet are skipped (continue) BEFORE adding review-green.
-  assert.ok(/errSet\.has\(id\)\)continue;[\s\S]*add\('review-green'\)/.test(body), "green loop skips ids in errSet (error-over-green)");
-  // red + grey are painted unconditionally from their own (disjoint) sets — no cross-set skipping needed.
-  assert.ok(/m\.red\|\|\[\][\s\S]*add\('review-red'\)/.test(body), "red ids → .review-red");
-  assert.ok(/m\.grey\|\|\[\][\s\S]*add\('review-grey'\)/.test(body), "grey ids → .review-grey");
+  // error-over-pass: in the pass loop, ids present in errSet are skipped (continue) BEFORE adding review-pass.
+  assert.ok(/errSet\.has\(id\)\)continue;[\s\S]*add\('review-pass'\)/.test(body), "pass loop skips ids in errSet (error-over-pass)");
+  // fail + pending are painted unconditionally from their own (disjoint) sets — no cross-set skipping needed.
+  assert.ok(/m\.fail\|\|\[\][\s\S]*add\('review-fail'\)/.test(body), "fail ids → .review-fail");
+  assert.ok(/m\.pending\|\|\[\][\s\S]*add\('review-pending'\)/.test(body), "pending ids → .review-pending");
+});
+
+check("#210 recolor: the worklist verdict dropdown (.cel-review-*) uses the SAME tokens the tree paint locks to (no drift)", () => {
+  // The operator's ask: the tree verdict paint MATCHES the dropdown colors. flowPaneHtml.test.mjs locks the TREE fills to
+  // these tokens; here we lock the DROPDOWN side to the same named tokens, so a drift on EITHER side fails a test.
+  assert.match(COCKPIT_SRC, /\.cel-review-pass\{color:var\(--vscode-testing-iconPassed/, "dropdown pass = testing-iconPassed (matches the tree's review-pass)");
+  assert.match(COCKPIT_SRC, /\.cel-review-fail\{color:var\(--vscode-testing-iconFailed/, "dropdown fail = testing-iconFailed (matches the tree's review-fail)");
+  assert.match(COCKPIT_SRC, /\.cel-review-pending\{color:var\(--vscode-charts-yellow/, "dropdown pending = charts-yellow (matches the tree's review-pending)");
 });
 
 check("GEN-GUARD: markReviewOverlay drops a mark aimed at a superseded render (m.gen!==gen → return)", () => {
@@ -182,7 +190,7 @@ check("SURVIVES-REVEAL: clrTN is called ONLY by mark/clearThisNode, NEVER by hig
 check("the this-node marker clears ONLY the .this-node class, never the selection/failed-criterion/review classes", () => {
   const m = SCRIPT.match(/const clrTN=\(\)=>\{[^}]*\};/);
   assert.ok(m, "clrTN body");
-  assert.ok(!/current|failed-criterion|review-green|review-red|review-grey|error-node/.test(m[0]), "clrTN strips only .this-node");
+  assert.ok(!/current|failed-criterion|review-pass|review-fail|review-pending|error-node/.test(m[0]), "clrTN strips only .this-node");
 });
 
 check("GEN-GUARD: markThisNode drops a mark aimed at a superseded render (m.gen!==gen → return); clearThisNode is ungated", () => {
@@ -283,7 +291,7 @@ check("SELECTION-COUPLED: clrDV IS called by BOTH highlight and clearHighlight (
 check("clrDV strips ONLY the .diverter class, never the other channels", () => {
   const m = SCRIPT.match(/const clrDV=\(\)=>\{[^}]*\};/);
   assert.ok(m, "clrDV body");
-  assert.ok(!/current|failed-criterion|review-green|review-red|review-grey|error-node|this-node/.test(m[0]), "clrDV strips only .diverter");
+  assert.ok(!/current|failed-criterion|review-pass|review-fail|review-pending|error-node|this-node/.test(m[0]), "clrDV strips only .diverter");
 });
 
 check("GEN-GUARD: markDiverters drops a mark aimed at a superseded render (clear-then-set); clearDiverters is ungated", () => {
@@ -298,7 +306,7 @@ check("GEN-GUARD: markDiverters drops a mark aimed at a superseded render (clear
 check("the diverter handlers touch ONLY the .diverter class (independent of every other overlay)", () => {
   for (const type of ["markDiverters", "clearDiverters"]) {
     const body = handlerBody(type);
-    assert.ok(!/current|failed-criterion|review-green|review-red|review-grey|error-node|this-node/.test(body), `${type} touches only .diverter`);
+    assert.ok(!/current|failed-criterion|review-pass|review-fail|review-pending|error-node|this-node/.test(body), `${type} touches only .diverter`);
   }
 });
 
@@ -408,7 +416,7 @@ check("SURVIVES-REVEAL: clrLeaf is called ONLY by mark/clearLeaves, NEVER by the
 check("clrLeaf strips ONLY the leaf-verdict classes, never the selection/review/marker classes", () => {
   const m = SCRIPT.match(/const clrLeaf=\(\)=>\{[\s\S]*?\};/);
   assert.ok(m, "clrLeaf body");
-  assert.ok(!/current|failed-criterion|review-green|review-red|review-grey|error-node|this-node|diverter/.test(m[0]), "clrLeaf strips only .flow-leaf-yes/.flow-leaf-no");
+  assert.ok(!/current|failed-criterion|review-pass|review-fail|review-pending|error-node|this-node|diverter/.test(m[0]), "clrLeaf strips only .flow-leaf-yes/.flow-leaf-no");
 });
 
 check("CLEAR-THEN-SET + GEN-GUARD + MUTUAL EXCLUSION: markLeaves clears both classes first, is gen-guarded, and yes/no are exclusive per leaf", () => {

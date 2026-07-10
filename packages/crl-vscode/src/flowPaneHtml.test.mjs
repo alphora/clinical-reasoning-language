@@ -131,13 +131,13 @@ check("no <style> or style= inside the SVG (CSP); FLOW_STYLE carries var() + fal
   assert.ok(!/\.flow-row\.current>rect\{stroke:/.test(FLOW_STYLE), "Todo 3: .current no longer recolors the base rect stroke COLOUR (a stroke-WIDTH thicken is fine)");
 });
 
-check("#210 verdict painting: .review-green/-red/-grey + .error-node overlay CSS exists, is NON-OUTLINE (fill, not stroke/outline)", () => {
+check("#210 verdict painting: .review-pass/-fail/-pending + .error-node overlay CSS exists, is NON-OUTLINE (fill, not stroke/outline)", () => {
   // The verdict overlay must be a fill tint, NOT a stroke/outline — so it coexists with .current (ring) + .failed-criterion
   // (dashed stroke) on independent SVG axes. Assert all four rules exist and set `fill` (and crucially NOT `stroke`/`outline`).
   const rules = {
-    green: FLOW_STYLE.match(/\.flow-row\.review-green>rect\{([^}]*)\}/),
-    red: FLOW_STYLE.match(/\.flow-row\.review-red>rect\{([^}]*)\}/),
-    grey: FLOW_STYLE.match(/\.flow-row\.review-grey>rect\{([^}]*)\}/),
+    pass: FLOW_STYLE.match(/\.flow-row\.review-pass>rect\{([^}]*)\}/),
+    fail: FLOW_STYLE.match(/\.flow-row\.review-fail>rect\{([^}]*)\}/),
+    pending: FLOW_STYLE.match(/\.flow-row\.review-pending>rect\{([^}]*)\}/),
     error: FLOW_STYLE.match(/\.flow-row\.error-node>rect\{([^}]*)\}/),
   };
   for (const [name, rule] of Object.entries(rules)) {
@@ -146,11 +146,16 @@ check("#210 verdict painting: .review-green/-red/-grey + .error-node overlay CSS
     assert.ok(!/stroke:/.test(rule[1]), `${name} overlay does NOT set stroke (independent axis from .current/.failed-criterion)`);
     assert.ok(!/outline/.test(rule[1]), `${name} overlay is non-outline`);
   }
-  // green / red / grey must be visually DISTINCT (different fill colors — the three verdicts).
+  // pass / fail / pending must be visually DISTINCT (the three verdict colors — green / red / yellow).
   const fillOf = (r) => r[1].match(/fill:([^;]*)/)[1];
-  assert.notEqual(fillOf(rules.green), fillOf(rules.red), "green fill ≠ red fill");
-  assert.notEqual(fillOf(rules.green), fillOf(rules.grey), "green fill ≠ grey fill");
-  assert.notEqual(fillOf(rules.red), fillOf(rules.grey), "red fill ≠ grey fill");
+  assert.notEqual(fillOf(rules.pass), fillOf(rules.fail), "pass (green) fill ≠ fail (red) fill");
+  assert.notEqual(fillOf(rules.pass), fillOf(rules.pending), "pass (green) fill ≠ pending (yellow) fill");
+  assert.notEqual(fillOf(rules.fail), fillOf(rules.pending), "fail (red) fill ≠ pending (yellow) fill");
+  // #210: the tree paint uses the SAME color TOKENS as the worklist verdict dropdown (`.cel-review-*`): pass→testing-
+  // iconPassed, fail→testing-iconFailed, pending→charts-yellow. Lock the tokens so the two can't drift.
+  assert.match(fillOf(rules.pass), /testing-iconPassed/, "pass fill = the dropdown's pass token (testing-iconPassed)");
+  assert.match(fillOf(rules.fail), /testing-iconFailed/, "fail fill = the dropdown's fail token (testing-iconFailed)");
+  assert.match(fillOf(rules.pending), /charts-yellow/, "pending fill = the dropdown's pending token (charts-yellow)");
 });
 
 check("#210: verdict overlay COEXISTS — .failed-criterion/-preempt rules are ALL stroke-only (no fill)", () => {
@@ -168,14 +173,14 @@ check("#210: verdict overlay COEXISTS — .failed-criterion/-preempt rules are A
     assert.ok(!/[^-]fill:/.test(body), `${name} sets no fill — the review fill coexists with it`);
   }
   // FIX 4: verdict fills win the rect fill by SPECIFICITY ((0,2,1) > (0,1,1)), not order — but the EQUAL-specificity
-  // error-over-green tiebreak IS order-dependent, so assert .error-node>rect comes AFTER .review-green>rect. Also assert the
+  // error-over-pass tiebreak IS order-dependent, so assert .error-node>rect comes AFTER .review-pass>rect. Also assert the
   // verdict fills sit after EVERY fill-setting kind rule (a defensive lock: if a future kind rule were bumped to (0,2,x)).
-  for (const kind of [".flow-row>rect", ".flow-decision>rect", ".flow-when>rect", ".flow-activity>rect", ".flow-certify>rect", ".flow-notcertify>rect"])
-    for (const verdict of [".flow-row.review-green>rect", ".flow-row.review-red>rect", ".flow-row.review-grey>rect", ".flow-row.error-node>rect"])
+  for (const kind of [".flow-row>rect", ".flow-decision>rect", ".flow-when>rect", ".flow-activity>rect"])
+    for (const verdict of [".flow-row.review-pass>rect", ".flow-row.review-fail>rect", ".flow-row.review-pending>rect", ".flow-row.error-node>rect"])
       assert.ok(FLOW_STYLE.indexOf(kind) < FLOW_STYLE.indexOf(verdict), `${verdict} sits after the ${kind} kind fill`);
   assert.ok(
-    FLOW_STYLE.indexOf(".flow-row.review-green>rect") < FLOW_STYLE.indexOf(".flow-row.error-node>rect"),
-    "error-over-green: .error-node>rect comes AFTER .review-green>rect (equal-specificity last-wins tiebreak)",
+    FLOW_STYLE.indexOf(".flow-row.review-pass>rect") < FLOW_STYLE.indexOf(".flow-row.error-node>rect"),
+    "error-over-pass: .error-node>rect comes AFTER .review-pass>rect (equal-specificity last-wins tiebreak)",
   );
 });
 
@@ -183,7 +188,7 @@ check("#177 slice 4: .this-node marker uses a PROVEN stroke (NOT outline), wins 
   // FIX 1 (impl review): the tree marker must NOT rely on `outline` on an SVG rect — this repo's evidence is outline does
   // NOT paint here (it's why .current/.failed-criterion switched to stroke). So .this-node>rect paints a `stroke`, NO outline,
   // NO fill. Against the other STROKE channels (.current/.failed-criterion/-preempt) it intentionally WINS by being ordered
-  // LAST (equal specificity, later-wins); against the FILL channels (.review-green/-red/-grey/.error-node) it COEXISTS (stroke + fill layer).
+  // LAST (equal specificity, later-wins); against the FILL channels (.review-pass/-fail/-pending/.error-node) it COEXISTS (stroke + fill layer).
   const rule = FLOW_STYLE.match(/\.flow-row\.this-node>rect\{([^}]*)\}/);
   assert.ok(rule, ".flow-row.this-node>rect rule present");
   assert.match(rule[1], /stroke:/, "this-node marks via stroke (the PROVEN-painting SVG axis, like .current)");
@@ -197,7 +202,7 @@ check("#177 slice 4: .this-node marker uses a PROVEN stroke (NOT outline), wins 
       `.this-node>rect comes AFTER ${sel} (later-wins, so the marker overrides the transient ${sel} stroke)`,
     );
   // The verdict FILL rules are UNTOUCHED (still fill, no stroke) — stroke + fill layer, so a green+focused node shows both.
-  for (const sel of [".flow-row.review-green>rect", ".flow-row.review-red>rect", ".flow-row.review-grey>rect", ".flow-row.error-node>rect"]) {
+  for (const sel of [".flow-row.review-pass>rect", ".flow-row.review-fail>rect", ".flow-row.review-pending>rect", ".flow-row.error-node>rect"]) {
     const b = FLOW_STYLE.match(new RegExp(`${sel.replace(/[.>]/g, (c) => "\\" + c)}\\{([^}]*)\\}`))[1];
     assert.match(b, /fill:/, `${sel} still paints via fill (untouched by the slice-4 stroke)`);
     assert.ok(!/stroke:/.test(b), `${sel} sets no stroke — the this-node stroke layers over its fill`);
@@ -495,7 +500,7 @@ check("Todo 2: `when` border — inferred (no code is) → flow-inferred (purple
   assert.ok(whenCls("I").includes("flow-inferred"), "an inferred when (no code is) → flow-inferred (purple)");
 });
 
-check("Todo 2: determination leaf border by PAS category — certify GREEN, not-certify + pended GOLD, ordinary NEUTRAL", () => {
+check("#210: EVERY recommend leaf (incl. determinations) is neutral flow-activity — no PA-specific certify/not-certify border", () => {
   const st = [{ decision: "D", lib: "Pol", nodeKey: "d:D", location: {}, children: [
     node("w1", "when", "when A", ["c:A"], [node("aC", "action", "certify.Approve", ["act:c"], [], { actionKind: "recommend-activity" })]),
     node("w2", "when", "when B", ["c:B"], [node("aN", "action", "not-certify.Deny", ["act:n"], [], { actionKind: "recommend-activity" })]),
@@ -504,16 +509,22 @@ check("Todo 2: determination leaf border by PAS category — certify GREEN, not-
   ] }];
   const rr = renderFlowPane(st, { concepts });
   const actCls = (label) => rr.html.match(new RegExp(`class="(flow-row flow-[a-z]+)[^"]*"[^>]*><title>[^<]*</title><rect[^>]*/><text[^>]*>${label}</text>`))[1];
-  assert.equal(actCls("Approve"), "flow-row flow-certify", "certify.* → green");
-  assert.equal(actCls("Deny"), "flow-row flow-notcertify", "not-certify.* → gold");
-  assert.equal(actCls("Info"), "flow-row flow-notcertify", "pended.* → gold (same bucket as not-certify)");
-  assert.equal(actCls("Order MRI"), "flow-row flow-activity", "an ordinary (non-determination) activity → neutral flow-activity");
+  // ALL four (certify / not-certify / pended / ordinary) are now the SAME neutral flow-activity grey (#210: de-PA-specific).
+  assert.equal(actCls("Approve"), "flow-row flow-activity", "certify.* → neutral (no green border)");
+  assert.equal(actCls("Deny"), "flow-row flow-activity", "not-certify.* → neutral (no gold border)");
+  assert.equal(actCls("Info"), "flow-row flow-activity", "pended.* → neutral (no gold border)");
+  assert.equal(actCls("Order MRI"), "flow-row flow-activity", "an ordinary activity → neutral flow-activity");
+  assert.ok(!/flow-certify|flow-notcertify/.test(rr.html), "no flow-certify/flow-notcertify class is emitted at all");
+  // a neutral recommend leaf must ALSO get flow-greyborder so its grey border HIDES under the on-path ring (like other
+  // neutral nodes) — the actCls regex above discards trailing classes, so assert the FULL class string here.
+  const fullCls = (label) => rr.html.match(new RegExp(`class="(flow-row flow-activity[^"]*)"[^>]*><title>[^<]*</title><rect[^>]*/><text[^>]*>${label}</text>`))[1];
+  for (const label of ["Approve", "Deny", "Info", "Order MRI"])
+    assert.ok(fullCls(label).includes("flow-greyborder"), `${label} leaf is flow-greyborder (grey border hides under the ring, like every neutral node)`);
 });
 
-check("Todo 2: FLOW_STYLE — decision grey (not blue), certify green, not-certify gold, inferred purple; NO peek / non-source / textLink-blue", () => {
+check("Todo 2 / #210: FLOW_STYLE — decision grey, NO certify/not-certify rules, inferred purple; NO peek / non-source / textLink-blue", () => {
   assert.match(FLOW_STYLE, /\.flow-decision>rect\{[^}]*stroke:var\(--vscode-descriptionForeground/, "decision border is neutral grey (not focusBorder blue)");
-  assert.match(FLOW_STYLE, /\.flow-certify>rect\{[^}]*charts-green/, "certify → green");
-  assert.match(FLOW_STYLE, /\.flow-notcertify>rect\{[^}]*editorWarning-foreground/, "not-certify + pended → gold (distinct token from the preempt amber)");
+  assert.ok(!/flow-certify|flow-notcertify/.test(FLOW_STYLE), "#210: the certify/not-certify leaf-border rules are REMOVED (de-PA-specific)");
   assert.match(FLOW_STYLE, /\.flow-when\.flow-inferred>rect\{[^}]*charts-purple/, "inferred when → purple");
   assert.match(FLOW_STYLE, /\.flow-leaf\.flow-inferred>rect\{[^}]*charts-purple/, "inferred outline leaf → purple (still dashed via .flow-leaf)");
   // #210: the inferred (purple) OFF-PATH border is slightly heavier (1.4) than the grey Source border (operator ask). The

@@ -2,8 +2,8 @@
 // Renders CrlDecisionStructure[] as an SVG forest: each decision root branches through its when/otherwise/action sub-nodes;
 // a composite `when` hangs its `defined as` operator OUTLINE below it, and recommend targets are determination boxes.
 // #187 Todo 2 BORDER SEMANTICS: a node's border carries meaning — a `when` is grey (Source) or purple (inferred, no
-// `code is`); a determination target is green (certify) / gold (not-certify + pended); ordinary activity / use-decision /
-// decision are neutral grey. Nothing is blue (blue is the on-path ring). The old asserted/inferred peek DOTS are gone.
+// `code is`); every recommend target / ordinary activity / use-decision / decision is neutral grey (#210: the old PA-specific
+// certify→green / not-certify→gold determination borders were removed). Nothing is blue (blue is the on-path ring).
 //
 // CSP-safe by construction: geometry is SVG PRESENTATION attributes (x/y/width/d/…) — never a `style=` attribute and never
 // a `<style>` element inside the SVG; all color/font lives in FLOW_STYLE (a CSS string the shell concatenates into its
@@ -12,7 +12,7 @@
 // nodeKey is a JSON string (quotes/brackets) and cannot be a DOM id; `anchors` is keyed BY nodeKey → the generated id (the
 // cross-pane join, mirroring crlPaneHtml). `id` + `data-reveal` ride the SAME <g> so highlight (getElementById) and click
 // (closest('[data-reveal]')) resolve to one element.
-import { buildDefStruct, determinationCategory, displayDetermination, type CrlConceptNode, type CrlDecisionStructure, type CrlStructureNode, type DefStructExpr, type ResolveDefExprEntry } from "@smile-digital-health/crl";
+import { buildDefStruct, displayDetermination, type CrlConceptNode, type CrlDecisionStructure, type CrlStructureNode, type DefStructExpr, type ResolveDefExprEntry } from "@smile-digital-health/crl";
 
 /** Reserved prefix marking a synthetic outline-row nodeKey — provably disjoint from every structure/concept nodeKey
  *  (those are JSON arrays), so a leaf anchor no-ops against every existing keyset. A concept-operand leaf's key carries
@@ -127,10 +127,6 @@ interface LaidNode {
   /** Concept-bearing node's Source flag: `true` = has a local `code is` (grey border); `false` = inferred / no `code is`
    *  (purple border); `undefined` = concept-less OR an unresolved concept ref → neutral (Todo 2 border scheme). */
   isSource?: boolean;
-  /** #187 Todo 2: a recommend-activity's PAS determination category (`certify` / `not-certify` / `pended`), parsed from
-   *  its raw `<category>.<key>` name — drives the leaf border (certify → green, not-certify + pended → gold). `undefined`
-   *  for an ordinary (non-determination) activity or a use-decision (those stay neutral). */
-  dispositionCategory?: string;
   /** #187 Todo 2b: a guarded `recommend X when <guard>`'s resolved guard concept — rendered as a clickable "when …" TAB
    *  on the action box (a discoverable replacement for the removed peek dot). Absent for an unguarded recommend. */
   guard?: { conceptKey: string; conceptName: string; conceptLib: string; isSource: boolean };
@@ -155,8 +151,8 @@ interface LaidNode {
 }
 
 /**
- * #210: the DISPOSITION-LEAF nodeKeys in a structure forest — a recommend-activity `action` (a certify / not-certify /
- * ordinary-recommend outcome tip). Used by the MV verdict fold's leaf-aware precedence (green wins on interior nodes, RED
+ * #210: the DISPOSITION-LEAF nodeKeys in a structure forest — a recommend-activity `action` (an outcome tip, whatever its
+ * determination category). Used by the MV verdict fold's leaf-aware precedence (pass wins on interior nodes, FAIL
  * wins on a leaf). Deliberately EXCLUDES `use-decision` actions (interior delegation glue — the real disposition is the
  * sub-decision's own recommend) and every `when`/`otherwise`/`decision` node. A branch with MULTIPLE recommends yields
  * MULTIPLE leaves (any outcome tip reddens); an `otherwise → Unmet` recommend IS a leaf (walks all children regardless of
@@ -257,9 +253,6 @@ function buildLaid(
     const conceptRef = n.kind === "when" ? n.refKeys[0] : undefined;
     const cf = conceptFields(conceptRef);
     const useDecision = n.kind === "action" && n.actionKind === "use-decision";
-    // #187 Todo 2: a recommend-activity's determination category, from its RAW `<category>.<key>` name (before display
-    // stripping). An ordinary activity / use-decision / non-action → undefined → neutral (no green/gold).
-    const dispositionCategory = n.kind === "action" && n.actionKind === "recommend-activity" ? determinationCategory(n.label) : undefined;
     // #187 Todo 2b: a guarded action (`recommend X when <guard>` OR `use decision D when <guard>`) — resolve the guard
     // concept (refKeys[1], present on ANY guarded action) for its "when …" tab.
     const guardRef = n.kind === "action" && n.refKeys.length > 1 ? n.refKeys[1] : undefined;
@@ -306,7 +299,7 @@ function buildLaid(
       }
     }
     const children = [...structureChildren, ...outlineRoots];
-    return { nodeKey: n.nodeKey, kind: n.kind, useDecision, dispositionCategory, guard, label: display, full, depth, y: nodeY, children, ...cf };
+    return { nodeKey: n.nodeKey, kind: n.kind, useDecision, guard, label: display, full, depth, y: nodeY, children, ...cf };
   };
 
   const roots: LaidNode[] = [];
@@ -455,20 +448,21 @@ export function renderFlowPane(
 
     // A regular STRUCTURE node (decision / when / otherwise / action). #187 Todo 2 border semantics:
     //  - a `when` IS its gating concept → inferred (no `code is`) PURPLE / Source or unresolved GREY;
-    //  - a recommend-activity is a determination TARGET → certify GREEN / not-certify+pended GOLD / ordinary neutral;
-    //  - a use-decision, otherwise, decision → neutral grey (never blue — blue is reserved for the on-path ring, Todo 3).
+    //  - every recommend-activity / use-decision / otherwise / decision → neutral grey (#210: no PA-specific determination
+    //    border; never blue — blue is reserved for the on-path ring, Todo 3).
     const classes = ["flow-row"];
     if (n.kind === "action") {
       if (n.useDecision) classes.push("flow-use");
-      else if (n.dispositionCategory === "certify") classes.push("flow-certify");
-      else if (n.dispositionCategory === "not-certify" || n.dispositionCategory === "pended") classes.push("flow-notcertify");
-      else classes.push("flow-activity"); // ordinary (non-determination) activity → neutral
+      // #210: a recommend-activity disposition leaf is NEUTRAL grey — the SAME as a regular internal activity. The former
+      // certify→green / not-certify+pended→gold borders made the viewer PA-specific; the outcome's meaning is carried by
+      // the node label + the verdict painting, not a determination-category border.
+      else classes.push("flow-activity");
     } else {
       classes.push(`flow-${n.kind}`);
       if (n.kind === "when" && n.isSource === false) classes.push("flow-inferred"); // inferred gating concept → purple border
     }
-    // #187 Todo 3b: a plain GREY SOLID identity border (decision / non-inferred when / ordinary activity) muddies the blue
-    // on-path ring → mark it so CSS can HIDE it when ringed. A COLOURED border (inferred/certify/not-certify) or a DASHED
+    // #187 Todo 3b: a plain GREY SOLID identity border (decision / non-inferred when / ordinary activity, incl. a disposition
+    // leaf) muddies the blue on-path ring → mark it so CSS can HIDE it when ringed. A COLOURED border (inferred) or a DASHED
     // one (use-decision/otherwise) is NOT marked — it stays visible (it carries meaning the ring doesn't).
     if (classes.includes("flow-decision") || classes.includes("flow-activity") || (classes.includes("flow-when") && !classes.includes("flow-inferred")))
       classes.push("flow-greyborder");
@@ -510,7 +504,7 @@ export function renderFlowPane(
  *  CORR_STYLE + shellHtml. #187 Todo 3: the on-path highlight is the `.flow-ring` rect (a deterministic SVG rect-stroke);
  *  the shell's global `.current`/`.diverter`/`.failed-criterion` OUTLINE overlays ARE neutralized on flow `<g>`s (they
  *  paint a lumpy square there — the flow uses the ring + rect strokes instead). The per-case CHANNELS still paint rect
- *  strokes/fills: `.this-node` (orange), `.failed-criterion`/`-preempt` (dashed), `.diverter` (dotted), `.review-green/-red/-grey`/`.error-node` (fill). */
+ *  strokes/fills: `.this-node` (orange), `.failed-criterion`/`-preempt` (dashed), `.diverter` (dotted), `.review-pass/-fail/-pending`/`.error-node` (fill). */
 export const FLOW_STYLE =
   `.flow-wrap{display:inline-block;min-width:100%}` +
   `.flow-svg{display:block;font:12px var(--vscode-editor-font-family,sans-serif)}` +
@@ -518,8 +512,8 @@ export const FLOW_STYLE =
   `.flow-row>rect{fill:var(--vscode-editorWidget-background,#252526);stroke:var(--vscode-panel-border,#454545);stroke-width:1}` +
   `.flow-row>text{fill:var(--vscode-foreground,#cccccc)}` +
   // #187 Todo 2 BORDER SEMANTICS. NOTHING here is blue — blue is reserved for the on-path ring (Todo 3). Decision + a
-  // Source `when` + an ordinary activity + a use-decision all read NEUTRAL GREY; meaning is carried by the exceptions
-  // below (inferred → purple, certify → green, not-certify/pended → gold).
+  // Source `when` + every recommend activity + a use-decision all read NEUTRAL GREY; the ONLY border exception is an
+  // inferred `when` → purple (#210: the certify/not-certify determination borders were removed — de-PA-specific).
   `.flow-decision>rect{fill:var(--vscode-editor-background,#1e1e1e);stroke:var(--vscode-descriptionForeground,#8c8c8c);stroke-width:1.5}` +
   `.flow-decision>text{font-weight:bold}` +
   // A `when` IS its gating concept: Source (has local `code is`) OR unresolved → grey; inferred (no `code is`) → PURPLE.
@@ -529,12 +523,10 @@ export const FLOW_STYLE =
   // are EQUAL specificity ((0,2,1)) but sit LATER in the sheet, so a ringed inferred node overrides this 1.4.
   `.flow-when.flow-inferred>rect{stroke:var(--vscode-charts-purple,#c586c0);stroke-width:1.4}` +
   `.flow-otherwise>rect{stroke-dasharray:3 2;opacity:.85}` +
-  // A recommend TARGET. A DETERMINATION colors by PAS category: certify → GREEN, not-certify + pended → GOLD (solid — the
-  // preempt overlay's amber is DASHED, so the two are distinct even at a shared hue). An ordinary (non-determination)
-  // activity → neutral grey; a use-decision → neutral grey with its dashed delegation shape.
+  // A recommend TARGET. #210: ALL recommend activities (incl. determinations) → neutral grey, the SAME as an ordinary
+  // activity (the certify→green / not-certify+pended→gold borders were removed — they made the viewer PA-specific). A
+  // use-decision → neutral grey with its dashed delegation shape.
   `.flow-activity>rect{fill:var(--vscode-editorWidget-background,#252526);stroke:var(--vscode-descriptionForeground,#8c8c8c);stroke-width:1.5}` +
-  `.flow-certify>rect{fill:var(--vscode-editorWidget-background,#252526);stroke:var(--vscode-charts-green,#3fb950);stroke-width:1.5}` +
-  `.flow-notcertify>rect{fill:var(--vscode-editorWidget-background,#252526);stroke:var(--vscode-editorWarning-foreground,#cca700);stroke-width:1.5}` +
   `.flow-use>rect{fill:var(--vscode-editorWidget-background,#252526);stroke:var(--vscode-descriptionForeground,#8c8c8c);stroke-dasharray:5 2}` +
   // #187 Todo 2b: a guarded recommend's "when <guard>" TAB — a labeled, clickable pill on the box top (the discoverable
   // replacement for the peek dot). Grey / purple by the guard's Source; a hover highlight signals it's interactive.
@@ -573,7 +565,7 @@ export const FLOW_STYLE =
   `.flow-leaf .flow-ring>rect{stroke-width:1.5}` +
   `.flow-row.current .flow-ring,.flow-row.flow-leaf-yes .flow-ring{display:inline}` +
   // #187 Todo 3b: when the ring is shown — HIDE a plain GREY SOLID border (`.flow-greyborder`): a faint grey line just
-  // inside the blue ring only muddies it (the ring is the border). A COLOURED identity border (inferred/certify/not-certify)
+  // inside the blue ring only muddies it (the ring is the border). A COLOURED identity border (inferred purple)
   // instead THICKENS so its meaning still reads inside the ring. Both are EQUAL-specificity ((0,2,1)) to the overlay stroke
   // channels and placed BEFORE them, so `.this-node`/`.failed-criterion`/`.diverter` still win on a node that is on-path AND
   // an overlay (the thicken sets only stroke-WIDTH; the hide sets `stroke:transparent`, which a later overlay's stroke beats).
@@ -593,24 +585,25 @@ export const FLOW_STYLE =
   // #156 slice 5 / #210 VERDICT PAINTING: the Medical Validation review overlay — a PERSISTENT channel that survives
   // selection (unlike failed-criterion, which clears on every reveal). It is a NON-OUTLINE FILL TINT on the rect, an
   // INDEPENDENT SVG axis from the two stroke-only channels above: `.current` and `.failed-criterion`/`-preempt` set only
-  // `stroke`/`stroke-width`, so a verdict FILL coexists with both WITHOUT fighting (a `.current.review-green` keeps its
+  // `stroke`/`stroke-width`, so a verdict FILL coexists with both WITHOUT fighting (a `.current.review-pass` keeps its
   // focus stroke AND reads green; a `.failed-criterion.error-node` keeps its dashed red stroke over the error fill). The
   // fill overrides the base `.flow-row>rect` fill AND the kind-fills (flow-decision/when/activity) by SPECIFICITY, not
-  // order: `.flow-row.review-green>rect` = (0,2,1) outranks `.flow-decision>rect`/`.flow-activity>rect` = (0,1,1) regardless
-  // of sheet position (FIX 4, Claude impl review). Each RINGED reviewed node paints its case's VERDICT: pass→green wash,
-  // fail→red wash, pending→grey wash (grey subdued — it "loses" precedence, so a faint context tint). The host resolves the
-  // per-node verdict (green/red/grey are DISJOINT — exactly one class per node), so these three never co-occur and need no
-  // tiebreak among themselves. `.error-node` (a green node whose pass case's RUN errored — the host filters error ⊆ green) is
-  // painted INSTEAD of `.review-green` (error-over-green), a subdued red wash distinct from the failed-criterion STROKE channel.
-  `.flow-row.review-green>rect{fill:var(--vscode-testing-iconPassed,#3fb950);fill-opacity:.18}` +
-  `.flow-row.review-red>rect{fill:var(--vscode-testing-iconFailed,#f14c4c);fill-opacity:.18}` +
-  `.flow-row.review-grey>rect{fill:var(--vscode-descriptionForeground,#8c8c8c);fill-opacity:.14}` +
-  `.flow-row.error-node>rect{fill:var(--vscode-testing-iconFailed,#f14c4c);fill-opacity:.20}` +
+  // order: `.flow-row.review-pass>rect` = (0,2,1) outranks `.flow-decision>rect`/`.flow-activity>rect` = (0,1,1) regardless
+  // of sheet position (FIX 4, Claude impl review). Each RINGED reviewed node paints its case's VERDICT with the SAME color
+  // tokens the worklist verdict dropdown uses (`.cel-review-*`, correspondenceCockpit.ts): pass→green, fail→red, pending→
+  // YELLOW (pending is subdued at a lower opacity — it "loses" precedence, a faint context tint). The host resolves the
+  // per-node verdict (pass/fail/pending are DISJOINT — exactly one class per node), so these three never co-occur and need no
+  // tiebreak among themselves. `.error-node` (a pass node whose case's RUN errored — the host filters error ⊆ pass) is
+  // painted INSTEAD of `.review-pass` (error-over-pass), a subdued red wash distinct from the failed-criterion STROKE channel.
+  `.flow-row.review-pass>rect{fill:var(--vscode-testing-iconPassed,#73c991);fill-opacity:.2}` +
+  `.flow-row.review-fail>rect{fill:var(--vscode-testing-iconFailed,#f14c4c);fill-opacity:.2}` +
+  `.flow-row.review-pending>rect{fill:var(--vscode-charts-yellow,#d29922);fill-opacity:.16}` +
+  `.flow-row.error-node>rect{fill:var(--vscode-testing-iconFailed,#f14c4c);fill-opacity:.22}` +
   // #177 slice 4: the "this node" cross-pane marker — the FOCUSED questionnaire question's tree node. It paints a
   // distinctive solid `stroke` on the >rect — the SAME proven axis `.current`/`.failed-criterion` use (FIX 1 impl review:
   // this repo's evidence is that `outline` does NOT paint on the SVG here, which is exactly why those switched to stroke).
-  // It COEXISTS with the verdict fills (`.review-green/-red/-grey`/`.error-node` are `fill` — fill + stroke layer fine: a
-  // green node that's the focused question shows the green fill AND this accent border). Against the OTHER stroke channels (`.current`/`.failed-criterion`/
+  // It COEXISTS with the verdict fills (`.review-pass/-fail/-pending`/`.error-node` are `fill` — fill + stroke layer fine: a
+  // pass node that's the focused question shows the green fill AND this accent border). Against the OTHER stroke channels (`.current`/`.failed-criterion`/
   // `-preempt`/`.diverter`) it deliberately WINS: it is ordered LAST among the stroke rules (after them in the sheet, equal specificity),
   // so on a node that is BOTH the focused question and selected/a-criterion the focused-question marker (the primary
   // indicator) overrides the transient selection/criterion stroke (the right tradeoff). The color is a DISTINCT accent

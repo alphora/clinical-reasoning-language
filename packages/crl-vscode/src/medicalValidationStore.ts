@@ -7,7 +7,7 @@
 // integers + fixed literals, so it stays vscode-free + HTML-escape-free):
 //   - medicalValidationSidecarPath: from a .cel, locate the ONE policy-scoped sidecar (one per POLICY, not per .cel).
 //   - load/save the sidecar: a corruption-tolerant read + an ATOMIC write (tmp+rename), keyed by frozen caseId.
-//   - deriveReviewOverlay: the TOTAL verdict fold (leaf-aware precedence) over all REVIEWED cases → disjoint {green, red, grey} + error (⊆ green).
+//   - deriveReviewOverlay: the TOTAL verdict fold (leaf-aware precedence) over all REVIEWED cases → disjoint {pass, fail, pending} + error (⊆ pass).
 //   - isReviewState / setReviewState: the review-state dropdown (slice 4 wires it to the webview <select> change).
 //   - reviewProgress / renderProgressChrome: the slice-6 worklist progress READOUT (pure count + its tree-chrome HTML).
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
@@ -223,32 +223,32 @@ export interface CasePaint {
   litNodeKeys: readonly string[];
 }
 
-/** The derived node overlay (#210 verdict painting). Three DISJOINT verdict-color sets — a nodeKey lit by several reviewed
- *  cases resolves to exactly one via the leaf-aware precedence (see `deriveReviewOverlay`): `green` (pass), `red` (fail),
- *  `grey` (pending). Plus `error` — the subset of `green` (INVARIANT: `error ⊆ green`) whose pass-verdict case's run
- *  errored; the caller paints it INSTEAD of green (error-over-green). Slice 2 reworks error. A node lit only by unreviewed
- *  cases is in NONE. */
+/** The derived node overlay (#210 verdict painting). Three DISJOINT verdict sets — a nodeKey lit by several reviewed cases
+ *  resolves to exactly one via the leaf-aware precedence (see `deriveReviewOverlay`): `pass` / `fail` / `pending`. The caller
+ *  paints each with the SAME color the worklist verdict dropdown uses (pass→green, fail→red, pending→yellow). Plus `error` —
+ *  the subset of `pass` (INVARIANT: `error ⊆ pass`) whose pass-verdict case's run errored; the caller paints it INSTEAD of
+ *  the pass fill (error-over-pass). Slice 2 reworks error. A node lit only by unreviewed cases is in NONE. */
 export interface ReviewOverlay {
-  green: Set<string>;
-  red: Set<string>;
-  grey: Set<string>;
+  pass: Set<string>;
+  fail: Set<string>;
+  pending: Set<string>;
   error: Set<string>;
 }
 
 /**
  * The TOTAL verdict-painting fold (#210) — recomputed in full each time, NOT first-write-wins. Each REVIEWED case lights
- * every tree nodeKey on its fired path (`litNodeKeys`) with its VERDICT color: `pass`→green, `fail`→red, `pending`→grey
- * (`unreviewed` paints nothing). A node lit by several cases resolves to ONE color by the operator precedence:
- *   - GREY always loses (a node lit grey + any color paints the color).
- *   - GREEN vs RED flips on leaf-ness: on an INTERIOR node green wins (a pass path through it dominates a fail path); on a
- *     LEAF (a disposition/outcome tip — `isLeaf(nodeKey)` true) RED wins (a failed outcome shows red even if a pass path
- *     also reaches it). `isLeaf` is injected (the caller knows which nodeKeys are recommend-activity actions) so this stays
+ * every tree nodeKey on its fired path (`litNodeKeys`) with its VERDICT: `pass` / `fail` / `pending` (`unreviewed` paints
+ * nothing). A node lit by several cases resolves to ONE verdict by the operator precedence:
+ *   - PENDING always loses (a node lit pending + any decided verdict paints the decided one).
+ *   - PASS vs FAIL flips on leaf-ness: on an INTERIOR node pass wins (a pass path through it dominates a fail path); on a
+ *     LEAF (a disposition/outcome tip — `isLeaf(nodeKey)` true) FAIL wins (a failed outcome shows even if a pass path also
+ *     reaches it). `isLeaf` is injected (the caller knows which nodeKeys are recommend-activity actions) so this stays
  *     vscode-free + fully unit-testable.
- * `error` (Slice 2 reworks it): the subset of GREEN nodes (INVARIANT `error ⊆ green` — a pass-verdict node whose run
- * `status === "error"` that DIDN'T flip to red under precedence) the caller reddens ON TOP of green (execution broke →
+ * `error` (Slice 2 reworks it): the subset of PASS nodes (INVARIANT `error ⊆ pass` — a pass-verdict node whose run
+ * `status === "error"` that DIDN'T flip to fail under precedence) the caller paints error ON TOP of pass (execution broke →
  * nothing to trust). The verdict and the run `status` are ORTHOGONAL (a pass verdict overrides a run `status:"fail"` — still
- * green; only run `error` reddens). A pass-run-error node that ALSO resolves to red (a leaf a fail case reached) is already
- * red, so it drops out of `error` — keeping the invariant true and avoiding a double class.
+ * pass; only run `error` reddens). A pass-run-error node that ALSO resolves to fail (a leaf a fail case reached) is already
+ * fail-colored, so it drops out of `error` — keeping the invariant true and avoiding a double class.
  * A caseId absent from `perCase` (stale) contributes nothing. Idempotent: multiple cases lighting one node collapse.
  */
 export function deriveReviewOverlay(
@@ -256,14 +256,14 @@ export function deriveReviewOverlay(
   perCase: ReadonlyMap<string, CasePaint>,
   isLeaf: (nodeKey: string) => boolean,
 ): ReviewOverlay {
-  // First accumulate, per node, WHICH verdicts light it (a node lit by several reviewed cases can be green+red+grey). Then
-  // resolve ONE color per node by the operator precedence: GREY always loses; GREEN vs RED → green wins on INTERIOR nodes,
-  // RED wins on a LEAF (disposition/outcome tip). `error` = the pass-verdict + run-`error` subset, then filtered to ⊆ green.
-  const votes = new Map<string, { g: boolean; r: boolean; y: boolean }>();
+  // First accumulate, per node, WHICH verdicts light it (a node lit by several reviewed cases can be pass+fail+pending). Then
+  // resolve ONE verdict per node by the operator precedence: PENDING always loses; PASS vs FAIL → pass wins on INTERIOR
+  // nodes, FAIL wins on a LEAF (disposition/outcome tip). `error` = the pass-verdict + run-`error` subset, then filtered ⊆ pass.
+  const votes = new Map<string, { pass: boolean; fail: boolean; pending: boolean }>();
   const error = new Set<string>();
-  const vote = (key: string): { g: boolean; r: boolean; y: boolean } => {
+  const vote = (key: string): { pass: boolean; fail: boolean; pending: boolean } => {
     let v = votes.get(key);
-    if (!v) votes.set(key, (v = { g: false, r: false, y: false }));
+    if (!v) votes.set(key, (v = { pass: false, fail: false, pending: false }));
     return v;
   };
   for (const [caseId, state] of Object.entries(byCaseId)) {
@@ -271,29 +271,29 @@ export function deriveReviewOverlay(
     if (!paint) continue; // stale entry (no live case) → inert
     for (const key of paint.litNodeKeys) {
       if (state === "pass") {
-        vote(key).g = true;
+        vote(key).pass = true;
         if (paint.status === "error") error.add(key); // run-status error reddens even a pass verdict (Slice 2 reworks)
-      } else if (state === "fail") vote(key).r = true;
-      else if (state === "pending") vote(key).y = true; // "unreviewed" doesn't paint
+      } else if (state === "fail") vote(key).fail = true;
+      else if (state === "pending") vote(key).pending = true; // "unreviewed" doesn't paint
     }
   }
-  const green = new Set<string>();
-  const red = new Set<string>();
-  const grey = new Set<string>();
+  const pass = new Set<string>();
+  const fail = new Set<string>();
+  const pending = new Set<string>();
   for (const [key, v] of votes) {
-    // grey always loses to a color; green vs red flips on a leaf.
-    if (v.g && v.r) (isLeaf(key) ? red : green).add(key);
-    else if (v.g) green.add(key);
-    else if (v.r) red.add(key);
-    else grey.add(key); // only pending lit it
+    // pending always loses to a decided verdict; pass vs fail flips on a leaf.
+    if (v.pass && v.fail) (isLeaf(key) ? fail : pass).add(key);
+    else if (v.pass) pass.add(key);
+    else if (v.fail) fail.add(key);
+    else pending.add(key); // only pending lit it
   }
-  // Keep `error ⊆ green` a TRUE invariant (gpt55 impl review): a `vote(key).g` node CAN still resolve to RED — a LEAF lit by
-  // both a pass-run-error case (adds to `error`) AND a fail case flips to red. Such a node is already red (visually identical
-  // to the error wash), so drop it from `error`: the caller paints `.error-node` INSTEAD of `.review-green`, and there is no
-  // green to override on a red-resolved node. Net: `error` = exactly the green nodes whose run errored (error-over-green).
+  // Keep `error ⊆ pass` a TRUE invariant (gpt55 impl review): a `vote(key).pass` node CAN still resolve to FAIL — a LEAF lit
+  // by both a pass-run-error case (adds to `error`) AND a fail case flips to fail. Such a node is already fail-colored, so
+  // drop it from `error`: the caller paints `.error-node` INSTEAD of `.review-pass`, and there is no pass fill to override on
+  // a fail-resolved node. Net: `error` = exactly the pass nodes whose run errored (error-over-pass).
   const visibleError = new Set<string>();
-  for (const key of error) if (green.has(key)) visibleError.add(key);
-  return { green, red, grey, error: visibleError };
+  for (const key of error) if (pass.has(key)) visibleError.add(key);
+  return { pass, fail, pending, error: visibleError };
 }
 
 /**
@@ -303,7 +303,7 @@ export function deriveReviewOverlay(
  * scenario / ambiguous-name collision) is SKIPPED — it can't paint (it never round-trips to a reviewable checkbox).
  * `litNodeKeysOf` returns the tree nodeKeys the case lights — the SAME join the cockpit reveal uses
  * (`crlAnchorsForUnits(unitsForCase(caseId), …)`); we pass it as a closure so this stays vscode-/maps-free.
- * The result feeds `deriveReviewOverlay(byCaseId, perCase, isLeaf)` (verdict fold, error ⊆ green, stale inert).
+ * The result feeds `deriveReviewOverlay(byCaseId, perCase, isLeaf)` (verdict fold, error ⊆ pass, stale inert).
  */
 export function buildReviewPerCase(
   caseIds: Iterable<string>,

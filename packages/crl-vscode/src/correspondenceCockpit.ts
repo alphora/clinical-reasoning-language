@@ -794,7 +794,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
    * Drive the Medical Validation VERDICT tree overlay (#156 slice 5 / #210, disc 161 §1 + §"Architecture"). This is a
    * SEPARATE, PERSISTENT channel from `.current` (selection) and `.failed-criterion` (peek): it is recomputed from the
    * REVIEWED worklist cases (not the selection) and survives selection changes — the webview mutates the verdict fills
-   * (`.review-green/-red/-grey`/`.error-node`) ONLY on mark/clearReviewOverlay, never on highlight/clearHighlight (so they
+   * (`.review-pass/-fail/-pending`/`.error-node`) ONLY on mark/clearReviewOverlay, never on highlight/clearHighlight (so they
    * never blink off when the clinician clicks around). Clone of `driveFailedCriteriaPeek`'s shape (host recompute → post),
    * but to the TREE pane only (the verdict overlay is the tree's at-rest review state; the cockpit never paints it).
    *
@@ -802,7 +802,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
    *    order-independent class-strip is safe + correct — it wipes a leftover overlay after `Show Cockpit`).
    *  - MV mode → build `perCase` over the frozen, scenario-bearing cases (status from `scenarioByCaseId`, litNodeKeys via
    *    the SAME case→tree join the reveal uses: `crlAnchorsForUnits(unitsForCase(caseId), …)`), fold to the disjoint
-   *    `{green, red, grey}` + `error` sets (via `deriveReviewOverlay` + the `collectDispositionLeafKeys` leaf set), map each
+   *    `{pass, fail, pending}` + `error` sets (via `deriveReviewOverlay` + the `collectDispositionLeafKeys` leaf set), map each
    *    node-key set to TREE segment ids via the SAME `segmentsFor` the
    *    failed-criterion channel uses, and ALWAYS post the gen-stamped `markReviewOverlay` — even when the sets are EMPTY
    *    (FIX 1, gpt55 impl review). The webview's mark handler does clrRO()+add-nothing = a clear-EFFECT, but it is
@@ -830,7 +830,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     // the per-case questionnaire below) is pure waste. A stale reviewed id (not in scenarioByCaseId) → statusOf undefined →
     // buildReviewPerCase skips it. litNodeKeysOf is thus only called for reviewed cases → it unconditionally unions the
     // on-path sub-question leaves (guarding an errored/absent sv → base only). Sub-question `leaf::` keys are INTERIOR to the
-    // fold (disjoint from `dispositionLeafKeys` by the `leaf::` prefix → isLeaf false → green-wins) and map via segmentsFor.
+    // fold (disjoint from `dispositionLeafKeys` by the `leaf::` prefix → isLeaf false → pass-wins) and map via segmentsFor.
     const perCase = buildReviewPerCase(
       Object.keys(reviewByCaseId),
       (caseId) => scenarioByCaseId.get(caseId)?.status,
@@ -856,19 +856,19 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     // #210 verdict painting: leaf-aware precedence lives in the pure fold, so it needs an `isLeaf` closure. A disposition
     // LEAF = a recommend-activity `action` nodeKey (use-decision is interior delegation glue — NOT a leaf), collected from
     // the current structure by the shared `collectDispositionLeafKeys` (unit-tested in flowPaneHtml.test.mjs). The fold flips
-    // GREEN-vs-RED on it (interior→green wins, leaf→red wins).
+    // PASS-vs-FAIL on it (interior→pass wins, leaf→fail wins).
     const dispositionLeafKeys = collectDispositionLeafKeys(crlStructure);
-    const { green, red, grey, error } = deriveReviewOverlay(reviewByCaseId, perCase, (k) => dispositionLeafKeys.has(k));
-    // The fold already resolved each node to ONE verdict color (disjoint sets); error is the pass+run-error subset (unchanged
-    // Slice-1 behavior, painted over green). Map each nodeKey set → tree segment ids via the SAME segmentsFor the
-    // failed-criterion channel uses (no parallel mapping). A nodeKey with no tree anchor no-ops.
+    const { pass, fail, pending, error } = deriveReviewOverlay(reviewByCaseId, perCase, (k) => dispositionLeafKeys.has(k));
+    // The fold already resolved each node to ONE verdict (disjoint sets); error is the pass+run-error subset painted over
+    // pass. Map each nodeKey set → tree segment ids via the SAME segmentsFor the failed-criterion channel uses (no parallel
+    // mapping). A nodeKey with no tree anchor no-ops.
     // ALWAYS a gen-stamped mark in MV mode (even when empty) — gen-ordered, so an empty mark cannot race a live one (FIX 1).
     void tree.panel.webview.postMessage({
       type: "markReviewOverlay",
       gen: tree.gen,
-      green: segmentsFor(tree, [...green]).segmentIds,
-      red: segmentsFor(tree, [...red]).segmentIds,
-      grey: segmentsFor(tree, [...grey]).segmentIds,
+      pass: segmentsFor(tree, [...pass]).segmentIds,
+      fail: segmentsFor(tree, [...fail]).segmentIds,
+      pending: segmentsFor(tree, [...pending]).segmentIds,
       error: segmentsFor(tree, [...error]).segmentIds,
     });
   }
@@ -2192,14 +2192,14 @@ ${CORR_STYLE}${FLOW_STYLE}${QUESTIONNAIRE_STYLE}`;
  *  string-testable (FIX 2, gpt55 impl review). Nothing here references the nonce/CSP (those live in the shellHtml wrapper),
  *  so the const is byte-identical to the inlined script that preceded it. The central #156-slice-5 invariant locked by the
  *  test: the selection handlers (highlight/clearHighlight) never call clrRO() (the review overlay survives selection), and
- *  the markReviewOverlay handler paints error-over-green (skips .review-green for ids in the error set) + the disjoint
- *  .review-red/.review-grey sets (#210). */
+ *  the markReviewOverlay handler paints error-over-pass (skips .review-pass for ids in the error set) + the disjoint
+ *  .review-fail/.review-pending sets (#210). */
 export const COCKPIT_WEBVIEW_SCRIPT =
   `const v=acquireVsCodeApi();const root=document.getElementById('root');const fcc=document.getElementById('fcChrome');let gen=-1;` +
   `const clrFC=()=>{for(const el of root.querySelectorAll('.failed-criterion,.failed-criterion-preempt')){el.classList.remove('failed-criterion');el.classList.remove('failed-criterion-preempt');}};` +
   // #156 slice 5 / #210: the review-overlay clear. DISTINCT from clrFC — called ONLY by mark/clearReviewOverlay, NEVER by the
   // selection channel (highlight/clearHighlight), so the verdict fills SURVIVE selection (the survives-selection invariant).
-  `const clrRO=()=>{for(const el of root.querySelectorAll('.review-green,.review-red,.review-grey,.error-node')){el.classList.remove('review-green');el.classList.remove('review-red');el.classList.remove('review-grey');el.classList.remove('error-node');}};` +
+  `const clrRO=()=>{for(const el of root.querySelectorAll('.review-pass,.review-fail,.review-pending,.error-node')){el.classList.remove('review-pass');el.classList.remove('review-fail');el.classList.remove('review-pending');el.classList.remove('error-node');}};` +
   // #177 slice 4: the "this node" marker clear. DISTINCT from clrFC/clrRO — called ONLY by mark/clearThisNode, NEVER by the
   // selection channel (highlight/clearHighlight), so `.this-node` SURVIVES a cockpit reveal (it tracks the focused QUESTION,
   // not the selection — it moves only when the case or the question changes, the done-overlay lifecycle).
@@ -2244,15 +2244,15 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   // .failed-criterion. CRITICAL: it is mutated ONLY here (mark/clearReviewOverlay), NEVER by highlight/clearHighlight/
   // clrFC — so it SURVIVES selection changes (the clinician's verdict painting never blinks off as they click around).
   // mark replaces the prior overlay (clear-then-set, gen-guarded like the others). The host already resolved each node to
-  // ONE verdict color (green/red/grey are DISJOINT); error (⊆ green, a pass-verdict node whose run errored) paints .error-node
-  // INSTEAD of .review-green (error-over-green). No scroll (at-rest paint).
+  // ONE verdict (pass/fail/pending are DISJOINT); error (⊆ pass, a pass-verdict node whose run errored) paints .error-node
+  // INSTEAD of .review-pass (error-over-pass). No scroll (at-rest paint).
   `else if(m.type==='clearReviewOverlay'){clrRO();}` +
   `else if(m.type==='markReviewOverlay'){if(m.gen!==gen)return;clrRO();` +
   `const errSet=new Set(m.error||[]);` +
   `for(const id of errSet){const el=document.getElementById(id);if(el)el.classList.add('error-node');}` +
-  `for(const id of (m.green||[])){if(errSet.has(id))continue;const el=document.getElementById(id);if(el)el.classList.add('review-green');}` +
-  `for(const id of (m.red||[])){const el=document.getElementById(id);if(el)el.classList.add('review-red');}` +
-  `for(const id of (m.grey||[])){const el=document.getElementById(id);if(el)el.classList.add('review-grey');}}` +
+  `for(const id of (m.pass||[])){if(errSet.has(id))continue;const el=document.getElementById(id);if(el)el.classList.add('review-pass');}` +
+  `for(const id of (m.fail||[])){const el=document.getElementById(id);if(el)el.classList.add('review-fail');}` +
+  `for(const id of (m.pending||[])){const el=document.getElementById(id);if(el)el.classList.add('review-pending');}}` +
   // #177 slice 4: the "this node" cross-pane marker — a SEPARATE channel from .current, .failed-criterion AND the review
   // overlay. Like the review overlay it is mutated ONLY here (mark/clearThisNode), NEVER by highlight/clearHighlight/clrFC/
   // clrRO — so it SURVIVES a cockpit reveal (the focused question's node stays marked as the clinician clicks around). mark
