@@ -49,7 +49,7 @@ async function loadCockpit() {
   return require(out);
 }
 
-const { COCKPIT_WEBVIEW_SCRIPT: SCRIPT, leafMarkBuckets } = await loadCockpit();
+const { COCKPIT_WEBVIEW_SCRIPT: SCRIPT, leafMarkBuckets, leafBucketsFromQuestionnaire } = await loadCockpit();
 
 let pass = 0;
 const check = (label, fn) => {
@@ -465,6 +465,56 @@ check("BUCKETING: leafMarkBuckets gates on the on-path composite + maps conceptT
   assert.deepEqual(noKeys, ["leaf::w:On|c:no"], "the on-path false leaf is no");
   // absent concept ('Unk') and the off-path leaf appear in NEITHER bucket.
   assert.ok(!yesKeys.concat(noKeys).some((k) => k.includes("c:unk") || k === "leaf::w:Off|c:yes"), "unknown + off-path leaves get NO mark");
+});
+
+// ── #210 Slice 1b: the shared leaf bucketing over a QUESTIONNAIRE + injected resolveKey (driveLeafMarks + driveDoneOverlay share it) ──
+check("BUCKETING: leafBucketsFromQuestionnaire resolves when-evaluated/yes rows → satisfiedWhens, then buckets", () => {
+  const questions = [
+    { rowKind: "when-evaluated", answer: "yes", nodeId: "rt:on" }, //   → w:On (satisfied composite)
+    { rowKind: "when-evaluated", answer: "no", nodeId: "rt:off" }, //   answer !== yes → w:Off NOT satisfied
+    { rowKind: "when-preempted", answer: "yes", nodeId: "rt:pre" }, //  wrong rowKind → skipped
+    { rowKind: "when-evaluated", answer: "yes", nodeId: "rt:dangle" }, // resolveKey → undefined → skipped
+  ];
+  const resolveKey = (id) => ({ "rt:on": "w:On", "rt:off": "w:Off", "rt:pre": "w:Pre", "rt:dangle": undefined })[id];
+  const leafConcepts = {
+    "leaf::w:On|c:yes": { lib: "Pol", name: "Yes", topWhenKey: "w:On" },
+    "leaf::w:On|c:no": { lib: "Pol", name: "No", topWhenKey: "w:On" },
+    "leaf::w:Off|c:y": { lib: "Pol", name: "OffYes", topWhenKey: "w:Off" }, // its composite was answer:no → off-path
+  };
+  const conceptTruth = [
+    { libraryName: "Pol", name: "Yes", satisfied: true },
+    { libraryName: "Pol", name: "No", satisfied: false },
+    { libraryName: "Pol", name: "OffYes", satisfied: true },
+  ];
+  const { yesKeys, noKeys } = leafBucketsFromQuestionnaire(questions, resolveKey, conceptTruth, leafConcepts);
+  assert.deepEqual(yesKeys, ["leaf::w:On|c:yes"], "only the satisfied on-path leaf under w:On is yes");
+  assert.deepEqual(noKeys, ["leaf::w:On|c:no"], "the false on-path leaf is no");
+  assert.ok(!yesKeys.concat(noKeys).includes("leaf::w:Off|c:y"), "w:Off's leaf is off-path (its row was answer:no) → no mark");
+});
+check("BUCKETING: leafBucketsFromQuestionnaire — empty questions / undefined conceptTruth → empty buckets (no crash)", () => {
+  const leafConcepts = { "leaf::w:On|c:x": { lib: "Pol", name: "X", topWhenKey: "w:On" } };
+  assert.deepEqual(leafBucketsFromQuestionnaire([], () => "w:On", undefined, leafConcepts), { yesKeys: [], noKeys: [] }, "no rows → nothing satisfied → empty");
+  const oneYes = [{ rowKind: "when-evaluated", answer: "yes", nodeId: "n" }];
+  assert.deepEqual(leafBucketsFromQuestionnaire(oneYes, () => "w:On", undefined, leafConcepts), { yesKeys: [], noKeys: [] }, "satisfied when but undefined truth → unknown → empty");
+});
+
+// ── #210 Slice 1b: HOST-side wiring source-grep locks (driveDoneOverlay + the memo routing live outside the webview SCRIPT) ──
+check("Slice 1b: driveDoneOverlay iterates REVIEWED ids only + unions the case's on-path yes-leaf keys into litNodeKeys", () => {
+  // reviewed-only input: unreviewed cases can't vote, so we don't pay their structure join / questionnaire build.
+  assert.ok(/buildReviewPerCase\(\s*Object\.keys\(reviewByCaseId\)/.test(COCKPIT_SRC), "buildReviewPerCase is fed Object.keys(reviewByCaseId), not scenarioByCaseId.keys()");
+  // litNodeKeysOf unions the sub-question yes-leaves onto the structure base.
+  assert.ok(/leafBucketsFromQuestionnaire\(\s*questionnaireFor\(caseId, sv\)\.questions/.test(COCKPIT_SRC), "litNodeKeysOf builds the case's questionnaire via questionnaireFor + buckets it");
+  assert.ok(/yesKeys\.length \? \[\.\.\.base, \.\.\.yesKeys\] : base/.test(COCKPIT_SRC), "the case's yes-leaf keys are appended to the structure base");
+  // the errored/absent sv guard: no leaf keys for an errored case (buildReviewPerCase still calls litNodeKeysOf for status 'error').
+  assert.ok(/if \(!sv \|\| sv\.status === "error"\) return base;/.test(COCKPIT_SRC), "an errored/absent sv unions NO leaf keys (base only)");
+  // the fold's isLeaf is unchanged → a `leaf::` key (disjoint from dispositionLeafKeys) is INTERIOR (green-wins).
+  assert.ok(/deriveReviewOverlay\(reviewByCaseId, perCase, \(k\) => dispositionLeafKeys\.has\(k\)\)/.test(COCKPIT_SRC), "the leaf-aware fold call is unchanged (leaf:: keys fold as interior)");
+});
+check("Slice 1b: questionnaireFor routes the FOCUSED case to the memo, a NON-focused case to buildQuestionnaireRaw (no memo poisoning)", () => {
+  const m = COCKPIT_SRC.match(/function questionnaireFor\([^)]*\)[^{]*\{([\s\S]*?)\n  \}/);
+  assert.ok(m, "questionnaireFor body");
+  assert.ok(/state\.selection\.caseId === caseId/.test(m[1]), "gated on the FOCUSED selection's caseId");
+  assert.ok(/\? buildFocusedQuestionnaire\(sv\) : buildQuestionnaireRaw\(sv\)/.test(m[1]), "focused → memo; non-focused → raw build (never poisons the focused memo slot)");
 });
 
 console.log(`\ncockpitWebviewScript.test: ${pass} checks passed`);

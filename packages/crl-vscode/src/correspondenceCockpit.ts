@@ -214,6 +214,30 @@ export function leafMarkBuckets(
   return { yesKeys, noKeys };
 }
 
+/** #210 Slice 1b (PURE, unit-tested): the yes/no leaf bucketing over an ALREADY-BUILT questionnaire + an INJECTED
+ *  `resolveKey` (runtime `nodeId` → structure `when` nodeKey). Taking the questionnaire (not building it) + injecting the
+ *  resolver keeps this vscode-free AND lets BOTH callers share ONE bucketing path with no drift: `driveLeafMarks` (the
+ *  focused-case ring) and `driveDoneOverlay` (per-reviewed-case verdict paint). The FOCUSED case's questionnaire build is
+ *  shared across all its drivers via `focusedQMemo` (`#187 Todo 5`); a non-focused reviewed case builds its questionnaire
+ *  once per repaint (see `questionnaireFor`). The on-path-SATISFIED composite whens = the `when-evaluated`/`answer:"yes"`
+ *  rows resolved via `resolveKey`; `leafMarkBuckets` then applies the on-path gate + the absent-is-unknown rule. */
+export function leafBucketsFromQuestionnaire(
+  questions: Questionnaire["questions"],
+  resolveKey: (nodeId: string) => string | undefined,
+  conceptTruth: readonly { libraryName?: string; name: string; satisfied: boolean }[] | undefined,
+  leafConcepts: Record<string, { lib: string; name: string; topWhenKey: string }>,
+): { yesKeys: string[]; noKeys: string[] } {
+  const satisfiedWhenKeys = new Set<string>();
+  for (const x of questions) {
+    if (x.rowKind !== "when-evaluated" || x.answer !== "yes") continue;
+    const k = resolveKey(x.nodeId);
+    if (k !== undefined) satisfiedWhenKeys.add(k);
+  }
+  const truthByKey = new Map<string, boolean>();
+  for (const r of conceptTruth ?? []) truthByKey.set(JSON.stringify([r.libraryName, r.name]), r.satisfied);
+  return leafMarkBuckets(leafConcepts, satisfiedWhenKeys, truthByKey);
+}
+
 export function registerCorrespondenceCockpit(context: vscode.ExtensionContext): void {
   // NOTE: crl.active is owned + gated (on workspace .crl/.cel content) by registerProvenancePanel — do NOT set it here.
   // An unconditional setContext at activation would surface both the provenance view and this navigator in EVERY window.
@@ -801,12 +825,33 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       return;
     }
     const m = crlMaps;
-    // scenarioByCaseId already excludes ambiguous-name + unfrozen cases (rebuild's join), so its keys are exactly the
-    // paintable frozen cases. statusOf returns undefined for any caseId not in it → buildReviewPerCase skips it.
+    // #210 Slice 1b: iterate REVIEWED case ids only (`Object.keys(reviewByCaseId)`), NOT all frozen cases — an unreviewed
+    // case can't vote (the fold iterates `byCaseId` = reviewByCaseId), so building its perCase row (the structure join AND
+    // the per-case questionnaire below) is pure waste. A stale reviewed id (not in scenarioByCaseId) → statusOf undefined →
+    // buildReviewPerCase skips it. litNodeKeysOf is thus only called for reviewed cases → it unconditionally unions the
+    // on-path sub-question leaves (guarding an errored/absent sv → base only). Sub-question `leaf::` keys are INTERIOR to the
+    // fold (disjoint from `dispositionLeafKeys` by the `leaf::` prefix → isLeaf false → green-wins) and map via segmentsFor.
     const perCase = buildReviewPerCase(
-      scenarioByCaseId.keys(),
+      Object.keys(reviewByCaseId),
       (caseId) => scenarioByCaseId.get(caseId)?.status,
-      (caseId) => crlAnchorsForUnits(unitsForCase(caseId, m), m), // the case→tree reveal join (postReveal's case|tree arm)
+      (caseId) => {
+        const base = crlAnchorsForUnits(unitsForCase(caseId, m), m); // the case→tree reveal join (postReveal's case|tree arm)
+        const sv = scenarioByCaseId.get(caseId);
+        if (!sv || sv.status === "error") return base; // no on-path sub-questions for an errored/absent case
+        // ONLY the yes-leaves paint (a satisfied on-path sub-question) — the same set that RINGS (`.flow-leaf-yes`); a false
+        // operand isn't on the fired path so it neither rings nor paints (do NOT union `noKeys`). KNOWN inherited gap: under
+        // `not X` with X false, X is the decisive operand yet a false leaf → no ring, no paint (a Todo-3 ring-semantics
+        // question, not a paint bug). PERF (deferred, both impl reviewers): a non-focused reviewed case rebuilds its
+        // questionnaire here on every tree repaint (bounded by the reviewed subset; the focused case shares `focusedQMemo`).
+        // If a large worklist ever janks, memoize non-focused raw builds on `(caseId, indexVersion)` like the focused slot.
+        const { yesKeys } = leafBucketsFromQuestionnaire(
+          questionnaireFor(caseId, sv).questions,
+          whenKeyResolver(sv),
+          sv.conceptTruth,
+          tree.leafConcepts,
+        );
+        return yesKeys.length ? [...base, ...yesKeys] : base;
+      },
     );
     // #210 verdict painting: leaf-aware precedence lives in the pure fold, so it needs an `isLeaf` closure. A disposition
     // LEAF = a recommend-activity `action` nodeKey (use-decision is interior delegation glue — NOT a leaf), collected from
@@ -1005,23 +1050,13 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       markLeaves(tree, [], []); // empty gen-stamped (steady-state clear-effect)
       return;
     }
-    // The on-path-SATISFIED composite `when`s = the questionnaire's leaf-expanding rows. Resolve each runtime nodeId → its
-    // structure `when` nodeKey via `resolveThisNode` — the IDENTICAL join `driveDiverters`/`driveThisNode` use to light the
-    // tree's when-anchors (keyed by structure nodeKey), which is exactly the string the flow render tags as `topWhenKey`
-    // (`buildDefLeaves(..., n.nodeKey)`); those two channels demonstrably hit the right whens, so the gate coincides.
-    const q = buildFocusedQuestionnaire(sv); // shared single-slot memo (driveDiverters already walked it this dispatch/ack)
-    const root = { lib: sv.decision?.libraryName ?? "", decision: sv.decision?.name ?? "" };
-    const satisfiedWhenKeys = new Set<string>();
-    for (const x of q.questions) {
-      if (x.rowKind !== "when-evaluated" || x.answer !== "yes") continue;
-      const { nodeKey } = resolveThisNode(x.nodeId, root, sv.tree, runtimeRefIndex, crlMaps);
-      if (nodeKey !== undefined) satisfiedWhenKeys.add(nodeKey);
-    }
-    // Verdict map (lib,name) → satisfied, collision-proof key (matches the questionnaire's truthKey). The pure
-    // `leafMarkBuckets` applies the on-path gate + the absent-is-unknown rule (unit-tested in isolation).
-    const truthByKey = new Map<string, boolean>();
-    for (const r of sv.conceptTruth ?? []) truthByKey.set(JSON.stringify([r.libraryName, r.name]), r.satisfied);
-    const { yesKeys, noKeys } = leafMarkBuckets(tree.leafConcepts, satisfiedWhenKeys, truthByKey);
+    // On-path-SATISFIED composite `when`s = the questionnaire's leaf-expanding rows; the pure `leafBucketsFromQuestionnaire`
+    // resolves each `when-evaluated`/yes row's runtime nodeId → its structure `when` nodeKey (via `whenKeyResolver` →
+    // `resolveThisNode`, the IDENTICAL join `driveDiverters`/`driveThisNode` use, so the gate coincides with the flow
+    // render's `topWhenKey`) then applies the on-path gate + the absent-is-unknown rule. SHARED with `driveDoneOverlay`'s
+    // per-reviewed-case paint (no drift). Here `q` comes from the focused memo (`#187 Todo 5` — driveDiverters already walked it).
+    const q = buildFocusedQuestionnaire(sv);
+    const { yesKeys, noKeys } = leafBucketsFromQuestionnaire(q.questions, whenKeyResolver(sv), sv.conceptTruth, tree.leafConcepts);
     markLeaves(tree, segmentsFor(tree, yesKeys).segmentIds, segmentsFor(tree, noKeys).segmentIds);
   }
 
@@ -1186,15 +1221,38 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   // (focused caseId, indexVersion) (sv, crlMaps + all resolvers are rebuilt together, bumping indexVersion), so a slot
   // keyed on that pair serves both without a second walk. Auto-invalidates on any case/model change (no explicit clear).
   let focusedQMemo: { caseId: string; iv: number; q: Questionnaire } | undefined;
-  function buildFocusedQuestionnaire(sv: ScenarioViewModel): Questionnaire {
-    const caseId = state.selection?.primary === "cel" ? state.selection.caseId : "";
-    if (focusedQMemo && focusedQMemo.caseId === caseId && focusedQMemo.iv === indexVersion) return focusedQMemo.q;
-    const q = buildQuestionnaire(sv, buildResolveValueTypes(), sv.decision?.libraryName, {
+  /** The UN-memoized questionnaire build for ANY case's sv. #210 Slice 1b: `driveDoneOverlay` builds a per-reviewed-case
+   *  questionnaire and MUST NOT touch `focusedQMemo` for a non-focused sv (its caseId key would poison the focused slot),
+   *  so it routes through `questionnaireFor` → this raw builder for non-focused cases. */
+  function buildQuestionnaireRaw(sv: ScenarioViewModel): Questionnaire {
+    return buildQuestionnaire(sv, buildResolveValueTypes(), sv.decision?.libraryName, {
       conceptShape: buildConceptShapeResolver(),
       defExpr: buildDefExprResolver(),
     });
+  }
+  // CAUTION: this memoizes on the FOCUSED `state.selection.caseId`, NOT on `sv` — so it is CORRECT ONLY for the focused
+  // scenario. Passing a NON-focused sv would return the focused case's cached questionnaire (or poison the slot with a
+  // non-focused build). Every caller passes `focusedScenario()`; per-case builds MUST route through `questionnaireFor`.
+  function buildFocusedQuestionnaire(sv: ScenarioViewModel): Questionnaire {
+    const caseId = state.selection?.primary === "cel" ? state.selection.caseId : "";
+    if (focusedQMemo && focusedQMemo.caseId === caseId && focusedQMemo.iv === indexVersion) return focusedQMemo.q;
+    const q = buildQuestionnaireRaw(sv);
     focusedQMemo = { caseId, iv: indexVersion, q };
     return q;
+  }
+  /** #210 Slice 1b: the questionnaire for an ARBITRARY reviewed case. The FOCUSED case shares the `focusedQMemo` build
+   *  (driveDiverters/driveLeafMarks already walked it this dispatch/ack); a NON-focused case builds raw (never the memo —
+   *  its caseId key would poison the focused slot). Keyed on the SAME `state.selection.caseId` the memo keys on. */
+  function questionnaireFor(caseId: string, sv: ScenarioViewModel): Questionnaire {
+    const focused = state.selection?.primary === "cel" && state.selection.caseId === caseId;
+    return focused ? buildFocusedQuestionnaire(sv) : buildQuestionnaireRaw(sv);
+  }
+  /** #210 Slice 1b: the injected `resolveKey` for `leafBucketsFromQuestionnaire` — a runtime `nodeId` → its structure
+   *  `when` nodeKey, via the SAME `resolveThisNode` join `driveDiverters`/`driveThisNode`/`driveLeafMarks` use (keyed by
+   *  structure nodeKey = the flow render's `topWhenKey`). Returns undefined off-model (crlMaps null) → the row is skipped. */
+  function whenKeyResolver(sv: ScenarioViewModel): (nodeId: string) => string | undefined {
+    const root = { lib: sv.decision?.libraryName ?? "", decision: sv.decision?.name ?? "" };
+    return (nodeId) => (crlMaps ? resolveThisNode(nodeId, root, sv.tree, runtimeRefIndex, crlMaps).nodeKey : undefined);
   }
 
   /** Build the frame-aware concept→value-types resolver `buildQuestionnaire` injects. A bare sub-`when` concept resolves
