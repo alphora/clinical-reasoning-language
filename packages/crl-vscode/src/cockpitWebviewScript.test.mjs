@@ -49,7 +49,7 @@ async function loadCockpit() {
   return require(out);
 }
 
-const { COCKPIT_WEBVIEW_SCRIPT: SCRIPT, leafMarkBuckets, leafBucketsFromQuestionnaire, resolveProducedLeafKeys, shouldWidenFilterForSelection } = await loadCockpit();
+const { COCKPIT_WEBVIEW_SCRIPT: SCRIPT, leafMarkBuckets, leafBucketsFromQuestionnaire, resolveProducedLeafKeys, shouldWidenFilterForSelection, caseIdsForSubQuestionLeaf } = await loadCockpit();
 
 let pass = 0;
 const check = (label, fn) => {
@@ -586,6 +586,35 @@ check("#214 filter: dispatch widens via shouldWidenFilterForSelection + re-rende
 check("#214 filter: the webview chip click posts worklistFilterToggle{state}, BEFORE the [data-reveal] branch (controls first)", () => {
   assert.ok(/type:'worklistFilterToggle',state:wf\.getAttribute\('data-worklist-filter'\)/.test(SCRIPT), "a chip click posts worklistFilterToggle{state}");
   assert.ok(SCRIPT.indexOf("worklistFilterToggle") < SCRIPT.indexOf("[data-reveal]"), "the chip handler precedes [data-reveal]");
+});
+
+// ── #216 sub-question click → dynamic on-path case selection (host wiring; the resolution lives in the cockpit closure) ──
+check("#216 sub-question: the reveal handler routes a sub-question hit to selectSubQuestionCases, NOT mapHitToPrimary", () => {
+  assert.ok(/if \(isSubQuestionHit\(hit\)\) \{[\s\S]*selectSubQuestionCases\(hit\.subQuestionLeafKey/.test(COCKPIT_SRC), "isSubQuestionHit → selectSubQuestionCases");
+  // it must be diverted BEFORE the generic mapHitToPrimary select (the leaf key is not a unit/nodeKey/caseId).
+  assert.ok(COCKPIT_SRC.indexOf("isSubQuestionHit(hit)") < COCKPIT_SRC.indexOf("selectInPrimary(mapHitToPrimary(hit, p"), "the sub-question branch precedes the generic mapHitToPrimary select");
+});
+check("#216 sub-question: selectSubQuestionCases builds per-case yes-leaf entries, delegates to the pure filter, then selects in the current primary", () => {
+  const m = COCKPIT_SRC.match(/function selectSubQuestionCases\([^)]*\)[^{]*\{([\s\S]*?)\n  \}/);
+  assert.ok(m, "selectSubQuestionCases body");
+  assert.ok(/for \(const \[caseId, sv\] of scenarioByCaseId\)/.test(m[1]), "iterates the frozen scenarios to build entries");
+  assert.ok(/sv\.status === "error" \? \[\] : leafBucketsFromQuestionnaire\(questionnaireFor\(caseId, sv\)\.questions[\s\S]*\.yesKeys/.test(m[1]), "per-case yes-leaf keys from the Slice-1b leaf truth (errored → empty)");
+  assert.ok(/caseIdsForSubQuestionLeaf\(leafKey, entries\)/.test(m[1]), "delegates the on-path filter to the pure, unit-tested helper");
+  assert.ok(/mapHitToPrimary\(\{ caseId \}, p, m\)[\s\S]*selectInPrimary\(ids, p\)/.test(m[1]), "maps each case → the CURRENT primary's ids, then selects (multi → the quick-pick)");
+});
+check("#216 sub-question: caseIdsForSubQuestionLeaf (PURE) keeps cases whose yes-leaves include THIS leaf; excludes off-path/false, skips errored", () => {
+  const LEAF = "leaf::w:B|1|c:L1"; // the clicked operand's on-path key
+  const OTHER = "leaf::w:B|0|c:L1"; // same concept, a DIFFERENT operand path (must not match)
+  const entries = [
+    { caseId: "cOn", status: "pass", yesLeafKeys: [LEAF, "leaf::w:A|0|c:X"] }, // fired the clicked operand → keep
+    { caseId: "cWhenOff", status: "fail", yesLeafKeys: [] }, // owning when off-path → no yes-leaf → drop
+    { caseId: "cLeafFalse", status: "pass", yesLeafKeys: ["leaf::w:A|0|c:X"] }, // when on, operand false → drop
+    { caseId: "cOtherPath", status: "pass", yesLeafKeys: [OTHER] }, // same concept, other operand path → drop
+    { caseId: "cErr", status: "error", yesLeafKeys: [LEAF] }, // errored → no trustworthy truth → skip
+    { caseId: "cOn2", status: "pending", yesLeafKeys: [LEAF] }, // a second on-path case (any non-error status) → keep
+  ];
+  assert.deepEqual(caseIdsForSubQuestionLeaf(LEAF, entries), ["cOn", "cOn2"], "only the two non-errored on-path cases, in order");
+  assert.deepEqual(caseIdsForSubQuestionLeaf("leaf::nobody", entries), [], "a leaf no case fires → empty (no selection)");
 });
 
 console.log(`\ncockpitWebviewScript.test: ${pass} checks passed`);

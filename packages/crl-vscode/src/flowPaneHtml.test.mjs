@@ -353,7 +353,7 @@ const dentry = (nodeKey, name, body, { hasCodeIs = false, isInferred = true } = 
 const defExprOf = (map) => (_lib, name) => map[name];
 const leafRowsOf = (html) => [...html.matchAll(/<g id="[^"]*" class="(flow-row flow-leaf[^"]*)"[^>]*>.*?<text[^>]*>([^<]*)<\/text>/g)].map((m) => ({ cls: m[1], label: m[2] }));
 
-check("Option-C: an INFERRED composite when renders an ANY OF outline of leaf rows (def-edge, non-Source grey, peek-not-select, path-keyed anchor, NO top OR)", () => {
+check("Option-C: an INFERRED composite when renders an ANY OF outline of leaf rows (def-edge, non-Source grey, select-owning-when, path-keyed anchor, NO top OR)", () => {
   // when B (c:B, inferred — no code is) `defined as` (L1 or L2); L2 has no code is.
   const map = { B: dentry("c:B", "B", dor(dref("L1", "c:L1"), dref("L2", "c:L2", { hasCodeIs: false }))) };
   const rr = renderFlowPane(structure, { concepts, revealPrefix: "g2_", defExpr: defExprOf(map) });
@@ -364,10 +364,16 @@ check("Option-C: an INFERRED composite when renders an ANY OF outline of leaf ro
   assert.ok(/class="flow-def-edge"/.test(rr.html), "outline connectors use the distinct flow-def-edge, not flow-edge");
   assert.ok(leafRows.find((l) => l.label === "L2").cls.includes("flow-inferred"), "L2 (no code-is) → inferred (purple solid border)");
   assert.ok(!leafRows.find((l) => l.label === "L1").cls.includes("flow-inferred"), "L1 (code-is) → NOT inferred (grey solid border — like a main question)");
-  const leafPeeks = Object.values(rr.reveals).filter((v) => v.conceptNodeKey === "c:L1" || v.conceptNodeKey === "c:L2");
-  assert.equal(leafPeeks.length, 2, "each leaf reveals its OWN concept (peek), never a {nodeKey} select");
+  // #216: each leaf reveals a SUB-QUESTION hit carrying its OWN stable `leaf::` key (resolved host-side to the cases where
+  // the operand is TRUE on-path), NOT a concept peek and NOT a static {nodeKey}.
+  const leafKeys = [...rr.html.matchAll(/<g id="[^"]*" class="flow-row flow-leaf[^"]*"[^>]*data-reveal="([^"]*)"/g)].map((m) => m[1]);
+  assert.equal(leafKeys.length, 2, "two leaf rows carry a reveal");
+  for (const k of leafKeys) {
+    assert.ok(rr.reveals[k].subQuestionLeafKey && rr.reveals[k].subQuestionLeafKey.startsWith("leaf::"), "a leaf's reveal is a {subQuestionLeafKey} carrying its own leaf:: key");
+    assert.ok(!rr.reveals[k].nodeKey && !rr.reveals[k].conceptNodeKey, "a leaf reveal is NEITHER a static {nodeKey} nor a {conceptNodeKey} peek");
+  }
+  assert.ok(!Object.values(rr.reveals).some((v) => v.conceptNodeKey === "c:L1" || v.conceptNodeKey === "c:L2"), "leaves no longer PEEK their own concept");
   assert.equal(Object.keys(rr.anchors).filter((k) => k.startsWith("leaf::")).length, 2, "ONLY the 2 leaf rows anchor (op rows are render-only)");
-  assert.ok(!Object.values(rr.reveals).some((v) => v.nodeKey && v.nodeKey.startsWith("leaf::")), "no {nodeKey} select for a synthetic leaf");
 });
 
 check("Option-C: a level with more than the cap collapses the remainder into a '+N more' render-only stub", () => {

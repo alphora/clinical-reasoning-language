@@ -20,8 +20,16 @@ export interface ConceptHit {
   conceptNodeKey: string;
 }
 
+/** #216: a TREE SUB-QUESTION (outline `defined as` operand) click. Carries the leaf's STABLE `leaf::` key. It is NOT a
+ *  static selection (the applicable cases depend on which cases evaluate THIS operand TRUE on-path) and NOT a peek — so it
+ *  is kept OUT of `RevealHit`, diverted before `mapHitToPrimary`, and resolved dynamically host-side (the cases whose fired
+ *  path lights this leaf `.flow-leaf-yes`, then selected in the current primary — a subset of the owning `when`'s cases). */
+export interface SubQuestionHit {
+  subQuestionLeafKey: string;
+}
+
 /** Everything a webview click can resolve to. */
-export type WebviewHit = RevealHit | FactHit | ConceptHit;
+export type WebviewHit = RevealHit | FactHit | ConceptHit | SubQuestionHit;
 
 /** True for a fact peek (→ peekConcept), false otherwise. */
 export function isFactHit(hit: WebviewHit): hit is FactHit {
@@ -32,4 +40,9 @@ export function isFactHit(hit: WebviewHit): hit is FactHit {
  *  would treat it as a decision). */
 export function isConceptHit(hit: WebviewHit): hit is ConceptHit {
   return "conceptNodeKey" in hit;
+}
+
+/** True for a tree sub-question click (→ dynamic on-path case selection); diverted before mapHitToPrimary. */
+export function isSubQuestionHit(hit: WebviewHit): hit is SubQuestionHit {
+  return "subQuestionLeafKey" in hit;
 }

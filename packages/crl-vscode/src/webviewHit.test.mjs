@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { load } from "./test-harness.mjs";
 
-const { isFactHit, isConceptHit } = await load("webviewHit.ts");
+const { isFactHit, isConceptHit, isSubQuestionHit } = await load("webviewHit.ts");
 
 let pass = 0;
 const check = (label, fn) => {
@@ -31,6 +31,15 @@ check("concept hit is NOT a fact hit, and a decision {nodeKey} is NOT a concept 
   assert.equal(isConceptHit({ nodeKey: "n1" }), false);
   assert.equal(isConceptHit({ unitId: "u1", range: {} }), false);
   assert.equal(isConceptHit({ caseId: "c1" }), false);
+});
+
+check("#216 a sub-question hit (has subQuestionLeafKey) → isSubQuestionHit true, and is DISJOINT from fact/concept/select hits", () => {
+  assert.equal(isSubQuestionHit({ subQuestionLeafKey: "leaf::w:B|0|c:L1" }), true, "→ dynamic on-path case selection");
+  assert.equal(isFactHit({ subQuestionLeafKey: "leaf::x" }), false, "NOT a fact peek");
+  assert.equal(isConceptHit({ subQuestionLeafKey: "leaf::x" }), false, "NOT a concept peek");
+  assert.equal(isSubQuestionHit({ conceptNodeKey: "cA" }), false);
+  assert.equal(isSubQuestionHit({ nodeKey: "n1" }), false);
+  assert.equal(isSubQuestionHit({ caseId: "c1" }), false);
 });
 
 console.log(`\nwebviewHit.test: ${pass} checks passed`);

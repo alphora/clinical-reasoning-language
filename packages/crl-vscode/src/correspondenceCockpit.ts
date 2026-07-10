@@ -103,7 +103,7 @@ import {
   normalizePaneOrder,
   type PaneSpec,
 } from "./paneOrder";
-import { isConceptHit, isFactHit, type RevealHit, type WebviewHit } from "./webviewHit";
+import { isConceptHit, isFactHit, isSubQuestionHit, type RevealHit, type WebviewHit } from "./webviewHit";
 import { PaneRevealCoordinator, type SemanticTarget } from "./paneRevealCoordinator";
 import { discoverProvenance, findPolicySrc, PANEL_VALIDATION_MODE } from "./provenanceFindings";
 import { buildViewerModel, type ViewerModel } from "./provenanceViewer";
@@ -256,6 +256,23 @@ export function resolveProducedLeafKeys(
   for (const p of producedActions) {
     const k = resolveKey(p.nodeId);
     if (k !== undefined && dispositionLeafKeys.has(k) && !out.includes(k)) out.push(k);
+  }
+  return out;
+}
+
+/** #216 (PURE, unit-tested): the frozen cases a clicked SUB-QUESTION applies to — the cases whose fired path lights THIS
+ *  leaf (`yesLeafKeys.includes(leafKey)`, the Slice-1b on-path TRUE-operand set, which already gates on the owning composite
+ *  `when` being on-path-satisfied AND the operand's concept being TRUE — so a leaf-true-but-when-off-path case, a
+ *  when-on-but-leaf-false case, and a same-concept-different-operand-path leaf are all correctly EXCLUDED). An errored run is
+ *  skipped (no trustworthy on-path truth). Returns case ids in caseId space (the caller maps them to the current primary). */
+export function caseIdsForSubQuestionLeaf(
+  leafKey: string,
+  entries: Iterable<{ caseId: string; status: string; yesLeafKeys: readonly string[] }>,
+): string[] {
+  const out: string[] = [];
+  for (const e of entries) {
+    if (e.status === "error") continue;
+    if (e.yesLeafKeys.includes(leafKey)) out.push(e.caseId);
   }
   return out;
 }
@@ -1382,8 +1399,9 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
         // re-applies via the selection-driven dispatch path; the review overlay is selection-INDEPENDENT, so it re-drives here.)
         driveDoneOverlay();
         // #187 Todo 5: a fresh tree render dropped its `.flow-leaf-yes/no` classes (innerHTML replaced) — re-drive the
-        // per-case leaf verdict overlay (tree-only, selection-INDEPENDENT like the review overlay) so a tree opened /
-        // re-rendered mid-session repaints the focused case's leaf answers.
+        // per-case leaf verdict overlay so a tree opened / re-rendered mid-session repaints the focused case's leaf answers.
+        // NOTE: unlike the review overlay, this is selection-DEPENDENT — it rings `focusedScenario()`, which exists only in
+        // cel-primary; it re-drives HERE (on ack) to survive the innerHTML replacement, and ALSO on every selection dispatch.
         driveLeafMarks();
       }
       // #177 slice 4: a freshly-(re)rendered marker-bearing pane (tree/crl/source/questionnaire) loses its `.this-node`
@@ -1443,12 +1461,38 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
         return;
       }
       if (!crlMaps) return;
+      // #216: a tree SUB-QUESTION click → select the case(s) where THIS operand is TRUE on-path (dynamic), NOT via
+      // `mapHitToPrimary` (the leaf key isn't a unit/nodeKey/caseId). Diverted here (needs crlMaps + the per-case run truth).
+      if (isSubQuestionHit(hit)) {
+        selectSubQuestionCases(hit.subQuestionLeafKey, crlMaps);
+        return;
+      }
       // Otherwise the click sets the selection in the CURRENT primary's space (mapping cross-pane as needed).
       const p = state.primary;
       // record the open-raw locus only for a source-span click while source-primary
       lastClicked = "unitId" in hit && p === "source" ? { unitId: hit.unitId, range: hit.range } : undefined;
       selectInPrimary(mapHitToPrimary(hit, p, crlMaps), p);
     }
+  }
+
+  /** #216: resolve a clicked tree SUB-QUESTION (its stable `leaf::` key) → the frozen cases whose fired path lights that leaf
+   *  `.flow-leaf-yes` (the operand is TRUE on-path — the SAME per-case leaf truth Slice 1b paints, via `leafBucketsFromQuestionnaire`),
+   *  then select them in the current primary (each case → the primary's ids via `mapHitToPrimary`, so one case selects and
+   *  several raise the multi-case quick-pick). An unreached operand (no case lights it) → no cases → a no-op (prior selection
+   *  stays). Only the on-path cases are offered; in cel-primary (the MV default) the selected case re-rings the clicked leaf.
+   *  In source-primary no leaf ever rings (that is a cel-primary/focused-case feature) — the case still selects, without a ring. */
+  function selectSubQuestionCases(leafKey: string, m: CrlRevealMaps): void {
+    const tree = views.get("tree");
+    if (!tree) return;
+    const entries: { caseId: string; status: string; yesLeafKeys: readonly string[] }[] = [];
+    for (const [caseId, sv] of scenarioByCaseId) {
+      const yesLeafKeys = sv.status === "error" ? [] : leafBucketsFromQuestionnaire(questionnaireFor(caseId, sv).questions, whenKeyResolver(sv), sv.conceptTruth, tree.leafConcepts).yesKeys;
+      entries.push({ caseId, status: sv.status, yesLeafKeys });
+    }
+    const caseIds = caseIdsForSubQuestionLeaf(leafKey, entries); // the on-path cases (the pure, tested filter)
+    const p = state.primary;
+    const ids = [...new Set(caseIds.flatMap((caseId) => mapHitToPrimary({ caseId }, p, m)))];
+    selectInPrimary(ids, p);
   }
 
   /** Map a webview click hit → the candidate ids in the CURRENT primary's space (the 3×3 click matrix; cross arms via maps).

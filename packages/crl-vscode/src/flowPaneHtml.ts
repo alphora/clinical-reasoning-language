@@ -51,7 +51,7 @@ export interface RenderedFlow {
   anchors: Record<string, FlowAnchor>;
   /** opaque key → a node-body select ({nodeKey}, a crlNode) OR a concept/guard peek ({conceptNodeKey}). Same shapes as
    *  RenderedCrl, so the shell needs no new hit kinds. */
-  reveals: Record<string, { nodeKey: string } | { conceptNodeKey: string }>;
+  reveals: Record<string, { nodeKey: string } | { conceptNodeKey: string } | { subQuestionLeafKey: string }>;
   /** #187 Todo 5: def-leaf anchor key (the same `leaf::` key used in `anchors`) → its leaf concept identity + the OWNING
    *  composite `when` structure key. The cockpit joins `{lib,name}` to a case's `conceptTruth` for the yes/no verdict and
    *  gates on `topWhenKey` being on the fired-satisfied path. The `+N more` stub + cross-lib/omitted leaves get NO entry. */
@@ -336,7 +336,7 @@ export function renderFlowPane(
   const prefix = opts.revealPrefix ?? "";
   const concepts = opts.concepts ?? [];
   const anchors: Record<string, FlowAnchor> = {};
-  const reveals: Record<string, { nodeKey: string } | { conceptNodeKey: string }> = {};
+  const reveals: Record<string, { nodeKey: string } | { conceptNodeKey: string } | { subQuestionLeafKey: string }> = {};
   const leafConcepts: Record<string, { lib: string; name: string; topWhenKey: string }> = {};
 
   if (structure.length === 0) {
@@ -426,13 +426,16 @@ export function renderFlowPane(
       continue;
     }
 
-    // #187 Option-C: an OUTLINE LEAF row (a `defined as` concept operand). Peeks its OWN concept (`{conceptNodeKey}`); its
-    // synthetic `leaf::` key (path-bearing → collision-free) anchors it + joins the Todo-5 verdict overlay. No peek dot
-    // (the whole row IS the concept). #187 Todo 3: carries a hidden on-path RING revealed when the operand is TRUE
-    // (`markLeaves` toggles `.flow-leaf-yes`); a false / unknown operand shows nothing (ring = on-path, not a verdict tick).
+    // #187 Option-C: an OUTLINE LEAF row (a `defined as` concept operand). Its synthetic `leaf::` key (`n.nodeKey`,
+    // path-bearing → collision-free) anchors it + joins the Todo-5 verdict overlay. #187 Todo 3: carries a hidden on-path
+    // RING revealed when the operand is TRUE (`markLeaves` toggles `.flow-leaf-yes`); a false / unknown operand shows nothing.
     if (n.outline) {
-      const conceptKey = n.conceptKey as string; // an outline leaf always resolves a concept (else it's `external`)
-      reveals[key] = { conceptNodeKey: conceptKey };
+      // #216: a sub-question left-click SELECTS the case(s) where THIS operand is TRUE on-path — a SUBSET of the owning
+      // branch's cases (the cases that would light this leaf `.flow-leaf-yes`), resolved DYNAMICALLY host-side + selected in
+      // the current primary. The hit carries the STABLE `leaf::` key (`n.nodeKey`), NOT the render-scoped reveal key. (Was a
+      // concept PEEK → highlighted the parent `when` = the "selects its parent" bug; a first fix revealed the owning `when`'s
+      // nodeKey, but that offered the parent's FULL case list, including cases this operand isn't on-path for.)
+      reveals[key] = { subQuestionLeafKey: n.nodeKey };
       if (n.conceptName !== undefined && n.conceptLib !== undefined && n.topWhenKey !== undefined)
         leafConcepts[n.nodeKey] = { lib: n.conceptLib, name: n.conceptName, topWhenKey: n.topWhenKey };
       // #187 Todo 2: border by Source — inferred (no `code is`) → purple, Source → grey — kept DASHED (an operand chip,
