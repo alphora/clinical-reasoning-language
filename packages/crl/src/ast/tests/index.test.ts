@@ -7,5 +7,6 @@ import "./representation-structure.test";
 import "./terminology-structure.test";
 import "./activity-structure.test";
 import "./library-and-include-structure.test";
+import "./meta-carrier.test";
 
 // parseInput has been moved to parseInput.ts

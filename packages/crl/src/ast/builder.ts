@@ -255,9 +255,11 @@ export class CRLAstBuilder
 
   visitLibraryStatement(ctx: LibraryStatementContext): LibraryDeclaration {
     const name = ctx.identifier().text.slice(1, -1);
+    const meta = this.metaFrom(ctx.metaLine()); // #203 Todo 2: library-scope meta rides trailing `- meta is` lines
     return {
       type: "LibraryDeclaration",
       name,
+      ...(meta.length > 0 ? { meta } : {}), // conditional-spread: a meta-less library stays byte-identical
       location: getLocation(ctx),
     };
   }
@@ -276,8 +278,12 @@ export class CRLAstBuilder
 
   visitDecisionStatement(ctx: DecisionStatementContext): Decision {
     const name = ctx.decisionIdentifier().text.slice(1, -1);
-    const body = this.visit(ctx.decisionBody()!) as DecisionBody;
-    return { type: "Decision", name, body, location: getLocation(ctx) };
+    const decisionBody = ctx.decisionBody()!;
+    const body = this.visit(decisionBody) as DecisionBody;
+    // #203 Todo 2: decision-scope meta rides leading `- meta is` lines (read here on Decision, NOT on DecisionBody,
+    // to avoid double-representation). Conditional-spread keeps a meta-less decision byte-identical.
+    const meta = this.metaFrom(decisionBody.metaLine());
+    return { type: "Decision", name, body, ...(meta.length > 0 ? { meta } : {}), location: getLocation(ctx) };
   }
 
   visitDecisionBody(ctx: DecisionBodyContext): DecisionBody {
@@ -559,10 +565,12 @@ export class CRLAstBuilder
     return { conceptType, valueTypes };
   }
 
-  private parseMeta(
-    bodyCtx: import("../grammar/generated/antlr/CRLParser").ConceptBodyContext,
+  /** #203 Todo 2: extract the raw backtick bodies of a `metaLine*` list. Shared by concept / decision / library
+   *  (each visitor passes its own fully-typed `ctx.metaLine()` — antlr4ts gives each rule context its own accessor
+   *  with no shared base, so the caller supplies the exact array). The `@tag` parse is the validator's job. */
+  private metaFrom(
+    metaLines: readonly (import("../grammar/generated/antlr/CRLParser").MetaLineContext | undefined)[],
   ): string[] {
-    const metaLines = bodyCtx.metaLine?.() ?? [];
     const metas: string[] = [];
     for (const metaCtx of metaLines) {
       const backtickCtx = metaCtx?.backtickString?.();
@@ -763,7 +771,7 @@ export class CRLAstBuilder
 
     const types = this.parseConceptTypes(bodyCtx, ctx);
     const { conceptType, valueTypes } = types;
-    const meta = this.parseMeta(bodyCtx);
+    const meta = this.metaFrom(bodyCtx.metaLine());
     const evidence = this.parseEvidence(bodyCtx);
     const code = this.parseCode(bodyCtx);
     const definition = this.parseConceptDefinition(bodyCtx, ctx);

@@ -46,8 +46,10 @@ crl
 //   local library and an installed package both declare the same library
 //   name; the `as` clause renames the package's library inside this file.
 //
+// #203 Todo 2: library-scope metadata rides trailing `- meta is `@tag: body`.` lines, immediately after the
+// `library "Name".` declaration (before includes). Same carrier as concept/decision meta (KE flags need policy scope).
 libraryStatement
-    : LIBRARY identifier DOT
+    : LIBRARY identifier DOT metaLine*
     ;
 
 includeStatement
@@ -84,7 +86,7 @@ decisionStatement
 // closer: the block ends at the next top-level declaration (same boundary the
 // former `whenBlock+` relied on).
 decisionBody
-    : blockQualifier? branchItem+
+    : (metaLine)* blockQualifier? branchItem+
     ;
 
 // ============================

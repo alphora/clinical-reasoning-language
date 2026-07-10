@@ -38,6 +38,9 @@ export type Statement = Decision | Concept | Activity | Terminology | Parameter;
 export interface LibraryDeclaration extends ASTNode {
   type: "LibraryDeclaration";
   name: string;
+  /** #203 Todo 2: library-scope `@tag` metadata (raw backtick bodies; the `@tag` parse is the validator's job).
+   *  Omitted when the `library` declaration carries no `- meta is` lines. */
+  meta?: string[];
   location: Location;
 }
 
@@ -119,6 +122,9 @@ export interface Decision extends ASTNode {
   type: "Decision";
   name: string;
   body: DecisionBody;
+  /** #203 Todo 2: decision-scope `@tag` metadata (raw backtick bodies; the `@tag` parse is the validator's job).
+   *  Omitted when the decision body carries no leading `- meta is` lines. */
+  meta?: string[];
   location: Location;
 }
 
