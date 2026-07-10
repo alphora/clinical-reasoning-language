@@ -70,7 +70,7 @@ const BADGE: Record<string, string> = { pass: "✓", fail: "✗", error: "⚠" }
 // The four review-verdict labels the worklist dropdown offers (#156 slice 4, extended). "To do" is the unstored default
 // (absence in the sidecar); Pending / Pass / Fail are the persisted verdicts. Each verdict paints its fired path on the tree
 // (#210: Pass→green, Fail→red, Pending→yellow — the tree paints with these SAME dropdown colors; To do→none. deriveReviewOverlay).
-const REVIEW_LABEL: Record<ReviewState, string> = { unreviewed: "To do", pending: "Pending", pass: "Pass", fail: "Fail" };
+export const REVIEW_LABEL: Record<ReviewState, string> = { unreviewed: "To do", pending: "Pending", pass: "Pass", fail: "Fail" };
 // EXPORTED for a drift guard (#214): this MUST deep-equal the store's `REVIEW_STATES` — the chips iterate this, the host
 // resets the filter to `new Set(REVIEW_STATES)` (= "all chips active"), so a divergence silently desyncs the two. Kept as a
 // LOCAL const (not a runtime import of `REVIEW_STATES`) because celPaneHtml is deliberately fs-free.

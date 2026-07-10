@@ -44,7 +44,7 @@ import {
   type Selection,
   type State,
 } from "./correspondenceEngine";
-import { renderCelPane, reverseCelAnchors } from "./celPaneHtml";
+import { renderCelPane, REVIEW_LABEL, REVIEW_ORDER, reverseCelAnchors } from "./celPaneHtml";
 import { CORR_STYLE } from "./corrKey";
 import {
   buildRuntimeRefIndex,
@@ -260,19 +260,22 @@ export function resolveProducedLeafKeys(
   return out;
 }
 
-/** #216 (PURE, unit-tested): the frozen cases a clicked SUB-QUESTION applies to — the cases whose fired path lights THIS
- *  leaf (`yesLeafKeys.includes(leafKey)`, the Slice-1b on-path TRUE-operand set, which already gates on the owning composite
- *  `when` being on-path-satisfied AND the operand's concept being TRUE — so a leaf-true-but-when-off-path case, a
- *  when-on-but-leaf-false case, and a same-concept-different-operand-path leaf are all correctly EXCLUDED). An errored run is
- *  skipped (no trustworthy on-path truth). Returns case ids in caseId space (the caller maps them to the current primary). */
-export function caseIdsForSubQuestionLeaf(
-  leafKey: string,
-  entries: Iterable<{ caseId: string; status: string; yesLeafKeys: readonly string[] }>,
+/** #216/#217 (PURE, unit-tested): the frozen cases a clicked node applies to — the cases whose per-case key set (`keys`)
+ *  contains the clicked SEMANTIC node key. ONE membership core shared by BOTH the Slice-1b sub-question left-click (keys =
+ *  the on-path `yesLeafKeys` — leaf-true-but-when-off-path / when-on-but-leaf-false / same-concept-other-operand-path are all
+ *  correctly excluded because they aren't in that set) AND the Slice-3 right-click resolver (keys = the case's full execution
+ *  lit set: interior ∪ produced disposition leaves ∪ on-path yes-leaves). `key` is a SEMANTIC key (a structure `nodeKey` or a
+ *  synthetic `leaf::` key — NOT the webview's render-scoped `data-reveal` key), valid for rendered tree nodes. Returns case
+ *  ids in ENTRY ITERATION ORDER (stable QuickPick order), a case at most ONCE even if its `keys` repeats the match. Applies
+ *  NO status/reviewability filter — the caller supplies exactly the entries it wants considered (e.g. an errored run passes
+ *  `keys: []` so it never matches a leaf, but its interior keys still match; a non-reviewable case is simply omitted). */
+export function caseIdsForNodeThroughLit(
+  key: string,
+  entries: Iterable<{ caseId: string; keys: readonly string[] }>,
 ): string[] {
   const out: string[] = [];
   for (const e of entries) {
-    if (e.status === "error") continue;
-    if (e.yesLeafKeys.includes(leafKey)) out.push(e.caseId);
+    if (e.keys.includes(key) && !out.includes(e.caseId)) out.push(e.caseId);
   }
   return out;
 }
@@ -887,6 +890,29 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
    * re-drive above is the actual correctness guarantee, so a reorder degrades to a redundant re-paint, never a wrong one):
    * render → mark arrive in order, and successive marks stay ordered.
    */
+  /** #217: the per-case EXECUTION lit-node-key set — the single source of truth shared by BOTH `driveDoneOverlay`'s verdict
+   *  paint AND the right-click resolver (`nodeVerdictMenu`). `interior` (`crlAnchorsForUnits` MINUS disposition leaves —
+   *  correspondence reveal reach, computed even for an errored/non-executing run) ∪ `produced` (the disposition leaves the run
+   *  actually PRODUCED — the sound EXECUTION reach; empty for an errored run) ∪ `yes` (on-path TRUE sub-question operands).
+   *  HOST GLUE, NOT pure — closes over `crlMaps`/`questionnaireFor`/`whenKeyResolver`; it recomputes `produced` per case
+   *  (NEVER reads an overlay-local `producedByCaseId` map — that would couple resolution to when the overlay last ran, gpt55/
+   *  Claude R2). MUST route through `questionnaireFor` (guards the focused/raw split), NEVER `buildFocusedQuestionnaire` (its
+   *  memo poisons on a non-focused `sv`, which the resolver passes). NOTE: only the `produced` term literally means "the fired
+   *  path runs through this node"; `interior` is correspondence reach, so it resolves errored / non-executing cases at interior
+   *  `when` nodes — intentionally retained because it EQUALS the paint side (which also paints interior for errored cases). */
+  function litNodeKeysForCase(
+    caseId: string,
+    sv: ScenarioViewModel | undefined,
+    m: CrlRevealMaps,
+    dispositionLeafKeys: Set<string>,
+    leafConcepts: Record<string, { lib: string; name: string; topWhenKey: string }>,
+  ): string[] {
+    const interior = crlAnchorsForUnits(unitsForCase(caseId, m), m).filter((k) => !dispositionLeafKeys.has(k));
+    const produced = sv ? producedDispositionLeafKeys(sv, dispositionLeafKeys) : [];
+    const yes = !sv || sv.status === "error" ? [] : leafBucketsFromQuestionnaire(questionnaireFor(caseId, sv).questions, whenKeyResolver(sv), sv.conceptTruth, leafConcepts).yesKeys;
+    return [...interior, ...produced, ...yes];
+  }
+
   function driveDoneOverlay(): void {
     const tree = views.get("tree");
     if (!tree) return; // tree pane is opt-in; nothing to paint
@@ -903,36 +929,25 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     // (reviewed subset). An ambiguous/unreviewable case → verdict `unreviewed` → correctly SUPPRESSES its produced leaf's ✓.
     // PERF (deferred, Claude R2): this walks `collectProducedActions` + `resolveThisNode` for EVERY frozen scenario each
     // repaint (a NEW cost — previously only reviewed cases were traversed). Bounded + OFF the click/selection hot path
-    // (driveDoneOverlay fires on tree re-render / verdict change / model refresh). If a large worklist janks, memoize
-    // `producedByCaseId` per `indexVersion` (with the non-focused questionnaire memo — same deferral).
+    // (driveDoneOverlay fires on tree re-render / verdict change / model refresh). If a large worklist janks, memoize the
+    // per-case produced-leaf reach per `indexVersion` (with the non-focused questionnaire memo — same deferral).
     const badgeEntries: { producedLeafKeys: readonly string[]; verdict: ReviewState }[] = [];
-    const producedByCaseId = new Map<string, readonly string[]>();
     for (const sc of scenarios?.scenarios ?? []) {
       const produced = producedDispositionLeafKeys(sc, dispositionLeafKeys);
       const caseId = duplicateScenarioNames.has(sc.case.name) ? undefined : caseIdByName[sc.case.name];
       const verdict: ReviewState = (caseId !== undefined ? reviewByCaseId[caseId] : undefined) ?? "unreviewed";
       badgeEntries.push({ producedLeafKeys: produced, verdict });
-      if (caseId !== undefined) producedByCaseId.set(caseId, produced);
     }
     const allPassLeaves = deriveAllPassLeaves(badgeEntries);
     // PAINTING — iterate REVIEWED cases only (`Object.keys(reviewByCaseId)`; an unreviewed case can't vote). Each reviewed
-    // case's `litNodeKeys` = INTERIOR structure (`crlAnchorsForUnits` MINUS disposition leaves — reveal reach, UNCHANGED) ∪
-    // its PRODUCED disposition leaves (execution reach — #210 align-both: leaves paint by the verdict of the case that
-    // produced them, reliably) ∪ its on-path sub-question yes-leaves (Slice 1b). A stale reviewed id → statusOf undefined →
-    // skipped. (Perf note unchanged: a non-focused reviewed case rebuilds its questionnaire here; focused shares `focusedQMemo`.)
+    // case's lit set is the SHARED `litNodeKeysForCase` (interior ∪ produced ∪ on-path yes-leaves) — the SAME function the
+    // right-click resolver uses, so right-click reach and paint reach share one definition (they differ only in the case SET
+    // each iterates: paint = reviewed here, resolve = all reviewable). A stale reviewed id → sv undefined → interior-only,
+    // statusOf undefined → skipped by the fold. (Perf: a non-focused reviewed case rebuilds its questionnaire; focused memo.)
     const perCase = buildReviewPerCase(
       Object.keys(reviewByCaseId),
       (caseId) => scenarioByCaseId.get(caseId)?.status,
-      (caseId) => {
-        const interior = crlAnchorsForUnits(unitsForCase(caseId, m), m).filter((k) => !dispositionLeafKeys.has(k));
-        const produced = producedByCaseId.get(caseId) ?? [];
-        const sv = scenarioByCaseId.get(caseId);
-        const yes =
-          !sv || sv.status === "error"
-            ? []
-            : leafBucketsFromQuestionnaire(questionnaireFor(caseId, sv).questions, whenKeyResolver(sv), sv.conceptTruth, tree.leafConcepts).yesKeys;
-        return [...interior, ...produced, ...yes];
-      },
+      (caseId) => litNodeKeysForCase(caseId, scenarioByCaseId.get(caseId), m, dispositionLeafKeys, tree.leafConcepts),
     );
     // #210 verdict painting: the leaf-aware precedence (interior→pass wins, leaf→fail wins) lives in the pure fold via `isLeaf`.
     const { pass, fail, pending, error } = deriveReviewOverlay(reviewByCaseId, perCase, (k) => dispositionLeafKeys.has(k));
@@ -1208,18 +1223,18 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
         );
         const kb = Math.round(textLen / 1024);
         const html = `<p class="placeholder">Source is large (${kb} KB, ${markCount} marks) — inline render skipped. Use the navigator + “CRL: Open Raw Source at Locus”.</p>`;
-        void v.panel.webview.postMessage({ type: "render", html, gen, indexVersion });
+        void v.panel.webview.postMessage({ type: "render", html, gen, indexVersion, mode });
         return;
       }
       const r = renderSourcePane(model.anchor.text, units, overlays, { revealPrefix: `g${gen}_`, unitNumber, showKeys });
       v.anchors = r.anchors;
       v.reveals = r.reveals;
-      void v.panel.webview.postMessage({ type: "render", html: r.html, gen, indexVersion });
+      void v.panel.webview.postMessage({ type: "render", html: r.html, gen, indexVersion, mode });
     } else if (pane === "crl") {
       const r = renderCrlPane(crlStructure, { revealPrefix: `g${gen}_`, rowKeyNumbers, showKeys, concepts: conceptLayer, conceptKeyNumbers });
       v.anchors = r.anchors;
       v.reveals = r.reveals;
-      void v.panel.webview.postMessage({ type: "render", html: r.html, gen, indexVersion });
+      void v.panel.webview.postMessage({ type: "render", html: r.html, gen, indexVersion, mode });
     } else if (pane === "cel") {
       // CEL pane — the READ-ONLY condensed scenario cases (C2c-1). Since the pane split (disc 179) this pane NEVER renders
       // the worklist UI (that's the separate `worklist` pane); it's the case-list slated to become the typed-hole editor.
@@ -1231,7 +1246,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       v.anchors = r.anchors;
       v.reveals = r.reveals;
       conceptToFactAnchors = r.conceptToFactAnchors; // fact-peek reverse map — cel-pane-owned (captured atomically w/ anchors)
-      void v.panel.webview.postMessage({ type: "render", html: r.html, gen, indexVersion });
+      void v.panel.webview.postMessage({ type: "render", html: r.html, gen, indexVersion, mode });
     } else if (pane === "worklist") {
       // WORKLIST pane (disc 179) — the MV review surface: renderCelPane WITH worklist opts (verdict dropdowns, notes, row
       // numbers). Fact-peek is OFF here (revealableConceptKeys OMITTED → no fact spans, empty conceptToFactAnchors), so it
@@ -1243,7 +1258,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       v.anchors = r.anchors;
       v.reveals = r.reveals;
       worklistActions = r.worklistActions ?? {}; // worklist-pane-owned (captured atomically with this render's anchors)
-      void v.panel.webview.postMessage({ type: "render", html: r.html, gen, indexVersion });
+      void v.panel.webview.postMessage({ type: "render", html: r.html, gen, indexVersion, mode });
     } else if (pane === "tree") {
       // tree — the graphical decision-tree flowchart (T2 renderer). Same structure + concept inputs as the CRL pane; its
       // reveal shapes are IDENTICAL ({nodeKey} | {conceptNodeKey}), so clicks route through the existing onWebviewMessage
@@ -1256,7 +1271,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       v.anchors = r.anchors;
       v.reveals = r.reveals;
       v.leafConcepts = r.leafConcepts; // #187 Todo 5: the def-leaf verdict-join map (captured atomically with the anchors)
-      void v.panel.webview.postMessage({ type: "render", html: r.html, gen, indexVersion });
+      void v.panel.webview.postMessage({ type: "render", html: r.html, gen, indexVersion, mode });
     } else {
       // questionnaire (#177 slice 3) — a STATIC, read-only projection of the FOCUSED cel case's fired path. Gets the
       // selected-case `sv` via the SAME `scenarioByCaseId` join `driveFailedCriteriaPeek` uses + a frame-aware
@@ -1280,7 +1295,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       // questionNodeIds-reassignment point keeps the cursor valid after ANY render (select, nav, rebuild). The chrome at
       // line ~907 already display-clamps via renderQuestionNav, so this only corrects the host-held index for driveThisNode.
       currentQuestionIndex = questionNodeIds.length ? Math.min(currentQuestionIndex, questionNodeIds.length - 1) : 0;
-      void v.panel.webview.postMessage({ type: "render", html: r.html, gen, indexVersion });
+      void v.panel.webview.postMessage({ type: "render", html: r.html, gen, indexVersion, mode });
     }
   }
 
@@ -1372,7 +1387,7 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       v.anchors = {};
       v.reveals = {};
       v.leafConcepts = {}; // #187 Todo 5
-      void v.panel.webview.postMessage({ type: "render", html: `<p class="placeholder">${escapeHtml(message)}</p>`, gen, indexVersion });
+      void v.panel.webview.postMessage({ type: "render", html: `<p class="placeholder">${escapeHtml(message)}</p>`, gen, indexVersion, mode });
     }
   }
 
@@ -1429,6 +1444,8 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       navigateQuestion(msg.dir); // #177 slice 5: the questionnaire pane's prev/next sub-nav — moves currentQuestionIndex
     } else if (msg.type === "worklistSet" && typeof msg.key === "string") {
       setWorklist(msg.key, msg.value); // #156 slice 4: a worklist dropdown change (MV mode) — host validates + persists it
+    } else if (msg.type === "nodeVerdictMenu" && typeof msg.key === "string") {
+      void nodeVerdictMenu(msg.key); // #217: a right-click on a flow node (MV) — open a verdict quick-pick for its case(s)
     } else if (msg.type === "worklistFilterToggle") {
       toggleWorklistFilter(msg.state); // #214: toggle a verdict in/out of the worklist filter (host validates the state)
     } else if (msg.type === "notesToggle" && typeof msg.key === "string") {
@@ -1484,12 +1501,14 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
   function selectSubQuestionCases(leafKey: string, m: CrlRevealMaps): void {
     const tree = views.get("tree");
     if (!tree) return;
-    const entries: { caseId: string; status: string; yesLeafKeys: readonly string[] }[] = [];
-    for (const [caseId, sv] of scenarioByCaseId) {
-      const yesLeafKeys = sv.status === "error" ? [] : leafBucketsFromQuestionnaire(questionnaireFor(caseId, sv).questions, whenKeyResolver(sv), sv.conceptTruth, tree.leafConcepts).yesKeys;
-      entries.push({ caseId, status: sv.status, yesLeafKeys });
-    }
-    const caseIds = caseIdsForSubQuestionLeaf(leafKey, entries); // the on-path cases (the pure, tested filter)
+    // keys = the on-path `yesLeafKeys` (an errored run → `[]` so it never matches a leaf) — the pure helper then filters to
+    // the cases whose fired path lights THIS leaf. NARROWER than the right-click resolver's full lit set (leaves only), on
+    // purpose: a sub-question left-click navigates to the cases the operand is TRUE on-path for, not every case through it.
+    const entries = [...scenarioByCaseId].map(([caseId, sv]) => ({
+      caseId,
+      keys: sv.status === "error" ? [] : leafBucketsFromQuestionnaire(questionnaireFor(caseId, sv).questions, whenKeyResolver(sv), sv.conceptTruth, tree.leafConcepts).yesKeys,
+    }));
+    const caseIds = caseIdsForNodeThroughLit(leafKey, entries); // the on-path cases (the shared, tested membership core)
     const p = state.primary;
     const ids = [...new Set(caseIds.flatMap((caseId) => mapHitToPrimary({ caseId }, p, m)))];
     selectInPrimary(ids, p);
@@ -1866,20 +1885,94 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
     return true;
   }
 
+  /** #217: apply a verdict to a case + persist + refresh — the SHARED tail of a worklist dropdown change (`setWorklist`) AND a
+   *  tree right-click (`nodeVerdictMenu`). Validates `value` is a known ReviewState (trusted-input); on a persist FAILURE
+   *  returns `false` with memory+disk untouched (a caller must NOT paint an unpersisted verdict). `renderPane("worklist")`
+   *  safely no-ops when the worklist pane is closed (a tree-set with no worklist open, renderPane guards `!v`); the selection
+   *  re-drive re-reveals the CURRENTLY-selected case (which for a right-click may differ from `caseId` — the click is an
+   *  affordance, not a selection — harmless: `driveDoneOverlay` repaints ALL reviewed cases). Double-chrome guard: the select
+   *  dispatch also renders chrome, so `renderTreeChrome()` only when there's NO selection (else chrome posts twice). */
+  function applyVerdict(caseId: string, value: unknown): boolean {
+    if (mode !== "medical-validation" || !mvSidecarPath) return false; // defensive: MV-only + a sidecar to persist into
+    if (!isReviewState(value)) return false; // trusted-input guard: drop any value not in the known state set
+    const next = setReviewState(reviewByCaseId, caseId, value);
+    if (!persistMv(next, notesByCaseId)) return false; // save (both maps) failed → memory + disk untouched
+    renderPane("worklist"); // single-pane re-render (the dropdown selection); no-op when the worklist pane is closed
+    if (state.selection) dispatch({ type: "select", selection: state.selection });
+    else renderTreeChrome(); // #156 slice 6: the reviewed/pending counts changed → refresh the tree-chrome progress readout
+    driveDoneOverlay(); // #156 slice 5: the reviewed set changed → repaint the tree done/error overlay (no tree re-render)
+    return true;
+  }
+
   function setWorklist(key: string, value: unknown): void {
     if (mode !== "medical-validation") return; // defensive: the dropdown only exists in MV mode
     const action = worklistActions[key]; // trusted: looked up by opaque key, not a caseId from the webview
-    if (!action || !mvSidecarPath) return;
-    if (!isReviewState(value)) return; // trusted-input guard: drop any value not in the known state set
-    const next = setReviewState(reviewByCaseId, action.caseId, value);
-    if (!persistMv(next, notesByCaseId)) return; // save (both maps) failed → memory + disk untouched
-    renderPane("worklist"); // single-pane re-render (the dropdown selection); re-drive the selection so its highlight survives
-    // #156 slice 6: the reviewed/pending counts changed → refresh the tree-chrome progress readout (no tree re-render). The
-    // selection-dispatch path below ALSO renders chrome (dispatch → driveFailedCriteriaPeek → renderTreeChrome), so only
-    // call renderTreeChrome here when there's NO selection (else the chrome would post twice for a selected toggle).
-    if (state.selection) dispatch({ type: "select", selection: state.selection });
-    else renderTreeChrome();
-    driveDoneOverlay(); // #156 slice 5: the reviewed set changed → repaint the tree done/error overlay (no tree re-render)
+    if (!action) return;
+    applyVerdict(action.caseId, value); // the shared persist+refresh tail (validates the value)
+  }
+
+  /** #217: a right-click on a flow-pane node → open a native verdict quick-pick for the case(s) whose fired path runs through
+   *  it. The webview posts the OPAQUE render `data-reveal` key; we look it up in the tree's `reveals`, normalize the hit to
+   *  its SEMANTIC key (`{nodeKey}`→nodeKey, `{subQuestionLeafKey}`→that; a concept/fact peek → no verdict), then resolve the
+   *  cases via the SHARED `litNodeKeysForCase` reach + the pure `caseIdsForNodeThroughLit` membership test over `scenarioByCaseId`
+   *  (the reviewable set — excludes ambiguous duplicate-name cases; an errored case still matches at interior when-nodes).
+   *  EVERY no-op exit emits a transient status note — the webview has already suppressed the native menu, so a silent return
+   *  would be a dead right-click (reachable mid-rebuild `!crlMaps`, or a stale-MV webview posting after a retarget). */
+  async function nodeVerdictMenu(revealKey: string): Promise<void> {
+    const note = (msg: string): void => void vscode.window.setStatusBarMessage(`Medical Validation: ${msg}`, 3000);
+    if (mode !== "medical-validation" || !crlMaps || !mvSidecarPath) return note("not ready"); // no sidecar → applyVerdict can't persist; note here (else a feedback-less dead pick)
+    const tree = views.get("tree");
+    const hit = tree?.reveals[revealKey]; // trusted: looked up by opaque key, not a semantic key from the webview
+    if (!tree || !hit) return note("no node here");
+    const semanticKey = isSubQuestionHit(hit)
+      ? hit.subQuestionLeafKey
+      : isFactHit(hit) || isConceptHit(hit)
+        ? undefined // a concept/fact peek is not a case-bearing verdict node
+        : "nodeKey" in hit
+          ? hit.nodeKey
+          : undefined;
+    if (semanticKey === undefined) return note("this node has no reviewable cases");
+    const m = crlMaps;
+    const dispositionLeafKeys = collectDispositionLeafKeys(crlStructure);
+    const ver = indexVersion; // stale-pick guard: capture the model version + sidecar at menu-open (revalidated before each apply)
+    const sidecar = mvSidecarPath;
+    // PERF: this builds `litNodeKeysForCase` for EVERY reviewable case — each non-focused case does a full `buildQuestionnaireRaw`
+    // (only the focused case hits the memo). Broader than any prior path (driveDoneOverlay's paint builds questionnaires for
+    // REVIEWED cases only), but bounded + OFF the hot path (a right-click). The deferred `indexVersion`-keyed memo (see driveDoneOverlay) is the escape valve if a large worklist janks.
+    const entries = [...scenarioByCaseId].map(([caseId, sv]) => ({ caseId, keys: litNodeKeysForCase(caseId, sv, m, dispositionLeafKeys, tree.leafConcepts) }));
+    const caseIds = caseIdsForNodeThroughLit(semanticKey, entries);
+    if (caseIds.length === 0) return note("no reviewable cases run through this node");
+    await pickVerdictLoop(caseIds, ver, sidecar);
+  }
+
+  /** #217: present the verdict quick-pick(s). ONE case → straight to the verdict pick. SEVERAL → a re-entrant loop: pick a
+   *  case (its row shows the live verdict) → pick a verdict → re-show the case list with the updated verdict → Esc to finish
+   *  (the faithful native realization of "per-case dropdowns"). Every await is stale-guarded (a rebuild / policy retarget /
+   *  mode change between open and choice must not write to the wrong sidecar). */
+  async function pickVerdictLoop(caseIds: string[], ver: number, sidecar: string | undefined): Promise<void> {
+    const stale = (): boolean => indexVersion !== ver || mvSidecarPath !== sidecar || mode !== "medical-validation";
+    // EVERY stale exit surfaces a note (never a silent return) — the webview already suppressed the native menu, so a bare
+    // return would be a dead right-click. An Esc/cancel is NOT stale (a deliberate user dismissal) and gets no note.
+    const staleNote = (): void => void vscode.window.setStatusBarMessage("Medical Validation: cases changed — verdict not applied", 3000);
+    const nameOf = (caseId: string): string => labelInPrimary(caseId, "cel").label;
+    const verdictLabel = (caseId: string): string => REVIEW_LABEL[reviewByCaseId[caseId] ?? "unreviewed"];
+    const pickVerdict = async (caseId: string): Promise<void> => {
+      const current = reviewByCaseId[caseId] ?? "unreviewed";
+      const items = REVIEW_ORDER.map((st) => ({ label: REVIEW_LABEL[st], description: st === current ? "current" : "", state: st }));
+      const pick = await vscode.window.showQuickPick(items, { placeHolder: `Set review verdict — ${nameOf(caseId)}` });
+      if (!pick) return; // Esc — deliberate cancel, no note
+      if (stale() || !scenarioByCaseId.has(caseId)) return staleNote();
+      applyVerdict(caseId, pick.state);
+    };
+    if (caseIds.length === 1) return pickVerdict(caseIds[0]);
+    for (;;) {
+      if (stale()) return staleNote();
+      const items = caseIds.map((caseId) => ({ label: nameOf(caseId), description: `verdict: ${verdictLabel(caseId)}`, caseId }));
+      const pick = await vscode.window.showQuickPick(items, { placeHolder: "Pick a case to set its verdict (Esc to finish)" });
+      if (!pick) return; // Esc ends the loop — deliberate cancel, no note
+      if (stale() || !scenarioByCaseId.has(pick.caseId)) return staleNote(); // revalidate BEFORE opening the verdict picker (don't drive a stale second picker)
+      await pickVerdict(pick.caseId);
+    }
   }
 
   // ── notes drawer (#156) — the per-case conversation. All mutations go through persistMv (never a bare saveSidecar), so a
@@ -2361,7 +2454,10 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   // because the click handler cleared its textarea BEFORE this render arrived (snapshot already empty).
   `if(m.type==='render'){var _d={},_a=null,_s=0,_e=0;` +
   `for(const ta of root.querySelectorAll('textarea[data-note-draft]')){const k=ta.getAttribute('data-note-draft');_d[k]=ta.value;if(ta===document.activeElement){_a=k;_s=ta.selectionStart;_e=ta.selectionEnd;}}` +
-  `gen=m.gen;root.innerHTML=m.html;fcc.innerHTML='';` +
+  // #217: LIVE mode signal — a cockpit↔MV retarget doesn't rebuild the shell HTML, so a static <body data-mode> would go
+  // stale; every render carries the current mode and stamps it here. The right-click contextmenu gate reads it (host stays
+  // authoritative — a webview that hasn't re-rendered since a retarget still gates as its last mode, but the host re-checks).
+  `gen=m.gen;root.innerHTML=m.html;fcc.innerHTML='';if(m.mode)document.body.dataset.mode=m.mode;` +
   `for(const ta of root.querySelectorAll('textarea[data-note-draft]')){const k=ta.getAttribute('data-note-draft');if(Object.prototype.hasOwnProperty.call(_d,k)){ta.value=_d[k];if(k===_a){ta.focus();try{ta.setSelectionRange(_s,_e);}catch(_x){}}}}` +
   `v.postMessage({type:'ready',gen:m.gen,indexVersion:m.indexVersion});}` +
   // The at-rest selection channel (.current). Clearing/applying it ALSO wipes the failed-criterion overlay — so the
@@ -2461,6 +2557,18 @@ export const COCKPIT_WEBVIEW_SCRIPT =
   `if(wf){e.preventDefault();e.stopPropagation();v.postMessage({type:'worklistFilterToggle',state:wf.getAttribute('data-worklist-filter')});return;}` +
   `const t=e.target.closest&&e.target.closest('[data-reveal]');` +
   `if(t)v.postMessage({type:'reveal',key:t.getAttribute('data-reveal')});});` +
+  // #217: RIGHT-CLICK a flow node → the host opens a verdict quick-pick for the case(s) whose fired path runs through it.
+  // Gate: MV mode (live `data-mode`) + inside `.flow-svg` (the FLOW/tree pane ONLY — the script is shared by every pane, so
+  // without this we'd `preventDefault` the native menu in source/cel/worklist too) + a `.flow-row[data-reveal]` (a rendered
+  // structure node; the guard tab is `.flow-guard-tab` NOT a `.flow-row`, so `closest('.flow-row[data-reveal]')` on a tab
+  // resolves to the parent action's key — sets the guarded action's verdict, acceptable). We post the OPAQUE render key; the
+  // host normalizes it to the semantic node key. The host is AUTHORITATIVE (re-checks mode/maps) and emits a status note on
+  // any no-op — since we've already suppressed the native menu, a silent host return would be a dead right-click.
+  `root.addEventListener('contextmenu',(e)=>{` +
+  `if(document.body.dataset.mode!=='medical-validation')return;` +
+  `if(!(e.target.closest&&e.target.closest('.flow-svg')))return;` +
+  `const g=e.target.closest('.flow-row[data-reveal]');if(!g)return;` +
+  `e.preventDefault();e.stopPropagation();v.postMessage({type:'nodeVerdictMenu',key:g.getAttribute('data-reveal')});});` +
   // #156 slice 4: the worklist dropdown's 'change' posts the opaque key + the chosen value; the host validates the value
   // is a known ReviewState and persists it. A native <select> is keyboard- + screen-reader-operable, so no hand-rolled
   // keydown handling is needed. stopPropagation keeps the change from bubbling into any ancestor listener.

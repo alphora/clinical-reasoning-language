@@ -49,7 +49,7 @@ async function loadCockpit() {
   return require(out);
 }
 
-const { COCKPIT_WEBVIEW_SCRIPT: SCRIPT, leafMarkBuckets, leafBucketsFromQuestionnaire, resolveProducedLeafKeys, shouldWidenFilterForSelection, caseIdsForSubQuestionLeaf } = await loadCockpit();
+const { COCKPIT_WEBVIEW_SCRIPT: SCRIPT, leafMarkBuckets, leafBucketsFromQuestionnaire, resolveProducedLeafKeys, shouldWidenFilterForSelection, caseIdsForNodeThroughLit } = await loadCockpit();
 
 let pass = 0;
 const check = (label, fn) => {
@@ -527,14 +527,13 @@ check("resolveProducedLeafKeys: no produced actions → empty (a blocked/errored
 });
 
 // ── #210 Slice 1b: HOST-side wiring source-grep locks (driveDoneOverlay + the memo routing live outside the webview SCRIPT) ──
-check("Slice 1b/#210: driveDoneOverlay reviewed-only painting; litNodeKeys = interior ∪ PRODUCED leaves ∪ yes sub-questions", () => {
+check("Slice 1b/#210/#217: driveDoneOverlay reviewed-only painting, delegating to the SHARED litNodeKeysForCase reach", () => {
   // reviewed-only painting input: unreviewed cases can't vote.
   assert.ok(/buildReviewPerCase\(\s*Object\.keys\(reviewByCaseId\)/.test(COCKPIT_SRC), "buildReviewPerCase is fed Object.keys(reviewByCaseId), not scenarioByCaseId.keys()");
-  // INTERIOR structure = crlAnchors MINUS disposition leaves (reveal reach); leaves come from the EXECUTION reach instead.
-  assert.ok(/crlAnchorsForUnits\(unitsForCase\(caseId, m\), m\)\.filter\(\(k\) => !dispositionLeafKeys\.has\(k\)\)/.test(COCKPIT_SRC), "interior = crlAnchors minus disposition leaves");
-  assert.ok(/const produced = producedByCaseId\.get\(caseId\)/.test(COCKPIT_SRC), "the case's PRODUCED disposition leaves (execution reach) are unioned in");
-  assert.ok(/leafBucketsFromQuestionnaire\(questionnaireFor\(caseId, sv\)\.questions/.test(COCKPIT_SRC), "on-path sub-question yes-leaves via questionnaireFor");
-  assert.ok(/return \[\.\.\.interior, \.\.\.produced, \.\.\.yes\];/.test(COCKPIT_SRC), "litNodeKeys = interior ∪ produced ∪ yes");
+  // #217: the per-case lit reach moved into the shared litNodeKeysForCase (used by BOTH paint here and the right-click resolver).
+  assert.ok(/litNodeKeysForCase\(caseId, scenarioByCaseId\.get\(caseId\), m, dispositionLeafKeys, tree\.leafConcepts\)/.test(COCKPIT_SRC), "the paint callback delegates to the shared litNodeKeysForCase");
+  assert.ok(!/const producedByCaseId = new Map/.test(COCKPIT_SRC) && !/producedByCaseId\.(get|set)\(/.test(COCKPIT_SRC), "the overlay-local producedByCaseId map is gone — litNodeKeysForCase recomputes produced (no overlay-run coupling)");
+  // the shared reach shape (interior ∪ produced ∪ yes) is asserted in the #217 litNodeKeysForCase check.
   // the fold's isLeaf is unchanged.
   assert.ok(/deriveReviewOverlay\(reviewByCaseId, perCase, \(k\) => dispositionLeafKeys\.has\(k\)\)/.test(COCKPIT_SRC), "the leaf-aware fold call is unchanged");
 });
@@ -588,33 +587,80 @@ check("#214 filter: the webview chip click posts worklistFilterToggle{state}, BE
   assert.ok(SCRIPT.indexOf("worklistFilterToggle") < SCRIPT.indexOf("[data-reveal]"), "the chip handler precedes [data-reveal]");
 });
 
-// ── #216 sub-question click → dynamic on-path case selection (host wiring; the resolution lives in the cockpit closure) ──
+// ── #216 sub-question left-click → dynamic on-path case selection (host wiring; the resolution lives in the cockpit closure) ──
 check("#216 sub-question: the reveal handler routes a sub-question hit to selectSubQuestionCases, NOT mapHitToPrimary", () => {
   assert.ok(/if \(isSubQuestionHit\(hit\)\) \{[\s\S]*selectSubQuestionCases\(hit\.subQuestionLeafKey/.test(COCKPIT_SRC), "isSubQuestionHit → selectSubQuestionCases");
   // it must be diverted BEFORE the generic mapHitToPrimary select (the leaf key is not a unit/nodeKey/caseId).
   assert.ok(COCKPIT_SRC.indexOf("isSubQuestionHit(hit)") < COCKPIT_SRC.indexOf("selectInPrimary(mapHitToPrimary(hit, p"), "the sub-question branch precedes the generic mapHitToPrimary select");
 });
-check("#216 sub-question: selectSubQuestionCases builds per-case yes-leaf entries, delegates to the pure filter, then selects in the current primary", () => {
+check("#216 sub-question: selectSubQuestionCases builds per-case yes-leaf entries (errored → []), delegates to the shared membership core, selects", () => {
   const m = COCKPIT_SRC.match(/function selectSubQuestionCases\([^)]*\)[^{]*\{([\s\S]*?)\n  \}/);
   assert.ok(m, "selectSubQuestionCases body");
-  assert.ok(/for \(const \[caseId, sv\] of scenarioByCaseId\)/.test(m[1]), "iterates the frozen scenarios to build entries");
-  assert.ok(/sv\.status === "error" \? \[\] : leafBucketsFromQuestionnaire\(questionnaireFor\(caseId, sv\)\.questions[\s\S]*\.yesKeys/.test(m[1]), "per-case yes-leaf keys from the Slice-1b leaf truth (errored → empty)");
-  assert.ok(/caseIdsForSubQuestionLeaf\(leafKey, entries\)/.test(m[1]), "delegates the on-path filter to the pure, unit-tested helper");
+  assert.ok(/scenarioByCaseId\]\.map\(\(\[caseId, sv\]\)/.test(m[1]), "maps the frozen scenarios to entries");
+  assert.ok(/keys: sv\.status === "error" \? \[\] : leafBucketsFromQuestionnaire\(questionnaireFor\(caseId, sv\)\.questions[\s\S]*\.yesKeys/.test(m[1]), "per-case keys = the on-path yes-leaves (errored → empty)");
+  assert.ok(/caseIdsForNodeThroughLit\(leafKey, entries\)/.test(m[1]), "delegates the on-path filter to the shared, unit-tested membership core");
   assert.ok(/mapHitToPrimary\(\{ caseId \}, p, m\)[\s\S]*selectInPrimary\(ids, p\)/.test(m[1]), "maps each case → the CURRENT primary's ids, then selects (multi → the quick-pick)");
 });
-check("#216 sub-question: caseIdsForSubQuestionLeaf (PURE) keeps cases whose yes-leaves include THIS leaf; excludes off-path/false, skips errored", () => {
-  const LEAF = "leaf::w:B|1|c:L1"; // the clicked operand's on-path key
+check("#216/#217 caseIdsForNodeThroughLit (PURE): keeps cases whose per-case keyset contains THIS key; dedupes; entry order; no status filter", () => {
+  const KEY = "leaf::w:B|1|c:L1"; // the clicked operand's on-path key
   const OTHER = "leaf::w:B|0|c:L1"; // same concept, a DIFFERENT operand path (must not match)
   const entries = [
-    { caseId: "cOn", status: "pass", yesLeafKeys: [LEAF, "leaf::w:A|0|c:X"] }, // fired the clicked operand → keep
-    { caseId: "cWhenOff", status: "fail", yesLeafKeys: [] }, // owning when off-path → no yes-leaf → drop
-    { caseId: "cLeafFalse", status: "pass", yesLeafKeys: ["leaf::w:A|0|c:X"] }, // when on, operand false → drop
-    { caseId: "cOtherPath", status: "pass", yesLeafKeys: [OTHER] }, // same concept, other operand path → drop
-    { caseId: "cErr", status: "error", yesLeafKeys: [LEAF] }, // errored → no trustworthy truth → skip
-    { caseId: "cOn2", status: "pending", yesLeafKeys: [LEAF] }, // a second on-path case (any non-error status) → keep
+    { caseId: "cOn", keys: [KEY, "leaf::w:A|0|c:X"] }, // contains the key → keep
+    { caseId: "cWhenOff", keys: [] }, // errored/off-path → empty keyset (caller pre-filtered) → drop
+    { caseId: "cLeafFalse", keys: ["leaf::w:A|0|c:X"] }, // key absent → drop
+    { caseId: "cOtherPath", keys: [OTHER] }, // same concept, other operand path → drop
+    { caseId: "cOn2", keys: [KEY, KEY] }, // contains it (twice) → kept ONCE (dedupe within a case)
   ];
-  assert.deepEqual(caseIdsForSubQuestionLeaf(LEAF, entries), ["cOn", "cOn2"], "only the two non-errored on-path cases, in order");
-  assert.deepEqual(caseIdsForSubQuestionLeaf("leaf::nobody", entries), [], "a leaf no case fires → empty (no selection)");
+  assert.deepEqual(caseIdsForNodeThroughLit(KEY, entries), ["cOn", "cOn2"], "only the two matching cases, in entry-iteration order, each once");
+  assert.deepEqual(caseIdsForNodeThroughLit("leaf::nobody", entries), [], "a key no case holds → empty");
+});
+
+// ── #217 right-click a flow node → per-case verdict quick-pick (webview gate + host wiring; collapse to one execution reach) ──
+check("#217 webview: a contextmenu listener gates MV (live data-mode) + .flow-svg (tree only) + .flow-row[data-reveal], posts nodeVerdictMenu", () => {
+  assert.ok(/addEventListener\('contextmenu',\(e\)=>\{/.test(SCRIPT), "contextmenu listener present");
+  assert.ok(/contextmenu'[\s\S]*document\.body\.dataset\.mode!=='medical-validation'\)return/.test(SCRIPT), "MV-only via the LIVE data-mode signal (else native menu preserved)");
+  assert.ok(/contextmenu'[\s\S]*closest\('\.flow-svg'\)\)\)return/.test(SCRIPT), "flow/tree pane ONLY (else the shared script would suppress the native menu in other panes)");
+  assert.ok(/contextmenu'[\s\S]*closest\('\.flow-row\[data-reveal\]'\)/.test(SCRIPT), "a rendered structure node (guard tabs are .flow-guard-tab, excluded)");
+  assert.ok(/contextmenu'[\s\S]*e\.preventDefault\(\);e\.stopPropagation\(\);v\.postMessage\(\{type:'nodeVerdictMenu',key:g\.getAttribute\('data-reveal'\)\}\)/.test(SCRIPT), "suppresses the native menu + posts the OPAQUE render key");
+});
+check("#217 webview: the render handler stamps the LIVE mode onto document.body.dataset.mode each render", () => {
+  assert.ok(/if\(m\.mode\)document\.body\.dataset\.mode=m\.mode/.test(SCRIPT), "render carries + stamps mode (a static body stamp would go stale across a retarget)");
+});
+check("#217 host: nodeVerdictMenu is routed, normalizes the hit to a SEMANTIC key, resolves via the shared reach, never uses the raw reveal key", () => {
+  assert.ok(/msg\.type === "nodeVerdictMenu"[\s\S]*nodeVerdictMenu\(msg\.key\)/.test(COCKPIT_SRC), "routed from the nodeVerdictMenu message");
+  const m = COCKPIT_SRC.match(/async function nodeVerdictMenu\([^)]*\)[^{]*\{([\s\S]*?)\n  \}/);
+  assert.ok(m, "nodeVerdictMenu body");
+  assert.ok(/tree\?\.reveals\[revealKey\]/.test(m[1]), "looks the opaque reveal key up in the tree reveals (never passes it raw to the resolver)");
+  assert.ok(/isSubQuestionHit\(hit\)[\s\S]*hit\.subQuestionLeafKey[\s\S]*"nodeKey" in hit[\s\S]*hit\.nodeKey/.test(m[1]), "normalizes {subQuestionLeafKey}/{nodeKey} → the semantic key");
+  assert.ok(/litNodeKeysForCase\(caseId, sv[\s\S]*caseIdsForNodeThroughLit\(semanticKey, entries\)/.test(m[1]), "resolves cases via the SHARED lit reach + the pure membership core over scenarioByCaseId");
+  assert.ok(/setStatusBarMessage/.test(m[1]), "every no-op exit emits a transient status note (the native menu is already suppressed — no silent dead click)");
+});
+check("#217 host: litNodeKeysForCase is the SHARED reach — driveDoneOverlay paints with it, and it routes through questionnaireFor (NOT buildFocusedQuestionnaire)", () => {
+  const m = COCKPIT_SRC.match(/function litNodeKeysForCase\([^)]*\)[^{]*\{([\s\S]*?)\n  \}/);
+  assert.ok(m, "litNodeKeysForCase body");
+  assert.ok(/questionnaireFor\(caseId, sv\)/.test(m[1]), "routes through questionnaireFor (guards the focused/raw split)");
+  assert.ok(!/buildFocusedQuestionnaire/.test(m[1]), "must NOT call buildFocusedQuestionnaire (its memo poisons on a non-focused sv the resolver passes)");
+  assert.ok(/crlAnchorsForUnits\(unitsForCase\(caseId, m\), m\)\.filter\([\s\S]*producedDispositionLeafKeys\(sv, dispositionLeafKeys\)/.test(m[1]), "interior (minus disposition leaves) ∪ produced — recomputes produced (no overlay-local map)");
+  assert.ok(/litNodeKeysForCase\(caseId, scenarioByCaseId\.get\(caseId\), m, dispositionLeafKeys, tree\.leafConcepts\)/.test(COCKPIT_SRC), "driveDoneOverlay's paint callback uses the SAME shared reach");
+});
+check("#217 host: applyVerdict is the shared persist tail (validates + returns boolean + aborts on save-fail), used by BOTH setWorklist and the quick-pick", () => {
+  const m = COCKPIT_SRC.match(/function applyVerdict\([^)]*\)[^{]*\{([\s\S]*?)\n  \}/);
+  assert.ok(m, "applyVerdict body");
+  assert.ok(/isReviewState\(value\)\) return false/.test(m[1]), "validates the value (trusted-input)");
+  assert.ok(/persistMv\(next, notesByCaseId\)\) return false/.test(m[1]), "aborts (returns false) on a persist failure — never paints an unpersisted verdict");
+  assert.ok(/if \(state\.selection\) dispatch\(\{ type: "select"[\s\S]*else renderTreeChrome\(\)[\s\S]*driveDoneOverlay\(\)/.test(m[1]), "keeps the double-chrome guard + repaints the overlay");
+  assert.ok(/function setWorklist\([\s\S]*applyVerdict\(action\.caseId, value\)/.test(COCKPIT_SRC), "setWorklist delegates to the shared applyVerdict");
+});
+check("#217 host: the verdict pick is stale-guarded (indexVersion + sidecar + scenarioByCaseId), every stale exit notes, multi-case re-enters", () => {
+  const m = COCKPIT_SRC.match(/async function pickVerdictLoop\([^)]*\)[^{]*\{([\s\S]*?)\n  \}/);
+  assert.ok(m, "pickVerdictLoop body");
+  assert.ok(/indexVersion !== ver \|\| mvSidecarPath !== sidecar \|\| mode !== "medical-validation"/.test(m[1]), "stale guard = model version + sidecar + mode");
+  assert.ok(/stale\(\) \|\| !scenarioByCaseId\.has\(caseId\)\) return staleNote\(\)/.test(m[1]), "verdict pick revalidates the case + notes on stale (no silent dead click)");
+  assert.ok(/for \(;;\) \{\s*if \(stale\(\)\) return staleNote\(\)/.test(m[1]), "the multi-case loop-top stale exit ALSO notes (not a silent return)");
+  assert.ok(/stale\(\) \|\| !scenarioByCaseId\.has\(pick\.caseId\)\) return staleNote\(\)[\s\S]*await pickVerdict\(pick\.caseId\)/.test(m[1]), "revalidates immediately after the case-list pick, BEFORE opening the verdict picker");
+  assert.ok(/caseIds\.length === 1\) return pickVerdict/.test(m[1]), "single case → straight to the verdict pick");
+  // an Esc/cancel (`if (!pick) return;`) is a DELIBERATE dismissal — it must NOT emit a note (only stale exits do).
+  assert.ok(/if \(!pick\) return; \/\/ Esc/.test(m[1]), "an Esc cancel returns without a note");
 });
 
 console.log(`\ncockpitWebviewScript.test: ${pass} checks passed`);
