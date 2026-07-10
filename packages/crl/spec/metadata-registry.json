@@ -18,6 +18,19 @@
     "A-external-ref": "Scored hints to an external store. Candidates are extraction-derived (replace-by-run); confirmed are durable.",
     "C-provenance": "Extraction exhaust (regenerated each run; replace-by-run)."
   },
+  "flagModel": {
+    "_about": "A `flag` (a tag with `flag: true`) is a narrative->CRL problem or a validation concern that BLOCKS Medical Validation completion while open. ONE mechanism; two categories by origin (KE #203, disc 220).",
+    "categories": {
+      "review": "authored by the AI during narrative->CRL (source-ambiguity / source-contradiction / unsettled fork / encoding-infidelity). The tags: customer-confirmable, internal-inconsistency, open-fork, fidelity-defect.",
+      "note": "authored by a HUMAN during Medical Validation (a concern raised while validating). Same behavior as `review`; the note-flag carrier + tag land with the MV cockpit surface (Todo 4)."
+    },
+    "status": "open | resolved (NO deferred). `open` blocks mvComplete + emits; `resolved` persists (learning signal) + does not emit.",
+    "mvComplete": "the real gate: mvComplete = (every MV case is `pass`) AND (no `open` flags). Resolved flags do NOT block it. Surfaced in the MV cockpit (Todo 4).",
+    "lifecycle": "agent/human authors `open` -> human RESOLVES to `resolved` IN MV (open<->resolved only; MV NEVER deletes) -> the separate LEARNING system consumes + DELETES `resolved` flags (backlog; not MV, not this feature).",
+    "transitions": "state changes happen in the MV cockpit: a warning badge on the tree START NODE while any flag is `open` -> the flag list -> per-flag open<->resolved toggle -> the cockpit edits the `.crl` META line (metadata-only; never the decision logic).",
+    "emit": "open flags emit to CQL as normal meta-tag behavior (a KE reads them in generated CQL); resolved flags do NOT emit (noise). Orthogonal to mvComplete.",
+    "reAddGuard": "a resolved flag's `key` (normalized source-span/hash) suppresses re-add on re-extraction while the source problem persists; correcting the source removes it cleanly."
+  },
   "valueTypes": {
     "ExternalReference": {
       "note": "Shared shape for the two external-ref tags. KG (Concept Graph) and REEF are DISTINCT stores serving different purposes; both hold scored hints.",
@@ -208,12 +221,13 @@
       "id": "customer-confirmable",
       "aliases": [],
       "family": "B-narrative",
-      "reviewFlag": true,
+      "flag": true,
+      "category": "review",
       "valueShape": "text",
       "extraFields": {
-        "status": { "type": "enum", "values": ["open", "resolved"], "default": "open", "note": "no `deferred` for review flags — a flag is open (emit+warn+ship-gate) or resolved (durable, no emit, no gate)" },
+        "status": { "type": "enum", "values": ["open", "resolved"], "default": "open", "note": "a flag is `open` (blocks mvComplete; emits) or `resolved` (persists as a learning signal; no emit). No `deferred`. See `flagModel`. MV transitions open<->resolved ONLY; the `resolved`->deleted step is the separate learning system (not MV)." },
         "assumption": { "type": "string", "required": false, "note": "the provisional reading taken pending the ruling" },
-        "key": { "type": "string", "required": false, "note": "stable re-detect key (agent-supplied: @id + a normalized source-span/hash). Matches a `resolved` tombstone to suppress re-add on a later extraction run." }
+        "key": { "type": "string", "required": false, "note": "stable re-detect key (agent-supplied: @id + a normalized source-span/hash). Matches a `resolved` tombstone to suppress re-add on a later extraction run (see `flagModel.reAddGuard`)." }
       },
       "cardinality": "0..n",
       "attachmentTargets": ["concept"],
@@ -221,17 +235,18 @@
       "origin": "either",
       "retention": "inline",
       "lifecycle": "append",
-      "lifecycleNote": "status open -> resolved; `resolved` is a DURABLE tombstone (NOT deleted) whose body carries the ruling. Grep `status open` for the open worklist.",
+      "lifecycleNote": "status open -> resolved (in MV); `resolved` PERSISTS as a learning signal (the separate learning system consumes + deletes it — see `flagModel`). Grep `status open` for the open worklist.",
       "warnWhileOpen": true,
       "emit": { "cql": false, "fhir": false },
-      "plannedEmit": { "cql": true, "condition": "only status=open emits — pre-ship KE-workflow visibility; the ship-gate resolves all open flags before ship, so the shipped artifact is clean. Status-aware emit is Todo 4 (#203)." },
+      "plannedEmit": { "cql": true, "condition": "only status=open emits — normal meta-tag behavior (open flags show in the generated CQL a KE reads). `resolved` flags do NOT emit (noise in the artifact). Emit is orthogonal to the mvComplete gate. Status-aware emit is Todo 5 (#203)." },
       "notes": "REVIEW FLAG. An EXTERNAL-stakeholder ambiguity resolved provisionally, pending a customer/Burton ruling. Resolve when the ruling arrives (record it in the `resolved` body). Distinct from @open-fork (INTERNAL modeling alternatives)."
     },
     {
       "id": "internal-inconsistency",
       "aliases": [],
       "family": "B-narrative",
-      "reviewFlag": true,
+      "flag": true,
+      "category": "review",
       "valueShape": "text",
       "extraFields": {
         "status": { "type": "enum", "values": ["open", "resolved"], "default": "open" },
@@ -253,7 +268,8 @@
       "id": "open-fork",
       "aliases": [],
       "family": "B-narrative",
-      "reviewFlag": true,
+      "flag": true,
+      "category": "review",
       "valueShape": "text",
       "extraFields": {
         "status": { "type": "enum", "values": ["open", "resolved"], "default": "open" },
@@ -277,7 +293,8 @@
       "id": "fidelity-defect",
       "aliases": ["over-reach-to-fix", "criterion-drop-to-fix"],
       "family": "B-narrative",
-      "reviewFlag": true,
+      "flag": true,
+      "category": "review",
       "valueShape": "text",
       "extraFields": {
         "status": { "type": "enum", "values": ["open", "resolved"], "default": "open" },
@@ -313,7 +330,7 @@
       "lifecycleNote": "DELETE when the CRL no longer depends on the gap. Delete-on-fix is DELIBERATE here (unlike the review flags): the durable record lives in the FILED ISSUE, not inline.",
       "emit": { "cql": false, "fhir": false },
       "plannedEmit": { "cql": true, "condition": "emit as a CQL block comment — a visible tracked gap, like @business-logic-deferred. Todo 4." },
-      "notes": "A durable POINTER to a filed gap/issue — NOT a review flag (no `reviewFlag`, no `warnWhileOpen`, no `status`): a filed gap is managed work that ships fine (like `// TODO(#123)`). Requires `; ref <issue>`. Covers the KE's @stage-boundary case when the gap is FILED; the un-filed 'stage/language can't express this' cases REUSE @crl-future-expression (language limit) / @business-logic-deferred / @clinical-logic-deferred (deferred logic)."
+      "notes": "A durable POINTER to a filed gap/issue — NOT a flag (no `flag`, no `warnWhileOpen`, no `status`; does not block mvComplete): a filed gap is managed work that ships fine (like `// TODO(#123)`). Requires `; ref <issue>`. Covers the KE's @stage-boundary case when the gap is FILED; the un-filed 'stage/language can't express this' cases REUSE @crl-future-expression (language limit) / @business-logic-deferred / @clinical-logic-deferred (deferred logic)."
     }
   ],
   "validatorRules": [
@@ -324,11 +341,11 @@
     "a meta line NOT starting '@' -> legitimate untyped note (back-compat), no diagnostic",
     "re-run staleness: warn if two distinct run ids' family-C / candidate-ref exhaust coexist on one concept",
     "family-C tags and candidate (status=candidate) external refs MUST carry `run` -> error if omitted (otherwise the re-run replace match key is undefined)",
-    "review flag (`reviewFlag:true`) with status=open (or status absent -> defaults open) -> WARNING (open review flag — resolve before ship). Ship-blocking is a `shipPolicy` escalation (Todo 3); the base diagnostic is a warning per KE #203.",
-    "review-flag RE-ADD GUARD: an extractor MUST NOT emit a review flag whose `key` matches an existing status=resolved tombstone on the same target (the source property persists, but the human resolution stands). A genuinely-new instance (different `key` / source-span) MAY be added.",
+    "flag (`flag:true`) with status=open (or status absent -> defaults open) -> WARNING (open flag — blocks mvComplete; resolve in MV). The mvComplete predicate (Todo 3) consumes this: mvComplete = all cases pass AND no open flags.",
+    "flag RE-ADD GUARD: an extractor MUST NOT emit a flag whose `key` matches an existing status=resolved tombstone on the same target (the source property persists, but the human resolution stands). A genuinely-new instance (different `key` / source-span) MAY be added. See `flagModel.reAddGuard`.",
     "@fidelity-defect without a `direction` (over-reach|criterion-drop) -> error",
     "@gap-filed without a `ref` -> error (a filed gap needs its issue id)",
-    "review flags use status open|resolved ONLY -> a review flag with status=deferred is an error (deferred/tracked work is @gap-filed or @business-logic-deferred, not a review flag)"
+    "flags use status open|resolved ONLY -> a flag with status=deferred is an error (deferred/tracked work is @gap-filed or @business-logic-deferred, not a flag)"
   ],
-  "reRunReplaceRule": "On re-extraction, the producer replaces the prior run's family-C tags (semantic-parse-text) and candidate (status=candidate) external refs for a concept, matched by by/run. Confirmed refs and family-B durable tags (id, description, ke-feedback, logic-expression-text, controlled-natural-language, crl-future-expression, business-logic-deferred, clinical-logic-deferred, cql-comment, customer-confirmable, internal-inconsistency, open-fork, fidelity-defect, gap-filed) are never auto-replaced. Refs with status=rejected or status=superseded are durable historical records (preserved across re-runs so negative review work isn't lost). REVIEW-FLAG RE-ADD GUARD (`reviewFlag:true`): a resolved review-flag tombstone is durable; on re-extraction the producer MUST NOT re-add a review flag whose `key` matches an existing status=resolved tombstone on the same target — matched by (tag id + attachment `@id` + `key`, where `key` is a normalized source-span/hash). Prevents a persistent source contradiction from re-opening a flag the human already resolved."
+  "reRunReplaceRule": "On re-extraction, the producer replaces the prior run's family-C tags (semantic-parse-text) and candidate (status=candidate) external refs for a concept, matched by by/run. Confirmed refs and family-B durable tags (id, description, ke-feedback, logic-expression-text, controlled-natural-language, crl-future-expression, business-logic-deferred, clinical-logic-deferred, cql-comment, customer-confirmable, internal-inconsistency, open-fork, fidelity-defect, gap-filed) are never auto-replaced. Refs with status=rejected or status=superseded are durable historical records (preserved across re-runs so negative review work isn't lost). FLAG RE-ADD GUARD (`flag:true`): a resolved flag tombstone is durable; on re-extraction the producer MUST NOT re-add a review flag whose `key` matches an existing status=resolved tombstone on the same target — matched by (tag id + attachment `@id` + `key`, where `key` is a normalized source-span/hash). Prevents a persistent source contradiction from re-opening a flag the human already resolved."
 }

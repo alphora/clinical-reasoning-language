@@ -79,18 +79,24 @@ Everything lives inline; the `.crl` is the source of truth (no sidecar). Extract
 
 Replace-eligible tags (family-C + candidate external refs) **require** a `run` so the match key is unambiguous — the Validator errors if it's omitted. Refs with `status: rejected` or `status: superseded` are **durable historical records** (preserved across re-runs so negative review work isn't lost).
 
-## Review flags (KE #203)
+## Flags (KE #203)
 
-Review flags are the **audit trail of deliberate, still-open decisions** — the ones the review discipline says must be grounded before ship. They reuse `@ke-feedback`'s machinery rather than a parallel convention:
+A **flag** (a tag with `flag: true`) marks a problem that **blocks Medical Validation completion while open**. ONE mechanism, two `category` values by origin (see `flagModel` in the registry):
 
-- **Status lifecycle:** `status open → resolved` (review flags use **open|resolved only** — no `deferred`). A resolved flag is a **durable tombstone** whose body carries the resolution (e.g. the ruling for `@customer-confirmable`) — it is **not deleted**, so the audit trail survives. Grep `status open` for the open worklist.
-- **Warn + ship-gate while open:** a review flag with `status open` (the default) raises a Validator **warning** ("open review flag — resolve before ship"); ship-*blocking* is a `shipPolicy` escalation (a later validator todo). The `warnWhileOpen` marker is **per-tag** (family B also holds non-gating tags like `@ke-feedback`/`@id`, which must NOT gate).
-- **Emit is pre-ship:** review flags emit to CQL **only while `status open`** — the generated CQL a KE reads during authoring shows the open flags; the ship-gate resolves them before the final ship, so the **shipped artifact is clean** (no leak). *(Status-aware emit is not yet implemented — a later todo; the registry declares it via `plannedEmit`.)*
-- **Re-add guard:** because a source property (e.g. `@internal-inconsistency`) persists across extraction runs, a resolved tombstone must not be re-opened. An extractor MUST NOT re-add a review flag whose `key` (a normalized source-span/hash) matches an existing `resolved` tombstone; a *genuinely-new* instance (different `key`) may be added.
-- **The four flags** (`@customer-confirmable`, `@internal-inconsistency`, `@open-fork`, `@fidelity-defect{direction}`) carve on distinct axes: external-ruling vs internal-fork vs source-self-contradiction vs encoding-fidelity.
-- **`@stage-boundary` is intentionally NOT a tag** — "the stage/language can't express this" is covered by the existing `@crl-future-expression` (language limit), `@business-logic-deferred` / `@clinical-logic-deferred` (deferred logic), or `@gap-filed` when the gap is filed. Adding a near-synonym is the concept-hiding smell.
-- **`@gap-filed` is a pointer, not a flag** — it ships fine (managed work tracked in the filed issue), needs a required `; ref <issue>`, and does **not** warn or gate. It deletes when the CRL no longer depends on the gap (the durable record lives in the tracker).
-- **Scope:** review flags are `concept`-scoped today; `decision`/`library` scope is the planned carrier (see the carrier note above).
+- **`category: review`** — authored by the **AI during narrative → CRL**: source-ambiguity (`@customer-confirmable`), source-self-contradiction (`@internal-inconsistency`), an unsettled modeling fork (`@open-fork`), or encoding-infidelity (`@fidelity-defect{direction}`). A **learning signal**.
+- **`category: note`** — authored by a **human during Medical Validation** (a concern raised while validating). Same behavior; the note-flag carrier lands with the MV cockpit surface.
+
+The mechanics (shared):
+
+- **`mvComplete` is the gate:** `mvComplete = (every MV case is pass) ∧ (no OPEN flags)`. Resolved flags do NOT block it. Surfaced in the MV cockpit.
+- **Status lifecycle:** `open → resolved` (**open|resolved only** — no `deferred`). MV transitions **open ↔ resolved only** (edits the `.crl` *meta* — metadata-only, never the logic); it **never deletes**. The `resolved → deleted` step belongs to a separate **learning** system (which consumes the resolved flags, extracts the lesson, then removes them — out of scope here). `resolved` persists meanwhile as the learning signal.
+- **Warn while open:** an `open` flag raises a Validator **warning** and blocks `mvComplete`. The `warnWhileOpen` marker is **per-tag** (family B also holds non-gating tags like `@ke-feedback`/`@id`).
+- **Emit:** an `open` flag emits to CQL — normal meta-tag behavior (a KE sees open work in the generated CQL); a `resolved` flag does **not** emit (noise in the artifact). Emit is orthogonal to `mvComplete`. *(Status-aware emit is a later todo; the registry declares it via `plannedEmit`.)*
+- **Transitions in MV:** a warning badge on the tree **start node** while any flag is open → the flag list → an open↔resolved toggle per flag → the cockpit writes the `.crl` meta.
+- **Re-add guard:** a source property (e.g. `@internal-inconsistency`) can persist across extraction runs, so a `resolved` tombstone must not be re-opened. An extractor MUST NOT re-add a flag whose `key` (a normalized source-span/hash) matches an existing `resolved` tombstone; correcting the source removes it cleanly. A genuinely-new instance (different `key`) may be added.
+- **`@stage-boundary` is intentionally NOT a flag** — "the stage/language can't express this" reuses `@crl-future-expression` (language limit), `@business-logic-deferred` / `@clinical-logic-deferred` (deferred logic), or `@gap-filed` when filed. A near-synonym is the concept-hiding smell.
+- **`@gap-filed` is a pointer, not a flag** — it ships fine (managed work tracked in the filed issue), needs a required `; ref <issue>`, and does **not** gate `mvComplete`. Deleted when the CRL no longer depends on the gap.
+- **Scope:** flags are `concept`-scoped today; `decision`/`library` is the planned carrier (see the carrier note above).
 
 ## Stable identity (recommended)
 
