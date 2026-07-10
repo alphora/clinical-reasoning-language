@@ -527,6 +527,37 @@ export function renderFlowPane(
  *  the shell's global `.current`/`.diverter`/`.failed-criterion` OUTLINE overlays ARE neutralized on flow `<g>`s (they
  *  paint a lumpy square there — the flow uses the ring + rect strokes instead). The per-case CHANNELS still paint rect
  *  strokes/fills: `.this-node` (orange), `.failed-criterion`/`-preempt` (dashed), `.diverter` (dotted), `.review-pass/-fail/-pending`/`.error-node` (fill). */
+// #218: the FIVE authoritative paint tokens the MV legend decodes. ONE const per concept, interpolated into BOTH the tree
+// paint rules AND the legend swatch rules below → the legend cannot drift from the paint BY CONSTRUCTION (Claude R1). Named
+// semantically (not after the token) so a future reader doesn't "clean up" a shared token that's reused elsewhere (e.g.
+// focusBorder is also the filter-chip focus color). Verdict = a FILL (with an alpha wash on the tree); inferred/ring = a STROKE.
+const TOK_VERDICT_PASS = "var(--vscode-testing-iconPassed,#73c991)";
+const TOK_VERDICT_FAIL = "var(--vscode-testing-iconFailed,#f14c4c)";
+const TOK_VERDICT_PENDING = "var(--vscode-charts-yellow,#d29922)";
+const TOK_INFERRED = "var(--vscode-charts-purple,#c586c0)";
+const TOK_RING = "var(--vscode-focusBorder,#3794ff)";
+
+/** #218: the MV flow-pane color KEY (operator-scoped to EXACTLY three concepts — verdict fill, inferred purple, selected-path
+ *  ring; no grey/disposition, no ✓ badge, no stadium). MV-ONLY: verdict fills paint only in medical-validation mode, and the
+ *  operator chose MV-only (so purple/ring go unlabelled in cockpit mode — a known, accepted limitation). Rendered into the
+ *  tree-pane `#fcChrome`; the swatch CSS lives in FLOW_STYLE keyed on the SAME `TOK_*` consts. The verdict chips are full
+ *  opacity (hue-truthful; the tree wash is `.2/.16`, invisible at chip size — a deliberate alpha divergence, hue is what the
+ *  key decodes). "Selected path" NOT "Selected case": the ring also marks source-primary correspondence reach, not only a case. */
+export function flowLegendChrome(mode: "cockpit" | "medical-validation"): string {
+  if (mode !== "medical-validation") return "";
+  const chip = (cls: string, label: string, gap: boolean): string =>
+    `<span class="fc-lg${gap ? " fc-lg-gap" : ""}"><i class="fc-sw ${cls}" aria-hidden="true"></i>${label}</span>`;
+  return (
+    `<div class="fc-legend" role="group" aria-label="Tree color key: green fill Pass, red fill Fail, yellow fill Pending, purple border Inferred, blue ring Selected path">` +
+    chip("fc-sw-pass", "Pass", false) +
+    chip("fc-sw-fail", "Fail", false) +
+    chip("fc-sw-pending", "Pending", false) +
+    chip("fc-sw-inferred", "Inferred", true) + // fc-lg-gap → 3 visual concept-groups: [Pass Fail Pending] · [Inferred] · [Selected path]
+    chip("fc-sw-ring", "Selected path", true) +
+    `</div>`
+  );
+}
+
 export const FLOW_STYLE =
   `.flow-wrap{display:inline-block;min-width:100%}` +
   `.flow-svg{display:block;font:12px var(--vscode-editor-font-family,sans-serif)}` +
@@ -543,7 +574,7 @@ export const FLOW_STYLE =
   // #210: the inferred (purple) OFF-PATH border reads slightly THICKER than the grey Source border (operator: make the
   // off-path purple a touch heavier). On-path still wins — the `.flow-row.current/flow-leaf-yes>rect` thicken rules (2.5/2)
   // are EQUAL specificity ((0,2,1)) but sit LATER in the sheet, so a ringed inferred node overrides this 1.4.
-  `.flow-when.flow-inferred>rect{stroke:var(--vscode-charts-purple,#c586c0);stroke-width:1.4}` +
+  `.flow-when.flow-inferred>rect{stroke:${TOK_INFERRED};stroke-width:1.4}` +
   `.flow-otherwise>rect{stroke-dasharray:3 2;opacity:.85}` +
   // A recommend TARGET. #210: ALL recommend activities (incl. determinations) → neutral grey, the SAME as an ordinary
   // activity (the certify→green / not-certify+pended→gold borders were removed — they made the viewer PA-specific). A
@@ -554,7 +585,7 @@ export const FLOW_STYLE =
   // replacement for the peek dot). Grey / purple by the guard's Source; a hover highlight signals it's interactive.
   `.flow-guard-tab{cursor:pointer}` +
   `.flow-guard-tab>rect{fill:var(--vscode-editor-background,#1e1e1e);stroke:var(--vscode-descriptionForeground,#8c8c8c);stroke-width:1}` +
-  `.flow-guard-tab.flow-inferred>rect{stroke:var(--vscode-charts-purple,#c586c0)}` +
+  `.flow-guard-tab.flow-inferred>rect{stroke:${TOK_INFERRED}}` +
   `.flow-guard-tab>text{fill:var(--vscode-descriptionForeground,#cccccc);font:600 9px/1 var(--vscode-editor-font-family,monospace);letter-spacing:.02em}` +
   `.flow-guard-tab:hover>rect{fill:var(--vscode-toolbar-hoverBackground,#2a2d2e)}` +
   `.flow-edge{fill:none;stroke:var(--vscode-panel-border,#454545);stroke-width:1.6}` + // slightly thicker — hard to see on Mac (operator feedback)
@@ -565,7 +596,7 @@ export const FLOW_STYLE =
   // / PURPLE (inferred, decomposes into its own sub-questions recursively). On-path → the blue ring, same as a main node.
   // (Solid, not the Todo-2 dashed chip: the indent + smaller box + dashed spine already distinguish it from a decision box.)
   `.flow-leaf>rect{fill:var(--vscode-editor-background,#1e1e1e);stroke:var(--vscode-descriptionForeground,#8c8c8c);stroke-width:1}` +
-  `.flow-leaf.flow-inferred>rect{stroke:var(--vscode-charts-purple,#c586c0);stroke-width:1.4}` + // #210: off-path purple slightly heavier (on-path 2 wins, later)
+  `.flow-leaf.flow-inferred>rect{stroke:${TOK_INFERRED};stroke-width:1.4}` + // #210: off-path purple slightly heavier (on-path 2 wins, later)
   `.flow-leaf>text{fill:var(--vscode-descriptionForeground,#bfbfbf);font-size:11px}` +
   // #187 Option-C OUTLINE rows. An OPERATOR / TOP-OR label — a bare uppercase caption (no box), like the questionnaire's
   // ANY OF / ALL OF tab; render-only (not clickable). An EXTERNAL / MORE stub — a faint dashed box (unaddressable operand).
@@ -583,7 +614,7 @@ export const FLOW_STYLE =
   // `pointer-events:none` — the ring is nested in the row `<g data-reveal>`, so a click on the ring band routes to the row.
   `.flow-row.current,.flow-row.diverter,.flow-row.failed-criterion,.flow-row.failed-criterion-preempt{outline:none}` +
   `.flow-ring{display:none}` +
-  `.flow-ring>rect{fill:none;stroke:var(--vscode-focusBorder,#3794ff);stroke-width:2.5;stroke-dasharray:none}` +
+  `.flow-ring>rect{fill:none;stroke:${TOK_RING};stroke-width:2.5;stroke-dasharray:none}` +
   `.flow-leaf .flow-ring>rect{stroke-width:1.5}` +
   `.flow-row.current .flow-ring,.flow-row.flow-leaf-yes .flow-ring{display:inline}` +
   // #187 Todo 3b: when the ring is shown — HIDE a plain GREY SOLID border (`.flow-greyborder`): a faint grey line just
@@ -617,9 +648,9 @@ export const FLOW_STYLE =
   // per-node verdict (pass/fail/pending are DISJOINT — exactly one class per node), so these three never co-occur and need no
   // tiebreak among themselves. `.error-node` (a pass node whose case's RUN errored — the host filters error ⊆ pass) is
   // painted INSTEAD of `.review-pass` (error-over-pass), a subdued red wash distinct from the failed-criterion STROKE channel.
-  `.flow-row.review-pass>rect{fill:var(--vscode-testing-iconPassed,#73c991);fill-opacity:.2}` +
-  `.flow-row.review-fail>rect{fill:var(--vscode-testing-iconFailed,#f14c4c);fill-opacity:.2}` +
-  `.flow-row.review-pending>rect{fill:var(--vscode-charts-yellow,#d29922);fill-opacity:.16}` +
+  `.flow-row.review-pass>rect{fill:${TOK_VERDICT_PASS};fill-opacity:.2}` + // #218: shared TOK_* consts (legend swatches key on the same) → paint/legend can't drift
+  `.flow-row.review-fail>rect{fill:${TOK_VERDICT_FAIL};fill-opacity:.2}` +
+  `.flow-row.review-pending>rect{fill:${TOK_VERDICT_PENDING};fill-opacity:.16}` +
   `.flow-row.error-node>rect{fill:var(--vscode-testing-iconFailed,#f14c4c);fill-opacity:.22}` +
   // #210 ALL-PASS ✓ BADGE — a green circle + white check, HIDDEN until the host toggles `.leaf-allpass` (every route producing
   // this outcome is pass). Theme-aware WITHOUT a media query: solid green + white read on light AND dark. A thin separation
@@ -645,4 +676,18 @@ export const FLOW_STYLE =
   // #187 Todo 3: the per-case leaf verdict is now the on-path RING (above) — `markLeaves` toggles `.flow-leaf-yes` (TRUE
   // → ring) / `.flow-leaf-no` (false → NOTHING; `.flow-leaf-no` is a RESERVED no-op class, kept so a muted false marker is
   // a cheap re-add if the audit ever needs false≠unevaluated). The old green ✓ / grey ✗ tick glyphs are removed.
-  `.flow-row.flow-leaf-no{}`;
+  `.flow-row.flow-leaf-no{}` +
+  // #218: the MV color KEY (rendered into `#fcChrome` by `flowLegendChrome`, outside the SVG). Swatch tokens are the SHARED
+  // `TOK_*` consts — the SAME ones the paint rules above interpolate — so the key cannot drift from the paint. Verdict chips
+  // are a FILL at FULL opacity (the tree wash is `.2/.16` — invisible at 9px; the key decodes HUE, deliberately not alpha);
+  // inferred/ring chips are a BORDER (mirroring the tree's stroke). Muted via the LABEL `color` only (NOT parent `opacity`,
+  // which would fade the chips too). `fc-lg-gap` splits the row into 3 concept-groups: [Pass Fail Pending] · [Inferred] · [Selected path].
+  `.fc-legend{display:inline-flex;flex-wrap:wrap;align-items:center;gap:2px 6px;margin-left:8px;font-size:.9em;color:var(--vscode-descriptionForeground,#8c8c8c)}` +
+  `.fc-legend .fc-lg{display:inline-flex;align-items:center}` +
+  `.fc-legend .fc-lg-gap{margin-left:8px}` +
+  `.fc-legend .fc-sw{display:inline-block;width:9px;height:9px;margin-right:3px;border-radius:2px;box-sizing:border-box}` +
+  `.fc-legend .fc-sw-pass{background:${TOK_VERDICT_PASS}}` +
+  `.fc-legend .fc-sw-fail{background:${TOK_VERDICT_FAIL}}` +
+  `.fc-legend .fc-sw-pending{background:${TOK_VERDICT_PENDING}}` +
+  `.fc-legend .fc-sw-inferred{border:1.5px solid ${TOK_INFERRED}}` +
+  `.fc-legend .fc-sw-ring{border:1.5px solid ${TOK_RING};border-radius:9px}`;

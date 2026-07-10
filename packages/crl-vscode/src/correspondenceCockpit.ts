@@ -74,7 +74,7 @@ import {
   type ReviewState,
 } from "./medicalValidationStore";
 import { renderCrlPane } from "./crlPaneHtml";
-import { collectDispositionLeafKeys, FLOW_STYLE, renderFlowPane } from "./flowPaneHtml";
+import { collectDispositionLeafKeys, FLOW_STYLE, flowLegendChrome, renderFlowPane } from "./flowPaneHtml";
 import { QUESTIONNAIRE_STYLE, renderQuestionnairePane, shouldRerenderQuestionnaire, nextQuestionIndex } from "./questionnairePaneHtml";
 import { buildQuestionnaire, collectProducedActions, producedPathDiverterIds, type Questionnaire } from "./questionnaireModel";
 import type { ConceptValueType, ResolveValueTypes, ResolveConceptShape, ResolveDefExpr } from "./questionnaireModel";
@@ -761,7 +761,9 @@ export function registerCorrespondenceCockpit(context: vscode.ExtensionContext):
       banner =
         `<div class="fc-gaps"><div class="fc-gaps-head">Couldn't locate the CRL row for:</div>${rows}</div>`;
     }
-    return progress + toggle + diverterToggle + banner;
+    // #218: the color KEY sits AFTER the banner so a transient ⚠ gap alert stays adjacent to the toggles. MV-only (the
+    // helper returns "" in cockpit mode — verdict fills only paint in MV, and the operator scoped the legend to MV).
+    return progress + toggle + diverterToggle + banner + flowLegendChrome(mode);
   }
 
   /** Push the current tree-pane chrome (toggle + gap banner) to the tree webview, if open. Does NOT re-render the

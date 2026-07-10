@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
-const { renderFlowPane, FLOW_STYLE, wrapLabel, collectDispositionLeafKeys } = await load("flowPaneHtml.ts");
+const { renderFlowPane, FLOW_STYLE, flowLegendChrome, wrapLabel, collectDispositionLeafKeys } = await load("flowPaneHtml.ts");
 
 let pass = 0;
 const check = (label, fn) => {
@@ -540,7 +540,9 @@ check("Todo 2 / #210: FLOW_STYLE — decision grey, NO certify/not-certify rules
   assert.ok(!/flow-peek/.test(FLOW_STYLE), "no peek-dot CSS");
   assert.ok(!/flow-nonsource/.test(FLOW_STYLE), "no non-source FILL CSS (border carries the signal now)");
   assert.ok(!/textLink-foreground/.test(FLOW_STYLE), "use-decision is no longer blue (textLink)");
-  assert.equal((FLOW_STYLE.match(/focusBorder/g) || []).length, 1, "focusBorder (blue) appears ONLY in the on-path .current ring");
+  // #218: blue (focusBorder) is reserved for the ring AND the legend swatch that DECODES the ring (.fc-sw-ring) — nowhere else.
+  assert.equal((FLOW_STYLE.match(/focusBorder/g) || []).length, 2, "focusBorder (blue) appears ONLY in the on-path ring + its legend swatch");
+  assert.match(FLOW_STYLE, /\.fc-sw-ring\{border:[^}]*var\(--vscode-focusBorder/, "the legend ring swatch uses the SAME focusBorder token as the ring");
 });
 
 check("#210 flowchart shape: the decision ROOT (start) + a recommend LEAF (end) are STADIUMS (rx=NODE_H/2); when/use-decision are rects (rx=6)", () => {
@@ -661,6 +663,34 @@ check("#208 render: a long label emits two <tspan>s in a NODE_H=44 box; a short 
   // every structure box is NODE_H=44 and its on-path ring rect is 44+2*2.5=49 tall (box height + 2*off).
   assert.ok(rr.html.includes('height="44"'), "structure boxes are NODE_H=44");
   assert.ok(rr.html.includes('height="49"'), "the on-path ring rect = box height + 2*off (44 + 5)");
+});
+
+// ── #218 the MV flow-pane color KEY (flowLegendChrome + shared-const drift-proofing) ──
+check("#218 legend: MV mode renders exactly the operator's 3 concepts (verdict Pass/Fail/Pending, Inferred, Selected path); cockpit → empty", () => {
+  const mv = flowLegendChrome("medical-validation");
+  assert.equal(flowLegendChrome("cockpit"), "", "cockpit mode → no legend (MV-only, mirrors progress/diverterToggle gating)");
+  for (const [cls, label] of [["fc-sw-pass", "Pass"], ["fc-sw-fail", "Fail"], ["fc-sw-pending", "Pending"], ["fc-sw-inferred", "Inferred"], ["fc-sw-ring", "Selected path"]])
+    assert.ok(mv.includes(`class="fc-sw ${cls}" aria-hidden="true"></i>${label}`), `${label} chip present + swatch aria-hidden`);
+  assert.ok(!/grey|disposition|badge|✓|stadium|certify/i.test(mv), "no out-of-scope rows (operator scoped to exactly 3 concepts)");
+  // 3 visual concept-groups: the verdict chips are ungapped; Inferred + Selected-path carry fc-lg-gap.
+  assert.equal((mv.match(/fc-lg-gap/g) || []).length, 2, "Inferred + Selected-path start new groups → [Pass Fail Pending] · [Inferred] · [Selected path]");
+  assert.ok(/role="group" aria-label="Tree color key/.test(mv), "the legend is an aria-labelled group");
+});
+check("#218 legend: swatch tokens are the SAME shared consts as the paint — key can't drift from the tree (extracted-equality)", () => {
+  // extract the token out of BOTH the paint rule and the swatch rule; assert identical (hue lock — intentionally NOT alpha).
+  const tokenIn = (re) => { const m = FLOW_STYLE.match(re); return m && m[1]; };
+  const pairs = [
+    [/\.flow-row\.review-pass>rect\{fill:(var\(--[^)]*\))/, /\.fc-sw-pass\{background:(var\(--[^)]*\))\}/, "pass"],
+    [/\.flow-row\.review-fail>rect\{fill:(var\(--[^)]*\))/, /\.fc-sw-fail\{background:(var\(--[^)]*\))\}/, "fail"],
+    [/\.flow-row\.review-pending>rect\{fill:(var\(--[^)]*\))/, /\.fc-sw-pending\{background:(var\(--[^)]*\))\}/, "pending"],
+    [/\.flow-when\.flow-inferred>rect\{stroke:(var\(--[^)]*\))/, /\.fc-sw-inferred\{border:[^}]*solid (var\(--[^)]*\))\}/, "inferred"],
+    [/\.flow-ring>rect\{fill:none;stroke:(var\(--[^)]*\))/, /\.fc-sw-ring\{border:[^}]*solid (var\(--[^)]*\))/, "ring"],
+  ];
+  for (const [paintRe, swRe, name] of pairs) {
+    const paint = tokenIn(paintRe), sw = tokenIn(swRe);
+    assert.ok(paint, `${name}: paint token extracted`);
+    assert.equal(sw, paint, `${name}: legend swatch token EQUALS the paint token (shared TOK_* const — no drift)`);
+  }
 });
 
 console.log(`\nflowPaneHtml.test: ${pass} checks passed`);

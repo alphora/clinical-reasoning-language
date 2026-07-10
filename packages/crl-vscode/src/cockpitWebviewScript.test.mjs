@@ -354,6 +354,11 @@ check("disc 164: the diverter on/off toggle round-trips (webview [data-diverter-
   );
 });
 
+check("#218 legend: buildTreeChromeHtml appends flowLegendChrome(mode) AFTER the banner (MV-gating lives in the exported helper)", () => {
+  assert.ok(/return progress \+ toggle \+ diverterToggle \+ banner \+ flowLegendChrome\(mode\);/.test(COCKPIT_SRC), "chrome ends with the legend, after the ⚠ gap banner");
+  assert.ok(/import \{[^}]*flowLegendChrome[^}]*\} from "\.\/flowPaneHtml"/.test(COCKPIT_SRC), "flowLegendChrome imported from flowPaneHtml (co-located with FLOW_STYLE + the shared TOK_* consts)");
+});
+
 // ── #156 notes: the drawer control delegation + draft preserve/restore ──
 check("notes controls post their messages (toggle/close/add/editStart/editSave/editCancel/delete)", () => {
   assert.match(SCRIPT, /type:'notesToggle',key:/, "glyph → notesToggle{key}");
