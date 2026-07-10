@@ -690,4 +690,4 @@ export const FLOW_STYLE =
   `.fc-legend .fc-sw-fail{background:${TOK_VERDICT_FAIL}}` +
   `.fc-legend .fc-sw-pending{background:${TOK_VERDICT_PENDING}}` +
   `.fc-legend .fc-sw-inferred{border:1.5px solid ${TOK_INFERRED}}` +
-  `.fc-legend .fc-sw-ring{border:1.5px solid ${TOK_RING};border-radius:9px}`;
+  `.fc-legend .fc-sw-ring{border:1.5px solid ${TOK_RING}}`;
